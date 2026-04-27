@@ -124,6 +124,7 @@ func BuildResult(deps Deps) Result {
 		Method:      http.MethodGet,
 		Path:        "/health",
 		Summary:     "Health check",
+		Description: "Liveness probe for orchestration. Always returns 200 with a static {\"status\":\"ok\"} body, no auth, no database access.",
 	}, func(_ context.Context, _ *struct{}) (*healthOutput, error) {
 		out := &healthOutput{}
 		out.Body.Status = "ok"
@@ -160,6 +161,7 @@ func BuildResult(deps Deps) Result {
 		Method:      http.MethodGet,
 		Path:        "/auth/capabilities",
 		Summary:     "List available authentication methods",
+		Description: "Returns which login methods (password, OIDC providers, magic-link) the deployment has configured. Used by the login UI to render only enabled providers. Public, cacheable, no auth.",
 	}, authhandlers.Capabilities(authDeps))
 
 	// Avatar proxy — public (see note above the health endpoint).
@@ -168,6 +170,7 @@ func BuildResult(deps Deps) Result {
 		Method:      http.MethodGet,
 		Path:        "/avatars/{userId}",
 		Summary:     "Stream a user's avatar image",
+		Description: "Streams a user's avatar bytes from object storage with caching headers. Public so <img src> works without bearer tokens; the userId path is the only thing the caller needs to know.",
 	}, authhandlers.AvatarProxy(authDeps))
 
 	// Public auth endpoints (login / register) behind per-IP rate limiter.
@@ -185,60 +188,70 @@ func BuildResult(deps Deps) Result {
 			Method:      http.MethodPost,
 			Path:        "/auth/register",
 			Summary:     "Register a new local-password account",
+			Description: "Creates a new local user account from email + password. Refuses when registration is closed (RegistrationOpen=false) and validates against MinPasswordLength. On success issues an access token and sets the refresh cookie. Rate-limited.",
 		}, authhandlers.Register(authDeps))
 		huma.Register(subAPI, huma.Operation{
 			OperationID: "auth-login",
 			Method:      http.MethodPost,
 			Path:        "/auth/login",
 			Summary:     "Log in with email and password",
+			Description: "Authenticates a local-password user. When TOTP is enabled returns a step-up challenge instead of a session; otherwise issues an access token and sets the refresh cookie. Rate-limited per IP.",
 		}, authhandlers.Login(authDeps))
 		huma.Register(subAPI, huma.Operation{
 			OperationID: "auth-oidc-google-start",
 			Method:      http.MethodGet,
 			Path:        "/auth/oidc/google/start",
 			Summary:     "Start a Google OIDC login flow",
+			Description: "Generates a state nonce and 302-redirects the user to Google's OIDC authorization endpoint. Pairs with /auth/oidc/google/callback.",
 		}, authhandlers.OIDCGoogleStart(authDeps))
 		huma.Register(subAPI, huma.Operation{
 			OperationID: "auth-oidc-google-callback",
 			Method:      http.MethodGet,
 			Path:        "/auth/oidc/google/callback",
 			Summary:     "Complete a Google OIDC login flow",
+			Description: "Receives the authorization code from Google, exchanges it for ID tokens, upserts the user, and bounces back to the web app with a session cookie. Validates the state nonce minted by /start.",
 		}, authhandlers.OIDCGoogleCallback(authDeps))
 		huma.Register(subAPI, huma.Operation{
 			OperationID: "auth-oidc-github-start",
 			Method:      http.MethodGet,
 			Path:        "/auth/oidc/github/start",
 			Summary:     "Start a GitHub OAuth login flow",
+			Description: "Generates a state nonce and 302-redirects the user to GitHub's OAuth authorize endpoint. Pairs with /auth/oidc/github/callback.",
 		}, authhandlers.OIDCGithubStart(authDeps))
 		huma.Register(subAPI, huma.Operation{
 			OperationID: "auth-oidc-github-callback",
 			Method:      http.MethodGet,
 			Path:        "/auth/oidc/github/callback",
 			Summary:     "Complete a GitHub OAuth login flow",
+			Description: "Receives the authorization code from GitHub, exchanges it for an access token, upserts the user from the verified primary email, and bounces back to the web app with a session cookie.",
 		}, authhandlers.OIDCGithubCallback(authDeps))
 		huma.Register(subAPI, huma.Operation{
 			OperationID: "auth-oidc-microsoft-start",
 			Method:      http.MethodGet,
 			Path:        "/auth/oidc/microsoft/start",
 			Summary:     "Start a Microsoft OIDC login flow",
+			Description: "Generates a state nonce and 302-redirects the user to Microsoft's OIDC authorization endpoint. Pairs with /auth/oidc/microsoft/callback.",
 		}, authhandlers.OIDCMicrosoftStart(authDeps))
 		huma.Register(subAPI, huma.Operation{
 			OperationID: "auth-oidc-microsoft-callback",
 			Method:      http.MethodGet,
 			Path:        "/auth/oidc/microsoft/callback",
 			Summary:     "Complete a Microsoft OIDC login flow",
+			Description: "Receives the authorization code from Microsoft, exchanges it for ID tokens, upserts the user, and bounces back to the web app with a session cookie. Validates the state nonce minted by /start.",
 		}, authhandlers.OIDCMicrosoftCallback(authDeps))
 		huma.Register(subAPI, huma.Operation{
 			OperationID: "auth-magic-link-request",
 			Method:      http.MethodPost,
 			Path:        "/auth/magic-link/request",
 			Summary:     "Request a passwordless magic link",
+			Description: "Issues a single-use signed token by email so the recipient can log in without a password. Always returns 200 to avoid revealing whether the address is registered. Rate-limited per IP.",
 		}, authhandlers.MagicLinkRequest(authDeps))
 		huma.Register(subAPI, huma.Operation{
 			OperationID: "auth-magic-link-verify",
 			Method:      http.MethodGet,
 			Path:        "/auth/magic-link/verify",
 			Summary:     "Verify a magic link token and issue session",
+			Description: "Consumes the one-time token from /auth/magic-link/request, marks it spent, and issues an access token plus refresh cookie. Tokens expire quickly and can be redeemed only once.",
 		}, authhandlers.MagicLinkVerify(authDeps))
 	})
 
@@ -257,18 +270,21 @@ func BuildResult(deps Deps) Result {
 			Method:      http.MethodPost,
 			Path:        "/auth/refresh",
 			Summary:     "Rotate refresh token and issue a new access token",
+			Description: "Reads the refresh cookie, rotates it (old one is invalidated), and returns a fresh access token. Used by the web client and CLI to silently extend sessions without re-prompting for credentials.",
 		}, authhandlers.Refresh(authDeps))
 		huma.Register(subAPI, huma.Operation{
 			OperationID: "auth-logout",
 			Method:      http.MethodPost,
 			Path:        "/auth/logout",
 			Summary:     "Revoke a session",
+			Description: "Revokes the current session referenced by the refresh cookie and clears the cookie on the response. Idempotent: succeeds even if the cookie is missing or already invalid.",
 		}, authhandlers.Logout(authDeps))
 		huma.Register(subAPI, huma.Operation{
 			OperationID: "auth-login-totp",
 			Method:      http.MethodPost,
 			Path:        "/auth/login/totp",
 			Summary:     "Complete a TOTP step-up login",
+			Description: "Second leg of the TOTP-protected login: takes the challenge id returned by /auth/login plus a 6-digit TOTP code, and on success issues an access token and refresh cookie. Recovery codes are accepted in place of TOTP codes.",
 		}, authhandlers.LoginTotp(authDeps))
 	})
 
@@ -292,12 +308,14 @@ func BuildResult(deps Deps) Result {
 			Method:      http.MethodGet,
 			Path:        "/me",
 			Summary:     "Return the authenticated user's profile",
+			Description: "Returns the caller's profile (id, email, display name, locale, avatar URL, instance role) plus the list of workspaces they belong to. Used by both web apps to render the user shell.",
 		}, authhandlers.Me(authDeps))
 		huma.Register(subAPI, huma.Operation{
 			OperationID: "me-patch",
 			Method:      http.MethodPatch,
 			Path:        "/me",
 			Summary:     "Patch the authenticated user's profile",
+			Description: "Updates the caller's editable profile fields (display name, locale, timezone). Email changes go through a separate verified flow and are not allowed here.",
 		}, authhandlers.PatchMe(authDeps))
 
 		// Avatar upload / delete. The public GET counterpart is
@@ -307,12 +325,14 @@ func BuildResult(deps Deps) Result {
 			Method:      http.MethodPost,
 			Path:        "/me/avatar",
 			Summary:     "Upload a new avatar image for the authenticated user",
+			Description: "Accepts a multipart upload, validates the image type and size, stores it in object storage, and updates the caller's avatar reference. Returns AUTH.AVATAR.STORAGE_UNAVAILABLE when storage is not configured.",
 		}, authhandlers.AvatarUpload(authDeps))
 		huma.Register(subAPI, huma.Operation{
 			OperationID: "me-avatar-delete",
 			Method:      http.MethodDelete,
 			Path:        "/me/avatar",
 			Summary:     "Remove the authenticated user's avatar",
+			Description: "Deletes the caller's stored avatar object and clears the avatar reference on the user row. Idempotent: returns 200 even if no avatar was set.",
 		}, authhandlers.AvatarDelete(authDeps))
 
 		// Sessions
@@ -321,18 +341,21 @@ func BuildResult(deps Deps) Result {
 			Method:      http.MethodGet,
 			Path:        "/me/sessions",
 			Summary:     "List the authenticated user's active sessions",
+			Description: "Lists every active session belonging to the caller (device label, IP, user agent, last seen) so the security UI can show signed-in devices and offer revocation.",
 		}, authhandlers.ListSessions(authDeps))
 		huma.Register(subAPI, huma.Operation{
 			OperationID: "me-sessions-revoke",
 			Method:      http.MethodDelete,
 			Path:        "/me/sessions/{sessionId}",
 			Summary:     "Revoke a single session",
+			Description: "Revokes the named session belonging to the caller. The next refresh attempt with that session will fail; access tokens already issued continue to work until they expire.",
 		}, authhandlers.RevokeOneSession(authDeps))
 		huma.Register(subAPI, huma.Operation{
 			OperationID: "me-sessions-revoke-others",
 			Method:      http.MethodDelete,
 			Path:        "/me/sessions",
 			Summary:     "Revoke every session except the current one",
+			Description: "Bulk-revokes every session belonging to the caller except the one carrying the current refresh cookie. Used by 'sign out everywhere else' UI.",
 		}, authhandlers.RevokeAllOtherSessions(authDeps))
 
 		// Password
@@ -341,6 +364,7 @@ func BuildResult(deps Deps) Result {
 			Method:      http.MethodPost,
 			Path:        "/me/password",
 			Summary:     "Change the authenticated user's password",
+			Description: "Requires the current password to match before storing a new bcrypt hash. The new password is validated against MinPasswordLength. Does not revoke other sessions automatically.",
 		}, authhandlers.ChangePassword(authDeps))
 
 		// TOTP
@@ -349,36 +373,42 @@ func BuildResult(deps Deps) Result {
 			Method:      http.MethodGet,
 			Path:        "/me/totp",
 			Summary:     "Return TOTP 2FA status",
+			Description: "Reports whether TOTP is enrolled and confirmed for the caller, plus the count of remaining recovery codes. Used by the security panel to show enrollment state.",
 		}, authhandlers.TotpStatus(authDeps))
 		huma.Register(subAPI, huma.Operation{
 			OperationID: "me-totp-enroll",
 			Method:      http.MethodPost,
 			Path:        "/me/totp/enroll",
 			Summary:     "Begin TOTP 2FA enrollment",
+			Description: "Generates a fresh TOTP secret and otpauth:// provisioning URL for the caller to scan. The secret is stored as pending until /me/totp/confirm validates a code.",
 		}, authhandlers.TotpEnroll(authDeps))
 		huma.Register(subAPI, huma.Operation{
 			OperationID: "me-totp-confirm",
 			Method:      http.MethodPost,
 			Path:        "/me/totp/confirm",
 			Summary:     "Confirm TOTP 2FA enrollment",
+			Description: "Validates a 6-digit code against the pending secret from /me/totp/enroll. On success activates TOTP for the caller and returns a fresh batch of recovery codes (shown once).",
 		}, authhandlers.TotpConfirm(authDeps))
 		huma.Register(subAPI, huma.Operation{
 			OperationID: "me-totp-disable",
 			Method:      http.MethodDelete,
 			Path:        "/me/totp",
 			Summary:     "Disable TOTP 2FA",
+			Description: "Removes the TOTP secret and recovery codes for the caller. Requires a valid current TOTP code (or recovery code) to authorize the change.",
 		}, authhandlers.TotpDisable(authDeps))
 		huma.Register(subAPI, huma.Operation{
 			OperationID: "me-totp-recovery-status",
 			Method:      http.MethodGet,
 			Path:        "/me/totp/recovery-codes",
 			Summary:     "Return remaining recovery code count",
+			Description: "Reports how many unused recovery codes the caller has left. Does not return the codes themselves; those are only shown at generation time.",
 		}, authhandlers.TotpRecoveryCodesStatus(authDeps))
 		huma.Register(subAPI, huma.Operation{
 			OperationID: "me-totp-recovery-regenerate",
 			Method:      http.MethodPost,
 			Path:        "/me/totp/recovery-codes",
 			Summary:     "Regenerate TOTP recovery codes",
+			Description: "Replaces the caller's recovery code batch with a fresh set, invalidating any unused old codes. Returns the new codes (shown once) and requires a valid TOTP code.",
 		}, authhandlers.TotpRegenerateRecoveryCodes(authDeps))
 	})
 
@@ -419,18 +449,21 @@ func BuildResult(deps Deps) Result {
 			Method:      http.MethodPost,
 			Path:        "/workspaces",
 			Summary:     "Create a workspace",
+			Description: "Creates a new workspace owned by the caller. The caller is added as the first owner-role member. Used during onboarding and from the workspace-switcher 'New workspace' action.",
 		}, wshandlers.Create(wsDeps))
 		huma.Register(subAPI, huma.Operation{
 			OperationID: "workspaces-list",
 			Method:      http.MethodGet,
 			Path:        "/workspaces",
 			Summary:     "List workspaces for the authenticated user",
+			Description: "Lists every workspace the caller belongs to with their role. Used by the workspace switcher and during the post-login bootstrap to choose a default workspace.",
 		}, wshandlers.List(wsDeps))
 		huma.Register(subAPI, huma.Operation{
 			OperationID: "invites-accept",
 			Method:      http.MethodPost,
 			Path:        "/invites/{token}/accept",
 			Summary:     "Accept a workspace invite",
+			Description: "Consumes a workspace invite token: adds the caller as a member with the role declared on the invite and marks the invite redeemed. The caller must already have an authenticated account.",
 		}, wshandlers.AcceptInvite(inviteDeps))
 	})
 
@@ -444,18 +477,21 @@ func BuildResult(deps Deps) Result {
 			Method:      http.MethodGet,
 			Path:        "/workspaces/{wsId}",
 			Summary:     "Get workspace details",
+			Description: "Returns the workspace metadata (name, slug, plan, settings) along with the caller's role in it. Requires workspace membership.",
 		}, wshandlers.Get(wsDeps))
 		huma.Register(subAPI, huma.Operation{
 			OperationID: "workspaces-members-list",
 			Method:      http.MethodGet,
 			Path:        "/workspaces/{wsId}/members",
 			Summary:     "List workspace members",
+			Description: "Lists every active member of the workspace with their role and join time. Used by the admin members panel; requires workspace membership.",
 		}, wshandlers.ListMembers(wsDeps))
 		huma.Register(subAPI, huma.Operation{
 			OperationID: "workspaces-users-list",
 			Method:      http.MethodGet,
 			Path:        "/workspaces/{wsId}/users",
 			Summary:     "List workspace users (actor picker)",
+			Description: "Lightweight listing of workspace members for actor / assignee pickers. Returns only id, display name, and avatar URL — no role or session info — and is the source of truth for in-product mention pickers.",
 		}, wshandlers.ListUsers(wsDeps))
 	})
 
@@ -470,42 +506,49 @@ func BuildResult(deps Deps) Result {
 			Method:      http.MethodPatch,
 			Path:        "/workspaces/{wsId}",
 			Summary:     "Update workspace details",
+			Description: "Updates editable workspace fields (name, slug, settings). Requires workspace admin role; owner-only fields go through dedicated endpoints.",
 		}, wshandlers.Patch(wsDeps))
 		huma.Register(subAPI, huma.Operation{
 			OperationID: "workspaces-members-add",
 			Method:      http.MethodPost,
 			Path:        "/workspaces/{wsId}/members",
 			Summary:     "Add a member to a workspace",
+			Description: "Sends a workspace invite to the supplied email at the requested role. The recipient gets a link they redeem via /invites/{token}/accept. Requires workspace admin role.",
 		}, wshandlers.InviteMember(wsDeps))
 		huma.Register(subAPI, huma.Operation{
 			OperationID: "workspaces-members-update-role",
 			Method:      http.MethodPatch,
 			Path:        "/workspaces/{wsId}/members/{userId}",
 			Summary:     "Update a member's role",
+			Description: "Changes a member's role within the workspace. Promoting to owner or demoting the last owner is rejected to keep at least one owner present.",
 		}, wshandlers.UpdateMemberRole(wsDeps))
 		huma.Register(subAPI, huma.Operation{
 			OperationID: "workspaces-members-remove",
 			Method:      http.MethodDelete,
 			Path:        "/workspaces/{wsId}/members/{userId}",
 			Summary:     "Remove a member from a workspace",
+			Description: "Removes the named user from the workspace. Removing the last owner is rejected. Outstanding sessions for the removed user keep working until their access tokens expire; refresh inside this workspace will fail.",
 		}, wshandlers.RemoveMember(wsDeps))
 		huma.Register(subAPI, huma.Operation{
 			OperationID: "workspaces-invites-create",
 			Method:      http.MethodPost,
 			Path:        "/workspaces/{wsId}/invites",
 			Summary:     "Create an invite link",
+			Description: "Issues a shareable invite link with the requested role and expiry. The link is the only artifact returned that contains the token; subsequent listings return only metadata.",
 		}, wshandlers.CreateInvite(inviteDeps))
 		huma.Register(subAPI, huma.Operation{
 			OperationID: "workspaces-invites-list",
 			Method:      http.MethodGet,
 			Path:        "/workspaces/{wsId}/invites",
 			Summary:     "List invite links",
+			Description: "Lists outstanding invite links for the workspace (id, role, expiry, redemption count) so admins can revoke or audit. Tokens are never returned.",
 		}, wshandlers.ListInvites(inviteDeps))
 		huma.Register(subAPI, huma.Operation{
 			OperationID: "workspaces-invites-revoke",
 			Method:      http.MethodDelete,
 			Path:        "/workspaces/{wsId}/invites/{inviteId}",
 			Summary:     "Revoke an invite link",
+			Description: "Marks an invite token as revoked so future redemption attempts fail with INVITE.REVOKED. Already-redeemed memberships are unaffected.",
 		}, wshandlers.RevokeInvite(inviteDeps))
 	})
 
@@ -520,6 +563,7 @@ func BuildResult(deps Deps) Result {
 			Method:      http.MethodDelete,
 			Path:        "/workspaces/{wsId}",
 			Summary:     "Disable a workspace",
+			Description: "Soft-disables the workspace: members lose access to its data and the workspace stops appearing in switcher listings. Owner role required. Hard deletion is performed by instance admins through a separate flow.",
 		}, wshandlers.Disable(wsDeps))
 	})
 
@@ -538,6 +582,7 @@ func BuildResult(deps Deps) Result {
 			Method:      http.MethodGet,
 			Path:        "/invites/{token}/info",
 			Summary:     "Preview invite details (public)",
+			Description: "Returns workspace name, inviter display name, and role for an invite token so the accept page can render context before the user signs in. Public, rate-limited; never reveals member emails or token-derived secrets.",
 		}, wshandlers.InviteInfo(inviteDeps))
 	})
 
@@ -558,6 +603,7 @@ func BuildResult(deps Deps) Result {
 		Method:      http.MethodGet,
 		Path:        "/oauth/callback/{provider}",
 		Summary:     "Complete a personal OAuth integration flow",
+		Description: "Receives the provider's authorization code, exchanges it for tokens, encrypts and persists them on the user's user_integrations row, and 302-redirects back to WebBaseURL. Public because the user arrives via redirect from the third-party.",
 	}, inthandlers.Callback(integrationsDeps))
 
 	// /me/integrations (auth-protected).
@@ -569,18 +615,21 @@ func BuildResult(deps Deps) Result {
 			Method:      http.MethodGet,
 			Path:        "/me/integrations",
 			Summary:     "List the authenticated user's personal OAuth integrations",
+			Description: "Lists each personal OAuth integration the caller has connected (provider, account label, expiry). Encrypted tokens are never returned. Used by the integrations panel.",
 		}, inthandlers.List(integrationsDeps))
 		huma.Register(subAPI, huma.Operation{
 			OperationID: "me-integrations-connect",
 			Method:      http.MethodPost,
 			Path:        "/me/integrations/{provider}/connect",
 			Summary:     "Start a personal OAuth connect flow",
+			Description: "Generates a state nonce and returns the provider's authorization URL the client should redirect to. The flow finishes at /oauth/callback/{provider}. Returns INTEGRATION.OAUTH.PROVIDER_NOT_CONFIGURED when the provider is not registered.",
 		}, inthandlers.Connect(integrationsDeps))
 		huma.Register(subAPI, huma.Operation{
 			OperationID: "me-integrations-disconnect",
 			Method:      http.MethodDelete,
 			Path:        "/me/integrations/{id}",
 			Summary:     "Disconnect a personal OAuth integration",
+			Description: "Removes the named user_integrations row and best-effort revokes the provider token. Idempotent: returns 200 even if the integration was already removed.",
 		}, inthandlers.Disconnect(integrationsDeps))
 	})
 

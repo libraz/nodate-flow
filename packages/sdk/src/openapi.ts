@@ -11,7 +11,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List instance audit logs */
+        /**
+         * List instance audit logs
+         * @description List instance audit logs
+         */
         get: operations["admin-list-audit-logs"];
         put?: never;
         post?: never;
@@ -28,10 +31,16 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List instance administrators */
+        /**
+         * List instance administrators
+         * @description List instance administrators
+         */
         get: operations["admin-list-admins"];
         put?: never;
-        /** Grant instance admin privileges */
+        /**
+         * Grant instance admin privileges
+         * @description Grant instance admin privileges
+         */
         post: operations["admin-grant-admin"];
         delete?: never;
         options?: never;
@@ -49,7 +58,10 @@ export interface paths {
         get?: never;
         put?: never;
         post?: never;
-        /** Revoke instance admin privileges */
+        /**
+         * Revoke instance admin privileges
+         * @description Revoke instance admin privileges
+         */
         delete: operations["admin-revoke-admin"];
         options?: never;
         head?: never;
@@ -63,7 +75,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Get instance-level statistics */
+        /**
+         * Get instance-level statistics
+         * @description Get instance-level statistics
+         */
         get: operations["admin-instance-stats"];
         put?: never;
         post?: never;
@@ -83,7 +98,10 @@ export interface paths {
         get?: never;
         put?: never;
         post?: never;
-        /** Revoke a session */
+        /**
+         * Revoke a session
+         * @description Revoke a session
+         */
         delete: operations["admin-revoke-session"];
         options?: never;
         head?: never;
@@ -97,14 +115,20 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List instance settings */
+        /**
+         * List instance settings
+         * @description List instance settings
+         */
         get: operations["admin-list-settings"];
         put?: never;
         post?: never;
         delete?: never;
         options?: never;
         head?: never;
-        /** Update instance settings */
+        /**
+         * Update instance settings
+         * @description Update instance settings
+         */
         patch: operations["admin-patch-settings"];
         trace?: never;
     };
@@ -117,7 +141,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Bootstrap the first instance admin */
+        /**
+         * Bootstrap the first instance admin
+         * @description Bootstrap the first instance admin
+         */
         post: operations["admin-setup"];
         delete?: never;
         options?: never;
@@ -132,7 +159,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List all users */
+        /**
+         * List all users
+         * @description List all users
+         */
         get: operations["admin-list-users"];
         put?: never;
         post?: never;
@@ -149,14 +179,20 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Get user details */
+        /**
+         * Get user details
+         * @description Get user details
+         */
         get: operations["admin-get-user"];
         put?: never;
         post?: never;
         delete?: never;
         options?: never;
         head?: never;
-        /** Update user (suspend/enable) */
+        /**
+         * Update user (suspend/enable)
+         * @description Update user (suspend/enable)
+         */
         patch: operations["admin-patch-user"];
         trace?: never;
     };
@@ -167,7 +203,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List sessions for a user */
+        /**
+         * List sessions for a user
+         * @description List sessions for a user
+         */
         get: operations["admin-list-user-sessions"];
         put?: never;
         post?: never;
@@ -184,7 +223,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List all workspaces */
+        /**
+         * List all workspaces
+         * @description List all workspaces
+         */
         get: operations["admin-list-workspaces"];
         put?: never;
         post?: never;
@@ -201,14 +243,20 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Get workspace details */
+        /**
+         * Get workspace details
+         * @description Get workspace details
+         */
         get: operations["admin-get-workspace"];
         put?: never;
         post?: never;
         delete?: never;
         options?: never;
         head?: never;
-        /** Update workspace (suspend/enable) */
+        /**
+         * Update workspace (suspend/enable)
+         * @description Update workspace (suspend/enable)
+         */
         patch: operations["admin-patch-workspace"];
         trace?: never;
     };
@@ -219,7 +267,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List available authentication methods */
+        /**
+         * List available authentication methods
+         * @description List available authentication methods
+         */
         get: operations["auth-capabilities"];
         put?: never;
         post?: never;
@@ -238,7 +289,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Log in with email and password */
+        /**
+         * Log in with email and password
+         * @description Log in with email and password
+         */
         post: operations["auth-login"];
         delete?: never;
         options?: never;
@@ -255,7 +309,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Complete a TOTP step-up login */
+        /**
+         * Complete a TOTP step-up login
+         * @description Complete a TOTP step-up login
+         */
         post: operations["auth-login-totp"];
         delete?: never;
         options?: never;
@@ -272,7 +329,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Revoke a session */
+        /**
+         * Revoke a session
+         * @description Revoke a session
+         */
         post: operations["auth-logout"];
         delete?: never;
         options?: never;
@@ -289,7 +349,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Request a passwordless magic link */
+        /**
+         * Request a passwordless magic link
+         * @description Request a passwordless magic link
+         */
         post: operations["auth-magic-link-request"];
         delete?: never;
         options?: never;
@@ -304,7 +367,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Verify a magic link token and issue session */
+        /**
+         * Verify a magic link token and issue session
+         * @description Verify a magic link token and issue session
+         */
         get: operations["auth-magic-link-verify"];
         put?: never;
         post?: never;
@@ -321,7 +387,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Complete a GitHub OAuth login flow */
+        /**
+         * Complete a GitHub OAuth login flow
+         * @description Complete a GitHub OAuth login flow
+         */
         get: operations["auth-oidc-github-callback"];
         put?: never;
         post?: never;
@@ -338,7 +407,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Start a GitHub OAuth login flow */
+        /**
+         * Start a GitHub OAuth login flow
+         * @description Start a GitHub OAuth login flow
+         */
         get: operations["auth-oidc-github-start"];
         put?: never;
         post?: never;
@@ -355,7 +427,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Complete a Google OIDC login flow */
+        /**
+         * Complete a Google OIDC login flow
+         * @description Complete a Google OIDC login flow
+         */
         get: operations["auth-oidc-google-callback"];
         put?: never;
         post?: never;
@@ -372,7 +447,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Start a Google OIDC login flow */
+        /**
+         * Start a Google OIDC login flow
+         * @description Start a Google OIDC login flow
+         */
         get: operations["auth-oidc-google-start"];
         put?: never;
         post?: never;
@@ -389,7 +467,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Complete a Microsoft OIDC login flow */
+        /**
+         * Complete a Microsoft OIDC login flow
+         * @description Complete a Microsoft OIDC login flow
+         */
         get: operations["auth-oidc-microsoft-callback"];
         put?: never;
         post?: never;
@@ -406,7 +487,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Start a Microsoft OIDC login flow */
+        /**
+         * Start a Microsoft OIDC login flow
+         * @description Start a Microsoft OIDC login flow
+         */
         get: operations["auth-oidc-microsoft-start"];
         put?: never;
         post?: never;
@@ -425,7 +509,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Rotate refresh token and issue a new access token */
+        /**
+         * Rotate refresh token and issue a new access token
+         * @description Rotate refresh token and issue a new access token
+         */
         post: operations["auth-refresh"];
         delete?: never;
         options?: never;
@@ -442,7 +529,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Register a new local-password account */
+        /**
+         * Register a new local-password account
+         * @description Register a new local-password account
+         */
         post: operations["auth-register"];
         delete?: never;
         options?: never;
@@ -457,7 +547,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Stream a user's avatar image */
+        /**
+         * Stream a user's avatar image
+         * @description Stream a user's avatar image
+         */
         get: operations["me-avatar-proxy"];
         put?: never;
         post?: never;
@@ -474,7 +567,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Health check */
+        /**
+         * Health check
+         * @description Health check
+         */
         get: operations["health"];
         put?: never;
         post?: never;
@@ -491,7 +587,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List inbox items for the caller */
+        /**
+         * List inbox items for the caller
+         * @description List inbox items for the caller
+         */
         get: operations["inbox-list"];
         put?: never;
         post?: never;
@@ -510,7 +609,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Archive an inbox item */
+        /**
+         * Archive an inbox item
+         * @description Archive an inbox item
+         */
         post: operations["inbox-archive"];
         delete?: never;
         options?: never;
@@ -527,7 +629,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Snooze an inbox item */
+        /**
+         * Snooze an inbox item
+         * @description Snooze an inbox item
+         */
         post: operations["inbox-snooze"];
         delete?: never;
         options?: never;
@@ -544,7 +649,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Accept a workspace invite */
+        /**
+         * Accept a workspace invite
+         * @description Accept a workspace invite
+         */
         post: operations["invites-accept"];
         delete?: never;
         options?: never;
@@ -559,7 +667,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Preview invite details (public) */
+        /**
+         * Preview invite details (public)
+         * @description Preview invite details (public)
+         */
         get: operations["invites-info"];
         put?: never;
         post?: never;
@@ -576,14 +687,20 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Return the authenticated user's profile */
+        /**
+         * Return the authenticated user's profile
+         * @description Return the authenticated user's profile
+         */
         get: operations["me"];
         put?: never;
         post?: never;
         delete?: never;
         options?: never;
         head?: never;
-        /** Patch the authenticated user's profile */
+        /**
+         * Patch the authenticated user's profile
+         * @description Patch the authenticated user's profile
+         */
         patch: operations["me-patch"];
         trace?: never;
     };
@@ -596,9 +713,15 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Upload a new avatar image for the authenticated user */
+        /**
+         * Upload a new avatar image for the authenticated user
+         * @description Upload a new avatar image for the authenticated user
+         */
         post: operations["me-avatar-upload"];
-        /** Remove the authenticated user's avatar */
+        /**
+         * Remove the authenticated user's avatar
+         * @description Remove the authenticated user's avatar
+         */
         delete: operations["me-avatar-delete"];
         options?: never;
         head?: never;
@@ -612,7 +735,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List events across every workspace the caller belongs to */
+        /**
+         * List events across every workspace the caller belongs to
+         * @description List events across every workspace the caller belongs to
+         */
         get: operations["me-calendar-events-list"];
         put?: never;
         post?: never;
@@ -629,10 +755,16 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List the caller's favorites */
+        /**
+         * List the caller's favorites
+         * @description List the caller's favorites
+         */
         get: operations["favorites-list"];
         put?: never;
-        /** Add an item to favorites */
+        /**
+         * Add an item to favorites
+         * @description Add an item to favorites
+         */
         post: operations["favorites-create"];
         delete?: never;
         options?: never;
@@ -650,7 +782,10 @@ export interface paths {
         get?: never;
         put?: never;
         post?: never;
-        /** Remove an item from favorites */
+        /**
+         * Remove an item from favorites
+         * @description Remove an item from favorites
+         */
         delete: operations["favorites-delete"];
         options?: never;
         head?: never;
@@ -664,7 +799,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List the authenticated user's personal OAuth integrations */
+        /**
+         * List the authenticated user's personal OAuth integrations
+         * @description List the authenticated user's personal OAuth integrations
+         */
         get: operations["me-integrations-list"];
         put?: never;
         post?: never;
@@ -684,7 +822,10 @@ export interface paths {
         get?: never;
         put?: never;
         post?: never;
-        /** Disconnect a personal OAuth integration */
+        /**
+         * Disconnect a personal OAuth integration
+         * @description Disconnect a personal OAuth integration
+         */
         delete: operations["me-integrations-disconnect"];
         options?: never;
         head?: never;
@@ -700,7 +841,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Start a personal OAuth connect flow */
+        /**
+         * Start a personal OAuth connect flow
+         * @description Start a personal OAuth connect flow
+         */
         post: operations["me-integrations-connect"];
         delete?: never;
         options?: never;
@@ -715,7 +859,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List pending event invites addressed to the caller */
+        /**
+         * List pending event invites addressed to the caller
+         * @description List pending event invites addressed to the caller
+         */
         get: operations["me-invites-list"];
         put?: never;
         post?: never;
@@ -732,7 +879,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List notifications for the caller */
+        /**
+         * List notifications for the caller
+         * @description List notifications for the caller
+         */
         get: operations["notifications-list"];
         put?: never;
         post?: never;
@@ -749,7 +899,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Count unread notifications for the caller */
+        /**
+         * Count unread notifications for the caller
+         * @description Count unread notifications for the caller
+         */
         get: operations["notifications-unread-count"];
         put?: never;
         post?: never;
@@ -768,7 +921,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Change the authenticated user's password */
+        /**
+         * Change the authenticated user's password
+         * @description Change the authenticated user's password
+         */
         post: operations["me-password-change"];
         delete?: never;
         options?: never;
@@ -783,11 +939,17 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List the authenticated user's active sessions */
+        /**
+         * List the authenticated user's active sessions
+         * @description List the authenticated user's active sessions
+         */
         get: operations["me-sessions-list"];
         put?: never;
         post?: never;
-        /** Revoke every session except the current one */
+        /**
+         * Revoke every session except the current one
+         * @description Revoke every session except the current one
+         */
         delete: operations["me-sessions-revoke-others"];
         options?: never;
         head?: never;
@@ -804,7 +966,10 @@ export interface paths {
         get?: never;
         put?: never;
         post?: never;
-        /** Revoke a single session */
+        /**
+         * Revoke a single session
+         * @description Revoke a single session
+         */
         delete: operations["me-sessions-revoke"];
         options?: never;
         head?: never;
@@ -818,7 +983,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List tasks assigned to the authenticated user across every workspace */
+        /**
+         * List tasks assigned to the authenticated user across every workspace
+         * @description List tasks assigned to the authenticated user across every workspace
+         */
         get: operations["me-tasks-list"];
         put?: never;
         post?: never;
@@ -835,7 +1003,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List tasks with due_on in range across every workspace */
+        /**
+         * List tasks with due_on in range across every workspace
+         * @description List tasks with due_on in range across every workspace
+         */
         get: operations["me-tasks-with-dates-list"];
         put?: never;
         post?: never;
@@ -852,11 +1023,17 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Return TOTP 2FA status */
+        /**
+         * Return TOTP 2FA status
+         * @description Return TOTP 2FA status
+         */
         get: operations["me-totp-status"];
         put?: never;
         post?: never;
-        /** Disable TOTP 2FA */
+        /**
+         * Disable TOTP 2FA
+         * @description Disable TOTP 2FA
+         */
         delete: operations["me-totp-disable"];
         options?: never;
         head?: never;
@@ -872,7 +1049,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Confirm TOTP 2FA enrollment */
+        /**
+         * Confirm TOTP 2FA enrollment
+         * @description Confirm TOTP 2FA enrollment
+         */
         post: operations["me-totp-confirm"];
         delete?: never;
         options?: never;
@@ -889,7 +1069,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Begin TOTP 2FA enrollment */
+        /**
+         * Begin TOTP 2FA enrollment
+         * @description Begin TOTP 2FA enrollment
+         */
         post: operations["me-totp-enroll"];
         delete?: never;
         options?: never;
@@ -904,10 +1087,16 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Return remaining recovery code count */
+        /**
+         * Return remaining recovery code count
+         * @description Return remaining recovery code count
+         */
         get: operations["me-totp-recovery-status"];
         put?: never;
-        /** Regenerate TOTP recovery codes */
+        /**
+         * Regenerate TOTP recovery codes
+         * @description Regenerate TOTP recovery codes
+         */
         post: operations["me-totp-recovery-regenerate"];
         delete?: never;
         options?: never;
@@ -924,7 +1113,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Archive a notification */
+        /**
+         * Archive a notification
+         * @description Archive a notification
+         */
         post: operations["notifications-archive"];
         delete?: never;
         options?: never;
@@ -941,7 +1133,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Mark a notification as read */
+        /**
+         * Mark a notification as read
+         * @description Mark a notification as read
+         */
         post: operations["notifications-mark-read"];
         delete?: never;
         options?: never;
@@ -956,7 +1151,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Complete a personal OAuth integration flow */
+        /**
+         * Complete a personal OAuth integration flow
+         * @description Complete a personal OAuth integration flow
+         */
         get: operations["oauth-integration-callback"];
         put?: never;
         post?: never;
@@ -973,15 +1171,24 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Fetch a project */
+        /**
+         * Fetch a project
+         * @description Fetch a project
+         */
         get: operations["projects-get"];
         put?: never;
         post?: never;
-        /** Soft-disable a project */
+        /**
+         * Soft-disable a project
+         * @description Soft-disable a project
+         */
         delete: operations["projects-disable"];
         options?: never;
         head?: never;
-        /** Patch a project */
+        /**
+         * Patch a project
+         * @description Patch a project
+         */
         patch: operations["projects-patch"];
         trace?: never;
     };
@@ -992,7 +1199,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List every task dependency edge within a project */
+        /**
+         * List every task dependency edge within a project
+         * @description List every task dependency edge within a project
+         */
         get: operations["projects-dependencies-list"];
         put?: never;
         post?: never;
@@ -1009,10 +1219,16 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List members of a project */
+        /**
+         * List members of a project
+         * @description List members of a project
+         */
         get: operations["projects-members-list"];
         put?: never;
-        /** Add a member to a project */
+        /**
+         * Add a member to a project
+         * @description Add a member to a project
+         */
         post: operations["projects-members-add"];
         delete?: never;
         options?: never;
@@ -1030,7 +1246,10 @@ export interface paths {
         get?: never;
         put?: never;
         post?: never;
-        /** Remove a member from a project */
+        /**
+         * Remove a member from a project
+         * @description Remove a member from a project
+         */
         delete: operations["projects-members-remove"];
         options?: never;
         head?: never;
@@ -1044,7 +1263,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List events in a project's timeline */
+        /**
+         * List events in a project's timeline
+         * @description List events in a project's timeline
+         */
         get: operations["projects-timeline-list"];
         put?: never;
         post?: never;
@@ -1063,7 +1285,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Accept a calendar event invite via magic-link token */
+        /**
+         * Accept a calendar event invite via magic-link token
+         * @description Accept a calendar event invite via magic-link token
+         */
         post: operations["event-invites-accept"];
         delete?: never;
         options?: never;
@@ -1078,7 +1303,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Fetch a publicly shared lens (no auth required) */
+        /**
+         * Fetch a publicly shared lens (no auth required)
+         * @description Fetch a publicly shared lens (no auth required)
+         */
         get: operations["lenses-get-public"];
         put?: never;
         post?: never;
@@ -1097,7 +1325,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Accept or dismiss a relation suggestion */
+        /**
+         * Accept or dismiss a relation suggestion
+         * @description Accept or dismiss a relation suggestion
+         */
         post: operations["relation-suggestions-resolve"];
         delete?: never;
         options?: never;
@@ -1112,7 +1343,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Render a public calendar share by URL token */
+        /**
+         * Render a public calendar share by URL token
+         * @description Render a public calendar share by URL token
+         */
         get: operations["public-shares-render"];
         put?: never;
         post?: never;
@@ -1131,7 +1365,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Manually inject a signal */
+        /**
+         * Manually inject a signal
+         * @description Manually inject a signal
+         */
         post: operations["signals-create"];
         delete?: never;
         options?: never;
@@ -1146,10 +1383,16 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List tasks for a project or workspace */
+        /**
+         * List tasks for a project or workspace
+         * @description List tasks for a project or workspace
+         */
         get: operations["tasks-list"];
         put?: never;
-        /** Create a task */
+        /**
+         * Create a task
+         * @description Create a task
+         */
         post: operations["tasks-create"];
         delete?: never;
         options?: never;
@@ -1166,7 +1409,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Bulk-update sort weights for tasks within a project */
+        /**
+         * Bulk-update sort weights for tasks within a project
+         * @description Bulk-update sort weights for tasks within a project
+         */
         post: operations["tasks-reorder"];
         delete?: never;
         options?: never;
@@ -1181,15 +1427,24 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Fetch a task */
+        /**
+         * Fetch a task
+         * @description Fetch a task
+         */
         get: operations["tasks-get"];
         put?: never;
         post?: never;
-        /** Soft-disable a task */
+        /**
+         * Soft-disable a task
+         * @description Soft-disable a task
+         */
         delete: operations["tasks-disable"];
         options?: never;
         head?: never;
-        /** Patch a task */
+        /**
+         * Patch a task
+         * @description Patch a task
+         */
         patch: operations["tasks-patch"];
         trace?: never;
     };
@@ -1200,10 +1455,16 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List actors on a task */
+        /**
+         * List actors on a task
+         * @description List actors on a task
+         */
         get: operations["tasks-actors-list"];
         put?: never;
-        /** Attach an actor to a task */
+        /**
+         * Attach an actor to a task
+         * @description Attach an actor to a task
+         */
         post: operations["tasks-actors-add"];
         delete?: never;
         options?: never;
@@ -1221,7 +1482,10 @@ export interface paths {
         get?: never;
         put?: never;
         post?: never;
-        /** Remove an actor from a task */
+        /**
+         * Remove an actor from a task
+         * @description Remove an actor from a task
+         */
         delete: operations["tasks-actors-remove"];
         options?: never;
         head?: never;
@@ -1235,10 +1499,16 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List AI agent actors on a task */
+        /**
+         * List AI agent actors on a task
+         * @description List AI agent actors on a task
+         */
         get: operations["tasks-agents-list"];
         put?: never;
-        /** Attach an AI agent to a task */
+        /**
+         * Attach an AI agent to a task
+         * @description Attach an AI agent to a task
+         */
         post: operations["tasks-agents-add"];
         delete?: never;
         options?: never;
@@ -1253,7 +1523,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List recent AI invocations scoped to this task */
+        /**
+         * List recent AI invocations scoped to this task
+         * @description List recent AI invocations scoped to this task
+         */
         get: operations["tasks-ai-invocations-list"];
         put?: never;
         post?: never;
@@ -1272,7 +1545,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Apply proposed steps as child tasks under a parent task */
+        /**
+         * Apply proposed steps as child tasks under a parent task
+         * @description Apply proposed steps as child tasks under a parent task
+         */
         post: operations["tasks-apply-steps"];
         delete?: never;
         options?: never;
@@ -1289,7 +1565,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Archive a task */
+        /**
+         * Archive a task
+         * @description Archive a task
+         */
         post: operations["tasks-archive"];
         delete?: never;
         options?: never;
@@ -1304,10 +1583,16 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List attachments on a task */
+        /**
+         * List attachments on a task
+         * @description List attachments on a task
+         */
         get: operations["tasks-attachments-list"];
         put?: never;
-        /** Register an attachment metadata row on a task */
+        /**
+         * Register an attachment metadata row on a task
+         * @description Register an attachment metadata row on a task
+         */
         post: operations["tasks-attachments-add"];
         delete?: never;
         options?: never;
@@ -1324,7 +1609,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Get a presigned PUT URL for uploading an attachment */
+        /**
+         * Get a presigned PUT URL for uploading an attachment
+         * @description Get a presigned PUT URL for uploading an attachment
+         */
         post: operations["tasks-attachments-presign"];
         delete?: never;
         options?: never;
@@ -1342,7 +1630,10 @@ export interface paths {
         get?: never;
         put?: never;
         post?: never;
-        /** Soft-delete an attachment from a task */
+        /**
+         * Soft-delete an attachment from a task
+         * @description Soft-delete an attachment from a task
+         */
         delete: operations["tasks-attachments-delete"];
         options?: never;
         head?: never;
@@ -1356,7 +1647,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Get a presigned GET URL for downloading an attachment */
+        /**
+         * Get a presigned GET URL for downloading an attachment
+         * @description Get a presigned GET URL for downloading an attachment
+         */
         get: operations["tasks-attachments-download"];
         put?: never;
         post?: never;
@@ -1373,10 +1667,16 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List comments on a task */
+        /**
+         * List comments on a task
+         * @description List comments on a task
+         */
         get: operations["tasks-comments-list"];
         put?: never;
-        /** Add a comment to a task */
+        /**
+         * Add a comment to a task
+         * @description Add a comment to a task
+         */
         post: operations["tasks-comments-add"];
         delete?: never;
         options?: never;
@@ -1394,11 +1694,17 @@ export interface paths {
         get?: never;
         put?: never;
         post?: never;
-        /** Delete a comment (author or workspace admin) */
+        /**
+         * Delete a comment (author or workspace admin)
+         * @description Delete a comment (author or workspace admin)
+         */
         delete: operations["tasks-comments-delete"];
         options?: never;
         head?: never;
-        /** Edit a comment (author only) */
+        /**
+         * Edit a comment (author only)
+         * @description Edit a comment (author only)
+         */
         patch: operations["tasks-comments-edit"];
         trace?: never;
     };
@@ -1411,7 +1717,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Attach a constraint to a task */
+        /**
+         * Attach a constraint to a task
+         * @description Attach a constraint to a task
+         */
         post: operations["tasks-constraints-add"];
         delete?: never;
         options?: never;
@@ -1428,7 +1737,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Compile a natural-language prompt into a constraint DSL expression */
+        /**
+         * Compile a natural-language prompt into a constraint DSL expression
+         * @description Compile a natural-language prompt into a constraint DSL expression
+         */
         post: operations["tasks-constraints-compile"];
         delete?: never;
         options?: never;
@@ -1445,7 +1757,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Run the constraint engine for a task and persist satisfied/failed markers */
+        /**
+         * Run the constraint engine for a task and persist satisfied/failed markers
+         * @description Run the constraint engine for a task and persist satisfied/failed markers
+         */
         post: operations["tasks-constraints-evaluate"];
         delete?: never;
         options?: never;
@@ -1462,7 +1777,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Explain a constraint DSL expression in human-readable form */
+        /**
+         * Explain a constraint DSL expression in human-readable form
+         * @description Explain a constraint DSL expression in human-readable form
+         */
         post: operations["tasks-constraints-explain"];
         delete?: never;
         options?: never;
@@ -1480,7 +1798,10 @@ export interface paths {
         get?: never;
         put?: never;
         post?: never;
-        /** Remove a constraint from a task */
+        /**
+         * Remove a constraint from a task
+         * @description Remove a constraint from a task
+         */
         delete: operations["tasks-constraints-remove"];
         options?: never;
         head?: never;
@@ -1494,10 +1815,16 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List incoming and outgoing dependency edges for a task */
+        /**
+         * List incoming and outgoing dependency edges for a task
+         * @description List incoming and outgoing dependency edges for a task
+         */
         get: operations["tasks-dependencies-list"];
         put?: never;
-        /** Add a dependency edge from a task */
+        /**
+         * Add a dependency edge from a task
+         * @description Add a dependency edge from a task
+         */
         post: operations["tasks-dependencies-add"];
         delete?: never;
         options?: never;
@@ -1515,7 +1842,10 @@ export interface paths {
         get?: never;
         put?: never;
         post?: never;
-        /** Remove a dependency edge */
+        /**
+         * Remove a dependency edge
+         * @description Remove a dependency edge
+         */
         delete: operations["tasks-dependencies-remove"];
         options?: never;
         head?: never;
@@ -1529,7 +1859,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List description version history for a task */
+        /**
+         * List description version history for a task
+         * @description List description version history for a task
+         */
         get: operations["tasks-description-history-list"];
         put?: never;
         post?: never;
@@ -1546,7 +1879,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Get a specific description version with full body */
+        /**
+         * Get a specific description version with full body
+         * @description Get a specific description version with full body
+         */
         get: operations["tasks-description-history-get"];
         put?: never;
         post?: never;
@@ -1565,7 +1901,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Restore a previous description version */
+        /**
+         * Restore a previous description version
+         * @description Restore a previous description version
+         */
         post: operations["tasks-description-history-restore"];
         delete?: never;
         options?: never;
@@ -1580,7 +1919,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List likely-duplicate tasks by embedding similarity */
+        /**
+         * List likely-duplicate tasks by embedding similarity
+         * @description List likely-duplicate tasks by embedding similarity
+         */
         get: operations["tasks-duplicates-list"];
         put?: never;
         post?: never;
@@ -1597,7 +1939,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Propose the next likely state transition for a task */
+        /**
+         * Propose the next likely state transition for a task
+         * @description Propose the next likely state transition for a task
+         */
         get: operations["tasks-infer-state"];
         put?: never;
         post?: never;
@@ -1614,10 +1959,16 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List labels on a task */
+        /**
+         * List labels on a task
+         * @description List labels on a task
+         */
         get: operations["tasks-labels-list"];
         put?: never;
-        /** Attach a label to a task */
+        /**
+         * Attach a label to a task
+         * @description Attach a label to a task
+         */
         post: operations["tasks-labels-add"];
         delete?: never;
         options?: never;
@@ -1635,7 +1986,10 @@ export interface paths {
         get?: never;
         put?: never;
         post?: never;
-        /** Remove a label from a task */
+        /**
+         * Remove a label from a task
+         * @description Remove a label from a task
+         */
         delete: operations["tasks-labels-remove"];
         options?: never;
         head?: never;
@@ -1649,7 +2003,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List calendar events a task is linked to via task_event_links */
+        /**
+         * List calendar events a task is linked to via task_event_links
+         * @description List calendar events a task is linked to via task_event_links
+         */
         get: operations["tasks-linked-events-list"];
         put?: never;
         post?: never;
@@ -1668,7 +2025,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Link a task to a calendar event (contributes_to / blocks / ...) */
+        /**
+         * Link a task to a calendar event (contributes_to / blocks / ...)
+         * @description Link a task to a calendar event (contributes_to / blocks / ...)
+         */
         post: operations["tasks-event-links-create"];
         delete?: never;
         options?: never;
@@ -1686,7 +2046,10 @@ export interface paths {
         get?: never;
         put?: never;
         post?: never;
-        /** Soft-disable a task↔event link */
+        /**
+         * Soft-disable a task↔event link
+         * @description Soft-disable a task↔event link
+         */
         delete: operations["tasks-event-links-remove"];
         options?: never;
         head?: never;
@@ -1702,7 +2065,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** AI-powered step decomposition for a task */
+        /**
+         * AI-powered step decomposition for a task
+         * @description AI-powered step decomposition for a task
+         */
         post: operations["tasks-propose-steps"];
         delete?: never;
         options?: never;
@@ -1717,10 +2083,16 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List reactions on a task */
+        /**
+         * List reactions on a task
+         * @description List reactions on a task
+         */
         get: operations["tasks-reactions-list"];
         put?: never;
-        /** Add a reaction to a task */
+        /**
+         * Add a reaction to a task
+         * @description Add a reaction to a task
+         */
         post: operations["tasks-reactions-create"];
         delete?: never;
         options?: never;
@@ -1738,7 +2110,10 @@ export interface paths {
         get?: never;
         put?: never;
         post?: never;
-        /** Remove a reaction from a task */
+        /**
+         * Remove a reaction from a task
+         * @description Remove a reaction from a task
+         */
         delete: operations["tasks-reactions-delete"];
         options?: never;
         head?: never;
@@ -1752,7 +2127,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List pending relation suggestions for a task */
+        /**
+         * List pending relation suggestions for a task
+         * @description List pending relation suggestions for a task
+         */
         get: operations["relation-suggestions-list-task"];
         put?: never;
         post?: never;
@@ -1769,7 +2147,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Replay transition events and report drift vs stored derived_state */
+        /**
+         * Replay transition events and report drift vs stored derived_state
+         * @description Replay transition events and report drift vs stored derived_state
+         */
         get: operations["tasks-replay"];
         put?: never;
         post?: never;
@@ -1786,7 +2167,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List events in a task's timeline */
+        /**
+         * List events in a task's timeline
+         * @description List events in a task's timeline
+         */
         get: operations["tasks-timeline-list"];
         put?: never;
         post?: never;
@@ -1805,7 +2189,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Apply a state machine transition to a task */
+        /**
+         * Apply a state machine transition to a task
+         * @description Apply a state machine transition to a task
+         */
         post: operations["tasks-transitions-apply"];
         delete?: never;
         options?: never;
@@ -1822,7 +2209,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Unarchive a task */
+        /**
+         * Unarchive a task
+         * @description Unarchive a task
+         */
         post: operations["tasks-unarchive"];
         delete?: never;
         options?: never;
@@ -1837,10 +2227,16 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List workspaces for the authenticated user */
+        /**
+         * List workspaces for the authenticated user
+         * @description List workspaces for the authenticated user
+         */
         get: operations["workspaces-list"];
         put?: never;
-        /** Create a workspace */
+        /**
+         * Create a workspace
+         * @description Create a workspace
+         */
         post: operations["workspaces-create"];
         delete?: never;
         options?: never;
@@ -1855,15 +2251,24 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Get workspace details */
+        /**
+         * Get workspace details
+         * @description Get workspace details
+         */
         get: operations["workspaces-get"];
         put?: never;
         post?: never;
-        /** Disable a workspace */
+        /**
+         * Disable a workspace
+         * @description Disable a workspace
+         */
         delete: operations["workspaces-disable"];
         options?: never;
         head?: never;
-        /** Update workspace details */
+        /**
+         * Update workspace details
+         * @description Update workspace details
+         */
         patch: operations["workspaces-patch"];
         trace?: never;
     };
@@ -1874,10 +2279,16 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List AI agents for a workspace */
+        /**
+         * List AI agents for a workspace
+         * @description List AI agents for a workspace
+         */
         get: operations["ai-agents-list"];
         put?: never;
-        /** Create a new AI agent */
+        /**
+         * Create a new AI agent
+         * @description Create a new AI agent
+         */
         post: operations["ai-agents-create"];
         delete?: never;
         options?: never;
@@ -1898,7 +2309,10 @@ export interface paths {
         delete?: never;
         options?: never;
         head?: never;
-        /** Replace an AI agent's event_trigger_types list */
+        /**
+         * Replace an AI agent's event_trigger_types list
+         * @description Replace an AI agent's event_trigger_types list
+         */
         patch: operations["ai-agent-event-triggers-update"];
         trace?: never;
     };
@@ -1911,7 +2325,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Toggle the kill switch on an AI agent */
+        /**
+         * Toggle the kill switch on an AI agent
+         * @description Toggle the kill switch on an AI agent
+         */
         post: operations["ai-agent-pause"];
         delete?: never;
         options?: never;
@@ -1932,7 +2349,10 @@ export interface paths {
         delete?: never;
         options?: never;
         head?: never;
-        /** Update an AI agent's schedule_kind trigger mode */
+        /**
+         * Update an AI agent's schedule_kind trigger mode
+         * @description Update an AI agent's schedule_kind trigger mode
+         */
         patch: operations["ai-agent-schedule-update"];
         trace?: never;
     };
@@ -1945,7 +2365,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Manually trigger one run of an AI agent */
+        /**
+         * Manually trigger one run of an AI agent
+         * @description Manually trigger one run of an AI agent
+         */
         post: operations["ai-agent-trigger"];
         delete?: never;
         options?: never;
@@ -1960,14 +2383,20 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List auto-action rules for a workspace */
+        /**
+         * List auto-action rules for a workspace
+         * @description List auto-action rules for a workspace
+         */
         get: operations["ai-auto-action-rules-list"];
         put?: never;
         post?: never;
         delete?: never;
         options?: never;
         head?: never;
-        /** Patch auto-action rules for a workspace */
+        /**
+         * Patch auto-action rules for a workspace
+         * @description Patch auto-action rules for a workspace
+         */
         patch: operations["ai-auto-action-rules-update"];
         trace?: never;
     };
@@ -1978,14 +2407,20 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Get auto-action executor settings for a workspace */
+        /**
+         * Get auto-action executor settings for a workspace
+         * @description Get auto-action executor settings for a workspace
+         */
         get: operations["ai-auto-action-settings-get"];
         put?: never;
         post?: never;
         delete?: never;
         options?: never;
         head?: never;
-        /** Patch auto-action executor settings for a workspace */
+        /**
+         * Patch auto-action executor settings for a workspace
+         * @description Patch auto-action executor settings for a workspace
+         */
         patch: operations["ai-auto-action-settings-update"];
         trace?: never;
     };
@@ -1996,7 +2431,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Workspace-wide deterministic auto-action proposals */
+        /**
+         * Workspace-wide deterministic auto-action proposals
+         * @description Workspace-wide deterministic auto-action proposals
+         */
         get: operations["ai-auto-actions"];
         put?: never;
         post?: never;
@@ -2015,7 +2453,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Compile natural-language prose into a validated Lens JSON (ADR 0004) */
+        /**
+         * Compile natural-language prose into a validated Lens JSON (ADR 0004)
+         * @description Compile natural-language prose into a validated Lens JSON (ADR 0004)
+         */
         post: operations["ai-compile-lens"];
         delete?: never;
         options?: never;
@@ -2030,7 +2471,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Today's accumulated LLM spend (USD) for a workspace */
+        /**
+         * Today's accumulated LLM spend (USD) for a workspace
+         * @description Today's accumulated LLM spend (USD) for a workspace
+         */
         get: operations["ai-cost-today"];
         put?: never;
         post?: never;
@@ -2047,7 +2491,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List redacted LLM call audit rows for the AI reasoning panel */
+        /**
+         * List redacted LLM call audit rows for the AI reasoning panel
+         * @description List redacted LLM call audit rows for the AI reasoning panel
+         */
         get: operations["ai-invocations-list"];
         put?: never;
         post?: never;
@@ -2064,7 +2511,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** AI suggestion acceptance metrics over a trailing window */
+        /**
+         * AI suggestion acceptance metrics over a trailing window
+         * @description AI suggestion acceptance metrics over a trailing window
+         */
         get: operations["ai-metrics"];
         put?: never;
         post?: never;
@@ -2081,7 +2531,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List workspace AI models across all providers */
+        /**
+         * List workspace AI models across all providers
+         * @description List workspace AI models across all providers
+         */
         get: operations["ai-models-list"];
         put?: never;
         post?: never;
@@ -2098,7 +2551,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Suggest priority adjustments for open tasks in a workspace */
+        /**
+         * Suggest priority adjustments for open tasks in a workspace
+         * @description Suggest priority adjustments for open tasks in a workspace
+         */
         get: operations["ai-priority-suggestions-list"];
         put?: never;
         post?: never;
@@ -2115,10 +2571,16 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List LLM providers (masked, no ciphertext) */
+        /**
+         * List LLM providers (masked, no ciphertext)
+         * @description List LLM providers (masked, no ciphertext)
+         */
         get: operations["ai-providers-list"];
         put?: never;
-        /** Register an LLM provider with an encrypted API key */
+        /**
+         * Register an LLM provider with an encrypted API key
+         * @description Register an LLM provider with an encrypted API key
+         */
         post: operations["ai-providers-create"];
         delete?: never;
         options?: never;
@@ -2136,11 +2598,17 @@ export interface paths {
         get?: never;
         put?: never;
         post?: never;
-        /** Soft-delete an LLM provider */
+        /**
+         * Soft-delete an LLM provider
+         * @description Soft-delete an LLM provider
+         */
         delete: operations["ai-providers-delete"];
         options?: never;
         head?: never;
-        /** Rotate an LLM provider API key */
+        /**
+         * Rotate an LLM provider API key
+         * @description Rotate an LLM provider API key
+         */
         patch: operations["ai-providers-patch"];
         trace?: never;
     };
@@ -2151,7 +2619,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Workspace-wide deterministic reminder engine proposals */
+        /**
+         * Workspace-wide deterministic reminder engine proposals
+         * @description Workspace-wide deterministic reminder engine proposals
+         */
         get: operations["ai-reminders"];
         put?: never;
         post?: never;
@@ -2170,7 +2641,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Resolve a natural-language command into an MCP tool invocation */
+        /**
+         * Resolve a natural-language command into an MCP tool invocation
+         * @description Resolve a natural-language command into an MCP tool invocation
+         */
         post: operations["ai-resolve-command"];
         delete?: never;
         options?: never;
@@ -2185,7 +2659,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Workspace-wide deterministic state inference proposals */
+        /**
+         * Workspace-wide deterministic state inference proposals
+         * @description Workspace-wide deterministic state inference proposals
+         */
         get: operations["ai-state-suggestions"];
         put?: never;
         post?: never;
@@ -2202,7 +2679,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List pending AI suggestions for a workspace */
+        /**
+         * List pending AI suggestions for a workspace
+         * @description List pending AI suggestions for a workspace
+         */
         get: operations["ai-suggestions-list"];
         put?: never;
         post?: never;
@@ -2221,7 +2701,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Mark an AI suggestion as applied */
+        /**
+         * Mark an AI suggestion as applied
+         * @description Mark an AI suggestion as applied
+         */
         post: operations["ai-suggestions-apply"];
         delete?: never;
         options?: never;
@@ -2238,7 +2721,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Dismiss an AI suggestion */
+        /**
+         * Dismiss an AI suggestion
+         * @description Dismiss an AI suggestion
+         */
         post: operations["ai-suggestions-dismiss"];
         delete?: never;
         options?: never;
@@ -2253,7 +2739,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Deterministic weekly digest markdown for a workspace */
+        /**
+         * Deterministic weekly digest markdown for a workspace
+         * @description Deterministic weekly digest markdown for a workspace
+         */
         get: operations["ai-weekly-digest"];
         put?: never;
         post?: never;
@@ -2270,7 +2759,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List recent audit log entries for a workspace */
+        /**
+         * List recent audit log entries for a workspace
+         * @description List recent audit log entries for a workspace
+         */
         get: operations["audit-logs-list"];
         put?: never;
         post?: never;
@@ -2287,7 +2779,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List events across all calendars in a workspace */
+        /**
+         * List events across all calendars in a workspace
+         * @description List events across all calendars in a workspace
+         */
         get: operations["calendar-events-list"];
         put?: never;
         post?: never;
@@ -2306,7 +2801,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Shift an umbrella event and move confirmed contributes_to-linked tasks by the same day delta */
+        /**
+         * Shift an umbrella event and move confirmed contributes_to-linked tasks by the same day delta
+         * @description Shift an umbrella event and move confirmed contributes_to-linked tasks by the same day delta
+         */
         post: operations["calendar-events-shift-apply"];
         delete?: never;
         options?: never;
@@ -2321,7 +2819,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List tasks linked to a calendar event via task_event_links */
+        /**
+         * List tasks linked to a calendar event via task_event_links
+         * @description List tasks linked to a calendar event via task_event_links
+         */
         get: operations["calendar-events-linked-tasks-list"];
         put?: never;
         post?: never;
@@ -2340,7 +2841,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Propose shifting an umbrella event and partition linked tasks into safe vs conflict */
+        /**
+         * Propose shifting an umbrella event and partition linked tasks into safe vs conflict
+         * @description Propose shifting an umbrella event and partition linked tasks into safe vs conflict
+         */
         post: operations["calendar-events-shift-propose"];
         delete?: never;
         options?: never;
@@ -2355,10 +2859,16 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List calendars in a workspace */
+        /**
+         * List calendars in a workspace
+         * @description List calendars in a workspace
+         */
         get: operations["calendars-list"];
         put?: never;
-        /** Create a calendar */
+        /**
+         * Create a calendar
+         * @description Create a calendar
+         */
         post: operations["calendars-create"];
         delete?: never;
         options?: never;
@@ -2375,7 +2885,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Subscribe the caller to the holiday feed for a country */
+        /**
+         * Subscribe the caller to the holiday feed for a country
+         * @description Subscribe the caller to the holiday feed for a country
+         */
         post: operations["calendars-subscribe-system"];
         delete?: never;
         options?: never;
@@ -2390,15 +2903,24 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Get a calendar */
+        /**
+         * Get a calendar
+         * @description Get a calendar
+         */
         get: operations["calendars-get"];
         put?: never;
         post?: never;
-        /** Delete a calendar */
+        /**
+         * Delete a calendar
+         * @description Delete a calendar
+         */
         delete: operations["calendars-delete"];
         options?: never;
         head?: never;
-        /** Update a calendar */
+        /**
+         * Update a calendar
+         * @description Update a calendar
+         */
         patch: operations["calendars-patch"];
         trace?: never;
     };
@@ -2409,10 +2931,16 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List events in a calendar */
+        /**
+         * List events in a calendar
+         * @description List events in a calendar
+         */
         get: operations["events-list"];
         put?: never;
-        /** Create an event */
+        /**
+         * Create an event
+         * @description Create an event
+         */
         post: operations["events-create"];
         delete?: never;
         options?: never;
@@ -2429,7 +2957,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Create a calendar event from a task */
+        /**
+         * Create a calendar event from a task
+         * @description Create a calendar event from a task
+         */
         post: operations["events-from-task"];
         delete?: never;
         options?: never;
@@ -2446,7 +2977,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Parse natural language text into an event proposal */
+        /**
+         * Parse natural language text into an event proposal
+         * @description Parse natural language text into an event proposal
+         */
         post: operations["events-smart-create"];
         delete?: never;
         options?: never;
@@ -2461,15 +2995,24 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Get an event */
+        /**
+         * Get an event
+         * @description Get an event
+         */
         get: operations["events-get"];
         put?: never;
         post?: never;
-        /** Delete an event */
+        /**
+         * Delete an event
+         * @description Delete an event
+         */
         delete: operations["events-delete"];
         options?: never;
         head?: never;
-        /** Update an event */
+        /**
+         * Update an event
+         * @description Update an event
+         */
         patch: operations["events-patch"];
         trace?: never;
     };
@@ -2480,10 +3023,16 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List attachments on an event */
+        /**
+         * List attachments on an event
+         * @description List attachments on an event
+         */
         get: operations["attachments-list"];
         put?: never;
-        /** Record attachment metadata for an event */
+        /**
+         * Record attachment metadata for an event
+         * @description Record attachment metadata for an event
+         */
         post: operations["attachments-create"];
         delete?: never;
         options?: never;
@@ -2501,7 +3050,10 @@ export interface paths {
         get?: never;
         put?: never;
         post?: never;
-        /** Delete an attachment from an event */
+        /**
+         * Delete an attachment from an event
+         * @description Delete an attachment from an event
+         */
         delete: operations["attachments-delete"];
         options?: never;
         head?: never;
@@ -2515,10 +3067,16 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List attendees on an event */
+        /**
+         * List attendees on an event
+         * @description List attendees on an event
+         */
         get: operations["attendees-list"];
         put?: never;
-        /** Add attendees to an event */
+        /**
+         * Add attendees to an event
+         * @description Add attendees to an event
+         */
         post: operations["attendees-add"];
         delete?: never;
         options?: never;
@@ -2539,7 +3097,10 @@ export interface paths {
         delete?: never;
         options?: never;
         head?: never;
-        /** Update own RSVP for an event */
+        /**
+         * Update own RSVP for an event
+         * @description Update own RSVP for an event
+         */
         patch: operations["attendees-rsvp"];
         trace?: never;
     };
@@ -2552,7 +3113,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Create (or rotate) a magic-link invite for an attendee */
+        /**
+         * Create (or rotate) a magic-link invite for an attendee
+         * @description Create (or rotate) a magic-link invite for an attendee
+         */
         post: operations["event-invites-create"];
         delete?: never;
         options?: never;
@@ -2570,7 +3134,10 @@ export interface paths {
         get?: never;
         put?: never;
         post?: never;
-        /** Remove an attendee from an event */
+        /**
+         * Remove an attendee from an event
+         * @description Remove an attendee from an event
+         */
         delete: operations["attendees-remove"];
         options?: never;
         head?: never;
@@ -2590,7 +3157,10 @@ export interface paths {
         delete?: never;
         options?: never;
         head?: never;
-        /** Toggle can_edit for an attendee */
+        /**
+         * Toggle can_edit for an attendee
+         * @description Toggle can_edit for an attendee
+         */
         patch: operations["attendees-can-edit"];
         trace?: never;
     };
@@ -2601,10 +3171,16 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List checklist items for an event */
+        /**
+         * List checklist items for an event
+         * @description List checklist items for an event
+         */
         get: operations["checklist-list"];
         put?: never;
-        /** Add a checklist item to an event */
+        /**
+         * Add a checklist item to an event
+         * @description Add a checklist item to an event
+         */
         post: operations["checklist-create"];
         delete?: never;
         options?: never;
@@ -2622,11 +3198,17 @@ export interface paths {
         get?: never;
         put?: never;
         post?: never;
-        /** Delete a checklist item */
+        /**
+         * Delete a checklist item
+         * @description Delete a checklist item
+         */
         delete: operations["checklist-delete"];
         options?: never;
         head?: never;
-        /** Update a checklist item */
+        /**
+         * Update a checklist item
+         * @description Update a checklist item
+         */
         patch: operations["checklist-update"];
         trace?: never;
     };
@@ -2637,10 +3219,16 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List comments on an event */
+        /**
+         * List comments on an event
+         * @description List comments on an event
+         */
         get: operations["comments-list"];
         put?: never;
-        /** Add a comment to an event */
+        /**
+         * Add a comment to an event
+         * @description Add a comment to an event
+         */
         post: operations["comments-create"];
         delete?: never;
         options?: never;
@@ -2658,11 +3246,17 @@ export interface paths {
         get?: never;
         put?: never;
         post?: never;
-        /** Delete a comment */
+        /**
+         * Delete a comment
+         * @description Delete a comment
+         */
         delete: operations["comments-delete"];
         options?: never;
         head?: never;
-        /** Edit a comment */
+        /**
+         * Edit a comment
+         * @description Edit a comment
+         */
         patch: operations["comments-edit"];
         trace?: never;
     };
@@ -2673,7 +3267,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List active magic-link invites for an event */
+        /**
+         * List active magic-link invites for an event
+         * @description List active magic-link invites for an event
+         */
         get: operations["event-invites-list"];
         put?: never;
         post?: never;
@@ -2693,7 +3290,10 @@ export interface paths {
         get?: never;
         put?: never;
         post?: never;
-        /** Revoke a magic-link invite */
+        /**
+         * Revoke a magic-link invite
+         * @description Revoke a magic-link invite
+         */
         delete: operations["event-invites-revoke"];
         options?: never;
         head?: never;
@@ -2707,10 +3307,16 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List members of a calendar */
+        /**
+         * List members of a calendar
+         * @description List members of a calendar
+         */
         get: operations["members-list"];
         put?: never;
-        /** Add a member to a calendar */
+        /**
+         * Add a member to a calendar
+         * @description Add a member to a calendar
+         */
         post: operations["members-add"];
         delete?: never;
         options?: never;
@@ -2728,11 +3334,17 @@ export interface paths {
         get?: never;
         put?: never;
         post?: never;
-        /** Remove a member from a calendar */
+        /**
+         * Remove a member from a calendar
+         * @description Remove a member from a calendar
+         */
         delete: operations["members-remove"];
         options?: never;
         head?: never;
-        /** Update a member's role */
+        /**
+         * Update a member's role
+         * @description Update a member's role
+         */
         patch: operations["members-update-role"];
         trace?: never;
     };
@@ -2743,10 +3355,16 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List memos in a calendar */
+        /**
+         * List memos in a calendar
+         * @description List memos in a calendar
+         */
         get: operations["memos-list"];
         put?: never;
-        /** Create a memo */
+        /**
+         * Create a memo
+         * @description Create a memo
+         */
         post: operations["memos-create"];
         delete?: never;
         options?: never;
@@ -2764,11 +3382,17 @@ export interface paths {
         get?: never;
         put?: never;
         post?: never;
-        /** Delete a memo */
+        /**
+         * Delete a memo
+         * @description Delete a memo
+         */
         delete: operations["memos-delete"];
         options?: never;
         head?: never;
-        /** Update a memo */
+        /**
+         * Update a memo
+         * @description Update a memo
+         */
         patch: operations["memos-update"];
         trace?: never;
     };
@@ -2781,7 +3405,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Subscribe the caller to a calendar visible in the workspace */
+        /**
+         * Subscribe the caller to a calendar visible in the workspace
+         * @description Subscribe the caller to a calendar visible in the workspace
+         */
         post: operations["calendars-self-subscribe"];
         delete?: never;
         options?: never;
@@ -2802,7 +3429,10 @@ export interface paths {
         delete?: never;
         options?: never;
         head?: never;
-        /** Update the caller's own subscription preferences for a calendar */
+        /**
+         * Update the caller's own subscription preferences for a calendar
+         * @description Update the caller's own subscription preferences for a calendar
+         */
         patch: operations["calendars-self-subscription-patch"];
         trace?: never;
     };
@@ -2813,10 +3443,16 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List dashboard widgets in a workspace */
+        /**
+         * List dashboard widgets in a workspace
+         * @description List dashboard widgets in a workspace
+         */
         get: operations["dashboard-widgets-list"];
         put?: never;
-        /** Create a dashboard widget */
+        /**
+         * Create a dashboard widget
+         * @description Create a dashboard widget
+         */
         post: operations["dashboard-widgets-create"];
         delete?: never;
         options?: never;
@@ -2831,15 +3467,24 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Fetch a dashboard widget by id */
+        /**
+         * Fetch a dashboard widget by id
+         * @description Fetch a dashboard widget by id
+         */
         get: operations["dashboard-widgets-get"];
         put?: never;
         post?: never;
-        /** Soft-delete a dashboard widget */
+        /**
+         * Soft-delete a dashboard widget
+         * @description Soft-delete a dashboard widget
+         */
         delete: operations["dashboard-widgets-delete"];
         options?: never;
         head?: never;
-        /** Update a dashboard widget */
+        /**
+         * Update a dashboard widget
+         * @description Update a dashboard widget
+         */
         patch: operations["dashboard-widgets-update"];
         trace?: never;
     };
@@ -2851,7 +3496,10 @@ export interface paths {
             cookie?: never;
         };
         get?: never;
-        /** Update widget position and size */
+        /**
+         * Update widget position and size
+         * @description Update widget position and size
+         */
         put: operations["dashboard-widgets-update-position"];
         post?: never;
         delete?: never;
@@ -2867,7 +3515,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List teammate personal calendars the caller can subscribe to */
+        /**
+         * List teammate personal calendars the caller can subscribe to
+         * @description List teammate personal calendars the caller can subscribe to
+         */
         get: operations["discoverable-calendars-list"];
         put?: never;
         post?: never;
@@ -2904,10 +3555,16 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List import jobs for the workspace */
+        /**
+         * List import jobs for the workspace
+         * @description List import jobs for the workspace
+         */
         get: operations["imports-list"];
         put?: never;
-        /** Create an import job */
+        /**
+         * Create an import job
+         * @description Create an import job
+         */
         post: operations["imports-create"];
         delete?: never;
         options?: never;
@@ -2922,7 +3579,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Get a single import job */
+        /**
+         * Get a single import job
+         * @description Get a single import job
+         */
         get: operations["imports-get"];
         put?: never;
         post?: never;
@@ -2941,7 +3601,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Cancel a pending or running import job */
+        /**
+         * Cancel a pending or running import job
+         * @description Cancel a pending or running import job
+         */
         post: operations["imports-cancel"];
         delete?: never;
         options?: never;
@@ -2958,7 +3621,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Ask the AI orchestrator to score and recommend actions for inbox items */
+        /**
+         * Ask the AI orchestrator to score and recommend actions for inbox items
+         * @description Ask the AI orchestrator to score and recommend actions for inbox items
+         */
         post: operations["inbox-triage"];
         delete?: never;
         options?: never;
@@ -2973,10 +3639,16 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List intake items in the triage queue */
+        /**
+         * List intake items in the triage queue
+         * @description List intake items in the triage queue
+         */
         get: operations["intake-list"];
         put?: never;
-        /** Create an intake item */
+        /**
+         * Create an intake item
+         * @description Create an intake item
+         */
         post: operations["intake-create"];
         delete?: never;
         options?: never;
@@ -2991,14 +3663,20 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Get a single intake item */
+        /**
+         * Get a single intake item
+         * @description Get a single intake item
+         */
         get: operations["intake-get"];
         put?: never;
         post?: never;
         delete?: never;
         options?: never;
         head?: never;
-        /** Triage an intake item (accept, reject, snooze, or mark duplicate) */
+        /**
+         * Triage an intake item (accept, reject, snooze, or mark duplicate)
+         * @description Triage an intake item (accept, reject, snooze, or mark duplicate)
+         */
         patch: operations["intake-triage"];
         trace?: never;
     };
@@ -3011,7 +3689,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Convert an intake item into a task */
+        /**
+         * Convert an intake item into a task
+         * @description Convert an intake item into a task
+         */
         post: operations["intake-convert"];
         delete?: never;
         options?: never;
@@ -3026,10 +3707,16 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List invite links */
+        /**
+         * List invite links
+         * @description List invite links
+         */
         get: operations["workspaces-invites-list"];
         put?: never;
-        /** Create an invite link */
+        /**
+         * Create an invite link
+         * @description Create an invite link
+         */
         post: operations["workspaces-invites-create"];
         delete?: never;
         options?: never;
@@ -3047,7 +3734,10 @@ export interface paths {
         get?: never;
         put?: never;
         post?: never;
-        /** Revoke an invite link */
+        /**
+         * Revoke an invite link
+         * @description Revoke an invite link
+         */
         delete: operations["workspaces-invites-revoke"];
         options?: never;
         head?: never;
@@ -3061,10 +3751,16 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List labels in a workspace */
+        /**
+         * List labels in a workspace
+         * @description List labels in a workspace
+         */
         get: operations["labels-list"];
         put?: never;
-        /** Create a label */
+        /**
+         * Create a label
+         * @description Create a label
+         */
         post: operations["labels-create"];
         delete?: never;
         options?: never;
@@ -3079,15 +3775,24 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Fetch a label */
+        /**
+         * Fetch a label
+         * @description Fetch a label
+         */
         get: operations["labels-get"];
         put?: never;
         post?: never;
-        /** Soft-disable a label */
+        /**
+         * Soft-disable a label
+         * @description Soft-disable a label
+         */
         delete: operations["labels-disable"];
         options?: never;
         head?: never;
-        /** Update a label */
+        /**
+         * Update a label
+         * @description Update a label
+         */
         patch: operations["labels-patch"];
         trace?: never;
     };
@@ -3098,10 +3803,16 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List saved views for a workspace/project */
+        /**
+         * List saved views for a workspace/project
+         * @description List saved views for a workspace/project
+         */
         get: operations["lenses-list"];
         put?: never;
-        /** Create a saved view (lens) */
+        /**
+         * Create a saved view (lens)
+         * @description Create a saved view (lens)
+         */
         post: operations["lenses-create"];
         delete?: never;
         options?: never;
@@ -3116,15 +3827,24 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Fetch a saved view */
+        /**
+         * Fetch a saved view
+         * @description Fetch a saved view
+         */
         get: operations["lenses-get"];
         put?: never;
         post?: never;
-        /** Delete a saved view */
+        /**
+         * Delete a saved view
+         * @description Delete a saved view
+         */
         delete: operations["lenses-delete"];
         options?: never;
         head?: never;
-        /** Update a saved view */
+        /**
+         * Update a saved view
+         * @description Update a saved view
+         */
         patch: operations["lenses-update"];
         trace?: never;
     };
@@ -3137,7 +3857,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Publish a lens publicly with a shareable token URL */
+        /**
+         * Publish a lens publicly with a shareable token URL
+         * @description Publish a lens publicly with a shareable token URL
+         */
         post: operations["lenses-publish"];
         delete?: never;
         options?: never;
@@ -3154,7 +3877,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Revoke public access to a lens */
+        /**
+         * Revoke public access to a lens
+         * @description Revoke public access to a lens
+         */
         post: operations["lenses-unpublish"];
         delete?: never;
         options?: never;
@@ -3169,10 +3895,16 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List the caller's MCP tokens (no plaintext) */
+        /**
+         * List the caller's MCP tokens (no plaintext)
+         * @description List the caller's MCP tokens (no plaintext)
+         */
         get: operations["mcp-tokens-list"];
         put?: never;
-        /** Mint a new MCP bearer token (plaintext returned once) */
+        /**
+         * Mint a new MCP bearer token (plaintext returned once)
+         * @description Mint a new MCP bearer token (plaintext returned once)
+         */
         post: operations["mcp-tokens-create"];
         delete?: never;
         options?: never;
@@ -3190,7 +3922,10 @@ export interface paths {
         get?: never;
         put?: never;
         post?: never;
-        /** Revoke an MCP bearer token */
+        /**
+         * Revoke an MCP bearer token
+         * @description Revoke an MCP bearer token
+         */
         delete: operations["mcp-tokens-delete"];
         options?: never;
         head?: never;
@@ -3204,10 +3939,16 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List workspace members */
+        /**
+         * List workspace members
+         * @description List workspace members
+         */
         get: operations["workspaces-members-list"];
         put?: never;
-        /** Add a member to a workspace */
+        /**
+         * Add a member to a workspace
+         * @description Add a member to a workspace
+         */
         post: operations["workspaces-members-add"];
         delete?: never;
         options?: never;
@@ -3225,11 +3966,17 @@ export interface paths {
         get?: never;
         put?: never;
         post?: never;
-        /** Remove a member from a workspace */
+        /**
+         * Remove a member from a workspace
+         * @description Remove a member from a workspace
+         */
         delete: operations["workspaces-members-remove"];
         options?: never;
         head?: never;
-        /** Update a member's role */
+        /**
+         * Update a member's role
+         * @description Update a member's role
+         */
         patch: operations["workspaces-members-update-role"];
         trace?: never;
     };
@@ -3242,7 +3989,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Mark all notifications as read in a workspace */
+        /**
+         * Mark all notifications as read in a workspace
+         * @description Mark all notifications as read in a workspace
+         */
         post: operations["notifications-mark-all-read"];
         delete?: never;
         options?: never;
@@ -3257,10 +4007,16 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List root pages in a workspace */
+        /**
+         * List root pages in a workspace
+         * @description List root pages in a workspace
+         */
         get: operations["pages-list"];
         put?: never;
-        /** Create a page */
+        /**
+         * Create a page
+         * @description Create a page
+         */
         post: operations["pages-create"];
         delete?: never;
         options?: never;
@@ -3277,7 +4033,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Generate a page with AI */
+        /**
+         * Generate a page with AI
+         * @description Generate a page with AI
+         */
         post: operations["pages-generate"];
         delete?: never;
         options?: never;
@@ -3292,7 +4051,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Search pages by title */
+        /**
+         * Search pages by title
+         * @description Search pages by title
+         */
         get: operations["pages-search"];
         put?: never;
         post?: never;
@@ -3309,15 +4071,24 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Fetch a page by id */
+        /**
+         * Fetch a page by id
+         * @description Fetch a page by id
+         */
         get: operations["pages-get"];
         put?: never;
         post?: never;
-        /** Soft-delete a page */
+        /**
+         * Soft-delete a page
+         * @description Soft-delete a page
+         */
         delete: operations["pages-delete"];
         options?: never;
         head?: never;
-        /** Update a page */
+        /**
+         * Update a page
+         * @description Update a page
+         */
         patch: operations["pages-update"];
         trace?: never;
     };
@@ -3328,7 +4099,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List child pages */
+        /**
+         * List child pages
+         * @description List child pages
+         */
         get: operations["pages-list-children"];
         put?: never;
         post?: never;
@@ -3345,10 +4119,16 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List projects in a workspace */
+        /**
+         * List projects in a workspace
+         * @description List projects in a workspace
+         */
         get: operations["projects-list"];
         put?: never;
-        /** Create a project in a workspace */
+        /**
+         * Create a project in a workspace
+         * @description Create a project in a workspace
+         */
         post: operations["projects-create"];
         delete?: never;
         options?: never;
@@ -3363,10 +4143,16 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List public share pages in a workspace */
+        /**
+         * List public share pages in a workspace
+         * @description List public share pages in a workspace
+         */
         get: operations["public-shares-list"];
         put?: never;
-        /** Create a public share page (returns plaintext token once) */
+        /**
+         * Create a public share page (returns plaintext token once)
+         * @description Create a public share page (returns plaintext token once)
+         */
         post: operations["public-shares-create"];
         delete?: never;
         options?: never;
@@ -3381,15 +4167,24 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Get a public share page with its published events */
+        /**
+         * Get a public share page with its published events
+         * @description Get a public share page with its published events
+         */
         get: operations["public-shares-get"];
         put?: never;
         post?: never;
-        /** Delete a public share page (admin or owner only) */
+        /**
+         * Delete a public share page (admin or owner only)
+         * @description Delete a public share page (admin or owner only)
+         */
         delete: operations["public-shares-delete"];
         options?: never;
         head?: never;
-        /** Update public share page metadata */
+        /**
+         * Update public share page metadata
+         * @description Update public share page metadata
+         */
         patch: operations["public-shares-patch"];
         trace?: never;
     };
@@ -3402,7 +4197,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Attach events to a public share page */
+        /**
+         * Attach events to a public share page
+         * @description Attach events to a public share page
+         */
         post: operations["public-shares-events-attach"];
         delete?: never;
         options?: never;
@@ -3423,7 +4221,10 @@ export interface paths {
         delete?: never;
         options?: never;
         head?: never;
-        /** Batch-reorder the events published on a public share page */
+        /**
+         * Batch-reorder the events published on a public share page
+         * @description Batch-reorder the events published on a public share page
+         */
         patch: operations["public-shares-events-reorder"];
         trace?: never;
     };
@@ -3437,7 +4238,10 @@ export interface paths {
         get?: never;
         put?: never;
         post?: never;
-        /** Detach an event from a public share page */
+        /**
+         * Detach an event from a public share page
+         * @description Detach an event from a public share page
+         */
         delete: operations["public-shares-events-detach"];
         options?: never;
         head?: never;
@@ -3453,7 +4257,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Rotate the URL token for a public share page */
+        /**
+         * Rotate the URL token for a public share page
+         * @description Rotate the URL token for a public share page
+         */
         post: operations["public-shares-rotate"];
         delete?: never;
         options?: never;
@@ -3468,7 +4275,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List pending relation suggestions for a workspace */
+        /**
+         * List pending relation suggestions for a workspace
+         * @description List pending relation suggestions for a workspace
+         */
         get: operations["relation-suggestions-list-workspace"];
         put?: never;
         post?: never;
@@ -3487,7 +4297,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Apply AI proposal — create parent task with subtasks and assignees */
+        /**
+         * Apply AI proposal — create parent task with subtasks and assignees
+         * @description Apply AI proposal — create parent task with subtasks and assignees
+         */
         post: operations["tasks-apply-smart"];
         delete?: never;
         options?: never;
@@ -3502,7 +4315,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List archived tasks in a workspace */
+        /**
+         * List archived tasks in a workspace
+         * @description List archived tasks in a workspace
+         */
         get: operations["tasks-archived-list"];
         put?: never;
         post?: never;
@@ -3521,7 +4337,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** AI-powered subtask decomposition and assignee suggestions */
+        /**
+         * AI-powered subtask decomposition and assignee suggestions
+         * @description AI-powered subtask decomposition and assignee suggestions
+         */
         post: operations["tasks-propose-smart"];
         delete?: never;
         options?: never;
@@ -3536,10 +4355,16 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List timeboxes in a workspace */
+        /**
+         * List timeboxes in a workspace
+         * @description List timeboxes in a workspace
+         */
         get: operations["timeboxes-list"];
         put?: never;
-        /** Create a timebox */
+        /**
+         * Create a timebox
+         * @description Create a timebox
+         */
         post: operations["timeboxes-create"];
         delete?: never;
         options?: never;
@@ -3554,15 +4379,24 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Fetch a timebox by id */
+        /**
+         * Fetch a timebox by id
+         * @description Fetch a timebox by id
+         */
         get: operations["timeboxes-get"];
         put?: never;
         post?: never;
-        /** Soft-delete a timebox */
+        /**
+         * Soft-delete a timebox
+         * @description Soft-delete a timebox
+         */
         delete: operations["timeboxes-delete"];
         options?: never;
         head?: never;
-        /** Update a timebox */
+        /**
+         * Update a timebox
+         * @description Update a timebox
+         */
         patch: operations["timeboxes-update"];
         trace?: never;
     };
@@ -3575,7 +4409,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Transition timebox status */
+        /**
+         * Transition timebox status
+         * @description Transition timebox status
+         */
         post: operations["timeboxes-update-status"];
         delete?: never;
         options?: never;
@@ -3590,10 +4427,16 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List tasks in a timebox with progress */
+        /**
+         * List tasks in a timebox with progress
+         * @description List tasks in a timebox with progress
+         */
         get: operations["timeboxes-list-tasks"];
         put?: never;
-        /** Add a task to a timebox */
+        /**
+         * Add a task to a timebox
+         * @description Add a task to a timebox
+         */
         post: operations["timeboxes-add-task"];
         delete?: never;
         options?: never;
@@ -3611,7 +4454,10 @@ export interface paths {
         get?: never;
         put?: never;
         post?: never;
-        /** Remove a task from a timebox */
+        /**
+         * Remove a task from a timebox
+         * @description Remove a task from a timebox
+         */
         delete: operations["timeboxes-remove-task"];
         options?: never;
         head?: never;
@@ -3625,7 +4471,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List events in a workspace's timeline */
+        /**
+         * List events in a workspace's timeline
+         * @description List events in a workspace's timeline
+         */
         get: operations["workspaces-timeline-list"];
         put?: never;
         post?: never;
@@ -3642,7 +4491,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List workspace users (actor picker) */
+        /**
+         * List workspace users (actor picker)
+         * @description List workspace users (actor picker)
+         */
         get: operations["workspaces-users-list"];
         put?: never;
         post?: never;
@@ -3659,10 +4511,16 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List webhook subscriptions */
+        /**
+         * List webhook subscriptions
+         * @description List webhook subscriptions
+         */
         get: operations["webhooks-list"];
         put?: never;
-        /** Create a webhook subscription */
+        /**
+         * Create a webhook subscription
+         * @description Create a webhook subscription
+         */
         post: operations["webhooks-create"];
         delete?: never;
         options?: never;
@@ -3677,11 +4535,17 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Get a webhook subscription (includes secret) */
+        /**
+         * Get a webhook subscription (includes secret)
+         * @description Get a webhook subscription (includes secret)
+         */
         get: operations["webhooks-get"];
         put?: never;
         post?: never;
-        /** Soft-delete a webhook subscription */
+        /**
+         * Soft-delete a webhook subscription
+         * @description Soft-delete a webhook subscription
+         */
         delete: operations["webhooks-delete"];
         options?: never;
         head?: never;
@@ -3695,7 +4559,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List delivery log for a webhook subscription */
+        /**
+         * List delivery log for a webhook subscription
+         * @description List delivery log for a webhook subscription
+         */
         get: operations["webhooks-deliveries-list"];
         put?: never;
         post?: never;
@@ -3714,7 +4581,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Send a test ping delivery */
+        /**
+         * Send a test ping delivery
+         * @description Send a test ping delivery
+         */
         post: operations["webhooks-test-delivery"];
         delete?: never;
         options?: never;
@@ -3735,7 +4605,10 @@ export interface paths {
         delete?: never;
         options?: never;
         head?: never;
-        /** Activate or deactivate a webhook subscription */
+        /**
+         * Activate or deactivate a webhook subscription
+         * @description Activate or deactivate a webhook subscription
+         */
         patch: operations["webhooks-toggle"];
         trace?: never;
     };
@@ -3773,7 +4646,7 @@ export interface components {
             inviteId: string;
             rsvp: string;
         };
-        AcceptWorkspaceInviteOutputBody: {
+        AcceptInviteOutputBody: {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
@@ -3915,108 +4788,6 @@ export interface components {
             readonly $schema?: string;
             ok: boolean;
         };
-        AddWorkspaceMemberInputBody: {
-            /**
-             * Format: uri
-             * @description A URL to the JSON Schema for this object.
-             */
-            readonly $schema?: string;
-            /** Format: email */
-            email: string;
-            /** @enum {string} */
-            role: "owner" | "admin" | "member" | "guest";
-        };
-        AdminListWorkspacesOutputBody: {
-            /**
-             * Format: uri
-             * @description A URL to the JSON Schema for this object.
-             */
-            readonly $schema?: string;
-            items: components["schemas"]["AdminWorkspace"][] | null;
-            /** Format: int64 */
-            total: number;
-        };
-        AdminPatchWorkspaceInputBody: {
-            /**
-             * Format: uri
-             * @description A URL to the JSON Schema for this object.
-             */
-            readonly $schema?: string;
-            enabled: boolean | null;
-        };
-        AdminPatchWorkspaceOutputBody: {
-            /**
-             * Format: uri
-             * @description A URL to the JSON Schema for this object.
-             */
-            readonly $schema?: string;
-            ok: boolean;
-        };
-        AdminRevokeSessionOutputBody: {
-            /**
-             * Format: uri
-             * @description A URL to the JSON Schema for this object.
-             */
-            readonly $schema?: string;
-            ok: boolean;
-        };
-        AdminSession: {
-            active: boolean;
-            /** Format: int64 */
-            createdAt: number;
-            /** Format: int64 */
-            expiresAt: number;
-            id: string;
-            ipAddress: string;
-            /** Format: int64 */
-            lastUsedAt?: number;
-            userAgent: string;
-        };
-        AdminUser: {
-            /**
-             * Format: uri
-             * @description A URL to the JSON Schema for this object.
-             */
-            readonly $schema?: string;
-            avatarUrl?: string;
-            /** Format: int64 */
-            createdAt: number;
-            displayName: string;
-            email: string;
-            /** Format: int64 */
-            emailVerifiedAt?: number;
-            enabled: boolean;
-            id: string;
-            isInstanceAdmin: boolean;
-            /** Format: int64 */
-            lastLoginAt?: number;
-            locale: string;
-            /** Format: int64 */
-            updatedAt?: number;
-            /** Format: int64 */
-            workspaceCount: number;
-        };
-        AdminWorkspace: {
-            /**
-             * Format: uri
-             * @description A URL to the JSON Schema for this object.
-             */
-            readonly $schema?: string;
-            /** Format: int64 */
-            createdAt: number;
-            description?: string;
-            enabled: boolean;
-            iconUrl?: string;
-            id: string;
-            /** Format: int64 */
-            memberCount: number;
-            name: string;
-            /** Format: int64 */
-            projectCount?: number;
-            slug: string;
-            /** Format: int64 */
-            updatedAt?: number;
-        };
         AgentSummary: {
             /**
              * Format: uri
@@ -4037,58 +4808,6 @@ export interface components {
             systemPrompt: string;
             /** Format: int64 */
             updatedAt?: number;
-        };
-        AiCostTodayOutputBody: {
-            /**
-             * Format: uri
-             * @description A URL to the JSON Schema for this object.
-             */
-            readonly $schema?: string;
-            /** Format: double */
-            costUsd: number;
-            /** @description Local date in the requested timezone (YYYY-MM-DD). Falls back to UTC if tz is absent or invalid. */
-            date: string;
-            /** Format: double */
-            monthlyCapUsd?: number;
-        };
-        AiInvocation: {
-            costEstimate?: string;
-            errorCode?: string;
-            /** @description Invocation public id (UUID v7) */
-            id: string;
-            /** Format: int64 */
-            invokedAt: number;
-            model: string;
-            promptRedacted: string;
-            purpose: string;
-            responseRedacted?: string;
-            status: string;
-            /** Format: int32 */
-            tokensInput?: number;
-            /** Format: int32 */
-            tokensOutput?: number;
-        };
-        AiMetricsOutputBody: {
-            /**
-             * Format: uri
-             * @description A URL to the JSON Schema for this object.
-             */
-            readonly $schema?: string;
-            /**
-             * Format: double
-             * @description applied / (applied + dismissed), 0 when no decisions
-             */
-            acceptanceRate: number;
-            /** Format: int64 */
-            applied: number;
-            /** Format: int64 */
-            dismissed: number;
-            /** @description Per-provider egress rate limiter counters */
-            outboundLimits: components["schemas"]["OutboundLimitStat"][] | null;
-            /** Format: int64 */
-            proposed: number;
-            /** Format: int64 */
-            windowDays: number;
         };
         AiSuggestionListBody: {
             /**
@@ -4281,35 +5000,6 @@ export interface components {
             targetWorkspaceName?: string;
             userAgent?: string;
         };
-        AuditLogEntryDTO: {
-            action: string;
-            actorDisplayName: string | null;
-            actorUserPublicId: string | null;
-            ipAddress: string | null;
-            metadataJson: unknown;
-            /** Format: int64 */
-            occurredAt: number;
-            /** @description Audit entry public id (UUID v7) */
-            publicId: string;
-            resourcePublicId: string | null;
-            resourceType: string;
-            userAgent: string | null;
-        };
-        AuthTokens: {
-            /**
-             * Format: uri
-             * @description A URL to the JSON Schema for this object.
-             */
-            readonly $schema?: string;
-            accessToken: string;
-            /**
-             * Format: int64
-             * @description Access token expiry, unix seconds
-             */
-            expiresAt: number;
-            /** @description User public id (UUID v7) */
-            userId: string;
-        };
         AutoActionRuleBody: {
             /** Format: double */
             confidence: number;
@@ -4329,6 +5019,21 @@ export interface components {
             intervalMinutes: number;
             /** Format: double */
             threshold: number;
+        };
+        Body: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            /**
+             * Format: int64
+             * @description Number of exported rows
+             */
+            count: number;
+            /** @description Export format used */
+            format: string;
+            tasks: components["schemas"]["ExportedTask"][] | null;
         };
         CalendarResponse: {
             /**
@@ -4531,6 +5236,19 @@ export interface components {
             Secure: boolean;
             Unparsed: string[] | null;
             Value: string;
+        };
+        CostTodayOutputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            /** Format: double */
+            costUsd: number;
+            /** @description Local date in the requested timezone (YYYY-MM-DD). Falls back to UTC if tz is absent or invalid. */
+            date: string;
+            /** Format: double */
+            monthlyCapUsd?: number;
         };
         CountUnreadOutputBody: {
             /**
@@ -4763,6 +5481,34 @@ export interface components {
             readonly $schema?: string;
             body?: string;
             title: string;
+        };
+        CreateInviteInputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            email?: string;
+            /**
+             * Format: int64
+             * @description Seconds until invite expires
+             */
+            expiresIn?: number;
+            label?: string;
+            /** Format: int32 */
+            maxUses?: number;
+            /** @enum {string} */
+            role: "owner" | "admin" | "member" | "guest";
+        };
+        CreateInviteOutputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            invite: components["schemas"]["Invite"];
+            /** @description Plaintext token (only returned once) */
+            token: string;
         };
         CreateLabelBody: {
             /**
@@ -5015,34 +5761,6 @@ export interface components {
             name: string;
             slug: string;
             timezone?: string;
-        };
-        CreateWorkspaceInviteInputBody: {
-            /**
-             * Format: uri
-             * @description A URL to the JSON Schema for this object.
-             */
-            readonly $schema?: string;
-            email?: string;
-            /**
-             * Format: int64
-             * @description Seconds until invite expires
-             */
-            expiresIn?: number;
-            label?: string;
-            /** Format: int32 */
-            maxUses?: number;
-            /** @enum {string} */
-            role: "owner" | "admin" | "member" | "guest";
-        };
-        CreateWorkspaceInviteOutputBody: {
-            /**
-             * Format: uri
-             * @description A URL to the JSON Schema for this object.
-             */
-            readonly $schema?: string;
-            invite: components["schemas"]["WorkspaceInvite"];
-            /** @description Plaintext token (only returned once) */
-            token: string;
         };
         CrossCalendarEventResponse: {
             allDay: boolean;
@@ -5399,6 +6117,17 @@ export interface components {
             readonly $schema?: string;
             outcomes: components["schemas"]["EvaluateConstraintsOutcome"][] | null;
         };
+        Event: {
+            actorDisplayName?: string;
+            actorUserId?: string;
+            /** @description Event public id (UUID v7) */
+            id: string;
+            /** Format: int64 */
+            occurredAt: number;
+            payload?: unknown;
+            taskId?: string;
+            type: string;
+        };
         EventInviteCreateResponse: {
             /**
              * Format: uri
@@ -5468,21 +6197,6 @@ export interface components {
             readonly $schema?: string;
             /** @description Human-readable explanation */
             explanation: string;
-        };
-        ExportBody: {
-            /**
-             * Format: uri
-             * @description A URL to the JSON Schema for this object.
-             */
-            readonly $schema?: string;
-            /**
-             * Format: int64
-             * @description Number of exported rows
-             */
-            count: number;
-            /** @description Export format used */
-            format: string;
-            tasks: components["schemas"]["ExportedTask"][] | null;
         };
         ExportedTask: {
             assigneeDisplayName?: string;
@@ -5629,48 +6343,6 @@ export interface components {
             /** Format: int64 */
             totalItems: number;
         };
-        InboxItem: {
-            /** Format: int64 */
-            createdAt: number;
-            externalId?: string;
-            /** @description InboxItem public id (UUID v7) */
-            id: string;
-            kind: string;
-            payload?: unknown;
-            /** Format: int64 */
-            receivedAt: number;
-            source: string;
-            taskId?: string;
-            taskTitle?: string;
-            workspaceId: string;
-        };
-        InboxTriageInputBody: {
-            /**
-             * Format: uri
-             * @description A URL to the JSON Schema for this object.
-             */
-            readonly $schema?: string;
-            /**
-             * Format: int64
-             * @description Number of inbox items to score (default 20, max 50)
-             */
-            limit?: number;
-        };
-        InboxTriageOutputBody: {
-            /**
-             * Format: uri
-             * @description A URL to the JSON Schema for this object.
-             */
-            readonly $schema?: string;
-            suggestions: components["schemas"]["InboxTriageSuggestion"][] | null;
-        };
-        InboxTriageSuggestion: {
-            inboxItemId: string;
-            reasoning: string;
-            recommendedAction: string;
-            /** Format: float */
-            score: number;
-        };
         InferStateOutputBody: {
             /**
              * Format: uri
@@ -5715,27 +6387,20 @@ export interface components {
             /** Format: int64 */
             totalWorkspaces: number;
         };
-        IntakeItem: {
-            /**
-             * Format: uri
-             * @description A URL to the JSON Schema for this object.
-             */
-            readonly $schema?: string;
-            aiReasoning?: string;
-            /** Format: double */
-            aiScore?: number;
-            body?: string;
+        Invite: {
             /** Format: int64 */
             createdAt: number;
-            /** @description Intake item public id (UUID v7) */
-            id: string;
+            createdByName: string;
             /** Format: int64 */
-            snoozeUntil?: number;
-            taskId?: string;
-            title: string;
-            triageStatus: string;
-            triagedByDisplayName?: string;
-            triagedByUserId?: string;
+            expiresAt?: number;
+            /** @description Invite public id (UUID v7) */
+            id: string;
+            label?: string;
+            /** Format: int32 */
+            maxUses: number | null;
+            role: string;
+            /** Format: int32 */
+            useCount: number;
         };
         InviteInfoOutputBody: {
             /**
@@ -5760,6 +6425,45 @@ export interface components {
             id: string;
             /** Format: int64 */
             sentAt?: number;
+        };
+        Invocation: {
+            costEstimate?: string;
+            errorCode?: string;
+            /** @description Invocation public id (UUID v7) */
+            id: string;
+            /** Format: int64 */
+            invokedAt: number;
+            model: string;
+            promptRedacted: string;
+            purpose: string;
+            responseRedacted?: string;
+            status: string;
+            /** Format: int32 */
+            tokensInput?: number;
+            /** Format: int32 */
+            tokensOutput?: number;
+        };
+        Item: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            aiReasoning?: string;
+            /** Format: double */
+            aiScore?: number;
+            body?: string;
+            /** Format: int64 */
+            createdAt: number;
+            /** @description Intake item public id (UUID v7) */
+            id: string;
+            /** Format: int64 */
+            snoozeUntil?: number;
+            taskId?: string;
+            title: string;
+            triageStatus: string;
+            triagedByDisplayName?: string;
+            triagedByUserId?: string;
         };
         Label: {
             /**
@@ -5843,7 +6547,7 @@ export interface components {
              * @description A URL to the JSON Schema for this object.
              */
             readonly $schema?: string;
-            entries: components["schemas"]["AuditLogEntryDTO"][] | null;
+            entries: components["schemas"]["LogEntryDTO"][] | null;
             /** Format: int64 */
             total: number;
         };
@@ -6008,7 +6712,7 @@ export interface components {
              * @description A URL to the JSON Schema for this object.
              */
             readonly $schema?: string;
-            items: components["schemas"]["InboxItem"][] | null;
+            items: components["schemas"]["Item"][] | null;
             nextCursor: string | null;
             /** Format: int64 */
             total: number;
@@ -6019,7 +6723,7 @@ export interface components {
              * @description A URL to the JSON Schema for this object.
              */
             readonly $schema?: string;
-            items: components["schemas"]["IntakeItem"][] | null;
+            items: components["schemas"]["Item"][] | null;
             nextCursor: string | null;
             /** Format: int64 */
             total: number;
@@ -6032,13 +6736,24 @@ export interface components {
             readonly $schema?: string;
             providers: components["schemas"]["ProviderStatus"][] | null;
         };
+        ListInvitesOutputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            invites: components["schemas"]["Invite"][] | null;
+            nextCursor: string | null;
+            /** Format: int64 */
+            total: number;
+        };
         ListInvocationsOutputBody: {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
              */
             readonly $schema?: string;
-            invocations: components["schemas"]["AiInvocation"][] | null;
+            invocations: components["schemas"]["Invocation"][] | null;
         };
         ListLabelsBody: {
             /**
@@ -6153,6 +6868,17 @@ export interface components {
             tasks: components["schemas"]["MyTaskListItem"][] | null;
             /** Format: int64 */
             total: number;
+        };
+        ListOutputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            nextCursor: string | null;
+            /** Format: int64 */
+            total: number;
+            webhooks: components["schemas"]["WebhookSubscriptionDTO"][] | null;
         };
         ListPagesBody: {
             /**
@@ -6375,7 +7101,7 @@ export interface components {
              * @description A URL to the JSON Schema for this object.
              */
             readonly $schema?: string;
-            events: components["schemas"]["TimelineEvent"][] | null;
+            events: components["schemas"]["Event"][] | null;
             nextCursor: string | null;
             /** Format: int64 */
             total: number;
@@ -6386,7 +7112,7 @@ export interface components {
              * @description A URL to the JSON Schema for this object.
              */
             readonly $schema?: string;
-            items: components["schemas"]["AdminSession"][] | null;
+            items: components["schemas"]["Session"][] | null;
             /** Format: int64 */
             total: number;
         };
@@ -6396,7 +7122,7 @@ export interface components {
              * @description A URL to the JSON Schema for this object.
              */
             readonly $schema?: string;
-            items: components["schemas"]["AdminUser"][] | null;
+            items: components["schemas"]["User"][] | null;
             /** Format: int64 */
             total: number;
         };
@@ -6410,35 +7136,13 @@ export interface components {
             total: number;
             widgets: components["schemas"]["WidgetDTO"][] | null;
         };
-        ListWorkspaceInvitesOutputBody: {
-            /**
-             * Format: uri
-             * @description A URL to the JSON Schema for this object.
-             */
-            readonly $schema?: string;
-            invites: components["schemas"]["WorkspaceInvite"][] | null;
-            nextCursor: string | null;
-            /** Format: int64 */
-            total: number;
-        };
-        ListWorkspaceMembersOutputBody: {
-            /**
-             * Format: uri
-             * @description A URL to the JSON Schema for this object.
-             */
-            readonly $schema?: string;
-            members: components["schemas"]["WorkspaceMember"][] | null;
-            nextCursor: string | null;
-            /** Format: int64 */
-            total: number;
-        };
         ListWorkspaceUsersOutputBody: {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
              */
             readonly $schema?: string;
-            users: components["schemas"]["WorkspaceUserSummary"][] | null;
+            users: components["schemas"]["UserSummary"][] | null;
         };
         ListWorkspacesOutputBody: {
             /**
@@ -6446,10 +7150,23 @@ export interface components {
              * @description A URL to the JSON Schema for this object.
              */
             readonly $schema?: string;
-            nextCursor: string | null;
+            items: components["schemas"]["Workspace"][] | null;
             /** Format: int64 */
             total: number;
-            workspaces: components["schemas"]["Workspace"][] | null;
+        };
+        LogEntryDTO: {
+            action: string;
+            actorDisplayName: string | null;
+            actorUserPublicId: string | null;
+            ipAddress: string | null;
+            metadataJson: unknown;
+            /** Format: int64 */
+            occurredAt: number;
+            /** @description Audit entry public id (UUID v7) */
+            publicId: string;
+            resourcePublicId: string | null;
+            resourceType: string;
+            userAgent: string | null;
         };
         LoginBody: {
             /**
@@ -6576,6 +7293,23 @@ export interface components {
             /** @enum {string} */
             weekStart: "mon" | "sun" | "sat";
         };
+        Member: {
+            avatarUrl?: string;
+            /** Format: int64 */
+            createdAt: number;
+            displayName: string;
+            email: string;
+            /** @description Member public id (UUID v7) */
+            id: string;
+            /** Format: int64 */
+            invitedAt?: number;
+            /** Format: int64 */
+            joinedAt?: number;
+            role: string;
+            /** Format: int64 */
+            updatedAt?: number;
+            userId: string;
+        };
         MemberResponse: {
             /**
              * Format: uri
@@ -6608,6 +7342,28 @@ export interface components {
             updatedAt?: number;
             userDisplayName: string;
             userPublicId: string;
+        };
+        MetricsOutputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            /**
+             * Format: double
+             * @description applied / (applied + dismissed), 0 when no decisions
+             */
+            acceptanceRate: number;
+            /** Format: int64 */
+            applied: number;
+            /** Format: int64 */
+            dismissed: number;
+            /** @description Per-provider egress rate limiter counters */
+            outboundLimits: components["schemas"]["OutboundLimitStat"][] | null;
+            /** Format: int64 */
+            proposed: number;
+            /** Format: int64 */
+            windowDays: number;
         };
         ModelSummary: {
             displayName: string;
@@ -6702,17 +7458,6 @@ export interface components {
             severity: string;
             title: string;
             workspaceId: string;
-        };
-        NotificationsListOutputBody: {
-            /**
-             * Format: uri
-             * @description A URL to the JSON Schema for this object.
-             */
-            readonly $schema?: string;
-            nextCursor: string | null;
-            notifications: components["schemas"]["NotificationDTO"][] | null;
-            /** Format: int64 */
-            total: number;
         };
         OIDCStartOutputBody: {
             /**
@@ -7076,12 +7821,15 @@ export interface components {
              * @description A URL to the JSON Schema for this object.
              */
             readonly $schema?: string;
-            country?: string;
-            description?: string;
-            iconUrl?: string;
-            name?: string;
-            slug?: string;
-            timezone?: string;
+            enabled: boolean | null;
+        };
+        PatchWorkspaceOutputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            ok: boolean;
         };
         PauseAgentInputBody: {
             /**
@@ -7440,14 +8188,6 @@ export interface components {
             readonly $schema?: string;
             ok: boolean;
         };
-        RemoveWorkspaceMemberOutputBody: {
-            /**
-             * Format: uri
-             * @description A URL to the JSON Schema for this object.
-             */
-            readonly $schema?: string;
-            ok: boolean;
-        };
         RenderPublicShareOutputBody: {
             /**
              * Format: uri
@@ -7596,7 +8336,7 @@ export interface components {
             readonly $schema?: string;
             revoked: boolean;
         };
-        RevokeSessionOutputBody: {
+        RevokeInviteOutputBody: {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
@@ -7604,7 +8344,7 @@ export interface components {
             readonly $schema?: string;
             ok: boolean;
         };
-        RevokeWorkspaceInviteOutputBody: {
+        RevokeSessionOutputBody: {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
@@ -7665,6 +8405,18 @@ export interface components {
             readonly $schema?: string;
             alreadySubscribed: boolean;
             subscribed: boolean;
+        };
+        Session: {
+            active: boolean;
+            /** Format: int64 */
+            createdAt: number;
+            /** Format: int64 */
+            expiresAt: number;
+            id: string;
+            ipAddress: string;
+            /** Format: int64 */
+            lastUsedAt?: number;
+            userAgent: string;
         };
         SessionSummary: {
             /**
@@ -8174,17 +8926,6 @@ export interface components {
             /** Format: int64 */
             updatedAt: number;
         };
-        TimelineEvent: {
-            actorDisplayName?: string;
-            actorUserId?: string;
-            /** @description TimelineEvent public id (UUID v7) */
-            id: string;
-            /** Format: int64 */
-            occurredAt: number;
-            payload?: unknown;
-            taskId?: string;
-            type: string;
-        };
         ToggleCanEditInputBody: {
             /**
              * Format: uri
@@ -8218,6 +8959,21 @@ export interface components {
              */
             readonly $schema?: string;
             ok: boolean;
+        };
+        Tokens: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            accessToken: string;
+            /**
+             * Format: int64
+             * @description Access token expiry, unix seconds
+             */
+            expiresAt: number;
+            /** @description User public id (UUID v7) */
+            userId: string;
         };
         TotpConfirmInputBody: {
             /**
@@ -8318,6 +9074,18 @@ export interface components {
              */
             transition: "start" | "block" | "unblock" | "submit" | "complete" | "reopen" | "cancel";
         };
+        TriageInputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            /**
+             * Format: int64
+             * @description Number of inbox items to score (default 20, max 50)
+             */
+            limit?: number;
+        };
         TriageIntakeItemBody: {
             /**
              * Format: uri
@@ -8331,6 +9099,21 @@ export interface components {
             snoozeUntil?: number;
             /** @enum {string} */
             status: "accepted" | "rejected" | "snoozed" | "duplicate";
+        };
+        TriageOutputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            suggestions: components["schemas"]["TriageSuggestion"][] | null;
+        };
+        TriageSuggestion: {
+            inboxItemId: string;
+            reasoning: string;
+            recommendedAction: string;
+            /** Format: float */
+            score: number;
         };
         TriggerAgentOutputBody: {
             /**
@@ -8561,14 +9344,35 @@ export interface components {
             /** Format: int64 */
             width: number;
         };
-        UpdateWorkspaceMemberRoleInputBody: {
+        User: {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
              */
             readonly $schema?: string;
-            /** @enum {string} */
-            role: "owner" | "admin" | "member" | "guest";
+            avatarUrl?: string;
+            /** Format: int64 */
+            createdAt: number;
+            displayName: string;
+            email: string;
+            /** Format: int64 */
+            emailVerifiedAt?: number;
+            enabled: boolean;
+            id: string;
+            isInstanceAdmin: boolean;
+            /** Format: int64 */
+            lastLoginAt?: number;
+            locale: string;
+            /** Format: int64 */
+            updatedAt?: number;
+            /** Format: int64 */
+            workspaceCount: number;
+        };
+        UserSummary: {
+            avatarUrl?: string;
+            displayName: string;
+            /** @description User public id (UUID v7) */
+            id: string;
         };
         WebhookDeliveryDTO: {
             /** Format: int32 */
@@ -8616,17 +9420,6 @@ export interface components {
             /** Format: int64 */
             updatedAt: number | null;
             url: string;
-        };
-        WebhooksListOutputBody: {
-            /**
-             * Format: uri
-             * @description A URL to the JSON Schema for this object.
-             */
-            readonly $schema?: string;
-            nextCursor: string | null;
-            /** Format: int64 */
-            total: number;
-            webhooks: components["schemas"]["WebhookSubscriptionDTO"][] | null;
         };
         WeeklyDigestCounts: {
             /** Format: int64 */
@@ -8690,63 +9483,20 @@ export interface components {
              * @description A URL to the JSON Schema for this object.
              */
             readonly $schema?: string;
-            country: string;
             /** Format: int64 */
             createdAt: number;
             description?: string;
+            enabled: boolean;
             iconUrl?: string;
-            /** @description Workspace public id (UUID v7) */
             id: string;
-            /**
-             * Format: int64
-             * @description Number of enabled members in this workspace
-             */
+            /** Format: int64 */
             memberCount: number;
             name: string;
-            /** @description Caller's role in this workspace */
-            role?: string;
+            /** Format: int64 */
+            projectCount?: number;
             slug: string;
-            timezone: string;
             /** Format: int64 */
             updatedAt?: number;
-        };
-        WorkspaceInvite: {
-            /** Format: int64 */
-            createdAt: number;
-            createdByName: string;
-            /** Format: int64 */
-            expiresAt?: number;
-            /** @description Invite public id (UUID v7) */
-            id: string;
-            label?: string;
-            /** Format: int32 */
-            maxUses: number | null;
-            role: string;
-            /** Format: int32 */
-            useCount: number;
-        };
-        WorkspaceMember: {
-            avatarUrl?: string;
-            /** Format: int64 */
-            createdAt: number;
-            displayName: string;
-            email: string;
-            /** @description WorkspaceMember public id (UUID v7) */
-            id: string;
-            /** Format: int64 */
-            invitedAt?: number;
-            /** Format: int64 */
-            joinedAt?: number;
-            role: string;
-            /** Format: int64 */
-            updatedAt?: number;
-            userId: string;
-        };
-        WorkspaceUserSummary: {
-            avatarUrl?: string;
-            displayName: string;
-            /** @description User public id (UUID v7) */
-            id: string;
         };
     };
     responses: never;
@@ -8937,7 +9687,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["AdminRevokeSessionOutputBody"];
+                    "application/json": components["schemas"]["RevokeSessionOutputBody"];
                 };
             };
             /** @description Error */
@@ -9094,7 +9844,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["AdminUser"];
+                    "application/json": components["schemas"]["User"];
                 };
             };
             /** @description Error */
@@ -9198,7 +9948,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["AdminListWorkspacesOutputBody"];
+                    "application/json": components["schemas"]["ListWorkspacesOutputBody"];
                 };
             };
             /** @description Error */
@@ -9229,7 +9979,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["AdminWorkspace"];
+                    "application/json": components["schemas"]["Workspace"];
                 };
             };
             /** @description Error */
@@ -9254,7 +10004,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["AdminPatchWorkspaceInputBody"];
+                "application/json": components["schemas"]["PatchWorkspaceInputBody"];
             };
         };
         responses: {
@@ -9264,7 +10014,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["AdminPatchWorkspaceOutputBody"];
+                    "application/json": components["schemas"]["PatchWorkspaceOutputBody"];
                 };
             };
             /** @description Error */
@@ -9366,7 +10116,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["AuthTokens"];
+                    "application/json": components["schemas"]["Tokens"];
                 };
             };
             /** @description Error */
@@ -9465,7 +10215,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["AuthTokens"];
+                    "application/json": components["schemas"]["Tokens"];
                 };
             };
             /** @description Error */
@@ -9500,7 +10250,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["AuthTokens"];
+                    "application/json": components["schemas"]["Tokens"];
                 };
             };
             /** @description Error */
@@ -9564,7 +10314,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["AuthTokens"];
+                    "application/json": components["schemas"]["Tokens"];
                 };
             };
             /** @description Error */
@@ -9628,7 +10378,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["AuthTokens"];
+                    "application/json": components["schemas"]["Tokens"];
                 };
             };
             /** @description Error */
@@ -9691,7 +10441,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["AuthTokens"];
+                    "application/json": components["schemas"]["Tokens"];
                 };
             };
             /** @description Error */
@@ -9727,7 +10477,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["AuthTokens"];
+                    "application/json": components["schemas"]["Tokens"];
                 };
             };
             /** @description Error */
@@ -9923,7 +10673,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["AcceptWorkspaceInviteOutputBody"];
+                    "application/json": components["schemas"]["AcceptInviteOutputBody"];
                 };
             };
             /** @description Error */
@@ -10378,7 +11128,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["NotificationsListOutputBody"];
+                    "application/json": components["schemas"]["ListOutputBody"];
                 };
             };
             /** @description Error */
@@ -13645,7 +14395,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["AiCostTodayOutputBody"];
+                    "application/json": components["schemas"]["CostTodayOutputBody"];
                 };
             };
             /** @description Error */
@@ -13713,7 +14463,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["AiMetricsOutputBody"];
+                    "application/json": components["schemas"]["MetricsOutputBody"];
                 };
             };
             /** @description Error */
@@ -16179,7 +16929,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ExportBody"];
+                    "application/json": components["schemas"]["Body"];
                 };
             };
             /** @description Error */
@@ -16337,7 +17087,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["InboxTriageInputBody"];
+                "application/json": components["schemas"]["TriageInputBody"];
             };
         };
         responses: {
@@ -16347,7 +17097,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["InboxTriageOutputBody"];
+                    "application/json": components["schemas"]["TriageOutputBody"];
                 };
             };
             /** @description Error */
@@ -16418,7 +17168,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["IntakeItem"];
+                    "application/json": components["schemas"]["Item"];
                 };
             };
             /** @description Error */
@@ -16450,7 +17200,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["IntakeItem"];
+                    "application/json": components["schemas"]["Item"];
                 };
             };
             /** @description Error */
@@ -16486,7 +17236,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["IntakeItem"];
+                    "application/json": components["schemas"]["Item"];
                 };
             };
             /** @description Error */
@@ -16556,7 +17306,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ListWorkspaceInvitesOutputBody"];
+                    "application/json": components["schemas"]["ListInvitesOutputBody"];
                 };
             };
             /** @description Error */
@@ -16581,7 +17331,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["CreateWorkspaceInviteInputBody"];
+                "application/json": components["schemas"]["CreateInviteInputBody"];
             };
         };
         responses: {
@@ -16591,7 +17341,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["CreateWorkspaceInviteOutputBody"];
+                    "application/json": components["schemas"]["CreateInviteOutputBody"];
                 };
             };
             /** @description Error */
@@ -16623,7 +17373,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["RevokeWorkspaceInviteOutputBody"];
+                    "application/json": components["schemas"]["RevokeInviteOutputBody"];
                 };
             };
             /** @description Error */
@@ -17164,7 +17914,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ListWorkspaceMembersOutputBody"];
+                    "application/json": components["schemas"]["ListMembersOutputBody"];
                 };
             };
             /** @description Error */
@@ -17189,7 +17939,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["AddWorkspaceMemberInputBody"];
+                "application/json": components["schemas"]["AddMemberInputBody"];
             };
         };
         responses: {
@@ -17199,7 +17949,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["WorkspaceMember"];
+                    "application/json": components["schemas"]["Member"];
                 };
             };
             /** @description Error */
@@ -17231,7 +17981,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["RemoveWorkspaceMemberOutputBody"];
+                    "application/json": components["schemas"]["RemoveMemberOutputBody"];
                 };
             };
             /** @description Error */
@@ -17257,7 +18007,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["UpdateWorkspaceMemberRoleInputBody"];
+                "application/json": components["schemas"]["UpdateMemberRoleInputBody"];
             };
         };
         responses: {
@@ -17267,7 +18017,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["WorkspaceMember"];
+                    "application/json": components["schemas"]["Member"];
                 };
             };
             /** @description Error */
@@ -18517,7 +19267,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["WebhooksListOutputBody"];
+                    "application/json": components["schemas"]["ListOutputBody"];
                 };
             };
             /** @description Error */

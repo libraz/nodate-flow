@@ -173,6 +173,7 @@ func RegisterAutoActionRules(api huma.API, deps Deps) {
 		Method:      http.MethodGet,
 		Path:        "/workspaces/{wsId}/ai/auto-action-rules",
 		Summary:     "List auto-action rules for a workspace",
+		Description: "Returns the workspace's auto-action rule rows (rule kind, condition, side-effect). On first read seeds the default rule set so admins can begin tweaking immediately.",
 	}, GetAutoActionRules(deps))
 
 	huma.Register(api, huma.Operation{
@@ -180,6 +181,7 @@ func RegisterAutoActionRules(api huma.API, deps Deps) {
 		Method:      http.MethodPatch,
 		Path:        "/workspaces/{wsId}/ai/auto-action-rules",
 		Summary:     "Patch auto-action rules for a workspace",
+		Description: "Updates one or more auto-action rules in a single request. Each row may toggle enabled, change its threshold, or rewrite its condition. Returns the post-update set so the UI can reconcile state.",
 	}, PatchAutoActionRules(deps))
 }
 

@@ -72,12 +72,14 @@ func RegisterAiSuggestions(api huma.API, deps TriageDeps) {
 		Method:      http.MethodGet,
 		Path:        "/workspaces/{wsId}/ai/suggestions",
 		Summary:     "List pending AI suggestions for a workspace",
+		Description: "Returns AI inbox triage suggestions that have been proposed but not yet applied or dismissed. Sourced from the events table per ADR 0002 so the Glass Dock can resume across devices.",
 	}, ListAiSuggestions(deps))
 	huma.Register(api, huma.Operation{
 		OperationID:   "ai-suggestions-apply",
 		Method:        http.MethodPost,
 		Path:          "/workspaces/{wsId}/ai/suggestions/{inboxItemId}/apply",
 		Summary:       "Mark an AI suggestion as applied",
+		Description:   "Appends an ai.suggestion.applied reaction event so the suggestion drops out of the pending list. The actual side-effect (e.g. archive or assign) is performed separately by the client; this endpoint only records the user's choice.",
 		DefaultStatus: http.StatusNoContent,
 	}, ApplyAiSuggestion(deps))
 	huma.Register(api, huma.Operation{
@@ -85,6 +87,7 @@ func RegisterAiSuggestions(api huma.API, deps TriageDeps) {
 		Method:        http.MethodPost,
 		Path:          "/workspaces/{wsId}/ai/suggestions/{inboxItemId}/dismiss",
 		Summary:       "Dismiss an AI suggestion",
+		Description:   "Appends an ai.suggestion.dismissed reaction event so the suggestion drops out of the pending list and the AI metrics counter records the negative signal.",
 		DefaultStatus: http.StatusNoContent,
 	}, DismissAiSuggestion(deps))
 }

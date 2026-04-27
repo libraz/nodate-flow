@@ -17,6 +17,7 @@ func RegisterCollection(api huma.API, deps Deps) {
 		Method:      http.MethodPost,
 		Path:        "/tasks",
 		Summary:     "Create a task",
+		Description: "Creates a task in the project supplied in the body. Validates project membership server-side and emits a task.created event so timelines, AI pipelines, and webhooks see it.",
 	}, Create(deps))
 
 	huma.Register(api, huma.Operation{
@@ -24,6 +25,7 @@ func RegisterCollection(api huma.API, deps Deps) {
 		Method:      http.MethodGet,
 		Path:        "/tasks",
 		Summary:     "List tasks for a project or workspace",
+		Description: "Returns a cursor-paginated page of tasks filtered by project or workspace plus optional status / assignee / label filters. Backs every task list view (board, list, etc.).",
 	}, List(deps))
 
 	huma.Register(api, huma.Operation{
@@ -31,6 +33,7 @@ func RegisterCollection(api huma.API, deps Deps) {
 		Method:      http.MethodPost,
 		Path:        "/tasks/reorder",
 		Summary:     "Bulk-update sort weights for tasks within a project",
+		Description: "Updates many tasks' sort_order in one request after a drag-and-drop. Atomic per project so no other client sees a partially reordered list.",
 	}, Reorder(deps))
 
 	huma.Register(api, huma.Operation{
@@ -38,6 +41,7 @@ func RegisterCollection(api huma.API, deps Deps) {
 		Method:      http.MethodGet,
 		Path:        "/me/tasks",
 		Summary:     "List tasks assigned to the authenticated user across every workspace",
+		Description: "Returns the caller's open assigned tasks across every workspace they belong to so the global My Tasks view can render without per-workspace round trips.",
 	}, ListMyTasks(deps))
 
 	huma.Register(api, huma.Operation{
@@ -45,6 +49,7 @@ func RegisterCollection(api huma.API, deps Deps) {
 		Method:      http.MethodGet,
 		Path:        "/me/tasks-with-dates",
 		Summary:     "List tasks with due_on in range across every workspace",
+		Description: "Returns the caller's tasks whose due_on falls inside the supplied date range. Used by calendar overlays and weekly digest generation.",
 	}, ListMyTasksWithDates(deps))
 }
 
@@ -57,6 +62,7 @@ func RegisterTaskScoped(api huma.API, deps Deps) {
 		Method:      http.MethodGet,
 		Path:        "/tasks/{id}",
 		Summary:     "Fetch a task",
+		Description: "Returns a single task with its core fields, derived state, labels, and assignee. Sub-resources (comments, attachments, dependencies) live on dedicated endpoints.",
 	}, Get(deps))
 
 	huma.Register(api, huma.Operation{
@@ -64,6 +70,7 @@ func RegisterTaskScoped(api huma.API, deps Deps) {
 		Method:      http.MethodPatch,
 		Path:        "/tasks/{id}",
 		Summary:     "Patch a task",
+		Description: "Updates editable task fields (title, description, due_on, priority, assignee). Description edits append a description-version row so history is queryable.",
 	}, Patch(deps))
 
 	huma.Register(api, huma.Operation{
@@ -71,6 +78,7 @@ func RegisterTaskScoped(api huma.API, deps Deps) {
 		Method:      http.MethodDelete,
 		Path:        "/tasks/{id}",
 		Summary:     "Soft-disable a task",
+		Description: "Marks the task as removed so it disappears from active views without erasing data. Idempotent. Use /unarchive on archived tasks; this endpoint is the destructive variant.",
 	}, Disable(deps))
 
 	huma.Register(api, huma.Operation{
@@ -78,6 +86,7 @@ func RegisterTaskScoped(api huma.API, deps Deps) {
 		Method:      http.MethodGet,
 		Path:        "/tasks/{id}/duplicates",
 		Summary:     "List likely-duplicate tasks by embedding similarity",
+		Description: "Returns tasks similar to this one ranked by cosine distance over the description embedding. Used by the duplicate-warning chip on the task editor.",
 	}, ListDuplicates(deps))
 
 	huma.Register(api, huma.Operation{
@@ -85,6 +94,7 @@ func RegisterTaskScoped(api huma.API, deps Deps) {
 		Method:      http.MethodGet,
 		Path:        "/tasks/{id}/infer-state",
 		Summary:     "Propose the next likely state transition for a task",
+		Description: "Runs the deterministic state-inference engine and returns the proposed next state plus the matching rule and rationale. Read-only; apply with /transitions.",
 	}, InferState(deps))
 
 	huma.Register(api, huma.Operation{
@@ -92,6 +102,7 @@ func RegisterTaskScoped(api huma.API, deps Deps) {
 		Method:      http.MethodGet,
 		Path:        "/tasks/{id}/ai/invocations",
 		Summary:     "List recent AI invocations scoped to this task",
+		Description: "Returns redacted ai_invocations rows scoped to the task so the AI reasoning panel can show which prompts the LLM saw and what it decided.",
 	}, ListAiInvocations(deps))
 
 	huma.Register(api, huma.Operation{
@@ -99,6 +110,7 @@ func RegisterTaskScoped(api huma.API, deps Deps) {
 		Method:      http.MethodPost,
 		Path:        "/tasks/{id}/transitions",
 		Summary:     "Apply a state machine transition to a task",
+		Description: "Applies the named transition to the task. Validates against the state machine and emits a task.transitioned event. Refuses transitions that violate attached constraints.",
 	}, Transition(deps))
 
 	huma.Register(api, huma.Operation{
@@ -106,6 +118,7 @@ func RegisterTaskScoped(api huma.API, deps Deps) {
 		Method:      http.MethodPost,
 		Path:        "/tasks/{id}/constraints",
 		Summary:     "Attach a constraint to a task",
+		Description: "Persists a constraint DSL expression on the task. Subsequent transitions and the constraint engine evaluate against this rule.",
 	}, AddConstraint(deps))
 
 	huma.Register(api, huma.Operation{
@@ -113,6 +126,7 @@ func RegisterTaskScoped(api huma.API, deps Deps) {
 		Method:      http.MethodGet,
 		Path:        "/tasks/{id}/replay",
 		Summary:     "Replay transition events and report drift vs stored derived_state",
+		Description: "Replays every state-changing event in the task timeline and reports whether the recomputed derived_state matches the row. Diagnostic; does not mutate state.",
 	}, Replay(deps))
 
 	huma.Register(api, huma.Operation{
@@ -120,6 +134,7 @@ func RegisterTaskScoped(api huma.API, deps Deps) {
 		Method:      http.MethodPost,
 		Path:        "/tasks/{id}/constraints/evaluate",
 		Summary:     "Run the constraint engine for a task and persist satisfied/failed markers",
+		Description: "Evaluates every constraint attached to the task and persists the satisfied / failed markers so the UI can render the result without re-running rules client-side.",
 	}, EvaluateConstraints(deps))
 
 	huma.Register(api, huma.Operation{
@@ -127,6 +142,7 @@ func RegisterTaskScoped(api huma.API, deps Deps) {
 		Method:      http.MethodPost,
 		Path:        "/tasks/{id}/constraints/compile",
 		Summary:     "Compile a natural-language prompt into a constraint DSL expression",
+		Description: "Asks the AI compiler to translate a natural-language constraint description into a validated DSL expression. Returns the expression plus the compiler's confidence so the UI can confirm before /add.",
 	}, CompileConstraint(deps))
 
 	huma.Register(api, huma.Operation{
@@ -134,6 +150,7 @@ func RegisterTaskScoped(api huma.API, deps Deps) {
 		Method:      http.MethodPost,
 		Path:        "/tasks/{id}/constraints/explain",
 		Summary:     "Explain a constraint DSL expression in human-readable form",
+		Description: "Renders a stored constraint DSL back into prose so non-technical users can review what was attached. Used by the constraint detail panel.",
 	}, ExplainConstraint(deps))
 
 	huma.Register(api, huma.Operation{
@@ -141,6 +158,7 @@ func RegisterTaskScoped(api huma.API, deps Deps) {
 		Method:      http.MethodDelete,
 		Path:        "/tasks/{id}/constraints/{cid}",
 		Summary:     "Remove a constraint from a task",
+		Description: "Detaches the named constraint from the task. Subsequent evaluations no longer consider it. Idempotent.",
 	}, RemoveConstraint(deps))
 
 	huma.Register(api, huma.Operation{
@@ -148,6 +166,7 @@ func RegisterTaskScoped(api huma.API, deps Deps) {
 		Method:      http.MethodGet,
 		Path:        "/tasks/{id}/dependencies",
 		Summary:     "List incoming and outgoing dependency edges for a task",
+		Description: "Returns both blocks and blocked-by edges connected to the task. Used by the dependency panel and by the project graph view's per-task drilldown.",
 	}, ListDependencies(deps))
 
 	huma.Register(api, huma.Operation{
@@ -155,6 +174,7 @@ func RegisterTaskScoped(api huma.API, deps Deps) {
 		Method:      http.MethodPost,
 		Path:        "/tasks/{id}/dependencies",
 		Summary:     "Add a dependency edge from a task",
+		Description: "Creates a blocks / blocked-by edge from this task to another. Refuses cycles so the graph stays a DAG.",
 	}, AddDependency(deps))
 
 	huma.Register(api, huma.Operation{
@@ -162,6 +182,7 @@ func RegisterTaskScoped(api huma.API, deps Deps) {
 		Method:      http.MethodDelete,
 		Path:        "/tasks/{id}/dependencies/{depId}",
 		Summary:     "Remove a dependency edge",
+		Description: "Removes the named dependency edge. Idempotent.",
 	}, RemoveDependency(deps))
 
 	huma.Register(api, huma.Operation{
@@ -169,6 +190,7 @@ func RegisterTaskScoped(api huma.API, deps Deps) {
 		Method:      http.MethodGet,
 		Path:        "/tasks/{id}/linked-events",
 		Summary:     "List calendar events a task is linked to via task_event_links",
+		Description: "Returns the calendar events linked to this task with the link kind (contributes_to / blocks / etc.). Used by the task detail's calendar section.",
 	}, ListLinkedEvents(deps))
 
 	huma.Register(api, huma.Operation{
@@ -176,6 +198,7 @@ func RegisterTaskScoped(api huma.API, deps Deps) {
 		Method:      http.MethodPost,
 		Path:        "/tasks/{id}/links",
 		Summary:     "Link a task to a calendar event (contributes_to / blocks / ...)",
+		Description: "Creates a task_event_link row with the supplied kind so calendar shifts and task changes can propagate per the link semantics.",
 	}, CreateTaskEventLink(deps))
 
 	huma.Register(api, huma.Operation{
@@ -183,6 +206,7 @@ func RegisterTaskScoped(api huma.API, deps Deps) {
 		Method:      http.MethodDelete,
 		Path:        "/tasks/{id}/links/{linkId}",
 		Summary:     "Soft-disable a task↔event link",
+		Description: "Marks the named task↔event link as removed so propagation rules stop firing. Audit history is preserved.",
 	}, DeleteTaskEventLink(deps))
 
 	huma.Register(api, huma.Operation{
@@ -190,6 +214,7 @@ func RegisterTaskScoped(api huma.API, deps Deps) {
 		Method:      http.MethodGet,
 		Path:        "/tasks/{id}/actors",
 		Summary:     "List actors on a task",
+		Description: "Returns the human actors (assignees, collaborators, watchers) attached to the task with their role.",
 	}, ListActors(deps))
 
 	huma.Register(api, huma.Operation{
@@ -197,6 +222,7 @@ func RegisterTaskScoped(api huma.API, deps Deps) {
 		Method:      http.MethodPost,
 		Path:        "/tasks/{id}/actors",
 		Summary:     "Attach an actor to a task",
+		Description: "Adds a human actor to the task at the requested role (assignee / collaborator / watcher). Triggers the assignment notification pipeline when the role is assignee.",
 	}, AddActor(deps))
 
 	huma.Register(api, huma.Operation{
@@ -204,6 +230,7 @@ func RegisterTaskScoped(api huma.API, deps Deps) {
 		Method:      http.MethodDelete,
 		Path:        "/tasks/{id}/actors/{actorId}",
 		Summary:     "Remove an actor from a task",
+		Description: "Detaches the named actor from the task. Idempotent.",
 	}, RemoveActor(deps))
 
 	huma.Register(api, huma.Operation{
@@ -211,6 +238,7 @@ func RegisterTaskScoped(api huma.API, deps Deps) {
 		Method:      http.MethodGet,
 		Path:        "/tasks/{id}/agents",
 		Summary:     "List AI agent actors on a task",
+		Description: "Returns the AI agent actors currently attached to the task. Distinguished from human actors so UI can render differently and quotas can apply per-agent.",
 	}, ListAgentActors(deps))
 
 	huma.Register(api, huma.Operation{
@@ -218,6 +246,7 @@ func RegisterTaskScoped(api huma.API, deps Deps) {
 		Method:      http.MethodPost,
 		Path:        "/tasks/{id}/agents",
 		Summary:     "Attach an AI agent to a task",
+		Description: "Attaches an AI agent so the agent's runtime can be scheduled on or triggered for the task. Idempotent per (task, agent).",
 	}, AddAgentActor(deps))
 
 	huma.Register(api, huma.Operation{
@@ -225,6 +254,7 @@ func RegisterTaskScoped(api huma.API, deps Deps) {
 		Method:      http.MethodPost,
 		Path:        "/tasks/{id}/comments",
 		Summary:     "Add a comment to a task",
+		Description: "Appends a comment from the caller. Mentions inside the body are parsed and routed through the notifications pipeline.",
 	}, AddComment(deps))
 
 	huma.Register(api, huma.Operation{
@@ -232,6 +262,7 @@ func RegisterTaskScoped(api huma.API, deps Deps) {
 		Method:      http.MethodGet,
 		Path:        "/tasks/{id}/comments",
 		Summary:     "List comments on a task",
+		Description: "Returns the comments on the task in chronological order with reaction counts. Cursor-paginated for long threads.",
 	}, ListComments(deps))
 
 	huma.Register(api, huma.Operation{
@@ -239,6 +270,7 @@ func RegisterTaskScoped(api huma.API, deps Deps) {
 		Method:      http.MethodPatch,
 		Path:        "/tasks/{id}/comments/{cid}",
 		Summary:     "Edit a comment (author only)",
+		Description: "Replaces the body of the named comment. Only the original author may edit; an edited_at timestamp is set.",
 	}, EditComment(deps))
 
 	huma.Register(api, huma.Operation{
@@ -246,6 +278,7 @@ func RegisterTaskScoped(api huma.API, deps Deps) {
 		Method:      http.MethodDelete,
 		Path:        "/tasks/{id}/comments/{cid}",
 		Summary:     "Delete a comment (author or workspace admin)",
+		Description: "Removes the named comment. Permitted to the comment author or any workspace admin. Idempotent.",
 	}, DeleteComment(deps))
 
 	huma.Register(api, huma.Operation{
@@ -253,6 +286,7 @@ func RegisterTaskScoped(api huma.API, deps Deps) {
 		Method:      http.MethodPost,
 		Path:        "/tasks/{id}/attachments",
 		Summary:     "Register an attachment metadata row on a task",
+		Description: "Records that a file (already uploaded via /presign) is associated with the task. Stores filename, MIME, size, and storage key.",
 	}, AddAttachment(deps))
 
 	huma.Register(api, huma.Operation{
@@ -260,6 +294,7 @@ func RegisterTaskScoped(api huma.API, deps Deps) {
 		Method:      http.MethodPost,
 		Path:        "/tasks/{id}/attachments/presign",
 		Summary:     "Get a presigned PUT URL for uploading an attachment",
+		Description: "Returns a short-lived presigned PUT URL the client can stream the file directly to S3 with. Pair with /attachments to record metadata after the upload completes.",
 	}, PresignUpload(deps))
 
 	huma.Register(api, huma.Operation{
@@ -267,6 +302,7 @@ func RegisterTaskScoped(api huma.API, deps Deps) {
 		Method:      http.MethodGet,
 		Path:        "/tasks/{id}/attachments",
 		Summary:     "List attachments on a task",
+		Description: "Returns the attachments registered on the task with metadata only — bytes are fetched separately via /download.",
 	}, ListAttachments(deps))
 
 	huma.Register(api, huma.Operation{
@@ -274,6 +310,7 @@ func RegisterTaskScoped(api huma.API, deps Deps) {
 		Method:      http.MethodGet,
 		Path:        "/tasks/{id}/attachments/{aid}/download",
 		Summary:     "Get a presigned GET URL for downloading an attachment",
+		Description: "Returns a short-lived presigned GET URL so the client can stream the file straight from object storage. The API never proxies the bytes.",
 	}, DownloadAttachment(deps))
 
 	huma.Register(api, huma.Operation{
@@ -281,6 +318,7 @@ func RegisterTaskScoped(api huma.API, deps Deps) {
 		Method:      http.MethodDelete,
 		Path:        "/tasks/{id}/attachments/{aid}",
 		Summary:     "Soft-delete an attachment from a task",
+		Description: "Marks the attachment as removed and best-effort deletes the underlying object. Idempotent.",
 	}, DeleteAttachment(deps))
 
 	huma.Register(api, huma.Operation{
@@ -288,6 +326,7 @@ func RegisterTaskScoped(api huma.API, deps Deps) {
 		Method:      http.MethodPost,
 		Path:        "/tasks/{id}/archive",
 		Summary:     "Archive a task",
+		Description: "Moves the task into the archive so it disappears from active views without removing it. Idempotent.",
 	}, Archive(deps))
 
 	huma.Register(api, huma.Operation{
@@ -295,6 +334,7 @@ func RegisterTaskScoped(api huma.API, deps Deps) {
 		Method:      http.MethodPost,
 		Path:        "/tasks/{id}/unarchive",
 		Summary:     "Unarchive a task",
+		Description: "Restores an archived task to active state. Idempotent.",
 	}, Unarchive(deps))
 
 	// Description version history.
@@ -303,6 +343,7 @@ func RegisterTaskScoped(api huma.API, deps Deps) {
 		Method:      http.MethodGet,
 		Path:        "/tasks/{id}/description-history",
 		Summary:     "List description version history for a task",
+		Description: "Returns a chronological list of description revisions (id, author, edited_at) without the full body so the version chooser is cheap.",
 	}, ListDescriptionVersions(deps))
 
 	huma.Register(api, huma.Operation{
@@ -310,6 +351,7 @@ func RegisterTaskScoped(api huma.API, deps Deps) {
 		Method:      http.MethodGet,
 		Path:        "/tasks/{id}/description-history/{versionId}",
 		Summary:     "Get a specific description version with full body",
+		Description: "Returns the full body of one description revision so the diff viewer can render the historical content.",
 	}, GetDescriptionVersion(deps))
 
 	huma.Register(api, huma.Operation{
@@ -317,6 +359,7 @@ func RegisterTaskScoped(api huma.API, deps Deps) {
 		Method:      http.MethodPost,
 		Path:        "/tasks/{id}/description-history/{versionId}/restore",
 		Summary:     "Restore a previous description version",
+		Description: "Replaces the task's current description with the named historical version, appending a new revision so the restore itself is recorded.",
 	}, RestoreDescriptionVersion(deps))
 }
 
@@ -328,6 +371,7 @@ func RegisterWorkspaceScoped(api huma.API, deps Deps) {
 		Method:      http.MethodGet,
 		Path:        "/workspaces/{wsId}/tasks/archived",
 		Summary:     "List archived tasks in a workspace",
+		Description: "Returns archived tasks in the workspace with cursor pagination. Used by the archive panel and bulk-restore tooling.",
 	}, ListArchived(deps))
 
 	huma.Register(api, huma.Operation{
@@ -335,6 +379,7 @@ func RegisterWorkspaceScoped(api huma.API, deps Deps) {
 		Method:      http.MethodGet,
 		Path:        "/workspaces/{wsId}/calendar-events/{evtId}/linked-tasks",
 		Summary:     "List tasks linked to a calendar event via task_event_links",
+		Description: "Returns the tasks linked to the named calendar event with the link kind. Inverse of /tasks/{id}/linked-events.",
 	}, ListLinkedTasks(deps))
 
 	huma.Register(api, huma.Operation{
@@ -342,6 +387,7 @@ func RegisterWorkspaceScoped(api huma.API, deps Deps) {
 		Method:      http.MethodPost,
 		Path:        "/workspaces/{wsId}/calendar-events/{evtId}/propose-shift",
 		Summary:     "Propose shifting an umbrella event and partition linked tasks into safe vs conflict",
+		Description: "Dry-runs an umbrella event shift and returns which contributes_to-linked tasks would move cleanly versus which would conflict with constraints. Read-only; apply with /apply-shift.",
 	}, ProposeShift(deps))
 
 	huma.Register(api, huma.Operation{
@@ -349,5 +395,6 @@ func RegisterWorkspaceScoped(api huma.API, deps Deps) {
 		Method:      http.MethodPost,
 		Path:        "/workspaces/{wsId}/calendar-events/{evtId}/apply-shift",
 		Summary:     "Shift an umbrella event and move confirmed contributes_to-linked tasks by the same day delta",
+		Description: "Applies the previously proposed shift: moves the umbrella event and the confirmed task subset by the same day delta. Conflicting tasks are left in place; their conflict reasons are returned.",
 	}, ApplyShift(deps))
 }

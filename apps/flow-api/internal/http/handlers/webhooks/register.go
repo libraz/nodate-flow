@@ -15,6 +15,7 @@ func Register(api huma.API, deps Deps) {
 		Method:      http.MethodPost,
 		Path:        "/workspaces/{wsId}/webhooks",
 		Summary:     "Create a webhook subscription",
+		Description: "Registers an outbound webhook subscription for the workspace. Returns the freshly minted HMAC signing secret in the response body — this is the only time it is returned plaintext.",
 	}, Create(deps))
 
 	huma.Register(api, huma.Operation{
@@ -22,6 +23,7 @@ func Register(api huma.API, deps Deps) {
 		Method:      http.MethodGet,
 		Path:        "/workspaces/{wsId}/webhooks",
 		Summary:     "List webhook subscriptions",
+		Description: "Lists every webhook subscription in the workspace with its target URL, event filters, and active state. Signing secrets are masked.",
 	}, List(deps))
 
 	huma.Register(api, huma.Operation{
@@ -29,6 +31,7 @@ func Register(api huma.API, deps Deps) {
 		Method:      http.MethodGet,
 		Path:        "/workspaces/{wsId}/webhooks/{webhookId}",
 		Summary:     "Get a webhook subscription (includes secret)",
+		Description: "Returns the named webhook subscription including its plaintext signing secret so the operator can rotate it. Restricted to workspace admins.",
 	}, Get(deps))
 
 	huma.Register(api, huma.Operation{
@@ -36,6 +39,7 @@ func Register(api huma.API, deps Deps) {
 		Method:      http.MethodDelete,
 		Path:        "/workspaces/{wsId}/webhooks/{webhookId}",
 		Summary:     "Soft-delete a webhook subscription",
+		Description: "Marks the subscription as removed so no further deliveries are attempted. Delivery history remains queryable for audit.",
 	}, Delete(deps))
 
 	huma.Register(api, huma.Operation{
@@ -43,6 +47,7 @@ func Register(api huma.API, deps Deps) {
 		Method:      http.MethodPatch,
 		Path:        "/workspaces/{wsId}/webhooks/{webhookId}/toggle",
 		Summary:     "Activate or deactivate a webhook subscription",
+		Description: "Flips the subscription's active flag. Inactive subscriptions stay registered but skip delivery — useful for pausing during a downstream outage.",
 	}, Toggle(deps))
 
 	huma.Register(api, huma.Operation{
@@ -50,6 +55,7 @@ func Register(api huma.API, deps Deps) {
 		Method:      http.MethodGet,
 		Path:        "/workspaces/{wsId}/webhooks/{webhookId}/deliveries",
 		Summary:     "List delivery log for a webhook subscription",
+		Description: "Returns recent delivery attempts for the subscription with status code, latency, error reason, and the redacted payload preview. Used by the webhook detail panel for diagnostics.",
 	}, ListDeliveries(deps))
 
 	huma.Register(api, huma.Operation{
@@ -57,5 +63,6 @@ func Register(api huma.API, deps Deps) {
 		Method:      http.MethodPost,
 		Path:        "/workspaces/{wsId}/webhooks/{webhookId}/test",
 		Summary:     "Send a test ping delivery",
+		Description: "Synchronously sends a test ping payload signed with the subscription's secret so the operator can verify reachability and signature handling without waiting for a real event.",
 	}, TestDelivery(deps))
 }

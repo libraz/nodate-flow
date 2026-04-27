@@ -66,27 +66,24 @@ func RequireCalendarMember(db ACLDB) func(http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			actorID, ok := ActorFromContext(r.Context())
 			if !ok {
-				writeError(w, http.StatusForbidden, apierrors.CalendarCalendarAccessDenied.Code,
-					apierrors.CalendarCalendarAccessDenied.Message)
+				writeSpecError(w, apierrors.CalendarCalendarAccessDenied)
 				return
 			}
 
 			raw := chi.URLParam(r, "calId")
 			pub, err := uuid.Parse(raw)
 			if err != nil {
-				writeError(w, http.StatusNotFound, apierrors.CalendarCalendarNotFound.Code,
-					apierrors.CalendarCalendarNotFound.Message)
+				writeSpecError(w, apierrors.CalendarCalendarNotFound)
 				return
 			}
 
 			var calID uint32
 			if err := db.QueryRowContext(r.Context(), calQuery, types.FromUUID(pub)).Scan(&calID); err != nil {
 				if errors.Is(err, sql.ErrNoRows) {
-					writeError(w, http.StatusNotFound, apierrors.CalendarCalendarNotFound.Code,
-						apierrors.CalendarCalendarNotFound.Message)
+					writeSpecError(w, apierrors.CalendarCalendarNotFound)
 					return
 				}
-				writeError(w, http.StatusInternalServerError, apierrors.InternalUnexpected.Code, apierrors.InternalUnexpected.Message)
+				writeSpecError(w, apierrors.InternalUnexpected)
 				return
 			}
 
@@ -94,11 +91,10 @@ func RequireCalendarMember(db ACLDB) func(http.Handler) http.Handler {
 			var subID uint32
 			if err := db.QueryRowContext(r.Context(), subQuery, calID, actorID).Scan(&subID); err != nil {
 				if errors.Is(err, sql.ErrNoRows) {
-					writeError(w, http.StatusForbidden, apierrors.CalendarCalendarAccessDenied.Code,
-						apierrors.CalendarCalendarAccessDenied.Message)
+					writeSpecError(w, apierrors.CalendarCalendarAccessDenied)
 					return
 				}
-				writeError(w, http.StatusInternalServerError, apierrors.InternalUnexpected.Code, apierrors.InternalUnexpected.Message)
+				writeSpecError(w, apierrors.InternalUnexpected)
 				return
 			}
 

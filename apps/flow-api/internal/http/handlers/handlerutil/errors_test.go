@@ -1,6 +1,7 @@
 package handlerutil
 
 import (
+	"encoding/json"
 	"testing"
 
 	"github.com/danielgtaylor/huma/v2"
@@ -53,23 +54,73 @@ func TestHTTPErr_EnvelopeShape(t *testing.T) {
 
 	err := HTTPErr(spec)
 
-	model, ok := err.(*huma.ErrorModel)
+	pd, ok := err.(*ProblemDetails)
 	if !ok {
-		t.Fatalf("expected *huma.ErrorModel, got %T", err)
+		t.Fatalf("expected *ProblemDetails, got %T", err)
 	}
 
-	if model.Type != "RATE.LIMIT_EXCEEDED" {
-		t.Errorf("type: got %q, want %q", model.Type, "RATE.LIMIT_EXCEEDED")
+	if pd.Type != "RATE.LIMIT_EXCEEDED" {
+		t.Errorf("type: got %q, want %q", pd.Type, "RATE.LIMIT_EXCEEDED")
 	}
-	if model.Title != "Too Many Requests" {
-		t.Errorf("title: got %q, want %q", model.Title, "Too Many Requests")
+	if pd.Title != "Too Many Requests" {
+		t.Errorf("title: got %q, want %q", pd.Title, "Too Many Requests")
 	}
-	if model.Detail != "Too many requests" {
-		t.Errorf("detail: got %q, want %q (must NOT include code prefix)", model.Detail, "Too many requests")
+	if pd.Detail != "Too many requests" {
+		t.Errorf("detail: got %q, want %q (must NOT include code prefix)", pd.Detail, "Too many requests")
 	}
-	if model.Status != 429 {
-		t.Errorf("status: got %d, want 429", model.Status)
+	if pd.Status != 429 {
+		t.Errorf("status: got %d, want 429", pd.Status)
 	}
+}
+
+// TestHTTPErr_PropagatesDescriptionAndUserAction guards the wire shape
+// added when ErrorResponse was extended. Description and UserAction
+// must be copied from the Spec verbatim so the SDK and frontend see
+// the catalog text without round-tripping the registry.
+func TestHTTPErr_PropagatesDescriptionAndUserAction(t *testing.T) {
+	t.Parallel()
+
+	spec := &apierrors.Spec{
+		Code:        "WS.TASK.NOT_FOUND",
+		Status:      404,
+		Message:     "Task not found",
+		Description: "The task does not exist or the actor lacks visibility.",
+		UserAction:  "Refresh the list and verify the task is still visible to you.",
+	}
+
+	pd, ok := HTTPErr(spec).(*ProblemDetails)
+	if !ok {
+		t.Fatalf("expected *ProblemDetails")
+	}
+	if pd.Description != spec.Description {
+		t.Errorf("description: got %q, want %q", pd.Description, spec.Description)
+	}
+	if pd.UserAction != spec.UserAction {
+		t.Errorf("userAction: got %q, want %q", pd.UserAction, spec.UserAction)
+	}
+
+	// Also marshal to JSON and verify the omitempty tags fire when
+	// the catalog has not provided the optional fields.
+	bare := HTTPErr(&apierrors.Spec{Code: "X.Y.MINIMAL", Status: 400, Message: "bare"})
+	bytes, err := json.Marshal(bare)
+	if err != nil {
+		t.Fatalf("marshal: %v", err)
+	}
+	got := string(bytes)
+	if contains(got, "description") || contains(got, "userAction") {
+		t.Errorf("empty description/userAction must be omitted, got %s", got)
+	}
+}
+
+// contains is a tiny strings.Contains stand-in to avoid a top-level
+// import in this single test.
+func contains(s, sub string) bool {
+	for i := 0; i+len(sub) <= len(s); i++ {
+		if s[i:i+len(sub)] == sub {
+			return true
+		}
+	}
+	return false
 }
 
 func TestHTTPErr_DifferentStatusCodes(t *testing.T) {

@@ -6,8 +6,6 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/danielgtaylor/huma/v2"
-
 	apierrors "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/errors"
 )
 
@@ -53,19 +51,19 @@ func TestClassifyItemkitErrorOther(t *testing.T) {
 	}
 }
 
-// extractCode pulls the apierror code from the Huma error envelope so
-// tests can assert against the canonical type without depending on
+// extractCode pulls the apierror code from the canonical envelope so
+// tests can assert against the wire type without depending on
 // internal pointer identity.
 func extractCode(t *testing.T, err error) string {
 	t.Helper()
 	if err == nil {
 		return ""
 	}
-	var em *huma.ErrorModel
-	if !errors.As(err, &em) {
-		t.Fatalf("expected *huma.ErrorModel, got %T", err)
+	var pd *ProblemDetails
+	if !errors.As(err, &pd) {
+		t.Fatalf("expected *ProblemDetails, got %T", err)
 	}
-	return em.Type
+	return pd.Type
 }
 
 func TestTranslateCalendarItemkitErrorNil(t *testing.T) {

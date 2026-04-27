@@ -186,24 +186,32 @@ func ProjectFromContext(ctx context.Context) (ProjectContext, bool) {
 // Error response
 // ----------------------------------------------------------------------------
 
-// errorBody mirrors the wire shape of the canonical ErrorResponse DTO. It is
-// duplicated here to avoid an import cycle with the handlers package; the
-// real type lives under apps/flow-api/internal/http/handlers and is generated from
-// the OpenAPI definition.
-//
-// TODO: Replace with a shared dto package once it exists.
+// errorBody mirrors the wire shape of the canonical ErrorResponse DTO.
+// It is duplicated here to avoid an import cycle with the handlers
+// package; the real type lives under apps/flow-api/internal/dto and is
+// generated from the OpenAPI definition. Description and UserAction are
+// optional and propagate the catalog text from errors/*.yaml.
 type errorBody struct {
-	Code    string `json:"code"`
-	Message string `json:"message"`
+	Code        string `json:"code"`
+	Message     string `json:"message"`
+	Description string `json:"description,omitempty"`
+	UserAction  string `json:"userAction,omitempty"`
 }
 
-// writeError writes a JSON error response. ACL middleware cannot return
-// errors via Huma's pipeline (it sits at the chi layer above Huma), so we
-// emit the same shape directly.
-func writeError(w http.ResponseWriter, status int, code, message string) {
+// writeSpecError writes the canonical JSON error envelope for the
+// chi-level middlewares (ACL, calendar). They sit above Huma's
+// pipeline so they cannot return a `huma.StatusError`; the body shape
+// mirrors the ProblemDetails wire format so clients can branch on the
+// same fields regardless of which layer emitted the error.
+func writeSpecError(w http.ResponseWriter, spec *apierrors.Spec) {
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
-	w.WriteHeader(status)
-	_ = json.NewEncoder(w).Encode(errorBody{Code: code, Message: message})
+	w.WriteHeader(spec.Status)
+	_ = json.NewEncoder(w).Encode(errorBody{
+		Code:        spec.Code,
+		Message:     spec.Message,
+		Description: spec.Description,
+		UserAction:  spec.UserAction,
+	})
 }
 
 // writeAPIError converts an *apierrors.APIError into a JSON error
@@ -213,10 +221,10 @@ func writeError(w http.ResponseWriter, status int, code, message string) {
 func writeAPIError(w http.ResponseWriter, err error) {
 	var ae *apierrors.APIError
 	if stderrors.As(err, &ae) && ae.Spec != nil {
-		writeError(w, ae.Spec.Status, ae.Spec.Code, ae.Spec.Message)
+		writeSpecError(w, ae.Spec)
 		return
 	}
-	writeError(w, http.StatusInternalServerError, apierrors.InternalUnexpected.Code, apierrors.InternalUnexpected.Message)
+	writeSpecError(w, apierrors.InternalUnexpected)
 }
 
 // hasSpec reports whether err is an APIError carrying the given spec.
@@ -249,8 +257,7 @@ func RequireInstanceAdmin(db ACLDB) func(http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			userID, ok := ActorFromContext(r.Context())
 			if !ok {
-				writeError(w, http.StatusForbidden, apierrors.InstanceAdminRequired.Code,
-					apierrors.InstanceAdminRequired.Message)
+				writeSpecError(w, apierrors.InstanceAdminRequired)
 				return
 			}
 			if err := acl.CheckInstanceAdmin(r.Context(), db, userID); err != nil {
@@ -280,15 +287,13 @@ func RequireWorkspaceMember(db ACLDB) func(http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			userID, ok := ActorFromContext(r.Context())
 			if !ok {
-				writeError(w, http.StatusForbidden, apierrors.WsWorkspaceAccessDenied.Code,
-					apierrors.WsWorkspaceAccessDenied.Message)
+				writeSpecError(w, apierrors.WsWorkspaceAccessDenied)
 				return
 			}
 			raw := chi.URLParam(r, "wsId")
 			pub, err := uuid.Parse(raw)
 			if err != nil {
-				writeError(w, http.StatusNotFound, apierrors.WsWorkspaceNotFound.Code,
-					apierrors.WsWorkspaceNotFound.Message)
+				writeSpecError(w, apierrors.WsWorkspaceNotFound)
 				return
 			}
 			access, err := acl.ResolveWorkspaceAccess(r.Context(), db, pub, userID)
@@ -312,8 +317,7 @@ func RequireWorkspaceRole(minRole WorkspaceRole) func(http.Handler) http.Handler
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			ws, ok := WorkspaceFromContext(r.Context())
 			if !ok || !ws.Role.AtLeast(minRole) {
-				writeError(w, http.StatusForbidden, apierrors.WsMemberRoleDenied.Code,
-					apierrors.WsMemberRoleDenied.Message)
+				writeSpecError(w, apierrors.WsMemberRoleDenied)
 				return
 			}
 			next.ServeHTTP(w, r)
@@ -346,21 +350,18 @@ func RequireProjectMember(db ACLDB) func(http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			userID, ok := ActorFromContext(r.Context())
 			if !ok {
-				writeError(w, http.StatusForbidden, apierrors.WsProjectAccessDenied.Code,
-					apierrors.WsProjectAccessDenied.Message)
+				writeSpecError(w, apierrors.WsProjectAccessDenied)
 				return
 			}
 			ws, ok := WorkspaceFromContext(r.Context())
 			if !ok {
-				writeError(w, http.StatusNotFound, apierrors.WsProjectNotFound.Code,
-					apierrors.WsProjectNotFound.Message)
+				writeSpecError(w, apierrors.WsProjectNotFound)
 				return
 			}
 			raw := chi.URLParam(r, "prjId")
 			pub, err := uuid.Parse(raw)
 			if err != nil {
-				writeError(w, http.StatusNotFound, apierrors.WsProjectNotFound.Code,
-					apierrors.WsProjectNotFound.Message)
+				writeSpecError(w, apierrors.WsProjectNotFound)
 				return
 			}
 			prjID, err := acl.ResolveProjectInWorkspace(r.Context(), db, ws.ID, pub)
@@ -392,15 +393,13 @@ func RequireProjectMemberByGlobalID(db ACLDB) func(http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			userID, ok := ActorFromContext(r.Context())
 			if !ok {
-				writeError(w, http.StatusForbidden, apierrors.WsProjectAccessDenied.Code,
-					apierrors.WsProjectAccessDenied.Message)
+				writeSpecError(w, apierrors.WsProjectAccessDenied)
 				return
 			}
 			raw := chi.URLParam(r, "prjId")
 			pub, err := uuid.Parse(raw)
 			if err != nil {
-				writeError(w, http.StatusNotFound, apierrors.WsProjectNotFound.Code,
-					apierrors.WsProjectNotFound.Message)
+				writeSpecError(w, apierrors.WsProjectNotFound)
 				return
 			}
 			prj, err := acl.ResolveProjectByPublicID(r.Context(), db, pub)
@@ -414,8 +413,7 @@ func RequireProjectMemberByGlobalID(db ACLDB) func(http.Handler) http.Handler {
 				// match the historical surface of this middleware. Transport
 				// errors propagate as INTERNAL.UNEXPECTED via writeAPIError.
 				if hasSpec(err, apierrors.WsWorkspaceNotFound) {
-					writeError(w, http.StatusNotFound, apierrors.WsProjectNotFound.Code,
-						apierrors.WsProjectNotFound.Message)
+					writeSpecError(w, apierrors.WsProjectNotFound)
 					return
 				}
 				writeAPIError(w, err)
@@ -465,15 +463,13 @@ func RequireTaskAccess(db ACLDB) func(http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			userID, ok := ActorFromContext(r.Context())
 			if !ok {
-				writeError(w, http.StatusForbidden, apierrors.WsTaskAccessDenied.Code,
-					apierrors.WsTaskAccessDenied.Message)
+				writeSpecError(w, apierrors.WsTaskAccessDenied)
 				return
 			}
 			raw := chi.URLParam(r, "id")
 			pub, err := uuid.Parse(raw)
 			if err != nil {
-				writeError(w, http.StatusNotFound, apierrors.WsTaskNotFound.Code,
-					apierrors.WsTaskNotFound.Message)
+				writeSpecError(w, apierrors.WsTaskNotFound)
 				return
 			}
 			rec, err := acl.ResolveTaskByPublicID(r.Context(), db, pub)
@@ -487,8 +483,7 @@ func RequireTaskAccess(db ACLDB) func(http.Handler) http.Handler {
 				// disclosing existence of cross-tenant tasks. Transport
 				// errors propagate as INTERNAL.UNEXPECTED via writeAPIError.
 				if hasSpec(err, apierrors.WsWorkspaceNotFound) {
-					writeError(w, http.StatusNotFound, apierrors.WsTaskNotFound.Code,
-						apierrors.WsTaskNotFound.Message)
+					writeSpecError(w, apierrors.WsTaskNotFound)
 					return
 				}
 				writeAPIError(w, err)
@@ -547,8 +542,7 @@ func RequireProjectRole(minRole ProjectRole) func(http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			prj, ok := ProjectFromContext(r.Context())
 			if !ok {
-				writeError(w, http.StatusForbidden, apierrors.WsProjectAccessDenied.Code,
-					apierrors.WsProjectAccessDenied.Message)
+				writeSpecError(w, apierrors.WsProjectAccessDenied)
 				return
 			}
 			if prj.Role == ProjectRoleElevated {
@@ -556,8 +550,7 @@ func RequireProjectRole(minRole ProjectRole) func(http.Handler) http.Handler {
 				return
 			}
 			if !prj.Role.AtLeast(minRole) {
-				writeError(w, http.StatusForbidden, apierrors.WsProjectAccessDenied.Code,
-					apierrors.WsProjectAccessDenied.Message)
+				writeSpecError(w, apierrors.WsProjectAccessDenied)
 				return
 			}
 			next.ServeHTTP(w, r)

@@ -15,6 +15,7 @@ func Register(api huma.API, deps Deps) {
 		Method:      http.MethodPost,
 		Path:        "/workspaces/{wsId}/imports",
 		Summary:     "Create an import job",
+		Description: "Submits an import job (Asana / CSV / etc.) referencing previously uploaded source data. The job runs asynchronously; poll /imports/{importId} for progress.",
 	}, Create(deps))
 
 	huma.Register(api, huma.Operation{
@@ -22,6 +23,7 @@ func Register(api huma.API, deps Deps) {
 		Method:      http.MethodGet,
 		Path:        "/workspaces/{wsId}/imports",
 		Summary:     "List import jobs for the workspace",
+		Description: "Returns recent import jobs in the workspace with their status (pending, running, succeeded, failed, cancelled). Backs the import history panel.",
 	}, List(deps))
 
 	huma.Register(api, huma.Operation{
@@ -29,6 +31,7 @@ func Register(api huma.API, deps Deps) {
 		Method:      http.MethodGet,
 		Path:        "/workspaces/{wsId}/imports/{importId}",
 		Summary:     "Get a single import job",
+		Description: "Returns the full state of one import job: progress counters, error log, summary stats. Used by the in-progress poller and the post-run report.",
 	}, Get(deps))
 
 	huma.Register(api, huma.Operation{
@@ -36,5 +39,6 @@ func Register(api huma.API, deps Deps) {
 		Method:      http.MethodPost,
 		Path:        "/workspaces/{wsId}/imports/{importId}/cancel",
 		Summary:     "Cancel a pending or running import job",
+		Description: "Marks the job as cancelled so the worker stops on its next checkpoint. Already-imported rows remain; partial state is documented in the import report.",
 	}, Cancel(deps))
 }

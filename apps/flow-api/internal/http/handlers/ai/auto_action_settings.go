@@ -164,6 +164,7 @@ func RegisterAutoActionSettings(api huma.API, deps Deps) {
 		Method:      http.MethodGet,
 		Path:        "/workspaces/{wsId}/ai/auto-action-settings",
 		Summary:     "Get auto-action executor settings for a workspace",
+		Description: "Returns the executor toggle (enabled, dry-run, score threshold) plus the global rate budget for the auto-action engine. Workspace admin only.",
 	}, GetAutoActionSettings(deps))
 
 	huma.Register(api, huma.Operation{
@@ -171,6 +172,7 @@ func RegisterAutoActionSettings(api huma.API, deps Deps) {
 		Method:      http.MethodPatch,
 		Path:        "/workspaces/{wsId}/ai/auto-action-settings",
 		Summary:     "Patch auto-action executor settings for a workspace",
+		Description: "Updates the executor toggle, dry-run mode, score threshold, and rate budget. Changes apply on the next executor tick; in-flight runs continue with the old settings.",
 	}, PatchAutoActionSettings(deps))
 }
 

@@ -21,10 +21,12 @@ import (
 	"database/sql"
 	"net/http"
 	"net/http/httptest"
+	"sort"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/danielgtaylor/huma/v2"
 	_ "github.com/go-sql-driver/mysql"
 
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/auth"
@@ -186,5 +188,84 @@ func TestAuthAPIBuilderIsEmpty(t *testing.T) {
 	res := BuildResult(stubDeps(t))
 	for _, op := range res.AuthOps {
 		t.Errorf("buildAuthAPI registered %s %s (%s) but is documented as a placeholder; update the test if this surface is now intentional", op.Method, op.Path, op.OperationID)
+	}
+}
+
+// TestEveryOperationHasDescription walks every huma.Operation registered
+// against any sub-API and fails if any one has an empty Description.
+//
+// Description carries auth requirements, idempotency notes, and side
+// effects that consumers (SDK readers, future LLM tooling, partner
+// integrations) need to use the endpoint correctly. Summary alone is
+// not enough — it is a four-word headline. We require a real
+// 1-2 sentence Description on every operation.
+//
+// When this test fails it lists every operation that is missing the
+// field. Add `Description: "..."` to the offending huma.Operation
+// (typically in apps/flow-api/internal/http/router/router.go or in a
+// handlers/<feature>/register.go file) and re-run.
+func TestEveryOperationHasDescription(t *testing.T) {
+	t.Parallel()
+	res := BuildResult(stubDeps(t))
+
+	type missing struct {
+		method      string
+		path        string
+		operationID string
+		summary     string
+	}
+	seen := map[string]missing{}
+
+	for _, a := range res.APIs {
+		spec := a.OpenAPI()
+		if spec == nil || spec.Paths == nil {
+			continue
+		}
+		for path, item := range spec.Paths {
+			if item == nil {
+				continue
+			}
+			verbs := map[string]*huma.Operation{
+				http.MethodGet:     item.Get,
+				http.MethodPost:    item.Post,
+				http.MethodPut:     item.Put,
+				http.MethodPatch:   item.Patch,
+				http.MethodDelete:  item.Delete,
+				http.MethodHead:    item.Head,
+				http.MethodOptions: item.Options,
+			}
+			for method, op := range verbs {
+				if op == nil {
+					continue
+				}
+				if strings.TrimSpace(op.Description) == "" {
+					key := method + " " + path + " " + op.OperationID
+					seen[key] = missing{
+						method:      method,
+						path:        path,
+						operationID: op.OperationID,
+						summary:     op.Summary,
+					}
+				}
+			}
+		}
+	}
+	bad := make([]missing, 0, len(seen))
+	for _, m := range seen {
+		bad = append(bad, m)
+	}
+
+	if len(bad) > 0 {
+		// Stable ordering so the failure is diff-friendly across runs.
+		sort.Slice(bad, func(i, j int) bool {
+			if bad[i].path != bad[j].path {
+				return bad[i].path < bad[j].path
+			}
+			return bad[i].method < bad[j].method
+		})
+		t.Errorf("%d operations are missing huma.Operation.Description:", len(bad))
+		for _, m := range bad {
+			t.Errorf("  %-6s %s (%s) — summary: %q", m.method, m.path, m.operationID, m.summary)
+		}
 	}
 }

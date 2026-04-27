@@ -332,7 +332,7 @@ func TestDelivery(deps Deps) func(context.Context, *TestDeliveryInput) (*TestDel
 			WorkspaceID:    wsCtx.ID,
 			SubscriptionID: subID,
 			EventType:      "webhook.test",
-			EventPublicID:  sql.NullString{},
+			EventPublicID:  nil,
 			PayloadJson:    payload,
 			NextRetryAt:    sql.NullTime{Time: now, Valid: true},
 		}); err != nil {

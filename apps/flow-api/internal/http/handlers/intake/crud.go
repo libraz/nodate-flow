@@ -288,7 +288,10 @@ func Convert(deps Deps) func(context.Context, *ConvertIntakeItemInput) (*Convert
 		defer tx.Rollback() //nolint:errcheck
 		qtx := deps.Queries.WithTx(tx)
 
-		nextNum, err := qtx.AssignTaskNumber(ctx, prj.ID)
+		nextNum, err := qtx.AssignTaskNumber(ctx, generated.AssignTaskNumberParams{
+			WorkspaceID: prj.WorkspaceID,
+			ProjectID:   prj.ID,
+		})
 		if err != nil {
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}

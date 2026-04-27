@@ -169,12 +169,21 @@ func HandleGithubWebhook(deps Deps) http.HandlerFunc {
 
 // writeError writes the canonical error envelope from an error spec at
 // the chi layer (we cannot use Huma's pipeline here because the webhook
-// route is not registered through Huma).
+// route is not registered through Huma). Description and userAction are
+// copied verbatim from the spec when present so the wire shape mirrors
+// the Huma-side ProblemDetails envelope.
 func writeError(w http.ResponseWriter, spec *apierrors.Spec) {
-	writeJSON(w, spec.Status, map[string]any{
+	body := map[string]any{
 		"code":    spec.Code,
 		"message": spec.Message,
-	})
+	}
+	if spec.Description != "" {
+		body["description"] = spec.Description
+	}
+	if spec.UserAction != "" {
+		body["userAction"] = spec.UserAction
+	}
+	writeJSON(w, spec.Status, body)
 }
 
 func writeJSON(w http.ResponseWriter, status int, body any) {

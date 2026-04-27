@@ -16,6 +16,7 @@ func RegisterWorkspaceScoped(api huma.API, deps Deps) {
 		Method:      http.MethodPost,
 		Path:        "/workspaces/{wsId}/projects",
 		Summary:     "Create a project in a workspace",
+		Description: "Creates a new project in the workspace. The caller becomes the first project member with admin role. Requires workspace admin role.",
 	}, Create(deps))
 
 	huma.Register(api, huma.Operation{
@@ -23,6 +24,7 @@ func RegisterWorkspaceScoped(api huma.API, deps Deps) {
 		Method:      http.MethodGet,
 		Path:        "/workspaces/{wsId}/projects",
 		Summary:     "List projects in a workspace",
+		Description: "Returns every project the caller can see in the workspace. Backs the project switcher and the project list panel.",
 	}, List(deps))
 }
 
@@ -35,6 +37,7 @@ func RegisterGlobal(api huma.API, deps Deps) {
 		Method:      http.MethodGet,
 		Path:        "/projects/{prjId}",
 		Summary:     "Fetch a project",
+		Description: "Returns the project metadata (name, description, status, settings). Used by the project header and detail pages.",
 	}, Get(deps))
 
 	huma.Register(api, huma.Operation{
@@ -42,6 +45,7 @@ func RegisterGlobal(api huma.API, deps Deps) {
 		Method:      http.MethodPatch,
 		Path:        "/projects/{prjId}",
 		Summary:     "Patch a project",
+		Description: "Updates editable project fields (name, description, status, settings). Project admin role required.",
 	}, Patch(deps))
 
 	huma.Register(api, huma.Operation{
@@ -49,6 +53,7 @@ func RegisterGlobal(api huma.API, deps Deps) {
 		Method:      http.MethodDelete,
 		Path:        "/projects/{prjId}",
 		Summary:     "Soft-disable a project",
+		Description: "Marks the project as disabled so it disappears from listings and pickers. Tasks remain queryable for audit but reject new edits.",
 	}, Disable(deps))
 
 	huma.Register(api, huma.Operation{
@@ -56,6 +61,7 @@ func RegisterGlobal(api huma.API, deps Deps) {
 		Method:      http.MethodGet,
 		Path:        "/projects/{prjId}/dependencies",
 		Summary:     "List every task dependency edge within a project",
+		Description: "Returns every blocks/blocked-by edge between tasks inside the project so the dependency graph view can render the full network in one round trip.",
 	}, ListDependencies(deps))
 
 	huma.Register(api, huma.Operation{
@@ -63,6 +69,7 @@ func RegisterGlobal(api huma.API, deps Deps) {
 		Method:      http.MethodGet,
 		Path:        "/projects/{prjId}/members",
 		Summary:     "List members of a project",
+		Description: "Lists every active member of the project with their role. Drives the project members panel and the assignee picker.",
 	}, ListMembers(deps))
 
 	huma.Register(api, huma.Operation{
@@ -70,6 +77,7 @@ func RegisterGlobal(api huma.API, deps Deps) {
 		Method:      http.MethodPost,
 		Path:        "/projects/{prjId}/members",
 		Summary:     "Add a member to a project",
+		Description: "Adds an existing workspace member to the project at the requested role. Requires project admin role; the user must already belong to the parent workspace.",
 	}, AddMember(deps))
 
 	huma.Register(api, huma.Operation{
@@ -77,5 +85,6 @@ func RegisterGlobal(api huma.API, deps Deps) {
 		Method:      http.MethodDelete,
 		Path:        "/projects/{prjId}/members/{userId}",
 		Summary:     "Remove a member from a project",
+		Description: "Removes the named user from the project. Workspace membership is unaffected. Refuses to remove the last project admin.",
 	}, RemoveMember(deps))
 }

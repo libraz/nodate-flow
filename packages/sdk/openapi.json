@@ -62,12 +62,12 @@
         "required": ["inviteId", "rsvp"],
         "type": "object"
       },
-      "AcceptWorkspaceInviteOutputBody": {
+      "AcceptInviteOutputBody": {
         "additionalProperties": false,
         "properties": {
           "$schema": {
             "description": "A URL to the JSON Schema for this object.",
-            "examples": ["https://example.com/schemas/AcceptWorkspaceInviteOutputBody.json"],
+            "examples": ["https://example.com/schemas/AcceptInviteOutputBody.json"],
             "format": "uri",
             "readOnly": true,
             "type": "string"
@@ -369,246 +369,6 @@
         "required": ["ok"],
         "type": "object"
       },
-      "AddWorkspaceMemberInputBody": {
-        "additionalProperties": false,
-        "properties": {
-          "$schema": {
-            "description": "A URL to the JSON Schema for this object.",
-            "examples": ["https://example.com/schemas/AddWorkspaceMemberInputBody.json"],
-            "format": "uri",
-            "readOnly": true,
-            "type": "string"
-          },
-          "email": {
-            "format": "email",
-            "type": "string"
-          },
-          "role": {
-            "enum": ["owner", "admin", "member", "guest"],
-            "type": "string"
-          }
-        },
-        "required": ["email", "role"],
-        "type": "object"
-      },
-      "AdminListWorkspacesOutputBody": {
-        "additionalProperties": false,
-        "properties": {
-          "$schema": {
-            "description": "A URL to the JSON Schema for this object.",
-            "examples": ["https://example.com/schemas/AdminListWorkspacesOutputBody.json"],
-            "format": "uri",
-            "readOnly": true,
-            "type": "string"
-          },
-          "items": {
-            "items": {
-              "$ref": "#/components/schemas/AdminWorkspace"
-            },
-            "type": ["array", "null"]
-          },
-          "total": {
-            "format": "int64",
-            "type": "integer"
-          }
-        },
-        "required": ["total", "items"],
-        "type": "object"
-      },
-      "AdminPatchWorkspaceInputBody": {
-        "additionalProperties": false,
-        "properties": {
-          "$schema": {
-            "description": "A URL to the JSON Schema for this object.",
-            "examples": ["https://example.com/schemas/AdminPatchWorkspaceInputBody.json"],
-            "format": "uri",
-            "readOnly": true,
-            "type": "string"
-          },
-          "enabled": {
-            "type": ["boolean", "null"]
-          }
-        },
-        "required": ["enabled"],
-        "type": "object"
-      },
-      "AdminPatchWorkspaceOutputBody": {
-        "additionalProperties": false,
-        "properties": {
-          "$schema": {
-            "description": "A URL to the JSON Schema for this object.",
-            "examples": ["https://example.com/schemas/AdminPatchWorkspaceOutputBody.json"],
-            "format": "uri",
-            "readOnly": true,
-            "type": "string"
-          },
-          "ok": {
-            "type": "boolean"
-          }
-        },
-        "required": ["ok"],
-        "type": "object"
-      },
-      "AdminRevokeSessionOutputBody": {
-        "additionalProperties": false,
-        "properties": {
-          "$schema": {
-            "description": "A URL to the JSON Schema for this object.",
-            "examples": ["https://example.com/schemas/AdminRevokeSessionOutputBody.json"],
-            "format": "uri",
-            "readOnly": true,
-            "type": "string"
-          },
-          "ok": {
-            "type": "boolean"
-          }
-        },
-        "required": ["ok"],
-        "type": "object"
-      },
-      "AdminSession": {
-        "additionalProperties": false,
-        "properties": {
-          "active": {
-            "type": "boolean"
-          },
-          "createdAt": {
-            "format": "int64",
-            "type": "integer"
-          },
-          "expiresAt": {
-            "format": "int64",
-            "type": "integer"
-          },
-          "id": {
-            "type": "string"
-          },
-          "ipAddress": {
-            "type": "string"
-          },
-          "lastUsedAt": {
-            "format": "int64",
-            "type": "integer"
-          },
-          "userAgent": {
-            "type": "string"
-          }
-        },
-        "required": ["id", "userAgent", "ipAddress", "expiresAt", "active", "createdAt"],
-        "type": "object"
-      },
-      "AdminUser": {
-        "additionalProperties": false,
-        "properties": {
-          "$schema": {
-            "description": "A URL to the JSON Schema for this object.",
-            "examples": ["https://example.com/schemas/AdminUser.json"],
-            "format": "uri",
-            "readOnly": true,
-            "type": "string"
-          },
-          "avatarUrl": {
-            "type": "string"
-          },
-          "createdAt": {
-            "format": "int64",
-            "type": "integer"
-          },
-          "displayName": {
-            "type": "string"
-          },
-          "email": {
-            "type": "string"
-          },
-          "emailVerifiedAt": {
-            "format": "int64",
-            "type": "integer"
-          },
-          "enabled": {
-            "type": "boolean"
-          },
-          "id": {
-            "type": "string"
-          },
-          "isInstanceAdmin": {
-            "type": "boolean"
-          },
-          "lastLoginAt": {
-            "format": "int64",
-            "type": "integer"
-          },
-          "locale": {
-            "type": "string"
-          },
-          "updatedAt": {
-            "format": "int64",
-            "type": "integer"
-          },
-          "workspaceCount": {
-            "format": "int64",
-            "type": "integer"
-          }
-        },
-        "required": [
-          "id",
-          "email",
-          "displayName",
-          "locale",
-          "enabled",
-          "workspaceCount",
-          "isInstanceAdmin",
-          "createdAt"
-        ],
-        "type": "object"
-      },
-      "AdminWorkspace": {
-        "additionalProperties": false,
-        "properties": {
-          "$schema": {
-            "description": "A URL to the JSON Schema for this object.",
-            "examples": ["https://example.com/schemas/AdminWorkspace.json"],
-            "format": "uri",
-            "readOnly": true,
-            "type": "string"
-          },
-          "createdAt": {
-            "format": "int64",
-            "type": "integer"
-          },
-          "description": {
-            "type": "string"
-          },
-          "enabled": {
-            "type": "boolean"
-          },
-          "iconUrl": {
-            "type": "string"
-          },
-          "id": {
-            "type": "string"
-          },
-          "memberCount": {
-            "format": "int64",
-            "type": "integer"
-          },
-          "name": {
-            "type": "string"
-          },
-          "projectCount": {
-            "format": "int64",
-            "type": "integer"
-          },
-          "slug": {
-            "type": "string"
-          },
-          "updatedAt": {
-            "format": "int64",
-            "type": "integer"
-          }
-        },
-        "required": ["id", "slug", "name", "enabled", "memberCount", "createdAt"],
-        "type": "object"
-      },
       "AgentSummary": {
         "additionalProperties": false,
         "properties": {
@@ -668,125 +428,6 @@
           "scheduleKind",
           "paused",
           "createdAt"
-        ],
-        "type": "object"
-      },
-      "AiCostTodayOutputBody": {
-        "additionalProperties": false,
-        "properties": {
-          "$schema": {
-            "description": "A URL to the JSON Schema for this object.",
-            "examples": ["https://example.com/schemas/AiCostTodayOutputBody.json"],
-            "format": "uri",
-            "readOnly": true,
-            "type": "string"
-          },
-          "costUsd": {
-            "format": "double",
-            "type": "number"
-          },
-          "date": {
-            "description": "Local date in the requested timezone (YYYY-MM-DD). Falls back to UTC if tz is absent or invalid.",
-            "type": "string"
-          },
-          "monthlyCapUsd": {
-            "format": "double",
-            "type": "number"
-          }
-        },
-        "required": ["costUsd", "date"],
-        "type": "object"
-      },
-      "AiInvocation": {
-        "additionalProperties": false,
-        "properties": {
-          "costEstimate": {
-            "type": "string"
-          },
-          "errorCode": {
-            "type": "string"
-          },
-          "id": {
-            "description": "Invocation public id (UUID v7)",
-            "type": "string"
-          },
-          "invokedAt": {
-            "format": "int64",
-            "type": "integer"
-          },
-          "model": {
-            "type": "string"
-          },
-          "promptRedacted": {
-            "type": "string"
-          },
-          "purpose": {
-            "type": "string"
-          },
-          "responseRedacted": {
-            "type": "string"
-          },
-          "status": {
-            "type": "string"
-          },
-          "tokensInput": {
-            "format": "int32",
-            "type": "integer"
-          },
-          "tokensOutput": {
-            "format": "int32",
-            "type": "integer"
-          }
-        },
-        "required": ["id", "purpose", "model", "promptRedacted", "status", "invokedAt"],
-        "type": "object"
-      },
-      "AiMetricsOutputBody": {
-        "additionalProperties": false,
-        "properties": {
-          "$schema": {
-            "description": "A URL to the JSON Schema for this object.",
-            "examples": ["https://example.com/schemas/AiMetricsOutputBody.json"],
-            "format": "uri",
-            "readOnly": true,
-            "type": "string"
-          },
-          "acceptanceRate": {
-            "description": "applied / (applied + dismissed), 0 when no decisions",
-            "format": "double",
-            "type": "number"
-          },
-          "applied": {
-            "format": "int64",
-            "type": "integer"
-          },
-          "dismissed": {
-            "format": "int64",
-            "type": "integer"
-          },
-          "outboundLimits": {
-            "description": "Per-provider egress rate limiter counters",
-            "items": {
-              "$ref": "#/components/schemas/OutboundLimitStat"
-            },
-            "type": ["array", "null"]
-          },
-          "proposed": {
-            "format": "int64",
-            "type": "integer"
-          },
-          "windowDays": {
-            "format": "int64",
-            "type": "integer"
-          }
-        },
-        "required": [
-          "windowDays",
-          "proposed",
-          "applied",
-          "dismissed",
-          "acceptanceRate",
-          "outboundLimits"
         ],
         "type": "object"
       },
@@ -1292,80 +933,6 @@
         "required": ["id", "action", "occurredAt"],
         "type": "object"
       },
-      "AuditLogEntryDTO": {
-        "additionalProperties": false,
-        "properties": {
-          "action": {
-            "type": "string"
-          },
-          "actorDisplayName": {
-            "type": ["string", "null"]
-          },
-          "actorUserPublicId": {
-            "type": ["string", "null"]
-          },
-          "ipAddress": {
-            "type": ["string", "null"]
-          },
-          "metadataJson": {},
-          "occurredAt": {
-            "format": "int64",
-            "type": "integer"
-          },
-          "publicId": {
-            "description": "Audit entry public id (UUID v7)",
-            "type": "string"
-          },
-          "resourcePublicId": {
-            "type": ["string", "null"]
-          },
-          "resourceType": {
-            "type": "string"
-          },
-          "userAgent": {
-            "type": ["string", "null"]
-          }
-        },
-        "required": [
-          "publicId",
-          "actorUserPublicId",
-          "actorDisplayName",
-          "action",
-          "resourceType",
-          "resourcePublicId",
-          "ipAddress",
-          "userAgent",
-          "metadataJson",
-          "occurredAt"
-        ],
-        "type": "object"
-      },
-      "AuthTokens": {
-        "additionalProperties": false,
-        "properties": {
-          "$schema": {
-            "description": "A URL to the JSON Schema for this object.",
-            "examples": ["https://example.com/schemas/AuthTokens.json"],
-            "format": "uri",
-            "readOnly": true,
-            "type": "string"
-          },
-          "accessToken": {
-            "type": "string"
-          },
-          "expiresAt": {
-            "description": "Access token expiry, unix seconds",
-            "format": "int64",
-            "type": "integer"
-          },
-          "userId": {
-            "description": "User public id (UUID v7)",
-            "type": "string"
-          }
-        },
-        "required": ["accessToken", "expiresAt", "userId"],
-        "type": "object"
-      },
       "AutoActionRuleBody": {
         "additionalProperties": false,
         "properties": {
@@ -1410,6 +977,35 @@
           }
         },
         "required": ["enabled", "intervalMinutes", "threshold"],
+        "type": "object"
+      },
+      "Body": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/Body.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "count": {
+            "description": "Number of exported rows",
+            "format": "int64",
+            "type": "integer"
+          },
+          "format": {
+            "description": "Export format used",
+            "type": "string"
+          },
+          "tasks": {
+            "items": {
+              "$ref": "#/components/schemas/ExportedTask"
+            },
+            "type": ["array", "null"]
+          }
+        },
+        "required": ["format", "count", "tasks"],
         "type": "object"
       },
       "CalendarResponse": {
@@ -1922,6 +1518,32 @@
         ],
         "type": "object"
       },
+      "CostTodayOutputBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/CostTodayOutputBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "costUsd": {
+            "format": "double",
+            "type": "number"
+          },
+          "date": {
+            "description": "Local date in the requested timezone (YYYY-MM-DD). Falls back to UTC if tz is absent or invalid.",
+            "type": "string"
+          },
+          "monthlyCapUsd": {
+            "format": "double",
+            "type": "number"
+          }
+        },
+        "required": ["costUsd", "date"],
+        "type": "object"
+      },
       "CountUnreadOutputBody": {
         "additionalProperties": false,
         "properties": {
@@ -2353,6 +1975,64 @@
           }
         },
         "required": ["title"],
+        "type": "object"
+      },
+      "CreateInviteInputBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/CreateInviteInputBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "email": {
+            "maxLength": 320,
+            "type": "string"
+          },
+          "expiresIn": {
+            "description": "Seconds until invite expires",
+            "format": "int64",
+            "minimum": 1,
+            "type": "integer"
+          },
+          "label": {
+            "maxLength": 200,
+            "type": "string"
+          },
+          "maxUses": {
+            "format": "int32",
+            "minimum": 1,
+            "type": "integer"
+          },
+          "role": {
+            "enum": ["owner", "admin", "member", "guest"],
+            "type": "string"
+          }
+        },
+        "required": ["role"],
+        "type": "object"
+      },
+      "CreateInviteOutputBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/CreateInviteOutputBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "invite": {
+            "$ref": "#/components/schemas/Invite"
+          },
+          "token": {
+            "description": "Plaintext token (only returned once)",
+            "type": "string"
+          }
+        },
+        "required": ["invite", "token"],
         "type": "object"
       },
       "CreateLabelBody": {
@@ -2926,64 +2606,6 @@
           }
         },
         "required": ["slug", "name"],
-        "type": "object"
-      },
-      "CreateWorkspaceInviteInputBody": {
-        "additionalProperties": false,
-        "properties": {
-          "$schema": {
-            "description": "A URL to the JSON Schema for this object.",
-            "examples": ["https://example.com/schemas/CreateWorkspaceInviteInputBody.json"],
-            "format": "uri",
-            "readOnly": true,
-            "type": "string"
-          },
-          "email": {
-            "maxLength": 320,
-            "type": "string"
-          },
-          "expiresIn": {
-            "description": "Seconds until invite expires",
-            "format": "int64",
-            "minimum": 1,
-            "type": "integer"
-          },
-          "label": {
-            "maxLength": 200,
-            "type": "string"
-          },
-          "maxUses": {
-            "format": "int32",
-            "minimum": 1,
-            "type": "integer"
-          },
-          "role": {
-            "enum": ["owner", "admin", "member", "guest"],
-            "type": "string"
-          }
-        },
-        "required": ["role"],
-        "type": "object"
-      },
-      "CreateWorkspaceInviteOutputBody": {
-        "additionalProperties": false,
-        "properties": {
-          "$schema": {
-            "description": "A URL to the JSON Schema for this object.",
-            "examples": ["https://example.com/schemas/CreateWorkspaceInviteOutputBody.json"],
-            "format": "uri",
-            "readOnly": true,
-            "type": "string"
-          },
-          "invite": {
-            "$ref": "#/components/schemas/WorkspaceInvite"
-          },
-          "token": {
-            "description": "Plaintext token (only returned once)",
-            "type": "string"
-          }
-        },
-        "required": ["invite", "token"],
         "type": "object"
       },
       "CrossCalendarEventResponse": {
@@ -3777,6 +3399,34 @@
         "required": ["outcomes"],
         "type": "object"
       },
+      "Event": {
+        "additionalProperties": false,
+        "properties": {
+          "actorDisplayName": {
+            "type": "string"
+          },
+          "actorUserId": {
+            "type": "string"
+          },
+          "id": {
+            "description": "Event public id (UUID v7)",
+            "type": "string"
+          },
+          "occurredAt": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "payload": {},
+          "taskId": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string"
+          }
+        },
+        "required": ["id", "type", "occurredAt"],
+        "type": "object"
+      },
       "EventInviteCreateResponse": {
         "additionalProperties": false,
         "properties": {
@@ -3942,35 +3592,6 @@
           }
         },
         "required": ["explanation"],
-        "type": "object"
-      },
-      "ExportBody": {
-        "additionalProperties": false,
-        "properties": {
-          "$schema": {
-            "description": "A URL to the JSON Schema for this object.",
-            "examples": ["https://example.com/schemas/ExportBody.json"],
-            "format": "uri",
-            "readOnly": true,
-            "type": "string"
-          },
-          "count": {
-            "description": "Number of exported rows",
-            "format": "int64",
-            "type": "integer"
-          },
-          "format": {
-            "description": "Export format used",
-            "type": "string"
-          },
-          "tasks": {
-            "items": {
-              "$ref": "#/components/schemas/ExportedTask"
-            },
-            "type": ["array", "null"]
-          }
-        },
-        "required": ["format", "count", "tasks"],
         "type": "object"
       },
       "ExportedTask": {
@@ -4291,104 +3912,6 @@
         ],
         "type": "object"
       },
-      "InboxItem": {
-        "additionalProperties": false,
-        "properties": {
-          "createdAt": {
-            "format": "int64",
-            "type": "integer"
-          },
-          "externalId": {
-            "type": "string"
-          },
-          "id": {
-            "description": "InboxItem public id (UUID v7)",
-            "type": "string"
-          },
-          "kind": {
-            "type": "string"
-          },
-          "payload": {},
-          "receivedAt": {
-            "format": "int64",
-            "type": "integer"
-          },
-          "source": {
-            "type": "string"
-          },
-          "taskId": {
-            "type": "string"
-          },
-          "taskTitle": {
-            "type": "string"
-          },
-          "workspaceId": {
-            "type": "string"
-          }
-        },
-        "required": ["id", "workspaceId", "source", "kind", "receivedAt", "createdAt"],
-        "type": "object"
-      },
-      "InboxTriageInputBody": {
-        "additionalProperties": false,
-        "properties": {
-          "$schema": {
-            "description": "A URL to the JSON Schema for this object.",
-            "examples": ["https://example.com/schemas/InboxTriageInputBody.json"],
-            "format": "uri",
-            "readOnly": true,
-            "type": "string"
-          },
-          "limit": {
-            "description": "Number of inbox items to score (default 20, max 50)",
-            "format": "int64",
-            "maximum": 50,
-            "minimum": 1,
-            "type": "integer"
-          }
-        },
-        "type": "object"
-      },
-      "InboxTriageOutputBody": {
-        "additionalProperties": false,
-        "properties": {
-          "$schema": {
-            "description": "A URL to the JSON Schema for this object.",
-            "examples": ["https://example.com/schemas/InboxTriageOutputBody.json"],
-            "format": "uri",
-            "readOnly": true,
-            "type": "string"
-          },
-          "suggestions": {
-            "items": {
-              "$ref": "#/components/schemas/InboxTriageSuggestion"
-            },
-            "type": ["array", "null"]
-          }
-        },
-        "required": ["suggestions"],
-        "type": "object"
-      },
-      "InboxTriageSuggestion": {
-        "additionalProperties": false,
-        "properties": {
-          "inboxItemId": {
-            "type": "string"
-          },
-          "reasoning": {
-            "type": "string"
-          },
-          "recommendedAction": {
-            "type": "string"
-          },
-          "score": {
-            "format": "float",
-            "type": "number"
-          }
-        },
-        "required": ["inboxItemId", "score", "recommendedAction", "reasoning"],
-        "type": "object"
-      },
       "InferStateOutputBody": {
         "additionalProperties": false,
         "properties": {
@@ -4500,55 +4023,41 @@
         "required": ["totalUsers", "totalWorkspaces"],
         "type": "object"
       },
-      "IntakeItem": {
+      "Invite": {
         "additionalProperties": false,
         "properties": {
-          "$schema": {
-            "description": "A URL to the JSON Schema for this object.",
-            "examples": ["https://example.com/schemas/IntakeItem.json"],
-            "format": "uri",
-            "readOnly": true,
-            "type": "string"
-          },
-          "aiReasoning": {
-            "type": "string"
-          },
-          "aiScore": {
-            "format": "double",
-            "type": "number"
-          },
-          "body": {
-            "type": "string"
-          },
           "createdAt": {
             "format": "int64",
             "type": "integer"
           },
-          "id": {
-            "description": "Intake item public id (UUID v7)",
+          "createdByName": {
             "type": "string"
           },
-          "snoozeUntil": {
+          "expiresAt": {
             "format": "int64",
             "type": "integer"
           },
-          "taskId": {
+          "id": {
+            "description": "Invite public id (UUID v7)",
             "type": "string"
           },
-          "title": {
+          "label": {
             "type": "string"
           },
-          "triageStatus": {
+          "maxUses": {
+            "format": "int32",
+            "type": ["integer", "null"]
+          },
+          "role": {
             "type": "string"
           },
-          "triagedByDisplayName": {
-            "type": "string"
-          },
-          "triagedByUserId": {
-            "type": "string"
+          "useCount": {
+            "format": "int32",
+            "minimum": 0,
+            "type": "integer"
           }
         },
-        "required": ["id", "title", "triageStatus", "createdAt"],
+        "required": ["id", "role", "maxUses", "useCount", "createdByName", "createdAt"],
         "type": "object"
       },
       "InviteInfoOutputBody": {
@@ -4605,6 +4114,101 @@
           }
         },
         "required": ["id", "attendeePublicId", "email", "expiresAt", "createdAt"],
+        "type": "object"
+      },
+      "Invocation": {
+        "additionalProperties": false,
+        "properties": {
+          "costEstimate": {
+            "type": "string"
+          },
+          "errorCode": {
+            "type": "string"
+          },
+          "id": {
+            "description": "Invocation public id (UUID v7)",
+            "type": "string"
+          },
+          "invokedAt": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "model": {
+            "type": "string"
+          },
+          "promptRedacted": {
+            "type": "string"
+          },
+          "purpose": {
+            "type": "string"
+          },
+          "responseRedacted": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "tokensInput": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "tokensOutput": {
+            "format": "int32",
+            "type": "integer"
+          }
+        },
+        "required": ["id", "purpose", "model", "promptRedacted", "status", "invokedAt"],
+        "type": "object"
+      },
+      "Item": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/Item.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "aiReasoning": {
+            "type": "string"
+          },
+          "aiScore": {
+            "format": "double",
+            "type": "number"
+          },
+          "body": {
+            "type": "string"
+          },
+          "createdAt": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "id": {
+            "description": "Intake item public id (UUID v7)",
+            "type": "string"
+          },
+          "snoozeUntil": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "taskId": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "triageStatus": {
+            "type": "string"
+          },
+          "triagedByDisplayName": {
+            "type": "string"
+          },
+          "triagedByUserId": {
+            "type": "string"
+          }
+        },
+        "required": ["id", "title", "triageStatus", "createdAt"],
         "type": "object"
       },
       "Label": {
@@ -4802,7 +4406,7 @@
           },
           "entries": {
             "items": {
-              "$ref": "#/components/schemas/AuditLogEntryDTO"
+              "$ref": "#/components/schemas/LogEntryDTO"
             },
             "type": ["array", "null"]
           },
@@ -5209,7 +4813,7 @@
           },
           "items": {
             "items": {
-              "$ref": "#/components/schemas/InboxItem"
+              "$ref": "#/components/schemas/Item"
             },
             "type": ["array", "null"]
           },
@@ -5236,7 +4840,7 @@
           },
           "items": {
             "items": {
-              "$ref": "#/components/schemas/IntakeItem"
+              "$ref": "#/components/schemas/Item"
             },
             "type": ["array", "null"]
           },
@@ -5271,6 +4875,33 @@
         "required": ["providers"],
         "type": "object"
       },
+      "ListInvitesOutputBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/ListInvitesOutputBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "invites": {
+            "items": {
+              "$ref": "#/components/schemas/Invite"
+            },
+            "type": ["array", "null"]
+          },
+          "nextCursor": {
+            "type": ["string", "null"]
+          },
+          "total": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "required": ["total", "invites", "nextCursor"],
+        "type": "object"
+      },
       "ListInvocationsOutputBody": {
         "additionalProperties": false,
         "properties": {
@@ -5283,7 +4914,7 @@
           },
           "invocations": {
             "items": {
-              "$ref": "#/components/schemas/AiInvocation"
+              "$ref": "#/components/schemas/Invocation"
             },
             "type": ["array", "null"]
           }
@@ -5567,6 +5198,33 @@
           }
         },
         "required": ["total", "tasks", "nextCursor"],
+        "type": "object"
+      },
+      "ListOutputBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/ListOutputBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "nextCursor": {
+            "type": ["string", "null"]
+          },
+          "total": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "webhooks": {
+            "items": {
+              "$ref": "#/components/schemas/WebhookSubscriptionDTO"
+            },
+            "type": ["array", "null"]
+          }
+        },
+        "required": ["total", "webhooks", "nextCursor"],
         "type": "object"
       },
       "ListPagesBody": {
@@ -6109,7 +5767,7 @@
           },
           "events": {
             "items": {
-              "$ref": "#/components/schemas/TimelineEvent"
+              "$ref": "#/components/schemas/Event"
             },
             "type": ["array", "null"]
           },
@@ -6136,7 +5794,7 @@
           },
           "items": {
             "items": {
-              "$ref": "#/components/schemas/AdminSession"
+              "$ref": "#/components/schemas/Session"
             },
             "type": ["array", "null"]
           },
@@ -6160,7 +5818,7 @@
           },
           "items": {
             "items": {
-              "$ref": "#/components/schemas/AdminUser"
+              "$ref": "#/components/schemas/User"
             },
             "type": ["array", "null"]
           },
@@ -6196,60 +5854,6 @@
         "required": ["total", "widgets"],
         "type": "object"
       },
-      "ListWorkspaceInvitesOutputBody": {
-        "additionalProperties": false,
-        "properties": {
-          "$schema": {
-            "description": "A URL to the JSON Schema for this object.",
-            "examples": ["https://example.com/schemas/ListWorkspaceInvitesOutputBody.json"],
-            "format": "uri",
-            "readOnly": true,
-            "type": "string"
-          },
-          "invites": {
-            "items": {
-              "$ref": "#/components/schemas/WorkspaceInvite"
-            },
-            "type": ["array", "null"]
-          },
-          "nextCursor": {
-            "type": ["string", "null"]
-          },
-          "total": {
-            "format": "int64",
-            "type": "integer"
-          }
-        },
-        "required": ["total", "invites", "nextCursor"],
-        "type": "object"
-      },
-      "ListWorkspaceMembersOutputBody": {
-        "additionalProperties": false,
-        "properties": {
-          "$schema": {
-            "description": "A URL to the JSON Schema for this object.",
-            "examples": ["https://example.com/schemas/ListWorkspaceMembersOutputBody.json"],
-            "format": "uri",
-            "readOnly": true,
-            "type": "string"
-          },
-          "members": {
-            "items": {
-              "$ref": "#/components/schemas/WorkspaceMember"
-            },
-            "type": ["array", "null"]
-          },
-          "nextCursor": {
-            "type": ["string", "null"]
-          },
-          "total": {
-            "format": "int64",
-            "type": "integer"
-          }
-        },
-        "required": ["total", "members", "nextCursor"],
-        "type": "object"
-      },
       "ListWorkspaceUsersOutputBody": {
         "additionalProperties": false,
         "properties": {
@@ -6262,7 +5866,7 @@
           },
           "users": {
             "items": {
-              "$ref": "#/components/schemas/WorkspaceUserSummary"
+              "$ref": "#/components/schemas/UserSummary"
             },
             "type": ["array", "null"]
           }
@@ -6280,21 +5884,66 @@
             "readOnly": true,
             "type": "string"
           },
-          "nextCursor": {
-            "type": ["string", "null"]
-          },
-          "total": {
-            "format": "int64",
-            "type": "integer"
-          },
-          "workspaces": {
+          "items": {
             "items": {
               "$ref": "#/components/schemas/Workspace"
             },
             "type": ["array", "null"]
+          },
+          "total": {
+            "format": "int64",
+            "type": "integer"
           }
         },
-        "required": ["total", "workspaces", "nextCursor"],
+        "required": ["total", "items"],
+        "type": "object"
+      },
+      "LogEntryDTO": {
+        "additionalProperties": false,
+        "properties": {
+          "action": {
+            "type": "string"
+          },
+          "actorDisplayName": {
+            "type": ["string", "null"]
+          },
+          "actorUserPublicId": {
+            "type": ["string", "null"]
+          },
+          "ipAddress": {
+            "type": ["string", "null"]
+          },
+          "metadataJson": {},
+          "occurredAt": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "publicId": {
+            "description": "Audit entry public id (UUID v7)",
+            "type": "string"
+          },
+          "resourcePublicId": {
+            "type": ["string", "null"]
+          },
+          "resourceType": {
+            "type": "string"
+          },
+          "userAgent": {
+            "type": ["string", "null"]
+          }
+        },
+        "required": [
+          "publicId",
+          "actorUserPublicId",
+          "actorDisplayName",
+          "action",
+          "resourceType",
+          "resourcePublicId",
+          "ipAddress",
+          "userAgent",
+          "metadataJson",
+          "occurredAt"
+        ],
         "type": "object"
       },
       "LoginBody": {
@@ -6597,6 +6246,48 @@
         ],
         "type": "object"
       },
+      "Member": {
+        "additionalProperties": false,
+        "properties": {
+          "avatarUrl": {
+            "type": "string"
+          },
+          "createdAt": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "displayName": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string"
+          },
+          "id": {
+            "description": "Member public id (UUID v7)",
+            "type": "string"
+          },
+          "invitedAt": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "joinedAt": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "role": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "userId": {
+            "type": "string"
+          }
+        },
+        "required": ["id", "userId", "email", "displayName", "role", "createdAt"],
+        "type": "object"
+      },
       "MemberResponse": {
         "additionalProperties": false,
         "properties": {
@@ -6679,6 +6370,55 @@
           "userPublicId",
           "userDisplayName",
           "createdAt"
+        ],
+        "type": "object"
+      },
+      "MetricsOutputBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/MetricsOutputBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "acceptanceRate": {
+            "description": "applied / (applied + dismissed), 0 when no decisions",
+            "format": "double",
+            "type": "number"
+          },
+          "applied": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "dismissed": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "outboundLimits": {
+            "description": "Per-provider egress rate limiter counters",
+            "items": {
+              "$ref": "#/components/schemas/OutboundLimitStat"
+            },
+            "type": ["array", "null"]
+          },
+          "proposed": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "windowDays": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "windowDays",
+          "proposed",
+          "applied",
+          "dismissed",
+          "acceptanceRate",
+          "outboundLimits"
         ],
         "type": "object"
       },
@@ -6974,33 +6714,6 @@
           "deliveredAt",
           "createdAt"
         ],
-        "type": "object"
-      },
-      "NotificationsListOutputBody": {
-        "additionalProperties": false,
-        "properties": {
-          "$schema": {
-            "description": "A URL to the JSON Schema for this object.",
-            "examples": ["https://example.com/schemas/NotificationsListOutputBody.json"],
-            "format": "uri",
-            "readOnly": true,
-            "type": "string"
-          },
-          "nextCursor": {
-            "type": ["string", "null"]
-          },
-          "notifications": {
-            "items": {
-              "$ref": "#/components/schemas/NotificationDTO"
-            },
-            "type": ["array", "null"]
-          },
-          "total": {
-            "format": "int64",
-            "type": "integer"
-          }
-        },
-        "required": ["total", "notifications", "nextCursor"],
         "type": "object"
       },
       "OIDCStartOutputBody": {
@@ -7789,33 +7502,28 @@
             "readOnly": true,
             "type": "string"
           },
-          "country": {
-            "pattern": "^$|^[A-Z]{2}$",
-            "type": "string"
-          },
-          "description": {
-            "maxLength": 500,
-            "type": "string"
-          },
-          "iconUrl": {
-            "maxLength": 500,
-            "type": "string"
-          },
-          "name": {
-            "maxLength": 100,
-            "minLength": 1,
-            "type": "string"
-          },
-          "slug": {
-            "maxLength": 64,
-            "minLength": 1,
-            "type": "string"
-          },
-          "timezone": {
-            "maxLength": 64,
-            "type": "string"
+          "enabled": {
+            "type": ["boolean", "null"]
           }
         },
+        "required": ["enabled"],
+        "type": "object"
+      },
+      "PatchWorkspaceOutputBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/PatchWorkspaceOutputBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "ok": {
+            "type": "boolean"
+          }
+        },
+        "required": ["ok"],
         "type": "object"
       },
       "PauseAgentInputBody": {
@@ -8670,23 +8378,6 @@
         "required": ["ok"],
         "type": "object"
       },
-      "RemoveWorkspaceMemberOutputBody": {
-        "additionalProperties": false,
-        "properties": {
-          "$schema": {
-            "description": "A URL to the JSON Schema for this object.",
-            "examples": ["https://example.com/schemas/RemoveWorkspaceMemberOutputBody.json"],
-            "format": "uri",
-            "readOnly": true,
-            "type": "string"
-          },
-          "ok": {
-            "type": "boolean"
-          }
-        },
-        "required": ["ok"],
-        "type": "object"
-      },
       "RenderPublicShareOutputBody": {
         "additionalProperties": false,
         "properties": {
@@ -8989,12 +8680,12 @@
         "required": ["revoked"],
         "type": "object"
       },
-      "RevokeSessionOutputBody": {
+      "RevokeInviteOutputBody": {
         "additionalProperties": false,
         "properties": {
           "$schema": {
             "description": "A URL to the JSON Schema for this object.",
-            "examples": ["https://example.com/schemas/RevokeSessionOutputBody.json"],
+            "examples": ["https://example.com/schemas/RevokeInviteOutputBody.json"],
             "format": "uri",
             "readOnly": true,
             "type": "string"
@@ -9006,12 +8697,12 @@
         "required": ["ok"],
         "type": "object"
       },
-      "RevokeWorkspaceInviteOutputBody": {
+      "RevokeSessionOutputBody": {
         "additionalProperties": false,
         "properties": {
           "$schema": {
             "description": "A URL to the JSON Schema for this object.",
-            "examples": ["https://example.com/schemas/RevokeWorkspaceInviteOutputBody.json"],
+            "examples": ["https://example.com/schemas/RevokeSessionOutputBody.json"],
             "format": "uri",
             "readOnly": true,
             "type": "string"
@@ -9141,6 +8832,37 @@
           }
         },
         "required": ["subscribed", "alreadySubscribed"],
+        "type": "object"
+      },
+      "Session": {
+        "additionalProperties": false,
+        "properties": {
+          "active": {
+            "type": "boolean"
+          },
+          "createdAt": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "expiresAt": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "id": {
+            "type": "string"
+          },
+          "ipAddress": {
+            "type": "string"
+          },
+          "lastUsedAt": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "userAgent": {
+            "type": "string"
+          }
+        },
+        "required": ["id", "userAgent", "ipAddress", "expiresAt", "active", "createdAt"],
         "type": "object"
       },
       "SessionSummary": {
@@ -10432,34 +10154,6 @@
         ],
         "type": "object"
       },
-      "TimelineEvent": {
-        "additionalProperties": false,
-        "properties": {
-          "actorDisplayName": {
-            "type": "string"
-          },
-          "actorUserId": {
-            "type": "string"
-          },
-          "id": {
-            "description": "TimelineEvent public id (UUID v7)",
-            "type": "string"
-          },
-          "occurredAt": {
-            "format": "int64",
-            "type": "integer"
-          },
-          "payload": {},
-          "taskId": {
-            "type": "string"
-          },
-          "type": {
-            "type": "string"
-          }
-        },
-        "required": ["id", "type", "occurredAt"],
-        "type": "object"
-      },
       "ToggleCanEditInputBody": {
         "additionalProperties": false,
         "properties": {
@@ -10528,6 +10222,32 @@
           }
         },
         "required": ["ok"],
+        "type": "object"
+      },
+      "Tokens": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/Tokens.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "accessToken": {
+            "type": "string"
+          },
+          "expiresAt": {
+            "description": "Access token expiry, unix seconds",
+            "format": "int64",
+            "type": "integer"
+          },
+          "userId": {
+            "description": "User public id (UUID v7)",
+            "type": "string"
+          }
+        },
+        "required": ["accessToken", "expiresAt", "userId"],
         "type": "object"
       },
       "TotpConfirmInputBody": {
@@ -10735,6 +10455,26 @@
         "required": ["transition"],
         "type": "object"
       },
+      "TriageInputBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/TriageInputBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "limit": {
+            "description": "Number of inbox items to score (default 20, max 50)",
+            "format": "int64",
+            "maximum": 50,
+            "minimum": 1,
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
       "TriageIntakeItemBody": {
         "additionalProperties": false,
         "properties": {
@@ -10756,6 +10496,46 @@
           }
         },
         "required": ["status"],
+        "type": "object"
+      },
+      "TriageOutputBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/TriageOutputBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "suggestions": {
+            "items": {
+              "$ref": "#/components/schemas/TriageSuggestion"
+            },
+            "type": ["array", "null"]
+          }
+        },
+        "required": ["suggestions"],
+        "type": "object"
+      },
+      "TriageSuggestion": {
+        "additionalProperties": false,
+        "properties": {
+          "inboxItemId": {
+            "type": "string"
+          },
+          "reasoning": {
+            "type": "string"
+          },
+          "recommendedAction": {
+            "type": "string"
+          },
+          "score": {
+            "format": "float",
+            "type": "number"
+          }
+        },
+        "required": ["inboxItemId", "score", "recommendedAction", "reasoning"],
         "type": "object"
       },
       "TriggerAgentOutputBody": {
@@ -11228,22 +11008,85 @@
         "required": ["positionX", "positionY", "width", "height", "sortWeight"],
         "type": "object"
       },
-      "UpdateWorkspaceMemberRoleInputBody": {
+      "User": {
         "additionalProperties": false,
         "properties": {
           "$schema": {
             "description": "A URL to the JSON Schema for this object.",
-            "examples": ["https://example.com/schemas/UpdateWorkspaceMemberRoleInputBody.json"],
+            "examples": ["https://example.com/schemas/User.json"],
             "format": "uri",
             "readOnly": true,
             "type": "string"
           },
-          "role": {
-            "enum": ["owner", "admin", "member", "guest"],
+          "avatarUrl": {
+            "type": "string"
+          },
+          "createdAt": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "displayName": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string"
+          },
+          "emailVerifiedAt": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "id": {
+            "type": "string"
+          },
+          "isInstanceAdmin": {
+            "type": "boolean"
+          },
+          "lastLoginAt": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "locale": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "workspaceCount": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "email",
+          "displayName",
+          "locale",
+          "enabled",
+          "workspaceCount",
+          "isInstanceAdmin",
+          "createdAt"
+        ],
+        "type": "object"
+      },
+      "UserSummary": {
+        "additionalProperties": false,
+        "properties": {
+          "avatarUrl": {
+            "type": "string"
+          },
+          "displayName": {
+            "type": "string"
+          },
+          "id": {
+            "description": "User public id (UUID v7)",
             "type": "string"
           }
         },
-        "required": ["role"],
+        "required": ["id", "displayName"],
         "type": "object"
       },
       "WebhookDeliveryDTO": {
@@ -11387,33 +11230,6 @@
           "createdAt",
           "updatedAt"
         ],
-        "type": "object"
-      },
-      "WebhooksListOutputBody": {
-        "additionalProperties": false,
-        "properties": {
-          "$schema": {
-            "description": "A URL to the JSON Schema for this object.",
-            "examples": ["https://example.com/schemas/WebhooksListOutputBody.json"],
-            "format": "uri",
-            "readOnly": true,
-            "type": "string"
-          },
-          "nextCursor": {
-            "type": ["string", "null"]
-          },
-          "total": {
-            "format": "int64",
-            "type": "integer"
-          },
-          "webhooks": {
-            "items": {
-              "$ref": "#/components/schemas/WebhookSubscriptionDTO"
-            },
-            "type": ["array", "null"]
-          }
-        },
-        "required": ["total", "webhooks", "nextCursor"],
         "type": "object"
       },
       "WeeklyDigestCounts": {
@@ -11573,9 +11389,6 @@
             "readOnly": true,
             "type": "string"
           },
-          "country": {
-            "type": "string"
-          },
           "createdAt": {
             "format": "int64",
             "type": "integer"
@@ -11583,133 +11396,35 @@
           "description": {
             "type": "string"
           },
+          "enabled": {
+            "type": "boolean"
+          },
           "iconUrl": {
             "type": "string"
           },
           "id": {
-            "description": "Workspace public id (UUID v7)",
             "type": "string"
           },
           "memberCount": {
-            "description": "Number of enabled members in this workspace",
             "format": "int64",
             "type": "integer"
           },
           "name": {
             "type": "string"
           },
-          "role": {
-            "description": "Caller's role in this workspace",
-            "type": "string"
+          "projectCount": {
+            "format": "int64",
+            "type": "integer"
           },
           "slug": {
             "type": "string"
           },
-          "timezone": {
-            "type": "string"
-          },
           "updatedAt": {
             "format": "int64",
             "type": "integer"
           }
         },
-        "required": ["id", "slug", "name", "timezone", "country", "memberCount", "createdAt"],
-        "type": "object"
-      },
-      "WorkspaceInvite": {
-        "additionalProperties": false,
-        "properties": {
-          "createdAt": {
-            "format": "int64",
-            "type": "integer"
-          },
-          "createdByName": {
-            "type": "string"
-          },
-          "expiresAt": {
-            "format": "int64",
-            "type": "integer"
-          },
-          "id": {
-            "description": "Invite public id (UUID v7)",
-            "type": "string"
-          },
-          "label": {
-            "type": "string"
-          },
-          "maxUses": {
-            "format": "int32",
-            "type": ["integer", "null"]
-          },
-          "role": {
-            "type": "string"
-          },
-          "useCount": {
-            "format": "int32",
-            "minimum": 0,
-            "type": "integer"
-          }
-        },
-        "required": ["id", "role", "maxUses", "useCount", "createdByName", "createdAt"],
-        "type": "object"
-      },
-      "WorkspaceMember": {
-        "additionalProperties": false,
-        "properties": {
-          "avatarUrl": {
-            "type": "string"
-          },
-          "createdAt": {
-            "format": "int64",
-            "type": "integer"
-          },
-          "displayName": {
-            "type": "string"
-          },
-          "email": {
-            "type": "string"
-          },
-          "id": {
-            "description": "WorkspaceMember public id (UUID v7)",
-            "type": "string"
-          },
-          "invitedAt": {
-            "format": "int64",
-            "type": "integer"
-          },
-          "joinedAt": {
-            "format": "int64",
-            "type": "integer"
-          },
-          "role": {
-            "type": "string"
-          },
-          "updatedAt": {
-            "format": "int64",
-            "type": "integer"
-          },
-          "userId": {
-            "type": "string"
-          }
-        },
-        "required": ["id", "userId", "email", "displayName", "role", "createdAt"],
-        "type": "object"
-      },
-      "WorkspaceUserSummary": {
-        "additionalProperties": false,
-        "properties": {
-          "avatarUrl": {
-            "type": "string"
-          },
-          "displayName": {
-            "type": "string"
-          },
-          "id": {
-            "description": "User public id (UUID v7)",
-            "type": "string"
-          }
-        },
-        "required": ["id", "displayName"],
+        "required": ["id", "slug", "name", "enabled", "memberCount", "createdAt"],
         "type": "object"
       }
     }
@@ -11722,6 +11437,7 @@
   "paths": {
     "/admin/audit-logs": {
       "get": {
+        "description": "Returns a cursor-paginated page of instance-level audit log entries with filters by actor, action, and time range. Backs the admin Audit panel.",
         "operationId": "admin-list-audit-logs",
         "parameters": [
           {
@@ -11808,6 +11524,7 @@
     },
     "/admin/instance-admins": {
       "get": {
+        "description": "Lists every user with the instance-admin role so the admin UI can show who has top-level privileges.",
         "operationId": "admin-list-admins",
         "parameters": [
           {
@@ -11860,6 +11577,7 @@
         "tags": ["Admin"]
       },
       "post": {
+        "description": "Marks the supplied user as an instance admin. Idempotent: repeated grants are no-ops. Logged to the audit trail.",
         "operationId": "admin-grant-admin",
         "requestBody": {
           "content": {
@@ -11899,6 +11617,7 @@
     },
     "/admin/instance-admins/{userId}": {
       "delete": {
+        "description": "Removes the instance-admin role from the named user. Refuses to remove the last remaining instance admin to keep the instance manageable.",
         "operationId": "admin-revoke-admin",
         "parameters": [
           {
@@ -11940,6 +11659,7 @@
     },
     "/admin/instance-stats": {
       "get": {
+        "description": "Returns aggregate counts (users, workspaces, sessions, tasks) for the admin overview page. Computed on the fly; safe to call frequently.",
         "operationId": "admin-instance-stats",
         "responses": {
           "200": {
@@ -11969,6 +11689,7 @@
     },
     "/admin/sessions/{sessionId}": {
       "delete": {
+        "description": "Revokes the named session immediately. Outstanding access tokens keep working until they expire; refresh attempts will fail.",
         "operationId": "admin-revoke-session",
         "parameters": [
           {
@@ -11985,7 +11706,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/AdminRevokeSessionOutputBody"
+                  "$ref": "#/components/schemas/RevokeSessionOutputBody"
                 }
               }
             },
@@ -12008,6 +11729,7 @@
     },
     "/admin/settings": {
       "get": {
+        "description": "Returns every mutable instance-level setting (registration toggles, password policy, etc.) for the admin Settings panel.",
         "operationId": "admin-list-settings",
         "responses": {
           "200": {
@@ -12035,6 +11757,7 @@
         "tags": ["Admin"]
       },
       "patch": {
+        "description": "Patches one or more instance-level settings. Each settings change is recorded in the audit log and takes effect immediately for new requests.",
         "operationId": "admin-patch-settings",
         "requestBody": {
           "content": {
@@ -12074,6 +11797,7 @@
     },
     "/admin/setup": {
       "post": {
+        "description": "One-shot bootstrap that promotes the calling user to instance admin when no admin exists yet. Refuses with ADMIN.SETUP.ALREADY_BOOTSTRAPPED once the first admin is in place.",
         "operationId": "admin-setup",
         "responses": {
           "200": {
@@ -12103,6 +11827,7 @@
     },
     "/admin/users": {
       "get": {
+        "description": "Lists every user in the instance with status, role, and last-seen timestamp. Backs the admin Users panel; supports filtering by status and search by email or display name.",
         "operationId": "admin-list-users",
         "parameters": [
           {
@@ -12176,6 +11901,7 @@
     },
     "/admin/users/{userId}": {
       "get": {
+        "description": "Returns the full user row plus the workspaces they belong to and their session count. Used by the admin user-detail page.",
         "operationId": "admin-get-user",
         "parameters": [
           {
@@ -12192,7 +11918,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/AdminUser"
+                  "$ref": "#/components/schemas/User"
                 }
               }
             },
@@ -12213,6 +11939,7 @@
         "tags": ["Admin"]
       },
       "patch": {
+        "description": "Changes administrative user state: suspends or re-enables the account. Suspending revokes all active sessions for the user.",
         "operationId": "admin-patch-user",
         "parameters": [
           {
@@ -12262,6 +11989,7 @@
     },
     "/admin/users/{userId}/sessions": {
       "get": {
+        "description": "Lists every active session for the named user (device, IP, last-seen). Used by admins to investigate suspicious activity and to revoke sessions one by one.",
         "operationId": "admin-list-user-sessions",
         "parameters": [
           {
@@ -12324,6 +12052,7 @@
     },
     "/admin/workspaces": {
       "get": {
+        "description": "Lists every workspace on the instance with member count, plan, and status. Backs the admin Workspaces panel.",
         "operationId": "admin-list-workspaces",
         "parameters": [
           {
@@ -12374,7 +12103,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/AdminListWorkspacesOutputBody"
+                  "$ref": "#/components/schemas/ListWorkspacesOutputBody"
                 }
               }
             },
@@ -12397,6 +12126,7 @@
     },
     "/admin/workspaces/{wsId}": {
       "get": {
+        "description": "Returns the workspace metadata along with administrative counts (members, owners, projects) for the admin workspace-detail page.",
         "operationId": "admin-get-workspace",
         "parameters": [
           {
@@ -12413,7 +12143,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/AdminWorkspace"
+                  "$ref": "#/components/schemas/Workspace"
                 }
               }
             },
@@ -12434,6 +12164,7 @@
         "tags": ["Admin"]
       },
       "patch": {
+        "description": "Changes administrative workspace state: suspends or re-enables the workspace. Suspended workspaces are hidden from the switcher and reject API calls.",
         "operationId": "admin-patch-workspace",
         "parameters": [
           {
@@ -12449,7 +12180,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/AdminPatchWorkspaceInputBody"
+                "$ref": "#/components/schemas/PatchWorkspaceInputBody"
               }
             }
           },
@@ -12460,7 +12191,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/AdminPatchWorkspaceOutputBody"
+                  "$ref": "#/components/schemas/PatchWorkspaceOutputBody"
                 }
               }
             },
@@ -12483,6 +12214,7 @@
     },
     "/auth/capabilities": {
       "get": {
+        "description": "Returns which login methods (password, OIDC providers, magic-link) the deployment has configured. Used by the login UI to render only enabled providers. Public, cacheable, no auth.",
         "operationId": "auth-capabilities",
         "responses": {
           "200": {
@@ -12518,6 +12250,7 @@
     },
     "/auth/login": {
       "post": {
+        "description": "Authenticates a local-password user. When TOTP is enabled returns a step-up challenge instead of a session; otherwise issues an access token and sets the refresh cookie. Rate-limited per IP.",
         "operationId": "auth-login",
         "parameters": [
           {
@@ -12572,6 +12305,7 @@
     },
     "/auth/login/totp": {
       "post": {
+        "description": "Second leg of the TOTP-protected login: takes the challenge id returned by /auth/login plus a 6-digit TOTP code, and on success issues an access token and refresh cookie. Recovery codes are accepted in place of TOTP codes.",
         "operationId": "auth-login-totp",
         "parameters": [
           {
@@ -12597,7 +12331,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/AuthTokens"
+                  "$ref": "#/components/schemas/Tokens"
                 }
               }
             },
@@ -12626,6 +12360,7 @@
     },
     "/auth/logout": {
       "post": {
+        "description": "Revokes the current session referenced by the refresh cookie and clears the cookie on the response. Idempotent: succeeds even if the cookie is missing or already invalid.",
         "operationId": "auth-logout",
         "parameters": [
           {
@@ -12670,6 +12405,7 @@
     },
     "/auth/magic-link/request": {
       "post": {
+        "description": "Issues a single-use signed token by email so the recipient can log in without a password. Always returns 200 to avoid revealing whether the address is registered. Rate-limited per IP.",
         "operationId": "auth-magic-link-request",
         "requestBody": {
           "content": {
@@ -12708,6 +12444,7 @@
     },
     "/auth/magic-link/verify": {
       "get": {
+        "description": "Consumes the one-time token from /auth/magic-link/request, marks it spent, and issues an access token plus refresh cookie. Tokens expire quickly and can be redeemed only once.",
         "operationId": "auth-magic-link-verify",
         "parameters": [
           {
@@ -12731,7 +12468,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/AuthTokens"
+                  "$ref": "#/components/schemas/Tokens"
                 }
               }
             },
@@ -12760,6 +12497,7 @@
     },
     "/auth/oidc/github/callback": {
       "get": {
+        "description": "Receives the authorization code from GitHub, exchanges it for an access token, upserts the user from the verified primary email, and bounces back to the web app with a session cookie.",
         "operationId": "auth-oidc-github-callback",
         "parameters": [
           {
@@ -12791,7 +12529,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/AuthTokens"
+                  "$ref": "#/components/schemas/Tokens"
                 }
               }
             },
@@ -12820,6 +12558,7 @@
     },
     "/auth/oidc/github/start": {
       "get": {
+        "description": "Generates a state nonce and 302-redirects the user to GitHub's OAuth authorize endpoint. Pairs with /auth/oidc/github/callback.",
         "operationId": "auth-oidc-github-start",
         "responses": {
           "200": {
@@ -12848,6 +12587,7 @@
     },
     "/auth/oidc/google/callback": {
       "get": {
+        "description": "Receives the authorization code from Google, exchanges it for ID tokens, upserts the user, and bounces back to the web app with a session cookie. Validates the state nonce minted by /start.",
         "operationId": "auth-oidc-google-callback",
         "parameters": [
           {
@@ -12879,7 +12619,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/AuthTokens"
+                  "$ref": "#/components/schemas/Tokens"
                 }
               }
             },
@@ -12908,6 +12648,7 @@
     },
     "/auth/oidc/google/start": {
       "get": {
+        "description": "Generates a state nonce and 302-redirects the user to Google's OIDC authorization endpoint. Pairs with /auth/oidc/google/callback.",
         "operationId": "auth-oidc-google-start",
         "responses": {
           "200": {
@@ -12936,6 +12677,7 @@
     },
     "/auth/oidc/microsoft/callback": {
       "get": {
+        "description": "Receives the authorization code from Microsoft, exchanges it for ID tokens, upserts the user, and bounces back to the web app with a session cookie. Validates the state nonce minted by /start.",
         "operationId": "auth-oidc-microsoft-callback",
         "parameters": [
           {
@@ -12967,7 +12709,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/AuthTokens"
+                  "$ref": "#/components/schemas/Tokens"
                 }
               }
             },
@@ -12996,6 +12738,7 @@
     },
     "/auth/oidc/microsoft/start": {
       "get": {
+        "description": "Generates a state nonce and 302-redirects the user to Microsoft's OIDC authorization endpoint. Pairs with /auth/oidc/microsoft/callback.",
         "operationId": "auth-oidc-microsoft-start",
         "responses": {
           "200": {
@@ -13024,6 +12767,7 @@
     },
     "/auth/refresh": {
       "post": {
+        "description": "Reads the refresh cookie, rotates it (old one is invalidated), and returns a fresh access token. Used by the web client and CLI to silently extend sessions without re-prompting for credentials.",
         "operationId": "auth-refresh",
         "parameters": [
           {
@@ -13046,7 +12790,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/AuthTokens"
+                  "$ref": "#/components/schemas/Tokens"
                 }
               }
             },
@@ -13075,6 +12819,7 @@
     },
     "/auth/register": {
       "post": {
+        "description": "Creates a new local user account from email + password. Refuses when registration is closed (RegistrationOpen=false) and validates against MinPasswordLength. On success issues an access token and sets the refresh cookie. Rate-limited.",
         "operationId": "auth-register",
         "parameters": [
           {
@@ -13100,7 +12845,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/AuthTokens"
+                  "$ref": "#/components/schemas/Tokens"
                 }
               }
             },
@@ -13129,6 +12874,7 @@
     },
     "/avatars/{userId}": {
       "get": {
+        "description": "Streams a user's avatar bytes from object storage with caching headers. Public so \u003cimg src\u003e works without bearer tokens; the userId path is the only thing the caller needs to know.",
         "operationId": "me-avatar-proxy",
         "parameters": [
           {
@@ -13162,6 +12908,7 @@
     },
     "/health": {
       "get": {
+        "description": "Liveness probe for orchestration. Always returns 200 with a static {\"status\":\"ok\"} body, no auth, no database access. Exempt from the public per-IP rate limiter so kubelet probes are not throttled.",
         "operationId": "health",
         "responses": {
           "200": {
@@ -13190,6 +12937,7 @@
     },
     "/inbox": {
       "get": {
+        "description": "Returns the caller's inbox: signals, mentions, and assignments waiting to be triaged across every workspace they belong to. Backs the global Inbox view.",
         "operationId": "inbox-list",
         "parameters": [
           {
@@ -13253,6 +13001,7 @@
     },
     "/inbox/{id}/archive": {
       "post": {
+        "description": "Removes the named inbox item from the active list. Idempotent: archiving an already-archived item returns 200.",
         "operationId": "inbox-archive",
         "parameters": [
           {
@@ -13301,6 +13050,7 @@
     },
     "/inbox/{id}/snooze": {
       "post": {
+        "description": "Hides the named inbox item until a caller-supplied wake-up time, after which it reappears in the active list.",
         "operationId": "inbox-snooze",
         "parameters": [
           {
@@ -13359,6 +13109,7 @@
     },
     "/invites/{token}/accept": {
       "post": {
+        "description": "Consumes a workspace invite token: adds the caller as a member with the role declared on the invite and marks the invite redeemed. The caller must already have an authenticated account.",
         "operationId": "invites-accept",
         "parameters": [
           {
@@ -13375,7 +13126,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/AcceptWorkspaceInviteOutputBody"
+                  "$ref": "#/components/schemas/AcceptInviteOutputBody"
                 }
               }
             },
@@ -13397,6 +13148,7 @@
     },
     "/invites/{token}/info": {
       "get": {
+        "description": "Returns workspace name, inviter display name, and role for an invite token so the accept page can render context before the user signs in. Public, rate-limited; never reveals member emails or token-derived secrets.",
         "operationId": "invites-info",
         "parameters": [
           {
@@ -13435,6 +13187,7 @@
     },
     "/me": {
       "get": {
+        "description": "Returns the caller's profile (id, email, display name, locale, avatar URL, instance role) plus the list of workspaces they belong to. Used by both web apps to render the user shell.",
         "operationId": "me",
         "responses": {
           "200": {
@@ -13461,6 +13214,7 @@
         "summary": "Return the authenticated user's profile"
       },
       "patch": {
+        "description": "Updates the caller's editable profile fields (display name, locale, timezone). Email changes go through a separate verified flow and are not allowed here.",
         "operationId": "me-patch",
         "requestBody": {
           "content": {
@@ -13499,6 +13253,7 @@
     },
     "/me/avatar": {
       "delete": {
+        "description": "Deletes the caller's stored avatar object and clears the avatar reference on the user row. Idempotent: returns 200 even if no avatar was set.",
         "operationId": "me-avatar-delete",
         "responses": {
           "200": {
@@ -13525,6 +13280,7 @@
         "summary": "Remove the authenticated user's avatar"
       },
       "post": {
+        "description": "Accepts a multipart upload, validates the image type and size, stores it in object storage, and updates the caller's avatar reference. Returns AUTH.AVATAR.STORAGE_UNAVAILABLE when storage is not configured.",
         "operationId": "me-avatar-upload",
         "requestBody": {
           "content": {
@@ -13576,6 +13332,7 @@
     },
     "/me/calendar-events": {
       "get": {
+        "description": "Returns the caller's events across every workspace within a date range so the global My Calendar view can render without per-workspace round trips.",
         "operationId": "me-calendar-events-list",
         "parameters": [
           {
@@ -13628,6 +13385,7 @@
     },
     "/me/favorites": {
       "get": {
+        "description": "Lists every favorite the caller has pinned across all their workspaces (projects, lenses, dashboards, tasks). Used by the global sidebar.",
         "operationId": "favorites-list",
         "parameters": [
           {
@@ -13689,6 +13447,7 @@
         "summary": "List the caller's favorites"
       },
       "post": {
+        "description": "Pins the supplied target (kind + id) to the caller's favorites list. Idempotent: pinning an already-favorited item returns the existing row.",
         "operationId": "favorites-create",
         "requestBody": {
           "content": {
@@ -13727,6 +13486,7 @@
     },
     "/me/favorites/{id}": {
       "delete": {
+        "description": "Unpins the named favorite. Idempotent: returns 200 even if the favorite no longer exists.",
         "operationId": "favorites-delete",
         "parameters": [
           {
@@ -13778,6 +13538,7 @@
     },
     "/me/integrations": {
       "get": {
+        "description": "Lists each personal OAuth integration the caller has connected (provider, account label, expiry). Encrypted tokens are never returned. Used by the integrations panel.",
         "operationId": "me-integrations-list",
         "responses": {
           "200": {
@@ -13806,6 +13567,7 @@
     },
     "/me/integrations/{id}": {
       "delete": {
+        "description": "Removes the named user_integrations row and best-effort revokes the provider token. Idempotent: returns 200 even if the integration was already removed.",
         "operationId": "me-integrations-disconnect",
         "parameters": [
           {
@@ -13846,6 +13608,7 @@
     },
     "/me/integrations/{provider}/connect": {
       "post": {
+        "description": "Generates a state nonce and returns the provider's authorization URL the client should redirect to. The flow finishes at /oauth/callback/{provider}. Returns INTEGRATION.OAUTH.PROVIDER_NOT_CONFIGURED when the provider is not registered.",
         "operationId": "me-integrations-connect",
         "parameters": [
           {
@@ -13895,6 +13658,7 @@
     },
     "/me/invites": {
       "get": {
+        "description": "Returns calendar event invites that have been sent to the caller's email and that the caller has not yet accepted or declined. Backs the /me/invites page.",
         "operationId": "me-invites-list",
         "responses": {
           "200": {
@@ -13923,6 +13687,7 @@
     },
     "/me/notifications": {
       "get": {
+        "description": "Returns a cursor-paginated page of the caller's notifications across every workspace they belong to. Includes unread, read, and archived states; filterable by status.",
         "operationId": "notifications-list",
         "parameters": [
           {
@@ -13974,7 +13739,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/NotificationsListOutputBody"
+                  "$ref": "#/components/schemas/ListOutputBody"
                 }
               }
             },
@@ -13996,6 +13761,7 @@
     },
     "/me/notifications/unread-count": {
       "get": {
+        "description": "Returns the number of unread notifications across every workspace. Cheap; safe to poll for the bell badge.",
         "operationId": "notifications-unread-count",
         "parameters": [
           {
@@ -14036,6 +13802,7 @@
     },
     "/me/password": {
       "post": {
+        "description": "Requires the current password to match before storing a new bcrypt hash. The new password is validated against MinPasswordLength. Does not revoke other sessions automatically.",
         "operationId": "me-password-change",
         "parameters": [
           {
@@ -14083,6 +13850,7 @@
     },
     "/me/sessions": {
       "delete": {
+        "description": "Bulk-revokes every session belonging to the caller except the one carrying the current refresh cookie. Used by 'sign out everywhere else' UI.",
         "operationId": "me-sessions-revoke-others",
         "parameters": [
           {
@@ -14118,6 +13886,7 @@
         "summary": "Revoke every session except the current one"
       },
       "get": {
+        "description": "Lists every active session belonging to the caller (device label, IP, user agent, last seen) so the security UI can show signed-in devices and offer revocation.",
         "operationId": "me-sessions-list",
         "parameters": [
           {
@@ -14155,6 +13924,7 @@
     },
     "/me/sessions/{sessionId}": {
       "delete": {
+        "description": "Revokes the named session belonging to the caller. The next refresh attempt with that session will fail; access tokens already issued continue to work until they expire.",
         "operationId": "me-sessions-revoke",
         "parameters": [
           {
@@ -14195,6 +13965,7 @@
     },
     "/me/tasks": {
       "get": {
+        "description": "Returns the caller's open assigned tasks across every workspace they belong to so the global My Tasks view can render without per-workspace round trips.",
         "operationId": "me-tasks-list",
         "parameters": [
           {
@@ -14212,9 +13983,9 @@
             "in": "query",
             "name": "limit",
             "schema": {
-              "default": 200,
+              "default": 100,
               "format": "int32",
-              "maximum": 500,
+              "maximum": 1000,
               "minimum": 1,
               "type": "integer"
             }
@@ -14258,6 +14029,7 @@
     },
     "/me/tasks-with-dates": {
       "get": {
+        "description": "Returns the caller's tasks whose due_on falls inside the supplied date range. Used by calendar overlays and weekly digest generation.",
         "operationId": "me-tasks-with-dates-list",
         "parameters": [
           {
@@ -14297,7 +14069,7 @@
             "in": "query",
             "name": "limit",
             "schema": {
-              "default": 500,
+              "default": 100,
               "format": "int32",
               "maximum": 1000,
               "minimum": 1,
@@ -14343,6 +14115,7 @@
     },
     "/me/totp": {
       "delete": {
+        "description": "Removes the TOTP secret and recovery codes for the caller. Requires a valid current TOTP code (or recovery code) to authorize the change.",
         "operationId": "me-totp-disable",
         "requestBody": {
           "content": {
@@ -14379,6 +14152,7 @@
         "summary": "Disable TOTP 2FA"
       },
       "get": {
+        "description": "Reports whether TOTP is enrolled and confirmed for the caller, plus the count of remaining recovery codes. Used by the security panel to show enrollment state.",
         "operationId": "me-totp-status",
         "responses": {
           "200": {
@@ -14407,6 +14181,7 @@
     },
     "/me/totp/confirm": {
       "post": {
+        "description": "Validates a 6-digit code against the pending secret from /me/totp/enroll. On success activates TOTP for the caller and returns a fresh batch of recovery codes (shown once).",
         "operationId": "me-totp-confirm",
         "requestBody": {
           "content": {
@@ -14445,6 +14220,7 @@
     },
     "/me/totp/enroll": {
       "post": {
+        "description": "Generates a fresh TOTP secret and otpauth:// provisioning URL for the caller to scan. The secret is stored as pending until /me/totp/confirm validates a code.",
         "operationId": "me-totp-enroll",
         "responses": {
           "200": {
@@ -14473,6 +14249,7 @@
     },
     "/me/totp/recovery-codes": {
       "get": {
+        "description": "Reports how many unused recovery codes the caller has left. Does not return the codes themselves; those are only shown at generation time.",
         "operationId": "me-totp-recovery-status",
         "responses": {
           "200": {
@@ -14499,6 +14276,7 @@
         "summary": "Return remaining recovery code count"
       },
       "post": {
+        "description": "Replaces the caller's recovery code batch with a fresh set, invalidating any unused old codes. Returns the new codes (shown once) and requires a valid TOTP code.",
         "operationId": "me-totp-recovery-regenerate",
         "requestBody": {
           "content": {
@@ -14537,6 +14315,7 @@
     },
     "/notifications/{notifId}/archive": {
       "post": {
+        "description": "Removes the notification from the active inbox. Archived notifications stay queryable via the list endpoint with the appropriate status filter.",
         "operationId": "notifications-archive",
         "parameters": [
           {
@@ -14577,6 +14356,7 @@
     },
     "/notifications/{notifId}/read": {
       "post": {
+        "description": "Flips the named notification to read. Idempotent: marking an already-read notification returns 200.",
         "operationId": "notifications-mark-read",
         "parameters": [
           {
@@ -14617,6 +14397,7 @@
     },
     "/oauth/callback/{provider}": {
       "get": {
+        "description": "Receives the provider's authorization code, exchanges it for tokens, encrypts and persists them on the user's user_integrations row, and 302-redirects back to WebBaseURL. Public because the user arrives via redirect from the third-party.",
         "operationId": "oauth-integration-callback",
         "parameters": [
           {
@@ -14680,6 +14461,7 @@
     },
     "/projects/{prjId}": {
       "delete": {
+        "description": "Marks the project as disabled so it disappears from listings and pickers. Tasks remain queryable for audit but reject new edits.",
         "operationId": "projects-disable",
         "parameters": [
           {
@@ -14716,6 +14498,7 @@
         "summary": "Soft-disable a project"
       },
       "get": {
+        "description": "Returns the project metadata (name, description, status, settings). Used by the project header and detail pages.",
         "operationId": "projects-get",
         "parameters": [
           {
@@ -14752,6 +14535,7 @@
         "summary": "Fetch a project"
       },
       "patch": {
+        "description": "Updates editable project fields (name, description, status, settings). Project admin role required.",
         "operationId": "projects-patch",
         "parameters": [
           {
@@ -14800,6 +14584,7 @@
     },
     "/projects/{prjId}/dependencies": {
       "get": {
+        "description": "Returns every blocks/blocked-by edge between tasks inside the project so the dependency graph view can render the full network in one round trip.",
         "operationId": "projects-dependencies-list",
         "parameters": [
           {
@@ -14838,6 +14623,7 @@
     },
     "/projects/{prjId}/members": {
       "get": {
+        "description": "Lists every active member of the project with their role. Drives the project members panel and the assignee picker.",
         "operationId": "projects-members-list",
         "parameters": [
           {
@@ -14897,6 +14683,7 @@
         "summary": "List members of a project"
       },
       "post": {
+        "description": "Adds an existing workspace member to the project at the requested role. Requires project admin role; the user must already belong to the parent workspace.",
         "operationId": "projects-members-add",
         "parameters": [
           {
@@ -14945,6 +14732,7 @@
     },
     "/projects/{prjId}/members/{userId}": {
       "delete": {
+        "description": "Removes the named user from the project. Workspace membership is unaffected. Refuses to remove the last project admin.",
         "operationId": "projects-members-remove",
         "parameters": [
           {
@@ -14991,6 +14779,7 @@
     },
     "/projects/{prjId}/timeline": {
       "get": {
+        "description": "Returns the project-wide event stream (every task event in the project plus project-level events) so the project Activity tab can render a unified feed.",
         "operationId": "projects-timeline-list",
         "parameters": [
           {
@@ -15075,6 +14864,7 @@
     },
     "/public/invites/accept": {
       "post": {
+        "description": "Consumes a magic-link invite token: marks the attendee's RSVP as accepted and registers the resulting account context. Public, rate-limited; the opaque token is the only capability.",
         "operationId": "event-invites-accept",
         "requestBody": {
           "content": {
@@ -15113,6 +14903,7 @@
     },
     "/public/lenses/{token}": {
       "get": {
+        "description": "Renders the published lens with its current task results. The opaque token is the only capability; revoke via /lenses/{lensId}/unpublish stops resolving.",
         "operationId": "lenses-get-public",
         "parameters": [
           {
@@ -15155,6 +14946,7 @@
     },
     "/relation-suggestions/{suggestionId}/resolve": {
       "post": {
+        "description": "Records the human decision on the suggestion: accept (creates the actual relation row) or dismiss (suppresses it from future listings). Idempotent.",
         "operationId": "relation-suggestions-resolve",
         "parameters": [
           {
@@ -15205,6 +14997,7 @@
     },
     "/share/cal/{token}": {
       "get": {
+        "description": "Returns the public share page contents (title, description, theme, ordered events) addressed by its opaque URL token. Public, rate-limited; no auth required.",
         "operationId": "public-shares-render",
         "parameters": [
           {
@@ -15245,6 +15038,7 @@
     },
     "/signals": {
       "post": {
+        "description": "Manually inserts a signal row of the requested kind on behalf of the caller. Useful for development, scripted intake from custom sources, and replaying webhook payloads after a downtime.",
         "operationId": "signals-create",
         "requestBody": {
           "content": {
@@ -15283,6 +15077,7 @@
     },
     "/tasks": {
       "get": {
+        "description": "Returns a cursor-paginated page of tasks filtered by project or workspace plus optional status / assignee / label filters. Backs every task list view (board, list, etc.).",
         "operationId": "tasks-list",
         "parameters": [
           {
@@ -15397,6 +15192,7 @@
         "summary": "List tasks for a project or workspace"
       },
       "post": {
+        "description": "Creates a task in the project supplied in the body. Validates project membership server-side and emits a task.created event so timelines, AI pipelines, and webhooks see it.",
         "operationId": "tasks-create",
         "requestBody": {
           "content": {
@@ -15435,6 +15231,7 @@
     },
     "/tasks/reorder": {
       "post": {
+        "description": "Updates many tasks' sort_order in one request after a drag-and-drop. Atomic per project so no other client sees a partially reordered list.",
         "operationId": "tasks-reorder",
         "requestBody": {
           "content": {
@@ -15473,6 +15270,7 @@
     },
     "/tasks/{id}": {
       "delete": {
+        "description": "Marks the task as removed so it disappears from active views without erasing data. Idempotent. Use /unarchive on archived tasks; this endpoint is the destructive variant.",
         "operationId": "tasks-disable",
         "parameters": [
           {
@@ -15509,6 +15307,7 @@
         "summary": "Soft-disable a task"
       },
       "get": {
+        "description": "Returns a single task with its core fields, derived state, labels, and assignee. Sub-resources (comments, attachments, dependencies) live on dedicated endpoints.",
         "operationId": "tasks-get",
         "parameters": [
           {
@@ -15545,6 +15344,7 @@
         "summary": "Fetch a task"
       },
       "patch": {
+        "description": "Updates editable task fields (title, description, due_on, priority, assignee). Description edits append a description-version row so history is queryable.",
         "operationId": "tasks-patch",
         "parameters": [
           {
@@ -15593,6 +15393,7 @@
     },
     "/tasks/{id}/actors": {
       "get": {
+        "description": "Returns the human actors (assignees, collaborators, watchers) attached to the task with their role.",
         "operationId": "tasks-actors-list",
         "parameters": [
           {
@@ -15652,6 +15453,7 @@
         "summary": "List actors on a task"
       },
       "post": {
+        "description": "Adds a human actor to the task at the requested role (assignee / collaborator / watcher). Triggers the assignment notification pipeline when the role is assignee.",
         "operationId": "tasks-actors-add",
         "parameters": [
           {
@@ -15700,6 +15502,7 @@
     },
     "/tasks/{id}/actors/{actorId}": {
       "delete": {
+        "description": "Detaches the named actor from the task. Idempotent.",
         "operationId": "tasks-actors-remove",
         "parameters": [
           {
@@ -15746,6 +15549,7 @@
     },
     "/tasks/{id}/agents": {
       "get": {
+        "description": "Returns the AI agent actors currently attached to the task. Distinguished from human actors so UI can render differently and quotas can apply per-agent.",
         "operationId": "tasks-agents-list",
         "parameters": [
           {
@@ -15805,6 +15609,7 @@
         "summary": "List AI agent actors on a task"
       },
       "post": {
+        "description": "Attaches an AI agent so the agent's runtime can be scheduled on or triggered for the task. Idempotent per (task, agent).",
         "operationId": "tasks-agents-add",
         "parameters": [
           {
@@ -15853,6 +15658,7 @@
     },
     "/tasks/{id}/ai/invocations": {
       "get": {
+        "description": "Returns redacted ai_invocations rows scoped to the task so the AI reasoning panel can show which prompts the LLM saw and what it decided.",
         "operationId": "tasks-ai-invocations-list",
         "parameters": [
           {
@@ -15914,6 +15720,7 @@
     },
     "/tasks/{id}/apply-steps": {
       "post": {
+        "description": "Persists a proposal returned by /propose-steps as ordered child tasks under this parent. The client may trim or reorder the steps before applying.",
         "operationId": "tasks-apply-steps",
         "parameters": [
           {
@@ -15962,6 +15769,7 @@
     },
     "/tasks/{id}/archive": {
       "post": {
+        "description": "Moves the task into the archive so it disappears from active views without removing it. Idempotent.",
         "operationId": "tasks-archive",
         "parameters": [
           {
@@ -16000,6 +15808,7 @@
     },
     "/tasks/{id}/attachments": {
       "get": {
+        "description": "Returns the attachments registered on the task with metadata only — bytes are fetched separately via /download.",
         "operationId": "tasks-attachments-list",
         "parameters": [
           {
@@ -16059,6 +15868,7 @@
         "summary": "List attachments on a task"
       },
       "post": {
+        "description": "Records that a file (already uploaded via /presign) is associated with the task. Stores filename, MIME, size, and storage key.",
         "operationId": "tasks-attachments-add",
         "parameters": [
           {
@@ -16107,6 +15917,7 @@
     },
     "/tasks/{id}/attachments/presign": {
       "post": {
+        "description": "Returns a short-lived presigned PUT URL the client can stream the file directly to S3 with. Pair with /attachments to record metadata after the upload completes.",
         "operationId": "tasks-attachments-presign",
         "parameters": [
           {
@@ -16155,6 +15966,7 @@
     },
     "/tasks/{id}/attachments/{aid}": {
       "delete": {
+        "description": "Marks the attachment as removed and best-effort deletes the underlying object. Idempotent.",
         "operationId": "tasks-attachments-delete",
         "parameters": [
           {
@@ -16201,6 +16013,7 @@
     },
     "/tasks/{id}/attachments/{aid}/download": {
       "get": {
+        "description": "Returns a short-lived presigned GET URL so the client can stream the file straight from object storage. The API never proxies the bytes.",
         "operationId": "tasks-attachments-download",
         "parameters": [
           {
@@ -16247,6 +16060,7 @@
     },
     "/tasks/{id}/comments": {
       "get": {
+        "description": "Returns the comments on the task in chronological order with reaction counts. Cursor-paginated for long threads.",
         "operationId": "tasks-comments-list",
         "parameters": [
           {
@@ -16316,6 +16130,7 @@
         "summary": "List comments on a task"
       },
       "post": {
+        "description": "Appends a comment from the caller. Mentions inside the body are parsed and routed through the notifications pipeline.",
         "operationId": "tasks-comments-add",
         "parameters": [
           {
@@ -16364,6 +16179,7 @@
     },
     "/tasks/{id}/comments/{cid}": {
       "delete": {
+        "description": "Removes the named comment. Permitted to the comment author or any workspace admin. Idempotent.",
         "operationId": "tasks-comments-delete",
         "parameters": [
           {
@@ -16408,6 +16224,7 @@
         "summary": "Delete a comment (author or workspace admin)"
       },
       "patch": {
+        "description": "Replaces the body of the named comment. Only the original author may edit; an edited_at timestamp is set.",
         "operationId": "tasks-comments-edit",
         "parameters": [
           {
@@ -16464,6 +16281,7 @@
     },
     "/tasks/{id}/constraints": {
       "post": {
+        "description": "Persists a constraint DSL expression on the task. Subsequent transitions and the constraint engine evaluate against this rule.",
         "operationId": "tasks-constraints-add",
         "parameters": [
           {
@@ -16512,6 +16330,7 @@
     },
     "/tasks/{id}/constraints/compile": {
       "post": {
+        "description": "Asks the AI compiler to translate a natural-language constraint description into a validated DSL expression. Returns the expression plus the compiler's confidence so the UI can confirm before /add.",
         "operationId": "tasks-constraints-compile",
         "parameters": [
           {
@@ -16560,6 +16379,7 @@
     },
     "/tasks/{id}/constraints/evaluate": {
       "post": {
+        "description": "Evaluates every constraint attached to the task and persists the satisfied / failed markers so the UI can render the result without re-running rules client-side.",
         "operationId": "tasks-constraints-evaluate",
         "parameters": [
           {
@@ -16598,6 +16418,7 @@
     },
     "/tasks/{id}/constraints/explain": {
       "post": {
+        "description": "Renders a stored constraint DSL back into prose so non-technical users can review what was attached. Used by the constraint detail panel.",
         "operationId": "tasks-constraints-explain",
         "parameters": [
           {
@@ -16646,6 +16467,7 @@
     },
     "/tasks/{id}/constraints/{cid}": {
       "delete": {
+        "description": "Detaches the named constraint from the task. Subsequent evaluations no longer consider it. Idempotent.",
         "operationId": "tasks-constraints-remove",
         "parameters": [
           {
@@ -16692,6 +16514,7 @@
     },
     "/tasks/{id}/dependencies": {
       "get": {
+        "description": "Returns both blocks and blocked-by edges connected to the task. Used by the dependency panel and by the project graph view's per-task drilldown.",
         "operationId": "tasks-dependencies-list",
         "parameters": [
           {
@@ -16728,6 +16551,7 @@
         "summary": "List incoming and outgoing dependency edges for a task"
       },
       "post": {
+        "description": "Creates a blocks / blocked-by edge from this task to another. Refuses cycles so the graph stays a DAG.",
         "operationId": "tasks-dependencies-add",
         "parameters": [
           {
@@ -16776,6 +16600,7 @@
     },
     "/tasks/{id}/dependencies/{depId}": {
       "delete": {
+        "description": "Removes the named dependency edge. Idempotent.",
         "operationId": "tasks-dependencies-remove",
         "parameters": [
           {
@@ -16822,6 +16647,7 @@
     },
     "/tasks/{id}/description-history": {
       "get": {
+        "description": "Returns a chronological list of description revisions (id, author, edited_at) without the full body so the version chooser is cheap.",
         "operationId": "tasks-description-history-list",
         "parameters": [
           {
@@ -16860,6 +16686,7 @@
     },
     "/tasks/{id}/description-history/{versionId}": {
       "get": {
+        "description": "Returns the full body of one description revision so the diff viewer can render the historical content.",
         "operationId": "tasks-description-history-get",
         "parameters": [
           {
@@ -16906,6 +16733,7 @@
     },
     "/tasks/{id}/description-history/{versionId}/restore": {
       "post": {
+        "description": "Replaces the task's current description with the named historical version, appending a new revision so the restore itself is recorded.",
         "operationId": "tasks-description-history-restore",
         "parameters": [
           {
@@ -16952,6 +16780,7 @@
     },
     "/tasks/{id}/duplicates": {
       "get": {
+        "description": "Returns tasks similar to this one ranked by cosine distance over the description embedding. Used by the duplicate-warning chip on the task editor.",
         "operationId": "tasks-duplicates-list",
         "parameters": [
           {
@@ -16990,6 +16819,7 @@
     },
     "/tasks/{id}/infer-state": {
       "get": {
+        "description": "Runs the deterministic state-inference engine and returns the proposed next state plus the matching rule and rationale. Read-only; apply with /transitions.",
         "operationId": "tasks-infer-state",
         "parameters": [
           {
@@ -17028,6 +16858,7 @@
     },
     "/tasks/{id}/labels": {
       "get": {
+        "description": "Returns the labels currently attached to the task, in the order they were added. Used by the task detail view's label chips.",
         "operationId": "tasks-labels-list",
         "parameters": [
           {
@@ -17064,6 +16895,7 @@
         "summary": "List labels on a task"
       },
       "post": {
+        "description": "Attaches an existing workspace label to the task. Idempotent: re-attaching a label is a no-op.",
         "operationId": "tasks-labels-add",
         "parameters": [
           {
@@ -17112,6 +16944,7 @@
     },
     "/tasks/{id}/labels/{labelId}": {
       "delete": {
+        "description": "Detaches the named label from the task. Idempotent: returns 200 even when the label was not attached.",
         "operationId": "tasks-labels-remove",
         "parameters": [
           {
@@ -17158,6 +16991,7 @@
     },
     "/tasks/{id}/linked-events": {
       "get": {
+        "description": "Returns the calendar events linked to this task with the link kind (contributes_to / blocks / etc.). Used by the task detail's calendar section.",
         "operationId": "tasks-linked-events-list",
         "parameters": [
           {
@@ -17186,7 +17020,7 @@
             "schema": {
               "default": 100,
               "format": "int32",
-              "maximum": 500,
+              "maximum": 1000,
               "minimum": 1,
               "type": "integer"
             }
@@ -17230,6 +17064,7 @@
     },
     "/tasks/{id}/links": {
       "post": {
+        "description": "Creates a task_event_link row with the supplied kind so calendar shifts and task changes can propagate per the link semantics.",
         "operationId": "tasks-event-links-create",
         "parameters": [
           {
@@ -17278,6 +17113,7 @@
     },
     "/tasks/{id}/links/{linkId}": {
       "delete": {
+        "description": "Marks the named task↔event link as removed so propagation rules stop firing. Audit history is preserved.",
         "operationId": "tasks-event-links-remove",
         "parameters": [
           {
@@ -17324,6 +17160,7 @@
     },
     "/tasks/{id}/propose-steps": {
       "post": {
+        "description": "Asks the workspace's LLM to decompose this task into ordered execution steps. Returns the proposal and a cache key so /apply-steps can persist it; nothing is written until apply.",
         "operationId": "tasks-propose-steps",
         "parameters": [
           {
@@ -17372,6 +17209,7 @@
     },
     "/tasks/{id}/reactions": {
       "get": {
+        "description": "Returns the emoji reactions left on the task grouped by glyph, with reactor identities. Used by the task header reaction strip.",
         "operationId": "tasks-reactions-list",
         "parameters": [
           {
@@ -17410,6 +17248,7 @@
         "summary": "List reactions on a task"
       },
       "post": {
+        "description": "Records a single emoji reaction from the caller on the task. Idempotent per (task, user, glyph): a duplicate add returns the existing row.",
         "operationId": "tasks-reactions-create",
         "parameters": [
           {
@@ -17460,6 +17299,7 @@
     },
     "/tasks/{id}/reactions/{reactionId}": {
       "delete": {
+        "description": "Removes the caller's reaction from the task. Idempotent: deleting an already-removed reaction returns 200.",
         "operationId": "tasks-reactions-delete",
         "parameters": [
           {
@@ -17510,6 +17350,7 @@
     },
     "/tasks/{id}/relation-suggestions": {
       "get": {
+        "description": "Returns the relation candidates the auto-detect pipeline has surfaced for the named task. Sorted by similarity score so the most likely match is first.",
         "operationId": "relation-suggestions-list-task",
         "parameters": [
           {
@@ -17562,6 +17403,7 @@
     },
     "/tasks/{id}/replay": {
       "get": {
+        "description": "Replays every state-changing event in the task timeline and reports whether the recomputed derived_state matches the row. Diagnostic; does not mutate state.",
         "operationId": "tasks-replay",
         "parameters": [
           {
@@ -17600,6 +17442,7 @@
     },
     "/tasks/{id}/timeline": {
       "get": {
+        "description": "Returns the chronological event log for the task (state transitions, comments, link changes, AI suggestions). Backs the activity tab on the task detail view.",
         "operationId": "tasks-timeline-list",
         "parameters": [
           {
@@ -17684,6 +17527,7 @@
     },
     "/tasks/{id}/transitions": {
       "post": {
+        "description": "Applies the named transition to the task. Validates against the state machine and emits a task.transitioned event. Refuses transitions that violate attached constraints.",
         "operationId": "tasks-transitions-apply",
         "parameters": [
           {
@@ -17732,6 +17576,7 @@
     },
     "/tasks/{id}/unarchive": {
       "post": {
+        "description": "Restores an archived task to active state. Idempotent.",
         "operationId": "tasks-unarchive",
         "parameters": [
           {
@@ -17770,6 +17615,7 @@
     },
     "/workspaces": {
       "get": {
+        "description": "Lists every workspace the caller belongs to with their role. Used by the workspace switcher and during the post-login bootstrap to choose a default workspace.",
         "operationId": "workspaces-list",
         "parameters": [
           {
@@ -17821,6 +17667,7 @@
         "summary": "List workspaces for the authenticated user"
       },
       "post": {
+        "description": "Creates a new workspace owned by the caller. The caller is added as the first owner-role member. Used during onboarding and from the workspace-switcher 'New workspace' action.",
         "operationId": "workspaces-create",
         "requestBody": {
           "content": {
@@ -17859,6 +17706,7 @@
     },
     "/workspaces/{wsId}": {
       "delete": {
+        "description": "Soft-disables the workspace: members lose access to its data and the workspace stops appearing in switcher listings. Owner role required. Hard deletion is performed by instance admins through a separate flow.",
         "operationId": "workspaces-disable",
         "parameters": [
           {
@@ -17895,6 +17743,7 @@
         "summary": "Disable a workspace"
       },
       "get": {
+        "description": "Returns the workspace metadata (name, slug, plan, settings) along with the caller's role in it. Requires workspace membership.",
         "operationId": "workspaces-get",
         "parameters": [
           {
@@ -17931,6 +17780,7 @@
         "summary": "Get workspace details"
       },
       "patch": {
+        "description": "Updates editable workspace fields (name, slug, settings). Requires workspace admin role; owner-only fields go through dedicated endpoints.",
         "operationId": "workspaces-patch",
         "parameters": [
           {
@@ -17979,6 +17829,7 @@
     },
     "/workspaces/{wsId}/ai/agents": {
       "get": {
+        "description": "Lists every AI agent registered in the workspace with status, schedule, and last-run summary. Backs the Agents panel.",
         "operationId": "ai-agents-list",
         "parameters": [
           {
@@ -18038,6 +17889,7 @@
         "summary": "List AI agents for a workspace"
       },
       "post": {
+        "description": "Registers a new AI agent in the workspace with name, prompt, schedule, and event triggers. The agent starts paused so the operator can review configuration before unpausing.",
         "operationId": "ai-agents-create",
         "parameters": [
           {
@@ -18086,6 +17938,7 @@
     },
     "/workspaces/{wsId}/ai/agents/{agentId}/event-triggers": {
       "patch": {
+        "description": "Replaces the set of event types that automatically wake the agent. Empty list disables event triggering entirely; cron and manual triggers continue to work.",
         "operationId": "ai-agent-event-triggers-update",
         "parameters": [
           {
@@ -18142,6 +17995,7 @@
     },
     "/workspaces/{wsId}/ai/agents/{agentId}/pause": {
       "post": {
+        "description": "Flips the agent's paused flag so the runtime stops scheduling it. In-flight runs continue to completion; subsequent triggers no-op until the agent is unpaused.",
         "operationId": "ai-agent-pause",
         "parameters": [
           {
@@ -18198,6 +18052,7 @@
     },
     "/workspaces/{wsId}/ai/agents/{agentId}/schedule": {
       "patch": {
+        "description": "Updates the agent's schedule_kind (cron / on-event / manual) and any associated cadence settings. Takes effect on the next scheduler tick.",
         "operationId": "ai-agent-schedule-update",
         "parameters": [
           {
@@ -18254,6 +18109,7 @@
     },
     "/workspaces/{wsId}/ai/agents/{agentId}/trigger": {
       "post": {
+        "description": "Enqueues one run of the agent (or runs synchronously when no queue is configured). Returns AI.AGENT.RUNTIME_DISABLED when neither AgentQueue nor AgentRunner is wired.",
         "operationId": "ai-agent-trigger",
         "parameters": [
           {
@@ -18300,6 +18156,7 @@
     },
     "/workspaces/{wsId}/ai/auto-action-rules": {
       "get": {
+        "description": "Returns the workspace's auto-action rule rows (rule kind, condition, side-effect). On first read seeds the default rule set so admins can begin tweaking immediately.",
         "operationId": "ai-auto-action-rules-list",
         "parameters": [
           {
@@ -18336,6 +18193,7 @@
         "summary": "List auto-action rules for a workspace"
       },
       "patch": {
+        "description": "Updates one or more auto-action rules in a single request. Each row may toggle enabled, change its threshold, or rewrite its condition. Returns the post-update set so the UI can reconcile state.",
         "operationId": "ai-auto-action-rules-update",
         "parameters": [
           {
@@ -18384,6 +18242,7 @@
     },
     "/workspaces/{wsId}/ai/auto-action-settings": {
       "get": {
+        "description": "Returns the executor toggle (enabled, dry-run, score threshold) plus the global rate budget for the auto-action engine. Workspace admin only.",
         "operationId": "ai-auto-action-settings-get",
         "parameters": [
           {
@@ -18420,6 +18279,7 @@
         "summary": "Get auto-action executor settings for a workspace"
       },
       "patch": {
+        "description": "Updates the executor toggle, dry-run mode, score threshold, and rate budget. Changes apply on the next executor tick; in-flight runs continue with the old settings.",
         "operationId": "ai-auto-action-settings-update",
         "parameters": [
           {
@@ -18468,6 +18328,7 @@
     },
     "/workspaces/{wsId}/ai/auto-actions": {
       "get": {
+        "description": "Returns auto-action proposals (auto-archive, auto-close, auto-reassign) the engine surfaces. Read-only; execution happens via the auto-action executor when settings.enabled.",
         "operationId": "ai-auto-actions",
         "parameters": [
           {
@@ -18506,6 +18367,7 @@
     },
     "/workspaces/{wsId}/ai/compile-lens": {
       "post": {
+        "description": "Asks the workspace LLM to translate a natural-language description into a validated Lens JSON. Returns the JSON plus the model's confidence so the client can confirm before saving.",
         "operationId": "ai-compile-lens",
         "parameters": [
           {
@@ -18554,6 +18416,7 @@
     },
     "/workspaces/{wsId}/ai/cost-today": {
       "get": {
+        "description": "Returns the workspace's accumulated LLM spend for the current UTC day in USD. Used to power the AI cost gauge and to trip the configured budget guard.",
         "operationId": "ai-cost-today",
         "parameters": [
           {
@@ -18580,7 +18443,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/AiCostTodayOutputBody"
+                  "$ref": "#/components/schemas/CostTodayOutputBody"
                 }
               }
             },
@@ -18602,6 +18465,7 @@
     },
     "/workspaces/{wsId}/ai/invocations": {
       "get": {
+        "description": "Returns a cursor-paginated page of redacted ai_invocations rows so the AI reasoning panel can show prompts, models, and costs without leaking secrets.",
         "operationId": "ai-invocations-list",
         "parameters": [
           {
@@ -18663,6 +18527,7 @@
     },
     "/workspaces/{wsId}/ai/metrics": {
       "get": {
+        "description": "Returns suggestion acceptance / dismissal counts and rate over a trailing window. Used by the AI Settings page to show whether the assistant is helpful.",
         "operationId": "ai-metrics",
         "parameters": [
           {
@@ -18693,7 +18558,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/AiMetricsOutputBody"
+                  "$ref": "#/components/schemas/MetricsOutputBody"
                 }
               }
             },
@@ -18715,6 +18580,7 @@
     },
     "/workspaces/{wsId}/ai/models": {
       "get": {
+        "description": "Returns every model exposed by the workspace's enabled providers (OpenAI, Anthropic, local, etc.) so model pickers can render a unified list.",
         "operationId": "ai-models-list",
         "parameters": [
           {
@@ -18776,6 +18642,7 @@
     },
     "/workspaces/{wsId}/ai/priority-suggestions": {
       "get": {
+        "description": "Runs the deterministic priority-suggestion engine and returns proposals (task id, current priority, suggested priority, reason). Read-only; the client applies via /tasks/{id}.",
         "operationId": "ai-priority-suggestions-list",
         "parameters": [
           {
@@ -18814,6 +18681,7 @@
     },
     "/workspaces/{wsId}/ai/providers": {
       "get": {
+        "description": "Lists every LLM provider configured for the workspace with masked key suffixes only. Backs the AI Settings panel.",
         "operationId": "ai-providers-list",
         "parameters": [
           {
@@ -18873,6 +18741,7 @@
         "summary": "List LLM providers (masked, no ciphertext)"
       },
       "post": {
+        "description": "Creates a workspace LLM provider row (kind, base URL, model defaults). The plaintext API key is encrypted at rest with the deployment cipher and never echoed back. Workspace admin only.",
         "operationId": "ai-providers-create",
         "parameters": [
           {
@@ -18921,6 +18790,7 @@
     },
     "/workspaces/{wsId}/ai/providers/{providerId}": {
       "delete": {
+        "description": "Marks the provider as removed so subsequent AI calls fail closed with AI.PROVIDER.NOT_CONFIGURED. Historical ai_invocations rows remain queryable.",
         "operationId": "ai-providers-delete",
         "parameters": [
           {
@@ -18965,6 +18835,7 @@
         "summary": "Soft-delete an LLM provider"
       },
       "patch": {
+        "description": "Re-encrypts and stores a new API key for the provider, optionally updating model defaults at the same time. The old key is overwritten in place.",
         "operationId": "ai-providers-patch",
         "parameters": [
           {
@@ -19021,6 +18892,7 @@
     },
     "/workspaces/{wsId}/ai/reminders": {
       "get": {
+        "description": "Returns reminders the deterministic engine surfaces for the workspace (due-soon, stale, blocked-by). Used by the Reminders dock.",
         "operationId": "ai-reminders",
         "parameters": [
           {
@@ -19059,6 +18931,7 @@
     },
     "/workspaces/{wsId}/ai/resolve-command": {
       "post": {
+        "description": "Asks the LLM to translate a natural-language instruction into a structured MCP tool call. Returns the tool name and arguments; execution is the client's call so it can confirm first.",
         "operationId": "ai-resolve-command",
         "parameters": [
           {
@@ -19107,6 +18980,7 @@
     },
     "/workspaces/{wsId}/ai/state-suggestions": {
       "get": {
+        "description": "Returns deterministic state-transition proposals across every open task in the workspace. Read-only; the client applies via /tasks/{id}/transitions.",
         "operationId": "ai-state-suggestions",
         "parameters": [
           {
@@ -19145,6 +19019,7 @@
     },
     "/workspaces/{wsId}/ai/suggestions": {
       "get": {
+        "description": "Returns AI inbox triage suggestions that have been proposed but not yet applied or dismissed. Sourced from the events table per ADR 0002 so the Glass Dock can resume across devices.",
         "operationId": "ai-suggestions-list",
         "parameters": [
           {
@@ -19183,6 +19058,7 @@
     },
     "/workspaces/{wsId}/ai/suggestions/{inboxItemId}/apply": {
       "post": {
+        "description": "Appends an ai.suggestion.applied reaction event so the suggestion drops out of the pending list. The actual side-effect (e.g. archive or assign) is performed separately by the client; this endpoint only records the user's choice.",
         "operationId": "ai-suggestions-apply",
         "parameters": [
           {
@@ -19222,6 +19098,7 @@
     },
     "/workspaces/{wsId}/ai/suggestions/{inboxItemId}/dismiss": {
       "post": {
+        "description": "Appends an ai.suggestion.dismissed reaction event so the suggestion drops out of the pending list and the AI metrics counter records the negative signal.",
         "operationId": "ai-suggestions-dismiss",
         "parameters": [
           {
@@ -19261,6 +19138,7 @@
     },
     "/workspaces/{wsId}/ai/weekly-digest": {
       "get": {
+        "description": "Renders a deterministic weekly digest (Markdown) summarizing what shipped, what stalled, and what's coming for the workspace. Used by the email digest job and the in-app digest panel.",
         "operationId": "ai-weekly-digest",
         "parameters": [
           {
@@ -19299,6 +19177,7 @@
     },
     "/workspaces/{wsId}/audit-logs": {
       "get": {
+        "description": "Returns a cursor-paginated page of workspace audit log entries (actor, action, target, timestamp). Restricted to workspace admins; backs the admin Audit panel.",
         "operationId": "audit-logs-list",
         "parameters": [
           {
@@ -19412,6 +19291,7 @@
     },
     "/workspaces/{wsId}/calendar-events": {
       "get": {
+        "description": "Returns events from every calendar the caller can see in the workspace within the supplied date range. Used by the unified workspace calendar view.",
         "operationId": "calendar-events-list",
         "parameters": [
           {
@@ -19474,6 +19354,7 @@
     },
     "/workspaces/{wsId}/calendar-events/{evtId}/apply-shift": {
       "post": {
+        "description": "Applies the previously proposed shift: moves the umbrella event and the confirmed task subset by the same day delta. Conflicting tasks are left in place; their conflict reasons are returned.",
         "operationId": "calendar-events-shift-apply",
         "parameters": [
           {
@@ -19530,6 +19411,7 @@
     },
     "/workspaces/{wsId}/calendar-events/{evtId}/linked-tasks": {
       "get": {
+        "description": "Returns the tasks linked to the named calendar event with the link kind. Inverse of /tasks/{id}/linked-events.",
         "operationId": "calendar-events-linked-tasks-list",
         "parameters": [
           {
@@ -19556,7 +19438,7 @@
             "schema": {
               "default": 100,
               "format": "int32",
-              "maximum": 500,
+              "maximum": 1000,
               "minimum": 1,
               "type": "integer"
             }
@@ -19600,6 +19482,7 @@
     },
     "/workspaces/{wsId}/calendar-events/{evtId}/propose-shift": {
       "post": {
+        "description": "Dry-runs an umbrella event shift and returns which contributes_to-linked tasks would move cleanly versus which would conflict with constraints. Read-only; apply with /apply-shift.",
         "operationId": "calendar-events-shift-propose",
         "parameters": [
           {
@@ -19656,6 +19539,7 @@
     },
     "/workspaces/{wsId}/calendars": {
       "get": {
+        "description": "Returns calendars the caller is subscribed to within the workspace plus their color and visibility flags. Backs the calendar sidebar.",
         "operationId": "calendars-list",
         "parameters": [
           {
@@ -19694,6 +19578,7 @@
         "summary": "List calendars in a workspace"
       },
       "post": {
+        "description": "Creates a new calendar in the workspace owned by the caller. Personal calendars default to discoverable=false; team calendars default to true.",
         "operationId": "calendars-create",
         "parameters": [
           {
@@ -19744,6 +19629,7 @@
     },
     "/workspaces/{wsId}/calendars/subscribe-system": {
       "post": {
+        "description": "Subscribes the caller to a system-managed read-only holiday calendar for the supplied ISO country code. Idempotent.",
         "operationId": "calendars-subscribe-system",
         "parameters": [
           {
@@ -19794,6 +19680,7 @@
     },
     "/workspaces/{wsId}/calendars/{calId}": {
       "delete": {
+        "description": "Soft-deletes the calendar. Subscriptions are revoked; event history stays queryable for audit. Requires calendar owner role.",
         "operationId": "calendars-delete",
         "parameters": [
           {
@@ -19842,6 +19729,7 @@
         "summary": "Delete a calendar"
       },
       "get": {
+        "description": "Returns the calendar's metadata (name, color, timezone, owner, sharing flags) for the calendar settings panel.",
         "operationId": "calendars-get",
         "parameters": [
           {
@@ -19890,6 +19778,7 @@
         "summary": "Get a calendar"
       },
       "patch": {
+        "description": "Updates editable calendar fields (name, description, color, timezone, discoverable). Requires calendar admin role.",
         "operationId": "calendars-patch",
         "parameters": [
           {
@@ -19950,6 +19839,7 @@
     },
     "/workspaces/{wsId}/calendars/{calId}/events": {
       "get": {
+        "description": "Returns events from the named calendar within the supplied date range. Recurrence rules are expanded server-side; client receives concrete instances.",
         "operationId": "events-list",
         "parameters": [
           {
@@ -20022,6 +19912,7 @@
         "summary": "List events in a calendar"
       },
       "post": {
+        "description": "Creates an event in the calendar. Optionally accepts an attendee list which triggers RSVP requests; recurrence rules are validated against RFC 5545.",
         "operationId": "events-create",
         "parameters": [
           {
@@ -20082,6 +19973,7 @@
     },
     "/workspaces/{wsId}/calendars/{calId}/events/from-task": {
       "post": {
+        "description": "Creates an event seeded from the supplied task (title, due_on, description) and links the two via task_event_links so propagation rules can keep them in sync.",
         "operationId": "events-from-task",
         "parameters": [
           {
@@ -20142,6 +20034,7 @@
     },
     "/workspaces/{wsId}/calendars/{calId}/events/smart-create": {
       "post": {
+        "description": "Asks the workspace LLM to translate a free-text prompt (e.g. 'lunch with Sam tomorrow at noon') into a structured event proposal. Read-only; the client confirms before /create.",
         "operationId": "events-smart-create",
         "parameters": [
           {
@@ -20202,6 +20095,7 @@
     },
     "/workspaces/{wsId}/calendars/{calId}/events/{evtId}": {
       "delete": {
+        "description": "Removes the event. Linked tasks remain but their task_event_link rows are tombstoned so propagation rules stop firing. Idempotent.",
         "operationId": "events-delete",
         "parameters": [
           {
@@ -20260,6 +20154,7 @@
         "summary": "Delete an event"
       },
       "get": {
+        "description": "Returns one event with its full body, recurrence rule, attendees, and link metadata. Used by the event detail panel.",
         "operationId": "events-get",
         "parameters": [
           {
@@ -20318,6 +20213,7 @@
         "summary": "Get an event"
       },
       "patch": {
+        "description": "Updates editable event fields (title, time range, description, location, recurrence). Time changes trigger task-shift propagation through task_event_links.",
         "operationId": "events-patch",
         "parameters": [
           {
@@ -20388,6 +20284,7 @@
     },
     "/workspaces/{wsId}/calendars/{calId}/events/{evtId}/attachments": {
       "get": {
+        "description": "Returns metadata for files attached to the event (filename, size, MIME, uploader). Bytes are fetched separately via signed URLs.",
         "operationId": "attachments-list",
         "parameters": [
           {
@@ -20446,6 +20343,7 @@
         "summary": "List attachments on an event"
       },
       "post": {
+        "description": "Records that a file (already uploaded out-of-band) is attached to the event. Stores filename, MIME, size, and storage key.",
         "operationId": "attachments-create",
         "parameters": [
           {
@@ -20516,6 +20414,7 @@
     },
     "/workspaces/{wsId}/calendars/{calId}/events/{evtId}/attachments/{attId}": {
       "delete": {
+        "description": "Marks the attachment as removed and best-effort deletes the underlying object. Idempotent.",
         "operationId": "attachments-delete",
         "parameters": [
           {
@@ -20586,6 +20485,7 @@
     },
     "/workspaces/{wsId}/calendars/{calId}/events/{evtId}/attendees": {
       "get": {
+        "description": "Returns the attendee list for the event with each attendee's RSVP state and edit permission.",
         "operationId": "attendees-list",
         "parameters": [
           {
@@ -20644,6 +20544,7 @@
         "summary": "List attendees on an event"
       },
       "post": {
+        "description": "Adds one or more attendees (workspace members or external email addresses) to the event. External invitees receive a magic-link invite email.",
         "operationId": "attendees-add",
         "parameters": [
           {
@@ -20714,6 +20615,7 @@
     },
     "/workspaces/{wsId}/calendars/{calId}/events/{evtId}/attendees/rsvp": {
       "patch": {
+        "description": "Updates the caller's own RSVP (yes / no / maybe). Other attendees' RSVPs are unaffected.",
         "operationId": "attendees-rsvp",
         "parameters": [
           {
@@ -20784,6 +20686,7 @@
     },
     "/workspaces/{wsId}/calendars/{calId}/events/{evtId}/attendees/{attendeeId}/invite": {
       "post": {
+        "description": "Mints a fresh magic-link invite token for the attendee and emails it. Repeated calls rotate the token, invalidating any prior unused link.",
         "operationId": "event-invites-create",
         "parameters": [
           {
@@ -20864,6 +20767,7 @@
     },
     "/workspaces/{wsId}/calendars/{calId}/events/{evtId}/attendees/{userId}": {
       "delete": {
+        "description": "Removes the named attendee from the event. Idempotent.",
         "operationId": "attendees-remove",
         "parameters": [
           {
@@ -20934,6 +20838,7 @@
     },
     "/workspaces/{wsId}/calendars/{calId}/events/{evtId}/attendees/{userId}/can-edit": {
       "patch": {
+        "description": "Grants or revokes the named attendee's permission to edit the event. The event owner can always edit; this gates other attendees.",
         "operationId": "attendees-can-edit",
         "parameters": [
           {
@@ -21014,6 +20919,7 @@
     },
     "/workspaces/{wsId}/calendars/{calId}/events/{evtId}/checklist": {
       "get": {
+        "description": "Returns the checklist items attached to the event in display order, used by the event prep panel.",
         "operationId": "checklist-list",
         "parameters": [
           {
@@ -21072,6 +20978,7 @@
         "summary": "List checklist items for an event"
       },
       "post": {
+        "description": "Appends a checklist item to the event with optional assignee. Returns the persisted item including its display order.",
         "operationId": "checklist-create",
         "parameters": [
           {
@@ -21142,6 +21049,7 @@
     },
     "/workspaces/{wsId}/calendars/{calId}/events/{evtId}/checklist/{itemId}": {
       "delete": {
+        "description": "Removes the named checklist item. Idempotent.",
         "operationId": "checklist-delete",
         "parameters": [
           {
@@ -21210,6 +21118,7 @@
         "summary": "Delete a checklist item"
       },
       "patch": {
+        "description": "Updates a checklist item's text, completion state, assignee, or display order.",
         "operationId": "checklist-update",
         "parameters": [
           {
@@ -21290,6 +21199,7 @@
     },
     "/workspaces/{wsId}/calendars/{calId}/events/{evtId}/comments": {
       "get": {
+        "description": "Returns the comment thread on the event in chronological order. Used by the event detail comment pane.",
         "operationId": "comments-list",
         "parameters": [
           {
@@ -21348,6 +21258,7 @@
         "summary": "List comments on an event"
       },
       "post": {
+        "description": "Appends a comment from the caller to the event thread. Mentions in the body are routed through the notifications pipeline.",
         "operationId": "comments-create",
         "parameters": [
           {
@@ -21418,6 +21329,7 @@
     },
     "/workspaces/{wsId}/calendars/{calId}/events/{evtId}/comments/{cId}": {
       "delete": {
+        "description": "Removes the named comment. Permitted to the comment author or any calendar admin.",
         "operationId": "comments-delete",
         "parameters": [
           {
@@ -21486,6 +21398,7 @@
         "summary": "Delete a comment"
       },
       "patch": {
+        "description": "Replaces the body of the named comment. Only the original author may edit; an edited_at timestamp is set.",
         "operationId": "comments-edit",
         "parameters": [
           {
@@ -21566,6 +21479,7 @@
     },
     "/workspaces/{wsId}/calendars/{calId}/events/{evtId}/invites": {
       "get": {
+        "description": "Lists outstanding magic-link invites for the event with attendee, expiry, and last-sent metadata. Tokens are masked.",
         "operationId": "event-invites-list",
         "parameters": [
           {
@@ -21626,6 +21540,7 @@
     },
     "/workspaces/{wsId}/calendars/{calId}/events/{evtId}/invites/{inviteId}": {
       "delete": {
+        "description": "Marks the invite token as revoked so future redemption attempts fail. Already-accepted RSVPs are unaffected.",
         "operationId": "event-invites-revoke",
         "parameters": [
           {
@@ -21696,6 +21611,7 @@
     },
     "/workspaces/{wsId}/calendars/{calId}/members": {
       "get": {
+        "description": "Lists every member of the calendar with their role and join time. Used by the calendar settings members panel.",
         "operationId": "members-list",
         "parameters": [
           {
@@ -21744,6 +21660,7 @@
         "summary": "List members of a calendar"
       },
       "post": {
+        "description": "Adds a workspace member to the calendar at the requested role (viewer / editor / admin). Calendar admin role required.",
         "operationId": "members-add",
         "parameters": [
           {
@@ -21804,6 +21721,7 @@
     },
     "/workspaces/{wsId}/calendars/{calId}/members/{userId}": {
       "delete": {
+        "description": "Removes the named member from the calendar. Their subscription rows are tombstoned. Refuses to remove the last admin.",
         "operationId": "members-remove",
         "parameters": [
           {
@@ -21862,6 +21780,7 @@
         "summary": "Remove a member from a calendar"
       },
       "patch": {
+        "description": "Changes a calendar member's role. Refuses to demote the last admin so the calendar stays manageable.",
         "operationId": "members-update-role",
         "parameters": [
           {
@@ -21932,6 +21851,7 @@
     },
     "/workspaces/{wsId}/calendars/{calId}/memos": {
       "get": {
+        "description": "Returns memos pinned to the calendar (e.g. running notes for a recurring meeting). Used by the calendar memo sidebar.",
         "operationId": "memos-list",
         "parameters": [
           {
@@ -21980,6 +21900,7 @@
         "summary": "List memos in a calendar"
       },
       "post": {
+        "description": "Creates a memo on the calendar with title and Markdown body. Returns the persisted memo including its assigned id.",
         "operationId": "memos-create",
         "parameters": [
           {
@@ -22040,6 +21961,7 @@
     },
     "/workspaces/{wsId}/calendars/{calId}/memos/{memoId}": {
       "delete": {
+        "description": "Removes the memo. Idempotent.",
         "operationId": "memos-delete",
         "parameters": [
           {
@@ -22098,6 +22020,7 @@
         "summary": "Delete a memo"
       },
       "patch": {
+        "description": "Updates the memo's title or Markdown body.",
         "operationId": "memos-update",
         "parameters": [
           {
@@ -22168,6 +22091,7 @@
     },
     "/workspaces/{wsId}/calendars/{calId}/subscribe": {
       "post": {
+        "description": "Subscribes the caller to the named calendar at viewer role. Returns the new subscription record with default color override.",
         "operationId": "calendars-self-subscribe",
         "parameters": [
           {
@@ -22218,6 +22142,7 @@
     },
     "/workspaces/{wsId}/calendars/{calId}/subscription": {
       "patch": {
+        "description": "Updates the caller's own subscription preferences (color override, visibility, notification opt-out) without affecting other members.",
         "operationId": "calendars-self-subscription-patch",
         "parameters": [
           {
@@ -22278,6 +22203,7 @@
     },
     "/workspaces/{wsId}/dashboard/widgets": {
       "get": {
+        "description": "Returns every dashboard widget in the workspace ordered by position. Backs the dashboard rendering loop in flow-web.",
         "operationId": "dashboard-widgets-list",
         "parameters": [
           {
@@ -22337,6 +22263,7 @@
         "summary": "List dashboard widgets in a workspace"
       },
       "post": {
+        "description": "Adds a new widget to the workspace dashboard with the provided kind and config blob. Returns the persisted widget including its assigned position so the client can render it immediately.",
         "operationId": "dashboard-widgets-create",
         "parameters": [
           {
@@ -22385,6 +22312,7 @@
     },
     "/workspaces/{wsId}/dashboard/widgets/{widgetId}": {
       "delete": {
+        "description": "Marks the widget as removed without erasing config so an undo affordance can restore it. Idempotent.",
         "operationId": "dashboard-widgets-delete",
         "parameters": [
           {
@@ -22429,6 +22357,7 @@
         "summary": "Soft-delete a dashboard widget"
       },
       "get": {
+        "description": "Returns a single widget with its kind, config, and computed payload. Used when opening a widget's detail or edit panel.",
         "operationId": "dashboard-widgets-get",
         "parameters": [
           {
@@ -22473,6 +22402,7 @@
         "summary": "Fetch a dashboard widget by id"
       },
       "patch": {
+        "description": "Updates a widget's title and config blob. Position changes go through the dedicated /position endpoint to avoid heavy reflows on drag.",
         "operationId": "dashboard-widgets-update",
         "parameters": [
           {
@@ -22529,6 +22459,7 @@
     },
     "/workspaces/{wsId}/dashboard/widgets/{widgetId}/position": {
       "put": {
+        "description": "Persists a widget's grid x/y coordinates and width/height after a drag-and-resize gesture. Idempotent and lightweight so it can fire on every drop.",
         "operationId": "dashboard-widgets-update-position",
         "parameters": [
           {
@@ -22585,6 +22516,7 @@
     },
     "/workspaces/{wsId}/discoverable-calendars": {
       "get": {
+        "description": "Lists teammate personal calendars marked discoverable so the caller can opt in. Excludes calendars the caller is already subscribed to.",
         "operationId": "discoverable-calendars-list",
         "parameters": [
           {
@@ -22678,7 +22610,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ExportBody"
+                  "$ref": "#/components/schemas/Body"
                 }
               }
             },
@@ -22700,6 +22632,7 @@
     },
     "/workspaces/{wsId}/imports": {
       "get": {
+        "description": "Returns recent import jobs in the workspace with their status (pending, running, succeeded, failed, cancelled). Backs the import history panel.",
         "operationId": "imports-list",
         "parameters": [
           {
@@ -22759,6 +22692,7 @@
         "summary": "List import jobs for the workspace"
       },
       "post": {
+        "description": "Submits an import job (Asana / CSV / etc.) referencing previously uploaded source data. The job runs asynchronously; poll /imports/{importId} for progress.",
         "operationId": "imports-create",
         "parameters": [
           {
@@ -22807,6 +22741,7 @@
     },
     "/workspaces/{wsId}/imports/{importId}": {
       "get": {
+        "description": "Returns the full state of one import job: progress counters, error log, summary stats. Used by the in-progress poller and the post-run report.",
         "operationId": "imports-get",
         "parameters": [
           {
@@ -22853,6 +22788,7 @@
     },
     "/workspaces/{wsId}/imports/{importId}/cancel": {
       "post": {
+        "description": "Marks the job as cancelled so the worker stops on its next checkpoint. Already-imported rows remain; partial state is documented in the import report.",
         "operationId": "imports-cancel",
         "parameters": [
           {
@@ -22899,6 +22835,7 @@
     },
     "/workspaces/{wsId}/inbox/triage": {
       "post": {
+        "description": "Synchronously runs the AI triage prompt over the caller's pending inbox items and returns a per-item score plus recommended action. Each call is recorded as an ai.suggestion.proposed event so /ai/suggestions can replay it.",
         "operationId": "inbox-triage",
         "parameters": [
           {
@@ -22914,7 +22851,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/InboxTriageInputBody"
+                "$ref": "#/components/schemas/TriageInputBody"
               }
             }
           },
@@ -22925,7 +22862,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/InboxTriageOutputBody"
+                  "$ref": "#/components/schemas/TriageOutputBody"
                 }
               }
             },
@@ -22947,6 +22884,7 @@
     },
     "/workspaces/{wsId}/intake": {
       "get": {
+        "description": "Returns intake items pending triage (signals + manual submissions) ordered by priority. Backs the workspace Intake board.",
         "operationId": "intake-list",
         "parameters": [
           {
@@ -23016,6 +22954,7 @@
         "summary": "List intake items in the triage queue"
       },
       "post": {
+        "description": "Pushes a new intake row onto the workspace triage queue. Used by the manual 'capture' affordance and by integrations that want a human to review before a task is created.",
         "operationId": "intake-create",
         "parameters": [
           {
@@ -23042,7 +22981,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/IntakeItem"
+                  "$ref": "#/components/schemas/Item"
                 }
               }
             },
@@ -23064,6 +23003,7 @@
     },
     "/workspaces/{wsId}/intake/{id}": {
       "get": {
+        "description": "Returns the named intake item with its source signal payload and current triage state. Used by the intake detail panel.",
         "operationId": "intake-get",
         "parameters": [
           {
@@ -23088,7 +23028,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/IntakeItem"
+                  "$ref": "#/components/schemas/Item"
                 }
               }
             },
@@ -23108,6 +23048,7 @@
         "summary": "Get a single intake item"
       },
       "patch": {
+        "description": "Records the human triage decision on the named intake item: accept (forward to /convert), reject (drop with reason), snooze (revisit later), or mark duplicate of an existing task.",
         "operationId": "intake-triage",
         "parameters": [
           {
@@ -23142,7 +23083,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/IntakeItem"
+                  "$ref": "#/components/schemas/Item"
                 }
               }
             },
@@ -23164,6 +23105,7 @@
     },
     "/workspaces/{wsId}/intake/{id}/convert": {
       "post": {
+        "description": "Creates a task from the intake row and links the two so the source signal is preserved on the task timeline. Closes the intake item as accepted.",
         "operationId": "intake-convert",
         "parameters": [
           {
@@ -23220,6 +23162,7 @@
     },
     "/workspaces/{wsId}/invites": {
       "get": {
+        "description": "Lists outstanding invite links for the workspace (id, role, expiry, redemption count) so admins can revoke or audit. Tokens are never returned.",
         "operationId": "workspaces-invites-list",
         "parameters": [
           {
@@ -23259,7 +23202,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ListWorkspaceInvitesOutputBody"
+                  "$ref": "#/components/schemas/ListInvitesOutputBody"
                 }
               }
             },
@@ -23279,6 +23222,7 @@
         "summary": "List invite links"
       },
       "post": {
+        "description": "Issues a shareable invite link with the requested role and expiry. The link is the only artifact returned that contains the token; subsequent listings return only metadata.",
         "operationId": "workspaces-invites-create",
         "parameters": [
           {
@@ -23294,7 +23238,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/CreateWorkspaceInviteInputBody"
+                "$ref": "#/components/schemas/CreateInviteInputBody"
               }
             }
           },
@@ -23305,7 +23249,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/CreateWorkspaceInviteOutputBody"
+                  "$ref": "#/components/schemas/CreateInviteOutputBody"
                 }
               }
             },
@@ -23327,6 +23271,7 @@
     },
     "/workspaces/{wsId}/invites/{inviteId}": {
       "delete": {
+        "description": "Marks an invite token as revoked so future redemption attempts fail with INVITE.REVOKED. Already-redeemed memberships are unaffected.",
         "operationId": "workspaces-invites-revoke",
         "parameters": [
           {
@@ -23351,7 +23296,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/RevokeWorkspaceInviteOutputBody"
+                  "$ref": "#/components/schemas/RevokeInviteOutputBody"
                 }
               }
             },
@@ -23373,6 +23318,7 @@
     },
     "/workspaces/{wsId}/labels": {
       "get": {
+        "description": "Returns every active label in the workspace ordered by name. Used to populate label pickers and filter chips.",
         "operationId": "labels-list",
         "parameters": [
           {
@@ -23442,6 +23388,7 @@
         "summary": "List labels in a workspace"
       },
       "post": {
+        "description": "Creates a workspace label with name and color. Names are unique within the workspace.",
         "operationId": "labels-create",
         "parameters": [
           {
@@ -23490,6 +23437,7 @@
     },
     "/workspaces/{wsId}/labels/{id}": {
       "delete": {
+        "description": "Marks the label as disabled so it disappears from pickers without breaking historical task assignments. Idempotent.",
         "operationId": "labels-disable",
         "parameters": [
           {
@@ -23534,6 +23482,7 @@
         "summary": "Soft-disable a label"
       },
       "get": {
+        "description": "Returns one label including its name, color, and disabled state. Used by the label edit panel.",
         "operationId": "labels-get",
         "parameters": [
           {
@@ -23578,6 +23527,7 @@
         "summary": "Fetch a label"
       },
       "patch": {
+        "description": "Renames or recolors the label. Existing task assignments keep working; the new name and color propagate immediately.",
         "operationId": "labels-patch",
         "parameters": [
           {
@@ -23634,6 +23584,7 @@
     },
     "/workspaces/{wsId}/lenses": {
       "get": {
+        "description": "Lists lenses visible to the caller within the workspace, optionally scoped to a project. Backs the saved-views menu.",
         "operationId": "lenses-list",
         "parameters": [
           {
@@ -23703,6 +23654,7 @@
         "summary": "List saved views for a workspace/project"
       },
       "post": {
+        "description": "Persists a new lens (filter + grouping + sort) so the caller can re-open the same view across sessions and share it with teammates. The Lens JSON is validated against the schema before insert.",
         "operationId": "lenses-create",
         "parameters": [
           {
@@ -23751,6 +23703,7 @@
     },
     "/workspaces/{wsId}/lenses/{lensId}": {
       "delete": {
+        "description": "Removes the lens. If it is currently published the public token is also revoked so the unauthenticated mirror stops resolving.",
         "operationId": "lenses-delete",
         "parameters": [
           {
@@ -23795,6 +23748,7 @@
         "summary": "Delete a saved view"
       },
       "get": {
+        "description": "Returns one lens including its full Lens JSON and ownership metadata. Used when opening a saved view directly from a deep link.",
         "operationId": "lenses-get",
         "parameters": [
           {
@@ -23839,6 +23793,7 @@
         "summary": "Fetch a saved view"
       },
       "patch": {
+        "description": "Updates a lens's name, scope, or Lens JSON. Re-validates the JSON before persistence so an invalid update cannot wedge the view.",
         "operationId": "lenses-update",
         "parameters": [
           {
@@ -23895,6 +23850,7 @@
     },
     "/workspaces/{wsId}/lenses/{lensId}/publish": {
       "post": {
+        "description": "Mints an opaque public token for the lens and returns the canonical /public/lenses/{token} URL. Pages rendered against this token are unauthenticated.",
         "operationId": "lenses-publish",
         "parameters": [
           {
@@ -23941,6 +23897,7 @@
     },
     "/workspaces/{wsId}/lenses/{lensId}/unpublish": {
       "post": {
+        "description": "Invalidates the lens's public token. Future fetches against the old URL return 404.",
         "operationId": "lenses-unpublish",
         "parameters": [
           {
@@ -23987,6 +23944,7 @@
     },
     "/workspaces/{wsId}/me/mcp-tokens": {
       "get": {
+        "description": "Lists the caller's existing MCP tokens with label, last-used time, and creation time. Plaintext is never returned; rotate by issuing a new token and revoking the old one.",
         "operationId": "mcp-tokens-list",
         "parameters": [
           {
@@ -24046,6 +24004,7 @@
         "summary": "List the caller's MCP tokens (no plaintext)"
       },
       "post": {
+        "description": "Generates a new MCP bearer token (mcp_…) the caller can pass to a local MCP client to authenticate against /mcp. The plaintext token is returned exactly once; only the hash is stored.",
         "operationId": "mcp-tokens-create",
         "parameters": [
           {
@@ -24094,6 +24053,7 @@
     },
     "/workspaces/{wsId}/me/mcp-tokens/{tokenId}": {
       "delete": {
+        "description": "Marks the token as revoked so future /mcp requests carrying it are rejected. Idempotent.",
         "operationId": "mcp-tokens-delete",
         "parameters": [
           {
@@ -24140,6 +24100,7 @@
     },
     "/workspaces/{wsId}/members": {
       "get": {
+        "description": "Lists every active member of the workspace with their role and join time. Used by the admin members panel; requires workspace membership.",
         "operationId": "workspaces-members-list",
         "parameters": [
           {
@@ -24179,7 +24140,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ListWorkspaceMembersOutputBody"
+                  "$ref": "#/components/schemas/ListMembersOutputBody"
                 }
               }
             },
@@ -24199,6 +24160,7 @@
         "summary": "List workspace members"
       },
       "post": {
+        "description": "Sends a workspace invite to the supplied email at the requested role. The recipient gets a link they redeem via /invites/{token}/accept. Requires workspace admin role.",
         "operationId": "workspaces-members-add",
         "parameters": [
           {
@@ -24214,7 +24176,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/AddWorkspaceMemberInputBody"
+                "$ref": "#/components/schemas/AddMemberInputBody"
               }
             }
           },
@@ -24225,7 +24187,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/WorkspaceMember"
+                  "$ref": "#/components/schemas/Member"
                 }
               }
             },
@@ -24247,6 +24209,7 @@
     },
     "/workspaces/{wsId}/members/{userId}": {
       "delete": {
+        "description": "Removes the named user from the workspace. Removing the last owner is rejected. Outstanding sessions for the removed user keep working until their access tokens expire; refresh inside this workspace will fail.",
         "operationId": "workspaces-members-remove",
         "parameters": [
           {
@@ -24271,7 +24234,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/RemoveWorkspaceMemberOutputBody"
+                  "$ref": "#/components/schemas/RemoveMemberOutputBody"
                 }
               }
             },
@@ -24291,6 +24254,7 @@
         "summary": "Remove a member from a workspace"
       },
       "patch": {
+        "description": "Changes a member's role within the workspace. Promoting to owner or demoting the last owner is rejected to keep at least one owner present.",
         "operationId": "workspaces-members-update-role",
         "parameters": [
           {
@@ -24314,7 +24278,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/UpdateWorkspaceMemberRoleInputBody"
+                "$ref": "#/components/schemas/UpdateMemberRoleInputBody"
               }
             }
           },
@@ -24325,7 +24289,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/WorkspaceMember"
+                  "$ref": "#/components/schemas/Member"
                 }
               }
             },
@@ -24347,6 +24311,7 @@
     },
     "/workspaces/{wsId}/notifications/read-all": {
       "post": {
+        "description": "Bulk-marks every unread notification for the caller within the workspace as read. Useful for the 'mark all read' affordance in the notifications panel.",
         "operationId": "notifications-mark-all-read",
         "parameters": [
           {
@@ -24387,6 +24352,7 @@
     },
     "/workspaces/{wsId}/pages": {
       "get": {
+        "description": "Returns top-level pages (no parent) in the workspace, sorted alphabetically. Used to render the page tree's first level.",
         "operationId": "pages-list",
         "parameters": [
           {
@@ -24446,6 +24412,7 @@
         "summary": "List root pages in a workspace"
       },
       "post": {
+        "description": "Creates a new page (optionally as a child of an existing page) with title and Markdown body. Returns the persisted page including its assigned id.",
         "operationId": "pages-create",
         "parameters": [
           {
@@ -24494,6 +24461,7 @@
     },
     "/workspaces/{wsId}/pages/generate": {
       "post": {
+        "description": "Asks the workspace's configured LLM to draft a page from the supplied prompt and persists the result. Records an ai_invocations row.",
         "operationId": "pages-generate",
         "parameters": [
           {
@@ -24542,6 +24510,7 @@
     },
     "/workspaces/{wsId}/pages/search": {
       "get": {
+        "description": "Substring-matches page titles in the workspace. Backs the page picker and command palette.",
         "operationId": "pages-search",
         "parameters": [
           {
@@ -24615,6 +24584,7 @@
     },
     "/workspaces/{wsId}/pages/{pageId}": {
       "delete": {
+        "description": "Marks the page as deleted so it disappears from the tree without losing content. Idempotent.",
         "operationId": "pages-delete",
         "parameters": [
           {
@@ -24659,6 +24629,7 @@
         "summary": "Soft-delete a page"
       },
       "get": {
+        "description": "Returns a single page with its full Markdown body and metadata. Used when opening a page from the tree.",
         "operationId": "pages-get",
         "parameters": [
           {
@@ -24703,6 +24674,7 @@
         "summary": "Fetch a page by id"
       },
       "patch": {
+        "description": "Updates page title and Markdown body. Optionally re-parents the page within the tree.",
         "operationId": "pages-update",
         "parameters": [
           {
@@ -24759,6 +24731,7 @@
     },
     "/workspaces/{wsId}/pages/{pageId}/children": {
       "get": {
+        "description": "Returns the immediate children of the named page so the tree can be expanded one level at a time.",
         "operationId": "pages-list-children",
         "parameters": [
           {
@@ -24828,6 +24801,7 @@
     },
     "/workspaces/{wsId}/projects": {
       "get": {
+        "description": "Returns every project the caller can see in the workspace. Backs the project switcher and the project list panel.",
         "operationId": "projects-list",
         "parameters": [
           {
@@ -24887,6 +24861,7 @@
         "summary": "List projects in a workspace"
       },
       "post": {
+        "description": "Creates a new project in the workspace. The caller becomes the first project member with admin role. Requires workspace admin role.",
         "operationId": "projects-create",
         "parameters": [
           {
@@ -24935,6 +24910,7 @@
     },
     "/workspaces/{wsId}/public-shares": {
       "get": {
+        "description": "Lists public share pages owned by the workspace with metadata only (token is masked). Backs the share-management panel.",
         "operationId": "public-shares-list",
         "parameters": [
           {
@@ -24973,6 +24949,7 @@
         "summary": "List public share pages in a workspace"
       },
       "post": {
+        "description": "Mints a new public share page with a fresh URL token. The token is returned plaintext exactly once so the operator can copy the share URL; subsequent reads only return its hash.",
         "operationId": "public-shares-create",
         "parameters": [
           {
@@ -25023,6 +25000,7 @@
     },
     "/workspaces/{wsId}/public-shares/{shareId}": {
       "delete": {
+        "description": "Removes the share page so its URL stops resolving. Permitted to the share owner or workspace admins. Idempotent.",
         "operationId": "public-shares-delete",
         "parameters": [
           {
@@ -25071,6 +25049,7 @@
         "summary": "Delete a public share page (admin or owner only)"
       },
       "get": {
+        "description": "Returns the share page's metadata plus the ordered list of events currently published on it. The plaintext token is not returned.",
         "operationId": "public-shares-get",
         "parameters": [
           {
@@ -25119,6 +25098,7 @@
         "summary": "Get a public share page with its published events"
       },
       "patch": {
+        "description": "Updates the share page title, description, and theme. Token / event list use dedicated endpoints.",
         "operationId": "public-shares-patch",
         "parameters": [
           {
@@ -25179,6 +25159,7 @@
     },
     "/workspaces/{wsId}/public-shares/{shareId}/events": {
       "post": {
+        "description": "Publishes one or more events on the share page. Order defaults to creation order; reorder via /events/reorder.",
         "operationId": "public-shares-events-attach",
         "parameters": [
           {
@@ -25239,6 +25220,7 @@
     },
     "/workspaces/{wsId}/public-shares/{shareId}/events/reorder": {
       "patch": {
+        "description": "Replaces the order of published events in a single request after a drag-and-drop. Atomic so no client sees a partial reorder.",
         "operationId": "public-shares-events-reorder",
         "parameters": [
           {
@@ -25299,6 +25281,7 @@
     },
     "/workspaces/{wsId}/public-shares/{shareId}/events/{evtId}": {
       "delete": {
+        "description": "Unpublishes the named event from the share page without deleting the event itself. Idempotent.",
         "operationId": "public-shares-events-detach",
         "parameters": [
           {
@@ -25359,6 +25342,7 @@
     },
     "/workspaces/{wsId}/public-shares/{shareId}/rotate": {
       "post": {
+        "description": "Replaces the share's URL token with a fresh one. The previous token immediately stops resolving. The new plaintext token is returned exactly once.",
         "operationId": "public-shares-rotate",
         "parameters": [
           {
@@ -25409,6 +25393,7 @@
     },
     "/workspaces/{wsId}/relation-suggestions": {
       "get": {
+        "description": "Returns auto-detected task relation candidates (likely duplicates / dependencies) that the embedding pipeline has surfaced for the workspace and that no one has accepted or dismissed yet.",
         "operationId": "relation-suggestions-list-workspace",
         "parameters": [
           {
@@ -25472,6 +25457,7 @@
     },
     "/workspaces/{wsId}/tasks/apply-smart": {
       "post": {
+        "description": "Persists a proposal returned by /propose-smart: creates the parent task plus each accepted subtask under it and sets the suggested assignees. The client may trim the subtask set before applying.",
         "operationId": "tasks-apply-smart",
         "parameters": [
           {
@@ -25520,6 +25506,7 @@
     },
     "/workspaces/{wsId}/tasks/archived": {
       "get": {
+        "description": "Returns archived tasks in the workspace with cursor pagination. Used by the archive panel and bulk-restore tooling.",
         "operationId": "tasks-archived-list",
         "parameters": [
           {
@@ -25591,6 +25578,7 @@
     },
     "/workspaces/{wsId}/tasks/propose-smart": {
       "post": {
+        "description": "Asks the workspace's LLM to decompose a goal into subtasks with suggested assignees. Returns the proposal and a cache key so /apply-smart can persist it; nothing is written until apply.",
         "operationId": "tasks-propose-smart",
         "parameters": [
           {
@@ -25639,6 +25627,7 @@
     },
     "/workspaces/{wsId}/timeboxes": {
       "get": {
+        "description": "Returns timeboxes in the workspace ordered by start date. Used by the timebox planner to render past, current, and upcoming periods.",
         "operationId": "timeboxes-list",
         "parameters": [
           {
@@ -25698,6 +25687,7 @@
         "summary": "List timeboxes in a workspace"
       },
       "post": {
+        "description": "Creates a new timebox (sprint / focus block) with a date range, owner, and goal. Tasks are attached separately via /timeboxes/{id}/tasks.",
         "operationId": "timeboxes-create",
         "parameters": [
           {
@@ -25746,6 +25736,7 @@
     },
     "/workspaces/{wsId}/timeboxes/{timeboxId}": {
       "delete": {
+        "description": "Marks the timebox as removed. Tasks previously associated stay queryable; the link rows are tombstoned. Idempotent.",
         "operationId": "timeboxes-delete",
         "parameters": [
           {
@@ -25790,6 +25781,7 @@
         "summary": "Soft-delete a timebox"
       },
       "get": {
+        "description": "Returns a single timebox with metadata and aggregate progress (counts only). Use /tasks for the task list.",
         "operationId": "timeboxes-get",
         "parameters": [
           {
@@ -25834,6 +25826,7 @@
         "summary": "Fetch a timebox by id"
       },
       "patch": {
+        "description": "Updates timebox name, goal, owner, or date range. Status changes use the dedicated /status endpoint.",
         "operationId": "timeboxes-update",
         "parameters": [
           {
@@ -25890,6 +25883,7 @@
     },
     "/workspaces/{wsId}/timeboxes/{timeboxId}/status": {
       "post": {
+        "description": "Moves the timebox between planned / active / completed / cancelled. Status transitions enforce a state machine and emit timeline events.",
         "operationId": "timeboxes-update-status",
         "parameters": [
           {
@@ -25946,6 +25940,7 @@
     },
     "/workspaces/{wsId}/timeboxes/{timeboxId}/tasks": {
       "get": {
+        "description": "Returns the tasks associated with the timebox plus per-task progress and the aggregate completion percentage.",
         "operationId": "timeboxes-list-tasks",
         "parameters": [
           {
@@ -26013,6 +26008,7 @@
         "summary": "List tasks in a timebox with progress"
       },
       "post": {
+        "description": "Associates an existing workspace task with the timebox so it counts toward the timebox's progress and burndown.",
         "operationId": "timeboxes-add-task",
         "parameters": [
           {
@@ -26069,6 +26065,7 @@
     },
     "/workspaces/{wsId}/timeboxes/{timeboxId}/tasks/{taskId}": {
       "delete": {
+        "description": "Detaches the task from the timebox without affecting the task itself. Idempotent.",
         "operationId": "timeboxes-remove-task",
         "parameters": [
           {
@@ -26123,6 +26120,7 @@
     },
     "/workspaces/{wsId}/timeline": {
       "get": {
+        "description": "Returns the workspace-wide event stream (every task / project / signal event the caller can see). Cursor-paginated and intended for the workspace Activity view.",
         "operationId": "workspaces-timeline-list",
         "parameters": [
           {
@@ -26207,6 +26205,7 @@
     },
     "/workspaces/{wsId}/users": {
       "get": {
+        "description": "Lightweight listing of workspace members for actor / assignee pickers. Returns only id, display name, and avatar URL — no role or session info — and is the source of truth for in-product mention pickers.",
         "operationId": "workspaces-users-list",
         "parameters": [
           {
@@ -26245,6 +26244,7 @@
     },
     "/workspaces/{wsId}/webhooks": {
       "get": {
+        "description": "Lists every webhook subscription in the workspace with its target URL, event filters, and active state. Signing secrets are masked.",
         "operationId": "webhooks-list",
         "parameters": [
           {
@@ -26286,7 +26286,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/WebhooksListOutputBody"
+                  "$ref": "#/components/schemas/ListOutputBody"
                 }
               }
             },
@@ -26306,6 +26306,7 @@
         "summary": "List webhook subscriptions"
       },
       "post": {
+        "description": "Registers an outbound webhook subscription for the workspace. Returns the freshly minted HMAC signing secret in the response body — this is the only time it is returned plaintext.",
         "operationId": "webhooks-create",
         "parameters": [
           {
@@ -26356,6 +26357,7 @@
     },
     "/workspaces/{wsId}/webhooks/{webhookId}": {
       "delete": {
+        "description": "Marks the subscription as removed so no further deliveries are attempted. Delivery history remains queryable for audit.",
         "operationId": "webhooks-delete",
         "parameters": [
           {
@@ -26404,6 +26406,7 @@
         "summary": "Soft-delete a webhook subscription"
       },
       "get": {
+        "description": "Returns the named webhook subscription including its plaintext signing secret so the operator can rotate it. Restricted to workspace admins.",
         "operationId": "webhooks-get",
         "parameters": [
           {
@@ -26454,6 +26457,7 @@
     },
     "/workspaces/{wsId}/webhooks/{webhookId}/deliveries": {
       "get": {
+        "description": "Returns recent delivery attempts for the subscription with status code, latency, error reason, and the redacted payload preview. Used by the webhook detail panel for diagnostics.",
         "operationId": "webhooks-deliveries-list",
         "parameters": [
           {
@@ -26527,6 +26531,7 @@
     },
     "/workspaces/{wsId}/webhooks/{webhookId}/test": {
       "post": {
+        "description": "Synchronously sends a test ping payload signed with the subscription's secret so the operator can verify reachability and signature handling without waiting for a real event.",
         "operationId": "webhooks-test-delivery",
         "parameters": [
           {
@@ -26577,6 +26582,7 @@
     },
     "/workspaces/{wsId}/webhooks/{webhookId}/toggle": {
       "patch": {
+        "description": "Flips the subscription's active flag. Inactive subscriptions stay registered but skip delivery — useful for pausing during a downstream outage.",
         "operationId": "webhooks-toggle",
         "parameters": [
           {
