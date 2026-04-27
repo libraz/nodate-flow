@@ -102,17 +102,17 @@ type Config struct {
 	IntGoogleClientID     string `env:"NF_AUTH_GOOGLE_INTEGRATION_CLIENT_ID" envDefault:""`
 	IntGoogleClientSecret string `env:"NF_AUTH_GOOGLE_INTEGRATION_CLIENT_SECRET" envDefault:""`
 
-	// SmtpHost is the SMTP server hostname. When empty, email
+	// SMTPHost is the SMTP server hostname. When empty, email
 	// sending is disabled (invite links are returned without delivery).
-	SmtpHost string `env:"NF_AUTH_SMTP_HOST" envDefault:""`
-	// SmtpPort is the SMTP server port (typically 587 for STARTTLS).
-	SmtpPort int `env:"NF_AUTH_SMTP_PORT" envDefault:"587"`
-	// SmtpUsername is the SASL login. Empty to skip authentication.
-	SmtpUsername string `env:"NF_AUTH_SMTP_USERNAME" envDefault:""`
-	// SmtpPassword is the SASL secret.
-	SmtpPassword string `env:"NF_AUTH_SMTP_PASSWORD" envDefault:""`
-	// SmtpFrom is the envelope sender address.
-	SmtpFrom string `env:"NF_AUTH_SMTP_FROM" envDefault:"noreply@nodate-flow.local"`
+	SMTPHost string `env:"NF_AUTH_SMTP_HOST" envDefault:""`
+	// SMTPPort is the SMTP server port (typically 587 for STARTTLS).
+	SMTPPort int `env:"NF_AUTH_SMTP_PORT" envDefault:"587"`
+	// SMTPUsername is the SASL login. Empty to skip authentication.
+	SMTPUsername string `env:"NF_AUTH_SMTP_USERNAME" envDefault:""`
+	// SMTPPassword is the SASL secret.
+	SMTPPassword string `env:"NF_AUTH_SMTP_PASSWORD" envDefault:""`
+	// SMTPFrom is the envelope sender address.
+	SMTPFrom string `env:"NF_AUTH_SMTP_FROM" envDefault:"noreply@nodate-flow.local"`
 
 	// S3Endpoint is the host:port of the S3-compatible object store
 	// (e.g. "minio:9000" or "s3.amazonaws.com") used for avatar

@@ -80,20 +80,20 @@ func main() {
 	}
 
 	var emailSender email.Sender
-	if cfg.SmtpHost != "" {
+	if cfg.SMTPHost != "" {
 		s, smtpErr := email.NewSMTPSender(email.SMTPConfig{
-			Host:     cfg.SmtpHost,
-			Port:     cfg.SmtpPort,
-			Username: cfg.SmtpUsername,
-			Password: cfg.SmtpPassword,
-			From:     cfg.SmtpFrom,
+			Host:     cfg.SMTPHost,
+			Port:     cfg.SMTPPort,
+			Username: cfg.SMTPUsername,
+			Password: cfg.SMTPPassword,
+			From:     cfg.SMTPFrom,
 		})
 		if smtpErr != nil {
 			logger.Error("smtp init failed", "err", smtpErr)
 			os.Exit(1)
 		}
 		emailSender = s
-		logger.Info("email sender configured", "host", cfg.SmtpHost)
+		logger.Info("email sender configured", "host", cfg.SMTPHost)
 	}
 
 	integrationsRegistry := integrations.NewRegistry(

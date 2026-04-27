@@ -970,6 +970,10 @@ func (f *fakeQueries) UpsertUserIntegration(ctx context.Context, arg generated.U
 	return 1, nil
 }
 
+// Method name mirrors the sqlc-generated interface; it cannot be renamed without
+// renaming the SQL query and regenerating across both apps.
+//
+//nolint:revive // see comment above
 func (f *fakeQueries) FindUserIntegrationByPublicId(ctx context.Context, arg generated.FindUserIntegrationByPublicIdParams) (generated.FindUserIntegrationByPublicIdRow, error) {
 	if f.findByPubErr != nil {
 		return generated.FindUserIntegrationByPublicIdRow{}, f.findByPubErr
