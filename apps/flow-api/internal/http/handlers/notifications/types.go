@@ -64,8 +64,8 @@ type ListInput struct {
 	Offset      int32  `query:"offset" minimum:"0" default:"0"`
 }
 
-// NotificationsListOutputBody is the response body for GET /me/notifications.
-type NotificationsListOutputBody struct {
+// ListOutputBody is the response body for GET /me/notifications.
+type ListOutputBody struct {
 	Total         int64             `json:"total"`
 	Notifications []NotificationDTO `json:"notifications"`
 	NextCursor    *string           `json:"nextCursor"`
@@ -73,7 +73,7 @@ type NotificationsListOutputBody struct {
 
 // ListOutput is the response for GET /me/notifications.
 type ListOutput struct {
-	Body NotificationsListOutputBody
+	Body ListOutputBody
 }
 
 // --- CountUnread ---

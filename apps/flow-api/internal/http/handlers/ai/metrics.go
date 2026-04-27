@@ -26,18 +26,18 @@ type OutboundLimitStat struct {
 	Denied      uint64 `json:"denied"`
 }
 
-// AiMetricsInput is the path+query input for GET /workspaces/{wsId}/ai/metrics.
-type AiMetricsInput struct {
+// MetricsInput is the path+query input for GET /workspaces/{wsId}/ai/metrics.
+type MetricsInput struct {
 	WsID       string `path:"wsId"`
 	WindowDays int    `query:"windowDays" minimum:"1" maximum:"365" default:"30" doc:"Trailing window in days"`
 }
 
-// AiMetricsOutputBody is the response payload for the metrics endpoint.
+// MetricsOutputBody is the response payload for the metrics endpoint.
 //
 // acceptanceRate is applied / (applied + dismissed) over the window,
 // clamped to [0, 1]. Proposed is reported separately because a
 // suggestion may be neither applied nor dismissed yet (still pending).
-type AiMetricsOutputBody struct {
+type MetricsOutputBody struct {
 	WindowDays     int                 `json:"windowDays"`
 	Proposed       int64               `json:"proposed"`
 	Applied        int64               `json:"applied"`
@@ -46,14 +46,14 @@ type AiMetricsOutputBody struct {
 	OutboundLimits []OutboundLimitStat `json:"outboundLimits" doc:"Per-provider egress rate limiter counters"`
 }
 
-// AiMetricsOutput is the Huma envelope for AiMetricsOutputBody.
-type AiMetricsOutput struct {
-	Body AiMetricsOutputBody
+// MetricsOutput is the Huma envelope for MetricsOutputBody.
+type MetricsOutput struct {
+	Body MetricsOutputBody
 }
 
 // Metrics handles GET /workspaces/{wsId}/ai/metrics.
-func Metrics(deps Deps) func(context.Context, *AiMetricsInput) (*AiMetricsOutput, error) {
-	return func(ctx context.Context, in *AiMetricsInput) (*AiMetricsOutput, error) {
+func Metrics(deps Deps) func(context.Context, *MetricsInput) (*MetricsOutput, error) {
+	return func(ctx context.Context, in *MetricsInput) (*MetricsOutput, error) {
 		ws, ok := middleware.WorkspaceFromContext(ctx)
 		if !ok {
 			return nil, httpErr(apierrors.WsWorkspaceNotFound)
@@ -89,7 +89,7 @@ func Metrics(deps Deps) func(context.Context, *AiMetricsInput) (*AiMetricsOutput
 			})
 		}
 		sortOutboundLimits(limits)
-		return &AiMetricsOutput{Body: AiMetricsOutputBody{
+		return &MetricsOutput{Body: MetricsOutputBody{
 			WindowDays:     window,
 			Proposed:       proposed,
 			Applied:        applied,

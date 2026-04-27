@@ -101,7 +101,7 @@ func List(deps Deps) func(context.Context, *ListIntakeItemsInput) (*ListIntakeIt
 		}
 
 		out := &ListIntakeItemsOutput{}
-		out.Body.Items = make([]IntakeItem, 0, len(rows))
+		out.Body.Items = make([]Item, 0, len(rows))
 		for _, r := range rows {
 			out.Body.Items = append(out.Body.Items, mapListRow(r))
 		}

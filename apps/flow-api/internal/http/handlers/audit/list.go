@@ -56,7 +56,7 @@ func List(deps Deps) func(context.Context, *ListAuditLogsInput) (*ListAuditLogsO
 		}
 
 		out := &ListAuditLogsOutput{}
-		out.Body.Entries = make([]AuditLogEntryDTO, 0, len(rows))
+		out.Body.Entries = make([]LogEntryDTO, 0, len(rows))
 		for _, r := range rows {
 			out.Body.Entries = append(out.Body.Entries, mapListRow(r))
 		}

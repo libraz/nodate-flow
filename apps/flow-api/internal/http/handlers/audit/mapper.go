@@ -5,7 +5,7 @@ import (
 	"github.com/nodate-flow/nodate-flow/packages/go-shared/dbtype"
 )
 
-// mapListRow converts a ListWorkspaceAuditLogsRow to the AuditLogEntryDTO.
+// mapListRow converts a ListWorkspaceAuditLogsRow to the LogEntryDTO.
 // Null-capable columns are surfaced as nil pointers so the JSON payload
 // matches the frontend TypeScript interface, which uses "string | null"
 // for actorUserPublicId, actorDisplayName, resourcePublicId, ipAddress,
@@ -14,8 +14,8 @@ import (
 // Time conversion: occurred_at is DATETIME in the database, which sqlc
 // exposes as a non-nullable time.Time. Every audit row has a populated
 // occurred_at (NOT NULL), so the Unix-seconds conversion is unconditional.
-func mapListRow(r generated.ListWorkspaceAuditLogsRow) AuditLogEntryDTO {
-	dto := AuditLogEntryDTO{
+func mapListRow(r generated.ListWorkspaceAuditLogsRow) LogEntryDTO {
+	dto := LogEntryDTO{
 		PublicID:     r.PublicID.String(),
 		Action:       r.Action,
 		ResourceType: r.ResourceType,

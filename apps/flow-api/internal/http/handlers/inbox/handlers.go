@@ -26,7 +26,7 @@ func List(deps Deps) func(context.Context, *ListInboxInput) (*ListInboxOutput, e
 			limit = 50
 		}
 		out := &ListInboxOutput{}
-		out.Body.Items = []InboxItem{}
+		out.Body.Items = []Item{}
 
 		if in.WorkspaceID != "" {
 			wsID, err := resolve.WorkspaceMember(ctx, deps.DB, in.WorkspaceID, actorID)
@@ -42,7 +42,7 @@ func List(deps Deps) func(context.Context, *ListInboxInput) (*ListInboxOutput, e
 				return nil, httpErr(apierrors.InternalUnexpected)
 			}
 			for _, r := range rows {
-				out.Body.Items = append(out.Body.Items, InboxItem{
+				out.Body.Items = append(out.Body.Items, Item{
 					ID:          r.PublicID.String(),
 					WorkspaceID: bytesToUUIDString(r.WorkspacePublicID),
 					TaskID:      nullBytesToUUIDString(r.TaskPublicID),
@@ -70,7 +70,7 @@ func List(deps Deps) func(context.Context, *ListInboxInput) (*ListInboxOutput, e
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
 		for _, r := range rows {
-			out.Body.Items = append(out.Body.Items, InboxItem{
+			out.Body.Items = append(out.Body.Items, Item{
 				ID:          r.PublicID.String(),
 				WorkspaceID: bytesToUUIDString(r.WorkspacePublicID),
 				TaskID:      nullBytesToUUIDString(r.TaskPublicID),

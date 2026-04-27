@@ -30,33 +30,33 @@ type TriageDeps struct {
 	AI *ai.Orchestrator
 }
 
-// InboxTriageSuggestion is the per-item DTO returned to the client.
-type InboxTriageSuggestion struct {
+// TriageSuggestion is the per-item DTO returned to the client.
+type TriageSuggestion struct {
 	InboxItemID       string  `json:"inboxItemId"`
 	Score             float32 `json:"score"`
 	RecommendedAction string  `json:"recommendedAction"`
 	Reasoning         string  `json:"reasoning"`
 }
 
-// InboxTriageInputBody is the JSON body for POST /workspaces/{wsId}/inbox/triage.
-type InboxTriageInputBody struct {
+// TriageInputBody is the JSON body for POST /workspaces/{wsId}/inbox/triage.
+type TriageInputBody struct {
 	Limit int `json:"limit,omitempty" minimum:"1" maximum:"50" doc:"Number of inbox items to score (default 20, max 50)"`
 }
 
-// InboxTriageInput is the request for POST /workspaces/{wsId}/inbox/triage.
-type InboxTriageInput struct {
+// TriageInput is the request for POST /workspaces/{wsId}/inbox/triage.
+type TriageInput struct {
 	WorkspaceID string `path:"wsId"`
-	Body        InboxTriageInputBody
+	Body        TriageInputBody
 }
 
-// InboxTriageOutputBody is the response body for POST /workspaces/{wsId}/inbox/triage.
-type InboxTriageOutputBody struct {
-	Suggestions []InboxTriageSuggestion `json:"suggestions"`
+// TriageOutputBody is the response body for POST /workspaces/{wsId}/inbox/triage.
+type TriageOutputBody struct {
+	Suggestions []TriageSuggestion `json:"suggestions"`
 }
 
-// InboxTriageOutput is the response envelope for the triage endpoint.
-type InboxTriageOutput struct {
-	Body InboxTriageOutputBody
+// TriageOutput is the response envelope for the triage endpoint.
+type TriageOutput struct {
+	Body TriageOutputBody
 }
 
 // deterministicFallback runs the pure inboxtriage rule engine over
@@ -111,8 +111,8 @@ func RegisterTriage(api huma.API, deps TriageDeps) {
 }
 
 // Triage handles POST /workspaces/{wsId}/inbox/triage.
-func Triage(deps TriageDeps) func(context.Context, *InboxTriageInput) (*InboxTriageOutput, error) {
-	return func(ctx context.Context, in *InboxTriageInput) (*InboxTriageOutput, error) {
+func Triage(deps TriageDeps) func(context.Context, *TriageInput) (*TriageOutput, error) {
+	return func(ctx context.Context, in *TriageInput) (*TriageOutput, error) {
 		actorID, ok := middleware.ActorFromContext(ctx)
 		if !ok {
 			return nil, httpErr(apierrors.WsWorkspaceAccessDenied)
@@ -154,10 +154,10 @@ func Triage(deps TriageDeps) func(context.Context, *InboxTriageInput) (*InboxTri
 		if err != nil {
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
-		out := &InboxTriageOutput{}
-		out.Body.Suggestions = make([]InboxTriageSuggestion, 0, len(suggestions))
+		out := &TriageOutput{}
+		out.Body.Suggestions = make([]TriageSuggestion, 0, len(suggestions))
 		for _, s := range suggestions {
-			out.Body.Suggestions = append(out.Body.Suggestions, InboxTriageSuggestion{
+			out.Body.Suggestions = append(out.Body.Suggestions, TriageSuggestion{
 				InboxItemID:       s.InboxItemID,
 				Score:             s.Score,
 				RecommendedAction: s.RecommendedAction,

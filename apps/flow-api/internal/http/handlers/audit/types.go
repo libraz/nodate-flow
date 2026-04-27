@@ -39,10 +39,10 @@ var totalAsInt64 = handlerutil.TotalAsInt64
 
 // --- DTOs ---
 
-// AuditLogEntryDTO is the public DTO for a single audit_logs row. Field
+// LogEntryDTO is the public DTO for a single audit_logs row. Field
 // names mirror the frontend's apps/flow-web/src/features/audit/api.ts
 // AuditLogEntry shape so the React query consumes this response unchanged.
-type AuditLogEntryDTO struct {
+type LogEntryDTO struct {
 	// PublicID is the audit entry UUID v7.
 	PublicID string `json:"publicId" doc:"Audit entry public id (UUID v7)"`
 	// ActorUserPublicID is the acting user's UUID, or nil for system /
@@ -96,7 +96,7 @@ type ListAuditLogsBody struct {
 	// Total is the number of rows matching the filters before pagination.
 	Total int64 `json:"total"`
 	// Entries is the current page of matching rows, newest first.
-	Entries []AuditLogEntryDTO `json:"entries"`
+	Entries []LogEntryDTO `json:"entries"`
 }
 
 // ListAuditLogsOutput is the response for GET /workspaces/{wsId}/audit-logs.
