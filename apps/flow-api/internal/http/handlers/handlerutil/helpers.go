@@ -22,25 +22,54 @@ import (
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/middleware"
 )
 
+// ProblemDetails extends huma.ErrorModel with the developer-facing
+// description and end-user recovery hint sourced from errors/*.yaml.
+//
+// The embedded ErrorModel keeps the wire payload RFC 9457 compatible
+// (type / title / status / detail), while the extra `description` and
+// `userAction` fields let the frontend render a richer toast (and the
+// SDK surface them as typed properties) without losing backwards
+// compatibility with generic problem+json clients, which simply ignore
+// unknown members.
+type ProblemDetails struct {
+	huma.ErrorModel
+	Description string `json:"description,omitempty" doc:"Developer-facing explanation of when this error fires."`
+	UserAction  string `json:"userAction,omitempty" doc:"Short imperative the UI can render to tell the end user how to recover."`
+}
+
+// GetStatus implements huma.StatusError so Huma sets the response code.
+func (p *ProblemDetails) GetStatus() int { return p.ErrorModel.Status }
+
+// Error implements the error interface, mirroring huma.ErrorModel's
+// formatting so existing log lines remain stable.
+func (p *ProblemDetails) Error() string { return p.ErrorModel.Error() }
+
 // HTTPErr converts an apierrors.Spec into a Huma status error so the
 // canonical problem+json envelope is emitted by the framework. All
 // handler packages should call this instead of defining a local httpErr.
 //
-// The envelope is RFC 9457-compliant:
+// The envelope is RFC 9457-compliant and additionally includes
+// description + userAction copied from the error catalog:
 //
-//   - type:   the machine-readable error code (e.g. "WS.TASK.NOT_FOUND").
+//   - type:        the machine-readable error code (e.g. "WS.TASK.NOT_FOUND").
 //     Clients should branch on this field.
-//   - title:  the HTTP status text (e.g. "Not Found"). Populated by Huma
-//     from the status when omitted, set explicitly here for determinism.
-//   - detail: the human-readable message from the Spec. Must NOT be
-//     prefixed with the code — clients read `type` for that.
-//   - status: the HTTP status code.
+//   - title:       the HTTP status text (e.g. "Not Found"). Populated
+//     explicitly for determinism.
+//   - detail:      the human-readable message from the Spec. Must NOT
+//     be prefixed with the code — clients read `type` for that.
+//   - status:      the HTTP status code.
+//   - description: developer-facing explanation (omitted when empty).
+//   - userAction:  end-user recovery hint (omitted when empty).
 func HTTPErr(spec *apierrors.Spec) error {
-	return &huma.ErrorModel{
-		Type:   spec.Code,
-		Title:  http.StatusText(spec.Status),
-		Status: spec.Status,
-		Detail: spec.Message,
+	return &ProblemDetails{
+		ErrorModel: huma.ErrorModel{
+			Type:   spec.Code,
+			Title:  http.StatusText(spec.Status),
+			Status: spec.Status,
+			Detail: spec.Message,
+		},
+		Description: spec.Description,
+		UserAction:  spec.UserAction,
 	}
 }
 
@@ -52,15 +81,19 @@ func WriteSpecError(w http.ResponseWriter, spec *apierrors.Spec) {
 	w.Header().Set("Content-Type", "application/problem+json; charset=utf-8")
 	w.WriteHeader(spec.Status)
 	_ = json.NewEncoder(w).Encode(struct {
-		Type   string `json:"type"`
-		Title  string `json:"title"`
-		Status int    `json:"status"`
-		Detail string `json:"detail"`
+		Type        string `json:"type"`
+		Title       string `json:"title"`
+		Status      int    `json:"status"`
+		Detail      string `json:"detail"`
+		Description string `json:"description,omitempty"`
+		UserAction  string `json:"userAction,omitempty"`
 	}{
-		Type:   spec.Code,
-		Title:  http.StatusText(spec.Status),
-		Status: spec.Status,
-		Detail: spec.Message,
+		Type:        spec.Code,
+		Title:       http.StatusText(spec.Status),
+		Status:      spec.Status,
+		Detail:      spec.Message,
+		Description: spec.Description,
+		UserAction:  spec.UserAction,
 	})
 }
 

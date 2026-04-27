@@ -24,7 +24,7 @@ func codeOf(t *testing.T, raw string) string {
 func TestParseError_Codes(t *testing.T) {
 	cases := map[string]string{
 		`not json`:                         CodeInvalidJSON,
-		`{"op":"bogus"}`:                   CodeUnknownOp,
+		`{"op":"bogus"}`:                   CodeUnsupportedOperator,
 		`{"op":"and","terms":[]}`:          CodeEmptyTerms,
 		`{"op":"time.due_before"}`:         CodeMissingArg,
 		`{"op":"dependency.all_done"}`:     CodeMissingArg,

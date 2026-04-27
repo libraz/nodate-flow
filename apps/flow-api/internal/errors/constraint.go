@@ -4,14 +4,14 @@ package errors
 
 // Error codes and specs.
 var (
-	// CONSTRAINT.EVAL.BAD_DATE — Constraint date argument is not a valid YYYY-MM-DD
-	ConstraintEvalBadDate = &Spec{Code: "CONSTRAINT.EVAL.BAD_DATE", Status: 422, Message: "Constraint date argument is not a valid YYYY-MM-DD"}
+	// CONSTRAINT.EVAL.DATE_PARSING_FAILED — Constraint date argument could not be parsed as YYYY-MM-DD
+	ConstraintEvalDateParsingFailed = &Spec{Code: "CONSTRAINT.EVAL.DATE_PARSING_FAILED", Status: 422, Message: "Constraint date argument could not be parsed as YYYY-MM-DD", Description: "Returned when a time.* builtin receives a non-parseable date literal {value} at evaluation time.", UserAction: "Send the date as a YYYY-MM-DD string (for example 2026-04-08)."}
 	// CONSTRAINT.PARSE.EMPTY_TERMS — Constraint and/or requires at least one term
-	ConstraintParseEmptyTerms = &Spec{Code: "CONSTRAINT.PARSE.EMPTY_TERMS", Status: 422, Message: "Constraint and/or requires at least one term"}
+	ConstraintParseEmptyTerms = &Spec{Code: "CONSTRAINT.PARSE.EMPTY_TERMS", Status: 422, Message: "Constraint and/or requires at least one term", Description: "Returned when an and / or node is supplied with an empty terms list.", UserAction: "Add at least one child expression to the and / or node."}
 	// CONSTRAINT.PARSE.INVALID_JSON — Constraint expression is not valid JSON
-	ConstraintParseInvalidJson = &Spec{Code: "CONSTRAINT.PARSE.INVALID_JSON", Status: 422, Message: "Constraint expression is not valid JSON"}
+	ConstraintParseInvalidJson = &Spec{Code: "CONSTRAINT.PARSE.INVALID_JSON", Status: 422, Message: "Constraint expression is not valid JSON", Description: "Returned when the stored constraint expression cannot be decoded as JSON before the DSL validator even runs.", UserAction: "Fix the JSON syntax in the constraint expression."}
 	// CONSTRAINT.PARSE.MISSING_ARG — Constraint expression is missing a required argument
-	ConstraintParseMissingArg = &Spec{Code: "CONSTRAINT.PARSE.MISSING_ARG", Status: 422, Message: "Constraint expression is missing a required argument"}
-	// CONSTRAINT.PARSE.UNKNOWN_OP — Constraint expression uses an unknown operator
-	ConstraintParseUnknownOp = &Spec{Code: "CONSTRAINT.PARSE.UNKNOWN_OP", Status: 422, Message: "Constraint expression uses an unknown operator"}
+	ConstraintParseMissingArg = &Spec{Code: "CONSTRAINT.PARSE.MISSING_ARG", Status: 422, Message: "Constraint expression is missing a required argument", Description: "Returned when a builtin is used without its required arg / taskIds / max field.", UserAction: "Provide the argument listed in the constraint DSL reference."}
+	// CONSTRAINT.PARSE.UNSUPPORTED_OPERATOR — Constraint expression uses an operator that is not supported
+	ConstraintParseUnsupportedOperator = &Spec{Code: "CONSTRAINT.PARSE.UNSUPPORTED_OPERATOR", Status: 422, Message: "Constraint expression uses an operator that is not supported", Description: "Returned when a constraint node references an op {operator} that is not in the closed DSL whitelist (ADR 0006). The offending operator is included in the error details.", UserAction: "Replace {operator} with one of the documented ops (and, or, not, time.*, dependency.*, actor.*, signal.*, approval.*, ci.*)."}
 )

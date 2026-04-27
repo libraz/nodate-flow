@@ -5,5 +5,5 @@ package errors
 // Error codes and specs.
 var (
 	// RATE.LIMIT.EXCEEDED — Request rate limit exceeded
-	RateLimitExceeded = &Spec{Code: "RATE.LIMIT.EXCEEDED", Status: 429, Message: "Request rate limit exceeded"}
+	RateLimitExceeded = &Spec{Code: "RATE.LIMIT.EXCEEDED", Status: 429, Message: "Request rate limit exceeded", Description: "Returned when the global, per-IP, or per-user request rate limit has been exceeded for the called endpoint.", UserAction: "Wait for the Retry-After interval before retrying."}
 )

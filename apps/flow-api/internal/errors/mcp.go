@@ -5,25 +5,25 @@ package errors
 // Error codes and specs.
 var (
 	// MCP.PROTOCOL.FRAME_MALFORMED — MCP protocol frame is malformed
-	McpProtocolFrameMalformed = &Spec{Code: "MCP.PROTOCOL.FRAME_MALFORMED", Status: 400, Message: "MCP protocol frame is malformed"}
+	McpProtocolFrameMalformed = &Spec{Code: "MCP.PROTOCOL.FRAME_MALFORMED", Status: 400, Message: "MCP protocol frame is malformed", Description: "Returned when the incoming JSON-RPC frame cannot be parsed, uses an unsupported method, or declares a jsonrpc version other than 2.0.", UserAction: "Ensure the client sends a well-formed JSON-RPC 2.0 request with a supported method."}
 	// MCP.RATE.LIMITED — MCP request rate limit exceeded
-	McpRateLimited = &Spec{Code: "MCP.RATE.LIMITED", Status: 429, Message: "MCP request rate limit exceeded"}
+	McpRateLimited = &Spec{Code: "MCP.RATE.LIMITED", Status: 429, Message: "MCP request rate limit exceeded", Description: "Returned when the per-token MCP call rate limit has been reached.", UserAction: "Slow down the request rate and retry after the Retry-After interval."}
 	// MCP.SCOPE.INSUFFICIENT — MCP token does not have the required scope
-	McpScopeInsufficient = &Spec{Code: "MCP.SCOPE.INSUFFICIENT", Status: 403, Message: "MCP token does not have the required scope"}
+	McpScopeInsufficient = &Spec{Code: "MCP.SCOPE.INSUFFICIENT", Status: 403, Message: "MCP token does not have the required scope", Description: "Returned when the requested tool or resource requires a scope not granted to the presented MCP token.", UserAction: "Re-issue the MCP token with the required scope."}
 	// MCP.TOKEN.EXPIRED — MCP token has expired
-	McpTokenExpired = &Spec{Code: "MCP.TOKEN.EXPIRED", Status: 401, Message: "MCP token has expired"}
+	McpTokenExpired = &Spec{Code: "MCP.TOKEN.EXPIRED", Status: 401, Message: "MCP token has expired", Description: "Returned when the MCP token has passed its expiration timestamp.", UserAction: "Re-issue a new MCP token."}
 	// MCP.TOKEN.REVOKED — MCP token has been revoked
-	McpTokenRevoked = &Spec{Code: "MCP.TOKEN.REVOKED", Status: 401, Message: "MCP token has been revoked"}
+	McpTokenRevoked = &Spec{Code: "MCP.TOKEN.REVOKED", Status: 401, Message: "MCP token has been revoked", Description: "Returned when the MCP token has been explicitly revoked by the user or an admin.", UserAction: "Re-issue a new MCP token."}
 	// MCP.TOKEN.UNKNOWN — MCP token is invalid
-	McpTokenUnknown = &Spec{Code: "MCP.TOKEN.UNKNOWN", Status: 401, Message: "MCP token is invalid"}
+	McpTokenUnknown = &Spec{Code: "MCP.TOKEN.UNKNOWN", Status: 401, Message: "MCP token is invalid", Description: "Returned when the bearer token presented to the MCP endpoint is unknown or malformed.", UserAction: "Re-issue an MCP token from your account settings."}
 	// MCP.TOKEN.WORKSPACE_MISMATCH — MCP token is bound to a different workspace
-	McpTokenWorkspaceMismatch = &Spec{Code: "MCP.TOKEN.WORKSPACE_MISMATCH", Status: 403, Message: "MCP token is bound to a different workspace"}
+	McpTokenWorkspaceMismatch = &Spec{Code: "MCP.TOKEN.WORKSPACE_MISMATCH", Status: 403, Message: "MCP token is bound to a different workspace", Description: "Returned when the MCP token is bound to one workspace but the tool arguments reference a resource belonging to another workspace.", UserAction: "Use an MCP token issued for the workspace that owns the target resource."}
 	// MCP.TOOL.ARGUMENTS_INVALID — MCP tool arguments are invalid
-	McpToolArgumentsInvalid = &Spec{Code: "MCP.TOOL.ARGUMENTS_INVALID", Status: 422, Message: "MCP tool arguments are invalid"}
+	McpToolArgumentsInvalid = &Spec{Code: "MCP.TOOL.ARGUMENTS_INVALID", Status: 422, Message: "MCP tool arguments are invalid", Description: "Returned when the supplied arguments do not match the tool's input schema.", UserAction: "Inspect the tool schema and correct the argument types or required fields."}
 	// MCP.TOOL.EXECUTION_FAILED — MCP tool execution failed
-	McpToolExecutionFailed = &Spec{Code: "MCP.TOOL.EXECUTION_FAILED", Status: 500, Message: "MCP tool execution failed"}
+	McpToolExecutionFailed = &Spec{Code: "MCP.TOOL.EXECUTION_FAILED", Status: 500, Message: "MCP tool execution failed", Description: "Returned when an internal error occurs inside the tool body, such as a database error while executing the tool.", UserAction: "Retry the call; if the problem persists, contact the server administrator."}
 	// MCP.TOOL.GUARD_UNAVAILABLE — MCP tool guard subsystem is unavailable
-	McpToolGuardUnavailable = &Spec{Code: "MCP.TOOL.GUARD_UNAVAILABLE", Status: 500, Message: "MCP tool guard subsystem is unavailable"}
+	McpToolGuardUnavailable = &Spec{Code: "MCP.TOOL.GUARD_UNAVAILABLE", Status: 500, Message: "MCP tool guard subsystem is unavailable", Description: "Returned when the agent guard or budget snapshot for an AI-agent-backed MCP session could not be loaded (e.g. DB error before tool execution started). The tool body itself was never invoked.", UserAction: "Retry; if the problem persists, check service health and the agent's configuration."}
 	// MCP.TOOL.NOT_FOUND — MCP tool not found
-	McpToolNotFound = &Spec{Code: "MCP.TOOL.NOT_FOUND", Status: 404, Message: "MCP tool not found"}
+	McpToolNotFound = &Spec{Code: "MCP.TOOL.NOT_FOUND", Status: 404, Message: "MCP tool not found", Description: "Returned when the client requests a tool name that is not registered on this MCP server.", UserAction: "Check the tool name against the list returned by tools/list."}
 )

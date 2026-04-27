@@ -5,41 +5,41 @@ package errors
 // Error codes and specs.
 var (
 	// AI.AGENT.NOT_FOUND — AI agent not found
-	AiAgentNotFound = &Spec{Code: "AI.AGENT.NOT_FOUND", Status: 404, Message: "AI agent not found"}
+	AiAgentNotFound = &Spec{Code: "AI.AGENT.NOT_FOUND", Status: 404, Message: "AI agent not found", Description: "Returned when an operation targets an ai_agents row that does not exist in the workspace or has been disabled.", UserAction: "Verify the agent id and that it belongs to this workspace."}
 	// AI.AGENT.PAUSED — AI agent is paused
-	AiAgentPaused = &Spec{Code: "AI.AGENT.PAUSED", Status: 409, Message: "AI agent is paused"}
+	AiAgentPaused = &Spec{Code: "AI.AGENT.PAUSED", Status: 409, Message: "AI agent is paused", Description: "Returned when a manual trigger targets an agent whose paused=TRUE kill switch is engaged.", UserAction: "Resume the agent from the agents settings page before triggering it."}
 	// AI.AGENT.RUNTIME_DISABLED — AI agent runtime is not configured
-	AiAgentRuntimeDisabled = &Spec{Code: "AI.AGENT.RUNTIME_DISABLED", Status: 503, Message: "AI agent runtime is not configured"}
+	AiAgentRuntimeDisabled = &Spec{Code: "AI.AGENT.RUNTIME_DISABLED", Status: 503, Message: "AI agent runtime is not configured", Description: "Returned when a trigger endpoint is reached but neither the scheduler queue nor a synchronous runner is wired on this replica.", UserAction: "NF_AGENT_RUNNER defaults to 'orchestrator'. Set it to 'log' only for debugging. Ensure a provider is configured."}
 	// AI.COST.GUARD_EXCEEDED — AI cost guard threshold exceeded
-	AiCostGuardExceeded = &Spec{Code: "AI.COST.GUARD_EXCEEDED", Status: 402, Message: "AI cost guard threshold exceeded"}
+	AiCostGuardExceeded = &Spec{Code: "AI.COST.GUARD_EXCEEDED", Status: 402, Message: "AI cost guard threshold exceeded", Description: "Returned when the workspace's monthly AI spend has reached the configured cost guard limit.", UserAction: "Wait for the next billing period or raise the cost guard in workspace settings."}
 	// AI.MODEL.NOT_FOUND — AI model not found
-	AiModelNotFound = &Spec{Code: "AI.MODEL.NOT_FOUND", Status: 404, Message: "AI model not found"}
+	AiModelNotFound = &Spec{Code: "AI.MODEL.NOT_FOUND", Status: 404, Message: "AI model not found", Description: "Returned when an operation references an ai_models row that does not exist in the workspace or has been disabled.", UserAction: "Pick a model from the workspace's registered providers."}
 	// AI.NL_QUERY.UNPARSEABLE — Could not turn that into a filter
-	AiNlQueryUnparseable = &Spec{Code: "AI.NL_QUERY.UNPARSEABLE", Status: 422, Message: "Could not turn that into a filter"}
+	AiNlQueryUnparseable = &Spec{Code: "AI.NL_QUERY.UNPARSEABLE", Status: 422, Message: "Could not turn that into a filter", Description: "Returned when the NL query compiler could not produce a valid Lens JSON from the user's prose, either because the upstream LLM emitted malformed output or because the result failed schema validation against the closed Lens grammar (ADR 0004).", UserAction: "Rephrase the request — e.g. \"blocked tasks due this week\"."}
 	// AI.PROVIDER.NOT_CONFIGURED — AI provider is not configured
-	AiProviderNotConfigured = &Spec{Code: "AI.PROVIDER.NOT_CONFIGURED", Status: 412, Message: "AI provider is not configured"}
+	AiProviderNotConfigured = &Spec{Code: "AI.PROVIDER.NOT_CONFIGURED", Status: 412, Message: "AI provider is not configured", Description: "Returned when an AI feature is invoked but no provider credentials have been configured for the workspace or instance.", UserAction: "Configure an AI provider in workspace or instance settings."}
 	// AI.PROVIDER.UPSTREAM_AUTH_REJECTED — AI provider rejected credentials
-	AiProviderUpstreamAuthRejected = &Spec{Code: "AI.PROVIDER.UPSTREAM_AUTH_REJECTED", Status: 502, Message: "AI provider rejected credentials"}
+	AiProviderUpstreamAuthRejected = &Spec{Code: "AI.PROVIDER.UPSTREAM_AUTH_REJECTED", Status: 502, Message: "AI provider rejected credentials", Description: "Returned when the upstream LLM provider responded with HTTP 401 or 403, indicating the API key is invalid, revoked, or lacks permission for the requested model.", UserAction: "Verify the AI provider API key in workspace or instance settings."}
 	// AI.PROVIDER.UPSTREAM_RATE_LIMITED — AI provider rate limit exceeded
-	AiProviderUpstreamRateLimited = &Spec{Code: "AI.PROVIDER.UPSTREAM_RATE_LIMITED", Status: 429, Message: "AI provider rate limit exceeded"}
+	AiProviderUpstreamRateLimited = &Spec{Code: "AI.PROVIDER.UPSTREAM_RATE_LIMITED", Status: 429, Message: "AI provider rate limit exceeded", Description: "Returned when the upstream LLM provider responded with HTTP 429 after the client exhausted its retry budget.", UserAction: "Wait a moment and retry, or lower the request rate."}
 	// AI.PROVIDER.UPSTREAM_REQUEST_REJECTED — AI provider rejected the request
-	AiProviderUpstreamRequestRejected = &Spec{Code: "AI.PROVIDER.UPSTREAM_REQUEST_REJECTED", Status: 502, Message: "AI provider rejected the request"}
+	AiProviderUpstreamRequestRejected = &Spec{Code: "AI.PROVIDER.UPSTREAM_REQUEST_REJECTED", Status: 502, Message: "AI provider rejected the request", Description: "Returned when the upstream LLM provider responded with a non-success status that is not auth-related or rate-limited (e.g. 400 invalid request, 5xx provider error).", UserAction: "Retry in a moment; if the problem persists, check the provider's status page or the model configuration."}
 	// AI.PROVIDER.UPSTREAM_TIMEOUT — AI provider call timed out
-	AiProviderUpstreamTimeout = &Spec{Code: "AI.PROVIDER.UPSTREAM_TIMEOUT", Status: 504, Message: "AI provider call timed out"}
+	AiProviderUpstreamTimeout = &Spec{Code: "AI.PROVIDER.UPSTREAM_TIMEOUT", Status: 504, Message: "AI provider call timed out", Description: "Returned when the upstream LLM provider did not respond within the configured timeout.", UserAction: "Retry the request, or reduce the prompt size."}
 	// AI.PROVIDER.UPSTREAM_UNREACHABLE — Could not reach AI provider
-	AiProviderUpstreamUnreachable = &Spec{Code: "AI.PROVIDER.UPSTREAM_UNREACHABLE", Status: 502, Message: "Could not reach AI provider"}
+	AiProviderUpstreamUnreachable = &Spec{Code: "AI.PROVIDER.UPSTREAM_UNREACHABLE", Status: 502, Message: "Could not reach AI provider", Description: "Returned when the request to the upstream LLM provider failed at the transport layer (DNS, TCP, TLS, or the connection was refused or reset).", UserAction: "Check network connectivity and the provider's status page, then retry."}
 	// AI.REDACTION.LENS_UNAVAILABLE — Redaction lens is unavailable
-	AiRedactionLensUnavailable = &Spec{Code: "AI.REDACTION.LENS_UNAVAILABLE", Status: 500, Message: "Redaction lens is unavailable"}
+	AiRedactionLensUnavailable = &Spec{Code: "AI.REDACTION.LENS_UNAVAILABLE", Status: 500, Message: "Redaction lens is unavailable", Description: "Returned when the pre-LLM redactor could not load its configured lens (the rule set was missing, the workspace setting failed to fetch, or the lens registry is offline) and the request was blocked to avoid leaking secrets.", UserAction: "Retry in a moment; if the problem persists, contact your administrator."}
 	// AI.REDACTION.RULE_INVALID — Redaction rule is invalid
-	AiRedactionRuleInvalid = &Spec{Code: "AI.REDACTION.RULE_INVALID", Status: 500, Message: "Redaction rule is invalid"}
+	AiRedactionRuleInvalid = &Spec{Code: "AI.REDACTION.RULE_INVALID", Status: 500, Message: "Redaction rule is invalid", Description: "Returned when the redactor compiled lens contains a malformed rule (e.g. an unparseable pattern or unsupported action) and refused to run.", UserAction: "Ask your administrator to review the redaction rule configuration."}
 	// AI.REDACTION.TIMEOUT — Redaction pipeline timed out
-	AiRedactionTimeout = &Spec{Code: "AI.REDACTION.TIMEOUT", Status: 504, Message: "Redaction pipeline timed out"}
+	AiRedactionTimeout = &Spec{Code: "AI.REDACTION.TIMEOUT", Status: 504, Message: "Redaction pipeline timed out", Description: "Returned when the pre-LLM redactor exceeded its configured deadline while scanning the prompt and the request was blocked to avoid leaking secrets.", UserAction: "Retry with a shorter prompt; if the problem persists, contact your administrator."}
 	// AI.RESPONSE.INVALID_JSON — AI provider response was not valid JSON
-	AiResponseInvalidJson = &Spec{Code: "AI.RESPONSE.INVALID_JSON", Status: 502, Message: "AI provider response was not valid JSON"}
+	AiResponseInvalidJson = &Spec{Code: "AI.RESPONSE.INVALID_JSON", Status: 502, Message: "AI provider response was not valid JSON", Description: "Returned when the upstream LLM returned a completion whose body could not be decoded as JSON, or where no JSON payload could be extracted from the surrounding text.", UserAction: "Retry the request; if the problem persists, check the provider or model configuration."}
 	// AI.RESPONSE.MISSING_FIELD — AI provider response is missing a required field
-	AiResponseMissingField = &Spec{Code: "AI.RESPONSE.MISSING_FIELD", Status: 502, Message: "AI provider response is missing a required field"}
+	AiResponseMissingField = &Spec{Code: "AI.RESPONSE.MISSING_FIELD", Status: 502, Message: "AI provider response is missing a required field", Description: "Returned when the JSON returned by the upstream LLM decoded successfully but a field required by the response schema (e.g. tool name, action, or score) was absent or empty.", UserAction: "Retry the request; if the problem persists, lower the prompt complexity or pick a stronger model."}
 	// AI.RESPONSE.SCHEMA_MISMATCH — AI provider response did not match the expected schema
-	AiResponseSchemaMismatch = &Spec{Code: "AI.RESPONSE.SCHEMA_MISMATCH", Status: 502, Message: "AI provider response did not match the expected schema"}
+	AiResponseSchemaMismatch = &Spec{Code: "AI.RESPONSE.SCHEMA_MISMATCH", Status: 502, Message: "AI provider response did not match the expected schema", Description: "Returned when the JSON returned by the upstream LLM decoded successfully but failed structural validation (wrong field types, unknown enum values, or values outside the allowed range).", UserAction: "Retry the request; if the problem persists, pick a stronger model or simplify the prompt."}
 	// AI.SAFETY.BLOCKED — Request blocked by safety policy
-	AiSafetyBlocked = &Spec{Code: "AI.SAFETY.BLOCKED", Status: 422, Message: "Request blocked by safety policy"}
+	AiSafetyBlocked = &Spec{Code: "AI.SAFETY.BLOCKED", Status: 422, Message: "Request blocked by safety policy", Description: "Returned when the prompt or response was blocked by the configured safety filters.", UserAction: "Rephrase the request to comply with the safety policy."}
 )

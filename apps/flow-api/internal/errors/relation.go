@@ -5,7 +5,7 @@ package errors
 // Error codes and specs.
 var (
 	// RELATION.SUGGESTION.ALREADY_RESOLVED — Relation suggestion has already been resolved
-	RelationSuggestionAlreadyResolved = &Spec{Code: "RELATION.SUGGESTION.ALREADY_RESOLVED", Status: 409, Message: "Relation suggestion has already been resolved"}
+	RelationSuggestionAlreadyResolved = &Spec{Code: "RELATION.SUGGESTION.ALREADY_RESOLVED", Status: 409, Message: "Relation suggestion has already been resolved", Description: "Returned when attempting to accept or dismiss a suggestion that has already been accepted or dismissed.", UserAction: "No action needed; the suggestion has already been resolved."}
 	// RELATION.SUGGESTION.NOT_FOUND — Relation suggestion not found
-	RelationSuggestionNotFound = &Spec{Code: "RELATION.SUGGESTION.NOT_FOUND", Status: 404, Message: "Relation suggestion not found"}
+	RelationSuggestionNotFound = &Spec{Code: "RELATION.SUGGESTION.NOT_FOUND", Status: 404, Message: "Relation suggestion not found", Description: "Returned when a relation suggestion with the given public_id does not exist or has been deleted.", UserAction: "Verify the suggestion ID, or refresh the list to see current suggestions."}
 )

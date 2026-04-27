@@ -5,13 +5,13 @@ package errors
 // Error codes and specs.
 var (
 	// SHARE.SHARE.DELETE_FORBIDDEN — Only workspace admins or owners can delete a share
-	ShareShareDeleteForbidden = &Spec{Code: "SHARE.SHARE.DELETE_FORBIDDEN", Status: 403, Message: "Only workspace admins or owners can delete a share"}
+	ShareShareDeleteForbidden = &Spec{Code: "SHARE.SHARE.DELETE_FORBIDDEN", Status: 403, Message: "Only workspace admins or owners can delete a share", Description: "Returned when a non-admin tries to delete a share. Create / edit / rotate / add events are open to all non-guest workspace members; delete is restricted to admin/owner to prevent accidental URL loss.", UserAction: "Ask a workspace admin or owner to delete the share on your behalf."}
 	// SHARE.SHARE.EXPIRED — Share page has expired
-	ShareShareExpired = &Spec{Code: "SHARE.SHARE.EXPIRED", Status: 410, Message: "Share page has expired"}
+	ShareShareExpired = &Spec{Code: "SHARE.SHARE.EXPIRED", Status: 410, Message: "Share page has expired", Description: "Returned when the share's expires_at is in the past. The row still exists but the public render refuses to serve it.", UserAction: "Ask a workspace member to extend or rotate the share, then use the new URL."}
 	// SHARE.SHARE.NOT_FOUND — Share page not found
-	ShareShareNotFound = &Spec{Code: "SHARE.SHARE.NOT_FOUND", Status: 404, Message: "Share page not found"}
+	ShareShareNotFound = &Spec{Code: "SHARE.SHARE.NOT_FOUND", Status: 404, Message: "Share page not found", Description: "Returned when a share with the given public_id or token hash does not exist.", UserAction: "Verify the URL; if you rotated the token recently, use the new URL returned at rotate time."}
 	// SHARE.SHARE.TOKEN_INVALID — Share token is invalid
-	ShareShareTokenInvalid = &Spec{Code: "SHARE.SHARE.TOKEN_INVALID", Status: 404, Message: "Share token is invalid"}
+	ShareShareTokenInvalid = &Spec{Code: "SHARE.SHARE.TOKEN_INVALID", Status: 404, Message: "Share token is invalid", Description: "Returned when the URL token does not match any token_hash. Deliberately 404 (not 401) so the existence of any share is not leaked by the status code.", UserAction: "Verify the URL was copied correctly. Rotation invalidates prior tokens."}
 	// SHARE.SHARE_EVENT.REORDER_INVALID — Reorder input must be a permutation of the share's current events
-	ShareShareEventReorderInvalid = &Spec{Code: "SHARE.SHARE_EVENT.REORDER_INVALID", Status: 400, Message: "Reorder input must be a permutation of the share's current events"}
+	ShareShareEventReorderInvalid = &Spec{Code: "SHARE.SHARE_EVENT.REORDER_INVALID", Status: 400, Message: "Reorder input must be a permutation of the share's current events", Description: "Returned when a batch reorder request supplies a linkPublicIds array that is missing an existing link, references a link that does not belong to the share, or contains duplicates. The reorder is atomic and requires the full current set.", UserAction: "Refetch the share's event list and resubmit the reorder with every current link exactly once."}
 )

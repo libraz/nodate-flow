@@ -5,13 +5,13 @@ package errors
 // Error codes and specs.
 var (
 	// PAGE.GENERATION.UPSTREAM_UNAVAILABLE — AI page generation failed
-	PageGenerationUpstreamUnavailable = &Spec{Code: "PAGE.GENERATION.UPSTREAM_UNAVAILABLE", Status: 502, Message: "AI page generation failed"}
+	PageGenerationUpstreamUnavailable = &Spec{Code: "PAGE.GENERATION.UPSTREAM_UNAVAILABLE", Status: 502, Message: "AI page generation failed", Description: "Returned when the upstream LLM provider did not return a usable response while generating page content.", UserAction: "Retry the generation; if the problem persists, check the AI provider status."}
 	// PAGE.PAGE.CIRCULAR_PARENT — Cannot set parent to self or descendant
-	PagePageCircularParent = &Spec{Code: "PAGE.PAGE.CIRCULAR_PARENT", Status: 400, Message: "Cannot set parent to self or descendant"}
+	PagePageCircularParent = &Spec{Code: "PAGE.PAGE.CIRCULAR_PARENT", Status: 400, Message: "Cannot set parent to self or descendant", Description: "Returned when a page move would create a circular reference by setting the parent to the page itself or one of its descendants.", UserAction: "Choose a parent that is not the page itself or any of its children."}
 	// PAGE.PAGE.MAX_DEPTH — Maximum nesting depth exceeded
-	PagePageMaxDepth = &Spec{Code: "PAGE.PAGE.MAX_DEPTH", Status: 400, Message: "Maximum nesting depth exceeded"}
+	PagePageMaxDepth = &Spec{Code: "PAGE.PAGE.MAX_DEPTH", Status: 400, Message: "Maximum nesting depth exceeded", Description: "Returned when creating or moving a page would exceed the maximum allowed nesting depth of 5 levels.", UserAction: "Restructure the page hierarchy to reduce nesting, or place the page at a shallower level."}
 	// PAGE.PAGE.NOT_FOUND — Page not found
-	PagePageNotFound = &Spec{Code: "PAGE.PAGE.NOT_FOUND", Status: 404, Message: "Page not found"}
+	PagePageNotFound = &Spec{Code: "PAGE.PAGE.NOT_FOUND", Status: 404, Message: "Page not found", Description: "Returned when a page with the given public_id does not exist or the actor has no visibility into it.", UserAction: "Verify the page ID, or refresh the list to see current pages."}
 	// PAGE.PAGE.TITLE_TAKEN — A page with this title already exists under the same parent
-	PagePageTitleTaken = &Spec{Code: "PAGE.PAGE.TITLE_TAKEN", Status: 409, Message: "A page with this title already exists under the same parent"}
+	PagePageTitleTaken = &Spec{Code: "PAGE.PAGE.TITLE_TAKEN", Status: 409, Message: "A page with this title already exists under the same parent", Description: "Returned when the requested page title conflicts with an existing page that shares the same parent in the hierarchy.", UserAction: "Choose a different title or move the page to a different parent."}
 )

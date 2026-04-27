@@ -5,17 +5,17 @@ package errors
 // Error codes and specs.
 var (
 	// INTEGRATION.SLACK.RATE_LIMITED — Slack API rate limit exceeded
-	IntegrationSlackRateLimited = &Spec{Code: "INTEGRATION.SLACK.RATE_LIMITED", Status: 429, Message: "Slack API rate limit exceeded"}
+	IntegrationSlackRateLimited = &Spec{Code: "INTEGRATION.SLACK.RATE_LIMITED", Status: 429, Message: "Slack API rate limit exceeded", Description: "Returned when Slack returns a 429 due to method-level rate limiting.", UserAction: "Wait for the Retry-After interval before retrying."}
 	// INTEGRATION.SLACK.TOKEN_INVALID — Slack API token is invalid
-	IntegrationSlackTokenInvalid = &Spec{Code: "INTEGRATION.SLACK.TOKEN_INVALID", Status: 401, Message: "Slack API token is invalid"}
+	IntegrationSlackTokenInvalid = &Spec{Code: "INTEGRATION.SLACK.TOKEN_INVALID", Status: 401, Message: "Slack API token is invalid", Description: "Returned when Slack rejects the integration's bot or user token.", UserAction: "Re-authorize the Slack integration."}
 	// INTEGRATION.SLACK.WEBHOOK_PAYLOAD_UNPARSEABLE — Slack webhook payload could not be parsed
-	IntegrationSlackWebhookPayloadUnparseable = &Spec{Code: "INTEGRATION.SLACK.WEBHOOK_PAYLOAD_UNPARSEABLE", Status: 400, Message: "Slack webhook payload could not be parsed"}
+	IntegrationSlackWebhookPayloadUnparseable = &Spec{Code: "INTEGRATION.SLACK.WEBHOOK_PAYLOAD_UNPARSEABLE", Status: 400, Message: "Slack webhook payload could not be parsed", Description: "Returned when the Slack event payload is malformed or missing required fields.", UserAction: "Check the Slack app event subscription configuration."}
 	// INTEGRATION.SLACK.WEBHOOK_SIGNATURE_MALFORMED — Slack webhook signature is malformed
-	IntegrationSlackWebhookSignatureMalformed = &Spec{Code: "INTEGRATION.SLACK.WEBHOOK_SIGNATURE_MALFORMED", Status: 400, Message: "Slack webhook signature is malformed"}
+	IntegrationSlackWebhookSignatureMalformed = &Spec{Code: "INTEGRATION.SLACK.WEBHOOK_SIGNATURE_MALFORMED", Status: 400, Message: "Slack webhook signature is malformed", Description: "Returned when the X-Slack-Signature header does not start with the expected v0= prefix, or when the X-Slack-Request-Timestamp header is not a valid Unix timestamp.", UserAction: "Verify that the Slack signing version (v0) and timestamp format are unchanged."}
 	// INTEGRATION.SLACK.WEBHOOK_SIGNATURE_MISMATCH — Slack webhook signature does not match
-	IntegrationSlackWebhookSignatureMismatch = &Spec{Code: "INTEGRATION.SLACK.WEBHOOK_SIGNATURE_MISMATCH", Status: 401, Message: "Slack webhook signature does not match"}
+	IntegrationSlackWebhookSignatureMismatch = &Spec{Code: "INTEGRATION.SLACK.WEBHOOK_SIGNATURE_MISMATCH", Status: 401, Message: "Slack webhook signature does not match", Description: "Returned when the HMAC-SHA256 of the body computed with the configured signing secret does not match the X-Slack-Signature header. Indicates either secret mismatch or payload tampering.", UserAction: "Verify that the signing secret in Slack matches the one configured in the integration settings."}
 	// INTEGRATION.SLACK.WEBHOOK_SIGNATURE_MISSING — Slack webhook signature header is missing
-	IntegrationSlackWebhookSignatureMissing = &Spec{Code: "INTEGRATION.SLACK.WEBHOOK_SIGNATURE_MISSING", Status: 401, Message: "Slack webhook signature header is missing"}
+	IntegrationSlackWebhookSignatureMissing = &Spec{Code: "INTEGRATION.SLACK.WEBHOOK_SIGNATURE_MISSING", Status: 401, Message: "Slack webhook signature header is missing", Description: "Returned when the X-Slack-Signature or X-Slack-Request-Timestamp header is absent, or when the workspace has no signing secret configured for the integration.", UserAction: "Check that the Slack app is configured to forward signed events and that the signing secret is present in the integration settings."}
 	// INTEGRATION.SLACK.WEBHOOK_TIMESTAMP_EXPIRED — Slack webhook timestamp is outside the allowed clock skew
-	IntegrationSlackWebhookTimestampExpired = &Spec{Code: "INTEGRATION.SLACK.WEBHOOK_TIMESTAMP_EXPIRED", Status: 401, Message: "Slack webhook timestamp is outside the allowed clock skew"}
+	IntegrationSlackWebhookTimestampExpired = &Spec{Code: "INTEGRATION.SLACK.WEBHOOK_TIMESTAMP_EXPIRED", Status: 401, Message: "Slack webhook timestamp is outside the allowed clock skew", Description: "Returned when the request timestamp drifts more than the configured replay window (5 minutes). This blocks replay attacks.", UserAction: "Ensure the sender clock is in sync; if the request was queued, retry it now."}
 )

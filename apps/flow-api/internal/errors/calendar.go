@@ -5,145 +5,145 @@ package errors
 // Error codes and specs.
 var (
 	// CALENDAR.ATTACHMENT.LIST_QUERY_INTERRUPTED — Could not retrieve attachments
-	CalendarAttachmentListQueryInterrupted = &Spec{Code: "CALENDAR.ATTACHMENT.LIST_QUERY_INTERRUPTED", Status: 500, Message: "Could not retrieve attachments"}
+	CalendarAttachmentListQueryInterrupted = &Spec{Code: "CALENDAR.ATTACHMENT.LIST_QUERY_INTERRUPTED", Status: 500, Message: "Could not retrieve attachments", Description: "Returned when the database query to list attachments encounters an unexpected error.", UserAction: "Retry the request. If the problem persists, contact support."}
 	// CALENDAR.ATTACHMENT.NOT_FOUND — Attachment not found
-	CalendarAttachmentNotFound = &Spec{Code: "CALENDAR.ATTACHMENT.NOT_FOUND", Status: 404, Message: "Attachment not found"}
+	CalendarAttachmentNotFound = &Spec{Code: "CALENDAR.ATTACHMENT.NOT_FOUND", Status: 404, Message: "Attachment not found", Description: "Returned when an attachment with the given public_id does not exist on the specified event.", UserAction: "Verify the attachment ID."}
 	// CALENDAR.ATTACHMENT.STORE_DELETE_INTERRUPTED — Could not delete attachment
-	CalendarAttachmentStoreDeleteInterrupted = &Spec{Code: "CALENDAR.ATTACHMENT.STORE_DELETE_INTERRUPTED", Status: 500, Message: "Could not delete attachment"}
+	CalendarAttachmentStoreDeleteInterrupted = &Spec{Code: "CALENDAR.ATTACHMENT.STORE_DELETE_INTERRUPTED", Status: 500, Message: "Could not delete attachment", Description: "Returned when the soft-delete query for an attachment encounters an unexpected database error.", UserAction: "Retry the request. If the problem persists, contact support."}
 	// CALENDAR.ATTACHMENT.STORE_READ_INTERRUPTED — Could not find attachment
-	CalendarAttachmentStoreReadInterrupted = &Spec{Code: "CALENDAR.ATTACHMENT.STORE_READ_INTERRUPTED", Status: 500, Message: "Could not find attachment"}
+	CalendarAttachmentStoreReadInterrupted = &Spec{Code: "CALENDAR.ATTACHMENT.STORE_READ_INTERRUPTED", Status: 500, Message: "Could not find attachment", Description: "Returned when looking up an attachment row encounters an unexpected database error.", UserAction: "Retry the request. If the problem persists, contact support."}
 	// CALENDAR.ATTACHMENT.STORE_WRITE_INTERRUPTED — Could not save attachment
-	CalendarAttachmentStoreWriteInterrupted = &Spec{Code: "CALENDAR.ATTACHMENT.STORE_WRITE_INTERRUPTED", Status: 500, Message: "Could not save attachment"}
+	CalendarAttachmentStoreWriteInterrupted = &Spec{Code: "CALENDAR.ATTACHMENT.STORE_WRITE_INTERRUPTED", Status: 500, Message: "Could not save attachment", Description: "Returned when inserting an attachment row encounters an unexpected database error.", UserAction: "Retry the request. If the problem persists, contact support."}
 	// CALENDAR.ATTACHMENT.UPLOADER_OR_OWNER_REQUIRED — Only the uploader or calendar owner can delete this attachment
-	CalendarAttachmentUploaderOrOwnerRequired = &Spec{Code: "CALENDAR.ATTACHMENT.UPLOADER_OR_OWNER_REQUIRED", Status: 403, Message: "Only the uploader or calendar owner can delete this attachment"}
+	CalendarAttachmentUploaderOrOwnerRequired = &Spec{Code: "CALENDAR.ATTACHMENT.UPLOADER_OR_OWNER_REQUIRED", Status: 403, Message: "Only the uploader or calendar owner can delete this attachment", Description: "Returned when a user who is neither the attachment uploader nor the calendar owner attempts to delete the attachment.", UserAction: "Ask the uploader or calendar owner to delete the attachment."}
 	// CALENDAR.ATTENDEE.CAN_EDIT_UPDATE_INTERRUPTED — Could not update edit permission
-	CalendarAttendeeCanEditUpdateInterrupted = &Spec{Code: "CALENDAR.ATTENDEE.CAN_EDIT_UPDATE_INTERRUPTED", Status: 500, Message: "Could not update edit permission"}
+	CalendarAttendeeCanEditUpdateInterrupted = &Spec{Code: "CALENDAR.ATTENDEE.CAN_EDIT_UPDATE_INTERRUPTED", Status: 500, Message: "Could not update edit permission", Description: "Returned when the query to toggle an attendee's can_edit flag encounters an unexpected database error.", UserAction: "Retry the request. If the problem persists, contact support."}
 	// CALENDAR.ATTENDEE.LIST_QUERY_INTERRUPTED — Could not retrieve attendees
-	CalendarAttendeeListQueryInterrupted = &Spec{Code: "CALENDAR.ATTENDEE.LIST_QUERY_INTERRUPTED", Status: 500, Message: "Could not retrieve attendees"}
+	CalendarAttendeeListQueryInterrupted = &Spec{Code: "CALENDAR.ATTENDEE.LIST_QUERY_INTERRUPTED", Status: 500, Message: "Could not retrieve attendees", Description: "Returned when the query to list attendees of an event encounters an unexpected database error.", UserAction: "Retry the request. If the problem persists, contact support."}
 	// CALENDAR.ATTENDEE.OWNER_REQUIRED_TO_TOGGLE_EDIT — Only the event owner can change edit permissions
-	CalendarAttendeeOwnerRequiredToToggleEdit = &Spec{Code: "CALENDAR.ATTENDEE.OWNER_REQUIRED_TO_TOGGLE_EDIT", Status: 403, Message: "Only the event owner can change edit permissions"}
+	CalendarAttendeeOwnerRequiredToToggleEdit = &Spec{Code: "CALENDAR.ATTENDEE.OWNER_REQUIRED_TO_TOGGLE_EDIT", Status: 403, Message: "Only the event owner can change edit permissions", Description: "Returned when a non-owner attempts to toggle the can_edit permission on an attendee.", UserAction: "Ask the event owner to change the attendee's edit permission."}
 	// CALENDAR.ATTENDEE.RSVP_UPDATE_INTERRUPTED — Could not update RSVP
-	CalendarAttendeeRsvpUpdateInterrupted = &Spec{Code: "CALENDAR.ATTENDEE.RSVP_UPDATE_INTERRUPTED", Status: 500, Message: "Could not update RSVP"}
+	CalendarAttendeeRsvpUpdateInterrupted = &Spec{Code: "CALENDAR.ATTENDEE.RSVP_UPDATE_INTERRUPTED", Status: 500, Message: "Could not update RSVP", Description: "Returned when the query to update an attendee's RSVP status encounters an unexpected database error.", UserAction: "Retry the request. If the problem persists, contact support."}
 	// CALENDAR.ATTENDEE.STORE_REMOVE_INTERRUPTED — Could not remove attendee
-	CalendarAttendeeStoreRemoveInterrupted = &Spec{Code: "CALENDAR.ATTENDEE.STORE_REMOVE_INTERRUPTED", Status: 500, Message: "Could not remove attendee"}
+	CalendarAttendeeStoreRemoveInterrupted = &Spec{Code: "CALENDAR.ATTENDEE.STORE_REMOVE_INTERRUPTED", Status: 500, Message: "Could not remove attendee", Description: "Returned when the query to remove an attendee encounters an unexpected database error.", UserAction: "Retry the request. If the problem persists, contact support."}
 	// CALENDAR.ATTENDEE.USER_ID_MALFORMED — Invalid user ID
-	CalendarAttendeeUserIdMalformed = &Spec{Code: "CALENDAR.ATTENDEE.USER_ID_MALFORMED", Status: 400, Message: "Invalid user ID"}
+	CalendarAttendeeUserIdMalformed = &Spec{Code: "CALENDAR.ATTENDEE.USER_ID_MALFORMED", Status: 400, Message: "Invalid user ID", Description: "Returned when the user ID path parameter is not a valid UUID.", UserAction: "Provide a valid UUID for the user."}
 	// CALENDAR.ATTENDEE.USER_NOT_FOUND — User not found
-	CalendarAttendeeUserNotFound = &Spec{Code: "CALENDAR.ATTENDEE.USER_NOT_FOUND", Status: 404, Message: "User not found"}
+	CalendarAttendeeUserNotFound = &Spec{Code: "CALENDAR.ATTENDEE.USER_NOT_FOUND", Status: 404, Message: "User not found", Description: "Returned when the specified user public_id does not match any active user.", UserAction: "Verify the user ID."}
 	// CALENDAR.CALENDAR.ACCESS_DENIED — You do not have access to this calendar
-	CalendarCalendarAccessDenied = &Spec{Code: "CALENDAR.CALENDAR.ACCESS_DENIED", Status: 403, Message: "You do not have access to this calendar"}
+	CalendarCalendarAccessDenied = &Spec{Code: "CALENDAR.CALENDAR.ACCESS_DENIED", Status: 403, Message: "You do not have access to this calendar", Description: "Returned when the actor is authenticated but does not hold an active subscription to the target calendar.", UserAction: "Ask the calendar owner or an admin to grant you access."}
 	// CALENDAR.CALENDAR.LIST_QUERY_INTERRUPTED — Could not retrieve calendars
-	CalendarCalendarListQueryInterrupted = &Spec{Code: "CALENDAR.CALENDAR.LIST_QUERY_INTERRUPTED", Status: 500, Message: "Could not retrieve calendars"}
+	CalendarCalendarListQueryInterrupted = &Spec{Code: "CALENDAR.CALENDAR.LIST_QUERY_INTERRUPTED", Status: 500, Message: "Could not retrieve calendars", Description: "Returned when the database query to list the user's subscribed calendars encounters an unexpected error.", UserAction: "Retry the request. If the problem persists, contact support."}
 	// CALENDAR.CALENDAR.NOT_FOUND — Calendar not found
-	CalendarCalendarNotFound = &Spec{Code: "CALENDAR.CALENDAR.NOT_FOUND", Status: 404, Message: "Calendar not found"}
+	CalendarCalendarNotFound = &Spec{Code: "CALENDAR.CALENDAR.NOT_FOUND", Status: 404, Message: "Calendar not found", Description: "Returned when a calendar with the given public_id does not exist or the actor has no visibility into it.", UserAction: "Verify the calendar ID, or ask the calendar owner to share it with you."}
 	// CALENDAR.CALENDAR.OWNER_ROLE_REQUIRED — Only calendar owners can perform this action
-	CalendarCalendarOwnerRoleRequired = &Spec{Code: "CALENDAR.CALENDAR.OWNER_ROLE_REQUIRED", Status: 403, Message: "Only calendar owners can perform this action"}
+	CalendarCalendarOwnerRoleRequired = &Spec{Code: "CALENDAR.CALENDAR.OWNER_ROLE_REQUIRED", Status: 403, Message: "Only calendar owners can perform this action", Description: "Returned when a non-owner attempts an owner-only operation such as deleting a calendar.", UserAction: "Ask a calendar owner to perform this action on your behalf."}
 	// CALENDAR.CALENDAR.STORE_DELETE_INTERRUPTED — Could not delete calendar
-	CalendarCalendarStoreDeleteInterrupted = &Spec{Code: "CALENDAR.CALENDAR.STORE_DELETE_INTERRUPTED", Status: 500, Message: "Could not delete calendar"}
+	CalendarCalendarStoreDeleteInterrupted = &Spec{Code: "CALENDAR.CALENDAR.STORE_DELETE_INTERRUPTED", Status: 500, Message: "Could not delete calendar", Description: "Returned when the soft-delete query for a calendar encounters an unexpected database error.", UserAction: "Retry the request. If the problem persists, contact support."}
 	// CALENDAR.CALENDAR.STORE_READ_INTERRUPTED — Could not read calendar after update
-	CalendarCalendarStoreReadInterrupted = &Spec{Code: "CALENDAR.CALENDAR.STORE_READ_INTERRUPTED", Status: 500, Message: "Could not read calendar after update"}
+	CalendarCalendarStoreReadInterrupted = &Spec{Code: "CALENDAR.CALENDAR.STORE_READ_INTERRUPTED", Status: 500, Message: "Could not read calendar after update", Description: "Returned when re-reading the calendar row after a successful patch encounters an unexpected error.", UserAction: "Retry the request. If the problem persists, contact support."}
 	// CALENDAR.CALENDAR.STORE_WRITE_INTERRUPTED — Could not save calendar
-	CalendarCalendarStoreWriteInterrupted = &Spec{Code: "CALENDAR.CALENDAR.STORE_WRITE_INTERRUPTED", Status: 500, Message: "Could not save calendar"}
+	CalendarCalendarStoreWriteInterrupted = &Spec{Code: "CALENDAR.CALENDAR.STORE_WRITE_INTERRUPTED", Status: 500, Message: "Could not save calendar", Description: "Returned when inserting or updating a calendar row encounters an unexpected database error.", UserAction: "Retry the request. If the problem persists, contact support."}
 	// CALENDAR.CHECKLIST.ITEM_NOT_FOUND — Checklist item not found
-	CalendarChecklistItemNotFound = &Spec{Code: "CALENDAR.CHECKLIST.ITEM_NOT_FOUND", Status: 404, Message: "Checklist item not found"}
+	CalendarChecklistItemNotFound = &Spec{Code: "CALENDAR.CHECKLIST.ITEM_NOT_FOUND", Status: 404, Message: "Checklist item not found", Description: "Returned when a checklist item with the given public_id does not exist on the specified event.", UserAction: "Verify the checklist item ID."}
 	// CALENDAR.CHECKLIST.LIST_QUERY_INTERRUPTED — Could not retrieve checklist items
-	CalendarChecklistListQueryInterrupted = &Spec{Code: "CALENDAR.CHECKLIST.LIST_QUERY_INTERRUPTED", Status: 500, Message: "Could not retrieve checklist items"}
+	CalendarChecklistListQueryInterrupted = &Spec{Code: "CALENDAR.CHECKLIST.LIST_QUERY_INTERRUPTED", Status: 500, Message: "Could not retrieve checklist items", Description: "Returned when the database query to list checklist items encounters an unexpected error.", UserAction: "Retry the request. If the problem persists, contact support."}
 	// CALENDAR.CHECKLIST.STORE_DELETE_INTERRUPTED — Could not delete checklist item
-	CalendarChecklistStoreDeleteInterrupted = &Spec{Code: "CALENDAR.CHECKLIST.STORE_DELETE_INTERRUPTED", Status: 500, Message: "Could not delete checklist item"}
+	CalendarChecklistStoreDeleteInterrupted = &Spec{Code: "CALENDAR.CHECKLIST.STORE_DELETE_INTERRUPTED", Status: 500, Message: "Could not delete checklist item", Description: "Returned when the soft-delete query for a checklist item encounters an unexpected database error.", UserAction: "Retry the request. If the problem persists, contact support."}
 	// CALENDAR.CHECKLIST.STORE_WRITE_INTERRUPTED — Could not save checklist item
-	CalendarChecklistStoreWriteInterrupted = &Spec{Code: "CALENDAR.CHECKLIST.STORE_WRITE_INTERRUPTED", Status: 500, Message: "Could not save checklist item"}
+	CalendarChecklistStoreWriteInterrupted = &Spec{Code: "CALENDAR.CHECKLIST.STORE_WRITE_INTERRUPTED", Status: 500, Message: "Could not save checklist item", Description: "Returned when inserting or updating a checklist item row encounters an unexpected database error.", UserAction: "Retry the request. If the problem persists, contact support."}
 	// CALENDAR.COMMENT.AUTHOR_OR_OWNER_REQUIRED — Only the comment author or calendar owner can delete this comment
-	CalendarCommentAuthorOrOwnerRequired = &Spec{Code: "CALENDAR.COMMENT.AUTHOR_OR_OWNER_REQUIRED", Status: 403, Message: "Only the comment author or calendar owner can delete this comment"}
+	CalendarCommentAuthorOrOwnerRequired = &Spec{Code: "CALENDAR.COMMENT.AUTHOR_OR_OWNER_REQUIRED", Status: 403, Message: "Only the comment author or calendar owner can delete this comment", Description: "Returned when a user who is neither the comment author nor the calendar owner attempts to delete the comment.", UserAction: "Ask the comment author or calendar owner to delete the comment."}
 	// CALENDAR.COMMENT.LIST_QUERY_INTERRUPTED — Could not retrieve comments
-	CalendarCommentListQueryInterrupted = &Spec{Code: "CALENDAR.COMMENT.LIST_QUERY_INTERRUPTED", Status: 500, Message: "Could not retrieve comments"}
+	CalendarCommentListQueryInterrupted = &Spec{Code: "CALENDAR.COMMENT.LIST_QUERY_INTERRUPTED", Status: 500, Message: "Could not retrieve comments", Description: "Returned when the database query to list comments encounters an unexpected error.", UserAction: "Retry the request. If the problem persists, contact support."}
 	// CALENDAR.COMMENT.NOT_FOUND — Comment not found
-	CalendarCommentNotFound = &Spec{Code: "CALENDAR.COMMENT.NOT_FOUND", Status: 404, Message: "Comment not found"}
+	CalendarCommentNotFound = &Spec{Code: "CALENDAR.COMMENT.NOT_FOUND", Status: 404, Message: "Comment not found", Description: "Returned when a comment with the given public_id does not exist on the specified event.", UserAction: "Verify the comment ID."}
 	// CALENDAR.COMMENT.STORE_DELETE_INTERRUPTED — Could not delete comment
-	CalendarCommentStoreDeleteInterrupted = &Spec{Code: "CALENDAR.COMMENT.STORE_DELETE_INTERRUPTED", Status: 500, Message: "Could not delete comment"}
+	CalendarCommentStoreDeleteInterrupted = &Spec{Code: "CALENDAR.COMMENT.STORE_DELETE_INTERRUPTED", Status: 500, Message: "Could not delete comment", Description: "Returned when the soft-delete query for a comment encounters an unexpected database error.", UserAction: "Retry the request. If the problem persists, contact support."}
 	// CALENDAR.COMMENT.STORE_READ_INTERRUPTED — Could not find comment
-	CalendarCommentStoreReadInterrupted = &Spec{Code: "CALENDAR.COMMENT.STORE_READ_INTERRUPTED", Status: 500, Message: "Could not find comment"}
+	CalendarCommentStoreReadInterrupted = &Spec{Code: "CALENDAR.COMMENT.STORE_READ_INTERRUPTED", Status: 500, Message: "Could not find comment", Description: "Returned when looking up a comment row encounters an unexpected database error.", UserAction: "Retry the request. If the problem persists, contact support."}
 	// CALENDAR.COMMENT.STORE_WRITE_INTERRUPTED — Could not save comment
-	CalendarCommentStoreWriteInterrupted = &Spec{Code: "CALENDAR.COMMENT.STORE_WRITE_INTERRUPTED", Status: 500, Message: "Could not save comment"}
+	CalendarCommentStoreWriteInterrupted = &Spec{Code: "CALENDAR.COMMENT.STORE_WRITE_INTERRUPTED", Status: 500, Message: "Could not save comment", Description: "Returned when inserting or updating a comment row encounters an unexpected database error.", UserAction: "Retry the request. If the problem persists, contact support."}
 	// CALENDAR.EVENT.DATE_RANGE_UNPARSEABLE — Could not parse date or datetime parameter
-	CalendarEventDateRangeUnparseable = &Spec{Code: "CALENDAR.EVENT.DATE_RANGE_UNPARSEABLE", Status: 422, Message: "Could not parse date or datetime parameter"}
+	CalendarEventDateRangeUnparseable = &Spec{Code: "CALENDAR.EVENT.DATE_RANGE_UNPARSEABLE", Status: 422, Message: "Could not parse date or datetime parameter", Description: "Returned when the start or end query parameter cannot be parsed as an RFC 3339 datetime or YYYY-MM-DD date.", UserAction: "Provide dates in YYYY-MM-DD or RFC 3339 format (e.g. 2024-01-15 or 2024-01-15T09:00:00Z)."}
 	// CALENDAR.EVENT.EDIT_PERMISSION_REQUIRED — You do not have permission to edit this event
-	CalendarEventEditPermissionRequired = &Spec{Code: "CALENDAR.EVENT.EDIT_PERMISSION_REQUIRED", Status: 403, Message: "You do not have permission to edit this event"}
+	CalendarEventEditPermissionRequired = &Spec{Code: "CALENDAR.EVENT.EDIT_PERMISSION_REQUIRED", Status: 403, Message: "You do not have permission to edit this event", Description: "Returned when the actor is neither the event owner, a calendar owner/manager, nor an attendee with edit rights.", UserAction: "Ask the event owner to grant you edit access or to make the change."}
 	// CALENDAR.EVENT.LIST_QUERY_INTERRUPTED — Could not retrieve events
-	CalendarEventListQueryInterrupted = &Spec{Code: "CALENDAR.EVENT.LIST_QUERY_INTERRUPTED", Status: 500, Message: "Could not retrieve events"}
+	CalendarEventListQueryInterrupted = &Spec{Code: "CALENDAR.EVENT.LIST_QUERY_INTERRUPTED", Status: 500, Message: "Could not retrieve events", Description: "Returned when the database query to list events (including recurring events) encounters an unexpected error.", UserAction: "Retry the request. If the problem persists, contact support."}
 	// CALENDAR.EVENT.NOT_FOUND — Event not found
-	CalendarEventNotFound = &Spec{Code: "CALENDAR.EVENT.NOT_FOUND", Status: 404, Message: "Event not found"}
+	CalendarEventNotFound = &Spec{Code: "CALENDAR.EVENT.NOT_FOUND", Status: 404, Message: "Event not found", Description: "Returned when an event with the given public_id does not exist in the specified calendar.", UserAction: "Verify the event ID, or refresh the calendar to see current events."}
 	// CALENDAR.EVENT.OWNER_USER_ID_MALFORMED — Invalid ownerUserId
-	CalendarEventOwnerUserIdMalformed = &Spec{Code: "CALENDAR.EVENT.OWNER_USER_ID_MALFORMED", Status: 400, Message: "Invalid ownerUserId"}
+	CalendarEventOwnerUserIdMalformed = &Spec{Code: "CALENDAR.EVENT.OWNER_USER_ID_MALFORMED", Status: 400, Message: "Invalid ownerUserId", Description: "Returned when the ownerUserId field is not a valid UUID.", UserAction: "Provide a valid UUID for the owner user."}
 	// CALENDAR.EVENT.OWNER_USER_NOT_FOUND — Owner user not found
-	CalendarEventOwnerUserNotFound = &Spec{Code: "CALENDAR.EVENT.OWNER_USER_NOT_FOUND", Status: 400, Message: "Owner user not found"}
+	CalendarEventOwnerUserNotFound = &Spec{Code: "CALENDAR.EVENT.OWNER_USER_NOT_FOUND", Status: 400, Message: "Owner user not found", Description: "Returned when the specified ownerUserId does not match any active user.", UserAction: "Verify the owner user ID and ensure the user account is active."}
 	// CALENDAR.EVENT.OWNER_USER_RESOLVE_INTERRUPTED — Could not resolve owner user
-	CalendarEventOwnerUserResolveInterrupted = &Spec{Code: "CALENDAR.EVENT.OWNER_USER_RESOLVE_INTERRUPTED", Status: 500, Message: "Could not resolve owner user"}
+	CalendarEventOwnerUserResolveInterrupted = &Spec{Code: "CALENDAR.EVENT.OWNER_USER_RESOLVE_INTERRUPTED", Status: 500, Message: "Could not resolve owner user", Description: "Returned when looking up the owner user's internal ID encounters an unexpected database error.", UserAction: "Retry the request. If the problem persists, contact support."}
 	// CALENDAR.EVENT.START_END_PAIR_REQUIRED — startAt and endAt must be provided together
-	CalendarEventStartEndPairRequired = &Spec{Code: "CALENDAR.EVENT.START_END_PAIR_REQUIRED", Status: 422, Message: "startAt and endAt must be provided together"}
+	CalendarEventStartEndPairRequired = &Spec{Code: "CALENDAR.EVENT.START_END_PAIR_REQUIRED", Status: 422, Message: "startAt and endAt must be provided together", Description: "Returned when a create or patch request supplies one of startAt / endAt without the other. Undated events must omit both.", UserAction: "Provide both startAt and endAt, or omit both to create a planning-stage (undated) event."}
 	// CALENDAR.EVENT.STORE_DELETE_INTERRUPTED — Could not delete event
-	CalendarEventStoreDeleteInterrupted = &Spec{Code: "CALENDAR.EVENT.STORE_DELETE_INTERRUPTED", Status: 500, Message: "Could not delete event"}
+	CalendarEventStoreDeleteInterrupted = &Spec{Code: "CALENDAR.EVENT.STORE_DELETE_INTERRUPTED", Status: 500, Message: "Could not delete event", Description: "Returned when the soft-delete query for an event encounters an unexpected database error.", UserAction: "Retry the request. If the problem persists, contact support."}
 	// CALENDAR.EVENT.STORE_READ_INTERRUPTED — Could not read event
-	CalendarEventStoreReadInterrupted = &Spec{Code: "CALENDAR.EVENT.STORE_READ_INTERRUPTED", Status: 500, Message: "Could not read event"}
+	CalendarEventStoreReadInterrupted = &Spec{Code: "CALENDAR.EVENT.STORE_READ_INTERRUPTED", Status: 500, Message: "Could not read event", Description: "Returned when reading an event row (including after a patch) encounters an unexpected database error.", UserAction: "Retry the request. If the problem persists, contact support."}
 	// CALENDAR.EVENT.STORE_WRITE_INTERRUPTED — Could not save event
-	CalendarEventStoreWriteInterrupted = &Spec{Code: "CALENDAR.EVENT.STORE_WRITE_INTERRUPTED", Status: 500, Message: "Could not save event"}
+	CalendarEventStoreWriteInterrupted = &Spec{Code: "CALENDAR.EVENT.STORE_WRITE_INTERRUPTED", Status: 500, Message: "Could not save event", Description: "Returned when inserting or updating an event row encounters an unexpected database error.", UserAction: "Retry the request. If the problem persists, contact support."}
 	// CALENDAR.INVITE.LIST_QUERY_INTERRUPTED — Could not retrieve invites
-	CalendarInviteListQueryInterrupted = &Spec{Code: "CALENDAR.INVITE.LIST_QUERY_INTERRUPTED", Status: 500, Message: "Could not retrieve invites"}
+	CalendarInviteListQueryInterrupted = &Spec{Code: "CALENDAR.INVITE.LIST_QUERY_INTERRUPTED", Status: 500, Message: "Could not retrieve invites", Description: "Returned when the database query to list invites encounters an unexpected error.", UserAction: "Retry the request. If the problem persists, contact support."}
 	// CALENDAR.INVITE.NOT_FOUND — Invite not found or expired
-	CalendarInviteNotFound = &Spec{Code: "CALENDAR.INVITE.NOT_FOUND", Status: 404, Message: "Invite not found or expired"}
+	CalendarInviteNotFound = &Spec{Code: "CALENDAR.INVITE.NOT_FOUND", Status: 404, Message: "Invite not found or expired", Description: "Returned when the invite token or public_id does not match any active invite, or the invite has expired or exhausted its use limit.", UserAction: "Ask the calendar owner for a new invite link."}
 	// CALENDAR.INVITE.STORE_LOOKUP_INTERRUPTED — Could not look up invite
-	CalendarInviteStoreLookupInterrupted = &Spec{Code: "CALENDAR.INVITE.STORE_LOOKUP_INTERRUPTED", Status: 500, Message: "Could not look up invite"}
+	CalendarInviteStoreLookupInterrupted = &Spec{Code: "CALENDAR.INVITE.STORE_LOOKUP_INTERRUPTED", Status: 500, Message: "Could not look up invite", Description: "Returned when looking up an invite by token hash encounters an unexpected database error.", UserAction: "Retry the request. If the problem persists, contact support."}
 	// CALENDAR.INVITE.STORE_REVOKE_INTERRUPTED — Could not revoke invite
-	CalendarInviteStoreRevokeInterrupted = &Spec{Code: "CALENDAR.INVITE.STORE_REVOKE_INTERRUPTED", Status: 500, Message: "Could not revoke invite"}
+	CalendarInviteStoreRevokeInterrupted = &Spec{Code: "CALENDAR.INVITE.STORE_REVOKE_INTERRUPTED", Status: 500, Message: "Could not revoke invite", Description: "Returned when the disable query for an invite encounters an unexpected database error.", UserAction: "Retry the request. If the problem persists, contact support."}
 	// CALENDAR.INVITE.STORE_WRITE_INTERRUPTED — Could not save invite
-	CalendarInviteStoreWriteInterrupted = &Spec{Code: "CALENDAR.INVITE.STORE_WRITE_INTERRUPTED", Status: 500, Message: "Could not save invite"}
+	CalendarInviteStoreWriteInterrupted = &Spec{Code: "CALENDAR.INVITE.STORE_WRITE_INTERRUPTED", Status: 500, Message: "Could not save invite", Description: "Returned when inserting an invite row encounters an unexpected database error.", UserAction: "Retry the request. If the problem persists, contact support."}
 	// CALENDAR.INVITE.TOKEN_GENERATE_INTERRUPTED — Could not generate invite token
-	CalendarInviteTokenGenerateInterrupted = &Spec{Code: "CALENDAR.INVITE.TOKEN_GENERATE_INTERRUPTED", Status: 500, Message: "Could not generate invite token"}
+	CalendarInviteTokenGenerateInterrupted = &Spec{Code: "CALENDAR.INVITE.TOKEN_GENERATE_INTERRUPTED", Status: 500, Message: "Could not generate invite token", Description: "Returned when cryptographic random generation for the invite token encounters an error.", UserAction: "Retry the request. If the problem persists, contact support."}
 	// CALENDAR.MEMBER.ALREADY_SUBSCRIBED — User is already a member of this calendar
-	CalendarMemberAlreadySubscribed = &Spec{Code: "CALENDAR.MEMBER.ALREADY_SUBSCRIBED", Status: 409, Message: "User is already a member of this calendar"}
+	CalendarMemberAlreadySubscribed = &Spec{Code: "CALENDAR.MEMBER.ALREADY_SUBSCRIBED", Status: 409, Message: "User is already a member of this calendar", Description: "Returned when attempting to add a user who already has an active subscription to the calendar.", UserAction: "The user is already a member. Update their role instead if needed."}
 	// CALENDAR.MEMBER.LAST_OWNER_REMOVAL_BLOCKED — Cannot remove the last owner of a calendar
-	CalendarMemberLastOwnerRemovalBlocked = &Spec{Code: "CALENDAR.MEMBER.LAST_OWNER_REMOVAL_BLOCKED", Status: 409, Message: "Cannot remove the last owner of a calendar"}
+	CalendarMemberLastOwnerRemovalBlocked = &Spec{Code: "CALENDAR.MEMBER.LAST_OWNER_REMOVAL_BLOCKED", Status: 409, Message: "Cannot remove the last owner of a calendar", Description: "Returned when attempting to remove or downgrade the sole remaining owner of a calendar. At least one owner must remain.", UserAction: "Transfer ownership to another member before removing the current owner."}
 	// CALENDAR.MEMBER.LIST_QUERY_INTERRUPTED — Could not retrieve members
-	CalendarMemberListQueryInterrupted = &Spec{Code: "CALENDAR.MEMBER.LIST_QUERY_INTERRUPTED", Status: 500, Message: "Could not retrieve members"}
+	CalendarMemberListQueryInterrupted = &Spec{Code: "CALENDAR.MEMBER.LIST_QUERY_INTERRUPTED", Status: 500, Message: "Could not retrieve members", Description: "Returned when the database query to list calendar subscribers encounters an unexpected error.", UserAction: "Retry the request. If the problem persists, contact support."}
 	// CALENDAR.MEMBER.NOT_FOUND — Member not found
-	CalendarMemberNotFound = &Spec{Code: "CALENDAR.MEMBER.NOT_FOUND", Status: 404, Message: "Member not found"}
+	CalendarMemberNotFound = &Spec{Code: "CALENDAR.MEMBER.NOT_FOUND", Status: 404, Message: "Member not found", Description: "Returned when the target user does not have a subscription to the specified calendar.", UserAction: "Verify the user is a member of this calendar."}
 	// CALENDAR.MEMBER.STORE_READ_INTERRUPTED — Could not look up member
-	CalendarMemberStoreReadInterrupted = &Spec{Code: "CALENDAR.MEMBER.STORE_READ_INTERRUPTED", Status: 500, Message: "Could not look up member"}
+	CalendarMemberStoreReadInterrupted = &Spec{Code: "CALENDAR.MEMBER.STORE_READ_INTERRUPTED", Status: 500, Message: "Could not look up member", Description: "Returned when looking up a subscription row encounters an unexpected database error.", UserAction: "Retry the request. If the problem persists, contact support."}
 	// CALENDAR.MEMBER.STORE_REMOVE_INTERRUPTED — Could not remove member
-	CalendarMemberStoreRemoveInterrupted = &Spec{Code: "CALENDAR.MEMBER.STORE_REMOVE_INTERRUPTED", Status: 500, Message: "Could not remove member"}
+	CalendarMemberStoreRemoveInterrupted = &Spec{Code: "CALENDAR.MEMBER.STORE_REMOVE_INTERRUPTED", Status: 500, Message: "Could not remove member", Description: "Returned when the disable query for a subscription encounters an unexpected database error.", UserAction: "Retry the request. If the problem persists, contact support."}
 	// CALENDAR.MEMBER.STORE_WRITE_INTERRUPTED — Could not add member
-	CalendarMemberStoreWriteInterrupted = &Spec{Code: "CALENDAR.MEMBER.STORE_WRITE_INTERRUPTED", Status: 500, Message: "Could not add member"}
+	CalendarMemberStoreWriteInterrupted = &Spec{Code: "CALENDAR.MEMBER.STORE_WRITE_INTERRUPTED", Status: 500, Message: "Could not add member", Description: "Returned when inserting a subscription row encounters an unexpected database error.", UserAction: "Retry the request. If the problem persists, contact support."}
 	// CALENDAR.MEMBER.USER_ID_MALFORMED — Invalid user ID
-	CalendarMemberUserIdMalformed = &Spec{Code: "CALENDAR.MEMBER.USER_ID_MALFORMED", Status: 400, Message: "Invalid user ID"}
+	CalendarMemberUserIdMalformed = &Spec{Code: "CALENDAR.MEMBER.USER_ID_MALFORMED", Status: 400, Message: "Invalid user ID", Description: "Returned when the user ID path parameter is not a valid UUID.", UserAction: "Provide a valid UUID for the user."}
 	// CALENDAR.MEMBER.USER_NOT_FOUND — User not found
-	CalendarMemberUserNotFound = &Spec{Code: "CALENDAR.MEMBER.USER_NOT_FOUND", Status: 404, Message: "User not found"}
+	CalendarMemberUserNotFound = &Spec{Code: "CALENDAR.MEMBER.USER_NOT_FOUND", Status: 404, Message: "User not found", Description: "Returned when the specified user (by email or public_id) does not match any active user.", UserAction: "Verify the user email or ID."}
 	// CALENDAR.MEMO.LIST_QUERY_INTERRUPTED — Could not retrieve memos
-	CalendarMemoListQueryInterrupted = &Spec{Code: "CALENDAR.MEMO.LIST_QUERY_INTERRUPTED", Status: 500, Message: "Could not retrieve memos"}
+	CalendarMemoListQueryInterrupted = &Spec{Code: "CALENDAR.MEMO.LIST_QUERY_INTERRUPTED", Status: 500, Message: "Could not retrieve memos", Description: "Returned when the database query to list memos encounters an unexpected error.", UserAction: "Retry the request. If the problem persists, contact support."}
 	// CALENDAR.MEMO.NOT_FOUND — Memo not found
-	CalendarMemoNotFound = &Spec{Code: "CALENDAR.MEMO.NOT_FOUND", Status: 404, Message: "Memo not found"}
+	CalendarMemoNotFound = &Spec{Code: "CALENDAR.MEMO.NOT_FOUND", Status: 404, Message: "Memo not found", Description: "Returned when a memo with the given public_id does not exist in the specified calendar.", UserAction: "Verify the memo ID, or refresh the list to see current memos."}
 	// CALENDAR.MEMO.STORE_DELETE_INTERRUPTED — Could not delete memo
-	CalendarMemoStoreDeleteInterrupted = &Spec{Code: "CALENDAR.MEMO.STORE_DELETE_INTERRUPTED", Status: 500, Message: "Could not delete memo"}
+	CalendarMemoStoreDeleteInterrupted = &Spec{Code: "CALENDAR.MEMO.STORE_DELETE_INTERRUPTED", Status: 500, Message: "Could not delete memo", Description: "Returned when the soft-delete query for a memo encounters an unexpected database error.", UserAction: "Retry the request. If the problem persists, contact support."}
 	// CALENDAR.MEMO.STORE_READ_INTERRUPTED — Could not find memo
-	CalendarMemoStoreReadInterrupted = &Spec{Code: "CALENDAR.MEMO.STORE_READ_INTERRUPTED", Status: 500, Message: "Could not find memo"}
+	CalendarMemoStoreReadInterrupted = &Spec{Code: "CALENDAR.MEMO.STORE_READ_INTERRUPTED", Status: 500, Message: "Could not find memo", Description: "Returned when looking up a memo row encounters an unexpected database error.", UserAction: "Retry the request. If the problem persists, contact support."}
 	// CALENDAR.MEMO.STORE_WRITE_INTERRUPTED — Could not save memo
-	CalendarMemoStoreWriteInterrupted = &Spec{Code: "CALENDAR.MEMO.STORE_WRITE_INTERRUPTED", Status: 500, Message: "Could not save memo"}
+	CalendarMemoStoreWriteInterrupted = &Spec{Code: "CALENDAR.MEMO.STORE_WRITE_INTERRUPTED", Status: 500, Message: "Could not save memo", Description: "Returned when inserting or updating a memo row encounters an unexpected database error.", UserAction: "Retry the request. If the problem persists, contact support."}
 	// CALENDAR.SMART_CREATE.TEXT_UNPARSEABLE — Could not parse event from text
-	CalendarSmartCreateTextUnparseable = &Spec{Code: "CALENDAR.SMART_CREATE.TEXT_UNPARSEABLE", Status: 422, Message: "Could not parse event from text"}
+	CalendarSmartCreateTextUnparseable = &Spec{Code: "CALENDAR.SMART_CREATE.TEXT_UNPARSEABLE", Status: 422, Message: "Could not parse event from text", Description: "Returned when the natural language parser cannot extract event parameters from the submitted text.", UserAction: "Try rephrasing the event description with clearer date, time, and title information."}
 	// CALENDAR.SUBSCRIPTION.COUNTRY_INVALID — Country code is invalid or not supported
-	CalendarSubscriptionCountryInvalid = &Spec{Code: "CALENDAR.SUBSCRIPTION.COUNTRY_INVALID", Status: 400, Message: "Country code is invalid or not supported"}
+	CalendarSubscriptionCountryInvalid = &Spec{Code: "CALENDAR.SUBSCRIPTION.COUNTRY_INVALID", Status: 400, Message: "Country code is invalid or not supported", Description: "Returned when the ISO 3166-1 alpha-2 country code supplied to the subscribe-system endpoint is not recognised or has no holiday feed available.", UserAction: "Pick a supported country code (e.g. JP, US, GB) from the selector."}
 	// CALENDAR.SUBSCRIPTION.STORE_WRITE_INTERRUPTED — Could not create calendar subscription
-	CalendarSubscriptionStoreWriteInterrupted = &Spec{Code: "CALENDAR.SUBSCRIPTION.STORE_WRITE_INTERRUPTED", Status: 500, Message: "Could not create calendar subscription"}
+	CalendarSubscriptionStoreWriteInterrupted = &Spec{Code: "CALENDAR.SUBSCRIPTION.STORE_WRITE_INTERRUPTED", Status: 500, Message: "Could not create calendar subscription", Description: "Returned when inserting a calendar subscription row encounters an unexpected database error.", UserAction: "Retry the request. If the problem persists, contact support."}
 	// CALENDAR.TASK_SYNC.STORE_WRITE_INTERRUPTED — Could not create event from task
-	CalendarTaskSyncStoreWriteInterrupted = &Spec{Code: "CALENDAR.TASK_SYNC.STORE_WRITE_INTERRUPTED", Status: 500, Message: "Could not create event from task"}
+	CalendarTaskSyncStoreWriteInterrupted = &Spec{Code: "CALENDAR.TASK_SYNC.STORE_WRITE_INTERRUPTED", Status: 500, Message: "Could not create event from task", Description: "Returned when inserting the calendar event for the linked task encounters an unexpected database error.", UserAction: "Retry the request. If the problem persists, contact support."}
 	// CALENDAR.TASK_SYNC.TASK_ID_MALFORMED — Invalid taskId format
-	CalendarTaskSyncTaskIdMalformed = &Spec{Code: "CALENDAR.TASK_SYNC.TASK_ID_MALFORMED", Status: 400, Message: "Invalid taskId format"}
+	CalendarTaskSyncTaskIdMalformed = &Spec{Code: "CALENDAR.TASK_SYNC.TASK_ID_MALFORMED", Status: 400, Message: "Invalid taskId format", Description: "Returned when the taskId field is not a valid UUID.", UserAction: "Provide a valid UUID for the task."}
 	// CALENDAR.TASK_SYNC.TASK_LOOKUP_INTERRUPTED — Could not look up task
-	CalendarTaskSyncTaskLookupInterrupted = &Spec{Code: "CALENDAR.TASK_SYNC.TASK_LOOKUP_INTERRUPTED", Status: 500, Message: "Could not look up task"}
+	CalendarTaskSyncTaskLookupInterrupted = &Spec{Code: "CALENDAR.TASK_SYNC.TASK_LOOKUP_INTERRUPTED", Status: 500, Message: "Could not look up task", Description: "Returned when the raw query to read the task row encounters an unexpected database error.", UserAction: "Retry the request. If the problem persists, contact support."}
 	// CALENDAR.TASK_SYNC.TASK_NOT_FOUND — Task not found
-	CalendarTaskSyncTaskNotFound = &Spec{Code: "CALENDAR.TASK_SYNC.TASK_NOT_FOUND", Status: 404, Message: "Task not found"}
+	CalendarTaskSyncTaskNotFound = &Spec{Code: "CALENDAR.TASK_SYNC.TASK_NOT_FOUND", Status: 404, Message: "Task not found", Description: "Returned when the specified task public_id does not match any active task in the workspace.", UserAction: "Verify the task ID and ensure it belongs to the current workspace."}
 	// CALENDAR.TASK_SYNC.TIMEZONE_UNRECOGNIZED — Unrecognized timezone
-	CalendarTaskSyncTimezoneUnrecognized = &Spec{Code: "CALENDAR.TASK_SYNC.TIMEZONE_UNRECOGNIZED", Status: 400, Message: "Unrecognized timezone"}
+	CalendarTaskSyncTimezoneUnrecognized = &Spec{Code: "CALENDAR.TASK_SYNC.TIMEZONE_UNRECOGNIZED", Status: 400, Message: "Unrecognized timezone", Description: "Returned when the timezone field is not a valid IANA timezone name.", UserAction: "Provide a valid IANA timezone (e.g. America/New_York, Asia/Tokyo)."}
 	// CALENDAR.USER_PROFILE.LOOKUP_INTERRUPTED — Could not retrieve user profile
-	CalendarUserProfileLookupInterrupted = &Spec{Code: "CALENDAR.USER_PROFILE.LOOKUP_INTERRUPTED", Status: 500, Message: "Could not retrieve user profile"}
+	CalendarUserProfileLookupInterrupted = &Spec{Code: "CALENDAR.USER_PROFILE.LOOKUP_INTERRUPTED", Status: 500, Message: "Could not retrieve user profile", Description: "Returned when looking up the actor's user profile encounters an unexpected database error.", UserAction: "Retry the request. If the problem persists, contact support."}
 	// CALENDAR.WORKSPACE.NOT_FOUND — Workspace not found
-	CalendarWorkspaceNotFound = &Spec{Code: "CALENDAR.WORKSPACE.NOT_FOUND", Status: 404, Message: "Workspace not found"}
+	CalendarWorkspaceNotFound = &Spec{Code: "CALENDAR.WORKSPACE.NOT_FOUND", Status: 404, Message: "Workspace not found", Description: "Returned when the workspace public_id in the request path does not match any active workspace.", UserAction: "Verify the workspace ID in the URL."}
 )

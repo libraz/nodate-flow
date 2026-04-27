@@ -5,85 +5,85 @@ package errors
 // Error codes and specs.
 var (
 	// WS.DESCRIPTION_VERSION.NOT_FOUND — Description version not found
-	WsDescriptionVersionNotFound = &Spec{Code: "WS.DESCRIPTION_VERSION.NOT_FOUND", Status: 404, Message: "Description version not found"}
+	WsDescriptionVersionNotFound = &Spec{Code: "WS.DESCRIPTION_VERSION.NOT_FOUND", Status: 404, Message: "Description version not found", Description: "Returned when a description version with the given public_id does not exist or has been removed.", UserAction: "Verify the version ID, or refresh the version history."}
 	// WS.FAVORITE.ALREADY_EXISTS — This item is already in your favorites
-	WsFavoriteAlreadyExists = &Spec{Code: "WS.FAVORITE.ALREADY_EXISTS", Status: 409, Message: "This item is already in your favorites"}
+	WsFavoriteAlreadyExists = &Spec{Code: "WS.FAVORITE.ALREADY_EXISTS", Status: 409, Message: "This item is already in your favorites", Description: "Returned when the actor attempts to add an item that is already in their favorites list.", UserAction: "The item is already favorited."}
 	// WS.FAVORITE.NOT_FOUND — Favorite not found
-	WsFavoriteNotFound = &Spec{Code: "WS.FAVORITE.NOT_FOUND", Status: 404, Message: "Favorite not found"}
+	WsFavoriteNotFound = &Spec{Code: "WS.FAVORITE.NOT_FOUND", Status: 404, Message: "Favorite not found", Description: "Returned when a favorite with the given public_id does not exist or belongs to another user.", UserAction: "Verify the favorite ID."}
 	// WS.IMPORT.ALREADY_RUNNING — An import job is already running for this project
-	WsImportAlreadyRunning = &Spec{Code: "WS.IMPORT.ALREADY_RUNNING", Status: 409, Message: "An import job is already running for this project"}
+	WsImportAlreadyRunning = &Spec{Code: "WS.IMPORT.ALREADY_RUNNING", Status: 409, Message: "An import job is already running for this project", Description: "Returned when a new import is requested while another import job is still in progress for the same project.", UserAction: "Wait for the current import to finish, or cancel it before starting a new one."}
 	// WS.IMPORT.CANNOT_CANCEL — Only pending or running import jobs can be cancelled
-	WsImportCannotCancel = &Spec{Code: "WS.IMPORT.CANNOT_CANCEL", Status: 409, Message: "Only pending or running import jobs can be cancelled"}
+	WsImportCannotCancel = &Spec{Code: "WS.IMPORT.CANNOT_CANCEL", Status: 409, Message: "Only pending or running import jobs can be cancelled", Description: "Returned when attempting to cancel an import job that has already completed, failed, or been cancelled.", UserAction: "The import job is no longer in a cancellable state."}
 	// WS.IMPORT.NOT_FOUND — Import job not found
-	WsImportNotFound = &Spec{Code: "WS.IMPORT.NOT_FOUND", Status: 404, Message: "Import job not found"}
+	WsImportNotFound = &Spec{Code: "WS.IMPORT.NOT_FOUND", Status: 404, Message: "Import job not found", Description: "Returned when an import job with the given public_id does not exist or belongs to a different workspace.", UserAction: "Verify the import job ID, or refresh the list to see current imports."}
 	// WS.INTAKE.ALREADY_CONVERTED — This intake item has already been converted to a task
-	WsIntakeAlreadyConverted = &Spec{Code: "WS.INTAKE.ALREADY_CONVERTED", Status: 409, Message: "This intake item has already been converted to a task"}
+	WsIntakeAlreadyConverted = &Spec{Code: "WS.INTAKE.ALREADY_CONVERTED", Status: 409, Message: "This intake item has already been converted to a task", Description: "Returned when attempting to convert an intake item that has already been converted to a task.", UserAction: "The item has already been converted. Open the linked task instead."}
 	// WS.INTAKE.ALREADY_TRIAGED — This intake item has already been triaged
-	WsIntakeAlreadyTriaged = &Spec{Code: "WS.INTAKE.ALREADY_TRIAGED", Status: 409, Message: "This intake item has already been triaged"}
+	WsIntakeAlreadyTriaged = &Spec{Code: "WS.INTAKE.ALREADY_TRIAGED", Status: 409, Message: "This intake item has already been triaged", Description: "Returned when attempting to triage an intake item that has already been triaged.", UserAction: "The item has already been triaged. No further action is needed."}
 	// WS.INTAKE.NOT_FOUND — Intake item not found
-	WsIntakeNotFound = &Spec{Code: "WS.INTAKE.NOT_FOUND", Status: 404, Message: "Intake item not found"}
+	WsIntakeNotFound = &Spec{Code: "WS.INTAKE.NOT_FOUND", Status: 404, Message: "Intake item not found", Description: "Returned when an intake item with the given public_id does not exist or has been removed.", UserAction: "Verify the intake item ID, or refresh the list to see current items."}
 	// WS.LABEL.NAME_ALREADY_TAKEN — A label with this name already exists
-	WsLabelNameAlreadyTaken = &Spec{Code: "WS.LABEL.NAME_ALREADY_TAKEN", Status: 409, Message: "A label with this name already exists"}
+	WsLabelNameAlreadyTaken = &Spec{Code: "WS.LABEL.NAME_ALREADY_TAKEN", Status: 409, Message: "A label with this name already exists", Description: "Returned when the requested label name already exists within the same workspace/project scope.", UserAction: "Choose a different name."}
 	// WS.LABEL.NOT_FOUND — Label not found
-	WsLabelNotFound = &Spec{Code: "WS.LABEL.NOT_FOUND", Status: 404, Message: "Label not found"}
+	WsLabelNotFound = &Spec{Code: "WS.LABEL.NOT_FOUND", Status: 404, Message: "Label not found", Description: "Returned when a label with the given public_id does not exist or has been deleted.", UserAction: "Verify the label ID, or refresh the list to see current labels."}
 	// WS.LENS.ALREADY_PRIVATE — This saved view is already private
-	WsLensAlreadyPrivate = &Spec{Code: "WS.LENS.ALREADY_PRIVATE", Status: 409, Message: "This saved view is already private"}
+	WsLensAlreadyPrivate = &Spec{Code: "WS.LENS.ALREADY_PRIVATE", Status: 409, Message: "This saved view is already private", Description: "Returned when attempting to unpublish a lens that is not currently shared.", UserAction: "The view is already private."}
 	// WS.LENS.ALREADY_PUBLIC — This saved view is already published
-	WsLensAlreadyPublic = &Spec{Code: "WS.LENS.ALREADY_PUBLIC", Status: 409, Message: "This saved view is already published"}
+	WsLensAlreadyPublic = &Spec{Code: "WS.LENS.ALREADY_PUBLIC", Status: 409, Message: "This saved view is already published", Description: "Returned when attempting to publish a lens that is already shared publicly.", UserAction: "The view is already public. Use the existing share link."}
 	// WS.LENS.NAME_ALREADY_TAKEN — A saved view with this name already exists
-	WsLensNameAlreadyTaken = &Spec{Code: "WS.LENS.NAME_ALREADY_TAKEN", Status: 409, Message: "A saved view with this name already exists"}
+	WsLensNameAlreadyTaken = &Spec{Code: "WS.LENS.NAME_ALREADY_TAKEN", Status: 409, Message: "A saved view with this name already exists", Description: "Returned when the requested lens name already exists within the same workspace/project scope.", UserAction: "Choose a different name."}
 	// WS.LENS.NOT_FOUND — Saved view not found
-	WsLensNotFound = &Spec{Code: "WS.LENS.NOT_FOUND", Status: 404, Message: "Saved view not found"}
+	WsLensNotFound = &Spec{Code: "WS.LENS.NOT_FOUND", Status: 404, Message: "Saved view not found", Description: "Returned when a lens with the given public_id does not exist or has been deleted.", UserAction: "Verify the view ID, or refresh the list to see current saved views."}
 	// WS.LENS.PUBLIC_TOKEN_INVALID — Public share link not found or expired
-	WsLensPublicTokenInvalid = &Spec{Code: "WS.LENS.PUBLIC_TOKEN_INVALID", Status: 404, Message: "Public share link not found or expired"}
+	WsLensPublicTokenInvalid = &Spec{Code: "WS.LENS.PUBLIC_TOKEN_INVALID", Status: 404, Message: "Public share link not found or expired", Description: "Returned when a public lens token does not match any published lens.", UserAction: "Verify the share link is correct and the view is still published."}
 	// WS.MEMBER.NOT_FOUND — Workspace member not found
-	WsMemberNotFound = &Spec{Code: "WS.MEMBER.NOT_FOUND", Status: 404, Message: "Workspace member not found"}
+	WsMemberNotFound = &Spec{Code: "WS.MEMBER.NOT_FOUND", Status: 404, Message: "Workspace member not found", Description: "Returned when the target user is not a member of the workspace.", UserAction: "Invite the user to the workspace first."}
 	// WS.MEMBER.ROLE_DENIED — Your role does not permit this action
-	WsMemberRoleDenied = &Spec{Code: "WS.MEMBER.ROLE_DENIED", Status: 403, Message: "Your role does not permit this action"}
+	WsMemberRoleDenied = &Spec{Code: "WS.MEMBER.ROLE_DENIED", Status: 403, Message: "Your role does not permit this action", Description: "Returned when the actor's workspace role is insufficient for the attempted operation.", UserAction: "Ask a workspace admin to elevate your role."}
 	// WS.MENTION.NOT_FOUND — Mention not found
-	WsMentionNotFound = &Spec{Code: "WS.MENTION.NOT_FOUND", Status: 404, Message: "Mention not found"}
+	WsMentionNotFound = &Spec{Code: "WS.MENTION.NOT_FOUND", Status: 404, Message: "Mention not found", Description: "Returned when a mention with the given public_id does not exist or has been removed.", UserAction: "Verify the mention ID."}
 	// WS.NOTIFICATION.NOT_FOUND — Notification not found
-	WsNotificationNotFound = &Spec{Code: "WS.NOTIFICATION.NOT_FOUND", Status: 404, Message: "Notification not found"}
+	WsNotificationNotFound = &Spec{Code: "WS.NOTIFICATION.NOT_FOUND", Status: 404, Message: "Notification not found", Description: "Returned when a notification with the given public_id does not exist or belongs to another user.", UserAction: "Verify the notification ID."}
 	// WS.NOTIFICATION_PREFERENCE.NOT_FOUND — Notification preference not found
-	WsNotificationPreferenceNotFound = &Spec{Code: "WS.NOTIFICATION_PREFERENCE.NOT_FOUND", Status: 404, Message: "Notification preference not found"}
+	WsNotificationPreferenceNotFound = &Spec{Code: "WS.NOTIFICATION_PREFERENCE.NOT_FOUND", Status: 404, Message: "Notification preference not found", Description: "Returned when a notification preference with the given public_id does not exist for the current user.", UserAction: "Verify the notification preference ID, or create a new one."}
 	// WS.PROJECT.ACCESS_DENIED — You do not have access to this project
-	WsProjectAccessDenied = &Spec{Code: "WS.PROJECT.ACCESS_DENIED", Status: 403, Message: "You do not have access to this project"}
+	WsProjectAccessDenied = &Spec{Code: "WS.PROJECT.ACCESS_DENIED", Status: 403, Message: "You do not have access to this project", Description: "Returned when the actor is a workspace member but lacks the required project role.", UserAction: "Ask a project lead to grant you access."}
 	// WS.PROJECT.FEATURE_DISABLED — This feature is disabled for the project
-	WsProjectFeatureDisabled = &Spec{Code: "WS.PROJECT.FEATURE_DISABLED", Status: 403, Message: "This feature is disabled for the project"}
+	WsProjectFeatureDisabled = &Spec{Code: "WS.PROJECT.FEATURE_DISABLED", Status: 403, Message: "This feature is disabled for the project", Description: "Returned when a request targets a feature that has been disabled in the project settings.", UserAction: "Enable the feature in project settings, or contact a project admin."}
 	// WS.PROJECT.IDENTIFIER_ALREADY_TAKEN — Project identifier is already taken
-	WsProjectIdentifierAlreadyTaken = &Spec{Code: "WS.PROJECT.IDENTIFIER_ALREADY_TAKEN", Status: 409, Message: "Project identifier is already taken"}
+	WsProjectIdentifierAlreadyTaken = &Spec{Code: "WS.PROJECT.IDENTIFIER_ALREADY_TAKEN", Status: 409, Message: "Project identifier is already taken", Description: "Returned when the requested project identifier already exists within the workspace.", UserAction: "Choose a different identifier."}
 	// WS.PROJECT.NOT_FOUND — Project not found
-	WsProjectNotFound = &Spec{Code: "WS.PROJECT.NOT_FOUND", Status: 404, Message: "Project not found"}
+	WsProjectNotFound = &Spec{Code: "WS.PROJECT.NOT_FOUND", Status: 404, Message: "Project not found", Description: "Returned when a project does not exist or when the actor cannot access it (404 to avoid leaking existence).", UserAction: "Verify the project ID, or contact a workspace admin if you should have access."}
 	// WS.PROJECT.SLUG_ALREADY_TAKEN — Project slug is already taken
-	WsProjectSlugAlreadyTaken = &Spec{Code: "WS.PROJECT.SLUG_ALREADY_TAKEN", Status: 409, Message: "Project slug is already taken"}
+	WsProjectSlugAlreadyTaken = &Spec{Code: "WS.PROJECT.SLUG_ALREADY_TAKEN", Status: 409, Message: "Project slug is already taken", Description: "Returned when the requested project slug already exists within the workspace.", UserAction: "Choose a different slug."}
 	// WS.REACTION.ALREADY_EXISTS — You already reacted with this emoji
-	WsReactionAlreadyExists = &Spec{Code: "WS.REACTION.ALREADY_EXISTS", Status: 409, Message: "You already reacted with this emoji"}
+	WsReactionAlreadyExists = &Spec{Code: "WS.REACTION.ALREADY_EXISTS", Status: 409, Message: "You already reacted with this emoji", Description: "Returned when the actor attempts to add a duplicate reaction with the same emoji to the same target.", UserAction: "Remove the existing reaction first if you want to change it."}
 	// WS.REACTION.NOT_FOUND — Reaction not found
-	WsReactionNotFound = &Spec{Code: "WS.REACTION.NOT_FOUND", Status: 404, Message: "Reaction not found"}
+	WsReactionNotFound = &Spec{Code: "WS.REACTION.NOT_FOUND", Status: 404, Message: "Reaction not found", Description: "Returned when a reaction with the given public_id does not exist or has been removed.", UserAction: "Verify the reaction ID."}
 	// WS.TASK.ACCESS_DENIED — You do not have access to this task
-	WsTaskAccessDenied = &Spec{Code: "WS.TASK.ACCESS_DENIED", Status: 403, Message: "You do not have access to this task"}
+	WsTaskAccessDenied = &Spec{Code: "WS.TASK.ACCESS_DENIED", Status: 403, Message: "You do not have access to this task", Description: "Returned when the actor lacks the required project role to read or modify the task.", UserAction: "Ask a project lead to grant you access."}
 	// WS.TASK.ALREADY_ARCHIVED — Task is already archived
-	WsTaskAlreadyArchived = &Spec{Code: "WS.TASK.ALREADY_ARCHIVED", Status: 409, Message: "Task is already archived"}
+	WsTaskAlreadyArchived = &Spec{Code: "WS.TASK.ALREADY_ARCHIVED", Status: 409, Message: "Task is already archived", Description: "Returned when attempting to archive a task that is already in the archived state.", UserAction: "The task is already archived."}
 	// WS.TASK.NOT_ARCHIVED — Task is not archived
-	WsTaskNotArchived = &Spec{Code: "WS.TASK.NOT_ARCHIVED", Status: 409, Message: "Task is not archived"}
+	WsTaskNotArchived = &Spec{Code: "WS.TASK.NOT_ARCHIVED", Status: 409, Message: "Task is not archived", Description: "Returned when attempting to unarchive a task that is not in the archived state.", UserAction: "The task is not archived."}
 	// WS.TASK.NOT_FOUND — Task not found
-	WsTaskNotFound = &Spec{Code: "WS.TASK.NOT_FOUND", Status: 404, Message: "Task not found"}
+	WsTaskNotFound = &Spec{Code: "WS.TASK.NOT_FOUND", Status: 404, Message: "Task not found", Description: "Returned when a task with the given public_id does not exist or has been deleted in the current workspace.", UserAction: "Verify the task ID, or refresh the list to see current tasks."}
 	// WS.TASK.STATE_TRANSITION_BLOCKED_BY_CONSTRAINT — Task cannot transition to the requested state
-	WsTaskStateTransitionBlockedByConstraint = &Spec{Code: "WS.TASK.STATE_TRANSITION_BLOCKED_BY_CONSTRAINT", Status: 422, Message: "Task cannot transition to the requested state"}
+	WsTaskStateTransitionBlockedByConstraint = &Spec{Code: "WS.TASK.STATE_TRANSITION_BLOCKED_BY_CONSTRAINT", Status: 422, Message: "Task cannot transition to the requested state", Description: "Returned when an unsatisfied constraint blocks the requested lifecycle transition.", UserAction: "Review unmet constraints in the task detail panel and resolve them before retrying."}
 	// WS.TASK.TITLE_TOO_LONG — Task title is too long
-	WsTaskTitleTooLong = &Spec{Code: "WS.TASK.TITLE_TOO_LONG", Status: 422, Message: "Task title is too long"}
+	WsTaskTitleTooLong = &Spec{Code: "WS.TASK.TITLE_TOO_LONG", Status: 422, Message: "Task title is too long", Description: "Returned when the submitted title exceeds the maximum allowed length.", UserAction: "Shorten the title and retry."}
 	// WS.TASK.TRANSITION_REJECTED — Task transition not allowed in current state
-	WsTaskTransitionRejected = &Spec{Code: "WS.TASK.TRANSITION_REJECTED", Status: 422, Message: "Task transition not allowed in current state"}
+	WsTaskTransitionRejected = &Spec{Code: "WS.TASK.TRANSITION_REJECTED", Status: 422, Message: "Task transition not allowed in current state", Description: "Returned by the constraint engine when the requested transition is illegal for the task's current lifecycle state.", UserAction: "Refresh the task to see its current state and choose a valid transition."}
 	// WS.TASK.TRANSITION_UNKNOWN — Unknown task transition
-	WsTaskTransitionUnknown = &Spec{Code: "WS.TASK.TRANSITION_UNKNOWN", Status: 400, Message: "Unknown task transition"}
+	WsTaskTransitionUnknown = &Spec{Code: "WS.TASK.TRANSITION_UNKNOWN", Status: 400, Message: "Unknown task transition", Description: "Returned when the client submits a transition name that is not one of {start|block|unblock|submit|complete|reopen|cancel}. Rejected at the HTTP layer before the constraint engine runs.", UserAction: "Use one of the supported transition names defined by the API."}
 	// WS.TASK.UPDATE_CONFLICT — Task was modified by someone else
-	WsTaskUpdateConflict = &Spec{Code: "WS.TASK.UPDATE_CONFLICT", Status: 409, Message: "Task was modified by someone else"}
+	WsTaskUpdateConflict = &Spec{Code: "WS.TASK.UPDATE_CONFLICT", Status: 409, Message: "Task was modified by someone else", Description: "Returned when an optimistic concurrency check (version or updated_at) fails during update.", UserAction: "Reload the task to see the latest version, then re-apply your changes."}
 	// WS.VIEW_PREFERENCE.NOT_FOUND — View preference not found
-	WsViewPreferenceNotFound = &Spec{Code: "WS.VIEW_PREFERENCE.NOT_FOUND", Status: 404, Message: "View preference not found"}
+	WsViewPreferenceNotFound = &Spec{Code: "WS.VIEW_PREFERENCE.NOT_FOUND", Status: 404, Message: "View preference not found", Description: "Returned when a view preference with the given public_id does not exist for the current user.", UserAction: "Verify the view preference ID, or create a new one."}
 	// WS.WORKSPACE.ACCESS_DENIED — You do not have access to this workspace
-	WsWorkspaceAccessDenied = &Spec{Code: "WS.WORKSPACE.ACCESS_DENIED", Status: 403, Message: "You do not have access to this workspace"}
+	WsWorkspaceAccessDenied = &Spec{Code: "WS.WORKSPACE.ACCESS_DENIED", Status: 403, Message: "You do not have access to this workspace", Description: "Returned when the actor is authenticated but is not a member of the target workspace.", UserAction: "Ask a workspace admin to invite you."}
 	// WS.WORKSPACE.NOT_FOUND — Workspace not found
-	WsWorkspaceNotFound = &Spec{Code: "WS.WORKSPACE.NOT_FOUND", Status: 404, Message: "Workspace not found"}
+	WsWorkspaceNotFound = &Spec{Code: "WS.WORKSPACE.NOT_FOUND", Status: 404, Message: "Workspace not found", Description: "Returned when a workspace with the given public_id does not exist or the actor has no visibility into it.", UserAction: "Verify the workspace ID, or ask an admin to add you as a member."}
 	// WS.WORKSPACE.SLUG_ALREADY_TAKEN — Workspace slug is already taken
-	WsWorkspaceSlugAlreadyTaken = &Spec{Code: "WS.WORKSPACE.SLUG_ALREADY_TAKEN", Status: 409, Message: "Workspace slug is already taken"}
+	WsWorkspaceSlugAlreadyTaken = &Spec{Code: "WS.WORKSPACE.SLUG_ALREADY_TAKEN", Status: 409, Message: "Workspace slug is already taken", Description: "Returned when the requested workspace slug conflicts with an existing workspace on the same instance.", UserAction: "Choose a different slug."}
 )

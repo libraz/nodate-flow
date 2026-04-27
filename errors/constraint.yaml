@@ -14,14 +14,14 @@ resources:
         description: "Returned when the stored constraint expression cannot be decoded as JSON before the DSL validator even runs."
         userAction: "Fix the JSON syntax in the constraint expression."
 
-      unknown_op:
-        code: CONSTRAINT.PARSE.UNKNOWN_OP
+      unsupported_operator:
+        code: CONSTRAINT.PARSE.UNSUPPORTED_OPERATOR
         status: 422
-        message: "Constraint expression uses an unknown operator"
-        message_ja: "制約式に未知の演算子が含まれています"
-        message_zh: "约束表达式包含未知运算符"
-        description: "Returned when a constraint node references an op that is not in the closed DSL whitelist (ADR 0006)."
-        userAction: "Use one of the documented ops (and, or, not, time.*, dependency.*, actor.*, signal.*, approval.*, ci.*)."
+        message: "Constraint expression uses an operator that is not supported"
+        message_ja: "制約式にサポートされていない演算子 {operator} が含まれています"
+        message_zh: "约束表达式使用了不受支持的运算符 {operator}"
+        description: "Returned when a constraint node references an op {operator} that is not in the closed DSL whitelist (ADR 0006). The offending operator is included in the error details."
+        userAction: "Replace {operator} with one of the documented ops (and, or, not, time.*, dependency.*, actor.*, signal.*, approval.*, ci.*)."
 
       missing_arg:
         code: CONSTRAINT.PARSE.MISSING_ARG
@@ -44,11 +44,11 @@ resources:
   eval:
     breadcrumb: "Constraint > Eval"
     errors:
-      bad_date:
-        code: CONSTRAINT.EVAL.BAD_DATE
+      date_parsing_failed:
+        code: CONSTRAINT.EVAL.DATE_PARSING_FAILED
         status: 422
-        message: "Constraint date argument is not a valid YYYY-MM-DD"
-        message_ja: "制約の日付は YYYY-MM-DD 形式で指定してください"
-        message_zh: "约束日期参数必须为 YYYY-MM-DD 格式"
-        description: "Returned when time.* builtins receive a non-parseable date literal at evaluation time."
+        message: "Constraint date argument could not be parsed as YYYY-MM-DD"
+        message_ja: "制約の日付 {value} を YYYY-MM-DD 形式として解釈できませんでした"
+        message_zh: "无法将约束日期参数 {value} 解析为 YYYY-MM-DD 格式"
+        description: "Returned when a time.* builtin receives a non-parseable date literal {value} at evaluation time."
         userAction: "Send the date as a YYYY-MM-DD string (for example 2026-04-08)."

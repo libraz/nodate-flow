@@ -5,13 +5,13 @@ package errors
 // Error codes and specs.
 var (
 	// TIMEBOX.TASK.ALREADY_ADDED — Task is already in this timebox
-	TimeboxTaskAlreadyAdded = &Spec{Code: "TIMEBOX.TASK.ALREADY_ADDED", Status: 409, Message: "Task is already in this timebox"}
+	TimeboxTaskAlreadyAdded = &Spec{Code: "TIMEBOX.TASK.ALREADY_ADDED", Status: 409, Message: "Task is already in this timebox", Description: "Returned when the task has already been added to the target timebox.", UserAction: "No action needed; the task is already present in the timebox."}
 	// TIMEBOX.TIMEBOX.ALREADY_COMPLETED — Cannot modify a completed timebox
-	TimeboxTimeboxAlreadyCompleted = &Spec{Code: "TIMEBOX.TIMEBOX.ALREADY_COMPLETED", Status: 409, Message: "Cannot modify a completed timebox"}
+	TimeboxTimeboxAlreadyCompleted = &Spec{Code: "TIMEBOX.TIMEBOX.ALREADY_COMPLETED", Status: 409, Message: "Cannot modify a completed timebox", Description: "Returned when an update or state change is attempted on a timebox that has already been marked as completed.", UserAction: "Reopen the timebox before making changes, or create a new one."}
 	// TIMEBOX.TIMEBOX.INVALID_DATES — Timebox end date must be after start date
-	TimeboxTimeboxInvalidDates = &Spec{Code: "TIMEBOX.TIMEBOX.INVALID_DATES", Status: 422, Message: "Timebox end date must be after start date"}
+	TimeboxTimeboxInvalidDates = &Spec{Code: "TIMEBOX.TIMEBOX.INVALID_DATES", Status: 422, Message: "Timebox end date must be after start date", Description: "Returned when ends_on is not strictly after starts_on.", UserAction: "Adjust the start or end date so that the end date comes after the start date."}
 	// TIMEBOX.TIMEBOX.NAME_TAKEN — A timebox with this name already exists in the workspace
-	TimeboxTimeboxNameTaken = &Spec{Code: "TIMEBOX.TIMEBOX.NAME_TAKEN", Status: 409, Message: "A timebox with this name already exists in the workspace"}
+	TimeboxTimeboxNameTaken = &Spec{Code: "TIMEBOX.TIMEBOX.NAME_TAKEN", Status: 409, Message: "A timebox with this name already exists in the workspace", Description: "Returned when the requested timebox name conflicts with an existing timebox in the same workspace.", UserAction: "Choose a different name."}
 	// TIMEBOX.TIMEBOX.NOT_FOUND — Timebox not found
-	TimeboxTimeboxNotFound = &Spec{Code: "TIMEBOX.TIMEBOX.NOT_FOUND", Status: 404, Message: "Timebox not found"}
+	TimeboxTimeboxNotFound = &Spec{Code: "TIMEBOX.TIMEBOX.NOT_FOUND", Status: 404, Message: "Timebox not found", Description: "Returned when a timebox with the given public_id does not exist or the actor has no visibility into it.", UserAction: "Verify the timebox ID, or refresh the list to see current timeboxes."}
 )

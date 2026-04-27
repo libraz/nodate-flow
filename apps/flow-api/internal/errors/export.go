@@ -5,7 +5,7 @@ package errors
 // Error codes and specs.
 var (
 	// EXPORT.TASK.DATASET_QUERY_FAILED — Could not load tasks for export
-	ExportTaskDatasetQueryFailed = &Spec{Code: "EXPORT.TASK.DATASET_QUERY_FAILED", Status: 500, Message: "Could not load tasks for export"}
+	ExportTaskDatasetQueryFailed = &Spec{Code: "EXPORT.TASK.DATASET_QUERY_FAILED", Status: 500, Message: "Could not load tasks for export", Description: "Returned when the database query that materialises the rows for the export (workspace-scoped or lens-scoped) fails before any output is rendered.", UserAction: "Retry the export; if the problem persists, contact your administrator."}
 	// EXPORT.TASK.LENS_NOT_FOUND — Lens referenced for export not found
-	ExportTaskLensNotFound = &Spec{Code: "EXPORT.TASK.LENS_NOT_FOUND", Status: 404, Message: "Lens referenced for export not found"}
+	ExportTaskLensNotFound = &Spec{Code: "EXPORT.TASK.LENS_NOT_FOUND", Status: 404, Message: "Lens referenced for export not found", Description: "Returned when the saved view (lens) specified as the source for the export does not exist or has been deleted.", UserAction: "Verify the lens ID, or choose a different saved view."}
 )

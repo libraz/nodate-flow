@@ -5,23 +5,23 @@ package errors
 // Error codes and specs.
 var (
 	// VALIDATION.BODY.DATE_FORMAT_INVALID — Date must be in YYYY-MM-DD format
-	ValidationBodyDateFormatInvalid = &Spec{Code: "VALIDATION.BODY.DATE_FORMAT_INVALID", Status: 400, Message: "Date must be in YYYY-MM-DD format"}
+	ValidationBodyDateFormatInvalid = &Spec{Code: "VALIDATION.BODY.DATE_FORMAT_INVALID", Status: 400, Message: "Date must be in YYYY-MM-DD format", Description: "Returned when a date field fails to parse as an ISO 8601 calendar date (YYYY-MM-DD).", UserAction: "Send the date as a YYYY-MM-DD string (for example 2026-04-08)."}
 	// VALIDATION.BODY.DUE_BEFORE_START — Due date must be on or after start date.
-	ValidationBodyDueBeforeStart = &Spec{Code: "VALIDATION.BODY.DUE_BEFORE_START", Status: 400, Message: "Due date must be on or after start date."}
+	ValidationBodyDueBeforeStart = &Spec{Code: "VALIDATION.BODY.DUE_BEFORE_START", Status: 400, Message: "Due date must be on or after start date.", Description: "Returned when a task update would leave dueOn strictly earlier than startedOn, either because the incoming dueOn precedes an existing startedOn or both fields are supplied in the body and inverted.", UserAction: "Choose a due date on or after the start date, or update the start date to be on or before the due date."}
 	// VALIDATION.BODY.FIELD_INVALID — A field in the request body is invalid
-	ValidationBodyFieldInvalid = &Spec{Code: "VALIDATION.BODY.FIELD_INVALID", Status: 422, Message: "A field in the request body is invalid"}
+	ValidationBodyFieldInvalid = &Spec{Code: "VALIDATION.BODY.FIELD_INVALID", Status: 422, Message: "A field in the request body is invalid", Description: "Returned when one or more fields fail schema validation (type, format, range). Failing field paths are listed in details.", UserAction: "Correct the fields listed in the error details and retry."}
 	// VALIDATION.BODY.FIELD_MISSING — A required field is missing in the request body
-	ValidationBodyFieldMissing = &Spec{Code: "VALIDATION.BODY.FIELD_MISSING", Status: 422, Message: "A required field is missing in the request body"}
+	ValidationBodyFieldMissing = &Spec{Code: "VALIDATION.BODY.FIELD_MISSING", Status: 422, Message: "A required field is missing in the request body", Description: "Returned when one or more required fields are absent from the request body. The missing field paths are listed in details.", UserAction: "Add the missing fields listed in the error details and retry."}
 	// VALIDATION.BODY.UNPARSEABLE — Request body could not be parsed
-	ValidationBodyUnparseable = &Spec{Code: "VALIDATION.BODY.UNPARSEABLE", Status: 400, Message: "Request body could not be parsed"}
+	ValidationBodyUnparseable = &Spec{Code: "VALIDATION.BODY.UNPARSEABLE", Status: 400, Message: "Request body could not be parsed", Description: "Returned when the request body is not valid JSON or does not match the declared content-type.", UserAction: "Send a syntactically valid JSON body matching the API schema."}
 	// VALIDATION.FILE.TOO_LARGE — File exceeds the maximum allowed size
-	ValidationFileTooLarge = &Spec{Code: "VALIDATION.FILE.TOO_LARGE", Status: 413, Message: "File exceeds the maximum allowed size"}
+	ValidationFileTooLarge = &Spec{Code: "VALIDATION.FILE.TOO_LARGE", Status: 413, Message: "File exceeds the maximum allowed size", Description: "Returned when the uploaded file exceeds the per-file size limit.", UserAction: "Reduce the file size and try again."}
 	// VALIDATION.FILE.TYPE_NOT_ALLOWED — File type is not allowed
-	ValidationFileTypeNotAllowed = &Spec{Code: "VALIDATION.FILE.TYPE_NOT_ALLOWED", Status: 415, Message: "File type is not allowed"}
+	ValidationFileTypeNotAllowed = &Spec{Code: "VALIDATION.FILE.TYPE_NOT_ALLOWED", Status: 415, Message: "File type is not allowed", Description: "Returned when the uploaded file's MIME type is not in the allowlist.", UserAction: "Upload a file with an allowed type (images, documents, archives, text)."}
 	// VALIDATION.PATH.PARAM_INVALID — A path parameter is invalid
-	ValidationPathParamInvalid = &Spec{Code: "VALIDATION.PATH.PARAM_INVALID", Status: 400, Message: "A path parameter is invalid"}
+	ValidationPathParamInvalid = &Spec{Code: "VALIDATION.PATH.PARAM_INVALID", Status: 400, Message: "A path parameter is invalid", Description: "Returned when a URL path parameter does not match its expected format (UUID, slug, integer).", UserAction: "Check the URL and correct the malformed parameter."}
 	// VALIDATION.QUERY.FIELD_INVALID — A query parameter is invalid
-	ValidationQueryFieldInvalid = &Spec{Code: "VALIDATION.QUERY.FIELD_INVALID", Status: 422, Message: "A query parameter is invalid"}
+	ValidationQueryFieldInvalid = &Spec{Code: "VALIDATION.QUERY.FIELD_INVALID", Status: 422, Message: "A query parameter is invalid", Description: "Returned when a query parameter fails schema validation (type, range, enum).", UserAction: "Correct the query parameter listed in details and retry."}
 	// VALIDATION.QUERY.UNKNOWN_FIELD — Unknown query parameter
-	ValidationQueryUnknownField = &Spec{Code: "VALIDATION.QUERY.UNKNOWN_FIELD", Status: 422, Message: "Unknown query parameter"}
+	ValidationQueryUnknownField = &Spec{Code: "VALIDATION.QUERY.UNKNOWN_FIELD", Status: 422, Message: "Unknown query parameter", Description: "Returned when an unknown query parameter is supplied and strict mode is enabled.", UserAction: "Remove the unknown query parameter."}
 )

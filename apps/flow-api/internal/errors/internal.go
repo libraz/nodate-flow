@@ -5,9 +5,9 @@ package errors
 // Error codes and specs.
 var (
 	// INTERNAL.DB.UNAVAILABLE — Database is temporarily unavailable
-	InternalDbUnavailable = &Spec{Code: "INTERNAL.DB.UNAVAILABLE", Status: 503, Message: "Database is temporarily unavailable"}
+	InternalDbUnavailable = &Spec{Code: "INTERNAL.DB.UNAVAILABLE", Status: 503, Message: "Database is temporarily unavailable", Description: "Returned when the API cannot reach the database (connection refused, timeout, failover in progress).", UserAction: "Retry shortly; contact your administrator if the problem persists."}
 	// INTERNAL.STORAGE.NOT_CONFIGURED — Storage not configured
-	InternalStorageNotConfigured = &Spec{Code: "INTERNAL.STORAGE.NOT_CONFIGURED", Status: 503, Message: "Storage not configured"}
+	InternalStorageNotConfigured = &Spec{Code: "INTERNAL.STORAGE.NOT_CONFIGURED", Status: 503, Message: "Storage not configured", Description: "File storage is not configured on this instance. Uploads and downloads of attachments are disabled.", UserAction: "Ask your instance administrator to configure object storage (S3-compatible endpoint, bucket, and credentials)."}
 	// INTERNAL.UNEXPECTED — An unexpected internal error occurred
-	InternalUnexpected = &Spec{Code: "INTERNAL.UNEXPECTED", Status: 500, Message: "An unexpected internal error occurred"}
+	InternalUnexpected = &Spec{Code: "INTERNAL.UNEXPECTED", Status: 500, Message: "An unexpected internal error occurred", Description: "Final catch-all for unhandled panics or bugs. Should never be thrown explicitly from a handler; always paired with a request_id in the structured log for triage.", UserAction: "Retry; if the problem persists, contact your administrator with the request ID."}
 )

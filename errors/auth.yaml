@@ -221,13 +221,31 @@ resources:
   magic_link:
     breadcrumb: "Auth > Magic Link"
     errors:
-      invalid_or_expired:
-        code: AUTH.MAGIC_LINK.INVALID_OR_EXPIRED
+      malformed:
+        code: AUTH.MAGIC_LINK.MALFORMED
         status: 401
-        message: "Magic link is invalid or has expired"
-        message_ja: "マジックリンクが無効か有効期限が切れています"
-        message_zh: "魔法链接无效或已过期"
-        description: "Returned when the magic link token is malformed, unknown, or past its expiration timestamp."
+        message: "Magic link token is malformed or unknown"
+        message_ja: "マジックリンクのトークンが不正または未知です"
+        message_zh: "魔法链接令牌格式错误或未知"
+        description: "Returned when the magic link token is missing, has an invalid format, or does not match any issued token (signature / hash mismatch). Distinct from EXPIRED so the UI can hint that the link was tampered with or copied incorrectly."
+        userAction: "Request a new magic link from the login page and click it directly without modifying the URL."
+
+      expired:
+        code: AUTH.MAGIC_LINK.EXPIRED
+        status: 401
+        message: "Magic link has expired"
+        message_ja: "マジックリンクの有効期限が切れています"
+        message_zh: "魔法链接已过期"
+        description: "Returned when the magic link token is past its 15-minute expiration timestamp."
+        userAction: "Request a new magic link from the login page; links remain valid for 15 minutes."
+
+      revoked:
+        code: AUTH.MAGIC_LINK.REVOKED
+        status: 401
+        message: "Magic link has been revoked"
+        message_ja: "マジックリンクは無効化されました"
+        message_zh: "魔法链接已被撤销"
+        description: "Returned when the magic link token has been explicitly invalidated before use (for example when a newer link supersedes it or an admin revoked the account)."
         userAction: "Request a new magic link from the login page."
 
       already_used:

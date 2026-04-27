@@ -147,10 +147,18 @@ type ListResponse[T any] struct {
 //
 // It mirrors the shape of apps/flow-api/internal/errors without importing it,
 // so packages that only need the wire format can depend on dto alone.
+//
+// Description and UserAction are populated from errors/*.yaml so that
+// frontends can render a richer toast (developer-facing context + end
+// user recovery hint) without round-tripping the error catalog. Both
+// are optional on the wire so consumers that pre-date the addition keep
+// rendering correctly.
 type ErrorResponse struct {
-	Code    string         `json:"code" doc:"Stable error code (e.g. WS.TASK.NOT_FOUND)"`
-	Message string         `json:"message" doc:"Human-readable English message"`
-	Details map[string]any `json:"details,omitempty" doc:"Optional structured details"`
+	Code        string         `json:"code" doc:"Stable error code (e.g. WS.TASK.NOT_FOUND)"`
+	Message     string         `json:"message" doc:"Human-readable English message"`
+	Details     map[string]any `json:"details,omitempty" doc:"Optional structured details"`
+	Description string         `json:"description,omitempty" doc:"Developer-facing explanation of when this error fires."`
+	UserAction  string         `json:"userAction,omitempty" doc:"Short imperative the UI can render to tell the end user how to recover."`
 }
 
 // Timestamps is the standard created/updated metadata block.

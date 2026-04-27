@@ -353,8 +353,8 @@ func genGoFile(recs []record) []byte {
 	b.WriteString("var (\n")
 	for _, r := range recs {
 		fmt.Fprintf(&b, "\t// %s — %s\n", r.Code, r.Message)
-		fmt.Fprintf(&b, "\t%s = &Spec{Code: %q, Status: %d, Message: %q}\n",
-			goConst(r.Code), r.Code, r.Status, r.Message)
+		fmt.Fprintf(&b, "\t%s = &Spec{Code: %q, Status: %d, Message: %q, Description: %q, UserAction: %q}\n",
+			goConst(r.Code), r.Code, r.Status, r.Message, r.Description, r.UserAction)
 	}
 	b.WriteString(")\n")
 	return b.Bytes()
@@ -374,9 +374,11 @@ import (
 
 // Spec describes an error code defined in errors/*.yaml.
 type Spec struct {
-	Code    string
-	Status  int
-	Message string
+	Code        string
+	Status      int
+	Message     string
+	Description string
+	UserAction  string
 }
 
 // APIError is the runtime error value carried through the API. It wraps a

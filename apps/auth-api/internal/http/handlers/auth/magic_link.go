@@ -89,18 +89,18 @@ func MagicLinkRequest(deps Deps) func(context.Context, *MagicLinkRequestInput) (
 func MagicLinkVerify(deps Deps) func(context.Context, *MagicLinkVerifyInput) (*MagicLinkVerifyOutput, error) {
 	return func(ctx context.Context, in *MagicLinkVerifyInput) (*MagicLinkVerifyOutput, error) {
 		if in.Token == "" {
-			return nil, httpErr(apierrors.AuthMagicLinkInvalidOrExpired)
+			return nil, httpErr(apierrors.AuthMagicLinkMalformed)
 		}
 		hash := authpkg.HashOpaque(in.Token)
 		row, err := deps.Queries.FindMagicLinkByTokenHash(ctx, hash)
 		if err != nil {
-			return nil, httpErr(apierr.SpecForErrNoRows(err, apierrors.AuthMagicLinkInvalidOrExpired, apierrors.InternalUnexpected))
+			return nil, httpErr(apierr.SpecForErrNoRows(err, apierrors.AuthMagicLinkMalformed, apierrors.InternalUnexpected))
 		}
 		if row.UsedAt.Valid {
 			return nil, httpErr(apierrors.AuthMagicLinkAlreadyUsed)
 		}
 		if row.ExpiresAt.Before(time.Now()) {
-			return nil, httpErr(apierrors.AuthMagicLinkInvalidOrExpired)
+			return nil, httpErr(apierrors.AuthMagicLinkExpired)
 		}
 
 		// Mark used before issuing tokens so a race condition cannot
@@ -111,7 +111,7 @@ func MagicLinkVerify(deps Deps) func(context.Context, *MagicLinkVerifyInput) (*M
 
 		pub, err := deps.Queries.FindUserPublicIdById(ctx, row.UserID)
 		if err != nil {
-			return nil, httpErr(apierrors.AuthMagicLinkInvalidOrExpired)
+			return nil, httpErr(apierrors.InternalUnexpected)
 		}
 		if uerr := deps.Queries.UpdateUserLastLoginAt(ctx, row.UserID); uerr != nil {
 			// non-fatal

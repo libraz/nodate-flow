@@ -104,10 +104,10 @@ func Parse(raw []byte) (Constraint, error) {
 // Stable i18n codes for parse errors. Keep in sync with
 // errors/constraint.yaml.
 const (
-	CodeInvalidJSON = "CONSTRAINT.PARSE.INVALID_JSON"
-	CodeUnknownOp   = "CONSTRAINT.PARSE.UNKNOWN_OP"
-	CodeMissingArg  = "CONSTRAINT.PARSE.MISSING_ARG"
-	CodeEmptyTerms  = "CONSTRAINT.PARSE.EMPTY_TERMS"
+	CodeInvalidJSON         = "CONSTRAINT.PARSE.INVALID_JSON"
+	CodeUnsupportedOperator = "CONSTRAINT.PARSE.UNSUPPORTED_OPERATOR"
+	CodeMissingArg          = "CONSTRAINT.PARSE.MISSING_ARG"
+	CodeEmptyTerms          = "CONSTRAINT.PARSE.EMPTY_TERMS"
 )
 
 // validate walks the AST and enforces per-Op invariants.
@@ -144,7 +144,7 @@ func validate(c *Constraint) error {
 			return parseErr(CodeMissingArg, "%s requires arg", c.Op)
 		}
 	default:
-		return parseErr(CodeUnknownOp, "unknown op %q", c.Op)
+		return parseErr(CodeUnsupportedOperator, "unknown op %q", c.Op)
 	}
 	return nil
 }

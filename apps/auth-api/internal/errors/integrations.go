@@ -5,25 +5,25 @@ package errors
 // Error codes and specs.
 var (
 	// INTEGRATION.CONNECTION.NOT_FOUND — Integration connection not found
-	IntegrationConnectionNotFound = &Spec{Code: "INTEGRATION.CONNECTION.NOT_FOUND", Status: 404, Message: "Integration connection not found"}
+	IntegrationConnectionNotFound = &Spec{Code: "INTEGRATION.CONNECTION.NOT_FOUND", Status: 404, Message: "Integration connection not found", Description: "Returned by DELETE /me/integrations/{publicId} when the row does not exist or does not belong to the caller.", UserAction: "Refresh the integrations list."}
 	// INTEGRATION.OAUTH.AUTHORIZATION_CODE_INVALID — OAuth authorization code is invalid or expired
-	IntegrationOauthAuthorizationCodeInvalid = &Spec{Code: "INTEGRATION.OAUTH.AUTHORIZATION_CODE_INVALID", Status: 400, Message: "OAuth authorization code is invalid or expired"}
+	IntegrationOauthAuthorizationCodeInvalid = &Spec{Code: "INTEGRATION.OAUTH.AUTHORIZATION_CODE_INVALID", Status: 400, Message: "OAuth authorization code is invalid or expired", Description: "Returned when the provider's token endpoint rejected the authorization code as unknown, already-used, or expired.", UserAction: "Start the connect flow again from the integrations page."}
 	// INTEGRATION.OAUTH.PROFILE_FETCH_REJECTED — OAuth provider rejected the profile request
-	IntegrationOauthProfileFetchRejected = &Spec{Code: "INTEGRATION.OAUTH.PROFILE_FETCH_REJECTED", Status: 502, Message: "OAuth provider rejected the profile request"}
+	IntegrationOauthProfileFetchRejected = &Spec{Code: "INTEGRATION.OAUTH.PROFILE_FETCH_REJECTED", Status: 502, Message: "OAuth provider rejected the profile request", Description: "Returned when the token exchange succeeded but the provider's identity endpoint replied with an error status (e.g. 401 invalid token, 403 missing scope, or a 5xx).", UserAction: "Try the connect flow again, ensuring the requested scopes are still granted."}
 	// INTEGRATION.OAUTH.PROFILE_FETCH_UNREACHABLE — Could not reach the OAuth provider profile endpoint
-	IntegrationOauthProfileFetchUnreachable = &Spec{Code: "INTEGRATION.OAUTH.PROFILE_FETCH_UNREACHABLE", Status: 502, Message: "Could not reach the OAuth provider profile endpoint"}
+	IntegrationOauthProfileFetchUnreachable = &Spec{Code: "INTEGRATION.OAUTH.PROFILE_FETCH_UNREACHABLE", Status: 502, Message: "Could not reach the OAuth provider profile endpoint", Description: "Returned when the token exchange succeeded but the subsequent call to the provider's identity endpoint failed at the transport layer.", UserAction: "Check the provider's status page and try the connect flow again."}
 	// INTEGRATION.OAUTH.PROFILE_INVALID_PAYLOAD — OAuth provider returned an unparseable profile payload
-	IntegrationOauthProfileInvalidPayload = &Spec{Code: "INTEGRATION.OAUTH.PROFILE_INVALID_PAYLOAD", Status: 502, Message: "OAuth provider returned an unparseable profile payload"}
+	IntegrationOauthProfileInvalidPayload = &Spec{Code: "INTEGRATION.OAUTH.PROFILE_INVALID_PAYLOAD", Status: 502, Message: "OAuth provider returned an unparseable profile payload", Description: "Returned when the provider's identity endpoint responded successfully but the body could not be decoded as JSON, was missing required identity fields, or did not match the expected schema.", UserAction: "Try the connect flow again. If the problem persists, contact your administrator."}
 	// INTEGRATION.OAUTH.PROVIDER_NOT_CONFIGURED — Integration provider is not configured on this server
-	IntegrationOauthProviderNotConfigured = &Spec{Code: "INTEGRATION.OAUTH.PROVIDER_NOT_CONFIGURED", Status: 503, Message: "Integration provider is not configured on this server"}
+	IntegrationOauthProviderNotConfigured = &Spec{Code: "INTEGRATION.OAUTH.PROVIDER_NOT_CONFIGURED", Status: 503, Message: "Integration provider is not configured on this server", Description: "Returned when the api has no client id or client secret set for the requested provider (the NF_<provider>_CLIENT_ID/SECRET env vars are empty).", UserAction: "Ask the instance administrator to set the OAuth credentials."}
 	// INTEGRATION.OAUTH.PROVIDER_UNREACHABLE — Could not reach the OAuth provider
-	IntegrationOauthProviderUnreachable = &Spec{Code: "INTEGRATION.OAUTH.PROVIDER_UNREACHABLE", Status: 502, Message: "Could not reach the OAuth provider"}
+	IntegrationOauthProviderUnreachable = &Spec{Code: "INTEGRATION.OAUTH.PROVIDER_UNREACHABLE", Status: 502, Message: "Could not reach the OAuth provider", Description: "Returned when the request to the provider's token endpoint failed at the transport layer (DNS, TCP, TLS, or the connection was refused or reset).", UserAction: "Check the provider's status page and try the connect flow again."}
 	// INTEGRATION.OAUTH.PROVIDER_UNSUPPORTED — Unknown integration provider
-	IntegrationOauthProviderUnsupported = &Spec{Code: "INTEGRATION.OAUTH.PROVIDER_UNSUPPORTED", Status: 400, Message: "Unknown integration provider"}
+	IntegrationOauthProviderUnsupported = &Spec{Code: "INTEGRATION.OAUTH.PROVIDER_UNSUPPORTED", Status: 400, Message: "Unknown integration provider", Description: "Returned when the {provider} path parameter is not one of the supported providers (github, slack, google_calendar).", UserAction: "Choose a supported provider from the integrations list."}
 	// INTEGRATION.OAUTH.REDIRECT_URI_MISMATCH — OAuth redirect URI does not match the registered value
-	IntegrationOauthRedirectUriMismatch = &Spec{Code: "INTEGRATION.OAUTH.REDIRECT_URI_MISMATCH", Status: 400, Message: "OAuth redirect URI does not match the registered value"}
+	IntegrationOauthRedirectUriMismatch = &Spec{Code: "INTEGRATION.OAUTH.REDIRECT_URI_MISMATCH", Status: 400, Message: "OAuth redirect URI does not match the registered value", Description: "Returned when the provider's token endpoint rejected the exchange because the redirect_uri parameter did not match the value registered for this OAuth application.", UserAction: "Ask the instance administrator to verify the OAuth application's redirect URI."}
 	// INTEGRATION.OAUTH.STATE_INVALID — OAuth state token is missing, unknown, or expired
-	IntegrationOauthStateInvalid = &Spec{Code: "INTEGRATION.OAUTH.STATE_INVALID", Status: 400, Message: "OAuth state token is missing, unknown, or expired"}
+	IntegrationOauthStateInvalid = &Spec{Code: "INTEGRATION.OAUTH.STATE_INVALID", Status: 400, Message: "OAuth state token is missing, unknown, or expired", Description: "Returned by the OAuth callback handler when the state query parameter does not match a row in oauth_states, or the row has expired.", UserAction: "Start the connect flow again."}
 	// INTEGRATION.OAUTH.TOKEN_EXCHANGE_REJECTED — OAuth provider rejected the token exchange
-	IntegrationOauthTokenExchangeRejected = &Spec{Code: "INTEGRATION.OAUTH.TOKEN_EXCHANGE_REJECTED", Status: 502, Message: "OAuth provider rejected the token exchange"}
+	IntegrationOauthTokenExchangeRejected = &Spec{Code: "INTEGRATION.OAUTH.TOKEN_EXCHANGE_REJECTED", Status: 502, Message: "OAuth provider rejected the token exchange", Description: "Returned when the provider's token endpoint replied with a non-success status that is not an invalid-code or redirect-mismatch error (e.g. unsupported_grant_type, invalid_client, or a 5xx).", UserAction: "Try the connect flow again. If the problem persists, check the server logs."}
 )

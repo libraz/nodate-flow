@@ -49,6 +49,14 @@ resources:
         message_zh: "无法撤销最后一位管理员"
         description: "Returned when revoking would leave the instance with zero admins."
         userAction: "Grant admin privileges to another user first."
+      status_unavailable:
+        code: INSTANCE.ADMIN.STATUS_UNAVAILABLE
+        status: 500
+        message: "Could not determine instance administrator status"
+        message_ja: "インスタンス管理者ステータスを取得できませんでした"
+        message_zh: "无法确定实例管理员状态"
+        description: "Returned by the /me endpoint when the IsInstanceAdmin lookup cannot complete (database unavailable, query timeout). The previous behaviour silently treated the user as a non-admin, which could mask UI capability checks; this code surfaces the failure so the client can retry."
+        userAction: "Retry the request. If the problem persists, contact your instance administrator."
 
   user:
     breadcrumb: "Instance > User"

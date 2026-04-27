@@ -5,23 +5,25 @@ package errors
 // Error codes and specs.
 var (
 	// INSTANCE.ADMIN.LAST_ADMIN — Cannot revoke the last remaining administrator
-	InstanceAdminLastAdmin = &Spec{Code: "INSTANCE.ADMIN.LAST_ADMIN", Status: 409, Message: "Cannot revoke the last remaining administrator"}
+	InstanceAdminLastAdmin = &Spec{Code: "INSTANCE.ADMIN.LAST_ADMIN", Status: 409, Message: "Cannot revoke the last remaining administrator", Description: "Returned when revoking would leave the instance with zero admins.", UserAction: "Grant admin privileges to another user first."}
 	// INSTANCE.ADMIN.NOT_FOUND — User is not an instance administrator
-	InstanceAdminNotFound = &Spec{Code: "INSTANCE.ADMIN.NOT_FOUND", Status: 404, Message: "User is not an instance administrator"}
+	InstanceAdminNotFound = &Spec{Code: "INSTANCE.ADMIN.NOT_FOUND", Status: 404, Message: "User is not an instance administrator", Description: "Returned when attempting to revoke admin privileges from a user who is not an instance admin.", UserAction: "Verify the user is listed as an instance administrator."}
 	// INSTANCE.ADMIN.REQUIRED — Instance administrator privileges are required
-	InstanceAdminRequired = &Spec{Code: "INSTANCE.ADMIN.REQUIRED", Status: 403, Message: "Instance administrator privileges are required"}
+	InstanceAdminRequired = &Spec{Code: "INSTANCE.ADMIN.REQUIRED", Status: 403, Message: "Instance administrator privileges are required", Description: "Returned when an endpoint that requires the instance-admin role is called by a non-admin user.", UserAction: "Ask an instance administrator to perform this operation."}
 	// INSTANCE.ADMIN.SELF_REVOKE — Cannot revoke your own administrator privileges
-	InstanceAdminSelfRevoke = &Spec{Code: "INSTANCE.ADMIN.SELF_REVOKE", Status: 409, Message: "Cannot revoke your own administrator privileges"}
+	InstanceAdminSelfRevoke = &Spec{Code: "INSTANCE.ADMIN.SELF_REVOKE", Status: 409, Message: "Cannot revoke your own administrator privileges", Description: "Returned when an instance admin tries to revoke their own admin grant.", UserAction: "Ask another instance administrator to revoke your privileges."}
+	// INSTANCE.ADMIN.STATUS_UNAVAILABLE — Could not determine instance administrator status
+	InstanceAdminStatusUnavailable = &Spec{Code: "INSTANCE.ADMIN.STATUS_UNAVAILABLE", Status: 500, Message: "Could not determine instance administrator status", Description: "Returned by the /me endpoint when the IsInstanceAdmin lookup cannot complete (database unavailable, query timeout). The previous behaviour silently treated the user as a non-admin, which could mask UI capability checks; this code surfaces the failure so the client can retry.", UserAction: "Retry the request. If the problem persists, contact your instance administrator."}
 	// INSTANCE.QUOTA.EXCEEDED — Instance quota has been exceeded
-	InstanceQuotaExceeded = &Spec{Code: "INSTANCE.QUOTA.EXCEEDED", Status: 429, Message: "Instance quota has been exceeded"}
+	InstanceQuotaExceeded = &Spec{Code: "INSTANCE.QUOTA.EXCEEDED", Status: 429, Message: "Instance quota has been exceeded", Description: "Returned when an instance-wide resource quota (workspaces, users, storage) is exhausted.", UserAction: "Contact your instance administrator to raise the quota."}
 	// INSTANCE.SETTINGS.INVALID_KEY — Unknown setting key
-	InstanceSettingsInvalidKey = &Spec{Code: "INSTANCE.SETTINGS.INVALID_KEY", Status: 400, Message: "Unknown setting key"}
+	InstanceSettingsInvalidKey = &Spec{Code: "INSTANCE.SETTINGS.INVALID_KEY", Status: 400, Message: "Unknown setting key", Description: "Returned when a PATCH /admin/settings request references a setting key that is not recognized.", UserAction: "Use one of the supported setting keys."}
 	// INSTANCE.SETTINGS.INVALID_VALUE — Invalid value for setting
-	InstanceSettingsInvalidValue = &Spec{Code: "INSTANCE.SETTINGS.INVALID_VALUE", Status: 400, Message: "Invalid value for setting"}
+	InstanceSettingsInvalidValue = &Spec{Code: "INSTANCE.SETTINGS.INVALID_VALUE", Status: 400, Message: "Invalid value for setting", Description: "Returned when a setting value does not pass validation for its key.", UserAction: "Check the expected format for this setting."}
 	// INSTANCE.SETUP.ALREADY_INITIALIZED — Instance has already been initialized
-	InstanceSetupAlreadyInitialized = &Spec{Code: "INSTANCE.SETUP.ALREADY_INITIALIZED", Status: 409, Message: "Instance has already been initialized"}
+	InstanceSetupAlreadyInitialized = &Spec{Code: "INSTANCE.SETUP.ALREADY_INITIALIZED", Status: 409, Message: "Instance has already been initialized", Description: "Returned when the initial setup endpoint is called after the instance has already been bootstrapped with an admin account.", UserAction: "Sign in with the existing admin account instead of running setup again."}
 	// INSTANCE.USER.NOT_FOUND — User not found
-	InstanceUserNotFound = &Spec{Code: "INSTANCE.USER.NOT_FOUND", Status: 404, Message: "User not found"}
+	InstanceUserNotFound = &Spec{Code: "INSTANCE.USER.NOT_FOUND", Status: 404, Message: "User not found", Description: "Returned when an admin endpoint references a user that does not exist.", UserAction: "Verify the user ID."}
 	// INSTANCE.WORKSPACE.NOT_FOUND — Workspace not found
-	InstanceWorkspaceNotFound = &Spec{Code: "INSTANCE.WORKSPACE.NOT_FOUND", Status: 404, Message: "Workspace not found"}
+	InstanceWorkspaceNotFound = &Spec{Code: "INSTANCE.WORKSPACE.NOT_FOUND", Status: 404, Message: "Workspace not found", Description: "Returned when an admin endpoint references a workspace that does not exist.", UserAction: "Verify the workspace ID."}
 )

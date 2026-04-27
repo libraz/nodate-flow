@@ -51,10 +51,20 @@ export const AuthErrors = {
     status: 404,
     message: "No account found for this email address",
   },
-  AUTH_MAGIC_LINK_INVALID_OR_EXPIRED: {
-    code: "AUTH.MAGIC_LINK.INVALID_OR_EXPIRED",
+  AUTH_MAGIC_LINK_EXPIRED: {
+    code: "AUTH.MAGIC_LINK.EXPIRED",
     status: 401,
-    message: "Magic link is invalid or has expired",
+    message: "Magic link has expired",
+  },
+  AUTH_MAGIC_LINK_MALFORMED: {
+    code: "AUTH.MAGIC_LINK.MALFORMED",
+    status: 401,
+    message: "Magic link token is malformed or unknown",
+  },
+  AUTH_MAGIC_LINK_REVOKED: {
+    code: "AUTH.MAGIC_LINK.REVOKED",
+    status: 401,
+    message: "Magic link has been revoked",
   },
   AUTH_OIDC_EMAIL_NOT_VERIFIED: {
     code: "AUTH.OIDC.EMAIL_NOT_VERIFIED",

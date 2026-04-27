@@ -5,13 +5,13 @@ package errors
 // Error codes and specs.
 var (
 	// WEBHOOK.DELIVERY.ALREADY_DELIVERED — Webhook delivery has already been completed
-	WebhookDeliveryAlreadyDelivered = &Spec{Code: "WEBHOOK.DELIVERY.ALREADY_DELIVERED", Status: 409, Message: "Webhook delivery has already been completed"}
+	WebhookDeliveryAlreadyDelivered = &Spec{Code: "WEBHOOK.DELIVERY.ALREADY_DELIVERED", Status: 409, Message: "Webhook delivery has already been completed", Description: "Returned when attempting to re-deliver a webhook delivery that has already been successfully completed.", UserAction: "No action needed; the delivery has already been sent. Create a new delivery if needed."}
 	// WEBHOOK.DELIVERY.NOT_FOUND — Webhook delivery not found
-	WebhookDeliveryNotFound = &Spec{Code: "WEBHOOK.DELIVERY.NOT_FOUND", Status: 404, Message: "Webhook delivery not found"}
+	WebhookDeliveryNotFound = &Spec{Code: "WEBHOOK.DELIVERY.NOT_FOUND", Status: 404, Message: "Webhook delivery not found", Description: "Returned when a webhook delivery with the given public_id does not exist or the actor does not have access to it.", UserAction: "Verify the delivery ID, or refresh the list to see recent deliveries."}
 	// WEBHOOK.SUBSCRIPTION.LIMIT_EXCEEDED — Maximum webhook subscriptions per workspace reached
-	WebhookSubscriptionLimitExceeded = &Spec{Code: "WEBHOOK.SUBSCRIPTION.LIMIT_EXCEEDED", Status: 409, Message: "Maximum webhook subscriptions per workspace reached"}
+	WebhookSubscriptionLimitExceeded = &Spec{Code: "WEBHOOK.SUBSCRIPTION.LIMIT_EXCEEDED", Status: 409, Message: "Maximum webhook subscriptions per workspace reached", Description: "Returned when the workspace has already reached the maximum number of allowed webhook subscriptions.", UserAction: "Remove unused webhook subscriptions before adding a new one."}
 	// WEBHOOK.SUBSCRIPTION.NOT_FOUND — Webhook subscription not found
-	WebhookSubscriptionNotFound = &Spec{Code: "WEBHOOK.SUBSCRIPTION.NOT_FOUND", Status: 404, Message: "Webhook subscription not found"}
+	WebhookSubscriptionNotFound = &Spec{Code: "WEBHOOK.SUBSCRIPTION.NOT_FOUND", Status: 404, Message: "Webhook subscription not found", Description: "Returned when a webhook subscription with the given public_id does not exist or the actor does not have access to it.", UserAction: "Verify the subscription ID, or refresh the list to see current webhook subscriptions."}
 	// WEBHOOK.SUBSCRIPTION.URL_UNREACHABLE — Webhook URL is not reachable
-	WebhookSubscriptionUrlUnreachable = &Spec{Code: "WEBHOOK.SUBSCRIPTION.URL_UNREACHABLE", Status: 400, Message: "Webhook URL is not reachable"}
+	WebhookSubscriptionUrlUnreachable = &Spec{Code: "WEBHOOK.SUBSCRIPTION.URL_UNREACHABLE", Status: 400, Message: "Webhook URL is not reachable", Description: "Returned when a test delivery to the configured webhook URL fails because the endpoint cannot be reached or does not respond with a success status.", UserAction: "Check the webhook URL is correct, publicly accessible, and returns a 2xx status."}
 )

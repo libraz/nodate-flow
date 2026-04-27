@@ -9,10 +9,19 @@ import (
 )
 
 // Spec describes an error code defined in errors/*.yaml.
+//
+// Description is a developer-facing explanation of when the code is
+// emitted; UserAction is a short imperative sentence the UI can render
+// to tell the end user how to recover. Both are populated from the
+// errors/*.yaml source by gen-errors and surfaced on the wire so
+// frontends can localise toast bodies without round-tripping the
+// catalog.
 type Spec struct {
-	Code    string
-	Status  int
-	Message string
+	Code        string
+	Status      int
+	Message     string
+	Description string
+	UserAction  string
 }
 
 // APIError is the runtime error value carried through the API. It wraps a

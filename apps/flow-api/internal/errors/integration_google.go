@@ -5,5 +5,5 @@ package errors
 // Error codes and specs.
 var (
 	// INTEGRATION.GOOGLE.WEBHOOK_INVALID_TOKEN — Google push channel token verification failed
-	IntegrationGoogleWebhookInvalidToken = &Spec{Code: "INTEGRATION.GOOGLE.WEBHOOK_INVALID_TOKEN", Status: 401, Message: "Google push channel token verification failed"}
+	IntegrationGoogleWebhookInvalidToken = &Spec{Code: "INTEGRATION.GOOGLE.WEBHOOK_INVALID_TOKEN", Status: 401, Message: "Google push channel token verification failed", Description: "Returned when the X-Goog-Channel-Token header does not match the expected channel token configured for the integration.", UserAction: "Verify that the channel token matches the one registered during push notification setup."}
 )

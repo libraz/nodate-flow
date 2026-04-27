@@ -5,13 +5,13 @@ package errors
 // Error codes and specs.
 var (
 	// ITEM.ITEMKIT.INVARIANT_VIOLATION — Item invariant violated
-	ItemItemkitInvariantViolation = &Spec{Code: "ITEM.ITEMKIT.INVARIANT_VIOLATION", Status: 422, Message: "Item invariant violated"}
+	ItemItemkitInvariantViolation = &Spec{Code: "ITEM.ITEMKIT.INVARIANT_VIOLATION", Status: 422, Message: "Item invariant violated", Description: "Returned when a requested mutation would break a documented task ↔ calendar_event invariant (e.g. task_id set without task_role, two 'event'-role events for one task, chronology reversed). Usually indicates a caller bug or a race the reconciler has not yet healed.", UserAction: "Retry after refreshing the task and event. If it persists, report the task + event IDs — the reconciler should have caught this."}
 	// ITEM.ITEMKIT.OPTIMISTIC_LOCK — Item was modified by another actor
-	ItemItemkitOptimisticLock = &Spec{Code: "ITEM.ITEMKIT.OPTIMISTIC_LOCK", Status: 409, Message: "Item was modified by another actor"}
+	ItemItemkitOptimisticLock = &Spec{Code: "ITEM.ITEMKIT.OPTIMISTIC_LOCK", Status: 409, Message: "Item was modified by another actor", Description: "Returned when the caller's If-Unchanged-Since header does not match the current updated_at of the task or a linked event. Someone else committed a write between the read and the write.", UserAction: "Reload the item and retry the edit against the current state."}
 	// ITEM.ITEMKIT.RECURRENCE_WITH_TASK_LINK — Recurring events cannot be linked to a task
-	ItemItemkitRecurrenceWithTaskLink = &Spec{Code: "ITEM.ITEMKIT.RECURRENCE_WITH_TASK_LINK", Status: 422, Message: "Recurring events cannot be linked to a task"}
+	ItemItemkitRecurrenceWithTaskLink = &Spec{Code: "ITEM.ITEMKIT.RECURRENCE_WITH_TASK_LINK", Status: 422, Message: "Recurring events cannot be linked to a task", Description: "Returned when an actor tries to add recurrence_rule to an event that is a task projection (task_id + task_role set), or tries to link a task to an event that already has a recurrence_rule. Task-projection events must be single-instance.", UserAction: "Unlink the task from this event first, or create the recurrence on a separate non-linked event."}
 	// ITEM.ITEMKIT.SCHEDULED_LINK_COUNT_HIGH — Too many scheduled events linked to this task
-	ItemItemkitScheduledLinkCountHigh = &Spec{Code: "ITEM.ITEMKIT.SCHEDULED_LINK_COUNT_HIGH", Status: 422, Message: "Too many scheduled events linked to this task"}
+	ItemItemkitScheduledLinkCountHigh = &Spec{Code: "ITEM.ITEMKIT.SCHEDULED_LINK_COUNT_HIGH", Status: 422, Message: "Too many scheduled events linked to this task", Description: "Returned as a soft warning when a task accumulates more than the recommended number of 'scheduled'-role events. No DB-level cap exists; this is a caller signal that auto-scheduling may be producing explosion.", UserAction: "Review and prune time-block events on this task, or raise the soft limit in a new PR if genuinely needed."}
 	// ITEM.ITEMKIT.SHIFT_CONFLICT — Shift proposal has unresolved conflicts
-	ItemItemkitShiftConflict = &Spec{Code: "ITEM.ITEMKIT.SHIFT_CONFLICT", Status: 409, Message: "Shift proposal has unresolved conflicts"}
+	ItemItemkitShiftConflict = &Spec{Code: "ITEM.ITEMKIT.SHIFT_CONFLICT", Status: 409, Message: "Shift proposal has unresolved conflicts", Description: "Returned when ApplyShiftProposal is invoked with tasks that also contribute to other events whose dates are not moving. Each conflicting task must either be confirmed explicitly or excluded before the shift can proceed.", UserAction: "Review the conflict list on the proposal, choose shift / skip / unlink per task, and resubmit."}
 )

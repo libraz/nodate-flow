@@ -5,81 +5,85 @@ package errors
 // Error codes and specs.
 var (
 	// AUTH.AVATAR.NOT_FOUND — Avatar not found.
-	AuthAvatarNotFound = &Spec{Code: "AUTH.AVATAR.NOT_FOUND", Status: 404, Message: "Avatar not found."}
+	AuthAvatarNotFound = &Spec{Code: "AUTH.AVATAR.NOT_FOUND", Status: 404, Message: "Avatar not found.", Description: "Returned by the avatar proxy endpoint when the target user does not exist or has no avatar stored.", UserAction: "Upload an avatar first, or verify that the user identifier is correct."}
 	// AUTH.AVATAR.STORAGE_UNAVAILABLE — Avatar storage is temporarily unavailable. Please try again.
-	AuthAvatarStorageUnavailable = &Spec{Code: "AUTH.AVATAR.STORAGE_UNAVAILABLE", Status: 503, Message: "Avatar storage is temporarily unavailable. Please try again."}
+	AuthAvatarStorageUnavailable = &Spec{Code: "AUTH.AVATAR.STORAGE_UNAVAILABLE", Status: 503, Message: "Avatar storage is temporarily unavailable. Please try again.", Description: "Returned when the avatar object store (S3 or MinIO) is unreachable or fails to read/write the avatar object.", UserAction: "Wait a moment and retry the request. If the problem persists, contact your instance administrator."}
 	// AUTH.AVATAR.UPLOAD_INVALID_IMAGE — The uploaded file is not a valid image.
-	AuthAvatarUploadInvalidImage = &Spec{Code: "AUTH.AVATAR.UPLOAD_INVALID_IMAGE", Status: 400, Message: "The uploaded file is not a valid image."}
+	AuthAvatarUploadInvalidImage = &Spec{Code: "AUTH.AVATAR.UPLOAD_INVALID_IMAGE", Status: 400, Message: "The uploaded file is not a valid image.", Description: "Returned when the uploaded file cannot be decoded as an image, or its bytes do not match any supported image format.", UserAction: "Re-export the file as a valid JPEG, PNG, WebP, or GIF image and try again."}
 	// AUTH.AVATAR.UPLOAD_TOO_LARGE — The uploaded image is too large. Maximum size is 5 MB.
-	AuthAvatarUploadTooLarge = &Spec{Code: "AUTH.AVATAR.UPLOAD_TOO_LARGE", Status: 413, Message: "The uploaded image is too large. Maximum size is 5 MB."}
+	AuthAvatarUploadTooLarge = &Spec{Code: "AUTH.AVATAR.UPLOAD_TOO_LARGE", Status: 413, Message: "The uploaded image is too large. Maximum size is 5 MB.", Description: "Returned when the avatar upload request body exceeds the 5 MB size limit enforced by the server.", UserAction: "Choose a smaller image (under 5 MB) and try uploading again."}
 	// AUTH.AVATAR.UPLOAD_UNSUPPORTED_TYPE — Unsupported image type. Use JPEG, PNG, WebP, or GIF.
-	AuthAvatarUploadUnsupportedType = &Spec{Code: "AUTH.AVATAR.UPLOAD_UNSUPPORTED_TYPE", Status: 415, Message: "Unsupported image type. Use JPEG, PNG, WebP, or GIF."}
+	AuthAvatarUploadUnsupportedType = &Spec{Code: "AUTH.AVATAR.UPLOAD_UNSUPPORTED_TYPE", Status: 415, Message: "Unsupported image type. Use JPEG, PNG, WebP, or GIF.", Description: "Returned when the uploaded avatar's MIME type is not one of the accepted values (image/jpeg, image/png, image/webp, image/gif).", UserAction: "Convert the image to JPEG, PNG, WebP, or GIF and upload it again."}
 	// AUTH.LOGIN.ACCOUNT_LOCKED — Account is temporarily locked
-	AuthLoginAccountLocked = &Spec{Code: "AUTH.LOGIN.ACCOUNT_LOCKED", Status: 423, Message: "Account is temporarily locked"}
+	AuthLoginAccountLocked = &Spec{Code: "AUTH.LOGIN.ACCOUNT_LOCKED", Status: 423, Message: "Account is temporarily locked", Description: "Returned when the account has been locked after repeated failed login attempts.", UserAction: "Wait for the lock period to elapse or contact an administrator."}
 	// AUTH.LOGIN.INVALID_CREDENTIALS — Invalid email or password
-	AuthLoginInvalidCredentials = &Spec{Code: "AUTH.LOGIN.INVALID_CREDENTIALS", Status: 401, Message: "Invalid email or password"}
+	AuthLoginInvalidCredentials = &Spec{Code: "AUTH.LOGIN.INVALID_CREDENTIALS", Status: 401, Message: "Invalid email or password", Description: "Returned when the submitted email does not exist or the password does not match. The same code is returned in both cases to prevent user enumeration.", UserAction: "Check your credentials and try again, or reset your password."}
 	// AUTH.LOGIN.RATE_LIMITED_AFTER_RETRIES — Too many failed login attempts
-	AuthLoginRateLimitedAfterRetries = &Spec{Code: "AUTH.LOGIN.RATE_LIMITED_AFTER_RETRIES", Status: 429, Message: "Too many failed login attempts"}
+	AuthLoginRateLimitedAfterRetries = &Spec{Code: "AUTH.LOGIN.RATE_LIMITED_AFTER_RETRIES", Status: 429, Message: "Too many failed login attempts", Description: "Returned when the login rate limit for the source IP or account has been exceeded.", UserAction: "Wait a few minutes before trying again."}
 	// AUTH.MAGIC_LINK.ALREADY_USED — This magic link has already been used
-	AuthMagicLinkAlreadyUsed = &Spec{Code: "AUTH.MAGIC_LINK.ALREADY_USED", Status: 409, Message: "This magic link has already been used"}
+	AuthMagicLinkAlreadyUsed = &Spec{Code: "AUTH.MAGIC_LINK.ALREADY_USED", Status: 409, Message: "This magic link has already been used", Description: "Returned when the magic link token has already been consumed to create a session.", UserAction: "Request a new magic link from the login page."}
 	// AUTH.MAGIC_LINK.EMAIL_NOT_FOUND — No account found for this email address
-	AuthMagicLinkEmailNotFound = &Spec{Code: "AUTH.MAGIC_LINK.EMAIL_NOT_FOUND", Status: 404, Message: "No account found for this email address"}
-	// AUTH.MAGIC_LINK.INVALID_OR_EXPIRED — Magic link is invalid or has expired
-	AuthMagicLinkInvalidOrExpired = &Spec{Code: "AUTH.MAGIC_LINK.INVALID_OR_EXPIRED", Status: 401, Message: "Magic link is invalid or has expired"}
+	AuthMagicLinkEmailNotFound = &Spec{Code: "AUTH.MAGIC_LINK.EMAIL_NOT_FOUND", Status: 404, Message: "No account found for this email address", Description: "Returned when a magic link is requested for an email that is not associated with any account.", UserAction: "Check the email address for typos, or register a new account."}
+	// AUTH.MAGIC_LINK.EXPIRED — Magic link has expired
+	AuthMagicLinkExpired = &Spec{Code: "AUTH.MAGIC_LINK.EXPIRED", Status: 401, Message: "Magic link has expired", Description: "Returned when the magic link token is past its 15-minute expiration timestamp.", UserAction: "Request a new magic link from the login page; links remain valid for 15 minutes."}
+	// AUTH.MAGIC_LINK.MALFORMED — Magic link token is malformed or unknown
+	AuthMagicLinkMalformed = &Spec{Code: "AUTH.MAGIC_LINK.MALFORMED", Status: 401, Message: "Magic link token is malformed or unknown", Description: "Returned when the magic link token is missing, has an invalid format, or does not match any issued token (signature / hash mismatch). Distinct from EXPIRED so the UI can hint that the link was tampered with or copied incorrectly.", UserAction: "Request a new magic link from the login page and click it directly without modifying the URL."}
+	// AUTH.MAGIC_LINK.REVOKED — Magic link has been revoked
+	AuthMagicLinkRevoked = &Spec{Code: "AUTH.MAGIC_LINK.REVOKED", Status: 401, Message: "Magic link has been revoked", Description: "Returned when the magic link token has been explicitly invalidated before use (for example when a newer link supersedes it or an admin revoked the account).", UserAction: "Request a new magic link from the login page."}
 	// AUTH.OIDC.EMAIL_NOT_VERIFIED — Email address is not verified by the identity provider
-	AuthOidcEmailNotVerified = &Spec{Code: "AUTH.OIDC.EMAIL_NOT_VERIFIED", Status: 403, Message: "Email address is not verified by the identity provider"}
+	AuthOidcEmailNotVerified = &Spec{Code: "AUTH.OIDC.EMAIL_NOT_VERIFIED", Status: 403, Message: "Email address is not verified by the identity provider", Description: "Returned when the OIDC identity provider indicates the user's email address has not been verified.", UserAction: "Verify your email address with your identity provider, then try again."}
 	// AUTH.OIDC.GITHUB_NOT_CONFIGURED — GitHub login is not configured
-	AuthOidcGithubNotConfigured = &Spec{Code: "AUTH.OIDC.GITHUB_NOT_CONFIGURED", Status: 503, Message: "GitHub login is not configured"}
+	AuthOidcGithubNotConfigured = &Spec{Code: "AUTH.OIDC.GITHUB_NOT_CONFIGURED", Status: 503, Message: "GitHub login is not configured", Description: "Returned when the user attempts to sign in via GitHub but the instance has no GitHub OIDC client configured.", UserAction: "Ask the instance administrator to configure GitHub login credentials."}
 	// AUTH.OIDC.ID_TOKEN_INVALID — OIDC ID token is invalid
-	AuthOidcIdTokenInvalid = &Spec{Code: "AUTH.OIDC.ID_TOKEN_INVALID", Status: 401, Message: "OIDC ID token is invalid"}
+	AuthOidcIdTokenInvalid = &Spec{Code: "AUTH.OIDC.ID_TOKEN_INVALID", Status: 401, Message: "OIDC ID token is invalid", Description: "Returned when the ID token fails verification (signature, issuer, audience, or expiration).", UserAction: "Restart the sign-in flow, or contact support if the problem persists."}
 	// AUTH.OIDC.MICROSOFT_NOT_CONFIGURED — Microsoft login is not configured
-	AuthOidcMicrosoftNotConfigured = &Spec{Code: "AUTH.OIDC.MICROSOFT_NOT_CONFIGURED", Status: 503, Message: "Microsoft login is not configured"}
+	AuthOidcMicrosoftNotConfigured = &Spec{Code: "AUTH.OIDC.MICROSOFT_NOT_CONFIGURED", Status: 503, Message: "Microsoft login is not configured", Description: "Returned when the user attempts to sign in via Microsoft but the instance has no Microsoft OIDC client configured.", UserAction: "Ask the instance administrator to configure Microsoft login credentials."}
 	// AUTH.OIDC.NONCE_MISMATCH — OIDC nonce does not match
-	AuthOidcNonceMismatch = &Spec{Code: "AUTH.OIDC.NONCE_MISMATCH", Status: 400, Message: "OIDC nonce does not match"}
+	AuthOidcNonceMismatch = &Spec{Code: "AUTH.OIDC.NONCE_MISMATCH", Status: 400, Message: "OIDC nonce does not match", Description: "Returned when the nonce claim in the ID token does not match the one embedded in the authentication request.", UserAction: "Restart the sign-in flow from the login page."}
 	// AUTH.OIDC.PROVIDER_UNREACHABLE — OIDC provider is unreachable
-	AuthOidcProviderUnreachable = &Spec{Code: "AUTH.OIDC.PROVIDER_UNREACHABLE", Status: 502, Message: "OIDC provider is unreachable"}
+	AuthOidcProviderUnreachable = &Spec{Code: "AUTH.OIDC.PROVIDER_UNREACHABLE", Status: 502, Message: "OIDC provider is unreachable", Description: "Returned when the configured OIDC provider cannot be contacted for discovery or token exchange.", UserAction: "Try again in a moment; contact your administrator if the problem persists."}
 	// AUTH.OIDC.STATE_MISMATCH — OIDC state parameter does not match
-	AuthOidcStateMismatch = &Spec{Code: "AUTH.OIDC.STATE_MISMATCH", Status: 400, Message: "OIDC state parameter does not match"}
+	AuthOidcStateMismatch = &Spec{Code: "AUTH.OIDC.STATE_MISMATCH", Status: 400, Message: "OIDC state parameter does not match", Description: "Returned when the state value returned by the identity provider does not match the one issued at the start of the flow, indicating possible CSRF.", UserAction: "Restart the sign-in flow from the login page."}
 	// AUTH.PASSWORD.CURRENT_MISMATCH — Current password is incorrect
-	AuthPasswordCurrentMismatch = &Spec{Code: "AUTH.PASSWORD.CURRENT_MISMATCH", Status: 401, Message: "Current password is incorrect"}
+	AuthPasswordCurrentMismatch = &Spec{Code: "AUTH.PASSWORD.CURRENT_MISMATCH", Status: 401, Message: "Current password is incorrect", Description: "Returned by /me/password when the submitted current password does not verify against the stored hash.", UserAction: "Re-enter your current password."}
 	// AUTH.PASSWORD.NO_LOCAL_IDENTITY — Account has no local password to change
-	AuthPasswordNoLocalIdentity = &Spec{Code: "AUTH.PASSWORD.NO_LOCAL_IDENTITY", Status: 409, Message: "Account has no local password to change"}
+	AuthPasswordNoLocalIdentity = &Spec{Code: "AUTH.PASSWORD.NO_LOCAL_IDENTITY", Status: 409, Message: "Account has no local password to change", Description: "Returned when /me/password is called for an account that only has OIDC identities.", UserAction: "Change your password through your identity provider instead."}
 	// AUTH.PASSWORD.TOO_WEAK — Password does not meet strength requirements
-	AuthPasswordTooWeak = &Spec{Code: "AUTH.PASSWORD.TOO_WEAK", Status: 422, Message: "Password does not meet strength requirements"}
+	AuthPasswordTooWeak = &Spec{Code: "AUTH.PASSWORD.TOO_WEAK", Status: 422, Message: "Password does not meet strength requirements", Description: "Returned by /me/password when the new password is shorter than the minimum length.", UserAction: "Choose a longer password."}
 	// AUTH.PAT.EXPIRED — Personal access token has expired
-	AuthPatExpired = &Spec{Code: "AUTH.PAT.EXPIRED", Status: 401, Message: "Personal access token has expired"}
+	AuthPatExpired = &Spec{Code: "AUTH.PAT.EXPIRED", Status: 401, Message: "Personal access token has expired", Description: "Returned when the PAT's expiration timestamp has passed.", UserAction: "Create a new personal access token."}
 	// AUTH.PAT.TOKEN_UNKNOWN — Personal access token is invalid
-	AuthPatTokenUnknown = &Spec{Code: "AUTH.PAT.TOKEN_UNKNOWN", Status: 401, Message: "Personal access token is invalid"}
+	AuthPatTokenUnknown = &Spec{Code: "AUTH.PAT.TOKEN_UNKNOWN", Status: 401, Message: "Personal access token is invalid", Description: "Returned when the supplied personal access token is unknown, malformed, or has been revoked.", UserAction: "Generate a new personal access token and update the client configuration."}
 	// AUTH.REGISTER.EMAIL_ALREADY_TAKEN — Email address is already registered
-	AuthRegisterEmailAlreadyTaken = &Spec{Code: "AUTH.REGISTER.EMAIL_ALREADY_TAKEN", Status: 409, Message: "Email address is already registered"}
+	AuthRegisterEmailAlreadyTaken = &Spec{Code: "AUTH.REGISTER.EMAIL_ALREADY_TAKEN", Status: 409, Message: "Email address is already registered", Description: "Returned when a registration attempt uses an email that is already associated with an existing account.", UserAction: "Sign in with the existing account, or use a different email address."}
 	// AUTH.REGISTER.INSTANCE_REGISTRATION_DISABLED — Self-service registration is disabled on this instance
-	AuthRegisterInstanceRegistrationDisabled = &Spec{Code: "AUTH.REGISTER.INSTANCE_REGISTRATION_DISABLED", Status: 403, Message: "Self-service registration is disabled on this instance"}
+	AuthRegisterInstanceRegistrationDisabled = &Spec{Code: "AUTH.REGISTER.INSTANCE_REGISTRATION_DISABLED", Status: 403, Message: "Self-service registration is disabled on this instance", Description: "Returned when an open registration attempt is made on an instance where self-service signup has been disabled by an admin.", UserAction: "Contact your instance administrator to request an account."}
 	// AUTH.REGISTER.PASSWORD_TOO_WEAK — Password does not meet strength requirements
-	AuthRegisterPasswordTooWeak = &Spec{Code: "AUTH.REGISTER.PASSWORD_TOO_WEAK", Status: 422, Message: "Password does not meet strength requirements"}
+	AuthRegisterPasswordTooWeak = &Spec{Code: "AUTH.REGISTER.PASSWORD_TOO_WEAK", Status: 422, Message: "Password does not meet strength requirements", Description: "Returned when the submitted password fails the minimum complexity policy (length, character classes).", UserAction: "Choose a stronger password with at least 12 characters including mixed case, numbers, and symbols."}
 	// AUTH.SESSION.EXPIRED — Session has expired
-	AuthSessionExpired = &Spec{Code: "AUTH.SESSION.EXPIRED", Status: 401, Message: "Session has expired"}
+	AuthSessionExpired = &Spec{Code: "AUTH.SESSION.EXPIRED", Status: 401, Message: "Session has expired", Description: "Returned when the session or access token is past its expiration timestamp.", UserAction: "Sign in again to continue."}
 	// AUTH.SESSION.REVOKED — Session has been revoked
-	AuthSessionRevoked = &Spec{Code: "AUTH.SESSION.REVOKED", Status: 401, Message: "Session has been revoked"}
+	AuthSessionRevoked = &Spec{Code: "AUTH.SESSION.REVOKED", Status: 401, Message: "Session has been revoked", Description: "Returned when the session has been explicitly invalidated (logout elsewhere, admin revoke, password change).", UserAction: "Sign in again."}
 	// AUTH.TOKEN.MISSING_OR_MALFORMED — Missing or invalid authentication token
-	AuthTokenMissingOrMalformed = &Spec{Code: "AUTH.TOKEN.MISSING_OR_MALFORMED", Status: 401, Message: "Missing or invalid authentication token"}
+	AuthTokenMissingOrMalformed = &Spec{Code: "AUTH.TOKEN.MISSING_OR_MALFORMED", Status: 401, Message: "Missing or invalid authentication token", Description: "Returned when the Authorization header is absent, does not start with Bearer, or the token is empty. Distinct from signature verification failures.", UserAction: "Include a valid Bearer token in the Authorization header."}
 	// AUTH.TOKEN.REFRESH_EXPIRED — Refresh token has expired
-	AuthTokenRefreshExpired = &Spec{Code: "AUTH.TOKEN.REFRESH_EXPIRED", Status: 401, Message: "Refresh token has expired"}
+	AuthTokenRefreshExpired = &Spec{Code: "AUTH.TOKEN.REFRESH_EXPIRED", Status: 401, Message: "Refresh token has expired", Description: "Returned when the refresh token is past its lifetime and can no longer be exchanged.", UserAction: "Sign in again."}
 	// AUTH.TOKEN.REFRESH_INVALID — Refresh token is invalid
-	AuthTokenRefreshInvalid = &Spec{Code: "AUTH.TOKEN.REFRESH_INVALID", Status: 401, Message: "Refresh token is invalid"}
+	AuthTokenRefreshInvalid = &Spec{Code: "AUTH.TOKEN.REFRESH_INVALID", Status: 401, Message: "Refresh token is invalid", Description: "Returned when a refresh token is malformed, unknown, or has already been rotated.", UserAction: "Sign in again to obtain a new session."}
 	// AUTH.TOKEN.SIGNATURE_INVALID — Token signature is invalid
-	AuthTokenSignatureInvalid = &Spec{Code: "AUTH.TOKEN.SIGNATURE_INVALID", Status: 401, Message: "Token signature is invalid"}
+	AuthTokenSignatureInvalid = &Spec{Code: "AUTH.TOKEN.SIGNATURE_INVALID", Status: 401, Message: "Token signature is invalid", Description: "Returned when the JWT signature verification fails (wrong key, tampered payload).", UserAction: "Sign in again."}
 	// AUTH.TOTP.ALREADY_ENROLLED — Two-factor authentication is already enabled
-	AuthTotpAlreadyEnrolled = &Spec{Code: "AUTH.TOTP.ALREADY_ENROLLED", Status: 409, Message: "Two-factor authentication is already enabled"}
+	AuthTotpAlreadyEnrolled = &Spec{Code: "AUTH.TOTP.ALREADY_ENROLLED", Status: 409, Message: "Two-factor authentication is already enabled", Description: "Returned when attempting to enroll TOTP for an account that already has it active.", UserAction: "Disable the existing 2FA before enrolling again."}
 	// AUTH.TOTP.CODE_MISMATCH — Two-factor authentication code is incorrect
-	AuthTotpCodeMismatch = &Spec{Code: "AUTH.TOTP.CODE_MISMATCH", Status: 401, Message: "Two-factor authentication code is incorrect"}
+	AuthTotpCodeMismatch = &Spec{Code: "AUTH.TOTP.CODE_MISMATCH", Status: 401, Message: "Two-factor authentication code is incorrect", Description: "Returned when the submitted TOTP code does not match the expected value within the allowed time window.", UserAction: "Re-enter the current code from your authenticator app."}
 	// AUTH.TOTP.CODE_REQUIRED — Two-factor authentication code is required
-	AuthTotpCodeRequired = &Spec{Code: "AUTH.TOTP.CODE_REQUIRED", Status: 401, Message: "Two-factor authentication code is required"}
+	AuthTotpCodeRequired = &Spec{Code: "AUTH.TOTP.CODE_REQUIRED", Status: 401, Message: "Two-factor authentication code is required", Description: "Returned when the account has 2FA enabled and the login request did not include a TOTP code.", UserAction: "Submit the 6-digit code from your authenticator app."}
 	// AUTH.TOTP.NOT_CONFIGURED — Two-factor authentication is not available on this server
-	AuthTotpNotConfigured = &Spec{Code: "AUTH.TOTP.NOT_CONFIGURED", Status: 503, Message: "Two-factor authentication is not available on this server"}
+	AuthTotpNotConfigured = &Spec{Code: "AUTH.TOTP.NOT_CONFIGURED", Status: 503, Message: "Two-factor authentication is not available on this server", Description: "Returned when the server has no encryption key configured (NF_SECRET_KEY is unset) so TOTP secrets cannot be stored.", UserAction: "Ask the instance administrator to configure NF_SECRET_KEY."}
 	// AUTH.TOTP.NOT_ENROLLED — Two-factor authentication is not enabled
-	AuthTotpNotEnrolled = &Spec{Code: "AUTH.TOTP.NOT_ENROLLED", Status: 409, Message: "Two-factor authentication is not enabled"}
+	AuthTotpNotEnrolled = &Spec{Code: "AUTH.TOTP.NOT_ENROLLED", Status: 409, Message: "Two-factor authentication is not enabled", Description: "Returned when confirming or disabling TOTP on an account that has no pending or active enrollment.", UserAction: "Start a new TOTP enrollment first."}
 	// AUTH.TOTP.RECOVERY_CODE_INVALID — Recovery code is invalid
-	AuthTotpRecoveryCodeInvalid = &Spec{Code: "AUTH.TOTP.RECOVERY_CODE_INVALID", Status: 401, Message: "Recovery code is invalid"}
+	AuthTotpRecoveryCodeInvalid = &Spec{Code: "AUTH.TOTP.RECOVERY_CODE_INVALID", Status: 401, Message: "Recovery code is invalid", Description: "Returned when the submitted recovery code does not match any unused code on file for the account.", UserAction: "Try a different recovery code, or sign in with your authenticator app code."}
 	// AUTH.TOTP.RECOVERY_CODE_REQUIRED — Either a TOTP code or a recovery code is required
-	AuthTotpRecoveryCodeRequired = &Spec{Code: "AUTH.TOTP.RECOVERY_CODE_REQUIRED", Status: 400, Message: "Either a TOTP code or a recovery code is required"}
+	AuthTotpRecoveryCodeRequired = &Spec{Code: "AUTH.TOTP.RECOVERY_CODE_REQUIRED", Status: 400, Message: "Either a TOTP code or a recovery code is required", Description: "Returned when the TOTP login step is called with neither a 6-digit code nor a recovery code.", UserAction: "Provide your authenticator code or one of your saved recovery codes."}
 )
