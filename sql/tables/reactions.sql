@@ -23,8 +23,8 @@ CREATE TABLE reactions (
   UNIQUE KEY uniq_reactions_workspace_public_id (workspace_id, public_id),
   UNIQUE KEY uniq_reactions_user_task_emoji (user_id, task_id, emoji, enabled),
   UNIQUE KEY uniq_reactions_user_comment_emoji (user_id, comment_id, emoji, enabled),
-  KEY idx_reactions_task_id (task_id),
-  KEY idx_reactions_comment_id (comment_id),
+  KEY idx_reactions_task_id_emoji (task_id, emoji),
+  KEY idx_reactions_comment_id_emoji (comment_id, emoji),
 
   CONSTRAINT fk_reactions_workspace FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
   CONSTRAINT fk_reactions_user      FOREIGN KEY (user_id)      REFERENCES users(id)      ON DELETE CASCADE,

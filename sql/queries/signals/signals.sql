@@ -1,6 +1,9 @@
 -- name: InsertSignal :execlastid
 -- Insert an inbound signal (manual or webhook).
-INSERT INTO signals (
+-- Dedup is workspace-scoped via UNIQUE (workspace_id, source, external_id)
+-- when external_id is non-NULL. Duplicate deliveries are silently ignored
+-- via INSERT IGNORE; LastInsertId() returns 0 when the row was a duplicate.
+INSERT IGNORE INTO signals (
   public_id,
   workspace_id,
   task_id,

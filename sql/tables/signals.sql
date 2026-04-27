@@ -23,9 +23,9 @@ CREATE TABLE signals (
 
   UNIQUE KEY uniq_signals_public_id (public_id),
   UNIQUE KEY uniq_signals_workspace_public_id (workspace_id, public_id),
+  UNIQUE KEY uniq_signals_workspace_source_external_id (workspace_id, source, external_id),
   KEY idx_signals_workspace_id_received_at (workspace_id, received_at),
   KEY idx_signals_workspace_id_task_id (workspace_id, task_id),
-  KEY idx_signals_source_external_id (source, external_id),
 
   CONSTRAINT fk_signals_workspace FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
   CONSTRAINT fk_signals_task FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE SET NULL

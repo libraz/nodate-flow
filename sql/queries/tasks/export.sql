@@ -17,7 +17,7 @@ SELECT
   t.updated_at,
   t.created_at
 FROM tasks t
-INNER JOIN projects p ON p.id = t.project_id
+INNER JOIN projects p ON p.id = t.project_id AND p.enabled = TRUE
 LEFT JOIN task_actors ta ON ta.task_id = t.id
   AND ta.role = 'assignee'
   AND ta.kind = 'user'
@@ -47,7 +47,7 @@ SELECT
   t.updated_at,
   t.created_at
 FROM tasks t
-INNER JOIN projects p ON p.id = t.project_id
+INNER JOIN projects p ON p.id = t.project_id AND p.enabled = TRUE
 LEFT JOIN task_actors ta ON ta.task_id = t.id
   AND ta.role = 'assignee'
   AND ta.kind = 'user'

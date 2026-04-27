@@ -10,23 +10,22 @@ INSERT INTO comments (
 
 -- name: ListCommentsForTask :many
 -- List comments on a task joined with author display fields.
+-- Reads from v_comment_for_task which centralizes the comments + tasks +
+-- users JOINs and `enabled` propagation shared with the keyset variant.
 SELECT
-  c.public_id,
-  u.public_id AS author_public_id,
-  u.display_name AS author_display_name,
-  u.avatar_url AS author_avatar_url,
-  c.body,
-  c.edited_at,
-  c.updated_at,
-  c.created_at,
+  v.public_id,
+  v.author_public_id,
+  v.author_display_name,
+  v.author_avatar_url,
+  v.body,
+  v.edited_at,
+  v.updated_at,
+  v.created_at,
   COUNT(*) OVER() AS total
-FROM comments c
-INNER JOIN tasks t ON t.id = c.task_id AND t.enabled = TRUE
-INNER JOIN users u ON u.id = c.author_id AND u.enabled = TRUE
-WHERE c.workspace_id = ?
-  AND t.public_id = ?
-  AND c.enabled = TRUE
-ORDER BY c.created_at ASC, c.public_id ASC
+FROM v_comment_for_task v
+WHERE v.workspace_id = ?
+  AND v.task_public_id = ?
+ORDER BY v.created_at ASC, v.public_id ASC
 LIMIT ? OFFSET ?;
 
 -- name: ListCommentsForTaskKeyset :many
@@ -39,27 +38,25 @@ LIMIT ? OFFSET ?;
 -- so the cursor semantics match the rest of the keyset family. UI
 -- consumers that want oldest-first must reverse the page client-side.
 --
--- Index used: idx_comments_task_id_keyset (task_id, created_at, public_id).
+-- Index used: idx_comments_task_id_keyset (task_id, created_at, public_id)
+-- on the underlying comments table; the view is MERGEd by the optimizer.
 SELECT
-  c.public_id,
-  u.public_id AS author_public_id,
-  u.display_name AS author_display_name,
-  u.avatar_url AS author_avatar_url,
-  c.body,
-  c.edited_at,
-  c.updated_at,
-  c.created_at
-FROM comments c
-INNER JOIN tasks t ON t.id = c.task_id AND t.enabled = TRUE
-INNER JOIN users u ON u.id = c.author_id AND u.enabled = TRUE
-WHERE c.workspace_id = ?
-  AND t.public_id = ?
-  AND c.enabled = TRUE
+  v.public_id,
+  v.author_public_id,
+  v.author_display_name,
+  v.author_avatar_url,
+  v.body,
+  v.edited_at,
+  v.updated_at,
+  v.created_at
+FROM v_comment_for_task v
+WHERE v.workspace_id = ?
+  AND v.task_public_id = ?
   AND (sqlc.narg(cursor_created_at) IS NULL
-       OR c.created_at < sqlc.narg(cursor_created_at)
-       OR (c.created_at = sqlc.narg(cursor_created_at)
-           AND c.public_id < sqlc.narg(cursor_public_id)))
-ORDER BY c.created_at DESC, c.public_id DESC
+       OR v.created_at < sqlc.narg(cursor_created_at)
+       OR (v.created_at = sqlc.narg(cursor_created_at)
+           AND v.public_id < sqlc.narg(cursor_public_id)))
+ORDER BY v.created_at DESC, v.public_id DESC
 LIMIT ?;
 
 -- name: EditComment :exec

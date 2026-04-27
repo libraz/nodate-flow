@@ -1646,8 +1646,8 @@ CREATE TABLE reactions (
   UNIQUE KEY uniq_reactions_workspace_public_id (workspace_id, public_id),
   UNIQUE KEY uniq_reactions_user_task_emoji (user_id, task_id, emoji, enabled),
   UNIQUE KEY uniq_reactions_user_comment_emoji (user_id, comment_id, emoji, enabled),
-  KEY idx_reactions_task_id (task_id),
-  KEY idx_reactions_comment_id (comment_id),
+  KEY idx_reactions_task_id_emoji (task_id, emoji),
+  KEY idx_reactions_comment_id_emoji (comment_id, emoji),
 
   CONSTRAINT fk_reactions_workspace FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
   CONSTRAINT fk_reactions_user      FOREIGN KEY (user_id)      REFERENCES users(id)      ON DELETE CASCADE,
@@ -1789,9 +1789,9 @@ CREATE TABLE signals (
 
   UNIQUE KEY uniq_signals_public_id (public_id),
   UNIQUE KEY uniq_signals_workspace_public_id (workspace_id, public_id),
+  UNIQUE KEY uniq_signals_workspace_source_external_id (workspace_id, source, external_id),
   KEY idx_signals_workspace_id_received_at (workspace_id, received_at),
   KEY idx_signals_workspace_id_task_id (workspace_id, task_id),
-  KEY idx_signals_source_external_id (source, external_id),
 
   CONSTRAINT fk_signals_workspace FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
   CONSTRAINT fk_signals_task FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE SET NULL
@@ -2520,6 +2520,7 @@ CREATE TABLE workspaces (
 
 DROP VIEW IF EXISTS `v_admin_users`;
 DROP VIEW IF EXISTS `v_audit_recent`;
+DROP VIEW IF EXISTS `v_comment_for_task`;
 DROP VIEW IF EXISTS `v_inbox`;
 DROP VIEW IF EXISTS `v_instance_audit_logs`;
 DROP VIEW IF EXISTS `v_my_tasks`;
@@ -2646,6 +2647,30 @@ INNER JOIN workspaces w
 LEFT JOIN users actor
   ON actor.id = al.actor_user_id AND actor.enabled = TRUE
 WHERE al.enabled = TRUE;
+
+-- >>> v_comment_for_task.sql
+-- v_comment_for_task
+-- Shared projection used by ListCommentsForTask (offset variant) and
+-- ListCommentsForTaskKeyset (keyset variant). Encapsulates the comments
+-- + tasks + users JOINs so both query variants stay aligned on
+-- visibility (`enabled = TRUE` propagation) and column shape.
+CREATE OR REPLACE ALGORITHM=MERGE VIEW v_comment_for_task AS
+SELECT
+  c.workspace_id,
+  c.task_id,
+  t.public_id AS task_public_id,
+  c.public_id,
+  u.public_id AS author_public_id,
+  u.display_name AS author_display_name,
+  u.avatar_url AS author_avatar_url,
+  c.body,
+  c.edited_at,
+  c.updated_at,
+  c.created_at
+FROM comments c
+INNER JOIN tasks t ON t.id = c.task_id AND t.enabled = TRUE
+INNER JOIN users u ON u.id = c.author_id AND u.enabled = TRUE
+WHERE c.enabled = TRUE;
 
 -- >>> v_inbox.sql
 -- v_inbox
