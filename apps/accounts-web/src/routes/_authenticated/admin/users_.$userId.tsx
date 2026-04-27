@@ -4,10 +4,12 @@
  */
 
 import Button from '@nodate-flow/ui/primitives/button';
+import { confirmAction } from '@nodate-flow/ui/primitives/confirm/action';
 import { Link, createFileRoute } from '@tanstack/react-router';
 import { type ReactElement, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { useInvalidateInstanceStats } from '../../../features/admin-stats/api';
 import { sdk } from '../../../lib/sdk';
 
 interface UserDetail {
@@ -78,6 +80,7 @@ function formatTimestamp(ts: number | null | undefined, never: string): string {
 function UserDetailPage(): ReactElement {
   const { userId } = Route.useParams();
   const { t } = useTranslation('admin');
+  const invalidateInstanceStats = useInvalidateInstanceStats();
   const [user, setUser] = useState<UserDetail | null>(null);
   const [sessions, setSessions] = useState<UserSession[]>([]);
   const [loading, setLoading] = useState(true);
@@ -108,8 +111,12 @@ function UserDetailPage(): ReactElement {
 
   const handleToggleEnabled = async () => {
     if (!user) return;
-    const confirmMsg = user.enabled ? t('users.confirm_suspend') : t('users.confirm_enable');
-    if (!window.confirm(confirmMsg)) return;
+    const ok = await confirmAction({
+      tone: 'danger',
+      message: user.enabled ? t('users.confirm_suspend') : t('users.confirm_enable'),
+      confirmLabel: user.enabled ? t('users.suspend') : t('users.enable'),
+    });
+    if (!ok) return;
 
     setActionLoading(true);
     await sdk.PATCH('/admin/users/{userId}', {
@@ -122,6 +129,7 @@ function UserDetailPage(): ReactElement {
     const result = await sdk.GET('/admin/users/{userId}', { params: { path: { userId } } });
     if (result.data) {
       setUser(result.data as UserDetail);
+      void invalidateInstanceStats();
     }
   };
 
@@ -129,7 +137,12 @@ function UserDetailPage(): ReactElement {
     if (!user) return;
 
     if (user.isInstanceAdmin) {
-      if (!window.confirm(t('admins.confirm_revoke'))) return;
+      const ok = await confirmAction({
+        tone: 'danger',
+        message: t('admins.confirm_revoke'),
+        confirmLabel: t('admins.revoke'),
+      });
+      if (!ok) return;
       setActionLoading(true);
       await sdk.DELETE('/admin/instance-admins/{adminId}', {
         params: { path: { adminId: userId } },
@@ -146,6 +159,7 @@ function UserDetailPage(): ReactElement {
     const result = await sdk.GET('/admin/users/{userId}', { params: { path: { userId } } });
     if (result.data) {
       setUser(result.data as UserDetail);
+      void invalidateInstanceStats();
     }
   };
 

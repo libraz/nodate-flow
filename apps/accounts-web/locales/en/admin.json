@@ -10,7 +10,7 @@
   },
   "users": {
     "title": "User Management",
-    "search": "Search users\u2026",
+    "search": "Search users…",
     "email": "Email",
     "name": "Name",
     "status": "Status",
@@ -36,7 +36,7 @@
   },
   "workspaces": {
     "title": "Workspace Management",
-    "search": "Search workspaces\u2026",
+    "search": "Search workspaces…",
     "name": "Name",
     "slug": "Slug",
     "members": "Members",
@@ -76,7 +76,7 @@
     "revoke": "Revoke",
     "grant": "Grant Admin",
     "grant_search_label": "Search user",
-    "grant_search_placeholder": "Search by name or email\u2026",
+    "grant_search_placeholder": "Search by name or email…",
     "clear_selection": "Clear selection",
     "grant_hint": "Search for a user by name or email, or grant admin privileges directly from a user's detail page.",
     "grant_submit": "Grant",
@@ -96,19 +96,19 @@
     "max_members_per_workspace": "Max Members per Workspace",
     "unlimited_placeholder": "0 = unlimited",
     "save": "Save Settings",
-    "saving": "Saving\u2026",
+    "saving": "Saving…",
     "saved": "Settings saved successfully."
   },
   "setup": {
     "title": "Instance Setup",
     "description": "No administrator has been set up yet. Click below to become the first instance administrator.",
     "submit": "Become Admin",
-    "submitting": "Setting up\u2026",
+    "submitting": "Setting up…",
     "success": "You are now an instance administrator."
   },
   "common": {
     "back": "Back",
-    "loading": "Loading\u2026",
+    "loading": "Loading…",
     "previous": "Previous",
     "next": "Next",
     "page": "Page {page} of {total}",

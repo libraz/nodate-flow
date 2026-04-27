@@ -3,6 +3,7 @@
  */
 
 import Button from '@nodate-flow/ui/primitives/button';
+import { confirmAction } from '@nodate-flow/ui/primitives/confirm/action';
 import { Link, createFileRoute } from '@tanstack/react-router';
 import { type ReactElement, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -74,8 +75,13 @@ function WorkspaceDetailPage(): ReactElement {
 
   const handleToggleEnabled = async () => {
     if (!workspace) return;
-    const confirmMsg = workspace.enabled ? t('workspaces.suspend') : t('workspaces.enable');
-    if (!window.confirm(confirmMsg)) return;
+    const action = workspace.enabled ? t('workspaces.suspend') : t('workspaces.enable');
+    const ok = await confirmAction({
+      tone: 'danger',
+      message: action,
+      confirmLabel: action,
+    });
+    if (!ok) return;
 
     setActionLoading(true);
     await sdk.PATCH('/admin/workspaces/{wsId}', {

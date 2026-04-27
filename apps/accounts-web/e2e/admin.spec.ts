@@ -219,6 +219,54 @@ test.describe('admin pages', () => {
         });
     });
 
+    test('combobox supports keyboard nav (Arrow + Enter selects user)', async ({ page }) => {
+      const { admin } = loadTenants();
+      await injectAuth(page.context(), admin);
+      await page.goto('/admin/admins');
+      await page.waitForLoadState('networkidle');
+
+      // Combobox should expose ARIA combobox role
+      const combo = page.getByRole('combobox', { name: /search user/i });
+      await expect(combo).toBeVisible();
+      await expect(combo).toHaveAttribute('aria-expanded', 'false');
+
+      await combo.focus();
+      await combo.fill('e2e');
+
+      // Wait for the listbox to materialize from the debounced search
+      const listbox = page.getByRole('listbox');
+      await expect(listbox).toBeVisible({ timeout: 5_000 });
+      await expect(combo).toHaveAttribute('aria-expanded', 'true');
+
+      // Skip the rest of the test if the API returned no candidate users
+      const optionCount = await page.getByRole('option').count();
+      test.skip(optionCount === 0, 'No matching users available to select');
+
+      // Arrow Down moves the active descendant
+      await combo.press('ArrowDown');
+      const ad1 = await combo.getAttribute('aria-activedescendant');
+      expect(ad1).not.toBeNull();
+      await combo.press('ArrowDown');
+      const ad2 = await combo.getAttribute('aria-activedescendant');
+      expect(ad2).not.toBe(ad1);
+
+      // Esc closes the listbox
+      await combo.press('Escape');
+      await expect(listbox).toBeHidden();
+      await expect(combo).toHaveAttribute('aria-expanded', 'false');
+
+      // Re-open and pick the first option with Enter
+      await combo.focus();
+      await combo.press('ArrowDown');
+      await expect(page.getByRole('listbox')).toBeVisible();
+      await combo.press('Enter');
+      await expect(page.getByRole('listbox')).toBeHidden();
+
+      // Grant button is enabled once a user is selected
+      const grantButton = page.getByRole('button', { name: /^grant$/i });
+      await expect(grantButton).toBeEnabled();
+    });
+
     test('hint text is descriptive', async ({ page }) => {
       const { admin } = loadTenants();
       await injectAuth(page.context(), admin);
