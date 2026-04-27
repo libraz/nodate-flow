@@ -122,7 +122,7 @@ func Create(deps Deps) func(context.Context, *CreateReactionInput) (*CreateReact
 
 // ListForTask handles GET /tasks/{id}/reactions.
 func ListForTask(deps Deps) func(context.Context, *ListReactionsInput) (*ListReactionsOutput, error) {
-	return func(ctx context.Context, in *ListReactionsInput) (*ListReactionsOutput, error) {
+	return func(ctx context.Context, _ *ListReactionsInput) (*ListReactionsOutput, error) {
 		_, ok := middleware.WorkspaceFromContext(ctx)
 		if !ok {
 			return nil, httpErr(apierrors.WsWorkspaceNotFound)

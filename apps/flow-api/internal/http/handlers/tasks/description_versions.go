@@ -45,7 +45,7 @@ func mapDescriptionVersionFull(r generated.FindDescriptionVersionRow) Descriptio
 
 // ListDescriptionVersions handles GET /tasks/{id}/description-history.
 func ListDescriptionVersions(deps Deps) func(context.Context, *ListDescriptionVersionsInput) (*ListDescriptionVersionsOutput, error) {
-	return func(ctx context.Context, in *ListDescriptionVersionsInput) (*ListDescriptionVersionsOutput, error) {
+	return func(ctx context.Context, _ *ListDescriptionVersionsInput) (*ListDescriptionVersionsOutput, error) {
 		ws, ok := middleware.WorkspaceFromContext(ctx)
 		if !ok {
 			return nil, httpErr(apierrors.WsWorkspaceNotFound)

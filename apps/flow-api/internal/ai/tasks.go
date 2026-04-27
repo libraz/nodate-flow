@@ -460,16 +460,16 @@ func parseProposedTasks(s string) ([]ProposedTask, error) {
 // Hand-written, no regex. Returns "" when nothing balanced is found.
 func extractJSON(s string) string {
 	start := -1
-	var open byte
-	var close byte
+	var openCh byte
+	var closeCh byte
 	for i := 0; i < len(s); i++ {
 		if s[i] == '[' || s[i] == '{' {
 			start = i
-			open = s[i]
-			if open == '[' {
-				close = ']'
+			openCh = s[i]
+			if openCh == '[' {
+				closeCh = ']'
 			} else {
-				close = '}'
+				closeCh = '}'
 			}
 			break
 		}
@@ -500,9 +500,9 @@ func extractJSON(s string) string {
 			inStr = true
 			continue
 		}
-		if c == open {
+		if c == openCh {
 			depth++
-		} else if c == close {
+		} else if c == closeCh {
 			depth--
 			if depth == 0 {
 				return s[start : i+1]

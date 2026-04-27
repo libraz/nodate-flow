@@ -13,7 +13,7 @@ import (
 // seedEvent inserts a standalone calendar_event (no task link) and
 // returns its internal id + public id. Mirror of what reschedule /
 // schedule tests use but without requiring task projection.
-func seedEvent(t *testing.T, ctx context.Context, db *sql.DB, f fixtures, startAt time.Time) (uint32, dbtype.PublicID) {
+func seedEvent(ctx context.Context, t *testing.T, db *sql.DB, f fixtures, startAt time.Time) (uint32, dbtype.PublicID) {
 	t.Helper()
 	pub := dbtype.New()
 	endAt := startAt.Add(time.Hour)
@@ -42,13 +42,13 @@ func TestLinkTaskToEvent_CreatesAndAppendsEvent(t *testing.T) {
 	ctx := context.Background()
 	f := seed(t, ctx, db)
 	defer purge(t, db, f.wsID)
-	evtID, _ := seedEvent(t, ctx, db, f, time.Date(2026, 5, 1, 10, 0, 0, 0, time.UTC))
+	evtID, _ := seedEvent(ctx, t, db, f, time.Date(2026, 5, 1, 10, 0, 0, 0, time.UTC))
 
 	tx, err := db.BeginTx(ctx, nil)
 	if err != nil {
 		t.Fatalf("begin: %v", err)
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 	pub, linkID, err := LinkTaskToEvent(ctx, tx, LinkTaskToEventArgs{
 		WorkspaceID: f.wsID,
 		TaskID:      f.taskID,
@@ -93,7 +93,7 @@ func TestLinkTaskToEvent_IsIdempotent(t *testing.T) {
 	ctx := context.Background()
 	f := seed(t, ctx, db)
 	defer purge(t, db, f.wsID)
-	evtID, _ := seedEvent(t, ctx, db, f, time.Date(2026, 5, 2, 9, 0, 0, 0, time.UTC))
+	evtID, _ := seedEvent(ctx, t, db, f, time.Date(2026, 5, 2, 9, 0, 0, 0, time.UTC))
 
 	var firstPub dbtype.PublicID
 	for i := 0; i < 2; i++ {
@@ -109,7 +109,7 @@ func TestLinkTaskToEvent_IsIdempotent(t *testing.T) {
 			ActorUserID: f.userID,
 		})
 		if err != nil {
-			tx.Rollback()
+			_ = tx.Rollback()
 			t.Fatalf("iter %d: %v", i, err)
 		}
 		if err := tx.Commit(); err != nil {
@@ -147,13 +147,13 @@ func TestLinkTaskToEvent_RejectsUnknownRelation(t *testing.T) {
 	ctx := context.Background()
 	f := seed(t, ctx, db)
 	defer purge(t, db, f.wsID)
-	evtID, _ := seedEvent(t, ctx, db, f, time.Date(2026, 5, 3, 9, 0, 0, 0, time.UTC))
+	evtID, _ := seedEvent(ctx, t, db, f, time.Date(2026, 5, 3, 9, 0, 0, 0, time.UTC))
 
 	tx, err := db.BeginTx(ctx, nil)
 	if err != nil {
 		t.Fatalf("begin: %v", err)
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 	_, _, err = LinkTaskToEvent(ctx, tx, LinkTaskToEventArgs{
 		WorkspaceID: f.wsID,
 		TaskID:      f.taskID,
@@ -171,13 +171,13 @@ func TestLinkTaskToEvent_RejectsMissingTask(t *testing.T) {
 	ctx := context.Background()
 	f := seed(t, ctx, db)
 	defer purge(t, db, f.wsID)
-	evtID, _ := seedEvent(t, ctx, db, f, time.Date(2026, 5, 4, 9, 0, 0, 0, time.UTC))
+	evtID, _ := seedEvent(ctx, t, db, f, time.Date(2026, 5, 4, 9, 0, 0, 0, time.UTC))
 
 	tx, err := db.BeginTx(ctx, nil)
 	if err != nil {
 		t.Fatalf("begin: %v", err)
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 	_, _, err = LinkTaskToEvent(ctx, tx, LinkTaskToEventArgs{
 		WorkspaceID: f.wsID,
 		TaskID:      999999,
@@ -195,7 +195,7 @@ func TestUnlinkTaskFromEvent_SoftDisables(t *testing.T) {
 	ctx := context.Background()
 	f := seed(t, ctx, db)
 	defer purge(t, db, f.wsID)
-	evtID, _ := seedEvent(t, ctx, db, f, time.Date(2026, 5, 5, 9, 0, 0, 0, time.UTC))
+	evtID, _ := seedEvent(ctx, t, db, f, time.Date(2026, 5, 5, 9, 0, 0, 0, time.UTC))
 
 	tx, err := db.BeginTx(ctx, nil)
 	if err != nil {
@@ -209,7 +209,7 @@ func TestUnlinkTaskFromEvent_SoftDisables(t *testing.T) {
 		ActorUserID: f.userID,
 	})
 	if err != nil {
-		tx.Rollback()
+		_ = tx.Rollback()
 		t.Fatalf("link: %v", err)
 	}
 	if err := UnlinkTaskFromEvent(ctx, tx, UnlinkTaskFromEventArgs{
@@ -217,7 +217,7 @@ func TestUnlinkTaskFromEvent_SoftDisables(t *testing.T) {
 		LinkID:      pub,
 		ActorUserID: f.userID,
 	}); err != nil {
-		tx.Rollback()
+		_ = tx.Rollback()
 		t.Fatalf("unlink: %v", err)
 	}
 	if err := tx.Commit(); err != nil {
@@ -258,7 +258,7 @@ func TestUnlinkTaskFromEvent_ReturnsNotFoundForAlreadyDisabled(t *testing.T) {
 	if err != nil {
 		t.Fatalf("begin: %v", err)
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 	// Bogus link id — not present.
 	err = UnlinkTaskFromEvent(ctx, tx, UnlinkTaskFromEventArgs{
 		WorkspaceID: f.wsID,
@@ -275,13 +275,13 @@ func TestLinkTaskToEvent_DifferentRelationsCoexist(t *testing.T) {
 	ctx := context.Background()
 	f := seed(t, ctx, db)
 	defer purge(t, db, f.wsID)
-	evtID, _ := seedEvent(t, ctx, db, f, time.Date(2026, 5, 6, 9, 0, 0, 0, time.UTC))
+	evtID, _ := seedEvent(ctx, t, db, f, time.Date(2026, 5, 6, 9, 0, 0, 0, time.UTC))
 
 	tx, err := db.BeginTx(ctx, nil)
 	if err != nil {
 		t.Fatalf("begin: %v", err)
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 	for _, rel := range []Relation{
 		RelationContributesTo, RelationBlocks, RelationDependsOn, RelationPrepFor,
 	} {

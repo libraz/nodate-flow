@@ -79,7 +79,7 @@ func runCreateImportJob(ctx context.Context, deps Deps, s *session, raw json.Raw
 	}
 	var in struct {
 		Source     string `json:"source"`
-		ProjectID string `json:"projectId"`
+		ProjectID  string `json:"projectId"`
 		ConfigJSON string `json:"configJson"`
 	}
 	if err := parseArgs(raw, &in); err != nil {

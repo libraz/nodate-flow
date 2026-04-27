@@ -407,16 +407,16 @@ func (h *Handler) loadAgentGuardSnapshot(ctx context.Context, agentID uint32) (a
 			slog.WarnContext(ctx, "mcp: malformed allowed_scopes_json", slog.Int("agent_id", int(agentID)), slog.String("err", uerr.Error()))
 		}
 	}
-	var cap *int64
+	var costCap *int64
 	if row.MonthlyCostCapCents.Valid {
 		v := int64(row.MonthlyCostCapCents.Int32)
-		cap = &v
+		costCap = &v
 	}
 	return agentguard.Agent{
 		Enabled:             row.Enabled,
 		Paused:              row.Paused,
 		AllowedScopes:       scopes,
-		MonthlyCostCapCents: cap,
+		MonthlyCostCapCents: costCap,
 	}, nil
 }
 

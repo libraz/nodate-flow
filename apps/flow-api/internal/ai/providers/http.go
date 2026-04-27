@@ -165,7 +165,7 @@ func doLimited(ctx context.Context, destination string, req *http.Request) (*htt
 
 	for attempt := 0; attempt < maxRetries && resp.StatusCode == http.StatusTooManyRequests; attempt++ {
 		// Read and discard body so connection can be reused.
-		io.Copy(io.Discard, resp.Body)
+		_, _ = io.Copy(io.Discard, resp.Body)
 		resp.Body.Close()
 
 		// Parse Retry-After header (seconds) or use exponential backoff.

@@ -510,8 +510,8 @@ func Search(deps Deps) func(context.Context, *SearchPagesInput) (*SearchPagesOut
 
 // GenerateWithAI handles POST /workspaces/{wsId}/pages/generate.
 // This is a placeholder that returns an error until AI dependencies are wired.
-func GenerateWithAI(deps Deps) func(context.Context, *GeneratePageInput) (*GeneratePageOutput, error) {
-	return func(ctx context.Context, in *GeneratePageInput) (*GeneratePageOutput, error) {
+func GenerateWithAI(_ Deps) func(context.Context, *GeneratePageInput) (*GeneratePageOutput, error) {
+	return func(ctx context.Context, _ *GeneratePageInput) (*GeneratePageOutput, error) {
 		ws, ok := middleware.WorkspaceFromContext(ctx)
 		if !ok {
 			return nil, httpErr(apierrors.WsWorkspaceNotFound)

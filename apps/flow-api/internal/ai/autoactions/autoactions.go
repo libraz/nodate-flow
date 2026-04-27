@@ -102,7 +102,7 @@ func DefaultRuleConfigs() []RuleConfig {
 		{Kind: KindNudgeAssignee, Enabled: true, Confidence: 0.70, IdleHours: 72},
 		{Kind: KindCloseStaleReview, Enabled: true, Confidence: 0.70, IdleHours: 120},
 		{Kind: KindAutoArchiveCompleted, Enabled: false, Confidence: 0.90, IdleHours: 336}, // 14 days
-		{Kind: KindAutoCloseStale, Enabled: false, Confidence: 0.80, IdleHours: 720},        // 30 days
+		{Kind: KindAutoCloseStale, Enabled: false, Confidence: 0.80, IdleHours: 720},       // 30 days
 	}
 }
 

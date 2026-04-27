@@ -12,7 +12,7 @@ import (
 // seedExtraTask inserts an additional tasks row in the same project
 // as the primary fixture task, with an optional due_on date.
 // Returns the internal id + public id.
-func seedExtraTask(t *testing.T, ctx context.Context, db *sql.DB, f fixtures, title string, dueOn time.Time) (uint32, dbtype.PublicID) {
+func seedExtraTask(ctx context.Context, t *testing.T, db *sql.DB, f fixtures, title string, dueOn time.Time) (uint32, dbtype.PublicID) {
 	t.Helper()
 	pub := dbtype.New()
 	var dueOnArg any
@@ -38,7 +38,7 @@ func seedExtraTask(t *testing.T, ctx context.Context, db *sql.DB, f fixtures, ti
 
 // linkContributesTo inserts a contributes_to link between a task and
 // an event in one tx so tests stay terse.
-func linkContributesTo(t *testing.T, ctx context.Context, db *sql.DB, f fixtures, taskID, eventID uint32) {
+func linkContributesTo(ctx context.Context, t *testing.T, db *sql.DB, f fixtures, taskID, eventID uint32) {
 	t.Helper()
 	tx, err := db.BeginTx(ctx, nil)
 	if err != nil {
@@ -51,7 +51,7 @@ func linkContributesTo(t *testing.T, ctx context.Context, db *sql.DB, f fixtures
 		Relation:    RelationContributesTo,
 		ActorUserID: f.userID,
 	}); err != nil {
-		tx.Rollback()
+		_ = tx.Rollback()
 		t.Fatalf("link: %v", err)
 	}
 	if err := tx.Commit(); err != nil {
@@ -64,13 +64,13 @@ func TestProposeShiftEventAndChildren_NoLinks(t *testing.T) {
 	ctx := context.Background()
 	f := seed(t, ctx, db)
 	defer purge(t, db, f.wsID)
-	evtID, _ := seedEvent(t, ctx, db, f, time.Date(2026, 6, 1, 10, 0, 0, 0, time.UTC))
+	evtID, _ := seedEvent(ctx, t, db, f, time.Date(2026, 6, 1, 10, 0, 0, 0, time.UTC))
 
 	tx, err := db.BeginTx(ctx, nil)
 	if err != nil {
 		t.Fatalf("begin: %v", err)
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 	newStart := time.Date(2026, 6, 8, 10, 0, 0, 0, time.UTC)
 	p, err := ProposeShiftEventAndChildren(ctx, tx, f.wsID, evtID, newStart)
 	if err != nil {
@@ -90,22 +90,22 @@ func TestProposeShiftEventAndChildren_PartitionsSafeAndConflict(t *testing.T) {
 	f := seed(t, ctx, db)
 	defer purge(t, db, f.wsID)
 
-	umbrella, _ := seedEvent(t, ctx, db, f, time.Date(2026, 6, 1, 10, 0, 0, 0, time.UTC))
-	other, _ := seedEvent(t, ctx, db, f, time.Date(2026, 7, 1, 10, 0, 0, 0, time.UTC))
+	umbrella, _ := seedEvent(ctx, t, db, f, time.Date(2026, 6, 1, 10, 0, 0, 0, time.UTC))
+	other, _ := seedEvent(ctx, t, db, f, time.Date(2026, 7, 1, 10, 0, 0, 0, time.UTC))
 
 	// The primary fixture task is safe (linked only to umbrella).
-	linkContributesTo(t, ctx, db, f, f.taskID, umbrella)
+	linkContributesTo(ctx, t, db, f, f.taskID, umbrella)
 
 	// A second task that contributes to BOTH events = conflict.
-	conflictTaskID, conflictTaskPub := seedExtraTask(t, ctx, db, f, "Conflict task", time.Time{})
-	linkContributesTo(t, ctx, db, f, conflictTaskID, umbrella)
-	linkContributesTo(t, ctx, db, f, conflictTaskID, other)
+	conflictTaskID, conflictTaskPub := seedExtraTask(ctx, t, db, f, "Conflict task", time.Time{})
+	linkContributesTo(ctx, t, db, f, conflictTaskID, umbrella)
+	linkContributesTo(ctx, t, db, f, conflictTaskID, other)
 
 	tx, err := db.BeginTx(ctx, nil)
 	if err != nil {
 		t.Fatalf("begin: %v", err)
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 	newStart := time.Date(2026, 6, 8, 10, 0, 0, 0, time.UTC)
 	p, err := ProposeShiftEventAndChildren(ctx, tx, f.wsID, umbrella, newStart)
 	if err != nil {
@@ -162,7 +162,7 @@ func TestProposeShiftEventAndChildren_RejectsUndated(t *testing.T) {
 	if err != nil {
 		t.Fatalf("begin: %v", err)
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 	_, err = ProposeShiftEventAndChildren(ctx, tx, f.wsID, evtID,
 		time.Date(2026, 6, 8, 10, 0, 0, 0, time.UTC))
 	if err == nil {
@@ -177,11 +177,11 @@ func TestApplyShiftEventAndChildren_ShiftsUmbrellaAndSafeTasks(t *testing.T) {
 	defer purge(t, db, f.wsID)
 
 	umbrellaStart := time.Date(2026, 6, 1, 10, 0, 0, 0, time.UTC)
-	umbrella, _ := seedEvent(t, ctx, db, f, umbrellaStart)
+	umbrella, _ := seedEvent(ctx, t, db, f, umbrellaStart)
 
 	dueDate := time.Date(2026, 5, 28, 0, 0, 0, 0, time.UTC)
-	safeTaskID, _ := seedExtraTask(t, ctx, db, f, "Safe", dueDate)
-	linkContributesTo(t, ctx, db, f, safeTaskID, umbrella)
+	safeTaskID, _ := seedExtraTask(ctx, t, db, f, "Safe", dueDate)
+	linkContributesTo(ctx, t, db, f, safeTaskID, umbrella)
 
 	tx, err := db.BeginTx(ctx, nil)
 	if err != nil {
@@ -195,7 +195,7 @@ func TestApplyShiftEventAndChildren_ShiftsUmbrellaAndSafeTasks(t *testing.T) {
 		ConfirmedTaskIDs: []uint32{safeTaskID},
 		ActorUserID:      f.userID,
 	}); err != nil {
-		tx.Rollback()
+		_ = tx.Rollback()
 		t.Fatalf("apply: %v", err)
 	}
 	if err := tx.Commit(); err != nil {
@@ -233,11 +233,11 @@ func TestApplyShiftEventAndChildren_IgnoresUnconfirmedTasks(t *testing.T) {
 	defer purge(t, db, f.wsID)
 
 	umbrellaStart := time.Date(2026, 6, 1, 10, 0, 0, 0, time.UTC)
-	umbrella, _ := seedEvent(t, ctx, db, f, umbrellaStart)
+	umbrella, _ := seedEvent(ctx, t, db, f, umbrellaStart)
 
 	dueDate := time.Date(2026, 5, 28, 0, 0, 0, 0, time.UTC)
-	skippedTaskID, _ := seedExtraTask(t, ctx, db, f, "Skipped", dueDate)
-	linkContributesTo(t, ctx, db, f, skippedTaskID, umbrella)
+	skippedTaskID, _ := seedExtraTask(ctx, t, db, f, "Skipped", dueDate)
+	linkContributesTo(ctx, t, db, f, skippedTaskID, umbrella)
 
 	tx, err := db.BeginTx(ctx, nil)
 	if err != nil {
@@ -251,7 +251,7 @@ func TestApplyShiftEventAndChildren_IgnoresUnconfirmedTasks(t *testing.T) {
 		ConfirmedTaskIDs: nil, // empty = shift umbrella only
 		ActorUserID:      f.userID,
 	}); err != nil {
-		tx.Rollback()
+		_ = tx.Rollback()
 		t.Fatalf("apply: %v", err)
 	}
 	if err := tx.Commit(); err != nil {
@@ -276,10 +276,10 @@ func TestApplyShiftEventAndChildren_IgnoresStaleTaskIDs(t *testing.T) {
 	defer purge(t, db, f.wsID)
 
 	umbrellaStart := time.Date(2026, 6, 1, 10, 0, 0, 0, time.UTC)
-	umbrella, _ := seedEvent(t, ctx, db, f, umbrellaStart)
+	umbrella, _ := seedEvent(ctx, t, db, f, umbrellaStart)
 
 	dueDate := time.Date(2026, 5, 28, 0, 0, 0, 0, time.UTC)
-	unrelatedTaskID, _ := seedExtraTask(t, ctx, db, f, "Unrelated", dueDate)
+	unrelatedTaskID, _ := seedExtraTask(ctx, t, db, f, "Unrelated", dueDate)
 	// Note: NOT linked to umbrella.
 
 	tx, err := db.BeginTx(ctx, nil)
@@ -294,7 +294,7 @@ func TestApplyShiftEventAndChildren_IgnoresStaleTaskIDs(t *testing.T) {
 		ConfirmedTaskIDs: []uint32{unrelatedTaskID, 999999},
 		ActorUserID:      f.userID,
 	}); err != nil {
-		tx.Rollback()
+		_ = tx.Rollback()
 		t.Fatalf("apply: %v", err)
 	}
 	if err := tx.Commit(); err != nil {
@@ -319,11 +319,11 @@ func TestApplyShiftEventAndChildren_TimeOnlyChangeSkipsTasks(t *testing.T) {
 	defer purge(t, db, f.wsID)
 
 	umbrellaStart := time.Date(2026, 6, 1, 10, 0, 0, 0, time.UTC)
-	umbrella, _ := seedEvent(t, ctx, db, f, umbrellaStart)
+	umbrella, _ := seedEvent(ctx, t, db, f, umbrellaStart)
 
 	dueDate := time.Date(2026, 5, 28, 0, 0, 0, 0, time.UTC)
-	taskID, _ := seedExtraTask(t, ctx, db, f, "Same-day", dueDate)
-	linkContributesTo(t, ctx, db, f, taskID, umbrella)
+	taskID, _ := seedExtraTask(ctx, t, db, f, "Same-day", dueDate)
+	linkContributesTo(ctx, t, db, f, taskID, umbrella)
 
 	tx, err := db.BeginTx(ctx, nil)
 	if err != nil {
@@ -338,7 +338,7 @@ func TestApplyShiftEventAndChildren_TimeOnlyChangeSkipsTasks(t *testing.T) {
 		ConfirmedTaskIDs: []uint32{taskID},
 		ActorUserID:      f.userID,
 	}); err != nil {
-		tx.Rollback()
+		_ = tx.Rollback()
 		t.Fatalf("apply: %v", err)
 	}
 	if err := tx.Commit(); err != nil {
@@ -392,7 +392,7 @@ func TestApplyShiftEventAndChildren_RejectsUndatedUmbrella(t *testing.T) {
 	if err != nil {
 		t.Fatalf("begin: %v", err)
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 	err = ApplyShiftEventAndChildren(ctx, tx, ApplyShiftEventAndChildrenArgs{
 		WorkspaceID: f.wsID,
 		EventID:     evtID,

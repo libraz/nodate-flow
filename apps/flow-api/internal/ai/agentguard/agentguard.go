@@ -71,13 +71,13 @@ func Decide(agent Agent, req Request) Decision {
 			Reason:  "scope " + req.RequiredScope + " is not in the agent's allow list",
 		}
 	}
-	if cap := agent.MonthlyCostCapCents; cap != nil {
+	if costCap := agent.MonthlyCostCapCents; costCap != nil {
 		// Apply a 95% safety margin to the effective cap. Concurrent
 		// tool calls may read the same spend value before any of them
 		// record their cost, so capping at 95% prevents budget overrun
 		// from the resulting race window.
-		effectiveCap := *cap * 95 / 100
-		if effectiveCap <= 0 && *cap > 0 {
+		effectiveCap := *costCap * 95 / 100
+		if effectiveCap <= 0 && *costCap > 0 {
 			effectiveCap = 1
 		}
 		if req.SpentCentsMonth >= effectiveCap {

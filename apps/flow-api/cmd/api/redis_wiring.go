@@ -9,10 +9,10 @@ import (
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/ai/providers"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/auth/sessadapter"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/config"
-	"github.com/nodate-flow/nodate-flow/packages/go-shared/sessionstore"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/generated"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/outbound"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/stream"
+	"github.com/nodate-flow/nodate-flow/packages/go-shared/sessionstore"
 )
 
 // buildSessionStore selects the Redis driver when NF_FLOW_SESSION_STORE=redis

@@ -22,7 +22,7 @@ import (
 // AND-filters projects.enabled, but bypassing the view would otherwise
 // leak orphan-looking rows.
 func Disable(deps Deps) func(context.Context, *DisableProjectInput) (*DisableProjectOutput, error) {
-	return func(ctx context.Context, in *DisableProjectInput) (*DisableProjectOutput, error) {
+	return func(ctx context.Context, _ *DisableProjectInput) (*DisableProjectOutput, error) {
 		prj, ok := middleware.ProjectFromContext(ctx)
 		if !ok {
 			return nil, httpErr(apierrors.WsProjectNotFound)

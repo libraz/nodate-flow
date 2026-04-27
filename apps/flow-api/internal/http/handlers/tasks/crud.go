@@ -594,7 +594,7 @@ func List(deps Deps) func(context.Context, *ListTasksInput) (*ListTasksOutput, e
 
 // Get handles GET /tasks/{id}.
 func Get(deps Deps) func(context.Context, *GetTaskInput) (*GetTaskOutput, error) {
-	return func(ctx context.Context, in *GetTaskInput) (*GetTaskOutput, error) {
+	return func(ctx context.Context, _ *GetTaskInput) (*GetTaskOutput, error) {
 		ws, ok := middleware.WorkspaceFromContext(ctx)
 		if !ok {
 			return nil, httpErr(apierrors.WsTaskNotFound)
@@ -816,7 +816,7 @@ var translateItemkitTaskError = handlerutil.TranslateTaskItemkitError
 // itemkit.DeleteTask so any linked calendar_events cascade
 // soft-disabled in the same transaction.
 func Disable(deps Deps) func(context.Context, *DisableTaskInput) (*DisableTaskOutput, error) {
-	return func(ctx context.Context, in *DisableTaskInput) (*DisableTaskOutput, error) {
+	return func(ctx context.Context, _ *DisableTaskInput) (*DisableTaskOutput, error) {
 		ws, ok := middleware.WorkspaceFromContext(ctx)
 		if !ok {
 			return nil, httpErr(apierrors.WsTaskNotFound)

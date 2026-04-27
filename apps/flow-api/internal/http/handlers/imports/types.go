@@ -51,8 +51,8 @@ type ImportJobBody struct {
 
 // CreateImportBody is the JSON body for POST /workspaces/{wsId}/imports.
 type CreateImportBody struct {
-	Source     string          `json:"source" enum:"github,jira,linear,csv"`
-	ProjectID *string         `json:"projectId,omitempty" doc:"Target project public id (UUID v7)"`
+	Source     string         `json:"source" enum:"github,jira,linear,csv"`
+	ProjectID  *string        `json:"projectId,omitempty" doc:"Target project public id (UUID v7)"`
 	ConfigJSON map[string]any `json:"configJson,omitempty" doc:"Source-specific configuration"`
 }
 

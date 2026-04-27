@@ -17,8 +17,8 @@ import (
 var validFavoriteTargetTypes = map[string]generated.UserFavoritesTargetType{
 	"project": generated.UserFavoritesTargetTypeProject,
 	"task":    generated.UserFavoritesTargetTypeTask,
-	"page":   generated.UserFavoritesTargetTypePage,
-	"lens":   generated.UserFavoritesTargetTypeLens,
+	"page":    generated.UserFavoritesTargetTypePage,
+	"lens":    generated.UserFavoritesTargetTypeLens,
 	"timebox": generated.UserFavoritesTargetTypeTimebox,
 }
 

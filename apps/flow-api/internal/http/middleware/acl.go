@@ -307,11 +307,11 @@ func RequireWorkspaceMember(db ACLDB) func(http.Handler) http.Handler {
 // RequireWorkspaceRole returns a middleware that asserts the actor's
 // workspace role (previously injected by [RequireWorkspaceMember]) meets the
 // given minimum. Responds 403 WS.MEMBER.ROLE_DENIED on failure.
-func RequireWorkspaceRole(min WorkspaceRole) func(http.Handler) http.Handler {
+func RequireWorkspaceRole(minRole WorkspaceRole) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			ws, ok := WorkspaceFromContext(r.Context())
-			if !ok || !ws.Role.AtLeast(min) {
+			if !ok || !ws.Role.AtLeast(minRole) {
 				writeError(w, http.StatusForbidden, apierrors.WsMemberRoleDenied.Code,
 					apierrors.WsMemberRoleDenied.Message)
 				return
@@ -542,7 +542,7 @@ func TaskVisibilityFilter(userID uint32, wsRole WorkspaceRole) (fragment string,
 // project role.
 //
 // Responds 403 WS.PROJECT.ACCESS_DENIED on failure.
-func RequireProjectRole(min ProjectRole) func(http.Handler) http.Handler {
+func RequireProjectRole(minRole ProjectRole) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			prj, ok := ProjectFromContext(r.Context())
@@ -555,7 +555,7 @@ func RequireProjectRole(min ProjectRole) func(http.Handler) http.Handler {
 				next.ServeHTTP(w, r)
 				return
 			}
-			if !prj.Role.AtLeast(min) {
+			if !prj.Role.AtLeast(minRole) {
 				writeError(w, http.StatusForbidden, apierrors.WsProjectAccessDenied.Code,
 					apierrors.WsProjectAccessDenied.Message)
 				return

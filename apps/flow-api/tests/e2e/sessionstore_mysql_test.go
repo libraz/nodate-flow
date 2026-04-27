@@ -9,8 +9,8 @@ import (
 
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/auth/sessadapter"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/generated"
-	"github.com/nodate-flow/nodate-flow/packages/go-shared/sessionstore"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/types"
+	"github.com/nodate-flow/nodate-flow/packages/go-shared/sessionstore"
 )
 
 // TestSessionstoreMySQLDriver exercises the MySQL [sessionstore.Store]

@@ -35,8 +35,8 @@ var workspaceRoleRank = map[WorkspaceRole]int{
 
 // AtLeast reports whether the receiver role meets or exceeds the given
 // minimum role in the workspace hierarchy.
-func (r WorkspaceRole) AtLeast(min WorkspaceRole) bool {
-	return workspaceRoleRank[r] >= workspaceRoleRank[min]
+func (r WorkspaceRole) AtLeast(minRole WorkspaceRole) bool {
+	return workspaceRoleRank[r] >= workspaceRoleRank[minRole]
 }
 
 // ProjectRole is the role of a user inside a project. The hierarchy is
@@ -63,8 +63,8 @@ var projectRoleRank = map[ProjectRole]int{
 
 // AtLeast reports whether the receiver role meets or exceeds the given
 // minimum role in the project hierarchy.
-func (r ProjectRole) AtLeast(min ProjectRole) bool {
-	return projectRoleRank[r] >= projectRoleRank[min]
+func (r ProjectRole) AtLeast(minRole ProjectRole) bool {
+	return projectRoleRank[r] >= projectRoleRank[minRole]
 }
 
 // TaskVisibility represents the Layer 4 task-level visibility setting.

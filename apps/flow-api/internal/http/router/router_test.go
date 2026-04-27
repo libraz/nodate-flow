@@ -112,20 +112,20 @@ func resolvePath(t *testing.T, p string) string {
 	t.Helper()
 	out := p
 	for {
-		open := strings.Index(out, "{")
-		if open < 0 {
+		openIdx := strings.Index(out, "{")
+		if openIdx < 0 {
 			break
 		}
-		close := strings.Index(out[open:], "}")
-		if close < 0 {
+		closeIdx := strings.Index(out[openIdx:], "}")
+		if closeIdx < 0 {
 			t.Fatalf("malformed path template: %q", p)
 		}
-		name := out[open+1 : open+close]
+		name := out[openIdx+1 : openIdx+closeIdx]
 		val, ok := pathPlaceholders[name]
 		if !ok {
 			t.Fatalf("path %q references unknown parameter %q — add it to pathPlaceholders", p, name)
 		}
-		out = out[:open] + val + out[open+close+1:]
+		out = out[:openIdx] + val + out[openIdx+closeIdx+1:]
 	}
 	return out
 }
