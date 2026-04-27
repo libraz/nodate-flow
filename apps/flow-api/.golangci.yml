@@ -19,12 +19,13 @@ linters:
           files:
             - '!**/internal/ai/**'
             - '!**/internal/http/handlers/ai/**'
+            - '!**/internal/http/router/**'
             - '!**/cmd/secrets-rotate/**'
             - '!**/cmd/api/**'
             - '!**/tests/**'
           deny:
             - pkg: github.com/nodate-flow/nodate-flow/packages/go-shared/crypto
-              desc: crypto package may only be imported from internal/ai, internal/http/handlers/ai, cmd/api, cmd/secrets-rotate, and tests
+              desc: crypto package may only be imported from internal/ai, internal/http/handlers/ai, internal/http/router, cmd/api, cmd/secrets-rotate, and tests
     forbidigo:
       forbid:
         - pattern: slog\.Int64\("(workspace|task|user|actor|project|page|label|comment|event|calendar|share|invite|reaction|widget|timebox|signal|suggestion|attachment|constraint|dependency|favorite|import_job|intake_item|version|widget_id)_id"
