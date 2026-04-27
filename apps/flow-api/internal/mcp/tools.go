@@ -129,7 +129,7 @@ func registerTools(h *Handler) {
 		requiredScope: "write:workspace",
 		inputSchema: objectSchema(map[string]any{
 			"taskId":     stringSchema("Task public id (UUID v7).", Constraints{Pattern: publicIDPattern}),
-			"transition": stringSchema("Transition name: start | block | unblock | submit | complete | reopen | cancel."),
+			"transition": stringSchema("Transition name: start | block | unblock | submit | complete | reopen | cancel.", Constraints{Pattern: `^(start|block|unblock|submit|complete|reopen|cancel)$`}),
 			"reason":     stringSchema("Optional reason for the transition."),
 		}, []string{"taskId", "transition"}),
 		run: runTransitionTask,
@@ -139,8 +139,8 @@ func registerTools(h *Handler) {
 		description:   "Append a comment to a task.",
 		requiredScope: "write:workspace",
 		inputSchema: objectSchema(map[string]any{
-			"taskId": stringSchema("Task public id (UUID v7)."),
-			"body":   stringSchema("Comment body."),
+			"taskId": stringSchema("Task public id (UUID v7).", Constraints{Pattern: publicIDPattern}),
+			"body":   stringSchema("Comment body.", Constraints{MinLength: intPtr(1)}),
 		}, []string{"taskId", "body"}),
 		run: runAddComment,
 	})
@@ -160,7 +160,7 @@ func registerTools(h *Handler) {
 		description:   "Ask the workspace LLM to propose tasks from free text. Requires a configured AI provider.",
 		requiredScope: "write:workspace",
 		inputSchema: objectSchema(map[string]any{
-			"source": stringSchema("Input text to propose tasks from."),
+			"source": stringSchema("Input text to propose tasks from.", Constraints{MinLength: intPtr(1)}),
 		}, []string{"source"}),
 		run: runProposeTasksFrom,
 	})
@@ -169,7 +169,7 @@ func registerTools(h *Handler) {
 		description:   "Ask the workspace LLM to propose a priority for a task. Requires a configured AI provider.",
 		requiredScope: "write:workspace",
 		inputSchema: objectSchema(map[string]any{
-			"taskId": stringSchema("Task public id (UUID v7)."),
+			"taskId": stringSchema("Task public id (UUID v7).", Constraints{Pattern: publicIDPattern}),
 		}, []string{"taskId"}),
 		run: runProposePriority,
 	})
@@ -178,7 +178,7 @@ func registerTools(h *Handler) {
 		description:   "Ask the workspace LLM to break an existing task into concrete execution steps.",
 		requiredScope: "read:workspace",
 		inputSchema: objectSchema(map[string]any{
-			"taskId": stringSchema("Task public id (UUID v7)."),
+			"taskId": stringSchema("Task public id (UUID v7).", Constraints{Pattern: publicIDPattern}),
 		}, []string{"taskId"}),
 		run: runProposeSteps,
 	})
@@ -187,14 +187,14 @@ func registerTools(h *Handler) {
 		description:   "Create the given steps as child tasks under an existing parent task.",
 		requiredScope: "write:workspace",
 		inputSchema: objectSchema(map[string]any{
-			"parentTaskId": stringSchema("Parent task public id (UUID v7)."),
+			"parentTaskId": stringSchema("Parent task public id (UUID v7).", Constraints{Pattern: publicIDPattern}),
 			"steps": map[string]any{
 				"type":        "array",
 				"description": "Step definitions to create as child tasks.",
 				"items": objectSchema(map[string]any{
-					"title":       stringSchema("Step title."),
+					"title":       stringSchema("Step title.", Constraints{MinLength: intPtr(1), MaxLength: intPtr(500)}),
 					"description": stringSchema("Step description (optional)."),
-					"priority":    intSchema("Step priority 0..4 (optional)."),
+					"priority":    intSchema("Step priority 0..4 (optional).", Constraints{Min: intPtr(0), Max: intPtr(4)}),
 				}, []string{"title"}),
 			},
 		}, []string{"parentTaskId", "steps"}),
@@ -205,7 +205,7 @@ func registerTools(h *Handler) {
 		description:   "Return likely-duplicate tasks for a given task by embedding similarity (ADR 0003).",
 		requiredScope: "read:workspace",
 		inputSchema: objectSchema(map[string]any{
-			"taskId": stringSchema("Task public id (UUID v7)."),
+			"taskId": stringSchema("Task public id (UUID v7).", Constraints{Pattern: publicIDPattern}),
 		}, []string{"taskId"}),
 		run: runProposeDuplicates,
 	})
@@ -214,7 +214,7 @@ func registerTools(h *Handler) {
 		description:   "Compile a natural-language query into a validated Lens view JSON.",
 		requiredScope: "read:workspace",
 		inputSchema: objectSchema(map[string]any{
-			"prompt": stringSchema("Natural-language description of the desired view."),
+			"prompt": stringSchema("Natural-language description of the desired view.", Constraints{MinLength: intPtr(1)}),
 		}, []string{"prompt"}),
 		run: runProposeLens,
 	})
@@ -233,11 +233,11 @@ func registerTools(h *Handler) {
 		description:   "Create a new timebox (sprint / iteration) in the workspace.",
 		requiredScope: "write:workspace",
 		inputSchema: objectSchema(map[string]any{
-			"name":        stringSchema("Timebox name."),
-			"startsOn":    stringSchema("Start date YYYY-MM-DD."),
-			"endsOn":      stringSchema("End date YYYY-MM-DD."),
+			"name":        stringSchema("Timebox name.", Constraints{MinLength: intPtr(1), MaxLength: intPtr(200)}),
+			"startsOn":    stringSchema("Start date YYYY-MM-DD.", Constraints{Pattern: `^\d{4}-\d{2}-\d{2}$`}),
+			"endsOn":      stringSchema("End date YYYY-MM-DD.", Constraints{Pattern: `^\d{4}-\d{2}-\d{2}$`}),
 			"description": stringSchema("Optional description."),
-			"projectId":   stringSchema("Optional project public id (UUID v7) to scope the timebox."),
+			"projectId":   stringSchema("Optional project public id (UUID v7) to scope the timebox.", Constraints{Pattern: publicIDPattern}),
 		}, []string{"name", "startsOn", "endsOn"}),
 		run: runCreateTimebox,
 	})
@@ -246,8 +246,8 @@ func registerTools(h *Handler) {
 		description:   "Add a task to a timebox.",
 		requiredScope: "write:workspace",
 		inputSchema: objectSchema(map[string]any{
-			"timeboxId": stringSchema("Timebox public id (UUID v7)."),
-			"taskId":    stringSchema("Task public id (UUID v7)."),
+			"timeboxId": stringSchema("Timebox public id (UUID v7).", Constraints{Pattern: publicIDPattern}),
+			"taskId":    stringSchema("Task public id (UUID v7).", Constraints{Pattern: publicIDPattern}),
 		}, []string{"timeboxId", "taskId"}),
 		run: runAddTaskToTimebox,
 	})
@@ -266,7 +266,7 @@ func registerTools(h *Handler) {
 		description:   "Given a task, find related or duplicate tasks by embedding similarity. Returns structured suggestions with kind.",
 		requiredScope: "read:workspace",
 		inputSchema: objectSchema(map[string]any{
-			"taskId": stringSchema("Task public id (UUID v7)."),
+			"taskId": stringSchema("Task public id (UUID v7).", Constraints{Pattern: publicIDPattern}),
 		}, []string{"taskId"}),
 		run: runProposeRelations,
 	})
@@ -275,8 +275,8 @@ func registerTools(h *Handler) {
 		description:   "List wiki pages for the current workspace. Returns root-level pages by default.",
 		requiredScope: "read:workspace",
 		inputSchema: objectSchema(map[string]any{
-			"projectId":    stringSchema("Optional project public id (UUID v7) to scope pages."),
-			"parentPageId": stringSchema("Optional parent page public id (UUID v7) to list child pages."),
+			"projectId":    stringSchema("Optional project public id (UUID v7) to scope pages.", Constraints{Pattern: publicIDPattern}),
+			"parentPageId": stringSchema("Optional parent page public id (UUID v7) to list child pages.", Constraints{Pattern: publicIDPattern}),
 		}, nil),
 		run: runListPages,
 	})
@@ -285,7 +285,7 @@ func registerTools(h *Handler) {
 		description:   "Get a wiki page by ID, including its content.",
 		requiredScope: "read:workspace",
 		inputSchema: objectSchema(map[string]any{
-			"pageId": stringSchema("Page public id (UUID v7)."),
+			"pageId": stringSchema("Page public id (UUID v7).", Constraints{Pattern: publicIDPattern}),
 		}, []string{"pageId"}),
 		run: runGetPage,
 	})
@@ -294,10 +294,10 @@ func registerTools(h *Handler) {
 		description:   "Create a new wiki page.",
 		requiredScope: "write:workspace",
 		inputSchema: objectSchema(map[string]any{
-			"title":        stringSchema("Page title."),
+			"title":        stringSchema("Page title.", Constraints{MinLength: intPtr(1), MaxLength: intPtr(200)}),
 			"body":         stringSchema("Optional page body content."),
-			"parentPageId": stringSchema("Optional parent page public id (UUID v7)."),
-			"projectId":    stringSchema("Optional project public id (UUID v7)."),
+			"parentPageId": stringSchema("Optional parent page public id (UUID v7).", Constraints{Pattern: publicIDPattern}),
+			"projectId":    stringSchema("Optional project public id (UUID v7).", Constraints{Pattern: publicIDPattern}),
 		}, []string{"title"}),
 		run: runCreatePage,
 	})
@@ -306,8 +306,8 @@ func registerTools(h *Handler) {
 		description:   "Update a wiki page's title or content.",
 		requiredScope: "write:workspace",
 		inputSchema: objectSchema(map[string]any{
-			"pageId": stringSchema("Page public id (UUID v7)."),
-			"title":  stringSchema("New title (optional)."),
+			"pageId": stringSchema("Page public id (UUID v7).", Constraints{Pattern: publicIDPattern}),
+			"title":  stringSchema("New title (optional).", Constraints{MaxLength: intPtr(200)}),
 			"body":   stringSchema("New body content (optional)."),
 		}, []string{"pageId"}),
 		run: runUpdatePage,
@@ -317,12 +317,12 @@ func registerTools(h *Handler) {
 		description:   "Generate a wiki page using AI based on project or task context.",
 		requiredScope: "write:workspace",
 		inputSchema: objectSchema(map[string]any{
-			"contextDescription": stringSchema("What the page should be about."),
-			"projectId":          stringSchema("Optional project public id (UUID v7)."),
+			"contextDescription": stringSchema("What the page should be about.", Constraints{MinLength: intPtr(1)}),
+			"projectId":          stringSchema("Optional project public id (UUID v7).", Constraints{Pattern: publicIDPattern}),
 			"taskIds": map[string]any{
 				"type":        "array",
 				"description": "Optional task public ids (UUID v7) to include as context.",
-				"items":       stringSchema("Task public id (UUID v7)."),
+				"items":       stringSchema("Task public id (UUID v7).", Constraints{Pattern: publicIDPattern}),
 			},
 		}, []string{"contextDescription"}),
 		run: runGeneratePage,
@@ -332,8 +332,8 @@ func registerTools(h *Handler) {
 		description:   "Create a task with AI-suggested subtask breakdown and assignees based on past ticket patterns.",
 		requiredScope: "write:workspace",
 		inputSchema: objectSchema(map[string]any{
-			"projectId":   stringSchema("Project public id (UUID v7)."),
-			"title":       stringSchema("Task title."),
+			"projectId":   stringSchema("Project public id (UUID v7).", Constraints{Pattern: publicIDPattern}),
+			"title":       stringSchema("Task title.", Constraints{MinLength: intPtr(1), MaxLength: intPtr(500)}),
 			"description": stringSchema("Optional task description for better AI analysis."),
 		}, []string{"projectId", "title"}),
 		run: runSmartCreateTask,
@@ -354,8 +354,8 @@ func registerTools(h *Handler) {
 		inputSchema: objectSchema(map[string]any{
 			"startDate": stringSchema("Range start as YYYY-MM-DD (mutually exclusive with startAt).", Constraints{Pattern: `^\d{4}-\d{2}-\d{2}$`}),
 			"endDate":   stringSchema("Range end as YYYY-MM-DD (mutually exclusive with endAt).", Constraints{Pattern: `^\d{4}-\d{2}-\d{2}$`}),
-			"startAt":   intSchema("Range start, unix seconds since epoch (mutually exclusive with startDate)."),
-			"endAt":     intSchema("Range end, unix seconds since epoch (mutually exclusive with endDate)."),
+			"startAt":   intSchema("Range start, unix seconds since epoch (mutually exclusive with startDate).", Constraints{Min: intPtr(0)}),
+			"endAt":     intSchema("Range end, unix seconds since epoch (mutually exclusive with endDate).", Constraints{Min: intPtr(0)}),
 		}, nil),
 		run: runListCalendarEvents,
 	})
@@ -366,8 +366,8 @@ func registerTools(h *Handler) {
 		inputSchema: objectSchema(map[string]any{
 			"calendarId":  stringSchema("Calendar public id (UUID v7).", Constraints{Pattern: publicIDPattern}),
 			"title":       stringSchema("Event title.", Constraints{MinLength: intPtr(1), MaxLength: intPtr(500)}),
-			"startAt":     intSchema("Start time, unix seconds since epoch (timed events)."),
-			"endAt":       intSchema("End time, unix seconds since epoch (timed events)."),
+			"startAt":     intSchema("Start time, unix seconds since epoch (timed events).", Constraints{Min: intPtr(0)}),
+			"endAt":       intSchema("End time, unix seconds since epoch (timed events).", Constraints{Min: intPtr(0)}),
 			"startDate":   stringSchema("Start date YYYY-MM-DD (all-day events).", Constraints{Pattern: `^\d{4}-\d{2}-\d{2}$`}),
 			"endDate":     stringSchema("End date YYYY-MM-DD (all-day events, inclusive).", Constraints{Pattern: `^\d{4}-\d{2}-\d{2}$`}),
 			"kind":        stringSchema("Event kind: event | block | free (default event)."),
@@ -388,8 +388,8 @@ func registerTools(h *Handler) {
 		inputSchema: objectSchema(map[string]any{
 			"eventId":    stringSchema("Event public id (UUID v7).", Constraints{Pattern: publicIDPattern}),
 			"title":      stringSchema("New title.", Constraints{MinLength: intPtr(1), MaxLength: intPtr(500)}),
-			"startAt":    intSchema("New start time, unix seconds since epoch."),
-			"endAt":      intSchema("New end time, unix seconds since epoch."),
+			"startAt":    intSchema("New start time, unix seconds since epoch.", Constraints{Min: intPtr(0)}),
+			"endAt":      intSchema("New end time, unix seconds since epoch.", Constraints{Min: intPtr(0)}),
 			"startDate":  stringSchema("New start date YYYY-MM-DD (all-day events).", Constraints{Pattern: `^\d{4}-\d{2}-\d{2}$`}),
 			"endDate":    stringSchema("New end date YYYY-MM-DD (all-day events).", Constraints{Pattern: `^\d{4}-\d{2}-\d{2}$`}),
 			"kind":       stringSchema("New kind: event | block | free."),
@@ -406,7 +406,7 @@ func registerTools(h *Handler) {
 		description:   "Delete a calendar event (soft-delete).",
 		requiredScope: "write:workspace",
 		inputSchema: objectSchema(map[string]any{
-			"eventId": stringSchema("Event public id (UUID v7)."),
+			"eventId": stringSchema("Event public id (UUID v7).", Constraints{Pattern: publicIDPattern}),
 		}, []string{"eventId"}),
 		run: runDeleteCalendarEvent,
 	})
@@ -428,8 +428,8 @@ func registerTools(h *Handler) {
 		inputSchema: objectSchema(map[string]any{
 			"taskId":     stringSchema("Task public id (UUID v7).", Constraints{Pattern: publicIDPattern}),
 			"calendarId": stringSchema("Calendar public id (UUID v7).", Constraints{Pattern: publicIDPattern}),
-			"startAt":    intSchema("Start time, unix seconds since epoch."),
-			"endAt":      intSchema("End time, unix seconds since epoch."),
+			"startAt":    intSchema("Start time, unix seconds since epoch.", Constraints{Min: intPtr(0)}),
+			"endAt":      intSchema("End time, unix seconds since epoch.", Constraints{Min: intPtr(0)}),
 		}, []string{"taskId", "calendarId", "startAt", "endAt"}),
 		run: runCreateEventFromTask,
 	})
@@ -438,7 +438,7 @@ func registerTools(h *Handler) {
 		description:   "List memos (shared to-do items) in a calendar.",
 		requiredScope: "read:workspace",
 		inputSchema: objectSchema(map[string]any{
-			"calendarId": stringSchema("Calendar public id (UUID v7)."),
+			"calendarId": stringSchema("Calendar public id (UUID v7).", Constraints{Pattern: publicIDPattern}),
 		}, []string{"calendarId"}),
 		run: runListCalendarMemos,
 	})
@@ -447,8 +447,8 @@ func registerTools(h *Handler) {
 		description:   "Toggle the done/undone state of a calendar memo.",
 		requiredScope: "write:workspace",
 		inputSchema: objectSchema(map[string]any{
-			"memoId":     stringSchema("Memo public id (UUID v7)."),
-			"calendarId": stringSchema("Calendar public id (UUID v7)."),
+			"memoId":     stringSchema("Memo public id (UUID v7).", Constraints{Pattern: publicIDPattern}),
+			"calendarId": stringSchema("Calendar public id (UUID v7).", Constraints{Pattern: publicIDPattern}),
 			"done":       boolSchema("Set to true to mark done, false to unmark."),
 		}, []string{"memoId", "calendarId", "done"}),
 		run: runToggleCalendarMemo,
@@ -458,8 +458,8 @@ func registerTools(h *Handler) {
 		description:   "Parse natural language into a calendar event (AI-powered, coming soon).",
 		requiredScope: "write:workspace",
 		inputSchema: objectSchema(map[string]any{
-			"text":       stringSchema("Natural language description of the event."),
-			"calendarId": stringSchema("Calendar public id (UUID v7)."),
+			"text":       stringSchema("Natural language description of the event.", Constraints{MinLength: intPtr(1)}),
+			"calendarId": stringSchema("Calendar public id (UUID v7).", Constraints{Pattern: publicIDPattern}),
 		}, []string{"text", "calendarId"}),
 		run: runSmartCreateEvent,
 	})
@@ -480,8 +480,8 @@ func registerTools(h *Handler) {
 		description:   "Create a new label in the workspace.",
 		requiredScope: "write:workspace",
 		inputSchema: objectSchema(map[string]any{
-			"name":        stringSchema("Label name."),
-			"color":       stringSchema("Hex color (e.g. #ef4444). Optional."),
+			"name":        stringSchema("Label name.", Constraints{MinLength: intPtr(1), MaxLength: intPtr(100)}),
+			"color":       stringSchema("Hex color (e.g. #ef4444). Optional.", Constraints{Pattern: `^#[0-9a-fA-F]{6}$`}),
 			"description": stringSchema("Optional description."),
 		}, []string{"name"}),
 		run: runCreateLabel,
@@ -491,8 +491,8 @@ func registerTools(h *Handler) {
 		description:   "Attach a label to a task.",
 		requiredScope: "write:workspace",
 		inputSchema: objectSchema(map[string]any{
-			"taskId":  stringSchema("Task public id (UUID v7)."),
-			"labelId": stringSchema("Label public id (UUID v7)."),
+			"taskId":  stringSchema("Task public id (UUID v7).", Constraints{Pattern: publicIDPattern}),
+			"labelId": stringSchema("Label public id (UUID v7).", Constraints{Pattern: publicIDPattern}),
 		}, []string{"taskId", "labelId"}),
 		run: runAddTaskLabel,
 	})
@@ -501,8 +501,8 @@ func registerTools(h *Handler) {
 		description:   "Remove a label from a task.",
 		requiredScope: "write:workspace",
 		inputSchema: objectSchema(map[string]any{
-			"taskId":  stringSchema("Task public id (UUID v7)."),
-			"labelId": stringSchema("Label public id (UUID v7)."),
+			"taskId":  stringSchema("Task public id (UUID v7).", Constraints{Pattern: publicIDPattern}),
+			"labelId": stringSchema("Label public id (UUID v7).", Constraints{Pattern: publicIDPattern}),
 		}, []string{"taskId", "labelId"}),
 		run: runRemoveTaskLabel,
 	})
@@ -511,7 +511,7 @@ func registerTools(h *Handler) {
 		description:   "Resolve a human-readable task reference (e.g. NF-42) to a task public id.",
 		requiredScope: "read:workspace",
 		inputSchema: objectSchema(map[string]any{
-			"ref": stringSchema("Task reference in PROJECT_IDENTIFIER-NUMBER format (e.g. NF-42)."),
+			"ref": stringSchema("Task reference in PROJECT_IDENTIFIER-NUMBER format (e.g. NF-42).", Constraints{Pattern: `^[A-Za-z][A-Za-z0-9_]*-[0-9]+$`}),
 		}, []string{"ref"}),
 		run: runResolveTaskRef,
 	})
@@ -520,7 +520,7 @@ func registerTools(h *Handler) {
 		description:   "Archive a task.",
 		requiredScope: "write:workspace",
 		inputSchema: objectSchema(map[string]any{
-			"taskId": stringSchema("Task public id (UUID v7)."),
+			"taskId": stringSchema("Task public id (UUID v7).", Constraints{Pattern: publicIDPattern}),
 		}, []string{"taskId"}),
 		run: runArchiveTask,
 	})
@@ -529,7 +529,7 @@ func registerTools(h *Handler) {
 		description:   "Unarchive a task.",
 		requiredScope: "write:workspace",
 		inputSchema: objectSchema(map[string]any{
-			"taskId": stringSchema("Task public id (UUID v7)."),
+			"taskId": stringSchema("Task public id (UUID v7).", Constraints{Pattern: publicIDPattern}),
 		}, []string{"taskId"}),
 		run: runUnarchiveTask,
 	})
@@ -550,8 +550,8 @@ func registerTools(h *Handler) {
 		description:   "Add a task, project, page, lens, or timebox to the user's favorites.",
 		requiredScope: "write:workspace",
 		inputSchema: objectSchema(map[string]any{
-			"targetType": stringSchema("Entity type: project, task, page, lens, or timebox."),
-			"targetId":   stringSchema("Public ID of the entity to favorite."),
+			"targetType": stringSchema("Entity type: project, task, page, lens, or timebox.", Constraints{Pattern: `^(project|task|page|lens|timebox)$`}),
+			"targetId":   stringSchema("Public ID of the entity to favorite.", Constraints{Pattern: publicIDPattern}),
 		}, []string{"targetType", "targetId"}),
 		run: runAddFavorite,
 	})
@@ -560,8 +560,8 @@ func registerTools(h *Handler) {
 		description:   "Add an emoji reaction to a task.",
 		requiredScope: "write:workspace",
 		inputSchema: objectSchema(map[string]any{
-			"taskId": stringSchema("Task public id (UUID v7)."),
-			"emoji":  stringSchema("Unicode emoji character."),
+			"taskId": stringSchema("Task public id (UUID v7).", Constraints{Pattern: publicIDPattern}),
+			"emoji":  stringSchema("Unicode emoji character.", Constraints{MinLength: intPtr(1), MaxLength: intPtr(32)}),
 		}, []string{"taskId", "emoji"}),
 		run: runAddReaction,
 	})
@@ -570,7 +570,7 @@ func registerTools(h *Handler) {
 		description:   "List emoji reactions on a task.",
 		requiredScope: "read:workspace",
 		inputSchema: objectSchema(map[string]any{
-			"taskId": stringSchema("Task public id (UUID v7)."),
+			"taskId": stringSchema("Task public id (UUID v7).", Constraints{Pattern: publicIDPattern}),
 		}, []string{"taskId"}),
 		run: runListReactions,
 	})
@@ -590,7 +590,7 @@ func registerTools(h *Handler) {
 		description:   "List intake items in the workspace triage queue.",
 		requiredScope: "read:workspace",
 		inputSchema: objectSchema(map[string]any{
-			"status": stringSchema("Filter by triage status: pending, accepted, rejected, snoozed, duplicate. Optional."),
+			"status": stringSchema("Filter by triage status: pending, accepted, rejected, snoozed, duplicate. Optional.", Constraints{Pattern: `^(pending|accepted|rejected|snoozed|duplicate)$`}),
 			"limit":  intSchema("Max results (1..200, default 50).", Constraints{Min: intPtr(1), Max: intPtr(200)}),
 			"offset": intSchema("Skip N results.", Constraints{Min: intPtr(0)}),
 		}, nil),
@@ -601,9 +601,9 @@ func registerTools(h *Handler) {
 		description:   "Accept, reject, snooze, or mark as duplicate an intake item.",
 		requiredScope: "write:workspace",
 		inputSchema: objectSchema(map[string]any{
-			"intakeItemId": stringSchema("Intake item public id (UUID v7)."),
-			"status":       stringSchema("Triage decision: accepted, rejected, snoozed, or duplicate."),
-			"snoozeUntil":  intSchema("Unix seconds timestamp for snooze expiry (required when status is snoozed)."),
+			"intakeItemId": stringSchema("Intake item public id (UUID v7).", Constraints{Pattern: publicIDPattern}),
+			"status":       stringSchema("Triage decision: accepted, rejected, snoozed, or duplicate.", Constraints{Pattern: `^(accepted|rejected|snoozed|duplicate)$`}),
+			"snoozeUntil":  intSchema("Unix seconds timestamp for snooze expiry (required when status is snoozed).", Constraints{Min: intPtr(0)}),
 		}, []string{"intakeItemId", "status"}),
 		run: runTriageIntakeItem,
 	})
@@ -612,8 +612,8 @@ func registerTools(h *Handler) {
 		description:   "Convert an intake item into a task in a specified project.",
 		requiredScope: "write:workspace",
 		inputSchema: objectSchema(map[string]any{
-			"intakeItemId": stringSchema("Intake item public id (UUID v7)."),
-			"projectId":    stringSchema("Project public id (UUID v7) to create the task in."),
+			"intakeItemId": stringSchema("Intake item public id (UUID v7).", Constraints{Pattern: publicIDPattern}),
+			"projectId":    stringSchema("Project public id (UUID v7) to create the task in.", Constraints{Pattern: publicIDPattern}),
 		}, []string{"intakeItemId", "projectId"}),
 		run: runConvertIntakeToTask,
 	})
@@ -622,7 +622,7 @@ func registerTools(h *Handler) {
 		description:   "List description version history for a task (newest first, without body).",
 		requiredScope: "read:workspace",
 		inputSchema: objectSchema(map[string]any{
-			"taskId": stringSchema("Task public id (UUID v7)."),
+			"taskId": stringSchema("Task public id (UUID v7).", Constraints{Pattern: publicIDPattern}),
 		}, []string{"taskId"}),
 		run: runListDescriptionVersions,
 	})
@@ -631,8 +631,8 @@ func registerTools(h *Handler) {
 		description:   "Restore a previous description version, updating the task description and creating a new version snapshot.",
 		requiredScope: "write:workspace",
 		inputSchema: objectSchema(map[string]any{
-			"taskId":    stringSchema("Task public id (UUID v7)."),
-			"versionId": stringSchema("Description version public id (UUID v7) to restore."),
+			"taskId":    stringSchema("Task public id (UUID v7).", Constraints{Pattern: publicIDPattern}),
+			"versionId": stringSchema("Description version public id (UUID v7) to restore.", Constraints{Pattern: publicIDPattern}),
 		}, []string{"taskId", "versionId"}),
 		run: runRestoreDescriptionVersion,
 	})
@@ -643,7 +643,7 @@ func registerTools(h *Handler) {
 		description:   "List import jobs for the workspace.",
 		requiredScope: "read:workspace",
 		inputSchema: objectSchema(map[string]any{
-			"status": stringSchema("Filter by status: pending, running, completed, failed, cancelled. Optional."),
+			"status": stringSchema("Filter by status: pending, running, completed, failed, cancelled. Optional.", Constraints{Pattern: `^(pending|running|completed|failed|cancelled)$`}),
 			"limit":  intSchema("Max results (1..200, default 50).", Constraints{Min: intPtr(1), Max: intPtr(200)}),
 			"offset": intSchema("Skip N results.", Constraints{Min: intPtr(0)}),
 		}, nil),
@@ -654,8 +654,8 @@ func registerTools(h *Handler) {
 		description:   "Create a new import job.",
 		requiredScope: "write:workspace",
 		inputSchema: objectSchema(map[string]any{
-			"source":     stringSchema("Import source: github, jira, linear, or csv."),
-			"projectId":  stringSchema("Project public id (UUID v7) to import into. Optional."),
+			"source":     stringSchema("Import source: github, jira, linear, or csv.", Constraints{Pattern: `^(github|jira|linear|csv)$`}),
+			"projectId":  stringSchema("Project public id (UUID v7) to import into. Optional.", Constraints{Pattern: publicIDPattern}),
 			"configJson": stringSchema("JSON string with source-specific configuration. Optional."),
 		}, []string{"source"}),
 		run: runCreateImportJob,
