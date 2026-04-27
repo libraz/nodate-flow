@@ -120,13 +120,6 @@
         "vitest-axe": "^0.1.0",
       },
     },
-    "packages/fixtures": {
-      "name": "@nodate-flow/fixtures",
-      "version": "0.0.0",
-      "devDependencies": {
-        "typescript": "5.6.3",
-      },
-    },
     "packages/holidays": {
       "name": "@nodate-flow/holidays",
       "version": "0.0.1",
@@ -462,8 +455,6 @@
     "@nodate-flow/accounts-web": ["@nodate-flow/accounts-web@workspace:apps/accounts-web"],
 
     "@nodate-flow/cli": ["@nodate-flow/cli@workspace:apps/cli"],
-
-    "@nodate-flow/fixtures": ["@nodate-flow/fixtures@workspace:packages/fixtures"],
 
     "@nodate-flow/flow-web": ["@nodate-flow/flow-web@workspace:apps/flow-web"],
 
