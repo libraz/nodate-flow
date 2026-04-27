@@ -86,8 +86,6 @@ var (
 	CalendarEventStoreReadInterrupted = &Spec{Code: "CALENDAR.EVENT.STORE_READ_INTERRUPTED", Status: 500, Message: "Could not read event"}
 	// CALENDAR.EVENT.STORE_WRITE_INTERRUPTED — Could not save event
 	CalendarEventStoreWriteInterrupted = &Spec{Code: "CALENDAR.EVENT.STORE_WRITE_INTERRUPTED", Status: 500, Message: "Could not save event"}
-	// CALENDAR.INVITE.EMAIL_SEND_INTERRUPTED — Could not send invite email
-	CalendarInviteEmailSendInterrupted = &Spec{Code: "CALENDAR.INVITE.EMAIL_SEND_INTERRUPTED", Status: 500, Message: "Could not send invite email"}
 	// CALENDAR.INVITE.LIST_QUERY_INTERRUPTED — Could not retrieve invites
 	CalendarInviteListQueryInterrupted = &Spec{Code: "CALENDAR.INVITE.LIST_QUERY_INTERRUPTED", Status: 500, Message: "Could not retrieve invites"}
 	// CALENDAR.INVITE.NOT_FOUND — Invite not found or expired
@@ -108,14 +106,10 @@ var (
 	CalendarMemberListQueryInterrupted = &Spec{Code: "CALENDAR.MEMBER.LIST_QUERY_INTERRUPTED", Status: 500, Message: "Could not retrieve members"}
 	// CALENDAR.MEMBER.NOT_FOUND — Member not found
 	CalendarMemberNotFound = &Spec{Code: "CALENDAR.MEMBER.NOT_FOUND", Status: 404, Message: "Member not found"}
-	// CALENDAR.MEMBER.OWNER_COUNT_QUERY_INTERRUPTED — Could not verify owner count
-	CalendarMemberOwnerCountQueryInterrupted = &Spec{Code: "CALENDAR.MEMBER.OWNER_COUNT_QUERY_INTERRUPTED", Status: 500, Message: "Could not verify owner count"}
 	// CALENDAR.MEMBER.STORE_READ_INTERRUPTED — Could not look up member
 	CalendarMemberStoreReadInterrupted = &Spec{Code: "CALENDAR.MEMBER.STORE_READ_INTERRUPTED", Status: 500, Message: "Could not look up member"}
 	// CALENDAR.MEMBER.STORE_REMOVE_INTERRUPTED — Could not remove member
 	CalendarMemberStoreRemoveInterrupted = &Spec{Code: "CALENDAR.MEMBER.STORE_REMOVE_INTERRUPTED", Status: 500, Message: "Could not remove member"}
-	// CALENDAR.MEMBER.STORE_ROLE_UPDATE_INTERRUPTED — Could not update member role
-	CalendarMemberStoreRoleUpdateInterrupted = &Spec{Code: "CALENDAR.MEMBER.STORE_ROLE_UPDATE_INTERRUPTED", Status: 500, Message: "Could not update member role"}
 	// CALENDAR.MEMBER.STORE_WRITE_INTERRUPTED — Could not add member
 	CalendarMemberStoreWriteInterrupted = &Spec{Code: "CALENDAR.MEMBER.STORE_WRITE_INTERRUPTED", Status: 500, Message: "Could not add member"}
 	// CALENDAR.MEMBER.USER_ID_MALFORMED — Invalid user ID
@@ -136,8 +130,6 @@ var (
 	CalendarSmartCreateTextUnparseable = &Spec{Code: "CALENDAR.SMART_CREATE.TEXT_UNPARSEABLE", Status: 422, Message: "Could not parse event from text"}
 	// CALENDAR.SUBSCRIPTION.COUNTRY_INVALID — Country code is invalid or not supported
 	CalendarSubscriptionCountryInvalid = &Spec{Code: "CALENDAR.SUBSCRIPTION.COUNTRY_INVALID", Status: 400, Message: "Country code is invalid or not supported"}
-	// CALENDAR.SUBSCRIPTION.MEMBERSHIP_CHECK_INTERRUPTED — Could not verify membership
-	CalendarSubscriptionMembershipCheckInterrupted = &Spec{Code: "CALENDAR.SUBSCRIPTION.MEMBERSHIP_CHECK_INTERRUPTED", Status: 500, Message: "Could not verify membership"}
 	// CALENDAR.SUBSCRIPTION.STORE_WRITE_INTERRUPTED — Could not create calendar subscription
 	CalendarSubscriptionStoreWriteInterrupted = &Spec{Code: "CALENDAR.SUBSCRIPTION.STORE_WRITE_INTERRUPTED", Status: 500, Message: "Could not create calendar subscription"}
 	// CALENDAR.TASK_SYNC.STORE_WRITE_INTERRUPTED — Could not create event from task
@@ -150,12 +142,8 @@ var (
 	CalendarTaskSyncTaskNotFound = &Spec{Code: "CALENDAR.TASK_SYNC.TASK_NOT_FOUND", Status: 404, Message: "Task not found"}
 	// CALENDAR.TASK_SYNC.TIMEZONE_UNRECOGNIZED — Unrecognized timezone
 	CalendarTaskSyncTimezoneUnrecognized = &Spec{Code: "CALENDAR.TASK_SYNC.TIMEZONE_UNRECOGNIZED", Status: 400, Message: "Unrecognized timezone"}
-	// CALENDAR.TASK_SYNC.VIEWER_ROLE_INSUFFICIENT — Viewers cannot create events
-	CalendarTaskSyncViewerRoleInsufficient = &Spec{Code: "CALENDAR.TASK_SYNC.VIEWER_ROLE_INSUFFICIENT", Status: 403, Message: "Viewers cannot create events"}
 	// CALENDAR.USER_PROFILE.LOOKUP_INTERRUPTED — Could not retrieve user profile
 	CalendarUserProfileLookupInterrupted = &Spec{Code: "CALENDAR.USER_PROFILE.LOOKUP_INTERRUPTED", Status: 500, Message: "Could not retrieve user profile"}
-	// CALENDAR.USER_PROFILE.USER_LOOKUP_INTERRUPTED — Could not look up user
-	CalendarUserProfileUserLookupInterrupted = &Spec{Code: "CALENDAR.USER_PROFILE.USER_LOOKUP_INTERRUPTED", Status: 500, Message: "Could not look up user"}
 	// CALENDAR.WORKSPACE.NOT_FOUND — Workspace not found
 	CalendarWorkspaceNotFound = &Spec{Code: "CALENDAR.WORKSPACE.NOT_FOUND", Status: 404, Message: "Workspace not found"}
 )

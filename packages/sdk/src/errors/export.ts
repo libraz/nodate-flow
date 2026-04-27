@@ -6,30 +6,10 @@ export const ExportErrors = {
     status: 500,
     message: "Could not load tasks for export",
   },
-  EXPORT_TASK_FORMAT_RENDER_FAILED: {
-    code: "EXPORT.TASK.FORMAT_RENDER_FAILED",
-    status: 500,
-    message: "Could not render export file",
-  },
-  EXPORT_TASK_FORMAT_UNSUPPORTED: {
-    code: "EXPORT.TASK.FORMAT_UNSUPPORTED",
-    status: 400,
-    message: "Unsupported export format",
-  },
   EXPORT_TASK_LENS_NOT_FOUND: {
     code: "EXPORT.TASK.LENS_NOT_FOUND",
     status: 404,
     message: "Lens referenced for export not found",
-  },
-  EXPORT_TASK_STORAGE_WRITE_FAILED: {
-    code: "EXPORT.TASK.STORAGE_WRITE_FAILED",
-    status: 500,
-    message: "Could not write export file",
-  },
-  EXPORT_TASK_TOO_MANY_ROWS: {
-    code: "EXPORT.TASK.TOO_MANY_ROWS",
-    status: 422,
-    message: "Export exceeds maximum row limit",
   },
 } as const;
 

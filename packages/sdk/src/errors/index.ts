@@ -13,7 +13,6 @@ export * from "./integrations.js";
 export * from "./internal.js";
 export * from "./item.js";
 export * from "./mcp.js";
-export * from "./notification.js";
 export * from "./page.js";
 export * from "./rate.js";
 export * from "./relation.js";

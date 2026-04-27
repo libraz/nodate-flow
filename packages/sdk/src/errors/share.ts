@@ -21,11 +21,6 @@ export const ShareErrors = {
     status: 404,
     message: "Share token is invalid",
   },
-  SHARE_SHARE_EVENT_EVENT_NOT_VISIBLE: {
-    code: "SHARE.SHARE_EVENT.EVENT_NOT_VISIBLE",
-    status: 422,
-    message: "Event cannot be published",
-  },
   SHARE_SHARE_EVENT_REORDER_INVALID: {
     code: "SHARE.SHARE_EVENT.REORDER_INVALID",
     status: 400,

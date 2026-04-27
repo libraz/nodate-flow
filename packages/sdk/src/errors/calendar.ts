@@ -206,11 +206,6 @@ export const CalendarErrors = {
     status: 500,
     message: "Could not save event",
   },
-  CALENDAR_INVITE_EMAIL_SEND_INTERRUPTED: {
-    code: "CALENDAR.INVITE.EMAIL_SEND_INTERRUPTED",
-    status: 500,
-    message: "Could not send invite email",
-  },
   CALENDAR_INVITE_LIST_QUERY_INTERRUPTED: {
     code: "CALENDAR.INVITE.LIST_QUERY_INTERRUPTED",
     status: 500,
@@ -261,11 +256,6 @@ export const CalendarErrors = {
     status: 404,
     message: "Member not found",
   },
-  CALENDAR_MEMBER_OWNER_COUNT_QUERY_INTERRUPTED: {
-    code: "CALENDAR.MEMBER.OWNER_COUNT_QUERY_INTERRUPTED",
-    status: 500,
-    message: "Could not verify owner count",
-  },
   CALENDAR_MEMBER_STORE_READ_INTERRUPTED: {
     code: "CALENDAR.MEMBER.STORE_READ_INTERRUPTED",
     status: 500,
@@ -275,11 +265,6 @@ export const CalendarErrors = {
     code: "CALENDAR.MEMBER.STORE_REMOVE_INTERRUPTED",
     status: 500,
     message: "Could not remove member",
-  },
-  CALENDAR_MEMBER_STORE_ROLE_UPDATE_INTERRUPTED: {
-    code: "CALENDAR.MEMBER.STORE_ROLE_UPDATE_INTERRUPTED",
-    status: 500,
-    message: "Could not update member role",
   },
   CALENDAR_MEMBER_STORE_WRITE_INTERRUPTED: {
     code: "CALENDAR.MEMBER.STORE_WRITE_INTERRUPTED",
@@ -331,11 +316,6 @@ export const CalendarErrors = {
     status: 400,
     message: "Country code is invalid or not supported",
   },
-  CALENDAR_SUBSCRIPTION_MEMBERSHIP_CHECK_INTERRUPTED: {
-    code: "CALENDAR.SUBSCRIPTION.MEMBERSHIP_CHECK_INTERRUPTED",
-    status: 500,
-    message: "Could not verify membership",
-  },
   CALENDAR_SUBSCRIPTION_STORE_WRITE_INTERRUPTED: {
     code: "CALENDAR.SUBSCRIPTION.STORE_WRITE_INTERRUPTED",
     status: 500,
@@ -366,20 +346,10 @@ export const CalendarErrors = {
     status: 400,
     message: "Unrecognized timezone",
   },
-  CALENDAR_TASK_SYNC_VIEWER_ROLE_INSUFFICIENT: {
-    code: "CALENDAR.TASK_SYNC.VIEWER_ROLE_INSUFFICIENT",
-    status: 403,
-    message: "Viewers cannot create events",
-  },
   CALENDAR_USER_PROFILE_LOOKUP_INTERRUPTED: {
     code: "CALENDAR.USER_PROFILE.LOOKUP_INTERRUPTED",
     status: 500,
     message: "Could not retrieve user profile",
-  },
-  CALENDAR_USER_PROFILE_USER_LOOKUP_INTERRUPTED: {
-    code: "CALENDAR.USER_PROFILE.USER_LOOKUP_INTERRUPTED",
-    status: 500,
-    message: "Could not look up user",
   },
   CALENDAR_WORKSPACE_NOT_FOUND: {
     code: "CALENDAR.WORKSPACE.NOT_FOUND",

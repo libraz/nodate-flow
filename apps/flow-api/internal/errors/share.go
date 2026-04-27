@@ -12,8 +12,6 @@ var (
 	ShareShareNotFound = &Spec{Code: "SHARE.SHARE.NOT_FOUND", Status: 404, Message: "Share page not found"}
 	// SHARE.SHARE.TOKEN_INVALID — Share token is invalid
 	ShareShareTokenInvalid = &Spec{Code: "SHARE.SHARE.TOKEN_INVALID", Status: 404, Message: "Share token is invalid"}
-	// SHARE.SHARE_EVENT.EVENT_NOT_VISIBLE — Event cannot be published
-	ShareShareEventEventNotVisible = &Spec{Code: "SHARE.SHARE_EVENT.EVENT_NOT_VISIBLE", Status: 422, Message: "Event cannot be published"}
 	// SHARE.SHARE_EVENT.REORDER_INVALID — Reorder input must be a permutation of the share's current events
 	ShareShareEventReorderInvalid = &Spec{Code: "SHARE.SHARE_EVENT.REORDER_INVALID", Status: 400, Message: "Reorder input must be a permutation of the share's current events"}
 )

@@ -6,11 +6,6 @@ export const TimeboxErrors = {
     status: 409,
     message: "Task is already in this timebox",
   },
-  TIMEBOX_TASK_NOT_IN_TIMEBOX: {
-    code: "TIMEBOX.TASK.NOT_IN_TIMEBOX",
-    status: 404,
-    message: "Task not found in this timebox",
-  },
   TIMEBOX_TIMEBOX_ALREADY_COMPLETED: {
     code: "TIMEBOX.TIMEBOX.ALREADY_COMPLETED",
     status: 409,
