@@ -19,6 +19,7 @@
       "version": "0.0.0",
       "dependencies": {
         "@hookform/resolvers": "3.9.1",
+        "@nodate-flow/i18n-shared": "workspace:*",
         "@nodate-flow/sdk": "workspace:*",
         "@tanstack/react-query": "5.59.16",
         "@tanstack/react-router": "1.168.10",
@@ -79,6 +80,7 @@
         "@dnd-kit/utilities": "3.2.2",
         "@hookform/resolvers": "3.9.1",
         "@nodate-flow/holidays": "workspace:*",
+        "@nodate-flow/i18n-shared": "workspace:*",
         "@tanstack/react-query": "5.59.16",
         "@tanstack/react-router": "1.168.10",
         "@tanstack/react-table": "8.20.5",
@@ -128,6 +130,13 @@
       },
       "devDependencies": {
         "bun-types": "^1.0.0",
+        "typescript": "5.6.3",
+      },
+    },
+    "packages/i18n-shared": {
+      "name": "@nodate-flow/i18n-shared",
+      "version": "0.0.0",
+      "devDependencies": {
         "typescript": "5.6.3",
       },
     },
@@ -459,6 +468,8 @@
     "@nodate-flow/flow-web": ["@nodate-flow/flow-web@workspace:apps/flow-web"],
 
     "@nodate-flow/holidays": ["@nodate-flow/holidays@workspace:packages/holidays"],
+
+    "@nodate-flow/i18n-shared": ["@nodate-flow/i18n-shared@workspace:packages/i18n-shared"],
 
     "@nodate-flow/sdk": ["@nodate-flow/sdk@workspace:packages/sdk"],
 

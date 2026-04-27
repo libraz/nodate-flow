@@ -1,16 +1,6 @@
 {
   "common": {
-    "loading": "Loading…",
-    "confirm": "Confirm",
-    "cancel": "Cancel",
-    "confirm_title": "Are you sure?",
-    "breadcrumb": "Breadcrumb",
-    "date": {
-      "weekdays": ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"],
-      "monthYear": "{month, plural, =1 {January} =2 {February} =3 {March} =4 {April} =5 {May} =6 {June} =7 {July} =8 {August} =9 {September} =10 {October} =11 {November} =12 {December} other {}} {year}",
-      "openPicker": "Choose date",
-      "placeholder": "Select a date"
-    }
+    "breadcrumb": "Breadcrumb"
   },
   "landing": {
     "wordmark": "nodate-flow",
@@ -229,7 +219,19 @@
         "save": "Save changes",
         "saved": "Calendar updated",
         "save_error": "Could not save changes. Please try again.",
-        "name_required": "Name is required."
+        "name_required": "Name is required.",
+        "color": {
+          "blue": "Blue",
+          "cyan": "Cyan",
+          "green": "Green",
+          "amber": "Amber",
+          "orange": "Orange",
+          "red": "Red",
+          "pink": "Pink",
+          "purple": "Purple",
+          "slate": "Slate",
+          "ink": "Ink"
+        }
       },
       "delete": {
         "title": "Danger zone",

@@ -1,3 +1,4 @@
+import { mergeCommon } from '@nodate-flow/i18n-shared';
 import i18n from 'i18next';
 import ICU from 'i18next-icu';
 import { initReactI18next } from 'react-i18next';
@@ -58,21 +59,21 @@ export function initI18n(): typeof i18n {
         en: {
           auth: enAuth,
           admin: enAdmin,
-          common: enCommon,
+          common: mergeCommon('en', enCommon),
           errors: enErrors,
           instanceStats: enInstanceStats,
         },
         ja: {
           auth: jaAuth,
           admin: jaAdmin,
-          common: jaCommon,
+          common: mergeCommon('ja', jaCommon),
           errors: jaErrors,
           instanceStats: jaInstanceStats,
         },
         zh: {
           auth: zhAuth,
           admin: zhAdmin,
-          common: zhCommon,
+          common: mergeCommon('zh', zhCommon),
           errors: zhErrors,
           instanceStats: zhInstanceStats,
         },

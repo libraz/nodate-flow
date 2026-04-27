@@ -1,3 +1,4 @@
+import { mergeCommon } from '@nodate-flow/i18n-shared';
 import i18n from 'i18next';
 import ICU from 'i18next-icu';
 import { initReactI18next } from 'react-i18next';
@@ -136,7 +137,7 @@ export function initI18n(): typeof i18n {
       resources: {
         en: {
           archive: enArchive,
-          common: enCommon,
+          common: mergeCommon('en', enCommon),
           settings: enSettings,
           inbox: enInbox,
           timeline: enTimeline,
@@ -161,7 +162,7 @@ export function initI18n(): typeof i18n {
         },
         ja: {
           archive: jaArchive,
-          common: jaCommon,
+          common: mergeCommon('ja', jaCommon),
           settings: jaSettings,
           inbox: jaInbox,
           timeline: jaTimeline,
@@ -186,7 +187,7 @@ export function initI18n(): typeof i18n {
         },
         zh: {
           archive: zhArchive,
-          common: zhCommon,
+          common: mergeCommon('zh', zhCommon),
           settings: zhSettings,
           inbox: zhInbox,
           timeline: zhTimeline,

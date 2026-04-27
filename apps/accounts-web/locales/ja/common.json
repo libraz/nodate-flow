@@ -1,12 +1,3 @@
 {
-  "common": {
-    "date": {
-      "weekdays": ["月", "火", "水", "木", "金", "土", "日"],
-      "monthYear": "{year}年{month}月",
-      "openPicker": "日付を選択",
-      "placeholder": "日付を選択",
-      "prev_month": "前の月",
-      "next_month": "次の月"
-    }
-  }
+  "common": {}
 }
