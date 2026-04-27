@@ -1,10 +1,11 @@
 #!/usr/bin/env bash
-# check-token-fallbacks.sh — forbid var(--nf-*, fallback) patterns in app CSS.
+# check-token-fallbacks.sh — forbid var(--nf-*, fallback) patterns in app
+# CSS and inline TSX/TS styles.
 #
 # Per docs/conventions/design-tokens.md every --nf-* token must be defined
 # by the active theme. A `var(--nf-foo, <fallback>)` pattern hides theme-
 # loading bugs (the fallback silently masks a missing token) and bypasses
-# the design-system contract. App CSS must reference tokens directly:
+# the design-system contract. App code must reference tokens directly:
 # `var(--nf-foo)`.
 #
 # Theme files in packages/ui/src/themes/ are intentionally excluded — those
@@ -48,12 +49,14 @@ for dir in "${SCAN_DIRS[@]}"; do
   done < <(grep -rnE "$PATTERN" "$dir" "${EXCLUDES[@]}" \
     --include='*.css' \
     --include='*.module.css' \
+    --include='*.tsx' \
+    --include='*.ts' \
     2>/dev/null \
     || true)
 done
 
 if [[ $count -gt 0 ]]; then
-  echo "Found $count token fallback(s) in app CSS:"
+  echo "Found $count token fallback(s) in app CSS / inline TSX styles:"
   echo -e "$found_lines" | sort
   echo ""
   echo "Drop the fallback so the active theme's token wins:"
@@ -64,5 +67,5 @@ if [[ $count -gt 0 ]]; then
     exit 1
   fi
 else
-  echo "No --nf-* token fallbacks found in app CSS."
+  echo "No --nf-* token fallbacks found in app CSS or inline TSX styles."
 fi
