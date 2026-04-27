@@ -51,6 +51,12 @@ type Worker struct {
 	queries *generated.Queries
 	client  *http.Client
 	done    chan struct{}
+
+	// run is the function executed inside each Hook goroutine. Tests
+	// override it to exercise the goroutine plumbing (detached cancel,
+	// panic recovery) without a live database. Production code leaves
+	// this nil and the hook routes to [Worker.createDeliveries].
+	run func(ctx context.Context, workspaceID uint32, eventType string)
 }
 
 // NewWorker creates a Worker backed by the given database.
@@ -72,9 +78,30 @@ func NewWorker(db *sql.DB, q *generated.Queries) *Worker {
 // eventInternalID parameter is unused here — webhook deliveries
 // dedupe on (subscription_id, event_public_id) once the payload
 // builder is wired to surface the events.public_id.
+//
+// The spawned goroutine inherits the parent context's values via
+// [context.WithoutCancel] so trace span / logger attributes survive
+// request cancellation while DB inserts still get to finish. A
+// recover() guards the goroutine: a panic inside createDeliveries
+// would otherwise crash the whole flow-api process.
 func (w *Worker) Hook() func(ctx context.Context, workspaceID uint32, eventType string, eventInternalID uint32) {
 	return func(ctx context.Context, workspaceID uint32, eventType string, _ uint32) {
-		go w.createDeliveries(context.Background(), workspaceID, eventType)
+		detached := context.WithoutCancel(ctx)
+		go func() {
+			defer func() {
+				if r := recover(); r != nil {
+					slog.ErrorContext(detached, "webhook hook panic",
+						slog.Any("recover", r),
+						slog.Uint64("workspace_id", uint64(workspaceID)),
+						slog.String("event_type", eventType))
+				}
+			}()
+			fn := w.run
+			if fn == nil {
+				fn = w.createDeliveries
+			}
+			fn(detached, workspaceID, eventType)
+		}()
 	}
 }
 
