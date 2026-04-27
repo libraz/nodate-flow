@@ -73,6 +73,45 @@ func HTTPErr(spec *apierrors.Spec) error {
 	}
 }
 
+// HTTPErrWithRetryAfter is the Retry-After-emitting variant of [HTTPErr].
+// Returns a Huma error that additionally implements huma.HeadersError so
+// the framework writes a Retry-After response header when retryAfter is
+// non-empty. Used by AI provider rate-limit propagation: the upstream
+// 429's Retry-After is forwarded so the UI / client can back off the
+// same way it would for a direct upstream call.
+func HTTPErrWithRetryAfter(spec *apierrors.Spec, retryAfter string) error {
+	return &headersProblemDetails{
+		ProblemDetails: ProblemDetails{
+			ErrorModel: huma.ErrorModel{
+				Type:   spec.Code,
+				Title:  http.StatusText(spec.Status),
+				Status: spec.Status,
+				Detail: spec.Message,
+			},
+			Description: spec.Description,
+			UserAction:  spec.UserAction,
+		},
+		retryAfter: retryAfter,
+	}
+}
+
+// headersProblemDetails extends ProblemDetails with a Retry-After
+// response header. Implements huma.HeadersError so Huma writes the
+// header before the status code is set.
+type headersProblemDetails struct {
+	ProblemDetails
+	retryAfter string
+}
+
+// GetHeaders returns the headers Huma should append to the response.
+// Implements huma.HeadersError.
+func (p *headersProblemDetails) GetHeaders() http.Header {
+	if p == nil || p.retryAfter == "" {
+		return nil
+	}
+	return http.Header{"Retry-After": []string{p.retryAfter}}
+}
+
 // WriteSpecError writes a JSON error envelope for raw chi handlers that
 // cannot return errors through the Huma pipeline (file downloads,
 // streaming responses, etc.). The envelope mirrors the shape produced

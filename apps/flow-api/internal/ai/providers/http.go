@@ -21,6 +21,16 @@ const defaultHTTPTimeout = 90 * time.Second
 // keep-alives work; per-call timeouts come from the request context.
 var sharedClient = &http.Client{Timeout: defaultHTTPTimeout}
 
+// SetHTTPTimeoutForTest overrides the package-wide HTTP client timeout
+// and returns a restore function. Only intended for tests that need to
+// trigger the upstream-timeout sentinel without waiting the full 90s
+// production deadline. Calling this from non-test code is undefined.
+func SetHTTPTimeoutForTest(d time.Duration) func() {
+	prev := sharedClient.Timeout
+	sharedClient.Timeout = d
+	return func() { sharedClient.Timeout = prev }
+}
+
 // Destination constants for the outbound rate limiter registry.
 // Each provider routes its Do() through these keys so operators can
 // configure per-provider egress caps.

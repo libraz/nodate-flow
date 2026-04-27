@@ -49,7 +49,7 @@ func ResolveCommand(deps Deps) func(context.Context, *ResolveCommandInput) (*Res
 			if errors.Is(err, nlcommand.ErrUnresolvable) {
 				return nil, httpErr(apierrors.AiResponseInvalidJson)
 			}
-			return nil, httpErr(apierrors.AiProviderUpstreamUnreachable)
+			return nil, mapProviderError(err)
 		}
 
 		// Audit the resolved command so usage analytics and cost tracking

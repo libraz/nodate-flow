@@ -47,7 +47,7 @@ func CompileLens(deps Deps) func(context.Context, *CompileLensInput) (*CompileLe
 			if errors.Is(err, nlquery.ErrUnparseable) {
 				return nil, httpErr(apierrors.AiNlQueryUnparseable)
 			}
-			return nil, httpErr(apierrors.AiProviderUpstreamUnreachable)
+			return nil, mapProviderError(err)
 		}
 		out := &CompileLensOutput{}
 		out.Body.Prompt = in.Body.Prompt

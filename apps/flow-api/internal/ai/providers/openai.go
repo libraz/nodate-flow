@@ -87,28 +87,28 @@ func (p *openAIProvider) Complete(ctx context.Context, req Request) (*Response, 
 
 	resp, err := doLimited(ctx, DestOpenAI, httpReq)
 	if err != nil {
-		return nil, fmt.Errorf("openai: do: %w", err)
+		return nil, classifyTransportError(ctx, err)
 	}
 	defer resp.Body.Close()
 	raw, err := io.ReadAll(io.LimitReader(resp.Body, 10<<20))
 	if err != nil {
-		return nil, fmt.Errorf("openai: read body: %w", err)
+		return nil, classifyTransportError(ctx, err)
 	}
-	if resp.StatusCode/100 != 2 {
-		return nil, fmt.Errorf("openai: upstream status %d", resp.StatusCode)
+	if uerr := classifyHTTPStatus(resp.StatusCode, resp.Header.Get("Retry-After")); uerr != nil {
+		return nil, uerr
 	}
 
 	var or openAIResp
 	if err := json.Unmarshal(raw, &or); err != nil {
-		return nil, fmt.Errorf("openai: parse: %w", err)
+		return nil, &UpstreamError{Sentinel: ErrResponseInvalidJSON, Status: resp.StatusCode}
 	}
 	if or.Error != nil {
-		return nil, fmt.Errorf("openai: %s: %s", or.Error.Type, or.Error.Message)
+		return nil, &UpstreamError{Sentinel: ErrUpstreamRequestRejected, Status: resp.StatusCode}
 	}
-	var text string
-	if len(or.Choices) > 0 {
-		text = or.Choices[0].Message.Content
+	if len(or.Choices) == 0 {
+		return nil, &UpstreamError{Sentinel: ErrResponseSchemaMismatch, Status: resp.StatusCode}
 	}
+	text := or.Choices[0].Message.Content
 	return &Response{
 		Text:         text,
 		InputTokens:  or.Usage.PromptTokens,
