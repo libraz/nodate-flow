@@ -22,7 +22,9 @@
         "free": "编辑空闲时间",
         "milestone": "编辑里程碑"
       }
-    }
+    },
+    "discard_unsaved": "放弃未保存的更改？",
+    "discard_confirm": "放弃"
   },
   "field": {
     "title": "标题",

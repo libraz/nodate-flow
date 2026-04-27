@@ -22,7 +22,9 @@
         "free": "空き時間を編集",
         "milestone": "マイルストーンを編集"
       }
-    }
+    },
+    "discard_unsaved": "未保存の変更を破棄しますか？",
+    "discard_confirm": "破棄"
   },
   "field": {
     "title": "タイトル",

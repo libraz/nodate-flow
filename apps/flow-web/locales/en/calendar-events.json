@@ -22,7 +22,9 @@
         "free": "Edit free time",
         "milestone": "Edit milestone"
       }
-    }
+    },
+    "discard_unsaved": "Discard unsaved changes?",
+    "discard_confirm": "Discard"
   },
   "field": {
     "title": "Title",

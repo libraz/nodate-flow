@@ -68,6 +68,8 @@ const copy = {
     presetWorking: enCal.blockLabel.preset.working,
     validationTitleRequired: enCal.validation.titleRequired,
     validationEndBeforeStart: enCal.validation.endBeforeStart,
+    discardUnsaved: enCal.dialog.discard_unsaved,
+    discardConfirm: enCal.dialog.discard_confirm,
   },
   ja: {
     titleField: jaCal.field.title,
@@ -569,5 +571,36 @@ test.describe('calendar event dialog', () => {
     } finally {
       await context.close();
     }
+  });
+
+  /* ─────────────────────────────────────────────────────────── */
+
+  test('confirms before discarding unsaved changes when closing the dialog', async ({ page }) => {
+    const errors = attachConsoleErrorGuard(page);
+    tenant = await createTestTenant();
+    await ensurePersonalCalendar(tenant);
+
+    await injectAuth(page.context(), tenant);
+    await openCalendar(page);
+    const dialog = await openCreateDialog(page);
+
+    // Make the form dirty: type a title.
+    await dialog.getByLabel(copy.en.titleField).fill('Pending edit');
+
+    // Click Cancel — the discard confirm dialog appears (themed Dialog role).
+    await dialog.getByRole('button', { name: enCal.action.cancel }).click();
+    const confirmDialog = page.getByRole('dialog').filter({ hasText: copy.en.discardUnsaved });
+    await expect(confirmDialog).toBeVisible();
+    await confirmDialog.getByRole('button', { name: /cancel/i }).click();
+    await expect(dialog).toBeVisible();
+
+    // Try again, this time confirm: dialog closes.
+    await dialog.getByRole('button', { name: enCal.action.cancel }).click();
+    const confirmDialog2 = page.getByRole('dialog').filter({ hasText: copy.en.discardUnsaved });
+    await expect(confirmDialog2).toBeVisible();
+    await confirmDialog2.getByRole('button', { name: copy.en.discardConfirm }).click();
+    await expect(dialog).toBeHidden();
+
+    expect(errors).toEqual([]);
   });
 });

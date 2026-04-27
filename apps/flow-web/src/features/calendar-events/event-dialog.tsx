@@ -723,8 +723,69 @@ export default function EventDialog({
     }
   }
 
-  function handleClose(): void {
+  // Snapshot the initial user-visible field values so a dirty check can
+  // detect any unsaved edit before the dialog dismisses. Re-snapshots
+  // when `open` flips to true so reopening the dialog after a save
+  // resets the baseline.
+  const initialSnapshotRef = useRef<string>('');
+  // biome-ignore lint/correctness/useExhaustiveDependencies: snapshot baseline must only refresh when dialog opens
+  useEffect(() => {
+    if (!open) return;
+    initialSnapshotRef.current = JSON.stringify({
+      kind,
+      title,
+      startDate,
+      endDate,
+      startTime,
+      endTime,
+      allDay,
+      calendarId,
+      projectId,
+      priority,
+      showAs,
+      location,
+      blockPreset,
+      blockCustomLabel,
+      recurrence,
+      recurrenceCustom,
+      notification,
+      memo,
+    });
+  }, [open]);
+
+  function isDirty(): boolean {
+    const current = JSON.stringify({
+      kind,
+      title,
+      startDate,
+      endDate,
+      startTime,
+      endTime,
+      allDay,
+      calendarId,
+      projectId,
+      priority,
+      showAs,
+      location,
+      blockPreset,
+      blockCustomLabel,
+      recurrence,
+      recurrenceCustom,
+      notification,
+      memo,
+    });
+    return current !== initialSnapshotRef.current;
+  }
+
+  async function handleClose(): Promise<void> {
     if (isPending) return;
+    if (isDirty()) {
+      const confirmed = await confirmAction({
+        message: t('dialog.discard_unsaved'),
+        confirmLabel: t('dialog.discard_confirm'),
+      });
+      if (!confirmed) return;
+    }
     onClose();
   }
 
@@ -739,7 +800,14 @@ export default function EventDialog({
   const showMilestone = kind === 'milestone';
 
   return (
-    <Dialog open={open} onClose={handleClose} title={headerTitle} size="lg">
+    <Dialog
+      open={open}
+      onClose={() => {
+        void handleClose();
+      }}
+      title={headerTitle}
+      size="lg"
+    >
       <form onSubmit={handleSubmit} onKeyDown={handleKeyDown} className={styles.body}>
         <div className={styles.bodyScroll}>
           <SegmentedControl
@@ -1128,7 +1196,14 @@ export default function EventDialog({
             </Button>
           ) : null}
           <div className={styles.footerActions}>
-            <Button type="button" variant="ghost" onClick={handleClose} disabled={isPending}>
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={() => {
+                void handleClose();
+              }}
+              disabled={isPending}
+            >
               {t('action.cancel')}
             </Button>
             <Button type="submit" disabled={isPending}>
