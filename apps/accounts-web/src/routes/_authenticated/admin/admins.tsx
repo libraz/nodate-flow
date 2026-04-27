@@ -11,6 +11,7 @@ import { useTranslation } from 'react-i18next';
 
 import { useInvalidateInstanceStats } from '../../../features/admin-stats/api';
 import { sdk } from '../../../lib/sdk';
+import { useSubmitGuard } from '../../../lib/use-submit-guard';
 
 interface InstanceAdmin {
   id: string;
@@ -54,13 +55,13 @@ function formatTimestamp(ts: number): string {
   return new Date(ts * 1000).toLocaleString();
 }
 
-function AdminsPage(): ReactElement {
+export function AdminsPage(): ReactElement {
   const { t } = useTranslation('admin');
   const invalidateInstanceStats = useInvalidateInstanceStats();
   const [admins, setAdmins] = useState<InstanceAdmin[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [actionLoading, setActionLoading] = useState(false);
+  const { guard: guardSubmit, submitting: actionLoading, end: endSubmit } = useSubmitGuard();
   const [grantError, setGrantError] = useState<string | null>(null);
   const [userResults, setUserResults] = useState<UserSearchResult[]>([]);
   const [selectedUserId, setSelectedUserId] = useState<string | undefined>(undefined);
@@ -112,37 +113,40 @@ function AdminsPage(): ReactElement {
       confirmLabel: t('admins.revoke'),
     });
     if (!ok) return;
-
-    setActionLoading(true);
-    const { error: err } = await sdk.DELETE('/admin/instance-admins/{adminId}', {
-      params: { path: { adminId } },
-    });
-    setActionLoading(false);
-
-    if (!err) {
-      setAdmins((prev) => prev.filter((a) => a.id !== adminId));
-      void invalidateInstanceStats();
+    if (guardSubmit()) return;
+    try {
+      const { error: err } = await sdk.DELETE('/admin/instance-admins/{adminId}', {
+        params: { path: { adminId } },
+      });
+      if (!err) {
+        setAdmins((prev) => prev.filter((a) => a.id !== adminId));
+        void invalidateInstanceStats();
+      }
+    } finally {
+      endSubmit();
     }
   };
 
   const handleGrant = async (user: UserSearchResult) => {
     setGrantError(null);
-    setActionLoading(true);
-    const { data, error: err } = await sdk.POST('/admin/instance-admins', {
-      body: { userId: user.id },
-    });
-    setActionLoading(false);
+    if (guardSubmit()) return;
+    try {
+      const { data, error: err } = await sdk.POST('/admin/instance-admins', {
+        body: { userId: user.id },
+      });
+      if (err || !data) {
+        setGrantError(t('errors.generic'));
+        return;
+      }
 
-    if (err || !data) {
-      setGrantError(t('errors.generic'));
-      return;
+      const body = data as { admin: InstanceAdmin };
+      setAdmins((prev) => [...prev, body.admin]);
+      setSelectedUserId(undefined);
+      setUserResults([]);
+      void invalidateInstanceStats();
+    } finally {
+      endSubmit();
     }
-
-    const body = data as { admin: InstanceAdmin };
-    setAdmins((prev) => [...prev, body.admin]);
-    setSelectedUserId(undefined);
-    setUserResults([]);
-    void invalidateInstanceStats();
   };
 
   return (

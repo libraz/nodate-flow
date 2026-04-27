@@ -23,6 +23,7 @@ import { useTranslation } from 'react-i18next';
 import { z } from 'zod';
 
 import { formatDate } from '../../lib/format';
+import { useSubmitGuard } from '../../lib/use-submit-guard';
 
 import { TASK_PRIORITIES, type TaskPriority, useCreateTask } from './api';
 import { PRIORITY_KEY } from './constants';
@@ -88,7 +89,7 @@ export default function TaskCreateDialog({
   const [priority, setPriority] = useState<TaskPriority>(2);
   const [dueOn, setDueOn] = useState('');
   const [errors, setErrors] = useState<FieldErrors>({});
-  const [submitting, setSubmitting] = useState(false);
+  const { guard, submitting, end } = useSubmitGuard();
 
   // AI Assist state
   const [proposal, setProposal] = useState<SmartProposal | null>(null);
@@ -163,7 +164,7 @@ export default function TaskCreateDialog({
 
   const handleApplySmart = async (): Promise<void> => {
     if (!workspaceId || !proposal) return;
-    setSubmitting(true);
+    if (guard()) return;
     try {
       const subtasks = proposal.subtasks
         .filter((_, i) => selectedSubtasks.has(i))
@@ -193,13 +194,12 @@ export default function TaskCreateDialog({
     } catch {
       toaster.show({ tone: 'danger', message: t('tasks.errors.create_failed') });
     } finally {
-      setSubmitting(false);
+      end();
     }
   };
 
   const handleSubmit = async (e: FormEvent<HTMLFormElement>): Promise<void> => {
     e.preventDefault();
-    if (submitting) return;
     const parsed = schema.safeParse({
       title,
       description: description.trim() === '' ? undefined : description,
@@ -217,7 +217,7 @@ export default function TaskCreateDialog({
       return;
     }
     setErrors({});
-    setSubmitting(true);
+    if (guard()) return;
     try {
       await create.mutateAsync({
         projectId,
@@ -232,7 +232,7 @@ export default function TaskCreateDialog({
     } catch {
       toaster.show({ tone: 'danger', message: t('tasks.errors.create_failed') });
     } finally {
-      setSubmitting(false);
+      end();
     }
   };
 
