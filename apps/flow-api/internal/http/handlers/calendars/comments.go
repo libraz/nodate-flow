@@ -17,9 +17,9 @@ import (
 
 // ListCommentsInput is the input for listing event comments.
 type ListCommentsInput struct {
-	WsId  string `path:"wsId" doc:"Workspace public ID"`
-	CalId string `path:"calId" doc:"Calendar public ID"`
-	EvtId string `path:"evtId" doc:"Event public ID"`
+	WsID  string `path:"wsId" doc:"Workspace public ID"`
+	CalID string `path:"calId" doc:"Calendar public ID"`
+	EvtID string `path:"evtId" doc:"Event public ID"`
 }
 
 // CommentResponse is the JSON representation of an event comment.
@@ -27,7 +27,7 @@ type CommentResponse struct {
 	ID          string  `json:"id"`
 	UserID      string  `json:"userId"`
 	DisplayName string  `json:"displayName"`
-	AvatarUrl   *string `json:"avatarUrl,omitempty"`
+	AvatarURL   *string `json:"avatarUrl,omitempty"`
 	Body        string  `json:"body"`
 	EditedAt    *int64  `json:"editedAt,omitempty"`
 	CreatedAt   int64   `json:"createdAt"`
@@ -42,9 +42,9 @@ type ListCommentsOutput struct {
 
 // CreateCommentInput is the input for creating an event comment.
 type CreateCommentInput struct {
-	WsId  string `path:"wsId" doc:"Workspace public ID"`
-	CalId string `path:"calId" doc:"Calendar public ID"`
-	EvtId string `path:"evtId" doc:"Event public ID"`
+	WsID  string `path:"wsId" doc:"Workspace public ID"`
+	CalID string `path:"calId" doc:"Calendar public ID"`
+	EvtID string `path:"evtId" doc:"Event public ID"`
 	Body  struct {
 		Body string `json:"body" minLength:"1" maxLength:"5000" doc:"Comment text"`
 	}
@@ -57,9 +57,9 @@ type CreateCommentOutput struct {
 
 // EditCommentInput is the input for editing a comment.
 type EditCommentInput struct {
-	WsId  string `path:"wsId" doc:"Workspace public ID"`
-	CalId string `path:"calId" doc:"Calendar public ID"`
-	EvtId string `path:"evtId" doc:"Event public ID"`
+	WsID  string `path:"wsId" doc:"Workspace public ID"`
+	CalID string `path:"calId" doc:"Calendar public ID"`
+	EvtID string `path:"evtId" doc:"Event public ID"`
 	CId   string `path:"cId" doc:"Comment public ID"`
 	Body  struct {
 		Body string `json:"body" minLength:"1" maxLength:"5000" doc:"Updated comment text"`
@@ -75,9 +75,9 @@ type EditCommentOutput struct {
 
 // DeleteCommentInput is the input for deleting a comment.
 type DeleteCommentInput struct {
-	WsId  string `path:"wsId" doc:"Workspace public ID"`
-	CalId string `path:"calId" doc:"Calendar public ID"`
-	EvtId string `path:"evtId" doc:"Event public ID"`
+	WsID  string `path:"wsId" doc:"Workspace public ID"`
+	CalID string `path:"calId" doc:"Calendar public ID"`
+	EvtID string `path:"evtId" doc:"Event public ID"`
 	CId   string `path:"cId" doc:"Comment public ID"`
 }
 
@@ -93,16 +93,16 @@ type DeleteCommentOutput struct {
 // ListComments returns all comments on an event in chronological order.
 func ListComments(deps Deps) func(context.Context, *ListCommentsInput) (*ListCommentsOutput, error) {
 	return func(ctx context.Context, input *ListCommentsInput) (*ListCommentsOutput, error) {
-		wsID, actorID, err := resolveWorkspace(ctx, deps.Queries, input.WsId)
+		wsID, actorID, err := resolveWorkspace(ctx, deps.Queries, input.WsID)
 		if err != nil {
 			return nil, err
 		}
-		cal, _, err := resolveCalendar(ctx, deps.CalendarQueries, wsID, actorID, input.CalId)
+		cal, _, err := resolveCalendar(ctx, deps.CalendarQueries, wsID, actorID, input.CalID)
 		if err != nil {
 			return nil, err
 		}
 
-		evt, err := resolveEvent(ctx, deps.CalendarQueries, cal.ID, wsID, input.EvtId)
+		evt, err := resolveEvent(ctx, deps.CalendarQueries, cal.ID, wsID, input.EvtID)
 		if err != nil {
 			return nil, err
 		}
@@ -122,7 +122,7 @@ func ListComments(deps Deps) func(context.Context, *ListCommentsInput) (*ListCom
 				Body:        r.Body,
 				CreatedAt:   r.CreatedAt.Unix(),
 			}
-			resp.AvatarUrl = dbtype.PtrFromNullString(r.AvatarUrl)
+			resp.AvatarURL = dbtype.PtrFromNullString(r.AvatarUrl)
 			resp.EditedAt = dbtype.UnixSecondsFromNullTime(r.EditedAt)
 			out.Body.Comments[i] = resp
 		}
@@ -133,16 +133,16 @@ func ListComments(deps Deps) func(context.Context, *ListCommentsInput) (*ListCom
 // CreateComment adds a comment to an event.
 func CreateComment(deps Deps) func(context.Context, *CreateCommentInput) (*CreateCommentOutput, error) {
 	return func(ctx context.Context, input *CreateCommentInput) (*CreateCommentOutput, error) {
-		wsID, actorID, err := resolveWorkspace(ctx, deps.Queries, input.WsId)
+		wsID, actorID, err := resolveWorkspace(ctx, deps.Queries, input.WsID)
 		if err != nil {
 			return nil, err
 		}
-		cal, _, err := resolveCalendar(ctx, deps.CalendarQueries, wsID, actorID, input.CalId)
+		cal, _, err := resolveCalendar(ctx, deps.CalendarQueries, wsID, actorID, input.CalID)
 		if err != nil {
 			return nil, err
 		}
 
-		evt, err := resolveEvent(ctx, deps.CalendarQueries, cal.ID, wsID, input.EvtId)
+		evt, err := resolveEvent(ctx, deps.CalendarQueries, cal.ID, wsID, input.EvtID)
 		if err != nil {
 			return nil, err
 		}
@@ -172,11 +172,11 @@ func CreateComment(deps Deps) func(context.Context, *CreateCommentInput) (*Creat
 			Body:        input.Body.Body,
 			CreatedAt:   handlerutil.NowUnix(),
 		}
-		out.Body.AvatarUrl = dbtype.PtrFromNullString(profile.AvatarUrl)
+		out.Body.AvatarURL = dbtype.PtrFromNullString(profile.AvatarUrl)
 
 		_ = appendCalendarEvent(ctx, deps.DB, wsID, "calendar.event.comment.created", &actorID, map[string]any{
-			"eventId":    input.EvtId,
-			"calendarId": input.CalId,
+			"eventId":    input.EvtID,
+			"calendarId": input.CalID,
 			"commentId":  commentPublicID.String(),
 		})
 
@@ -187,16 +187,16 @@ func CreateComment(deps Deps) func(context.Context, *CreateCommentInput) (*Creat
 // EditComment edits a comment. Only the author can edit their own comment.
 func EditComment(deps Deps) func(context.Context, *EditCommentInput) (*EditCommentOutput, error) {
 	return func(ctx context.Context, input *EditCommentInput) (*EditCommentOutput, error) {
-		wsID, actorID, err := resolveWorkspace(ctx, deps.Queries, input.WsId)
+		wsID, actorID, err := resolveWorkspace(ctx, deps.Queries, input.WsID)
 		if err != nil {
 			return nil, err
 		}
-		cal, _, err := resolveCalendar(ctx, deps.CalendarQueries, wsID, actorID, input.CalId)
+		cal, _, err := resolveCalendar(ctx, deps.CalendarQueries, wsID, actorID, input.CalID)
 		if err != nil {
 			return nil, err
 		}
 
-		evt, err := resolveEvent(ctx, deps.CalendarQueries, cal.ID, wsID, input.EvtId)
+		evt, err := resolveEvent(ctx, deps.CalendarQueries, cal.ID, wsID, input.EvtID)
 		if err != nil {
 			return nil, err
 		}
@@ -218,8 +218,8 @@ func EditComment(deps Deps) func(context.Context, *EditCommentInput) (*EditComme
 		}
 
 		_ = appendCalendarEvent(ctx, deps.DB, wsID, "calendar.event.comment.updated", &actorID, map[string]any{
-			"eventId":    input.EvtId,
-			"calendarId": input.CalId,
+			"eventId":    input.EvtID,
+			"calendarId": input.CalID,
 			"commentId":  input.CId,
 		})
 
@@ -232,16 +232,16 @@ func EditComment(deps Deps) func(context.Context, *EditCommentInput) (*EditComme
 // DeleteComment deletes a comment. The author or a calendar owner can delete.
 func DeleteComment(deps Deps) func(context.Context, *DeleteCommentInput) (*DeleteCommentOutput, error) {
 	return func(ctx context.Context, input *DeleteCommentInput) (*DeleteCommentOutput, error) {
-		wsID, actorID, err := resolveWorkspace(ctx, deps.Queries, input.WsId)
+		wsID, actorID, err := resolveWorkspace(ctx, deps.Queries, input.WsID)
 		if err != nil {
 			return nil, err
 		}
-		cal, _, err := resolveCalendar(ctx, deps.CalendarQueries, wsID, actorID, input.CalId)
+		cal, _, err := resolveCalendar(ctx, deps.CalendarQueries, wsID, actorID, input.CalID)
 		if err != nil {
 			return nil, err
 		}
 
-		evt, err := resolveEvent(ctx, deps.CalendarQueries, cal.ID, wsID, input.EvtId)
+		evt, err := resolveEvent(ctx, deps.CalendarQueries, cal.ID, wsID, input.EvtID)
 		if err != nil {
 			return nil, err
 		}
@@ -281,8 +281,8 @@ func DeleteComment(deps Deps) func(context.Context, *DeleteCommentInput) (*Delet
 		out.Body.Deleted = true
 
 		_ = appendCalendarEvent(ctx, deps.DB, wsID, "calendar.event.comment.deleted", &actorID, map[string]any{
-			"eventId":    input.EvtId,
-			"calendarId": input.CalId,
+			"eventId":    input.EvtID,
+			"calendarId": input.CalID,
 			"commentId":  input.CId,
 		})
 

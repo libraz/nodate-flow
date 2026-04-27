@@ -17,7 +17,7 @@ import (
 
 // ListCalendarsInput is the input for the list calendars endpoint.
 type ListCalendarsInput struct {
-	WsId string `path:"wsId" doc:"Workspace public ID"`
+	WsID string `path:"wsId" doc:"Workspace public ID"`
 }
 
 // CalendarResponse is the JSON representation of a calendar with subscription info.
@@ -27,7 +27,7 @@ type CalendarResponse struct {
 	Name                   string  `json:"name"`
 	Description            *string `json:"description,omitempty"`
 	Color                  string  `json:"color"`
-	CoverUrl               *string `json:"coverUrl,omitempty"`
+	CoverURL               *string `json:"coverUrl,omitempty"`
 	SystemSlug             *string `json:"systemSlug,omitempty"`
 	Role                   string  `json:"role"`
 	MemberColor            string  `json:"memberColor"`
@@ -47,13 +47,13 @@ type ListCalendarsOutput struct {
 
 // CreateCalendarInput is the input for the create calendar endpoint.
 type CreateCalendarInput struct {
-	WsId string `path:"wsId" doc:"Workspace public ID"`
+	WsID string `path:"wsId" doc:"Workspace public ID"`
 	Body struct {
 		Kind        string  `json:"kind" enum:"personal,system" doc:"Calendar kind"`
 		Name        string  `json:"name" minLength:"1" maxLength:"255" doc:"Calendar name"`
 		Description *string `json:"description,omitempty" required:"false" doc:"Calendar description"`
 		Color       string  `json:"color" minLength:"1" maxLength:"7" doc:"Display color (hex)"`
-		CoverUrl    *string `json:"coverUrl,omitempty" required:"false" doc:"Cover image URL"`
+		CoverURL    *string `json:"coverUrl,omitempty" required:"false" doc:"Cover image URL"`
 		SystemSlug  *string `json:"systemSlug,omitempty" required:"false" doc:"System calendar slug"`
 	}
 }
@@ -65,8 +65,8 @@ type CreateCalendarOutput struct {
 
 // GetCalendarInput is the input for the get calendar endpoint.
 type GetCalendarInput struct {
-	WsId  string `path:"wsId" doc:"Workspace public ID"`
-	CalId string `path:"calId" doc:"Calendar public ID"`
+	WsID  string `path:"wsId" doc:"Workspace public ID"`
+	CalID string `path:"calId" doc:"Calendar public ID"`
 }
 
 // GetCalendarOutput is the response for the get calendar endpoint.
@@ -76,13 +76,13 @@ type GetCalendarOutput struct {
 
 // PatchCalendarInput is the input for the patch calendar endpoint.
 type PatchCalendarInput struct {
-	WsId  string `path:"wsId" doc:"Workspace public ID"`
-	CalId string `path:"calId" doc:"Calendar public ID"`
+	WsID  string `path:"wsId" doc:"Workspace public ID"`
+	CalID string `path:"calId" doc:"Calendar public ID"`
 	Body  struct {
 		Name        *string `json:"name,omitempty" required:"false" doc:"Calendar name"`
 		Description *string `json:"description,omitempty" required:"false" doc:"Calendar description"`
 		Color       *string `json:"color,omitempty" required:"false" doc:"Display color"`
-		CoverUrl    *string `json:"coverUrl,omitempty" required:"false" doc:"Cover image URL"`
+		CoverURL    *string `json:"coverUrl,omitempty" required:"false" doc:"Cover image URL"`
 	}
 }
 
@@ -93,8 +93,8 @@ type PatchCalendarOutput struct {
 
 // DeleteCalendarInput is the input for the delete calendar endpoint.
 type DeleteCalendarInput struct {
-	WsId  string `path:"wsId" doc:"Workspace public ID"`
-	CalId string `path:"calId" doc:"Calendar public ID"`
+	WsID  string `path:"wsId" doc:"Workspace public ID"`
+	CalID string `path:"calId" doc:"Calendar public ID"`
 }
 
 // DeleteCalendarOutput is the response for the delete calendar endpoint.
@@ -110,7 +110,7 @@ type DeleteCalendarOutput struct {
 // within the given workspace.
 func ListCalendars(deps Deps) func(context.Context, *ListCalendarsInput) (*ListCalendarsOutput, error) {
 	return func(ctx context.Context, input *ListCalendarsInput) (*ListCalendarsOutput, error) {
-		wsID, actorID, err := resolveWorkspace(ctx, deps.Queries, input.WsId)
+		wsID, actorID, err := resolveWorkspace(ctx, deps.Queries, input.WsID)
 		if err != nil {
 			return nil, err
 		}
@@ -138,7 +138,7 @@ func ListCalendars(deps Deps) func(context.Context, *ListCalendarsInput) (*ListC
 // subscribes the creator as owner.
 func CreateCalendar(deps Deps) func(context.Context, *CreateCalendarInput) (*CreateCalendarOutput, error) {
 	return func(ctx context.Context, input *CreateCalendarInput) (*CreateCalendarOutput, error) {
-		wsID, actorID, err := resolveWorkspace(ctx, deps.Queries, input.WsId)
+		wsID, actorID, err := resolveWorkspace(ctx, deps.Queries, input.WsID)
 		if err != nil {
 			return nil, err
 		}
@@ -149,9 +149,9 @@ func CreateCalendar(deps Deps) func(context.Context, *CreateCalendarInput) (*Cre
 		if input.Body.Description != nil {
 			desc = sql.NullString{String: *input.Body.Description, Valid: true}
 		}
-		coverUrl := sql.NullString{}
-		if input.Body.CoverUrl != nil {
-			coverUrl = sql.NullString{String: *input.Body.CoverUrl, Valid: true}
+		coverURL := sql.NullString{}
+		if input.Body.CoverURL != nil {
+			coverURL = sql.NullString{String: *input.Body.CoverURL, Valid: true}
 		}
 		systemSlug := sql.NullString{}
 		if input.Body.SystemSlug != nil {
@@ -165,7 +165,7 @@ func CreateCalendar(deps Deps) func(context.Context, *CreateCalendarInput) (*Cre
 			Name:        input.Body.Name,
 			Description: desc,
 			Color:       input.Body.Color,
-			CoverUrl:    coverUrl,
+			CoverUrl:    coverURL,
 			OwnerUserID: sql.NullInt32{Int32: int32(actorID), Valid: true},
 			SystemSlug:  systemSlug,
 		})
@@ -192,7 +192,7 @@ func CreateCalendar(deps Deps) func(context.Context, *CreateCalendarInput) (*Cre
 			Name:        input.Body.Name,
 			Description: input.Body.Description,
 			Color:       input.Body.Color,
-			CoverUrl:    input.Body.CoverUrl,
+			CoverURL:    input.Body.CoverURL,
 			SystemSlug:  input.Body.SystemSlug,
 			// calendar_subscriptions.role has been dropped. Creator is
 			// the calendar owner (cal.owner_user_id); DTO surfaces "owner" to
@@ -218,11 +218,11 @@ func CreateCalendar(deps Deps) func(context.Context, *CreateCalendarInput) (*Cre
 // GetCalendar returns a single calendar with the actor's subscription info.
 func GetCalendar(deps Deps) func(context.Context, *GetCalendarInput) (*GetCalendarOutput, error) {
 	return func(ctx context.Context, input *GetCalendarInput) (*GetCalendarOutput, error) {
-		wsID, actorID, err := resolveWorkspace(ctx, deps.Queries, input.WsId)
+		wsID, actorID, err := resolveWorkspace(ctx, deps.Queries, input.WsID)
 		if err != nil {
 			return nil, err
 		}
-		cal, sub, err := resolveCalendar(ctx, deps.CalendarQueries, wsID, actorID, input.CalId)
+		cal, sub, err := resolveCalendar(ctx, deps.CalendarQueries, wsID, actorID, input.CalID)
 		if err != nil {
 			return nil, err
 		}
@@ -237,11 +237,11 @@ func GetCalendar(deps Deps) func(context.Context, *GetCalendarInput) (*GetCalend
 // perform this operation.
 func PatchCalendar(deps Deps) func(context.Context, *PatchCalendarInput) (*PatchCalendarOutput, error) {
 	return func(ctx context.Context, input *PatchCalendarInput) (*PatchCalendarOutput, error) {
-		wsID, actorID, err := resolveWorkspace(ctx, deps.Queries, input.WsId)
+		wsID, actorID, err := resolveWorkspace(ctx, deps.Queries, input.WsID)
 		if err != nil {
 			return nil, err
 		}
-		cal, sub, err := resolveCalendar(ctx, deps.CalendarQueries, wsID, actorID, input.CalId)
+		cal, sub, err := resolveCalendar(ctx, deps.CalendarQueries, wsID, actorID, input.CalID)
 		if err != nil {
 			return nil, err
 		}
@@ -264,11 +264,11 @@ func PatchCalendar(deps Deps) func(context.Context, *PatchCalendarInput) (*Patch
 			patchColor = sql.NullString{String: *input.Body.Color, Valid: true}
 		}
 		patchCover := sql.NullString{}
-		if input.Body.CoverUrl != nil {
-			patchCover = sql.NullString{String: *input.Body.CoverUrl, Valid: true}
+		if input.Body.CoverURL != nil {
+			patchCover = sql.NullString{String: *input.Body.CoverURL, Valid: true}
 		}
 
-		calUID, _ := uuid.Parse(input.CalId)
+		calUID, _ := uuid.Parse(input.CalID)
 		err = deps.CalendarQueries.PatchCalendar(ctx, calendar.PatchCalendarParams{
 			Name:        patchName,
 			Description: patchDesc,
@@ -293,7 +293,7 @@ func PatchCalendar(deps Deps) func(context.Context, *PatchCalendarInput) (*Patch
 		out.Body = calendarFromRow(cal, sub)
 
 		_ = appendCalendarEvent(ctx, deps.DB, wsID, "calendar.updated", &actorID, map[string]any{
-			"calendarId": input.CalId,
+			"calendarId": input.CalID,
 		})
 
 		return out, nil
@@ -303,11 +303,11 @@ func PatchCalendar(deps Deps) func(context.Context, *PatchCalendarInput) (*Patch
 // DeleteCalendar soft-deletes a calendar. Only owners can perform this.
 func DeleteCalendar(deps Deps) func(context.Context, *DeleteCalendarInput) (*DeleteCalendarOutput, error) {
 	return func(ctx context.Context, input *DeleteCalendarInput) (*DeleteCalendarOutput, error) {
-		wsID, actorID, err := resolveWorkspace(ctx, deps.Queries, input.WsId)
+		wsID, actorID, err := resolveWorkspace(ctx, deps.Queries, input.WsID)
 		if err != nil {
 			return nil, err
 		}
-		cal, _, err := resolveCalendar(ctx, deps.CalendarQueries, wsID, actorID, input.CalId)
+		cal, _, err := resolveCalendar(ctx, deps.CalendarQueries, wsID, actorID, input.CalID)
 		if err != nil {
 			return nil, err
 		}
@@ -318,7 +318,7 @@ func DeleteCalendar(deps Deps) func(context.Context, *DeleteCalendarInput) (*Del
 		}
 		_ = cal
 
-		calUID, _ := uuid.Parse(input.CalId)
+		calUID, _ := uuid.Parse(input.CalID)
 		err = deps.CalendarQueries.DisableCalendar(ctx, calendar.DisableCalendarParams{
 			PublicID:    types.FromUUID(calUID),
 			WorkspaceID: wsID,
@@ -331,7 +331,7 @@ func DeleteCalendar(deps Deps) func(context.Context, *DeleteCalendarInput) (*Del
 		out.Body.Deleted = true
 
 		_ = appendCalendarEvent(ctx, deps.DB, wsID, "calendar.deleted", &actorID, map[string]any{
-			"calendarId": input.CalId,
+			"calendarId": input.CalID,
 		})
 
 		return out, nil
@@ -361,7 +361,7 @@ func calendarFromListRow(r calendar.ListCalendarsForUserRow) CalendarResponse {
 		CreatedAt:              r.CreatedAt.Unix(),
 	}
 	resp.Description = dbtype.PtrFromNullString(r.Description)
-	resp.CoverUrl = dbtype.PtrFromNullString(r.CoverUrl)
+	resp.CoverURL = dbtype.PtrFromNullString(r.CoverUrl)
 	resp.SystemSlug = dbtype.PtrFromNullString(r.SystemSlug)
 	resp.UpdatedAt = dbtype.UnixSecondsFromNullTime(r.UpdatedAt)
 	return resp
@@ -387,7 +387,7 @@ func calendarFromRow(c calendar.FindCalendarByPublicIdRow, s calendar.FindCalend
 		CreatedAt:              c.CreatedAt.Unix(),
 	}
 	resp.Description = dbtype.PtrFromNullString(c.Description)
-	resp.CoverUrl = dbtype.PtrFromNullString(c.CoverUrl)
+	resp.CoverURL = dbtype.PtrFromNullString(c.CoverUrl)
 	resp.SystemSlug = dbtype.PtrFromNullString(c.SystemSlug)
 	resp.UpdatedAt = dbtype.UnixSecondsFromNullTime(c.UpdatedAt)
 	return resp

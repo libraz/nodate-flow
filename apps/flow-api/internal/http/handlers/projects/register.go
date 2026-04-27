@@ -27,7 +27,7 @@ func RegisterWorkspaceScoped(api huma.API, deps Deps) {
 }
 
 // RegisterGlobal wires the global project routes (under /projects/{prjId}).
-// The caller must attach RequireProjectMemberByGlobalId to the underlying
+// The caller must attach RequireProjectMemberByGlobalID to the underlying
 // chi router.
 func RegisterGlobal(api huma.API, deps Deps) {
 	huma.Register(api, huma.Operation{

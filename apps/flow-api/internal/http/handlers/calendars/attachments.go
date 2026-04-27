@@ -17,9 +17,9 @@ import (
 
 // ListAttachmentsInput is the input for listing event attachments.
 type ListAttachmentsInput struct {
-	WsId  string `path:"wsId" doc:"Workspace public ID"`
-	CalId string `path:"calId" doc:"Calendar public ID"`
-	EvtId string `path:"evtId" doc:"Event public ID"`
+	WsID  string `path:"wsId" doc:"Workspace public ID"`
+	CalID string `path:"calId" doc:"Calendar public ID"`
+	EvtID string `path:"evtId" doc:"Event public ID"`
 }
 
 // AttachmentResponse is the JSON representation of an event attachment.
@@ -43,9 +43,9 @@ type ListAttachmentsOutput struct {
 
 // CreateAttachmentInput is the input for creating an attachment metadata record.
 type CreateAttachmentInput struct {
-	WsId  string `path:"wsId" doc:"Workspace public ID"`
-	CalId string `path:"calId" doc:"Calendar public ID"`
-	EvtId string `path:"evtId" doc:"Event public ID"`
+	WsID  string `path:"wsId" doc:"Workspace public ID"`
+	CalID string `path:"calId" doc:"Calendar public ID"`
+	EvtID string `path:"evtId" doc:"Event public ID"`
 	Body  struct {
 		Filename       string `json:"filename" minLength:"1" maxLength:"255" doc:"Original filename"`
 		ContentType    string `json:"contentType" minLength:"1" maxLength:"255" doc:"MIME content type"`
@@ -62,10 +62,10 @@ type CreateAttachmentOutput struct {
 
 // DeleteAttachmentInput is the input for soft-deleting an attachment.
 type DeleteAttachmentInput struct {
-	WsId  string `path:"wsId" doc:"Workspace public ID"`
-	CalId string `path:"calId" doc:"Calendar public ID"`
-	EvtId string `path:"evtId" doc:"Event public ID"`
-	AttId string `path:"attId" doc:"Attachment public ID"`
+	WsID  string `path:"wsId" doc:"Workspace public ID"`
+	CalID string `path:"calId" doc:"Calendar public ID"`
+	EvtID string `path:"evtId" doc:"Event public ID"`
+	AttID string `path:"attId" doc:"Attachment public ID"`
 }
 
 // DeleteAttachmentOutput is the response for the delete attachment endpoint.
@@ -80,16 +80,16 @@ type DeleteAttachmentOutput struct {
 // ListAttachments returns all attachments on an event.
 func ListAttachments(deps Deps) func(context.Context, *ListAttachmentsInput) (*ListAttachmentsOutput, error) {
 	return func(ctx context.Context, input *ListAttachmentsInput) (*ListAttachmentsOutput, error) {
-		wsID, actorID, err := resolveWorkspace(ctx, deps.Queries, input.WsId)
+		wsID, actorID, err := resolveWorkspace(ctx, deps.Queries, input.WsID)
 		if err != nil {
 			return nil, err
 		}
-		cal, _, err := resolveCalendar(ctx, deps.CalendarQueries, wsID, actorID, input.CalId)
+		cal, _, err := resolveCalendar(ctx, deps.CalendarQueries, wsID, actorID, input.CalID)
 		if err != nil {
 			return nil, err
 		}
 
-		evt, err := resolveEvent(ctx, deps.CalendarQueries, cal.ID, wsID, input.EvtId)
+		evt, err := resolveEvent(ctx, deps.CalendarQueries, cal.ID, wsID, input.EvtID)
 		if err != nil {
 			return nil, err
 		}
@@ -120,16 +120,16 @@ func ListAttachments(deps Deps) func(context.Context, *ListAttachmentsInput) (*L
 // CreateAttachment records metadata for an uploaded file attachment on an event.
 func CreateAttachment(deps Deps) func(context.Context, *CreateAttachmentInput) (*CreateAttachmentOutput, error) {
 	return func(ctx context.Context, input *CreateAttachmentInput) (*CreateAttachmentOutput, error) {
-		wsID, actorID, err := resolveWorkspace(ctx, deps.Queries, input.WsId)
+		wsID, actorID, err := resolveWorkspace(ctx, deps.Queries, input.WsID)
 		if err != nil {
 			return nil, err
 		}
-		cal, _, err := resolveCalendar(ctx, deps.CalendarQueries, wsID, actorID, input.CalId)
+		cal, _, err := resolveCalendar(ctx, deps.CalendarQueries, wsID, actorID, input.CalID)
 		if err != nil {
 			return nil, err
 		}
 
-		evt, err := resolveEvent(ctx, deps.CalendarQueries, cal.ID, wsID, input.EvtId)
+		evt, err := resolveEvent(ctx, deps.CalendarQueries, cal.ID, wsID, input.EvtID)
 		if err != nil {
 			return nil, err
 		}
@@ -173,8 +173,8 @@ func CreateAttachment(deps Deps) func(context.Context, *CreateAttachmentInput) (
 		}
 
 		_ = appendCalendarEvent(ctx, deps.DB, wsID, "calendar.event.attachment.created", &actorID, map[string]any{
-			"eventId":      input.EvtId,
-			"calendarId":   input.CalId,
+			"eventId":      input.EvtID,
+			"calendarId":   input.CalID,
 			"attachmentId": attPublicID.String(),
 			"filename":     input.Body.Filename,
 		})
@@ -186,21 +186,21 @@ func CreateAttachment(deps Deps) func(context.Context, *CreateAttachmentInput) (
 // DeleteAttachment soft-deletes an attachment from an event.
 func DeleteAttachment(deps Deps) func(context.Context, *DeleteAttachmentInput) (*DeleteAttachmentOutput, error) {
 	return func(ctx context.Context, input *DeleteAttachmentInput) (*DeleteAttachmentOutput, error) {
-		wsID, actorID, err := resolveWorkspace(ctx, deps.Queries, input.WsId)
+		wsID, actorID, err := resolveWorkspace(ctx, deps.Queries, input.WsID)
 		if err != nil {
 			return nil, err
 		}
-		cal, _, err := resolveCalendar(ctx, deps.CalendarQueries, wsID, actorID, input.CalId)
-		if err != nil {
-			return nil, err
-		}
-
-		evt, err := resolveEvent(ctx, deps.CalendarQueries, cal.ID, wsID, input.EvtId)
+		cal, _, err := resolveCalendar(ctx, deps.CalendarQueries, wsID, actorID, input.CalID)
 		if err != nil {
 			return nil, err
 		}
 
-		attUID, err := uuid.Parse(input.AttId)
+		evt, err := resolveEvent(ctx, deps.CalendarQueries, cal.ID, wsID, input.EvtID)
+		if err != nil {
+			return nil, err
+		}
+
+		attUID, err := uuid.Parse(input.AttID)
 		if err != nil {
 			return nil, httpErr(apierrors.CalendarAttachmentNotFound)
 		}
@@ -235,9 +235,9 @@ func DeleteAttachment(deps Deps) func(context.Context, *DeleteAttachmentInput) (
 		out.Body.Deleted = true
 
 		_ = appendCalendarEvent(ctx, deps.DB, wsID, "calendar.event.attachment.deleted", &actorID, map[string]any{
-			"eventId":      input.EvtId,
-			"calendarId":   input.CalId,
-			"attachmentId": input.AttId,
+			"eventId":      input.EvtID,
+			"calendarId":   input.CalID,
+			"attachmentId": input.AttID,
 		})
 
 		return out, nil

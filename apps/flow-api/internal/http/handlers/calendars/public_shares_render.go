@@ -26,7 +26,7 @@ type PublicShareRenderEvent struct {
 	Timezone       string  `json:"timezone"`
 	Location       *string `json:"location,omitempty"`
 	Memo           *string `json:"memo,omitempty"`
-	Url            *string `json:"url,omitempty"`
+	URL            *string `json:"url,omitempty"`
 	Kind           string  `json:"kind"`
 	ShowAs         string  `json:"showAs"`
 	BlockLabel     *string `json:"blockLabel,omitempty"`
@@ -40,8 +40,8 @@ type PublicShareRenderEvent struct {
 type PublicShareRenderPage struct {
 	Title               string  `json:"title"`
 	Description         *string `json:"description,omitempty"`
-	IconUrl             *string `json:"iconUrl,omitempty"`
-	CoverUrl            *string `json:"coverUrl,omitempty"`
+	IconURL             *string `json:"iconUrl,omitempty"`
+	CoverURL            *string `json:"coverUrl,omitempty"`
 	Timezone            string  `json:"timezone"`
 	ShowHolidaysCountry *string `json:"showHolidaysCountry,omitempty"`
 	WorkspaceID         string  `json:"workspaceId"`
@@ -91,8 +91,8 @@ func RenderPublicShare(deps Deps) func(context.Context, *RenderPublicShareInput)
 		out.Body.Page = PublicShareRenderPage{
 			Title:               page.Title,
 			Description:         nullStringPtr(page.Description),
-			IconUrl:             nullStringPtr(page.IconUrl),
-			CoverUrl:            nullStringPtr(page.CoverUrl),
+			IconURL:             nullStringPtr(page.IconUrl),
+			CoverURL:            nullStringPtr(page.CoverUrl),
 			Timezone:            page.Timezone,
 			ShowHolidaysCountry: nullStringPtr(page.ShowHolidaysCountry),
 			WorkspaceID:         page.WorkspacePublicID.String(),
@@ -110,7 +110,7 @@ func RenderPublicShare(deps Deps) func(context.Context, *RenderPublicShareInput)
 				Timezone:       e.Timezone,
 				Location:       nullStringPtr(e.Location),
 				Memo:           nullStringPtr(e.Memo),
-				Url:            nullStringPtr(e.Url),
+				URL:            nullStringPtr(e.Url),
 				Kind:           string(e.Kind),
 				ShowAs:         string(e.ShowAs),
 				BlockLabel:     nullStringPtr(e.BlockLabel),

@@ -23,8 +23,8 @@ var memberColors = []string{
 
 // AddMemberInput is the input for adding a member to a calendar.
 type AddMemberInput struct {
-	WsId  string `path:"wsId" doc:"Workspace public ID"`
-	CalId string `path:"calId" doc:"Calendar public ID"`
+	WsID  string `path:"wsId" doc:"Workspace public ID"`
+	CalID string `path:"calId" doc:"Calendar public ID"`
 	Body  struct {
 		Email string `json:"email" doc:"Email of the user to add" minLength:"1"`
 		Role  string `json:"role" enum:"manager,editor,viewer" doc:"Role to assign"`
@@ -36,7 +36,7 @@ type MemberResponse struct {
 	ID          string  `json:"id"`
 	UserID      string  `json:"userId"`
 	DisplayName string  `json:"displayName"`
-	AvatarUrl   *string `json:"avatarUrl,omitempty"`
+	AvatarURL   *string `json:"avatarUrl,omitempty"`
 	MemberColor string  `json:"memberColor"`
 	Role        string  `json:"role"`
 	CreatedAt   int64   `json:"createdAt"`
@@ -49,8 +49,8 @@ type AddMemberOutput struct {
 
 // ListMembersInput is the input for listing calendar members.
 type ListMembersInput struct {
-	WsId  string `path:"wsId" doc:"Workspace public ID"`
-	CalId string `path:"calId" doc:"Calendar public ID"`
+	WsID  string `path:"wsId" doc:"Workspace public ID"`
+	CalID string `path:"calId" doc:"Calendar public ID"`
 }
 
 // ListMembersOutput is the response for the list members endpoint.
@@ -62,9 +62,9 @@ type ListMembersOutput struct {
 
 // UpdateMemberRoleInput is the input for updating a member's role.
 type UpdateMemberRoleInput struct {
-	WsId   string `path:"wsId" doc:"Workspace public ID"`
-	CalId  string `path:"calId" doc:"Calendar public ID"`
-	UserId string `path:"userId" doc:"User public ID"`
+	WsID   string `path:"wsId" doc:"Workspace public ID"`
+	CalID  string `path:"calId" doc:"Calendar public ID"`
+	UserID string `path:"userId" doc:"User public ID"`
 	Body   struct {
 		Role string `json:"role" enum:"owner,manager,editor,viewer" doc:"New role"`
 	}
@@ -79,9 +79,9 @@ type UpdateMemberRoleOutput struct {
 
 // RemoveMemberInput is the input for removing a member from a calendar.
 type RemoveMemberInput struct {
-	WsId   string `path:"wsId" doc:"Workspace public ID"`
-	CalId  string `path:"calId" doc:"Calendar public ID"`
-	UserId string `path:"userId" doc:"User public ID"`
+	WsID   string `path:"wsId" doc:"Workspace public ID"`
+	CalID  string `path:"calId" doc:"Calendar public ID"`
+	UserID string `path:"userId" doc:"User public ID"`
 }
 
 // RemoveMemberOutput is the response for the remove member endpoint.
@@ -96,11 +96,11 @@ type RemoveMemberOutput struct {
 // AddMember adds a user to a calendar by email. Only owners and managers can add members.
 func AddMember(deps Deps) func(context.Context, *AddMemberInput) (*AddMemberOutput, error) {
 	return func(ctx context.Context, input *AddMemberInput) (*AddMemberOutput, error) {
-		wsID, actorID, err := resolveWorkspace(ctx, deps.Queries, input.WsId)
+		wsID, actorID, err := resolveWorkspace(ctx, deps.Queries, input.WsID)
 		if err != nil {
 			return nil, err
 		}
-		cal, _, err := resolveCalendar(ctx, deps.CalendarQueries, wsID, actorID, input.CalId)
+		cal, _, err := resolveCalendar(ctx, deps.CalendarQueries, wsID, actorID, input.CalID)
 		if err != nil {
 			return nil, err
 		}
@@ -155,10 +155,10 @@ func AddMember(deps Deps) func(context.Context, *AddMemberInput) (*AddMemberOutp
 			Role:        input.Body.Role,
 			CreatedAt:   handlerutil.NowUnix(),
 		}
-		out.Body.AvatarUrl = dbtype.PtrFromNullString(user.AvatarUrl)
+		out.Body.AvatarURL = dbtype.PtrFromNullString(user.AvatarUrl)
 
 		_ = appendCalendarEvent(ctx, deps.DB, wsID, "calendar.member.added", &actorID, map[string]any{
-			"calendarId": input.CalId,
+			"calendarId": input.CalID,
 			"userId":     user.PublicID.String(),
 			"role":       input.Body.Role,
 		})
@@ -170,11 +170,11 @@ func AddMember(deps Deps) func(context.Context, *AddMemberInput) (*AddMemberOutp
 // ListMembers returns all members of a calendar.
 func ListMembers(deps Deps) func(context.Context, *ListMembersInput) (*ListMembersOutput, error) {
 	return func(ctx context.Context, input *ListMembersInput) (*ListMembersOutput, error) {
-		wsID, actorID, err := resolveWorkspace(ctx, deps.Queries, input.WsId)
+		wsID, actorID, err := resolveWorkspace(ctx, deps.Queries, input.WsID)
 		if err != nil {
 			return nil, err
 		}
-		cal, _, err := resolveCalendar(ctx, deps.CalendarQueries, wsID, actorID, input.CalId)
+		cal, _, err := resolveCalendar(ctx, deps.CalendarQueries, wsID, actorID, input.CalID)
 		if err != nil {
 			return nil, err
 		}
@@ -201,7 +201,7 @@ func ListMembers(deps Deps) func(context.Context, *ListMembersInput) (*ListMembe
 				Role:        "editor",
 				CreatedAt:   r.CreatedAt.Unix(),
 			}
-			resp.AvatarUrl = dbtype.PtrFromNullString(r.AvatarUrl)
+			resp.AvatarURL = dbtype.PtrFromNullString(r.AvatarUrl)
 			out.Body.Members[i] = resp
 		}
 		return out, nil
@@ -211,11 +211,11 @@ func ListMembers(deps Deps) func(context.Context, *ListMembersInput) (*ListMembe
 // UpdateMemberRole changes a member's role. Only owners can change roles.
 func UpdateMemberRole(deps Deps) func(context.Context, *UpdateMemberRoleInput) (*UpdateMemberRoleOutput, error) {
 	return func(ctx context.Context, input *UpdateMemberRoleInput) (*UpdateMemberRoleOutput, error) {
-		wsID, actorID, err := resolveWorkspace(ctx, deps.Queries, input.WsId)
+		wsID, actorID, err := resolveWorkspace(ctx, deps.Queries, input.WsID)
 		if err != nil {
 			return nil, err
 		}
-		cal, _, err := resolveCalendar(ctx, deps.CalendarQueries, wsID, actorID, input.CalId)
+		cal, _, err := resolveCalendar(ctx, deps.CalendarQueries, wsID, actorID, input.CalID)
 		if err != nil {
 			return nil, err
 		}
@@ -225,7 +225,7 @@ func UpdateMemberRole(deps Deps) func(context.Context, *UpdateMemberRoleInput) (
 			return nil, httpErr(apierrors.CalendarCalendarOwnerRoleRequired)
 		}
 
-		targetUID, err := uuid.Parse(input.UserId)
+		targetUID, err := uuid.Parse(input.UserID)
 		if err != nil {
 			return nil, httpErr(apierrors.CalendarMemberUserIdMalformed)
 		}
@@ -243,8 +243,8 @@ func UpdateMemberRole(deps Deps) func(context.Context, *UpdateMemberRoleInput) (
 		out.Body.Updated = true
 
 		_ = appendCalendarEvent(ctx, deps.DB, wsID, "calendar.member.role_changed", &actorID, map[string]any{
-			"calendarId": input.CalId,
-			"userId":     input.UserId,
+			"calendarId": input.CalID,
+			"userId":     input.UserID,
 			"newRole":    input.Body.Role,
 		})
 
@@ -256,16 +256,16 @@ func UpdateMemberRole(deps Deps) func(context.Context, *UpdateMemberRoleInput) (
 // members can remove themselves (leave). The last owner cannot be removed.
 func RemoveMember(deps Deps) func(context.Context, *RemoveMemberInput) (*RemoveMemberOutput, error) {
 	return func(ctx context.Context, input *RemoveMemberInput) (*RemoveMemberOutput, error) {
-		wsID, actorID, err := resolveWorkspace(ctx, deps.Queries, input.WsId)
+		wsID, actorID, err := resolveWorkspace(ctx, deps.Queries, input.WsID)
 		if err != nil {
 			return nil, err
 		}
-		cal, _, err := resolveCalendar(ctx, deps.CalendarQueries, wsID, actorID, input.CalId)
+		cal, _, err := resolveCalendar(ctx, deps.CalendarQueries, wsID, actorID, input.CalID)
 		if err != nil {
 			return nil, err
 		}
 
-		targetUID, err := uuid.Parse(input.UserId)
+		targetUID, err := uuid.Parse(input.UserID)
 		if err != nil {
 			return nil, httpErr(apierrors.CalendarMemberUserIdMalformed)
 		}
@@ -311,8 +311,8 @@ func RemoveMember(deps Deps) func(context.Context, *RemoveMemberInput) (*RemoveM
 		out.Body.Removed = true
 
 		_ = appendCalendarEvent(ctx, deps.DB, wsID, "calendar.member.removed", &actorID, map[string]any{
-			"calendarId": input.CalId,
-			"userId":     input.UserId,
+			"calendarId": input.CalID,
+			"userId":     input.UserID,
 		})
 
 		return out, nil

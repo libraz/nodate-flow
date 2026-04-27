@@ -381,13 +381,13 @@ func RequireProjectMember(db ACLDB) func(http.Handler) http.Handler {
 	}
 }
 
-// RequireProjectMemberByGlobalId returns a middleware that resolves a project
+// RequireProjectMemberByGlobalID returns a middleware that resolves a project
 // from the {prjId} path parameter alone (no {wsId} in the URL). It looks up
 // the project globally by public_id, derives the owning workspace, verifies
 // workspace membership, then applies the same project membership / workspace
 // elevation logic as [RequireProjectMember]. Both workspace and project
 // contexts are injected for downstream handlers.
-func RequireProjectMemberByGlobalId(db ACLDB) func(http.Handler) http.Handler {
+func RequireProjectMemberByGlobalID(db ACLDB) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			userID, ok := ActorFromContext(r.Context())

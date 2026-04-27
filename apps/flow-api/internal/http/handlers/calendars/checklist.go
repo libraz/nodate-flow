@@ -16,9 +16,9 @@ import (
 
 // ListChecklistInput is the input for listing checklist items.
 type ListChecklistInput struct {
-	WsId  string `path:"wsId" doc:"Workspace public ID"`
-	CalId string `path:"calId" doc:"Calendar public ID"`
-	EvtId string `path:"evtId" doc:"Event public ID"`
+	WsID  string `path:"wsId" doc:"Workspace public ID"`
+	CalID string `path:"calId" doc:"Calendar public ID"`
+	EvtID string `path:"evtId" doc:"Event public ID"`
 }
 
 // ChecklistItemResponse is the JSON representation of a checklist item.
@@ -39,9 +39,9 @@ type ListChecklistOutput struct {
 
 // CreateChecklistItemInput is the input for creating a checklist item.
 type CreateChecklistItemInput struct {
-	WsId  string `path:"wsId" doc:"Workspace public ID"`
-	CalId string `path:"calId" doc:"Calendar public ID"`
-	EvtId string `path:"evtId" doc:"Event public ID"`
+	WsID  string `path:"wsId" doc:"Workspace public ID"`
+	CalID string `path:"calId" doc:"Calendar public ID"`
+	EvtID string `path:"evtId" doc:"Event public ID"`
 	Body  struct {
 		Title      string `json:"title" minLength:"1" maxLength:"500" doc:"Item title"`
 		SortWeight int32  `json:"sortWeight" required:"false" doc:"Sort weight for ordering"`
@@ -55,10 +55,10 @@ type CreateChecklistItemOutput struct {
 
 // UpdateChecklistItemInput is the input for updating a checklist item.
 type UpdateChecklistItemInput struct {
-	WsId   string `path:"wsId" doc:"Workspace public ID"`
-	CalId  string `path:"calId" doc:"Calendar public ID"`
-	EvtId  string `path:"evtId" doc:"Event public ID"`
-	ItemId string `path:"itemId" doc:"Checklist item public ID"`
+	WsID   string `path:"wsId" doc:"Workspace public ID"`
+	CalID  string `path:"calId" doc:"Calendar public ID"`
+	EvtID  string `path:"evtId" doc:"Event public ID"`
+	ItemID string `path:"itemId" doc:"Checklist item public ID"`
 	Body   struct {
 		Title      *string `json:"title,omitempty" required:"false" doc:"Item title"`
 		Done       *bool   `json:"done,omitempty" required:"false" doc:"Done flag"`
@@ -75,10 +75,10 @@ type UpdateChecklistItemOutput struct {
 
 // DeleteChecklistItemInput is the input for deleting a checklist item.
 type DeleteChecklistItemInput struct {
-	WsId   string `path:"wsId" doc:"Workspace public ID"`
-	CalId  string `path:"calId" doc:"Calendar public ID"`
-	EvtId  string `path:"evtId" doc:"Event public ID"`
-	ItemId string `path:"itemId" doc:"Checklist item public ID"`
+	WsID   string `path:"wsId" doc:"Workspace public ID"`
+	CalID  string `path:"calId" doc:"Calendar public ID"`
+	EvtID  string `path:"evtId" doc:"Event public ID"`
+	ItemID string `path:"itemId" doc:"Checklist item public ID"`
 }
 
 // DeleteChecklistItemOutput is the response for the delete checklist item endpoint.
@@ -93,16 +93,16 @@ type DeleteChecklistItemOutput struct {
 // ListChecklist returns all checklist items for an event.
 func ListChecklist(deps Deps) func(context.Context, *ListChecklistInput) (*ListChecklistOutput, error) {
 	return func(ctx context.Context, input *ListChecklistInput) (*ListChecklistOutput, error) {
-		wsID, actorID, err := resolveWorkspace(ctx, deps.Queries, input.WsId)
+		wsID, actorID, err := resolveWorkspace(ctx, deps.Queries, input.WsID)
 		if err != nil {
 			return nil, err
 		}
-		cal, _, err := resolveCalendar(ctx, deps.CalendarQueries, wsID, actorID, input.CalId)
+		cal, _, err := resolveCalendar(ctx, deps.CalendarQueries, wsID, actorID, input.CalID)
 		if err != nil {
 			return nil, err
 		}
 
-		evt, err := resolveEvent(ctx, deps.CalendarQueries, cal.ID, wsID, input.EvtId)
+		evt, err := resolveEvent(ctx, deps.CalendarQueries, cal.ID, wsID, input.EvtID)
 		if err != nil {
 			return nil, err
 		}
@@ -130,16 +130,16 @@ func ListChecklist(deps Deps) func(context.Context, *ListChecklistInput) (*ListC
 // CreateChecklistItem adds a checklist item to an event.
 func CreateChecklistItem(deps Deps) func(context.Context, *CreateChecklistItemInput) (*CreateChecklistItemOutput, error) {
 	return func(ctx context.Context, input *CreateChecklistItemInput) (*CreateChecklistItemOutput, error) {
-		wsID, actorID, err := resolveWorkspace(ctx, deps.Queries, input.WsId)
+		wsID, actorID, err := resolveWorkspace(ctx, deps.Queries, input.WsID)
 		if err != nil {
 			return nil, err
 		}
-		cal, _, err := resolveCalendar(ctx, deps.CalendarQueries, wsID, actorID, input.CalId)
+		cal, _, err := resolveCalendar(ctx, deps.CalendarQueries, wsID, actorID, input.CalID)
 		if err != nil {
 			return nil, err
 		}
 
-		evt, err := resolveEvent(ctx, deps.CalendarQueries, cal.ID, wsID, input.EvtId)
+		evt, err := resolveEvent(ctx, deps.CalendarQueries, cal.ID, wsID, input.EvtID)
 		if err != nil {
 			return nil, err
 		}
@@ -167,8 +167,8 @@ func CreateChecklistItem(deps Deps) func(context.Context, *CreateChecklistItemIn
 		}
 
 		_ = appendCalendarEvent(ctx, deps.DB, wsID, "calendar.event.checklist.created", &actorID, map[string]any{
-			"eventId":    input.EvtId,
-			"calendarId": input.CalId,
+			"eventId":    input.EvtID,
+			"calendarId": input.CalID,
 			"itemId":     itemPublicID.String(),
 		})
 
@@ -179,21 +179,21 @@ func CreateChecklistItem(deps Deps) func(context.Context, *CreateChecklistItemIn
 // UpdateChecklistItem updates a checklist item's title, done status, or sort weight.
 func UpdateChecklistItem(deps Deps) func(context.Context, *UpdateChecklistItemInput) (*UpdateChecklistItemOutput, error) {
 	return func(ctx context.Context, input *UpdateChecklistItemInput) (*UpdateChecklistItemOutput, error) {
-		wsID, actorID, err := resolveWorkspace(ctx, deps.Queries, input.WsId)
+		wsID, actorID, err := resolveWorkspace(ctx, deps.Queries, input.WsID)
 		if err != nil {
 			return nil, err
 		}
-		cal, _, err := resolveCalendar(ctx, deps.CalendarQueries, wsID, actorID, input.CalId)
-		if err != nil {
-			return nil, err
-		}
-
-		evt, err := resolveEvent(ctx, deps.CalendarQueries, cal.ID, wsID, input.EvtId)
+		cal, _, err := resolveCalendar(ctx, deps.CalendarQueries, wsID, actorID, input.CalID)
 		if err != nil {
 			return nil, err
 		}
 
-		itemUID, err := uuid.Parse(input.ItemId)
+		evt, err := resolveEvent(ctx, deps.CalendarQueries, cal.ID, wsID, input.EvtID)
+		if err != nil {
+			return nil, err
+		}
+
+		itemUID, err := uuid.Parse(input.ItemID)
 		if err != nil {
 			return nil, httpErr(apierrors.CalendarChecklistItemNotFound)
 		}
@@ -219,9 +219,9 @@ func UpdateChecklistItem(deps Deps) func(context.Context, *UpdateChecklistItemIn
 		}
 
 		_ = appendCalendarEvent(ctx, deps.DB, wsID, "calendar.event.checklist.updated", &actorID, map[string]any{
-			"eventId":    input.EvtId,
-			"calendarId": input.CalId,
-			"itemId":     input.ItemId,
+			"eventId":    input.EvtID,
+			"calendarId": input.CalID,
+			"itemId":     input.ItemID,
 		})
 
 		out := &UpdateChecklistItemOutput{}
@@ -233,21 +233,21 @@ func UpdateChecklistItem(deps Deps) func(context.Context, *UpdateChecklistItemIn
 // DeleteChecklistItem soft-deletes a checklist item.
 func DeleteChecklistItem(deps Deps) func(context.Context, *DeleteChecklistItemInput) (*DeleteChecklistItemOutput, error) {
 	return func(ctx context.Context, input *DeleteChecklistItemInput) (*DeleteChecklistItemOutput, error) {
-		wsID, actorID, err := resolveWorkspace(ctx, deps.Queries, input.WsId)
+		wsID, actorID, err := resolveWorkspace(ctx, deps.Queries, input.WsID)
 		if err != nil {
 			return nil, err
 		}
-		cal, _, err := resolveCalendar(ctx, deps.CalendarQueries, wsID, actorID, input.CalId)
-		if err != nil {
-			return nil, err
-		}
-
-		evt, err := resolveEvent(ctx, deps.CalendarQueries, cal.ID, wsID, input.EvtId)
+		cal, _, err := resolveCalendar(ctx, deps.CalendarQueries, wsID, actorID, input.CalID)
 		if err != nil {
 			return nil, err
 		}
 
-		itemUID, err := uuid.Parse(input.ItemId)
+		evt, err := resolveEvent(ctx, deps.CalendarQueries, cal.ID, wsID, input.EvtID)
+		if err != nil {
+			return nil, err
+		}
+
+		itemUID, err := uuid.Parse(input.ItemID)
 		if err != nil {
 			return nil, httpErr(apierrors.CalendarChecklistItemNotFound)
 		}
@@ -265,9 +265,9 @@ func DeleteChecklistItem(deps Deps) func(context.Context, *DeleteChecklistItemIn
 		out.Body.Deleted = true
 
 		_ = appendCalendarEvent(ctx, deps.DB, wsID, "calendar.event.checklist.deleted", &actorID, map[string]any{
-			"eventId":    input.EvtId,
-			"calendarId": input.CalId,
-			"itemId":     input.ItemId,
+			"eventId":    input.EvtID,
+			"calendarId": input.CalID,
+			"itemId":     input.ItemID,
 		})
 
 		return out, nil

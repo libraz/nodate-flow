@@ -28,8 +28,8 @@ type PublicShareResponse struct {
 	ID                  string  `json:"id"`
 	Title               string  `json:"title"`
 	Description         *string `json:"description,omitempty"`
-	IconUrl             *string `json:"iconUrl,omitempty"`
-	CoverUrl            *string `json:"coverUrl,omitempty"`
+	IconURL             *string `json:"iconUrl,omitempty"`
+	CoverURL            *string `json:"coverUrl,omitempty"`
 	Timezone            string  `json:"timezone"`
 	ShowHolidaysCountry *string `json:"showHolidaysCountry,omitempty"`
 	ExpiresAt           *int64  `json:"expiresAt,omitempty"`
@@ -61,12 +61,12 @@ type ShareEventResponse struct {
 
 // CreatePublicShareInput is the body for creating a new share page.
 type CreatePublicShareInput struct {
-	WsId string `path:"wsId" doc:"Workspace public ID"`
+	WsID string `path:"wsId" doc:"Workspace public ID"`
 	Body struct {
 		Title               string  `json:"title" minLength:"1" maxLength:"255" doc:"Public-facing title"`
 		Description         *string `json:"description,omitempty" required:"false" doc:"Markdown description"`
-		IconUrl             *string `json:"iconUrl,omitempty" required:"false" maxLength:"2048" doc:"Icon image URL"`
-		CoverUrl            *string `json:"coverUrl,omitempty" required:"false" maxLength:"2048" doc:"Cover image URL"`
+		IconURL             *string `json:"iconUrl,omitempty" required:"false" maxLength:"2048" doc:"Icon image URL"`
+		CoverURL            *string `json:"coverUrl,omitempty" required:"false" maxLength:"2048" doc:"Cover image URL"`
 		Timezone            *string `json:"timezone,omitempty" required:"false" doc:"IANA timezone; defaults to workspace tz"`
 		ShowHolidaysCountry *string `json:"showHolidaysCountry,omitempty" required:"false" minLength:"2" maxLength:"2" doc:"ISO 3166-1 alpha-2 country code; enables holiday overlay"`
 		ExpiresAt           *int64  `json:"expiresAt,omitempty" required:"false" doc:"Unix seconds; omit for no expiry"`
@@ -80,7 +80,7 @@ type CreatePublicShareOutput struct {
 
 // ListPublicSharesInput lists every workspace share.
 type ListPublicSharesInput struct {
-	WsId string `path:"wsId" doc:"Workspace public ID"`
+	WsID string `path:"wsId" doc:"Workspace public ID"`
 }
 
 // ListPublicSharesOutput returns the share list (token omitted).
@@ -92,8 +92,8 @@ type ListPublicSharesOutput struct {
 
 // GetPublicShareInput fetches a single share.
 type GetPublicShareInput struct {
-	WsId    string `path:"wsId" doc:"Workspace public ID"`
-	ShareId string `path:"shareId" doc:"Share public ID"`
+	WsID    string `path:"wsId" doc:"Workspace public ID"`
+	ShareID string `path:"shareId" doc:"Share public ID"`
 }
 
 // GetPublicShareOutput returns the share plus its published events.
@@ -109,13 +109,13 @@ type GetPublicShareOutput struct {
 // set a new value. clearShowHolidaysCountry=true drops the country; set
 // showHolidaysCountry explicitly to change it.
 type PatchPublicShareInput struct {
-	WsId    string `path:"wsId" doc:"Workspace public ID"`
-	ShareId string `path:"shareId" doc:"Share public ID"`
+	WsID    string `path:"wsId" doc:"Workspace public ID"`
+	ShareID string `path:"shareId" doc:"Share public ID"`
 	Body    struct {
 		Title                    *string `json:"title,omitempty" required:"false" minLength:"1" maxLength:"255"`
 		Description              *string `json:"description,omitempty" required:"false"`
-		IconUrl                  *string `json:"iconUrl,omitempty" required:"false" maxLength:"2048"`
-		CoverUrl                 *string `json:"coverUrl,omitempty" required:"false" maxLength:"2048"`
+		IconURL                  *string `json:"iconUrl,omitempty" required:"false" maxLength:"2048"`
+		CoverURL                 *string `json:"coverUrl,omitempty" required:"false" maxLength:"2048"`
 		Timezone                 *string `json:"timezone,omitempty" required:"false"`
 		ShowHolidaysCountry      *string `json:"showHolidaysCountry,omitempty" required:"false" minLength:"2" maxLength:"2"`
 		ClearShowHolidaysCountry bool    `json:"clearShowHolidaysCountry,omitempty" required:"false"`
@@ -132,8 +132,8 @@ type PatchPublicShareOutput struct {
 
 // RotatePublicShareTokenInput rotates the URL token.
 type RotatePublicShareTokenInput struct {
-	WsId    string `path:"wsId" doc:"Workspace public ID"`
-	ShareId string `path:"shareId" doc:"Share public ID"`
+	WsID    string `path:"wsId" doc:"Workspace public ID"`
+	ShareID string `path:"shareId" doc:"Share public ID"`
 }
 
 // RotatePublicShareTokenOutput returns the share with the new plaintext token.
@@ -143,8 +143,8 @@ type RotatePublicShareTokenOutput struct {
 
 // DeletePublicShareInput soft-deletes a share. Admin/owner only.
 type DeletePublicShareInput struct {
-	WsId    string `path:"wsId" doc:"Workspace public ID"`
-	ShareId string `path:"shareId" doc:"Share public ID"`
+	WsID    string `path:"wsId" doc:"Workspace public ID"`
+	ShareID string `path:"shareId" doc:"Share public ID"`
 }
 
 // DeletePublicShareOutput confirms deletion.
@@ -156,10 +156,10 @@ type DeletePublicShareOutput struct {
 
 // AttachEventsToShareInput bulk-adds events to a share.
 type AttachEventsToShareInput struct {
-	WsId    string `path:"wsId" doc:"Workspace public ID"`
-	ShareId string `path:"shareId" doc:"Share public ID"`
+	WsID    string `path:"wsId" doc:"Workspace public ID"`
+	ShareID string `path:"shareId" doc:"Share public ID"`
 	Body    struct {
-		EventIds []string `json:"eventIds" minItems:"1" maxItems:"500" doc:"Event public IDs to attach; confidential events are rejected"`
+		EventIDs []string `json:"eventIds" minItems:"1" maxItems:"500" doc:"Event public IDs to attach; confidential events are rejected"`
 	}
 }
 
@@ -176,8 +176,8 @@ type AttachEventsToShareOutput struct {
 // must be a permutation of the share's current links — no partial
 // reorders.
 type ReorderShareEventsInput struct {
-	WsId    string `path:"wsId" doc:"Workspace public ID"`
-	ShareId string `path:"shareId" doc:"Share public ID"`
+	WsID    string `path:"wsId" doc:"Workspace public ID"`
+	ShareID string `path:"shareId" doc:"Share public ID"`
 	Body    struct {
 		LinkPublicIDs []string `json:"linkPublicIds" minItems:"0" maxItems:"500" doc:"Complete new ordering of share-event link public IDs; must be a permutation of the share's current links"`
 	}
@@ -192,9 +192,9 @@ type ReorderShareEventsOutput struct {
 
 // DetachEventFromShareInput removes a single event from a share.
 type DetachEventFromShareInput struct {
-	WsId    string `path:"wsId" doc:"Workspace public ID"`
-	ShareId string `path:"shareId" doc:"Share public ID"`
-	EvtId   string `path:"evtId" doc:"Event public ID"`
+	WsID    string `path:"wsId" doc:"Workspace public ID"`
+	ShareID string `path:"shareId" doc:"Share public ID"`
+	EvtID   string `path:"evtId" doc:"Event public ID"`
 }
 
 // DetachEventFromShareOutput confirms the link was removed.
@@ -211,7 +211,7 @@ type DetachEventFromShareOutput struct {
 // call this.
 func CreatePublicShare(deps Deps) func(context.Context, *CreatePublicShareInput) (*CreatePublicShareOutput, error) {
 	return func(ctx context.Context, input *CreatePublicShareInput) (*CreatePublicShareOutput, error) {
-		wsID, actorID, err := resolveWorkspaceNonGuest(ctx, deps.Queries, input.WsId)
+		wsID, actorID, err := resolveWorkspaceNonGuest(ctx, deps.Queries, input.WsID)
 		if err != nil {
 			return nil, err
 		}
@@ -245,8 +245,8 @@ func CreatePublicShare(deps Deps) func(context.Context, *CreatePublicShareInput)
 			TokenHash:           tokenHash,
 			Title:               input.Body.Title,
 			Description:         nullStringFromPtr(input.Body.Description),
-			IconUrl:             nullStringFromPtr(input.Body.IconUrl),
-			CoverUrl:            nullStringFromPtr(input.Body.CoverUrl),
+			IconUrl:             nullStringFromPtr(input.Body.IconURL),
+			CoverUrl:            nullStringFromPtr(input.Body.CoverURL),
 			Timezone:            tz,
 			ShowHolidaysCountry: nullStringFromPtr(input.Body.ShowHolidaysCountry),
 			ExpiresAt:           nullTimeFromUnixPtr(input.Body.ExpiresAt),
@@ -278,7 +278,7 @@ func CreatePublicShare(deps Deps) func(context.Context, *CreatePublicShareInput)
 // ListPublicShares returns every enabled share in the workspace.
 func ListPublicShares(deps Deps) func(context.Context, *ListPublicSharesInput) (*ListPublicSharesOutput, error) {
 	return func(ctx context.Context, input *ListPublicSharesInput) (*ListPublicSharesOutput, error) {
-		wsID, _, err := resolveWorkspaceNonGuest(ctx, deps.Queries, input.WsId)
+		wsID, _, err := resolveWorkspaceNonGuest(ctx, deps.Queries, input.WsID)
 		if err != nil {
 			return nil, err
 		}
@@ -298,11 +298,11 @@ func ListPublicShares(deps Deps) func(context.Context, *ListPublicSharesInput) (
 // GetPublicShare returns the share and its published events for the editor UI.
 func GetPublicShare(deps Deps) func(context.Context, *GetPublicShareInput) (*GetPublicShareOutput, error) {
 	return func(ctx context.Context, input *GetPublicShareInput) (*GetPublicShareOutput, error) {
-		wsID, _, err := resolveWorkspaceNonGuest(ctx, deps.Queries, input.WsId)
+		wsID, _, err := resolveWorkspaceNonGuest(ctx, deps.Queries, input.WsID)
 		if err != nil {
 			return nil, err
 		}
-		sharePID, err := parsePublicID(input.ShareId)
+		sharePID, err := parsePublicID(input.ShareID)
 		if err != nil {
 			return nil, errShareNotFound
 		}
@@ -336,11 +336,11 @@ func GetPublicShare(deps Deps) func(context.Context, *GetPublicShareInput) (*Get
 // PatchPublicShare updates mutable share fields.
 func PatchPublicShare(deps Deps) func(context.Context, *PatchPublicShareInput) (*PatchPublicShareOutput, error) {
 	return func(ctx context.Context, input *PatchPublicShareInput) (*PatchPublicShareOutput, error) {
-		wsID, actorID, err := resolveWorkspaceNonGuest(ctx, deps.Queries, input.WsId)
+		wsID, actorID, err := resolveWorkspaceNonGuest(ctx, deps.Queries, input.WsID)
 		if err != nil {
 			return nil, err
 		}
-		sharePID, err := parsePublicID(input.ShareId)
+		sharePID, err := parsePublicID(input.ShareID)
 		if err != nil {
 			return nil, errShareNotFound
 		}
@@ -356,8 +356,8 @@ func PatchPublicShare(deps Deps) func(context.Context, *PatchPublicShareInput) (
 			PublicID:            sharePID,
 			Title:               nullStringFromPtr(input.Body.Title),
 			Description:         nullStringFromPtr(input.Body.Description),
-			IconUrl:             nullStringFromPtr(input.Body.IconUrl),
-			CoverUrl:            nullStringFromPtr(input.Body.CoverUrl),
+			IconUrl:             nullStringFromPtr(input.Body.IconURL),
+			CoverUrl:            nullStringFromPtr(input.Body.CoverURL),
 			Timezone:            nullStringFromPtr(input.Body.Timezone),
 			ShowHolidaysCountry: nullStringFromPtr(input.Body.ShowHolidaysCountry),
 			ExpiresAt:           nullTimeFromUnixPtr(input.Body.ExpiresAt),
@@ -387,7 +387,7 @@ func PatchPublicShare(deps Deps) func(context.Context, *PatchPublicShareInput) (
 		}
 
 		_ = appendCalendarEvent(ctx, deps.DB, wsID, "public_share.updated", &actorID, map[string]any{
-			"shareId": input.ShareId,
+			"shareId": input.ShareID,
 		})
 
 		out := &PatchPublicShareOutput{}
@@ -401,11 +401,11 @@ func PatchPublicShare(deps Deps) func(context.Context, *PatchPublicShareInput) (
 // exactly once.
 func RotatePublicShareToken(deps Deps) func(context.Context, *RotatePublicShareTokenInput) (*RotatePublicShareTokenOutput, error) {
 	return func(ctx context.Context, input *RotatePublicShareTokenInput) (*RotatePublicShareTokenOutput, error) {
-		wsID, actorID, err := resolveWorkspaceNonGuest(ctx, deps.Queries, input.WsId)
+		wsID, actorID, err := resolveWorkspaceNonGuest(ctx, deps.Queries, input.WsID)
 		if err != nil {
 			return nil, err
 		}
-		sharePID, err := parsePublicID(input.ShareId)
+		sharePID, err := parsePublicID(input.ShareID)
 		if err != nil {
 			return nil, errShareNotFound
 		}
@@ -432,7 +432,7 @@ func RotatePublicShareToken(deps Deps) func(context.Context, *RotatePublicShareT
 		}
 
 		_ = appendCalendarEvent(ctx, deps.DB, wsID, "public_share.rotated", &actorID, map[string]any{
-			"shareId": input.ShareId,
+			"shareId": input.ShareID,
 		})
 
 		out := &RotatePublicShareTokenOutput{}
@@ -447,11 +447,11 @@ func RotatePublicShareToken(deps Deps) func(context.Context, *RotatePublicShareT
 // workspace admins to prevent accidental URL loss.
 func DeletePublicShare(deps Deps) func(context.Context, *DeletePublicShareInput) (*DeletePublicShareOutput, error) {
 	return func(ctx context.Context, input *DeletePublicShareInput) (*DeletePublicShareOutput, error) {
-		wsID, actorID, err := resolveWorkspaceAdmin(ctx, deps.Queries, input.WsId)
+		wsID, actorID, err := resolveWorkspaceAdmin(ctx, deps.Queries, input.WsID)
 		if err != nil {
 			return nil, err
 		}
-		sharePID, err := parsePublicID(input.ShareId)
+		sharePID, err := parsePublicID(input.ShareID)
 		if err != nil {
 			return nil, errShareNotFound
 		}
@@ -462,7 +462,7 @@ func DeletePublicShare(deps Deps) func(context.Context, *DeletePublicShareInput)
 			return nil, httpErr(apierrors.CalendarCalendarStoreDeleteInterrupted)
 		}
 		_ = appendCalendarEvent(ctx, deps.DB, wsID, "public_share.deleted", &actorID, map[string]any{
-			"shareId": input.ShareId,
+			"shareId": input.ShareID,
 		})
 		out := &DeletePublicShareOutput{}
 		out.Body.Deleted = true
@@ -475,11 +475,11 @@ func DeletePublicShare(deps Deps) func(context.Context, *DeletePublicShareInput)
 // that specific event, but the rest of the batch still applies.
 func AttachEventsToShare(deps Deps) func(context.Context, *AttachEventsToShareInput) (*AttachEventsToShareOutput, error) {
 	return func(ctx context.Context, input *AttachEventsToShareInput) (*AttachEventsToShareOutput, error) {
-		wsID, actorID, err := resolveWorkspaceNonGuest(ctx, deps.Queries, input.WsId)
+		wsID, actorID, err := resolveWorkspaceNonGuest(ctx, deps.Queries, input.WsID)
 		if err != nil {
 			return nil, err
 		}
-		sharePID, err := parsePublicID(input.ShareId)
+		sharePID, err := parsePublicID(input.ShareID)
 		if err != nil {
 			return nil, errShareNotFound
 		}
@@ -496,7 +496,7 @@ func AttachEventsToShare(deps Deps) func(context.Context, *AttachEventsToShareIn
 
 		attached := 0
 		skipped := 0
-		for _, raw := range input.Body.EventIds {
+		for _, raw := range input.Body.EventIDs {
 			pid, err := parsePublicID(raw)
 			if err != nil {
 				skipped++
@@ -529,7 +529,7 @@ func AttachEventsToShare(deps Deps) func(context.Context, *AttachEventsToShareIn
 
 		if attached > 0 {
 			_ = appendCalendarEvent(ctx, deps.DB, wsID, "public_share.events_attached", &actorID, map[string]any{
-				"shareId":  input.ShareId,
+				"shareId":  input.ShareID,
 				"attached": attached,
 				"skipped":  skipped,
 			})
@@ -550,11 +550,11 @@ func AttachEventsToShare(deps Deps) func(context.Context, *AttachEventsToShareIn
 // AttachEventsToShare).
 func ReorderShareEvents(deps Deps) func(context.Context, *ReorderShareEventsInput) (*ReorderShareEventsOutput, error) {
 	return func(ctx context.Context, input *ReorderShareEventsInput) (*ReorderShareEventsOutput, error) {
-		wsID, actorID, err := resolveWorkspaceNonGuest(ctx, deps.Queries, input.WsId)
+		wsID, actorID, err := resolveWorkspaceNonGuest(ctx, deps.Queries, input.WsID)
 		if err != nil {
 			return nil, err
 		}
-		sharePID, err := parsePublicID(input.ShareId)
+		sharePID, err := parsePublicID(input.ShareID)
 		if err != nil {
 			return nil, errShareNotFound
 		}
@@ -634,7 +634,7 @@ func ReorderShareEvents(deps Deps) func(context.Context, *ReorderShareEventsInpu
 		}
 
 		_ = appendCalendarEvent(ctx, deps.DB, wsID, "public_share.events_reordered", &actorID, map[string]any{
-			"shareId": input.ShareId,
+			"shareId": input.ShareID,
 			"count":   len(requested),
 		})
 
@@ -647,11 +647,11 @@ func ReorderShareEvents(deps Deps) func(context.Context, *ReorderShareEventsInpu
 // DetachEventFromShare soft-disables one share↔event link.
 func DetachEventFromShare(deps Deps) func(context.Context, *DetachEventFromShareInput) (*DetachEventFromShareOutput, error) {
 	return func(ctx context.Context, input *DetachEventFromShareInput) (*DetachEventFromShareOutput, error) {
-		wsID, actorID, err := resolveWorkspaceNonGuest(ctx, deps.Queries, input.WsId)
+		wsID, actorID, err := resolveWorkspaceNonGuest(ctx, deps.Queries, input.WsID)
 		if err != nil {
 			return nil, err
 		}
-		sharePID, err := parsePublicID(input.ShareId)
+		sharePID, err := parsePublicID(input.ShareID)
 		if err != nil {
 			return nil, errShareNotFound
 		}
@@ -665,7 +665,7 @@ func DetachEventFromShare(deps Deps) func(context.Context, *DetachEventFromShare
 			}
 			return nil, httpErr(apierrors.CalendarCalendarStoreReadInterrupted)
 		}
-		evtPID, err := parsePublicID(input.EvtId)
+		evtPID, err := parsePublicID(input.EvtID)
 		if err != nil {
 			return nil, errEventNotFound
 		}
@@ -686,8 +686,8 @@ func DetachEventFromShare(deps Deps) func(context.Context, *DetachEventFromShare
 			return nil, httpErr(apierrors.CalendarCalendarStoreWriteInterrupted)
 		}
 		_ = appendCalendarEvent(ctx, deps.DB, wsID, "public_share.event_detached", &actorID, map[string]any{
-			"shareId": input.ShareId,
-			"eventId": input.EvtId,
+			"shareId": input.ShareID,
+			"eventId": input.EvtID,
 		})
 		out := &DetachEventFromShareOutput{}
 		out.Body.Removed = true
@@ -796,8 +796,8 @@ func publicShareFromRow(r calendar.FindPublicShareByPublicIdRow, eventCount int6
 		ID:                  r.PublicID.String(),
 		Title:               r.Title,
 		Description:         nullStringPtr(r.Description),
-		IconUrl:             nullStringPtr(r.IconUrl),
-		CoverUrl:            nullStringPtr(r.CoverUrl),
+		IconURL:             nullStringPtr(r.IconUrl),
+		CoverURL:            nullStringPtr(r.CoverUrl),
 		Timezone:            r.Timezone,
 		ShowHolidaysCountry: nullStringPtr(r.ShowHolidaysCountry),
 		ExpiresAt:           nullTimeUnixPtr(r.ExpiresAt),
@@ -814,8 +814,8 @@ func publicShareFromListRow(r calendar.ListPublicSharesRow) PublicShareResponse 
 		ID:                  r.PublicID.String(),
 		Title:               r.Title,
 		Description:         nullStringPtr(r.Description),
-		IconUrl:             nullStringPtr(r.IconUrl),
-		CoverUrl:            nullStringPtr(r.CoverUrl),
+		IconURL:             nullStringPtr(r.IconUrl),
+		CoverURL:            nullStringPtr(r.CoverUrl),
 		Timezone:            r.Timezone,
 		ShowHolidaysCountry: nullStringPtr(r.ShowHolidaysCountry),
 		ExpiresAt:           nullTimeUnixPtr(r.ExpiresAt),

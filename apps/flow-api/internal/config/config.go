@@ -158,17 +158,17 @@ type Config struct {
 	// Useful for local development against a sidecar collector.
 	OtelInsecure bool `env:"NF_FLOW_OTEL_INSECURE" envDefault:"true"`
 
-	// SmtpHost is the SMTP server hostname. When empty, email
+	// SMTPHost is the SMTP server hostname. When empty, email
 	// notifications are disabled.
-	SmtpHost string `env:"NF_FLOW_SMTP_HOST" envDefault:""`
-	// SmtpPort is the SMTP server port (typically 587 for STARTTLS).
-	SmtpPort int `env:"NF_FLOW_SMTP_PORT" envDefault:"587"`
-	// SmtpUsername is the SASL login. Empty for unauthenticated relays.
-	SmtpUsername string `env:"NF_FLOW_SMTP_USERNAME" envDefault:""`
-	// SmtpPassword is the SASL secret.
-	SmtpPassword string `env:"NF_FLOW_SMTP_PASSWORD" envDefault:""`
-	// SmtpFrom is the default envelope sender address.
-	SmtpFrom string `env:"NF_FLOW_SMTP_FROM" envDefault:"noreply@nodate-flow.local"`
+	SMTPHost string `env:"NF_FLOW_SMTP_HOST" envDefault:""`
+	// SMTPPort is the SMTP server port (typically 587 for STARTTLS).
+	SMTPPort int `env:"NF_FLOW_SMTP_PORT" envDefault:"587"`
+	// SMTPUsername is the SASL login. Empty for unauthenticated relays.
+	SMTPUsername string `env:"NF_FLOW_SMTP_USERNAME" envDefault:""`
+	// SMTPPassword is the SASL secret.
+	SMTPPassword string `env:"NF_FLOW_SMTP_PASSWORD" envDefault:""`
+	// SMTPFrom is the default envelope sender address.
+	SMTPFrom string `env:"NF_FLOW_SMTP_FROM" envDefault:"noreply@nodate-flow.local"`
 
 	// FlowWebURL is the origin of the flow-web frontend that hosts the
 	// public /invites/accept RSVP page. Used by calendar handlers when

@@ -18,11 +18,11 @@ import (
 
 // AddAttendeesInput is the input for adding attendees to an event.
 type AddAttendeesInput struct {
-	WsId  string `path:"wsId" doc:"Workspace public ID"`
-	CalId string `path:"calId" doc:"Calendar public ID"`
-	EvtId string `path:"evtId" doc:"Event public ID"`
+	WsID  string `path:"wsId" doc:"Workspace public ID"`
+	CalID string `path:"calId" doc:"Calendar public ID"`
+	EvtID string `path:"evtId" doc:"Event public ID"`
 	Body  struct {
-		UserIds []string `json:"userIds" doc:"List of user public IDs to add" minItems:"1"`
+		UserIDs []string `json:"userIds" doc:"List of user public IDs to add" minItems:"1"`
 	}
 }
 
@@ -31,7 +31,7 @@ type AttendeeResponse struct {
 	ID          string  `json:"id"`
 	UserID      string  `json:"userId"`
 	DisplayName string  `json:"displayName"`
-	AvatarUrl   *string `json:"avatarUrl,omitempty"`
+	AvatarURL   *string `json:"avatarUrl,omitempty"`
 	Rsvp        string  `json:"rsvp"`
 	CanEdit     bool    `json:"canEdit"`
 	CreatedAt   int64   `json:"createdAt"`
@@ -46,9 +46,9 @@ type AddAttendeesOutput struct {
 
 // ListAttendeesInput is the input for listing attendees on an event.
 type ListAttendeesInput struct {
-	WsId  string `path:"wsId" doc:"Workspace public ID"`
-	CalId string `path:"calId" doc:"Calendar public ID"`
-	EvtId string `path:"evtId" doc:"Event public ID"`
+	WsID  string `path:"wsId" doc:"Workspace public ID"`
+	CalID string `path:"calId" doc:"Calendar public ID"`
+	EvtID string `path:"evtId" doc:"Event public ID"`
 }
 
 // ListAttendeesOutput is the response for the list attendees endpoint.
@@ -60,10 +60,10 @@ type ListAttendeesOutput struct {
 
 // RemoveAttendeeInput is the input for removing an attendee from an event.
 type RemoveAttendeeInput struct {
-	WsId   string `path:"wsId" doc:"Workspace public ID"`
-	CalId  string `path:"calId" doc:"Calendar public ID"`
-	EvtId  string `path:"evtId" doc:"Event public ID"`
-	UserId string `path:"userId" doc:"User public ID"`
+	WsID   string `path:"wsId" doc:"Workspace public ID"`
+	CalID  string `path:"calId" doc:"Calendar public ID"`
+	EvtID  string `path:"evtId" doc:"Event public ID"`
+	UserID string `path:"userId" doc:"User public ID"`
 }
 
 // RemoveAttendeeOutput is the response for the remove attendee endpoint.
@@ -75,9 +75,9 @@ type RemoveAttendeeOutput struct {
 
 // UpdateRsvpInput is the input for updating an attendee's RSVP.
 type UpdateRsvpInput struct {
-	WsId  string `path:"wsId" doc:"Workspace public ID"`
-	CalId string `path:"calId" doc:"Calendar public ID"`
-	EvtId string `path:"evtId" doc:"Event public ID"`
+	WsID  string `path:"wsId" doc:"Workspace public ID"`
+	CalID string `path:"calId" doc:"Calendar public ID"`
+	EvtID string `path:"evtId" doc:"Event public ID"`
 	Body  struct {
 		Rsvp string `json:"rsvp" enum:"pending,accepted,declined,tentative" doc:"RSVP response"`
 	}
@@ -92,10 +92,10 @@ type UpdateRsvpOutput struct {
 
 // ToggleCanEditInput is the input for toggling an attendee's can_edit permission.
 type ToggleCanEditInput struct {
-	WsId   string `path:"wsId" doc:"Workspace public ID"`
-	CalId  string `path:"calId" doc:"Calendar public ID"`
-	EvtId  string `path:"evtId" doc:"Event public ID"`
-	UserId string `path:"userId" doc:"User public ID"`
+	WsID   string `path:"wsId" doc:"Workspace public ID"`
+	CalID  string `path:"calId" doc:"Calendar public ID"`
+	EvtID  string `path:"evtId" doc:"Event public ID"`
+	UserID string `path:"userId" doc:"User public ID"`
 	Body   struct {
 		CanEdit bool `json:"canEdit" doc:"Whether the attendee can edit the event"`
 	}
@@ -141,16 +141,16 @@ func resolveEvent(
 // AddAttendees adds one or more attendees to a calendar event.
 func AddAttendees(deps Deps) func(context.Context, *AddAttendeesInput) (*AddAttendeesOutput, error) {
 	return func(ctx context.Context, input *AddAttendeesInput) (*AddAttendeesOutput, error) {
-		wsID, actorID, err := resolveWorkspace(ctx, deps.Queries, input.WsId)
+		wsID, actorID, err := resolveWorkspace(ctx, deps.Queries, input.WsID)
 		if err != nil {
 			return nil, err
 		}
-		cal, _, err := resolveCalendar(ctx, deps.CalendarQueries, wsID, actorID, input.CalId)
+		cal, _, err := resolveCalendar(ctx, deps.CalendarQueries, wsID, actorID, input.CalID)
 		if err != nil {
 			return nil, err
 		}
 
-		evt, err := resolveEvent(ctx, deps.CalendarQueries, cal.ID, wsID, input.EvtId)
+		evt, err := resolveEvent(ctx, deps.CalendarQueries, cal.ID, wsID, input.EvtID)
 		if err != nil {
 			return nil, err
 		}
@@ -162,9 +162,9 @@ func AddAttendees(deps Deps) func(context.Context, *AddAttendeesInput) (*AddAtte
 		}
 
 		out := &AddAttendeesOutput{}
-		out.Body.Attendees = make([]AttendeeResponse, 0, len(input.Body.UserIds))
+		out.Body.Attendees = make([]AttendeeResponse, 0, len(input.Body.UserIDs))
 
-		for _, uidStr := range input.Body.UserIds {
+		for _, uidStr := range input.Body.UserIDs {
 			uid, parseErr := uuid.Parse(uidStr)
 			if parseErr != nil {
 				continue
@@ -200,13 +200,13 @@ func AddAttendees(deps Deps) func(context.Context, *AddAttendeesInput) (*AddAtte
 				CanEdit:     false,
 				CreatedAt:   handlerutil.NowUnix(),
 			}
-			resp.AvatarUrl = dbtype.PtrFromNullString(profile.AvatarUrl)
+			resp.AvatarURL = dbtype.PtrFromNullString(profile.AvatarUrl)
 			out.Body.Attendees = append(out.Body.Attendees, resp)
 		}
 
 		_ = appendCalendarEvent(ctx, deps.DB, wsID, "calendar.event.attendees.added", &actorID, map[string]any{
-			"eventId":    input.EvtId,
-			"calendarId": input.CalId,
+			"eventId":    input.EvtID,
+			"calendarId": input.CalID,
 			"count":      len(out.Body.Attendees),
 		})
 
@@ -219,16 +219,16 @@ func AddAttendees(deps Deps) func(context.Context, *AddAttendeesInput) (*AddAtte
 // resolveEvent (the event must belong to that calendar in the workspace).
 func ListAttendees(deps Deps) func(context.Context, *ListAttendeesInput) (*ListAttendeesOutput, error) {
 	return func(ctx context.Context, input *ListAttendeesInput) (*ListAttendeesOutput, error) {
-		wsID, actorID, err := resolveWorkspace(ctx, deps.Queries, input.WsId)
+		wsID, actorID, err := resolveWorkspace(ctx, deps.Queries, input.WsID)
 		if err != nil {
 			return nil, err
 		}
-		cal, _, err := resolveCalendar(ctx, deps.CalendarQueries, wsID, actorID, input.CalId)
+		cal, _, err := resolveCalendar(ctx, deps.CalendarQueries, wsID, actorID, input.CalID)
 		if err != nil {
 			return nil, err
 		}
 
-		evt, err := resolveEvent(ctx, deps.CalendarQueries, cal.ID, wsID, input.EvtId)
+		evt, err := resolveEvent(ctx, deps.CalendarQueries, cal.ID, wsID, input.EvtID)
 		if err != nil {
 			return nil, err
 		}
@@ -249,7 +249,7 @@ func ListAttendees(deps Deps) func(context.Context, *ListAttendeesInput) (*ListA
 				CanEdit:     r.CanEdit,
 				CreatedAt:   r.CreatedAt.Unix(),
 			}
-			resp.AvatarUrl = dbtype.PtrFromNullString(r.AvatarUrl)
+			resp.AvatarURL = dbtype.PtrFromNullString(r.AvatarUrl)
 			out.Body.Attendees[i] = resp
 		}
 		return out, nil
@@ -260,16 +260,16 @@ func ListAttendees(deps Deps) func(context.Context, *ListAttendeesInput) (*ListA
 // calendar managers can remove attendees.
 func RemoveAttendee(deps Deps) func(context.Context, *RemoveAttendeeInput) (*RemoveAttendeeOutput, error) {
 	return func(ctx context.Context, input *RemoveAttendeeInput) (*RemoveAttendeeOutput, error) {
-		wsID, actorID, err := resolveWorkspace(ctx, deps.Queries, input.WsId)
+		wsID, actorID, err := resolveWorkspace(ctx, deps.Queries, input.WsID)
 		if err != nil {
 			return nil, err
 		}
-		cal, _, err := resolveCalendar(ctx, deps.CalendarQueries, wsID, actorID, input.CalId)
+		cal, _, err := resolveCalendar(ctx, deps.CalendarQueries, wsID, actorID, input.CalID)
 		if err != nil {
 			return nil, err
 		}
 
-		evt, err := resolveEvent(ctx, deps.CalendarQueries, cal.ID, wsID, input.EvtId)
+		evt, err := resolveEvent(ctx, deps.CalendarQueries, cal.ID, wsID, input.EvtID)
 		if err != nil {
 			return nil, err
 		}
@@ -278,7 +278,7 @@ func RemoveAttendee(deps Deps) func(context.Context, *RemoveAttendeeInput) (*Rem
 			return nil, httpErr(apierrors.CalendarEventEditPermissionRequired)
 		}
 
-		targetUID, err := uuid.Parse(input.UserId)
+		targetUID, err := uuid.Parse(input.UserID)
 		if err != nil {
 			return nil, httpErr(apierrors.CalendarAttendeeUserIdMalformed)
 		}
@@ -296,9 +296,9 @@ func RemoveAttendee(deps Deps) func(context.Context, *RemoveAttendeeInput) (*Rem
 		}
 
 		_ = appendCalendarEvent(ctx, deps.DB, wsID, "calendar.event.attendee.removed", &actorID, map[string]any{
-			"eventId":    input.EvtId,
-			"calendarId": input.CalId,
-			"userId":     input.UserId,
+			"eventId":    input.EvtID,
+			"calendarId": input.CalID,
+			"userId":     input.UserID,
 		})
 
 		out := &RemoveAttendeeOutput{}
@@ -310,16 +310,16 @@ func RemoveAttendee(deps Deps) func(context.Context, *RemoveAttendeeInput) (*Rem
 // UpdateRsvp updates the authenticated user's RSVP for an event.
 func UpdateRsvp(deps Deps) func(context.Context, *UpdateRsvpInput) (*UpdateRsvpOutput, error) {
 	return func(ctx context.Context, input *UpdateRsvpInput) (*UpdateRsvpOutput, error) {
-		wsID, actorID, err := resolveWorkspace(ctx, deps.Queries, input.WsId)
+		wsID, actorID, err := resolveWorkspace(ctx, deps.Queries, input.WsID)
 		if err != nil {
 			return nil, err
 		}
-		cal, _, err := resolveCalendar(ctx, deps.CalendarQueries, wsID, actorID, input.CalId)
+		cal, _, err := resolveCalendar(ctx, deps.CalendarQueries, wsID, actorID, input.CalID)
 		if err != nil {
 			return nil, err
 		}
 
-		evt, err := resolveEvent(ctx, deps.CalendarQueries, cal.ID, wsID, input.EvtId)
+		evt, err := resolveEvent(ctx, deps.CalendarQueries, cal.ID, wsID, input.EvtID)
 		if err != nil {
 			return nil, err
 		}
@@ -337,8 +337,8 @@ func UpdateRsvp(deps Deps) func(context.Context, *UpdateRsvpInput) (*UpdateRsvpO
 		out.Body.Updated = true
 
 		_ = appendCalendarEvent(ctx, deps.DB, wsID, "calendar.event.rsvp.updated", &actorID, map[string]any{
-			"eventId":    input.EvtId,
-			"calendarId": input.CalId,
+			"eventId":    input.EvtID,
+			"calendarId": input.CalID,
 			"rsvp":       input.Body.Rsvp,
 		})
 
@@ -350,16 +350,16 @@ func UpdateRsvp(deps Deps) func(context.Context, *UpdateRsvpInput) (*UpdateRsvpO
 // Only the event owner can perform this action.
 func ToggleCanEdit(deps Deps) func(context.Context, *ToggleCanEditInput) (*ToggleCanEditOutput, error) {
 	return func(ctx context.Context, input *ToggleCanEditInput) (*ToggleCanEditOutput, error) {
-		wsID, actorID, err := resolveWorkspace(ctx, deps.Queries, input.WsId)
+		wsID, actorID, err := resolveWorkspace(ctx, deps.Queries, input.WsID)
 		if err != nil {
 			return nil, err
 		}
-		cal, _, err := resolveCalendar(ctx, deps.CalendarQueries, wsID, actorID, input.CalId)
+		cal, _, err := resolveCalendar(ctx, deps.CalendarQueries, wsID, actorID, input.CalID)
 		if err != nil {
 			return nil, err
 		}
 
-		evt, err := resolveEvent(ctx, deps.CalendarQueries, cal.ID, wsID, input.EvtId)
+		evt, err := resolveEvent(ctx, deps.CalendarQueries, cal.ID, wsID, input.EvtID)
 		if err != nil {
 			return nil, err
 		}
@@ -368,7 +368,7 @@ func ToggleCanEdit(deps Deps) func(context.Context, *ToggleCanEditInput) (*Toggl
 			return nil, httpErr(apierrors.CalendarAttendeeOwnerRequiredToToggleEdit)
 		}
 
-		targetUID, err := uuid.Parse(input.UserId)
+		targetUID, err := uuid.Parse(input.UserID)
 		if err != nil {
 			return nil, httpErr(apierrors.CalendarAttendeeUserIdMalformed)
 		}

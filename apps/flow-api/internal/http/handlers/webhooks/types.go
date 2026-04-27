@@ -54,7 +54,7 @@ type WebhookDeliveryDTO struct {
 	ID          string `json:"id" doc:"WebhookDelivery public id (UUID v7)"`
 	EventType   string `json:"eventType"`
 	Status      string `json:"status"`
-	HttpStatus  *int16 `json:"httpStatus"`
+	HTTPStatus  *int16 `json:"httpStatus"`
 	Attempts    uint8  `json:"attempts"`
 	MaxAttempts uint8  `json:"maxAttempts"`
 	DeliveredAt *int64 `json:"deliveredAt"`

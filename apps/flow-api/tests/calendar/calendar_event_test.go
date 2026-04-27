@@ -343,7 +343,7 @@ func TestPrivateEventVisibility_ScrubsFieldsForNonOwner(t *testing.T) {
 		EndAt    *int64  `json:"endAt"`
 		Location *string `json:"location"`
 		Memo     *string `json:"memo"`
-		Url      *string `json:"url"`
+		URL      *string `json:"url"`
 	}
 
 	var memberView eventView
@@ -356,7 +356,7 @@ func TestPrivateEventVisibility_ScrubsFieldsForNonOwner(t *testing.T) {
 	assert.Equal(t, end.Unix(), *memberView.EndAt)
 	assert.Nil(t, memberView.Location, "location must be scrubbed for non-owner on private event")
 	assert.Nil(t, memberView.Memo, "memo must be scrubbed for non-owner on private event")
-	assert.Nil(t, memberView.Url, "url must be scrubbed for non-owner on private event")
+	assert.Nil(t, memberView.URL, "url must be scrubbed for non-owner on private event")
 
 	var ownerView eventView
 	helpers.DoJSON(t, http.MethodGet, owner.WsPath("calendars", calID, "events", created.ID), owner.AccessToken, nil, &ownerView)
@@ -364,8 +364,8 @@ func TestPrivateEventVisibility_ScrubsFieldsForNonOwner(t *testing.T) {
 	assert.Equal(t, "Private Meeting", ownerView.Title)
 	require.NotNil(t, ownerView.Location)
 	require.NotNil(t, ownerView.Memo)
-	require.NotNil(t, ownerView.Url)
+	require.NotNil(t, ownerView.URL)
 	assert.Equal(t, "HQ Room 3", *ownerView.Location)
 	assert.Equal(t, "Budget review notes", *ownerView.Memo)
-	assert.Equal(t, "https://internal.example/meet", *ownerView.Url)
+	assert.Equal(t, "https://internal.example/meet", *ownerView.URL)
 }

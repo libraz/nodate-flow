@@ -23,8 +23,8 @@ import (
 
 // ListEventsInput is the input for the list events endpoint.
 type ListEventsInput struct {
-	WsId  string    `path:"wsId" doc:"Workspace public ID"`
-	CalId string    `path:"calId" doc:"Calendar public ID"`
+	WsID  string    `path:"wsId" doc:"Workspace public ID"`
+	CalID string    `path:"calId" doc:"Calendar public ID"`
 	Start time.Time `query:"start" doc:"Range start (inclusive)" required:"true"`
 	End   time.Time `query:"end" doc:"Range end (exclusive)" required:"true"`
 }
@@ -44,7 +44,7 @@ type EventResponse struct {
 	Timezone             string           `json:"timezone"`
 	Location             *string          `json:"location,omitempty"`
 	Memo                 *string          `json:"memo,omitempty"`
-	Url                  *string          `json:"url,omitempty"`
+	URL                  *string          `json:"url,omitempty"`
 	BlockLabel           *string          `json:"blockLabel,omitempty"`
 	RecurrenceRule       *json.RawMessage `json:"recurrenceRule,omitempty"`
 	RecurrenceEnd        *int64           `json:"recurrenceEnd,omitempty"`
@@ -63,8 +63,8 @@ type ListEventsOutput struct {
 
 // CreateEventInput is the input for the create event endpoint.
 type CreateEventInput struct {
-	WsId  string `path:"wsId" doc:"Workspace public ID"`
-	CalId string `path:"calId" doc:"Calendar public ID"`
+	WsID  string `path:"wsId" doc:"Workspace public ID"`
+	CalID string `path:"calId" doc:"Calendar public ID"`
 	Body  struct {
 		Kind               string           `json:"kind" enum:"event,block,free,milestone" doc:"Event kind"`
 		Visibility         string           `json:"visibility,omitempty" required:"false" enum:"default,public,private,confidential" doc:"Visibility"`
@@ -76,7 +76,7 @@ type CreateEventInput struct {
 		Timezone           string           `json:"timezone" doc:"IANA timezone"`
 		Location           *string          `json:"location,omitempty" required:"false" doc:"Location"`
 		Memo               *string          `json:"memo,omitempty" required:"false" doc:"Memo / notes"`
-		Url                *string          `json:"url,omitempty" required:"false" doc:"Related URL"`
+		URL                *string          `json:"url,omitempty" required:"false" doc:"Related URL"`
 		OwnerUserID        *string          `json:"ownerUserId,omitempty" required:"false" doc:"Owner user public ID (defaults to actor)"`
 		BlockLabel         *string          `json:"blockLabel,omitempty" required:"false" doc:"Block label"`
 		RecurrenceRule     *json.RawMessage `json:"recurrenceRule,omitempty" required:"false" doc:"RFC 5545 recurrence rule as JSON"`
@@ -92,9 +92,9 @@ type CreateEventOutput struct {
 
 // GetEventInput is the input for the get event endpoint.
 type GetEventInput struct {
-	WsId  string `path:"wsId" doc:"Workspace public ID"`
-	CalId string `path:"calId" doc:"Calendar public ID"`
-	EvtId string `path:"evtId" doc:"Event public ID"`
+	WsID  string `path:"wsId" doc:"Workspace public ID"`
+	CalID string `path:"calId" doc:"Calendar public ID"`
+	EvtID string `path:"evtId" doc:"Event public ID"`
 }
 
 // GetEventOutput is the response for the get event endpoint.
@@ -104,9 +104,9 @@ type GetEventOutput struct {
 
 // PatchEventInput is the input for the patch event endpoint.
 type PatchEventInput struct {
-	WsId  string `path:"wsId" doc:"Workspace public ID"`
-	CalId string `path:"calId" doc:"Calendar public ID"`
-	EvtId string `path:"evtId" doc:"Event public ID"`
+	WsID  string `path:"wsId" doc:"Workspace public ID"`
+	CalID string `path:"calId" doc:"Calendar public ID"`
+	EvtID string `path:"evtId" doc:"Event public ID"`
 	Body  struct {
 		Kind                 *string          `json:"kind,omitempty" required:"false" doc:"Event kind"`
 		Visibility           *string          `json:"visibility,omitempty" required:"false" doc:"Visibility"`
@@ -118,7 +118,7 @@ type PatchEventInput struct {
 		Timezone             *string          `json:"timezone,omitempty" required:"false" doc:"IANA timezone"`
 		Location             *string          `json:"location,omitempty" required:"false" doc:"Location"`
 		Memo                 *string          `json:"memo,omitempty" required:"false" doc:"Memo"`
-		Url                  *string          `json:"url,omitempty" required:"false" doc:"Related URL"`
+		URL                  *string          `json:"url,omitempty" required:"false" doc:"Related URL"`
 		BlockLabel           *string          `json:"blockLabel,omitempty" required:"false" doc:"Block label"`
 		RecurrenceRule       *json.RawMessage `json:"recurrenceRule,omitempty" required:"false" doc:"Recurrence rule"`
 		RecurrenceEnd        *int64           `json:"recurrenceEnd,omitempty" required:"false" doc:"Recurrence end as unix seconds (UTC)"`
@@ -134,9 +134,9 @@ type PatchEventOutput struct {
 
 // DeleteEventInput is the input for the delete event endpoint.
 type DeleteEventInput struct {
-	WsId  string `path:"wsId" doc:"Workspace public ID"`
-	CalId string `path:"calId" doc:"Calendar public ID"`
-	EvtId string `path:"evtId" doc:"Event public ID"`
+	WsID  string `path:"wsId" doc:"Workspace public ID"`
+	CalID string `path:"calId" doc:"Calendar public ID"`
+	EvtID string `path:"evtId" doc:"Event public ID"`
 }
 
 // DeleteEventOutput is the response for the delete event endpoint.
@@ -148,7 +148,7 @@ type DeleteEventOutput struct {
 
 // ListCalendarEventsInput is the input for the cross-calendar event list endpoint.
 type ListCalendarEventsInput struct {
-	WsId  string `path:"wsId" doc:"Workspace public ID"`
+	WsID  string `path:"wsId" doc:"Workspace public ID"`
 	Start string `query:"start" doc:"Range start (inclusive, date or datetime)" required:"true"`
 	End   string `query:"end" doc:"Range end (exclusive, date or datetime)" required:"true"`
 }
@@ -188,11 +188,11 @@ type ListCalendarEventsOutput struct {
 // both non-recurring and recurring events.
 func ListEvents(deps Deps) func(context.Context, *ListEventsInput) (*ListEventsOutput, error) {
 	return func(ctx context.Context, input *ListEventsInput) (*ListEventsOutput, error) {
-		wsID, actorID, err := resolveWorkspace(ctx, deps.Queries, input.WsId)
+		wsID, actorID, err := resolveWorkspace(ctx, deps.Queries, input.WsID)
 		if err != nil {
 			return nil, err
 		}
-		cal, _, err := resolveCalendar(ctx, deps.CalendarQueries, wsID, actorID, input.CalId)
+		cal, _, err := resolveCalendar(ctx, deps.CalendarQueries, wsID, actorID, input.CalID)
 		if err != nil {
 			return nil, err
 		}
@@ -233,11 +233,11 @@ func ListEvents(deps Deps) func(context.Context, *ListEventsInput) (*ListEventsO
 // CreateEvent creates a new event in a calendar.
 func CreateEvent(deps Deps) func(context.Context, *CreateEventInput) (*CreateEventOutput, error) {
 	return func(ctx context.Context, input *CreateEventInput) (*CreateEventOutput, error) {
-		wsID, actorID, err := resolveWorkspace(ctx, deps.Queries, input.WsId)
+		wsID, actorID, err := resolveWorkspace(ctx, deps.Queries, input.WsID)
 		if err != nil {
 			return nil, err
 		}
-		cal, sub, err := resolveCalendar(ctx, deps.CalendarQueries, wsID, actorID, input.CalId)
+		cal, sub, err := resolveCalendar(ctx, deps.CalendarQueries, wsID, actorID, input.CalID)
 		if err != nil {
 			return nil, err
 		}
@@ -309,8 +309,8 @@ func CreateEvent(deps Deps) func(context.Context, *CreateEventInput) (*CreateEve
 		if input.Body.Memo != nil {
 			params.Memo = sql.NullString{String: *input.Body.Memo, Valid: true}
 		}
-		if input.Body.Url != nil {
-			params.Url = sql.NullString{String: *input.Body.Url, Valid: true}
+		if input.Body.URL != nil {
+			params.Url = sql.NullString{String: *input.Body.URL, Valid: true}
 		}
 		if input.Body.BlockLabel != nil {
 			params.BlockLabel = sql.NullString{String: *input.Body.BlockLabel, Valid: true}
@@ -343,7 +343,7 @@ func CreateEvent(deps Deps) func(context.Context, *CreateEventInput) (*CreateEve
 			Timezone:   input.Body.Timezone,
 			Location:   input.Body.Location,
 			Memo:       input.Body.Memo,
-			Url:        input.Body.Url,
+			URL:        input.Body.URL,
 			BlockLabel: input.Body.BlockLabel,
 			CreatedAt:  handlerutil.NowUnix(),
 		}
@@ -359,7 +359,7 @@ func CreateEvent(deps Deps) func(context.Context, *CreateEventInput) (*CreateEve
 
 		eventBusPayload := map[string]any{
 			"eventId":    eventPublicID.String(),
-			"calendarId": input.CalId,
+			"calendarId": input.CalID,
 			"title":      input.Body.Title,
 			"kind":       input.Body.Kind,
 		}
@@ -376,16 +376,16 @@ func CreateEvent(deps Deps) func(context.Context, *CreateEventInput) (*CreateEve
 // GetEvent returns a single event by its public ID.
 func GetEvent(deps Deps) func(context.Context, *GetEventInput) (*GetEventOutput, error) {
 	return func(ctx context.Context, input *GetEventInput) (*GetEventOutput, error) {
-		wsID, actorID, err := resolveWorkspace(ctx, deps.Queries, input.WsId)
+		wsID, actorID, err := resolveWorkspace(ctx, deps.Queries, input.WsID)
 		if err != nil {
 			return nil, err
 		}
-		cal, _, err := resolveCalendar(ctx, deps.CalendarQueries, wsID, actorID, input.CalId)
+		cal, _, err := resolveCalendar(ctx, deps.CalendarQueries, wsID, actorID, input.CalID)
 		if err != nil {
 			return nil, err
 		}
 
-		evtUID, err := uuid.Parse(input.EvtId)
+		evtUID, err := uuid.Parse(input.EvtID)
 		if err != nil {
 			return nil, errEventNotFound
 		}
@@ -408,7 +408,7 @@ func GetEvent(deps Deps) func(context.Context, *GetEventInput) (*GetEventOutput,
 		if evt.Visibility == calendar.CalendarEventsVisibilityPrivate && evt.OwnerUserID != actorID {
 			resp.Memo = nil
 			resp.Location = nil
-			resp.Url = nil
+			resp.URL = nil
 		}
 
 		out := &GetEventOutput{}
@@ -425,16 +425,16 @@ func GetEvent(deps Deps) func(context.Context, *GetEventInput) (*GetEventOutput,
 // sqlc PATCH inside the same transaction.
 func PatchEvent(deps Deps) func(context.Context, *PatchEventInput) (*PatchEventOutput, error) {
 	return func(ctx context.Context, input *PatchEventInput) (*PatchEventOutput, error) {
-		wsID, actorID, err := resolveWorkspace(ctx, deps.Queries, input.WsId)
+		wsID, actorID, err := resolveWorkspace(ctx, deps.Queries, input.WsID)
 		if err != nil {
 			return nil, err
 		}
-		cal, sub, err := resolveCalendar(ctx, deps.CalendarQueries, wsID, actorID, input.CalId)
+		cal, sub, err := resolveCalendar(ctx, deps.CalendarQueries, wsID, actorID, input.CalID)
 		if err != nil {
 			return nil, err
 		}
 
-		evtUID, err := uuid.Parse(input.EvtId)
+		evtUID, err := uuid.Parse(input.EvtID)
 		if err != nil {
 			return nil, errEventNotFound
 		}
@@ -553,8 +553,8 @@ func PatchEvent(deps Deps) func(context.Context, *PatchEventInput) (*PatchEventO
 		if input.Body.Memo != nil {
 			params.Memo = sql.NullString{String: *input.Body.Memo, Valid: true}
 		}
-		if input.Body.Url != nil {
-			params.Url = sql.NullString{String: *input.Body.Url, Valid: true}
+		if input.Body.URL != nil {
+			params.Url = sql.NullString{String: *input.Body.URL, Valid: true}
 		}
 		if input.Body.BlockLabel != nil {
 			params.BlockLabel = sql.NullString{String: *input.Body.BlockLabel, Valid: true}
@@ -607,8 +607,8 @@ func PatchEvent(deps Deps) func(context.Context, *PatchEventInput) (*PatchEventO
 		// working.
 		if !isLinked {
 			_ = appendCalendarEvent(ctx, deps.DB, wsID, "calendar.event.updated", &actorID, map[string]any{
-				"eventId":    input.EvtId,
-				"calendarId": input.CalId,
+				"eventId":    input.EvtID,
+				"calendarId": input.CalID,
 			})
 		}
 
@@ -642,16 +642,16 @@ func translateItemkitError(ctx context.Context, op string, err error) error {
 // (task_role = 'due'), leaving the task itself intact.
 func DeleteEvent(deps Deps) func(context.Context, *DeleteEventInput) (*DeleteEventOutput, error) {
 	return func(ctx context.Context, input *DeleteEventInput) (*DeleteEventOutput, error) {
-		wsID, actorID, err := resolveWorkspace(ctx, deps.Queries, input.WsId)
+		wsID, actorID, err := resolveWorkspace(ctx, deps.Queries, input.WsID)
 		if err != nil {
 			return nil, err
 		}
-		cal, sub, err := resolveCalendar(ctx, deps.CalendarQueries, wsID, actorID, input.CalId)
+		cal, sub, err := resolveCalendar(ctx, deps.CalendarQueries, wsID, actorID, input.CalID)
 		if err != nil {
 			return nil, err
 		}
 
-		evtUID, err := uuid.Parse(input.EvtId)
+		evtUID, err := uuid.Parse(input.EvtID)
 		if err != nil {
 			return nil, errEventNotFound
 		}
@@ -706,7 +706,7 @@ func DeleteEvent(deps Deps) func(context.Context, *DeleteEventInput) (*DeleteEve
 // in a workspace within a time range.
 func ListCalendarEvents(deps Deps) func(context.Context, *ListCalendarEventsInput) (*ListCalendarEventsOutput, error) {
 	return func(ctx context.Context, input *ListCalendarEventsInput) (*ListCalendarEventsOutput, error) {
-		wsID, actorID, err := resolveWorkspace(ctx, deps.Queries, input.WsId)
+		wsID, actorID, err := resolveWorkspace(ctx, deps.Queries, input.WsID)
 		if err != nil {
 			return nil, err
 		}
@@ -815,7 +815,7 @@ func eventFromRangeRow(e calendar.ListCalendarEventsByRangeRow) EventResponse {
 	}
 	resp.Location = dbtype.PtrFromNullString(e.Location)
 	resp.Memo = dbtype.PtrFromNullString(e.Memo)
-	resp.Url = dbtype.PtrFromNullString(e.Url)
+	resp.URL = dbtype.PtrFromNullString(e.Url)
 	resp.BlockLabel = dbtype.PtrFromNullString(e.BlockLabel)
 	resp.NotificationOffset = dbtype.PtrFromNullInt32(e.NotificationOffset)
 	resp.UpdatedAt = dbtype.UnixSecondsFromNullTime(e.UpdatedAt)
@@ -837,7 +837,7 @@ func eventFromRecurringRow(e calendar.ListRecurringCalendarEventsByRangeRow) Eve
 	}
 	resp.Location = dbtype.PtrFromNullString(e.Location)
 	resp.Memo = dbtype.PtrFromNullString(e.Memo)
-	resp.Url = dbtype.PtrFromNullString(e.Url)
+	resp.URL = dbtype.PtrFromNullString(e.Url)
 	resp.BlockLabel = dbtype.PtrFromNullString(e.BlockLabel)
 	if e.RecurrenceRule != nil {
 		raw := json.RawMessage(e.RecurrenceRule)
@@ -880,7 +880,7 @@ func eventFromFullRow(e calendar.FindCalendarEventByPublicIdRow) EventResponse {
 	}
 	resp.Location = dbtype.PtrFromNullString(e.Location)
 	resp.Memo = dbtype.PtrFromNullString(e.Memo)
-	resp.Url = dbtype.PtrFromNullString(e.Url)
+	resp.URL = dbtype.PtrFromNullString(e.Url)
 	resp.BlockLabel = dbtype.PtrFromNullString(e.BlockLabel)
 	if e.RecurrenceRule != nil {
 		raw := json.RawMessage(e.RecurrenceRule)

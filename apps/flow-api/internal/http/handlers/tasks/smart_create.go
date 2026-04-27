@@ -56,7 +56,7 @@ type ApplySmartSubtask struct {
 	Title          string `json:"title" minLength:"1" maxLength:"500"`
 	Description    string `json:"description,omitempty" maxLength:"50000"`
 	Priority       int32  `json:"priority" minimum:"0" maximum:"4"`
-	AssigneeUserId string `json:"assigneeUserId,omitempty"`
+	AssigneeUserID string `json:"assigneeUserId,omitempty"`
 }
 
 // ApplySmartInput is the request for POST /workspaces/{wsId}/tasks/apply-smart.
@@ -67,7 +67,7 @@ type ApplySmartInput struct {
 		Title           string              `json:"title" minLength:"1" maxLength:"500"`
 		Description     string              `json:"description,omitempty" maxLength:"50000"`
 		Priority        int32               `json:"priority" minimum:"0" maximum:"4"`
-		AssigneeUserIds []string            `json:"assigneeUserIds,omitempty"`
+		AssigneeUserIDs []string            `json:"assigneeUserIds,omitempty"`
 		Subtasks        []ApplySmartSubtask `json:"subtasks,omitempty"`
 	}
 }
@@ -168,7 +168,7 @@ func ApplySmart(deps SmartCreateDeps) func(context.Context, *ApplySmartInput) (*
 		}
 
 		// Attach assignees to parent task.
-		for _, uid := range in.Body.AssigneeUserIds {
+		for _, uid := range in.Body.AssigneeUserIDs {
 			if err := addActorByPublicID(ctx, qtx, deps.DB, ws.ID, uint32(parentID), uid); err != nil {
 				return nil, err
 			}
@@ -196,8 +196,8 @@ func ApplySmart(deps SmartCreateDeps) func(context.Context, *ApplySmartInput) (*
 			}
 
 			// Attach subtask assignee if provided.
-			if sub.AssigneeUserId != "" {
-				if err := addActorByPublicID(ctx, qtx, deps.DB, ws.ID, uint32(subID), sub.AssigneeUserId); err != nil {
+			if sub.AssigneeUserID != "" {
+				if err := addActorByPublicID(ctx, qtx, deps.DB, ws.ID, uint32(subID), sub.AssigneeUserID); err != nil {
 					return nil, err
 				}
 			}

@@ -714,7 +714,7 @@ func buildAuthenticatedAPI(r chi.Router, deps Deps, shared *sharedDeps, authMW f
 	// /projects/{prjId}.
 	r.Group(func(sub chi.Router) {
 		sub.Use(authMW)
-		sub.Use(middleware.RequireProjectMemberByGlobalId(shared.aclDB))
+		sub.Use(middleware.RequireProjectMemberByGlobalID(shared.aclDB))
 		subAPI := newSubAPI(sub)
 		apis = append(apis, subAPI)
 		projects.RegisterGlobal(subAPI, shared.prjDeps)

@@ -33,10 +33,10 @@ const (
 // expiresInHours is optional and clamped to [1, 720]; 0/missing falls back
 // to the 7-day default.
 type CreateEventInviteInput struct {
-	WsId       string `path:"wsId" doc:"Workspace public ID"`
-	CalId      string `path:"calId" doc:"Calendar public ID"`
-	EvtId      string `path:"evtId" doc:"Event public ID"`
-	AttendeeId string `path:"attendeeId" doc:"Attendee public ID"`
+	WsID       string `path:"wsId" doc:"Workspace public ID"`
+	CalID      string `path:"calId" doc:"Calendar public ID"`
+	EvtID      string `path:"evtId" doc:"Event public ID"`
+	AttendeeID string `path:"attendeeId" doc:"Attendee public ID"`
 	Body       struct {
 		ExpiresInHours *int `json:"expiresInHours,omitempty" required:"false" minimum:"1" maximum:"720" doc:"Token lifetime in hours; default 168, cap 720"`
 	}
@@ -93,10 +93,10 @@ type AcceptEventInviteOutput struct {
 
 // RevokeEventInviteInput deletes a single invite row.
 type RevokeEventInviteInput struct {
-	WsId     string `path:"wsId" doc:"Workspace public ID"`
-	CalId    string `path:"calId" doc:"Calendar public ID"`
-	EvtId    string `path:"evtId" doc:"Event public ID"`
-	InviteId string `path:"inviteId" doc:"Invite public ID"`
+	WsID     string `path:"wsId" doc:"Workspace public ID"`
+	CalID    string `path:"calId" doc:"Calendar public ID"`
+	EvtID    string `path:"evtId" doc:"Event public ID"`
+	InviteID string `path:"inviteId" doc:"Invite public ID"`
 }
 
 // RevokeEventInviteOutput is a 204-style confirmation envelope. We use a
@@ -123,9 +123,9 @@ type InviteSummaryResponse struct {
 
 // ListEventInvitesInput lists every active invite for a single event.
 type ListEventInvitesInput struct {
-	WsId  string `path:"wsId" doc:"Workspace public ID"`
-	CalId string `path:"calId" doc:"Calendar public ID"`
-	EvtId string `path:"evtId" doc:"Event public ID"`
+	WsID  string `path:"wsId" doc:"Workspace public ID"`
+	CalID string `path:"calId" doc:"Calendar public ID"`
+	EvtID string `path:"evtId" doc:"Event public ID"`
 }
 
 // ListEventInvitesOutput is the response shape for the per-event invite
@@ -150,15 +150,15 @@ type ListEventInvitesOutput struct {
 // ".created" otherwise.
 func CreateEventInvite(deps Deps) func(context.Context, *CreateEventInviteInput) (*CreateEventInviteOutput, error) {
 	return func(ctx context.Context, input *CreateEventInviteInput) (*CreateEventInviteOutput, error) {
-		wsID, actorID, err := resolveWorkspace(ctx, deps.Queries, input.WsId)
+		wsID, actorID, err := resolveWorkspace(ctx, deps.Queries, input.WsID)
 		if err != nil {
 			return nil, err
 		}
-		cal, _, err := resolveCalendar(ctx, deps.CalendarQueries, wsID, actorID, input.CalId)
+		cal, _, err := resolveCalendar(ctx, deps.CalendarQueries, wsID, actorID, input.CalID)
 		if err != nil {
 			return nil, err
 		}
-		evt, err := resolveEvent(ctx, deps.CalendarQueries, cal.ID, wsID, input.EvtId)
+		evt, err := resolveEvent(ctx, deps.CalendarQueries, cal.ID, wsID, input.EvtID)
 		if err != nil {
 			return nil, err
 		}
@@ -173,7 +173,7 @@ func CreateEventInvite(deps Deps) func(context.Context, *CreateEventInviteInput)
 		// direct (publicID → attendee) query, so we list active
 		// attendees for the event and match locally. This keeps the
 		// scope of this change inside the handler layer.
-		attendeePID, err := parsePublicID(input.AttendeeId)
+		attendeePID, err := parsePublicID(input.AttendeeID)
 		if err != nil {
 			return nil, httpErr(apierrors.CalendarAttendeeUserNotFound)
 		}
@@ -277,9 +277,9 @@ func CreateEventInvite(deps Deps) func(context.Context, *CreateEventInviteInput)
 			eventType = "calendar.event.invite.rotated"
 		}
 		_ = appendCalendarEvent(ctx, deps.DB, wsID, eventType, &actorID, map[string]any{
-			"eventId":          input.EvtId,
-			"calendarId":       input.CalId,
-			"attendeePublicId": input.AttendeeId,
+			"eventId":          input.EvtID,
+			"calendarId":       input.CalID,
+			"attendeePublicId": input.AttendeeID,
 			"invitePublicId":   invitePublicID.String(),
 		})
 
@@ -498,22 +498,22 @@ func AcceptEventInvite(deps Deps) func(context.Context, *AcceptEventInviteInput)
 // ACL as create. Once disabled, the magic link returns NOT_FOUND.
 func RevokeEventInvite(deps Deps) func(context.Context, *RevokeEventInviteInput) (*RevokeEventInviteOutput, error) {
 	return func(ctx context.Context, input *RevokeEventInviteInput) (*RevokeEventInviteOutput, error) {
-		wsID, actorID, err := resolveWorkspace(ctx, deps.Queries, input.WsId)
+		wsID, actorID, err := resolveWorkspace(ctx, deps.Queries, input.WsID)
 		if err != nil {
 			return nil, err
 		}
-		cal, _, err := resolveCalendar(ctx, deps.CalendarQueries, wsID, actorID, input.CalId)
+		cal, _, err := resolveCalendar(ctx, deps.CalendarQueries, wsID, actorID, input.CalID)
 		if err != nil {
 			return nil, err
 		}
-		evt, err := resolveEvent(ctx, deps.CalendarQueries, cal.ID, wsID, input.EvtId)
+		evt, err := resolveEvent(ctx, deps.CalendarQueries, cal.ID, wsID, input.EvtID)
 		if err != nil {
 			return nil, err
 		}
 		if evt.OwnerUserID != actorID {
 			return nil, httpErr(apierrors.CalendarCalendarOwnerRoleRequired)
 		}
-		invitePID, err := parsePublicID(input.InviteId)
+		invitePID, err := parsePublicID(input.InviteID)
 		if err != nil {
 			return nil, httpErr(apierrors.CalendarInviteNotFound)
 		}
@@ -532,9 +532,9 @@ func RevokeEventInvite(deps Deps) func(context.Context, *RevokeEventInviteInput)
 			return nil, httpErr(apierrors.CalendarInviteStoreRevokeInterrupted)
 		}
 		_ = appendCalendarEvent(ctx, deps.DB, wsID, "calendar.event.invite.revoked", &actorID, map[string]any{
-			"eventId":        input.EvtId,
-			"calendarId":     input.CalId,
-			"invitePublicId": input.InviteId,
+			"eventId":        input.EvtID,
+			"calendarId":     input.CalID,
+			"invitePublicId": input.InviteID,
 		})
 		out := &RevokeEventInviteOutput{}
 		out.Body.Revoked = true
@@ -546,15 +546,15 @@ func RevokeEventInvite(deps Deps) func(context.Context, *RevokeEventInviteInput)
 // so non-owners can't discover who was invited before they accept.
 func ListEventInvites(deps Deps) func(context.Context, *ListEventInvitesInput) (*ListEventInvitesOutput, error) {
 	return func(ctx context.Context, input *ListEventInvitesInput) (*ListEventInvitesOutput, error) {
-		wsID, actorID, err := resolveWorkspace(ctx, deps.Queries, input.WsId)
+		wsID, actorID, err := resolveWorkspace(ctx, deps.Queries, input.WsID)
 		if err != nil {
 			return nil, err
 		}
-		cal, _, err := resolveCalendar(ctx, deps.CalendarQueries, wsID, actorID, input.CalId)
+		cal, _, err := resolveCalendar(ctx, deps.CalendarQueries, wsID, actorID, input.CalID)
 		if err != nil {
 			return nil, err
 		}
-		evt, err := resolveEvent(ctx, deps.CalendarQueries, cal.ID, wsID, input.EvtId)
+		evt, err := resolveEvent(ctx, deps.CalendarQueries, cal.ID, wsID, input.EvtID)
 		if err != nil {
 			return nil, err
 		}

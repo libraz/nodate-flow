@@ -18,8 +18,8 @@ import (
 
 // ListMemosInput is the input for the list memos endpoint.
 type ListMemosInput struct {
-	WsId  string `path:"wsId" doc:"Workspace public ID"`
-	CalId string `path:"calId" doc:"Calendar public ID"`
+	WsID  string `path:"wsId" doc:"Workspace public ID"`
+	CalID string `path:"calId" doc:"Calendar public ID"`
 }
 
 // MemoResponse is the JSON representation of a calendar memo.
@@ -43,8 +43,8 @@ type ListMemosOutput struct {
 
 // CreateMemoInput is the input for the create memo endpoint.
 type CreateMemoInput struct {
-	WsId  string `path:"wsId" doc:"Workspace public ID"`
-	CalId string `path:"calId" doc:"Calendar public ID"`
+	WsID  string `path:"wsId" doc:"Workspace public ID"`
+	CalID string `path:"calId" doc:"Calendar public ID"`
 	Body  struct {
 		Title      string `json:"title" minLength:"1" maxLength:"500" doc:"Memo title"`
 		SortWeight int32  `json:"sortWeight" required:"false" doc:"Sort weight for ordering"`
@@ -58,9 +58,9 @@ type CreateMemoOutput struct {
 
 // UpdateMemoInput is the input for the update memo endpoint.
 type UpdateMemoInput struct {
-	WsId   string `path:"wsId" doc:"Workspace public ID"`
-	CalId  string `path:"calId" doc:"Calendar public ID"`
-	MemoId string `path:"memoId" doc:"Memo public ID"`
+	WsID   string `path:"wsId" doc:"Workspace public ID"`
+	CalID  string `path:"calId" doc:"Calendar public ID"`
+	MemoID string `path:"memoId" doc:"Memo public ID"`
 	Body   struct {
 		Title      *string `json:"title,omitempty" minLength:"1" maxLength:"500" required:"false" doc:"Memo title"`
 		Done       *bool   `json:"done,omitempty" required:"false" doc:"Whether the memo is done"`
@@ -77,9 +77,9 @@ type UpdateMemoOutput struct {
 
 // DeleteMemoInput is the input for the delete memo endpoint.
 type DeleteMemoInput struct {
-	WsId   string `path:"wsId" doc:"Workspace public ID"`
-	CalId  string `path:"calId" doc:"Calendar public ID"`
-	MemoId string `path:"memoId" doc:"Memo public ID"`
+	WsID   string `path:"wsId" doc:"Workspace public ID"`
+	CalID  string `path:"calId" doc:"Calendar public ID"`
+	MemoID string `path:"memoId" doc:"Memo public ID"`
 }
 
 // DeleteMemoOutput is the response for the delete memo endpoint.
@@ -94,11 +94,11 @@ type DeleteMemoOutput struct {
 // ListMemos returns all memos in a calendar.
 func ListMemos(deps Deps) func(context.Context, *ListMemosInput) (*ListMemosOutput, error) {
 	return func(ctx context.Context, input *ListMemosInput) (*ListMemosOutput, error) {
-		wsID, actorID, err := resolveWorkspace(ctx, deps.Queries, input.WsId)
+		wsID, actorID, err := resolveWorkspace(ctx, deps.Queries, input.WsID)
 		if err != nil {
 			return nil, err
 		}
-		cal, _, err := resolveCalendar(ctx, deps.CalendarQueries, wsID, actorID, input.CalId)
+		cal, _, err := resolveCalendar(ctx, deps.CalendarQueries, wsID, actorID, input.CalID)
 		if err != nil {
 			return nil, err
 		}
@@ -130,11 +130,11 @@ func ListMemos(deps Deps) func(context.Context, *ListMemosInput) (*ListMemosOutp
 // CreateMemo creates a new memo in a calendar.
 func CreateMemo(deps Deps) func(context.Context, *CreateMemoInput) (*CreateMemoOutput, error) {
 	return func(ctx context.Context, input *CreateMemoInput) (*CreateMemoOutput, error) {
-		wsID, actorID, err := resolveWorkspace(ctx, deps.Queries, input.WsId)
+		wsID, actorID, err := resolveWorkspace(ctx, deps.Queries, input.WsID)
 		if err != nil {
 			return nil, err
 		}
-		cal, _, err := resolveCalendar(ctx, deps.CalendarQueries, wsID, actorID, input.CalId)
+		cal, _, err := resolveCalendar(ctx, deps.CalendarQueries, wsID, actorID, input.CalID)
 		if err != nil {
 			return nil, err
 		}
@@ -163,7 +163,7 @@ func CreateMemo(deps Deps) func(context.Context, *CreateMemoInput) (*CreateMemoO
 
 		_ = appendCalendarEvent(ctx, deps.DB, wsID, "calendar.memo.created", &actorID, map[string]any{
 			"memoId":     memoPublicID.String(),
-			"calendarId": input.CalId,
+			"calendarId": input.CalID,
 			"title":      input.Body.Title,
 		})
 
@@ -174,16 +174,16 @@ func CreateMemo(deps Deps) func(context.Context, *CreateMemoInput) (*CreateMemoO
 // UpdateMemo updates a memo's title, done status, or sort weight.
 func UpdateMemo(deps Deps) func(context.Context, *UpdateMemoInput) (*UpdateMemoOutput, error) {
 	return func(ctx context.Context, input *UpdateMemoInput) (*UpdateMemoOutput, error) {
-		wsID, actorID, err := resolveWorkspace(ctx, deps.Queries, input.WsId)
+		wsID, actorID, err := resolveWorkspace(ctx, deps.Queries, input.WsID)
 		if err != nil {
 			return nil, err
 		}
-		cal, _, err := resolveCalendar(ctx, deps.CalendarQueries, wsID, actorID, input.CalId)
+		cal, _, err := resolveCalendar(ctx, deps.CalendarQueries, wsID, actorID, input.CalID)
 		if err != nil {
 			return nil, err
 		}
 
-		memoUID, err := uuid.Parse(input.MemoId)
+		memoUID, err := uuid.Parse(input.MemoID)
 		if err != nil {
 			return nil, httpErr(apierrors.CalendarMemoNotFound)
 		}
@@ -221,8 +221,8 @@ func UpdateMemo(deps Deps) func(context.Context, *UpdateMemoInput) (*UpdateMemoO
 		out.Body.Updated = true
 
 		_ = appendCalendarEvent(ctx, deps.DB, wsID, "calendar.memo.updated", &actorID, map[string]any{
-			"memoId":     input.MemoId,
-			"calendarId": input.CalId,
+			"memoId":     input.MemoID,
+			"calendarId": input.CalID,
 		})
 
 		return out, nil
@@ -232,16 +232,16 @@ func UpdateMemo(deps Deps) func(context.Context, *UpdateMemoInput) (*UpdateMemoO
 // DeleteMemo soft-deletes a memo from a calendar.
 func DeleteMemo(deps Deps) func(context.Context, *DeleteMemoInput) (*DeleteMemoOutput, error) {
 	return func(ctx context.Context, input *DeleteMemoInput) (*DeleteMemoOutput, error) {
-		wsID, actorID, err := resolveWorkspace(ctx, deps.Queries, input.WsId)
+		wsID, actorID, err := resolveWorkspace(ctx, deps.Queries, input.WsID)
 		if err != nil {
 			return nil, err
 		}
-		cal, _, err := resolveCalendar(ctx, deps.CalendarQueries, wsID, actorID, input.CalId)
+		cal, _, err := resolveCalendar(ctx, deps.CalendarQueries, wsID, actorID, input.CalID)
 		if err != nil {
 			return nil, err
 		}
 
-		memoUID, err := uuid.Parse(input.MemoId)
+		memoUID, err := uuid.Parse(input.MemoID)
 		if err != nil {
 			return nil, httpErr(apierrors.CalendarMemoNotFound)
 		}
@@ -268,8 +268,8 @@ func DeleteMemo(deps Deps) func(context.Context, *DeleteMemoInput) (*DeleteMemoO
 		out.Body.Deleted = true
 
 		_ = appendCalendarEvent(ctx, deps.DB, wsID, "calendar.memo.deleted", &actorID, map[string]any{
-			"memoId":     input.MemoId,
-			"calendarId": input.CalId,
+			"memoId":     input.MemoID,
+			"calendarId": input.CalID,
 		})
 
 		return out, nil

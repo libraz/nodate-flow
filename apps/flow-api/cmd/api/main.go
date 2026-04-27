@@ -274,20 +274,20 @@ func main() {
 	// is used so handlers can always call Send and check for
 	// email.ErrNotConfigured on the return path.
 	var emailSender email.Sender
-	if cfg.SmtpHost != "" {
+	if cfg.SMTPHost != "" {
 		s, serr := email.NewSMTPSender(email.SMTPConfig{
-			Host:     cfg.SmtpHost,
-			Port:     cfg.SmtpPort,
-			Username: cfg.SmtpUsername,
-			Password: cfg.SmtpPassword,
-			From:     cfg.SmtpFrom,
+			Host:     cfg.SMTPHost,
+			Port:     cfg.SMTPPort,
+			Username: cfg.SMTPUsername,
+			Password: cfg.SMTPPassword,
+			From:     cfg.SMTPFrom,
 		})
 		if serr != nil {
 			logger.Error("smtp sender init failed", "err", serr)
 			os.Exit(1)
 		}
 		emailSender = s
-		logger.Info("smtp email enabled", "host", cfg.SmtpHost, "port", cfg.SmtpPort)
+		logger.Info("smtp email enabled", "host", cfg.SMTPHost, "port", cfg.SMTPPort)
 	} else {
 		emailSender = email.NoopSender{}
 		logger.Warn("smtp email disabled: NF_FLOW_SMTP_HOST is not set")
@@ -325,7 +325,7 @@ func main() {
 		AgentRunner:           runner,
 		Storage:               storageClient,
 		EmailSender:           emailSender,
-		EmailFrom:             cfg.SmtpFrom,
+		EmailFrom:             cfg.SMTPFrom,
 		FlowWebURL:            cfg.FlowWebURL,
 		EmbedOpenAIKey:        cfg.EmbedOpenAIKey,
 		EmbedModel:            cfg.EmbedModel,

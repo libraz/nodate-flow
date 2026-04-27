@@ -212,7 +212,7 @@ func ListForTask(deps Deps) func(context.Context, *ListTimelineForTaskInput) (*L
 }
 
 // ListForProject handles GET /projects/{prjId}/timeline. The route must
-// be mounted behind RequireProjectMemberByGlobalId so the workspace and
+// be mounted behind RequireProjectMemberByGlobalID so the workspace and
 // project contexts are populated.
 func ListForProject(deps Deps) func(context.Context, *ListTimelineForProjectInput) (*ListTimelineOutput, error) {
 	return func(ctx context.Context, in *ListTimelineForProjectInput) (*ListTimelineOutput, error) {

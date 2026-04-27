@@ -10,7 +10,7 @@ import (
 )
 
 // Get handles GET /projects/{prjId}. The project context has already been
-// resolved by RequireProjectMemberByGlobalId.
+// resolved by RequireProjectMemberByGlobalID.
 func Get(deps Deps) func(context.Context, *GetProjectInput) (*GetProjectOutput, error) {
 	return func(ctx context.Context, _ *GetProjectInput) (*GetProjectOutput, error) {
 		prj, ok := middleware.ProjectFromContext(ctx)

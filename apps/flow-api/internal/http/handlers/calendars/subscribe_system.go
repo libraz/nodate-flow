@@ -10,7 +10,7 @@ import (
 // SubscribeSystemCalendarInput is the body for
 // POST /workspaces/{wsId}/calendars/subscribe-system.
 type SubscribeSystemCalendarInput struct {
-	WsId string `path:"wsId" doc:"Workspace public ID"`
+	WsID string `path:"wsId" doc:"Workspace public ID"`
 	Body struct {
 		// Country is an ISO 3166-1 alpha-2 code selecting the holiday feed
 		// to subscribe to (e.g. "JP", "US"). The calendar is created on
@@ -32,7 +32,7 @@ type SubscribeSystemCalendarOutput struct {
 // workspace (one row per country) and the caller is subscribed as a viewer.
 func SubscribeSystemCalendar(deps Deps) func(context.Context, *SubscribeSystemCalendarInput) (*SubscribeSystemCalendarOutput, error) {
 	return func(ctx context.Context, input *SubscribeSystemCalendarInput) (*SubscribeSystemCalendarOutput, error) {
-		wsID, actorID, err := resolveWorkspace(ctx, deps.Queries, input.WsId)
+		wsID, actorID, err := resolveWorkspace(ctx, deps.Queries, input.WsID)
 		if err != nil {
 			return nil, err
 		}

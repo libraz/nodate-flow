@@ -381,7 +381,7 @@ func mapDeliveryRow(r generated.ListWebhookDeliveriesRow) WebhookDeliveryDTO {
 		ID:          r.PublicID.String(),
 		EventType:   r.EventType,
 		Status:      string(r.Status),
-		HttpStatus:  httpStatus,
+		HTTPStatus:  httpStatus,
 		Attempts:    r.Attempts,
 		MaxAttempts: r.MaxAttempts,
 		DeliveredAt: nullTimeUnix(r.DeliveredAt),

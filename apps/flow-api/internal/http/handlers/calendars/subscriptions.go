@@ -19,7 +19,7 @@ import (
 // endpoint. It is workspace-scoped: the actor must be a workspace member but
 // is, by definition, NOT yet a member of the calendars being listed.
 type ListDiscoverableCalendarsInput struct {
-	WsId string `path:"wsId" doc:"Workspace public ID"`
+	WsID string `path:"wsId" doc:"Workspace public ID"`
 }
 
 // DiscoverableCalendarResponse is the JSON representation of a teammate
@@ -32,7 +32,7 @@ type DiscoverableCalendarResponse struct {
 	Color            string  `json:"color"`
 	OwnerUserID      string  `json:"ownerUserId"`
 	OwnerDisplayName string  `json:"ownerDisplayName"`
-	OwnerAvatarUrl   *string `json:"ownerAvatarUrl,omitempty"`
+	OwnerAvatarURL   *string `json:"ownerAvatarUrl,omitempty"`
 	CreatedAt        int64   `json:"createdAt"`
 }
 
@@ -48,8 +48,8 @@ type ListDiscoverableCalendarsOutput struct {
 // calendar lookup is performed manually (not via calMW) because the actor
 // is, by definition, not yet a member of the calendar.
 type SelfSubscribeInput struct {
-	WsId  string `path:"wsId" doc:"Workspace public ID"`
-	CalId string `path:"calId" doc:"Calendar public ID"`
+	WsID  string `path:"wsId" doc:"Workspace public ID"`
+	CalID string `path:"calId" doc:"Calendar public ID"`
 }
 
 // SelfSubscribeOutput is the response for the self-subscribe endpoint.
@@ -66,8 +66,8 @@ type SelfSubscribeOutput struct {
 // subscription preferences for a calendar (visibility, display color,
 // sort order in the right rail).
 type PatchOwnSubscriptionInput struct {
-	WsId  string `path:"wsId" doc:"Workspace public ID"`
-	CalId string `path:"calId" doc:"Calendar public ID"`
+	WsID  string `path:"wsId" doc:"Workspace public ID"`
+	CalID string `path:"calId" doc:"Calendar public ID"`
 	Body  struct {
 		Visible      *bool   `json:"visible,omitempty" required:"false" doc:"Whether events from this calendar are rendered for the caller"`
 		DisplayColor *string `json:"displayColor,omitempty" required:"false" doc:"Caller-specific display color (hex)"`
@@ -90,7 +90,7 @@ type PatchOwnSubscriptionOutput struct {
 // "Add teammate calendar" drawer in the flow-web right rail.
 func ListDiscoverableCalendars(deps Deps) func(context.Context, *ListDiscoverableCalendarsInput) (*ListDiscoverableCalendarsOutput, error) {
 	return func(ctx context.Context, input *ListDiscoverableCalendarsInput) (*ListDiscoverableCalendarsOutput, error) {
-		wsID, actorID, err := resolveWorkspace(ctx, deps.Queries, input.WsId)
+		wsID, actorID, err := resolveWorkspace(ctx, deps.Queries, input.WsID)
 		if err != nil {
 			return nil, err
 		}
@@ -117,7 +117,7 @@ func ListDiscoverableCalendars(deps Deps) func(context.Context, *ListDiscoverabl
 				CreatedAt:        r.CreatedAt.Unix(),
 			}
 			resp.Description = dbtype.PtrFromNullString(r.Description)
-			resp.OwnerAvatarUrl = dbtype.PtrFromNullString(r.OwnerAvatarUrl)
+			resp.OwnerAvatarURL = dbtype.PtrFromNullString(r.OwnerAvatarUrl)
 			out.Body.Calendars[i] = resp
 		}
 		return out, nil
@@ -129,14 +129,14 @@ func ListDiscoverableCalendars(deps Deps) func(context.Context, *ListDiscoverabl
 // 200 with alreadySubscribed=true rather than 409.
 func SelfSubscribe(deps Deps) func(context.Context, *SelfSubscribeInput) (*SelfSubscribeOutput, error) {
 	return func(ctx context.Context, input *SelfSubscribeInput) (*SelfSubscribeOutput, error) {
-		wsID, actorID, err := resolveWorkspace(ctx, deps.Queries, input.WsId)
+		wsID, actorID, err := resolveWorkspace(ctx, deps.Queries, input.WsID)
 		if err != nil {
 			return nil, err
 		}
 
 		// Manual calendar lookup: calMW is intentionally not applied here,
 		// because the actor is, by definition, not yet a calendar member.
-		calUID, err := uuid.Parse(input.CalId)
+		calUID, err := uuid.Parse(input.CalID)
 		if err != nil {
 			return nil, errCalendarNotFound
 		}
@@ -187,7 +187,7 @@ func SelfSubscribe(deps Deps) func(context.Context, *SelfSubscribeInput) (*SelfS
 		}
 
 		_ = appendCalendarEvent(ctx, deps.DB, wsID, "calendar.subscribed", &actorID, map[string]any{
-			"calendarId": input.CalId,
+			"calendarId": input.CalID,
 		})
 
 		out := &SelfSubscribeOutput{}
@@ -202,11 +202,11 @@ func SelfSubscribe(deps Deps) func(context.Context, *SelfSubscribeInput) (*SelfS
 // already subscribed to. Calendar membership is enforced by calMW.
 func PatchOwnSubscription(deps Deps) func(context.Context, *PatchOwnSubscriptionInput) (*PatchOwnSubscriptionOutput, error) {
 	return func(ctx context.Context, input *PatchOwnSubscriptionInput) (*PatchOwnSubscriptionOutput, error) {
-		wsID, actorID, err := resolveWorkspace(ctx, deps.Queries, input.WsId)
+		wsID, actorID, err := resolveWorkspace(ctx, deps.Queries, input.WsID)
 		if err != nil {
 			return nil, err
 		}
-		cal, _, err := resolveCalendar(ctx, deps.CalendarQueries, wsID, actorID, input.CalId)
+		cal, _, err := resolveCalendar(ctx, deps.CalendarQueries, wsID, actorID, input.CalID)
 		if err != nil {
 			return nil, err
 		}
@@ -230,7 +230,7 @@ func PatchOwnSubscription(deps Deps) func(context.Context, *PatchOwnSubscription
 		}
 
 		_ = appendCalendarEvent(ctx, deps.DB, wsID, "calendar.subscription.updated", &actorID, map[string]any{
-			"calendarId": input.CalId,
+			"calendarId": input.CalID,
 		})
 
 		out := &PatchOwnSubscriptionOutput{}

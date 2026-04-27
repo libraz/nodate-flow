@@ -14,8 +14,8 @@ import (
 
 // SmartCreateInput is the input for the smart event creation endpoint.
 type SmartCreateInput struct {
-	WsId  string `path:"wsId" doc:"Workspace public ID"`
-	CalId string `path:"calId" doc:"Calendar public ID"`
+	WsID  string `path:"wsId" doc:"Workspace public ID"`
+	CalID string `path:"calId" doc:"Calendar public ID"`
 	Body  struct {
 		Text     string `json:"text" minLength:"1" maxLength:"1000" doc:"Natural language event description"`
 		Timezone string `json:"timezone,omitempty" doc:"IANA timezone (e.g. America/New_York). Defaults to the caller's user or workspace timezone when omitted, falling back to UTC."`
@@ -43,11 +43,11 @@ type SmartCreateOutput struct {
 // POST /events request.
 func SmartCreate(deps Deps) func(context.Context, *SmartCreateInput) (*SmartCreateOutput, error) {
 	return func(ctx context.Context, input *SmartCreateInput) (*SmartCreateOutput, error) {
-		wsID, actorID, err := resolveWorkspace(ctx, deps.Queries, input.WsId)
+		wsID, actorID, err := resolveWorkspace(ctx, deps.Queries, input.WsID)
 		if err != nil {
 			return nil, err
 		}
-		_, _, err = resolveCalendar(ctx, deps.CalendarQueries, wsID, actorID, input.CalId)
+		_, _, err = resolveCalendar(ctx, deps.CalendarQueries, wsID, actorID, input.CalID)
 		if err != nil {
 			return nil, err
 		}
