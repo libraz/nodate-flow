@@ -23,6 +23,13 @@ export interface EmptyStateProps extends Omit<HTMLAttributes<HTMLDivElement>, 't
   icon?: ReactNode;
   /** Primary message (e.g. "No tasks yet"). */
   title: ReactNode;
+  /**
+   * Heading element used for the title. EmptyState always sits inside a
+   * page that already owns the document `<h1>`, so the title defaults to
+   * `<h2>` for screen-reader navigation. Pass `'p'` to opt out (legacy
+   * behaviour) or a different heading level when nesting deeper.
+   */
+  titleAs?: 'h2' | 'h3' | 'h4' | 'p';
   /** Supporting text below the title. */
   description?: ReactNode;
   /**
@@ -37,15 +44,17 @@ export interface EmptyStateProps extends Omit<HTMLAttributes<HTMLDivElement>, 't
 export default function EmptyState({
   icon,
   title,
+  titleAs = 'h2',
   description,
   action,
   className,
   ...rest
 }: EmptyStateProps): ReactElement {
+  const TitleTag = titleAs;
   return (
     <div className={cx(styles.root, className)} {...rest}>
       {icon ? <div className={styles.icon}>{icon}</div> : null}
-      <p className={styles.title}>{title}</p>
+      <TitleTag className={styles.title}>{title}</TitleTag>
       {description ? <p className={styles.description}>{description}</p> : null}
       {action ? <div className={styles.action}>{action}</div> : null}
     </div>
