@@ -6,6 +6,18 @@
  * navigation: ArrowUp/ArrowDown to move active option, Home/End to jump,
  * Enter to select, Escape to dismiss. Active option is communicated via
  * `aria-activedescendant`.
+ *
+ * Two modes:
+ * 1. Static (default): pass `options` and the input filters them client-side
+ *    using a substring match against `label`.
+ * 2. Async: pass `onSearch(query)` and feed the resulting items back via the
+ *    `options` prop. The component will not filter; whatever you pass is
+ *    rendered as-is. `onSearch` is debounced (`searchDebounceMs`, default
+ *    200ms). Pair with `isLoading` and `emptyMessage` for status text.
+ *
+ * For richly-formatted rows (avatar, secondary line, etc.) supply
+ * `renderItem(option)`. Selection still uses `option.value` and
+ * `option.label` (the label is what gets written back to the input).
  */
 
 import {
@@ -27,9 +39,11 @@ import {
   type FocusEvent,
   type KeyboardEvent,
   type ReactElement,
+  type ReactNode,
   type Ref,
   type SyntheticEvent,
   forwardRef,
+  useCallback,
   useEffect,
   useId,
   useMemo,
@@ -42,20 +56,39 @@ import styles from './combobox.module.css';
 
 export interface ComboboxOption {
   value: string;
-  /** Already-translated display label. */
+  /** Already-translated display label written back to the input on select. */
   label: string;
   disabled?: boolean;
 }
 
 export interface ComboboxProps {
-  /** Available options. */
+  /** Available options. In async mode this is the result set from `onSearch`. */
   options: ComboboxOption[];
   /** Controlled selected value. */
-  value?: string;
+  value?: string | undefined;
   /** Default selected value (uncontrolled). */
-  defaultValue?: string;
+  defaultValue?: string | undefined;
   /** Called when selection changes. */
-  onChange?: (value: string) => void;
+  onChange?: ((value: string) => void) | undefined;
+  /**
+   * Optional async search callback. When provided, the component will
+   * NOT filter `options` client-side; it forwards the typed query (after
+   * debounce) so the caller can fetch matching items and update `options`.
+   */
+  onSearch?: (query: string) => void;
+  /** Debounce window for `onSearch` in milliseconds. Default 200. */
+  searchDebounceMs?: number;
+  /** Show a loading row inside the listbox. */
+  isLoading?: boolean;
+  /**
+   * Already-translated message rendered when the listbox is open and there
+   * are no options to show. Required for async mode; optional otherwise.
+   */
+  emptyMessage?: string;
+  /** Already-translated loading message. Defaults to nothing visible. */
+  loadingMessage?: string;
+  /** Custom row renderer. Receives the original option. */
+  renderItem?: (option: ComboboxOption) => ReactNode;
   /** Already-translated placeholder. */
   placeholder?: string;
   /** Already-translated accessible label. */
@@ -73,6 +106,12 @@ function ComboboxImpl(
     value,
     defaultValue,
     onChange,
+    onSearch,
+    searchDebounceMs = 200,
+    isLoading = false,
+    emptyMessage,
+    loadingMessage,
+    renderItem,
     placeholder,
     'aria-label': ariaLabel,
     id: idProp,
@@ -81,6 +120,8 @@ function ComboboxImpl(
   }: ComboboxProps,
   ref: Ref<HTMLInputElement>,
 ): ReactElement {
+  const isAsync = typeof onSearch === 'function';
+
   const [selected, setSelected] = useControllableState<string>({
     value,
     defaultValue,
@@ -104,25 +145,60 @@ function ComboboxImpl(
    * since the previous sync: `query === prevInitialLabelRef.current`
    * distinguishes "untouched placeholder/selected label" from "in-progress
    * filter query". First-mount `useState(initialLabel)` still handles the
-   * initial render.
+   * initial render. Async mode skips this entirely — the caller owns the
+   * `options` list and label substitution would clobber the search query.
    */
   const prevInitialLabelRef = useRef(initialLabel);
   useEffect(() => {
+    if (isAsync) {
+      prevInitialLabelRef.current = initialLabel;
+      return;
+    }
     if (prevInitialLabelRef.current === initialLabel) return;
     if (query === prevInitialLabelRef.current) {
       setQuery(initialLabel);
     }
     prevInitialLabelRef.current = initialLabel;
-  }, [initialLabel, query]);
+  }, [initialLabel, query, isAsync]);
+
   const baseId = useId();
   const inputId = idProp ?? `${baseId}-input`;
   const listId = `${baseId}-list`;
 
   const filtered = useMemo(() => {
+    if (isAsync) return options;
     if (!query || query === initialLabel) return options;
     const q = query.toLowerCase();
     return options.filter((o) => o.label.toLowerCase().includes(q));
-  }, [options, query, initialLabel]);
+  }, [options, query, initialLabel, isAsync]);
+
+  /**
+   * Debounce the async search callback so we do not fire a network
+   * request on every keystroke. Keep the latest callback in a ref to
+   * avoid resetting the timer when the parent re-renders with a new
+   * function identity.
+   */
+  const onSearchRef = useRef(onSearch);
+  onSearchRef.current = onSearch;
+  const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const scheduleSearch = useCallback(
+    (next: string) => {
+      if (!isAsync) return;
+      if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
+      debounceTimerRef.current = setTimeout(() => {
+        onSearchRef.current?.(next);
+      }, searchDebounceMs);
+    },
+    [isAsync, searchDebounceMs],
+  );
+
+  useEffect(
+    () => () => {
+      if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
+    },
+    [],
+  );
 
   const { refs, floatingStyles, context } = useFloating({
     open,
@@ -158,9 +234,11 @@ function ComboboxImpl(
   ]);
 
   const handleChange = (event: ChangeEvent<HTMLInputElement>): void => {
-    setQuery(event.target.value);
+    const next = event.target.value;
+    setQuery(next);
     setOpen(true);
     setActiveIndex(0);
+    scheduleSearch(next);
   };
 
   const select = (option: ComboboxOption): void => {
@@ -187,18 +265,20 @@ function ComboboxImpl(
       event.preventDefault();
       if (!open) {
         setOpen(true);
-        setActiveIndex(0);
+        setActiveIndex(filtered.length > 0 ? 0 : null);
         return;
       }
+      if (filtered.length === 0) return;
       const next = activeIndex === null ? 0 : (activeIndex + 1) % filtered.length;
       setActiveIndex(next);
     } else if (event.key === 'ArrowUp') {
       event.preventDefault();
       if (!open) {
         setOpen(true);
-        setActiveIndex(filtered.length - 1);
+        setActiveIndex(filtered.length > 0 ? filtered.length - 1 : null);
         return;
       }
+      if (filtered.length === 0) return;
       const prev =
         activeIndex === null || activeIndex === 0 ? filtered.length - 1 : activeIndex - 1;
       setActiveIndex(prev);
@@ -211,12 +291,17 @@ function ComboboxImpl(
       }
     } else if (event.key === 'Home' && open) {
       event.preventDefault();
-      setActiveIndex(0);
+      if (filtered.length > 0) setActiveIndex(0);
     } else if (event.key === 'End' && open) {
       event.preventDefault();
-      setActiveIndex(filtered.length - 1);
+      if (filtered.length > 0) setActiveIndex(filtered.length - 1);
     }
   };
+
+  const showLoadingRow = open && isLoading && filtered.length === 0;
+  const showEmptyRow = open && !isLoading && filtered.length === 0 && emptyMessage !== undefined;
+  const showOptionsRow = open && filtered.length > 0;
+  const showFloating = showLoadingRow || showEmptyRow || showOptionsRow;
 
   return (
     <div className={cx(styles.root, className)}>
@@ -234,8 +319,11 @@ function ComboboxImpl(
         aria-controls={open ? listId : undefined}
         aria-autocomplete="list"
         aria-activedescendant={
-          open && activeIndex !== null ? `${baseId}-opt-${activeIndex}` : undefined
+          open && activeIndex !== null && filtered.length > 0
+            ? `${baseId}-opt-${activeIndex}`
+            : undefined
         }
+        aria-busy={isLoading || undefined}
         autoComplete="off"
         disabled={disabled}
         className={styles.input}
@@ -250,7 +338,7 @@ function ComboboxImpl(
           },
         })}
       />
-      {open && filtered.length > 0 ? (
+      {showFloating ? (
         <FloatingPortal>
           <ul
             ref={refs.setFloating}
@@ -259,32 +347,44 @@ function ComboboxImpl(
             className={styles.list}
             {...getFloatingProps()}
           >
-            {filtered.map((option, idx) => {
-              const active = idx === activeIndex;
-              const isSelected = option.value === selected;
-              return (
-                <li
-                  key={option.value}
-                  ref={(node) => {
-                    listRef.current[idx] = node;
-                  }}
-                  id={`${baseId}-opt-${idx}`}
-                  role="option"
-                  aria-selected={isSelected}
-                  aria-disabled={option.disabled || undefined}
-                  className={cx(
-                    styles.option,
-                    active && styles.optionActive,
-                    isSelected && styles.optionSelected,
-                  )}
-                  {...getItemProps({
-                    onClick: () => select(option),
-                  })}
-                >
-                  {option.label}
-                </li>
-              );
-            })}
+            {showLoadingRow ? (
+              <li className={styles.statusRow} aria-live="polite">
+                {loadingMessage ?? ''}
+              </li>
+            ) : null}
+            {showEmptyRow ? (
+              <li className={styles.statusRow} role="status">
+                {emptyMessage}
+              </li>
+            ) : null}
+            {showOptionsRow
+              ? filtered.map((option, idx) => {
+                  const active = idx === activeIndex;
+                  const isSelected = option.value === selected;
+                  return (
+                    <li
+                      key={option.value}
+                      ref={(node) => {
+                        listRef.current[idx] = node;
+                      }}
+                      id={`${baseId}-opt-${idx}`}
+                      role="option"
+                      aria-selected={isSelected}
+                      aria-disabled={option.disabled || undefined}
+                      className={cx(
+                        styles.option,
+                        active && styles.optionActive,
+                        isSelected && styles.optionSelected,
+                      )}
+                      {...getItemProps({
+                        onClick: () => select(option),
+                      })}
+                    >
+                      {renderItem ? renderItem(option) : option.label}
+                    </li>
+                  );
+                })
+              : null}
           </ul>
         </FloatingPortal>
       ) : null}

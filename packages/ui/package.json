@@ -52,6 +52,7 @@
     "./primitives/drawer": "./src/primitives/drawer/drawer.tsx",
     "./primitives/toast": "./src/primitives/toast/toast.tsx",
     "./primitives/confirm": "./src/primitives/confirm/confirm.tsx",
+    "./primitives/confirm/action": "./src/primitives/confirm/confirm-action.ts",
     "./primitives/tabs": "./src/primitives/tabs/tabs.tsx",
     "./primitives/segmented-control": "./src/primitives/segmented-control/segmented-control.tsx",
     "./primitives/scroll-area": "./src/primitives/scroll-area/scroll-area.tsx",
