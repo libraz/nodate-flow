@@ -1,5 +1,5 @@
 import type { ColumnDef, ColumnPinningState, RowSelectionState } from '@tanstack/react-table';
-import { render, screen, within } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { type ReactElement, useState } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -95,8 +95,7 @@ describe.each(THEMES)('DataGrid [%s]', (theme) => {
     expect(screen.getByText('nothing here')).toBeDefined();
   });
 
-  it('toggles row selection via checkbox column and fires onRowSelectionChange', async () => {
-    const user = userEvent.setup();
+  it('toggles row selection via checkbox column and fires onRowSelectionChange', () => {
     const onChange = vi.fn();
 
     function Wrapper(): ReactElement {
@@ -120,7 +119,10 @@ describe.each(THEMES)('DataGrid [%s]', (theme) => {
     // first body row, first cell holds the checkbox
     const firstBodyRow = screen.getAllByRole('row')[1] as HTMLElement;
     const checkbox = within(firstBodyRow).getByRole('checkbox') as HTMLInputElement;
-    await user.click(checkbox);
+    // happy-dom 20.x toggles `checked` on userEvent.click but does not dispatch
+    // the `change` event, so React's onChange never runs. fireEvent.click
+    // dispatches change synchronously and exercises the same code path.
+    fireEvent.click(checkbox);
     expect(onChange).toHaveBeenCalled();
     expect(checkbox.checked).toBe(true);
   });
