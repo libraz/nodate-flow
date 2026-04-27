@@ -121,7 +121,7 @@ func CreateProvider(deps Deps) func(context.Context, *CreateProviderInput) (*Cre
 				supports_tools, supports_vision, enabled
 			) VALUES (?, ?, ?, ?, ?, ?, ?, 0, 0, ?, ?, TRUE)`
 			if _, err := deps.DB.ExecContext(ctx, insertModel,
-				modelPub, ws.ID, uint32(providerInternalID),
+				modelPub, ws.ID, uint32(providerInternalID), //#nosec G115 -- LastInsertId for ai_providers.id (BIGINT UNSIGNED), fits uint32 within realistic deployments
 				in.Body.DefaultModel, in.Body.DefaultModel,
 				d.contextWindow, d.maxOutputTokens,
 				d.supportsTools, d.supportsVision,

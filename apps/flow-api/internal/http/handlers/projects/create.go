@@ -79,7 +79,7 @@ func Create(deps Deps) func(context.Context, *CreateProjectInput) (*CreateProjec
 			if _, mErr := deps.Queries.AddProjectMember(ctx, generated.AddProjectMemberParams{
 				PublicID:    memberPub,
 				WorkspaceID: ws.ID,
-				ProjectID:   uint32(projectID),
+				ProjectID:   uint32(projectID), //#nosec G115 -- LastInsertId for projects.id (BIGINT UNSIGNED), fits uint32 within realistic deployments
 				UserID:      userID,
 				Role:        generated.ProjectMembersRoleLead,
 				AddedAt:     sql.NullTime{Time: time.Now(), Valid: true},

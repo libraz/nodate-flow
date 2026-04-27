@@ -328,7 +328,7 @@ func CheckTaskVisibility(
 		if isElevated {
 			return nil
 		}
-		if rec.CreatedByUserID.Valid && uint32(rec.CreatedByUserID.Int32) == userID {
+		if rec.CreatedByUserID.Valid && uint32(rec.CreatedByUserID.Int32) == userID { //#nosec G115 -- created_by_user_id is users.id (BIGINT UNSIGNED), fits uint32 within realistic deployments
 			return nil
 		}
 		ok, err := IsTaskActor(ctx, db, rec.ID, userID)

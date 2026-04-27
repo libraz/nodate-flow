@@ -21,7 +21,7 @@ type ReplayLoader struct {
 func (l *ReplayLoader) Load(ctx context.Context, taskID uint32) ([]TransitionEvent, error) {
 	rows, err := l.Queries.ListTransitionEventsForReplay(ctx, generated.ListTransitionEventsForReplayParams{
 		WorkspaceID: l.WorkspaceID,
-		TaskID:      sql.NullInt32{Int32: int32(taskID), Valid: true},
+		TaskID:      sql.NullInt32{Int32: int32(taskID), Valid: true}, //#nosec G115 -- task_id is tasks.id (BIGINT UNSIGNED), fits int32 within realistic deployments
 	})
 	if err != nil {
 		return nil, err

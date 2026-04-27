@@ -183,7 +183,7 @@ func ApplySmart(deps SmartCreateDeps) func(context.Context, *ApplySmartInput) (*
 				PublicID:        subPub,
 				WorkspaceID:     ws.ID,
 				ProjectID:       prj.ID,
-				ParentTaskID:    sql.NullInt32{Int32: int32(parentID), Valid: true},
+				ParentTaskID:    sql.NullInt32{Int32: int32(parentID), Valid: true}, //#nosec G115 -- parent_task_id is tasks.id (BIGINT UNSIGNED), fits int32 within realistic deployments
 				CreatedByUserID: sql.NullInt32{Int32: int32(actorID), Valid: true},
 				UpdatedByUserID: sql.NullInt32{Int32: int32(actorID), Valid: true},
 				Title:           sub.Title,

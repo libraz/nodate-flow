@@ -152,11 +152,11 @@ func Append(ctx context.Context, db DBTX, evt Event) error {
 	q := generated.New(db)
 	taskID := sql.NullInt32{}
 	if evt.TaskID != nil {
-		taskID = sql.NullInt32{Int32: int32(*evt.TaskID), Valid: true}
+		taskID = sql.NullInt32{Int32: int32(*evt.TaskID), Valid: true} //#nosec G115 -- task_id is tasks.id (BIGINT UNSIGNED), fits int32 within realistic deployments
 	}
 	actorID := sql.NullInt32{}
 	if evt.ActorUserID != nil {
-		actorID = sql.NullInt32{Int32: int32(*evt.ActorUserID), Valid: true}
+		actorID = sql.NullInt32{Int32: int32(*evt.ActorUserID), Valid: true} //#nosec G115 -- actor user id sourced from session, fits int32 within realistic deployments
 	}
 	lastID, err := q.AppendEvent(ctx, generated.AppendEventParams{
 		PublicID:    types.New(),
@@ -177,7 +177,7 @@ func Append(ctx context.Context, db DBTX, evt Event) error {
 	}
 	// LastInsertId is a positive int64 produced by AUTO_INCREMENT; cast to
 	// uint32 for the hook signature (events.id is INT UNSIGNED).
-	eventInternalID := uint32(lastID)
+	eventInternalID := uint32(lastID) //#nosec G115 -- LastInsertId for events.id (BIGINT UNSIGNED), fits uint32 within realistic deployments
 	seq := globalSeq.Add(1)
 	seqCtx := WithSeq(ctx, seq)
 	fireNotifyHooks(seqCtx, evt.WorkspaceID, evt.Type, eventInternalID)

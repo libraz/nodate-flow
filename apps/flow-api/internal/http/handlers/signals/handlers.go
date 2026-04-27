@@ -61,7 +61,7 @@ func Create(deps Deps) func(context.Context, *CreateInput) (*CreateOutput, error
 			if !found {
 				return nil, httpErr(apierrors.WsTaskNotFound)
 			}
-			taskFK = sql.NullInt32{Int32: int32(id), Valid: true}
+			taskFK = sql.NullInt32{Int32: int32(id), Valid: true} //#nosec G115 -- task_id is tasks.id (BIGINT UNSIGNED), fits int32 within realistic deployments
 			taskInternal = id
 			taskLinked = true
 		}

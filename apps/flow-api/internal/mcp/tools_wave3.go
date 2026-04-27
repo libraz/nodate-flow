@@ -231,7 +231,7 @@ func runConvertIntakeToTask(ctx context.Context, deps Deps, s *session, raw json
 	}
 
 	if err := qtx.SetIntakeItemTask(ctx, generated.SetIntakeItemTaskParams{
-		TaskID:      sql.NullInt32{Int32: int32(taskID), Valid: true},
+		TaskID:      sql.NullInt32{Int32: int32(taskID), Valid: true}, //#nosec G115 -- task_id is tasks.id (BIGINT UNSIGNED), fits int32 within realistic deployments
 		WorkspaceID: s.workspaceID,
 		PublicID:    pub,
 	}); err != nil {
@@ -390,7 +390,7 @@ func runRestoreDescriptionVersion(ctx context.Context, deps Deps, s *session, ra
 		AuthorUserID:  sql.NullInt32{Int32: int32(s.userID), Valid: true},
 		VersionNumber: uint32(nextVer),
 		Body:          version.Body,
-		BodyLength:    uint32(len(version.Body)),
+		BodyLength:    uint32(len(version.Body)), //#nosec G115 -- description body length capped at 50KB by handler validation, fits uint32
 	}); err != nil {
 		return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
 	}

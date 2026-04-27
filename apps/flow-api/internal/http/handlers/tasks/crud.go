@@ -464,7 +464,7 @@ func List(deps Deps) func(context.Context, *ListTasksInput) (*ListTasksOutput, e
 				if qerr != nil {
 					return nil, httpErr(apierrors.InternalUnexpected)
 				}
-				hasMore := int32(len(rows)) > limit
+				hasMore := int32(len(rows)) > limit //#nosec G115 -- rows length capped at limit+1 with limit validated to maximum:200
 				if hasMore {
 					rows = rows[:limit]
 				}
@@ -555,7 +555,7 @@ func List(deps Deps) func(context.Context, *ListTasksInput) (*ListTasksOutput, e
 			if qerr != nil {
 				return nil, httpErr(apierrors.InternalUnexpected)
 			}
-			hasMore := int32(len(rows)) > limit
+			hasMore := int32(len(rows)) > limit //#nosec G115 -- rows length capped at limit+1 with limit validated to maximum:200
 			if hasMore {
 				rows = rows[:limit]
 			}

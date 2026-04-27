@@ -51,11 +51,11 @@ func seed(t *testing.T, ctx context.Context, db *sql.DB) fixtures {
 		return id
 	}
 
-	wsID := uint32(exec(
+	wsID := uint32(exec( //#nosec G115 -- LastInsertId in test seed, fits uint32
 		`INSERT INTO workspaces (public_id, slug, name, timezone) VALUES (?, ?, ?, 'UTC')`,
 		dbtype.New(), "ws-"+suffix[:10], "ItemKit Test "+suffix,
 	))
-	userID := uint32(exec(
+	userID := uint32(exec( //#nosec G115 -- LastInsertId in test seed, fits uint32
 		`INSERT INTO users (public_id, email, display_name, locale, timezone)
 		 VALUES (?, ?, ?, 'en', 'UTC')`,
 		dbtype.New(), "itemkit+"+suffix+"@example.test", "ItemKit Tester",
@@ -65,12 +65,12 @@ func seed(t *testing.T, ctx context.Context, db *sql.DB) fixtures {
 		 VALUES (?, ?, ?, 'owner', NOW())`,
 		dbtype.New(), wsID, userID,
 	)
-	projectID := uint32(exec(
+	projectID := uint32(exec( //#nosec G115 -- LastInsertId in test seed, fits uint32
 		`INSERT INTO projects (public_id, workspace_id, name, slug, identifier)
 		 VALUES (?, ?, ?, ?, ?)`,
 		dbtype.New(), wsID, "ItemKit Test Project", "pj-"+suffix[:10], "IKT",
 	))
-	calendarID := uint32(exec(
+	calendarID := uint32(exec( //#nosec G115 -- LastInsertId in test seed, fits uint32
 		`INSERT INTO calendars (public_id, workspace_id, kind, name, owner_user_id)
 		 VALUES (?, ?, 'personal', 'Main', ?)`,
 		dbtype.New(), wsID, userID,

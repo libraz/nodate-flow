@@ -2514,7 +2514,7 @@ func runSmartCreateTask(ctx context.Context, deps Deps, s *session, raw json.Raw
 			PublicID:        childPub,
 			WorkspaceID:     s.workspaceID,
 			ProjectID:       prjID,
-			ParentTaskID:    sql.NullInt32{Int32: int32(parentID), Valid: true},
+			ParentTaskID:    sql.NullInt32{Int32: int32(parentID), Valid: true}, //#nosec G115 -- parent_task_id is tasks.id (BIGINT UNSIGNED), fits int32 within realistic deployments
 			CreatedByUserID: sql.NullInt32{Int32: int32(s.userID), Valid: true},
 			UpdatedByUserID: sql.NullInt32{Int32: int32(s.userID), Valid: true},
 			Title:           st.Title,
@@ -2612,7 +2612,7 @@ func nullTimeFormat(t sql.NullTime, layout string) string {
 // convention (personal owner -> "owner", system -> "viewer", otherwise
 // "editor" since every ws member has edit access).
 func calendarRoleFor(kind calendar.CalendarsKind, ownerUserID sql.NullInt32, actorUserID uint32) string {
-	if ownerUserID.Valid && uint32(ownerUserID.Int32) == actorUserID {
+	if ownerUserID.Valid && uint32(ownerUserID.Int32) == actorUserID { //#nosec G115 -- owner_user_id is users.id (BIGINT UNSIGNED), fits uint32 within realistic deployments
 		return "owner"
 	}
 	if kind == calendar.CalendarsKindSystem {

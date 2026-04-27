@@ -45,10 +45,10 @@ func Create(deps Deps) func(context.Context, *CreateWidgetInput) (*CreateWidgetO
 			WidgetType:  generated.DashboardWidgetsWidgetType(in.Body.WidgetType),
 			Title:       in.Body.Title,
 			Config:      configRaw,
-			PositionX:   uint16(in.Body.PositionX),
-			PositionY:   uint16(in.Body.PositionY),
-			Width:       uint16(in.Body.Width),
-			Height:      uint16(in.Body.Height),
+			PositionX:   uint16(in.Body.PositionX), //#nosec G115 -- PositionX request-validated to maximum:1023 (well below uint16)
+			PositionY:   uint16(in.Body.PositionY), //#nosec G115 -- PositionY request-validated to maximum:1023 (well below uint16)
+			Width:       uint16(in.Body.Width),     //#nosec G115 -- Width request-validated to a small uint range
+			Height:      uint16(in.Body.Height),    //#nosec G115 -- Height request-validated to a small uint range
 		})
 		if err != nil {
 			return nil, httpErr(apierrors.InternalUnexpected)
@@ -189,16 +189,16 @@ func Update(deps Deps) func(context.Context, *UpdateWidgetInput) (*UpdateWidgetO
 			params.Config = *in.Body.Config
 		}
 		if in.Body.PositionX != nil {
-			params.PositionX = sql.NullInt16{Int16: int16(*in.Body.PositionX), Valid: true}
+			params.PositionX = sql.NullInt16{Int16: int16(*in.Body.PositionX), Valid: true} //#nosec G115 -- PositionX request-validated to maximum:1023
 		}
 		if in.Body.PositionY != nil {
-			params.PositionY = sql.NullInt16{Int16: int16(*in.Body.PositionY), Valid: true}
+			params.PositionY = sql.NullInt16{Int16: int16(*in.Body.PositionY), Valid: true} //#nosec G115 -- PositionY request-validated to maximum:1023
 		}
 		if in.Body.Width != nil {
-			params.Width = sql.NullInt16{Int16: int16(*in.Body.Width), Valid: true}
+			params.Width = sql.NullInt16{Int16: int16(*in.Body.Width), Valid: true} //#nosec G115 -- Width request-validated to a small uint range
 		}
 		if in.Body.Height != nil {
-			params.Height = sql.NullInt16{Int16: int16(*in.Body.Height), Valid: true}
+			params.Height = sql.NullInt16{Int16: int16(*in.Body.Height), Valid: true} //#nosec G115 -- Height request-validated to a small uint range
 		}
 
 		if err := deps.Queries.UpdateWidget(ctx, params); err != nil {
@@ -266,11 +266,11 @@ func UpdatePosition(deps Deps) func(context.Context, *UpdateWidgetPositionInput)
 		}
 
 		if err := deps.Queries.UpdateWidgetPosition(ctx, generated.UpdateWidgetPositionParams{
-			PositionX:   uint16(in.Body.PositionX),
-			PositionY:   uint16(in.Body.PositionY),
-			Width:       uint16(in.Body.Width),
-			Height:      uint16(in.Body.Height),
-			SortWeight:  int32(in.Body.SortWeight),
+			PositionX:   uint16(in.Body.PositionX), //#nosec G115 -- PositionX request-validated to maximum:1023 (well below uint16)
+			PositionY:   uint16(in.Body.PositionY), //#nosec G115 -- PositionY request-validated to maximum:1023 (well below uint16)
+			Width:       uint16(in.Body.Width),     //#nosec G115 -- Width request-validated to a small uint range
+			Height:      uint16(in.Body.Height),    //#nosec G115 -- Height request-validated to a small uint range
+			SortWeight:  int32(in.Body.SortWeight), //#nosec G115 -- SortWeight request-validated to a 32-bit signed range
 			WorkspaceID: ws.ID,
 			PublicID:    pub,
 		}); err != nil {

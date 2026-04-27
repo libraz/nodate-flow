@@ -188,7 +188,7 @@ func run(ctx context.Context, logger *slog.Logger) error {
 	}
 	if created {
 		logger.Info("created user", "email", cfg.email, "id", ownerID)
-		if err := createLocalIdentity(ctx, q, uint32(ownerID), cfg.email, cfg.password); err != nil {
+		if err := createLocalIdentity(ctx, q, uint32(ownerID), cfg.email, cfg.password); err != nil { //#nosec G115 -- LastInsertId for users.id (BIGINT UNSIGNED), fits uint32 in dev seed
 			return fmt.Errorf("owner identity: %w", err)
 		}
 		logger.Info("created local identity", "email", cfg.email)
@@ -208,19 +208,19 @@ func run(ctx context.Context, logger *slog.Logger) error {
 	}
 
 	// 3. Owner membership + instance admin grant.
-	if err := ensureMembership(ctx, db, q, uint32(wsID), uint32(ownerID), generated.WorkspaceMembersRoleOwner, logger); err != nil {
+	if err := ensureMembership(ctx, db, q, uint32(wsID), uint32(ownerID), generated.WorkspaceMembersRoleOwner, logger); err != nil { //#nosec G115 -- LastInsertIds for workspaces.id and users.id (BIGINT UNSIGNED), fit uint32 in dev seed
 		return fmt.Errorf("ensure owner membership: %w", err)
 	}
-	if err := ensureInstanceAdmin(ctx, db, uint32(ownerID), logger); err != nil {
+	if err := ensureInstanceAdmin(ctx, db, uint32(ownerID), logger); err != nil { //#nosec G115 -- LastInsertId for users.id (BIGINT UNSIGNED), fits uint32 in dev seed
 		return fmt.Errorf("ensure instance admin: %w", err)
 	}
 
 	// 4. Owner personal calendar + subscription.
-	ownerCalID, err := ensurePersonalCalendar(ctx, db, uint32(wsID), uint32(ownerID), cfg.workspaceName, logger)
+	ownerCalID, err := ensurePersonalCalendar(ctx, db, uint32(wsID), uint32(ownerID), cfg.workspaceName, logger) //#nosec G115 -- LastInsertIds for workspaces.id and users.id (BIGINT UNSIGNED), fit uint32 in dev seed
 	if err != nil {
 		return fmt.Errorf("ensure owner calendar: %w", err)
 	}
-	if err := ensureSubscription(ctx, db, uint32(wsID), ownerCalID, uint32(ownerID), logger); err != nil {
+	if err := ensureSubscription(ctx, db, uint32(wsID), ownerCalID, uint32(ownerID), logger); err != nil { //#nosec G115 -- LastInsertIds for workspaces.id and users.id (BIGINT UNSIGNED), fit uint32 in dev seed
 		return fmt.Errorf("ensure owner subscription: %w", err)
 	}
 
@@ -231,21 +231,21 @@ func run(ctx context.Context, logger *slog.Logger) error {
 	}
 	if secondCreated {
 		logger.Info("created user", "email", cfg.user2Email, "id", secondID)
-		if err := createLocalIdentity(ctx, q, uint32(secondID), cfg.user2Email, cfg.user2Password); err != nil {
+		if err := createLocalIdentity(ctx, q, uint32(secondID), cfg.user2Email, cfg.user2Password); err != nil { //#nosec G115 -- LastInsertId for users.id (BIGINT UNSIGNED), fits uint32 in dev seed
 			return fmt.Errorf("second identity: %w", err)
 		}
 		logger.Info("created local identity", "email", cfg.user2Email)
 	} else {
 		logger.Info("user exists", "email", cfg.user2Email, "id", secondID)
 	}
-	if err := ensureMembership(ctx, db, q, uint32(wsID), uint32(secondID), generated.WorkspaceMembersRoleMember, logger); err != nil {
+	if err := ensureMembership(ctx, db, q, uint32(wsID), uint32(secondID), generated.WorkspaceMembersRoleMember, logger); err != nil { //#nosec G115 -- LastInsertIds for workspaces.id and users.id (BIGINT UNSIGNED), fit uint32 in dev seed
 		return fmt.Errorf("ensure second membership: %w", err)
 	}
-	secondCalID, err := ensurePersonalCalendar(ctx, db, uint32(wsID), uint32(secondID), cfg.user2DisplayName, logger)
+	secondCalID, err := ensurePersonalCalendar(ctx, db, uint32(wsID), uint32(secondID), cfg.user2DisplayName, logger) //#nosec G115 -- LastInsertIds for workspaces.id and users.id (BIGINT UNSIGNED), fit uint32 in dev seed
 	if err != nil {
 		return fmt.Errorf("ensure second calendar: %w", err)
 	}
-	if err := ensureSubscription(ctx, db, uint32(wsID), secondCalID, uint32(secondID), logger); err != nil {
+	if err := ensureSubscription(ctx, db, uint32(wsID), secondCalID, uint32(secondID), logger); err != nil { //#nosec G115 -- LastInsertIds for workspaces.id and users.id (BIGINT UNSIGNED), fit uint32 in dev seed
 		return fmt.Errorf("ensure second subscription: %w", err)
 	}
 
@@ -452,7 +452,7 @@ func ensureTasks(ctx context.Context, db *sql.DB, q *generated.Queries, wsID, pr
 		return 0, err
 	}
 	if count == 0 {
-		createdBy := sql.NullInt32{Int32: int32(userID), Valid: true}
+		createdBy := sql.NullInt32{Int32: int32(userID), Valid: true} //#nosec G115 -- user id sourced from seed flow, fits int32
 		for _, s := range l.Tasks {
 			nextNum, err := q.AssignTaskNumber(ctx, projID)
 			if err != nil {
@@ -464,7 +464,7 @@ func ensureTasks(ctx context.Context, db *sql.DB, q *generated.Queries, wsID, pr
 				ProjectID:       projID,
 				CreatedByUserID: createdBy,
 				UpdatedByUserID: createdBy,
-				TaskNumber:      uint32(nextNum),
+				TaskNumber:      uint32(nextNum), //#nosec G115 -- task_number is per-project sequence, fits uint32
 				Title:           s.Title,
 				Priority:        s.Priority,
 				Visibility:      generated.TasksVisibilityPublic,
@@ -848,7 +848,7 @@ func ensurePublicShare(ctx context.Context, db *sql.DB, cq *calendar.Queries, ws
 	id, err := cq.CreatePublicShare(ctx, calendar.CreatePublicShareParams{
 		PublicID:            types.New(),
 		WorkspaceID:         wsID,
-		CreatedByUserID:     sql.NullInt32{Int32: int32(ownerID), Valid: true},
+		CreatedByUserID:     sql.NullInt32{Int32: int32(ownerID), Valid: true}, //#nosec G115 -- owner id sourced from seed flow, fits int32
 		TokenHash:           tokenHash,
 		Title:               title,
 		Description:         sql.NullString{String: description, Valid: description != ""},

@@ -84,7 +84,7 @@ func (c *Client) EmbedTask(ctx context.Context, taskID uint32, title, descriptio
 	return c.Queries.UpsertTaskEmbedding(ctx, generated.UpsertTaskEmbeddingParams{
 		TaskID:         taskID,
 		Model:          model,
-		Dim:            uint16(len(raw)),
+		Dim:            uint16(len(raw)), //#nosec G115 -- embedding dimensions cap at the upstream model's MaxDim (~3072 today), well below uint16
 		StringToVector: Encode(raw),
 		ContentHash:    hash,
 	})

@@ -79,7 +79,7 @@ func renameFromEvent(ctx context.Context, tx TX, args RenameItemArgs) error {
 	}
 	var taskPtr *uint32
 	if evt.taskID.Valid {
-		tid := uint32(evt.taskID.Int32)
+		tid := uint32(evt.taskID.Int32) //#nosec G115 -- task_id is tasks.id (BIGINT UNSIGNED), fits uint32 within realistic deployments
 		taskPtr = &tid
 		if _, err := tx.ExecContext(ctx, `UPDATE tasks SET title = ? WHERE id = ?`, args.NewTitle, tid); err != nil {
 			return fmt.Errorf("itemkit: propagate event rename to task: %w", err)

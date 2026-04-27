@@ -39,7 +39,7 @@ func Create(deps Deps) func(context.Context, *CreateLensInput) (*CreateLensOutpu
 			if err != nil {
 				return nil, httpErr(apierr.SpecForErrNoRows(err, apierrors.WsProjectNotFound, apierrors.InternalUnexpected))
 			}
-			projectID = sql.NullInt32{Int32: int32(row.ID), Valid: true}
+			projectID = sql.NullInt32{Int32: int32(row.ID), Valid: true} //#nosec G115 -- project_id is projects.id (BIGINT UNSIGNED), fits int32 within realistic deployments
 		}
 
 		pub := types.New()
@@ -105,7 +105,7 @@ func List(deps Deps) func(context.Context, *ListLensesInput) (*ListLensesOutput,
 			if err != nil {
 				return nil, httpErr(apierr.SpecForErrNoRows(err, apierrors.WsProjectNotFound, apierrors.InternalUnexpected))
 			}
-			projectID = sql.NullInt32{Int32: int32(row.ID), Valid: true}
+			projectID = sql.NullInt32{Int32: int32(row.ID), Valid: true} //#nosec G115 -- project_id is projects.id (BIGINT UNSIGNED), fits int32 within realistic deployments
 		}
 
 		limit := in.Limit

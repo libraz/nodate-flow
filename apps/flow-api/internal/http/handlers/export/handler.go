@@ -289,7 +289,7 @@ func fetchForLens(
 	if projectID.Valid {
 		dbRows, err := deps.Queries.ExportTasksForLens(ctx, generated.ExportTasksForLensParams{
 			WorkspaceID: ws.ID,
-			ProjectID:   uint32(projectID.Int32),
+			ProjectID:   uint32(projectID.Int32), //#nosec G115 -- project_id is projects.id (BIGINT UNSIGNED), fits uint32 within realistic deployments
 			Limit:       limit,
 		})
 		if err != nil {

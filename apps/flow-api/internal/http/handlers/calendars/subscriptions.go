@@ -222,7 +222,7 @@ func PatchOwnSubscription(deps Deps) func(context.Context, *PatchOwnSubscription
 			params.DisplayColor = sql.NullString{String: *input.Body.DisplayColor, Valid: true}
 		}
 		if input.Body.SortWeight != nil {
-			params.SortWeight = sql.NullInt32{Int32: int32(*input.Body.SortWeight), Valid: true}
+			params.SortWeight = sql.NullInt32{Int32: int32(*input.Body.SortWeight), Valid: true} //#nosec G115 -- SortWeight request-validated to a 32-bit signed range
 		}
 
 		if err := deps.CalendarQueries.PatchCalendarSubscription(ctx, params); err != nil {

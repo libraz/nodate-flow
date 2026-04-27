@@ -315,7 +315,7 @@ func (h *Handler) handleToolCall(w http.ResponseWriter, r *http.Request, s *sess
 		runCtx = ai.WithAgentID(runCtx, s.agentID)
 	}
 	result, toolErr := t.run(runCtx, h.deps, s, args)
-	dur := int32(time.Since(start).Milliseconds())
+	dur := int32(time.Since(start).Milliseconds()) //#nosec G115 -- per-tool execution duration in ms is bounded well within int32 (~24 days)
 	if toolErr != nil {
 		var ae *apierrors.APIError
 		spec := apierrors.McpToolExecutionFailed

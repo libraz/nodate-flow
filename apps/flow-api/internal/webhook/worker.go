@@ -290,7 +290,7 @@ func (w *Worker) markFailed(ctx context.Context, row generated.FindPendingDelive
 	nextAttempt := int(row.Attempts) // attempts is pre-increment; current index
 	httpSt := sql.NullInt16{}
 	if httpStatus > 0 {
-		httpSt = sql.NullInt16{Int16: int16(httpStatus), Valid: true}
+		httpSt = sql.NullInt16{Int16: int16(httpStatus), Valid: true} //#nosec G115 -- HTTP status codes are 1xx-5xx, well within int16
 	}
 	respBody := sql.NullString{}
 	if responseBody != "" {

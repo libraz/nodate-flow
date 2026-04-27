@@ -141,7 +141,7 @@ func ApplyShift(deps Deps) func(context.Context, *ApplyShiftInput) (*ApplyShiftO
 		}
 		out := &ApplyShiftOutput{}
 		out.Body.Ok = true
-		out.Body.ShiftedTasks = int32(len(confirmedInternal))
+		out.Body.ShiftedTasks = int32(len(confirmedInternal)) //#nosec G115 -- len of confirmed task ids, bounded by request payload size
 		out.Body.DeltaSeconds = delta
 		out.Body.NewStartAt = newStart.Unix()
 		return out, nil

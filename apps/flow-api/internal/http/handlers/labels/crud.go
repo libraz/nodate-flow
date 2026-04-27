@@ -42,7 +42,7 @@ func Create(deps Deps) func(context.Context, *CreateLabelInput) (*CreateLabelOut
 			if err != nil {
 				return nil, httpErr(apierr.SpecForErrNoRows(err, apierrors.WsProjectNotFound, apierrors.InternalUnexpected))
 			}
-			projectID = sql.NullInt32{Int32: int32(proj.ID), Valid: true}
+			projectID = sql.NullInt32{Int32: int32(proj.ID), Valid: true} //#nosec G115 -- project_id is projects.id (BIGINT UNSIGNED), fits int32 within realistic deployments
 		}
 
 		var parentLabelID sql.NullInt32
@@ -58,7 +58,7 @@ func Create(deps Deps) func(context.Context, *CreateLabelInput) (*CreateLabelOut
 			if err != nil {
 				return nil, httpErr(apierr.SpecForErrNoRows(err, apierrors.WsLabelNotFound, apierrors.InternalUnexpected))
 			}
-			parentLabelID = sql.NullInt32{Int32: int32(parent.ID), Valid: true}
+			parentLabelID = sql.NullInt32{Int32: int32(parent.ID), Valid: true} //#nosec G115 -- parent_label_id is task_labels.id (BIGINT UNSIGNED), fits int32 within realistic deployments
 		}
 
 		if _, err := deps.Queries.CreateLabel(ctx, generated.CreateLabelParams{
@@ -144,7 +144,7 @@ func List(deps Deps) func(context.Context, *ListLabelsInput) (*ListLabelsOutput,
 			}
 			rows, err := deps.Queries.ListLabelsForProject(ctx, generated.ListLabelsForProjectParams{
 				WorkspaceID: ws.ID,
-				ProjectID:   sql.NullInt32{Int32: int32(proj.ID), Valid: true},
+				ProjectID:   sql.NullInt32{Int32: int32(proj.ID), Valid: true}, //#nosec G115 -- project_id is projects.id (BIGINT UNSIGNED), fits int32 within realistic deployments
 				Limit:       limit,
 				Offset:      in.Offset,
 			})

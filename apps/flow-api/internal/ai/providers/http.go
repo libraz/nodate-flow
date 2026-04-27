@@ -210,7 +210,7 @@ func retryDelay(resp *http.Response, attempt int) time.Duration {
 		}
 	}
 	// Exponential backoff: 1s, 2s, 4s.
-	return time.Duration(1<<uint(attempt)) * time.Second
+	return time.Duration(1<<uint(attempt)) * time.Second //#nosec G115 -- attempt is the retry counter capped at maxRetries (single digit)
 }
 
 // zero overwrites b with zero bytes. Used to scrub plaintext API keys after

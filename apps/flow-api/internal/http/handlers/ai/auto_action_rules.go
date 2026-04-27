@@ -234,7 +234,7 @@ func resolveRuleParams(wsID uint32, item PatchAutoActionRuleItem, existing map[s
 		params.Confidence = fmt.Sprintf("%.2f", *item.Confidence)
 	}
 	if item.IdleHours != nil {
-		params.IdleHours = uint32(*item.IdleHours)
+		params.IdleHours = uint32(*item.IdleHours) //#nosec G115 -- IdleHours is request-validated to maximum:8760 (one year)
 	}
 
 	return params

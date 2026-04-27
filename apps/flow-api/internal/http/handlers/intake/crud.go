@@ -188,7 +188,7 @@ func Triage(deps Deps) func(context.Context, *TriageIntakeItemInput) (*TriageInt
 
 		if err := deps.Queries.UpdateIntakeItemTriage(ctx, generated.UpdateIntakeItemTriageParams{
 			TriageStatus:    generated.IntakeItemsTriageStatus(in.Body.Status),
-			TriagedByUserID: sql.NullInt32{Int32: int32(actorID), Valid: true},
+			TriagedByUserID: sql.NullInt32{Int32: int32(actorID), Valid: true}, //#nosec G115 -- actor user id sourced from session, fits int32 within realistic deployments
 			SnoozeUntil:     snoozeUntil,
 			WorkspaceID:     ws.ID,
 			PublicID:        pub,
@@ -297,10 +297,10 @@ func Convert(deps Deps) func(context.Context, *ConvertIntakeItemInput) (*Convert
 			PublicID:        taskPub,
 			WorkspaceID:     ws.ID,
 			ProjectID:       prj.ID,
-			TaskNumber:      uint32(nextNum),
+			TaskNumber:      uint32(nextNum), //#nosec G115 -- task_number is per-project sequence, fits uint32
 			ParentTaskID:    sql.NullInt32{},
-			CreatedByUserID: sql.NullInt32{Int32: int32(actorID), Valid: true},
-			UpdatedByUserID: sql.NullInt32{Int32: int32(actorID), Valid: true},
+			CreatedByUserID: sql.NullInt32{Int32: int32(actorID), Valid: true}, //#nosec G115 -- actor user id sourced from session, fits int32 within realistic deployments
+			UpdatedByUserID: sql.NullInt32{Int32: int32(actorID), Valid: true}, //#nosec G115 -- actor user id sourced from session, fits int32 within realistic deployments
 			Title:           item.Title,
 			Description:     desc,
 			Priority:        0,
@@ -314,7 +314,7 @@ func Convert(deps Deps) func(context.Context, *ConvertIntakeItemInput) (*Convert
 
 		// Link intake item to the created task.
 		if err := qtx.SetIntakeItemTask(ctx, generated.SetIntakeItemTaskParams{
-			TaskID:      sql.NullInt32{Int32: int32(taskID), Valid: true},
+			TaskID:      sql.NullInt32{Int32: int32(taskID), Valid: true}, //#nosec G115 -- task_id is tasks.id (BIGINT UNSIGNED), fits int32 within realistic deployments
 			WorkspaceID: ws.ID,
 			PublicID:    pub,
 		}); err != nil {

@@ -73,7 +73,7 @@ func (h *Handler) authenticate(ctx context.Context, tok string) (*session, error
 	scopes := parseScopes(row.ScopesJson)
 	var agentID uint32
 	if row.AgentID.Valid {
-		agentID = uint32(row.AgentID.Int32)
+		agentID = uint32(row.AgentID.Int32) //#nosec G115 -- agent_id is agents.id (BIGINT UNSIGNED), fits uint32 within realistic deployments
 	}
 	return &session{
 		userID:      row.UserID,
@@ -220,7 +220,7 @@ func canEditCalendarEvent(ctx context.Context, deps Deps, s *session, eventOwner
 	if err := deps.DB.QueryRowContext(ctx, q, calendarID).Scan(&ownerID); err != nil {
 		return false, nil
 	}
-	if ownerID.Valid && uint32(ownerID.Int32) == s.userID {
+	if ownerID.Valid && uint32(ownerID.Int32) == s.userID { //#nosec G115 -- owner_user_id is users.id (BIGINT UNSIGNED), fits uint32 within realistic deployments
 		return true, nil
 	}
 	return false, nil

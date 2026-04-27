@@ -154,7 +154,7 @@ func ListArchived(deps Deps) func(context.Context, *ListArchivedTasksInput) (*Li
 			if qerr != nil {
 				return nil, httpErr(apierrors.InternalUnexpected)
 			}
-			hasMore := int32(len(rows)) > in.Limit
+			hasMore := int32(len(rows)) > in.Limit //#nosec G115 -- rows length capped at in.Limit+1 with in.Limit validated to maximum:200
 			if hasMore {
 				rows = rows[:in.Limit]
 			}

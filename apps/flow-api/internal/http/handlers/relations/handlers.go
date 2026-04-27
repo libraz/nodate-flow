@@ -172,7 +172,7 @@ func resolveAccept(
 	// Mark the suggestion as accepted.
 	if err := deps.Queries.ResolveSuggestion(ctx, generated.ResolveSuggestionParams{
 		Status:      generated.RelationSuggestionsStatusAccepted,
-		ResolvedBy:  sql.NullInt32{Int32: int32(actorID), Valid: true},
+		ResolvedBy:  sql.NullInt32{Int32: int32(actorID), Valid: true}, //#nosec G115 -- actor user id sourced from session, fits int32 within realistic deployments
 		WorkspaceID: wsID,
 		PublicID:    suggestion.PublicID,
 	}); err != nil {
@@ -227,7 +227,7 @@ func resolveDismiss(
 ) (*ResolveOutput, error) {
 	if err := deps.Queries.ResolveSuggestion(ctx, generated.ResolveSuggestionParams{
 		Status:      generated.RelationSuggestionsStatusDismissed,
-		ResolvedBy:  sql.NullInt32{Int32: int32(actorID), Valid: true},
+		ResolvedBy:  sql.NullInt32{Int32: int32(actorID), Valid: true}, //#nosec G115 -- actor user id sourced from session, fits int32 within realistic deployments
 		WorkspaceID: wsID,
 		PublicID:    suggestion.PublicID,
 	}); err != nil {

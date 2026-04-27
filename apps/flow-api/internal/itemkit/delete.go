@@ -75,7 +75,7 @@ func unlinkEventRow(ctx context.Context, tx TX, evt eventRow, actorID uint32, re
 	}
 	var taskPtr *uint32
 	if evt.taskID.Valid {
-		tid := uint32(evt.taskID.Int32)
+		tid := uint32(evt.taskID.Int32) //#nosec G115 -- task_id is tasks.id (BIGINT UNSIGNED), fits uint32 within realistic deployments
 		taskPtr = &tid
 	}
 	return appendItemEvents(ctx, tx, eventbus.ItemUnscheduled, evt.workspaceID, &actorID, taskPtr,
@@ -125,7 +125,7 @@ func DeleteEvent(ctx context.Context, tx TX, workspaceID, eventID, actorID uint3
 	}
 	var taskPtr *uint32
 	if evt.taskID.Valid && evt.taskRole.Valid {
-		tid := uint32(evt.taskID.Int32)
+		tid := uint32(evt.taskID.Int32) //#nosec G115 -- task_id is tasks.id (BIGINT UNSIGNED), fits uint32 within realistic deployments
 		taskPtr = &tid
 		if DateRole(evt.taskRole.String) == RoleDue {
 			if _, err := tx.ExecContext(ctx, `UPDATE tasks SET due_on = NULL WHERE id = ?`, tid); err != nil {

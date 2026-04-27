@@ -134,7 +134,7 @@ func PatchAutoActionSettings(deps Deps) func(context.Context, *PatchAutoActionSe
 			params.AutoActionEnabled = *in.Body.Enabled
 		}
 		if in.Body.IntervalMinutes != nil {
-			params.AutoActionIntervalMinutes = uint32(*in.Body.IntervalMinutes)
+			params.AutoActionIntervalMinutes = uint32(*in.Body.IntervalMinutes) //#nosec G115 -- IntervalMinutes is request-validated to a small positive int
 		}
 		if in.Body.Threshold != nil {
 			params.AutoActionThreshold = fmt.Sprintf("%.2f", *in.Body.Threshold)

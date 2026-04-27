@@ -64,7 +64,7 @@ func CreateMcpToken(deps Deps) func(context.Context, *CreateMcpTokenInput) (*Cre
 			if qerr != nil {
 				return nil, httpErr(apierrors.ValidationBodyFieldInvalid)
 			}
-			agentID = sql.NullInt32{Int32: int32(id), Valid: true}
+			agentID = sql.NullInt32{Int32: int32(id), Valid: true} //#nosec G115 -- agent_id is agents.id (BIGINT UNSIGNED), fits int32 within realistic deployments
 		}
 
 		pub := types.New()

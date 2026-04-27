@@ -124,7 +124,7 @@ func ScheduleTask(ctx context.Context, tx TX, args ScheduleTaskArgs) (dbtype.Pub
 	if err != nil {
 		return dbtype.PublicID{}, 0, fmt.Errorf("itemkit: last insert id: %w", err)
 	}
-	eventID := uint32(id64)
+	eventID := uint32(id64) //#nosec G115 -- LastInsertId for calendar_events.id (BIGINT UNSIGNED), fits uint32 within realistic deployments
 
 	if err := applySnapFlags(ctx, tx, eventID, snap); err != nil {
 		return dbtype.PublicID{}, 0, err

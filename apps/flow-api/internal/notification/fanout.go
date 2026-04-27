@@ -185,12 +185,12 @@ func (f *Fanout) fanout(ctx context.Context, workspaceID uint32, eventType strin
 
 	actorUserID := uint32(0)
 	if row.actorUserID.Valid {
-		actorUserID = uint32(row.actorUserID.Int32)
+		actorUserID = uint32(row.actorUserID.Int32) //#nosec G115 -- actor_user_id is users.id (BIGINT UNSIGNED), fits uint32 within realistic deployments
 	}
 
 	sourceEventID := sql.NullInt32{}
 	if eventInternalID != 0 {
-		sourceEventID = sql.NullInt32{Int32: int32(eventInternalID), Valid: true}
+		sourceEventID = sql.NullInt32{Int32: int32(eventInternalID), Valid: true} //#nosec G115 -- event id is events.id (BIGINT UNSIGNED), fits int32 within realistic deployments
 	}
 
 	for _, recipientID := range recipients {

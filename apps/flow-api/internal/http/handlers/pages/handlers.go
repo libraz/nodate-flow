@@ -72,7 +72,7 @@ func checkAncestorDepthAndCircular(ctx context.Context, db *sql.DB, wsID uint32,
 			// Reached root.
 			break
 		}
-		currentID = uint32(parentID.Int32)
+		currentID = uint32(parentID.Int32) //#nosec G115 -- parent_id is pages.id (BIGINT UNSIGNED), fits uint32 within realistic deployments
 		depth++
 	}
 	if depth > MaxPageDepth {

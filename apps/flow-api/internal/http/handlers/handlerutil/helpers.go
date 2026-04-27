@@ -291,7 +291,11 @@ func TotalAsInt64(v interface{}) int64 {
 	case int:
 		return int64(x)
 	case uint64:
-		return int64(x)
+		// COUNT(*) OVER() returns a non-negative row count; the only realistic
+		// way to overflow int64 here is per-workspace row counts above ~9.2e18,
+		// which exceeds the addressable workspace by many orders of magnitude.
+		return int64(x) //#nosec G115 -- COUNT(*) result, bounded by workspace size
+
 	case []byte:
 		var n int64
 		for _, c := range x {

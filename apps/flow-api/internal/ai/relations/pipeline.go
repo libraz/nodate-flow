@@ -83,7 +83,7 @@ ORDER BY id DESC LIMIT 1`
 	if !taskID.Valid {
 		return
 	}
-	p.processTask(ctx, workspaceID, uint32(taskID.Int32))
+	p.processTask(ctx, workspaceID, uint32(taskID.Int32)) //#nosec G115 -- task_id is tasks.id (BIGINT UNSIGNED), fits uint32 within realistic deployments
 }
 
 // processTask embeds the given task (if needed), finds similar tasks

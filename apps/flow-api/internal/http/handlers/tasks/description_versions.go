@@ -174,7 +174,7 @@ func RestoreDescriptionVersion(deps Deps) func(context.Context, *RestoreDescript
 			AuthorUserID:  sql.NullInt32{Int32: int32(actorID), Valid: true},
 			VersionNumber: uint32(nextVer),
 			Body:          version.Body,
-			BodyLength:    uint32(len(version.Body)),
+			BodyLength:    uint32(len(version.Body)), //#nosec G115 -- description body length capped at 50KB by handler validation, fits uint32
 		}); err != nil {
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}

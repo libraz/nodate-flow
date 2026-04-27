@@ -206,7 +206,7 @@ func ApplyTransitionTx(ctx context.Context, tx *sql.Tx, p ApplyParams) (ApplyRes
 
 	updatedBy := sql.NullInt32{}
 	if p.ActorUserID != nil {
-		updatedBy = sql.NullInt32{Int32: int32(*p.ActorUserID), Valid: true}
+		updatedBy = sql.NullInt32{Int32: int32(*p.ActorUserID), Valid: true} //#nosec G115 -- actor user id sourced from session, fits int32 within realistic deployments
 	}
 	if err := qtx.TransitionTaskState(ctx, generated.TransitionTaskStateParams{
 		DerivedState:    next,

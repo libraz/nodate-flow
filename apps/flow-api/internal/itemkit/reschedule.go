@@ -77,7 +77,7 @@ func RescheduleEvent(ctx context.Context, tx TX, args RescheduleEventArgs) error
 		role := DateRole(evt.taskRole.String)
 		if role == RoleDue {
 			if !args.StartAt.IsZero() {
-				if err := propagateTaskDateFromRole(ctx, tx, uint32(evt.taskID.Int32), role, args.StartAt); err != nil {
+				if err := propagateTaskDateFromRole(ctx, tx, uint32(evt.taskID.Int32), role, args.StartAt); err != nil { //#nosec G115 -- task_id is tasks.id (BIGINT UNSIGNED), fits uint32 within realistic deployments
 					return err
 				}
 			}
@@ -88,11 +88,11 @@ func RescheduleEvent(ctx context.Context, tx TX, args RescheduleEventArgs) error
 		"eventPublicId": evt.publicID.String(),
 	}
 	if evt.taskID.Valid {
-		payload["taskId"] = uint32(evt.taskID.Int32)
+		payload["taskId"] = uint32(evt.taskID.Int32) //#nosec G115 -- task_id is tasks.id (BIGINT UNSIGNED), fits uint32 within realistic deployments
 	}
 	var taskPtr *uint32
 	if evt.taskID.Valid {
-		v := uint32(evt.taskID.Int32)
+		v := uint32(evt.taskID.Int32) //#nosec G115 -- task_id is tasks.id (BIGINT UNSIGNED), fits uint32 within realistic deployments
 		taskPtr = &v
 	}
 	return appendItemEvents(ctx, tx, eventbus.ItemRescheduled, args.WorkspaceID, &args.ActorUserID, taskPtr, payload)

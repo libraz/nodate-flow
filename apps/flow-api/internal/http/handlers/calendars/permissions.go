@@ -58,7 +58,7 @@ func validateInvite(expiresAt sql.NullTime, maxUses sql.NullInt32, useCount uint
 	if expiresAt.Valid && expiresAt.Time.Before(time.Now()) {
 		return errInviteNotFound
 	}
-	if maxUses.Valid && useCount >= uint32(maxUses.Int32) {
+	if maxUses.Valid && useCount >= uint32(maxUses.Int32) { //#nosec G115 -- max_uses is INT NOT NULL non-negative, fits uint32
 		return errInviteNotFound
 	}
 	return nil

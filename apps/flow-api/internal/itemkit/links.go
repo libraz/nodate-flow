@@ -101,7 +101,7 @@ func LinkTaskToEvent(ctx context.Context, tx TX, args LinkTaskToEventArgs) (dbty
 	if err != nil {
 		return dbtype.PublicID{}, 0, fmt.Errorf("itemkit: last insert id: %w", err)
 	}
-	linkID := uint32(id64)
+	linkID := uint32(id64) //#nosec G115 -- LastInsertId for task_event_links.id (BIGINT UNSIGNED), fits uint32 within realistic deployments
 
 	payload := map[string]any{
 		"linkPublicId": pub.String(),

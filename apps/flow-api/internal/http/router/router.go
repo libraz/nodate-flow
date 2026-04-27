@@ -1316,10 +1316,10 @@ func newDBInvocationLogger(q *generated.Queries, publish func(context.Context, u
 		}
 		var tIn, tOut sql.NullInt32
 		if rec.TokensInput > 0 {
-			tIn = sql.NullInt32{Int32: int32(rec.TokensInput), Valid: true}
+			tIn = sql.NullInt32{Int32: int32(rec.TokensInput), Valid: true} //#nosec G115 -- LLM token counts cap well below int32 (~2B per call would exhaust any provider context window)
 		}
 		if rec.TokensOutput > 0 {
-			tOut = sql.NullInt32{Int32: int32(rec.TokensOutput), Valid: true}
+			tOut = sql.NullInt32{Int32: int32(rec.TokensOutput), Valid: true} //#nosec G115 -- LLM token counts cap well below int32
 		}
 		var cost sql.NullString
 		if rec.CostCents > 0 {

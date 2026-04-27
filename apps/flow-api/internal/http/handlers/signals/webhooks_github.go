@@ -107,7 +107,7 @@ func HandleGithubWebhook(deps Deps) http.HandlerFunc {
 		if marker, ok := extractTaskMarker(body); ok {
 			id, found, terr := resolveTaskInWorkspace(ctx, deps.DB, wsID, marker)
 			if terr == nil && found {
-				taskFK = sql.NullInt32{Int32: int32(id), Valid: true}
+				taskFK = sql.NullInt32{Int32: int32(id), Valid: true} //#nosec G115 -- task_id is tasks.id (BIGINT UNSIGNED), fits int32 within realistic deployments
 				taskInternal = id
 				taskLinked = true
 			}

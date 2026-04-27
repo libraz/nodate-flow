@@ -44,7 +44,7 @@ func (MockProvider) Embed(_ context.Context, text string) ([]float32, error) {
 		z = (z ^ (z >> 27)) * 0x94d049bb133111eb
 		z ^= z >> 31
 		// Map to [-1, 1).
-		f := float64(int64(z)) / float64(math.MaxInt64)
+		f := float64(int64(z)) / float64(math.MaxInt64) //#nosec G115 -- z is a deterministic mixed uint64; we map it onto [-1,1] regardless of sign
 		out[i] = float32(f)
 	}
 	return out, nil
