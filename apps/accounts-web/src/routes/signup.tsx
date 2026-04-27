@@ -8,6 +8,7 @@ import { useZodForm } from '@nodate-flow/ui/hooks/use-zod-form';
 import Button from '@nodate-flow/ui/primitives/button';
 import FormField from '@nodate-flow/ui/primitives/form-field';
 import Input from '@nodate-flow/ui/primitives/input';
+import { toaster } from '@nodate-flow/ui/primitives/toast';
 import { Link, createFileRoute, useNavigate } from '@tanstack/react-router';
 import { type ReactElement, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -97,6 +98,7 @@ function SignupPage(): ReactElement {
         isInstanceAdmin: me.isInstanceAdmin,
       };
       authStore.getState().setSession(reg.accessToken, user);
+      toaster.show({ message: t('signup.success'), tone: 'success' });
       void navigate({ to: '/profile', replace: true });
     } catch (err) {
       setServerError(mapAuthThrown(err));
@@ -110,17 +112,9 @@ function SignupPage(): ReactElement {
           void handleSubmit(onSubmit)(e);
         }}
         noValidate
-        style={{ display: 'flex', flexDirection: 'column', gap: 'var(--nf-space-5, 1.5rem)' }}
+        className="aw-stack aw-stack-5"
       >
-        <h1
-          style={{
-            fontFamily: 'var(--nf-font-display, var(--font-display))',
-            fontSize: 'var(--nf-text-2xl, 1.5rem)',
-            margin: 0,
-          }}
-        >
-          {t('signup.title')}
-        </h1>
+        <h1 className="aw-page-title">{t('signup.title')}</h1>
 
         <FormField
           label={t('signup.name')}
@@ -166,14 +160,7 @@ function SignupPage(): ReactElement {
         </FormField>
 
         {serverError ? (
-          <p
-            role="alert"
-            style={{
-              margin: 0,
-              color: 'var(--nf-color-danger)',
-              fontSize: 'var(--nf-text-sm, 0.875rem)',
-            }}
-          >
+          <p role="alert" className="aw-error">
             {t(serverError)}
           </p>
         ) : null}
@@ -184,16 +171,9 @@ function SignupPage(): ReactElement {
 
         <OAuthButtonRow mode="signup" onError={setServerError} />
 
-        <p
-          style={{
-            margin: 0,
-            fontSize: 'var(--nf-text-sm, 0.875rem)',
-            color: 'var(--nf-color-fg-muted)',
-            textAlign: 'center',
-          }}
-        >
+        <p className="aw-flush aw-muted aw-text-sm aw-text-center">
           {t('signup.have_account')}{' '}
-          <Link to="/login" style={{ fontWeight: 500, color: 'var(--nf-color-accent)' }}>
+          <Link to="/login" className="aw-link">
             {t('signup.login_link')}
           </Link>
         </p>

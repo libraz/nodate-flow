@@ -203,25 +203,9 @@ function LoginPage(): ReactElement {
     if (magicLinkSent) {
       return (
         <AuthCard>
-          <div
-            style={{ display: 'flex', flexDirection: 'column', gap: 'var(--nf-space-5, 1.5rem)' }}
-          >
-            <h1
-              style={{
-                fontFamily: 'var(--nf-font-display, var(--font-display))',
-                fontSize: 'var(--nf-text-2xl, 1.5rem)',
-                margin: 0,
-              }}
-            >
-              {t('login.magic_link_title')}
-            </h1>
-            <p
-              style={{
-                margin: 0,
-                color: 'var(--nf-color-fg-muted)',
-                fontSize: 'var(--nf-text-sm, 0.875rem)',
-              }}
-            >
+          <div className="aw-stack aw-stack-5">
+            <h1 className="aw-page-title">{t('login.magic_link_title')}</h1>
+            <p className="aw-flush aw-muted aw-text-sm">
               {t('login.magic_link_sent', { email: magicLinkEmail })}
             </p>
             <Button
@@ -246,26 +230,10 @@ function LoginPage(): ReactElement {
             void handleMagicLinkSubmit(e);
           }}
           noValidate
-          style={{ display: 'flex', flexDirection: 'column', gap: 'var(--nf-space-5, 1.5rem)' }}
+          className="aw-stack aw-stack-5"
         >
-          <h1
-            style={{
-              fontFamily: 'var(--nf-font-display, var(--font-display))',
-              fontSize: 'var(--nf-text-2xl, 1.5rem)',
-              margin: 0,
-            }}
-          >
-            {t('login.magic_link_title')}
-          </h1>
-          <p
-            style={{
-              margin: 0,
-              color: 'var(--nf-color-fg-muted)',
-              fontSize: 'var(--nf-text-sm, 0.875rem)',
-            }}
-          >
-            {t('login.magic_link_instructions')}
-          </p>
+          <h1 className="aw-page-title">{t('login.magic_link_title')}</h1>
+          <p className="aw-flush aw-muted aw-text-sm">{t('login.magic_link_instructions')}</p>
           <FormField label={t('login.email')} required>
             {(control) => (
               <Input
@@ -277,18 +245,12 @@ function LoginPage(): ReactElement {
                 onChange={(e) => {
                   setMagicLinkEmail(e.target.value);
                 }}
+                autoFocus
               />
             )}
           </FormField>
           {serverError ? (
-            <p
-              role="alert"
-              style={{
-                margin: 0,
-                color: 'var(--nf-color-danger)',
-                fontSize: 'var(--nf-text-sm, 0.875rem)',
-              }}
-            >
+            <p role="alert" className="aw-error">
               {t(serverError)}
             </p>
           ) : null}
@@ -322,26 +284,10 @@ function LoginPage(): ReactElement {
             void handleTotpSubmit(e);
           }}
           noValidate
-          style={{ display: 'flex', flexDirection: 'column', gap: 'var(--nf-space-5, 1.5rem)' }}
+          className="aw-stack aw-stack-5"
         >
-          <h1
-            style={{
-              fontFamily: 'var(--nf-font-display, var(--font-display))',
-              fontSize: 'var(--nf-text-2xl, 1.5rem)',
-              margin: 0,
-            }}
-          >
-            {t('login.totp_title')}
-          </h1>
-          <p
-            style={{
-              margin: 0,
-              color: 'var(--nf-color-fg-muted)',
-              fontSize: 'var(--nf-text-sm, 0.875rem)',
-            }}
-          >
-            {t('login.totp_instructions')}
-          </p>
+          <h1 className="aw-page-title">{t('login.totp_title')}</h1>
+          <p className="aw-flush aw-muted aw-text-sm">{t('login.totp_instructions')}</p>
           {useRecovery ? (
             <FormField label={t('login.recovery_code')} required>
               {(control) => (
@@ -370,10 +316,14 @@ function LoginPage(): ReactElement {
                     setTotpCode(e.target.value.replace(/\D/g, '').slice(0, 6));
                   }}
                   autoFocus
+                  aria-describedby="totp-status"
                 />
               )}
             </FormField>
           )}
+          <p id="totp-status" className="aw-flush aw-muted aw-text-sm" aria-live="polite">
+            {t('login.totp_status_awaiting')}
+          </p>
           <Button
             type="button"
             variant="ghost"
@@ -386,14 +336,7 @@ function LoginPage(): ReactElement {
             {useRecovery ? t('login.totp_use_code') : t('login.totp_use_recovery')}
           </Button>
           {serverError ? (
-            <p
-              role="alert"
-              style={{
-                margin: 0,
-                color: 'var(--nf-color-danger)',
-                fontSize: 'var(--nf-text-sm, 0.875rem)',
-              }}
-            >
+            <p role="alert" className="aw-error">
               {t(serverError)}
             </p>
           ) : null}
@@ -427,17 +370,9 @@ function LoginPage(): ReactElement {
           void handleSubmit(onSubmit)(e);
         }}
         noValidate
-        style={{ display: 'flex', flexDirection: 'column', gap: 'var(--nf-space-5, 1.5rem)' }}
+        className="aw-stack aw-stack-5"
       >
-        <h1
-          style={{
-            fontFamily: 'var(--nf-font-display, var(--font-display))',
-            fontSize: 'var(--nf-text-2xl, 1.5rem)',
-            margin: 0,
-          }}
-        >
-          {t('login.title')}
-        </h1>
+        <h1 className="aw-page-title">{t('login.title')}</h1>
 
         <FormField
           label={t('login.email')}
@@ -479,14 +414,7 @@ function LoginPage(): ReactElement {
         </FormField>
 
         {serverError ? (
-          <p
-            role="alert"
-            style={{
-              margin: 0,
-              color: 'var(--nf-color-danger)',
-              fontSize: 'var(--nf-text-sm, 0.875rem)',
-            }}
-          >
+          <p role="alert" className="aw-error">
             {t(serverError)}
           </p>
         ) : null}
@@ -499,22 +427,10 @@ function LoginPage(): ReactElement {
 
         {caps?.magicLink && (
           <>
-            <div
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 'var(--nf-space-3, 0.75rem)',
-                color: 'var(--nf-color-fg-muted)',
-                fontSize: 'var(--nf-text-sm, 0.875rem)',
-              }}
-            >
-              <hr
-                style={{ flex: 1, border: 'none', borderTop: '1px solid var(--nf-color-border)' }}
-              />
+            <div className="aw-row aw-row-3 aw-muted aw-text-sm">
+              <hr className="aw-rule" />
               <span>{t('login.magic_link_divider')}</span>
-              <hr
-                style={{ flex: 1, border: 'none', borderTop: '1px solid var(--nf-color-border)' }}
-              />
+              <hr className="aw-rule" />
             </div>
 
             <Button
@@ -531,16 +447,9 @@ function LoginPage(): ReactElement {
         )}
 
         {caps?.registrationOpen !== false && (
-          <p
-            style={{
-              margin: 0,
-              fontSize: 'var(--nf-text-sm, 0.875rem)',
-              color: 'var(--nf-color-fg-muted)',
-              textAlign: 'center',
-            }}
-          >
+          <p className="aw-flush aw-muted aw-text-sm aw-text-center">
             {t('login.no_account')}{' '}
-            <Link to="/signup" style={{ fontWeight: 500, color: 'var(--nf-color-accent)' }}>
+            <Link to="/signup" className="aw-link">
               {t('login.signup_link')}
             </Link>
           </p>

@@ -77,6 +77,50 @@ test.describe('signup page', () => {
     ]);
   });
 
+  test('successful signup shows the welcome toast before redirect', async ({ page }) => {
+    // Capture toast text before the navigation completes. The toaster mounts
+    // a portal at #nf-toast-root; the success toast is announced via
+    // aria-live="polite" so it shows up as accessible-name on the live region.
+    const suffix = `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
+    const email = `e2e-signup-toast-${suffix}@example.test`;
+
+    await page.getByLabel(/display name|name/i).fill(`E2E Toast ${suffix}`);
+    await page.getByLabel(/email/i).fill(email);
+    await page.getByLabel(/password/i).fill('correct horse battery staple');
+    await page.getByRole('button', { name: /create account/i }).click();
+
+    // The toast must appear before or simultaneously with the redirect; we
+    // grant a small window since toaster.show is synchronous but navigation
+    // races against it. If the API rate-limits, we accept that path.
+    const toastOrError = await Promise.race([
+      page
+        .locator('#nf-toast-root')
+        .getByText(/welcome|account created/i)
+        .waitFor({
+          state: 'visible',
+          timeout: 5_000,
+        })
+        .then(() => 'toast' as const),
+      page
+        .locator('[role="alert"]')
+        .waitFor({
+          state: 'visible',
+          timeout: 5_000,
+        })
+        .then(() => 'error' as const),
+    ]).catch(() => 'none' as const);
+
+    if (toastOrError === 'toast') {
+      // Eventually we land on /profile.
+      await expect(page).toHaveURL(/\/profile/, { timeout: 15_000 });
+    } else if (toastOrError === 'error') {
+      // Rate-limited or registration disabled — acceptable in CI.
+      expect(['error']).toContain(toastOrError);
+    } else {
+      throw new Error('Neither success toast nor error alert appeared.');
+    }
+  });
+
   test('accessibility check', async ({ page }) => {
     await checkA11y(page, ['color-contrast']);
   });

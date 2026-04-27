@@ -1,26 +1,48 @@
 /**
  * Admin layout route. Gates access to instance admin pages.
- * Redirects non-admins to /profile.
+ *
+ * The guard renders three states:
+ *   1. user undefined: a centered loading skeleton (auth bootstrap not done).
+ *   2. user known + non-admin: emit a one-shot redirect to /profile, render null.
+ *   3. user known + admin: render the admin shell.
+ *
+ * Previous implementation flashed `null` for one frame while the auth state
+ * was loading, which produced a brief blank page on direct /admin loads.
  */
 
+import Spinner from '@nodate-flow/ui/primitives/spinner';
 import { Link, Outlet, createFileRoute, useNavigate } from '@tanstack/react-router';
 import { type ReactElement, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { selectUser, useAuth } from '../../features/auth/auth-store';
 
-function AdminLayout(): ReactElement | null {
+export function AdminLayout(): ReactElement | null {
   const user = useAuth(selectUser);
   const navigate = useNavigate();
   const { t } = useTranslation('admin');
 
+  // _authenticated guards on session; `user === null` here means the /me
+  // hydrate has not landed yet, so we render a loading skeleton instead of
+  // returning null and flashing a blank page.
+  const userResolved = user !== null;
+  const isAdmin = userResolved && user.isInstanceAdmin === true;
+
   useEffect(() => {
-    if (user && !user.isInstanceAdmin) {
+    if (userResolved && !isAdmin) {
       void navigate({ to: '/profile', replace: true });
     }
-  }, [user, navigate]);
+  }, [userResolved, isAdmin, navigate]);
 
-  if (!user?.isInstanceAdmin) return null;
+  if (!userResolved) {
+    return (
+      <div data-testid="admin-guard-loading" style={loadingStyle}>
+        <Spinner label={t('common.loading')} size="md" />
+      </div>
+    );
+  }
+
+  if (!isAdmin) return null;
 
   const navLinkStyle = {
     display: 'block',
@@ -57,7 +79,7 @@ function AdminLayout(): ReactElement | null {
             padding: '0 var(--nf-space-3, 0.75rem)',
           }}
         >
-          Admin
+          {t('title')}
         </h2>
         <Link to="/admin/users" style={navLinkStyle}>
           {t('nav.users')}
@@ -101,6 +123,13 @@ function AdminLayout(): ReactElement | null {
     </div>
   );
 }
+
+const loadingStyle = {
+  minHeight: '100vh',
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+} as const;
 
 export const Route = createFileRoute('/_authenticated/admin')({
   component: AdminLayout,

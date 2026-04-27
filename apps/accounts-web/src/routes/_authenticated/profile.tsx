@@ -486,19 +486,7 @@ export function ProfilePage(): ReactElement {
           {(control) => {
             const { ref, ...field } = register('themePreference');
             return (
-              <select
-                {...control}
-                {...field}
-                ref={ref}
-                style={{
-                  padding: '0.5rem 0.75rem',
-                  borderRadius: 'var(--nf-radius-md, 0.375rem)',
-                  border: 'var(--nf-space-px, 1px) solid var(--nf-color-border)',
-                  background: 'var(--nf-color-bg)',
-                  color: 'var(--nf-color-fg)',
-                  fontSize: 'var(--nf-text-sm, 0.875rem)',
-                }}
-              >
+              <select {...control} {...field} ref={ref} className="aw-select">
                 <option value="system">{t('profile.theme_system')}</option>
                 <option value="aurora-light">{t('profile.theme_aurora_light')}</option>
                 <option value="aurora-dark">{t('profile.theme_aurora_dark')}</option>
@@ -512,14 +500,7 @@ export function ProfilePage(): ReactElement {
         </FormField>
 
         {serverError ? (
-          <p
-            role="alert"
-            style={{
-              margin: 0,
-              color: 'var(--nf-color-danger)',
-              fontSize: 'var(--nf-text-sm, 0.875rem)',
-            }}
-          >
+          <p role="alert" className="aw-error">
             {serverError}
           </p>
         ) : null}

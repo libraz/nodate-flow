@@ -140,7 +140,7 @@ function WorkspaceEditPage(): ReactElement {
   if (loadError) {
     return (
       <AuthCard>
-        <p role="alert" style={{ color: 'var(--nf-color-danger)' }}>
+        <p role="alert" className="aw-error">
           {loadError}
         </p>
         <Link to="/workspaces">{t('workspaces.back')}</Link>
@@ -155,17 +155,9 @@ function WorkspaceEditPage(): ReactElement {
           void handleSubmit(onSubmit)(e);
         }}
         noValidate
-        style={{ display: 'flex', flexDirection: 'column', gap: 'var(--nf-space-5)' }}
+        className="aw-stack aw-stack-5"
       >
-        <h1
-          style={{
-            fontFamily: 'var(--nf-font-display, var(--font-display))',
-            fontSize: 'var(--nf-text-2xl, 1.5rem)',
-            margin: 0,
-          }}
-        >
-          {t('workspaces.edit_title')}
-        </h1>
+        <h1 className="aw-page-title">{t('workspaces.edit_title')}</h1>
 
         <FormField
           label={t('workspaces.name_label')}
@@ -206,19 +198,7 @@ function WorkspaceEditPage(): ReactElement {
           {(control) => {
             const { ref, ...field } = register('timezone');
             return (
-              <select
-                {...control}
-                {...field}
-                ref={ref}
-                style={{
-                  padding: '0.5rem 0.75rem',
-                  borderRadius: 'var(--nf-radius-md, 0.375rem)',
-                  border: 'var(--nf-space-px, 1px) solid var(--nf-color-border)',
-                  background: 'var(--nf-color-bg)',
-                  color: 'var(--nf-color-fg)',
-                  fontSize: 'var(--nf-text-sm, 0.875rem)',
-                }}
-              >
+              <select {...control} {...field} ref={ref} className="aw-select">
                 {timezoneGroups.map(({ region, zones }) => (
                   <optgroup key={region} label={region}>
                     {zones.map((tz) => (
@@ -240,19 +220,7 @@ function WorkspaceEditPage(): ReactElement {
           {(control) => {
             const { ref, ...field } = register('country');
             return (
-              <select
-                {...control}
-                {...field}
-                ref={ref}
-                style={{
-                  padding: '0.5rem 0.75rem',
-                  borderRadius: 'var(--nf-radius-md, 0.375rem)',
-                  border: 'var(--nf-space-px, 1px) solid var(--nf-color-border)',
-                  background: 'var(--nf-color-bg)',
-                  color: 'var(--nf-color-fg)',
-                  fontSize: 'var(--nf-text-sm, 0.875rem)',
-                }}
-              >
+              <select {...control} {...field} ref={ref} className="aw-select">
                 <option value="">{t('profile.country_unset')}</option>
                 {countries.map(([code, name]) => (
                   <option key={code} value={code}>
@@ -265,7 +233,7 @@ function WorkspaceEditPage(): ReactElement {
         </FormField>
 
         {serverError ? (
-          <p role="alert" style={{ margin: 0, color: 'var(--nf-color-danger)' }}>
+          <p role="alert" className="aw-error">
             {serverError}
           </p>
         ) : null}

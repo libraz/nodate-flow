@@ -8,6 +8,7 @@ import { useZodForm } from '@nodate-flow/ui/hooks/use-zod-form';
 import Button from '@nodate-flow/ui/primitives/button';
 import FormField from '@nodate-flow/ui/primitives/form-field';
 import Input from '@nodate-flow/ui/primitives/input';
+import { toaster } from '@nodate-flow/ui/primitives/toast';
 import { Link, createFileRoute } from '@tanstack/react-router';
 import QRCode from 'qrcode';
 import { type FormEvent, type ReactElement, useEffect, useState } from 'react';
@@ -37,9 +38,18 @@ type TotpConfirmOutputBody = components['schemas']['TotpConfirmOutputBody'];
 type TotpRegenerateRecoveryCodesOutputBody =
   components['schemas']['TotpRegenerateRecoveryCodesOutputBody'];
 
+/**
+ * @brief Identifier returned by parseUserAgent when a token is recognized.
+ * Concrete browser/OS labels remain English-derived strings (e.g. "Chrome 124"),
+ * while the unknown tokens are translation keys resolved at render time so
+ * non-English locales don't see a hardcoded "Unknown".
+ */
+type BrowserToken = { kind: 'name'; label: string } | { kind: 'unknown' };
+type OsToken = { kind: 'name'; label: string } | { kind: 'unknown' };
+
 interface ParsedUA {
-  browser: string;
-  os: string;
+  browser: BrowserToken;
+  os: OsToken;
 }
 
 /**
@@ -51,7 +61,7 @@ interface ParsedUA {
  * Avoids regex per project convention: locates the marker via indexOf, then
  * consumes leading digits until a non-digit byte.
  */
-function extractVersion(ua: string, marker: string): string {
+export function extractVersion(ua: string, marker: string): string {
   const idx = ua.indexOf(marker);
   if (idx === -1) return '';
   let i = idx + marker.length;
@@ -66,44 +76,39 @@ function extractVersion(ua: string, marker: string): string {
 }
 
 /**
- * @brief Parse a User-Agent string into a glanceable browser + OS label.
+ * @brief Parse a User-Agent string into glanceable browser + OS tokens.
  * @param ua Raw User-Agent header value.
- * @return Browser and OS labels, each defaulting to "Unknown".
+ * @return Tagged tokens; `kind === 'unknown'` lets the caller pick the
+ *         appropriate i18n key instead of receiving a hardcoded "Unknown".
  *
  * Hand-rolled, regex-free parser covering common desktop and mobile agents.
  * Order matters for browsers: Edge UA embeds "Chrome/" and Chrome UA embeds
  * "Safari/", so detection runs Edge -> Firefox -> Chrome -> Safari.
  */
-function parseUserAgent(ua: string): ParsedUA {
-  let browser = 'Unknown';
+export function parseUserAgent(ua: string): ParsedUA {
+  let browser: BrowserToken = { kind: 'unknown' };
   const edgeVer = extractVersion(ua, 'Edg/');
   const firefoxVer = extractVersion(ua, 'Firefox/');
   const chromeVer = extractVersion(ua, 'Chrome/');
   const safariVer = extractVersion(ua, 'Version/');
-  if (edgeVer) browser = `Edge ${edgeVer}`;
-  else if (firefoxVer) browser = `Firefox ${firefoxVer}`;
-  else if (chromeVer) browser = `Chrome ${chromeVer}`;
-  else if (safariVer && ua.indexOf('Safari/') !== -1) browser = `Safari ${safariVer}`;
+  if (edgeVer) browser = { kind: 'name', label: `Edge ${edgeVer}` };
+  else if (firefoxVer) browser = { kind: 'name', label: `Firefox ${firefoxVer}` };
+  else if (chromeVer) browser = { kind: 'name', label: `Chrome ${chromeVer}` };
+  else if (safariVer && ua.indexOf('Safari/') !== -1)
+    browser = { kind: 'name', label: `Safari ${safariVer}` };
 
-  let os = 'Unknown';
-  if (ua.indexOf('Windows NT') !== -1) os = 'Windows';
-  else if (ua.indexOf('Mac OS X') !== -1 || ua.indexOf('Macintosh') !== -1) os = 'macOS';
-  else if (ua.indexOf('Android') !== -1) os = 'Android';
+  // Order matters: iPad/iPhone UAs include "Mac OS X" / "Macintosh", and
+  // Android UAs include "Linux", so the more specific match must come first.
+  let os: OsToken = { kind: 'unknown' };
+  if (ua.indexOf('Windows NT') !== -1) os = { kind: 'name', label: 'Windows' };
+  else if (ua.indexOf('Android') !== -1) os = { kind: 'name', label: 'Android' };
   else if (ua.indexOf('iPhone') !== -1 || ua.indexOf('iPad') !== -1 || ua.indexOf('iOS') !== -1)
-    os = 'iOS';
-  else if (ua.indexOf('Linux') !== -1) os = 'Linux';
+    os = { kind: 'name', label: 'iOS' };
+  else if (ua.indexOf('Mac OS X') !== -1 || ua.indexOf('Macintosh') !== -1)
+    os = { kind: 'name', label: 'macOS' };
+  else if (ua.indexOf('Linux') !== -1) os = { kind: 'name', label: 'Linux' };
 
   return { browser, os };
-}
-
-/**
- * @brief Format a User-Agent string for display in the sessions list.
- * @param ua Raw User-Agent header value.
- * @return "Browser · OS" style label (middle dot separator).
- */
-function formatDevice(ua: string): string {
-  const { browser, os } = parseUserAgent(ua);
-  return `${browser} · ${os}`;
 }
 
 /** Seconds in a day — shared between relative and absolute branches. */
@@ -152,7 +157,7 @@ function formatRelative(ts: number, locale: string): string {
   }
 }
 
-function SecurityPage(): ReactElement {
+export function SecurityPage(): ReactElement {
   const { t, i18n } = useTranslation('auth');
   const locale = i18n.resolvedLanguage ?? 'en';
 
@@ -230,56 +235,46 @@ function SecurityPage(): ReactElement {
   const handleRevokeSession = async (sessionId: string): Promise<void> => {
     setRevokingId(sessionId);
     try {
-      await sdk.DELETE('/me/sessions/{sessionId}', {
+      const { error } = await sdk.DELETE('/me/sessions/{sessionId}', {
         params: { path: { sessionId } },
       });
+      if (error) {
+        toaster.show({ message: t('security.session_revoke_failed'), tone: 'danger' });
+        return;
+      }
       setSessions((prev) => prev.filter((s) => s.id !== sessionId));
     } catch {
-      // ignore
+      toaster.show({ message: t('security.session_revoke_failed'), tone: 'danger' });
     } finally {
       setRevokingId(null);
     }
   };
 
-  const sectionStyle = {
-    display: 'flex',
-    flexDirection: 'column' as const,
-    gap: 'var(--nf-space-4, 1rem)',
-  };
-
-  const headingStyle = {
-    fontFamily: 'var(--nf-font-display, var(--font-display))',
-    fontSize: 'var(--nf-text-lg, 1.125rem)',
-    margin: 0,
-  };
-
-  const dividerStyle = {
-    border: 'none',
-    borderBlockStart: 'var(--nf-space-px, 1px) solid var(--nf-color-border)',
-    margin: 0,
+  /**
+   * Build the localized "Browser · OS" label without leaking English
+   * "Unknown" into JA/ZH locales.
+   */
+  const formatDevice = (ua: string): string => {
+    const { browser, os } = parseUserAgent(ua);
+    const browserLabel =
+      browser.kind === 'name' ? browser.label : t('security.session.browser_unknown');
+    const osLabel = os.kind === 'name' ? os.label : t('security.session.os_unknown');
+    return `${browserLabel} · ${osLabel}`;
   };
 
   return (
     <AuthCard>
-      <h1
-        style={{
-          fontFamily: 'var(--nf-font-display, var(--font-display))',
-          fontSize: 'var(--nf-text-2xl, 1.5rem)',
-          margin: 0,
-        }}
-      >
-        {t('security.title')}
-      </h1>
+      <h1 className="aw-page-title">{t('security.title')}</h1>
 
       {/* Password change */}
-      <section style={sectionStyle}>
-        <h2 style={headingStyle}>{t('security.password_title')}</h2>
+      <section className="aw-stack aw-stack-4">
+        <h2 className="aw-section-title">{t('security.password_title')}</h2>
         <form
           onSubmit={(e) => {
             void handleSubmit(onChangePassword)(e);
           }}
           noValidate
-          style={{ display: 'flex', flexDirection: 'column', gap: 'var(--nf-space-4, 1rem)' }}
+          className="aw-stack aw-stack-4"
         >
           <FormField
             label={t('security.current_password')}
@@ -322,28 +317,13 @@ function SecurityPage(): ReactElement {
           </FormField>
 
           {passwordError ? (
-            <p
-              role="alert"
-              style={{
-                margin: 0,
-                color: 'var(--nf-color-danger)',
-                fontSize: 'var(--nf-text-sm, 0.875rem)',
-              }}
-            >
+            <p role="alert" className="aw-error">
               {t(passwordError)}
             </p>
           ) : null}
 
           {passwordSuccess ? (
-            <output
-              style={{
-                margin: 0,
-                color: 'var(--nf-color-success, var(--nf-color-success))',
-                fontSize: 'var(--nf-text-sm, 0.875rem)',
-              }}
-            >
-              {t('security.password_changed')}
-            </output>
+            <output className="aw-success">{t('security.password_changed')}</output>
           ) : null}
 
           <Button type="submit" variant="primary" disabled={isSubmitting}>
@@ -352,70 +332,33 @@ function SecurityPage(): ReactElement {
         </form>
       </section>
 
-      <hr style={dividerStyle} />
+      <hr className="aw-rule" />
 
       {/* TOTP management */}
-      <section style={sectionStyle}>
-        <h2 style={headingStyle}>{t('security.totp.title')}</h2>
+      <section className="aw-stack aw-stack-4">
+        <h2 className="aw-section-title">{t('security.totp.title')}</h2>
         <TotpSection />
       </section>
 
-      <hr style={dividerStyle} />
+      <hr className="aw-rule" />
 
       {/* Active sessions */}
-      <section style={sectionStyle}>
-        <h2 style={headingStyle}>{t('security.sessions_title')}</h2>
+      <section className="aw-stack aw-stack-4">
+        <h2 className="aw-section-title">{t('security.sessions_title')}</h2>
         {sessionsLoading ? (
-          <p
-            style={{
-              margin: 0,
-              fontSize: 'var(--nf-text-sm, 0.875rem)',
-              color: 'var(--nf-color-fg-muted)',
-            }}
-          >
-            {t('security.sessions_loading')}
-          </p>
+          <p className="aw-flush aw-muted aw-text-sm">{t('security.sessions_loading')}</p>
         ) : sessions.length === 0 ? (
-          <p
-            style={{
-              margin: 0,
-              fontSize: 'var(--nf-text-sm, 0.875rem)',
-              color: 'var(--nf-color-fg-muted)',
-            }}
-          >
-            {t('security.sessions_empty')}
-          </p>
+          <p className="aw-flush aw-muted aw-text-sm">{t('security.sessions_empty')}</p>
         ) : (
-          <ul
-            style={{
-              listStyle: 'none',
-              margin: 0,
-              padding: 0,
-              display: 'flex',
-              flexDirection: 'column',
-              gap: 'var(--nf-space-3, 0.75rem)',
-            }}
-          >
+          <ul className="aw-list">
             {sessions.map((session) => (
               <li
                 key={session.id}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  padding: 'var(--nf-space-3, 0.75rem)',
-                  borderRadius: 'var(--nf-radius-md, 0.375rem)',
-                  border: 'var(--nf-space-px, 1px) solid var(--nf-color-border)',
-                  background: session.current ? 'var(--nf-color-bg-elevated)' : 'transparent',
-                }}
+                className={`aw-row-between aw-surface ${session.current ? 'aw-surface-elevated' : ''}`}
               >
                 <div>
                   <p
-                    style={{
-                      margin: 0,
-                      fontSize: 'var(--nf-text-sm, 0.875rem)',
-                      fontWeight: session.current ? 600 : 400,
-                    }}
+                    className={`aw-flush aw-text-sm ${session.current ? 'aw-weight-semibold' : ''}`}
                     title={session.userAgent || undefined}
                   >
                     {session.userAgent
@@ -423,22 +366,8 @@ function SecurityPage(): ReactElement {
                       : t('security.session_unknown_agent')}
                     {session.current ? ` (${t('security.session_current')})` : ''}
                   </p>
-                  <p
-                    style={{
-                      margin: 0,
-                      fontSize: 'var(--nf-text-xs, 0.75rem)',
-                      color: 'var(--nf-color-fg-muted)',
-                    }}
-                  >
-                    {session.ipAddress}
-                  </p>
-                  <p
-                    style={{
-                      margin: 0,
-                      fontSize: 'var(--nf-text-xs, 0.75rem)',
-                      color: 'var(--nf-color-fg-muted)',
-                    }}
-                  >
+                  <p className="aw-flush aw-muted aw-text-xs">{session.ipAddress}</p>
+                  <p className="aw-flush aw-muted aw-text-xs">
                     {t('security.session_created')}: {formatRelative(session.createdAt, locale)}
                     {' · '}
                     {t('security.session_last_active')}:{' '}
@@ -465,16 +394,12 @@ function SecurityPage(): ReactElement {
         )}
       </section>
 
-      <hr style={dividerStyle} />
+      <hr className="aw-rule" />
 
-      <p
-        style={{
-          margin: 0,
-          fontSize: 'var(--nf-text-sm, 0.875rem)',
-          color: 'var(--nf-color-fg-muted)',
-        }}
-      >
-        <Link to="/profile">{t('security.profile_link')}</Link>
+      <p className="aw-flush aw-muted aw-text-sm">
+        <Link to="/profile" className="aw-link">
+          {t('security.profile_link')}
+        </Link>
       </p>
     </AuthCard>
   );
@@ -574,17 +499,7 @@ function TotpSection(): ReactElement {
   };
 
   if (status === null) {
-    return (
-      <p
-        style={{
-          margin: 0,
-          fontSize: 'var(--nf-text-sm, 0.875rem)',
-          color: 'var(--nf-color-fg-muted)',
-        }}
-      >
-        {t('security.totp.loading')}
-      </p>
-    );
+    return <p className="aw-flush aw-muted aw-text-sm">{t('security.totp.loading')}</p>;
   }
 
   // After confirm, show recovery codes once.
@@ -601,25 +516,10 @@ function TotpSection(): ReactElement {
 
   if (status === 'disabled') {
     return (
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--nf-space-3, 0.75rem)' }}>
-        <p
-          style={{
-            margin: 0,
-            fontSize: 'var(--nf-text-sm, 0.875rem)',
-            color: 'var(--nf-color-fg-muted)',
-          }}
-        >
-          {t('security.totp.disabled_description')}
-        </p>
+      <div className="aw-stack aw-stack-3">
+        <p className="aw-flush aw-muted aw-text-sm">{t('security.totp.disabled_description')}</p>
         {errorKey ? (
-          <p
-            role="alert"
-            style={{
-              margin: 0,
-              color: 'var(--nf-color-danger)',
-              fontSize: 'var(--nf-text-sm, 0.875rem)',
-            }}
-          >
+          <p role="alert" className="aw-error">
             {t(errorKey)}
           </p>
         ) : null}
@@ -646,31 +546,14 @@ function TotpSection(): ReactElement {
       // the QR step. Offer to restart (POST /me/totp/enroll is
       // idempotent in the pending state and rotates the secret).
       return (
-        <div
-          style={{ display: 'flex', flexDirection: 'column', gap: 'var(--nf-space-3, 0.75rem)' }}
-        >
-          <p
-            style={{
-              margin: 0,
-              fontSize: 'var(--nf-text-sm, 0.875rem)',
-              color: 'var(--nf-color-fg-muted)',
-            }}
-          >
-            {t('security.totp.pending_description')}
-          </p>
+        <div className="aw-stack aw-stack-3">
+          <p className="aw-flush aw-muted aw-text-sm">{t('security.totp.pending_description')}</p>
           {errorKey ? (
-            <p
-              role="alert"
-              style={{
-                margin: 0,
-                color: 'var(--nf-color-danger)',
-                fontSize: 'var(--nf-text-sm, 0.875rem)',
-              }}
-            >
+            <p role="alert" className="aw-error">
               {t(errorKey)}
             </p>
           ) : null}
-          <div style={{ display: 'flex', gap: 'var(--nf-space-2, 0.5rem)', flexWrap: 'wrap' }}>
+          <div className="aw-actions">
             <Button
               type="button"
               variant="primary"
@@ -725,6 +608,10 @@ function TotpSection(): ReactElement {
 
 /**
  * EnrollmentStep — renders the QR code, secret, and code-confirm form.
+ *
+ * If QR generation fails (e.g. canvas blocked, library load error), the
+ * fallback surface promotes the secret string for manual entry so the user
+ * is never left looking at a blank panel mid-enrollment.
  */
 function EnrollmentStep({
   enrollment,
@@ -742,15 +629,20 @@ function EnrollmentStep({
   const { t } = useTranslation('auth');
   const [code, setCode] = useState('');
   const [qrDataUrl, setQrDataUrl] = useState<string | null>(null);
+  const [qrFailed, setQrFailed] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
+    setQrFailed(false);
     QRCode.toDataURL(enrollment.otpauthUrl, { width: 200, margin: 1 })
       .then((url: string) => {
         if (!cancelled) setQrDataUrl(url);
       })
       .catch(() => {
-        if (!cancelled) setQrDataUrl(null);
+        if (!cancelled) {
+          setQrDataUrl(null);
+          setQrFailed(true);
+        }
       });
     return () => {
       cancelled = true;
@@ -763,44 +655,26 @@ function EnrollmentStep({
   };
 
   return (
-    <form
-      onSubmit={handleSubmit}
-      style={{ display: 'flex', flexDirection: 'column', gap: 'var(--nf-space-3, 0.75rem)' }}
-    >
-      <p style={{ margin: 0, fontSize: 'var(--nf-text-sm, 0.875rem)' }}>
-        {t('security.totp.enroll_instructions')}
-      </p>
+    <form onSubmit={handleSubmit} className="aw-stack aw-stack-3">
+      <p className="aw-flush aw-text-sm">{t('security.totp.enroll_instructions')}</p>
       {qrDataUrl ? (
         <img
           src={qrDataUrl}
           alt={t('security.totp.qr_label')}
           width={200}
           height={200}
-          style={{ alignSelf: 'center' }}
+          className="aw-self-center"
         />
+      ) : qrFailed ? (
+        <p role="alert" className="aw-warning">
+          {t('security.qr_fallback_title')}
+        </p>
       ) : null}
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: 'auto 1fr',
-          gap: 'var(--nf-space-2, 0.5rem)',
-          alignItems: 'center',
-          padding: 'var(--nf-space-3, 0.75rem)',
-          border: 'var(--nf-space-px, 1px) solid var(--nf-color-border)',
-          borderRadius: 'var(--nf-radius-md, 0.375rem)',
-        }}
-      >
-        <span style={{ fontWeight: 500, fontSize: 'var(--nf-text-sm, 0.875rem)' }}>
+      <div className="aw-grid-secret aw-surface">
+        <span className="aw-text-sm aw-weight-semibold">
           {t('security.totp.manual_secret_label')}
         </span>
-        <code
-          style={{
-            fontFamily: 'var(--font-mono)',
-            fontSize: 'var(--nf-text-sm, 0.875rem)',
-            wordBreak: 'break-all',
-            userSelect: 'all',
-          }}
-        >
+        <code className="aw-mono aw-text-sm" data-testid="totp-secret">
           {enrollment.secret}
         </code>
       </div>
@@ -821,18 +695,11 @@ function EnrollmentStep({
         )}
       </FormField>
       {errorKey ? (
-        <p
-          role="alert"
-          style={{
-            margin: 0,
-            color: 'var(--nf-color-danger)',
-            fontSize: 'var(--nf-text-sm, 0.875rem)',
-          }}
-        >
+        <p role="alert" className="aw-error">
           {t(errorKey)}
         </p>
       ) : null}
-      <div style={{ display: 'flex', gap: 'var(--nf-space-2, 0.5rem)', flexWrap: 'wrap' }}>
+      <div className="aw-actions">
         <Button type="submit" variant="primary" disabled={busy || code.length !== 6}>
           {busy ? t('security.totp.confirming') : t('security.totp.confirm')}
         </Button>
@@ -857,35 +724,12 @@ function RecoveryCodesView({
 }): ReactElement {
   const { t } = useTranslation('auth');
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--nf-space-3, 0.75rem)' }}>
-      <h3 style={{ margin: 0, fontSize: 'var(--nf-text-base, 1rem)' }}>
-        {t('security.totp.recovery_codes_title')}
-      </h3>
-      <p
-        role="alert"
-        style={{
-          margin: 0,
-          color: 'var(--nf-color-warning, var(--nf-color-danger))',
-          fontSize: 'var(--nf-text-sm, 0.875rem)',
-          fontWeight: 600,
-        }}
-      >
+    <div className="aw-stack aw-stack-3">
+      <h3 className="aw-flush aw-text-base">{t('security.totp.recovery_codes_title')}</h3>
+      <p role="alert" className="aw-warning">
         {t('security.totp.recovery_codes_warning')}
       </p>
-      <ul
-        style={{
-          listStyle: 'none',
-          padding: 'var(--nf-space-3, 0.75rem)',
-          margin: 0,
-          border: 'var(--nf-space-px, 1px) solid var(--nf-color-border)',
-          borderRadius: 'var(--nf-radius-md, 0.375rem)',
-          fontFamily: 'var(--font-mono)',
-          fontSize: 'var(--nf-text-sm, 0.875rem)',
-          display: 'grid',
-          gridTemplateColumns: '1fr 1fr',
-          gap: 'var(--nf-space-1, 0.25rem) var(--nf-space-4, 1rem)',
-        }}
-      >
+      <ul className="aw-grid-codes aw-surface aw-mono aw-text-sm">
         {codes.map((c) => (
           <li key={c} style={{ userSelect: 'all' }}>
             {c}
@@ -975,17 +819,9 @@ function EnabledPanel({
 
   if (mode === 'idle') {
     return (
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--nf-space-3, 0.75rem)' }}>
-        <p
-          style={{
-            margin: 0,
-            fontSize: 'var(--nf-text-sm, 0.875rem)',
-            color: 'var(--nf-color-fg-muted)',
-          }}
-        >
-          {t('security.totp.enabled_description')}
-        </p>
-        <div style={{ display: 'flex', gap: 'var(--nf-space-2, 0.5rem)', flexWrap: 'wrap' }}>
+      <div className="aw-stack aw-stack-3">
+        <p className="aw-flush aw-muted aw-text-sm">{t('security.totp.enabled_description')}</p>
+        <div className="aw-actions">
           <Button
             type="button"
             variant="ghost"
@@ -1020,9 +856,9 @@ function EnabledPanel({
         if (mode === 'disable') void handleDisable(e);
         else void handleRegenerate(e);
       }}
-      style={{ display: 'flex', flexDirection: 'column', gap: 'var(--nf-space-3, 0.75rem)' }}
+      className="aw-stack aw-stack-3"
     >
-      <p style={{ margin: 0, fontSize: 'var(--nf-text-sm, 0.875rem)' }}>{title}</p>
+      <p className="aw-flush aw-text-sm">{title}</p>
       <FormField label={t('security.totp.password_required')} required>
         {(control) => (
           <Input
@@ -1038,18 +874,11 @@ function EnabledPanel({
         )}
       </FormField>
       {errorKey ? (
-        <p
-          role="alert"
-          style={{
-            margin: 0,
-            color: 'var(--nf-color-danger)',
-            fontSize: 'var(--nf-text-sm, 0.875rem)',
-          }}
-        >
+        <p role="alert" className="aw-error">
           {t(errorKey)}
         </p>
       ) : null}
-      <div style={{ display: 'flex', gap: 'var(--nf-space-2, 0.5rem)', flexWrap: 'wrap' }}>
+      <div className="aw-actions">
         <Button
           type="submit"
           variant={mode === 'disable' ? 'danger' : 'primary'}

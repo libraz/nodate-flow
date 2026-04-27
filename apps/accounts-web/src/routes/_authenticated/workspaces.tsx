@@ -54,26 +54,18 @@ function WorkspacesPage(): ReactElement {
 
   return (
     <AuthCard width="wide">
-      <h1
-        style={{
-          fontFamily: 'var(--nf-font-display, var(--font-display))',
-          fontSize: 'var(--nf-text-2xl, 1.5rem)',
-          margin: 0,
-        }}
-      >
-        {t('workspaces.title')}
-      </h1>
+      <h1 className="aw-page-title">{t('workspaces.title')}</h1>
 
       {error ? (
-        <p role="alert" style={{ margin: 0, color: 'var(--nf-color-danger)' }}>
+        <p role="alert" className="aw-error">
           {error}
         </p>
       ) : null}
 
       {loading ? (
-        <p style={{ color: 'var(--nf-color-fg-muted)' }}>{t('workspaces.loading')}</p>
+        <p className="aw-muted">{t('workspaces.loading')}</p>
       ) : workspaces.length === 0 ? (
-        <p style={{ color: 'var(--nf-color-fg-muted)' }}>{t('workspaces.empty')}</p>
+        <p className="aw-muted">{t('workspaces.empty')}</p>
       ) : (
         <ul
           style={{
@@ -111,11 +103,11 @@ function WorkspacesPage(): ReactElement {
                     }}
                   >
                     {ws.slug}
-                    <span style={{ margin: '0 var(--nf-space-2)' }}>·</span>
+                    <span className="aw-bullet">·</span>
                     {ws.timezone}
                     {ws.country ? (
                       <>
-                        <span style={{ margin: '0 var(--nf-space-2)' }}>·</span>
+                        <span className="aw-bullet">·</span>
                         {ws.country}
                       </>
                     ) : null}

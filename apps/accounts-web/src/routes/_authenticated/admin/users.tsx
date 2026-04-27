@@ -28,34 +28,6 @@ interface UsersResponse {
 
 type StatusFilter = 'all' | 'active' | 'suspended';
 
-const tableStyle: React.CSSProperties = {
-  width: '100%',
-  borderCollapse: 'collapse',
-  fontSize: 'var(--nf-text-sm, 0.875rem)',
-};
-
-const thStyle: React.CSSProperties = {
-  textAlign: 'start',
-  padding: 'var(--nf-space-2, 0.5rem) var(--nf-space-3, 0.75rem)',
-  borderBlockEnd: '2px solid var(--nf-color-border)',
-  fontWeight: 600,
-  color: 'var(--nf-color-fg-muted)',
-  whiteSpace: 'nowrap',
-};
-
-const tdStyle: React.CSSProperties = {
-  padding: 'var(--nf-space-2, 0.5rem) var(--nf-space-3, 0.75rem)',
-  borderBlockEnd: '1px solid var(--nf-color-border)',
-};
-
-const badgeBase: React.CSSProperties = {
-  display: 'inline-block',
-  padding: '0.125rem 0.5rem',
-  borderRadius: 'var(--nf-radius-full, 9999px)',
-  fontSize: 'var(--nf-text-xs, 0.75rem)',
-  fontWeight: 500,
-};
-
 function formatTimestamp(ts: number | null, never: string): string {
   if (ts === null || ts === 0) return never;
   return new Date(ts * 1000).toLocaleString();
@@ -125,19 +97,11 @@ function UsersPage(): ReactElement {
   };
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--nf-space-6, 1.5rem)' }}>
-      <h1
-        style={{
-          fontFamily: 'var(--nf-font-display, var(--font-display))',
-          fontSize: 'var(--nf-text-2xl, 1.5rem)',
-          margin: 0,
-        }}
-      >
-        {t('users.title')}
-      </h1>
+    <div className="aw-stack aw-stack-6">
+      <h1 className="aw-page-title">{t('users.title')}</h1>
 
-      <div style={{ display: 'flex', gap: 'var(--nf-space-3, 0.75rem)', alignItems: 'center' }}>
-        <div style={{ flex: 1 }}>
+      <div className="aw-row aw-row-3">
+        <div className="aw-grow">
           <Input
             type="search"
             placeholder={t('users.search')}
@@ -149,14 +113,7 @@ function UsersPage(): ReactElement {
           value={statusFilter}
           onChange={handleFilterChange}
           aria-label={t('users.status')}
-          style={{
-            padding: '0.5rem 0.75rem',
-            borderRadius: 'var(--nf-radius-md, 0.375rem)',
-            border: 'var(--nf-space-px, 1px) solid var(--nf-color-border)',
-            background: 'var(--nf-color-bg)',
-            color: 'var(--nf-color-fg)',
-            fontSize: 'var(--nf-text-sm, 0.875rem)',
-          }}
+          className="aw-select"
         >
           <option value="all">{t('users.all_users')}</option>
           <option value="active">{t('users.active_only')}</option>
@@ -165,68 +122,51 @@ function UsersPage(): ReactElement {
       </div>
 
       {error ? (
-        <p
-          role="alert"
-          style={{
-            margin: 0,
-            color: 'var(--nf-color-danger)',
-            fontSize: 'var(--nf-text-sm, 0.875rem)',
-          }}
-        >
+        <p role="alert" className="aw-error">
           {error}
         </p>
       ) : null}
 
       {loading ? (
-        <p style={{ color: 'var(--nf-color-fg-muted)' }}>{t('common.loading')}</p>
+        <p className="aw-muted">{t('common.loading')}</p>
       ) : users.length === 0 ? (
-        <p style={{ color: 'var(--nf-color-fg-muted)' }}>{t('users.no_results')}</p>
+        <p className="aw-muted">{t('users.no_results')}</p>
       ) : (
-        <div style={{ overflowX: 'auto' }}>
-          <table style={tableStyle}>
+        <div className="aw-table-scroll">
+          <table className="aw-table">
             <thead>
               <tr>
-                <th style={thStyle}>{t('users.email')}</th>
-                <th style={thStyle}>{t('users.name')}</th>
-                <th style={thStyle}>{t('users.status')}</th>
-                <th style={thStyle}>{t('users.admin')}</th>
-                <th style={thStyle}>{t('users.workspaces')}</th>
-                <th style={thStyle}>{t('users.last_login')}</th>
-                <th style={thStyle}>{t('users.created_at')}</th>
+                <th className="aw-th">{t('users.email')}</th>
+                <th className="aw-th">{t('users.name')}</th>
+                <th className="aw-th">{t('users.status')}</th>
+                <th className="aw-th">{t('users.admin')}</th>
+                <th className="aw-th">{t('users.workspaces')}</th>
+                <th className="aw-th">{t('users.last_login')}</th>
+                <th className="aw-th">{t('users.created_at')}</th>
               </tr>
             </thead>
             <tbody>
               {users.map((u) => (
                 <tr key={u.id}>
-                  <td style={tdStyle}>
-                    <Link
-                      to="/admin/users/$userId"
-                      params={{ userId: u.id }}
-                      style={{ color: 'var(--nf-color-accent)' }}
-                    >
+                  <td className="aw-td">
+                    <Link to="/admin/users/$userId" params={{ userId: u.id }} className="aw-link">
                       {u.email}
                     </Link>
                   </td>
-                  <td style={tdStyle}>{u.displayName}</td>
-                  <td style={tdStyle}>
+                  <td className="aw-td">{u.displayName}</td>
+                  <td className="aw-td">
                     <span
-                      style={{
-                        ...badgeBase,
-                        background: u.enabled
-                          ? 'color-mix(in srgb, var(--nf-color-success, green) 15%, transparent)'
-                          : 'color-mix(in srgb, var(--nf-color-danger, red) 15%, transparent)',
-                        color: u.enabled
-                          ? 'var(--nf-color-success, green)'
-                          : 'var(--nf-color-danger, red)',
-                      }}
+                      className={
+                        u.enabled ? 'aw-badge aw-badge-success' : 'aw-badge aw-badge-danger'
+                      }
                     >
                       {u.enabled ? t('users.enabled') : t('users.disabled')}
                     </span>
                   </td>
-                  <td style={tdStyle}>{u.isInstanceAdmin ? t('common.yes') : t('common.no')}</td>
-                  <td style={tdStyle}>{u.workspaceCount}</td>
-                  <td style={tdStyle}>{formatTimestamp(u.lastLoginAt, t('common.never'))}</td>
-                  <td style={tdStyle}>{formatTimestamp(u.createdAt, t('common.never'))}</td>
+                  <td className="aw-td">{u.isInstanceAdmin ? t('common.yes') : t('common.no')}</td>
+                  <td className="aw-td">{u.workspaceCount}</td>
+                  <td className="aw-td">{formatTimestamp(u.lastLoginAt, t('common.never'))}</td>
+                  <td className="aw-td">{formatTimestamp(u.createdAt, t('common.never'))}</td>
                 </tr>
               ))}
             </tbody>
@@ -234,20 +174,11 @@ function UsersPage(): ReactElement {
         </div>
       )}
 
-      <div
-        style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          fontSize: 'var(--nf-text-sm, 0.875rem)',
-        }}
-      >
+      <div className="aw-pagination">
         <Button variant="default" disabled={page <= 1} onClick={() => setPage((p) => p - 1)}>
           {t('common.previous')}
         </Button>
-        <span style={{ color: 'var(--nf-color-fg-muted)' }}>
-          {t('common.page', { page, total: totalPages })}
-        </span>
+        <span className="aw-muted">{t('common.page', { page, total: totalPages })}</span>
         <Button
           variant="default"
           disabled={page >= totalPages}
