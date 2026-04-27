@@ -1,5 +1,5 @@
 /**
- * Calendars rail — holiday subscription mode E2E (W11).
+ * Calendars rail — holiday subscription mode E2E.
  *
  * The rail's third section mode (alongside `list` and `discover`) lets the
  * actor subscribe their workspace to a national holiday feed by picking

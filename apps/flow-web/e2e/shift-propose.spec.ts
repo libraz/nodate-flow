@@ -1,5 +1,5 @@
 /**
- * Calendar event shift propose / apply E2E (W14).
+ * Calendar event shift propose / apply E2E.
  *
  * Covers apps/flow-web/src/features/events/shift-event-dialog.tsx, opened
  * from the event detail page header. The dialog respects the actor's
@@ -11,7 +11,7 @@
  * so the propose-shift response carries a non-empty safe-task list with
  * no conflicts (the same task is not linked to any other event).
  *
- * Cases (aligned with R6 plan §6 W14 row):
+ * Cases:
  *   A. ask mode (default for new users) — shift dialog opens in pick
  *      phase, preview advances to confirm with safe task pre-checked,
  *      Apply moves event + checked task.

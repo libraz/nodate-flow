@@ -1,5 +1,5 @@
 /**
- * Event-from-task quick action E2E (W15).
+ * Event-from-task quick action E2E.
  *
  * Covers apps/flow-web/src/features/tasks/event-from-task/event-from-task-dialog.tsx,
  * triggered from the TaskActionsCard ("Create calendar event" button) on
@@ -10,7 +10,7 @@
  * from-task) derives the event's title + start/end from the task's due_on,
  * so the dialog only collects the destination workspace + calendar.
  *
- * Cases (aligned with R6 plan §6 W15 row, scoped to current UI surfaces):
+ * Cases (scoped to current UI surfaces):
  *   A. trigger from a task → event-from-task dialog opens with the
  *      destination workspace pre-selected to the task's workspace.
  *   B. submit → event created and linked to the task; cross-checked via

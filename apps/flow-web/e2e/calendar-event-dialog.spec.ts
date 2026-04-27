@@ -3,7 +3,7 @@
  *
  * Regression coverage for apps/flow-web/src/features/calendar-events/
  * event-dialog.tsx, driven through the `/calendar` route against the
- * real flow-api backend (tasks + calendar events, merged in R6 Phase 0).
+ * real flow-api backend (tasks + calendar events served by one binary).
  *
  * Each test creates its own tenant via REST + seeds any prerequisites
  * (personal calendar, pre-existing event, etc.) so the suite stays

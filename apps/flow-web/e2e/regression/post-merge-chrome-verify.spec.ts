@@ -1,5 +1,5 @@
 /**
- * R6 Phase 0 chrome-verify substitute.
+ * Post-merge chrome-verify substitute.
  *
  * The chrome-verify skill normally drives Chrome DevTools MCP for a
  * 6-axis judgement gate (layout / UX / i18n leak / multi-language /
@@ -10,7 +10,7 @@
  * cleanliness, and golden-path render across the merged calendar
  * surfaces.
  *
- * Surfaces walked (per task #27):
+ * Surfaces walked:
  *   - /calendar  month view
  *   - /calendar  week view
  *   - /calendar  day view
@@ -103,7 +103,7 @@ function todayAtUnix(hhmm: string): number {
   return Math.floor(d.getTime() / 1000);
 }
 
-test.describe('R6 chrome-verify substitute (calendar surfaces)', () => {
+test.describe('chrome-verify substitute (calendar surfaces)', () => {
   test.use({ viewport: { width: 1280, height: 800 } });
 
   let tenant: TestTenant | null = null;

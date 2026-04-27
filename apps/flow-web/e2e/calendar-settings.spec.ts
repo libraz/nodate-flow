@@ -1,5 +1,5 @@
 /**
- * Calendar Settings Drawer — General tab E2E (W13).
+ * Calendar Settings Drawer — General tab E2E.
  *
  * Covers apps/flow-web/src/features/calendars/general-tab.tsx (rename,
  * color swatch, description) plus the validation invariant. Each test
@@ -8,9 +8,8 @@
  * stays satisfied. See {@link seedPersonalCalendar} for context on why
  * personal — not shared — is the seed kind.
  *
- * Cases (aligned with R6 plan §6 W13 row, scoped to the General tab —
- * archive / delete confirm flow are intentionally out of scope per the
- * task description's case list):
+ * Cases (scoped to the General tab — archive / delete confirm flow are
+ * intentionally out of scope):
  *   A. open drawer → fields prefilled from current calendar.
  *   B. rename calendar → save → name updates in the rail without reload.
  *   C. change color → swatch active state updates and rail row dot
@@ -56,9 +55,9 @@ interface SeedCalendar {
  * Returns the actor's auto-created personal calendar after PATCHing it
  * with the desired baseline name / color / description.
  *
- * The original plan was to seed a `kind=shared` calendar so the surface
- * read closer to the W13 plan target (rename / color / archive / delete
- * on a member-managed calendar). Calendar sharing is modelled via
+ * We originally intended to seed a `kind=shared` calendar so the
+ * surface read closer to a member-managed calendar (rename / color /
+ * archive / delete). Calendar sharing is modelled via
  * subscriptions rather than a dedicated kind, so `calendars.kind` is
  * `personal | system` end-to-end. Falling back to the personal calendar
  * still exercises the General tab end-to-end (the actor is owner, so

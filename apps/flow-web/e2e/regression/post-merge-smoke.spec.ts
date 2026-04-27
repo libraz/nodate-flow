@@ -1,5 +1,5 @@
 /**
- * R6 Phase 0 post-merge smoke regression.
+ * Post-merge smoke regression.
  *
  * After merging time-api into flow-api, the surface a single tenant
  * touches in one session must stay green end-to-end:
@@ -64,7 +64,7 @@ function todayAtUnix(hhmm: string): number {
   return Math.floor(d.getTime() / 1000);
 }
 
-test.describe('R6 post-merge smoke', () => {
+test.describe('post-merge smoke', () => {
   test.use({ viewport: { width: 1280, height: 800 } });
 
   let tenant: TestTenant | null = null;

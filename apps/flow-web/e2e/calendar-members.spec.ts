@@ -1,5 +1,5 @@
 /**
- * Calendar Settings Drawer — Members tab E2E (W12).
+ * Calendar Settings Drawer — Members tab E2E.
  *
  * Covers apps/flow-web/src/features/calendars/calendar-members-tab.tsx,
  * accessed via the rail's per-row menu → Settings → Members tab. The drawer
@@ -8,19 +8,19 @@
  * owner). See {@link getOwnedCalendar} for context on why personal — not
  * shared — is the seed kind.
  *
- * Cases (aligned with R6 plan §6 W12 row):
+ * Cases:
  *   A. members tab lists current members with role badges.
  *   B. invite a new member by email → row appears with role badge.
  *   C. change a member's role (editor → manager) → row badge updates.
  *   D. remove a member → confirm → row disappears.
  *   E. last-owner remove guard: a single owner cannot be removed (control
- *      is disabled), matching the plan's "最後の owner remove ガード" case.
+ *      is disabled).
  *
- * Note on case E: the user-supplied prompt also describes a "non-manager
- * cannot see role-change/remove controls" scenario; that gate does not
- * exist in the current calendar-members-tab implementation (controls are
- * rendered for everyone, only `lockOwner` disables them), and the plan's
- * row 5 is the last-owner guard. We test the implementation as built.
+ * Note on case E: a "non-manager cannot see role-change/remove controls"
+ * scenario was once considered, but that gate does not exist in the
+ * current calendar-members-tab implementation (controls are rendered
+ * for everyone, only `lockOwner` disables them). We test the
+ * implementation as built.
  */
 
 import { type Page, expect, test } from '@playwright/test';
@@ -60,10 +60,10 @@ interface OwnedCalendar {
 }
 
 /**
- * Returns the actor's auto-created personal calendar. The original plan
- * for these tests was to seed a `kind=shared` calendar so the surface
- * read closer to the W12 plan target (member-managed calendar). Calendar
- * sharing is modelled via subscriptions rather than a dedicated kind, so
+ * Returns the actor's auto-created personal calendar. We originally
+ * intended to seed a `kind=shared` calendar so the surface read closer
+ * to a member-managed calendar. Calendar sharing is modelled via
+ * subscriptions rather than a dedicated kind, so
  * `calendars.kind` is `personal | system` end-to-end. Using the personal
  * calendar keeps the rail's Settings menu visible (the actor is owner)
  * and exercises the same drawer code path; the only functional gap vs.

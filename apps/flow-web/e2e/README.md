@@ -1,6 +1,6 @@
 # Web E2E (Playwright)
 
-Phase 1 closeout smoke harness for `apps/flow-web`. Real backend, real DB, no
+Smoke + regression harness for `apps/flow-web`. Real backend, real DB, no
 mocks (per `CLAUDE.md` rule 7).
 
 ## Layout

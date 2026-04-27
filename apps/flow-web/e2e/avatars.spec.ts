@@ -1,9 +1,8 @@
 /**
- * Avatar proxy E2E (R7 Phase A G3).
+ * Avatar proxy E2E.
  *
  * Verifies that the unified Avatar primitive integrates with the
- * auth-api `/avatars/{userId}` proxy endpoint across the two surfaces
- * that were migrated in G3:
+ * auth-api `/avatars/{userId}` proxy endpoint across two surfaces:
  *
  *   1. Top-bar account-menu trigger renders an Avatar whose
  *      underlying <img src> matches the proxy URL pattern.
