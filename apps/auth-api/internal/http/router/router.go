@@ -549,6 +549,7 @@ func BuildResult(deps Deps) Result {
 		Registry:      deps.Integrations,
 		PublicBaseURL: deps.PublicBaseURL,
 		WebBaseURL:    deps.WebBaseURL,
+		Audit:         auditRec,
 	}
 
 	// OAuth callback — unauthenticated (user arrives from provider).

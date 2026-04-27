@@ -7,9 +7,10 @@ import (
 	"context"
 	"database/sql"
 
-	"github.com/nodate-flow/nodate-flow/packages/go-shared/crypto"
+	"github.com/nodate-flow/nodate-flow/apps/auth-api/internal/audit"
 	"github.com/nodate-flow/nodate-flow/apps/auth-api/internal/db/generated"
 	integrationspkg "github.com/nodate-flow/nodate-flow/apps/auth-api/internal/integrations"
+	"github.com/nodate-flow/nodate-flow/packages/go-shared/crypto"
 )
 
 // HandlerQuerier is the narrow subset of [generated.Querier] that the
@@ -36,6 +37,9 @@ type Deps struct {
 	Registry      *integrationspkg.Registry
 	PublicBaseURL string
 	WebBaseURL    string
+	// Audit records audit log entries for connect/disconnect side
+	// effects. Optional: nil disables audit logging.
+	Audit audit.Sink
 }
 
 // ConnectionSummary is the public DTO for a user_integrations row.

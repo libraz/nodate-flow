@@ -21,11 +21,17 @@ func OIDCGithubCallback(deps Deps) func(context.Context, *OIDCCallbackInput) (*O
 		if deps.OIDCGithub == nil {
 			return nil, httpErr(apierrors.AuthOidcGithubNotConfigured)
 		}
-		// Validate the state JWT for CSRF protection.
-		if _, err := deps.JWT.VerifyOIDCState(in.State); err != nil {
+		// Validate the state JWT for CSRF protection. The signed state
+		// embeds the nonce so we can pass it uniformly to Exchange,
+		// matching the Google/Microsoft callbacks; GitHub itself does
+		// not bind a nonce yet, but threading it through removes the
+		// drift between handlers and prepares for a future when it
+		// does.
+		nonce, err := deps.JWT.VerifyOIDCState(in.State)
+		if err != nil {
 			return nil, httpErr(apierrors.AuthOidcStateMismatch)
 		}
-		claims, err := deps.OIDCGithub.Exchange(ctx, in.Code)
+		claims, err := deps.OIDCGithub.Exchange(ctx, in.Code, nonce)
 		if err != nil {
 			return nil, httpErr(apierrors.AuthOidcIdTokenInvalid)
 		}

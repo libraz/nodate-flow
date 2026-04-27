@@ -17,7 +17,7 @@ type Deps struct {
 	Queries *generated.Queries
 	// Audit records audit log entries for workspace mutations.
 	// Optional: nil disables audit logging.
-	Audit *audit.Recorder
+	Audit audit.Sink
 }
 
 // InviteDeps extends the standard Deps with fields required by the

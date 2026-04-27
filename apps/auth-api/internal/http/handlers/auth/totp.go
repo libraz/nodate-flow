@@ -23,6 +23,7 @@ import (
 	"encoding/base32"
 	"time"
 
+	"github.com/nodate-flow/nodate-flow/apps/auth-api/internal/audit"
 	"github.com/nodate-flow/nodate-flow/apps/auth-api/internal/auth"
 	"github.com/nodate-flow/nodate-flow/apps/auth-api/internal/db/generated"
 	apierrors "github.com/nodate-flow/nodate-flow/apps/auth-api/internal/errors"
@@ -100,6 +101,7 @@ func TotpEnroll(deps Deps) func(context.Context, *struct{}) (*TotpEnrollOutput, 
 			account = "user"
 		}
 		otpURL := auth.TotpOtpauthURL("nodate-flow", account, secret)
+		recordTotpEnrolledAudit(ctx, deps, uid)
 		out := &TotpEnrollOutput{}
 		out.Body.OtpauthURL = otpURL
 		out.Body.Secret = base32.StdEncoding.WithPadding(base32.NoPadding).EncodeToString(secret)
@@ -243,6 +245,7 @@ func TotpDisable(deps Deps) func(context.Context, *TotpDisableInput) (*TotpDisab
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
 		_ = deps.Queries.DeleteAllRecoveryCodesForUser(ctx, uid)
+		recordTotpDisabledAudit(ctx, deps, uid)
 		out := &TotpDisableOutput{}
 		out.Body.Ok = true
 		return out, nil
@@ -257,4 +260,30 @@ func loadLocalIdentity(ctx context.Context, deps Deps, uid uint32) (generated.Fi
 		return row, httpErr(apierr.SpecForErrNoRows(err, apierrors.AuthPasswordNoLocalIdentity, apierrors.InternalUnexpected))
 	}
 	return row, nil
+}
+
+// recordTotpEnrolledAudit emits the audit entry for a successful TOTP
+// enrollment. Nil-safe so handlers do not need to guard the call.
+func recordTotpEnrolledAudit(ctx context.Context, deps Deps, uid uint32) {
+	if deps.Audit == nil {
+		return
+	}
+	deps.Audit.Record(ctx, audit.Entry{
+		Action:       "auth.totp_enrolled",
+		ActorID:      uid,
+		ResourceType: "user",
+	})
+}
+
+// recordTotpDisabledAudit emits the audit entry for a successful TOTP
+// disable. Nil-safe so handlers do not need to guard the call.
+func recordTotpDisabledAudit(ctx context.Context, deps Deps, uid uint32) {
+	if deps.Audit == nil {
+		return
+	}
+	deps.Audit.Record(ctx, audit.Entry{
+		Action:       "auth.totp_disabled",
+		ActorID:      uid,
+		ResourceType: "user",
+	})
 }

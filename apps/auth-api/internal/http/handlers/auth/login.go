@@ -153,6 +153,7 @@ func LoginTotp(deps Deps) func(context.Context, *LoginTotpInput) (*LoginTotpOutp
 		if hasCode {
 			secret, derr := deps.Cipher.Decrypt([]byte(ident.MfaSecretCiphertext.String))
 			if derr != nil {
+				recordCipherDecryptFailure(ctx, deps, uint32(uid), "login_totp", derr)
 				return nil, httpErr(apierrors.InternalUnexpected)
 			}
 			if !auth.VerifyTotp(secret, in.Body.Code, time.Now()) {
@@ -253,4 +254,25 @@ func bumpFailed(ctx context.Context, deps Deps, row generated.FindLocalIdentityB
 	}); err != nil {
 		slog.ErrorContext(ctx, "login: failed to bump failed attempts counter", slog.Any("err", err), slog.String("user_public_id", row.UserPublicID.String()))
 	}
+}
+
+// recordCipherDecryptFailure logs a high-severity audit entry whenever
+// the application cipher fails to decrypt a stored ciphertext. This is
+// almost always evidence of key rotation drift or storage tampering;
+// surfacing it through audit (and not just logs) lets operators trace
+// the affected user and timestamp without having to grep server logs.
+func recordCipherDecryptFailure(ctx context.Context, deps Deps, actorID uint32, contextLabel string, derr error) {
+	slog.ErrorContext(ctx, "auth: cipher decrypt failed", slog.String("context", contextLabel), slog.Any("err", derr))
+	if deps.Audit == nil {
+		return
+	}
+	deps.Audit.Record(ctx, audit.Entry{
+		Action:       "auth.cipher_decrypt_failed",
+		ActorID:      actorID,
+		ResourceType: "user",
+		Metadata: map[string]any{
+			"context":  contextLabel,
+			"severity": "high",
+		},
+	})
 }

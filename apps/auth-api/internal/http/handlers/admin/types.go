@@ -15,7 +15,7 @@ import (
 type Deps struct {
 	DB      *sql.DB
 	Queries *generated.Queries
-	Audit   *audit.Recorder
+	Audit   audit.Sink
 }
 
 // --- Pagination ---

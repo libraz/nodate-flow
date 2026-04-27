@@ -13,6 +13,20 @@ import (
 	"github.com/nodate-flow/nodate-flow/apps/auth-api/internal/db/types"
 )
 
+// Sink is the minimal contract used by handlers to append audit
+// entries. The production implementation is *Recorder; tests inject
+// fakes that capture the entries.
+type Sink interface {
+	Record(ctx context.Context, e Entry)
+}
+
+// NoopSink discards every entry. Useful in tests that do not assert
+// on audit side effects but still need a non-nil dependency.
+type NoopSink struct{}
+
+// Record discards the entry.
+func (NoopSink) Record(context.Context, Entry) {}
+
 // Recorder appends audit log entries to the audit_logs table.
 // A nil *Recorder is safe to use; all methods become no-ops so callers
 // never need nil guards.
@@ -81,13 +95,13 @@ func (r *Recorder) Record(ctx context.Context, e Entry) {
 	// instance_audit_logs so the FK on workspace_id is never violated.
 	if e.WorkspaceID == 0 {
 		_, err := r.q.AppendInstanceAuditLog(ctx, generated.AppendInstanceAuditLogParams{
-			PublicID:           types.New(),
-			ActorUserID:        actorID,
-			Action:             e.Action,
-			TargetResourceType: sql.NullString{String: e.ResourceType, Valid: e.ResourceType != ""},
+			PublicID:               types.New(),
+			ActorUserID:            actorID,
+			Action:                 e.Action,
+			TargetResourceType:     sql.NullString{String: e.ResourceType, Valid: e.ResourceType != ""},
 			TargetResourcePublicID: resourcePublicID,
-			PayloadJson:        metaJSON,
-			OccurredAt:         now,
+			PayloadJson:            metaJSON,
+			OccurredAt:             now,
 		})
 		if err != nil {
 			slog.WarnContext(ctx, "audit: failed to append instance log", slog.String("action", e.Action), slog.String("err", err.Error()))

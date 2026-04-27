@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -18,11 +19,12 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/nodate-flow/nodate-flow/packages/go-shared/crypto"
+	"github.com/nodate-flow/nodate-flow/apps/auth-api/internal/audit"
 	"github.com/nodate-flow/nodate-flow/apps/auth-api/internal/db/generated"
 	"github.com/nodate-flow/nodate-flow/apps/auth-api/internal/db/types"
 	integrationspkg "github.com/nodate-flow/nodate-flow/apps/auth-api/internal/integrations"
 	"github.com/nodate-flow/nodate-flow/packages/go-shared/authn"
+	"github.com/nodate-flow/nodate-flow/packages/go-shared/crypto"
 )
 
 // testCipherKey is a fixed 32-byte key for test Cipher construction.
@@ -511,6 +513,169 @@ func TestCallback_ExchangeTokensAreEncrypted(t *testing.T) {
 	assert.Equal(t, "secret-refresh-token", string(decryptedRefresh))
 }
 
+// TestCallback_DeletesStateBeforeExchange asserts that the OAuth state
+// row is removed from the database before the (potentially expensive)
+// provider Exchange call runs. If a network blip caused Exchange to
+// retry, the state row must already be gone so the same code cannot be
+// replayed.
+func TestCallback_DeletesStateBeforeExchange(t *testing.T) {
+	t.Parallel()
+	q := &fakeQueries{
+		consumeStateRow: generated.ConsumeOauthStateRow{
+			UserID:    1,
+			Provider:  "github",
+			ExpiresAt: time.Now().Add(10 * time.Minute),
+		},
+	}
+	reg := integrationspkg.NewRegistry(
+		func() (integrationspkg.Provider, error) {
+			return &stubExchangeProvider{
+				stubProvider: stubProvider{name: "github"},
+				tokens:       &integrationspkg.TokenSet{AccessToken: "t"},
+				account:      &integrationspkg.Account{ExternalID: "1", Label: "x"},
+				onCall:       func() { q.log("Exchange") },
+			}, nil
+		},
+	)
+	deps := Deps{
+		Queries:       q,
+		Registry:      reg,
+		Cipher:        newTestCipher(t),
+		PublicBaseURL: "https://auth.example.com",
+		WebBaseURL:    "https://app.example.com",
+	}
+	_ = serveNoAuth(t, deps, "callback", http.MethodGet,
+		"/oauth/callback/github?code=c&state=valid-state")
+
+	require.Contains(t, q.callLog, "DeleteOauthState",
+		"DeleteOauthState must be called for the consumed state")
+	require.Contains(t, q.callLog, "Exchange",
+		"provider Exchange must be called on the happy path")
+
+	deleteIdx := -1
+	exchIdx := -1
+	for i, ev := range q.callLog {
+		if ev == "DeleteOauthState" && deleteIdx == -1 {
+			deleteIdx = i
+		}
+		if ev == "Exchange" && exchIdx == -1 {
+			exchIdx = i
+		}
+	}
+	assert.Less(t, deleteIdx, exchIdx,
+		"DeleteOauthState must run BEFORE provider Exchange to close the re-use window")
+	assert.Contains(t, q.deletedStates, "valid-state",
+		"the consumed state value must be the one deleted")
+}
+
+// TestCallback_HappyPath_RecordsLinkedAudit asserts that a successful
+// callback emits an integration.linked audit entry with the provider in
+// metadata, matching the link side-effect contract.
+func TestCallback_HappyPath_RecordsLinkedAudit(t *testing.T) {
+	t.Parallel()
+	sink := &captureSink{}
+	q := &fakeQueries{
+		consumeStateRow: generated.ConsumeOauthStateRow{
+			UserID:    77,
+			Provider:  "github",
+			ExpiresAt: time.Now().Add(10 * time.Minute),
+		},
+	}
+	reg := integrationspkg.NewRegistry(
+		func() (integrationspkg.Provider, error) {
+			return &stubExchangeProvider{
+				stubProvider: stubProvider{name: "github"},
+				tokens:       &integrationspkg.TokenSet{AccessToken: "t"},
+				account:      &integrationspkg.Account{ExternalID: "1", Label: "x"},
+			}, nil
+		},
+	)
+	deps := Deps{
+		Queries:       q,
+		Registry:      reg,
+		Cipher:        newTestCipher(t),
+		Audit:         sink,
+		PublicBaseURL: "https://auth.example.com",
+		WebBaseURL:    "https://app.example.com",
+	}
+	_ = serveNoAuth(t, deps, "callback", http.MethodGet,
+		"/oauth/callback/github?code=c&state=s")
+
+	entries := sink.snapshot()
+	require.Len(t, entries, 1, "exactly one audit entry must be recorded for a successful link")
+	got := entries[0]
+	assert.Equal(t, "integration.linked", got.Action)
+	assert.Equal(t, uint32(77), got.ActorID, "actor must be the user from the consumed state row")
+	assert.Equal(t, "user_integration", got.ResourceType)
+	assert.Equal(t, "github", got.Metadata["provider"])
+}
+
+// TestCallback_ExchangeFailure_NoLinkedAudit asserts the audit entry is
+// NOT emitted when the OAuth Exchange step fails — the integration was
+// never linked, so the audit log must not pretend it was.
+func TestCallback_ExchangeFailure_NoLinkedAudit(t *testing.T) {
+	t.Parallel()
+	sink := &captureSink{}
+	q := &fakeQueries{
+		consumeStateRow: generated.ConsumeOauthStateRow{
+			UserID:    1,
+			Provider:  "github",
+			ExpiresAt: time.Now().Add(10 * time.Minute),
+		},
+	}
+	reg := integrationspkg.NewRegistry(
+		func() (integrationspkg.Provider, error) {
+			return &stubExchangeProvider{
+				stubProvider: stubProvider{name: "github"},
+				exchErr:      errors.New("exchange boom"),
+			}, nil
+		},
+	)
+	deps := Deps{
+		Queries:       q,
+		Registry:      reg,
+		Cipher:        newTestCipher(t),
+		Audit:         sink,
+		PublicBaseURL: "https://auth.example.com",
+		WebBaseURL:    "https://app.example.com",
+	}
+	_ = serveNoAuth(t, deps, "callback", http.MethodGet,
+		"/oauth/callback/github?code=c&state=s")
+
+	assert.Empty(t, sink.snapshot(),
+		"failed exchange must not emit a linked audit entry")
+}
+
+// TestDisconnect_RecordsUnlinkedAudit asserts that a successful
+// disconnect emits the integration.unlinked audit entry.
+func TestDisconnect_RecordsUnlinkedAudit(t *testing.T) {
+	t.Parallel()
+	pub := types.New()
+	q := &fakeQueries{
+		findByPubRow: generated.FindUserIntegrationByPublicIdRow{
+			ID:       7,
+			PublicID: pub,
+			Provider: "slack",
+		},
+	}
+	sink := &captureSink{}
+	deps := Deps{
+		Queries:  q,
+		Registry: integrationspkg.NewRegistry(),
+		Audit:    sink,
+	}
+	resp := serve(t, deps, "disconnect", http.MethodDelete, "/me/integrations/"+pub.String(), 99, "")
+	require.Equal(t, http.StatusOK, resp.Code, "body=%s", resp.Body.String())
+
+	entries := sink.snapshot()
+	require.Len(t, entries, 1, "disconnect must emit one audit entry")
+	got := entries[0]
+	assert.Equal(t, "integration.unlinked", got.Action)
+	assert.Equal(t, uint32(99), got.ActorID, "actor must be the requester, not the row owner")
+	assert.Equal(t, "user_integration", got.ResourceType)
+	assert.Equal(t, "slack", got.Metadata["provider"])
+}
+
 // --- ConnectionSummary mapping ---
 
 func TestRowToConnectionSummary_MapsAllFields(t *testing.T) {
@@ -691,14 +856,47 @@ type stubExchangeProvider struct {
 	stubProvider
 	tokens  *integrationspkg.TokenSet
 	account *integrationspkg.Account
+	onCall  func()
+	exchErr error
 }
 
 func (s *stubExchangeProvider) Exchange(ctx context.Context, code, redirectURI string) (*integrationspkg.TokenSet, *integrationspkg.Account, error) {
+	if s.onCall != nil {
+		s.onCall()
+	}
+	if s.exchErr != nil {
+		return nil, nil, s.exchErr
+	}
 	return s.tokens, s.account, nil
+}
+
+// captureSink is an audit.Sink that records every entry for assertion.
+type captureSink struct {
+	mu      sync.Mutex
+	entries []audit.Entry
+}
+
+func (c *captureSink) Record(_ context.Context, e audit.Entry) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.entries = append(c.entries, e)
+}
+
+func (c *captureSink) snapshot() []audit.Entry {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	out := make([]audit.Entry, len(c.entries))
+	copy(out, c.entries)
+	return out
 }
 
 // fakeQueries implements HandlerQuerier for unit tests.
 type fakeQueries struct {
+	mu sync.Mutex
+	// callLog records the order in which fake methods are invoked so
+	// tests can assert ordering invariants such as
+	// DeleteOauthState-before-Exchange.
+	callLog []string
 
 	// ListUserIntegrations
 	listRows []generated.ListUserIntegrationsRow
@@ -709,6 +907,9 @@ type fakeQueries struct {
 	// ConsumeOauthState
 	consumeStateRow generated.ConsumeOauthStateRow
 	consumeStateErr error
+
+	// DeleteOauthState
+	deletedStates []string
 
 	// UpsertUserIntegration
 	upserted     bool
@@ -726,6 +927,14 @@ type fakeQueries struct {
 	deleted bool
 }
 
+// log appends an event to the call order trace. Safe for concurrent
+// use because Huma may invoke handlers from a request goroutine.
+func (f *fakeQueries) log(event string) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.callLog = append(f.callLog, event)
+}
+
 func (f *fakeQueries) ListUserIntegrations(ctx context.Context, userID uint32) ([]generated.ListUserIntegrationsRow, error) {
 	return f.listRows, nil
 }
@@ -736,6 +945,7 @@ func (f *fakeQueries) CreateOauthState(ctx context.Context, arg generated.Create
 }
 
 func (f *fakeQueries) ConsumeOauthState(ctx context.Context, state string) (generated.ConsumeOauthStateRow, error) {
+	f.log("ConsumeOauthState")
 	if f.consumeStateErr != nil {
 		return generated.ConsumeOauthStateRow{}, f.consumeStateErr
 	}
@@ -743,6 +953,10 @@ func (f *fakeQueries) ConsumeOauthState(ctx context.Context, state string) (gene
 }
 
 func (f *fakeQueries) DeleteOauthState(ctx context.Context, state string) error {
+	f.log("DeleteOauthState")
+	f.mu.Lock()
+	f.deletedStates = append(f.deletedStates, state)
+	f.mu.Unlock()
 	return nil
 }
 

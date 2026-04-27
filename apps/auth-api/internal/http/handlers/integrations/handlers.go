@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/nodate-flow/nodate-flow/apps/auth-api/internal/audit"
 	"github.com/nodate-flow/nodate-flow/apps/auth-api/internal/db/generated"
 	"github.com/nodate-flow/nodate-flow/apps/auth-api/internal/db/types"
 	apierrors "github.com/nodate-flow/nodate-flow/apps/auth-api/internal/errors"
@@ -181,6 +182,15 @@ func Callback(deps Deps) func(context.Context, *OAuthCallbackInput) (*OAuthCallb
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
 
+		if deps.Audit != nil {
+			deps.Audit.Record(ctx, audit.Entry{
+				Action:       "integration.linked",
+				ActorID:      row.UserID,
+				ResourceType: "user_integration",
+				Metadata:     map[string]any{"provider": in.Provider},
+			})
+		}
+
 		return redirectOnSuccess(deps, in.Provider, row.RedirectTo), nil
 	}
 }
@@ -215,6 +225,14 @@ func Disconnect(deps Deps) func(context.Context, *DisconnectInput) (*DisconnectO
 			UserID: uid,
 		}); err != nil {
 			return nil, httpErr(apierrors.InternalUnexpected)
+		}
+		if deps.Audit != nil {
+			deps.Audit.Record(ctx, audit.Entry{
+				Action:       "integration.unlinked",
+				ActorID:      uid,
+				ResourceType: "user_integration",
+				Metadata:     map[string]any{"provider": string(row.Provider)},
+			})
 		}
 		out := &DisconnectOutput{}
 		out.Body.Ok = true

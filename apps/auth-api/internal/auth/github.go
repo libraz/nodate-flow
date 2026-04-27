@@ -58,8 +58,12 @@ func (c *GithubOAuthClient) AuthCodeURL(state string) string {
 }
 
 // Exchange swaps an authorization code for an access token and fetches
-// the user profile from GitHub's /user endpoint.
-func (c *GithubOAuthClient) Exchange(ctx context.Context, code string) (*GithubClaims, error) {
+// the user profile from GitHub's /user endpoint. The nonce parameter
+// is accepted for parity with the Google/Microsoft OIDC clients so the
+// callback handler can pass it uniformly; GitHub OAuth2 has no
+// id_token to bind it to, so the value is currently unused on the
+// wire but reserved for the day GitHub ships true OIDC.
+func (c *GithubOAuthClient) Exchange(ctx context.Context, code, _ string) (*GithubClaims, error) {
 	tok, err := c.oauth.Exchange(ctx, code)
 	if err != nil {
 		return nil, fmt.Errorf("github: oauth exchange: %w", err)

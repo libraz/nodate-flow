@@ -3,6 +3,7 @@
 package auth
 
 import (
+	"context"
 	"database/sql"
 	"net/http"
 
@@ -15,6 +16,14 @@ import (
 	"github.com/nodate-flow/nodate-flow/packages/go-shared/sessionstore"
 )
 
+// GithubExchanger is the narrow contract used by the GitHub OIDC
+// start/callback handlers. The production implementation is
+// *auth.GithubOAuthClient; tests inject a fake to avoid real HTTP.
+type GithubExchanger interface {
+	AuthCodeURL(state string) string
+	Exchange(ctx context.Context, code, nonce string) (*auth.GithubClaims, error)
+}
+
 // Deps is the dependency bundle passed to each handler.
 type Deps struct {
 	DB       *sql.DB
@@ -23,8 +32,9 @@ type Deps struct {
 	JWT      *auth.JWTIssuer
 	OIDC     *auth.OIDCClient
 	// OIDCGithub is the GitHub OAuth2 client for login. Nil when the
-	// NF_AUTH_GITHUB_OIDC_CLIENT_ID env is unset.
-	OIDCGithub *auth.GithubOAuthClient
+	// NF_AUTH_GITHUB_OIDC_CLIENT_ID env is unset. Declared as an
+	// interface so unit tests can substitute a fake exchanger.
+	OIDCGithub GithubExchanger
 	// OIDCMicrosoft is the Microsoft OIDC client for login. Nil when
 	// the NF_AUTH_MICROSOFT_OIDC_CLIENT_ID env is unset.
 	OIDCMicrosoft *auth.MicrosoftOIDCClient
@@ -40,8 +50,9 @@ type Deps struct {
 	// When false, POST /auth/register returns 403.
 	RegistrationOpen bool
 	// Audit records audit log entries for sensitive auth operations.
-	// Optional: nil disables audit logging.
-	Audit *audit.Recorder
+	// Optional: nil disables audit logging. Declared as audit.Sink so
+	// tests can substitute an in-memory capture.
+	Audit audit.Sink
 	// EmailSender sends transactional emails (magic link). Nil when
 	// SMTP is not configured.
 	EmailSender email.Sender
