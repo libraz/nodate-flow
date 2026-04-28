@@ -237,7 +237,7 @@ test.describe('ai priority suggestions', () => {
 
     // Sanity: the root FatalFallback heading must NOT appear — the
     // per-feature boundary contains the failure to its own subtree.
-    await expect(page.getByRole('heading', { level: 1, name: copy.fatalTitle })).toHaveCount(0);
+    await expect(page.getByRole('heading', { level: 1, name: copy.fatalTitle })).toBeHidden();
   });
 
   /**
@@ -275,7 +275,7 @@ test.describe('ai priority suggestions', () => {
     });
     // Cross-check: the en title should not also render — proves the
     // ja resource bundle is the active one, not just an additive load.
-    await expect(page.getByRole('heading', { name: copy.pageTitle })).toHaveCount(0);
+    await expect(page.getByRole('heading', { name: copy.pageTitle })).toBeHidden();
   });
 
   /**

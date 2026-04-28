@@ -212,9 +212,9 @@ test.describe('i18n key exposure sweep', () => {
       await page.waitForTimeout(300);
 
       const body = await page.locator('body').textContent();
-      // Common i18n key patterns: "namespace.key" with dots
-      // Should NOT match: "common.loading", "nav.home", etc.
-      // Exception: URLs, domain names, version strings
+      // Common i18n key patterns: "namespace.key.subkey" with dots.
+      // Should NOT match: "common.loading", "nav.home" (only 1 dot),
+      // domain names, version strings.
       const suspiciousKeys = body?.match(/\b[a-z]+\.[a-z_]+\.[a-z_]+\b/g) ?? [];
       const filtered = suspiciousKeys.filter(
         (k) =>
@@ -226,8 +226,12 @@ test.describe('i18n key exposure sweep', () => {
           !k.includes('.js') &&
           !k.includes('.ts'),
       );
-      // Allow a small number of false positives (CSS class names, etc.)
-      expect(filtered.length).toBeLessThan(5);
+      // The whole point of this sweep is "no leaked i18n keys", so the
+      // post-filter list must be empty. If a real false positive ever
+      // shows up (CSS class name, library identifier, etc.) extend the
+      // filter list above with a precise exclusion rather than relaxing
+      // this threshold — a leaked key is always a regression.
+      expect(filtered, `Suspected i18n key leaks on ${route}: ${filtered.join(', ')}`).toEqual([]);
     });
   }
 });

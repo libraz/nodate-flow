@@ -66,6 +66,15 @@ async function loginInContext(
 ): Promise<void> {
   const page = await context.newPage();
   try {
+    // AUTH_API_URL is a JSON API endpoint — `goto` may abort with
+    // ERR_ABORTED (no HTML body / non-2xx) or time out before the
+    // navigation "commit" event fires. The navigation itself is
+    // throwaway: we only need the browser to adopt the auth-api
+    // origin so the subsequent same-origin `fetch` inherits the
+    // session cookies that auth-api sets via Set-Cookie. The follow-
+    // up `page.evaluate` call below is the real assertion gate (it
+    // throws on non-OK login), so swallowing the goto error here is
+    // safe and intentional.
     await page.goto(AUTH_API_URL, { waitUntil: 'commit', timeout: 5000 }).catch(() => {});
     const r = await page.evaluate(
       async (creds: { email: string; password: string; authUrl: string }) => {

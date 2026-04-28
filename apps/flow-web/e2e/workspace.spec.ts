@@ -34,9 +34,15 @@ test.describe('workspace', () => {
     await page.getByLabel(/^name/i).fill(wsName);
     await page.getByRole('button', { name: /save|create/i }).click();
 
-    // Verify workspace was created — it appears in the workspace selector
-    // dropdown as an <option>, which is hidden until the select opens.
-    // Check that the page contains the workspace name (visible or in DOM).
-    await expect(page.locator(`text=${wsName}`).first()).toBeAttached({ timeout: 10_000 });
+    // Verify workspace was created — after the create dialog closes,
+    // the SPA refetches the workspaces list and renders a new row in
+    // the DataGrid whose name cell is a <Link to="/workspaces/$id">
+    // carrying the new workspace name. Target that visible link
+    // explicitly so we do not match the offscreen <option> nodes
+    // inside the closed workspace-selector <select>, which Playwright
+    // also resolves via a bare `text=` locator but reports as hidden.
+    await expect(page.getByRole('link', { name: wsName, exact: true }).first()).toBeVisible({
+      timeout: 10_000,
+    });
   });
 });

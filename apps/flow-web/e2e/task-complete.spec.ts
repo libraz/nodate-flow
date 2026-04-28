@@ -49,21 +49,21 @@ test.describe('task complete transition', () => {
     // Click the Complete transition.
     await completeButton.click();
 
-    // After a successful POST the React Query cache invalidates, the badge
-    // re-renders with "Done", and Complete is no longer a legal transition
-    // from the new state — so the button disappears.
-    await expect(completeButton).toHaveCount(0, { timeout: 10_000 });
+    // After a successful POST the React Query cache invalidates and the
+    // sidebar state badge re-renders with "Done". This is the primary
+    // signal that the transition landed end-to-end. Scope to the
+    // sidebar's <aside> and to the row that contains the "State" label
+    // so we don't match unrelated "Done" strings (toasts, static copy,
+    // or other state-graph labels).
+    const sidebar = page.locator('aside');
+    const stateLabel = sidebar.getByText(/^State$/);
+    await expect(stateLabel).toBeVisible({ timeout: 10_000 });
+    const stateRow = stateLabel.locator('..');
+    await expect(stateRow.getByText(/^Done$/).first()).toBeVisible({ timeout: 10_000 });
 
-    // The "Done" status label should now be visible somewhere on the page
-    // (state badge in the sidebar). Scope to the sidebar's <aside> to avoid
-    // matching unrelated "Done" strings in toasts or static copy.
-    await expect(
-      page
-        .locator('aside')
-        .getByText(/^Done$/)
-        .first(),
-    ).toBeVisible({
-      timeout: 10_000,
-    });
+    // Complete is no longer a legal transition from the Done state, so
+    // the Transitions card should hide the button as well — assert via
+    // toBeHidden so the assertion semantics match the user-visible state.
+    await expect(completeButton).toBeHidden();
   });
 });
