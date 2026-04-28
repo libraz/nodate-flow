@@ -30,6 +30,7 @@
     "no_results": "No users found.",
     "detail": "User Details",
     "user_agent": "User Agent",
+    "ip_address": "IP",
     "session_actions": "Actions",
     "sessions": "Sessions",
     "grant_admin": "Grant Admin",

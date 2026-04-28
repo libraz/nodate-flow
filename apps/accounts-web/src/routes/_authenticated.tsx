@@ -6,11 +6,13 @@
 
 import { Link, Outlet, createFileRoute, useNavigate } from '@tanstack/react-router';
 import { type ReactElement, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import { selectIsAuthenticated, selectUser, useAuth } from '../features/auth/auth-store';
 import { useAuthBootstrap } from '../hooks/use-auth-bootstrap';
 
-function AuthenticatedLayout(): ReactElement | null {
+export function AuthenticatedLayout(): ReactElement | null {
+  const { t } = useTranslation('admin');
   const { status } = useAuthBootstrap();
   const isAuthenticated = useAuth(selectIsAuthenticated);
   const user = useAuth(selectUser);
@@ -45,7 +47,7 @@ function AuthenticatedLayout(): ReactElement | null {
               textDecoration: 'none',
             }}
           >
-            Admin
+            {t('title')}
           </Link>
         </nav>
       ) : null}
