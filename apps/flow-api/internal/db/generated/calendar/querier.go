@@ -49,7 +49,7 @@ type Querier interface {
 	// exactly once at create time.
 	CreatePublicShare(ctx context.Context, arg CreatePublicShareParams) (int64, error)
 	// Remove all attendees from an event (used when re-setting attendee list).
-	DeleteAllCalendarEventAttendees(ctx context.Context, eventID uint32) error
+	DeleteAllCalendarEventAttendees(ctx context.Context, eventID sql.NullInt32) error
 	// Remove one event from a share (soft). Looks up the link by share +
 	// event internal ids (caller resolves both via their public ids first).
 	DetachEventFromShare(ctx context.Context, arg DetachEventFromShareParams) error
@@ -57,7 +57,10 @@ type Querier interface {
 	DisableCalendar(ctx context.Context, arg DisableCalendarParams) error
 	// Soft-delete a checklist item.
 	DisableCalendarChecklistItem(ctx context.Context, arg DisableCalendarChecklistItemParams) error
-	// Soft-delete a calendar event.
+	// Soft-delete a calendar event by stamping deleted_at and clearing enabled.
+	// The two flags express different intents: enabled=FALSE was the legacy
+	// soft-disable (kept for compatibility with existing reads), while
+	// deleted_at is the new auditable deletion timestamp gating LIST/GET.
 	DisableCalendarEvent(ctx context.Context, arg DisableCalendarEventParams) error
 	// Soft-delete an attachment. Actual blob cleanup is deferred.
 	DisableCalendarEventAttachment(ctx context.Context, arg DisableCalendarEventAttachmentParams) error
@@ -122,13 +125,13 @@ type Querier interface {
 	// List checklist items for an event in display order.
 	ListCalendarChecklistItems(ctx context.Context, eventID uint32) ([]ListCalendarChecklistItemsRow, error)
 	// List active attachments for an event.
-	ListCalendarEventAttachments(ctx context.Context, eventID uint32) ([]ListCalendarEventAttachmentsRow, error)
+	ListCalendarEventAttachments(ctx context.Context, eventID sql.NullInt32) ([]ListCalendarEventAttachmentsRow, error)
 	// List all attendees for an event with user profile info.
-	ListCalendarEventAttendees(ctx context.Context, eventID uint32) ([]ListCalendarEventAttendeesRow, error)
+	ListCalendarEventAttendees(ctx context.Context, eventID sql.NullInt32) ([]ListCalendarEventAttendeesRow, error)
 	// List comments on an event in chronological order.
-	ListCalendarEventComments(ctx context.Context, eventID uint32) ([]ListCalendarEventCommentsRow, error)
+	ListCalendarEventComments(ctx context.Context, eventID sql.NullInt32) ([]ListCalendarEventCommentsRow, error)
 	// List all active invites for a single event, newest first.
-	ListCalendarEventInvitesForEvent(ctx context.Context, eventID uint32) ([]CalendarEventInvite, error)
+	ListCalendarEventInvitesForEvent(ctx context.Context, eventID sql.NullInt32) ([]CalendarEventInvite, error)
 	// Cross-calendar query: list events across multiple calendars for a user
 	// within a workspace and time range. Used by the unified calendar view.
 	ListCalendarEventsAcrossCalendars(ctx context.Context, arg ListCalendarEventsAcrossCalendarsParams) ([]ListCalendarEventsAcrossCalendarsRow, error)

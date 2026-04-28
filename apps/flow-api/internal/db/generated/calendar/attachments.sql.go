@@ -30,7 +30,7 @@ INSERT INTO calendar_event_attachments (
 type CreateCalendarEventAttachmentParams struct {
 	PublicID       types.PublicID `json:"publicId"`
 	WorkspaceID    uint32         `json:"-"`
-	EventID        uint32         `json:"-"`
+	EventID        sql.NullInt32  `json:"-"`
 	UploaderID     uint32         `json:"-"`
 	Filename       string         `json:"filename"`
 	ContentType    string         `json:"contentType"`
@@ -68,7 +68,7 @@ WHERE public_id = ?
 
 type DisableCalendarEventAttachmentParams struct {
 	PublicID    types.PublicID `json:"publicId"`
-	EventID     uint32         `json:"-"`
+	EventID     sql.NullInt32  `json:"-"`
 	WorkspaceID uint32         `json:"-"`
 }
 
@@ -100,14 +100,14 @@ LIMIT 1
 
 type FindCalendarEventAttachmentByPublicIdParams struct {
 	PublicID    types.PublicID `json:"publicId"`
-	EventID     uint32         `json:"-"`
+	EventID     sql.NullInt32  `json:"-"`
 	WorkspaceID uint32         `json:"-"`
 }
 
 type FindCalendarEventAttachmentByPublicIdRow struct {
 	ID          uint32         `json:"-"`
 	PublicID    types.PublicID `json:"publicId"`
-	EventID     uint32         `json:"-"`
+	EventID     sql.NullInt32  `json:"-"`
 	UploaderID  uint32         `json:"-"`
 	Filename    string         `json:"filename"`
 	ContentType string         `json:"contentType"`
@@ -167,7 +167,7 @@ type ListCalendarEventAttachmentsRow struct {
 }
 
 // List active attachments for an event.
-func (q *Queries) ListCalendarEventAttachments(ctx context.Context, eventID uint32) ([]ListCalendarEventAttachmentsRow, error) {
+func (q *Queries) ListCalendarEventAttachments(ctx context.Context, eventID sql.NullInt32) ([]ListCalendarEventAttachmentsRow, error) {
 	rows, err := q.db.QueryContext(ctx, listCalendarEventAttachments, eventID)
 	if err != nil {
 		return nil, err

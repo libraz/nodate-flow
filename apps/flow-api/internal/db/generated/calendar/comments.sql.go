@@ -26,7 +26,7 @@ INSERT INTO calendar_event_comments (
 type CreateCalendarEventCommentParams struct {
 	PublicID    types.PublicID `json:"publicId"`
 	WorkspaceID uint32         `json:"-"`
-	EventID     uint32         `json:"-"`
+	EventID     sql.NullInt32  `json:"-"`
 	AuthorID    uint32         `json:"-"`
 	Body        string         `json:"body"`
 }
@@ -48,15 +48,17 @@ func (q *Queries) CreateCalendarEventComment(ctx context.Context, arg CreateCale
 
 const disableCalendarEventComment = `-- name: DisableCalendarEventComment :exec
 UPDATE calendar_event_comments
-SET enabled = FALSE
+SET enabled = FALSE,
+    deleted_at = CURRENT_TIMESTAMP(3)
 WHERE public_id = ?
   AND event_id = ?
   AND workspace_id = ?
+  AND deleted_at IS NULL
 `
 
 type DisableCalendarEventCommentParams struct {
 	PublicID    types.PublicID `json:"publicId"`
-	EventID     uint32         `json:"-"`
+	EventID     sql.NullInt32  `json:"-"`
 	WorkspaceID uint32         `json:"-"`
 }
 
@@ -81,19 +83,20 @@ WHERE public_id = ?
   AND event_id = ?
   AND workspace_id = ?
   AND enabled = TRUE
+  AND deleted_at IS NULL
 LIMIT 1
 `
 
 type FindCalendarEventCommentByPublicIdParams struct {
 	PublicID    types.PublicID `json:"publicId"`
-	EventID     uint32         `json:"-"`
+	EventID     sql.NullInt32  `json:"-"`
 	WorkspaceID uint32         `json:"-"`
 }
 
 type FindCalendarEventCommentByPublicIdRow struct {
 	ID        uint32         `json:"-"`
 	PublicID  types.PublicID `json:"publicId"`
-	EventID   uint32         `json:"-"`
+	EventID   sql.NullInt32  `json:"-"`
 	AuthorID  uint32         `json:"-"`
 	Body      string         `json:"body"`
 	EditedAt  sql.NullTime   `json:"editedAt"`
@@ -132,6 +135,7 @@ FROM calendar_event_comments c
 INNER JOIN users u ON u.id = c.author_id AND u.enabled = TRUE
 WHERE c.event_id = ?
   AND c.enabled = TRUE
+  AND c.deleted_at IS NULL
 ORDER BY c.created_at ASC
 `
 
@@ -147,7 +151,7 @@ type ListCalendarEventCommentsRow struct {
 }
 
 // List comments on an event in chronological order.
-func (q *Queries) ListCalendarEventComments(ctx context.Context, eventID uint32) ([]ListCalendarEventCommentsRow, error) {
+func (q *Queries) ListCalendarEventComments(ctx context.Context, eventID sql.NullInt32) ([]ListCalendarEventCommentsRow, error) {
 	rows, err := q.db.QueryContext(ctx, listCalendarEventComments, eventID)
 	if err != nil {
 		return nil, err
@@ -188,12 +192,13 @@ WHERE public_id = ?
   AND workspace_id = ?
   AND author_id = ?
   AND enabled = TRUE
+  AND deleted_at IS NULL
 `
 
 type UpdateCalendarEventCommentParams struct {
 	Body        string         `json:"body"`
 	PublicID    types.PublicID `json:"publicId"`
-	EventID     uint32         `json:"-"`
+	EventID     sql.NullInt32  `json:"-"`
 	WorkspaceID uint32         `json:"-"`
 	AuthorID    uint32         `json:"-"`
 }

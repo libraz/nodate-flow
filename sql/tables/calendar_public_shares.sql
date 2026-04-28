@@ -31,6 +31,7 @@ CREATE TABLE calendar_public_shares (
   UNIQUE KEY uniq_calendar_public_shares_workspace_public_id (workspace_id, public_id),
   UNIQUE KEY uniq_calendar_public_shares_token_hash (token_hash),
   KEY idx_calendar_public_shares_workspace (workspace_id, enabled),
+  KEY idx_calendar_public_shares_expires_at (expires_at),
 
   CONSTRAINT fk_calendar_public_shares_workspace FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
   CONSTRAINT fk_calendar_public_shares_creator FOREIGN KEY (created_by_user_id) REFERENCES users(id) ON DELETE SET NULL

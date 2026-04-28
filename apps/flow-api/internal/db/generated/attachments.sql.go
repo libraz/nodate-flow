@@ -30,7 +30,7 @@ INSERT INTO attachments (
 type AddAttachmentParams struct {
 	PublicID       types.PublicID `json:"publicId"`
 	WorkspaceID    uint32         `json:"-"`
-	TaskID         uint32         `json:"-"`
+	TaskID         sql.NullInt32  `json:"-"`
 	UploaderID     uint32         `json:"-"`
 	Filename       string         `json:"filename"`
 	ContentType    string         `json:"contentType"`

@@ -26,6 +26,7 @@ CREATE TABLE workspace_invites (
   UNIQUE KEY uniq_workspace_invites_workspace_public_id (workspace_id, public_id),
   UNIQUE KEY uniq_workspace_invites_token_hash (token_hash),
   KEY idx_workspace_invites_workspace_id (workspace_id),
+  KEY idx_workspace_invites_expires_at (expires_at),
 
   CONSTRAINT fk_workspace_invites_workspace FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
   CONSTRAINT fk_workspace_invites_created_by FOREIGN KEY (created_by_user_id) REFERENCES users(id) ON DELETE SET NULL

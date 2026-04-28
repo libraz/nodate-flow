@@ -23,6 +23,7 @@ FROM calendar_event_comments c
 INNER JOIN users u ON u.id = c.author_id AND u.enabled = TRUE
 WHERE c.event_id = ?
   AND c.enabled = TRUE
+  AND c.deleted_at IS NULL
 ORDER BY c.created_at ASC;
 
 -- name: FindCalendarEventCommentByPublicId :one
@@ -41,6 +42,7 @@ WHERE public_id = ?
   AND event_id = ?
   AND workspace_id = ?
   AND enabled = TRUE
+  AND deleted_at IS NULL
 LIMIT 1;
 
 -- name: UpdateCalendarEventComment :exec
@@ -52,12 +54,15 @@ WHERE public_id = ?
   AND event_id = ?
   AND workspace_id = ?
   AND author_id = ?
-  AND enabled = TRUE;
+  AND enabled = TRUE
+  AND deleted_at IS NULL;
 
 -- name: DisableCalendarEventComment :exec
 -- Soft-delete a comment (author or calendar owner).
 UPDATE calendar_event_comments
-SET enabled = FALSE
+SET enabled = FALSE,
+    deleted_at = CURRENT_TIMESTAMP(3)
 WHERE public_id = ?
   AND event_id = ?
-  AND workspace_id = ?;
+  AND workspace_id = ?
+  AND deleted_at IS NULL;

@@ -100,10 +100,12 @@ func (q *Queries) CreateCalendarEvent(ctx context.Context, arg CreateCalendarEve
 
 const disableCalendarEvent = `-- name: DisableCalendarEvent :exec
 UPDATE calendar_events
-SET enabled = FALSE
+SET enabled = FALSE,
+    deleted_at = CURRENT_TIMESTAMP(3)
 WHERE public_id = ?
   AND calendar_id = ?
   AND workspace_id = ?
+  AND deleted_at IS NULL
 `
 
 type DisableCalendarEventParams struct {
@@ -112,7 +114,10 @@ type DisableCalendarEventParams struct {
 	WorkspaceID uint32         `json:"-"`
 }
 
-// Soft-delete a calendar event.
+// Soft-delete a calendar event by stamping deleted_at and clearing enabled.
+// The two flags express different intents: enabled=FALSE was the legacy
+// soft-disable (kept for compatibility with existing reads), while
+// deleted_at is the new auditable deletion timestamp gating LIST/GET.
 func (q *Queries) DisableCalendarEvent(ctx context.Context, arg DisableCalendarEventParams) error {
 	_, err := q.db.ExecContext(ctx, disableCalendarEvent, arg.PublicID, arg.CalendarID, arg.WorkspaceID)
 	return err
@@ -151,6 +156,7 @@ WHERE public_id = ?
   AND calendar_id = ?
   AND workspace_id = ?
   AND enabled = TRUE
+  AND deleted_at IS NULL
 LIMIT 1
 `
 
@@ -231,6 +237,7 @@ FROM calendar_events
 WHERE public_id = ?
   AND workspace_id = ?
   AND enabled = TRUE
+  AND deleted_at IS NULL
 LIMIT 1
 `
 
@@ -287,6 +294,7 @@ WHERE ce.workspace_id = ?
   AND ce.start_at < ?
   AND ce.end_at > ?
   AND ce.enabled = TRUE
+  AND ce.deleted_at IS NULL
 ORDER BY ce.start_at ASC, ce.public_id ASC
 LIMIT 1000
 `
@@ -393,6 +401,7 @@ WHERE ce.calendar_id = ?
   AND ce.start_at < ?
   AND ce.end_at > ?
   AND ce.enabled = TRUE
+  AND ce.deleted_at IS NULL
 ORDER BY ce.start_at ASC, ce.public_id ASC
 LIMIT 1000
 `
@@ -517,6 +526,7 @@ WHERE ce.recurrence_rule IS NULL
   AND ce.start_at < ?
   AND ce.end_at > ?
   AND ce.enabled = TRUE
+  AND ce.deleted_at IS NULL
 ORDER BY ce.start_at ASC, ce.public_id ASC
 LIMIT 2000
 `
@@ -658,6 +668,7 @@ WHERE ce.recurrence_rule IS NOT NULL
   AND ce.start_at < ?
   AND (ce.recurrence_end IS NULL OR ce.recurrence_end > ?)
   AND ce.enabled = TRUE
+  AND ce.deleted_at IS NULL
 ORDER BY ce.start_at ASC, ce.public_id ASC
 LIMIT 2000
 `
@@ -785,6 +796,7 @@ WHERE ce.workspace_id = ?
   AND ce.start_at < ?
   AND (ce.recurrence_end IS NULL OR ce.recurrence_end > ?)
   AND ce.enabled = TRUE
+  AND ce.deleted_at IS NULL
 ORDER BY ce.start_at ASC
 LIMIT 1000
 `
@@ -900,6 +912,7 @@ WHERE ce.calendar_id = ?
   AND ce.start_at < ?
   AND (ce.recurrence_end IS NULL OR ce.recurrence_end > ?)
   AND ce.enabled = TRUE
+  AND ce.deleted_at IS NULL
 ORDER BY ce.start_at ASC
 LIMIT 1000
 `
@@ -1006,6 +1019,7 @@ WHERE public_id = ?
   AND calendar_id = ?
   AND workspace_id = ?
   AND enabled = TRUE
+  AND deleted_at IS NULL
 `
 
 type PatchCalendarEventParams struct {

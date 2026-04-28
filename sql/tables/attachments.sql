@@ -7,7 +7,7 @@ CREATE TABLE attachments (
   id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY COMMENT 'Internal PK, never exposed',
   public_id BINARY(16) NOT NULL COMMENT 'UUID v7, the only externally visible ID',
   workspace_id INT UNSIGNED NOT NULL COMMENT 'Internal FK to workspaces.id',
-  task_id INT UNSIGNED NOT NULL COMMENT 'Internal FK to tasks.id',
+  task_id INT UNSIGNED NULL COMMENT 'Internal FK to tasks.id; nullable so audit-trail attachments survive task deletion (FK SET NULL)',
   uploader_id INT UNSIGNED NOT NULL COMMENT 'Internal FK to users.id (uploader)',
 
   filename VARCHAR(255) NOT NULL COMMENT 'Original filename',
@@ -29,6 +29,6 @@ CREATE TABLE attachments (
   KEY idx_attachments_workspace_id_uploader_id (workspace_id, uploader_id),
 
   CONSTRAINT fk_attachments_workspace FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
-  CONSTRAINT fk_attachments_task FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE CASCADE,
+  CONSTRAINT fk_attachments_task FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE SET NULL,
   CONSTRAINT fk_attachments_uploader FOREIGN KEY (uploader_id) REFERENCES users(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Task file attachments metadata';

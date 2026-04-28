@@ -2142,6 +2142,8 @@ type AiSetting struct {
 	ID uint32 `json:"-"`
 	// Internal FK to workspaces.id
 	WorkspaceID uint32 `json:"-"`
+	// Last modifier user.id (audit field; NULL when user is removed or for system writers)
+	ModifiedByUserID sql.NullInt32 `json:"modifiedByUserId"`
 	// Embedding model key (resolved by ai/embed registry)
 	EmbedModel string `json:"embedModel"`
 	// Daily embed cost cap in cents (separate bucket from chat budget)
@@ -2170,8 +2172,8 @@ type Attachment struct {
 	PublicID types.PublicID `json:"publicId"`
 	// Internal FK to workspaces.id
 	WorkspaceID uint32 `json:"-"`
-	// Internal FK to tasks.id
-	TaskID uint32 `json:"taskId"`
+	// Internal FK to tasks.id; nullable so audit-trail attachments survive task deletion (FK SET NULL)
+	TaskID sql.NullInt32 `json:"taskId"`
 	// Internal FK to users.id (uploader)
 	UploaderID uint32 `json:"uploaderId"`
 	// Original filename
@@ -2339,7 +2341,9 @@ type CalendarEvent struct {
 	// Structured per-event markers (non_working_day, auto_snapped, etc.); unknown keys preserved.
 	Flags json.RawMessage `json:"flags"`
 	// Enabled flag
-	Enabled   bool         `json:"enabled"`
+	Enabled bool `json:"enabled"`
+	// Soft-delete timestamp; rows with deleted_at IS NOT NULL are excluded from LIST/GET
+	DeletedAt sql.NullTime `json:"deletedAt"`
 	UpdatedAt sql.NullTime `json:"updatedAt"`
 	CreatedAt time.Time    `json:"createdAt"`
 }
@@ -2352,8 +2356,8 @@ type CalendarEventAttachment struct {
 	PublicID types.PublicID `json:"publicId"`
 	// Internal FK to workspaces.id
 	WorkspaceID uint32 `json:"-"`
-	// Internal FK to calendar_events.id
-	EventID uint32 `json:"eventId"`
+	// Internal FK to calendar_events.id; nullable so audit-trail attachments survive event hard-delete (FK SET NULL)
+	EventID sql.NullInt32 `json:"eventId"`
 	// Internal FK to users.id (uploader)
 	UploaderID uint32 `json:"uploaderId"`
 	// Original filename
@@ -2384,8 +2388,8 @@ type CalendarEventAttendee struct {
 	PublicID types.PublicID `json:"publicId"`
 	// Internal FK to workspaces.id
 	WorkspaceID uint32 `json:"-"`
-	// Internal FK to calendar_events.id
-	EventID uint32 `json:"eventId"`
+	// Internal FK to calendar_events.id; nullable so audit-trail attendee rows survive event hard-delete (FK SET NULL); active rows for live events are NOT NULL via app constraint
+	EventID sql.NullInt32 `json:"eventId"`
 	// Internal FK to users.id
 	UserID uint32 `json:"-"`
 	// Attendance response
@@ -2436,8 +2440,8 @@ type CalendarEventComment struct {
 	PublicID types.PublicID `json:"publicId"`
 	// Internal FK to workspaces.id
 	WorkspaceID uint32 `json:"-"`
-	// Internal FK to calendar_events.id
-	EventID uint32 `json:"eventId"`
+	// Internal FK to calendar_events.id; nullable so audit-trail comments survive event hard-delete (FK SET NULL)
+	EventID sql.NullInt32 `json:"eventId"`
 	// Internal FK to users.id
 	AuthorID uint32 `json:"authorId"`
 	// Comment text (markdown)
@@ -2449,7 +2453,9 @@ type CalendarEventComment struct {
 	// Admin notes
 	Notes sql.NullString `json:"notes"`
 	// Enabled flag
-	Enabled   bool         `json:"enabled"`
+	Enabled bool `json:"enabled"`
+	// Soft-delete timestamp; rows with deleted_at IS NOT NULL are excluded from LIST/GET
+	DeletedAt sql.NullTime `json:"deletedAt"`
 	UpdatedAt sql.NullTime `json:"updatedAt"`
 	CreatedAt time.Time    `json:"createdAt"`
 }
@@ -2464,10 +2470,10 @@ type CalendarEventInvite struct {
 	WorkspaceID uint32 `json:"-"`
 	// Internal FK to calendars.id
 	CalendarID uint32 `json:"calendarId"`
-	// Internal FK to calendar_events.id
-	EventID uint32 `json:"eventId"`
-	// Internal FK to calendar_event_attendees.id
-	AttendeeID uint32 `json:"attendeeId"`
+	// Internal FK to calendar_events.id; nullable so revoked invites survive event hard-delete (FK SET NULL)
+	EventID sql.NullInt32 `json:"eventId"`
+	// Internal FK to calendar_event_attendees.id; nullable to mirror parent attendee being detached on event hard-delete
+	AttendeeID sql.NullInt32 `json:"attendeeId"`
 	// Recipient email, denormalized from attendee for inbox queries
 	Email string `json:"email"`
 	// SHA-256 digest of the plaintext magic-link token
@@ -2604,8 +2610,8 @@ type Comment struct {
 	PublicID types.PublicID `json:"publicId"`
 	// Internal FK to workspaces.id
 	WorkspaceID uint32 `json:"-"`
-	// Internal FK to tasks.id
-	TaskID uint32 `json:"taskId"`
+	// Internal FK to tasks.id; nullable so audit-trail comments survive task deletion (FK SET NULL)
+	TaskID sql.NullInt32 `json:"taskId"`
 	// Internal FK to users.id
 	AuthorID uint32 `json:"authorId"`
 	// Markdown body
@@ -2888,6 +2894,8 @@ type Label struct {
 	ProjectID sql.NullInt32 `json:"-"`
 	// Self-ref for hierarchy; NULL = root
 	ParentLabelID sql.NullInt32 `json:"parentLabelId"`
+	// Creator user.id (audit field; NULL when creator is removed)
+	CreatedByUserID sql.NullInt32 `json:"-"`
 	// Display name
 	Name string `json:"name"`
 	// Hex color
@@ -3575,7 +3583,7 @@ type TaskDescriptionVersion struct {
 type TaskEmbedding struct {
 	// Internal FK to tasks.id
 	TaskID uint32 `json:"taskId"`
-	// Denormalized from tasks.workspace_id for scoped queries (no FK; cascade via fk_task_embeddings_task)
+	// Denormalized from tasks.workspace_id for scoped queries; FK guarantees consistency on workspace removal
 	WorkspaceID uint32 `json:"-"`
 	// Embedding model key, e.g. mock-768
 	Model string `json:"model"`
@@ -3902,7 +3910,7 @@ type VAuditRecent struct {
 
 type VCommentForTask struct {
 	WorkspaceID       uint32         `json:"-"`
-	TaskID            uint32         `json:"taskId"`
+	TaskID            sql.NullInt32  `json:"taskId"`
 	TaskPublicID      []byte         `json:"taskPublicId"`
 	PublicID          types.PublicID `json:"publicId"`
 	AuthorPublicID    []byte         `json:"authorPublicId"`

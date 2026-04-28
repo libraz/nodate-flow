@@ -5,11 +5,12 @@ INSERT INTO labels (
   workspace_id,
   project_id,
   parent_label_id,
+  created_by_user_id,
   name,
   color,
   description,
   sort_weight
-) VALUES (?, ?, ?, ?, ?, ?, ?, ?);
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);
 
 -- name: FindLabelByPublicId :one
 -- Resolve a label by its UUID v7 within a workspace.

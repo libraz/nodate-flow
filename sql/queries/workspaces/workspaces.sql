@@ -11,8 +11,8 @@ INSERT INTO workspaces (
 ) VALUES (?, ?, ?, ?, ?, ?, ?);
 
 -- name: FindWorkspaceTimezoneCountryById :one
--- Fetch just the timezone and country columns by internal id. Used by
--- time-api when resolving the effective timezone for a request.
+-- Fetch just the timezone and country columns by internal id. Used by the
+-- calendar layer when resolving the effective timezone for a request.
 SELECT timezone, country
 FROM workspaces
 WHERE id = ?

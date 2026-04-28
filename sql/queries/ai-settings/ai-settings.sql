@@ -11,6 +11,7 @@
 SELECT
   id,
   workspace_id,
+  modified_by_user_id,
   embed_model,
   embed_budget_cents_day,
   duplicate_threshold_high,
@@ -26,9 +27,11 @@ LIMIT 1;
 
 -- name: UpsertAiSettings :exec
 -- Create or update the ai_settings row for a workspace. The UNIQUE KEY on
--- workspace_id makes this idempotent.
+-- workspace_id makes this idempotent. modified_by_user_id is the audit
+-- trail for the most recent writer; system writers pass NULL.
 INSERT INTO ai_settings (
   workspace_id,
+  modified_by_user_id,
   embed_model,
   embed_budget_cents_day,
   duplicate_threshold_high,
@@ -36,8 +39,9 @@ INSERT INTO ai_settings (
   auto_action_enabled,
   auto_action_interval_minutes,
   auto_action_threshold
-) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
 ON DUPLICATE KEY UPDATE
+  modified_by_user_id = VALUES(modified_by_user_id),
   embed_model = VALUES(embed_model),
   embed_budget_cents_day = VALUES(embed_budget_cents_day),
   duplicate_threshold_high = VALUES(duplicate_threshold_high),

@@ -18,8 +18,8 @@ CREATE TABLE calendar_event_invites (
   public_id BINARY(16) NOT NULL COMMENT 'UUID v7, the only externally visible ID',
   workspace_id INT UNSIGNED NOT NULL COMMENT 'Internal FK to workspaces.id',
   calendar_id INT UNSIGNED NOT NULL COMMENT 'Internal FK to calendars.id',
-  event_id INT UNSIGNED NOT NULL COMMENT 'Internal FK to calendar_events.id',
-  attendee_id INT UNSIGNED NOT NULL COMMENT 'Internal FK to calendar_event_attendees.id',
+  event_id INT UNSIGNED NULL COMMENT 'Internal FK to calendar_events.id; nullable so revoked invites survive event hard-delete (FK SET NULL)',
+  attendee_id INT UNSIGNED NULL COMMENT 'Internal FK to calendar_event_attendees.id; nullable to mirror parent attendee being detached on event hard-delete',
 
   email VARCHAR(255) CHARACTER SET latin1 COLLATE latin1_swedish_ci NOT NULL COMMENT 'Recipient email, denormalized from attendee for inbox queries',
   token_hash BINARY(32) NOT NULL COMMENT 'SHA-256 digest of the plaintext magic-link token',
@@ -43,6 +43,6 @@ CREATE TABLE calendar_event_invites (
 
   CONSTRAINT fk_calendar_event_invites_workspace FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
   CONSTRAINT fk_calendar_event_invites_calendar FOREIGN KEY (calendar_id) REFERENCES calendars(id) ON DELETE CASCADE,
-  CONSTRAINT fk_calendar_event_invites_event FOREIGN KEY (event_id) REFERENCES calendar_events(id) ON DELETE CASCADE,
-  CONSTRAINT fk_calendar_event_invites_attendee FOREIGN KEY (attendee_id) REFERENCES calendar_event_attendees(id) ON DELETE CASCADE
+  CONSTRAINT fk_calendar_event_invites_event FOREIGN KEY (event_id) REFERENCES calendar_events(id) ON DELETE SET NULL,
+  CONSTRAINT fk_calendar_event_invites_attendee FOREIGN KEY (attendee_id) REFERENCES calendar_event_attendees(id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Magic-link invite rows for calendar event attendees';

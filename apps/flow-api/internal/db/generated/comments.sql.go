@@ -26,7 +26,7 @@ INSERT INTO comments (
 type AddCommentParams struct {
 	PublicID    types.PublicID `json:"publicId"`
 	WorkspaceID uint32         `json:"-"`
-	TaskID      uint32         `json:"-"`
+	TaskID      sql.NullInt32  `json:"-"`
 	AuthorID    uint32         `json:"-"`
 	Body        string         `json:"body"`
 }

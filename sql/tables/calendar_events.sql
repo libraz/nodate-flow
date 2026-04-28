@@ -48,6 +48,7 @@ CREATE TABLE calendar_events (
   notes TEXT NULL COMMENT 'Admin notes',
   flags JSON NULL COMMENT 'Structured per-event markers (non_working_day, auto_snapped, etc.); unknown keys preserved.',
   enabled BOOLEAN NOT NULL DEFAULT TRUE COMMENT 'Enabled flag',
+  deleted_at DATETIME(3) NULL DEFAULT NULL COMMENT 'Soft-delete timestamp; rows with deleted_at IS NOT NULL are excluded from LIST/GET',
   updated_at TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
   created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
 
@@ -58,6 +59,7 @@ CREATE TABLE calendar_events (
   KEY idx_calendar_events_calendar_recurrence (calendar_id, recurrence_end),
   KEY idx_calendar_events_workspace_range (workspace_id, start_at, end_at),
   KEY idx_calendar_events_task_role (task_id, task_role, enabled),
+  KEY idx_calendar_events_deleted_at (deleted_at),
   FULLTEXT KEY ft_calendar_events_title_memo (title, memo),
 
   CONSTRAINT fk_calendar_events_workspace FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,

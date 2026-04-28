@@ -7,7 +7,7 @@ CREATE TABLE comments (
   id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY COMMENT 'Internal PK, never exposed',
   public_id BINARY(16) NOT NULL COMMENT 'UUID v7, the only externally visible ID',
   workspace_id INT UNSIGNED NOT NULL COMMENT 'Internal FK to workspaces.id',
-  task_id INT UNSIGNED NOT NULL COMMENT 'Internal FK to tasks.id',
+  task_id INT UNSIGNED NULL COMMENT 'Internal FK to tasks.id; nullable so audit-trail comments survive task deletion (FK SET NULL)',
   author_id INT UNSIGNED NOT NULL COMMENT 'Internal FK to users.id',
 
   body MEDIUMTEXT NOT NULL COMMENT 'Markdown body',
@@ -33,6 +33,6 @@ CREATE TABLE comments (
   FULLTEXT KEY ft_comments_body (body),
 
   CONSTRAINT fk_comments_workspace FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
-  CONSTRAINT fk_comments_task FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE CASCADE,
+  CONSTRAINT fk_comments_task FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE SET NULL,
   CONSTRAINT fk_comments_author FOREIGN KEY (author_id) REFERENCES users(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Task discussion comments';

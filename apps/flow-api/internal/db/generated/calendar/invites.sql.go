@@ -43,8 +43,8 @@ type CreateCalendarEventInviteParams struct {
 	PublicID    types.PublicID `json:"publicId"`
 	WorkspaceID uint32         `json:"-"`
 	CalendarID  uint32         `json:"-"`
-	EventID     uint32         `json:"-"`
-	AttendeeID  uint32         `json:"-"`
+	EventID     sql.NullInt32  `json:"-"`
+	AttendeeID  sql.NullInt32  `json:"-"`
 	Email       string         `json:"email"`
 	TokenHash   []byte         `json:"tokenHash"`
 	ExpiresAt   time.Time      `json:"expiresAt"`
@@ -91,8 +91,8 @@ LIMIT 1
 `
 
 type FindActiveCalendarEventInviteParams struct {
-	EventID    uint32 `json:"-"`
-	AttendeeID uint32 `json:"-"`
+	EventID    sql.NullInt32 `json:"-"`
+	AttendeeID sql.NullInt32 `json:"-"`
 }
 
 // Find the currently active invite for a given (event_id, attendee_id)
@@ -205,7 +205,7 @@ ORDER BY created_at DESC, id DESC
 `
 
 // List all active invites for a single event, newest first.
-func (q *Queries) ListCalendarEventInvitesForEvent(ctx context.Context, eventID uint32) ([]CalendarEventInvite, error) {
+func (q *Queries) ListCalendarEventInvitesForEvent(ctx context.Context, eventID sql.NullInt32) ([]CalendarEventInvite, error) {
 	rows, err := q.db.QueryContext(ctx, listCalendarEventInvitesForEvent, eventID)
 	if err != nil {
 		return nil, err
@@ -280,8 +280,8 @@ type ListMyCalendarEventInvitesRow struct {
 	PublicID          types.PublicID `json:"publicId"`
 	WorkspaceID       uint32         `json:"-"`
 	CalendarID        uint32         `json:"-"`
-	EventID           uint32         `json:"-"`
-	AttendeeID        uint32         `json:"-"`
+	EventID           sql.NullInt32  `json:"-"`
+	AttendeeID        sql.NullInt32  `json:"-"`
 	Email             string         `json:"email"`
 	ExpiresAt         time.Time      `json:"expiresAt"`
 	SentAt            sql.NullTime   `json:"sentAt"`

@@ -355,8 +355,8 @@ type FindWorkspaceTimezoneCountryByIdRow struct {
 	Country  sql.NullString `json:"country"`
 }
 
-// Fetch just the timezone and country columns by internal id. Used by
-// time-api when resolving the effective timezone for a request.
+// Fetch just the timezone and country columns by internal id. Used by the
+// calendar layer when resolving the effective timezone for a request.
 func (q *Queries) FindWorkspaceTimezoneCountryById(ctx context.Context, id uint32) (FindWorkspaceTimezoneCountryByIdRow, error) {
 	row := q.db.QueryRowContext(ctx, findWorkspaceTimezoneCountryById, id)
 	var i FindWorkspaceTimezoneCountryByIdRow

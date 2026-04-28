@@ -19,22 +19,24 @@ INSERT INTO labels (
   workspace_id,
   project_id,
   parent_label_id,
+  created_by_user_id,
   name,
   color,
   description,
   sort_weight
-) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
 `
 
 type CreateLabelParams struct {
-	PublicID      types.PublicID `json:"publicId"`
-	WorkspaceID   uint32         `json:"-"`
-	ProjectID     sql.NullInt32  `json:"-"`
-	ParentLabelID sql.NullInt32  `json:"-"`
-	Name          string         `json:"name"`
-	Color         string         `json:"color"`
-	Description   sql.NullString `json:"description"`
-	SortWeight    int32          `json:"sortWeight"`
+	PublicID        types.PublicID `json:"publicId"`
+	WorkspaceID     uint32         `json:"-"`
+	ProjectID       sql.NullInt32  `json:"-"`
+	ParentLabelID   sql.NullInt32  `json:"-"`
+	CreatedByUserID sql.NullInt32  `json:"-"`
+	Name            string         `json:"name"`
+	Color           string         `json:"color"`
+	Description     sql.NullString `json:"description"`
+	SortWeight      int32          `json:"sortWeight"`
 }
 
 // Insert a new label in a workspace.
@@ -44,6 +46,7 @@ func (q *Queries) CreateLabel(ctx context.Context, arg CreateLabelParams) (int64
 		arg.WorkspaceID,
 		arg.ProjectID,
 		arg.ParentLabelID,
+		arg.CreatedByUserID,
 		arg.Name,
 		arg.Color,
 		arg.Description,

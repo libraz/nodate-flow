@@ -16,6 +16,7 @@ const getAiSettings = `-- name: GetAiSettings :one
 SELECT
   id,
   workspace_id,
+  modified_by_user_id,
   embed_model,
   embed_budget_cents_day,
   duplicate_threshold_high,
@@ -31,17 +32,18 @@ LIMIT 1
 `
 
 type GetAiSettingsRow struct {
-	ID                        uint32       `json:"-"`
-	WorkspaceID               uint32       `json:"-"`
-	EmbedModel                string       `json:"embedModel"`
-	EmbedBudgetCentsDay       uint32       `json:"embedBudgetCentsDay"`
-	DuplicateThresholdHigh    string       `json:"duplicateThresholdHigh"`
-	DuplicateThresholdLow     string       `json:"duplicateThresholdLow"`
-	AutoActionEnabled         bool         `json:"autoActionEnabled"`
-	AutoActionIntervalMinutes uint32       `json:"autoActionIntervalMinutes"`
-	AutoActionThreshold       string       `json:"autoActionThreshold"`
-	UpdatedAt                 sql.NullTime `json:"updatedAt"`
-	CreatedAt                 time.Time    `json:"createdAt"`
+	ID                        uint32        `json:"-"`
+	WorkspaceID               uint32        `json:"-"`
+	ModifiedByUserID          sql.NullInt32 `json:"modifiedByUserId"`
+	EmbedModel                string        `json:"embedModel"`
+	EmbedBudgetCentsDay       uint32        `json:"embedBudgetCentsDay"`
+	DuplicateThresholdHigh    string        `json:"duplicateThresholdHigh"`
+	DuplicateThresholdLow     string        `json:"duplicateThresholdLow"`
+	AutoActionEnabled         bool          `json:"autoActionEnabled"`
+	AutoActionIntervalMinutes uint32        `json:"autoActionIntervalMinutes"`
+	AutoActionThreshold       string        `json:"autoActionThreshold"`
+	UpdatedAt                 sql.NullTime  `json:"updatedAt"`
+	CreatedAt                 time.Time     `json:"createdAt"`
 }
 
 // ============================================================================
@@ -58,6 +60,7 @@ func (q *Queries) GetAiSettings(ctx context.Context, workspaceID uint32) (GetAiS
 	err := row.Scan(
 		&i.ID,
 		&i.WorkspaceID,
+		&i.ModifiedByUserID,
 		&i.EmbedModel,
 		&i.EmbedBudgetCentsDay,
 		&i.DuplicateThresholdHigh,
@@ -74,6 +77,7 @@ func (q *Queries) GetAiSettings(ctx context.Context, workspaceID uint32) (GetAiS
 const upsertAiSettings = `-- name: UpsertAiSettings :exec
 INSERT INTO ai_settings (
   workspace_id,
+  modified_by_user_id,
   embed_model,
   embed_budget_cents_day,
   duplicate_threshold_high,
@@ -81,8 +85,9 @@ INSERT INTO ai_settings (
   auto_action_enabled,
   auto_action_interval_minutes,
   auto_action_threshold
-) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
 ON DUPLICATE KEY UPDATE
+  modified_by_user_id = VALUES(modified_by_user_id),
   embed_model = VALUES(embed_model),
   embed_budget_cents_day = VALUES(embed_budget_cents_day),
   duplicate_threshold_high = VALUES(duplicate_threshold_high),
@@ -93,21 +98,24 @@ ON DUPLICATE KEY UPDATE
 `
 
 type UpsertAiSettingsParams struct {
-	WorkspaceID               uint32 `json:"-"`
-	EmbedModel                string `json:"embedModel"`
-	EmbedBudgetCentsDay       uint32 `json:"embedBudgetCentsDay"`
-	DuplicateThresholdHigh    string `json:"duplicateThresholdHigh"`
-	DuplicateThresholdLow     string `json:"duplicateThresholdLow"`
-	AutoActionEnabled         bool   `json:"autoActionEnabled"`
-	AutoActionIntervalMinutes uint32 `json:"autoActionIntervalMinutes"`
-	AutoActionThreshold       string `json:"autoActionThreshold"`
+	WorkspaceID               uint32        `json:"-"`
+	ModifiedByUserID          sql.NullInt32 `json:"modifiedByUserId"`
+	EmbedModel                string        `json:"embedModel"`
+	EmbedBudgetCentsDay       uint32        `json:"embedBudgetCentsDay"`
+	DuplicateThresholdHigh    string        `json:"duplicateThresholdHigh"`
+	DuplicateThresholdLow     string        `json:"duplicateThresholdLow"`
+	AutoActionEnabled         bool          `json:"autoActionEnabled"`
+	AutoActionIntervalMinutes uint32        `json:"autoActionIntervalMinutes"`
+	AutoActionThreshold       string        `json:"autoActionThreshold"`
 }
 
 // Create or update the ai_settings row for a workspace. The UNIQUE KEY on
-// workspace_id makes this idempotent.
+// workspace_id makes this idempotent. modified_by_user_id is the audit
+// trail for the most recent writer; system writers pass NULL.
 func (q *Queries) UpsertAiSettings(ctx context.Context, arg UpsertAiSettingsParams) error {
 	_, err := q.db.ExecContext(ctx, upsertAiSettings,
 		arg.WorkspaceID,
+		arg.ModifiedByUserID,
 		arg.EmbedModel,
 		arg.EmbedBudgetCentsDay,
 		arg.DuplicateThresholdHigh,

@@ -177,8 +177,8 @@ type Querier interface {
 	FindWorkspaceInviteWorkspaceName(ctx context.Context, tokenHash string) (FindWorkspaceInviteWorkspaceNameRow, error)
 	// Resolve a workspace membership by (workspace_id, user_id).
 	FindWorkspaceMemberByUserId(ctx context.Context, arg FindWorkspaceMemberByUserIdParams) (FindWorkspaceMemberByUserIdRow, error)
-	// Fetch just the timezone and country columns by internal id. Used by
-	// time-api when resolving the effective timezone for a request.
+	// Fetch just the timezone and country columns by internal id. Used by the
+	// calendar layer when resolving the effective timezone for a request.
 	FindWorkspaceTimezoneCountryById(ctx context.Context, id uint32) (FindWorkspaceTimezoneCountryByIdRow, error)
 	// Resolve internal workspace id from public_id; ignored if workspace is disabled.
 	// Direct table lookup (no view) because this is a single-column id resolution

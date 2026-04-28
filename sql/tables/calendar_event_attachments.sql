@@ -8,7 +8,7 @@ CREATE TABLE calendar_event_attachments (
   id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY COMMENT 'Internal PK, never exposed',
   public_id BINARY(16) NOT NULL COMMENT 'UUID v7, the only externally visible ID',
   workspace_id INT UNSIGNED NOT NULL COMMENT 'Internal FK to workspaces.id',
-  event_id INT UNSIGNED NOT NULL COMMENT 'Internal FK to calendar_events.id',
+  event_id INT UNSIGNED NULL COMMENT 'Internal FK to calendar_events.id; nullable so audit-trail attachments survive event hard-delete (FK SET NULL)',
   uploader_id INT UNSIGNED NOT NULL COMMENT 'Internal FK to users.id (uploader)',
 
   filename VARCHAR(255) NOT NULL COMMENT 'Original filename',
@@ -30,6 +30,6 @@ CREATE TABLE calendar_event_attachments (
   KEY idx_calendar_event_attachments_workspace_uploader (workspace_id, uploader_id),
 
   CONSTRAINT fk_calendar_event_attachments_workspace FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
-  CONSTRAINT fk_calendar_event_attachments_event FOREIGN KEY (event_id) REFERENCES calendar_events(id) ON DELETE CASCADE,
+  CONSTRAINT fk_calendar_event_attachments_event FOREIGN KEY (event_id) REFERENCES calendar_events(id) ON DELETE SET NULL,
   CONSTRAINT fk_calendar_event_attachments_uploader FOREIGN KEY (uploader_id) REFERENCES users(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Calendar event file attachments';

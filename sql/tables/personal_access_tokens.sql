@@ -28,6 +28,7 @@ CREATE TABLE personal_access_tokens (
   UNIQUE KEY uniq_personal_access_tokens_workspace_public_id (workspace_id, public_id),
   UNIQUE KEY uniq_personal_access_tokens_token_hash (token_hash),
   KEY idx_personal_access_tokens_workspace_id_user_id (workspace_id, user_id),
+  KEY idx_personal_access_tokens_expires_at (expires_at),
 
   CONSTRAINT fk_personal_access_tokens_workspace FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
   CONSTRAINT fk_personal_access_tokens_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE

@@ -23,6 +23,7 @@ CREATE TABLE magic_link_tokens (
   UNIQUE KEY uniq_magic_link_tokens_public_id (public_id),
   UNIQUE KEY uniq_magic_link_tokens_token_hash (token_hash),
   KEY idx_magic_link_tokens_user_id (user_id),
+  KEY idx_magic_link_tokens_expires_at (expires_at),
 
   CONSTRAINT fk_magic_link_tokens_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Passwordless magic-link tokens';

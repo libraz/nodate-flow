@@ -457,8 +457,8 @@ type Querier interface {
 	FindWorkspaceInviteWorkspaceName(ctx context.Context, tokenHash string) (FindWorkspaceInviteWorkspaceNameRow, error)
 	// Resolve a workspace membership by (workspace_id, user_id).
 	FindWorkspaceMemberByUserId(ctx context.Context, arg FindWorkspaceMemberByUserIdParams) (FindWorkspaceMemberByUserIdRow, error)
-	// Fetch just the timezone and country columns by internal id. Used by
-	// time-api when resolving the effective timezone for a request.
+	// Fetch just the timezone and country columns by internal id. Used by the
+	// calendar layer when resolving the effective timezone for a request.
 	FindWorkspaceTimezoneCountryById(ctx context.Context, id uint32) (FindWorkspaceTimezoneCountryByIdRow, error)
 	// Fetch the minimal fields an agent runner needs to invoke an LLM.
 	GetAgentForExec(ctx context.Context, arg GetAgentForExecParams) (GetAgentForExecRow, error)
@@ -1115,7 +1115,8 @@ type Querier interface {
 	// Update workspace name and slug by public_id.
 	UpdateWorkspaceFull(ctx context.Context, arg UpdateWorkspaceFullParams) error
 	// Create or update the ai_settings row for a workspace. The UNIQUE KEY on
-	// workspace_id makes this idempotent.
+	// workspace_id makes this idempotent. modified_by_user_id is the audit
+	// trail for the most recent writer; system writers pass NULL.
 	UpsertAiSettings(ctx context.Context, arg UpsertAiSettingsParams) error
 	// Insert or update a single auto-action rule for a workspace.
 	// The UNIQUE KEY on (workspace_id, kind) makes this idempotent.

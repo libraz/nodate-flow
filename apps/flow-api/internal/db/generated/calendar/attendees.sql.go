@@ -27,7 +27,7 @@ INSERT INTO calendar_event_attendees (
 type CreateCalendarEventAttendeeParams struct {
 	PublicID    types.PublicID             `json:"publicId"`
 	WorkspaceID uint32                     `json:"-"`
-	EventID     uint32                     `json:"-"`
+	EventID     sql.NullInt32              `json:"-"`
 	UserID      uint32                     `json:"-"`
 	Rsvp        CalendarEventAttendeesRsvp `json:"rsvp"`
 	CanEdit     bool                       `json:"canEdit"`
@@ -56,7 +56,7 @@ WHERE event_id = ?
 `
 
 // Remove all attendees from an event (used when re-setting attendee list).
-func (q *Queries) DeleteAllCalendarEventAttendees(ctx context.Context, eventID uint32) error {
+func (q *Queries) DeleteAllCalendarEventAttendees(ctx context.Context, eventID sql.NullInt32) error {
 	_, err := q.db.ExecContext(ctx, deleteAllCalendarEventAttendees, eventID)
 	return err
 }
@@ -69,8 +69,8 @@ WHERE event_id = ?
 `
 
 type DisableCalendarEventAttendeeParams struct {
-	EventID uint32 `json:"-"`
-	UserID  uint32 `json:"-"`
+	EventID sql.NullInt32 `json:"-"`
+	UserID  uint32        `json:"-"`
 }
 
 // Remove an attendee from an event (soft-delete).
@@ -93,8 +93,8 @@ LIMIT 1
 `
 
 type FindCalendarEventAttendeeParams struct {
-	EventID uint32 `json:"-"`
-	UserID  uint32 `json:"-"`
+	EventID sql.NullInt32 `json:"-"`
+	UserID  uint32        `json:"-"`
 }
 
 type FindCalendarEventAttendeeRow struct {
@@ -146,7 +146,7 @@ type ListCalendarEventAttendeesRow struct {
 }
 
 // List all attendees for an event with user profile info.
-func (q *Queries) ListCalendarEventAttendees(ctx context.Context, eventID uint32) ([]ListCalendarEventAttendeesRow, error) {
+func (q *Queries) ListCalendarEventAttendees(ctx context.Context, eventID sql.NullInt32) ([]ListCalendarEventAttendeesRow, error) {
 	rows, err := q.db.QueryContext(ctx, listCalendarEventAttendees, eventID)
 	if err != nil {
 		return nil, err
@@ -187,9 +187,9 @@ WHERE event_id = ?
 `
 
 type UpdateAttendeeCanEditParams struct {
-	CanEdit bool   `json:"canEdit"`
-	EventID uint32 `json:"-"`
-	UserID  uint32 `json:"-"`
+	CanEdit bool          `json:"canEdit"`
+	EventID sql.NullInt32 `json:"-"`
+	UserID  uint32        `json:"-"`
 }
 
 // Grant or revoke edit permission on an attendee (by event owner).
@@ -208,7 +208,7 @@ WHERE event_id = ?
 
 type UpdateAttendeeRsvpParams struct {
 	Rsvp    CalendarEventAttendeesRsvp `json:"rsvp"`
-	EventID uint32                     `json:"-"`
+	EventID sql.NullInt32              `json:"-"`
 	UserID  uint32                     `json:"-"`
 }
 

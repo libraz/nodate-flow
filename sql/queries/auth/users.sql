@@ -102,7 +102,22 @@ LIMIT 1;
 
 -- name: FindUserByPublicId :one
 -- Lookup a user by external public_id (UUID v7) via the v_users view.
-SELECT *
+SELECT
+  workspace_id,
+  public_id,
+  email,
+  display_name,
+  avatar_url,
+  locale,
+  timezone,
+  country,
+  week_start,
+  theme_preference,
+  calendar_shift_default,
+  workspace_role,
+  last_login_at,
+  updated_at,
+  created_at
 FROM v_users
 WHERE public_id = ?
 LIMIT 1;
