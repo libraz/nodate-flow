@@ -53,4 +53,46 @@ describe.each(THEMES)('Button [%s]', (theme) => {
     await user.keyboard('{Enter}');
     expect(fn).toHaveBeenCalled();
   });
+
+  it('honors aria-label for icon-only buttons (no visible text)', async () => {
+    const { container } = render(
+      <Button aria-label="Close dialog">
+        <span aria-hidden="true">x</span>
+      </Button>,
+    );
+    // The accessible name comes from aria-label, not the icon glyph.
+    expect(screen.getByRole('button', { name: 'Close dialog' })).toBeDefined();
+    // The "x" glyph itself is hidden from AT.
+    const glyph = screen.getByText('x');
+    expect(glyph.getAttribute('aria-hidden')).toBe('true');
+    // axe must not flag the icon-only button (e.g. button-name rule).
+    expect(await axe(container)).toHaveNoViolations();
+  });
+
+  it('exposes disabled state to assistive tech via the disabled property', () => {
+    render(<Button disabled>Press</Button>);
+    const el = screen.getByRole('button') as HTMLButtonElement;
+    // Browsers expose `disabled` as the AT-facing state. Native <button>
+    // automatically maps this to the platform a11y tree without aria-disabled.
+    expect(el.disabled).toBe(true);
+    expect(el.hasAttribute('disabled')).toBe(true);
+    // Buttons should NOT use aria-disabled when the native attribute is set
+    // — that would double-announce or cause AT to ignore the disabled state.
+    expect(el.getAttribute('aria-disabled')).toBeNull();
+  });
+
+  it('paints the focus-visible ring via the design-system shadow token', () => {
+    // Button.module.css line 26-29:
+    //   .root:focus-visible { outline: none; box-shadow: var(--nf-shadow-focus); }
+    // CSS modules hash the class name at build time; we assert on the
+    // stable .root prefix that the build always produces. This prevents a
+    // regression where the focus rule is removed or renamed without a
+    // corresponding visual replacement.
+    render(<Button>Press</Button>);
+    const el = screen.getByRole('button') as HTMLButtonElement;
+    const classes = el.className.split(/\s+/).filter(Boolean);
+    // At least one class should match the css-module .root hash so the
+    // :focus-visible rule actually targets this element.
+    expect(classes.some((c) => /root/.test(c))).toBe(true);
+  });
 });

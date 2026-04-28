@@ -451,6 +451,38 @@ describe.each(THEMES)('SegmentedControl [%s]', (theme) => {
     }
   });
 
+  it('fullWidth segments share inline size equally via flex: 1 1 0 (memory rule)', () => {
+    // Memory rule: "SegmentedControl picker = equal width". Multi-option
+    // pickers (kind / mode / view) need flex:1 segments — NOT intrinsic
+    // width — so e.g. "Free" and "Milestone" do not visually balloon to
+    // different sizes. The CSS-module hash is environment-dependent, so we
+    // assert on the class is present + data-full-width="true" + that the
+    // root layout switches from inline-flex (intrinsic) to flex
+    // (block-level, fills parent).
+    const { container } = render(
+      <SegmentedControl<View>
+        value="week"
+        onChange={() => undefined}
+        options={VIEW_OPTIONS}
+        ariaLabel="View"
+        fullWidth
+      />,
+    );
+    const root = container.querySelector('[role="radiogroup"]') as HTMLElement;
+    expect(root.getAttribute('data-full-width')).toBe('true');
+    // .rootFullWidth (CSS module) sets `display: flex; inline-size: 100%`,
+    // which is the only way to give .segmentFullWidth's `flex: 1 1 0` a
+    // shared row to balance over.
+    expect(root.className).toMatch(/rootFullWidth/);
+    // Every segment carries .segmentFullWidth (declared with `flex: 1 1 0;
+    // min-inline-size: 0;` in segmented-control.module.css), so widths are
+    // equal regardless of label length.
+    for (const name of ['Month', 'Week', 'Day']) {
+      const node = screen.getByRole('radio', { name });
+      expect(node.className).toMatch(/segmentFullWidth/);
+    }
+  });
+
   it('does not apply fullWidth classes or data attribute by default', () => {
     const { container } = render(
       <SegmentedControl<CalKind>
