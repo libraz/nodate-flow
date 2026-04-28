@@ -25,17 +25,17 @@ type DB interface {
 // ----------------------------------------------------------------------------
 
 // CheckInstanceAdmin verifies the actor has an active row in
-// instance_admins. Returns nil on success, INSTANCE.ADMIN.REQUIRED on
-// permission failure, or the underlying database error for
-// transport-level problems (callers map those to their transport's
-// generic 5xx code).
+// instance_admins. Returns nil on success,
+// AUTH.PERMISSION.INSTANCE_ADMIN_REQUIRED on permission failure, or the
+// underlying database error for transport-level problems (callers map
+// those to their transport's generic 5xx code).
 func CheckInstanceAdmin(ctx context.Context, db DB, userID uint32) error {
 	const q = `SELECT 1 FROM instance_admins
 WHERE user_id = ? AND enabled = TRUE AND revoked_at IS NULL LIMIT 1`
 	var one int
 	if err := db.QueryRowContext(ctx, q, userID).Scan(&one); err != nil {
 		if stderrors.Is(err, sql.ErrNoRows) {
-			return apierrors.New(apierrors.InstanceAdminRequired)
+			return apierrors.New(apierrors.AuthPermissionInstanceAdminRequired)
 		}
 		return err
 	}

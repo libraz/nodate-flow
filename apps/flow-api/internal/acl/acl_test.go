@@ -349,11 +349,11 @@ func TestACLLayered(t *testing.T) {
 	})
 	t.Run("instance/admin/denied", func(t *testing.T) {
 		err := acl.CheckInstanceAdmin(ctx, db, fx.memberUserID)
-		requireSpec(t, err, apierrors.InstanceAdminRequired)
+		requireSpec(t, err, apierrors.AuthPermissionInstanceAdminRequired)
 	})
 	t.Run("instance/admin/not_found", func(t *testing.T) {
 		err := acl.CheckInstanceAdmin(ctx, db, 999_999_999)
-		requireSpec(t, err, apierrors.InstanceAdminRequired)
+		requireSpec(t, err, apierrors.AuthPermissionInstanceAdminRequired)
 	})
 
 	// -----------------------------------------------------------------

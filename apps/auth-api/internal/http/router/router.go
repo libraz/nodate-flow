@@ -290,8 +290,16 @@ func BuildResult(deps Deps) Result {
 
 	// Bearer-protected auth endpoints.
 	jwtResolver := &authn.JWTResolver{JWT: deps.JWT.JWTIssuer, DB: passthroughDB{deps.DB}}
-	authMW := authn.RequireAuth(jwtResolver)
-	adminACL := middleware.RequireInstanceAdmin(passthroughDB{deps.DB})
+	rawAuthMW := authn.RequireAuth(jwtResolver)
+	// Wrap RequireAuth with LoggerContext so every authenticated route
+	// gets a request-scoped logger pre-populated with actor_id and
+	// request_id once auth resolves. Workspace-scoped attrs are added
+	// by RequireWorkspaceMember which calls enrichLoggerWithWorkspace.
+	loggerCtx := middleware.LoggerContext()
+	authMW := func(next http.Handler) http.Handler {
+		return rawAuthMW(loggerCtx(next))
+	}
+	adminACL := middleware.RequireInstanceAdmin(deps.Queries)
 	adminDeps := adminhandlers.Deps{
 		DB:      deps.DB,
 		Queries: deps.Queries,

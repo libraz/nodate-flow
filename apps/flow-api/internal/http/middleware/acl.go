@@ -12,6 +12,7 @@ package middleware
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	stderrors "errors"
 	"net/http"
@@ -20,8 +21,10 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/acl"
+	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/generated"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/types"
 	apierrors "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/errors"
+	sharedacl "github.com/nodate-flow/nodate-flow/packages/go-shared/acl"
 	"github.com/nodate-flow/nodate-flow/packages/go-shared/authn"
 )
 
@@ -199,29 +202,36 @@ func ProjectFromContext(ctx context.Context) (ProjectContext, bool) {
 // Error response
 // ----------------------------------------------------------------------------
 
-// errorBody mirrors the wire shape of the canonical ErrorResponse DTO.
-// It is duplicated here to avoid an import cycle with the handlers
-// package; the real type lives under apps/flow-api/internal/dto and is
-// generated from the OpenAPI definition. Description and UserAction are
-// optional and propagate the catalog text from errors/*.yaml.
-type errorBody struct {
-	Code        string `json:"code"`
-	Message     string `json:"message"`
+// problemBody is the RFC 9457 problem+json wire shape emitted by the
+// chi-level middlewares (ACL, calendar). The struct is duplicated here
+// rather than re-using [handlerutil.WriteSpecError] because that
+// package depends on this `middleware` package for [ActorFromContext]
+// — importing it back from middleware would create a cycle. The
+// fields mirror handlerutil's struct verbatim so the wire payload is
+// byte-identical regardless of which layer emitted the error.
+type problemBody struct {
+	Type        string `json:"type"`
+	Title       string `json:"title"`
+	Status      int    `json:"status"`
+	Detail      string `json:"detail"`
 	Description string `json:"description,omitempty"`
 	UserAction  string `json:"userAction,omitempty"`
 }
 
-// writeSpecError writes the canonical JSON error envelope for the
-// chi-level middlewares (ACL, calendar). They sit above Huma's
-// pipeline so they cannot return a `huma.StatusError`; the body shape
-// mirrors the ProblemDetails wire format so clients can branch on the
-// same fields regardless of which layer emitted the error.
+// writeSpecError writes the canonical RFC 9457 problem+json error
+// envelope for the chi-level middlewares (ACL, calendar). They sit
+// above Huma's pipeline so they cannot return a `huma.StatusError`;
+// the body shape mirrors handlerutil.WriteSpecError so clients can
+// branch on the same `type` field regardless of which layer emitted
+// the error.
 func writeSpecError(w http.ResponseWriter, spec *apierrors.Spec) {
-	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	w.Header().Set("Content-Type", "application/problem+json; charset=utf-8")
 	w.WriteHeader(spec.Status)
-	_ = json.NewEncoder(w).Encode(errorBody{
-		Code:        spec.Code,
-		Message:     spec.Message,
+	_ = json.NewEncoder(w).Encode(problemBody{
+		Type:        spec.Code,
+		Title:       http.StatusText(spec.Status),
+		Status:      spec.Status,
+		Detail:      spec.Message,
 		Description: spec.Description,
 		UserAction:  spec.UserAction,
 	})
@@ -260,26 +270,71 @@ type ACLDB = acl.DB
 // Instance-level
 // ----------------------------------------------------------------------------
 
-// RequireInstanceAdmin returns a middleware that allows the request through
-// only when the actor has an active row in instance_admins. It assumes an
-// auth middleware has already populated the actor via [WithActor].
-//
-// On failure it responds 403 INSTANCE.ADMIN.REQUIRED.
-func RequireInstanceAdmin(db ACLDB) func(http.Handler) http.Handler {
-	return func(next http.Handler) http.Handler {
-		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			userID, ok := ActorFromContext(r.Context())
-			if !ok {
-				writeSpecError(w, apierrors.InstanceAdminRequired)
-				return
-			}
-			if err := acl.CheckInstanceAdmin(r.Context(), db, userID); err != nil {
-				writeAPIError(w, err)
-				return
-			}
-			next.ServeHTTP(w, r)
-		})
+// codeSpec maps a canonical error code string to its [apierrors.Spec]
+// pointer. The shared instance-admin middleware
+// ([sharedacl.RequireInstanceAdmin]) emits errors as
+// `(status, code, message)` tuples; this map lets the local adapter
+// recover the rich catalog metadata (Description / UserAction) before
+// delegating to [writeSpecError]. Unknown codes fall through to a
+// synthetic Spec built from the supplied tuple so the wire shape stays
+// RFC 9457-compliant for any future code that might be added to the
+// shared package.
+var codeSpec = map[string]*apierrors.Spec{
+	sharedacl.CodeSessionUnauthorized:   apierrors.AuthSessionUnauthorized,
+	sharedacl.CodeInstanceAdminRequired: apierrors.AuthPermissionInstanceAdminRequired,
+	sharedacl.CodeInternalUnexpected:    apierrors.InternalUnexpected,
+}
+
+// writeSpecErrorByCode renders the RFC 9457 envelope for a (status,
+// code, message) tuple emitted by [sharedacl.RequireInstanceAdmin]. It
+// prefers the canonical [apierrors.Spec] for the code so the wire
+// payload carries the catalog Description / UserAction; for unknown
+// codes it builds a synthetic Spec on the fly so the wire shape stays
+// stable.
+func writeSpecErrorByCode(w http.ResponseWriter, _ *http.Request, status int, code, message string) {
+	if spec, ok := codeSpec[code]; ok {
+		writeSpecError(w, spec)
+		return
 	}
+	writeSpecError(w, &apierrors.Spec{
+		Code:    code,
+		Status:  status,
+		Message: message,
+	})
+}
+
+// RequireInstanceAdmin returns a middleware that allows the request through
+// only when the actor has an active row in instance_admins. The decision
+// logic is delegated to [sharedacl.RequireInstanceAdmin] from
+// `packages/go-shared/acl/`; this function only wires the app-specific
+// callbacks (sqlc query, actor extractor, RFC 9457 error writer).
+//
+// On failure it responds:
+//   - 401 AUTH.SESSION.UNAUTHORIZED when no actor is present on the
+//     request context.
+//   - 403 AUTH.PERMISSION.INSTANCE_ADMIN_REQUIRED when the actor is
+//     authenticated but is not an instance administrator.
+//   - 500 INTERNAL.UNEXPECTED for transport-level lookup failures.
+//
+// All responses are emitted via [writeSpecError] so the body is RFC
+// 9457 problem+json (type / title / status / detail).
+func RequireInstanceAdmin(q *generated.Queries) func(http.Handler) http.Handler {
+	return sharedacl.RequireInstanceAdmin(sharedacl.Config{
+		IsInstanceAdmin: func(ctx context.Context, uid uint32) (bool, error) {
+			_, err := q.AdminFindInstanceAdminByUserId(ctx, uid)
+			if stderrors.Is(err, sql.ErrNoRows) {
+				return false, nil
+			}
+			if err != nil {
+				return false, err
+			}
+			return true, nil
+		},
+		ExtractActor: func(r *http.Request) (uint32, bool) {
+			return authn.ActorFromContext(r.Context())
+		},
+		WriteError: writeSpecErrorByCode,
+	})
 }
 
 // ----------------------------------------------------------------------------
@@ -295,6 +350,12 @@ func RequireInstanceAdmin(db ACLDB) func(http.Handler) http.Handler {
 //   - 404 WS.WORKSPACE.NOT_FOUND when the workspace does not exist or the
 //     path parameter is not a valid UUID.
 //   - 403 WS.WORKSPACE.ACCESS_DENIED when the actor is not a member.
+//
+// Side effect: once the workspace context is in scope, the helper also
+// re-runs the slog logger enrichment so [nflog.LoggerFromContext] (called
+// by downstream handlers) returns a logger that already carries
+// workspace_id / workspace_public_id without each handler having to
+// stamp those attrs on every log line.
 func RequireWorkspaceMember(db ACLDB) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -317,6 +378,7 @@ func RequireWorkspaceMember(db ACLDB) func(http.Handler) http.Handler {
 			ctx := context.WithValue(r.Context(), ctxKeyWorkspaceID, access.ID)
 			ctx = context.WithValue(ctx, ctxKeyWorkspaceIDPublic, pub)
 			ctx = context.WithValue(ctx, ctxKeyWorkspaceRole, access.Role)
+			ctx = enrichLoggerWithWorkspace(ctx, access.ID, pub)
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})
 	}
@@ -448,6 +510,7 @@ func RequireProjectMemberByGlobalID(db ACLDB) func(http.Handler) http.Handler {
 			ctx = context.WithValue(ctx, ctxKeyProjectID, prj.ID)
 			ctx = context.WithValue(ctx, ctxKeyProjectIDPublic, pub)
 			ctx = context.WithValue(ctx, ctxKeyProjectRole, role)
+			ctx = enrichLoggerWithWorkspace(ctx, prj.WorkspaceID, wsPubID.UUID())
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})
 	}
@@ -532,6 +595,7 @@ func RequireTaskAccess(db ACLDB) func(http.Handler) http.Handler {
 			ctx = context.WithValue(ctx, ctxKeyProjectRole, prjRole)
 			ctx = context.WithValue(ctx, ctxKeyTaskID, rec.ID)
 			ctx = context.WithValue(ctx, ctxKeyTaskIDPublic, pub)
+			ctx = enrichLoggerWithWorkspace(ctx, rec.WorkspaceID, wsPubID.UUID())
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})
 	}

@@ -1,34 +1,63 @@
+// Package middleware contains chi-compatible HTTP middlewares for the
+// auth-api service, including authentication and ACL (access control
+// list) enforcement.
 package middleware
 
 import (
 	"context"
 	"database/sql"
-	"encoding/json"
-	"errors"
+	stderrors "errors"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 
+	"github.com/nodate-flow/nodate-flow/apps/auth-api/internal/db/generated"
 	"github.com/nodate-flow/nodate-flow/apps/auth-api/internal/db/types"
 	apierrors "github.com/nodate-flow/nodate-flow/apps/auth-api/internal/errors"
+	"github.com/nodate-flow/nodate-flow/apps/auth-api/internal/http/handlers/handlerutil"
+	sharedacl "github.com/nodate-flow/nodate-flow/packages/go-shared/acl"
 	"github.com/nodate-flow/nodate-flow/packages/go-shared/authn"
 )
 
-// ACLDB is the minimal database surface for ACL queries.
+// ACLDB is the minimal database surface for ACL queries that are not
+// yet routed through the sqlc-generated [generated.Queries] helper.
+// Workspace-membership lookups still use it; instance-admin lookups
+// have been migrated to the typed query (see [RequireInstanceAdmin]).
 type ACLDB interface {
 	QueryRowContext(ctx context.Context, query string, args ...any) *sql.Row
 }
 
-type errorBody struct {
-	Code    string `json:"code"`
-	Message string `json:"message"`
+// codeSpec maps a canonical error code string to its [apierrors.Spec]
+// pointer. The shared instance-admin middleware ([sharedacl.RequireInstanceAdmin])
+// emits errors as `(status, code, message)` tuples; this map lets the
+// adapter recover the rich catalog metadata (Description / UserAction)
+// before delegating to [handlerutil.WriteSpecError]. Unknown codes
+// fall through to a synthetic Spec built from the supplied tuple so
+// the wire shape stays RFC 9457-compliant for any future code that
+// might be added to the shared package.
+var codeSpec = map[string]*apierrors.Spec{
+	sharedacl.CodeSessionUnauthorized:   apierrors.AuthSessionUnauthorized,
+	sharedacl.CodeInstanceAdminRequired: apierrors.AuthPermissionInstanceAdminRequired,
+	sharedacl.CodeInternalUnexpected:    apierrors.InternalUnexpected,
 }
 
-func writeError(w http.ResponseWriter, status int, code, message string) {
-	w.Header().Set("Content-Type", "application/json; charset=utf-8")
-	w.WriteHeader(status)
-	_ = json.NewEncoder(w).Encode(errorBody{Code: code, Message: message})
+// writeSpecErrorByCode renders the RFC 9457 envelope for a (status,
+// code, message) tuple emitted by [sharedacl.RequireInstanceAdmin]. It
+// prefers the canonical [apierrors.Spec] for the code so the wire
+// payload carries the catalog Description / UserAction; for unknown
+// codes it builds a synthetic Spec on the fly so the wire shape stays
+// stable.
+func writeSpecErrorByCode(w http.ResponseWriter, _ *http.Request, status int, code, message string) {
+	if spec, ok := codeSpec[code]; ok {
+		handlerutil.WriteSpecError(w, spec)
+		return
+	}
+	handlerutil.WriteSpecError(w, &apierrors.Spec{
+		Code:    code,
+		Status:  status,
+		Message: message,
+	})
 }
 
 // ----------------------------------------------------------------------------
@@ -101,34 +130,38 @@ func WorkspaceFromContext(ctx context.Context) (WorkspaceContext, bool) {
 // Instance-level
 // ----------------------------------------------------------------------------
 
-// RequireInstanceAdmin checks the instance_admins table for the authenticated
-// user and rejects the request with 403 if no active grant exists.
-func RequireInstanceAdmin(db ACLDB) func(http.Handler) http.Handler {
-	const q = `SELECT 1 FROM instance_admins WHERE user_id = ? AND enabled = TRUE AND revoked_at IS NULL LIMIT 1`
-	return func(next http.Handler) http.Handler {
-		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			userID, ok := authn.ActorFromContext(r.Context())
-			if !ok {
-				writeError(w, apierrors.InstanceAdminRequired.Status,
-					apierrors.InstanceAdminRequired.Code,
-					apierrors.InstanceAdminRequired.Message)
-				return
+// RequireInstanceAdmin returns a middleware that allows the request through
+// only when the actor has an active row in instance_admins. The decision
+// logic is delegated to [sharedacl.RequireInstanceAdmin] from
+// `packages/go-shared/acl/`; this function only wires the app-specific
+// callbacks (sqlc query, actor extractor, RFC 9457 error writer).
+//
+// On failure it responds:
+//   - 401 AUTH.SESSION.UNAUTHORIZED when no actor is present on the
+//     request context.
+//   - 403 AUTH.PERMISSION.INSTANCE_ADMIN_REQUIRED when the actor is
+//     authenticated but is not an instance administrator.
+//   - 500 INTERNAL.UNEXPECTED for transport-level lookup failures.
+//
+// All responses are emitted via [handlerutil.WriteSpecError] so the
+// body is RFC 9457 problem+json (type / title / status / detail).
+func RequireInstanceAdmin(q *generated.Queries) func(http.Handler) http.Handler {
+	return sharedacl.RequireInstanceAdmin(sharedacl.Config{
+		IsInstanceAdmin: func(ctx context.Context, uid uint32) (bool, error) {
+			_, err := q.AdminFindInstanceAdminByUserId(ctx, uid)
+			if stderrors.Is(err, sql.ErrNoRows) {
+				return false, nil
 			}
-			var one int
-			err := db.QueryRowContext(r.Context(), q, userID).Scan(&one)
 			if err != nil {
-				if errors.Is(err, sql.ErrNoRows) {
-					writeError(w, apierrors.InstanceAdminRequired.Status,
-						apierrors.InstanceAdminRequired.Code,
-						apierrors.InstanceAdminRequired.Message)
-					return
-				}
-				writeError(w, 500, "INTERNAL.UNEXPECTED", "Internal error")
-				return
+				return false, err
 			}
-			next.ServeHTTP(w, r)
-		})
-	}
+			return true, nil
+		},
+		ExtractActor: func(r *http.Request) (uint32, bool) {
+			return authn.ActorFromContext(r.Context())
+		},
+		WriteError: writeSpecErrorByCode,
+	})
 }
 
 // ----------------------------------------------------------------------------
@@ -150,44 +183,37 @@ WHERE workspace_id = ? AND user_id = ? AND enabled = TRUE LIMIT 1`
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			userID, ok := authn.ActorFromContext(r.Context())
 			if !ok {
-				writeError(w, http.StatusForbidden,
-					apierrors.WsWorkspaceAccessDenied.Code,
-					apierrors.WsWorkspaceAccessDenied.Message)
+				handlerutil.WriteSpecError(w, apierrors.WsWorkspaceAccessDenied)
 				return
 			}
 			raw := chi.URLParam(r, "wsId")
 			pub, err := uuid.Parse(raw)
 			if err != nil {
-				writeError(w, http.StatusNotFound,
-					apierrors.WsWorkspaceNotFound.Code,
-					apierrors.WsWorkspaceNotFound.Message)
+				handlerutil.WriteSpecError(w, apierrors.WsWorkspaceNotFound)
 				return
 			}
 			var wsID uint32
 			if err := db.QueryRowContext(r.Context(), wsQuery, types.FromUUID(pub)).Scan(&wsID); err != nil {
-				if errors.Is(err, sql.ErrNoRows) {
-					writeError(w, http.StatusNotFound,
-						apierrors.WsWorkspaceNotFound.Code,
-						apierrors.WsWorkspaceNotFound.Message)
+				if stderrors.Is(err, sql.ErrNoRows) {
+					handlerutil.WriteSpecError(w, apierrors.WsWorkspaceNotFound)
 					return
 				}
-				writeError(w, http.StatusInternalServerError, "INTERNAL.UNEXPECTED", "Internal error")
+				handlerutil.WriteSpecError(w, apierrors.InternalUnexpected)
 				return
 			}
 			var role string
 			if err := db.QueryRowContext(r.Context(), memQuery, wsID, userID).Scan(&role); err != nil {
-				if errors.Is(err, sql.ErrNoRows) {
-					writeError(w, http.StatusForbidden,
-						apierrors.WsWorkspaceAccessDenied.Code,
-						apierrors.WsWorkspaceAccessDenied.Message)
+				if stderrors.Is(err, sql.ErrNoRows) {
+					handlerutil.WriteSpecError(w, apierrors.WsWorkspaceAccessDenied)
 					return
 				}
-				writeError(w, http.StatusInternalServerError, "INTERNAL.UNEXPECTED", "Internal error")
+				handlerutil.WriteSpecError(w, apierrors.InternalUnexpected)
 				return
 			}
 			ctx := context.WithValue(r.Context(), ctxKeyWorkspaceID, wsID)
 			ctx = context.WithValue(ctx, ctxKeyWorkspaceIDPublic, pub)
 			ctx = context.WithValue(ctx, ctxKeyWorkspaceRole, WorkspaceRole(role))
+			ctx = enrichLoggerWithWorkspace(ctx, wsID, pub)
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})
 	}
@@ -201,9 +227,7 @@ func RequireWorkspaceRole(minRole WorkspaceRole) func(http.Handler) http.Handler
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			ws, ok := WorkspaceFromContext(r.Context())
 			if !ok || !ws.Role.AtLeast(minRole) {
-				writeError(w, http.StatusForbidden,
-					apierrors.WsMemberRoleDenied.Code,
-					apierrors.WsMemberRoleDenied.Message)
+				handlerutil.WriteSpecError(w, apierrors.WsMemberRoleDenied)
 				return
 			}
 			next.ServeHTTP(w, r)
