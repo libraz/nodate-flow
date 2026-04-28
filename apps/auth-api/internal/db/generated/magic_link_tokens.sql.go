@@ -101,14 +101,22 @@ func (q *Queries) FindMagicLinkByTokenHash(ctx context.Context, tokenHash string
 	return i, err
 }
 
-const markMagicLinkUsed = `-- name: MarkMagicLinkUsed :exec
+const markMagicLinkUsed = `-- name: MarkMagicLinkUsed :execrows
 UPDATE magic_link_tokens
 SET used_at = CURRENT_TIMESTAMP
 WHERE id = ?
+  AND used_at IS NULL
 `
 
-// Stamp used_at on a magic link token after successful verification.
-func (q *Queries) MarkMagicLinkUsed(ctx context.Context, id uint32) error {
-	_, err := q.db.ExecContext(ctx, markMagicLinkUsed, id)
-	return err
+// Atomically stamp used_at on a magic link token. The WHERE clause
+// includes used_at IS NULL so two concurrent verify requests racing on
+// the same token can never both succeed: exactly one UPDATE will match
+// and the loser sees zero affected rows. Callers MUST inspect
+// RowsAffected and treat 0 as "already consumed" (return ALREADY_USED).
+func (q *Queries) MarkMagicLinkUsed(ctx context.Context, id uint32) (int64, error) {
+	result, err := q.db.ExecContext(ctx, markMagicLinkUsed, id)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
 }

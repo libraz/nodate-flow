@@ -938,8 +938,12 @@ type Querier interface {
 	MarkDeliveryDelivered(ctx context.Context, arg MarkDeliveryDeliveredParams) error
 	// Mark a delivery attempt as failed with retry scheduling.
 	MarkDeliveryFailed(ctx context.Context, arg MarkDeliveryFailedParams) error
-	// Stamp used_at on a magic link token after successful verification.
-	MarkMagicLinkUsed(ctx context.Context, id uint32) error
+	// Atomically stamp used_at on a magic link token. The WHERE clause
+	// includes used_at IS NULL so two concurrent verify requests racing on
+	// the same token can never both succeed: exactly one UPDATE will match
+	// and the loser sees zero affected rows. Callers MUST inspect
+	// RowsAffected and treat 0 as "already consumed" (return ALREADY_USED).
+	MarkMagicLinkUsed(ctx context.Context, id uint32) (int64, error)
 	// Mark a notification as delivered (email/push sent).
 	MarkNotificationDelivered(ctx context.Context, publicID types.PublicID) error
 	// Mark a single notification as read.

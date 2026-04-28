@@ -232,8 +232,12 @@ type Querier interface {
 	ListWorkspaceMembers(ctx context.Context, arg ListWorkspaceMembersParams) ([]ListWorkspaceMembersRow, error)
 	// List workspaces a user belongs to.
 	ListWorkspacesForUser(ctx context.Context, arg ListWorkspacesForUserParams) ([]ListWorkspacesForUserRow, error)
-	// Stamp used_at on a magic link token after successful verification.
-	MarkMagicLinkUsed(ctx context.Context, id uint32) error
+	// Atomically stamp used_at on a magic link token. The WHERE clause
+	// includes used_at IS NULL so two concurrent verify requests racing on
+	// the same token can never both succeed: exactly one UPDATE will match
+	// and the loser sees zero affected rows. Callers MUST inspect
+	// RowsAffected and treat 0 as "already consumed" (return ALREADY_USED).
+	MarkMagicLinkUsed(ctx context.Context, id uint32) (int64, error)
 	// Stamp used_at on a recovery code by internal id.
 	MarkRecoveryCodeUsed(ctx context.Context, id uint32) error
 	// Patch the authenticated user's profile. NULL params leave the column untouched.

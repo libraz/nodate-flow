@@ -103,10 +103,17 @@ func MagicLinkVerify(deps Deps) func(context.Context, *MagicLinkVerifyInput) (*M
 			return nil, httpErr(apierrors.AuthMagicLinkExpired)
 		}
 
-		// Mark used before issuing tokens so a race condition cannot
-		// produce two sessions from the same link.
-		if err := deps.Queries.MarkMagicLinkUsed(ctx, row.ID); err != nil {
+		// Atomic compare-and-set on used_at: the SQL UPDATE matches only
+		// when used_at IS NULL, so two concurrent verify requests racing
+		// on the same token cannot both win. Exactly one will see
+		// RowsAffected == 1; the loser sees 0 and is rejected with
+		// ALREADY_USED so we never mint two sessions from one link.
+		affected, err := deps.Queries.MarkMagicLinkUsed(ctx, row.ID)
+		if err != nil {
 			return nil, httpErr(apierrors.InternalUnexpected)
+		}
+		if affected == 0 {
+			return nil, httpErr(apierrors.AuthMagicLinkAlreadyUsed)
 		}
 
 		pub, err := deps.Queries.FindUserPublicIdById(ctx, row.UserID)

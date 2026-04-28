@@ -24,11 +24,16 @@ WHERE token_hash = ?
   AND enabled = TRUE
 LIMIT 1;
 
--- name: MarkMagicLinkUsed :exec
--- Stamp used_at on a magic link token after successful verification.
+-- name: MarkMagicLinkUsed :execrows
+-- Atomically stamp used_at on a magic link token. The WHERE clause
+-- includes used_at IS NULL so two concurrent verify requests racing on
+-- the same token can never both succeed: exactly one UPDATE will match
+-- and the loser sees zero affected rows. Callers MUST inspect
+-- RowsAffected and treat 0 as "already consumed" (return ALREADY_USED).
 UPDATE magic_link_tokens
 SET used_at = CURRENT_TIMESTAMP
-WHERE id = ?;
+WHERE id = ?
+  AND used_at IS NULL;
 
 -- name: CleanupExpiredMagicLinks :exec
 -- Delete tokens that are either expired-and-used or expired-and-unused, for periodic cleanup.
