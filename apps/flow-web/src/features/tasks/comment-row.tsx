@@ -108,38 +108,12 @@ export default function CommentRow({
   };
 
   return (
-    <Card style={{ padding: '0.875rem 1rem' }}>
-      <header
-        style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          gap: '0.5rem',
-          marginBlockEnd: '0.375rem',
-        }}
-      >
+    <Card className={styles.card}>
+      <header className={styles.header}>
         <strong>{comment.authorDisplayName}</strong>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-          <span
-            style={{
-              color: 'var(--nf-color-fg-muted)',
-              fontVariantNumeric: 'tabular-nums',
-              fontSize: 'var(--nf-text-sm)',
-            }}
-          >
-            {formatEpochDateTime(comment.createdAt, locale)}
-          </span>
-          {edited ? (
-            <span
-              style={{
-                color: 'var(--nf-color-fg-muted)',
-                fontSize: 'var(--nf-text-xs)',
-                fontStyle: 'italic',
-              }}
-            >
-              {t('tasks.comments.edited')}
-            </span>
-          ) : null}
+        <div className={styles.headerRight}>
+          <span className={styles.timestamp}>{formatEpochDateTime(comment.createdAt, locale)}</span>
+          {edited ? <span className={styles.editedHint}>{t('tasks.comments.edited')}</span> : null}
           {isAuthor && !editing ? (
             <Popover
               open={menuOpen}
@@ -187,7 +161,7 @@ export default function CommentRow({
       </header>
 
       {editing ? (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+        <div className={styles.editor}>
           <Textarea
             value={draft}
             onChange={(e) => {
@@ -204,7 +178,7 @@ export default function CommentRow({
             aria-label={t('tasks.comments.edit')}
             placeholder={t('tasks.comments.edit_placeholder')}
           />
-          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem' }}>
+          <div className={styles.editorActions}>
             <Button type="button" variant="ghost" onClick={cancelEdit}>
               {t('tasks.comments.cancel')}
             </Button>

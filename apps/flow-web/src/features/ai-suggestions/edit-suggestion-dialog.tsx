@@ -13,6 +13,7 @@ import { type FormEvent, type ReactElement, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { z } from 'zod';
 
+import styles from './edit-suggestion-dialog.module.css';
 import type { Suggestion } from './store';
 
 const ACTIONS = ['open', 'snooze', 'archive'] as const;
@@ -69,10 +70,7 @@ export default function EditSuggestionDialog({
 
   return (
     <Dialog open={open} onClose={onClose} title={t('edit.title')}>
-      <form
-        onSubmit={handleSubmit}
-        style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}
-      >
+      <form onSubmit={handleSubmit} className={styles.form}>
         <FormField label={t('edit.action_label')}>
           {(control) => (
             <Select
@@ -99,7 +97,7 @@ export default function EditSuggestionDialog({
             />
           )}
         </FormField>
-        <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
+        <div className={styles.actions}>
           <Button type="button" variant="ghost" size="sm" onClick={onClose}>
             {t('edit.cancel')}
           </Button>

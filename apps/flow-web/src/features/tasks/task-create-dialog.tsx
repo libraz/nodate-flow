@@ -396,17 +396,7 @@ function SmartCreateSection({
   const { t } = useTranslation('common');
 
   return (
-    <section
-      aria-label={t('tasks.smart_create.assist_button')}
-      style={{
-        border: '1px solid var(--nf-color-border)',
-        borderRadius: '0.5rem',
-        padding: '1rem',
-        display: 'flex',
-        flexDirection: 'column',
-        gap: '0.75rem',
-      }}
-    >
+    <section aria-label={t('tasks.smart_create.assist_button')} className={styles.smartSection}>
       {/* Propose button / loading */}
       {!proposal && !proposing && (
         <Button type="button" variant="ghost" disabled={disabled} onClick={onPropose}>
@@ -415,25 +405,15 @@ function SmartCreateSection({
       )}
 
       {proposing && (
-        <div
-          style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}
-          role="status"
-          aria-live="polite"
-        >
-          <Spinner
-            label={t('tasks.smart_create.suggesting')}
-            style={{ inlineSize: '1rem', blockSize: '1rem' }}
-          />
+        <div className={styles.smartLoading} role="status" aria-live="polite">
+          <Spinner label={t('tasks.smart_create.suggesting')} className={styles.smartSpinner} />
           <span>{t('tasks.smart_create.suggesting')}</span>
         </div>
       )}
 
       {/* Error state */}
       {proposalError && !proposing && (
-        <p
-          role="alert"
-          style={{ color: 'var(--nf-color-danger)', margin: 0, fontSize: 'var(--nf-text-sm)' }}
-        >
+        <p role="alert" className={styles.smartError}>
           {t('tasks.smart_create.error')}
         </p>
       )}
@@ -443,17 +423,11 @@ function SmartCreateSection({
         <>
           {/* Suggested assignees */}
           {proposal.suggestedAssignees.length > 0 && (
-            <fieldset style={{ border: 'none', margin: 0, padding: 0 }}>
-              <legend
-                style={{
-                  fontWeight: 600,
-                  fontSize: 'var(--nf-text-sm)',
-                  marginBlockEnd: '0.5rem',
-                }}
-              >
+            <fieldset className={styles.smartFieldset}>
+              <legend className={styles.smartLegend}>
                 {t('tasks.smart_create.assignee_section')}
               </legend>
-              <ul style={{ listStyle: 'none', margin: 0, padding: 0 }}>
+              <ul className={styles.smartList}>
                 {proposal.suggestedAssignees.map((a) => (
                   <AssigneeSuggestionRow
                     key={a.userPublicId}
@@ -470,17 +444,11 @@ function SmartCreateSection({
 
           {/* Suggested subtasks */}
           {proposal.subtasks.length > 0 && (
-            <fieldset style={{ border: 'none', margin: 0, padding: 0 }}>
-              <legend
-                style={{
-                  fontWeight: 600,
-                  fontSize: 'var(--nf-text-sm)',
-                  marginBlockEnd: '0.5rem',
-                }}
-              >
+            <fieldset className={styles.smartFieldset}>
+              <legend className={styles.smartLegend}>
                 {t('tasks.smart_create.subtask_section')}
               </legend>
-              <ul style={{ listStyle: 'none', margin: 0, padding: 0 }}>
+              <ul className={styles.smartList}>
                 {proposal.subtasks.map((st, idx) => (
                   <SubtaskProposalRow
                     key={`${st.title}-${String(idx)}`}
@@ -497,20 +465,12 @@ function SmartCreateSection({
 
           {/* No suggestions */}
           {proposal.suggestedAssignees.length === 0 && proposal.subtasks.length === 0 && (
-            <p
-              style={{
-                margin: 0,
-                fontSize: 'var(--nf-text-sm)',
-                color: 'var(--nf-color-fg-muted)',
-              }}
-            >
-              {t('tasks.smart_create.no_suggestions')}
-            </p>
+            <p className={styles.smartEmpty}>{t('tasks.smart_create.no_suggestions')}</p>
           )}
 
           {/* Apply button */}
           {(proposal.suggestedAssignees.length > 0 || proposal.subtasks.length > 0) && (
-            <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+            <div className={styles.smartApplyRow}>
               <Button type="button" variant="primary" disabled={applying} onClick={onApply}>
                 {t('tasks.smart_create.apply')}
               </Button>
@@ -538,34 +498,15 @@ function AssigneeSuggestionRow({
   const checkboxId = `assignee-${assignee.userPublicId}`;
 
   return (
-    <li
-      style={{
-        display: 'flex',
-        alignItems: 'center',
-        gap: '0.5rem',
-        paddingBlock: '0.375rem',
-      }}
-    >
+    <li className={styles.assigneeRow}>
       <Checkbox id={checkboxId} checked={checked} onChange={onToggle} />
-      <label
-        htmlFor={checkboxId}
-        style={{ flex: 1, cursor: 'pointer', fontSize: 'var(--nf-text-sm)' }}
-      >
-        <span style={{ fontWeight: 500 }}>{assignee.displayName}</span>
-        <span
-          style={{
-            marginInlineStart: '0.5rem',
-            color: 'var(--nf-color-fg-muted)',
-            fontSize: 'var(--nf-text-xs)',
-          }}
-        >
+      <label htmlFor={checkboxId} className={styles.assigneeLabel}>
+        <span className={styles.assigneeName}>{assignee.displayName}</span>
+        <span className={styles.assigneeConfidence}>
           {t('tasks.smart_create.confidence', { value: String(confidence) })}
         </span>
       </label>
-      <span
-        style={{ fontSize: 'var(--nf-text-xs)', color: 'var(--nf-color-fg-muted)' }}
-        title={assignee.reason}
-      >
+      <span className={styles.assigneeReason} title={assignee.reason}>
         {t('tasks.smart_create.reason', { reason: assignee.reason })}
       </span>
     </li>
@@ -582,50 +523,21 @@ function SubtaskProposalRow({ subtask, checked, onToggle }: SubtaskProposalRowPr
   const checkboxId = `subtask-${subtask.title.replaceAll(/\s+/g, '-').slice(0, 32)}`;
 
   return (
-    <li
-      style={{
-        display: 'flex',
-        alignItems: 'flex-start',
-        gap: '0.5rem',
-        paddingBlock: '0.375rem',
-      }}
-    >
+    <li className={styles.subtaskRow}>
       <Checkbox
         id={checkboxId}
         checked={checked}
         onChange={onToggle}
-        style={{ marginBlockStart: '0.125rem' }}
+        className={styles.subtaskCheckbox}
       />
-      <label
-        htmlFor={checkboxId}
-        style={{ flex: 1, cursor: 'pointer', fontSize: 'var(--nf-text-sm)' }}
-      >
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.375rem' }}>
-          <span style={{ fontWeight: 500 }}>{subtask.title}</span>
+      <label htmlFor={checkboxId} className={styles.subtaskLabel}>
+        <div className={styles.subtaskHeader}>
+          <span className={styles.subtaskTitle}>{subtask.title}</span>
           <Badge tone={priorityTone(subtask.priority)}>{subtask.priority}</Badge>
         </div>
-        {subtask.description && (
-          <p
-            style={{
-              margin: '0.25rem 0 0',
-              fontSize: 'var(--nf-text-xs)',
-              color: 'var(--nf-color-fg-muted)',
-            }}
-          >
-            {subtask.description}
-          </p>
-        )}
+        {subtask.description && <p className={styles.subtaskDescription}>{subtask.description}</p>}
         {subtask.assignee && (
-          <span
-            style={{
-              fontSize: 'var(--nf-text-xs)',
-              color: 'var(--nf-color-fg-muted)',
-              marginBlockStart: '0.125rem',
-              display: 'block',
-            }}
-          >
-            {subtask.assignee.displayName}
-          </span>
+          <span className={styles.subtaskAssignee}>{subtask.assignee.displayName}</span>
         )}
       </label>
     </li>

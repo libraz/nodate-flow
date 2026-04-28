@@ -9,6 +9,8 @@ import Button from '@nodate-flow/ui/primitives/button';
 import type { ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import styles from './suggestion-actions.module.css';
+
 export interface SuggestionActionsProps {
   onApply: () => void;
   onDismiss: () => void;
@@ -25,7 +27,7 @@ export default function SuggestionActions({
 }: SuggestionActionsProps): ReactElement {
   const { t } = useTranslation('ai-suggestions');
   return (
-    <div style={{ display: 'flex', gap: '0.5rem', flexShrink: 0 }}>
+    <div className={styles.row}>
       <Button type="button" variant="primary" size="sm" onClick={onApply} disabled={disabled}>
         {t('action.apply')}
       </Button>

@@ -40,10 +40,10 @@ export default function CalendarSettingsDrawer({
   const { t } = useTranslation('common');
 
   const fallback = (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-      <Skeleton style={{ blockSize: '2rem', inlineSize: '60%' }} />
-      <Skeleton style={{ blockSize: '2.5rem', inlineSize: '100%' }} />
-      <Skeleton style={{ blockSize: '4rem', inlineSize: '100%' }} />
+    <div className={styles.fallback}>
+      <Skeleton className={styles.fallbackHead} />
+      <Skeleton className={styles.fallbackField} />
+      <Skeleton className={styles.fallbackBody} />
     </div>
   );
 

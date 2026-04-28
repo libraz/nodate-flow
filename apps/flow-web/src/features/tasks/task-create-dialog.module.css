@@ -23,3 +23,128 @@
   display: flex;
   flex-direction: column;
 }
+
+/* ── Smart-create AI Assist section ─────────────────────────────────── */
+
+.smartSection {
+  border: 1px solid var(--nf-color-border);
+  border-radius: var(--nf-radius-sm);
+  padding: var(--nf-space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-3);
+}
+
+.smartLoading {
+  display: flex;
+  align-items: center;
+  gap: var(--nf-space-2);
+}
+
+.smartSpinner {
+  inline-size: 1rem;
+  block-size: 1rem;
+}
+
+.smartError {
+  color: var(--nf-color-danger);
+  margin: 0;
+  font-size: var(--nf-text-sm);
+}
+
+.smartFieldset {
+  border: none;
+  margin: 0;
+  padding: 0;
+}
+
+.smartLegend {
+  font-weight: var(--nf-weight-semibold);
+  font-size: var(--nf-text-sm);
+  margin-block-end: var(--nf-space-2);
+}
+
+.smartList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.smartEmpty {
+  margin: 0;
+  font-size: var(--nf-text-sm);
+  color: var(--nf-color-fg-muted);
+}
+
+.smartApplyRow {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.assigneeRow {
+  display: flex;
+  align-items: center;
+  gap: var(--nf-space-2);
+  padding-block: var(--nf-space-2);
+}
+
+.assigneeLabel {
+  flex: 1;
+  cursor: pointer;
+  font-size: var(--nf-text-sm);
+}
+
+.assigneeName {
+  font-weight: var(--nf-weight-medium);
+}
+
+.assigneeConfidence {
+  margin-inline-start: var(--nf-space-2);
+  color: var(--nf-color-fg-muted);
+  font-size: var(--nf-text-xs);
+}
+
+.assigneeReason {
+  font-size: var(--nf-text-xs);
+  color: var(--nf-color-fg-muted);
+}
+
+.subtaskRow {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--nf-space-2);
+  padding-block: var(--nf-space-2);
+}
+
+.subtaskCheckbox {
+  margin-block-start: var(--nf-space-px);
+}
+
+.subtaskLabel {
+  flex: 1;
+  cursor: pointer;
+  font-size: var(--nf-text-sm);
+}
+
+.subtaskHeader {
+  display: flex;
+  align-items: center;
+  gap: var(--nf-space-2);
+}
+
+.subtaskTitle {
+  font-weight: var(--nf-weight-medium);
+}
+
+.subtaskDescription {
+  margin: var(--nf-space-1) 0 0;
+  font-size: var(--nf-text-xs);
+  color: var(--nf-color-fg-muted);
+}
+
+.subtaskAssignee {
+  font-size: var(--nf-text-xs);
+  color: var(--nf-color-fg-muted);
+  margin-block-start: var(--nf-space-px);
+  display: block;
+}

@@ -1,0 +1,10 @@
+/*
+ * SuggestionActions — 3-button action row used by inbox / planning
+ * suggestion cards. Tokens only.
+ */
+
+.row {
+  display: flex;
+  gap: var(--nf-space-2);
+  flex-shrink: 0;
+}

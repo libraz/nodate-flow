@@ -28,6 +28,7 @@ import {
   useTaskSearch,
 } from './api';
 import { STATE_TONE } from './constants';
+import styles from './dependencies-section.module.css';
 
 interface DependenciesSectionProps {
   taskId: string;
@@ -96,14 +97,9 @@ export default function DependenciesSection({
   };
 
   return (
-    <section
-      aria-label={t('tasks.detail.dependencies.title')}
-      style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}
-    >
-      <header style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <h2 style={{ margin: 0, fontSize: 'var(--nf-text-lg)' }}>
-          {t('tasks.detail.dependencies.title')}
-        </h2>
+    <section aria-label={t('tasks.detail.dependencies.title')} className={styles.section}>
+      <header className={styles.header}>
+        <h2 className={styles.headerTitle}>{t('tasks.detail.dependencies.title')}</h2>
         {!picking ? (
           <Button
             type="button"
@@ -136,9 +132,7 @@ export default function DependenciesSection({
       ) : null}
 
       {isEmpty && !picking ? (
-        <p style={{ margin: 0, color: 'var(--nf-color-fg-muted)' }}>
-          {t('tasks.detail.dependencies.empty')}
-        </p>
+        <p className={styles.empty}>{t('tasks.detail.dependencies.empty')}</p>
       ) : null}
 
       <DependencyGroup
@@ -201,58 +195,21 @@ function DependencyGroup({
   const { t } = useTranslation('common');
   if (items.length === 0) return null;
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.375rem' }}>
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: '0.5rem',
-          fontSize: 'var(--nf-text-xs)',
-          textTransform: 'uppercase',
-          letterSpacing: '0.05em',
-          color: 'var(--nf-color-fg-muted)',
-        }}
-      >
+    <div className={styles.group}>
+      <div className={styles.groupHeader}>
         <Badge tone={tone}>{label}</Badge>
         <span>({items.length})</span>
       </div>
-      <ul
-        style={{
-          listStyle: 'none',
-          margin: 0,
-          padding: 0,
-          display: 'flex',
-          flexDirection: 'column',
-          gap: '0.25rem',
-        }}
-      >
+      <ul className={styles.groupList}>
         {items.map((edge) => {
           const stateTone = STATE_TONE[edge.otherTaskDerivedState as TaskDerivedState] ?? 'neutral';
           return (
-            <li
-              key={edge.id}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.5rem',
-                padding: '0.5rem 0.625rem',
-                borderRadius: '0.5rem',
-                background: 'var(--nf-color-surface))',
-              }}
-            >
+            <li key={edge.id} className={styles.groupItem}>
               <Badge tone={stateTone}>{edge.otherTaskDerivedState}</Badge>
               <Link
                 to="/tasks/$taskId"
                 params={{ taskId: edge.otherTaskId }}
-                style={{
-                  flex: 1,
-                  minWidth: 0,
-                  overflow: 'hidden',
-                  textOverflow: 'ellipsis',
-                  whiteSpace: 'nowrap',
-                  color: 'inherit',
-                  textDecoration: 'none',
-                }}
+                className={styles.groupLink}
               >
                 {edge.otherTaskTitle}
               </Link>
@@ -316,24 +273,15 @@ function DependencyPicker({
   };
 
   return (
-    <div
-      style={{
-        display: 'flex',
-        flexDirection: 'column',
-        gap: '0.5rem',
-        padding: '0.75rem',
-        borderRadius: '0.5rem',
-        border: '1px solid var(--nf-color-border))',
-      }}
-    >
-      <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+    <div className={styles.picker}>
+      <div className={styles.pickerControls}>
         <Select
           aria-label={t('tasks.detail.dependencies.kindLabel')}
           value={kind}
           onChange={(e) => {
             setKind(e.target.value as AddableKind);
           }}
-          style={{ inlineSize: '12rem' }}
+          className={styles.pickerKindSelect}
         >
           <option value="blocks">{t('tasks.detail.dependencies.kind.blocks')}</option>
           <option value="relates">{t('tasks.detail.dependencies.kind.relates')}</option>
@@ -348,37 +296,22 @@ function DependencyPicker({
           placeholder={t('tasks.detail.dependencies.search')}
           autoFocus
           aria-label={t('tasks.detail.dependencies.search')}
-          style={{ flex: 1 }}
+          className={styles.pickerSearch}
         />
         <Button type="button" variant="ghost" size="sm" onClick={onClose}>
           {t('tasks.detail.dependencies.addCancel')}
         </Button>
       </div>
       {debounced.length === 0 ? (
-        <p style={{ margin: 0, color: 'var(--nf-color-fg-muted)', fontSize: '0.8125rem' }}>
-          {t('tasks.detail.dependencies.searchHint')}
-        </p>
+        <p className={styles.pickerHint}>{t('tasks.detail.dependencies.searchHint')}</p>
       ) : search.isFetching ? (
-        <div style={{ display: 'flex', justifyContent: 'center', padding: '0.5rem' }}>
+        <div className={styles.pickerLoadingRow}>
           <Spinner label={t('common.loading')} />
         </div>
       ) : results.length === 0 ? (
-        <p style={{ margin: 0, color: 'var(--nf-color-fg-muted)', fontSize: '0.8125rem' }}>
-          {t('tasks.detail.dependencies.searchEmpty')}
-        </p>
+        <p className={styles.pickerHint}>{t('tasks.detail.dependencies.searchEmpty')}</p>
       ) : (
-        <ul
-          style={{
-            listStyle: 'none',
-            margin: 0,
-            padding: 0,
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '0.25rem',
-            maxBlockSize: '16rem',
-            overflowY: 'auto',
-          }}
-        >
+        <ul className={styles.pickerResults}>
           {results.map((task) => (
             <li key={task.id}>
               <button
@@ -386,34 +319,12 @@ function DependencyPicker({
                 onClick={() => {
                   void handlePick(task.id);
                 }}
-                style={{
-                  inlineSize: '100%',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.5rem',
-                  padding: '0.5rem 0.625rem',
-                  borderRadius: '0.375rem',
-                  background: 'transparent',
-                  border: '1px solid transparent',
-                  textAlign: 'start',
-                  cursor: 'pointer',
-                  color: 'inherit',
-                  font: 'inherit',
-                }}
+                className={styles.pickerResultButton}
               >
                 <Badge tone={STATE_TONE[task.derivedState as TaskDerivedState] ?? 'neutral'}>
                   {task.derivedState}
                 </Badge>
-                <span
-                  style={{
-                    flex: 1,
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                    whiteSpace: 'nowrap',
-                  }}
-                >
-                  {task.title}
-                </span>
+                <span className={styles.pickerResultTitle}>{task.title}</span>
               </button>
             </li>
           ))}

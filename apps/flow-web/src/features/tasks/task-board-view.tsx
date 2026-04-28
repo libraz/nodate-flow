@@ -96,12 +96,7 @@ export default function TaskBoardView({ projectId }: TaskBoardViewProps): ReactE
         const items = groups[state];
         return (
           <section key={state} aria-label={t(STATE_KEY[state])} className={css.column}>
-            <Card
-              style={{
-                padding: '0.75rem 1rem',
-                background: 'var(--nf-color-surface)',
-              }}
-            >
+            <Card className={css.headerCard}>
               <header className={css.columnHeader}>
                 <span className={css.columnHeaderLabel}>{t(STATE_KEY[state])}</span>
                 <span className={css.columnHeaderCount}>{items.length}</span>
@@ -109,15 +104,7 @@ export default function TaskBoardView({ projectId }: TaskBoardViewProps): ReactE
               {/* Show the D&D-disabled hint once, on the first column,
                   so it isn't repeated five times across the board. */}
               {index === 0 ? (
-                <p
-                  style={{
-                    margin: '0.5rem 0 0',
-                    fontSize: '0.75rem',
-                    color: 'var(--nf-color-fg-muted)',
-                  }}
-                >
-                  {t('tasks.board.dnd_disabled_hint')}
-                </p>
+                <p className={css.dndHint}>{t('tasks.board.dnd_disabled_hint')}</p>
               ) : null}
             </Card>
             <div role="list" aria-label={t(STATE_KEY[state])} className={css.dropZone}>

@@ -59,6 +59,17 @@
   background: var(--nf-color-bg-sunken);
 }
 
+.headerCard {
+  padding: var(--nf-space-3) var(--nf-space-4);
+  background: var(--nf-color-surface);
+}
+
+.dndHint {
+  margin: var(--nf-space-2) 0 0;
+  font-size: var(--nf-text-xs);
+  color: var(--nf-color-fg-muted);
+}
+
 @media (max-width: 767px) {
   .board {
     grid-auto-flow: row;

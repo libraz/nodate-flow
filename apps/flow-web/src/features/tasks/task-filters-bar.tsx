@@ -16,6 +16,7 @@ import LensPicker from './lens-picker';
 import { useWorkspaceUsersQuery } from '../workspaces/api';
 import { TASK_PRIORITIES, TASK_STATES, type TaskDerivedState, type TaskPriority } from './api';
 import { PRIORITY_KEY, STATE_KEY } from './constants';
+import styles from './task-filters-bar.module.css';
 import {
   resetTaskFilters,
   setTaskFilterAssignee,
@@ -50,7 +51,7 @@ function AssigneePicker({
 }: AssigneePickerProps): ReactElement {
   const { data: users } = useWorkspaceUsersQuery(workspaceId);
   return (
-    <div style={{ inlineSize: '12rem' }}>
+    <div className={styles.assigneePicker}>
       <Combobox
         aria-label={label}
         placeholder={label}
@@ -114,19 +115,10 @@ export default function TaskFiltersBar({
   const hasActiveFilter = activeSearch || activeStates || activeAssignee || activePriority;
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+    <div className={styles.bar}>
       {/* Controls row */}
-      <div
-        role="search"
-        aria-label={t('tasks.title')}
-        style={{
-          display: 'flex',
-          gap: '0.75rem',
-          alignItems: 'center',
-          flexWrap: 'wrap',
-        }}
-      >
-        <div style={{ inlineSize: '18rem' }}>
+      <div role="search" aria-label={t('tasks.title')} className={styles.controlsRow}>
+        <div className={styles.searchInput}>
           <Input
             type="search"
             value={filters.search ?? ''}
@@ -137,11 +129,7 @@ export default function TaskFiltersBar({
             aria-label={t('tasks.filters.search_placeholder')}
           />
         </div>
-        <div
-          role="group"
-          aria-label={t('tasks.filters.status')}
-          style={{ display: 'inline-flex', gap: '0.375rem', flexWrap: 'wrap' }}
-        >
+        <div role="group" aria-label={t('tasks.filters.status')} className={styles.toggleGroup}>
           {TASK_STATES.map((state) => {
             const active = selectedStates.has(state);
             return (
@@ -152,41 +140,15 @@ export default function TaskFiltersBar({
                 onClick={() => {
                   toggleState(state);
                 }}
-                style={{
-                  paddingBlock: '0.25rem',
-                  paddingInline: '0.625rem',
-                  borderRadius: '999px',
-                  border: active
-                    ? '1px solid var(--nf-color-accent)'
-                    : '1px solid var(--nf-color-border)',
-                  background: active ? 'var(--nf-color-accent-subtle)' : 'transparent',
-                  color: active ? 'var(--nf-color-accent)' : 'var(--nf-color-fg-muted)',
-                  font: 'inherit',
-                  fontSize: '0.8125rem',
-                  fontWeight: active ? 600 : 400,
-                  cursor: 'pointer',
-                }}
+                className={`${styles.toggleChip} ${active ? styles.toggleChipActive : ''}`.trim()}
               >
                 {t(STATE_KEY[state])}
               </button>
             );
           })}
         </div>
-        <span
-          aria-hidden
-          style={{
-            display: 'block',
-            inlineSize: '1px',
-            blockSize: '1.25rem',
-            background: 'var(--nf-color-border)',
-            flexShrink: 0,
-          }}
-        />
-        <div
-          role="group"
-          aria-label={t('tasks.filters.priority')}
-          style={{ display: 'inline-flex', gap: '0.375rem', flexWrap: 'wrap' }}
-        >
+        <span aria-hidden className={styles.divider} />
+        <div role="group" aria-label={t('tasks.filters.priority')} className={styles.toggleGroup}>
           {TASK_PRIORITIES.map((p) => {
             const active = selectedPriorities.has(p);
             return (
@@ -197,20 +159,7 @@ export default function TaskFiltersBar({
                 onClick={() => {
                   togglePriority(p);
                 }}
-                style={{
-                  paddingBlock: '0.25rem',
-                  paddingInline: '0.625rem',
-                  borderRadius: '999px',
-                  border: active
-                    ? '1px solid var(--nf-color-accent)'
-                    : '1px solid var(--nf-color-border)',
-                  background: active ? 'var(--nf-color-accent-subtle)' : 'transparent',
-                  color: active ? 'var(--nf-color-accent)' : 'var(--nf-color-fg-muted)',
-                  font: 'inherit',
-                  fontSize: '0.8125rem',
-                  fontWeight: active ? 600 : 400,
-                  cursor: 'pointer',
-                }}
+                className={`${styles.toggleChip} ${active ? styles.toggleChipActive : ''}`.trim()}
               >
                 {t(PRIORITY_KEY[p])}
               </button>
@@ -220,7 +169,7 @@ export default function TaskFiltersBar({
         {workspaceId !== undefined ? (
           <Suspense
             fallback={
-              <div style={{ inlineSize: '12rem' }}>
+              <div className={styles.assigneePicker}>
                 <Input disabled placeholder={assigneeLabel} aria-label={assigneeLabel} />
               </div>
             }
@@ -233,7 +182,7 @@ export default function TaskFiltersBar({
             />
           </Suspense>
         ) : (
-          <div style={{ inlineSize: '12rem' }}>
+          <div className={styles.assigneePicker}>
             <Input disabled placeholder={assigneeLabel} aria-label={assigneeLabel} />
           </div>
         )}
@@ -243,17 +192,7 @@ export default function TaskFiltersBar({
             onClick={() => {
               resetTaskFilters(projectId);
             }}
-            style={{
-              marginInlineStart: 'auto',
-              background: 'none',
-              border: 'none',
-              padding: '0.25rem 0.5rem',
-              color: 'var(--nf-color-fg-muted)',
-              cursor: 'pointer',
-              font: 'inherit',
-              fontSize: '0.8125rem',
-              textDecoration: 'underline',
-            }}
+            className={styles.clearButton}
           >
             {t('tasks.filters.clear')}
           </button>
@@ -267,16 +206,7 @@ export default function TaskFiltersBar({
 
       {/* Active filter chips */}
       {hasActiveFilter ? (
-        <div
-          role="status"
-          aria-live="polite"
-          style={{
-            display: 'flex',
-            gap: '0.375rem',
-            flexWrap: 'wrap',
-            alignItems: 'center',
-          }}
-        >
+        <div role="status" aria-live="polite" className={styles.chipsRow}>
           {activeSearch ? (
             <Chip
               onDismiss={() => {

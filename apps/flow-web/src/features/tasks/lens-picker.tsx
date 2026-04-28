@@ -1,15 +1,25 @@
 /**
- * LensPicker — lightweight dropdown for listing, applying, creating, and
- * deleting saved views (lenses). Wrapped in Suspense at the mount site.
+ * LensPicker — saved-views (lens) listing + management.
+ *
+ * Hosted inside the design-system `Popover` primitive: it owns the
+ * positioning, focus trap, dismiss-on-Escape / outside click, and aria
+ * roles. The picker is still feature-local because the savedviews CRUD
+ * shape is tasks-specific.
+ *
+ * The L1 fix lifts `aria-selected` from a hardcoded `false` to a real
+ * comparison between the current task filters and each lens's stored
+ * filter map.
  */
 
-import { type ReactElement, useRef, useState } from 'react';
+import Popover from '@nodate-flow/ui/primitives/popover';
+import { type ReactElement, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import type { TaskDerivedState, TaskFilters, TaskPriority } from './api';
 import type { LensDto } from './lens-api';
 import { useCreateLens, useDeleteLens, useLensesQuery } from './lens-api';
-import { getTaskFilters, setTaskFilters } from './use-task-filters';
+import styles from './lens-picker.module.css';
+import { getTaskFilters, setTaskFilters, useTaskFilters } from './use-task-filters';
 
 export interface LensPickerProps {
   workspaceId: string;
@@ -73,17 +83,52 @@ function taskFiltersToLensFilter(filters: TaskFilters): Record<string, Record<st
   return out;
 }
 
+/**
+ * Compare a lens's saved filter against the currently active filter so
+ * the dropdown can mark the matching row with `aria-selected`. Order
+ * within state/priority value arrays is treated as significant only as
+ * a multi-set: we compare sorted projections to avoid false negatives
+ * after a re-application of the same lens.
+ */
+function isLensActive(
+  lensFilter: Record<string, Record<string, unknown>>,
+  current: TaskFilters,
+): boolean {
+  const lensShape = lensFilterToTaskFilters(lensFilter);
+
+  const sameStringArray = (a?: readonly string[], b?: readonly string[]): boolean => {
+    const aa = (a ?? []).slice().sort();
+    const bb = (b ?? []).slice().sort();
+    if (aa.length !== bb.length) return false;
+    for (let i = 0; i < aa.length; i++) if (aa[i] !== bb[i]) return false;
+    return true;
+  };
+  const sameNumberArray = (a?: readonly number[], b?: readonly number[]): boolean => {
+    const aa = (a ?? []).slice().sort();
+    const bb = (b ?? []).slice().sort();
+    if (aa.length !== bb.length) return false;
+    for (let i = 0; i < aa.length; i++) if (aa[i] !== bb[i]) return false;
+    return true;
+  };
+
+  return (
+    sameStringArray(lensShape.states, current.states) &&
+    sameNumberArray(lensShape.priority, current.priority) &&
+    (lensShape.assigneeId ?? '') === (current.assigneeId ?? '') &&
+    (lensShape.search ?? '') === (current.search ?? '')
+  );
+}
+
 export default function LensPicker({ workspaceId, projectId }: LensPickerProps): ReactElement {
   const { t } = useTranslation('common');
   const { data: lenses } = useLensesQuery(workspaceId, projectId);
+  const currentFilters = useTaskFilters(projectId);
   const createLens = useCreateLens();
   const deleteLens = useDeleteLens();
 
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [nameInput, setNameInput] = useState('');
-  const triggerRef = useRef<HTMLButtonElement>(null);
-  const dropdownRef = useRef<HTMLDivElement>(null);
 
   const handleApply = (lens: LensDto): void => {
     const filters = lensFilterToTaskFilters(lens.filter);
@@ -98,8 +143,8 @@ export default function LensPicker({ workspaceId, projectId }: LensPickerProps):
   const handleSave = (): void => {
     const trimmed = nameInput.trim();
     if (trimmed.length === 0) return;
-    const currentFilters = getTaskFilters(projectId);
-    const filter = taskFiltersToLensFilter(currentFilters);
+    const captured = getTaskFilters(projectId);
+    const filter = taskFiltersToLensFilter(captured);
     setSaving(true);
     createLens.mutate(
       { workspaceId, name: trimmed, projectId, filter },
@@ -112,186 +157,80 @@ export default function LensPicker({ workspaceId, projectId }: LensPickerProps):
     );
   };
 
-  return (
-    <div style={{ position: 'relative', display: 'inline-block' }}>
-      <button
-        ref={triggerRef}
-        type="button"
-        aria-expanded={open}
-        aria-haspopup="listbox"
-        onClick={() => {
-          setOpen((prev) => !prev);
-        }}
-        style={{
-          background: 'none',
-          border: '1px solid var(--nf-color-border)',
-          borderRadius: '0.375rem',
-          padding: '0.25rem 0.625rem',
-          color: 'var(--nf-color-fg-muted)',
-          cursor: 'pointer',
-          font: 'inherit',
-          fontSize: '0.8125rem',
-        }}
-      >
-        {t('tasks.lens.title')}
-      </button>
-
-      {open ? (
-        <div
-          ref={dropdownRef}
-          role="listbox"
-          aria-label={t('tasks.lens.title')}
-          style={{
-            position: 'absolute',
-            insetBlockStart: '100%',
-            insetInlineEnd: '0',
-            marginBlockStart: '0.25rem',
-            background: 'var(--nf-color-bg)',
-            border: '1px solid var(--nf-color-border)',
-            borderRadius: '0.5rem',
-            boxShadow: 'var(--nf-shadow-elevated)',
-            minInlineSize: '14rem',
-            maxInlineSize: '20rem',
-            zIndex: 50,
-            padding: '0.375rem',
-          }}
-        >
-          {lenses.length === 0 ? (
-            <p
-              style={{
-                padding: '0.5rem',
-                margin: 0,
-                color: 'var(--nf-color-fg-muted)',
-                fontSize: '0.8125rem',
-              }}
-            >
-              {t('tasks.lens.empty')}
-            </p>
-          ) : (
-            <ul style={{ listStyle: 'none', margin: 0, padding: 0 }}>
-              {lenses.map((lens) => (
-                <li
-                  key={lens.id}
-                  role="option"
-                  aria-selected={false}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '0.375rem',
-                    padding: '0.375rem 0.5rem',
-                    borderRadius: '0.25rem',
-                    cursor: 'pointer',
-                    fontSize: '0.8125rem',
+  const panel = (
+    <div className={styles.panel}>
+      {lenses.length === 0 ? (
+        <p className={styles.empty}>{t('tasks.lens.empty')}</p>
+      ) : (
+        <ul role="listbox" aria-label={t('tasks.lens.title')} className={styles.list}>
+          {lenses.map((lens) => {
+            const selected = isLensActive(lens.filter, currentFilters);
+            return (
+              <li
+                key={lens.id}
+                role="option"
+                aria-selected={selected}
+                className={`${styles.option} ${selected ? styles.optionSelected : ''}`.trim()}
+              >
+                <button
+                  type="button"
+                  className={styles.optionApply}
+                  onClick={() => {
+                    handleApply(lens);
                   }}
                 >
-                  <button
-                    type="button"
-                    onClick={() => {
-                      handleApply(lens);
-                    }}
-                    style={{
-                      flex: 1,
-                      background: 'none',
-                      border: 'none',
-                      padding: 0,
-                      textAlign: 'start',
-                      cursor: 'pointer',
-                      font: 'inherit',
-                      color: 'var(--nf-color-fg)',
-                    }}
-                  >
-                    {lens.name}
-                    {lens.isDefault ? (
-                      <span
-                        style={{
-                          marginInlineStart: '0.375rem',
-                          fontSize: '0.6875rem',
-                          padding: '0.125rem 0.375rem',
-                          borderRadius: '999px',
-                          background: 'var(--nf-color-accent-subtle)',
-                          color: 'var(--nf-color-accent)',
-                        }}
-                      >
-                        {t('tasks.lens.default_badge')}
-                      </span>
-                    ) : null}
-                  </button>
-                  <button
-                    type="button"
-                    aria-label={t('tasks.lens.delete')}
-                    onClick={() => {
-                      handleDelete(lens);
-                    }}
-                    style={{
-                      background: 'none',
-                      border: 'none',
-                      padding: '0.125rem 0.25rem',
-                      cursor: 'pointer',
-                      color: 'var(--nf-color-fg-muted)',
-                      fontSize: 'var(--nf-text-xs)',
-                      lineHeight: 1,
-                    }}
-                  >
-                    &times;
-                  </button>
-                </li>
-              ))}
-            </ul>
-          )}
+                  {lens.name}
+                  {lens.isDefault ? (
+                    <span className={styles.defaultBadge}>{t('tasks.lens.default_badge')}</span>
+                  ) : null}
+                </button>
+                <button
+                  type="button"
+                  aria-label={t('tasks.lens.delete')}
+                  className={styles.optionDelete}
+                  onClick={() => {
+                    handleDelete(lens);
+                  }}
+                >
+                  &times;
+                </button>
+              </li>
+            );
+          })}
+        </ul>
+      )}
 
-          {/* Save current view form */}
-          <div
-            style={{
-              borderBlockStart: '1px solid var(--nf-color-border)',
-              marginBlockStart: '0.375rem',
-              paddingBlockStart: '0.375rem',
-              display: 'flex',
-              gap: '0.25rem',
-            }}
-          >
-            <input
-              type="text"
-              value={nameInput}
-              onChange={(e) => {
-                setNameInput(e.target.value);
-              }}
-              placeholder={t('tasks.lens.name_placeholder')}
-              aria-label={t('tasks.lens.name_placeholder')}
-              style={{
-                flex: 1,
-                border: '1px solid var(--nf-color-border)',
-                borderRadius: '0.25rem',
-                padding: '0.25rem 0.5rem',
-                font: 'inherit',
-                fontSize: '0.8125rem',
-                background: 'var(--nf-color-bg)',
-                color: 'var(--nf-color-fg)',
-              }}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') handleSave();
-              }}
-            />
-            <button
-              type="button"
-              disabled={saving || nameInput.trim().length === 0}
-              onClick={handleSave}
-              style={{
-                border: 'none',
-                borderRadius: '0.25rem',
-                padding: '0.25rem 0.5rem',
-                font: 'inherit',
-                fontSize: '0.8125rem',
-                background: 'var(--nf-color-accent)',
-                color: 'var(--nf-color-bg)',
-                cursor: saving ? 'wait' : 'pointer',
-                opacity: nameInput.trim().length === 0 ? 0.5 : 1,
-              }}
-            >
-              {saving ? t('tasks.lens.creating') : t('tasks.lens.create')}
-            </button>
-          </div>
-        </div>
-      ) : null}
+      <div className={styles.saveRow}>
+        <input
+          type="text"
+          value={nameInput}
+          onChange={(e) => {
+            setNameInput(e.target.value);
+          }}
+          placeholder={t('tasks.lens.name_placeholder')}
+          aria-label={t('tasks.lens.name_placeholder')}
+          className={styles.saveInput}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') handleSave();
+          }}
+        />
+        <button
+          type="button"
+          disabled={saving || nameInput.trim().length === 0}
+          onClick={handleSave}
+          className={styles.saveButton}
+        >
+          {saving ? t('tasks.lens.creating') : t('tasks.lens.create')}
+        </button>
+      </div>
     </div>
+  );
+
+  return (
+    <Popover open={open} onOpenChange={setOpen} placement="bottom-end" content={panel}>
+      <button type="button" aria-haspopup="listbox" className={styles.trigger}>
+        {t('tasks.lens.title')}
+      </button>
+    </Popover>
   );
 }
