@@ -331,15 +331,19 @@ func (h *Handler) handleToolCall(w http.ResponseWriter, r *http.Request, s *sess
 	}
 	resultJSON, _ := json.Marshal(result)
 	// Redact secrets from the response text so MCP callers never see
-	// raw API keys, tokens, or passwords in tool output.
-	redactedResult := ai.RedactJSONFields(string(resultJSON))
-	h.audit(r.Context(), s, params.Name, args, json.RawMessage(redactedResult),
+	// raw API keys, tokens, or passwords in tool output. We redact here
+	// FIRST so the same redacted bytes flow into both the HTTP response
+	// AND the audit row — the audit helper redacts again defensively
+	// (centralized invariant), but the call site MUST never hand audit
+	// or the client raw secret-bearing JSON.
+	_, redactedResult := redactAuditPayloads(args, resultJSON)
+	h.audit(r.Context(), s, params.Name, args, redactedResult,
 		generated.McpInvocationsStatusOk, "", dur)
 	// MCP spec: result content is a list of content parts. We wrap the
 	// tool output as a single JSON text part.
 	writeRPCResult(w, req.ID, map[string]any{
 		"content": []map[string]any{
-			{"type": "text", "text": redactedResult},
+			{"type": "text", "text": string(redactedResult)},
 		},
 		"isError": false,
 	})
@@ -497,21 +501,11 @@ func (h *Handler) audit(
 	if h.deps.Queries == nil {
 		return
 	}
-	argsBlob := args
-	if len(argsBlob) == 0 {
-		argsBlob = json.RawMessage("{}")
-	}
-	resBlob := result
-	if len(resBlob) == 0 {
-		resBlob = json.RawMessage("{}")
-	}
-	// Compact to keep stored JSON minimal.
-	var buf bytes.Buffer
-	_ = json.Compact(&buf, argsBlob)
-	argsBlob = json.RawMessage(ai.RedactJSONFields(buf.String()))
-	buf.Reset()
-	_ = json.Compact(&buf, resBlob)
-	resBlob = json.RawMessage(ai.RedactJSONFields(buf.String()))
+	// Redact BEFORE persisting. This is the single guarantee that
+	// mcp_invocations.{arguments,result}_redacted_json never contain
+	// raw API keys, tokens, or passwords. Callers that already redacted
+	// upstream pay only an idempotent second pass.
+	argsBlob, resBlob := redactAuditPayloads(args, result)
 
 	var userID sql.NullInt32
 	if s != nil {
@@ -537,4 +531,45 @@ func (h *Handler) audit(
 	if err != nil {
 		slog.ErrorContext(ctx, "mcp audit log failed", slog.String("tool", toolName), slog.Any("err", err))
 	}
+}
+
+// redactAuditPayloads is the single source of truth for the
+// "redact before persist / before return" invariant. It accepts the
+// raw arguments and result blobs as they came out of the tool handler
+// (or json.Marshal of the tool's return value) and produces the
+// compact, redacted JSON that is safe to:
+//
+//   - write to mcp_invocations.arguments_redacted_json
+//   - write to mcp_invocations.result_redacted_json
+//   - hand back to the MCP client as tool output text
+//
+// Empty inputs are normalised to "{}" so the audit row never carries
+// NULL where the caller expected a JSON document. Redaction is
+// performed by ai.RedactJSONFields, which both scrubs sensitive JSON
+// field values (api_key, token, password, secret, authorization,
+// apikey) and replaces any registered secret prefix (sk-, mcp_, ghp_,
+// AKIA, ...) wherever it appears in the text.
+//
+// The function is idempotent: applying it twice produces the same
+// bytes as applying it once. Callers that pre-redact for the HTTP
+// response can therefore pass the redacted result back through audit
+// without double-marking.
+func redactAuditPayloads(args, result json.RawMessage) (json.RawMessage, json.RawMessage) {
+	return redactOnePayload(args), redactOnePayload(result)
+}
+
+// redactOnePayload compacts then redacts a single JSON-ish blob. If
+// the blob is empty, it returns the literal "{}" so the audit row is
+// always a valid JSON document.
+func redactOnePayload(raw json.RawMessage) json.RawMessage {
+	if len(raw) == 0 {
+		return json.RawMessage("{}")
+	}
+	var buf bytes.Buffer
+	if err := json.Compact(&buf, raw); err != nil {
+		// Compact failed — fall back to scrubbing the raw bytes
+		// directly so we never silently drop the row.
+		return json.RawMessage(ai.RedactJSONFields(string(raw)))
+	}
+	return json.RawMessage(ai.RedactJSONFields(buf.String()))
 }
