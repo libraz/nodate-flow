@@ -25,29 +25,26 @@ func OIDCMicrosoftCallback(deps Deps) func(context.Context, *OIDCCallbackInput) 
 		if err != nil {
 			return nil, httpErr(apierrors.AuthOidcStateMismatch)
 		}
-		idTok, err := deps.OIDCMicrosoft.Exchange(ctx, in.Code, nonce)
+		claims, err := deps.OIDCMicrosoft.Exchange(ctx, in.Code, nonce)
 		if err != nil {
 			return nil, httpErr(apierrors.AuthOidcIdTokenInvalid)
 		}
-		var claims struct {
-			Email    string `json:"email"`
-			Sub      string `json:"sub"`
-			Name     string `json:"name"`
-			Verified bool   `json:"email_verified"`
-		}
-		if err := idTok.Claims(&claims); err != nil {
-			return nil, httpErr(apierrors.AuthOidcIdTokenInvalid)
-		}
 		// Microsoft sometimes returns preferred_username instead of email.
-		if claims.Email == "" {
-			var alt struct {
-				PreferredUsername string `json:"preferred_username"`
-			}
-			_ = idTok.Claims(&alt)
-			claims.Email = alt.PreferredUsername
+		email := claims.Email
+		if email == "" {
+			email = claims.PreferredUsername
 		}
-		if claims.Email == "" {
+		if email == "" {
 			return nil, httpErr(apierrors.AuthOidcIdTokenInvalid)
+		}
+		// Reject unverified emails. Microsoft Entra ID may omit
+		// email_verified or set it to false for personal Microsoft
+		// accounts whose email has not been confirmed; auto-provisioning
+		// an account with an unverified email would let an attacker
+		// claim a victim's email by creating an unverified Microsoft
+		// account first.
+		if !claims.EmailVerified {
+			return nil, httpErr(apierrors.AuthOidcEmailNotVerified)
 		}
 
 		ident, err := deps.Queries.FindIdentityByProviderSubject(ctx, generated.FindIdentityByProviderSubjectParams{
@@ -71,7 +68,7 @@ func OIDCMicrosoftCallback(deps Deps) func(context.Context, *OIDCCallbackInput) 
 			userPub = types.New()
 			uid, err := deps.Queries.RegisterUser(ctx, generated.RegisterUserParams{
 				PublicID:        userPub,
-				Email:           claims.Email,
+				Email:           email,
 				DisplayName:     claims.Name,
 				Locale:          "en",
 				ThemePreference: generated.UsersThemePreference("system"),
@@ -97,7 +94,7 @@ func OIDCMicrosoftCallback(deps Deps) func(context.Context, *OIDCCallbackInput) 
 			Action:       "auth.login_oidc",
 			ActorID:      userID,
 			ResourceType: "user",
-			Metadata:     map[string]any{"provider": "microsoft", "email": claims.Email},
+			Metadata:     map[string]any{"provider": "microsoft", "email": email},
 		})
 		tokens, refresh, err := issueTokens(ctx, deps, userID, userPub, in.UserAgent, authn.ClientIPFromContext(ctx))
 		if err != nil {

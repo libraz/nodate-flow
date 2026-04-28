@@ -6,6 +6,7 @@ import (
 	"errors"
 
 	"github.com/nodate-flow/nodate-flow/apps/auth-api/internal/audit"
+	internauth "github.com/nodate-flow/nodate-flow/apps/auth-api/internal/auth"
 	"github.com/nodate-flow/nodate-flow/apps/auth-api/internal/db/generated"
 	"github.com/nodate-flow/nodate-flow/apps/auth-api/internal/db/types"
 	apierrors "github.com/nodate-flow/nodate-flow/apps/auth-api/internal/errors"
@@ -33,6 +34,15 @@ func OIDCGithubCallback(deps Deps) func(context.Context, *OIDCCallbackInput) (*O
 		}
 		claims, err := deps.OIDCGithub.Exchange(ctx, in.Code, nonce)
 		if err != nil {
+			// GitHub does not return email_verified in an id_token (it
+			// has no id_token at all), so the verification check is
+			// performed inside the OAuth client when it resolves the
+			// primary email. Surface that as AUTH.OIDC.EMAIL_NOT_VERIFIED
+			// so the three providers reject unverified accounts with
+			// the same code.
+			if errors.Is(err, internauth.ErrGithubEmailNotVerified) {
+				return nil, httpErr(apierrors.AuthOidcEmailNotVerified)
+			}
 			return nil, httpErr(apierrors.AuthOidcIdTokenInvalid)
 		}
 		if claims.Email == "" {

@@ -7,6 +7,7 @@ package auth
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -14,6 +15,12 @@ import (
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/github"
 )
+
+// ErrGithubEmailNotVerified is returned by the GitHub OAuth client when
+// the authenticated user has no primary verified email available. The
+// handler maps it to AUTH.OIDC.EMAIL_NOT_VERIFIED so the three OIDC
+// providers reject unverified accounts uniformly.
+var ErrGithubEmailNotVerified = errors.New("github: no primary verified email")
 
 // GithubOAuthConfig configures the GitHub OAuth2 client.
 type GithubOAuthConfig struct {
@@ -36,6 +43,10 @@ type GithubClaims struct {
 type GithubOAuthClient struct {
 	cfg   GithubOAuthConfig
 	oauth *oauth2.Config
+	// apiBaseURL is the GitHub API root used for /user and /user/emails.
+	// Defaults to https://api.github.com; tests override it to point at
+	// an httptest server.
+	apiBaseURL string
 }
 
 // NewGithubOAuth builds a GithubOAuthClient.
@@ -49,7 +60,16 @@ func NewGithubOAuth(cfg GithubOAuthConfig) *GithubOAuthClient {
 			Endpoint:     github.Endpoint,
 			Scopes:       []string{"read:user", "user:email"},
 		},
+		apiBaseURL: "https://api.github.com",
 	}
+}
+
+// WithAPIBaseURL overrides the GitHub API root. Intended for tests that
+// stand up an httptest.Server in place of api.github.com. Returns the
+// receiver for chaining.
+func (c *GithubOAuthClient) WithAPIBaseURL(base string) *GithubOAuthClient {
+	c.apiBaseURL = base
+	return c
 }
 
 // AuthCodeURL returns the GitHub authorization redirect URL.
@@ -68,7 +88,7 @@ func (c *GithubOAuthClient) Exchange(ctx context.Context, code, _ string) (*Gith
 	if err != nil {
 		return nil, fmt.Errorf("github: oauth exchange: %w", err)
 	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "https://api.github.com/user", nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.apiBaseURL+"/user", nil)
 	if err != nil {
 		return nil, fmt.Errorf("github: build request: %w", err)
 	}
@@ -99,10 +119,15 @@ func (c *GithubOAuthClient) Exchange(ctx context.Context, code, _ string) (*Gith
 	if err := json.Unmarshal(body, &raw); err != nil {
 		return nil, fmt.Errorf("github: decode user: %w", err)
 	}
-	// If primary email is private, fetch from /user/emails endpoint.
-	email := raw.Email
-	if email == "" {
-		email, _ = fetchGithubPrimaryEmail(ctx, tok.AccessToken)
+	// Always resolve the email through /user/emails so we can require
+	// the primary entry to be verified=true. The /user payload only
+	// echoes the user's chosen public email and gives us no signal
+	// about verification, so trusting it would let an attacker
+	// auto-provision an account against any email they have managed
+	// to add to GitHub but never verified.
+	email, err := c.fetchGithubPrimaryVerifiedEmail(ctx, tok.AccessToken)
+	if err != nil {
+		return nil, err
 	}
 	return &GithubClaims{
 		Sub:   fmt.Sprintf("%d", raw.ID),
@@ -112,32 +137,37 @@ func (c *GithubOAuthClient) Exchange(ctx context.Context, code, _ string) (*Gith
 	}, nil
 }
 
-// fetchGithubPrimaryEmail calls /user/emails to find the user's
-// primary verified email when the /user response has it empty.
-func fetchGithubPrimaryEmail(ctx context.Context, accessToken string) (string, error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "https://api.github.com/user/emails", nil)
+// fetchGithubPrimaryVerifiedEmail calls /user/emails and returns the
+// primary email iff it is also verified. Returns
+// ErrGithubEmailNotVerified when no such address exists so the caller
+// can surface AUTH.OIDC.EMAIL_NOT_VERIFIED.
+func (c *GithubOAuthClient) fetchGithubPrimaryVerifiedEmail(ctx context.Context, accessToken string) (string, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.apiBaseURL+"/user/emails", nil)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("github: build emails request: %w", err)
 	}
 	req.Header.Set("Authorization", "Bearer "+accessToken)
 	req.Header.Set("Accept", "application/json")
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("github: emails request: %w", err)
 	}
 	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("github: emails request returned %d", resp.StatusCode)
+	}
 	var emails []struct {
 		Email    string `json:"email"`
 		Primary  bool   `json:"primary"`
 		Verified bool   `json:"verified"`
 	}
 	if err := json.NewDecoder(resp.Body).Decode(&emails); err != nil {
-		return "", err
+		return "", fmt.Errorf("github: decode emails: %w", err)
 	}
 	for _, e := range emails {
 		if e.Primary && e.Verified {
 			return e.Email, nil
 		}
 	}
-	return "", fmt.Errorf("github: no primary verified email found")
+	return "", ErrGithubEmailNotVerified
 }

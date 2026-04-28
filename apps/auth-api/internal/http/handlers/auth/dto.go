@@ -24,6 +24,15 @@ type GithubExchanger interface {
 	Exchange(ctx context.Context, code, nonce string) (*auth.GithubClaims, error)
 }
 
+// MicrosoftExchanger is the narrow contract used by the Microsoft OIDC
+// start/callback handlers. The production implementation is
+// *auth.MicrosoftOIDCClient; tests inject a fake to avoid the real
+// discovery / token-exchange round trip.
+type MicrosoftExchanger interface {
+	AuthCodeURL(ctx context.Context, state, nonce string) (string, error)
+	Exchange(ctx context.Context, code, expectedNonce string) (*auth.MicrosoftClaims, error)
+}
+
 // Deps is the dependency bundle passed to each handler.
 type Deps struct {
 	DB       *sql.DB
@@ -36,8 +45,9 @@ type Deps struct {
 	// interface so unit tests can substitute a fake exchanger.
 	OIDCGithub GithubExchanger
 	// OIDCMicrosoft is the Microsoft OIDC client for login. Nil when
-	// the NF_AUTH_MICROSOFT_OIDC_CLIENT_ID env is unset.
-	OIDCMicrosoft *auth.MicrosoftOIDCClient
+	// the NF_AUTH_MICROSOFT_OIDC_CLIENT_ID env is unset. Declared as an
+	// interface so unit tests can substitute a fake exchanger.
+	OIDCMicrosoft MicrosoftExchanger
 	// Cipher encrypts/decrypts TOTP secrets. Nil when NF_SECRET_KEY is
 	// unset; the TOTP endpoints return AUTH.TOTP.NOT_CONFIGURED in that
 	// case so the rest of the api still boots.

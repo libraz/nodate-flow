@@ -11,6 +11,8 @@ import (
 
 	"github.com/nodate-flow/nodate-flow/apps/auth-api/internal/audit"
 	internauth "github.com/nodate-flow/nodate-flow/apps/auth-api/internal/auth"
+	apierrors "github.com/nodate-flow/nodate-flow/apps/auth-api/internal/errors"
+	"github.com/nodate-flow/nodate-flow/apps/auth-api/internal/http/handlers/handlerutil"
 )
 
 // fakeGithubExchanger captures the nonce passed to Exchange so the
@@ -64,6 +66,35 @@ func TestOIDCGithubCallback_PassesNonceFromState(t *testing.T) {
 	assert.Equal(t, "auth-code", gh.gotCode, "code must be forwarded verbatim")
 	assert.Equal(t, wantNonce, gh.gotNonce,
 		"nonce decoded from the signed state must be forwarded to Exchange (was discarded before the audit fix)")
+}
+
+// TestOIDCGithubCallback_RejectsUnverifiedEmail asserts the callback
+// returns AUTH.OIDC.EMAIL_NOT_VERIFIED when the OAuth client signals
+// no primary verified email is available. This keeps GitHub aligned
+// with Google and Microsoft, which reject unverified emails using the
+// same error code.
+func TestOIDCGithubCallback_RejectsUnverifiedEmail(t *testing.T) {
+	t.Parallel()
+	jwt, err := internauth.NewJWTIssuer(nil, "iss", "aud", time.Minute)
+	require.NoError(t, err)
+	state, err := jwt.SignOIDCState("nonce-value")
+	require.NoError(t, err)
+
+	gh := &fakeGithubExchanger{err: internauth.ErrGithubEmailNotVerified}
+	deps := Deps{
+		JWT:        jwt,
+		OIDCGithub: gh,
+		Audit:      audit.NoopSink{},
+	}
+	handler := OIDCGithubCallback(deps)
+	_, err = handler(context.Background(), &OIDCCallbackInput{Code: "auth-code", State: state})
+	require.Error(t, err)
+
+	var problem *handlerutil.ProblemDetails
+	require.True(t, errors.As(err, &problem), "expected handlerutil.ProblemDetails, got %T", err)
+	assert.Equal(t, apierrors.AuthOidcEmailNotVerified.Code, problem.Type,
+		"unverified primary email must surface as AUTH.OIDC.EMAIL_NOT_VERIFIED")
+	assert.Equal(t, apierrors.AuthOidcEmailNotVerified.Status, problem.Status)
 }
 
 // TestOIDCGithubCallback_RejectsBadState asserts state validation

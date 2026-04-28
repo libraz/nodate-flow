@@ -18,6 +18,23 @@ type MicrosoftOIDCConfig struct {
 	RedirectURL  string
 }
 
+// MicrosoftClaims holds the subset of id_token claims the callback
+// handler consumes. Returning a flat struct from Exchange (rather than
+// the raw *oidc.IDToken) keeps the handler boundary testable: tests
+// can build a MicrosoftClaims value directly without needing to forge
+// a verified id_token through the go-oidc library's private fields.
+type MicrosoftClaims struct {
+	Sub               string `json:"sub"`
+	Email             string `json:"email"`
+	Name              string `json:"name"`
+	PreferredUsername string `json:"preferred_username"`
+	// EmailVerified reflects the email_verified claim from the
+	// id_token. Microsoft Entra ID may omit it for personal accounts
+	// whose email has not been confirmed; the handler must reject the
+	// exchange in that case.
+	EmailVerified bool `json:"email_verified"`
+}
+
 // MicrosoftOIDCClient wraps the standard OIDC discovery flow for
 // Microsoft Entra ID (Azure AD) using the "common" tenant so that
 // any Microsoft account can sign in.
@@ -69,8 +86,9 @@ func (c *MicrosoftOIDCClient) AuthCodeURL(ctx context.Context, state, nonce stri
 	return c.oauth.AuthCodeURL(state, oidc.Nonce(nonce)), nil
 }
 
-// Exchange swaps an authorization code for tokens and verifies the id_token.
-func (c *MicrosoftOIDCClient) Exchange(ctx context.Context, code, expectedNonce string) (*oidc.IDToken, error) {
+// Exchange swaps an authorization code for tokens, verifies the
+// id_token, and returns the parsed claims the callback handler needs.
+func (c *MicrosoftOIDCClient) Exchange(ctx context.Context, code, expectedNonce string) (*MicrosoftClaims, error) {
 	if err := c.ensure(ctx); err != nil {
 		return nil, err
 	}
@@ -89,5 +107,9 @@ func (c *MicrosoftOIDCClient) Exchange(ctx context.Context, code, expectedNonce 
 	if expectedNonce != "" && subtle.ConstantTimeCompare([]byte(idTok.Nonce), []byte(expectedNonce)) != 1 {
 		return nil, fmt.Errorf("microsoft: oidc nonce mismatch")
 	}
-	return idTok, nil
+	var claims MicrosoftClaims
+	if err := idTok.Claims(&claims); err != nil {
+		return nil, fmt.Errorf("microsoft: decode claims: %w", err)
+	}
+	return &claims, nil
 }
