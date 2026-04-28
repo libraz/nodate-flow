@@ -17,6 +17,15 @@ import (
 // row, and issues fresh app tokens.
 func OIDCGoogleCallback(deps Deps) func(context.Context, *OIDCCallbackInput) (*OIDCCallbackOutput, error) {
 	return func(ctx context.Context, in *OIDCCallbackInput) (*OIDCCallbackOutput, error) {
+		// Surface provider-side rejections before any code-exchange
+		// logic. Google redirects with `?error=...&error_description=...`
+		// when the user denies consent or the relying-party app is
+		// misconfigured; without this branch the handler would fail
+		// later with a generic "id_token invalid" code and obscure the
+		// real cause.
+		if in.Error != "" {
+			return nil, oidcProviderRejection(ctx, "google", in.Error, in.ErrorDescription)
+		}
 		if deps.OIDC == nil {
 			return nil, httpErr(apierrors.AuthOidcProviderUnreachable)
 		}

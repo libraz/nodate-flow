@@ -232,11 +232,28 @@ type OIDCStartOutput struct {
 	}
 }
 
-// OIDCCallbackInput is the query for GET /auth/oidc/google/callback.
+// OIDCCallbackInput is the query for GET /auth/oidc/{provider}/callback.
+//
+// Identity providers redirect back to this endpoint with either an
+// authorization `code` on success, or with `error` / `error_description`
+// query parameters when the user denied consent or the relying-party
+// configuration was rejected at the IdP. The callback handlers check
+// `Error` first so a provider-side rejection is surfaced as
+// AUTH.OIDC.PROVIDER_REJECTED instead of leaking through as the
+// downstream "id_token invalid" code.
 type OIDCCallbackInput struct {
 	UserAgent string `header:"User-Agent"`
 	Code      string `query:"code"`
 	State     string `query:"state"`
+	// Error is the OAuth2 / OIDC error slug supplied by the IdP when it
+	// declines the sign-in (e.g. "access_denied", "invalid_scope"). Empty
+	// on the happy path.
+	Error string `query:"error"`
+	// ErrorDescription is the optional human-readable explanation the
+	// IdP attached to Error. May contain provider-controlled text, so
+	// the handlers forward it through ProblemDetails extensions but
+	// never log it verbatim.
+	ErrorDescription string `query:"error_description"`
 }
 
 // OIDCCallbackOutput is the response for OIDC callback.

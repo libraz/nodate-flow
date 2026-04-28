@@ -135,6 +135,45 @@ func TestOIDCMicrosoftCallback_RejectsBadState(t *testing.T) {
 	assert.Empty(t, ms.gotCode, "Exchange must not run when state verification fails")
 }
 
+// TestOIDCMicrosoftCallback_SurfacesProviderRejection asserts that an
+// IdP callback carrying `?error=...&error_description=...` is surfaced
+// as AUTH.OIDC.PROVIDER_REJECTED with HTTP 400, and the token-exchange
+// stub is never invoked. Without this guard a Microsoft-side rejection
+// would surface as the downstream "id_token invalid" code and obscure
+// the real cause of the failure (denied consent, misconfigured app,
+// rejected scopes, etc.).
+func TestOIDCMicrosoftCallback_SurfacesProviderRejection(t *testing.T) {
+	t.Parallel()
+	jwt, err := internauth.NewJWTIssuer(nil, "iss", "aud", time.Minute)
+	require.NoError(t, err)
+	state, err := jwt.SignOIDCStateForProvider("nonce-value", "microsoft")
+	require.NoError(t, err)
+
+	ms := &fakeMicrosoftExchanger{}
+	deps := Deps{
+		JWT:           jwt,
+		OIDCMicrosoft: ms,
+		Audit:         audit.NoopSink{},
+	}
+	handler := OIDCMicrosoftCallback(deps)
+	_, err = handler(context.Background(), &OIDCCallbackInput{
+		State:            state,
+		Error:            "invalid_scope",
+		ErrorDescription: "scope rejected",
+	})
+	require.Error(t, err)
+
+	var problem *handlerutil.ProblemDetails
+	require.True(t, errors.As(err, &problem), "expected handlerutil.ProblemDetails, got %T", err)
+	assert.Equal(t, apierrors.AuthOidcProviderRejected.Code, problem.Type,
+		"provider-rejected callback must surface AUTH.OIDC.PROVIDER_REJECTED")
+	assert.Equal(t, apierrors.AuthOidcProviderRejected.Status, problem.Status)
+	assert.Equal(t, "microsoft", problem.Extensions["provider"])
+	assert.Equal(t, "invalid_scope", problem.Extensions["provider_error"])
+	assert.Equal(t, "scope rejected", problem.Extensions["provider_error_description"])
+	assert.Empty(t, ms.gotCode, "Exchange must not run when the IdP rejects the callback")
+}
+
 // TestOIDCMicrosoftCallback_PreferredUsernameFallback verifies the
 // callback falls back to the preferred_username claim when email is
 // empty (Microsoft Entra ID often omits the `email` claim for

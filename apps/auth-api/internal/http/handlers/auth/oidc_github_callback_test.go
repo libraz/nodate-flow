@@ -116,3 +116,42 @@ func TestOIDCGithubCallback_RejectsBadState(t *testing.T) {
 	require.Error(t, err)
 	assert.Empty(t, gh.gotCode, "Exchange must not run when state verification fails")
 }
+
+// TestOIDCGithubCallback_SurfacesProviderRejection asserts that an IdP
+// callback carrying `?error=...&error_description=...` is surfaced as
+// AUTH.OIDC.PROVIDER_REJECTED with HTTP 400, and the token-exchange
+// stub is never invoked. This guards against the audit-found behaviour
+// where a user denying consent (or a misconfigured app) would surface
+// as a cryptic AUTH.OIDC.ID_TOKEN_INVALID instead of a precise
+// provider-rejection code.
+func TestOIDCGithubCallback_SurfacesProviderRejection(t *testing.T) {
+	t.Parallel()
+	jwt, err := internauth.NewJWTIssuer(nil, "iss", "aud", time.Minute)
+	require.NoError(t, err)
+	state, err := jwt.SignOIDCStateForProvider("nonce-value", "github")
+	require.NoError(t, err)
+
+	gh := &fakeGithubExchanger{}
+	deps := Deps{
+		JWT:        jwt,
+		OIDCGithub: gh,
+		Audit:      audit.NoopSink{},
+	}
+	handler := OIDCGithubCallback(deps)
+	_, err = handler(context.Background(), &OIDCCallbackInput{
+		State:            state,
+		Error:            "access_denied",
+		ErrorDescription: "user denied",
+	})
+	require.Error(t, err)
+
+	var problem *handlerutil.ProblemDetails
+	require.True(t, errors.As(err, &problem), "expected handlerutil.ProblemDetails, got %T", err)
+	assert.Equal(t, apierrors.AuthOidcProviderRejected.Code, problem.Type,
+		"provider-rejected callback must surface AUTH.OIDC.PROVIDER_REJECTED")
+	assert.Equal(t, apierrors.AuthOidcProviderRejected.Status, problem.Status)
+	assert.Equal(t, "github", problem.Extensions["provider"])
+	assert.Equal(t, "access_denied", problem.Extensions["provider_error"])
+	assert.Equal(t, "user denied", problem.Extensions["provider_error_description"])
+	assert.Empty(t, gh.gotCode, "Exchange must not run when the IdP rejects the callback")
+}

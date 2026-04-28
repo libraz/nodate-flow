@@ -19,6 +19,15 @@ import (
 // fresh app tokens.
 func OIDCGithubCallback(deps Deps) func(context.Context, *OIDCCallbackInput) (*OIDCCallbackOutput, error) {
 	return func(ctx context.Context, in *OIDCCallbackInput) (*OIDCCallbackOutput, error) {
+		// Surface provider-side rejections before any code-exchange
+		// logic. GitHub redirects with `?error=...&error_description=...`
+		// when the user denies consent or the relying-party app is
+		// misconfigured; without this branch the handler would fail
+		// later with a generic "id_token invalid" / token-exchange
+		// error and obscure the real cause.
+		if in.Error != "" {
+			return nil, oidcProviderRejection(ctx, "github", in.Error, in.ErrorDescription)
+		}
 		if deps.OIDCGithub == nil {
 			return nil, httpErr(apierrors.AuthOidcGithubNotConfigured)
 		}

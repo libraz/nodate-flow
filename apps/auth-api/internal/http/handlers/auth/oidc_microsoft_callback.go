@@ -18,6 +18,15 @@ import (
 // app tokens.
 func OIDCMicrosoftCallback(deps Deps) func(context.Context, *OIDCCallbackInput) (*OIDCCallbackOutput, error) {
 	return func(ctx context.Context, in *OIDCCallbackInput) (*OIDCCallbackOutput, error) {
+		// Surface provider-side rejections before any code-exchange
+		// logic. Microsoft Entra ID redirects with
+		// `?error=...&error_description=...` when the user denies
+		// consent or the relying-party app is misconfigured; without
+		// this branch the handler would fail later with a generic
+		// "id_token invalid" code and obscure the real cause.
+		if in.Error != "" {
+			return nil, oidcProviderRejection(ctx, "microsoft", in.Error, in.ErrorDescription)
+		}
 		if deps.OIDCMicrosoft == nil {
 			return nil, httpErr(apierrors.AuthOidcMicrosoftNotConfigured)
 		}

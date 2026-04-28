@@ -178,21 +178,36 @@ func LoginTotp(deps Deps) func(context.Context, *LoginTotpInput) (*LoginTotpOutp
 		} else {
 			hash := auth.HashRecoveryCode(in.Body.RecoveryCode)
 			rcID, lerr := deps.Queries.FindUnusedRecoveryCode(ctx, generated.FindUnusedRecoveryCodeParams{UserID: uid, CodeHash: hash})
+			recordRecoveryFailure := func() error {
+				bumpFailedByIDWithThreshold(ctx, deps, ident.ID, ident.FailedAttempts, maxRecoveryFailedBeforeLock)
+				deps.Audit.Record(ctx, audit.Entry{
+					Action:       "auth.login_totp_failed",
+					ActorID:      uint32(uid),
+					ResourceType: "user",
+					Metadata:     map[string]any{"method": "recovery_code"},
+				})
+				if ident.FailedAttempts+1 >= maxRecoveryFailedBeforeLock {
+					return httpErr(apierrors.AuthLoginRateLimitedAfterRetries)
+				}
+				return httpErr(apierrors.AuthTotpRecoveryCodeInvalid)
+			}
 			if lerr != nil {
 				if errors.Is(lerr, sql.ErrNoRows) {
-					bumpFailedByIDWithThreshold(ctx, deps, ident.ID, ident.FailedAttempts, maxRecoveryFailedBeforeLock)
-					deps.Audit.Record(ctx, audit.Entry{
-						Action:       "auth.login_totp_failed",
-						ActorID:      uint32(uid),
-						ResourceType: "user",
-						Metadata:     map[string]any{"method": "recovery_code"},
-					})
-					if ident.FailedAttempts+1 >= maxRecoveryFailedBeforeLock {
-						return nil, httpErr(apierrors.AuthLoginRateLimitedAfterRetries)
-					}
-					return nil, httpErr(apierrors.AuthTotpRecoveryCodeInvalid)
+					return nil, recordRecoveryFailure()
 				}
 				return nil, httpErr(apierrors.InternalUnexpected)
+			}
+			// Defense-in-depth: even though the SQL WHERE clause
+			// filtered by code_hash, re-verify the supplied code
+			// re-hashes to the same digest using a constant-time
+			// comparator. A mismatch here cannot happen on a healthy
+			// happy path (the row was selected by hash equality) but
+			// the explicit check guards against future refactors that
+			// might reuse the lookup against an in-memory cache where
+			// no storage layer enforces equality, and keeps the
+			// comparison time independent of the divergence offset.
+			if !auth.VerifyRecoveryCodeHash(in.Body.RecoveryCode, hash) {
+				return nil, recordRecoveryFailure()
 			}
 			if merr := deps.Queries.MarkRecoveryCodeUsed(ctx, rcID); merr != nil {
 				return nil, httpErr(apierrors.InternalUnexpected)
