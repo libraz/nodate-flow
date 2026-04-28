@@ -209,9 +209,16 @@ func TestWebhookFanoutDedupAndOccurredAt(t *testing.T) {
 	ownerInternalID := lookupUserInternalID(ctx, t, testDB, owner.UserPublicID)
 
 	// Insert an event row directly so the test owns the occurred_at
-	// instant and the events.id needed by the hook.
+	// instant and the events.id needed by the hook. The recorded
+	// occurred_at is stamped two seconds in the past so a worker that
+	// (incorrectly) uses time.Now() at dispatch will diverge from the
+	// stored value by ~2s while a correct worker that propagates
+	// events.occurred_at lands within the 1s slop tolerated below.
+	// Backdating the row is preferred over an explicit sleep: the
+	// dispatch path is observed via a real clock-skew gap without
+	// adding wall-clock delay to the test.
 	eventPubID := types.New()
-	eventOccurredAt := time.Now().UTC().Truncate(time.Second)
+	eventOccurredAt := time.Now().UTC().Truncate(time.Second).Add(-2 * time.Second)
 	res, err := testDB.ExecContext(ctx, `
 		INSERT INTO events (public_id, workspace_id, task_id, actor_user_id, type, payload_json, occurred_at)
 		VALUES (?, ?, NULL, ?, 'task.created', JSON_OBJECT(), ?)
@@ -220,11 +227,6 @@ func TestWebhookFanoutDedupAndOccurredAt(t *testing.T) {
 	eventLastID, err := res.LastInsertId()
 	require.NoError(t, err)
 	eventInternalID := uint32(eventLastID) //#nosec G115 -- LastInsertId in test seed, fits uint32
-
-	// Sleep so any time.Now()-based OccurredAt stamping would diverge
-	// from eventOccurredAt by an obvious margin (the assertion below
-	// tolerates 1s of clock skew but rejects the 2s drift).
-	time.Sleep(2 * time.Second)
 
 	// Fire the worker's hook twice for the same eventInternalID. The
 	// hook spawns goroutines, so we poll for the first row to land

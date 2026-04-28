@@ -107,10 +107,21 @@ func TestProjectDisableCascadesToChildTasks(t *testing.T) {
 		`SELECT UNIX_TIMESTAMP(updated_at) FROM tasks WHERE public_id = UUID_TO_BIN(?, 0)`,
 		t2.ID).Scan(&beforeT2))
 
-	// Sleep a second so the CURRENT_TIMESTAMP(3) bump is observable
-	// against the captured baseline (MySQL stores at second precision
-	// when surfaced through UNIX_TIMESTAMP without a fractional part).
-	time.Sleep(1100 * time.Millisecond)
+	// Wait until MySQL's clock has advanced past the captured baseline
+	// by at least one second so the CURRENT_TIMESTAMP(3) stamp the
+	// cascade writes is observably greater. UNIX_TIMESTAMP without a
+	// fractional argument returns whole seconds so we need a strict
+	// integer-second advance, not just a small float bump. Polling
+	// avoids paying a fixed 1.1s sleep on hosts whose clock has already
+	// rolled over.
+	require.Eventually(t, func() bool {
+		var nowSec float64
+		if err := testDB.QueryRow(`SELECT UNIX_TIMESTAMP(NOW(3))`).Scan(&nowSec); err != nil {
+			return false
+		}
+		return nowSec >= beforeT1+1.0 && nowSec >= beforeT2+1.0
+	}, 5*time.Second, 50*time.Millisecond,
+		"MySQL NOW() must advance at least one second past the captured baseline")
 
 	// Disable the project.
 	status, _ := doJSONStatus(t, http.MethodDelete,
