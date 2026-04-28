@@ -20,11 +20,17 @@ export const loginSchema = z.object({
 
 export type LoginFormValues = z.infer<typeof loginSchema>;
 
-export const signupSchema = z.object({
-  email: z.string().min(1, 'validation.email_required').email('validation.email_invalid'),
-  password: z.string().min(8, 'validation.password_min'),
-  displayName: z.string().min(1, 'validation.name_required'),
-});
+export const signupSchema = z
+  .object({
+    email: z.string().min(1, 'validation.email_required').email('validation.email_invalid'),
+    password: z.string().min(8, 'validation.password_min'),
+    newPasswordConfirm: z.string(),
+    displayName: z.string().min(1, 'validation.name_required'),
+  })
+  .refine((data) => data.password === data.newPasswordConfirm, {
+    path: ['newPasswordConfirm'],
+    message: 'errors.passwords_do_not_match',
+  });
 
 export type SignupFormValues = z.infer<typeof signupSchema>;
 

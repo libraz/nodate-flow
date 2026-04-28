@@ -23,9 +23,12 @@ test.describe('login page', () => {
     const title = await heading.textContent();
     expect(title).toBe('Sign in to your account');
 
-    // Email and password fields
-    await expect(page.getByLabel(/email/i)).toBeVisible();
-    await expect(page.getByLabel(/password/i)).toBeVisible();
+    // Email and password fields. Resolve by input `name=` so the
+    // "Show password" toggle button (which carries an aria-label of
+    // "Show password") cannot collide with the password input under
+    // Playwright strict mode.
+    await expect(page.locator('input[name="email"]')).toBeVisible();
+    await expect(page.locator('input[name="password"]')).toBeVisible();
 
     // Submit button
     await expect(page.getByRole('button', { name: /sign in/i })).toBeVisible();

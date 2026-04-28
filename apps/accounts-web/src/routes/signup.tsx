@@ -10,7 +10,7 @@ import FormField from '@nodate-flow/ui/primitives/form-field';
 import Input from '@nodate-flow/ui/primitives/input';
 import { toaster } from '@nodate-flow/ui/primitives/toast';
 import { Link, createFileRoute, useNavigate } from '@tanstack/react-router';
-import { type ReactElement, useEffect, useState } from 'react';
+import { type ReactElement, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import AuthCard from '../components/auth-card';
@@ -55,17 +55,35 @@ function SignupPage(): ReactElement {
   } = useZodForm<typeof signupSchema>(signupSchema, {
     email: '',
     password: '',
+    newPasswordConfirm: '',
     displayName: '',
   });
 
   const submitGuard = useSubmitGuard();
   const [serverError, setServerError] = useState<AuthErrorI18nKey | null>(null);
 
+  /**
+   * Focus refs (F4). Mirrors the login page pattern: validation failures
+   * land focus on the first invalid field; server errors land focus on
+   * the live alert region so screen-reader users hear the failure.
+   */
+  const displayNameRef = useRef<HTMLInputElement>(null);
+  const emailRef = useRef<HTMLInputElement>(null);
+  const passwordRef = useRef<HTMLInputElement>(null);
+  const passwordConfirmRef = useRef<HTMLInputElement>(null);
+  const alertRef = useRef<HTMLParagraphElement>(null);
+
   useEffect(() => {
     if (isAuthenticated) {
       void navigate({ to: '/profile', replace: true });
     }
   }, [isAuthenticated, navigate]);
+
+  useEffect(() => {
+    if (serverError) {
+      alertRef.current?.focus();
+    }
+  }, [serverError]);
 
   const onSubmit = async (values: SignupFormValues): Promise<void> => {
     if (submitGuard.guard()) return;
@@ -111,11 +129,28 @@ function SignupPage(): ReactElement {
     }
   };
 
+  const submitWithFocus = handleSubmit(
+    async (values) => {
+      await onSubmit(values);
+    },
+    (formErrors) => {
+      if (formErrors.displayName) {
+        displayNameRef.current?.focus();
+      } else if (formErrors.email) {
+        emailRef.current?.focus();
+      } else if (formErrors.password) {
+        passwordRef.current?.focus();
+      } else if (formErrors.newPasswordConfirm) {
+        passwordConfirmRef.current?.focus();
+      }
+    },
+  );
+
   return (
     <AuthCard>
       <form
         onSubmit={(e) => {
-          void handleSubmit(onSubmit)(e);
+          void submitWithFocus(e);
         }}
         noValidate
         className="aw-stack aw-stack-5"
@@ -128,9 +163,19 @@ function SignupPage(): ReactElement {
           {...(errors.displayName?.message ? { error: t(errors.displayName.message) } : {})}
         >
           {(control) => {
-            const { ref, ...field } = register('displayName');
+            const { ref: rhfRef, ...field } = register('displayName');
             return (
-              <Input {...control} {...field} ref={ref} type="text" autoComplete="name" autoFocus />
+              <Input
+                {...control}
+                {...field}
+                ref={(el) => {
+                  rhfRef(el);
+                  displayNameRef.current = el;
+                }}
+                type="text"
+                autoComplete="name"
+                autoFocus
+              />
             );
           }}
         </FormField>
@@ -141,8 +186,19 @@ function SignupPage(): ReactElement {
           {...(errors.email?.message ? { error: t(errors.email.message) } : {})}
         >
           {(control) => {
-            const { ref, ...field } = register('email');
-            return <Input {...control} {...field} ref={ref} type="email" autoComplete="email" />;
+            const { ref: rhfRef, ...field } = register('email');
+            return (
+              <Input
+                {...control}
+                {...field}
+                ref={(el) => {
+                  rhfRef(el);
+                  emailRef.current = el;
+                }}
+                type="email"
+                autoComplete="email"
+              />
+            );
           }}
         </FormField>
 
@@ -152,13 +208,52 @@ function SignupPage(): ReactElement {
           {...(errors.password?.message ? { error: t(errors.password.message) } : {})}
         >
           {(control) => {
-            const { ref, ...field } = register('password');
-            return <PasswordInput {...control} {...field} ref={ref} autoComplete="new-password" />;
+            const { ref: rhfRef, ...field } = register('password');
+            return (
+              <PasswordInput
+                {...control}
+                {...field}
+                ref={(el) => {
+                  rhfRef(el);
+                  passwordRef.current = el;
+                }}
+                autoComplete="new-password"
+              />
+            );
+          }}
+        </FormField>
+
+        <FormField
+          label={t('signup.password_confirm')}
+          required
+          {...(errors.newPasswordConfirm?.message
+            ? { error: t(errors.newPasswordConfirm.message) }
+            : {})}
+        >
+          {(control) => {
+            const { ref: rhfRef, ...field } = register('newPasswordConfirm');
+            return (
+              <PasswordInput
+                {...control}
+                {...field}
+                ref={(el) => {
+                  rhfRef(el);
+                  passwordConfirmRef.current = el;
+                }}
+                autoComplete="new-password"
+              />
+            );
           }}
         </FormField>
 
         {serverError ? (
-          <p role="alert" className="aw-error">
+          <p
+            ref={alertRef}
+            role="alert"
+            tabIndex={-1}
+            className="aw-error"
+            data-testid="signup-server-error"
+          >
             {t(serverError)}
           </p>
         ) : null}

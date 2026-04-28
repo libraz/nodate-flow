@@ -1,0 +1,23 @@
+/*
+ * Authenticated layout — admin nav anchor styling.
+ *
+ * Replaces the inline `style={{ ... }}` blocks that lived in
+ * `_authenticated.tsx`. Tokens only — `--nf-space-*`, `--nf-text-*`,
+ * `--nf-color-*` — so the four themes can re-skin without touching
+ * the JSX.
+ */
+
+.adminNav {
+  position: fixed;
+  inset-block-start: 0;
+  inset-inline-end: 0;
+  padding-block: var(--nf-space-2);
+  padding-inline: var(--nf-space-4);
+  z-index: var(--nf-z-sticky);
+}
+
+.adminLink {
+  font-size: var(--nf-text-xs);
+  color: var(--nf-color-fg-muted);
+  text-decoration: none;
+}

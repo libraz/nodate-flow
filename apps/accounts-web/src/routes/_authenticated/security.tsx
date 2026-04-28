@@ -31,6 +31,8 @@ import {
 import { logError } from '../../lib/log';
 import { sdk } from '../../lib/sdk';
 
+import recoveryStyles from './recovery-codes.module.css';
+
 /** SDK-derived response bodies. Local interfaces caused silent shape drift. */
 type SessionSummary = components['schemas']['SessionSummary'];
 type ListSessionsOutputBody = components['schemas']['ListSessionsOutputBody'];
@@ -712,10 +714,36 @@ function EnrollmentStep({
 }
 
 /**
- * RecoveryCodesView — shown once after confirm or regenerate. The codes
- * are never returned again, so the user must save them now.
+ * @brief Format today's date as YYYY-MM-DD in the user's local time zone.
+ *
+ * Used both for the printed/exported file header and for the file name
+ * suffix. Avoids `toISOString()` so the rendered date matches the user's
+ * wall clock instead of UTC.
  */
-function RecoveryCodesView({
+function todayLocalDate(now: Date = new Date()): string {
+  const y = now.getFullYear();
+  const m = String(now.getMonth() + 1).padStart(2, '0');
+  const d = String(now.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
+
+/**
+ * @brief Build the textual export of the recovery codes used by both
+ *        "Copy all" and "Download .txt" affordances.
+ */
+function buildRecoveryCodesText(codes: readonly string[], header: string): string {
+  return `${header}\n${codes.join('\n')}\n`;
+}
+
+/**
+ * RecoveryCodesView — shown once after confirm or regenerate. The codes
+ * are never returned again, so the user must save them now. Provides
+ * Copy / Download / Print affordances so the user can always exfiltrate
+ * the secrets even when the browser denies clipboard access.
+ *
+ * Exported for unit testing; do not import from feature code.
+ */
+export function RecoveryCodesView({
   codes,
   onDismiss,
 }: {
@@ -723,19 +751,83 @@ function RecoveryCodesView({
   onDismiss: () => void;
 }): ReactElement {
   const { t } = useTranslation('auth');
+  const date = todayLocalDate();
+  const fileHeader = t('security.totp.recovery.file_header', { date });
+
+  const handleCopyAll = async (): Promise<void> => {
+    try {
+      await navigator.clipboard.writeText(codes.join('\n'));
+      toaster.show({ tone: 'success', message: t('security.totp.recovery.copied') });
+    } catch {
+      toaster.show({ tone: 'danger', message: t('security.totp.recovery.copy_failed') });
+    }
+  };
+
+  const handleDownload = (): void => {
+    const blob = new Blob([buildRecoveryCodesText(codes, fileHeader)], {
+      type: 'text/plain;charset=utf-8',
+    });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = `nodate-flow-recovery-codes-${date}.txt`;
+    document.body.appendChild(anchor);
+    anchor.click();
+    document.body.removeChild(anchor);
+    URL.revokeObjectURL(url);
+  };
+
+  const handlePrint = (): void => {
+    document.body.classList.add('nf-print-recovery-codes');
+    try {
+      window.print();
+    } finally {
+      // Restore the regular UI even if the user cancels the print dialog.
+      // Some browsers fire `afterprint`, others do not — best effort cleanup
+      // happens synchronously here as well.
+      document.body.classList.remove('nf-print-recovery-codes');
+    }
+  };
+
   return (
-    <div className="aw-stack aw-stack-3">
+    <div className="aw-stack aw-stack-3 aw-print-only-area">
       <h3 className="aw-flush aw-text-base">{t('security.totp.recovery_codes_title')}</h3>
       <p role="alert" className="aw-warning">
         {t('security.totp.recovery_codes_warning')}
       </p>
       <ul className="aw-grid-codes aw-surface aw-mono aw-text-sm">
         {codes.map((c) => (
-          <li key={c} style={{ userSelect: 'all' }}>
-            {c}
-          </li>
+          <li key={c}>{c}</li>
         ))}
       </ul>
+      <div className={recoveryStyles.actions}>
+        <Button
+          type="button"
+          variant="default"
+          aria-label={t('security.totp.recovery.copy_all_aria')}
+          onClick={() => {
+            void handleCopyAll();
+          }}
+        >
+          {t('security.totp.recovery.copy_all')}
+        </Button>
+        <Button
+          type="button"
+          variant="default"
+          aria-label={t('security.totp.recovery.download_aria')}
+          onClick={handleDownload}
+        >
+          {t('security.totp.recovery.download')}
+        </Button>
+        <Button
+          type="button"
+          variant="default"
+          aria-label={t('security.totp.recovery.print_aria')}
+          onClick={handlePrint}
+        >
+          {t('security.totp.recovery.print')}
+        </Button>
+      </div>
       <div>
         <Button type="button" variant="primary" onClick={onDismiss}>
           {t('security.totp.recovery_codes_done')}

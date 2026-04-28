@@ -286,3 +286,36 @@
   gap: var(--nf-space-2);
   flex-wrap: wrap;
 }
+
+/* ── recovery-codes print mode ────────────────────────────────────────── */
+/*
+ * The TOTP recovery-codes view exposes a "Print" affordance that calls
+ * `window.print()` after toggling the `nf-print-recovery-codes` body
+ * class. While the class is present and a print is in progress, every
+ * subtree rooted at <body> is hidden except the one marked with the
+ * `aw-print-only-area` class — giving the user a clean code list on
+ * paper. The class is removed again after the print dialog closes.
+ *
+ * The `visibility` strategy (rather than `display: none`) preserves
+ * layout positions for nested fixed/portal elements that might react
+ * to dimensional changes during the print preview.
+ */
+@media print {
+  body.nf-print-recovery-codes * {
+    visibility: hidden !important;
+  }
+
+  body.nf-print-recovery-codes .aw-print-only-area,
+  body.nf-print-recovery-codes .aw-print-only-area * {
+    visibility: visible !important;
+  }
+
+  body.nf-print-recovery-codes .aw-print-only-area {
+    position: absolute;
+    inset-block-start: 0;
+    inset-inline-start: 0;
+    inline-size: 100%;
+    background: white;
+    color: black;
+  }
+}

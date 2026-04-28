@@ -1,0 +1,24 @@
+/*
+ * Recovery codes view — local styles for the "save affordances" row
+ * (copy / download / print). The print stylesheet itself lives in the
+ * global `layout.css` because CSS Modules hash the class names and the
+ * `body.*` selector must reference a stable global token. This module
+ * only owns the layout of the action row and its mobile breakpoint.
+ *
+ * Tokens only — no hardcoded px / hex / rem values.
+ */
+
+.actions {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  gap: var(--nf-space-3);
+  margin-block-start: var(--nf-space-2);
+}
+
+@media (max-width: 480px) {
+  .actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}

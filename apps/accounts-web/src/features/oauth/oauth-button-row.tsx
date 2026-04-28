@@ -23,6 +23,8 @@ import { type AuthErrorI18nKey, mapAuthError, mapAuthThrown } from '../../lib/au
 import { sdk } from '../../lib/sdk';
 import { useCapabilities } from '../auth/use-capabilities';
 
+import styles from './oauth-button-row.module.css';
+
 /**
  * Operating mode of the row.
  *
@@ -63,18 +65,18 @@ function OAuthButtonRow({ mode, onError }: OAuthButtonRowProps): ReactElement | 
   // the idle UX so the user can retry. A nullable provider id captures
   // both pieces (which one is busy + whether anything is busy).
   const [pendingProvider, setPendingProvider] = useState<OAuthProvider | null>(null);
+  // Tracking aria-busy independently lets us drop the busy hint *before*
+  // flipping `pendingProvider` back to null on error so screen readers do
+  // not briefly announce a busy-but-enabled control as React replays the
+  // two state updates. Declared alongside `pendingProvider` so the hook
+  // count stays stable across the early-return branches below.
+  const [busyProvider, setBusyProvider] = useState<OAuthProvider | null>(null);
 
   // Caps are still loading -- defer rendering until we know whether any
   // provider is actually enabled. A flicker of the divider would be
   // worse than a tiny delay here since this row is below the fold.
   if (!caps) return null;
   if (!caps.oidcGoogle && !caps.oidcGithub && !caps.oidcMicrosoft) return null;
-
-  // Tracking aria-busy independently lets us drop the busy hint *before*
-  // flipping `pendingProvider` back to null on error so screen readers do
-  // not briefly announce a busy-but-enabled control as React replays the
-  // two state updates.
-  const [busyProvider, setBusyProvider] = useState<OAuthProvider | null>(null);
 
   const handleStart = async (provider: OAuthProvider): Promise<void> => {
     if (pendingProvider !== null) return;
@@ -107,28 +109,13 @@ function OAuthButtonRow({ mode, onError }: OAuthButtonRowProps): ReactElement | 
   // does not influence rendering today.
   return (
     <div data-mode={mode}>
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: 'var(--nf-space-3)',
-          color: 'var(--nf-color-fg-muted)',
-          fontSize: 'var(--nf-text-sm)',
-        }}
-      >
-        <hr style={{ flex: 1, border: 'none', borderTop: '1px solid var(--nf-color-border)' }} />
+      <div className={styles.divider}>
+        <hr className={styles.dividerRule} />
         <span>{t('login.sso_divider')}</span>
-        <hr style={{ flex: 1, border: 'none', borderTop: '1px solid var(--nf-color-border)' }} />
+        <hr className={styles.dividerRule} />
       </div>
 
-      <div
-        style={{
-          display: 'flex',
-          flexDirection: 'column',
-          gap: 'var(--nf-space-3)',
-          marginTop: 'var(--nf-space-3)',
-        }}
-      >
+      <div className={styles.providers}>
         {caps.oidcGoogle && (
           <Button
             type="button"

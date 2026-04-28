@@ -4,8 +4,13 @@
  *
  * Lives at the feature level (not in `packages/ui`) because the toggle
  * copy + `aria-pressed` semantics are auth-specific and only the auth
- * flows currently render password fields. Promote to a primitive once a
- * second consumer appears.
+ * flows currently render password fields.
+ *
+ * TODO(@ui-ds): once flow-web grows password-change UI (currently the
+ * second consumer trigger), lift this component into `packages/ui/`
+ * and parameterise the show/hide labels via props so the design system
+ * owns the focus-trap and CapsLock semantics. Tracking note from the
+ * accounts-web token-cleanup sweep.
  */
 
 import Input, { type InputProps } from '@nodate-flow/ui/primitives/input';
@@ -20,6 +25,8 @@ import {
   useState,
 } from 'react';
 import { useTranslation } from 'react-i18next';
+
+import styles from './password-input.module.css';
 
 export interface PasswordInputProps extends Omit<InputProps, 'type'> {
   /** Called whenever the underlying input value changes. */
@@ -83,7 +90,7 @@ const PasswordInput = forwardRef<HTMLInputElement, PasswordInputProps>(
       .trim();
 
     return (
-      <span style={{ position: 'relative', display: 'inline-flex', width: '100%' }}>
+      <span className={styles.wrapper}>
         <Input
           {...rest}
           ref={ref}
@@ -94,7 +101,7 @@ const PasswordInput = forwardRef<HTMLInputElement, PasswordInputProps>(
           onBlur={handleBlur}
           onKeyDown={handleKeyDown}
           {...(mergedDescribedBy ? { 'aria-describedby': mergedDescribedBy } : {})}
-          style={{ paddingInlineEnd: '2.75rem', width: '100%' }}
+          className={styles.input}
         />
         <button
           type="button"
@@ -103,35 +110,12 @@ const PasswordInput = forwardRef<HTMLInputElement, PasswordInputProps>(
           onClick={() => {
             setRevealed((prev) => !prev);
           }}
-          style={{
-            position: 'absolute',
-            insetInlineEnd: '0.25rem',
-            insetBlockStart: '50%',
-            transform: 'translateY(-50%)',
-            background: 'transparent',
-            border: 'none',
-            padding: 'var(--nf-space-1) var(--nf-space-2)',
-            cursor: 'pointer',
-            color: 'var(--nf-color-fg-muted)',
-            font: 'inherit',
-            fontSize: 'var(--nf-text-xs)',
-          }}
+          className={styles.toggle}
         >
           {revealed ? t('login.password_hide') : t('login.password_show')}
         </button>
         {showCapsHint ? (
-          <output
-            id={capsHintId}
-            aria-live="polite"
-            style={{
-              marginBlockStart: 'var(--nf-space-1)',
-              color: 'var(--nf-color-warning, var(--nf-color-fg-muted))',
-              fontSize: 'var(--nf-text-xs)',
-              position: 'absolute',
-              insetBlockStart: '100%',
-              insetInlineStart: 0,
-            }}
-          >
+          <output id={capsHintId} aria-live="polite" className={styles.capsHint}>
             {t('login.caps_lock_on')}
           </output>
         ) : null}

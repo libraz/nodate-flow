@@ -11,6 +11,8 @@ import { useTranslation } from 'react-i18next';
 import { selectIsAuthenticated, selectUser, useAuth } from '../features/auth/auth-store';
 import { useAuthBootstrap } from '../hooks/use-auth-bootstrap';
 
+import styles from './_authenticated.module.css';
+
 export function AuthenticatedLayout(): ReactElement | null {
   const { t } = useTranslation('admin');
   const { status } = useAuthBootstrap();
@@ -30,23 +32,8 @@ export function AuthenticatedLayout(): ReactElement | null {
   return (
     <>
       {user?.isInstanceAdmin ? (
-        <nav
-          style={{
-            position: 'fixed',
-            top: 0,
-            insetInlineEnd: 0,
-            padding: 'var(--nf-space-2) var(--nf-space-4)',
-            zIndex: 100,
-          }}
-        >
-          <Link
-            to="/admin/users"
-            style={{
-              fontSize: 'var(--nf-text-xs)',
-              color: 'var(--nf-color-fg-muted)',
-              textDecoration: 'none',
-            }}
-          >
+        <nav className={styles.adminNav}>
+          <Link to="/admin/users" className={styles.adminLink}>
             {t('title')}
           </Link>
         </nav>

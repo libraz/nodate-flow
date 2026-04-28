@@ -20,10 +20,13 @@ test.describe('signup page', () => {
     await expect(heading).toBeVisible();
     expect(await heading.textContent()).toBe('Create your account');
 
-    // All three fields: name, email, password
+    // All four fields: display name, email, password, confirm password.
+    // Resolve passwords by `name=` so the "Show password" toggle button
+    // does not collide with the input under Playwright strict mode.
     await expect(page.getByLabel(/display name|name/i)).toBeVisible();
-    await expect(page.getByLabel(/email/i)).toBeVisible();
-    await expect(page.getByLabel(/password/i)).toBeVisible();
+    await expect(page.locator('input[name="email"]')).toBeVisible();
+    await expect(page.locator('input[name="password"]')).toBeVisible();
+    await expect(page.locator('input[name="newPasswordConfirm"]')).toBeVisible();
 
     // Submit button
     await expect(page.getByRole('button', { name: /create account/i })).toBeVisible();
@@ -63,9 +66,11 @@ test.describe('signup page', () => {
     const suffix = `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
     const email = `e2e-signup-${suffix}@example.test`;
 
+    const password = 'correct horse battery staple';
     await page.getByLabel(/display name|name/i).fill(`E2E Signup ${suffix}`);
-    await page.getByLabel(/email/i).fill(email);
-    await page.getByLabel(/password/i).fill('correct horse battery staple');
+    await page.locator('input[name="email"]').fill(email);
+    await page.locator('input[name="password"]').fill(password);
+    await page.locator('input[name="newPasswordConfirm"]').fill(password);
     await page.getByRole('button', { name: /create account/i }).click();
 
     // Should redirect to /profile after successful signup, or show
@@ -84,9 +89,11 @@ test.describe('signup page', () => {
     const suffix = `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
     const email = `e2e-signup-toast-${suffix}@example.test`;
 
+    const password = 'correct horse battery staple';
     await page.getByLabel(/display name|name/i).fill(`E2E Toast ${suffix}`);
-    await page.getByLabel(/email/i).fill(email);
-    await page.getByLabel(/password/i).fill('correct horse battery staple');
+    await page.locator('input[name="email"]').fill(email);
+    await page.locator('input[name="password"]').fill(password);
+    await page.locator('input[name="newPasswordConfirm"]').fill(password);
     await page.getByRole('button', { name: /create account/i }).click();
 
     // The toast must appear before or simultaneously with the redirect; we

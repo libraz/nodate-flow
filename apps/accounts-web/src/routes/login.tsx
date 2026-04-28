@@ -27,6 +27,7 @@ import {
 } from '../features/auth/auth-store';
 import PasswordInput from '../features/auth/password-input';
 import { useCapsLockHint } from '../features/auth/use-caps-lock-hint';
+import { useRateLimitCountdown } from '../features/auth/use-rate-limit-countdown';
 import OAuthButtonRow from '../features/oauth/oauth-button-row';
 import type { ProblemJson } from '../lib/api-error';
 import { type AuthErrorI18nKey, mapAuthError, mapAuthThrown } from '../lib/auth-errors';
@@ -97,6 +98,32 @@ function LoginPage(): ReactElement {
   const magicLinkGuard = useSubmitGuard();
   const magicLinkEmailRef = useRef<HTMLInputElement>(null);
 
+  /**
+   * Rate-limit cooldown driven by the server. Set from the `Retry-After`
+   * header on a 429 response. While `> 0` the form inputs and submit
+   * button are disabled and a banner counts down toward zero.
+   */
+  const [retryAfterSeconds, setRetryAfterSeconds] = useState(0);
+  const { secondsLeft, active: rateLimited } = useRateLimitCountdown({
+    seconds: retryAfterSeconds,
+    onExpire: () => {
+      setRetryAfterSeconds(0);
+      setServerError(null);
+    },
+  });
+  const rateLimitMinutes = Math.floor(secondsLeft / 60);
+  const rateLimitSeconds = secondsLeft % 60;
+
+  /**
+   * Refs used by the post-submit focus management (F4). The first invalid
+   * field receives focus when client-side validation fails; otherwise
+   * focus moves to the alert region carrying the server error so screen
+   * readers immediately announce the failure.
+   */
+  const emailRef = useRef<HTMLInputElement>(null);
+  const passwordRef = useRef<HTMLInputElement>(null);
+  const alertRef = useRef<HTMLParagraphElement>(null);
+
   const redirectAfterLogin = useCallback((): void => {
     if (redirectTarget && isSafeRedirect(redirectTarget)) {
       window.location.href = redirectTarget;
@@ -110,6 +137,15 @@ function LoginPage(): ReactElement {
       redirectAfterLogin();
     }
   }, [isAuthenticated, redirectAfterLogin]);
+
+  // Once a server-side error is rendered, push focus onto the live region
+  // so screen-reader users hear it immediately. The ref is `tabIndex={-1}`
+  // so the focus is programmatic-only and does not pollute the tab order.
+  useEffect(() => {
+    if (serverError) {
+      alertRef.current?.focus();
+    }
+  }, [serverError]);
 
   const completeSignIn = async (accessToken: string): Promise<void> => {
     authStore.getState().setAccessToken(accessToken);
@@ -135,13 +171,24 @@ function LoginPage(): ReactElement {
   };
 
   const onSubmit = async (values: LoginFormValues): Promise<void> => {
+    if (rateLimited) return;
     setServerError(null);
     try {
-      const { data, error } = await sdk.POST('/auth/login', {
+      const { data, error, response } = await sdk.POST('/auth/login', {
         body: { email: values.email, password: values.password },
       });
       if (error || !data) {
         setServerError(mapAuthError(error as ProblemJson | undefined));
+        if (response.status === 429) {
+          // The auth-api signals the cooldown via the Retry-After header,
+          // serialised as an integer number of seconds. Anything <= 0 is
+          // treated as "no banner" so the form does not get stuck if the
+          // header is absent on a future provider.
+          const retry = Number.parseInt(response.headers.get('Retry-After') ?? '', 10);
+          if (Number.isFinite(retry) && retry > 0) {
+            setRetryAfterSeconds(retry);
+          }
+        }
         return;
       }
       const login = data as LoginResponse;
@@ -409,16 +456,46 @@ function LoginPage(): ReactElement {
     );
   }
 
+  /**
+   * Submit handler that wires F4 (focus management). RHF validates first;
+   * if `errors` is non-empty after a submit attempt, focus moves to the
+   * first invalid field. When validation passes but the server returns
+   * an error, focus moves to the alert region after `serverError` is set
+   * — handled by the effect at the top of the component since the alert
+   * is conditionally rendered.
+   */
+  const submitWithFocus = handleSubmit(
+    async (values) => {
+      await onSubmit(values);
+    },
+    (formErrors) => {
+      if (formErrors.email) {
+        emailRef.current?.focus();
+      } else if (formErrors.password) {
+        passwordRef.current?.focus();
+      }
+    },
+  );
+
   return (
     <AuthCard>
       <form
         onSubmit={(e) => {
-          void handleSubmit(onSubmit)(e);
+          void submitWithFocus(e);
         }}
         noValidate
         className="aw-stack aw-stack-5"
       >
         <h1 className="aw-page-title">{t('login.title')}</h1>
+
+        {rateLimited ? (
+          <output aria-live="polite" data-testid="login-rate-limit-banner" className="aw-warning">
+            {t('rate_limit.banner', {
+              minutes: rateLimitMinutes,
+              seconds: rateLimitSeconds,
+            })}
+          </output>
+        ) : null}
 
         <FormField
           label={t('login.email')}
@@ -426,15 +503,19 @@ function LoginPage(): ReactElement {
           {...(errors.email?.message ? { error: t(errors.email.message) } : {})}
         >
           {(control) => {
-            const { ref, ...field } = register('email');
+            const { ref: rhfRef, ...field } = register('email');
             return (
               <Input
                 {...control}
                 {...field}
-                ref={ref}
+                ref={(el) => {
+                  rhfRef(el);
+                  emailRef.current = el;
+                }}
                 type="email"
                 autoComplete="email"
                 autoFocus
+                disabled={rateLimited}
               />
             );
           }}
@@ -446,20 +527,35 @@ function LoginPage(): ReactElement {
           {...(errors.password?.message ? { error: t(errors.password.message) } : {})}
         >
           {(control) => {
-            const { ref, ...field } = register('password');
+            const { ref: rhfRef, ...field } = register('password');
             return (
-              <PasswordInput {...control} {...field} ref={ref} autoComplete="current-password" />
+              <PasswordInput
+                {...control}
+                {...field}
+                ref={(el) => {
+                  rhfRef(el);
+                  passwordRef.current = el;
+                }}
+                autoComplete="current-password"
+                disabled={rateLimited}
+              />
             );
           }}
         </FormField>
 
         {serverError ? (
-          <p role="alert" className="aw-error">
+          <p
+            ref={alertRef}
+            role="alert"
+            tabIndex={-1}
+            className="aw-error"
+            data-testid="login-server-error"
+          >
             {t(serverError)}
           </p>
         ) : null}
 
-        <Button type="submit" variant="primary" disabled={isSubmitting}>
+        <Button type="submit" variant="primary" disabled={isSubmitting || rateLimited}>
           {isSubmitting ? t('login.submitting') : t('login.submit')}
         </Button>
 
