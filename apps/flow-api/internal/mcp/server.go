@@ -180,29 +180,29 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	body, err := io.ReadAll(io.LimitReader(r.Body, 1<<20))
 	if err != nil {
-		writeRPCError(w, nil, apierrors.McpProtocolFrameMalformed, "failed to read request body")
+		writeRPCTransportError(w, nil, apierrors.McpProtocolFrameMalformed, "failed to read request body")
 		return
 	}
 	var req rpcRequest
 	if err := json.Unmarshal(body, &req); err != nil || req.JSONRPC != "2.0" {
-		writeRPCError(w, nil, apierrors.McpProtocolFrameMalformed, "invalid JSON-RPC 2.0 frame")
+		writeRPCTransportError(w, nil, apierrors.McpProtocolFrameMalformed, "invalid JSON-RPC 2.0 frame")
 		return
 	}
 
 	// Authenticate via Authorization: Bearer mcp_...
 	tok, ok := bearerFromHeader(r.Header.Get("Authorization"))
 	if !ok || !strings.HasPrefix(tok, auth.PrefixMCP) {
-		writeRPCError(w, req.ID, apierrors.McpTokenUnknown, "missing mcp bearer")
+		writeRPCTransportError(w, req.ID, apierrors.McpTokenUnknown, "missing mcp bearer")
 		return
 	}
 	session, err := h.authenticate(r.Context(), tok)
 	if err != nil {
 		var ae *apierrors.APIError
 		if errors.As(err, &ae) {
-			writeRPCError(w, req.ID, ae.Spec, ae.Spec.Message)
+			writeRPCTransportError(w, req.ID, ae.Spec, ae.Spec.Message)
 			return
 		}
-		writeRPCError(w, req.ID, apierrors.InternalUnexpected, "auth failed")
+		writeRPCTransportError(w, req.ID, apierrors.InternalUnexpected, "auth failed")
 		return
 	}
 
@@ -211,7 +211,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	tokHash := hashToken(tok)
 	if allowed, retryAfter := h.rl.allow(tokHash); !allowed {
 		w.Header().Set("Retry-After", strconv.Itoa(int(retryAfter.Seconds())))
-		writeRPCError(w, req.ID, apierrors.RateLimitExceeded, "rate limit exceeded")
+		writeRPCTransportError(w, req.ID, apierrors.RateLimitExceeded, "rate limit exceeded")
 		return
 	}
 
@@ -233,7 +233,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	case "tools/call":
 		h.handleToolCall(w, r, session, req)
 	default:
-		writeRPCError(w, req.ID, apierrors.McpProtocolFrameMalformed, "unknown method: "+req.Method)
+		writeRPCAppError(w, req.ID, apierrors.McpProtocolFrameMalformed, "unknown method: "+req.Method)
 	}
 }
 
@@ -243,22 +243,22 @@ func (h *Handler) handleToolCall(w http.ResponseWriter, r *http.Request, s *sess
 		Arguments json.RawMessage `json:"arguments"`
 	}
 	if len(req.Params) == 0 {
-		writeRPCError(w, req.ID, apierrors.McpProtocolFrameMalformed, "missing params")
+		writeRPCAppError(w, req.ID, apierrors.McpProtocolFrameMalformed, "missing params")
 		return
 	}
 	if err := json.Unmarshal(req.Params, &params); err != nil {
-		writeRPCError(w, req.ID, apierrors.McpProtocolFrameMalformed, "invalid params")
+		writeRPCAppError(w, req.ID, apierrors.McpProtocolFrameMalformed, "invalid params")
 		return
 	}
 	t, ok := h.tools[params.Name]
 	if !ok {
-		writeRPCError(w, req.ID, apierrors.McpToolNotFound, "tool not found: "+params.Name)
+		writeRPCAppError(w, req.ID, apierrors.McpToolNotFound, "tool not found: "+params.Name)
 		return
 	}
 	if !s.hasScope(t.requiredScope) {
 		h.audit(r.Context(), s, params.Name, params.Arguments, nil,
 			generated.McpInvocationsStatusDenied, apierrors.McpScopeInsufficient.Code, 0)
-		writeRPCError(w, req.ID, apierrors.McpScopeInsufficient, "scope "+t.requiredScope+" required")
+		writeRPCAppError(w, req.ID, apierrors.McpScopeInsufficient, "scope "+t.requiredScope+" required")
 		return
 	}
 	// Agent guard: when the session is backed by an AI agent
@@ -272,7 +272,7 @@ func (h *Handler) handleToolCall(w http.ResponseWriter, r *http.Request, s *sess
 			slog.ErrorContext(r.Context(), "mcp: agent guard load failed", slog.Any("err", aerr))
 			h.audit(r.Context(), s, params.Name, params.Arguments, nil,
 				generated.McpInvocationsStatusError, apierrors.McpToolGuardUnavailable.Code, 0)
-			writeRPCError(w, req.ID, apierrors.McpToolGuardUnavailable, "agent guard check failed")
+			writeRPCAppError(w, req.ID, apierrors.McpToolGuardUnavailable, "agent guard check failed")
 			return
 		}
 		spent, serr := h.loadAgentMonthSpendCents(r.Context(), s.agentID)
@@ -280,7 +280,7 @@ func (h *Handler) handleToolCall(w http.ResponseWriter, r *http.Request, s *sess
 			slog.ErrorContext(r.Context(), "mcp: agent spend load failed", slog.Any("err", serr))
 			h.audit(r.Context(), s, params.Name, params.Arguments, nil,
 				generated.McpInvocationsStatusError, apierrors.McpToolGuardUnavailable.Code, 0)
-			writeRPCError(w, req.ID, apierrors.McpToolGuardUnavailable, "agent spend check failed")
+			writeRPCAppError(w, req.ID, apierrors.McpToolGuardUnavailable, "agent spend check failed")
 			return
 		}
 		decision := agentguard.Decide(agent, agentguard.Request{
@@ -295,14 +295,14 @@ func (h *Handler) handleToolCall(w http.ResponseWriter, r *http.Request, s *sess
 			}
 			h.audit(r.Context(), s, params.Name, params.Arguments, nil,
 				generated.McpInvocationsStatusDenied, spec.Code, 0)
-			writeRPCError(w, req.ID, spec, "agent guard: "+decision.Reason)
+			writeRPCAppError(w, req.ID, spec, "agent guard: "+decision.Reason)
 			return
 		}
 	}
 	// Validate individual argument sizes before execution to prevent
 	// excessively large payloads from reaching tool handlers.
 	if valErr := validateToolArgs(params.Arguments); valErr != nil {
-		writeRPCError(w, req.ID, apierrors.McpProtocolFrameMalformed, valErr.Error())
+		writeRPCAppError(w, req.ID, apierrors.McpProtocolFrameMalformed, valErr.Error())
 		return
 	}
 	args := params.Arguments
@@ -326,7 +326,7 @@ func (h *Handler) handleToolCall(w http.ResponseWriter, r *http.Request, s *sess
 			generated.McpInvocationsStatusError, spec.Code, dur)
 		// Use the stable spec message rather than the raw error to
 		// avoid leaking internal details (DB errors, paths, etc.).
-		writeRPCError(w, req.ID, spec, spec.Message)
+		writeRPCAppError(w, req.ID, spec, spec.Message)
 		return
 	}
 	resultJSON, _ := json.Marshal(result)
@@ -378,7 +378,43 @@ func writeRPCResult(w http.ResponseWriter, id json.RawMessage, result any) {
 	_ = json.NewEncoder(w).Encode(rpcResponse{JSONRPC: "2.0", ID: id, Result: result})
 }
 
-func writeRPCError(w http.ResponseWriter, id json.RawMessage, spec *apierrors.Spec, msg string) {
+// writeRPCAppError writes a JSON-RPC error envelope at HTTP 200. Use
+// this for errors that occur AFTER the request was successfully routed
+// (auth ok, frame valid) — application-level failures belong inside the
+// JSON-RPC envelope per JSON-RPC 2.0 convention. Examples: unknown
+// method, malformed params, tool not found, scope insufficient,
+// workspace mismatch resolved during tool dispatch, agent guard
+// rejection, tool execution failure (including ACL denials raised by
+// tool handlers).
+//
+// The HTTP status is intentionally left implicit (200). The spec code
+// is preserved on the wire via the JSON-RPC error envelope's
+// data.code field, which is the stable contract for callers that need
+// to distinguish error categories programmatically.
+func writeRPCAppError(w http.ResponseWriter, id json.RawMessage, spec *apierrors.Spec, msg string) {
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	// Implicit 200; do not call WriteHeader.
+	// JSON-RPC code = -32000 block reserved for server errors; we encode the
+	// nodate-flow error code string in data.code for callers that care.
+	_ = json.NewEncoder(w).Encode(rpcResponse{
+		JSONRPC: "2.0",
+		ID:      id,
+		Error: &rpcError{
+			Code:    -32000,
+			Message: msg,
+			Data:    map[string]any{"code": spec.Code},
+		},
+	})
+}
+
+// writeRPCTransportError writes the JSON-RPC error envelope with the
+// HTTP status from the spec. Use this for transport-layer rejections —
+// auth failures (missing/expired/unknown bearer), malformed JSON-RPC
+// frames (pre-envelope), and rate limits — that the client should
+// observe at the HTTP layer per MCP Streamable HTTP guidance. The
+// envelope body shape matches [writeRPCAppError]; only the HTTP status
+// differs.
+func writeRPCTransportError(w http.ResponseWriter, id json.RawMessage, spec *apierrors.Spec, msg string) {
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	w.WriteHeader(spec.Status)
 	// JSON-RPC code = -32000 block reserved for server errors; we encode the

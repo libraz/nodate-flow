@@ -110,7 +110,7 @@ func (h *Handler) serveSSE(w http.ResponseWriter, r *http.Request) {
 	// Validate Accept header.
 	accept := r.Header.Get("Accept")
 	if accept != "text/event-stream" {
-		writeRPCError(w, nil, apierrors.McpProtocolFrameMalformed,
+		writeRPCTransportError(w, nil, apierrors.McpProtocolFrameMalformed,
 			"GET requires Accept: text/event-stream")
 		return
 	}
@@ -118,31 +118,31 @@ func (h *Handler) serveSSE(w http.ResponseWriter, r *http.Request) {
 	// Authenticate via Authorization: Bearer mcp_...
 	tok, ok := bearerFromHeader(r.Header.Get("Authorization"))
 	if !ok || !strings.HasPrefix(tok, auth.PrefixMCP) {
-		writeRPCError(w, nil, apierrors.McpTokenUnknown, "missing mcp bearer")
+		writeRPCTransportError(w, nil, apierrors.McpTokenUnknown, "missing mcp bearer")
 		return
 	}
 	sess, err := h.authenticate(r.Context(), tok)
 	if err != nil {
 		var ae *apierrors.APIError
 		if stderrors.As(err, &ae) {
-			writeRPCError(w, nil, ae.Spec, ae.Spec.Message)
+			writeRPCTransportError(w, nil, ae.Spec, ae.Spec.Message)
 			return
 		}
-		writeRPCError(w, nil, apierrors.InternalUnexpected, "auth failed")
+		writeRPCTransportError(w, nil, apierrors.InternalUnexpected, "auth failed")
 		return
 	}
 
 	// Per-token rate limiting (counts the SSE connection initiation).
 	if allowed, retryAfter := h.rl.allow(tok); !allowed {
 		w.Header().Set("Retry-After", strconv.Itoa(int(retryAfter.Seconds())))
-		writeRPCError(w, nil, apierrors.RateLimitExceeded, "rate limit exceeded")
+		writeRPCTransportError(w, nil, apierrors.RateLimitExceeded, "rate limit exceeded")
 		return
 	}
 
 	// Verify streaming support.
 	flusher, ok := w.(http.Flusher)
 	if !ok {
-		writeRPCError(w, nil, apierrors.InternalUnexpected, "streaming not supported")
+		writeRPCTransportError(w, nil, apierrors.InternalUnexpected, "streaming not supported")
 		return
 	}
 
