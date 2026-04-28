@@ -29,6 +29,17 @@ import OAuthButtonRow from '../features/oauth/oauth-button-row';
 import type { ProblemJson } from '../lib/api-error';
 import { type AuthErrorI18nKey, mapAuthError, mapAuthThrown } from '../lib/auth-errors';
 import { sdk } from '../lib/sdk';
+import { useSubmitGuard } from '../lib/use-submit-guard';
+
+/**
+ * Recovery code character bounds enforced by the auth-api: codes are
+ * generated as 10-character base32 strings but we accept up to 20 chars
+ * defensively so a future longer-format rotation does not silently
+ * truncate user input. Mirrored in the i18n helper text key so the copy
+ * and the validation cannot drift.
+ */
+const RECOVERY_MIN_LEN = 8;
+const RECOVERY_MAX_LEN = 20;
 
 export interface LoginSearch {
   redirect?: string;
@@ -76,11 +87,11 @@ function LoginPage(): ReactElement {
   const [totpCode, setTotpCode] = useState('');
   const [useRecovery, setUseRecovery] = useState(false);
   const [recoveryCode, setRecoveryCode] = useState('');
-  const [totpSubmitting, setTotpSubmitting] = useState(false);
+  const totpGuard = useSubmitGuard();
   const [showMagicLink, setShowMagicLink] = useState(false);
   const [magicLinkEmail, setMagicLinkEmail] = useState('');
   const [magicLinkSent, setMagicLinkSent] = useState(false);
-  const [magicLinkSending, setMagicLinkSending] = useState(false);
+  const magicLinkGuard = useSubmitGuard();
   const magicLinkEmailRef = useRef<HTMLInputElement>(null);
 
   const redirectAfterLogin = useCallback((): void => {
@@ -149,8 +160,10 @@ function LoginPage(): ReactElement {
     e.preventDefault();
     setServerError(null);
     if (challengeToken == null) return;
-    if (useRecovery ? recoveryCode.trim().length < 10 : totpCode.length !== 6) return;
-    setTotpSubmitting(true);
+    if (useRecovery ? recoveryCode.trim().length < RECOVERY_MIN_LEN : totpCode.length !== 6) return;
+    // Synchronous re-entrancy guard: a fast double Enter / double click
+    // bails on the second call before reaching the network layer.
+    if (totpGuard.guard()) return;
     try {
       const { data, error } = await sdk.POST('/auth/login/totp', {
         body: useRecovery
@@ -166,7 +179,7 @@ function LoginPage(): ReactElement {
     } catch (err) {
       setServerError(mapAuthThrown(err));
     } finally {
-      setTotpSubmitting(false);
+      totpGuard.end();
     }
   };
 
@@ -181,8 +194,10 @@ function LoginPage(): ReactElement {
   const handleMagicLinkSubmit = async (e: FormEvent<HTMLFormElement>): Promise<void> => {
     e.preventDefault();
     if (!magicLinkEmail.trim()) return;
+    // Synchronous re-entrancy guard: a fast double Enter / double click
+    // bails on the second call before reaching the network layer.
+    if (magicLinkGuard.guard()) return;
     setServerError(null);
-    setMagicLinkSending(true);
     try {
       const { error } = await sdk.POST('/auth/magic-link/request' as never, {
         body: { email: magicLinkEmail.trim() },
@@ -195,7 +210,7 @@ function LoginPage(): ReactElement {
     } catch (err) {
       setServerError(mapAuthThrown(err));
     } finally {
-      setMagicLinkSending(false);
+      magicLinkGuard.end();
     }
   };
 
@@ -257,9 +272,11 @@ function LoginPage(): ReactElement {
           <Button
             type="submit"
             variant="primary"
-            disabled={magicLinkSending || !magicLinkEmail.trim()}
+            disabled={magicLinkGuard.submitting || !magicLinkEmail.trim()}
           >
-            {magicLinkSending ? t('login.magic_link_sending') : t('login.magic_link_submit')}
+            {magicLinkGuard.submitting
+              ? t('login.magic_link_sending')
+              : t('login.magic_link_submit')}
           </Button>
           <Button
             type="button"
@@ -277,6 +294,19 @@ function LoginPage(): ReactElement {
   }
 
   if (challengeToken != null) {
+    // Status copy reflects validation state so the `aria-live` region read
+    // by screen readers stays in sync with the visible input. We only ever
+    // surface a single description string per render to avoid contradictory
+    // hints (the disabled submit button is the second cue).
+    const recoveryRemaining = RECOVERY_MIN_LEN - recoveryCode.trim().length;
+    const totpStatus = useRecovery
+      ? recoveryRemaining > 0
+        ? t('login.recovery_helper')
+        : t('login.totp_status_awaiting')
+      : totpCode.length < 6
+        ? t('login.totp_status_need_digits')
+        : t('login.totp_status_awaiting');
+    const totpError = serverError ? t(serverError) : null;
     return (
       <AuthCard>
         <form
@@ -289,21 +319,32 @@ function LoginPage(): ReactElement {
           <h1 className="aw-page-title">{t('login.totp_title')}</h1>
           <p className="aw-flush aw-muted aw-text-sm">{t('login.totp_instructions')}</p>
           {useRecovery ? (
-            <FormField label={t('login.recovery_code')} required>
+            <FormField
+              label={t('login.recovery_code')}
+              required
+              description={totpStatus}
+              {...(totpError ? { error: totpError } : {})}
+            >
               {(control) => (
                 <Input
                   {...control}
                   autoComplete="one-time-code"
+                  maxLength={RECOVERY_MAX_LEN}
                   value={recoveryCode}
                   onChange={(e) => {
-                    setRecoveryCode(e.target.value.toUpperCase().slice(0, 20));
+                    setRecoveryCode(e.target.value.toUpperCase().slice(0, RECOVERY_MAX_LEN));
                   }}
                   autoFocus
                 />
               )}
             </FormField>
           ) : (
-            <FormField label={t('login.totp_code')} required>
+            <FormField
+              label={t('login.totp_code')}
+              required
+              description={totpStatus}
+              {...(totpError ? { error: totpError } : {})}
+            >
               {(control) => (
                 <Input
                   {...control}
@@ -316,14 +357,10 @@ function LoginPage(): ReactElement {
                     setTotpCode(e.target.value.replace(/\D/g, '').slice(0, 6));
                   }}
                   autoFocus
-                  aria-describedby="totp-status"
                 />
               )}
             </FormField>
           )}
-          <p id="totp-status" className="aw-flush aw-muted aw-text-sm" aria-live="polite">
-            {t('login.totp_status_awaiting')}
-          </p>
           <Button
             type="button"
             variant="ghost"
@@ -331,21 +368,16 @@ function LoginPage(): ReactElement {
               setUseRecovery((v) => !v);
               setServerError(null);
             }}
-            disabled={totpSubmitting}
+            disabled={totpGuard.submitting}
           >
             {useRecovery ? t('login.totp_use_code') : t('login.totp_use_recovery')}
           </Button>
-          {serverError ? (
-            <p role="alert" className="aw-error">
-              {t(serverError)}
-            </p>
-          ) : null}
           <Button
             type="submit"
             variant="primary"
             disabled={
-              totpSubmitting ||
-              (useRecovery ? recoveryCode.trim().length < 10 : totpCode.length !== 6)
+              totpGuard.submitting ||
+              (useRecovery ? recoveryCode.trim().length < RECOVERY_MIN_LEN : totpCode.length !== 6)
             }
           >
             {useRecovery ? t('login.recovery_submit') : t('login.totp_submit')}
@@ -354,7 +386,7 @@ function LoginPage(): ReactElement {
             type="button"
             variant="ghost"
             onClick={handleCancelTotp}
-            disabled={totpSubmitting}
+            disabled={totpGuard.submitting}
           >
             {t('login.totp_cancel')}
           </Button>

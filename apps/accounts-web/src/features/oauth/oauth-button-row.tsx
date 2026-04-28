@@ -15,7 +15,7 @@
  */
 
 import Button from '@nodate-flow/ui/primitives/button';
-import type { ReactElement } from 'react';
+import { type ReactElement, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import type { ProblemJson } from '../../lib/api-error';
@@ -56,6 +56,13 @@ export interface OAuthButtonRowProps {
 function OAuthButtonRow({ mode, onError }: OAuthButtonRowProps): ReactElement | null {
   const { t } = useTranslation('auth');
   const caps = useCapabilities();
+  // Tracks the in-flight provider so we can disable every button while a
+  // start call is pending. We do not use `useSubmitGuard()` here because
+  // the success path navigates via `window.location` and never releases
+  // the guard; a thrown / errored start call still needs to flip back to
+  // the idle UX so the user can retry. A nullable provider id captures
+  // both pieces (which one is busy + whether anything is busy).
+  const [pendingProvider, setPendingProvider] = useState<OAuthProvider | null>(null);
 
   // Caps are still loading -- defer rendering until we know whether any
   // provider is actually enabled. A flicker of the divider would be
@@ -64,18 +71,28 @@ function OAuthButtonRow({ mode, onError }: OAuthButtonRowProps): ReactElement | 
   if (!caps.oidcGoogle && !caps.oidcGithub && !caps.oidcMicrosoft) return null;
 
   const handleStart = async (provider: OAuthProvider): Promise<void> => {
+    if (pendingProvider !== null) return;
+    setPendingProvider(provider);
     try {
       const { data, error } = await sdk.GET(`/auth/oidc/${provider}/start` as never);
       if (error || !data) {
         onError?.(mapAuthError(error as ProblemJson | undefined));
+        setPendingProvider(null);
         return;
       }
       const result = data as { authorizationUrl: string };
+      // Leave `pendingProvider` set on success: the browser is about to
+      // navigate away, so re-enabling the buttons would only flash a
+      // brief idle UX and re-open the multi-click race we are guarding
+      // against.
       window.location.href = result.authorizationUrl;
     } catch (err) {
       onError?.(mapAuthThrown(err));
+      setPendingProvider(null);
     }
   };
+
+  const isPending = pendingProvider !== null;
 
   // `data-mode` is a stable hook for parent CSS / E2E selectors but
   // does not influence rendering today.
@@ -107,6 +124,8 @@ function OAuthButtonRow({ mode, onError }: OAuthButtonRowProps): ReactElement | 
           <Button
             type="button"
             variant="default"
+            disabled={isPending}
+            aria-busy={pendingProvider === 'google'}
             onClick={() => {
               void handleStart('google');
             }}
@@ -118,6 +137,8 @@ function OAuthButtonRow({ mode, onError }: OAuthButtonRowProps): ReactElement | 
           <Button
             type="button"
             variant="default"
+            disabled={isPending}
+            aria-busy={pendingProvider === 'github'}
             onClick={() => {
               void handleStart('github');
             }}
@@ -129,6 +150,8 @@ function OAuthButtonRow({ mode, onError }: OAuthButtonRowProps): ReactElement | 
           <Button
             type="button"
             variant="default"
+            disabled={isPending}
+            aria-busy={pendingProvider === 'microsoft'}
             onClick={() => {
               void handleStart('microsoft');
             }}
