@@ -11,11 +11,6 @@ export const InstanceErrors = {
     status: 404,
     message: "User is not an instance administrator",
   },
-  INSTANCE_ADMIN_REQUIRED: {
-    code: "INSTANCE.ADMIN.REQUIRED",
-    status: 403,
-    message: "Instance administrator privileges are required",
-  },
   INSTANCE_ADMIN_SELF_REVOKE: {
     code: "INSTANCE.ADMIN.SELF_REVOKE",
     status: 409,

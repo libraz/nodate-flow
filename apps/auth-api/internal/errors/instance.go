@@ -8,8 +8,6 @@ var (
 	InstanceAdminLastAdmin = &Spec{Code: "INSTANCE.ADMIN.LAST_ADMIN", Status: 409, Message: "Cannot revoke the last remaining administrator", Description: "Returned when revoking would leave the instance with zero admins.", UserAction: "Grant admin privileges to another user first."}
 	// INSTANCE.ADMIN.NOT_FOUND — User is not an instance administrator
 	InstanceAdminNotFound = &Spec{Code: "INSTANCE.ADMIN.NOT_FOUND", Status: 404, Message: "User is not an instance administrator", Description: "Returned when attempting to revoke admin privileges from a user who is not an instance admin.", UserAction: "Verify the user is listed as an instance administrator."}
-	// INSTANCE.ADMIN.REQUIRED — Instance administrator privileges are required
-	InstanceAdminRequired = &Spec{Code: "INSTANCE.ADMIN.REQUIRED", Status: 403, Message: "Instance administrator privileges are required", Description: "Returned when an endpoint that requires the instance-admin role is called by a non-admin user.", UserAction: "Ask an instance administrator to perform this operation."}
 	// INSTANCE.ADMIN.SELF_REVOKE — Cannot revoke your own administrator privileges
 	InstanceAdminSelfRevoke = &Spec{Code: "INSTANCE.ADMIN.SELF_REVOKE", Status: 409, Message: "Cannot revoke your own administrator privileges", Description: "Returned when an instance admin tries to revoke their own admin grant.", UserAction: "Ask another instance administrator to revoke your privileges."}
 	// INSTANCE.ADMIN.STATUS_UNAVAILABLE — Could not determine instance administrator status

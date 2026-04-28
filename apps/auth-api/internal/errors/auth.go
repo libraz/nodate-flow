@@ -40,6 +40,8 @@ var (
 	AuthOidcMicrosoftNotConfigured = &Spec{Code: "AUTH.OIDC.MICROSOFT_NOT_CONFIGURED", Status: 503, Message: "Microsoft login is not configured", Description: "Returned when the user attempts to sign in via Microsoft but the instance has no Microsoft OIDC client configured.", UserAction: "Ask the instance administrator to configure Microsoft login credentials."}
 	// AUTH.OIDC.NONCE_MISMATCH — OIDC nonce does not match
 	AuthOidcNonceMismatch = &Spec{Code: "AUTH.OIDC.NONCE_MISMATCH", Status: 400, Message: "OIDC nonce does not match", Description: "Returned when the nonce claim in the ID token does not match the one embedded in the authentication request.", UserAction: "Restart the sign-in flow from the login page."}
+	// AUTH.OIDC.PROVIDER_REJECTED — The identity provider declined the sign-in
+	AuthOidcProviderRejected = &Spec{Code: "AUTH.OIDC.PROVIDER_REJECTED", Status: 400, Message: "The identity provider declined the sign-in", Description: "Returned when the OIDC callback URL carries `error` / `error_description` query parameters, meaning the identity provider refused to issue an authorization code. Common causes include the user denying the consent screen, the relying-party application being misconfigured at the IdP, or the IdP rejecting the requested scopes.", UserAction: "Retry the sign-in flow and approve the consent screen, or contact your workspace administrator if the identity provider keeps rejecting the request.", I18nKey: "auth.errors.oidc_provider_rejected"}
 	// AUTH.OIDC.PROVIDER_UNREACHABLE — OIDC provider is unreachable
 	AuthOidcProviderUnreachable = &Spec{Code: "AUTH.OIDC.PROVIDER_UNREACHABLE", Status: 502, Message: "OIDC provider is unreachable", Description: "Returned when the configured OIDC provider cannot be contacted for discovery or token exchange.", UserAction: "Try again in a moment; contact your administrator if the problem persists."}
 	// AUTH.OIDC.STATE_MISMATCH — OIDC state parameter does not match
@@ -54,6 +56,8 @@ var (
 	AuthPatExpired = &Spec{Code: "AUTH.PAT.EXPIRED", Status: 401, Message: "Personal access token has expired", Description: "Returned when the PAT's expiration timestamp has passed.", UserAction: "Create a new personal access token."}
 	// AUTH.PAT.TOKEN_UNKNOWN — Personal access token is invalid
 	AuthPatTokenUnknown = &Spec{Code: "AUTH.PAT.TOKEN_UNKNOWN", Status: 401, Message: "Personal access token is invalid", Description: "Returned when the supplied personal access token is unknown, malformed, or has been revoked.", UserAction: "Generate a new personal access token and update the client configuration."}
+	// AUTH.PERMISSION.INSTANCE_ADMIN_REQUIRED — Instance administrator privileges are required
+	AuthPermissionInstanceAdminRequired = &Spec{Code: "AUTH.PERMISSION.INSTANCE_ADMIN_REQUIRED", Status: 403, Message: "Instance administrator privileges are required", Description: "Returned when an endpoint that requires the instance-admin role is called by a non-admin user.", UserAction: "Ask an instance administrator to perform this operation.", I18nKey: "auth.errors.permission_instance_admin_required"}
 	// AUTH.REGISTER.EMAIL_ALREADY_TAKEN — Email address is already registered
 	AuthRegisterEmailAlreadyTaken = &Spec{Code: "AUTH.REGISTER.EMAIL_ALREADY_TAKEN", Status: 409, Message: "Email address is already registered", Description: "Returned when a registration attempt uses an email that is already associated with an existing account.", UserAction: "Sign in with the existing account, or use a different email address."}
 	// AUTH.REGISTER.INSTANCE_REGISTRATION_DISABLED — Self-service registration is disabled on this instance
@@ -64,6 +68,8 @@ var (
 	AuthSessionExpired = &Spec{Code: "AUTH.SESSION.EXPIRED", Status: 401, Message: "Session has expired", Description: "Returned when the session or access token is past its expiration timestamp.", UserAction: "Sign in again to continue."}
 	// AUTH.SESSION.REVOKED — Session has been revoked
 	AuthSessionRevoked = &Spec{Code: "AUTH.SESSION.REVOKED", Status: 401, Message: "Session has been revoked", Description: "Returned when the session has been explicitly invalidated (logout elsewhere, admin revoke, password change).", UserAction: "Sign in again."}
+	// AUTH.SESSION.UNAUTHORIZED — You must be signed in to access this resource
+	AuthSessionUnauthorized = &Spec{Code: "AUTH.SESSION.UNAUTHORIZED", Status: 401, Message: "You must be signed in to access this resource", Description: "Returned when a request reaches a protected route with no authenticated session present on the context. Distinct from AUTH.SESSION.EXPIRED (had a valid session, now expired) and AUTH.SESSION.REVOKED (session was explicitly invalidated server-side).", UserAction: "Sign in and retry the request.", I18nKey: "auth.errors.session_unauthorized"}
 	// AUTH.TOKEN.MISSING_OR_MALFORMED — Missing or invalid authentication token
 	AuthTokenMissingOrMalformed = &Spec{Code: "AUTH.TOKEN.MISSING_OR_MALFORMED", Status: 401, Message: "Missing or invalid authentication token", Description: "Returned when the Authorization header is absent, does not start with Bearer, or the token is empty. Distinct from signature verification failures.", UserAction: "Include a valid Bearer token in the Authorization header."}
 	// AUTH.TOKEN.REFRESH_EXPIRED — Refresh token has expired

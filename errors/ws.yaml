@@ -185,6 +185,16 @@ resources:
         description: "Returned when attempting to unarchive a task that is not in the archived state."
         userAction: "The task is not archived."
 
+      actor_role_invalid:
+        code: WS.TASK.ACTOR_ROLE_INVALID
+        status: 422
+        message: "Task actor role must be one of: assignee, reviewer, watcher, approver"
+        message_ja: "タスク参加者の役割は assignee / reviewer / watcher / approver のいずれかを指定してください"
+        message_zh: "任务参与者角色必须为 assignee、reviewer、watcher 或 approver 之一"
+        description: "Returned when a task create or update payload includes an `actors[].role` value outside the allowed enum. The persisted column is `task_actors.role ENUM('assignee','reviewer','watcher','approver')`, so any other string is rejected at the validation boundary before the SQL layer."
+        userAction: "Set each actor's role to one of: assignee, reviewer, watcher, approver."
+        i18nKey: "workspace.errors.task_actor_role_invalid"
+
   member:
     breadcrumb: "Workspace > Member"
     errors:

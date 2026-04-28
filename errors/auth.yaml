@@ -179,6 +179,29 @@ resources:
         description: "Returned when the session has been explicitly invalidated (logout elsewhere, admin revoke, password change)."
         userAction: "Sign in again."
 
+      unauthorized:
+        code: AUTH.SESSION.UNAUTHORIZED
+        status: 401
+        message: "You must be signed in to access this resource"
+        message_ja: "このリソースにアクセスするにはサインインが必要です"
+        message_zh: "访问此资源需要先登录"
+        description: "Returned when a request reaches a protected route with no authenticated session present on the context. Distinct from AUTH.SESSION.EXPIRED (had a valid session, now expired) and AUTH.SESSION.REVOKED (session was explicitly invalidated server-side)."
+        userAction: "Sign in and retry the request."
+        i18nKey: "auth.errors.session_unauthorized"
+
+  permission:
+    breadcrumb: "Auth > Permission"
+    errors:
+      instance_admin_required:
+        code: AUTH.PERMISSION.INSTANCE_ADMIN_REQUIRED
+        status: 403
+        message: "Instance administrator privileges are required"
+        message_ja: "インスタンス管理者権限が必要です"
+        message_zh: "此操作需要实例管理员权限"
+        description: "Returned when an endpoint that requires the instance-admin role is called by a non-admin user."
+        userAction: "Ask an instance administrator to perform this operation."
+        i18nKey: "auth.errors.permission_instance_admin_required"
+
   token:
     breadcrumb: "Auth > Token"
     errors:
@@ -304,6 +327,16 @@ resources:
         message_zh: "无法连接到 OIDC 服务提供商"
         description: "Returned when the configured OIDC provider cannot be contacted for discovery or token exchange."
         userAction: "Try again in a moment; contact your administrator if the problem persists."
+
+      provider_rejected:
+        code: AUTH.OIDC.PROVIDER_REJECTED
+        status: 400
+        message: "The identity provider declined the sign-in"
+        message_ja: "ID プロバイダがサインインを拒否しました"
+        message_zh: "身份提供方拒绝了此次登录"
+        description: "Returned when the OIDC callback URL carries `error` / `error_description` query parameters, meaning the identity provider refused to issue an authorization code. Common causes include the user denying the consent screen, the relying-party application being misconfigured at the IdP, or the IdP rejecting the requested scopes."
+        userAction: "Retry the sign-in flow and approve the consent screen, or contact your workspace administrator if the identity provider keeps rejecting the request."
+        i18nKey: "auth.errors.oidc_provider_rejected"
 
       github_not_configured:
         code: AUTH.OIDC.GITHUB_NOT_CONFIGURED

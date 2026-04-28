@@ -91,6 +91,12 @@ export const AuthErrors = {
     status: 400,
     message: "OIDC nonce does not match",
   },
+  AUTH_OIDC_PROVIDER_REJECTED: {
+    code: "AUTH.OIDC.PROVIDER_REJECTED",
+    status: 400,
+    message: "The identity provider declined the sign-in",
+    i18nKey: "auth.errors.oidc_provider_rejected",
+  },
   AUTH_OIDC_PROVIDER_UNREACHABLE: {
     code: "AUTH.OIDC.PROVIDER_UNREACHABLE",
     status: 502,
@@ -126,6 +132,12 @@ export const AuthErrors = {
     status: 401,
     message: "Personal access token is invalid",
   },
+  AUTH_PERMISSION_INSTANCE_ADMIN_REQUIRED: {
+    code: "AUTH.PERMISSION.INSTANCE_ADMIN_REQUIRED",
+    status: 403,
+    message: "Instance administrator privileges are required",
+    i18nKey: "auth.errors.permission_instance_admin_required",
+  },
   AUTH_REGISTER_EMAIL_ALREADY_TAKEN: {
     code: "AUTH.REGISTER.EMAIL_ALREADY_TAKEN",
     status: 409,
@@ -150,6 +162,12 @@ export const AuthErrors = {
     code: "AUTH.SESSION.REVOKED",
     status: 401,
     message: "Session has been revoked",
+  },
+  AUTH_SESSION_UNAUTHORIZED: {
+    code: "AUTH.SESSION.UNAUTHORIZED",
+    status: 401,
+    message: "You must be signed in to access this resource",
+    i18nKey: "auth.errors.session_unauthorized",
   },
   AUTH_TOKEN_MISSING_OR_MALFORMED: {
     code: "AUTH.TOKEN.MISSING_OR_MALFORMED",

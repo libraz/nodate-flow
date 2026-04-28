@@ -16,12 +16,20 @@ import (
 // errors/*.yaml source by gen-errors and surfaced on the wire so
 // frontends can localise toast bodies without round-tripping the
 // catalog.
+//
+// I18nKey is an optional dotted i18next key (e.g.
+// "auth.errors.oidc_provider_rejected") that the frontend can use to
+// look up a hand-curated translation richer than the catalog's default
+// message. It is populated from the optional top-level `i18nKey` field
+// in errors/*.yaml; entries without that field leave I18nKey empty and
+// the wire envelope omits the corresponding extension member.
 type Spec struct {
 	Code        string
 	Status      int
 	Message     string
 	Description string
 	UserAction  string
+	I18nKey     string
 }
 
 // APIError is the runtime error value carried through the API. It wraps a

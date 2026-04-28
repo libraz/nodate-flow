@@ -17,14 +17,6 @@ resources:
   admin:
     breadcrumb: "Instance > Admin"
     errors:
-      required:
-        code: INSTANCE.ADMIN.REQUIRED
-        status: 403
-        message: "Instance administrator privileges are required"
-        message_ja: "インスタンス管理者権限が必要です"
-        message_zh: "此操作需要实例管理员权限"
-        description: "Returned when an endpoint that requires the instance-admin role is called by a non-admin user."
-        userAction: "Ask an instance administrator to perform this operation."
       not_found:
         code: INSTANCE.ADMIN.NOT_FOUND
         status: 404

@@ -146,6 +146,12 @@ export const WsErrors = {
     status: 403,
     message: "You do not have access to this task",
   },
+  WS_TASK_ACTOR_ROLE_INVALID: {
+    code: "WS.TASK.ACTOR_ROLE_INVALID",
+    status: 422,
+    message: "Task actor role must be one of: assignee, reviewer, watcher, approver",
+    i18nKey: "workspace.errors.task_actor_role_invalid",
+  },
   WS_TASK_ALREADY_ARCHIVED: {
     code: "WS.TASK.ALREADY_ARCHIVED",
     status: 409,
