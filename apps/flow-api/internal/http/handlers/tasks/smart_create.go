@@ -17,7 +17,9 @@ import (
 	apierrors "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/errors"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/eventbus"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/middleware"
+	nflog "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/log"
 	"github.com/nodate-flow/nodate-flow/packages/go-shared/apierr"
+	"github.com/nodate-flow/nodate-flow/packages/go-shared/logutil"
 )
 
 // SmartCreateDeps is the dependency bundle for the propose-smart and
@@ -308,14 +310,11 @@ func emitCreatedEvent(ctx context.Context, db *sql.DB, wsID, actorID uint32, tas
 			"title":     title,
 		},
 	}); err != nil {
-		slog.ErrorContext(ctx, "eventbus.Append failed",
+		nflog.LoggerFromContext(ctx).ErrorContext(ctx, "eventbus.Append failed",
 			slog.Any("err", err),
 			slog.String("handler", "tasks.emitCreatedEvent"),
 			slog.String("event_type", string(eventbus.TaskCreated)),
-			slog.Int64("workspace_id", int64(wsID)),
-			slog.Int64("actor_id", actorIDv),
-			slog.Int64("task_id", taskID),
-			slog.String("task_public_id", taskPub.String()),
+			logutil.LogEntityPID("task", taskPub),
 		)
 	}
 }

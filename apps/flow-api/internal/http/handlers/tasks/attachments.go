@@ -12,6 +12,7 @@ import (
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/eventbus"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/handlers/handlerutil"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/middleware"
+	nflog "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/log"
 	"github.com/nodate-flow/nodate-flow/packages/go-shared/logutil"
 )
 
@@ -57,7 +58,7 @@ func AddAttachment(deps Deps) func(context.Context, *AddTaskAttachmentInput) (*A
 				"filename":     in.Body.Filename,
 			},
 		}); err != nil {
-			slog.ErrorContext(ctx, "eventbus.Append failed",
+			nflog.LoggerFromContext(ctx).ErrorContext(ctx, "eventbus.Append failed",
 				slog.Any("err", err),
 				slog.String("handler", "tasks.AddAttachment"),
 				slog.String("event_type", string(eventbus.TaskAttachmentAdded)),
@@ -153,7 +154,7 @@ func DeleteAttachment(deps Deps) func(context.Context, *DeleteTaskAttachmentInpu
 				"attachmentId": aid.String(),
 			},
 		}); err != nil {
-			slog.ErrorContext(ctx, "eventbus.Append failed",
+			nflog.LoggerFromContext(ctx).ErrorContext(ctx, "eventbus.Append failed",
 				slog.Any("err", err),
 				slog.String("handler", "tasks.DeleteAttachment"),
 				slog.String("event_type", string(eventbus.TaskAttachmentRemoved)),

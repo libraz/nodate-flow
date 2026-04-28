@@ -12,6 +12,7 @@ import (
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/eventbus"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/handlers/handlerutil"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/middleware"
+	nflog "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/log"
 	"github.com/nodate-flow/nodate-flow/packages/go-shared/logutil"
 )
 
@@ -44,7 +45,7 @@ func Archive(deps Deps) func(context.Context, *ArchiveTaskInput) (*ArchiveTaskOu
 			TaskID:      &taskInternal,
 			Payload:     map[string]any{"taskId": task.PublicID.String()},
 		}); err != nil {
-			slog.ErrorContext(ctx, "eventbus.Append failed",
+			nflog.LoggerFromContext(ctx).ErrorContext(ctx, "eventbus.Append failed",
 				slog.Any("err", err),
 				slog.String("handler", "tasks.Archive"),
 				slog.String("event_type", string(eventbus.TaskArchived)),
@@ -98,7 +99,7 @@ func Unarchive(deps Deps) func(context.Context, *UnarchiveTaskInput) (*Unarchive
 			TaskID:      &taskInternal,
 			Payload:     map[string]any{"taskId": task.PublicID.String()},
 		}); err != nil {
-			slog.ErrorContext(ctx, "eventbus.Append failed",
+			nflog.LoggerFromContext(ctx).ErrorContext(ctx, "eventbus.Append failed",
 				slog.Any("err", err),
 				slog.String("handler", "tasks.Unarchive"),
 				slog.String("event_type", string(eventbus.TaskUnarchived)),

@@ -10,6 +10,7 @@ import (
 	apierrors "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/errors"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/eventbus"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/middleware"
+	nflog "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/log"
 	"github.com/nodate-flow/nodate-flow/packages/go-shared/apierr"
 	"github.com/nodate-flow/nodate-flow/packages/go-shared/logutil"
 )
@@ -47,7 +48,7 @@ func AddConstraint(deps Deps) func(context.Context, *AddTaskConstraintInput) (*A
 				"kind":         in.Body.Kind,
 			},
 		}); err != nil {
-			slog.ErrorContext(ctx, "eventbus.Append failed",
+			nflog.LoggerFromContext(ctx).ErrorContext(ctx, "eventbus.Append failed",
 				slog.Any("err", err),
 				slog.String("handler", "tasks.AddConstraint"),
 				slog.String("event_type", string(eventbus.TaskConstraintAdded)),
@@ -106,7 +107,7 @@ func RemoveConstraint(deps Deps) func(context.Context, *RemoveTaskConstraintInpu
 				"constraintId": cid.String(),
 			},
 		}); err != nil {
-			slog.ErrorContext(ctx, "eventbus.Append failed",
+			nflog.LoggerFromContext(ctx).ErrorContext(ctx, "eventbus.Append failed",
 				slog.Any("err", err),
 				slog.String("handler", "tasks.RemoveConstraint"),
 				slog.String("event_type", string(eventbus.TaskConstraintRemoved)),

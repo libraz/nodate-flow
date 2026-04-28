@@ -11,6 +11,7 @@ import (
 	apierrors "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/errors"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/eventbus"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/middleware"
+	nflog "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/log"
 	"github.com/nodate-flow/nodate-flow/packages/go-shared/apierr"
 	"github.com/nodate-flow/nodate-flow/packages/go-shared/logutil"
 )
@@ -89,7 +90,7 @@ func Create(deps Deps) func(context.Context, *CreateLabelInput) (*CreateLabelOut
 			ActorUserID: actorPtr(ctx),
 			Payload:     map[string]any{"labelId": pub.String()},
 		}); err != nil {
-			slog.ErrorContext(ctx, "eventbus.Append failed",
+			nflog.LoggerFromContext(ctx).ErrorContext(ctx, "eventbus.Append failed",
 				slog.Any("err", err),
 				slog.String("handler", "labels.Create"),
 				slog.String("event_type", string(eventbus.LabelCreated)),
@@ -292,7 +293,7 @@ func Patch(deps Deps) func(context.Context, *PatchLabelInput) (*PatchLabelOutput
 			ActorUserID: actorPtr(ctx),
 			Payload:     map[string]any{"labelId": pub.String()},
 		}); err != nil {
-			slog.ErrorContext(ctx, "eventbus.Append failed",
+			nflog.LoggerFromContext(ctx).ErrorContext(ctx, "eventbus.Append failed",
 				slog.Any("err", err),
 				slog.String("handler", "labels.Patch"),
 				slog.String("event_type", string(eventbus.LabelUpdated)),
@@ -351,7 +352,7 @@ func Disable(deps Deps) func(context.Context, *DisableLabelInput) (*DisableLabel
 			ActorUserID: actorPtr(ctx),
 			Payload:     map[string]any{"labelId": pub.String()},
 		}); err != nil {
-			slog.ErrorContext(ctx, "eventbus.Append failed",
+			nflog.LoggerFromContext(ctx).ErrorContext(ctx, "eventbus.Append failed",
 				slog.Any("err", err),
 				slog.String("handler", "labels.Disable"),
 				slog.String("event_type", string(eventbus.LabelDisabled)),
@@ -425,7 +426,7 @@ func AddTaskLabel(deps Deps) func(context.Context, *AddTaskLabelInput) (*AddTask
 			TaskID:      &taskID,
 			Payload:     map[string]any{"labelId": labelPub.String()},
 		}); err != nil {
-			slog.ErrorContext(ctx, "eventbus.Append failed",
+			nflog.LoggerFromContext(ctx).ErrorContext(ctx, "eventbus.Append failed",
 				slog.Any("err", err),
 				slog.String("handler", "labels.AddTaskLabel"),
 				slog.String("event_type", string(eventbus.TaskLabelAdded)),
@@ -516,7 +517,7 @@ func RemoveTaskLabel(deps Deps) func(context.Context, *RemoveTaskLabelInput) (*R
 			TaskID:      &taskID,
 			Payload:     map[string]any{"labelId": labelPub.String()},
 		}); err != nil {
-			slog.ErrorContext(ctx, "eventbus.Append failed",
+			nflog.LoggerFromContext(ctx).ErrorContext(ctx, "eventbus.Append failed",
 				slog.Any("err", err),
 				slog.String("handler", "labels.RemoveTaskLabel"),
 				slog.String("event_type", string(eventbus.TaskLabelRemoved)),

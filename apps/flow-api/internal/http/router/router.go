@@ -290,11 +290,22 @@ func BuildResult(deps Deps) Result {
 
 	shared := buildSharedDeps(deps)
 
-	authMW := middleware.RequireAuth(middleware.AuthDeps{
+	rawAuthMW := middleware.RequireAuth(middleware.AuthDeps{
 		JWT:     deps.JWT,
 		Queries: deps.Queries,
 		DB:      shared.aclDB,
 	})
+	// Wrap RequireAuth with LoggerContext so every authenticated route
+	// receives a request-scoped logger pre-populated with actor_id and
+	// request_id once auth resolves. Workspace-scoped attrs (workspace_id
+	// / workspace_public_id) are appended by RequireWorkspaceMember (and
+	// the project / task ACL helpers) once the workspace is resolved,
+	// so each builder gets a fully-tagged logger without having to thread
+	// a "log-after-acl" wrapper through every group.
+	loggerCtx := middleware.LoggerContext()
+	authMW := func(next http.Handler) http.Handler {
+		return rawAuthMW(loggerCtx(next))
+	}
 
 	authedAPIs := buildAuthenticatedAPI(r, deps, shared, authMW)
 	publicAPIs := buildPublicShareAPI(r, deps, shared)

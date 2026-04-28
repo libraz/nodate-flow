@@ -9,6 +9,7 @@ import (
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/types"
 	apierrors "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/errors"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/middleware"
+	nflog "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/log"
 	"github.com/nodate-flow/nodate-flow/packages/go-shared/logutil"
 )
 
@@ -45,7 +46,7 @@ func Disable(deps Deps) func(context.Context, *DisableProjectInput) (*DisablePro
 			 WHERE workspace_id = ? AND project_id = ? AND enabled = TRUE`,
 			ws.ID, prj.ID,
 		).Scan(&childCount); err != nil {
-			slog.ErrorContext(ctx, "projects.Disable: count child tasks failed",
+			nflog.LoggerFromContext(ctx).ErrorContext(ctx, "projects.Disable: count child tasks failed",
 				slog.Any("err", err),
 				slog.String("handler", "projects.Disable"),
 				logutil.LogEntity("workspace", ws.PublicID),
@@ -65,7 +66,7 @@ func Disable(deps Deps) func(context.Context, *DisableProjectInput) (*DisablePro
 			WorkspaceID: ws.ID,
 			ProjectID:   prj.ID,
 		}); err != nil {
-			slog.ErrorContext(ctx, "projects.Disable: child task cascade failed",
+			nflog.LoggerFromContext(ctx).ErrorContext(ctx, "projects.Disable: child task cascade failed",
 				slog.Any("err", err),
 				slog.String("handler", "projects.Disable"),
 				logutil.LogEntity("workspace", ws.PublicID),
@@ -78,7 +79,7 @@ func Disable(deps Deps) func(context.Context, *DisableProjectInput) (*DisablePro
 			WorkspaceID: ws.ID,
 			PublicID:    types.FromUUID(prj.PublicID),
 		}); err != nil {
-			slog.ErrorContext(ctx, "projects.Disable: project disable failed",
+			nflog.LoggerFromContext(ctx).ErrorContext(ctx, "projects.Disable: project disable failed",
 				slog.Any("err", err),
 				slog.String("handler", "projects.Disable"),
 				logutil.LogEntity("workspace", ws.PublicID),
@@ -91,7 +92,7 @@ func Disable(deps Deps) func(context.Context, *DisableProjectInput) (*DisablePro
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
 
-		slog.InfoContext(ctx, "project disabled with cascade",
+		nflog.LoggerFromContext(ctx).InfoContext(ctx, "project disabled with cascade",
 			logutil.LogEntity("workspace", ws.PublicID),
 			logutil.LogEntity("project", prj.PublicID),
 			slog.Int64("child_tasks_disabled", childCount),
