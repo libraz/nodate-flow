@@ -206,7 +206,7 @@ NF_DB_USER     ?= nodate
 NF_DB_PASSWORD ?= nodatepw
 NF_DB_NAME     ?= nodate_flow
 
-.PHONY: db-schema db-apply db-reset db-shell seed-flow seed-time
+.PHONY: db-schema db-apply db-reset db-shell seed-flow seed-calendar
 db-schema: ## Regenerate sql/schema.sql from sql/tables + sql/views
 	bash sql/build-schema.sh > sql/schema.sql
 
@@ -226,8 +226,8 @@ seed-flow: ## Insert dev admin user + demo workspace (idempotent; NF_SEED_LOCALE
 	@dsn="$${NF_DB_DSN:-$(NF_DB_USER):$(NF_DB_PASSWORD)@tcp($(NF_DB_HOST):$(NF_DB_PORT))/$(NF_DB_NAME)?parseTime=true&charset=utf8mb4&collation=utf8mb4_0900_ai_ci}"; \
 	cd apps/flow-api && NF_DB_DSN="$$dsn" go run ./cmd/seed-dev
 
-seed-time: ## Seed nodate-time calendar demo data via REST API (NF_SEED_LOCALE=en|ja)
-	./scripts/seed-time.sh
+seed-calendar: ## Seed calendar demo data via REST API (NF_SEED_LOCALE=en|ja)
+	./scripts/seed-calendar.sh
 
 # ---------- clean ----------
 

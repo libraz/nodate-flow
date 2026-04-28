@@ -4,7 +4,7 @@ set -euo pipefail
 API="${TC_API_URL:-http://localhost:8080}"
 LOCALE="${NF_SEED_LOCALE:-en}"
 
-echo "=== Seeding nodate-time demo data (locale: $LOCALE) ==="
+echo "=== Seeding calendar demo data (locale: $LOCALE) ==="
 echo "API: $API"
 echo ""
 
@@ -46,12 +46,12 @@ create_event() {
 # ---------- Locale-dependent strings ----------
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-LOCALE_FILE="$SCRIPT_DIR/locales/seed-time/${LOCALE}.sh"
+LOCALE_FILE="$SCRIPT_DIR/locales/seed-calendar/${LOCALE}.sh"
 if [ ! -f "$LOCALE_FILE" ]; then
   echo "ERROR: unsupported locale '$LOCALE' (add $LOCALE_FILE)" >&2
   exit 1
 fi
-# shellcheck source=locales/seed-time/en.sh
+# shellcheck source=locales/seed-calendar/en.sh
 source "$LOCALE_FILE"
 
 # ---------- 1. Register users ----------

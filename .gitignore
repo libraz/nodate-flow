@@ -45,9 +45,6 @@ vendor/
 /apps/auth-api/dump-openapi
 /apps/auth-api/healthcheck
 /scripts/merge-openapi
-/apps/time-api/api
-/apps/time-api/dump-openapi
-/apps/time-api/healthcheck
 /healthcheck
 go.sum.bak
 

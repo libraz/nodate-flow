@@ -1,11 +1,11 @@
-# Locale: ja — seed-time display strings
+# Locale: ja — seed-calendar display strings
 MANAGER_NAME="佐藤マネージャー"
 TALENT_A_NAME="タレントA"
 TALENT_B_NAME="タレントB"
 WS_NAME="デモ事務所"
 CAL_NAME="運営スケジュール"
 
-# Event titles (order must match EVENTS_META in seed-time.sh)
+# Event titles (order must match EVENTS_META in seed-calendar.sh)
 EVENT_TITLES=(
   "A 撮影"
   "B オーディション"

@@ -1,11 +1,11 @@
-# Locale: en — seed-time display strings
+# Locale: en — seed-calendar display strings
 MANAGER_NAME="Manager Sato"
 TALENT_A_NAME="Talent A"
 TALENT_B_NAME="Talent B"
 WS_NAME="Demo Office"
 CAL_NAME="Operations Schedule"
 
-# Event titles (order must match EVENTS_META in seed-time.sh)
+# Event titles (order must match EVENTS_META in seed-calendar.sh)
 EVENT_TITLES=(
   "A Photo Shoot"
   "B Audition"
