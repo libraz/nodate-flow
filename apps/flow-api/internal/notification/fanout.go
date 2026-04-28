@@ -11,6 +11,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/dbretry"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/generated"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/types"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/obs"
@@ -213,6 +214,15 @@ func (f *Fanout) fanout(ctx context.Context, workspaceID uint32, eventType strin
 		}
 	}
 	if len(filtered) == 0 {
+		// Recipient set is empty (only the actor was in the workspace,
+		// or the actor is the sole member). Log at debug so production
+		// dashboards stay quiet but tests can opt in by raising the
+		// level.
+		slog.DebugContext(ctx, "notification fanout: no recipients after filter",
+			slog.Uint64("workspace_id", uint64(workspaceID)),
+			slog.Uint64("event_id", uint64(eventInternalID)),
+			slog.Int("members_total", len(recipients)),
+			slog.Uint64("actor_user_id", uint64(actorUserID)))
 		return
 	}
 
@@ -268,19 +278,31 @@ func (f *Fanout) fanout(ctx context.Context, workspaceID uint32, eventType strin
 
 		for _, channel := range channels {
 			pubID := types.New()
-			affected, err := f.queries.CreateNotification(ctx, generated.CreateNotificationParams{
-				PublicID:         pubID,
-				WorkspaceID:      workspaceID,
-				RecipientUserID:  recipientID,
-				ActorUserID:      actorID,
-				SourceEventID:    sourceEventID,
-				EventType:        eventType,
-				ResourceType:     resourceType,
-				ResourcePublicID: row.resourcePublicID,
-				Title:            title,
-				Body:             sql.NullString{},
-				Severity:         severity,
-				Channel:          channel,
+			// Retry on transient deadlocks. The fan-out goroutine runs
+			// in auto-commit (no enclosing tx), so re-issuing the
+			// INSERT IGNORE is safe and the unique key still dedupes
+			// across retries.
+			var affected int64
+			err := dbretry.Do(ctx, "notification.CreateNotification", func(ctx context.Context) error {
+				n, e := f.queries.CreateNotification(ctx, generated.CreateNotificationParams{
+					PublicID:         pubID,
+					WorkspaceID:      workspaceID,
+					RecipientUserID:  recipientID,
+					ActorUserID:      actorID,
+					SourceEventID:    sourceEventID,
+					EventType:        eventType,
+					ResourceType:     resourceType,
+					ResourcePublicID: row.resourcePublicID,
+					Title:            title,
+					Body:             sql.NullString{},
+					Severity:         severity,
+					Channel:          channel,
+				})
+				if e != nil {
+					return e
+				}
+				affected = n
+				return nil
 			})
 			if err != nil {
 				slog.ErrorContext(ctx, "notification fanout: failed to create notification",

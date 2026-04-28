@@ -5,6 +5,7 @@ import (
 	"log/slog"
 
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/audit"
+	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/dbretry"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/generated"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/types"
 	apierrors "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/errors"
@@ -96,12 +97,18 @@ func AddDependency(deps Deps) func(context.Context, *AddTaskDependencyInput) (*A
 			return nil, httpErr(apierr.SpecForErrNoRows(err, apierrors.WsTaskNotFound, apierrors.InternalUnexpected))
 		}
 		pub := types.New()
-		if _, err := deps.Queries.AddDependency(ctx, generated.AddDependencyParams{
-			PublicID:    pub,
-			WorkspaceID: ws.ID,
-			FromTaskID:  task.ID,
-			ToTaskID:    toID,
-			Kind:        generated.TaskDependenciesKind(in.Body.Kind),
+		// Retry on transient FK deadlocks: task_dependencies has FKs
+		// into tasks/workspaces and races with concurrent transition
+		// transactions on the same task rows.
+		if err := dbretry.Do(ctx, "tasks.AddDependency", func(ctx context.Context) error {
+			_, e := deps.Queries.AddDependency(ctx, generated.AddDependencyParams{
+				PublicID:    pub,
+				WorkspaceID: ws.ID,
+				FromTaskID:  task.ID,
+				ToTaskID:    toID,
+				Kind:        generated.TaskDependenciesKind(in.Body.Kind),
+			})
+			return e
 		}); err != nil {
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}

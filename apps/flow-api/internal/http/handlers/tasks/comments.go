@@ -6,6 +6,7 @@ import (
 	"log/slog"
 
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/audit"
+	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/dbretry"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/generated"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/types"
 	apierrors "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/errors"
@@ -33,12 +34,18 @@ func AddComment(deps Deps) func(context.Context, *AddTaskCommentInput) (*AddTask
 			return nil, httpErr(apierrors.WsTaskAccessDenied)
 		}
 		pub := types.New()
-		if _, err := deps.Queries.AddComment(ctx, generated.AddCommentParams{
-			PublicID:    pub,
-			WorkspaceID: ws.ID,
-			TaskID:      handlerutil.NullInt32From(task.ID),
-			AuthorID:    actorID,
-			Body:        in.Body.Body,
+		// Retry on transient FK deadlocks: comments inherits FK locks
+		// on tasks/workspaces/users via its FKs and races with the
+		// task transition / fan-out paths under heavy parallel load.
+		if err := dbretry.Do(ctx, "tasks.AddComment", func(ctx context.Context) error {
+			_, e := deps.Queries.AddComment(ctx, generated.AddCommentParams{
+				PublicID:    pub,
+				WorkspaceID: ws.ID,
+				TaskID:      handlerutil.NullInt32From(task.ID),
+				AuthorID:    actorID,
+				Body:        in.Body.Body,
+			})
+			return e
 		}); err != nil {
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}

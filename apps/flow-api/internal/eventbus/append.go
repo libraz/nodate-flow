@@ -17,6 +17,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/dbretry"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/generated"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/types"
 )
@@ -138,6 +139,15 @@ func fireNotifyHooks(ctx context.Context, workspaceInternalID uint32, eventType 
 
 // Append inserts a single event row using the provided DBTX. When db is
 // a *sql.Tx the event is part of that transaction.
+//
+// When db is a *sql.DB (auto-commit, no enclosing transaction) the
+// INSERT is wrapped in a deadlock retry loop: parallel handlers and
+// fan-out goroutines compete on FK record locks for shared parents
+// (workspaces, tasks, users), and InnoDB occasionally rolls one back
+// with ER_LOCK_DEADLOCK (1213). Re-issuing the statement reliably
+// resolves the contention. Callers passing a *sql.Tx own the retry
+// boundary themselves — InnoDB invalidates the whole tx on deadlock,
+// so retrying just the INSERT inside the dead tx would not help.
 func Append(ctx context.Context, db DBTX, evt Event) error {
 	var raw json.RawMessage
 	if evt.Payload == nil {
@@ -158,7 +168,7 @@ func Append(ctx context.Context, db DBTX, evt Event) error {
 	if evt.ActorUserID != nil {
 		actorID = sql.NullInt32{Int32: int32(*evt.ActorUserID), Valid: true} //#nosec G115 -- actor user id sourced from session, fits int32 within realistic deployments
 	}
-	lastID, err := q.AppendEvent(ctx, generated.AppendEventParams{
+	params := generated.AppendEventParams{
 		PublicID:    types.New(),
 		WorkspaceID: evt.WorkspaceID,
 		TaskID:      taskID,
@@ -166,7 +176,23 @@ func Append(ctx context.Context, db DBTX, evt Event) error {
 		Type:        evt.Type,
 		PayloadJson: raw,
 		OccurredAt:  time.Now().UTC(),
-	})
+	}
+	var lastID int64
+	insert := func(ctx context.Context) error {
+		id, err := q.AppendEvent(ctx, params)
+		if err != nil {
+			return err
+		}
+		lastID = id
+		return nil
+	}
+	var err error
+	if _, isTx := db.(*sql.Tx); isTx {
+		// Caller owns the transaction boundary; do not retry inside it.
+		err = insert(ctx)
+	} else {
+		err = dbretry.Do(ctx, "eventbus.Append", insert)
+	}
 	if err != nil {
 		slog.ErrorContext(ctx, "eventbus: append failed",
 			"type", evt.Type,

@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/audit"
+	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/dbretry"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/generated"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/types"
 	apierrors "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/errors"
@@ -73,15 +74,20 @@ func Create(deps Deps) func(context.Context, *CreateInput) (*CreateOutput, error
 		ext := sql.NullString{String: in.Body.ExternalID, Valid: in.Body.ExternalID != ""}
 		pub := types.New()
 		now := time.Now().UTC()
-		if _, err := deps.Queries.InsertSignal(ctx, generated.InsertSignalParams{
-			PublicID:    pub,
-			WorkspaceID: wsID,
-			TaskID:      taskFK,
-			Source:      generated.SignalsSource(in.Body.Source),
-			Kind:        in.Body.Kind,
-			ExternalID:  ext,
-			PayloadJson: payload,
-			ReceivedAt:  now,
+		// Retry on transient FK deadlocks; signals shares FK lock
+		// space with tasks/workspaces.
+		if err := dbretry.Do(ctx, "signals.Create", func(ctx context.Context) error {
+			_, e := deps.Queries.InsertSignal(ctx, generated.InsertSignalParams{
+				PublicID:    pub,
+				WorkspaceID: wsID,
+				TaskID:      taskFK,
+				Source:      generated.SignalsSource(in.Body.Source),
+				Kind:        in.Body.Kind,
+				ExternalID:  ext,
+				PayloadJson: payload,
+				ReceivedAt:  now,
+			})
+			return e
 		}); err != nil {
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}

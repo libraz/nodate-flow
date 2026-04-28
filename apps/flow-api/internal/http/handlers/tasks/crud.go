@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/audit"
+	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/dbretry"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/generated"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/types"
 	apierrors "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/errors"
@@ -32,6 +33,14 @@ var allowedDerivedStates = map[string]struct{}{
 	"done":      {},
 	"cancelled": {},
 }
+
+// errCreateValidation is the sentinel returned from the dbretry.InTx
+// callback inside Create when a validation failure (unparseable id,
+// unknown member, invalid role) is encountered. It is non-transient so
+// dbretry skips the retry loop; the outer handler then dispatches the
+// captured validation closure to translate the failure into the right
+// problem+json envelope.
+var errCreateValidation = errors.New("tasks.Create: validation failed")
 
 // translateActorRoleError converts an apierror returned by
 // [parseActorRole] into the canonical problem+json envelope so the
@@ -308,76 +317,86 @@ func Create(deps Deps) func(context.Context, *CreateTaskInput) (*CreateTaskOutpu
 			vis = generated.TasksVisibility(in.Body.Visibility)
 		}
 
-		// Allocate next task number inside a transaction for gap-lock safety.
-		tx, err := deps.DB.BeginTx(ctx, nil)
-		if err != nil {
-			return nil, httpErr(apierrors.InternalUnexpected)
-		}
-		defer tx.Rollback() //nolint:errcheck
-		qtx := deps.Queries.WithTx(tx)
-		nextNum, err := qtx.AssignTaskNumber(ctx, generated.AssignTaskNumberParams{
-			WorkspaceID: prj.WorkspaceID,
-			ProjectID:   prj.ID,
-		})
-		if err != nil {
-			return nil, httpErr(apierrors.InternalUnexpected)
-		}
-
-		taskID, err := qtx.CreateTask(ctx, generated.CreateTaskParams{
-			PublicID:        pub,
-			WorkspaceID:     prj.WorkspaceID,
-			ProjectID:       prj.ID,
-			TaskNumber:      uint32(nextNum), //#nosec G115 -- task_number is per-project sequence, fits uint32
-			ParentTaskID:    sql.NullInt32{},
-			CreatedByUserID: sql.NullInt32{Int32: int32(actorID), Valid: true}, //#nosec G115 -- actor user id sourced from session, fits int32 within realistic deployments
-			UpdatedByUserID: sql.NullInt32{Int32: int32(actorID), Valid: true}, //#nosec G115 -- actor user id sourced from session, fits int32 within realistic deployments
-			Title:           in.Body.Title,
-			Description:     desc,
-			Priority:        in.Body.Priority,
-			DueOn:           due,
-			StartedOn:       start,
-			Visibility:      vis,
-		})
-		if err != nil {
-			return nil, httpErr(apierrors.InternalUnexpected)
-		}
-
-		// Attach actors. When the caller passed no explicit actor list we
-		// auto-attach them as the sole `assignee` so the task shows up on
-		// their /me/tasks and /me/tasks-with-dates feeds (calendar quick-
-		// create UX). An explicit non-empty list is treated as
-		// authoritative — the creator is NOT merged in. See the bug at
-		// docs/bugs/2026-04-23-web-calendar-quick-create-task-invisible.md
-		// for the motivating flow.
-		if len(in.Body.Actors) == 0 {
-			actorPub := types.New()
-			if _, err := qtx.AddActor(ctx, generated.AddActorParams{
-				PublicID:    actorPub,
+		// Run the create transaction inside a deadlock-aware retry
+		// wrapper. The tx body acquires FK record locks against
+		// workspaces, projects, users, and gap locks during
+		// AssignTaskNumber, so it routinely deadlocks with concurrent
+		// transitions and fan-out under heavy parallel test load.
+		// Restarting the whole tx on ER_LOCK_DEADLOCK is the standard
+		// MySQL recipe.
+		var (
+			taskID       int64
+			validationFn func() error
+		)
+		txErr := dbretry.InTx(ctx, deps.DB, "tasks.Create", nil, func(ctx context.Context, tx *sql.Tx) error {
+			validationFn = nil
+			qtx := deps.Queries.WithTx(tx)
+			nextNum, err := qtx.AssignTaskNumber(ctx, generated.AssignTaskNumberParams{
 				WorkspaceID: prj.WorkspaceID,
-				TaskID:      uint32(taskID),                                    //#nosec G115 -- LastInsertId for tasks.id (BIGINT UNSIGNED), fits uint32 within realistic deployments
-				UserID:      sql.NullInt32{Int32: int32(actorID), Valid: true}, //#nosec G115 -- actor user id sourced from session, fits int32 within realistic deployments
-				Role:        generated.TaskActorsRoleAssignee,
-			}); err != nil {
-				return nil, httpErr(apierrors.InternalUnexpected)
+				ProjectID:   prj.ID,
+			})
+			if err != nil {
+				return err
 			}
-		} else {
+
+			tID, err := qtx.CreateTask(ctx, generated.CreateTaskParams{
+				PublicID:        pub,
+				WorkspaceID:     prj.WorkspaceID,
+				ProjectID:       prj.ID,
+				TaskNumber:      uint32(nextNum), //#nosec G115 -- task_number is per-project sequence, fits uint32
+				ParentTaskID:    sql.NullInt32{},
+				CreatedByUserID: sql.NullInt32{Int32: int32(actorID), Valid: true}, //#nosec G115 -- actor user id sourced from session, fits int32 within realistic deployments
+				UpdatedByUserID: sql.NullInt32{Int32: int32(actorID), Valid: true}, //#nosec G115 -- actor user id sourced from session, fits int32 within realistic deployments
+				Title:           in.Body.Title,
+				Description:     desc,
+				Priority:        in.Body.Priority,
+				DueOn:           due,
+				StartedOn:       start,
+				Visibility:      vis,
+			})
+			if err != nil {
+				return err
+			}
+			taskID = tID
+
+			// Attach actors. When the caller passed no explicit actor
+			// list we auto-attach them as the sole `assignee` so the
+			// task shows up on their /me/tasks feeds. An explicit
+			// non-empty list is treated as authoritative.
+			if len(in.Body.Actors) == 0 {
+				actorPub := types.New()
+				if _, err := qtx.AddActor(ctx, generated.AddActorParams{
+					PublicID:    actorPub,
+					WorkspaceID: prj.WorkspaceID,
+					TaskID:      uint32(tID),                                       //#nosec G115 -- LastInsertId for tasks.id (BIGINT UNSIGNED), fits uint32 within realistic deployments
+					UserID:      sql.NullInt32{Int32: int32(actorID), Valid: true}, //#nosec G115 -- actor user id sourced from session, fits int32 within realistic deployments
+					Role:        generated.TaskActorsRoleAssignee,
+				}); err != nil {
+					return err
+				}
+				return nil
+			}
 			for _, a := range in.Body.Actors {
 				userPub, perr := types.Parse(a.UserID)
 				if perr != nil {
-					return nil, httpErr(apierrors.WsMemberNotFound)
+					validationFn = func() error { return httpErr(apierrors.WsMemberNotFound) }
+					return errCreateValidation
 				}
 				uid, lerr := qtx.FindUserInternalIdByPublicId(ctx, userPub)
 				if lerr != nil {
 					if errors.Is(lerr, sql.ErrNoRows) {
-						return nil, httpErr(apierrors.WsMemberNotFound)
+						validationFn = func() error { return httpErr(apierrors.WsMemberNotFound) }
+						return errCreateValidation
 					}
-					return nil, httpErr(apierrors.InternalUnexpected)
+					return lerr
 				}
 				role := generated.TaskActorsRoleAssignee
 				if a.Role != "" {
 					parsed, perr := parseActorRole(a.Role)
 					if perr != nil {
-						return nil, translateActorRoleError(perr)
+						capturedErr := perr
+						validationFn = func() error { return translateActorRoleError(capturedErr) }
+						return errCreateValidation
 					}
 					role = parsed
 				}
@@ -385,16 +404,19 @@ func Create(deps Deps) func(context.Context, *CreateTaskInput) (*CreateTaskOutpu
 				if _, aerr := qtx.AddActor(ctx, generated.AddActorParams{
 					PublicID:    actorPub,
 					WorkspaceID: prj.WorkspaceID,
-					TaskID:      uint32(taskID),                                //#nosec G115 -- LastInsertId for tasks.id (BIGINT UNSIGNED), fits uint32 within realistic deployments
+					TaskID:      uint32(tID),                                   //#nosec G115 -- LastInsertId for tasks.id (BIGINT UNSIGNED), fits uint32 within realistic deployments
 					UserID:      sql.NullInt32{Int32: int32(uid), Valid: true}, //#nosec G115 -- user id is users.id (BIGINT UNSIGNED), fits int32 within realistic deployments
 					Role:        role,
 				}); aerr != nil {
-					return nil, httpErr(apierrors.InternalUnexpected)
+					return aerr
 				}
 			}
+			return nil
+		})
+		if validationFn != nil {
+			return nil, validationFn()
 		}
-
-		if err := tx.Commit(); err != nil {
+		if txErr != nil {
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
 		if err := eventbus.Append(ctx, deps.DB, eventbus.Event{
@@ -876,15 +898,30 @@ func Disable(deps Deps) func(context.Context, *DisableTaskInput) (*DisableTaskOu
 			return nil, httpErr(apierrors.WsTaskNotFound)
 		}
 		actorID, _ := middleware.ActorFromContext(ctx)
-		tx, err := deps.DB.BeginTx(ctx, nil)
-		if err != nil {
-			return nil, httpErr(apierrors.InternalUnexpected)
-		}
-		defer tx.Rollback() //nolint:errcheck
-		if err := itemkit.DeleteTask(ctx, tx, ws.ID, task.ID, actorID); err != nil {
-			return nil, translateItemkitTaskError(err)
-		}
-		if err := tx.Commit(); err != nil {
+		// Wrap the delete in dbretry.InTx: itemkit.DeleteTask appends
+		// item.deleted (and a legacy task.disabled) event row inside
+		// the same tx, which competes for FK locks with concurrent
+		// transitions and fan-out goroutines under heavy parallel
+		// load. Restarting the whole transaction on ER_LOCK_DEADLOCK
+		// is the canonical MySQL recipe.
+		//
+		// We pass the raw error through to dbretry so it can detect
+		// the transient mysql code; only after the retry budget is
+		// exhausted (or the error is non-transient) do we translate
+		// the result into a problem+json envelope.
+		var rawErr error
+		txErr := dbretry.InTx(ctx, deps.DB, "tasks.Disable", nil, func(ctx context.Context, tx *sql.Tx) error {
+			rawErr = nil
+			if err := itemkit.DeleteTask(ctx, tx, ws.ID, task.ID, actorID); err != nil {
+				rawErr = err
+				return err
+			}
+			return nil
+		})
+		if txErr != nil {
+			if rawErr != nil {
+				return nil, translateItemkitTaskError(rawErr)
+			}
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
 		if actorID != 0 {
