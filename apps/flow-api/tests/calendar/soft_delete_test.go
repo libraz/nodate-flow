@@ -2,7 +2,6 @@ package calendar
 
 import (
 	"context"
-	"database/sql"
 	"net/http"
 	"testing"
 	"time"
@@ -15,9 +14,11 @@ import (
 )
 
 // TestSoftDelete_EventExcludedFromListAndFind verifies that the soft-delete
-// path stamped by DELETE /events/{evtId} (which sets calendar_events.deleted_at
-// and clears `enabled`) makes the event invisible to LIST and GET. Both
-// queries filter on `deleted_at IS NULL` per sql/queries/calendars/events.sql.
+// path stamped by DELETE /events/{evtId} (which sets
+// calendar_events.enabled = FALSE) makes the event invisible to LIST and GET.
+// Per sql/tables/calendar_events.sql, `enabled` is the sole soft-delete marker
+// (there is no deleted_at column); LIST/GET queries filter on
+// `enabled = TRUE` per sql/queries/calendars/events.sql.
 //
 // Run prerequisites: NF_TEST_INTEGRATION=1 + Docker (testcontainers MySQL).
 // Invoke locally with `make test-integration` or
@@ -58,15 +59,15 @@ func TestSoftDelete_EventExcludedFromListAndFind(t *testing.T) {
 	status, _ := helpers.DoJSONStatus(t, http.MethodGet, tt.WsPath("calendars", calID, "events", dropID), tt.AccessToken, nil)
 	assert.Equal(t, http.StatusNotFound, status, "GET on soft-deleted event must 404")
 
-	// And the row itself must still exist with deleted_at set, proving
-	// soft-delete (not hard-delete) and supporting audit trails.
+	// And the row itself must still exist with enabled=FALSE, proving
+	// soft-delete (not hard-delete) and supporting audit trails. Per
+	// sql/tables/calendar_events.sql there is no deleted_at column;
+	// `enabled` is the sole soft-delete signal.
 	dropInternalID := resolveEventInternalID(t, dropID)
-	var deletedAt sql.NullTime
 	var enabled bool
 	require.NoError(t, testDB.QueryRowContext(context.Background(),
-		`SELECT deleted_at, enabled FROM calendar_events WHERE id = ?`, dropInternalID).
-		Scan(&deletedAt, &enabled))
-	assert.True(t, deletedAt.Valid, "soft-deleted event row must carry deleted_at")
+		`SELECT enabled FROM calendar_events WHERE id = ?`, dropInternalID).
+		Scan(&enabled))
 	assert.False(t, enabled, "soft-deleted event row must have enabled=false")
 }
 

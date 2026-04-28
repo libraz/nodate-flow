@@ -38,10 +38,16 @@ func TestCalendarReminderDispatch(t *testing.T) {
 	// as a member of the owner's workspace so the FK on
 	// calendar_event_attendees.user_id is satisfied via a workspace they
 	// share.
+	//
+	// Supply public_id explicitly: workspace_members.public_id is
+	// BINARY(16) NOT NULL with no default, and STRICT_TRANS_TABLES
+	// (MySQL 9 default) turns the missing column into a warning when
+	// combined with INSERT IGNORE — silently dropping the row.
+	memberPID := types.New()
 	_, err := testDB.ExecContext(ctx, `
-		INSERT IGNORE INTO workspace_members (workspace_id, user_id, role, enabled)
-		VALUES (?, ?, 'member', TRUE)
-	`, wsID, attendeeID)
+		INSERT IGNORE INTO workspace_members (public_id, workspace_id, user_id, role, enabled)
+		VALUES (?, ?, ?, 'member', TRUE)
+	`, memberPID, wsID, attendeeID)
 	require.NoError(t, err)
 
 	// Seed a personal calendar owned by the tenant.

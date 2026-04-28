@@ -17,10 +17,22 @@ import (
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/tests/helpers"
 )
 
+// seededActivityIDs holds the public_ids inserted by seedActivity, one
+// per source leg, so callers can filter ListWorkspaceActivity output to
+// exactly the rows this test seeded (CreateTestTenant itself emits
+// audit_logs rows for workspace.create and project.create, so an
+// unfiltered count would be misleading).
+type seededActivityIDs struct {
+	audit [16]byte
+	ai    [16]byte
+	mcp   [16]byte
+}
+
 // seedActivity inserts one row into each of the three source tables for
-// a fresh tenant and returns its workspace_id. The provider row is
-// created on demand because ai_invocations.provider_id is NOT NULL.
-func seedActivity(t *testing.T) uint32 {
+// a fresh tenant and returns its workspace_id together with the seeded
+// public_ids. The provider row is created on demand because
+// ai_invocations.provider_id is NOT NULL.
+func seedActivity(t *testing.T) (uint32, seededActivityIDs) {
 	t.Helper()
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	t.Cleanup(cancel)
@@ -39,11 +51,14 @@ func seedActivity(t *testing.T) uint32 {
 		`SELECT id FROM users WHERE public_id = UUID_TO_BIN(?, 0)`,
 		tt.UserPublicID).Scan(&userID))
 
-	// ai_providers row (FK target for ai_invocations).
+	// ai_providers row (FK target for ai_invocations). Column names follow
+	// sql/tables/ai_providers.sql: name (label), api_key_ciphertext
+	// (VARBINARY, AES-GCM blob), api_key_prefix/api_key_suffix (NOT NULL
+	// masking chars), default_model.
 	provPub := uuid.Must(uuid.NewV7())
 	provRes, err := testDB.ExecContext(ctx, `
-		INSERT INTO ai_providers (public_id, workspace_id, kind, display_name, encrypted_api_key, model_default)
-		VALUES (?, ?, 'openai_compat', 'm8-prov', '', 'test-model')`,
+		INSERT INTO ai_providers (public_id, workspace_id, kind, name, api_key_ciphertext, api_key_prefix, api_key_suffix, default_model)
+		VALUES (?, ?, 'openai_compat', 'm8-prov', X'00', 'sk-test1', 'last', 'test-model')`,
 		provPub[:], wsID)
 	require.NoError(t, err)
 	provID64, err := provRes.LastInsertId()
@@ -76,12 +91,25 @@ func seedActivity(t *testing.T) uint32 {
 		mcpPub[:], wsID, userID, now.Add(-1*time.Second))
 	require.NoError(t, err)
 
-	return wsID
+	return wsID, seededActivityIDs{audit: auditPub, ai: aiPub, mcp: mcpPub}
+}
+
+// findSeeded looks up a row by public_id in the ListWorkspaceActivity
+// result set. Returns the matching row and true when found. The view's
+// public_id is sourced from the underlying audit/ai/mcp row, so each
+// seeded leg has a distinct, addressable identity.
+func findSeeded(rows []generated.ListWorkspaceActivityRow, want [16]byte) (generated.ListWorkspaceActivityRow, bool) {
+	for _, r := range rows {
+		if [16]byte(r.PublicID.UUID()) == want {
+			return r, true
+		}
+	}
+	return generated.ListWorkspaceActivityRow{}, false
 }
 
 func TestVWorkspaceActivityUnionsAllSources(t *testing.T) {
 	skipIfNoIntegration(t)
-	wsID := seedActivity(t)
+	wsID, seeded := seedActivity(t)
 
 	q := generated.New(testDB)
 	rows, err := q.ListWorkspaceActivity(context.Background(), generated.ListWorkspaceActivityParams{
@@ -92,22 +120,33 @@ func TestVWorkspaceActivityUnionsAllSources(t *testing.T) {
 		Limit:        50,
 	})
 	require.NoError(t, err)
-	require.Len(t, rows, 3, "view should surface one row per source table")
 
-	got := map[string]bool{}
-	for _, r := range rows {
-		s, ok := r.Source.([]byte)
-		require.True(t, ok, "source column should decode to []byte")
-		got[string(s)] = true
-	}
-	require.True(t, got["audit"], "audit leg missing")
-	require.True(t, got["ai"], "ai leg missing")
-	require.True(t, got["mcp"], "mcp leg missing")
+	// CreateTestTenant writes additional audit_logs rows during workspace
+	// bootstrap, so the unfiltered count is intentionally not asserted.
+	// Instead, look up each seeded row by its public_id and verify the
+	// source label is what the view derives.
+	auditRow, ok := findSeeded(rows, seeded.audit)
+	require.True(t, ok, "seeded audit row missing from view output")
+	auditSrc, ok := auditRow.Source.([]byte)
+	require.True(t, ok, "source column should decode to []byte")
+	require.Equal(t, "audit", string(auditSrc))
+
+	aiRow, ok := findSeeded(rows, seeded.ai)
+	require.True(t, ok, "seeded ai row missing from view output")
+	aiSrc, ok := aiRow.Source.([]byte)
+	require.True(t, ok)
+	require.Equal(t, "ai", string(aiSrc))
+
+	mcpRow, ok := findSeeded(rows, seeded.mcp)
+	require.True(t, ok, "seeded mcp row missing from view output")
+	mcpSrc, ok := mcpRow.Source.([]byte)
+	require.True(t, ok)
+	require.Equal(t, "mcp", string(mcpSrc))
 }
 
 func TestVWorkspaceActivitySourceFilter(t *testing.T) {
 	skipIfNoIntegration(t)
-	wsID := seedActivity(t)
+	wsID, seeded := seedActivity(t)
 
 	q := generated.New(testDB)
 	rows, err := q.ListWorkspaceActivity(context.Background(), generated.ListWorkspaceActivityParams{
@@ -116,8 +155,20 @@ func TestVWorkspaceActivitySourceFilter(t *testing.T) {
 		Limit:        50,
 	})
 	require.NoError(t, err)
-	require.Len(t, rows, 1, "filter_source='audit' should narrow to the audit leg only")
-	s, ok := rows[0].Source.([]byte)
-	require.True(t, ok)
-	require.Equal(t, "audit", string(s))
+
+	// All returned rows must carry source='audit' (filter is exact match)
+	// and the seeded audit row must appear; ai / mcp seeded rows must not.
+	require.NotEmpty(t, rows, "audit filter must surface at least the seeded row")
+	for _, r := range rows {
+		s, ok := r.Source.([]byte)
+		require.True(t, ok)
+		require.Equal(t, "audit", string(s),
+			"filter_source='audit' must exclude all non-audit legs")
+	}
+	_, hasAudit := findSeeded(rows, seeded.audit)
+	require.True(t, hasAudit, "seeded audit row must survive the filter")
+	_, hasAI := findSeeded(rows, seeded.ai)
+	require.False(t, hasAI, "seeded ai row must be excluded by filter_source='audit'")
+	_, hasMCP := findSeeded(rows, seeded.mcp)
+	require.False(t, hasMCP, "seeded mcp row must be excluded by filter_source='audit'")
 }

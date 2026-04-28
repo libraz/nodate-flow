@@ -40,10 +40,19 @@ func TestNotificationFanoutDedup(t *testing.T) {
 	// Add the recipient as a member of the actor's workspace so the
 	// fan-out picks them up. Direct insert avoids the invite/accept
 	// flow which is orthogonal to this test.
+	//
+	// public_id is BINARY(16) NOT NULL with no default; supply a fresh
+	// UUID v7 so STRICT_TRANS_TABLES (MySQL 9 default) does not turn
+	// the row insertion into a silent INSERT IGNORE warning. The
+	// previous version omitted public_id and worked only because the
+	// container happened to run with the strict flag relaxed; under
+	// heavy parallel load it falls back to "no rows inserted" and the
+	// downstream fan-out then sees zero recipients.
+	memberPID := types.New()
 	_, err := testDB.ExecContext(ctx, `
-		INSERT IGNORE INTO workspace_members (workspace_id, user_id, role, enabled)
-		VALUES (?, ?, 'member', TRUE)
-	`, wsInternalID, recipientInternalID)
+		INSERT IGNORE INTO workspace_members (public_id, workspace_id, user_id, role, enabled)
+		VALUES (?, ?, ?, 'member', TRUE)
+	`, memberPID, wsInternalID, recipientInternalID)
 	require.NoError(t, err)
 
 	// Insert a single event row and capture its internal id.
