@@ -59,4 +59,14 @@ describe.each(THEMES)('Input [%s]', (theme) => {
     await user.type(el, 'no');
     expect(el.value).toBe('');
   });
+
+  it('defaults dir to "auto" so the browser flips per content', () => {
+    render(<Input aria-label="auto-dir" />);
+    expect(screen.getByLabelText('auto-dir').getAttribute('dir')).toBe('auto');
+  });
+
+  it('forwards explicit dir="rtl"', () => {
+    render(<Input aria-label="rtl-input" dir="rtl" />);
+    expect(screen.getByLabelText('rtl-input').getAttribute('dir')).toBe('rtl');
+  });
 });

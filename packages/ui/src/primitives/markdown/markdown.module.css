@@ -21,7 +21,7 @@
 .md h3,
 .md h4 {
   margin-block: 1em 0.4em;
-  font-weight: var(--nf-weight-semibold, 600);
+  font-weight: var(--nf-weight-semibold);
   line-height: 1.3;
 }
 .md h1 {
@@ -50,7 +50,7 @@
 }
 
 .md a {
-  color: var(--nf-color-link, var(--nf-color-accent, #4f6cff));
+  color: var(--nf-color-accent);
   text-decoration: underline;
   text-underline-offset: 2px;
 }
@@ -59,17 +59,17 @@
 }
 
 .md code {
-  font-family: var(--nf-font-mono, ui-monospace, SFMono-Regular, monospace);
+  font-family: var(--nf-font-mono);
   font-size: 0.9em;
   padding: 0.1em 0.35em;
   border-radius: 0.25em;
-  background: var(--nf-color-surface-hover, rgba(127, 127, 127, 0.12));
+  background: var(--nf-color-surface-hover);
 }
 .md pre {
   margin-block: 0.75em;
   padding: 0.75em 0.9em;
   border-radius: 0.5em;
-  background: var(--nf-color-surface-hover, rgba(127, 127, 127, 0.12));
+  background: var(--nf-color-surface-hover);
   overflow-x: auto;
 }
 .md pre code {
@@ -81,13 +81,13 @@
 .md blockquote {
   margin-block: 0.75em;
   padding-inline-start: 0.9em;
-  border-inline-start: 3px solid var(--nf-color-border, rgba(127, 127, 127, 0.3));
-  color: var(--nf-color-fg-muted, #666);
+  border-inline-start: 3px solid var(--nf-color-border);
+  color: var(--nf-color-fg-muted);
 }
 
 .md hr {
   border: 0;
-  border-block-start: 1px solid var(--nf-color-border, rgba(127, 127, 127, 0.3));
+  border-block-start: var(--nf-space-px) solid var(--nf-color-border);
   margin-block: 1em;
 }
 
@@ -98,13 +98,13 @@
 }
 .md th,
 .md td {
-  border: 1px solid var(--nf-color-border, rgba(127, 127, 127, 0.3));
+  border: var(--nf-space-px) solid var(--nf-color-border);
   padding: 0.35em 0.6em;
   text-align: start;
 }
 .md th {
-  background: var(--nf-color-surface-hover, rgba(127, 127, 127, 0.08));
-  font-weight: var(--nf-weight-semibold, 600);
+  background: var(--nf-color-surface-hover);
+  font-weight: var(--nf-weight-semibold);
 }
 
 .md img {

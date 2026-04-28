@@ -56,15 +56,18 @@ export interface DialogProps extends Omit<HTMLAttributes<HTMLDivElement>, 'title
   /**
    * Maximum inline size of the dialog body. Mobile bottom-sheet variant
    * (< 768px) ignores this and uses 100% width regardless.
-   * - 'md' (default): 32rem — the current width, fits short forms.
+   * - 'sm': 24rem — confirms, very short prompts.
+   * - 'md' (default): 32rem — fits short forms.
    * - 'lg': 36rem — content-heavy dialogs (unified pickers, multi-column).
    * - 'xl': 40rem — very dense dialogs (settings panels, data inspectors).
    */
-  size?: 'md' | 'lg' | 'xl';
+  size?: 'sm' | 'md' | 'lg' | 'xl';
 }
 
-function sizeClass(size: 'md' | 'lg' | 'xl'): string | undefined {
+function sizeClass(size: 'sm' | 'md' | 'lg' | 'xl'): string | undefined {
   switch (size) {
+    case 'sm':
+      return styles.sizeSm;
     case 'lg':
       return styles.sizeLg;
     case 'xl':

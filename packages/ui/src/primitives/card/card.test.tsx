@@ -27,4 +27,15 @@ describe.each(THEMES)('Card [%s]', (theme) => {
     const { container } = render(<Card elevated>hi</Card>);
     expect(container.firstChild).toBeDefined();
   });
+
+  it('renders as a different element when as="article" is passed', () => {
+    const { container } = render(
+      <Card as="article" aria-label="Card article">
+        <p>body</p>
+      </Card>,
+    );
+    const root = container.firstElementChild;
+    expect(root?.tagName).toBe('ARTICLE');
+    expect(root?.getAttribute('aria-label')).toBe('Card article');
+  });
 });

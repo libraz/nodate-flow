@@ -42,4 +42,18 @@ describe.each(THEMES)('Popover [%s]', (theme) => {
     await user.keyboard('{Escape}');
     await waitFor(() => expect(screen.queryByRole('button', { name: 'Inside' })).toBeNull());
   });
+
+  it('applies minBlockSize / minInlineSize so morphic popovers do not reflow', async () => {
+    const user = userEvent.setup();
+    render(
+      <Popover content={<p>panel</p>} minBlockSize="14rem" minInlineSize="20rem">
+        <button type="button">Open</button>
+      </Popover>,
+    );
+    await user.click(screen.getByRole('button', { name: 'Open' }));
+    const panel = await screen.findByRole('dialog');
+    // Lock styles flow through inline `style` so DOM-level checks suffice.
+    expect(panel.style.minBlockSize).toBe('14rem');
+    expect(panel.style.minInlineSize).toBe('20rem');
+  });
 });

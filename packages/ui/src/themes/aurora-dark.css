@@ -48,8 +48,23 @@
   --nf-shadow-sm: 0 1px 2px oklch(0% 0 0 / 0.4);
   --nf-shadow-md: 0 8px 24px oklch(0% 0 0 / 0.45);
   --nf-shadow-lg: 0 20px 48px oklch(0% 0 0 / 0.55);
+  --nf-shadow-elevated: 0 6px 20px oklch(0% 0 0 / 0.5);
   --nf-shadow-focus: 0 0 0 var(--nf-focus-ring-offset) var(--nf-color-bg), 0 0 0
     calc(var(--nf-focus-ring-offset) + var(--nf-focus-ring-width)) var(--nf-color-focus-ring);
+
+  --nf-overlay-press: oklch(100% 0 0 / 0.06);
+  --nf-overlay-hover: oklch(100% 0 0 / 0.03);
+
+  --nf-color-state-open-bg: oklch(28% 0.05 250);
+  --nf-color-state-open-fg: oklch(78% 0.14 250);
+  --nf-color-state-waiting-bg: oklch(28% 0.05 70);
+  --nf-color-state-waiting-fg: oklch(80% 0.14 70);
+  --nf-color-state-review-bg: oklch(28% 0.05 300);
+  --nf-color-state-review-fg: oklch(78% 0.15 300);
+  --nf-color-state-done-bg: oklch(28% 0.05 155);
+  --nf-color-state-done-fg: oklch(78% 0.14 155);
+  --nf-color-state-cancelled-bg: oklch(26% 0.02 30);
+  --nf-color-state-cancelled-fg: oklch(72% 0.04 30);
 
   --nf-surface-blur: 32px;
   --nf-surface-saturation: 1.6;

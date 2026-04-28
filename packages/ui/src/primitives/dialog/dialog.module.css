@@ -22,6 +22,10 @@
   gap: var(--nf-space-4);
 }
 
+.sizeSm {
+  max-inline-size: 24rem;
+}
+
 .sizeMd {
   max-inline-size: 32rem;
 }

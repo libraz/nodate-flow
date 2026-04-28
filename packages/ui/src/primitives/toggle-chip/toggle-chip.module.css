@@ -64,10 +64,10 @@
 .root[data-pressed="true"]:hover:not(:disabled) {
   /*
    * Keep the same fill on hover: the pressed state is the "committed" state
-   * and should not shift color on hover. Use currentColor-at-opacity for a
-   * subtle hover overlay via a box-shadow inset without disturbing tokens.
+   * and should not shift colour on hover. The press-overlay token tints the
+   * filled background slightly without disturbing the underlying chip colour.
    */
-  box-shadow: inset 0 0 0 9999px rgb(0 0 0 / 0.04);
+  box-shadow: inset 0 0 0 9999px var(--nf-overlay-press);
 }
 
 .dot {

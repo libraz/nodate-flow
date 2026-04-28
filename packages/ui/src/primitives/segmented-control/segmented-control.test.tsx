@@ -538,4 +538,52 @@ describe.each(THEMES)('SegmentedControl [%s]', (theme) => {
     );
     expect(await axe(disabled.container)).toHaveNoViolations();
   });
+
+  it('flips ArrowLeft / ArrowRight when document direction is RTL', async () => {
+    document.documentElement.dir = 'rtl';
+    try {
+      const user = userEvent.setup();
+      render(<Controlled initial="month" options={VIEW_OPTIONS} />);
+
+      const month = screen.getByRole('radio', { name: 'Month' });
+      const week = screen.getByRole('radio', { name: 'Week' });
+      const day = screen.getByRole('radio', { name: 'Day' });
+
+      // In RTL, ArrowLeft moves to the *next* (visually-leftward) segment.
+      // The array order is [month, week, day] so the next from "month" is
+      // "week" — exactly what ArrowRight would do in LTR.
+      month.focus();
+      await user.keyboard('{ArrowLeft}');
+      expect(week.getAttribute('aria-checked')).toBe('true');
+      expect(document.activeElement).toBe(week);
+
+      await user.keyboard('{ArrowLeft}');
+      expect(day.getAttribute('aria-checked')).toBe('true');
+      expect(document.activeElement).toBe(day);
+
+      // ArrowRight moves backward in RTL — wrap from last back to last-1.
+      await user.keyboard('{ArrowRight}');
+      expect(week.getAttribute('aria-checked')).toBe('true');
+      expect(document.activeElement).toBe(week);
+    } finally {
+      document.documentElement.dir = '';
+    }
+  });
+
+  it('honours an explicit ancestor [dir="rtl"] island even when the document is LTR', async () => {
+    const user = userEvent.setup();
+    render(
+      <div dir="rtl">
+        <Controlled initial="month" options={VIEW_OPTIONS} />
+      </div>,
+    );
+
+    const month = screen.getByRole('radio', { name: 'Month' });
+    const week = screen.getByRole('radio', { name: 'Week' });
+
+    month.focus();
+    await user.keyboard('{ArrowLeft}');
+    // The closest [dir] ancestor is the wrapper div with dir="rtl".
+    expect(week.getAttribute('aria-checked')).toBe('true');
+  });
 });

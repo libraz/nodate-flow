@@ -60,8 +60,35 @@
   --nf-shadow-sm: 0 1px 2px oklch(20% 0.02 260 / 0.06);
   --nf-shadow-md: 0 4px 12px oklch(20% 0.02 260 / 0.08);
   --nf-shadow-lg: 0 12px 32px oklch(20% 0.02 260 / 0.12);
+  --nf-shadow-elevated: 0 4px 12px oklch(20% 0.02 260 / 0.12);
   --nf-shadow-focus: 0 0 0 var(--nf-focus-ring-offset) var(--nf-color-bg), 0 0 0
     calc(var(--nf-focus-ring-offset) + var(--nf-focus-ring-width)) var(--nf-color-focus-ring);
+
+  /*
+   * Press / hover overlays applied as inset box-shadow tints on already-coloured
+   * surfaces (e.g. a pressed toggle-chip). Keeps the underlying token-driven fill
+   * intact while signalling interaction. Themes pick a near-foreground colour so
+   * the overlay reads correctly on both light and dark canvases.
+   */
+  --nf-overlay-press: oklch(0% 0 0 / 0.04);
+  --nf-overlay-hover: oklch(0% 0 0 / 0.02);
+
+  /*
+   * Task derived-state palette. Used by project state graph node fills /
+   * borders, status badges, and any UI that maps a `TaskDerivedState`
+   * (open / waiting / review / done / cancelled) to a colour. Each state has a
+   * `-bg` tint (light backdrop) and a `-fg` saturated tone (border / label).
+   */
+  --nf-color-state-open-bg: oklch(92% 0.04 250);
+  --nf-color-state-open-fg: oklch(55% 0.15 250);
+  --nf-color-state-waiting-bg: oklch(92% 0.06 70);
+  --nf-color-state-waiting-fg: oklch(55% 0.15 70);
+  --nf-color-state-review-bg: oklch(92% 0.05 300);
+  --nf-color-state-review-fg: oklch(55% 0.15 300);
+  --nf-color-state-done-bg: oklch(92% 0.05 155);
+  --nf-color-state-done-fg: oklch(55% 0.15 155);
+  --nf-color-state-cancelled-bg: oklch(92% 0.02 30);
+  --nf-color-state-cancelled-fg: oklch(55% 0.08 30);
 
   /* surface effects */
   --nf-surface-blur: 24px;

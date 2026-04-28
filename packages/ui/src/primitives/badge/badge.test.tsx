@@ -23,4 +23,15 @@ describe.each(THEMES)('Badge [%s]', (theme) => {
     render(<Badge tone="success">ok</Badge>);
     expect(screen.getByText('ok').className).toContain('success');
   });
+
+  it('renders as a link element when as="a" is passed', () => {
+    render(
+      <Badge as="a" href="/issue">
+        Open
+      </Badge>,
+    );
+    const link = screen.getByRole('link', { name: 'Open' }) as HTMLAnchorElement;
+    expect(link.tagName).toBe('A');
+    expect(link.getAttribute('href')).toBe('/issue');
+  });
 });

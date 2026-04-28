@@ -46,6 +46,21 @@
   --nf-weight-semibold: 600;
   --nf-weight-bold: 700;
 
+  /*
+   * layout measures — content max-widths used to constrain reading-line
+   * length on standalone / public pages. Theme-invariant: the readable
+   * column width does not change between aurora / dotline / glass.
+   *
+   * - content (48rem ~ 768px): primary content column. Suits long-form
+   *   marketing pages, public share/event pages, and centred article
+   *   layouts where lines should not exceed ~75 characters.
+   * - narrow (32rem ~ 512px): single-column auth / status surfaces. Sits
+   *   between AuthCard's narrow (28rem) and wide (36rem) presets and is
+   *   intended for one-column flows like invite acceptance.
+   */
+  --nf-measure-content: 48rem;
+  --nf-measure-narrow: 32rem;
+
   /* z-index */
   --nf-z-base: 0;
   --nf-z-dropdown: 1000;

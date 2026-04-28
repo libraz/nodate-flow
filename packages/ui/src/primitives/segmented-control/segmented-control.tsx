@@ -170,6 +170,28 @@ function toneClass(tone: SegmentedControlTone | undefined): string | undefined {
  * element can wrap with their own ref or use the event target. The typical
  * use-case (ordinal enum picker) doesn't need an external ref.
  */
+/**
+ * Read the effective writing direction at the moment of a keystroke. Walks
+ * up from the keypress target looking for an explicit `dir` attribute so a
+ * locally scoped RTL island (e.g. a single Arabic-language form region in an
+ * otherwise English document) navigates correctly; falls back to
+ * `document.documentElement.dir`, then `'ltr'`. Resolved per-event rather
+ * than via `useSyncExternalStore` so we never need a re-render to pick up a
+ * direction change — the next keystroke after the change reads correctly.
+ */
+function readEffectiveDir(node: Element | null): 'rtl' | 'ltr' {
+  if (node) {
+    const closest = node.closest('[dir]');
+    if (closest instanceof HTMLElement && closest.dir) {
+      return closest.dir === 'rtl' ? 'rtl' : 'ltr';
+    }
+  }
+  if (typeof document !== 'undefined' && document.documentElement.dir === 'rtl') {
+    return 'rtl';
+  }
+  return 'ltr';
+}
+
 function SegmentedControl<T extends string>({
   value,
   onChange,
@@ -183,6 +205,7 @@ function SegmentedControl<T extends string>({
   style,
 }: SegmentedControlProps<T>): ReactElement {
   const buttonRefs = useRef<Map<T, HTMLButtonElement>>(new Map());
+  const rootRef = useRef<HTMLDivElement | null>(null);
 
   // Pre-compute the list of enabled segments so keyboard navigation skips
   // disabled entries without repeatedly filtering inside the handler.
@@ -216,13 +239,26 @@ function SegmentedControl<T extends string>({
       const currentIdx = enabledOptions.findIndex((opt) => opt.value === focused);
       if (currentIdx < 0) return;
 
+      // In RTL, the visual order of segments is mirrored: the segment at the
+      // start of the array sits on the right. Honour the user's spatial
+      // expectation by inverting ArrowLeft / ArrowRight (ArrowUp / ArrowDown
+      // remain logical and ignore direction — they map to prev / next).
+      const isRtl = readEffectiveDir(event.currentTarget) === 'rtl';
       let nextIdx = currentIdx;
       switch (event.key) {
         case 'ArrowRight':
+          nextIdx = isRtl
+            ? (currentIdx - 1 + enabledOptions.length) % enabledOptions.length
+            : (currentIdx + 1) % enabledOptions.length;
+          break;
         case 'ArrowDown':
           nextIdx = (currentIdx + 1) % enabledOptions.length;
           break;
         case 'ArrowLeft':
+          nextIdx = isRtl
+            ? (currentIdx + 1) % enabledOptions.length
+            : (currentIdx - 1 + enabledOptions.length) % enabledOptions.length;
+          break;
         case 'ArrowUp':
           nextIdx = (currentIdx - 1 + enabledOptions.length) % enabledOptions.length;
           break;
@@ -257,6 +293,7 @@ function SegmentedControl<T extends string>({
 
   return (
     <div
+      ref={rootRef}
       role="radiogroup"
       aria-label={ariaLabel}
       aria-disabled={disabled || undefined}

@@ -106,12 +106,18 @@ export function ConfirmProvider(): ReactElement {
       <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
         <div style={{ whiteSpace: 'pre-wrap' }}>{state?.message}</div>
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem' }}>
-          <Button type="button" variant="ghost" onClick={handleCancel}>
+          <Button
+            type="button"
+            variant="ghost"
+            data-testid="confirm-dialog-cancel"
+            onClick={handleCancel}
+          >
             {state?.cancelLabel ?? 'Cancel'}
           </Button>
           <Button
             type="button"
             variant={state?.tone === 'danger' ? 'danger' : 'primary'}
+            data-testid="confirm-dialog-confirm"
             onClick={handleConfirm}
             autoFocus
           >

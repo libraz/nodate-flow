@@ -20,7 +20,14 @@ import {
   useInteractions,
   useRole,
 } from '@floating-ui/react';
-import { type ReactElement, type ReactNode, cloneElement, isValidElement, useState } from 'react';
+import {
+  type CSSProperties,
+  type ReactElement,
+  type ReactNode,
+  cloneElement,
+  isValidElement,
+  useState,
+} from 'react';
 import { cx } from '../../lib/cx';
 import styles from './popover.module.css';
 
@@ -37,6 +44,18 @@ export interface PopoverProps {
   onOpenChange?: (open: boolean) => void;
   /** Optional className for the popover panel. */
   className?: string;
+  /**
+   * Lock the panel to a fixed minimum block-size. Use for kind/mode-swap
+   * popovers whose inner content grows or shrinks: without a floor the panel
+   * reflows on every switch, which contradicts the "morphic UI must not
+   * reflow" rule. Accepts any CSS length (`'18rem'`, `'240px'`, ...).
+   */
+  minBlockSize?: string;
+  /**
+   * Lock the panel to a fixed minimum inline-size. Default of `12rem` is set
+   * by the CSS module; pass to override (e.g. wider kind picker).
+   */
+  minInlineSize?: string;
 }
 
 /**
@@ -49,6 +68,8 @@ export default function Popover({
   open: controlledOpen,
   onOpenChange,
   className,
+  minBlockSize,
+  minInlineSize,
 }: PopoverProps): ReactElement {
   const [uncontrolledOpen, setUncontrolledOpen] = useState(false);
   const isControlled = controlledOpen !== undefined;
@@ -81,6 +102,15 @@ export default function Popover({
     getReferenceProps({ ref: refs.setReference, ...(children.props as object) }),
   );
 
+  const lockStyle: CSSProperties =
+    minBlockSize !== undefined || minInlineSize !== undefined
+      ? {
+          ...floatingStyles,
+          ...(minBlockSize !== undefined ? { minBlockSize } : {}),
+          ...(minInlineSize !== undefined ? { minInlineSize } : {}),
+        }
+      : floatingStyles;
+
   return (
     <>
       {trigger}
@@ -89,7 +119,7 @@ export default function Popover({
           <FloatingFocusManager context={context} modal={false}>
             <div
               ref={refs.setFloating}
-              style={floatingStyles}
+              style={lockStyle}
               className={cx(styles.popover, className)}
               {...getFloatingProps()}
             >

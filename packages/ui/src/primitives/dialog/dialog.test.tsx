@@ -163,14 +163,26 @@ describe.each(THEMES)('Dialog [%s]', (theme) => {
     expect(document.activeElement).toBe(cancel);
   });
 
+  it('applies size="sm" via data-size and sizeSm class', () => {
+    render(
+      <Dialog open={true} onClose={() => {}} title="t" size="sm">
+        <button type="button">OK</button>
+      </Dialog>,
+    );
+    const dialog = screen.getByRole('dialog');
+    expect(dialog.getAttribute('data-size')).toBe('sm');
+    expect(dialog.className).toMatch(/sizeSm/);
+    expect(dialog.className).not.toMatch(/sizeMd/);
+  });
+
   it('uses fixed-size container variants so morphic dialogs do not reflow on kind switch', () => {
     // Memory rule: "Morphic UI must not reflow" — kind/mode-switching
     // dialogs need a fixed container size. The Dialog primitive enforces
-    // this by exposing exactly three size variants (md/lg/xl), each
-    // mapped to a single CSS-module class. Callers pick a size that
-    // accommodates the largest variant and stick with it; the size MUST
-    // NOT change as a function of inner content.
-    for (const size of ['md', 'lg', 'xl'] as const) {
+    // this by exposing four size variants (sm/md/lg/xl), each mapped to a
+    // single CSS-module class. Callers pick a size that accommodates the
+    // largest variant and stick with it; the size MUST NOT change as a
+    // function of inner content.
+    for (const size of ['sm', 'md', 'lg', 'xl'] as const) {
       const { unmount } = render(
         <Dialog open={true} onClose={() => {}} title="t" size={size}>
           <button type="button">OK</button>
@@ -178,7 +190,7 @@ describe.each(THEMES)('Dialog [%s]', (theme) => {
       );
       const dialog = screen.getByRole('dialog');
       // The size token determines width, not the content. data-size is the
-      // stable surface; sizeMd/sizeLg/sizeXl are the CSS-module classes.
+      // stable surface; sizeSm/sizeMd/sizeLg/sizeXl are the CSS-module classes.
       expect(dialog.getAttribute('data-size')).toBe(size);
       unmount();
     }

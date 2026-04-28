@@ -97,6 +97,11 @@ export interface ComboboxProps {
   id?: string;
   /** Disable the entire combobox. */
   disabled?: boolean;
+  /**
+   * Direction hint for the input. Defaults to `'auto'` so the browser flips
+   * caret / selection per the typed query's strong-directional character.
+   */
+  dir?: 'ltr' | 'rtl' | 'auto';
   className?: string;
 }
 
@@ -116,6 +121,7 @@ function ComboboxImpl(
     'aria-label': ariaLabel,
     id: idProp,
     disabled,
+    dir = 'auto',
     className,
   }: ComboboxProps,
   ref: Ref<HTMLInputElement>,
@@ -314,6 +320,7 @@ function ComboboxImpl(
         id={inputId}
         type="text"
         role="combobox"
+        dir={dir}
         aria-label={ariaLabel}
         aria-expanded={open}
         aria-controls={open ? listId : undefined}

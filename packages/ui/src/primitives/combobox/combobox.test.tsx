@@ -247,4 +247,14 @@ describe.each(THEMES)('Combobox [%s]', (theme) => {
     await user.click(input);
     expect(screen.getByTestId('row-apple').textContent).toBe('APPLE');
   });
+
+  it('defaults dir to "auto"', () => {
+    render(<Combobox options={OPTIONS} aria-label="auto" />);
+    expect(screen.getByRole('combobox').getAttribute('dir')).toBe('auto');
+  });
+
+  it('forwards dir="rtl" to the underlying input', () => {
+    render(<Combobox options={OPTIONS} aria-label="rtl" dir="rtl" />);
+    expect(screen.getByRole('combobox').getAttribute('dir')).toBe('rtl');
+  });
 });

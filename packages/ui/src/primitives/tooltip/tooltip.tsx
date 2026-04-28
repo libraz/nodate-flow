@@ -20,9 +20,46 @@ import {
   useInteractions,
   useRole,
 } from '@floating-ui/react';
-import { type ReactElement, type ReactNode, cloneElement, isValidElement, useState } from 'react';
+import {
+  type ReactElement,
+  type ReactNode,
+  cloneElement,
+  isValidElement,
+  useState,
+  useSyncExternalStore,
+} from 'react';
 import { cx } from '../../lib/cx';
 import styles from './tooltip.module.css';
+
+/**
+ * Subscribe to `prefers-reduced-motion` so the hover-open delay collapses to
+ * 0ms whenever the user has asked for reduced motion. Implemented via
+ * `useSyncExternalStore` so SSR returns a stable default (no preference) and
+ * the client opts in once `matchMedia` is available.
+ */
+const REDUCED_MOTION_QUERY = '(prefers-reduced-motion: reduce)';
+
+function subscribeReducedMotion(notify: () => void): () => void {
+  if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') {
+    return () => {};
+  }
+  const mql = window.matchMedia(REDUCED_MOTION_QUERY);
+  mql.addEventListener('change', notify);
+  return () => mql.removeEventListener('change', notify);
+}
+
+function readReducedMotion(): boolean {
+  if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return false;
+  return window.matchMedia(REDUCED_MOTION_QUERY).matches;
+}
+
+function readReducedMotionServer(): boolean {
+  return false;
+}
+
+function usePrefersReducedMotion(): boolean {
+  return useSyncExternalStore(subscribeReducedMotion, readReducedMotion, readReducedMotionServer);
+}
 
 export interface TooltipProps {
   /** Already-translated tooltip content. */
@@ -48,6 +85,10 @@ export default function Tooltip({
   className,
 }: TooltipProps): ReactElement {
   const [open, setOpen] = useState(false);
+  const reducedMotion = usePrefersReducedMotion();
+  // Reduced-motion users get instant tooltips: any easing-in delay reads as
+  // visual motion the user has explicitly asked us to suppress.
+  const effectiveDelay = reducedMotion ? 0 : delay;
   const { refs, floatingStyles, context } = useFloating({
     open,
     onOpenChange: setOpen,
@@ -56,7 +97,10 @@ export default function Tooltip({
     whileElementsMounted: autoUpdate,
   });
 
-  const hover = useHover(context, { delay: { open: delay, close: 0 }, move: false });
+  const hover = useHover(context, {
+    delay: { open: effectiveDelay, close: 0 },
+    move: false,
+  });
   const focus = useFocus(context);
   const dismiss = useDismiss(context, { escapeKey: true });
   const role = useRole(context, { role: 'tooltip' });

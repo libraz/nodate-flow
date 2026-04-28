@@ -49,4 +49,39 @@ describe.each(THEMES)('Tooltip [%s]', (theme) => {
     await user.keyboard('{Escape}');
     await waitFor(() => expect(screen.queryByRole('tooltip')).toBeNull());
   });
+
+  it('collapses the hover delay to 0ms when prefers-reduced-motion is set', async () => {
+    /*
+     * The default delay is 200ms. Under `prefers-reduced-motion: reduce`
+     * the tooltip should appear instantly on hover, treating any easing-in
+     * delay as motion the user has explicitly asked us to suppress.
+     */
+    const original = window.matchMedia;
+    window.matchMedia = ((q: string) =>
+      ({
+        matches: q === '(prefers-reduced-motion: reduce)',
+        media: q,
+        onchange: null,
+        addEventListener: () => {},
+        removeEventListener: () => {},
+        addListener: () => {},
+        removeListener: () => {},
+        dispatchEvent: () => true,
+      }) as unknown as MediaQueryList) as typeof window.matchMedia;
+    try {
+      const user = userEvent.setup();
+      render(
+        <Tooltip content="Help text" delay={200}>
+          <button type="button">Help</button>
+        </Tooltip>,
+      );
+      // Hovering should reveal the tooltip without waiting out a 200ms delay.
+      // If the delay is honoured, this lookup races and findByRole flakes.
+      await user.hover(screen.getByRole('button', { name: 'Help' }));
+      const tip = await screen.findByRole('tooltip');
+      expect(tip.textContent).toContain('Help text');
+    } finally {
+      window.matchMedia = original;
+    }
+  });
 });

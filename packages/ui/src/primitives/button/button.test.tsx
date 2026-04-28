@@ -81,6 +81,20 @@ describe.each(THEMES)('Button [%s]', (theme) => {
     expect(el.getAttribute('aria-disabled')).toBeNull();
   });
 
+  it('renders as an anchor when as="a" is passed', () => {
+    render(
+      <Button as="a" href="/example">
+        Link
+      </Button>,
+    );
+    const link = screen.getByRole('link', { name: 'Link' }) as HTMLAnchorElement;
+    expect(link.tagName).toBe('A');
+    expect(link.getAttribute('href')).toBe('/example');
+    // `type="button"` only makes sense on <button>; the polymorphic switch
+    // must not spread it onto an <a>.
+    expect(link.hasAttribute('type')).toBe(false);
+  });
+
   it('paints the focus-visible ring via the design-system shadow token', () => {
     // Button.module.css line 26-29:
     //   .root:focus-visible { outline: none; box-shadow: var(--nf-shadow-focus); }

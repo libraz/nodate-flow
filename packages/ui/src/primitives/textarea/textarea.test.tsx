@@ -59,4 +59,14 @@ describe.each(THEMES)('Textarea [%s]', (theme) => {
     await user.type(el, 'no');
     expect(el.value).toBe('');
   });
+
+  it('defaults dir to "auto"', () => {
+    render(<Textarea aria-label="auto-dir" />);
+    expect(screen.getByLabelText('auto-dir').getAttribute('dir')).toBe('auto');
+  });
+
+  it('forwards explicit dir="rtl"', () => {
+    render(<Textarea aria-label="rtl-ta" dir="rtl" />);
+    expect(screen.getByLabelText('rtl-ta').getAttribute('dir')).toBe('rtl');
+  });
 });
