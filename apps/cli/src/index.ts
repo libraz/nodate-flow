@@ -15,6 +15,9 @@ import {
   executeSearch,
   executeUpdate,
 } from './task-builders.js';
+import { DateValidationError, assertYmd } from './util/date.js';
+import { EXIT_AUTH, EXIT_RUNTIME, EXIT_VALIDATION, isAuthRequiredError } from './util/exit.js';
+import { optionalYmd, resolveDeprecatedFlag } from './util/flags.js';
 
 const cli = createCLI({
   name: 'tnk',
@@ -45,19 +48,19 @@ auth
           ? String((error as Record<string, unknown>).detail)
           : 'Login failed';
       stderr.write(c`{red Error}: ${msg}\n`);
-      process.exitCode = 1;
+      process.exitCode = EXIT_AUTH;
       return;
     }
 
     if (data.step === 'totp_required') {
       stderr.write(c`{yellow TOTP required}. Use the web UI to complete login.\n`);
-      process.exitCode = 1;
+      process.exitCode = EXIT_AUTH;
       return;
     }
 
     if (!data.accessToken) {
       stderr.write(c`{red Error}: No access token in response\n`);
-      process.exitCode = 1;
+      process.exitCode = EXIT_AUTH;
       return;
     }
 
@@ -106,17 +109,27 @@ const task = cli.command('task').description('Task commands');
 task
   .command('list')
   .description('List tasks')
-  .option('-p, --project <projectId>', {
+  .option('-p, --project-id <projectId>', {
     description: 'Filter by project public id',
     type: 'string',
+  })
+  .option('--project <projectId>', {
+    description: 'Deprecated alias for --project-id',
+    type: 'string',
+    hidden: true,
   })
   .option('-s, --status <status>', {
     description: 'Filter by derived state',
     type: 'string',
   })
-  .option('-w, --workspace <workspaceId>', {
+  .option('-w, --workspace-id <workspaceId>', {
     description: 'Workspace public id',
     type: 'string',
+  })
+  .option('--workspace <workspaceId>', {
+    description: 'Deprecated alias for --workspace-id',
+    type: 'string',
+    hidden: true,
   })
   .option('-l, --limit <limit>', {
     description: 'Maximum number of tasks to return',
@@ -124,12 +137,36 @@ task
     default: 25,
   })
   .action(async ({ options, stdout, stderr }) => {
-    const projectId = options.project as string | undefined;
+    const projectId = resolveDeprecatedFlag(
+      options,
+      'project-id',
+      'project',
+      '--project-id',
+      '--project',
+      stderr,
+    );
+    const workspaceId = resolveDeprecatedFlag(
+      options,
+      'workspace-id',
+      'workspace',
+      '--workspace-id',
+      '--workspace',
+      stderr,
+    );
     const status = options.status as string | undefined;
-    const workspaceId = options.workspace as string | undefined;
     const limit = options.limit as number;
 
-    const client = createFlowClient();
+    let client: ReturnType<typeof createFlowClient>;
+    try {
+      client = createFlowClient();
+    } catch (err) {
+      if (isAuthRequiredError(err)) {
+        stderr.write(c`{red Error}: ${(err as Error).message}\n`);
+        process.exitCode = EXIT_AUTH;
+        return;
+      }
+      throw err;
+    }
 
     const query: Record<string, unknown> = { limit };
     if (projectId) query.projectId = projectId;
@@ -145,7 +182,7 @@ task
           ? String((error as Record<string, unknown>).detail)
           : 'Failed to list tasks';
       stderr.write(c`{red Error}: ${msg}\n`);
-      process.exitCode = 1;
+      process.exitCode = EXIT_RUNTIME;
       return;
     }
 
@@ -202,10 +239,15 @@ task
     description: 'Task description',
     type: 'string',
   })
-  .option('-p, --project <projectId>', {
+  .option('-p, --project-id <projectId>', {
     description: 'Project public id (required)',
     type: 'string',
     required: true,
+  })
+  .option('--project <projectId>', {
+    description: 'Deprecated alias for --project-id',
+    type: 'string',
+    hidden: true,
   })
   .option('--due <date>', {
     description: 'Due date (YYYY-MM-DD)',
@@ -228,14 +270,50 @@ task
   })
   .action(async ({ options, stdout, stderr }) => {
     const title = options.title as string;
-    const projectId = options.project as string;
+    const projectId = resolveDeprecatedFlag(
+      options,
+      'project-id',
+      'project',
+      '--project-id',
+      '--project',
+      stderr,
+    );
+    if (!projectId) {
+      // `required: true` on `--project-id` will already reject this,
+      // but if only the deprecated `--project` is given without a value
+      // the resolver returns undefined; surface a usage error.
+      stderr.write(c`{red Error}: --project-id is required.\n`);
+      process.exitCode = EXIT_VALIDATION;
+      return;
+    }
     const description = options.description as string | undefined;
-    const dueOn = options.due as string | undefined;
-    const startOn = options.start as string | undefined;
+    let dueOn: string | undefined;
+    let startOn: string | undefined;
+    try {
+      dueOn = optionalYmd(options.due, '--due');
+      startOn = optionalYmd(options.start, '--start');
+    } catch (err) {
+      if (err instanceof DateValidationError) {
+        stderr.write(c`{red Error}: ${err.message}\n`);
+        process.exitCode = EXIT_VALIDATION;
+        return;
+      }
+      throw err;
+    }
     const priority = options.priority as number;
     const visibility = (options.visibility as 'public' | 'project' | 'private') ?? 'public';
 
-    const client = createFlowClient();
+    let client: ReturnType<typeof createFlowClient>;
+    try {
+      client = createFlowClient();
+    } catch (err) {
+      if (isAuthRequiredError(err)) {
+        stderr.write(c`{red Error}: ${(err as Error).message}\n`);
+        process.exitCode = EXIT_AUTH;
+        return;
+      }
+      throw err;
+    }
 
     const body: Record<string, unknown> = {
       title,
@@ -256,7 +334,7 @@ task
           ? String((error as Record<string, unknown>).detail)
           : 'Failed to create task';
       stderr.write(c`{red Error}: ${msg}\n`);
-      process.exitCode = 1;
+      process.exitCode = EXIT_RUNTIME;
       return;
     }
 
@@ -318,8 +396,27 @@ task
     if (options.title !== undefined) updateOptions.title = options.title as string;
     if (options.description !== undefined)
       updateOptions.description = options.description as string;
-    if (options.due !== undefined) updateOptions.due = options.due as string;
-    if (options.start !== undefined) updateOptions.start = options.start as string;
+    try {
+      // For `update`, an empty string is a sentinel that clears the
+      // date, so only validate non-empty values.
+      if (typeof options.due === 'string' && options.due.length > 0) {
+        updateOptions.due = assertYmd(options.due, '--due');
+      } else if (options.due !== undefined) {
+        updateOptions.due = options.due as string;
+      }
+      if (typeof options.start === 'string' && options.start.length > 0) {
+        updateOptions.start = assertYmd(options.start, '--start');
+      } else if (options.start !== undefined) {
+        updateOptions.start = options.start as string;
+      }
+    } catch (err) {
+      if (err instanceof DateValidationError) {
+        stderr.write(c`{red Error}: ${err.message}\n`);
+        process.exitCode = EXIT_VALIDATION;
+        return;
+      }
+      throw err;
+    }
     if (options.priority !== undefined) updateOptions.priority = options.priority as number;
     if (options.state !== undefined) updateOptions.state = options.state as string;
     if (options.visibility !== undefined)
@@ -331,11 +428,21 @@ task
       stderr.write(
         'No fields to update. Use --title, --description, --due, --start, --priority, --state, or --visibility.\n',
       );
-      process.exitCode = 1;
+      process.exitCode = EXIT_VALIDATION;
       return;
     }
 
-    const client = createFlowClient() as unknown as SdkClientLike;
+    let client: SdkClientLike;
+    try {
+      client = createFlowClient() as unknown as SdkClientLike;
+    } catch (err) {
+      if (isAuthRequiredError(err)) {
+        stderr.write(c`{red Error}: ${(err as Error).message}\n`);
+        process.exitCode = EXIT_AUTH;
+        return;
+      }
+      throw err;
+    }
     const { data, error } = await executeUpdate(client, id, plan);
 
     if (error) {
@@ -344,7 +451,7 @@ task
           ? String((error as Record<string, unknown>).detail)
           : 'Failed to update task';
       stderr.write(c`{red Error}: ${msg}\n`);
-      process.exitCode = 1;
+      process.exitCode = EXIT_RUNTIME;
       return;
     }
 
@@ -357,7 +464,7 @@ task
       | undefined;
     if (!latest) {
       stderr.write(c`{red Error}: No update applied\n`);
-      process.exitCode = 1;
+      process.exitCode = EXIT_RUNTIME;
       return;
     }
 
@@ -372,13 +479,23 @@ task
 task
   .command('search <query>')
   .description('Search tasks by title (case-insensitive substring match)')
-  .option('-w, --workspace <workspaceId>', {
-    description: 'Workspace public id (required when --project is not given)',
+  .option('-w, --workspace-id <workspaceId>', {
+    description: 'Workspace public id (required when --project-id is not given)',
     type: 'string',
   })
-  .option('-p, --project <projectId>', {
-    description: 'Project public id (alternative to --workspace)',
+  .option('--workspace <workspaceId>', {
+    description: 'Deprecated alias for --workspace-id',
     type: 'string',
+    hidden: true,
+  })
+  .option('-p, --project-id <projectId>', {
+    description: 'Project public id (alternative to --workspace-id)',
+    type: 'string',
+  })
+  .option('--project <projectId>', {
+    description: 'Deprecated alias for --project-id',
+    type: 'string',
+    hidden: true,
   })
   .option('-l, --limit <limit>', {
     description: 'Maximum number of tasks to return',
@@ -386,25 +503,51 @@ task
     default: 20,
   })
   .action(async ({ args, options, stdout, stderr }) => {
+    const workspaceId = resolveDeprecatedFlag(
+      options,
+      'workspace-id',
+      'workspace',
+      '--workspace-id',
+      '--workspace',
+      stderr,
+    );
+    const projectId = resolveDeprecatedFlag(
+      options,
+      'project-id',
+      'project',
+      '--project-id',
+      '--project',
+      stderr,
+    );
     const searchOptions: SearchOptionsInput = {};
-    if (options.workspace !== undefined) searchOptions.workspaceId = options.workspace as string;
-    if (options.project !== undefined) searchOptions.projectId = options.project as string;
+    if (workspaceId !== undefined) searchOptions.workspaceId = workspaceId;
+    if (projectId !== undefined) searchOptions.projectId = projectId;
     if (options.limit !== undefined) searchOptions.limit = options.limit as number;
 
     const result = buildSearchQuery(args.query as string, searchOptions);
 
     if (result === 'empty_query') {
       stderr.write('Search query must not be empty.\n');
-      process.exitCode = 1;
+      process.exitCode = EXIT_VALIDATION;
       return;
     }
     if (result === 'missing_scope') {
-      stderr.write('Either --workspace or --project must be provided to scope the search.\n');
-      process.exitCode = 1;
+      stderr.write('Either --workspace-id or --project-id must be provided to scope the search.\n');
+      process.exitCode = EXIT_VALIDATION;
       return;
     }
 
-    const client = createFlowClient() as unknown as SdkClientLike;
+    let client: SdkClientLike;
+    try {
+      client = createFlowClient() as unknown as SdkClientLike;
+    } catch (err) {
+      if (isAuthRequiredError(err)) {
+        stderr.write(c`{red Error}: ${(err as Error).message}\n`);
+        process.exitCode = EXIT_AUTH;
+        return;
+      }
+      throw err;
+    }
     const { data, error } = await executeSearch(client, result);
 
     if (error) {
@@ -413,7 +556,7 @@ task
           ? String((error as Record<string, unknown>).detail)
           : 'Failed to search tasks';
       stderr.write(c`{red Error}: ${msg}\n`);
-      process.exitCode = 1;
+      process.exitCode = EXIT_RUNTIME;
       return;
     }
 
@@ -468,7 +611,17 @@ task
   .description('View task details')
   .action(async ({ args, stdout, stderr }) => {
     const id = args.id as string;
-    const client = createFlowClient();
+    let client: ReturnType<typeof createFlowClient>;
+    try {
+      client = createFlowClient();
+    } catch (err) {
+      if (isAuthRequiredError(err)) {
+        stderr.write(c`{red Error}: ${(err as Error).message}\n`);
+        process.exitCode = EXIT_AUTH;
+        return;
+      }
+      throw err;
+    }
 
     const { data, error } = await client.GET('/tasks/{id}', {
       params: { path: { id } },
@@ -480,7 +633,7 @@ task
           ? String((error as Record<string, unknown>).detail)
           : 'Failed to fetch task';
       stderr.write(c`{red Error}: ${msg}\n`);
-      process.exitCode = 1;
+      process.exitCode = EXIT_RUNTIME;
       return;
     }
 
