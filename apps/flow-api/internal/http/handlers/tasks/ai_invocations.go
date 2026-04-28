@@ -27,7 +27,7 @@ type ListTaskAiInvocationsInput struct {
 }
 
 // TaskAiInvocation is the masked DTO for an ai_invocations row scoped
-// to a task. Fields mirror the workspace-scoped AiInvocation DTO in
+// to a task. Fields mirror the workspace-scoped ai.Invocation DTO in
 // handlers/ai/invocations.go — keeping the shape identical lets the
 // frontend reuse the same rendering code.
 type TaskAiInvocation struct {

@@ -32,12 +32,12 @@ type MetricsInput struct {
 	WindowDays int    `query:"windowDays" minimum:"1" maximum:"365" default:"30" doc:"Trailing window in days"`
 }
 
-// AiMetricsOutputBody is the response payload for the metrics endpoint.
+// MetricsOutputBody is the response payload for the metrics endpoint.
 //
 // acceptanceRate is applied / (applied + dismissed) over the window,
 // clamped to [0, 1]. Proposed is reported separately because a
 // suggestion may be neither applied nor dismissed yet (still pending).
-type AiMetricsOutputBody struct {
+type MetricsOutputBody struct {
 	WindowDays     int                 `json:"windowDays"`
 	Proposed       int64               `json:"proposed"`
 	Applied        int64               `json:"applied"`
@@ -46,9 +46,9 @@ type AiMetricsOutputBody struct {
 	OutboundLimits []OutboundLimitStat `json:"outboundLimits" doc:"Per-provider egress rate limiter counters"`
 }
 
-// MetricsOutput is the Huma envelope for AiMetricsOutputBody.
+// MetricsOutput is the Huma envelope for MetricsOutputBody.
 type MetricsOutput struct {
-	Body AiMetricsOutputBody
+	Body MetricsOutputBody
 }
 
 // Metrics handles GET /workspaces/{wsId}/ai/metrics.
@@ -89,7 +89,7 @@ func Metrics(deps Deps) func(context.Context, *MetricsInput) (*MetricsOutput, er
 			})
 		}
 		sortOutboundLimits(limits)
-		return &MetricsOutput{Body: AiMetricsOutputBody{
+		return &MetricsOutput{Body: MetricsOutputBody{
 			WindowDays:     window,
 			Proposed:       proposed,
 			Applied:        applied,

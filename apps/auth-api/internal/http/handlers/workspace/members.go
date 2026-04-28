@@ -42,7 +42,7 @@ func ListMembers(deps Deps) func(context.Context, *ListMembersInput) (*ListMembe
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
 		out := &ListMembersOutput{}
-		out.Body.Members = make([]WorkspaceMember, 0, len(rows))
+		out.Body.Members = make([]Member, 0, len(rows))
 		for _, r := range rows {
 			out.Body.Members = append(out.Body.Members, rowToMember(r))
 		}
@@ -136,7 +136,7 @@ func InviteMember(deps Deps) func(context.Context, *AddMemberInput) (*AddMemberO
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
 		_ = mkRes // result struct reserved for future UI signals (created calendar, etc.)
-		return &AddMemberOutput{Body: WorkspaceMember{
+		return &AddMemberOutput{Body: Member{
 			ID:          mem.PublicID.String(),
 			UserID:      userPub.String(),
 			Email:       emailAddr,
@@ -190,7 +190,7 @@ func UpdateMemberRole(deps Deps) func(context.Context, *UpdateMemberRoleInput) (
 		if err != nil {
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
-		return &UpdateMemberRoleOutput{Body: WorkspaceMember{
+		return &UpdateMemberRoleOutput{Body: Member{
 			ID:        mem.PublicID.String(),
 			UserID:    userPub.String(),
 			Role:      string(mem.Role),

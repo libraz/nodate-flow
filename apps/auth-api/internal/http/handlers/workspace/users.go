@@ -26,9 +26,9 @@ func ListUsers(deps Deps) func(context.Context, *ListWorkspaceUsersInput) (*List
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
 		out := &ListWorkspaceUsersOutput{}
-		out.Body.Users = make([]WorkspaceUserSummary, 0, len(rows))
+		out.Body.Users = make([]UserSummary, 0, len(rows))
 		for _, r := range rows {
-			out.Body.Users = append(out.Body.Users, WorkspaceUserSummary{
+			out.Body.Users = append(out.Body.Users, UserSummary{
 				ID:          r.UserPublicID.String(),
 				DisplayName: r.DisplayName,
 				AvatarURL:   nullStr(r.AvatarUrl),

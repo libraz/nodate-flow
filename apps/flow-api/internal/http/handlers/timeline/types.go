@@ -44,9 +44,9 @@ func uuidFromBytes(b []byte) string {
 	return u.String()
 }
 
-// TimelineEvent is the public DTO for a row in v_task_timeline. Time
+// Event is the public DTO for a row in v_task_timeline. Time
 // fields use the project-wide convention: *At = int64 unix seconds.
-type TimelineEvent struct {
+type Event struct {
 	// ID is the event public_id (UUID v7 string).
 	ID string `json:"id" doc:"Event public id (UUID v7)"`
 	// Type is the canonical dotted event kind, e.g. "task.created".
@@ -100,8 +100,8 @@ type ListTimelineForWorkspaceInput struct {
 // reserved for a future cursor-based migration and is currently nil.
 type ListTimelineOutput struct {
 	Body struct {
-		Total      int64           `json:"total"`
-		Events     []TimelineEvent `json:"events"`
-		NextCursor *string         `json:"nextCursor"`
+		Total      int64   `json:"total"`
+		Events     []Event `json:"events"`
+		NextCursor *string `json:"nextCursor"`
 	}
 }

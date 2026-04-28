@@ -30,8 +30,8 @@ var totalAsInt64 = handlerutil.TotalAsInt64
 // nullStr delegates to handlerutil.NullStr.
 var nullStr = handlerutil.NullStr
 
-// IntakeItem is the public DTO for an intake item row.
-type IntakeItem struct {
+// Item is the public DTO for an intake item row.
+type Item struct {
 	ID                   string   `json:"id" doc:"Intake item public id (UUID v7)"`
 	Title                string   `json:"title"`
 	Body                 string   `json:"body,omitempty"`
@@ -61,7 +61,7 @@ type CreateIntakeItemInput struct {
 
 // CreateIntakeItemOutput is the response for POST /workspaces/{wsId}/intake.
 type CreateIntakeItemOutput struct {
-	Body IntakeItem
+	Body Item
 }
 
 // ---- List ----
@@ -76,9 +76,9 @@ type ListIntakeItemsInput struct {
 
 // ListIntakeItemsBody is the response payload for GET /workspaces/{wsId}/intake.
 type ListIntakeItemsBody struct {
-	Total      int64        `json:"total"`
-	Items      []IntakeItem `json:"items"`
-	NextCursor *string      `json:"nextCursor"`
+	Total      int64   `json:"total"`
+	Items      []Item  `json:"items"`
+	NextCursor *string `json:"nextCursor"`
 }
 
 // ListIntakeItemsOutput is the response for GET /workspaces/{wsId}/intake.
@@ -96,7 +96,7 @@ type GetIntakeItemInput struct {
 
 // GetIntakeItemOutput is the response for GET /workspaces/{wsId}/intake/{id}.
 type GetIntakeItemOutput struct {
-	Body IntakeItem
+	Body Item
 }
 
 // ---- Triage ----
@@ -116,7 +116,7 @@ type TriageIntakeItemInput struct {
 
 // TriageIntakeItemOutput is the response for PATCH /workspaces/{wsId}/intake/{id}.
 type TriageIntakeItemOutput struct {
-	Body IntakeItem
+	Body Item
 }
 
 // ---- Convert ----

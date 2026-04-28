@@ -87,10 +87,10 @@ type PatchUserOutput struct {
 
 // --- Workspaces ---
 
-// AdminWorkspace is the public DTO for a workspace in the admin panel.
-// The Admin prefix avoids the OpenAPI schema collision with the
+// Workspace is the public DTO for a workspace in the admin panel.
+// The package qualifier (admin.Workspace) distinguishes it from the
 // member-facing Workspace DTO in the workspace handler package.
-type AdminWorkspace struct {
+type Workspace struct {
 	ID           string  `json:"id"`
 	Slug         string  `json:"slug"`
 	Name         string  `json:"name"`
@@ -112,13 +112,13 @@ type ListWorkspacesInput struct {
 
 // ListWorkspacesOutput is the response for GET /admin/workspaces.
 type ListWorkspacesOutput struct {
-	Body AdminListWorkspacesOutputBody
+	Body ListWorkspacesOutputBody
 }
 
-// AdminListWorkspacesOutputBody is the response body for GET /admin/workspaces.
-type AdminListWorkspacesOutputBody struct {
-	Total int64            `json:"total"`
-	Items []AdminWorkspace `json:"items"`
+// ListWorkspacesOutputBody is the response body for GET /admin/workspaces.
+type ListWorkspacesOutputBody struct {
+	Total int64       `json:"total"`
+	Items []Workspace `json:"items"`
 }
 
 // GetWorkspaceInput binds the path parameter for GET /admin/workspaces/{wsId}.
@@ -128,17 +128,17 @@ type GetWorkspaceInput struct {
 
 // GetWorkspaceOutput is the response for GET /admin/workspaces/{wsId}.
 type GetWorkspaceOutput struct {
-	Body AdminWorkspace
+	Body Workspace
 }
 
 // PatchWorkspaceInput binds the path and body for PATCH /admin/workspaces/{wsId}.
 type PatchWorkspaceInput struct {
 	WsID string `path:"wsId"`
-	Body AdminPatchWorkspaceInputBody
+	Body PatchWorkspaceInputBody
 }
 
-// AdminPatchWorkspaceInputBody is the JSON body for PATCH /admin/workspaces/{wsId}.
-type AdminPatchWorkspaceInputBody struct {
+// PatchWorkspaceInputBody is the JSON body for PATCH /admin/workspaces/{wsId}.
+type PatchWorkspaceInputBody struct {
 	Enabled *bool `json:"enabled"`
 }
 

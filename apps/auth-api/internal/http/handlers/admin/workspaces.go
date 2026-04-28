@@ -41,7 +41,7 @@ func ListWorkspaces(deps Deps) func(context.Context, *ListWorkspacesInput) (*Lis
 		}
 
 		out := &ListWorkspacesOutput{}
-		out.Body.Items = make([]AdminWorkspace, len(rows))
+		out.Body.Items = make([]Workspace, len(rows))
 		for i, r := range rows {
 			out.Body.Items[i] = rowToAdminWorkspaceList(r)
 		}

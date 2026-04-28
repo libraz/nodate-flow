@@ -86,9 +86,9 @@ func rowToWorkspaceFromList(r generated.ListWorkspacesForUserRow) Workspace {
 	}
 }
 
-// rowToMember builds a WorkspaceMember DTO from a list row.
-func rowToMember(r generated.ListWorkspaceMembersRow) WorkspaceMember {
-	return WorkspaceMember{
+// rowToMember builds a Member DTO from a list row.
+func rowToMember(r generated.ListWorkspaceMembersRow) Member {
+	return Member{
 		ID:          r.PublicID.String(),
 		UserID:      r.UserPublicID.String(),
 		Email:       r.Email,
@@ -103,8 +103,8 @@ func rowToMember(r generated.ListWorkspaceMembersRow) WorkspaceMember {
 }
 
 // rowToInvite converts a ListWorkspaceInvitesRow to the public DTO.
-func rowToInvite(r generated.ListWorkspaceInvitesRow) WorkspaceInvite {
-	return WorkspaceInvite{
+func rowToInvite(r generated.ListWorkspaceInvitesRow) Invite {
+	return Invite{
 		ID:            r.PublicID.String(),
 		Role:          string(r.Role),
 		MaxUses:       nullInt32Ptr(r.MaxUses),
