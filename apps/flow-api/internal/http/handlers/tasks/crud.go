@@ -428,7 +428,7 @@ func Create(deps Deps) func(context.Context, *CreateTaskInput) (*CreateTaskOutpu
 			// Write-time embedding upsert (ADR 0003). Failures are swallowed
 			// so the task write still succeeds; the weekly reindex cron
 			// picks up any rows that missed.
-			_ = deps.Embedder.EmbedTask(ctx, uint32(taskID), in.Body.Title, in.Body.Description) //#nosec G115 -- LastInsertId for tasks.id (BIGINT UNSIGNED), fits uint32 within realistic deployments
+			_ = deps.Embedder.EmbedTask(ctx, prj.WorkspaceID, uint32(taskID), in.Body.Title, in.Body.Description) //#nosec G115 -- LastInsertId for tasks.id (BIGINT UNSIGNED), fits uint32 within realistic deployments
 		}
 
 		row, err := deps.Queries.FindTaskByPublicId(ctx, generated.FindTaskByPublicIdParams{
@@ -822,7 +822,7 @@ func Patch(deps Deps) func(context.Context, *PatchTaskInput) (*PatchTaskOutput, 
 			ResourceID:   task.PublicID.String(),
 		})
 		if deps.Embedder != nil && (in.Body.Title != nil || in.Body.Description != nil) {
-			_ = deps.Embedder.EmbedTask(ctx, task.ID, newTitle, nullStr(newDesc))
+			_ = deps.Embedder.EmbedTask(ctx, ws.ID, task.ID, newTitle, nullStr(newDesc))
 		}
 		taskInternal := int64(task.ID)
 		if err := eventbus.Append(ctx, deps.DB, eventbus.Event{

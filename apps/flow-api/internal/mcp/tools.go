@@ -1456,7 +1456,7 @@ func runProposeDuplicates(ctx context.Context, deps Deps, s *session, raw json.R
 		if row.Description.Valid {
 			desc = row.Description.String
 		}
-		if eerr := deps.Embedder.EmbedTask(ctx, taskInternal, row.Title, desc); eerr != nil {
+		if eerr := deps.Embedder.EmbedTask(ctx, s.workspaceID, taskInternal, row.Title, desc); eerr != nil {
 			return map[string]any{"candidates": []any{}, "model": model}, nil
 		}
 		src, err = deps.Queries.GetTaskEmbedding(ctx, generated.GetTaskEmbeddingParams{
@@ -2000,7 +2000,7 @@ func runProposeRelations(ctx context.Context, deps Deps, s *session, raw json.Ra
 		if row.Description.Valid {
 			desc = row.Description.String
 		}
-		if eerr := deps.Embedder.EmbedTask(ctx, taskInternal, row.Title, desc); eerr != nil {
+		if eerr := deps.Embedder.EmbedTask(ctx, s.workspaceID, taskInternal, row.Title, desc); eerr != nil {
 			return map[string]any{"candidates": []any{}, "model": model}, nil
 		}
 		src, err = deps.Queries.GetTaskEmbedding(ctx, generated.GetTaskEmbeddingParams{

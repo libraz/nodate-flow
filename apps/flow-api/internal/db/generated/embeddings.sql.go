@@ -199,8 +199,8 @@ func (q *Queries) ListStaleTaskEmbeddings(ctx context.Context, arg ListStaleTask
 
 const upsertTaskEmbedding = `-- name: UpsertTaskEmbedding :exec
 
-INSERT INTO task_embeddings (task_id, model, dim, vector, content_hash, embedded_at)
-VALUES (?, ?, ?, STRING_TO_VECTOR(?), ?, NOW(3))
+INSERT INTO task_embeddings (task_id, workspace_id, model, dim, vector, content_hash, embedded_at)
+VALUES (?, ?, ?, ?, STRING_TO_VECTOR(?), ?, NOW(3))
 ON DUPLICATE KEY UPDATE
   dim = VALUES(dim),
   vector = VALUES(vector),
@@ -210,6 +210,7 @@ ON DUPLICATE KEY UPDATE
 
 type UpsertTaskEmbeddingParams struct {
 	TaskID         uint32      `json:"-"`
+	WorkspaceID    uint32      `json:"-"`
 	Model          string      `json:"model"`
 	Dim            uint16      `json:"dim"`
 	StringToVector interface{} `json:"stringToVector"`
@@ -219,9 +220,10 @@ type UpsertTaskEmbeddingParams struct {
 // ============================================================================
 // task_embeddings queries (ADR 0003)
 //
-// Internal plumbing: task_embeddings has no workspace_id / public_id of its
-// own; workspace scoping is reached via the FK to tasks(id). Every query
-// below joins or filters through tasks so the workspace boundary still holds.
+// Internal plumbing: task_embeddings has no public_id of its own; workspace
+// scoping is reached via the denormalized workspace_id column (FK-guarded
+// against tasks.workspace_id). Every query below filters through that
+// column so the workspace boundary still holds without a JOIN through tasks.
 //
 // VECTOR columns are read/written as []byte. The Go embedding client
 // L2-normalizes vectors before INSERT and serializes them with
@@ -234,10 +236,12 @@ type UpsertTaskEmbeddingParams struct {
 // Insert or replace the embedding row for (task_id, model). The caller is
 // responsible for L2-normalizing `vector` before calling this query. The
 // content_hash lets callers skip re-embedding when the input text is
-// unchanged.
+// unchanged. workspace_id is denormalized from tasks for scoped pruning;
+// callers MUST pass the task's owning workspace.
 func (q *Queries) UpsertTaskEmbedding(ctx context.Context, arg UpsertTaskEmbeddingParams) error {
 	_, err := q.db.ExecContext(ctx, upsertTaskEmbedding,
 		arg.TaskID,
+		arg.WorkspaceID,
 		arg.Model,
 		arg.Dim,
 		arg.StringToVector,

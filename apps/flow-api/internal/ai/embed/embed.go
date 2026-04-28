@@ -56,7 +56,12 @@ func New(provider Provider, q *generated.Queries) *Client {
 // (task_id, model) row already exists with the same content hash the
 // call is a no-op, so repeated PATCHes that don't change title or
 // description stay cheap.
-func (c *Client) EmbedTask(ctx context.Context, taskID uint32, title, description string) error {
+//
+// workspaceID is denormalized into task_embeddings.workspace_id so the
+// duplicate-detection query layer can scope by workspace without joining
+// through tasks. It MUST match the owning task's workspace_id; the FK on
+// task_embeddings.workspace_id enforces that the row exists in workspaces.
+func (c *Client) EmbedTask(ctx context.Context, workspaceID, taskID uint32, title, description string) error {
 	text := composeTaskText(title, description)
 	if text == "" {
 		return nil
@@ -83,6 +88,7 @@ func (c *Client) EmbedTask(ctx context.Context, taskID uint32, title, descriptio
 
 	return c.Queries.UpsertTaskEmbedding(ctx, generated.UpsertTaskEmbeddingParams{
 		TaskID:         taskID,
+		WorkspaceID:    workspaceID,
 		Model:          model,
 		Dim:            uint16(len(raw)), //#nosec G115 -- embedding dimensions cap at the upstream model's MaxDim (~3072 today), well below uint16
 		StringToVector: Encode(raw),

@@ -72,7 +72,7 @@ func (p *Pipeline) processLatestTaskEvent(ctx context.Context, workspaceID uint3
 
 	// Find the last event of this type for the workspace.
 	const q = `SELECT task_id FROM events
-WHERE workspace_id = ? AND event_type = ?
+WHERE workspace_id = ? AND type = ?
 ORDER BY id DESC LIMIT 1`
 	var taskID sql.NullInt32
 	if err := p.DB.QueryRowContext(ctx, q, workspaceID, eventType).Scan(&taskID); err != nil {
@@ -129,7 +129,7 @@ func (p *Pipeline) processTask(ctx context.Context, workspaceID uint32, taskID u
 		if desc.Valid {
 			descStr = desc.String
 		}
-		if eerr := p.Embedder.EmbedTask(ctx, taskID, title, descStr); eerr != nil {
+		if eerr := p.Embedder.EmbedTask(ctx, workspaceID, taskID, title, descStr); eerr != nil {
 			slog.Error("relations pipeline: embed task", "taskId", taskID, "err", eerr)
 			return
 		}

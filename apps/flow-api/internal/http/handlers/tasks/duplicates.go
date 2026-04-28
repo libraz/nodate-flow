@@ -77,7 +77,7 @@ func ListDuplicates(deps Deps) func(context.Context, *ListDuplicatesInput) (*Lis
 			if ferr != nil {
 				return emptyDuplicates(model), nil
 			}
-			if eerr := deps.Embedder.EmbedTask(ctx, task.ID, row.Title, nullStr(row.Description)); eerr != nil {
+			if eerr := deps.Embedder.EmbedTask(ctx, ws.ID, task.ID, row.Title, nullStr(row.Description)); eerr != nil {
 				return emptyDuplicates(model), nil
 			}
 			src, err = deps.Queries.GetTaskEmbedding(ctx, generated.GetTaskEmbeddingParams{

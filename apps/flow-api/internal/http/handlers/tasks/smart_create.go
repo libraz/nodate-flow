@@ -234,7 +234,7 @@ func ApplySmart(deps SmartCreateDeps) func(context.Context, *ApplySmartInput) (*
 
 		// Write-time embedding for the parent task (best-effort).
 		if deps.Embedder != nil {
-			_ = deps.Embedder.EmbedTask(ctx, uint32(parentID), in.Body.Title, in.Body.Description) //#nosec G115 -- LastInsertId for tasks.id (BIGINT UNSIGNED), fits uint32 within realistic deployments
+			_ = deps.Embedder.EmbedTask(ctx, ws.ID, uint32(parentID), in.Body.Title, in.Body.Description) //#nosec G115 -- LastInsertId for tasks.id (BIGINT UNSIGNED), fits uint32 within realistic deployments
 		}
 
 		out := &ApplySmartOutput{}
