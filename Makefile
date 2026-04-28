@@ -112,11 +112,16 @@ build-accounts-web:
 
 # ---------- test ----------
 
-.PHONY: test test-api test-web test-accounts-web test-ui test-sdk test-e2e test-contract test-openapi-diff test-schema-collisions lighthouse
+.PHONY: test test-api test-api-mock test-api-real test-web test-accounts-web test-ui test-sdk test-e2e test-contract test-openapi-diff test-schema-collisions lighthouse
 test: test-api test-auth-api test-web test-accounts-web test-ui test-sdk ## Run unit/integration tests (Go + TS)
 
-test-api: ## Go tests (flow)
-	cd apps/flow-api && go test ./...
+test-api: test-api-mock test-api-real ## Go tests (flow) — both NF_FLOW_AI_MOCK on and off
+
+test-api-mock: ## Go tests (flow) with NF_FLOW_AI_MOCK=1 (mock AI orchestrator path)
+	cd apps/flow-api && NF_FLOW_AI_MOCK=1 go test ./...
+
+test-api-real: ## Go tests (flow) with NF_FLOW_AI_MOCK unset (real per-tenant provider path)
+	cd apps/flow-api && env -u NF_FLOW_AI_MOCK go test ./...
 
 test-auth-api: ## Go tests (auth)
 	cd apps/auth-api && go test ./...

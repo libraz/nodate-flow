@@ -134,10 +134,29 @@ jobs:
           fi
 
   # ---------- Job 3: Integration tests (Go E2E + Playwright) ----------
+  #
+  # The matrix runs the flow-api E2E suite twice:
+  #
+  #   - ai_mock="1"  exercises tests gated on NF_FLOW_AI_MOCK=1 (deterministic
+  #     mock AI orchestrator: ai_triage / ai_compile_lens / mcp_duplicates /
+  #     task_duplicates).
+  #   - ai_mock=""   leaves NF_FLOW_AI_MOCK unset so the real per-tenant
+  #     workspace provider path is wired in. Required by
+  #     ai_provider_failures_test.go which skips when the mock is on.
+  #
+  # Both modes share the same testcontainers boot cost (~30s cold), so the
+  # matrix roughly doubles the integration job wall time vs a single run
+  # but keeps both surfaces honest. Playwright + auth-api + the heavier
+  # web build only run in the mock-on shard to avoid duplicating work
+  # that does not depend on NF_FLOW_AI_MOCK.
   test-integration:
-    name: Integration tests
+    name: Integration tests (ai_mock=${{ matrix.ai_mock || 'off' }})
     runs-on: ubuntu-latest
     needs: [lint-and-typecheck]
+    strategy:
+      fail-fast: false
+      matrix:
+        ai_mock: ["1", ""]
     steps:
       - uses: actions/checkout@v4
 
@@ -156,6 +175,7 @@ jobs:
         run: bun install --frozen-lockfile
 
       - name: Install Playwright browsers
+        if: matrix.ai_mock == '1'
         run: bunx playwright install --with-deps chromium
         working-directory: apps/flow-web
 
@@ -167,6 +187,7 @@ jobs:
       - name: Go test (full, with testcontainers) — flow-api
         env:
           NF_TEST_INTEGRATION: "1"
+          NF_FLOW_AI_MOCK: ${{ matrix.ai_mock }}
         run: go test -race -count=1 -timeout=10m -coverprofile=coverage.out -covermode=atomic ./...
         working-directory: apps/flow-api
 
@@ -181,19 +202,22 @@ jobs:
           fi
 
       - name: Go test (full, with testcontainers) — auth-api
+        if: matrix.ai_mock == '1'
         run: go test -race -count=1 -timeout=10m -coverprofile=coverage.out -covermode=atomic ./...
         working-directory: apps/auth-api
 
       - name: Build web for E2E
+        if: matrix.ai_mock == '1'
         run: bun run build
         working-directory: apps/flow-web
 
       - name: Playwright E2E
+        if: matrix.ai_mock == '1'
         run: bun run e2e
         working-directory: apps/flow-web
 
       - name: Upload Playwright report
-        if: failure()
+        if: failure() && matrix.ai_mock == '1'
         uses: actions/upload-artifact@v4
         with:
           name: playwright-report
