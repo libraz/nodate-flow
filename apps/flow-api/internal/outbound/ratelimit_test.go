@@ -9,11 +9,11 @@ import (
 func TestLimiterAllowBurst(t *testing.T) {
 	l := NewLimiter(1, 3)
 	for i := 0; i < 3; i++ {
-		if !l.Allow() {
+		if !l.Allow(context.Background()) {
 			t.Fatalf("burst slot %d should be allowed", i)
 		}
 	}
-	if l.Allow() {
+	if l.Allow(context.Background()) {
 		t.Fatal("4th call should be denied until refill")
 	}
 }
@@ -26,21 +26,21 @@ func TestLimiterRefill(t *testing.T) {
 	l.last = clock
 	l.tokens = 1
 
-	if !l.Allow() {
+	if !l.Allow(context.Background()) {
 		t.Fatal("first token should be available")
 	}
-	if l.Allow() {
+	if l.Allow(context.Background()) {
 		t.Fatal("second token should be gone")
 	}
 	clock = base.Add(250 * time.Millisecond) // +2.5 tokens at 10/sec
-	if !l.Allow() {
+	if !l.Allow(context.Background()) {
 		t.Fatal("after refill the limiter should allow again")
 	}
 }
 
 func TestLimiterWaitCancellation(t *testing.T) {
 	l := NewLimiter(0.1, 1) // very slow refill
-	if !l.Allow() {
+	if !l.Allow(context.Background()) {
 		t.Fatal("first token should be available")
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Millisecond)
@@ -69,14 +69,14 @@ func TestRegistryAppliesLimiter(t *testing.T) {
 
 func TestLimiterStats(t *testing.T) {
 	l := NewLimiter(1000, 2)
-	if !l.Allow() {
+	if !l.Allow(context.Background()) {
 		t.Fatal("first allow")
 	}
-	if !l.Allow() {
+	if !l.Allow(context.Background()) {
 		t.Fatal("second allow")
 	}
 	// Drain - third should be denied (no time advance).
-	if l.Allow() {
+	if l.Allow(context.Background()) {
 		t.Fatal("third should be denied without refill")
 	}
 	s := l.Stats()

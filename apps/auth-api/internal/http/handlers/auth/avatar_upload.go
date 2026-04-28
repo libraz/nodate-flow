@@ -16,6 +16,7 @@ import (
 	"io"
 	"log/slog"
 	"strings"
+	"time"
 
 	"github.com/danielgtaylor/huma/v2"
 
@@ -28,6 +29,7 @@ import (
 	"github.com/nodate-flow/nodate-flow/apps/auth-api/internal/db/types"
 	apierrors "github.com/nodate-flow/nodate-flow/apps/auth-api/internal/errors"
 	"github.com/nodate-flow/nodate-flow/packages/go-shared/authn"
+	"github.com/nodate-flow/nodate-flow/packages/go-shared/ctxutil"
 )
 
 // maxAvatarBytes bounds the accepted payload size. 5 MiB covers every
@@ -147,8 +149,18 @@ func AvatarUpload(deps Deps) func(context.Context, *AvatarUploadInput) (*AvatarU
 			ID:        uid,
 		}); err != nil {
 			// Best-effort cleanup of the just-written object so we do
-			// not leak storage when the DB update fails.
-			_ = deps.Storage.RemoveObject(context.Background(), key)
+			// not leak storage when the DB update fails. We MUST run
+			// this even if ctx has been cancelled by the failing
+			// request — otherwise a flaky upstream produces orphaned
+			// blobs every time. ctxutil.Cleanup gives us inherited
+			// values (trace ids, slog attrs) without inheriting the
+			// cancellation, plus a hard 5s upper bound so the cleanup
+			// cannot block shutdown.
+			cleanupCtx, cleanupCancel := ctxutil.Cleanup(ctx, 5*time.Second)
+			if rmErr := deps.Storage.RemoveObject(cleanupCtx, key); rmErr != nil {
+				slog.WarnContext(cleanupCtx, "avatar upload: orphan cleanup failed", "err", rmErr, "key", key)
+			}
+			cleanupCancel()
 			return nil, httpErr(apierrors.AuthSessionRevoked)
 		}
 

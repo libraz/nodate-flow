@@ -19,8 +19,14 @@ var ErrLimitExceeded = errors.New("outbound: rate limit exceeded")
 // in-process token bucket) and by the `redis` build-tagged
 // RedisLimiter. Call sites should take this interface so a Redis
 // backend can replace the default without code changes.
+//
+// Allow accepts a context so distributed implementations (e.g.
+// [RedisLimiter]) can honour the caller's deadline / cancellation
+// instead of blocking on an internal Background timeout. The
+// in-process [Limiter] does not perform I/O, so its Allow ignores
+// ctx aside from the standard "respect cancellation" contract.
 type RateLimiter interface {
-	Allow() bool
+	Allow(ctx context.Context) bool
 	Wait(ctx context.Context) error
 	Stats() LimiterStats
 }
@@ -79,8 +85,18 @@ func NewLimiter(ratePerSec float64, burst int) *Limiter {
 }
 
 // Allow attempts to consume one token immediately. Returns true on
-// success. It does not block.
-func (l *Limiter) Allow() bool {
+// success. It does not block. The ctx argument is accepted for
+// interface symmetry with [RedisLimiter]; the in-process limiter
+// performs no I/O so cancellation has no practical effect, but a
+// pre-cancelled ctx is treated as a denial so callers cannot abuse
+// the bucket once their deadline has passed.
+func (l *Limiter) Allow(ctx context.Context) bool {
+	if ctx != nil {
+		if err := ctx.Err(); err != nil {
+			l.denied.Add(1)
+			return false
+		}
+	}
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	l.advance()

@@ -77,11 +77,27 @@ redis.call('EXPIRE', KEYS[1], math.ceil(cap / refill) + 60)
 return granted
 `
 
-// Allow implements [RateLimiter].
-func (l *RedisLimiter) Allow() bool {
-	ctx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
+// Allow implements [RateLimiter]. The 500ms timeout is layered on top
+// of the caller's ctx so a cancelled or already-expired request returns
+// immediately instead of blocking on the Redis round trip. Passing a
+// nil ctx is tolerated by deriving from [context.Background] so legacy
+// call sites that have not been updated still behave correctly.
+func (l *RedisLimiter) Allow(ctx context.Context) bool {
+	parent := ctx
+	if parent == nil {
+		parent = context.Background()
+	}
+	if err := parent.Err(); err != nil {
+		// Caller has already given up; do not perform a Redis round
+		// trip. We deny here rather than fail-open because the goal
+		// of cancellation is to short-circuit, and counting the call
+		// as denied keeps stats honest.
+		l.denied.Add(1)
+		return false
+	}
+	cctx, cancel := context.WithTimeout(parent, 500*time.Millisecond)
 	defer cancel()
-	return l.tryConsume(ctx)
+	return l.tryConsume(cctx)
 }
 
 // Wait implements [RateLimiter]. Polls the bucket every pollWait
