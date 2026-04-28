@@ -28,6 +28,9 @@ jobs:
           npm ci --workspace=packages/ui
           npm run check-themes --workspace=packages/ui
 
+      - name: Inline spacing token check
+        run: npm run lint:design-tokens --workspace=packages/ui
+
       - name: Legacy token scan
         run: |
           echo "Scanning for legacy --color-* token references..."

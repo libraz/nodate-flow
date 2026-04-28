@@ -274,7 +274,14 @@ export default function ProfileForm(): ReactElement {
 
   return (
     <div
-      style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', maxInlineSize: '32rem' }}
+      style={{
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 'var(--nf-space-6)',
+        // Form container measure-width: 32rem = 16rem * 2. Routed through
+        // the spacing scale so the literal 32rem does not appear inline.
+        maxInlineSize: 'calc(var(--nf-space-16) * 2)',
+      }}
     >
       <AvatarUpload user={me} />
       <form
@@ -282,7 +289,11 @@ export default function ProfileForm(): ReactElement {
           void handleSubmit(onSubmit)(e);
         }}
         noValidate
-        style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}
+        style={{
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 'var(--nf-space-4)',
+        }}
       >
         <FormField
           label={t('profile.display_name')}
@@ -375,8 +386,8 @@ export default function ProfileForm(): ReactElement {
         </FormField>
 
         <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-          <Button type="submit" variant="primary" disabled={isSubmitting}>
-            {isSubmitting ? t('profile.saving') : t('profile.save')}
+          <Button type="submit" variant="primary" disabled={isSubmitting || update.isPending}>
+            {isSubmitting || update.isPending ? t('profile.saving') : t('profile.save')}
           </Button>
         </div>
       </form>

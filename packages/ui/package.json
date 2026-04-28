@@ -74,7 +74,9 @@
   "scripts": {
     "typecheck": "tsc -b",
     "test": "vitest run",
-    "check-themes": "tsx scripts/check-theme-parity.ts"
+    "check-themes": "tsx scripts/check-theme-parity.ts",
+    "check-inline-spacing": "tsx scripts/check-inline-spacing.ts",
+    "lint:design-tokens": "tsx scripts/check-inline-spacing.ts --ci"
   },
   "dependencies": {
     "@floating-ui/react": "0.27.0",

@@ -124,8 +124,13 @@ export default function MarkdownEditor({
     prefixLine(textareaRef, value, '> ', onChange);
   };
 
+  // Square icon-button toolbar items — `aspect-ratio: 1` paired with the
+  // `sm` button vertical padding lets each glyph share an equal hit-target
+  // without freezing a literal pixel/rem width.
+  const toolbarButtonStyle = { aspectRatio: '1', padding: 'var(--nf-space-1)' } as const;
+
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.375rem' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--nf-space-2)' }}>
       {/* Toolbar */}
       <div
         role="toolbar"
@@ -133,7 +138,7 @@ export default function MarkdownEditor({
         style={{
           display: 'flex',
           flexWrap: 'wrap',
-          gap: '0.25rem',
+          gap: 'var(--nf-space-1)',
           alignItems: 'center',
         }}
       >
@@ -144,7 +149,7 @@ export default function MarkdownEditor({
           onClick={handleBold}
           aria-label={t('tasks.markdown_editor.bold')}
           disabled={previewing}
-          style={{ fontWeight: 700, minInlineSize: '2rem' }}
+          style={{ ...toolbarButtonStyle, fontWeight: 700 }}
         >
           B
         </Button>
@@ -155,7 +160,7 @@ export default function MarkdownEditor({
           onClick={handleItalic}
           aria-label={t('tasks.markdown_editor.italic')}
           disabled={previewing}
-          style={{ fontStyle: 'italic', minInlineSize: '2rem' }}
+          style={{ ...toolbarButtonStyle, fontStyle: 'italic' }}
         >
           I
         </Button>
@@ -166,7 +171,7 @@ export default function MarkdownEditor({
           onClick={handleHeading}
           aria-label={t('tasks.markdown_editor.heading')}
           disabled={previewing}
-          style={{ minInlineSize: '2rem' }}
+          style={toolbarButtonStyle}
         >
           H
         </Button>
@@ -177,9 +182,9 @@ export default function MarkdownEditor({
           onClick={handleList}
           aria-label={t('tasks.markdown_editor.list')}
           disabled={previewing}
-          style={{ minInlineSize: '2rem' }}
+          style={toolbarButtonStyle}
         >
-          &#8226;
+          •
         </Button>
         <Button
           type="button"
@@ -188,7 +193,7 @@ export default function MarkdownEditor({
           onClick={handleCode}
           aria-label={t('tasks.markdown_editor.code')}
           disabled={previewing}
-          style={{ fontFamily: 'var(--font-mono)', minInlineSize: '2rem' }}
+          style={{ ...toolbarButtonStyle, fontFamily: 'var(--font-mono)' }}
         >
           {'</>'}
         </Button>
@@ -199,9 +204,9 @@ export default function MarkdownEditor({
           onClick={handleLink}
           aria-label={t('tasks.markdown_editor.link')}
           disabled={previewing}
-          style={{ minInlineSize: '2rem' }}
+          style={toolbarButtonStyle}
         >
-          &#128279;
+          🔗
         </Button>
         <Button
           type="button"
@@ -210,7 +215,7 @@ export default function MarkdownEditor({
           onClick={handleQuote}
           aria-label={t('tasks.markdown_editor.quote')}
           disabled={previewing}
-          style={{ minInlineSize: '2rem' }}
+          style={toolbarButtonStyle}
         >
           &gt;
         </Button>
@@ -237,9 +242,12 @@ export default function MarkdownEditor({
         <div
           style={{
             border: '1px solid var(--nf-color-border)',
-            borderRadius: '0.375rem',
-            padding: '0.75rem',
-            minBlockSize: `${rows * 1.5}rem`,
+            borderRadius: 'var(--nf-radius-sm)',
+            padding: 'var(--nf-space-3)',
+            // `--nf-space-6` is 1.5rem so this preserves the original
+            // `${rows} * 1.5rem` minimum height while routing the base
+            // unit through the spacing scale.
+            minBlockSize: `calc(var(--nf-space-6) * ${String(rows)})`,
             background: 'var(--nf-color-surface)',
           }}
         >
