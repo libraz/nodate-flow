@@ -137,6 +137,40 @@ export async function injectAuth(context: BrowserContext, tenant: TestTenant): P
 }
 
 /**
+ * Creates a workspace owned by the given tenant via POST /workspaces.
+ *
+ * Seeded once per tenant in `global-setup` so that:
+ *   1. `/workspaces` always renders at least one row for member-facing tests.
+ *   2. `/admin/workspaces` always lists at least one row for admin tests.
+ *
+ * The slug is derived from the tenant email's UUID suffix to keep it
+ * unique across parallel runs sharing the same database.
+ *
+ * Returns the workspace's public id (UUID v7) so callers can deep-link
+ * if needed. Throws on non-2xx so global-setup fails loudly rather than
+ * letting tests skip on missing fixtures.
+ */
+export async function seedWorkspace(tenant: TestTenant): Promise<string> {
+  const suffix = randomUUID().slice(0, 12);
+  const slug = `e2e-ws-${suffix}`;
+  const name = `E2E Workspace ${suffix}`;
+  const res = await fetch(`${AUTH_API_URL}/workspaces`, {
+    method: 'POST',
+    headers: {
+      authorization: `Bearer ${tenant.accessToken}`,
+      'Content-Type': 'application/json',
+      accept: 'application/json',
+    },
+    body: JSON.stringify({ slug, name, timezone: 'UTC' }),
+  });
+  if (!res.ok) {
+    throw new Error(`POST /workspaces -> ${res.status} ${await res.text()}`);
+  }
+  const body = (await res.json()) as { id: string };
+  return body.id;
+}
+
+/**
  * Grants instance-admin to the given tenant via REST.
  * Uses the bootstrap endpoint that makes the first user admin if none exist,
  * or grants directly if the tenant is already admin.

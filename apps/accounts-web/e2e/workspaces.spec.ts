@@ -66,10 +66,13 @@ test.describe('workspace edit page', () => {
     await page.goto('/workspaces');
     await page.waitForLoadState('networkidle');
 
-    // Try to click the first workspace link; if no workspaces, skip gracefully
+    // global-setup seeds a workspace for `user`, so the link is a hard
+    // precondition: failing it indicates a regression in the seed flow
+    // or the workspace list endpoint, not a missing fixture.
     const wsLink = page.locator('a[href*="/workspaces/"]').first();
-    const linkVisible = await wsLink.isVisible({ timeout: 10_000 }).catch(() => false);
-    test.skip(!linkVisible, 'No workspaces available for this tenant');
+    await expect(wsLink, 'seeded workspace link must be present in the list').toBeVisible({
+      timeout: 10_000,
+    });
 
     await wsLink.click();
     await page.waitForLoadState('networkidle');
@@ -90,14 +93,18 @@ test.describe('workspace edit page', () => {
     await page.waitForLoadState('networkidle');
 
     const wsLink = page.locator('a[href*="/workspaces/"]').first();
-    const linkVisible = await wsLink.isVisible({ timeout: 10_000 }).catch(() => false);
-    test.skip(!linkVisible, 'No workspaces available for this tenant');
+    await expect(wsLink, 'seeded workspace link must be present in the list').toBeVisible({
+      timeout: 10_000,
+    });
 
     await wsLink.click();
     await page.waitForLoadState('networkidle');
 
-    // Name field should have a non-empty value
-    const nameInput = page.getByLabel(/^name$/i);
+    // Name field should have a non-empty value. The label is "Name"
+    // followed by a `<span aria-hidden>*</span>` required indicator,
+    // which Playwright surfaces as accessible-name "Name" — match it
+    // as a substring rather than an anchored exact string.
+    const nameInput = page.getByLabel(/name/i).first();
     await expect(nameInput).toBeVisible({ timeout: 10_000 });
     const value = await nameInput.inputValue();
     expect(value.length).toBeGreaterThan(0);
@@ -110,14 +117,16 @@ test.describe('workspace edit page', () => {
     await page.waitForLoadState('networkidle');
 
     const wsLink = page.locator('a[href*="/workspaces/"]').first();
-    const linkVisible = await wsLink.isVisible({ timeout: 10_000 }).catch(() => false);
-    test.skip(!linkVisible, 'No workspaces available for this tenant');
+    await expect(wsLink, 'seeded workspace link must be present in the list').toBeVisible({
+      timeout: 10_000,
+    });
 
     await wsLink.click();
     await page.waitForLoadState('networkidle');
 
-    // Timezone selector (uses the profile.timezone i18n key, renders as "Timezone")
-    await expect(page.getByLabel(/timezone/i)).toBeVisible({ timeout: 10_000 });
+    // Timezone selector (uses the profile.timezone i18n key, which
+    // renders as "Time zone" — note the space — in en.json).
+    await expect(page.getByLabel(/time\s*zone/i)).toBeVisible({ timeout: 10_000 });
   });
 
   test('no i18n keys exposed on edit page', async ({ page }) => {
@@ -127,8 +136,9 @@ test.describe('workspace edit page', () => {
     await page.waitForLoadState('networkidle');
 
     const wsLink = page.locator('a[href*="/workspaces/"]').first();
-    const linkVisible = await wsLink.isVisible({ timeout: 10_000 }).catch(() => false);
-    test.skip(!linkVisible, 'No workspaces available for this tenant');
+    await expect(wsLink, 'seeded workspace link must be present in the list').toBeVisible({
+      timeout: 10_000,
+    });
 
     await wsLink.click();
     await page.waitForLoadState('networkidle');
@@ -145,8 +155,9 @@ test.describe('workspace edit page', () => {
     await page.waitForLoadState('networkidle');
 
     const wsLink = page.locator('a[href*="/workspaces/"]').first();
-    const linkVisible = await wsLink.isVisible({ timeout: 10_000 }).catch(() => false);
-    test.skip(!linkVisible, 'No workspaces available for this tenant');
+    await expect(wsLink, 'seeded workspace link must be present in the list').toBeVisible({
+      timeout: 10_000,
+    });
 
     await wsLink.click();
     await page.waitForLoadState('networkidle');

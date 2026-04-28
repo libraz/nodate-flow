@@ -10,7 +10,7 @@ import { writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { createTestTenant, grantInstanceAdmin } from './tenant';
+import { createTestTenant, grantInstanceAdmin, seedWorkspace } from './tenant';
 
 export interface SharedTenants {
   user: Awaited<ReturnType<typeof createTestTenant>>;
@@ -19,6 +19,17 @@ export interface SharedTenants {
   admin: Awaited<ReturnType<typeof createTestTenant>>;
   /** Whether the admin tenant actually has instance-admin privileges. */
   adminGranted: boolean;
+  /**
+   * Public id of the workspace owned by `user`. Seeded so `/workspaces`
+   * member-facing tests always have a row to click.
+   */
+  userWorkspaceId: string;
+  /**
+   * Public id of the workspace owned by `admin`. Seeded so the
+   * admin-facing `/admin/workspaces` list always has a row to click,
+   * independent of what other parallel runs create.
+   */
+  adminWorkspaceId: string;
 }
 
 const Filename = fileURLToPath(import.meta.url);
@@ -40,7 +51,20 @@ async function globalSetup(): Promise<void> {
   const admin = await createTestTenant();
   const adminGranted = await grantInstanceAdmin(admin);
 
-  const tenants: SharedTenants = { user, user2, admin, adminGranted };
+  // Seed one workspace per visible tenant so list pages
+  // (`/workspaces`, `/admin/workspaces`) always have at least one row
+  // and downstream tests don't need to skip on empty state.
+  const userWorkspaceId = await seedWorkspace(user);
+  const adminWorkspaceId = await seedWorkspace(admin);
+
+  const tenants: SharedTenants = {
+    user,
+    user2,
+    admin,
+    adminGranted,
+    userWorkspaceId,
+    adminWorkspaceId,
+  };
   writeFileSync(TENANTS_PATH, JSON.stringify(tenants, null, 2));
 }
 

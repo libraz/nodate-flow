@@ -67,17 +67,33 @@ test.describe('admin user-detail action mutations', () => {
     await expect(confirmDialog).toBeHidden({ timeout: 5_000 });
 
     // After mutation + refetch the badge text flips to "Suspended".
+    // We assert the suspended badge appears AND the original Active
+    // badge is gone — proves the row actually replaced its status
+    // rather than additively rendering both labels.
     const suspendedBadge = page
       .locator('span')
       .filter({ hasText: new RegExp(`^${copy.disabled}$`) });
     await expect(suspendedBadge).toBeVisible({ timeout: 10_000 });
+    await expect(statusBadge).toBeHidden();
+    // The action button label must also have flipped to "Enable" so a
+    // user landing on the page now sees the inverse mutation affordance.
+    await expect(page.getByRole('button', { name: copy.enable, exact: true })).toBeVisible({
+      timeout: 10_000,
+    });
 
-    // The action button now reads "Enable". Click → confirm → back to Active.
+    // Click Enable → confirm → back to Active.
     await page.getByRole('button', { name: copy.enable, exact: true }).click();
     await expect(confirmDialog).toBeVisible({ timeout: 5_000 });
     await confirmDialog.getByRole('button', { name: new RegExp(`^${copy.enable}$`, 'i') }).click();
     await expect(confirmDialog).toBeHidden({ timeout: 5_000 });
+    // Both directions of the status flip are verified now: Active
+    // returns and Suspended is gone.
     await expect(statusBadge).toBeVisible({ timeout: 10_000 });
+    await expect(suspendedBadge).toBeHidden();
+    // And the destructive "Suspend" affordance is back.
+    await expect(page.getByRole('button', { name: copy.suspend, exact: true })).toBeVisible({
+      timeout: 10_000,
+    });
   });
 
   test('grant then revoke admin toggles the admin field', async ({ page }) => {

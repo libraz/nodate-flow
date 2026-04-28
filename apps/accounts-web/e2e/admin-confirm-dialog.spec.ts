@@ -33,13 +33,15 @@ test.describe('admin themed confirm dialog', () => {
     await page.goto('/admin/workspaces');
     await page.waitForLoadState('networkidle');
 
-    const hasRows = await page.waitForSelector('td', { timeout: 10_000 }).then(
-      () => true,
-      () => false,
-    );
-    test.skip(!hasRows, 'No workspaces in the admin list to test confirm dialog');
+    // global-setup seeds a workspace for both `user` and `admin`, so
+    // the admin list is never empty. Treat the row as a hard
+    // precondition: a missing <td> means the seed flow regressed.
+    await page.waitForSelector('td', { timeout: 10_000 });
 
     const wsLink = page.locator('a[href*="/admin/workspaces/"]').first();
+    await expect(wsLink, 'seeded workspace must be visible in admin list').toBeVisible({
+      timeout: 10_000,
+    });
     await wsLink.click();
     await expect(page).toHaveURL(/\/admin\/workspaces\//, { timeout: 10_000 });
 

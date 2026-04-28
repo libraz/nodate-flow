@@ -7,11 +7,44 @@
  * Uses the shared admin tenant from global setup.
  */
 
+import { randomUUID } from 'node:crypto';
+
 import { expect, test } from '@playwright/test';
 
 import { loadTenants } from './fixtures/load-tenants';
-import { injectAuth } from './fixtures/tenant';
+import { AUTH_API_URL, injectAuth } from './fixtures/tenant';
 import { checkA11y } from './helpers/a11y';
+
+/**
+ * Registers two fresh non-admin users via POST /auth/register so the
+ * grant-admin search has at least two candidates to keyboard-navigate
+ * between. The display names share a unique prefix that the test then
+ * uses as the search query, isolating it from any other e2e users
+ * accumulated on a hot database.
+ *
+ * Returns the shared display-name prefix that uniquely identifies the
+ * pair (e.g. `kbnav-3f0a1b2c`).
+ */
+async function seedTwoCandidates(): Promise<string> {
+  const tag = `kbnav-${randomUUID().slice(0, 8)}`;
+  for (let i = 0; i < 2; i++) {
+    const email = `${tag}+${i}@example.test`;
+    const res = await fetch(`${AUTH_API_URL}/auth/register`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', accept: 'application/json' },
+      body: JSON.stringify({
+        email,
+        password: 'correct horse battery staple',
+        displayName: `${tag} candidate ${i}`,
+        locale: 'en',
+      }),
+    });
+    if (!res.ok) {
+      throw new Error(`POST /auth/register -> ${res.status} ${await res.text()}`);
+    }
+  }
+  return tag;
+}
 
 test.describe('admin pages', () => {
   test.beforeEach(() => {
@@ -111,13 +144,17 @@ test.describe('admin pages', () => {
       await page.waitForLoadState('networkidle');
       await page.waitForSelector('td', { timeout: 10_000 });
 
-      // Click the first user row's detail link/name
+      // global-setup seeds at least 3 users (user, user2, admin) plus
+      // optionally the bootstrap seed admin, so the admin user list is
+      // never empty. Treat the link as a hard precondition rather than
+      // an optional click.
       const firstLink = page.locator('a[href*="/admin/users/"]').first();
-      if (await firstLink.isVisible()) {
-        await firstLink.click();
-        await expect(page).toHaveURL(/\/admin\/users\//);
-        await expect(page.getByRole('heading', { name: /user details/i })).toBeVisible();
-      }
+      await expect(firstLink, 'admin user list must contain at least one row').toBeVisible({
+        timeout: 10_000,
+      });
+      await firstLink.click();
+      await expect(page).toHaveURL(/\/admin\/users\//);
+      await expect(page.getByRole('heading', { name: /user details/i })).toBeVisible();
     });
 
     test('no i18n keys exposed', async ({ page }) => {
@@ -152,12 +189,15 @@ test.describe('admin pages', () => {
       await page.goto('/admin/workspaces');
       await page.waitForLoadState('networkidle');
 
-      await page.waitForSelector('td', { timeout: 10_000 }).catch(() => {
-        // May have no workspaces, that's fine
-      });
+      // global-setup seeds workspaces for both `user` and `admin`, so
+      // the admin workspace list always has at least two rows. A
+      // missing <td> indicates the seed flow regressed, not an
+      // acceptable empty state.
+      await page.waitForSelector('td', { timeout: 10_000 });
 
       const badges = page.locator('span').filter({ hasText: /^(Active|Suspended)$/ });
       const count = await badges.count();
+      expect(count, 'expected at least one status badge after workspace seed').toBeGreaterThan(0);
       for (let i = 0; i < count; i++) {
         const badge = badges.nth(i);
         const bg = await badge.evaluate((el) => getComputedStyle(el).backgroundColor);
@@ -211,21 +251,26 @@ test.describe('admin pages', () => {
       const searchInput = page.getByPlaceholder(/search by name or email/i);
       await searchInput.fill('e2e');
 
-      // Wait for debounced search to trigger dropdown
-      await page.waitForTimeout(500);
-
-      // Dropdown should appear (either with results or "no results" message)
-      const dropdown = page.locator('ul').filter({
-        has: page.locator('li'),
-      });
-      await expect(dropdown)
-        .toBeVisible({ timeout: 5_000 })
-        .catch(() => {
-          // If no results, the dropdown might show "No users found"
-        });
+      // The Combobox primitive sets `role="listbox"` on the popover
+      // unconditionally — both for matching results and for the
+      // "no users found" empty branch — so we can deterministically
+      // assert it materializes after the debounced search resolves.
+      // Swallowing the failure with `.catch(() => {})` would silently
+      // mask a regression where the dropdown never opens, so use a
+      // hard assertion here.
+      const listbox = page.getByRole('listbox');
+      await expect(listbox).toBeVisible({ timeout: 5_000 });
+      await expect(searchInput).toHaveAttribute('aria-expanded', 'true');
     });
 
     test('combobox supports keyboard nav (Arrow + Enter selects user)', async ({ page }) => {
+      // Seed two fresh non-admin users sharing a unique tag so the
+      // search dropdown returns at least two options for keyboard
+      // navigation (ArrowDown must change aria-activedescendant, and
+      // a generic "e2e" query is unstable on a hot DB where prior
+      // runs already promoted every shared user to admin).
+      const tag = await seedTwoCandidates();
+
       const { admin } = loadTenants();
       await injectAuth(page.context(), admin);
       await page.goto('/admin/admins');
@@ -237,16 +282,25 @@ test.describe('admin pages', () => {
       await expect(combo).toHaveAttribute('aria-expanded', 'false');
 
       await combo.focus();
-      await combo.fill('e2e');
+      await combo.fill(tag);
 
       // Wait for the listbox to materialize from the debounced search
       const listbox = page.getByRole('listbox');
       await expect(listbox).toBeVisible({ timeout: 5_000 });
       await expect(combo).toHaveAttribute('aria-expanded', 'true');
 
-      // Skip the rest of the test if the API returned no candidate users
-      const optionCount = await page.getByRole('option').count();
-      test.skip(optionCount === 0, 'No matching users available to select');
+      // Hard precondition: the two freshly-seeded candidates MUST
+      // surface in the search. We poll because the search is
+      // debounced and the listbox flips through loading/empty states
+      // before the API response settles. Fewer than 2 matches
+      // indicates the search endpoint or seed flow broke — fail
+      // loudly rather than skip.
+      await expect
+        .poll(async () => page.getByRole('option').count(), {
+          timeout: 5_000,
+          message: `admin user search for ${tag} must return both seeded candidates`,
+        })
+        .toBeGreaterThanOrEqual(2);
 
       // Arrow Down moves the active descendant
       await combo.press('ArrowDown');
@@ -289,13 +343,14 @@ test.describe('admin pages', () => {
       await page.goto('/admin/admins');
       await page.waitForLoadState('networkidle');
 
-      // The current admin should be in the list with a revoke button
+      // The shared admin tenant from globalSetup is granted instance
+      // admin (the `adminGranted` beforeEach gate already skips this
+      // suite when the grant failed), so the admin row must be in the
+      // list and must surface a Revoke button. Asserting unconditionally
+      // — without `.catch`-swallowing — so a missing row counts as a
+      // real regression instead of a silent pass.
       const revokeButtons = page.getByRole('button', { name: /revoke/i });
-      await expect(revokeButtons.first())
-        .toBeVisible({ timeout: 10_000 })
-        .catch(() => {
-          // Might not have admin listed if setup didn't work
-        });
+      await expect(revokeButtons.first()).toBeVisible({ timeout: 10_000 });
     });
   });
 
