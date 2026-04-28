@@ -101,8 +101,12 @@ func TestAuthBadCredentials(t *testing.T) {
 	require.GreaterOrEqual(t, status, 400, "bad password must not return 2xx")
 }
 
-// TestAuthLockout verifies that 5 consecutive bad-password attempts
-// result in a lockout on the 6th try (even with the correct password).
+// TestAuthLockout verifies that lockout is enforced: 5 consecutive
+// bad-password attempts must result in a non-2xx response on the 6th
+// login even when the correct password is supplied. The test fails
+// (rather than skips) if lockout is not enforced — a build that
+// silently lets the 6th login succeed is a security regression we want
+// CI to surface, not hide.
 func TestAuthLockout(t *testing.T) {
 	bootstrap(t)
 	t.Parallel()
@@ -117,14 +121,14 @@ func TestAuthLockout(t *testing.T) {
 		require.GreaterOrEqual(t, status, 400, "bad password attempt %d must fail", i)
 	}
 
-	// 6th attempt with the correct password should be locked out.
+	// 6th attempt with the correct password must still be rejected.
 	status, body := doJSONStatus(t, http.MethodPost, testServerURL+"/auth/login", "", map[string]any{
 		"email":    tt.Email,
 		"password": tt.Password,
 	})
-	if status < 400 {
-		t.Skipf("lockout not enforced by this build; got %d body=%s", status, string(body))
-	}
+	require.GreaterOrEqualf(t, status, 400,
+		"lockout not enforced: 6th login with correct password returned %d body=%s",
+		status, string(body))
 }
 
 // doRaw sends a request with optional JSON body and optional request
