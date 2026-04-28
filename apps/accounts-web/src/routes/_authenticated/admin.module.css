@@ -37,6 +37,20 @@
   border-radius: var(--nf-radius-md);
 }
 
+.navLink:hover {
+  background: var(--nf-color-surface-hover);
+}
+
+/*
+ * Applied via TanStack Router `<Link activeProps>` on the entry whose route
+ * matches the current URL. Uses the brand accent-subtle wash so the active
+ * page is visible against `--nf-color-bg` without yelling.
+ */
+.navLinkActive {
+  background: var(--nf-color-accent-subtle);
+  font-weight: var(--nf-weight-semibold);
+}
+
 .spacer {
   flex: 1;
 }

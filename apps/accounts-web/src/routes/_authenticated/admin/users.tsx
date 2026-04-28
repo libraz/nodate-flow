@@ -8,6 +8,7 @@ import { Link, createFileRoute } from '@tanstack/react-router';
 import { type ReactElement, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { formatTimestamp } from '../../../lib/format-timestamp';
 import { sdk } from '../../../lib/sdk';
 
 interface AdminUser {
@@ -27,11 +28,6 @@ interface UsersResponse {
 }
 
 type StatusFilter = 'all' | 'active' | 'suspended';
-
-function formatTimestamp(ts: number | null, never: string): string {
-  if (ts === null || ts === 0) return never;
-  return new Date(ts * 1000).toLocaleString();
-}
 
 function UsersPage(): ReactElement {
   const { t } = useTranslation('admin');

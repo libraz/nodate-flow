@@ -49,22 +49,46 @@ export function AdminLayout(): ReactElement | null {
     <div className={styles.shell}>
       <aside className={styles.aside}>
         <h2 className={styles.title}>{t('title')}</h2>
-        <Link to="/admin/users" className={styles.navLink}>
+        <Link
+          to="/admin/users"
+          className={styles.navLink}
+          activeProps={{ className: `${styles.navLink} ${styles.navLinkActive}` }}
+        >
           {t('nav.users')}
         </Link>
-        <Link to="/admin/workspaces" className={styles.navLink}>
+        <Link
+          to="/admin/workspaces"
+          className={styles.navLink}
+          activeProps={{ className: `${styles.navLink} ${styles.navLinkActive}` }}
+        >
           {t('nav.workspaces')}
         </Link>
-        <Link to="/admin/audit-logs" className={styles.navLink}>
+        <Link
+          to="/admin/audit-logs"
+          className={styles.navLink}
+          activeProps={{ className: `${styles.navLink} ${styles.navLinkActive}` }}
+        >
           {t('nav.audit_logs')}
         </Link>
-        <Link to="/admin/admins" className={styles.navLink}>
+        <Link
+          to="/admin/admins"
+          className={styles.navLink}
+          activeProps={{ className: `${styles.navLink} ${styles.navLinkActive}` }}
+        >
           {t('nav.admins')}
         </Link>
-        <Link to="/admin/stats" className={styles.navLink}>
+        <Link
+          to="/admin/stats"
+          className={styles.navLink}
+          activeProps={{ className: `${styles.navLink} ${styles.navLinkActive}` }}
+        >
           {t('nav.stats')}
         </Link>
-        <Link to="/admin/settings" className={styles.navLink}>
+        <Link
+          to="/admin/settings"
+          className={styles.navLink}
+          activeProps={{ className: `${styles.navLink} ${styles.navLinkActive}` }}
+        >
           {t('nav.settings')}
         </Link>
         <div className={styles.spacer} />

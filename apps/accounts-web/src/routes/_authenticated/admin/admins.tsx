@@ -10,6 +10,8 @@ import { type ReactElement, useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { useInvalidateInstanceStats } from '../../../features/admin-stats/api';
+import { adminTableStyle, adminTdStyle, adminThStyle } from '../../../features/admin/styles';
+import { formatTimestamp } from '../../../lib/format-timestamp';
 import { sdk } from '../../../lib/sdk';
 import { useSubmitGuard } from '../../../lib/use-submit-guard';
 
@@ -30,29 +32,6 @@ interface UserSearchResult {
   id: string;
   email: string;
   displayName: string;
-}
-
-const tableStyle: React.CSSProperties = {
-  width: '100%',
-  borderCollapse: 'collapse',
-  fontSize: 'var(--nf-text-sm)',
-};
-
-const thStyle: React.CSSProperties = {
-  textAlign: 'start',
-  padding: 'var(--nf-space-2) var(--nf-space-3)',
-  borderBlockEnd: '2px solid var(--nf-color-border)',
-  fontWeight: 600,
-  color: 'var(--nf-color-fg-muted)',
-};
-
-const tdStyle: React.CSSProperties = {
-  padding: 'var(--nf-space-2) var(--nf-space-3)',
-  borderBlockEnd: '1px solid var(--nf-color-border)',
-};
-
-function formatTimestamp(ts: number): string {
-  return new Date(ts * 1000).toLocaleString();
 }
 
 export function AdminsPage(): ReactElement {
@@ -180,24 +159,24 @@ export function AdminsPage(): ReactElement {
         <p style={{ color: 'var(--nf-color-fg-muted)' }}>{t('admins.no_admins')}</p>
       ) : (
         <div style={{ overflowX: 'auto' }}>
-          <table style={tableStyle}>
+          <table style={adminTableStyle}>
             <thead>
               <tr>
-                <th style={thStyle}>{t('admins.name')}</th>
-                <th style={thStyle}>{t('admins.email')}</th>
-                <th style={thStyle}>{t('admins.granted_at')}</th>
-                <th style={thStyle}>{t('admins.granted_by')}</th>
-                <th style={thStyle} />
+                <th style={adminThStyle}>{t('admins.name')}</th>
+                <th style={adminThStyle}>{t('admins.email')}</th>
+                <th style={adminThStyle}>{t('admins.granted_at')}</th>
+                <th style={adminThStyle}>{t('admins.granted_by')}</th>
+                <th style={adminThStyle} />
               </tr>
             </thead>
             <tbody>
               {admins.map((admin) => (
                 <tr key={admin.id}>
-                  <td style={tdStyle}>{admin.displayName}</td>
-                  <td style={tdStyle}>{admin.email}</td>
-                  <td style={tdStyle}>{formatTimestamp(admin.grantedAt)}</td>
-                  <td style={tdStyle}>{admin.grantedBy}</td>
-                  <td style={tdStyle}>
+                  <td style={adminTdStyle}>{admin.displayName}</td>
+                  <td style={adminTdStyle}>{admin.email}</td>
+                  <td style={adminTdStyle}>{formatTimestamp(admin.grantedAt)}</td>
+                  <td style={adminTdStyle}>{admin.grantedBy}</td>
+                  <td style={adminTdStyle}>
                     <Button
                       variant="danger"
                       disabled={actionLoading}

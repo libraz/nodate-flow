@@ -11,7 +11,16 @@ import { type ReactElement, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { useInvalidateInstanceStats } from '../../../features/admin-stats/api';
+import {
+  adminBadgeBase,
+  adminLabelStyle,
+  adminTdStyle,
+  adminThStyle,
+  adminValueStyle,
+} from '../../../features/admin/styles';
+import { formatTimestamp } from '../../../lib/format-timestamp';
 import { sdk } from '../../../lib/sdk';
+import { useSubmitGuard } from '../../../lib/use-submit-guard';
 
 interface UserDetail {
   id: string;
@@ -39,46 +48,12 @@ interface SessionsResponse {
   total: number;
 }
 
-const labelStyle: React.CSSProperties = {
-  color: 'var(--nf-color-fg-muted)',
-  fontSize: 'var(--nf-text-xs)',
-  marginBlockEnd: 'var(--nf-space-1)',
-};
-
-const valueStyle: React.CSSProperties = {
-  fontSize: 'var(--nf-text-sm)',
-  marginBlockEnd: 'var(--nf-space-3)',
-};
-
-const badgeBase: React.CSSProperties = {
-  display: 'inline-block',
-  padding: '0.125rem 0.5rem',
-  borderRadius: 'var(--nf-radius-pill)',
-  fontSize: 'var(--nf-text-xs)',
-  fontWeight: 500,
-};
-
-const thStyle: React.CSSProperties = {
-  textAlign: 'start',
-  padding: 'var(--nf-space-2) var(--nf-space-3)',
-  borderBlockEnd: '2px solid var(--nf-color-border)',
-  fontWeight: 600,
-  color: 'var(--nf-color-fg-muted)',
-  fontSize: 'var(--nf-text-sm)',
-};
-
-const tdStyle: React.CSSProperties = {
-  padding: 'var(--nf-space-2) var(--nf-space-3)',
-  borderBlockEnd: '1px solid var(--nf-color-border)',
-  fontSize: 'var(--nf-text-sm)',
-};
-
-function formatTimestamp(ts: number | null | undefined, never: string): string {
-  if (ts === null || ts === undefined || ts === 0) return never;
-  return new Date(ts * 1000).toLocaleString();
-}
-
-function UserDetailPage(): ReactElement {
+/**
+ * Renders the user detail content. Exported so unit tests can mount the
+ * page without a real router; the production route still wires it via
+ * `createFileRoute(...)({ component: UserDetailPage })` below.
+ */
+export function UserDetailPage(): ReactElement {
   const { userId } = Route.useParams();
   const { t } = useTranslation('admin');
   const invalidateInstanceStats = useInvalidateInstanceStats();
@@ -86,7 +61,16 @@ function UserDetailPage(): ReactElement {
   const [sessions, setSessions] = useState<UserSession[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [actionLoading, setActionLoading] = useState(false);
+  // Each destructive action gets its own guard so a slow suspend cannot
+  // race with an admin grant / session revoke. The previous shared boolean
+  // disabled all buttons during any in-flight call but did not prevent the
+  // second handler from firing if the user clicked it during the same tick
+  // before React re-rendered. Per-action guards close that race and let
+  // unrelated buttons (e.g. revoke session N vs revoke session M) keep
+  // operating independently.
+  const enabledGuard = useSubmitGuard();
+  const adminGuard = useSubmitGuard();
+  const sessionGuard = useSubmitGuard();
 
   useEffect(() => {
     setLoading(true);
@@ -118,19 +102,20 @@ function UserDetailPage(): ReactElement {
       confirmLabel: user.enabled ? t('users.suspend') : t('users.enable'),
     });
     if (!ok) return;
-
-    setActionLoading(true);
-    await sdk.PATCH('/admin/users/{userId}', {
-      params: { path: { userId } },
-      body: { enabled: !user.enabled },
-    });
-    setActionLoading(false);
-
-    // Refetch to get updated state
-    const result = await sdk.GET('/admin/users/{userId}', { params: { path: { userId } } });
-    if (result.data) {
-      setUser(result.data as UserDetail);
-      void invalidateInstanceStats();
+    if (enabledGuard.guard()) return;
+    try {
+      await sdk.PATCH('/admin/users/{userId}', {
+        params: { path: { userId } },
+        body: { enabled: !user.enabled },
+      });
+      // Refetch to get updated state
+      const result = await sdk.GET('/admin/users/{userId}', { params: { path: { userId } } });
+      if (result.data) {
+        setUser(result.data as UserDetail);
+        void invalidateInstanceStats();
+      }
+    } finally {
+      enabledGuard.end();
     }
   };
 
@@ -144,17 +129,24 @@ function UserDetailPage(): ReactElement {
         confirmLabel: t('admins.revoke'),
       });
       if (!ok) return;
-      setActionLoading(true);
-      await sdk.DELETE('/admin/instance-admins/{adminId}', {
-        params: { path: { adminId: userId } },
-      });
+      if (adminGuard.guard()) return;
+      try {
+        await sdk.DELETE('/admin/instance-admins/{adminId}', {
+          params: { path: { adminId: userId } },
+        });
+      } finally {
+        adminGuard.end();
+      }
     } else {
-      setActionLoading(true);
-      await sdk.POST('/admin/instance-admins', {
-        body: { userId: user.id },
-      });
+      if (adminGuard.guard()) return;
+      try {
+        await sdk.POST('/admin/instance-admins', {
+          body: { userId: user.id },
+        });
+      } finally {
+        adminGuard.end();
+      }
     }
-    setActionLoading(false);
 
     // Refetch
     const result = await sdk.GET('/admin/users/{userId}', { params: { path: { userId } } });
@@ -165,14 +157,16 @@ function UserDetailPage(): ReactElement {
   };
 
   const handleRevokeSession = async (sessionId: string) => {
-    setActionLoading(true);
-    const { error: err } = await sdk.DELETE('/admin/sessions/{sessionId}', {
-      params: { path: { sessionId } },
-    });
-    setActionLoading(false);
-
-    if (!err) {
-      setSessions((prev) => prev.filter((s) => s.id !== sessionId));
+    if (sessionGuard.guard()) return;
+    try {
+      const { error: err } = await sdk.DELETE('/admin/sessions/{sessionId}', {
+        params: { path: { sessionId } },
+      });
+      if (!err) {
+        setSessions((prev) => prev.filter((s) => s.id !== sessionId));
+      }
+    } finally {
+      sessionGuard.end();
     }
   };
 
@@ -183,9 +177,6 @@ function UserDetailPage(): ReactElement {
   if (error || !user) {
     return (
       <div>
-        <Link to="/admin/users" style={{ color: 'var(--nf-color-accent)' }}>
-          {t('common.back_to_users')}
-        </Link>
         <p
           role="alert"
           style={{
@@ -202,13 +193,7 @@ function UserDetailPage(): ReactElement {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--nf-space-6)' }}>
       <div>
-        <Link
-          to="/admin/users"
-          style={{
-            color: 'var(--nf-color-accent)',
-            fontSize: 'var(--nf-text-sm)',
-          }}
-        >
+        <Link to="/admin/users" className="aw-link aw-text-sm">
           {t('common.back_to_users')}
         </Link>
       </div>
@@ -230,17 +215,17 @@ function UserDetailPage(): ReactElement {
           borderRadius: 'var(--nf-radius-md)',
         }}
       >
-        <div style={labelStyle}>{t('users.name')}</div>
-        <div style={valueStyle}>{user.displayName}</div>
+        <div style={adminLabelStyle}>{t('users.name')}</div>
+        <div style={adminValueStyle}>{user.displayName}</div>
 
-        <div style={labelStyle}>{t('users.email')}</div>
-        <div style={valueStyle}>{user.email}</div>
+        <div style={adminLabelStyle}>{t('users.email')}</div>
+        <div style={adminValueStyle}>{user.email}</div>
 
-        <div style={labelStyle}>{t('users.status')}</div>
-        <div style={valueStyle}>
+        <div style={adminLabelStyle}>{t('users.status')}</div>
+        <div style={adminValueStyle}>
           <span
             style={{
-              ...badgeBase,
+              ...adminBadgeBase,
               background: user.enabled
                 ? 'color-mix(in srgb, var(--nf-color-success) 15%, transparent)'
                 : 'color-mix(in srgb, var(--nf-color-danger) 15%, transparent)',
@@ -251,28 +236,32 @@ function UserDetailPage(): ReactElement {
           </span>
         </div>
 
-        <div style={labelStyle}>{t('users.admin')}</div>
-        <div style={valueStyle}>{user.isInstanceAdmin ? t('common.yes') : t('common.no')}</div>
+        <div style={adminLabelStyle}>{t('users.admin')}</div>
+        <div style={adminValueStyle}>{user.isInstanceAdmin ? t('common.yes') : t('common.no')}</div>
 
-        <div style={labelStyle}>{t('users.workspaces')}</div>
-        <div style={valueStyle}>{user.workspaceCount}</div>
+        <div style={adminLabelStyle}>{t('users.workspaces')}</div>
+        <div style={adminValueStyle}>{user.workspaceCount}</div>
 
-        <div style={labelStyle}>{t('users.last_login')}</div>
-        <div style={valueStyle}>{formatTimestamp(user.lastLoginAt, t('common.never'))}</div>
+        <div style={adminLabelStyle}>{t('users.last_login')}</div>
+        <div style={adminValueStyle}>{formatTimestamp(user.lastLoginAt, t('common.never'))}</div>
 
-        <div style={labelStyle}>{t('users.created_at')}</div>
-        <div style={valueStyle}>{formatTimestamp(user.createdAt, t('common.never'))}</div>
+        <div style={adminLabelStyle}>{t('users.created_at')}</div>
+        <div style={adminValueStyle}>{formatTimestamp(user.createdAt, t('common.never'))}</div>
       </div>
 
       <div style={{ display: 'flex', gap: 'var(--nf-space-3)' }}>
         <Button
           variant="default"
-          disabled={actionLoading}
+          disabled={enabledGuard.submitting}
           onClick={() => void handleToggleEnabled()}
         >
           {user.enabled ? t('users.suspend') : t('users.enable')}
         </Button>
-        <Button variant="default" disabled={actionLoading} onClick={() => void handleToggleAdmin()}>
+        <Button
+          variant="default"
+          disabled={adminGuard.submitting}
+          onClick={() => void handleToggleAdmin()}
+        >
           {user.isInstanceAdmin ? t('users.revoke_admin') : t('users.grant_admin')}
         </Button>
       </div>
@@ -301,10 +290,10 @@ function UserDetailPage(): ReactElement {
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
               <tr>
-                <th style={thStyle}>{t('users.user_agent')}</th>
-                <th style={thStyle}>IP</th>
-                <th style={thStyle}>{t('users.created_at')}</th>
-                <th style={thStyle}>
+                <th style={adminThStyle}>{t('users.user_agent')}</th>
+                <th style={adminThStyle}>{t('users.ip_address')}</th>
+                <th style={adminThStyle}>{t('users.created_at')}</th>
+                <th style={adminThStyle}>
                   <VisuallyHidden>{t('users.session_actions')}</VisuallyHidden>
                 </th>
               </tr>
@@ -312,14 +301,14 @@ function UserDetailPage(): ReactElement {
             <tbody>
               {sessions.map((s) => (
                 <tr key={s.id}>
-                  <td style={tdStyle}>{s.userAgent}</td>
-                  <td style={tdStyle}>{s.ipAddress}</td>
-                  <td style={tdStyle}>{formatTimestamp(s.createdAt, t('common.never'))}</td>
-                  <td style={tdStyle}>
+                  <td style={adminTdStyle}>{s.userAgent}</td>
+                  <td style={adminTdStyle}>{s.ipAddress}</td>
+                  <td style={adminTdStyle}>{formatTimestamp(s.createdAt, t('common.never'))}</td>
+                  <td style={adminTdStyle}>
                     {s.active ? (
                       <Button
                         variant="danger"
-                        disabled={actionLoading}
+                        disabled={sessionGuard.submitting}
                         onClick={() => void handleRevokeSession(s.id)}
                       >
                         {t('admins.revoke')}

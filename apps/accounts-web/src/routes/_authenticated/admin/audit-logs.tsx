@@ -9,6 +9,8 @@ import { createFileRoute } from '@tanstack/react-router';
 import { type ReactElement, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { adminTableStyle, adminTdStyle, adminThStyle } from '../../../features/admin/styles';
+import { formatTimestamp } from '../../../lib/format-timestamp';
 import { sdk } from '../../../lib/sdk';
 
 interface AuditLogEntry {
@@ -25,29 +27,6 @@ interface AuditLogEntry {
 interface AuditLogsResponse {
   items: AuditLogEntry[];
   total: number;
-}
-
-const tableStyle: React.CSSProperties = {
-  width: '100%',
-  borderCollapse: 'collapse',
-  fontSize: 'var(--nf-text-sm)',
-};
-
-const thStyle: React.CSSProperties = {
-  textAlign: 'start',
-  padding: 'var(--nf-space-2) var(--nf-space-3)',
-  borderBlockEnd: '2px solid var(--nf-color-border)',
-  fontWeight: 600,
-  color: 'var(--nf-color-fg-muted)',
-};
-
-const tdStyle: React.CSSProperties = {
-  padding: 'var(--nf-space-2) var(--nf-space-3)',
-  borderBlockEnd: '1px solid var(--nf-color-border)',
-};
-
-function formatTimestamp(ts: number): string {
-  return new Date(ts * 1000).toLocaleString();
 }
 
 /** Format an ISO `YYYY-MM-DD` string using the given BCP 47 locale. */
@@ -229,27 +208,27 @@ function AuditLogsPage(): ReactElement {
         <p style={{ color: 'var(--nf-color-fg-muted)' }}>{t('audit_logs.no_results')}</p>
       ) : (
         <div style={{ overflowX: 'auto' }}>
-          <table style={tableStyle}>
+          <table style={adminTableStyle}>
             <thead>
               <tr>
-                <th style={thStyle}>{t('audit_logs.occurred_at')}</th>
-                <th style={thStyle}>{t('audit_logs.action')}</th>
-                <th style={thStyle}>{t('audit_logs.actor')}</th>
-                <th style={thStyle}>{t('audit_logs.target')}</th>
-                <th style={thStyle}>{t('audit_logs.ip_address')}</th>
+                <th style={adminThStyle}>{t('audit_logs.occurred_at')}</th>
+                <th style={adminThStyle}>{t('audit_logs.action')}</th>
+                <th style={adminThStyle}>{t('audit_logs.actor')}</th>
+                <th style={adminThStyle}>{t('audit_logs.target')}</th>
+                <th style={adminThStyle}>{t('audit_logs.ip_address')}</th>
               </tr>
             </thead>
             <tbody>
               {entries.map((entry) => (
                 <tr key={entry.id}>
-                  <td style={tdStyle}>{formatTimestamp(entry.occurredAt)}</td>
-                  <td style={tdStyle}>{entry.action}</td>
-                  <td style={tdStyle}>{entry.actorEmail}</td>
-                  <td style={tdStyle}>
+                  <td style={adminTdStyle}>{formatTimestamp(entry.occurredAt)}</td>
+                  <td style={adminTdStyle}>{entry.action}</td>
+                  <td style={adminTdStyle}>{entry.actorEmail}</td>
+                  <td style={adminTdStyle}>
                     {entry.targetType}
                     {entry.workspaceName ? ` (${entry.workspaceName})` : ''}
                   </td>
-                  <td style={tdStyle}>{entry.ipAddress}</td>
+                  <td style={adminTdStyle}>{entry.ipAddress}</td>
                 </tr>
               ))}
             </tbody>

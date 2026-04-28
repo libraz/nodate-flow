@@ -8,6 +8,13 @@ import { Link, createFileRoute } from '@tanstack/react-router';
 import { type ReactElement, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import {
+  adminBadgeBase,
+  adminTableStyle,
+  adminTdStyle,
+  adminThStyle,
+} from '../../../features/admin/styles';
+import { formatTimestamp } from '../../../lib/format-timestamp';
 import { sdk } from '../../../lib/sdk';
 
 interface AdminWorkspace {
@@ -26,39 +33,6 @@ interface WorkspacesResponse {
 }
 
 type StatusFilter = 'all' | 'active' | 'suspended';
-
-const tableStyle: React.CSSProperties = {
-  width: '100%',
-  borderCollapse: 'collapse',
-  fontSize: 'var(--nf-text-sm)',
-};
-
-const thStyle: React.CSSProperties = {
-  textAlign: 'start',
-  padding: 'var(--nf-space-2) var(--nf-space-3)',
-  borderBlockEnd: '2px solid var(--nf-color-border)',
-  fontWeight: 600,
-  color: 'var(--nf-color-fg-muted)',
-  whiteSpace: 'nowrap',
-};
-
-const tdStyle: React.CSSProperties = {
-  padding: 'var(--nf-space-2) var(--nf-space-3)',
-  borderBlockEnd: '1px solid var(--nf-color-border)',
-};
-
-const badgeBase: React.CSSProperties = {
-  display: 'inline-block',
-  padding: '0.125rem 0.5rem',
-  borderRadius: 'var(--nf-radius-pill)',
-  fontSize: 'var(--nf-text-xs)',
-  fontWeight: 500,
-};
-
-function formatTimestamp(ts: number | null, never: string): string {
-  if (ts === null || ts === 0) return never;
-  return new Date(ts * 1000).toLocaleString();
-}
 
 function WorkspacesPage(): ReactElement {
   const { t } = useTranslation('admin');
@@ -182,21 +156,21 @@ function WorkspacesPage(): ReactElement {
         <p style={{ color: 'var(--nf-color-fg-muted)' }}>{t('workspaces.no_results')}</p>
       ) : (
         <div style={{ overflowX: 'auto' }}>
-          <table style={tableStyle}>
+          <table style={adminTableStyle}>
             <thead>
               <tr>
-                <th style={thStyle}>{t('workspaces.name')}</th>
-                <th style={thStyle}>{t('workspaces.slug')}</th>
-                <th style={thStyle}>{t('workspaces.members')}</th>
-                <th style={thStyle}>{t('workspaces.projects')}</th>
-                <th style={thStyle}>{t('workspaces.status')}</th>
-                <th style={thStyle}>{t('workspaces.created_at')}</th>
+                <th style={adminThStyle}>{t('workspaces.name')}</th>
+                <th style={adminThStyle}>{t('workspaces.slug')}</th>
+                <th style={adminThStyle}>{t('workspaces.members')}</th>
+                <th style={adminThStyle}>{t('workspaces.projects')}</th>
+                <th style={adminThStyle}>{t('workspaces.status')}</th>
+                <th style={adminThStyle}>{t('workspaces.created_at')}</th>
               </tr>
             </thead>
             <tbody>
               {workspaces.map((ws) => (
                 <tr key={ws.id}>
-                  <td style={tdStyle}>
+                  <td style={adminTdStyle}>
                     <Link
                       to="/admin/workspaces/$wsId"
                       params={{ wsId: ws.id }}
@@ -205,13 +179,13 @@ function WorkspacesPage(): ReactElement {
                       {ws.name}
                     </Link>
                   </td>
-                  <td style={tdStyle}>{ws.slug}</td>
-                  <td style={tdStyle}>{ws.memberCount}</td>
-                  <td style={tdStyle}>{ws.projectCount}</td>
-                  <td style={tdStyle}>
+                  <td style={adminTdStyle}>{ws.slug}</td>
+                  <td style={adminTdStyle}>{ws.memberCount}</td>
+                  <td style={adminTdStyle}>{ws.projectCount}</td>
+                  <td style={adminTdStyle}>
                     <span
                       style={{
-                        ...badgeBase,
+                        ...adminBadgeBase,
                         background: ws.enabled
                           ? 'color-mix(in srgb, var(--nf-color-success) 15%, transparent)'
                           : 'color-mix(in srgb, var(--nf-color-danger) 15%, transparent)',
@@ -221,7 +195,7 @@ function WorkspacesPage(): ReactElement {
                       {ws.enabled ? t('workspaces.enabled') : t('workspaces.disabled')}
                     </span>
                   </td>
-                  <td style={tdStyle}>{formatTimestamp(ws.createdAt, t('common.never'))}</td>
+                  <td style={adminTdStyle}>{formatTimestamp(ws.createdAt, t('common.never'))}</td>
                 </tr>
               ))}
             </tbody>

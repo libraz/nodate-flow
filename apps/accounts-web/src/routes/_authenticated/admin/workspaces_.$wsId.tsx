@@ -8,6 +8,8 @@ import { Link, createFileRoute } from '@tanstack/react-router';
 import { type ReactElement, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { adminBadgeBase, adminLabelStyle, adminValueStyle } from '../../../features/admin/styles';
+import { formatTimestamp } from '../../../lib/format-timestamp';
 import { sdk } from '../../../lib/sdk';
 
 interface WorkspaceDetail {
@@ -18,30 +20,6 @@ interface WorkspaceDetail {
   projectCount: number;
   enabled: boolean;
   createdAt: number;
-}
-
-const labelStyle: React.CSSProperties = {
-  color: 'var(--nf-color-fg-muted)',
-  fontSize: 'var(--nf-text-xs)',
-  marginBlockEnd: 'var(--nf-space-1)',
-};
-
-const valueStyle: React.CSSProperties = {
-  fontSize: 'var(--nf-text-sm)',
-  marginBlockEnd: 'var(--nf-space-3)',
-};
-
-const badgeBase: React.CSSProperties = {
-  display: 'inline-block',
-  padding: '0.125rem 0.5rem',
-  borderRadius: 'var(--nf-radius-pill)',
-  fontSize: 'var(--nf-text-xs)',
-  fontWeight: 500,
-};
-
-function formatTimestamp(ts: number | null, never: string): string {
-  if (ts === null || ts === 0) return never;
-  return new Date(ts * 1000).toLocaleString();
 }
 
 function WorkspaceDetailPage(): ReactElement {
@@ -151,23 +129,23 @@ function WorkspaceDetailPage(): ReactElement {
           borderRadius: 'var(--nf-radius-md)',
         }}
       >
-        <div style={labelStyle}>{t('workspaces.name')}</div>
-        <div style={valueStyle}>{workspace.name}</div>
+        <div style={adminLabelStyle}>{t('workspaces.name')}</div>
+        <div style={adminValueStyle}>{workspace.name}</div>
 
-        <div style={labelStyle}>{t('workspaces.slug')}</div>
-        <div style={valueStyle}>{workspace.slug}</div>
+        <div style={adminLabelStyle}>{t('workspaces.slug')}</div>
+        <div style={adminValueStyle}>{workspace.slug}</div>
 
-        <div style={labelStyle}>{t('workspaces.members')}</div>
-        <div style={valueStyle}>{workspace.memberCount}</div>
+        <div style={adminLabelStyle}>{t('workspaces.members')}</div>
+        <div style={adminValueStyle}>{workspace.memberCount}</div>
 
-        <div style={labelStyle}>{t('workspaces.projects')}</div>
-        <div style={valueStyle}>{workspace.projectCount}</div>
+        <div style={adminLabelStyle}>{t('workspaces.projects')}</div>
+        <div style={adminValueStyle}>{workspace.projectCount}</div>
 
-        <div style={labelStyle}>{t('workspaces.status')}</div>
-        <div style={valueStyle}>
+        <div style={adminLabelStyle}>{t('workspaces.status')}</div>
+        <div style={adminValueStyle}>
           <span
             style={{
-              ...badgeBase,
+              ...adminBadgeBase,
               background: workspace.enabled ? 'var(--nf-color-success)' : 'var(--nf-color-danger)',
               color: workspace.enabled ? 'var(--nf-color-success)' : 'var(--nf-color-danger)',
             }}
@@ -176,8 +154,8 @@ function WorkspaceDetailPage(): ReactElement {
           </span>
         </div>
 
-        <div style={labelStyle}>{t('workspaces.created_at')}</div>
-        <div style={valueStyle}>{formatTimestamp(workspace.createdAt, t('common.never'))}</div>
+        <div style={adminLabelStyle}>{t('workspaces.created_at')}</div>
+        <div style={adminValueStyle}>{formatTimestamp(workspace.createdAt, t('common.never'))}</div>
       </div>
 
       <div>
