@@ -13,7 +13,7 @@ func TestOIDCStateSignVerifyRoundTrip(t *testing.T) {
 	}
 
 	nonce := "abc123"
-	tok, err := iss.SignOIDCState(nonce)
+	tok, err := iss.SignOIDCStateForProvider(nonce, "github")
 	if err != nil {
 		t.Fatalf("sign oidc state: %v", err)
 	}
@@ -21,7 +21,7 @@ func TestOIDCStateSignVerifyRoundTrip(t *testing.T) {
 		t.Fatal("signed token is empty")
 	}
 
-	got, err := iss.VerifyOIDCState(tok)
+	got, err := iss.VerifyOIDCStateForProvider(tok, "github")
 	if err != nil {
 		t.Fatalf("verify oidc state: %v", err)
 	}
@@ -33,8 +33,8 @@ func TestOIDCStateSignVerifyRoundTrip(t *testing.T) {
 func TestOIDCStateRejectsTampered(t *testing.T) {
 	t.Parallel()
 	iss, _ := NewJWTIssuer(nil, "nodate-flow", "api", time.Minute)
-	tok, _ := iss.SignOIDCState("nonce123")
-	if _, err := iss.VerifyOIDCState(tok + "garbage"); err == nil {
+	tok, _ := iss.SignOIDCStateForProvider("nonce123", "github")
+	if _, err := iss.VerifyOIDCStateForProvider(tok+"garbage", "github"); err == nil {
 		t.Fatal("expected error on tampered oidc state token")
 	}
 }
@@ -45,7 +45,7 @@ func TestOIDCStateRejectsAccessToken(t *testing.T) {
 	// An access token should not be accepted as an OIDC state token
 	// because they have different audiences.
 	accessTok, _, _ := iss.Sign([16]byte{1}, [16]byte{2})
-	if _, err := iss.VerifyOIDCState(accessTok); err == nil {
+	if _, err := iss.VerifyOIDCStateForProvider(accessTok, "github"); err == nil {
 		t.Fatal("access token should not be accepted as oidc state")
 	}
 }
@@ -55,7 +55,7 @@ func TestOIDCStateRejectsTotpChallenge(t *testing.T) {
 	iss, _ := NewJWTIssuer(nil, "nodate-flow", "api", time.Minute)
 	// A TOTP challenge token should not be accepted as an OIDC state token.
 	totpTok, _, _ := iss.SignTotpChallenge("01961234-5678-7aaa-bbbb-ccccddddeeee")
-	if _, err := iss.VerifyOIDCState(totpTok); err == nil {
+	if _, err := iss.VerifyOIDCStateForProvider(totpTok, "github"); err == nil {
 		t.Fatal("totp challenge should not be accepted as oidc state")
 	}
 }

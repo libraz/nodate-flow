@@ -187,7 +187,7 @@ func Int32ToUint32(n sql.NullInt32) uint32 {
 	if !n.Valid {
 		return 0
 	}
-	return uint32(n.Int32)
+	return uint32(n.Int32) //#nosec G115 -- internal row id, bounded by realistic workspace size; complement of NullInt32From
 }
 
 // NullStr converts a sql.NullString to a plain Go string, returning the

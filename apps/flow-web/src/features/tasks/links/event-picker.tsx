@@ -234,7 +234,6 @@ export default function EventPicker({
     <div
       ref={popoverRef}
       className={styles.popover}
-      // biome-ignore lint/a11y/useSemanticElements: <dialog> implies modal semantics; this is a non-modal anchored popover and must not block the surrounding page
       role="dialog"
       aria-modal="false"
       aria-label={t('trigger.linkEvent')}
@@ -281,9 +280,6 @@ export default function EventPicker({
       ) : null}
       {showEmptyHint ? <p className={styles.resultsHint}>{t('picker.searchPlaceholder')}</p> : null}
 
-      {/* biome-ignore lint/a11y/useFocusableInteractive: focus stays on the combobox input; options are addressed via aria-activedescendant per the WAI-ARIA combobox pattern */}
-      {/* biome-ignore lint/a11y/noNoninteractiveElementToInteractiveRole: combobox + listbox + activedescendant pattern requires the listbox role on a host element */}
-      {/* biome-ignore lint/a11y/useSemanticElements: <select> cannot render the date/title/already-linked tri-column rows or the past-divider grouping */}
       <ul id={listboxId} role="listbox" className={styles.results}>
         {upcoming.map((entry) => (
           <ResultRow
@@ -363,7 +359,6 @@ function ResultRow({
     // biome-ignore lint/a11y/useFocusableInteractive: activedescendant pattern keeps focus on the input; options are not individually focusable by design
     // biome-ignore lint/a11y/useSemanticElements: <option> cannot host the date/title/already-linked tri-column layout or arbitrary children
     <li
-      // biome-ignore lint/a11y/noNoninteractiveElementToInteractiveRole: combobox + listbox + activedescendant pattern requires the option role on each row inside the listbox
       role="option"
       id={optionId}
       aria-selected={isActive}

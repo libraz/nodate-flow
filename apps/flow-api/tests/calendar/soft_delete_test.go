@@ -272,8 +272,9 @@ func seedEventChildren(
 	// The invite token_hash unique-key is BINARY(32). Seed it with a
 	// per-test random value so parallel runs cannot collide.
 	tokenHash := make([]byte, 32)
+	salt := int(evtInternalID) % 251
 	for i := range tokenHash {
-		tokenHash[i] = byte(i + int(evtInternalID)%251)
+		tokenHash[i] = byte((i + salt) & 0xff)
 	}
 	_, err = testDB.ExecContext(ctx, `
 		INSERT INTO calendar_event_invites

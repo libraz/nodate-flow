@@ -82,7 +82,7 @@ func RegisterAiSuggestions(api huma.API, deps TriageDeps) {
 		Summary:       "Mark an AI suggestion as applied",
 		Description:   "Appends an ai.suggestion.applied reaction event so the suggestion drops out of the pending list. The actual side-effect (e.g. archive or assign) is performed separately by the client; this endpoint only records the user's choice.",
 		DefaultStatus: http.StatusNoContent,
-		Tags:        []string{"Tasks"},
+		Tags:          []string{"Tasks"},
 	}, ApplyAiSuggestion(deps))
 	huma.Register(api, huma.Operation{
 		OperationID:   "ai-suggestions-dismiss",
@@ -91,7 +91,7 @@ func RegisterAiSuggestions(api huma.API, deps TriageDeps) {
 		Summary:       "Dismiss an AI suggestion",
 		Description:   "Appends an ai.suggestion.dismissed reaction event so the suggestion drops out of the pending list and the AI metrics counter records the negative signal.",
 		DefaultStatus: http.StatusNoContent,
-		Tags:        []string{"Tasks"},
+		Tags:          []string{"Tasks"},
 	}, DismissAiSuggestion(deps))
 }
 
