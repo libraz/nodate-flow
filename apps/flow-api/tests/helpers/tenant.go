@@ -10,11 +10,39 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"sync"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/require"
 )
+
+// cleanupDB is the *sql.DB used by CreateTestTenant's auto-registered
+// t.Cleanup to purge per-test workspace rows. It is set once per test
+// binary by RegisterCleanupDB (typically from TestMain) and read by the
+// REST helper without forcing every call site to pass a *sql.DB.
+var (
+	cleanupDBMu sync.RWMutex
+	cleanupDB   *sql.DB
+)
+
+// RegisterCleanupDB stores the database handle that auto-registered
+// per-tenant cleanups should target. Call it once from TestMain before
+// running tests; subsequent CreateTestTenant calls will then schedule
+// PurgeWorkspace via t.Cleanup automatically. Safe to call with a nil
+// db (cleanup is then a no-op, useful when the test package owns its
+// own teardown strategy).
+func RegisterCleanupDB(db *sql.DB) {
+	cleanupDBMu.Lock()
+	cleanupDB = db
+	cleanupDBMu.Unlock()
+}
+
+func getCleanupDB() *sql.DB {
+	cleanupDBMu.RLock()
+	defer cleanupDBMu.RUnlock()
+	return cleanupDB
+}
 
 // TestTenant is the bundle of identifiers and tokens that a single
 // integration test needs in order to act as an isolated user. Each
@@ -103,6 +131,13 @@ func CreateTestTenant(t *testing.T, baseURL string) *TestTenant {
 		tt.AccessToken, prjBody, &prjResp)
 	require.NotEmpty(t, prjResp.ID, "project create did not return id")
 	tt.ProjectPublicID = prjResp.ID
+
+	// Auto-register workspace purge so every test that creates a tenant
+	// gets cleanup for free. Skipped if RegisterCleanupDB was not called.
+	if db := getCleanupDB(); db != nil {
+		wsPub := tt.WorkspacePublicID
+		t.Cleanup(func() { PurgeWorkspace(t, db, wsPub) })
+	}
 
 	return tt
 }

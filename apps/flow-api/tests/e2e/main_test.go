@@ -46,6 +46,7 @@ func TestMain(m *testing.M) {
 	}
 	testServerURL = srv.BaseURL
 	testDB = inst.DB
+	helpers.RegisterCleanupDB(inst.DB)
 	code := m.Run()
 	cleanup()
 	os.Exit(code)

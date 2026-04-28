@@ -57,10 +57,10 @@ test.describe('public share create', () => {
       page.getByText(/no public share pages yet\.|公開シェアページはまだありません。/i),
     ).toBeVisible();
 
-    // Open the create dialog. Two buttons share the "Create share" label
-    // pattern (header + dialog submit), but only the header button is
-    // visible before the dialog opens.
-    await page.getByRole('button', { name: /^(create share|シェアを作成)$/i }).click();
+    // Open the create dialog. The header button has its own testid so
+    // we don't collide with the dialog's primary submit (which shares
+    // the "Create" label).
+    await page.getByTestId('public-share-create-open').click();
 
     const dialog = page.getByRole('dialog');
     await expect(dialog).toBeVisible({ timeout: 5_000 });
@@ -78,9 +78,8 @@ test.describe('public share create', () => {
       .getByPlaceholder(/e\.g\. Group A Official Schedule|例: グループ A 公式スケジュール/i)
       .fill(shareTitle);
 
-    // Submit via the primary action inside the dialog. Scope to `dialog`
-    // so we do not collide with the header's "Create share" button.
-    await dialog.getByRole('button', { name: /^(create|作成する?)$/i }).click();
+    // Submit via the primary action inside the dialog.
+    await dialog.getByTestId('public-share-create-submit').click();
 
     // Stage 2: reveal-once panel. The dialog swaps in a read-only URL
     // field and a Copy action. We match on the URL shape (origin +
@@ -95,12 +94,12 @@ test.describe('public share create', () => {
     const revealedUrl = await urlField.inputValue();
     expect(revealedUrl).toMatch(/^https?:\/\/[^/]+\/share\/cal\/[A-Za-z0-9._-]+$/);
 
-    const copyButton = dialog.getByRole('button', { name: /^(copy|コピー)$/i });
+    const copyButton = dialog.getByTestId('public-share-create-copy');
     await expect(copyButton).toBeVisible();
     await expect(copyButton).toBeEnabled();
 
     // Dismiss the dialog via the reveal-panel Done action.
-    await dialog.getByRole('button', { name: /^(done|完了)$/i }).click();
+    await dialog.getByTestId('public-share-create-done').click();
     await expect(dialog).toBeHidden({ timeout: 5_000 });
 
     // The newly created share should now appear as a row in the table.
@@ -130,19 +129,19 @@ test.describe('public share create', () => {
 
     // Create a share through the dialog so we exercise the UI path
     // end-to-end — no REST shortcut.
-    await page.getByRole('button', { name: /^(create share|シェアを作成)$/i }).click();
+    await page.getByTestId('public-share-create-open').click();
 
     const dialog = page.getByRole('dialog');
     const shareTitle = `Delete-me ${Date.now().toString(36)}`;
     await dialog
       .getByPlaceholder(/e\.g\. Group A Official Schedule|例: グループ A 公式スケジュール/i)
       .fill(shareTitle);
-    await dialog.getByRole('button', { name: /^(create|作成する?)$/i }).click();
+    await dialog.getByTestId('public-share-create-submit').click();
 
     await expect(
       dialog.getByRole('heading', { name: /^(share page created|シェアページを作成しました)$/i }),
     ).toBeVisible({ timeout: 10_000 });
-    await dialog.getByRole('button', { name: /^(done|完了)$/i }).click();
+    await dialog.getByTestId('public-share-create-done').click();
     await expect(dialog).toBeHidden({ timeout: 5_000 });
 
     // Confirm the row landed in the table.
@@ -151,15 +150,15 @@ test.describe('public share create', () => {
 
     // Scope to the table row carrying our share so parallel rows (if
     // any later) cannot confuse the selector. Two buttons live in the
-    // actions cell — Rotate and Delete — so filter by accessible name.
+    // actions cell — Rotate and Delete — so filter by testid.
     const row = page.getByRole('row').filter({ hasText: shareTitle });
-    await row.getByRole('button', { name: /^(delete|削除)$/i }).click();
+    await row.getByTestId('public-share-delete').click();
 
     // Confirmation dialog (imperative confirm primitive) prompts before
     // delete. Click the themed Confirm button.
     const confirmDialog = page.getByRole('dialog');
     await expect(confirmDialog).toBeVisible({ timeout: 5_000 });
-    await confirmDialog.getByRole('button', { name: /^(confirm|実行)$/i }).click();
+    await confirmDialog.getByTestId('confirm-dialog-confirm').click();
     await expect(confirmDialog).toBeHidden({ timeout: 5_000 });
 
     // Row should be gone and the empty-state copy should reappear.

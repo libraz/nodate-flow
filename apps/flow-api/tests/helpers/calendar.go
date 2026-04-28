@@ -93,6 +93,10 @@ func CreateCalendarTestTenant(t *testing.T, srv *TestServer) *CalendarTestTenant
 	token, _, err := srv.JWT.Sign(userPub, dbtype.PublicID{})
 	require.NoError(t, err, "sign test jwt")
 
+	// Auto-register workspace purge so calendar tests get the same
+	// cleanup contract as the REST CreateTestTenant in tenant.go.
+	t.Cleanup(func() { PurgeWorkspace(t, srv.DB, wsPub.String()) })
+
 	return &CalendarTestTenant{
 		BaseURL:           srv.BaseURL,
 		UserPublicID:      userPub,

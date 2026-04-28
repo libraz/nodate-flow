@@ -55,7 +55,7 @@ test.describe('invite create', () => {
 
     // Open the creation dialog. The button sits in the Members tab
     // header next to "Add member".
-    await page.getByRole('button', { name: /^(create invite link|招待リンクを作成)$/i }).click();
+    await page.getByTestId('invite-create-open').click();
 
     const dialog = page.getByRole('dialog');
     await expect(dialog).toBeVisible({ timeout: 5_000 });
@@ -75,7 +75,7 @@ test.describe('invite create', () => {
     const inviteLabel = `E2E invite ${Date.now()}`;
     await dialog.getByLabel(/^(label \(optional\)|ラベル（任意）)$/i).fill(inviteLabel);
 
-    await dialog.getByRole('button', { name: /^(create invite link|招待リンクを作成)$/i }).click();
+    await dialog.getByTestId('invite-create-submit').click();
 
     // Step 2: reveal-once panel. The dialog swaps in a read-only input
     // carrying the fully qualified /invite/<token> URL plus a Copy
@@ -90,12 +90,12 @@ test.describe('invite create', () => {
     const revealedUrl = await tokenField.inputValue();
     expect(revealedUrl).toMatch(/^https?:\/\/[^/]+\/invite\/[A-Za-z0-9._-]+$/);
 
-    const copyButton = dialog.getByRole('button', { name: /^(copy link|リンクをコピー)$/i });
+    const copyButton = dialog.getByTestId('invite-create-copy');
     await expect(copyButton).toBeVisible();
     await expect(copyButton).toBeEnabled();
 
     // Close the dialog via the Close action in the reveal panel.
-    await dialog.getByRole('button', { name: /^(close|閉じる)$/i }).click();
+    await dialog.getByTestId('invite-create-close').click();
     await expect(dialog).toBeHidden({ timeout: 5_000 });
 
     // The active-invites DataGrid (aria-label = "Invite links" / "招待
@@ -120,18 +120,18 @@ test.describe('invite create', () => {
       timeout: 15_000,
     });
 
-    await page.getByRole('button', { name: /^(create invite link|招待リンクを作成)$/i }).click();
+    await page.getByTestId('invite-create-open').click();
 
     const dialog = page.getByRole('dialog');
     const inviteLabel = `Revoke-me ${Date.now()}`;
     await dialog.getByLabel(/^(label \(optional\)|ラベル（任意）)$/i).fill(inviteLabel);
-    await dialog.getByRole('button', { name: /^(create invite link|招待リンクを作成)$/i }).click();
+    await dialog.getByTestId('invite-create-submit').click();
 
     // Wait for reveal panel then dismiss the dialog.
     await expect(
       dialog.getByRole('heading', { name: /^(invite link ready|招待リンクの準備ができました)$/i }),
     ).toBeVisible({ timeout: 10_000 });
-    await dialog.getByRole('button', { name: /^(close|閉じる)$/i }).click();
+    await dialog.getByTestId('invite-create-close').click();
     await expect(dialog).toBeHidden({ timeout: 5_000 });
 
     const invitesGrid = page.getByRole('grid', { name: /^(invite links|招待リンク)$/i });
@@ -142,7 +142,7 @@ test.describe('invite create', () => {
     // the label we just created so parallel rows cannot confuse the
     // selector.
     const row = invitesGrid.getByRole('row').filter({ hasText: inviteLabel });
-    await row.getByRole('button', { name: /^(revoke|無効化)$/i }).click();
+    await row.getByTestId('invite-revoke').click();
 
     // The list hides itself entirely when empty (component returns an
     // empty fragment), so after revoke the grid should disappear.
