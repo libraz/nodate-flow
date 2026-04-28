@@ -1,6 +1,8 @@
 #!/usr/bin/env node
 // Entry point for the `tnk` CLI.
 
+import { pathToFileURL } from 'node:url';
+
 import { c, createCLI, prompt, table } from '@libraz/node-cli';
 
 import { createAuthClient, createFlowClient } from './api.js';
@@ -18,6 +20,7 @@ import {
 import { DateValidationError, assertYmd } from './util/date.js';
 import { EXIT_AUTH, EXIT_RUNTIME, EXIT_VALIDATION, isAuthRequiredError } from './util/exit.js';
 import { optionalYmd, resolveDeprecatedFlag } from './util/flags.js';
+import { type ExamplesByPath, attachExamples } from './util/help.js';
 
 const cli = createCLI({
   name: 'tnk',
@@ -114,9 +117,8 @@ task
     type: 'string',
   })
   .option('--project <projectId>', {
-    description: 'Deprecated alias for --project-id',
+    description: '(DEPRECATED, use --project-id instead) Project public id',
     type: 'string',
-    hidden: true,
   })
   .option('-s, --status <status>', {
     description: 'Filter by derived state',
@@ -127,9 +129,8 @@ task
     type: 'string',
   })
   .option('--workspace <workspaceId>', {
-    description: 'Deprecated alias for --workspace-id',
+    description: '(DEPRECATED, use --workspace-id instead) Workspace public id',
     type: 'string',
-    hidden: true,
   })
   .option('-l, --limit <limit>', {
     description: 'Maximum number of tasks to return',
@@ -245,9 +246,8 @@ task
     required: true,
   })
   .option('--project <projectId>', {
-    description: 'Deprecated alias for --project-id',
+    description: '(DEPRECATED, use --project-id instead) Project public id',
     type: 'string',
-    hidden: true,
   })
   .option('--due <date>', {
     description: 'Due date (YYYY-MM-DD)',
@@ -484,18 +484,16 @@ task
     type: 'string',
   })
   .option('--workspace <workspaceId>', {
-    description: 'Deprecated alias for --workspace-id',
+    description: '(DEPRECATED, use --workspace-id instead) Workspace public id',
     type: 'string',
-    hidden: true,
   })
   .option('-p, --project-id <projectId>', {
     description: 'Project public id (alternative to --workspace-id)',
     type: 'string',
   })
   .option('--project <projectId>', {
-    description: 'Deprecated alias for --project-id',
+    description: '(DEPRECATED, use --project-id instead) Project public id',
     type: 'string',
-    hidden: true,
   })
   .option('-l, --limit <limit>', {
     description: 'Maximum number of tasks to return',
@@ -651,6 +649,45 @@ task
   });
 
 // ---------------------------------------------------------------------------
+// Help examples
+// ---------------------------------------------------------------------------
+const examples: ExamplesByPath = {
+  'auth login': ['tnk auth login'],
+  'auth logout': ['tnk auth logout'],
+  'auth status': ['tnk auth status'],
+  'task list': [
+    'tnk task list',
+    'tnk task list --project-id 9c2ad1d8-1f2c-7e1c-9a8a-44c0c9f0c1ab',
+    'tnk task list --workspace-id 0190f3a6-4e6c-7d2a-94c9-aa86b1f72c11 --status in_progress --limit 50',
+  ],
+  'task create': [
+    'tnk task create --title "Write report" --project-id 9c2ad1d8-1f2c-7e1c-9a8a-44c0c9f0c1ab',
+    'tnk task create --title "Ship release" --project-id 9c2ad1d8-1f2c-7e1c-9a8a-44c0c9f0c1ab --due 2026-05-01 --priority 2',
+    'tnk task create -t "Internal note" -p 9c2ad1d8-1f2c-7e1c-9a8a-44c0c9f0c1ab --visibility private',
+  ],
+  'task update': [
+    'tnk task update 9c2ad1d8 --title "Updated title"',
+    'tnk task update 9c2ad1d8 --state start',
+    'tnk task update 9c2ad1d8 --due 2026-06-15 --priority 3',
+    'tnk task update 9c2ad1d8 --due ""',
+  ],
+  'task search': [
+    'tnk task search "release" --workspace-id 0190f3a6-4e6c-7d2a-94c9-aa86b1f72c11',
+    'tnk task search "report" --project-id 9c2ad1d8-1f2c-7e1c-9a8a-44c0c9f0c1ab --limit 10',
+  ],
+  'task view': ['tnk task view 9c2ad1d8-1f2c-7e1c-9a8a-44c0c9f0c1ab'],
+};
+attachExamples(cli, examples);
+
+export { cli, examples };
+
+// ---------------------------------------------------------------------------
 // Start
 // ---------------------------------------------------------------------------
-cli.start();
+// Only auto-start when this module is the process entry point. Importing
+// it from a test must not consume `process.argv` or open the interactive
+// shell.
+const entry = process.argv[1];
+if (entry && import.meta.url === pathToFileURL(entry).href) {
+  cli.start();
+}
