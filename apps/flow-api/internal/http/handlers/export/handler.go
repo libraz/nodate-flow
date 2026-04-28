@@ -129,13 +129,15 @@ func CSV(deps Deps) http.HandlerFunc {
 		var rows []exportRow
 		var err error
 
+		source := "workspace"
 		if lensID != "" {
+			source = "lens"
 			rows, err = fetchForLens(ctx, deps, ws, lensID, limit)
 		} else {
 			rows, err = fetchForWorkspace(ctx, deps, ws, limit)
 		}
 		if err != nil {
-			writeFetchError(w, err)
+			writeFetchError(ctx, w, source, err)
 			return
 		}
 
@@ -379,8 +381,9 @@ func parseLimit(s string, def int32) int32 {
 // matching problem+json envelope so the wire shape stays identical to
 // the Huma-mediated JSON route. Unknown shapes collapse to
 // INTERNAL.UNEXPECTED so a transport-layer regression does not leak a
-// raw error string.
-func writeFetchError(w http.ResponseWriter, err error) {
+// raw error string — but the original error is logged first so the
+// fallback never silently swallows an unfamiliar failure mode.
+func writeFetchError(ctx context.Context, w http.ResponseWriter, source string, err error) {
 	var hm *huma.ErrorModel
 	switch e := err.(type) {
 	case *handlerutil.ProblemDetails:
@@ -410,5 +413,9 @@ func writeFetchError(w http.ResponseWriter, err error) {
 		})
 		return
 	}
+	slog.ErrorContext(ctx, "export: fetch error",
+		slog.Any("error", err),
+		slog.String("source", source),
+	)
 	handlerutil.WriteSpecError(w, apierrors.InternalUnexpected)
 }

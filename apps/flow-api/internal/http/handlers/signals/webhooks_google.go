@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"log/slog"
 	"net/http"
 	"time"
 
@@ -22,11 +23,19 @@ func HandleGoogleWebhook(deps Deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		body, err := io.ReadAll(http.MaxBytesReader(w, r.Body, 1<<20))
 		if err != nil {
+			slog.ErrorContext(r.Context(), "webhook: google body read failed",
+				slog.Any("error", err),
+				slog.String("source", "google"),
+			)
 			writeError(w, apierrors.IntegrationGhWebhookPayloadUnparseable)
 			return
 		}
 		token := r.Header.Get(goog.HeaderChannelToken)
 		if !goog.VerifyChannelToken(token, deps.GoogleChannelToken) {
+			slog.ErrorContext(r.Context(), "webhook: google channel token verification failed",
+				slog.String("source", "google"),
+				slog.Bool("token_present", token != ""),
+			)
 			writeError(w, apierrors.IntegrationGoogleWebhookInvalidToken)
 			return
 		}
@@ -38,6 +47,10 @@ func HandleGoogleWebhook(deps Deps) http.HandlerFunc {
 		}
 		wsPub, err := types.Parse(deps.DefaultWorkspaceID)
 		if err != nil {
+			slog.ErrorContext(r.Context(), "webhook: google default workspace id parse failed",
+				slog.Any("error", err),
+				slog.String("source", "google"),
+			)
 			writeError(w, apierrors.InternalUnexpected)
 			return
 		}
@@ -49,6 +62,10 @@ func HandleGoogleWebhook(deps Deps) http.HandlerFunc {
 				writeError(w, apierrors.WsWorkspaceNotFound)
 				return
 			}
+			slog.ErrorContext(ctx, "webhook: google workspace lookup failed",
+				slog.Any("error", err),
+				slog.String("source", "google"),
+			)
 			writeError(w, apierrors.InternalUnexpected)
 			return
 		}

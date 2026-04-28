@@ -21,12 +21,20 @@ func HandleSlackWebhook(deps Deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		body, err := io.ReadAll(http.MaxBytesReader(w, r.Body, 1<<20))
 		if err != nil {
+			slog.ErrorContext(r.Context(), "webhook: slack body read failed",
+				slog.Any("error", err),
+				slog.String("source", "slack"),
+			)
 			writeError(w, apierrors.IntegrationSlackWebhookPayloadUnparseable)
 			return
 		}
 		ts := r.Header.Get(sl.TimestampHeader)
 		sig := r.Header.Get(sl.SignatureHeader)
 		if verr := sl.VerifySignature(body, sig, ts, deps.SlackSigningSecret, time.Now()); verr != nil {
+			slog.ErrorContext(r.Context(), "webhook: slack signature verification failed",
+				slog.Any("error", verr),
+				slog.String("source", "slack"),
+			)
 			writeError(w, slackVerifyErrorSpec(verr))
 			return
 		}
@@ -37,6 +45,10 @@ func HandleSlackWebhook(deps Deps) http.HandlerFunc {
 		}
 		wsPub, err := types.Parse(deps.DefaultWorkspaceID)
 		if err != nil {
+			slog.ErrorContext(r.Context(), "webhook: slack default workspace id parse failed",
+				slog.Any("error", err),
+				slog.String("source", "slack"),
+			)
 			writeError(w, apierrors.InternalUnexpected)
 			return
 		}
@@ -48,6 +60,10 @@ func HandleSlackWebhook(deps Deps) http.HandlerFunc {
 				writeError(w, apierrors.WsWorkspaceNotFound)
 				return
 			}
+			slog.ErrorContext(ctx, "webhook: slack workspace lookup failed",
+				slog.Any("error", err),
+				slog.String("source", "slack"),
+			)
 			writeError(w, apierrors.InternalUnexpected)
 			return
 		}

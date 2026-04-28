@@ -1,6 +1,7 @@
 package export
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -55,7 +56,7 @@ func TestWriteFetchErrorPropagatesHumaEnvelope(t *testing.T) {
 
 	spec := apierrors.ExportTaskLensNotFound
 	rr := httptest.NewRecorder()
-	writeFetchError(rr, handlerutil.HTTPErr(spec))
+	writeFetchError(context.Background(), rr, "lens", handlerutil.HTTPErr(spec))
 
 	if rr.Code != spec.Status {
 		t.Errorf("status: got %d want %d", rr.Code, spec.Status)
@@ -83,7 +84,7 @@ func TestWriteFetchErrorUnknownShapeFallsBackToInternal(t *testing.T) {
 	t.Parallel()
 
 	rr := httptest.NewRecorder()
-	writeFetchError(rr, errString("opaque internal error"))
+	writeFetchError(context.Background(), rr, "workspace", errString("opaque internal error"))
 
 	if rr.Code != http.StatusInternalServerError {
 		t.Errorf("status: got %d want 500", rr.Code)
