@@ -264,5 +264,7 @@
   "WS.VIEW_PREFERENCE.NOT_FOUND": "View preference not found",
   "WS.WORKSPACE.ACCESS_DENIED": "You do not have access to this workspace",
   "WS.WORKSPACE.NOT_FOUND": "Workspace not found",
-  "WS.WORKSPACE.SLUG_ALREADY_TAKEN": "Workspace slug is already taken"
+  "WS.WORKSPACE.SLUG_ALREADY_TAKEN": "Workspace slug is already taken",
+  "WS.WORKSPACE_INVITE.EXHAUSTED": "Invite has reached its use limit.",
+  "WS.WORKSPACE_INVITE.EXPIRED": "Invite has expired."
 }

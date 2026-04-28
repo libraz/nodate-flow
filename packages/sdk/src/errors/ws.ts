@@ -206,6 +206,16 @@ export const WsErrors = {
     status: 409,
     message: "Workspace slug is already taken",
   },
+  WS_WORKSPACE_INVITE_EXHAUSTED: {
+    code: "WS.WORKSPACE_INVITE.EXHAUSTED",
+    status: 410,
+    message: "Invite has reached its use limit.",
+  },
+  WS_WORKSPACE_INVITE_EXPIRED: {
+    code: "WS.WORKSPACE_INVITE.EXPIRED",
+    status: 410,
+    message: "Invite has expired.",
+  },
 } as const;
 
 export type WsErrorCode = (typeof WsErrors)[keyof typeof WsErrors]["code"];

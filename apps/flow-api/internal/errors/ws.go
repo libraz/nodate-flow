@@ -86,4 +86,8 @@ var (
 	WsWorkspaceNotFound = &Spec{Code: "WS.WORKSPACE.NOT_FOUND", Status: 404, Message: "Workspace not found", Description: "Returned when a workspace with the given public_id does not exist or the actor has no visibility into it.", UserAction: "Verify the workspace ID, or ask an admin to add you as a member."}
 	// WS.WORKSPACE.SLUG_ALREADY_TAKEN — Workspace slug is already taken
 	WsWorkspaceSlugAlreadyTaken = &Spec{Code: "WS.WORKSPACE.SLUG_ALREADY_TAKEN", Status: 409, Message: "Workspace slug is already taken", Description: "Returned when the requested workspace slug conflicts with an existing workspace on the same instance.", UserAction: "Choose a different slug."}
+	// WS.WORKSPACE_INVITE.EXHAUSTED — Invite has reached its use limit.
+	WsWorkspaceInviteExhausted = &Spec{Code: "WS.WORKSPACE_INVITE.EXHAUSTED", Status: 410, Message: "Invite has reached its use limit.", Description: "Returned when the workspace invite has been redeemed the maximum allowed number of times.", UserAction: "Ask a workspace admin to send a new invite."}
+	// WS.WORKSPACE_INVITE.EXPIRED — Invite has expired.
+	WsWorkspaceInviteExpired = &Spec{Code: "WS.WORKSPACE_INVITE.EXPIRED", Status: 410, Message: "Invite has expired.", Description: "Returned when the workspace invite token's expiration time has passed.", UserAction: "Ask a workspace admin to send a new invite."}
 )

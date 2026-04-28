@@ -264,5 +264,7 @@
   "WS.VIEW_PREFERENCE.NOT_FOUND": "ビュー設定が見つかりません",
   "WS.WORKSPACE.ACCESS_DENIED": "このワークスペースへのアクセス権がありません",
   "WS.WORKSPACE.NOT_FOUND": "ワークスペースが見つかりません",
-  "WS.WORKSPACE.SLUG_ALREADY_TAKEN": "このワークスペース slug は既に使用されています"
+  "WS.WORKSPACE.SLUG_ALREADY_TAKEN": "このワークスペース slug は既に使用されています",
+  "WS.WORKSPACE_INVITE.EXHAUSTED": "招待の利用回数の上限に達しました。",
+  "WS.WORKSPACE_INVITE.EXPIRED": "招待の有効期限が切れています。"
 }

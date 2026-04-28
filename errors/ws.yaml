@@ -32,6 +32,27 @@ resources:
         description: "Returned when the requested workspace slug conflicts with an existing workspace on the same instance."
         userAction: "Choose a different slug."
 
+  workspace_invite:
+    breadcrumb: "Workspace > Invite"
+    errors:
+      expired:
+        code: WS.WORKSPACE_INVITE.EXPIRED
+        status: 410
+        message: "Invite has expired."
+        message_ja: "招待の有効期限が切れています。"
+        message_zh: "邀请已过期。"
+        description: "Returned when the workspace invite token's expiration time has passed."
+        userAction: "Ask a workspace admin to send a new invite."
+
+      exhausted:
+        code: WS.WORKSPACE_INVITE.EXHAUSTED
+        status: 410
+        message: "Invite has reached its use limit."
+        message_ja: "招待の利用回数の上限に達しました。"
+        message_zh: "邀请已达到使用次数上限。"
+        description: "Returned when the workspace invite has been redeemed the maximum allowed number of times."
+        userAction: "Ask a workspace admin to send a new invite."
+
   project:
     breadcrumb: "Workspace > Project"
     errors:

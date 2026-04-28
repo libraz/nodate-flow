@@ -264,5 +264,7 @@
   "WS.VIEW_PREFERENCE.NOT_FOUND": "未找到视图偏好设置",
   "WS.WORKSPACE.ACCESS_DENIED": "您没有访问此工作区的权限",
   "WS.WORKSPACE.NOT_FOUND": "未找到工作区",
-  "WS.WORKSPACE.SLUG_ALREADY_TAKEN": "该工作区 slug 已被使用"
+  "WS.WORKSPACE.SLUG_ALREADY_TAKEN": "该工作区 slug 已被使用",
+  "WS.WORKSPACE_INVITE.EXHAUSTED": "邀请已达到使用次数上限。",
+  "WS.WORKSPACE_INVITE.EXPIRED": "邀请已过期。"
 }
