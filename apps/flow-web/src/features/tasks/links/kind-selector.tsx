@@ -91,7 +91,6 @@ export default function KindSelector({
             }}
             id={`${prefix}-${kind}`}
             type="button"
-            // biome-ignore lint/a11y/useSemanticElements: segmented-control pill needs button styling that <input type="radio"> cannot render; the radiogroup pattern is implemented in JS
             role="radio"
             aria-checked={checked}
             tabIndex={checked ? 0 : -1}

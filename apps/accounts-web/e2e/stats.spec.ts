@@ -153,6 +153,13 @@ test.describe('admin instance stats dashboard', () => {
     await expect(lastUpdatedOutput).toBeVisible();
     const beforeText = (await lastUpdatedOutput.textContent()) ?? '';
 
+    // The timestamp is rendered at HH:MM:SS resolution. If the initial
+    // load and the refetch happen in the same wall-clock second the
+    // formatted text is identical and the assertion below would be a
+    // race. Waiting >1s here guarantees the post-refetch render falls
+    // into a new second so the text is observably different.
+    await page.waitForTimeout(1_100);
+
     // Click refresh and wait for the resulting network request.
     const refetch = page.waitForResponse(
       (res) => res.url().includes('/admin/instance-stats') && res.status() === 200,
@@ -160,10 +167,6 @@ test.describe('admin instance stats dashboard', () => {
     await refreshButton.click();
     await refetch;
 
-    // Either the button briefly went into the "Refreshing…" state, or
-    // (more reliably across timing) the timestamp text changed once
-    // the refetch settled. We assert the latter, which is the
-    // user-visible signal the spec requires.
     await expect
       .poll(async () => (await lastUpdatedOutput.textContent()) ?? '', { timeout: 10_000 })
       .not.toBe(beforeText);
