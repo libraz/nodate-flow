@@ -17,7 +17,19 @@ func newTestLogger(buf *bytes.Buffer) *slog.Logger {
 func TestRedactHandler_SensitiveKeysAreRedacted(t *testing.T) {
 	t.Parallel()
 
-	keys := []string{"authorization", "token", "password", "secret", "api_key", "apikey"}
+	keys := []string{
+		"authorization",
+		"authorization_code",
+		"api_key",
+		"apikey",
+		"client_secret",
+		"code",
+		"id_token",
+		"password",
+		"refresh_token",
+		"secret",
+		"token",
+	}
 	for _, key := range keys {
 		t.Run(key, func(t *testing.T) {
 			t.Parallel()
@@ -235,6 +247,37 @@ func TestRedact_NewSecretPrefixes(t *testing.T) {
 			afterPrefix := tc.value[len(tc.prefix):]
 			if strings.Contains(got, afterPrefix) {
 				t.Fatalf("raw secret body leaked in output: %s", got)
+			}
+		})
+	}
+}
+
+func TestRedactJSONFields_OAuthKeys(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name string
+		key  string
+	}{
+		{"client_secret", "client_secret"},
+		{"refresh_token", "refresh_token"},
+		{"authorization_code", "authorization_code"},
+		{"id_token", "id_token"},
+		{"code", "code"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			input := `{"` + tc.key + `":"super-sensitive-value-xyz"}`
+			got := RedactJSONFields(input)
+
+			if strings.Contains(got, "super-sensitive-value-xyz") {
+				t.Fatalf("raw value leaked for key %q: %s", tc.key, got)
+			}
+			expected := `"` + tc.key + `":"[REDACTED]"`
+			if !strings.Contains(got, expected) {
+				t.Fatalf("expected %q in output, got: %s", expected, got)
 			}
 		})
 	}

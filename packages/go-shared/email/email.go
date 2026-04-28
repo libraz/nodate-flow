@@ -6,6 +6,7 @@ package email
 import (
 	"context"
 	"errors"
+	"log/slog"
 )
 
 // Message is the minimal structured representation of an outbound
@@ -19,6 +20,24 @@ type Message struct {
 	// ReplyTo carries an opaque routing token (e.g. base32 task id)
 	// the inbound parser uses to attribute replies back to a task.
 	ReplyTo string
+}
+
+// LogValue implements [slog.LogValuer] so a Message logged via slog
+// only emits non-sensitive metadata. Body is intentionally excluded
+// because it can carry magic-link tokens, calendar invite links, and
+// verification codes; ReplyTo is excluded because it carries an
+// opaque routing token that points at a task. The reported recipients,
+// subject_len, and body_bytes give operators enough signal to triage
+// delivery without exposing payload.
+func (m Message) LogValue() slog.Value {
+	to := make([]string, len(m.To))
+	copy(to, m.To)
+	return slog.GroupValue(
+		slog.String("from", m.From),
+		slog.Any("to", to),
+		slog.Int("subject_len", len(m.Subject)),
+		slog.Int("body_bytes", len(m.Body)),
+	)
 }
 
 // Sender is the egress contract. Implementations are typically

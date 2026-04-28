@@ -38,14 +38,22 @@ var SecretPrefixes = []string{
 }
 
 // redactedSensitiveJSONKeys lists the JSON object field names whose values
-// are always redacted, regardless of content.
+// are always redacted, regardless of content. The OAuth/OIDC keys
+// (client_secret, refresh_token, code, id_token, authorization_code) are
+// included so token-exchange form bodies cannot leak through HTTP
+// middleware traces or upstream error responses.
 var redactedSensitiveJSONKeys = map[string]struct{}{
-	"api_key":       {},
-	"apikey":        {},
-	"authorization": {},
-	"token":         {},
-	"password":      {},
-	"secret":        {},
+	"api_key":            {},
+	"apikey":             {},
+	"authorization":      {},
+	"authorization_code": {},
+	"client_secret":      {},
+	"code":               {},
+	"id_token":           {},
+	"password":           {},
+	"refresh_token":      {},
+	"secret":             {},
+	"token":              {},
 }
 
 var (
@@ -211,14 +219,22 @@ func redactJSONOnce(s string) string {
 }
 
 // sensitiveAttrKeys are attribute keys whose values are always replaced
-// with [REDACTED] regardless of content.
+// with [REDACTED] regardless of content. Mirrors redactedSensitiveJSONKeys
+// so an OAuth client_secret / refresh_token / authorization code passed
+// as a structured slog attr is scrubbed identically to one embedded in a
+// JSON-encoded log line.
 var sensitiveAttrKeys = map[string]struct{}{
-	"authorization": {},
-	"api_key":       {},
-	"apikey":        {},
-	"token":         {},
-	"password":      {},
-	"secret":        {},
+	"api_key":            {},
+	"apikey":             {},
+	"authorization":      {},
+	"authorization_code": {},
+	"client_secret":      {},
+	"code":               {},
+	"id_token":           {},
+	"password":           {},
+	"refresh_token":      {},
+	"secret":             {},
+	"token":              {},
 }
 
 // RedactHandler wraps another slog.Handler and scrubs secret-looking
