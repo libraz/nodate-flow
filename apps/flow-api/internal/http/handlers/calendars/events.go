@@ -5,7 +5,6 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"strings"
 	"time"
 
@@ -700,10 +699,12 @@ func DeleteEvent(deps Deps) func(context.Context, *DeleteEventInput) (*DeleteEve
 		defer func() { _ = tx.Rollback() }()
 
 		if err := itemkit.DeleteEvent(ctx, tx, wsID, evt.ID, actorID); err != nil {
-			// fmt.Errorf is acceptable here: translateItemkitError maps the
-			// wrapped error to a calendar apierror code (the wrap only adds
-			// context for the structured log emitted by the classifier).
-			return nil, translateItemkitError(ctx, "itemkit.DeleteEvent", fmt.Errorf("itemkit: delete event: %w", err))
+			// Mirror the unwrapped pattern used by the other itemkit
+			// call sites (RenameItem / RescheduleEvent above): the
+			// translator's structured log already records the op name,
+			// and the classifier matches on the original error's
+			// message so wrapping would only duplicate context.
+			return nil, translateItemkitError(ctx, "itemkit.DeleteEvent", err)
 		}
 		if err := tx.Commit(); err != nil {
 			return nil, httpErr(apierrors.CalendarEventStoreDeleteInterrupted)

@@ -117,6 +117,53 @@ func TestNullTimeDateStr(t *testing.T) {
 	}
 }
 
+// TestNullTimeDate covers the NULL/zero, exact-UTC-midnight, and
+// JST-near-day-boundary cases. The JST case (23:30 local on 2026-04-28
+// = 14:30 UTC same day) is the regression guard for the bug where
+// NullTimeDate skipped .UTC() while NullTimeDateStr called it: a
+// driver returning JST-localised time would render different calendar
+// days depending on which helper a mapper happened to call.
+func TestNullTimeDate(t *testing.T) {
+	t.Parallel()
+
+	t.Run("NULL", func(t *testing.T) {
+		t.Parallel()
+		if got := NullTimeDate(sql.NullTime{Valid: false}); got != nil {
+			t.Errorf("NULL: got %v want nil", got)
+		}
+	})
+
+	t.Run("UTC midnight", func(t *testing.T) {
+		t.Parallel()
+		when := time.Date(2026, 4, 28, 0, 0, 0, 0, time.UTC)
+		got := NullTimeDate(sql.NullTime{Time: when, Valid: true})
+		if got == nil || *got != "2026-04-28" {
+			t.Errorf("UTC midnight: got %v want pointer to 2026-04-28", got)
+		}
+	})
+
+	t.Run("JST near day boundary matches NullTimeDateStr", func(t *testing.T) {
+		t.Parallel()
+		// 23:30 JST on 2026-04-28 = 14:30 UTC on 2026-04-28; both helpers
+		// must report 2026-04-28. A driver that returns the value with
+		// JST attached would otherwise tempt a non-UTC formatter into
+		// returning 2026-04-29 here.
+		jst := time.FixedZone("JST", 9*60*60)
+		when := time.Date(2026, 4, 28, 23, 30, 0, 0, jst)
+		gotPtr := NullTimeDate(sql.NullTime{Time: when, Valid: true})
+		gotStr := NullTimeDateStr(sql.NullTime{Time: when, Valid: true})
+		if gotPtr == nil || *gotPtr != "2026-04-28" {
+			t.Errorf("NullTimeDate JST: got %v want pointer to 2026-04-28", gotPtr)
+		}
+		if gotStr != "2026-04-28" {
+			t.Errorf("NullTimeDateStr JST: got %q want 2026-04-28", gotStr)
+		}
+		if gotPtr == nil || *gotPtr != gotStr {
+			t.Errorf("helpers must agree: NullTimeDate=%v NullTimeDateStr=%q", gotPtr, gotStr)
+		}
+	})
+}
+
 func TestBytesToUUIDString(t *testing.T) {
 	t.Parallel()
 	if got := BytesToUUIDString(nil); got != "" {

@@ -17,6 +17,7 @@ import (
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/handlers/handlerutil"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/middleware"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/itemkit"
+	nflog "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/log"
 	"github.com/nodate-flow/nodate-flow/packages/go-shared/apierr"
 	"github.com/nodate-flow/nodate-flow/packages/go-shared/logutil"
 	"github.com/nodate-flow/nodate-flow/packages/go-shared/stringutil"
@@ -32,6 +33,44 @@ var allowedDerivedStates = map[string]struct{}{
 	"cancelled": {},
 }
 
+// translateActorRoleError converts an apierror returned by
+// [parseActorRole] into the canonical problem+json envelope so the
+// `received_role` detail surfaces through ProblemDetails extensions.
+// Falls back to a generic WS.TASK.ACTOR_ROLE_INVALID envelope when the
+// caller hands in something other than an *apierr.APIError, which
+// shouldn't happen in practice but keeps the helper total.
+func translateActorRoleError(err error) error {
+	var apiErr *apierr.APIError
+	if errors.As(err, &apiErr) {
+		return handlerutil.HTTPErrFromAPIError(apiErr)
+	}
+	return httpErr(apierrors.WsTaskActorRoleInvalid)
+}
+
+// parseActorRole validates the `role` field on a task-actor body and
+// converts it to the sqlc-generated enum type. The OpenAPI schema
+// already restricts the field to the catalog enum, but the Huma
+// validator only runs on declared inputs — older clients or
+// hand-rolled JSON could still slip an unknown role through to the
+// SQL boundary, where MySQL would emit a 1265 "Data truncated" error
+// and the handler would surface it as a generic 500.
+//
+// Returning a typed apierror means the same payload from any code
+// path (CRUD create, AddActor, AddAgentActor) lands on
+// WS.TASK.ACTOR_ROLE_INVALID with HTTP 422 and the offending value
+// echoed back in `received_role`.
+func parseActorRole(s string) (generated.TaskActorsRole, error) {
+	switch generated.TaskActorsRole(s) {
+	case generated.TaskActorsRoleAssignee,
+		generated.TaskActorsRoleReviewer,
+		generated.TaskActorsRoleWatcher,
+		generated.TaskActorsRoleApprover:
+		return generated.TaskActorsRole(s), nil
+	default:
+		return "", apierr.New(apierrors.WsTaskActorRoleInvalid).WithDetail("received_role", s)
+	}
+}
+
 // hasListFilters reports whether any optional filter is set on the list
 // query input; it is used to choose between the sqlc fast path and the
 // dynamic SQL path.
@@ -39,10 +78,21 @@ func hasListFilters(in *ListTasksInput) bool {
 	return in.Q != "" || len(in.State) > 0 || in.Assignee != ""
 }
 
-// needsDynamicQuery reports whether the request must go through the dynamic
-// SQL path. This is true when there are explicit filters, or when the actor
-// is not a workspace admin/owner (since non-elevated users need Layer 4
-// visibility filtering that the static sqlc queries cannot express).
+// needsDynamicQuery reports whether GET /tasks must go through the
+// dynamic SQL path instead of the sqlc-generated fast path.
+//
+// The dynamic path is required for two non-overlapping reasons:
+//   - the caller passed at least one of the user-facing filters
+//     (q / state / assignee), which sqlc cannot express;
+//   - the caller is not a workspace admin or owner, so the Layer-4
+//     task visibility filter must be appended at runtime — again
+//     beyond what the static sqlc queries express.
+//
+// The helper is kept (and not inlined into both call sites) because
+// the combined predicate covers two filter sources and four boolean
+// sub-clauses; inlining at both call sites would duplicate the
+// rationale comment and invite drift between the project-scope and
+// workspace-scope branches.
 func needsDynamicQuery(in *ListTasksInput, wsRole middleware.WorkspaceRole) bool {
 	if hasListFilters(in) {
 		return true
@@ -325,7 +375,11 @@ func Create(deps Deps) func(context.Context, *CreateTaskInput) (*CreateTaskOutpu
 				}
 				role := generated.TaskActorsRoleAssignee
 				if a.Role != "" {
-					role = generated.TaskActorsRole(a.Role)
+					parsed, perr := parseActorRole(a.Role)
+					if perr != nil {
+						return nil, translateActorRoleError(perr)
+					}
+					role = parsed
 				}
 				actorPub := types.New()
 				if _, aerr := qtx.AddActor(ctx, generated.AddActorParams{
@@ -354,7 +408,7 @@ func Create(deps Deps) func(context.Context, *CreateTaskInput) (*CreateTaskOutpu
 				"title":     in.Body.Title,
 			},
 		}); err != nil {
-			slog.ErrorContext(ctx, "eventbus.Append failed",
+			nflog.LoggerFromContext(ctx).ErrorContext(ctx, "eventbus.Append failed",
 				slog.Any("err", err),
 				slog.String("handler", "tasks.Create"),
 				slog.String("event_type", string(eventbus.TaskCreated)),
@@ -780,7 +834,7 @@ func Patch(deps Deps) func(context.Context, *PatchTaskInput) (*PatchTaskOutput, 
 				"taskId": task.PublicID.String(),
 			},
 		}); err != nil {
-			slog.ErrorContext(ctx, "eventbus.Append failed",
+			nflog.LoggerFromContext(ctx).ErrorContext(ctx, "eventbus.Append failed",
 				slog.Any("err", err),
 				slog.String("handler", "tasks.Patch"),
 				slog.String("event_type", string(eventbus.TaskUpdated)),
@@ -852,7 +906,7 @@ func Disable(deps Deps) func(context.Context, *DisableTaskInput) (*DisableTaskOu
 				"taskId": task.PublicID.String(),
 			},
 		}); err != nil {
-			slog.ErrorContext(ctx, "eventbus.Append failed",
+			nflog.LoggerFromContext(ctx).ErrorContext(ctx, "eventbus.Append failed",
 				slog.Any("err", err),
 				slog.String("handler", "tasks.Disable"),
 				slog.String("event_type", string(eventbus.TaskDisabled)),

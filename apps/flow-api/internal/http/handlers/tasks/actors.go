@@ -11,6 +11,7 @@ import (
 	apierrors "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/errors"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/eventbus"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/middleware"
+	nflog "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/log"
 	"github.com/nodate-flow/nodate-flow/packages/go-shared/apierr"
 	"github.com/nodate-flow/nodate-flow/packages/go-shared/logutil"
 )
@@ -35,13 +36,17 @@ func AddActor(deps Deps) func(context.Context, *AddTaskActorInput) (*AddTaskActo
 		if err := deps.DB.QueryRowContext(ctx, q, userPub).Scan(&uid); err != nil {
 			return nil, httpErr(apierr.SpecForErrNoRows(err, apierrors.WsMemberNotFound, apierrors.InternalUnexpected))
 		}
+		role, perr := parseActorRole(in.Body.Role)
+		if perr != nil {
+			return nil, translateActorRoleError(perr)
+		}
 		pub := types.New()
 		if _, err := deps.Queries.AddActor(ctx, generated.AddActorParams{
 			PublicID:    pub,
 			WorkspaceID: ws.ID,
 			TaskID:      task.ID,
 			UserID:      sql.NullInt32{Int32: int32(uid), Valid: true},
-			Role:        generated.TaskActorsRole(in.Body.Role),
+			Role:        role,
 		}); err != nil {
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
@@ -58,7 +63,7 @@ func AddActor(deps Deps) func(context.Context, *AddTaskActorInput) (*AddTaskActo
 				"role":    in.Body.Role,
 			},
 		}); err != nil {
-			slog.ErrorContext(ctx, "eventbus.Append failed",
+			nflog.LoggerFromContext(ctx).ErrorContext(ctx, "eventbus.Append failed",
 				slog.Any("err", err),
 				slog.String("handler", "tasks.AddActor"),
 				slog.String("event_type", string(eventbus.TaskActorAdded)),
@@ -152,7 +157,7 @@ func RemoveActor(deps Deps) func(context.Context, *RemoveTaskActorInput) (*Remov
 				"actorId": aid.String(),
 			},
 		}); err != nil {
-			slog.ErrorContext(ctx, "eventbus.Append failed",
+			nflog.LoggerFromContext(ctx).ErrorContext(ctx, "eventbus.Append failed",
 				slog.Any("err", err),
 				slog.String("handler", "tasks.RemoveActor"),
 				slog.String("event_type", string(eventbus.TaskActorRemoved)),

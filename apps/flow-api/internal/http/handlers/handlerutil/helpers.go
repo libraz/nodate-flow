@@ -20,6 +20,7 @@ import (
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/types"
 	apierrors "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/errors"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/middleware"
+	"github.com/nodate-flow/nodate-flow/packages/go-shared/apierr"
 )
 
 // ProblemDetails extends huma.ErrorModel with the developer-facing
@@ -31,10 +32,19 @@ import (
 // SDK surface them as typed properties) without losing backwards
 // compatibility with generic problem+json clients, which simply ignore
 // unknown members.
+//
+// Extensions carries optional RFC 9457 extension members keyed by
+// `x-` prefixed names. Currently we emit `x-i18n-key` when the
+// originating Spec has an i18nKey set in errors/*.yaml, so the
+// frontend can prefer a hand-curated translation over the catalog
+// default. The field is omitted entirely when no extensions apply,
+// keeping the payload byte-identical for the bulk of the catalog
+// that has not opted in yet.
 type ProblemDetails struct {
 	huma.ErrorModel
-	Description string `json:"description,omitempty" doc:"Developer-facing explanation of when this error fires."`
-	UserAction  string `json:"userAction,omitempty" doc:"Short imperative the UI can render to tell the end user how to recover."`
+	Description string         `json:"description,omitempty" doc:"Developer-facing explanation of when this error fires."`
+	UserAction  string         `json:"userAction,omitempty" doc:"Short imperative the UI can render to tell the end user how to recover."`
+	Extensions  map[string]any `json:"extensions,omitempty" doc:"Optional RFC 9457 extension members. Currently emits x-i18n-key for codes that opt into a curated i18next key."`
 }
 
 // GetStatus implements huma.StatusError so Huma sets the response code.
@@ -70,6 +80,58 @@ func HTTPErr(spec *apierrors.Spec) error {
 		},
 		Description: spec.Description,
 		UserAction:  spec.UserAction,
+		Extensions:  specExtensions(spec),
+	}
+}
+
+// specExtensions returns the RFC 9457 extension map for a spec, or
+// nil when the spec has no opt-in metadata. Today this only populates
+// `x-i18n-key`; new extension members would be added here so every
+// code path (HTTPErr, HTTPErrWithRetryAfter, WriteSpecError) stays in
+// sync. Returning nil lets the JSON `omitempty` tag drop the field
+// from the wire payload entirely.
+func specExtensions(spec *apierrors.Spec) map[string]any {
+	if spec == nil || spec.I18nKey == "" {
+		return nil
+	}
+	return map[string]any{"x-i18n-key": spec.I18nKey}
+}
+
+// HTTPErrFromAPIError converts an *apierr.APIError into the canonical
+// problem+json envelope. Use this when a helper returns an APIError
+// (carrying detail metadata via [apierr.WithDetail]) and you need to
+// surface it with the same shape [HTTPErr] would have produced. The
+// detail map is forwarded as RFC 9457 extensions so the SDK can
+// surface it for diagnostics.
+//
+// A nil APIError or one with a nil Spec collapses to
+// apierrors.InternalUnexpected so callers can rely on the result
+// always implementing huma.StatusError.
+func HTTPErrFromAPIError(e *apierr.APIError) error {
+	if e == nil || e.Spec == nil {
+		return HTTPErr(apierrors.InternalUnexpected)
+	}
+	ext := specExtensions(e.Spec)
+	if len(e.Details) > 0 {
+		merged := make(map[string]any, len(e.Details)+len(ext))
+		for k, v := range ext {
+			merged[k] = v
+		}
+		for k, v := range e.Details {
+			merged[k] = v
+		}
+		ext = merged
+	}
+	return &ProblemDetails{
+		ErrorModel: huma.ErrorModel{
+			Type:   e.Spec.Code,
+			Title:  http.StatusText(e.Spec.Status),
+			Status: e.Spec.Status,
+			Detail: e.Spec.Message,
+		},
+		Description: e.Spec.Description,
+		UserAction:  e.Spec.UserAction,
+		Extensions:  ext,
 	}
 }
 
@@ -90,6 +152,7 @@ func HTTPErrWithRetryAfter(spec *apierrors.Spec, retryAfter string) error {
 			},
 			Description: spec.Description,
 			UserAction:  spec.UserAction,
+			Extensions:  specExtensions(spec),
 		},
 		retryAfter: retryAfter,
 	}
@@ -120,12 +183,13 @@ func WriteSpecError(w http.ResponseWriter, spec *apierrors.Spec) {
 	w.Header().Set("Content-Type", "application/problem+json; charset=utf-8")
 	w.WriteHeader(spec.Status)
 	_ = json.NewEncoder(w).Encode(struct {
-		Type        string `json:"type"`
-		Title       string `json:"title"`
-		Status      int    `json:"status"`
-		Detail      string `json:"detail"`
-		Description string `json:"description,omitempty"`
-		UserAction  string `json:"userAction,omitempty"`
+		Type        string         `json:"type"`
+		Title       string         `json:"title"`
+		Status      int            `json:"status"`
+		Detail      string         `json:"detail"`
+		Description string         `json:"description,omitempty"`
+		UserAction  string         `json:"userAction,omitempty"`
+		Extensions  map[string]any `json:"extensions,omitempty"`
 	}{
 		Type:        spec.Code,
 		Title:       http.StatusText(spec.Status),
@@ -133,6 +197,7 @@ func WriteSpecError(w http.ResponseWriter, spec *apierrors.Spec) {
 		Detail:      spec.Message,
 		Description: spec.Description,
 		UserAction:  spec.UserAction,
+		Extensions:  specExtensions(spec),
 	})
 }
 
@@ -241,15 +306,20 @@ func NullTimeUnixVal(t sql.NullTime) int64 {
 	return t.Time.Unix()
 }
 
-// NullTimeDate converts a sql.NullTime to a *string formatted as YYYY-MM-DD.
-// Returns nil for the NULL case so the field is omitted from JSON. This is
-// the single conversion point for nullable _on columns (DATE), per the
-// api-types convention.
+// NullTimeDate converts a sql.NullTime to a *string formatted as YYYY-MM-DD
+// in UTC. Returns nil for the NULL case so the field is omitted from JSON.
+// This is the single conversion point for nullable _on columns (DATE), per
+// the api-types convention.
+//
+// The .UTC() normalisation matches [NullTimeDateStr]: a sql.NullTime
+// carrying a non-UTC location (e.g. JST when the driver applies a session
+// timezone) would otherwise format to a different calendar day depending
+// on which helper a mapper happened to call. Both helpers must agree.
 func NullTimeDate(t sql.NullTime) *string {
 	if !t.Valid {
 		return nil
 	}
-	s := t.Time.Format("2006-01-02")
+	s := t.Time.UTC().Format("2006-01-02")
 	return &s
 }
 

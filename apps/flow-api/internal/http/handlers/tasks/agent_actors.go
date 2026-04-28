@@ -16,7 +16,9 @@ import (
 	apierrors "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/errors"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/eventbus"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/middleware"
+	nflog "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/log"
 	"github.com/nodate-flow/nodate-flow/packages/go-shared/apierr"
+	"github.com/nodate-flow/nodate-flow/packages/go-shared/logutil"
 )
 
 // AddAgentActor handles POST /tasks/{id}/agents. Attaches an AI agent
@@ -42,13 +44,17 @@ func AddAgentActor(deps Deps) func(context.Context, *AddTaskAgentActorInput) (*A
 		if err != nil {
 			return nil, httpErr(apierr.SpecForErrNoRows(err, apierrors.AiProviderNotConfigured, apierrors.InternalUnexpected))
 		}
+		role, perr := parseActorRole(in.Body.Role)
+		if perr != nil {
+			return nil, translateActorRoleError(perr)
+		}
 		pub := types.New()
 		if _, err := deps.Queries.AddAgentActor(ctx, generated.AddAgentActorParams{
 			PublicID:    pub,
 			WorkspaceID: ws.ID,
 			TaskID:      task.ID,
 			AgentID:     sql.NullInt32{Int32: int32(agentID), Valid: true}, //#nosec G115 -- agent id is agents.id (BIGINT UNSIGNED), fits int32 within realistic deployments
-			Role:        generated.TaskActorsRole(in.Body.Role),
+			Role:        role,
 		}); err != nil {
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
@@ -66,14 +72,14 @@ func AddAgentActor(deps Deps) func(context.Context, *AddTaskAgentActorInput) (*A
 				"role":    in.Body.Role,
 			},
 		}); err != nil {
-			slog.ErrorContext(ctx, "eventbus.Append failed",
+			nflog.LoggerFromContext(ctx).ErrorContext(ctx, "eventbus.Append failed",
 				slog.Any("err", err),
 				slog.String("handler", "tasks.AddAgentActor"),
 				slog.String("event_type", string(eventbus.TaskActorAdded)),
-				slog.Int64("workspace_id", int64(ws.ID)),
-				slog.Int64("task_id", taskInternal),
+				logutil.LogEntity("workspace", ws.PublicID),
+				logutil.LogEntity("task", task.PublicID),
 				slog.String("actor_public_id", pub.String()),
-				slog.String("agent_id", agentPub.String()),
+				slog.String("agent_public_id", agentPub.String()),
 			)
 		}
 		if aID, aOk := middleware.ActorFromContext(ctx); aOk {

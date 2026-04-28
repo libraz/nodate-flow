@@ -1,7 +1,30 @@
+// Package-level note on mapper layout:
+//
+// The five v_task_list-derived sqlc row types
+// (FindTaskByPublicIdRow + four ListTasks* variants) share the same
+// underlying view but project different column subsets — Find selects
+// the rich detail columns (Description, label/constraint counts,
+// CreatedByUserPublicID, etc.) while List* selects the leaner
+// summary columns and an OFFSET / Total or keyset projection. The
+// detail and list paths therefore land on two distinct DTOs (Task vs
+// TaskListItem) and the Find→Task mapper is necessarily separate.
+//
+// Within the four List* mappers the column set is byte-identical, so
+// they collapse onto a single rowToTaskListItem helper through a
+// taskListRow projection struct with thin per-source adapters
+// (taskListRowFrom*). This is the H7 audit fix: before the
+// consolidation each adapter ran the same TaskListItem field
+// projection inline, which had drifted at least once during the
+// keyset rollout.
+
 package tasks
 
 import (
+	"database/sql"
+	"time"
+
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/generated"
+	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/types"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/handlers/handlerutil"
 )
 
@@ -46,7 +69,46 @@ func rowToTaskFromFind(r generated.FindTaskByPublicIdRow) Task {
 	}
 }
 
-func rowToTaskListItemFromProject(r generated.ListTasksForProjectRow) TaskListItem {
+// taskListRow is the union of v_task_list columns that the four
+// ListTasks* sqlc rows share. It is the single intermediate
+// representation [taskListRowToDTO] consumes; per-source adapters
+// (taskListRowFromProject, taskListRowFromProjectKeyset,
+// taskListRowFromWorkspace, taskListRowFromWorkspaceKeyset) populate
+// it from the matching generated row type.
+//
+// Unifying through this struct guarantees the four call sites in
+// crud.go produce byte-identical TaskListItem JSON regardless of
+// which underlying query ran. Adding or removing a column in
+// v_task_list now only requires updating one TaskListItem projection
+// rather than four parallel inline expressions.
+type taskListRow struct {
+	PublicID                types.PublicID
+	ProjectPublicID         []byte
+	ProjectName             string
+	ParentTaskPublicID      sql.NullString
+	Title                   string
+	Visibility              generated.TasksVisibility
+	DerivedState            generated.TasksDerivedState
+	Priority                int32
+	DueOn                   sql.NullTime
+	StartedOn               sql.NullTime
+	CompletedAt             sql.NullTime
+	ProjectIdentifier       sql.NullString
+	TaskNumber              uint32
+	ArchivedAt              sql.NullTime
+	LabelIDs                sql.NullString
+	SortWeight              int32
+	UpdatedAt               sql.NullTime
+	CreatedAt               time.Time
+	PrimaryAssigneePublicID interface{}
+	AssigneeCount           int64
+}
+
+// taskListRowToDTO converts the unified projection into TaskListItem.
+// This is the single function responsible for shaping list-row JSON;
+// every caller must route through here so OFFSET and keyset variants
+// stay observable-identical at the wire level.
+func taskListRowToDTO(r taskListRow) TaskListItem {
 	return TaskListItem{
 		ID:                r.PublicID.String(),
 		ProjectID:         bytesToUUIDString(r.ProjectPublicID),
@@ -62,96 +124,150 @@ func rowToTaskListItemFromProject(r generated.ListTasksForProjectRow) TaskListIt
 		StartedOn:         nullDate(r.StartedOn),
 		CompletedAt:       nullTimeUnix(r.CompletedAt),
 		ArchivedAt:        nullTimeUnix(r.ArchivedAt),
-		LabelIDs:          nullStr(r.LabelIds),
+		LabelIDs:          nullStr(r.LabelIDs),
 		SortWeight:        r.SortWeight,
 		PrimaryAssigneeID: rawBytesToUUIDPtr(r.PrimaryAssigneePublicID),
 		AssigneeCount:     r.AssigneeCount,
 		UpdatedAt:         nullTimeUnix(r.UpdatedAt),
 		CreatedAt:         r.CreatedAt.Unix(),
 	}
+}
+
+// taskListRowFromProject adapts a ListTasksForProjectRow into the
+// unified [taskListRow] projection. The adapter discards the
+// COUNT(*) OVER() Total column because it lives on the response
+// envelope's `total` field, not on individual task entries.
+func taskListRowFromProject(r generated.ListTasksForProjectRow) taskListRow {
+	return taskListRow{
+		PublicID:                r.PublicID,
+		ProjectPublicID:         r.ProjectPublicID,
+		ProjectName:             r.ProjectName,
+		ParentTaskPublicID:      r.ParentTaskPublicID,
+		Title:                   r.Title,
+		Visibility:              r.Visibility,
+		DerivedState:            r.DerivedState,
+		Priority:                r.Priority,
+		DueOn:                   r.DueOn,
+		StartedOn:               r.StartedOn,
+		CompletedAt:             r.CompletedAt,
+		ProjectIdentifier:       r.ProjectIdentifier,
+		TaskNumber:              r.TaskNumber,
+		ArchivedAt:              r.ArchivedAt,
+		LabelIDs:                r.LabelIds,
+		SortWeight:              r.SortWeight,
+		UpdatedAt:               r.UpdatedAt,
+		CreatedAt:               r.CreatedAt,
+		PrimaryAssigneePublicID: r.PrimaryAssigneePublicID,
+		AssigneeCount:           r.AssigneeCount,
+	}
+}
+
+// taskListRowFromProjectKeyset adapts a ListTasksForProjectKeysetRow.
+// The keyset row drops the Total column entirely because keyset
+// pagination never carries an absolute total (it answers "more pages?",
+// not "page X of Y"); the projection is otherwise identical to
+// [taskListRowFromProject].
+func taskListRowFromProjectKeyset(r generated.ListTasksForProjectKeysetRow) taskListRow {
+	return taskListRow{
+		PublicID:                r.PublicID,
+		ProjectPublicID:         r.ProjectPublicID,
+		ProjectName:             r.ProjectName,
+		ParentTaskPublicID:      r.ParentTaskPublicID,
+		Title:                   r.Title,
+		Visibility:              r.Visibility,
+		DerivedState:            r.DerivedState,
+		Priority:                r.Priority,
+		DueOn:                   r.DueOn,
+		StartedOn:               r.StartedOn,
+		CompletedAt:             r.CompletedAt,
+		ProjectIdentifier:       r.ProjectIdentifier,
+		TaskNumber:              r.TaskNumber,
+		ArchivedAt:              r.ArchivedAt,
+		LabelIDs:                r.LabelIds,
+		SortWeight:              r.SortWeight,
+		UpdatedAt:               r.UpdatedAt,
+		CreatedAt:               r.CreatedAt,
+		PrimaryAssigneePublicID: r.PrimaryAssigneePublicID,
+		AssigneeCount:           r.AssigneeCount,
+	}
+}
+
+// taskListRowFromWorkspace adapts a ListTasksForWorkspaceRow.
+func taskListRowFromWorkspace(r generated.ListTasksForWorkspaceRow) taskListRow {
+	return taskListRow{
+		PublicID:                r.PublicID,
+		ProjectPublicID:         r.ProjectPublicID,
+		ProjectName:             r.ProjectName,
+		ParentTaskPublicID:      r.ParentTaskPublicID,
+		Title:                   r.Title,
+		Visibility:              r.Visibility,
+		DerivedState:            r.DerivedState,
+		Priority:                r.Priority,
+		DueOn:                   r.DueOn,
+		StartedOn:               r.StartedOn,
+		CompletedAt:             r.CompletedAt,
+		ProjectIdentifier:       r.ProjectIdentifier,
+		TaskNumber:              r.TaskNumber,
+		ArchivedAt:              r.ArchivedAt,
+		LabelIDs:                r.LabelIds,
+		SortWeight:              r.SortWeight,
+		UpdatedAt:               r.UpdatedAt,
+		CreatedAt:               r.CreatedAt,
+		PrimaryAssigneePublicID: r.PrimaryAssigneePublicID,
+		AssigneeCount:           r.AssigneeCount,
+	}
+}
+
+// taskListRowFromWorkspaceKeyset adapts a ListTasksForWorkspaceKeysetRow.
+func taskListRowFromWorkspaceKeyset(r generated.ListTasksForWorkspaceKeysetRow) taskListRow {
+	return taskListRow{
+		PublicID:                r.PublicID,
+		ProjectPublicID:         r.ProjectPublicID,
+		ProjectName:             r.ProjectName,
+		ParentTaskPublicID:      r.ParentTaskPublicID,
+		Title:                   r.Title,
+		Visibility:              r.Visibility,
+		DerivedState:            r.DerivedState,
+		Priority:                r.Priority,
+		DueOn:                   r.DueOn,
+		StartedOn:               r.StartedOn,
+		CompletedAt:             r.CompletedAt,
+		ProjectIdentifier:       r.ProjectIdentifier,
+		TaskNumber:              r.TaskNumber,
+		ArchivedAt:              r.ArchivedAt,
+		LabelIDs:                r.LabelIds,
+		SortWeight:              r.SortWeight,
+		UpdatedAt:               r.UpdatedAt,
+		CreatedAt:               r.CreatedAt,
+		PrimaryAssigneePublicID: r.PrimaryAssigneePublicID,
+		AssigneeCount:           r.AssigneeCount,
+	}
+}
+
+// rowToTaskListItemFromProject is the public façade preserved for
+// backwards-compatibility with the four crud.go call sites.
+func rowToTaskListItemFromProject(r generated.ListTasksForProjectRow) TaskListItem {
+	return taskListRowToDTO(taskListRowFromProject(r))
 }
 
 // rowToTaskListItemFromProjectKeyset is the keyset-pagination twin of
-// rowToTaskListItemFromProject. The Row shape differs only in that it
-// drops the COUNT(*) OVER() Total column (keyset queries never carry
-// total since the response is "more pages or not", not "page X of Y"),
-// so the projection is otherwise identical.
+// rowToTaskListItemFromProject. The adapter handles the row-shape
+// difference; the DTO projection runs through the same
+// [taskListRowToDTO] so the two paths stay observable-identical.
 func rowToTaskListItemFromProjectKeyset(r generated.ListTasksForProjectKeysetRow) TaskListItem {
-	return TaskListItem{
-		ID:                r.PublicID.String(),
-		ProjectID:         bytesToUUIDString(r.ProjectPublicID),
-		ProjectName:       r.ProjectName,
-		ProjectIdentifier: r.ProjectIdentifier.String,
-		TaskNumber:        int32(r.TaskNumber), //#nosec G115 -- task_number is per-project sequence (uint32), fits int32 within realistic deployments
-		ParentTaskID:      nullBytesToUUIDString(r.ParentTaskPublicID),
-		Title:             r.Title,
-		Visibility:        string(r.Visibility),
-		DerivedState:      string(r.DerivedState),
-		Priority:          r.Priority,
-		DueOn:             nullDate(r.DueOn),
-		StartedOn:         nullDate(r.StartedOn),
-		CompletedAt:       nullTimeUnix(r.CompletedAt),
-		ArchivedAt:        nullTimeUnix(r.ArchivedAt),
-		LabelIDs:          nullStr(r.LabelIds),
-		SortWeight:        r.SortWeight,
-		PrimaryAssigneeID: rawBytesToUUIDPtr(r.PrimaryAssigneePublicID),
-		AssigneeCount:     r.AssigneeCount,
-		UpdatedAt:         nullTimeUnix(r.UpdatedAt),
-		CreatedAt:         r.CreatedAt.Unix(),
-	}
+	return taskListRowToDTO(taskListRowFromProjectKeyset(r))
 }
 
 // rowToTaskListItemFromWorkspaceKeyset is the keyset-pagination twin of
-// rowToTaskListItemFromWorkspace, structurally identical bar the Total
-// column.
+// rowToTaskListItemFromWorkspace.
 func rowToTaskListItemFromWorkspaceKeyset(r generated.ListTasksForWorkspaceKeysetRow) TaskListItem {
-	return TaskListItem{
-		ID:                r.PublicID.String(),
-		ProjectID:         bytesToUUIDString(r.ProjectPublicID),
-		ProjectName:       r.ProjectName,
-		ProjectIdentifier: r.ProjectIdentifier.String,
-		TaskNumber:        int32(r.TaskNumber), //#nosec G115 -- task_number is per-project sequence (uint32), fits int32 within realistic deployments
-		ParentTaskID:      nullBytesToUUIDString(r.ParentTaskPublicID),
-		Title:             r.Title,
-		Visibility:        string(r.Visibility),
-		DerivedState:      string(r.DerivedState),
-		Priority:          r.Priority,
-		DueOn:             nullDate(r.DueOn),
-		StartedOn:         nullDate(r.StartedOn),
-		CompletedAt:       nullTimeUnix(r.CompletedAt),
-		ArchivedAt:        nullTimeUnix(r.ArchivedAt),
-		LabelIDs:          nullStr(r.LabelIds),
-		SortWeight:        r.SortWeight,
-		PrimaryAssigneeID: rawBytesToUUIDPtr(r.PrimaryAssigneePublicID),
-		AssigneeCount:     r.AssigneeCount,
-		UpdatedAt:         nullTimeUnix(r.UpdatedAt),
-		CreatedAt:         r.CreatedAt.Unix(),
-	}
+	return taskListRowToDTO(taskListRowFromWorkspaceKeyset(r))
 }
 
+// rowToTaskListItemFromWorkspace runs the workspace-scope OFFSET path
+// through the unified projection.
 func rowToTaskListItemFromWorkspace(r generated.ListTasksForWorkspaceRow) TaskListItem {
-	return TaskListItem{
-		ID:                r.PublicID.String(),
-		ProjectID:         bytesToUUIDString(r.ProjectPublicID),
-		ProjectName:       r.ProjectName,
-		ProjectIdentifier: r.ProjectIdentifier.String,
-		TaskNumber:        int32(r.TaskNumber), //#nosec G115 -- task_number is per-project sequence (uint32), fits int32 within realistic deployments
-		ParentTaskID:      nullBytesToUUIDString(r.ParentTaskPublicID),
-		Title:             r.Title,
-		Visibility:        string(r.Visibility),
-		DerivedState:      string(r.DerivedState),
-		Priority:          r.Priority,
-		DueOn:             nullDate(r.DueOn),
-		StartedOn:         nullDate(r.StartedOn),
-		CompletedAt:       nullTimeUnix(r.CompletedAt),
-		ArchivedAt:        nullTimeUnix(r.ArchivedAt),
-		LabelIDs:          nullStr(r.LabelIds),
-		SortWeight:        r.SortWeight,
-		PrimaryAssigneeID: rawBytesToUUIDPtr(r.PrimaryAssigneePublicID),
-		AssigneeCount:     r.AssigneeCount,
-		UpdatedAt:         nullTimeUnix(r.UpdatedAt),
-		CreatedAt:         r.CreatedAt.Unix(),
-	}
+	return taskListRowToDTO(taskListRowFromWorkspace(r))
 }
 
 func rowToConstraint(r generated.ListConstraintsForTaskRow) TaskConstraint {
