@@ -1,0 +1,124 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`tnk help output > matches snapshot for \`auth login\` 1`] = `
+"Usage: auth login
+
+Log in with email and password
+
+Examples:
+  tnk auth login"
+`;
+
+exports[`tnk help output > matches snapshot for \`auth logout\` 1`] = `
+"Usage: auth logout
+
+Clear stored credentials
+
+Examples:
+  tnk auth logout"
+`;
+
+exports[`tnk help output > matches snapshot for \`auth status\` 1`] = `
+"Usage: auth status
+
+Show current authentication status
+
+Examples:
+  tnk auth status"
+`;
+
+exports[`tnk help output > matches snapshot for \`task create\` 1`] = `
+"Usage: task create [options]
+
+Create a task
+
+Options:
+  -t, --title <title>                Task title (required) (required)
+  -d, --description <description>    Task description
+  -p, --project-id <project-id>      Project public id (required) (required)
+      --project <project>            (DEPRECATED, use --project-id instead) Project public id
+      --due <due>                    Due date (YYYY-MM-DD)
+      --start <start>                Start date (YYYY-MM-DD)
+      --priority <priority>          Priority (0-3) (default: 0)
+      --visibility <visibility>      Visibility: public, project, or private (default: "public") [public, project, private]
+
+Examples:
+  tnk task create --title "Write report" --project-id 9c2ad1d8-1f2c-7e1c-9a8a-44c0c9f0c1ab
+  tnk task create --title "Ship release" --project-id 9c2ad1d8-1f2c-7e1c-9a8a-44c0c9f0c1ab --due 2026-05-01 --priority 2
+  tnk task create -t "Internal note" -p 9c2ad1d8-1f2c-7e1c-9a8a-44c0c9f0c1ab --visibility private"
+`;
+
+exports[`tnk help output > matches snapshot for \`task list\` 1`] = `
+"Usage: task list [options]
+
+List tasks
+
+Options:
+  -p, --project-id <project-id>        Filter by project public id
+      --project <project>              (DEPRECATED, use --project-id instead) Project public id
+  -s, --status <status>                Filter by derived state
+  -w, --workspace-id <workspace-id>    Workspace public id
+      --workspace <workspace>          (DEPRECATED, use --workspace-id instead) Workspace public id
+  -l, --limit <limit>                  Maximum number of tasks to return (default: 25)
+
+Examples:
+  tnk task list
+  tnk task list --project-id 9c2ad1d8-1f2c-7e1c-9a8a-44c0c9f0c1ab
+  tnk task list --workspace-id 0190f3a6-4e6c-7d2a-94c9-aa86b1f72c11 --status in_progress --limit 50"
+`;
+
+exports[`tnk help output > matches snapshot for \`task search\` 1`] = `
+"Usage: task search <query> [options]
+
+Search tasks by title (case-insensitive substring match)
+
+Arguments:
+  query (required)
+
+Options:
+  -w, --workspace-id <workspace-id>    Workspace public id (required when --project-id is not given)
+      --workspace <workspace>          (DEPRECATED, use --workspace-id instead) Workspace public id
+  -p, --project-id <project-id>        Project public id (alternative to --workspace-id)
+      --project <project>              (DEPRECATED, use --project-id instead) Project public id
+  -l, --limit <limit>                  Maximum number of tasks to return (default: 20)
+
+Examples:
+  tnk task search "release" --workspace-id 0190f3a6-4e6c-7d2a-94c9-aa86b1f72c11
+  tnk task search "report" --project-id 9c2ad1d8-1f2c-7e1c-9a8a-44c0c9f0c1ab --limit 10"
+`;
+
+exports[`tnk help output > matches snapshot for \`task update\` 1`] = `
+"Usage: task update <id> [options]
+
+Update a task
+
+Arguments:
+  id (required)
+
+Options:
+  -t, --title <title>                New title
+  -d, --description <description>    New description
+      --due <due>                    Due date (YYYY-MM-DD, empty to clear)
+      --start <start>                Start date (YYYY-MM-DD, empty to clear)
+      --priority <priority>          Priority (0-3)
+      --state <state>                Apply a state-machine transition: start, block, unblock, submit, complete, reopen, cancel [start, block, unblock, submit, complete, reopen, cancel]
+      --visibility <visibility>      Visibility: public, project, or private [public, project, private]
+
+Examples:
+  tnk task update 9c2ad1d8 --title "Updated title"
+  tnk task update 9c2ad1d8 --state start
+  tnk task update 9c2ad1d8 --due 2026-06-15 --priority 3
+  tnk task update 9c2ad1d8 --due """
+`;
+
+exports[`tnk help output > matches snapshot for \`task view\` 1`] = `
+"Usage: task view <id>
+
+View task details
+
+Arguments:
+  id (required)
+
+Examples:
+  tnk task view 9c2ad1d8-1f2c-7e1c-9a8a-44c0c9f0c1ab"
+`;
