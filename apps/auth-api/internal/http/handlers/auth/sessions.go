@@ -6,12 +6,59 @@ package auth
 
 import (
 	"context"
+	"time"
 
 	"github.com/nodate-flow/nodate-flow/apps/auth-api/internal/auth"
 	"github.com/nodate-flow/nodate-flow/apps/auth-api/internal/db/types"
 	apierrors "github.com/nodate-flow/nodate-flow/apps/auth-api/internal/errors"
 	"github.com/nodate-flow/nodate-flow/packages/go-shared/authn"
+	"github.com/nodate-flow/nodate-flow/packages/go-shared/sessionstore"
 )
+
+// userAgentMaxLen caps the stored User-Agent string. The sessions
+// table column is sized for this upper bound.
+const userAgentMaxLen = 255
+
+// truncateUserAgent clips an oversized User-Agent header to the column
+// width so a malicious client cannot use it as a write-amp vector.
+func truncateUserAgent(ua string) string {
+	if len(ua) > userAgentMaxLen {
+		return ua[:userAgentMaxLen]
+	}
+	return ua
+}
+
+// IssueTokens signs an access JWT and creates a new session row. It
+// returns the JSON-body Tokens envelope plus the freshly-minted
+// plaintext refresh token, which the caller must attach to the
+// response via a Set-Cookie header (never in the JSON body). Shared
+// by every login path (register, login, magic-link, OIDC).
+func IssueTokens(ctx context.Context, deps Deps, userID uint32, userPub types.PublicID, userAgent, ipAddress string) (Tokens, string, error) {
+	sessPub := types.New()
+	access, exp, err := deps.JWT.Sign(userPub, sessPub)
+	if err != nil {
+		return Tokens{}, "", httpErr(apierrors.InternalUnexpected)
+	}
+	refresh, refreshHash, err := auth.GenerateRefresh()
+	if err != nil {
+		return Tokens{}, "", httpErr(apierrors.InternalUnexpected)
+	}
+	if _, err := deps.Sessions.Create(ctx, sessionstore.CreateParams{
+		PublicID:    sessPub,
+		UserID:      userID,
+		RefreshHash: refreshHash,
+		UserAgent:   truncateUserAgent(userAgent),
+		IPAddress:   ipAddress,
+		ExpiresAt:   time.Now().Add(refreshCookieTTL),
+	}); err != nil {
+		return Tokens{}, "", httpErr(apierrors.InternalUnexpected)
+	}
+	return Tokens{
+		AccessToken: access,
+		ExpiresAt:   exp.Unix(),
+		UserID:      userPub.String(),
+	}, refresh, nil
+}
 
 // ListSessions handles GET /me/sessions. It returns every active
 // session for the caller, marking the one matching the current

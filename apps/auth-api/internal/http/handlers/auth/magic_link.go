@@ -15,13 +15,16 @@ import (
 	"github.com/nodate-flow/nodate-flow/packages/go-shared/apierr"
 	"github.com/nodate-flow/nodate-flow/packages/go-shared/authn"
 	"github.com/nodate-flow/nodate-flow/packages/go-shared/email"
+	sharedtoken "github.com/nodate-flow/nodate-flow/packages/go-shared/token"
 )
 
 // magicLinkTTL is how long a magic link token stays valid.
 const magicLinkTTL = 15 * time.Minute
 
-// magicLinkPrefix is used to generate the opaque token.
-const magicLinkPrefix = "ml_"
+// magicLinkPrefix is the user-visible prefix on the opaque token.
+// Sourced from packages/go-shared/token so the prefix catalogue cannot
+// drift between auth-api and flow-api.
+const magicLinkPrefix = sharedtoken.PrefixMagicLink
 
 // MagicLinkRequest handles POST /auth/magic-link/request. It generates
 // a one-time token, stores its SHA-256 hash, and sends the link via
@@ -129,7 +132,7 @@ func MagicLinkVerify(deps Deps) func(context.Context, *MagicLinkVerifyInput) (*M
 			ActorID:      row.UserID,
 			ResourceType: "user",
 		})
-		tokens, refresh, err := issueTokens(ctx, deps, row.UserID, pub, in.UserAgent, authn.ClientIPFromContext(ctx))
+		tokens, refresh, err := IssueTokens(ctx, deps, row.UserID, pub, in.UserAgent, authn.ClientIPFromContext(ctx))
 		if err != nil {
 			return nil, err
 		}

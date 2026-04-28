@@ -23,12 +23,13 @@ func OIDCGithubCallback(deps Deps) func(context.Context, *OIDCCallbackInput) (*O
 			return nil, httpErr(apierrors.AuthOidcGithubNotConfigured)
 		}
 		// Validate the state JWT for CSRF protection. The signed state
-		// embeds the nonce so we can pass it uniformly to Exchange,
-		// matching the Google/Microsoft callbacks; GitHub itself does
-		// not bind a nonce yet, but threading it through removes the
-		// drift between handlers and prepares for a future when it
-		// does.
-		nonce, err := deps.JWT.VerifyOIDCState(in.State)
+		// embeds the nonce + the provider it was minted for; the
+		// provider claim defends against cross-provider state replay
+		// (a state issued for /oidc/google/callback can't be redeemed
+		// here). GitHub itself does not bind a nonce yet, but
+		// threading it through removes drift between handlers and
+		// prepares for a future when it does.
+		nonce, err := deps.JWT.VerifyOIDCStateForProvider(in.State, "github")
 		if err != nil {
 			return nil, httpErr(apierrors.AuthOidcStateMismatch)
 		}
@@ -102,7 +103,7 @@ func OIDCGithubCallback(deps Deps) func(context.Context, *OIDCCallbackInput) (*O
 			ResourceType: "user",
 			Metadata:     map[string]any{"provider": "github", "email": claims.Email},
 		})
-		tokens, refresh, err := issueTokens(ctx, deps, userID, userPub, in.UserAgent, authn.ClientIPFromContext(ctx))
+		tokens, refresh, err := IssueTokens(ctx, deps, userID, userPub, in.UserAgent, authn.ClientIPFromContext(ctx))
 		if err != nil {
 			return nil, err
 		}

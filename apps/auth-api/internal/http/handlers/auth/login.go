@@ -19,8 +19,15 @@ import (
 )
 
 // maxFailedBeforeLock is the failed-login threshold that triggers a
-// 15-minute account lockout.
+// 15-minute account lockout for password and TOTP code paths.
 const maxFailedBeforeLock = 5
+
+// maxRecoveryFailedBeforeLock is the tighter threshold applied when the
+// failure happened on the recovery-code branch of the TOTP step. The
+// recovery counter shares storage with the TOTP failed-attempts column;
+// the lower threshold makes recovery-code brute-forcing trip the lockout
+// faster without giving up the timing-uniform single-counter design.
+const maxRecoveryFailedBeforeLock = 3
 
 // Login handles POST /auth/login. It verifies the password against the
 // stored argon2id hash and rotates the failed-attempts counter.
@@ -93,7 +100,7 @@ func Login(deps Deps) func(context.Context, *LoginInput) (*LoginOutput, error) {
 			ResourceType: "user",
 			Metadata:     map[string]any{"email": email},
 		})
-		tokens, refresh, err := issueTokens(ctx, deps, row.UserID, row.UserPublicID, in.UserAgent, authn.ClientIPFromContext(ctx))
+		tokens, refresh, err := IssueTokens(ctx, deps, row.UserID, row.UserPublicID, in.UserAgent, authn.ClientIPFromContext(ctx))
 		if err != nil {
 			return nil, err
 		}
@@ -173,14 +180,14 @@ func LoginTotp(deps Deps) func(context.Context, *LoginTotpInput) (*LoginTotpOutp
 			rcID, lerr := deps.Queries.FindUnusedRecoveryCode(ctx, generated.FindUnusedRecoveryCodeParams{UserID: uid, CodeHash: hash})
 			if lerr != nil {
 				if errors.Is(lerr, sql.ErrNoRows) {
-					bumpFailedByID(ctx, deps, ident.ID, ident.FailedAttempts)
+					bumpFailedByIDWithThreshold(ctx, deps, ident.ID, ident.FailedAttempts, maxRecoveryFailedBeforeLock)
 					deps.Audit.Record(ctx, audit.Entry{
 						Action:       "auth.login_totp_failed",
 						ActorID:      uint32(uid),
 						ResourceType: "user",
 						Metadata:     map[string]any{"method": "recovery_code"},
 					})
-					if ident.FailedAttempts+1 >= maxFailedBeforeLock {
+					if ident.FailedAttempts+1 >= maxRecoveryFailedBeforeLock {
 						return nil, httpErr(apierrors.AuthLoginRateLimitedAfterRetries)
 					}
 					return nil, httpErr(apierrors.AuthTotpRecoveryCodeInvalid)
@@ -212,7 +219,7 @@ func LoginTotp(deps Deps) func(context.Context, *LoginTotpInput) (*LoginTotpOutp
 			ActorID:      uint32(uid),
 			ResourceType: "user",
 		})
-		tokens, refresh, err := issueTokens(ctx, deps, uid, u.PublicID, in.UserAgent, authn.ClientIPFromContext(ctx))
+		tokens, refresh, err := IssueTokens(ctx, deps, uid, u.PublicID, in.UserAgent, authn.ClientIPFromContext(ctx))
 		if err != nil {
 			return nil, err
 		}
@@ -224,12 +231,22 @@ func LoginTotp(deps Deps) func(context.Context, *LoginTotpInput) (*LoginTotpOutp
 }
 
 // bumpFailedByID increments the failed-attempts counter on an identity
-// identified by its internal ID. Used by the TOTP login path where we
-// already have the identity row from FindLocalIdentityByUserId.
+// identified by its internal ID, locking the account for 15 minutes if
+// the count reaches [maxFailedBeforeLock]. Used by the TOTP login path
+// where we already have the identity row from FindLocalIdentityByUserId.
 func bumpFailedByID(ctx context.Context, deps Deps, identityID uint32, currentAttempts uint32) {
+	bumpFailedByIDWithThreshold(ctx, deps, identityID, currentAttempts, maxFailedBeforeLock)
+}
+
+// bumpFailedByIDWithThreshold is the threshold-parameterised variant of
+// [bumpFailedByID]. The recovery-code branch passes the lower
+// [maxRecoveryFailedBeforeLock] so an attacker probing recovery codes
+// trips the 15-minute lockout faster than an attacker brute-forcing
+// 6-digit TOTP codes.
+func bumpFailedByIDWithThreshold(ctx context.Context, deps Deps, identityID uint32, currentAttempts, threshold uint32) {
 	next := currentAttempts + 1
 	var lock sql.NullTime
-	if next >= maxFailedBeforeLock {
+	if next >= threshold {
 		lock = sql.NullTime{Time: time.Now().Add(15 * time.Minute), Valid: true}
 	}
 	if err := deps.Queries.UpdateIdentityFailedAttempts(ctx, generated.UpdateIdentityFailedAttemptsParams{

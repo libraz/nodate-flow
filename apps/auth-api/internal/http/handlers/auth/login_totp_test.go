@@ -107,3 +107,62 @@ func TestMaxFailedBeforeLock_IsReasonable(t *testing.T) {
 	assert.Equal(t, uint32(5), uint32(maxFailedBeforeLock),
 		"lockout threshold must be 5 to match security requirements")
 }
+
+// TestRecoveryCodeThreshold_IsTighter pins the invariant that recovery
+// codes lock out faster than TOTP codes. Recovery codes are high-entropy
+// single-use secrets, so a small attempt budget caps the brute-force
+// success probability before a determined attacker can search the space.
+func TestRecoveryCodeThreshold_IsTighter(t *testing.T) {
+	t.Parallel()
+	assert.Equal(t, uint32(3), uint32(maxRecoveryFailedBeforeLock),
+		"recovery-code lockout threshold must be 3")
+	assert.Less(t, uint32(maxRecoveryFailedBeforeLock), uint32(maxFailedBeforeLock),
+		"recovery threshold must be strictly tighter than TOTP threshold")
+}
+
+// TestBumpFailedByIDWithThreshold_LocksAtRecoveryThreshold validates the
+// recovery-code branch trips the lockout at three failures even though
+// the TOTP threshold is five. This is the wire-up test for the L1 fix:
+// without it, recovery codes would inherit the laxer TOTP threshold and
+// give an attacker five times the attempt budget per period.
+func TestBumpFailedByIDWithThreshold_LocksAtRecoveryThreshold(t *testing.T) {
+	t.Parallel()
+	db := &fakeDBTX{}
+	q := generated.New(db)
+	deps := Deps{Queries: q}
+
+	// Two prior failures; the third (this call) should trigger lockout
+	// when the recovery threshold is in effect.
+	bumpFailedByIDWithThreshold(context.Background(), deps, 42, maxRecoveryFailedBeforeLock-1, maxRecoveryFailedBeforeLock)
+
+	require.Len(t, db.execCalls, 1)
+	args := db.execCalls[0].args
+	assert.Equal(t, uint32(maxRecoveryFailedBeforeLock), args[0],
+		"failed_attempts must reach the recovery threshold")
+	lock, ok := args[1].(sql.NullTime)
+	require.True(t, ok)
+	assert.True(t, lock.Valid,
+		"recovery threshold must lock at 3 even though TOTP threshold is 5")
+}
+
+// TestBumpFailedByIDWithThreshold_DoesNotLockBelowTotpThreshold confirms
+// the legacy TOTP path (called via [bumpFailedByID]) does NOT lock at 3
+// failures — the threshold parameter is what gates the lockout, not a
+// global rule.
+func TestBumpFailedByIDWithThreshold_DoesNotLockBelowTotpThreshold(t *testing.T) {
+	t.Parallel()
+	db := &fakeDBTX{}
+	q := generated.New(db)
+	deps := Deps{Queries: q}
+
+	// Three prior failures with TOTP threshold (5) — should NOT lock.
+	bumpFailedByID(context.Background(), deps, 42, 2)
+
+	require.Len(t, db.execCalls, 1)
+	args := db.execCalls[0].args
+	assert.Equal(t, uint32(3), args[0])
+	lock, ok := args[1].(sql.NullTime)
+	require.True(t, ok)
+	assert.False(t, lock.Valid,
+		"TOTP path must not lock at 3 failures — that is the recovery-only threshold")
+}

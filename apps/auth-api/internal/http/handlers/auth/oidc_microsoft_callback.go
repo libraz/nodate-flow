@@ -21,7 +21,10 @@ func OIDCMicrosoftCallback(deps Deps) func(context.Context, *OIDCCallbackInput) 
 		if deps.OIDCMicrosoft == nil {
 			return nil, httpErr(apierrors.AuthOidcMicrosoftNotConfigured)
 		}
-		nonce, err := deps.JWT.VerifyOIDCState(in.State)
+		// Validate the state JWT for CSRF protection. The signed state
+		// embeds the nonce + the provider it was minted for; the
+		// provider claim defends against cross-provider state replay.
+		nonce, err := deps.JWT.VerifyOIDCStateForProvider(in.State, "microsoft")
 		if err != nil {
 			return nil, httpErr(apierrors.AuthOidcStateMismatch)
 		}
@@ -96,7 +99,7 @@ func OIDCMicrosoftCallback(deps Deps) func(context.Context, *OIDCCallbackInput) 
 			ResourceType: "user",
 			Metadata:     map[string]any{"provider": "microsoft", "email": email},
 		})
-		tokens, refresh, err := issueTokens(ctx, deps, userID, userPub, in.UserAgent, authn.ClientIPFromContext(ctx))
+		tokens, refresh, err := IssueTokens(ctx, deps, userID, userPub, in.UserAgent, authn.ClientIPFromContext(ctx))
 		if err != nil {
 			return nil, err
 		}

@@ -16,10 +16,11 @@ func OIDCGoogleStart(deps Deps) func(context.Context, *struct{}) (*OIDCStartOutp
 			return nil, httpErr(apierrors.AuthOidcProviderUnreachable)
 		}
 		nonce := authn.RandomHex(16)
-		// State is a signed JWT that embeds the nonce. The callback
-		// validates the JWT signature + expiry to provide CSRF
-		// protection without server-side storage.
-		state, err := deps.JWT.SignOIDCState(nonce)
+		// State is a signed JWT that embeds the nonce and the provider
+		// it was minted for. The callback validates the JWT signature,
+		// expiry, and provider binding to provide CSRF protection plus
+		// cross-provider replay defence without server-side storage.
+		state, err := deps.JWT.SignOIDCStateForProvider(nonce, "google")
 		if err != nil {
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}

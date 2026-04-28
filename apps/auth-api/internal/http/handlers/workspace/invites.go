@@ -14,10 +14,14 @@ import (
 	"github.com/nodate-flow/nodate-flow/packages/go-shared/authn"
 	"github.com/nodate-flow/nodate-flow/packages/go-shared/email"
 	"github.com/nodate-flow/nodate-flow/packages/go-shared/memberkit"
+	sharedtoken "github.com/nodate-flow/nodate-flow/packages/go-shared/token"
 )
 
 // PrefixInvite is the user-visible prefix for workspace invite tokens.
-const PrefixInvite = "inv_"
+// Re-exported from the centralised packages/go-shared/token catalogue
+// so callers in this package keep their existing import surface while
+// the constant lives in a single source of truth.
+const PrefixInvite = sharedtoken.PrefixInvite
 
 // uint32FromNullInt32 extracts a uint32 from a sql.NullInt32; returns
 // 0 when the null flag is unset.
@@ -178,12 +182,12 @@ func AcceptInvite(deps InviteDeps) func(context.Context, *AcceptInviteInput) (*A
 
 		// Validate expiry.
 		if invite.ExpiresAt.Valid && invite.ExpiresAt.Time.Before(time.Now()) {
-			return nil, httpErr(apierrors.WsWorkspaceNotFound)
+			return nil, httpErr(apierrors.WsWorkspaceInviteExpired)
 		}
 
 		// Validate use count.
 		if invite.MaxUses.Valid && int32(invite.UseCount) >= invite.MaxUses.Int32 { //#nosec G115 -- workspace_invites.use_count is INT UNSIGNED capped by max_uses (INT)
-			return nil, httpErr(apierrors.WsWorkspaceNotFound)
+			return nil, httpErr(apierrors.WsWorkspaceInviteExhausted)
 		}
 
 		// Idempotency: if already a member, return workspace info.
@@ -259,12 +263,12 @@ func InviteInfo(deps InviteDeps) func(context.Context, *InviteInfoInput) (*Invit
 
 		// Validate expiry.
 		if invite.ExpiresAt.Valid && invite.ExpiresAt.Time.Before(time.Now()) {
-			return nil, httpErr(apierrors.WsWorkspaceNotFound)
+			return nil, httpErr(apierrors.WsWorkspaceInviteExpired)
 		}
 
 		// Validate use count.
 		if invite.MaxUses.Valid && int32(invite.UseCount) >= invite.MaxUses.Int32 { //#nosec G115 -- workspace_invites.use_count is INT UNSIGNED capped by max_uses (INT)
-			return nil, httpErr(apierrors.WsWorkspaceNotFound)
+			return nil, httpErr(apierrors.WsWorkspaceInviteExhausted)
 		}
 
 		wsRow, err := deps.Queries.FindWorkspaceInviteWorkspaceName(ctx, hash)

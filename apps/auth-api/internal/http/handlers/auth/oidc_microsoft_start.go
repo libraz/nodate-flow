@@ -15,7 +15,7 @@ func OIDCMicrosoftStart(deps Deps) func(context.Context, *struct{}) (*OIDCStartO
 			return nil, httpErr(apierrors.AuthOidcMicrosoftNotConfigured)
 		}
 		nonce := authn.RandomHex(16)
-		state, err := deps.JWT.SignOIDCState(nonce)
+		state, err := deps.JWT.SignOIDCStateForProvider(nonce, "microsoft")
 		if err != nil {
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}

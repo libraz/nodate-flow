@@ -66,3 +66,50 @@ func TestVerifyOIDCState_WrongAudience(t *testing.T) {
 	_, err = j.VerifyTotpChallenge(token)
 	assert.Error(t, err, "OIDC state token must not pass TOTP challenge verification")
 }
+
+// TestVerifyOIDCStateForProvider_ProviderMismatch is the regression test
+// for the cross-provider replay defence: a state JWT signed for "google"
+// must not pass verification when checked against "github". Without
+// this binding an attacker who phishes a victim through one provider
+// could redeem the resulting state at another provider's callback.
+func TestVerifyOIDCStateForProvider_ProviderMismatch(t *testing.T) {
+	t.Parallel()
+	j := newTestIssuer(t)
+
+	token, err := j.SignOIDCStateForProvider("nonce-x", "google")
+	require.NoError(t, err)
+
+	_, err = j.VerifyOIDCStateForProvider(token, "github")
+	assert.Error(t, err, "state signed for one provider must not verify against another")
+}
+
+// TestVerifyOIDCStateForProvider_AcceptsMatchingProvider is the
+// happy-path counterpart: a state for the matching provider is accepted
+// and the nonce is returned intact.
+func TestVerifyOIDCStateForProvider_AcceptsMatchingProvider(t *testing.T) {
+	t.Parallel()
+	j := newTestIssuer(t)
+
+	const nonce = "nonce-y"
+	token, err := j.SignOIDCStateForProvider(nonce, "github")
+	require.NoError(t, err)
+
+	got, err := j.VerifyOIDCStateForProvider(token, "github")
+	require.NoError(t, err)
+	assert.Equal(t, nonce, got)
+}
+
+// TestVerifyOIDCStateForProvider_RejectsLegacyUnboundState ensures the
+// laxer legacy [SignOIDCState] tokens (which omit the provider claim)
+// are rejected by the provider-aware verifier. Otherwise an attacker
+// could craft a "compatibility" token that bypasses the binding.
+func TestVerifyOIDCStateForProvider_RejectsLegacyUnboundState(t *testing.T) {
+	t.Parallel()
+	j := newTestIssuer(t)
+
+	token, err := j.SignOIDCState("nonce-z")
+	require.NoError(t, err)
+
+	_, err = j.VerifyOIDCStateForProvider(token, "google")
+	assert.Error(t, err, "legacy state without provider claim must not satisfy provider-bound verification")
+}

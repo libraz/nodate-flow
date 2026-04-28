@@ -50,7 +50,7 @@ func TestOIDCMicrosoftCallback_RejectsUnverifiedEmail(t *testing.T) {
 	jwt, err := internauth.NewJWTIssuer(nil, "iss", "aud", time.Minute)
 	require.NoError(t, err)
 
-	state, err := jwt.SignOIDCState("nonce-value")
+	state, err := jwt.SignOIDCStateForProvider("nonce-value", "microsoft")
 	require.NoError(t, err)
 
 	ms := &fakeMicrosoftExchanger{
@@ -86,7 +86,7 @@ func TestOIDCMicrosoftCallback_AcceptsVerifiedEmailWithoutDB(t *testing.T) {
 	t.Parallel()
 	jwt, err := internauth.NewJWTIssuer(nil, "iss", "aud", time.Minute)
 	require.NoError(t, err)
-	state, err := jwt.SignOIDCState("nonce-value")
+	state, err := jwt.SignOIDCStateForProvider("nonce-value", "microsoft")
 	require.NoError(t, err)
 
 	ms := &fakeMicrosoftExchanger{
@@ -143,7 +143,7 @@ func TestOIDCMicrosoftCallback_PreferredUsernameFallback(t *testing.T) {
 	t.Parallel()
 	jwt, err := internauth.NewJWTIssuer(nil, "iss", "aud", time.Minute)
 	require.NoError(t, err)
-	state, err := jwt.SignOIDCState("nonce-value")
+	state, err := jwt.SignOIDCStateForProvider("nonce-value", "microsoft")
 	require.NoError(t, err)
 
 	ms := &fakeMicrosoftExchanger{

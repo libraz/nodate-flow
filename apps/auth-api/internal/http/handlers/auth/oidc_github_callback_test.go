@@ -48,7 +48,7 @@ func TestOIDCGithubCallback_PassesNonceFromState(t *testing.T) {
 	require.NoError(t, err)
 
 	const wantNonce = "01961234-5678-7000-8000-deadbeefcafe"
-	state, err := jwt.SignOIDCState(wantNonce)
+	state, err := jwt.SignOIDCStateForProvider(wantNonce, "github")
 	require.NoError(t, err)
 
 	gh := &fakeGithubExchanger{
@@ -77,7 +77,7 @@ func TestOIDCGithubCallback_RejectsUnverifiedEmail(t *testing.T) {
 	t.Parallel()
 	jwt, err := internauth.NewJWTIssuer(nil, "iss", "aud", time.Minute)
 	require.NoError(t, err)
-	state, err := jwt.SignOIDCState("nonce-value")
+	state, err := jwt.SignOIDCStateForProvider("nonce-value", "github")
 	require.NoError(t, err)
 
 	gh := &fakeGithubExchanger{err: internauth.ErrGithubEmailNotVerified}
