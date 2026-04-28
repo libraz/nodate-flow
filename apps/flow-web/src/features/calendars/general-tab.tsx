@@ -22,6 +22,7 @@ import { useTranslation } from 'react-i18next';
 
 import { formatApiError } from '../../lib/api-error';
 import { confirmAction } from '../../lib/confirm-action';
+import { CALENDAR_EVENT_PALETTE } from '../../lib/source-colors';
 import {
   useCalendarEventCountQuery,
   useCalendarQuery,
@@ -31,70 +32,13 @@ import {
 import styles from './calendar-settings-drawer.module.css';
 
 /**
- * Curated 10-swatch calendar palette. Each swatch carries a stable
- * hex (the value persisted by the API and rendered on event chips
- * outside the themed canvas) and a paired design token used to paint
- * the picker swatch. Swatch rendering goes through the token so the
- * picker reads as native to the active theme; the persisted hex is
- * retained as the canonical cross-theme identity. Custom hex pickers
- * are out of scope for v1.
+ * Re-export of the curated calendar swatch palette so existing
+ * consumers (e.g. the color-palette aria test) keep their import path.
+ * The single source of truth lives in `lib/source-colors.ts` so that
+ * every hex literal that bypasses the design-token pipeline sits behind
+ * one `nf-token-override` annotation.
  */
-export const COLOR_PALETTE: ReadonlyArray<{
-  hex: string;
-  token: string;
-  nameKey: string;
-}> = [
-  {
-    hex: '#2563eb',
-    token: 'var(--nf-cal-color-1)',
-    nameKey: 'calendar.settings.general.color.blue',
-  },
-  {
-    hex: '#0891b2',
-    token: 'var(--nf-cal-color-2)',
-    nameKey: 'calendar.settings.general.color.cyan',
-  },
-  {
-    hex: '#16a34a',
-    token: 'var(--nf-cal-color-3)',
-    nameKey: 'calendar.settings.general.color.green',
-  },
-  {
-    hex: '#ca8a04',
-    token: 'var(--nf-cal-color-4)',
-    nameKey: 'calendar.settings.general.color.amber',
-  },
-  {
-    hex: '#ea580c',
-    token: 'var(--nf-cal-color-5)',
-    nameKey: 'calendar.settings.general.color.orange',
-  },
-  {
-    hex: '#dc2626',
-    token: 'var(--nf-cal-color-6)',
-    nameKey: 'calendar.settings.general.color.red',
-  },
-  {
-    hex: '#db2777',
-    token: 'var(--nf-cal-color-7)',
-    nameKey: 'calendar.settings.general.color.pink',
-  },
-  {
-    hex: '#9333ea',
-    token: 'var(--nf-cal-color-8)',
-    nameKey: 'calendar.settings.general.color.purple',
-  },
-  {
-    hex: '#475569',
-    token: 'var(--nf-cal-color-9)',
-    nameKey: 'calendar.settings.general.color.slate',
-  },
-  {
-    hex: '#0f172a',
-    token: 'var(--nf-cal-color-10)',
-    nameKey: 'calendar.settings.general.color.ink',
-  },
-];
+export const COLOR_PALETTE = CALENDAR_EVENT_PALETTE;
 
 export interface GeneralTabProps {
   workspaceId: string;

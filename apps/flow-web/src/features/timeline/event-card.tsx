@@ -11,21 +11,21 @@ import type { ReactElement, ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { authApiBaseUrl } from '../../lib/sdk';
+import { INTEGRATION_SOURCE_COLORS } from '../../lib/source-colors';
 import type { TimelineEvent } from './api';
 
 export interface EventCardProps {
   event: TimelineEvent;
 }
 
-/** Brand colors for external sources and event categories (fixed, not theme-dependent). */
-const SOURCE_COLOR = {
-  github: '#6e5494',
-  slack: '#4a154b',
-  google: '#4285f4',
-  signal: '#0ea5e9',
-  ai: '#10b981',
-  task: '#f59e0b',
-} as const;
+/**
+ * Brand and category colors used by the timeline source-mix coding.
+ * Re-exposed under the original `SOURCE_COLOR` name so existing
+ * call-sites in this file keep their phrasing while the actual hex
+ * literals live in `lib/source-colors.ts` behind a single
+ * `nf-token-override` annotation.
+ */
+const SOURCE_COLOR = INTEGRATION_SOURCE_COLORS;
 
 /**
  * eventSourceTag returns a short category label derived from the event

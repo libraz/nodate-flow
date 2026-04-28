@@ -14,6 +14,13 @@
 #   - packages/ui/src/calendar/**/*.module.css (calendar token definitions --nf-cal-*)
 #   - *.test.* / *.spec.*        (test files)
 #   - node_modules/
+#
+# Allow-marker:
+#   - Files annotated with `nf-token-override: ...` are skipped because the
+#     hex value is intentionally persisted by the API or carries an external
+#     brand identity that cannot flow through the design-token pipeline.
+#     The marker must appear at file scope; per-line annotations are not
+#     supported by this script.
 
 set -euo pipefail
 
@@ -44,11 +51,24 @@ EXCLUDES=(
 count=0
 found_files=""
 
+# has_override returns 0 when the given file declares an
+# `nf-token-override: ...` annotation anywhere in its body. Files with the
+# annotation are intentionally allowed to carry hex literals because they
+# either persist values via the API or reproduce external brand
+# identities; either way the design-token pipeline cannot apply.
+has_override() {
+  local path="${1%%:*}"
+  [[ -f "$path" ]] && grep -q 'nf-token-override' "$path"
+}
+
 for dir in "${SCAN_DIRS[@]}"; do
   [[ -d "$dir" ]] || continue
 
   # Scan CSS files
   while IFS= read -r line; do
+    if has_override "$line"; then
+      continue
+    fi
     count=$((count + 1))
     found_files="$found_files\n$line"
   done < <(grep -rnE "$COLOR_PATTERN" "$dir" "${EXCLUDES[@]}" \
@@ -68,7 +88,13 @@ for dir in "${SCAN_DIRS[@]}"; do
     if echo "$line" | grep -qE 'var\(--nf-'; then
       continue
     fi
-    # Filter out typed brand color constant declarations (intentionally hardcoded)
+    # Files annotated with `nf-token-override` opt out of the scan.
+    if has_override "$line"; then
+      continue
+    fi
+    # Filter out typed brand color constant declarations (intentionally hardcoded).
+    # Retained as a fallback for files that pre-date the `nf-token-override`
+    # annotation; new code should rely on the annotation instead.
     if echo "$line" | grep -qE "^\s*(github|slack|google|signal|ai|task):.*'#|BRAND_COLOR|SOURCE_COLOR"; then
       continue
     fi

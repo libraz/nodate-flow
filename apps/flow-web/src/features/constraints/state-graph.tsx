@@ -8,6 +8,8 @@
 import type { ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { CONSTRAINT_STATE_COLORS } from '../../lib/source-colors';
+
 const STATES = ['open', 'waiting', 'review', 'done', 'cancelled'] as const;
 export type GraphState = (typeof STATES)[number];
 
@@ -37,19 +39,14 @@ const EDGES: { from: GraphState; to: GraphState; label: string }[] = [
  * External signal sources that may feed this task. Rendered as
  * floating square nodes with a dashed edge into `open`, so the
  * state graph shows clearly that github / slack / google can
- * drive transitions from outside.
+ * drive transitions from outside. Brand colors come from the
+ * shared `source-colors` module so every hex literal that bypasses
+ * the design-token pipeline lives behind one annotation.
  */
-/** Brand colors for external integration sources (fixed, not theme-dependent). */
-const BRAND_COLOR = {
-  github: '#6e5494',
-  slack: '#4a154b',
-  google: '#4285f4',
-} as const;
-
 const EXTERNAL_SOURCES: { id: string; color: string; y: number }[] = [
-  { id: 'github', color: BRAND_COLOR.github, y: 30 },
-  { id: 'slack', color: BRAND_COLOR.slack, y: 120 },
-  { id: 'google', color: BRAND_COLOR.google, y: 210 },
+  { id: 'github', color: CONSTRAINT_STATE_COLORS.github, y: 30 },
+  { id: 'slack', color: CONSTRAINT_STATE_COLORS.slack, y: 120 },
+  { id: 'google', color: CONSTRAINT_STATE_COLORS.google, y: 210 },
 ];
 
 export interface StateGraphProps {
