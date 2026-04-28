@@ -21,10 +21,12 @@ import {
   selectIsAuthenticated,
   useAuth,
 } from '../features/auth/auth-store';
+import PasswordInput from '../features/auth/password-input';
 import OAuthButtonRow from '../features/oauth/oauth-button-row';
 import type { ProblemJson } from '../lib/api-error';
 import { type AuthErrorI18nKey, mapAuthError, mapAuthThrown } from '../lib/auth-errors';
 import { sdk } from '../lib/sdk';
+import { useSubmitGuard } from '../lib/use-submit-guard';
 
 interface RegisterResponse {
   accessToken: string;
@@ -56,6 +58,7 @@ function SignupPage(): ReactElement {
     displayName: '',
   });
 
+  const submitGuard = useSubmitGuard();
   const [serverError, setServerError] = useState<AuthErrorI18nKey | null>(null);
 
   useEffect(() => {
@@ -65,6 +68,7 @@ function SignupPage(): ReactElement {
   }, [isAuthenticated, navigate]);
 
   const onSubmit = async (values: SignupFormValues): Promise<void> => {
+    if (submitGuard.guard()) return;
     setServerError(null);
     try {
       const { data, error } = await sdk.POST('/auth/register', {
@@ -102,6 +106,8 @@ function SignupPage(): ReactElement {
       void navigate({ to: '/profile', replace: true });
     } catch (err) {
       setServerError(mapAuthThrown(err));
+    } finally {
+      submitGuard.end();
     }
   };
 
@@ -147,15 +153,7 @@ function SignupPage(): ReactElement {
         >
           {(control) => {
             const { ref, ...field } = register('password');
-            return (
-              <Input
-                {...control}
-                {...field}
-                ref={ref}
-                type="password"
-                autoComplete="new-password"
-              />
-            );
+            return <PasswordInput {...control} {...field} ref={ref} autoComplete="new-password" />;
           }}
         </FormField>
 
@@ -165,8 +163,8 @@ function SignupPage(): ReactElement {
           </p>
         ) : null}
 
-        <Button type="submit" variant="primary" disabled={isSubmitting}>
-          {isSubmitting ? t('signup.submitting') : t('signup.submit')}
+        <Button type="submit" variant="primary" disabled={isSubmitting || submitGuard.submitting}>
+          {isSubmitting || submitGuard.submitting ? t('signup.submitting') : t('signup.submit')}
         </Button>
 
         <OAuthButtonRow mode="signup" onError={setServerError} />

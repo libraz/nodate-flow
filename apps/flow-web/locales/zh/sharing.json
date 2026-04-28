@@ -34,6 +34,14 @@
     "col_priority": "优先级",
     "col_due": "截止",
     "col_assignee": "负责人",
-    "no_tasks": "此视图中暂无任务。"
+    "no_tasks": "此视图中暂无任务。",
+    "errors": {
+      "invalid_title": "此公开视图不可用。",
+      "invalid_body": "链接可能无效，或视图已被取消发布。",
+      "expired_title": "此公开视图已过期。",
+      "expired_body": "此视图的发布期限已结束。",
+      "network_title": "网络错误",
+      "network_body": "无法连接到服务器。请检查您的连接并重试。"
+    }
   }
 }

@@ -132,9 +132,17 @@ export function useAcceptInvite(): UseMutationResult<AcceptInviteOutput, ApiErro
   });
 }
 
-/** GET /invites/{token}/info — public info about an invite (no auth required). */
-export function useInviteInfoQuery(token: string): UseSuspenseQueryResult<InviteInfoOutput> {
-  return useSuspenseQuery({
+/**
+ * inviteInfoQueryOptions — shared query options for the public invite-info
+ * fetch. Exposed so route-level `beforeLoad` hooks can prefetch the same
+ * cache entry the component reads via {@link useInviteInfoQuery}, keeping
+ * the queryKey, queryFn, and error mapping in a single place.
+ */
+export function inviteInfoQueryOptions(token: string): {
+  queryKey: ReturnType<typeof inviteKeys.info>;
+  queryFn: () => Promise<InviteInfoOutput>;
+} {
+  return {
     queryKey: inviteKeys.info(token),
     queryFn: async (): Promise<InviteInfoOutput> => {
       const { data, error } = await sdk.GET('/invites/{token}/info', {
@@ -143,5 +151,10 @@ export function useInviteInfoQuery(token: string): UseSuspenseQueryResult<Invite
       if (error || !data) throw toError(error, 'Failed to load invite info');
       return data;
     },
-  });
+  };
+}
+
+/** GET /invites/{token}/info — public info about an invite (no auth required). */
+export function useInviteInfoQuery(token: string): UseSuspenseQueryResult<InviteInfoOutput> {
+  return useSuspenseQuery(inviteInfoQueryOptions(token));
 }

@@ -53,11 +53,10 @@ function WorkspaceDetailPage(): ReactElement {
 
   const handleToggleEnabled = async () => {
     if (!workspace) return;
-    const action = workspace.enabled ? t('workspaces.suspend') : t('workspaces.enable');
     const ok = await confirmAction({
       tone: 'danger',
-      message: action,
-      confirmLabel: action,
+      message: workspace.enabled ? t('workspaces.confirm_suspend') : t('workspaces.confirm_enable'),
+      confirmLabel: workspace.enabled ? t('workspaces.suspend') : t('workspaces.enable'),
     });
     if (!ok) return;
 
@@ -146,7 +145,9 @@ function WorkspaceDetailPage(): ReactElement {
           <span
             style={{
               ...adminBadgeBase,
-              background: workspace.enabled ? 'var(--nf-color-success)' : 'var(--nf-color-danger)',
+              background: workspace.enabled
+                ? 'color-mix(in srgb, var(--nf-color-success) 15%, transparent)'
+                : 'color-mix(in srgb, var(--nf-color-danger) 15%, transparent)',
               color: workspace.enabled ? 'var(--nf-color-success)' : 'var(--nf-color-danger)',
             }}
           >

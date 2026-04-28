@@ -1,6 +1,8 @@
 {
   "common": {
-    "breadcrumb": "Breadcrumb"
+    "breadcrumb": "Breadcrumb",
+    "unknown_role": "Unknown role",
+    "network_error": "Network error. Check your connection and try again."
   },
   "landing": {
     "wordmark": "nodate-flow",
@@ -1028,6 +1030,7 @@
       "title_invalid": "This share link is invalid.",
       "title_expired": "This share link has expired.",
       "body": "This link may have expired or been removed.",
+      "body_network": "We could not reach the server. Check your connection and try again.",
       "back": "Back to nodate-flow"
     }
   },

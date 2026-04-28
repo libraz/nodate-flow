@@ -29,6 +29,7 @@ import { type ProfileFormValues, profileSchema } from '../../features/auth/auth-
 import { type AuthUser, authStore, selectUser, useAuth } from '../../features/auth/auth-store';
 import { type SupportedLanguage, setLanguage } from '../../i18n';
 import { sdk } from '../../lib/sdk';
+import { useSubmitGuard } from '../../lib/use-submit-guard';
 import { type ThemePreference, useTheme } from '../../providers/theme-provider';
 
 // Sensible default country per UI language. Used to gently cascade the
@@ -150,6 +151,7 @@ export function ProfilePage(): ReactElement {
   const { setPreference } = useTheme();
   const [serverError, setServerError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+  const submitGuard = useSubmitGuard();
   const workspaceCount = useWorkspaceCount(user);
   // Only show the CTA once we know the count is exactly zero. While the
   // count is `undefined` we render nothing so the page does not flash
@@ -296,6 +298,7 @@ export function ProfilePage(): ReactElement {
   };
 
   const onSubmit = async (values: ProfileFormValues): Promise<void> => {
+    if (submitGuard.guard()) return;
     setServerError(null);
     setSuccess(false);
     try {
@@ -330,6 +333,8 @@ export function ProfilePage(): ReactElement {
       setSuccess(true);
     } catch {
       setServerError(t('errors.unknown'));
+    } finally {
+      submitGuard.end();
     }
   };
 
@@ -517,8 +522,12 @@ export function ProfilePage(): ReactElement {
           </output>
         ) : null}
 
-        <Button type="submit" variant="primary" disabled={isSubmitting || !isDirty}>
-          {isSubmitting ? t('profile.saving') : t('profile.save')}
+        <Button
+          type="submit"
+          variant="primary"
+          disabled={isSubmitting || submitGuard.submitting || !isDirty}
+        >
+          {isSubmitting || submitGuard.submitting ? t('profile.saving') : t('profile.save')}
         </Button>
 
         <p

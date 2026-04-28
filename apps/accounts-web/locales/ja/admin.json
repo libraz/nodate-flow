@@ -49,6 +49,8 @@
     "disabled": "停止",
     "suspend": "停止",
     "enable": "有効化",
+    "confirm_suspend": "このワークスペースを停止しますか？",
+    "confirm_enable": "このワークスペースを有効化しますか？",
     "all_workspaces": "すべて",
     "active_only": "有効",
     "suspended_only": "停止中",

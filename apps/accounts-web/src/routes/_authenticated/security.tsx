@@ -19,6 +19,8 @@ import {
   type ChangePasswordFormValues,
   changePasswordSchema,
 } from '../../features/auth/auth-schemas';
+import PasswordInput from '../../features/auth/password-input';
+import { useCapsLockHint } from '../../features/auth/use-caps-lock-hint';
 import type { ProblemJson } from '../../lib/api-error';
 import {
   type AuthErrorI18nKey,
@@ -287,13 +289,7 @@ export function SecurityPage(): ReactElement {
             {(control) => {
               const { ref, ...field } = register('currentPassword');
               return (
-                <Input
-                  {...control}
-                  {...field}
-                  ref={ref}
-                  type="password"
-                  autoComplete="current-password"
-                />
+                <PasswordInput {...control} {...field} ref={ref} autoComplete="current-password" />
               );
             }}
           </FormField>
@@ -306,13 +302,7 @@ export function SecurityPage(): ReactElement {
             {(control) => {
               const { ref, ...field } = register('newPassword');
               return (
-                <Input
-                  {...control}
-                  {...field}
-                  ref={ref}
-                  type="password"
-                  autoComplete="new-password"
-                />
+                <PasswordInput {...control} {...field} ref={ref} autoComplete="new-password" />
               );
             }}
           </FormField>
@@ -631,6 +621,7 @@ function EnrollmentStep({
   const [code, setCode] = useState('');
   const [qrDataUrl, setQrDataUrl] = useState<string | null>(null);
   const [qrFailed, setQrFailed] = useState(false);
+  const capsHint = useCapsLockHint();
 
   useEffect(() => {
     let cancelled = false;
@@ -691,10 +682,18 @@ function EnrollmentStep({
             onChange={(e) => {
               setCode(e.target.value.replace(/\D/g, '').slice(0, 6));
             }}
+            onKeyDown={capsHint.handlers.onKeyDown}
+            onFocus={capsHint.handlers.onFocus}
+            onBlur={capsHint.handlers.onBlur}
             required
           />
         )}
       </FormField>
+      {capsHint.capsLockOn ? (
+        <output aria-live="polite" className="aw-flush aw-muted aw-text-xs">
+          {t('login.caps_lock_on')}
+        </output>
+      ) : null}
       {errorKey ? (
         <p role="alert" className="aw-error">
           {t(errorKey)}
@@ -862,9 +861,8 @@ function EnabledPanel({
       <p className="aw-flush aw-text-sm">{title}</p>
       <FormField label={t('security.totp.password_required')} required>
         {(control) => (
-          <Input
+          <PasswordInput
             {...control}
-            type="password"
             autoComplete="current-password"
             value={password}
             onChange={(e) => {

@@ -49,6 +49,8 @@
     "disabled": "Suspended",
     "suspend": "Suspend",
     "enable": "Enable",
+    "confirm_suspend": "Are you sure you want to suspend this workspace?",
+    "confirm_enable": "Are you sure you want to enable this workspace?",
     "all_workspaces": "All",
     "active_only": "Active",
     "suspended_only": "Suspended",

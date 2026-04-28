@@ -1,6 +1,8 @@
 {
   "common": {
-    "breadcrumb": "面包屑导航"
+    "breadcrumb": "面包屑导航",
+    "unknown_role": "未知角色",
+    "network_error": "网络错误。请检查您的连接并重试。"
   },
   "landing": {
     "wordmark": "nodate-flow",
@@ -1028,6 +1030,7 @@
       "title_invalid": "此分享链接无效。",
       "title_expired": "此分享链接已过期。",
       "body": "该链接可能已过期或被移除。",
+      "body_network": "无法连接到服务器。请检查您的连接并重试。",
       "back": "返回 nodate-flow"
     }
   },

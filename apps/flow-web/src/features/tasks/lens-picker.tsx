@@ -149,7 +149,7 @@ export default function LensPicker({ workspaceId, projectId }: LensPickerProps):
             background: 'var(--nf-color-bg)',
             border: '1px solid var(--nf-color-border)',
             borderRadius: '0.5rem',
-            boxShadow: '0 4px 12px oklch(0 0 0 / 12%)',
+            boxShadow: 'var(--nf-shadow-elevated)',
             minInlineSize: '14rem',
             maxInlineSize: '20rem',
             zIndex: 50,

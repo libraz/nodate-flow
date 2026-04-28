@@ -176,7 +176,12 @@ export default function PublicShareCreateDialog({
             <Button type="button" variant="ghost" onClick={handleClose}>
               {t('workspace.public_shares.dialog.cancel')}
             </Button>
-            <Button type="submit" variant="primary" disabled={submitting || title.trim() === ''}>
+            <Button
+              type="submit"
+              variant="primary"
+              data-testid="public-share-create-submit"
+              disabled={submitting || title.trim() === ''}
+            >
               {t('workspace.public_shares.dialog.submit')}
             </Button>
           </div>
@@ -202,6 +207,7 @@ export default function PublicShareCreateDialog({
             <Button
               type="button"
               variant="ghost"
+              data-testid="public-share-create-copy"
               onClick={() => {
                 void handleCopy();
               }}
@@ -210,7 +216,12 @@ export default function PublicShareCreateDialog({
                 ? t('workspace.public_shares.dialog.copied')
                 : t('workspace.public_shares.dialog.copy')}
             </Button>
-            <Button type="button" variant="primary" onClick={handleClose}>
+            <Button
+              type="button"
+              variant="primary"
+              data-testid="public-share-create-done"
+              onClick={handleClose}
+            >
               {t('workspace.public_shares.dialog.done')}
             </Button>
           </div>

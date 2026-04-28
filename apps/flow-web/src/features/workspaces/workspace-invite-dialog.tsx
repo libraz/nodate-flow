@@ -151,6 +151,7 @@ export default function WorkspaceInviteDialog({
             <Button
               variant="primary"
               size="sm"
+              data-testid="invite-create-copy"
               onClick={() => {
                 void handleCopy();
               }}
@@ -159,7 +160,7 @@ export default function WorkspaceInviteDialog({
             </Button>
           </div>
           <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-            <Button variant="ghost" onClick={handleClose}>
+            <Button variant="ghost" data-testid="invite-create-close" onClick={handleClose}>
               {t('workspaces.form.close')}
             </Button>
           </div>
@@ -248,7 +249,12 @@ export default function WorkspaceInviteDialog({
           <Button type="button" variant="ghost" onClick={handleClose} disabled={submitting}>
             {t('workspaces.form.cancel')}
           </Button>
-          <Button type="submit" variant="primary" disabled={submitting}>
+          <Button
+            type="submit"
+            variant="primary"
+            data-testid="invite-create-submit"
+            disabled={submitting}
+          >
             {t('workspaces.invites.create')}
           </Button>
         </div>

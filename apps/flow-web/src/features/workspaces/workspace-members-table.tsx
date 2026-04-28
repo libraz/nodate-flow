@@ -170,6 +170,7 @@ export default function WorkspaceMembersTable({
             <Button
               variant="ghost"
               size="sm"
+              data-testid="invite-create-open"
               onClick={() => {
                 setInviteOpen(true);
               }}

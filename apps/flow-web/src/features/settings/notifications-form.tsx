@@ -10,6 +10,7 @@ import { toaster } from '@nodate-flow/ui/primitives/toast';
 import { type FormEvent, type ReactElement, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { useSubmitGuard } from '../../lib/use-submit-guard';
 import { type PatchMeInput, useMeQuery, useUpdateMe } from './api';
 import styles from './notifications-form.module.css';
 
@@ -66,11 +67,11 @@ export default function NotificationsForm(): ReactElement {
     notifEmailDueSoon: me.notifEmailDueSoon,
     notifWebPush: me.notifWebPush,
   });
-  const [submitting, setSubmitting] = useState(false);
+  const submitGuard = useSubmitGuard();
 
   const handleSubmit = async (e: FormEvent<HTMLFormElement>): Promise<void> => {
     e.preventDefault();
-    setSubmitting(true);
+    if (submitGuard.guard()) return;
     const patch: PatchMeInput = { ...state };
     try {
       await update.mutateAsync(patch);
@@ -78,7 +79,7 @@ export default function NotificationsForm(): ReactElement {
     } catch {
       toaster.show({ tone: 'danger', message: t('notifications.errors.update_failed') });
     } finally {
-      setSubmitting(false);
+      submitGuard.end();
     }
   };
 
@@ -115,8 +116,8 @@ export default function NotificationsForm(): ReactElement {
       </ul>
 
       <div className={styles.actions}>
-        <Button type="submit" variant="primary" disabled={submitting}>
-          {submitting ? t('notifications.saving') : t('notifications.save')}
+        <Button type="submit" variant="primary" disabled={submitGuard.submitting}>
+          {submitGuard.submitting ? t('notifications.saving') : t('notifications.save')}
         </Button>
       </div>
     </form>

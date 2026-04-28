@@ -39,3 +39,27 @@ export function formatApiError(error: unknown, t: TFunction, fallbackKey: string
   if (error instanceof Error) return error.message;
   return t(fallbackKey);
 }
+
+/**
+ * isNetworkError — true when the caught value represents a transport-layer
+ * failure (DNS / TCP / CORS / aborted fetch) rather than a server response
+ * we could decode. Lets call sites surface a network-specific message
+ * ("check your connection") separately from server-returned codes
+ * ("invite expired").
+ *
+ * Heuristics, in order:
+ *   - Native `TypeError` from `fetch()` (browsers throw this when the
+ *     request never reached a server).
+ *   - `ApiError` with no `code` AND no `httpStatus` — toApiError() only
+ *     populates those when it had a parseable response envelope, so the
+ *     absence of both signals "we never got a useful reply".
+ *   - `DOMException` with name `AbortError` — request cancellation.
+ */
+export function isNetworkError(error: unknown): boolean {
+  if (error instanceof TypeError) return true;
+  if (error instanceof DOMException && error.name === 'AbortError') return true;
+  if (error instanceof ApiError) {
+    return error.code === undefined && error.httpStatus === undefined;
+  }
+  return false;
+}

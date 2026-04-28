@@ -70,13 +70,21 @@ function OAuthButtonRow({ mode, onError }: OAuthButtonRowProps): ReactElement | 
   if (!caps) return null;
   if (!caps.oidcGoogle && !caps.oidcGithub && !caps.oidcMicrosoft) return null;
 
+  // Tracking aria-busy independently lets us drop the busy hint *before*
+  // flipping `pendingProvider` back to null on error so screen readers do
+  // not briefly announce a busy-but-enabled control as React replays the
+  // two state updates.
+  const [busyProvider, setBusyProvider] = useState<OAuthProvider | null>(null);
+
   const handleStart = async (provider: OAuthProvider): Promise<void> => {
     if (pendingProvider !== null) return;
     setPendingProvider(provider);
+    setBusyProvider(provider);
     try {
       const { data, error } = await sdk.GET(`/auth/oidc/${provider}/start` as never);
       if (error || !data) {
         onError?.(mapAuthError(error as ProblemJson | undefined));
+        setBusyProvider(null);
         setPendingProvider(null);
         return;
       }
@@ -88,6 +96,7 @@ function OAuthButtonRow({ mode, onError }: OAuthButtonRowProps): ReactElement | 
       window.location.href = result.authorizationUrl;
     } catch (err) {
       onError?.(mapAuthThrown(err));
+      setBusyProvider(null);
       setPendingProvider(null);
     }
   };
@@ -125,7 +134,7 @@ function OAuthButtonRow({ mode, onError }: OAuthButtonRowProps): ReactElement | 
             type="button"
             variant="default"
             disabled={isPending}
-            aria-busy={pendingProvider === 'google'}
+            aria-busy={busyProvider === 'google'}
             onClick={() => {
               void handleStart('google');
             }}
@@ -138,7 +147,7 @@ function OAuthButtonRow({ mode, onError }: OAuthButtonRowProps): ReactElement | 
             type="button"
             variant="default"
             disabled={isPending}
-            aria-busy={pendingProvider === 'github'}
+            aria-busy={busyProvider === 'github'}
             onClick={() => {
               void handleStart('github');
             }}
@@ -151,7 +160,7 @@ function OAuthButtonRow({ mode, onError }: OAuthButtonRowProps): ReactElement | 
             type="button"
             variant="default"
             disabled={isPending}
-            aria-busy={pendingProvider === 'microsoft'}
+            aria-busy={busyProvider === 'microsoft'}
             onClick={() => {
               void handleStart('microsoft');
             }}

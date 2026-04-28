@@ -7,15 +7,15 @@
  * this page shows a simple confirmation without event enrichment.
  */
 
-import { useMutation } from '@tanstack/react-query';
-import { CalendarCheck, CircleAlert } from 'lucide-react';
-import { type ReactElement, type ReactNode, useState } from 'react';
-import { useTranslation } from 'react-i18next';
-
 import Button from '@nodate-flow/ui/primitives/button';
 import Card from '@nodate-flow/ui/primitives/card';
+import { useMutation } from '@tanstack/react-query';
+import { CalendarCheck, CircleAlert } from 'lucide-react';
+import { type ReactElement, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 
-import { ApiError, formatApiError, toApiError } from '../../lib/api-error';
+import PublicPageLayout from '../../components/public-page-layout';
+import { ApiError, formatApiError, isNetworkError, toApiError } from '../../lib/api-error';
 import { sdk } from '../../lib/sdk';
 
 type RsvpChoice = 'accepted' | 'tentative' | 'declined';
@@ -41,12 +41,12 @@ export default function PublicAcceptInvitePage({
 
   if (!token) {
     return (
-      <PageShell>
+      <PublicPageLayout measure="narrow" alignMain="center" mainLabel={t('invites.accept.title')}>
         <ErrorState
           icon={<CircleAlert size={40} aria-hidden="true" />}
           message={t('invites.accept.invalid_link')}
         />
-      </PageShell>
+      </PublicPageLayout>
     );
   }
 
@@ -84,9 +84,14 @@ function AcceptInviteForm({ token }: AcceptInviteFormProps): ReactElement {
           ? t('invites.accept.success_tentative')
           : t('invites.accept.success_declined');
     return (
-      <PageShell>
+      <PublicPageLayout
+        measure="narrow"
+        alignMain="center"
+        mainLabel={t('invites.accept.success_title')}
+      >
         <Card>
-          <div
+          <section
+            aria-label={t('invites.accept.success_title')}
             style={{
               display: 'flex',
               flexDirection: 'column',
@@ -103,19 +108,21 @@ function AcceptInviteForm({ token }: AcceptInviteFormProps): ReactElement {
             />
             <h1 style={headingStyle}>{t('invites.accept.success_title')}</h1>
             <p style={{ margin: 0, color: 'var(--nf-color-fg-muted)' }}>{successMessage}</p>
-          </div>
+          </section>
         </Card>
-      </PageShell>
+      </PublicPageLayout>
     );
   }
 
   const error = mutation.error;
   const isNotFound = error instanceof ApiError && error.code === 'CALENDAR.INVITE.NOT_FOUND';
+  const network = isNetworkError(error);
 
   return (
-    <PageShell>
+    <PublicPageLayout measure="narrow" alignMain="center" mainLabel={t('invites.accept.title')}>
       <Card>
-        <div
+        <section
+          aria-label={t('invites.accept.title')}
           style={{
             display: 'flex',
             flexDirection: 'column',
@@ -142,9 +149,11 @@ function AcceptInviteForm({ token }: AcceptInviteFormProps): ReactElement {
               }}
               role="alert"
             >
-              {isNotFound
-                ? t('invites.accept.not_found')
-                : formatApiError(error, t, 'invites.accept.error_generic')}
+              {network
+                ? t('common.network_error')
+                : isNotFound
+                  ? t('invites.accept.not_found')
+                  : formatApiError(error, t, 'invites.accept.error_generic')}
             </p>
           ) : null}
 
@@ -194,9 +203,9 @@ function AcceptInviteForm({ token }: AcceptInviteFormProps): ReactElement {
               {t('invites.accept.submitting')}
             </p>
           ) : null}
-        </div>
+        </section>
       </Card>
-    </PageShell>
+    </PublicPageLayout>
   );
 }
 
@@ -223,25 +232,6 @@ function ErrorState({ icon, message }: ErrorStateProps): ReactElement {
         <p style={{ margin: 0 }}>{message}</p>
       </div>
     </Card>
-  );
-}
-
-function PageShell({ children }: { children: ReactNode }): ReactElement {
-  return (
-    <main
-      style={{
-        maxWidth: '32rem',
-        marginInline: 'auto',
-        padding: 'var(--nf-space-6) var(--nf-space-4)',
-        display: 'flex',
-        flexDirection: 'column',
-        gap: 'var(--nf-space-4)',
-        minBlockSize: '100vh',
-        justifyContent: 'center',
-      }}
-    >
-      {children}
-    </main>
   );
 }
 

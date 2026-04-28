@@ -25,6 +25,8 @@ import {
   selectIsAuthenticated,
   useAuth,
 } from '../features/auth/auth-store';
+import PasswordInput from '../features/auth/password-input';
+import { useCapsLockHint } from '../features/auth/use-caps-lock-hint';
 import OAuthButtonRow from '../features/oauth/oauth-button-row';
 import type { ProblemJson } from '../lib/api-error';
 import { type AuthErrorI18nKey, mapAuthError, mapAuthThrown } from '../lib/auth-errors';
@@ -88,6 +90,7 @@ function LoginPage(): ReactElement {
   const [useRecovery, setUseRecovery] = useState(false);
   const [recoveryCode, setRecoveryCode] = useState('');
   const totpGuard = useSubmitGuard();
+  const totpCapsHint = useCapsLockHint();
   const [showMagicLink, setShowMagicLink] = useState(false);
   const [magicLinkEmail, setMagicLinkEmail] = useState('');
   const [magicLinkSent, setMagicLinkSent] = useState(false);
@@ -334,6 +337,9 @@ function LoginPage(): ReactElement {
                   onChange={(e) => {
                     setRecoveryCode(e.target.value.toUpperCase().slice(0, RECOVERY_MAX_LEN));
                   }}
+                  onKeyDown={totpCapsHint.handlers.onKeyDown}
+                  onFocus={totpCapsHint.handlers.onFocus}
+                  onBlur={totpCapsHint.handlers.onBlur}
                   autoFocus
                 />
               )}
@@ -356,11 +362,19 @@ function LoginPage(): ReactElement {
                   onChange={(e) => {
                     setTotpCode(e.target.value.replace(/\D/g, '').slice(0, 6));
                   }}
+                  onKeyDown={totpCapsHint.handlers.onKeyDown}
+                  onFocus={totpCapsHint.handlers.onFocus}
+                  onBlur={totpCapsHint.handlers.onBlur}
                   autoFocus
                 />
               )}
             </FormField>
           )}
+          {totpCapsHint.capsLockOn ? (
+            <output aria-live="polite" className="aw-flush aw-muted aw-text-xs">
+              {t('login.caps_lock_on')}
+            </output>
+          ) : null}
           <Button
             type="button"
             variant="ghost"
@@ -434,13 +448,7 @@ function LoginPage(): ReactElement {
           {(control) => {
             const { ref, ...field } = register('password');
             return (
-              <Input
-                {...control}
-                {...field}
-                ref={ref}
-                type="password"
-                autoComplete="current-password"
-              />
+              <PasswordInput {...control} {...field} ref={ref} autoComplete="current-password" />
             );
           }}
         </FormField>

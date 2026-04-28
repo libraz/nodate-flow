@@ -34,6 +34,14 @@
     "col_priority": "Priority",
     "col_due": "Due",
     "col_assignee": "Assignee",
-    "no_tasks": "No tasks in this view."
+    "no_tasks": "No tasks in this view.",
+    "errors": {
+      "invalid_title": "This public view is not available.",
+      "invalid_body": "The link may be invalid or the view may have been unpublished.",
+      "expired_title": "This public view has expired.",
+      "expired_body": "The publish window for this view has closed.",
+      "network_title": "Network error",
+      "network_body": "We could not reach the server. Check your connection and try again."
+    }
   }
 }

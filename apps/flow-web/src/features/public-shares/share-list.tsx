@@ -79,6 +79,7 @@ export default function ShareList({ workspaceId }: ShareListProps): ReactElement
         <Button
           type="button"
           variant="primary"
+          data-testid="public-share-create-open"
           onClick={() => {
             setCreateOpen(true);
           }}
@@ -136,6 +137,7 @@ export default function ShareList({ workspaceId }: ShareListProps): ReactElement
                     <Button
                       type="button"
                       variant="ghost"
+                      data-testid="public-share-rotate"
                       onClick={() => {
                         void handleRotate(share);
                       }}
@@ -145,6 +147,7 @@ export default function ShareList({ workspaceId }: ShareListProps): ReactElement
                     <Button
                       type="button"
                       variant="ghost"
+                      data-testid="public-share-delete"
                       onClick={() => {
                         void handleDelete(share);
                       }}

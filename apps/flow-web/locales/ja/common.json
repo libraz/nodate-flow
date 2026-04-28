@@ -1,6 +1,8 @@
 {
   "common": {
-    "breadcrumb": "パンくずリスト"
+    "breadcrumb": "パンくずリスト",
+    "unknown_role": "不明な権限",
+    "network_error": "ネットワークエラーです。接続を確認してもう一度お試しください。"
   },
   "landing": {
     "wordmark": "nodate-flow",
@@ -1028,6 +1030,7 @@
       "title_invalid": "この共有リンクは無効です。",
       "title_expired": "この共有リンクは有効期限が切れています。",
       "body": "このリンクは期限切れか削除された可能性があります。",
+      "body_network": "サーバーに接続できませんでした。接続を確認してもう一度お試しください。",
       "back": "nodate-flow に戻る"
     }
   },

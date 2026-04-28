@@ -19,22 +19,24 @@ export interface ProjectStateGraphProps {
   projectId: string;
 }
 
-/** State-based fill colours for node backgrounds (light tint). */
+/** State-based fill colours for node backgrounds. Resolved at render time
+ * via the design-system theme tokens so the graph reflows with the active
+ * theme without bundling per-state oklch literals. */
 const STATE_BG: Record<TaskDerivedState, string> = {
-  open: 'oklch(0.92 0.04 250)',
-  waiting: 'oklch(0.92 0.06 70)',
-  review: 'oklch(0.92 0.05 300)',
-  done: 'oklch(0.92 0.05 155)',
-  cancelled: 'oklch(0.92 0.02 30)',
+  open: 'var(--nf-color-state-open-bg)',
+  waiting: 'var(--nf-color-state-waiting-bg)',
+  review: 'var(--nf-color-state-review-bg)',
+  done: 'var(--nf-color-state-done-bg)',
+  cancelled: 'var(--nf-color-state-cancelled-bg)',
 };
 
 /** State-based border/stroke colours. */
 const STATE_BORDER: Record<TaskDerivedState, string> = {
-  open: 'oklch(0.55 0.15 250)',
-  waiting: 'oklch(0.55 0.15 70)',
-  review: 'oklch(0.55 0.15 300)',
-  done: 'oklch(0.55 0.15 155)',
-  cancelled: 'oklch(0.55 0.08 30)',
+  open: 'var(--nf-color-state-open-fg)',
+  waiting: 'var(--nf-color-state-waiting-fg)',
+  review: 'var(--nf-color-state-review-fg)',
+  done: 'var(--nf-color-state-done-fg)',
+  cancelled: 'var(--nf-color-state-cancelled-fg)',
 };
 
 /**

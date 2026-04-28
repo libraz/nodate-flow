@@ -87,6 +87,7 @@ export default function WorkspaceInvitesList({
         <Button
           variant="danger"
           size="sm"
+          data-testid="invite-revoke"
           disabled={revokeInvite.isPending}
           onClick={() => {
             void handleRevoke(row.original.id);

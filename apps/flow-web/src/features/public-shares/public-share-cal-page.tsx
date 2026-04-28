@@ -13,11 +13,19 @@ import Card from '@nodate-flow/ui/primitives/card';
 import Skeleton from '@nodate-flow/ui/primitives/skeleton';
 import { useQuery } from '@tanstack/react-query';
 import { Calendar as CalendarIcon, Globe, MapPin } from 'lucide-react';
-import type { ReactElement } from 'react';
+import { type ReactElement, memo } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { ApiError, toApiError } from '../../lib/api-error';
+import PublicPageLayout from '../../components/public-page-layout';
+import { ApiError, isNetworkError, toApiError } from '../../lib/api-error';
 import { sdk } from '../../lib/sdk';
+
+/**
+ * Approximate hydrated height of a single ShareEventCard. The skeleton
+ * loader places three of these so the page does not jump on first paint
+ * when events render with title + when label + optional location/memo.
+ */
+const SHARE_EVENT_CARD_HEIGHT = '5rem';
 
 type SharePageDTO = components['schemas']['PublicShareRenderPage'];
 type ShareEventDTO = components['schemas']['PublicShareRenderEvent'];
@@ -73,83 +81,119 @@ export default function PublicShareCalPage({ token }: PublicShareCalPageProps): 
 
   if (isLoading) {
     return (
-      <main
-        style={{
-          maxWidth: '48rem',
-          marginInline: 'auto',
-          padding: 'var(--nf-space-6) var(--nf-space-4)',
-          display: 'flex',
-          flexDirection: 'column',
-          gap: 'var(--nf-space-3)',
-        }}
-      >
+      <PublicPageLayout busy>
         <Skeleton style={{ height: '3rem' }} />
-        <Skeleton style={{ height: '4rem' }} />
-        <Skeleton style={{ height: '4rem' }} />
-        <Skeleton style={{ height: '4rem' }} />
-      </main>
+        <Skeleton style={{ height: SHARE_EVENT_CARD_HEIGHT }} />
+        <Skeleton style={{ height: SHARE_EVENT_CARD_HEIGHT }} />
+        <Skeleton style={{ height: SHARE_EVENT_CARD_HEIGHT }} />
+      </PublicPageLayout>
     );
   }
 
   if (error || !data) {
+    const network = isNetworkError(error);
     const isExpired = error instanceof ApiError && error.code === 'SHARE.SHARE.EXPIRED';
-    const titleKey = isExpired ? 'share.error.title_expired' : 'share.error.title_invalid';
+    const titleKey = network
+      ? 'common.network_error'
+      : isExpired
+        ? 'share.error.title_expired'
+        : 'share.error.title_invalid';
     return (
-      <div
-        style={{
-          minHeight: '100vh',
-          display: 'flex',
-          flexDirection: 'column',
-          backgroundColor: 'var(--nf-color-bg)',
-        }}
-      >
-        <header
+      <PublicPageLayout showBrandHeader alignMain="center">
+        <CalendarIcon
+          size={48}
+          style={{ color: 'var(--nf-color-fg-subtle)', alignSelf: 'center' }}
+          aria-hidden="true"
+        />
+        <h1
           style={{
-            maxWidth: '48rem',
-            width: '100%',
-            marginInline: 'auto',
-            padding: 'var(--nf-space-4)',
-            display: 'flex',
-            alignItems: 'center',
-          }}
-        >
-          <a
-            href="/"
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: 'var(--nf-space-2)',
-              color: 'var(--nf-color-fg)',
-              fontWeight: 'var(--nf-weight-semibold)',
-              fontSize: 'var(--nf-text-base)',
-              textDecoration: 'none',
-            }}
-          >
-            <CalendarIcon
-              size={20}
-              style={{ color: 'var(--nf-color-accent)' }}
-              aria-hidden="true"
-            />
-            {t('share.brand')}
-          </a>
-        </header>
-        <main
-          style={{
-            flex: 1,
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: 'var(--nf-space-4)',
-            padding: 'var(--nf-space-6) var(--nf-space-4)',
+            fontSize: 'var(--nf-text-xl)',
+            fontWeight: 'var(--nf-weight-semibold)',
+            color: 'var(--nf-color-fg)',
+            margin: 0,
             textAlign: 'center',
           }}
         >
-          <CalendarIcon
-            size={48}
-            style={{ color: 'var(--nf-color-fg-subtle)' }}
-            aria-hidden="true"
+          {t(titleKey)}
+        </h1>
+        <p
+          style={{
+            color: 'var(--nf-color-fg-muted)',
+            margin: 0,
+            maxInlineSize: 'var(--nf-measure-narrow)',
+            alignSelf: 'center',
+            textAlign: 'center',
+          }}
+        >
+          {network ? t('share.error.body_network') : t('share.error.body')}
+        </p>
+        <a
+          href="/"
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            alignSelf: 'center',
+            marginBlockStart: 'var(--nf-space-2)',
+            paddingInline: 'var(--nf-space-4)',
+            paddingBlock: 'var(--nf-space-2)',
+            borderRadius: 'var(--nf-radius-md)',
+            backgroundColor: 'var(--nf-color-accent)',
+            color: 'var(--nf-color-accent-fg)',
+            textDecoration: 'none',
+            fontWeight: 'var(--nf-weight-medium)',
+            fontSize: 'var(--nf-text-sm)',
+          }}
+        >
+          {t('share.error.back')}
+        </a>
+      </PublicPageLayout>
+    );
+  }
+
+  const { page, events } = data;
+  const pageTimezone = page.timezone || 'UTC';
+
+  const titleHeader = (
+    <header
+      style={{
+        maxInlineSize: 'var(--nf-measure-content)',
+        inlineSize: '100%',
+        marginInline: 'auto',
+        padding: 'var(--nf-space-6) var(--nf-space-4) var(--nf-space-4)',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 'var(--nf-space-2)',
+      }}
+    >
+      <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--nf-space-3)' }}>
+        {page.iconUrl ? (
+          <img
+            src={page.iconUrl}
+            alt=""
+            style={{
+              width: '2.5rem',
+              height: '2.5rem',
+              borderRadius: 'var(--nf-radius-md)',
+              objectFit: 'cover',
+            }}
           />
+        ) : (
+          <div
+            style={{
+              width: '2.5rem',
+              height: '2.5rem',
+              borderRadius: 'var(--nf-radius-md)',
+              backgroundColor: 'var(--nf-color-accent-subtle)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+            aria-hidden="true"
+          >
+            <CalendarIcon size={20} style={{ color: 'var(--nf-color-accent)' }} />
+          </div>
+        )}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--nf-space-0-5)' }}>
           <h1
             style={{
               fontSize: 'var(--nf-text-xl)',
@@ -158,181 +202,82 @@ export default function PublicShareCalPage({ token }: PublicShareCalPageProps): 
               margin: 0,
             }}
           >
-            {t(titleKey)}
+            {page.title}
           </h1>
           <p
             style={{
+              fontSize: 'var(--nf-text-sm)',
               color: 'var(--nf-color-fg-muted)',
               margin: 0,
-              maxWidth: '32rem',
             }}
           >
-            {t('share.error.body')}
+            {page.workspaceName}
           </p>
-          <a
-            href="/"
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              marginBlockStart: 'var(--nf-space-2)',
-              paddingInline: 'var(--nf-space-4)',
-              paddingBlock: 'var(--nf-space-2)',
-              borderRadius: 'var(--nf-radius-md)',
-              backgroundColor: 'var(--nf-color-accent)',
-              color: 'var(--nf-color-accent-fg)',
-              textDecoration: 'none',
-              fontWeight: 'var(--nf-weight-medium)',
-              fontSize: 'var(--nf-text-sm)',
-            }}
-          >
-            {t('share.error.back')}
-          </a>
-        </main>
+        </div>
       </div>
-    );
-  }
 
-  const { page, events } = data;
-  const pageTimezone = page.timezone || 'UTC';
-
-  return (
-    <div style={{ minHeight: '100vh', backgroundColor: 'var(--nf-color-bg)' }}>
-      {page.coverUrl ? (
-        <div
+      {page.description ? (
+        <p
           style={{
-            height: '12rem',
-            backgroundImage: `url(${encodeURI(page.coverUrl)})`,
-            backgroundSize: 'cover',
-            backgroundPosition: 'center',
-            backgroundColor: 'var(--nf-color-bg-subtle)',
+            fontSize: 'var(--nf-text-sm)',
+            color: 'var(--nf-color-fg-muted)',
+            whiteSpace: 'pre-wrap',
+            margin: 0,
           }}
-          aria-hidden="true"
-        />
+        >
+          {page.description}
+        </p>
       ) : null}
 
-      <header
+      <div
         style={{
-          maxWidth: '48rem',
-          marginInline: 'auto',
-          padding: 'var(--nf-space-6) var(--nf-space-4) var(--nf-space-4)',
           display: 'flex',
-          flexDirection: 'column',
-          gap: 'var(--nf-space-2)',
+          flexWrap: 'wrap',
+          gap: 'var(--nf-space-3)',
+          fontSize: 'var(--nf-text-xs)',
+          color: 'var(--nf-color-fg-subtle)',
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--nf-space-3)' }}>
-          {page.iconUrl ? (
-            <img
-              src={page.iconUrl}
-              alt=""
-              style={{
-                width: '2.5rem',
-                height: '2.5rem',
-                borderRadius: 'var(--nf-radius-md)',
-                objectFit: 'cover',
-              }}
-            />
-          ) : (
-            <div
-              style={{
-                width: '2.5rem',
-                height: '2.5rem',
-                borderRadius: 'var(--nf-radius-md)',
-                backgroundColor: 'var(--nf-color-accent-subtle)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-              }}
-              aria-hidden="true"
-            >
-              <CalendarIcon size={20} style={{ color: 'var(--nf-color-accent)' }} />
-            </div>
-          )}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--nf-space-0-5)' }}>
-            <h1
-              style={{
-                fontSize: 'var(--nf-text-xl)',
-                fontWeight: 'var(--nf-weight-semibold)',
-                color: 'var(--nf-color-fg)',
-                margin: 0,
-              }}
-            >
-              {page.title}
-            </h1>
-            <p
-              style={{
-                fontSize: 'var(--nf-text-sm)',
-                color: 'var(--nf-color-fg-muted)',
-                margin: 0,
-              }}
-            >
-              {page.workspaceName}
-            </p>
-          </div>
-        </div>
-
-        {page.description ? (
-          <p
-            style={{
-              fontSize: 'var(--nf-text-sm)',
-              color: 'var(--nf-color-fg-muted)',
-              whiteSpace: 'pre-wrap',
-              margin: 0,
-            }}
-          >
-            {page.description}
-          </p>
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 'var(--nf-space-1)' }}>
+          <Globe size={12} />
+          {pageTimezone}
+        </span>
+        {page.showHolidaysCountry ? (
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 'var(--nf-space-1)' }}>
+            {t('share.holidays_country', { country: page.showHolidaysCountry })}
+          </span>
         ) : null}
+      </div>
+    </header>
+  );
 
-        <div
+  return (
+    <PublicPageLayout
+      mainLabel={page.title}
+      {...(page.coverUrl ? { coverImageUrl: page.coverUrl } : {})}
+      beforeMain={titleHeader}
+    >
+      {events.length === 0 ? (
+        <p
           style={{
-            display: 'flex',
-            flexWrap: 'wrap',
-            gap: 'var(--nf-space-3)',
-            fontSize: 'var(--nf-text-xs)',
+            padding: 'var(--nf-space-12) 0',
+            textAlign: 'center',
             color: 'var(--nf-color-fg-subtle)',
           }}
         >
-          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 'var(--nf-space-1)' }}>
-            <Globe size={12} />
-            {pageTimezone}
-          </span>
-          {page.showHolidaysCountry ? (
-            <span
-              style={{ display: 'inline-flex', alignItems: 'center', gap: 'var(--nf-space-1)' }}
-            >
-              {t('share.holidays_country', { country: page.showHolidaysCountry })}
-            </span>
-          ) : null}
-        </div>
-      </header>
-
-      <main
-        style={{
-          maxWidth: '48rem',
-          marginInline: 'auto',
-          padding: '0 var(--nf-space-4) var(--nf-space-6)',
-        }}
-      >
-        {events.length === 0 ? (
-          <p
-            style={{
-              padding: 'var(--nf-space-12) 0',
-              textAlign: 'center',
-              color: 'var(--nf-color-fg-subtle)',
-            }}
-          >
-            {t('share.no_upcoming_events')}
-          </p>
-        ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--nf-space-2)' }}>
-            {events.map((event) => (
-              <ShareEventCard key={event.id} event={event} fallbackTimezone={pageTimezone} />
-            ))}
-          </div>
-        )}
-      </main>
-    </div>
+          {t('share.no_upcoming_events')}
+        </p>
+      ) : (
+        <section
+          aria-label={t('share.brand')}
+          style={{ display: 'flex', flexDirection: 'column', gap: 'var(--nf-space-2)' }}
+        >
+          {events.map((event) => (
+            <ShareEventCard key={event.id} event={event} fallbackTimezone={pageTimezone} />
+          ))}
+        </section>
+      )}
+    </PublicPageLayout>
   );
 }
 
@@ -347,8 +292,13 @@ interface ShareEventCardProps {
  * All date formatting goes through `Intl.DateTimeFormat` with an explicit
  * `timeZone` so the label matches the page's publishing zone regardless
  * of the visitor's local timezone. Times are localized via `i18n.language`.
+ *
+ * Memoized so re-renders of the parent (e.g. when an unrelated card
+ * changes) don't re-format every event in the list.
  */
-function ShareEventCard({ event, fallbackTimezone }: ShareEventCardProps): ReactElement {
+const ShareEventCard = memo(ShareEventCardImpl);
+
+function ShareEventCardImpl({ event, fallbackTimezone }: ShareEventCardProps): ReactElement {
   const { t, i18n } = useTranslation();
   const zone = event.timezone || fallbackTimezone;
   const locale = i18n.language || 'en';

@@ -49,6 +49,8 @@
     "disabled": "已停用",
     "suspend": "停用",
     "enable": "启用",
+    "confirm_suspend": "确定要停用该工作区吗？",
+    "confirm_enable": "确定要启用该工作区吗？",
     "all_workspaces": "全部",
     "active_only": "启用中",
     "suspended_only": "已停用",
