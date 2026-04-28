@@ -2282,7 +2282,7 @@ type Calendar struct {
 	CreatedAt time.Time    `json:"createdAt"`
 }
 
-// Calendar events with kind/visibility/show_as classification; nullable start/end for planning-stage placeholders; task_role links to task projection (D1).
+// Calendar events with kind/visibility/show_as classification; nullable start/end for planning-stage placeholders; task_role links to task projection. Soft-delete is signalled solely by enabled=FALSE (no deleted_at column); consumer views must propagate enabled=TRUE on every JOIN to honour soft-delete.
 type CalendarEvent struct {
 	// Internal PK, never exposed
 	ID uint32 `json:"-"`
@@ -2334,16 +2334,16 @@ type CalendarEvent struct {
 	TaskID sql.NullInt32 `json:"-"`
 	// When task_id IS NOT NULL: which task field this event represents. due=task.due_on, scheduled=time-blocked (multi-link allowed).
 	TaskRole NullCalendarEventsTaskRole `json:"taskRole"`
+	// De-NULLed surrogate for task_role; empty string when task_role IS NULL. Exists solely to power uniq_calendar_events_task_role_key over (task_id, task_role_key).
+	TaskRoleKey string `json:"-"`
 	// Display order
 	SortWeight int32 `json:"sortWeight"`
 	// Admin notes
 	Notes sql.NullString `json:"notes"`
 	// Structured per-event markers (non_working_day, auto_snapped, etc.); unknown keys preserved.
 	Flags json.RawMessage `json:"flags"`
-	// Enabled flag
-	Enabled bool `json:"enabled"`
-	// Soft-delete timestamp; rows with deleted_at IS NOT NULL are excluded from LIST/GET
-	DeletedAt sql.NullTime `json:"deletedAt"`
+	// Soft-delete flag; FALSE excludes the row from LIST/GET. The single soft-delete signal for this table — propagate via INNER/LEFT JOIN ... AND ce.enabled = TRUE in every consumer view (matches project-wide enabled propagation in docs/conventions/db.md).
+	Enabled   bool         `json:"enabled"`
 	UpdatedAt sql.NullTime `json:"updatedAt"`
 	CreatedAt time.Time    `json:"createdAt"`
 }
@@ -2392,6 +2392,8 @@ type CalendarEventAttendee struct {
 	EventID sql.NullInt32 `json:"-"`
 	// Internal FK to users.id
 	UserID uint32 `json:"-"`
+	// De-NULLed surrogate for event_id; 0 when event_id IS NULL. Exists solely to power uniq_calendar_event_attendees_event_user over (event_id_key, user_id). VIRTUAL (not STORED) so the FK ON DELETE SET NULL on event_id can be created — STORED + NOT NULL would fail the FK precondition check at table creation time.
+	EventIDKey uint32 `json:"-"`
 	// Attendance response
 	Rsvp CalendarEventAttendeesRsvp `json:"rsvp"`
 	// Whether this attendee can edit the event (granted by owner)
@@ -4019,7 +4021,6 @@ type VTaskDetail struct {
 
 type VTaskList struct {
 	WorkspaceID             uint32            `json:"-"`
-	TaskInternalID          uint32            `json:"-"`
 	ProjectID               uint32            `json:"-"`
 	CreatedByUserID         sql.NullInt32     `json:"-"`
 	PublicID                types.PublicID    `json:"publicId"`
@@ -4046,7 +4047,6 @@ type VTaskList struct {
 
 type VTaskListAll struct {
 	WorkspaceID             uint32            `json:"-"`
-	TaskInternalID          uint32            `json:"-"`
 	ProjectID               uint32            `json:"-"`
 	CreatedByUserID         sql.NullInt32     `json:"-"`
 	PublicID                types.PublicID    `json:"publicId"`
@@ -4073,7 +4073,6 @@ type VTaskListAll struct {
 
 type VTaskListArchived struct {
 	WorkspaceID             uint32            `json:"-"`
-	TaskInternalID          uint32            `json:"-"`
 	ProjectID               uint32            `json:"-"`
 	CreatedByUserID         sql.NullInt32     `json:"-"`
 	PublicID                types.PublicID    `json:"publicId"`

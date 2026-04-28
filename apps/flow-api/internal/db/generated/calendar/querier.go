@@ -57,10 +57,9 @@ type Querier interface {
 	DisableCalendar(ctx context.Context, arg DisableCalendarParams) error
 	// Soft-delete a checklist item.
 	DisableCalendarChecklistItem(ctx context.Context, arg DisableCalendarChecklistItemParams) error
-	// Soft-delete a calendar event by stamping deleted_at and clearing enabled.
-	// The two flags express different intents: enabled=FALSE was the legacy
-	// soft-disable (kept for compatibility with existing reads), while
-	// deleted_at is the new auditable deletion timestamp gating LIST/GET.
+	// Soft-delete a calendar event by clearing the enabled flag. enabled=FALSE
+	// gates LIST/GET reads; the column doubles as the auditable soft-delete
+	// marker (no separate deleted_at column).
 	DisableCalendarEvent(ctx context.Context, arg DisableCalendarEventParams) error
 	// Soft-delete an attachment. Actual blob cleanup is deferred.
 	DisableCalendarEventAttachment(ctx context.Context, arg DisableCalendarEventAttachmentParams) error

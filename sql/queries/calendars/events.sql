@@ -59,7 +59,6 @@ WHERE public_id = ?
   AND calendar_id = ?
   AND workspace_id = ?
   AND enabled = TRUE
-  AND deleted_at IS NULL
 LIMIT 1;
 
 -- name: ListCalendarEventsByRange :many
@@ -90,7 +89,6 @@ WHERE ce.calendar_id = ?
   AND ce.start_at < ?
   AND ce.end_at > ?
   AND ce.enabled = TRUE
-  AND ce.deleted_at IS NULL
 ORDER BY ce.start_at ASC, ce.public_id ASC
 LIMIT 1000;
 
@@ -125,7 +123,6 @@ WHERE ce.calendar_id = ?
   AND ce.start_at < ?
   AND (ce.recurrence_end IS NULL OR ce.recurrence_end > ?)
   AND ce.enabled = TRUE
-  AND ce.deleted_at IS NULL
 ORDER BY ce.start_at ASC
 LIMIT 1000;
 
@@ -163,7 +160,6 @@ WHERE ce.workspace_id = ?
   AND ce.start_at < ?
   AND ce.end_at > ?
   AND ce.enabled = TRUE
-  AND ce.deleted_at IS NULL
 ORDER BY ce.start_at ASC, ce.public_id ASC
 LIMIT 1000;
 
@@ -204,7 +200,6 @@ WHERE ce.workspace_id = ?
   AND ce.start_at < ?
   AND (ce.recurrence_end IS NULL OR ce.recurrence_end > ?)
   AND ce.enabled = TRUE
-  AND ce.deleted_at IS NULL
 ORDER BY ce.start_at ASC
 LIMIT 1000;
 
@@ -263,7 +258,6 @@ WHERE ce.recurrence_rule IS NULL
   AND ce.start_at < ?
   AND ce.end_at > ?
   AND ce.enabled = TRUE
-  AND ce.deleted_at IS NULL
 ORDER BY ce.start_at ASC, ce.public_id ASC
 LIMIT 2000;
 
@@ -321,7 +315,6 @@ WHERE ce.recurrence_rule IS NOT NULL
   AND ce.start_at < ?
   AND (ce.recurrence_end IS NULL OR ce.recurrence_end > ?)
   AND ce.enabled = TRUE
-  AND ce.deleted_at IS NULL
 ORDER BY ce.start_at ASC, ce.public_id ASC
 LIMIT 2000;
 
@@ -349,21 +342,18 @@ SET kind                = COALESCE(sqlc.narg('kind'), kind),
 WHERE public_id = ?
   AND calendar_id = ?
   AND workspace_id = ?
-  AND enabled = TRUE
-  AND deleted_at IS NULL;
+  AND enabled = TRUE;
 
 -- name: DisableCalendarEvent :exec
--- Soft-delete a calendar event by stamping deleted_at and clearing enabled.
--- The two flags express different intents: enabled=FALSE was the legacy
--- soft-disable (kept for compatibility with existing reads), while
--- deleted_at is the new auditable deletion timestamp gating LIST/GET.
+-- Soft-delete a calendar event by clearing the enabled flag. enabled=FALSE
+-- gates LIST/GET reads; the column doubles as the auditable soft-delete
+-- marker (no separate deleted_at column).
 UPDATE calendar_events
-SET enabled = FALSE,
-    deleted_at = CURRENT_TIMESTAMP(3)
+SET enabled = FALSE
 WHERE public_id = ?
   AND calendar_id = ?
   AND workspace_id = ?
-  AND deleted_at IS NULL;
+  AND enabled = TRUE;
 
 -- ListAllCalendarEvents was consumed only by the deleted ICS export path;
 -- the replacement will query via calendar_public_shares.
@@ -375,5 +365,4 @@ FROM calendar_events
 WHERE public_id = ?
   AND workspace_id = ?
   AND enabled = TRUE
-  AND deleted_at IS NULL
 LIMIT 1;

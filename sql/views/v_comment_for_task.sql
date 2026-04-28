@@ -17,6 +17,7 @@ SELECT
   c.updated_at,
   c.created_at
 FROM comments c
+INNER JOIN workspaces w ON w.id = c.workspace_id AND w.enabled = TRUE
 INNER JOIN tasks t ON t.id = c.task_id AND t.enabled = TRUE
 INNER JOIN users u ON u.id = c.author_id AND u.enabled = TRUE
 WHERE c.enabled = TRUE;

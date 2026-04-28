@@ -34,8 +34,8 @@ SELECT
   al.resource_public_id,
   CAST('info' AS CHAR(8) CHARACTER SET utf8mb4) AS severity
 FROM audit_logs al
-INNER JOIN workspaces w_a
-  ON w_a.id = al.workspace_id AND w_a.enabled = TRUE
+INNER JOIN workspaces w
+  ON w.id = al.workspace_id AND w.enabled = TRUE
 LEFT JOIN users actor
   ON actor.id = al.actor_user_id AND actor.enabled = TRUE
 WHERE al.enabled = TRUE
@@ -69,8 +69,8 @@ SELECT
     AS CHAR(8) CHARACTER SET utf8mb4
   ) AS severity
 FROM ai_invocations ai
-INNER JOIN workspaces w_i
-  ON w_i.id = ai.workspace_id AND w_i.enabled = TRUE
+INNER JOIN workspaces w
+  ON w.id = ai.workspace_id AND w.enabled = TRUE
 LEFT JOIN users actor
   ON actor.id = ai.user_id AND actor.enabled = TRUE
 WHERE ai.enabled = TRUE
@@ -97,8 +97,8 @@ SELECT
     AS CHAR(8) CHARACTER SET utf8mb4
   ) AS severity
 FROM mcp_invocations mi
-INNER JOIN workspaces w_m
-  ON w_m.id = mi.workspace_id AND w_m.enabled = TRUE
+INNER JOIN workspaces w
+  ON w.id = mi.workspace_id AND w.enabled = TRUE
 LEFT JOIN users actor
   ON actor.id = mi.user_id AND actor.enabled = TRUE
 WHERE mi.enabled = TRUE;

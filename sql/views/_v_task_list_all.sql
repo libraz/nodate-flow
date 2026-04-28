@@ -13,7 +13,6 @@
 CREATE OR REPLACE ALGORITHM=MERGE VIEW v_task_list_all AS
 SELECT
   t.workspace_id,
-  t.id AS task_internal_id,
   t.project_id,
   t.created_by_user_id,
   t.public_id,

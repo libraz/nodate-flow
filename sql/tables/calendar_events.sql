@@ -43,12 +43,21 @@ CREATE TABLE calendar_events (
   -- Cross-module link to nodate-flow tasks
   task_id INT UNSIGNED NULL COMMENT 'Linked task (optional, for task-calendar sync)',
   task_role ENUM('due','scheduled') NULL COMMENT 'When task_id IS NOT NULL: which task field this event represents. due=task.due_on, scheduled=time-blocked (multi-link allowed).',
+  /**
+   * task_role_key: de-NULLed projection of task_role used to build a UNIQUE
+   * key over (task_id, task_role). MySQL UNIQUE indexes treat NULLs as
+   * distinct, which would let two NULL task_role rows coexist for the same
+   * task_id and silently weaken the (task_id, task_role) invariant. By
+   * coalescing NULL to the empty string in a STORED generated column we get
+   * a NOT NULL surrogate that participates in the UNIQUE without losing the
+   * "absent role" sentinel.
+   */
+  task_role_key VARCHAR(32) GENERATED ALWAYS AS (COALESCE(task_role, '')) STORED NOT NULL COMMENT 'De-NULLed surrogate for task_role; empty string when task_role IS NULL. Exists solely to power uniq_calendar_events_task_role_key over (task_id, task_role_key).',
 
   sort_weight INT NOT NULL DEFAULT 0 COMMENT 'Display order',
   notes TEXT NULL COMMENT 'Admin notes',
   flags JSON NULL COMMENT 'Structured per-event markers (non_working_day, auto_snapped, etc.); unknown keys preserved.',
-  enabled BOOLEAN NOT NULL DEFAULT TRUE COMMENT 'Enabled flag',
-  deleted_at DATETIME(3) NULL DEFAULT NULL COMMENT 'Soft-delete timestamp; rows with deleted_at IS NOT NULL are excluded from LIST/GET',
+  enabled BOOLEAN NOT NULL DEFAULT TRUE COMMENT 'Soft-delete flag; FALSE excludes the row from LIST/GET. The single soft-delete signal for this table — propagate via INNER/LEFT JOIN ... AND ce.enabled = TRUE in every consumer view (matches project-wide enabled propagation in docs/conventions/db.md).',
   updated_at TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
   created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
 
@@ -59,7 +68,7 @@ CREATE TABLE calendar_events (
   KEY idx_calendar_events_calendar_recurrence (calendar_id, recurrence_end),
   KEY idx_calendar_events_workspace_range (workspace_id, start_at, end_at),
   KEY idx_calendar_events_task_role (task_id, task_role, enabled),
-  KEY idx_calendar_events_deleted_at (deleted_at),
+  UNIQUE KEY uniq_calendar_events_task_role_key (task_id, task_role_key),
   FULLTEXT KEY ft_calendar_events_title_memo (title, memo),
 
   CONSTRAINT fk_calendar_events_workspace FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
@@ -80,4 +89,4 @@ CREATE TABLE calendar_events (
   CONSTRAINT chk_calendar_events_notification_requires_start CHECK (start_at IS NOT NULL OR notification_offset IS NULL),
   CONSTRAINT chk_calendar_events_chronology CHECK (end_at IS NULL OR start_at IS NULL OR end_at >= start_at),
   CONSTRAINT chk_calendar_events_milestone_no_recurrence CHECK (kind <> 'milestone' OR recurrence_rule IS NULL)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Calendar events with kind/visibility/show_as classification; nullable start/end for planning-stage placeholders; task_role links to task projection (D1).';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Calendar events with kind/visibility/show_as classification; nullable start/end for planning-stage placeholders; task_role links to task projection. Soft-delete is signalled solely by enabled=FALSE (no deleted_at column); consumer views must propagate enabled=TRUE on every JOIN to honour soft-delete.';

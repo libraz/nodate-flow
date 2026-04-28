@@ -121,6 +121,19 @@ sql:
             go_struct_tag: 'json:"-"'
           - column: "*.task_internal_id"
             go_struct_tag: 'json:"-"'
+          - column: "*.user_internal_id"
+            go_struct_tag: 'json:"-"'
+          - column: "*.project_internal_id"
+            go_struct_tag: 'json:"-"'
+          - column: "*.event_internal_id"
+            go_struct_tag: 'json:"-"'
+          # Generated columns that exist solely to back de-NULLed UNIQUE indexes
+          # (calendar_events.task_role_key STORED, calendar_event_attendees.event_id_key
+          # VIRTUAL). Pure infrastructure derivatives — must never surface in JSON.
+          - column: "*.task_role_key"
+            go_struct_tag: 'json:"-"'
+          - column: "*.event_id_key"
+            go_struct_tag: 'json:"-"'
           - column: "*.comment_id"
             go_struct_tag: 'json:"-"'
           - column: "*.mentioned_user_id"
@@ -285,6 +298,21 @@ sql:
             go_struct_tag: 'json:"-"'
           - column: "*.initiated_by_user_id"
             go_struct_tag: 'json:"-"'
+          - column: "*.task_internal_id"
+            go_struct_tag: 'json:"-"'
+          - column: "*.user_internal_id"
+            go_struct_tag: 'json:"-"'
+          - column: "*.project_internal_id"
+            go_struct_tag: 'json:"-"'
+          - column: "*.event_internal_id"
+            go_struct_tag: 'json:"-"'
+          # Generated columns that exist solely to back de-NULLed UNIQUE indexes
+          # (calendar_events.task_role_key STORED, calendar_event_attendees.event_id_key
+          # VIRTUAL). Pure infrastructure derivatives — must never surface in JSON.
+          - column: "*.task_role_key"
+            go_struct_tag: 'json:"-"'
+          - column: "*.event_id_key"
+            go_struct_tag: 'json:"-"'
   # --- auth-api (auth + audit + workspace queries only) ---
   - engine: "mysql"
     queries:
@@ -374,3 +402,18 @@ sql:
               import: "github.com/nodate-flow/nodate-flow/apps/auth-api/internal/db/types"
               package: "types"
               type: "PublicID"
+          - column: "*.task_internal_id"
+            go_struct_tag: 'json:"-"'
+          - column: "*.user_internal_id"
+            go_struct_tag: 'json:"-"'
+          - column: "*.project_internal_id"
+            go_struct_tag: 'json:"-"'
+          - column: "*.event_internal_id"
+            go_struct_tag: 'json:"-"'
+          # Generated columns that exist solely to back de-NULLed UNIQUE indexes
+          # (calendar_events.task_role_key STORED, calendar_event_attendees.event_id_key
+          # VIRTUAL). Pure infrastructure derivatives — must never surface in JSON.
+          - column: "*.task_role_key"
+            go_struct_tag: 'json:"-"'
+          - column: "*.event_id_key"
+            go_struct_tag: 'json:"-"'
