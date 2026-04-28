@@ -29,9 +29,9 @@ func List(deps Deps) func(context.Context, *ListWorkspacesInput) (*ListWorkspace
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
 		out := &ListWorkspacesOutput{}
-		out.Body.Items = make([]Workspace, 0, len(rows))
+		out.Body.Workspaces = make([]Workspace, 0, len(rows))
 		for _, r := range rows {
-			out.Body.Items = append(out.Body.Items, rowToWorkspaceFromList(r))
+			out.Body.Workspaces = append(out.Body.Workspaces, rowToWorkspaceFromList(r))
 		}
 		if len(rows) > 0 {
 			out.Body.Total = totalAsInt64(rows[0].Total)

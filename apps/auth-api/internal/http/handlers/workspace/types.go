@@ -100,7 +100,7 @@ type ListWorkspacesOutput struct {
 // ListWorkspacesOutputBody is the response body envelope for GET /workspaces.
 type ListWorkspacesOutputBody struct {
 	Total      int64       `json:"total"`
-	Items      []Workspace `json:"items"`
+	Workspaces []Workspace `json:"workspaces"`
 	NextCursor *string     `json:"nextCursor"`
 }
 
