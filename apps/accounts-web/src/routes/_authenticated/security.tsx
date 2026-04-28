@@ -26,6 +26,7 @@ import {
   mapAuthError,
   mapAuthThrown,
 } from '../../lib/auth-errors';
+import { logError } from '../../lib/log';
 import { sdk } from '../../lib/sdk';
 
 /** SDK-derived response bodies. Local interfaces caused silent shape drift. */
@@ -223,7 +224,7 @@ export function SecurityPage(): ReactElement {
       })
       .catch((err: unknown) => {
         if (!cancelled) {
-          console.error('Failed to fetch sessions', err);
+          logError('Failed to fetch sessions', err);
           setSessionsLoading(false);
         }
       });
@@ -432,7 +433,7 @@ function TotpSection(): ReactElement {
       })
       .catch((err: unknown) => {
         if (!cancelled) {
-          console.error('Failed to fetch TOTP status', err);
+          logError('Failed to fetch TOTP status', err);
         }
       });
     return () => {
