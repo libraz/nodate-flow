@@ -15,8 +15,7 @@
  *
  * Mounting the panel would require a fully stubbed SDK + drawer +
  * confirm-action surface; the source-level guards cover the branch
- * decisions directly without paying that cost. A canonical integration
- * guard already lives in `lib/__tests__/api-error-call-sites.test.ts`.
+ * decisions directly without paying that cost.
  */
 
 import { readFileSync } from 'node:fs';
