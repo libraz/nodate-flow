@@ -296,6 +296,7 @@ func RegisterSteps(api huma.API, deps StepsDeps) {
 		Path:        "/tasks/{id}/propose-steps",
 		Summary:     "AI-powered step decomposition for a task",
 		Description: "Asks the workspace's LLM to decompose this task into ordered execution steps. Returns the proposal and a cache key so /apply-steps can persist it; nothing is written until apply.",
+		Tags:        []string{"Tasks"},
 	}, ProposeSteps(deps))
 
 	huma.Register(api, huma.Operation{
@@ -304,5 +305,6 @@ func RegisterSteps(api huma.API, deps StepsDeps) {
 		Path:        "/tasks/{id}/apply-steps",
 		Summary:     "Apply proposed steps as child tasks under a parent task",
 		Description: "Persists a proposal returned by /propose-steps as ordered child tasks under this parent. The client may trim or reorder the steps before applying.",
+		Tags:        []string{"Tasks"},
 	}, ApplySteps(deps))
 }

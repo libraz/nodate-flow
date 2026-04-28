@@ -14,6 +14,7 @@ import (
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/types"
 	apierrors "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/errors"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/eventbus"
+	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/handlers/handlerutil"
 	gh "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/integrations/github"
 )
 
@@ -52,11 +53,19 @@ func HandleGithubWebhook(deps Deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		body, err := io.ReadAll(http.MaxBytesReader(w, r.Body, 1<<20))
 		if err != nil {
+			slog.ErrorContext(r.Context(), "webhook: github body read failed",
+				slog.Any("error", err),
+				slog.String("source", "github"),
+			)
 			writeError(w, apierrors.IntegrationGhWebhookPayloadUnparseable)
 			return
 		}
 		sig := r.Header.Get(gh.SignatureHeader)
 		if !gh.VerifySignature(body, sig, deps.GhWebhookSecret) {
+			slog.ErrorContext(r.Context(), "webhook: github signature verification failed",
+				slog.String("source", "github"),
+				slog.Bool("signature_present", sig != ""),
+			)
 			writeError(w, apierrors.IntegrationGhWebhookInvalidSignature)
 			return
 		}
@@ -85,6 +94,10 @@ func HandleGithubWebhook(deps Deps) http.HandlerFunc {
 		}
 		wsPub, err := types.Parse(deps.DefaultWorkspaceID)
 		if err != nil {
+			slog.ErrorContext(r.Context(), "webhook: github default workspace id parse failed",
+				slog.Any("error", err),
+				slog.String("source", "github"),
+			)
 			writeError(w, apierrors.InternalUnexpected)
 			return
 		}
@@ -96,6 +109,10 @@ func HandleGithubWebhook(deps Deps) http.HandlerFunc {
 				writeError(w, apierrors.WsWorkspaceNotFound)
 				return
 			}
+			slog.ErrorContext(ctx, "webhook: github workspace lookup failed",
+				slog.Any("error", err),
+				slog.String("source", "github"),
+			)
 			writeError(w, apierrors.InternalUnexpected)
 			return
 		}
@@ -167,23 +184,21 @@ func HandleGithubWebhook(deps Deps) http.HandlerFunc {
 	}
 }
 
-// writeError writes the canonical error envelope from an error spec at
-// the chi layer (we cannot use Huma's pipeline here because the webhook
-// route is not registered through Huma). Description and userAction are
-// copied verbatim from the spec when present so the wire shape mirrors
-// the Huma-side ProblemDetails envelope.
+// webhookErr writes the canonical apierror envelope from an error spec
+// at the chi layer (the webhook routes are not registered through Huma,
+// so the framework's ProblemDetails pipeline cannot run). The wire
+// shape mirrors handlerutil.HTTPErr's RFC 9457 envelope (`type` /
+// `title` / `status` / `detail` / `description` / `userAction`) so SDK
+// clients branch on the same `type` field they receive from Huma
+// endpoints.
+func webhookErr(w http.ResponseWriter, spec *apierrors.Spec) {
+	handlerutil.WriteSpecError(w, spec)
+}
+
+// writeError is preserved as a thin alias so existing callers in this
+// package keep compiling; new code should call webhookErr directly.
 func writeError(w http.ResponseWriter, spec *apierrors.Spec) {
-	body := map[string]any{
-		"code":    spec.Code,
-		"message": spec.Message,
-	}
-	if spec.Description != "" {
-		body["description"] = spec.Description
-	}
-	if spec.UserAction != "" {
-		body["userAction"] = spec.UserAction
-	}
-	writeJSON(w, spec.Status, body)
+	webhookErr(w, spec)
 }
 
 func writeJSON(w http.ResponseWriter, status int, body any) {

@@ -22,11 +22,16 @@ import (
 // --- Input/Output types ---
 
 // ListEventsInput is the input for the list events endpoint.
+//
+// Start and End accept either RFC 3339 datetime strings or YYYY-MM-DD
+// dates. Plain dates are interpreted as UTC midnight, matching
+// ListCalendarEventsInput so callers can use a single date format for
+// both per-calendar and cross-calendar list endpoints.
 type ListEventsInput struct {
-	WsID  string    `path:"wsId" doc:"Workspace public ID"`
-	CalID string    `path:"calId" doc:"Calendar public ID"`
-	Start time.Time `query:"start" doc:"Range start (inclusive)" required:"true"`
-	End   time.Time `query:"end" doc:"Range end (exclusive)" required:"true"`
+	WsID  string `path:"wsId" doc:"Workspace public ID"`
+	CalID string `path:"calId" doc:"Calendar public ID"`
+	Start string `query:"start" doc:"Range start (inclusive, RFC 3339 datetime or YYYY-MM-DD)" required:"true"`
+	End   string `query:"end" doc:"Range end (exclusive, RFC 3339 datetime or YYYY-MM-DD)" required:"true"`
 }
 
 // EventResponse is the JSON representation of a calendar event.
@@ -197,11 +202,20 @@ func ListEvents(deps Deps) func(context.Context, *ListEventsInput) (*ListEventsO
 			return nil, err
 		}
 
+		startTime, err := parseFlexibleTime(input.Start)
+		if err != nil {
+			return nil, httpErr(apierrors.CalendarEventDateRangeUnparseable)
+		}
+		endTime, err := parseFlexibleTime(input.End)
+		if err != nil {
+			return nil, httpErr(apierrors.CalendarEventDateRangeUnparseable)
+		}
+
 		// Non-recurring events: start_at < end, end_at > start (overlap check).
 		nonRecurring, err := deps.CalendarQueries.ListCalendarEventsByRange(ctx, calendar.ListCalendarEventsByRangeParams{
 			CalendarID: cal.ID,
-			StartAt:    sql.NullTime{Time: input.End, Valid: true},
-			EndAt:      sql.NullTime{Time: input.Start, Valid: true},
+			StartAt:    sql.NullTime{Time: endTime, Valid: true},
+			EndAt:      sql.NullTime{Time: startTime, Valid: true},
 		})
 		if err != nil {
 			return nil, httpErr(apierrors.CalendarEventListQueryInterrupted)
@@ -210,8 +224,8 @@ func ListEvents(deps Deps) func(context.Context, *ListEventsInput) (*ListEventsO
 		// Recurring events whose recurrence window overlaps the query range.
 		recurring, err := deps.CalendarQueries.ListRecurringCalendarEventsByRange(ctx, calendar.ListRecurringCalendarEventsByRangeParams{
 			CalendarID:    cal.ID,
-			StartAt:       sql.NullTime{Time: input.End, Valid: true},
-			RecurrenceEnd: sql.NullTime{Time: input.Start, Valid: true},
+			StartAt:       sql.NullTime{Time: endTime, Valid: true},
+			RecurrenceEnd: sql.NullTime{Time: startTime, Valid: true},
 		})
 		if err != nil {
 			return nil, httpErr(apierrors.CalendarEventListQueryInterrupted)
@@ -453,7 +467,7 @@ func PatchEvent(deps Deps) func(context.Context, *PatchEventInput) (*PatchEventO
 		// Check edit permission (try to find attendee record for the actor).
 		var attendee *calendar.FindCalendarEventAttendeeRow
 		att, attErr := deps.CalendarQueries.FindCalendarEventAttendee(ctx, calendar.FindCalendarEventAttendeeParams{
-			EventID: evt.ID,
+			EventID: handlerutil.NullInt32From(evt.ID),
 			UserID:  actorID,
 		})
 		if attErr == nil {
@@ -669,7 +683,7 @@ func DeleteEvent(deps Deps) func(context.Context, *DeleteEventInput) (*DeleteEve
 
 		var attendee *calendar.FindCalendarEventAttendeeRow
 		att, attErr := deps.CalendarQueries.FindCalendarEventAttendee(ctx, calendar.FindCalendarEventAttendeeParams{
-			EventID: evt.ID,
+			EventID: handlerutil.NullInt32From(evt.ID),
 			UserID:  actorID,
 		})
 		if attErr == nil {
@@ -801,61 +815,6 @@ func ListCalendarEvents(deps Deps) func(context.Context, *ListCalendarEventsInpu
 	}
 }
 
-// --- Mapping helpers ---
-
-func eventFromRangeRow(e calendar.ListCalendarEventsByRangeRow) EventResponse {
-	resp := EventResponse{
-		ID:         e.PublicID.String(),
-		Kind:       string(e.Kind),
-		Visibility: string(e.Visibility),
-		ShowAs:     string(e.ShowAs),
-		Title:      e.Title,
-		AllDay:     e.AllDay,
-		StartAt:    nullTimeUnixPtr(e.StartAt),
-		EndAt:      nullTimeUnixPtr(e.EndAt),
-		Timezone:   e.Timezone,
-		CreatedAt:  e.CreatedAt.Unix(),
-	}
-	resp.Location = dbtype.PtrFromNullString(e.Location)
-	resp.Memo = dbtype.PtrFromNullString(e.Memo)
-	resp.URL = dbtype.PtrFromNullString(e.Url)
-	resp.BlockLabel = dbtype.PtrFromNullString(e.BlockLabel)
-	resp.NotificationOffset = dbtype.PtrFromNullInt32(e.NotificationOffset)
-	resp.UpdatedAt = dbtype.UnixSecondsFromNullTime(e.UpdatedAt)
-	return resp
-}
-
-func eventFromRecurringRow(e calendar.ListRecurringCalendarEventsByRangeRow) EventResponse {
-	resp := EventResponse{
-		ID:         e.PublicID.String(),
-		Kind:       string(e.Kind),
-		Visibility: string(e.Visibility),
-		ShowAs:     string(e.ShowAs),
-		Title:      e.Title,
-		AllDay:     e.AllDay,
-		StartAt:    nullTimeUnixPtr(e.StartAt),
-		EndAt:      nullTimeUnixPtr(e.EndAt),
-		Timezone:   e.Timezone,
-		CreatedAt:  e.CreatedAt.Unix(),
-	}
-	resp.Location = dbtype.PtrFromNullString(e.Location)
-	resp.Memo = dbtype.PtrFromNullString(e.Memo)
-	resp.URL = dbtype.PtrFromNullString(e.Url)
-	resp.BlockLabel = dbtype.PtrFromNullString(e.BlockLabel)
-	if e.RecurrenceRule != nil {
-		raw := json.RawMessage(e.RecurrenceRule)
-		resp.RecurrenceRule = &raw
-	}
-	resp.RecurrenceEnd = dbtype.UnixSecondsFromNullTime(e.RecurrenceEnd)
-	if e.RecurrenceExceptions != nil {
-		raw := json.RawMessage(e.RecurrenceExceptions)
-		resp.RecurrenceExceptions = &raw
-	}
-	resp.NotificationOffset = dbtype.PtrFromNullInt32(e.NotificationOffset)
-	resp.UpdatedAt = dbtype.UnixSecondsFromNullTime(e.UpdatedAt)
-	return resp
-}
-
 // parseFlexibleTime parses a date string ("2006-01-02") or a full
 // RFC 3339 datetime string into a time.Time. The returned error is an
 // internal sentinel; every caller in this package wraps it with
@@ -876,34 +835,3 @@ func parseFlexibleTime(s string) (time.Time, error) {
 // succeeds. Handlers translate this to
 // apierrors.CalendarEventDateRangeUnparseable.
 var errInvalidFlexibleTime = errors.New("calendar: cannot parse as date or datetime")
-
-func eventFromFullRow(e calendar.FindCalendarEventByPublicIdRow) EventResponse {
-	resp := EventResponse{
-		ID:         e.PublicID.String(),
-		Kind:       string(e.Kind),
-		Visibility: string(e.Visibility),
-		ShowAs:     string(e.ShowAs),
-		Title:      e.Title,
-		AllDay:     e.AllDay,
-		StartAt:    nullTimeUnixPtr(e.StartAt),
-		EndAt:      nullTimeUnixPtr(e.EndAt),
-		Timezone:   e.Timezone,
-		CreatedAt:  e.CreatedAt.Unix(),
-	}
-	resp.Location = dbtype.PtrFromNullString(e.Location)
-	resp.Memo = dbtype.PtrFromNullString(e.Memo)
-	resp.URL = dbtype.PtrFromNullString(e.Url)
-	resp.BlockLabel = dbtype.PtrFromNullString(e.BlockLabel)
-	if e.RecurrenceRule != nil {
-		raw := json.RawMessage(e.RecurrenceRule)
-		resp.RecurrenceRule = &raw
-	}
-	resp.RecurrenceEnd = dbtype.UnixSecondsFromNullTime(e.RecurrenceEnd)
-	if e.RecurrenceExceptions != nil {
-		raw := json.RawMessage(e.RecurrenceExceptions)
-		resp.RecurrenceExceptions = &raw
-	}
-	resp.NotificationOffset = dbtype.PtrFromNullInt32(e.NotificationOffset)
-	resp.UpdatedAt = dbtype.UnixSecondsFromNullTime(e.UpdatedAt)
-	return resp
-}

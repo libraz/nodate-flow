@@ -35,7 +35,7 @@ func AddComment(deps Deps) func(context.Context, *AddTaskCommentInput) (*AddTask
 		if _, err := deps.Queries.AddComment(ctx, generated.AddCommentParams{
 			PublicID:    pub,
 			WorkspaceID: ws.ID,
-			TaskID:      task.ID,
+			TaskID:      handlerutil.NullInt32From(task.ID),
 			AuthorID:    actorID,
 			Body:        in.Body.Body,
 		}); err != nil {

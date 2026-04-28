@@ -77,11 +77,12 @@ func runCreateLabel(ctx context.Context, deps Deps, s *session, raw json.RawMess
 	}
 	pub := newPublicID()
 	if _, err := deps.Queries.CreateLabel(ctx, generated.CreateLabelParams{
-		PublicID:    pub,
-		WorkspaceID: s.workspaceID,
-		Name:        in.Name,
-		Color:       in.Color,
-		Description: sql.NullString{String: in.Description, Valid: in.Description != ""},
+		PublicID:        pub,
+		WorkspaceID:     s.workspaceID,
+		CreatedByUserID: sql.NullInt32{Int32: int32(s.userID), Valid: true}, //#nosec G115 -- actor user id from session, bounded by realistic deployments
+		Name:            in.Name,
+		Color:           in.Color,
+		Description:     sql.NullString{String: in.Description, Valid: in.Description != ""},
 	}); err != nil {
 		return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
 	}

@@ -775,7 +775,7 @@ func ensureAttendee(ctx context.Context, db *sql.DB, cq *calendar.Queries, wsID,
 	if _, err := cq.CreateCalendarEventAttendee(ctx, calendar.CreateCalendarEventAttendeeParams{
 		PublicID:    types.New(),
 		WorkspaceID: wsID,
-		EventID:     eventID,
+		EventID:     sql.NullInt32{Int32: int32(eventID), Valid: true}, //#nosec G115 -- internal row id, bounded by realistic deployments
 		UserID:      userID,
 		Rsvp:        calendar.CalendarEventAttendeesRsvpPending,
 		CanEdit:     false,

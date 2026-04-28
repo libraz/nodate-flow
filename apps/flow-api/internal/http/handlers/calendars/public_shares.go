@@ -2,11 +2,7 @@ package calendars
 
 import (
 	"context"
-	"crypto/rand"
-	"crypto/sha256"
 	"database/sql"
-	"encoding/base64"
-	"encoding/hex"
 	"errors"
 
 	"github.com/google/uuid"
@@ -17,13 +13,22 @@ import (
 	apierrors "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/errors"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/handlers/handlerutil"
 	"github.com/nodate-flow/nodate-flow/packages/go-shared/region"
+	sharedtoken "github.com/nodate-flow/nodate-flow/packages/go-shared/token"
 )
 
 // --- Input/Output types ---
 
-// PublicShareResponse is the editor-facing shape of a share page. The
-// plaintext token is only populated for create and rotate responses;
-// every other endpoint leaves it empty.
+// PublicShareResponse is the editor-facing shape of a share page when
+// the plaintext token is NOT exposed — list / get / patch endpoints
+// return this variant. The token-bearing variants
+// (PublicShareCreateResponse, PublicShareRotateResponse) are returned
+// only by the two endpoints that mint a new token.
+//
+// Splitting the schema (rather than relying on `omitempty`) keeps the
+// generated OpenAPI surface honest: SDK clients see a `Token` field
+// only on the operations that actually return one, so accidental
+// destructuring of `share.token` on a list response now fails at type
+// check time instead of silently shipping `undefined`.
 type PublicShareResponse struct {
 	ID                  string  `json:"id"`
 	Title               string  `json:"title"`
@@ -37,9 +42,25 @@ type PublicShareResponse struct {
 	EventCount          int64   `json:"eventCount"`
 	CreatorID           *string `json:"creatorId,omitempty"`
 	CreatorDisplayName  *string `json:"creatorDisplayName,omitempty"`
-	Token               string  `json:"token,omitempty"`
 	UpdatedAt           *int64  `json:"updatedAt,omitempty"`
 	CreatedAt           int64   `json:"createdAt"`
+}
+
+// PublicShareCreateResponse extends PublicShareResponse with the
+// plaintext token returned exactly once at creation time. Subsequent
+// reads strip the token field by returning PublicShareResponse instead.
+type PublicShareCreateResponse struct {
+	PublicShareResponse
+	Token string `json:"token"`
+}
+
+// PublicShareRotateResponse mirrors PublicShareCreateResponse but is a
+// distinct type so the generated OpenAPI clearly distinguishes the
+// "minted on create" and "rotated existing" code paths even though the
+// payload shape coincides today.
+type PublicShareRotateResponse struct {
+	PublicShareResponse
+	Token string `json:"token"`
 }
 
 // ShareEventResponse is the editor-facing projection of an event published on a share.
@@ -75,7 +96,7 @@ type CreatePublicShareInput struct {
 
 // CreatePublicShareOutput returns the new share with the plaintext token.
 type CreatePublicShareOutput struct {
-	Body PublicShareResponse
+	Body PublicShareCreateResponse
 }
 
 // ListPublicSharesInput lists every workspace share.
@@ -138,7 +159,7 @@ type RotatePublicShareTokenInput struct {
 
 // RotatePublicShareTokenOutput returns the share with the new plaintext token.
 type RotatePublicShareTokenOutput struct {
-	Body PublicShareResponse
+	Body PublicShareRotateResponse
 }
 
 // DeletePublicShareInput soft-deletes a share. Admin/owner only.
@@ -269,8 +290,10 @@ func CreatePublicShare(deps Deps) func(context.Context, *CreatePublicShareInput)
 		})
 
 		out := &CreatePublicShareOutput{}
-		out.Body = publicShareFromRow(row, 0)
-		out.Body.Token = token
+		out.Body = PublicShareCreateResponse{
+			PublicShareResponse: publicShareFromRow(row, 0),
+			Token:               token,
+		}
 		return out, nil
 	}
 }
@@ -436,8 +459,10 @@ func RotatePublicShareToken(deps Deps) func(context.Context, *RotatePublicShareT
 		})
 
 		out := &RotatePublicShareTokenOutput{}
-		out.Body = publicShareFromRow(row, 0)
-		out.Body.Token = token
+		out.Body = PublicShareRotateResponse{
+			PublicShareResponse: publicShareFromRow(row, 0),
+			Token:               token,
+		}
 		return out, nil
 	}
 }
@@ -748,16 +773,11 @@ func parsePublicID(s string) (types.PublicID, error) {
 	return types.FromUUID(uid), nil
 }
 
-// mintShareToken generates a 32-char URL-safe token and returns
-// (plaintext, hex(SHA-256(plaintext))).
+// mintShareToken delegates to the shared token package so the share
+// minting logic stays in lockstep with the invite minting logic. The
+// share + invite columns both store hex(SHA-256(plaintext)).
 func mintShareToken() (string, string, error) {
-	b := make([]byte, 24)
-	if _, err := rand.Read(b); err != nil {
-		return "", "", err
-	}
-	token := base64.RawURLEncoding.EncodeToString(b)
-	sum := sha256.Sum256([]byte(token))
-	return token, hex.EncodeToString(sum[:]), nil
+	return sharedtoken.MintToken()
 }
 
 func nullStringFromPtr(p *string) sql.NullString {

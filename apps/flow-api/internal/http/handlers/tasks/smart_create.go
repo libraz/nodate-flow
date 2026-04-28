@@ -253,6 +253,7 @@ func RegisterSmartCreate(api huma.API, deps SmartCreateDeps) {
 		Path:        "/workspaces/{wsId}/tasks/propose-smart",
 		Summary:     "AI-powered subtask decomposition and assignee suggestions",
 		Description: "Asks the workspace's LLM to decompose a goal into subtasks with suggested assignees. Returns the proposal and a cache key so /apply-smart can persist it; nothing is written until apply.",
+		Tags:        []string{"Tasks"},
 	}, ProposeSmart(deps))
 
 	huma.Register(api, huma.Operation{
@@ -261,6 +262,7 @@ func RegisterSmartCreate(api huma.API, deps SmartCreateDeps) {
 		Path:        "/workspaces/{wsId}/tasks/apply-smart",
 		Summary:     "Apply AI proposal — create parent task with subtasks and assignees",
 		Description: "Persists a proposal returned by /propose-smart: creates the parent task plus each accepted subtask under it and sets the suggested assignees. The client may trim the subtask set before applying.",
+		Tags:        []string{"Tasks"},
 	}, ApplySmart(deps))
 }
 

@@ -204,7 +204,7 @@ func canEditCalendarEvent(ctx context.Context, deps Deps, s *session, eventOwner
 		return true, nil
 	}
 	att, err := deps.CalendarQueries.FindCalendarEventAttendee(ctx, calendar.FindCalendarEventAttendeeParams{
-		EventID: eventID,
+		EventID: sql.NullInt32{Int32: int32(eventID), Valid: true}, //#nosec G115 -- internal row id, bounded by realistic deployments
 		UserID:  s.userID,
 	})
 	if err == nil && att.CanEdit {

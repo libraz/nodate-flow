@@ -8115,6 +8115,70 @@
         "required": ["id", "name", "filter", "sort", "groupBy"],
         "type": "object"
       },
+      "PublicShareCreateResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/PublicShareCreateResponse.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "coverUrl": {
+            "type": "string"
+          },
+          "createdAt": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "creatorDisplayName": {
+            "type": "string"
+          },
+          "creatorId": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "eventCount": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "expiresAt": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "iconUrl": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "showHolidaysCountry": {
+            "type": "string"
+          },
+          "sortWeight": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "timezone": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "token": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "required": ["token", "id", "title", "timezone", "sortWeight", "eventCount", "createdAt"],
+        "type": "object"
+      },
       "PublicShareRenderEvent": {
         "additionalProperties": false,
         "properties": {
@@ -8255,6 +8319,67 @@
           "title": {
             "type": "string"
           },
+          "updatedAt": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "required": ["id", "title", "timezone", "sortWeight", "eventCount", "createdAt"],
+        "type": "object"
+      },
+      "PublicShareRotateResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/PublicShareRotateResponse.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "coverUrl": {
+            "type": "string"
+          },
+          "createdAt": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "creatorDisplayName": {
+            "type": "string"
+          },
+          "creatorId": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "eventCount": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "expiresAt": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "iconUrl": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "showHolidaysCountry": {
+            "type": "string"
+          },
+          "sortWeight": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "timezone": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
           "token": {
             "type": "string"
           },
@@ -8263,7 +8388,7 @@
             "type": "integer"
           }
         },
-        "required": ["id", "title", "timezone", "sortWeight", "eventCount", "createdAt"],
+        "required": ["token", "id", "title", "timezone", "sortWeight", "eventCount", "createdAt"],
         "type": "object"
       },
       "PublishLensBody": {
@@ -13156,7 +13281,8 @@
             "description": "Error"
           }
         },
-        "summary": "Health check"
+        "summary": "Health check",
+        "tags": ["Public"]
       }
     },
     "/inbox": {
@@ -13220,7 +13346,8 @@
             "description": "Error"
           }
         },
-        "summary": "List inbox items for the caller"
+        "summary": "List inbox items for the caller",
+        "tags": ["Tasks"]
       }
     },
     "/inbox/{id}/archive": {
@@ -13269,7 +13396,8 @@
             "description": "Error"
           }
         },
-        "summary": "Archive an inbox item"
+        "summary": "Archive an inbox item",
+        "tags": ["Tasks"]
       }
     },
     "/inbox/{id}/snooze": {
@@ -13328,7 +13456,8 @@
             "description": "Error"
           }
         },
-        "summary": "Snooze an inbox item"
+        "summary": "Snooze an inbox item",
+        "tags": ["Tasks"]
       }
     },
     "/invites/{token}/accept": {
@@ -13604,7 +13733,8 @@
             "description": "Error"
           }
         },
-        "summary": "List events across every workspace the caller belongs to"
+        "summary": "List events across every workspace the caller belongs to",
+        "tags": ["Calendar"]
       }
     },
     "/me/favorites": {
@@ -13668,7 +13798,8 @@
             "description": "Error"
           }
         },
-        "summary": "List the caller's favorites"
+        "summary": "List the caller's favorites",
+        "tags": ["Tasks"]
       },
       "post": {
         "description": "Pins the supplied target (kind + id) to the caller's favorites list. Idempotent: pinning an already-favorited item returns the existing row.",
@@ -13705,7 +13836,8 @@
             "description": "Error"
           }
         },
-        "summary": "Add an item to favorites"
+        "summary": "Add an item to favorites",
+        "tags": ["Tasks"]
       }
     },
     "/me/favorites/{id}": {
@@ -13757,7 +13889,8 @@
             "description": "Error"
           }
         },
-        "summary": "Remove an item from favorites"
+        "summary": "Remove an item from favorites",
+        "tags": ["Tasks"]
       }
     },
     "/me/integrations": {
@@ -13906,7 +14039,8 @@
             "description": "Error"
           }
         },
-        "summary": "List pending event invites addressed to the caller"
+        "summary": "List pending event invites addressed to the caller",
+        "tags": ["CalendarInvite"]
       }
     },
     "/me/notifications": {
@@ -13980,7 +14114,8 @@
             "description": "Error"
           }
         },
-        "summary": "List notifications for the caller"
+        "summary": "List notifications for the caller",
+        "tags": ["Tasks"]
       }
     },
     "/me/notifications/unread-count": {
@@ -14021,7 +14156,8 @@
             "description": "Error"
           }
         },
-        "summary": "Count unread notifications for the caller"
+        "summary": "Count unread notifications for the caller",
+        "tags": ["Tasks"]
       }
     },
     "/me/password": {
@@ -14248,7 +14384,8 @@
             "description": "Error"
           }
         },
-        "summary": "List tasks assigned to the authenticated user across every workspace"
+        "summary": "List tasks assigned to the authenticated user across every workspace",
+        "tags": ["Tasks"]
       }
     },
     "/me/tasks-with-dates": {
@@ -14334,7 +14471,8 @@
             "description": "Error"
           }
         },
-        "summary": "List tasks with due_on in range across every workspace"
+        "summary": "List tasks with due_on in range across every workspace",
+        "tags": ["Tasks"]
       }
     },
     "/me/totp": {
@@ -14575,7 +14713,8 @@
             "description": "Error"
           }
         },
-        "summary": "Archive a notification"
+        "summary": "Archive a notification",
+        "tags": ["Tasks"]
       }
     },
     "/notifications/{notifId}/read": {
@@ -14616,7 +14755,8 @@
             "description": "Error"
           }
         },
-        "summary": "Mark a notification as read"
+        "summary": "Mark a notification as read",
+        "tags": ["Tasks"]
       }
     },
     "/oauth/callback/{provider}": {
@@ -14719,7 +14859,8 @@
             "description": "Error"
           }
         },
-        "summary": "Soft-disable a project"
+        "summary": "Soft-disable a project",
+        "tags": ["Projects"]
       },
       "get": {
         "description": "Returns the project metadata (name, description, status, settings). Used by the project header and detail pages.",
@@ -14756,7 +14897,8 @@
             "description": "Error"
           }
         },
-        "summary": "Fetch a project"
+        "summary": "Fetch a project",
+        "tags": ["Projects"]
       },
       "patch": {
         "description": "Updates editable project fields (name, description, status, settings). Project admin role required.",
@@ -14803,7 +14945,8 @@
             "description": "Error"
           }
         },
-        "summary": "Patch a project"
+        "summary": "Patch a project",
+        "tags": ["Projects"]
       }
     },
     "/projects/{prjId}/dependencies": {
@@ -14842,7 +14985,8 @@
             "description": "Error"
           }
         },
-        "summary": "List every task dependency edge within a project"
+        "summary": "List every task dependency edge within a project",
+        "tags": ["Projects"]
       }
     },
     "/projects/{prjId}/members": {
@@ -14904,7 +15048,8 @@
             "description": "Error"
           }
         },
-        "summary": "List members of a project"
+        "summary": "List members of a project",
+        "tags": ["Projects"]
       },
       "post": {
         "description": "Adds an existing workspace member to the project at the requested role. Requires project admin role; the user must already belong to the parent workspace.",
@@ -14951,7 +15096,8 @@
             "description": "Error"
           }
         },
-        "summary": "Add a member to a project"
+        "summary": "Add a member to a project",
+        "tags": ["Projects"]
       }
     },
     "/projects/{prjId}/members/{userId}": {
@@ -14998,7 +15144,8 @@
             "description": "Error"
           }
         },
-        "summary": "Remove a member from a project"
+        "summary": "Remove a member from a project",
+        "tags": ["Projects"]
       }
     },
     "/projects/{prjId}/timeline": {
@@ -15083,7 +15230,8 @@
             "description": "Error"
           }
         },
-        "summary": "List events in a project's timeline"
+        "summary": "List events in a project's timeline",
+        "tags": ["Tasks"]
       }
     },
     "/public/invites/accept": {
@@ -15122,7 +15270,8 @@
             "description": "Error"
           }
         },
-        "summary": "Accept a calendar event invite via magic-link token"
+        "summary": "Accept a calendar event invite via magic-link token",
+        "tags": ["CalendarInvite"]
       }
     },
     "/public/lenses/{token}": {
@@ -15165,7 +15314,8 @@
             "description": "Error"
           }
         },
-        "summary": "Fetch a publicly shared lens (no auth required)"
+        "summary": "Fetch a publicly shared lens (no auth required)",
+        "tags": ["Lens"]
       }
     },
     "/relation-suggestions/{suggestionId}/resolve": {
@@ -15216,7 +15366,8 @@
             "description": "Error"
           }
         },
-        "summary": "Accept or dismiss a relation suggestion"
+        "summary": "Accept or dismiss a relation suggestion",
+        "tags": ["Tasks"]
       }
     },
     "/share/cal/{token}": {
@@ -15257,7 +15408,8 @@
             "description": "Error"
           }
         },
-        "summary": "Render a public calendar share by URL token"
+        "summary": "Render a public calendar share by URL token",
+        "tags": ["CalendarShare"]
       }
     },
     "/signals": {
@@ -15296,12 +15448,13 @@
             "description": "Error"
           }
         },
-        "summary": "Manually inject a signal"
+        "summary": "Manually inject a signal",
+        "tags": ["Signal"]
       }
     },
     "/tasks": {
       "get": {
-        "description": "Returns a cursor-paginated page of tasks filtered by project or workspace plus optional status / assignee / label filters. Backs every task list view (board, list, etc.).",
+        "description": "Returns a cursor-paginated page of tasks filtered by project or workspace plus optional status / assignee / label filters. Backs every task list view (board, list, etc.).\n\nLayer 4 task visibility (public / project / private) is enforced as a SQL filter rather than a per-row 403, so tasks the actor cannot see are silently excluded from both the rows and the `total` count. This is asymmetric with the single-task endpoint (which returns 404 on visibility denial); see `docs/conventions/acl.md` for the rationale.",
         "operationId": "tasks-list",
         "parameters": [
           {
@@ -15413,7 +15566,8 @@
             "description": "Error"
           }
         },
-        "summary": "List tasks for a project or workspace"
+        "summary": "List tasks for a project or workspace",
+        "tags": ["Tasks"]
       },
       "post": {
         "description": "Creates a task in the project supplied in the body. Validates project membership server-side and emits a task.created event so timelines, AI pipelines, and webhooks see it.",
@@ -15450,7 +15604,8 @@
             "description": "Error"
           }
         },
-        "summary": "Create a task"
+        "summary": "Create a task",
+        "tags": ["Tasks"]
       }
     },
     "/tasks/reorder": {
@@ -15489,7 +15644,8 @@
             "description": "Error"
           }
         },
-        "summary": "Bulk-update sort weights for tasks within a project"
+        "summary": "Bulk-update sort weights for tasks within a project",
+        "tags": ["Tasks"]
       }
     },
     "/tasks/{id}": {
@@ -15528,7 +15684,8 @@
             "description": "Error"
           }
         },
-        "summary": "Soft-disable a task"
+        "summary": "Soft-disable a task",
+        "tags": ["Tasks"]
       },
       "get": {
         "description": "Returns a single task with its core fields, derived state, labels, and assignee. Sub-resources (comments, attachments, dependencies) live on dedicated endpoints.",
@@ -15565,7 +15722,8 @@
             "description": "Error"
           }
         },
-        "summary": "Fetch a task"
+        "summary": "Fetch a task",
+        "tags": ["Tasks"]
       },
       "patch": {
         "description": "Updates editable task fields (title, description, due_on, priority, assignee). Description edits append a description-version row so history is queryable.",
@@ -15612,7 +15770,8 @@
             "description": "Error"
           }
         },
-        "summary": "Patch a task"
+        "summary": "Patch a task",
+        "tags": ["Tasks"]
       }
     },
     "/tasks/{id}/actors": {
@@ -15674,7 +15833,8 @@
             "description": "Error"
           }
         },
-        "summary": "List actors on a task"
+        "summary": "List actors on a task",
+        "tags": ["Tasks"]
       },
       "post": {
         "description": "Adds a human actor to the task at the requested role (assignee / collaborator / watcher). Triggers the assignment notification pipeline when the role is assignee.",
@@ -15721,7 +15881,8 @@
             "description": "Error"
           }
         },
-        "summary": "Attach an actor to a task"
+        "summary": "Attach an actor to a task",
+        "tags": ["Tasks"]
       }
     },
     "/tasks/{id}/actors/{actorId}": {
@@ -15768,7 +15929,8 @@
             "description": "Error"
           }
         },
-        "summary": "Remove an actor from a task"
+        "summary": "Remove an actor from a task",
+        "tags": ["Tasks"]
       }
     },
     "/tasks/{id}/agents": {
@@ -15830,7 +15992,8 @@
             "description": "Error"
           }
         },
-        "summary": "List AI agent actors on a task"
+        "summary": "List AI agent actors on a task",
+        "tags": ["Tasks"]
       },
       "post": {
         "description": "Attaches an AI agent so the agent's runtime can be scheduled on or triggered for the task. Idempotent per (task, agent).",
@@ -15877,7 +16040,8 @@
             "description": "Error"
           }
         },
-        "summary": "Attach an AI agent to a task"
+        "summary": "Attach an AI agent to a task",
+        "tags": ["Tasks"]
       }
     },
     "/tasks/{id}/ai/invocations": {
@@ -15939,7 +16103,8 @@
             "description": "Error"
           }
         },
-        "summary": "List recent AI invocations scoped to this task"
+        "summary": "List recent AI invocations scoped to this task",
+        "tags": ["Tasks"]
       }
     },
     "/tasks/{id}/apply-steps": {
@@ -15988,7 +16153,8 @@
             "description": "Error"
           }
         },
-        "summary": "Apply proposed steps as child tasks under a parent task"
+        "summary": "Apply proposed steps as child tasks under a parent task",
+        "tags": ["Tasks"]
       }
     },
     "/tasks/{id}/archive": {
@@ -16027,7 +16193,8 @@
             "description": "Error"
           }
         },
-        "summary": "Archive a task"
+        "summary": "Archive a task",
+        "tags": ["Tasks"]
       }
     },
     "/tasks/{id}/attachments": {
@@ -16089,7 +16256,8 @@
             "description": "Error"
           }
         },
-        "summary": "List attachments on a task"
+        "summary": "List attachments on a task",
+        "tags": ["Tasks"]
       },
       "post": {
         "description": "Records that a file (already uploaded via /presign) is associated with the task. Stores filename, MIME, size, and storage key.",
@@ -16136,7 +16304,8 @@
             "description": "Error"
           }
         },
-        "summary": "Register an attachment metadata row on a task"
+        "summary": "Register an attachment metadata row on a task",
+        "tags": ["Tasks"]
       }
     },
     "/tasks/{id}/attachments/presign": {
@@ -16185,7 +16354,8 @@
             "description": "Error"
           }
         },
-        "summary": "Get a presigned PUT URL for uploading an attachment"
+        "summary": "Get a presigned PUT URL for uploading an attachment",
+        "tags": ["Tasks"]
       }
     },
     "/tasks/{id}/attachments/{aid}": {
@@ -16232,7 +16402,8 @@
             "description": "Error"
           }
         },
-        "summary": "Soft-delete an attachment from a task"
+        "summary": "Soft-delete an attachment from a task",
+        "tags": ["Tasks"]
       }
     },
     "/tasks/{id}/attachments/{aid}/download": {
@@ -16279,7 +16450,8 @@
             "description": "Error"
           }
         },
-        "summary": "Get a presigned GET URL for downloading an attachment"
+        "summary": "Get a presigned GET URL for downloading an attachment",
+        "tags": ["Tasks"]
       }
     },
     "/tasks/{id}/comments": {
@@ -16351,7 +16523,8 @@
             "description": "Error"
           }
         },
-        "summary": "List comments on a task"
+        "summary": "List comments on a task",
+        "tags": ["Tasks"]
       },
       "post": {
         "description": "Appends a comment from the caller. Mentions inside the body are parsed and routed through the notifications pipeline.",
@@ -16398,7 +16571,8 @@
             "description": "Error"
           }
         },
-        "summary": "Add a comment to a task"
+        "summary": "Add a comment to a task",
+        "tags": ["Tasks"]
       }
     },
     "/tasks/{id}/comments/{cid}": {
@@ -16445,7 +16619,8 @@
             "description": "Error"
           }
         },
-        "summary": "Delete a comment (author or workspace admin)"
+        "summary": "Delete a comment (author or workspace admin)",
+        "tags": ["Tasks"]
       },
       "patch": {
         "description": "Replaces the body of the named comment. Only the original author may edit; an edited_at timestamp is set.",
@@ -16500,7 +16675,8 @@
             "description": "Error"
           }
         },
-        "summary": "Edit a comment (author only)"
+        "summary": "Edit a comment (author only)",
+        "tags": ["Tasks"]
       }
     },
     "/tasks/{id}/constraints": {
@@ -16549,7 +16725,8 @@
             "description": "Error"
           }
         },
-        "summary": "Attach a constraint to a task"
+        "summary": "Attach a constraint to a task",
+        "tags": ["Tasks"]
       }
     },
     "/tasks/{id}/constraints/compile": {
@@ -16598,7 +16775,8 @@
             "description": "Error"
           }
         },
-        "summary": "Compile a natural-language prompt into a constraint DSL expression"
+        "summary": "Compile a natural-language prompt into a constraint DSL expression",
+        "tags": ["Tasks"]
       }
     },
     "/tasks/{id}/constraints/evaluate": {
@@ -16637,7 +16815,8 @@
             "description": "Error"
           }
         },
-        "summary": "Run the constraint engine for a task and persist satisfied/failed markers"
+        "summary": "Run the constraint engine for a task and persist satisfied/failed markers",
+        "tags": ["Tasks"]
       }
     },
     "/tasks/{id}/constraints/explain": {
@@ -16686,7 +16865,8 @@
             "description": "Error"
           }
         },
-        "summary": "Explain a constraint DSL expression in human-readable form"
+        "summary": "Explain a constraint DSL expression in human-readable form",
+        "tags": ["Tasks"]
       }
     },
     "/tasks/{id}/constraints/{cid}": {
@@ -16733,7 +16913,8 @@
             "description": "Error"
           }
         },
-        "summary": "Remove a constraint from a task"
+        "summary": "Remove a constraint from a task",
+        "tags": ["Tasks"]
       }
     },
     "/tasks/{id}/dependencies": {
@@ -16772,7 +16953,8 @@
             "description": "Error"
           }
         },
-        "summary": "List incoming and outgoing dependency edges for a task"
+        "summary": "List incoming and outgoing dependency edges for a task",
+        "tags": ["Tasks"]
       },
       "post": {
         "description": "Creates a blocks / blocked-by edge from this task to another. Refuses cycles so the graph stays a DAG.",
@@ -16819,7 +17001,8 @@
             "description": "Error"
           }
         },
-        "summary": "Add a dependency edge from a task"
+        "summary": "Add a dependency edge from a task",
+        "tags": ["Tasks"]
       }
     },
     "/tasks/{id}/dependencies/{depId}": {
@@ -16866,7 +17049,8 @@
             "description": "Error"
           }
         },
-        "summary": "Remove a dependency edge"
+        "summary": "Remove a dependency edge",
+        "tags": ["Tasks"]
       }
     },
     "/tasks/{id}/description-history": {
@@ -16905,7 +17089,8 @@
             "description": "Error"
           }
         },
-        "summary": "List description version history for a task"
+        "summary": "List description version history for a task",
+        "tags": ["Tasks"]
       }
     },
     "/tasks/{id}/description-history/{versionId}": {
@@ -16952,7 +17137,8 @@
             "description": "Error"
           }
         },
-        "summary": "Get a specific description version with full body"
+        "summary": "Get a specific description version with full body",
+        "tags": ["Tasks"]
       }
     },
     "/tasks/{id}/description-history/{versionId}/restore": {
@@ -16999,7 +17185,8 @@
             "description": "Error"
           }
         },
-        "summary": "Restore a previous description version"
+        "summary": "Restore a previous description version",
+        "tags": ["Tasks"]
       }
     },
     "/tasks/{id}/duplicates": {
@@ -17038,7 +17225,8 @@
             "description": "Error"
           }
         },
-        "summary": "List likely-duplicate tasks by embedding similarity"
+        "summary": "List likely-duplicate tasks by embedding similarity",
+        "tags": ["Tasks"]
       }
     },
     "/tasks/{id}/infer-state": {
@@ -17077,7 +17265,8 @@
             "description": "Error"
           }
         },
-        "summary": "Propose the next likely state transition for a task"
+        "summary": "Propose the next likely state transition for a task",
+        "tags": ["Tasks"]
       }
     },
     "/tasks/{id}/labels": {
@@ -17116,7 +17305,8 @@
             "description": "Error"
           }
         },
-        "summary": "List labels on a task"
+        "summary": "List labels on a task",
+        "tags": ["Labels"]
       },
       "post": {
         "description": "Attaches an existing workspace label to the task. Idempotent: re-attaching a label is a no-op.",
@@ -17163,7 +17353,8 @@
             "description": "Error"
           }
         },
-        "summary": "Attach a label to a task"
+        "summary": "Attach a label to a task",
+        "tags": ["Labels"]
       }
     },
     "/tasks/{id}/labels/{labelId}": {
@@ -17210,7 +17401,8 @@
             "description": "Error"
           }
         },
-        "summary": "Remove a label from a task"
+        "summary": "Remove a label from a task",
+        "tags": ["Labels"]
       }
     },
     "/tasks/{id}/linked-events": {
@@ -17283,7 +17475,8 @@
             "description": "Error"
           }
         },
-        "summary": "List calendar events a task is linked to via task_event_links"
+        "summary": "List calendar events a task is linked to via task_event_links",
+        "tags": ["Tasks"]
       }
     },
     "/tasks/{id}/links": {
@@ -17332,7 +17525,8 @@
             "description": "Error"
           }
         },
-        "summary": "Link a task to a calendar event (contributes_to / blocks / ...)"
+        "summary": "Link a task to a calendar event (contributes_to / blocks / ...)",
+        "tags": ["Tasks"]
       }
     },
     "/tasks/{id}/links/{linkId}": {
@@ -17379,7 +17573,8 @@
             "description": "Error"
           }
         },
-        "summary": "Soft-disable a task↔event link"
+        "summary": "Soft-disable a task↔event link",
+        "tags": ["Tasks"]
       }
     },
     "/tasks/{id}/propose-steps": {
@@ -17428,7 +17623,8 @@
             "description": "Error"
           }
         },
-        "summary": "AI-powered step decomposition for a task"
+        "summary": "AI-powered step decomposition for a task",
+        "tags": ["Tasks"]
       }
     },
     "/tasks/{id}/reactions": {
@@ -17469,7 +17665,8 @@
             "description": "Error"
           }
         },
-        "summary": "List reactions on a task"
+        "summary": "List reactions on a task",
+        "tags": ["Tasks"]
       },
       "post": {
         "description": "Records a single emoji reaction from the caller on the task. Idempotent per (task, user, glyph): a duplicate add returns the existing row.",
@@ -17518,7 +17715,8 @@
             "description": "Error"
           }
         },
-        "summary": "Add a reaction to a task"
+        "summary": "Add a reaction to a task",
+        "tags": ["Tasks"]
       }
     },
     "/tasks/{id}/reactions/{reactionId}": {
@@ -17569,7 +17767,8 @@
             "description": "Error"
           }
         },
-        "summary": "Remove a reaction from a task"
+        "summary": "Remove a reaction from a task",
+        "tags": ["Tasks"]
       }
     },
     "/tasks/{id}/relation-suggestions": {
@@ -17622,7 +17821,8 @@
             "description": "Error"
           }
         },
-        "summary": "List pending relation suggestions for a task"
+        "summary": "List pending relation suggestions for a task",
+        "tags": ["Tasks"]
       }
     },
     "/tasks/{id}/replay": {
@@ -17661,7 +17861,8 @@
             "description": "Error"
           }
         },
-        "summary": "Replay transition events and report drift vs stored derived_state"
+        "summary": "Replay transition events and report drift vs stored derived_state",
+        "tags": ["Tasks"]
       }
     },
     "/tasks/{id}/timeline": {
@@ -17746,7 +17947,8 @@
             "description": "Error"
           }
         },
-        "summary": "List events in a task's timeline"
+        "summary": "List events in a task's timeline",
+        "tags": ["Tasks"]
       }
     },
     "/tasks/{id}/transitions": {
@@ -17795,7 +17997,8 @@
             "description": "Error"
           }
         },
-        "summary": "Apply a state machine transition to a task"
+        "summary": "Apply a state machine transition to a task",
+        "tags": ["Tasks"]
       }
     },
     "/tasks/{id}/unarchive": {
@@ -17834,7 +18037,8 @@
             "description": "Error"
           }
         },
-        "summary": "Unarchive a task"
+        "summary": "Unarchive a task",
+        "tags": ["Tasks"]
       }
     },
     "/workspaces": {
@@ -18110,7 +18314,8 @@
             "description": "Error"
           }
         },
-        "summary": "List AI agents for a workspace"
+        "summary": "List AI agents for a workspace",
+        "tags": ["Public"]
       },
       "post": {
         "description": "Registers a new AI agent in the workspace with name, prompt, schedule, and event triggers. The agent starts paused so the operator can review configuration before unpausing.",
@@ -18157,7 +18362,8 @@
             "description": "Error"
           }
         },
-        "summary": "Create a new AI agent"
+        "summary": "Create a new AI agent",
+        "tags": ["Public"]
       }
     },
     "/workspaces/{wsId}/ai/agents/{agentId}/event-triggers": {
@@ -18214,7 +18420,8 @@
             "description": "Error"
           }
         },
-        "summary": "Replace an AI agent's event_trigger_types list"
+        "summary": "Replace an AI agent's event_trigger_types list",
+        "tags": ["Public"]
       }
     },
     "/workspaces/{wsId}/ai/agents/{agentId}/pause": {
@@ -18271,7 +18478,8 @@
             "description": "Error"
           }
         },
-        "summary": "Toggle the kill switch on an AI agent"
+        "summary": "Toggle the kill switch on an AI agent",
+        "tags": ["Public"]
       }
     },
     "/workspaces/{wsId}/ai/agents/{agentId}/schedule": {
@@ -18328,7 +18536,8 @@
             "description": "Error"
           }
         },
-        "summary": "Update an AI agent's schedule_kind trigger mode"
+        "summary": "Update an AI agent's schedule_kind trigger mode",
+        "tags": ["Public"]
       }
     },
     "/workspaces/{wsId}/ai/agents/{agentId}/trigger": {
@@ -18375,7 +18584,8 @@
             "description": "Error"
           }
         },
-        "summary": "Manually trigger one run of an AI agent"
+        "summary": "Manually trigger one run of an AI agent",
+        "tags": ["Public"]
       }
     },
     "/workspaces/{wsId}/ai/auto-action-rules": {
@@ -18414,7 +18624,8 @@
             "description": "Error"
           }
         },
-        "summary": "List auto-action rules for a workspace"
+        "summary": "List auto-action rules for a workspace",
+        "tags": ["AI"]
       },
       "patch": {
         "description": "Updates one or more auto-action rules in a single request. Each row may toggle enabled, change its threshold, or rewrite its condition. Returns the post-update set so the UI can reconcile state.",
@@ -18461,7 +18672,8 @@
             "description": "Error"
           }
         },
-        "summary": "Patch auto-action rules for a workspace"
+        "summary": "Patch auto-action rules for a workspace",
+        "tags": ["AI"]
       }
     },
     "/workspaces/{wsId}/ai/auto-action-settings": {
@@ -18500,7 +18712,8 @@
             "description": "Error"
           }
         },
-        "summary": "Get auto-action executor settings for a workspace"
+        "summary": "Get auto-action executor settings for a workspace",
+        "tags": ["AI"]
       },
       "patch": {
         "description": "Updates the executor toggle, dry-run mode, score threshold, and rate budget. Changes apply on the next executor tick; in-flight runs continue with the old settings.",
@@ -18547,7 +18760,8 @@
             "description": "Error"
           }
         },
-        "summary": "Patch auto-action executor settings for a workspace"
+        "summary": "Patch auto-action executor settings for a workspace",
+        "tags": ["AI"]
       }
     },
     "/workspaces/{wsId}/ai/auto-actions": {
@@ -18586,7 +18800,8 @@
             "description": "Error"
           }
         },
-        "summary": "Workspace-wide deterministic auto-action proposals"
+        "summary": "Workspace-wide deterministic auto-action proposals",
+        "tags": ["Public"]
       }
     },
     "/workspaces/{wsId}/ai/compile-lens": {
@@ -18635,7 +18850,8 @@
             "description": "Error"
           }
         },
-        "summary": "Compile natural-language prose into a validated Lens JSON (ADR 0004)"
+        "summary": "Compile natural-language prose into a validated Lens JSON (ADR 0004)",
+        "tags": ["Public"]
       }
     },
     "/workspaces/{wsId}/ai/cost-today": {
@@ -18684,7 +18900,8 @@
             "description": "Error"
           }
         },
-        "summary": "Today's accumulated LLM spend (USD) for a workspace"
+        "summary": "Today's accumulated LLM spend (USD) for a workspace",
+        "tags": ["Public"]
       }
     },
     "/workspaces/{wsId}/ai/invocations": {
@@ -18746,7 +18963,8 @@
             "description": "Error"
           }
         },
-        "summary": "List redacted LLM call audit rows for the AI reasoning panel"
+        "summary": "List redacted LLM call audit rows for the AI reasoning panel",
+        "tags": ["Public"]
       }
     },
     "/workspaces/{wsId}/ai/metrics": {
@@ -18799,7 +19017,8 @@
             "description": "Error"
           }
         },
-        "summary": "AI suggestion acceptance metrics over a trailing window"
+        "summary": "AI suggestion acceptance metrics over a trailing window",
+        "tags": ["Public"]
       }
     },
     "/workspaces/{wsId}/ai/models": {
@@ -18861,7 +19080,8 @@
             "description": "Error"
           }
         },
-        "summary": "List workspace AI models across all providers"
+        "summary": "List workspace AI models across all providers",
+        "tags": ["Public"]
       }
     },
     "/workspaces/{wsId}/ai/priority-suggestions": {
@@ -18900,7 +19120,8 @@
             "description": "Error"
           }
         },
-        "summary": "Suggest priority adjustments for open tasks in a workspace"
+        "summary": "Suggest priority adjustments for open tasks in a workspace",
+        "tags": ["Public"]
       }
     },
     "/workspaces/{wsId}/ai/providers": {
@@ -18962,7 +19183,8 @@
             "description": "Error"
           }
         },
-        "summary": "List LLM providers (masked, no ciphertext)"
+        "summary": "List LLM providers (masked, no ciphertext)",
+        "tags": ["AI"]
       },
       "post": {
         "description": "Creates a workspace LLM provider row (kind, base URL, model defaults). The plaintext API key is encrypted at rest with the deployment cipher and never echoed back. Workspace admin only.",
@@ -19009,7 +19231,8 @@
             "description": "Error"
           }
         },
-        "summary": "Register an LLM provider with an encrypted API key"
+        "summary": "Register an LLM provider with an encrypted API key",
+        "tags": ["AI"]
       }
     },
     "/workspaces/{wsId}/ai/providers/{providerId}": {
@@ -19056,7 +19279,8 @@
             "description": "Error"
           }
         },
-        "summary": "Soft-delete an LLM provider"
+        "summary": "Soft-delete an LLM provider",
+        "tags": ["AI"]
       },
       "patch": {
         "description": "Re-encrypts and stores a new API key for the provider, optionally updating model defaults at the same time. The old key is overwritten in place.",
@@ -19111,7 +19335,8 @@
             "description": "Error"
           }
         },
-        "summary": "Rotate an LLM provider API key"
+        "summary": "Rotate an LLM provider API key",
+        "tags": ["AI"]
       }
     },
     "/workspaces/{wsId}/ai/reminders": {
@@ -19150,7 +19375,8 @@
             "description": "Error"
           }
         },
-        "summary": "Workspace-wide deterministic reminder engine proposals"
+        "summary": "Workspace-wide deterministic reminder engine proposals",
+        "tags": ["Public"]
       }
     },
     "/workspaces/{wsId}/ai/resolve-command": {
@@ -19199,7 +19425,8 @@
             "description": "Error"
           }
         },
-        "summary": "Resolve a natural-language command into an MCP tool invocation"
+        "summary": "Resolve a natural-language command into an MCP tool invocation",
+        "tags": ["Public"]
       }
     },
     "/workspaces/{wsId}/ai/state-suggestions": {
@@ -19238,7 +19465,8 @@
             "description": "Error"
           }
         },
-        "summary": "Workspace-wide deterministic state inference proposals"
+        "summary": "Workspace-wide deterministic state inference proposals",
+        "tags": ["Public"]
       }
     },
     "/workspaces/{wsId}/ai/suggestions": {
@@ -19277,7 +19505,8 @@
             "description": "Error"
           }
         },
-        "summary": "List pending AI suggestions for a workspace"
+        "summary": "List pending AI suggestions for a workspace",
+        "tags": ["Tasks"]
       }
     },
     "/workspaces/{wsId}/ai/suggestions/{inboxItemId}/apply": {
@@ -19317,7 +19546,8 @@
             "description": "Error"
           }
         },
-        "summary": "Mark an AI suggestion as applied"
+        "summary": "Mark an AI suggestion as applied",
+        "tags": ["Tasks"]
       }
     },
     "/workspaces/{wsId}/ai/suggestions/{inboxItemId}/dismiss": {
@@ -19357,7 +19587,8 @@
             "description": "Error"
           }
         },
-        "summary": "Dismiss an AI suggestion"
+        "summary": "Dismiss an AI suggestion",
+        "tags": ["Tasks"]
       }
     },
     "/workspaces/{wsId}/ai/weekly-digest": {
@@ -19396,7 +19627,8 @@
             "description": "Error"
           }
         },
-        "summary": "Deterministic weekly digest markdown for a workspace"
+        "summary": "Deterministic weekly digest markdown for a workspace",
+        "tags": ["Public"]
       }
     },
     "/workspaces/{wsId}/audit-logs": {
@@ -19510,7 +19742,8 @@
             "description": "Error"
           }
         },
-        "summary": "List recent audit log entries for a workspace"
+        "summary": "List recent audit log entries for a workspace",
+        "tags": ["Admin"]
       }
     },
     "/workspaces/{wsId}/calendar-events": {
@@ -19573,7 +19806,8 @@
             "description": "Error"
           }
         },
-        "summary": "List events across all calendars in a workspace"
+        "summary": "List events across all calendars in a workspace",
+        "tags": ["Public"]
       }
     },
     "/workspaces/{wsId}/calendar-events/{evtId}/apply-shift": {
@@ -19630,7 +19864,8 @@
             "description": "Error"
           }
         },
-        "summary": "Shift an umbrella event and move confirmed contributes_to-linked tasks by the same day delta"
+        "summary": "Shift an umbrella event and move confirmed contributes_to-linked tasks by the same day delta",
+        "tags": ["Tasks"]
       }
     },
     "/workspaces/{wsId}/calendar-events/{evtId}/linked-tasks": {
@@ -19701,7 +19936,8 @@
             "description": "Error"
           }
         },
-        "summary": "List tasks linked to a calendar event via task_event_links"
+        "summary": "List tasks linked to a calendar event via task_event_links",
+        "tags": ["Tasks"]
       }
     },
     "/workspaces/{wsId}/calendar-events/{evtId}/propose-shift": {
@@ -19758,7 +19994,8 @@
             "description": "Error"
           }
         },
-        "summary": "Propose shifting an umbrella event and partition linked tasks into safe vs conflict"
+        "summary": "Propose shifting an umbrella event and partition linked tasks into safe vs conflict",
+        "tags": ["Tasks"]
       }
     },
     "/workspaces/{wsId}/calendars": {
@@ -19799,7 +20036,8 @@
             "description": "Error"
           }
         },
-        "summary": "List calendars in a workspace"
+        "summary": "List calendars in a workspace",
+        "tags": ["Calendar"]
       },
       "post": {
         "description": "Creates a new calendar in the workspace owned by the caller. Personal calendars default to discoverable=false; team calendars default to true.",
@@ -19848,7 +20086,8 @@
             "description": "Error"
           }
         },
-        "summary": "Create a calendar"
+        "summary": "Create a calendar",
+        "tags": ["Calendar"]
       }
     },
     "/workspaces/{wsId}/calendars/subscribe-system": {
@@ -19899,7 +20138,8 @@
             "description": "Error"
           }
         },
-        "summary": "Subscribe the caller to the holiday feed for a country"
+        "summary": "Subscribe the caller to the holiday feed for a country",
+        "tags": ["Calendar"]
       }
     },
     "/workspaces/{wsId}/calendars/{calId}": {
@@ -19950,7 +20190,8 @@
             "description": "Error"
           }
         },
-        "summary": "Delete a calendar"
+        "summary": "Delete a calendar",
+        "tags": ["Calendar"]
       },
       "get": {
         "description": "Returns the calendar's metadata (name, color, timezone, owner, sharing flags) for the calendar settings panel.",
@@ -19999,7 +20240,8 @@
             "description": "Error"
           }
         },
-        "summary": "Get a calendar"
+        "summary": "Get a calendar",
+        "tags": ["Calendar"]
       },
       "patch": {
         "description": "Updates editable calendar fields (name, description, color, timezone, discoverable). Requires calendar admin role.",
@@ -20058,7 +20300,8 @@
             "description": "Error"
           }
         },
-        "summary": "Update a calendar"
+        "summary": "Update a calendar",
+        "tags": ["Calendar"]
       }
     },
     "/workspaces/{wsId}/calendars/{calId}/events": {
@@ -20087,26 +20330,24 @@
             }
           },
           {
-            "description": "Range start (inclusive)",
+            "description": "Range start (inclusive, RFC 3339 datetime or YYYY-MM-DD)",
             "explode": false,
             "in": "query",
             "name": "start",
             "required": true,
             "schema": {
-              "description": "Range start (inclusive)",
-              "format": "date-time",
+              "description": "Range start (inclusive, RFC 3339 datetime or YYYY-MM-DD)",
               "type": "string"
             }
           },
           {
-            "description": "Range end (exclusive)",
+            "description": "Range end (exclusive, RFC 3339 datetime or YYYY-MM-DD)",
             "explode": false,
             "in": "query",
             "name": "end",
             "required": true,
             "schema": {
-              "description": "Range end (exclusive)",
-              "format": "date-time",
+              "description": "Range end (exclusive, RFC 3339 datetime or YYYY-MM-DD)",
               "type": "string"
             }
           }
@@ -20133,7 +20374,8 @@
             "description": "Error"
           }
         },
-        "summary": "List events in a calendar"
+        "summary": "List events in a calendar",
+        "tags": ["Calendar"]
       },
       "post": {
         "description": "Creates an event in the calendar. Optionally accepts an attendee list which triggers RSVP requests; recurrence rules are validated against RFC 5545.",
@@ -20192,7 +20434,8 @@
             "description": "Error"
           }
         },
-        "summary": "Create an event"
+        "summary": "Create an event",
+        "tags": ["Calendar"]
       }
     },
     "/workspaces/{wsId}/calendars/{calId}/events/from-task": {
@@ -20253,7 +20496,8 @@
             "description": "Error"
           }
         },
-        "summary": "Create a calendar event from a task"
+        "summary": "Create a calendar event from a task",
+        "tags": ["Calendar"]
       }
     },
     "/workspaces/{wsId}/calendars/{calId}/events/smart-create": {
@@ -20314,7 +20558,8 @@
             "description": "Error"
           }
         },
-        "summary": "Parse natural language text into an event proposal"
+        "summary": "Parse natural language text into an event proposal",
+        "tags": ["Calendar"]
       }
     },
     "/workspaces/{wsId}/calendars/{calId}/events/{evtId}": {
@@ -20375,7 +20620,8 @@
             "description": "Error"
           }
         },
-        "summary": "Delete an event"
+        "summary": "Delete an event",
+        "tags": ["Calendar"]
       },
       "get": {
         "description": "Returns one event with its full body, recurrence rule, attendees, and link metadata. Used by the event detail panel.",
@@ -20434,7 +20680,8 @@
             "description": "Error"
           }
         },
-        "summary": "Get an event"
+        "summary": "Get an event",
+        "tags": ["Calendar"]
       },
       "patch": {
         "description": "Updates editable event fields (title, time range, description, location, recurrence). Time changes trigger task-shift propagation through task_event_links.",
@@ -20503,7 +20750,8 @@
             "description": "Error"
           }
         },
-        "summary": "Update an event"
+        "summary": "Update an event",
+        "tags": ["Calendar"]
       }
     },
     "/workspaces/{wsId}/calendars/{calId}/events/{evtId}/attachments": {
@@ -20564,7 +20812,8 @@
             "description": "Error"
           }
         },
-        "summary": "List attachments on an event"
+        "summary": "List attachments on an event",
+        "tags": ["Calendar"]
       },
       "post": {
         "description": "Records that a file (already uploaded out-of-band) is attached to the event. Stores filename, MIME, size, and storage key.",
@@ -20633,7 +20882,8 @@
             "description": "Error"
           }
         },
-        "summary": "Record attachment metadata for an event"
+        "summary": "Record attachment metadata for an event",
+        "tags": ["Calendar"]
       }
     },
     "/workspaces/{wsId}/calendars/{calId}/events/{evtId}/attachments/{attId}": {
@@ -20704,7 +20954,8 @@
             "description": "Error"
           }
         },
-        "summary": "Delete an attachment from an event"
+        "summary": "Delete an attachment from an event",
+        "tags": ["Calendar"]
       }
     },
     "/workspaces/{wsId}/calendars/{calId}/events/{evtId}/attendees": {
@@ -20765,7 +21016,8 @@
             "description": "Error"
           }
         },
-        "summary": "List attendees on an event"
+        "summary": "List attendees on an event",
+        "tags": ["Calendar"]
       },
       "post": {
         "description": "Adds one or more attendees (workspace members or external email addresses) to the event. External invitees receive a magic-link invite email.",
@@ -20834,7 +21086,8 @@
             "description": "Error"
           }
         },
-        "summary": "Add attendees to an event"
+        "summary": "Add attendees to an event",
+        "tags": ["Calendar"]
       }
     },
     "/workspaces/{wsId}/calendars/{calId}/events/{evtId}/attendees/rsvp": {
@@ -20905,7 +21158,8 @@
             "description": "Error"
           }
         },
-        "summary": "Update own RSVP for an event"
+        "summary": "Update own RSVP for an event",
+        "tags": ["Calendar"]
       }
     },
     "/workspaces/{wsId}/calendars/{calId}/events/{evtId}/attendees/{attendeeId}/invite": {
@@ -20986,7 +21240,8 @@
             "description": "Error"
           }
         },
-        "summary": "Create (or rotate) a magic-link invite for an attendee"
+        "summary": "Create (or rotate) a magic-link invite for an attendee",
+        "tags": ["CalendarInvite"]
       }
     },
     "/workspaces/{wsId}/calendars/{calId}/events/{evtId}/attendees/{userId}": {
@@ -21057,7 +21312,8 @@
             "description": "Error"
           }
         },
-        "summary": "Remove an attendee from an event"
+        "summary": "Remove an attendee from an event",
+        "tags": ["Calendar"]
       }
     },
     "/workspaces/{wsId}/calendars/{calId}/events/{evtId}/attendees/{userId}/can-edit": {
@@ -21138,7 +21394,8 @@
             "description": "Error"
           }
         },
-        "summary": "Toggle can_edit for an attendee"
+        "summary": "Toggle can_edit for an attendee",
+        "tags": ["Calendar"]
       }
     },
     "/workspaces/{wsId}/calendars/{calId}/events/{evtId}/checklist": {
@@ -21199,7 +21456,8 @@
             "description": "Error"
           }
         },
-        "summary": "List checklist items for an event"
+        "summary": "List checklist items for an event",
+        "tags": ["Calendar"]
       },
       "post": {
         "description": "Appends a checklist item to the event with optional assignee. Returns the persisted item including its display order.",
@@ -21268,7 +21526,8 @@
             "description": "Error"
           }
         },
-        "summary": "Add a checklist item to an event"
+        "summary": "Add a checklist item to an event",
+        "tags": ["Calendar"]
       }
     },
     "/workspaces/{wsId}/calendars/{calId}/events/{evtId}/checklist/{itemId}": {
@@ -21339,7 +21598,8 @@
             "description": "Error"
           }
         },
-        "summary": "Delete a checklist item"
+        "summary": "Delete a checklist item",
+        "tags": ["Calendar"]
       },
       "patch": {
         "description": "Updates a checklist item's text, completion state, assignee, or display order.",
@@ -21418,7 +21678,8 @@
             "description": "Error"
           }
         },
-        "summary": "Update a checklist item"
+        "summary": "Update a checklist item",
+        "tags": ["Calendar"]
       }
     },
     "/workspaces/{wsId}/calendars/{calId}/events/{evtId}/comments": {
@@ -21479,7 +21740,8 @@
             "description": "Error"
           }
         },
-        "summary": "List comments on an event"
+        "summary": "List comments on an event",
+        "tags": ["Calendar"]
       },
       "post": {
         "description": "Appends a comment from the caller to the event thread. Mentions in the body are routed through the notifications pipeline.",
@@ -21548,7 +21810,8 @@
             "description": "Error"
           }
         },
-        "summary": "Add a comment to an event"
+        "summary": "Add a comment to an event",
+        "tags": ["Calendar"]
       }
     },
     "/workspaces/{wsId}/calendars/{calId}/events/{evtId}/comments/{cId}": {
@@ -21619,7 +21882,8 @@
             "description": "Error"
           }
         },
-        "summary": "Delete a comment"
+        "summary": "Delete a comment",
+        "tags": ["Calendar"]
       },
       "patch": {
         "description": "Replaces the body of the named comment. Only the original author may edit; an edited_at timestamp is set.",
@@ -21698,7 +21962,8 @@
             "description": "Error"
           }
         },
-        "summary": "Edit a comment"
+        "summary": "Edit a comment",
+        "tags": ["Calendar"]
       }
     },
     "/workspaces/{wsId}/calendars/{calId}/events/{evtId}/invites": {
@@ -21759,7 +22024,8 @@
             "description": "Error"
           }
         },
-        "summary": "List active magic-link invites for an event"
+        "summary": "List active magic-link invites for an event",
+        "tags": ["CalendarInvite"]
       }
     },
     "/workspaces/{wsId}/calendars/{calId}/events/{evtId}/invites/{inviteId}": {
@@ -21830,7 +22096,8 @@
             "description": "Error"
           }
         },
-        "summary": "Revoke a magic-link invite"
+        "summary": "Revoke a magic-link invite",
+        "tags": ["CalendarInvite"]
       }
     },
     "/workspaces/{wsId}/calendars/{calId}/members": {
@@ -21881,7 +22148,8 @@
             "description": "Error"
           }
         },
-        "summary": "List members of a calendar"
+        "summary": "List members of a calendar",
+        "tags": ["Calendar"]
       },
       "post": {
         "description": "Adds a workspace member to the calendar at the requested role (viewer / editor / admin). Calendar admin role required.",
@@ -21940,7 +22208,8 @@
             "description": "Error"
           }
         },
-        "summary": "Add a member to a calendar"
+        "summary": "Add a member to a calendar",
+        "tags": ["Calendar"]
       }
     },
     "/workspaces/{wsId}/calendars/{calId}/members/{userId}": {
@@ -22001,7 +22270,8 @@
             "description": "Error"
           }
         },
-        "summary": "Remove a member from a calendar"
+        "summary": "Remove a member from a calendar",
+        "tags": ["Calendar"]
       },
       "patch": {
         "description": "Changes a calendar member's role. Refuses to demote the last admin so the calendar stays manageable.",
@@ -22070,7 +22340,8 @@
             "description": "Error"
           }
         },
-        "summary": "Update a member's role"
+        "summary": "Update a member's role",
+        "tags": ["Calendar"]
       }
     },
     "/workspaces/{wsId}/calendars/{calId}/memos": {
@@ -22121,7 +22392,8 @@
             "description": "Error"
           }
         },
-        "summary": "List memos in a calendar"
+        "summary": "List memos in a calendar",
+        "tags": ["Calendar"]
       },
       "post": {
         "description": "Creates a memo on the calendar with title and Markdown body. Returns the persisted memo including its assigned id.",
@@ -22180,7 +22452,8 @@
             "description": "Error"
           }
         },
-        "summary": "Create a memo"
+        "summary": "Create a memo",
+        "tags": ["Calendar"]
       }
     },
     "/workspaces/{wsId}/calendars/{calId}/memos/{memoId}": {
@@ -22241,7 +22514,8 @@
             "description": "Error"
           }
         },
-        "summary": "Delete a memo"
+        "summary": "Delete a memo",
+        "tags": ["Calendar"]
       },
       "patch": {
         "description": "Updates the memo's title or Markdown body.",
@@ -22310,7 +22584,8 @@
             "description": "Error"
           }
         },
-        "summary": "Update a memo"
+        "summary": "Update a memo",
+        "tags": ["Calendar"]
       }
     },
     "/workspaces/{wsId}/calendars/{calId}/subscribe": {
@@ -22361,7 +22636,8 @@
             "description": "Error"
           }
         },
-        "summary": "Subscribe the caller to a calendar visible in the workspace"
+        "summary": "Subscribe the caller to a calendar visible in the workspace",
+        "tags": ["Calendar"]
       }
     },
     "/workspaces/{wsId}/calendars/{calId}/subscription": {
@@ -22422,7 +22698,8 @@
             "description": "Error"
           }
         },
-        "summary": "Update the caller's own subscription preferences for a calendar"
+        "summary": "Update the caller's own subscription preferences for a calendar",
+        "tags": ["Calendar"]
       }
     },
     "/workspaces/{wsId}/dashboard/widgets": {
@@ -22484,7 +22761,8 @@
             "description": "Error"
           }
         },
-        "summary": "List dashboard widgets in a workspace"
+        "summary": "List dashboard widgets in a workspace",
+        "tags": ["Admin"]
       },
       "post": {
         "description": "Adds a new widget to the workspace dashboard with the provided kind and config blob. Returns the persisted widget including its assigned position so the client can render it immediately.",
@@ -22531,7 +22809,8 @@
             "description": "Error"
           }
         },
-        "summary": "Create a dashboard widget"
+        "summary": "Create a dashboard widget",
+        "tags": ["Admin"]
       }
     },
     "/workspaces/{wsId}/dashboard/widgets/{widgetId}": {
@@ -22578,7 +22857,8 @@
             "description": "Error"
           }
         },
-        "summary": "Soft-delete a dashboard widget"
+        "summary": "Soft-delete a dashboard widget",
+        "tags": ["Admin"]
       },
       "get": {
         "description": "Returns a single widget with its kind, config, and computed payload. Used when opening a widget's detail or edit panel.",
@@ -22623,7 +22903,8 @@
             "description": "Error"
           }
         },
-        "summary": "Fetch a dashboard widget by id"
+        "summary": "Fetch a dashboard widget by id",
+        "tags": ["Admin"]
       },
       "patch": {
         "description": "Updates a widget's title and config blob. Position changes go through the dedicated /position endpoint to avoid heavy reflows on drag.",
@@ -22678,7 +22959,8 @@
             "description": "Error"
           }
         },
-        "summary": "Update a dashboard widget"
+        "summary": "Update a dashboard widget",
+        "tags": ["Admin"]
       }
     },
     "/workspaces/{wsId}/dashboard/widgets/{widgetId}/position": {
@@ -22735,7 +23017,8 @@
             "description": "Error"
           }
         },
-        "summary": "Update widget position and size"
+        "summary": "Update widget position and size",
+        "tags": ["Admin"]
       }
     },
     "/workspaces/{wsId}/discoverable-calendars": {
@@ -22776,7 +23059,8 @@
             "description": "Error"
           }
         },
-        "summary": "List teammate personal calendars the caller can subscribe to"
+        "summary": "List teammate personal calendars the caller can subscribe to",
+        "tags": ["Public"]
       }
     },
     "/workspaces/{wsId}/export/tasks": {
@@ -22851,7 +23135,8 @@
             "description": "Error"
           }
         },
-        "summary": "Export tasks as JSON"
+        "summary": "Export tasks as JSON",
+        "tags": ["Admin"]
       }
     },
     "/workspaces/{wsId}/imports": {
@@ -22913,7 +23198,8 @@
             "description": "Error"
           }
         },
-        "summary": "List import jobs for the workspace"
+        "summary": "List import jobs for the workspace",
+        "tags": ["Admin"]
       },
       "post": {
         "description": "Submits an import job (Asana / CSV / etc.) referencing previously uploaded source data. The job runs asynchronously; poll /imports/{importId} for progress.",
@@ -22960,7 +23246,8 @@
             "description": "Error"
           }
         },
-        "summary": "Create an import job"
+        "summary": "Create an import job",
+        "tags": ["Admin"]
       }
     },
     "/workspaces/{wsId}/imports/{importId}": {
@@ -23007,7 +23294,8 @@
             "description": "Error"
           }
         },
-        "summary": "Get a single import job"
+        "summary": "Get a single import job",
+        "tags": ["Admin"]
       }
     },
     "/workspaces/{wsId}/imports/{importId}/cancel": {
@@ -23054,7 +23342,8 @@
             "description": "Error"
           }
         },
-        "summary": "Cancel a pending or running import job"
+        "summary": "Cancel a pending or running import job",
+        "tags": ["Admin"]
       }
     },
     "/workspaces/{wsId}/inbox/triage": {
@@ -23103,7 +23392,8 @@
             "description": "Error"
           }
         },
-        "summary": "Ask the AI orchestrator to score and recommend actions for inbox items"
+        "summary": "Ask the AI orchestrator to score and recommend actions for inbox items",
+        "tags": ["Tasks"]
       }
     },
     "/workspaces/{wsId}/intake": {
@@ -23175,7 +23465,8 @@
             "description": "Error"
           }
         },
-        "summary": "List intake items in the triage queue"
+        "summary": "List intake items in the triage queue",
+        "tags": ["Tasks"]
       },
       "post": {
         "description": "Pushes a new intake row onto the workspace triage queue. Used by the manual 'capture' affordance and by integrations that want a human to review before a task is created.",
@@ -23222,7 +23513,8 @@
             "description": "Error"
           }
         },
-        "summary": "Create an intake item"
+        "summary": "Create an intake item",
+        "tags": ["Tasks"]
       }
     },
     "/workspaces/{wsId}/intake/{id}": {
@@ -23269,7 +23561,8 @@
             "description": "Error"
           }
         },
-        "summary": "Get a single intake item"
+        "summary": "Get a single intake item",
+        "tags": ["Tasks"]
       },
       "patch": {
         "description": "Records the human triage decision on the named intake item: accept (forward to /convert), reject (drop with reason), snooze (revisit later), or mark duplicate of an existing task.",
@@ -23324,7 +23617,8 @@
             "description": "Error"
           }
         },
-        "summary": "Triage an intake item (accept, reject, snooze, or mark duplicate)"
+        "summary": "Triage an intake item (accept, reject, snooze, or mark duplicate)",
+        "tags": ["Tasks"]
       }
     },
     "/workspaces/{wsId}/intake/{id}/convert": {
@@ -23381,7 +23675,8 @@
             "description": "Error"
           }
         },
-        "summary": "Convert an intake item into a task"
+        "summary": "Convert an intake item into a task",
+        "tags": ["Tasks"]
       }
     },
     "/workspaces/{wsId}/invites": {
@@ -23609,7 +23904,8 @@
             "description": "Error"
           }
         },
-        "summary": "List labels in a workspace"
+        "summary": "List labels in a workspace",
+        "tags": ["Labels"]
       },
       "post": {
         "description": "Creates a workspace label with name and color. Names are unique within the workspace.",
@@ -23656,7 +23952,8 @@
             "description": "Error"
           }
         },
-        "summary": "Create a label"
+        "summary": "Create a label",
+        "tags": ["Labels"]
       }
     },
     "/workspaces/{wsId}/labels/{id}": {
@@ -23703,7 +24000,8 @@
             "description": "Error"
           }
         },
-        "summary": "Soft-disable a label"
+        "summary": "Soft-disable a label",
+        "tags": ["Labels"]
       },
       "get": {
         "description": "Returns one label including its name, color, and disabled state. Used by the label edit panel.",
@@ -23748,7 +24046,8 @@
             "description": "Error"
           }
         },
-        "summary": "Fetch a label"
+        "summary": "Fetch a label",
+        "tags": ["Labels"]
       },
       "patch": {
         "description": "Renames or recolors the label. Existing task assignments keep working; the new name and color propagate immediately.",
@@ -23803,7 +24102,8 @@
             "description": "Error"
           }
         },
-        "summary": "Update a label"
+        "summary": "Update a label",
+        "tags": ["Labels"]
       }
     },
     "/workspaces/{wsId}/lenses": {
@@ -23875,7 +24175,8 @@
             "description": "Error"
           }
         },
-        "summary": "List saved views for a workspace/project"
+        "summary": "List saved views for a workspace/project",
+        "tags": ["Lens"]
       },
       "post": {
         "description": "Persists a new lens (filter + grouping + sort) so the caller can re-open the same view across sessions and share it with teammates. The Lens JSON is validated against the schema before insert.",
@@ -23922,7 +24223,8 @@
             "description": "Error"
           }
         },
-        "summary": "Create a saved view (lens)"
+        "summary": "Create a saved view (lens)",
+        "tags": ["Lens"]
       }
     },
     "/workspaces/{wsId}/lenses/{lensId}": {
@@ -23969,7 +24271,8 @@
             "description": "Error"
           }
         },
-        "summary": "Delete a saved view"
+        "summary": "Delete a saved view",
+        "tags": ["Lens"]
       },
       "get": {
         "description": "Returns one lens including its full Lens JSON and ownership metadata. Used when opening a saved view directly from a deep link.",
@@ -24014,7 +24317,8 @@
             "description": "Error"
           }
         },
-        "summary": "Fetch a saved view"
+        "summary": "Fetch a saved view",
+        "tags": ["Lens"]
       },
       "patch": {
         "description": "Updates a lens's name, scope, or Lens JSON. Re-validates the JSON before persistence so an invalid update cannot wedge the view.",
@@ -24069,7 +24373,8 @@
             "description": "Error"
           }
         },
-        "summary": "Update a saved view"
+        "summary": "Update a saved view",
+        "tags": ["Lens"]
       }
     },
     "/workspaces/{wsId}/lenses/{lensId}/publish": {
@@ -24116,7 +24421,8 @@
             "description": "Error"
           }
         },
-        "summary": "Publish a lens publicly with a shareable token URL"
+        "summary": "Publish a lens publicly with a shareable token URL",
+        "tags": ["Lens"]
       }
     },
     "/workspaces/{wsId}/lenses/{lensId}/unpublish": {
@@ -24163,7 +24469,8 @@
             "description": "Error"
           }
         },
-        "summary": "Revoke public access to a lens"
+        "summary": "Revoke public access to a lens",
+        "tags": ["Lens"]
       }
     },
     "/workspaces/{wsId}/me/mcp-tokens": {
@@ -24225,7 +24532,8 @@
             "description": "Error"
           }
         },
-        "summary": "List the caller's MCP tokens (no plaintext)"
+        "summary": "List the caller's MCP tokens (no plaintext)",
+        "tags": ["AI"]
       },
       "post": {
         "description": "Generates a new MCP bearer token (mcp_…) the caller can pass to a local MCP client to authenticate against /mcp. The plaintext token is returned exactly once; only the hash is stored.",
@@ -24272,7 +24580,8 @@
             "description": "Error"
           }
         },
-        "summary": "Mint a new MCP bearer token (plaintext returned once)"
+        "summary": "Mint a new MCP bearer token (plaintext returned once)",
+        "tags": ["AI"]
       }
     },
     "/workspaces/{wsId}/me/mcp-tokens/{tokenId}": {
@@ -24319,7 +24628,8 @@
             "description": "Error"
           }
         },
-        "summary": "Revoke an MCP bearer token"
+        "summary": "Revoke an MCP bearer token",
+        "tags": ["AI"]
       }
     },
     "/workspaces/{wsId}/members": {
@@ -24571,7 +24881,8 @@
             "description": "Error"
           }
         },
-        "summary": "Mark all notifications as read in a workspace"
+        "summary": "Mark all notifications as read in a workspace",
+        "tags": ["Tasks"]
       }
     },
     "/workspaces/{wsId}/pages": {
@@ -24633,7 +24944,8 @@
             "description": "Error"
           }
         },
-        "summary": "List root pages in a workspace"
+        "summary": "List root pages in a workspace",
+        "tags": ["Public"]
       },
       "post": {
         "description": "Creates a new page (optionally as a child of an existing page) with title and Markdown body. Returns the persisted page including its assigned id.",
@@ -24680,7 +24992,8 @@
             "description": "Error"
           }
         },
-        "summary": "Create a page"
+        "summary": "Create a page",
+        "tags": ["Public"]
       }
     },
     "/workspaces/{wsId}/pages/generate": {
@@ -24729,7 +25042,8 @@
             "description": "Error"
           }
         },
-        "summary": "Generate a page with AI"
+        "summary": "Generate a page with AI",
+        "tags": ["Public"]
       }
     },
     "/workspaces/{wsId}/pages/search": {
@@ -24803,7 +25117,8 @@
             "description": "Error"
           }
         },
-        "summary": "Search pages by title"
+        "summary": "Search pages by title",
+        "tags": ["Public"]
       }
     },
     "/workspaces/{wsId}/pages/{pageId}": {
@@ -24850,7 +25165,8 @@
             "description": "Error"
           }
         },
-        "summary": "Soft-delete a page"
+        "summary": "Soft-delete a page",
+        "tags": ["Public"]
       },
       "get": {
         "description": "Returns a single page with its full Markdown body and metadata. Used when opening a page from the tree.",
@@ -24895,7 +25211,8 @@
             "description": "Error"
           }
         },
-        "summary": "Fetch a page by id"
+        "summary": "Fetch a page by id",
+        "tags": ["Public"]
       },
       "patch": {
         "description": "Updates page title and Markdown body. Optionally re-parents the page within the tree.",
@@ -24950,7 +25267,8 @@
             "description": "Error"
           }
         },
-        "summary": "Update a page"
+        "summary": "Update a page",
+        "tags": ["Public"]
       }
     },
     "/workspaces/{wsId}/pages/{pageId}/children": {
@@ -25020,7 +25338,8 @@
             "description": "Error"
           }
         },
-        "summary": "List child pages"
+        "summary": "List child pages",
+        "tags": ["Public"]
       }
     },
     "/workspaces/{wsId}/projects": {
@@ -25082,7 +25401,8 @@
             "description": "Error"
           }
         },
-        "summary": "List projects in a workspace"
+        "summary": "List projects in a workspace",
+        "tags": ["Workspace"]
       },
       "post": {
         "description": "Creates a new project in the workspace. The caller becomes the first project member with admin role. Requires workspace admin role.",
@@ -25129,7 +25449,8 @@
             "description": "Error"
           }
         },
-        "summary": "Create a project in a workspace"
+        "summary": "Create a project in a workspace",
+        "tags": ["Workspace"]
       }
     },
     "/workspaces/{wsId}/public-shares": {
@@ -25170,7 +25491,8 @@
             "description": "Error"
           }
         },
-        "summary": "List public share pages in a workspace"
+        "summary": "List public share pages in a workspace",
+        "tags": ["Public"]
       },
       "post": {
         "description": "Mints a new public share page with a fresh URL token. The token is returned plaintext exactly once so the operator can copy the share URL; subsequent reads only return its hash.",
@@ -25202,7 +25524,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/PublicShareResponse"
+                  "$ref": "#/components/schemas/PublicShareCreateResponse"
                 }
               }
             },
@@ -25219,7 +25541,8 @@
             "description": "Error"
           }
         },
-        "summary": "Create a public share page (returns plaintext token once)"
+        "summary": "Create a public share page (returns plaintext token once)",
+        "tags": ["Public"]
       }
     },
     "/workspaces/{wsId}/public-shares/{shareId}": {
@@ -25270,7 +25593,8 @@
             "description": "Error"
           }
         },
-        "summary": "Delete a public share page (admin or owner only)"
+        "summary": "Delete a public share page (admin or owner only)",
+        "tags": ["Public"]
       },
       "get": {
         "description": "Returns the share page's metadata plus the ordered list of events currently published on it. The plaintext token is not returned.",
@@ -25319,7 +25643,8 @@
             "description": "Error"
           }
         },
-        "summary": "Get a public share page with its published events"
+        "summary": "Get a public share page with its published events",
+        "tags": ["Public"]
       },
       "patch": {
         "description": "Updates the share page title, description, and theme. Token / event list use dedicated endpoints.",
@@ -25378,7 +25703,8 @@
             "description": "Error"
           }
         },
-        "summary": "Update public share page metadata"
+        "summary": "Update public share page metadata",
+        "tags": ["Public"]
       }
     },
     "/workspaces/{wsId}/public-shares/{shareId}/events": {
@@ -25439,7 +25765,8 @@
             "description": "Error"
           }
         },
-        "summary": "Attach events to a public share page"
+        "summary": "Attach events to a public share page",
+        "tags": ["Public"]
       }
     },
     "/workspaces/{wsId}/public-shares/{shareId}/events/reorder": {
@@ -25500,7 +25827,8 @@
             "description": "Error"
           }
         },
-        "summary": "Batch-reorder the events published on a public share page"
+        "summary": "Batch-reorder the events published on a public share page",
+        "tags": ["Public"]
       }
     },
     "/workspaces/{wsId}/public-shares/{shareId}/events/{evtId}": {
@@ -25561,7 +25889,8 @@
             "description": "Error"
           }
         },
-        "summary": "Detach an event from a public share page"
+        "summary": "Detach an event from a public share page",
+        "tags": ["Public"]
       }
     },
     "/workspaces/{wsId}/public-shares/{shareId}/rotate": {
@@ -25595,7 +25924,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/PublicShareResponse"
+                  "$ref": "#/components/schemas/PublicShareRotateResponse"
                 }
               }
             },
@@ -25612,7 +25941,8 @@
             "description": "Error"
           }
         },
-        "summary": "Rotate the URL token for a public share page"
+        "summary": "Rotate the URL token for a public share page",
+        "tags": ["Public"]
       }
     },
     "/workspaces/{wsId}/relation-suggestions": {
@@ -25676,7 +26006,8 @@
             "description": "Error"
           }
         },
-        "summary": "List pending relation suggestions for a workspace"
+        "summary": "List pending relation suggestions for a workspace",
+        "tags": ["Tasks"]
       }
     },
     "/workspaces/{wsId}/tasks/apply-smart": {
@@ -25725,7 +26056,8 @@
             "description": "Error"
           }
         },
-        "summary": "Apply AI proposal — create parent task with subtasks and assignees"
+        "summary": "Apply AI proposal — create parent task with subtasks and assignees",
+        "tags": ["Tasks"]
       }
     },
     "/workspaces/{wsId}/tasks/archived": {
@@ -25797,7 +26129,8 @@
             "description": "Error"
           }
         },
-        "summary": "List archived tasks in a workspace"
+        "summary": "List archived tasks in a workspace",
+        "tags": ["Tasks"]
       }
     },
     "/workspaces/{wsId}/tasks/propose-smart": {
@@ -25846,7 +26179,8 @@
             "description": "Error"
           }
         },
-        "summary": "AI-powered subtask decomposition and assignee suggestions"
+        "summary": "AI-powered subtask decomposition and assignee suggestions",
+        "tags": ["Tasks"]
       }
     },
     "/workspaces/{wsId}/timeboxes": {
@@ -25908,7 +26242,8 @@
             "description": "Error"
           }
         },
-        "summary": "List timeboxes in a workspace"
+        "summary": "List timeboxes in a workspace",
+        "tags": ["Tasks"]
       },
       "post": {
         "description": "Creates a new timebox (sprint / focus block) with a date range, owner, and goal. Tasks are attached separately via /timeboxes/{id}/tasks.",
@@ -25955,7 +26290,8 @@
             "description": "Error"
           }
         },
-        "summary": "Create a timebox"
+        "summary": "Create a timebox",
+        "tags": ["Tasks"]
       }
     },
     "/workspaces/{wsId}/timeboxes/{timeboxId}": {
@@ -26002,7 +26338,8 @@
             "description": "Error"
           }
         },
-        "summary": "Soft-delete a timebox"
+        "summary": "Soft-delete a timebox",
+        "tags": ["Tasks"]
       },
       "get": {
         "description": "Returns a single timebox with metadata and aggregate progress (counts only). Use /tasks for the task list.",
@@ -26047,7 +26384,8 @@
             "description": "Error"
           }
         },
-        "summary": "Fetch a timebox by id"
+        "summary": "Fetch a timebox by id",
+        "tags": ["Tasks"]
       },
       "patch": {
         "description": "Updates timebox name, goal, owner, or date range. Status changes use the dedicated /status endpoint.",
@@ -26102,7 +26440,8 @@
             "description": "Error"
           }
         },
-        "summary": "Update a timebox"
+        "summary": "Update a timebox",
+        "tags": ["Tasks"]
       }
     },
     "/workspaces/{wsId}/timeboxes/{timeboxId}/status": {
@@ -26159,7 +26498,8 @@
             "description": "Error"
           }
         },
-        "summary": "Transition timebox status"
+        "summary": "Transition timebox status",
+        "tags": ["Tasks"]
       }
     },
     "/workspaces/{wsId}/timeboxes/{timeboxId}/tasks": {
@@ -26229,7 +26569,8 @@
             "description": "Error"
           }
         },
-        "summary": "List tasks in a timebox with progress"
+        "summary": "List tasks in a timebox with progress",
+        "tags": ["Tasks"]
       },
       "post": {
         "description": "Associates an existing workspace task with the timebox so it counts toward the timebox's progress and burndown.",
@@ -26284,7 +26625,8 @@
             "description": "Error"
           }
         },
-        "summary": "Add a task to a timebox"
+        "summary": "Add a task to a timebox",
+        "tags": ["Tasks"]
       }
     },
     "/workspaces/{wsId}/timeboxes/{timeboxId}/tasks/{taskId}": {
@@ -26339,7 +26681,8 @@
             "description": "Error"
           }
         },
-        "summary": "Remove a task from a timebox"
+        "summary": "Remove a task from a timebox",
+        "tags": ["Tasks"]
       }
     },
     "/workspaces/{wsId}/timeline": {
@@ -26424,7 +26767,8 @@
             "description": "Error"
           }
         },
-        "summary": "List events in a workspace's timeline"
+        "summary": "List events in a workspace's timeline",
+        "tags": ["Tasks"]
       }
     },
     "/workspaces/{wsId}/users": {
@@ -26527,7 +26871,8 @@
             "description": "Error"
           }
         },
-        "summary": "List webhook subscriptions"
+        "summary": "List webhook subscriptions",
+        "tags": ["Webhook"]
       },
       "post": {
         "description": "Registers an outbound webhook subscription for the workspace. Returns the freshly minted HMAC signing secret in the response body — this is the only time it is returned plaintext.",
@@ -26576,7 +26921,8 @@
             "description": "Error"
           }
         },
-        "summary": "Create a webhook subscription"
+        "summary": "Create a webhook subscription",
+        "tags": ["Webhook"]
       }
     },
     "/workspaces/{wsId}/webhooks/{webhookId}": {
@@ -26627,7 +26973,8 @@
             "description": "Error"
           }
         },
-        "summary": "Soft-delete a webhook subscription"
+        "summary": "Soft-delete a webhook subscription",
+        "tags": ["Webhook"]
       },
       "get": {
         "description": "Returns the named webhook subscription including its plaintext signing secret so the operator can rotate it. Restricted to workspace admins.",
@@ -26676,7 +27023,8 @@
             "description": "Error"
           }
         },
-        "summary": "Get a webhook subscription (includes secret)"
+        "summary": "Get a webhook subscription (includes secret)",
+        "tags": ["Webhook"]
       }
     },
     "/workspaces/{wsId}/webhooks/{webhookId}/deliveries": {
@@ -26750,7 +27098,8 @@
             "description": "Error"
           }
         },
-        "summary": "List delivery log for a webhook subscription"
+        "summary": "List delivery log for a webhook subscription",
+        "tags": ["Webhook"]
       }
     },
     "/workspaces/{wsId}/webhooks/{webhookId}/test": {
@@ -26801,7 +27150,8 @@
             "description": "Error"
           }
         },
-        "summary": "Send a test ping delivery"
+        "summary": "Send a test ping delivery",
+        "tags": ["Webhook"]
       }
     },
     "/workspaces/{wsId}/webhooks/{webhookId}/toggle": {
@@ -26862,7 +27212,8 @@
             "description": "Error"
           }
         },
-        "summary": "Activate or deactivate a webhook subscription"
+        "summary": "Activate or deactivate a webhook subscription",
+        "tags": ["Webhook"]
       }
     }
   }

@@ -1,12 +1,17 @@
 package auth
 
-import "github.com/nodate-flow/nodate-flow/packages/go-shared/authn"
+import (
+	"github.com/nodate-flow/nodate-flow/packages/go-shared/authn"
+	sharedtoken "github.com/nodate-flow/nodate-flow/packages/go-shared/token"
+)
 
 // PrefixPAT is the user-visible prefix for personal access tokens.
-const PrefixPAT = "pat_"
+// Sourced from packages/go-shared/token so auth-api and flow-api see
+// the same catalogue.
+const PrefixPAT = sharedtoken.PrefixPAT
 
 // PrefixMCP is the user-visible prefix for MCP bearer tokens.
-const PrefixMCP = "mcp_"
+const PrefixMCP = sharedtoken.PrefixMCP
 
 // PrefixRefresh is the user-visible prefix for refresh tokens.
 const PrefixRefresh = authn.PrefixRefresh

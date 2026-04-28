@@ -7,6 +7,7 @@ import (
 	"time"
 
 	apierrors "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/errors"
+	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/handlers/handlerutil"
 	"github.com/nodate-flow/nodate-flow/packages/go-shared/apierr"
 )
 
@@ -97,7 +98,7 @@ func RenderPublicShare(deps Deps) func(context.Context, *RenderPublicShareInput)
 			ShowHolidaysCountry: nullStringPtr(page.ShowHolidaysCountry),
 			WorkspaceID:         page.WorkspacePublicID.String(),
 			WorkspaceName:       page.WorkspaceName,
-			CreatedAt:           page.CreatedAt.Unix(),
+			CreatedAt:           handlerutil.TimeToUnix(page.CreatedAt),
 		}
 		out.Body.Events = make([]PublicShareRenderEvent, len(events))
 		for i, e := range events {

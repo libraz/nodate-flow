@@ -18,5 +18,6 @@ func Register(api huma.API, deps Deps) {
 		Path:        "/workspaces/{wsId}/audit-logs",
 		Summary:     "List recent audit log entries for a workspace",
 		Description: "Returns a cursor-paginated page of workspace audit log entries (actor, action, target, timestamp). Restricted to workspace admins; backs the admin Audit panel.",
+		Tags:        []string{"Admin"},
 	}, List(deps))
 }

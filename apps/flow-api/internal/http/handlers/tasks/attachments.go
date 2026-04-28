@@ -35,7 +35,7 @@ func AddAttachment(deps Deps) func(context.Context, *AddTaskAttachmentInput) (*A
 		if _, err := deps.Queries.AddAttachment(ctx, generated.AddAttachmentParams{
 			PublicID:       pub,
 			WorkspaceID:    ws.ID,
-			TaskID:         task.ID,
+			TaskID:         handlerutil.NullInt32From(task.ID),
 			UploaderID:     actorID,
 			Filename:       in.Body.Filename,
 			ContentType:    in.Body.ContentType,

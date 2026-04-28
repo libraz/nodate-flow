@@ -61,15 +61,21 @@ func Create(deps Deps) func(context.Context, *CreateLabelInput) (*CreateLabelOut
 			parentLabelID = sql.NullInt32{Int32: int32(parent.ID), Valid: true} //#nosec G115 -- parent_label_id is task_labels.id (BIGINT UNSIGNED), fits int32 within realistic deployments
 		}
 
+		var createdByUserID sql.NullInt32
+		if uid, ok := middleware.ActorFromContext(ctx); ok {
+			createdByUserID = sql.NullInt32{Int32: int32(uid), Valid: true} //#nosec G115 -- actor user id from session, bounded by realistic deployments
+		}
+
 		if _, err := deps.Queries.CreateLabel(ctx, generated.CreateLabelParams{
-			PublicID:      pub,
-			WorkspaceID:   ws.ID,
-			ProjectID:     projectID,
-			ParentLabelID: parentLabelID,
-			Name:          in.Body.Name,
-			Color:         color,
-			Description:   sql.NullString{String: in.Body.Description, Valid: in.Body.Description != ""},
-			SortWeight:    0,
+			PublicID:        pub,
+			WorkspaceID:     ws.ID,
+			ProjectID:       projectID,
+			ParentLabelID:   parentLabelID,
+			CreatedByUserID: createdByUserID,
+			Name:            in.Body.Name,
+			Color:           color,
+			Description:     sql.NullString{String: in.Body.Description, Valid: in.Body.Description != ""},
+			SortWeight:      0,
 		}); err != nil {
 			if isDuplicateEntry(err) {
 				return nil, httpErr(apierrors.WsLabelNameAlreadyTaken)

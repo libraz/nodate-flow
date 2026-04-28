@@ -12,6 +12,7 @@ import (
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/types"
 	apierrors "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/errors"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/eventbus"
+	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/handlers/handlerutil"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/middleware"
 )
 
@@ -105,7 +106,7 @@ func PresignUpload(deps Deps) func(context.Context, *PresignUploadInput) (*Presi
 		if _, err := deps.Queries.AddAttachment(ctx, generated.AddAttachmentParams{
 			PublicID:       pub,
 			WorkspaceID:    ws.ID,
-			TaskID:         task.ID,
+			TaskID:         handlerutil.NullInt32From(task.ID),
 			UploaderID:     actorID,
 			Filename:       in.Body.Filename,
 			ContentType:    in.Body.ContentType,

@@ -108,6 +108,7 @@ func RegisterTriage(api huma.API, deps TriageDeps) {
 		Path:        "/workspaces/{wsId}/inbox/triage",
 		Summary:     "Ask the AI orchestrator to score and recommend actions for inbox items",
 		Description: "Synchronously runs the AI triage prompt over the caller's pending inbox items and returns a per-item score plus recommended action. Each call is recorded as an ai.suggestion.proposed event so /ai/suggestions can replay it.",
+		Tags:        []string{"Tasks"},
 	}, Triage(deps))
 }
 

@@ -540,6 +540,7 @@ func buildAuthenticatedAPI(r chi.Router, deps Deps, shared *sharedDeps, authMW f
 			Path:        "/workspaces/{wsId}/projects",
 			Summary:     "List projects in a workspace",
 			Description: "Returns every project the caller can see in the workspace. Backs the project switcher and the project list panel.",
+			Tags:        []string{"Workspace"},
 		}, projects.List(shared.prjDeps))
 		labelDeps := labels.Deps{DB: deps.DB, Queries: deps.Queries, Audit: shared.auditRec}
 		labels.RegisterWorkspaceScoped(subAPI, labelDeps)
@@ -559,6 +560,7 @@ func buildAuthenticatedAPI(r chi.Router, deps Deps, shared *sharedDeps, authMW f
 			Path:        "/workspaces/{wsId}/ai/cost-today",
 			Summary:     "Today's accumulated LLM spend (USD) for a workspace",
 			Description: "Returns the workspace's accumulated LLM spend for the current UTC day in USD. Used to power the AI cost gauge and to trip the configured budget guard.",
+			Tags:        []string{"Public"},
 		}, aihandlers.CostToday(shared.aiDeps))
 		huma.Register(subAPI, huma.Operation{
 			OperationID: "ai-metrics",
@@ -566,6 +568,7 @@ func buildAuthenticatedAPI(r chi.Router, deps Deps, shared *sharedDeps, authMW f
 			Path:        "/workspaces/{wsId}/ai/metrics",
 			Summary:     "AI suggestion acceptance metrics over a trailing window",
 			Description: "Returns suggestion acceptance / dismissal counts and rate over a trailing window. Used by the AI Settings page to show whether the assistant is helpful.",
+			Tags:        []string{"Public"},
 		}, aihandlers.Metrics(shared.aiDeps))
 		huma.Register(subAPI, huma.Operation{
 			OperationID: "ai-agent-pause",
@@ -573,6 +576,7 @@ func buildAuthenticatedAPI(r chi.Router, deps Deps, shared *sharedDeps, authMW f
 			Path:        "/workspaces/{wsId}/ai/agents/{agentId}/pause",
 			Summary:     "Toggle the kill switch on an AI agent",
 			Description: "Flips the agent's paused flag so the runtime stops scheduling it. In-flight runs continue to completion; subsequent triggers no-op until the agent is unpaused.",
+			Tags:        []string{"Public"},
 		}, aihandlers.PauseAgent(shared.aiDeps))
 		huma.Register(subAPI, huma.Operation{
 			OperationID: "ai-agents-list",
@@ -580,6 +584,7 @@ func buildAuthenticatedAPI(r chi.Router, deps Deps, shared *sharedDeps, authMW f
 			Path:        "/workspaces/{wsId}/ai/agents",
 			Summary:     "List AI agents for a workspace",
 			Description: "Lists every AI agent registered in the workspace with status, schedule, and last-run summary. Backs the Agents panel.",
+			Tags:        []string{"Public"},
 		}, aihandlers.ListAgents(shared.aiDeps))
 		huma.Register(subAPI, huma.Operation{
 			OperationID: "ai-agents-create",
@@ -587,6 +592,7 @@ func buildAuthenticatedAPI(r chi.Router, deps Deps, shared *sharedDeps, authMW f
 			Path:        "/workspaces/{wsId}/ai/agents",
 			Summary:     "Create a new AI agent",
 			Description: "Registers a new AI agent in the workspace with name, prompt, schedule, and event triggers. The agent starts paused so the operator can review configuration before unpausing.",
+			Tags:        []string{"Public"},
 		}, aihandlers.CreateAgent(shared.aiDeps))
 		huma.Register(subAPI, huma.Operation{
 			OperationID: "ai-agent-schedule-update",
@@ -594,6 +600,7 @@ func buildAuthenticatedAPI(r chi.Router, deps Deps, shared *sharedDeps, authMW f
 			Path:        "/workspaces/{wsId}/ai/agents/{agentId}/schedule",
 			Summary:     "Update an AI agent's schedule_kind trigger mode",
 			Description: "Updates the agent's schedule_kind (cron / on-event / manual) and any associated cadence settings. Takes effect on the next scheduler tick.",
+			Tags:        []string{"Public"},
 		}, aihandlers.UpdateAgentSchedule(shared.aiDeps))
 		huma.Register(subAPI, huma.Operation{
 			OperationID: "ai-agent-event-triggers-update",
@@ -601,6 +608,7 @@ func buildAuthenticatedAPI(r chi.Router, deps Deps, shared *sharedDeps, authMW f
 			Path:        "/workspaces/{wsId}/ai/agents/{agentId}/event-triggers",
 			Summary:     "Replace an AI agent's event_trigger_types list",
 			Description: "Replaces the set of event types that automatically wake the agent. Empty list disables event triggering entirely; cron and manual triggers continue to work.",
+			Tags:        []string{"Public"},
 		}, aihandlers.UpdateAgentEventTriggers(shared.aiDeps))
 		huma.Register(subAPI, huma.Operation{
 			OperationID: "ai-agent-trigger",
@@ -608,6 +616,7 @@ func buildAuthenticatedAPI(r chi.Router, deps Deps, shared *sharedDeps, authMW f
 			Path:        "/workspaces/{wsId}/ai/agents/{agentId}/trigger",
 			Summary:     "Manually trigger one run of an AI agent",
 			Description: "Enqueues one run of the agent (or runs synchronously when no queue is configured). Returns AI.AGENT.RUNTIME_DISABLED when neither AgentQueue nor AgentRunner is wired.",
+			Tags:        []string{"Public"},
 		}, aihandlers.TriggerAgent(shared.aiDeps, deps.AgentQueue, deps.AgentRunner))
 		huma.Register(subAPI, huma.Operation{
 			OperationID: "ai-models-list",
@@ -615,6 +624,7 @@ func buildAuthenticatedAPI(r chi.Router, deps Deps, shared *sharedDeps, authMW f
 			Path:        "/workspaces/{wsId}/ai/models",
 			Summary:     "List workspace AI models across all providers",
 			Description: "Returns every model exposed by the workspace's enabled providers (OpenAI, Anthropic, local, etc.) so model pickers can render a unified list.",
+			Tags:        []string{"Public"},
 		}, aihandlers.ListModels(shared.aiDeps))
 		huma.Register(subAPI, huma.Operation{
 			OperationID: "ai-priority-suggestions-list",
@@ -622,6 +632,7 @@ func buildAuthenticatedAPI(r chi.Router, deps Deps, shared *sharedDeps, authMW f
 			Path:        "/workspaces/{wsId}/ai/priority-suggestions",
 			Summary:     "Suggest priority adjustments for open tasks in a workspace",
 			Description: "Runs the deterministic priority-suggestion engine and returns proposals (task id, current priority, suggested priority, reason). Read-only; the client applies via /tasks/{id}.",
+			Tags:        []string{"Public"},
 		}, aihandlers.ListPrioritySuggestions(shared.aiDeps))
 		huma.Register(subAPI, huma.Operation{
 			OperationID: "ai-compile-lens",
@@ -629,6 +640,7 @@ func buildAuthenticatedAPI(r chi.Router, deps Deps, shared *sharedDeps, authMW f
 			Path:        "/workspaces/{wsId}/ai/compile-lens",
 			Summary:     "Compile natural-language prose into a validated Lens JSON (ADR 0004)",
 			Description: "Asks the workspace LLM to translate a natural-language description into a validated Lens JSON. Returns the JSON plus the model's confidence so the client can confirm before saving.",
+			Tags:        []string{"Public"},
 		}, aihandlers.CompileLens(shared.aiDeps))
 		huma.Register(subAPI, huma.Operation{
 			OperationID: "ai-state-suggestions",
@@ -636,6 +648,7 @@ func buildAuthenticatedAPI(r chi.Router, deps Deps, shared *sharedDeps, authMW f
 			Path:        "/workspaces/{wsId}/ai/state-suggestions",
 			Summary:     "Workspace-wide deterministic state inference proposals",
 			Description: "Returns deterministic state-transition proposals across every open task in the workspace. Read-only; the client applies via /tasks/{id}/transitions.",
+			Tags:        []string{"Public"},
 		}, aihandlers.ListStateSuggestions(shared.aiDeps))
 		huma.Register(subAPI, huma.Operation{
 			OperationID: "ai-reminders",
@@ -643,6 +656,7 @@ func buildAuthenticatedAPI(r chi.Router, deps Deps, shared *sharedDeps, authMW f
 			Path:        "/workspaces/{wsId}/ai/reminders",
 			Summary:     "Workspace-wide deterministic reminder engine proposals",
 			Description: "Returns reminders the deterministic engine surfaces for the workspace (due-soon, stale, blocked-by). Used by the Reminders dock.",
+			Tags:        []string{"Public"},
 		}, aihandlers.ListReminders(shared.aiDeps))
 		huma.Register(subAPI, huma.Operation{
 			OperationID: "ai-auto-actions",
@@ -650,6 +664,7 @@ func buildAuthenticatedAPI(r chi.Router, deps Deps, shared *sharedDeps, authMW f
 			Path:        "/workspaces/{wsId}/ai/auto-actions",
 			Summary:     "Workspace-wide deterministic auto-action proposals",
 			Description: "Returns auto-action proposals (auto-archive, auto-close, auto-reassign) the engine surfaces. Read-only; execution happens via the auto-action executor when settings.enabled.",
+			Tags:        []string{"Public"},
 		}, aihandlers.ListAutoActions(shared.aiDeps))
 		huma.Register(subAPI, huma.Operation{
 			OperationID: "ai-weekly-digest",
@@ -657,6 +672,7 @@ func buildAuthenticatedAPI(r chi.Router, deps Deps, shared *sharedDeps, authMW f
 			Path:        "/workspaces/{wsId}/ai/weekly-digest",
 			Summary:     "Deterministic weekly digest markdown for a workspace",
 			Description: "Renders a deterministic weekly digest (Markdown) summarizing what shipped, what stalled, and what's coming for the workspace. Used by the email digest job and the in-app digest panel.",
+			Tags:        []string{"Public"},
 		}, aihandlers.WeeklyDigest(shared.aiDeps))
 		huma.Register(subAPI, huma.Operation{
 			OperationID: "ai-invocations-list",
@@ -664,6 +680,7 @@ func buildAuthenticatedAPI(r chi.Router, deps Deps, shared *sharedDeps, authMW f
 			Path:        "/workspaces/{wsId}/ai/invocations",
 			Summary:     "List redacted LLM call audit rows for the AI reasoning panel",
 			Description: "Returns a cursor-paginated page of redacted ai_invocations rows so the AI reasoning panel can show prompts, models, and costs without leaking secrets.",
+			Tags:        []string{"Public"},
 		}, aihandlers.ListInvocations(shared.aiDeps))
 		huma.Register(subAPI, huma.Operation{
 			OperationID: "ai-resolve-command",
@@ -671,6 +688,7 @@ func buildAuthenticatedAPI(r chi.Router, deps Deps, shared *sharedDeps, authMW f
 			Path:        "/workspaces/{wsId}/ai/resolve-command",
 			Summary:     "Resolve a natural-language command into an MCP tool invocation",
 			Description: "Asks the LLM to translate a natural-language instruction into a structured MCP tool call. Returns the tool name and arguments; execution is the client's call so it can confirm first.",
+			Tags:        []string{"Public"},
 		}, aihandlers.ResolveCommand(shared.aiDeps))
 
 		// Workspace-scoped archived task listing.
@@ -720,6 +738,7 @@ func buildAuthenticatedAPI(r chi.Router, deps Deps, shared *sharedDeps, authMW f
 			Path:        "/workspaces/{wsId}/projects",
 			Summary:     "Create a project in a workspace",
 			Description: "Creates a new project in the workspace. The caller becomes the first project member with admin role. Requires workspace admin role.",
+			Tags:        []string{"Workspace"},
 		}, projects.Create(shared.prjDeps))
 		aihandlers.RegisterProviders(subAPI, shared.aiDeps)
 		aihandlers.RegisterAutoActionSettings(subAPI, shared.aiDeps)
@@ -842,6 +861,7 @@ func buildAuthenticatedAPI(r chi.Router, deps Deps, shared *sharedDeps, authMW f
 			Path:        "/workspaces/{wsId}/calendars",
 			Summary:     "List calendars in a workspace",
 			Description: "Returns calendars the caller is subscribed to within the workspace plus their color and visibility flags. Backs the calendar sidebar.",
+			Tags:        []string{"Calendar"},
 		}, calendars.ListCalendars(shared.calDeps))
 		huma.Register(subAPI, huma.Operation{
 			OperationID: "calendars-create",
@@ -849,6 +869,7 @@ func buildAuthenticatedAPI(r chi.Router, deps Deps, shared *sharedDeps, authMW f
 			Path:        "/workspaces/{wsId}/calendars",
 			Summary:     "Create a calendar",
 			Description: "Creates a new calendar in the workspace owned by the caller. Personal calendars default to discoverable=false; team calendars default to true.",
+			Tags:        []string{"Calendar"},
 		}, calendars.CreateCalendar(shared.calDeps))
 		huma.Register(subAPI, huma.Operation{
 			OperationID: "calendars-subscribe-system",
@@ -856,6 +877,7 @@ func buildAuthenticatedAPI(r chi.Router, deps Deps, shared *sharedDeps, authMW f
 			Path:        "/workspaces/{wsId}/calendars/subscribe-system",
 			Summary:     "Subscribe the caller to the holiday feed for a country",
 			Description: "Subscribes the caller to a system-managed read-only holiday calendar for the supplied ISO country code. Idempotent.",
+			Tags:        []string{"Calendar"},
 		}, calendars.SubscribeSystemCalendar(shared.calDeps))
 		huma.Register(subAPI, huma.Operation{
 			OperationID: "discoverable-calendars-list",
@@ -863,6 +885,7 @@ func buildAuthenticatedAPI(r chi.Router, deps Deps, shared *sharedDeps, authMW f
 			Path:        "/workspaces/{wsId}/discoverable-calendars",
 			Summary:     "List teammate personal calendars the caller can subscribe to",
 			Description: "Lists teammate personal calendars marked discoverable so the caller can opt in. Excludes calendars the caller is already subscribed to.",
+			Tags:        []string{"Public"},
 		}, calendars.ListDiscoverableCalendars(shared.calDeps))
 		huma.Register(subAPI, huma.Operation{
 			OperationID: "calendars-self-subscribe",
@@ -870,6 +893,7 @@ func buildAuthenticatedAPI(r chi.Router, deps Deps, shared *sharedDeps, authMW f
 			Path:        "/workspaces/{wsId}/calendars/{calId}/subscribe",
 			Summary:     "Subscribe the caller to a calendar visible in the workspace",
 			Description: "Subscribes the caller to the named calendar at viewer role. Returns the new subscription record with default color override.",
+			Tags:        []string{"Calendar"},
 		}, calendars.SelfSubscribe(shared.calDeps))
 		huma.Register(subAPI, huma.Operation{
 			OperationID: "calendar-events-list",
@@ -877,6 +901,7 @@ func buildAuthenticatedAPI(r chi.Router, deps Deps, shared *sharedDeps, authMW f
 			Path:        "/workspaces/{wsId}/calendar-events",
 			Summary:     "List events across all calendars in a workspace",
 			Description: "Returns events from every calendar the caller can see in the workspace within the supplied date range. Used by the unified workspace calendar view.",
+			Tags:        []string{"Public"},
 		}, calendars.ListCalendarEvents(shared.calDeps))
 		huma.Register(subAPI, huma.Operation{
 			OperationID: "me-calendar-events-list",
@@ -884,6 +909,7 @@ func buildAuthenticatedAPI(r chi.Router, deps Deps, shared *sharedDeps, authMW f
 			Path:        "/me/calendar-events",
 			Summary:     "List events across every workspace the caller belongs to",
 			Description: "Returns the caller's events across every workspace within a date range so the global My Calendar view can render without per-workspace round trips.",
+			Tags:        []string{"Calendar"},
 		}, calendars.ListMyCalendarEvents(shared.calDeps))
 		huma.Register(subAPI, huma.Operation{
 			OperationID: "me-invites-list",
@@ -891,6 +917,7 @@ func buildAuthenticatedAPI(r chi.Router, deps Deps, shared *sharedDeps, authMW f
 			Path:        "/me/invites",
 			Summary:     "List pending event invites addressed to the caller",
 			Description: "Returns calendar event invites that have been sent to the caller's email and that the caller has not yet accepted or declined. Backs the /me/invites page.",
+			Tags:        []string{"CalendarInvite"},
 		}, calendars.ListMyInvites(shared.calDeps))
 
 		// Public share admin endpoints (workspace-scoped).
@@ -900,6 +927,7 @@ func buildAuthenticatedAPI(r chi.Router, deps Deps, shared *sharedDeps, authMW f
 			Path:        "/workspaces/{wsId}/public-shares",
 			Summary:     "List public share pages in a workspace",
 			Description: "Lists public share pages owned by the workspace with metadata only (token is masked). Backs the share-management panel.",
+			Tags:        []string{"Public"},
 		}, calendars.ListPublicShares(shared.calDeps))
 		huma.Register(subAPI, huma.Operation{
 			OperationID: "public-shares-create",
@@ -907,6 +935,7 @@ func buildAuthenticatedAPI(r chi.Router, deps Deps, shared *sharedDeps, authMW f
 			Path:        "/workspaces/{wsId}/public-shares",
 			Summary:     "Create a public share page (returns plaintext token once)",
 			Description: "Mints a new public share page with a fresh URL token. The token is returned plaintext exactly once so the operator can copy the share URL; subsequent reads only return its hash.",
+			Tags:        []string{"Public"},
 		}, calendars.CreatePublicShare(shared.calDeps))
 		huma.Register(subAPI, huma.Operation{
 			OperationID: "public-shares-get",
@@ -914,6 +943,7 @@ func buildAuthenticatedAPI(r chi.Router, deps Deps, shared *sharedDeps, authMW f
 			Path:        "/workspaces/{wsId}/public-shares/{shareId}",
 			Summary:     "Get a public share page with its published events",
 			Description: "Returns the share page's metadata plus the ordered list of events currently published on it. The plaintext token is not returned.",
+			Tags:        []string{"Public"},
 		}, calendars.GetPublicShare(shared.calDeps))
 		huma.Register(subAPI, huma.Operation{
 			OperationID: "public-shares-patch",
@@ -921,6 +951,7 @@ func buildAuthenticatedAPI(r chi.Router, deps Deps, shared *sharedDeps, authMW f
 			Path:        "/workspaces/{wsId}/public-shares/{shareId}",
 			Summary:     "Update public share page metadata",
 			Description: "Updates the share page title, description, and theme. Token / event list use dedicated endpoints.",
+			Tags:        []string{"Public"},
 		}, calendars.PatchPublicShare(shared.calDeps))
 		huma.Register(subAPI, huma.Operation{
 			OperationID: "public-shares-rotate",
@@ -928,6 +959,7 @@ func buildAuthenticatedAPI(r chi.Router, deps Deps, shared *sharedDeps, authMW f
 			Path:        "/workspaces/{wsId}/public-shares/{shareId}/rotate",
 			Summary:     "Rotate the URL token for a public share page",
 			Description: "Replaces the share's URL token with a fresh one. The previous token immediately stops resolving. The new plaintext token is returned exactly once.",
+			Tags:        []string{"Public"},
 		}, calendars.RotatePublicShareToken(shared.calDeps))
 		huma.Register(subAPI, huma.Operation{
 			OperationID: "public-shares-delete",
@@ -935,6 +967,7 @@ func buildAuthenticatedAPI(r chi.Router, deps Deps, shared *sharedDeps, authMW f
 			Path:        "/workspaces/{wsId}/public-shares/{shareId}",
 			Summary:     "Delete a public share page (admin or owner only)",
 			Description: "Removes the share page so its URL stops resolving. Permitted to the share owner or workspace admins. Idempotent.",
+			Tags:        []string{"Public"},
 		}, calendars.DeletePublicShare(shared.calDeps))
 		huma.Register(subAPI, huma.Operation{
 			OperationID: "public-shares-events-attach",
@@ -942,6 +975,7 @@ func buildAuthenticatedAPI(r chi.Router, deps Deps, shared *sharedDeps, authMW f
 			Path:        "/workspaces/{wsId}/public-shares/{shareId}/events",
 			Summary:     "Attach events to a public share page",
 			Description: "Publishes one or more events on the share page. Order defaults to creation order; reorder via /events/reorder.",
+			Tags:        []string{"Public"},
 		}, calendars.AttachEventsToShare(shared.calDeps))
 		huma.Register(subAPI, huma.Operation{
 			OperationID: "public-shares-events-detach",
@@ -949,6 +983,7 @@ func buildAuthenticatedAPI(r chi.Router, deps Deps, shared *sharedDeps, authMW f
 			Path:        "/workspaces/{wsId}/public-shares/{shareId}/events/{evtId}",
 			Summary:     "Detach an event from a public share page",
 			Description: "Unpublishes the named event from the share page without deleting the event itself. Idempotent.",
+			Tags:        []string{"Public"},
 		}, calendars.DetachEventFromShare(shared.calDeps))
 		huma.Register(subAPI, huma.Operation{
 			OperationID: "public-shares-events-reorder",
@@ -956,6 +991,7 @@ func buildAuthenticatedAPI(r chi.Router, deps Deps, shared *sharedDeps, authMW f
 			Path:        "/workspaces/{wsId}/public-shares/{shareId}/events/reorder",
 			Summary:     "Batch-reorder the events published on a public share page",
 			Description: "Replaces the order of published events in a single request after a drag-and-drop. Atomic so no client sees a partial reorder.",
+			Tags:        []string{"Public"},
 		}, calendars.ReorderShareEvents(shared.calDeps))
 	})
 
@@ -975,6 +1011,7 @@ func buildAuthenticatedAPI(r chi.Router, deps Deps, shared *sharedDeps, authMW f
 			Path:        "/workspaces/{wsId}/calendars/{calId}",
 			Summary:     "Get a calendar",
 			Description: "Returns the calendar's metadata (name, color, timezone, owner, sharing flags) for the calendar settings panel.",
+			Tags:        []string{"Calendar"},
 		}, calendars.GetCalendar(shared.calDeps))
 		huma.Register(subAPI, huma.Operation{
 			OperationID: "calendars-patch",
@@ -982,6 +1019,7 @@ func buildAuthenticatedAPI(r chi.Router, deps Deps, shared *sharedDeps, authMW f
 			Path:        "/workspaces/{wsId}/calendars/{calId}",
 			Summary:     "Update a calendar",
 			Description: "Updates editable calendar fields (name, description, color, timezone, discoverable). Requires calendar admin role.",
+			Tags:        []string{"Calendar"},
 		}, calendars.PatchCalendar(shared.calDeps))
 		huma.Register(subAPI, huma.Operation{
 			OperationID: "calendars-delete",
@@ -989,6 +1027,7 @@ func buildAuthenticatedAPI(r chi.Router, deps Deps, shared *sharedDeps, authMW f
 			Path:        "/workspaces/{wsId}/calendars/{calId}",
 			Summary:     "Delete a calendar",
 			Description: "Soft-deletes the calendar. Subscriptions are revoked; event history stays queryable for audit. Requires calendar owner role.",
+			Tags:        []string{"Calendar"},
 		}, calendars.DeleteCalendar(shared.calDeps))
 
 		// Events within a calendar.
@@ -998,6 +1037,7 @@ func buildAuthenticatedAPI(r chi.Router, deps Deps, shared *sharedDeps, authMW f
 			Path:        "/workspaces/{wsId}/calendars/{calId}/events",
 			Summary:     "List events in a calendar",
 			Description: "Returns events from the named calendar within the supplied date range. Recurrence rules are expanded server-side; client receives concrete instances.",
+			Tags:        []string{"Calendar"},
 		}, calendars.ListEvents(shared.calDeps))
 		huma.Register(subAPI, huma.Operation{
 			OperationID: "events-create",
@@ -1005,6 +1045,7 @@ func buildAuthenticatedAPI(r chi.Router, deps Deps, shared *sharedDeps, authMW f
 			Path:        "/workspaces/{wsId}/calendars/{calId}/events",
 			Summary:     "Create an event",
 			Description: "Creates an event in the calendar. Optionally accepts an attendee list which triggers RSVP requests; recurrence rules are validated against RFC 5545.",
+			Tags:        []string{"Calendar"},
 		}, calendars.CreateEvent(shared.calDeps))
 		huma.Register(subAPI, huma.Operation{
 			OperationID: "events-get",
@@ -1012,6 +1053,7 @@ func buildAuthenticatedAPI(r chi.Router, deps Deps, shared *sharedDeps, authMW f
 			Path:        "/workspaces/{wsId}/calendars/{calId}/events/{evtId}",
 			Summary:     "Get an event",
 			Description: "Returns one event with its full body, recurrence rule, attendees, and link metadata. Used by the event detail panel.",
+			Tags:        []string{"Calendar"},
 		}, calendars.GetEvent(shared.calDeps))
 		huma.Register(subAPI, huma.Operation{
 			OperationID: "events-patch",
@@ -1019,6 +1061,7 @@ func buildAuthenticatedAPI(r chi.Router, deps Deps, shared *sharedDeps, authMW f
 			Path:        "/workspaces/{wsId}/calendars/{calId}/events/{evtId}",
 			Summary:     "Update an event",
 			Description: "Updates editable event fields (title, time range, description, location, recurrence). Time changes trigger task-shift propagation through task_event_links.",
+			Tags:        []string{"Calendar"},
 		}, calendars.PatchEvent(shared.calDeps))
 		huma.Register(subAPI, huma.Operation{
 			OperationID: "events-delete",
@@ -1026,6 +1069,7 @@ func buildAuthenticatedAPI(r chi.Router, deps Deps, shared *sharedDeps, authMW f
 			Path:        "/workspaces/{wsId}/calendars/{calId}/events/{evtId}",
 			Summary:     "Delete an event",
 			Description: "Removes the event. Linked tasks remain but their task_event_link rows are tombstoned so propagation rules stop firing. Idempotent.",
+			Tags:        []string{"Calendar"},
 		}, calendars.DeleteEvent(shared.calDeps))
 		huma.Register(subAPI, huma.Operation{
 			OperationID: "events-smart-create",
@@ -1033,6 +1077,7 @@ func buildAuthenticatedAPI(r chi.Router, deps Deps, shared *sharedDeps, authMW f
 			Path:        "/workspaces/{wsId}/calendars/{calId}/events/smart-create",
 			Summary:     "Parse natural language text into an event proposal",
 			Description: "Asks the workspace LLM to translate a free-text prompt (e.g. 'lunch with Sam tomorrow at noon') into a structured event proposal. Read-only; the client confirms before /create.",
+			Tags:        []string{"Calendar"},
 		}, calendars.SmartCreate(shared.calDeps))
 		huma.Register(subAPI, huma.Operation{
 			OperationID: "events-from-task",
@@ -1040,6 +1085,7 @@ func buildAuthenticatedAPI(r chi.Router, deps Deps, shared *sharedDeps, authMW f
 			Path:        "/workspaces/{wsId}/calendars/{calId}/events/from-task",
 			Summary:     "Create a calendar event from a task",
 			Description: "Creates an event seeded from the supplied task (title, due_on, description) and links the two via task_event_links so propagation rules can keep them in sync.",
+			Tags:        []string{"Calendar"},
 		}, calendars.CreateEventFromTask(shared.calDeps))
 
 		// Calendar members.
@@ -1049,6 +1095,7 @@ func buildAuthenticatedAPI(r chi.Router, deps Deps, shared *sharedDeps, authMW f
 			Path:        "/workspaces/{wsId}/calendars/{calId}/subscription",
 			Summary:     "Update the caller's own subscription preferences for a calendar",
 			Description: "Updates the caller's own subscription preferences (color override, visibility, notification opt-out) without affecting other members.",
+			Tags:        []string{"Calendar"},
 		}, calendars.PatchOwnSubscription(shared.calDeps))
 		huma.Register(subAPI, huma.Operation{
 			OperationID: "members-add",
@@ -1056,6 +1103,7 @@ func buildAuthenticatedAPI(r chi.Router, deps Deps, shared *sharedDeps, authMW f
 			Path:        "/workspaces/{wsId}/calendars/{calId}/members",
 			Summary:     "Add a member to a calendar",
 			Description: "Adds a workspace member to the calendar at the requested role (viewer / editor / admin). Calendar admin role required.",
+			Tags:        []string{"Calendar"},
 		}, calendars.AddMember(shared.calDeps))
 		huma.Register(subAPI, huma.Operation{
 			OperationID: "members-list",
@@ -1063,6 +1111,7 @@ func buildAuthenticatedAPI(r chi.Router, deps Deps, shared *sharedDeps, authMW f
 			Path:        "/workspaces/{wsId}/calendars/{calId}/members",
 			Summary:     "List members of a calendar",
 			Description: "Lists every member of the calendar with their role and join time. Used by the calendar settings members panel.",
+			Tags:        []string{"Calendar"},
 		}, calendars.ListMembers(shared.calDeps))
 		huma.Register(subAPI, huma.Operation{
 			OperationID: "members-update-role",
@@ -1070,6 +1119,7 @@ func buildAuthenticatedAPI(r chi.Router, deps Deps, shared *sharedDeps, authMW f
 			Path:        "/workspaces/{wsId}/calendars/{calId}/members/{userId}",
 			Summary:     "Update a member's role",
 			Description: "Changes a calendar member's role. Refuses to demote the last admin so the calendar stays manageable.",
+			Tags:        []string{"Calendar"},
 		}, calendars.UpdateMemberRole(shared.calDeps))
 		huma.Register(subAPI, huma.Operation{
 			OperationID: "members-remove",
@@ -1077,6 +1127,7 @@ func buildAuthenticatedAPI(r chi.Router, deps Deps, shared *sharedDeps, authMW f
 			Path:        "/workspaces/{wsId}/calendars/{calId}/members/{userId}",
 			Summary:     "Remove a member from a calendar",
 			Description: "Removes the named member from the calendar. Their subscription rows are tombstoned. Refuses to remove the last admin.",
+			Tags:        []string{"Calendar"},
 		}, calendars.RemoveMember(shared.calDeps))
 
 		// Event attendees.
@@ -1086,6 +1137,7 @@ func buildAuthenticatedAPI(r chi.Router, deps Deps, shared *sharedDeps, authMW f
 			Path:        "/workspaces/{wsId}/calendars/{calId}/events/{evtId}/attendees",
 			Summary:     "List attendees on an event",
 			Description: "Returns the attendee list for the event with each attendee's RSVP state and edit permission.",
+			Tags:        []string{"Calendar"},
 		}, calendars.ListAttendees(shared.calDeps))
 		huma.Register(subAPI, huma.Operation{
 			OperationID: "attendees-add",
@@ -1093,6 +1145,7 @@ func buildAuthenticatedAPI(r chi.Router, deps Deps, shared *sharedDeps, authMW f
 			Path:        "/workspaces/{wsId}/calendars/{calId}/events/{evtId}/attendees",
 			Summary:     "Add attendees to an event",
 			Description: "Adds one or more attendees (workspace members or external email addresses) to the event. External invitees receive a magic-link invite email.",
+			Tags:        []string{"Calendar"},
 		}, calendars.AddAttendees(shared.calDeps))
 		huma.Register(subAPI, huma.Operation{
 			OperationID: "attendees-remove",
@@ -1100,6 +1153,7 @@ func buildAuthenticatedAPI(r chi.Router, deps Deps, shared *sharedDeps, authMW f
 			Path:        "/workspaces/{wsId}/calendars/{calId}/events/{evtId}/attendees/{userId}",
 			Summary:     "Remove an attendee from an event",
 			Description: "Removes the named attendee from the event. Idempotent.",
+			Tags:        []string{"Calendar"},
 		}, calendars.RemoveAttendee(shared.calDeps))
 		huma.Register(subAPI, huma.Operation{
 			OperationID: "attendees-rsvp",
@@ -1107,6 +1161,7 @@ func buildAuthenticatedAPI(r chi.Router, deps Deps, shared *sharedDeps, authMW f
 			Path:        "/workspaces/{wsId}/calendars/{calId}/events/{evtId}/attendees/rsvp",
 			Summary:     "Update own RSVP for an event",
 			Description: "Updates the caller's own RSVP (yes / no / maybe). Other attendees' RSVPs are unaffected.",
+			Tags:        []string{"Calendar"},
 		}, calendars.UpdateRsvp(shared.calDeps))
 		huma.Register(subAPI, huma.Operation{
 			OperationID: "attendees-can-edit",
@@ -1114,6 +1169,7 @@ func buildAuthenticatedAPI(r chi.Router, deps Deps, shared *sharedDeps, authMW f
 			Path:        "/workspaces/{wsId}/calendars/{calId}/events/{evtId}/attendees/{userId}/can-edit",
 			Summary:     "Toggle can_edit for an attendee",
 			Description: "Grants or revokes the named attendee's permission to edit the event. The event owner can always edit; this gates other attendees.",
+			Tags:        []string{"Calendar"},
 		}, calendars.ToggleCanEdit(shared.calDeps))
 
 		// Event invites (magic link).
@@ -1123,6 +1179,7 @@ func buildAuthenticatedAPI(r chi.Router, deps Deps, shared *sharedDeps, authMW f
 			Path:        "/workspaces/{wsId}/calendars/{calId}/events/{evtId}/attendees/{attendeeId}/invite",
 			Summary:     "Create (or rotate) a magic-link invite for an attendee",
 			Description: "Mints a fresh magic-link invite token for the attendee and emails it. Repeated calls rotate the token, invalidating any prior unused link.",
+			Tags:        []string{"CalendarInvite"},
 		}, calendars.CreateEventInvite(shared.calDeps))
 		huma.Register(subAPI, huma.Operation{
 			OperationID: "event-invites-list",
@@ -1130,6 +1187,7 @@ func buildAuthenticatedAPI(r chi.Router, deps Deps, shared *sharedDeps, authMW f
 			Path:        "/workspaces/{wsId}/calendars/{calId}/events/{evtId}/invites",
 			Summary:     "List active magic-link invites for an event",
 			Description: "Lists outstanding magic-link invites for the event with attendee, expiry, and last-sent metadata. Tokens are masked.",
+			Tags:        []string{"CalendarInvite"},
 		}, calendars.ListEventInvites(shared.calDeps))
 		huma.Register(subAPI, huma.Operation{
 			OperationID: "event-invites-revoke",
@@ -1137,6 +1195,7 @@ func buildAuthenticatedAPI(r chi.Router, deps Deps, shared *sharedDeps, authMW f
 			Path:        "/workspaces/{wsId}/calendars/{calId}/events/{evtId}/invites/{inviteId}",
 			Summary:     "Revoke a magic-link invite",
 			Description: "Marks the invite token as revoked so future redemption attempts fail. Already-accepted RSVPs are unaffected.",
+			Tags:        []string{"CalendarInvite"},
 		}, calendars.RevokeEventInvite(shared.calDeps))
 
 		// Event comments.
@@ -1146,6 +1205,7 @@ func buildAuthenticatedAPI(r chi.Router, deps Deps, shared *sharedDeps, authMW f
 			Path:        "/workspaces/{wsId}/calendars/{calId}/events/{evtId}/comments",
 			Summary:     "List comments on an event",
 			Description: "Returns the comment thread on the event in chronological order. Used by the event detail comment pane.",
+			Tags:        []string{"Calendar"},
 		}, calendars.ListComments(shared.calDeps))
 		huma.Register(subAPI, huma.Operation{
 			OperationID: "comments-create",
@@ -1153,6 +1213,7 @@ func buildAuthenticatedAPI(r chi.Router, deps Deps, shared *sharedDeps, authMW f
 			Path:        "/workspaces/{wsId}/calendars/{calId}/events/{evtId}/comments",
 			Summary:     "Add a comment to an event",
 			Description: "Appends a comment from the caller to the event thread. Mentions in the body are routed through the notifications pipeline.",
+			Tags:        []string{"Calendar"},
 		}, calendars.CreateComment(shared.calDeps))
 		huma.Register(subAPI, huma.Operation{
 			OperationID: "comments-edit",
@@ -1160,6 +1221,7 @@ func buildAuthenticatedAPI(r chi.Router, deps Deps, shared *sharedDeps, authMW f
 			Path:        "/workspaces/{wsId}/calendars/{calId}/events/{evtId}/comments/{cId}",
 			Summary:     "Edit a comment",
 			Description: "Replaces the body of the named comment. Only the original author may edit; an edited_at timestamp is set.",
+			Tags:        []string{"Calendar"},
 		}, calendars.EditComment(shared.calDeps))
 		huma.Register(subAPI, huma.Operation{
 			OperationID: "comments-delete",
@@ -1167,6 +1229,7 @@ func buildAuthenticatedAPI(r chi.Router, deps Deps, shared *sharedDeps, authMW f
 			Path:        "/workspaces/{wsId}/calendars/{calId}/events/{evtId}/comments/{cId}",
 			Summary:     "Delete a comment",
 			Description: "Removes the named comment. Permitted to the comment author or any calendar admin.",
+			Tags:        []string{"Calendar"},
 		}, calendars.DeleteComment(shared.calDeps))
 
 		// Event checklist.
@@ -1176,6 +1239,7 @@ func buildAuthenticatedAPI(r chi.Router, deps Deps, shared *sharedDeps, authMW f
 			Path:        "/workspaces/{wsId}/calendars/{calId}/events/{evtId}/checklist",
 			Summary:     "List checklist items for an event",
 			Description: "Returns the checklist items attached to the event in display order, used by the event prep panel.",
+			Tags:        []string{"Calendar"},
 		}, calendars.ListChecklist(shared.calDeps))
 		huma.Register(subAPI, huma.Operation{
 			OperationID: "checklist-create",
@@ -1183,6 +1247,7 @@ func buildAuthenticatedAPI(r chi.Router, deps Deps, shared *sharedDeps, authMW f
 			Path:        "/workspaces/{wsId}/calendars/{calId}/events/{evtId}/checklist",
 			Summary:     "Add a checklist item to an event",
 			Description: "Appends a checklist item to the event with optional assignee. Returns the persisted item including its display order.",
+			Tags:        []string{"Calendar"},
 		}, calendars.CreateChecklistItem(shared.calDeps))
 		huma.Register(subAPI, huma.Operation{
 			OperationID: "checklist-update",
@@ -1190,6 +1255,7 @@ func buildAuthenticatedAPI(r chi.Router, deps Deps, shared *sharedDeps, authMW f
 			Path:        "/workspaces/{wsId}/calendars/{calId}/events/{evtId}/checklist/{itemId}",
 			Summary:     "Update a checklist item",
 			Description: "Updates a checklist item's text, completion state, assignee, or display order.",
+			Tags:        []string{"Calendar"},
 		}, calendars.UpdateChecklistItem(shared.calDeps))
 		huma.Register(subAPI, huma.Operation{
 			OperationID: "checklist-delete",
@@ -1197,6 +1263,7 @@ func buildAuthenticatedAPI(r chi.Router, deps Deps, shared *sharedDeps, authMW f
 			Path:        "/workspaces/{wsId}/calendars/{calId}/events/{evtId}/checklist/{itemId}",
 			Summary:     "Delete a checklist item",
 			Description: "Removes the named checklist item. Idempotent.",
+			Tags:        []string{"Calendar"},
 		}, calendars.DeleteChecklistItem(shared.calDeps))
 
 		// Calendar memos.
@@ -1206,6 +1273,7 @@ func buildAuthenticatedAPI(r chi.Router, deps Deps, shared *sharedDeps, authMW f
 			Path:        "/workspaces/{wsId}/calendars/{calId}/memos",
 			Summary:     "List memos in a calendar",
 			Description: "Returns memos pinned to the calendar (e.g. running notes for a recurring meeting). Used by the calendar memo sidebar.",
+			Tags:        []string{"Calendar"},
 		}, calendars.ListMemos(shared.calDeps))
 		huma.Register(subAPI, huma.Operation{
 			OperationID: "memos-create",
@@ -1213,6 +1281,7 @@ func buildAuthenticatedAPI(r chi.Router, deps Deps, shared *sharedDeps, authMW f
 			Path:        "/workspaces/{wsId}/calendars/{calId}/memos",
 			Summary:     "Create a memo",
 			Description: "Creates a memo on the calendar with title and Markdown body. Returns the persisted memo including its assigned id.",
+			Tags:        []string{"Calendar"},
 		}, calendars.CreateMemo(shared.calDeps))
 		huma.Register(subAPI, huma.Operation{
 			OperationID: "memos-update",
@@ -1220,6 +1289,7 @@ func buildAuthenticatedAPI(r chi.Router, deps Deps, shared *sharedDeps, authMW f
 			Path:        "/workspaces/{wsId}/calendars/{calId}/memos/{memoId}",
 			Summary:     "Update a memo",
 			Description: "Updates the memo's title or Markdown body.",
+			Tags:        []string{"Calendar"},
 		}, calendars.UpdateMemo(shared.calDeps))
 		huma.Register(subAPI, huma.Operation{
 			OperationID: "memos-delete",
@@ -1227,6 +1297,7 @@ func buildAuthenticatedAPI(r chi.Router, deps Deps, shared *sharedDeps, authMW f
 			Path:        "/workspaces/{wsId}/calendars/{calId}/memos/{memoId}",
 			Summary:     "Delete a memo",
 			Description: "Removes the memo. Idempotent.",
+			Tags:        []string{"Calendar"},
 		}, calendars.DeleteMemo(shared.calDeps))
 
 		// Event attachments.
@@ -1236,6 +1307,7 @@ func buildAuthenticatedAPI(r chi.Router, deps Deps, shared *sharedDeps, authMW f
 			Path:        "/workspaces/{wsId}/calendars/{calId}/events/{evtId}/attachments",
 			Summary:     "List attachments on an event",
 			Description: "Returns metadata for files attached to the event (filename, size, MIME, uploader). Bytes are fetched separately via signed URLs.",
+			Tags:        []string{"Calendar"},
 		}, calendars.ListAttachments(shared.calDeps))
 		huma.Register(subAPI, huma.Operation{
 			OperationID: "attachments-create",
@@ -1243,6 +1315,7 @@ func buildAuthenticatedAPI(r chi.Router, deps Deps, shared *sharedDeps, authMW f
 			Path:        "/workspaces/{wsId}/calendars/{calId}/events/{evtId}/attachments",
 			Summary:     "Record attachment metadata for an event",
 			Description: "Records that a file (already uploaded out-of-band) is attached to the event. Stores filename, MIME, size, and storage key.",
+			Tags:        []string{"Calendar"},
 		}, calendars.CreateAttachment(shared.calDeps))
 		huma.Register(subAPI, huma.Operation{
 			OperationID: "attachments-delete",
@@ -1250,6 +1323,7 @@ func buildAuthenticatedAPI(r chi.Router, deps Deps, shared *sharedDeps, authMW f
 			Path:        "/workspaces/{wsId}/calendars/{calId}/events/{evtId}/attachments/{attId}",
 			Summary:     "Delete an attachment from an event",
 			Description: "Marks the attachment as removed and best-effort deletes the underlying object. Idempotent.",
+			Tags:        []string{"Calendar"},
 		}, calendars.DeleteAttachment(shared.calDeps))
 	})
 
@@ -1285,6 +1359,7 @@ func buildPublicShareAPI(r chi.Router, deps Deps, shared *sharedDeps) []huma.API
 			Path:        "/health",
 			Summary:     "Health check",
 			Description: "Liveness probe for orchestration. Always returns 200 with a static {\"status\":\"ok\"} body, no auth, no database access. Exempt from the public per-IP rate limiter so kubelet probes are not throttled.",
+			Tags:        []string{"Public"},
 		}, func(_ context.Context, _ *struct{}) (*healthOutput, error) {
 			out := &healthOutput{}
 			out.Body.Status = "ok"
@@ -1324,6 +1399,7 @@ func buildPublicShareAPI(r chi.Router, deps Deps, shared *sharedDeps) []huma.API
 			Path:        "/share/cal/{token}",
 			Summary:     "Render a public calendar share by URL token",
 			Description: "Returns the public share page contents (title, description, theme, ordered events) addressed by its opaque URL token. Public, rate-limited; no auth required.",
+			Tags:        []string{"CalendarShare"},
 		}, calendars.RenderPublicShare(calDeps))
 		huma.Register(subAPI, huma.Operation{
 			OperationID: "event-invites-accept",
@@ -1331,6 +1407,7 @@ func buildPublicShareAPI(r chi.Router, deps Deps, shared *sharedDeps) []huma.API
 			Path:        "/public/invites/accept",
 			Summary:     "Accept a calendar event invite via magic-link token",
 			Description: "Consumes a magic-link invite token: marks the attendee's RSVP as accepted and registers the resulting account context. Public, rate-limited; the opaque token is the only capability.",
+			Tags:        []string{"CalendarInvite"},
 		}, calendars.AcceptEventInvite(calDeps))
 	})
 

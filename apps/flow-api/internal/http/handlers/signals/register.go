@@ -15,5 +15,6 @@ func RegisterCollection(api huma.API, deps Deps) {
 		Path:        "/signals",
 		Summary:     "Manually inject a signal",
 		Description: "Manually inserts a signal row of the requested kind on behalf of the caller. Useful for development, scripted intake from custom sources, and replaying webhook payloads after a downtime.",
+		Tags:        []string{"Signal"},
 	}, Create(deps))
 }

@@ -14,6 +14,7 @@ func Register(api huma.API, deps Deps) {
 		Path:        "/inbox",
 		Summary:     "List inbox items for the caller",
 		Description: "Returns the caller's inbox: signals, mentions, and assignments waiting to be triaged across every workspace they belong to. Backs the global Inbox view.",
+		Tags:        []string{"Tasks"},
 	}, List(deps))
 	huma.Register(api, huma.Operation{
 		OperationID: "inbox-archive",
@@ -21,6 +22,7 @@ func Register(api huma.API, deps Deps) {
 		Path:        "/inbox/{id}/archive",
 		Summary:     "Archive an inbox item",
 		Description: "Removes the named inbox item from the active list. Idempotent: archiving an already-archived item returns 200.",
+		Tags:        []string{"Tasks"},
 	}, Archive(deps))
 	huma.Register(api, huma.Operation{
 		OperationID: "inbox-snooze",
@@ -28,5 +30,6 @@ func Register(api huma.API, deps Deps) {
 		Path:        "/inbox/{id}/snooze",
 		Summary:     "Snooze an inbox item",
 		Description: "Hides the named inbox item until a caller-supplied wake-up time, after which it reappears in the active list.",
+		Tags:        []string{"Tasks"},
 	}, Snooze(deps))
 }

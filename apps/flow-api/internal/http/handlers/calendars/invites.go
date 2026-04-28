@@ -2,7 +2,6 @@ package calendars
 
 import (
 	"context"
-	"crypto/rand"
 	"crypto/sha256"
 	"database/sql"
 	"encoding/hex"
@@ -14,8 +13,10 @@ import (
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/generated/calendar"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/types"
 	apierrors "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/errors"
+	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/handlers/handlerutil"
 	"github.com/nodate-flow/nodate-flow/packages/go-shared/apierr"
 	"github.com/nodate-flow/nodate-flow/packages/go-shared/email"
+	sharedtoken "github.com/nodate-flow/nodate-flow/packages/go-shared/token"
 )
 
 // Default and maximum expiry windows for a freshly minted invite token.
@@ -177,7 +178,7 @@ func CreateEventInvite(deps Deps) func(context.Context, *CreateEventInviteInput)
 		if err != nil {
 			return nil, httpErr(apierrors.CalendarAttendeeUserNotFound)
 		}
-		attendees, err := deps.CalendarQueries.ListCalendarEventAttendees(ctx, evt.ID)
+		attendees, err := deps.CalendarQueries.ListCalendarEventAttendees(ctx, handlerutil.NullInt32From(evt.ID))
 		if err != nil {
 			return nil, httpErr(apierrors.CalendarInviteStoreLookupInterrupted)
 		}
@@ -222,7 +223,7 @@ func CreateEventInvite(deps Deps) func(context.Context, *CreateEventInviteInput)
 		// does not surface the internal id, so go through the direct
 		// per-user lookup.
 		attRow, err := deps.CalendarQueries.FindCalendarEventAttendee(ctx, calendar.FindCalendarEventAttendeeParams{
-			EventID: evt.ID,
+			EventID: handlerutil.NullInt32From(evt.ID),
 			UserID:  matched.UserID,
 		})
 		if err != nil {
@@ -230,8 +231,8 @@ func CreateEventInvite(deps Deps) func(context.Context, *CreateEventInviteInput)
 		}
 
 		existing, err := deps.CalendarQueries.FindActiveCalendarEventInvite(ctx, calendar.FindActiveCalendarEventInviteParams{
-			EventID:    evt.ID,
-			AttendeeID: attRow.ID,
+			EventID:    handlerutil.NullInt32From(evt.ID),
+			AttendeeID: handlerutil.NullInt32From(attRow.ID),
 		})
 		rotated := false
 		var invitePublicID types.PublicID
@@ -256,8 +257,8 @@ func CreateEventInvite(deps Deps) func(context.Context, *CreateEventInviteInput)
 				PublicID:    invitePublicID,
 				WorkspaceID: wsID,
 				CalendarID:  cal.ID,
-				EventID:     evt.ID,
-				AttendeeID:  attRow.ID,
+				EventID:     handlerutil.NullInt32From(evt.ID),
+				AttendeeID:  handlerutil.NullInt32From(attRow.ID),
 				Email:       profile.Email,
 				TokenHash:   tokenHash,
 				ExpiresAt:   expiresAt,
@@ -448,7 +449,7 @@ func AcceptEventInvite(deps Deps) func(context.Context, *AcceptEventInviteInput)
 			if lerr != nil {
 				continue
 			}
-			if row.ID == invite.AttendeeID {
+			if row.ID == handlerutil.Int32ToUint32(invite.AttendeeID) {
 				targetUserID = a.UserID
 				attendeeMatched = true
 				break
@@ -525,7 +526,7 @@ func RevokeEventInvite(deps Deps) func(context.Context, *RevokeEventInviteInput)
 		// the event path parameter the caller supplied. Without this
 		// check an event owner could revoke invites for an event they
 		// don't own simply by knowing a public ID.
-		if invite.EventID != evt.ID {
+		if handlerutil.Int32ToUint32(invite.EventID) != evt.ID {
 			return nil, httpErr(apierrors.CalendarInviteNotFound)
 		}
 		if err := deps.CalendarQueries.DisableCalendarEventInvite(ctx, invite.ID); err != nil {
@@ -561,14 +562,14 @@ func ListEventInvites(deps Deps) func(context.Context, *ListEventInvitesInput) (
 		if evt.OwnerUserID != actorID {
 			return nil, httpErr(apierrors.CalendarCalendarOwnerRoleRequired)
 		}
-		rows, err := deps.CalendarQueries.ListCalendarEventInvitesForEvent(ctx, evt.ID)
+		rows, err := deps.CalendarQueries.ListCalendarEventInvitesForEvent(ctx, handlerutil.NullInt32From(evt.ID))
 		if err != nil {
 			return nil, httpErr(apierrors.CalendarInviteListQueryInterrupted)
 		}
 
 		// Build a (internal attendee id → public ID) index so we can
 		// attach attendeePublicId to each invite without N round-trips.
-		attendees, err := deps.CalendarQueries.ListCalendarEventAttendees(ctx, evt.ID)
+		attendees, err := deps.CalendarQueries.ListCalendarEventAttendees(ctx, handlerutil.NullInt32From(evt.ID))
 		if err != nil {
 			return nil, httpErr(apierrors.CalendarInviteListQueryInterrupted)
 		}
@@ -578,7 +579,7 @@ func ListEventInvites(deps Deps) func(context.Context, *ListEventInvitesInput) (
 			// the list query omits it. This is O(attendees) per list
 			// call — acceptable given typical event attendee counts.
 			row, lerr := deps.CalendarQueries.FindCalendarEventAttendee(ctx, calendar.FindCalendarEventAttendeeParams{
-				EventID: evt.ID,
+				EventID: handlerutil.NullInt32From(evt.ID),
 				UserID:  a.UserID,
 			})
 			if lerr != nil {
@@ -598,7 +599,7 @@ func ListEventInvites(deps Deps) func(context.Context, *ListEventInvitesInput) (
 				AcceptedAt: nullTimeUnixPtr(r.AcceptedAt),
 				CreatedAt:  r.CreatedAt.Unix(),
 			}
-			if pid, ok := internalToPublic[r.AttendeeID]; ok {
+			if pid, ok := internalToPublic[handlerutil.Int32ToUint32(r.AttendeeID)]; ok {
 				item.AttendeePublicID = pid.String()
 			}
 			out.Body.Invites = append(out.Body.Invites, item)
@@ -609,19 +610,19 @@ func ListEventInvites(deps Deps) func(context.Context, *ListEventInvitesInput) (
 
 // --- Helpers ---
 
-// mintInviteToken generates a 64-hex-char plaintext token (32 random
-// bytes hex-encoded) and returns it alongside the raw-byte SHA-256 hash
-// to persist. The plaintext is only surfaced once, immediately after
-// generation — subsequent reads hash the incoming token and look the
-// hash up in calendar_event_invites.token_hash.
+// mintInviteToken delegates to the shared token package and converts
+// the hex-encoded hash to the raw-byte form expected by
+// calendar_event_invites.token_hash (BINARY(32)). The plaintext is
+// only surfaced once; subsequent reads hash the incoming token via
+// HashInviteToken and look the result up in the column.
 func mintInviteToken() (string, []byte, error) {
-	b := make([]byte, 32)
-	if _, err := rand.Read(b); err != nil {
+	raw, hashHex, err := sharedtoken.MintToken()
+	if err != nil {
 		return "", nil, err
 	}
-	token := hex.EncodeToString(b)
-	sum := sha256.Sum256([]byte(token))
-	hash := make([]byte, len(sum))
-	copy(hash, sum[:])
-	return token, hash, nil
+	hashBytes, err := hex.DecodeString(hashHex)
+	if err != nil {
+		return "", nil, err
+	}
+	return raw, hashBytes, nil
 }

@@ -22,6 +22,7 @@ func RegisterWorkspaceScoped(api huma.API, router chi.Router, deps Deps) {
 		Path:        "/workspaces/{wsId}/export/tasks",
 		Summary:     "Export tasks as JSON",
 		Description: "Export workspace tasks as a JSON array, optionally scoped by a saved lens.",
+		Tags:        []string{"Admin"},
 	}, Export(deps))
 
 	// CSV export as a raw chi handler (file download).

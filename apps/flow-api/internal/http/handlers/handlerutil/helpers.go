@@ -171,6 +171,25 @@ func PublicIDOrEmpty(p types.PublicID) string {
 	return p.String()
 }
 
+// NullInt32From wraps a non-null uint32 (typically an internal row ID
+// resolved earlier in the handler) into a sql.NullInt32 suitable for
+// passing to sqlc-generated query params whose underlying column is
+// nullable. The conversion narrows uint32 to int32 — internal ids are
+// well below the int32 ceiling in any realistic deployment.
+func NullInt32From(v uint32) sql.NullInt32 {
+	return sql.NullInt32{Int32: int32(v), Valid: true} //#nosec G115 -- internal row id, bounded by realistic workspace size
+}
+
+// Int32ToUint32 unpacks a sql.NullInt32 into the non-null uint32 ID the
+// handler layer uses, returning 0 for the NULL case so callers can
+// continue treating "no row" as a sentinel without a separate branch.
+func Int32ToUint32(n sql.NullInt32) uint32 {
+	if !n.Valid {
+		return 0
+	}
+	return uint32(n.Int32)
+}
+
 // NullStr converts a sql.NullString to a plain Go string, returning the
 // empty string when the column is NULL.
 func NullStr(s sql.NullString) string {

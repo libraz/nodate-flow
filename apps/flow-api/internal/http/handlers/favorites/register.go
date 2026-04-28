@@ -15,6 +15,7 @@ func Register(api huma.API, deps Deps) {
 		Path:        "/me/favorites",
 		Summary:     "List the caller's favorites",
 		Description: "Lists every favorite the caller has pinned across all their workspaces (projects, lenses, dashboards, tasks). Used by the global sidebar.",
+		Tags:        []string{"Tasks"},
 	}, List(deps))
 
 	huma.Register(api, huma.Operation{
@@ -23,6 +24,7 @@ func Register(api huma.API, deps Deps) {
 		Path:        "/me/favorites",
 		Summary:     "Add an item to favorites",
 		Description: "Pins the supplied target (kind + id) to the caller's favorites list. Idempotent: pinning an already-favorited item returns the existing row.",
+		Tags:        []string{"Tasks"},
 	}, Create(deps))
 
 	huma.Register(api, huma.Operation{
@@ -31,5 +33,6 @@ func Register(api huma.API, deps Deps) {
 		Path:        "/me/favorites/{id}",
 		Summary:     "Remove an item from favorites",
 		Description: "Unpins the named favorite. Idempotent: returns 200 even if the favorite no longer exists.",
+		Tags:        []string{"Tasks"},
 	}, Delete(deps))
 }

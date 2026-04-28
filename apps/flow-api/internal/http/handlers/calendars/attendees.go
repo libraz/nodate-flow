@@ -178,7 +178,7 @@ func AddAttendees(deps Deps) func(context.Context, *AddAttendeesInput) (*AddAtte
 			_, createErr := deps.CalendarQueries.CreateCalendarEventAttendee(ctx, calendar.CreateCalendarEventAttendeeParams{
 				PublicID:    attPublicID,
 				WorkspaceID: wsID,
-				EventID:     evt.ID,
+				EventID:     handlerutil.NullInt32From(evt.ID),
 				UserID:      userID,
 				Rsvp:        calendar.CalendarEventAttendeesRsvpPending,
 				CanEdit:     false,
@@ -233,7 +233,7 @@ func ListAttendees(deps Deps) func(context.Context, *ListAttendeesInput) (*ListA
 			return nil, err
 		}
 
-		rows, err := deps.CalendarQueries.ListCalendarEventAttendees(ctx, evt.ID)
+		rows, err := deps.CalendarQueries.ListCalendarEventAttendees(ctx, handlerutil.NullInt32From(evt.ID))
 		if err != nil {
 			return nil, httpErr(apierrors.CalendarAttendeeListQueryInterrupted)
 		}
@@ -288,7 +288,7 @@ func RemoveAttendee(deps Deps) func(context.Context, *RemoveAttendeeInput) (*Rem
 		}
 
 		err = deps.CalendarQueries.DisableCalendarEventAttendee(ctx, calendar.DisableCalendarEventAttendeeParams{
-			EventID: evt.ID,
+			EventID: handlerutil.NullInt32From(evt.ID),
 			UserID:  targetUserID,
 		})
 		if err != nil {
@@ -326,7 +326,7 @@ func UpdateRsvp(deps Deps) func(context.Context, *UpdateRsvpInput) (*UpdateRsvpO
 
 		err = deps.CalendarQueries.UpdateAttendeeRsvp(ctx, calendar.UpdateAttendeeRsvpParams{
 			Rsvp:    calendar.CalendarEventAttendeesRsvp(input.Body.Rsvp),
-			EventID: evt.ID,
+			EventID: handlerutil.NullInt32From(evt.ID),
 			UserID:  actorID,
 		})
 		if err != nil {
@@ -379,7 +379,7 @@ func ToggleCanEdit(deps Deps) func(context.Context, *ToggleCanEditInput) (*Toggl
 
 		err = deps.CalendarQueries.UpdateAttendeeCanEdit(ctx, calendar.UpdateAttendeeCanEditParams{
 			CanEdit: input.Body.CanEdit,
-			EventID: evt.ID,
+			EventID: handlerutil.NullInt32From(evt.ID),
 			UserID:  targetUserID,
 		})
 		if err != nil {

@@ -94,7 +94,7 @@ func ListAttachments(deps Deps) func(context.Context, *ListAttachmentsInput) (*L
 			return nil, err
 		}
 
-		rows, err := deps.CalendarQueries.ListCalendarEventAttachments(ctx, evt.ID)
+		rows, err := deps.CalendarQueries.ListCalendarEventAttachments(ctx, handlerutil.NullInt32From(evt.ID))
 		if err != nil {
 			return nil, httpErr(apierrors.CalendarAttachmentListQueryInterrupted)
 		}
@@ -143,7 +143,7 @@ func CreateAttachment(deps Deps) func(context.Context, *CreateAttachmentInput) (
 		_, err = deps.CalendarQueries.CreateCalendarEventAttachment(ctx, calendar.CreateCalendarEventAttachmentParams{
 			PublicID:       attPublicID,
 			WorkspaceID:    wsID,
-			EventID:        evt.ID,
+			EventID:        handlerutil.NullInt32From(evt.ID),
 			UploaderID:     actorID,
 			Filename:       input.Body.Filename,
 			ContentType:    input.Body.ContentType,
@@ -207,7 +207,7 @@ func DeleteAttachment(deps Deps) func(context.Context, *DeleteAttachmentInput) (
 
 		att, err := deps.CalendarQueries.FindCalendarEventAttachmentByPublicId(ctx, calendar.FindCalendarEventAttachmentByPublicIdParams{
 			PublicID:    types.FromUUID(attUID),
-			EventID:     evt.ID,
+			EventID:     handlerutil.NullInt32From(evt.ID),
 			WorkspaceID: wsID,
 		})
 		if err != nil {
@@ -224,7 +224,7 @@ func DeleteAttachment(deps Deps) func(context.Context, *DeleteAttachmentInput) (
 
 		err = deps.CalendarQueries.DisableCalendarEventAttachment(ctx, calendar.DisableCalendarEventAttachmentParams{
 			PublicID:    types.FromUUID(attUID),
-			EventID:     evt.ID,
+			EventID:     handlerutil.NullInt32From(evt.ID),
 			WorkspaceID: wsID,
 		})
 		if err != nil {

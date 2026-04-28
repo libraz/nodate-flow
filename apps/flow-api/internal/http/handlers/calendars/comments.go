@@ -107,7 +107,7 @@ func ListComments(deps Deps) func(context.Context, *ListCommentsInput) (*ListCom
 			return nil, err
 		}
 
-		rows, err := deps.CalendarQueries.ListCalendarEventComments(ctx, evt.ID)
+		rows, err := deps.CalendarQueries.ListCalendarEventComments(ctx, handlerutil.NullInt32From(evt.ID))
 		if err != nil {
 			return nil, httpErr(apierrors.CalendarCommentListQueryInterrupted)
 		}
@@ -151,7 +151,7 @@ func CreateComment(deps Deps) func(context.Context, *CreateCommentInput) (*Creat
 		_, err = deps.CalendarQueries.CreateCalendarEventComment(ctx, calendar.CreateCalendarEventCommentParams{
 			PublicID:    commentPublicID,
 			WorkspaceID: wsID,
-			EventID:     evt.ID,
+			EventID:     handlerutil.NullInt32From(evt.ID),
 			AuthorID:    actorID,
 			Body:        input.Body.Body,
 		})
@@ -209,7 +209,7 @@ func EditComment(deps Deps) func(context.Context, *EditCommentInput) (*EditComme
 		err = deps.CalendarQueries.UpdateCalendarEventComment(ctx, calendar.UpdateCalendarEventCommentParams{
 			Body:        input.Body.Body,
 			PublicID:    types.FromUUID(commentUID),
-			EventID:     evt.ID,
+			EventID:     handlerutil.NullInt32From(evt.ID),
 			WorkspaceID: wsID,
 			AuthorID:    actorID,
 		})
@@ -253,7 +253,7 @@ func DeleteComment(deps Deps) func(context.Context, *DeleteCommentInput) (*Delet
 
 		comment, err := deps.CalendarQueries.FindCalendarEventCommentByPublicId(ctx, calendar.FindCalendarEventCommentByPublicIdParams{
 			PublicID:    types.FromUUID(commentUID),
-			EventID:     evt.ID,
+			EventID:     handlerutil.NullInt32From(evt.ID),
 			WorkspaceID: wsID,
 		})
 		if err != nil {
@@ -270,7 +270,7 @@ func DeleteComment(deps Deps) func(context.Context, *DeleteCommentInput) (*Delet
 
 		err = deps.CalendarQueries.DisableCalendarEventComment(ctx, calendar.DisableCalendarEventCommentParams{
 			PublicID:    types.FromUUID(commentUID),
-			EventID:     evt.ID,
+			EventID:     handlerutil.NullInt32From(evt.ID),
 			WorkspaceID: wsID,
 		})
 		if err != nil {

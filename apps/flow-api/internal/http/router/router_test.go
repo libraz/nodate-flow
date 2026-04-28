@@ -269,3 +269,74 @@ func TestEveryOperationHasDescription(t *testing.T) {
 		}
 	}
 }
+
+// TestEveryOperationHasTags asserts that every huma.Operation declares
+// at least one Tag. Tags drive OpenAPI navigation grouping; missing
+// tags collapse the SDK side-bar into a single un-grouped list. Same
+// failure surface as TestEveryOperationHasDescription — the failure
+// message lists each offender so the fix is mechanical.
+func TestEveryOperationHasTags(t *testing.T) {
+	t.Parallel()
+	res := BuildResult(stubDeps(t))
+
+	type missing struct {
+		method      string
+		path        string
+		operationID string
+		summary     string
+	}
+	seen := map[string]missing{}
+
+	for _, a := range res.APIs {
+		spec := a.OpenAPI()
+		if spec == nil || spec.Paths == nil {
+			continue
+		}
+		for path, item := range spec.Paths {
+			if item == nil {
+				continue
+			}
+			verbs := map[string]*huma.Operation{
+				http.MethodGet:     item.Get,
+				http.MethodPost:    item.Post,
+				http.MethodPut:     item.Put,
+				http.MethodPatch:   item.Patch,
+				http.MethodDelete:  item.Delete,
+				http.MethodHead:    item.Head,
+				http.MethodOptions: item.Options,
+			}
+			for method, op := range verbs {
+				if op == nil {
+					continue
+				}
+				if len(op.Tags) == 0 {
+					key := method + " " + path + " " + op.OperationID
+					seen[key] = missing{
+						method:      method,
+						path:        path,
+						operationID: op.OperationID,
+						summary:     op.Summary,
+					}
+				}
+			}
+		}
+	}
+
+	bad := make([]missing, 0, len(seen))
+	for _, m := range seen {
+		bad = append(bad, m)
+	}
+
+	if len(bad) > 0 {
+		sort.Slice(bad, func(i, j int) bool {
+			if bad[i].path != bad[j].path {
+				return bad[i].path < bad[j].path
+			}
+			return bad[i].method < bad[j].method
+		})
+		t.Errorf("%d operations are missing huma.Operation.Tags:", len(bad))
+		for _, m := range bad {
+			t.Errorf("  %-6s %s (%s) — summary: %q", m.method, m.path, m.operationID, m.summary)
+		}
+	}
+}

@@ -1262,7 +1262,7 @@ func runAddComment(ctx context.Context, deps Deps, s *session, raw json.RawMessa
 	if _, err := deps.Queries.AddComment(ctx, generated.AddCommentParams{
 		PublicID:    cpub,
 		WorkspaceID: s.workspaceID,
-		TaskID:      taskInternal,
+		TaskID:      sql.NullInt32{Int32: int32(taskInternal), Valid: true}, //#nosec G115 -- internal row id, bounded by realistic deployments
 		AuthorID:    s.userID,
 		Body:        in.Body,
 	}); err != nil {
