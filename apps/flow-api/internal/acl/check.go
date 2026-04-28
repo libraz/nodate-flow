@@ -92,6 +92,12 @@ WHERE id = ? AND enabled = TRUE LIMIT 1`
 // error when the workspace is being resolved indirectly (for example
 // via a project or task lookup) so the leaked existence is consistent
 // with the outer resource's not-found behaviour.
+//
+// The role column is a MySQL ENUM. We re-validate against the Go
+// [WorkspaceRole] enum as defence in depth: a row carrying an unknown
+// role string surfaces as INTERNAL.UNEXPECTED, never as a 403. A
+// corrupt enum is a server-side invariant violation, not a caller
+// permissions failure.
 func CheckWorkspaceMember(ctx context.Context, db DB, wsID, userID uint32, deniedSpec *apierrors.Spec) (WorkspaceRole, error) {
 	const q = `SELECT role FROM workspace_members
 WHERE workspace_id = ? AND user_id = ? AND enabled = TRUE LIMIT 1`
@@ -105,7 +111,11 @@ WHERE workspace_id = ? AND user_id = ? AND enabled = TRUE LIMIT 1`
 		}
 		return "", err
 	}
-	return WorkspaceRole(role), nil
+	wr := WorkspaceRole(role)
+	if !wr.IsValid() {
+		return "", apierrors.New(apierrors.InternalUnexpected)
+	}
+	return wr, nil
 }
 
 // ResolveWorkspaceAccess combines [ResolveWorkspaceByPublicID] and
@@ -200,6 +210,14 @@ WHERE id = ? AND enabled = TRUE LIMIT 1`
 // member but holds an elevated workspace role (owner/admin), access is
 // granted with [ProjectRoleElevated]. Otherwise this returns
 // deniedSpec (default WS.PROJECT.ACCESS_DENIED).
+//
+// The role column is a MySQL ENUM so any value reaching this function
+// is already constrained at the schema layer. We re-validate against
+// the Go [ProjectRole] enum anyway (defence in depth): if a row
+// somehow carries an unknown role string — schema drift, manual edit,
+// future column added but not yet mapped — we return INTERNAL.UNEXPECTED
+// rather than a misleading 403. A corrupt enum is a server-side
+// invariant violation, not the caller's fault.
 func CheckProjectMembership(
 	ctx context.Context,
 	db DB,
@@ -213,7 +231,14 @@ WHERE workspace_id = ? AND project_id = ? AND user_id = ? AND enabled = TRUE LIM
 	scanErr := db.QueryRowContext(ctx, q, wsID, prjID, userID).Scan(&roleStr)
 	switch {
 	case scanErr == nil:
-		return ProjectRole(roleStr), true, nil
+		pr := ProjectRole(roleStr)
+		if !pr.IsValid() || pr == ProjectRoleElevated {
+			// Empty role here is a real corrupt row (the elevated marker
+			// is only used for the not-a-member-but-elevated path below,
+			// never for project_members rows that actually exist).
+			return "", false, apierrors.New(apierrors.InternalUnexpected)
+		}
+		return pr, true, nil
 	case stderrors.Is(scanErr, sql.ErrNoRows):
 		if !wsRole.AtLeast(WorkspaceRoleAdmin) {
 			if deniedSpec == nil {

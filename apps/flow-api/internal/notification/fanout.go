@@ -13,8 +13,16 @@ import (
 
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/generated"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/types"
+	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/obs"
 	"github.com/nodate-flow/nodate-flow/packages/go-shared/email"
 )
+
+// preferenceFetchRetryDelay is the back-off applied between the first
+// preference-fetch attempt and the single retry. Kept small because
+// the request-detached fan-out goroutine has a budget governed by
+// [defaultFanoutTimeout]; exhausting half the budget on a backoff
+// would defeat the purpose of retrying.
+const preferenceFetchRetryDelay = 50 * time.Millisecond
 
 // defaultFanoutTimeout caps how long a single fan-out goroutine may run
 // when no explicit timeout is configured. The detached context keeps
@@ -51,6 +59,14 @@ type Fanout struct {
 	// without a live database. Production code leaves this nil and
 	// the hook routes to [Fanout.fanout].
 	run func(ctx context.Context, workspaceID uint32, eventType string, eventInternalID uint32)
+
+	// fetchPreferences is the function used to load (recipient,
+	// channel) preferences. Production code leaves this nil and the
+	// fan-out path falls through to [Fanout.queries.GetEnabledChannelsForRecipients].
+	// Tests override it to simulate transient and persistent DB errors
+	// so the retry-once-then-fall-back contract can be exercised
+	// without a live database.
+	fetchPreferences func(ctx context.Context, params generated.GetEnabledChannelsForRecipientsParams) ([]generated.GetEnabledChannelsForRecipientsRow, error)
 }
 
 // NewFanout creates a Fanout backed by the given database and email
@@ -202,23 +218,24 @@ func (f *Fanout) fanout(ctx context.Context, workspaceID uint32, eventType strin
 
 	// Resolve enabled (recipient, channel) pairs in a single round
 	// trip. Recipients with no row for this category fall through to
-	// the default in_app channel below.
+	// the default in_app channel below. The first failure triggers
+	// one retry with a small back-off; if it still fails we increment
+	// the preference-fetch error counter and fall back to the safe
+	// default (in_app only for every recipient) rather than silently
+	// dropping notifications.
 	eventCategory := categoryForEventType(eventType)
-	prefs, err := f.queries.GetEnabledChannelsForRecipients(ctx, generated.GetEnabledChannelsForRecipientsParams{
+	prefs, err := f.loadPreferencesWithRetry(ctx, generated.GetEnabledChannelsForRecipientsParams{
 		WorkspaceID:   workspaceID,
 		EventCategory: eventCategory,
 		UserIds:       filtered,
 	})
 	if err != nil {
-		slog.ErrorContext(ctx, "notification fanout: failed to load notification preferences",
+		slog.ErrorContext(ctx, "notification fanout: failed to load notification preferences after retry",
 			slog.Uint64("workspace_id", uint64(workspaceID)),
 			slog.String("event_category", eventCategory),
 			slog.String("event_type", eventType),
 			slog.String("err", err.Error()))
-		// On preference lookup failure, fall back to the safe default
-		// (in_app only for every recipient) rather than silently
-		// dropping notifications. The dispatcher can retry email/push
-		// from the in_app rows once it inspects preferences itself.
+		obs.IncNotificationFanoutPreferenceFetchError(err)
 		prefs = nil
 	}
 
@@ -279,16 +296,17 @@ func (f *Fanout) fanout(ctx context.Context, workspaceID uint32, eventType strin
 				// INSERT IGNORE collided with the (recipient, source_event,
 				// channel) unique key — the notification already exists.
 				// This is the at-least-once happy path; record it as
-				// debug, not an error.
+				// debug, not an error, and bump the dedup counter so
+				// dashboards can confirm the rate is steady (a sudden
+				// spike usually points to a hook fan-firing more than
+				// expected).
 				slog.DebugContext(ctx, "notification fanout: deduplicated",
 					slog.Uint64("workspace_id", uint64(workspaceID)),
 					slog.Uint64("recipient_user_id", uint64(recipientID)),
 					slog.Uint64("event_id", uint64(eventInternalID)),
 					slog.String("event_type", eventType),
 					slog.String("channel", string(channel)))
-				// TODO: increment a Prometheus counter
-				// `nf_notification_dedup_total{channel,event_type}` once the
-				// notification metrics file exists in apps/flow-api/internal/obs.
+				obs.IncNotificationFanoutDedup("unique_collision")
 			}
 		}
 	}
@@ -343,6 +361,50 @@ func (f *Fanout) DeliverCalendarReminder(
 		}
 	}
 	return firstErr
+}
+
+// loadPreferencesWithRetry fetches the (recipient, channel)
+// preference rows for the given workspace+category+recipient set.
+// It performs at most one retry with a small delay before the
+// caller falls back to the in_app-only default. The intent is
+// to ride out single-packet drops or short connection-pool stalls
+// without giving up correctness on the first hiccup.
+//
+// Tests inject a synthetic [Fanout.fetchPreferences] hook to
+// simulate transient and persistent failures without a live DB.
+func (f *Fanout) loadPreferencesWithRetry(
+	ctx context.Context,
+	params generated.GetEnabledChannelsForRecipientsParams,
+) ([]generated.GetEnabledChannelsForRecipientsRow, error) {
+	fetch := f.fetchPreferences
+	if fetch == nil {
+		fetch = f.queries.GetEnabledChannelsForRecipients
+	}
+
+	rows, err := fetch(ctx, params)
+	if err == nil {
+		return rows, nil
+	}
+	firstErr := err
+
+	slog.WarnContext(ctx, "notification fanout: preference fetch failed, retrying once",
+		slog.Uint64("workspace_id", uint64(params.WorkspaceID)),
+		slog.String("event_category", params.EventCategory),
+		slog.String("err", err.Error()))
+
+	// Sleep with the same context so callers can short-circuit the
+	// retry when the goroutine timeout fires.
+	select {
+	case <-time.After(preferenceFetchRetryDelay):
+	case <-ctx.Done():
+		return nil, firstErr
+	}
+
+	rows, retryErr := fetch(ctx, params)
+	if retryErr == nil {
+		return rows, nil
+	}
+	return nil, retryErr
 }
 
 // eventRow is a minimal representation of an event extracted from the

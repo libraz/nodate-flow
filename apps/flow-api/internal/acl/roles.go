@@ -39,6 +39,16 @@ func (r WorkspaceRole) AtLeast(minRole WorkspaceRole) bool {
 	return workspaceRoleRank[r] >= workspaceRoleRank[minRole]
 }
 
+// IsValid reports whether r is one of the four known workspace role
+// constants. Used by the middleware to reject DB rows whose role
+// column drifted out of the closed enum (typically a manual edit or
+// a schema migration that fell behind). An invalid role surfaces as
+// INTERNAL.UNEXPECTED, never as a permissive "default" role.
+func (r WorkspaceRole) IsValid() bool {
+	_, ok := workspaceRoleRank[r]
+	return ok
+}
+
 // ProjectRole is the role of a user inside a project. The hierarchy is
 // lead > editor > commenter > viewer.
 type ProjectRole string
@@ -65,6 +75,19 @@ var projectRoleRank = map[ProjectRole]int{
 // minimum role in the project hierarchy.
 func (r ProjectRole) AtLeast(minRole ProjectRole) bool {
 	return projectRoleRank[r] >= projectRoleRank[minRole]
+}
+
+// IsValid reports whether r is one of the known project role
+// constants. The empty string ([ProjectRoleElevated]) counts as
+// valid because it is the explicit marker for workspace-level
+// elevation. Any other unknown value is treated as a server-side
+// data invariant violation by the caller.
+func (r ProjectRole) IsValid() bool {
+	if r == ProjectRoleElevated {
+		return true
+	}
+	_, ok := projectRoleRank[r]
+	return ok
 }
 
 // TaskVisibility represents the Layer 4 task-level visibility setting.

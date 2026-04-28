@@ -10,6 +10,11 @@ import (
 	"sync/atomic"
 	"testing"
 	"time"
+
+	"github.com/prometheus/client_golang/prometheus/testutil"
+
+	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/generated"
+	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/obs"
 )
 
 // TestHook_DetachesFromParentContext verifies that cancelling the
@@ -205,5 +210,150 @@ func TestShutdown_ContextDeadline(t *testing.T) {
 	err := f.Shutdown(ctx)
 	if !errors.Is(err, context.DeadlineExceeded) {
 		t.Fatalf("expected context.DeadlineExceeded, got %v", err)
+	}
+}
+
+// TestLoadPreferencesWithRetry_TransientErrorRecovers verifies that a
+// single transient failure on the first attempt is masked by the
+// retry path: the second attempt's rows are returned and no
+// preference-fetch error counter increment is observed.
+func TestLoadPreferencesWithRetry_TransientErrorRecovers(t *testing.T) {
+	t.Parallel()
+
+	f := NewFanout(nil, nil, nil)
+
+	var calls atomic.Int32
+	wantRow := generated.GetEnabledChannelsForRecipientsRow{
+		UserID:  42,
+		Channel: generated.NotificationPreferencesChannelEmail,
+	}
+	f.fetchPreferences = func(_ context.Context, _ generated.GetEnabledChannelsForRecipientsParams) ([]generated.GetEnabledChannelsForRecipientsRow, error) {
+		if calls.Add(1) == 1 {
+			return nil, errors.New("transient: connection reset by peer")
+		}
+		return []generated.GetEnabledChannelsForRecipientsRow{wantRow}, nil
+	}
+
+	rows, err := f.loadPreferencesWithRetry(context.Background(), generated.GetEnabledChannelsForRecipientsParams{
+		WorkspaceID:   1,
+		EventCategory: "task.lifecycle",
+		UserIds:       []uint32{42},
+	})
+	if err != nil {
+		t.Fatalf("expected nil error after retry success, got %v", err)
+	}
+	if got := calls.Load(); got != 2 {
+		t.Fatalf("expected exactly 2 fetch attempts (initial + retry), got %d", got)
+	}
+	if len(rows) != 1 || rows[0] != wantRow {
+		t.Fatalf("unexpected rows: %+v", rows)
+	}
+}
+
+// TestLoadPreferencesWithRetry_PersistentErrorPropagates verifies that
+// when both the initial attempt and the retry fail, the error is
+// returned to the caller (which then bumps the error counter and
+// falls back to the in_app default in [Fanout.fanout]).
+func TestLoadPreferencesWithRetry_PersistentErrorPropagates(t *testing.T) {
+	t.Parallel()
+
+	f := NewFanout(nil, nil, nil)
+
+	var calls atomic.Int32
+	dbErr := errors.New("driver: bad connection")
+	f.fetchPreferences = func(_ context.Context, _ generated.GetEnabledChannelsForRecipientsParams) ([]generated.GetEnabledChannelsForRecipientsRow, error) {
+		calls.Add(1)
+		return nil, dbErr
+	}
+
+	_, err := f.loadPreferencesWithRetry(context.Background(), generated.GetEnabledChannelsForRecipientsParams{
+		WorkspaceID:   1,
+		EventCategory: "task.lifecycle",
+		UserIds:       []uint32{42},
+	})
+	if err == nil {
+		t.Fatal("expected error after persistent failure, got nil")
+	}
+	if got := calls.Load(); got != 2 {
+		t.Fatalf("expected exactly 2 fetch attempts (initial + retry), got %d", got)
+	}
+}
+
+// TestLoadPreferencesWithRetry_ContextCancelDuringBackoff verifies
+// that a deadline firing during the inter-attempt backoff aborts
+// the retry promptly rather than burning the rest of the goroutine
+// timeout sleeping.
+func TestLoadPreferencesWithRetry_ContextCancelDuringBackoff(t *testing.T) {
+	t.Parallel()
+
+	f := NewFanout(nil, nil, nil)
+
+	var calls atomic.Int32
+	f.fetchPreferences = func(_ context.Context, _ generated.GetEnabledChannelsForRecipientsParams) ([]generated.GetEnabledChannelsForRecipientsRow, error) {
+		calls.Add(1)
+		return nil, errors.New("transient")
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Millisecond)
+	defer cancel()
+
+	start := time.Now()
+	_, err := f.loadPreferencesWithRetry(ctx, generated.GetEnabledChannelsForRecipientsParams{
+		WorkspaceID:   1,
+		EventCategory: "task.lifecycle",
+		UserIds:       []uint32{42},
+	})
+	elapsed := time.Since(start)
+	if err == nil {
+		t.Fatal("expected error from ctx cancel, got nil")
+	}
+	if got := calls.Load(); got != 1 {
+		t.Fatalf("expected only the first attempt before backoff cancel, got %d", got)
+	}
+	// The backoff window is 50ms; the deadline should fire well before.
+	if elapsed >= preferenceFetchRetryDelay {
+		t.Fatalf("backoff was not interrupted by ctx (elapsed=%v >= %v)", elapsed, preferenceFetchRetryDelay)
+	}
+}
+
+// TestFanoutMetrics_PreferenceFetchErrorTypeLabel verifies that a
+// generic DB error increments the counter under type="db" while a
+// timeout / cancellation increments it under type="timeout". The
+// counters are package-global so this test does not run in parallel
+// with itself, but it can run alongside other notification tests
+// because the assertions are deltas off the pre-call baseline.
+func TestFanoutMetrics_PreferenceFetchErrorTypeLabel(t *testing.T) {
+	dbCounter := obs.NotificationFanoutPreferenceFetchErrorsCounter("db")
+	timeoutCounter := obs.NotificationFanoutPreferenceFetchErrorsCounter("timeout")
+
+	dbBefore := testutil.ToFloat64(dbCounter)
+	timeoutBefore := testutil.ToFloat64(timeoutCounter)
+
+	obs.IncNotificationFanoutPreferenceFetchError(errors.New("driver: bad connection"))
+	obs.IncNotificationFanoutPreferenceFetchError(context.DeadlineExceeded)
+	obs.IncNotificationFanoutPreferenceFetchError(context.Canceled)
+
+	if got, want := testutil.ToFloat64(dbCounter)-dbBefore, 1.0; got != want {
+		t.Fatalf("type=db delta: got %v want %v", got, want)
+	}
+	if got, want := testutil.ToFloat64(timeoutCounter)-timeoutBefore, 2.0; got != want {
+		t.Fatalf("type=timeout delta: got %v want %v", got, want)
+	}
+}
+
+// TestFanoutMetrics_DedupCounter verifies that IncNotificationFanoutDedup
+// bumps the (reason) labelled counter exactly once per call. The
+// fan-out path under [Fanout.fanout] calls this on every INSERT IGNORE
+// row that hit the (recipient, source_event, channel) UNIQUE key.
+func TestFanoutMetrics_DedupCounter(t *testing.T) {
+	uniqueCounter := obs.NotificationFanoutDedupCounter("unique_collision")
+	before := testutil.ToFloat64(uniqueCounter)
+
+	obs.IncNotificationFanoutDedup("unique_collision")
+	obs.IncNotificationFanoutDedup("unique_collision")
+	obs.IncNotificationFanoutDedup("unique_collision")
+
+	if got, want := testutil.ToFloat64(uniqueCounter)-before, 3.0; got != want {
+		t.Fatalf("unique_collision delta: got %v want %v", got, want)
 	}
 }

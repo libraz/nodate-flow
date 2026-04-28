@@ -67,6 +67,53 @@ func TestProjectRoleAtLeast(t *testing.T) {
 	}
 }
 
+func TestWorkspaceRoleIsValid(t *testing.T) {
+	t.Parallel()
+	cases := []struct {
+		name string
+		role acl.WorkspaceRole
+		want bool
+	}{
+		{"owner", acl.WorkspaceRoleOwner, true},
+		{"admin", acl.WorkspaceRoleAdmin, true},
+		{"member", acl.WorkspaceRoleMember, true},
+		{"guest", acl.WorkspaceRoleGuest, true},
+		{"unknown", acl.WorkspaceRole("nope"), false},
+		{"empty", acl.WorkspaceRole(""), false},
+	}
+	for _, tc := range cases {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			require.Equal(t, tc.want, tc.role.IsValid())
+		})
+	}
+}
+
+func TestProjectRoleIsValid(t *testing.T) {
+	t.Parallel()
+	cases := []struct {
+		name string
+		role acl.ProjectRole
+		want bool
+	}{
+		{"lead", acl.ProjectRoleLead, true},
+		{"editor", acl.ProjectRoleEditor, true},
+		{"commenter", acl.ProjectRoleCommenter, true},
+		{"viewer", acl.ProjectRoleViewer, true},
+		{"elevated/empty", acl.ProjectRoleElevated, true},
+		{"unknown", acl.ProjectRole("nope"), false},
+		{"capitalized", acl.ProjectRole("Lead"), false},
+	}
+	for _, tc := range cases {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			require.Equal(t, tc.want, tc.role.IsValid())
+		})
+	}
+}
+
 func TestTaskVisibilityFilter(t *testing.T) {
 	t.Parallel()
 	cases := []struct {

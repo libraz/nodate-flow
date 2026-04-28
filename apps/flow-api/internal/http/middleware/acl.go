@@ -172,12 +172,25 @@ type ProjectContext struct {
 
 // ProjectFromContext extracts the project metadata established by
 // [RequireProjectMember].
+//
+// The role string is validated against the closed [ProjectRole] enum.
+// If a corrupted DB row injects an unknown value into the context,
+// callers receive ok=false here and a generic 500 INTERNAL.UNEXPECTED
+// upstream rather than a misleading 403 — corrupt enum data is a
+// server-side invariant violation, not a permissions failure on the
+// caller's part. Validation at the read site is defence in depth: the
+// injecting middleware ([RequireProjectMember],
+// [RequireProjectMemberByGlobalID], [RequireTaskAccess]) already rejects
+// invalid roles before they reach the context.
 func ProjectFromContext(ctx context.Context) (ProjectContext, bool) {
 	id, ok := ctx.Value(ctxKeyProjectID).(uint32)
 	if !ok {
 		return ProjectContext{}, false
 	}
 	role, _ := ctx.Value(ctxKeyProjectRole).(ProjectRole)
+	if !role.IsValid() {
+		return ProjectContext{}, false
+	}
 	pub, _ := ctx.Value(ctxKeyProjectIDPublic).(uuid.UUID)
 	return ProjectContext{ID: id, PublicID: pub, Role: role}, true
 }

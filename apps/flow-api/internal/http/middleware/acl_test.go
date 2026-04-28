@@ -71,6 +71,43 @@ func TestProjectFromContext(t *testing.T) {
 	}
 }
 
+// TestProjectFromContext_InvalidRoleReportsAbsent verifies that a
+// corrupted role value (e.g. an unknown enum string written by a
+// stale schema migration or a manual DB edit) is treated as a
+// server-side invariant violation — the context lookup returns
+// ok=false so callers surface 500 INTERNAL.UNEXPECTED rather than
+// silently falling through to a permissive default role or
+// producing a misleading 403.
+func TestProjectFromContext_InvalidRoleReportsAbsent(t *testing.T) {
+	t.Parallel()
+	pub := uuid.New()
+	ctx := context.WithValue(context.Background(), ctxKeyProjectID, uint32(11))
+	ctx = context.WithValue(ctx, ctxKeyProjectIDPublic, pub)
+	ctx = context.WithValue(ctx, ctxKeyProjectRole, ProjectRole("not_a_real_role"))
+	if _, ok := ProjectFromContext(ctx); ok {
+		t.Fatal("ProjectFromContext returned ok=true for an unknown role string")
+	}
+}
+
+// TestProjectFromContext_ElevatedIsValid verifies that the elevated
+// marker (empty string) is accepted as valid — workspace owners /
+// admins reach a project without a per-project role and the
+// middleware records that with [ProjectRoleElevated].
+func TestProjectFromContext_ElevatedIsValid(t *testing.T) {
+	t.Parallel()
+	pub := uuid.New()
+	ctx := context.WithValue(context.Background(), ctxKeyProjectID, uint32(11))
+	ctx = context.WithValue(ctx, ctxKeyProjectIDPublic, pub)
+	ctx = context.WithValue(ctx, ctxKeyProjectRole, ProjectRoleElevated)
+	prj, ok := ProjectFromContext(ctx)
+	if !ok {
+		t.Fatal("expected ok=true for ProjectRoleElevated marker")
+	}
+	if prj.Role != ProjectRoleElevated {
+		t.Fatalf("expected role=elevated, got %q", prj.Role)
+	}
+}
+
 func TestTaskVisibilityFilterDelegation(t *testing.T) {
 	t.Parallel()
 	// Admin sees everything -> empty fragment.

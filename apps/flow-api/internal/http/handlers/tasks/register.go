@@ -25,7 +25,7 @@ func RegisterCollection(api huma.API, deps Deps) {
 		Method:      http.MethodGet,
 		Path:        "/tasks",
 		Summary:     "List tasks for a project or workspace",
-		Description: "Returns a cursor-paginated page of tasks filtered by project or workspace plus optional status / assignee / label filters. Backs every task list view (board, list, etc.).",
+		Description: "Returns a cursor-paginated page of tasks filtered by project or workspace plus optional status / assignee / label filters. Backs every task list view (board, list, etc.).\n\nLayer 4 task visibility (public / project / private) is enforced as a SQL filter rather than a per-row 403, so tasks the actor cannot see are silently excluded from both the rows and the `total` count. This is asymmetric with the single-task endpoint (which returns 404 on visibility denial); see `docs/conventions/acl.md` for the rationale.",
 	}, List(deps))
 
 	huma.Register(api, huma.Operation{
