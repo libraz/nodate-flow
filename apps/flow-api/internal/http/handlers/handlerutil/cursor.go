@@ -29,6 +29,20 @@ import (
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/types"
 )
 
+// Millis is unix-epoch milliseconds. It exists as a distinct named
+// type — not just an int64 — so the cursor wire format is
+// type-checked: the keyset queries compare against DATETIME(3) columns
+// and a future maintainer who reaches for `t.Unix()` (seconds) instead
+// of `t.UnixMilli()` (milliseconds) would silently drop sub-second
+// precision and produce cursors that skip rows. Forcing the explicit
+// `Millis(t.UTC().UnixMilli())` conversion at the encode site means
+// any "let me just use Unix() here" refactor is rejected by the
+// compiler instead of by a flaky pagination test.
+//
+// See [cursorPayload] and [EncodeCursor] for how this is used on the
+// wire; the package doc explains the JSON-in-base64 framing.
+type Millis int64
+
 // cursorPayload is the on-the-wire shape carried inside the base64url
 // cursor string. The JSON keys are deliberately one-letter to keep the
 // encoded blob short; this is opaque to clients so brevity costs us
@@ -41,9 +55,10 @@ import (
 // produces a cursor that excludes valid rows whose true timestamp lies
 // between the truncated second and the actual last-row time, which
 // shows up as missing pages on dense fixtures (see
-// TestKeysetHandlerListTasksWorkspace).
+// TestKeysetHandlerListTasksWorkspace). The [Millis] named type is the
+// compile-time guard that pins this contract.
 type cursorPayload struct {
-	T int64  `json:"t"`
+	T Millis `json:"t"`
 	P string `json:"p"`
 }
 
@@ -58,7 +73,7 @@ type cursorPayload struct {
 // same second as the page boundary.
 func EncodeCursor(t time.Time, pid types.PublicID) string {
 	payload := cursorPayload{
-		T: t.UTC().UnixMilli(),
+		T: Millis(t.UTC().UnixMilli()),
 		P: pid.String(),
 	}
 	buf, err := json.Marshal(payload)
@@ -104,5 +119,5 @@ func DecodeCursor(s string) (time.Time, types.PublicID, error) {
 	if err != nil {
 		return time.Time{}, types.PublicID{}, fmt.Errorf("cursor: invalid public id: %w", err)
 	}
-	return time.UnixMilli(payload.T).UTC(), pid, nil
+	return time.UnixMilli(int64(payload.T)).UTC(), pid, nil
 }

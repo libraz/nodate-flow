@@ -2,6 +2,7 @@ package handlerutil
 
 import (
 	"encoding/base64"
+	"encoding/json"
 	"strings"
 	"testing"
 	"time"
@@ -119,5 +120,24 @@ func TestDecodeCursorInvalidPublicID(t *testing.T) {
 	_, _, err := DecodeCursor(bad)
 	if err == nil {
 		t.Fatal("expected decode error for invalid public id")
+	}
+}
+
+// TestMillisJSONShape pins the wire format of the Millis named type:
+// Go marshals named integer types as plain JSON numbers, so the
+// cursor blob is byte-identical to the int64-backed predecessor and
+// existing decoded fixtures remain valid. A future change that gives
+// Millis a custom MarshalJSON (for example wrapping it in a string)
+// would silently break every cursor in flight; this test fails first.
+func TestMillisJSONShape(t *testing.T) {
+	t.Parallel()
+	buf, err := json.Marshal(cursorPayload{T: Millis(1_700_000_000_123), P: "00000000-0000-7000-8000-000000000000"})
+	if err != nil {
+		t.Fatalf("marshal: %v", err)
+	}
+	got := string(buf)
+	want := `{"t":1700000000123,"p":"00000000-0000-7000-8000-000000000000"}`
+	if got != want {
+		t.Fatalf("Millis wire shape changed: got %s want %s", got, want)
 	}
 }
