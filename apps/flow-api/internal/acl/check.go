@@ -400,8 +400,8 @@ func TaskVisibilityFilter(userID uint32, wsRole WorkspaceRole) (fragment string,
       v.created_by_user_id = ?
       OR EXISTS (
         SELECT 1 FROM task_actors ta
-        WHERE ta.task_id = v.task_internal_id
-          AND ta.user_id = ?
+        INNER JOIN tasks tav ON tav.id = ta.task_id AND tav.public_id = v.public_id
+        WHERE ta.user_id = ?
           AND ta.enabled = TRUE
       )
     ))
