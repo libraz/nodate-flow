@@ -4,7 +4,6 @@
  * - Assigned task summary (from GET /me/tasks)
  * - Workspace quick links
  * - Quick actions (create task, search)
- * - Theme / language switchers
  */
 
 import type { components } from '@nodate-flow/sdk';
@@ -28,14 +27,7 @@ import { OPEN_COMMAND_PALETTE_EVENT } from '../components/layout/glass-dock';
 import { selectUser, useAuth } from '../features/auth/auth-store';
 import DashboardView from '../features/dashboard/dashboard-view';
 import { useWorkspacesQuery } from '../features/workspaces/api';
-import { type SupportedLanguage, setLanguage, supportedLanguages } from '../i18n';
 import { sdk } from '../lib/sdk';
-import {
-  type ThemePreference,
-  type concreteThemes,
-  themePreferences,
-  useTheme,
-} from '../providers/theme-provider';
 
 type AssignedTask = components['schemas']['MyTaskListItem'];
 
@@ -292,125 +284,6 @@ function WorkspaceLinks(): ReactElement {
   );
 }
 
-/* ── Theme / language switchers (kept from original) ───────── */
-
-function LanguageSwitcher(): ReactElement {
-  const { t, i18n } = useTranslation('common');
-  const current = (i18n.resolvedLanguage ?? 'en') as SupportedLanguage;
-  return (
-    <fieldset
-      style={{
-        border: '1px solid var(--nf-color-hairline)',
-        borderRadius: '999px',
-        padding: '0.125rem',
-        display: 'inline-flex',
-        gap: '0.125rem',
-      }}
-    >
-      <legend
-        style={{
-          fontFamily: 'var(--font-mono)',
-          fontSize: '0.625rem',
-          letterSpacing: '0.08em',
-          color: 'var(--nf-color-fg-muted)',
-          paddingInline: '0.5rem',
-        }}
-      >
-        {t('nav.language')}
-      </legend>
-      {supportedLanguages.map((lng) => {
-        const active = lng === current;
-        const labelMap: Record<SupportedLanguage, string> = {
-          en: t('lang.en'),
-          ja: t('lang.ja'),
-          zh: t('lang.zh'),
-        };
-        const label = labelMap[lng];
-        return (
-          <button
-            key={lng}
-            type="button"
-            onClick={() => {
-              setLanguage(lng);
-            }}
-            style={{
-              background: active ? 'var(--nf-color-fg)' : 'transparent',
-              color: active ? 'var(--nf-color-bg)' : 'var(--nf-color-fg)',
-              border: 'none',
-              borderRadius: '999px',
-              paddingBlock: '0.375rem',
-              paddingInline: '0.75rem',
-              fontFamily: 'var(--font-mono)',
-              fontSize: 'var(--nf-text-xs)',
-              cursor: 'pointer',
-            }}
-          >
-            {label}
-          </button>
-        );
-      })}
-    </fieldset>
-  );
-}
-
-function ThemeSwitcher(): ReactElement {
-  const { t } = useTranslation('common');
-  const { preference, setPreference } = useTheme();
-  return (
-    <fieldset
-      style={{
-        border: '1px solid var(--nf-color-hairline)',
-        borderRadius: '999px',
-        padding: '0.125rem',
-        display: 'inline-flex',
-        gap: '0.125rem',
-        flexWrap: 'wrap',
-      }}
-    >
-      <legend
-        style={{
-          fontFamily: 'var(--font-mono)',
-          fontSize: '0.625rem',
-          letterSpacing: '0.08em',
-          color: 'var(--nf-color-fg-muted)',
-          paddingInline: '0.5rem',
-        }}
-      >
-        {t('nav.theme')}
-      </legend>
-      {themePreferences.map((pref: ThemePreference) => {
-        const active = pref === preference;
-        return (
-          <button
-            key={pref}
-            type="button"
-            onClick={() => {
-              setPreference(pref);
-            }}
-            style={{
-              background: active ? 'var(--nf-color-fg)' : 'transparent',
-              color: active ? 'var(--nf-color-bg)' : 'var(--nf-color-fg)',
-              border: 'none',
-              borderRadius: '999px',
-              paddingBlock: '0.375rem',
-              paddingInline: '0.75rem',
-              fontFamily: 'var(--font-mono)',
-              fontSize: 'var(--nf-text-xs)',
-              cursor: 'pointer',
-            }}
-          >
-            {pref === 'system' ? t('theme.system') : t(themeLabelKey(pref))}
-          </button>
-        );
-      })}
-    </fieldset>
-  );
-}
-
-function themeLabelKey(name: (typeof concreteThemes)[number]): string {
-  return `theme.${name}` as const;
-}
-
 /* ── Dashboard widgets (workspace-scoped) ─────────────────── */
 
 function HomeDashboard(): ReactElement {
@@ -575,20 +448,6 @@ function HomePage(): ReactElement {
       <Suspense fallback={null}>
         <HomeDashboard />
       </Suspense>
-
-      {/* Theme / language */}
-      <footer
-        style={{
-          display: 'flex',
-          gap: '1rem',
-          flexWrap: 'wrap',
-          alignItems: 'center',
-          marginTop: 'auto',
-        }}
-      >
-        <ThemeSwitcher />
-        <LanguageSwitcher />
-      </footer>
     </section>
   );
 }
