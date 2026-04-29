@@ -118,8 +118,14 @@
  * share of the available inline size (`flex: 1 1 0`); `min-inline-size: 0`
  * is required so labels that exceed the share truncate via ellipsis rather
  * than pushing siblings wider and undoing the balancing.
+ *
+ * Compound `.segment.segmentFullWidth` selector (specificity 0,2,0) is
+ * required because `.size-md .segment` / `.size-sm .segment` (also 0,2,0)
+ * set a `min-inline-size: var(--nf-space-10|8)` floor that would otherwise
+ * win by source order even though `min-inline-size: 0` is the intended
+ * full-width behaviour. Equal specificity + later-in-cascade resolves it.
  */
-.segmentFullWidth {
+.segment.segmentFullWidth {
   flex: 1 1 0;
   min-inline-size: 0;
   white-space: nowrap;

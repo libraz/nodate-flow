@@ -278,9 +278,11 @@ export default function ProfileForm(): ReactElement {
         display: 'flex',
         flexDirection: 'column',
         gap: 'var(--nf-space-6)',
-        // Form container measure-width: 32rem = 16rem * 2. Routed through
-        // the spacing scale so the literal 32rem does not appear inline.
-        maxInlineSize: 'calc(var(--nf-space-16) * 2)',
+        // Cap the form's reading-line at the narrow single-column measure
+        // (32rem ~ 512px). `--nf-space-16` is 4rem (step 16 in the spacing
+        // scale, not 16rem), so the previous `calc(var(--nf-space-16) * 2)`
+        // resolved to 8rem and crushed the form to 128px.
+        maxInlineSize: 'var(--nf-measure-narrow)',
       }}
     >
       <AvatarUpload user={me} />
