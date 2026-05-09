@@ -1,12 +1,9 @@
 /**
  * Dashboard feature — query key factory, types, and hooks for
  * dashboard widget CRUD and position updates.
- *
- * Types are defined inline because the SDK may not yet include these
- * endpoints. API calls use raw fetch via the shared base URL and auth
- * store token (same pattern as timeboxes).
  */
 
+import type { components } from '@nodate-flow/sdk';
 import {
   type UseMutationResult,
   type UseSuspenseQueryResult,
@@ -15,8 +12,8 @@ import {
   useSuspenseQuery,
 } from '@tanstack/react-query';
 
-import { apiBaseUrl } from '../../lib/sdk';
-import { authStore } from '../auth/auth-store';
+import { ApiError, toApiError } from '../../lib/api-error';
+import { sdk } from '../../lib/sdk';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -31,42 +28,19 @@ export type WidgetType =
   | 'overdue_tasks'
   | 'notification_feed';
 
+type SDKWidget = components['schemas']['WidgetDTO'];
+
 /** Widget item returned by the list / detail API. Timestamps are unix seconds. */
-export interface WidgetItem {
-  id: string;
+export type WidgetItem = Omit<SDKWidget, 'config' | 'widgetType'> & {
   widgetType: WidgetType;
-  title: string;
-  config: Record<string, unknown>;
-  positionX: number;
-  positionY: number;
-  width: number;
-  height: number;
-  creatorDisplayName: string;
-  updatedAt: number;
-  createdAt: number;
-  total: number;
-}
+  config?: Record<string, unknown>;
+};
 
 /** Body for POST /workspaces/{wsId}/dashboard/widgets. */
-export interface CreateWidgetInput {
-  widgetType: WidgetType;
-  title: string;
-  config?: Record<string, unknown> | undefined;
-  positionX?: number | undefined;
-  positionY?: number | undefined;
-  width?: number | undefined;
-  height?: number | undefined;
-}
+export type CreateWidgetInput = components['schemas']['CreateWidgetBody'];
 
 /** Body for PATCH /workspaces/{wsId}/dashboard/widgets/{widgetId}. */
-export interface UpdateWidgetInput {
-  title?: string | undefined;
-  config?: Record<string, unknown> | undefined;
-  positionX?: number | undefined;
-  positionY?: number | undefined;
-  width?: number | undefined;
-  height?: number | undefined;
-}
+export type UpdateWidgetInput = components['schemas']['UpdateWidgetBody'];
 
 // ---------------------------------------------------------------------------
 // Query key factory
@@ -79,53 +53,18 @@ export const dashboardKeys = {
   detail: (id: string) => [...dashboardKeys.all, 'detail', id] as const,
 };
 
-// ---------------------------------------------------------------------------
-// Error helper
-// ---------------------------------------------------------------------------
-
-import { ApiError, toApiError } from '../../lib/api-error';
-
 export { ApiError as DashboardApiError };
 
-// ---------------------------------------------------------------------------
-// Fetch helpers
-// ---------------------------------------------------------------------------
-
-function authHeaders(): HeadersInit {
-  const token = authStore.getState().accessToken;
-  // biome-ignore lint/style/useNamingConvention: HTTP header name
-  return token ? { Authorization: `Bearer ${token}` } : {};
-}
-
-async function fetchJson<T>(url: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(url, {
-    ...init,
-    credentials: 'include',
-    headers: {
-      ...authHeaders(),
-      ...init?.headers,
-    },
-  });
-  if (!res.ok) {
-    const body = (await res.json().catch(() => null)) as unknown;
-    throw toApiError(body, `Request failed with status ${String(res.status)}`);
+function toWidgetItem(widget: SDKWidget): WidgetItem {
+  const { config, widgetType, ...rest } = widget;
+  const out: WidgetItem = {
+    ...rest,
+    widgetType: widgetType as WidgetType,
+  };
+  if (config && typeof config === 'object' && !Array.isArray(config)) {
+    out.config = config as Record<string, unknown>;
   }
-  return (await res.json()) as T;
-}
-
-async function fetchVoid(url: string, init?: RequestInit): Promise<void> {
-  const res = await fetch(url, {
-    ...init,
-    credentials: 'include',
-    headers: {
-      ...authHeaders(),
-      ...init?.headers,
-    },
-  });
-  if (!res.ok) {
-    const body = (await res.json().catch(() => null)) as unknown;
-    throw toApiError(body, `Request failed with status ${String(res.status)}`);
-  }
+  return out;
 }
 
 // ---------------------------------------------------------------------------
@@ -137,10 +76,11 @@ export function useWidgetsQuery(wsId: string): UseSuspenseQueryResult<WidgetItem
   return useSuspenseQuery({
     queryKey: dashboardKeys.list(wsId),
     queryFn: async (): Promise<WidgetItem[]> => {
-      const data = await fetchJson<{ items?: WidgetItem[] }>(
-        `${apiBaseUrl}/workspaces/${wsId}/dashboard/widgets?limit=200`,
-      );
-      return data.items ?? [];
+      const { data, error } = await sdk.GET('/workspaces/{wsId}/dashboard/widgets', {
+        params: { path: { wsId }, query: { limit: 200 } },
+      });
+      if (error || !data) throw toApiError(error, 'Failed to load dashboard widgets');
+      return (data.widgets ?? []).map(toWidgetItem);
     },
   });
 }
@@ -160,11 +100,12 @@ export function useCreateWidget(
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({ input }: CreateWidgetArgs): Promise<WidgetItem> => {
-      return fetchJson<WidgetItem>(`${apiBaseUrl}/workspaces/${wsId}/dashboard/widgets`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(input),
+      const { data, error } = await sdk.POST('/workspaces/{wsId}/dashboard/widgets', {
+        params: { path: { wsId } },
+        body: input,
       });
+      if (error || !data) throw toApiError(error, 'Failed to create dashboard widget');
+      return toWidgetItem(data);
     },
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: dashboardKeys.list(wsId) });
@@ -184,14 +125,12 @@ export function useUpdateWidget(
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({ widgetId, patch }: UpdateWidgetArgs): Promise<WidgetItem> => {
-      return fetchJson<WidgetItem>(
-        `${apiBaseUrl}/workspaces/${wsId}/dashboard/widgets/${widgetId}`,
-        {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(patch),
-        },
-      );
+      const { data, error } = await sdk.PATCH('/workspaces/{wsId}/dashboard/widgets/{widgetId}', {
+        params: { path: { wsId, widgetId } },
+        body: patch,
+      });
+      if (error || !data) throw toApiError(error, 'Failed to update dashboard widget');
+      return toWidgetItem(data);
     },
     onSuccess: (_data, vars) => {
       void qc.invalidateQueries({ queryKey: dashboardKeys.list(wsId) });
@@ -204,9 +143,12 @@ export interface UpdateWidgetPositionArgs {
   widgetId: string;
   positionX: number;
   positionY: number;
+  width: number;
+  height: number;
+  sortWeight: number;
 }
 
-/** PATCH /workspaces/{wsId}/dashboard/widgets/{widgetId} — update position only. */
+/** PUT /workspaces/{wsId}/dashboard/widgets/{widgetId}/position — update position only. */
 export function useUpdateWidgetPosition(
   wsId: string,
 ): UseMutationResult<WidgetItem, ApiError, UpdateWidgetPositionArgs> {
@@ -216,15 +158,19 @@ export function useUpdateWidgetPosition(
       widgetId,
       positionX,
       positionY,
+      width,
+      height,
+      sortWeight,
     }: UpdateWidgetPositionArgs): Promise<WidgetItem> => {
-      return fetchJson<WidgetItem>(
-        `${apiBaseUrl}/workspaces/${wsId}/dashboard/widgets/${widgetId}`,
+      const { data, error } = await sdk.PUT(
+        '/workspaces/{wsId}/dashboard/widgets/{widgetId}/position',
         {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ positionX, positionY }),
+          params: { path: { wsId, widgetId } },
+          body: { positionX, positionY, width, height, sortWeight },
         },
       );
+      if (error || !data) throw toApiError(error, 'Failed to update dashboard widget position');
+      return toWidgetItem(data);
     },
     onSuccess: (_data, vars) => {
       void qc.invalidateQueries({ queryKey: dashboardKeys.list(wsId) });
@@ -238,9 +184,10 @@ export function useDeleteWidget(wsId: string): UseMutationResult<void, ApiError,
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (widgetId: string): Promise<void> => {
-      await fetchVoid(`${apiBaseUrl}/workspaces/${wsId}/dashboard/widgets/${widgetId}`, {
-        method: 'DELETE',
+      const { error } = await sdk.DELETE('/workspaces/{wsId}/dashboard/widgets/{widgetId}', {
+        params: { path: { wsId, widgetId } },
       });
+      if (error) throw toApiError(error, 'Failed to delete dashboard widget');
     },
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: dashboardKeys.list(wsId) });

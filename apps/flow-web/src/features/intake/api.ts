@@ -1,6 +1,4 @@
-/**
- * Intake feature — typed queries and mutations.
- */
+import type { components } from '@nodate-flow/sdk';
 import {
   type UseMutationResult,
   type UseSuspenseQueryResult,
@@ -12,20 +10,7 @@ import {
 import { type ApiError, toApiError } from '../../lib/api-error';
 import { sdk } from '../../lib/sdk';
 
-// TODO: Replace with SDK types after `bun run generate:sdk`
-export interface IntakeItem {
-  id: string;
-  title: string;
-  body?: string;
-  triageStatus: string;
-  snoozeUntil?: number;
-  aiScore?: number;
-  aiReasoning?: string;
-  taskId?: string;
-  triagedByUserId?: string;
-  triagedByDisplayName?: string;
-  createdAt: number;
-}
+export type IntakeItem = components['schemas']['IntakeItem'];
 
 /** Query key factory for the intake feature. */
 export const intakeKeys = {
@@ -48,7 +33,7 @@ export function useIntakeQuery(
         },
       });
       if (error || !data) throw toApiError(error, 'Failed to load intake items');
-      return (data as { items?: IntakeItem[] }).items ?? [];
+      return data.items ?? [];
     },
   });
 }
@@ -68,7 +53,7 @@ export function useCreateIntake(): UseMutationResult<IntakeItem, ApiError, Creat
         body: { title, ...(body != null ? { body } : {}) },
       });
       if (error || !data) throw toApiError(error, 'Failed to create intake item');
-      return data as IntakeItem;
+      return data;
     },
     onSuccess: (_data, vars) => {
       void qc.invalidateQueries({ queryKey: intakeKeys.list(vars.workspaceId) });
@@ -127,7 +112,7 @@ export function useConvertIntake(): UseMutationResult<
         body: { projectId },
       });
       if (error || !data) throw toApiError(error, 'Failed to convert intake item');
-      return data as { taskId: string };
+      return data;
     },
     onSuccess: (_data, vars) => {
       void qc.invalidateQueries({ queryKey: intakeKeys.list(vars.workspaceId) });

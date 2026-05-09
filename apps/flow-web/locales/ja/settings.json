@@ -87,12 +87,6 @@
       "page_of": "{total} ページ中 {current} ページ"
     }
   },
-  "audit": {
-    "empty": {
-      "title": "近日対応",
-      "body": "このサーバーでは監査ログをまだご利用いただけません。次回のアップデート以降に再度ご確認ください。"
-    }
-  },
   "sections_label": "ワークスペース設定セクション",
   "settings_sections_label": "設定セクション",
   "access_restricted": {

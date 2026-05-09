@@ -12,11 +12,11 @@ import Input from '@nodate-flow/ui/primitives/input';
 import { type ReactElement, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import type { PublicShare } from './api';
+import type { PublicShareWithToken } from './api';
 import styles from './rotate-dialog.module.css';
 
 export interface RotateTokenDialogProps {
-  share: PublicShare | null;
+  share: PublicShareWithToken | null;
   webUrl: string;
   onClose: () => void;
 }

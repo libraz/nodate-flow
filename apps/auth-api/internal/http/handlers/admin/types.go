@@ -87,10 +87,8 @@ type PatchUserOutput struct {
 
 // --- Workspaces ---
 
-// Workspace is the public DTO for a workspace in the admin panel.
-// The package qualifier (admin.Workspace) distinguishes it from the
-// member-facing Workspace DTO in the workspace handler package.
-type Workspace struct {
+// AdminWorkspace is the public DTO for a workspace in the admin panel.
+type AdminWorkspace struct {
 	ID           string  `json:"id"`
 	Slug         string  `json:"slug"`
 	Name         string  `json:"name"`
@@ -112,13 +110,13 @@ type ListWorkspacesInput struct {
 
 // ListWorkspacesOutput is the response for GET /admin/workspaces.
 type ListWorkspacesOutput struct {
-	Body ListWorkspacesOutputBody
+	Body AdminListWorkspacesOutputBody
 }
 
-// ListWorkspacesOutputBody is the response body for GET /admin/workspaces.
-type ListWorkspacesOutputBody struct {
-	Total int64       `json:"total"`
-	Items []Workspace `json:"items"`
+// AdminListWorkspacesOutputBody is the response body for GET /admin/workspaces.
+type AdminListWorkspacesOutputBody struct {
+	Total int64            `json:"total"`
+	Items []AdminWorkspace `json:"items"`
 }
 
 // GetWorkspaceInput binds the path parameter for GET /admin/workspaces/{wsId}.
@@ -128,17 +126,17 @@ type GetWorkspaceInput struct {
 
 // GetWorkspaceOutput is the response for GET /admin/workspaces/{wsId}.
 type GetWorkspaceOutput struct {
-	Body Workspace
+	Body AdminWorkspace
 }
 
 // PatchWorkspaceInput binds the path and body for PATCH /admin/workspaces/{wsId}.
 type PatchWorkspaceInput struct {
 	WsID string `path:"wsId"`
-	Body PatchWorkspaceInputBody
+	Body AdminPatchWorkspaceInputBody
 }
 
-// PatchWorkspaceInputBody is the JSON body for PATCH /admin/workspaces/{wsId}.
-type PatchWorkspaceInputBody struct {
+// AdminPatchWorkspaceInputBody is the JSON body for PATCH /admin/workspaces/{wsId}.
+type AdminPatchWorkspaceInputBody struct {
 	Enabled *bool `json:"enabled"`
 }
 
@@ -185,14 +183,14 @@ type RevokeSessionInput struct {
 	SessionID string `path:"sessionId"`
 }
 
-// RevokeSessionOutputBody is the response body for DELETE /admin/sessions/{sessionId}.
-type RevokeSessionOutputBody struct {
+// AdminRevokeSessionOutputBody is the response body for DELETE /admin/sessions/{sessionId}.
+type AdminRevokeSessionOutputBody struct {
 	Ok bool `json:"ok"`
 }
 
 // RevokeSessionOutput is the response for DELETE /admin/sessions/{sessionId}.
 type RevokeSessionOutput struct {
-	Body RevokeSessionOutputBody
+	Body AdminRevokeSessionOutputBody
 }
 
 // --- Instance Admins ---

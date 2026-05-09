@@ -49,16 +49,18 @@ type Signal struct {
 	CreatedAt  int64           `json:"createdAt"`
 }
 
+type SignalCreateInputBody struct {
+	WorkspaceID string          `json:"workspaceId" required:"true" doc:"Workspace public id (UUID v7)"`
+	Source      string          `json:"source" required:"true" enum:"manual,github,slack,email,webhook"`
+	Kind        string          `json:"kind" required:"true" minLength:"1" maxLength:"255"`
+	ExternalID  string          `json:"externalId,omitempty" maxLength:"255"`
+	TaskID      string          `json:"taskId,omitempty" doc:"Optional task public id to attach to"`
+	Payload     json.RawMessage `json:"payload,omitempty"`
+}
+
 // CreateInput is the body for POST /signals.
 type CreateInput struct {
-	Body struct {
-		WorkspaceID string          `json:"workspaceId" doc:"Workspace public id (UUID v7)"`
-		Source      string          `json:"source" enum:"manual,github,slack,email,webhook"`
-		Kind        string          `json:"kind" minLength:"1" maxLength:"255"`
-		ExternalID  string          `json:"externalId,omitempty" maxLength:"255"`
-		TaskID      string          `json:"taskId,omitempty" doc:"Optional task public id to attach to"`
-		Payload     json.RawMessage `json:"payload,omitempty"`
-	}
+	Body SignalCreateInputBody
 }
 
 // CreateOutput is the response for POST /signals.

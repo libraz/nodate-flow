@@ -1,34 +1,18 @@
 /**
  * Audit log feature — suspense query for listing workspace audit entries.
- *
- * The backend endpoint GET /workspaces/{wsId}/audit-logs is not yet
- * exposed in the OpenAPI spec. This module is written against the
- * expected shape so the UI is ready the moment the handler ships.
- * Until then the query will 404 and the ErrorBoundary catches it.
  */
 
+import type { components } from '@nodate-flow/sdk';
 import { type UseSuspenseQueryResult, useSuspenseQuery } from '@tanstack/react-query';
 
+import { toApiError } from '../../lib/api-error';
 import { sdk } from '../../lib/sdk';
 
-/** Shape matching the sqlc ListRecentAuditRow + API camelCase mapping. */
-export interface AuditLogEntry {
-  publicId: string;
-  actorUserPublicId: string | null;
-  actorDisplayName: string | null;
-  action: string;
-  resourceType: string;
-  resourcePublicId: string | null;
-  ipAddress: string | null;
-  userAgent: string | null;
-  metadataJson: Record<string, unknown> | null;
-  occurredAt: number;
-}
-
-export interface AuditLogListResponse {
+export type AuditLogEntry = components['schemas']['LogEntryDTO'];
+export type AuditLogListResponse = {
   entries: AuditLogEntry[];
   total: number;
-}
+};
 
 export interface AuditLogFilters {
   action?: string;
@@ -58,11 +42,7 @@ export function useAuditLogsQuery(
   return useSuspenseQuery({
     queryKey: auditLogKeys.list(workspaceId, filters),
     queryFn: async (): Promise<AuditLogListResponse> => {
-      // Until the endpoint is added to the OpenAPI spec we use an
-      // untyped GET via the SDK client.  Once the spec includes
-      // /workspaces/{wsId}/audit-logs this can switch to the typed
-      // overload.
-      const queryParams: Record<string, unknown> = {
+      const queryParams: AuditLogFilters = {
         limit: filters.limit ?? 50,
         offset: filters.offset ?? 0,
       };
@@ -72,20 +52,10 @@ export function useAuditLogsQuery(
       if (filters.dateFrom !== undefined) queryParams.dateFrom = filters.dateFrom;
       if (filters.dateTo !== undefined) queryParams.dateTo = filters.dateTo;
 
-      // TODO(openapi): Remove type suppression once GET /workspaces/{wsId}/audit-logs
-      // is registered as a Huma operation and included in the merged OpenAPI spec.
-      // Tracked by the audit-logs endpoint not yet being defined in flow-api handlers.
-      const untypedSdk = sdk as unknown as {
-        // biome-ignore lint/style/useNamingConvention: SDK method name
-        GET: (
-          url: string,
-          opts: { params: { query: Record<string, unknown> } },
-        ) => Promise<{ data?: AuditLogListResponse; error?: unknown }>;
-      };
-      const { data, error } = await untypedSdk.GET(`/workspaces/${workspaceId}/audit-logs`, {
-        params: { query: queryParams },
+      const { data, error } = await sdk.GET('/workspaces/{wsId}/audit-logs', {
+        params: { path: { wsId: workspaceId }, query: queryParams },
       });
-      if (error || !data) throw new Error('Failed to load audit logs');
+      if (error || !data) throw toApiError(error, 'Failed to load audit logs');
       return { entries: data.entries ?? [], total: data.total ?? 0 };
     },
   });

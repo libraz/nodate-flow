@@ -1,6 +1,4 @@
-/**
- * Favorites feature — typed queries and mutations.
- */
+import type { components } from '@nodate-flow/sdk';
 import {
   type UseMutationResult,
   type UseSuspenseQueryResult,
@@ -12,14 +10,7 @@ import {
 import { type ApiError, toApiError } from '../../lib/api-error';
 import { sdk } from '../../lib/sdk';
 
-// TODO: Replace with SDK types after `bun run generate:sdk`
-export interface Favorite {
-  id: string;
-  targetType: string;
-  targetId: string;
-  folderName?: string;
-  createdAt: number;
-}
+export type Favorite = components['schemas']['Favorite'];
 
 /** Query key factory for the favorites feature. */
 export const favoritesKeys = {
@@ -35,7 +26,7 @@ export function useFavoritesQuery(workspaceId: string): UseSuspenseQueryResult<F
         params: { query: { workspaceId } },
       });
       if (error || !data) throw toApiError(error, 'Failed to load favorites');
-      return (data as { favorites?: Favorite[] }).favorites ?? [];
+      return data.favorites ?? [];
     },
   });
 }
@@ -60,7 +51,7 @@ export function useAddFavorite(): UseMutationResult<Favorite, ApiError, AddFavor
         body: { workspaceId, targetType, targetId },
       });
       if (error || !data) throw toApiError(error, 'Failed to add favorite');
-      return data as Favorite;
+      return data;
     },
     onSuccess: (_data, vars) => {
       void qc.invalidateQueries({ queryKey: favoritesKeys.list(vars.workspaceId) });

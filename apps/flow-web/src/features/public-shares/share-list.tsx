@@ -16,6 +16,7 @@ import { formatEpochDateTime } from '../../lib/format';
 import { getPublicBaseUrl } from '../../lib/public-base-url';
 import {
   type PublicShare,
+  type PublicShareWithToken,
   useDeletePublicShare,
   usePublicSharesQuery,
   useRotatePublicShareToken,
@@ -34,7 +35,7 @@ export default function ShareList({ workspaceId }: ShareListProps): ReactElement
   const deleteShare = useDeletePublicShare(workspaceId);
   const rotate = useRotatePublicShareToken(workspaceId);
   const [createOpen, setCreateOpen] = useState(false);
-  const [rotatedShare, setRotatedShare] = useState<PublicShare | null>(null);
+  const [rotatedShare, setRotatedShare] = useState<PublicShareWithToken | null>(null);
   const locale = i18n.resolvedLanguage ?? 'en';
 
   const handleDelete = async (share: PublicShare): Promise<void> => {

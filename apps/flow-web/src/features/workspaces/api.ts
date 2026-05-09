@@ -20,7 +20,7 @@ export type Workspace = components['schemas']['Workspace'];
 export type WorkspaceMember = components['schemas']['WorkspaceMember'];
 export type WorkspaceUserSummary = components['schemas']['WorkspaceUserSummary'];
 export type CreateWorkspaceInput = components['schemas']['CreateWorkspaceInputBody'];
-export type PatchWorkspaceInput = components['schemas']['PatchWorkspaceInputBody'];
+export type PatchWorkspaceInput = components['schemas']['WorkspacePatchWorkspaceInputBody'];
 export type InviteMemberInput = components['schemas']['AddWorkspaceMemberInputBody'];
 export type UpdateMemberRoleInput = components['schemas']['UpdateWorkspaceMemberRoleInputBody'];
 
@@ -77,7 +77,7 @@ export function useWorkspacesQuery(): UseSuspenseQueryResult<Workspace[]> {
     queryFn: async (): Promise<Workspace[]> => {
       const { data, error } = await sdk.GET('/workspaces', {});
       if (error || !data) throw toError(error, 'Failed to load workspaces');
-      return data.items ?? [];
+      return data.workspaces ?? [];
     },
   });
 }

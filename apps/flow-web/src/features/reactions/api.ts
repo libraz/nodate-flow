@@ -2,6 +2,7 @@
  * Reactions feature — typed queries and mutations backed by the SDK.
  */
 
+import type { components } from '@nodate-flow/sdk';
 import {
   type UseMutationResult,
   type UseSuspenseQueryResult,
@@ -13,15 +14,7 @@ import {
 import { type ApiError, toApiError } from '../../lib/api-error';
 import { sdk } from '../../lib/sdk';
 
-// TODO: Replace with SDK types after `bun run generate:sdk`
-// export type Reaction = components['schemas']['Reaction'];
-export interface Reaction {
-  id: string;
-  emoji: string;
-  userId: string;
-  userDisplayName: string;
-  createdAt: number;
-}
+export type Reaction = components['schemas']['Reaction'];
 
 /** Query key factory for the reactions feature. */
 export const reactionsKeys = {
@@ -37,7 +30,7 @@ export function useTaskReactionsQuery(taskId: string): UseSuspenseQueryResult<Re
         params: { path: { id: taskId } },
       });
       if (error || !data) throw toApiError(error, 'Failed to load reactions');
-      return (data as { reactions?: Reaction[] }).reactions ?? [];
+      return data.reactions ?? [];
     },
   });
 }

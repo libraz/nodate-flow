@@ -33,6 +33,7 @@ func main() {
 
 	res := router.BuildResult(router.Deps{JWT: issuer})
 	merged := mergeSpecs(res.APIs)
+	patchErrorModelSchema(merged)
 
 	buf, err := json.MarshalIndent(merged, "", "  ")
 	if err != nil {
@@ -84,7 +85,32 @@ func mergeSpecs(apis []huma.API) *huma.OpenAPI {
 			}
 		}
 	}
+	patchErrorModelSchema(root)
 	return root
+}
+
+func patchErrorModelSchema(spec *huma.OpenAPI) {
+	if spec == nil || spec.Components == nil || spec.Components.Schemas == nil {
+		return
+	}
+	schema := spec.Components.Schemas.Map()["ErrorModel"]
+	if schema == nil {
+		return
+	}
+	if schema.Properties == nil {
+		schema.Properties = map[string]*huma.Schema{}
+	}
+	if typeSchema := schema.Properties["type"]; typeSchema != nil {
+		typeSchema.Format = ""
+	}
+	schema.Properties["description"] = &huma.Schema{
+		Type:        "string",
+		Description: "Developer-facing explanation of when this error fires.",
+	}
+	schema.Properties["userAction"] = &huma.Schema{
+		Type:        "string",
+		Description: "Short imperative the UI can render to tell the end user how to recover.",
+	}
 }
 
 // mergePathItem copies operations from src into dst for verbs that dst

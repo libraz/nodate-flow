@@ -294,8 +294,8 @@ type ListMyTasksOutput struct {
 // server-side clock; the client should send the widest range it plans
 // to render.
 type ListMyTasksWithDatesInput struct {
-	From   string `query:"from" required:"true" doc:"Range start YYYY-MM-DD (inclusive)"`
-	To     string `query:"to" required:"true" doc:"Range end YYYY-MM-DD (inclusive)"`
+	From   string `query:"from" required:"true" minLength:"1" pattern:"^20\\d{2}-(0[1-9]|1[0-2])-(0[1-9]|1\\d|2[0-8])$" doc:"Range start YYYY-MM-DD (inclusive)"`
+	To     string `query:"to" required:"true" minLength:"1" pattern:"^20\\d{2}-(0[1-9]|1[0-2])-(0[1-9]|1\\d|2[0-8])$" doc:"Range end YYYY-MM-DD (inclusive)"`
 	Cursor string `query:"cursor" doc:"Opaque cursor returned by previous page; pass to fetch next page. Empty when at end."`
 	// Cross-workspace calendar grid: month-range fetch may exceed handlerutil.MaxListLimit; cap raised to 1000.
 	Limit  int32 `query:"limit" minimum:"1" maximum:"1000" default:"100"`
@@ -1020,6 +1020,7 @@ type ListLinkedEventsOutput struct {
 
 // ListLinkedTasksInput is the path for GET /calendar-events/{evtId}/linked-tasks.
 type ListLinkedTasksInput struct {
+	WsID     string `path:"wsId"`
 	EventID  string `path:"evtId"`
 	Relation string `query:"relation" enum:"contributes_to,blocks,depends_on,prep_for"`
 	// Reverse umbrella graph: mirror of ListLinkedEventsInput; cap raised to 1000.

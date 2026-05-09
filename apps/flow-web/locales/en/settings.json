@@ -87,12 +87,6 @@
       "page_of": "Page {current} of {total}"
     }
   },
-  "audit": {
-    "empty": {
-      "title": "Coming soon",
-      "body": "The audit log isn't available yet on this server. Check back after the next update."
-    }
-  },
   "sections_label": "Workspace settings sections",
   "settings_sections_label": "Settings sections",
   "access_restricted": {

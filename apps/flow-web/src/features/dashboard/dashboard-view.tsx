@@ -88,6 +88,9 @@ function WidgetGrid({ wsId, editing, onAddWidget }: WidgetGridProps): ReactEleme
             widgetId: widget.id,
             positionX: newX,
             positionY: newY,
+            width: widget.width,
+            height: widget.height,
+            sortWeight: widget.sortWeight,
           })
           .catch(() => {
             toaster.show({ tone: 'danger', message: t('update_position_error') });

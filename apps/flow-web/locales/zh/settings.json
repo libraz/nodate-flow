@@ -87,12 +87,6 @@
       "page_of": "第 {current} / {total} 页"
     }
   },
-  "audit": {
-    "empty": {
-      "title": "敬请期待",
-      "body": "此服务器尚不支持审计日志，请在下次更新后再来查看。"
-    }
-  },
   "sections_label": "工作区设置板块",
   "settings_sections_label": "设置板块",
   "access_restricted": {

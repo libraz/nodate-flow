@@ -432,6 +432,23 @@
         "required": ["enabled"],
         "type": "object"
       },
+      "AdminRevokeSessionOutputBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/AdminRevokeSessionOutputBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "ok": {
+            "type": "boolean"
+          }
+        },
+        "required": ["ok"],
+        "type": "object"
+      },
       "AdminWorkspace": {
         "additionalProperties": false,
         "properties": {
@@ -1163,6 +1180,32 @@
         "required": ["id", "action", "occurredAt"],
         "type": "object"
       },
+      "AuthTokens": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/AuthTokens.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "accessToken": {
+            "type": "string"
+          },
+          "expiresAt": {
+            "description": "Access token expiry, unix seconds",
+            "format": "int64",
+            "type": "integer"
+          },
+          "userId": {
+            "description": "User public id (UUID v7)",
+            "type": "string"
+          }
+        },
+        "required": ["accessToken", "expiresAt", "userId"],
+        "type": "object"
+      },
       "AutoActionRuleBody": {
         "additionalProperties": false,
         "properties": {
@@ -1236,6 +1279,23 @@
           }
         },
         "required": ["format", "count", "tasks"],
+        "type": "object"
+      },
+      "CalendarRemoveMemberOutputBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/CalendarRemoveMemberOutputBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "removed": {
+            "type": "boolean"
+          }
+        },
+        "required": ["removed"],
         "type": "object"
       },
       "CalendarResponse": {
@@ -3528,6 +3588,10 @@
             "readOnly": true,
             "type": "string"
           },
+          "description": {
+            "description": "Developer-facing explanation of when this error fires.",
+            "type": "string"
+          },
           "detail": {
             "description": "A human-readable explanation specific to this occurrence of the problem.",
             "examples": ["Property foo is required but is missing."],
@@ -3561,7 +3625,10 @@
             "default": "about:blank",
             "description": "A URI reference to human-readable documentation for the error.",
             "examples": ["https://example.com/errors/example"],
-            "format": "uri",
+            "type": "string"
+          },
+          "userAction": {
+            "description": "Short imperative the UI can render to tell the end user how to recover.",
             "type": "string"
           }
         },
@@ -5353,33 +5420,6 @@
         "required": ["total", "tasks", "nextCursor"],
         "type": "object"
       },
-      "ListOutputBody": {
-        "additionalProperties": false,
-        "properties": {
-          "$schema": {
-            "description": "A URL to the JSON Schema for this object.",
-            "examples": ["https://example.com/schemas/ListOutputBody.json"],
-            "format": "uri",
-            "readOnly": true,
-            "type": "string"
-          },
-          "nextCursor": {
-            "type": ["string", "null"]
-          },
-          "total": {
-            "format": "int64",
-            "type": "integer"
-          },
-          "webhooks": {
-            "items": {
-              "$ref": "#/components/schemas/WebhookSubscriptionDTO"
-            },
-            "type": ["array", "null"]
-          }
-        },
-        "required": ["total", "webhooks", "nextCursor"],
-        "type": "object"
-      },
       "ListPagesBody": {
         "additionalProperties": false,
         "properties": {
@@ -6054,33 +6094,6 @@
         "required": ["users"],
         "type": "object"
       },
-      "ListWorkspacesOutputBody": {
-        "additionalProperties": false,
-        "properties": {
-          "$schema": {
-            "description": "A URL to the JSON Schema for this object.",
-            "examples": ["https://example.com/schemas/ListWorkspacesOutputBody.json"],
-            "format": "uri",
-            "readOnly": true,
-            "type": "string"
-          },
-          "items": {
-            "items": {
-              "$ref": "#/components/schemas/Workspace"
-            },
-            "type": ["array", "null"]
-          },
-          "nextCursor": {
-            "type": ["string", "null"]
-          },
-          "total": {
-            "format": "int64",
-            "type": "integer"
-          }
-        },
-        "required": ["total", "items", "nextCursor"],
-        "type": "object"
-      },
       "LogEntryDTO": {
         "additionalProperties": false,
         "properties": {
@@ -6427,6 +6440,23 @@
           "notifWebPush",
           "isInstanceAdmin"
         ],
+        "type": "object"
+      },
+      "MeRevokeSessionOutputBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/MeRevokeSessionOutputBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "ok": {
+            "type": "boolean"
+          }
+        },
+        "required": ["ok"],
         "type": "object"
       },
       "MemberResponse": {
@@ -6806,6 +6836,33 @@
           "deliveredAt",
           "createdAt"
         ],
+        "type": "object"
+      },
+      "NotificationsListOutputBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/NotificationsListOutputBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "nextCursor": {
+            "type": ["string", "null"]
+          },
+          "notifications": {
+            "items": {
+              "$ref": "#/components/schemas/NotificationDTO"
+            },
+            "type": ["array", "null"]
+          },
+          "total": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "required": ["total", "notifications", "nextCursor"],
         "type": "object"
       },
       "OIDCStartOutputBody": {
@@ -7582,45 +7639,6 @@
           }
         },
         "required": ["ok"],
-        "type": "object"
-      },
-      "PatchWorkspaceInputBody": {
-        "additionalProperties": false,
-        "properties": {
-          "$schema": {
-            "description": "A URL to the JSON Schema for this object.",
-            "examples": ["https://example.com/schemas/PatchWorkspaceInputBody.json"],
-            "format": "uri",
-            "readOnly": true,
-            "type": "string"
-          },
-          "country": {
-            "pattern": "^$|^[A-Z]{2}$",
-            "type": "string"
-          },
-          "description": {
-            "maxLength": 500,
-            "type": "string"
-          },
-          "iconUrl": {
-            "maxLength": 500,
-            "type": "string"
-          },
-          "name": {
-            "maxLength": 100,
-            "minLength": 1,
-            "type": "string"
-          },
-          "slug": {
-            "maxLength": 64,
-            "minLength": 1,
-            "type": "string"
-          },
-          "timezone": {
-            "maxLength": 64,
-            "type": "string"
-          }
-        },
         "type": "object"
       },
       "PatchWorkspaceOutputBody": {
@@ -8498,23 +8516,6 @@
         "required": ["removed"],
         "type": "object"
       },
-      "RemoveMemberOutputBody": {
-        "additionalProperties": false,
-        "properties": {
-          "$schema": {
-            "description": "A URL to the JSON Schema for this object.",
-            "examples": ["https://example.com/schemas/RemoveMemberOutputBody.json"],
-            "format": "uri",
-            "readOnly": true,
-            "type": "string"
-          },
-          "removed": {
-            "type": "boolean"
-          }
-        },
-        "required": ["removed"],
-        "type": "object"
-      },
       "RemoveProjectMemberBody": {
         "additionalProperties": false,
         "properties": {
@@ -8936,23 +8937,6 @@
         "required": ["ok"],
         "type": "object"
       },
-      "RevokeSessionOutputBody": {
-        "additionalProperties": false,
-        "properties": {
-          "$schema": {
-            "description": "A URL to the JSON Schema for this object.",
-            "examples": ["https://example.com/schemas/RevokeSessionOutputBody.json"],
-            "format": "uri",
-            "readOnly": true,
-            "type": "string"
-          },
-          "ok": {
-            "type": "boolean"
-          }
-        },
-        "required": ["ok"],
-        "type": "object"
-      },
       "SavedLens": {
         "additionalProperties": false,
         "properties": {
@@ -9277,6 +9261,42 @@
           }
         },
         "required": ["id", "source", "kind", "receivedAt", "createdAt"],
+        "type": "object"
+      },
+      "SignalCreateInputBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/SignalCreateInputBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "externalId": {
+            "maxLength": 255,
+            "type": "string"
+          },
+          "kind": {
+            "maxLength": 255,
+            "minLength": 1,
+            "type": "string"
+          },
+          "payload": {},
+          "source": {
+            "enum": ["manual", "github", "slack", "email", "webhook"],
+            "type": "string"
+          },
+          "taskId": {
+            "description": "Optional task public id to attach to",
+            "type": "string"
+          },
+          "workspaceId": {
+            "description": "Workspace public id (UUID v7)",
+            "type": "string"
+          }
+        },
+        "required": ["workspaceId", "source", "kind"],
         "type": "object"
       },
       "SmartCreateInputBody": {
@@ -10491,32 +10511,6 @@
         "required": ["ok"],
         "type": "object"
       },
-      "Tokens": {
-        "additionalProperties": false,
-        "properties": {
-          "$schema": {
-            "description": "A URL to the JSON Schema for this object.",
-            "examples": ["https://example.com/schemas/Tokens.json"],
-            "format": "uri",
-            "readOnly": true,
-            "type": "string"
-          },
-          "accessToken": {
-            "type": "string"
-          },
-          "expiresAt": {
-            "description": "Access token expiry, unix seconds",
-            "format": "int64",
-            "type": "integer"
-          },
-          "userId": {
-            "description": "User public id (UUID v7)",
-            "type": "string"
-          }
-        },
-        "required": ["accessToken", "expiresAt", "userId"],
-        "type": "object"
-      },
       "TotpConfirmInputBody": {
         "additionalProperties": false,
         "properties": {
@@ -11480,6 +11474,33 @@
         ],
         "type": "object"
       },
+      "WebhooksListOutputBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/WebhooksListOutputBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "nextCursor": {
+            "type": ["string", "null"]
+          },
+          "total": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "webhooks": {
+            "items": {
+              "$ref": "#/components/schemas/WebhookSubscriptionDTO"
+            },
+            "type": ["array", "null"]
+          }
+        },
+        "required": ["total", "webhooks", "nextCursor"],
+        "type": "object"
+      },
       "WeeklyDigestCounts": {
         "additionalProperties": false,
         "properties": {
@@ -11759,6 +11780,62 @@
         "required": ["id", "userId", "email", "displayName", "role", "createdAt"],
         "type": "object"
       },
+      "WorkspacePatchWorkspaceInputBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/WorkspacePatchWorkspaceInputBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "country": {
+            "pattern": "^$|^[A-Z]{2}$",
+            "type": "string"
+          },
+          "description": {
+            "maxLength": 500,
+            "type": "string"
+          },
+          "iconUrl": {
+            "maxLength": 500,
+            "type": "string"
+          },
+          "name": {
+            "maxLength": 100,
+            "minLength": 1,
+            "type": "string"
+          },
+          "slug": {
+            "maxLength": 64,
+            "minLength": 1,
+            "type": "string"
+          },
+          "timezone": {
+            "maxLength": 64,
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "WorkspaceRemoveMemberOutputBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/WorkspaceRemoveMemberOutputBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "ok": {
+            "type": "boolean"
+          }
+        },
+        "required": ["ok"],
+        "type": "object"
+      },
       "WorkspaceUserSummary": {
         "additionalProperties": false,
         "properties": {
@@ -11774,6 +11851,33 @@
           }
         },
         "required": ["id", "displayName"],
+        "type": "object"
+      },
+      "WorkspacesListOutputBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/WorkspacesListOutputBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "nextCursor": {
+            "type": ["string", "null"]
+          },
+          "total": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "workspaces": {
+            "items": {
+              "$ref": "#/components/schemas/Workspace"
+            },
+            "type": ["array", "null"]
+          }
+        },
+        "required": ["total", "workspaces", "nextCursor"],
         "type": "object"
       }
     }
@@ -12055,7 +12159,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/RevokeSessionOutputBody"
+                  "$ref": "#/components/schemas/AdminRevokeSessionOutputBody"
                 }
               }
             },
@@ -12680,7 +12784,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Tokens"
+                  "$ref": "#/components/schemas/AuthTokens"
                 }
               }
             },
@@ -12817,7 +12921,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Tokens"
+                  "$ref": "#/components/schemas/AuthTokens"
                 }
               }
             },
@@ -12871,6 +12975,22 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "explode": false,
+            "in": "query",
+            "name": "error",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "explode": false,
+            "in": "query",
+            "name": "error_description",
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -12878,7 +12998,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Tokens"
+                  "$ref": "#/components/schemas/AuthTokens"
                 }
               }
             },
@@ -12961,6 +13081,22 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "explode": false,
+            "in": "query",
+            "name": "error",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "explode": false,
+            "in": "query",
+            "name": "error_description",
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -12968,7 +13104,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Tokens"
+                  "$ref": "#/components/schemas/AuthTokens"
                 }
               }
             },
@@ -13051,6 +13187,22 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "explode": false,
+            "in": "query",
+            "name": "error",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "explode": false,
+            "in": "query",
+            "name": "error_description",
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -13058,7 +13210,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Tokens"
+                  "$ref": "#/components/schemas/AuthTokens"
                 }
               }
             },
@@ -13139,7 +13291,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Tokens"
+                  "$ref": "#/components/schemas/AuthTokens"
                 }
               }
             },
@@ -13194,7 +13346,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Tokens"
+                  "$ref": "#/components/schemas/AuthTokens"
                 }
               }
             },
@@ -13696,6 +13848,8 @@
             "required": true,
             "schema": {
               "description": "Range start (inclusive, YYYY-MM-DD or RFC3339)",
+              "minLength": 1,
+              "pattern": "^20\\d{2}-(0[1-9]|1[0-2])-(0[1-9]|1\\d|2[0-8])$",
               "type": "string"
             }
           },
@@ -13707,6 +13861,8 @@
             "required": true,
             "schema": {
               "description": "Range end (exclusive, YYYY-MM-DD or RFC3339)",
+              "minLength": 1,
+              "pattern": "^20\\d{2}-(0[1-9]|1[0-2])-(0[1-9]|1\\d|2[0-8])$",
               "type": "string"
             }
           }
@@ -14097,7 +14253,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ListOutputBody"
+                  "$ref": "#/components/schemas/NotificationsListOutputBody"
                 }
               }
             },
@@ -14303,7 +14459,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/RevokeSessionOutputBody"
+                  "$ref": "#/components/schemas/MeRevokeSessionOutputBody"
                 }
               }
             },
@@ -14401,6 +14557,8 @@
             "required": true,
             "schema": {
               "description": "Range start YYYY-MM-DD (inclusive)",
+              "minLength": 1,
+              "pattern": "^20\\d{2}-(0[1-9]|1[0-2])-(0[1-9]|1\\d|2[0-8])$",
               "type": "string"
             }
           },
@@ -14412,6 +14570,8 @@
             "required": true,
             "schema": {
               "description": "Range end YYYY-MM-DD (inclusive)",
+              "minLength": 1,
+              "pattern": "^20\\d{2}-(0[1-9]|1[0-2])-(0[1-9]|1\\d|2[0-8])$",
               "type": "string"
             }
           },
@@ -15420,7 +15580,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/CreateInputBody"
+                "$ref": "#/components/schemas/SignalCreateInputBody"
               }
             }
           },
@@ -18075,7 +18235,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ListWorkspacesOutputBody"
+                  "$ref": "#/components/schemas/WorkspacesListOutputBody"
                 }
               }
             },
@@ -18224,7 +18384,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/PatchWorkspaceInputBody"
+                "$ref": "#/components/schemas/WorkspacePatchWorkspaceInputBody"
               }
             }
           },
@@ -19769,6 +19929,8 @@
             "required": true,
             "schema": {
               "description": "Range start (inclusive, date or datetime)",
+              "minLength": 1,
+              "pattern": "^20\\d{2}-(0[1-9]|1[0-2])-(0[1-9]|1\\d|2[0-8])$",
               "type": "string"
             }
           },
@@ -19780,6 +19942,8 @@
             "required": true,
             "schema": {
               "description": "Range end (exclusive, date or datetime)",
+              "minLength": 1,
+              "pattern": "^20\\d{2}-(0[1-9]|1[0-2])-(0[1-9]|1\\d|2[0-8])$",
               "type": "string"
             }
           }
@@ -19873,6 +20037,14 @@
         "description": "Returns the tasks linked to the named calendar event with the link kind. Inverse of /tasks/{id}/linked-events.",
         "operationId": "calendar-events-linked-tasks-list",
         "parameters": [
+          {
+            "in": "path",
+            "name": "wsId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
           {
             "in": "path",
             "name": "evtId",
@@ -20337,6 +20509,8 @@
             "required": true,
             "schema": {
               "description": "Range start (inclusive, RFC 3339 datetime or YYYY-MM-DD)",
+              "minLength": 1,
+              "pattern": "^20\\d{2}-(0[1-9]|1[0-2])-(0[1-9]|1\\d|2[0-8])$",
               "type": "string"
             }
           },
@@ -20348,6 +20522,8 @@
             "required": true,
             "schema": {
               "description": "Range end (exclusive, RFC 3339 datetime or YYYY-MM-DD)",
+              "minLength": 1,
+              "pattern": "^20\\d{2}-(0[1-9]|1[0-2])-(0[1-9]|1\\d|2[0-8])$",
               "type": "string"
             }
           }
@@ -22253,7 +22429,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/RemoveMemberOutputBody"
+                  "$ref": "#/components/schemas/CalendarRemoveMemberOutputBody"
                 }
               }
             },
@@ -24768,7 +24944,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/RemoveMemberOutputBody"
+                  "$ref": "#/components/schemas/WorkspaceRemoveMemberOutputBody"
                 }
               }
             },
@@ -26854,7 +27030,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ListOutputBody"
+                  "$ref": "#/components/schemas/WebhooksListOutputBody"
                 }
               }
             },

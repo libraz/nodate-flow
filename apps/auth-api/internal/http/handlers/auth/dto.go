@@ -134,10 +134,10 @@ type RegisterInput struct {
 	}
 }
 
-// Tokens is the tokens envelope returned by register/login/refresh.
+// AuthTokens is the tokens envelope returned by register/login/refresh.
 // The refresh token is intentionally NOT part of this struct: it is
 // delivered as an httpOnly Set-Cookie header instead.
-type Tokens struct {
+type AuthTokens struct {
 	AccessToken string `json:"accessToken"`
 	ExpiresAt   int64  `json:"expiresAt" doc:"Access token expiry, unix seconds"`
 	UserID      string `json:"userId" doc:"User public id (UUID v7)"`
@@ -146,7 +146,7 @@ type Tokens struct {
 // RegisterOutput is the response for POST /auth/register.
 type RegisterOutput struct {
 	SetCookie http.Cookie `header:"Set-Cookie"`
-	Body      Tokens
+	Body      AuthTokens
 }
 
 // LoginInput is the body for POST /auth/login.
@@ -192,7 +192,7 @@ type LoginTotpInput struct {
 // LoginTotpOutput is the response for POST /auth/login/totp.
 type LoginTotpOutput struct {
 	SetCookie http.Cookie `header:"Set-Cookie"`
-	Body      Tokens
+	Body      AuthTokens
 }
 
 // RefreshInput is the request for POST /auth/refresh. The refresh token
@@ -205,7 +205,7 @@ type RefreshInput struct {
 // RefreshOutput is the response for POST /auth/refresh.
 type RefreshOutput struct {
 	SetCookie http.Cookie `header:"Set-Cookie"`
-	Body      Tokens
+	Body      AuthTokens
 }
 
 // LogoutInput is the request for POST /auth/logout. The refresh token is
@@ -259,7 +259,7 @@ type OIDCCallbackInput struct {
 // OIDCCallbackOutput is the response for OIDC callback.
 type OIDCCallbackOutput struct {
 	SetCookie http.Cookie `header:"Set-Cookie"`
-	Body      Tokens
+	Body      AuthTokens
 }
 
 // MeBody is the public DTO for the authenticated user profile, shared
@@ -379,9 +379,12 @@ type RevokeSessionInput struct {
 
 // RevokeSessionOutput is the response for DELETE /me/sessions/{sessionId}.
 type RevokeSessionOutput struct {
-	Body struct {
-		Ok bool `json:"ok"`
-	}
+	Body MeRevokeSessionOutputBody
+}
+
+// MeRevokeSessionOutputBody is the response body for DELETE /me/sessions/{sessionId}.
+type MeRevokeSessionOutputBody struct {
+	Ok bool `json:"ok"`
 }
 
 // RevokeAllOtherSessionsInput binds the refresh cookie so the handler
@@ -516,5 +519,5 @@ type MagicLinkVerifyInput struct {
 // MagicLinkVerifyOutput is the response for GET /auth/magic-link/verify.
 type MagicLinkVerifyOutput struct {
 	SetCookie http.Cookie `header:"Set-Cookie"`
-	Body      Tokens
+	Body      AuthTokens
 }

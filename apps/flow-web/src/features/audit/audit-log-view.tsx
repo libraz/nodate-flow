@@ -131,7 +131,7 @@ function formatTimestamp(unix: number): string {
   return new Date(unix * 1000).toLocaleString();
 }
 
-function formatMetadata(meta: Record<string, unknown> | null): string {
+function formatMetadata(meta: unknown): string {
   if (!meta) return '';
   return JSON.stringify(meta);
 }

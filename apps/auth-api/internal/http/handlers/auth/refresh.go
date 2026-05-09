@@ -69,7 +69,7 @@ func Refresh(deps Deps) func(context.Context, *RefreshInput) (*RefreshOutput, er
 		}
 		return &RefreshOutput{
 			SetCookie: newRefreshCookie(newPlain, deps.CookieSecure),
-			Body: Tokens{
+			Body: AuthTokens{
 				AccessToken: access,
 				ExpiresAt:   exp.Unix(),
 				UserID:      pub.String(),

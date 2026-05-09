@@ -1,6 +1,4 @@
-/**
- * Description version history — queries and mutations.
- */
+import type { components } from '@nodate-flow/sdk';
 import {
   type UseMutationResult,
   type UseSuspenseQueryResult,
@@ -13,19 +11,8 @@ import { type ApiError, toApiError } from '../../lib/api-error';
 import { sdk } from '../../lib/sdk';
 import { tasksKeys } from './api';
 
-// TODO: Replace with SDK types after `bun run generate:sdk`
-export interface DescriptionVersion {
-  id: string;
-  versionNumber: number;
-  authorId?: string;
-  authorDisplayName?: string;
-  bodyLength: number;
-  createdAt: number;
-}
-
-export interface DescriptionVersionFull extends DescriptionVersion {
-  body: string;
-}
+export type DescriptionVersion = components['schemas']['DescriptionVersion'];
+export type DescriptionVersionFull = components['schemas']['DescriptionVersionFull'];
 
 /** Query key factory for description history, nested under tasks. */
 export const descriptionHistoryKeys = {
@@ -44,7 +31,7 @@ export function useDescriptionHistoryQuery(
         params: { path: { id: taskId } },
       });
       if (error || !data) throw toApiError(error, 'Failed to load description history');
-      return (data as { versions?: DescriptionVersion[] }).versions ?? [];
+      return data.versions ?? [];
     },
   });
 }
@@ -60,7 +47,7 @@ export function useDescriptionVersionQuery(
         params: { path: { id: taskId, versionId } },
       });
       if (error || !data) throw toApiError(error, 'Failed to load description version');
-      return data as DescriptionVersionFull;
+      return data;
     },
   });
 }

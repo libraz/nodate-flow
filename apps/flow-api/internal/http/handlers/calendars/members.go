@@ -86,9 +86,12 @@ type RemoveMemberInput struct {
 
 // RemoveMemberOutput is the response for the remove member endpoint.
 type RemoveMemberOutput struct {
-	Body struct {
-		Removed bool `json:"removed"`
-	}
+	Body CalendarRemoveMemberOutputBody
+}
+
+// CalendarRemoveMemberOutputBody is the response body for removing a calendar member.
+type CalendarRemoveMemberOutputBody struct {
+	Removed bool `json:"removed"`
 }
 
 // --- Handlers ---

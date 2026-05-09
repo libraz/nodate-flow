@@ -30,7 +30,7 @@ type Workspace = components['schemas']['Workspace'];
 async function fetchWorkspaceList(): Promise<Workspace[]> {
   const { data, error } = await authSdk.GET('/workspaces', {});
   if (error || !data) return [];
-  return data.items ?? [];
+  return data.workspaces ?? [];
 }
 
 function SetupRoute(): ReactElement {

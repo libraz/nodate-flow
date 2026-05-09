@@ -15,22 +15,22 @@ type CostTodayInput struct {
 	Tz   string `query:"tz" doc:"IANA timezone name (e.g. Asia/Tokyo). Defaults to UTC when absent or invalid."`
 }
 
-// CostTodayOutputBody is the response payload for the cost-today endpoint.
+// AiCostTodayOutputBody is the response payload for the cost-today endpoint.
 //
 // `costUsd` is today's accumulated LLM spend in USD (cents-from-DB / 100).
 // `monthlyCapUsd` is omitted in the MVP (no env var defined yet); the field
 // is reserved for the upcoming monthly cap once it lands.
 // `date` is today in the requested timezone as YYYY-MM-DD (falls back to UTC
 // when `tz` is absent or invalid) per docs/conventions/api-types.md.
-type CostTodayOutputBody struct {
+type AiCostTodayOutputBody struct {
 	CostUsd       float64  `json:"costUsd"`
 	MonthlyCapUsd *float64 `json:"monthlyCapUsd,omitempty"`
 	Date          string   `json:"date" doc:"Local date in the requested timezone (YYYY-MM-DD). Falls back to UTC if tz is absent or invalid."`
 }
 
-// CostTodayOutput is the Huma envelope for CostTodayOutputBody.
+// CostTodayOutput is the Huma envelope for AiCostTodayOutputBody.
 type CostTodayOutput struct {
-	Body CostTodayOutputBody
+	Body AiCostTodayOutputBody
 }
 
 // CostToday handles GET /workspaces/{wsId}/ai/cost-today.
@@ -60,7 +60,7 @@ func CostToday(deps Deps) func(context.Context, *CostTodayInput) (*CostTodayOutp
 		if err != nil {
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
-		return &CostTodayOutput{Body: CostTodayOutputBody{
+		return &CostTodayOutput{Body: AiCostTodayOutputBody{
 			CostUsd: float64(cents) / 100.0,
 			Date:    now.Format("2006-01-02"),
 		}}, nil

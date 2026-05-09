@@ -22,6 +22,9 @@ import { ApiError, toApiError } from '../../lib/api-error';
 import { sdk } from '../../lib/sdk';
 
 export type PublicShare = components['schemas']['PublicShareResponse'];
+export type PublicShareWithToken =
+  | components['schemas']['PublicShareCreateResponse']
+  | components['schemas']['PublicShareRotateResponse'];
 export type ShareEvent = components['schemas']['ShareEventResponse'];
 export type ShareDetail = components['schemas']['GetPublicShareOutputBody'];
 export type CrossCalendarEvent = components['schemas']['CrossCalendarEventResponse'];
@@ -60,10 +63,10 @@ export function usePublicSharesQuery(workspaceId: string): UseSuspenseQueryResul
  */
 export function useCreatePublicShare(
   workspaceId: string,
-): UseMutationResult<PublicShare, ApiError, CreatePublicShareInput> {
+): UseMutationResult<PublicShareWithToken, ApiError, CreatePublicShareInput> {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (input: CreatePublicShareInput): Promise<PublicShare> => {
+    mutationFn: async (input: CreatePublicShareInput): Promise<PublicShareWithToken> => {
       const { data, error } = await sdk.POST('/workspaces/{wsId}/public-shares', {
         params: { path: { wsId: workspaceId } },
         body: input,
@@ -101,10 +104,10 @@ export function useDeletePublicShare(
  */
 export function useRotatePublicShareToken(
   workspaceId: string,
-): UseMutationResult<PublicShare, ApiError, string> {
+): UseMutationResult<PublicShareWithToken, ApiError, string> {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (shareId: string): Promise<PublicShare> => {
+    mutationFn: async (shareId: string): Promise<PublicShareWithToken> => {
       const { data, error } = await sdk.POST('/workspaces/{wsId}/public-shares/{shareId}/rotate', {
         params: { path: { wsId: workspaceId, shareId } },
       });

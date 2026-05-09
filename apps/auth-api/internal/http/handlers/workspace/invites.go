@@ -94,7 +94,7 @@ func CreateInvite(deps InviteDeps) func(context.Context, *CreateInviteInput) (*C
 			})
 		}
 
-		invite := Invite{
+		invite := WorkspaceInvite{
 			ID:        pub.String(),
 			Role:      string(role),
 			MaxUses:   nullInt32Ptr(maxUses),
@@ -131,7 +131,7 @@ func ListInvites(deps InviteDeps) func(context.Context, *ListInvitesInput) (*Lis
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
 		out := &ListInvitesOutput{}
-		out.Body.Invites = make([]Invite, 0, len(rows))
+		out.Body.Invites = make([]WorkspaceInvite, 0, len(rows))
 		for _, r := range rows {
 			out.Body.Invites = append(out.Body.Invites, rowToInvite(r))
 		}
