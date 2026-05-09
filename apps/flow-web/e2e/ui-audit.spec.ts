@@ -34,36 +34,16 @@ test.describe('not-found page', () => {
 });
 
 test.describe('login page', () => {
-  test('renders login form with signup link', async ({ page }) => {
+  test('redirects to the centralised accounts login', async ({ page }) => {
     await page.goto('/login');
-    await page.waitForLoadState('networkidle');
-
-    // Form elements. Resolve passwords by `name=` so the show-password
-    // toggle button (aria-label "Show password") cannot collide with
-    // the input under Playwright strict mode.
-    await expect(page.getByLabel(/email/i)).toBeVisible();
-    await expect(page.locator('input[name="password"]')).toBeVisible();
-    await expect(page.getByRole('button', { name: /sign in/i })).toBeVisible();
-
-    // Signup link present
-    const signupLink = page.getByRole('link', { name: /sign ?up|create/i });
-    await expect(signupLink).toBeVisible();
+    await expect(page).toHaveURL(/http:\/\/localhost:5175\/login\?redirect=/);
   });
 });
 
 test.describe('signup page', () => {
-  test('renders signup form with login link', async ({ page }) => {
+  test('redirects to the centralised accounts signup', async ({ page }) => {
     await page.goto('/signup');
-    await page.waitForLoadState('networkidle');
-
-    await expect(page.getByLabel(/name/i)).toBeVisible();
-    await expect(page.getByLabel(/email/i)).toBeVisible();
-    // Both password fields are present after the signup-confirm work.
-    await expect(page.locator('input[name="password"]')).toBeVisible();
-    await expect(page.locator('input[name="newPasswordConfirm"]')).toBeVisible();
-
-    const loginLink = page.getByRole('link', { name: /sign in|log in/i });
-    await expect(loginLink).toBeVisible();
+    await expect(page).toHaveURL(/http:\/\/localhost:5175\/signup\?redirect=/);
   });
 });
 

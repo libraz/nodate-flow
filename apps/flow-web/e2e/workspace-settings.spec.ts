@@ -36,6 +36,9 @@ test.describe('workspace settings', () => {
       // Verify the main content area renders
       const main = page.getByRole('main');
       await expect(main).toBeVisible({ timeout: 15_000 });
+      await expect(main.getByRole('heading', { level: 1 }).first()).toBeVisible({
+        timeout: 15_000,
+      });
 
       // Verify no i18n key leaks
       const bodyText = await page.locator('body').innerText();
