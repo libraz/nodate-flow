@@ -7,9 +7,9 @@ import (
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/handlers/handlerutil"
 )
 
-// mapListRow converts a ListIntakeItemsForWorkspaceRow to the IntakeItem DTO.
-func mapListRow(r generated.ListIntakeItemsForWorkspaceRow) IntakeItem {
-	item := IntakeItem{
+// mapListRow converts a ListIntakeItemsForWorkspaceRow to the Record DTO.
+func mapListRow(r generated.ListIntakeItemsForWorkspaceRow) Record {
+	item := Record{
 		ID:                   r.PublicID.String(),
 		Title:                r.Title,
 		Body:                 nullStr(r.Body),
@@ -28,9 +28,9 @@ func mapListRow(r generated.ListIntakeItemsForWorkspaceRow) IntakeItem {
 	return item
 }
 
-// mapFindRow converts a FindIntakeItemByPublicIdRow to the IntakeItem DTO.
-func mapFindRow(r generated.FindIntakeItemByPublicIdRow) IntakeItem {
-	item := IntakeItem{
+// mapFindRow converts a FindIntakeItemByPublicIdRow to the Record DTO.
+func mapFindRow(r generated.FindIntakeItemByPublicIdRow) Record {
+	item := Record{
 		ID:           r.PublicID.String(),
 		Title:        r.Title,
 		Body:         nullStr(r.Body),

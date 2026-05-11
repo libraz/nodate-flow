@@ -22,7 +22,8 @@
   },
   "filter": {
     "workspace_label": "工作区",
-    "workspace_all": "所有工作区"
+    "workspace_all": "所有工作区",
+    "handoff": "智能体停滞"
   },
   "toast": {
     "archived": "已归档",

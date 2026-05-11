@@ -16,6 +16,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/generated"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/types"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/taskstate"
 )
@@ -43,6 +44,31 @@ type wsAutoActionConfig struct {
 	threshold       float32
 }
 
+// HandoffQuerier is the narrow slice of [generated.Querier] the
+// auto-action executor needs to apply a handoff_to_user action. Kept
+// as a small interface so unit tests can pass a fake without standing
+// up a real DB. Production wiring uses [generated.New] / WithTx on
+// the executor's *sql.DB.
+type HandoffQuerier interface {
+	InsertHandoffToUserEvent(ctx context.Context, arg generated.InsertHandoffToUserEventParams) (int64, error)
+	GetTaskAgentMemo(ctx context.Context, arg generated.GetTaskAgentMemoParams) (json.RawMessage, error)
+	UpdateTaskAgentMemo(ctx context.Context, arg generated.UpdateTaskAgentMemoParams) error
+}
+
+// ActorDisabler disables a single (workspace_id, task_id, agent_id)
+// task_actors row by setting enabled = FALSE. The production
+// implementation wraps a *sql.Tx; tests pass a fake that records the
+// disable for assertions.
+type ActorDisabler interface {
+	DisableAgentActor(ctx context.Context, workspaceID, taskID, agentID uint32) error
+}
+
+// defaultHandoffLoopLimit caps automated handoffs per task before the
+// auto-action executor gives up and skips emitting further handoff
+// events. Mirrors the runtime's NF_AGENT_HANDOFF_LOOP_LIMIT default
+// so the same memo counter caps both code paths.
+const defaultHandoffLoopLimit = 5
+
 // Executor is the background worker that turns auto-action proposals
 // into real mutations. It is started once in main.go alongside the
 // agent scheduler.
@@ -50,6 +76,11 @@ type Executor struct {
 	DB     *sql.DB
 	Config ExecutorConfig
 	Logger *slog.Logger
+
+	// HandoffLoopLimit caps automated handoff_to_user emissions per
+	// task. Zero falls back to defaultHandoffLoopLimit. Wired from
+	// NF_AGENT_HANDOFF_LOOP_LIMIT alongside the runtime field.
+	HandoffLoopLimit int
 
 	stopOnce sync.Once
 	stopCh   chan struct{}
@@ -114,6 +145,15 @@ type taskRow struct {
 	updatedAt    sql.NullTime
 	createdAt    time.Time
 	hasAssignee  bool
+
+	// Agent-assignee facts populated when the task has at least one
+	// enabled task_actors row with kind='agent' and role='assignee'.
+	// Used by KindHandoffToUser; otherwise unused. agentMemo is the
+	// raw JSON blob from tasks.agent_memo or nil when unset.
+	hasAgentAssignee bool
+	agentID          uint32
+	agentPublicID    types.PublicID
+	agentMemo        []byte
 }
 
 const wsAutoActionQuery = `
@@ -246,8 +286,19 @@ func (e *Executor) processWorkspaceWithThreshold(ctx context.Context, wsID uint3
 	dynamicTaskQuery := fmt.Sprintf(`
 SELECT t.id, t.public_id, t.workspace_id, t.title, t.derived_state,
        t.priority, t.due_on, t.updated_at, t.created_at,
-       EXISTS(SELECT 1 FROM task_actors ta WHERE ta.task_id = t.id AND ta.kind = 'assignee') AS has_assignee
+       EXISTS(SELECT 1 FROM task_actors ta WHERE ta.task_id = t.id AND ta.kind = 'assignee') AS has_assignee,
+       ag.id   AS agent_id,
+       ag.public_id AS agent_public_id,
+       t.agent_memo
 FROM tasks t
+LEFT JOIN task_actors agent_ta
+  ON agent_ta.task_id = t.id
+  AND agent_ta.kind = 'agent'
+  AND agent_ta.role = 'assignee'
+  AND agent_ta.enabled = TRUE
+LEFT JOIN ai_agents ag
+  ON ag.id = agent_ta.agent_id
+  AND ag.enabled = TRUE
 WHERE t.workspace_id = ? AND t.enabled = TRUE
   %s
   AND (
@@ -267,20 +318,38 @@ LIMIT 200
 
 	now := time.Now().UTC()
 	for rows.Next() {
-		var r taskRow
+		var (
+			r              taskRow
+			agentIDNull    sql.NullInt32
+			agentPubIDRaw  []byte
+			agentMemoBytes []byte
+		)
 		if err := rows.Scan(
 			&r.id, &r.publicID, &r.workspaceID, &r.title,
 			&r.derivedState, &r.priority, &r.dueOn, &r.updatedAt,
 			&r.createdAt, &r.hasAssignee,
+			&agentIDNull, &agentPubIDRaw, &agentMemoBytes,
 		); err != nil {
 			e.Logger.Error("auto-action executor: scan task", "err", err)
 			continue
 		}
+		if agentIDNull.Valid {
+			r.hasAgentAssignee = true
+			//#nosec G115 -- ai_agents.id is INT UNSIGNED, fits uint32
+			r.agentID = uint32(agentIDNull.Int32)
+			if len(agentPubIDRaw) == 16 {
+				_ = r.agentPublicID.Scan(agentPubIDRaw)
+			}
+		}
+		if len(agentMemoBytes) > 0 {
+			r.agentMemo = agentMemoBytes
+		}
 
 		sig := Signals{
-			State:       State(r.derivedState),
-			HasAssignee: r.hasAssignee,
-			Now:         now,
+			State:            State(r.derivedState),
+			HasAssignee:      r.hasAssignee,
+			HasAgentAssignee: r.hasAgentAssignee,
+			Now:              now,
 		}
 		if r.updatedAt.Valid {
 			sig.UpdatedAt = r.updatedAt.Time
@@ -291,12 +360,37 @@ LIMIT 200
 			sig.HasDueOn = true
 			sig.DueOn = r.dueOn.Time
 		}
+		if r.hasAgentAssignee {
+			sig.AgentAttempts, sig.AgentLastFinishedAt = decodeAgentMemo(r.agentMemo)
+		}
 		act := EvaluateWithConfig(sig, rules)
 		if act == nil || act.Confidence < threshold {
 			continue
 		}
 		e.applyAction(ctx, r, act)
 	}
+}
+
+// decodeAgentMemo extracts the attempts and last_finished_at unix-seconds
+// fields the handoff_to_user rule needs from the JSON blob stored in
+// tasks.agent_memo. Missing or unparseable values yield zero — the rule
+// already handles the zero case by skipping (attempts < threshold).
+func decodeAgentMemo(raw []byte) (attempts int, lastFinishedAt time.Time) {
+	if len(raw) == 0 {
+		return 0, time.Time{}
+	}
+	var memo struct {
+		Attempts       int   `json:"attempts"`
+		LastFinishedAt int64 `json:"last_finished_at"`
+	}
+	if err := json.Unmarshal(raw, &memo); err != nil {
+		return 0, time.Time{}
+	}
+	var finished time.Time
+	if memo.LastFinishedAt > 0 {
+		finished = time.Unix(memo.LastFinishedAt, 0).UTC()
+	}
+	return memo.Attempts, finished
 }
 
 func (e *Executor) applyAction(ctx context.Context, r taskRow, act *Action) {
@@ -318,12 +412,183 @@ func (e *Executor) applyAction(ctx context.Context, r taskRow, act *Action) {
 		e.autoArchive(ctx, r, act)
 	case KindAutoCloseStale:
 		e.autoClose(ctx, r, act)
+	case KindHandoffToUser:
+		e.handoffToUser(ctx, r, act)
 	case KindAssignOwner, KindNudgeAssignee:
 		// These require human judgment (who to assign, how to nudge).
 		// Record an event so Glass Dock can surface them, but don't
 		// mutate data autonomously.
 		e.recordProposal(ctx, r, act)
 	}
+}
+
+// handoffToUser is the production wiring around [applyHandoffToUser].
+// It opens a transaction, builds the sqlc-backed HandoffQuerier and
+// raw-SQL ActorDisabler, runs the shared logic, and commits.
+func (e *Executor) handoffToUser(ctx context.Context, r taskRow, act *Action) {
+	if !r.hasAgentAssignee || r.agentID == 0 {
+		// Defensive guard: the rule already filters for an agent
+		// assignee, but we re-check here so a stale row read does
+		// not turn into an event with no actor.
+		return
+	}
+	tx, err := e.DB.BeginTx(ctx, nil)
+	if err != nil {
+		e.Logger.Error("auto-action executor: begin tx", "err", err)
+		return
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	q := generated.New(e.DB).WithTx(tx)
+	disabler := &txActorDisabler{tx: tx}
+
+	emitted, err := e.applyHandoffToUser(ctx, q, disabler, r, act, time.Now().UTC())
+	if err != nil {
+		e.Logger.Error("auto-action executor: handoff_to_user", "task", r.publicID.String(), "err", err)
+		return
+	}
+	if err := tx.Commit(); err != nil {
+		e.Logger.Error("auto-action executor: commit", "task", r.publicID.String(), "err", err)
+		return
+	}
+	if emitted {
+		e.Logger.Info("auto-action applied: handoff_to_user",
+			"task", r.publicID.String(),
+			"agent", r.agentPublicID.String(),
+		)
+	} else {
+		e.Logger.Info("auto-action skipped: handoff_to_user (loop budget exhausted)",
+			"task", r.publicID.String(),
+			"agent", r.agentPublicID.String(),
+		)
+	}
+}
+
+// applyHandoffToUser is the pure logic of the handoff_to_user action.
+// It is split out so unit tests can drive it with a fake HandoffQuerier
+// + ActorDisabler. The bool return value indicates whether a handoff
+// event was actually emitted (false when the loop budget is exhausted).
+//
+// Behaviour mirrors the orchestrator runner's handleHandoff:
+//   - Read prior handoff_count from agent_memo.
+//   - If prior >= HandoffLoopLimit (defaultHandoffLoopLimit when zero),
+//     skip the emission and return (false, nil) so the caller can log.
+//   - Otherwise emit agent.task.handoff_to_user with actor_agent_id set,
+//     disable the agent task_actors row, and merge handoff state into
+//     agent_memo (status=handed_back, reason=stuck, count=prior+1,
+//     last_handoff_at=now unix seconds).
+func (e *Executor) applyHandoffToUser(
+	ctx context.Context,
+	q HandoffQuerier,
+	disabler ActorDisabler,
+	r taskRow,
+	act *Action,
+	at time.Time,
+) (bool, error) {
+	limit := e.HandoffLoopLimit
+	if limit <= 0 {
+		limit = defaultHandoffLoopLimit
+	}
+	priorAttempts, priorCount := readMemoCounters(ctx, q, r.workspaceID, r.id)
+	if priorCount >= limit {
+		// Budget exhausted: do not emit another handoff. The
+		// orchestrator runtime owns the loop-detected failure event;
+		// the auto-action path simply refuses to add to the noise.
+		return false, nil
+	}
+
+	payload := map[string]any{
+		"reason":        "stuck",
+		"agentPublicId": r.agentPublicID.String(),
+		"taskPublicId":  r.publicID.String(),
+		"handoffCount":  priorCount + 1,
+		"attempts":      priorAttempts,
+		"detectedBy":    "auto_action",
+	}
+	if act != nil && act.Reason != "" {
+		payload["detail"] = act.Reason
+	}
+	raw, err := json.Marshal(payload)
+	if err != nil {
+		return false, fmt.Errorf("marshal handoff payload: %w", err)
+	}
+	if _, err := q.InsertHandoffToUserEvent(ctx, generated.InsertHandoffToUserEventParams{
+		PublicID:     types.New(),
+		WorkspaceID:  r.workspaceID,
+		TaskID:       sql.NullInt32{Int32: int32(r.id), Valid: true},      //#nosec G115 -- tasks.id fits int32
+		ActorAgentID: sql.NullInt32{Int32: int32(r.agentID), Valid: true}, //#nosec G115 -- ai_agents.id fits int32
+		PayloadJson:  raw,
+		OccurredAt:   at,
+	}); err != nil {
+		return false, fmt.Errorf("insert handoff event: %w", err)
+	}
+
+	if err := disabler.DisableAgentActor(ctx, r.workspaceID, r.id, r.agentID); err != nil {
+		return false, fmt.Errorf("disable agent actor: %w", err)
+	}
+
+	memoPatch := map[string]any{
+		"handoff_status":  "handed_back",
+		"handoff_reason":  "stuck",
+		"handoff_count":   priorCount + 1,
+		"last_handoff_at": at.Unix(),
+	}
+	patchRaw, err := json.Marshal(memoPatch)
+	if err != nil {
+		return false, fmt.Errorf("marshal memo patch: %w", err)
+	}
+	if err := q.UpdateTaskAgentMemo(ctx, generated.UpdateTaskAgentMemoParams{
+		Column1:     patchRaw,
+		WorkspaceID: r.workspaceID,
+		ID:          r.id,
+	}); err != nil {
+		return false, fmt.Errorf("update agent_memo: %w", err)
+	}
+	return true, nil
+}
+
+// readMemoCounters reads attempts + handoff_count out of agent_memo so
+// applyHandoffToUser can decide whether to emit and what counter to
+// stamp on the new event / memo patch. Missing rows / decode errors
+// yield zeros — the caller treats those as "first attempt".
+func readMemoCounters(ctx context.Context, q HandoffQuerier, workspaceID, taskID uint32) (attempts, handoffCount int) {
+	raw, err := q.GetTaskAgentMemo(ctx, generated.GetTaskAgentMemoParams{
+		WorkspaceID: workspaceID,
+		ID:          taskID,
+	})
+	if err != nil || len(raw) == 0 {
+		return 0, 0
+	}
+	var memo struct {
+		Attempts     int `json:"attempts"`
+		HandoffCount int `json:"handoff_count"`
+	}
+	if err := json.Unmarshal(raw, &memo); err != nil {
+		return 0, 0
+	}
+	return memo.Attempts, memo.HandoffCount
+}
+
+// txActorDisabler implements ActorDisabler over a *sql.Tx by issuing a
+// targeted UPDATE against task_actors. We match on (workspace_id,
+// task_id, agent_id, kind='agent', role='assignee') so a stale row in
+// some other role for the same agent does not get disabled.
+type txActorDisabler struct{ tx *sql.Tx }
+
+// DisableAgentActor flips enabled=FALSE on the agent assignee row.
+func (d *txActorDisabler) DisableAgentActor(ctx context.Context, workspaceID, taskID, agentID uint32) error {
+	const q = `UPDATE task_actors
+		SET enabled = FALSE
+		WHERE workspace_id = ?
+		  AND task_id = ?
+		  AND agent_id = ?
+		  AND kind = 'agent'
+		  AND role = 'assignee'
+		  AND enabled = TRUE`
+	if _, err := d.tx.ExecContext(ctx, q, workspaceID, taskID, agentID); err != nil {
+		return err
+	}
+	return nil
 }
 
 // escalate bumps priority by 1 (if not already max) and records an event.

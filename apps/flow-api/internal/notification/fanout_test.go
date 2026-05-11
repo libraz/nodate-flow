@@ -341,6 +341,79 @@ func TestFanoutMetrics_PreferenceFetchErrorTypeLabel(t *testing.T) {
 	}
 }
 
+// TestClassifyEvent_AgentTaskEvents verifies that the agent.task.*
+// event family produces the expected (title, resource, severity)
+// tuples and routes through categoryForEventType to the "ai"
+// notification preference bucket. agent.task.thought is suppressed
+// (empty title) because it represents private agent reasoning that
+// must not generate user notifications.
+func TestClassifyEvent_AgentTaskEvents(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		eventType    string
+		wantTitle    string
+		wantResource string
+		wantSeverity generated.NotificationsSeverity
+		wantCategory string
+	}{
+		{
+			eventType:    "agent.task.handoff_to_user",
+			wantTitle:    "An agent handed back to you",
+			wantResource: "task",
+			wantSeverity: generated.NotificationsSeverityHigh,
+			wantCategory: "ai",
+		},
+		{
+			eventType:    "agent.task.handoff_to_agent",
+			wantTitle:    "A task was handed off to an agent",
+			wantResource: "task",
+			wantSeverity: generated.NotificationsSeverityNormal,
+			wantCategory: "ai",
+		},
+		{
+			eventType:    "agent.task.attached",
+			wantTitle:    "An agent was attached to a task",
+			wantResource: "task",
+			wantSeverity: generated.NotificationsSeverityLow,
+			wantCategory: "ai",
+		},
+		{
+			eventType:    "agent.task.detached",
+			wantTitle:    "An agent was detached from a task",
+			wantResource: "task",
+			wantSeverity: generated.NotificationsSeverityLow,
+			wantCategory: "ai",
+		},
+		{
+			eventType:    "agent.task.thought",
+			wantTitle:    "",
+			wantResource: "",
+			wantSeverity: generated.NotificationsSeverity(""),
+			wantCategory: "ai",
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.eventType, func(t *testing.T) {
+			t.Parallel()
+			gotTitle, gotResource, gotSeverity := classifyEvent(tc.eventType)
+			if gotTitle != tc.wantTitle {
+				t.Errorf("title: got %q, want %q", gotTitle, tc.wantTitle)
+			}
+			if gotResource != tc.wantResource {
+				t.Errorf("resource: got %q, want %q", gotResource, tc.wantResource)
+			}
+			if gotSeverity != tc.wantSeverity {
+				t.Errorf("severity: got %q, want %q", gotSeverity, tc.wantSeverity)
+			}
+			if got := categoryForEventType(tc.eventType); got != tc.wantCategory {
+				t.Errorf("category: got %q, want %q", got, tc.wantCategory)
+			}
+		})
+	}
+}
+
 // TestFanoutMetrics_DedupCounter verifies that IncNotificationFanoutDedup
 // bumps the (reason) labelled counter exactly once per call. The
 // fan-out path under [Fanout.fanout] calls this on every INSERT IGNORE

@@ -8,6 +8,7 @@ package generated
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"time"
 
 	types "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/types"
@@ -277,6 +278,9 @@ SELECT
   v.project_identifier,
   v.task_number,
   v.archived_at,
+  v.agent_memo,
+  v.agent_assignee_public_id,
+  v.agent_assignee_name,
   v.label_count,
   v.constraint_count,
   v.constraint_satisfied_count,
@@ -314,6 +318,9 @@ type FindTaskByPublicIdRow struct {
 	ProjectIdentifier        sql.NullString    `json:"projectIdentifier"`
 	TaskNumber               uint32            `json:"taskNumber"`
 	ArchivedAt               sql.NullTime      `json:"archivedAt"`
+	AgentMemo                json.RawMessage   `json:"agentMemo"`
+	AgentAssigneePublicID    []byte            `json:"agentAssigneePublicId"`
+	AgentAssigneeName        string            `json:"agentAssigneeName"`
 	LabelCount               int64             `json:"labelCount"`
 	ConstraintCount          int64             `json:"constraintCount"`
 	ConstraintSatisfiedCount int64             `json:"constraintSatisfiedCount"`
@@ -346,6 +353,9 @@ func (q *Queries) FindTaskByPublicId(ctx context.Context, arg FindTaskByPublicId
 		&i.ProjectIdentifier,
 		&i.TaskNumber,
 		&i.ArchivedAt,
+		&i.AgentMemo,
+		&i.AgentAssigneePublicID,
+		&i.AgentAssigneeName,
 		&i.LabelCount,
 		&i.ConstraintCount,
 		&i.ConstraintSatisfiedCount,

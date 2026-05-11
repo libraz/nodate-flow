@@ -279,6 +279,33 @@ func RegisterTaskScoped(api huma.API, deps Deps) {
 	}, AddAgentActor(deps))
 
 	huma.Register(api, huma.Operation{
+		OperationID: "tasks-handoff-to-agent",
+		Method:      http.MethodPost,
+		Path:        "/tasks/{id}/handoff/to-agent",
+		Summary:     "Promote an AI agent to the task's current assignee",
+		Description: "Disables any current agent assignee on the task and attaches the supplied agent in its place. Emits an agent.task.handoff_to_agent event so the orchestrator can pick up the new assignment.",
+		Tags:        []string{"Tasks"},
+	}, HandoffToAgent(deps))
+
+	huma.Register(api, huma.Operation{
+		OperationID: "tasks-handoff-to-user",
+		Method:      http.MethodPost,
+		Path:        "/tasks/{id}/handoff/to-user",
+		Summary:     "Hand a task back to a human user",
+		Description: "Disables the current agent assignee, optionally upserts a target user as the new assignee, and stamps tasks.agent_memo with the handoff reason. Emits agent.task.handoff_to_user tagged with the prior agent as actor.",
+		Tags:        []string{"Tasks"},
+	}, HandoffToUser(deps))
+
+	huma.Register(api, huma.Operation{
+		OperationID: "tasks-agent-runs-list",
+		Method:      http.MethodGet,
+		Path:        "/tasks/{id}/agent-runs",
+		Summary:     "List recent agent run events scoped to a task",
+		Description: "Returns the agent run lifecycle events (started / completed / failed) the orchestrator has appended for this task. Most recent first. Empty until the orchestrator stamps task_id and actor_agent_id on its ai.agent.run.* events.",
+		Tags:        []string{"Tasks"},
+	}, ListAgentRuns(deps))
+
+	huma.Register(api, huma.Operation{
 		OperationID: "tasks-comments-add",
 		Method:      http.MethodPost,
 		Path:        "/tasks/{id}/comments",

@@ -60,6 +60,15 @@ const (
 	// for longer than a threshold. The task is cancelled
 	// automatically so the backlog stays honest.
 	KindAutoCloseStale Kind = "auto_close_stale"
+	// KindHandoffToUser fires when an AI agent assignee has been
+	// attempting the task for a while with no observable progress
+	// (derived_state has not changed). The executor hands the task
+	// back to a human by emitting agent.task.handoff_to_user,
+	// disabling the agent actor row, and stamping agent_memo with
+	// handoff_status="handed_back" / handoff_reason="stuck". The
+	// runtime's "stuck" reason is distinct from low_confidence /
+	// cost_cap / tool_error so the inbox UI can label it explicitly.
+	KindHandoffToUser Kind = "handoff_to_user"
 )
 
 // Signals is the compact bag of task facts the rules read. It is kept
@@ -72,6 +81,13 @@ type Signals struct {
 	HasAssignee   bool
 	AssigneeCount int64
 	Now           time.Time
+
+	// Agent-assignee signals, populated when the task has at least one
+	// enabled task_actors row with kind='agent' and role='assignee'.
+	// They drive the handoff_to_user rule and are otherwise unused.
+	HasAgentAssignee    bool
+	AgentAttempts       int
+	AgentLastFinishedAt time.Time
 }
 
 // Action is the rule engine output. Evaluate returns nil when no
@@ -89,6 +105,10 @@ type RuleConfig struct {
 	Enabled    bool
 	Confidence float32
 	IdleHours  uint32 // 0 for rules that use due_on (escalate_overdue)
+	// AttemptsThreshold is the minimum agent run-attempts count
+	// before the handoff_to_user rule will fire. Only meaningful for
+	// KindHandoffToUser; other kinds ignore it.
+	AttemptsThreshold int
 }
 
 // DefaultRuleConfigs returns the built-in rule configurations that
@@ -103,6 +123,10 @@ func DefaultRuleConfigs() []RuleConfig {
 		{Kind: KindCloseStaleReview, Enabled: true, Confidence: 0.70, IdleHours: 120},
 		{Kind: KindAutoArchiveCompleted, Enabled: false, Confidence: 0.90, IdleHours: 336}, // 14 days
 		{Kind: KindAutoCloseStale, Enabled: false, Confidence: 0.80, IdleHours: 720},       // 30 days
+		// HandoffToUser: agent has been attempting the task at least
+		// AttemptsThreshold times with the last finished_at older than
+		// IdleHours and no observable derived_state movement.
+		{Kind: KindHandoffToUser, Enabled: true, Confidence: 0.80, IdleHours: 4, AttemptsThreshold: 3},
 	}
 }
 
@@ -151,9 +175,13 @@ func EvaluateWithConfig(s Signals, rules []RuleConfig) *Action {
 		return nil
 	}
 
-	// Urgency order: most urgent first.
+	// Urgency order: most urgent first. KindHandoffToUser sits below
+	// escalate_overdue so a missed deadline still wins, but above
+	// nudge_assignee because once the agent looks stuck a human
+	// touch is more useful than another automated nudge.
 	order := []Kind{
 		KindEscalateOverdue,
+		KindHandoffToUser,
 		KindAssignOwner,
 		KindNudgeAssignee,
 		KindCloseStaleReview,
@@ -208,6 +236,33 @@ func EvaluateWithConfig(s Signals, rules []RuleConfig) *Action {
 					Reason:     fmt.Sprintf("open task idle for %d day(s) — auto-closing", idleDays(idle)),
 				}
 			}
+		case KindHandoffToUser:
+			if !s.HasAgentAssignee {
+				continue
+			}
+			if s.AgentAttempts < rc.AttemptsThreshold {
+				continue
+			}
+			// Use last_finished_at when available so cold attempts (a
+			// run that started but never recorded a finish) do not
+			// short-circuit the idle window. Fall back to UpdatedAt
+			// so the rule still fires for tasks whose memo has not
+			// yet been stamped with a finish.
+			ref := s.AgentLastFinishedAt
+			if ref.IsZero() {
+				ref = s.UpdatedAt
+			}
+			if s.Now.Sub(ref) < threshold {
+				continue
+			}
+			return &Action{
+				Kind:       KindHandoffToUser,
+				Confidence: rc.Confidence,
+				Reason: fmt.Sprintf(
+					"agent has attempted %d time(s) with no progress for %d hour(s) — handing back to a human",
+					s.AgentAttempts, idleHours(s.Now.Sub(ref)),
+				),
+			}
 		}
 	}
 	return nil
@@ -219,4 +274,12 @@ func idleDays(d time.Duration) int {
 		return 1
 	}
 	return days
+}
+
+func idleHours(d time.Duration) int {
+	hours := int(d / time.Hour)
+	if hours < 1 {
+		return 1
+	}
+	return hours
 }

@@ -24,6 +24,21 @@ SELECT
   t.started_on,
   t.completed_at,
   t.archived_at,
+  t.agent_memo,
+  -- Current AI agent assignee (kind='agent', role='assignee', enabled chain).
+  -- When multiple enabled agent-assignee rows exist for the same task, expose
+  -- the most recently updated row (ties broken by id desc) so the detail view
+  -- reflects the latest handoff target.
+  (SELECT ag.public_id FROM task_actors a
+     INNER JOIN ai_agents ag ON ag.id = a.agent_id AND ag.enabled = TRUE
+     WHERE a.task_id = t.id AND a.kind = 'agent' AND a.role = 'assignee' AND a.enabled = TRUE
+     ORDER BY a.updated_at DESC, a.id DESC
+     LIMIT 1) AS agent_assignee_public_id,
+  CAST(COALESCE((SELECT ag.name FROM task_actors a
+     INNER JOIN ai_agents ag ON ag.id = a.agent_id AND ag.enabled = TRUE
+     WHERE a.task_id = t.id AND a.kind = 'agent' AND a.role = 'assignee' AND a.enabled = TRUE
+     ORDER BY a.updated_at DESC, a.id DESC
+     LIMIT 1), '') AS CHAR(255)) AS agent_assignee_name,
   (SELECT COUNT(*) FROM task_constraints c
      WHERE c.task_id = t.id AND c.enabled = TRUE) AS constraint_count,
   (SELECT COUNT(*) FROM task_constraints c

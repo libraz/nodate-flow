@@ -7,6 +7,7 @@
 import { buildAvatarUrl } from '@nodate-flow/sdk';
 import Avatar from '@nodate-flow/ui/primitives/avatar';
 import type { TFunction } from 'i18next';
+import { Bot } from 'lucide-react';
 import type { ReactElement, ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -296,22 +297,29 @@ function humanizePayload(type: string, payload: unknown, t: TFunction, locale: s
   );
 }
 
+function isAgentEvent(event: { type: string; actorUserId?: string }): boolean {
+  if (event.actorUserId && event.actorUserId.length > 0) return false;
+  return event.type.startsWith('agent.') || event.type.startsWith('ai.agent.');
+}
+
 export default function EventCard({ event }: EventCardProps): ReactElement {
   const { t, i18n } = useTranslation('timeline');
   const locale = i18n.resolvedLanguage ?? 'en';
 
-  const displayName = event.actorDisplayName?.trim();
-  const hasName = displayName !== undefined && displayName.length > 0;
-  const actorLabel = hasName ? displayName : t('actor.system');
+  const isAgent = isAgentEvent(event);
+  const rawDisplayName = event.actorDisplayName?.trim();
+  const hasName = rawDisplayName !== undefined && rawDisplayName.length > 0;
+  const agentName = hasName ? rawDisplayName : t('actor.system');
+  const actorLabel = isAgent ? t('actor.actor_agent', { name: agentName }) : agentName;
   // Avatar initial: first character of each whitespace-separated word, max 2.
   // Never derive initials from the raw actorUserId (UUID).
   const initials = hasName
-    ? displayName
+    ? rawDisplayName
         .split(/\s+/)
         .filter((w) => w.length > 0)
         .slice(0, 2)
         .map((w) => (w[0] ?? '').toUpperCase())
-        .join('') || (displayName[0] ?? '').toUpperCase()
+        .join('') || (rawDisplayName[0] ?? '').toUpperCase()
     : t('actor.initials_fallback');
 
   const normalizedType = event.type.replace(/\./g, '_');
@@ -326,10 +334,11 @@ export default function EventCard({ event }: EventCardProps): ReactElement {
   const tag = eventSourceTag(event.type, event.payload);
 
   // Actor avatar URL: only resolve when the event carries a real user
-  // id. AI/MCP/system events have no user behind them, so they fall
-  // through to the initials placeholder rendered by the Avatar primitive.
+  // id. Agent / MCP / system events have no user behind them, so they
+  // fall through to the initials placeholder rendered by the Avatar
+  // primitive — agent events get a bot glyph in place of the avatar.
   const actorAvatarSrc =
-    event.actorUserId && event.actorUserId.length > 0
+    !isAgent && event.actorUserId && event.actorUserId.length > 0
       ? buildAvatarUrl(event.actorUserId, authApiBaseUrl)
       : undefined;
 
@@ -369,12 +378,30 @@ export default function EventCard({ event }: EventCardProps): ReactElement {
             zIndex: 1,
           }}
         >
-          <Avatar
-            alt={actorLabel}
-            initials={initials}
-            size="sm"
-            {...(actorAvatarSrc ? { src: actorAvatarSrc } : {})}
-          />
+          {isAgent ? (
+            <span
+              aria-label={actorLabel}
+              style={{
+                inlineSize: '1.25rem',
+                blockSize: '1.25rem',
+                borderRadius: '999px',
+                background: 'color-mix(in oklab, var(--nf-color-accent) 14%, transparent)',
+                color: 'var(--nf-color-accent)',
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              <Bot size={12} strokeWidth={1.75} aria-hidden="true" />
+            </span>
+          ) : (
+            <Avatar
+              alt={actorLabel}
+              initials={initials}
+              size="sm"
+              {...(actorAvatarSrc ? { src: actorAvatarSrc } : {})}
+            />
+          )}
         </div>
       </div>
 

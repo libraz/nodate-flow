@@ -27,7 +27,7 @@ import { type ApiError, toApiError } from '../../../lib/api-error';
 import { sdk } from '../../../lib/sdk';
 
 /** Intake item DTO mirrored from the generated SDK. */
-export type IntakeItem = components['schemas']['IntakeItem'];
+export type IntakeItem = components['schemas']['Record'];
 
 /**
  * Triage status filter. Mirrors the backend enum so the picker stays in

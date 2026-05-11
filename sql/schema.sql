@@ -136,6 +136,7 @@ CREATE TABLE ai_agents (
   monthly_cost_cap_cents INT UNSIGNED NULL COMMENT 'Monthly spend cap in USD cents (null = no cap)',
   schedule_kind ENUM('disabled','interval','on_event','manual') NOT NULL DEFAULT 'disabled' COMMENT 'Trigger mode: interval = fires every NF_AGENT_TICK_INTERVAL; on_event = fires from eventbus; manual = only via /agents/{id}/trigger',
   event_trigger_types JSON NULL COMMENT 'JSON array of eventbus Kind strings that fire this agent when schedule_kind=on_event (e.g., ["signal.attached","task.transition.submit"])',
+  schedule_scope ENUM('workspace','assigned_tasks') NOT NULL DEFAULT 'workspace' COMMENT 'When schedule_kind=on_event, controls whether the agent reacts to all workspace events or only events for tasks where it is an enabled actor',
   paused BOOLEAN NOT NULL DEFAULT FALSE COMMENT 'Manually or automatically paused (e.g., cost cap exceeded)',
 
   sort_weight INT NOT NULL DEFAULT 0 COMMENT 'Display order',
@@ -975,6 +976,7 @@ CREATE TABLE events (
   workspace_id INT UNSIGNED NOT NULL COMMENT 'Internal FK to workspaces.id',
   task_id INT UNSIGNED NULL COMMENT 'Internal FK to tasks.id when the event targets a task',
   actor_user_id INT UNSIGNED NULL COMMENT 'Acting user.id (null for system/bot actions)',
+  actor_agent_id INT UNSIGNED NULL COMMENT 'Acting ai_agents.id when the event was produced by an AI agent (mutually exclusive with actor_user_id; both NULL means system actor)',
 
   type VARCHAR(64) CHARACTER SET latin1 COLLATE latin1_swedish_ci NOT NULL COMMENT 'Event type (e.g., task.created, signal.attached)',
   payload_json JSON NOT NULL CHECK (JSON_VALID(payload_json)) COMMENT 'Event payload',
@@ -991,10 +993,12 @@ CREATE TABLE events (
   KEY idx_events_workspace_id_occurred_at (workspace_id, occurred_at),
   KEY idx_events_workspace_id_task_id_occurred_at (workspace_id, task_id, occurred_at),
   KEY idx_events_workspace_id_type (workspace_id, type),
+  KEY idx_events_workspace_id_actor_agent_id (workspace_id, actor_agent_id),
 
   CONSTRAINT fk_events_workspace FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
   CONSTRAINT fk_events_task FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE CASCADE,
-  CONSTRAINT fk_events_actor FOREIGN KEY (actor_user_id) REFERENCES users(id) ON DELETE SET NULL
+  CONSTRAINT fk_events_actor FOREIGN KEY (actor_user_id) REFERENCES users(id) ON DELETE SET NULL,
+  CONSTRAINT fk_events_actor_agent FOREIGN KEY (actor_agent_id) REFERENCES ai_agents(id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Append-only event log';
 
 -- >>> identities.sql
@@ -2118,6 +2122,7 @@ CREATE TABLE tasks (
   title VARCHAR(255) NOT NULL COMMENT 'Task title',
   description MEDIUMTEXT NULL COMMENT 'Markdown body',
   derived_state ENUM('open','waiting','review','done','cancelled') NOT NULL DEFAULT 'open' COMMENT 'Computed from constraints + events; do NOT update directly',
+  agent_memo JSON NOT NULL DEFAULT (JSON_OBJECT()) COMMENT 'Per-task scratchpad for the assigned AI agent: last_thought, retry_count, last_error, handoff_status, handoff_reason, last_started_at, last_cost_cents. NOT NULL with default {} so sqlc-generated json.RawMessage scans cleanly; mapper treats {} as "no memo yet"',
   priority INT NOT NULL DEFAULT 0 COMMENT 'LLM-optimized heuristic priority',
   due_on DATE NULL COMMENT 'Deadline for task completion; drives constraint evaluation',
   started_on DATE NULL COMMENT 'Date work began on this task',
@@ -2893,6 +2898,21 @@ SELECT
   t.started_on,
   t.completed_at,
   t.archived_at,
+  t.agent_memo,
+  -- Current AI agent assignee (kind='agent', role='assignee', enabled chain).
+  -- When multiple enabled agent-assignee rows exist for the same task, expose
+  -- the most recently updated row (ties broken by id desc) so the detail view
+  -- reflects the latest handoff target.
+  (SELECT ag.public_id FROM task_actors a
+     INNER JOIN ai_agents ag ON ag.id = a.agent_id AND ag.enabled = TRUE
+     WHERE a.task_id = t.id AND a.kind = 'agent' AND a.role = 'assignee' AND a.enabled = TRUE
+     ORDER BY a.updated_at DESC, a.id DESC
+     LIMIT 1) AS agent_assignee_public_id,
+  CAST(COALESCE((SELECT ag.name FROM task_actors a
+     INNER JOIN ai_agents ag ON ag.id = a.agent_id AND ag.enabled = TRUE
+     WHERE a.task_id = t.id AND a.kind = 'agent' AND a.role = 'assignee' AND a.enabled = TRUE
+     ORDER BY a.updated_at DESC, a.id DESC
+     LIMIT 1), '') AS CHAR(255)) AS agent_assignee_name,
   (SELECT COUNT(*) FROM task_constraints c
      WHERE c.task_id = t.id AND c.enabled = TRUE) AS constraint_count,
   (SELECT COUNT(*) FROM task_constraints c

@@ -8,7 +8,7 @@ import { type UseSuspenseQueryResult, useSuspenseQuery } from '@tanstack/react-q
 
 import { sdk } from '../../lib/sdk';
 
-export type TimelineEvent = components['schemas']['TimelineEvent'];
+export type TimelineEvent = components['schemas']['Event'];
 
 /**
  * All known timeline event kinds. The UI maps these to i18n keys by

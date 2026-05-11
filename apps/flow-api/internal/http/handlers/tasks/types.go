@@ -61,33 +61,58 @@ var nullDate = handlerutil.NullTimeDateStr
 // totalAsInt64 delegates to handlerutil.TotalAsInt64.
 var totalAsInt64 = handlerutil.TotalAsInt64
 
+// AgentRef is a minimal pointer to an AI agent surfaced as a side
+// reference inside other DTOs (TaskAgentContext, agent-run rows). The
+// shape is deliberately tiny so it can be embedded without bloating the
+// parent payload; richer agent details live on the dedicated agent
+// endpoints.
+type AgentRef struct {
+	ID   string `json:"id"`
+	Name string `json:"name,omitempty"`
+}
+
+// TaskAgentContext is the agent-handoff state surfaced on the Task DTO.
+// Populated from v_task_detail.agent_memo (JSON), the joined agent
+// assignee public_id, and the joined agent assignee name. Absent
+// (`agentContext` omitted) when the task has no agent assignee and no
+// historical memo.
+type TaskAgentContext struct {
+	Agent         *AgentRef `json:"agent,omitempty"`
+	LastRunAt     *int64    `json:"lastRunAt,omitempty"`
+	LastThought   string    `json:"lastThought,omitempty"`
+	Attempts      int       `json:"attempts"`
+	HandoffStatus string    `json:"handoffStatus,omitempty"`
+	HandoffReason string    `json:"handoffReason,omitempty"`
+}
+
 // Task is the public DTO for a task row.
 type Task struct {
-	ID                       string `json:"id"`
-	WorkspaceID              string `json:"workspaceId" format:"uuid"`
-	ProjectID                string `json:"projectId"`
-	ProjectName              string `json:"projectName,omitempty"`
-	ParentTaskID             string `json:"parentTaskId,omitempty"`
-	CreatedByUserID          string `json:"createdByUserId,omitempty"`
-	Title                    string `json:"title"`
-	Description              string `json:"description,omitempty"`
-	Visibility               string `json:"visibility"`
-	DerivedState             string `json:"derivedState"`
-	Priority                 int32  `json:"priority"`
-	DueOn                    string `json:"dueOn,omitempty"`
-	StartedOn                string `json:"startedOn,omitempty"`
-	CompletedAt              *int64 `json:"completedAt,omitempty"`
-	ProjectIdentifier        string `json:"projectIdentifier,omitempty"`
-	TaskNumber               int32  `json:"taskNumber"`
-	ArchivedAt               *int64 `json:"archivedAt,omitempty"`
-	LabelCount               int64  `json:"labelCount"`
-	ConstraintCount          int64  `json:"constraintCount"`
-	ConstraintSatisfiedCount int64  `json:"constraintSatisfiedCount"`
-	DependencyCount          int64  `json:"dependencyCount"`
-	ActorCount               int64  `json:"actorCount"`
-	SortWeight               int32  `json:"sortWeight"`
-	UpdatedAt                *int64 `json:"updatedAt,omitempty"`
-	CreatedAt                int64  `json:"createdAt"`
+	ID                       string            `json:"id"`
+	WorkspaceID              string            `json:"workspaceId" format:"uuid"`
+	ProjectID                string            `json:"projectId"`
+	ProjectName              string            `json:"projectName,omitempty"`
+	ParentTaskID             string            `json:"parentTaskId,omitempty"`
+	CreatedByUserID          string            `json:"createdByUserId,omitempty"`
+	Title                    string            `json:"title"`
+	Description              string            `json:"description,omitempty"`
+	Visibility               string            `json:"visibility"`
+	DerivedState             string            `json:"derivedState"`
+	Priority                 int32             `json:"priority"`
+	DueOn                    string            `json:"dueOn,omitempty"`
+	StartedOn                string            `json:"startedOn,omitempty"`
+	CompletedAt              *int64            `json:"completedAt,omitempty"`
+	ProjectIdentifier        string            `json:"projectIdentifier,omitempty"`
+	TaskNumber               int32             `json:"taskNumber"`
+	ArchivedAt               *int64            `json:"archivedAt,omitempty"`
+	LabelCount               int64             `json:"labelCount"`
+	ConstraintCount          int64             `json:"constraintCount"`
+	ConstraintSatisfiedCount int64             `json:"constraintSatisfiedCount"`
+	DependencyCount          int64             `json:"dependencyCount"`
+	ActorCount               int64             `json:"actorCount"`
+	SortWeight               int32             `json:"sortWeight"`
+	AgentContext             *TaskAgentContext `json:"agentContext,omitempty"`
+	UpdatedAt                *int64            `json:"updatedAt,omitempty"`
+	CreatedAt                int64             `json:"createdAt"`
 }
 
 // TaskListItem is the public DTO for a task row in list responses.
@@ -657,6 +682,70 @@ type ListTaskAgentActorsBody struct {
 // ListTaskAgentActorsOutput is the response for GET /tasks/{id}/agents.
 type ListTaskAgentActorsOutput struct {
 	Body ListTaskAgentActorsBody
+}
+
+// ---- Agent Handoff I/O ----------------------------------------------------
+
+// HandoffToAgentBody is the JSON body for POST /tasks/{id}/handoff/to-agent.
+type HandoffToAgentBody struct {
+	AgentID string `json:"agentId" required:"true" doc:"Target AI agent public id (UUID v7)"`
+}
+
+// HandoffToAgentInput is the request for POST /tasks/{id}/handoff/to-agent.
+type HandoffToAgentInput struct {
+	ID   string `path:"id"`
+	Body HandoffToAgentBody
+}
+
+// HandoffToAgentOutput is the response for POST /tasks/{id}/handoff/to-agent.
+type HandoffToAgentOutput struct {
+	Body Task
+}
+
+// HandoffToUserBody is the JSON body for POST /tasks/{id}/handoff/to-user.
+type HandoffToUserBody struct {
+	Reason             string `json:"reason" required:"true" enum:"manual,low_confidence,cost_cap,tool_error,constraint_conflict" doc:"Why the agent is handing the task back to a human"`
+	TargetUserPublicID string `json:"targetUserPublicId,omitempty" doc:"Optional user public id (UUID v7) to attach as the new assignee"`
+}
+
+// HandoffToUserInput is the request for POST /tasks/{id}/handoff/to-user.
+type HandoffToUserInput struct {
+	ID   string `path:"id"`
+	Body HandoffToUserBody
+}
+
+// HandoffToUserOutput is the response for POST /tasks/{id}/handoff/to-user.
+type HandoffToUserOutput struct {
+	Body Task
+}
+
+// AgentRunEvent is one entry in the GET /tasks/{id}/agent-runs response.
+// It is a flattened view over the events row joined with the producing
+// agent so the timeline UI can render run history without an extra
+// agents lookup per row.
+type AgentRunEvent struct {
+	EventID     string   `json:"eventId"`
+	Type        string   `json:"type"`
+	OccurredAt  int64    `json:"occurredAt"`
+	Agent       AgentRef `json:"agent"`
+	PayloadJSON string   `json:"payloadJson,omitempty"`
+}
+
+// ListAgentRunsInput is the query for GET /tasks/{id}/agent-runs.
+type ListAgentRunsInput struct {
+	ID    string `path:"id"`
+	Limit int32  `query:"limit" minimum:"1" maximum:"100" default:"20"`
+}
+
+// ListAgentRunsBody is the response payload for GET /tasks/{id}/agent-runs.
+type ListAgentRunsBody struct {
+	Total int64           `json:"total"`
+	Runs  []AgentRunEvent `json:"runs"`
+}
+
+// ListAgentRunsOutput is the response for GET /tasks/{id}/agent-runs.
+type ListAgentRunsOutput struct {
+	Body ListAgentRunsBody
 }
 
 // ---- Comments I/O ----------------------------------------------------------

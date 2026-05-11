@@ -17,7 +17,7 @@ import { sdk } from '../../lib/sdk';
 export type OutboundLimitStat = components['schemas']['OutboundLimitStat'];
 
 /** Full AI metrics payload for one workspace + window. */
-export type AiMetrics = components['schemas']['AiMetricsOutputBody'];
+export type AiMetrics = components['schemas']['MetricsOutputBody'];
 
 /** Allowed dashboard window presets. */
 export type AiMetricsWindow = 7 | 30 | 90;

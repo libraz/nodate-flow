@@ -30,8 +30,8 @@ type TriageDeps struct {
 	AI *ai.Orchestrator
 }
 
-// InboxTriageSuggestion is the per-item DTO returned to the client.
-type InboxTriageSuggestion struct {
+// TriageSuggestion is the per-item DTO returned to the client.
+type TriageSuggestion struct {
 	InboxItemID       string  `json:"inboxItemId"`
 	Score             float32 `json:"score"`
 	RecommendedAction string  `json:"recommendedAction"`
@@ -51,7 +51,7 @@ type TriageInput struct {
 
 // TriageOutputBody is the response body for POST /workspaces/{wsId}/inbox/triage.
 type TriageOutputBody struct {
-	Suggestions []InboxTriageSuggestion `json:"suggestions"`
+	Suggestions []TriageSuggestion `json:"suggestions"`
 }
 
 // TriageOutput is the response envelope for the triage endpoint.
@@ -157,9 +157,9 @@ func Triage(deps TriageDeps) func(context.Context, *TriageInput) (*TriageOutput,
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
 		out := &TriageOutput{}
-		out.Body.Suggestions = make([]InboxTriageSuggestion, 0, len(suggestions))
+		out.Body.Suggestions = make([]TriageSuggestion, 0, len(suggestions))
 		for _, s := range suggestions {
-			out.Body.Suggestions = append(out.Body.Suggestions, InboxTriageSuggestion{
+			out.Body.Suggestions = append(out.Body.Suggestions, TriageSuggestion{
 				InboxItemID:       s.InboxItemID,
 				Score:             s.Score,
 				RecommendedAction: s.RecommendedAction,

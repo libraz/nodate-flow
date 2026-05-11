@@ -45,5 +45,27 @@
   "empty": {
     "title": "No AI activity yet",
     "body": "When an agent works on this task, its run will show up here."
+  },
+  "task_detail": {
+    "agent": {
+      "panel_title": "Agent",
+      "status": {
+        "running": "Working",
+        "handed_back": "Handed back",
+        "stuck": "Stuck — needs you"
+      },
+      "last_run_ago": "last run {time} ago",
+      "attempts": "tries: {current}/{max}",
+      "cost_today": "cost today: ${amount}",
+      "hand_back": "Hand back to me",
+      "run_history": "Open run history"
+    }
+  },
+  "handoff_reason": {
+    "low_confidence": "Low confidence",
+    "cost_cap": "Cost cap reached",
+    "tool_error": "Tool error",
+    "constraint_conflict": "Constraint conflict",
+    "manual": "Manual handoff"
   }
 }

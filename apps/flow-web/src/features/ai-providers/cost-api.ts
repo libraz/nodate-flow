@@ -10,7 +10,7 @@ import { type UseQueryResult, useQuery } from '@tanstack/react-query';
 
 import { sdk } from '../../lib/sdk';
 
-export type AiCostToday = components['schemas']['AiCostTodayOutputBody'];
+export type AiCostToday = components['schemas']['CostTodayOutputBody'];
 
 /** Query key factory for AI cost endpoints. */
 export const aiCostKeys = {

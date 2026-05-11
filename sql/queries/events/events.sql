@@ -11,6 +11,24 @@ INSERT INTO events (
   occurred_at
 ) VALUES (?, ?, ?, ?, ?, ?, ?);
 
+-- name: AppendAgentEvent :execlastid
+-- Append a single agent-actor event to the append-only event log. Mirrors
+-- AppendEvent but binds actor_agent_id and leaves actor_user_id NULL,
+-- preserving the actor_user_id / actor_agent_id mutual exclusion that the
+-- events table relies on (enforced by query design rather than a CHECK
+-- constraint; see sql/tables/events.sql for the rationale). Used by the
+-- orchestrator runner when emitting ai.agent.run.* events and by MCP tool
+-- calls dispatched from an agent context.
+INSERT INTO events (
+  public_id,
+  workspace_id,
+  task_id,
+  actor_agent_id,
+  type,
+  payload_json,
+  occurred_at
+) VALUES (?, ?, ?, ?, ?, ?, ?);
+
 -- name: ListEventsForTask :many
 -- List a task's timeline via v_task_timeline.
 SELECT

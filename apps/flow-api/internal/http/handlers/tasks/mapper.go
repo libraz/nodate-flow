@@ -21,6 +21,7 @@ package tasks
 
 import (
 	"database/sql"
+	"encoding/json"
 	"time"
 
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/generated"
@@ -64,9 +65,69 @@ func rowToTaskFromFind(r generated.FindTaskByPublicIdRow) Task {
 		DependencyCount:          r.DependencyCount,
 		ActorCount:               r.ActorCount,
 		SortWeight:               r.SortWeight,
+		AgentContext:             buildAgentContext(r.AgentMemo, r.AgentAssigneePublicID, r.AgentAssigneeName),
 		UpdatedAt:                nullTimeUnix(r.UpdatedAt),
 		CreatedAt:                r.CreatedAt.Unix(),
 	}
+}
+
+// agentMemoPayload is the persisted shape of tasks.agent_memo as written
+// by the orchestrator and handoff endpoints. Only the keys consumed by
+// the API DTO are declared here; extra fields are tolerated so the
+// orchestrator can evolve the schema without breaking the reader.
+type agentMemoPayload struct {
+	LastStartedAt int64  `json:"last_started_at"`
+	LastRunAt     int64  `json:"last_run_at"`
+	LastThought   string `json:"last_thought"`
+	Attempts      int    `json:"attempts"`
+	HandoffStatus string `json:"handoff_status"`
+	HandoffReason string `json:"handoff_reason"`
+}
+
+// buildAgentContext assembles the AgentContext field on the Task DTO
+// from the persisted agent_memo JSON and the joined agent assignee
+// columns surfaced by v_task_detail. Returns nil when the task has no
+// agent memo and no current agent assignee — keeping the field
+// `omitempty` so unrelated tasks pay no payload cost.
+//
+// The agent_assignee_public_id column is bytea ([]byte) because
+// view-aliased *_public_id columns do not pick up the sqlc
+// types.PublicID override; the conversion to a UUID string happens
+// here at the mapper boundary.
+func buildAgentContext(memo json.RawMessage, agentPublicID []byte, agentName string) *TaskAgentContext {
+	hasAgent := len(agentPublicID) > 0
+	hasMemo := len(memo) > 0 && string(memo) != "null" && string(memo) != "{}"
+	if !hasAgent && !hasMemo {
+		return nil
+	}
+	ctx := &TaskAgentContext{}
+	if hasAgent {
+		ctx.Agent = &AgentRef{
+			ID:   bytesToUUIDString(agentPublicID),
+			Name: agentName,
+		}
+	}
+	if hasMemo {
+		var p agentMemoPayload
+		if err := json.Unmarshal(memo, &p); err == nil {
+			// last_run_at is the canonical key; the orchestrator briefly
+			// also writes last_started_at on start. Prefer last_run_at
+			// when both are present.
+			switch {
+			case p.LastRunAt > 0:
+				v := p.LastRunAt
+				ctx.LastRunAt = &v
+			case p.LastStartedAt > 0:
+				v := p.LastStartedAt
+				ctx.LastRunAt = &v
+			}
+			ctx.LastThought = p.LastThought
+			ctx.Attempts = p.Attempts
+			ctx.HandoffStatus = p.HandoffStatus
+			ctx.HandoffReason = p.HandoffReason
+		}
+	}
+	return ctx
 }
 
 // taskListRow is the union of v_task_list columns that the four

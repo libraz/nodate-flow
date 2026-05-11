@@ -13,7 +13,7 @@ import { createStore } from 'zustand/vanilla';
 import type { components } from '@nodate-flow/sdk';
 
 /** Suggestion DTO mirrored from the SDK. */
-export type Suggestion = components['schemas']['InboxTriageSuggestion'];
+export type Suggestion = components['schemas']['TriageSuggestion'];
 
 export interface SuggestionsState {
   suggestions: Suggestion[];

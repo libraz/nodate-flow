@@ -45,5 +45,27 @@
   "empty": {
     "title": "AI の活動はまだありません",
     "body": "エージェントがこのタスクで動作すると、ここに実行履歴が表示されます。"
+  },
+  "task_detail": {
+    "agent": {
+      "panel_title": "エージェント",
+      "status": {
+        "running": "稼働中",
+        "handed_back": "ユーザーに戻されました",
+        "stuck": "停止中 — 確認してください"
+      },
+      "last_run_ago": "{time}前に最終実行",
+      "attempts": "試行: {current}/{max}",
+      "cost_today": "本日のコスト: ${amount}",
+      "hand_back": "手元に戻す",
+      "run_history": "実行履歴"
+    }
+  },
+  "handoff_reason": {
+    "low_confidence": "確信度が低い",
+    "cost_cap": "コスト上限到達",
+    "tool_error": "ツールエラー",
+    "constraint_conflict": "制約の衝突",
+    "manual": "手動引き戻し"
   }
 }

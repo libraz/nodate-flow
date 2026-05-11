@@ -1494,6 +1494,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/tasks/{id}/agent-runs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List recent agent run events scoped to a task
+         * @description Returns the agent run lifecycle events (started / completed / failed) the orchestrator has appended for this task. Most recent first. Empty until the orchestrator stamps task_id and actor_agent_id on its ai.agent.run.* events.
+         */
+        get: operations["tasks-agent-runs-list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/tasks/{id}/agents": {
         parameters: {
             query?: never;
@@ -1928,6 +1948,46 @@ export interface paths {
         get: operations["tasks-duplicates-list"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/tasks/{id}/handoff/to-agent": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Promote an AI agent to the task's current assignee
+         * @description Disables any current agent assignee on the task and attaches the supplied agent in its place. Emits an agent.task.handoff_to_agent event so the orchestrator can pick up the new assignment.
+         */
+        post: operations["tasks-handoff-to-agent"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/tasks/{id}/handoff/to-user": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Hand a task back to a human user
+         * @description Disables the current agent assignee, optionally upserts a target user as the new assignee, and stamps tasks.agent_memo with the handoff reason. Emits agent.task.handoff_to_user tagged with the prior agent as actor.
+         */
+        post: operations["tasks-handoff-to-user"];
         delete?: never;
         options?: never;
         head?: never;
@@ -4848,6 +4908,18 @@ export interface components {
             /** Format: int64 */
             updatedAt?: number;
         };
+        AgentRef: {
+            id: string;
+            name?: string;
+        };
+        AgentRunEvent: {
+            agent: components["schemas"]["AgentRef"];
+            eventId: string;
+            /** Format: int64 */
+            occurredAt: number;
+            payloadJson?: string;
+            type: string;
+        };
         AgentSummary: {
             /**
              * Format: uri
@@ -4868,58 +4940,6 @@ export interface components {
             systemPrompt: string;
             /** Format: int64 */
             updatedAt?: number;
-        };
-        AiCostTodayOutputBody: {
-            /**
-             * Format: uri
-             * @description A URL to the JSON Schema for this object.
-             */
-            readonly $schema?: string;
-            /** Format: double */
-            costUsd: number;
-            /** @description Local date in the requested timezone (YYYY-MM-DD). Falls back to UTC if tz is absent or invalid. */
-            date: string;
-            /** Format: double */
-            monthlyCapUsd?: number;
-        };
-        AiInvocation: {
-            costEstimate?: string;
-            errorCode?: string;
-            /** @description Invocation public id (UUID v7) */
-            id: string;
-            /** Format: int64 */
-            invokedAt: number;
-            model: string;
-            promptRedacted: string;
-            purpose: string;
-            responseRedacted?: string;
-            status: string;
-            /** Format: int32 */
-            tokensInput?: number;
-            /** Format: int32 */
-            tokensOutput?: number;
-        };
-        AiMetricsOutputBody: {
-            /**
-             * Format: uri
-             * @description A URL to the JSON Schema for this object.
-             */
-            readonly $schema?: string;
-            /**
-             * Format: double
-             * @description applied / (applied + dismissed), 0 when no decisions
-             */
-            acceptanceRate: number;
-            /** Format: int64 */
-            applied: number;
-            /** Format: int64 */
-            dismissed: number;
-            /** @description Per-provider egress rate limiter counters */
-            outboundLimits: components["schemas"]["OutboundLimitStat"][] | null;
-            /** Format: int64 */
-            proposed: number;
-            /** Format: int64 */
-            windowDays: number;
         };
         AiSuggestionListBody: {
             /**
@@ -5371,6 +5391,19 @@ export interface components {
             Secure: boolean;
             Unparsed: string[] | null;
             Value: string;
+        };
+        CostTodayOutputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            /** Format: double */
+            costUsd: number;
+            /** @description Local date in the requested timezone (YYYY-MM-DD). Falls back to UTC if tz is absent or invalid. */
+            date: string;
+            /** Format: double */
+            monthlyCapUsd?: number;
         };
         CountUnreadOutputBody: {
             /**
@@ -6244,6 +6277,17 @@ export interface components {
             readonly $schema?: string;
             outcomes: components["schemas"]["EvaluateConstraintsOutcome"][] | null;
         };
+        Event: {
+            actorDisplayName?: string;
+            actorUserId?: string;
+            /** @description Event public id (UUID v7) */
+            id: string;
+            /** Format: int64 */
+            occurredAt: number;
+            payload?: unknown;
+            taskId?: string;
+            type: string;
+        };
         EventInviteCreateResponse: {
             /**
              * Format: uri
@@ -6427,6 +6471,29 @@ export interface components {
             readonly $schema?: string;
             ok: boolean;
         };
+        HandoffToAgentBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            /** @description Target AI agent public id (UUID v7) */
+            agentId: string;
+        };
+        HandoffToUserBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            /**
+             * @description Why the agent is handing the task back to a human
+             * @enum {string}
+             */
+            reason: "manual" | "low_confidence" | "cost_cap" | "tool_error" | "constraint_conflict";
+            /** @description Optional user public id (UUID v7) to attach as the new assignee */
+            targetUserPublicId?: string;
+        };
         HealthOutputBody: {
             /**
              * Format: uri
@@ -6458,28 +6525,6 @@ export interface components {
             status: string;
             /** Format: int64 */
             totalItems: number;
-        };
-        InboxItem: {
-            /** Format: int64 */
-            createdAt: number;
-            externalId?: string;
-            /** @description Inbox item public id (UUID v7) */
-            id: string;
-            kind: string;
-            payload?: unknown;
-            /** Format: int64 */
-            receivedAt: number;
-            source: string;
-            taskId?: string;
-            taskTitle?: string;
-            workspaceId: string;
-        };
-        InboxTriageSuggestion: {
-            inboxItemId: string;
-            reasoning: string;
-            recommendedAction: string;
-            /** Format: float */
-            score: number;
         };
         InferStateOutputBody: {
             /**
@@ -6525,28 +6570,6 @@ export interface components {
             /** Format: int64 */
             totalWorkspaces: number;
         };
-        IntakeItem: {
-            /**
-             * Format: uri
-             * @description A URL to the JSON Schema for this object.
-             */
-            readonly $schema?: string;
-            aiReasoning?: string;
-            /** Format: double */
-            aiScore?: number;
-            body?: string;
-            /** Format: int64 */
-            createdAt: number;
-            /** @description Intake item public id (UUID v7) */
-            id: string;
-            /** Format: int64 */
-            snoozeUntil?: number;
-            taskId?: string;
-            title: string;
-            triageStatus: string;
-            triagedByDisplayName?: string;
-            triagedByUserId?: string;
-        };
         InviteInfoOutputBody: {
             /**
              * Format: uri
@@ -6570,6 +6593,38 @@ export interface components {
             id: string;
             /** Format: int64 */
             sentAt?: number;
+        };
+        Invocation: {
+            costEstimate?: string;
+            errorCode?: string;
+            /** @description Invocation public id (UUID v7) */
+            id: string;
+            /** Format: int64 */
+            invokedAt: number;
+            model: string;
+            promptRedacted: string;
+            purpose: string;
+            responseRedacted?: string;
+            status: string;
+            /** Format: int32 */
+            tokensInput?: number;
+            /** Format: int32 */
+            tokensOutput?: number;
+        };
+        Item: {
+            /** Format: int64 */
+            createdAt: number;
+            externalId?: string;
+            /** @description Inbox item public id (UUID v7) */
+            id: string;
+            kind: string;
+            payload?: unknown;
+            /** Format: int64 */
+            receivedAt: number;
+            source: string;
+            taskId?: string;
+            taskTitle?: string;
+            workspaceId: string;
         };
         Label: {
             /**
@@ -6607,6 +6662,16 @@ export interface components {
              */
             readonly $schema?: string;
             items: components["schemas"]["InstanceAdmin"][] | null;
+            /** Format: int64 */
+            total: number;
+        };
+        ListAgentRunsBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            runs: components["schemas"]["AgentRunEvent"][] | null;
             /** Format: int64 */
             total: number;
         };
@@ -6818,7 +6883,7 @@ export interface components {
              * @description A URL to the JSON Schema for this object.
              */
             readonly $schema?: string;
-            items: components["schemas"]["InboxItem"][] | null;
+            items: components["schemas"]["Item"][] | null;
             nextCursor: string | null;
             /** Format: int64 */
             total: number;
@@ -6829,7 +6894,7 @@ export interface components {
              * @description A URL to the JSON Schema for this object.
              */
             readonly $schema?: string;
-            items: components["schemas"]["IntakeItem"][] | null;
+            items: components["schemas"]["Record"][] | null;
             nextCursor: string | null;
             /** Format: int64 */
             total: number;
@@ -6859,7 +6924,7 @@ export interface components {
              * @description A URL to the JSON Schema for this object.
              */
             readonly $schema?: string;
-            invocations: components["schemas"]["AiInvocation"][] | null;
+            invocations: components["schemas"]["Invocation"][] | null;
         };
         ListLabelsBody: {
             /**
@@ -6972,6 +7037,17 @@ export interface components {
             readonly $schema?: string;
             nextCursor: string | null;
             tasks: components["schemas"]["MyTaskListItem"][] | null;
+            /** Format: int64 */
+            total: number;
+        };
+        ListOutputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            nextCursor: string | null;
+            notifications: components["schemas"]["NotificationDTO"][] | null;
             /** Format: int64 */
             total: number;
         };
@@ -7196,7 +7272,7 @@ export interface components {
              * @description A URL to the JSON Schema for this object.
              */
             readonly $schema?: string;
-            events: components["schemas"]["TimelineEvent"][] | null;
+            events: components["schemas"]["Event"][] | null;
             nextCursor: string | null;
             /** Format: int64 */
             total: number;
@@ -7430,6 +7506,28 @@ export interface components {
             userDisplayName: string;
             userPublicId: string;
         };
+        MetricsOutputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            /**
+             * Format: double
+             * @description applied / (applied + dismissed), 0 when no decisions
+             */
+            acceptanceRate: number;
+            /** Format: int64 */
+            applied: number;
+            /** Format: int64 */
+            dismissed: number;
+            /** @description Per-provider egress rate limiter counters */
+            outboundLimits: components["schemas"]["OutboundLimitStat"][] | null;
+            /** Format: int64 */
+            proposed: number;
+            /** Format: int64 */
+            windowDays: number;
+        };
         ModelSummary: {
             displayName: string;
             /** @description Model public id (UUID v7) */
@@ -7523,17 +7621,6 @@ export interface components {
             severity: string;
             title: string;
             workspaceId: string;
-        };
-        NotificationsListOutputBody: {
-            /**
-             * Format: uri
-             * @description A URL to the JSON Schema for this object.
-             */
-            readonly $schema?: string;
-            nextCursor: string | null;
-            notifications: components["schemas"]["NotificationDTO"][] | null;
-            /** Format: int64 */
-            total: number;
         };
         OIDCStartOutputBody: {
             /**
@@ -8248,6 +8335,28 @@ export interface components {
             userDisplayName: string;
             userId: string;
         };
+        Record: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            aiReasoning?: string;
+            /** Format: double */
+            aiScore?: number;
+            body?: string;
+            /** Format: int64 */
+            createdAt: number;
+            /** @description Intake item public id (UUID v7) */
+            id: string;
+            /** Format: int64 */
+            snoozeUntil?: number;
+            taskId?: string;
+            title: string;
+            triageStatus: string;
+            triagedByDisplayName?: string;
+            triagedByUserId?: string;
+        };
         RegisterInputBody: {
             /**
              * Format: uri
@@ -8749,6 +8858,7 @@ export interface components {
             readonly $schema?: string;
             /** Format: int64 */
             actorCount: number;
+            agentContext?: components["schemas"]["TaskAgentContext"];
             /** Format: int64 */
             archivedAt?: number;
             /** Format: int64 */
@@ -8817,6 +8927,16 @@ export interface components {
             role: string;
             /** Format: int64 */
             updatedAt?: number;
+        };
+        TaskAgentContext: {
+            agent?: components["schemas"]["AgentRef"];
+            /** Format: int64 */
+            attempts: number;
+            handoffReason?: string;
+            handoffStatus?: string;
+            /** Format: int64 */
+            lastRunAt?: number;
+            lastThought?: string;
         };
         TaskAiInvocation: {
             costEstimate?: string;
@@ -9066,17 +9186,6 @@ export interface components {
             /** Format: int64 */
             updatedAt: number;
         };
-        TimelineEvent: {
-            actorDisplayName?: string;
-            actorUserId?: string;
-            /** @description Event public id (UUID v7) */
-            id: string;
-            /** Format: int64 */
-            occurredAt: number;
-            payload?: unknown;
-            taskId?: string;
-            type: string;
-        };
         ToggleCanEditInputBody: {
             /**
              * Format: uri
@@ -9242,7 +9351,14 @@ export interface components {
              * @description A URL to the JSON Schema for this object.
              */
             readonly $schema?: string;
-            suggestions: components["schemas"]["InboxTriageSuggestion"][] | null;
+            suggestions: components["schemas"]["TriageSuggestion"][] | null;
+        };
+        TriageSuggestion: {
+            inboxItemId: string;
+            reasoning: string;
+            recommendedAction: string;
+            /** Format: float */
+            score: number;
         };
         TriggerAgentOutputBody: {
             /**
@@ -9526,6 +9642,17 @@ export interface components {
             maxAttempts: number;
             status: string;
         };
+        WebhookListOutputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            nextCursor: string | null;
+            /** Format: int64 */
+            total: number;
+            webhooks: components["schemas"]["WebhookSubscriptionDTO"][] | null;
+        };
         WebhookSubscriptionDTO: {
             /** Format: int64 */
             createdAt: number;
@@ -9554,17 +9681,6 @@ export interface components {
             /** Format: int64 */
             updatedAt: number | null;
             url: string;
-        };
-        WebhooksListOutputBody: {
-            /**
-             * Format: uri
-             * @description A URL to the JSON Schema for this object.
-             */
-            readonly $schema?: string;
-            nextCursor: string | null;
-            /** Format: int64 */
-            total: number;
-            webhooks: components["schemas"]["WebhookSubscriptionDTO"][] | null;
         };
         WeeklyDigestCounts: {
             /** Format: int64 */
@@ -11354,7 +11470,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["NotificationsListOutputBody"];
+                    "application/json": components["schemas"]["ListOutputBody"];
                 };
             };
             /** @description Error */
@@ -12626,6 +12742,39 @@ export interface operations {
             };
         };
     };
+    "tasks-agent-runs-list": {
+        parameters: {
+            query?: {
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListAgentRunsBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
     "tasks-agents-list": {
         parameters: {
             query?: {
@@ -13481,6 +13630,76 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ListDuplicatesOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "tasks-handoff-to-agent": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["HandoffToAgentBody"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Task"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "tasks-handoff-to-user": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["HandoffToUserBody"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Task"];
                 };
             };
             /** @description Error */
@@ -14621,7 +14840,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["AiCostTodayOutputBody"];
+                    "application/json": components["schemas"]["CostTodayOutputBody"];
                 };
             };
             /** @description Error */
@@ -14689,7 +14908,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["AiMetricsOutputBody"];
+                    "application/json": components["schemas"]["MetricsOutputBody"];
                 };
             };
             /** @description Error */
@@ -17395,7 +17614,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["IntakeItem"];
+                    "application/json": components["schemas"]["Record"];
                 };
             };
             /** @description Error */
@@ -17427,7 +17646,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["IntakeItem"];
+                    "application/json": components["schemas"]["Record"];
                 };
             };
             /** @description Error */
@@ -17463,7 +17682,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["IntakeItem"];
+                    "application/json": components["schemas"]["Record"];
                 };
             };
             /** @description Error */
@@ -19494,7 +19713,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["WebhooksListOutputBody"];
+                    "application/json": components["schemas"]["WebhookListOutputBody"];
                 };
             };
             /** @description Error */

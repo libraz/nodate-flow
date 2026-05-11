@@ -195,6 +195,45 @@ resources:
         userAction: "Set each actor's role to one of: assignee, reviewer, watcher, approver."
         i18nKey: "workspace.errors.task_actor_role_invalid"
 
+  task_agent:
+    breadcrumb: "Workspace > Task > Agent"
+    errors:
+      not_assigned:
+        code: WS.TASK_AGENT.NOT_ASSIGNED
+        status: 422
+        message: "Task has no agent assignee"
+        message_ja: "このタスクには AI エージェントの担当者が割り当てられていません"
+        message_zh: "该任务尚未分配 AI 代理负责人"
+        description: "Returned when an operation requires the task to have an AI agent assignee but none is currently assigned (for example, POST /tasks/{id}/handoff/to-user issued against a task whose actor_agent_id is NULL)."
+        userAction: "Assign an agent to the task via POST /tasks/{id}/handoff/to-agent before invoking the agent-only operation."
+
+      already_assigned:
+        code: WS.TASK_AGENT.ALREADY_ASSIGNED
+        status: 409
+        message: "Agent is already the assignee for this task"
+        message_ja: "このエージェントは既に当該タスクの担当者です"
+        message_zh: "该代理已经是此任务的负责人"
+        description: "Returned by POST /tasks/{id}/handoff/to-agent when the supplied agent_id matches the task's current actor_agent_id, so the handoff would be a no-op."
+        userAction: "If you intended to refresh the run, use the agent run trigger endpoint instead; otherwise hand off to a different agent."
+
+      handoff_loop_detected:
+        code: WS.TASK_AGENT.HANDOFF_LOOP_DETECTED
+        status: 422
+        message: "Handoff bounced between agent and user too many times"
+        message_ja: "エージェントとユーザー間のハンドオフが短時間に繰り返されすぎました"
+        message_zh: "代理与用户之间的交接在短时间内反复过多"
+        description: "Returned when the recent agent.task.handoff_* event history shows the task ping-ponging between agent and user beyond the configured threshold (NF_AGENT_HANDOFF_LOOP_LIMIT). Protects against runaway autoaction cycles."
+        userAction: "Open the task and resolve the underlying disagreement manually; the loop limit resets after a cool-down window or admin override."
+
+      cost_cap_exceeded:
+        code: WS.TASK_AGENT.COST_CAP_EXCEEDED
+        status: 422
+        message: "Agent monthly cost cap has been reached"
+        message_ja: "エージェントの月次コスト上限に達しました"
+        message_zh: "代理的月度费用上限已达上限"
+        description: "Returned when starting or resuming an agent run would push the agent's accumulated spend past ai_agents.monthly_cost_cap_cents for the current billing month."
+        userAction: "Wait for the next billing cycle, raise the agent's monthly_cost_cap_cents in agent settings, or hand the task off to another agent or user."
+
   member:
     breadcrumb: "Workspace > Member"
     errors:

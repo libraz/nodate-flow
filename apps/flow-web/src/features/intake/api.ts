@@ -10,7 +10,7 @@ import {
 import { type ApiError, toApiError } from '../../lib/api-error';
 import { sdk } from '../../lib/sdk';
 
-export type IntakeItem = components['schemas']['IntakeItem'];
+export type IntakeItem = components['schemas']['Record'];
 
 /** Query key factory for the intake feature. */
 export const intakeKeys = {

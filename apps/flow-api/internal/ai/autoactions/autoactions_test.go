@@ -101,6 +101,83 @@ func TestEvaluate(t *testing.T) {
 				Now:       now,
 			},
 		},
+		{
+			name: "open with agent assignee, attempts>=3, idle>4h → handoff_to_user",
+			sig: Signals{
+				State:               StateOpen,
+				UpdatedAt:           now.Add(-2 * time.Hour),
+				HasAssignee:         true,
+				HasAgentAssignee:    true,
+				AgentAttempts:       3,
+				AgentLastFinishedAt: now.Add(-5 * time.Hour),
+				Now:                 now,
+			},
+			want: KindHandoffToUser,
+		},
+		{
+			name: "open with agent assignee but attempts<3 → no handoff",
+			sig: Signals{
+				State:               StateOpen,
+				UpdatedAt:           now.Add(-2 * time.Hour),
+				HasAssignee:         true,
+				HasAgentAssignee:    true,
+				AgentAttempts:       2,
+				AgentLastFinishedAt: now.Add(-10 * time.Hour),
+				Now:                 now,
+			},
+		},
+		{
+			name: "open with agent assignee, attempts>=3 but idle<4h → no handoff",
+			sig: Signals{
+				State:               StateOpen,
+				UpdatedAt:           now.Add(-1 * time.Hour),
+				HasAssignee:         true,
+				HasAgentAssignee:    true,
+				AgentAttempts:       5,
+				AgentLastFinishedAt: now.Add(-1 * time.Hour),
+				Now:                 now,
+			},
+		},
+		{
+			name: "no agent assignee → handoff never fires even with attempts",
+			sig: Signals{
+				State:               StateOpen,
+				UpdatedAt:           now.Add(-5 * 24 * time.Hour),
+				HasAssignee:         true,
+				HasAgentAssignee:    false,
+				AgentAttempts:       9,
+				AgentLastFinishedAt: now.Add(-99 * time.Hour),
+				Now:                 now,
+			},
+			want: KindNudgeAssignee,
+		},
+		{
+			name: "agent assignee handoff falls back to UpdatedAt when last_finished_at unset",
+			sig: Signals{
+				State:            StateOpen,
+				UpdatedAt:        now.Add(-6 * time.Hour),
+				HasAssignee:      true,
+				HasAgentAssignee: true,
+				AgentAttempts:    3,
+				Now:              now,
+			},
+			want: KindHandoffToUser,
+		},
+		{
+			name: "agent assignee but task overdue → escalate beats handoff",
+			sig: Signals{
+				State:               StateOpen,
+				UpdatedAt:           now.Add(-2 * 24 * time.Hour),
+				DueOn:               now.Add(-24 * time.Hour),
+				HasDueOn:            true,
+				HasAssignee:         true,
+				HasAgentAssignee:    true,
+				AgentAttempts:       5,
+				AgentLastFinishedAt: now.Add(-10 * time.Hour),
+				Now:                 now,
+			},
+			want: KindEscalateOverdue,
+		},
 	}
 
 	for _, tc := range cases {

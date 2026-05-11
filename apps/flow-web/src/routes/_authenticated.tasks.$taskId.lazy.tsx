@@ -39,6 +39,7 @@ import FavoriteButton from '../features/favorites/favorite-button';
 import { useProjectQuery } from '../features/projects/api';
 import { useTaskReactionsQuery } from '../features/reactions/api';
 import ReactionBar from '../features/reactions/reaction-bar';
+import AgentPanel from '../features/tasks/agent-panel/agent-panel';
 import AIAgentsSection from '../features/tasks/ai-agents/section';
 import AIAgentsSkeleton from '../features/tasks/ai-agents/skeleton';
 import {
@@ -1224,6 +1225,9 @@ function TaskDetailPanel({ id }: TaskDetailPanelProps): ReactElement {
           <TaskBreadcrumb workspaceId={task.workspaceId} projectId={task.projectId} />
         </Suspense>
         <TitleEditor id={id} initial={task.title} workspaceId={task.workspaceId} />
+        {task.agentContext?.agent ? (
+          <AgentPanel taskId={id} agentContext={task.agentContext} locale={locale} />
+        ) : null}
         <DescriptionSection id={id} initial={task.description ?? ''} />
         <Suspense fallback={<Skeleton style={{ blockSize: '2rem', inlineSize: '12rem' }} />}>
           <ReactionsSection taskId={id} />

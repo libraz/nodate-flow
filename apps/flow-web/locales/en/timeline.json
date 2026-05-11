@@ -27,7 +27,8 @@
   "actor": {
     "system": "System",
     "unknown": "Unknown",
-    "initials_fallback": "?"
+    "initials_fallback": "?",
+    "actor_agent": "{name} (agent)"
   },
   "event": {
     "task_created": "{actor} created this task",

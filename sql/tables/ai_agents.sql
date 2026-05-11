@@ -19,6 +19,7 @@ CREATE TABLE ai_agents (
   monthly_cost_cap_cents INT UNSIGNED NULL COMMENT 'Monthly spend cap in USD cents (null = no cap)',
   schedule_kind ENUM('disabled','interval','on_event','manual') NOT NULL DEFAULT 'disabled' COMMENT 'Trigger mode: interval = fires every NF_AGENT_TICK_INTERVAL; on_event = fires from eventbus; manual = only via /agents/{id}/trigger',
   event_trigger_types JSON NULL COMMENT 'JSON array of eventbus Kind strings that fire this agent when schedule_kind=on_event (e.g., ["signal.attached","task.transition.submit"])',
+  schedule_scope ENUM('workspace','assigned_tasks') NOT NULL DEFAULT 'workspace' COMMENT 'When schedule_kind=on_event, controls whether the agent reacts to all workspace events or only events for tasks where it is an enabled actor',
   paused BOOLEAN NOT NULL DEFAULT FALSE COMMENT 'Manually or automatically paused (e.g., cost cap exceeded)',
 
   sort_weight INT NOT NULL DEFAULT 0 COMMENT 'Display order',

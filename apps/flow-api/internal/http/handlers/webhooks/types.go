@@ -93,8 +93,8 @@ type ListInput struct {
 	Offset int32  `query:"offset" minimum:"0" default:"0"`
 }
 
-// WebhooksListOutputBody is the response body for GET /workspaces/{wsId}/webhooks.
-type WebhooksListOutputBody struct {
+// WebhookListOutputBody is the response body for GET /workspaces/{wsId}/webhooks.
+type WebhookListOutputBody struct {
 	Total      int64                    `json:"total"`
 	Webhooks   []WebhookSubscriptionDTO `json:"webhooks"`
 	NextCursor *string                  `json:"nextCursor"`
@@ -102,7 +102,7 @@ type WebhooksListOutputBody struct {
 
 // ListOutput is the response for GET /workspaces/{wsId}/webhooks.
 type ListOutput struct {
-	Body WebhooksListOutputBody
+	Body WebhookListOutputBody
 }
 
 // --- Get ---

@@ -13,8 +13,17 @@ import (
 // from the sqlc bundle. Kept as an interface so unit tests can pass
 // a fake without a real DB, and so this file stays import-free of
 // the heavy generated package.
+//
+// ListOnEventAgentsForEvent resolves matching on_event agents for a
+// specific appended events row id. It enforces ai_agents.schedule_scope:
+// 'workspace' agents always match the event-type predicate, while
+// 'assigned_tasks' agents additionally require an enabled task_actor
+// (kind='agent') row tying them to the event's task_id. Events with a
+// NULL task_id never wake an 'assigned_tasks' agent because there is
+// no task scope to bind against.
 type OnEventAgentsQuerier interface {
 	ListOnEventAgentsFor(ctx context.Context, workspaceID uint32, eventKind string) ([]OnEventAgentMatch, error)
+	ListOnEventAgentsForEvent(ctx context.Context, workspaceID uint32, eventInternalID uint32) ([]OnEventAgentMatch, error)
 }
 
 // OnEventAgentMatch is the narrow row returned from the on-event
@@ -40,26 +49,39 @@ type EventTrigger struct {
 
 // NotifyHook returns a closure compatible with eventbus.AddNotifyHook.
 // The closure fires agent lookups off the request goroutine — it is
-// best-effort and never blocks the caller. The eventInternalID
-// parameter is accepted for signature compatibility but unused: the
-// dedupe key is built from agent_id + event_type + tick.
+// best-effort and never blocks the caller. The eventInternalID is the
+// events.id row that was just appended; the scoped lookup joins
+// through it so schedule_scope='assigned_tasks' agents only wake when
+// the source event is bound to a task they own.
 func (e *EventTrigger) NotifyHook() func(ctx context.Context, workspaceID uint32, eventType string, eventInternalID uint32) {
-	return func(ctx context.Context, workspaceID uint32, eventType string, _ uint32) {
+	return func(ctx context.Context, workspaceID uint32, eventType string, eventInternalID uint32) {
 		if e == nil || e.Queries == nil || e.Queue == nil {
 			return
 		}
-		e.dispatch(ctx, workspaceID, eventType)
+		e.dispatch(ctx, workspaceID, eventType, eventInternalID)
 	}
 }
 
-func (e *EventTrigger) dispatch(ctx context.Context, workspaceID uint32, eventType string) {
+func (e *EventTrigger) dispatch(ctx context.Context, workspaceID uint32, eventType string, eventInternalID uint32) {
 	if e.Now == nil {
 		e.Now = time.Now
 	}
 	if e.Logger == nil {
 		e.Logger = slog.Default()
 	}
-	rows, err := e.Queries.ListOnEventAgentsFor(ctx, workspaceID, eventType)
+	// Prefer the event-scoped query when the eventInternalID is known
+	// (every real eventbus.Append delivers one). Falls back to the
+	// legacy workspace-wide lookup for callers that pass 0 — tests
+	// historically use that shape and don't exercise schedule_scope.
+	var (
+		rows []OnEventAgentMatch
+		err  error
+	)
+	if eventInternalID != 0 {
+		rows, err = e.Queries.ListOnEventAgentsForEvent(ctx, workspaceID, eventInternalID)
+	} else {
+		rows, err = e.Queries.ListOnEventAgentsFor(ctx, workspaceID, eventType)
+	}
 	if err != nil {
 		e.Logger.Warn("on_event agent lookup failed", "err", err, "ws", workspaceID, "event", eventType)
 		return
@@ -69,7 +91,7 @@ func (e *EventTrigger) dispatch(ctx context.Context, workspaceID uint32, eventTy
 		key := fmt.Sprintf("%d:event:%s:%d", r.ID, eventType, now.UnixNano())
 		run := Run{
 			DedupeKey:   key,
-			Job:         Job{AgentID: r.ID, WsID: r.WorkspaceID},
+			Job:         Job{AgentID: r.ID, WsID: r.WorkspaceID, SourceEventID: eventInternalID},
 			ScheduledAt: now,
 		}
 		if err := e.Queue.Enqueue(ctx, run); err != nil && !errors.Is(err, ErrDuplicate) {
@@ -107,6 +129,56 @@ WHERE enabled = TRUE
 
 func (q *sqlcOnEventQuerier) ListOnEventAgentsFor(ctx context.Context, workspaceID uint32, eventKind string) ([]OnEventAgentMatch, error) {
 	rows, err := q.db.QueryContext(ctx, onEventAgentsQuery, workspaceID, eventKind)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := make([]OnEventAgentMatch, 0)
+	for rows.Next() {
+		var m OnEventAgentMatch
+		if err := rows.Scan(&m.ID, &m.WorkspaceID); err != nil {
+			return nil, err
+		}
+		out = append(out, m)
+	}
+	return out, rows.Err()
+}
+
+// onEventAgentsForEventQuery resolves on_event agents bound to a
+// specific events row, enforcing ai_agents.schedule_scope:
+//
+//   - 'workspace' (default) — matches any agent whose event_trigger_types
+//     contains the event's type, mirroring [onEventAgentsQuery].
+//   - 'assigned_tasks' — additionally requires an enabled task_actor
+//     (kind='agent') tying the agent to the event's task_id. Events with
+//     a NULL task_id never wake an assigned-task agent because there is
+//     no task scope to bind against.
+const onEventAgentsForEventQuery = `SELECT a.id, a.workspace_id
+FROM ai_agents a
+INNER JOIN events e ON e.id = ? AND e.workspace_id = a.workspace_id
+WHERE a.enabled = TRUE
+  AND a.paused = FALSE
+  AND a.schedule_kind = 'on_event'
+  AND a.workspace_id = ?
+  AND JSON_CONTAINS(a.event_trigger_types, JSON_QUOTE(e.type))
+  AND (
+    a.schedule_scope = 'workspace'
+    OR (
+      a.schedule_scope = 'assigned_tasks'
+      AND e.task_id IS NOT NULL
+      AND EXISTS (
+        SELECT 1 FROM task_actors ta
+        WHERE ta.workspace_id = a.workspace_id
+          AND ta.task_id = e.task_id
+          AND ta.agent_id = a.id
+          AND ta.kind = 'agent'
+          AND ta.enabled = TRUE
+      )
+    )
+  )`
+
+func (q *sqlcOnEventQuerier) ListOnEventAgentsForEvent(ctx context.Context, workspaceID uint32, eventInternalID uint32) ([]OnEventAgentMatch, error) {
+	rows, err := q.db.QueryContext(ctx, onEventAgentsForEventQuery, eventInternalID, workspaceID)
 	if err != nil {
 		return nil, err
 	}

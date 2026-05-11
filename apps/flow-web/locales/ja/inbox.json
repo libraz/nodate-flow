@@ -22,7 +22,8 @@
   },
   "filter": {
     "workspace_label": "ワークスペース",
-    "workspace_all": "すべてのワークスペース"
+    "workspace_all": "すべてのワークスペース",
+    "handoff": "エージェント停止"
   },
   "toast": {
     "archived": "アーカイブしました",

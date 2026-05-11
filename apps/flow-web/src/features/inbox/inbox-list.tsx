@@ -31,6 +31,7 @@ import TriageSuggestionRow from './triage-suggestion-row';
 type WorkspaceFilter = string | 'all';
 
 const SNOOZE_ONE_HOUR_SEC = 60 * 60;
+const HANDOFF_KIND = 'agent.task.handoff_to_user';
 
 export default function InboxList(): ReactElement {
   const { t } = useTranslation('inbox');
@@ -41,6 +42,7 @@ export default function InboxList(): ReactElement {
   const archive = useArchiveInboxItem();
   const snooze = useSnoozeInboxItem();
   const [selectedWorkspaceId, setSelectedWorkspaceId] = useState<WorkspaceFilter>('all');
+  const [handoffOnly, setHandoffOnly] = useState<boolean>(false);
   const [editingSuggestion, setEditingSuggestion] = useState<Suggestion | null>(null);
   const triageWorkspaceId =
     selectedWorkspaceId === 'all' ? (workspaces[0]?.id ?? '') : selectedWorkspaceId;
@@ -162,10 +164,13 @@ export default function InboxList(): ReactElement {
     setEditingSuggestion(null);
   };
 
-  const filteredItems =
+  const workspaceFiltered =
     selectedWorkspaceId === 'all'
       ? items
       : items.filter((item) => item.workspaceId === selectedWorkspaceId);
+  const filteredItems = handoffOnly
+    ? workspaceFiltered.filter((item) => item.kind === HANDOFF_KIND)
+    : workspaceFiltered;
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
@@ -208,6 +213,17 @@ export default function InboxList(): ReactElement {
             ))}
           </select>
         </label>
+        <Button
+          type="button"
+          variant={handoffOnly ? 'primary' : 'default'}
+          size="sm"
+          aria-pressed={handoffOnly}
+          onClick={() => {
+            setHandoffOnly((prev) => !prev);
+          }}
+        >
+          {t('filter.handoff')}
+        </Button>
         <Button
           type="button"
           variant="primary"

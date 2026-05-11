@@ -22,6 +22,12 @@ type Job struct {
 	AgentID uint32
 	WsID    uint32
 	Paused  bool
+	// SourceEventID is the events.id row whose append woke the agent,
+	// or 0 for scheduler-driven (interval) and manual runs. The runner
+	// uses it to look up the source event's task_id so the emitted
+	// ai.agent.run.* events stay bound to the same task and surface in
+	// the task's run-history view.
+	SourceEventID uint32
 }
 
 // Source returns the set of jobs that should run at the given tick.

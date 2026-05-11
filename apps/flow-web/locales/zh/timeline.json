@@ -27,7 +27,8 @@
   "actor": {
     "system": "系统",
     "unknown": "未知",
-    "initials_fallback": "?"
+    "initials_fallback": "?",
+    "actor_agent": "{name}（智能体）"
   },
   "event": {
     "task_created": "{actor} 创建了此任务",

@@ -14,6 +14,51 @@ import (
 	types "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/types"
 )
 
+const appendAgentEvent = `-- name: AppendAgentEvent :execlastid
+INSERT INTO events (
+  public_id,
+  workspace_id,
+  task_id,
+  actor_agent_id,
+  type,
+  payload_json,
+  occurred_at
+) VALUES (?, ?, ?, ?, ?, ?, ?)
+`
+
+type AppendAgentEventParams struct {
+	PublicID     types.PublicID  `json:"publicId"`
+	WorkspaceID  uint32          `json:"-"`
+	TaskID       sql.NullInt32   `json:"-"`
+	ActorAgentID sql.NullInt32   `json:"actorAgentId"`
+	Type         string          `json:"type"`
+	PayloadJson  json.RawMessage `json:"payloadJson"`
+	OccurredAt   time.Time       `json:"occurredAt"`
+}
+
+// Append a single agent-actor event to the append-only event log. Mirrors
+// AppendEvent but binds actor_agent_id and leaves actor_user_id NULL,
+// preserving the actor_user_id / actor_agent_id mutual exclusion that the
+// events table relies on (enforced by query design rather than a CHECK
+// constraint; see sql/tables/events.sql for the rationale). Used by the
+// orchestrator runner when emitting ai.agent.run.* events and by MCP tool
+// calls dispatched from an agent context.
+func (q *Queries) AppendAgentEvent(ctx context.Context, arg AppendAgentEventParams) (int64, error) {
+	result, err := q.db.ExecContext(ctx, appendAgentEvent,
+		arg.PublicID,
+		arg.WorkspaceID,
+		arg.TaskID,
+		arg.ActorAgentID,
+		arg.Type,
+		arg.PayloadJson,
+		arg.OccurredAt,
+	)
+	if err != nil {
+		return 0, err
+	}
+	return result.LastInsertId()
+}
+
 const appendEvent = `-- name: AppendEvent :execlastid
 INSERT INTO events (
   public_id,

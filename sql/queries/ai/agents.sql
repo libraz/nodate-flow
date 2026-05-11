@@ -59,6 +59,46 @@ WHERE a.enabled = TRUE
   AND a.workspace_id = ?
   AND JSON_CONTAINS(a.event_trigger_types, JSON_QUOTE(?));
 
+-- name: ListOnEventAgentsForEvent :many
+-- List every enabled non-paused on_event agent that should wake for a
+-- specific appended event. Joins through the events row so the filter
+-- can use the event's task_id to enforce ai_agents.schedule_scope:
+--   * 'workspace' (default) → fan out to every workspace-scoped agent
+--     whose event_trigger_types contains the event kind, matching the
+--     legacy ListOnEventAgents semantics.
+--   * 'assigned_tasks' → only fan out to agents that are an enabled
+--     task_actor (kind='agent') on the event's task. Events without a
+--     task_id are skipped for assigned-task agents because there is no
+--     task scope to match.
+-- Driven by the eventbus notify hook with the inserted event's id, so
+-- the fan-out is still one round-trip per append.
+SELECT
+  a.id,
+  a.workspace_id,
+  a.public_id
+FROM ai_agents a
+INNER JOIN events e ON e.id = ? AND e.workspace_id = a.workspace_id
+WHERE a.enabled = TRUE
+  AND a.paused = FALSE
+  AND a.schedule_kind = 'on_event'
+  AND a.workspace_id = ?
+  AND JSON_CONTAINS(a.event_trigger_types, JSON_QUOTE(e.type))
+  AND (
+    a.schedule_scope = 'workspace'
+    OR (
+      a.schedule_scope = 'assigned_tasks'
+      AND e.task_id IS NOT NULL
+      AND EXISTS (
+        SELECT 1 FROM task_actors ta
+        WHERE ta.workspace_id = a.workspace_id
+          AND ta.task_id = e.task_id
+          AND ta.agent_id = a.id
+          AND ta.kind = 'agent'
+          AND ta.enabled = TRUE
+      )
+    )
+  );
+
 -- name: GetAgentGuardSnapshot :one
 -- Fetch the minimal fields the agent guard needs to make an allow/deny
 -- decision. Returns enabled, paused, allowed_scopes_json, and the

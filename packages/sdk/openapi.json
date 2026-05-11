@@ -497,6 +497,42 @@
         "required": ["id", "slug", "name", "enabled", "memberCount", "createdAt"],
         "type": "object"
       },
+      "AgentRef": {
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          }
+        },
+        "required": ["id"],
+        "type": "object"
+      },
+      "AgentRunEvent": {
+        "additionalProperties": false,
+        "properties": {
+          "agent": {
+            "$ref": "#/components/schemas/AgentRef"
+          },
+          "eventId": {
+            "type": "string"
+          },
+          "occurredAt": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "payloadJson": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string"
+          }
+        },
+        "required": ["eventId", "type", "occurredAt", "agent"],
+        "type": "object"
+      },
       "AgentSummary": {
         "additionalProperties": false,
         "properties": {
@@ -556,125 +592,6 @@
           "scheduleKind",
           "paused",
           "createdAt"
-        ],
-        "type": "object"
-      },
-      "AiCostTodayOutputBody": {
-        "additionalProperties": false,
-        "properties": {
-          "$schema": {
-            "description": "A URL to the JSON Schema for this object.",
-            "examples": ["https://example.com/schemas/AiCostTodayOutputBody.json"],
-            "format": "uri",
-            "readOnly": true,
-            "type": "string"
-          },
-          "costUsd": {
-            "format": "double",
-            "type": "number"
-          },
-          "date": {
-            "description": "Local date in the requested timezone (YYYY-MM-DD). Falls back to UTC if tz is absent or invalid.",
-            "type": "string"
-          },
-          "monthlyCapUsd": {
-            "format": "double",
-            "type": "number"
-          }
-        },
-        "required": ["costUsd", "date"],
-        "type": "object"
-      },
-      "AiInvocation": {
-        "additionalProperties": false,
-        "properties": {
-          "costEstimate": {
-            "type": "string"
-          },
-          "errorCode": {
-            "type": "string"
-          },
-          "id": {
-            "description": "Invocation public id (UUID v7)",
-            "type": "string"
-          },
-          "invokedAt": {
-            "format": "int64",
-            "type": "integer"
-          },
-          "model": {
-            "type": "string"
-          },
-          "promptRedacted": {
-            "type": "string"
-          },
-          "purpose": {
-            "type": "string"
-          },
-          "responseRedacted": {
-            "type": "string"
-          },
-          "status": {
-            "type": "string"
-          },
-          "tokensInput": {
-            "format": "int32",
-            "type": "integer"
-          },
-          "tokensOutput": {
-            "format": "int32",
-            "type": "integer"
-          }
-        },
-        "required": ["id", "purpose", "model", "promptRedacted", "status", "invokedAt"],
-        "type": "object"
-      },
-      "AiMetricsOutputBody": {
-        "additionalProperties": false,
-        "properties": {
-          "$schema": {
-            "description": "A URL to the JSON Schema for this object.",
-            "examples": ["https://example.com/schemas/AiMetricsOutputBody.json"],
-            "format": "uri",
-            "readOnly": true,
-            "type": "string"
-          },
-          "acceptanceRate": {
-            "description": "applied / (applied + dismissed), 0 when no decisions",
-            "format": "double",
-            "type": "number"
-          },
-          "applied": {
-            "format": "int64",
-            "type": "integer"
-          },
-          "dismissed": {
-            "format": "int64",
-            "type": "integer"
-          },
-          "outboundLimits": {
-            "description": "Per-provider egress rate limiter counters",
-            "items": {
-              "$ref": "#/components/schemas/OutboundLimitStat"
-            },
-            "type": ["array", "null"]
-          },
-          "proposed": {
-            "format": "int64",
-            "type": "integer"
-          },
-          "windowDays": {
-            "format": "int64",
-            "type": "integer"
-          }
-        },
-        "required": [
-          "windowDays",
-          "proposed",
-          "applied",
-          "dismissed",
-          "acceptanceRate",
-          "outboundLimits"
         ],
         "type": "object"
       },
@@ -1806,6 +1723,32 @@
           "Raw",
           "Unparsed"
         ],
+        "type": "object"
+      },
+      "CostTodayOutputBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/CostTodayOutputBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "costUsd": {
+            "format": "double",
+            "type": "number"
+          },
+          "date": {
+            "description": "Local date in the requested timezone (YYYY-MM-DD). Falls back to UTC if tz is absent or invalid.",
+            "type": "string"
+          },
+          "monthlyCapUsd": {
+            "format": "double",
+            "type": "number"
+          }
+        },
+        "required": ["costUsd", "date"],
         "type": "object"
       },
       "CountUnreadOutputBody": {
@@ -3675,6 +3618,34 @@
         "required": ["outcomes"],
         "type": "object"
       },
+      "Event": {
+        "additionalProperties": false,
+        "properties": {
+          "actorDisplayName": {
+            "type": "string"
+          },
+          "actorUserId": {
+            "type": "string"
+          },
+          "id": {
+            "description": "Event public id (UUID v7)",
+            "type": "string"
+          },
+          "occurredAt": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "payload": {},
+          "taskId": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string"
+          }
+        },
+        "required": ["id", "type", "occurredAt"],
+        "type": "object"
+      },
       "EventInviteCreateResponse": {
         "additionalProperties": false,
         "properties": {
@@ -4084,6 +4055,47 @@
         "required": ["ok"],
         "type": "object"
       },
+      "HandoffToAgentBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/HandoffToAgentBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "agentId": {
+            "description": "Target AI agent public id (UUID v7)",
+            "type": "string"
+          }
+        },
+        "required": ["agentId"],
+        "type": "object"
+      },
+      "HandoffToUserBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/HandoffToUserBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "reason": {
+            "description": "Why the agent is handing the task back to a human",
+            "enum": ["manual", "low_confidence", "cost_cap", "tool_error", "constraint_conflict"],
+            "type": "string"
+          },
+          "targetUserPublicId": {
+            "description": "Optional user public id (UUID v7) to attach as the new assignee",
+            "type": "string"
+          }
+        },
+        "required": ["reason"],
+        "type": "object"
+      },
       "HealthOutputBody": {
         "additionalProperties": false,
         "properties": {
@@ -4158,64 +4170,6 @@
           "failedItems",
           "createdAt"
         ],
-        "type": "object"
-      },
-      "InboxItem": {
-        "additionalProperties": false,
-        "properties": {
-          "createdAt": {
-            "format": "int64",
-            "type": "integer"
-          },
-          "externalId": {
-            "type": "string"
-          },
-          "id": {
-            "description": "Inbox item public id (UUID v7)",
-            "type": "string"
-          },
-          "kind": {
-            "type": "string"
-          },
-          "payload": {},
-          "receivedAt": {
-            "format": "int64",
-            "type": "integer"
-          },
-          "source": {
-            "type": "string"
-          },
-          "taskId": {
-            "type": "string"
-          },
-          "taskTitle": {
-            "type": "string"
-          },
-          "workspaceId": {
-            "type": "string"
-          }
-        },
-        "required": ["id", "workspaceId", "source", "kind", "receivedAt", "createdAt"],
-        "type": "object"
-      },
-      "InboxTriageSuggestion": {
-        "additionalProperties": false,
-        "properties": {
-          "inboxItemId": {
-            "type": "string"
-          },
-          "reasoning": {
-            "type": "string"
-          },
-          "recommendedAction": {
-            "type": "string"
-          },
-          "score": {
-            "format": "float",
-            "type": "number"
-          }
-        },
-        "required": ["inboxItemId", "score", "recommendedAction", "reasoning"],
         "type": "object"
       },
       "InferStateOutputBody": {
@@ -4329,57 +4283,6 @@
         "required": ["totalUsers", "totalWorkspaces"],
         "type": "object"
       },
-      "IntakeItem": {
-        "additionalProperties": false,
-        "properties": {
-          "$schema": {
-            "description": "A URL to the JSON Schema for this object.",
-            "examples": ["https://example.com/schemas/IntakeItem.json"],
-            "format": "uri",
-            "readOnly": true,
-            "type": "string"
-          },
-          "aiReasoning": {
-            "type": "string"
-          },
-          "aiScore": {
-            "format": "double",
-            "type": "number"
-          },
-          "body": {
-            "type": "string"
-          },
-          "createdAt": {
-            "format": "int64",
-            "type": "integer"
-          },
-          "id": {
-            "description": "Intake item public id (UUID v7)",
-            "type": "string"
-          },
-          "snoozeUntil": {
-            "format": "int64",
-            "type": "integer"
-          },
-          "taskId": {
-            "type": "string"
-          },
-          "title": {
-            "type": "string"
-          },
-          "triageStatus": {
-            "type": "string"
-          },
-          "triagedByDisplayName": {
-            "type": "string"
-          },
-          "triagedByUserId": {
-            "type": "string"
-          }
-        },
-        "required": ["id", "title", "triageStatus", "createdAt"],
-        "type": "object"
-      },
       "InviteInfoOutputBody": {
         "additionalProperties": false,
         "properties": {
@@ -4434,6 +4337,88 @@
           }
         },
         "required": ["id", "attendeePublicId", "email", "expiresAt", "createdAt"],
+        "type": "object"
+      },
+      "Invocation": {
+        "additionalProperties": false,
+        "properties": {
+          "costEstimate": {
+            "type": "string"
+          },
+          "errorCode": {
+            "type": "string"
+          },
+          "id": {
+            "description": "Invocation public id (UUID v7)",
+            "type": "string"
+          },
+          "invokedAt": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "model": {
+            "type": "string"
+          },
+          "promptRedacted": {
+            "type": "string"
+          },
+          "purpose": {
+            "type": "string"
+          },
+          "responseRedacted": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "tokensInput": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "tokensOutput": {
+            "format": "int32",
+            "type": "integer"
+          }
+        },
+        "required": ["id", "purpose", "model", "promptRedacted", "status", "invokedAt"],
+        "type": "object"
+      },
+      "Item": {
+        "additionalProperties": false,
+        "properties": {
+          "createdAt": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "externalId": {
+            "type": "string"
+          },
+          "id": {
+            "description": "Inbox item public id (UUID v7)",
+            "type": "string"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "payload": {},
+          "receivedAt": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "source": {
+            "type": "string"
+          },
+          "taskId": {
+            "type": "string"
+          },
+          "taskTitle": {
+            "type": "string"
+          },
+          "workspaceId": {
+            "type": "string"
+          }
+        },
+        "required": ["id", "workspaceId", "source", "kind", "receivedAt", "createdAt"],
         "type": "object"
       },
       "Label": {
@@ -4526,6 +4511,30 @@
           }
         },
         "required": ["total", "items"],
+        "type": "object"
+      },
+      "ListAgentRunsBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/ListAgentRunsBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "runs": {
+            "items": {
+              "$ref": "#/components/schemas/AgentRunEvent"
+            },
+            "type": ["array", "null"]
+          },
+          "total": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "required": ["total", "runs"],
         "type": "object"
       },
       "ListAgentsOutputBody": {
@@ -5038,7 +5047,7 @@
           },
           "items": {
             "items": {
-              "$ref": "#/components/schemas/InboxItem"
+              "$ref": "#/components/schemas/Item"
             },
             "type": ["array", "null"]
           },
@@ -5065,7 +5074,7 @@
           },
           "items": {
             "items": {
-              "$ref": "#/components/schemas/IntakeItem"
+              "$ref": "#/components/schemas/Record"
             },
             "type": ["array", "null"]
           },
@@ -5139,7 +5148,7 @@
           },
           "invocations": {
             "items": {
-              "$ref": "#/components/schemas/AiInvocation"
+              "$ref": "#/components/schemas/Invocation"
             },
             "type": ["array", "null"]
           }
@@ -5423,6 +5432,33 @@
           }
         },
         "required": ["total", "tasks", "nextCursor"],
+        "type": "object"
+      },
+      "ListOutputBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/ListOutputBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "nextCursor": {
+            "type": ["string", "null"]
+          },
+          "notifications": {
+            "items": {
+              "$ref": "#/components/schemas/NotificationDTO"
+            },
+            "type": ["array", "null"]
+          },
+          "total": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "required": ["total", "notifications", "nextCursor"],
         "type": "object"
       },
       "ListPagesBody": {
@@ -5965,7 +6001,7 @@
           },
           "events": {
             "items": {
-              "$ref": "#/components/schemas/TimelineEvent"
+              "$ref": "#/components/schemas/Event"
             },
             "type": ["array", "null"]
           },
@@ -6549,6 +6585,55 @@
         ],
         "type": "object"
       },
+      "MetricsOutputBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/MetricsOutputBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "acceptanceRate": {
+            "description": "applied / (applied + dismissed), 0 when no decisions",
+            "format": "double",
+            "type": "number"
+          },
+          "applied": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "dismissed": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "outboundLimits": {
+            "description": "Per-provider egress rate limiter counters",
+            "items": {
+              "$ref": "#/components/schemas/OutboundLimitStat"
+            },
+            "type": ["array", "null"]
+          },
+          "proposed": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "windowDays": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "windowDays",
+          "proposed",
+          "applied",
+          "dismissed",
+          "acceptanceRate",
+          "outboundLimits"
+        ],
+        "type": "object"
+      },
       "ModelSummary": {
         "additionalProperties": false,
         "properties": {
@@ -6841,33 +6926,6 @@
           "deliveredAt",
           "createdAt"
         ],
-        "type": "object"
-      },
-      "NotificationsListOutputBody": {
-        "additionalProperties": false,
-        "properties": {
-          "$schema": {
-            "description": "A URL to the JSON Schema for this object.",
-            "examples": ["https://example.com/schemas/NotificationsListOutputBody.json"],
-            "format": "uri",
-            "readOnly": true,
-            "type": "string"
-          },
-          "nextCursor": {
-            "type": ["string", "null"]
-          },
-          "notifications": {
-            "items": {
-              "$ref": "#/components/schemas/NotificationDTO"
-            },
-            "type": ["array", "null"]
-          },
-          "total": {
-            "format": "int64",
-            "type": "integer"
-          }
-        },
-        "required": ["total", "notifications", "nextCursor"],
         "type": "object"
       },
       "OIDCStartOutputBody": {
@@ -8504,6 +8562,57 @@
         "required": ["id", "emoji", "userId", "userDisplayName", "createdAt"],
         "type": "object"
       },
+      "Record": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/Record.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "aiReasoning": {
+            "type": "string"
+          },
+          "aiScore": {
+            "format": "double",
+            "type": "number"
+          },
+          "body": {
+            "type": "string"
+          },
+          "createdAt": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "id": {
+            "description": "Intake item public id (UUID v7)",
+            "type": "string"
+          },
+          "snoozeUntil": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "taskId": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "triageStatus": {
+            "type": "string"
+          },
+          "triagedByDisplayName": {
+            "type": "string"
+          },
+          "triagedByUserId": {
+            "type": "string"
+          }
+        },
+        "required": ["id", "title", "triageStatus", "createdAt"],
+        "type": "object"
+      },
       "RegisterInputBody": {
         "additionalProperties": false,
         "properties": {
@@ -9616,6 +9725,9 @@
             "format": "int64",
             "type": "integer"
           },
+          "agentContext": {
+            "$ref": "#/components/schemas/TaskAgentContext"
+          },
           "archivedAt": {
             "format": "int64",
             "type": "integer"
@@ -9792,6 +9904,33 @@
           }
         },
         "required": ["id", "agentId", "agentName", "role", "createdAt"],
+        "type": "object"
+      },
+      "TaskAgentContext": {
+        "additionalProperties": false,
+        "properties": {
+          "agent": {
+            "$ref": "#/components/schemas/AgentRef"
+          },
+          "attempts": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "handoffReason": {
+            "type": "string"
+          },
+          "handoffStatus": {
+            "type": "string"
+          },
+          "lastRunAt": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "lastThought": {
+            "type": "string"
+          }
+        },
+        "required": ["attempts"],
         "type": "object"
       },
       "TaskAiInvocation": {
@@ -10463,34 +10602,6 @@
         ],
         "type": "object"
       },
-      "TimelineEvent": {
-        "additionalProperties": false,
-        "properties": {
-          "actorDisplayName": {
-            "type": "string"
-          },
-          "actorUserId": {
-            "type": "string"
-          },
-          "id": {
-            "description": "Event public id (UUID v7)",
-            "type": "string"
-          },
-          "occurredAt": {
-            "format": "int64",
-            "type": "integer"
-          },
-          "payload": {},
-          "taskId": {
-            "type": "string"
-          },
-          "type": {
-            "type": "string"
-          }
-        },
-        "required": ["id", "type", "occurredAt"],
-        "type": "object"
-      },
       "ToggleCanEditInputBody": {
         "additionalProperties": false,
         "properties": {
@@ -10821,12 +10932,32 @@
           },
           "suggestions": {
             "items": {
-              "$ref": "#/components/schemas/InboxTriageSuggestion"
+              "$ref": "#/components/schemas/TriageSuggestion"
             },
             "type": ["array", "null"]
           }
         },
         "required": ["suggestions"],
+        "type": "object"
+      },
+      "TriageSuggestion": {
+        "additionalProperties": false,
+        "properties": {
+          "inboxItemId": {
+            "type": "string"
+          },
+          "reasoning": {
+            "type": "string"
+          },
+          "recommendedAction": {
+            "type": "string"
+          },
+          "score": {
+            "format": "float",
+            "type": "number"
+          }
+        },
+        "required": ["inboxItemId", "score", "recommendedAction", "reasoning"],
         "type": "object"
       },
       "TriggerAgentOutputBody": {
@@ -11439,6 +11570,33 @@
         ],
         "type": "object"
       },
+      "WebhookListOutputBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/WebhookListOutputBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "nextCursor": {
+            "type": ["string", "null"]
+          },
+          "total": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "webhooks": {
+            "items": {
+              "$ref": "#/components/schemas/WebhookSubscriptionDTO"
+            },
+            "type": ["array", "null"]
+          }
+        },
+        "required": ["total", "webhooks", "nextCursor"],
+        "type": "object"
+      },
       "WebhookSubscriptionDTO": {
         "additionalProperties": false,
         "properties": {
@@ -11527,33 +11685,6 @@
           "createdAt",
           "updatedAt"
         ],
-        "type": "object"
-      },
-      "WebhooksListOutputBody": {
-        "additionalProperties": false,
-        "properties": {
-          "$schema": {
-            "description": "A URL to the JSON Schema for this object.",
-            "examples": ["https://example.com/schemas/WebhooksListOutputBody.json"],
-            "format": "uri",
-            "readOnly": true,
-            "type": "string"
-          },
-          "nextCursor": {
-            "type": ["string", "null"]
-          },
-          "total": {
-            "format": "int64",
-            "type": "integer"
-          },
-          "webhooks": {
-            "items": {
-              "$ref": "#/components/schemas/WebhookSubscriptionDTO"
-            },
-            "type": ["array", "null"]
-          }
-        },
-        "required": ["total", "webhooks", "nextCursor"],
         "type": "object"
       },
       "WeeklyDigestCounts": {
@@ -14306,7 +14437,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/NotificationsListOutputBody"
+                  "$ref": "#/components/schemas/ListOutputBody"
                 }
               }
             },
@@ -16144,6 +16275,58 @@
         "tags": ["Tasks"]
       }
     },
+    "/tasks/{id}/agent-runs": {
+      "get": {
+        "description": "Returns the agent run lifecycle events (started / completed / failed) the orchestrator has appended for this task. Most recent first. Empty until the orchestrator stamps task_id and actor_agent_id on its ai.agent.run.* events.",
+        "operationId": "tasks-agent-runs-list",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "explode": false,
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "default": 20,
+              "format": "int32",
+              "maximum": 100,
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListAgentRunsBody"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "List recent agent run events scoped to a task",
+        "tags": ["Tasks"]
+      }
+    },
     "/tasks/{id}/agents": {
       "get": {
         "description": "Returns the AI agent actors currently attached to the task. Distinguished from human actors so UI can render differently and quotas can apply per-agent.",
@@ -17437,6 +17620,106 @@
           }
         },
         "summary": "List likely-duplicate tasks by embedding similarity",
+        "tags": ["Tasks"]
+      }
+    },
+    "/tasks/{id}/handoff/to-agent": {
+      "post": {
+        "description": "Disables any current agent assignee on the task and attaches the supplied agent in its place. Emits an agent.task.handoff_to_agent event so the orchestrator can pick up the new assignment.",
+        "operationId": "tasks-handoff-to-agent",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/HandoffToAgentBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Task"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Promote an AI agent to the task's current assignee",
+        "tags": ["Tasks"]
+      }
+    },
+    "/tasks/{id}/handoff/to-user": {
+      "post": {
+        "description": "Disables the current agent assignee, optionally upserts a target user as the new assignee, and stamps tasks.agent_memo with the handoff reason. Emits agent.task.handoff_to_user tagged with the prior agent as actor.",
+        "operationId": "tasks-handoff-to-user",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/HandoffToUserBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Task"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Hand a task back to a human user",
         "tags": ["Tasks"]
       }
     },
@@ -19094,7 +19377,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/AiCostTodayOutputBody"
+                  "$ref": "#/components/schemas/CostTodayOutputBody"
                 }
               }
             },
@@ -19211,7 +19494,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/AiMetricsOutputBody"
+                  "$ref": "#/components/schemas/MetricsOutputBody"
                 }
               }
             },
@@ -23719,7 +24002,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/IntakeItem"
+                  "$ref": "#/components/schemas/Record"
                 }
               }
             },
@@ -23767,7 +24050,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/IntakeItem"
+                  "$ref": "#/components/schemas/Record"
                 }
               }
             },
@@ -23823,7 +24106,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/IntakeItem"
+                  "$ref": "#/components/schemas/Record"
                 }
               }
             },
@@ -27077,7 +27360,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/WebhooksListOutputBody"
+                  "$ref": "#/components/schemas/WebhookListOutputBody"
                 }
               }
             },

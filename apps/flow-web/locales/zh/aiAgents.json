@@ -45,5 +45,27 @@
   "empty": {
     "title": "暂无 AI 活动",
     "body": "当代理在此任务上运行时，运行记录将显示在此处。"
+  },
+  "task_detail": {
+    "agent": {
+      "panel_title": "智能体",
+      "status": {
+        "running": "运行中",
+        "handed_back": "已交还",
+        "stuck": "停滞 — 需要您介入"
+      },
+      "last_run_ago": "{time}前最后运行",
+      "attempts": "尝试: {current}/{max}",
+      "cost_today": "今日成本: ${amount}",
+      "hand_back": "交还给我",
+      "run_history": "运行历史"
+    }
+  },
+  "handoff_reason": {
+    "low_confidence": "置信度低",
+    "cost_cap": "成本上限",
+    "tool_error": "工具错误",
+    "constraint_conflict": "约束冲突",
+    "manual": "手动交还"
   }
 }

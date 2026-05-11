@@ -126,6 +126,7 @@ export const tasksKeys = {
   duplicates: (id: string) => [...tasksKeys.all, 'detail', id, 'duplicates'] as const,
   inferState: (id: string) => [...tasksKeys.all, 'detail', id, 'infer-state'] as const,
   aiInvocations: (id: string) => [...tasksKeys.all, 'detail', id, 'ai-invocations'] as const,
+  agentRuns: (id: string) => [...tasksKeys.all, 'detail', id, 'agent-runs'] as const,
   dependencies: (id: string) => [...tasksKeys.all, 'detail', id, 'dependencies'] as const,
   attachments: (id: string) => [...tasksKeys.all, 'detail', id, 'attachments'] as const,
 };
@@ -138,6 +139,22 @@ export interface TaskDependenciesResult {
 }
 
 export type TaskAiInvocation = components['schemas']['TaskAiInvocation'];
+
+export type TaskAgentContext = components['schemas']['TaskAgentContext'];
+export type AgentRef = components['schemas']['AgentRef'];
+export type AgentRunEvent = components['schemas']['AgentRunEvent'];
+export type HandoffToAgentInput = components['schemas']['HandoffToAgentBody'];
+export type HandoffToUserInput = components['schemas']['HandoffToUserBody'];
+export type HandoffReason = HandoffToUserInput['reason'];
+
+export type AgentHandoffStatus = 'running' | 'handed_back' | 'stuck';
+
+export function deriveAgentStatus(ctx: TaskAgentContext | undefined): AgentHandoffStatus {
+  const raw = ctx?.handoffStatus;
+  if (raw === 'stuck') return 'stuck';
+  if (raw === 'handed_back') return 'handed_back';
+  return 'running';
+}
 
 export type InferStateProposal = components['schemas']['InferStateProposal'];
 export interface InferStateResult {
@@ -1043,6 +1060,71 @@ export function useUnarchiveTask(): UseMutationResult<void, ApiError, string> {
     onSuccess: (_data, id) => {
       void qc.invalidateQueries({ queryKey: tasksKeys.detail(id) });
       void qc.invalidateQueries({ queryKey: [...tasksKeys.all, 'list'] });
+    },
+  });
+}
+
+/* ── Agent handoff hooks ──────────────────────────────────────── */
+
+export interface HandoffToAgentArgs {
+  taskId: string;
+  input: HandoffToAgentInput;
+}
+
+export function useHandoffToAgent(): UseMutationResult<Task, ApiError, HandoffToAgentArgs> {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ taskId, input }: HandoffToAgentArgs): Promise<Task> => {
+      const { data, error } = await sdk.POST('/tasks/{id}/handoff/to-agent', {
+        params: { path: { id: taskId } },
+        body: input,
+      });
+      if (error || !data) throw toApiError(error, 'Failed to hand off to agent');
+      return data;
+    },
+    onSuccess: (task) => {
+      qc.setQueryData(tasksKeys.detail(task.id), task);
+      void qc.invalidateQueries({ queryKey: tasksKeys.detail(task.id) });
+      void qc.invalidateQueries({ queryKey: tasksKeys.agentRuns(task.id) });
+      void qc.invalidateQueries({ queryKey: [...timelineKeys.all, 'task', task.id] });
+    },
+  });
+}
+
+export interface HandoffToUserArgs {
+  taskId: string;
+  input: HandoffToUserInput;
+}
+
+export function useHandoffToUser(): UseMutationResult<Task, ApiError, HandoffToUserArgs> {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ taskId, input }: HandoffToUserArgs): Promise<Task> => {
+      const { data, error } = await sdk.POST('/tasks/{id}/handoff/to-user', {
+        params: { path: { id: taskId } },
+        body: input,
+      });
+      if (error || !data) throw toApiError(error, 'Failed to hand task back');
+      return data;
+    },
+    onSuccess: (task) => {
+      qc.setQueryData(tasksKeys.detail(task.id), task);
+      void qc.invalidateQueries({ queryKey: tasksKeys.detail(task.id) });
+      void qc.invalidateQueries({ queryKey: tasksKeys.agentRuns(task.id) });
+      void qc.invalidateQueries({ queryKey: [...timelineKeys.all, 'task', task.id] });
+    },
+  });
+}
+
+export function useTaskAgentRunsQuery(taskId: string): UseSuspenseQueryResult<AgentRunEvent[]> {
+  return useSuspenseQuery({
+    queryKey: tasksKeys.agentRuns(taskId),
+    queryFn: async (): Promise<AgentRunEvent[]> => {
+      const { data, error } = await sdk.GET('/tasks/{id}/agent-runs', {
+        params: { path: { id: taskId } },
+      });
+      if (error || !data) throw toApiError(error, 'Failed to load agent runs');
+      return data.runs ?? [];
     },
   });
 }

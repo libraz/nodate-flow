@@ -18,7 +18,7 @@ import { sdk } from '../../lib/sdk';
 export type InboxSource = 'manual' | 'github' | 'slack' | 'email' | 'webhook';
 
 /** Inbox item DTO mirrored from the SDK. `receivedAt` / `createdAt` are unix seconds. */
-export type InboxItem = components['schemas']['InboxItem'];
+export type InboxItem = components['schemas']['Item'];
 
 /** Query key factory for the inbox feature. */
 export const inboxKeys = {

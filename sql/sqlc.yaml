@@ -3,6 +3,7 @@ sql:
   - engine: "mysql"
     queries:
       - "queries/admin"
+      - "queries/agents"
       - "queries/ai"
       - "queries/ai-embeddings"
       - "queries/ai-settings"
@@ -221,6 +222,17 @@ sql:
               type: "PublicID"
           - column: "*.initiated_by_user_id"
             go_struct_tag: 'json:"-"'
+          # tasks.agent_memo is JSON NOT NULL DEFAULT JSON_OBJECT(). The
+          # default ensures freshly-created tasks have '{}' rather than NULL
+          # so sqlc's default json.RawMessage scan path is safe. The mapper
+          # treats '{}' as "no memo yet" (see buildAgentContext guard).
+          # v_task_detail.agent_assignee_name comes from a COALESCEd
+          # correlated subquery, which sqlc's MySQL parser can't type-infer
+          # and emits as interface{}. Force string here; the underlying
+          # ai_agents.name column is VARCHAR(255) NOT NULL and COALESCE
+          # provides '' as the no-agent fallback.
+          - column: "v_task_detail.agent_assignee_name"
+            go_type: "string"
   # --- flow-api calendar subpackage (calendar queries only) ---
   # Generated alongside the primary flow-api generated package so that the
   # calendar handlers can import a calendar-scoped queries struct without
@@ -313,6 +325,7 @@ sql:
             go_struct_tag: 'json:"-"'
           - column: "*.event_id_key"
             go_struct_tag: 'json:"-"'
+          # See note in flow-api block above.
   # --- auth-api (auth + audit + workspace queries only) ---
   - engine: "mysql"
     queries:

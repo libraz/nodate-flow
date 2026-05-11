@@ -93,6 +93,15 @@ const (
 	AiAgentRunFailed    = sharedbus.AiAgentRunFailed
 )
 
+// Agent handoff events (per-task attach / thought / handoff trail).
+const (
+	AgentTaskAttached       = sharedbus.AgentTaskAttached
+	AgentTaskDetached       = sharedbus.AgentTaskDetached
+	AgentTaskThought        = sharedbus.AgentTaskThought
+	AgentTaskHandoffToUser  = sharedbus.AgentTaskHandoffToUser
+	AgentTaskHandoffToAgent = sharedbus.AgentTaskHandoffToAgent
+)
+
 // Timebox lifecycle events.
 const (
 	TimeboxCreated     = sharedbus.TimeboxCreated

@@ -241,7 +241,12 @@ func main() {
 		} else {
 			logger.Info("agent executor: nil (bookkeeping only)")
 		}
-		runner = &agentruntime.OrchestratorRunner{DB: db, Executor: executor}
+		runner = &agentruntime.OrchestratorRunner{
+			DB:               db,
+			Executor:         executor,
+			Queries:          queries,
+			HandoffLoopLimit: cfg.AgentHandoffLoopLimit,
+		}
 		logger.Info("agent runner: orchestrator")
 	} else {
 		runner = &agentruntime.LogRunner{Sink: func(_ context.Context, j agentruntime.Job, _ time.Time) {
@@ -422,7 +427,8 @@ func main() {
 			ConfidenceThreshold: float32(cfg.AutoActionThreshold),
 			DryRun:              cfg.AutoActionDryRun,
 		},
-		Logger: logger,
+		HandoffLoopLimit: cfg.AgentHandoffLoopLimit,
+		Logger:           logger,
 	}
 	autoActionCtx, autoActionCancel := context.WithCancel(context.Background())
 	defer autoActionCancel()

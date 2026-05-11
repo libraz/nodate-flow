@@ -22,7 +22,8 @@
   },
   "filter": {
     "workspace_label": "Workspace",
-    "workspace_all": "All workspaces"
+    "workspace_all": "All workspaces",
+    "handoff": "Agent stuck"
   },
   "toast": {
     "archived": "Archived",

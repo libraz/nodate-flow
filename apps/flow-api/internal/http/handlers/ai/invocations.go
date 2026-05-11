@@ -16,10 +16,10 @@ type ListInvocationsInput struct {
 	Offset int32  `query:"offset" minimum:"0" default:"0"`
 }
 
-// AiInvocation is the masked DTO for an ai_invocations row. Prompt and
+// Invocation is the masked DTO for an ai_invocations row. Prompt and
 // response bodies are already redacted at write time; this endpoint
 // only forwards what the orchestrator persisted.
-type AiInvocation struct {
+type Invocation struct {
 	ID               string `json:"id" doc:"Invocation public id (UUID v7)"`
 	Purpose          string `json:"purpose"`
 	Model            string `json:"model"`
@@ -36,7 +36,7 @@ type AiInvocation struct {
 // ListInvocationsOutput wraps the paginated invocation list.
 type ListInvocationsOutput struct {
 	Body struct {
-		Invocations []AiInvocation `json:"invocations"`
+		Invocations []Invocation `json:"invocations"`
 	}
 }
 
@@ -59,9 +59,9 @@ func ListInvocations(deps Deps) func(context.Context, *ListInvocationsInput) (*L
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
 		out := &ListInvocationsOutput{}
-		out.Body.Invocations = make([]AiInvocation, 0, len(rows))
+		out.Body.Invocations = make([]Invocation, 0, len(rows))
 		for _, r := range rows {
-			dto := AiInvocation{
+			dto := Invocation{
 				ID:             r.PublicID.String(),
 				Purpose:        r.Purpose,
 				Model:          r.Model,

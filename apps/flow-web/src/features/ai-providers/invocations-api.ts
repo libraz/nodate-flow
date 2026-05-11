@@ -8,7 +8,7 @@ import { type UseSuspenseQueryResult, useSuspenseQuery } from '@tanstack/react-q
 
 import { sdk } from '../../lib/sdk';
 
-export type AiInvocation = components['schemas']['AiInvocation'];
+export type AiInvocation = components['schemas']['Invocation'];
 
 export const aiInvocationsKeys = {
   all: ['ai-invocations'] as const,

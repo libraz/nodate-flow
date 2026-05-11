@@ -1,0 +1,250 @@
+/*
+ * Agent panel for the task detail page.
+ *
+ * Mirrors the visual language of the AI activity section. All colors,
+ * spacing, radii and shadows come from design tokens (see
+ * /docs/conventions/design-tokens.md). Translucent surfaces use
+ * color-mix() so the four themes pick up the right accent.
+ *
+ * The container has a fixed minimum block-size so the kind/mode-style
+ * fade transitions between status pills don't reflow surrounding
+ * sections.
+ */
+
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-3);
+  padding: var(--nf-space-4);
+  border-radius: var(--nf-radius-md);
+  background: color-mix(in oklab, var(--nf-color-accent) 4%, var(--nf-color-bg));
+  border: 1px solid color-mix(in oklab, var(--nf-color-accent) 18%, transparent);
+  min-block-size: 10rem;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  gap: var(--nf-space-3);
+  min-block-size: 2.5rem;
+}
+
+.avatar {
+  inline-size: 2.5rem;
+  block-size: 2.5rem;
+  border-radius: var(--nf-radius-pill);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: color-mix(in oklab, var(--nf-color-accent) 14%, transparent);
+  color: var(--nf-color-accent);
+  flex-shrink: 0;
+  font-size: 1.25rem;
+}
+
+.identity {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-1);
+  min-inline-size: 0;
+  flex: 1;
+}
+
+.agentName {
+  font-size: var(--nf-text-base);
+  font-weight: 600;
+  color: var(--nf-color-fg);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.statusPill {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--nf-space-2);
+  align-self: flex-start;
+  padding: 0 var(--nf-space-2);
+  border-radius: var(--nf-radius-pill);
+  font-size: var(--nf-text-xs);
+  font-weight: 500;
+  line-height: 1.5rem;
+  white-space: nowrap;
+  border: 1px solid transparent;
+  transition: opacity var(--nf-duration-fast) var(--nf-ease-standard);
+}
+
+.statusPill[data-tone="success"] {
+  background: color-mix(in oklab, var(--nf-color-success) 12%, transparent);
+  color: var(--nf-color-success);
+  border-color: color-mix(in oklab, var(--nf-color-success) 24%, transparent);
+}
+
+.statusPill[data-tone="warning"] {
+  background: color-mix(in oklab, var(--nf-color-warning) 14%, transparent);
+  color: var(--nf-color-warning);
+  border-color: color-mix(in oklab, var(--nf-color-warning) 28%, transparent);
+}
+
+.statusPill[data-tone="neutral"] {
+  background: color-mix(in oklab, var(--nf-color-bg-elevated) 80%, transparent);
+  color: var(--nf-color-fg-muted);
+  border-color: var(--nf-color-hairline);
+}
+
+.statusGlyph {
+  inline-size: 0.5rem;
+  block-size: 0.5rem;
+  border-radius: 50%;
+  display: inline-block;
+  background: currentColor;
+}
+
+.statusGlyph[data-pulse="true"] {
+  animation: pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.4;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .statusGlyph[data-pulse="true"] {
+    animation: none;
+  }
+  .statusPill {
+    transition: none;
+  }
+}
+
+.meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--nf-space-2) var(--nf-space-3);
+  font-size: var(--nf-text-xs);
+  color: var(--nf-color-fg-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.metaItem {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--nf-space-1);
+}
+
+.reason {
+  display: inline-flex;
+  align-items: center;
+  align-self: flex-start;
+  padding: 0 var(--nf-space-2);
+  border-radius: var(--nf-radius-sm);
+  background: color-mix(in oklab, var(--nf-color-warning) 12%, transparent);
+  color: var(--nf-color-warning);
+  font-size: var(--nf-text-xs);
+  line-height: 1.5rem;
+}
+
+.thought {
+  margin: 0;
+  padding: var(--nf-space-2) var(--nf-space-3);
+  border-radius: var(--nf-radius-sm);
+  background: color-mix(in oklab, var(--nf-color-bg-elevated) 70%, transparent);
+  font-size: var(--nf-text-xs);
+  color: var(--nf-color-fg);
+  font-style: italic;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-word;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.actions {
+  display: flex;
+  gap: var(--nf-space-2);
+  flex-wrap: wrap;
+  margin-block-start: auto;
+}
+
+.runList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-2);
+}
+
+.runRow {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-1);
+  padding: var(--nf-space-3);
+  border-radius: var(--nf-radius-sm);
+  background: color-mix(in oklab, var(--nf-color-bg-elevated) 50%, transparent);
+  border: 1px solid var(--nf-color-hairline);
+}
+
+.runHeader {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--nf-space-2);
+  font-size: var(--nf-text-xs);
+}
+
+.runType {
+  font-family: var(--font-mono);
+  color: var(--nf-color-fg);
+  word-break: break-word;
+}
+
+.runTime {
+  color: var(--nf-color-fg-subtle);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.runMeta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--nf-space-2) var(--nf-space-3);
+  font-size: var(--nf-text-xs);
+  color: var(--nf-color-fg-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.runError {
+  margin: 0;
+  padding: var(--nf-space-2);
+  border-radius: var(--nf-radius-sm);
+  background: color-mix(in oklab, var(--nf-color-danger) 8%, transparent);
+  color: var(--nf-color-fg);
+  font-family: var(--font-mono);
+  font-size: var(--nf-text-xs);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.runEmpty {
+  padding: var(--nf-space-4);
+  text-align: center;
+  color: var(--nf-color-fg-muted);
+  font-size: var(--nf-text-sm);
+}
+
+.toolCalls {
+  margin: 0;
+  padding-inline-start: var(--nf-space-4);
+  font-size: var(--nf-text-xs);
+  color: var(--nf-color-fg-muted);
+  font-family: var(--font-mono);
+}

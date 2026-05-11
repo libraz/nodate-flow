@@ -122,6 +122,14 @@ type Config struct {
 	// row must reach before the purger deletes it.
 	AgentRunsRetention time.Duration `env:"NF_FLOW_AGENT_RUNS_RETENTION" envDefault:"168h"`
 
+	// AgentHandoffLoopLimit caps the number of automated agent → user
+	// handoffs the orchestrator may emit on a single task before it
+	// treats the task as stuck. When the count in tasks.agent_memo
+	// reaches the limit, the runner emits ai.agent.run.failed with
+	// WS.TASK_AGENT.HANDOFF_LOOP_DETECTED and pauses the agent instead
+	// of writing another handoff event.
+	AgentHandoffLoopLimit int `env:"NF_AGENT_HANDOFF_LOOP_LIMIT" envDefault:"5"`
+
 	// AutoActionInterval controls how often the autonomous auto-action
 	// executor evaluates tasks and applies actions (escalate, close
 	// stale reviews). Set to 0 to disable. Default: 5m.

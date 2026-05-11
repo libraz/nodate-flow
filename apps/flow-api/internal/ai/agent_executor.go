@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"strconv"
 
+	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/ai/agentruntime"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/ai/providers"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/generated"
 )
@@ -44,37 +45,44 @@ type AgentExecutor struct {
 // The agentID argument is the internal ai_agents.id because the
 // runner already has it in hand from DBSource; looking it up again
 // by public id would cost an extra round-trip per tick.
-func (e *AgentExecutor) ExecuteAgent(ctx context.Context, workspaceID, agentID uint32) error {
+func (e *AgentExecutor) ExecuteAgent(ctx context.Context, workspaceID, agentID uint32) (agentruntime.ExecutionResult, error) {
+	var result agentruntime.ExecutionResult
 	if e == nil || e.Queries == nil || e.Resolver == nil {
-		return ErrNoProvider
+		return result, ErrNoProvider
 	}
 	row, err := e.Queries.GetAgentForExec(ctx, generated.GetAgentForExecParams{
 		WorkspaceID: workspaceID,
 		ID:          agentID,
 	})
 	if err != nil {
-		return fmt.Errorf("ai: agent lookup failed: %w", err)
+		return result, fmt.Errorf("ai: agent lookup failed: %w", err)
 	}
 	if row.Paused {
-		return ErrAgentPaused
+		return result, ErrAgentPaused
 	}
 	// Pre-flight: skip LLM call if no new events since last successful run.
 	if e.PreFlight != nil {
 		if skip, _ := e.PreFlight.ShouldSkip(ctx, workspaceID, agentID); skip {
-			return nil
+			return result, nil
 		}
 	}
 	if e.Guard != nil {
 		if err := e.Guard.Check(ctx, workspaceID); err != nil {
-			return err
+			// The runner uses CostCapHit to fire the cost_cap handoff
+			// trigger and pause the agent, so distinguish budget hits
+			// from generic guard read failures.
+			if errors.Is(err, ErrDailyBudgetExceeded) {
+				result.CostCapHit = true
+			}
+			return result, err
 		}
 	}
 	prov, err := e.Resolver.Default(ctx, workspaceID)
 	if err != nil {
-		return err
+		return result, err
 	}
 	if prov == nil {
-		return ErrNoProvider
+		return result, ErrNoProvider
 	}
 	ctx = providers.WithWorkspaceID(ctx, workspaceID)
 	req := providers.Request{
@@ -94,7 +102,7 @@ func (e *AgentExecutor) ExecuteAgent(ctx context.Context, workspaceID, agentID u
 		if o := (&Orchestrator{LogInvoke: e.Log}); o.LogInvoke != nil {
 			o.logFailure(ctx, workspaceID, "agent_tick", req, err)
 		}
-		return fmt.Errorf("ai: agent provider call failed: %w", err)
+		return result, fmt.Errorf("ai: agent provider call failed: %w", err)
 	}
 	if e.OnInvocation != nil {
 		e.OnInvocation(string(prov.Kind()), req.Model, wsIDStr, resp.CostCents)
@@ -102,5 +110,7 @@ func (e *AgentExecutor) ExecuteAgent(ctx context.Context, workspaceID, agentID u
 	if o := (&Orchestrator{LogInvoke: e.Log}); o.LogInvoke != nil {
 		o.logSuccess(ctx, workspaceID, "agent_tick", req, resp)
 	}
-	return nil
+	result.CostCents = resp.CostCents
+	result.LastThought = resp.Text
+	return result, nil
 }

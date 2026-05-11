@@ -102,6 +102,48 @@ func (ns NullAiAgentsScheduleKind) Value() (driver.Value, error) {
 	return string(ns.AiAgentsScheduleKind), nil
 }
 
+type AiAgentsScheduleScope string
+
+const (
+	AiAgentsScheduleScopeWorkspace     AiAgentsScheduleScope = "workspace"
+	AiAgentsScheduleScopeAssignedTasks AiAgentsScheduleScope = "assigned_tasks"
+)
+
+func (e *AiAgentsScheduleScope) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = AiAgentsScheduleScope(s)
+	case string:
+		*e = AiAgentsScheduleScope(s)
+	default:
+		return fmt.Errorf("unsupported scan type for AiAgentsScheduleScope: %T", src)
+	}
+	return nil
+}
+
+type NullAiAgentsScheduleScope struct {
+	AiAgentsScheduleScope AiAgentsScheduleScope `json:"aiAgentsScheduleScope"`
+	Valid                 bool                  `json:"valid"` // Valid is true if AiAgentsScheduleScope is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullAiAgentsScheduleScope) Scan(value interface{}) error {
+	if value == nil {
+		ns.AiAgentsScheduleScope, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.AiAgentsScheduleScope.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullAiAgentsScheduleScope) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.AiAgentsScheduleScope), nil
+}
+
 type AiInvocationsStatus string
 
 const (
@@ -2010,6 +2052,8 @@ type AiAgent struct {
 	ScheduleKind AiAgentsScheduleKind `json:"scheduleKind"`
 	// JSON array of eventbus Kind strings that fire this agent when schedule_kind=on_event (e.g., ["signal.attached","task.transition.submit"])
 	EventTriggerTypes json.RawMessage `json:"eventTriggerTypes"`
+	// When schedule_kind=on_event, controls whether the agent reacts to all workspace events or only events for tasks where it is an enabled actor
+	ScheduleScope AiAgentsScheduleScope `json:"scheduleScope"`
 	// Manually or automatically paused (e.g., cost cap exceeded)
 	Paused bool `json:"paused"`
 	// Display order
@@ -2676,6 +2720,8 @@ type Event struct {
 	TaskID sql.NullInt32 `json:"-"`
 	// Acting user.id (null for system/bot actions)
 	ActorUserID sql.NullInt32 `json:"-"`
+	// Acting ai_agents.id when the event was produced by an AI agent. Mutual exclusion with actor_user_id is enforced by query design and handler validation, not a CHECK constraint (MySQL 8.4 forbids CHECK on columns used by FK referential actions; both FKs use ON DELETE SET NULL). Each INSERT binds exactly one of the two columns: AppendEvent (events.sql) sets actor_user_id only; AppendAgentEvent (events.sql) and InsertHandoffToUserEvent (agents/handoff.sql) set actor_agent_id only; InsertHandoffToAgentEvent (agents/handoff.sql) sets actor_user_id only. Both NULL means system actor.
+	ActorAgentID sql.NullInt32 `json:"actorAgentId"`
 	// Event type (e.g., task.created, signal.attached)
 	Type string `json:"type"`
 	// Event payload
@@ -3453,6 +3499,8 @@ type Task struct {
 	Description sql.NullString `json:"description"`
 	// Computed from constraints + events; do NOT update directly
 	DerivedState TasksDerivedState `json:"derivedState"`
+	// Per-task scratchpad for the assigned AI agent: last_thought, retry_count, last_error, handoff_status, handoff_reason, last_started_at, last_cost_cents. NOT NULL with default {} so sqlc-generated json.RawMessage scans cleanly; mapper treats {} as "no memo yet"
+	AgentMemo json.RawMessage `json:"agentMemo"`
 	// LLM-optimized heuristic priority
 	Priority int32 `json:"priority"`
 	// Deadline for task completion; drives constraint evaluation
@@ -4011,6 +4059,9 @@ type VTaskDetail struct {
 	StartedOn                sql.NullTime      `json:"startedOn"`
 	CompletedAt              sql.NullTime      `json:"completedAt"`
 	ArchivedAt               sql.NullTime      `json:"archivedAt"`
+	AgentMemo                json.RawMessage   `json:"agentMemo"`
+	AgentAssigneePublicID    []byte            `json:"agentAssigneePublicId"`
+	AgentAssigneeName        string            `json:"agentAssigneeName"`
 	ConstraintCount          int64             `json:"constraintCount"`
 	ConstraintSatisfiedCount int64             `json:"constraintSatisfiedCount"`
 	DependencyCount          int64             `json:"dependencyCount"`

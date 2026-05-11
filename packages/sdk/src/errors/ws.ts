@@ -192,6 +192,26 @@ export const WsErrors = {
     status: 409,
     message: "Task was modified by someone else",
   },
+  WS_TASK_AGENT_ALREADY_ASSIGNED: {
+    code: "WS.TASK_AGENT.ALREADY_ASSIGNED",
+    status: 409,
+    message: "Agent is already the assignee for this task",
+  },
+  WS_TASK_AGENT_COST_CAP_EXCEEDED: {
+    code: "WS.TASK_AGENT.COST_CAP_EXCEEDED",
+    status: 422,
+    message: "Agent monthly cost cap has been reached",
+  },
+  WS_TASK_AGENT_HANDOFF_LOOP_DETECTED: {
+    code: "WS.TASK_AGENT.HANDOFF_LOOP_DETECTED",
+    status: 422,
+    message: "Handoff bounced between agent and user too many times",
+  },
+  WS_TASK_AGENT_NOT_ASSIGNED: {
+    code: "WS.TASK_AGENT.NOT_ASSIGNED",
+    status: 422,
+    message: "Task has no agent assignee",
+  },
   WS_VIEW_PREFERENCE_NOT_FOUND: {
     code: "WS.VIEW_PREFERENCE.NOT_FOUND",
     status: 404,

@@ -128,6 +128,33 @@ func SeqFromContext(ctx context.Context) int64 {
 	return v
 }
 
+type actorAgentCtxKey struct{}
+
+// WithActorAgentID returns a copy of ctx tagged with the internal id of
+// the AI agent on whose behalf the wrapped work is running. The
+// orchestrator runner sets this around each agent tick so downstream
+// emitters (eventbus.Append, MCP tool calls) can attribute their event
+// rows to actor_agent_id instead of actor_user_id. Passing zero is a
+// no-op so callers can use it unconditionally.
+func WithActorAgentID(ctx context.Context, agentID uint32) context.Context {
+	if agentID == 0 {
+		return ctx
+	}
+	return context.WithValue(ctx, actorAgentCtxKey{}, agentID)
+}
+
+// ActorAgentIDFromContext returns the agent id previously set via
+// WithActorAgentID, or zero when the context is not tagged. A non-zero
+// return indicates the caller should use AppendAgentEvent (binding
+// actor_agent_id) instead of the user-actor AppendEvent path.
+func ActorAgentIDFromContext(ctx context.Context) uint32 {
+	if ctx == nil {
+		return 0
+	}
+	v, _ := ctx.Value(actorAgentCtxKey{}).(uint32)
+	return v
+}
+
 func fireNotifyHooks(ctx context.Context, workspaceInternalID uint32, eventType string, eventInternalID uint32) {
 	notifyMu.RLock()
 	hooks := notifyHooks

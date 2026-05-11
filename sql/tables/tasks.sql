@@ -17,6 +17,7 @@ CREATE TABLE tasks (
   title VARCHAR(255) NOT NULL COMMENT 'Task title',
   description MEDIUMTEXT NULL COMMENT 'Markdown body',
   derived_state ENUM('open','waiting','review','done','cancelled') NOT NULL DEFAULT 'open' COMMENT 'Computed from constraints + events; do NOT update directly',
+  agent_memo JSON NOT NULL DEFAULT (JSON_OBJECT()) COMMENT 'Per-task scratchpad for the assigned AI agent: last_thought, retry_count, last_error, handoff_status, handoff_reason, last_started_at, last_cost_cents. NOT NULL with default {} so sqlc-generated json.RawMessage scans cleanly; mapper treats {} as "no memo yet"',
   priority INT NOT NULL DEFAULT 0 COMMENT 'LLM-optimized heuristic priority',
   due_on DATE NULL COMMENT 'Deadline for task completion; drives constraint evaluation',
   started_on DATE NULL COMMENT 'Date work began on this task',

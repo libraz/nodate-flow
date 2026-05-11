@@ -7,6 +7,7 @@ package generated
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"time"
 
 	types "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/types"
@@ -86,6 +87,14 @@ type Querier interface {
 	AdminSuspendWorkspace(ctx context.Context, publicID types.PublicID) error
 	// Insert or update an instance setting.
 	AdminUpsertInstanceSetting(ctx context.Context, arg AdminUpsertInstanceSettingParams) error
+	// Append a single agent-actor event to the append-only event log. Mirrors
+	// AppendEvent but binds actor_agent_id and leaves actor_user_id NULL,
+	// preserving the actor_user_id / actor_agent_id mutual exclusion that the
+	// events table relies on (enforced by query design rather than a CHECK
+	// constraint; see sql/tables/events.sql for the rationale). Used by the
+	// orchestrator runner when emitting ai.agent.run.* events and by MCP tool
+	// calls dispatched from an agent context.
+	AppendAgentEvent(ctx context.Context, arg AppendAgentEventParams) (int64, error)
 	// Append a workspace-scoped audit row. metadata_json MUST be redacted.
 	AppendAuditLog(ctx context.Context, arg AppendAuditLogParams) (int64, error)
 	// Append a single event to the append-only event log. The events table has
@@ -519,6 +528,9 @@ type Querier interface {
 	GetRepoMappingByRepoID(ctx context.Context, repoID uint64) (GetRepoMappingByRepoIDRow, error)
 	// Fetch a single suggestion by public_id with source/target task info.
 	GetSuggestionByPublicId(ctx context.Context, arg GetSuggestionByPublicIdParams) (GetSuggestionByPublicIdRow, error)
+	// Read the raw agent_memo JSON for a task. Returns NULL when unset; callers
+	// treat that as an empty memo. workspace_id is required for tenant scope.
+	GetTaskAgentMemo(ctx context.Context, arg GetTaskAgentMemoParams) (json.RawMessage, error)
 	// Queries dedicated to the constraint engine.
 	// Keyed off the internal task_id so the engine never has to know
 	// about public_id resolution. All workspace scoping is enforced by
@@ -544,6 +556,20 @@ type Querier interface {
 	HasRecentEventsForWorkspace(ctx context.Context, arg HasRecentEventsForWorkspaceParams) (bool, error)
 	// Bump the use counter after a successful accept.
 	IncrementInviteUseCount(ctx context.Context, id uint32) error
+	// Append an agent.task.handoff_to_agent event. The caller is a human (or a
+	// system actor) transferring a task to an AI agent, so actor_user_id is
+	// populated and actor_agent_id stays NULL. Payload is caller-shaped: the
+	// handler embeds the target agent's public_id, the reason string, and any
+	// delegation chain context. Mutual exclusion of actor_user_id and
+	// actor_agent_id is preserved by this query's column list rather than a
+	// CHECK constraint (see sql/tables/events.sql).
+	InsertHandoffToAgentEvent(ctx context.Context, arg InsertHandoffToAgentEventParams) (int64, error)
+	// Append an agent.task.handoff_to_user event. The caller is an AI agent
+	// handing the task back to a human, so actor_agent_id is populated and
+	// actor_user_id stays NULL. Payload is caller-shaped: the handler embeds
+	// the target user's public_id, the reason string, and any handoff status
+	// recorded in tasks.agent_memo.
+	InsertHandoffToUserEvent(ctx context.Context, arg InsertHandoffToUserEventParams) (int64, error)
 	// Insert a hashed recovery code for a user.
 	InsertRecoveryCode(ctx context.Context, arg InsertRecoveryCodeParams) error
 	// Insert an inbound signal (manual or webhook).
@@ -561,6 +587,25 @@ type Querier interface {
 	ListActorsForTask(ctx context.Context, arg ListActorsForTaskParams) ([]ListActorsForTaskRow, error)
 	// List AI agent actors on a task joined with the agent definition.
 	ListAgentActorsForTask(ctx context.Context, arg ListAgentActorsForTaskParams) ([]ListAgentActorsForTaskRow, error)
+	// List recent agent run events scoped to a single task. The append-only
+	// events table is the source of truth for run history; agent_runs rows are
+	// a transient scheduler queue and the orchestrator does not stamp a back-
+	// pointer from event payloads to a specific agent_runs.public_id today, so
+	// a JOIN against agent_runs would only ever return its current pending /
+	// claimed slice. Filtering events instead gives the full historical record
+	// (started + completed + failed) and survives PurgeFinishedAgentRuns.
+	//
+	// Filter: actor_agent_id IS NOT NULL constrains rows to agent-produced
+	// events; the type LIKE narrows to the run lifecycle family. ORDER BY
+	// occurred_at DESC, id DESC produces a stable newest-first timeline.
+	ListAgentRunsByTask(ctx context.Context, arg ListAgentRunsByTaskParams) ([]ListAgentRunsByTaskRow, error)
+	// List the AI agents currently attached to a task as enabled actors. Used
+	// by the agent runtime's scoped event fan-out (schedule_scope =
+	// 'assigned_tasks') to enumerate the candidate agents for a given task
+	// before deciding which to wake. The chk_task_actors_kind_target check
+	// guarantees agent_id is non-null when kind='agent', but the join filters
+	// are kept explicit so the planner can use idx_task_actors_task_id_enabled.
+	ListAgentsAssignedToTask(ctx context.Context, arg ListAgentsAssignedToTaskParams) ([]ListAgentsAssignedToTaskRow, error)
 	// List a workspace's agents joined with the underlying model.
 	ListAgentsForWorkspace(ctx context.Context, arg ListAgentsForWorkspaceParams) ([]ListAgentsForWorkspaceRow, error)
 	// Recent redacted LLM call records scoped to a single task. Used by
@@ -654,6 +699,18 @@ type Querier interface {
 	// owning task lives in the given project (events with no task_id are
 	// excluded by virtue of project_public_id being NULL).
 	ListEventsForProject(ctx context.Context, arg ListEventsForProjectParams) ([]ListEventsForProjectRow, error)
+	// Incremental polling source for an agent whose schedule_scope is
+	// 'assigned_tasks'. Returns events newer than since_id whose owning task
+	// has this agent as an enabled actor, filtered by the agent's
+	// event_trigger_types. The caller passes the agent's internal id and the
+	// last id it processed (0 for the first poll). ORDER BY id ASC + LIMIT
+	// gives a forward-paginated stream the orchestrator can drain.
+	//
+	// The JSON_CONTAINS check matches the workspace-wide fan-out used by
+	// ListOnEventAgents so identical event kinds flow through identical
+	// predicates. Events without a task_id (workspace-level signals) are
+	// intentionally excluded — scoped agents only react to task-bound events.
+	ListEventsForScopedAgent(ctx context.Context, arg ListEventsForScopedAgentParams) ([]ListEventsForScopedAgentRow, error)
 	// List a task's timeline via v_task_timeline.
 	ListEventsForTask(ctx context.Context, arg ListEventsForTaskParams) ([]ListEventsForTaskRow, error)
 	// List the workspace-wide event timeline via v_task_timeline.
@@ -771,6 +828,19 @@ type Querier interface {
 	// so the fan-out from a single eventbus.Append to N agents is one
 	// round-trip per append (vs one per agent).
 	ListOnEventAgents(ctx context.Context, arg ListOnEventAgentsParams) ([]ListOnEventAgentsRow, error)
+	// List every enabled non-paused on_event agent that should wake for a
+	// specific appended event. Joins through the events row so the filter
+	// can use the event's task_id to enforce ai_agents.schedule_scope:
+	//   * 'workspace' (default) → fan out to every workspace-scoped agent
+	//     whose event_trigger_types contains the event kind, matching the
+	//     legacy ListOnEventAgents semantics.
+	//   * 'assigned_tasks' → only fan out to agents that are an enabled
+	//     task_actor (kind='agent') on the event's task. Events without a
+	//     task_id are skipped for assigned-task agents because there is no
+	//     task scope to match.
+	// Driven by the eventbus notify hook with the inserted event's id, so
+	// the fan-out is still one round-trip per append.
+	ListOnEventAgentsForEvent(ctx context.Context, arg ListOnEventAgentsForEventParams) ([]ListOnEventAgentsForEventRow, error)
 	// List all enabled pages (any nesting level) scoped to a project with creator info.
 	// The recursive CTE filters out pages whose ancestor chain contains any
 	// soft-disabled row, so disabling a parent transitively hides the entire
@@ -1116,6 +1186,13 @@ type Querier interface {
 	// updated_by_user_id is appended to the SET list so callers can attribute
 	// the edit; pass the acting user's internal id (NULL for system writers).
 	UpdateTask(ctx context.Context, arg UpdateTaskParams) error
+	// Merge the supplied JSON patch into the task's agent_memo column.
+	// JSON_MERGE_PATCH applies RFC 7396 semantics: keys present in the patch
+	// overwrite (or recursively merge object values), and explicit nulls in the
+	// patch remove keys. COALESCE with JSON_OBJECT() handles the initial NULL
+	// case so the first write does not need a separate INSERT path. workspace_id
+	// is required as a defence-in-depth tenant scope.
+	UpdateTaskAgentMemo(ctx context.Context, arg UpdateTaskAgentMemoParams) error
 	// Update only the sort_weight for a single task within a workspace.
 	// Used by the bulk reorder endpoint inside a transaction.
 	// updated_by_user_id is appended so reorder edits are attributed to the

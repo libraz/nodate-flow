@@ -103,6 +103,30 @@ const (
 	AiAgentRunFailed    Kind = "ai.agent.run.failed"
 )
 
+// Agent handoff events. Emitted as an AI agent is attached to a task,
+// records its private reasoning, and hands work back to a human or to
+// another agent. Distinct from the run-level ai.agent.* kinds above:
+// these are scoped to a single (agent, task) pair and form the audit
+// trail surfaced on the task timeline.
+const (
+	// AgentTaskAttached is appended when an agent is assigned to a task
+	// (task_actors row inserted with actor_agent_id set).
+	AgentTaskAttached Kind = "agent.task.attached"
+	// AgentTaskDetached is appended when an agent is removed from a task,
+	// either explicitly or as part of a handoff to a human/another agent.
+	AgentTaskDetached Kind = "agent.task.detached"
+	// AgentTaskThought is appended when an agent records a private memo
+	// (reasoning, plan, scratchpad) against a task it owns.
+	AgentTaskThought Kind = "agent.task.thought"
+	// AgentTaskHandoffToUser is appended when an agent hands a task back
+	// to a human actor (typically because it needs input or has finished
+	// its slice of work).
+	AgentTaskHandoffToUser Kind = "agent.task.handoff_to_user"
+	// AgentTaskHandoffToAgent is appended when an agent transfers a task
+	// to another agent (delegation chain).
+	AgentTaskHandoffToAgent Kind = "agent.task.handoff_to_agent"
+)
+
 // Timebox lifecycle events.
 const (
 	TimeboxCreated     Kind = "timebox.created"

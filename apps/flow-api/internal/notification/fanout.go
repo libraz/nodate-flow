@@ -551,6 +551,21 @@ func classifyEvent(eventType string) (title string, resourceType string, severit
 	case "item.milestone.link.removed":
 		return "An item was unlinked from a milestone", "task", generated.NotificationsSeverityLow
 
+	// agent.task.* events: AI agent lifecycle on tasks. handoff_to_user is
+	// the user-facing one that the inbox badge must surface; thought is
+	// suppressed because it represents private agent reasoning that should
+	// not generate notifications.
+	case "agent.task.handoff_to_user":
+		return "An agent handed back to you", "task", generated.NotificationsSeverityHigh
+	case "agent.task.handoff_to_agent":
+		return "A task was handed off to an agent", "task", generated.NotificationsSeverityNormal
+	case "agent.task.attached":
+		return "An agent was attached to a task", "task", generated.NotificationsSeverityLow
+	case "agent.task.detached":
+		return "An agent was detached from a task", "task", generated.NotificationsSeverityLow
+	case "agent.task.thought":
+		return "", "", ""
+
 	default:
 		return "", "", ""
 	}
@@ -576,6 +591,9 @@ func categoryForEventType(eventType string) string {
 		return "timebox"
 	case "item.milestone.link.added", "item.milestone.link.removed":
 		return "relation"
+	case "agent.task.handoff_to_user", "agent.task.handoff_to_agent",
+		"agent.task.attached", "agent.task.detached", "agent.task.thought":
+		return "ai"
 	default:
 		return "task.lifecycle"
 	}
