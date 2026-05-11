@@ -3,6 +3,7 @@
  * the per-workspace settings page where timezone and country can be edited.
  */
 
+import type { components } from '@nodate-flow/sdk';
 import { Link, createFileRoute } from '@tanstack/react-router';
 import { type ReactElement, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -10,27 +11,12 @@ import { useTranslation } from 'react-i18next';
 import AuthCard from '../../components/auth-card';
 import { sdk } from '../../lib/sdk';
 
-interface UserWorkspace {
-  id: string;
-  slug: string;
-  name: string;
-  description?: string;
-  iconUrl?: string;
-  timezone: string;
-  country: string;
-  role: string;
-  memberCount: number;
-  createdAt: number;
-}
-
-interface WorkspacesBody {
-  items: UserWorkspace[];
-  total: number;
-}
+type Workspace = components['schemas']['Workspace'];
+type WorkspacesListOutputBody = components['schemas']['WorkspacesListOutputBody'];
 
 function WorkspacesPage(): ReactElement {
   const { t } = useTranslation('auth');
-  const [workspaces, setWorkspaces] = useState<UserWorkspace[]>([]);
+  const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -43,8 +29,8 @@ function WorkspacesPage(): ReactElement {
         setLoading(false);
         return;
       }
-      const body = result.data as WorkspacesBody;
-      setWorkspaces(body.items);
+      const body = result.data as WorkspacesListOutputBody;
+      setWorkspaces(body.workspaces ?? []);
       setLoading(false);
     });
     return () => {
