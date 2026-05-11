@@ -2,11 +2,11 @@
  * Relation suggestions feature — query key factory, types, and hooks
  * for AI-detected task relation suggestions (auto-detect via embeddings).
  *
- * Uses raw fetch (not the SDK) because these endpoints may not yet be
- * in the generated OpenAPI spec. Follows the same pattern as
- * `features/notifications/api.ts`.
+ * Calls go through the typed `@nodate-flow/sdk` so request and response
+ * shapes stay aligned with the OpenAPI contract.
  */
 
+import type { components } from '@nodate-flow/sdk';
 import {
   type UseMutationResult,
   type UseQueryResult,
@@ -15,21 +15,21 @@ import {
   useQueryClient,
 } from '@tanstack/react-query';
 
-import { apiBaseUrl } from '../../lib/sdk';
-import { authStore } from '../auth/auth-store';
+import { ApiError, toApiError } from '../../lib/api-error';
+import { sdk } from '../../lib/sdk';
 import { tasksKeys } from '../tasks/api';
 
+/** Suggested relation kind — narrowed from the SDK's open `string` field. */
+export type SuggestedKind = 'blocks' | 'relates' | 'duplicates';
+
+/** Suggestion lifecycle status — narrowed from the SDK's open `string` field. */
+export type SuggestionStatus = 'pending' | 'accepted' | 'dismissed';
+
 /** A single AI-detected relation suggestion. */
-export interface RelationSuggestion {
-  id: string;
-  suggestedKind: 'blocks' | 'relates' | 'duplicates';
-  confidence: number;
-  status: 'pending' | 'accepted' | 'dismissed';
-  sourceTaskId: string;
-  sourceTaskTitle: string;
-  targetTaskId: string;
-  targetTaskTitle: string;
-  createdAt: number;
+export interface RelationSuggestion
+  extends Omit<components['schemas']['SuggestionDTO'], 'suggestedKind' | 'status'> {
+  suggestedKind: SuggestedKind;
+  status: SuggestionStatus;
 }
 
 /** Action to resolve a suggestion. */
@@ -50,34 +50,10 @@ export const relationKeys = {
   forWorkspace: (wsId: string) => [...relationKeys.all, 'workspace', wsId] as const,
 };
 
-import { ApiError, toApiError } from '../../lib/api-error';
-
 export { ApiError as RelationApiError };
 
-function authHeaders(): HeadersInit {
-  const token = authStore.getState().accessToken;
-  // biome-ignore lint/style/useNamingConvention: HTTP header name
-  return token ? { Authorization: `Bearer ${token}` } : {};
-}
-
-async function fetchJson<T>(url: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(url, {
-    ...init,
-    credentials: 'include',
-    headers: {
-      ...authHeaders(),
-      ...init?.headers,
-    },
-  });
-  if (!res.ok) {
-    const body = (await res.json().catch(() => null)) as unknown;
-    throw toApiError(body, `Request failed with status ${String(res.status)}`);
-  }
-  return (await res.json()) as T;
-}
-
 /**
- * GET /tasks/{taskId}/relation-suggestions — non-suspense query.
+ * GET /tasks/{id}/relation-suggestions — non-suspense query.
  *
  * Returns pending AI-detected relation suggestions for a task. Uses
  * `useQuery` (not suspense) because suggestions are optional and should
@@ -89,10 +65,12 @@ export function useRelationSuggestionsForTask(
   return useQuery({
     queryKey: relationKeys.forTask(taskId),
     queryFn: async (): Promise<RelationSuggestion[]> => {
-      const data = await fetchJson<{ total?: number; suggestions?: RelationSuggestion[] }>(
-        `${apiBaseUrl}/tasks/${taskId}/relation-suggestions`,
-      );
-      return (data.suggestions ?? []).filter((s) => s.status === 'pending');
+      const { data, error } = await sdk.GET('/tasks/{id}/relation-suggestions', {
+        params: { path: { id: taskId } },
+      });
+      if (error || !data) throw toApiError(error, 'Failed to load relation suggestions');
+      const list = (data.suggestions ?? []) as RelationSuggestion[];
+      return list.filter((s) => s.status === 'pending');
     },
     staleTime: 60_000,
   });
@@ -106,11 +84,11 @@ export function useResolveSuggestion(): UseMutationResult<void, ApiError, Resolv
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({ suggestionId, action }: ResolveSuggestionArgs): Promise<void> => {
-      await fetchJson<unknown>(`${apiBaseUrl}/relation-suggestions/${suggestionId}/resolve`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action }),
+      const { error } = await sdk.POST('/relation-suggestions/{suggestionId}/resolve', {
+        params: { path: { suggestionId } },
+        body: { action },
       });
+      if (error) throw toApiError(error, 'Failed to resolve relation suggestion');
     },
     onMutate: async ({ suggestionId, taskId }) => {
       await qc.cancelQueries({ queryKey: relationKeys.forTask(taskId) });

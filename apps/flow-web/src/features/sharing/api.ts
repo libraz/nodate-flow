@@ -2,11 +2,15 @@
  * Sharing feature — mutations for publishing/unpublishing lenses and a
  * query for fetching public lens data without authentication.
  *
- * Publish/unpublish use raw fetch because these endpoints may not yet be
- * in the generated SDK. The public lens query also uses raw fetch since
- * it requires no auth token.
+ * All calls go through the typed `@nodate-flow/sdk` so request and
+ * response shapes stay aligned with the OpenAPI contract. The public
+ * lens query goes through the SDK too — its request still works
+ * unauthenticated because openapi-fetch only attaches a bearer when the
+ * token provider returns one, and the SDK's per-request auth middleware
+ * is a no-op against the `/public/*` namespace.
  */
 
+import type { components } from '@nodate-flow/sdk';
 import {
   type UseMutationResult,
   type UseQueryResult,
@@ -15,30 +19,23 @@ import {
   useQueryClient,
 } from '@tanstack/react-query';
 
-import { apiBaseUrl } from '../../lib/sdk';
-import { authStore } from '../auth/auth-store';
+import { ApiError, toApiError } from '../../lib/api-error';
+import { sdk } from '../../lib/sdk';
 
-/** Public lens data returned by GET /public/lenses/{token}. */
-export interface PublicLensData {
-  name: string;
-  description: string | null;
-  tasks: PublicTask[];
-}
+/**
+ * Public lens data returned by GET /public/lenses/{token}.
+ *
+ * Sourced directly from the SDK so the wire shape and this view stay
+ * in lockstep with the backend `PublicLens` DTO (description + the
+ * resolved `tasks` array are part of the contract).
+ */
+export type PublicLensData = components['schemas']['PublicLens'];
 
 /** Minimal task representation in a public lens. */
-export interface PublicTask {
-  id: string;
-  title: string;
-  status: string;
-  priority: number;
-  dueOn: string | null;
-  assigneeDisplayName: string | null;
-}
+export type PublicTask = components['schemas']['PublicLensTask'];
 
 /** Response from POST /workspaces/{wsId}/lenses/{lensId}/publish. */
-export interface PublishResult {
-  publicToken: string;
-}
+export type PublishResult = components['schemas']['PublishLensBody'];
 
 /** Query key factory for the sharing feature. */
 export const sharingKeys = {
@@ -46,31 +43,7 @@ export const sharingKeys = {
   publicLens: (token: string) => [...sharingKeys.all, 'public-lens', token] as const,
 };
 
-import { ApiError, toApiError } from '../../lib/api-error';
-
 export { ApiError as SharingApiError };
-
-function authHeaders(): HeadersInit {
-  const token = authStore.getState().accessToken;
-  // biome-ignore lint/style/useNamingConvention: HTTP header name
-  return token ? { Authorization: `Bearer ${token}` } : {};
-}
-
-async function fetchJson<T>(url: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(url, {
-    ...init,
-    credentials: 'include',
-    headers: {
-      ...authHeaders(),
-      ...init?.headers,
-    },
-  });
-  if (!res.ok) {
-    const body = (await res.json().catch(() => null)) as unknown;
-    throw toApiError(body, `Request failed with status ${String(res.status)}`);
-  }
-  return (await res.json()) as T;
-}
 
 /** Arguments for publish/unpublish mutations. */
 export interface LensMutationArgs {
@@ -87,9 +60,11 @@ export function usePublishLens(
   const qc = useQueryClient();
   return useMutation<PublishResult, ApiError, LensMutationArgs>({
     mutationFn: async ({ lensId }): Promise<PublishResult> => {
-      return fetchJson<PublishResult>(`${apiBaseUrl}/workspaces/${wsId}/lenses/${lensId}/publish`, {
-        method: 'POST',
+      const { data, error } = await sdk.POST('/workspaces/{wsId}/lenses/{lensId}/publish', {
+        params: { path: { wsId, lensId } },
       });
+      if (error || !data) throw toApiError(error, 'Failed to publish lens');
+      return data;
     },
     onSettled: () => {
       void qc.invalidateQueries({ queryKey: sharingKeys.all });
@@ -106,10 +81,10 @@ export function useUnpublishLens(
   const qc = useQueryClient();
   return useMutation<void, ApiError, LensMutationArgs>({
     mutationFn: async ({ lensId }): Promise<void> => {
-      await fetchJson<{ ok: boolean }>(
-        `${apiBaseUrl}/workspaces/${wsId}/lenses/${lensId}/unpublish`,
-        { method: 'POST' },
-      );
+      const { error } = await sdk.POST('/workspaces/{wsId}/lenses/{lensId}/unpublish', {
+        params: { path: { wsId, lensId } },
+      });
+      if (error) throw toApiError(error, 'Failed to unpublish lens');
     },
     onSettled: () => {
       void qc.invalidateQueries({ queryKey: sharingKeys.all });
@@ -127,12 +102,11 @@ export function usePublicLensQuery(token: string): UseQueryResult<PublicLensData
   return useQuery<PublicLensData, ApiError>({
     queryKey: sharingKeys.publicLens(token),
     queryFn: async (): Promise<PublicLensData> => {
-      const res = await fetch(`${apiBaseUrl}/public/lenses/${token}`);
-      if (!res.ok) {
-        const body = (await res.json().catch(() => null)) as unknown;
-        throw toApiError(body, 'Failed to load public view');
-      }
-      return (await res.json()) as PublicLensData;
+      const { data, error } = await sdk.GET('/public/lenses/{token}', {
+        params: { path: { token } },
+      });
+      if (error || !data) throw toApiError(error, 'Failed to load public view');
+      return data as PublicLensData;
     },
   });
 }

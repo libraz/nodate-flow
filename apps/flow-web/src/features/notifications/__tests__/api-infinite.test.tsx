@@ -8,18 +8,33 @@
  *      `[...all, 'list']` prefix so the existing W5 mutation policy
  *      refreshes it.
  *
- * The fetch surface is mocked at the global `fetch` boundary because the
- * notifications module talks to the API via raw `fetch` (the SDK does
- * not yet expose these endpoints with the workspace-scoped path the
- * dropdown uses).
+ * The fetch surface is mocked at the global `fetch` boundary; the
+ * notifications module talks to the API through `@nodate-flow/sdk`
+ * (openapi-fetch). openapi-fetch destructures `globalThis.fetch` at
+ * client-construction time, so the mock is installed BEFORE the
+ * `../api` module (which imports the SDK client) is loaded — otherwise
+ * the SDK keeps a reference to the real fetch and bypasses the mock.
+ * That ordering is enforced by `vi.hoisted`, which runs before the
+ * static imports below.
  */
 
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { renderHook, waitFor } from '@testing-library/react';
 import type { ReactElement, ReactNode } from 'react';
 import { Suspense } from 'react';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
+const { fetchMock, originalFetch } = vi.hoisted(() => {
+  const mock = vi.fn();
+  const original = globalThis.fetch;
+  globalThis.fetch = mock as unknown as typeof fetch;
+  return { fetchMock: mock, originalFetch: original };
+});
+
+// Imports below run AFTER the hoisted fetch stub, so the SDK module
+// (loaded transitively via `../api`) captures the mock as its base
+// fetch.
+import { authStore } from '../../auth/auth-store';
 import { type NotificationItem, notificationKeys, useNotificationsInfiniteQuery } from '../api';
 
 /* ── Fixture helpers ──────────────────────────────────────── */
@@ -47,16 +62,16 @@ function aNotification(id: string, overrides: Partial<NotificationItem> = {}): N
 
 /** Build 3 pages of 10 notifications, advancing `nextCursor` per page. */
 function buildPages(): {
-  pageOne: { notifications: NotificationItem[]; nextCursor: string | null };
-  pageTwo: { notifications: NotificationItem[]; nextCursor: string | null };
-  pageThree: { notifications: NotificationItem[]; nextCursor: string | null };
+  pageOne: { notifications: NotificationItem[]; nextCursor: string | null; total: number };
+  pageTwo: { notifications: NotificationItem[]; nextCursor: string | null; total: number };
+  pageThree: { notifications: NotificationItem[]; nextCursor: string | null; total: number };
 } {
   const make = (start: number): NotificationItem[] =>
     Array.from({ length: 10 }, (_, i) => aNotification(`n-${start + i}`));
   return {
-    pageOne: { notifications: make(0), nextCursor: 'cursor-2' },
-    pageTwo: { notifications: make(10), nextCursor: 'cursor-3' },
-    pageThree: { notifications: make(20), nextCursor: null },
+    pageOne: { notifications: make(0), nextCursor: 'cursor-2', total: 30 },
+    pageTwo: { notifications: make(10), nextCursor: 'cursor-3', total: 30 },
+    pageThree: { notifications: make(20), nextCursor: null, total: 30 },
   };
 }
 
@@ -81,27 +96,46 @@ function buildClient(): QueryClient {
   });
 }
 
-/* ── Mock global fetch ───────────────────────────────────── */
+/**
+ * Seed the SDK auth store with a long-lived synthetic JWT so the
+ * SDK's request middleware skips its proactive `/auth/refresh` round
+ * trip and lets the mocked fetch see only the notifications calls
+ * the test cares about. The token's `exp` is hours in the future to
+ * sidestep the `isExpiringSoon` check.
+ */
+function seedAuthToken(): void {
+  const header = Buffer.from(JSON.stringify({ alg: 'none', typ: 'JWT' })).toString('base64url');
+  const payload = Buffer.from(
+    JSON.stringify({ exp: Math.floor(Date.now() / 1000) + 3600 }),
+  ).toString('base64url');
+  authStore.getState().setAccessToken(`${header}.${payload}.`);
+}
 
-const fetchMock = vi.fn();
-const originalFetch = globalThis.fetch;
+beforeAll(() => {
+  seedAuthToken();
+});
 
 beforeEach(() => {
-  globalThis.fetch = fetchMock as unknown as typeof fetch;
+  // Re-seed before each test in case a previous test (or SDK middleware)
+  // cleared the session via `clearSession()`.
+  seedAuthToken();
   fetchMock.mockReset();
 });
 
-afterEach(() => {
+afterAll(() => {
+  // Restore on test-suite teardown to keep other test files unaffected.
   globalThis.fetch = originalFetch;
 });
 
-/** Wrap a payload as a Response-like object the api.ts `fetchJson` consumes. */
+/**
+ * Wrap a payload as a real `Response` so openapi-fetch can read its
+ * headers / body without crashing on a partial mock.
+ */
 function ok(body: unknown): Response {
-  return {
-    ok: true,
+  return new Response(JSON.stringify(body), {
     status: 200,
-    json: async () => body,
-  } as unknown as Response;
+    headers: { 'Content-Type': 'application/json' },
+  });
 }
 
 /* ── Tests ───────────────────────────────────────────────── */
@@ -127,8 +161,17 @@ describe('useNotificationsInfiniteQuery', () => {
     expect(result.current.data.pages[0]?.notifications).toHaveLength(10);
     expect(result.current.hasNextPage).toBe(true);
 
+    // openapi-fetch invokes `fetch` with a `Request` instance, not a URL
+    // string — pull `.url` (or fall back to a stringified call arg) so
+    // these assertions cover both fetch input shapes.
+    const callUrl = (idx: number): string => {
+      const arg = fetchMock.mock.calls[idx]?.[0];
+      if (arg instanceof Request) return arg.url;
+      return String(arg ?? '');
+    };
+
     // First call must NOT carry a cursor query param.
-    const firstUrl = String(fetchMock.mock.calls[0]?.[0] ?? '');
+    const firstUrl = callUrl(0);
     expect(firstUrl).toContain('limit=20');
     expect(firstUrl).not.toContain('cursor=');
 
@@ -137,16 +180,14 @@ describe('useNotificationsInfiniteQuery', () => {
     await waitFor(() => {
       expect(result.current.data.pages).toHaveLength(2);
     });
-    const secondUrl = String(fetchMock.mock.calls[1]?.[0] ?? '');
-    expect(secondUrl).toContain('cursor=cursor-2');
+    expect(callUrl(1)).toContain('cursor=cursor-2');
 
     // Page 3.
     await result.current.fetchNextPage();
     await waitFor(() => {
       expect(result.current.data.pages).toHaveLength(3);
     });
-    const thirdUrl = String(fetchMock.mock.calls[2]?.[0] ?? '');
-    expect(thirdUrl).toContain('cursor=cursor-3');
+    expect(callUrl(2)).toContain('cursor=cursor-3');
 
     // Final state: 30 items flat-mapped, no further pages.
     const flat = result.current.data.pages.flatMap((p) => p.notifications);

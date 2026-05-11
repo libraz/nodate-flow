@@ -2,14 +2,17 @@
  * Export feature — mutation hook that fetches task exports in CSV or JSON
  * format and triggers a browser download via an invisible anchor element.
  *
- * Uses raw fetch (not the SDK) because the CSV response is not JSON and
- * the SDK's openapi-fetch client expects typed JSON envelopes.
+ * Goes through the typed `@nodate-flow/sdk`. The SDK types the response
+ * as JSON (the OpenAPI spec only documents the JSON envelope) but we
+ * pass `parseAs: 'stream'` and read the raw `Response` so the CSV branch
+ * can pull the body as text. The JSON branch decodes through
+ * `Response.json()` for the same reason.
  */
 
 import { type UseMutationResult, useMutation } from '@tanstack/react-query';
 
-import { apiBaseUrl } from '../../lib/sdk';
-import { authStore } from '../auth/auth-store';
+import { ApiError, toApiError } from '../../lib/api-error';
+import { sdk } from '../../lib/sdk';
 
 /** Supported export formats. */
 export type ExportFormat = 'csv' | 'json';
@@ -22,15 +25,7 @@ export interface ExportTasksArgs {
   lensId?: string | undefined;
 }
 
-import { ApiError, toApiError } from '../../lib/api-error';
-
 export { ApiError as ExportApiError };
-
-function authHeaders(): HeadersInit {
-  const token = authStore.getState().accessToken;
-  // biome-ignore lint/style/useNamingConvention: HTTP header name
-  return token ? { Authorization: `Bearer ${token}` } : {};
-}
 
 /**
  * Triggers a file download by creating an invisible anchor, clicking it,
@@ -67,35 +62,43 @@ function buildTimestamp(): string {
 export function useExportTasks(): UseMutationResult<number, ApiError, ExportTasksArgs> {
   return useMutation<number, ApiError, ExportTasksArgs>({
     mutationFn: async ({ workspaceId, format, lensId }): Promise<number> => {
-      const params = new URLSearchParams({ format, limit: '5000' });
-      if (lensId) {
-        params.set('lensId', lensId);
-      }
-      const url = `${apiBaseUrl}/workspaces/${workspaceId}/export/tasks?${params.toString()}`;
-
-      const res = await fetch(url, {
-        credentials: 'include',
-        headers: authHeaders(),
+      // `parseAs: 'stream'` short-circuits the SDK's default JSON decode
+      // so we can pull the raw response body — required for the CSV
+      // branch and also useful for the JSON branch (we want the parsed
+      // envelope, not the typed-but-wrong `Body` schema generated from
+      // the OpenAPI spec).
+      const { error, response } = await sdk.GET('/workspaces/{wsId}/export/tasks', {
+        params: {
+          path: { wsId: workspaceId },
+          query: {
+            format,
+            limit: 5000,
+            ...(lensId !== undefined ? { lensId } : {}),
+          },
+        },
+        parseAs: 'stream',
       });
 
-      if (!res.ok) {
-        const body = (await res.json().catch(() => null)) as unknown;
-        throw toApiError(body, `Export failed with status ${String(res.status)}`);
+      if (error) {
+        throw toApiError(error, 'Export failed');
+      }
+      if (!response.ok) {
+        throw new ApiError(undefined, `Export failed with status ${String(response.status)}`);
       }
 
       const timestamp = buildTimestamp();
 
       if (format === 'csv') {
-        const text = await res.text();
+        const text = await response.text();
         const blob = new Blob([text], { type: 'text/csv;charset=utf-8' });
         triggerDownload(blob, `tasks-${timestamp}.csv`);
-        // Count rows (subtract header row)
+        // Count rows (subtract header row).
         const lines = text.split('\n').filter((line) => line.trim().length > 0);
         return Math.max(0, lines.length - 1);
       }
 
-      // JSON format
-      const data = (await res.json()) as { count?: number; tasks?: unknown[] };
+      // JSON format.
+      const data = (await response.json()) as { count?: number; tasks?: unknown[] };
       const jsonStr = JSON.stringify(data, null, 2);
       const blob = new Blob([jsonStr], { type: 'application/json;charset=utf-8' });
       triggerDownload(blob, `tasks-${timestamp}.json`);

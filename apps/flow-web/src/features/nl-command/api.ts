@@ -2,48 +2,34 @@
  * NL command feature — mutation hook for resolving natural language
  * commands via the AI resolve-command endpoint.
  *
- * Uses raw fetch (like notifications) because the SDK may not yet
- * include this endpoint.
+ * Goes through the typed `@nodate-flow/sdk` so request and response
+ * shapes stay in lockstep with the OpenAPI contract.
  */
 
+import type { components } from '@nodate-flow/sdk';
 import { type UseMutationResult, useMutation } from '@tanstack/react-query';
 
-import { apiBaseUrl } from '../../lib/sdk';
-import { authStore } from '../auth/auth-store';
+import { ApiError, toApiError } from '../../lib/api-error';
+import { sdk } from '../../lib/sdk';
 
 /** Result returned by POST /workspaces/{wsId}/ai/resolve-command. */
-export interface ResolveCommandResult {
-  tool: string;
-  args: Record<string, unknown>;
-  confidence: number;
-}
-
-function authHeaders(): HeadersInit {
-  const token = authStore.getState().accessToken;
-  // biome-ignore lint/style/useNamingConvention: HTTP header name
-  return token ? { Authorization: `Bearer ${token}` } : {};
-}
+export type ResolveCommandResult = components['schemas']['ResolveCommandOutputBody'];
 
 /** Resolves a natural language prompt into a tool invocation. */
 export function useResolveCommand(
   wsId: string | null,
-): UseMutationResult<ResolveCommandResult, Error, string> {
-  return useMutation({
+): UseMutationResult<ResolveCommandResult, ApiError, string> {
+  return useMutation<ResolveCommandResult, ApiError, string>({
     mutationFn: async (prompt: string): Promise<ResolveCommandResult> => {
-      if (!wsId) throw new Error('No workspace selected');
-      const res = await fetch(`${apiBaseUrl}/workspaces/${wsId}/ai/resolve-command`, {
-        method: 'POST',
-        credentials: 'include',
-        headers: {
-          'Content-Type': 'application/json',
-          ...authHeaders(),
-        },
-        body: JSON.stringify({ prompt }),
+      if (!wsId) throw new ApiError(undefined, 'No workspace selected');
+      const { data, error } = await sdk.POST('/workspaces/{wsId}/ai/resolve-command', {
+        params: { path: { wsId } },
+        body: { prompt },
       });
-      if (!res.ok) {
-        throw new Error(`Failed to resolve command (${String(res.status)})`);
+      if (error || !data) {
+        throw toApiError(error, 'Failed to resolve command');
       }
-      return (await res.json()) as ResolveCommandResult;
+      return data;
     },
   });
 }

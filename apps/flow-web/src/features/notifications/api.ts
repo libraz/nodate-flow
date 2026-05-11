@@ -2,11 +2,11 @@
  * Notifications feature — query key factory, types, and hooks for
  * notification list, unread count, mark-read, archive, and mark-all-read.
  *
- * Types are defined inline because the SDK may not yet include these
- * endpoints. API calls use raw fetch via the shared base URL and auth
- * store token.
+ * All calls go through the typed `@nodate-flow/sdk` so request and
+ * response shapes stay aligned with the OpenAPI contract.
  */
 
+import type { components } from '@nodate-flow/sdk';
 import {
   type UseMutationResult,
   type UseQueryResult,
@@ -19,10 +19,26 @@ import {
   useSuspenseQuery,
 } from '@tanstack/react-query';
 
-import { apiBaseUrl } from '../../lib/sdk';
-import { authStore } from '../auth/auth-store';
+import { ApiError, toApiError } from '../../lib/api-error';
+import { sdk } from '../../lib/sdk';
 
-/** Notification item returned by the API. Timestamps are unix seconds. */
+/**
+ * Notification severity — narrowed from the SDK's open `string` field on
+ * `NotificationDTO` so consumers can switch on the four documented
+ * values without an `as` cast.
+ */
+export type NotificationSeverity = 'low' | 'normal' | 'high' | 'urgent';
+
+/**
+ * Notification item returned by the API. Widens / narrows a few fields
+ * vs the SDK's `NotificationDTO`:
+ *  - `severity` narrowed to the documented union
+ *  - `actorId`, `actorDisplayName`, `body`, `resourceId` flattened from
+ *    optional to nullable, matching the previous wire contract the rest
+ *    of the panel was written against.
+ *  - `total` retained on each item (the legacy single-page list flowed
+ *    it through item rows; new code should prefer the page envelope).
+ */
 export interface NotificationItem {
   id: string;
   workspaceId: string;
@@ -33,7 +49,7 @@ export interface NotificationItem {
   resourceId: string | null;
   title: string;
   body: string | null;
-  severity: 'low' | 'normal' | 'high' | 'urgent';
+  severity: NotificationSeverity;
   channel: string;
   readAt: number | null;
   deliveredAt: number | null;
@@ -41,9 +57,25 @@ export interface NotificationItem {
   total: number;
 }
 
-/** Unread count envelope from the API. */
-interface UnreadCountResponse {
-  unreadCount: number;
+/** Convert an SDK `NotificationDTO` row into the local `NotificationItem`. */
+function dtoToItem(dto: components['schemas']['NotificationDTO'], total: number): NotificationItem {
+  return {
+    id: dto.id,
+    workspaceId: dto.workspaceId,
+    actorId: dto.actorId ?? null,
+    actorDisplayName: dto.actorDisplayName ?? null,
+    eventType: dto.eventType,
+    resourceType: dto.resourceType,
+    resourceId: dto.resourceId ?? null,
+    title: dto.title,
+    body: dto.body ?? null,
+    severity: dto.severity as NotificationSeverity,
+    channel: dto.channel,
+    readAt: dto.readAt,
+    deliveredAt: dto.deliveredAt,
+    createdAt: dto.createdAt,
+    total,
+  };
 }
 
 /**
@@ -66,35 +98,7 @@ export const notificationKeys = {
   unreadCount: () => [...notificationKeys.all, 'unread-count'] as const,
 };
 
-import { ApiError, toApiError } from '../../lib/api-error';
-
 export { ApiError as NotificationApiError };
-
-function authHeaders(): HeadersInit {
-  const token = authStore.getState().accessToken;
-  // biome-ignore lint/style/useNamingConvention: HTTP header name
-  return token ? { Authorization: `Bearer ${token}` } : {};
-}
-
-async function fetchJson<T>(url: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(url, {
-    ...init,
-    credentials: 'include',
-    headers: {
-      ...authHeaders(),
-      ...init?.headers,
-    },
-  });
-  if (!res.ok) {
-    const body = (await res.json().catch(() => null)) as unknown;
-    // Thread `res.status` into the error so the global QueryCache 401
-    // handler in the shared SDK QueryClient can detect a terminal auth
-    // failure on polling endpoints (notifications unread-count) and
-    // stop the poll / bounce the user to /login.
-    throw toApiError(body, `Request failed with status ${String(res.status)}`, res.status);
-  }
-  return (await res.json()) as T;
-}
 
 /** Page size requested per call against `GET /me/notifications`. */
 const NOTIFICATIONS_PAGE_SIZE = 20;
@@ -123,10 +127,12 @@ export function useNotificationsQuery(): UseSuspenseQueryResult<NotificationItem
   return useSuspenseQuery({
     queryKey: notificationKeys.list(),
     queryFn: async (): Promise<NotificationItem[]> => {
-      const data = await fetchJson<{ notifications?: NotificationItem[] }>(
-        `${apiBaseUrl}/me/notifications?limit=50`,
-      );
-      return data.notifications ?? [];
+      const { data, error } = await sdk.GET('/me/notifications', {
+        params: { query: { limit: 50 } },
+      });
+      if (error || !data) throw toApiError(error, 'Failed to load notifications');
+      const total = data.total;
+      return (data.notifications ?? []).map((dto) => dtoToItem(dto, total));
     },
   });
 }
@@ -151,15 +157,18 @@ export function useNotificationsInfiniteQuery(): UseSuspenseInfiniteQueryResult<
     queryKey: notificationKeys.infinite(),
     initialPageParam: undefined as string | undefined,
     queryFn: async ({ pageParam }): Promise<NotificationsPage> => {
-      const params = new URLSearchParams();
-      params.set('limit', String(NOTIFICATIONS_PAGE_SIZE));
-      if (pageParam) params.set('cursor', pageParam);
-      const data = await fetchJson<{
-        notifications?: NotificationItem[];
-        nextCursor?: string | null;
-      }>(`${apiBaseUrl}/me/notifications?${params.toString()}`);
+      const { data, error } = await sdk.GET('/me/notifications', {
+        params: {
+          query: {
+            limit: NOTIFICATIONS_PAGE_SIZE,
+            ...(pageParam ? { cursor: pageParam } : {}),
+          },
+        },
+      });
+      if (error || !data) throw toApiError(error, 'Failed to load notifications');
+      const total = data.total;
       return {
-        notifications: data.notifications ?? [],
+        notifications: (data.notifications ?? []).map((dto) => dtoToItem(dto, total)),
         nextCursor: data.nextCursor ?? null,
       };
     },
@@ -184,9 +193,15 @@ export function useUnreadCountQuery(): UseQueryResult<number> {
   return useQuery({
     queryKey: notificationKeys.unreadCount(),
     queryFn: async (): Promise<number> => {
-      const data = await fetchJson<UnreadCountResponse>(
-        `${apiBaseUrl}/me/notifications/unread-count`,
-      );
+      const { data, error, response } = await sdk.GET('/me/notifications/unread-count');
+      if (error || !data) {
+        // Thread `response.status` into the error so the global
+        // QueryCache 401 handler in the shared SDK QueryClient can
+        // detect a terminal auth failure on polling endpoints
+        // (notifications unread-count) and stop the poll / bounce
+        // the user to /login.
+        throw toApiError(error, 'Failed to load unread count', response?.status);
+      }
       return data.unreadCount;
     },
     refetchInterval: (query): number | false => {
@@ -261,9 +276,10 @@ export function useMarkNotificationRead(): UseMutationResult<void, ApiError, str
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (id: string): Promise<void> => {
-      await fetchJson<unknown>(`${apiBaseUrl}/notifications/${id}/read`, {
-        method: 'POST',
+      const { error } = await sdk.POST('/notifications/{notifId}/read', {
+        params: { path: { notifId: id } },
       });
+      if (error) throw toApiError(error, 'Failed to mark notification read');
     },
     onMutate: async (id) => {
       // Cancel both the offset list and the infinite list so neither
@@ -320,9 +336,10 @@ export function useArchiveNotification(): UseMutationResult<void, ApiError, stri
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (id: string): Promise<void> => {
-      await fetchJson<unknown>(`${apiBaseUrl}/notifications/${id}/archive`, {
-        method: 'POST',
+      const { error } = await sdk.POST('/notifications/{notifId}/archive', {
+        params: { path: { notifId: id } },
       });
+      if (error) throw toApiError(error, 'Failed to archive notification');
     },
     onMutate: async (id) => {
       await qc.cancelQueries({ queryKey: [...notificationKeys.all, 'list'] });
@@ -384,9 +401,10 @@ export function useMarkAllRead(wsId: string | null): UseMutationResult<void, Api
   return useMutation({
     mutationFn: async (): Promise<void> => {
       if (!wsId) throw new ApiError(undefined, 'No workspace selected');
-      await fetchJson<unknown>(`${apiBaseUrl}/workspaces/${wsId}/notifications/read-all`, {
-        method: 'POST',
+      const { error } = await sdk.POST('/workspaces/{wsId}/notifications/read-all', {
+        params: { path: { wsId } },
       });
+      if (error) throw toApiError(error, 'Failed to mark all notifications read');
     },
     onMutate: async () => {
       await qc.cancelQueries({ queryKey: [...notificationKeys.all, 'list'] });

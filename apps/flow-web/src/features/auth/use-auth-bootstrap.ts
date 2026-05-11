@@ -13,7 +13,7 @@
 import { useEffect, useState } from 'react';
 
 import { type SupportedLanguage, i18n, setLanguage, supportedLanguages } from '../../i18n';
-import { authApiBaseUrl, refreshAccessToken } from '../../lib/sdk';
+import { authSdk, refreshAccessToken } from '../../lib/sdk';
 import { queryClient } from '../../providers/query-client';
 import { type AuthUser, authStore } from './auth-store';
 
@@ -28,24 +28,15 @@ let bootstrapPromise: Promise<AuthBootstrapStatus> | null = null;
 async function runBootstrap(): Promise<AuthBootstrapStatus> {
   const token = await refreshAccessToken();
   if (!token) return 'unauthenticated';
-  const meRes = await fetch(`${authApiBaseUrl}/me`, {
-    headers: { authorization: `Bearer ${token}` },
-  });
-  if (!meRes.ok) {
+  // Use the typed auth-api SDK for the /me probe. The SDK's request
+  // middleware reads the bearer from the auth store (which the
+  // refresher above has just populated) so we don't have to rebuild
+  // the Authorization header by hand.
+  const { data, error, response } = await authSdk.GET('/me', {});
+  if (error || !data || !response.ok) {
     authStore.getState().clearSession();
     return 'unauthenticated';
   }
-  const data = (await meRes.json()) as {
-    id: string;
-    email: string;
-    displayName: string;
-    locale: string;
-    timezone: string;
-    country: string;
-    themePreference: string;
-    isInstanceAdmin: boolean;
-    avatarUrl?: string | null;
-  };
   const user: AuthUser = {
     id: data.id,
     email: data.email,

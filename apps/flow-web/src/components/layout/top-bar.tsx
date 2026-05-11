@@ -12,7 +12,7 @@ import CommandPalette from './command-palette';
 import AiCostMeter from '../../features/ai-providers/cost-meter';
 import { authStore, selectUser, useAuth } from '../../features/auth/auth-store';
 import NotificationBell from '../../features/notifications/notification-bell';
-import { apiBaseUrl } from '../../lib/sdk';
+import { authSdk } from '../../lib/sdk';
 import { clearActiveWorkspaceId } from '../../lib/use-current-workspace';
 import TopBarBreadcrumb from './top-bar-breadcrumb';
 import styles from './top-bar.module.css';
@@ -40,10 +40,10 @@ export default function TopBar(): ReactElement {
 
   const handleLogout = async (): Promise<void> => {
     try {
-      await fetch(`${apiBaseUrl}/auth/logout`, {
-        method: 'POST',
-        credentials: 'include',
-      });
+      // Logout lives on auth-api; route through the auth-api SDK so the
+      // request goes to the right base URL with the same bearer/cookie
+      // plumbing as the rest of the auth surface.
+      await authSdk.POST('/auth/logout', {});
     } catch {
       // Even on network failure, clear local state and bounce to /login.
     }

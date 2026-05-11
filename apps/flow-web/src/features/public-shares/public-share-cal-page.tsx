@@ -30,7 +30,13 @@ const SHARE_EVENT_CARD_HEIGHT = '5rem';
 type SharePageDTO = components['schemas']['PublicShareRenderPage'];
 type ShareEventDTO = components['schemas']['PublicShareRenderEvent'];
 
-interface ShareRenderBody {
+/**
+ * Normalised view-model returned by `useShareRenderQuery`. Differs from the
+ * SDK `RenderPublicShareOutputBody` only in that `events` is collapsed from
+ * `T[] | null` to `T[]`; the page renders the empty list directly so the
+ * normalisation lives at the query boundary.
+ */
+interface NormalisedShareRender {
   page: SharePageDTO;
   events: ShareEventDTO[];
 }
@@ -45,7 +51,7 @@ interface ShareRenderBody {
 function useShareRenderQuery(token: string) {
   return useQuery({
     queryKey: ['share', 'cal', token],
-    queryFn: async (): Promise<ShareRenderBody> => {
+    queryFn: async (): Promise<NormalisedShareRender> => {
       const result = await sdk.GET('/share/cal/{token}', {
         params: { path: { token } },
       });
