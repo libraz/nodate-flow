@@ -100,8 +100,8 @@ func ListMyInvites(deps Deps) func(context.Context, *struct{}) (*ListMyInvitesOu
 // future client-hint parameter; the returned start_at / end_at are unix
 // seconds (UTC) regardless.
 type ListMyCalendarEventsInput struct {
-	Start string `query:"start" required:"true" minLength:"1" pattern:"^20\\d{2}-(0[1-9]|1[0-2])-(0[1-9]|1\\d|2[0-8])$" doc:"Range start (inclusive, YYYY-MM-DD or RFC3339)"`
-	End   string `query:"end" required:"true" minLength:"1" pattern:"^20\\d{2}-(0[1-9]|1[0-2])-(0[1-9]|1\\d|2[0-8])$" doc:"Range end (exclusive, YYYY-MM-DD or RFC3339)"`
+	Start string `query:"start" required:"true" minLength:"1" doc:"Range start (inclusive, YYYY-MM-DD or RFC 3339 datetime)"`
+	End   string `query:"end" required:"true" minLength:"1" doc:"Range end (exclusive, YYYY-MM-DD or RFC 3339 datetime)"`
 }
 
 // MyCalendarEventResponse is a single row in the cross-workspace

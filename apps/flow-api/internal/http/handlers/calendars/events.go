@@ -29,8 +29,8 @@ import (
 type ListEventsInput struct {
 	WsID  string `path:"wsId" doc:"Workspace public ID"`
 	CalID string `path:"calId" doc:"Calendar public ID"`
-	Start string `query:"start" doc:"Range start (inclusive, RFC 3339 datetime or YYYY-MM-DD)" required:"true" minLength:"1" pattern:"^20\\d{2}-(0[1-9]|1[0-2])-(0[1-9]|1\\d|2[0-8])$"`
-	End   string `query:"end" doc:"Range end (exclusive, RFC 3339 datetime or YYYY-MM-DD)" required:"true" minLength:"1" pattern:"^20\\d{2}-(0[1-9]|1[0-2])-(0[1-9]|1\\d|2[0-8])$"`
+	Start string `query:"start" doc:"Range start (inclusive, RFC 3339 datetime or YYYY-MM-DD)" required:"true" minLength:"1"`
+	End   string `query:"end" doc:"Range end (exclusive, RFC 3339 datetime or YYYY-MM-DD)" required:"true" minLength:"1"`
 }
 
 // EventResponse is the JSON representation of a calendar event.
@@ -153,8 +153,8 @@ type DeleteEventOutput struct {
 // ListCalendarEventsInput is the input for the cross-calendar event list endpoint.
 type ListCalendarEventsInput struct {
 	WsID  string `path:"wsId" doc:"Workspace public ID"`
-	Start string `query:"start" doc:"Range start (inclusive, date or datetime)" required:"true" minLength:"1" pattern:"^20\\d{2}-(0[1-9]|1[0-2])-(0[1-9]|1\\d|2[0-8])$"`
-	End   string `query:"end" doc:"Range end (exclusive, date or datetime)" required:"true" minLength:"1" pattern:"^20\\d{2}-(0[1-9]|1[0-2])-(0[1-9]|1\\d|2[0-8])$"`
+	Start string `query:"start" doc:"Range start (inclusive, RFC 3339 datetime or YYYY-MM-DD)" required:"true" minLength:"1"`
+	End   string `query:"end" doc:"Range end (exclusive, RFC 3339 datetime or YYYY-MM-DD)" required:"true" minLength:"1"`
 }
 
 // CrossCalendarEventResponse is the JSON representation of a cross-calendar event.

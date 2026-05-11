@@ -294,8 +294,8 @@ type ListMyTasksOutput struct {
 // server-side clock; the client should send the widest range it plans
 // to render.
 type ListMyTasksWithDatesInput struct {
-	From   string `query:"from" required:"true" minLength:"1" pattern:"^20\\d{2}-(0[1-9]|1[0-2])-(0[1-9]|1\\d|2[0-8])$" doc:"Range start YYYY-MM-DD (inclusive)"`
-	To     string `query:"to" required:"true" minLength:"1" pattern:"^20\\d{2}-(0[1-9]|1[0-2])-(0[1-9]|1\\d|2[0-8])$" doc:"Range end YYYY-MM-DD (inclusive)"`
+	From   string `query:"from" required:"true" minLength:"1" doc:"Range start YYYY-MM-DD (inclusive)"`
+	To     string `query:"to" required:"true" minLength:"1" doc:"Range end YYYY-MM-DD (inclusive)"`
 	Cursor string `query:"cursor" doc:"Opaque cursor returned by previous page; pass to fetch next page. Empty when at end."`
 	// Cross-workspace calendar grid: month-range fetch may exceed handlerutil.MaxListLimit; cap raised to 1000.
 	Limit  int32 `query:"limit" minimum:"1" maximum:"1000" default:"100"`
