@@ -7,7 +7,7 @@
  * step triggered by the server, not a user-filled form.
  */
 
-import { isSafeRedirect } from '@nodate-flow/sdk';
+import { type components, isSafeRedirect } from '@nodate-flow/sdk';
 import { useZodForm } from '@nodate-flow/ui/hooks/use-zod-form';
 import Button from '@nodate-flow/ui/primitives/button';
 import FormField from '@nodate-flow/ui/primitives/form-field';
@@ -48,26 +48,14 @@ export interface LoginSearch {
   redirect?: string;
 }
 
-interface LoginResponse {
-  accessToken?: string;
-  step?: string;
-  challengeToken?: string;
-}
-
-interface TotpResponse {
-  accessToken: string;
-}
-
-interface MeResponse {
-  id: string;
-  email: string;
-  displayName: string;
-  locale: string;
-  timezone: string;
-  country: string;
-  themePreference: string;
-  isInstanceAdmin: boolean;
-}
+/**
+ * SDK-derived response bodies. Local interfaces previously caused silent
+ * shape drift (e.g. missing `step` enum narrowing). All three are
+ * generated from the Go schema by `make gen-sdk`.
+ */
+type LoginResponse = components['schemas']['LoginBody'];
+type TotpResponse = components['schemas']['AuthTokens'];
+type MeResponse = components['schemas']['MeBody'];
 
 function LoginPage(): ReactElement {
   const { t } = useTranslation('auth');

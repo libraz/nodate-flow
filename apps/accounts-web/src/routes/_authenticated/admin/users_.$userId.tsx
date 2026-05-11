@@ -3,6 +3,7 @@
  * and suspend/enable actions.
  */
 
+import type { components } from '@nodate-flow/sdk';
 import VisuallyHidden from '@nodate-flow/ui/a11y/visually-hidden';
 import Button from '@nodate-flow/ui/primitives/button';
 import { confirmAction } from '@nodate-flow/ui/primitives/confirm/action';
@@ -22,31 +23,13 @@ import { formatTimestamp } from '../../../lib/format-timestamp';
 import { sdk } from '../../../lib/sdk';
 import { useSubmitGuard } from '../../../lib/use-submit-guard';
 
-interface UserDetail {
-  id: string;
-  email: string;
-  displayName: string;
-  enabled: boolean;
-  isInstanceAdmin: boolean;
-  workspaceCount: number;
-  lastLoginAt: number | null;
-  createdAt: number;
-}
-
-interface UserSession {
-  id: string;
-  userAgent: string;
-  ipAddress: string;
-  active: boolean;
-  expiresAt: number;
-  lastUsedAt: number | null;
-  createdAt: number;
-}
-
-interface SessionsResponse {
-  items: UserSession[];
-  total: number;
-}
+/**
+ * SDK-derived shapes; mirror the auth-api Go schema verbatim so a server-side
+ * field rename surfaces as a typecheck failure instead of a silent undefined.
+ */
+type UserDetail = components['schemas']['User'];
+type UserSession = components['schemas']['Session'];
+type SessionsResponse = components['schemas']['ListUserSessionsOutputBody'];
 
 /**
  * Renders the user detail content. Exported so unit tests can mount the
@@ -88,7 +71,7 @@ export function UserDetailPage(): ReactElement {
       setUser(userResult.data as UserDetail);
       if (sessionsResult.data) {
         const sessBody = sessionsResult.data as SessionsResponse;
-        setSessions(sessBody.items);
+        setSessions(sessBody.items ?? []);
       }
       setLoading(false);
     });

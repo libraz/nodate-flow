@@ -2,6 +2,7 @@
  * /admin/audit-logs -- Instance audit log viewer with filters and pagination.
  */
 
+import type { components } from '@nodate-flow/sdk';
 import Button from '@nodate-flow/ui/primitives/button';
 import DatePicker from '@nodate-flow/ui/primitives/date-picker';
 import Input from '@nodate-flow/ui/primitives/input';
@@ -13,21 +14,12 @@ import { adminTableStyle, adminTdStyle, adminThStyle } from '../../../features/a
 import { formatTimestamp } from '../../../lib/format-timestamp';
 import { sdk } from '../../../lib/sdk';
 
-interface AuditLogEntry {
-  id: string;
-  action: string;
-  actorEmail: string;
-  targetType: string;
-  targetId: string;
-  workspaceName: string | null;
-  ipAddress: string;
-  occurredAt: number;
-}
-
-interface AuditLogsResponse {
-  items: AuditLogEntry[];
-  total: number;
-}
+/**
+ * SDK-derived shapes; the local interfaces this replaced silently drifted
+ * from the API and rendered `undefined` for actor/target columns.
+ */
+type AuditLogEntry = components['schemas']['AuditEntry'];
+type AuditLogsResponse = components['schemas']['ListAuditLogsOutputBody'];
 
 /** Format an ISO `YYYY-MM-DD` string using the given BCP 47 locale. */
 function formatIsoDate(iso: string, locale: string): string {
@@ -62,22 +54,27 @@ function AuditLogsPage(): ReactElement {
     setLoading(true);
     setError(null);
 
-    const params = new URLSearchParams();
-    params.set('page', String(page));
-    params.set('perPage', String(perPage));
-    if (actionFilter) params.set('action', actionFilter);
-    if (fromDate) params.set('from', fromDate);
-    if (toDate) params.set('to', toDate);
+    // The audit-logs endpoint accepts unix-seconds bounds; the date pickers
+    // emit YYYY-MM-DD which we convert to the local-midnight epoch so the
+    // filter matches the user's wall clock.
+    const toUnix = (iso: string): number | undefined => {
+      if (!iso) return undefined;
+      const ts = new Date(`${iso}T00:00`).getTime();
+      return Number.isFinite(ts) ? Math.floor(ts / 1000) : undefined;
+    };
+    const fromTs = toUnix(fromDate);
+    const toTs = toUnix(toDate);
+    const offset = (page - 1) * perPage;
 
     void sdk
       .GET('/admin/audit-logs', {
         params: {
           query: {
-            page: String(page),
-            perPage: String(perPage),
+            limit: perPage,
+            offset,
             ...(actionFilter ? { action: actionFilter } : {}),
-            ...(fromDate ? { from: fromDate } : {}),
-            ...(toDate ? { to: toDate } : {}),
+            ...(fromTs !== undefined ? { from: fromTs } : {}),
+            ...(toTs !== undefined ? { to: toTs } : {}),
           },
         },
       })
@@ -89,7 +86,7 @@ function AuditLogsPage(): ReactElement {
           return;
         }
         const body = result.data as AuditLogsResponse;
-        setEntries(body.items);
+        setEntries(body.items ?? []);
         setTotal(body.total);
         setLoading(false);
       });
@@ -223,12 +220,12 @@ function AuditLogsPage(): ReactElement {
                 <tr key={entry.id}>
                   <td style={adminTdStyle}>{formatTimestamp(entry.occurredAt)}</td>
                   <td style={adminTdStyle}>{entry.action}</td>
-                  <td style={adminTdStyle}>{entry.actorEmail}</td>
+                  <td style={adminTdStyle}>{entry.actorDisplayName ?? ''}</td>
                   <td style={adminTdStyle}>
-                    {entry.targetType}
-                    {entry.workspaceName ? ` (${entry.workspaceName})` : ''}
+                    {entry.targetResourceType ?? ''}
+                    {entry.targetWorkspaceName ? ` (${entry.targetWorkspaceName})` : ''}
                   </td>
-                  <td style={adminTdStyle}>{entry.ipAddress}</td>
+                  <td style={adminTdStyle}>{entry.ipAddress ?? ''}</td>
                 </tr>
               ))}
             </tbody>

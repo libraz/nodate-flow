@@ -10,6 +10,7 @@
  * memoizes its in-flight promise).
  */
 
+import type { components } from '@nodate-flow/sdk';
 import { useEffect, useState } from 'react';
 
 import type { AuthUser } from '../features/auth/auth-store';
@@ -22,17 +23,11 @@ interface BootstrapResult {
   status: AuthBootstrapStatus;
 }
 
-interface MeResponse {
-  id: string;
-  email: string;
-  displayName: string;
-  locale: string;
-  timezone: string;
-  country: string;
-  themePreference: string;
-  isInstanceAdmin: boolean;
-  avatarUrl?: string | null;
-}
+/**
+ * SDK-derived response body. Generated from the Go schema by `make
+ * gen-sdk`; mirrors auth-api's GET /me exactly.
+ */
+type MeResponse = components['schemas']['MeBody'];
 
 let bootstrapPromise: Promise<AuthBootstrapStatus> | null = null;
 

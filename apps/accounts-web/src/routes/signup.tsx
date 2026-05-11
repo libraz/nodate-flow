@@ -4,6 +4,7 @@
  * Uses React Hook Form + Zod for client-side validation.
  */
 
+import type { components } from '@nodate-flow/sdk';
 import { useZodForm } from '@nodate-flow/ui/hooks/use-zod-form';
 import Button from '@nodate-flow/ui/primitives/button';
 import FormField from '@nodate-flow/ui/primitives/form-field';
@@ -28,20 +29,12 @@ import { type AuthErrorI18nKey, mapAuthError, mapAuthThrown } from '../lib/auth-
 import { sdk } from '../lib/sdk';
 import { useSubmitGuard } from '../lib/use-submit-guard';
 
-interface RegisterResponse {
-  accessToken: string;
-}
-
-interface MeResponse {
-  id: string;
-  email: string;
-  displayName: string;
-  locale: string;
-  timezone: string;
-  country: string;
-  themePreference: string;
-  isInstanceAdmin: boolean;
-}
+/**
+ * SDK-derived response bodies. Generated from the Go schema by `make
+ * gen-sdk`; mirrors auth-api's POST /auth/register and GET /me exactly.
+ */
+type RegisterResponse = components['schemas']['AuthTokens'];
+type MeResponse = components['schemas']['MeBody'];
 
 function SignupPage(): ReactElement {
   const { t } = useTranslation('auth');

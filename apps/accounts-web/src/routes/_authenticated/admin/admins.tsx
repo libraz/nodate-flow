@@ -2,6 +2,7 @@
  * /admin/admins -- Instance administrator list with grant/revoke.
  */
 
+import type { components } from '@nodate-flow/sdk';
 import Button from '@nodate-flow/ui/primitives/button';
 import Combobox, { type ComboboxOption } from '@nodate-flow/ui/primitives/combobox';
 import { confirmAction } from '@nodate-flow/ui/primitives/confirm/action';
@@ -15,24 +16,17 @@ import { formatTimestamp } from '../../../lib/format-timestamp';
 import { sdk } from '../../../lib/sdk';
 import { useSubmitGuard } from '../../../lib/use-submit-guard';
 
-interface InstanceAdmin {
-  id: string;
-  email: string;
-  displayName: string;
-  grantedAt: number;
-  grantedBy: string;
-}
+/**
+ * SDK-derived shapes; the local interfaces this replaced rendered
+ * `granted_by` as undefined because the field is named `grantedByDisplayName`
+ * in the Go schema, and treated grant POST responses as `{admin: ...}` even
+ * though the API returns `{ok: boolean}`.
+ */
+type InstanceAdmin = components['schemas']['InstanceAdmin'];
+type AdminsResponse = components['schemas']['ListAdminsOutputBody'];
 
-interface AdminsResponse {
-  items: InstanceAdmin[];
-  total: number;
-}
-
-interface UserSearchResult {
-  id: string;
-  email: string;
-  displayName: string;
-}
+/** Subset of `User` consumed by the grant-search Combobox. */
+type UserSearchResult = Pick<components['schemas']['User'], 'id' | 'email' | 'displayName'>;
 
 export function AdminsPage(): ReactElement {
   const { t } = useTranslation('admin');
@@ -56,15 +50,15 @@ export function AdminsPage(): ReactElement {
       setSearching(true);
       void sdk
         .GET('/admin/users', {
-          params: { query: { page: '1', perPage: '8', search: trimmed } },
+          params: { query: { limit: 8, offset: 0, search: trimmed } },
         })
         .then((result) => {
           setSearching(false);
           if (result.error || !result.data) return;
-          const body = result.data as { items: UserSearchResult[] };
+          const body = result.data as components['schemas']['ListUsersOutputBody'];
           // Exclude users already promoted to instance admin.
           const adminIds = new Set(admins.map((a) => a.id));
-          setUserResults(body.items.filter((u) => !adminIds.has(u.id)));
+          setUserResults((body.items ?? []).filter((u) => !adminIds.has(u.id)));
         });
     },
     [admins],
@@ -80,7 +74,7 @@ export function AdminsPage(): ReactElement {
         return;
       }
       const body = result.data as AdminsResponse;
-      setAdmins(body.items);
+      setAdmins(body.items ?? []);
       setLoading(false);
     });
   }, [t]);
@@ -117,9 +111,14 @@ export function AdminsPage(): ReactElement {
         setGrantError(t('errors.generic'));
         return;
       }
-
-      const body = data as { admin: InstanceAdmin };
-      setAdmins((prev) => [...prev, body.admin]);
+      // The grant endpoint returns `{ok: boolean}`, not the new admin row,
+      // so refetch the list to surface the freshly-promoted admin with the
+      // server-side `grantedAt` / `grantedByDisplayName` fields filled in.
+      const refreshed = await sdk.GET('/admin/instance-admins');
+      if (refreshed.data) {
+        const refreshedBody = refreshed.data as AdminsResponse;
+        setAdmins(refreshedBody.items ?? []);
+      }
       setSelectedUserId(undefined);
       setUserResults([]);
       void invalidateInstanceStats();
@@ -175,7 +174,7 @@ export function AdminsPage(): ReactElement {
                   <td style={adminTdStyle}>{admin.displayName}</td>
                   <td style={adminTdStyle}>{admin.email}</td>
                   <td style={adminTdStyle}>{formatTimestamp(admin.grantedAt)}</td>
-                  <td style={adminTdStyle}>{admin.grantedBy}</td>
+                  <td style={adminTdStyle}>{admin.grantedByDisplayName ?? ''}</td>
                   <td style={adminTdStyle}>
                     <Button
                       variant="danger"

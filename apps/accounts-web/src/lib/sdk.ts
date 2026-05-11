@@ -39,7 +39,7 @@ export const authApiBaseUrl =
  * functions that accept arbitrary paths. Callers cast responses to
  * the expected shape locally.
  */
-interface UntypedResponse {
+interface UntypedSdkResult {
   data?: unknown;
   error?: unknown;
   response: Response;
@@ -47,7 +47,7 @@ interface UntypedResponse {
 
 type AnySdk = {
   // biome-ignore lint/suspicious/noExplicitAny: auth-api paths not in OpenAPI spec
-  [K in 'GET' | 'POST' | 'PATCH' | 'PUT' | 'DELETE']: (...args: any[]) => Promise<UntypedResponse>;
+  [K in 'GET' | 'POST' | 'PATCH' | 'PUT' | 'DELETE']: (...args: any[]) => Promise<UntypedSdkResult>;
 } & { use: (middleware: unknown) => void };
 
 const typedSdk = createClient({

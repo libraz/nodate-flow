@@ -2,6 +2,7 @@
  * /admin/users -- Paginated user management list.
  */
 
+import type { components } from '@nodate-flow/sdk';
 import Button from '@nodate-flow/ui/primitives/button';
 import Input from '@nodate-flow/ui/primitives/input';
 import { Link, createFileRoute } from '@tanstack/react-router';
@@ -11,23 +12,21 @@ import { useTranslation } from 'react-i18next';
 import { formatTimestamp } from '../../../lib/format-timestamp';
 import { sdk } from '../../../lib/sdk';
 
-interface AdminUser {
-  id: string;
-  email: string;
-  displayName: string;
-  enabled: boolean;
-  isInstanceAdmin: boolean;
-  workspaceCount: number;
-  lastLoginAt: number | null;
-  createdAt: number;
-}
-
-interface UsersResponse {
-  items: AdminUser[];
-  total: number;
-}
+/**
+ * SDK-derived shapes; the local interfaces this replaced silently allowed
+ * sending unsupported `page` / `perPage` / `status` query params to the API.
+ */
+type AdminUser = components['schemas']['User'];
+type UsersResponse = components['schemas']['ListUsersOutputBody'];
 
 type StatusFilter = 'all' | 'active' | 'suspended';
+
+/** UI status filter -> API `enabled` query parameter mapping. */
+const STATUS_TO_ENABLED: Record<StatusFilter, 'true' | 'false' | '' | undefined> = {
+  all: undefined,
+  active: 'true',
+  suspended: 'false',
+};
 
 function UsersPage(): ReactElement {
   const { t } = useTranslation('admin');
@@ -45,20 +44,17 @@ function UsersPage(): ReactElement {
     setLoading(true);
     setError(null);
 
-    const params = new URLSearchParams();
-    params.set('page', String(page));
-    params.set('perPage', String(perPage));
-    if (search) params.set('search', search);
-    if (statusFilter !== 'all') params.set('status', statusFilter);
+    const offset = (page - 1) * perPage;
+    const enabledParam = STATUS_TO_ENABLED[statusFilter];
 
     void sdk
       .GET('/admin/users', {
         params: {
           query: {
-            page: String(page),
-            perPage: String(perPage),
+            limit: perPage,
+            offset,
             ...(search ? { search } : {}),
-            ...(statusFilter !== 'all' ? { status: statusFilter } : {}),
+            ...(enabledParam !== undefined ? { enabled: enabledParam } : {}),
           },
         },
       })
@@ -70,7 +66,7 @@ function UsersPage(): ReactElement {
           return;
         }
         const body = result.data as UsersResponse;
-        setUsers(body.items);
+        setUsers(body.items ?? []);
         setTotal(body.total);
         setLoading(false);
       });

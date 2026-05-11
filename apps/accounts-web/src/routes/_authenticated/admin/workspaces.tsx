@@ -2,6 +2,7 @@
  * /admin/workspaces -- Paginated workspace management list.
  */
 
+import type { components } from '@nodate-flow/sdk';
 import Button from '@nodate-flow/ui/primitives/button';
 import Input from '@nodate-flow/ui/primitives/input';
 import { Link, createFileRoute } from '@tanstack/react-router';
@@ -17,22 +18,21 @@ import {
 import { formatTimestamp } from '../../../lib/format-timestamp';
 import { sdk } from '../../../lib/sdk';
 
-interface AdminWorkspace {
-  id: string;
-  name: string;
-  slug: string;
-  memberCount: number;
-  projectCount: number;
-  enabled: boolean;
-  createdAt: number;
-}
-
-interface WorkspacesResponse {
-  items: AdminWorkspace[];
-  total: number;
-}
+/**
+ * SDK-derived shapes; the local interfaces this replaced silently allowed
+ * sending unsupported `page` / `perPage` / `status` query params to the API.
+ */
+type AdminWorkspace = components['schemas']['AdminWorkspace'];
+type WorkspacesResponse = components['schemas']['AdminListWorkspacesOutputBody'];
 
 type StatusFilter = 'all' | 'active' | 'suspended';
+
+/** UI status filter -> API `enabled` query parameter mapping. */
+const STATUS_TO_ENABLED: Record<StatusFilter, 'true' | 'false' | '' | undefined> = {
+  all: undefined,
+  active: 'true',
+  suspended: 'false',
+};
 
 function WorkspacesPage(): ReactElement {
   const { t } = useTranslation('admin');
@@ -50,20 +50,17 @@ function WorkspacesPage(): ReactElement {
     setLoading(true);
     setError(null);
 
-    const params = new URLSearchParams();
-    params.set('page', String(page));
-    params.set('perPage', String(perPage));
-    if (search) params.set('search', search);
-    if (statusFilter !== 'all') params.set('status', statusFilter);
+    const offset = (page - 1) * perPage;
+    const enabledParam = STATUS_TO_ENABLED[statusFilter];
 
     void sdk
       .GET('/admin/workspaces', {
         params: {
           query: {
-            page: String(page),
-            perPage: String(perPage),
+            limit: perPage,
+            offset,
             ...(search ? { search } : {}),
-            ...(statusFilter !== 'all' ? { status: statusFilter } : {}),
+            ...(enabledParam !== undefined ? { enabled: enabledParam } : {}),
           },
         },
       })
@@ -75,7 +72,7 @@ function WorkspacesPage(): ReactElement {
           return;
         }
         const body = result.data as WorkspacesResponse;
-        setWorkspaces(body.items);
+        setWorkspaces(body.items ?? []);
         setTotal(body.total);
         setLoading(false);
       });
@@ -181,7 +178,7 @@ function WorkspacesPage(): ReactElement {
                   </td>
                   <td style={adminTdStyle}>{ws.slug}</td>
                   <td style={adminTdStyle}>{ws.memberCount}</td>
-                  <td style={adminTdStyle}>{ws.projectCount}</td>
+                  <td style={adminTdStyle}>{ws.projectCount ?? 0}</td>
                   <td style={adminTdStyle}>
                     <span
                       style={{

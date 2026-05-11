@@ -112,12 +112,15 @@ function useWorkspaceCount(user: AuthUser | null): number | undefined {
           setFetched(undefined);
           return;
         }
-        const body = result.data as { total?: number; items?: readonly unknown[] };
+        // Field name follows GET /workspaces -> WorkspacesListOutputBody:
+        // `workspaces`, NOT `items`. We still tolerate `total` first because
+        // the endpoint always populates it, even when the array is null.
+        const body = result.data as components['schemas']['WorkspacesListOutputBody'];
         const total =
           typeof body.total === 'number'
             ? body.total
-            : Array.isArray(body.items)
-              ? body.items.length
+            : Array.isArray(body.workspaces)
+              ? body.workspaces.length
               : 0;
         setFetched(total);
       })

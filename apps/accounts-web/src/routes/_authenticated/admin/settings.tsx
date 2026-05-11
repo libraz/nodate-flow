@@ -2,6 +2,7 @@
  * /admin/settings -- Instance settings management.
  */
 
+import type { components } from '@nodate-flow/sdk';
 import Button from '@nodate-flow/ui/primitives/button';
 import { createFileRoute } from '@tanstack/react-router';
 import { type ReactElement, useEffect, useState } from 'react';
@@ -10,14 +11,11 @@ import { useTranslation } from 'react-i18next';
 import { sdk } from '../../../lib/sdk';
 import styles from './settings.module.css';
 
-interface InstanceSetting {
-  key: string;
-  value: string;
-}
-
-interface SettingsResponse {
-  items: InstanceSetting[];
-}
+/**
+ * SDK-derived types so the key/value rows stay in lock-step with the
+ * Go schema even when fields like `updatedAt` get added server-side.
+ */
+type SettingsResponse = components['schemas']['ListSettingsOutputBody'];
 
 function SettingsPage(): ReactElement {
   const { t } = useTranslation('admin');
@@ -35,7 +33,7 @@ function SettingsPage(): ReactElement {
     void sdk.GET('/admin/settings').then((result) => {
       if (result.data) {
         const body = result.data as SettingsResponse;
-        for (const s of body.items) {
+        for (const s of body.items ?? []) {
           switch (s.key) {
             case 'registration_open':
               setRegistrationOpen(s.value);

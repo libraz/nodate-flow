@@ -5,6 +5,7 @@
 
 import {
   SUPPORTED_COUNTRIES,
+  type components,
   detectTimezone,
   formatTimezoneLabel,
   groupTimezonesByRegion,
@@ -38,23 +39,16 @@ const schema = z.object({
 
 type FormValues = z.infer<typeof schema>;
 
-interface WorkspaceBody {
-  id: string;
-  slug: string;
-  name: string;
-  description?: string;
-  iconUrl?: string;
-  timezone: string;
-  country: string;
-  role: string;
-  memberCount: number;
-  createdAt: number;
-}
+/**
+ * SDK-derived workspace shape; mirrors the Go `Workspace` schema exactly so
+ * field-name drift between the API and this page is impossible.
+ */
+type Workspace = components['schemas']['Workspace'];
 
 function WorkspaceEditPage(): ReactElement {
   const { t } = useTranslation('auth');
   const { wsId } = useParams({ from: '/_authenticated/workspaces_/$wsId' });
-  const [workspace, setWorkspace] = useState<WorkspaceBody | null>(null);
+  const [workspace, setWorkspace] = useState<Workspace | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [serverError, setServerError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
@@ -105,7 +99,7 @@ function WorkspaceEditPage(): ReactElement {
         setLoadError(t('errors.generic'));
         return;
       }
-      setWorkspace(result.data as WorkspaceBody);
+      setWorkspace(result.data as Workspace);
     });
     return () => {
       cancelled = true;
@@ -130,7 +124,7 @@ function WorkspaceEditPage(): ReactElement {
         setServerError(t('errors.generic'));
         return;
       }
-      setWorkspace(data as WorkspaceBody);
+      setWorkspace(data as Workspace);
       setSuccess(true);
     } catch {
       setServerError(t('errors.unknown'));
