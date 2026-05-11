@@ -281,6 +281,7 @@ CREATE TABLE ai_providers (
 CREATE TABLE ai_settings (
   id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY COMMENT 'Internal PK, never exposed',
   workspace_id INT UNSIGNED NOT NULL COMMENT 'Internal FK to workspaces.id',
+  modified_by_user_id INT UNSIGNED NULL COMMENT 'Last modifier user.id (audit field; NULL when user is removed or for system writers)',
 
   embed_model              VARCHAR(64)  NOT NULL DEFAULT 'mock-768' COMMENT 'Embedding model key (resolved by ai/embed registry)',
   embed_budget_cents_day   INT UNSIGNED NOT NULL DEFAULT 100 COMMENT 'Daily embed cost cap in cents (separate bucket from chat budget)',
@@ -296,8 +297,10 @@ CREATE TABLE ai_settings (
   created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
 
   UNIQUE KEY uniq_ai_settings_workspace (workspace_id),
+  KEY idx_ai_settings_modified_by_user_id (modified_by_user_id),
 
-  CONSTRAINT fk_ai_settings_workspace FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE
+  CONSTRAINT fk_ai_settings_workspace FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
+  CONSTRAINT fk_ai_settings_modifier FOREIGN KEY (modified_by_user_id) REFERENCES users(id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Per-workspace AI configuration (ADR 0003): embeddings, duplicates, auto-actions';
 
 -- >>> attachments.sql
@@ -310,7 +313,7 @@ CREATE TABLE attachments (
   id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY COMMENT 'Internal PK, never exposed',
   public_id BINARY(16) NOT NULL COMMENT 'UUID v7, the only externally visible ID',
   workspace_id INT UNSIGNED NOT NULL COMMENT 'Internal FK to workspaces.id',
-  task_id INT UNSIGNED NOT NULL COMMENT 'Internal FK to tasks.id',
+  task_id INT UNSIGNED NULL COMMENT 'Internal FK to tasks.id; nullable so audit-trail attachments survive task deletion (FK SET NULL)',
   uploader_id INT UNSIGNED NOT NULL COMMENT 'Internal FK to users.id (uploader)',
 
   filename VARCHAR(255) NOT NULL COMMENT 'Original filename',
@@ -332,7 +335,7 @@ CREATE TABLE attachments (
   KEY idx_attachments_workspace_id_uploader_id (workspace_id, uploader_id),
 
   CONSTRAINT fk_attachments_workspace FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
-  CONSTRAINT fk_attachments_task FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE CASCADE,
+  CONSTRAINT fk_attachments_task FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE SET NULL,
   CONSTRAINT fk_attachments_uploader FOREIGN KEY (uploader_id) REFERENCES users(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Task file attachments metadata';
 
@@ -410,7 +413,7 @@ CREATE TABLE calendar_event_attachments (
   id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY COMMENT 'Internal PK, never exposed',
   public_id BINARY(16) NOT NULL COMMENT 'UUID v7, the only externally visible ID',
   workspace_id INT UNSIGNED NOT NULL COMMENT 'Internal FK to workspaces.id',
-  event_id INT UNSIGNED NOT NULL COMMENT 'Internal FK to calendar_events.id',
+  event_id INT UNSIGNED NULL COMMENT 'Internal FK to calendar_events.id; nullable so audit-trail attachments survive event hard-delete (FK SET NULL)',
   uploader_id INT UNSIGNED NOT NULL COMMENT 'Internal FK to users.id (uploader)',
 
   filename VARCHAR(255) NOT NULL COMMENT 'Original filename',
@@ -432,7 +435,7 @@ CREATE TABLE calendar_event_attachments (
   KEY idx_calendar_event_attachments_workspace_uploader (workspace_id, uploader_id),
 
   CONSTRAINT fk_calendar_event_attachments_workspace FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
-  CONSTRAINT fk_calendar_event_attachments_event FOREIGN KEY (event_id) REFERENCES calendar_events(id) ON DELETE CASCADE,
+  CONSTRAINT fk_calendar_event_attachments_event FOREIGN KEY (event_id) REFERENCES calendar_events(id) ON DELETE SET NULL,
   CONSTRAINT fk_calendar_event_attachments_uploader FOREIGN KEY (uploader_id) REFERENCES users(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Calendar event file attachments';
 
@@ -447,8 +450,31 @@ CREATE TABLE calendar_event_attendees (
   id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY COMMENT 'Internal PK, never exposed',
   public_id BINARY(16) NOT NULL COMMENT 'UUID v7, the only externally visible ID',
   workspace_id INT UNSIGNED NOT NULL COMMENT 'Internal FK to workspaces.id',
-  event_id INT UNSIGNED NOT NULL COMMENT 'Internal FK to calendar_events.id',
+  event_id INT UNSIGNED NULL COMMENT 'Internal FK to calendar_events.id; nullable so audit-trail attendee rows survive event hard-delete (FK SET NULL); active rows for live events are NOT NULL via app constraint',
   user_id INT UNSIGNED NOT NULL COMMENT 'Internal FK to users.id',
+  /**
+   * event_id_key: de-NULLed projection of event_id used to power the UNIQUE
+   * key over (event_id, user_id). MySQL UNIQUE indexes treat NULLs as
+   * distinct, so without this surrogate two audit-trail rows with
+   * event_id IS NULL (typical after the parent event is hard-deleted with
+   * ON DELETE SET NULL) for the same user_id would silently coexist,
+   * defeating the (event_id, user_id) invariant for live rows. The 0
+   * sentinel is safe because event_id references calendar_events.id, an
+   * AUTO_INCREMENT column whose values start at 1 — 0 cannot collide with
+   * any real event row.
+   *
+   * Must be VIRTUAL (not STORED): event_id is the FK target of an
+   * ON DELETE SET NULL action against calendar_events. MySQL refuses to
+   * create that FK while a STORED generated column depends on event_id
+   * and is declared NOT NULL, because the SET NULL action would have to
+   * physically rewrite the NOT NULL stored column. VIRTUAL avoids the
+   * physical write — the value is recomputed at read / index-update time,
+   * and MySQL 8.0+ supports indexes (incl. UNIQUE) on virtual columns,
+   * so uniq_calendar_event_attendees_event_user keeps working unchanged.
+   * IFNULL(event_id, 0) is deterministic, satisfying the indexed-virtual
+   * column requirement.
+   */
+  event_id_key INT UNSIGNED GENERATED ALWAYS AS (IFNULL(event_id, 0)) VIRTUAL NOT NULL COMMENT 'De-NULLed surrogate for event_id; 0 when event_id IS NULL. Exists solely to power uniq_calendar_event_attendees_event_user over (event_id_key, user_id). VIRTUAL (not STORED) so the FK ON DELETE SET NULL on event_id can be created — STORED + NOT NULL would fail the FK precondition check at table creation time.',
 
   rsvp ENUM('pending','accepted','declined','tentative') NOT NULL DEFAULT 'pending' COMMENT 'Attendance response',
   can_edit BOOLEAN NOT NULL DEFAULT FALSE COMMENT 'Whether this attendee can edit the event (granted by owner)',
@@ -461,11 +487,12 @@ CREATE TABLE calendar_event_attendees (
 
   UNIQUE KEY uniq_calendar_event_attendees_public_id (public_id),
   UNIQUE KEY uniq_calendar_event_attendees_workspace_public_id (workspace_id, public_id),
-  UNIQUE KEY uniq_calendar_event_attendees_event_user (event_id, user_id),
+  UNIQUE KEY uniq_calendar_event_attendees_event_user (event_id_key, user_id),
+  KEY idx_calendar_event_attendees_event_user (event_id, user_id),
   KEY idx_calendar_event_attendees_workspace_user (workspace_id, user_id),
 
   CONSTRAINT fk_calendar_event_attendees_workspace FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
-  CONSTRAINT fk_calendar_event_attendees_event FOREIGN KEY (event_id) REFERENCES calendar_events(id) ON DELETE CASCADE,
+  CONSTRAINT fk_calendar_event_attendees_event FOREIGN KEY (event_id) REFERENCES calendar_events(id) ON DELETE SET NULL,
   CONSTRAINT fk_calendar_event_attendees_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Calendar event attendees with RSVP and edit permission';
 
@@ -511,7 +538,7 @@ CREATE TABLE calendar_event_comments (
   id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY COMMENT 'Internal PK, never exposed',
   public_id BINARY(16) NOT NULL COMMENT 'UUID v7, the only externally visible ID',
   workspace_id INT UNSIGNED NOT NULL COMMENT 'Internal FK to workspaces.id',
-  event_id INT UNSIGNED NOT NULL COMMENT 'Internal FK to calendar_events.id',
+  event_id INT UNSIGNED NULL COMMENT 'Internal FK to calendar_events.id; nullable so audit-trail comments survive event hard-delete (FK SET NULL)',
   author_id INT UNSIGNED NOT NULL COMMENT 'Internal FK to users.id',
 
   body MEDIUMTEXT NOT NULL COMMENT 'Comment text (markdown)',
@@ -520,6 +547,7 @@ CREATE TABLE calendar_event_comments (
   sort_weight INT NOT NULL DEFAULT 0 COMMENT 'Display order',
   notes TEXT NULL COMMENT 'Admin notes',
   enabled BOOLEAN NOT NULL DEFAULT TRUE COMMENT 'Enabled flag',
+  deleted_at DATETIME(3) NULL DEFAULT NULL COMMENT 'Soft-delete timestamp; rows with deleted_at IS NOT NULL are excluded from LIST/GET',
   updated_at TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
   created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
 
@@ -527,9 +555,10 @@ CREATE TABLE calendar_event_comments (
   UNIQUE KEY uniq_calendar_event_comments_workspace_public_id (workspace_id, public_id),
   KEY idx_calendar_event_comments_event (workspace_id, event_id, created_at),
   KEY idx_calendar_event_comments_workspace_author (workspace_id, author_id),
+  KEY idx_calendar_event_comments_deleted_at (deleted_at),
 
   CONSTRAINT fk_calendar_event_comments_workspace FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
-  CONSTRAINT fk_calendar_event_comments_event FOREIGN KEY (event_id) REFERENCES calendar_events(id) ON DELETE CASCADE,
+  CONSTRAINT fk_calendar_event_comments_event FOREIGN KEY (event_id) REFERENCES calendar_events(id) ON DELETE SET NULL,
   CONSTRAINT fk_calendar_event_comments_author FOREIGN KEY (author_id) REFERENCES users(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Calendar event discussion comments';
 
@@ -554,8 +583,8 @@ CREATE TABLE calendar_event_invites (
   public_id BINARY(16) NOT NULL COMMENT 'UUID v7, the only externally visible ID',
   workspace_id INT UNSIGNED NOT NULL COMMENT 'Internal FK to workspaces.id',
   calendar_id INT UNSIGNED NOT NULL COMMENT 'Internal FK to calendars.id',
-  event_id INT UNSIGNED NOT NULL COMMENT 'Internal FK to calendar_events.id',
-  attendee_id INT UNSIGNED NOT NULL COMMENT 'Internal FK to calendar_event_attendees.id',
+  event_id INT UNSIGNED NULL COMMENT 'Internal FK to calendar_events.id; nullable so revoked invites survive event hard-delete (FK SET NULL)',
+  attendee_id INT UNSIGNED NULL COMMENT 'Internal FK to calendar_event_attendees.id; nullable to mirror parent attendee being detached on event hard-delete',
 
   email VARCHAR(255) CHARACTER SET latin1 COLLATE latin1_swedish_ci NOT NULL COMMENT 'Recipient email, denormalized from attendee for inbox queries',
   token_hash BINARY(32) NOT NULL COMMENT 'SHA-256 digest of the plaintext magic-link token',
@@ -579,8 +608,8 @@ CREATE TABLE calendar_event_invites (
 
   CONSTRAINT fk_calendar_event_invites_workspace FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
   CONSTRAINT fk_calendar_event_invites_calendar FOREIGN KEY (calendar_id) REFERENCES calendars(id) ON DELETE CASCADE,
-  CONSTRAINT fk_calendar_event_invites_event FOREIGN KEY (event_id) REFERENCES calendar_events(id) ON DELETE CASCADE,
-  CONSTRAINT fk_calendar_event_invites_attendee FOREIGN KEY (attendee_id) REFERENCES calendar_event_attendees(id) ON DELETE CASCADE
+  CONSTRAINT fk_calendar_event_invites_event FOREIGN KEY (event_id) REFERENCES calendar_events(id) ON DELETE SET NULL,
+  CONSTRAINT fk_calendar_event_invites_attendee FOREIGN KEY (attendee_id) REFERENCES calendar_event_attendees(id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Magic-link invite rows for calendar event attendees';
 
 -- >>> calendar_events.sql
@@ -629,11 +658,21 @@ CREATE TABLE calendar_events (
   -- Cross-module link to nodate-flow tasks
   task_id INT UNSIGNED NULL COMMENT 'Linked task (optional, for task-calendar sync)',
   task_role ENUM('due','scheduled') NULL COMMENT 'When task_id IS NOT NULL: which task field this event represents. due=task.due_on, scheduled=time-blocked (multi-link allowed).',
+  /**
+   * task_role_key: de-NULLed projection of task_role used to build a UNIQUE
+   * key over (task_id, task_role). MySQL UNIQUE indexes treat NULLs as
+   * distinct, which would let two NULL task_role rows coexist for the same
+   * task_id and silently weaken the (task_id, task_role) invariant. By
+   * coalescing NULL to the empty string in a STORED generated column we get
+   * a NOT NULL surrogate that participates in the UNIQUE without losing the
+   * "absent role" sentinel.
+   */
+  task_role_key VARCHAR(32) GENERATED ALWAYS AS (COALESCE(task_role, '')) STORED NOT NULL COMMENT 'De-NULLed surrogate for task_role; empty string when task_role IS NULL. Exists solely to power uniq_calendar_events_task_role_key over (task_id, task_role_key).',
 
   sort_weight INT NOT NULL DEFAULT 0 COMMENT 'Display order',
   notes TEXT NULL COMMENT 'Admin notes',
   flags JSON NULL COMMENT 'Structured per-event markers (non_working_day, auto_snapped, etc.); unknown keys preserved.',
-  enabled BOOLEAN NOT NULL DEFAULT TRUE COMMENT 'Enabled flag',
+  enabled BOOLEAN NOT NULL DEFAULT TRUE COMMENT 'Soft-delete flag; FALSE excludes the row from LIST/GET. The single soft-delete signal for this table — propagate via INNER/LEFT JOIN ... AND ce.enabled = TRUE in every consumer view (matches project-wide enabled propagation in docs/conventions/db.md).',
   updated_at TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
   created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
 
@@ -644,6 +683,7 @@ CREATE TABLE calendar_events (
   KEY idx_calendar_events_calendar_recurrence (calendar_id, recurrence_end),
   KEY idx_calendar_events_workspace_range (workspace_id, start_at, end_at),
   KEY idx_calendar_events_task_role (task_id, task_role, enabled),
+  UNIQUE KEY uniq_calendar_events_task_role_key (task_id, task_role_key),
   FULLTEXT KEY ft_calendar_events_title_memo (title, memo),
 
   CONSTRAINT fk_calendar_events_workspace FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
@@ -664,7 +704,7 @@ CREATE TABLE calendar_events (
   CONSTRAINT chk_calendar_events_notification_requires_start CHECK (start_at IS NOT NULL OR notification_offset IS NULL),
   CONSTRAINT chk_calendar_events_chronology CHECK (end_at IS NULL OR start_at IS NULL OR end_at >= start_at),
   CONSTRAINT chk_calendar_events_milestone_no_recurrence CHECK (kind <> 'milestone' OR recurrence_rule IS NULL)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Calendar events with kind/visibility/show_as classification; nullable start/end for planning-stage placeholders; task_role links to task projection (D1).';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Calendar events with kind/visibility/show_as classification; nullable start/end for planning-stage placeholders; task_role links to task projection. Soft-delete is signalled solely by enabled=FALSE (no deleted_at column); consumer views must propagate enabled=TRUE on every JOIN to honour soft-delete.';
 
 -- >>> calendar_memos.sql
 -- ====================================
@@ -766,6 +806,7 @@ CREATE TABLE calendar_public_shares (
   UNIQUE KEY uniq_calendar_public_shares_workspace_public_id (workspace_id, public_id),
   UNIQUE KEY uniq_calendar_public_shares_token_hash (token_hash),
   KEY idx_calendar_public_shares_workspace (workspace_id, enabled),
+  KEY idx_calendar_public_shares_expires_at (expires_at),
 
   CONSTRAINT fk_calendar_public_shares_workspace FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
   CONSTRAINT fk_calendar_public_shares_creator FOREIGN KEY (created_by_user_id) REFERENCES users(id) ON DELETE SET NULL
@@ -851,7 +892,7 @@ CREATE TABLE comments (
   id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY COMMENT 'Internal PK, never exposed',
   public_id BINARY(16) NOT NULL COMMENT 'UUID v7, the only externally visible ID',
   workspace_id INT UNSIGNED NOT NULL COMMENT 'Internal FK to workspaces.id',
-  task_id INT UNSIGNED NOT NULL COMMENT 'Internal FK to tasks.id',
+  task_id INT UNSIGNED NULL COMMENT 'Internal FK to tasks.id; nullable so audit-trail comments survive task deletion (FK SET NULL)',
   author_id INT UNSIGNED NOT NULL COMMENT 'Internal FK to users.id',
 
   body MEDIUMTEXT NOT NULL COMMENT 'Markdown body',
@@ -877,7 +918,7 @@ CREATE TABLE comments (
   FULLTEXT KEY ft_comments_body (body),
 
   CONSTRAINT fk_comments_workspace FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
-  CONSTRAINT fk_comments_task FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE CASCADE,
+  CONSTRAINT fk_comments_task FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE SET NULL,
   CONSTRAINT fk_comments_author FOREIGN KEY (author_id) REFERENCES users(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Task discussion comments';
 
@@ -1169,6 +1210,7 @@ CREATE TABLE labels (
   workspace_id    INT UNSIGNED NOT NULL                   COMMENT 'Internal FK to workspaces.id',
   project_id      INT UNSIGNED NULL                       COMMENT 'NULL = workspace-wide label',
   parent_label_id INT UNSIGNED NULL                       COMMENT 'Self-ref for hierarchy; NULL = root',
+  created_by_user_id INT UNSIGNED NULL                    COMMENT 'Creator user.id (audit field; NULL when creator is removed)',
 
   name            VARCHAR(64) NOT NULL COMMENT 'Display name',
   color           VARCHAR(16) CHARACTER SET latin1 COLLATE latin1_swedish_ci NOT NULL DEFAULT '#6b7280' COMMENT 'Hex color',
@@ -1185,10 +1227,12 @@ CREATE TABLE labels (
   UNIQUE KEY uniq_labels_workspace_id_project_id_name_enabled (workspace_id, project_id, name, enabled),
   KEY idx_labels_workspace_id_project_id_enabled (workspace_id, project_id, enabled),
   KEY idx_labels_parent_label_id (parent_label_id),
+  KEY idx_labels_created_by_user_id (created_by_user_id),
 
   CONSTRAINT fk_labels_workspace FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
   CONSTRAINT fk_labels_project   FOREIGN KEY (project_id)   REFERENCES projects(id)   ON DELETE CASCADE,
-  CONSTRAINT fk_labels_parent    FOREIGN KEY (parent_label_id) REFERENCES labels(id) ON DELETE SET NULL
+  CONSTRAINT fk_labels_parent    FOREIGN KEY (parent_label_id) REFERENCES labels(id) ON DELETE SET NULL,
+  CONSTRAINT fk_labels_creator   FOREIGN KEY (created_by_user_id) REFERENCES users(id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Hierarchical colored labels';
 
 -- >>> lenses.sql
@@ -1258,6 +1302,7 @@ CREATE TABLE magic_link_tokens (
   UNIQUE KEY uniq_magic_link_tokens_public_id (public_id),
   UNIQUE KEY uniq_magic_link_tokens_token_hash (token_hash),
   KEY idx_magic_link_tokens_user_id (user_id),
+  KEY idx_magic_link_tokens_expires_at (expires_at),
 
   CONSTRAINT fk_magic_link_tokens_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Passwordless magic-link tokens';
@@ -1557,6 +1602,7 @@ CREATE TABLE personal_access_tokens (
   UNIQUE KEY uniq_personal_access_tokens_workspace_public_id (workspace_id, public_id),
   UNIQUE KEY uniq_personal_access_tokens_token_hash (token_hash),
   KEY idx_personal_access_tokens_workspace_id_user_id (workspace_id, user_id),
+  KEY idx_personal_access_tokens_expires_at (expires_at),
 
   CONSTRAINT fk_personal_access_tokens_workspace FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
   CONSTRAINT fk_personal_access_tokens_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
@@ -1964,12 +2010,14 @@ CREATE TABLE task_description_versions (
 --
 -- Internal plumbing only: never crosses the API boundary, so no
 -- public_id column. workspace_id is denormalized from tasks for
--- workspace-scoped pruning / filtering without a JOIN; cascade is
--- still anchored on the FK to tasks(id).
+-- workspace-scoped pruning / filtering without a JOIN; an explicit
+-- FK to workspaces(id) ON DELETE CASCADE guarantees the denormalized
+-- value cannot point at a removed workspace, even if a future writer
+-- skips the JOIN through tasks.
 -- ====================================
 CREATE TABLE task_embeddings (
   task_id      INT UNSIGNED NOT NULL COMMENT 'Internal FK to tasks.id',
-  workspace_id INT UNSIGNED NOT NULL COMMENT 'Denormalized from tasks.workspace_id for scoped queries (no FK; cascade via fk_task_embeddings_task)',
+  workspace_id INT UNSIGNED NOT NULL COMMENT 'Denormalized from tasks.workspace_id for scoped queries; FK guarantees consistency on workspace removal',
   model        VARCHAR(64)  NOT NULL COMMENT 'Embedding model key, e.g. mock-768',
   dim          SMALLINT UNSIGNED NOT NULL COMMENT 'Vector dimensionality (redundant with type today)',
   vector       VECTOR(768)  NOT NULL COMMENT 'L2-normalized embedding vector',
@@ -1982,7 +2030,8 @@ CREATE TABLE task_embeddings (
   KEY idx_task_embeddings_workspace_id (workspace_id, task_id),
   INDEX idx_task_embeddings_model_embedded_at (model, embedded_at),
 
-  CONSTRAINT fk_task_embeddings_task FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE CASCADE
+  CONSTRAINT fk_task_embeddings_task FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE CASCADE,
+  CONSTRAINT fk_task_embeddings_workspace FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Task embedding vectors for duplicate detection (ADR 0003)';
 
 -- >>> task_event_links.sql
@@ -2475,6 +2524,7 @@ CREATE TABLE workspace_invites (
   UNIQUE KEY uniq_workspace_invites_workspace_public_id (workspace_id, public_id),
   UNIQUE KEY uniq_workspace_invites_token_hash (token_hash),
   KEY idx_workspace_invites_workspace_id (workspace_id),
+  KEY idx_workspace_invites_expires_at (expires_at),
 
   CONSTRAINT fk_workspace_invites_workspace FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
   CONSTRAINT fk_workspace_invites_created_by FOREIGN KEY (created_by_user_id) REFERENCES users(id) ON DELETE SET NULL
@@ -2576,7 +2626,6 @@ DROP VIEW IF EXISTS `_v_task_list_all`;
 CREATE OR REPLACE ALGORITHM=MERGE VIEW v_task_list_all AS
 SELECT
   t.workspace_id,
-  t.id AS task_internal_id,
   t.project_id,
   t.created_by_user_id,
   t.public_id,
@@ -2703,6 +2752,7 @@ SELECT
   c.updated_at,
   c.created_at
 FROM comments c
+INNER JOIN workspaces w ON w.id = c.workspace_id AND w.enabled = TRUE
 INNER JOIN tasks t ON t.id = c.task_id AND t.enabled = TRUE
 INNER JOIN users u ON u.id = c.author_id AND u.enabled = TRUE
 WHERE c.enabled = TRUE;
@@ -2983,8 +3033,8 @@ SELECT
   al.resource_public_id,
   CAST('info' AS CHAR(8) CHARACTER SET utf8mb4) AS severity
 FROM audit_logs al
-INNER JOIN workspaces w_a
-  ON w_a.id = al.workspace_id AND w_a.enabled = TRUE
+INNER JOIN workspaces w
+  ON w.id = al.workspace_id AND w.enabled = TRUE
 LEFT JOIN users actor
   ON actor.id = al.actor_user_id AND actor.enabled = TRUE
 WHERE al.enabled = TRUE
@@ -3018,8 +3068,8 @@ SELECT
     AS CHAR(8) CHARACTER SET utf8mb4
   ) AS severity
 FROM ai_invocations ai
-INNER JOIN workspaces w_i
-  ON w_i.id = ai.workspace_id AND w_i.enabled = TRUE
+INNER JOIN workspaces w
+  ON w.id = ai.workspace_id AND w.enabled = TRUE
 LEFT JOIN users actor
   ON actor.id = ai.user_id AND actor.enabled = TRUE
 WHERE ai.enabled = TRUE
@@ -3046,8 +3096,8 @@ SELECT
     AS CHAR(8) CHARACTER SET utf8mb4
   ) AS severity
 FROM mcp_invocations mi
-INNER JOIN workspaces w_m
-  ON w_m.id = mi.workspace_id AND w_m.enabled = TRUE
+INNER JOIN workspaces w
+  ON w.id = mi.workspace_id AND w.enabled = TRUE
 LEFT JOIN users actor
   ON actor.id = mi.user_id AND actor.enabled = TRUE
 WHERE mi.enabled = TRUE;
