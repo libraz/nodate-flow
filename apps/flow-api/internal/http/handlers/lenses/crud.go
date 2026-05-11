@@ -44,6 +44,7 @@ func Create(deps Deps) func(context.Context, *CreateLensInput) (*CreateLensOutpu
 
 		pub := types.New()
 		lensBlob := buildLensJSON(in.Body.Filter, in.Body.Sort, in.Body.GroupBy)
+		description := optionalNullString(in.Body.Description)
 
 		if _, err := deps.Queries.CreateLens(ctx, generated.CreateLensParams{
 			PublicID:    pub,
@@ -51,6 +52,7 @@ func Create(deps Deps) func(context.Context, *CreateLensInput) (*CreateLensOutpu
 			ProjectID:   projectID,
 			CreatorID:   actorID,
 			Name:        in.Body.Name,
+			Description: description,
 			LensJson:    lensBlob,
 			IsDefault:   in.Body.IsDefault,
 			SortWeight:  0,
@@ -72,13 +74,14 @@ func Create(deps Deps) func(context.Context, *CreateLensInput) (*CreateLensOutpu
 		})
 
 		return &CreateLensOutput{Body: SavedLens{
-			ID:        pub.String(),
-			Name:      in.Body.Name,
-			Filter:    in.Body.Filter,
-			Sort:      in.Body.Sort,
-			GroupBy:   in.Body.GroupBy,
-			IsDefault: in.Body.IsDefault,
-			CreatedAt: handlerutil.NowUnix(),
+			ID:          pub.String(),
+			Name:        in.Body.Name,
+			Description: in.Body.Description,
+			Filter:      in.Body.Filter,
+			Sort:        in.Body.Sort,
+			GroupBy:     in.Body.GroupBy,
+			IsDefault:   in.Body.IsDefault,
+			CreatedAt:   handlerutil.NowUnix(),
 		}}, nil
 	}
 }
@@ -185,6 +188,14 @@ func Update(deps Deps) func(context.Context, *UpdateLensInput) (*UpdateLensOutpu
 		if in.Body.Name != nil {
 			name = *in.Body.Name
 		}
+		// Description is a *string in the patch body so we cannot tell
+		// "unset" apart from "explicit null" once decoded; treat nil as
+		// "leave alone" (PATCH merge semantics) and any non-nil value as
+		// the new description (empty string clears).
+		description := existing.Description
+		if in.Body.Description != nil {
+			description = optionalNullString(in.Body.Description)
+		}
 		filter := existFilter
 		if in.Body.Filter != nil {
 			filter = *in.Body.Filter
@@ -206,6 +217,7 @@ func Update(deps Deps) func(context.Context, *UpdateLensInput) (*UpdateLensOutpu
 
 		if err := deps.Queries.UpdateLens(ctx, generated.UpdateLensParams{
 			Name:        name,
+			Description: description,
 			LensJson:    lensBlob,
 			IsDefault:   isDefault,
 			WorkspaceID: ws.ID,
@@ -232,6 +244,7 @@ func Update(deps Deps) func(context.Context, *UpdateLensInput) (*UpdateLensOutpu
 			CreatorID:          existing.CreatorPublicID.String(),
 			CreatorDisplayName: existing.CreatorDisplayName,
 			Name:               name,
+			Description:        nullString(description),
 			Filter:             filter,
 			Sort:               sort,
 			GroupBy:            groupBy,

@@ -8,6 +8,7 @@ SELECT
   w.public_id AS workspace_public_id,
   l.project_id,
   l.name,
+  l.description,
   l.lens_json,
   l.shared_at,
   l.safety_checked_at,
@@ -18,6 +19,47 @@ WHERE l.public_token = ?
   AND l.is_public = TRUE
   AND l.enabled = TRUE
 LIMIT 1;
+
+-- name: ListPublicLensTasks :many
+-- Resolve a publicly shared lens's task projection.
+--
+-- Returns a minimal, public-safe row set: title, status, priority, due_on,
+-- and the primary assignee's display name. Internal ids and workspace
+-- metadata are intentionally excluded so this query can back the
+-- unauthenticated GET /public/lenses/{token} endpoint.
+--
+-- The hard cap of 200 rows is enforced by the caller (see
+-- apps/flow-api/internal/http/handlers/lenses/resolve.go) and by the LIMIT
+-- bind parameter; public shares are not paginated.
+--
+-- Optional project_id narrows to a single project when the lens is
+-- project-scoped; pass NULL for workspace-wide lenses. Filter knobs
+-- mirror the closed Lens grammar:
+--   * state_filter   (string)  - matches v_task_list.derived_state when non-empty
+--   * priority_min   (nullable int) - tasks with priority >= value
+--   * priority_max   (nullable int) - tasks with priority <= value
+--   * due_from       (nullable date) - due_on >= value
+--   * due_to         (nullable date) - due_on <= value
+-- All filters are AND-combined; pass empty / NULL to skip a knob.
+SELECT
+  v.public_id,
+  v.title,
+  v.derived_state,
+  v.priority,
+  v.due_on,
+  u.display_name AS assignee_display_name
+FROM v_task_list v
+LEFT JOIN users u
+  ON u.public_id = v.primary_assignee_public_id AND u.enabled = TRUE
+WHERE v.workspace_id = ?
+  AND (sqlc.narg(project_id) IS NULL OR v.project_id = sqlc.narg(project_id))
+  AND (sqlc.arg(state_filter) = '' OR v.derived_state = sqlc.arg(state_filter))
+  AND (sqlc.narg(priority_min) IS NULL OR v.priority >= sqlc.narg(priority_min))
+  AND (sqlc.narg(priority_max) IS NULL OR v.priority <= sqlc.narg(priority_max))
+  AND (sqlc.narg(due_from) IS NULL OR (v.due_on IS NOT NULL AND v.due_on >= sqlc.narg(due_from)))
+  AND (sqlc.narg(due_to) IS NULL OR (v.due_on IS NOT NULL AND v.due_on <= sqlc.narg(due_to)))
+ORDER BY v.priority DESC, v.due_on ASC, v.created_at DESC, v.public_id DESC
+LIMIT ?;
 
 -- name: SetLensPublic :exec
 -- Enable public sharing on a lens. Generates a share URL token.

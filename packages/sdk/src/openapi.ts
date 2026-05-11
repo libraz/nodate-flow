@@ -5635,6 +5635,8 @@ export interface components {
              * @description A URL to the JSON Schema for this object.
              */
             readonly $schema?: string;
+            /** @description Optional public-facing description shown on the share page */
+            description?: string;
             filter: unknown;
             groupBy?: string;
             isDefault: boolean;
@@ -8088,12 +8090,29 @@ export interface components {
              * @description A URL to the JSON Schema for this object.
              */
             readonly $schema?: string;
+            /** @description Optional public-facing description shown on the share page */
+            description?: string;
             filter: unknown;
             groupBy: string | null;
             /** @description Lens public id (UUID v7) */
             id: string;
             name: string;
             sort: unknown;
+            /** @description Tasks matching the lens filter, capped at 200 rows */
+            tasks: components["schemas"]["PublicLensTask"][] | null;
+        };
+        PublicLensTask: {
+            /** @description Display name of the primary assignee, if any */
+            assigneeDisplayName?: string;
+            /** @description Due date as YYYY-MM-DD */
+            dueOn?: string;
+            /** @description Task public id (UUID v7) */
+            id: string;
+            /** Format: int32 */
+            priority: number;
+            /** @description Task derived state */
+            status: string;
+            title: string;
         };
         PublicShareCreateResponse: {
             /**
@@ -8465,6 +8484,8 @@ export interface components {
             createdAt: number;
             creatorDisplayName: string;
             creatorId: string;
+            /** @description Optional public-facing description shown on the share page */
+            description?: string;
             filter: unknown;
             groupBy: string | null;
             /** @description Lens public id (UUID v7) */
@@ -9312,6 +9333,8 @@ export interface components {
              * @description A URL to the JSON Schema for this object.
              */
             readonly $schema?: string;
+            /** @description Optional public-facing description shown on the share page; pass null to clear */
+            description?: string;
             filter?: unknown;
             groupBy?: string;
             isDefault?: boolean;
@@ -11051,9 +11074,9 @@ export interface operations {
     "me-calendar-events-list": {
         parameters: {
             query: {
-                /** @description Range start (inclusive, YYYY-MM-DD or RFC3339) */
+                /** @description Range start (inclusive, YYYY-MM-DD or RFC 3339 datetime) */
                 start: string;
-                /** @description Range end (exclusive, YYYY-MM-DD or RFC3339) */
+                /** @description Range end (exclusive, YYYY-MM-DD or RFC 3339 datetime) */
                 end: string;
             };
             header?: never;
@@ -15149,9 +15172,9 @@ export interface operations {
     "calendar-events-list": {
         parameters: {
             query: {
-                /** @description Range start (inclusive, date or datetime) */
+                /** @description Range start (inclusive, RFC 3339 datetime or YYYY-MM-DD) */
                 start: string;
-                /** @description Range end (exclusive, date or datetime) */
+                /** @description Range end (exclusive, RFC 3339 datetime or YYYY-MM-DD) */
                 end: string;
             };
             header?: never;

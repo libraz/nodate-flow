@@ -22,6 +22,7 @@ SELECT
   w.public_id AS workspace_public_id,
   l.project_id,
   l.name,
+  l.description,
   l.lens_json,
   l.shared_at,
   l.safety_checked_at,
@@ -41,6 +42,7 @@ type FindLensByPublicTokenRow struct {
 	WorkspacePublicID types.PublicID  `json:"workspacePublicId"`
 	ProjectID         sql.NullInt32   `json:"-"`
 	Name              string          `json:"name"`
+	Description       sql.NullString  `json:"description"`
 	LensJson          json.RawMessage `json:"lensJson"`
 	SharedAt          sql.NullTime    `json:"sharedAt"`
 	SafetyCheckedAt   sql.NullTime    `json:"safetyCheckedAt"`
@@ -59,12 +61,121 @@ func (q *Queries) FindLensByPublicToken(ctx context.Context, publicToken sql.Nul
 		&i.WorkspacePublicID,
 		&i.ProjectID,
 		&i.Name,
+		&i.Description,
 		&i.LensJson,
 		&i.SharedAt,
 		&i.SafetyCheckedAt,
 		&i.CreatedAt,
 	)
 	return i, err
+}
+
+const listPublicLensTasks = `-- name: ListPublicLensTasks :many
+SELECT
+  v.public_id,
+  v.title,
+  v.derived_state,
+  v.priority,
+  v.due_on,
+  u.display_name AS assignee_display_name
+FROM v_task_list v
+LEFT JOIN users u
+  ON u.public_id = v.primary_assignee_public_id AND u.enabled = TRUE
+WHERE v.workspace_id = ?
+  AND (? IS NULL OR v.project_id = ?)
+  AND (? = '' OR v.derived_state = ?)
+  AND (? IS NULL OR v.priority >= ?)
+  AND (? IS NULL OR v.priority <= ?)
+  AND (? IS NULL OR (v.due_on IS NOT NULL AND v.due_on >= ?))
+  AND (? IS NULL OR (v.due_on IS NOT NULL AND v.due_on <= ?))
+ORDER BY v.priority DESC, v.due_on ASC, v.created_at DESC, v.public_id DESC
+LIMIT ?
+`
+
+type ListPublicLensTasksParams struct {
+	WorkspaceID uint32            `json:"-"`
+	ProjectID   sql.NullInt32     `json:"projectId"`
+	StateFilter TasksDerivedState `json:"stateFilter"`
+	PriorityMin sql.NullInt32     `json:"priorityMin"`
+	PriorityMax sql.NullInt32     `json:"priorityMax"`
+	DueFrom     sql.NullTime      `json:"dueFrom"`
+	DueTo       sql.NullTime      `json:"dueTo"`
+	Limit       int32             `json:"limit"`
+}
+
+type ListPublicLensTasksRow struct {
+	PublicID            types.PublicID    `json:"publicId"`
+	Title               string            `json:"title"`
+	DerivedState        TasksDerivedState `json:"derivedState"`
+	Priority            int32             `json:"priority"`
+	DueOn               sql.NullTime      `json:"dueOn"`
+	AssigneeDisplayName sql.NullString    `json:"assigneeDisplayName"`
+}
+
+// Resolve a publicly shared lens's task projection.
+//
+// Returns a minimal, public-safe row set: title, status, priority, due_on,
+// and the primary assignee's display name. Internal ids and workspace
+// metadata are intentionally excluded so this query can back the
+// unauthenticated GET /public/lenses/{token} endpoint.
+//
+// The hard cap of 200 rows is enforced by the caller (see
+// apps/flow-api/internal/http/handlers/lenses/resolve.go) and by the LIMIT
+// bind parameter; public shares are not paginated.
+//
+// Optional project_id narrows to a single project when the lens is
+// project-scoped; pass NULL for workspace-wide lenses. Filter knobs
+// mirror the closed Lens grammar:
+//   - state_filter   (string)  - matches v_task_list.derived_state when non-empty
+//   - priority_min   (nullable int) - tasks with priority >= value
+//   - priority_max   (nullable int) - tasks with priority <= value
+//   - due_from       (nullable date) - due_on >= value
+//   - due_to         (nullable date) - due_on <= value
+//
+// All filters are AND-combined; pass empty / NULL to skip a knob.
+func (q *Queries) ListPublicLensTasks(ctx context.Context, arg ListPublicLensTasksParams) ([]ListPublicLensTasksRow, error) {
+	rows, err := q.db.QueryContext(ctx, listPublicLensTasks,
+		arg.WorkspaceID,
+		arg.ProjectID,
+		arg.ProjectID,
+		arg.StateFilter,
+		arg.StateFilter,
+		arg.PriorityMin,
+		arg.PriorityMin,
+		arg.PriorityMax,
+		arg.PriorityMax,
+		arg.DueFrom,
+		arg.DueFrom,
+		arg.DueTo,
+		arg.DueTo,
+		arg.Limit,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListPublicLensTasksRow{}
+	for rows.Next() {
+		var i ListPublicLensTasksRow
+		if err := rows.Scan(
+			&i.PublicID,
+			&i.Title,
+			&i.DerivedState,
+			&i.Priority,
+			&i.DueOn,
+			&i.AssigneeDisplayName,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const setLensPrivate = `-- name: SetLensPrivate :exec

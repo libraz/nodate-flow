@@ -177,7 +177,10 @@ func Unpublish(deps Deps) func(context.Context, *UnpublishLensInput) (*Unpublish
 
 // GetPublic handles GET /public/lenses/{token}. This is an
 // unauthenticated endpoint that returns a read-only view of a publicly
-// shared lens. Rate-limited by per-IP middleware at the router level.
+// shared lens together with the resolved task list. Rate-limited by
+// per-IP middleware at the router level. The task list is hard-capped
+// at publicLensTaskCap rows; public shares are not paginated because
+// they are intentionally a small projection, not a free data dump.
 func GetPublic(deps Deps) func(context.Context, *GetPublicLensInput) (*GetPublicLensOutput, error) {
 	return func(ctx context.Context, in *GetPublicLensInput) (*GetPublicLensOutput, error) {
 		row, err := deps.Queries.FindLensByPublicToken(ctx, sql.NullString{
@@ -188,7 +191,20 @@ func GetPublic(deps Deps) func(context.Context, *GetPublicLensInput) (*GetPublic
 			return nil, httpErr(apierr.SpecForErrNoRows(err, apierrors.WsLensPublicTokenInvalid, apierrors.InternalUnexpected))
 		}
 
-		return &GetPublicLensOutput{Body: rowToPublicLens(row)}, nil
+		body := rowToPublicLens(row)
+
+		tasks, err := resolvePublicLensTasks(ctx, deps.Queries, row)
+		if err != nil {
+			slog.ErrorContext(ctx, "resolvePublicLensTasks failed",
+				slog.Any("err", err),
+				slog.String("handler", "lenses.GetPublic"),
+				slog.String("lens_id", row.PublicID.String()),
+			)
+			return nil, httpErr(apierrors.InternalUnexpected)
+		}
+		body.Tasks = tasks
+
+		return &GetPublicLensOutput{Body: body}, nil
 	}
 }
 

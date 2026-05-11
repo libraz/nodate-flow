@@ -2928,6 +2928,8 @@ type Lense struct {
 	CreatorID uint32 `json:"creatorId"`
 	// Display name
 	Name string `json:"name"`
+	// Optional public-facing description shown on the share page
+	Description sql.NullString `json:"description"`
 	// Serialized Lens object (filter, sort, groupBy)
 	LensJson json.RawMessage `json:"lensJson"`
 	// Default lens for the scope

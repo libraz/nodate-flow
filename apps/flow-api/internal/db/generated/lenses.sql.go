@@ -21,10 +21,11 @@ INSERT INTO lenses (
   project_id,
   creator_id,
   name,
+  description,
   lens_json,
   is_default,
   sort_weight
-) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
 `
 
 type CreateLensParams struct {
@@ -33,6 +34,7 @@ type CreateLensParams struct {
 	ProjectID   sql.NullInt32   `json:"-"`
 	CreatorID   uint32          `json:"-"`
 	Name        string          `json:"name"`
+	Description sql.NullString  `json:"description"`
 	LensJson    json.RawMessage `json:"lensJson"`
 	IsDefault   bool            `json:"isDefault"`
 	SortWeight  int32           `json:"sortWeight"`
@@ -46,6 +48,7 @@ func (q *Queries) CreateLens(ctx context.Context, arg CreateLensParams) (int64, 
 		arg.ProjectID,
 		arg.CreatorID,
 		arg.Name,
+		arg.Description,
 		arg.LensJson,
 		arg.IsDefault,
 		arg.SortWeight,
@@ -81,6 +84,7 @@ SELECT
   u.public_id AS creator_public_id,
   u.display_name AS creator_display_name,
   l.name,
+  l.description,
   l.lens_json,
   l.is_default,
   l.is_public,
@@ -108,6 +112,7 @@ type GetLensByPublicIDRow struct {
 	CreatorPublicID    types.PublicID  `json:"creatorPublicId"`
 	CreatorDisplayName string          `json:"creatorDisplayName"`
 	Name               string          `json:"name"`
+	Description        sql.NullString  `json:"description"`
 	LensJson           json.RawMessage `json:"lensJson"`
 	IsDefault          bool            `json:"isDefault"`
 	IsPublic           bool            `json:"isPublic"`
@@ -129,6 +134,7 @@ func (q *Queries) GetLensByPublicID(ctx context.Context, arg GetLensByPublicIDPa
 		&i.CreatorPublicID,
 		&i.CreatorDisplayName,
 		&i.Name,
+		&i.Description,
 		&i.LensJson,
 		&i.IsDefault,
 		&i.IsPublic,
@@ -148,6 +154,7 @@ SELECT
   u.public_id AS creator_public_id,
   u.display_name AS creator_display_name,
   l.name,
+  l.description,
   l.lens_json,
   l.is_default,
   l.is_public,
@@ -179,6 +186,7 @@ type ListLensesForProjectRow struct {
 	CreatorPublicID    types.PublicID  `json:"creatorPublicId"`
 	CreatorDisplayName string          `json:"creatorDisplayName"`
 	Name               string          `json:"name"`
+	Description        sql.NullString  `json:"description"`
 	LensJson           json.RawMessage `json:"lensJson"`
 	IsDefault          bool            `json:"isDefault"`
 	IsPublic           bool            `json:"isPublic"`
@@ -211,6 +219,7 @@ func (q *Queries) ListLensesForProject(ctx context.Context, arg ListLensesForPro
 			&i.CreatorPublicID,
 			&i.CreatorDisplayName,
 			&i.Name,
+			&i.Description,
 			&i.LensJson,
 			&i.IsDefault,
 			&i.IsPublic,
@@ -261,6 +270,7 @@ func (q *Queries) ResolveLensProjectID(ctx context.Context, arg ResolveLensProje
 const updateLens = `-- name: UpdateLens :exec
 UPDATE lenses
 SET name = ?,
+    description = ?,
     lens_json = ?,
     is_default = ?
 WHERE workspace_id = ?
@@ -270,16 +280,18 @@ WHERE workspace_id = ?
 
 type UpdateLensParams struct {
 	Name        string          `json:"name"`
+	Description sql.NullString  `json:"description"`
 	LensJson    json.RawMessage `json:"lensJson"`
 	IsDefault   bool            `json:"isDefault"`
 	WorkspaceID uint32          `json:"-"`
 	PublicID    types.PublicID  `json:"publicId"`
 }
 
-// Update a lens name and/or JSON body.
+// Update a lens name, description and/or JSON body.
 func (q *Queries) UpdateLens(ctx context.Context, arg UpdateLensParams) error {
 	_, err := q.db.ExecContext(ctx, updateLens,
 		arg.Name,
+		arg.Description,
 		arg.LensJson,
 		arg.IsDefault,
 		arg.WorkspaceID,

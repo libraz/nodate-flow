@@ -801,6 +801,27 @@ type Querier interface {
 	ListProjectsForWorkspace(ctx context.Context, arg ListProjectsForWorkspaceParams) ([]ListProjectsForWorkspaceRow, error)
 	// Workspace provider list. NEVER selects api_key_ciphertext.
 	ListProvidersForWorkspace(ctx context.Context, arg ListProvidersForWorkspaceParams) ([]ListProvidersForWorkspaceRow, error)
+	// Resolve a publicly shared lens's task projection.
+	//
+	// Returns a minimal, public-safe row set: title, status, priority, due_on,
+	// and the primary assignee's display name. Internal ids and workspace
+	// metadata are intentionally excluded so this query can back the
+	// unauthenticated GET /public/lenses/{token} endpoint.
+	//
+	// The hard cap of 200 rows is enforced by the caller (see
+	// apps/flow-api/internal/http/handlers/lenses/resolve.go) and by the LIMIT
+	// bind parameter; public shares are not paginated.
+	//
+	// Optional project_id narrows to a single project when the lens is
+	// project-scoped; pass NULL for workspace-wide lenses. Filter knobs
+	// mirror the closed Lens grammar:
+	//   * state_filter   (string)  - matches v_task_list.derived_state when non-empty
+	//   * priority_min   (nullable int) - tasks with priority >= value
+	//   * priority_max   (nullable int) - tasks with priority <= value
+	//   * due_from       (nullable date) - due_on >= value
+	//   * due_to         (nullable date) - due_on <= value
+	// All filters are AND-combined; pass empty / NULL to skip a knob.
+	ListPublicLensTasks(ctx context.Context, arg ListPublicLensTasksParams) ([]ListPublicLensTasksRow, error)
 	// List all reactions on a comment.
 	ListReactionsForComment(ctx context.Context, commentID sql.NullInt32) ([]ListReactionsForCommentRow, error)
 	// List all reactions on a task, grouped by emoji with user info.
@@ -1075,7 +1096,7 @@ type Querier interface {
 	UpdateIntakeItemTriage(ctx context.Context, arg UpdateIntakeItemTriageParams) error
 	// Update mutable label fields.
 	UpdateLabel(ctx context.Context, arg UpdateLabelParams) error
-	// Update a lens name and/or JSON body.
+	// Update a lens name, description and/or JSON body.
 	UpdateLens(ctx context.Context, arg UpdateLensParams) error
 	// Record the timestamp of the latest AI safety check for a public lens.
 	UpdateLensSafetyCheck(ctx context.Context, id uint32) error
@@ -1129,9 +1150,10 @@ type Querier interface {
 	// ============================================================================
 	// task_embeddings queries (ADR 0003)
 	//
-	// Internal plumbing: task_embeddings has no workspace_id / public_id of its
-	// own; workspace scoping is reached via the FK to tasks(id). Every query
-	// below joins or filters through tasks so the workspace boundary still holds.
+	// Internal plumbing: task_embeddings has no public_id of its own; workspace
+	// scoping is reached via the denormalized workspace_id column (FK-guarded
+	// against tasks.workspace_id). Every query below filters through that
+	// column so the workspace boundary still holds without a JOIN through tasks.
 	//
 	// VECTOR columns are read/written as []byte. The Go embedding client
 	// L2-normalizes vectors before INSERT and serializes them with
@@ -1144,7 +1166,8 @@ type Querier interface {
 	// Insert or replace the embedding row for (task_id, model). The caller is
 	// responsible for L2-normalizing `vector` before calling this query. The
 	// content_hash lets callers skip re-embedding when the input text is
-	// unchanged.
+	// unchanged. workspace_id is denormalized from tasks for scoped pruning;
+	// callers MUST pass the task's owning workspace.
 	UpsertTaskEmbedding(ctx context.Context, arg UpsertTaskEmbeddingParams) error
 	// Insert or replace a user+provider integration. The uniq
 	// (user_id, provider) key guarantees only one active row per

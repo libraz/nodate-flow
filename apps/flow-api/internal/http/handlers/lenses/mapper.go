@@ -1,11 +1,22 @@
 package lenses
 
 import (
+	"database/sql"
 	"encoding/json"
 
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/generated"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/handlers/handlerutil"
 )
+
+// optionalNullString converts a *string from a request body into a
+// sql.NullString. nil and empty string both decode to {Valid: false}
+// because the column is nullable and empty descriptions add no value.
+func optionalNullString(s *string) sql.NullString {
+	if s == nil || *s == "" {
+		return sql.NullString{}
+	}
+	return sql.NullString{String: *s, Valid: true}
+}
 
 // lensJSON is the internal structure stored in the lens_json column.
 type lensJSON struct {
@@ -52,6 +63,7 @@ func rowToLensFromList(r generated.ListLensesForProjectRow) SavedLens {
 		CreatorID:          r.CreatorPublicID.String(),
 		CreatorDisplayName: r.CreatorDisplayName,
 		Name:               r.Name,
+		Description:        nullString(r.Description),
 		Filter:             filter,
 		Sort:               sort,
 		GroupBy:            groupBy,
@@ -74,6 +86,7 @@ func rowToLensFromGet(r generated.GetLensByPublicIDRow) SavedLens {
 		CreatorID:          r.CreatorPublicID.String(),
 		CreatorDisplayName: r.CreatorDisplayName,
 		Name:               r.Name,
+		Description:        nullString(r.Description),
 		Filter:             filter,
 		Sort:               sort,
 		GroupBy:            groupBy,
@@ -89,15 +102,34 @@ func rowToLensFromGet(r generated.GetLensByPublicIDRow) SavedLens {
 }
 
 // rowToPublicLens maps a FindLensByPublicTokenRow to the PublicLens DTO.
-// Only exposes the lens definition; all workspace/creator metadata is omitted.
+// Only exposes the lens definition; all workspace/creator metadata is
+// omitted. The Tasks slice is initialised to a non-nil empty slice so the
+// JSON encoder emits `[]` rather than `null`; the caller fills it in by
+// running the resolver.
 func rowToPublicLens(r generated.FindLensByPublicTokenRow) PublicLens {
 	filter, sort, groupBy := parseLensJSON(r.LensJson)
 	return PublicLens{
-		ID:      r.PublicID.String(),
-		Name:    r.Name,
-		Filter:  filter,
-		Sort:    sort,
-		GroupBy: groupBy,
+		ID:          r.PublicID.String(),
+		Name:        r.Name,
+		Description: nullString(r.Description),
+		Filter:      filter,
+		Sort:        sort,
+		GroupBy:     groupBy,
+		Tasks:       []PublicLensTask{},
+	}
+}
+
+// rowToPublicLensTask maps a ListPublicLensTasksRow to the PublicLensTask
+// DTO. due_on is rendered as a YYYY-MM-DD string per the API time
+// convention; the assignee display name is nullable.
+func rowToPublicLensTask(r generated.ListPublicLensTasksRow) PublicLensTask {
+	return PublicLensTask{
+		ID:                  r.PublicID.String(),
+		Title:               r.Title,
+		Status:              string(r.DerivedState),
+		Priority:            r.Priority,
+		DueOn:               nullDateString(r.DueOn),
+		AssigneeDisplayName: nullString(r.AssigneeDisplayName),
 	}
 }
 
@@ -106,3 +138,7 @@ var nullTimeUnix = handlerutil.NullTimeUnix
 
 // nullString delegates to handlerutil.NullStrPtr.
 var nullString = handlerutil.NullStrPtr
+
+// nullDateString delegates to handlerutil.NullTimeDate (returns *string
+// formatted as YYYY-MM-DD, nil for NULL).
+var nullDateString = handlerutil.NullTimeDate

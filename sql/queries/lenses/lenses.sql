@@ -6,10 +6,11 @@ INSERT INTO lenses (
   project_id,
   creator_id,
   name,
+  description,
   lens_json,
   is_default,
   sort_weight
-) VALUES (?, ?, ?, ?, ?, ?, ?, ?);
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);
 
 -- name: ListLensesForProject :many
 -- List enabled lenses scoped to a workspace + project (or workspace-wide when project_id IS NULL).
@@ -18,6 +19,7 @@ SELECT
   u.public_id AS creator_public_id,
   u.display_name AS creator_display_name,
   l.name,
+  l.description,
   l.lens_json,
   l.is_default,
   l.is_public,
@@ -44,6 +46,7 @@ SELECT
   u.public_id AS creator_public_id,
   u.display_name AS creator_display_name,
   l.name,
+  l.description,
   l.lens_json,
   l.is_default,
   l.is_public,
@@ -60,9 +63,10 @@ WHERE l.workspace_id = ?
   AND l.enabled = TRUE;
 
 -- name: UpdateLens :exec
--- Update a lens name and/or JSON body.
+-- Update a lens name, description and/or JSON body.
 UPDATE lenses
 SET name = ?,
+    description = ?,
     lens_json = ?,
     is_default = ?
 WHERE workspace_id = ?

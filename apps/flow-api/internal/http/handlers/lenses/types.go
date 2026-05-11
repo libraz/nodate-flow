@@ -27,6 +27,7 @@ type SavedLens struct {
 	CreatorID          string          `json:"creatorId"`
 	CreatorDisplayName string          `json:"creatorDisplayName"`
 	Name               string          `json:"name"`
+	Description        *string         `json:"description,omitempty" doc:"Optional public-facing description shown on the share page"`
 	Filter             json.RawMessage `json:"filter"`
 	Sort               json.RawMessage `json:"sort"`
 	GroupBy            *string         `json:"groupBy"`
@@ -40,15 +41,33 @@ type SavedLens struct {
 	CreatedAt          int64           `json:"createdAt"`
 }
 
+// PublicLensTask is the minimal task projection embedded in PublicLens.
+// All fields are public-safe: no internal ids, no descriptions, no
+// creator information, no embedding scores, no relations. Matches the
+// columns rendered by the public share page table.
+type PublicLensTask struct {
+	ID                  string  `json:"id" doc:"Task public id (UUID v7)"`
+	Title               string  `json:"title"`
+	Status              string  `json:"status" doc:"Task derived state"`
+	Priority            int32   `json:"priority"`
+	DueOn               *string `json:"dueOn,omitempty" doc:"Due date as YYYY-MM-DD"`
+	AssigneeDisplayName *string `json:"assigneeDisplayName,omitempty" doc:"Display name of the primary assignee, if any"`
+}
+
 // PublicLens is the read-only DTO returned by the unauthenticated
 // public share endpoint. It intentionally omits creator, workspace,
-// and internal metadata.
+// and internal metadata. Tasks resolved from the lens filter are
+// embedded so the share page can render in a single round-trip; the
+// list is hard-capped (see resolve.go) and not paginated because public
+// shares are not meant to be unbounded data dumps.
 type PublicLens struct {
-	ID      string          `json:"id" doc:"Lens public id (UUID v7)"`
-	Name    string          `json:"name"`
-	Filter  json.RawMessage `json:"filter"`
-	Sort    json.RawMessage `json:"sort"`
-	GroupBy *string         `json:"groupBy"`
+	ID          string           `json:"id" doc:"Lens public id (UUID v7)"`
+	Name        string           `json:"name"`
+	Description *string          `json:"description,omitempty" doc:"Optional public-facing description shown on the share page"`
+	Filter      json.RawMessage  `json:"filter"`
+	Sort        json.RawMessage  `json:"sort"`
+	GroupBy     *string          `json:"groupBy"`
+	Tasks       []PublicLensTask `json:"tasks" doc:"Tasks matching the lens filter, capped at 200 rows"`
 }
 
 // PublishLensInput is the input for POST /workspaces/{wsId}/lenses/{lensId}/publish.
@@ -95,12 +114,13 @@ type GetPublicLensOutput struct {
 
 // CreateLensBody is the request body for POST /workspaces/{wsId}/lenses.
 type CreateLensBody struct {
-	ProjectID *string         `json:"projectId,omitempty" doc:"Project public id; omit for workspace-wide"`
-	Name      string          `json:"name" minLength:"1" maxLength:"100"`
-	Filter    json.RawMessage `json:"filter"`
-	Sort      json.RawMessage `json:"sort"`
-	GroupBy   *string         `json:"groupBy,omitempty"`
-	IsDefault bool            `json:"isDefault"`
+	ProjectID   *string         `json:"projectId,omitempty" doc:"Project public id; omit for workspace-wide"`
+	Name        string          `json:"name" minLength:"1" maxLength:"100"`
+	Description *string         `json:"description,omitempty" maxLength:"500" doc:"Optional public-facing description shown on the share page"`
+	Filter      json.RawMessage `json:"filter"`
+	Sort        json.RawMessage `json:"sort"`
+	GroupBy     *string         `json:"groupBy,omitempty"`
+	IsDefault   bool            `json:"isDefault"`
 }
 
 // CreateLensInput is the input for POST /workspaces/{wsId}/lenses.
@@ -146,11 +166,12 @@ type GetLensOutput struct {
 
 // UpdateLensBody is the request body for PATCH /workspaces/{wsId}/lenses/{lensId}.
 type UpdateLensBody struct {
-	Name      *string          `json:"name,omitempty" minLength:"1" maxLength:"100"`
-	Filter    *json.RawMessage `json:"filter,omitempty"`
-	Sort      *json.RawMessage `json:"sort,omitempty"`
-	GroupBy   *string          `json:"groupBy,omitempty"`
-	IsDefault *bool            `json:"isDefault,omitempty"`
+	Name        *string          `json:"name,omitempty" minLength:"1" maxLength:"100"`
+	Description *string          `json:"description,omitempty" maxLength:"500" doc:"Optional public-facing description shown on the share page; pass null to clear"`
+	Filter      *json.RawMessage `json:"filter,omitempty"`
+	Sort        *json.RawMessage `json:"sort,omitempty"`
+	GroupBy     *string          `json:"groupBy,omitempty"`
+	IsDefault   *bool            `json:"isDefault,omitempty"`
 }
 
 // UpdateLensInput is the input for PATCH /workspaces/{wsId}/lenses/{lensId}.

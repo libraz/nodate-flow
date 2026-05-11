@@ -78,7 +78,9 @@ func TestLensCRUD(t *testing.T) {
 }
 
 // TestLensPublishUnpublish verifies that a lens can be published for
-// unauthenticated access and then unpublished to revoke it.
+// unauthenticated access and then unpublished to revoke it. The public
+// payload also surfaces the lens description and the resolved task list
+// projection (capped server-side) so anonymous viewers see real rows.
 func TestLensPublishUnpublish(t *testing.T) {
 	bootstrap(t)
 	t.Parallel()
@@ -86,16 +88,21 @@ func TestLensPublishUnpublish(t *testing.T) {
 
 	base := testServerURL + "/workspaces/" + tt.WorkspacePublicID + "/lenses"
 
-	// Create a lens.
+	// Create a lens with a description so the public endpoint exposes it.
 	var created struct {
-		ID string `json:"id"`
+		ID          string  `json:"id"`
+		Description *string `json:"description"`
 	}
+	const lensDescription = "What we are working on this week."
 	doJSON(t, http.MethodPost, base, tt.AccessToken, map[string]any{
-		"name":      "Public Board",
-		"filter":    json.RawMessage(`{}`),
-		"sort":      json.RawMessage(`[]`),
-		"isDefault": false,
+		"name":        "Public Board",
+		"description": lensDescription,
+		"filter":      json.RawMessage(`{}`),
+		"sort":        json.RawMessage(`[]`),
+		"isDefault":   false,
 	}, &created)
+	require.NotNil(t, created.Description)
+	require.Equal(t, lensDescription, *created.Description)
 
 	// Publish the lens.
 	var published struct {
@@ -105,14 +112,25 @@ func TestLensPublishUnpublish(t *testing.T) {
 		tt.AccessToken, nil, &published)
 	require.NotEmpty(t, published.PublicToken, "publish must return a token")
 
-	// Public endpoint works without authentication.
+	// Public endpoint works without authentication and exposes the
+	// description plus a (possibly empty) tasks array. The tasks slice
+	// must always be non-null so the frontend can map over it without a
+	// nil check.
 	var pub struct {
-		ID   string `json:"id"`
-		Name string `json:"name"`
+		ID          string  `json:"id"`
+		Name        string  `json:"name"`
+		Description *string `json:"description"`
+		Tasks       []struct {
+			ID    string `json:"id"`
+			Title string `json:"title"`
+		} `json:"tasks"`
 	}
 	doJSON(t, http.MethodGet, testServerURL+"/public/lenses/"+published.PublicToken,
 		"", nil, &pub) // no bearer
 	require.Equal(t, "Public Board", pub.Name)
+	require.NotNil(t, pub.Description, "public payload must include the description")
+	require.Equal(t, lensDescription, *pub.Description)
+	require.NotNil(t, pub.Tasks, "tasks must be present even when empty")
 
 	// Unpublish revokes access.
 	doJSON(t, http.MethodPost, base+"/"+created.ID+"/unpublish",

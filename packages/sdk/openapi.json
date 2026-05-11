@@ -2308,6 +2308,11 @@
             "readOnly": true,
             "type": "string"
           },
+          "description": {
+            "description": "Optional public-facing description shown on the share page",
+            "maxLength": 500,
+            "type": "string"
+          },
           "filter": {},
           "groupBy": {
             "type": "string"
@@ -8117,6 +8122,10 @@
             "readOnly": true,
             "type": "string"
           },
+          "description": {
+            "description": "Optional public-facing description shown on the share page",
+            "type": "string"
+          },
           "filter": {},
           "groupBy": {
             "type": ["string", "null"]
@@ -8128,9 +8137,46 @@
           "name": {
             "type": "string"
           },
-          "sort": {}
+          "sort": {},
+          "tasks": {
+            "description": "Tasks matching the lens filter, capped at 200 rows",
+            "items": {
+              "$ref": "#/components/schemas/PublicLensTask"
+            },
+            "type": ["array", "null"]
+          }
         },
-        "required": ["id", "name", "filter", "sort", "groupBy"],
+        "required": ["id", "name", "filter", "sort", "groupBy", "tasks"],
+        "type": "object"
+      },
+      "PublicLensTask": {
+        "additionalProperties": false,
+        "properties": {
+          "assigneeDisplayName": {
+            "description": "Display name of the primary assignee, if any",
+            "type": "string"
+          },
+          "dueOn": {
+            "description": "Due date as YYYY-MM-DD",
+            "type": "string"
+          },
+          "id": {
+            "description": "Task public id (UUID v7)",
+            "type": "string"
+          },
+          "priority": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "status": {
+            "description": "Task derived state",
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          }
+        },
+        "required": ["id", "title", "status", "priority"],
         "type": "object"
       },
       "PublicShareCreateResponse": {
@@ -8955,6 +9001,10 @@
             "type": "string"
           },
           "creatorId": {
+            "type": "string"
+          },
+          "description": {
+            "description": "Optional public-facing description shown on the share page",
             "type": "string"
           },
           "filter": {},
@@ -10957,6 +11007,11 @@
             "examples": ["https://example.com/schemas/UpdateLensBody.json"],
             "format": "uri",
             "readOnly": true,
+            "type": "string"
+          },
+          "description": {
+            "description": "Optional public-facing description shown on the share page; pass null to clear",
+            "maxLength": 500,
             "type": "string"
           },
           "filter": {},
@@ -13841,28 +13896,26 @@
         "operationId": "me-calendar-events-list",
         "parameters": [
           {
-            "description": "Range start (inclusive, YYYY-MM-DD or RFC3339)",
+            "description": "Range start (inclusive, YYYY-MM-DD or RFC 3339 datetime)",
             "explode": false,
             "in": "query",
             "name": "start",
             "required": true,
             "schema": {
-              "description": "Range start (inclusive, YYYY-MM-DD or RFC3339)",
+              "description": "Range start (inclusive, YYYY-MM-DD or RFC 3339 datetime)",
               "minLength": 1,
-              "pattern": "^20\\d{2}-(0[1-9]|1[0-2])-(0[1-9]|1\\d|2[0-8])$",
               "type": "string"
             }
           },
           {
-            "description": "Range end (exclusive, YYYY-MM-DD or RFC3339)",
+            "description": "Range end (exclusive, YYYY-MM-DD or RFC 3339 datetime)",
             "explode": false,
             "in": "query",
             "name": "end",
             "required": true,
             "schema": {
-              "description": "Range end (exclusive, YYYY-MM-DD or RFC3339)",
+              "description": "Range end (exclusive, YYYY-MM-DD or RFC 3339 datetime)",
               "minLength": 1,
-              "pattern": "^20\\d{2}-(0[1-9]|1[0-2])-(0[1-9]|1\\d|2[0-8])$",
               "type": "string"
             }
           }
@@ -14558,7 +14611,6 @@
             "schema": {
               "description": "Range start YYYY-MM-DD (inclusive)",
               "minLength": 1,
-              "pattern": "^20\\d{2}-(0[1-9]|1[0-2])-(0[1-9]|1\\d|2[0-8])$",
               "type": "string"
             }
           },
@@ -14571,7 +14623,6 @@
             "schema": {
               "description": "Range end YYYY-MM-DD (inclusive)",
               "minLength": 1,
-              "pattern": "^20\\d{2}-(0[1-9]|1[0-2])-(0[1-9]|1\\d|2[0-8])$",
               "type": "string"
             }
           },
@@ -19922,28 +19973,26 @@
             }
           },
           {
-            "description": "Range start (inclusive, date or datetime)",
+            "description": "Range start (inclusive, RFC 3339 datetime or YYYY-MM-DD)",
             "explode": false,
             "in": "query",
             "name": "start",
             "required": true,
             "schema": {
-              "description": "Range start (inclusive, date or datetime)",
+              "description": "Range start (inclusive, RFC 3339 datetime or YYYY-MM-DD)",
               "minLength": 1,
-              "pattern": "^20\\d{2}-(0[1-9]|1[0-2])-(0[1-9]|1\\d|2[0-8])$",
               "type": "string"
             }
           },
           {
-            "description": "Range end (exclusive, date or datetime)",
+            "description": "Range end (exclusive, RFC 3339 datetime or YYYY-MM-DD)",
             "explode": false,
             "in": "query",
             "name": "end",
             "required": true,
             "schema": {
-              "description": "Range end (exclusive, date or datetime)",
+              "description": "Range end (exclusive, RFC 3339 datetime or YYYY-MM-DD)",
               "minLength": 1,
-              "pattern": "^20\\d{2}-(0[1-9]|1[0-2])-(0[1-9]|1\\d|2[0-8])$",
               "type": "string"
             }
           }
@@ -20510,7 +20559,6 @@
             "schema": {
               "description": "Range start (inclusive, RFC 3339 datetime or YYYY-MM-DD)",
               "minLength": 1,
-              "pattern": "^20\\d{2}-(0[1-9]|1[0-2])-(0[1-9]|1\\d|2[0-8])$",
               "type": "string"
             }
           },
@@ -20523,7 +20571,6 @@
             "schema": {
               "description": "Range end (exclusive, RFC 3339 datetime or YYYY-MM-DD)",
               "minLength": 1,
-              "pattern": "^20\\d{2}-(0[1-9]|1[0-2])-(0[1-9]|1\\d|2[0-8])$",
               "type": "string"
             }
           }

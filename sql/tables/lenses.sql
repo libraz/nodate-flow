@@ -11,6 +11,7 @@ CREATE TABLE lenses (
   creator_id INT UNSIGNED NOT NULL COMMENT 'Internal FK to users.id',
 
   name VARCHAR(100) NOT NULL COMMENT 'Display name',
+  description VARCHAR(500) NULL COMMENT 'Optional public-facing description shown on the share page',
   lens_json JSON NOT NULL COMMENT 'Serialized Lens object (filter, sort, groupBy)',
   is_default BOOLEAN NOT NULL DEFAULT FALSE COMMENT 'Default lens for the scope',
   is_public BOOLEAN NOT NULL DEFAULT FALSE COMMENT 'Whether the lens is publicly shared',
