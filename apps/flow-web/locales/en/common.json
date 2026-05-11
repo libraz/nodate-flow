@@ -908,6 +908,7 @@
       "title": "Saved Views",
       "save": "Save View",
       "name_placeholder": "View name",
+      "description_placeholder": "Optional description shown on the public share page",
       "create": "Save",
       "creating": "Saving...",
       "delete": "Delete",

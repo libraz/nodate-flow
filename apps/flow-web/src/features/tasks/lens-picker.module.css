@@ -128,3 +128,16 @@
   cursor: not-allowed;
   opacity: 0.5;
 }
+
+.descriptionInput {
+  border: 1px solid var(--nf-color-border);
+  border-radius: var(--nf-radius-xs);
+  padding-block: var(--nf-space-1);
+  padding-inline: var(--nf-space-2);
+  font: inherit;
+  font-size: var(--nf-text-sm);
+  background: var(--nf-color-bg);
+  color: var(--nf-color-fg);
+  resize: vertical;
+  min-block-size: calc(var(--nf-space-6) * 1.5);
+}

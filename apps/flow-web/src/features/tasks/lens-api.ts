@@ -39,6 +39,7 @@ export interface LensDto {
   creatorId: string;
   creatorDisplayName: string;
   name: string;
+  description?: string;
   filter: Record<string, Record<string, unknown>>;
   sort: Array<{ field: string; dir: string }>;
   groupBy: string | null;
@@ -66,6 +67,9 @@ function toLensDto(lens: SavedLens): LensDto {
     sortWeight: lens.sortWeight,
     createdAt: lens.createdAt,
   };
+  if (lens.description != null) {
+    dto.description = lens.description;
+  }
   if (lens.updatedAt != null) {
     dto.updatedAt = lens.updatedAt;
   }
@@ -105,6 +109,7 @@ export function useLensesQuery(
 export interface CreateLensArgs {
   workspaceId: string;
   name: string;
+  description?: string;
   projectId?: string;
   filter: Record<string, Record<string, unknown>>;
   sort?: Array<{ field: string; dir: string }>;
@@ -120,6 +125,7 @@ export function useCreateLens(): UseMutationResult<LensDto, ApiError, CreateLens
         params: { path: { wsId: args.workspaceId } },
         body: {
           name: args.name,
+          ...(args.description ? { description: args.description } : {}),
           ...(args.projectId ? { projectId: args.projectId } : {}),
           filter: args.filter,
           sort: args.sort ?? [],

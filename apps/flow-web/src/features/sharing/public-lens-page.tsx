@@ -98,7 +98,7 @@ export default function PublicLensPage({ token }: PublicLensPageProps): ReactEle
       </header>
 
       <main className={styles.publicContent} aria-label={data.name}>
-        {data.tasks.length === 0 ? (
+        {!data.tasks || data.tasks.length === 0 ? (
           <p>{t('public_page.no_tasks')}</p>
         ) : (
           <table className={styles.publicTable}>

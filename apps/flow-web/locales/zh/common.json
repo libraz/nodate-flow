@@ -908,6 +908,7 @@
       "title": "已保存的视图",
       "save": "保存视图",
       "name_placeholder": "视图名称",
+      "description_placeholder": "在公开分享页上显示的可选说明",
       "create": "保存",
       "creating": "保存中…",
       "delete": "删除",

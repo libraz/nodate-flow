@@ -908,6 +908,7 @@
       "title": "保存済みビュー",
       "save": "ビューを保存",
       "name_placeholder": "ビュー名",
+      "description_placeholder": "公開シェアページに表示する説明（任意）",
       "create": "保存",
       "creating": "保存中...",
       "delete": "削除",

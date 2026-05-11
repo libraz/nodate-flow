@@ -129,6 +129,7 @@ export default function LensPicker({ workspaceId, projectId }: LensPickerProps):
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [nameInput, setNameInput] = useState('');
+  const [descriptionInput, setDescriptionInput] = useState('');
 
   const handleApply = (lens: LensDto): void => {
     const filters = lensFilterToTaskFilters(lens.filter);
@@ -143,15 +144,23 @@ export default function LensPicker({ workspaceId, projectId }: LensPickerProps):
   const handleSave = (): void => {
     const trimmed = nameInput.trim();
     if (trimmed.length === 0) return;
+    const trimmedDescription = descriptionInput.trim();
     const captured = getTaskFilters(projectId);
     const filter = taskFiltersToLensFilter(captured);
     setSaving(true);
     createLens.mutate(
-      { workspaceId, name: trimmed, projectId, filter },
+      {
+        workspaceId,
+        name: trimmed,
+        ...(trimmedDescription.length > 0 ? { description: trimmedDescription } : {}),
+        projectId,
+        filter,
+      },
       {
         onSettled: () => {
           setSaving(false);
           setNameInput('');
+          setDescriptionInput('');
         },
       },
     );
@@ -223,6 +232,18 @@ export default function LensPicker({ workspaceId, projectId }: LensPickerProps):
           {saving ? t('tasks.lens.creating') : t('tasks.lens.create')}
         </button>
       </div>
+
+      <textarea
+        value={descriptionInput}
+        onChange={(e) => {
+          setDescriptionInput(e.target.value);
+        }}
+        placeholder={t('tasks.lens.description_placeholder')}
+        aria-label={t('tasks.lens.description_placeholder')}
+        className={styles.descriptionInput}
+        maxLength={500}
+        rows={2}
+      />
     </div>
   );
 
