@@ -305,6 +305,9 @@ jobs:
       - name: Verify merged spec has no schema name collisions
         run: ./scripts/check-schema-collisions.sh
 
+      - name: Verify sql/schema.sql matches sql/tables and sql/views
+        run: ./scripts/schema-diff.sh
+
       - name: Verify public router allowlist (no auth-required path leaks into public surface)
         run: bun run scripts/check-public-router.ts
 

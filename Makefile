@@ -112,7 +112,7 @@ build-accounts-web:
 
 # ---------- test ----------
 
-.PHONY: test test-api test-api-mock test-api-real test-web test-accounts-web test-ui test-sdk test-e2e test-contract test-openapi-diff test-schema-collisions lighthouse
+.PHONY: test test-api test-api-mock test-api-real test-web test-accounts-web test-ui test-sdk test-e2e test-contract test-openapi-diff test-schema-collisions test-schema-diff lighthouse
 test: test-api test-auth-api test-web test-accounts-web test-ui test-sdk ## Run unit/integration tests (Go + TS)
 
 test-api: test-api-mock test-api-real ## Go tests (flow) — both NF_FLOW_AI_MOCK on and off
@@ -150,13 +150,19 @@ test-openapi-diff: ## Fail if the committed OpenAPI specs drift from the live Go
 test-schema-collisions: ## Fail if the merged OpenAPI spec has schema name collisions
 	./scripts/check-schema-collisions.sh
 
+test-schema-diff: ## Fail if sql/schema.sql is out of sync with sql/tables/** and sql/views/**
+	./scripts/schema-diff.sh
+
 lighthouse: build-web ## Run Lighthouse CI (a11y 95+, perf 70+)
 	$(PKG_X) @lhci/cli autorun
 
 # ---------- lint / format / typecheck ----------
 
-.PHONY: check lint format typecheck vet
-check: lint typecheck vet i18n-check ## Lint + typecheck + go vet + i18n locale guard
+.PHONY: check lint format typecheck vet check-dtos
+check: lint typecheck vet i18n-check check-dtos ## Lint + typecheck + go vet + i18n locale guard + DTO drift guard
+
+check-dtos: ## Fail when web routes/features hand-roll response DTOs instead of using SDK schemas
+	bash scripts/check-handrolled-dtos.sh
 
 lint: ## biome check + golangci-lint
 	$(PKG_RUN) check
