@@ -18,10 +18,10 @@ import {
   type PageItem,
   type UpdatePageInput,
   useCreatePage,
-  useGeneratePage,
   usePagesQuery,
   useUpdatePage,
 } from './api';
+import PageGenerateDialog from './page-generate-dialog';
 import styles from './pages.module.css';
 
 // ---------------------------------------------------------------------------
@@ -52,15 +52,14 @@ export default function PageEditor({
   const [body, setBody] = useState(existingPage?.body ?? '');
   const [parentPageId, setParentPageId] = useState(existingPage?.parentPageId ?? '');
   const [projectId, setProjectId] = useState(existingPage?.projectId ?? '');
+  const [generateDialogOpen, setGenerateDialogOpen] = useState(false);
 
   const createMutation = useCreatePage(workspaceId);
   const updateMutation = useUpdatePage(workspaceId);
-  const generateMutation = useGeneratePage(workspaceId);
 
   const { data: rootPages } = usePagesQuery(workspaceId);
 
   const isSaving = createMutation.isPending || updateMutation.isPending;
-  const isGenerating = generateMutation.isPending;
 
   const handleSubmit = (e: FormEvent<HTMLFormElement>): void => {
     e.preventDefault();
@@ -71,7 +70,11 @@ export default function PageEditor({
       if (title !== existingPage.title) patch.title = title;
       if (body !== (existingPage.body ?? '')) patch.body = body;
       if (parentPageId !== (existingPage.parentPageId ?? '')) {
-        patch.parentPageId = parentPageId || undefined;
+        // Backend treats absence as "unset"; with exactOptionalPropertyTypes
+        // we must leave the key off entirely instead of writing `undefined`.
+        if (parentPageId) {
+          patch.parentPageId = parentPageId;
+        }
       }
       updateMutation.mutate(
         { pageId: existingPage.id, patch },
@@ -97,20 +100,17 @@ export default function PageEditor({
     }
   };
 
-  const handleGenerate = (): void => {
+  const handleOpenGenerate = (): void => {
     if (title.trim().length === 0) return;
-    generateMutation.mutate(
-      {
-        title,
-        parentPageId: parentPageId || undefined,
-        projectId: projectId || undefined,
-      },
-      {
-        onSuccess: (generated) => {
-          setBody(generated.body ?? '');
-        },
-      },
-    );
+    setGenerateDialogOpen(true);
+  };
+
+  const handleCloseGenerate = (): void => {
+    setGenerateDialogOpen(false);
+  };
+
+  const handleGenerated = (generated: PageItem): void => {
+    setBody(generated.body ?? '');
   };
 
   const handleCancel = (): void => {
@@ -210,11 +210,11 @@ export default function PageEditor({
             type="button"
             variant="default"
             size="sm"
-            onClick={handleGenerate}
-            disabled={isGenerating || title.trim().length === 0}
+            onClick={handleOpenGenerate}
+            disabled={title.trim().length === 0}
           >
             <Sparkles size={14} aria-hidden />
-            {isGenerating ? t('ai_generating') : t('ai_generate')}
+            {t('ai_generate')}
           </Button>
           <span style={{ flex: 1 }} />
           <Button
@@ -236,6 +236,15 @@ export default function PageEditor({
           </Button>
         </div>
       </form>
+
+      <PageGenerateDialog
+        open={generateDialogOpen}
+        workspaceId={workspaceId}
+        title={title}
+        projectId={projectId.length > 0 ? projectId : undefined}
+        onClose={handleCloseGenerate}
+        onGenerated={handleGenerated}
+      />
     </div>
   );
 }

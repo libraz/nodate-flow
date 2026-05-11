@@ -270,6 +270,53 @@
 }
 
 /* ---------------------------------------------------------------------------
+ * Generate-with-AI dialog
+ * ---------------------------------------------------------------------------*/
+
+.generateForm {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-4);
+}
+
+.generateContext {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-1);
+  padding-block: var(--nf-space-2-5);
+  padding-inline: var(--nf-space-3);
+  background: var(--nf-color-surface);
+  border: var(--nf-space-px) solid var(--nf-color-border);
+  border-radius: var(--nf-radius-md);
+}
+
+.generateContextLabel {
+  font-size: var(--nf-text-xs);
+  font-weight: var(--nf-weight-semibold);
+  color: var(--nf-color-fg-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.generateContextValue {
+  font-size: var(--nf-text-sm);
+  color: var(--nf-color-fg);
+  word-break: break-word;
+}
+
+.generateHelp {
+  font-size: var(--nf-text-xs);
+  color: var(--nf-color-fg-muted);
+  margin: 0;
+}
+
+.generateActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--nf-space-2);
+}
+
+/* ---------------------------------------------------------------------------
  * Search bar
  * ---------------------------------------------------------------------------*/
 

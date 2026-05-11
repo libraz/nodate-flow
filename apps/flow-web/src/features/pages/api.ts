@@ -2,11 +2,11 @@
  * Pages feature — query key factory, types, and hooks for
  * page CRUD, child pages, search, and AI generation.
  *
- * Types are defined inline because the SDK may not yet include these
- * endpoints. API calls use raw fetch via the shared base URL and auth
- * store token (same pattern as timeboxes).
+ * Calls go through the typed `@nodate-flow/sdk` so request and response
+ * shapes stay aligned with the OpenAPI contract.
  */
 
+import type { components } from '@nodate-flow/sdk';
 import {
   type UseMutationResult,
   type UseQueryResult,
@@ -17,44 +17,32 @@ import {
   useSuspenseQuery,
 } from '@tanstack/react-query';
 
-import { apiBaseUrl } from '../../lib/sdk';
-import { authStore } from '../auth/auth-store';
+import { ApiError, toApiError } from '../../lib/api-error';
+import { sdk } from '../../lib/sdk';
 
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
 
-/** Page item returned by the list / detail API. Timestamps are unix seconds. */
-export interface PageItem {
-  id: string;
-  title: string;
+/**
+ * Unified page view used by detail screens and tree/list views.
+ *
+ * The list endpoints return `PageSummaryDTO` (no `body`, no
+ * `parentPageTitle`); the get endpoint returns the full `PageDTO`.
+ * We widen the local type to `body?` / `parentPageTitle?` so the same
+ * `PageItem` shape covers both surfaces.
+ */
+export interface PageItem
+  extends Omit<components['schemas']['PageDTO'], '$schema' | 'body' | 'parentPageTitle'> {
   body?: string;
-  projectId?: string;
-  projectName?: string;
-  creatorId: string;
-  creatorDisplayName: string;
-  parentPageId?: string;
   parentPageTitle?: string;
-  isAiGenerated: boolean;
-  updatedAt: number;
-  createdAt: number;
-  total: number;
 }
 
 /** Body for POST /workspaces/{wsId}/pages. */
-export interface CreatePageInput {
-  title: string;
-  body?: string | undefined;
-  parentPageId?: string | undefined;
-  projectId?: string | undefined;
-}
+export type CreatePageInput = Omit<components['schemas']['CreatePageBody'], '$schema'>;
 
 /** Body for PATCH /workspaces/{wsId}/pages/{pageId}. */
-export interface UpdatePageInput {
-  title?: string | undefined;
-  body?: string | undefined;
-  parentPageId?: string | undefined;
-}
+export type UpdatePageInput = Omit<components['schemas']['UpdatePageBody'], '$schema'>;
 
 // ---------------------------------------------------------------------------
 // Query key factory
@@ -73,50 +61,7 @@ export const pageKeys = {
 // Error helper
 // ---------------------------------------------------------------------------
 
-import { ApiError, toApiError } from '../../lib/api-error';
-
 export { ApiError as PageApiError };
-
-// ---------------------------------------------------------------------------
-// Fetch helpers
-// ---------------------------------------------------------------------------
-
-function authHeaders(): HeadersInit {
-  const token = authStore.getState().accessToken;
-  // biome-ignore lint/style/useNamingConvention: HTTP header name
-  return token ? { Authorization: `Bearer ${token}` } : {};
-}
-
-async function fetchJson<T>(url: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(url, {
-    ...init,
-    credentials: 'include',
-    headers: {
-      ...authHeaders(),
-      ...init?.headers,
-    },
-  });
-  if (!res.ok) {
-    const body = (await res.json().catch(() => null)) as unknown;
-    throw toApiError(body, `Request failed with status ${String(res.status)}`);
-  }
-  return (await res.json()) as T;
-}
-
-async function fetchVoid(url: string, init?: RequestInit): Promise<void> {
-  const res = await fetch(url, {
-    ...init,
-    credentials: 'include',
-    headers: {
-      ...authHeaders(),
-      ...init?.headers,
-    },
-  });
-  if (!res.ok) {
-    const body = (await res.json().catch(() => null)) as unknown;
-    throw toApiError(body, `Request failed with status ${String(res.status)}`);
-  }
-}
 
 // ---------------------------------------------------------------------------
 // Query hooks
@@ -127,10 +72,11 @@ export function usePagesQuery(wsId: string): UseSuspenseQueryResult<PageItem[]> 
   return useSuspenseQuery({
     queryKey: pageKeys.list(wsId),
     queryFn: async (): Promise<PageItem[]> => {
-      const data = await fetchJson<{ pages?: PageItem[] }>(
-        `${apiBaseUrl}/workspaces/${wsId}/pages?limit=200`,
-      );
-      return data.pages ?? [];
+      const { data, error } = await sdk.GET('/workspaces/{wsId}/pages', {
+        params: { path: { wsId }, query: { limit: 200 } },
+      });
+      if (error || !data) throw toApiError(error, 'Failed to load pages');
+      return (data.pages ?? []) as PageItem[];
     },
   });
 }
@@ -143,10 +89,11 @@ export function useChildPagesQuery(
   return useSuspenseQuery({
     queryKey: pageKeys.children(pageId),
     queryFn: async (): Promise<PageItem[]> => {
-      const data = await fetchJson<{ pages?: PageItem[] }>(
-        `${apiBaseUrl}/workspaces/${wsId}/pages/${pageId}/children?limit=200`,
-      );
-      return data.pages ?? [];
+      const { data, error } = await sdk.GET('/workspaces/{wsId}/pages/{pageId}/children', {
+        params: { path: { wsId, pageId }, query: { limit: 200 } },
+      });
+      if (error || !data) throw toApiError(error, 'Failed to load child pages');
+      return (data.pages ?? []) as PageItem[];
     },
   });
 }
@@ -156,7 +103,11 @@ export function usePageQuery(wsId: string, pageId: string): UseSuspenseQueryResu
   return useSuspenseQuery({
     queryKey: pageKeys.detail(pageId),
     queryFn: async (): Promise<PageItem> => {
-      return fetchJson<PageItem>(`${apiBaseUrl}/workspaces/${wsId}/pages/${pageId}`);
+      const { data, error } = await sdk.GET('/workspaces/{wsId}/pages/{pageId}', {
+        params: { path: { wsId, pageId } },
+      });
+      if (error || !data) throw toApiError(error, 'Failed to load page');
+      return data as PageItem;
     },
   });
 }
@@ -167,10 +118,11 @@ export function useSearchPages(wsId: string, query: string): UseQueryResult<Page
     queryKey: pageKeys.search(wsId, query),
     enabled: query.length >= 2,
     queryFn: async (): Promise<PageItem[]> => {
-      const data = await fetchJson<{ pages?: PageItem[] }>(
-        `${apiBaseUrl}/workspaces/${wsId}/pages/search?q=${encodeURIComponent(query)}&limit=50`,
-      );
-      return data.pages ?? [];
+      const { data, error } = await sdk.GET('/workspaces/{wsId}/pages/search', {
+        params: { path: { wsId }, query: { q: query, limit: 50 } },
+      });
+      if (error || !data) throw toApiError(error, 'Failed to search pages');
+      return (data.pages ?? []) as PageItem[];
     },
   });
 }
@@ -188,11 +140,12 @@ export function useCreatePage(wsId: string): UseMutationResult<PageItem, ApiErro
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({ input }: CreatePageArgs): Promise<PageItem> => {
-      return fetchJson<PageItem>(`${apiBaseUrl}/workspaces/${wsId}/pages`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(input),
+      const { data, error } = await sdk.POST('/workspaces/{wsId}/pages', {
+        params: { path: { wsId } },
+        body: input,
       });
+      if (error || !data) throw toApiError(error, 'Failed to create page');
+      return data as PageItem;
     },
     onSuccess: (_data, vars) => {
       void qc.invalidateQueries({ queryKey: pageKeys.list(wsId) });
@@ -213,11 +166,12 @@ export function useUpdatePage(wsId: string): UseMutationResult<PageItem, ApiErro
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({ pageId, patch }: UpdatePageArgs): Promise<PageItem> => {
-      return fetchJson<PageItem>(`${apiBaseUrl}/workspaces/${wsId}/pages/${pageId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(patch),
+      const { data, error } = await sdk.PATCH('/workspaces/{wsId}/pages/{pageId}', {
+        params: { path: { wsId, pageId } },
+        body: patch,
       });
+      if (error || !data) throw toApiError(error, 'Failed to update page');
+      return data as PageItem;
     },
     onSuccess: (_data, vars) => {
       void qc.invalidateQueries({ queryKey: pageKeys.list(wsId) });
@@ -231,9 +185,10 @@ export function useDeletePage(wsId: string): UseMutationResult<void, ApiError, s
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (pageId: string): Promise<void> => {
-      await fetchVoid(`${apiBaseUrl}/workspaces/${wsId}/pages/${pageId}`, {
-        method: 'DELETE',
+      const { error } = await sdk.DELETE('/workspaces/{wsId}/pages/{pageId}', {
+        params: { path: { wsId, pageId } },
       });
+      if (error) throw toApiError(error, 'Failed to delete page');
     },
     onSuccess: (_data, pageId) => {
       void qc.invalidateQueries({ queryKey: pageKeys.list(wsId) });
@@ -245,7 +200,7 @@ export function useDeletePage(wsId: string): UseMutationResult<void, ApiError, s
 
 export interface GeneratePageArgs {
   title: string;
-  parentPageId?: string | undefined;
+  prompt: string;
   projectId?: string | undefined;
 }
 
@@ -256,11 +211,17 @@ export function useGeneratePage(
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (args: GeneratePageArgs): Promise<PageItem> => {
-      return fetchJson<PageItem>(`${apiBaseUrl}/workspaces/${wsId}/pages/generate`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(args),
+      const body: components['schemas']['GeneratePageBody'] = {
+        title: args.title,
+        prompt: args.prompt,
+        ...(args.projectId !== undefined ? { projectId: args.projectId } : {}),
+      };
+      const { data, error } = await sdk.POST('/workspaces/{wsId}/pages/generate', {
+        params: { path: { wsId } },
+        body,
       });
+      if (error || !data) throw toApiError(error, 'Failed to generate page');
+      return data as PageItem;
     },
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: pageKeys.list(wsId) });

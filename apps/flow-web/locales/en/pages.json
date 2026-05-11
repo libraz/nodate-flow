@@ -16,6 +16,17 @@
   "confirm_delete": "Delete this page?",
   "ai_generate": "Generate with AI",
   "ai_generating": "Generating...",
+  "generate": {
+    "dialog_title": "Generate page with AI",
+    "context_label": "Page title",
+    "prompt_label": "Prompt",
+    "prompt_placeholder": "Describe what this page should cover, the audience, key sections, tone, and anything else the AI should know.",
+    "prompt_help": "The AI uses the page title above as context and your prompt as the instruction.",
+    "submit": "Generate",
+    "submitting": "Generating...",
+    "cancel": "Cancel",
+    "error": "Failed to generate page. Please try again."
+  },
   "children": "Sub-pages",
   "breadcrumb_label": "Breadcrumb",
   "search_placeholder": "Search pages...",
