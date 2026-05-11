@@ -6278,6 +6278,8 @@ export interface components {
             outcomes: components["schemas"]["EvaluateConstraintsOutcome"][] | null;
         };
         Event: {
+            actorAgentId?: string;
+            actorAgentName?: string;
             actorDisplayName?: string;
             actorUserId?: string;
             /** @description Event public id (UUID v7) */

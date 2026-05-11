@@ -297,29 +297,28 @@ function humanizePayload(type: string, payload: unknown, t: TFunction, locale: s
   );
 }
 
-function isAgentEvent(event: { type: string; actorUserId?: string }): boolean {
-  if (event.actorUserId && event.actorUserId.length > 0) return false;
-  return event.type.startsWith('agent.') || event.type.startsWith('ai.agent.');
-}
-
 export default function EventCard({ event }: EventCardProps): ReactElement {
   const { t, i18n } = useTranslation('timeline');
   const locale = i18n.resolvedLanguage ?? 'en';
 
-  const isAgent = isAgentEvent(event);
-  const rawDisplayName = event.actorDisplayName?.trim();
-  const hasName = rawDisplayName !== undefined && rawDisplayName.length > 0;
-  const agentName = hasName ? rawDisplayName : t('actor.system');
+  const isAgent = Boolean(event.actorAgentId && event.actorAgentId.length > 0);
+  const rawAgentName = event.actorAgentName?.trim();
+  const rawUserName = event.actorDisplayName?.trim();
+  const hasAgentName = isAgent && rawAgentName !== undefined && rawAgentName.length > 0;
+  const hasUserName = !isAgent && rawUserName !== undefined && rawUserName.length > 0;
+  const displayName = hasAgentName ? rawAgentName : hasUserName ? rawUserName : undefined;
+  const hasName = displayName !== undefined;
+  const agentName = hasName ? displayName : t('actor.system');
   const actorLabel = isAgent ? t('actor.actor_agent', { name: agentName }) : agentName;
   // Avatar initial: first character of each whitespace-separated word, max 2.
   // Never derive initials from the raw actorUserId (UUID).
   const initials = hasName
-    ? rawDisplayName
+    ? displayName
         .split(/\s+/)
         .filter((w) => w.length > 0)
         .slice(0, 2)
         .map((w) => (w[0] ?? '').toUpperCase())
-        .join('') || (rawDisplayName[0] ?? '').toUpperCase()
+        .join('') || (displayName[0] ?? '').toUpperCase()
     : t('actor.initials_fallback');
 
   const normalizedType = event.type.replace(/\./g, '_');

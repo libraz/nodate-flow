@@ -58,6 +58,11 @@ type Event struct {
 	// ActorDisplayName is a denormalised convenience for UIs that need
 	// the user's display name without a separate fetch.
 	ActorDisplayName string `json:"actorDisplayName,omitempty"`
+	// ActorAgentID is the acting AI agent's public_id, omitted when nil.
+	ActorAgentID string `json:"actorAgentId,omitempty"`
+	// ActorAgentName is a denormalised convenience for UIs to render the
+	// agent's display label without a second fetch.
+	ActorAgentName string `json:"actorAgentName,omitempty"`
 	// Payload is the raw JSON payload column passed through unmodified.
 	Payload json.RawMessage `json:"payload,omitempty"`
 	// OccurredAt is the unix timestamp in seconds (UTC).

@@ -20,14 +20,16 @@ import (
 // produced by the dynamic SELECT below; keeping it private to this
 // package avoids leaking generated.* row types into the mapper layer.
 type timelineRow struct {
-	publicID         types.PublicID
-	taskPublicID     []byte
-	actorPublicID    []byte
-	actorDisplayName sql.NullString
-	eventType        string
-	payload          json.RawMessage
-	occurredAt       time.Time
-	total            interface{}
+	publicID           types.PublicID
+	taskPublicID       []byte
+	actorPublicID      []byte
+	actorDisplayName   sql.NullString
+	actorAgentPublicID []byte
+	actorAgentName     string
+	eventType          string
+	payload            json.RawMessage
+	occurredAt         time.Time
+	total              interface{}
 }
 
 // queryTimeline runs a dynamic SELECT against v_task_timeline and
@@ -100,6 +102,8 @@ func queryTimeline(
   v.task_public_id,
   v.actor_user_public_id,
   v.actor_display_name,
+  v.actor_agent_public_id,
+  v.actor_agent_name,
   v.type,
   v.payload_json,
   v.occurred_at,
@@ -127,6 +131,8 @@ LIMIT ? OFFSET ?`, strings.Join(where, " AND "))
 			&r.taskPublicID,
 			&r.actorPublicID,
 			&r.actorDisplayName,
+			&r.actorAgentPublicID,
+			&r.actorAgentName,
 			&r.eventType,
 			&r.payload,
 			&r.occurredAt,
@@ -154,6 +160,8 @@ func toDTO(r timelineRow) Event {
 		TaskID:           uuidFromBytes(r.taskPublicID),
 		ActorUserID:      uuidFromBytes(r.actorPublicID),
 		ActorDisplayName: nullStr(r.actorDisplayName),
+		ActorAgentID:     uuidFromBytes(r.actorAgentPublicID),
+		ActorAgentName:   r.actorAgentName,
 		Payload:          r.payload,
 		OccurredAt:       r.occurredAt.Unix(),
 	}

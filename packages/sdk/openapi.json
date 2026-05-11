@@ -3621,6 +3621,12 @@
       "Event": {
         "additionalProperties": false,
         "properties": {
+          "actorAgentId": {
+            "type": "string"
+          },
+          "actorAgentName": {
+            "type": "string"
+          },
           "actorDisplayName": {
             "type": "string"
           },
