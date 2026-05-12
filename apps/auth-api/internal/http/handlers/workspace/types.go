@@ -8,6 +8,7 @@ import (
 	"github.com/nodate-flow/nodate-flow/apps/auth-api/internal/audit"
 	"github.com/nodate-flow/nodate-flow/apps/auth-api/internal/db/generated"
 	"github.com/nodate-flow/nodate-flow/apps/auth-api/internal/http/handlers/handlerutil"
+	"github.com/nodate-flow/nodate-flow/apps/auth-api/internal/storage"
 	"github.com/nodate-flow/nodate-flow/packages/go-shared/email"
 )
 
@@ -18,6 +19,13 @@ type Deps struct {
 	// Audit records audit log entries for workspace mutations.
 	// Optional: nil disables audit logging.
 	Audit audit.Sink
+	// Storage is the S3-compatible object store client used by the
+	// workspace owner self-delete handler to bulk-delete blobs before
+	// the CASCADE-anchored DB delete fires. Nil when NF_S3_ENDPOINT is
+	// unset; the delete handler degrades gracefully by skipping the
+	// MinIO sweep and reporting storageObjectsDeleted = 0 /
+	// minioErrors = 0 on the response.
+	Storage *storage.Client
 }
 
 // InviteDeps extends the standard Deps with fields required by the
@@ -137,19 +145,42 @@ type PatchWorkspaceOutput struct {
 	Body Workspace
 }
 
-// DisableWorkspaceInput is the path for DELETE /workspaces/{wsId}.
-type DisableWorkspaceInput struct {
+// DeleteWorkspaceInput is the path + body for DELETE /workspaces/{wsId}.
+//
+// The body's Confirm field is intentionally a *bool so the handler can
+// distinguish "missing" (nil) from "explicitly false" (*v == false) and
+// reject both with WORKSPACE.DELETE.CONFIRM_REQUIRED. The endpoint
+// performs an immediate, irreversible destructive delete of every row
+// scoped to the workspace plus every MinIO blob, so the caller MUST
+// acknowledge by sending {"confirm": true}.
+type DeleteWorkspaceInput struct {
 	WsID string `path:"wsId"`
+	Body DeleteWorkspaceInputBody
 }
 
-// DisableWorkspaceOutput is the response for DELETE /workspaces/{wsId}.
-type DisableWorkspaceOutput struct {
-	Body DisableWorkspaceOutputBody
+// DeleteWorkspaceInputBody is the JSON body for DELETE /workspaces/{wsId}.
+type DeleteWorkspaceInputBody struct {
+	Confirm *bool `json:"confirm,omitempty" doc:"Must be true to acknowledge irreversible deletion"`
 }
 
-// DisableWorkspaceOutputBody is the response body envelope for DELETE /workspaces/{wsId}.
-type DisableWorkspaceOutputBody struct {
-	Ok bool `json:"ok"`
+// DeleteWorkspaceOutput is the response for DELETE /workspaces/{wsId}.
+type DeleteWorkspaceOutput struct {
+	Body DeleteWorkspaceOutputBody
+}
+
+// DeleteWorkspaceOutputBody is the response body envelope for
+// DELETE /workspaces/{wsId}.
+//
+// Deleted is false when a concurrent delete won the race
+// (HardDeleteWorkspace RowsAffected == 0); the response is still 200 so
+// retries from the UI do not flap between 404 and success.
+// StorageObjectsDeleted is the count of MinIO keys the driver attempted
+// to delete; MinioErrors is 1 when at least one of those deletions failed
+// (the DB delete still proceeded; orphaned blobs can be reaped later).
+type DeleteWorkspaceOutputBody struct {
+	Deleted               bool  `json:"deleted"`
+	StorageObjectsDeleted int64 `json:"storageObjectsDeleted"`
+	MinioErrors           int64 `json:"minioErrors"`
 }
 
 // ListMembersInput is the query for GET /workspaces/{wsId}/members.

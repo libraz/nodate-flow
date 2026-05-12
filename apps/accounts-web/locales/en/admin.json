@@ -34,7 +34,31 @@
     "session_actions": "Actions",
     "sessions": "Sessions",
     "grant_admin": "Grant Admin",
-    "revoke_admin": "Revoke Admin"
+    "revoke_admin": "Revoke Admin",
+    "danger": {
+      "title": "Danger zone",
+      "description": "Irreversible actions. Permanently deleting this user removes their account, every session, and all attachments and avatars they have uploaded.",
+      "delete": "Delete user",
+      "deleting": "Deleting…",
+      "confirm": {
+        "title": "Delete {email}?",
+        "warning": "This permanently deletes the user account and reconciles every uploaded file referenced by them across the instance. This action cannot be undone.",
+        "loses_heading": "What will be lost",
+        "loses_account": "The user account and all sessions",
+        "loses_workspaces": "{count, plural, one {Membership in # workspace} other {Membership in # workspaces}}",
+        "loses_attachments": "All attachments and avatars they uploaded",
+        "type_to_confirm_label": "Type the user's email to confirm",
+        "type_to_confirm_help": "Enter {email} exactly to enable the delete button.",
+        "type_to_confirm_placeholder": "user email",
+        "submit": "Permanently delete",
+        "cancel": "Cancel"
+      },
+      "deleted": "User deleted",
+      "errors": {
+        "delete_failed": "Could not delete the user. Please try again.",
+        "delete_failed_with_code": "Could not delete the user ({code}). Please try again."
+      }
+    }
   },
   "workspaces": {
     "title": "Workspace Management",
@@ -55,7 +79,31 @@
     "active_only": "Active",
     "suspended_only": "Suspended",
     "no_results": "No workspaces found.",
-    "detail": "Workspace Details"
+    "detail": "Workspace Details",
+    "danger": {
+      "title": "Danger zone",
+      "description": "Irreversible actions. Permanently deleting this workspace destroys all of its projects, tasks, members, and uploaded files.",
+      "delete": "Delete workspace",
+      "deleting": "Deleting…",
+      "confirm": {
+        "title": "Delete {name}?",
+        "warning": "This permanently deletes the workspace and irreversibly removes every uploaded file from object storage. This action cannot be undone.",
+        "loses_heading": "What will be lost",
+        "loses_projects_and_tasks": "All projects, tasks, comments, and timeline history",
+        "loses_members": "{count, plural, one {# member} other {# members}} and their access",
+        "loses_attachments": "Every attachment and uploaded file in object storage",
+        "type_to_confirm_label": "Type the workspace slug to confirm",
+        "type_to_confirm_help": "Enter {slug} exactly to enable the delete button.",
+        "type_to_confirm_placeholder": "workspace slug",
+        "submit": "Permanently delete",
+        "cancel": "Cancel"
+      },
+      "deleted": "Workspace deleted",
+      "errors": {
+        "delete_failed": "Could not delete the workspace. Please try again.",
+        "delete_failed_with_code": "Could not delete the workspace ({code}). Please try again."
+      }
+    }
   },
   "audit_logs": {
     "title": "Instance Audit Log",

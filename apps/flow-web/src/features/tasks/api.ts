@@ -68,7 +68,6 @@ export type TransitionInput = components['schemas']['TransitionTaskBody'];
 export type TransitionName = TransitionInput['transition'];
 export type AddCommentInput = components['schemas']['AddTaskCommentBody'];
 export type AddActorInput = components['schemas']['AddTaskActorBody'];
-export type AddAttachmentInput = components['schemas']['AddTaskAttachmentBody'];
 export type PresignUploadInput = components['schemas']['PresignUploadBody'];
 export type PresignUploadResult = components['schemas']['PresignUploadOutputBody'];
 export type DownloadAttachmentResult = components['schemas']['DownloadAttachmentOutputBody'];
@@ -170,6 +169,7 @@ export interface DuplicatesResult {
 }
 
 import { ApiError, toApiError } from '../../lib/api-error';
+import { sha256Hex } from '../../lib/crypto/sha256';
 
 export { ApiError as TaskApiError };
 
@@ -931,35 +931,35 @@ export function useListAttachments(taskPublicId: string): UseSuspenseQueryResult
   });
 }
 
-export interface AddAttachmentArgs {
-  taskId: string;
-  input: AddAttachmentInput;
-}
-
-/** Registers attachment metadata on a task. */
-export function useAddAttachment(): UseMutationResult<TaskAttachment, ApiError, AddAttachmentArgs> {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: async ({ taskId, input }: AddAttachmentArgs): Promise<TaskAttachment> => {
-      const { data, error } = await sdk.POST('/tasks/{id}/attachments', {
-        params: { path: { id: taskId } },
-        body: input,
-      });
-      if (error || !data) throw toApiError(error, 'Failed to add attachment');
-      return data;
-    },
-    onSuccess: (_data, vars) => {
-      void qc.invalidateQueries({ queryKey: tasksKeys.attachments(vars.taskId) });
-    },
-  });
-}
-
 export interface PresignUploadArgs {
   taskId: string;
   file: File;
 }
 
-/** Requests a presigned PUT URL, uploads the file, and returns the result. */
+/**
+ * Content-addressed attachment upload for tasks.
+ *
+ * Single entry point that handles both halves of the dedup-aware
+ * pipeline:
+ *
+ *   1. Compute the file's SHA-256 client-side and POST it together with
+ *      the metadata to {@code /tasks/{id}/attachments/presign}. The
+ *      server inserts the {@code attachments} row in the same
+ *      transaction it consults the {@code storage_objects} table.
+ *   2. If the response carries {@code deduplicated: true} the bytes
+ *      already exist in object storage; we skip the PUT entirely.
+ *   3. Otherwise we stream the file to the presigned {@code uploadUrl}
+ *      with a {@code PUT} (Content-Type matches the metadata sent in
+ *      step 1, so the signature is honored).
+ *
+ * Either branch invalidates the task's attachments cache so the list
+ * row appears (or its ref count is reflected) immediately.
+ *
+ * The returned {@link PresignUploadResult} exposes
+ * {@code deduplicated} so callers can surface an "already uploaded"
+ * affordance if they want; the success path itself does not depend on
+ * the flag.
+ */
 export function usePresignUpload(): UseMutationResult<
   PresignUploadResult,
   ApiError,
@@ -968,20 +968,39 @@ export function usePresignUpload(): UseMutationResult<
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({ taskId, file }: PresignUploadArgs): Promise<PresignUploadResult> => {
+      const sha256 = await sha256Hex(file);
+      const contentType = file.type || 'application/octet-stream';
       const { data, error } = await sdk.POST('/tasks/{id}/attachments/presign', {
         params: { path: { id: taskId } },
         body: {
           filename: file.name,
-          contentType: file.type || 'application/octet-stream',
+          contentType,
           byteSize: file.size,
+          sha256,
         },
       });
       if (error || !data) throw toApiError(error, 'Failed to presign upload');
 
+      // Dedup hit — the blob already lives in object storage and the
+      // attachments row was created with a refcount bump. Nothing else
+      // for the client to do.
+      if (data.deduplicated) return data;
+
+      // Defensive: a non-deduplicated response without an uploadUrl
+      // would mean the server contract is broken; fail loudly rather
+      // than silently dropping the file.
+      if (!data.uploadUrl) {
+        throw new ApiError('UPLOAD_FAILED', 'Presign response missing uploadUrl');
+      }
+
+      const headers: Record<string, string> = {
+        'Content-Type': contentType,
+        ...(data.requiredHeaders ?? {}),
+      };
       const res = await fetch(data.uploadUrl, {
         method: 'PUT',
         body: file,
-        headers: { 'Content-Type': file.type || 'application/octet-stream' },
+        headers,
       });
       if (!res.ok) throw new ApiError('UPLOAD_FAILED', 'File upload failed');
 

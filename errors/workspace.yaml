@@ -1,0 +1,15 @@
+domain: workspace
+breadcrumb: "Workspace"
+
+resources:
+  delete:
+    breadcrumb: "Workspace > Delete"
+    errors:
+      confirm_required:
+        code: WORKSPACE.DELETE.CONFIRM_REQUIRED
+        status: 400
+        message: "Confirmation required to delete this workspace. Resend with confirm=true."
+        message_ja: "このワークスペースを削除するには確認が必要です。confirm=true を付けて再送信してください。"
+        message_zh: "删除此工作区需要确认。请将 confirm=true 一并重新发送。"
+        description: "Returned by `DELETE /workspaces/{wsId}` and `DELETE /admin/workspaces/{wsId}` when the request body is missing or has confirm=false. The endpoint immediately destroys all workspace data including MinIO blobs, so the API requires explicit confirmation in the body to prevent accidental loss."
+        userAction: "Resend the request with `{\"confirm\": true}` after acknowledging that the action is irreversible."

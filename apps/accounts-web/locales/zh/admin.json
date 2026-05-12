@@ -34,7 +34,31 @@
     "session_actions": "操作",
     "sessions": "会话",
     "grant_admin": "授予管理员权限",
-    "revoke_admin": "撤销管理员权限"
+    "revoke_admin": "撤销管理员权限",
+    "danger": {
+      "title": "危险操作",
+      "description": "不可逆操作。永久删除该用户将移除其账户、所有会话以及他们上传的全部附件和头像。",
+      "delete": "删除用户",
+      "deleting": "删除中…",
+      "confirm": {
+        "title": "删除 {email}？",
+        "warning": "这将永久删除该用户账户，并对实例中所有引用其文件进行清理。此操作无法撤销。",
+        "loses_heading": "将会丢失的内容",
+        "loses_account": "账户及所有会话",
+        "loses_workspaces": "{count} 个工作区的成员资格",
+        "loses_attachments": "其上传的所有附件和头像",
+        "type_to_confirm_label": "请输入用户邮箱以确认",
+        "type_to_confirm_help": "请准确输入 {email} 以启用删除按钮。",
+        "type_to_confirm_placeholder": "用户邮箱",
+        "submit": "永久删除",
+        "cancel": "取消"
+      },
+      "deleted": "已删除用户",
+      "errors": {
+        "delete_failed": "无法删除用户，请重试。",
+        "delete_failed_with_code": "无法删除用户（{code}），请重试。"
+      }
+    }
   },
   "workspaces": {
     "title": "工作区管理",
@@ -55,7 +79,31 @@
     "active_only": "启用中",
     "suspended_only": "已停用",
     "no_results": "未找到工作区。",
-    "detail": "工作区详情"
+    "detail": "工作区详情",
+    "danger": {
+      "title": "危险操作",
+      "description": "不可逆操作。永久删除该工作区将销毁其所有项目、任务、成员以及上传的文件。",
+      "delete": "删除工作区",
+      "deleting": "删除中…",
+      "confirm": {
+        "title": "删除 {name}？",
+        "warning": "这将永久删除工作区，并不可逆地从对象存储中清除每一份已上传的文件。此操作无法撤销。",
+        "loses_heading": "将会丢失的内容",
+        "loses_projects_and_tasks": "所有项目、任务、评论以及时间线记录",
+        "loses_members": "{count} 位成员及其访问权限",
+        "loses_attachments": "对象存储中的全部附件和上传文件",
+        "type_to_confirm_label": "请输入工作区标识以确认",
+        "type_to_confirm_help": "请准确输入 {slug} 以启用删除按钮。",
+        "type_to_confirm_placeholder": "工作区标识",
+        "submit": "永久删除",
+        "cancel": "取消"
+      },
+      "deleted": "已删除工作区",
+      "errors": {
+        "delete_failed": "无法删除工作区，请重试。",
+        "delete_failed_with_code": "无法删除工作区（{code}），请重试。"
+      }
+    }
   },
   "audit_logs": {
     "title": "实例审计日志",

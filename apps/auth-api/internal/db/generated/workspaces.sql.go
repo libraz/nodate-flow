@@ -224,18 +224,6 @@ func (q *Queries) CreateWorkspace(ctx context.Context, arg CreateWorkspaceParams
 	return result.LastInsertId()
 }
 
-const disableWorkspace = `-- name: DisableWorkspace :exec
-UPDATE workspaces
-SET enabled = FALSE
-WHERE public_id = ?
-`
-
-// Soft-disable a workspace. Cascade is handled by FK ON DELETE for hard purges.
-func (q *Queries) DisableWorkspace(ctx context.Context, publicID types.PublicID) error {
-	_, err := q.db.ExecContext(ctx, disableWorkspace, publicID)
-	return err
-}
-
 const findWorkspaceByPublicId = `-- name: FindWorkspaceByPublicId :one
 SELECT
   id,

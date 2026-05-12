@@ -342,20 +342,11 @@ func RegisterTaskScoped(api huma.API, deps Deps) {
 	}, DeleteComment(deps))
 
 	huma.Register(api, huma.Operation{
-		OperationID: "tasks-attachments-add",
-		Method:      http.MethodPost,
-		Path:        "/tasks/{id}/attachments",
-		Summary:     "Register an attachment metadata row on a task",
-		Description: "Records that a file (already uploaded via /presign) is associated with the task. Stores filename, MIME, size, and storage key.",
-		Tags:        []string{"Tasks"},
-	}, AddAttachment(deps))
-
-	huma.Register(api, huma.Operation{
 		OperationID: "tasks-attachments-presign",
 		Method:      http.MethodPost,
 		Path:        "/tasks/{id}/attachments/presign",
-		Summary:     "Get a presigned PUT URL for uploading an attachment",
-		Description: "Returns a short-lived presigned PUT URL the client can stream the file directly to S3 with. Pair with /attachments to record metadata after the upload completes.",
+		Summary:     "Reserve an attachment row and (if needed) get a presigned PUT URL",
+		Description: "Single entry point for adding an attachment to a task. The client supplies the file's SHA-256; the server runs content-addressed dedup and either bumps the ref count on an existing storage_objects row (deduplicated=true, no upload) or returns a presigned PUT URL the client streams the bytes to. The attachment row is always created in the same transaction.",
 		Tags:        []string{"Tasks"},
 	}, PresignUpload(deps))
 

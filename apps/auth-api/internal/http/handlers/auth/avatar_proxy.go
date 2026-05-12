@@ -27,38 +27,50 @@ type AvatarProxyInput struct {
 // URLs are meant to be shared in page content and email. The response
 // carries ETag + Cache-Control so browsers can revalidate cheaply.
 //
+// The proxy ONLY serves uploaded blobs (avatar_storage_object_id IS NOT
+// NULL). Externally hosted avatar_url values (https://...) are returned
+// verbatim by the /me endpoint and the client fetches them directly —
+// proxying through us would hide the actual origin and force every
+// browser cache to bounce off our CDN.
+//
 // NOT_FOUND is returned for:
 //   - an unknown user public id,
-//   - a user whose avatar_url is NULL,
-//   - a user whose avatar_url is an external URL (the client should fetch
-//     it directly, we do not proxy remote origins).
+//   - a user with no uploaded avatar (avatar_storage_object_id IS NULL).
 func AvatarProxy(deps Deps) func(context.Context, *AvatarProxyInput) (*huma.StreamResponse, error) {
 	return func(ctx context.Context, in *AvatarProxyInput) (*huma.StreamResponse, error) {
-		userID, err := types.Parse(in.UserID)
+		userPublic, err := types.Parse(in.UserID)
 		if err != nil {
 			return nil, httpErr(apierrors.AuthAvatarNotFound)
 		}
-		row, err := deps.Queries.FindUserByPublicId(ctx, userID)
+
+		// Resolve the internal user id and the linked storage object
+		// in two cheap lookups. We cannot reach into v_users for the
+		// joined storage_objects.public_id from this package without
+		// adding a query, so the two-step resolve keeps the change
+		// surface minimal at the cost of one extra round trip.
+		userID, err := deps.Queries.FindUserInternalIdByPublicId(ctx, userPublic)
 		if err != nil {
 			return nil, httpErr(apierrors.AuthAvatarNotFound)
 		}
-		if !row.AvatarUrl.Valid {
+		profile, err := deps.Queries.FindUserProfileById(ctx, userID)
+		if err != nil {
 			return nil, httpErr(apierrors.AuthAvatarNotFound)
 		}
-		key := row.AvatarUrl.String
-		if isExternalAvatarURL(key) {
-			// External OIDC-provider URLs are not hosted by us and are
-			// returned as-is by /me; the client should fetch them
-			// directly rather than routing through this proxy.
+		if !profile.AvatarStorageObjectID.Valid {
+			return nil, httpErr(apierrors.AuthAvatarNotFound)
+		}
+		soID := uint32(profile.AvatarStorageObjectID.Int32) //#nosec G115 -- column is INT UNSIGNED, fits uint32
+		so, err := deps.Queries.FindStorageObjectByID(ctx, soID)
+		if err != nil {
 			return nil, httpErr(apierrors.AuthAvatarNotFound)
 		}
 		if deps.Storage == nil {
 			return nil, httpErr(apierrors.AuthAvatarStorageUnavailable)
 		}
 
-		body, info, err := deps.Storage.GetObject(ctx, key)
+		body, info, err := deps.Storage.GetObject(ctx, so.StorageKey)
 		if err != nil {
-			slog.WarnContext(ctx, "avatar proxy: get object failed", "err", err, "key", key)
+			slog.WarnContext(ctx, "avatar proxy: get object failed", "err", err, "key", so.StorageKey)
 			return nil, httpErr(apierrors.AuthAvatarNotFound)
 		}
 
@@ -67,6 +79,9 @@ func AvatarProxy(deps Deps) func(context.Context, *AvatarProxyInput) (*huma.Stre
 				defer func() { _ = body.Close() }()
 
 				contentType := info.ContentType
+				if contentType == "" {
+					contentType = so.ContentType
+				}
 				if contentType == "" {
 					contentType = "image/jpeg"
 				}
@@ -81,7 +96,7 @@ func AvatarProxy(deps Deps) func(context.Context, *AvatarProxyInput) (*huma.Stre
 				hctx.SetStatus(200)
 
 				if _, werr := io.Copy(hctx.BodyWriter(), body); werr != nil {
-					slog.WarnContext(hctx.Context(), "avatar proxy: copy body failed", "err", werr, "key", key)
+					slog.WarnContext(hctx.Context(), "avatar proxy: copy body failed", "err", werr, "key", so.StorageKey)
 				}
 			},
 		}, nil

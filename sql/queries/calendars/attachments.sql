@@ -1,59 +1,74 @@
 -- name: CreateCalendarEventAttachment :execlastid
--- Record metadata for an uploaded file attachment on a calendar event.
+-- Record per-event attachment metadata. The blob (sha256, byte_size,
+-- content_type, storage_key) lives in storage_objects and is referenced via
+-- storage_object_id; caller MUST insert the storage_objects row or bump its
+-- ref_count inside the same transaction.
 INSERT INTO calendar_event_attachments (
   public_id,
   workspace_id,
   event_id,
   uploader_id,
-  filename,
-  content_type,
-  byte_size,
-  storage_key,
-  checksum_sha256
-) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);
+  storage_object_id,
+  filename
+) VALUES (?, ?, ?, ?, ?, ?);
 
 -- name: ListCalendarEventAttachments :many
--- List active attachments for an event.
+-- List active attachments for an event with uploader display fields and the
+-- storage_objects metadata flattened in via JOIN. Order is stable by
+-- created_at then public_id.
 SELECT
   a.public_id,
   a.filename,
-  a.content_type,
-  a.byte_size,
-  a.storage_key,
+  so.public_id AS storage_object_public_id,
+  so.content_type,
+  so.byte_size,
+  so.storage_key,
+  so.sha256,
   a.uploader_id,
   u.public_id AS user_public_id,
   u.display_name,
   a.created_at
 FROM calendar_event_attachments a
 INNER JOIN users u ON u.id = a.uploader_id AND u.enabled = TRUE
-WHERE a.event_id = ?
+INNER JOIN storage_objects so ON so.id = a.storage_object_id AND so.enabled = TRUE
+WHERE a.workspace_id = ?
+  AND a.event_id = ?
   AND a.enabled = TRUE
-ORDER BY a.created_at ASC;
+ORDER BY a.created_at ASC, a.public_id ASC;
 
 -- name: FindCalendarEventAttachmentByPublicId :one
--- Resolve an attachment by UUID v7 for download or deletion.
+-- Resolve an attachment by UUID v7 for download or deletion, including the
+-- backing storage_objects metadata so the handler can build a presigned URL
+-- without a second round trip.
 SELECT
-  id,
-  public_id,
-  event_id,
-  uploader_id,
-  filename,
-  content_type,
-  byte_size,
-  storage_key,
-  enabled,
-  created_at
-FROM calendar_event_attachments
-WHERE public_id = ?
-  AND event_id = ?
-  AND workspace_id = ?
-  AND enabled = TRUE
+  a.id,
+  a.public_id,
+  a.event_id,
+  a.uploader_id,
+  a.filename,
+  so.id AS storage_object_id,
+  so.public_id AS storage_object_public_id,
+  so.content_type,
+  so.byte_size,
+  so.storage_key,
+  so.sha256,
+  a.enabled,
+  a.created_at
+FROM calendar_event_attachments a
+INNER JOIN storage_objects so ON so.id = a.storage_object_id AND so.enabled = TRUE
+WHERE a.workspace_id = ?
+  AND a.event_id = ?
+  AND a.public_id = ?
+  AND a.enabled = TRUE
 LIMIT 1;
 
--- name: DisableCalendarEventAttachment :exec
--- Soft-delete an attachment. Actual blob cleanup is deferred.
-UPDATE calendar_event_attachments
-SET enabled = FALSE
-WHERE public_id = ?
+-- name: DeleteCalendarEventAttachment :exec
+-- Hard-delete a calendar event attachment row. Caller MUST have already
+-- decremented ref_count on the linked storage_objects row inside the same
+-- transaction; this row holding the FK reference must go away before
+-- DeleteStorageObjectIfUnreferenced can free the storage object (FK is
+-- ON DELETE RESTRICT). Audit trail survives via events.
+DELETE FROM calendar_event_attachments
+WHERE workspace_id = ?
   AND event_id = ?
-  AND workspace_id = ?;
+  AND public_id = ?;

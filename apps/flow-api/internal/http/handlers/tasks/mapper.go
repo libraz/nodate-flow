@@ -21,6 +21,7 @@ package tasks
 
 import (
 	"database/sql"
+	"encoding/hex"
 	"encoding/json"
 	"time"
 
@@ -383,16 +384,23 @@ func rowToComment(r generated.ListCommentsForTaskRow) TaskComment {
 	}
 }
 
+// rowToAttachment maps a ListAttachmentsForTask row (attachments JOIN
+// storage_objects) into the public TaskAttachment DTO. ContentType,
+// ByteSize, StorageKey, Sha256 and StorageObjectPublicID all come from
+// the joined storage_objects row so the API surface stays unchanged
+// after the dedup refactor (the columns just no longer live on the
+// attachments table itself).
 func rowToAttachment(r generated.ListAttachmentsForTaskRow) TaskAttachment {
 	return TaskAttachment{
 		ID:                  r.PublicID.String(),
+		StorageObjectID:     r.StorageObjectPublicID.String(),
 		UploaderID:          r.UploaderPublicID.String(),
 		UploaderDisplayName: r.UploaderDisplayName,
 		Filename:            r.Filename,
 		ContentType:         r.ContentType,
 		ByteSize:            r.ByteSize,
 		StorageKey:          r.StorageKey,
-		ChecksumSHA256:      nullStr(r.ChecksumSha256),
+		ChecksumSHA256:      hex.EncodeToString(r.Sha256),
 		UpdatedAt:           nullTimeUnix(r.UpdatedAt),
 		CreatedAt:           r.CreatedAt.Unix(),
 	}

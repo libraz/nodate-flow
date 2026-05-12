@@ -186,7 +186,11 @@ export interface paths {
         get: operations["admin-get-user"];
         put?: never;
         post?: never;
-        delete?: never;
+        /**
+         * Delete a user immediately
+         * @description Destructive immediate delete. Reconciles ref_counts on every storage_objects row referenced by the user (task / calendar attachments uploaded by them across any workspace, plus avatar storage objects owned directly by them), hard-deletes the user (CASCADE clears attachment + avatar SO rows), then sweeps any orphaned MinIO blobs. Requires `confirm: true` in the request body, returns 400 USER.DELETE.CONFIRM_REQUIRED otherwise. Rejects self-delete with USER.DELETE.SELF_NOT_ALLOWED to prevent admins locking themselves out. Suspension (PATCH with enabled=false) is a separate operation and is NOT a precondition.
+         */
+        delete: operations["admin-delete-user"];
         options?: never;
         head?: never;
         /**
@@ -250,7 +254,11 @@ export interface paths {
         get: operations["admin-get-workspace"];
         put?: never;
         post?: never;
-        delete?: never;
+        /**
+         * Delete a workspace immediately
+         * @description Destructive immediate delete. Sweeps every MinIO blob owned by the workspace, then issues a CASCADE-anchored hard DELETE on the workspaces row. Requires `confirm: true` in the request body, returns 400 WORKSPACE.DELETE.CONFIRM_REQUIRED otherwise. Idempotent: an already-deleted workspace returns 200 with deleted=false. Suspension (PATCH with enabled=false) is a separate, reversible operation and is NOT a precondition.
+         */
+        delete: operations["admin-delete-workspace"];
         options?: never;
         head?: never;
         /**
@@ -1611,11 +1619,7 @@ export interface paths {
          */
         get: operations["tasks-attachments-list"];
         put?: never;
-        /**
-         * Register an attachment metadata row on a task
-         * @description Records that a file (already uploaded via /presign) is associated with the task. Stores filename, MIME, size, and storage key.
-         */
-        post: operations["tasks-attachments-add"];
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -1632,8 +1636,8 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Get a presigned PUT URL for uploading an attachment
-         * @description Returns a short-lived presigned PUT URL the client can stream the file directly to S3 with. Pair with /attachments to record metadata after the upload completes.
+         * Reserve an attachment row and (if needed) get a presigned PUT URL
+         * @description Single entry point for adding an attachment to a task. The client supplies the file's SHA-256; the server runs content-addressed dedup and either bumps the ref count on an existing storage_objects row (deduplicated=true, no upload) or returns a presigned PUT URL the client streams the bytes to. The attachment row is always created in the same transaction.
          */
         post: operations["tasks-attachments-presign"];
         delete?: never;
@@ -2321,10 +2325,10 @@ export interface paths {
         put?: never;
         post?: never;
         /**
-         * Disable a workspace
-         * @description Soft-disables the workspace: members lose access to its data and the workspace stops appearing in switcher listings. Owner role required. Hard deletion is performed by instance admins through a separate flow.
+         * Delete a workspace immediately
+         * @description Destructive immediate delete by the workspace owner. Sweeps every MinIO blob owned by the workspace, then issues a CASCADE-anchored hard DELETE on the workspaces row and every dependent member, project, task, event, and attachment. Requires `confirm: true` in the request body, returns 400 WORKSPACE.DELETE.CONFIRM_REQUIRED otherwise. Idempotent: an already-deleted workspace returns 200 with deleted=false. Suspension (PATCH with enabled=false) is a separate, reversible operation and is NOT a precondition.
          */
-        delete: operations["workspaces-disable"];
+        delete: operations["workspaces-delete"];
         options?: never;
         head?: never;
         /**
@@ -3091,11 +3095,27 @@ export interface paths {
          */
         get: operations["attachments-list"];
         put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/workspaces/{wsId}/calendars/{calId}/events/{evtId}/attachments/presign": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
         /**
-         * Record attachment metadata for an event
-         * @description Records that a file (already uploaded out-of-band) is attached to the event. Stores filename, MIME, size, and storage key.
+         * Reserve an attachment row and (if needed) get a presigned PUT URL
+         * @description Single entry point for adding an attachment to an event. The client supplies the file's SHA-256; the server runs content-addressed dedup and either bumps the ref count on an existing storage_objects row (deduplicated=true, no upload) or returns a presigned PUT URL the client streams the bytes to.
          */
-        post: operations["attachments-create"];
+        post: operations["attachments-presign"];
         delete?: never;
         options?: never;
         head?: never;
@@ -3114,9 +3134,29 @@ export interface paths {
         post?: never;
         /**
          * Delete an attachment from an event
-         * @description Marks the attachment as removed and best-effort deletes the underlying object. Idempotent.
+         * @description Marks the attachment as removed, decrements the storage_objects ref_count, and best-effort deletes the underlying blob if no references remain. Idempotent.
          */
         delete: operations["attachments-delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/workspaces/{wsId}/calendars/{calId}/events/{evtId}/attachments/{attId}/download": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get a presigned GET URL for downloading an attachment
+         * @description Returns a short-lived presigned GET URL with Content-Disposition: attachment. Non-ASCII filenames are emitted in RFC 5987 form so they survive HTTP header transport.
+         */
+        get: operations["attachments-download"];
+        put?: never;
+        post?: never;
+        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -4783,18 +4823,6 @@ export interface components {
             /** @enum {string} */
             role: "assignee" | "reviewer" | "watcher" | "approver";
         };
-        AddTaskAttachmentBody: {
-            /**
-             * Format: uri
-             * @description A URL to the JSON Schema for this object.
-             */
-            readonly $schema?: string;
-            /** Format: int64 */
-            byteSize: number;
-            contentType: string;
-            filename: string;
-            storageKey: string;
-        };
         AddTaskBody: {
             /**
              * Format: uri
@@ -4860,6 +4888,18 @@ export interface components {
             email: string;
             /** @enum {string} */
             role: "owner" | "admin" | "member" | "guest";
+        };
+        AdminDeleteOutputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            deleted: boolean;
+            /** Format: int64 */
+            minioErrors: number;
+            /** Format: int64 */
+            storageObjectsDeleted: number;
         };
         AdminListWorkspacesOutputBody: {
             /**
@@ -5091,19 +5131,16 @@ export interface components {
             skipped: number;
         };
         AttachmentResponse: {
-            /**
-             * Format: uri
-             * @description A URL to the JSON Schema for this object.
-             */
-            readonly $schema?: string;
             /** Format: int64 */
             byteSize: number;
+            checksumSha256?: string;
             contentType: string;
             /** Format: int64 */
             createdAt: number;
             filename: string;
             id: string;
             storageKey: string;
+            storageObjectId?: string;
             uploaderId: string;
             uploaderName: string;
         };
@@ -5437,26 +5474,6 @@ export interface components {
              * @description Sampling temperature x100 (default 100)
              */
             temperature?: number;
-        };
-        CreateAttachmentInputBody: {
-            /**
-             * Format: uri
-             * @description A URL to the JSON Schema for this object.
-             */
-            readonly $schema?: string;
-            /**
-             * Format: int64
-             * @description File size in bytes
-             */
-            byteSize: number;
-            /** @description SHA-256 checksum */
-            checksumSha256?: string;
-            /** @description MIME content type */
-            contentType: string;
-            /** @description Original filename */
-            filename: string;
-            /** @description S3 object key */
-            storageKey: string;
         };
         CreateCalendarInputBody: {
             /**
@@ -6087,6 +6104,15 @@ export interface components {
             readonly $schema?: string;
             ok: boolean;
         };
+        DeleteUserInputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            /** @description Must be true to acknowledge irreversible deletion */
+            confirm?: boolean;
+        };
         DeleteWidgetBody: {
             /**
              * Format: uri
@@ -6094,6 +6120,27 @@ export interface components {
              */
             readonly $schema?: string;
             ok: boolean;
+        };
+        DeleteWorkspaceInputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            /** @description Must be true to acknowledge irreversible deletion */
+            confirm?: boolean;
+        };
+        DeleteWorkspaceOutputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            deleted: boolean;
+            /** Format: int64 */
+            minioErrors: number;
+            /** Format: int64 */
+            storageObjectsDeleted: number;
         };
         DescriptionVersion: {
             authorDisplayName?: string;
@@ -6148,14 +6195,6 @@ export interface components {
             ok: boolean;
         };
         DisableTaskBody: {
-            /**
-             * Format: uri
-             * @description A URL to the JSON Schema for this object.
-             */
-            readonly $schema?: string;
-            ok: boolean;
-        };
-        DisableWorkspaceOutputBody: {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
@@ -8004,6 +8043,43 @@ export interface components {
             readonly $schema?: string;
             ok: boolean;
         };
+        PresignAttachmentInputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            /**
+             * Format: int64
+             * @description File size in bytes
+             */
+            byteSize: number;
+            /** @description MIME type */
+            contentType: string;
+            /** @description Original filename */
+            filename: string;
+            /** @description Lowercase hex SHA-256 digest of the file body (64 chars). Drives content-addressed dedup. */
+            sha256: string;
+        };
+        PresignAttachmentOutputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            /** @description Public ID of the created attachment row */
+            attachmentId: string;
+            /** @description True when the server reused an existing blob and no upload is needed. */
+            deduplicated: boolean;
+            /** @description Headers the client MUST send verbatim with the PUT. Currently emits x-amz-content-sha256 to bind the upload body to the claimed digest. Empty/omitted when deduplicated=true. */
+            requiredHeaders?: {
+                [key: string]: string;
+            };
+            /** @description Object key (informational; the presigned URL already encodes it). */
+            storageKey: string;
+            /** @description Presigned PUT URL. Empty when deduplicated=true. */
+            uploadUrl?: string;
+        };
         PresignUploadBody: {
             /**
              * Format: uri
@@ -8019,6 +8095,8 @@ export interface components {
             contentType: string;
             /** @description Original filename */
             filename: string;
+            /** @description Lowercase hex SHA-256 digest of the file body (64 chars). Drives content-addressed dedup. */
+            sha256: string;
         };
         PresignUploadOutputBody: {
             /**
@@ -8028,10 +8106,16 @@ export interface components {
             readonly $schema?: string;
             /** @description Public ID of the created attachment row */
             attachmentId: string;
-            /** @description Object key to confirm after upload */
+            /** @description True when the server reused an existing blob and no upload is needed. */
+            deduplicated: boolean;
+            /** @description Headers the client MUST send verbatim with the PUT. Currently emits x-amz-content-sha256 to bind the upload body to the claimed digest. Empty/omitted when deduplicated=true. */
+            requiredHeaders?: {
+                [key: string]: string;
+            };
+            /** @description Object key (informational; the presigned URL already encodes it). */
             storageKey: string;
-            /** @description Presigned PUT URL */
-            uploadUrl: string;
+            /** @description Presigned PUT URL. Empty when deduplicated=true. */
+            uploadUrl?: string;
         };
         Project: {
             color?: string;
@@ -8957,11 +9041,6 @@ export interface components {
             tokensOutput?: number;
         };
         TaskAttachment: {
-            /**
-             * Format: uri
-             * @description A URL to the JSON Schema for this object.
-             */
-            readonly $schema?: string;
             /** Format: int64 */
             byteSize: number;
             checksumSha256?: string;
@@ -8971,6 +9050,7 @@ export interface components {
             filename: string;
             id: string;
             storageKey: string;
+            storageObjectId?: string;
             /** Format: int64 */
             updatedAt?: number;
             uploaderDisplayName: string;
@@ -10196,6 +10276,41 @@ export interface operations {
             };
         };
     };
+    "admin-delete-user": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                userId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DeleteUserInputBody"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminDeleteOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
     "admin-patch-user": {
         parameters: {
             query?: never;
@@ -10318,6 +10433,41 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AdminWorkspace"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "admin-delete-workspace": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                wsId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DeleteWorkspaceInputBody"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminDeleteOutputBody"];
                 };
             };
             /** @description Error */
@@ -12980,41 +13130,6 @@ export interface operations {
             };
         };
     };
-    "tasks-attachments-add": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["AddTaskAttachmentBody"];
-            };
-        };
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["TaskAttachment"];
-                };
-            };
-            /** @description Error */
-            default: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["ErrorModel"];
-                };
-            };
-        };
-    };
     "tasks-attachments-presign": {
         parameters: {
             query?: never;
@@ -14349,7 +14464,7 @@ export interface operations {
             };
         };
     };
-    "workspaces-disable": {
+    "workspaces-delete": {
         parameters: {
             query?: never;
             header?: never;
@@ -14358,7 +14473,11 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DeleteWorkspaceInputBody"];
+            };
+        };
         responses: {
             /** @description OK */
             200: {
@@ -14366,7 +14485,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["DisableWorkspaceOutputBody"];
+                    "application/json": components["schemas"]["DeleteWorkspaceOutputBody"];
                 };
             };
             /** @description Error */
@@ -16046,7 +16165,7 @@ export interface operations {
             };
         };
     };
-    "attachments-create": {
+    "attachments-presign": {
         parameters: {
             query?: never;
             header?: never;
@@ -16062,7 +16181,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["CreateAttachmentInputBody"];
+                "application/json": components["schemas"]["PresignAttachmentInputBody"];
             };
         };
         responses: {
@@ -16072,7 +16191,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["AttachmentResponse"];
+                    "application/json": components["schemas"]["PresignAttachmentOutputBody"];
                 };
             };
             /** @description Error */
@@ -16111,6 +16230,44 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["DeleteAttachmentOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "attachments-download": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Workspace public ID */
+                wsId: string;
+                /** @description Calendar public ID */
+                calId: string;
+                /** @description Event public ID */
+                evtId: string;
+                /** @description Attachment public ID */
+                attId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DownloadAttachmentOutputBody"];
                 };
             };
             /** @description Error */

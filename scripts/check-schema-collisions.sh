@@ -52,7 +52,7 @@ fi
 # under multiple operations again. We allowlist names that are known
 # shared DTOs (e.g. `Task`, `Workspace`, `CalendarResponse`).
 
-ALLOWLIST_PATTERN='^(AuthTokens|AutoActionSettingsBody|CalendarResponse|EventResponse|ImportJobBody|Label|ListTimelineOutputBody|MeBody|OIDCStartOutputBody|PageDTO|Project|PublicShareResponse|Record|SavedLens|Task|TaskComment|TimeboxDTO|WidgetDTO|Workspace|WorkspaceMember)$'
+ALLOWLIST_PATTERN='^(AdminDeleteOutputBody|AuthTokens|AutoActionSettingsBody|CalendarResponse|EventResponse|ImportJobBody|Label|ListTimelineOutputBody|MeBody|OIDCStartOutputBody|PageDTO|Project|PublicShareResponse|Record|SavedLens|Task|TaskComment|TimeboxDTO|WidgetDTO|Workspace|WorkspaceMember)$'
 
 mapfile -t suspects < <(
   jq -r '

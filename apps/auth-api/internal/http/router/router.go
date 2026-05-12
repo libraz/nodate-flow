@@ -304,6 +304,7 @@ func BuildResult(deps Deps) Result {
 		DB:      deps.DB,
 		Queries: deps.Queries,
 		Audit:   auditRec,
+		Storage: deps.Storage,
 	}
 
 	r.Group(func(sub chi.Router) {
@@ -440,6 +441,7 @@ func BuildResult(deps Deps) Result {
 		DB:      deps.DB,
 		Queries: deps.Queries,
 		Audit:   auditRec,
+		Storage: deps.Storage,
 	}
 	inviteDeps := wshandlers.InviteDeps{
 		Deps:        wsDeps,
@@ -567,12 +569,12 @@ func BuildResult(deps Deps) Result {
 		sub.Use(middleware.RequireWorkspaceRole(middleware.WorkspaceRoleOwner))
 		subAPI := newSubAPI(sub)
 		huma.Register(subAPI, huma.Operation{
-			OperationID: "workspaces-disable",
+			OperationID: "workspaces-delete",
 			Method:      http.MethodDelete,
 			Path:        "/workspaces/{wsId}",
-			Summary:     "Disable a workspace",
-			Description: "Soft-disables the workspace: members lose access to its data and the workspace stops appearing in switcher listings. Owner role required. Hard deletion is performed by instance admins through a separate flow.",
-		}, wshandlers.Disable(wsDeps))
+			Summary:     "Delete a workspace immediately",
+			Description: "Destructive immediate delete by the workspace owner. Sweeps every MinIO blob owned by the workspace, then issues a CASCADE-anchored hard DELETE on the workspaces row and every dependent member, project, task, event, and attachment. Requires `confirm: true` in the request body, returns 400 WORKSPACE.DELETE.CONFIRM_REQUIRED otherwise. Idempotent: an already-deleted workspace returns 200 with deleted=false. Suspension (PATCH with enabled=false) is a separate, reversible operation and is NOT a precondition.",
+		}, wshandlers.Delete(wsDeps))
 	})
 
 	// Public invite info (rate-limited, no auth).

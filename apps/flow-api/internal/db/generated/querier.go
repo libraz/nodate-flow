@@ -24,7 +24,10 @@ type Querier interface {
 	// Idempotent: if a soft-deleted row already exists for this (task, agent, role),
 	// re-enable it and adopt the newly supplied public_id.
 	AddAgentActor(ctx context.Context, arg AddAgentActorParams) (int64, error)
-	// Insert metadata for a newly uploaded attachment.
+	// Insert per-task attachment metadata. The blob itself (sha256, byte_size,
+	// content_type, storage_key) is owned by storage_objects and looked up via
+	// storage_object_id; caller MUST have either inserted a fresh storage_objects
+	// row or bumped ref_count on an existing one inside the same transaction.
 	AddAttachment(ctx context.Context, arg AddAttachmentParams) (int64, error)
 	// Append a comment to a task.
 	AddComment(ctx context.Context, arg AddCommentParams) (int64, error)
@@ -49,10 +52,15 @@ type Querier interface {
 	AdminFindInstanceAdminByUserId(ctx context.Context, userID uint32) (AdminFindInstanceAdminByUserIdRow, error)
 	// Resolve internal user_id from public_id for admin session lookup.
 	AdminFindUserIdByPublicId(ctx context.Context, publicID types.PublicID) (uint32, error)
+	// Resolve internal workspace_id from public_id for the admin purge driver.
+	// Unlike GetWorkspaceIdByPublicId this does NOT filter by enabled, since
+	// purge by design targets soft-disabled workspaces. sql.ErrNoRows means
+	// the workspace is already gone and the caller maps it to a 404.
+	AdminFindWorkspaceIdByPublicId(ctx context.Context, publicID types.PublicID) (uint32, error)
 	// Get a single setting by key.
 	AdminGetInstanceSetting(ctx context.Context, settingKey string) (AdminGetInstanceSettingRow, error)
 	// Find a single user by public_id for admin detail view.
-	AdminGetUser(ctx context.Context, publicID types.PublicID) (VAdminUser, error)
+	AdminGetUser(ctx context.Context, publicID types.PublicID) (AdminGetUserRow, error)
 	// Find a single workspace by public_id for admin detail view.
 	AdminGetWorkspace(ctx context.Context, publicID types.PublicID) (AdminGetWorkspaceRow, error)
 	// Grant instance admin to a user.
@@ -130,6 +138,12 @@ type Querier interface {
 	CleanupExpiredMagicLinks(ctx context.Context) error
 	// Disable TOTP on a local identity.
 	ClearIdentityMfa(ctx context.Context, id uint32) error
+	// Null out the authenticated user's avatar_storage_object_id column. Used by
+	// DELETE /me/avatar; caller MUST decrement ref_count on the previously linked
+	// storage_objects row (and possibly DeleteStorageObjectIfUnreferenced) inside
+	// the same transaction. PatchMe cannot be used because NULL narg means
+	// "leave alone".
+	ClearMyAvatarStorageObject(ctx context.Context, id uint32) error
 	// Null out the authenticated user's avatar_url column. Used by
 	// DELETE /me/avatar after the object has been removed from storage.
 	// PatchMe cannot be used because NULL narg means "leave alone" there.
@@ -256,9 +270,18 @@ type Querier interface {
 	CreateWorkspaceInvite(ctx context.Context, arg CreateWorkspaceInviteParams) (int64, error)
 	// Add a user to a workspace with the given role.
 	CreateWorkspaceMember(ctx context.Context, arg CreateWorkspaceMemberParams) (int64, error)
+	// Atomically drop ref_count by 1 with an underflow guard. Returning
+	// sql.Result lets the caller assert RowsAffected() == 1; a zero result
+	// means the row was already at 0 (programmer error: too many decrements)
+	// and the caller should rollback rather than continue.
+	DecrementStorageObjectRefCount(ctx context.Context, id uint32) (sql.Result, error)
 	// Delete every recovery code (used or not) for a user.
 	DeleteAllRecoveryCodesForUser(ctx context.Context, userID uint32) error
-	// Soft-delete an attachment row. Object storage cleanup is async.
+	// Hard-delete an attachment row. Caller MUST have already
+	// decremented ref_count on the linked storage_objects row inside
+	// the same transaction; this row holding the FK reference must go
+	// away before DeleteStorageObjectIfUnreferenced can free the storage
+	// object (FK is ON DELETE RESTRICT). Audit trail survives via events.
 	DeleteAttachment(ctx context.Context, arg DeleteAttachmentParams) error
 	// Soft-delete a comment.
 	DeleteComment(ctx context.Context, arg DeleteCommentParams) error
@@ -279,6 +302,12 @@ type Querier interface {
 	// Soft-delete a mapping by setting enabled = FALSE. Scoped to the
 	// workspace and identified by public_id.
 	DeleteRepoMapping(ctx context.Context, arg DeleteRepoMappingParams) error
+	// Hard-delete a storage object row only if no referencing rows remain.
+	// The WHERE ref_count = 0 makes this race-safe against a concurrent
+	// IncrementStorageObjectRefCount: if another transaction grabbed the
+	// row for dedup just before us, RowsAffected() returns 0 and the GC
+	// sweeper leaves the underlying MinIO blob alone.
+	DeleteStorageObjectIfUnreferenced(ctx context.Context, id uint32) (sql.Result, error)
 	// Remove every embedding row for a task across all models. ON DELETE
 	// CASCADE already handles task deletion; this query is for the
 	// re-embed-on-edit flow when a workspace switches to a different model.
@@ -323,8 +352,6 @@ type Querier interface {
 	DisableTimebox(ctx context.Context, arg DisableTimeboxParams) error
 	// Soft-delete a widget.
 	DisableWidget(ctx context.Context, arg DisableWidgetParams) error
-	// Soft-disable a workspace. Cascade is handled by FK ON DELETE for hard purges.
-	DisableWorkspace(ctx context.Context, publicID types.PublicID) error
 	// Bulk-dismiss all pending suggestions involving a specific task.
 	DismissAllForTask(ctx context.Context, arg DismissAllForTaskParams) error
 	// Edit a comment body and stamp edited_at.
@@ -424,6 +451,22 @@ type Querier interface {
 	// Resolve a session from its SHA-256 refresh hash. Caller validates expiry.
 	// id is required: used by RotateSessionRefreshHash (WHERE id = ?).
 	FindSessionByRefreshHash(ctx context.Context, refreshHash string) (FindSessionByRefreshHashRow, error)
+	// Resolve a storage object by its internal id. Used inside the same
+	// transaction as the referencing row insert/delete, where the FK id is
+	// already known and a public_id round trip is unnecessary.
+	FindStorageObjectByID(ctx context.Context, id uint32) (FindStorageObjectByIDRow, error)
+	// Look up a user-scoped storage object (e.g. avatar) by content hash.
+	// Used at upload time so that re-uploading the same avatar bytes reuses
+	// the existing object instead of allocating a fresh row in MinIO.
+	FindStorageObjectByOwnerUserSha(ctx context.Context, arg FindStorageObjectByOwnerUserShaParams) (FindStorageObjectByOwnerUserShaRow, error)
+	// Resolve a storage object by its externally visible UUID v7.
+	// The public_id is what handlers receive from the SDK; internal id is
+	// only ever exchanged via the FK on the referencing rows.
+	FindStorageObjectByPublicID(ctx context.Context, publicID types.PublicID) (FindStorageObjectByPublicIDRow, error)
+	// Look up a workspace-scoped storage object by its content hash.
+	// Used at upload time to detect a dedup hit and bump ref_count instead
+	// of inserting a new row. Matches the (workspace_id, sha256) UNIQUE key.
+	FindStorageObjectByWorkspaceSha(ctx context.Context, arg FindStorageObjectByWorkspaceShaParams) (FindStorageObjectByWorkspaceShaRow, error)
 	// Detail projection via v_task_detail. Workspace-scoped.
 	FindTaskByPublicId(ctx context.Context, arg FindTaskByPublicIdParams) (FindTaskByPublicIdRow, error)
 	// Resolve a single link (enabled only) inside a workspace.
@@ -433,11 +476,15 @@ type Querier interface {
 	// Resolve an unused recovery code by (user_id, hash).
 	FindUnusedRecoveryCode(ctx context.Context, arg FindUnusedRecoveryCodeParams) (uint32, error)
 	// Lookup a user by email for login. Returns internal id for the auth pipeline.
+	// avatar_storage_object_id is the FK for self-hosted avatars; avatar_url is
+	// the external (e.g. OIDC provider) fallback URL.
 	FindUserByEmail(ctx context.Context, email string) (FindUserByEmailRow, error)
 	// Lookup a user by email regardless of enabled flag (for invitation reuse).
+	// avatar_storage_object_id is the FK for self-hosted avatars; avatar_url is
+	// the external (e.g. OIDC provider) fallback URL.
 	FindUserByEmailIncludingDisabled(ctx context.Context, email string) (FindUserByEmailIncludingDisabledRow, error)
 	// Lookup a user by external public_id (UUID v7) via the v_users view.
-	FindUserByPublicId(ctx context.Context, publicID types.PublicID) (VUser, error)
+	FindUserByPublicId(ctx context.Context, publicID types.PublicID) (FindUserByPublicIdRow, error)
 	// Resolve the owning user + workspace for an MCP bearer token by hash.
 	// Returns internal ids for the auth middleware.
 	FindUserForMcpToken(ctx context.Context, tokenHash string) (FindUserForMcpTokenRow, error)
@@ -450,6 +497,9 @@ type Querier interface {
 	// Resolve the internal users.id for a public UUID, excluding disabled rows.
 	FindUserInternalIdByPublicId(ctx context.Context, publicID types.PublicID) (uint32, error)
 	// Fetch the minimal profile for the /me endpoint by internal id.
+	// avatar_storage_object_id is the FK for a self-hosted (uploaded) avatar;
+	// avatar_url stays for externally hosted avatars (e.g. OIDC provider). The
+	// handler resolves the storage object public_id / signed URL separately.
 	FindUserProfileById(ctx context.Context, id uint32) (FindUserProfileByIdRow, error)
 	// Resolve the public UUID for an internal users.id, excluding disabled rows.
 	FindUserPublicIdById(ctx context.Context, id uint32) (types.PublicID, error)
@@ -484,8 +534,14 @@ type Querier interface {
 	// workspace has never written a row; the caller should fall back to the
 	// column defaults (mock-768 / 100 cents/day / 0.870 / 0.750).
 	GetAiSettings(ctx context.Context, workspaceID uint32) (GetAiSettingsRow, error)
-	// Fetch a single attachment by its public id within a workspace.
+	// Fetch a single attachment by its public id within a workspace, with the
+	// backing storage_objects metadata. Used by download / detail handlers.
 	GetAttachmentByPublicID(ctx context.Context, arg GetAttachmentByPublicIDParams) (GetAttachmentByPublicIDRow, error)
+	// Resolve the internal storage_object_id for an attachment so the delete
+	// handler can decrement ref_count (and possibly GC the underlying blob)
+	// in the same transaction as the hard-delete below. Returns the internal
+	// attachment id as well so the caller does not have to round-trip.
+	GetAttachmentStorageObjectIDForDelete(ctx context.Context, arg GetAttachmentStorageObjectIDForDeleteParams) (GetAttachmentStorageObjectIDForDeleteRow, error)
 	// Resolve, for a set of recipients in one workspace, which delivery
 	// channels are enabled for a given event_category. A recipient with
 	// no row for the (workspace, category, channel) tuple returns no
@@ -551,11 +607,42 @@ type Querier interface {
 	// Return the role string for an enabled workspace member. Returns
 	// sql.ErrNoRows when the user is not a member.
 	GetWorkspaceMemberRole(ctx context.Context, arg GetWorkspaceMemberRoleParams) (WorkspaceMembersRole, error)
+	// Final stage of the admin user immediate destructive delete. Fires in
+	// the same request as the caller's MinIO sweep (avatar storage_objects
+	// + per-attachment ref_count decrements); there is no soft-disabled
+	// prerequisite (the `enabled` flag is reserved for reversible suspension
+	// and is unrelated to delete). RowsAffected = 0 means the user was
+	// already removed by a concurrent request and the caller should map it
+	// to a 404, NOT retry.
+	//
+	// The ON DELETE CASCADE chain on users.id removes user-scoped rows
+	// (sessions, recovery codes, instance admin grants, the user-scoped
+	// storage_objects rows whose blobs the caller already purged). FK
+	// ON DELETE SET NULL on attachments.uploader_id / similar audit-trail
+	// back-refs is intentional: the audit history outlives the user.
+	HardDeleteUser(ctx context.Context, id uint32) (sql.Result, error)
+	// Final stage of the admin workspace immediate destructive delete. Fires
+	// in the same request as the caller's MinIO sweep; there is no soft-
+	// disabled prerequisite (the `enabled` flag is reserved for reversible
+	// suspension and is unrelated to delete). RowsAffected = 0 means the
+	// workspace was already removed by a concurrent request and the caller
+	// should map it to a 404, NOT retry.
+	//
+	// The ON DELETE CASCADE chain on workspaces.id removes every workspace-
+	// scoped row (members, projects, tasks, events, attachments rows, and
+	// the storage_objects rows whose blobs the caller already purged from
+	// MinIO).
+	HardDeleteWorkspace(ctx context.Context, id uint32) (sql.Result, error)
 	// Check if any events have occurred in the workspace since the given timestamp.
 	// Used by the agent runtime pre-flight check to skip LLM calls when idle.
 	HasRecentEventsForWorkspace(ctx context.Context, arg HasRecentEventsForWorkspaceParams) (bool, error)
 	// Bump the use counter after a successful accept.
 	IncrementInviteUseCount(ctx context.Context, id uint32) error
+	// Bump ref_count by 1 when an additional referencing row is created
+	// (e.g. dedup hit on a re-upload). Caller MUST run this inside the
+	// same transaction as the referencing INSERT so the count cannot drift
+	// if the INSERT fails.
+	IncrementStorageObjectRefCount(ctx context.Context, id uint32) error
 	// Append an agent.task.handoff_to_agent event. The caller is a human (or a
 	// system actor) transferring a task to an AI agent, so actor_user_id is
 	// populated and actor_agent_id stays NULL. Payload is caller-shaped: the
@@ -577,6 +664,11 @@ type Querier interface {
 	// when external_id is non-NULL. Duplicate deliveries are silently ignored
 	// via INSERT IGNORE; LastInsertId() returns 0 when the row was a duplicate.
 	InsertSignal(ctx context.Context, arg InsertSignalParams) (int64, error)
+	// Create a brand new storage object row with ref_count = 1, representing
+	// the first reference (the just-inserted attachment / avatar). Caller
+	// supplies a UUID v7 public_id and either workspace_id OR owner_user_id
+	// (the CHECK constraint enforces exactly one is non-null).
+	InsertStorageObject(ctx context.Context, arg InsertStorageObjectParams) (sql.Result, error)
 	// Quick check: is this event category muted on the in_app channel for a user?
 	IsEventMutedForUser(ctx context.Context, arg IsEventMutedForUserParams) (int64, error)
 	// Find all active subscriptions in a workspace. Event type filtering
@@ -627,8 +719,21 @@ type Querier interface {
 	// is monotonically unique on this projection because v_task_list_archived
 	// only emits rows with archived_at IS NOT NULL.
 	ListArchivedTasksForWorkspaceKeyset(ctx context.Context, arg ListArchivedTasksForWorkspaceKeysetParams) ([]ListArchivedTasksForWorkspaceKeysetRow, error)
-	// List attachments on a task with uploader display fields.
+	// List attachments on a task with uploader display fields and the
+	// storage_objects metadata flattened in via JOIN. Returns total via a
+	// window function for paginated UI.
 	ListAttachmentsForTask(ctx context.Context, arg ListAttachmentsForTaskParams) ([]ListAttachmentsForTaskRow, error)
+	// Enumerate task attachments uploaded by a user across every workspace
+	// they belong to, joined with the underlying storage_objects so the
+	// purge driver can decrement ref_count and (if ref_count reaches 0)
+	// GC the MinIO blob. The workspace owning the attachment may stay
+	// alive after the user is deleted, so this cannot rely on
+	// ON DELETE CASCADE alone.
+	//
+	// The current ref_count column is returned so the caller can short-
+	// circuit the GC decision without an extra round-trip; treat it as a
+	// hint and re-check inside the decrement transaction.
+	ListAttachmentsForUploaderPurge(ctx context.Context, uploaderID uint32) ([]ListAttachmentsForUploaderPurgeRow, error)
 	// ============================================================================
 	// auto_action_rules queries
 	// Per-workspace auto-action rule configuration. Each row defines a single
@@ -637,6 +742,12 @@ type Querier interface {
 	// ============================================================================
 	// List all auto-action rules for a workspace, ordered by kind.
 	ListAutoActionRulesForWorkspace(ctx context.Context, workspaceID uint32) ([]AutoActionRule, error)
+	// Calendar-event variant of ListAttachmentsForUploaderPurge. Same
+	// contract: enumerate every calendar_event_attachments row uploaded
+	// by the target user with the joined storage_objects.storage_key and
+	// ref_count so the purge driver can decrement and GC blobs whose last
+	// referencing row is being removed.
+	ListCalendarEventAttachmentsForUploaderPurge(ctx context.Context, uploaderID uint32) ([]ListCalendarEventAttachmentsForUploaderPurgeRow, error)
 	// Return all task_embeddings for (workspace_id, model), excluding a given
 	// task_id (so self-similarity is filtered out). Cosine similarity is
 	// computed in Go because MySQL 9.6 Community does not expose
@@ -911,6 +1022,23 @@ type Querier interface {
 	// the given (workspace_id, model). Used by the background re-embed worker.
 	// LEFT JOIN so tasks with no row at all are returned as "stale".
 	ListStaleTaskEmbeddings(ctx context.Context, arg ListStaleTaskEmbeddingsParams) ([]ListStaleTaskEmbeddingsRow, error)
+	// Enumerate every storage_objects row owned directly by a user (avatars
+	// only at the moment) so the admin purge driver can clean MinIO before
+	// the users row is hard-deleted. Workspace-scoped attachments uploaded
+	// by the same user live under workspace_id and are handled separately
+	// via ListAttachmentsForUploaderPurge / the calendar variant.
+	ListStorageObjectsByOwnerUser(ctx context.Context, ownerUserID sql.NullInt32) ([]ListStorageObjectsByOwnerUserRow, error)
+	// Enumerate every storage_objects row scoped to a workspace, including
+	// already soft-disabled rows, so the admin purge driver can stream them
+	// to the MinIO sweeper before the workspace row is hard-deleted (the
+	// ON DELETE CASCADE on storage_objects.workspace_id would otherwise
+	// orphan the underlying blobs).
+	//
+	// Pre-conditions: caller has already verified the workspace is
+	// soft-deleted (enabled = FALSE). No workspace_id-on-WHERE-line-1 rule
+	// here because purge IS the admin tooling that operates across the
+	// workspace boundary by design.
+	ListStorageObjectsByWorkspace(ctx context.Context, workspaceID sql.NullInt32) ([]ListStorageObjectsByWorkspaceRow, error)
 	// Distinct role names currently attached to the task via
 	// task_actors. Used to populate Facts.ActorRoles.
 	ListTaskActorRolesForEngine(ctx context.Context, taskID uint32) ([]TaskActorsRole, error)
@@ -1116,6 +1244,12 @@ type Querier interface {
 	// Enable public sharing on a lens. Generates a share URL token.
 	// No-op if the lens is already public (WHERE is_public = FALSE guard).
 	SetLensPublic(ctx context.Context, arg SetLensPublicParams) error
+	// Bind the authenticated user's avatar to a freshly inserted (or dedup-hit)
+	// storage_objects row. Used by POST /me/avatar after a successful upload to
+	// MinIO. Caller MUST run this in the same transaction as the InsertStorageObject
+	// / IncrementStorageObjectRefCount that allocated the FK target so ref_count
+	// never drifts. PatchMe cannot be used because NULL narg means "leave alone".
+	SetMyAvatarStorageObject(ctx context.Context, arg SetMyAvatarStorageObjectParams) error
 	// Replace the authenticated user's avatar_url column with a non-NULL value.
 	// Used by POST /me/avatar after a successful upload. The COALESCE-style
 	// PatchMe query cannot be reused because it treats NULL as "leave alone"

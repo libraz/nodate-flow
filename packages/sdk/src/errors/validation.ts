@@ -26,6 +26,11 @@ export const ValidationErrors = {
     status: 400,
     message: "Request body could not be parsed",
   },
+  VALIDATION_CHECKSUM_FORMAT_INVALID: {
+    code: "VALIDATION.CHECKSUM.FORMAT_INVALID",
+    status: 400,
+    message: "Invalid checksum format. Expected SHA-256 as 64 hex characters.",
+  },
   VALIDATION_FILE_TOO_LARGE: {
     code: "VALIDATION.FILE.TOO_LARGE",
     status: 413,

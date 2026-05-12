@@ -8,6 +8,8 @@ SELECT
   u.email,
   u.display_name,
   u.avatar_url,
+  u.avatar_storage_object_id,
+  so_avatar.public_id AS avatar_storage_object_public_id,
   u.locale,
   u.timezone,
   u.country,
@@ -21,4 +23,6 @@ SELECT
   EXISTS(SELECT 1 FROM instance_admins ia
      WHERE ia.user_id = u.id AND ia.enabled = TRUE
        AND ia.revoked_at IS NULL) AS is_instance_admin
-FROM users u;
+FROM users u
+LEFT JOIN storage_objects so_avatar
+  ON so_avatar.id = u.avatar_storage_object_id AND so_avatar.enabled = TRUE;

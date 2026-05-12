@@ -2,39 +2,40 @@
  * AttachmentsTab — Attachments pane of the calendar event detail page.
  *
  * Lists attachment metadata associated with the event (filename, size,
- * uploader, created date) and exposes register-by-metadata + delete
- * actions. **The event-side API is metadata-only today** — there is
- * no presigned upload route and no presigned download route. The
- * task-side flow at `apps/flow-web/src/features/tasks/task-attachments.tsx`
- * uses `usePresignUpload` + `fetchDownloadUrl`; if those endpoints land
- * on the event side later, switch this file to mirror that flow.
+ * uploader, created date) and exposes content-addressed upload,
+ * download, and delete actions. The upload pipeline mirrors the
+ * task-side flow at
+ * `apps/flow-web/src/features/tasks/task-attachments.tsx`:
  *
- * For now the "Add" affordance opens a small inline form where the
- * caller pastes the storage key, filename, content type, and byte size
- * they obtained out-of-band. This keeps the UI honest about what the
- * backend actually exposes rather than faking an upload pipeline.
+ *   1. The user picks a file via the hidden `<input type="file">`.
+ *   2. We compute its SHA-256 client-side and POST the digest +
+ *      metadata to `/events/{evtId}/attachments/presign`.
+ *   3. If the response carries `deduplicated: true`, we skip the PUT
+ *      entirely (the byte stream already exists in object storage).
+ *      Otherwise we stream the file straight to the presigned PUT URL.
  *
  * Hooks consumed:
- *   - {@link useEventAttachmentsQuery}            — suspense list read
- *   - {@link useAddEventAttachmentMutation}       — POST metadata
- *   - {@link useDeleteEventAttachmentMutation}    — DELETE with confirm
+ *   - {@link useEventAttachmentsQuery}                — suspense list read
+ *   - {@link usePresignEventAttachmentMutation}       — content-addressed upload
+ *   - {@link fetchEventAttachmentDownloadUrl}         — one-shot download URL
+ *   - {@link useDeleteEventAttachmentMutation}        — DELETE with confirm
  *
  * Wrap in a `<Suspense>` boundary at the call site.
  */
 
 import Button from '@nodate-flow/ui/primitives/button';
-import Input from '@nodate-flow/ui/primitives/input';
 import { toaster } from '@nodate-flow/ui/primitives/toast';
-import { type FormEvent, type ReactElement, useId, useState } from 'react';
+import { type ChangeEvent, type ReactElement, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { confirmAction } from '../../lib/confirm-action';
 import { formatEpochDateTime } from '../../lib/format';
 import {
   type EventAttachment,
-  useAddEventAttachmentMutation,
+  fetchEventAttachmentDownloadUrl,
   useDeleteEventAttachmentMutation,
   useEventAttachmentsQuery,
+  usePresignEventAttachmentMutation,
 } from './attachments-api';
 import styles from './event-detail-page.module.css';
 
@@ -106,6 +107,20 @@ function AttachmentRow({
     }
   };
 
+  const handleDownload = async (): Promise<void> => {
+    try {
+      const url = await fetchEventAttachmentDownloadUrl({
+        wsId: workspaceId,
+        calId: calendarId,
+        evtId: eventId,
+        attachmentId: attachment.id,
+      });
+      window.open(url, '_blank');
+    } catch {
+      toaster.show({ tone: 'danger', message: t('event.attachments.download_error') });
+    }
+  };
+
   const created = formatEpochDateTime(attachment.createdAt, locale) ?? '';
 
   return (
@@ -120,6 +135,17 @@ function AttachmentRow({
         </span>
       </div>
       <div className={styles.attachmentControls}>
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          aria-label={t('event.attachments.download')}
+          onClick={() => {
+            void handleDownload();
+          }}
+        >
+          {t('event.attachments.download')}
+        </Button>
         <Button
           type="button"
           variant="ghost"
@@ -147,55 +173,31 @@ export default function AttachmentsTab({
   const { t, i18n } = useTranslation('calendar-events');
   const locale = i18n.resolvedLanguage ?? 'en';
   const { data: attachments } = useEventAttachmentsQuery(workspaceId, calendarId, eventId);
-  const addMutation = useAddEventAttachmentMutation();
+  const presignUpload = usePresignEventAttachmentMutation();
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const [showForm, setShowForm] = useState(false);
-  const [filename, setFilename] = useState('');
-  const [storageKey, setStorageKey] = useState('');
-  const [contentType, setContentType] = useState('');
-  const [byteSizeRaw, setByteSizeRaw] = useState('');
-  const formId = useId();
-  const filenameId = `${formId}-filename`;
-  const storageKeyId = `${formId}-storage-key`;
-  const contentTypeId = `${formId}-content-type`;
-  const byteSizeId = `${formId}-byte-size`;
-
-  const resetForm = (): void => {
-    setFilename('');
-    setStorageKey('');
-    setContentType('');
-    setByteSizeRaw('');
-  };
-
-  const parsedByteSize = Number.parseInt(byteSizeRaw, 10);
-  const validByteSize = !Number.isNaN(parsedByteSize) && parsedByteSize >= 0;
-  const canSubmit =
-    filename.trim().length > 0 &&
-    storageKey.trim().length > 0 &&
-    contentType.trim().length > 0 &&
-    validByteSize &&
-    !addMutation.isPending;
-
-  const handleSubmit = async (e: FormEvent<HTMLFormElement>): Promise<void> => {
-    e.preventDefault();
-    if (!canSubmit) return;
+  const handleFileChange = async (e: ChangeEvent<HTMLInputElement>): Promise<void> => {
+    const file = e.target.files?.[0];
+    if (!file) return;
     try {
-      await addMutation.mutateAsync({
+      const result = await presignUpload.mutateAsync({
         wsId: workspaceId,
         calId: calendarId,
         evtId: eventId,
-        input: {
-          filename: filename.trim(),
-          storageKey: storageKey.trim(),
-          contentType: contentType.trim(),
-          byteSize: parsedByteSize,
-        },
+        file,
       });
-      toaster.show({ tone: 'success', message: t('event.attachments.upload_success') });
-      resetForm();
-      setShowForm(false);
+      toaster.show({
+        tone: 'success',
+        message: result.deduplicated
+          ? t('event.attachments.upload_dedup_success')
+          : t('event.attachments.upload_success'),
+      });
     } catch {
-      toaster.show({ tone: 'danger', message: t('event.attachments.add_error') });
+      toaster.show({ tone: 'danger', message: t('event.attachments.upload_error') });
+    }
+    // Reset the input so the same file can be re-selected.
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
     }
   };
 
@@ -203,16 +205,27 @@ export default function AttachmentsTab({
     <div className={styles.tabPanel}>
       <div className={styles.tabHeader}>
         <span />
-        <Button
-          type="button"
-          variant="default"
-          size="sm"
-          onClick={() => {
-            setShowForm((v) => !v);
-          }}
-        >
-          {t('event.attachments.add')}
-        </Button>
+        <div>
+          <input
+            ref={fileInputRef}
+            type="file"
+            style={{ display: 'none' }}
+            onChange={(e) => {
+              void handleFileChange(e);
+            }}
+          />
+          <Button
+            type="button"
+            variant="default"
+            size="sm"
+            disabled={presignUpload.isPending}
+            onClick={() => fileInputRef.current?.click()}
+          >
+            {presignUpload.isPending
+              ? t('event.attachments.uploading')
+              : t('event.attachments.upload')}
+          </Button>
+        </div>
       </div>
       {attachments.length === 0 ? (
         <p className={styles.empty}>{t('event.attachments.empty')}</p>
@@ -230,88 +243,6 @@ export default function AttachmentsTab({
           ))}
         </ul>
       )}
-      {showForm ? (
-        <form
-          className={styles.attachmentForm}
-          onSubmit={(e) => {
-            void handleSubmit(e);
-          }}
-        >
-          <label
-            htmlFor={filenameId}
-            className={`${styles.attachmentFieldLabel} ${styles.attachmentFormFull}`}
-          >
-            <span>{t('event.attachments.field.filename')}</span>
-            <Input
-              id={filenameId}
-              type="text"
-              value={filename}
-              onChange={(e) => {
-                setFilename(e.target.value);
-              }}
-              required
-            />
-          </label>
-          <label
-            htmlFor={storageKeyId}
-            className={`${styles.attachmentFieldLabel} ${styles.attachmentFormFull}`}
-          >
-            <span>{t('event.attachments.field.storage_key')}</span>
-            <Input
-              id={storageKeyId}
-              type="text"
-              value={storageKey}
-              onChange={(e) => {
-                setStorageKey(e.target.value);
-              }}
-              required
-            />
-          </label>
-          <label htmlFor={contentTypeId} className={styles.attachmentFieldLabel}>
-            <span>{t('event.attachments.field.content_type')}</span>
-            <Input
-              id={contentTypeId}
-              type="text"
-              value={contentType}
-              onChange={(e) => {
-                setContentType(e.target.value);
-              }}
-              required
-            />
-          </label>
-          <label htmlFor={byteSizeId} className={styles.attachmentFieldLabel}>
-            <span>{t('event.attachments.field.byte_size')}</span>
-            <Input
-              id={byteSizeId}
-              type="number"
-              min={0}
-              value={byteSizeRaw}
-              onChange={(e) => {
-                setByteSizeRaw(e.target.value);
-              }}
-              required
-            />
-          </label>
-          <div className={`${styles.addRowControls} ${styles.attachmentFormFull}`}>
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              onClick={() => {
-                resetForm();
-                setShowForm(false);
-              }}
-            >
-              {t('event.comments.edit_cancel')}
-            </Button>
-            <Button type="submit" size="sm" disabled={!canSubmit}>
-              {addMutation.isPending
-                ? t('event.attachments.uploading')
-                : t('event.attachments.upload')}
-            </Button>
-          </div>
-        </form>
-      ) : null}
     </div>
   );
 }

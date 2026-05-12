@@ -24,12 +24,19 @@ import (
 var (
 	testServerURL string
 	testDB        *sql.DB
+	testStorage   *helpers.StorageBundle
 )
 
 // TestMain bootstraps the shared MySQL testcontainer and HTTP server
 // once for the whole package so parallel tests all talk to the same
 // harness. When NF_TEST_INTEGRATION is unset, it simply runs m.Run()
 // and every test skips via skipIfNoIntegration.
+//
+// MinIO is started lazily and bound into the test server so the
+// attachment / avatar dedup tests can exercise the real S3 path. If
+// MinIO startup fails (no Docker, image pull error) the suite still
+// runs; tests that require storage skip themselves via
+// requireStorage(t).
 func TestMain(m *testing.M) {
 	if os.Getenv("NF_TEST_INTEGRATION") == "" {
 		os.Exit(m.Run())
@@ -39,7 +46,21 @@ func TestMain(m *testing.M) {
 		fmt.Fprintln(os.Stderr, "e2e: start shared mysql:", err)
 		os.Exit(1)
 	}
-	srv, cleanup, err := helpers.NewTestServer(inst.DB)
+
+	// Best-effort MinIO bootstrap; storage-dependent tests gate on
+	// testStorage being non-nil so a missing MinIO does not break the
+	// rest of the suite.
+	if minioInst, mErr := helpers.EnsureSharedMinIO(); mErr == nil {
+		if bundle, bErr := helpers.NewStorageBundle(minioInst); bErr == nil {
+			testStorage = bundle
+		} else {
+			fmt.Fprintln(os.Stderr, "e2e: build storage bundle:", bErr)
+		}
+	} else {
+		fmt.Fprintln(os.Stderr, "e2e: minio unavailable, storage tests will skip:", mErr)
+	}
+
+	srv, cleanup, err := helpers.NewTestServerWithStorage(inst.DB, testStorage)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "e2e: start test server:", err)
 		os.Exit(1)
@@ -50,6 +71,17 @@ func TestMain(m *testing.M) {
 	code := m.Run()
 	cleanup()
 	os.Exit(code)
+}
+
+// requireStorage skips the test when the shared MinIO container failed
+// to start. Tests that exercise attachment / avatar uploads call this
+// at the top so the rest of the suite stays runnable on machines
+// without Docker volume support for MinIO.
+func requireStorage(t *testing.T) {
+	t.Helper()
+	if testStorage == nil {
+		t.Skip("storage tests require MinIO; bundle not initialised")
+	}
 }
 
 func mustStartHarness(t *testing.T) {

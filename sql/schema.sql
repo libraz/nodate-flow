@@ -51,6 +51,7 @@ DROP TABLE IF EXISTS `relation_suggestions`;
 DROP TABLE IF EXISTS `repo_workspace_mappings`;
 DROP TABLE IF EXISTS `sessions`;
 DROP TABLE IF EXISTS `signals`;
+DROP TABLE IF EXISTS `storage_objects`;
 DROP TABLE IF EXISTS `task_actors`;
 DROP TABLE IF EXISTS `task_constraints`;
 DROP TABLE IF EXISTS `task_dependencies`;
@@ -307,8 +308,11 @@ CREATE TABLE ai_settings (
 -- >>> attachments.sql
 -- ====================================
 -- attachments
--- Files uploaded against a task. The actual blob lives in object storage
--- under storage_key; this row is the metadata index.
+-- Files uploaded against a task. The actual blob and its content metadata
+-- (sha256 / byte_size / content_type / storage_key) live in storage_objects;
+-- this row is the per-task reference (filename, uploader, sort order). The
+-- same blob uploaded twice within a workspace shares one storage_objects
+-- row and bumps its ref_count.
 -- ====================================
 CREATE TABLE attachments (
   id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY COMMENT 'Internal PK, never exposed',
@@ -316,12 +320,9 @@ CREATE TABLE attachments (
   workspace_id INT UNSIGNED NOT NULL COMMENT 'Internal FK to workspaces.id',
   task_id INT UNSIGNED NULL COMMENT 'Internal FK to tasks.id; nullable so audit-trail attachments survive task deletion (FK SET NULL)',
   uploader_id INT UNSIGNED NOT NULL COMMENT 'Internal FK to users.id (uploader)',
+  storage_object_id INT UNSIGNED NOT NULL COMMENT 'FK to storage_objects.id; holds the actual blob metadata (sha256, byte_size, content_type, storage_key)',
 
-  filename VARCHAR(255) NOT NULL COMMENT 'Original filename',
-  content_type VARCHAR(127) CHARACTER SET latin1 COLLATE latin1_swedish_ci NOT NULL COMMENT 'MIME type',
-  byte_size BIGINT UNSIGNED NOT NULL COMMENT 'Size in bytes',
-  storage_key VARCHAR(512) CHARACTER SET latin1 COLLATE latin1_swedish_ci NOT NULL COMMENT 'Object storage key (e.g., s3 key)',
-  checksum_sha256 CHAR(64) CHARACTER SET latin1 COLLATE latin1_swedish_ci NULL COMMENT 'SHA-256 hex of file contents',
+  filename VARCHAR(512) NOT NULL COMMENT 'Original filename as supplied by the uploader; widened to 512 to safely hold multibyte paths',
 
   sort_weight INT NOT NULL DEFAULT 0 COMMENT 'Display order',
   notes TEXT NULL COMMENT 'Admin notes',
@@ -331,13 +332,16 @@ CREATE TABLE attachments (
 
   UNIQUE KEY uniq_attachments_public_id (public_id),
   UNIQUE KEY uniq_attachments_workspace_public_id (workspace_id, public_id),
-  UNIQUE KEY uniq_attachments_storage_key (storage_key),
   KEY idx_attachments_workspace_id_task_id (workspace_id, task_id),
   KEY idx_attachments_workspace_id_uploader_id (workspace_id, uploader_id),
+  KEY idx_attachments_storage_object (storage_object_id),
 
   CONSTRAINT fk_attachments_workspace FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
   CONSTRAINT fk_attachments_task FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE SET NULL,
-  CONSTRAINT fk_attachments_uploader FOREIGN KEY (uploader_id) REFERENCES users(id) ON DELETE CASCADE
+  CONSTRAINT fk_attachments_uploader FOREIGN KEY (uploader_id) REFERENCES users(id) ON DELETE CASCADE,
+  -- RESTRICT: attachments must be deleted (and ref_count decremented) before
+  -- the underlying storage_objects row may be removed by the GC sweeper.
+  CONSTRAINT fk_attachments_storage_object FOREIGN KEY (storage_object_id) REFERENCES storage_objects(id) ON DELETE RESTRICT
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Task file attachments metadata';
 
 -- >>> audit_logs.sql
@@ -406,9 +410,12 @@ CREATE TABLE auto_action_rules (
 -- >>> calendar_event_attachments.sql
 -- ====================================
 -- calendar_event_attachments
--- Files uploaded against a calendar event. Actual blobs live in object
--- storage under storage_key; this table is the metadata index.
--- Uses soft-delete via enabled flag.
+-- Files uploaded against a calendar event. The actual blob and its content
+-- metadata (sha256 / byte_size / content_type / storage_key) live in
+-- storage_objects; this row is the per-event reference (filename, uploader,
+-- sort order). Uses soft-delete via enabled flag so that disabling does not
+-- immediately drop the underlying storage_objects ref_count — physical
+-- removal happens when the row is hard-deleted.
 -- ====================================
 CREATE TABLE calendar_event_attachments (
   id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY COMMENT 'Internal PK, never exposed',
@@ -416,12 +423,9 @@ CREATE TABLE calendar_event_attachments (
   workspace_id INT UNSIGNED NOT NULL COMMENT 'Internal FK to workspaces.id',
   event_id INT UNSIGNED NULL COMMENT 'Internal FK to calendar_events.id; nullable so audit-trail attachments survive event hard-delete (FK SET NULL)',
   uploader_id INT UNSIGNED NOT NULL COMMENT 'Internal FK to users.id (uploader)',
+  storage_object_id INT UNSIGNED NOT NULL COMMENT 'FK to storage_objects.id; holds the actual blob metadata (sha256, byte_size, content_type, storage_key)',
 
-  filename VARCHAR(255) NOT NULL COMMENT 'Original filename',
-  content_type VARCHAR(127) CHARACTER SET latin1 COLLATE latin1_swedish_ci NOT NULL DEFAULT 'application/octet-stream' COMMENT 'MIME type',
-  byte_size BIGINT UNSIGNED NOT NULL DEFAULT 0 COMMENT 'Size in bytes',
-  storage_key VARCHAR(512) CHARACTER SET latin1 COLLATE latin1_swedish_ci NOT NULL COMMENT 'Object storage key',
-  checksum_sha256 CHAR(64) CHARACTER SET latin1 COLLATE latin1_swedish_ci NULL COMMENT 'SHA-256 hex of file contents',
+  filename VARCHAR(512) NOT NULL COMMENT 'Original filename as supplied by the uploader; widened to 512 to safely hold multibyte paths',
 
   sort_weight INT NOT NULL DEFAULT 0 COMMENT 'Display order',
   notes TEXT NULL COMMENT 'Admin notes',
@@ -431,13 +435,16 @@ CREATE TABLE calendar_event_attachments (
 
   UNIQUE KEY uniq_calendar_event_attachments_public_id (public_id),
   UNIQUE KEY uniq_calendar_event_attachments_workspace_public_id (workspace_id, public_id),
-  UNIQUE KEY uniq_calendar_event_attachments_storage_key (storage_key),
   KEY idx_calendar_event_attachments_event (event_id, enabled),
   KEY idx_calendar_event_attachments_workspace_uploader (workspace_id, uploader_id),
+  KEY idx_calendar_event_attachments_storage_object (storage_object_id),
 
   CONSTRAINT fk_calendar_event_attachments_workspace FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
   CONSTRAINT fk_calendar_event_attachments_event FOREIGN KEY (event_id) REFERENCES calendar_events(id) ON DELETE SET NULL,
-  CONSTRAINT fk_calendar_event_attachments_uploader FOREIGN KEY (uploader_id) REFERENCES users(id) ON DELETE CASCADE
+  CONSTRAINT fk_calendar_event_attachments_uploader FOREIGN KEY (uploader_id) REFERENCES users(id) ON DELETE CASCADE,
+  -- RESTRICT: attachments must be deleted (and ref_count decremented) before
+  -- the underlying storage_objects row may be removed by the GC sweeper.
+  CONSTRAINT fk_calendar_event_attachments_storage_object FOREIGN KEY (storage_object_id) REFERENCES storage_objects(id) ON DELETE RESTRICT
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Calendar event file attachments';
 
 -- >>> calendar_event_attendees.sql
@@ -976,7 +983,7 @@ CREATE TABLE events (
   workspace_id INT UNSIGNED NOT NULL COMMENT 'Internal FK to workspaces.id',
   task_id INT UNSIGNED NULL COMMENT 'Internal FK to tasks.id when the event targets a task',
   actor_user_id INT UNSIGNED NULL COMMENT 'Acting user.id (null for system/bot actions)',
-  actor_agent_id INT UNSIGNED NULL COMMENT 'Acting ai_agents.id when the event was produced by an AI agent (mutually exclusive with actor_user_id; both NULL means system actor)',
+  actor_agent_id INT UNSIGNED NULL COMMENT 'Acting ai_agents.id when the event was produced by an AI agent. Mutual exclusion with actor_user_id is enforced by query design and handler validation, not a CHECK constraint (MySQL 8.4 forbids CHECK on columns used by FK referential actions; both FKs use ON DELETE SET NULL). Each INSERT binds exactly one of the two columns: AppendEvent (events.sql) sets actor_user_id only; AppendAgentEvent (events.sql) and InsertHandoffToUserEvent (agents/handoff.sql) set actor_agent_id only; InsertHandoffToAgentEvent (agents/handoff.sql) sets actor_user_id only. Both NULL means system actor.',
 
   type VARCHAR(64) CHARACTER SET latin1 COLLATE latin1_swedish_ci NOT NULL COMMENT 'Event type (e.g., task.created, signal.attached)',
   payload_json JSON NOT NULL CHECK (JSON_VALID(payload_json)) COMMENT 'Event payload',
@@ -1859,6 +1866,56 @@ CREATE TABLE signals (
   CONSTRAINT fk_signals_task FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Inbound signals';
 
+-- >>> storage_objects.sql
+-- ====================================
+-- storage_objects
+-- Content-addressed metadata index for blobs that physically live in MinIO
+-- (S3-compatible object storage). One row per unique (scope, sha256) tuple
+-- so that uploading the same file twice within a scope reuses the underlying
+-- object and only bumps ref_count.
+--
+-- Scope is exclusive: a row either belongs to a workspace (task / calendar
+-- event attachments) or to a single user (avatar). The check constraint
+-- enforces exactly one of workspace_id / owner_user_id is non-null.
+--
+-- Lifecycle: creating a referencing row (attachments / users.avatar_*) bumps
+-- ref_count, deleting one decrements it. A background sweeper hard-deletes
+-- the MinIO object and this row when ref_count reaches 0. FKs from referrers
+-- use ON DELETE RESTRICT so we never lose track of a still-referenced blob.
+-- ====================================
+CREATE TABLE storage_objects (
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY COMMENT 'Internal PK, never exposed',
+  public_id BINARY(16) NOT NULL COMMENT 'UUID v7, the only externally visible ID',
+  workspace_id INT UNSIGNED NULL COMMENT 'Internal FK to workspaces.id; non-null for workspace-scoped blobs (task/calendar attachments). Mutually exclusive with owner_user_id.',
+  owner_user_id INT UNSIGNED NULL COMMENT 'Internal FK to users.id; non-null for user-scoped blobs (avatar). Mutually exclusive with workspace_id.',
+
+  sha256 BINARY(32) NOT NULL COMMENT 'SHA-256 of the raw blob; basis for content addressing and dedup within a scope',
+  byte_size BIGINT UNSIGNED NOT NULL COMMENT 'Size in bytes of the underlying blob',
+  content_type VARCHAR(127) CHARACTER SET latin1 COLLATE latin1_swedish_ci NOT NULL COMMENT 'MIME type recorded at upload time',
+  storage_key VARCHAR(255) CHARACTER SET latin1 COLLATE latin1_swedish_ci NOT NULL COMMENT 'Computed object key in MinIO (e.g. workspace/{wsPublicId}/{sha256_hex} or user/{userPublicId}/{sha256_hex})',
+  ref_count INT UNSIGNED NOT NULL DEFAULT 0 COMMENT 'Number of referencing rows (attachments / users.avatar_storage_object_id); GC eligible when 0',
+
+  sort_weight INT NOT NULL DEFAULT 0 COMMENT 'Display order',
+  notes TEXT NULL COMMENT 'Admin notes',
+  enabled BOOLEAN NOT NULL DEFAULT TRUE COMMENT 'Enabled flag',
+  updated_at TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+  created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+
+  UNIQUE KEY uniq_storage_objects_public_id (public_id),
+  -- Per-scope content dedup. NULLs are distinct in MySQL UNIQUE indexes, so
+  -- the workspace-scope and user-scope rows do not interfere with each other.
+  UNIQUE KEY uniq_storage_objects_workspace_sha (workspace_id, sha256),
+  UNIQUE KEY uniq_storage_objects_user_sha (owner_user_id, sha256),
+  UNIQUE KEY uniq_storage_objects_storage_key (storage_key),
+
+  CONSTRAINT fk_storage_objects_workspace FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
+  CONSTRAINT fk_storage_objects_owner_user FOREIGN KEY (owner_user_id) REFERENCES users(id) ON DELETE CASCADE,
+  CONSTRAINT chk_storage_objects_scope_exclusive CHECK (
+    (workspace_id IS NOT NULL AND owner_user_id IS NULL) OR
+    (workspace_id IS NULL     AND owner_user_id IS NOT NULL)
+  )
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Content-addressed object storage references; rows shared across attachments via storage_object_id with ref_count GC.';
+
 -- >>> task_actors.sql
 -- ====================================
 -- task_actors
@@ -2390,7 +2447,8 @@ CREATE TABLE users (
   email VARCHAR(255) CHARACTER SET latin1 COLLATE latin1_swedish_ci NOT NULL COMMENT 'Primary email, ASCII only',
   email_verified_at DATETIME(3) NULL COMMENT 'Email verification timestamp',
   display_name VARCHAR(255) NOT NULL COMMENT 'Human-readable name',
-  avatar_url VARCHAR(2048) NULL COMMENT 'Avatar image URL',
+  avatar_url VARCHAR(2048) NULL COMMENT 'Avatar image URL; used when the avatar is hosted externally (e.g. OIDC provider)',
+  avatar_storage_object_id INT UNSIGNED NULL COMMENT 'FK to storage_objects.id when the user uploaded their own avatar; NULL when avatar_url (external) is used or no avatar is set',
   locale VARCHAR(16) NOT NULL DEFAULT 'en' COMMENT 'Preferred locale tag (BCP 47)',
   timezone VARCHAR(64) CHARACTER SET latin1 COLLATE latin1_swedish_ci NOT NULL DEFAULT 'UTC' COMMENT 'Preferred IANA timezone (independent of locale)',
   country CHAR(2) CHARACTER SET latin1 COLLATE latin1_swedish_ci NULL COMMENT 'ISO 3166-1 alpha-2 country (independent of locale); drives default holiday subscription',
@@ -2419,7 +2477,13 @@ CREATE TABLE users (
 
   UNIQUE KEY uniq_users_public_id (public_id),
   UNIQUE KEY uniq_users_email (email),
-  KEY idx_users_enabled (enabled)
+  KEY idx_users_enabled (enabled),
+  KEY idx_users_avatar_storage_object (avatar_storage_object_id),
+
+  -- SET NULL: if the underlying storage_objects row is removed (e.g. after
+  -- ref_count reaches 0 via a sweeper) the user simply loses their avatar
+  -- rather than blocking the deletion.
+  CONSTRAINT fk_users_avatar_storage_object FOREIGN KEY (avatar_storage_object_id) REFERENCES storage_objects(id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Global user accounts';
 
 -- >>> webhook_deliveries.sql
@@ -2699,6 +2763,8 @@ SELECT
   u.email,
   u.display_name,
   u.avatar_url,
+  u.avatar_storage_object_id,
+  so_avatar.public_id AS avatar_storage_object_public_id,
   u.locale,
   u.timezone,
   u.country,
@@ -2712,7 +2778,9 @@ SELECT
   EXISTS(SELECT 1 FROM instance_admins ia
      WHERE ia.user_id = u.id AND ia.enabled = TRUE
        AND ia.revoked_at IS NULL) AS is_instance_admin
-FROM users u;
+FROM users u
+LEFT JOIN storage_objects so_avatar
+  ON so_avatar.id = u.avatar_storage_object_id AND so_avatar.enabled = TRUE;
 
 -- >>> v_audit_recent.sql
 -- v_audit_recent
@@ -2753,6 +2821,8 @@ SELECT
   u.public_id AS author_public_id,
   u.display_name AS author_display_name,
   u.avatar_url AS author_avatar_url,
+  u.avatar_storage_object_id AS author_avatar_storage_object_id,
+  so_author_avatar.public_id AS author_avatar_storage_object_public_id,
   c.body,
   c.edited_at,
   c.updated_at,
@@ -2761,6 +2831,8 @@ FROM comments c
 INNER JOIN workspaces w ON w.id = c.workspace_id AND w.enabled = TRUE
 INNER JOIN tasks t ON t.id = c.task_id AND t.enabled = TRUE
 INNER JOIN users u ON u.id = c.author_id AND u.enabled = TRUE
+LEFT JOIN storage_objects so_author_avatar
+  ON so_author_avatar.id = u.avatar_storage_object_id AND so_author_avatar.enabled = TRUE
 WHERE c.enabled = TRUE;
 
 -- >>> v_inbox.sql
@@ -3004,6 +3076,8 @@ SELECT
   u.email,
   u.display_name,
   u.avatar_url,
+  u.avatar_storage_object_id,
+  so_avatar.public_id AS avatar_storage_object_public_id,
   u.locale,
   u.timezone,
   u.country,
@@ -3019,6 +3093,8 @@ INNER JOIN workspace_members wm
   ON wm.user_id = u.id AND wm.enabled = TRUE
 INNER JOIN workspaces w
   ON w.id = wm.workspace_id AND w.enabled = TRUE
+LEFT JOIN storage_objects so_avatar
+  ON so_avatar.id = u.avatar_storage_object_id AND so_avatar.enabled = TRUE
 WHERE u.enabled = TRUE;
 
 -- >>> v_workspace_activity.sql
@@ -3138,6 +3214,8 @@ SELECT
   u.email,
   u.display_name,
   u.avatar_url,
+  u.avatar_storage_object_id,
+  so_avatar.public_id AS avatar_storage_object_public_id,
   wm.role,
   wm.invited_at,
   wm.joined_at,
@@ -3148,6 +3226,8 @@ INNER JOIN users u
   ON u.id = wm.user_id AND u.enabled = TRUE
 INNER JOIN workspaces w
   ON w.id = wm.workspace_id AND w.enabled = TRUE
+LEFT JOIN storage_objects so_avatar
+  ON so_avatar.id = u.avatar_storage_object_id AND so_avatar.enabled = TRUE
 WHERE wm.enabled = TRUE;
 
 DROP TRIGGER IF EXISTS `tasks_derived_state_guard`;

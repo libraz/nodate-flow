@@ -202,8 +202,6 @@
     },
     "attachments": {
       "empty": "添付ファイルはまだありません",
-      "add": "添付を追加",
-      "add_error": "添付の追加に失敗しました",
       "delete": "削除",
       "delete_confirm": "この添付を削除しますか？",
       "delete_success": "添付を削除しました",
@@ -211,19 +209,15 @@
       "upload": "アップロード",
       "uploading": "アップロード中…",
       "upload_success": "添付をアップロードしました",
+      "upload_dedup_success": "同じファイルが既にアップロード済みのためリンクしました",
       "upload_error": "アップロードに失敗しました",
       "download": "ダウンロード",
+      "download_error": "ダウンロード URL の取得に失敗しました",
       "size_unit": {
         "b": "B",
         "kb": "KB",
         "mb": "MB",
         "gb": "GB"
-      },
-      "field": {
-        "filename": "ファイル名",
-        "storage_key": "ストレージキー",
-        "content_type": "MIME タイプ",
-        "byte_size": "バイト数"
       }
     },
     "invites": {

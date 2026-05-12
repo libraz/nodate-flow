@@ -19,38 +19,32 @@ INSERT INTO calendar_event_attachments (
   workspace_id,
   event_id,
   uploader_id,
-  filename,
-  content_type,
-  byte_size,
-  storage_key,
-  checksum_sha256
-) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+  storage_object_id,
+  filename
+) VALUES (?, ?, ?, ?, ?, ?)
 `
 
 type CreateCalendarEventAttachmentParams struct {
-	PublicID       types.PublicID `json:"publicId"`
-	WorkspaceID    uint32         `json:"-"`
-	EventID        sql.NullInt32  `json:"-"`
-	UploaderID     uint32         `json:"-"`
-	Filename       string         `json:"filename"`
-	ContentType    string         `json:"contentType"`
-	ByteSize       uint64         `json:"byteSize"`
-	StorageKey     string         `json:"storageKey"`
-	ChecksumSha256 sql.NullString `json:"checksumSha256"`
+	PublicID        types.PublicID `json:"publicId"`
+	WorkspaceID     uint32         `json:"-"`
+	EventID         sql.NullInt32  `json:"-"`
+	UploaderID      uint32         `json:"-"`
+	StorageObjectID uint32         `json:"-"`
+	Filename        string         `json:"filename"`
 }
 
-// Record metadata for an uploaded file attachment on a calendar event.
+// Record per-event attachment metadata. The blob (sha256, byte_size,
+// content_type, storage_key) lives in storage_objects and is referenced via
+// storage_object_id; caller MUST insert the storage_objects row or bump its
+// ref_count inside the same transaction.
 func (q *Queries) CreateCalendarEventAttachment(ctx context.Context, arg CreateCalendarEventAttachmentParams) (int64, error) {
 	result, err := q.db.ExecContext(ctx, createCalendarEventAttachment,
 		arg.PublicID,
 		arg.WorkspaceID,
 		arg.EventID,
 		arg.UploaderID,
+		arg.StorageObjectID,
 		arg.Filename,
-		arg.ContentType,
-		arg.ByteSize,
-		arg.StorageKey,
-		arg.ChecksumSha256,
 	)
 	if err != nil {
 		return 0, err
@@ -58,68 +52,80 @@ func (q *Queries) CreateCalendarEventAttachment(ctx context.Context, arg CreateC
 	return result.LastInsertId()
 }
 
-const disableCalendarEventAttachment = `-- name: DisableCalendarEventAttachment :exec
-UPDATE calendar_event_attachments
-SET enabled = FALSE
-WHERE public_id = ?
+const deleteCalendarEventAttachment = `-- name: DeleteCalendarEventAttachment :exec
+DELETE FROM calendar_event_attachments
+WHERE workspace_id = ?
   AND event_id = ?
-  AND workspace_id = ?
+  AND public_id = ?
 `
 
-type DisableCalendarEventAttachmentParams struct {
-	PublicID    types.PublicID `json:"publicId"`
-	EventID     sql.NullInt32  `json:"-"`
+type DeleteCalendarEventAttachmentParams struct {
 	WorkspaceID uint32         `json:"-"`
+	EventID     sql.NullInt32  `json:"-"`
+	PublicID    types.PublicID `json:"publicId"`
 }
 
-// Soft-delete an attachment. Actual blob cleanup is deferred.
-func (q *Queries) DisableCalendarEventAttachment(ctx context.Context, arg DisableCalendarEventAttachmentParams) error {
-	_, err := q.db.ExecContext(ctx, disableCalendarEventAttachment, arg.PublicID, arg.EventID, arg.WorkspaceID)
+// Hard-delete a calendar event attachment row. Caller MUST have already
+// decremented ref_count on the linked storage_objects row inside the same
+// transaction; this row holding the FK reference must go away before
+// DeleteStorageObjectIfUnreferenced can free the storage object (FK is
+// ON DELETE RESTRICT). Audit trail survives via events.
+func (q *Queries) DeleteCalendarEventAttachment(ctx context.Context, arg DeleteCalendarEventAttachmentParams) error {
+	_, err := q.db.ExecContext(ctx, deleteCalendarEventAttachment, arg.WorkspaceID, arg.EventID, arg.PublicID)
 	return err
 }
 
 const findCalendarEventAttachmentByPublicId = `-- name: FindCalendarEventAttachmentByPublicId :one
 SELECT
-  id,
-  public_id,
-  event_id,
-  uploader_id,
-  filename,
-  content_type,
-  byte_size,
-  storage_key,
-  enabled,
-  created_at
-FROM calendar_event_attachments
-WHERE public_id = ?
-  AND event_id = ?
-  AND workspace_id = ?
-  AND enabled = TRUE
+  a.id,
+  a.public_id,
+  a.event_id,
+  a.uploader_id,
+  a.filename,
+  so.id AS storage_object_id,
+  so.public_id AS storage_object_public_id,
+  so.content_type,
+  so.byte_size,
+  so.storage_key,
+  so.sha256,
+  a.enabled,
+  a.created_at
+FROM calendar_event_attachments a
+INNER JOIN storage_objects so ON so.id = a.storage_object_id AND so.enabled = TRUE
+WHERE a.workspace_id = ?
+  AND a.event_id = ?
+  AND a.public_id = ?
+  AND a.enabled = TRUE
 LIMIT 1
 `
 
 type FindCalendarEventAttachmentByPublicIdParams struct {
-	PublicID    types.PublicID `json:"publicId"`
-	EventID     sql.NullInt32  `json:"-"`
 	WorkspaceID uint32         `json:"-"`
+	EventID     sql.NullInt32  `json:"-"`
+	PublicID    types.PublicID `json:"publicId"`
 }
 
 type FindCalendarEventAttachmentByPublicIdRow struct {
-	ID          uint32         `json:"-"`
-	PublicID    types.PublicID `json:"publicId"`
-	EventID     sql.NullInt32  `json:"-"`
-	UploaderID  uint32         `json:"-"`
-	Filename    string         `json:"filename"`
-	ContentType string         `json:"contentType"`
-	ByteSize    uint64         `json:"byteSize"`
-	StorageKey  string         `json:"storageKey"`
-	Enabled     bool           `json:"enabled"`
-	CreatedAt   time.Time      `json:"createdAt"`
+	ID                    uint32         `json:"-"`
+	PublicID              types.PublicID `json:"publicId"`
+	EventID               sql.NullInt32  `json:"-"`
+	UploaderID            uint32         `json:"-"`
+	Filename              string         `json:"filename"`
+	StorageObjectID       uint32         `json:"-"`
+	StorageObjectPublicID types.PublicID `json:"storageObjectPublicId"`
+	ContentType           string         `json:"contentType"`
+	ByteSize              uint64         `json:"byteSize"`
+	StorageKey            string         `json:"storageKey"`
+	Sha256                []byte         `json:"sha256"`
+	Enabled               bool           `json:"enabled"`
+	CreatedAt             time.Time      `json:"createdAt"`
 }
 
-// Resolve an attachment by UUID v7 for download or deletion.
+// Resolve an attachment by UUID v7 for download or deletion, including the
+// backing storage_objects metadata so the handler can build a presigned URL
+// without a second round trip.
 func (q *Queries) FindCalendarEventAttachmentByPublicId(ctx context.Context, arg FindCalendarEventAttachmentByPublicIdParams) (FindCalendarEventAttachmentByPublicIdRow, error) {
-	row := q.db.QueryRowContext(ctx, findCalendarEventAttachmentByPublicId, arg.PublicID, arg.EventID, arg.WorkspaceID)
+	row := q.db.QueryRowContext(ctx, findCalendarEventAttachmentByPublicId, arg.WorkspaceID, arg.EventID, arg.PublicID)
 	var i FindCalendarEventAttachmentByPublicIdRow
 	err := row.Scan(
 		&i.ID,
@@ -127,9 +133,12 @@ func (q *Queries) FindCalendarEventAttachmentByPublicId(ctx context.Context, arg
 		&i.EventID,
 		&i.UploaderID,
 		&i.Filename,
+		&i.StorageObjectID,
+		&i.StorageObjectPublicID,
 		&i.ContentType,
 		&i.ByteSize,
 		&i.StorageKey,
+		&i.Sha256,
 		&i.Enabled,
 		&i.CreatedAt,
 	)
@@ -140,35 +149,48 @@ const listCalendarEventAttachments = `-- name: ListCalendarEventAttachments :man
 SELECT
   a.public_id,
   a.filename,
-  a.content_type,
-  a.byte_size,
-  a.storage_key,
+  so.public_id AS storage_object_public_id,
+  so.content_type,
+  so.byte_size,
+  so.storage_key,
+  so.sha256,
   a.uploader_id,
   u.public_id AS user_public_id,
   u.display_name,
   a.created_at
 FROM calendar_event_attachments a
 INNER JOIN users u ON u.id = a.uploader_id AND u.enabled = TRUE
-WHERE a.event_id = ?
+INNER JOIN storage_objects so ON so.id = a.storage_object_id AND so.enabled = TRUE
+WHERE a.workspace_id = ?
+  AND a.event_id = ?
   AND a.enabled = TRUE
-ORDER BY a.created_at ASC
+ORDER BY a.created_at ASC, a.public_id ASC
 `
 
-type ListCalendarEventAttachmentsRow struct {
-	PublicID     types.PublicID `json:"publicId"`
-	Filename     string         `json:"filename"`
-	ContentType  string         `json:"contentType"`
-	ByteSize     uint64         `json:"byteSize"`
-	StorageKey   string         `json:"storageKey"`
-	UploaderID   uint32         `json:"-"`
-	UserPublicID types.PublicID `json:"userPublicId"`
-	DisplayName  string         `json:"displayName"`
-	CreatedAt    time.Time      `json:"createdAt"`
+type ListCalendarEventAttachmentsParams struct {
+	WorkspaceID uint32        `json:"-"`
+	EventID     sql.NullInt32 `json:"-"`
 }
 
-// List active attachments for an event.
-func (q *Queries) ListCalendarEventAttachments(ctx context.Context, eventID sql.NullInt32) ([]ListCalendarEventAttachmentsRow, error) {
-	rows, err := q.db.QueryContext(ctx, listCalendarEventAttachments, eventID)
+type ListCalendarEventAttachmentsRow struct {
+	PublicID              types.PublicID `json:"publicId"`
+	Filename              string         `json:"filename"`
+	StorageObjectPublicID types.PublicID `json:"storageObjectPublicId"`
+	ContentType           string         `json:"contentType"`
+	ByteSize              uint64         `json:"byteSize"`
+	StorageKey            string         `json:"storageKey"`
+	Sha256                []byte         `json:"sha256"`
+	UploaderID            uint32         `json:"-"`
+	UserPublicID          types.PublicID `json:"userPublicId"`
+	DisplayName           string         `json:"displayName"`
+	CreatedAt             time.Time      `json:"createdAt"`
+}
+
+// List active attachments for an event with uploader display fields and the
+// storage_objects metadata flattened in via JOIN. Order is stable by
+// created_at then public_id.
+func (q *Queries) ListCalendarEventAttachments(ctx context.Context, arg ListCalendarEventAttachmentsParams) ([]ListCalendarEventAttachmentsRow, error) {
+	rows, err := q.db.QueryContext(ctx, listCalendarEventAttachments, arg.WorkspaceID, arg.EventID)
 	if err != nil {
 		return nil, err
 	}
@@ -179,9 +201,11 @@ func (q *Queries) ListCalendarEventAttachments(ctx context.Context, eventID sql.
 		if err := rows.Scan(
 			&i.PublicID,
 			&i.Filename,
+			&i.StorageObjectPublicID,
 			&i.ContentType,
 			&i.ByteSize,
 			&i.StorageKey,
+			&i.Sha256,
 			&i.UploaderID,
 			&i.UserPublicID,
 			&i.DisplayName,

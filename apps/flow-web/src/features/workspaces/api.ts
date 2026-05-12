@@ -23,6 +23,13 @@ export type CreateWorkspaceInput = components['schemas']['CreateWorkspaceInputBo
 export type PatchWorkspaceInput = components['schemas']['WorkspacePatchWorkspaceInputBody'];
 export type InviteMemberInput = components['schemas']['AddWorkspaceMemberInputBody'];
 export type UpdateMemberRoleInput = components['schemas']['UpdateWorkspaceMemberRoleInputBody'];
+/**
+ * Result of {@link useDeleteWorkspace}. Mirrors the destructive-delete
+ * envelope returned by `DELETE /workspaces/{wsId}`: `deleted` is `false`
+ * when the workspace was already gone (idempotent), and the storage
+ * counters surface the MinIO sweep outcome for the caller's toast.
+ */
+export type DeleteWorkspaceResult = components['schemas']['DeleteWorkspaceOutputBody'];
 
 /** Query key factory for the workspaces feature. */
 export const workspacesKeys = {
@@ -165,23 +172,54 @@ export function useUpdateWorkspace(): UseMutationResult<Workspace, ApiError, Upd
   });
 }
 
-export function useDisableWorkspace(): UseMutationResult<void, ApiError, string> {
+export interface DeleteWorkspaceArgs {
+  wsId: string;
+  /**
+   * Must be `true`. The API rejects missing/false confirmation with a
+   * 400 `WORKSPACE.DELETE.CONFIRM_REQUIRED`. Plumbed through the args
+   * (rather than hardcoded) so the modal owns the gating logic and the
+   * mutation hook stays a transport-only concern.
+   */
+  confirm: boolean;
+}
+
+/**
+ * DELETE /workspaces/{wsId} — destructive immediate workspace delete by
+ * the owner. Sweeps every MinIO blob owned by the workspace, then
+ * issues a CASCADE-anchored hard DELETE on the workspaces row and
+ * every dependent member, project, task, event, and attachment. The
+ * server requires `{ confirm: true }`; missing/false yields a 400
+ * `WORKSPACE.DELETE.CONFIRM_REQUIRED`.
+ *
+ * On success the mutation invalidates the workspaces list and removes
+ * — rather than invalidates — the deleted workspace's detail cache so
+ * any still-mounted suspense consumers do not refetch a 404.
+ */
+export function useDeleteWorkspace(): UseMutationResult<
+  DeleteWorkspaceResult,
+  ApiError,
+  DeleteWorkspaceArgs
+> {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (id: string): Promise<void> => {
-      const { error } = await sdk.DELETE('/workspaces/{wsId}', {
-        params: { path: { wsId: id } },
+    mutationFn: async ({ wsId, confirm }: DeleteWorkspaceArgs): Promise<DeleteWorkspaceResult> => {
+      const { data, error } = await sdk.DELETE('/workspaces/{wsId}', {
+        params: { path: { wsId } },
+        body: { confirm },
       });
-      if (error) throw toError(error, 'Failed to disable workspace');
+      if (error || !data) throw toError(error, 'Failed to delete workspace');
+      return data;
     },
-    onSuccess: (_data, id) => {
+    onSuccess: (_data, vars) => {
       void qc.invalidateQueries({ queryKey: workspacesKeys.list() });
-      // Remove — not invalidate — the disabled workspace's cache. The
+      // Remove — not invalidate — the deleted workspace's cache. The
       // subtree of the deleted workspace will 404 on refetch, and any
       // detail/members queries still mounted would otherwise retry
       // three times and log to the console before the navigating
       // consumer unmounts.
-      qc.removeQueries({ queryKey: workspacesKeys.detail(id) });
+      qc.removeQueries({ queryKey: workspacesKeys.detail(vars.wsId) });
+      qc.removeQueries({ queryKey: workspacesKeys.members(vars.wsId) });
+      qc.removeQueries({ queryKey: workspacesKeys.users(vars.wsId) });
     },
   });
 }

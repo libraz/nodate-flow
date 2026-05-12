@@ -188,8 +188,15 @@ type TaskComment struct {
 }
 
 // TaskAttachment is the public DTO for an attachments row attached to a task.
+//
+// StorageObjectID surfaces the underlying storage_objects.public_id so
+// the client can correlate two attachments that point at the same blob
+// (the dedup case). StorageKey, ContentType, ByteSize, and Sha256 are
+// flattened in from storage_objects via JOIN; the API never exposes the
+// internal storage_objects.id.
 type TaskAttachment struct {
 	ID                  string `json:"id"`
+	StorageObjectID     string `json:"storageObjectId,omitempty"`
 	UploaderID          string `json:"uploaderId"`
 	UploaderDisplayName string `json:"uploaderDisplayName"`
 	Filename            string `json:"filename"`
@@ -826,25 +833,6 @@ type DeleteTaskCommentOutput struct {
 
 // ---- Attachments I/O -------------------------------------------------------
 
-// AddTaskAttachmentBody is the JSON body for POST /tasks/{id}/attachments.
-type AddTaskAttachmentBody struct {
-	Filename    string `json:"filename" minLength:"1" maxLength:"512"`
-	ContentType string `json:"contentType" minLength:"1" maxLength:"255"`
-	ByteSize    uint64 `json:"byteSize" minimum:"0"`
-	StorageKey  string `json:"storageKey" minLength:"1" maxLength:"1024"`
-}
-
-// AddTaskAttachmentInput is the request for POST /tasks/{id}/attachments.
-type AddTaskAttachmentInput struct {
-	ID   string `path:"id"`
-	Body AddTaskAttachmentBody
-}
-
-// AddTaskAttachmentOutput is the response for POST /tasks/{id}/attachments.
-type AddTaskAttachmentOutput struct {
-	Body TaskAttachment
-}
-
 // ListTaskAttachmentsInput is the query for GET /tasks/{id}/attachments.
 type ListTaskAttachmentsInput struct {
 	ID     string `path:"id"`
@@ -881,10 +869,19 @@ type DeleteTaskAttachmentOutput struct {
 }
 
 // PresignUploadBody is the JSON body for POST /tasks/{id}/attachments/presign.
+//
+// Sha256 is the lowercase hex (64 chars) digest of the file the client
+// is about to upload. The server uses it to look up an existing
+// content-addressed storage_objects row in the same workspace; on a hit
+// the attachment is created against the existing blob (no MinIO upload
+// needed) and the response carries Deduplicated=true with empty
+// UploadURL. On a miss the server allocates a new storage_objects row
+// and returns a presigned PUT URL the client streams the bytes to.
 type PresignUploadBody struct {
 	Filename    string `json:"filename" minLength:"1" maxLength:"512" doc:"Original filename"`
 	ContentType string `json:"contentType" minLength:"1" maxLength:"255" doc:"MIME type"`
 	ByteSize    uint64 `json:"byteSize" minimum:"1" doc:"File size in bytes"`
+	Sha256      string `json:"sha256" minLength:"64" maxLength:"64" pattern:"^[0-9a-f]{64}$" doc:"Lowercase hex SHA-256 digest of the file body (64 chars). Drives content-addressed dedup."`
 }
 
 // PresignUploadInput is the request for POST /tasks/{id}/attachments/presign.
@@ -894,10 +891,26 @@ type PresignUploadInput struct {
 }
 
 // PresignUploadOutputBody is the response body for presign upload.
+//
+// Deduplicated is true when the server already had a storage_objects
+// row in this workspace with the same sha256; in that case UploadURL
+// is empty and the client MUST NOT issue a PUT. Otherwise UploadURL
+// is a short-lived presigned PUT the client streams the file body to.
+//
+// RequiredHeaders carries headers the client MUST include in the PUT
+// request verbatim; they are part of the SigV4 signed-headers list so
+// any tampering invalidates the signature and the upload is rejected
+// by the bucket. The server today emits a single x-amz-content-sha256
+// entry that pins the body to the digest the client originally
+// claimed, blocking content-vs-hash mismatch attacks against the
+// dedup row. The map is omitted from the wire payload entirely on
+// the deduplicated branch.
 type PresignUploadOutputBody struct {
-	UploadURL    string `json:"uploadUrl" doc:"Presigned PUT URL"`
-	StorageKey   string `json:"storageKey" doc:"Object key to confirm after upload"`
-	AttachmentID string `json:"attachmentId" doc:"Public ID of the created attachment row"`
+	UploadURL       string            `json:"uploadUrl,omitempty" doc:"Presigned PUT URL. Empty when deduplicated=true."`
+	StorageKey      string            `json:"storageKey" doc:"Object key (informational; the presigned URL already encodes it)."`
+	AttachmentID    string            `json:"attachmentId" doc:"Public ID of the created attachment row"`
+	Deduplicated    bool              `json:"deduplicated" doc:"True when the server reused an existing blob and no upload is needed."`
+	RequiredHeaders map[string]string `json:"requiredHeaders,omitempty" doc:"Headers the client MUST send verbatim with the PUT. Currently emits x-amz-content-sha256 to bind the upload body to the claimed digest. Empty/omitted when deduplicated=true."`
 }
 
 // PresignUploadOutput is the response for POST /tasks/{id}/attachments/presign.

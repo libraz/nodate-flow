@@ -12,6 +12,8 @@ INSERT INTO users (
 
 -- name: FindUserByEmail :one
 -- Lookup a user by email for login. Returns internal id for the auth pipeline.
+-- avatar_storage_object_id is the FK for self-hosted avatars; avatar_url is
+-- the external (e.g. OIDC provider) fallback URL.
 SELECT
   id,
   public_id,
@@ -19,6 +21,7 @@ SELECT
   email_verified_at,
   display_name,
   avatar_url,
+  avatar_storage_object_id,
   locale,
   timezone,
   country,
@@ -35,6 +38,8 @@ LIMIT 1;
 
 -- name: FindUserByEmailIncludingDisabled :one
 -- Lookup a user by email regardless of enabled flag (for invitation reuse).
+-- avatar_storage_object_id is the FK for self-hosted avatars; avatar_url is
+-- the external (e.g. OIDC provider) fallback URL.
 SELECT
   id,
   public_id,
@@ -42,6 +47,7 @@ SELECT
   email_verified_at,
   display_name,
   avatar_url,
+  avatar_storage_object_id,
   locale,
   timezone,
   country,
@@ -212,7 +218,11 @@ LIMIT 1;
 
 -- name: FindUserProfileById :one
 -- Fetch the minimal profile for the /me endpoint by internal id.
-SELECT public_id, email, display_name, locale, timezone, country, week_start, theme_preference, calendar_shift_default, avatar_url,
+-- avatar_storage_object_id is the FK for a self-hosted (uploaded) avatar;
+-- avatar_url stays for externally hosted avatars (e.g. OIDC provider). The
+-- handler resolves the storage object public_id / signed URL separately.
+SELECT public_id, email, display_name, locale, timezone, country, week_start, theme_preference, calendar_shift_default,
+       avatar_url, avatar_storage_object_id,
        notif_email_digest_enabled, notif_email_mention_enabled,
        notif_email_assignment_enabled, notif_email_due_soon_enabled,
        notif_web_push_enabled
@@ -262,5 +272,27 @@ WHERE id = ?
 -- PatchMe cannot be used because NULL narg means "leave alone" there.
 UPDATE users
 SET avatar_url = NULL
+WHERE id = ?
+  AND enabled = TRUE;
+
+-- name: SetMyAvatarStorageObject :exec
+-- Bind the authenticated user's avatar to a freshly inserted (or dedup-hit)
+-- storage_objects row. Used by POST /me/avatar after a successful upload to
+-- MinIO. Caller MUST run this in the same transaction as the InsertStorageObject
+-- / IncrementStorageObjectRefCount that allocated the FK target so ref_count
+-- never drifts. PatchMe cannot be used because NULL narg means "leave alone".
+UPDATE users
+SET avatar_storage_object_id = ?
+WHERE id = ?
+  AND enabled = TRUE;
+
+-- name: ClearMyAvatarStorageObject :exec
+-- Null out the authenticated user's avatar_storage_object_id column. Used by
+-- DELETE /me/avatar; caller MUST decrement ref_count on the previously linked
+-- storage_objects row (and possibly DeleteStorageObjectIfUnreferenced) inside
+-- the same transaction. PatchMe cannot be used because NULL narg means
+-- "leave alone".
+UPDATE users
+SET avatar_storage_object_id = NULL
 WHERE id = ?
   AND enabled = TRUE;

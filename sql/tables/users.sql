@@ -10,7 +10,8 @@ CREATE TABLE users (
   email VARCHAR(255) CHARACTER SET latin1 COLLATE latin1_swedish_ci NOT NULL COMMENT 'Primary email, ASCII only',
   email_verified_at DATETIME(3) NULL COMMENT 'Email verification timestamp',
   display_name VARCHAR(255) NOT NULL COMMENT 'Human-readable name',
-  avatar_url VARCHAR(2048) NULL COMMENT 'Avatar image URL',
+  avatar_url VARCHAR(2048) NULL COMMENT 'Avatar image URL; used when the avatar is hosted externally (e.g. OIDC provider)',
+  avatar_storage_object_id INT UNSIGNED NULL COMMENT 'FK to storage_objects.id when the user uploaded their own avatar; NULL when avatar_url (external) is used or no avatar is set',
   locale VARCHAR(16) NOT NULL DEFAULT 'en' COMMENT 'Preferred locale tag (BCP 47)',
   timezone VARCHAR(64) CHARACTER SET latin1 COLLATE latin1_swedish_ci NOT NULL DEFAULT 'UTC' COMMENT 'Preferred IANA timezone (independent of locale)',
   country CHAR(2) CHARACTER SET latin1 COLLATE latin1_swedish_ci NULL COMMENT 'ISO 3166-1 alpha-2 country (independent of locale); drives default holiday subscription',
@@ -39,5 +40,11 @@ CREATE TABLE users (
 
   UNIQUE KEY uniq_users_public_id (public_id),
   UNIQUE KEY uniq_users_email (email),
-  KEY idx_users_enabled (enabled)
+  KEY idx_users_enabled (enabled),
+  KEY idx_users_avatar_storage_object (avatar_storage_object_id),
+
+  -- SET NULL: if the underlying storage_objects row is removed (e.g. after
+  -- ref_count reaches 0 via a sweeper) the user simply loses their avatar
+  -- rather than blocking the deletion.
+  CONSTRAINT fk_users_avatar_storage_object FOREIGN KEY (avatar_storage_object_id) REFERENCES storage_objects(id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Global user accounts';

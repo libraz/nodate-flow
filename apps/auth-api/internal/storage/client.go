@@ -119,7 +119,49 @@ func (c *Client) RemoveObject(ctx context.Context, key string) error {
 	return nil
 }
 
+// RemoveObjects deletes the given keys from the bucket in bulk. Errors
+// for individual keys are aggregated; if any deletion fails the method
+// returns the first error after attempting the rest. minio-go's
+// RemoveObjects API uses a goroutine + chan to stream up to 1000 keys
+// per S3 batch request.
+func (c *Client) RemoveObjects(ctx context.Context, keys []string) error {
+	if len(keys) == 0 {
+		return nil
+	}
+	objCh := make(chan minio.ObjectInfo, len(keys))
+	go func() {
+		defer close(objCh)
+		for _, k := range keys {
+			select {
+			case <-ctx.Done():
+				return
+			case objCh <- minio.ObjectInfo{Key: k}:
+			}
+		}
+	}()
+	var firstErr error
+	for rerr := range c.mc.RemoveObjects(ctx, c.bucket, objCh, minio.RemoveObjectsOptions{}) {
+		if rerr.Err != nil && firstErr == nil {
+			firstErr = fmt.Errorf("storage: remove object %q: %w", rerr.ObjectName, rerr.Err)
+		}
+	}
+	if firstErr != nil {
+		return firstErr
+	}
+	return nil
+}
+
 // Bucket returns the configured bucket name.
 func (c *Client) Bucket() string {
 	return c.bucket
+}
+
+// StorageKeyForUser builds the canonical content-addressed key for a
+// user-scoped blob (avatars). Mirrors flow-api's storage.StorageKeyForUser
+// so the two services produce identical keys when they touch the same
+// user's avatar bytes. userPublicIDHex must be the user's public_id as
+// 32 hex chars (no dashes); sha256Hex must be the lowercase 64-char hex
+// digest of the file body.
+func StorageKeyForUser(userPublicIDHex, sha256Hex string) string {
+	return fmt.Sprintf("user/%s/%s", userPublicIDHex, sha256Hex)
 }

@@ -218,40 +218,6 @@
         "required": ["agentId", "role"],
         "type": "object"
       },
-      "AddTaskAttachmentBody": {
-        "additionalProperties": false,
-        "properties": {
-          "$schema": {
-            "description": "A URL to the JSON Schema for this object.",
-            "examples": ["https://example.com/schemas/AddTaskAttachmentBody.json"],
-            "format": "uri",
-            "readOnly": true,
-            "type": "string"
-          },
-          "byteSize": {
-            "format": "int64",
-            "minimum": 0,
-            "type": "integer"
-          },
-          "contentType": {
-            "maxLength": 255,
-            "minLength": 1,
-            "type": "string"
-          },
-          "filename": {
-            "maxLength": 512,
-            "minLength": 1,
-            "type": "string"
-          },
-          "storageKey": {
-            "maxLength": 1024,
-            "minLength": 1,
-            "type": "string"
-          }
-        },
-        "required": ["filename", "contentType", "byteSize", "storageKey"],
-        "type": "object"
-      },
       "AddTaskBody": {
         "additionalProperties": false,
         "properties": {
@@ -389,6 +355,31 @@
           }
         },
         "required": ["email", "role"],
+        "type": "object"
+      },
+      "AdminDeleteOutputBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/AdminDeleteOutputBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "deleted": {
+            "type": "boolean"
+          },
+          "minioErrors": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "storageObjectsDeleted": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "required": ["deleted", "storageObjectsDeleted", "minioErrors"],
         "type": "object"
       },
       "AdminListWorkspacesOutputBody": {
@@ -979,17 +970,13 @@
       "AttachmentResponse": {
         "additionalProperties": false,
         "properties": {
-          "$schema": {
-            "description": "A URL to the JSON Schema for this object.",
-            "examples": ["https://example.com/schemas/AttachmentResponse.json"],
-            "format": "uri",
-            "readOnly": true,
-            "type": "string"
-          },
           "byteSize": {
             "format": "int64",
             "minimum": 0,
             "type": "integer"
+          },
+          "checksumSha256": {
+            "type": "string"
           },
           "contentType": {
             "type": "string"
@@ -1005,6 +992,9 @@
             "type": "string"
           },
           "storageKey": {
+            "type": "string"
+          },
+          "storageObjectId": {
             "type": "string"
           },
           "uploaderId": {
@@ -1818,49 +1808,6 @@
           }
         },
         "required": ["modelId", "name", "systemPrompt"],
-        "type": "object"
-      },
-      "CreateAttachmentInputBody": {
-        "additionalProperties": false,
-        "properties": {
-          "$schema": {
-            "description": "A URL to the JSON Schema for this object.",
-            "examples": ["https://example.com/schemas/CreateAttachmentInputBody.json"],
-            "format": "uri",
-            "readOnly": true,
-            "type": "string"
-          },
-          "byteSize": {
-            "description": "File size in bytes",
-            "format": "int64",
-            "minimum": 0,
-            "type": "integer"
-          },
-          "checksumSha256": {
-            "description": "SHA-256 checksum",
-            "maxLength": 64,
-            "type": "string"
-          },
-          "contentType": {
-            "description": "MIME content type",
-            "maxLength": 255,
-            "minLength": 1,
-            "type": "string"
-          },
-          "filename": {
-            "description": "Original filename",
-            "maxLength": 255,
-            "minLength": 1,
-            "type": "string"
-          },
-          "storageKey": {
-            "description": "S3 object key",
-            "maxLength": 1024,
-            "minLength": 1,
-            "type": "string"
-          }
-        },
-        "required": ["filename", "contentType", "byteSize", "storageKey"],
         "type": "object"
       },
       "CreateCalendarInputBody": {
@@ -3195,6 +3142,23 @@
         "required": ["ok"],
         "type": "object"
       },
+      "DeleteUserInputBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/DeleteUserInputBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "confirm": {
+            "description": "Must be true to acknowledge irreversible deletion",
+            "type": "boolean"
+          }
+        },
+        "type": "object"
+      },
       "DeleteWidgetBody": {
         "additionalProperties": false,
         "properties": {
@@ -3210,6 +3174,48 @@
           }
         },
         "required": ["ok"],
+        "type": "object"
+      },
+      "DeleteWorkspaceInputBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/DeleteWorkspaceInputBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "confirm": {
+            "description": "Must be true to acknowledge irreversible deletion",
+            "type": "boolean"
+          }
+        },
+        "type": "object"
+      },
+      "DeleteWorkspaceOutputBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/DeleteWorkspaceOutputBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "deleted": {
+            "type": "boolean"
+          },
+          "minioErrors": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "storageObjectsDeleted": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "required": ["deleted", "storageObjectsDeleted", "minioErrors"],
         "type": "object"
       },
       "DescriptionVersion": {
@@ -3335,23 +3341,6 @@
           "$schema": {
             "description": "A URL to the JSON Schema for this object.",
             "examples": ["https://example.com/schemas/DisableTaskBody.json"],
-            "format": "uri",
-            "readOnly": true,
-            "type": "string"
-          },
-          "ok": {
-            "type": "boolean"
-          }
-        },
-        "required": ["ok"],
-        "type": "object"
-      },
-      "DisableWorkspaceOutputBody": {
-        "additionalProperties": false,
-        "properties": {
-          "$schema": {
-            "description": "A URL to the JSON Schema for this object.",
-            "examples": ["https://example.com/schemas/DisableWorkspaceOutputBody.json"],
             "format": "uri",
             "readOnly": true,
             "type": "string"
@@ -7761,6 +7750,82 @@
         "required": ["ok"],
         "type": "object"
       },
+      "PresignAttachmentInputBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/PresignAttachmentInputBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "byteSize": {
+            "description": "File size in bytes",
+            "format": "int64",
+            "minimum": 1,
+            "type": "integer"
+          },
+          "contentType": {
+            "description": "MIME type",
+            "maxLength": 255,
+            "minLength": 1,
+            "type": "string"
+          },
+          "filename": {
+            "description": "Original filename",
+            "maxLength": 512,
+            "minLength": 1,
+            "type": "string"
+          },
+          "sha256": {
+            "description": "Lowercase hex SHA-256 digest of the file body (64 chars). Drives content-addressed dedup.",
+            "maxLength": 64,
+            "minLength": 64,
+            "pattern": "^[0-9a-f]{64}$",
+            "type": "string"
+          }
+        },
+        "required": ["filename", "contentType", "byteSize", "sha256"],
+        "type": "object"
+      },
+      "PresignAttachmentOutputBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/PresignAttachmentOutputBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "attachmentId": {
+            "description": "Public ID of the created attachment row",
+            "type": "string"
+          },
+          "deduplicated": {
+            "description": "True when the server reused an existing blob and no upload is needed.",
+            "type": "boolean"
+          },
+          "requiredHeaders": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "description": "Headers the client MUST send verbatim with the PUT. Currently emits x-amz-content-sha256 to bind the upload body to the claimed digest. Empty/omitted when deduplicated=true.",
+            "type": "object"
+          },
+          "storageKey": {
+            "description": "Object key (informational; the presigned URL already encodes it).",
+            "type": "string"
+          },
+          "uploadUrl": {
+            "description": "Presigned PUT URL. Empty when deduplicated=true.",
+            "type": "string"
+          }
+        },
+        "required": ["storageKey", "attachmentId", "deduplicated"],
+        "type": "object"
+      },
       "PresignUploadBody": {
         "additionalProperties": false,
         "properties": {
@@ -7788,9 +7853,16 @@
             "maxLength": 512,
             "minLength": 1,
             "type": "string"
+          },
+          "sha256": {
+            "description": "Lowercase hex SHA-256 digest of the file body (64 chars). Drives content-addressed dedup.",
+            "maxLength": 64,
+            "minLength": 64,
+            "pattern": "^[0-9a-f]{64}$",
+            "type": "string"
           }
         },
-        "required": ["filename", "contentType", "byteSize"],
+        "required": ["filename", "contentType", "byteSize", "sha256"],
         "type": "object"
       },
       "PresignUploadOutputBody": {
@@ -7807,16 +7879,27 @@
             "description": "Public ID of the created attachment row",
             "type": "string"
           },
+          "deduplicated": {
+            "description": "True when the server reused an existing blob and no upload is needed.",
+            "type": "boolean"
+          },
+          "requiredHeaders": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "description": "Headers the client MUST send verbatim with the PUT. Currently emits x-amz-content-sha256 to bind the upload body to the claimed digest. Empty/omitted when deduplicated=true.",
+            "type": "object"
+          },
           "storageKey": {
-            "description": "Object key to confirm after upload",
+            "description": "Object key (informational; the presigned URL already encodes it).",
             "type": "string"
           },
           "uploadUrl": {
-            "description": "Presigned PUT URL",
+            "description": "Presigned PUT URL. Empty when deduplicated=true.",
             "type": "string"
           }
         },
-        "required": ["uploadUrl", "storageKey", "attachmentId"],
+        "required": ["storageKey", "attachmentId", "deduplicated"],
         "type": "object"
       },
       "Project": {
@@ -9985,13 +10068,6 @@
       "TaskAttachment": {
         "additionalProperties": false,
         "properties": {
-          "$schema": {
-            "description": "A URL to the JSON Schema for this object.",
-            "examples": ["https://example.com/schemas/TaskAttachment.json"],
-            "format": "uri",
-            "readOnly": true,
-            "type": "string"
-          },
           "byteSize": {
             "format": "int64",
             "minimum": 0,
@@ -10014,6 +10090,9 @@
             "type": "string"
           },
           "storageKey": {
+            "type": "string"
+          },
+          "storageObjectId": {
             "type": "string"
           },
           "updatedAt": {
@@ -12545,6 +12624,54 @@
       }
     },
     "/admin/users/{userId}": {
+      "delete": {
+        "description": "Destructive immediate delete. Reconciles ref_counts on every storage_objects row referenced by the user (task / calendar attachments uploaded by them across any workspace, plus avatar storage objects owned directly by them), hard-deletes the user (CASCADE clears attachment + avatar SO rows), then sweeps any orphaned MinIO blobs. Requires `confirm: true` in the request body, returns 400 USER.DELETE.CONFIRM_REQUIRED otherwise. Rejects self-delete with USER.DELETE.SELF_NOT_ALLOWED to prevent admins locking themselves out. Suspension (PATCH with enabled=false) is a separate operation and is NOT a precondition.",
+        "operationId": "admin-delete-user",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "userId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeleteUserInputBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminDeleteOutputBody"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Delete a user immediately",
+        "tags": ["Admin"]
+      },
       "get": {
         "description": "Returns the full user row plus the workspaces they belong to and their session count. Used by the admin user-detail page.",
         "operationId": "admin-get-user",
@@ -12770,6 +12897,54 @@
       }
     },
     "/admin/workspaces/{wsId}": {
+      "delete": {
+        "description": "Destructive immediate delete. Sweeps every MinIO blob owned by the workspace, then issues a CASCADE-anchored hard DELETE on the workspaces row. Requires `confirm: true` in the request body, returns 400 WORKSPACE.DELETE.CONFIRM_REQUIRED otherwise. Idempotent: an already-deleted workspace returns 200 with deleted=false. Suspension (PATCH with enabled=false) is a separate, reversible operation and is NOT a precondition.",
+        "operationId": "admin-delete-workspace",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "wsId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeleteWorkspaceInputBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminDeleteOutputBody"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Delete a workspace immediately",
+        "tags": ["Admin"]
+      },
       "get": {
         "description": "Returns the workspace metadata along with administrative counts (members, owners, projects) for the admin workspace-detail page.",
         "operationId": "admin-get-workspace",
@@ -16658,59 +16833,11 @@
         },
         "summary": "List attachments on a task",
         "tags": ["Tasks"]
-      },
-      "post": {
-        "description": "Records that a file (already uploaded via /presign) is associated with the task. Stores filename, MIME, size, and storage key.",
-        "operationId": "tasks-attachments-add",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "id",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/AddTaskAttachmentBody"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/TaskAttachment"
-                }
-              }
-            },
-            "description": "OK"
-          },
-          "default": {
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorModel"
-                }
-              }
-            },
-            "description": "Error"
-          }
-        },
-        "summary": "Register an attachment metadata row on a task",
-        "tags": ["Tasks"]
       }
     },
     "/tasks/{id}/attachments/presign": {
       "post": {
-        "description": "Returns a short-lived presigned PUT URL the client can stream the file directly to S3 with. Pair with /attachments to record metadata after the upload completes.",
+        "description": "Single entry point for adding an attachment to a task. The client supplies the file's SHA-256; the server runs content-addressed dedup and either bumps the ref count on an existing storage_objects row (deduplicated=true, no upload) or returns a presigned PUT URL the client streams the bytes to. The attachment row is always created in the same transaction.",
         "operationId": "tasks-attachments-presign",
         "parameters": [
           {
@@ -16754,7 +16881,7 @@
             "description": "Error"
           }
         },
-        "summary": "Get a presigned PUT URL for uploading an attachment",
+        "summary": "Reserve an attachment row and (if needed) get a presigned PUT URL",
         "tags": ["Tasks"]
       }
     },
@@ -18634,8 +18761,8 @@
     },
     "/workspaces/{wsId}": {
       "delete": {
-        "description": "Soft-disables the workspace: members lose access to its data and the workspace stops appearing in switcher listings. Owner role required. Hard deletion is performed by instance admins through a separate flow.",
-        "operationId": "workspaces-disable",
+        "description": "Destructive immediate delete by the workspace owner. Sweeps every MinIO blob owned by the workspace, then issues a CASCADE-anchored hard DELETE on the workspaces row and every dependent member, project, task, event, and attachment. Requires `confirm: true` in the request body, returns 400 WORKSPACE.DELETE.CONFIRM_REQUIRED otherwise. Idempotent: an already-deleted workspace returns 200 with deleted=false. Suspension (PATCH with enabled=false) is a separate, reversible operation and is NOT a precondition.",
+        "operationId": "workspaces-delete",
         "parameters": [
           {
             "in": "path",
@@ -18646,12 +18773,22 @@
             }
           }
         ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeleteWorkspaceInputBody"
+              }
+            }
+          },
+          "required": true
+        },
         "responses": {
           "200": {
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/DisableWorkspaceOutputBody"
+                  "$ref": "#/components/schemas/DeleteWorkspaceOutputBody"
                 }
               }
             },
@@ -18668,7 +18805,7 @@
             "description": "Error"
           }
         },
-        "summary": "Disable a workspace"
+        "summary": "Delete a workspace immediately"
       },
       "get": {
         "description": "Returns the workspace metadata (name, slug, plan, settings) along with the caller's role in it. Requires workspace membership.",
@@ -21326,10 +21463,12 @@
         },
         "summary": "List attachments on an event",
         "tags": ["Calendar"]
-      },
+      }
+    },
+    "/workspaces/{wsId}/calendars/{calId}/events/{evtId}/attachments/presign": {
       "post": {
-        "description": "Records that a file (already uploaded out-of-band) is attached to the event. Stores filename, MIME, size, and storage key.",
-        "operationId": "attachments-create",
+        "description": "Single entry point for adding an attachment to an event. The client supplies the file's SHA-256; the server runs content-addressed dedup and either bumps the ref count on an existing storage_objects row (deduplicated=true, no upload) or returns a presigned PUT URL the client streams the bytes to.",
+        "operationId": "attachments-presign",
         "parameters": [
           {
             "description": "Workspace public ID",
@@ -21366,7 +21505,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/CreateAttachmentInputBody"
+                "$ref": "#/components/schemas/PresignAttachmentInputBody"
               }
             }
           },
@@ -21377,7 +21516,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/AttachmentResponse"
+                  "$ref": "#/components/schemas/PresignAttachmentOutputBody"
                 }
               }
             },
@@ -21394,13 +21533,13 @@
             "description": "Error"
           }
         },
-        "summary": "Record attachment metadata for an event",
+        "summary": "Reserve an attachment row and (if needed) get a presigned PUT URL",
         "tags": ["Calendar"]
       }
     },
     "/workspaces/{wsId}/calendars/{calId}/events/{evtId}/attachments/{attId}": {
       "delete": {
-        "description": "Marks the attachment as removed and best-effort deletes the underlying object. Idempotent.",
+        "description": "Marks the attachment as removed, decrements the storage_objects ref_count, and best-effort deletes the underlying blob if no references remain. Idempotent.",
         "operationId": "attachments-delete",
         "parameters": [
           {
@@ -21467,6 +21606,78 @@
           }
         },
         "summary": "Delete an attachment from an event",
+        "tags": ["Calendar"]
+      }
+    },
+    "/workspaces/{wsId}/calendars/{calId}/events/{evtId}/attachments/{attId}/download": {
+      "get": {
+        "description": "Returns a short-lived presigned GET URL with Content-Disposition: attachment. Non-ASCII filenames are emitted in RFC 5987 form so they survive HTTP header transport.",
+        "operationId": "attachments-download",
+        "parameters": [
+          {
+            "description": "Workspace public ID",
+            "in": "path",
+            "name": "wsId",
+            "required": true,
+            "schema": {
+              "description": "Workspace public ID",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Calendar public ID",
+            "in": "path",
+            "name": "calId",
+            "required": true,
+            "schema": {
+              "description": "Calendar public ID",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Event public ID",
+            "in": "path",
+            "name": "evtId",
+            "required": true,
+            "schema": {
+              "description": "Event public ID",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Attachment public ID",
+            "in": "path",
+            "name": "attId",
+            "required": true,
+            "schema": {
+              "description": "Attachment public ID",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DownloadAttachmentOutputBody"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Get a presigned GET URL for downloading an attachment",
         "tags": ["Calendar"]
       }
     },

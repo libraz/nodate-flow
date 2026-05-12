@@ -68,8 +68,12 @@ func TestExpiredTokenReturnsUnauthorized(t *testing.T) {
 		"refresh after logout must return 401")
 }
 
-// TestDisabledWorkspaceInaccessible verifies that after disabling a
-// workspace, all its resources become inaccessible.
+// TestDeletedWorkspaceInaccessible verifies that after the owner
+// immediate-deletes a workspace, all its resources become inaccessible
+// (the workspace middleware emits 404 / 403 for any onward call). The
+// test name keeps the historical "Disabled" label for downstream
+// reference but the underlying contract is now a single-step
+// destructive delete via DELETE /workspaces/{wsId} with confirm=true.
 func TestDisabledWorkspaceInaccessible(t *testing.T) {
 	bootstrap(t)
 	t.Parallel()
@@ -77,13 +81,14 @@ func TestDisabledWorkspaceInaccessible(t *testing.T) {
 
 	wsURL := testServerURL + "/workspaces/" + tt.WorkspacePublicID
 
-	// Create some resources before disabling.
+	// Create some resources before deleting.
 	doJSON(t, http.MethodPost, wsURL+"/pages", tt.AccessToken,
-		map[string]any{"title": "Before Disable"}, nil)
+		map[string]any{"title": "Before Delete"}, nil)
 
-	// Disable the workspace (owner only).
+	// Delete the workspace (owner only). The new contract requires
+	// {"confirm": true} in the body.
 	status, _ := doJSONStatus(t, http.MethodDelete, wsURL,
-		tt.AccessToken, nil)
+		tt.AccessToken, map[string]any{"confirm": true})
 	require.Equal(t, http.StatusOK, status)
 
 	// All workspace-scoped endpoints should now fail.

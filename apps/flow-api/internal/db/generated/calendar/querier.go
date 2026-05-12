@@ -29,7 +29,10 @@ type Querier interface {
 	CreateCalendarChecklistItem(ctx context.Context, arg CreateCalendarChecklistItemParams) (int64, error)
 	// Insert a new calendar event.
 	CreateCalendarEvent(ctx context.Context, arg CreateCalendarEventParams) (int64, error)
-	// Record metadata for an uploaded file attachment on a calendar event.
+	// Record per-event attachment metadata. The blob (sha256, byte_size,
+	// content_type, storage_key) lives in storage_objects and is referenced via
+	// storage_object_id; caller MUST insert the storage_objects row or bump its
+	// ref_count inside the same transaction.
 	CreateCalendarEventAttachment(ctx context.Context, arg CreateCalendarEventAttachmentParams) (int64, error)
 	// Add an attendee to a calendar event.
 	CreateCalendarEventAttendee(ctx context.Context, arg CreateCalendarEventAttendeeParams) (int64, error)
@@ -50,6 +53,12 @@ type Querier interface {
 	CreatePublicShare(ctx context.Context, arg CreatePublicShareParams) (int64, error)
 	// Remove all attendees from an event (used when re-setting attendee list).
 	DeleteAllCalendarEventAttendees(ctx context.Context, eventID sql.NullInt32) error
+	// Hard-delete a calendar event attachment row. Caller MUST have already
+	// decremented ref_count on the linked storage_objects row inside the same
+	// transaction; this row holding the FK reference must go away before
+	// DeleteStorageObjectIfUnreferenced can free the storage object (FK is
+	// ON DELETE RESTRICT). Audit trail survives via events.
+	DeleteCalendarEventAttachment(ctx context.Context, arg DeleteCalendarEventAttachmentParams) error
 	// Remove one event from a share (soft). Looks up the link by share +
 	// event internal ids (caller resolves both via their public ids first).
 	DetachEventFromShare(ctx context.Context, arg DetachEventFromShareParams) error
@@ -61,8 +70,6 @@ type Querier interface {
 	// gates LIST/GET reads; the column doubles as the auditable soft-delete
 	// marker (no separate deleted_at column).
 	DisableCalendarEvent(ctx context.Context, arg DisableCalendarEventParams) error
-	// Soft-delete an attachment. Actual blob cleanup is deferred.
-	DisableCalendarEventAttachment(ctx context.Context, arg DisableCalendarEventAttachmentParams) error
 	// Remove an attendee from an event (soft-delete).
 	DisableCalendarEventAttendee(ctx context.Context, arg DisableCalendarEventAttendeeParams) error
 	// Soft-delete a comment (author or calendar owner).
@@ -85,7 +92,9 @@ type Querier interface {
 	FindCalendarByPublicId(ctx context.Context, arg FindCalendarByPublicIdParams) (FindCalendarByPublicIdRow, error)
 	// Resolve a checklist item by UUID v7.
 	FindCalendarChecklistItemByPublicId(ctx context.Context, arg FindCalendarChecklistItemByPublicIdParams) (FindCalendarChecklistItemByPublicIdRow, error)
-	// Resolve an attachment by UUID v7 for download or deletion.
+	// Resolve an attachment by UUID v7 for download or deletion, including the
+	// backing storage_objects metadata so the handler can build a presigned URL
+	// without a second round trip.
 	FindCalendarEventAttachmentByPublicId(ctx context.Context, arg FindCalendarEventAttachmentByPublicIdParams) (FindCalendarEventAttachmentByPublicIdRow, error)
 	// Look up a specific attendee on an event (for permission checks).
 	FindCalendarEventAttendee(ctx context.Context, arg FindCalendarEventAttendeeParams) (FindCalendarEventAttendeeRow, error)
@@ -123,8 +132,10 @@ type Querier interface {
 	FindSystemCalendarBySlug(ctx context.Context, arg FindSystemCalendarBySlugParams) (FindSystemCalendarBySlugRow, error)
 	// List checklist items for an event in display order.
 	ListCalendarChecklistItems(ctx context.Context, eventID uint32) ([]ListCalendarChecklistItemsRow, error)
-	// List active attachments for an event.
-	ListCalendarEventAttachments(ctx context.Context, eventID sql.NullInt32) ([]ListCalendarEventAttachmentsRow, error)
+	// List active attachments for an event with uploader display fields and the
+	// storage_objects metadata flattened in via JOIN. Order is stable by
+	// created_at then public_id.
+	ListCalendarEventAttachments(ctx context.Context, arg ListCalendarEventAttachmentsParams) ([]ListCalendarEventAttachmentsRow, error)
 	// List all attendees for an event with user profile info.
 	ListCalendarEventAttendees(ctx context.Context, eventID sql.NullInt32) ([]ListCalendarEventAttendeesRow, error)
 	// List comments on an event in chronological order.

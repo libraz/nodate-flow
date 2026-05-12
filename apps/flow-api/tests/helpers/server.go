@@ -18,6 +18,7 @@ import (
 	calgen "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/generated/calendar"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/eventbus"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/router"
+	flowstorage "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/storage"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/stream"
 	"github.com/nodate-flow/nodate-flow/packages/go-shared/authn"
 	"github.com/nodate-flow/nodate-flow/packages/go-shared/crypto"
@@ -61,6 +62,10 @@ func mustDecodeHex(s string) []byte {
 // A fixed test cipher is always constructed so AI provider and MCP
 // tests can exercise encryption end to end. The server is torn down
 // via t.Cleanup.
+//
+// Storage is left nil; presign and avatar handlers return
+// INTERNAL.UNEXPECTED / AUTH.AVATAR.STORAGE_UNAVAILABLE. Callers that
+// need real S3/MinIO integration should use StartTestServerWithStorage.
 func StartTestServer(t *testing.T, db *sql.DB) *TestServer {
 	t.Helper()
 	require.NotNil(t, db, "StartTestServer requires a non-nil *sql.DB")
@@ -153,6 +158,74 @@ func NewTestServer(db *sql.DB) (*TestServer, func(), error) {
 	})
 
 	authHandler, err := testutil.BuildTestRouter(db, jwtKey, testCipherKey)
+	if err != nil {
+		return nil, nil, fmt.Errorf("build auth-api test router: %w", err)
+	}
+
+	composite := newCompositeHandler(authHandler, flowHandler)
+	srv := httptest.NewServer(composite)
+	cleanup := func() {
+		eventbus.SetNotifyHook(nil)
+		srv.Close()
+	}
+	return &TestServer{BaseURL: srv.URL, Server: srv, DB: db, JWT: jwtIssuer}, cleanup, nil
+}
+
+// NewTestServerWithStorage is the same as NewTestServer but additionally
+// plumbs the supplied StorageBundle into both the flow-api and
+// auth-api routers. The bundle's Flow client serves task / calendar
+// attachment presign endpoints; the bundle's Auth client serves the
+// avatar upload / delete / proxy handlers. Pass nil to fall back to
+// the no-storage path.
+func NewTestServerWithStorage(db *sql.DB, bundle *StorageBundle) (*TestServer, func(), error) {
+	if db == nil {
+		return nil, nil, fmt.Errorf("NewTestServerWithStorage requires a non-nil *sql.DB")
+	}
+	jwtKey, err := authn.DeriveEd25519Key(testCipherHex, "nodate-flow:jwt:v1")
+	if err != nil {
+		return nil, nil, fmt.Errorf("derive jwt key: %w", err)
+	}
+	queries := generated.New(db)
+	calendarQueries := calgen.New(db)
+	jwtIssuer, err := auth.NewJWTIssuer(jwtKey, "nodate-flow", "api", 15*time.Minute)
+	if err != nil {
+		return nil, nil, fmt.Errorf("init jwt issuer: %w", err)
+	}
+	cipher, err := crypto.New(testCipherKey)
+	if err != nil {
+		return nil, nil, fmt.Errorf("init test cipher: %w", err)
+	}
+	notifier := stream.NewInProcessNotifier()
+	tap := stream.NewEventbusTap(notifier)
+	eventbus.SetNotifyHook(tap.Publish)
+
+	var flowStorage *flowstorage.Client
+	if bundle != nil {
+		flowStorage = bundle.Flow
+	}
+
+	flowHandler := router.Build(router.Deps{
+		DB:                 db,
+		Queries:            queries,
+		CalendarQueries:    calendarQueries,
+		JWT:                jwtIssuer,
+		Cipher:             cipher,
+		GhWebhookSecret:    "",
+		SlackSigningSecret: "",
+		DefaultWorkspaceID: "",
+		DisableRateLimit:   true,
+		AiMock:             os.Getenv("NF_FLOW_AI_MOCK") != "" && os.Getenv("NF_FLOW_AI_MOCK") != "0" && os.Getenv("NF_FLOW_AI_MOCK") != "false",
+		StreamNotifier:     notifier,
+		StreamRemember:     tap.RememberWorkspace,
+		Storage:            flowStorage,
+	})
+
+	var authHandler http.Handler
+	if bundle != nil {
+		authHandler, err = testutil.BuildTestRouterWithStorage(db, jwtKey, testCipherKey, bundle.Auth)
+	} else {
+		authHandler, err = testutil.BuildTestRouter(db, jwtKey, testCipherKey)
+	}
 	if err != nil {
 		return nil, nil, fmt.Errorf("build auth-api test router: %w", err)
 	}

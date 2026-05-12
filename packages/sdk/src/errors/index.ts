@@ -18,6 +18,8 @@ export * from "./rate.js";
 export * from "./relation.js";
 export * from "./share.js";
 export * from "./timebox.js";
+export * from "./user.js";
 export * from "./validation.js";
 export * from "./webhook.js";
+export * from "./workspace.js";
 export * from "./ws.js";

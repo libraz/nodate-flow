@@ -123,9 +123,3 @@ SET name        = COALESCE(sqlc.narg('name'), name),
     country     = COALESCE(sqlc.narg('country'), country)
 WHERE public_id = ?
   AND enabled = TRUE;
-
--- name: DisableWorkspace :exec
--- Soft-disable a workspace. Cascade is handled by FK ON DELETE for hard purges.
-UPDATE workspaces
-SET enabled = FALSE
-WHERE public_id = ?;

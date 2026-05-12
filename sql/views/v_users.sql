@@ -8,6 +8,8 @@ SELECT
   u.email,
   u.display_name,
   u.avatar_url,
+  u.avatar_storage_object_id,
+  so_avatar.public_id AS avatar_storage_object_public_id,
   u.locale,
   u.timezone,
   u.country,
@@ -23,4 +25,6 @@ INNER JOIN workspace_members wm
   ON wm.user_id = u.id AND wm.enabled = TRUE
 INNER JOIN workspaces w
   ON w.id = wm.workspace_id AND w.enabled = TRUE
+LEFT JOIN storage_objects so_avatar
+  ON so_avatar.id = u.avatar_storage_object_id AND so_avatar.enabled = TRUE
 WHERE u.enabled = TRUE;

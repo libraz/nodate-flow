@@ -223,6 +223,12 @@ func PurgeWorkspace(t *testing.T, db *sql.DB, workspacePublicID string) {
 		`DELETE FROM ai_providers     WHERE workspace_id = ?`,
 		`DELETE FROM ai_settings      WHERE workspace_id = ?`,
 		`DELETE FROM attachments      WHERE workspace_id = ?`,
+		// storage_objects rows scoped to this workspace must be wiped
+		// AFTER attachments because of fk_attachments_storage_object.
+		// User-scoped (avatar) rows are owned via owner_user_id and
+		// fall under fk_storage_objects_owner_user CASCADE when the
+		// user is deleted by workspace_members CASCADE downstream.
+		`DELETE FROM storage_objects  WHERE workspace_id = ?`,
 		`DELETE FROM comments         WHERE workspace_id = ?`,
 		`DELETE FROM task_event_links  WHERE workspace_id = ?`,
 		`DELETE FROM task_constraints WHERE workspace_id = ?`,

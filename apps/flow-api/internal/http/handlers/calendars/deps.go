@@ -8,6 +8,7 @@ import (
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/generated/calendar"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/eventbus"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/handlers/handlerutil"
+	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/storage"
 	"github.com/nodate-flow/nodate-flow/packages/go-shared/email"
 )
 
@@ -34,6 +35,10 @@ type Deps struct {
 	// for outbound invite emails. Sourced from NF_FLOW_WEB_URL; defaults
 	// to http://localhost:5173 in development.
 	FlowWebURL string
+	// Storage is the S3-compatible object store client for event
+	// attachment uploads / downloads. Optional: nil makes the
+	// presign / download endpoints return INTERNAL.STORAGE.NOT_CONFIGURED.
+	Storage *storage.Client
 }
 
 // httpErr delegates to handlerutil.HTTPErr.

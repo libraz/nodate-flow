@@ -34,7 +34,31 @@
     "session_actions": "操作",
     "sessions": "セッション",
     "grant_admin": "管理者権限を付与",
-    "revoke_admin": "管理者権限を取り消し"
+    "revoke_admin": "管理者権限を取り消し",
+    "danger": {
+      "title": "危険な操作",
+      "description": "取り消せない操作です。ユーザーを完全に削除すると、アカウント、すべてのセッション、アップロード済みの添付ファイルとアバターも消去されます。",
+      "delete": "ユーザーを削除",
+      "deleting": "削除中…",
+      "confirm": {
+        "title": "{email} を削除しますか?",
+        "warning": "ユーザーアカウントを完全に削除し、インスタンス全体で参照されているアップロード済みファイルを整理します。この操作は元に戻せません。",
+        "loses_heading": "失われるもの",
+        "loses_account": "アカウントとすべてのセッション",
+        "loses_workspaces": "{count} 個のワークスペースのメンバーシップ",
+        "loses_attachments": "アップロード済みのすべての添付ファイルとアバター",
+        "type_to_confirm_label": "確認のためメールアドレスを入力",
+        "type_to_confirm_help": "削除を有効化するには {email} を正確に入力してください。",
+        "type_to_confirm_placeholder": "ユーザーのメールアドレス",
+        "submit": "完全に削除する",
+        "cancel": "キャンセル"
+      },
+      "deleted": "ユーザーを削除しました",
+      "errors": {
+        "delete_failed": "ユーザーを削除できませんでした。もう一度お試しください。",
+        "delete_failed_with_code": "ユーザーを削除できませんでした（{code}）。もう一度お試しください。"
+      }
+    }
   },
   "workspaces": {
     "title": "ワークスペース管理",
@@ -55,7 +79,31 @@
     "active_only": "有効",
     "suspended_only": "停止中",
     "no_results": "ワークスペースが見つかりません。",
-    "detail": "ワークスペース詳細"
+    "detail": "ワークスペース詳細",
+    "danger": {
+      "title": "危険な操作",
+      "description": "取り消せない操作です。ワークスペースを完全に削除すると、すべてのプロジェクト、タスク、メンバー、アップロード済みファイルが消去されます。",
+      "delete": "ワークスペースを削除",
+      "deleting": "削除中…",
+      "confirm": {
+        "title": "{name} を削除しますか?",
+        "warning": "ワークスペースを完全に削除し、オブジェクトストレージ上のすべてのアップロード済みファイルを不可逆的に消去します。この操作は元に戻せません。",
+        "loses_heading": "失われるもの",
+        "loses_projects_and_tasks": "すべてのプロジェクト・タスク・コメント・タイムライン履歴",
+        "loses_members": "{count} 名のメンバーとそのアクセス権",
+        "loses_attachments": "オブジェクトストレージ上のすべての添付ファイルとアップロード",
+        "type_to_confirm_label": "確認のためスラグを入力",
+        "type_to_confirm_help": "削除を有効化するには {slug} を正確に入力してください。",
+        "type_to_confirm_placeholder": "ワークスペースのスラグ",
+        "submit": "完全に削除する",
+        "cancel": "キャンセル"
+      },
+      "deleted": "ワークスペースを削除しました",
+      "errors": {
+        "delete_failed": "ワークスペースを削除できませんでした。もう一度お試しください。",
+        "delete_failed_with_code": "ワークスペースを削除できませんでした（{code}）。もう一度お試しください。"
+      }
+    }
   },
   "audit_logs": {
     "title": "インスタンス監査ログ",

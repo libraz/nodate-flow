@@ -84,6 +84,24 @@ func Register(api huma.API, deps Deps) {
 		Tags:        []string{"Admin"},
 	}, PatchWorkspace(deps))
 
+	huma.Register(api, huma.Operation{
+		OperationID: "admin-delete-workspace",
+		Method:      http.MethodDelete,
+		Path:        "/admin/workspaces/{wsId}",
+		Summary:     "Delete a workspace immediately",
+		Description: "Destructive immediate delete. Sweeps every MinIO blob owned by the workspace, then issues a CASCADE-anchored hard DELETE on the workspaces row. Requires `confirm: true` in the request body, returns 400 WORKSPACE.DELETE.CONFIRM_REQUIRED otherwise. Idempotent: an already-deleted workspace returns 200 with deleted=false. Suspension (PATCH with enabled=false) is a separate, reversible operation and is NOT a precondition.",
+		Tags:        []string{"Admin"},
+	}, DeleteWorkspace(deps))
+
+	huma.Register(api, huma.Operation{
+		OperationID: "admin-delete-user",
+		Method:      http.MethodDelete,
+		Path:        "/admin/users/{userId}",
+		Summary:     "Delete a user immediately",
+		Description: "Destructive immediate delete. Reconciles ref_counts on every storage_objects row referenced by the user (task / calendar attachments uploaded by them across any workspace, plus avatar storage objects owned directly by them), hard-deletes the user (CASCADE clears attachment + avatar SO rows), then sweeps any orphaned MinIO blobs. Requires `confirm: true` in the request body, returns 400 USER.DELETE.CONFIRM_REQUIRED otherwise. Rejects self-delete with USER.DELETE.SELF_NOT_ALLOWED to prevent admins locking themselves out. Suspension (PATCH with enabled=false) is a separate operation and is NOT a precondition.",
+		Tags:        []string{"Admin"},
+	}, DeleteUser(deps))
+
 	// --- Instance Admins ---
 	huma.Register(api, huma.Operation{
 		OperationID: "admin-list-admins",

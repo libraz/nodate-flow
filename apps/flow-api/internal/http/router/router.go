@@ -515,6 +515,7 @@ func buildSharedDeps(deps Deps) *sharedDeps {
 			EmailSender:     deps.EmailSender,
 			EmailFrom:       deps.EmailFrom,
 			FlowWebURL:      deps.FlowWebURL,
+			Storage:         deps.Storage,
 		},
 	}
 }
@@ -1321,19 +1322,27 @@ func buildAuthenticatedAPI(r chi.Router, deps Deps, shared *sharedDeps, authMW f
 			Tags:        []string{"Calendar"},
 		}, calendars.ListAttachments(shared.calDeps))
 		huma.Register(subAPI, huma.Operation{
-			OperationID: "attachments-create",
+			OperationID: "attachments-presign",
 			Method:      http.MethodPost,
-			Path:        "/workspaces/{wsId}/calendars/{calId}/events/{evtId}/attachments",
-			Summary:     "Record attachment metadata for an event",
-			Description: "Records that a file (already uploaded out-of-band) is attached to the event. Stores filename, MIME, size, and storage key.",
+			Path:        "/workspaces/{wsId}/calendars/{calId}/events/{evtId}/attachments/presign",
+			Summary:     "Reserve an attachment row and (if needed) get a presigned PUT URL",
+			Description: "Single entry point for adding an attachment to an event. The client supplies the file's SHA-256; the server runs content-addressed dedup and either bumps the ref count on an existing storage_objects row (deduplicated=true, no upload) or returns a presigned PUT URL the client streams the bytes to.",
 			Tags:        []string{"Calendar"},
-		}, calendars.CreateAttachment(shared.calDeps))
+		}, calendars.PresignAttachment(shared.calDeps))
+		huma.Register(subAPI, huma.Operation{
+			OperationID: "attachments-download",
+			Method:      http.MethodGet,
+			Path:        "/workspaces/{wsId}/calendars/{calId}/events/{evtId}/attachments/{attId}/download",
+			Summary:     "Get a presigned GET URL for downloading an attachment",
+			Description: "Returns a short-lived presigned GET URL with Content-Disposition: attachment. Non-ASCII filenames are emitted in RFC 5987 form so they survive HTTP header transport.",
+			Tags:        []string{"Calendar"},
+		}, calendars.DownloadAttachment(shared.calDeps))
 		huma.Register(subAPI, huma.Operation{
 			OperationID: "attachments-delete",
 			Method:      http.MethodDelete,
 			Path:        "/workspaces/{wsId}/calendars/{calId}/events/{evtId}/attachments/{attId}",
 			Summary:     "Delete an attachment from an event",
-			Description: "Marks the attachment as removed and best-effort deletes the underlying object. Idempotent.",
+			Description: "Marks the attachment as removed, decrements the storage_objects ref_count, and best-effort deletes the underlying blob if no references remain. Idempotent.",
 			Tags:        []string{"Calendar"},
 		}, calendars.DeleteAttachment(shared.calDeps))
 	})

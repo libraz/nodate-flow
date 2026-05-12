@@ -202,8 +202,6 @@
     },
     "attachments": {
       "empty": "No attachments yet",
-      "add": "Add attachment",
-      "add_error": "Failed to add attachment",
       "delete": "Delete",
       "delete_confirm": "Delete this attachment?",
       "delete_success": "Attachment deleted",
@@ -211,19 +209,15 @@
       "upload": "Upload",
       "uploading": "Uploading…",
       "upload_success": "Attachment uploaded",
+      "upload_dedup_success": "Attachment already on file — linked instantly",
       "upload_error": "Upload failed",
       "download": "Download",
+      "download_error": "Failed to fetch download URL",
       "size_unit": {
         "b": "B",
         "kb": "KB",
         "mb": "MB",
         "gb": "GB"
-      },
-      "field": {
-        "filename": "Filename",
-        "storage_key": "Storage key",
-        "content_type": "Content type",
-        "byte_size": "Byte size"
       }
     },
     "invites": {

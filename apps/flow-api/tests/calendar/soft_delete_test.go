@@ -100,6 +100,9 @@ func TestSoftDelete_ChildRowsRetainParentLink(t *testing.T) {
 
 	// Child rows must still resolve event_id = evtInternalID. Soft-delete
 	// is a column update on the parent; child FKs are untouched.
+	// Scope the NULL probe to this tenant so other parallel tests that
+	// hard-delete events (and intentionally leave SET NULL rows) cannot
+	// flake this assertion.
 	for _, c := range childTables() {
 		var matched int
 		require.NoError(t, testDB.QueryRowContext(context.Background(),
@@ -109,7 +112,8 @@ func TestSoftDelete_ChildRowsRetainParentLink(t *testing.T) {
 
 		var nulled int
 		require.NoError(t, testDB.QueryRowContext(context.Background(),
-			"SELECT COUNT(*) FROM "+c+" WHERE event_id IS NULL").Scan(&nulled))
+			"SELECT COUNT(*) FROM "+c+" WHERE workspace_id = ? AND event_id IS NULL",
+			tt.WorkspaceID).Scan(&nulled))
 		assert.Equalf(t, 0, nulled,
 			"%s must not have any NULL event_id rows after soft-delete", c)
 	}
@@ -285,13 +289,29 @@ func seedEventChildren(
 		pub(), tt.WorkspaceID, calInternalID, evtInternalID, tokenHash)
 	require.NoError(t, err, "seed calendar_event_invites")
 
-	// storage_key carries a UNIQUE constraint, so randomize it.
+	// Allocate a storage_objects row (content-addressed). storage_key
+	// and (workspace_id, sha256) carry UNIQUE constraints, so randomize
+	// the synthetic SHA-256 per test run.
+	sha := make([]byte, 32)
+	saltSO := int(evtInternalID) % 251
+	for i := range sha {
+		sha[i] = byte((i*7 + saltSO) & 0xff)
+	}
 	storageKey := "test/probe/" + uuid.Must(uuid.NewV7()).String()
+	res, err := testDB.ExecContext(ctx, `
+		INSERT INTO storage_objects
+		  (public_id, workspace_id, owner_user_id, sha256, byte_size,
+		   content_type, storage_key, ref_count)
+		VALUES (?, ?, NULL, ?, 12, 'application/octet-stream', ?, 1)`,
+		pub(), tt.WorkspaceID, sha, storageKey)
+	require.NoError(t, err, "seed storage_objects")
+	soID, err := res.LastInsertId()
+	require.NoError(t, err, "storage_objects insert id")
 	_, err = testDB.ExecContext(ctx, `
 		INSERT INTO calendar_event_attachments
 		  (public_id, workspace_id, event_id, uploader_id,
-		   filename, storage_key, byte_size)
-		VALUES (?, ?, ?, ?, 'probe.txt', ?, 12)`,
-		pub(), tt.WorkspaceID, evtInternalID, tt.UserInternalID, storageKey)
+		   filename, storage_object_id)
+		VALUES (?, ?, ?, ?, 'probe.txt', ?)`,
+		pub(), tt.WorkspaceID, evtInternalID, tt.UserInternalID, soID)
 	require.NoError(t, err, "seed calendar_event_attachments")
 }

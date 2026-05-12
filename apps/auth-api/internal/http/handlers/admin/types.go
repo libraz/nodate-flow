@@ -9,13 +9,21 @@ import (
 
 	"github.com/nodate-flow/nodate-flow/apps/auth-api/internal/audit"
 	"github.com/nodate-flow/nodate-flow/apps/auth-api/internal/db/generated"
+	"github.com/nodate-flow/nodate-flow/apps/auth-api/internal/storage"
 )
 
 // Deps is the dependency bundle for admin handlers.
+//
+// Storage is the S3-compatible object store client used by the purge
+// endpoints to bulk-delete blobs before the CASCADE-anchored DB delete
+// fires. Nil when NF_S3_ENDPOINT is unset; the purge handlers degrade
+// gracefully by skipping the MinIO sweep and reporting
+// storageObjectsDeleted = 0 / minioErrors = 0 on the response.
 type Deps struct {
 	DB      *sql.DB
 	Queries *generated.Queries
 	Audit   audit.Sink
+	Storage *storage.Client
 }
 
 // --- Pagination ---

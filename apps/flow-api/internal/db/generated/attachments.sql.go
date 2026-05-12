@@ -19,38 +19,32 @@ INSERT INTO attachments (
   workspace_id,
   task_id,
   uploader_id,
-  filename,
-  content_type,
-  byte_size,
-  storage_key,
-  checksum_sha256
-) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+  storage_object_id,
+  filename
+) VALUES (?, ?, ?, ?, ?, ?)
 `
 
 type AddAttachmentParams struct {
-	PublicID       types.PublicID `json:"publicId"`
-	WorkspaceID    uint32         `json:"-"`
-	TaskID         sql.NullInt32  `json:"-"`
-	UploaderID     uint32         `json:"-"`
-	Filename       string         `json:"filename"`
-	ContentType    string         `json:"contentType"`
-	ByteSize       uint64         `json:"byteSize"`
-	StorageKey     string         `json:"storageKey"`
-	ChecksumSha256 sql.NullString `json:"checksumSha256"`
+	PublicID        types.PublicID `json:"publicId"`
+	WorkspaceID     uint32         `json:"-"`
+	TaskID          sql.NullInt32  `json:"-"`
+	UploaderID      uint32         `json:"-"`
+	StorageObjectID uint32         `json:"-"`
+	Filename        string         `json:"filename"`
 }
 
-// Insert metadata for a newly uploaded attachment.
+// Insert per-task attachment metadata. The blob itself (sha256, byte_size,
+// content_type, storage_key) is owned by storage_objects and looked up via
+// storage_object_id; caller MUST have either inserted a fresh storage_objects
+// row or bumped ref_count on an existing one inside the same transaction.
 func (q *Queries) AddAttachment(ctx context.Context, arg AddAttachmentParams) (int64, error) {
 	result, err := q.db.ExecContext(ctx, addAttachment,
 		arg.PublicID,
 		arg.WorkspaceID,
 		arg.TaskID,
 		arg.UploaderID,
+		arg.StorageObjectID,
 		arg.Filename,
-		arg.ContentType,
-		arg.ByteSize,
-		arg.StorageKey,
-		arg.ChecksumSha256,
 	)
 	if err != nil {
 		return 0, err
@@ -59,8 +53,7 @@ func (q *Queries) AddAttachment(ctx context.Context, arg AddAttachmentParams) (i
 }
 
 const deleteAttachment = `-- name: DeleteAttachment :exec
-UPDATE attachments
-SET enabled = FALSE
+DELETE FROM attachments
 WHERE workspace_id = ?
   AND public_id = ?
 `
@@ -70,7 +63,11 @@ type DeleteAttachmentParams struct {
 	PublicID    types.PublicID `json:"publicId"`
 }
 
-// Soft-delete an attachment row. Object storage cleanup is async.
+// Hard-delete an attachment row. Caller MUST have already
+// decremented ref_count on the linked storage_objects row inside
+// the same transaction; this row holding the FK reference must go
+// away before DeleteStorageObjectIfUnreferenced can free the storage
+// object (FK is ON DELETE RESTRICT). Audit trail survives via events.
 func (q *Queries) DeleteAttachment(ctx context.Context, arg DeleteAttachmentParams) error {
 	_, err := q.db.ExecContext(ctx, deleteAttachment, arg.WorkspaceID, arg.PublicID)
 	return err
@@ -80,13 +77,16 @@ const getAttachmentByPublicID = `-- name: GetAttachmentByPublicID :one
 SELECT
   a.public_id,
   a.filename,
-  a.content_type,
-  a.byte_size,
-  a.storage_key,
-  a.checksum_sha256,
+  so.id AS storage_object_id,
+  so.public_id AS storage_object_public_id,
+  so.content_type,
+  so.byte_size,
+  so.storage_key,
+  so.sha256,
   a.updated_at,
   a.created_at
 FROM attachments a
+INNER JOIN storage_objects so ON so.id = a.storage_object_id AND so.enabled = TRUE
 WHERE a.workspace_id = ?
   AND a.public_id = ?
   AND a.enabled = TRUE
@@ -98,30 +98,67 @@ type GetAttachmentByPublicIDParams struct {
 }
 
 type GetAttachmentByPublicIDRow struct {
-	PublicID       types.PublicID `json:"publicId"`
-	Filename       string         `json:"filename"`
-	ContentType    string         `json:"contentType"`
-	ByteSize       uint64         `json:"byteSize"`
-	StorageKey     string         `json:"storageKey"`
-	ChecksumSha256 sql.NullString `json:"checksumSha256"`
-	UpdatedAt      sql.NullTime   `json:"updatedAt"`
-	CreatedAt      time.Time      `json:"createdAt"`
+	PublicID              types.PublicID `json:"publicId"`
+	Filename              string         `json:"filename"`
+	StorageObjectID       uint32         `json:"-"`
+	StorageObjectPublicID types.PublicID `json:"storageObjectPublicId"`
+	ContentType           string         `json:"contentType"`
+	ByteSize              uint64         `json:"byteSize"`
+	StorageKey            string         `json:"storageKey"`
+	Sha256                []byte         `json:"sha256"`
+	UpdatedAt             sql.NullTime   `json:"updatedAt"`
+	CreatedAt             time.Time      `json:"createdAt"`
 }
 
-// Fetch a single attachment by its public id within a workspace.
+// Fetch a single attachment by its public id within a workspace, with the
+// backing storage_objects metadata. Used by download / detail handlers.
 func (q *Queries) GetAttachmentByPublicID(ctx context.Context, arg GetAttachmentByPublicIDParams) (GetAttachmentByPublicIDRow, error) {
 	row := q.db.QueryRowContext(ctx, getAttachmentByPublicID, arg.WorkspaceID, arg.PublicID)
 	var i GetAttachmentByPublicIDRow
 	err := row.Scan(
 		&i.PublicID,
 		&i.Filename,
+		&i.StorageObjectID,
+		&i.StorageObjectPublicID,
 		&i.ContentType,
 		&i.ByteSize,
 		&i.StorageKey,
-		&i.ChecksumSha256,
+		&i.Sha256,
 		&i.UpdatedAt,
 		&i.CreatedAt,
 	)
+	return i, err
+}
+
+const getAttachmentStorageObjectIDForDelete = `-- name: GetAttachmentStorageObjectIDForDelete :one
+SELECT
+  a.id,
+  a.storage_object_id
+FROM attachments a
+WHERE a.workspace_id = ?
+  AND a.public_id = ?
+  AND a.enabled = TRUE
+LIMIT 1
+`
+
+type GetAttachmentStorageObjectIDForDeleteParams struct {
+	WorkspaceID uint32         `json:"-"`
+	PublicID    types.PublicID `json:"publicId"`
+}
+
+type GetAttachmentStorageObjectIDForDeleteRow struct {
+	ID              uint32 `json:"-"`
+	StorageObjectID uint32 `json:"-"`
+}
+
+// Resolve the internal storage_object_id for an attachment so the delete
+// handler can decrement ref_count (and possibly GC the underlying blob)
+// in the same transaction as the hard-delete below. Returns the internal
+// attachment id as well so the caller does not have to round-trip.
+func (q *Queries) GetAttachmentStorageObjectIDForDelete(ctx context.Context, arg GetAttachmentStorageObjectIDForDeleteParams) (GetAttachmentStorageObjectIDForDeleteRow, error) {
+	row := q.db.QueryRowContext(ctx, getAttachmentStorageObjectIDForDelete, arg.WorkspaceID, arg.PublicID)
+	var i GetAttachmentStorageObjectIDForDeleteRow
+	err := row.Scan(&i.ID, &i.StorageObjectID)
 	return i, err
 }
 
@@ -131,16 +168,18 @@ SELECT
   u.public_id AS uploader_public_id,
   u.display_name AS uploader_display_name,
   a.filename,
-  a.content_type,
-  a.byte_size,
-  a.storage_key,
-  a.checksum_sha256,
+  so.public_id AS storage_object_public_id,
+  so.content_type,
+  so.byte_size,
+  so.storage_key,
+  so.sha256,
   a.updated_at,
   a.created_at,
   COUNT(*) OVER() AS total
 FROM attachments a
 INNER JOIN tasks t ON t.id = a.task_id AND t.enabled = TRUE
 INNER JOIN users u ON u.id = a.uploader_id AND u.enabled = TRUE
+INNER JOIN storage_objects so ON so.id = a.storage_object_id AND so.enabled = TRUE
 WHERE a.workspace_id = ?
   AND t.public_id = ?
   AND a.enabled = TRUE
@@ -156,20 +195,23 @@ type ListAttachmentsForTaskParams struct {
 }
 
 type ListAttachmentsForTaskRow struct {
-	PublicID            types.PublicID `json:"publicId"`
-	UploaderPublicID    types.PublicID `json:"uploaderPublicId"`
-	UploaderDisplayName string         `json:"uploaderDisplayName"`
-	Filename            string         `json:"filename"`
-	ContentType         string         `json:"contentType"`
-	ByteSize            uint64         `json:"byteSize"`
-	StorageKey          string         `json:"storageKey"`
-	ChecksumSha256      sql.NullString `json:"checksumSha256"`
-	UpdatedAt           sql.NullTime   `json:"updatedAt"`
-	CreatedAt           time.Time      `json:"createdAt"`
-	Total               interface{}    `json:"total"`
+	PublicID              types.PublicID `json:"publicId"`
+	UploaderPublicID      types.PublicID `json:"uploaderPublicId"`
+	UploaderDisplayName   string         `json:"uploaderDisplayName"`
+	Filename              string         `json:"filename"`
+	StorageObjectPublicID types.PublicID `json:"storageObjectPublicId"`
+	ContentType           string         `json:"contentType"`
+	ByteSize              uint64         `json:"byteSize"`
+	StorageKey            string         `json:"storageKey"`
+	Sha256                []byte         `json:"sha256"`
+	UpdatedAt             sql.NullTime   `json:"updatedAt"`
+	CreatedAt             time.Time      `json:"createdAt"`
+	Total                 interface{}    `json:"total"`
 }
 
-// List attachments on a task with uploader display fields.
+// List attachments on a task with uploader display fields and the
+// storage_objects metadata flattened in via JOIN. Returns total via a
+// window function for paginated UI.
 func (q *Queries) ListAttachmentsForTask(ctx context.Context, arg ListAttachmentsForTaskParams) ([]ListAttachmentsForTaskRow, error) {
 	rows, err := q.db.QueryContext(ctx, listAttachmentsForTask,
 		arg.WorkspaceID,
@@ -189,10 +231,11 @@ func (q *Queries) ListAttachmentsForTask(ctx context.Context, arg ListAttachment
 			&i.UploaderPublicID,
 			&i.UploaderDisplayName,
 			&i.Filename,
+			&i.StorageObjectPublicID,
 			&i.ContentType,
 			&i.ByteSize,
 			&i.StorageKey,
-			&i.ChecksumSha256,
+			&i.Sha256,
 			&i.UpdatedAt,
 			&i.CreatedAt,
 			&i.Total,

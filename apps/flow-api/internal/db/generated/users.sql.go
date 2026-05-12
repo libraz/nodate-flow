@@ -44,10 +44,28 @@ FROM v_admin_users v
 WHERE v.public_id = ?
 `
 
+type AdminGetUserRow struct {
+	ID              uint32         `json:"-"`
+	PublicID        types.PublicID `json:"publicId"`
+	Email           string         `json:"email"`
+	DisplayName     string         `json:"displayName"`
+	AvatarUrl       sql.NullString `json:"avatarUrl"`
+	Locale          string         `json:"locale"`
+	Timezone        string         `json:"timezone"`
+	Country         sql.NullString `json:"country"`
+	LastLoginAt     sql.NullTime   `json:"lastLoginAt"`
+	EmailVerifiedAt sql.NullTime   `json:"emailVerifiedAt"`
+	Enabled         bool           `json:"enabled"`
+	CreatedAt       time.Time      `json:"createdAt"`
+	UpdatedAt       sql.NullTime   `json:"updatedAt"`
+	WorkspaceCount  int64          `json:"workspaceCount"`
+	IsInstanceAdmin bool           `json:"isInstanceAdmin"`
+}
+
 // Find a single user by public_id for admin detail view.
-func (q *Queries) AdminGetUser(ctx context.Context, publicID types.PublicID) (VAdminUser, error) {
+func (q *Queries) AdminGetUser(ctx context.Context, publicID types.PublicID) (AdminGetUserRow, error) {
 	row := q.db.QueryRowContext(ctx, adminGetUser, publicID)
-	var i VAdminUser
+	var i AdminGetUserRow
 	err := row.Scan(
 		&i.ID,
 		&i.PublicID,
@@ -208,6 +226,23 @@ WHERE id = ?
 // Disable TOTP on a local identity.
 func (q *Queries) ClearIdentityMfa(ctx context.Context, id uint32) error {
 	_, err := q.db.ExecContext(ctx, clearIdentityMfa, id)
+	return err
+}
+
+const clearMyAvatarStorageObject = `-- name: ClearMyAvatarStorageObject :exec
+UPDATE users
+SET avatar_storage_object_id = NULL
+WHERE id = ?
+  AND enabled = TRUE
+`
+
+// Null out the authenticated user's avatar_storage_object_id column. Used by
+// DELETE /me/avatar; caller MUST decrement ref_count on the previously linked
+// storage_objects row (and possibly DeleteStorageObjectIfUnreferenced) inside
+// the same transaction. PatchMe cannot be used because NULL narg means
+// "leave alone".
+func (q *Queries) ClearMyAvatarStorageObject(ctx context.Context, id uint32) error {
+	_, err := q.db.ExecContext(ctx, clearMyAvatarStorageObject, id)
 	return err
 }
 
@@ -444,6 +479,7 @@ SELECT
   email_verified_at,
   display_name,
   avatar_url,
+  avatar_storage_object_id,
   locale,
   timezone,
   country,
@@ -460,24 +496,27 @@ LIMIT 1
 `
 
 type FindUserByEmailRow struct {
-	ID                   uint32                    `json:"-"`
-	PublicID             types.PublicID            `json:"publicId"`
-	Email                string                    `json:"email"`
-	EmailVerifiedAt      sql.NullTime              `json:"emailVerifiedAt"`
-	DisplayName          string                    `json:"displayName"`
-	AvatarUrl            sql.NullString            `json:"avatarUrl"`
-	Locale               string                    `json:"locale"`
-	Timezone             string                    `json:"timezone"`
-	Country              sql.NullString            `json:"country"`
-	ThemePreference      UsersThemePreference      `json:"themePreference"`
-	CalendarShiftDefault UsersCalendarShiftDefault `json:"calendarShiftDefault"`
-	LastLoginAt          sql.NullTime              `json:"lastLoginAt"`
-	Enabled              bool                      `json:"enabled"`
-	UpdatedAt            sql.NullTime              `json:"updatedAt"`
-	CreatedAt            time.Time                 `json:"createdAt"`
+	ID                    uint32                    `json:"-"`
+	PublicID              types.PublicID            `json:"publicId"`
+	Email                 string                    `json:"email"`
+	EmailVerifiedAt       sql.NullTime              `json:"emailVerifiedAt"`
+	DisplayName           string                    `json:"displayName"`
+	AvatarUrl             sql.NullString            `json:"avatarUrl"`
+	AvatarStorageObjectID sql.NullInt32             `json:"-"`
+	Locale                string                    `json:"locale"`
+	Timezone              string                    `json:"timezone"`
+	Country               sql.NullString            `json:"country"`
+	ThemePreference       UsersThemePreference      `json:"themePreference"`
+	CalendarShiftDefault  UsersCalendarShiftDefault `json:"calendarShiftDefault"`
+	LastLoginAt           sql.NullTime              `json:"lastLoginAt"`
+	Enabled               bool                      `json:"enabled"`
+	UpdatedAt             sql.NullTime              `json:"updatedAt"`
+	CreatedAt             time.Time                 `json:"createdAt"`
 }
 
 // Lookup a user by email for login. Returns internal id for the auth pipeline.
+// avatar_storage_object_id is the FK for self-hosted avatars; avatar_url is
+// the external (e.g. OIDC provider) fallback URL.
 func (q *Queries) FindUserByEmail(ctx context.Context, email string) (FindUserByEmailRow, error) {
 	row := q.db.QueryRowContext(ctx, findUserByEmail, email)
 	var i FindUserByEmailRow
@@ -488,6 +527,7 @@ func (q *Queries) FindUserByEmail(ctx context.Context, email string) (FindUserBy
 		&i.EmailVerifiedAt,
 		&i.DisplayName,
 		&i.AvatarUrl,
+		&i.AvatarStorageObjectID,
 		&i.Locale,
 		&i.Timezone,
 		&i.Country,
@@ -509,6 +549,7 @@ SELECT
   email_verified_at,
   display_name,
   avatar_url,
+  avatar_storage_object_id,
   locale,
   timezone,
   country,
@@ -524,24 +565,27 @@ LIMIT 1
 `
 
 type FindUserByEmailIncludingDisabledRow struct {
-	ID                   uint32                    `json:"-"`
-	PublicID             types.PublicID            `json:"publicId"`
-	Email                string                    `json:"email"`
-	EmailVerifiedAt      sql.NullTime              `json:"emailVerifiedAt"`
-	DisplayName          string                    `json:"displayName"`
-	AvatarUrl            sql.NullString            `json:"avatarUrl"`
-	Locale               string                    `json:"locale"`
-	Timezone             string                    `json:"timezone"`
-	Country              sql.NullString            `json:"country"`
-	ThemePreference      UsersThemePreference      `json:"themePreference"`
-	CalendarShiftDefault UsersCalendarShiftDefault `json:"calendarShiftDefault"`
-	LastLoginAt          sql.NullTime              `json:"lastLoginAt"`
-	Enabled              bool                      `json:"enabled"`
-	UpdatedAt            sql.NullTime              `json:"updatedAt"`
-	CreatedAt            time.Time                 `json:"createdAt"`
+	ID                    uint32                    `json:"-"`
+	PublicID              types.PublicID            `json:"publicId"`
+	Email                 string                    `json:"email"`
+	EmailVerifiedAt       sql.NullTime              `json:"emailVerifiedAt"`
+	DisplayName           string                    `json:"displayName"`
+	AvatarUrl             sql.NullString            `json:"avatarUrl"`
+	AvatarStorageObjectID sql.NullInt32             `json:"-"`
+	Locale                string                    `json:"locale"`
+	Timezone              string                    `json:"timezone"`
+	Country               sql.NullString            `json:"country"`
+	ThemePreference       UsersThemePreference      `json:"themePreference"`
+	CalendarShiftDefault  UsersCalendarShiftDefault `json:"calendarShiftDefault"`
+	LastLoginAt           sql.NullTime              `json:"lastLoginAt"`
+	Enabled               bool                      `json:"enabled"`
+	UpdatedAt             sql.NullTime              `json:"updatedAt"`
+	CreatedAt             time.Time                 `json:"createdAt"`
 }
 
 // Lookup a user by email regardless of enabled flag (for invitation reuse).
+// avatar_storage_object_id is the FK for self-hosted avatars; avatar_url is
+// the external (e.g. OIDC provider) fallback URL.
 func (q *Queries) FindUserByEmailIncludingDisabled(ctx context.Context, email string) (FindUserByEmailIncludingDisabledRow, error) {
 	row := q.db.QueryRowContext(ctx, findUserByEmailIncludingDisabled, email)
 	var i FindUserByEmailIncludingDisabledRow
@@ -552,6 +596,7 @@ func (q *Queries) FindUserByEmailIncludingDisabled(ctx context.Context, email st
 		&i.EmailVerifiedAt,
 		&i.DisplayName,
 		&i.AvatarUrl,
+		&i.AvatarStorageObjectID,
 		&i.Locale,
 		&i.Timezone,
 		&i.Country,
@@ -587,10 +632,28 @@ WHERE public_id = ?
 LIMIT 1
 `
 
+type FindUserByPublicIdRow struct {
+	WorkspaceID          uint32                    `json:"-"`
+	PublicID             types.PublicID            `json:"publicId"`
+	Email                string                    `json:"email"`
+	DisplayName          string                    `json:"displayName"`
+	AvatarUrl            sql.NullString            `json:"avatarUrl"`
+	Locale               string                    `json:"locale"`
+	Timezone             string                    `json:"timezone"`
+	Country              sql.NullString            `json:"country"`
+	WeekStart            UsersWeekStart            `json:"weekStart"`
+	ThemePreference      UsersThemePreference      `json:"themePreference"`
+	CalendarShiftDefault UsersCalendarShiftDefault `json:"calendarShiftDefault"`
+	WorkspaceRole        WorkspaceMembersRole      `json:"workspaceRole"`
+	LastLoginAt          sql.NullTime              `json:"lastLoginAt"`
+	UpdatedAt            sql.NullTime              `json:"updatedAt"`
+	CreatedAt            time.Time                 `json:"createdAt"`
+}
+
 // Lookup a user by external public_id (UUID v7) via the v_users view.
-func (q *Queries) FindUserByPublicId(ctx context.Context, publicID types.PublicID) (VUser, error) {
+func (q *Queries) FindUserByPublicId(ctx context.Context, publicID types.PublicID) (FindUserByPublicIdRow, error) {
 	row := q.db.QueryRowContext(ctx, findUserByPublicId, publicID)
-	var i VUser
+	var i FindUserByPublicIdRow
 	err := row.Scan(
 		&i.WorkspaceID,
 		&i.PublicID,
@@ -628,7 +691,8 @@ func (q *Queries) FindUserInternalIdByPublicId(ctx context.Context, publicID typ
 }
 
 const findUserProfileById = `-- name: FindUserProfileById :one
-SELECT public_id, email, display_name, locale, timezone, country, week_start, theme_preference, calendar_shift_default, avatar_url,
+SELECT public_id, email, display_name, locale, timezone, country, week_start, theme_preference, calendar_shift_default,
+       avatar_url, avatar_storage_object_id,
        notif_email_digest_enabled, notif_email_mention_enabled,
        notif_email_assignment_enabled, notif_email_due_soon_enabled,
        notif_web_push_enabled
@@ -649,6 +713,7 @@ type FindUserProfileByIdRow struct {
 	ThemePreference             UsersThemePreference      `json:"themePreference"`
 	CalendarShiftDefault        UsersCalendarShiftDefault `json:"calendarShiftDefault"`
 	AvatarUrl                   sql.NullString            `json:"avatarUrl"`
+	AvatarStorageObjectID       sql.NullInt32             `json:"-"`
 	NotifEmailDigestEnabled     bool                      `json:"notifEmailDigestEnabled"`
 	NotifEmailMentionEnabled    bool                      `json:"notifEmailMentionEnabled"`
 	NotifEmailAssignmentEnabled bool                      `json:"notifEmailAssignmentEnabled"`
@@ -657,6 +722,9 @@ type FindUserProfileByIdRow struct {
 }
 
 // Fetch the minimal profile for the /me endpoint by internal id.
+// avatar_storage_object_id is the FK for a self-hosted (uploaded) avatar;
+// avatar_url stays for externally hosted avatars (e.g. OIDC provider). The
+// handler resolves the storage object public_id / signed URL separately.
 func (q *Queries) FindUserProfileById(ctx context.Context, id uint32) (FindUserProfileByIdRow, error) {
 	row := q.db.QueryRowContext(ctx, findUserProfileById, id)
 	var i FindUserProfileByIdRow
@@ -671,6 +739,7 @@ func (q *Queries) FindUserProfileById(ctx context.Context, id uint32) (FindUserP
 		&i.ThemePreference,
 		&i.CalendarShiftDefault,
 		&i.AvatarUrl,
+		&i.AvatarStorageObjectID,
 		&i.NotifEmailDigestEnabled,
 		&i.NotifEmailMentionEnabled,
 		&i.NotifEmailAssignmentEnabled,
@@ -821,6 +890,28 @@ type SetIdentityMfaSecretParams struct {
 // secret and clearing any previous confirmation timestamp.
 func (q *Queries) SetIdentityMfaSecret(ctx context.Context, arg SetIdentityMfaSecretParams) error {
 	_, err := q.db.ExecContext(ctx, setIdentityMfaSecret, arg.MfaSecretCiphertext, arg.ID)
+	return err
+}
+
+const setMyAvatarStorageObject = `-- name: SetMyAvatarStorageObject :exec
+UPDATE users
+SET avatar_storage_object_id = ?
+WHERE id = ?
+  AND enabled = TRUE
+`
+
+type SetMyAvatarStorageObjectParams struct {
+	AvatarStorageObjectID sql.NullInt32 `json:"-"`
+	ID                    uint32        `json:"-"`
+}
+
+// Bind the authenticated user's avatar to a freshly inserted (or dedup-hit)
+// storage_objects row. Used by POST /me/avatar after a successful upload to
+// MinIO. Caller MUST run this in the same transaction as the InsertStorageObject
+// / IncrementStorageObjectRefCount that allocated the FK target so ref_count
+// never drifts. PatchMe cannot be used because NULL narg means "leave alone".
+func (q *Queries) SetMyAvatarStorageObject(ctx context.Context, arg SetMyAvatarStorageObjectParams) error {
+	_, err := q.db.ExecContext(ctx, setMyAvatarStorageObject, arg.AvatarStorageObjectID, arg.ID)
 	return err
 }
 

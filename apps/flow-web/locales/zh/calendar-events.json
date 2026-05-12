@@ -202,8 +202,6 @@
     },
     "attachments": {
       "empty": "暂无附件",
-      "add": "添加附件",
-      "add_error": "添加附件失败",
       "delete": "删除",
       "delete_confirm": "删除此附件？",
       "delete_success": "已删除附件",
@@ -211,19 +209,15 @@
       "upload": "上传",
       "uploading": "上传中…",
       "upload_success": "已上传附件",
+      "upload_dedup_success": "相同文件已存在，已直接关联",
       "upload_error": "上传失败",
       "download": "下载",
+      "download_error": "获取下载链接失败",
       "size_unit": {
         "b": "B",
         "kb": "KB",
         "mb": "MB",
         "gb": "GB"
-      },
-      "field": {
-        "filename": "文件名",
-        "storage_key": "存储键",
-        "content_type": "内容类型",
-        "byte_size": "字节大小"
       }
     },
     "invites": {

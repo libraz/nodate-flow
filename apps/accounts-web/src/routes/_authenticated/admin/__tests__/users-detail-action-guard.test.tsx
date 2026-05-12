@@ -68,6 +68,11 @@ vi.mock('@tanstack/react-router', () => {
     Link: ({ children, ...rest }: { children: ReactNode } & Record<string, unknown>) => (
       <a {...(rest as Record<string, unknown>)}>{children}</a>
     ),
+    // The danger-zone delete handler navigates to /admin/users on
+    // success. The test never exercises the delete flow, but the
+    // page still calls `useNavigate()` at render time so the hook
+    // must resolve to a no-op shaped like the real return value.
+    useNavigate: () => () => undefined,
   };
 });
 

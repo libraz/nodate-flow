@@ -2220,16 +2220,10 @@ type Attachment struct {
 	TaskID sql.NullInt32 `json:"-"`
 	// Internal FK to users.id (uploader)
 	UploaderID uint32 `json:"-"`
-	// Original filename
+	// FK to storage_objects.id; holds the actual blob metadata (sha256, byte_size, content_type, storage_key)
+	StorageObjectID uint32 `json:"-"`
+	// Original filename as supplied by the uploader; widened to 512 to safely hold multibyte paths
 	Filename string `json:"filename"`
-	// MIME type
-	ContentType string `json:"contentType"`
-	// Size in bytes
-	ByteSize uint64 `json:"byteSize"`
-	// Object storage key (e.g., s3 key)
-	StorageKey string `json:"storageKey"`
-	// SHA-256 hex of file contents
-	ChecksumSha256 sql.NullString `json:"checksumSha256"`
 	// Display order
 	SortWeight int32 `json:"sortWeight"`
 	// Admin notes
@@ -2404,16 +2398,10 @@ type CalendarEventAttachment struct {
 	EventID sql.NullInt32 `json:"-"`
 	// Internal FK to users.id (uploader)
 	UploaderID uint32 `json:"-"`
-	// Original filename
+	// FK to storage_objects.id; holds the actual blob metadata (sha256, byte_size, content_type, storage_key)
+	StorageObjectID uint32 `json:"-"`
+	// Original filename as supplied by the uploader; widened to 512 to safely hold multibyte paths
 	Filename string `json:"filename"`
-	// MIME type
-	ContentType string `json:"contentType"`
-	// Size in bytes
-	ByteSize uint64 `json:"byteSize"`
-	// Object storage key
-	StorageKey string `json:"storageKey"`
-	// SHA-256 hex of file contents
-	ChecksumSha256 sql.NullString `json:"checksumSha256"`
 	// Display order
 	SortWeight int32 `json:"sortWeight"`
 	// Admin notes
@@ -3475,6 +3463,36 @@ type Signal struct {
 	CreatedAt time.Time    `json:"createdAt"`
 }
 
+// Content-addressed object storage references; rows shared across attachments via storage_object_id with ref_count GC.
+type StorageObject struct {
+	// Internal PK, never exposed
+	ID uint32 `json:"-"`
+	// UUID v7, the only externally visible ID
+	PublicID types.PublicID `json:"publicId"`
+	// Internal FK to workspaces.id; non-null for workspace-scoped blobs (task/calendar attachments). Mutually exclusive with owner_user_id.
+	WorkspaceID sql.NullInt32 `json:"-"`
+	// Internal FK to users.id; non-null for user-scoped blobs (avatar). Mutually exclusive with workspace_id.
+	OwnerUserID sql.NullInt32 `json:"-"`
+	// SHA-256 of the raw blob; basis for content addressing and dedup within a scope
+	Sha256 []byte `json:"sha256"`
+	// Size in bytes of the underlying blob
+	ByteSize uint64 `json:"byteSize"`
+	// MIME type recorded at upload time
+	ContentType string `json:"contentType"`
+	// Computed object key in MinIO (e.g. workspace/{wsPublicId}/{sha256_hex} or user/{userPublicId}/{sha256_hex})
+	StorageKey string `json:"storageKey"`
+	// Number of referencing rows (attachments / users.avatar_storage_object_id); GC eligible when 0
+	RefCount uint32 `json:"refCount"`
+	// Display order
+	SortWeight int32 `json:"sortWeight"`
+	// Admin notes
+	Notes sql.NullString `json:"notes"`
+	// Enabled flag
+	Enabled   bool         `json:"enabled"`
+	UpdatedAt sql.NullTime `json:"updatedAt"`
+	CreatedAt time.Time    `json:"createdAt"`
+}
+
 // nodate-flow core task object
 type Task struct {
 	// Internal PK, never exposed
@@ -3764,8 +3782,10 @@ type User struct {
 	EmailVerifiedAt sql.NullTime `json:"emailVerifiedAt"`
 	// Human-readable name
 	DisplayName string `json:"displayName"`
-	// Avatar image URL
+	// Avatar image URL; used when the avatar is hosted externally (e.g. OIDC provider)
 	AvatarUrl sql.NullString `json:"avatarUrl"`
+	// FK to storage_objects.id when the user uploaded their own avatar; NULL when avatar_url (external) is used or no avatar is set
+	AvatarStorageObjectID sql.NullInt32 `json:"-"`
 	// Preferred locale tag (BCP 47)
 	Locale string `json:"locale"`
 	// Preferred IANA timezone (independent of locale)
@@ -3929,21 +3949,23 @@ type UserViewPreference struct {
 }
 
 type VAdminUser struct {
-	ID              uint32         `json:"-"`
-	PublicID        types.PublicID `json:"publicId"`
-	Email           string         `json:"email"`
-	DisplayName     string         `json:"displayName"`
-	AvatarUrl       sql.NullString `json:"avatarUrl"`
-	Locale          string         `json:"locale"`
-	Timezone        string         `json:"timezone"`
-	Country         sql.NullString `json:"country"`
-	LastLoginAt     sql.NullTime   `json:"lastLoginAt"`
-	EmailVerifiedAt sql.NullTime   `json:"emailVerifiedAt"`
-	Enabled         bool           `json:"enabled"`
-	CreatedAt       time.Time      `json:"createdAt"`
-	UpdatedAt       sql.NullTime   `json:"updatedAt"`
-	WorkspaceCount  int64          `json:"workspaceCount"`
-	IsInstanceAdmin bool           `json:"isInstanceAdmin"`
+	ID                          uint32          `json:"-"`
+	PublicID                    types.PublicID  `json:"publicId"`
+	Email                       string          `json:"email"`
+	DisplayName                 string          `json:"displayName"`
+	AvatarUrl                   sql.NullString  `json:"avatarUrl"`
+	AvatarStorageObjectID       sql.NullInt32   `json:"-"`
+	AvatarStorageObjectPublicID *types.PublicID `json:"avatarStorageObjectPublicId"`
+	Locale                      string          `json:"locale"`
+	Timezone                    string          `json:"timezone"`
+	Country                     sql.NullString  `json:"country"`
+	LastLoginAt                 sql.NullTime    `json:"lastLoginAt"`
+	EmailVerifiedAt             sql.NullTime    `json:"emailVerifiedAt"`
+	Enabled                     bool            `json:"enabled"`
+	CreatedAt                   time.Time       `json:"createdAt"`
+	UpdatedAt                   sql.NullTime    `json:"updatedAt"`
+	WorkspaceCount              int64           `json:"workspaceCount"`
+	IsInstanceAdmin             bool            `json:"isInstanceAdmin"`
 }
 
 type VAuditRecent struct {
@@ -3961,17 +3983,19 @@ type VAuditRecent struct {
 }
 
 type VCommentForTask struct {
-	WorkspaceID       uint32         `json:"-"`
-	TaskID            sql.NullInt32  `json:"-"`
-	TaskPublicID      []byte         `json:"taskPublicId"`
-	PublicID          types.PublicID `json:"publicId"`
-	AuthorPublicID    []byte         `json:"authorPublicId"`
-	AuthorDisplayName string         `json:"authorDisplayName"`
-	AuthorAvatarUrl   sql.NullString `json:"authorAvatarUrl"`
-	Body              string         `json:"body"`
-	EditedAt          sql.NullTime   `json:"editedAt"`
-	UpdatedAt         sql.NullTime   `json:"updatedAt"`
-	CreatedAt         time.Time      `json:"createdAt"`
+	WorkspaceID                       uint32          `json:"-"`
+	TaskID                            sql.NullInt32   `json:"-"`
+	TaskPublicID                      []byte          `json:"taskPublicId"`
+	PublicID                          types.PublicID  `json:"publicId"`
+	AuthorPublicID                    []byte          `json:"authorPublicId"`
+	AuthorDisplayName                 string          `json:"authorDisplayName"`
+	AuthorAvatarUrl                   sql.NullString  `json:"authorAvatarUrl"`
+	AuthorAvatarStorageObjectID       sql.NullInt32   `json:"-"`
+	AuthorAvatarStorageObjectPublicID *types.PublicID `json:"authorAvatarStorageObjectPublicId"`
+	Body                              string          `json:"body"`
+	EditedAt                          sql.NullTime    `json:"editedAt"`
+	UpdatedAt                         sql.NullTime    `json:"updatedAt"`
+	CreatedAt                         time.Time       `json:"createdAt"`
 }
 
 type VInbox struct {
@@ -4151,34 +4175,38 @@ type VTaskListArchived struct {
 }
 
 type VTaskTimeline struct {
-	WorkspaceID       uint32          `json:"-"`
-	EventID           uint64          `json:"-"`
-	PublicID          types.PublicID  `json:"publicId"`
-	TaskPublicID      sql.NullString  `json:"taskPublicId"`
-	ProjectPublicID   sql.NullString  `json:"projectPublicId"`
-	ActorUserPublicID sql.NullString  `json:"actorUserPublicId"`
-	ActorDisplayName  sql.NullString  `json:"actorDisplayName"`
-	Type              string          `json:"type"`
-	PayloadJson       json.RawMessage `json:"payloadJson"`
-	OccurredAt        time.Time       `json:"occurredAt"`
+	WorkspaceID        uint32          `json:"-"`
+	EventID            uint64          `json:"-"`
+	PublicID           types.PublicID  `json:"publicId"`
+	TaskPublicID       sql.NullString  `json:"taskPublicId"`
+	ProjectPublicID    sql.NullString  `json:"projectPublicId"`
+	ActorUserPublicID  sql.NullString  `json:"actorUserPublicId"`
+	ActorDisplayName   sql.NullString  `json:"actorDisplayName"`
+	ActorAgentPublicID sql.NullString  `json:"actorAgentPublicId"`
+	ActorAgentName     interface{}     `json:"actorAgentName"`
+	Type               string          `json:"type"`
+	PayloadJson        json.RawMessage `json:"payloadJson"`
+	OccurredAt         time.Time       `json:"occurredAt"`
 }
 
 type VUser struct {
-	WorkspaceID          uint32                    `json:"-"`
-	PublicID             types.PublicID            `json:"publicId"`
-	Email                string                    `json:"email"`
-	DisplayName          string                    `json:"displayName"`
-	AvatarUrl            sql.NullString            `json:"avatarUrl"`
-	Locale               string                    `json:"locale"`
-	Timezone             string                    `json:"timezone"`
-	Country              sql.NullString            `json:"country"`
-	WeekStart            UsersWeekStart            `json:"weekStart"`
-	ThemePreference      UsersThemePreference      `json:"themePreference"`
-	CalendarShiftDefault UsersCalendarShiftDefault `json:"calendarShiftDefault"`
-	WorkspaceRole        WorkspaceMembersRole      `json:"workspaceRole"`
-	LastLoginAt          sql.NullTime              `json:"lastLoginAt"`
-	UpdatedAt            sql.NullTime              `json:"updatedAt"`
-	CreatedAt            time.Time                 `json:"createdAt"`
+	WorkspaceID                 uint32                    `json:"-"`
+	PublicID                    types.PublicID            `json:"publicId"`
+	Email                       string                    `json:"email"`
+	DisplayName                 string                    `json:"displayName"`
+	AvatarUrl                   sql.NullString            `json:"avatarUrl"`
+	AvatarStorageObjectID       sql.NullInt32             `json:"-"`
+	AvatarStorageObjectPublicID *types.PublicID           `json:"avatarStorageObjectPublicId"`
+	Locale                      string                    `json:"locale"`
+	Timezone                    string                    `json:"timezone"`
+	Country                     sql.NullString            `json:"country"`
+	WeekStart                   UsersWeekStart            `json:"weekStart"`
+	ThemePreference             UsersThemePreference      `json:"themePreference"`
+	CalendarShiftDefault        UsersCalendarShiftDefault `json:"calendarShiftDefault"`
+	WorkspaceRole               WorkspaceMembersRole      `json:"workspaceRole"`
+	LastLoginAt                 sql.NullTime              `json:"lastLoginAt"`
+	UpdatedAt                   sql.NullTime              `json:"updatedAt"`
+	CreatedAt                   time.Time                 `json:"createdAt"`
 }
 
 type VWorkspaceActivity struct {
@@ -4196,17 +4224,19 @@ type VWorkspaceActivity struct {
 }
 
 type VWorkspaceMember struct {
-	WorkspaceID  uint32               `json:"-"`
-	PublicID     types.PublicID       `json:"publicId"`
-	UserPublicID types.PublicID       `json:"userPublicId"`
-	Email        string               `json:"email"`
-	DisplayName  string               `json:"displayName"`
-	AvatarUrl    sql.NullString       `json:"avatarUrl"`
-	Role         WorkspaceMembersRole `json:"role"`
-	InvitedAt    sql.NullTime         `json:"invitedAt"`
-	JoinedAt     sql.NullTime         `json:"joinedAt"`
-	UpdatedAt    sql.NullTime         `json:"updatedAt"`
-	CreatedAt    time.Time            `json:"createdAt"`
+	WorkspaceID                 uint32               `json:"-"`
+	PublicID                    types.PublicID       `json:"publicId"`
+	UserPublicID                types.PublicID       `json:"userPublicId"`
+	Email                       string               `json:"email"`
+	DisplayName                 string               `json:"displayName"`
+	AvatarUrl                   sql.NullString       `json:"avatarUrl"`
+	AvatarStorageObjectID       sql.NullInt32        `json:"-"`
+	AvatarStorageObjectPublicID *types.PublicID      `json:"avatarStorageObjectPublicId"`
+	Role                        WorkspaceMembersRole `json:"role"`
+	InvitedAt                   sql.NullTime         `json:"invitedAt"`
+	JoinedAt                    sql.NullTime         `json:"joinedAt"`
+	UpdatedAt                   sql.NullTime         `json:"updatedAt"`
+	CreatedAt                   time.Time            `json:"createdAt"`
 }
 
 // Webhook delivery attempts and retry tracking

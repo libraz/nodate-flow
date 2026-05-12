@@ -157,7 +157,12 @@ func TestGuestCannotPerformAdminActions(t *testing.T) {
 			map[string]any{"role": "member"}},
 		{"remove member", http.MethodDelete,
 			wsBase + "/members/" + owner.UserPublicID, nil},
-		{"disable workspace", http.MethodDelete, wsBase, nil},
+		// DELETE /workspaces/{wsId} requires {"confirm": true} in the body
+		// to be reachable past the schema layer; we send it so the role
+		// check (this test's actual subject) is what produces the 403,
+		// not the missing-confirm guard (which would yield 400).
+		{"delete workspace", http.MethodDelete, wsBase,
+			map[string]any{"confirm": true}},
 	}
 
 	for _, op := range adminOps {
@@ -169,9 +174,14 @@ func TestGuestCannotPerformAdminActions(t *testing.T) {
 	}
 }
 
-// TestNonOwnerCannotDisableWorkspace verifies that only workspace
-// owners can soft-delete a workspace.
-func TestNonOwnerCannotDisableWorkspace(t *testing.T) {
+// TestNonOwnerCannotDeleteWorkspace verifies that only workspace owners
+// can immediate-delete a workspace via DELETE /workspaces/{wsId}.
+//
+// The confirm=true body is included so we are exclusively testing the
+// role-based rejection (RequireWorkspaceRole), not the missing-confirm
+// guard (WORKSPACE.DELETE.CONFIRM_REQUIRED). Even with a valid confirm
+// payload, a non-owner must be rejected with 403.
+func TestNonOwnerCannotDeleteWorkspace(t *testing.T) {
 	bootstrap(t)
 	t.Parallel()
 
@@ -189,10 +199,11 @@ func TestNonOwnerCannotDisableWorkspace(t *testing.T) {
 		testServerURL+"/invites/"+invite.Token+"/accept",
 		admin.AccessToken, nil, nil)
 
-	// Admin tries to delete workspace.
+	// Admin tries to delete workspace WITH confirm=true so we isolate
+	// the role check from the missing-confirm guard.
 	status, _ := doJSONStatus(t, http.MethodDelete,
 		testServerURL+"/workspaces/"+owner.WorkspacePublicID,
-		admin.AccessToken, nil)
+		admin.AccessToken, map[string]any{"confirm": true})
 	require.GreaterOrEqual(t, status, 403,
-		"only owner should be able to disable workspace")
+		"only owner should be able to delete workspace")
 }

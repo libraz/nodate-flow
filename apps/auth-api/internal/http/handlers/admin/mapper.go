@@ -72,7 +72,7 @@ func rowToAdminUser(r generated.AdminListUsersRow) User {
 	}
 }
 
-func rowToAdminUserDetail(r generated.VAdminUser) User {
+func rowToAdminUserDetail(r generated.AdminGetUserRow) User {
 	return User{
 		ID:              r.PublicID.String(),
 		Email:           r.Email,

@@ -32,6 +32,7 @@ sql:
       - "queries/relation_suggestions"
       - "queries/repo_mappings"
       - "queries/signals"
+      - "queries/storage-objects"
       - "queries/task-event-links"
       - "queries/tasks"
       - "queries/timeboxes"
@@ -189,6 +190,39 @@ sql:
             go_struct_tag: 'json:"-"'
           - column: "*.target_user_id"
             go_struct_tag: 'json:"-"'
+          # Internal FK back-refs to storage_objects.id. The blob's external
+          # identity is its storage_objects.public_id (UUID v7); the integer
+          # FK must never appear in JSON responses.
+          - column: "*.storage_object_id"
+            go_struct_tag: 'json:"-"'
+          - column: "*.avatar_storage_object_id"
+            go_struct_tag: 'json:"-"'
+          - column: "*.author_avatar_storage_object_id"
+            go_struct_tag: 'json:"-"'
+          # avatar_storage_object_public_id comes from LEFT JOIN storage_objects
+          # in v_users / v_workspace_members / v_admin_users / v_comment_for_task,
+          # so it is genuinely nullable.
+          - column: "*.avatar_storage_object_public_id"
+            nullable: true
+            go_type:
+              import: "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/types"
+              package: "types"
+              type: "PublicID"
+              pointer: true
+          - column: "*.author_avatar_storage_object_public_id"
+            nullable: true
+            go_type:
+              import: "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/types"
+              package: "types"
+              type: "PublicID"
+              pointer: true
+          # storage_object_public_id alias on attachments / calendar_event_attachments
+          # queries comes from INNER JOIN storage_objects so it is non-null.
+          - column: "*.storage_object_public_id"
+            go_type:
+              import: "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/types"
+              package: "types"
+              type: "PublicID"
           - column: "*.calendar_public_id"
             go_type:
               import: "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/types"
@@ -325,6 +359,34 @@ sql:
             go_struct_tag: 'json:"-"'
           - column: "*.event_id_key"
             go_struct_tag: 'json:"-"'
+          # Internal FK back-refs to storage_objects.id. The blob's external
+          # identity is its storage_objects.public_id (UUID v7); the integer
+          # FK must never appear in JSON responses.
+          - column: "*.storage_object_id"
+            go_struct_tag: 'json:"-"'
+          - column: "*.avatar_storage_object_id"
+            go_struct_tag: 'json:"-"'
+          - column: "*.author_avatar_storage_object_id"
+            go_struct_tag: 'json:"-"'
+          - column: "*.avatar_storage_object_public_id"
+            nullable: true
+            go_type:
+              import: "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/types"
+              package: "types"
+              type: "PublicID"
+              pointer: true
+          - column: "*.author_avatar_storage_object_public_id"
+            nullable: true
+            go_type:
+              import: "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/types"
+              package: "types"
+              type: "PublicID"
+              pointer: true
+          - column: "*.storage_object_public_id"
+            go_type:
+              import: "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/types"
+              package: "types"
+              type: "PublicID"
           # See note in flow-api block above.
   # --- auth-api (auth + audit + workspace queries only) ---
   - engine: "mysql"
@@ -334,6 +396,7 @@ sql:
       - "queries/workspaces"
       - "queries/admin"
       - "queries/integrations"
+      - "queries/storage-objects"
     schema:
       - "tables"
       - "views"
@@ -430,3 +493,33 @@ sql:
             go_struct_tag: 'json:"-"'
           - column: "*.event_id_key"
             go_struct_tag: 'json:"-"'
+          # Internal FK back-refs to storage_objects.id. The blob's external
+          # identity is its storage_objects.public_id (UUID v7); the integer
+          # FK must never appear in JSON responses.
+          - column: "*.storage_object_id"
+            go_struct_tag: 'json:"-"'
+          - column: "*.avatar_storage_object_id"
+            go_struct_tag: 'json:"-"'
+          - column: "*.author_avatar_storage_object_id"
+            go_struct_tag: 'json:"-"'
+          - column: "*.owner_user_id"
+            go_struct_tag: 'json:"-"'
+          - column: "*.avatar_storage_object_public_id"
+            nullable: true
+            go_type:
+              import: "github.com/nodate-flow/nodate-flow/apps/auth-api/internal/db/types"
+              package: "types"
+              type: "PublicID"
+              pointer: true
+          - column: "*.author_avatar_storage_object_public_id"
+            nullable: true
+            go_type:
+              import: "github.com/nodate-flow/nodate-flow/apps/auth-api/internal/db/types"
+              package: "types"
+              type: "PublicID"
+              pointer: true
+          - column: "*.storage_object_public_id"
+            go_type:
+              import: "github.com/nodate-flow/nodate-flow/apps/auth-api/internal/db/types"
+              package: "types"
+              type: "PublicID"
