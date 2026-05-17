@@ -41,6 +41,7 @@
 
 import type { components } from '@nodate-flow/sdk';
 import {
+  type InfiniteData,
   type UseMutationResult,
   type UseQueryResult,
   type UseSuspenseInfiniteQueryResult,
@@ -864,27 +865,38 @@ export function useReorderTasks(): UseMutationResult<void, ApiError, ReorderTask
     },
     onMutate: async (vars) => {
       await qc.cancelQueries({ queryKey: [...tasksKeys.all, 'list', vars.projectId] });
-      const snapshots = qc.getQueriesData<TaskListItem[]>({
+      const snapshots = qc.getQueriesData<unknown>({
         queryKey: [...tasksKeys.all, 'list', vars.projectId],
       });
-      // Optimistic: apply sort weights to cached lists
       const weightMap = new Map(vars.items.map((i) => [i.id, i.sortWeight]));
-      for (const [key, value] of snapshots) {
-        if (!value) continue;
-        const updated = value
+      const applyWeights = (list: TaskListItem[]): TaskListItem[] =>
+        list
           .map((task) => {
             const w = weightMap.get(task.id);
             return w != null ? { ...task, sortWeight: w } : task;
           })
           .sort((a, b) => a.sortWeight - b.sortWeight);
-        qc.setQueryData(key, updated);
+      for (const [key, value] of snapshots) {
+        if (!value) continue;
+        if (Array.isArray(value)) {
+          qc.setQueryData<TaskListItem[]>(key, applyWeights(value as TaskListItem[]));
+          continue;
+        }
+        const infinite = value as InfiniteData<TasksPage>;
+        if (Array.isArray(infinite.pages)) {
+          qc.setQueryData<InfiniteData<TasksPage>>(key, {
+            ...infinite,
+            pages: infinite.pages.map((page) => ({
+              ...page,
+              tasks: applyWeights(page.tasks),
+            })),
+          });
+        }
       }
       return { snapshots };
     },
     onError: (_err, _vars, ctx) => {
-      const snap = ctx as
-        | { snapshots: [readonly unknown[], TaskListItem[] | undefined][] }
-        | undefined;
+      const snap = ctx as { snapshots: [readonly unknown[], unknown][] } | undefined;
       if (!snap) return;
       for (const [key, value] of snap.snapshots) {
         qc.setQueryData(key, value);
