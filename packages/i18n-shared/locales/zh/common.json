@@ -18,7 +18,8 @@
       "openPicker": "选择日期",
       "placeholder": "请选择日期",
       "prev_month": "上个月",
-      "next_month": "下个月"
+      "next_month": "下个月",
+      "clear": "清除"
     }
   }
 }

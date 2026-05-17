@@ -2,7 +2,10 @@
   "common": {
     "breadcrumb": "Breadcrumb",
     "unknown_role": "Unknown role",
-    "network_error": "Network error. Check your connection and try again."
+    "network_error": "Network error. Check your connection and try again.",
+    "date": {
+      "placeholder": "Select a date"
+    }
   },
   "landing": {
     "wordmark": "nodate-flow",

@@ -484,6 +484,12 @@ export default function TaskSpreadsheetView({ projectId }: TaskSpreadsheetViewPr
             nextLabel={t('calendar.next')}
             triggerLabel={editDraft ? formatDate(editDraft, locale) : t('common.date.placeholder')}
             {...(css.cellDateTrigger ? { className: css.cellDateTrigger } : {})}
+            onClear={() => {
+              setEditDraft('');
+              commitEdit(rowIdx, 'due', '');
+              setEditingCell(null);
+            }}
+            clearLabel={t('common.date.clear')}
           />
         </div>
       );

@@ -384,7 +384,7 @@ function InlineDueCell({
   editing: boolean;
   onStartEdit: () => void;
   onStopEdit: () => void;
-  onSave: (dueOn: string) => void;
+  onSave: (dueOn: string | null) => void;
   locale: string;
 }): ReactElement {
   const { t } = useTranslation('common');
@@ -410,6 +410,13 @@ function InlineDueCell({
         prevLabel={t('calendar.prev')}
         nextLabel={t('calendar.next')}
         triggerLabel={dueOn ? formatDate(dueOn, locale) : t('common.date.placeholder')}
+        onClear={() => {
+          if (dueOn) {
+            onSave(null);
+          }
+          onStopEdit();
+        }}
+        clearLabel={t('common.date.clear')}
       />
     );
   }
@@ -565,9 +572,15 @@ export default function TaskListView({ projectId }: TaskListViewProps): ReactEle
 
   const handleInlineSave = (
     id: string,
-    patch: { title?: string; priority?: TaskPriority; dueOn?: string },
+    patch: { title?: string; priority?: TaskPriority; dueOn?: string | null },
   ) => {
-    void updateTask.mutateAsync({ id, patch }).catch(() => {
+    // Backend `*string` treats "" as clear and null as unchanged; map at the wire.
+    const wirePatch: { title?: string; priority?: TaskPriority; dueOn?: string } = {
+      ...(patch.title !== undefined && { title: patch.title }),
+      ...(patch.priority !== undefined && { priority: patch.priority }),
+      ...(patch.dueOn !== undefined && { dueOn: patch.dueOn ?? '' }),
+    };
+    void updateTask.mutateAsync({ id, patch: wirePatch }).catch(() => {
       toaster.show({ tone: 'danger', message: t('tasks.inline.save_failed') });
     });
   };

@@ -2,7 +2,10 @@
   "common": {
     "breadcrumb": "面包屑导航",
     "unknown_role": "未知角色",
-    "network_error": "网络错误。请检查您的连接并重试。"
+    "network_error": "网络错误。请检查您的连接并重试。",
+    "date": {
+      "placeholder": "请选择日期"
+    }
   },
   "landing": {
     "wordmark": "nodate-flow",

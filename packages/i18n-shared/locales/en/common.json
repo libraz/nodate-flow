@@ -18,7 +18,8 @@
       "openPicker": "Choose date",
       "placeholder": "Select a date",
       "prev_month": "Previous month",
-      "next_month": "Next month"
+      "next_month": "Next month",
+      "clear": "Clear"
     }
   }
 }

@@ -112,3 +112,33 @@
   outline-offset: -2px;
   font-weight: var(--nf-weight-bold);
 }
+
+.footer {
+  display: flex;
+  justify-content: flex-end;
+  margin-block-start: var(--nf-space-2);
+  padding-block-start: var(--nf-space-2);
+  border-block-start: 1px solid var(--nf-color-border);
+}
+
+.clearBtn {
+  all: unset;
+  cursor: pointer;
+  padding: var(--nf-space-1) var(--nf-space-2);
+  border-radius: var(--nf-radius-sm);
+  font-size: var(--nf-text-xs);
+  font-weight: var(--nf-weight-medium);
+  color: var(--nf-color-fg-muted);
+  transition: background var(--nf-duration-fast) var(--nf-ease-standard), color
+    var(--nf-duration-fast) var(--nf-ease-standard);
+}
+
+.clearBtn:hover {
+  background: var(--nf-color-surface-hover);
+  color: var(--nf-color-fg);
+}
+
+.clearBtn:focus-visible {
+  outline: var(--nf-focus-ring-width) solid var(--nf-color-focus-ring);
+  outline-offset: var(--nf-focus-ring-offset);
+}

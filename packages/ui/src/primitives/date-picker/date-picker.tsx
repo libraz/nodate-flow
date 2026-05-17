@@ -46,6 +46,20 @@ export interface DatePickerProps {
   triggerLabel?: string;
   /** Additional class on the trigger button. */
   className?: string;
+  /**
+   * Optional handler that, when provided, renders a "Clear" affordance in the
+   * popover footer for unsetting the current selection (e.g. clearing a
+   * task's due date back to null). Closes the popover after firing.
+   * Callers own the semantics of "clear" — typically passing `null` or `''`
+   * to their save handler.
+   */
+  onClear?: () => void;
+  /**
+   * Localized label for the optional "Clear" button. Required when `onClear`
+   * is provided. Kept as a required prop on the primitive so the design
+   * system stays free of i18next state.
+   */
+  clearLabel?: string;
 }
 
 const DEFAULT_WEEKDAYS_MONDAY = ['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su'];
@@ -125,6 +139,8 @@ export default function DatePicker({
   weekStart = 'monday',
   triggerLabel,
   className,
+  onClear,
+  clearLabel,
 }: DatePickerProps): ReactElement {
   const resolvedWeekdayLabels =
     weekdayLabels ?? (weekStart === 'monday' ? DEFAULT_WEEKDAYS_MONDAY : DEFAULT_WEEKDAYS_SUNDAY);
@@ -186,6 +202,11 @@ export default function DatePicker({
     },
     [viewYear, viewMonth, minDate, onChange],
   );
+
+  const handleClear = useCallback(() => {
+    onClear?.();
+    setOpen(false);
+  }, [onClear]);
 
   return (
     <Popover
@@ -264,6 +285,22 @@ export default function DatePicker({
               );
             })}
           </div>
+
+          {/* Footer: optional clear affordance. Only rendered when the caller
+              opts in via `onClear`; otherwise the panel keeps its compact
+              calendar-only layout. */}
+          {onClear !== undefined && (
+            <div className={styles.footer}>
+              <button
+                type="button"
+                className={styles.clearBtn}
+                onClick={handleClear}
+                aria-label={clearLabel}
+              >
+                {clearLabel}
+              </button>
+            </div>
+          )}
         </div>
       }
     >
