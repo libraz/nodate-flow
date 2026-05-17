@@ -6,6 +6,11 @@ export const IntegrationsErrors = {
     status: 404,
     message: "Integration connection not found",
   },
+  INTEGRATION_DISCORD_USER_NOT_FOUND: {
+    code: "INTEGRATION.DISCORD.USER_NOT_FOUND",
+    status: 404,
+    message: "No flow user is bound to that Discord account",
+  },
   INTEGRATION_OAUTH_AUTHORIZATION_CODE_INVALID: {
     code: "INTEGRATION.OAUTH.AUTHORIZATION_CODE_INVALID",
     status: 400,

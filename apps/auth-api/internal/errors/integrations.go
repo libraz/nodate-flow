@@ -6,6 +6,8 @@ package errors
 var (
 	// INTEGRATION.CONNECTION.NOT_FOUND — Integration connection not found
 	IntegrationConnectionNotFound = &Spec{Code: "INTEGRATION.CONNECTION.NOT_FOUND", Status: 404, Message: "Integration connection not found", Description: "Returned by DELETE /me/integrations/{publicId} when the row does not exist or does not belong to the caller.", UserAction: "Refresh the integrations list."}
+	// INTEGRATION.DISCORD.USER_NOT_FOUND — No flow user is bound to that Discord account
+	IntegrationDiscordUserNotFound = &Spec{Code: "INTEGRATION.DISCORD.USER_NOT_FOUND", Status: 404, Message: "No flow user is bound to that Discord account", Description: "Returned by the internal /internal/users/by-discord/{snowflake} lookup when no enabled user_integrations row with provider='discord' and a matching metadata_json.external_user_id exists. The presence-discord gateway treats this outcome as drop_no_user (expected and noisy).", UserAction: "Ask the user to bind their Discord account via the personal integrations settings page."}
 	// INTEGRATION.OAUTH.AUTHORIZATION_CODE_INVALID — OAuth authorization code is invalid or expired
 	IntegrationOauthAuthorizationCodeInvalid = &Spec{Code: "INTEGRATION.OAUTH.AUTHORIZATION_CODE_INVALID", Status: 400, Message: "OAuth authorization code is invalid or expired", Description: "Returned when the provider's token endpoint rejected the authorization code as unknown, already-used, or expired.", UserAction: "Start the connect flow again from the integrations page."}
 	// INTEGRATION.OAUTH.PROFILE_FETCH_REJECTED — OAuth provider rejected the profile request
@@ -19,7 +21,7 @@ var (
 	// INTEGRATION.OAUTH.PROVIDER_UNREACHABLE — Could not reach the OAuth provider
 	IntegrationOauthProviderUnreachable = &Spec{Code: "INTEGRATION.OAUTH.PROVIDER_UNREACHABLE", Status: 502, Message: "Could not reach the OAuth provider", Description: "Returned when the request to the provider's token endpoint failed at the transport layer (DNS, TCP, TLS, or the connection was refused or reset).", UserAction: "Check the provider's status page and try the connect flow again."}
 	// INTEGRATION.OAUTH.PROVIDER_UNSUPPORTED — Unknown integration provider
-	IntegrationOauthProviderUnsupported = &Spec{Code: "INTEGRATION.OAUTH.PROVIDER_UNSUPPORTED", Status: 400, Message: "Unknown integration provider", Description: "Returned when the {provider} path parameter is not one of the supported providers (github, slack, google_calendar).", UserAction: "Choose a supported provider from the integrations list."}
+	IntegrationOauthProviderUnsupported = &Spec{Code: "INTEGRATION.OAUTH.PROVIDER_UNSUPPORTED", Status: 400, Message: "Unknown integration provider", Description: "Returned when the {provider} path parameter is not one of the supported providers (github, slack, google_calendar, discord).", UserAction: "Choose a supported provider from the integrations list."}
 	// INTEGRATION.OAUTH.REDIRECT_URI_MISMATCH — OAuth redirect URI does not match the registered value
 	IntegrationOauthRedirectUriMismatch = &Spec{Code: "INTEGRATION.OAUTH.REDIRECT_URI_MISMATCH", Status: 400, Message: "OAuth redirect URI does not match the registered value", Description: "Returned when the provider's token endpoint rejected the exchange because the redirect_uri parameter did not match the value registered for this OAuth application.", UserAction: "Ask the instance administrator to verify the OAuth application's redirect URI."}
 	// INTEGRATION.OAUTH.STATE_INVALID — OAuth state token is missing, unknown, or expired

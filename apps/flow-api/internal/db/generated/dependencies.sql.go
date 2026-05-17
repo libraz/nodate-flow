@@ -64,6 +64,47 @@ func (q *Queries) DeleteDependency(ctx context.Context, arg DeleteDependencyPara
 	return err
 }
 
+const findRetroDraftAgent = `-- name: FindRetroDraftAgent :one
+SELECT
+  a.public_id AS agent_public_id,
+  a.name      AS agent_name
+FROM events e
+INNER JOIN ai_agents a
+  ON a.id = e.actor_agent_id
+ AND a.enabled = TRUE
+WHERE e.workspace_id = ?
+  AND e.task_id      = ?
+  AND e.type         = 'task.retro.drafted'
+  AND e.enabled      = TRUE
+  AND e.actor_agent_id IS NOT NULL
+ORDER BY e.occurred_at ASC, e.id ASC
+LIMIT 1
+`
+
+type FindRetroDraftAgentParams struct {
+	WorkspaceID uint32        `json:"-"`
+	TaskID      sql.NullInt32 `json:"-"`
+}
+
+type FindRetroDraftAgentRow struct {
+	AgentPublicID types.PublicID `json:"agentPublicId"`
+	AgentName     string         `json:"agentName"`
+}
+
+// Resolve the AI agent that produced a retro draft task by looking up the
+// TaskRetroDrafted event (type='task.retro.drafted') joined to ai_agents.
+// Returns the agent's public_id and display name. Used by the retro draft
+// queue handler to enrich rows with createdByAgentId / createdByAgentName
+// without coupling the main list query to ai_agents (the event-derived
+// attribution is the only authoritative source — tasks rows do not carry
+// created_by_agent_id).
+func (q *Queries) FindRetroDraftAgent(ctx context.Context, arg FindRetroDraftAgentParams) (FindRetroDraftAgentRow, error) {
+	row := q.db.QueryRowContext(ctx, findRetroDraftAgent, arg.WorkspaceID, arg.TaskID)
+	var i FindRetroDraftAgentRow
+	err := row.Scan(&i.AgentPublicID, &i.AgentName)
+	return i, err
+}
+
 const listDependenciesForProject = `-- name: ListDependenciesForProject :many
 SELECT
   td.public_id,
@@ -274,6 +315,94 @@ func (q *Queries) ListIncomingDependenciesForTask(ctx context.Context, arg ListI
 			&i.ToTaskPublicID,
 			&i.UpdatedAt,
 			&i.CreatedAt,
+			&i.Total,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listRetroDraftsForWorkspace = `-- name: ListRetroDraftsForWorkspace :many
+SELECT
+  t.id             AS task_id,
+  t.public_id      AS task_public_id,
+  t.title,
+  t.description,
+  t.created_at,
+  src.public_id    AS source_task_public_id,
+  src.title        AS source_task_title,
+  COUNT(*) OVER()  AS total
+FROM tasks t
+INNER JOIN task_dependencies td
+  ON td.from_task_id = t.id
+ AND td.kind = 'retro_of'
+ AND td.enabled = TRUE
+INNER JOIN tasks src
+  ON src.id = td.to_task_id
+WHERE t.workspace_id = ?
+  AND t.enabled = TRUE
+  -- Archived drafts must not surface in the queue: Discard archives the
+  -- task (POST /tasks/{id}/archive) and the UI expects the row to drop
+  -- out immediately. Without this filter, archive_at flips to non-null
+  -- but the row would still be returned by the next refetch — the
+  -- optimistic UI removal would visually rubber-band back.
+  AND t.archived_at IS NULL
+ORDER BY t.created_at DESC, t.public_id DESC
+LIMIT ? OFFSET ?
+`
+
+type ListRetroDraftsForWorkspaceParams struct {
+	WorkspaceID uint32 `json:"-"`
+	Limit       int32  `json:"limit"`
+	Offset      int32  `json:"offset"`
+}
+
+type ListRetroDraftsForWorkspaceRow struct {
+	TaskID             uint32         `json:"-"`
+	TaskPublicID       types.PublicID `json:"taskPublicId"`
+	Title              string         `json:"title"`
+	Description        sql.NullString `json:"description"`
+	CreatedAt          time.Time      `json:"createdAt"`
+	SourceTaskPublicID types.PublicID `json:"sourceTaskPublicId"`
+	SourceTaskTitle    string         `json:"sourceTaskTitle"`
+	Total              interface{}    `json:"total"`
+}
+
+// List draft retrospective tasks: tasks linked back to a source task
+// via a task_dependencies row with kind='retro_of'. Backs the Phase 6 / L2
+// retro draft queue endpoint (GET /workspaces/{wsId}/tasks/drafts?reason=retro).
+// The retro task itself is the from_task; to_task is the original task whose
+// lifecycle prompted the retrospective. Ordered newest-first so the queue
+// surfaces the freshest drafts at the top.
+// The internal task_id is returned so the handler can resolve the optional
+// created_by_agent attribution via FindRetroDraftAgent without re-issuing
+// a public_id -> id lookup per row (the json:"-" tag on *.id keeps it
+// out of the wire response).
+func (q *Queries) ListRetroDraftsForWorkspace(ctx context.Context, arg ListRetroDraftsForWorkspaceParams) ([]ListRetroDraftsForWorkspaceRow, error) {
+	rows, err := q.db.QueryContext(ctx, listRetroDraftsForWorkspace, arg.WorkspaceID, arg.Limit, arg.Offset)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListRetroDraftsForWorkspaceRow{}
+	for rows.Next() {
+		var i ListRetroDraftsForWorkspaceRow
+		if err := rows.Scan(
+			&i.TaskID,
+			&i.TaskPublicID,
+			&i.Title,
+			&i.Description,
+			&i.CreatedAt,
+			&i.SourceTaskPublicID,
+			&i.SourceTaskTitle,
 			&i.Total,
 		); err != nil {
 			return nil, err

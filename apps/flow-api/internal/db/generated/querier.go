@@ -102,11 +102,41 @@ type Querier interface {
 	// constraint; see sql/tables/events.sql for the rationale). Used by the
 	// orchestrator runner when emitting ai.agent.run.* events and by MCP tool
 	// calls dispatched from an agent context.
+	//
+	// `triggered_by_signal_id` (ADR 0008 D4) is set when the Applier emits this
+	// event in response to a judged signal so the timeline UI can render the
+	// causal chain "signal -> judge verdict -> task event".
+	//
+	// `reverses_event_id` (ADR 0008 D4 / J5) mirrors the same field on
+	// AppendEvent. The reversal handler uses this INSERT path when the target
+	// event being reversed was originally produced by an agent so the
+	// compensating event preserves the same actor kind. NULL for normal
+	// agent-emitted events.
 	AppendAgentEvent(ctx context.Context, arg AppendAgentEventParams) (int64, error)
 	// Append a workspace-scoped audit row. metadata_json MUST be redacted.
 	AppendAuditLog(ctx context.Context, arg AppendAuditLogParams) (int64, error)
-	// Append a single event to the append-only event log. The events table has
-	// no UPDATE/DELETE path; only purgeWorkspace removes rows.
+	// Append a single user-actor event to the append-only event log. The events
+	// table has no UPDATE/DELETE path; only purgeWorkspace removes rows.
+	//
+	// `actor_system_source` is bound here so the third actor source (ADR 0008
+	// D8) can be expressed without a separate INSERT path; callers pass an
+	// empty string when the row is genuinely user-attributed. The three-way
+	// actor exclusion (actor_user_id / actor_agent_id / actor_system_source)
+	// is enforced by handler-side validation (eventbus.validateActors) rather
+	// than a CHECK constraint because MySQL 8.4 forbids CHECK constraints on
+	// columns used in FK ON DELETE SET NULL actions; see sql/tables/events.sql.
+	//
+	// `triggered_by_signal_id` (ADR 0008 D4) is the internal signal id when the
+	// event was emitted by the Applier in response to a judged signal. NULL for
+	// events with no signal lineage. ON DELETE SET NULL on the FK so signal
+	// purge does not cascade to the event log.
+	//
+	// `reverses_event_id` (ADR 0008 D4 / J5) is the internal event id this row
+	// compensates. NULL for non-reversal events. The reversal handler binds
+	// this when appending a same-type compensating event so the derived_state
+	// projection can cancel the original out without ever UPDATEing the event
+	// log (events stay immutable; see CLAUDE.md rule 10). ON DELETE SET NULL
+	// so purging a reversed event detaches the backlink instead of cascading.
 	AppendEvent(ctx context.Context, arg AppendEventParams) (int64, error)
 	// Append an instance-wide audit row. payload_json MUST be redacted.
 	AppendInstanceAuditLog(ctx context.Context, arg AppendInstanceAuditLogParams) (int64, error)
@@ -385,6 +415,21 @@ type Querier interface {
 	FindDefaultProviderIDForWorkspace(ctx context.Context, workspaceID uint32) (uint32, error)
 	// Find a specific description version by public id.
 	FindDescriptionVersion(ctx context.Context, arg FindDescriptionVersionParams) (FindDescriptionVersionRow, error)
+	// Resolve a target event by public_id for the reversal handler (ADR 0008
+	// D4 / J5, POST /workspaces/{wsId}/events/{eventPublicId}/reverse). The
+	// handler uses this single query to drive three eligibility checks
+	// before appending the compensating event:
+	//   - target exists in the caller's workspace (LIMIT 1 + workspace_id =
+	//     ? gives 404 vs. 403 separation when combined with the standard
+	//     ACL middleware).
+	//   - target is LLM-origin (actor_agent_id IS NOT NULL); user-actor and
+	//     system-source rows are rejected with AI_REVERSE_NOT_LLM_ORIGIN.
+	//   - target has not already been reversed (was_reversed = FALSE);
+	//     double-reverse is rejected with AI_REVERSE_ALREADY_REVERSED.
+	// The `was_reversed` EXISTS subquery uses alias `e_chk` (reverse check),
+	// matching the v_task_timeline view, and is index-covered by
+	// idx_events_reverses (workspace_id, reverses_event_id).
+	FindEventForReverse(ctx context.Context, arg FindEventForReverseParams) (FindEventForReverseRow, error)
 	// Check if a user already reacted with a specific emoji on a task or comment.
 	FindExistingReaction(ctx context.Context, arg FindExistingReactionParams) (FindExistingReactionRow, error)
 	// Find a single favorite by public id.
@@ -443,6 +488,14 @@ type Querier interface {
 	FindProviderForDecrypt(ctx context.Context, arg FindProviderForDecryptParams) (FindProviderForDecryptRow, error)
 	// Find a single reaction by public id.
 	FindReactionByPublicId(ctx context.Context, publicID types.PublicID) (FindReactionByPublicIdRow, error)
+	// Resolve the AI agent that produced a retro draft task by looking up the
+	// TaskRetroDrafted event (type='task.retro.drafted') joined to ai_agents.
+	// Returns the agent's public_id and display name. Used by the retro draft
+	// queue handler to enrich rows with createdByAgentId / createdByAgentName
+	// without coupling the main list query to ai_agents (the event-derived
+	// attribution is the only authoritative source — tasks rows do not carry
+	// created_by_agent_id).
+	FindRetroDraftAgent(ctx context.Context, arg FindRetroDraftAgentParams) (FindRetroDraftAgentRow, error)
 	// Check if a pending or running import already exists for a project.
 	FindRunningImportForProject(ctx context.Context, arg FindRunningImportForProjectParams) (FindRunningImportForProjectRow, error)
 	// Resolve a session by its external public_id (UUID v7).
@@ -475,6 +528,22 @@ type Querier interface {
 	FindTaskLabelByIds(ctx context.Context, arg FindTaskLabelByIdsParams) (FindTaskLabelByIdsRow, error)
 	// Resolve an unused recovery code by (user_id, hash).
 	FindUnusedRecoveryCode(ctx context.Context, arg FindUnusedRecoveryCodeParams) (uint32, error)
+	// Resolve a Discord user snowflake to (user_public_id, workspace_public_id)
+	// via the user_integrations.metadata_json $.external_user_id binding.
+	// Used by the internal /internal/users/by-discord/{snowflake} lookup
+	// endpoint the presence-discord gateway calls before emitting a signal.
+	// Filters out soft-disabled integrations and deterministically returns
+	// the user's earliest-joined workspace as the "default" since there is
+	// no users.default_workspace_id column today (v1.0 limitation; future
+	// enhancement may add an explicit default-workspace column). The tiebreak
+	// on wm.id keeps the result stable when two memberships share a created_at.
+	// JSON_UNQUOTE(JSON_EXTRACT(...)) is used instead of comparing JSON
+	// values directly: MySQL JSON equality on string scalars returns 0 even
+	// when the printed values are identical (MySQL JSON values carry an
+	// internal type tag that the JSON_QUOTE round-trip does not produce
+	// identically). Unquoting the stored value and comparing against the
+	// raw string parameter avoids that quirk.
+	FindUserByDiscordSnowflake(ctx context.Context, snowflake interface{}) (FindUserByDiscordSnowflakeRow, error)
 	// Lookup a user by email for login. Returns internal id for the auth pipeline.
 	// avatar_storage_object_id is the FK for self-hosted avatars; avatar_url is
 	// the external (e.g. OIDC provider) fallback URL.
@@ -527,8 +596,9 @@ type Querier interface {
 	GetAgentGuardSnapshot(ctx context.Context, id uint32) (GetAgentGuardSnapshotRow, error)
 	// ============================================================================
 	// ai_settings queries (ADR 0003)
-	// Per-workspace AI knobs: embed model, daily embed budget, and the
-	// duplicate-detection similarity thresholds.
+	// Per-workspace AI knobs: embed model, daily embed budget, the
+	// duplicate-detection similarity thresholds, auto-action executor settings,
+	// and free-form judge_instructions spliced into the signal_judge prompt.
 	// ============================================================================
 	// Fetch the ai_settings row for a workspace. Returns sql.ErrNoRows when the
 	// workspace has never written a row; the caller should fall back to the
@@ -663,6 +733,13 @@ type Querier interface {
 	// Dedup is workspace-scoped via UNIQUE (workspace_id, source, external_id)
 	// when external_id is non-NULL. Duplicate deliveries are silently ignored
 	// via INSERT IGNORE; LastInsertId() returns 0 when the row was a duplicate.
+	// subject_type is NOT NULL per sql/tables/signals.sql (ADR 0008 D1) so every
+	// caller must resolve a kind-appropriate subject; subject_id stays NULL for
+	// workspace-scoped signals (workspace_id already identifies the owner).
+	// judge_run_id / judge_output_json / confidence / applied_at stay NULL at
+	// insert time; the judge fills them later. expires_at is provider-derived
+	// TTL (presence transitions, weather window) and is NULL for signals that
+	// never expire (manual).
 	InsertSignal(ctx context.Context, arg InsertSignalParams) (int64, error)
 	// Create a brand new storage object row with ref_count = 1, representing
 	// the first reference (the just-inserted attachment / avatar). Caller
@@ -690,6 +767,19 @@ type Querier interface {
 	// Filter: actor_agent_id IS NOT NULL constrains rows to agent-produced
 	// events; the type LIKE narrows to the run lifecycle family. ORDER BY
 	// occurred_at DESC, id DESC produces a stable newest-first timeline.
+	//
+	// Projects `actor_system_source` (ADR 0008 D8) and the LEFT JOINed
+	// `triggered_by_signal_public_id` (ADR 0008 D4) so the agent-runs handler
+	// can surface the third actor source and the signal causal link without
+	// exposing internal ids on the API boundary (CLAUDE.md rule 18). The
+	// signal join uses alias `tsig` (triggering signal) to mirror the
+	// v_task_timeline view.
+	//
+	// Reversal projection (ADR 0008 D4 / J5): `reverses_event_public_id`
+	// comes from the LEFT self-join aliased `e_rev` (reverse target);
+	// `was_reversed` is computed by a correlated EXISTS subquery using
+	// alias `e_chk` (reverse check), backed by idx_events_reverses
+	// (workspace_id, reverses_event_id) so the per-row scan stays bounded.
 	ListAgentRunsByTask(ctx context.Context, arg ListAgentRunsByTaskParams) ([]ListAgentRunsByTaskRow, error)
 	// List the AI agents currently attached to a task as enabled actors. Used
 	// by the agent runtime's scoped event fan-out (schedule_scope =
@@ -738,10 +828,17 @@ type Querier interface {
 	// auto_action_rules queries
 	// Per-workspace auto-action rule configuration. Each row defines a single
 	// rule kind (e.g. auto-close, auto-archive) with its own enabled flag,
-	// confidence threshold, and idle-hours delay.
+	// confidence threshold, and idle-hours delay. Rules can now be scoped per
+	// signal_kind; see docs/conventions/autonomy.md for resolution layer order.
+	// Rows may also carry an explicit autonomy_level ('suggest' | 'draft' |
+	// 'auto'); when non-NULL the resolver returns it verbatim and skips the
+	// confidence-vs-threshold gate. NULL preserves the legacy confidence-based
+	// derivation, so callers must be able to write NULL to clear an override.
 	// ============================================================================
-	// List all auto-action rules for a workspace, ordered by kind.
-	ListAutoActionRulesForWorkspace(ctx context.Context, workspaceID uint32) ([]AutoActionRule, error)
+	// List all auto-action rules for a workspace, ordered by kind with
+	// signal_kind as a deterministic tie-breaker (NULL/wildcard rows last so
+	// specific rules surface before fallbacks).
+	ListAutoActionRulesForWorkspace(ctx context.Context, workspaceID uint32) ([]ListAutoActionRulesForWorkspaceRow, error)
 	// Calendar-event variant of ListAttachmentsForUploaderPurge. Same
 	// contract: enumerate every calendar_event_attachments row uploaded
 	// by the target user with the joined storage_objects.storage_key and
@@ -808,7 +905,10 @@ type Querier interface {
 	ListDescriptionVersions(ctx context.Context, arg ListDescriptionVersionsParams) ([]ListDescriptionVersionsRow, error)
 	// List a project's timeline via v_task_timeline. Filters events whose
 	// owning task lives in the given project (events with no task_id are
-	// excluded by virtue of project_public_id being NULL).
+	// excluded by virtue of project_public_id being NULL). Projects
+	// `actor_system_source`, `triggered_by_signal_public_id`,
+	// `reverses_event_public_id` and `was_reversed` for the same reasons as
+	// ListEventsForTask.
 	ListEventsForProject(ctx context.Context, arg ListEventsForProjectParams) ([]ListEventsForProjectRow, error)
 	// Incremental polling source for an agent whose schedule_scope is
 	// 'assigned_tasks'. Returns events newer than since_id whose owning task
@@ -821,10 +921,29 @@ type Querier interface {
 	// ListOnEventAgents so identical event kinds flow through identical
 	// predicates. Events without a task_id (workspace-level signals) are
 	// intentionally excluded — scoped agents only react to task-bound events.
+	//
+	// Reversal projection (ADR 0008 D4 / J5): `reverses_event_id` is exposed
+	// so the orchestrator can recognise compensating events and skip
+	// triggering downstream agents on them when desired. `was_reversed` is
+	// computed by a correlated EXISTS subquery aliased `e_chk` (reverse
+	// check) and is backed by idx_events_reverses (workspace_id,
+	// reverses_event_id); on the polling hot-path this keeps the per-row
+	// cost to an index-only probe.
 	ListEventsForScopedAgent(ctx context.Context, arg ListEventsForScopedAgentParams) ([]ListEventsForScopedAgentRow, error)
-	// List a task's timeline via v_task_timeline.
+	// List a task's timeline via v_task_timeline. Projects
+	// `actor_system_source` (ADR 0008 D8, third actor source for worker-tick
+	// events), `triggered_by_signal_public_id` (ADR 0008 D4, signal
+	// traceability link), `reverses_event_public_id` (ADR 0008 D4 / J5,
+	// target event the row compensates) and `was_reversed` (TRUE when some
+	// other enabled event reverses this one) so the timeline UI can render
+	// the causal chain plus the reversal state of each entry. The view
+	// backs `was_reversed` with a correlated EXISTS on idx_events_reverses
+	// so per-row cost stays bounded.
 	ListEventsForTask(ctx context.Context, arg ListEventsForTaskParams) ([]ListEventsForTaskRow, error)
-	// List the workspace-wide event timeline via v_task_timeline.
+	// List the workspace-wide event timeline via v_task_timeline. Projects
+	// `actor_system_source`, `triggered_by_signal_public_id`,
+	// `reverses_event_public_id` and `was_reversed` for the same reasons as
+	// ListEventsForTask.
 	ListEventsForWorkspace(ctx context.Context, arg ListEventsForWorkspaceParams) ([]ListEventsForWorkspaceRow, error)
 	// List all favorites for a user within a workspace, ordered by sort weight.
 	ListFavoritesForUser(ctx context.Context, arg ListFavoritesForUserParams) ([]ListFavoritesForUserRow, error)
@@ -1014,6 +1133,17 @@ type Querier interface {
 	// List all active repository mappings for a workspace. Returns metadata
 	// only (no internal IDs leak through the view layer).
 	ListRepoMappingsForWorkspace(ctx context.Context, workspaceID uint32) ([]ListRepoMappingsForWorkspaceRow, error)
+	// List draft retrospective tasks: tasks linked back to a source task
+	// via a task_dependencies row with kind='retro_of'. Backs the Phase 6 / L2
+	// retro draft queue endpoint (GET /workspaces/{wsId}/tasks/drafts?reason=retro).
+	// The retro task itself is the from_task; to_task is the original task whose
+	// lifecycle prompted the retrospective. Ordered newest-first so the queue
+	// surfaces the freshest drafts at the top.
+	// The internal task_id is returned so the handler can resolve the optional
+	// created_by_agent attribution via FindRetroDraftAgent without re-issuing
+	// a public_id -> id lookup per row (the json:"-" tag on *.id keeps it
+	// out of the wire response).
+	ListRetroDraftsForWorkspace(ctx context.Context, arg ListRetroDraftsForWorkspaceParams) ([]ListRetroDraftsForWorkspaceRow, error)
 	// List a user's active sessions ordered by most recent first.
 	ListSessionsForUser(ctx context.Context, arg ListSessionsForUserParams) ([]ListSessionsForUserRow, error)
 	// List signals attached to a task via v_inbox.
@@ -1169,6 +1299,17 @@ type Querier interface {
 	MarkNotificationRead(ctx context.Context, arg MarkNotificationReadParams) error
 	// Stamp used_at on a recovery code by internal id.
 	MarkRecoveryCodeUsed(ctx context.Context, id uint32) error
+	// Resolve the most specific auto-action rule for a (workspace, kind, signal_kind)
+	// triple. Ordering:
+	//   1) exact signal_kind match (signal_kind = sqlc.arg(signal_kind))
+	//   2) wildcard-prefix rules where the stored value starts with '*.' and the
+	//      remainder is a dotted-suffix of the caller's signal_kind (e.g. stored
+	//      '*.presence' matches caller 'discord.presence' via LIKE comparison
+	//      against CONCAT('%.', SUBSTRING(signal_kind, 3))).
+	//   3) wildcard fallback (signal_kind IS NULL).
+	// Returns at most one row; if multiple wildcard rules tie, fall back to
+	// created_at ASC then id ASC for determinism.
+	MatchAutoActionRule(ctx context.Context, arg MatchAutoActionRuleParams) (MatchAutoActionRuleRow, error)
 	// Worker failed; park the row with the error message. Retry policy
 	// lives in the application layer so different agents can have
 	// different budgets.
@@ -1349,9 +1490,13 @@ type Querier interface {
 	// Create or update the ai_settings row for a workspace. The UNIQUE KEY on
 	// workspace_id makes this idempotent. modified_by_user_id is the audit
 	// trail for the most recent writer; system writers pass NULL.
+	// judge_instructions is included in the UPDATE clause so operators can clear
+	// it by passing an explicit NULL (or empty string) via sql.NullString.
 	UpsertAiSettings(ctx context.Context, arg UpsertAiSettingsParams) error
 	// Insert or update a single auto-action rule for a workspace.
-	// The UNIQUE KEY on (workspace_id, kind) makes this idempotent.
+	// The UNIQUE KEY on (workspace_id, kind, signal_kind_match) makes this
+	// idempotent. A different signal_kind targets a distinct row by design, so
+	// signal_kind is intentionally excluded from the UPDATE branch.
 	UpsertAutoActionRule(ctx context.Context, arg UpsertAutoActionRuleParams) error
 	// Create or update a notification preference for a user.
 	UpsertNotificationPreference(ctx context.Context, arg UpsertNotificationPreferenceParams) error
@@ -1383,6 +1528,9 @@ type Querier interface {
 	// Insert or replace a user+provider integration. The uniq
 	// (user_id, provider) key guarantees only one active row per
 	// provider per user; on conflict we refresh every token column.
+	// metadata_json carries provider-specific binding metadata (e.g.
+	// {"external_user_id": "<snowflake>", "verified_at": "..."} for
+	// provider='discord'); pass NULL for providers that do not set it.
 	UpsertUserIntegration(ctx context.Context, arg UpsertUserIntegrationParams) (int64, error)
 	// Create or update a user's view preference for a specific scope.
 	UpsertViewPreference(ctx context.Context, arg UpsertViewPreferenceParams) error

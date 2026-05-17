@@ -9,6 +9,15 @@ export type { paths, components, operations } from './openapi.js';
 export { createClient, type CreateClientOptions, type NodateFlowClient } from './client.js';
 export * from './errors/index.js';
 export {
+  SIGNAL_KINDS,
+  lookup as lookupSignalKind,
+  type SignalKind,
+  type SignalKindDefinition,
+  type SignalRetention,
+  type SignalAutonomy,
+  type SignalSubjectType,
+} from './signal-kinds/index.js';
+export {
   createTokenRefresher,
   createRefreshMiddleware,
   createAuthRequestMiddleware,

@@ -113,7 +113,7 @@ func (q *MySQLQueue) tryClaim(ctx context.Context) (Run, bool, error) {
 	}
 	return Run{
 		DedupeKey:   dedupeKey,
-		Job:         Job{AgentID: agentID, WsID: wsID},
+		Job:         Job{AgentID: agentID, WsID: wsID, DedupeKey: dedupeKey},
 		ScheduledAt: scheduledAt,
 		Attempts:    attempts + 1,
 	}, true, nil

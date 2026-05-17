@@ -37,3 +37,23 @@ resources:
         message_zh: "存储未配置"
         description: "File storage is not configured on this instance. Uploads and downloads of attachments are disabled."
         userAction: "Ask your instance administrator to configure object storage (S3-compatible endpoint, bucket, and credentials)."
+
+  eventbus:
+    breadcrumb: "Internal > Eventbus"
+    errors:
+      actor_multiple:
+        code: INTERNAL.EVENTBUS.ACTOR_MULTIPLE
+        status: 500
+        message: "Event has more than one actor source set"
+        message_ja: "イベントの actor が複数指定されています"
+        message_zh: "事件设置了多个 actor 来源"
+        description: "Internal-only guard. The events table allows at most one of (actor_user_id, actor_agent_id, actor_system_source) per row, but the eventbus caller supplied more than one. MySQL cannot enforce this via CHECK (FK ON DELETE SET NULL conflict) so the guard lives in the Go appender (ADR 0008 D8)."
+        userAction: "This is a server bug. Contact your administrator with the request ID."
+      judge_kind_outside_applier:
+        code: INTERNAL.EVENTBUS.JUDGE_KIND_OUTSIDE_APPLIER
+        status: 500
+        message: "Judge-driven event kind appended outside the signaljudge Applier"
+        message_ja: "judge 専用イベント kind が Applier 以外から append されました"
+        message_zh: "judge 专用事件 kind 在 Applier 之外被追加"
+        description: "Internal-only guard. The events kinds signal.judged, signal.applied, signal.rejected, task.auto_completed, and task.retro.drafted may only be emitted by the signaljudge Applier (ADR 0008 D4). Any other caller using eventbus.Append with one of these kinds is a server bug — the Applier is the sole writer of judge-driven task state, and bypassing it would break the audit chain and the autonomy gate."
+        userAction: "This is a server bug. Contact your administrator with the request ID."

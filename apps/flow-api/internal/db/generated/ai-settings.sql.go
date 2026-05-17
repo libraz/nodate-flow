@@ -24,6 +24,7 @@ SELECT
   auto_action_enabled,
   auto_action_interval_minutes,
   auto_action_threshold,
+  judge_instructions,
   updated_at,
   created_at
 FROM ai_settings
@@ -32,24 +33,26 @@ LIMIT 1
 `
 
 type GetAiSettingsRow struct {
-	ID                        uint32        `json:"-"`
-	WorkspaceID               uint32        `json:"-"`
-	ModifiedByUserID          sql.NullInt32 `json:"modifiedByUserId"`
-	EmbedModel                string        `json:"embedModel"`
-	EmbedBudgetCentsDay       uint32        `json:"embedBudgetCentsDay"`
-	DuplicateThresholdHigh    string        `json:"duplicateThresholdHigh"`
-	DuplicateThresholdLow     string        `json:"duplicateThresholdLow"`
-	AutoActionEnabled         bool          `json:"autoActionEnabled"`
-	AutoActionIntervalMinutes uint32        `json:"autoActionIntervalMinutes"`
-	AutoActionThreshold       string        `json:"autoActionThreshold"`
-	UpdatedAt                 sql.NullTime  `json:"updatedAt"`
-	CreatedAt                 time.Time     `json:"createdAt"`
+	ID                        uint32         `json:"-"`
+	WorkspaceID               uint32         `json:"-"`
+	ModifiedByUserID          sql.NullInt32  `json:"modifiedByUserId"`
+	EmbedModel                string         `json:"embedModel"`
+	EmbedBudgetCentsDay       uint32         `json:"embedBudgetCentsDay"`
+	DuplicateThresholdHigh    string         `json:"duplicateThresholdHigh"`
+	DuplicateThresholdLow     string         `json:"duplicateThresholdLow"`
+	AutoActionEnabled         bool           `json:"autoActionEnabled"`
+	AutoActionIntervalMinutes uint32         `json:"autoActionIntervalMinutes"`
+	AutoActionThreshold       string         `json:"autoActionThreshold"`
+	JudgeInstructions         sql.NullString `json:"judgeInstructions"`
+	UpdatedAt                 sql.NullTime   `json:"updatedAt"`
+	CreatedAt                 time.Time      `json:"createdAt"`
 }
 
 // ============================================================================
 // ai_settings queries (ADR 0003)
-// Per-workspace AI knobs: embed model, daily embed budget, and the
-// duplicate-detection similarity thresholds.
+// Per-workspace AI knobs: embed model, daily embed budget, the
+// duplicate-detection similarity thresholds, auto-action executor settings,
+// and free-form judge_instructions spliced into the signal_judge prompt.
 // ============================================================================
 // Fetch the ai_settings row for a workspace. Returns sql.ErrNoRows when the
 // workspace has never written a row; the caller should fall back to the
@@ -68,6 +71,7 @@ func (q *Queries) GetAiSettings(ctx context.Context, workspaceID uint32) (GetAiS
 		&i.AutoActionEnabled,
 		&i.AutoActionIntervalMinutes,
 		&i.AutoActionThreshold,
+		&i.JudgeInstructions,
 		&i.UpdatedAt,
 		&i.CreatedAt,
 	)
@@ -84,8 +88,9 @@ INSERT INTO ai_settings (
   duplicate_threshold_low,
   auto_action_enabled,
   auto_action_interval_minutes,
-  auto_action_threshold
-) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+  auto_action_threshold,
+  judge_instructions
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 ON DUPLICATE KEY UPDATE
   modified_by_user_id = VALUES(modified_by_user_id),
   embed_model = VALUES(embed_model),
@@ -94,24 +99,28 @@ ON DUPLICATE KEY UPDATE
   duplicate_threshold_low = VALUES(duplicate_threshold_low),
   auto_action_enabled = VALUES(auto_action_enabled),
   auto_action_interval_minutes = VALUES(auto_action_interval_minutes),
-  auto_action_threshold = VALUES(auto_action_threshold)
+  auto_action_threshold = VALUES(auto_action_threshold),
+  judge_instructions = VALUES(judge_instructions)
 `
 
 type UpsertAiSettingsParams struct {
-	WorkspaceID               uint32        `json:"-"`
-	ModifiedByUserID          sql.NullInt32 `json:"modifiedByUserId"`
-	EmbedModel                string        `json:"embedModel"`
-	EmbedBudgetCentsDay       uint32        `json:"embedBudgetCentsDay"`
-	DuplicateThresholdHigh    string        `json:"duplicateThresholdHigh"`
-	DuplicateThresholdLow     string        `json:"duplicateThresholdLow"`
-	AutoActionEnabled         bool          `json:"autoActionEnabled"`
-	AutoActionIntervalMinutes uint32        `json:"autoActionIntervalMinutes"`
-	AutoActionThreshold       string        `json:"autoActionThreshold"`
+	WorkspaceID               uint32         `json:"-"`
+	ModifiedByUserID          sql.NullInt32  `json:"modifiedByUserId"`
+	EmbedModel                string         `json:"embedModel"`
+	EmbedBudgetCentsDay       uint32         `json:"embedBudgetCentsDay"`
+	DuplicateThresholdHigh    string         `json:"duplicateThresholdHigh"`
+	DuplicateThresholdLow     string         `json:"duplicateThresholdLow"`
+	AutoActionEnabled         bool           `json:"autoActionEnabled"`
+	AutoActionIntervalMinutes uint32         `json:"autoActionIntervalMinutes"`
+	AutoActionThreshold       string         `json:"autoActionThreshold"`
+	JudgeInstructions         sql.NullString `json:"judgeInstructions"`
 }
 
 // Create or update the ai_settings row for a workspace. The UNIQUE KEY on
 // workspace_id makes this idempotent. modified_by_user_id is the audit
 // trail for the most recent writer; system writers pass NULL.
+// judge_instructions is included in the UPDATE clause so operators can clear
+// it by passing an explicit NULL (or empty string) via sql.NullString.
 func (q *Queries) UpsertAiSettings(ctx context.Context, arg UpsertAiSettingsParams) error {
 	_, err := q.db.ExecContext(ctx, upsertAiSettings,
 		arg.WorkspaceID,
@@ -123,6 +132,7 @@ func (q *Queries) UpsertAiSettings(ctx context.Context, arg UpsertAiSettingsPara
 		arg.AutoActionEnabled,
 		arg.AutoActionIntervalMinutes,
 		arg.AutoActionThreshold,
+		arg.JudgeInstructions,
 	)
 	return err
 }

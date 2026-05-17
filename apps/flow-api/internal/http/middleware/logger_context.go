@@ -39,9 +39,12 @@ func LoggerContext() func(http.Handler) http.Handler {
 			ctx := r.Context()
 			base := nflog.LoggerFromContext(ctx)
 
-			attrs := make([]any, 0, 6)
+			attrs := make([]any, 0, 7)
 			if rid := nflog.RequestIDFromContext(ctx); rid != "" {
 				attrs = append(attrs, slog.String("request_id", rid))
+			}
+			if mode, ok := AuthModeFromContext(ctx); ok {
+				attrs = append(attrs, slog.String("auth_mode", string(mode)))
 			}
 			if uid, ok := ActorFromContext(ctx); ok && uid != 0 {
 				attrs = append(attrs, slog.Any("actor_id", uid))

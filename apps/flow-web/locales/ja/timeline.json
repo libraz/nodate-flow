@@ -149,5 +149,30 @@
       "past_due_date_likely_ready_for_review": "期限を過ぎており、レビュー準備ができている可能性があります"
     },
     "unassigned": "—"
+  },
+  "signal": {
+    "caused_by": "{source}シグナル起点",
+    "unknown_source": "AI",
+    "reasoning": "ジャッジの理由",
+    "confidence": "確信度: {value}",
+    "rejected_note": "ジャッジは確認しましたが、アクションは行いませんでした",
+    "reverse": "取り消す",
+    "reversed_label": "取り消し済み",
+    "show_full_reasoning": "理由を全文表示",
+    "hide_full_reasoning": "隠す",
+    "signal_expired": "起点: AI エージェント（シグナルは失効）",
+    "reverse_confirm": {
+      "title": "このアクションを取り消しますか？",
+      "body": "このシグナルに基づき AI が行ったアクションを取り消します。元のシグナルとジャッジの理由は監査用にタイムラインに残ります。取り消しは再度取り消しできません。",
+      "confirm": "取り消す",
+      "cancel": "キャンセル"
+    },
+    "reverse_success": "アクションを取り消しました",
+    "reverse_error": {
+      "not_llm_origin": "AI が行ったアクションのみ取り消せます",
+      "already_reversed": "このアクションはすでに取り消されています",
+      "target_not_found": "対象のアクションが見つかりません",
+      "fetch_error": "アクションを取り消せませんでした。もう一度お試しください。"
+    }
   }
 }

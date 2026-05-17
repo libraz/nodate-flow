@@ -19,7 +19,7 @@
   },
   "integrations": {
     "title": "連携",
-    "description": "個人の GitHub / Slack / Google カレンダー アカウントを接続すると、nodate-flow がユーザーとして操作できるようになります。トークンは暗号化して保存されます。",
+    "description": "個人の GitHub / Slack / Google カレンダー / Discord アカウントを接続すると、nodate-flow がユーザーとして操作できるようになります。トークンは暗号化して保存されます。",
     "connect": "接続",
     "disconnect": "切断",
     "disconnect_confirm": "{provider} を切断しますか？再度利用するには認可し直す必要があります。",
@@ -39,6 +39,10 @@
       "google_calendar": {
         "name": "Google カレンダー",
         "description": "カレンダーと直近の予定を読み取ります。"
+      },
+      "discord": {
+        "name": "Discord",
+        "description": "プレゼンス情報を読み取り、対応可能なタイミングを提案に反映します。"
       }
     },
     "errors": {

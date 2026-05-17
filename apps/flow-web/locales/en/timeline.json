@@ -149,5 +149,30 @@
       "past_due_date_likely_ready_for_review": "Past due date — likely ready for review"
     },
     "unassigned": "—"
+  },
+  "signal": {
+    "caused_by": "Caused by: {source} signal",
+    "unknown_source": "AI",
+    "reasoning": "Judge reasoning",
+    "confidence": "Confidence: {value}",
+    "rejected_note": "Judge looked but didn't act",
+    "reverse": "Reverse",
+    "reversed_label": "Reversed",
+    "show_full_reasoning": "Show full reasoning",
+    "hide_full_reasoning": "Hide",
+    "signal_expired": "Caused by: AI agent (signal expired)",
+    "reverse_confirm": {
+      "title": "Reverse this action?",
+      "body": "This will undo the actions the AI took based on this signal. The original signal and judge reasoning will remain in the timeline for audit. You can't reverse a reversal.",
+      "confirm": "Reverse",
+      "cancel": "Cancel"
+    },
+    "reverse_success": "Action reversed",
+    "reverse_error": {
+      "not_llm_origin": "Only AI-generated actions can be reversed",
+      "already_reversed": "This action has already been reversed",
+      "target_not_found": "Action no longer exists",
+      "fetch_error": "Couldn't reverse the action. Please try again."
+    }
   }
 }

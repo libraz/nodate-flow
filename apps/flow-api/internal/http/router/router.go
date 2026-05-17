@@ -62,11 +62,13 @@ import (
 	audithandlers "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/handlers/audit"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/handlers/calendars"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/handlers/dashboard"
+	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/handlers/events"
 	exporthandlers "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/handlers/export"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/handlers/favorites"
 	importhandlers "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/handlers/imports"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/handlers/inbox"
 	intakehandlers "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/handlers/intake"
+	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/handlers/internalapi"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/handlers/labels"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/handlers/lenses"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/handlers/notifications"
@@ -156,6 +158,20 @@ type Deps struct {
 	// handler to return AI.AGENT.RUNTIME_DISABLED so operators
 	// notice misconfiguration instead of a silent no-op.
 	AgentRunner agentruntime.Runner
+	// JudgeEnqueuer is the optional signal_judge dispatch hook
+	// invoked from /signals and the /webhooks/* handlers after a
+	// signal row lands (ADR 0008 D3). Nil disables judge dispatch
+	// for single-binary deployments that have not opted in.
+	JudgeEnqueuer signals.JudgeEnqueuer
+
+	// FlowAPISignalToken is the shared secret internal-only callers
+	// (flow-worker, presence-discord) present in the Authorization
+	// header when calling POST /signals or any /internal/* route.
+	// Empty disables both service-token paths: /signals then accepts
+	// only real-user bearers (JWT / PAT / MCP) and /internal/* rejects
+	// every request with 401. The token is scoped to those two route
+	// groups only — other endpoints reject it even when configured.
+	FlowAPISignalToken string
 
 	// Storage is the S3-compatible object store client for file
 	// uploads / downloads. Nil in tests; presign endpoints return
@@ -507,6 +523,7 @@ func buildSharedDeps(deps Deps) *sharedDeps {
 			SlackSigningSecret: deps.SlackSigningSecret,
 			GoogleChannelToken: deps.GoogleChannelToken,
 			DefaultWorkspaceID: deps.DefaultWorkspaceID,
+			JudgeEnqueuer:      deps.JudgeEnqueuer,
 		},
 		calDeps: calendars.Deps{
 			Queries:         deps.Queries,
@@ -799,21 +816,55 @@ func buildAuthenticatedAPI(r chi.Router, deps Deps, shared *sharedDeps, authMW f
 		tasks.RegisterSteps(subAPI, stepsDeps)
 	})
 
-	// Workspace timeline.
+	// Workspace timeline + event reversal (ADR 0008 D4 / J5). Both share
+	// the same RequireWorkspaceMember middleware because reversal is a
+	// workspace-scoped mutation of an audit-log row that is otherwise
+	// only visible through the timeline.
 	r.Group(func(sub chi.Router) {
 		sub.Use(authMW)
 		sub.Use(middleware.RequireWorkspaceMember(shared.aclDB))
 		subAPI := newSubAPI(sub)
 		apis = append(apis, subAPI)
 		timeline.RegisterWorkspaceScoped(subAPI, shared.tlDeps)
+		eventsDeps := events.Deps{DB: deps.DB, Queries: deps.Queries}
+		events.RegisterWorkspaceScoped(subAPI, eventsDeps)
 	})
 
-	// Signals + inbox (auth only; handlers resolve ws membership themselves).
+	// Signals collection. POST /signals lives in its own chi group so
+	// the service-token middleware (RequireSignalsAuth) can be scoped
+	// to just this route — other authenticated endpoints below
+	// continue to require a real user bearer. When
+	// NF_FLOW_API_SIGNAL_TOKEN is empty the middleware is a passthrough
+	// to the standard JWT chain, so the route still 401s on
+	// unauthenticated requests (verified by
+	// TestAuthenticatedSubRouterAlwaysAuthenticated).
+	r.Group(func(sub chi.Router) {
+		sub.Use(middleware.RequireSignalsAuth(authMW, deps.FlowAPISignalToken))
+		subAPI := newSubAPI(sub)
+		apis = append(apis, subAPI)
+		signals.RegisterCollection(subAPI, shared.signalDeps)
+	})
+
+	// Internal service-token-only endpoints (/internal/*). Mounted
+	// under a chi group whose only auth middleware is
+	// RequireServiceTokenOnly — JWT / PAT / MCP bearers are rejected
+	// outright so these routes can never be reached with a user token,
+	// and an empty NF_FLOW_API_SIGNAL_TOKEN disables the group entirely
+	// (every request 401s). Current consumers: presence-discord
+	// snowflake → flow user lookup.
+	r.Group(func(sub chi.Router) {
+		sub.Use(middleware.RequireServiceTokenOnly(deps.FlowAPISignalToken))
+		subAPI := newSubAPI(sub)
+		apis = append(apis, subAPI)
+		internalapi.Register(subAPI, internalapi.Deps{DB: deps.DB, Queries: deps.Queries})
+	})
+
+	// Inbox + notifications + favorites + relations (auth only;
+	// handlers resolve ws membership themselves).
 	r.Group(func(sub chi.Router) {
 		sub.Use(authMW)
 		subAPI := newSubAPI(sub)
 		apis = append(apis, subAPI)
-		signals.RegisterCollection(subAPI, shared.signalDeps)
 		inbox.Register(subAPI, shared.inboxDeps)
 		notifications.Register(subAPI, shared.notifDeps)
 		favDeps := favorites.Deps{DB: deps.DB, Queries: deps.Queries, Audit: shared.auditRec}

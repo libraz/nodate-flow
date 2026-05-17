@@ -91,7 +91,7 @@ func (e *EventTrigger) dispatch(ctx context.Context, workspaceID uint32, eventTy
 		key := fmt.Sprintf("%d:event:%s:%d", r.ID, eventType, now.UnixNano())
 		run := Run{
 			DedupeKey:   key,
-			Job:         Job{AgentID: r.ID, WsID: r.WorkspaceID, SourceEventID: eventInternalID},
+			Job:         Job{AgentID: r.ID, WsID: r.WorkspaceID, SourceEventID: eventInternalID, DedupeKey: key},
 			ScheduledAt: now,
 		}
 		if err := e.Queue.Enqueue(ctx, run); err != nil && !errors.Is(err, ErrDuplicate) {

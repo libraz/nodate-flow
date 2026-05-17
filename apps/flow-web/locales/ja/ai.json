@@ -1,4 +1,33 @@
 {
+  "autonomy": {
+    "matrix": {
+      "title": "シグナル種別ごとの自律レベル",
+      "description": "シグナル種別ごとにアクションの自動度を選択します。個別設定がない場合はワークスペースの既定値が適用されます。",
+      "header": {
+        "kind": "シグナル種別",
+        "mode": "自律レベル"
+      },
+      "save": "変更を保存 ({count})",
+      "save_zero": "変更なし",
+      "reset": "リセット",
+      "changed_toast": "自律レベルの設定を更新しました",
+      "error_toast": "自律レベルの設定を保存できませんでした",
+      "empty": "対象のシグナル種別はありません",
+      "row_aria": "{kind} の自律レベル",
+      "changed_announce": "{kind} を {mode} に設定しました",
+      "default_hint": "デフォルト: {mode}"
+    },
+    "mode": {
+      "suggest": "提案のみ",
+      "draft": "下書き作成",
+      "auto": "自動適用"
+    },
+    "help": {
+      "suggest": "表示のみ — タスクは変更しません",
+      "draft": "下書きを作成し人によるレビューを待ちます",
+      "auto": "即時に適用します"
+    }
+  },
   "cost_today": {
     "label": "AI",
     "tooltip": "このワークスペースの本日の AI 利用額"

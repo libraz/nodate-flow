@@ -58,6 +58,48 @@ func (ns NullAgentRunsStatus) Value() (driver.Value, error) {
 	return string(ns.AgentRunsStatus), nil
 }
 
+type AiAgentsKind string
+
+const (
+	AiAgentsKindTaskAgent   AiAgentsKind = "task_agent"
+	AiAgentsKindSignalJudge AiAgentsKind = "signal_judge"
+)
+
+func (e *AiAgentsKind) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = AiAgentsKind(s)
+	case string:
+		*e = AiAgentsKind(s)
+	default:
+		return fmt.Errorf("unsupported scan type for AiAgentsKind: %T", src)
+	}
+	return nil
+}
+
+type NullAiAgentsKind struct {
+	AiAgentsKind AiAgentsKind `json:"aiAgentsKind"`
+	Valid        bool         `json:"valid"` // Valid is true if AiAgentsKind is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullAiAgentsKind) Scan(value interface{}) error {
+	if value == nil {
+		ns.AiAgentsKind, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.AiAgentsKind.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullAiAgentsKind) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.AiAgentsKind), nil
+}
+
 type AiAgentsScheduleKind string
 
 const (
@@ -230,6 +272,49 @@ func (ns NullAiProvidersKind) Value() (driver.Value, error) {
 		return nil, nil
 	}
 	return string(ns.AiProvidersKind), nil
+}
+
+type AutoActionRulesAutonomyLevel string
+
+const (
+	AutoActionRulesAutonomyLevelSuggest AutoActionRulesAutonomyLevel = "suggest"
+	AutoActionRulesAutonomyLevelDraft   AutoActionRulesAutonomyLevel = "draft"
+	AutoActionRulesAutonomyLevelAuto    AutoActionRulesAutonomyLevel = "auto"
+)
+
+func (e *AutoActionRulesAutonomyLevel) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = AutoActionRulesAutonomyLevel(s)
+	case string:
+		*e = AutoActionRulesAutonomyLevel(s)
+	default:
+		return fmt.Errorf("unsupported scan type for AutoActionRulesAutonomyLevel: %T", src)
+	}
+	return nil
+}
+
+type NullAutoActionRulesAutonomyLevel struct {
+	AutoActionRulesAutonomyLevel AutoActionRulesAutonomyLevel `json:"autoActionRulesAutonomyLevel"`
+	Valid                        bool                         `json:"valid"` // Valid is true if AutoActionRulesAutonomyLevel is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullAutoActionRulesAutonomyLevel) Scan(value interface{}) error {
+	if value == nil {
+		ns.AutoActionRulesAutonomyLevel, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.AutoActionRulesAutonomyLevel.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullAutoActionRulesAutonomyLevel) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.AutoActionRulesAutonomyLevel), nil
 }
 
 type CalendarEventAttendeesRsvp string
@@ -938,6 +1023,7 @@ const (
 	OauthStatesProviderGithub         OauthStatesProvider = "github"
 	OauthStatesProviderSlack          OauthStatesProvider = "slack"
 	OauthStatesProviderGoogleCalendar OauthStatesProvider = "google_calendar"
+	OauthStatesProviderDiscord        OauthStatesProvider = "discord"
 )
 
 func (e *OauthStatesProvider) Scan(src interface{}) error {
@@ -1108,12 +1194,13 @@ func (ns NullRelationSuggestionsSuggestedKind) Value() (driver.Value, error) {
 type SignalsSource string
 
 const (
-	SignalsSourceManual  SignalsSource = "manual"
-	SignalsSourceGithub  SignalsSource = "github"
-	SignalsSourceSlack   SignalsSource = "slack"
-	SignalsSourceEmail   SignalsSource = "email"
-	SignalsSourceGoogle  SignalsSource = "google"
-	SignalsSourceWebhook SignalsSource = "webhook"
+	SignalsSourceManual   SignalsSource = "manual"
+	SignalsSourceGithub   SignalsSource = "github"
+	SignalsSourceSlack    SignalsSource = "slack"
+	SignalsSourceEmail    SignalsSource = "email"
+	SignalsSourceGoogle   SignalsSource = "google"
+	SignalsSourceWebhook  SignalsSource = "webhook"
+	SignalsSourceCalendar SignalsSource = "calendar"
 )
 
 func (e *SignalsSource) Scan(src interface{}) error {
@@ -1149,6 +1236,50 @@ func (ns NullSignalsSource) Value() (driver.Value, error) {
 		return nil, nil
 	}
 	return string(ns.SignalsSource), nil
+}
+
+type SignalsSubjectType string
+
+const (
+	SignalsSubjectTypeUser          SignalsSubjectType = "user"
+	SignalsSubjectTypeTask          SignalsSubjectType = "task"
+	SignalsSubjectTypeWorkspace     SignalsSubjectType = "workspace"
+	SignalsSubjectTypeCalendarEvent SignalsSubjectType = "calendar_event"
+)
+
+func (e *SignalsSubjectType) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = SignalsSubjectType(s)
+	case string:
+		*e = SignalsSubjectType(s)
+	default:
+		return fmt.Errorf("unsupported scan type for SignalsSubjectType: %T", src)
+	}
+	return nil
+}
+
+type NullSignalsSubjectType struct {
+	SignalsSubjectType SignalsSubjectType `json:"signalsSubjectType"`
+	Valid              bool               `json:"valid"` // Valid is true if SignalsSubjectType is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullSignalsSubjectType) Scan(value interface{}) error {
+	if value == nil {
+		ns.SignalsSubjectType, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.SignalsSubjectType.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullSignalsSubjectType) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.SignalsSubjectType), nil
 }
 
 type TaskActorsKind string
@@ -1289,6 +1420,7 @@ const (
 	TaskDependenciesKindRelates    TaskDependenciesKind = "relates"
 	TaskDependenciesKindDuplicates TaskDependenciesKind = "duplicates"
 	TaskDependenciesKindSubtaskOf  TaskDependenciesKind = "subtask_of"
+	TaskDependenciesKindRetroOf    TaskDependenciesKind = "retro_of"
 )
 
 func (e *TaskDependenciesKind) Scan(src interface{}) error {
@@ -1553,6 +1685,7 @@ const (
 	UserIntegrationsProviderGithub         UserIntegrationsProvider = "github"
 	UserIntegrationsProviderSlack          UserIntegrationsProvider = "slack"
 	UserIntegrationsProviderGoogleCalendar UserIntegrationsProvider = "google_calendar"
+	UserIntegrationsProviderDiscord        UserIntegrationsProvider = "discord"
 )
 
 func (e *UserIntegrationsProvider) Scan(src interface{}) error {
@@ -2032,6 +2165,8 @@ type AiAgent struct {
 	WorkspaceID uint32 `json:"-"`
 	// Internal FK to ai_models.id
 	ModelID uint32 `json:"modelId"`
+	// Agent dispatch kind. task_agent: operates on tasks (default, all current agents). signal_judge: LLM judge for external signals (see ADR 0008 D3).
+	Kind AiAgentsKind `json:"kind"`
 	// Human-readable agent name
 	Name string `json:"name"`
 	// Free-form description
@@ -2202,6 +2337,8 @@ type AiSetting struct {
 	AutoActionIntervalMinutes uint32 `json:"autoActionIntervalMinutes"`
 	// Minimum confidence score for an action to be applied automatically
 	AutoActionThreshold string `json:"autoActionThreshold"`
+	// Free-form operator instructions appended to the signal_judge system prompt. NULL or empty string = use the built-in template only. Truncated at prompt-build time if exceeding the configured token budget. See apps/flow-api/internal/ai/signaljudge/prompt.go for inclusion logic.
+	JudgeInstructions sql.NullString `json:"judgeInstructions"`
 	// Enabled flag
 	Enabled   bool         `json:"enabled"`
 	UpdatedAt sql.NullTime `json:"updatedAt"`
@@ -2268,7 +2405,7 @@ type AuditLog struct {
 	CreatedAt time.Time    `json:"createdAt"`
 }
 
-// Per-workspace auto-action rule overrides (kind, confidence, idle threshold)
+// Per-workspace auto-action rule overrides (kind, signal_kind, confidence, idle threshold)
 type AutoActionRule struct {
 	// Internal PK, never exposed
 	ID uint32 `json:"-"`
@@ -2278,14 +2415,20 @@ type AutoActionRule struct {
 	WorkspaceID uint32 `json:"-"`
 	// Rule kind: escalate_overdue | assign_owner | nudge_assignee | close_stale_review
 	Kind string `json:"kind"`
+	// Signal scope: NULL = wildcard (matches every kind), exact dotted string match (e.g. 'discord.presence'), or wildcard prefix where the stored value matches kinds with that suffix-after-dot. Resolution layer details live in docs/conventions/autonomy.md
+	SignalKind sql.NullString `json:"signalKind"`
 	// Whether this rule fires during evaluation
 	Enabled bool `json:"enabled"`
 	// Confidence score emitted when this rule fires (0.00-1.00)
 	Confidence string `json:"confidence"`
 	// Idle threshold in hours. 0 for rules that use due_on (escalate_overdue)
-	IdleHours uint32       `json:"idleHours"`
-	UpdatedAt sql.NullTime `json:"updatedAt"`
-	CreatedAt time.Time    `json:"createdAt"`
+	IdleHours uint32 `json:"idleHours"`
+	// When set, the autonomy resolver returns this level verbatim and skips confidence comparison. NULL falls back to the existing confidence-vs-threshold derivation. Closed enum mirrors signalkinds.Autonomy.
+	AutonomyLevel NullAutoActionRulesAutonomyLevel `json:"autonomyLevel"`
+	// Internal normalization of signal_kind for the UNIQUE index. Empty string represents the NULL wildcard. Never read from app code -- only the unique-key engine touches this. Constraint order (GENERATED clause before NOT NULL) is required by MySQL 9.x parser.
+	SignalKindMatch string       `json:"signalKindMatch"`
+	UpdatedAt       sql.NullTime `json:"updatedAt"`
+	CreatedAt       time.Time    `json:"createdAt"`
 }
 
 // Calendar containers (personal layer or system holiday feed). Workspace members share events through event-level visibility (public/private/confidential), not shared-calendar membership.
@@ -2706,11 +2849,17 @@ type Event struct {
 	WorkspaceID uint32 `json:"-"`
 	// Internal FK to tasks.id when the event targets a task
 	TaskID sql.NullInt32 `json:"-"`
-	// Acting user.id (null for system/bot actions)
+	// Internal FK to signals.id; set when this event was emitted by the Applier in response to a judged signal. Provides full traceability from external input to task event (ADR 0008 D4).
+	TriggeredBySignalID sql.NullInt32 `json:"-"`
+	// Acting user.id (null for system/bot actions). Mutually exclusive with actor_agent_id and actor_system_source: exactly one of the three actor sources is set per row (both NULL is also legal for legacy "system actor"). The mutual-exclusion rule is enforced by query design and handler validation, not a CHECK constraint, because all three FK referential actions use ON DELETE SET NULL and MySQL 8.4 forbids CHECK constraints referencing columns used in FK referential actions. Each INSERT binds exactly one of the three columns: AppendEvent (events.sql) sets actor_user_id only; AppendAgentEvent (events.sql) and InsertHandoffToUserEvent (agents/handoff.sql) set actor_agent_id only; InsertHandoffToAgentEvent (agents/handoff.sql) sets actor_user_id only; worker-tick append paths set actor_system_source only.
 	ActorUserID sql.NullInt32 `json:"-"`
-	// Acting ai_agents.id when the event was produced by an AI agent. Mutual exclusion with actor_user_id is enforced by query design and handler validation, not a CHECK constraint (MySQL 8.4 forbids CHECK on columns used by FK referential actions; both FKs use ON DELETE SET NULL). Each INSERT binds exactly one of the two columns: AppendEvent (events.sql) sets actor_user_id only; AppendAgentEvent (events.sql) and InsertHandoffToUserEvent (agents/handoff.sql) set actor_agent_id only; InsertHandoffToAgentEvent (agents/handoff.sql) sets actor_user_id only. Both NULL means system actor.
+	// Acting ai_agents.id when the event was produced by an AI agent (judge / task agent). See actor_user_id comment for the three-way exclusion rule.
 	ActorAgentID sql.NullInt32 `json:"actorAgentId"`
-	// Event type (e.g., task.created, signal.attached)
+	// Third actor source for system-driven events emitted by the worker binary (apps/flow-worker; ADR 0008 D8). Examples: `worker:scheduler`, `worker:retention`, `worker:calendar`. Not an FK because the worker is not represented in the database. See actor_user_id comment for the three-way exclusion rule.
+	ActorSystemSource sql.NullString `json:"actorSystemSource"`
+	// Internal FK to events.id. Non-NULL means this event is a compensating reverse of another event (e.g., user undoing an auto-completion). The derived_state projection cancels both events out. See ADR 0008 D4 — events are immutable; reversals never UPDATE/DELETE.
+	ReversesEventID sql.NullInt64 `json:"-"`
+	// Event type (e.g., task.created, signal.attached, signal.judged)
 	Type string `json:"type"`
 	// Event payload
 	PayloadJson json.RawMessage `json:"payloadJson"`
@@ -3181,7 +3330,7 @@ type OauthState struct {
 	State string `json:"state"`
 	// Internal FK to users.id — the user who started the connect flow
 	UserID uint32 `json:"-"`
-	// Which provider this state belongs to
+	// Which provider this state belongs to. 'discord' is required for the personal Discord presence-binding flow (Phase 8 presence-discord gateway).
 	Provider OauthStatesProvider `json:"provider"`
 	// Optional client-supplied return URL to send the user to after the callback completes
 	RedirectTo sql.NullString `json:"redirectTo"`
@@ -3433,7 +3582,7 @@ type Session struct {
 	CreatedAt time.Time    `json:"createdAt"`
 }
 
-// Inbound signals
+// Inbound signals; judged by the signal_judge agent and reified into task events by the Applier (ADR 0008)
 type Signal struct {
 	// Internal PK, never exposed
 	ID uint32 `json:"-"`
@@ -3441,18 +3590,32 @@ type Signal struct {
 	PublicID types.PublicID `json:"publicId"`
 	// Internal FK to workspaces.id
 	WorkspaceID uint32 `json:"-"`
-	// Internal FK to tasks.id, if resolved
+	// Internal FK to tasks.id, if resolved (legacy fast path; duplicates subject_type=task / subject_id)
 	TaskID sql.NullInt32 `json:"-"`
-	// Originating channel
+	// Internal FK to agent_runs.id; set when a judge run has evaluated this signal. NULL means "not yet judged".
+	JudgeRunID sql.NullInt32 `json:"judgeRunId"`
+	// Originating channel. 'calendar' is reserved for internal scheduler ticks (flow-worker calendar_event_day job, etc.) — not a user-facing webhook source.
 	Source SignalsSource `json:"source"`
-	// Source-specific event kind (e.g., pull_request.opened)
+	// Source-specific event kind (e.g., pull_request.opened, discord.presence). Closed enumeration defined by signal_kinds/*.yaml; stays VARCHAR so new kinds do not require a schema change.
 	Kind string `json:"kind"`
-	// External identifier (delivery id, message ts, ...)
+	// External identifier (delivery id, message ts, ...). Dedupe key for webhook double delivery.
 	ExternalID sql.NullString `json:"externalId"`
-	// Raw normalized payload
+	// Raw normalized payload; anything the provider webhook cannot squeeze into the normalized columns stays here for the judge to read.
 	PayloadJson json.RawMessage `json:"payloadJson"`
 	// Time the signal was received
 	ReceivedAt time.Time `json:"receivedAt"`
+	// What the signal is about; selects which table subject_id targets.
+	SubjectType SignalsSubjectType `json:"subjectType"`
+	// Internal id of the subject row. NULL when subject_type=workspace (workspace_id already owns the row). Polymorphic, so not declared as an FK; integrity is enforced at ingestion time.
+	SubjectID sql.NullInt32 `json:"subjectId"`
+	// Structured verdict from the judge run (intent, target task, proposed events, reasoning excerpt). NULL until judged.
+	JudgeOutputJson json.RawMessage `json:"judgeOutputJson"`
+	// Judge confidence in [0.00, 1.00]; compared against ai_settings.auto_action_threshold / auto_action_rules.
+	Confidence sql.NullString `json:"confidence"`
+	// When the Applier wrote the resulting task event(s). NULL while pending or rejected.
+	AppliedAt sql.NullTime `json:"appliedAt"`
+	// When this signal stops being authoritative. Used by the retention sweep for stateful kinds (presence, weather window).
+	ExpiresAt sql.NullTime `json:"expiresAt"`
 	// Display order
 	SortWeight int32 `json:"sortWeight"`
 	// Admin notes
@@ -3609,7 +3772,7 @@ type TaskDependency struct {
 	FromTaskID uint32 `json:"fromTaskId"`
 	// Internal FK to tasks.id (target)
 	ToTaskID uint32 `json:"toTaskId"`
-	// Dependency kind
+	// Dependency kind. blocks: from_task waits on to_task. relates: informational link. duplicates: from_task duplicates to_task. subtask_of: from_task is a subtask of to_task. retro_of: created by the signal_judge Applier when an event-day signal triggers a retrospective draft task; from_task is the new draft, to_task is the original task whose lifecycle finished and prompted the retro.
 	Kind TaskDependenciesKind `json:"kind"`
 	// Display order
 	SortWeight int32 `json:"sortWeight"`
@@ -3861,7 +4024,7 @@ type UserIntegration struct {
 	PublicID types.PublicID `json:"publicId"`
 	// Internal FK to users.id
 	UserID uint32 `json:"-"`
-	// OAuth provider kind
+	// OAuth provider kind. 'discord' is reserved for personal presence binding read by the Phase 8 presence-discord gateway (see ADR 0008 D6) — no task-mutating tokens are stored.
 	Provider UserIntegrationsProvider `json:"provider"`
 	// Provider subject (GH login, Slack user id, Google sub)
 	ExternalAccountID string `json:"externalAccountId"`
@@ -3879,6 +4042,8 @@ type UserIntegration struct {
 	ConnectedAt time.Time `json:"connectedAt"`
 	// Last successful token refresh
 	LastRefreshedAt sql.NullTime `json:"lastRefreshedAt"`
+	// Provider-specific binding metadata. For provider='discord': stores {"external_user_id": "<Discord snowflake>", "verified_at": "<ISO-8601 UTC>"} so the Phase 8 gateway can resolve presence events to a user without a second token table. Other providers may write their own keys here.
+	MetadataJson json.RawMessage `json:"metadataJson"`
 	// Display order
 	SortWeight int32 `json:"sortWeight"`
 	// Admin notes
@@ -4175,18 +4340,22 @@ type VTaskListArchived struct {
 }
 
 type VTaskTimeline struct {
-	WorkspaceID        uint32          `json:"-"`
-	EventID            uint64          `json:"-"`
-	PublicID           types.PublicID  `json:"publicId"`
-	TaskPublicID       sql.NullString  `json:"taskPublicId"`
-	ProjectPublicID    sql.NullString  `json:"projectPublicId"`
-	ActorUserPublicID  *types.PublicID `json:"actorUserPublicId"`
-	ActorDisplayName   sql.NullString  `json:"actorDisplayName"`
-	ActorAgentPublicID sql.NullString  `json:"actorAgentPublicId"`
-	ActorAgentName     interface{}     `json:"actorAgentName"`
-	Type               string          `json:"type"`
-	PayloadJson        json.RawMessage `json:"payloadJson"`
-	OccurredAt         time.Time       `json:"occurredAt"`
+	WorkspaceID               uint32          `json:"-"`
+	EventID                   uint64          `json:"-"`
+	PublicID                  types.PublicID  `json:"publicId"`
+	TaskPublicID              sql.NullString  `json:"taskPublicId"`
+	ProjectPublicID           sql.NullString  `json:"projectPublicId"`
+	ActorUserPublicID         *types.PublicID `json:"actorUserPublicId"`
+	ActorDisplayName          sql.NullString  `json:"actorDisplayName"`
+	ActorAgentPublicID        sql.NullString  `json:"actorAgentPublicId"`
+	ActorAgentName            interface{}     `json:"actorAgentName"`
+	ActorSystemSource         sql.NullString  `json:"actorSystemSource"`
+	TriggeredBySignalPublicID *types.PublicID `json:"triggeredBySignalPublicId"`
+	ReversesEventPublicID     *types.PublicID `json:"reversesEventPublicId"`
+	WasReversed               bool            `json:"wasReversed"`
+	Type                      string          `json:"type"`
+	PayloadJson               json.RawMessage `json:"payloadJson"`
+	OccurredAt                time.Time       `json:"occurredAt"`
 }
 
 type VUser struct {
@@ -4207,6 +4376,16 @@ type VUser struct {
 	LastLoginAt                 sql.NullTime              `json:"lastLoginAt"`
 	UpdatedAt                   sql.NullTime              `json:"updatedAt"`
 	CreatedAt                   time.Time                 `json:"createdAt"`
+}
+
+type VUserPresenceCurrent struct {
+	WorkspaceID uint32          `json:"-"`
+	UserID      sql.NullInt32   `json:"-"`
+	Source      SignalsSource   `json:"source"`
+	Kind        string          `json:"kind"`
+	PayloadJson json.RawMessage `json:"payloadJson"`
+	ReceivedAt  time.Time       `json:"receivedAt"`
+	ExpiresAt   sql.NullTime    `json:"expiresAt"`
 }
 
 type VWorkspaceActivity struct {

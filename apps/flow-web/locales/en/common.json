@@ -922,6 +922,30 @@
       "load_failed": "Failed to load saved views",
       "save_failed": "Failed to save view",
       "delete_failed": "Failed to delete view"
+    },
+    "retro": {
+      "queue": {
+        "title": "Retrospective drafts",
+        "description": "Draft retrospectives the AI created from completed tasks and calendar events. Accept to promote to a regular task, or discard to remove.",
+        "empty": "No retrospective drafts right now",
+        "linked_original": "Linked to: {sourceTitle}",
+        "created_by_ai": "Drafted by AI {agentName} · {when}",
+        "created_anon": "Drafted by AI · {when}",
+        "accept": "Accept",
+        "discard": "Discard",
+        "accepted_toast": "Retrospective promoted to open",
+        "discarded_toast": "Retrospective discarded",
+        "accept_error": "Could not accept this retrospective",
+        "discard_error": "Could not discard this retrospective",
+        "fetch_error": "Could not load retrospective drafts",
+        "retry": "Retry",
+        "discard_confirm": {
+          "title": "Discard this draft?",
+          "body": "The draft will be archived. The original task and signal stay intact.",
+          "confirm": "Discard",
+          "cancel": "Cancel"
+        }
+      }
     }
   },
   "auth": {

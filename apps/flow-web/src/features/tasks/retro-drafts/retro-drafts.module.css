@@ -1,0 +1,153 @@
+/**
+ * Retro drafts queue — page + row + skeleton styles.
+ *
+ * Layout commitments:
+ *   - Row height is intentionally fixed (description is `line-clamp:2`
+ *     and the meta line is one line), so accepting / discarding one
+ *     row does not cause the rest of the queue to reflow. See
+ *     feedback_morph_layout_stability.
+ *   - All colours, spacing, and radii go through design tokens.
+ *   - Logical inline/block properties only; no `left/right`.
+ */
+
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-6);
+  padding-block: var(--nf-space-6);
+  padding-inline: var(--nf-space-6);
+  max-inline-size: 56rem;
+  margin-inline: auto;
+  inline-size: 100%;
+}
+
+.header {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-2);
+}
+
+.title {
+  font-size: var(--nf-text-2xl);
+  font-weight: var(--nf-weight-semibold);
+  color: var(--nf-color-fg);
+  margin: 0;
+}
+
+.subtitle {
+  font-size: var(--nf-text-sm);
+  color: var(--nf-color-fg-muted);
+  margin: 0;
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-3);
+}
+
+.row {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-2);
+  padding: var(--nf-space-4);
+}
+
+.rowTopRow {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-1);
+}
+
+.rowTitle {
+  font-size: var(--nf-text-base);
+  font-weight: var(--nf-weight-semibold);
+  color: var(--nf-color-fg);
+  text-decoration: none;
+  /* Single-line clamp to keep the row height fixed. */
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rowTitle:hover,
+.rowTitle:focus-visible {
+  text-decoration: underline;
+  color: var(--nf-color-accent);
+}
+
+.rowLinkedTo {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--nf-space-1);
+  font-size: var(--nf-text-xs);
+  color: var(--nf-color-fg-muted);
+  text-decoration: none;
+  /* Single-line; the link can wrap onto its own row but the inner
+     copy is clipped if it grows beyond the available width. */
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-inline-size: 100%;
+}
+
+.rowLinkedTo:hover,
+.rowLinkedTo:focus-visible {
+  text-decoration: underline;
+  color: var(--nf-color-accent);
+}
+
+.rowLinkedToArrow {
+  flex-shrink: 0;
+}
+
+.rowDescription {
+  font-size: var(--nf-text-sm);
+  color: var(--nf-color-fg-muted);
+  margin: 0;
+  /* Fixed two-line clamp — see feedback_morph_layout_stability. */
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  /* Keep the row height stable when description is short or absent. */
+  min-block-size: calc(var(--nf-text-sm) * 2 * 1.5);
+}
+
+.rowMeta {
+  font-size: var(--nf-text-xs);
+  color: var(--nf-color-fg-subtle);
+}
+
+.rowActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--nf-space-2);
+}
+
+.pagination {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--nf-space-3);
+  padding-block: var(--nf-space-2);
+}
+
+.paginationStatus {
+  font-size: var(--nf-text-sm);
+  color: var(--nf-color-fg-muted);
+}
+
+.paginationControls {
+  display: flex;
+  align-items: center;
+  gap: var(--nf-space-2);
+}
+
+.skeletonRow {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-2);
+  padding: var(--nf-space-4);
+}

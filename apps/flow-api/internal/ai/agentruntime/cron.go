@@ -28,6 +28,12 @@ type Job struct {
 	// ai.agent.run.* events stay bound to the same task and surface in
 	// the task's run-history view.
 	SourceEventID uint32
+	// DedupeKey is the agent_runs.dedupe_key value that the scheduler /
+	// enqueuer assigned to this job. The runner uses it to recover the
+	// dispatch hint (signal id for the signaljudge path, currently)
+	// without re-querying the queue. Empty when the run was driven
+	// in-process without a dedupe key.
+	DedupeKey string
 }
 
 // Source returns the set of jobs that should run at the given tick.

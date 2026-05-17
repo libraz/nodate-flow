@@ -12,6 +12,7 @@ package integrations
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"time"
@@ -30,10 +31,18 @@ type TokenSet struct {
 // exchange so the user can see which account they just connected.
 type Account struct {
 	// ExternalID is the provider-stable subject (GH numeric id as
-	// string, Slack user id, Google sub).
+	// string, Slack user id, Google sub, Discord snowflake).
 	ExternalID string
 	// Label is the human-readable display form (email, @handle, name).
 	Label string
+	// Metadata is optional provider-specific binding metadata,
+	// persisted verbatim into user_integrations.metadata_json. It is
+	// the carrier for queries that must look up integration rows by
+	// a provider-defined key (e.g. the Phase 8 presence-discord
+	// gateway resolves Discord events via
+	// JSON_EXTRACT(metadata_json, '$.external_user_id')). Providers
+	// that have nothing to store leave this nil.
+	Metadata json.RawMessage
 }
 
 // Provider is the per-service OAuth driver.

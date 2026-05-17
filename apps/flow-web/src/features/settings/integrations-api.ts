@@ -20,7 +20,7 @@ export { ApiError as SettingsApiError };
 
 export type ProviderStatus = components['schemas']['ProviderStatus'];
 export type ConnectionSummary = components['schemas']['ConnectionSummary'];
-export type IntegrationProviderName = 'github' | 'slack' | 'google_calendar';
+export type IntegrationProviderName = 'github' | 'slack' | 'google_calendar' | 'discord';
 
 export const integrationsKeys = {
   list: ['me', 'integrations'] as const,

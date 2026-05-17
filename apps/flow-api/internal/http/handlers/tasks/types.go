@@ -730,12 +730,27 @@ type HandoffToUserOutput struct {
 // It is a flattened view over the events row joined with the producing
 // agent so the timeline UI can render run history without an extra
 // agents lookup per row.
+//
+// ActorSystemSource and TriggeredBySignalID mirror the same two
+// traceability fields surfaced on the workspace / task timeline (ADR
+// 0008 D4 / D8). Both are pointer-typed so the JSON shape is
+// unambiguously `null` when the underlying column was SQL NULL: agent
+// runs predating ADR 0008 carry neither attribute.
 type AgentRunEvent struct {
-	EventID     string   `json:"eventId"`
-	Type        string   `json:"type"`
-	OccurredAt  int64    `json:"occurredAt"`
-	Agent       AgentRef `json:"agent"`
-	PayloadJSON string   `json:"payloadJson,omitempty"`
+	EventID             string   `json:"eventId"`
+	Type                string   `json:"type"`
+	OccurredAt          int64    `json:"occurredAt"`
+	Agent               AgentRef `json:"agent"`
+	ActorSystemSource   *string  `json:"actorSystemSource,omitempty"`
+	TriggeredBySignalID *string  `json:"triggeredBySignalId,omitempty"`
+	// ReversesEventID is the public_id of the event this row compensates
+	// (ADR 0008 D4 / J5). Null for non-reversal events.
+	ReversesEventID *string `json:"reversesEventId,omitempty"`
+	// WasReversed is TRUE when some other enabled event reverses this
+	// row (ADR 0008 D4 / J5). Mirrors the timeline DTO so the
+	// agent-runs view can render the same "Reversed" badge.
+	WasReversed bool   `json:"wasReversed"`
+	PayloadJSON string `json:"payloadJson,omitempty"`
 }
 
 // ListAgentRunsInput is the query for GET /tasks/{id}/agent-runs.
@@ -983,6 +998,65 @@ type ListArchivedTasksBody struct {
 // ListArchivedTasksOutput is the response for GET /workspaces/{wsId}/tasks/archived.
 type ListArchivedTasksOutput struct {
 	Body ListArchivedTasksBody
+}
+
+// ---- Retro draft queue (Phase 6 / L2) -------------------------------------
+
+// RetroDraftSourceTask is the minimal reference to the original task that
+// prompted a retrospective draft. Embedded on RetroDraft so the queue UI
+// can render "Retro for <title>" without an extra round trip.
+type RetroDraftSourceTask struct {
+	PublicID string `json:"publicId" format:"uuid"`
+	Title    string `json:"title"`
+}
+
+// RetroDraft is the public DTO for a draft retrospective task. The row
+// is materialised when the signal_judge Applier resolves a verdict with
+// action=generate_retro; the task carries an incoming task_dependencies
+// edge of kind='retro_of' back to the source task. The optional agent
+// fields name the AI agent that produced the draft (resolved from the
+// task.retro.drafted event's actor_agent_id, not from a column on tasks).
+//
+// The `signal` block from the Phase 6 / L2 design is deliberately omitted
+// from the first iteration: the draft itself already carries enough
+// context (title, description, source task) for the operator to make an
+// Accept / Discard decision, and the signal join can be added later
+// without breaking this response shape.
+type RetroDraft struct {
+	TaskPublicID       string               `json:"taskPublicId" format:"uuid"`
+	Title              string               `json:"title"`
+	Description        string               `json:"description,omitempty"`
+	CreatedAt          int64                `json:"createdAt"`
+	CreatedByAgentID   string               `json:"createdByAgentId,omitempty" format:"uuid"`
+	CreatedByAgentName string               `json:"createdByAgentName,omitempty"`
+	SourceTask         RetroDraftSourceTask `json:"sourceTask"`
+}
+
+// ListRetroDraftsInput is the query for
+// GET /workspaces/{wsId}/tasks/drafts?reason=retro.
+//
+// `reason` is constrained to the single value `retro` for now; the enum
+// rejects anything else at the boundary with a 422 (Huma validation).
+// Pagination is offset-based, defaulting to 20 rows per page with a hard
+// cap of 50 per the L2 design.
+type ListRetroDraftsInput struct {
+	WsID   string `path:"wsId"`
+	Reason string `query:"reason" enum:"retro" required:"true" doc:"Draft kind filter. Currently only 'retro' is supported."`
+	Limit  int32  `query:"limit" minimum:"1" maximum:"50" default:"20"`
+	Offset int32  `query:"offset" minimum:"0" default:"0"`
+}
+
+// ListRetroDraftsBody is the response payload for
+// GET /workspaces/{wsId}/tasks/drafts?reason=retro.
+type ListRetroDraftsBody struct {
+	Total  int64        `json:"total"`
+	Drafts []RetroDraft `json:"drafts"`
+}
+
+// ListRetroDraftsOutput is the response for
+// GET /workspaces/{wsId}/tasks/drafts?reason=retro.
+type ListRetroDraftsOutput struct {
+	Body ListRetroDraftsBody
 }
 
 // ---- Description Version History I/O --------------------------------------

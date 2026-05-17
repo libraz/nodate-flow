@@ -13,6 +13,7 @@ import (
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/types"
 	apierrors "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/errors"
 	goog "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/integrations/google"
+	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/signalkinds"
 )
 
 // HandleGoogleWebhook is a chi-level handler for POST /webhooks/google.
@@ -75,9 +76,23 @@ func HandleGoogleWebhook(deps Deps) http.HandlerFunc {
 			payload = json.RawMessage(`{}`)
 		}
 
+		// Google Drive push notifications today are not yet resolved to a
+		// specific calendar_event row at the webhook layer — the channel
+		// metadata in the headers identifies the watched resource, not the
+		// individual event row. resolveSubjectType returns "workspace" for
+		// the free-form Drive kinds NormalizeEventKind emits, which keeps
+		// signals.subject_type NOT NULL satisfied without claiming a more
+		// specific subject than we actually resolved.
+		//
+		// TODO(signal_kinds): once Phase 4 promotes calendar push events to
+		// the signal_kinds/calendar.yaml registry and a per-channel
+		// calendar_event resolver is in place, switch to
+		// SignalsSubjectTypeCalendarEvent with the resolved internal id.
 		ext := sql.NullString{String: r.Header.Get(goog.HeaderChannelID), Valid: r.Header.Get(goog.HeaderChannelID) != ""}
+		subjectType := resolveSubjectType(kind, "")
+		subjectID := subjectIDFor(subjectType, 0)
 		pub := types.New()
-		if _, err := deps.Queries.InsertSignal(ctx, generated.InsertSignalParams{
+		signalInternalID, err := deps.Queries.InsertSignal(ctx, generated.InsertSignalParams{
 			PublicID:    pub,
 			WorkspaceID: wsID,
 			Source:      generated.SignalsSourceGoogle,
@@ -85,9 +100,24 @@ func HandleGoogleWebhook(deps Deps) http.HandlerFunc {
 			ExternalID:  ext,
 			PayloadJson: payload,
 			ReceivedAt:  time.Now().UTC(),
-		}); err != nil {
+			SubjectType: subjectType,
+			SubjectID:   subjectID,
+		})
+		if err != nil {
 			writeError(w, apierrors.InternalUnexpected)
 			return
+		}
+
+		// Best-effort signal_judge dispatch (ADR 0008 D3).
+		if deps.JudgeEnqueuer != nil {
+			if jerr := deps.JudgeEnqueuer.EnqueueForSignal(ctx, signalInternalID, wsID, signalkinds.Kind(kind)); jerr != nil {
+				slog.WarnContext(ctx, "signaljudge enqueue failed",
+					slog.Any("err", jerr),
+					slog.String("handler", "signals.HandleGoogleWebhook"),
+					slog.String("signal_public_id", pub.String()),
+					slog.String("kind", kind),
+				)
+			}
 		}
 		writeJSON(w, http.StatusAccepted, map[string]any{"id": pub.String()})
 	}

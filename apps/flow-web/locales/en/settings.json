@@ -19,7 +19,7 @@
   },
   "integrations": {
     "title": "Integrations",
-    "description": "Connect your personal GitHub, Slack, and Google Calendar accounts so nodate-flow can act on your behalf. Tokens are encrypted at rest.",
+    "description": "Connect your personal GitHub, Slack, Google Calendar, and Discord accounts so nodate-flow can act on your behalf. Tokens are encrypted at rest.",
     "connect": "Connect",
     "disconnect": "Disconnect",
     "disconnect_confirm": "Disconnect {provider}? You will need to re-authorise to use it again.",
@@ -39,6 +39,10 @@
       "google_calendar": {
         "name": "Google Calendar",
         "description": "Read your calendars and upcoming events."
+      },
+      "discord": {
+        "name": "Discord",
+        "description": "Read your presence so suggestions can reflect when you're available."
       }
     },
     "errors": {

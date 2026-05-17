@@ -172,6 +172,39 @@ sql:
               package: "types"
               type: "PublicID"
               pointer: true
+          # triggered_by_signal_public_id is the public_id of the signal that
+          # caused this event (ADR 0008 D4). Sourced from a LEFT JOIN to
+          # signals so it is genuinely nullable: only events written by the
+          # Applier carry a backlink.
+          - column: "*.triggered_by_signal_public_id"
+            nullable: true
+            go_type:
+              import: "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/types"
+              package: "types"
+              type: "PublicID"
+              pointer: true
+          # triggered_by_signal_id is the internal events.triggered_by_signal_id
+          # FK back to signals.id; must not surface in JSON (the public_id
+          # alias above is what the API exposes).
+          - column: "*.triggered_by_signal_id"
+            go_struct_tag: 'json:"-"'
+          # reverses_event_public_id is the public_id of the event this row
+          # compensates (ADR 0008 D4 / J5). Sourced from a LEFT self-join
+          # on events (alias `e_rev`) so it is genuinely nullable: only the
+          # compensating events written by the reversal handler carry a
+          # backlink.
+          - column: "*.reverses_event_public_id"
+            nullable: true
+            go_type:
+              import: "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/types"
+              package: "types"
+              type: "PublicID"
+              pointer: true
+          # reverses_event_id is the internal events.reverses_event_id FK
+          # back to events.id; must not surface in JSON (the public_id
+          # alias above is what the API exposes).
+          - column: "*.reverses_event_id"
+            go_struct_tag: 'json:"-"'
           - column: "*.calendar_id"
             go_struct_tag: 'json:"-"'
           - column: "*.event_id"

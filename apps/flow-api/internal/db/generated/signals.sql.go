@@ -52,25 +52,38 @@ INSERT IGNORE INTO signals (
   kind,
   external_id,
   payload_json,
-  received_at
-) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+  received_at,
+  subject_type,
+  subject_id,
+  expires_at
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 `
 
 type InsertSignalParams struct {
-	PublicID    types.PublicID  `json:"publicId"`
-	WorkspaceID uint32          `json:"-"`
-	TaskID      sql.NullInt32   `json:"-"`
-	Source      SignalsSource   `json:"source"`
-	Kind        string          `json:"kind"`
-	ExternalID  sql.NullString  `json:"externalId"`
-	PayloadJson json.RawMessage `json:"payloadJson"`
-	ReceivedAt  time.Time       `json:"receivedAt"`
+	PublicID    types.PublicID     `json:"publicId"`
+	WorkspaceID uint32             `json:"-"`
+	TaskID      sql.NullInt32      `json:"-"`
+	Source      SignalsSource      `json:"source"`
+	Kind        string             `json:"kind"`
+	ExternalID  sql.NullString     `json:"externalId"`
+	PayloadJson json.RawMessage    `json:"payloadJson"`
+	ReceivedAt  time.Time          `json:"receivedAt"`
+	SubjectType SignalsSubjectType `json:"subjectType"`
+	SubjectID   sql.NullInt32      `json:"subjectId"`
+	ExpiresAt   sql.NullTime       `json:"expiresAt"`
 }
 
 // Insert an inbound signal (manual or webhook).
 // Dedup is workspace-scoped via UNIQUE (workspace_id, source, external_id)
 // when external_id is non-NULL. Duplicate deliveries are silently ignored
 // via INSERT IGNORE; LastInsertId() returns 0 when the row was a duplicate.
+// subject_type is NOT NULL per sql/tables/signals.sql (ADR 0008 D1) so every
+// caller must resolve a kind-appropriate subject; subject_id stays NULL for
+// workspace-scoped signals (workspace_id already identifies the owner).
+// judge_run_id / judge_output_json / confidence / applied_at stay NULL at
+// insert time; the judge fills them later. expires_at is provider-derived
+// TTL (presence transitions, weather window) and is NULL for signals that
+// never expire (manual).
 func (q *Queries) InsertSignal(ctx context.Context, arg InsertSignalParams) (int64, error) {
 	result, err := q.db.ExecContext(ctx, insertSignal,
 		arg.PublicID,
@@ -81,6 +94,9 @@ func (q *Queries) InsertSignal(ctx context.Context, arg InsertSignalParams) (int
 		arg.ExternalID,
 		arg.PayloadJson,
 		arg.ReceivedAt,
+		arg.SubjectType,
+		arg.SubjectID,
+		arg.ExpiresAt,
 	)
 	if err != nil {
 		return 0, err

@@ -648,6 +648,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/internal/users/by-discord/{snowflake}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Resolve a Discord snowflake to a flow user (service-token only)
+         * @description Returns the flow user public_id and default workspace public_id bound to the supplied Discord snowflake via user_integrations.metadata_json.external_user_id. Service-token only: requests authenticated as a user receive 401 from the middleware. Used by the presence-discord gateway before emitting a discord.presence signal.
+         */
+        get: operations["internal-users-by-discord"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/invites/{token}/accept": {
         parameters: {
             query?: never;
@@ -2451,7 +2471,7 @@ export interface paths {
         };
         /**
          * List auto-action rules for a workspace
-         * @description Returns the workspace's auto-action rule rows (rule kind, condition, side-effect). On first read seeds the default rule set so admins can begin tweaking immediately.
+         * @description Returns the workspace's auto-action rule rows (rule kind, optional signal_kind scope, condition, side-effect). On first read seeds the default wildcard rule set so admins can begin tweaking immediately.
          */
         get: operations["ai-auto-action-rules-list"];
         put?: never;
@@ -2461,7 +2481,7 @@ export interface paths {
         head?: never;
         /**
          * Patch auto-action rules for a workspace
-         * @description Updates one or more auto-action rules in a single request. Each row may toggle enabled, change its threshold, or rewrite its condition. Returns the post-update set so the UI can reconcile state.
+         * @description Updates one or more auto-action rules in a single request. Each row may toggle enabled, change its threshold, narrow its signal_kind scope, or rewrite its condition. Returns the post-update set so the UI can reconcile state.
          */
         patch: operations["ai-auto-action-rules-update"];
         trace?: never;
@@ -3630,6 +3650,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/workspaces/{wsId}/events/{eventPublicId}/reverse": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Reverse an LLM-origin event with a compensating event
+         * @description Appends a same-type compensating event whose reverses_event_id points back at the target. Only events with actor_agent_id set (LLM-origin) may be reversed; double-reversal is rejected. The events log stays immutable; the derived_state projection cancels the pair out for the timeline UI.
+         */
+        post: operations["events-reverse"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/workspaces/{wsId}/export/tasks": {
         parameters: {
             query?: never;
@@ -4430,6 +4470,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/workspaces/{wsId}/tasks/drafts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List draft tasks in a workspace by reason (currently only retro)
+         * @description Returns draft tasks of the requested reason for review. Currently the only supported reason is 'retro' — retrospective drafts created by the signal_judge Applier when an event-day signal triggers action=generate_retro. Each row carries the source task back-reference plus optional agent attribution sourced from the task.retro.drafted event. The retro draft queue UI (Phase 6 / L2) renders Accept / Discard against this feed.
+         */
+        get: operations["tasks-drafts-list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/workspaces/{wsId}/tasks/propose-smart": {
         parameters: {
             query?: never;
@@ -4953,12 +5013,16 @@ export interface components {
             name?: string;
         };
         AgentRunEvent: {
+            actorSystemSource?: string;
             agent: components["schemas"]["AgentRef"];
             eventId: string;
             /** Format: int64 */
             occurredAt: number;
             payloadJson?: string;
+            reversesEventId?: string;
+            triggeredBySignalId?: string;
             type: string;
+            wasReversed: boolean;
         };
         AgentSummary: {
             /**
@@ -5185,12 +5249,18 @@ export interface components {
             userId: string;
         };
         AutoActionRuleBody: {
+            /**
+             * @description Operator-picked autonomy level override. When set the resolver returns this level verbatim and skips the confidence gate. Nil/omitted means the row uses confidence-based derivation.
+             * @enum {string}
+             */
+            autonomyLevel?: "suggest" | "draft" | "auto";
             /** Format: double */
             confidence: number;
             enabled: boolean;
             /** Format: int64 */
             idleHours: number;
             kind: string;
+            signalKind?: string;
         };
         AutoActionSettingsBody: {
             /**
@@ -5218,6 +5288,17 @@ export interface components {
             /** @description Export format used */
             format: string;
             tasks: components["schemas"]["ExportedTask"][] | null;
+        };
+        ByDiscordOutputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            /** @description Flow user public_id (UUID v7) bound to the requested Discord snowflake. */
+            userId: string;
+            /** @description Default workspace public_id (UUID v7) for the resolved user. Currently the earliest-joined enabled membership. */
+            workspaceId: string;
         };
         CalendarRemoveMemberOutputBody: {
             /**
@@ -5388,7 +5469,7 @@ export interface components {
             /** Format: int64 */
             lastRefreshedAt?: number;
             /** @enum {string} */
-            provider: "github" | "slack" | "google_calendar";
+            provider: "github" | "slack" | "google_calendar" | "discord";
             scopes: string;
         };
         ConvertIntakeItemBody: {
@@ -6320,14 +6401,18 @@ export interface components {
             actorAgentId?: string;
             actorAgentName?: string;
             actorDisplayName?: string;
+            actorSystemSource?: string;
             actorUserId?: string;
             /** @description Event public id (UUID v7) */
             id: string;
             /** Format: int64 */
             occurredAt: number;
             payload?: unknown;
+            reversesEventId?: string;
             taskId?: string;
+            triggeredBySignalId?: string;
             type: string;
+            wasReversed: boolean;
         };
         EventInviteCreateResponse: {
             /**
@@ -7178,6 +7263,16 @@ export interface components {
             /** Format: int64 */
             total: number;
         };
+        ListRetroDraftsBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            drafts: components["schemas"]["RetroDraft"][] | null;
+            /** Format: int64 */
+            total: number;
+        };
         ListSessionsOutputBody: {
             /**
              * Format: uri
@@ -7748,6 +7843,11 @@ export interface components {
             updatedAt: number;
         };
         PatchAutoActionRuleItem: {
+            /**
+             * @description Operator-picked autonomy level override. Omit to preserve the prior value. Clearing back to NULL is not supported by this PATCH (Phase 4 follow-up).
+             * @enum {string}
+             */
+            autonomyLevel?: "suggest" | "draft" | "auto";
             /** Format: double */
             confidence?: number;
             enabled?: boolean;
@@ -7755,6 +7855,7 @@ export interface components {
             idleHours?: number;
             /** @enum {string} */
             kind: "escalate_overdue" | "assign_owner" | "nudge_assignee" | "close_stale_review";
+            signalKind?: string;
         };
         PatchAutoActionRulesInputBody: {
             /**
@@ -8255,7 +8356,7 @@ export interface components {
             configured: boolean;
             connection?: components["schemas"]["ConnectionSummary"];
             /** @enum {string} */
-            provider: "github" | "slack" | "google_calendar";
+            provider: "github" | "slack" | "google_calendar" | "discord";
         };
         PublicLens: {
             /**
@@ -8632,6 +8733,37 @@ export interface components {
             readonly $schema?: string;
             ok: boolean;
         };
+        RetroDraft: {
+            /** Format: int64 */
+            createdAt: number;
+            /** Format: uuid */
+            createdByAgentId?: string;
+            createdByAgentName?: string;
+            description?: string;
+            sourceTask: components["schemas"]["RetroDraftSourceTask"];
+            /** Format: uuid */
+            taskPublicId: string;
+            title: string;
+        };
+        RetroDraftSourceTask: {
+            /** Format: uuid */
+            publicId: string;
+            title: string;
+        };
+        ReverseOutputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            /**
+             * Format: int64
+             * @description Unix seconds (UTC) the compensating event was stamped with
+             */
+            occurredAt: number;
+            /** @description Public id (UUID v7) of the newly appended compensating event */
+            publicId: string;
+        };
         RevokeAdminOutputBody: {
             /**
              * Format: uri
@@ -8801,6 +8933,11 @@ export interface components {
             readonly $schema?: string;
             /** Format: int64 */
             createdAt: number;
+            /**
+             * Format: int64
+             * @description Provider-derived TTL in unix seconds; null for signals that never expire (e.g. manual).
+             */
+            expiresAt?: number;
             externalId?: string;
             /** @description Signal public id (UUID v7) */
             id: string;
@@ -8809,6 +8946,13 @@ export interface components {
             /** Format: int64 */
             receivedAt: number;
             source: string;
+            /** @description Subject row public id (UUID v7). Omitted when subject_type=workspace because workspace_id already identifies the owner. */
+            subjectId?: string;
+            /**
+             * @description What the signal is about (ADR 0008 D1).
+             * @enum {string}
+             */
+            subjectType: "user" | "task" | "workspace" | "calendar_event";
             taskId?: string;
         };
         SignalCreateInputBody: {
@@ -8817,12 +8961,25 @@ export interface components {
              * @description A URL to the JSON Schema for this object.
              */
             readonly $schema?: string;
+            /**
+             * Format: int64
+             * @description Provider-derived TTL in unix seconds; omit for signals that never expire.
+             */
+            expiresAt?: number;
             externalId?: string;
+            /** @description Signal kind from signal_kinds/*.yaml registry (e.g. discord.presence, manual). Unknown kinds are rejected with WS.SIGNAL.KIND_UNKNOWN. */
             kind: string;
             payload?: unknown;
             /** @enum {string} */
-            source: "manual" | "github" | "slack" | "email" | "webhook";
-            /** @description Optional task public id to attach to */
+            source: "manual" | "github" | "slack" | "email" | "google" | "webhook" | "calendar";
+            /** @description Subject row public id (UUID v7). Required when subjectType is user, task, or calendar_event; ignored when subjectType=workspace. */
+            subjectId?: string;
+            /**
+             * @description What the signal is about. Defaults to the kind's SubjectTypeDefault from signal_kinds/*.yaml when omitted.
+             * @enum {string}
+             */
+            subjectType?: "user" | "task" | "workspace" | "calendar_event";
+            /** @description Legacy fast path equivalent to (subjectType='task', subjectId=<task public id>). When both forms are supplied they must point at the same task. */
             taskId?: string;
             /** @description Workspace public id (UUID v7) */
             workspaceId: string;
@@ -11150,6 +11307,38 @@ export interface operations {
             };
         };
     };
+    "internal-users-by-discord": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Discord user snowflake (numeric string, 17-19 digits in practice). */
+                snowflake: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ByDiscordOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
     "invites-accept": {
         parameters: {
             query?: never;
@@ -11541,7 +11730,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                provider: "github" | "slack" | "google_calendar";
+                provider: "github" | "slack" | "google_calendar" | "discord";
             };
             cookie?: never;
         };
@@ -12128,7 +12317,7 @@ export interface operations {
             };
             header?: never;
             path: {
-                provider: "github" | "slack" | "google_calendar";
+                provider: "github" | "slack" | "google_calendar" | "discord";
             };
             cookie?: never;
         };
@@ -17510,6 +17699,39 @@ export interface operations {
             };
         };
     };
+    "events-reverse": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                wsId: string;
+                /** @description Event public id (UUID v7) of the LLM-origin event to reverse */
+                eventPublicId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReverseOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
     "export-tasks": {
         parameters: {
             query?: {
@@ -19425,6 +19647,42 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ListArchivedTasksBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "tasks-drafts-list": {
+        parameters: {
+            query: {
+                /** @description Draft kind filter. Currently only 'retro' is supported. */
+                reason: "retro";
+                limit?: number;
+                offset?: number;
+            };
+            header?: never;
+            path: {
+                wsId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListRetroDraftsBody"];
                 };
             };
             /** @description Error */

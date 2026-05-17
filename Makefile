@@ -27,7 +27,7 @@ help: ## Show this help
 
 # ---------- dev (yarn dev equivalent) ----------
 
-.PHONY: dev dev-api dev-auth-api dev-web dev-accounts-web dev-reset reload stop-dev up down logs
+.PHONY: dev dev-api dev-auth-api dev-worker dev-presence dev-web dev-accounts-web dev-reset reload stop-dev up down logs
 dev: db-schema .env ## Start MySQL (compose) + auth API + flow API + accounts web + flow web
 	@echo "starting mysql, auth-api, flow-api, accounts-web, flow-web..."
 	@docker compose up -d mysql
@@ -78,6 +78,17 @@ dev-auth-api: ## Run Go auth API against the local MySQL (reads .env)
 	  NF_DB_DSN="$${NF_DB_DSN:-$(NF_DB_USER):$(NF_DB_PASSWORD)@tcp($(NF_DB_HOST):$(NF_DB_PORT))/$(NF_DB_NAME)?parseTime=true&charset=utf8mb4&collation=utf8mb4_0900_ai_ci}" \
 	  go run ./cmd/api
 
+dev-worker: db-schema .env ## Run Go flow-worker natively against the local MySQL (not started by `make dev`)
+	cd apps/flow-worker && \
+	  NF_DB_DSN="$${NF_DB_DSN:-$(NF_DB_USER):$(NF_DB_PASSWORD)@tcp($(NF_DB_HOST):$(NF_DB_PORT))/$(NF_DB_NAME)?parseTime=true&charset=utf8mb4&collation=utf8mb4_0900_ai_ci}" \
+	  NF_FLOW_WORKER_LOG_LEVEL=debug \
+	  go run ./cmd/worker
+
+dev-presence: .env ## Run Go presence-discord gateway natively (not started by `make dev`)
+	cd apps/presence-discord && \
+	  NF_PRESENCE_LOG_LEVEL=debug \
+	  go run ./cmd/gateway
+
 dev-web: ## Run Vite dev server (flow-web, port 5173)
 	cd apps/flow-web && $(PKG_RUN) dev
 
@@ -95,14 +106,20 @@ logs: ## Tail compose logs
 
 # ---------- build ----------
 
-.PHONY: build build-api build-web build-accounts-web
-build: build-api build-auth-api build-web build-accounts-web ## Build all apps
+.PHONY: build build-api build-auth-api build-worker build-presence build-web build-accounts-web
+build: build-api build-auth-api build-worker build-presence build-web build-accounts-web ## Build all apps
 
 build-api:
 	cd apps/flow-api && go build -o ../../bin/flow-api ./cmd/api
 
 build-auth-api:
 	cd apps/auth-api && go build -o ../../bin/auth-api ./cmd/api
+
+build-worker:
+	cd apps/flow-worker && go build -o ../../bin/flow-worker ./cmd/worker
+
+build-presence:
+	cd apps/presence-discord && go build -o ../../bin/presence-discord ./cmd/gateway
 
 build-web:
 	cd apps/flow-web && $(PKG_RUN) build
@@ -183,14 +200,17 @@ vet: ## go vet
 
 # ---------- codegen ----------
 
-.PHONY: gen gen-sqlc gen-errors gen-sdk gen-openapi i18n-check
-gen: gen-sqlc gen-errors gen-sdk ## Run all codegen (sqlc + errors + sdk)
+.PHONY: gen gen-sqlc gen-errors gen-signal-kinds gen-sdk gen-openapi i18n-check
+gen: gen-sqlc gen-errors gen-signal-kinds gen-sdk ## Run all codegen (sqlc + errors + signal-kinds + sdk)
 
 gen-sqlc: ## sqlc generate (requires sqlc installed)
 	sqlc generate -f sql/sqlc.yaml
 
 gen-errors: ## Regenerate Go/TS error modules + locale stubs + docs from errors/*.yaml
 	go -C scripts run gen-errors.go
+
+gen-signal-kinds: ## Regenerate Go/TS signal-kind modules + locale stubs + docs from signal_kinds/*.yaml
+	go -C scripts run gen-signal-kinds.go
 
 i18n-check: ## Fail on missing ja keys, empty string values, or i18next-native '{{var}}' placeholders under the ICU backend
 	node scripts/i18n-translate.mjs --check

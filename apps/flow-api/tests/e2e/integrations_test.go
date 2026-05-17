@@ -9,7 +9,7 @@ import (
 )
 
 // TestIntegrationsList verifies that GET /me/integrations returns all
-// three providers in a deterministic order, each marked as not
+// four providers in a deterministic order, each marked as not
 // configured (the test harness has no OAuth credentials).
 func TestIntegrationsList(t *testing.T) {
 	bootstrap(t)
@@ -29,9 +29,9 @@ func TestIntegrationsList(t *testing.T) {
 	}
 	doJSON(t, http.MethodGet, testServerURL+"/me/integrations", tt.AccessToken, nil, &out)
 
-	require.Len(t, out.Providers, 3, "must list all three providers")
+	require.Len(t, out.Providers, 4, "must list all four providers")
 
-	expected := []string{"github", "slack", "google_calendar"}
+	expected := []string{"github", "slack", "google_calendar", "discord"}
 	for i, p := range out.Providers {
 		require.Equal(t, expected[i], p.Provider, "provider order")
 		require.False(t, p.Configured, "provider %s should not be configured in tests", p.Provider)
@@ -100,16 +100,16 @@ func TestIntegrationsUnauthenticated(t *testing.T) {
 }
 
 // TestIntegrationsListStableOrder verifies that the provider catalog
-// is returned in a deterministic order (github, slack, google_calendar)
-// regardless of how many times it is called. The frontend relies on
-// this for stable UI card placement.
+// is returned in a deterministic order (github, slack,
+// google_calendar, discord) regardless of how many times it is
+// called. The frontend relies on this for stable UI card placement.
 func TestIntegrationsListStableOrder(t *testing.T) {
 	bootstrap(t)
 	t.Parallel()
 
 	tt := newTenant(t)
 
-	expected := []string{"github", "slack", "google_calendar"}
+	expected := []string{"github", "slack", "google_calendar", "discord"}
 	for i := 0; i < 3; i++ {
 		var out struct {
 			Providers []struct {
@@ -117,7 +117,7 @@ func TestIntegrationsListStableOrder(t *testing.T) {
 			} `json:"providers"`
 		}
 		doJSON(t, http.MethodGet, testServerURL+"/me/integrations", tt.AccessToken, nil, &out)
-		require.Len(t, out.Providers, 3)
+		require.Len(t, out.Providers, 4)
 		for j, p := range out.Providers {
 			assert.Equal(t, expected[j], p.Provider,
 				"provider order must be stable across calls (iteration %d)", i)
@@ -225,7 +225,7 @@ func TestIntegrationsListResponseShape(t *testing.T) {
 		} `json:"providers"`
 	}
 	doJSON(t, http.MethodGet, testServerURL+"/me/integrations", tt.AccessToken, nil, &out)
-	require.Len(t, out.Providers, 3)
+	require.Len(t, out.Providers, 4)
 
 	for _, p := range out.Providers {
 		assert.NotEmpty(t, p.Provider, "provider name must be non-empty")

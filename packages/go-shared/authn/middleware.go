@@ -36,6 +36,7 @@ func RequireAuth(resolvers ...TokenResolver) func(http.Handler) http.Handler {
 				return
 			}
 			ctx := WithActor(r.Context(), userID)
+			ctx = WithAuthMode(ctx, AuthModeJWT)
 			var zero dbtype.PublicID
 			if sid != zero {
 				ctx = WithSessionPublicID(ctx, sid)

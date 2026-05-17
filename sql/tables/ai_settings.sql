@@ -1,9 +1,11 @@
 -- ====================================
 -- ai_settings
--- Per-workspace AI configuration (ADR 0003): embeddings, duplicates, auto-actions.
+-- Per-workspace AI configuration (ADR 0003): embeddings, duplicates,
+-- auto-actions, and signal_judge prompt customization.
 -- Holds duplicate-detection thresholds, the embed-budget bucket that
--- the CostGuard tracks separately from the LLM chat budget, and
--- auto-action executor settings.
+-- the CostGuard tracks separately from the LLM chat budget,
+-- auto-action executor settings, and free-form operator instructions
+-- (judge_instructions) that are spliced into the signal_judge system prompt.
 --
 -- Settings are not user-facing entities, so no public_id: the row is
 -- addressed by its parent workspace.
@@ -21,6 +23,9 @@ CREATE TABLE ai_settings (
   auto_action_enabled          BOOLEAN      NOT NULL DEFAULT TRUE  COMMENT 'Whether the auto-action executor runs for this workspace',
   auto_action_interval_minutes INT UNSIGNED NOT NULL DEFAULT 5     COMMENT 'How often the executor evaluates tasks (minutes); 0 disables',
   auto_action_threshold        DECIMAL(3,2) NOT NULL DEFAULT 0.80  COMMENT 'Minimum confidence score for an action to be applied automatically',
+
+  judge_instructions TEXT NULL
+    COMMENT 'Free-form operator instructions appended to the signal_judge system prompt. NULL or empty string = use the built-in template only. Truncated at prompt-build time if exceeding the configured token budget. See apps/flow-api/internal/ai/signaljudge/prompt.go for inclusion logic.',
 
   enabled BOOLEAN NOT NULL DEFAULT TRUE COMMENT 'Enabled flag',
   updated_at TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),

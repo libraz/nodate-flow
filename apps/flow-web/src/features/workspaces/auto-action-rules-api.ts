@@ -22,12 +22,25 @@ export type AutoActionRuleKind =
   | 'nudge_assignee'
   | 'close_stale_review';
 
+/**
+ * Operator-picked autonomy override.
+ *
+ * When set on a rule row, the resolver returns this level verbatim and
+ * skips the confidence gate. When undefined/null, the row falls back to
+ * confidence-based derivation (or the YAML default for the signal kind).
+ */
+export type AutonomyLevel = 'suggest' | 'draft' | 'auto';
+
 /** A single auto-action rule as returned by the API. */
 export interface AutoActionRule {
   kind: AutoActionRuleKind;
   enabled: boolean;
   confidence: number;
   idleHours: number;
+  /** Dotted signal-kind identifier (e.g. `discord.presence`). Omitted means wildcard. */
+  signalKind?: string;
+  /** Operator-picked autonomy override; absent means "unset" (use defaults). */
+  autonomyLevel?: AutonomyLevel;
 }
 
 /** Sparse patch for a single rule — only changed fields are required. */
@@ -36,6 +49,10 @@ export interface PatchAutoActionRule {
   enabled?: boolean;
   confidence?: number;
   idleHours?: number;
+  /** Dotted signal-kind identifier scope for this patch entry. */
+  signalKind?: string;
+  /** New autonomy level; omitting preserves the prior value. */
+  autonomyLevel?: AutonomyLevel;
 }
 
 /** Query key factory for auto-action rules. */
@@ -87,7 +104,7 @@ export function useUpdateAutoActionRules(): UseMutationResult<
       if (error || !data) {
         throw new Error('Failed to update auto-action rules');
       }
-      return (data as { rules: AutoActionRule[] }).rules;
+      return (data.rules ?? []) as AutoActionRule[];
     },
     onSuccess: (_data, vars) => {
       void qc.invalidateQueries({

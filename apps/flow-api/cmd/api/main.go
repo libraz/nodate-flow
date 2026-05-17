@@ -21,6 +21,7 @@ import (
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/ai/agentruntime"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/ai/autoactions"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/ai/providers"
+	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/ai/signaljudge"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/auth"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/config"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/generated"
@@ -220,6 +221,7 @@ func main() {
 	// trigger endpoint can enqueue / dispatch through the same
 	// instances that the scheduler uses.
 	var runner agentruntime.Runner
+	var judgeRunner *signaljudge.Runner
 	if cfg.AgentRunner == "orchestrator" {
 		var executor agentruntime.AgentExecutor
 		if cipher != nil && !cfg.AiMock {
@@ -237,13 +239,86 @@ func main() {
 				OnInvocation: obs.RecordAIInvocation,
 				PreFlight:    &ai.PreFlight{Queries: queries},
 			}
+			// The signal_judge runner shares the same provider
+			// resolver, cost guard, and metrics hook as the task-agent
+			// path so cost accounting and ai_invocations stay uniform
+			// across both kinds (ADR 0008 D3).
+			//
+			// Phase 3 / J4 — wire the Applier so the runner's verdict
+			// turns into events through the deterministic, non-LLM
+			// stage that owns the judge-only event kinds. The Applier
+			// is the sole legitimate caller of eventbus.AppendJudgeEvent
+			// (the runtime guard in eventbus.Append rejects everything
+			// else with INTERNAL.EVENTBUS.JUDGE_KIND_OUTSIDE_APPLIER).
+			//
+			// The autonomy resolver is the production
+			// [signaljudge.RuleBackedResolver] (Phase 4 / A1) which
+			// walks auto_action_rules → ai_settings.auto_action_threshold
+			// → signalkinds YAML default. The stub
+			// [signaljudge.SuggestOnlyResolver] stays available for
+			// tests but is no longer wired here.
+			// Phase 6 / L2 — the production TaskMutator wires the
+			// `generate_retro` branch through to a real tasks INSERT +
+			// task_dependencies(kind='retro_of') INSERT in one
+			// transaction. The other two action branches
+			// (complete_task / add_comment) remain no-op-with-warn on
+			// [SQLTaskMutator] until their phases land; the Applier
+			// still emits TaskAutoCompleted / SignalApplied so the
+			// timeline contract is preserved end-to-end.
+			judgeApplier := &signaljudge.Applier{
+				Bus: signaljudge.AppendJudgeEventFunc(func(ctx context.Context, evt eventbus.Event) error {
+					return eventbus.AppendJudgeEvent(ctx, db, evt)
+				}),
+				Tasks: &signaljudge.SQLTaskMutator{
+					DB:      db,
+					Queries: queries,
+					Logger:  logger,
+				},
+				Resolver: &signaljudge.SQLTaskResolver{DB: db},
+				Signals:  &signaljudge.SQLSignalUpdater{DB: db},
+				Autonomy: signaljudge.NewRuleBackedResolver(queries, &signaljudge.SQLSettingsLookup{Queries: queries}),
+				Logger:   logger,
+			}
+			judgeRunner = &signaljudge.Runner{
+				Agents:       &signaljudge.SQLAgentLookup{DB: db},
+				Signals:      &signaljudge.SQLSignalLookup{DB: db},
+				Resolver:     resolver,
+				Guard:        ai.NewCostGuard(budget, 0),
+				OnInvocation: obs.RecordAIInvocation,
+				Applier:      judgeApplier,
+				// Phase 6 / L1 — wire the three PromptDeps lookups so
+				// the runner renders the full context window
+				// (recent tasks + linked tasks + judge_instructions +
+				// "now in workspace timezone") instead of falling back
+				// to the Phase 2 composeJudgePrompt JSON snapshot.
+				// The lookups are narrow raw-SQL adapters that mirror
+				// the integration-test inline adapters in
+				// apps/flow-api/tests/signaljudge/prompt_render_test.go;
+				// caps (MaxRecentTasks=20 / MaxLinkedTasks=10) are
+				// enforced inside BuildPromptContext regardless of how
+				// many rows the lookups return.
+				Prompt: signaljudge.PromptDeps{
+					RecentTasks:       &signaljudge.SQLRecentTasksLookup{DB: db},
+					LinkedTasks:       &signaljudge.SQLLinkedTasksLookup{DB: db},
+					JudgeInstructions: &signaljudge.SQLJudgeInstructionsLookup{DB: db},
+				},
+			}
 			logger.Info("agent executor: workspace resolver")
 		} else {
 			logger.Info("agent executor: nil (bookkeeping only)")
 		}
+		// Wrap nil judgeRunner explicitly so the interface stored on
+		// OrchestratorRunner.Judge is also nil (not a typed nil
+		// pointer), which keeps the runner's `r.Judge != nil` guard
+		// honest.
+		var judgeIface agentruntime.JudgeExecutor
+		if judgeRunner != nil {
+			judgeIface = judgeRunner
+		}
 		runner = &agentruntime.OrchestratorRunner{
 			DB:               db,
 			Executor:         executor,
+			Judge:            judgeIface,
 			Queries:          queries,
 			HandoffLoopLimit: cfg.AgentHandoffLoopLimit,
 		}
@@ -312,6 +387,27 @@ func main() {
 	webhookWorker := webhook.NewWorker(db, queries)
 	eventbus.AddNotifyHook(webhookWorker.Hook())
 
+	// JudgeEnqueuer wakes any matching signal_judge agents the moment
+	// a fresh signal lands (ADR 0008 D3). The orchestrator dispatch
+	// branch in OrchestratorRunner.Run picks the queued row up via
+	// the judge-shaped dedupe_key.
+	//
+	// Phase 3 / J4 — attach the Matcher so deterministic, cheap
+	// filters (workspace AI kill switch, per-kind dedupe window,
+	// subject existence) run before we burn an agent_runs slot. The
+	// Matcher does NOT emit SignalRejected; that kind is reserved
+	// for verdicts the LLM judge actively dropped.
+	judgeMatcher := &signaljudge.Matcher{
+		DB:     db,
+		Logger: logger,
+	}
+	judgeEnqueuer := &signaljudge.Enqueuer{
+		DB:      db,
+		Queue:   agentQueue,
+		Logger:  logger,
+		Matcher: judgeMatcher,
+	}
+
 	inner := router.Build(router.Deps{
 		DB:                    db,
 		Queries:               queries,
@@ -328,6 +424,8 @@ func main() {
 		AiInvocationPublisher: aiInvocationPublisher,
 		AgentQueue:            agentQueue,
 		AgentRunner:           runner,
+		JudgeEnqueuer:         judgeEnqueuer,
+		FlowAPISignalToken:    cfg.FlowAPISignalToken,
 		Storage:               storageClient,
 		EmailSender:           emailSender,
 		EmailFrom:             cfg.SMTPFrom,

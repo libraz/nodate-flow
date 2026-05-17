@@ -45,7 +45,7 @@ type Deps struct {
 // ConnectionSummary is the public DTO for a user_integrations row.
 type ConnectionSummary struct {
 	ID                   string `json:"id" doc:"Connection public id (UUID v7)"`
-	Provider             string `json:"provider" enum:"github,slack,google_calendar"`
+	Provider             string `json:"provider" enum:"github,slack,google_calendar,discord"`
 	ExternalAccountID    string `json:"externalAccountId"`
 	ExternalAccountLabel string `json:"externalAccountLabel"`
 	Scopes               string `json:"scopes"`
@@ -59,7 +59,7 @@ type ConnectionSummary struct {
 // (even the ones missing a server-side connection) and disable the
 // Connect button for providers that are not configured.
 type ProviderStatus struct {
-	Provider   string             `json:"provider" enum:"github,slack,google_calendar"`
+	Provider   string             `json:"provider" enum:"github,slack,google_calendar,discord"`
 	Configured bool               `json:"configured" doc:"True when the server has credentials for this provider"`
 	Connection *ConnectionSummary `json:"connection,omitempty"`
 }
@@ -73,7 +73,7 @@ type ListIntegrationsOutput struct {
 
 // ConnectIntegrationInput is the request for POST /me/integrations/{provider}/connect.
 type ConnectIntegrationInput struct {
-	Provider string `path:"provider" enum:"github,slack,google_calendar"`
+	Provider string `path:"provider" enum:"github,slack,google_calendar,discord"`
 	Body     struct {
 		RedirectTo string `json:"redirectTo,omitempty" maxLength:"512" doc:"Optional client-supplied return URL; defaults to the integrations settings page"`
 	}
@@ -90,7 +90,7 @@ type ConnectIntegrationOutput struct {
 
 // OAuthCallbackInput is the query for GET /oauth/callback/{provider}.
 type OAuthCallbackInput struct {
-	Provider string `path:"provider" enum:"github,slack,google_calendar"`
+	Provider string `path:"provider" enum:"github,slack,google_calendar,discord"`
 	Code     string `query:"code"`
 	State    string `query:"state"`
 	Error    string `query:"error,omitempty"`

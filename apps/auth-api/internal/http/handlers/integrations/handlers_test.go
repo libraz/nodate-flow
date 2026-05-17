@@ -39,7 +39,7 @@ func newTestCipher(t *testing.T) *crypto.Cipher {
 
 // --- List handler ---
 
-func TestList_ReturnsAllThreeProviders(t *testing.T) {
+func TestList_ReturnsAllSupportedProviders(t *testing.T) {
 	t.Parallel()
 	q := &fakeQueries{}
 	deps := Deps{Queries: q, Registry: integrationspkg.NewRegistry()}
@@ -50,13 +50,13 @@ func TestList_ReturnsAllThreeProviders(t *testing.T) {
 		Providers []ProviderStatus `json:"providers"`
 	}
 	decodeBody(t, resp, &out)
-	require.Len(t, out.Providers, 3, "must list exactly 3 providers regardless of configuration")
+	require.Len(t, out.Providers, 4, "must list every supported provider regardless of configuration")
 
 	names := make([]string, len(out.Providers))
 	for i, p := range out.Providers {
 		names[i] = p.Provider
 	}
-	assert.Equal(t, []string{"github", "slack", "google_calendar"}, names,
+	assert.Equal(t, []string{"github", "slack", "google_calendar", "discord"}, names,
 		"providers must be in deterministic order for stable UI rendering")
 }
 

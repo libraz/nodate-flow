@@ -49,6 +49,9 @@ LIMIT 1;
 -- Insert or replace a user+provider integration. The uniq
 -- (user_id, provider) key guarantees only one active row per
 -- provider per user; on conflict we refresh every token column.
+-- metadata_json carries provider-specific binding metadata (e.g.
+-- {"external_user_id": "<snowflake>", "verified_at": "..."} for
+-- provider='discord'); pass NULL for providers that do not set it.
 INSERT INTO user_integrations (
   public_id,
   user_id,
@@ -58,8 +61,9 @@ INSERT INTO user_integrations (
   scopes,
   access_token_ciphertext,
   refresh_token_ciphertext,
-  access_token_expires_at
-) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+  access_token_expires_at,
+  metadata_json
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 ON DUPLICATE KEY UPDATE
   external_account_id = VALUES(external_account_id),
   external_account_label = VALUES(external_account_label),
@@ -67,6 +71,7 @@ ON DUPLICATE KEY UPDATE
   access_token_ciphertext = VALUES(access_token_ciphertext),
   refresh_token_ciphertext = VALUES(refresh_token_ciphertext),
   access_token_expires_at = VALUES(access_token_expires_at),
+  metadata_json = VALUES(metadata_json),
   last_refreshed_at = CURRENT_TIMESTAMP,
   enabled = TRUE;
 
@@ -140,3 +145,32 @@ WHERE state = ?;
 -- opportunistically from the callback handler.
 DELETE FROM oauth_states
 WHERE expires_at < CURRENT_TIMESTAMP;
+
+-- name: FindUserByDiscordSnowflake :one
+-- Resolve a Discord user snowflake to (user_public_id, workspace_public_id)
+-- via the user_integrations.metadata_json $.external_user_id binding.
+-- Used by the internal /internal/users/by-discord/{snowflake} lookup
+-- endpoint the presence-discord gateway calls before emitting a signal.
+-- Filters out soft-disabled integrations and deterministically returns
+-- the user's earliest-joined workspace as the "default" since there is
+-- no users.default_workspace_id column today (v1.0 limitation; future
+-- enhancement may add an explicit default-workspace column). The tiebreak
+-- on wm.id keeps the result stable when two memberships share a created_at.
+-- JSON_UNQUOTE(JSON_EXTRACT(...)) is used instead of comparing JSON
+-- values directly: MySQL JSON equality on string scalars returns 0 even
+-- when the printed values are identical (MySQL JSON values carry an
+-- internal type tag that the JSON_QUOTE round-trip does not produce
+-- identically). Unquoting the stored value and comparing against the
+-- raw string parameter avoids that quirk.
+SELECT
+  u.public_id AS user_public_id,
+  w.public_id AS workspace_public_id
+FROM user_integrations ui
+INNER JOIN users u ON u.id = ui.user_id AND u.enabled = TRUE
+INNER JOIN workspace_members wm ON wm.user_id = u.id AND wm.enabled = TRUE
+INNER JOIN workspaces w ON w.id = wm.workspace_id AND w.enabled = TRUE
+WHERE ui.provider = 'discord'
+  AND ui.enabled = TRUE
+  AND JSON_UNQUOTE(JSON_EXTRACT(ui.metadata_json, '$.external_user_id')) = CAST(sqlc.arg(snowflake) AS CHAR)
+ORDER BY wm.created_at ASC, wm.id ASC
+LIMIT 1;

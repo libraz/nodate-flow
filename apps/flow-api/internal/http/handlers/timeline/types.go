@@ -63,6 +63,27 @@ type Event struct {
 	// ActorAgentName is a denormalised convenience for UIs to render the
 	// agent's display label without a second fetch.
 	ActorAgentName string `json:"actorAgentName,omitempty"`
+	// ActorSystemSource names the worker-tick origin (e.g. `worker.calendar`,
+	// `worker.retention`) when the event was emitted by the worker binary
+	// (ADR 0008 D8). Null for user / agent actors. Surfaced as the third
+	// actor source on the timeline so the UI can attribute system-driven
+	// events without inferring from the event type.
+	ActorSystemSource *string `json:"actorSystemSource,omitempty"`
+	// TriggeredBySignalID is the public_id of the signal that caused the
+	// Applier to emit this event (ADR 0008 D4). Null for events with no
+	// signal lineage. The timeline UI renders this as a "caused by" link
+	// to surface the causal chain "signal -> judge verdict -> task event".
+	TriggeredBySignalID *string `json:"triggeredBySignalId,omitempty"`
+	// ReversesEventID is the public_id of the event this row compensates
+	// (ADR 0008 D4 / J5). Null for non-reversal events. Pointer-typed so
+	// the JSON shape is unambiguously `null` when the column was SQL
+	// NULL — SDK consumers branch on presence, not emptiness.
+	ReversesEventID *string `json:"reversesEventId,omitempty"`
+	// WasReversed is TRUE when some other enabled event points back at
+	// this row via reverses_event_id (ADR 0008 D4 / J5). Drives the
+	// "Reversed" badge on the timeline so the user does not see two
+	// matching reverse-buttons for a row that has already been undone.
+	WasReversed bool `json:"wasReversed"`
 	// Payload is the raw JSON payload column passed through unmodified.
 	Payload json.RawMessage `json:"payload,omitempty"`
 	// OccurredAt is the unix timestamp in seconds (UTC).

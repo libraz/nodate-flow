@@ -109,6 +109,14 @@ type Config struct {
 	IntGoogleClientID     string `env:"NF_AUTH_GOOGLE_INTEGRATION_CLIENT_ID" envDefault:""`
 	IntGoogleClientSecret string `env:"NF_AUTH_GOOGLE_INTEGRATION_CLIENT_SECRET" envDefault:""`
 
+	// Discord personal connection (Phase 8 presence binding). The
+	// redirect URI is read from env so deployments can keep the
+	// Discord OAuth app's registered callback in lock-step with the
+	// auth-api's public URL without re-deriving it server-side.
+	IntDiscordClientID     string `env:"NF_AUTH_DISCORD_CLIENT_ID" envDefault:""`
+	IntDiscordClientSecret string `env:"NF_AUTH_DISCORD_CLIENT_SECRET" envDefault:""`
+	IntDiscordRedirectURI  string `env:"NF_AUTH_DISCORD_REDIRECT_URI" envDefault:""`
+
 	// SMTPHost is the SMTP server hostname. When empty, email
 	// sending is disabled (invite links are returned without delivery).
 	SMTPHost string `env:"NF_AUTH_SMTP_HOST" envDefault:""`

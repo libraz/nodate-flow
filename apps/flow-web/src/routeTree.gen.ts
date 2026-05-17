@@ -46,6 +46,7 @@ import { Route as AuthenticatedProjectsProjectIdGanttRouteImport } from './route
 import { Route as AuthenticatedWorkspacesIdSettingsIndexRouteImport } from './routes/_authenticated.workspaces.$id.settings.index';
 import { Route as AuthenticatedWorkspacesIdProjectsIndexRouteImport } from './routes/_authenticated.workspaces.$id.projects.index';
 import { Route as AuthenticatedProjectsProjectIdTasksIndexRouteImport } from './routes/_authenticated.projects.$projectId.tasks.index';
+import { Route as AuthenticatedWorkspacesIdTasksDraftsRouteImport } from './routes/_authenticated.workspaces.$id.tasks.drafts';
 import { Route as AuthenticatedWorkspacesIdTasksArchivedRouteImport } from './routes/_authenticated.workspaces.$id.tasks.archived';
 import { Route as AuthenticatedWorkspacesIdSettingsWeeklyDigestRouteImport } from './routes/_authenticated.workspaces.$id.settings.weekly-digest';
 import { Route as AuthenticatedWorkspacesIdSettingsWebhooksRouteImport } from './routes/_authenticated.workspaces.$id.settings.webhooks';
@@ -316,6 +317,16 @@ const AuthenticatedProjectsProjectIdTasksIndexRoute =
     path: '/',
     getParentRoute: () => AuthenticatedProjectsProjectIdTasksRoute,
   } as any);
+const AuthenticatedWorkspacesIdTasksDraftsRoute =
+  AuthenticatedWorkspacesIdTasksDraftsRouteImport.update({
+    id: '/tasks/drafts',
+    path: '/tasks/drafts',
+    getParentRoute: () => AuthenticatedWorkspacesIdRoute,
+  } as any).lazy(() =>
+    import('./routes/_authenticated.workspaces.$id.tasks.drafts.lazy').then(
+      (d) => d.Route,
+    ),
+  );
 const AuthenticatedWorkspacesIdTasksArchivedRoute =
   AuthenticatedWorkspacesIdTasksArchivedRouteImport.update({
     id: '/tasks/archived',
@@ -593,6 +604,7 @@ export interface FileRoutesByFullPath {
   '/workspaces/$id/settings/webhooks': typeof AuthenticatedWorkspacesIdSettingsWebhooksRoute;
   '/workspaces/$id/settings/weekly-digest': typeof AuthenticatedWorkspacesIdSettingsWeeklyDigestRoute;
   '/workspaces/$id/tasks/archived': typeof AuthenticatedWorkspacesIdTasksArchivedRoute;
+  '/workspaces/$id/tasks/drafts': typeof AuthenticatedWorkspacesIdTasksDraftsRoute;
   '/projects/$projectId/tasks/': typeof AuthenticatedProjectsProjectIdTasksIndexRoute;
   '/workspaces/$id/projects/': typeof AuthenticatedWorkspacesIdProjectsIndexRoute;
   '/workspaces/$id/settings/': typeof AuthenticatedWorkspacesIdSettingsIndexRoute;
@@ -647,6 +659,7 @@ export interface FileRoutesByTo {
   '/workspaces/$id/settings/webhooks': typeof AuthenticatedWorkspacesIdSettingsWebhooksRoute;
   '/workspaces/$id/settings/weekly-digest': typeof AuthenticatedWorkspacesIdSettingsWeeklyDigestRoute;
   '/workspaces/$id/tasks/archived': typeof AuthenticatedWorkspacesIdTasksArchivedRoute;
+  '/workspaces/$id/tasks/drafts': typeof AuthenticatedWorkspacesIdTasksDraftsRoute;
   '/projects/$projectId/tasks': typeof AuthenticatedProjectsProjectIdTasksIndexRoute;
   '/workspaces/$id/projects': typeof AuthenticatedWorkspacesIdProjectsIndexRoute;
   '/workspaces/$id/settings': typeof AuthenticatedWorkspacesIdSettingsIndexRoute;
@@ -710,6 +723,7 @@ export interface FileRoutesById {
   '/_authenticated/workspaces/$id/settings/webhooks': typeof AuthenticatedWorkspacesIdSettingsWebhooksRoute;
   '/_authenticated/workspaces/$id/settings/weekly-digest': typeof AuthenticatedWorkspacesIdSettingsWeeklyDigestRoute;
   '/_authenticated/workspaces/$id/tasks/archived': typeof AuthenticatedWorkspacesIdTasksArchivedRoute;
+  '/_authenticated/workspaces/$id/tasks/drafts': typeof AuthenticatedWorkspacesIdTasksDraftsRoute;
   '/_authenticated/projects/$projectId/tasks/': typeof AuthenticatedProjectsProjectIdTasksIndexRoute;
   '/_authenticated/workspaces/$id/projects/': typeof AuthenticatedWorkspacesIdProjectsIndexRoute;
   '/_authenticated/workspaces/$id/settings/': typeof AuthenticatedWorkspacesIdSettingsIndexRoute;
@@ -774,6 +788,7 @@ export interface FileRouteTypes {
     | '/workspaces/$id/settings/webhooks'
     | '/workspaces/$id/settings/weekly-digest'
     | '/workspaces/$id/tasks/archived'
+    | '/workspaces/$id/tasks/drafts'
     | '/projects/$projectId/tasks/'
     | '/workspaces/$id/projects/'
     | '/workspaces/$id/settings/'
@@ -828,6 +843,7 @@ export interface FileRouteTypes {
     | '/workspaces/$id/settings/webhooks'
     | '/workspaces/$id/settings/weekly-digest'
     | '/workspaces/$id/tasks/archived'
+    | '/workspaces/$id/tasks/drafts'
     | '/projects/$projectId/tasks'
     | '/workspaces/$id/projects'
     | '/workspaces/$id/settings'
@@ -890,6 +906,7 @@ export interface FileRouteTypes {
     | '/_authenticated/workspaces/$id/settings/webhooks'
     | '/_authenticated/workspaces/$id/settings/weekly-digest'
     | '/_authenticated/workspaces/$id/tasks/archived'
+    | '/_authenticated/workspaces/$id/tasks/drafts'
     | '/_authenticated/projects/$projectId/tasks/'
     | '/_authenticated/workspaces/$id/projects/'
     | '/_authenticated/workspaces/$id/settings/'
@@ -1175,6 +1192,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/projects/$projectId/tasks/';
       preLoaderRoute: typeof AuthenticatedProjectsProjectIdTasksIndexRouteImport;
       parentRoute: typeof AuthenticatedProjectsProjectIdTasksRoute;
+    };
+    '/_authenticated/workspaces/$id/tasks/drafts': {
+      id: '/_authenticated/workspaces/$id/tasks/drafts';
+      path: '/tasks/drafts';
+      fullPath: '/workspaces/$id/tasks/drafts';
+      preLoaderRoute: typeof AuthenticatedWorkspacesIdTasksDraftsRouteImport;
+      parentRoute: typeof AuthenticatedWorkspacesIdRoute;
     };
     '/_authenticated/workspaces/$id/tasks/archived': {
       id: '/_authenticated/workspaces/$id/tasks/archived';
@@ -1518,6 +1542,7 @@ interface AuthenticatedWorkspacesIdRouteChildren {
   AuthenticatedWorkspacesIdTimelineRoute: typeof AuthenticatedWorkspacesIdTimelineRoute;
   AuthenticatedWorkspacesIdInsightsPriorityRoute: typeof AuthenticatedWorkspacesIdInsightsPriorityRoute;
   AuthenticatedWorkspacesIdTasksArchivedRoute: typeof AuthenticatedWorkspacesIdTasksArchivedRoute;
+  AuthenticatedWorkspacesIdTasksDraftsRoute: typeof AuthenticatedWorkspacesIdTasksDraftsRoute;
   AuthenticatedWorkspacesIdCalendarsCalIdEventsEvtIdRoute: typeof AuthenticatedWorkspacesIdCalendarsCalIdEventsEvtIdRoute;
 }
 
@@ -1537,6 +1562,8 @@ const AuthenticatedWorkspacesIdRouteChildren: AuthenticatedWorkspacesIdRouteChil
       AuthenticatedWorkspacesIdInsightsPriorityRoute,
     AuthenticatedWorkspacesIdTasksArchivedRoute:
       AuthenticatedWorkspacesIdTasksArchivedRoute,
+    AuthenticatedWorkspacesIdTasksDraftsRoute:
+      AuthenticatedWorkspacesIdTasksDraftsRoute,
     AuthenticatedWorkspacesIdCalendarsCalIdEventsEvtIdRoute:
       AuthenticatedWorkspacesIdCalendarsCalIdEventsEvtIdRoute,
   };

@@ -81,9 +81,40 @@ func TaskTransition(name string) Kind {
 	return "task.transition." + name
 }
 
-// Signal events.
+// Task events driven by the signaljudge Applier (Release 8 / Phase 2).
+// These are emitted exclusively from apps/flow-api/internal/ai/signaljudge
+// in response to a judged signal — never from generic task handlers.
 const (
+	// TaskAutoCompleted is appended when the Applier completes a task
+	// because a signal verdict with action=complete_task was applied
+	// under autonomy=auto. The derived_state collapses to "completed"
+	// via the standard event projection (no direct UPDATE).
+	TaskAutoCompleted Kind = "task.auto_completed"
+	// TaskRetroDrafted is appended when the Applier creates a draft
+	// retrospective task in response to a verdict with
+	// action=generate_retro.
+	TaskRetroDrafted Kind = "task.retro.drafted"
+)
+
+// Signal events. SignalAttached is appended by the public signal
+// ingestion endpoint; the remaining kinds are emitted exclusively by
+// the signaljudge Applier (Release 8 / Phase 2) as it translates a
+// judge verdict into concrete task-level effects.
+const (
+	// SignalAttached is appended when an external signal is ingested
+	// (webhook, MCP, CLI) and persisted to the signals table.
 	SignalAttached Kind = "signal.attached"
+	// SignalJudged is appended every time a signal_judge agent run
+	// produces a verdict, regardless of whether the verdict is applied.
+	// Acts as the audit anchor for the judge loop.
+	SignalJudged Kind = "signal.judged"
+	// SignalApplied is appended when the Applier reifies a judge verdict
+	// into a downstream task event under autonomy=auto.
+	SignalApplied Kind = "signal.applied"
+	// SignalRejected is appended when the Matcher or judge refuses a
+	// signal with sufficient confidence (schema violation, low score,
+	// explicit drop verdict) and no further action is taken.
+	SignalRejected Kind = "signal.rejected"
 )
 
 // AI suggestion lifecycle events.

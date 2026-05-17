@@ -24,6 +24,7 @@ import enReactions from '../../locales/en/reactions.json';
 import enRelations from '../../locales/en/relations.json';
 import enSettings from '../../locales/en/settings.json';
 import enSharing from '../../locales/en/sharing.json';
+import enSignalKinds from '../../locales/en/signal-kinds.json';
 import enSystemInfo from '../../locales/en/system-info.json';
 import enTimeline from '../../locales/en/timeline.json';
 import jaAiSuggestions from '../../locales/ja/ai-suggestions.json';
@@ -47,6 +48,7 @@ import jaReactions from '../../locales/ja/reactions.json';
 import jaRelations from '../../locales/ja/relations.json';
 import jaSettings from '../../locales/ja/settings.json';
 import jaSharing from '../../locales/ja/sharing.json';
+import jaSignalKinds from '../../locales/ja/signal-kinds.json';
 import jaSystemInfo from '../../locales/ja/system-info.json';
 import jaTimeline from '../../locales/ja/timeline.json';
 import zhAiSuggestions from '../../locales/zh/ai-suggestions.json';
@@ -70,6 +72,7 @@ import zhReactions from '../../locales/zh/reactions.json';
 import zhRelations from '../../locales/zh/relations.json';
 import zhSettings from '../../locales/zh/settings.json';
 import zhSharing from '../../locales/zh/sharing.json';
+import zhSignalKinds from '../../locales/zh/signal-kinds.json';
 import zhSystemInfo from '../../locales/zh/system-info.json';
 import zhTimeline from '../../locales/zh/timeline.json';
 import { defaultNamespace } from './namespaces';
@@ -132,6 +135,7 @@ export function initI18n(): typeof i18n {
         'archive',
         'linkedEvents',
         'sharing',
+        'signal-kinds',
         'system-info',
       ],
       resources: {
@@ -158,6 +162,7 @@ export function initI18n(): typeof i18n {
           linkedEvents: enLinkedEvents,
           reactions: enReactions,
           sharing: enSharing,
+          'signal-kinds': enSignalKinds,
           'system-info': enSystemInfo,
         },
         ja: {
@@ -183,6 +188,7 @@ export function initI18n(): typeof i18n {
           linkedEvents: jaLinkedEvents,
           reactions: jaReactions,
           sharing: jaSharing,
+          'signal-kinds': jaSignalKinds,
           'system-info': jaSystemInfo,
         },
         zh: {
@@ -208,6 +214,7 @@ export function initI18n(): typeof i18n {
           linkedEvents: zhLinkedEvents,
           reactions: zhReactions,
           sharing: zhSharing,
+          'signal-kinds': zhSignalKinds,
           'system-info': zhSystemInfo,
         },
       },

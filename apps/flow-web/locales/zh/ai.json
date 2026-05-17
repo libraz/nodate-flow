@@ -1,4 +1,33 @@
 {
+  "autonomy": {
+    "matrix": {
+      "title": "按信号类型设置自主级别",
+      "description": "为每种信号类型选择动作的自主程度。未设置覆盖时将应用工作区默认值。",
+      "header": {
+        "kind": "信号类型",
+        "mode": "自主级别"
+      },
+      "save": "保存更改 ({count})",
+      "save_zero": "无更改",
+      "reset": "重置",
+      "changed_toast": "自主级别设置已更新",
+      "error_toast": "无法保存自主级别设置",
+      "empty": "尚未配置任何信号类型",
+      "row_aria": "{kind} 的自主级别",
+      "changed_announce": "已将 {kind} 设置为 {mode}",
+      "default_hint": "默认: {mode}"
+    },
+    "mode": {
+      "suggest": "建议",
+      "draft": "草稿",
+      "auto": "自动"
+    },
+    "help": {
+      "suggest": "仅展示 — 不修改任务",
+      "draft": "创建草稿以供人工审阅",
+      "auto": "立即应用"
+    }
+  },
   "cost_today": {
     "label": "AI",
     "tooltip": "本工作区今日的 AI 使用消费"

@@ -437,6 +437,15 @@ func RegisterWorkspaceScoped(api huma.API, deps Deps) {
 	}, ListArchived(deps))
 
 	huma.Register(api, huma.Operation{
+		OperationID: "tasks-drafts-list",
+		Method:      http.MethodGet,
+		Path:        "/workspaces/{wsId}/tasks/drafts",
+		Summary:     "List draft tasks in a workspace by reason (currently only retro)",
+		Description: "Returns draft tasks of the requested reason for review. Currently the only supported reason is 'retro' — retrospective drafts created by the signal_judge Applier when an event-day signal triggers action=generate_retro. Each row carries the source task back-reference plus optional agent attribution sourced from the task.retro.drafted event. The retro draft queue UI (Phase 6 / L2) renders Accept / Discard against this feed.",
+		Tags:        []string{"Tasks"},
+	}, ListRetroDrafts(deps))
+
+	huma.Register(api, huma.Operation{
 		OperationID: "calendar-events-linked-tasks-list",
 		Method:      http.MethodGet,
 		Path:        "/workspaces/{wsId}/calendar-events/{evtId}/linked-tasks",

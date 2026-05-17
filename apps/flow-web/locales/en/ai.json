@@ -1,4 +1,33 @@
 {
+  "autonomy": {
+    "matrix": {
+      "title": "Autonomy by signal kind",
+      "description": "Pick how confident actions should be for each signal kind. The workspace defaults apply when no override exists.",
+      "header": {
+        "kind": "Signal kind",
+        "mode": "Autonomy"
+      },
+      "save": "Save changes ({count})",
+      "save_zero": "No changes",
+      "reset": "Reset",
+      "changed_toast": "Autonomy settings updated",
+      "error_toast": "Could not save autonomy settings",
+      "empty": "No signal kinds configured",
+      "row_aria": "Autonomy level for {kind}",
+      "changed_announce": "{kind} set to {mode}",
+      "default_hint": "Default: {mode}"
+    },
+    "mode": {
+      "suggest": "Suggest",
+      "draft": "Draft",
+      "auto": "Auto"
+    },
+    "help": {
+      "suggest": "Surface only — no task changes",
+      "draft": "Create a draft for human review",
+      "auto": "Apply immediately"
+    }
+  },
   "cost_today": {
     "label": "AI",
     "tooltip": "Today's AI spend across this workspace"

@@ -43,6 +43,7 @@ linters:
     paths:
       - apps/flow-api/internal/db/generated
       - apps/flow-api/internal/errors
+      - apps/flow-api/internal/signalkinds
       - third_party$
       - builtin$
       - examples$
@@ -55,6 +56,7 @@ formatters:
     paths:
       - apps/flow-api/internal/db/generated
       - apps/flow-api/internal/errors
+      - apps/flow-api/internal/signalkinds
       - third_party$
       - builtin$
       - examples$

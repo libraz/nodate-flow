@@ -11,7 +11,7 @@ resources:
         message: "Unknown integration provider"
         message_ja: "未知の連携プロバイダです"
         message_zh: "未知的集成服务提供商"
-        description: "Returned when the {provider} path parameter is not one of the supported providers (github, slack, google_calendar)."
+        description: "Returned when the {provider} path parameter is not one of the supported providers (github, slack, google_calendar, discord)."
         userAction: "Choose a supported provider from the integrations list."
 
       provider_not_configured:
@@ -106,3 +106,15 @@ resources:
         message_zh: "未找到集成连接"
         description: "Returned by DELETE /me/integrations/{publicId} when the row does not exist or does not belong to the caller."
         userAction: "Refresh the integrations list."
+
+  discord:
+    breadcrumb: "Integration > Discord"
+    errors:
+      user_not_found:
+        code: INTEGRATION.DISCORD.USER_NOT_FOUND
+        status: 404
+        message: "No flow user is bound to that Discord account"
+        message_ja: "その Discord アカウントに紐づくユーザーは存在しません"
+        message_zh: "未找到与该 Discord 账号绑定的用户"
+        description: "Returned by the internal /internal/users/by-discord/{snowflake} lookup when no enabled user_integrations row with provider='discord' and a matching metadata_json.external_user_id exists. The presence-discord gateway treats this outcome as drop_no_user (expected and noisy)."
+        userAction: "Ask the user to bind their Discord account via the personal integrations settings page."

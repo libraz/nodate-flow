@@ -378,6 +378,30 @@ func ListAgentRuns(deps Deps) func(context.Context, *ListAgentRunsInput) (*ListA
 		out := &ListAgentRunsOutput{}
 		out.Body.Runs = make([]AgentRunEvent, 0, len(rows))
 		for _, r := range rows {
+			// LEFT JOIN signals produces an all-zero PublicID when the
+			// event has no triggering signal (most agent runs predate ADR
+			// 0008 D4). Treat the zero value as SQL NULL so the JSON shape
+			// is `null` rather than the misleading
+			// "00000000-0000-0000-0000-000000000000" sentinel.
+			var triggeredBySignal *string
+			if r.TriggeredBySignalPublicID != (types.PublicID{}) {
+				v := r.TriggeredBySignalPublicID.String()
+				triggeredBySignal = &v
+			}
+			var sysSource *string
+			if r.ActorSystemSource.Valid {
+				v := r.ActorSystemSource.String
+				sysSource = &v
+			}
+			// Same null-vs-zero rationale as triggeredBySignal above: the
+			// LEFT self-join against events_e_rev produces an all-zero
+			// PublicID for non-reversal rows, which we surface as JSON
+			// `null` rather than the misleading nil-UUID sentinel.
+			var reversesEvent *string
+			if r.ReversesEventPublicID != (types.PublicID{}) {
+				v := r.ReversesEventPublicID.String()
+				reversesEvent = &v
+			}
 			out.Body.Runs = append(out.Body.Runs, AgentRunEvent{
 				EventID:    r.PublicID.String(),
 				Type:       r.Type,
@@ -386,7 +410,11 @@ func ListAgentRuns(deps Deps) func(context.Context, *ListAgentRunsInput) (*ListA
 					ID:   r.AgentPublicID.String(),
 					Name: r.AgentName.String,
 				},
-				PayloadJSON: string(r.PayloadJson),
+				ActorSystemSource:   sysSource,
+				TriggeredBySignalID: triggeredBySignal,
+				ReversesEventID:     reversesEvent,
+				WasReversed:         r.WasReversed,
+				PayloadJSON:         string(r.PayloadJson),
 			})
 		}
 		if len(rows) > 0 {

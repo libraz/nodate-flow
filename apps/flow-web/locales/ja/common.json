@@ -922,6 +922,30 @@
       "load_failed": "保存済みビューの読み込みに失敗しました",
       "save_failed": "ビューの保存に失敗しました",
       "delete_failed": "ビューの削除に失敗しました"
+    },
+    "retro": {
+      "queue": {
+        "title": "振り返りドラフト",
+        "description": "完了したタスクやカレンダーイベントから AI が下書きした振り返りです。承認すると通常のタスクとして起こされ、破棄すると削除されます。",
+        "empty": "現在、振り返りのドラフトはありません",
+        "linked_original": "元: {sourceTitle}",
+        "created_by_ai": "AI {agentName} が作成・{when}",
+        "created_anon": "AI が作成・{when}",
+        "accept": "承認",
+        "discard": "破棄",
+        "accepted_toast": "振り返りをタスクに昇格しました",
+        "discarded_toast": "振り返りを破棄しました",
+        "accept_error": "この振り返りを承認できませんでした",
+        "discard_error": "この振り返りを破棄できませんでした",
+        "fetch_error": "振り返りドラフトを読み込めませんでした",
+        "retry": "再試行",
+        "discard_confirm": {
+          "title": "このドラフトを破棄しますか？",
+          "body": "ドラフトはアーカイブされます。元のタスクとシグナルはそのまま残ります。",
+          "confirm": "破棄",
+          "cancel": "キャンセル"
+        }
+      }
     }
   },
   "auth": {

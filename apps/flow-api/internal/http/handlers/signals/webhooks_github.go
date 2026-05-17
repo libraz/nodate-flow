@@ -16,6 +16,7 @@ import (
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/eventbus"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/handlers/handlerutil"
 	gh "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/integrations/github"
+	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/signalkinds"
 )
 
 // taskMarker is the inline body marker convention that lets a GitHub
@@ -140,7 +141,25 @@ func HandleGithubWebhook(deps Deps) http.HandlerFunc {
 		pub := types.New()
 		now := time.Now().UTC()
 		ext := sql.NullString{String: r.Header.Get("X-GitHub-Delivery"), Valid: r.Header.Get("X-GitHub-Delivery") != ""}
-		if _, err := deps.Queries.InsertSignal(ctx, generated.InsertSignalParams{
+		// GitHub webhook kinds (issue / pull_request / commit events) are
+		// NOT yet members of the signal_kinds/*.yaml registry, so the
+		// registry lookup misses and resolveSubjectType falls back to
+		// SignalsSubjectTypeWorkspace. The task linkage (extracted from the
+		// `tnk:<uuid>` body marker) is recorded on the legacy `task_id`
+		// column; subject_type is upgraded to `task` so the new addressing
+		// shape stays consistent with the legacy fast path.
+		//
+		// TODO(signal_kinds): promote `github.issue.*`, `github.pr.*`, and
+		// `github.commit.*` to signal_kinds/github.yaml once the judge
+		// prompt schema needs them (ADR 0008 D2). Until then leaving the
+		// kind values as the free-form strings NormalizeEventKind produces
+		// keeps the wire shape stable.
+		subjectType := resolveSubjectType(event, "")
+		if taskLinked {
+			subjectType = generated.SignalsSubjectTypeTask
+		}
+		subjectID := subjectIDFor(subjectType, taskInternal)
+		signalInternalID, err := deps.Queries.InsertSignal(ctx, generated.InsertSignalParams{
 			PublicID:    pub,
 			WorkspaceID: wsID,
 			TaskID:      taskFK,
@@ -149,7 +168,10 @@ func HandleGithubWebhook(deps Deps) http.HandlerFunc {
 			ExternalID:  ext,
 			PayloadJson: payload,
 			ReceivedAt:  now,
-		}); err != nil {
+			SubjectType: subjectType,
+			SubjectID:   subjectID,
+		})
+		if err != nil {
 			writeError(w, apierrors.InternalUnexpected)
 			return
 		}
@@ -172,6 +194,21 @@ func HandleGithubWebhook(deps Deps) http.HandlerFunc {
 					slog.Int64("workspace_id", int64(wsID)),
 					slog.Int64("task_id", taskInternal),
 					slog.String("signal_id", pub.String()),
+					slog.String("kind", event),
+				)
+			}
+		}
+
+		// Best-effort signal_judge dispatch (ADR 0008 D3). The
+		// enqueuer logs and swallows errors so a flaky agent_runs
+		// insert cannot fail the webhook ACK; webhook redelivery
+		// retries the whole pipeline including the enqueue.
+		if deps.JudgeEnqueuer != nil {
+			if jerr := deps.JudgeEnqueuer.EnqueueForSignal(ctx, signalInternalID, wsID, signalkinds.Kind(event)); jerr != nil {
+				slog.WarnContext(ctx, "signaljudge enqueue failed",
+					slog.Any("err", jerr),
+					slog.String("handler", "signals.HandleGithubWebhook"),
+					slog.String("signal_public_id", pub.String()),
 					slog.String("kind", event),
 				)
 			}

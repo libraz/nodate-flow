@@ -3,5 +3,7 @@ go 1.25.0
 use (
 	./apps/auth-api
 	./apps/flow-api
+	./apps/flow-worker
+	./apps/presence-discord
 	./packages/go-shared
 )

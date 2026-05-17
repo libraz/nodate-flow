@@ -19,7 +19,12 @@ import {
 } from './integrations-api';
 import styles from './integrations-panel.module.css';
 
-const PROVIDER_ORDER: readonly IntegrationProviderName[] = ['github', 'slack', 'google_calendar'];
+const PROVIDER_ORDER: readonly IntegrationProviderName[] = [
+  'github',
+  'slack',
+  'google_calendar',
+  'discord',
+];
 
 export default function IntegrationsPanel(): ReactElement {
   const { t, i18n } = useTranslation('settings');

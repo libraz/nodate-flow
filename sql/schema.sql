@@ -127,6 +127,7 @@ CREATE TABLE ai_agents (
   workspace_id INT UNSIGNED NOT NULL COMMENT 'Internal FK to workspaces.id',
   model_id INT UNSIGNED NOT NULL COMMENT 'Internal FK to ai_models.id',
 
+  kind ENUM('task_agent','signal_judge') NOT NULL DEFAULT 'task_agent' COMMENT 'Agent dispatch kind. task_agent: operates on tasks (default, all current agents). signal_judge: LLM judge for external signals (see ADR 0008 D3).',
   name VARCHAR(255) NOT NULL COMMENT 'Human-readable agent name',
   description TEXT NULL COMMENT 'Free-form description',
   system_prompt MEDIUMTEXT NOT NULL COMMENT 'System prompt text',
@@ -272,10 +273,12 @@ CREATE TABLE ai_providers (
 -- >>> ai_settings.sql
 -- ====================================
 -- ai_settings
--- Per-workspace AI configuration (ADR 0003): embeddings, duplicates, auto-actions.
+-- Per-workspace AI configuration (ADR 0003): embeddings, duplicates,
+-- auto-actions, and signal_judge prompt customization.
 -- Holds duplicate-detection thresholds, the embed-budget bucket that
--- the CostGuard tracks separately from the LLM chat budget, and
--- auto-action executor settings.
+-- the CostGuard tracks separately from the LLM chat budget,
+-- auto-action executor settings, and free-form operator instructions
+-- (judge_instructions) that are spliced into the signal_judge system prompt.
 --
 -- Settings are not user-facing entities, so no public_id: the row is
 -- addressed by its parent workspace.
@@ -293,6 +296,9 @@ CREATE TABLE ai_settings (
   auto_action_enabled          BOOLEAN      NOT NULL DEFAULT TRUE  COMMENT 'Whether the auto-action executor runs for this workspace',
   auto_action_interval_minutes INT UNSIGNED NOT NULL DEFAULT 5     COMMENT 'How often the executor evaluates tasks (minutes); 0 disables',
   auto_action_threshold        DECIMAL(3,2) NOT NULL DEFAULT 0.80  COMMENT 'Minimum confidence score for an action to be applied automatically',
+
+  judge_instructions TEXT NULL
+    COMMENT 'Free-form operator instructions appended to the signal_judge system prompt. NULL or empty string = use the built-in template only. Truncated at prompt-build time if exceeding the configured token budget. See apps/flow-api/internal/ai/signaljudge/prompt.go for inclusion logic.',
 
   enabled BOOLEAN NOT NULL DEFAULT TRUE COMMENT 'Enabled flag',
   updated_at TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
@@ -384,7 +390,13 @@ CREATE TABLE audit_logs (
 -- auto_action_rules
 -- Per-workspace auto-action rule configuration.
 -- Each row overrides the default confidence and idle threshold for a
--- specific rule kind (e.g. escalate_overdue, assign_owner).
+-- specific rule kind (e.g. escalate_overdue, assign_owner) and can be
+-- further scoped to a specific signal_kind. A NULL signal_kind acts as
+-- the wildcard fallback that matches every signal kind for the rule.
+-- Rules may also declare an explicit autonomy_level that overrides the
+-- confidence-vs-threshold gate, so the autonomy matrix UI can persist a
+-- chosen mode (suggest | draft | auto) directly without encoding it via
+-- confidence values.
 -- The auto-action executor reads these rules together with ai_settings
 -- to decide which actions to propose or apply automatically.
 -- ====================================
@@ -393,19 +405,27 @@ CREATE TABLE auto_action_rules (
   public_id     BINARY(16)   NOT NULL COMMENT 'UUID v7, used in API responses',
   workspace_id  INT UNSIGNED NOT NULL COMMENT 'Internal FK to workspaces.id',
   kind          VARCHAR(64)  NOT NULL COMMENT 'Rule kind: escalate_overdue | assign_owner | nudge_assignee | close_stale_review',
+  signal_kind   VARCHAR(64)  NULL COMMENT 'Signal scope: NULL = wildcard (matches every kind), exact dotted string match (e.g. ''discord.presence''), or wildcard prefix where the stored value matches kinds with that suffix-after-dot. Resolution layer details live in docs/conventions/autonomy.md',
   enabled       BOOLEAN      NOT NULL DEFAULT TRUE COMMENT 'Whether this rule fires during evaluation',
   confidence    DECIMAL(3,2) NOT NULL COMMENT 'Confidence score emitted when this rule fires (0.00-1.00)',
   idle_hours    INT UNSIGNED NOT NULL COMMENT 'Idle threshold in hours. 0 for rules that use due_on (escalate_overdue)',
+  autonomy_level ENUM('suggest','draft','auto') NULL
+    COMMENT 'When set, the autonomy resolver returns this level verbatim and skips confidence comparison. NULL falls back to the existing confidence-vs-threshold derivation. Closed enum mirrors signalkinds.Autonomy.',
+
+  signal_kind_match VARCHAR(64) GENERATED ALWAYS AS (COALESCE(signal_kind, '')) STORED NOT NULL
+    COMMENT 'Internal normalization of signal_kind for the UNIQUE index. Empty string represents the NULL wildcard. Never read from app code -- only the unique-key engine touches this. Constraint order (GENERATED clause before NOT NULL) is required by MySQL 9.x parser.',
 
   updated_at TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
   created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
 
   UNIQUE KEY uniq_auto_action_rules_public_id (public_id),
   UNIQUE KEY uniq_auto_action_rules_workspace_public_id (workspace_id, public_id),
-  UNIQUE KEY uniq_auto_action_rules_ws_kind (workspace_id, kind),
+  UNIQUE KEY uniq_auto_action_rules_ws_kind_signal (workspace_id, kind, signal_kind_match),
+
+  KEY idx_auto_action_rules_ws_signal (workspace_id, signal_kind, kind),
 
   CONSTRAINT fk_auto_action_rules_ws FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Per-workspace auto-action rule overrides (kind, confidence, idle threshold)';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Per-workspace auto-action rule overrides (kind, signal_kind, confidence, idle threshold)';
 
 -- >>> calendar_event_attachments.sql
 -- ====================================
@@ -971,6 +991,10 @@ CREATE TABLE dashboard_widgets (
 -- Append-only event log. All workspace state transitions flow through this
 -- table. The API offers no DELETE endpoint; purgeWorkspace is the sole
 -- deletion path (test fixtures only).
+--
+-- See ADR 0008 (docs/adr/0008-signals-and-judge-loop.md) D4 for the
+-- `triggered_by_signal_id` traceability link and D8 for the third actor
+-- source `actor_system_source` (worker-tick events).
 -- ====================================
 CREATE TABLE events (
   -- BIGINT UNSIGNED is a deliberate exception to the project default
@@ -982,10 +1006,13 @@ CREATE TABLE events (
   public_id BINARY(16) NOT NULL COMMENT 'UUID v7, the only externally visible ID',
   workspace_id INT UNSIGNED NOT NULL COMMENT 'Internal FK to workspaces.id',
   task_id INT UNSIGNED NULL COMMENT 'Internal FK to tasks.id when the event targets a task',
-  actor_user_id INT UNSIGNED NULL COMMENT 'Acting user.id (null for system/bot actions)',
-  actor_agent_id INT UNSIGNED NULL COMMENT 'Acting ai_agents.id when the event was produced by an AI agent. Mutual exclusion with actor_user_id is enforced by query design and handler validation, not a CHECK constraint (MySQL 8.4 forbids CHECK on columns used by FK referential actions; both FKs use ON DELETE SET NULL). Each INSERT binds exactly one of the two columns: AppendEvent (events.sql) sets actor_user_id only; AppendAgentEvent (events.sql) and InsertHandoffToUserEvent (agents/handoff.sql) set actor_agent_id only; InsertHandoffToAgentEvent (agents/handoff.sql) sets actor_user_id only. Both NULL means system actor.',
+  triggered_by_signal_id INT UNSIGNED NULL COMMENT 'Internal FK to signals.id; set when this event was emitted by the Applier in response to a judged signal. Provides full traceability from external input to task event (ADR 0008 D4).',
+  actor_user_id INT UNSIGNED NULL COMMENT 'Acting user.id (null for system/bot actions). Mutually exclusive with actor_agent_id and actor_system_source: exactly one of the three actor sources is set per row (both NULL is also legal for legacy "system actor"). The mutual-exclusion rule is enforced by query design and handler validation, not a CHECK constraint, because all three FK referential actions use ON DELETE SET NULL and MySQL 8.4 forbids CHECK constraints referencing columns used in FK referential actions. Each INSERT binds exactly one of the three columns: AppendEvent (events.sql) sets actor_user_id only; AppendAgentEvent (events.sql) and InsertHandoffToUserEvent (agents/handoff.sql) set actor_agent_id only; InsertHandoffToAgentEvent (agents/handoff.sql) sets actor_user_id only; worker-tick append paths set actor_system_source only.',
+  actor_agent_id INT UNSIGNED NULL COMMENT 'Acting ai_agents.id when the event was produced by an AI agent (judge / task agent). See actor_user_id comment for the three-way exclusion rule.',
+  actor_system_source VARCHAR(64) CHARACTER SET latin1 COLLATE latin1_swedish_ci NULL COMMENT 'Third actor source for system-driven events emitted by the worker binary (apps/flow-worker; ADR 0008 D8). Examples: `worker:scheduler`, `worker:retention`, `worker:calendar`. Not an FK because the worker is not represented in the database. See actor_user_id comment for the three-way exclusion rule.',
+  reverses_event_id BIGINT UNSIGNED NULL COMMENT 'Internal FK to events.id. Non-NULL means this event is a compensating reverse of another event (e.g., user undoing an auto-completion). The derived_state projection cancels both events out. See ADR 0008 D4 — events are immutable; reversals never UPDATE/DELETE.',
 
-  type VARCHAR(64) CHARACTER SET latin1 COLLATE latin1_swedish_ci NOT NULL COMMENT 'Event type (e.g., task.created, signal.attached)',
+  type VARCHAR(64) CHARACTER SET latin1 COLLATE latin1_swedish_ci NOT NULL COMMENT 'Event type (e.g., task.created, signal.attached, signal.judged)',
   payload_json JSON NOT NULL CHECK (JSON_VALID(payload_json)) COMMENT 'Event payload',
   occurred_at DATETIME(3) NOT NULL COMMENT 'Logical time of the event (millisecond precision; ties broken by id)',
 
@@ -1001,11 +1028,15 @@ CREATE TABLE events (
   KEY idx_events_workspace_id_task_id_occurred_at (workspace_id, task_id, occurred_at),
   KEY idx_events_workspace_id_type (workspace_id, type),
   KEY idx_events_workspace_id_actor_agent_id (workspace_id, actor_agent_id),
+  KEY idx_events_triggered_by_signal (triggered_by_signal_id),
+  KEY idx_events_reverses (workspace_id, reverses_event_id),
 
   CONSTRAINT fk_events_workspace FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
   CONSTRAINT fk_events_task FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE CASCADE,
   CONSTRAINT fk_events_actor FOREIGN KEY (actor_user_id) REFERENCES users(id) ON DELETE SET NULL,
-  CONSTRAINT fk_events_actor_agent FOREIGN KEY (actor_agent_id) REFERENCES ai_agents(id) ON DELETE SET NULL
+  CONSTRAINT fk_events_actor_agent FOREIGN KEY (actor_agent_id) REFERENCES ai_agents(id) ON DELETE SET NULL,
+  CONSTRAINT fk_events_triggered_by_signal FOREIGN KEY (triggered_by_signal_id) REFERENCES signals(id) ON DELETE SET NULL,
+  CONSTRAINT fk_events_reverses FOREIGN KEY (reverses_event_id) REFERENCES events(id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Append-only event log';
 
 -- >>> identities.sql
@@ -1531,7 +1562,7 @@ CREATE TABLE oauth_states (
   state CHAR(64) CHARACTER SET latin1 COLLATE latin1_swedish_ci NOT NULL PRIMARY KEY COMMENT 'Random 32-byte token, hex-encoded',
 
   user_id INT UNSIGNED NOT NULL COMMENT 'Internal FK to users.id — the user who started the connect flow',
-  provider ENUM('github','slack','google_calendar') NOT NULL COMMENT 'Which provider this state belongs to',
+  provider ENUM('github','slack','google_calendar','discord') NOT NULL COMMENT 'Which provider this state belongs to. ''discord'' is required for the personal Discord presence-binding flow (Phase 8 presence-discord gateway).',
   redirect_to VARCHAR(512) NULL COMMENT 'Optional client-supplied return URL to send the user to after the callback completes',
 
   expires_at DATETIME(3) NOT NULL COMMENT 'Hard expiry; callback handler rejects rows past this timestamp',
@@ -1835,20 +1866,64 @@ CREATE TABLE sessions (
 -- >>> signals.sql
 -- ====================================
 -- signals
--- External or manually submitted signals (webhooks, manual drops) that may
--- be normalized and attached to a task. Optionally linked to a task.
+-- External or manually submitted signals (webhooks, manual drops, MCP emits,
+-- worker ticks) that may be normalized and routed to the LLM judge for a
+-- verdict. Optionally linked to a task via `task_id` (legacy fast path) and/or
+-- to an arbitrary subject via `(subject_type, subject_id)`.
+--
+-- See ADR 0008 (docs/adr/0008-signals-and-judge-loop.md) D1 for the rationale
+-- for extending this table in place rather than introducing `signals_v2`,
+-- and D5 for how `v_user_presence_current` projects the latest presence row
+-- per `(workspace_id, subject_id)` out of this table.
+--
+-- Lifecycle columns:
+--   judge_run_id      - FK to the agent_runs row that judged this signal
+--                       (NULL until the judge has evaluated it).
+--   judge_output_json - structured verdict from the judge (intent, target
+--                       task, proposed events, confidence, reasoning excerpt).
+--   confidence        - judge's reported confidence in [0.00, 1.00]; compared
+--                       against ai_settings.auto_action_threshold and
+--                       auto_action_rules to decide suggest / draft / auto.
+--   applied_at        - set by the Applier when the verdict has been reified
+--                       as one or more task events; NULL while pending or
+--                       rejected.
+--   expires_at        - provider-derived TTL; presence signals expire on the
+--                       next presence transition, weather signals expire at
+--                       the end of the window, manual signals do not expire.
+--                       The retention sweep drops expired, non-applied rows
+--                       for stateful kinds.
+--
+-- Subject columns:
+--   subject_type - what the signal is about. `task_id` remains the dedicated
+--                  optimised path for `subject_type='task'`; for the other
+--                  three subjects, `subject_id` carries the internal FK
+--                  whose target is named by `subject_type`.
+--   subject_id   - internal id of the subject row (NULL when subject_type is
+--                  `workspace`, since `workspace_id` already identifies the
+--                  row owner). Not declared as an FK because the target table
+--                  is polymorphic; integrity is enforced by handler validation
+--                  at ingestion time.
 -- ====================================
 CREATE TABLE signals (
   id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY COMMENT 'Internal PK, never exposed',
   public_id BINARY(16) NOT NULL COMMENT 'UUID v7, the only externally visible ID',
   workspace_id INT UNSIGNED NOT NULL COMMENT 'Internal FK to workspaces.id',
-  task_id INT UNSIGNED NULL COMMENT 'Internal FK to tasks.id, if resolved',
+  task_id INT UNSIGNED NULL COMMENT 'Internal FK to tasks.id, if resolved (legacy fast path; duplicates subject_type=task / subject_id)',
+  judge_run_id INT UNSIGNED NULL COMMENT 'Internal FK to agent_runs.id; set when a judge run has evaluated this signal. NULL means "not yet judged".',
 
-  source ENUM('manual','github','slack','email','google','webhook') NOT NULL COMMENT 'Originating channel',
-  kind VARCHAR(64) CHARACTER SET latin1 COLLATE latin1_swedish_ci NOT NULL COMMENT 'Source-specific event kind (e.g., pull_request.opened)',
-  external_id VARCHAR(255) CHARACTER SET latin1 COLLATE latin1_swedish_ci NULL COMMENT 'External identifier (delivery id, message ts, ...)',
-  payload_json JSON NOT NULL CHECK (JSON_VALID(payload_json)) COMMENT 'Raw normalized payload',
+  source ENUM('manual','github','slack','email','google','webhook','calendar') NOT NULL COMMENT 'Originating channel. ''calendar'' is reserved for internal scheduler ticks (flow-worker calendar_event_day job, etc.) — not a user-facing webhook source.',
+  kind VARCHAR(64) CHARACTER SET latin1 COLLATE latin1_swedish_ci NOT NULL COMMENT 'Source-specific event kind (e.g., pull_request.opened, discord.presence). Closed enumeration defined by signal_kinds/*.yaml; stays VARCHAR so new kinds do not require a schema change.',
+  external_id VARCHAR(255) CHARACTER SET latin1 COLLATE latin1_swedish_ci NULL COMMENT 'External identifier (delivery id, message ts, ...). Dedupe key for webhook double delivery.',
+  payload_json JSON NOT NULL CHECK (JSON_VALID(payload_json)) COMMENT 'Raw normalized payload; anything the provider webhook cannot squeeze into the normalized columns stays here for the judge to read.',
   received_at DATETIME(3) NOT NULL COMMENT 'Time the signal was received',
+
+  subject_type ENUM('user','task','workspace','calendar_event') NOT NULL COMMENT 'What the signal is about; selects which table subject_id targets.',
+  subject_id INT UNSIGNED NULL COMMENT 'Internal id of the subject row. NULL when subject_type=workspace (workspace_id already owns the row). Polymorphic, so not declared as an FK; integrity is enforced at ingestion time.',
+
+  judge_output_json JSON NULL CHECK (judge_output_json IS NULL OR JSON_VALID(judge_output_json)) COMMENT 'Structured verdict from the judge run (intent, target task, proposed events, reasoning excerpt). NULL until judged.',
+  confidence DECIMAL(3,2) NULL COMMENT 'Judge confidence in [0.00, 1.00]; compared against ai_settings.auto_action_threshold / auto_action_rules.',
+  applied_at DATETIME(3) NULL COMMENT 'When the Applier wrote the resulting task event(s). NULL while pending or rejected.',
+  expires_at DATETIME(3) NULL COMMENT 'When this signal stops being authoritative. Used by the retention sweep for stateful kinds (presence, weather window).',
 
   sort_weight INT NOT NULL DEFAULT 0 COMMENT 'Display order',
   notes TEXT NULL COMMENT 'Admin notes',
@@ -1856,15 +1931,31 @@ CREATE TABLE signals (
   updated_at TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
   created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
 
+  CONSTRAINT chk_signals_confidence_range CHECK (confidence IS NULL OR (confidence >= 0.00 AND confidence <= 1.00)),
+
   UNIQUE KEY uniq_signals_public_id (public_id),
   UNIQUE KEY uniq_signals_workspace_public_id (workspace_id, public_id),
   UNIQUE KEY uniq_signals_workspace_source_external_id (workspace_id, source, external_id),
   KEY idx_signals_workspace_id_received_at (workspace_id, received_at),
   KEY idx_signals_workspace_id_task_id (workspace_id, task_id),
+  -- Supports v_user_presence_current (latest row per subject) and per-subject
+  -- judge queue scans. observed_at-style ordering uses received_at; the index
+  -- direction is descending so the "latest first" scan is index-only.
+  KEY idx_signals_subject (workspace_id, subject_type, subject_id, received_at DESC),
+  -- Reverse lookup from agent_runs (operator visibility: "which signal did
+  -- this judge run evaluate?").
+  KEY idx_signals_judge_run (judge_run_id),
+  -- Retention sweep over expired, non-applied rows. MySQL 8.4 has no partial
+  -- index support; the index is plain and the sweep query carries the
+  -- IS NOT NULL filter.
+  KEY idx_signals_expires (expires_at),
+  -- Per-workspace, per-kind history (judge prompt context, autonomy metrics).
+  KEY idx_signals_workspace_kind_received (workspace_id, kind, received_at),
 
   CONSTRAINT fk_signals_workspace FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
-  CONSTRAINT fk_signals_task FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE SET NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Inbound signals';
+  CONSTRAINT fk_signals_task FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE SET NULL,
+  CONSTRAINT fk_signals_judge_run FOREIGN KEY (judge_run_id) REFERENCES agent_runs(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Inbound signals; judged by the signal_judge agent and reified into task events by the Applier (ADR 0008)';
 
 -- >>> storage_objects.sql
 -- ====================================
@@ -1995,7 +2086,16 @@ CREATE TABLE task_constraints (
 -- >>> task_dependencies.sql
 -- ====================================
 -- task_dependencies
--- Directed edges between tasks. from_task blocks/relates to to_task.
+-- Directed edges between tasks. from_task is the dependent / originating side,
+-- to_task is the target. Supported kinds:
+--   - blocks       : from_task is blocked until to_task completes
+--   - relates      : informational sibling link, no scheduling impact
+--   - duplicates   : from_task duplicates to_task (resolved together)
+--   - subtask_of   : from_task is a subtask of to_task (hierarchy)
+--   - retro_of     : from_task is a retrospective draft generated by the
+--                    signal_judge Applier when an event-day signal triggers
+--                    a retro for to_task (the original task whose lifecycle
+--                    finished and prompted the retrospective).
 -- ====================================
 CREATE TABLE task_dependencies (
   id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY COMMENT 'Internal PK, never exposed',
@@ -2004,7 +2104,7 @@ CREATE TABLE task_dependencies (
   from_task_id INT UNSIGNED NOT NULL COMMENT 'Internal FK to tasks.id (source)',
   to_task_id INT UNSIGNED NOT NULL COMMENT 'Internal FK to tasks.id (target)',
 
-  kind ENUM('blocks','relates','duplicates','subtask_of') NOT NULL DEFAULT 'blocks' COMMENT 'Dependency kind',
+  kind ENUM('blocks','relates','duplicates','subtask_of','retro_of') NOT NULL DEFAULT 'blocks' COMMENT 'Dependency kind. blocks: from_task waits on to_task. relates: informational link. duplicates: from_task duplicates to_task. subtask_of: from_task is a subtask of to_task. retro_of: created by the signal_judge Applier when an event-day signal triggers a retrospective draft task; from_task is the new draft, to_task is the original task whose lifecycle finished and prompted the retro.',
 
   sort_weight INT NOT NULL DEFAULT 0 COMMENT 'Display order',
   notes TEXT NULL COMMENT 'Admin notes',
@@ -2325,7 +2425,7 @@ CREATE TABLE user_integrations (
   public_id BINARY(16) NOT NULL COMMENT 'UUID v7, the only externally visible ID',
   user_id INT UNSIGNED NOT NULL COMMENT 'Internal FK to users.id',
 
-  provider ENUM('github','slack','google_calendar') NOT NULL COMMENT 'OAuth provider kind',
+  provider ENUM('github','slack','google_calendar','discord') NOT NULL COMMENT 'OAuth provider kind. ''discord'' is reserved for personal presence binding read by the Phase 8 presence-discord gateway (see ADR 0008 D6) — no task-mutating tokens are stored.',
   external_account_id VARCHAR(255) CHARACTER SET latin1 COLLATE latin1_swedish_ci NOT NULL COMMENT 'Provider subject (GH login, Slack user id, Google sub)',
   external_account_label VARCHAR(255) NOT NULL COMMENT 'Display-only label (email or @handle)',
   scopes TEXT NOT NULL COMMENT 'Space-separated list of granted OAuth scopes',
@@ -2336,6 +2436,8 @@ CREATE TABLE user_integrations (
 
   connected_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) COMMENT 'When the user first authorised the app',
   last_refreshed_at DATETIME(3) NULL COMMENT 'Last successful token refresh',
+
+  metadata_json JSON NULL CHECK (metadata_json IS NULL OR JSON_VALID(metadata_json)) COMMENT 'Provider-specific binding metadata. For provider=''discord'': stores {"external_user_id": "<Discord snowflake>", "verified_at": "<ISO-8601 UTC>"} so the Phase 8 gateway can resolve presence events to a user without a second token table. Other providers may write their own keys here.',
 
   sort_weight INT NOT NULL DEFAULT 0 COMMENT 'Display order',
   notes TEXT NULL COMMENT 'Admin notes',
@@ -2675,6 +2777,7 @@ DROP VIEW IF EXISTS `v_task_detail`;
 DROP VIEW IF EXISTS `v_task_list_archived`;
 DROP VIEW IF EXISTS `v_task_list`;
 DROP VIEW IF EXISTS `v_task_timeline`;
+DROP VIEW IF EXISTS `v_user_presence_current`;
 DROP VIEW IF EXISTS `v_users`;
 DROP VIEW IF EXISTS `v_workspace_activity`;
 DROP VIEW IF EXISTS `v_workspace_members`;
@@ -3038,6 +3141,21 @@ WHERE v.archived_at IS NULL;
 -- v_task_timeline
 -- Timeline of events related to tasks. Merges events with the owning
 -- task's public_id so the UI can render without touching internal ids.
+--
+-- Exposes the third actor source (`actor_system_source`, ADR 0008 D8) and
+-- the signal traceability link (`triggered_by_signal_public_id`, ADR 0008
+-- D4) so the timeline UI can render "Discord said idle -> judge ran ->
+-- task completed" as a single causal chain. The signal join uses alias
+-- `tsig` (triggering signal) to avoid colliding with any future signals
+-- JOIN that might use the conventional `s` alias.
+--
+-- Reversal projection (ADR 0008 D4 / J5): `reverses_event_public_id`
+-- surfaces the target event's public_id when this row is a compensating
+-- reverse, sourced from a self-join aliased `e_rev` (reverse target).
+-- `was_reversed` is TRUE when some other enabled event points back to this
+-- row via reverses_event_id; the correlated EXISTS subquery uses alias
+-- `e_chk` (reverse check) and is backed by idx_events_reverses
+-- (workspace_id, reverses_event_id) so the per-row scan stays index-only.
 CREATE OR REPLACE VIEW v_task_timeline AS
 SELECT
   e.workspace_id,
@@ -3049,6 +3167,15 @@ SELECT
   actor.display_name AS actor_display_name,
   agent.public_id AS actor_agent_public_id,
   CAST(COALESCE(agent.name, '') AS CHAR(255)) AS actor_agent_name,
+  e.actor_system_source,
+  tsig.public_id AS triggered_by_signal_public_id,
+  e_rev.public_id AS reverses_event_public_id,
+  EXISTS (
+    SELECT 1 FROM events e_chk
+    WHERE e_chk.workspace_id = e.workspace_id
+      AND e_chk.reverses_event_id = e.id
+      AND e_chk.enabled = TRUE
+  ) AS was_reversed,
   e.type,
   e.payload_json,
   e.occurred_at
@@ -3063,7 +3190,61 @@ LEFT JOIN users actor
   ON actor.id = e.actor_user_id AND actor.enabled = TRUE
 LEFT JOIN ai_agents agent
   ON agent.id = e.actor_agent_id AND agent.enabled = TRUE
+LEFT JOIN signals tsig
+  ON tsig.id = e.triggered_by_signal_id AND tsig.enabled = TRUE
+LEFT JOIN events e_rev
+  ON e_rev.id = e.reverses_event_id AND e_rev.enabled = TRUE
 WHERE e.enabled = TRUE;
+
+-- >>> v_user_presence_current.sql
+-- v_user_presence_current
+-- Materialised projection of the latest non-expired chat-platform presence
+-- signal per `(workspace_id, user_id)`. Selects the most recent row from
+-- `signals` whose `subject_type = 'user'` and whose `kind` is one of the
+-- chat-platform presence kinds.
+--
+-- Designed as a view rather than a dedicated `user_presence` table so that
+-- provider webhook handlers only ever write to one place (`signals`); the
+-- view is consistent by construction the moment a presence signal lands.
+-- See ADR 0008 (docs/adr/0008-signals-and-judge-loop.md) D5 for rationale.
+--
+-- The latest row per group is selected with the standard "self-join on MAX"
+-- pattern (no window functions in views, MySQL 8.4 supports them but the
+-- self-join form keeps the optimiser plan inspectable). Rows with a non-NULL
+-- `expires_at` in the past are filtered out so that stale presence does not
+-- bleed into the UI; the retention sweep will eventually delete them.
+CREATE OR REPLACE VIEW v_user_presence_current AS
+SELECT
+  s.workspace_id,
+  s.subject_id AS user_id,
+  s.source,
+  s.kind,
+  s.payload_json,
+  s.received_at,
+  s.expires_at
+FROM signals s
+INNER JOIN workspaces w
+  ON w.id = s.workspace_id AND w.enabled = TRUE
+INNER JOIN (
+  SELECT
+    workspace_id,
+    subject_id,
+    MAX(received_at) AS latest_received_at
+  FROM signals
+  WHERE enabled = TRUE
+    AND subject_type = 'user'
+    AND subject_id IS NOT NULL
+    AND kind IN ('discord.presence', 'slack.presence', 'teams.presence')
+    AND (expires_at IS NULL OR expires_at >= NOW(3))
+  GROUP BY workspace_id, subject_id
+) latest
+  ON latest.workspace_id = s.workspace_id
+ AND latest.subject_id   = s.subject_id
+ AND latest.latest_received_at = s.received_at
+WHERE s.enabled = TRUE
+  AND s.subject_type = 'user'
+  AND s.kind IN ('discord.presence', 'slack.presence', 'teams.presence')
+  AND (s.expires_at IS NULL OR s.expires_at >= NOW(3));
 
 -- >>> v_users.sql
 -- v_users

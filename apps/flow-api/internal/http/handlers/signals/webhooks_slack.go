@@ -13,6 +13,7 @@ import (
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/types"
 	apierrors "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/errors"
 	sl "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/integrations/slack"
+	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/signalkinds"
 )
 
 // HandleSlackWebhook is a chi-level handler for POST /webhooks/slack.
@@ -83,23 +84,53 @@ func HandleSlackWebhook(deps Deps) http.HandlerFunc {
 			}
 			kind = sl.NormalizeEventKind(envelope.Type, envelope.Event.Type)
 		}
+		// When NormalizeEventKind produces "slack.presence" the row already
+		// matches the signal_kinds/presence.yaml registry entry verbatim,
+		// so resolveSubjectType below dispatches to the typed default
+		// (subject_type=user). Slack message and reaction events remain as
+		// the free-form strings NormalizeEventKind emits until they earn
+		// signal_kinds/slack.yaml entries (TODO: registry expansion when
+		// the judge prompt needs them).
 		payload := body
 		if !json.Valid(body) {
 			payload = json.RawMessage(`{}`)
 		}
 
+		// Slack does not (yet) resolve the per-user subject from this
+		// webhook entrypoint — the mention/user normalisation is a follow-up
+		// when slack OAuth lands per ADR 0008 D6. Until then the row is
+		// workspace-scoped, which keeps signals.subject_type NOT NULL
+		// satisfied without claiming a user we have not actually resolved.
+		subjectType := resolveSubjectType(kind, "")
+		subjectID := subjectIDFor(subjectType, 0)
+
 		pub := types.New()
 		now := time.Now().UTC()
-		if _, err := deps.Queries.InsertSignal(ctx, generated.InsertSignalParams{
+		signalInternalID, err := deps.Queries.InsertSignal(ctx, generated.InsertSignalParams{
 			PublicID:    pub,
 			WorkspaceID: wsID,
 			Source:      generated.SignalsSourceSlack,
 			Kind:        kind,
 			PayloadJson: payload,
 			ReceivedAt:  now,
-		}); err != nil {
+			SubjectType: subjectType,
+			SubjectID:   subjectID,
+		})
+		if err != nil {
 			writeError(w, apierrors.InternalUnexpected)
 			return
+		}
+
+		// Best-effort signal_judge dispatch (ADR 0008 D3).
+		if deps.JudgeEnqueuer != nil {
+			if jerr := deps.JudgeEnqueuer.EnqueueForSignal(ctx, signalInternalID, wsID, signalkinds.Kind(kind)); jerr != nil {
+				slog.WarnContext(ctx, "signaljudge enqueue failed",
+					slog.Any("err", jerr),
+					slog.String("handler", "signals.HandleSlackWebhook"),
+					slog.String("signal_public_id", pub.String()),
+					slog.String("kind", kind),
+				)
+			}
 		}
 		writeJSON(w, http.StatusAccepted, map[string]any{"id": pub.String()})
 	}

@@ -1,15 +1,38 @@
 -- name: AppendEvent :execlastid
--- Append a single event to the append-only event log. The events table has
--- no UPDATE/DELETE path; only purgeWorkspace removes rows.
+-- Append a single user-actor event to the append-only event log. The events
+-- table has no UPDATE/DELETE path; only purgeWorkspace removes rows.
+--
+-- `actor_system_source` is bound here so the third actor source (ADR 0008
+-- D8) can be expressed without a separate INSERT path; callers pass an
+-- empty string when the row is genuinely user-attributed. The three-way
+-- actor exclusion (actor_user_id / actor_agent_id / actor_system_source)
+-- is enforced by handler-side validation (eventbus.validateActors) rather
+-- than a CHECK constraint because MySQL 8.4 forbids CHECK constraints on
+-- columns used in FK ON DELETE SET NULL actions; see sql/tables/events.sql.
+--
+-- `triggered_by_signal_id` (ADR 0008 D4) is the internal signal id when the
+-- event was emitted by the Applier in response to a judged signal. NULL for
+-- events with no signal lineage. ON DELETE SET NULL on the FK so signal
+-- purge does not cascade to the event log.
+--
+-- `reverses_event_id` (ADR 0008 D4 / J5) is the internal event id this row
+-- compensates. NULL for non-reversal events. The reversal handler binds
+-- this when appending a same-type compensating event so the derived_state
+-- projection can cancel the original out without ever UPDATEing the event
+-- log (events stay immutable; see CLAUDE.md rule 10). ON DELETE SET NULL
+-- so purging a reversed event detaches the backlink instead of cascading.
 INSERT INTO events (
   public_id,
   workspace_id,
   task_id,
   actor_user_id,
+  actor_system_source,
+  triggered_by_signal_id,
+  reverses_event_id,
   type,
   payload_json,
   occurred_at
-) VALUES (?, ?, ?, ?, ?, ?, ?);
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
 
 -- name: AppendAgentEvent :execlastid
 -- Append a single agent-actor event to the append-only event log. Mirrors
@@ -19,23 +42,47 @@ INSERT INTO events (
 -- constraint; see sql/tables/events.sql for the rationale). Used by the
 -- orchestrator runner when emitting ai.agent.run.* events and by MCP tool
 -- calls dispatched from an agent context.
+--
+-- `triggered_by_signal_id` (ADR 0008 D4) is set when the Applier emits this
+-- event in response to a judged signal so the timeline UI can render the
+-- causal chain "signal -> judge verdict -> task event".
+--
+-- `reverses_event_id` (ADR 0008 D4 / J5) mirrors the same field on
+-- AppendEvent. The reversal handler uses this INSERT path when the target
+-- event being reversed was originally produced by an agent so the
+-- compensating event preserves the same actor kind. NULL for normal
+-- agent-emitted events.
 INSERT INTO events (
   public_id,
   workspace_id,
   task_id,
   actor_agent_id,
+  triggered_by_signal_id,
+  reverses_event_id,
   type,
   payload_json,
   occurred_at
-) VALUES (?, ?, ?, ?, ?, ?, ?);
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);
 
 -- name: ListEventsForTask :many
--- List a task's timeline via v_task_timeline.
+-- List a task's timeline via v_task_timeline. Projects
+-- `actor_system_source` (ADR 0008 D8, third actor source for worker-tick
+-- events), `triggered_by_signal_public_id` (ADR 0008 D4, signal
+-- traceability link), `reverses_event_public_id` (ADR 0008 D4 / J5,
+-- target event the row compensates) and `was_reversed` (TRUE when some
+-- other enabled event reverses this one) so the timeline UI can render
+-- the causal chain plus the reversal state of each entry. The view
+-- backs `was_reversed` with a correlated EXISTS on idx_events_reverses
+-- so per-row cost stays bounded.
 SELECT
   v.public_id,
   v.task_public_id,
   v.actor_user_public_id,
   v.actor_display_name,
+  v.actor_system_source,
+  v.triggered_by_signal_public_id,
+  v.reverses_event_public_id,
+  v.was_reversed,
   v.type,
   v.payload_json,
   v.occurred_at,
@@ -60,13 +107,20 @@ ORDER BY occurred_at ASC, id ASC;
 -- name: ListEventsForProject :many
 -- List a project's timeline via v_task_timeline. Filters events whose
 -- owning task lives in the given project (events with no task_id are
--- excluded by virtue of project_public_id being NULL).
+-- excluded by virtue of project_public_id being NULL). Projects
+-- `actor_system_source`, `triggered_by_signal_public_id`,
+-- `reverses_event_public_id` and `was_reversed` for the same reasons as
+-- ListEventsForTask.
 SELECT
   v.public_id,
   v.task_public_id,
   v.project_public_id,
   v.actor_user_public_id,
   v.actor_display_name,
+  v.actor_system_source,
+  v.triggered_by_signal_public_id,
+  v.reverses_event_public_id,
+  v.was_reversed,
   v.type,
   v.payload_json,
   v.occurred_at,
@@ -113,12 +167,19 @@ WHERE workspace_id = ?
   AND type IN ('ai.suggestion.proposed', 'ai.suggestion.applied', 'ai.suggestion.dismissed');
 
 -- name: ListEventsForWorkspace :many
--- List the workspace-wide event timeline via v_task_timeline.
+-- List the workspace-wide event timeline via v_task_timeline. Projects
+-- `actor_system_source`, `triggered_by_signal_public_id`,
+-- `reverses_event_public_id` and `was_reversed` for the same reasons as
+-- ListEventsForTask.
 SELECT
   v.public_id,
   v.task_public_id,
   v.actor_user_public_id,
   v.actor_display_name,
+  v.actor_system_source,
+  v.triggered_by_signal_public_id,
+  v.reverses_event_public_id,
+  v.was_reversed,
   v.type,
   v.payload_json,
   v.occurred_at,
@@ -151,4 +212,40 @@ SELECT public_id, occurred_at
 FROM events
 WHERE workspace_id = ?
   AND id = ?
+LIMIT 1;
+
+-- name: FindEventForReverse :one
+-- Resolve a target event by public_id for the reversal handler (ADR 0008
+-- D4 / J5, POST /workspaces/{wsId}/events/{eventPublicId}/reverse). The
+-- handler uses this single query to drive three eligibility checks
+-- before appending the compensating event:
+--   - target exists in the caller's workspace (LIMIT 1 + workspace_id =
+--     ? gives 404 vs. 403 separation when combined with the standard
+--     ACL middleware).
+--   - target is LLM-origin (actor_agent_id IS NOT NULL); user-actor and
+--     system-source rows are rejected with AI_REVERSE_NOT_LLM_ORIGIN.
+--   - target has not already been reversed (was_reversed = FALSE);
+--     double-reverse is rejected with AI_REVERSE_ALREADY_REVERSED.
+-- The `was_reversed` EXISTS subquery uses alias `e_chk` (reverse check),
+-- matching the v_task_timeline view, and is index-covered by
+-- idx_events_reverses (workspace_id, reverses_event_id).
+SELECT
+  e.id,
+  e.workspace_id,
+  e.type,
+  e.actor_user_id,
+  e.actor_agent_id,
+  e.actor_system_source,
+  e.triggered_by_signal_id,
+  e.reverses_event_id,
+  EXISTS (
+    SELECT 1 FROM events e_chk
+    WHERE e_chk.workspace_id = e.workspace_id
+      AND e_chk.reverses_event_id = e.id
+      AND e_chk.enabled = TRUE
+  ) AS was_reversed
+FROM events e
+WHERE e.public_id = ?
+  AND e.workspace_id = ?
+  AND e.enabled = TRUE
 LIMIT 1;

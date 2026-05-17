@@ -17,6 +17,7 @@ import { toaster } from '@nodate-flow/ui/primitives/toast';
 import { type FormEvent, type ReactElement, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import AutonomyMatrix from '../ai/autonomy/autonomy-matrix';
 import {
   type AutoActionRule,
   type PatchAutoActionRule,
@@ -212,6 +213,15 @@ export default function AutoActionSettingsPage({
       <hr style={{ border: 'none', borderBlockStart: '1px solid var(--nf-color-border)' }} />
 
       <AutoActionRulesSection workspaceId={workspaceId} masterEnabled={enabled} />
+
+      <hr style={{ border: 'none', borderBlockStart: '1px solid var(--nf-color-border)' }} />
+
+      {/*
+       * Per-signal-kind autonomy matrix (Phase 4 / A2). Sits beneath the
+       * legacy four-rule table and lets operators set an autonomyLevel
+       * override per signal kind that fans out into all four rule rows.
+       */}
+      <AutonomyMatrix workspaceId={workspaceId} />
     </form>
   );
 }

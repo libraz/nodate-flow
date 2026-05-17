@@ -96,6 +96,15 @@ SELECT
   e.task_id,
   e.actor_user_id,
   e.actor_agent_id,
+  e.triggered_by_signal_id,
+  e.reverses_event_id,
+  EXISTS (
+    SELECT 1 FROM events e_chk
+    WHERE e_chk.workspace_id = e.workspace_id
+      AND e_chk.reverses_event_id = e.id
+      AND e_chk.enabled = TRUE
+  ) AS was_reversed,
+  e.actor_system_source,
   e.type,
   e.payload_json,
   e.occurred_at
@@ -126,15 +135,19 @@ type ListEventsForScopedAgentParams struct {
 }
 
 type ListEventsForScopedAgentRow struct {
-	ID           uint64          `json:"-"`
-	PublicID     types.PublicID  `json:"publicId"`
-	WorkspaceID  uint32          `json:"-"`
-	TaskID       sql.NullInt32   `json:"-"`
-	ActorUserID  sql.NullInt32   `json:"-"`
-	ActorAgentID sql.NullInt32   `json:"actorAgentId"`
-	Type         string          `json:"type"`
-	PayloadJson  json.RawMessage `json:"payloadJson"`
-	OccurredAt   time.Time       `json:"occurredAt"`
+	ID                  uint64          `json:"-"`
+	PublicID            types.PublicID  `json:"publicId"`
+	WorkspaceID         uint32          `json:"-"`
+	TaskID              sql.NullInt32   `json:"-"`
+	ActorUserID         sql.NullInt32   `json:"-"`
+	ActorAgentID        sql.NullInt32   `json:"actorAgentId"`
+	TriggeredBySignalID sql.NullInt32   `json:"-"`
+	ReversesEventID     sql.NullInt64   `json:"-"`
+	WasReversed         bool            `json:"wasReversed"`
+	ActorSystemSource   sql.NullString  `json:"actorSystemSource"`
+	Type                string          `json:"type"`
+	PayloadJson         json.RawMessage `json:"payloadJson"`
+	OccurredAt          time.Time       `json:"occurredAt"`
 }
 
 // Incremental polling source for an agent whose schedule_scope is
@@ -148,6 +161,14 @@ type ListEventsForScopedAgentRow struct {
 // ListOnEventAgents so identical event kinds flow through identical
 // predicates. Events without a task_id (workspace-level signals) are
 // intentionally excluded — scoped agents only react to task-bound events.
+//
+// Reversal projection (ADR 0008 D4 / J5): `reverses_event_id` is exposed
+// so the orchestrator can recognise compensating events and skip
+// triggering downstream agents on them when desired. `was_reversed` is
+// computed by a correlated EXISTS subquery aliased `e_chk` (reverse
+// check) and is backed by idx_events_reverses (workspace_id,
+// reverses_event_id); on the polling hot-path this keeps the per-row
+// cost to an index-only probe.
 func (q *Queries) ListEventsForScopedAgent(ctx context.Context, arg ListEventsForScopedAgentParams) ([]ListEventsForScopedAgentRow, error) {
 	rows, err := q.db.QueryContext(ctx, listEventsForScopedAgent,
 		arg.ID,
@@ -169,6 +190,10 @@ func (q *Queries) ListEventsForScopedAgent(ctx context.Context, arg ListEventsFo
 			&i.TaskID,
 			&i.ActorUserID,
 			&i.ActorAgentID,
+			&i.TriggeredBySignalID,
+			&i.ReversesEventID,
+			&i.WasReversed,
+			&i.ActorSystemSource,
 			&i.Type,
 			&i.PayloadJson,
 			&i.OccurredAt,

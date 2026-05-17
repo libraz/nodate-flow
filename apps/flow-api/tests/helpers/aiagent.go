@@ -119,16 +119,34 @@ func SeedAgent(t *testing.T, db *sql.DB, workspacePublicID string, opts SeedAgen
 	if opts.MonthlyCostCapCents > 0 {
 		costCapNull = sql.NullInt32{Int32: int32(opts.MonthlyCostCapCents), Valid: true} //#nosec G115 -- test fixture
 	}
-	res, err = tx.ExecContext(ctx, `
+	agentKind := opts.Kind
+	if agentKind == "" {
+		agentKind = "task_agent"
+	}
+	// event_trigger_types defaults to JSON_ARRAY() (wildcard); callers
+	// that want to scope a signal_judge agent to specific kinds pass
+	// a JSON literal in opts.EventTriggerTypes.
+	eventTriggerExpr := "JSON_ARRAY()"
+	var eventTriggerArgs []interface{}
+	if opts.EventTriggerTypes != "" {
+		eventTriggerExpr = "CAST(? AS JSON)"
+		eventTriggerArgs = append(eventTriggerArgs, opts.EventTriggerTypes)
+	}
+	insertSQL := `
 		INSERT INTO ai_agents (
-			public_id, workspace_id, model_id, name, description,
+			public_id, workspace_id, model_id, kind, name, description,
 			system_prompt, temperature, monthly_cost_cap_cents,
 			event_trigger_types,
 			schedule_kind, paused, enabled
-		) VALUES (?, ?, ?, ?, ?, ?, 100, ?, JSON_ARRAY(), 'manual', FALSE, TRUE)
-	`, agentPub, wsID, modelInternalID, agentName, "Test agent for handoff E2E",
-		"You are an integration-test agent. Do not call any tools.", costCapNull,
-	)
+		) VALUES (?, ?, ?, ?, ?, ?, ?, 100, ?, ` + eventTriggerExpr + `, 'manual', FALSE, TRUE)
+	`
+	args := append([]interface{}{
+		agentPub, wsID, modelInternalID, agentKind, agentName,
+		"Test agent for handoff E2E",
+		"You are an integration-test agent. Do not call any tools.",
+		costCapNull,
+	}, eventTriggerArgs...)
+	res, err = tx.ExecContext(ctx, insertSQL, args...)
 	require.NoError(t, err, "insert ai_agents")
 	agentInternalID := lastInsertID(t, res)
 
@@ -155,6 +173,15 @@ type SeedAgentOptions struct {
 	// MonthlyCostCapCents stamps ai_agents.monthly_cost_cap_cents. Use
 	// a low value (e.g. 1) for the cost_cap handoff path.
 	MonthlyCostCapCents int
+	// Kind overrides the ai_agents.kind column. Empty defaults to
+	// 'task_agent' to preserve every existing call site. Set to
+	// 'signal_judge' to seed a judge agent (ADR 0008 D3).
+	Kind string
+	// EventTriggerTypes overrides ai_agents.event_trigger_types. Empty
+	// leaves the column as the default JSON_ARRAY() (wildcard). Pass a
+	// JSON array literal (e.g. `["manual","discord.presence"]`) to
+	// scope a signal_judge agent to specific signal kinds.
+	EventTriggerTypes string
 }
 
 // AssignAgentToTask attaches the seeded agent as the task's enabled

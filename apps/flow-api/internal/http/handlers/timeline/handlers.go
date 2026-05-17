@@ -19,17 +19,27 @@ import (
 // timelineRow is the in-handler scan target. It mirrors the columns
 // produced by the dynamic SELECT below; keeping it private to this
 // package avoids leaking generated.* row types into the mapper layer.
+//
+// `actorSystemSource` and `triggeredBySignalPublicID` are the two ADR
+// 0008 traceability columns surfaced on the timeline: the former
+// distinguishes worker-tick events from user / agent actors (D8); the
+// latter links Applier-emitted events back to the originating signal
+// (D4). Both are nullable because most events have neither.
 type timelineRow struct {
-	publicID           types.PublicID
-	taskPublicID       []byte
-	actorPublicID      []byte
-	actorDisplayName   sql.NullString
-	actorAgentPublicID []byte
-	actorAgentName     string
-	eventType          string
-	payload            json.RawMessage
-	occurredAt         time.Time
-	total              interface{}
+	publicID                  types.PublicID
+	taskPublicID              []byte
+	actorPublicID             []byte
+	actorDisplayName          sql.NullString
+	actorAgentPublicID        []byte
+	actorAgentName            string
+	actorSystemSource         sql.NullString
+	triggeredBySignalPublicID []byte
+	reversesEventPublicID     []byte
+	wasReversed               bool
+	eventType                 string
+	payload                   json.RawMessage
+	occurredAt                time.Time
+	total                     interface{}
 }
 
 // queryTimeline runs a dynamic SELECT against v_task_timeline and
@@ -104,6 +114,10 @@ func queryTimeline(
   v.actor_display_name,
   v.actor_agent_public_id,
   v.actor_agent_name,
+  v.actor_system_source,
+  v.triggered_by_signal_public_id,
+  v.reverses_event_public_id,
+  v.was_reversed,
   v.type,
   v.payload_json,
   v.occurred_at,
@@ -133,6 +147,10 @@ LIMIT ? OFFSET ?`, strings.Join(where, " AND "))
 			&r.actorDisplayName,
 			&r.actorAgentPublicID,
 			&r.actorAgentName,
+			&r.actorSystemSource,
+			&r.triggeredBySignalPublicID,
+			&r.reversesEventPublicID,
+			&r.wasReversed,
 			&r.eventType,
 			&r.payload,
 			&r.occurredAt,
@@ -153,17 +171,41 @@ LIMIT ? OFFSET ?`, strings.Join(where, " AND "))
 
 // toDTO converts a timelineRow to the public Event DTO. This is
 // the only place that crosses the time / public-id boundary.
+//
+// ActorSystemSource and TriggeredBySignalID are emitted as *string
+// (rather than the plain "" + omitempty pattern used for the actor
+// pubid fields) so the JSON shape is unambiguously `null` when the
+// column was SQL NULL. SDK consumers branch on the presence of the
+// field rather than on emptiness, which keeps the causal chain
+// rendering deterministic when an event has neither attribute.
 func toDTO(r timelineRow) Event {
+	var sysSource *string
+	if r.actorSystemSource.Valid {
+		v := r.actorSystemSource.String
+		sysSource = &v
+	}
+	var triggeredBySignal *string
+	if s := uuidFromBytes(r.triggeredBySignalPublicID); s != "" {
+		triggeredBySignal = &s
+	}
+	var reversesEvent *string
+	if s := uuidFromBytes(r.reversesEventPublicID); s != "" {
+		reversesEvent = &s
+	}
 	return Event{
-		ID:               r.publicID.UUID().String(),
-		Type:             r.eventType,
-		TaskID:           uuidFromBytes(r.taskPublicID),
-		ActorUserID:      uuidFromBytes(r.actorPublicID),
-		ActorDisplayName: nullStr(r.actorDisplayName),
-		ActorAgentID:     uuidFromBytes(r.actorAgentPublicID),
-		ActorAgentName:   r.actorAgentName,
-		Payload:          r.payload,
-		OccurredAt:       r.occurredAt.Unix(),
+		ID:                  r.publicID.UUID().String(),
+		Type:                r.eventType,
+		TaskID:              uuidFromBytes(r.taskPublicID),
+		ActorUserID:         uuidFromBytes(r.actorPublicID),
+		ActorDisplayName:    nullStr(r.actorDisplayName),
+		ActorAgentID:        uuidFromBytes(r.actorAgentPublicID),
+		ActorAgentName:      r.actorAgentName,
+		ActorSystemSource:   sysSource,
+		TriggeredBySignalID: triggeredBySignal,
+		ReversesEventID:     reversesEvent,
+		WasReversed:         r.wasReversed,
+		Payload:             r.payload,
+		OccurredAt:          r.occurredAt.Unix(),
 	}
 }
 

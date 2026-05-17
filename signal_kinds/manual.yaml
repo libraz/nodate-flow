@@ -1,0 +1,24 @@
+# Manual and MCP signals — emitted by humans through the UI/CLI or by
+# MCP tool calls in agent runs.
+#
+# manual defaults to autonomy=auto because the user explicitly took the
+# action of emitting the signal; mcp.emit defaults to draft because the
+# emitter is an agent and the workspace should review what the agent
+# proposed before acting on it.
+
+kinds:
+  - kind: manual
+    source: manual
+    retention: discrete
+    autonomy_default: auto
+    subject_type_default: user
+    description: "User-emitted signal from UI or CLI"
+    i18n_key: signalKinds.manual
+
+  - kind: mcp.emit
+    source: mcp
+    retention: discrete
+    autonomy_default: draft
+    subject_type_default: workspace
+    description: "Signal emitted by an MCP tool call"
+    i18n_key: signalKinds.mcp.emit

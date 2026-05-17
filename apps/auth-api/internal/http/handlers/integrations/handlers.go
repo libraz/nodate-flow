@@ -28,9 +28,11 @@ import (
 const oauthStateTTL = 15 * time.Minute
 
 // supportedProviders is the canonical ordered list rendered by the
-// catalog endpoint. Keeping this stable lets the UI place the three
-// cards in a deterministic left-to-right order.
-var supportedProviders = []string{"github", "slack", "google_calendar"}
+// catalog endpoint. Keeping this stable lets the UI place the
+// provider cards in a deterministic left-to-right order. Discord is
+// presence-binding only and lives alongside the task-mutating
+// providers because the consent + token-storage plumbing is shared.
+var supportedProviders = []string{"github", "slack", "google_calendar", "discord"}
 
 // httpErr delegates to handlerutil.HTTPErr.
 var httpErr = handlerutil.HTTPErr
@@ -168,6 +170,10 @@ func Callback(deps Deps) func(context.Context, *OAuthCallbackInput) (*OAuthCallb
 		if !tokens.ExpiresAt.IsZero() {
 			expiresAt = sql.NullTime{Time: tokens.ExpiresAt, Valid: true}
 		}
+		// Providers may attach binding metadata (Discord stores the
+		// snowflake + verified_at here so the Phase 8 presence
+		// gateway can resolve events through JSON_EXTRACT). Pass
+		// through as-is; nil from acc.Metadata persists as NULL.
 		if _, err := deps.Queries.UpsertUserIntegration(ctx, generated.UpsertUserIntegrationParams{
 			PublicID:               types.New(),
 			UserID:                 row.UserID,
@@ -178,6 +184,7 @@ func Callback(deps Deps) func(context.Context, *OAuthCallbackInput) (*OAuthCallb
 			AccessTokenCiphertext:  accessBlob,
 			RefreshTokenCiphertext: sql.NullString{String: string(refreshBlob), Valid: len(refreshBlob) > 0},
 			AccessTokenExpiresAt:   expiresAt,
+			MetadataJson:           acc.Metadata,
 		}); err != nil {
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}

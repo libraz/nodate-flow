@@ -2,6 +2,7 @@ package ai
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"net/http"
 
@@ -15,13 +16,23 @@ import (
 
 // --- DTOs ---
 
-// AutoActionRuleBody is the public representation of a single auto-action
-// rule. The kind field identifies which rule this row configures.
+// AutoActionRuleBody is the public representation of a single
+// auto-action rule. Kind identifies the rule family; SignalKind narrows
+// it to a specific signal scope (nil = wildcard, matches every signal
+// kind for that family). See docs/conventions/autonomy.md for the
+// five-layer resolution order.
+//
+// AutonomyLevel, when non-nil, is the operator-picked override for the
+// resolver: the autonomy level is returned verbatim and the
+// confidence-vs-threshold comparison is bypassed. nil means "use the
+// legacy confidence-based derivation" (default).
 type AutoActionRuleBody struct {
-	Kind       string  `json:"kind"`
-	Enabled    bool    `json:"enabled"`
-	Confidence float64 `json:"confidence"`
-	IdleHours  int     `json:"idleHours"`
+	Kind          string  `json:"kind"`
+	SignalKind    *string `json:"signalKind,omitempty"`
+	Enabled       bool    `json:"enabled"`
+	Confidence    float64 `json:"confidence"`
+	IdleHours     int     `json:"idleHours"`
+	AutonomyLevel *string `json:"autonomyLevel,omitempty" enum:"suggest,draft,auto" doc:"Operator-picked autonomy level override. When set the resolver returns this level verbatim and skips the confidence gate. Nil/omitted means the row uses confidence-based derivation."`
 }
 
 // GetAutoActionRulesInput is the path-only input for
@@ -48,12 +59,25 @@ type PatchAutoActionRulesInput struct {
 }
 
 // PatchAutoActionRuleItem represents a partial update to a single
-// auto-action rule. Only non-nil fields are applied.
+// auto-action rule. Only non-nil fields are applied. SignalKind is the
+// rule's scope address — nil targets the wildcard row, a dotted string
+// targets that exact signal kind, and a wildcard-prefix value (e.g.
+// `*.presence`) targets a single wildcard-prefix row.
+//
+// AutonomyLevel: omitting the field preserves the row's prior value
+// (standard PATCH semantic). Sending one of "suggest" / "draft" /
+// "auto" writes that level as an explicit override on the resolver.
+// Clearing an override back to NULL is intentionally NOT supported by
+// this PATCH today — the matrix UI always picks one of the three
+// levels. A clear-to-NULL flow (e.g. ClearAutonomyLevel companion
+// bool) is a Phase 4 follow-up if needed.
 type PatchAutoActionRuleItem struct {
-	Kind       string   `json:"kind" enum:"escalate_overdue,assign_owner,nudge_assignee,close_stale_review"`
-	Enabled    *bool    `json:"enabled,omitempty"`
-	Confidence *float64 `json:"confidence,omitempty" minimum:"0" maximum:"1"`
-	IdleHours  *int     `json:"idleHours,omitempty" minimum:"0" maximum:"8760"`
+	Kind          string   `json:"kind" enum:"escalate_overdue,assign_owner,nudge_assignee,close_stale_review"`
+	SignalKind    *string  `json:"signalKind,omitempty"`
+	Enabled       *bool    `json:"enabled,omitempty"`
+	Confidence    *float64 `json:"confidence,omitempty" minimum:"0" maximum:"1"`
+	IdleHours     *int     `json:"idleHours,omitempty" minimum:"0" maximum:"8760"`
+	AutonomyLevel *string  `json:"autonomyLevel,omitempty" enum:"suggest,draft,auto" doc:"Operator-picked autonomy level override. Omit to preserve the prior value. Clearing back to NULL is not supported by this PATCH (Phase 4 follow-up)."`
 }
 
 // PatchAutoActionRulesOutput is the response for
@@ -78,6 +102,15 @@ var defaultRules = []ruleDefault{
 	{kind: "assign_owner", enabled: true, confidence: "0.75", idleHours: 24},
 	{kind: "nudge_assignee", enabled: true, confidence: "0.70", idleHours: 72},
 	{kind: "close_stale_review", enabled: true, confidence: "0.70", idleHours: 120},
+}
+
+// ruleKey is the composite address of an auto_action_rules row.
+// Mirrors the UNIQUE KEY (workspace_id, kind, signal_kind_match) — the
+// existing-rule lookup must be exact on both columns because a
+// different signal_kind targets a distinct row by design.
+type ruleKey struct {
+	Kind       string
+	SignalKind sql.NullString
 }
 
 // --- handlers ---
@@ -125,14 +158,16 @@ func PatchAutoActionRules(deps Deps) func(context.Context, *PatchAutoActionRules
 			return nil, httpErr(apierrors.WsWorkspaceNotFound)
 		}
 
-		// Read current rules into a map keyed by kind.
+		// Read current rules into a map keyed by (kind, signal_kind).
+		// Rules are now per-signal-kind, so kind alone is no longer a
+		// unique address.
 		rows, err := deps.Queries.ListAutoActionRulesForWorkspace(ctx, ws.ID)
 		if err != nil {
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
-		existing := make(map[string]generated.AutoActionRule, len(rows))
+		existing := make(map[ruleKey]generated.ListAutoActionRulesForWorkspaceRow, len(rows))
 		for _, r := range rows {
-			existing[r.Kind] = r
+			existing[ruleKey{Kind: r.Kind, SignalKind: r.SignalKind}] = r
 		}
 
 		// Apply each patch item.
@@ -143,12 +178,12 @@ func PatchAutoActionRules(deps Deps) func(context.Context, *PatchAutoActionRules
 			}
 		}
 
-		// Re-read and ensure all 4 defaults exist.
+		// Re-read and ensure all 4 wildcard defaults exist.
 		rows, err = deps.Queries.ListAutoActionRulesForWorkspace(ctx, ws.ID)
 		if err != nil {
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
-		if len(rows) < len(defaultRules) {
+		if !hasAllDefaults(rows) {
 			if err := seedDefaultRules(ctx, deps.Queries, ws.ID); err != nil {
 				return nil, httpErr(apierrors.InternalUnexpected)
 			}
@@ -173,7 +208,7 @@ func RegisterAutoActionRules(api huma.API, deps Deps) {
 		Method:      http.MethodGet,
 		Path:        "/workspaces/{wsId}/ai/auto-action-rules",
 		Summary:     "List auto-action rules for a workspace",
-		Description: "Returns the workspace's auto-action rule rows (rule kind, condition, side-effect). On first read seeds the default rule set so admins can begin tweaking immediately.",
+		Description: "Returns the workspace's auto-action rule rows (rule kind, optional signal_kind scope, condition, side-effect). On first read seeds the default wildcard rule set so admins can begin tweaking immediately.",
 		Tags:        []string{"AI"},
 	}, GetAutoActionRules(deps))
 
@@ -182,25 +217,31 @@ func RegisterAutoActionRules(api huma.API, deps Deps) {
 		Method:      http.MethodPatch,
 		Path:        "/workspaces/{wsId}/ai/auto-action-rules",
 		Summary:     "Patch auto-action rules for a workspace",
-		Description: "Updates one or more auto-action rules in a single request. Each row may toggle enabled, change its threshold, or rewrite its condition. Returns the post-update set so the UI can reconcile state.",
+		Description: "Updates one or more auto-action rules in a single request. Each row may toggle enabled, change its threshold, narrow its signal_kind scope, or rewrite its condition. Returns the post-update set so the UI can reconcile state.",
 		Tags:        []string{"AI"},
 	}, PatchAutoActionRules(deps))
 }
 
 // --- helpers ---
 
-// seedDefaultRules inserts the 4 default auto-action rules for a
-// workspace. The upsert uses INSERT IGNORE semantics so existing rows
-// are not overwritten.
+// seedDefaultRules inserts the 4 default wildcard auto-action rules
+// for a workspace. The upsert uses INSERT IGNORE semantics so existing
+// rows are not overwritten. Defaults always seed with NULL signal_kind
+// — workspace admins create scoped rules explicitly via PATCH.
+// AutonomyLevel is left at the zero value (NULL) so seeded rows fall
+// back to confidence-based derivation; an operator must opt into an
+// explicit level via the matrix UI.
 func seedDefaultRules(ctx context.Context, q *generated.Queries, wsID uint32) error {
 	for _, d := range defaultRules {
 		if err := q.UpsertAutoActionRule(ctx, generated.UpsertAutoActionRuleParams{
-			PublicID:    types.New(),
-			WorkspaceID: wsID,
-			Kind:        d.kind,
-			Enabled:     d.enabled,
-			Confidence:  d.confidence,
-			IdleHours:   d.idleHours,
+			PublicID:      types.New(),
+			WorkspaceID:   wsID,
+			Kind:          d.kind,
+			SignalKind:    sql.NullString{},
+			Enabled:       d.enabled,
+			Confidence:    d.confidence,
+			IdleHours:     d.idleHours,
+			AutonomyLevel: generated.NullAutoActionRulesAutonomyLevel{},
 		}); err != nil {
 			return err
 		}
@@ -208,26 +249,60 @@ func seedDefaultRules(ctx context.Context, q *generated.Queries, wsID uint32) er
 	return nil
 }
 
+// hasAllDefaults reports whether the workspace already has a
+// wildcard (NULL signal_kind) row for every default kind. Used after
+// a PATCH to decide whether the seeding pass needs to run again.
+func hasAllDefaults(rows []generated.ListAutoActionRulesForWorkspaceRow) bool {
+	wildcardByKind := make(map[string]struct{}, len(rows))
+	for _, r := range rows {
+		if !r.SignalKind.Valid {
+			wildcardByKind[r.Kind] = struct{}{}
+		}
+	}
+	for _, d := range defaultRules {
+		if _, ok := wildcardByKind[d.kind]; !ok {
+			return false
+		}
+	}
+	return true
+}
+
 // resolveRuleParams builds the upsert params for a single patch item by
-// merging the patch fields with the existing row or the default values.
-func resolveRuleParams(wsID uint32, item PatchAutoActionRuleItem, existing map[string]generated.AutoActionRule) generated.UpsertAutoActionRuleParams {
+// merging the patch fields with the existing row (looked up by exact
+// (kind, signal_kind) address) or the kind's seed defaults.
+func resolveRuleParams(wsID uint32, item PatchAutoActionRuleItem, existing map[ruleKey]generated.ListAutoActionRulesForWorkspaceRow) generated.UpsertAutoActionRuleParams {
+	signalKind := sql.NullString{}
+	if item.SignalKind != nil {
+		signalKind = sql.NullString{String: *item.SignalKind, Valid: true}
+	}
+
 	params := generated.UpsertAutoActionRuleParams{
 		PublicID:    types.New(),
 		WorkspaceID: wsID,
 		Kind:        item.Kind,
+		SignalKind:  signalKind,
 	}
 
-	// Start from existing row or defaults.
-	if row, ok := existing[item.Kind]; ok {
+	// Start from the exact (kind, signal_kind) row when present so we
+	// preserve its public_id and unchanged columns. A non-wildcard
+	// upsert that has no existing row falls back to the kind's seed
+	// defaults rather than reading the wildcard row — different
+	// signal_kind means different row.
+	if row, ok := existing[ruleKey{Kind: item.Kind, SignalKind: signalKind}]; ok {
 		params.PublicID = row.PublicID
 		params.Enabled = row.Enabled
 		params.Confidence = row.Confidence
 		params.IdleHours = row.IdleHours
+		params.AutonomyLevel = row.AutonomyLevel
 	} else {
 		def := findDefault(item.Kind)
 		params.Enabled = def.enabled
 		params.Confidence = def.confidence
 		params.IdleHours = def.idleHours
+		// Seed-default rows ship with NULL autonomy_level so the
+		// resolver falls back to confidence-based derivation until an
+		// operator picks an explicit level via the matrix.
+		params.AutonomyLevel = generated.NullAutoActionRulesAutonomyLevel{}
 	}
 
 	// Apply patch fields.
@@ -239,6 +314,16 @@ func resolveRuleParams(wsID uint32, item PatchAutoActionRuleItem, existing map[s
 	}
 	if item.IdleHours != nil {
 		params.IdleHours = uint32(*item.IdleHours) //#nosec G115 -- IdleHours is request-validated to maximum:8760 (one year)
+	}
+	if item.AutonomyLevel != nil {
+		// Huma's enum tag on PatchAutoActionRuleItem.AutonomyLevel
+		// rejects any non-enum string at the request boundary, so by
+		// the time we land here *item.AutonomyLevel is guaranteed to
+		// be one of suggest/draft/auto.
+		params.AutonomyLevel = generated.NullAutoActionRulesAutonomyLevel{
+			AutoActionRulesAutonomyLevel: generated.AutoActionRulesAutonomyLevel(*item.AutonomyLevel),
+			Valid:                        true,
+		}
 	}
 
 	return params
@@ -255,16 +340,30 @@ func findDefault(kind string) ruleDefault {
 	return ruleDefault{kind: kind, enabled: true, confidence: "0.70", idleHours: 0}
 }
 
-// mapRuleRows converts a slice of AutoActionRule DB rows into the API
-// response DTOs, converting the DECIMAL confidence string to float64.
-func mapRuleRows(rows []generated.AutoActionRule) []AutoActionRuleBody {
+// mapRuleRows converts a slice of auto_action_rules DB rows into the
+// API response DTOs, converting the DECIMAL confidence string to
+// float64 and surfacing signal_kind / autonomy_level as nullable
+// strings (nil = NULL in DB, i.e. wildcard / no override).
+func mapRuleRows(rows []generated.ListAutoActionRulesForWorkspaceRow) []AutoActionRuleBody {
 	out := make([]AutoActionRuleBody, len(rows))
 	for i, r := range rows {
+		var signalKind *string
+		if r.SignalKind.Valid {
+			v := r.SignalKind.String
+			signalKind = &v
+		}
+		var autonomyLevel *string
+		if r.AutonomyLevel.Valid {
+			v := string(r.AutonomyLevel.AutoActionRulesAutonomyLevel)
+			autonomyLevel = &v
+		}
 		out[i] = AutoActionRuleBody{
-			Kind:       r.Kind,
-			Enabled:    r.Enabled,
-			Confidence: parseThreshold(r.Confidence),
-			IdleHours:  int(r.IdleHours),
+			Kind:          r.Kind,
+			SignalKind:    signalKind,
+			Enabled:       r.Enabled,
+			Confidence:    parseThreshold(r.Confidence),
+			IdleHours:     int(r.IdleHours),
+			AutonomyLevel: autonomyLevel,
 		}
 	}
 	return out

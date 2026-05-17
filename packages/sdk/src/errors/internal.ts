@@ -6,6 +6,16 @@ export const InternalErrors = {
     status: 503,
     message: "Database is temporarily unavailable",
   },
+  INTERNAL_EVENTBUS_ACTOR_MULTIPLE: {
+    code: "INTERNAL.EVENTBUS.ACTOR_MULTIPLE",
+    status: 500,
+    message: "Event has more than one actor source set",
+  },
+  INTERNAL_EVENTBUS_JUDGE_KIND_OUTSIDE_APPLIER: {
+    code: "INTERNAL.EVENTBUS.JUDGE_KIND_OUTSIDE_APPLIER",
+    status: 500,
+    message: "Judge-driven event kind appended outside the signaljudge Applier",
+  },
   INTERNAL_STORAGE_NOT_CONFIGURED: {
     code: "INTERNAL.STORAGE.NOT_CONFIGURED",
     status: 503,

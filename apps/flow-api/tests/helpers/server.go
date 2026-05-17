@@ -239,6 +239,63 @@ func NewTestServerWithStorage(db *sql.DB, bundle *StorageBundle) (*TestServer, f
 	return &TestServer{BaseURL: srv.URL, Server: srv, DB: db, JWT: jwtIssuer}, cleanup, nil
 }
 
+// NewTestServerWithServiceToken boots a dedicated httptest.Server with
+// the flow-worker service token configured on the router. Used by the
+// service-token auth e2e suite so the shared test server (which has
+// no token configured) is not perturbed. The returned cleanup MUST be
+// invoked when the test finishes.
+func NewTestServerWithServiceToken(db *sql.DB, serviceToken string) (*TestServer, func(), error) {
+	if db == nil {
+		return nil, nil, fmt.Errorf("NewTestServerWithServiceToken requires a non-nil *sql.DB")
+	}
+	jwtKey, err := authn.DeriveEd25519Key(testCipherHex, "nodate-flow:jwt:v1")
+	if err != nil {
+		return nil, nil, fmt.Errorf("derive jwt key: %w", err)
+	}
+	queries := generated.New(db)
+	calendarQueries := calgen.New(db)
+	jwtIssuer, err := auth.NewJWTIssuer(jwtKey, "nodate-flow", "api", 15*time.Minute)
+	if err != nil {
+		return nil, nil, fmt.Errorf("init jwt issuer: %w", err)
+	}
+	cipher, err := crypto.New(testCipherKey)
+	if err != nil {
+		return nil, nil, fmt.Errorf("init test cipher: %w", err)
+	}
+	notifier := stream.NewInProcessNotifier()
+	tap := stream.NewEventbusTap(notifier)
+	eventbus.SetNotifyHook(tap.Publish)
+
+	flowHandler := router.Build(router.Deps{
+		DB:                 db,
+		Queries:            queries,
+		CalendarQueries:    calendarQueries,
+		JWT:                jwtIssuer,
+		Cipher:             cipher,
+		GhWebhookSecret:    "",
+		SlackSigningSecret: "",
+		DefaultWorkspaceID: "",
+		DisableRateLimit:   true,
+		AiMock:             os.Getenv("NF_FLOW_AI_MOCK") != "" && os.Getenv("NF_FLOW_AI_MOCK") != "0" && os.Getenv("NF_FLOW_AI_MOCK") != "false",
+		StreamNotifier:     notifier,
+		StreamRemember:     tap.RememberWorkspace,
+		FlowAPISignalToken: serviceToken,
+	})
+
+	authHandler, err := testutil.BuildTestRouter(db, jwtKey, testCipherKey)
+	if err != nil {
+		return nil, nil, fmt.Errorf("build auth-api test router: %w", err)
+	}
+
+	composite := newCompositeHandler(authHandler, flowHandler)
+	srv := httptest.NewServer(composite)
+	cleanup := func() {
+		eventbus.SetNotifyHook(nil)
+		srv.Close()
+	}
+	return &TestServer{BaseURL: srv.URL, Server: srv, DB: db, JWT: jwtIssuer}, cleanup, nil
+}
+
 // compositeHandler dispatches requests to the primary handler first.
 // If the primary returns 404 (route not found), it falls back to the
 // secondary handler. This lets the test server compose auth-api and

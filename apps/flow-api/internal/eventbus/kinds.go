@@ -71,9 +71,18 @@ const (
 // TaskTransition delegates to the shared helper.
 func TaskTransition(name string) Kind { return sharedbus.TaskTransition(name) }
 
-// Signal events.
+// Task events driven by the signaljudge Applier.
+const (
+	TaskAutoCompleted = sharedbus.TaskAutoCompleted
+	TaskRetroDrafted  = sharedbus.TaskRetroDrafted
+)
+
+// Signal events (ingestion + judge loop).
 const (
 	SignalAttached = sharedbus.SignalAttached
+	SignalJudged   = sharedbus.SignalJudged
+	SignalApplied  = sharedbus.SignalApplied
+	SignalRejected = sharedbus.SignalRejected
 )
 
 // AI suggestion lifecycle events.

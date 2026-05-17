@@ -922,6 +922,30 @@
       "load_failed": "加载已保存视图失败",
       "save_failed": "保存视图失败",
       "delete_failed": "删除视图失败"
+    },
+    "retro": {
+      "queue": {
+        "title": "回顾草稿",
+        "description": "AI 根据已完成的任务和日历事件起草的回顾。接受可提升为常规任务，丢弃则将其移除。",
+        "empty": "目前没有回顾草稿",
+        "linked_original": "关联自：{sourceTitle}",
+        "created_by_ai": "由 AI {agentName} 起草 · {when}",
+        "created_anon": "由 AI 起草 · {when}",
+        "accept": "接受",
+        "discard": "丢弃",
+        "accepted_toast": "回顾已提升为待办",
+        "discarded_toast": "已丢弃回顾",
+        "accept_error": "无法接受此回顾",
+        "discard_error": "无法丢弃此回顾",
+        "fetch_error": "无法加载回顾草稿",
+        "retry": "重试",
+        "discard_confirm": {
+          "title": "丢弃此草稿？",
+          "body": "草稿将被归档，原始任务与信号保持不变。",
+          "confirm": "丢弃",
+          "cancel": "取消"
+        }
+      }
     }
   },
   "auth": {

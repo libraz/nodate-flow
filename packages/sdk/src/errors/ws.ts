@@ -141,6 +141,21 @@ export const WsErrors = {
     status: 404,
     message: "Reaction not found",
   },
+  WS_SIGNAL_KIND_UNKNOWN: {
+    code: "WS.SIGNAL.KIND_UNKNOWN",
+    status: 422,
+    message: "Unknown signal kind",
+  },
+  WS_SIGNAL_SUBJECT_MISMATCH: {
+    code: "WS.SIGNAL.SUBJECT_MISMATCH",
+    status: 422,
+    message: "Signal subject does not match the linked task",
+  },
+  WS_SIGNAL_SUBJECT_NOT_FOUND: {
+    code: "WS.SIGNAL.SUBJECT_NOT_FOUND",
+    status: 404,
+    message: "Signal subject does not exist in this workspace",
+  },
   WS_TASK_ACCESS_DENIED: {
     code: "WS.TASK.ACCESS_DENIED",
     status: 403,

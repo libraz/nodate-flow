@@ -1,0 +1,30 @@
+# Presence signals — chat platform online/away/idle observations.
+#
+# Each entry is a concrete observable that a Matcher can act on, not an
+# abstract "user state" placeholder. The judge LLM interprets these kinds
+# alongside workspace context to decide whether they justify a task event.
+
+kinds:
+  - kind: discord.presence
+    source: discord
+    retention: stateful
+    autonomy_default: suggest
+    subject_type_default: user
+    description: "User online status from Discord gateway"
+    i18n_key: signalKinds.discord.presence
+
+  - kind: slack.presence
+    source: slack
+    retention: stateful
+    autonomy_default: suggest
+    subject_type_default: user
+    description: "User active/away status from Slack Events API"
+    i18n_key: signalKinds.slack.presence
+
+  - kind: teams.presence
+    source: teams
+    retention: stateful
+    autonomy_default: suggest
+    subject_type_default: user
+    description: "User presence from Microsoft Graph"
+    i18n_key: signalKinds.teams.presence

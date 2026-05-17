@@ -159,6 +159,11 @@ services:
       NF_FLOW_AGENT_TICK_INTERVAL: ${NF_FLOW_AGENT_TICK_INTERVAL:-1m}
       NF_SECRET_KEY: ${NF_SECRET_KEY:-}
       NF_FLOW_DEFAULT_WORKSPACE_ID: ${NF_FLOW_DEFAULT_WORKSPACE_ID:-}
+      # Shared secret consumed by flow-worker and presence-discord
+      # when calling POST /signals or /internal/* lookup endpoints.
+      # Empty disables every service-token path (see middleware
+      # RequireSignalsAuth / RequireServiceTokenOnly).
+      NF_FLOW_API_SIGNAL_TOKEN: ${NF_FLOW_API_SIGNAL_TOKEN:-}
       NF_FLOW_GH_WEBHOOK_SECRET: ${NF_FLOW_GH_WEBHOOK_SECRET:-}
       NF_FLOW_SLACK_SIGNING_SECRET: ${NF_FLOW_SLACK_SIGNING_SECRET:-}
       NF_FLOW_WEBHOOKS_INSECURE: ${NF_FLOW_WEBHOOKS_INSECURE:-true}
@@ -239,6 +244,94 @@ services:
       timeout: 3s
       retries: 10
       start_period: 10s
+
+  # Scheduled job runner (release-8 Phase 5, W1). Not started by default —
+  # bring it up explicitly with `docker compose --profile worker up -d`.
+  # Single-writer assumption for ticks: replicas is pinned at 1; horizontal
+  # scaling requires a future leader-election layer.
+  flow-worker:
+    build:
+      context: .
+      dockerfile: apps/flow-worker/Dockerfile
+    restart: unless-stopped
+    profiles: ["worker"]
+    deploy:
+      replicas: 1
+    depends_on:
+      mysql:
+        condition: service_healthy
+      api:
+        condition: service_healthy
+    environment:
+      NF_FLOW_WORKER_PORT: "9091"
+      NF_FLOW_WORKER_LOG_LEVEL: ${NF_FLOW_WORKER_LOG_LEVEL:-info}
+      NF_DB_DSN: ${NF_DB_DSN:-nodate:nodatepw@tcp(mysql:3306)/nodate_flow?parseTime=true&charset=utf8mb4&collation=utf8mb4_0900_ai_ci}
+      # flow-api service is named "api" inside this compose network.
+      NF_FLOW_API_BASE_URL: ${NF_FLOW_API_BASE_URL:-http://api:8080}
+      # Shared secret used by the worker to authenticate against
+      # flow-api's POST /signals and /internal/* endpoints. Same env
+      # var consumed by flow-api and presence-discord so one
+      # operator-set value wires the whole worker fleet. Empty
+      # disables every job that calls flow-api.
+      NF_FLOW_API_SIGNAL_TOKEN: ${NF_FLOW_API_SIGNAL_TOKEN:-}
+      # OTLP endpoint shared with flow-api. Empty disables tracing.
+      NF_OTEL_EXPORTER_OTLP_ENDPOINT: ${NF_OTEL_EXPORTER_OTLP_ENDPOINT:-otel-collector:4318}
+      NF_OTEL_INSECURE: ${NF_OTEL_INSECURE:-true}
+      NF_FLOW_VERSION: ${NF_VERSION:-dev}
+    # No ports published to the host. Prometheus scrapes :9091 over the
+    # docker network; operators running multiple compose stacks would
+    # collide on a host mapping.
+    expose:
+      - "9091"
+
+  # Discord presence gateway (release-8 Phase 8, P8-3). Holds a single
+  # Discord gateway WebSocket connection and translates presence updates
+  # into signals POSTed to flow-api. Not started by default — bring it up
+  # explicitly with `docker compose --profile presence-discord up -d`.
+  # The Discord bot also requires GUILD_PRESENCES + GUILD_MEMBERS
+  # privileged intents to be opted in via the Discord Developer Portal
+  # (see docs/conventions/discord-bot-setup.md).
+  #
+  # No healthcheck: the gateway exposes no HTTP endpoint, and the
+  # metrics listener only comes up after the WS session opens, so a
+  # naive TCP probe on :9094 would be misleading.
+  #
+  # Single connection only — no replicas: directive (Compose v2 deploy
+  # block is swarm-only anyway). Horizontal scaling would require
+  # session shard coordination which is out of scope.
+  presence-discord:
+    build:
+      context: .
+      dockerfile: apps/presence-discord/Dockerfile
+    restart: unless-stopped
+    profiles: ["presence-discord"]
+    depends_on:
+      api:
+        condition: service_healthy
+    environment:
+      NF_PRESENCE_LOG_LEVEL: ${NF_PRESENCE_LOG_LEVEL:-info}
+      NF_PRESENCE_METRICS_ADDR: ":9094"
+      NF_PRESENCE_DEBOUNCE_SECONDS: ${NF_PRESENCE_DEBOUNCE_SECONDS:-5}
+      # Discord bot token. Empty by default — the gateway logs a clear
+      # error and refuses to open the WS until set. Required env for
+      # the profile to do anything useful.
+      NF_DISCORD_BOT_TOKEN: ${NF_DISCORD_BOT_TOKEN:-}
+      # flow-api service is named "api" inside this compose network.
+      NF_FLOW_API_BASE_URL: ${NF_FLOW_API_BASE_URL:-http://api:8080}
+      # Shared secret used to authenticate POST /signals and the
+      # /internal/users/by-discord/{snowflake} lookup against flow-api.
+      # Same env var consumed by flow-api and flow-worker so one
+      # operator-set value covers every worker binary.
+      NF_FLOW_API_SIGNAL_TOKEN: ${NF_FLOW_API_SIGNAL_TOKEN:-}
+      # OTLP endpoint shared with flow-api / flow-worker. Empty
+      # disables tracing.
+      NF_OTEL_EXPORTER_OTLP_ENDPOINT: ${NF_OTEL_EXPORTER_OTLP_ENDPOINT:-otel-collector:4318}
+      NF_OTEL_INSECURE: ${NF_OTEL_INSECURE:-true}
+    # No ports published to the host. Prometheus scrapes :9094 over the
+    # docker network when a scrape target is wired in (see
+    # infra/prometheus/prometheus.yml).
+    expose:
+      - "9094"
 
 volumes:
   mysql_data:

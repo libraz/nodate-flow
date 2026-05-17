@@ -485,3 +485,33 @@ resources:
         message_zh: "仅可取消待处理或运行中的导入任务"
         description: "Returned when attempting to cancel an import job that has already completed, failed, or been cancelled."
         userAction: "The import job is no longer in a cancellable state."
+
+  signal:
+    breadcrumb: "Workspace > Signal"
+    errors:
+      kind_unknown:
+        code: WS.SIGNAL.KIND_UNKNOWN
+        status: 422
+        message: "Unknown signal kind"
+        message_ja: "未知のシグナル種別です"
+        message_zh: "未知的信号类型"
+        description: "Returned when the request supplies a `kind` value that is not present in the signal_kinds/*.yaml registry. The registry is the closed enumeration of signal kinds the system observes (ADR 0008 D2)."
+        userAction: "Use one of the documented signal kinds (e.g. discord.presence, slack.presence, calendar.event_day_arrived, manual). Adding a new kind requires a YAML entry plus a codegen run."
+
+      subject_mismatch:
+        code: WS.SIGNAL.SUBJECT_MISMATCH
+        status: 422
+        message: "Signal subject does not match the linked task"
+        message_ja: "シグナルの subject が指定タスクと一致しません"
+        message_zh: "信号 subject 与关联任务不一致"
+        description: "Returned when the request supplies both the legacy `taskId` parameter and a new `(subjectType, subjectId)` pair that point at different tasks. The two parameters must address the same task or the new fields must be omitted."
+        userAction: "Either send only `taskId`, or send `subjectType='task'` with `subjectId` equal to the same task public id."
+
+      subject_not_found:
+        code: WS.SIGNAL.SUBJECT_NOT_FOUND
+        status: 404
+        message: "Signal subject does not exist in this workspace"
+        message_ja: "シグナルの subject はこのワークスペースに存在しません"
+        message_zh: "信号 subject 在该工作区中不存在"
+        description: "Returned when `(subjectType, subjectId)` references a row that does not exist or is not visible in the actor's workspace. Returns 404 to avoid leaking cross-tenant existence."
+        userAction: "Verify the subject id, or omit `subjectType`/`subjectId` to fall back to the kind's default subject."

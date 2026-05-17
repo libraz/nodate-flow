@@ -23,6 +23,7 @@ export const namespaces = [
   'linkedEvents',
   'aiAgents',
   'sharing',
+  'signal-kinds',
   'export',
   'system-info',
 ] as const;

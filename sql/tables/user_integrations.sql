@@ -10,7 +10,7 @@ CREATE TABLE user_integrations (
   public_id BINARY(16) NOT NULL COMMENT 'UUID v7, the only externally visible ID',
   user_id INT UNSIGNED NOT NULL COMMENT 'Internal FK to users.id',
 
-  provider ENUM('github','slack','google_calendar') NOT NULL COMMENT 'OAuth provider kind',
+  provider ENUM('github','slack','google_calendar','discord') NOT NULL COMMENT 'OAuth provider kind. ''discord'' is reserved for personal presence binding read by the Phase 8 presence-discord gateway (see ADR 0008 D6) — no task-mutating tokens are stored.',
   external_account_id VARCHAR(255) CHARACTER SET latin1 COLLATE latin1_swedish_ci NOT NULL COMMENT 'Provider subject (GH login, Slack user id, Google sub)',
   external_account_label VARCHAR(255) NOT NULL COMMENT 'Display-only label (email or @handle)',
   scopes TEXT NOT NULL COMMENT 'Space-separated list of granted OAuth scopes',
@@ -21,6 +21,8 @@ CREATE TABLE user_integrations (
 
   connected_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) COMMENT 'When the user first authorised the app',
   last_refreshed_at DATETIME(3) NULL COMMENT 'Last successful token refresh',
+
+  metadata_json JSON NULL CHECK (metadata_json IS NULL OR JSON_VALID(metadata_json)) COMMENT 'Provider-specific binding metadata. For provider=''discord'': stores {"external_user_id": "<Discord snowflake>", "verified_at": "<ISO-8601 UTC>"} so the Phase 8 gateway can resolve presence events to a user without a second token table. Other providers may write their own keys here.',
 
   sort_weight INT NOT NULL DEFAULT 0 COMMENT 'Display order',
   notes TEXT NULL COMMENT 'Admin notes',

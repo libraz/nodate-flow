@@ -59,6 +59,23 @@ type AgentExecutor interface {
 	ExecuteAgent(ctx context.Context, workspaceID, agentID uint32) (ExecutionResult, error)
 }
 
+// JudgeExecutor is the narrow dependency the runner needs to dispatch
+// a signal_judge agent (ADR 0008 D3). Production wiring passes an
+// adapter around the signaljudge.Runner so this package stays free of
+// an import cycle with the ai stack.
+//
+// The runner calls ExecuteJudge instead of ExecuteAgent when the
+// claimed agent_runs row carries a judge-shaped dedupe_key. The
+// signal id is parsed out of the dedupe_key by the runner; the
+// JudgeExecutor only sees the (workspaceID, agentID, signalID)
+// triple. A nil JudgeExecutor disables signal_judge dispatch and the
+// runner falls back to the task-agent path with a warning — this is
+// the safe default for deployments that have not opted into the
+// judge wiring yet.
+type JudgeExecutor interface {
+	ExecuteJudge(ctx context.Context, workspaceID, agentID uint32, signalID int64) (ExecutionResult, error)
+}
+
 // handoffReason enumerates the structured reasons the orchestrator
 // emits an agent → user handoff. Stored on the payload so the inbox
 // UI can group / filter and the audit trail stays grep-able.
@@ -114,6 +131,13 @@ type RunnerQuerier interface {
 type OrchestratorRunner struct {
 	DB       *sql.DB
 	Executor AgentExecutor
+	// Judge is the dispatch hook for signal_judge agents (ADR 0008
+	// D3). When non-nil, claimed rows whose dedupe_key carries the
+	// `judge:<agent>:<signal>` shape route through ExecuteJudge
+	// instead of ExecuteAgent. A nil Judge falls back to the
+	// AgentExecutor with a warning, so deployments that have not
+	// opted into the judge wiring still degrade safely.
+	Judge JudgeExecutor
 	// Queries is the sqlc bundle used to update tasks.agent_memo,
 	// insert handoff events, and emit run events with actor_agent_id.
 	// May be nil during early single-binary smoke tests; the runner
@@ -168,7 +192,26 @@ func (r *OrchestratorRunner) Run(ctx context.Context, j Job, _ time.Time) error 
 		result ExecutionResult
 		runErr error
 	)
-	if r.Executor != nil {
+	// Dispatch path: a judge-shaped dedupe_key routes through the
+	// JudgeExecutor when one is configured. Falling back to the
+	// task-agent path is intentional — deployments that have not yet
+	// wired the judge still execute the queue (so the row does not
+	// stall), with a logged warning so the misconfiguration is
+	// visible.
+	if signalID, isJudge := parseJudgeDedupeKey(j.DedupeKey); isJudge {
+		if r.Judge != nil {
+			result, runErr = r.Judge.ExecuteJudge(ctx, j.WsID, j.AgentID, signalID)
+		} else {
+			slog.WarnContext(ctx, "agentruntime: judge dispatch with no JudgeExecutor configured; falling back to task-agent path",
+				slog.Uint64("workspace_internal", uint64(j.WsID)),
+				slog.Uint64("agent_internal", uint64(j.AgentID)),
+				slog.Int64("signal_internal", signalID),
+			)
+			if r.Executor != nil {
+				result, runErr = r.Executor.ExecuteAgent(ctx, j.WsID, j.AgentID)
+			}
+		}
+	} else if r.Executor != nil {
 		result, runErr = r.Executor.ExecuteAgent(ctx, j.WsID, j.AgentID)
 	}
 	finished := r.Now().UTC()

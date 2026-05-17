@@ -1,7 +1,8 @@
 -- ============================================================================
 -- ai_settings queries (ADR 0003)
--- Per-workspace AI knobs: embed model, daily embed budget, and the
--- duplicate-detection similarity thresholds.
+-- Per-workspace AI knobs: embed model, daily embed budget, the
+-- duplicate-detection similarity thresholds, auto-action executor settings,
+-- and free-form judge_instructions spliced into the signal_judge prompt.
 -- ============================================================================
 
 -- name: GetAiSettings :one
@@ -19,6 +20,7 @@ SELECT
   auto_action_enabled,
   auto_action_interval_minutes,
   auto_action_threshold,
+  judge_instructions,
   updated_at,
   created_at
 FROM ai_settings
@@ -29,6 +31,8 @@ LIMIT 1;
 -- Create or update the ai_settings row for a workspace. The UNIQUE KEY on
 -- workspace_id makes this idempotent. modified_by_user_id is the audit
 -- trail for the most recent writer; system writers pass NULL.
+-- judge_instructions is included in the UPDATE clause so operators can clear
+-- it by passing an explicit NULL (or empty string) via sql.NullString.
 INSERT INTO ai_settings (
   workspace_id,
   modified_by_user_id,
@@ -38,8 +42,9 @@ INSERT INTO ai_settings (
   duplicate_threshold_low,
   auto_action_enabled,
   auto_action_interval_minutes,
-  auto_action_threshold
-) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+  auto_action_threshold,
+  judge_instructions
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 ON DUPLICATE KEY UPDATE
   modified_by_user_id = VALUES(modified_by_user_id),
   embed_model = VALUES(embed_model),
@@ -48,4 +53,5 @@ ON DUPLICATE KEY UPDATE
   duplicate_threshold_low = VALUES(duplicate_threshold_low),
   auto_action_enabled = VALUES(auto_action_enabled),
   auto_action_interval_minutes = VALUES(auto_action_interval_minutes),
-  auto_action_threshold = VALUES(auto_action_threshold);
+  auto_action_threshold = VALUES(auto_action_threshold),
+  judge_instructions = VALUES(judge_instructions);

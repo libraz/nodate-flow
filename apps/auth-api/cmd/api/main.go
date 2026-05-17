@@ -106,6 +106,9 @@ func main() {
 		func() (integrations.Provider, error) {
 			return integrations.NewGoogleCalendar(cfg.IntGoogleClientID, cfg.IntGoogleClientSecret)
 		},
+		func() (integrations.Provider, error) {
+			return integrations.NewDiscord(cfg.IntDiscordClientID, cfg.IntDiscordClientSecret, cfg.IntDiscordRedirectURI)
+		},
 	)
 
 	refresherCtx, refresherCancel := context.WithCancel(context.Background())

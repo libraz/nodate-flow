@@ -19,7 +19,7 @@
   },
   "integrations": {
     "title": "集成",
-    "description": "连接你的 GitHub、Slack 和 Google 日历个人账户，让 nodate-flow 可以代你执行操作。令牌将以加密形式存储。",
+    "description": "连接你的 GitHub、Slack、Google 日历和 Discord 个人账户，让 nodate-flow 可以代你执行操作。令牌将以加密形式存储。",
     "connect": "连接",
     "disconnect": "断开",
     "disconnect_confirm": "断开 {provider}？再次使用前需要重新授权。",
@@ -39,6 +39,10 @@
       "google_calendar": {
         "name": "Google 日历",
         "description": "读取你的日历和即将到来的事件。"
+      },
+      "discord": {
+        "name": "Discord",
+        "description": "读取你的在线状态，让建议能反映你何时有空。"
       }
     },
     "errors": {

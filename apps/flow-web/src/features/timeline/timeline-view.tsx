@@ -16,6 +16,7 @@ import {
 } from './api';
 import EventCard from './event-card';
 import EventFilterBar from './event-filter-bar';
+import SignalGroup from './signal-group';
 
 export type TimelineScopeArg =
   | { kind: 'task'; id: string }
@@ -47,6 +48,44 @@ function dayKey(ts: number): string {
   const m = String(d.getMonth() + 1).padStart(2, '0');
   const day = String(d.getDate()).padStart(2, '0');
   return `${y}-${m}-${day}`;
+}
+
+/**
+ * SignalCluster — adjacent events that share a `triggeredBySignalId`.
+ * Events without that field surface as singleton "solo" clusters so the
+ * caller can render them with the legacy `EventCard` layout.
+ *
+ * Adjacency rather than full grouping is intentional: the server orders
+ * the timeline by `occurredAt DESC` and signal-driven events from one
+ * judge run are emitted in the same DB transaction, so they arrive
+ * contiguously. Keeping the cluster local to its slice preserves the
+ * temporal interleaving when the same signal fires multiple times.
+ */
+type SignalCluster =
+  | { kind: 'solo'; events: TimelineEvent[] }
+  | { kind: 'signal'; signalId: string; events: TimelineEvent[] };
+
+function clusterBySignal(events: TimelineEvent[]): SignalCluster[] {
+  const out: SignalCluster[] = [];
+  for (const ev of events) {
+    const sig =
+      ev.triggeredBySignalId !== undefined && ev.triggeredBySignalId.length > 0
+        ? ev.triggeredBySignalId
+        : null;
+    const last = out[out.length - 1];
+    if (sig !== null) {
+      if (last && last.kind === 'signal' && last.signalId === sig) {
+        last.events.push(ev);
+      } else {
+        out.push({ kind: 'signal', signalId: sig, events: [ev] });
+      }
+    } else if (last && last.kind === 'solo') {
+      last.events.push(ev);
+    } else {
+      out.push({ kind: 'solo', events: [ev] });
+    }
+  }
+  return out;
 }
 
 function TimelineInner({
@@ -185,9 +224,21 @@ function TimelineInner({
                     background: 'var(--nf-color-border)',
                   }}
                 />
-                {g.items.map((ev) => (
-                  <EventCard key={ev.id} event={ev} />
-                ))}
+                {clusterBySignal(g.items).map((cluster) =>
+                  cluster.kind === 'signal' && workspaceId !== undefined ? (
+                    <SignalGroup
+                      key={`sig-${cluster.signalId}`}
+                      signalId={cluster.signalId}
+                      workspaceId={workspaceId}
+                      events={cluster.events}
+                    />
+                  ) : (
+                    // Fall back to a flat list when we have no workspace
+                    // context (task-scoped embed) — the reverse action
+                    // is unavailable there anyway.
+                    cluster.events.map((ev) => <EventCard key={ev.id} event={ev} />)
+                  ),
+                )}
               </div>
             </section>
           ))}

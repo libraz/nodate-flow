@@ -14,7 +14,44 @@ const (
 	ctxKeyActorUserID ctxKey = iota
 	ctxKeySessionPublicID
 	ctxKeyClientIP
+	ctxKeyAuthMode
 )
+
+// AuthMode classifies how the request was authenticated. It is set by
+// the auth middlewares and consumed by access-logging middleware and
+// service-token-aware handlers that need to branch on whether a real
+// user or an internal service issued the request.
+type AuthMode string
+
+const (
+	// AuthModeJWT identifies requests authenticated through the
+	// standard bearer-token chain (JWT, PAT, MCP). The actor user id
+	// is populated on the context via [WithActor].
+	AuthModeJWT AuthMode = "jwt"
+	// AuthModeServiceToken identifies requests authenticated through
+	// the flow-worker shared-secret path. No actor user id is set on
+	// the context; the request body must specify which workspace the
+	// call is scoped to.
+	AuthModeServiceToken AuthMode = "service_token"
+)
+
+// WithAuthMode returns a new context carrying the authentication mode
+// used to admit the request. The auth middleware sets this before
+// downstream middleware (LoggerContext) and handlers run.
+func WithAuthMode(ctx context.Context, mode AuthMode) context.Context {
+	return context.WithValue(ctx, ctxKeyAuthMode, mode)
+}
+
+// AuthModeFromContext extracts the authentication mode populated by
+// the auth middleware. The boolean is false when no auth middleware
+// ran (e.g. public routes).
+func AuthModeFromContext(ctx context.Context) (AuthMode, bool) {
+	v, ok := ctx.Value(ctxKeyAuthMode).(AuthMode)
+	if !ok || v == "" {
+		return "", false
+	}
+	return v, true
+}
 
 // WithActor returns a new context carrying the authenticated user's
 // internal numeric id. This is normally called by [RequireAuth] before

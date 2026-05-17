@@ -1,0 +1,14 @@
+# Calendar signals — wall-clock ticks emitted by the worker when a
+# calendar event reaches a meaningful boundary in workspace local time.
+#
+# These are discrete (one per occurrence) rather than stateful, so the
+# retention sweep prunes them by expires_at alone.
+
+kinds:
+  - kind: calendar.event_day_arrived
+    source: calendar
+    retention: discrete
+    autonomy_default: draft
+    subject_type_default: calendar_event
+    description: "Internal scheduler tick when a calendar event's start_date arrives in workspace local time"
+    i18n_key: signalKinds.calendar.eventDayArrived

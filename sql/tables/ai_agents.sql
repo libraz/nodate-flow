@@ -9,6 +9,7 @@ CREATE TABLE ai_agents (
   workspace_id INT UNSIGNED NOT NULL COMMENT 'Internal FK to workspaces.id',
   model_id INT UNSIGNED NOT NULL COMMENT 'Internal FK to ai_models.id',
 
+  kind ENUM('task_agent','signal_judge') NOT NULL DEFAULT 'task_agent' COMMENT 'Agent dispatch kind. task_agent: operates on tasks (default, all current agents). signal_judge: LLM judge for external signals (see ADR 0008 D3).',
   name VARCHAR(255) NOT NULL COMMENT 'Human-readable agent name',
   description TEXT NULL COMMENT 'Free-form description',
   system_prompt MEDIUMTEXT NOT NULL COMMENT 'System prompt text',

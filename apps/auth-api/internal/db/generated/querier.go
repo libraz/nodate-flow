@@ -181,6 +181,22 @@ type Querier interface {
 	FindStorageObjectByWorkspaceSha(ctx context.Context, arg FindStorageObjectByWorkspaceShaParams) (FindStorageObjectByWorkspaceShaRow, error)
 	// Resolve an unused recovery code by (user_id, hash).
 	FindUnusedRecoveryCode(ctx context.Context, arg FindUnusedRecoveryCodeParams) (uint32, error)
+	// Resolve a Discord user snowflake to (user_public_id, workspace_public_id)
+	// via the user_integrations.metadata_json $.external_user_id binding.
+	// Used by the internal /internal/users/by-discord/{snowflake} lookup
+	// endpoint the presence-discord gateway calls before emitting a signal.
+	// Filters out soft-disabled integrations and deterministically returns
+	// the user's earliest-joined workspace as the "default" since there is
+	// no users.default_workspace_id column today (v1.0 limitation; future
+	// enhancement may add an explicit default-workspace column). The tiebreak
+	// on wm.id keeps the result stable when two memberships share a created_at.
+	// JSON_UNQUOTE(JSON_EXTRACT(...)) is used instead of comparing JSON
+	// values directly: MySQL JSON equality on string scalars returns 0 even
+	// when the printed values are identical (MySQL JSON values carry an
+	// internal type tag that the JSON_QUOTE round-trip does not produce
+	// identically). Unquoting the stored value and comparing against the
+	// raw string parameter avoids that quirk.
+	FindUserByDiscordSnowflake(ctx context.Context, snowflake interface{}) (FindUserByDiscordSnowflakeRow, error)
 	// Lookup a user by email for login. Returns internal id for the auth pipeline.
 	// avatar_storage_object_id is the FK for self-hosted avatars; avatar_url is
 	// the external (e.g. OIDC provider) fallback URL.
@@ -412,6 +428,9 @@ type Querier interface {
 	// Insert or replace a user+provider integration. The uniq
 	// (user_id, provider) key guarantees only one active row per
 	// provider per user; on conflict we refresh every token column.
+	// metadata_json carries provider-specific binding metadata (e.g.
+	// {"external_user_id": "<snowflake>", "verified_at": "..."} for
+	// provider='discord'); pass NULL for providers that do not set it.
 	UpsertUserIntegration(ctx context.Context, arg UpsertUserIntegrationParams) (int64, error)
 }
 
