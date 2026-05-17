@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { type ReactElement, useState } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { axe } from 'vitest-axe';
+import { getOverlayOpenCountForTests } from '../_overlay/overlay-lock';
 import Dialog from './dialog';
 
 const THEMES = ['aurora-light', 'aurora-dark', 'dotline-light', 'dotline-dark'] as const;
@@ -194,5 +195,214 @@ describe.each(THEMES)('Dialog [%s]', (theme) => {
       expect(dialog.getAttribute('data-size')).toBe(size);
       unmount();
     }
+  });
+});
+
+describe('Dialog overlay lock + background inert', () => {
+  let bgSibling: HTMLDivElement;
+
+  beforeEach(() => {
+    // Pre-existing background content that lives directly under <body>,
+    // outside the portal. The lock must inert this on open and restore
+    // it on close.
+    bgSibling = document.createElement('div');
+    bgSibling.id = 'bg-sibling';
+    bgSibling.textContent = 'background';
+    document.body.appendChild(bgSibling);
+  });
+
+  afterEach(() => {
+    bgSibling.remove();
+    document.getElementById('nf-portal-root')?.remove();
+    // Defensive: if a test regression leaves the body locked, scrub state
+    // so it does not leak across files.
+    document.body.style.removeProperty('overflow');
+    document.body.style.removeProperty('padding-inline-end');
+    document.body.style.removeProperty('scrollbar-gutter');
+    document.body.removeAttribute('data-nf-overlay-lock');
+  });
+
+  it('locks body scroll and inerts background siblings while open', () => {
+    expect(getOverlayOpenCountForTests()).toBe(0);
+    const { unmount } = render(
+      <Dialog open onClose={() => {}} title="t">
+        <button type="button">OK</button>
+      </Dialog>,
+    );
+    expect(getOverlayOpenCountForTests()).toBe(1);
+    expect(document.body.style.overflow).toBe('hidden');
+    expect(document.body.getAttribute('data-nf-overlay-lock')).toBe('');
+    expect(bgSibling.hasAttribute('inert')).toBe(true);
+    expect(bgSibling.getAttribute('aria-hidden')).toBe('true');
+    // Portal host itself stays interactive.
+    const portal = document.getElementById('nf-portal-root');
+    expect(portal).not.toBeNull();
+    expect(portal?.hasAttribute('inert')).toBe(false);
+    expect(portal?.getAttribute('aria-hidden')).toBeNull();
+    unmount();
+  });
+
+  it('restores body scroll and background siblings when closed', () => {
+    function Controlled({ open }: { open: boolean }) {
+      return (
+        <Dialog open={open} onClose={() => {}} title="t">
+          <button type="button">OK</button>
+        </Dialog>
+      );
+    }
+    const { rerender } = render(<Controlled open={true} />);
+    expect(document.body.style.overflow).toBe('hidden');
+    expect(bgSibling.hasAttribute('inert')).toBe(true);
+
+    rerender(<Controlled open={false} />);
+    expect(getOverlayOpenCountForTests()).toBe(0);
+    expect(document.body.style.overflow).toBe('');
+    expect(document.body.getAttribute('data-nf-overlay-lock')).toBeNull();
+    expect(bgSibling.hasAttribute('inert')).toBe(false);
+    expect(bgSibling.getAttribute('aria-hidden')).toBeNull();
+  });
+
+  it('reference-counts stacked dialogs (open A, open B, close A keeps lock)', () => {
+    function Stack({ aOpen, bOpen }: { aOpen: boolean; bOpen: boolean }) {
+      return (
+        <>
+          <Dialog open={aOpen} onClose={() => {}} title="A">
+            <button type="button">A-ok</button>
+          </Dialog>
+          <Dialog open={bOpen} onClose={() => {}} title="B">
+            <button type="button">B-ok</button>
+          </Dialog>
+        </>
+      );
+    }
+
+    const { rerender, unmount } = render(<Stack aOpen={true} bOpen={false} />);
+    expect(getOverlayOpenCountForTests()).toBe(1);
+    expect(document.body.style.overflow).toBe('hidden');
+    expect(bgSibling.hasAttribute('inert')).toBe(true);
+
+    rerender(<Stack aOpen={true} bOpen={true} />);
+    expect(getOverlayOpenCountForTests()).toBe(2);
+    expect(document.body.style.overflow).toBe('hidden');
+    expect(bgSibling.hasAttribute('inert')).toBe(true);
+
+    // Close the first dialog while the second remains open: lock and
+    // inert MUST stay applied.
+    rerender(<Stack aOpen={false} bOpen={true} />);
+    expect(getOverlayOpenCountForTests()).toBe(1);
+    expect(document.body.style.overflow).toBe('hidden');
+    expect(document.body.getAttribute('data-nf-overlay-lock')).toBe('');
+    expect(bgSibling.hasAttribute('inert')).toBe(true);
+    expect(bgSibling.getAttribute('aria-hidden')).toBe('true');
+
+    // Closing the last opener releases the lock.
+    rerender(<Stack aOpen={false} bOpen={false} />);
+    expect(getOverlayOpenCountForTests()).toBe(0);
+    expect(document.body.style.overflow).toBe('');
+    expect(document.body.getAttribute('data-nf-overlay-lock')).toBeNull();
+    expect(bgSibling.hasAttribute('inert')).toBe(false);
+    expect(bgSibling.getAttribute('aria-hidden')).toBeNull();
+    unmount();
+  });
+
+  it('preserves user-set inert and aria-hidden on background siblings across the lock cycle', () => {
+    bgSibling.setAttribute('inert', '');
+    bgSibling.setAttribute('aria-hidden', 'true');
+
+    const { unmount } = render(
+      <Dialog open onClose={() => {}} title="t">
+        <button type="button">OK</button>
+      </Dialog>,
+    );
+    // Still inert (we did not strip it, just re-asserted).
+    expect(bgSibling.hasAttribute('inert')).toBe(true);
+    expect(bgSibling.getAttribute('aria-hidden')).toBe('true');
+    unmount();
+    // After release, the user's pre-existing values must remain.
+    expect(bgSibling.hasAttribute('inert')).toBe(true);
+    expect(bgSibling.getAttribute('aria-hidden')).toBe('true');
+  });
+
+  it('restores focus to the opener after close, even when the opener lives inside a background-inerted body sibling', async () => {
+    // Reproduces the regression where useOverlayLock inerted the trigger's
+    // ancestor before useFocusTrap captured `previouslyFocused`, leaving
+    // `document.activeElement === <body>` after the dialog closed. The fix
+    // captures the snapshot during render (before any layout effect runs)
+    // and defers the restore via queueMicrotask (so the lock cleanup —
+    // which runs in declaration order, BEFORE the trap cleanup — has time
+    // to remove `inert` from the opener's ancestor first).
+    function Opener(): ReactElement {
+      const [open, setOpen] = useState(false);
+      return (
+        <>
+          <button type="button" data-testid="trigger" onClick={() => setOpen(true)}>
+            open dialog
+          </button>
+          {open ? (
+            <Dialog open onClose={() => setOpen(false)} title="t">
+              <button type="button">OK</button>
+            </Dialog>
+          ) : null}
+        </>
+      );
+    }
+
+    const user = userEvent.setup();
+    render(<Opener />);
+    const trigger = screen.getByTestId('trigger');
+    trigger.focus();
+    expect(document.activeElement).toBe(trigger);
+
+    await user.click(trigger);
+    // Dialog is now open; the lock has stamped `inert` on the trigger's
+    // body-level ancestor. Focus has been moved into the dialog.
+    expect(document.activeElement).toBe(screen.getByRole('button', { name: 'OK' }));
+
+    await user.keyboard('{Escape}');
+    // After close: lock released, inert removed, focus restored to trigger.
+    // The microtask scheduled by useFocusTrap cleanup is flushed by the
+    // `await` on userEvent.keyboard.
+    expect(document.activeElement).toBe(trigger);
+  });
+
+  it('restores focus to the inner dialog when an outer dialog stays open and inner closes', async () => {
+    // Stacked overlays must restore focus correctly even when the
+    // background remains inerted (because dialog A is still open). The
+    // microtask deferral handles this: by the time it fires, the inner
+    // dialog has unmounted and B's lock decrement still leaves the body
+    // locked under A — but the previouslyFocused element captured for B
+    // was inside A, which has never been inerted (it lives in the portal
+    // root, which the lock explicitly skips).
+    function Stack(): ReactElement {
+      const [bOpen, setBOpen] = useState(false);
+      return (
+        <Dialog open onClose={() => {}} title="A">
+          <button type="button" data-testid="open-b" onClick={() => setBOpen(true)}>
+            open B
+          </button>
+          {bOpen ? (
+            <Dialog open onClose={() => setBOpen(false)} title="B">
+              <button type="button">B-ok</button>
+            </Dialog>
+          ) : null}
+        </Dialog>
+      );
+    }
+
+    const user = userEvent.setup();
+    render(<Stack />);
+    // Dialog A opens; first focusable inside A is "open B".
+    const openB = screen.getByTestId('open-b');
+    expect(document.activeElement).toBe(openB);
+
+    await user.click(openB);
+    // Dialog B opens; first focusable inside B is "B-ok".
+    expect(document.activeElement).toBe(screen.getByRole('button', { name: 'B-ok' }));
+    expect(getOverlayOpenCountForTests()).toBe(2);
+
+    await user.keyboard('{Escape}');
+    // B closed; focus must return to the opener inside A — NOT to body.
+    expect(getOverlayOpenCountForTests()).toBe(1);
+    expect(document.activeElement).toBe(openB);
   });
 });

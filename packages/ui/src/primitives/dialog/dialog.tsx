@@ -4,7 +4,10 @@
  * Renders into a deterministic portal container (`#nf-portal-root`, created on
  * demand). Reuses {@link useFocusTrap} for focus containment, restores focus to
  * the previously focused element on close, dismisses on Escape, and applies
- * `aria-modal` + `role="dialog"`. Background siblings get `inert` while open.
+ * `aria-modal` + `role="dialog"`. While open, background `<body>` children
+ * (everything except `#nf-portal-root`) are made `inert` and `aria-hidden`,
+ * and body scroll is locked via {@link useOverlayLock}; both are
+ * reference-counted so stacked overlays cooperate.
  *
  * Note: we deliberately do NOT use the native `<dialog>` element because
  * happy-dom's `showModal()` implementation is incomplete; a div + a11y
@@ -25,6 +28,7 @@ import {
 import { createPortal } from 'react-dom';
 import { useFocusTrap } from '../../hooks/use-focus-trap';
 import { cx } from '../../lib/cx';
+import { useOverlayLock } from '../_overlay/overlay-lock';
 import styles from './dialog.module.css';
 
 const PORTAL_ID = 'nf-portal-root';
@@ -95,6 +99,7 @@ function DialogImpl(
   const titleId = useId();
 
   useFocusTrap(containerRef, open);
+  useOverlayLock(containerRef, open);
 
   const handleRef = useCallback(
     (node: HTMLDivElement | null) => {

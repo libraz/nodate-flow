@@ -2,8 +2,9 @@
  * Drawer — side-sheet variant of Dialog.
  *
  * Same a11y guarantees as Dialog (focus trap, escape, role="dialog" +
- * aria-modal, portal). Slides in from the configured side: `inline-start`,
- * `inline-end`, `block-start`, or `block-end` (logical sides only).
+ * aria-modal, portal, body scroll lock, background `inert` + `aria-hidden`).
+ * Slides in from the configured side: `inline-start`, `inline-end`,
+ * `block-start`, or `block-end` (logical sides only).
  */
 
 import {
@@ -20,6 +21,7 @@ import {
 import { createPortal } from 'react-dom';
 import { useFocusTrap } from '../../hooks/use-focus-trap';
 import { cx } from '../../lib/cx';
+import { useOverlayLock } from '../_overlay/overlay-lock';
 import styles from './drawer.module.css';
 
 const PORTAL_ID = 'nf-portal-root';
@@ -65,6 +67,7 @@ function DrawerImpl(
   const titleId = useId();
 
   useFocusTrap(containerRef, open);
+  useOverlayLock(containerRef, open);
 
   const handleRef = useCallback(
     (node: HTMLDivElement | null) => {

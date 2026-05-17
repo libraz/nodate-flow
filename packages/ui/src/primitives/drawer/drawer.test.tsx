@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { useState } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { axe } from 'vitest-axe';
+import { getOverlayOpenCountForTests } from '../_overlay/overlay-lock';
 import Drawer, { type DrawerSide } from './drawer';
 
 const THEMES = ['aurora-light', 'aurora-dark', 'dotline-light', 'dotline-dark'] as const;
@@ -60,5 +61,77 @@ describe.each(THEMES)('Drawer [%s]', (theme) => {
   it('traps focus on first interactive element', () => {
     render(<Harness />);
     expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Apply' }));
+  });
+});
+
+describe('Drawer overlay lock + background inert', () => {
+  let bgSibling: HTMLDivElement;
+
+  beforeEach(() => {
+    bgSibling = document.createElement('div');
+    bgSibling.id = 'bg-sibling-drawer';
+    bgSibling.textContent = 'background';
+    document.body.appendChild(bgSibling);
+  });
+
+  afterEach(() => {
+    bgSibling.remove();
+    document.getElementById('nf-portal-root')?.remove();
+    document.body.style.removeProperty('overflow');
+    document.body.style.removeProperty('padding-inline-end');
+    document.body.style.removeProperty('scrollbar-gutter');
+    document.body.removeAttribute('data-nf-overlay-lock');
+  });
+
+  it('locks body scroll and inerts background siblings while open', () => {
+    expect(getOverlayOpenCountForTests()).toBe(0);
+    const { unmount } = render(
+      <Drawer open onClose={() => {}} title="t">
+        <button type="button">Apply</button>
+      </Drawer>,
+    );
+    expect(getOverlayOpenCountForTests()).toBe(1);
+    expect(document.body.style.overflow).toBe('hidden');
+    expect(document.body.getAttribute('data-nf-overlay-lock')).toBe('');
+    expect(bgSibling.hasAttribute('inert')).toBe(true);
+    expect(bgSibling.getAttribute('aria-hidden')).toBe('true');
+    unmount();
+    expect(getOverlayOpenCountForTests()).toBe(0);
+    expect(document.body.style.overflow).toBe('');
+    expect(bgSibling.hasAttribute('inert')).toBe(false);
+    expect(bgSibling.getAttribute('aria-hidden')).toBeNull();
+  });
+
+  it('restores focus to the opener after close, even when the opener lives inside a background-inerted body sibling', async () => {
+    // Drawer composes the same useFocusTrap + useOverlayLock pair as
+    // Dialog, so it is subject to the same focus-restoration regression.
+    // Pin the corrected behaviour here too.
+    function Opener() {
+      const [open, setOpen] = useState(false);
+      return (
+        <>
+          <button type="button" data-testid="trigger" onClick={() => setOpen(true)}>
+            open drawer
+          </button>
+          {open ? (
+            <Drawer open onClose={() => setOpen(false)} title="t">
+              <button type="button">Apply</button>
+            </Drawer>
+          ) : null}
+        </>
+      );
+    }
+
+    const user = userEvent.setup();
+    render(<Opener />);
+    const trigger = screen.getByTestId('trigger');
+    trigger.focus();
+    expect(document.activeElement).toBe(trigger);
+
+    await user.click(trigger);
+    expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Apply' }));
+
+    await user.keyboard('{Escape}');
+    expect(document.activeElement).toBe(trigger);
   });
 });
