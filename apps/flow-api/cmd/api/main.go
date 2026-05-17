@@ -344,7 +344,7 @@ func main() {
 	outer.Use(nflog.RequestLogger(logger))
 	outer.Use(obs.TraceMiddleware())
 	outer.Use(obs.MetricsMiddleware())
-	outer.Use(httputil.BuildCORS(cfg.CorsAllowedOrigins))
+	outer.Use(httputil.BuildCORS(cfg.CorsAllowedOrigins, cfg.CorsDevLocalhost))
 
 	outer.Mount("/", inner)
 

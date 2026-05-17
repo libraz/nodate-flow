@@ -6,7 +6,7 @@
  * creation. Tenants are stored in a temp JSON file read by each spec.
  */
 
-import { writeFileSync } from 'node:fs';
+import { renameSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -49,7 +49,12 @@ async function globalSetup(): Promise<void> {
   const user2 = await createTestTenant();
 
   const tenants: SharedTenants = { user, user2, seededTasks: SEEDED_TASKS };
-  writeFileSync(TENANTS_PATH, JSON.stringify(tenants, null, 2));
+  // Atomic write: write to a temp file and rename. Prevents readers
+  // (loadTenants) from observing a partially-written file if the
+  // process is interrupted mid-write.
+  const tmpPath = `${TENANTS_PATH}.tmp`;
+  writeFileSync(tmpPath, JSON.stringify(tenants, null, 2));
+  renameSync(tmpPath, TENANTS_PATH);
 }
 
 async function createTaskWithDueDate(

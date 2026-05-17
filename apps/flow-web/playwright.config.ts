@@ -11,6 +11,14 @@ import { defineConfig, devices } from '@playwright/test';
 const isCI = !!process.env.CI;
 
 const WEB_BASE_URL = process.env.NF_WEB_URL ?? 'http://localhost:5173';
+const WEB_PORT = (() => {
+  try {
+    return new URL(WEB_BASE_URL).port || '5173';
+  } catch {
+    return '5173';
+  }
+})();
+const BROWSER_CHANNEL = process.env.PW_BROWSER_CHANNEL;
 
 export default defineConfig({
   testDir: './e2e',
@@ -39,11 +47,14 @@ export default defineConfig({
   projects: [
     {
       name: 'chromium',
-      use: { ...devices['Desktop Chrome'] },
+      use: {
+        ...devices['Desktop Chrome'],
+        ...(BROWSER_CHANNEL ? { channel: BROWSER_CHANNEL } : {}),
+      },
     },
   ],
   webServer: {
-    command: 'bun run dev',
+    command: `bun run dev -- --port=${WEB_PORT} --strictPort`,
     url: WEB_BASE_URL,
     reuseExistingServer: !isCI,
     timeout: 120_000,

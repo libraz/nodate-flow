@@ -214,7 +214,7 @@ func main() {
 	}
 
 	outer := chi.NewRouter()
-	outer.Use(httputil.BuildCORS(cfg.CorsAllowedOrigins))
+	outer.Use(httputil.BuildCORS(cfg.CorsAllowedOrigins, cfg.CorsDevLocalhost))
 	outer.Mount("/", inner)
 
 	addr := ":" + cfg.Port

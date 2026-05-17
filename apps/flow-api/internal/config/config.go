@@ -63,6 +63,13 @@ type Config struct {
 	// will then be disabled by the CORS spec).
 	CorsAllowedOrigins []string `env:"NF_FLOW_CORS" envSeparator:"," envDefault:"http://localhost:5173,http://127.0.0.1:5173"`
 
+	// CorsDevLocalhost relaxes the CORS check so that any
+	// http://localhost:<port> or http://127.0.0.1:<port> origin is
+	// accepted on top of the explicit allowlist. Intended for local dev
+	// where the Vite dev server may bind to a non-default port. MUST
+	// remain false in production.
+	CorsDevLocalhost bool `env:"NF_CORS_DEV_LOCALHOST" envDefault:"false"`
+
 	// OutboundLlmRps is the steady-state per-provider egress rate cap
 	// (requests per second) applied uniformly to every configured LLM
 	// destination. 0 disables the limiter (fail-open). The burst size

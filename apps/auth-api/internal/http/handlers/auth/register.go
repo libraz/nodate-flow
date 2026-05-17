@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"log/slog"
 	"strings"
 
 	"github.com/nodate-flow/nodate-flow/apps/auth-api/internal/auth"
@@ -29,11 +30,13 @@ func Register(deps Deps) func(context.Context, *RegisterInput) (*RegisterOutput,
 		if _, err := deps.Queries.FindUserByEmail(ctx, email); err == nil {
 			return nil, httpErr(apierrors.AuthRegisterEmailAlreadyTaken)
 		} else if !errors.Is(err, sql.ErrNoRows) {
+			slog.ErrorContext(ctx, "register: email lookup failed", "error", err)
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
 
 		hash, err := auth.HashPassword(in.Body.Password)
 		if err != nil {
+			slog.ErrorContext(ctx, "register: password hash failed", "error", err)
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
 
@@ -62,6 +65,7 @@ func Register(deps Deps) func(context.Context, *RegisterInput) (*RegisterOutput,
 			ThemePreference: generated.UsersThemePreference("system"),
 		})
 		if err != nil {
+			slog.ErrorContext(ctx, "register: create user failed", "error", err)
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
 
@@ -73,6 +77,7 @@ func Register(deps Deps) func(context.Context, *RegisterInput) (*RegisterOutput,
 			Subject:      email,
 			PasswordHash: sql.NullString{String: hash, Valid: true},
 		}); err != nil {
+			slog.ErrorContext(ctx, "register: create identity failed", "error", err)
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
 

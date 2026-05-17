@@ -63,6 +63,13 @@ type Config struct {
 	// (:5175) and flow-web (:5173) origins.
 	CorsAllowedOrigins []string `env:"NF_AUTH_CORS" envSeparator:"," envDefault:"http://localhost:5173,http://localhost:5175,http://127.0.0.1:5173,http://127.0.0.1:5175"`
 
+	// CorsDevLocalhost relaxes the CORS check so that any
+	// http://localhost:<port> or http://127.0.0.1:<port> origin is
+	// accepted on top of the explicit allowlist. Intended for local dev
+	// where the Vite dev server may bind to a non-default port. MUST
+	// remain false in production.
+	CorsDevLocalhost bool `env:"NF_CORS_DEV_LOCALHOST" envDefault:"false"`
+
 	// SessionStore selects the refresh-token session driver: mysql or redis.
 	SessionStore string `env:"NF_AUTH_SESSION_STORE" envDefault:"mysql"`
 	// RedisAddr is the host:port for the Redis session store.
