@@ -45,6 +45,8 @@ vendor/
 /apps/auth-api/dump-openapi
 /apps/auth-api/healthcheck
 /scripts/merge-openapi
+/apps/flow-worker/worker
+/apps/presence-discord/gateway
 /healthcheck
 go.sum.bak
 
