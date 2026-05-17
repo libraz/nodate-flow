@@ -190,6 +190,17 @@ test.describe('calendar settings drawer — general tab', () => {
 
     await expect(page.getByText(copy.savedToast)).toBeVisible({ timeout: 5_000 });
 
+    // Close the drawer before asserting against the rail. While the
+    // drawer is open, the overlay-lock marks every non-portal `<body>`
+    // child as `inert` + `aria-hidden="true"` (intentional a11y
+    // behaviour for modal dialogs), which removes the rail from the
+    // accessibility tree and makes `getByRole('listitem')` invisible
+    // even though its DOM and TanStack Query cache have already updated
+    // with the renamed name. Mirroring the real user flow (close drawer
+    // → see updated rail) keeps the assertion honest.
+    await page.keyboard.press('Escape');
+    await expect(drawer).toBeHidden({ timeout: 5_000 });
+
     // Rail row title updates without a page reload (react-query invalidate).
     const rail = page.getByRole('complementary', { name: copy.railTitle });
     await expect(rail.getByRole('listitem').filter({ hasText: renamed })).toBeVisible({

@@ -109,7 +109,9 @@ export default function TaskBoardView({ projectId }: TaskBoardViewProps): ReactE
             </Card>
             <div role="list" aria-label={t(STATE_KEY[state])} className={css.dropZone}>
               {items.length === 0 ? (
-                <p className={css.emptyColumn}>{t('tasks.board.empty_column')}</p>
+                <div role="listitem" className={css.emptyColumn}>
+                  {t('tasks.board.empty_column')}
+                </div>
               ) : (
                 items.map((task) => (
                   <div key={task.id} role="listitem">

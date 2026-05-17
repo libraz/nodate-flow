@@ -110,7 +110,10 @@ async function mockTaskAgentContext(
   taskId: string,
   agentContext: AgentContextShape,
 ): Promise<void> {
-  await page.route(`**/tasks/${taskId}`, async (route: Route) => {
+  // Scope to the API origin so the SPA HTML route at the same /tasks/{id}
+  // path on the dev server is NOT intercepted (which would otherwise feed
+  // index.html into JSON.parse and break the page load).
+  await page.route(`${API_BASE_URL}/tasks/${taskId}`, async (route: Route) => {
     if (route.request().method() !== 'GET') {
       await route.fallback();
       return;
@@ -132,7 +135,9 @@ async function mockTaskAgentContext(
  * exact wire shape the Huma operation produces.
  */
 async function mockAgentRunsList(page: Page, taskId: string): Promise<void> {
-  await page.route(`**/tasks/${taskId}/agent-runs*`, async (route: Route) => {
+  // Scope to the API origin (path + query) so the SPA route on the dev
+  // server is not accidentally intercepted.
+  await page.route(`${API_BASE_URL}/tasks/${taskId}/agent-runs*`, async (route: Route) => {
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
@@ -257,7 +262,7 @@ test.describe('task detail — agent handoff panel', () => {
     // on the payload shape and respond with a fake task that flips the
     // agentContext to handed_back.
     let captured: unknown = null;
-    await page.route(`**/tasks/${task.id}/handoff/to-user`, async (route: Route) => {
+    await page.route(`${API_BASE_URL}/tasks/${task.id}/handoff/to-user`, async (route: Route) => {
       if (route.request().method() !== 'POST') {
         await route.fallback();
         return;
@@ -309,11 +314,14 @@ test.describe('task detail — agent handoff panel', () => {
       handoffReason: 'low_confidence',
     });
     // Inject a synthetic agent.task.handoff_to_user event into the
-    // task timeline response. actorUserId is omitted so EventCard's
-    // `isAgentEvent` path triggers and the bot glyph renders. Once
-    // follow-up task #20 lands, the assertion below should be tightened
-    // to check for the agent name instead of the system fallback.
-    await page.route(`**/tasks/${task.id}/timeline*`, async (route: Route) => {
+    // task timeline response. actorUserId is omitted and actorAgentId
+    // is set so EventCard's `isAgent` branch triggers and the bot
+    // glyph renders. actorAgentName is intentionally absent so the
+    // template substitutes the t('actor.system') fallback (see
+    // assertion below). Once follow-up task #20 wires the agent name
+    // into TimelineEvent, the assertion should be tightened to check
+    // for the agent name instead of the system fallback.
+    await page.route(`${API_BASE_URL}/tasks/${task.id}/timeline*`, async (route: Route) => {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -324,6 +332,7 @@ test.describe('task detail — agent handoff panel', () => {
               id: '0192a4d8-3333-7000-8000-000000000003',
               type: 'agent.task.handoff_to_user',
               taskId: task.id,
+              actorAgentId: FAKE_AGENT_ID,
               payload: { reason: 'low_confidence' },
               occurredAt: Math.floor(Date.now() / 1000) - 120,
             },
