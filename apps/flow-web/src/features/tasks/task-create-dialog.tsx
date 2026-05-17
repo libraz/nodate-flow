@@ -200,9 +200,11 @@ export default function TaskCreateDialog({
 
   const handleSubmit = async (e: FormEvent<HTMLFormElement>): Promise<void> => {
     e.preventDefault();
+    const trimmedTitle = title.trim();
+    const trimmedDescription = description.trim();
     const parsed = schema.safeParse({
-      title,
-      description: description.trim() === '' ? undefined : description,
+      title: trimmedTitle,
+      description: trimmedDescription === '' ? undefined : trimmedDescription,
       priority,
       dueOn: dueOn === '' ? undefined : dueOn,
     });
@@ -355,7 +357,15 @@ export default function TaskCreateDialog({
           <Button type="button" variant="ghost" onClick={handleClose} disabled={submitting}>
             {t('tasks.form.cancel')}
           </Button>
-          <Button type="submit" variant="primary" disabled={submitting}>
+          {/* Disable submit when the title is empty or whitespace-only so the
+              user gets immediate UI feedback that a meaningful title is
+              required. handleSubmit also re-validates via the Zod schema as a
+              defence-in-depth check. */}
+          <Button
+            type="submit"
+            variant="primary"
+            disabled={submitting || title.trim().length === 0}
+          >
             {t('tasks.form.submit')}
           </Button>
         </div>

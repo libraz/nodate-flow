@@ -281,6 +281,10 @@ func Create(deps Deps) func(context.Context, *CreateTaskInput) (*CreateTaskOutpu
 		if !ok {
 			return nil, httpErr(apierrors.WsTaskAccessDenied)
 		}
+		title := strings.TrimSpace(in.Body.Title)
+		if title == "" {
+			return nil, httpErr(apierrors.ValidationBodyFieldInvalid)
+		}
 		prjPub, err := types.Parse(in.Body.ProjectID)
 		if err != nil {
 			return nil, httpErr(apierrors.WsProjectNotFound)
@@ -347,7 +351,7 @@ func Create(deps Deps) func(context.Context, *CreateTaskInput) (*CreateTaskOutpu
 				ParentTaskID:    sql.NullInt32{},
 				CreatedByUserID: sql.NullInt32{Int32: int32(actorID), Valid: true}, //#nosec G115 -- actor user id sourced from session, fits int32 within realistic deployments
 				UpdatedByUserID: sql.NullInt32{Int32: int32(actorID), Valid: true}, //#nosec G115 -- actor user id sourced from session, fits int32 within realistic deployments
-				Title:           in.Body.Title,
+				Title:           title,
 				Description:     desc,
 				Priority:        in.Body.Priority,
 				DueOn:           due,
@@ -427,7 +431,7 @@ func Create(deps Deps) func(context.Context, *CreateTaskInput) (*CreateTaskOutpu
 			Payload: map[string]any{
 				"taskId":    pub.String(),
 				"projectId": prjPub.String(),
-				"title":     in.Body.Title,
+				"title":     title,
 			},
 		}); err != nil {
 			nflog.LoggerFromContext(ctx).ErrorContext(ctx, "eventbus.Append failed",
@@ -444,13 +448,13 @@ func Create(deps Deps) func(context.Context, *CreateTaskInput) (*CreateTaskOutpu
 			WorkspaceID:  prj.WorkspaceID,
 			ResourceType: "task",
 			ResourceID:   pub.String(),
-			Metadata:     map[string]any{"title": in.Body.Title, "projectId": in.Body.ProjectID},
+			Metadata:     map[string]any{"title": title, "projectId": in.Body.ProjectID},
 		})
 		if deps.Embedder != nil {
 			// Write-time embedding upsert (ADR 0003). Failures are swallowed
 			// so the task write still succeeds; the weekly reindex cron
 			// picks up any rows that missed.
-			_ = deps.Embedder.EmbedTask(ctx, prj.WorkspaceID, uint32(taskID), in.Body.Title, in.Body.Description) //#nosec G115 -- LastInsertId for tasks.id (BIGINT UNSIGNED), fits uint32 within realistic deployments
+			_ = deps.Embedder.EmbedTask(ctx, prj.WorkspaceID, uint32(taskID), title, in.Body.Description) //#nosec G115 -- LastInsertId for tasks.id (BIGINT UNSIGNED), fits uint32 within realistic deployments
 		}
 
 		row, err := deps.Queries.FindTaskByPublicId(ctx, generated.FindTaskByPublicIdParams{
@@ -715,8 +719,12 @@ func Patch(deps Deps) func(context.Context, *PatchTaskInput) (*PatchTaskOutput, 
 		}
 
 		newTitle := current.Title
-		if in.Body.Title != nil && *in.Body.Title != "" {
-			newTitle = *in.Body.Title
+		if in.Body.Title != nil {
+			trimmedTitle := strings.TrimSpace(*in.Body.Title)
+			if trimmedTitle == "" {
+				return nil, httpErr(apierrors.ValidationBodyFieldInvalid)
+			}
+			newTitle = trimmedTitle
 		}
 		newDesc := current.Description
 		if in.Body.Description != nil {
