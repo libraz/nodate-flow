@@ -627,6 +627,10 @@ function CalendarRoute(): ReactElement {
               return (
                 <div
                   key={cell.key}
+                  // data-cell-key exposes the YYYY-MM-DD cell address for
+                  // E2E drag-target selection (otherwise CSS-module hashes
+                  // make cells un-addressable).
+                  data-cell-key={cell.key}
                   onDragEnter={(e) => {
                     handleDragEnter(e, cell.key);
                   }}
