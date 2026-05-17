@@ -14,7 +14,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { components } from '@nodate-flow/sdk';
 
-import { renderWithProviders } from '../../../test/helpers/render';
+import { renderWithProviders } from '@tests/helpers/render';
 import EventDialog, { type EventDialogMode } from '../event-dialog';
 
 type CreateEventInput = components['schemas']['CreateEventInputBody'];

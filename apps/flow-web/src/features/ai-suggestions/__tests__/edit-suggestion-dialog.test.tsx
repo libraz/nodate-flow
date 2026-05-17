@@ -2,7 +2,7 @@ import { screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 
-import { renderWithProviders } from '../../../test/helpers/render';
+import { renderWithProviders } from '@tests/helpers/render';
 import EditSuggestionDialog from '../edit-suggestion-dialog';
 import type { Suggestion } from '../store';
 

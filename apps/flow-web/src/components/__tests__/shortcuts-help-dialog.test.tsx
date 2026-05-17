@@ -10,8 +10,8 @@ import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { axe } from 'vitest-axe';
 
+import { renderWithProviders } from '@tests/helpers/render';
 import { SHORTCUT_BINDINGS } from '../../lib/use-keyboard-shortcuts';
-import { renderWithProviders } from '../../test/helpers/render';
 import ShortcutsHelpDialog from '../shortcuts-help-dialog';
 
 describe('<ShortcutsHelpDialog>', () => {

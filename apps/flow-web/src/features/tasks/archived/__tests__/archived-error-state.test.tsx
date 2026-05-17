@@ -10,7 +10,7 @@
 import { fireEvent, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 
-import { renderWithProviders } from '../../../../test/helpers/render';
+import { renderWithProviders } from '@tests/helpers/render';
 import ArchivedErrorState from '../archived-error-state';
 
 describe('<ArchivedErrorState>', () => {

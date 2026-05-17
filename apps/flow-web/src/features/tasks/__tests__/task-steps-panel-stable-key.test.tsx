@@ -20,7 +20,7 @@
 import { fireEvent, screen, waitFor } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 
-import { renderWithProviders } from '../../../test/helpers/render';
+import { renderWithProviders } from '@tests/helpers/render';
 
 vi.mock('@nodate-flow/ui/primitives/toast', () => ({
   toaster: { show: vi.fn() },

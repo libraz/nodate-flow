@@ -10,7 +10,7 @@ import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { axe } from 'vitest-axe';
 
-import { renderWithProviders } from '../../../test/helpers/render';
+import { renderWithProviders } from '@tests/helpers/render';
 import type { InboxItem } from '../api';
 import InboxItemRow from '../inbox-item-row';
 

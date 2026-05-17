@@ -9,7 +9,7 @@
 import { fireEvent, screen, waitFor } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 
-import { renderWithProviders } from '../../../test/helpers/render';
+import { renderWithProviders } from '@tests/helpers/render';
 import TaskCreateDialog from '../task-create-dialog';
 
 vi.mock('../api', async () => {

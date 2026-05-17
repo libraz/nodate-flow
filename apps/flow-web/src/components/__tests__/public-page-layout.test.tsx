@@ -9,7 +9,7 @@ import { screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { axe } from 'vitest-axe';
 
-import { renderWithProviders } from '../../test/helpers/render';
+import { renderWithProviders } from '@tests/helpers/render';
 import PublicPageLayout from '../public-page-layout';
 
 describe('<PublicPageLayout>', () => {
