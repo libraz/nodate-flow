@@ -16,7 +16,7 @@ import type { ReactElement, ReactNode } from 'react';
 
 import { authStore } from '../features/auth/auth-store';
 import type { Me } from '../features/settings/api';
-import { sdk } from '../lib/sdk';
+import { authSdk } from '../lib/sdk';
 import { queryClient } from './query-client';
 
 export {
@@ -54,7 +54,7 @@ async function fetchServerTheme(): Promise<ThemePreference | null> {
 async function syncServerTheme(pref: ThemePreference): Promise<void> {
   const token = authStore.getState().accessToken;
   if (!token) return;
-  const { data } = await sdk.PATCH('/me', { body: { themePreference: pref } });
+  const { data } = await authSdk.PATCH('/me', { body: { themePreference: pref } });
   if (data) queryClient.setQueryData<Me>(['me'], data);
 }
 
