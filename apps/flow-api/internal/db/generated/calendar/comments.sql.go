@@ -130,14 +130,22 @@ SELECT
   u.public_id AS user_public_id,
   u.display_name,
   u.avatar_url,
-  c.created_at
+  c.created_at,
+  COUNT(*) OVER() AS total
 FROM calendar_event_comments c
 INNER JOIN users u ON u.id = c.author_id AND u.enabled = TRUE
 WHERE c.event_id = ?
   AND c.enabled = TRUE
   AND c.deleted_at IS NULL
-ORDER BY c.created_at ASC
+ORDER BY c.created_at ASC, c.public_id ASC
+LIMIT ? OFFSET ?
 `
+
+type ListCalendarEventCommentsParams struct {
+	EventID sql.NullInt32 `json:"-"`
+	Limit   int32         `json:"limit"`
+	Offset  int32         `json:"offset"`
+}
 
 type ListCalendarEventCommentsRow struct {
 	PublicID     types.PublicID `json:"publicId"`
@@ -148,11 +156,14 @@ type ListCalendarEventCommentsRow struct {
 	DisplayName  string         `json:"displayName"`
 	AvatarUrl    sql.NullString `json:"avatarUrl"`
 	CreatedAt    time.Time      `json:"createdAt"`
+	Total        interface{}    `json:"total"`
 }
 
-// List comments on an event in chronological order.
-func (q *Queries) ListCalendarEventComments(ctx context.Context, eventID sql.NullInt32) ([]ListCalendarEventCommentsRow, error) {
-	rows, err := q.db.QueryContext(ctx, listCalendarEventComments, eventID)
+// List comments on an event in chronological order. Paginated
+// (LIMIT/OFFSET) so the result set is always bounded; total carries the
+// pre-page count.
+func (q *Queries) ListCalendarEventComments(ctx context.Context, arg ListCalendarEventCommentsParams) ([]ListCalendarEventCommentsRow, error) {
+	rows, err := q.db.QueryContext(ctx, listCalendarEventComments, arg.EventID, arg.Limit, arg.Offset)
 	if err != nil {
 		return nil, err
 	}
@@ -169,6 +180,7 @@ func (q *Queries) ListCalendarEventComments(ctx context.Context, eventID sql.Nul
 			&i.DisplayName,
 			&i.AvatarUrl,
 			&i.CreatedAt,
+			&i.Total,
 		); err != nil {
 			return nil, err
 		}

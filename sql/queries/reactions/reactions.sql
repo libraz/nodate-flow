@@ -10,34 +10,40 @@ INSERT INTO reactions (
 ) VALUES (?, ?, ?, ?, ?, ?);
 
 -- name: ListReactionsForTask :many
--- List all reactions on a task, grouped by emoji with user info.
+-- List reactions on a task with user info. Paginated (LIMIT/OFFSET) so
+-- the result set is always bounded; total carries the pre-page count.
 SELECT
   r.public_id,
   r.emoji,
   r.user_id,
   u.public_id AS user_public_id,
   u.display_name,
-  r.created_at
+  r.created_at,
+  COUNT(*) OVER() AS total
 FROM reactions r
 INNER JOIN users u ON u.id = r.user_id
 WHERE r.task_id = ?
   AND r.enabled = TRUE
-ORDER BY r.created_at ASC;
+ORDER BY r.created_at ASC, r.public_id ASC
+LIMIT ? OFFSET ?;
 
 -- name: ListReactionsForComment :many
--- List all reactions on a comment.
+-- List reactions on a comment. Paginated (LIMIT/OFFSET) so the result
+-- set is always bounded; total carries the pre-page count.
 SELECT
   r.public_id,
   r.emoji,
   r.user_id,
   u.public_id AS user_public_id,
   u.display_name,
-  r.created_at
+  r.created_at,
+  COUNT(*) OVER() AS total
 FROM reactions r
 INNER JOIN users u ON u.id = r.user_id
 WHERE r.comment_id = ?
   AND r.enabled = TRUE
-ORDER BY r.created_at ASC;
+ORDER BY r.created_at ASC, r.public_id ASC
+LIMIT ? OFFSET ?;
 
 -- name: DisableReaction :exec
 -- Soft-delete a reaction by public id and user.

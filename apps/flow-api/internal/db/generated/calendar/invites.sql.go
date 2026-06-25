@@ -197,23 +197,52 @@ const listCalendarEventInvitesForEvent = `-- name: ListCalendarEventInvitesForEv
 SELECT
   id, public_id, workspace_id, calendar_id, event_id, attendee_id,
   email, token_hash, expires_at, accepted_at, sent_at,
-  notes, enabled, updated_at, created_at
+  notes, enabled, updated_at, created_at,
+  COUNT(*) OVER() AS total
 FROM calendar_event_invites
 WHERE event_id = ?
   AND enabled = TRUE
 ORDER BY created_at DESC, id DESC
+LIMIT ? OFFSET ?
 `
 
-// List all active invites for a single event, newest first.
-func (q *Queries) ListCalendarEventInvitesForEvent(ctx context.Context, eventID sql.NullInt32) ([]CalendarEventInvite, error) {
-	rows, err := q.db.QueryContext(ctx, listCalendarEventInvitesForEvent, eventID)
+type ListCalendarEventInvitesForEventParams struct {
+	EventID sql.NullInt32 `json:"-"`
+	Limit   int32         `json:"limit"`
+	Offset  int32         `json:"offset"`
+}
+
+type ListCalendarEventInvitesForEventRow struct {
+	ID          uint32         `json:"-"`
+	PublicID    types.PublicID `json:"publicId"`
+	WorkspaceID uint32         `json:"-"`
+	CalendarID  uint32         `json:"-"`
+	EventID     sql.NullInt32  `json:"-"`
+	AttendeeID  sql.NullInt32  `json:"-"`
+	Email       string         `json:"email"`
+	TokenHash   []byte         `json:"tokenHash"`
+	ExpiresAt   time.Time      `json:"expiresAt"`
+	AcceptedAt  sql.NullTime   `json:"acceptedAt"`
+	SentAt      sql.NullTime   `json:"sentAt"`
+	Notes       sql.NullString `json:"notes"`
+	Enabled     bool           `json:"enabled"`
+	UpdatedAt   sql.NullTime   `json:"updatedAt"`
+	CreatedAt   time.Time      `json:"createdAt"`
+	Total       interface{}    `json:"total"`
+}
+
+// List active invites for a single event, newest first. Paginated
+// (LIMIT/OFFSET) so the result set is always bounded; total carries the
+// pre-page count.
+func (q *Queries) ListCalendarEventInvitesForEvent(ctx context.Context, arg ListCalendarEventInvitesForEventParams) ([]ListCalendarEventInvitesForEventRow, error) {
+	rows, err := q.db.QueryContext(ctx, listCalendarEventInvitesForEvent, arg.EventID, arg.Limit, arg.Offset)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	items := []CalendarEventInvite{}
+	items := []ListCalendarEventInvitesForEventRow{}
 	for rows.Next() {
-		var i CalendarEventInvite
+		var i ListCalendarEventInvitesForEventRow
 		if err := rows.Scan(
 			&i.ID,
 			&i.PublicID,
@@ -230,6 +259,7 @@ func (q *Queries) ListCalendarEventInvitesForEvent(ctx context.Context, eventID 
 			&i.Enabled,
 			&i.UpdatedAt,
 			&i.CreatedAt,
+			&i.Total,
 		); err != nil {
 			return nil, err
 		}
@@ -264,7 +294,8 @@ SELECT
   c.public_id AS calendar_public_id,
   c.name AS calendar_name,
   w.public_id AS workspace_public_id,
-  w.name AS workspace_name
+  w.name AS workspace_name,
+  COUNT(*) OVER() AS total
 FROM calendar_event_invites i
 INNER JOIN calendar_events e ON e.id = i.event_id AND e.enabled = TRUE
 INNER JOIN calendars c ON c.id = i.calendar_id AND c.enabled = TRUE
@@ -274,7 +305,14 @@ WHERE i.email = ?
   AND i.accepted_at IS NULL
   AND i.expires_at > NOW(6)
 ORDER BY i.created_at DESC, i.id DESC
+LIMIT ? OFFSET ?
 `
+
+type ListMyCalendarEventInvitesParams struct {
+	Email  string `json:"email"`
+	Limit  int32  `json:"limit"`
+	Offset int32  `json:"offset"`
+}
 
 type ListMyCalendarEventInvitesRow struct {
 	PublicID          types.PublicID `json:"publicId"`
@@ -296,14 +334,15 @@ type ListMyCalendarEventInvitesRow struct {
 	CalendarName      string         `json:"calendarName"`
 	WorkspacePublicID types.PublicID `json:"workspacePublicId"`
 	WorkspaceName     string         `json:"workspaceName"`
+	Total             interface{}    `json:"total"`
 }
 
 // Inbox query for /me/invites: active, unaccepted, non-expired invites
 // addressed to the authenticated user's primary email. JOINs event,
 // calendar, and workspace metadata so the handler can build a rich
 // inbox response without extra round trips.
-func (q *Queries) ListMyCalendarEventInvites(ctx context.Context, email string) ([]ListMyCalendarEventInvitesRow, error) {
-	rows, err := q.db.QueryContext(ctx, listMyCalendarEventInvites, email)
+func (q *Queries) ListMyCalendarEventInvites(ctx context.Context, arg ListMyCalendarEventInvitesParams) ([]ListMyCalendarEventInvitesRow, error) {
+	rows, err := q.db.QueryContext(ctx, listMyCalendarEventInvites, arg.Email, arg.Limit, arg.Offset)
 	if err != nil {
 		return nil, err
 	}
@@ -331,6 +370,7 @@ func (q *Queries) ListMyCalendarEventInvites(ctx context.Context, email string) 
 			&i.CalendarName,
 			&i.WorkspacePublicID,
 			&i.WorkspaceName,
+			&i.Total,
 		); err != nil {
 			return nil, err
 		}

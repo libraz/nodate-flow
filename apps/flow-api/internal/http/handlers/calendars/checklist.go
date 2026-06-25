@@ -16,9 +16,11 @@ import (
 
 // ListChecklistInput is the input for listing checklist items.
 type ListChecklistInput struct {
-	WsID  string `path:"wsId" doc:"Workspace public ID"`
-	CalID string `path:"calId" doc:"Calendar public ID"`
-	EvtID string `path:"evtId" doc:"Event public ID"`
+	WsID   string `path:"wsId" doc:"Workspace public ID"`
+	CalID  string `path:"calId" doc:"Calendar public ID"`
+	EvtID  string `path:"evtId" doc:"Event public ID"`
+	Limit  int32  `query:"limit" minimum:"1" maximum:"200" default:"50"`
+	Offset int32  `query:"offset" minimum:"0" default:"0"`
 }
 
 // ChecklistItemResponse is the JSON representation of a checklist item.
@@ -33,6 +35,7 @@ type ChecklistItemResponse struct {
 // ListChecklistOutput is the response for the list checklist endpoint.
 type ListChecklistOutput struct {
 	Body struct {
+		Total int64                   `json:"total" doc:"Total checklist items before paging"`
 		Items []ChecklistItemResponse `json:"items"`
 	}
 }
@@ -107,7 +110,12 @@ func ListChecklist(deps Deps) func(context.Context, *ListChecklistInput) (*ListC
 			return nil, err
 		}
 
-		rows, err := deps.CalendarQueries.ListCalendarChecklistItems(ctx, evt.ID)
+		page := handlerutil.Bind(input.Limit, input.Offset, handlerutil.DefaultListLimit, handlerutil.MaxListLimit)
+		rows, err := deps.CalendarQueries.ListCalendarChecklistItems(ctx, calendar.ListCalendarChecklistItemsParams{
+			EventID: evt.ID,
+			Limit:   page.Limit,
+			Offset:  page.Offset,
+		})
 		if err != nil {
 			return nil, httpErr(apierrors.CalendarChecklistListQueryInterrupted)
 		}
@@ -122,6 +130,9 @@ func ListChecklist(deps Deps) func(context.Context, *ListChecklistInput) (*ListC
 				SortWeight: r.SortWeight,
 				CreatedAt:  r.CreatedAt.Unix(),
 			}
+		}
+		if len(rows) > 0 {
+			out.Body.Total = handlerutil.TotalAsInt64(rows[0].Total)
 		}
 		return out, nil
 	}

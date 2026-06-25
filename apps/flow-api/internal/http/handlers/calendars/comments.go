@@ -17,9 +17,11 @@ import (
 
 // ListCommentsInput is the input for listing event comments.
 type ListCommentsInput struct {
-	WsID  string `path:"wsId" doc:"Workspace public ID"`
-	CalID string `path:"calId" doc:"Calendar public ID"`
-	EvtID string `path:"evtId" doc:"Event public ID"`
+	WsID   string `path:"wsId" doc:"Workspace public ID"`
+	CalID  string `path:"calId" doc:"Calendar public ID"`
+	EvtID  string `path:"evtId" doc:"Event public ID"`
+	Limit  int32  `query:"limit" minimum:"1" maximum:"200" default:"50"`
+	Offset int32  `query:"offset" minimum:"0" default:"0"`
 }
 
 // CommentResponse is the JSON representation of an event comment.
@@ -36,6 +38,7 @@ type CommentResponse struct {
 // ListCommentsOutput is the response for the list comments endpoint.
 type ListCommentsOutput struct {
 	Body struct {
+		Total    int64             `json:"total" doc:"Total comments on the event before paging"`
 		Comments []CommentResponse `json:"comments"`
 	}
 }
@@ -107,7 +110,12 @@ func ListComments(deps Deps) func(context.Context, *ListCommentsInput) (*ListCom
 			return nil, err
 		}
 
-		rows, err := deps.CalendarQueries.ListCalendarEventComments(ctx, handlerutil.NullInt32From(evt.ID))
+		page := handlerutil.Bind(input.Limit, input.Offset, handlerutil.DefaultListLimit, handlerutil.MaxListLimit)
+		rows, err := deps.CalendarQueries.ListCalendarEventComments(ctx, calendar.ListCalendarEventCommentsParams{
+			EventID: handlerutil.NullInt32From(evt.ID),
+			Limit:   page.Limit,
+			Offset:  page.Offset,
+		})
 		if err != nil {
 			return nil, httpErr(apierrors.CalendarCommentListQueryInterrupted)
 		}
@@ -125,6 +133,9 @@ func ListComments(deps Deps) func(context.Context, *ListCommentsInput) (*ListCom
 			resp.AvatarURL = dbtype.PtrFromNullString(r.AvatarUrl)
 			resp.EditedAt = dbtype.UnixSecondsFromNullTime(r.EditedAt)
 			out.Body.Comments[i] = resp
+		}
+		if len(rows) > 0 {
+			out.Body.Total = handlerutil.TotalAsInt64(rows[0].Total)
 		}
 		return out, nil
 	}

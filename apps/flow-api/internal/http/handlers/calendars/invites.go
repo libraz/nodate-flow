@@ -125,15 +125,18 @@ type InviteSummaryResponse struct {
 
 // ListEventInvitesInput lists every active invite for a single event.
 type ListEventInvitesInput struct {
-	WsID  string `path:"wsId" doc:"Workspace public ID"`
-	CalID string `path:"calId" doc:"Calendar public ID"`
-	EvtID string `path:"evtId" doc:"Event public ID"`
+	WsID   string `path:"wsId" doc:"Workspace public ID"`
+	CalID  string `path:"calId" doc:"Calendar public ID"`
+	EvtID  string `path:"evtId" doc:"Event public ID"`
+	Limit  int32  `query:"limit" minimum:"1" maximum:"200" default:"50"`
+	Offset int32  `query:"offset" minimum:"0" default:"0"`
 }
 
 // ListEventInvitesOutput is the response shape for the per-event invite
 // list. Keyed by the plural resource name to match repo conventions.
 type ListEventInvitesOutput struct {
 	Body struct {
+		Total   int64                   `json:"total" doc:"Total invites on the event before paging"`
 		Invites []InviteSummaryResponse `json:"invites"`
 	}
 }
@@ -603,7 +606,12 @@ func ListEventInvites(deps Deps) func(context.Context, *ListEventInvitesInput) (
 		if evt.OwnerUserID != actorID {
 			return nil, httpErr(apierrors.CalendarCalendarOwnerRoleRequired)
 		}
-		rows, err := deps.CalendarQueries.ListCalendarEventInvitesForEvent(ctx, handlerutil.NullInt32From(evt.ID))
+		page := handlerutil.Bind(input.Limit, input.Offset, handlerutil.DefaultListLimit, handlerutil.MaxListLimit)
+		rows, err := deps.CalendarQueries.ListCalendarEventInvitesForEvent(ctx, calendar.ListCalendarEventInvitesForEventParams{
+			EventID: handlerutil.NullInt32From(evt.ID),
+			Limit:   page.Limit,
+			Offset:  page.Offset,
+		})
 		if err != nil {
 			return nil, httpErr(apierrors.CalendarInviteListQueryInterrupted)
 		}
@@ -644,6 +652,9 @@ func ListEventInvites(deps Deps) func(context.Context, *ListEventInvitesInput) (
 				item.AttendeePublicID = pid.String()
 			}
 			out.Body.Invites = append(out.Body.Invites, item)
+		}
+		if len(rows) > 0 {
+			out.Body.Total = handlerutil.TotalAsInt64(rows[0].Total)
 		}
 		return out, nil
 	}

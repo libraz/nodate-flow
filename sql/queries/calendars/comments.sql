@@ -9,7 +9,9 @@ INSERT INTO calendar_event_comments (
 ) VALUES (?, ?, ?, ?, ?);
 
 -- name: ListCalendarEventComments :many
--- List comments on an event in chronological order.
+-- List comments on an event in chronological order. Paginated
+-- (LIMIT/OFFSET) so the result set is always bounded; total carries the
+-- pre-page count.
 SELECT
   c.public_id,
   c.author_id,
@@ -18,13 +20,15 @@ SELECT
   u.public_id AS user_public_id,
   u.display_name,
   u.avatar_url,
-  c.created_at
+  c.created_at,
+  COUNT(*) OVER() AS total
 FROM calendar_event_comments c
 INNER JOIN users u ON u.id = c.author_id AND u.enabled = TRUE
 WHERE c.event_id = ?
   AND c.enabled = TRUE
   AND c.deleted_at IS NULL
-ORDER BY c.created_at ASC;
+ORDER BY c.created_at ASC, c.public_id ASC
+LIMIT ? OFFSET ?;
 
 -- name: FindCalendarEventCommentByPublicId :one
 -- Resolve a comment by UUID v7.

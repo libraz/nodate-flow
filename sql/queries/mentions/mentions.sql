@@ -35,7 +35,9 @@ ORDER BY m.created_at DESC
 LIMIT ? OFFSET ?;
 
 -- name: ListMentionsForTask :many
--- List all mentions within a specific task (description or comments).
+-- List mentions within a specific task (description or comments).
+-- Paginated (LIMIT/OFFSET) so the result set is always bounded; total
+-- carries the pre-page count.
 SELECT
   m.public_id,
   m.mentioned_user_id,
@@ -44,13 +46,15 @@ SELECT
   m.actor_user_id,
   au.public_id AS actor_public_id,
   m.source,
-  m.created_at
+  m.created_at,
+  COUNT(*) OVER() AS total
 FROM mentions m
 INNER JOIN users mu ON mu.id = m.mentioned_user_id
 LEFT JOIN users au ON au.id = m.actor_user_id
 WHERE m.task_id = ?
   AND m.enabled = TRUE
-ORDER BY m.created_at ASC;
+ORDER BY m.created_at ASC, m.public_id ASC
+LIMIT ? OFFSET ?;
 
 -- name: DeleteMentionsForTaskDescription :exec
 -- Remove all task_description mentions for a task (before re-extracting).

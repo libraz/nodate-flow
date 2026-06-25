@@ -54,11 +54,14 @@ type CreateReactionOutput struct {
 
 // ListReactionsInput is the query for GET /tasks/{id}/reactions.
 type ListReactionsInput struct {
-	ID string `path:"id" doc:"Task public id (UUID v7)"`
+	ID     string `path:"id" doc:"Task public id (UUID v7)"`
+	Limit  int32  `query:"limit" minimum:"1" maximum:"200" default:"50"`
+	Offset int32  `query:"offset" minimum:"0" default:"0"`
 }
 
 // ListReactionsBody is the response payload for GET /tasks/{id}/reactions.
 type ListReactionsBody struct {
+	Total     int64      `json:"total" doc:"Total reactions on the task before paging"`
 	Reactions []Reaction `json:"reactions"`
 }
 

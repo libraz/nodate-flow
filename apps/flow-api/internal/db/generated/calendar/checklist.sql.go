@@ -131,12 +131,20 @@ SELECT
   done,
   sort_weight,
   created_by_user_id,
-  created_at
+  created_at,
+  COUNT(*) OVER() AS total
 FROM calendar_event_checklist_items
 WHERE event_id = ?
   AND enabled = TRUE
-ORDER BY sort_weight ASC, created_at ASC
+ORDER BY sort_weight ASC, created_at ASC, public_id ASC
+LIMIT ? OFFSET ?
 `
+
+type ListCalendarChecklistItemsParams struct {
+	EventID uint32 `json:"-"`
+	Limit   int32  `json:"limit"`
+	Offset  int32  `json:"offset"`
+}
 
 type ListCalendarChecklistItemsRow struct {
 	PublicID        types.PublicID `json:"publicId"`
@@ -145,11 +153,14 @@ type ListCalendarChecklistItemsRow struct {
 	SortWeight      int32          `json:"sortWeight"`
 	CreatedByUserID uint32         `json:"-"`
 	CreatedAt       time.Time      `json:"createdAt"`
+	Total           interface{}    `json:"total"`
 }
 
-// List checklist items for an event in display order.
-func (q *Queries) ListCalendarChecklistItems(ctx context.Context, eventID uint32) ([]ListCalendarChecklistItemsRow, error) {
-	rows, err := q.db.QueryContext(ctx, listCalendarChecklistItems, eventID)
+// List checklist items for an event in display order. Paginated
+// (LIMIT/OFFSET) so the result set is always bounded; total carries the
+// pre-page count.
+func (q *Queries) ListCalendarChecklistItems(ctx context.Context, arg ListCalendarChecklistItemsParams) ([]ListCalendarChecklistItemsRow, error) {
+	rows, err := q.db.QueryContext(ctx, listCalendarChecklistItems, arg.EventID, arg.Limit, arg.Offset)
 	if err != nil {
 		return nil, err
 	}
@@ -164,6 +175,7 @@ func (q *Queries) ListCalendarChecklistItems(ctx context.Context, eventID uint32
 			&i.SortWeight,
 			&i.CreatedByUserID,
 			&i.CreatedAt,
+			&i.Total,
 		); err != nil {
 			return nil, err
 		}

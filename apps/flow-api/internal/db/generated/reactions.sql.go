@@ -145,13 +145,21 @@ SELECT
   r.user_id,
   u.public_id AS user_public_id,
   u.display_name,
-  r.created_at
+  r.created_at,
+  COUNT(*) OVER() AS total
 FROM reactions r
 INNER JOIN users u ON u.id = r.user_id
 WHERE r.comment_id = ?
   AND r.enabled = TRUE
-ORDER BY r.created_at ASC
+ORDER BY r.created_at ASC, r.public_id ASC
+LIMIT ? OFFSET ?
 `
+
+type ListReactionsForCommentParams struct {
+	CommentID sql.NullInt32 `json:"-"`
+	Limit     int32         `json:"limit"`
+	Offset    int32         `json:"offset"`
+}
 
 type ListReactionsForCommentRow struct {
 	PublicID     types.PublicID `json:"publicId"`
@@ -160,11 +168,13 @@ type ListReactionsForCommentRow struct {
 	UserPublicID types.PublicID `json:"userPublicId"`
 	DisplayName  string         `json:"displayName"`
 	CreatedAt    time.Time      `json:"createdAt"`
+	Total        interface{}    `json:"total"`
 }
 
-// List all reactions on a comment.
-func (q *Queries) ListReactionsForComment(ctx context.Context, commentID sql.NullInt32) ([]ListReactionsForCommentRow, error) {
-	rows, err := q.db.QueryContext(ctx, listReactionsForComment, commentID)
+// List reactions on a comment. Paginated (LIMIT/OFFSET) so the result
+// set is always bounded; total carries the pre-page count.
+func (q *Queries) ListReactionsForComment(ctx context.Context, arg ListReactionsForCommentParams) ([]ListReactionsForCommentRow, error) {
+	rows, err := q.db.QueryContext(ctx, listReactionsForComment, arg.CommentID, arg.Limit, arg.Offset)
 	if err != nil {
 		return nil, err
 	}
@@ -179,6 +189,7 @@ func (q *Queries) ListReactionsForComment(ctx context.Context, commentID sql.Nul
 			&i.UserPublicID,
 			&i.DisplayName,
 			&i.CreatedAt,
+			&i.Total,
 		); err != nil {
 			return nil, err
 		}
@@ -200,13 +211,21 @@ SELECT
   r.user_id,
   u.public_id AS user_public_id,
   u.display_name,
-  r.created_at
+  r.created_at,
+  COUNT(*) OVER() AS total
 FROM reactions r
 INNER JOIN users u ON u.id = r.user_id
 WHERE r.task_id = ?
   AND r.enabled = TRUE
-ORDER BY r.created_at ASC
+ORDER BY r.created_at ASC, r.public_id ASC
+LIMIT ? OFFSET ?
 `
+
+type ListReactionsForTaskParams struct {
+	TaskID sql.NullInt32 `json:"-"`
+	Limit  int32         `json:"limit"`
+	Offset int32         `json:"offset"`
+}
 
 type ListReactionsForTaskRow struct {
 	PublicID     types.PublicID `json:"publicId"`
@@ -215,11 +234,13 @@ type ListReactionsForTaskRow struct {
 	UserPublicID types.PublicID `json:"userPublicId"`
 	DisplayName  string         `json:"displayName"`
 	CreatedAt    time.Time      `json:"createdAt"`
+	Total        interface{}    `json:"total"`
 }
 
-// List all reactions on a task, grouped by emoji with user info.
-func (q *Queries) ListReactionsForTask(ctx context.Context, taskID sql.NullInt32) ([]ListReactionsForTaskRow, error) {
-	rows, err := q.db.QueryContext(ctx, listReactionsForTask, taskID)
+// List reactions on a task with user info. Paginated (LIMIT/OFFSET) so
+// the result set is always bounded; total carries the pre-page count.
+func (q *Queries) ListReactionsForTask(ctx context.Context, arg ListReactionsForTaskParams) ([]ListReactionsForTaskRow, error) {
+	rows, err := q.db.QueryContext(ctx, listReactionsForTask, arg.TaskID, arg.Limit, arg.Offset)
 	if err != nil {
 		return nil, err
 	}
@@ -234,6 +255,7 @@ func (q *Queries) ListReactionsForTask(ctx context.Context, taskID sql.NullInt32
 			&i.UserPublicID,
 			&i.DisplayName,
 			&i.CreatedAt,
+			&i.Total,
 		); err != nil {
 			return nil, err
 		}

@@ -10,18 +10,22 @@ INSERT INTO calendar_event_checklist_items (
 ) VALUES (?, ?, ?, ?, ?, ?);
 
 -- name: ListCalendarChecklistItems :many
--- List checklist items for an event in display order.
+-- List checklist items for an event in display order. Paginated
+-- (LIMIT/OFFSET) so the result set is always bounded; total carries the
+-- pre-page count.
 SELECT
   public_id,
   title,
   done,
   sort_weight,
   created_by_user_id,
-  created_at
+  created_at,
+  COUNT(*) OVER() AS total
 FROM calendar_event_checklist_items
 WHERE event_id = ?
   AND enabled = TRUE
-ORDER BY sort_weight ASC, created_at ASC;
+ORDER BY sort_weight ASC, created_at ASC, public_id ASC
+LIMIT ? OFFSET ?;
 
 -- name: FindCalendarChecklistItemByPublicId :one
 -- Resolve a checklist item by UUID v7.

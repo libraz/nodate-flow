@@ -82,15 +82,19 @@ SET enabled = FALSE
 WHERE id = ?;
 
 -- name: ListCalendarEventInvitesForEvent :many
--- List all active invites for a single event, newest first.
+-- List active invites for a single event, newest first. Paginated
+-- (LIMIT/OFFSET) so the result set is always bounded; total carries the
+-- pre-page count.
 SELECT
   id, public_id, workspace_id, calendar_id, event_id, attendee_id,
   email, token_hash, expires_at, accepted_at, sent_at,
-  notes, enabled, updated_at, created_at
+  notes, enabled, updated_at, created_at,
+  COUNT(*) OVER() AS total
 FROM calendar_event_invites
 WHERE event_id = ?
   AND enabled = TRUE
-ORDER BY created_at DESC, id DESC;
+ORDER BY created_at DESC, id DESC
+LIMIT ? OFFSET ?;
 
 -- name: ListMyCalendarEventInvites :many
 -- Inbox query for /me/invites: active, unaccepted, non-expired invites
@@ -116,7 +120,8 @@ SELECT
   c.public_id AS calendar_public_id,
   c.name AS calendar_name,
   w.public_id AS workspace_public_id,
-  w.name AS workspace_name
+  w.name AS workspace_name,
+  COUNT(*) OVER() AS total
 FROM calendar_event_invites i
 INNER JOIN calendar_events e ON e.id = i.event_id AND e.enabled = TRUE
 INNER JOIN calendars c ON c.id = i.calendar_id AND c.enabled = TRUE
@@ -125,7 +130,8 @@ WHERE i.email = ?
   AND i.enabled = TRUE
   AND i.accepted_at IS NULL
   AND i.expires_at > NOW(6)
-ORDER BY i.created_at DESC, i.id DESC;
+ORDER BY i.created_at DESC, i.id DESC
+LIMIT ? OFFSET ?;
 
 -- name: CleanupExpiredCalendarEventInvites :exec
 -- TTL sweep: disable any invite whose expires_at is in the past.

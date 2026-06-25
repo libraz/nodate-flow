@@ -86,14 +86,22 @@ SELECT
   m.actor_user_id,
   au.public_id AS actor_public_id,
   m.source,
-  m.created_at
+  m.created_at,
+  COUNT(*) OVER() AS total
 FROM mentions m
 INNER JOIN users mu ON mu.id = m.mentioned_user_id
 LEFT JOIN users au ON au.id = m.actor_user_id
 WHERE m.task_id = ?
   AND m.enabled = TRUE
-ORDER BY m.created_at ASC
+ORDER BY m.created_at ASC, m.public_id ASC
+LIMIT ? OFFSET ?
 `
+
+type ListMentionsForTaskParams struct {
+	TaskID sql.NullInt32 `json:"-"`
+	Limit  int32         `json:"limit"`
+	Offset int32         `json:"offset"`
+}
 
 type ListMentionsForTaskRow struct {
 	PublicID             types.PublicID `json:"publicId"`
@@ -104,11 +112,14 @@ type ListMentionsForTaskRow struct {
 	ActorPublicID        types.PublicID `json:"actorPublicId"`
 	Source               MentionsSource `json:"source"`
 	CreatedAt            time.Time      `json:"createdAt"`
+	Total                interface{}    `json:"total"`
 }
 
-// List all mentions within a specific task (description or comments).
-func (q *Queries) ListMentionsForTask(ctx context.Context, taskID sql.NullInt32) ([]ListMentionsForTaskRow, error) {
-	rows, err := q.db.QueryContext(ctx, listMentionsForTask, taskID)
+// List mentions within a specific task (description or comments).
+// Paginated (LIMIT/OFFSET) so the result set is always bounded; total
+// carries the pre-page count.
+func (q *Queries) ListMentionsForTask(ctx context.Context, arg ListMentionsForTaskParams) ([]ListMentionsForTaskRow, error) {
+	rows, err := q.db.QueryContext(ctx, listMentionsForTask, arg.TaskID, arg.Limit, arg.Offset)
 	if err != nil {
 		return nil, err
 	}
@@ -125,6 +136,7 @@ func (q *Queries) ListMentionsForTask(ctx context.Context, taskID sql.NullInt32)
 			&i.ActorPublicID,
 			&i.Source,
 			&i.CreatedAt,
+			&i.Total,
 		); err != nil {
 			return nil, err
 		}

@@ -132,18 +132,24 @@ type Querier interface {
 	FindPublicShareByTokenHash(ctx context.Context, tokenHash string) (FindPublicShareByTokenHashRow, error)
 	// Find a system calendar by its slug within a workspace.
 	FindSystemCalendarBySlug(ctx context.Context, arg FindSystemCalendarBySlugParams) (FindSystemCalendarBySlugRow, error)
-	// List checklist items for an event in display order.
-	ListCalendarChecklistItems(ctx context.Context, eventID uint32) ([]ListCalendarChecklistItemsRow, error)
+	// List checklist items for an event in display order. Paginated
+	// (LIMIT/OFFSET) so the result set is always bounded; total carries the
+	// pre-page count.
+	ListCalendarChecklistItems(ctx context.Context, arg ListCalendarChecklistItemsParams) ([]ListCalendarChecklistItemsRow, error)
 	// List active attachments for an event with uploader display fields and the
 	// storage_objects metadata flattened in via JOIN. Order is stable by
 	// created_at then public_id.
 	ListCalendarEventAttachments(ctx context.Context, arg ListCalendarEventAttachmentsParams) ([]ListCalendarEventAttachmentsRow, error)
 	// List all attendees for an event with user profile info.
 	ListCalendarEventAttendees(ctx context.Context, eventID sql.NullInt32) ([]ListCalendarEventAttendeesRow, error)
-	// List comments on an event in chronological order.
-	ListCalendarEventComments(ctx context.Context, eventID sql.NullInt32) ([]ListCalendarEventCommentsRow, error)
-	// List all active invites for a single event, newest first.
-	ListCalendarEventInvitesForEvent(ctx context.Context, eventID sql.NullInt32) ([]CalendarEventInvite, error)
+	// List comments on an event in chronological order. Paginated
+	// (LIMIT/OFFSET) so the result set is always bounded; total carries the
+	// pre-page count.
+	ListCalendarEventComments(ctx context.Context, arg ListCalendarEventCommentsParams) ([]ListCalendarEventCommentsRow, error)
+	// List active invites for a single event, newest first. Paginated
+	// (LIMIT/OFFSET) so the result set is always bounded; total carries the
+	// pre-page count.
+	ListCalendarEventInvitesForEvent(ctx context.Context, arg ListCalendarEventInvitesForEventParams) ([]ListCalendarEventInvitesForEventRow, error)
 	// Cross-calendar query: list events across multiple calendars for a user
 	// within a workspace and time range. Used by the unified calendar view.
 	ListCalendarEventsAcrossCalendars(ctx context.Context, arg ListCalendarEventsAcrossCalendarsParams) ([]ListCalendarEventsAcrossCalendarsRow, error)
@@ -169,7 +175,7 @@ type Querier interface {
 	// addressed to the authenticated user's primary email. JOINs event,
 	// calendar, and workspace metadata so the handler can build a rich
 	// inbox response without extra round trips.
-	ListMyCalendarEventInvites(ctx context.Context, email string) ([]ListMyCalendarEventInvitesRow, error)
+	ListMyCalendarEventInvites(ctx context.Context, arg ListMyCalendarEventInvitesParams) ([]ListMyCalendarEventInvitesRow, error)
 	// Cross-workspace variant: list non-recurring events on every calendar
 	// the caller is subscribed to, across every workspace where the caller
 	// is still an active member. workspace_members is joined so that a
