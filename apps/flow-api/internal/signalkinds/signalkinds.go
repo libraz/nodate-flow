@@ -8,6 +8,8 @@
 // YAML edit followed by a regenerate; it is not a code edit.
 package signalkinds
 
+import "github.com/nodate-flow/nodate-flow/packages/go-shared/signalwire"
+
 // Kind is the dotted string identifier of a signal kind.
 type Kind string
 
@@ -57,16 +59,8 @@ const (
 	DiscordPresence Kind = "discord.presence"
 	// Manual — User-emitted signal from UI or CLI
 	Manual Kind = "manual"
-	// McpEmit — Signal emitted by an MCP tool call
-	McpEmit Kind = "mcp.emit"
 	// SlackPresence — User active/away status from Slack Events API
 	SlackPresence Kind = "slack.presence"
-	// StockPriceThreshold — Stock ticker crossed a configured threshold
-	StockPriceThreshold Kind = "stock.price_threshold"
-	// TeamsPresence — User presence from Microsoft Graph
-	TeamsPresence Kind = "teams.presence"
-	// WeatherCondition — Current weather observation for a workspace location
-	WeatherCondition Kind = "weather.condition"
 )
 
 // Definition describes one signal kind sourced from
@@ -110,15 +104,6 @@ var defs = []Definition{
 		I18nKey:            "signalKinds.manual",
 	},
 	{
-		Kind:               McpEmit,
-		Source:             "mcp",
-		Retention:          Retention("discrete"),
-		AutonomyDefault:    Autonomy("draft"),
-		SubjectTypeDefault: SubjectType("workspace"),
-		Description:        "Signal emitted by an MCP tool call",
-		I18nKey:            "signalKinds.mcp.emit",
-	},
-	{
 		Kind:               SlackPresence,
 		Source:             "slack",
 		Retention:          Retention("stateful"),
@@ -126,33 +111,6 @@ var defs = []Definition{
 		SubjectTypeDefault: SubjectType("user"),
 		Description:        "User active/away status from Slack Events API",
 		I18nKey:            "signalKinds.slack.presence",
-	},
-	{
-		Kind:               StockPriceThreshold,
-		Source:             "stock",
-		Retention:          Retention("discrete"),
-		AutonomyDefault:    Autonomy("suggest"),
-		SubjectTypeDefault: SubjectType("workspace"),
-		Description:        "Stock ticker crossed a configured threshold",
-		I18nKey:            "signalKinds.stock.priceThreshold",
-	},
-	{
-		Kind:               TeamsPresence,
-		Source:             "teams",
-		Retention:          Retention("stateful"),
-		AutonomyDefault:    Autonomy("suggest"),
-		SubjectTypeDefault: SubjectType("user"),
-		Description:        "User presence from Microsoft Graph",
-		I18nKey:            "signalKinds.teams.presence",
-	},
-	{
-		Kind:               WeatherCondition,
-		Source:             "weather",
-		Retention:          Retention("stateful"),
-		AutonomyDefault:    Autonomy("suggest"),
-		SubjectTypeDefault: SubjectType("workspace"),
-		Description:        "Current weather observation for a workspace location",
-		I18nKey:            "signalKinds.weather.condition",
 	},
 }
 
@@ -175,4 +133,20 @@ func All() []Definition {
 func Lookup(k Kind) (Definition, bool) {
 	d, ok := byKind[k]
 	return d, ok
+}
+
+// init asserts that every registry Source is a member of the
+// canonical signals.source wire enum (packages/go-shared/signalwire).
+// A registry source the wire/DB enum rejects would make the signal
+// it advertises fail with a Huma 422 before the handler runs; this
+// panic turns that drift into a startup failure (and a test failure
+// via the package's import) instead.
+func init() {
+	srcs := make([]string, 0, len(defs))
+	for _, d := range defs {
+		srcs = append(srcs, d.Source)
+	}
+	if err := signalwire.AssertSourcesCovered(srcs); err != nil {
+		panic(err)
+	}
 }

@@ -37,6 +37,7 @@ import (
 	"time"
 
 	"github.com/nodate-flow/nodate-flow/apps/presence-discord/internal/obs"
+	"github.com/nodate-flow/nodate-flow/packages/go-shared/signalwire"
 )
 
 // SignalKind is the wire-level signal kind emitted for every
@@ -45,10 +46,10 @@ import (
 const SignalKind = "discord.presence"
 
 // SignalSource is the wire-level source enum value reported on POST
-// /signals. Must match the source enum in
-// SignalCreateInputBody.Source. Lower-case because the API uses
-// snake/lower for enum values.
-const SignalSource = "discord"
+// /signals. Derived from packages/go-shared/signalwire (the canonical
+// signals.source enum) so this value can never drift from what flow-api's
+// Huma enum / DB ENUM accept.
+const SignalSource = string(signalwire.SourceDiscord)
 
 // SignalSubjectType is the subject_type the worker always emits.
 // Discord presence is fundamentally about a user, so every signal
@@ -64,20 +65,13 @@ type resolverResponse struct {
 	WorkspaceID string `json:"workspaceId"`
 }
 
-// signalCreateBody mirrors signals.SignalCreateInputBody on the
-// flow-api side. Kept as a local type rather than importing the
-// flow-api package because this worker should not pull flow-api's
-// dependency graph (sqlc, generated models, etc.) just to serialise a
-// JSON body.
-type signalCreateBody struct {
-	WorkspaceID string          `json:"workspaceId"`
-	Source      string          `json:"source"`
-	Kind        string          `json:"kind"`
-	SubjectType string          `json:"subjectType"`
-	SubjectID   string          `json:"subjectId,omitempty"`
-	Payload     json.RawMessage `json:"payload,omitempty"`
-	ExpiresAt   *int64          `json:"expiresAt,omitempty"`
-}
+// signalCreateBody is the POST /signals wire body. It aliases
+// signalwire.CreateRequest — the single shared wire shape owned by
+// packages/go-shared/signalwire — so presence-discord, flow-worker, and
+// flow-api can never diverge on field names or casing. Importing only
+// go-shared (not flow-api) keeps this binary free of flow-api's sqlc /
+// generated-model dependency graph.
+type signalCreateBody = signalwire.CreateRequest
 
 // signalPayload is the JSON object stored as signals.payload_json for
 // a discord.presence row. Schema mirrors the YAML in

@@ -104,6 +104,29 @@ func resolveCalendarEventInWorkspace(ctx context.Context, db *sql.DB, wsID uint3
 	return id, true, nil
 }
 
+// resolveSignalByDedupeKey loads the public_id of the existing signals row
+// that collided on the workspace-scoped dedupe key (workspace_id, source,
+// external_id). It is only meaningful when external_id is non-NULL, because
+// MySQL treats NULL as distinct in a UNIQUE key so a NULL-external_id INSERT
+// never collides. Returns (zero, false, nil) when no matching row exists; a
+// genuine miss here means the INSERT IGNORE was a no-op for a reason other
+// than the dedupe key and the caller must not fabricate a public id.
+func resolveSignalByDedupeKey(ctx context.Context, db *sql.DB, wsID uint32, source generated.SignalsSource, externalID sql.NullString) (types.PublicID, bool, error) {
+	if !externalID.Valid {
+		return types.PublicID{}, false, nil
+	}
+	const q = `SELECT public_id FROM signals
+		WHERE workspace_id = ? AND source = ? AND external_id = ? LIMIT 1`
+	var pub types.PublicID
+	if err := db.QueryRowContext(ctx, q, wsID, source, externalID.String).Scan(&pub); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return types.PublicID{}, false, nil
+		}
+		return types.PublicID{}, false, err
+	}
+	return pub, true, nil
+}
+
 // Create handles POST /signals. Most callers authenticate as a real
 // user via JWT / PAT / MCP, in which case the actor must be an enabled
 // member of the target workspace. The endpoint also accepts the
@@ -269,6 +292,39 @@ func Create(deps Deps) func(context.Context, *CreateInput) (*CreateOutput, error
 			return e
 		}); err != nil {
 			return nil, httpErr(apierrors.InternalUnexpected)
+		}
+
+		// INSERT IGNORE returns LastInsertId()=0 when the row collided on
+		// the workspace-scoped dedupe key (workspace_id, source,
+		// external_id) and nothing was written. In that case the freshly
+		// minted `pub` matches no persisted row, so emitting it would
+		// mis-attribute the response and writing an audit entry would spam
+		// the log on every duplicate redelivery. Short-circuit: resolve the
+		// existing row's public id and return it honestly, skipping the
+		// spurious audit write and the lifecycle/judge side effects (the
+		// judge enqueuer is already 0-guarded). When no existing row can be
+		// found (no dedupe key, e.g. NULL external_id), fall through to the
+		// normal path with the minted id.
+		if signalInternalID == 0 {
+			existing, found, lerr := resolveSignalByDedupeKey(ctx, deps.DB, wsID, generated.SignalsSource(in.Body.Source), ext)
+			if lerr != nil {
+				return nil, httpErr(apierrors.InternalUnexpected)
+			}
+			if found {
+				return &CreateOutput{Body: Signal{
+					ID:          existing.String(),
+					TaskID:      in.Body.TaskID,
+					Source:      in.Body.Source,
+					Kind:        in.Body.Kind,
+					ExternalID:  in.Body.ExternalID,
+					Payload:     payload,
+					SubjectType: string(subjectType),
+					SubjectID:   in.Body.SubjectID,
+					ReceivedAt:  now.Unix(),
+					ExpiresAt:   in.Body.ExpiresAt,
+					CreatedAt:   now.Unix(),
+				}}, nil
+			}
 		}
 
 		deps.Audit.Record(ctx, audit.Entry{

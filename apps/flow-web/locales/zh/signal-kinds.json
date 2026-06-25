@@ -5,14 +5,6 @@
   "signalKinds.discord.presence.label": "Discord presence",
   "signalKinds.manual.description": "User-emitted signal from UI or CLI",
   "signalKinds.manual.label": "Manual",
-  "signalKinds.mcp.emit.description": "Signal emitted by an MCP tool call",
-  "signalKinds.mcp.emit.label": "Mcp emit",
   "signalKinds.slack.presence.description": "User active/away status from Slack Events API",
-  "signalKinds.slack.presence.label": "Slack presence",
-  "signalKinds.stock.priceThreshold.description": "Stock ticker crossed a configured threshold",
-  "signalKinds.stock.priceThreshold.label": "Stock price threshold",
-  "signalKinds.teams.presence.description": "User presence from Microsoft Graph",
-  "signalKinds.teams.presence.label": "Teams presence",
-  "signalKinds.weather.condition.description": "Current weather observation for a workspace location",
-  "signalKinds.weather.condition.label": "Weather condition"
+  "signalKinds.slack.presence.label": "Slack presence"
 }

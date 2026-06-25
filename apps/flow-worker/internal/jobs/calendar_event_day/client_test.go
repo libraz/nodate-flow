@@ -192,20 +192,40 @@ func TestPostSignal200IsSuccess(t *testing.T) {
 	require.NoError(t, c.PostSignal(context.Background(), sampleBody()))
 }
 
-// TestPostSignal409IsSuccess proves the dedupe-collapse path is not
-// treated as failure. flow-api responds 409 when the external_id is
-// already present, which is the worker's expected outcome whenever the
-// previous tick already covered the same (event, day) tuple.
-func TestPostSignal409IsSuccess(t *testing.T) {
+// TestPostSignalDuplicate200IsSuccess pins the real dedupe-collapse
+// contract: flow-api does an INSERT IGNORE on the (workspace_id, source,
+// external_id) UNIQUE and returns 200 with the existing row even when the
+// external_id was already present. The worker therefore sees a plain 200
+// for a duplicate emit — never a 409 — and must treat it as success.
+func TestPostSignalDuplicate200IsSuccess(t *testing.T) {
 	t.Parallel()
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		w.WriteHeader(http.StatusConflict)
-		_, _ = w.Write([]byte(`{"error":"duplicate"}`))
+		// Same response shape flow-api returns for a fresh insert: the
+		// existing signal row. There is no distinguishing 409.
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{"id":"01923456-7890-7abc-9def-0123456789ab"}`))
 	}))
 	defer srv.Close()
 	c := newClient(t, srv.URL, "tok")
 	require.NoError(t, c.PostSignal(context.Background(), sampleBody()),
-		"409 from /signals must be treated as success (dedupe collapse)")
+		"a duplicate emit returns 200 (INSERT IGNORE), which must be treated as success")
+}
+
+// TestPostSignal409IsError documents that a 409 is no longer a special
+// success case. flow-api never returns 409 for POST /signals, so if one
+// ever surfaces it is an unexpected client error the worker must report
+// rather than silently swallow.
+func TestPostSignal409IsError(t *testing.T) {
+	t.Parallel()
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusConflict)
+		_, _ = w.Write([]byte(`{"error":"conflict"}`))
+	}))
+	defer srv.Close()
+	c := newClient(t, srv.URL, "tok")
+	err := c.PostSignal(context.Background(), sampleBody())
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "409")
 }
 
 // TestPostSignal400IsError covers permanent rejection: a 400 means the

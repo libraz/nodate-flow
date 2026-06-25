@@ -8,12 +8,33 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"fmt"
 
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/audit"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/generated"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/handlers/handlerutil"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/signalkinds"
+	"github.com/nodate-flow/nodate-flow/packages/go-shared/signalwire"
 )
+
+// sourceEnumTag is the comma-joined source enum value baked into the
+// SignalCreateInputBody.Source `enum:"..."` struct tag below. Huma reads
+// struct tags via reflection, so the tag value cannot be computed at
+// runtime — it must be a literal. To keep it honest, init() asserts the
+// literal equals signalwire.SourceEnumTag(); a future drift between the
+// hand-written tag and the canonical source list (when, e.g., a new
+// source is added to signalwire but not here) fails the build's test run
+// and panics at startup instead of silently rejecting valid signals.
+const sourceEnumTag = "manual,github,slack,email,google,webhook,calendar,discord"
+
+func init() {
+	if sourceEnumTag != signalwire.SourceEnumTag() {
+		panic(fmt.Sprintf(
+			"signals: SignalCreateInputBody.Source enum tag %q drifted from signalwire.SourceEnumTag() %q; "+
+				"update the enum tag in signals/types.go to match packages/go-shared/signalwire",
+			sourceEnumTag, signalwire.SourceEnumTag()))
+	}
+}
 
 // JudgeEnqueuer is the narrow surface signal handlers use to wake the
 // signal_judge agent runtime after a successful signal insert. The
@@ -100,6 +121,19 @@ type SignalCreateInputBody struct {
 	Payload     json.RawMessage `json:"payload,omitempty"`
 	ExpiresAt   *int64          `json:"expiresAt,omitempty" doc:"Provider-derived TTL in unix seconds; omit for signals that never expire."`
 }
+
+// Compile-time field-parity assertion between the Huma input DTO and the
+// shared wire body. Go permits a struct conversion only when both types
+// have identical field names and types (struct tags are ignored), so
+// these two conversions fail to compile the moment a field is added,
+// removed, or retyped on either side — making the worker / presence-
+// discord emitters (which serialise signalwire.CreateRequest) and the
+// flow-api receiver structurally inseparable. The DTO keeps its own
+// validation/enum tags so the OpenAPI document stays authoritative.
+var (
+	_ = func(b SignalCreateInputBody) signalwire.CreateRequest { return signalwire.CreateRequest(b) }
+	_ = func(r signalwire.CreateRequest) SignalCreateInputBody { return SignalCreateInputBody(r) }
+)
 
 // CreateInput is the body for POST /signals.
 type CreateInput struct {

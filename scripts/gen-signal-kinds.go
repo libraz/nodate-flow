@@ -73,6 +73,22 @@ var (
 		"workspace":      true,
 		"calendar_event": true,
 	}
+	// validSource is the canonical signals.source wire enum, mirrored
+	// from packages/go-shared/signalwire (the single source of truth).
+	// Every registry `source` must be a member or gen-signal-kinds
+	// fails — drift between the registry and the wire/DB enum is caught
+	// at codegen time, not at runtime as a 422. Keep in sync with
+	// signalwire.Sources() and sql/tables/signals.sql.
+	validSource = map[string]bool{
+		"manual":   true,
+		"github":   true,
+		"slack":    true,
+		"email":    true,
+		"google":   true,
+		"webhook":  true,
+		"calendar": true,
+		"discord":  true,
+	}
 )
 
 // Kind identifier rule: dotted lowercase segments, each starting with a
@@ -216,6 +232,10 @@ func validateEntry(path string, e kindEntry) error {
 	if e.Source == "" {
 		return fmt.Errorf("%s: %s missing 'source'", path, e.Kind)
 	}
+	if !validSource[e.Source] {
+		return fmt.Errorf("%s: %s has source %q not in the canonical wire enum "+
+			"(packages/go-shared/signalwire); add it there + sql/tables/signals.sql or fix the YAML", path, e.Kind, e.Source)
+	}
 	if !validRetention[e.Retention] {
 		return fmt.Errorf("%s: %s has invalid retention %q (want stateful|discrete)", path, e.Kind, e.Retention)
 	}
@@ -296,6 +316,8 @@ func genGoFile(all []record) []byte {
 	b.WriteString("// system observes and routes to the judge. Adding a new kind is a\n")
 	b.WriteString("// YAML edit followed by a regenerate; it is not a code edit.\n")
 	b.WriteString("package signalkinds\n\n")
+
+	b.WriteString("import \"github.com/nodate-flow/nodate-flow/packages/go-shared/signalwire\"\n\n")
 
 	b.WriteString("// Kind is the dotted string identifier of a signal kind.\n")
 	b.WriteString("type Kind string\n\n")
@@ -388,6 +410,22 @@ func genGoFile(all []record) []byte {
 	b.WriteString("func Lookup(k Kind) (Definition, bool) {\n")
 	b.WriteString("\td, ok := byKind[k]\n")
 	b.WriteString("\treturn d, ok\n")
+	b.WriteString("}\n\n")
+
+	b.WriteString("// init asserts that every registry Source is a member of the\n")
+	b.WriteString("// canonical signals.source wire enum (packages/go-shared/signalwire).\n")
+	b.WriteString("// A registry source the wire/DB enum rejects would make the signal\n")
+	b.WriteString("// it advertises fail with a Huma 422 before the handler runs; this\n")
+	b.WriteString("// panic turns that drift into a startup failure (and a test failure\n")
+	b.WriteString("// via the package's import) instead.\n")
+	b.WriteString("func init() {\n")
+	b.WriteString("\tsrcs := make([]string, 0, len(defs))\n")
+	b.WriteString("\tfor _, d := range defs {\n")
+	b.WriteString("\t\tsrcs = append(srcs, d.Source)\n")
+	b.WriteString("\t}\n")
+	b.WriteString("\tif err := signalwire.AssertSourcesCovered(srcs); err != nil {\n")
+	b.WriteString("\t\tpanic(err)\n")
+	b.WriteString("\t}\n")
 	b.WriteString("}\n")
 	return b.Bytes()
 }

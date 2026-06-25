@@ -20,11 +20,3 @@ kinds:
     subject_type_default: user
     description: "User active/away status from Slack Events API"
     i18n_key: signalKinds.slack.presence
-
-  - kind: teams.presence
-    source: teams
-    retention: stateful
-    autonomy_default: suggest
-    subject_type_default: user
-    description: "User presence from Microsoft Graph"
-    i18n_key: signalKinds.teams.presence

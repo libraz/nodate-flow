@@ -11,6 +11,8 @@ import (
 	"net/http"
 	"strings"
 	"time"
+
+	"github.com/nodate-flow/nodate-flow/packages/go-shared/signalwire"
 )
 
 // SignalsClient is the thin HTTP wrapper the worker uses to POST a
@@ -71,36 +73,30 @@ func NewSignalsClient(baseURL, token, userAgent string, logger *slog.Logger) (*S
 	}, nil
 }
 
-// PostSignalBody is the JSON shape the worker sends to flow-api. The
-// field names and casing must match
-// apps/flow-api/internal/http/handlers/signals/types.go
-// (SignalCreateInputBody) exactly — Huma rejects unknown / mistyped
-// fields with a 422 envelope that would surface as a per-tick warn loop.
+// PostSignalBody is the JSON shape the worker sends to flow-api. It is a
+// type alias for signalwire.CreateRequest — the single shared wire body
+// owned by packages/go-shared/signalwire — so the worker, flow-api, and
+// presence-discord can never diverge on field names or casing. Huma
+// rejects unknown / mistyped fields with a 422 envelope that would
+// surface as a per-tick warn loop, so sharing the struct turns wire
+// drift into a compile error.
 //
 // SubjectID is the calendar_events.public_id as a canonical UUID v7
 // string; the worker never sends the internal numeric id (CLAUDE.md
 // rule 18). Payload is a raw JSON document so the worker can include
-// the all-day flag and start instant without coupling the wire shape to
-// any Go struct on the flow-api side.
-type PostSignalBody struct {
-	WorkspaceID string          `json:"workspaceId"`
-	Source      string          `json:"source"`
-	Kind        string          `json:"kind"`
-	ExternalID  string          `json:"externalId,omitempty"`
-	SubjectType string          `json:"subjectType,omitempty"`
-	SubjectID   string          `json:"subjectId,omitempty"`
-	Payload     json.RawMessage `json:"payload,omitempty"`
-	ExpiresAt   *int64          `json:"expiresAt,omitempty"`
-}
+// the all-day flag and start instant. The worker leaves the TaskID and
+// other unused fields zero-valued (omitempty drops them from the wire).
+type PostSignalBody = signalwire.CreateRequest
 
 // PostSignal sends one POST /signals request and translates the
 // response into a Go error.
 //
 // Status handling:
-//   - 2xx                 → success.
-//   - 409 Conflict        → flow-api detected the external_id dedupe
-//     and collapsed the row; treated as success and
-//     logged at debug.
+//   - 2xx                 → success. flow-api returns 200 even when the
+//     external_id already exists: POST /signals does an INSERT IGNORE on
+//     the (workspace_id, source, external_id) UNIQUE and returns the
+//     existing (or freshly inserted) row, so a duplicate emit is a 200,
+//     not a 409.
 //   - 4xx (other)         → permanent error: the worker logs at warn
 //     and returns a non-nil error. Retrying on the
 //     next tick will not help — the dedupe key
@@ -150,14 +146,6 @@ func (c *SignalsClient) PostSignal(ctx context.Context, body PostSignalBody) err
 			slog.String("kind", body.Kind),
 			slog.String("subject_id", body.SubjectID),
 			slog.Int("status", resp.StatusCode),
-		)
-		return nil
-	case resp.StatusCode == http.StatusConflict:
-		// flow-api collapsed the dedupe — equivalent outcome to a fresh
-		// insert, so the tick is still healthy.
-		c.Logger.DebugContext(ctx, "calendar_event_day: signal deduplicated by flow-api",
-			slog.String("external_id", body.ExternalID),
-			slog.String("subject_id", body.SubjectID),
 		)
 		return nil
 	case resp.StatusCode >= 400 && resp.StatusCode < 500:
