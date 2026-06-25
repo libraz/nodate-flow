@@ -97,9 +97,11 @@ type TaskMutator interface {
 	// themselves — the Applier owns that event.
 	CompleteTask(ctx context.Context, workspaceID uint32, taskInternalID int64, agentID uint32) error
 	// AddComment appends a comment to the task. The comment body is
-	// the judge's reasoning excerpt (already redacted and length-capped
-	// by [ValidateVerdict]). Implementations emit task.comment.added
-	// through their normal path; the Applier does not re-emit it.
+	// the judge's reasoning excerpt, which the Applier has already
+	// scrubbed of secret-bearing tokens via [SanitizeVerdict] and
+	// length-capped via [ValidateVerdict] before this call.
+	// Implementations emit task.comment.added through their normal
+	// path; the Applier does not re-emit it.
 	AddComment(ctx context.Context, workspaceID uint32, taskInternalID int64, agentID uint32, body string) error
 	// DraftRetroTask creates a retrospective task linked to the
 	// source task and signal. Returns the new task's internal id and
@@ -211,6 +213,14 @@ func (a *Applier) Apply(ctx context.Context, sig SignalRef, agent AgentRef, runI
 	if vErr := ValidateVerdict(verdict); vErr != nil {
 		return a.rejectVerdict(ctx, sig, agent, runID, verdict, vErr)
 	}
+
+	// Response-side redaction. The verdict's free-text excerpt and any
+	// proposed-event payloads are LLM-authored and from here flow
+	// verbatim into the event log (judgedPayload, TaskAutoCompleted,
+	// TaskRetroDrafted, SignalApplied) and into task comments via
+	// AddComment. Scrub secret-bearing tokens once, on the local copy,
+	// so every downstream use below reads the redacted text.
+	verdict = SanitizeVerdict(verdict)
 
 	signalInternalID := sig.InternalID
 	taskID, taskOK, taskErr := a.resolveTarget(ctx, sig.WorkspaceID, verdict)

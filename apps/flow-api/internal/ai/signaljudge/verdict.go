@@ -46,11 +46,13 @@ type Verdict struct {
 	// [0.0, 1.0]. Compared against the autonomy resolver's thresholds
 	// to decide suggest / draft / auto.
 	Confidence float64 `json:"confidence"`
-	// ReasoningExcerpt is a short, redacted free-text explanation the
-	// timeline UI surfaces alongside the verdict. The Applier rejects
-	// excerpts > MaxReasoningExcerptLen so prompt-injection attempts
-	// to stuff arbitrary content into the audit log are bounded at
-	// the Applier rather than relying on the LLM to truncate itself.
+	// ReasoningExcerpt is a short free-text explanation the timeline UI
+	// surfaces alongside the verdict. It is scrubbed of secret-bearing
+	// tokens by [SanitizeVerdict] (which the Applier runs before any
+	// event or comment is persisted) and length-capped by
+	// [ValidateVerdict] so prompt-injection attempts to stuff arbitrary
+	// content into the audit log are bounded at the Applier rather than
+	// relying on the LLM to truncate or sanitise itself.
 	ReasoningExcerpt string `json:"reasoning_excerpt"`
 	// ProposedEvents are optional extra events the Applier should
 	// emit alongside the primary action. Restricted to the kinds
@@ -181,6 +183,37 @@ func ValidateVerdict(v Verdict) error {
 	}
 
 	return nil
+}
+
+// SanitizeVerdict returns a copy of v with every operator-facing
+// free-text field scrubbed of secret-bearing tokens before the verdict
+// reaches the event log or a task comment. The LLM produces
+// [Verdict.ReasoningExcerpt] and [ProposedEvent.PayloadJSON] from a
+// prompt that already redacts its inputs (prompt.go), but a creative or
+// compromised model can still echo or fabricate a token in its output;
+// this is the second redaction pass on the response side, mirroring the
+// Runner's redaction of the raw LLM response before it lands in
+// ai_invocations (runner.go:275).
+//
+// Reuses the same package-local redactors the prompt path uses:
+//   - [redactFreeFormText] for the prose excerpt (Bearer / sk- / ghp_ … prefixes).
+//   - [redactJSON] for each proposed-event payload (JSON-key blocklist +
+//     per-string substring scrub).
+//
+// The input is treated as immutable: ProposedEvents is copied before
+// any payload is rewritten so a caller holding the original slice is
+// unaffected.
+func SanitizeVerdict(v Verdict) Verdict {
+	v.ReasoningExcerpt = redactFreeFormText(v.ReasoningExcerpt)
+	if len(v.ProposedEvents) > 0 {
+		cleaned := make([]ProposedEvent, len(v.ProposedEvents))
+		copy(cleaned, v.ProposedEvents)
+		for i := range cleaned {
+			cleaned[i].PayloadJSON = redactJSON(cleaned[i].PayloadJSON)
+		}
+		v.ProposedEvents = cleaned
+	}
+	return v
 }
 
 // verdictError wraps a formatted validation message in a typed

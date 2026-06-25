@@ -542,6 +542,11 @@ func (o *Orchestrator) logFailure(ctx context.Context, workspaceID uint32, purpo
 		Model:          req.Model,
 		PromptRedacted: Redact(strings.TrimSpace(req.System + "\n" + req.Prompt)),
 		Status:         "error",
-		ErrorCode:      err.Error(),
+		// Provider errors can embed a verbatim upstream response body
+		// (e.g. an echoed Authorization header or an API key in a 401
+		// detail), so scrub the message before it lands in
+		// ai_invocations.error_code — same redactor the prompt/response
+		// fields above use, mirroring signaljudge/runner.go.
+		ErrorCode: Redact(err.Error()),
 	})
 }
