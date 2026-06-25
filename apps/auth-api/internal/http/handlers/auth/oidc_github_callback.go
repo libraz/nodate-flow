@@ -2,15 +2,12 @@ package auth
 
 import (
 	"context"
-	"database/sql"
 	"errors"
 
 	"github.com/nodate-flow/nodate-flow/apps/auth-api/internal/audit"
 	internauth "github.com/nodate-flow/nodate-flow/apps/auth-api/internal/auth"
 	"github.com/nodate-flow/nodate-flow/apps/auth-api/internal/db/generated"
-	"github.com/nodate-flow/nodate-flow/apps/auth-api/internal/db/types"
 	apierrors "github.com/nodate-flow/nodate-flow/apps/auth-api/internal/errors"
-	"github.com/nodate-flow/nodate-flow/packages/go-shared/authn"
 )
 
 // OIDCGithubCallback handles GET /auth/oidc/github/callback. It
@@ -67,51 +64,23 @@ func OIDCGithubCallback(deps Deps) func(context.Context, *OIDCCallbackInput) (*O
 			return nil, httpErr(apierrors.AuthOidcDomainNotAllowed)
 		}
 
-		ident, err := deps.Queries.FindIdentityByProviderSubject(ctx, generated.FindIdentityByProviderSubjectParams{
-			Provider: generated.IdentitiesProvider("github"),
-			Subject:  claims.Sub,
+		name := claims.Name
+		if name == "" {
+			name = claims.Login
+		}
+		// Resolve the verified sign-in to a user: log in an existing
+		// identity, link onto an existing same-email account, or
+		// auto-provision a fresh user (gated by RegistrationOpen). See
+		// resolveOIDCUser for the full ordering.
+		userID, userPub, err := deps.resolveOIDCUser(ctx, oidcProvisionParams{
+			Provider:    generated.IdentitiesProvider("github"),
+			Subject:     claims.Sub,
+			Email:       claims.Email,
+			DisplayName: name,
+			Locale:      "en",
 		})
-		var userID uint32
-		var userPub types.PublicID
-		switch {
-		case err == nil:
-			userID = ident.UserID
-			pub, qerr := deps.Queries.FindUserPublicIdById(ctx, userID)
-			if qerr != nil {
-				return nil, httpErr(apierrors.InternalUnexpected)
-			}
-			userPub = pub
-		case errors.Is(err, sql.ErrNoRows):
-			if !deps.RegistrationOpen {
-				return nil, httpErr(apierrors.AuthRegisterInstanceRegistrationDisabled)
-			}
-			userPub = types.New()
-			name := claims.Name
-			if name == "" {
-				name = claims.Login
-			}
-			uid, err := deps.Queries.RegisterUser(ctx, generated.RegisterUserParams{
-				PublicID:        userPub,
-				Email:           claims.Email,
-				DisplayName:     name,
-				Locale:          "en",
-				ThemePreference: generated.UsersThemePreference("system"),
-			})
-			if err != nil {
-				return nil, httpErr(apierrors.InternalUnexpected)
-			}
-			userID = uint32(uid) //#nosec G115 -- LastInsertId for users.id (BIGINT UNSIGNED AUTO_INCREMENT) fits uint32 in any realistic deployment
-			identPub := types.New()
-			if _, err := deps.Queries.CreateIdentity(ctx, generated.CreateIdentityParams{
-				PublicID: identPub,
-				UserID:   userID,
-				Provider: generated.IdentitiesProvider("github"),
-				Subject:  claims.Sub,
-			}); err != nil {
-				return nil, httpErr(apierrors.InternalUnexpected)
-			}
-		default:
-			return nil, httpErr(apierrors.InternalUnexpected)
+		if err != nil {
+			return nil, err
 		}
 
 		deps.Audit.Record(ctx, audit.Entry{
@@ -120,13 +89,9 @@ func OIDCGithubCallback(deps Deps) func(context.Context, *OIDCCallbackInput) (*O
 			ResourceType: "user",
 			Metadata:     map[string]any{"provider": "github", "email": claims.Email},
 		})
-		tokens, refresh, err := IssueTokens(ctx, deps, userID, userPub, in.UserAgent, authn.ClientIPFromContext(ctx))
-		if err != nil {
-			return nil, err
-		}
-		return &OIDCCallbackOutput{
-			SetCookie: newRefreshCookie(refresh, deps.CookieSecure),
-			Body:      tokens,
-		}, nil
+		// Shared step-up gate: if the account enrolled app-level TOTP,
+		// finishOIDCLogin returns a totp_required challenge instead of
+		// tokens. See its doc comment for the policy.
+		return deps.finishOIDCLogin(ctx, userID, userPub, in.UserAgent)
 	}
 }
