@@ -33,6 +33,28 @@ type session struct {
 	scopes  []string
 }
 
+// hasScope reports whether the session's granted scopes satisfy the
+// tool's required scope.
+//
+// Scopes are coarse access *tiers*, not per-tool or per-resource
+// capabilities. The vocabulary is fixed and two-tiered:
+//
+//   - read:workspace  — invoke read-only tools across the workspace.
+//   - write:workspace — additionally invoke every mutating tool; it
+//     widens to read:workspace and to both project-tier scopes.
+//   - read:project / write:project — the same two tiers narrowed to a
+//     project; write:project widens to read:project, and write:workspace
+//     widens to both.
+//
+// Matching is therefore a membership test with write-implies-read (and
+// workspace-implies-project) widening — there is no "read:calendar" or
+// "write:task:complete" granularity. A token holding write:workspace can
+// invoke any mutating tool; the resource it touches is still constrained,
+// but by the workspace-scoped resolvers in this file (resolveTask /
+// resolveCalendar / resolveWorkspaceUser, …) and the agent guard, not by
+// the scope string. This keeps the scope surface small and auditable;
+// per-resource least privilege is a deliberate future extension, not an
+// isolation gap (the resolvers, not the scopes, enforce tenancy).
 func (s *session) hasScope(required string) bool {
 	if required == "" {
 		return true
@@ -188,6 +210,38 @@ func resolveCalendar(ctx context.Context, deps Deps, s *session, publicID string
 		return 0, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
 	}
 	return row.ID, nil
+}
+
+// resolveWorkspaceUser resolves a user public id to its internal id and
+// verifies the user is an enabled member of the session workspace.
+//
+// This mirrors [acl.CheckWorkspaceMember]'s membership rule but binds it
+// to a public-id lookup so a caller cannot assign a globally-existing
+// user that is not a member of their workspace (the FK on
+// calendar_events.owner_user_id references the global users table, so a
+// non-member would otherwise pass referential integrity). Non-members
+// surface as MCP.TOKEN.WORKSPACE_MISMATCH, never leaking whether the
+// user exists outside the workspace.
+func resolveWorkspaceUser(ctx context.Context, deps Deps, s *session, publicID string) (uint32, error) {
+	pub, err := types.Parse(publicID)
+	if err != nil {
+		return 0, apierrors.Newf(apierrors.McpToolArgumentsInvalid, "invalid userId")
+	}
+	const q = `SELECT u.id FROM users u
+INNER JOIN workspace_members wm
+  ON wm.user_id = u.id
+  AND wm.workspace_id = ?
+  AND wm.enabled = TRUE
+WHERE u.public_id = ? AND u.enabled = TRUE
+LIMIT 1`
+	var userID uint32
+	if err := deps.DB.QueryRowContext(ctx, q, s.workspaceID, pub).Scan(&userID); err != nil {
+		if stderrors.Is(err, sql.ErrNoRows) {
+			return 0, apierrors.New(apierrors.McpTokenWorkspaceMismatch)
+		}
+		return 0, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
+	}
+	return userID, nil
 }
 
 // canEditCalendarEvent checks if the acting user can edit a calendar

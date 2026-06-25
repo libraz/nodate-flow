@@ -133,7 +133,11 @@ func (h *Handler) serveSSE(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Per-token rate limiting (counts the SSE connection initiation).
-	if allowed, retryAfter := h.rl.allow(tok); !allowed {
+	// Hash the token so the plaintext is never stored as a map key in the
+	// rate limiter, AND so the GET (SSE) and POST paths share one budget
+	// under the same hashed key — preventing a client from doubling its
+	// rate allowance by splitting requests across the two methods.
+	if allowed, retryAfter := h.rl.allow(hashToken(tok)); !allowed {
 		w.Header().Set("Retry-After", strconv.Itoa(int(retryAfter.Seconds())))
 		writeRPCTransportError(w, nil, apierrors.RateLimitExceeded, "rate limit exceeded")
 		return

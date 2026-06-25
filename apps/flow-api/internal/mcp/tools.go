@@ -2755,13 +2755,12 @@ func runListCalendarEvents(ctx context.Context, deps Deps, s *session, raw json.
 	items := make([]map[string]any, 0, len(rows))
 	for _, r := range rows {
 		item := map[string]any{
-			"id":          r.PublicID.String(),
-			"calendarId":  r.CalendarID,
-			"kind":        string(r.Kind),
-			"showAs":      string(r.ShowAs),
-			"title":       r.Title,
-			"allDay":      r.AllDay,
-			"ownerUserId": r.OwnerUserID,
+			"id":         r.PublicID.String(),
+			"calendarId": r.CalendarPublicID.String(),
+			"kind":       string(r.Kind),
+			"showAs":     string(r.ShowAs),
+			"title":      r.Title,
+			"allDay":     r.AllDay,
 		}
 		if r.AllDay {
 			if r.StartAt.Valid {
@@ -2865,15 +2864,13 @@ func runCreateCalendarEvent(ctx context.Context, deps Deps, s *session, raw json
 		if !calOwner.Valid || uint32(calOwner.Int32) != s.userID { //#nosec G115 -- owner_user_id is users.id (BIGINT UNSIGNED), fits uint32 within realistic deployments
 			return nil, apierrors.Newf(apierrors.McpToolExecutionFailed, "only the calendar owner can set ownerUserId")
 		}
-		// Resolve the target user by public id.
-		ownerPub, perr := types.Parse(in.OwnerUserID)
-		if perr != nil {
-			return nil, apierrors.Newf(apierrors.McpToolArgumentsInvalid, "invalid ownerUserId")
+		// Resolve the target user by public id, scoped to workspace
+		// membership so a non-member cannot be assigned as owner.
+		resolved, uerr := resolveWorkspaceUser(ctx, deps, s, in.OwnerUserID)
+		if uerr != nil {
+			return nil, uerr
 		}
-		const qUser = `SELECT id FROM users WHERE public_id = ? AND enabled = TRUE LIMIT 1`
-		if uerr := deps.DB.QueryRowContext(ctx, qUser, ownerPub).Scan(&ownerUserID); uerr != nil {
-			return nil, apierrors.Newf(apierrors.McpToolExecutionFailed, "owner user not found")
-		}
+		ownerUserID = resolved
 	}
 
 	pub := newPublicID()
@@ -3180,14 +3177,14 @@ func runListFreeSlots(ctx context.Context, deps Deps, s *session, raw json.RawMe
 
 	targetUserID := s.userID
 	if in.UserID != "" {
-		userPub, perr := types.Parse(in.UserID)
-		if perr != nil {
-			return nil, apierrors.Newf(apierrors.McpToolArgumentsInvalid, "invalid userId")
+		// Scope the lookup to workspace membership so the free/busy
+		// probe cannot act as an existence oracle for users outside
+		// the workspace.
+		resolved, uerr := resolveWorkspaceUser(ctx, deps, s, in.UserID)
+		if uerr != nil {
+			return nil, uerr
 		}
-		const q = `SELECT id FROM users WHERE public_id = ? AND enabled = TRUE LIMIT 1`
-		if uerr := deps.DB.QueryRowContext(ctx, q, userPub).Scan(&targetUserID); uerr != nil {
-			return nil, apierrors.Newf(apierrors.McpToolExecutionFailed, "user not found")
-		}
+		targetUserID = resolved
 	}
 
 	date, err := time.Parse("2006-01-02", in.Date)

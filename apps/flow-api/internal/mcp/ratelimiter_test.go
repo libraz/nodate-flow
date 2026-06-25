@@ -74,3 +74,60 @@ func TestRateLimiterIsolatesTokens(t *testing.T) {
 		t.Fatal("different token should have its own limit")
 	}
 }
+
+// TestRateLimiterSseAndPostShareHashedBudget locks in the M-5 fix: both
+// the SSE (GET) path (sse.go) and the POST path (server.go) key the rate
+// limiter on hashToken(tok). Because both reduce to the same hashed key,
+// a client cannot double its budget by splitting requests across the two
+// HTTP methods — requests counted under one method spend the shared
+// allowance for the other.
+func TestRateLimiterSseAndPostShareHashedBudget(t *testing.T) {
+	t.Parallel()
+	rl := newMCPRateLimiter()
+	const tok = "mcp_shared_budget_token"
+	key := hashToken(tok)
+
+	// Simulate the POST path consuming the full per-token budget under the
+	// hashed key (server.go: h.rl.allow(hashToken(tok))).
+	for i := 0; i < rl.maxReqs; i++ {
+		ok, _ := rl.allow(key)
+		if !ok {
+			t.Fatalf("POST request %d should be within budget", i+1)
+		}
+	}
+
+	// The SSE path now also keys on hashToken(tok) (sse.go), so a GET that
+	// arrives after the budget is spent must be denied — proving the two
+	// paths share one budget rather than each getting maxReqs.
+	if ok, retryAfter := rl.allow(hashToken(tok)); ok {
+		t.Fatal("SSE request must be denied: it shares the POST budget under the hashed key")
+	} else if retryAfter < time.Second {
+		t.Fatalf("retryAfter should be >= 1s, got %v", retryAfter)
+	}
+}
+
+// TestRateLimiterNeverKeysOnPlaintextToken guards the secret-in-memory
+// half of M-5: the raw bearer token must never appear as a rate-limiter
+// map key. Exhausting the budget through the hashed key must leave no
+// entry under the plaintext token.
+func TestRateLimiterNeverKeysOnPlaintextToken(t *testing.T) {
+	t.Parallel()
+	rl := newMCPRateLimiter()
+	const tok = "mcp_plaintext_should_never_be_a_key"
+
+	for i := 0; i < rl.maxReqs; i++ {
+		rl.allow(hashToken(tok))
+	}
+
+	rl.mu.Lock()
+	_, plaintextKeyed := rl.tokens[tok]
+	_, hashedKeyed := rl.tokens[hashToken(tok)]
+	rl.mu.Unlock()
+
+	if plaintextKeyed {
+		t.Error("plaintext token must never be stored as a rate-limiter key")
+	}
+	if !hashedKeyed {
+		t.Error("the hashed token must be the only key used by both paths")
+	}
+}

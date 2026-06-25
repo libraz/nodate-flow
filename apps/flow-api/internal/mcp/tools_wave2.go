@@ -12,6 +12,11 @@ import (
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/eventbus"
 )
 
+// reactionListLimit bounds the reactions returned by the MCP
+// list_reactions tool. Reactions are a small per-task collection, so a
+// fixed upper bound keeps the result set bounded without a paging cursor.
+const reactionListLimit int32 = 200
+
 // validFavoriteTargetTypes enumerates the accepted target_type values for
 // the add_favorite tool.
 var validFavoriteTargetTypes = map[string]generated.UserFavoritesTargetType{
@@ -185,7 +190,11 @@ func runListReactions(ctx context.Context, deps Deps, s *session, raw json.RawMe
 	if err != nil {
 		return nil, err
 	}
-	rows, err := deps.Queries.ListReactionsForTask(ctx, sql.NullInt32{Int32: int32(taskInternal), Valid: true}) //#nosec G115 -- task id is tasks.id (BIGINT UNSIGNED), fits int32 within realistic deployments
+	rows, err := deps.Queries.ListReactionsForTask(ctx, generated.ListReactionsForTaskParams{
+		TaskID: sql.NullInt32{Int32: int32(taskInternal), Valid: true}, //#nosec G115 -- task id is tasks.id (BIGINT UNSIGNED), fits int32 within realistic deployments
+		Limit:  reactionListLimit,
+		Offset: 0,
+	})
 	if err != nil {
 		return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
 	}

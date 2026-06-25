@@ -255,17 +255,52 @@ func (h *Handler) handleToolCall(w http.ResponseWriter, r *http.Request, s *sess
 		writeRPCAppError(w, req.ID, apierrors.McpToolNotFound, "tool not found: "+params.Name)
 		return
 	}
+	// Scope gate. By design this is a coarse read/write tier check, not
+	// a per-tool or per-resource capability. Each tool declares a single
+	// requiredScope drawn from a fixed two-tier vocabulary
+	// (read:workspace / write:workspace, plus the project-tier aliases
+	// read:project / write:project — see [session.hasScope]); a token's
+	// granted scopes are matched against it with write-implies-read
+	// widening. There is intentionally no scope like "read:calendar" or
+	// "write:task:complete": a token that can write the workspace can
+	// invoke every mutating tool in it.
+	//
+	// The finer-grained guarantees the product actually relies on —
+	// tenant isolation and per-resource ownership — are enforced
+	// downstream, not by this scope check: every tool re-resolves its
+	// target via the workspace-scoped resolvers in acl.go
+	// (resolveTask / resolveCalendar / resolveWorkspaceUser, …) and the
+	// agentguard branch below caps agent-backed tokens. Tightening this
+	// to per-tool least privilege would mean expanding the scope
+	// vocabulary and the token-issuance UI; that is a deliberate future
+	// step, not a gap that weakens the current isolation model. Keep new
+	// tools mapped onto the existing read/write tiers until that lands.
 	if !s.hasScope(t.requiredScope) {
 		h.audit(r.Context(), s, params.Name, params.Arguments, nil,
 			generated.McpInvocationsStatusDenied, apierrors.McpScopeInsufficient.Code, 0)
 		writeRPCAppError(w, req.ID, apierrors.McpScopeInsufficient, "scope "+t.requiredScope+" required")
 		return
 	}
-	// Agent guard: when the session is backed by an AI agent
-	// token, run agentguard.Decide to enforce enabled / paused /
-	// allowed-scopes. Monthly cost-cap enforcement here is still a
-	// placeholder — ai_invocations.agent_id is a follow-up, so we
-	// pass 0 spend and nil cap until that column lands.
+	// Agent guard: when the session is backed by an AI agent token,
+	// run agentguard.Decide to enforce enabled / paused /
+	// allowed-scopes and the monthly cost cap.
+	//
+	// Monthly cost-cap enforcement is a deliberate SOFT cap with
+	// post-hoc + 95%-margin semantics, not a hard pre-call reserve:
+	//   - spend is real: loadAgentMonthSpendCents sums
+	//     ai_invocations.cost_estimate for this agent_id this month
+	//     (the agent_id column already lands, despite older comments);
+	//   - we pass EstimatedCents = 0 because there is no per-tool cost
+	//     model yet, so an in-flight call's cost is unknown until it
+	//     returns. agentguard therefore pauses the agent the moment
+	//     recorded spend reaches 95% of the cap (SpentCentsMonth >=
+	//     effectiveCap), bounding worst-case overrun to roughly one
+	//     tool call beyond the cap.
+	// The would-exceed branch inside agentguard.Decide stays live for
+	// future callers that can supply a real EstimatedCents; at this
+	// call site it is intentionally inert (0 estimate) until a per-tool
+	// estimate lands. Do not fabricate a constant estimate here: a wrong
+	// guess would spuriously pause agents well under their real spend.
 	if s.agentID != 0 {
 		agent, aerr := h.loadAgentGuardSnapshot(r.Context(), s.agentID)
 		if aerr != nil {
@@ -287,6 +322,10 @@ func (h *Handler) handleToolCall(w http.ResponseWriter, r *http.Request, s *sess
 			ToolName:        params.Name,
 			RequiredScope:   t.requiredScope,
 			SpentCentsMonth: spent,
+			// Soft cap: no per-tool estimate yet, so the would-exceed
+			// branch is intentionally inert here and the cap bites
+			// post-hoc at 95% of the limit. See the comment above.
+			EstimatedCents: 0,
 		})
 		if decision.Outcome != agentguard.OutcomeAllow {
 			spec := apierrors.McpScopeInsufficient
