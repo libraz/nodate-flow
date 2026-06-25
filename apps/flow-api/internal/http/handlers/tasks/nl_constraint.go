@@ -20,6 +20,9 @@ func CompileConstraint(deps Deps) func(context.Context, *CompileConstraintInput)
 		}
 		parsed, err := deps.NlConstraint.Compile(ctx, in.Body.Prompt)
 		if err != nil {
+			if errors.Is(err, nlconstraint.ErrBudgetExceeded) {
+				return nil, httpErr(apierrors.AiCostGuardExceeded)
+			}
 			if errors.Is(err, nlconstraint.ErrUnparseable) {
 				return nil, httpErr(apierrors.AiResponseInvalidJson)
 			}

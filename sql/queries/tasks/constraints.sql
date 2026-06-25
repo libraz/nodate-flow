@@ -47,9 +47,12 @@ WHERE workspace_id = ?
   AND public_id = ?
   AND enabled = TRUE;
 
--- name: DeleteConstraint :exec
--- Soft-delete a constraint.
+-- name: DeleteConstraint :execrows
+-- Soft-delete a constraint. Scoped by the owning task_id so a sibling task's
+-- constraint cannot be deleted through another task's path; the affected-row
+-- count lets the handler return NOT_FOUND on a no-op.
 UPDATE task_constraints
 SET enabled = FALSE
 WHERE workspace_id = ?
-  AND public_id = ?;
+  AND public_id = ?
+  AND task_id = ?;

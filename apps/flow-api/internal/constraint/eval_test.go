@@ -70,6 +70,55 @@ func TestEvaluate_DepAllDone(t *testing.T) {
 	}
 }
 
+func TestEvaluate_DepOpenAtMost_IgnoresNonBlockingKinds(t *testing.T) {
+	c := mustParse(t, `{"op":"dependency.open_at_most","max":0}`)
+
+	// Two open deps but both informational (relates / retro_of) → the
+	// open count is 0, so an open_at_most:0 constraint is satisfied.
+	ok, err := Evaluate(c, Facts{
+		DependencyStates: map[string]string{"a": "open", "b": "waiting"},
+		DependencyKinds:  map[string]string{"a": "relates", "b": "retro_of"},
+	})
+	if err != nil || !ok {
+		t.Fatalf("expected satisfied (non-blocking deps ignored), got ok=%v err=%v", ok, err)
+	}
+
+	// A genuinely-blocking open dep still counts → not satisfied.
+	ok, _ = Evaluate(c, Facts{
+		DependencyStates: map[string]string{"a": "open", "b": "waiting"},
+		DependencyKinds:  map[string]string{"a": "blocks", "b": "relates"},
+	})
+	if ok {
+		t.Fatal("expected unsatisfied: a blocking open dep must count")
+	}
+
+	// subtask_of is blocking too.
+	ok, _ = Evaluate(c, Facts{
+		DependencyStates: map[string]string{"a": "waiting"},
+		DependencyKinds:  map[string]string{"a": "subtask_of"},
+	})
+	if ok {
+		t.Fatal("expected unsatisfied: subtask_of is a blocking kind")
+	}
+
+	// done / cancelled blocking deps do not count as open.
+	ok, _ = Evaluate(c, Facts{
+		DependencyStates: map[string]string{"a": "done", "b": "cancelled"},
+		DependencyKinds:  map[string]string{"a": "blocks", "b": "blocks"},
+	})
+	if err != nil || !ok {
+		t.Fatalf("expected satisfied: done/cancelled deps are not open, got ok=%v", ok)
+	}
+
+	// Backward compat: with no kinds recorded, every open dep counts.
+	ok, _ = Evaluate(c, Facts{
+		DependencyStates: map[string]string{"a": "open"},
+	})
+	if ok {
+		t.Fatal("expected unsatisfied: missing kind defaults to blocking")
+	}
+}
+
 func TestEvaluate_ActorHasRole(t *testing.T) {
 	c := mustParse(t, `{"op":"actor.has_role","arg":"reviewer"}`)
 	ok, _ := Evaluate(c, Facts{ActorRoles: map[string]bool{"reviewer": true}})

@@ -182,6 +182,11 @@ export const WsErrors = {
     status: 409,
     message: "Task is already archived",
   },
+  WS_TASK_DEPENDENCY_CYCLE: {
+    code: "WS.TASK.DEPENDENCY_CYCLE",
+    status: 422,
+    message: "Adding this dependency would create a cycle",
+  },
   WS_TASK_NOT_ARCHIVED: {
     code: "WS.TASK.NOT_ARCHIVED",
     status: 409,

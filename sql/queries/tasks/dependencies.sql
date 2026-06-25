@@ -72,12 +72,27 @@ WHERE td.workspace_id = ?
 ORDER BY td.created_at ASC, td.public_id ASC
 LIMIT 5000;
 
--- name: DeleteDependency :exec
--- Soft-delete a dependency edge.
+-- name: ListDependencyEdgesForWorkspace :many
+-- List every enabled dependency edge in the workspace as (from, to) internal
+-- id pairs. Used by AddDependency to walk the graph and reject an edge that
+-- would close a cycle, keeping the dependency graph a DAG. Internal ids are
+-- safe here because the result never leaves the handler (json:"-" on *.id).
+SELECT
+  td.from_task_id,
+  td.to_task_id
+FROM task_dependencies td
+WHERE td.workspace_id = ?
+  AND td.enabled = TRUE;
+
+-- name: DeleteDependency :execrows
+-- Soft-delete a dependency edge. Scoped by the owning from_task_id so a
+-- sibling task's edge cannot be deleted through another task's path; the
+-- affected-row count lets the handler return NOT_FOUND on a no-op.
 UPDATE task_dependencies
 SET enabled = FALSE
 WHERE workspace_id = ?
-  AND public_id = ?;
+  AND public_id = ?
+  AND from_task_id = ?;
 
 -- name: ListRetroDraftsForWorkspace :many
 -- List draft retrospective tasks: tasks linked back to a source task

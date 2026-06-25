@@ -195,6 +195,15 @@ resources:
         userAction: "Set each actor's role to one of: assignee, reviewer, watcher, approver."
         i18nKey: "workspace.errors.task_actor_role_invalid"
 
+      dependency_cycle:
+        code: WS.TASK.DEPENDENCY_CYCLE
+        status: 422
+        message: "Adding this dependency would create a cycle"
+        message_ja: "この依存関係を追加すると循環が発生します"
+        message_zh: "添加此依赖关系会产生循环依赖"
+        description: "Returned when a new task dependency edge would close a cycle in the workspace dependency graph (directly or transitively). The dependency graph must remain a DAG so blocked-by computation and topological scheduling terminate."
+        userAction: "Remove the conflicting dependency on the other task before adding this edge."
+
   task_agent:
     breadcrumb: "Workspace > Task > Agent"
     errors:

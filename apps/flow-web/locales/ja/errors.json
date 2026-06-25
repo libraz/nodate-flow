@@ -274,6 +274,7 @@
   "WS.TASK.ACCESS_DENIED": "このタスクへのアクセス権がありません",
   "WS.TASK.ACTOR_ROLE_INVALID": "タスク参加者の役割は assignee / reviewer / watcher / approver のいずれかを指定してください",
   "WS.TASK.ALREADY_ARCHIVED": "このタスクは既にアーカイブ済みです",
+  "WS.TASK.DEPENDENCY_CYCLE": "この依存関係を追加すると循環が発生します",
   "WS.TASK.NOT_ARCHIVED": "このタスクはアーカイブされていません",
   "WS.TASK.NOT_FOUND": "タスクが見つかりません",
   "WS.TASK.STATE_TRANSITION_BLOCKED_BY_CONSTRAINT": "タスクを指定した状態に遷移できません",

@@ -46,22 +46,29 @@ func (q *Queries) AddConstraint(ctx context.Context, arg AddConstraintParams) (i
 	return result.LastInsertId()
 }
 
-const deleteConstraint = `-- name: DeleteConstraint :exec
+const deleteConstraint = `-- name: DeleteConstraint :execrows
 UPDATE task_constraints
 SET enabled = FALSE
 WHERE workspace_id = ?
   AND public_id = ?
+  AND task_id = ?
 `
 
 type DeleteConstraintParams struct {
 	WorkspaceID uint32         `json:"-"`
 	PublicID    types.PublicID `json:"publicId"`
+	TaskID      uint32         `json:"-"`
 }
 
-// Soft-delete a constraint.
-func (q *Queries) DeleteConstraint(ctx context.Context, arg DeleteConstraintParams) error {
-	_, err := q.db.ExecContext(ctx, deleteConstraint, arg.WorkspaceID, arg.PublicID)
-	return err
+// Soft-delete a constraint. Scoped by the owning task_id so a sibling task's
+// constraint cannot be deleted through another task's path; the affected-row
+// count lets the handler return NOT_FOUND on a no-op.
+func (q *Queries) DeleteConstraint(ctx context.Context, arg DeleteConstraintParams) (int64, error) {
+	result, err := q.db.ExecContext(ctx, deleteConstraint, arg.WorkspaceID, arg.PublicID, arg.TaskID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
 }
 
 const failConstraint = `-- name: FailConstraint :exec

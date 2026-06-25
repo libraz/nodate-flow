@@ -16,16 +16,22 @@ const getTaskDueOnForEngine = `-- name: GetTaskDueOnForEngine :one
 
 SELECT due_on
 FROM tasks
-WHERE id = ? AND enabled = TRUE
+WHERE id = ? AND workspace_id = ? AND enabled = TRUE
 LIMIT 1
 `
 
+type GetTaskDueOnForEngineParams struct {
+	ID          uint32 `json:"-"`
+	WorkspaceID uint32 `json:"-"`
+}
+
 // Queries dedicated to the constraint engine.
-// Keyed off the internal task_id so the engine never has to know
-// about public_id resolution. All workspace scoping is enforced by
-// the caller before it lands here.
-func (q *Queries) GetTaskDueOnForEngine(ctx context.Context, id uint32) (sql.NullTime, error) {
-	row := q.db.QueryRowContext(ctx, getTaskDueOnForEngine, id)
+// Keyed off the internal task_id, but every read also filters on
+// workspace_id so the SQL boundary enforces tenant isolation even if
+// an upstream ACL check is bypassed. The engine never has to know
+// about public_id resolution.
+func (q *Queries) GetTaskDueOnForEngine(ctx context.Context, arg GetTaskDueOnForEngineParams) (sql.NullTime, error) {
+	row := q.db.QueryRowContext(ctx, getTaskDueOnForEngine, arg.ID, arg.WorkspaceID)
 	var due_on sql.NullTime
 	err := row.Scan(&due_on)
 	return due_on, err
@@ -34,23 +40,33 @@ func (q *Queries) GetTaskDueOnForEngine(ctx context.Context, id uint32) (sql.Nul
 const listDependencyStatesForEngine = `-- name: ListDependencyStatesForEngine :many
 SELECT
   tt.public_id   AS to_public_id,
-  tt.derived_state
+  tt.derived_state,
+  td.kind        AS dependency_kind
 FROM task_dependencies td
 INNER JOIN tasks tt ON tt.id = td.to_task_id AND tt.enabled = TRUE
 WHERE td.from_task_id = ?
+  AND td.workspace_id = ?
   AND td.enabled = TRUE
 `
 
+type ListDependencyStatesForEngineParams struct {
+	FromTaskID  uint32 `json:"fromTaskId"`
+	WorkspaceID uint32 `json:"-"`
+}
+
 type ListDependencyStatesForEngineRow struct {
-	ToPublicID   types.PublicID    `json:"toPublicId"`
-	DerivedState TasksDerivedState `json:"derivedState"`
+	ToPublicID     types.PublicID       `json:"toPublicId"`
+	DerivedState   TasksDerivedState    `json:"derivedState"`
+	DependencyKind TaskDependenciesKind `json:"dependencyKind"`
 }
 
 // Outgoing dependencies of a task with the referenced task's
-// public_id + current derived_state. The engine builds a
-// map[public_id]state from this rowset.
-func (q *Queries) ListDependencyStatesForEngine(ctx context.Context, fromTaskID uint32) ([]ListDependencyStatesForEngineRow, error) {
-	rows, err := q.db.QueryContext(ctx, listDependencyStatesForEngine, fromTaskID)
+// public_id, current derived_state, and dependency kind. The engine
+// builds a map[public_id]state and a map[public_id]kind from this
+// rowset; dependency.open_at_most uses the kind to ignore
+// non-blocking (informational) links.
+func (q *Queries) ListDependencyStatesForEngine(ctx context.Context, arg ListDependencyStatesForEngineParams) ([]ListDependencyStatesForEngineRow, error) {
+	rows, err := q.db.QueryContext(ctx, listDependencyStatesForEngine, arg.FromTaskID, arg.WorkspaceID)
 	if err != nil {
 		return nil, err
 	}
@@ -58,7 +74,7 @@ func (q *Queries) ListDependencyStatesForEngine(ctx context.Context, fromTaskID 
 	items := []ListDependencyStatesForEngineRow{}
 	for rows.Next() {
 		var i ListDependencyStatesForEngineRow
-		if err := rows.Scan(&i.ToPublicID, &i.DerivedState); err != nil {
+		if err := rows.Scan(&i.ToPublicID, &i.DerivedState, &i.DependencyKind); err != nil {
 			return nil, err
 		}
 		items = append(items, i)
@@ -75,13 +91,18 @@ func (q *Queries) ListDependencyStatesForEngine(ctx context.Context, fromTaskID 
 const listTaskActorRolesForEngine = `-- name: ListTaskActorRolesForEngine :many
 SELECT DISTINCT role
 FROM task_actors
-WHERE task_id = ? AND enabled = TRUE
+WHERE task_id = ? AND workspace_id = ? AND enabled = TRUE
 `
+
+type ListTaskActorRolesForEngineParams struct {
+	TaskID      uint32 `json:"-"`
+	WorkspaceID uint32 `json:"-"`
+}
 
 // Distinct role names currently attached to the task via
 // task_actors. Used to populate Facts.ActorRoles.
-func (q *Queries) ListTaskActorRolesForEngine(ctx context.Context, taskID uint32) ([]TaskActorsRole, error) {
-	rows, err := q.db.QueryContext(ctx, listTaskActorRolesForEngine, taskID)
+func (q *Queries) ListTaskActorRolesForEngine(ctx context.Context, arg ListTaskActorRolesForEngineParams) ([]TaskActorsRole, error) {
+	rows, err := q.db.QueryContext(ctx, listTaskActorRolesForEngine, arg.TaskID, arg.WorkspaceID)
 	if err != nil {
 		return nil, err
 	}
@@ -108,9 +129,14 @@ SELECT
   public_id,
   expression
 FROM task_constraints
-WHERE task_id = ? AND enabled = TRUE
+WHERE task_id = ? AND workspace_id = ? AND enabled = TRUE
 ORDER BY sort_weight ASC, id ASC
 `
+
+type ListTaskConstraintsForEngineParams struct {
+	TaskID      uint32 `json:"-"`
+	WorkspaceID uint32 `json:"-"`
+}
 
 type ListTaskConstraintsForEngineRow struct {
 	PublicID   types.PublicID `json:"publicId"`
@@ -118,8 +144,8 @@ type ListTaskConstraintsForEngineRow struct {
 }
 
 // Enabled constraint rows for a task in evaluation order.
-func (q *Queries) ListTaskConstraintsForEngine(ctx context.Context, taskID uint32) ([]ListTaskConstraintsForEngineRow, error) {
-	rows, err := q.db.QueryContext(ctx, listTaskConstraintsForEngine, taskID)
+func (q *Queries) ListTaskConstraintsForEngine(ctx context.Context, arg ListTaskConstraintsForEngineParams) ([]ListTaskConstraintsForEngineRow, error) {
+	rows, err := q.db.QueryContext(ctx, listTaskConstraintsForEngine, arg.TaskID, arg.WorkspaceID)
 	if err != nil {
 		return nil, err
 	}

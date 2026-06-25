@@ -30,23 +30,35 @@ type SqlcStore struct {
 func (s *SqlcStore) LoadTask(ctx context.Context, taskID uint32) (constraint.Facts, []Row, error) {
 	f := constraint.Facts{Now: time.Now()}
 
-	if due, err := s.Queries.GetTaskDueOnForEngine(ctx, taskID); err == nil && due.Valid {
+	if due, err := s.Queries.GetTaskDueOnForEngine(ctx, generated.GetTaskDueOnForEngineParams{
+		ID:          taskID,
+		WorkspaceID: s.WorkspaceID,
+	}); err == nil && due.Valid {
 		d := due.Time
 		f.DueOn = &d
 	}
 
-	deps, err := s.Queries.ListDependencyStatesForEngine(ctx, taskID)
+	deps, err := s.Queries.ListDependencyStatesForEngine(ctx, generated.ListDependencyStatesForEngineParams{
+		FromTaskID:  taskID,
+		WorkspaceID: s.WorkspaceID,
+	})
 	if err != nil {
 		return f, nil, err
 	}
 	if len(deps) > 0 {
 		f.DependencyStates = make(map[string]string, len(deps))
+		f.DependencyKinds = make(map[string]string, len(deps))
 		for _, d := range deps {
-			f.DependencyStates[d.ToPublicID.String()] = string(d.DerivedState)
+			pid := d.ToPublicID.String()
+			f.DependencyStates[pid] = string(d.DerivedState)
+			f.DependencyKinds[pid] = string(d.DependencyKind)
 		}
 	}
 
-	roles, err := s.Queries.ListTaskActorRolesForEngine(ctx, taskID)
+	roles, err := s.Queries.ListTaskActorRolesForEngine(ctx, generated.ListTaskActorRolesForEngineParams{
+		TaskID:      taskID,
+		WorkspaceID: s.WorkspaceID,
+	})
 	if err != nil {
 		return f, nil, err
 	}
@@ -57,7 +69,10 @@ func (s *SqlcStore) LoadTask(ctx context.Context, taskID uint32) (constraint.Fac
 		}
 	}
 
-	rows, err := s.Queries.ListTaskConstraintsForEngine(ctx, taskID)
+	rows, err := s.Queries.ListTaskConstraintsForEngine(ctx, generated.ListTaskConstraintsForEngineParams{
+		TaskID:      taskID,
+		WorkspaceID: s.WorkspaceID,
+	})
 	if err != nil {
 		return f, nil, err
 	}

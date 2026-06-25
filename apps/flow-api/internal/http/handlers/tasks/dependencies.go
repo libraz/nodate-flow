@@ -2,6 +2,7 @@ package tasks
 
 import (
 	"context"
+	"database/sql"
 	"log/slog"
 
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/audit"
@@ -96,43 +97,49 @@ func AddDependency(deps Deps) func(context.Context, *AddTaskDependencyInput) (*A
 		if err := deps.DB.QueryRowContext(ctx, q, ws.ID, toPub).Scan(&toID); err != nil {
 			return nil, httpErr(apierr.SpecForErrNoRows(err, apierrors.WsTaskNotFound, apierrors.InternalUnexpected))
 		}
+		// Reject any edge that would close a cycle so the dependency graph
+		// stays a DAG (the documented contract). The new edge is
+		// task.ID -> toID; it closes a cycle iff toID can already reach
+		// task.ID along existing edges.
+		edges, err := deps.Queries.ListDependencyEdgesForWorkspace(ctx, ws.ID)
+		if err != nil {
+			return nil, httpErr(apierrors.InternalUnexpected)
+		}
+		if dependencyEdgeClosesCycle(edges, task.ID, toID) {
+			return nil, httpErr(apierrors.WsTaskDependencyCycle)
+		}
 		pub := types.New()
-		// Retry on transient FK deadlocks: task_dependencies has FKs
-		// into tasks/workspaces and races with concurrent transition
-		// transactions on the same task rows.
-		if err := dbretry.Do(ctx, "tasks.AddDependency", func(ctx context.Context) error {
-			_, e := deps.Queries.AddDependency(ctx, generated.AddDependencyParams{
+		taskInternal := int64(task.ID)
+		// Insert the edge and append the event atomically inside one tx so
+		// a crash between insert and a post-commit append cannot lose the
+		// timeline row (L-14). Retry on transient FK deadlocks:
+		// task_dependencies has FKs into tasks/workspaces and races with
+		// concurrent transition transactions on the same task rows.
+		if err := dbretry.InTx(ctx, deps.DB, "tasks.AddDependency", nil, func(ctx context.Context, tx *sql.Tx) error {
+			qtx := deps.Queries.WithTx(tx)
+			if _, e := qtx.AddDependency(ctx, generated.AddDependencyParams{
 				PublicID:    pub,
 				WorkspaceID: ws.ID,
 				FromTaskID:  task.ID,
 				ToTaskID:    toID,
 				Kind:        generated.TaskDependenciesKind(in.Body.Kind),
+			}); e != nil {
+				return e
+			}
+			return eventbus.Append(ctx, tx, eventbus.Event{
+				Type:        eventbus.TaskDependencyAdded,
+				WorkspaceID: ws.ID,
+				ActorUserID: actorPtr(ctx),
+				TaskID:      &taskInternal,
+				Payload: map[string]any{
+					"taskId":       task.PublicID.String(),
+					"dependencyId": pub.String(),
+					"toTaskId":     toPub.String(),
+					"kind":         in.Body.Kind,
+				},
 			})
-			return e
 		}); err != nil {
 			return nil, httpErr(apierrors.InternalUnexpected)
-		}
-		taskInternal := int64(task.ID)
-		if err := eventbus.Append(ctx, deps.DB, eventbus.Event{
-			Type:        eventbus.TaskDependencyAdded,
-			WorkspaceID: ws.ID,
-			ActorUserID: actorPtr(ctx),
-			TaskID:      &taskInternal,
-			Payload: map[string]any{
-				"taskId":       task.PublicID.String(),
-				"dependencyId": pub.String(),
-				"toTaskId":     toPub.String(),
-				"kind":         in.Body.Kind,
-			},
-		}); err != nil {
-			nflog.LoggerFromContext(ctx).ErrorContext(ctx, "eventbus.Append failed",
-				slog.Any("err", err),
-				slog.String("handler", "tasks.AddDependency"),
-				slog.String("event_type", string(eventbus.TaskDependencyAdded)),
-				logutil.LogEntity("workspace", ws.PublicID),
-				logutil.LogEntity("task", task.PublicID),
-				slog.String("dependency_public_id", pub.String()),
-			)
 		}
 		if aID, aOk := middleware.ActorFromContext(ctx); aOk {
 			deps.Audit.Record(ctx, audit.Entry{
@@ -168,11 +175,20 @@ func RemoveDependency(deps Deps) func(context.Context, *RemoveTaskDependencyInpu
 		if err != nil {
 			return nil, httpErr(apierrors.ValidationPathParamInvalid)
 		}
-		if err := deps.Queries.DeleteDependency(ctx, generated.DeleteDependencyParams{
+		affected, err := deps.Queries.DeleteDependency(ctx, generated.DeleteDependencyParams{
 			WorkspaceID: ws.ID,
 			PublicID:    depID,
-		}); err != nil {
+			FromTaskID:  task.ID,
+		})
+		if err != nil {
 			return nil, httpErr(apierrors.InternalUnexpected)
+		}
+		// 0 rows means the edge does not exist on this task's path (it may
+		// belong to a sibling task). Return NOT_FOUND so a no-op is
+		// distinguishable from a real delete and one task cannot delete
+		// another task's edge.
+		if affected == 0 {
+			return nil, httpErr(apierrors.WsTaskNotFound)
 		}
 		taskInternal := int64(task.ID)
 		if err := eventbus.Append(ctx, deps.DB, eventbus.Event{
@@ -208,4 +224,36 @@ func RemoveDependency(deps Deps) func(context.Context, *RemoveTaskDependencyInpu
 		out.Body.Ok = true
 		return out, nil
 	}
+}
+
+// dependencyEdgeClosesCycle reports whether adding a directed edge
+// from -> to would close a cycle in the workspace dependency graph
+// described by edges. The new edge closes a cycle iff `to` can already
+// reach `from` along the existing edges (then from -> to -> ... -> from).
+// A self-edge (from == to) is also a cycle. The walk is a bounded BFS
+// over the in-memory adjacency list, so it terminates even on graphs
+// that already contain cycles from legacy rows.
+func dependencyEdgeClosesCycle(edges []generated.ListDependencyEdgesForWorkspaceRow, from, to uint32) bool {
+	if from == to {
+		return true
+	}
+	adj := make(map[uint32][]uint32, len(edges))
+	for _, e := range edges {
+		adj[e.FromTaskID] = append(adj[e.FromTaskID], e.ToTaskID)
+	}
+	visited := make(map[uint32]bool)
+	stack := []uint32{to}
+	for len(stack) > 0 {
+		n := stack[len(stack)-1]
+		stack = stack[:len(stack)-1]
+		if n == from {
+			return true
+		}
+		if visited[n] {
+			continue
+		}
+		visited[n] = true
+		stack = append(stack, adj[n]...)
+	}
+	return false
 }

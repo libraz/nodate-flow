@@ -2,12 +2,18 @@
 // MySQL pool.
 //
 // [SQLTaskMutator] is the production wiring for [TaskMutator]; it
-// replaces the Phase 3 [LogOnlyTaskMutator] stub for the
-// `generate_retro` branch (Phase 6 / L2 of
-// `docs/plan/release-8-signals-and-judge-loop.md`). The other branches
-// (`complete_task`, `add_comment`) remain no-op-with-warn — their
-// production wiring lands in later phases when the corresponding task
-// handlers are exposed as reusable functions.
+// replaces the Phase 3 [LogOnlyTaskMutator] stub. All three branches
+// are real writes:
+//
+//   - `complete_task` routes through [taskstate.ApplyTransitionTx], the
+//     canonical in-transaction derived_state writer the REST
+//     /tasks/{id}/transitions handler and the auto-action executor also
+//     use, so the completion actually moves the task to 'done'.
+//   - `add_comment` reuses the generated AddComment INSERT (the same one
+//     the REST POST /tasks/{id}/comments handler issues), persisting a
+//     real comments row attributed to a resolved workspace member.
+//   - `generate_retro` materialises a new retro task plus its retro_of
+//     dependency edge in one transaction.
 //
 // Design notes:
 //
@@ -55,7 +61,17 @@ import (
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/dbretry"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/generated"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/types"
+	apierrors "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/errors"
+	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/taskstate"
 )
+
+// agentCommentPrefix marks a comment row authored on behalf of the
+// signal judge. The comments table has no agent-author column
+// (author_id is a NOT NULL FK to users.id), so an auto-comment is
+// attributed to a real workspace member while this prefix keeps the
+// row honest about its machine origin. The timeline UI may render its
+// own badge; the prefix is the durable, query-able marker.
+const agentCommentPrefix = "[signal judge] "
 
 // retroTitlePrefix is the canonical prefix every retro-drafted task
 // title carries. Kept as a package-level constant so the prompt and
@@ -79,58 +95,254 @@ const retroDescriptionTemplate = "Retrospective draft created by the signal judg
 
 // SQLTaskMutator implements [TaskMutator] against the production
 // MySQL pool. Wired in cmd/api/main.go in place of
-// [LogOnlyTaskMutator] once the corresponding action branch has a
-// reviewed write path (Phase 6 / L2 lands the `generate_retro`
-// branch).
+// [LogOnlyTaskMutator]; every action branch (complete_task,
+// add_comment, generate_retro) performs a real write.
 //
-// Both DB and Queries are required: the retro path begins a
-// transaction on DB and binds the sqlc-generated queries to it via
-// Queries.WithTx, so the tasks INSERT and the task_dependencies
-// INSERT either both commit or both roll back. NowFn is a wall-clock
-// hook so tests can pin the description text; nil falls back to
-// time.Now.
+// Both DB and Queries are required: complete_task begins a transaction
+// on DB and drives [taskstate.ApplyTransitionTx]; add_comment and the
+// retro path bind the sqlc-generated queries via Queries.WithTx (the
+// retro path commits the tasks INSERT and the task_dependencies INSERT
+// atomically). NowFn is a wall-clock hook so tests can pin the
+// description text; nil falls back to time.Now.
 type SQLTaskMutator struct {
 	// DB is the shared *sql.DB used to begin transactions. Required.
 	DB *sql.DB
 	// Queries is the sqlc-generated query bundle bound to DB.
 	// Required.
 	Queries *generated.Queries
-	// Logger emits warn-level diagnostics when a no-op branch is
-	// invoked (complete_task / add_comment have not been wired yet).
-	// nil falls back to slog.Default().
+	// Logger emits warn-level diagnostics on benign skips (an
+	// idempotent re-completion, an unresolvable comment author, a
+	// rolled-back retro transaction). nil falls back to slog.Default().
 	Logger *slog.Logger
 	// NowFn is the wall-clock used to stamp the retro description's
 	// date placeholder. nil falls back to time.Now.
 	NowFn func() time.Time
 }
 
-// CompleteTask is the stub implementation. Phase 6 / L2 only lands
-// the retro branch; the complete_task branch is wired in a follow-up
-// phase. Returns nil so the Applier's existing TaskAutoCompleted
-// emission contract is preserved end-to-end.
+// CompleteTask drives the judged auto-complete through the canonical
+// in-transaction state-transition path so the task's derived_state
+// actually moves to 'done' — the same [taskstate.ApplyTransitionTx]
+// the REST /tasks/{id}/transitions handler and the auto-action
+// executor use. Routing through that single writer keeps the
+// derived_state UPDATE, the FOR UPDATE row lock, and the canonical
+// task.transition.complete event append atomic, and preserves the
+// trg_tasks_derived_state_guard invariant (derived_state is writable
+// only through that helper).
+//
+// Idempotency: when the task is already 'done' (a prior auto-complete
+// already landed, or a human closed it first), the state machine has
+// no 'complete' transition out of 'done' and ApplyTransitionTx returns
+// WS.TASK.TRANSITION_REJECTED. That case is treated as success — the
+// desired end state already holds, so the Applier proceeds to emit its
+// TaskAutoCompleted audit event.
+//
+// Any other rejection (the task sits in a state from which 'complete'
+// is genuinely illegal, e.g. 'waiting', or the row vanished) returns a
+// non-nil error. The Applier surfaces that error and short-circuits
+// before appending TaskAutoCompleted, so no completion event is ever
+// emitted without the matching state change.
+//
+// The trusted workspaceID / taskInternalID references are used as-is:
+// the workspace id scopes both the lock and the persisted UPDATE, and
+// the internal id is the FOR UPDATE lock key. The PublicID the
+// persisted UPDATE keys on is resolved from the same (workspace_id, id)
+// row so the two never diverge.
 func (m *SQLTaskMutator) CompleteTask(ctx context.Context, workspaceID uint32, taskInternalID int64, agentID uint32) error {
-	logger := m.logger()
-	logger.WarnContext(ctx, "signaljudge: SQLTaskMutator.CompleteTask is a no-op stub (Phase 6 / L2 ships retro only)",
-		slog.Uint64("workspace_internal", uint64(workspaceID)),
-		slog.Int64("task_internal", taskInternalID),
-		slog.Uint64("agent_internal", uint64(agentID)),
-	)
+	if m == nil || m.DB == nil {
+		return errors.New("signaljudge: SQLTaskMutator missing DB")
+	}
+	if workspaceID == 0 {
+		return errors.New("signaljudge: CompleteTask: workspaceID is zero")
+	}
+	if taskInternalID <= 0 {
+		return errors.New("signaljudge: CompleteTask: taskInternalID is zero")
+	}
+
+	pub, err := m.loadTaskPublicID(ctx, workspaceID, taskInternalID)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return fmt.Errorf("signaljudge: CompleteTask: source task not found: %w", err)
+		}
+		return fmt.Errorf("signaljudge: CompleteTask: load task public id: %w", err)
+	}
+
+	var rejected bool
+	txErr := dbretry.InTx(ctx, m.DB, "signaljudge.SQLTaskMutator.CompleteTask", nil, func(ctx context.Context, tx *sql.Tx) error {
+		_, spec, cause := taskstate.ApplyTransitionTx(ctx, tx, taskstate.ApplyParams{
+			WorkspaceID: workspaceID,
+			TaskID:      uint32(taskInternalID), //#nosec G115 -- tasks.id (INT UNSIGNED), fits uint32
+			PublicID:    pub,
+			Transition:  taskstate.TransitionComplete,
+			ActorUserID: nil, // judged by an agent, not a real user
+			Reason:      "auto-completed by signal judge",
+			Via:         "signal_judge",
+			ExtraPayload: map[string]any{
+				"agentInternalId": agentID,
+			},
+		})
+		if spec != nil {
+			if spec == apierrors.WsTaskTransitionRejected && m.taskIsDone(ctx, tx, workspaceID, taskInternalID) {
+				// Already done: idempotent success. The desired end
+				// state holds; let the Applier emit its audit event.
+				rejected = false
+				return nil
+			}
+			// Genuine rejection (illegal source state / missing row).
+			// Surface a sentinel error so the Applier skips the event.
+			rejected = true
+			if cause != nil {
+				return fmt.Errorf("transition rejected (%s): %w", spec.Code, cause)
+			}
+			return fmt.Errorf("transition rejected (%s)", spec.Code)
+		}
+		return nil
+	})
+	if txErr != nil {
+		if rejected {
+			m.logger().WarnContext(ctx, "signaljudge: CompleteTask transition rejected by state machine",
+				slog.Any("err", txErr),
+				slog.Uint64("workspace_internal", uint64(workspaceID)),
+				slog.Int64("task_internal", taskInternalID),
+				slog.Uint64("agent_internal", uint64(agentID)),
+			)
+		}
+		return fmt.Errorf("signaljudge: complete task: %w", txErr)
+	}
 	return nil
 }
 
-// AddComment is the stub implementation. Phase 6 / L2 only lands
-// the retro branch; the add_comment branch is wired in a follow-up
-// phase. Returns nil so the Applier's existing event-emission
-// contract is preserved end-to-end.
+// loadTaskPublicID resolves the public_id of an enabled task addressed
+// by its internal (workspace_id, id) pair. Returns sql.ErrNoRows when
+// the row does not exist or is disabled — the caller treats that as a
+// TOCTOU between the resolver and the mutator.
+func (m *SQLTaskMutator) loadTaskPublicID(ctx context.Context, workspaceID uint32, taskInternalID int64) (types.PublicID, error) {
+	const q = `SELECT public_id FROM tasks WHERE workspace_id = ? AND id = ? AND enabled = TRUE LIMIT 1`
+	var pub types.PublicID
+	if err := m.DB.QueryRowContext(ctx, q, workspaceID, taskInternalID).Scan(&pub); err != nil {
+		return types.PublicID{}, err
+	}
+	return pub, nil
+}
+
+// taskIsDone reports whether the task's derived_state is already
+// 'done', read inside the open transaction so the answer is consistent
+// with the row [taskstate.ApplyTransitionTx] just locked. Used to tell
+// an idempotent re-completion (already done) apart from a genuine
+// illegal-state rejection. A read error is treated as "not done" so the
+// caller surfaces the original rejection rather than masking it.
+func (m *SQLTaskMutator) taskIsDone(ctx context.Context, tx *sql.Tx, workspaceID uint32, taskInternalID int64) bool {
+	const q = `SELECT derived_state FROM tasks WHERE workspace_id = ? AND id = ? AND enabled = TRUE LIMIT 1`
+	var state string
+	if err := tx.QueryRowContext(ctx, q, workspaceID, taskInternalID).Scan(&state); err != nil {
+		return false
+	}
+	return state == string(generated.TasksDerivedStateDone)
+}
+
+// AddComment persists a real comment row for the judged auto-comment,
+// reusing the same generated.AddComment INSERT the REST
+// POST /tasks/{id}/comments handler uses. The comments table's
+// author_id is a NOT NULL FK to users.id with no agent-author column,
+// so the row is attributed to a real workspace member — the task's
+// first enabled human assignee, falling back to the workspace owner —
+// and the body is prefixed with agentCommentPrefix so the row stays
+// honest about its machine origin.
+//
+// The applier emits no follow-on event for the add_comment branch, so
+// the "no event without a state change" invariant is not at stake here;
+// this implementation eliminates the prior silent data-loss by making
+// the comment actually land. When no human author can be resolved at
+// all (no assignee and no owner — a degenerate workspace), the call
+// logs and returns nil rather than inventing an author, again without
+// emitting any event.
+//
+// The trusted workspaceID / taskInternalID references are used as-is to
+// scope the author lookup and the INSERT.
 func (m *SQLTaskMutator) AddComment(ctx context.Context, workspaceID uint32, taskInternalID int64, agentID uint32, body string) error {
-	logger := m.logger()
-	logger.WarnContext(ctx, "signaljudge: SQLTaskMutator.AddComment is a no-op stub (Phase 6 / L2 ships retro only)",
-		slog.Uint64("workspace_internal", uint64(workspaceID)),
-		slog.Int64("task_internal", taskInternalID),
-		slog.Uint64("agent_internal", uint64(agentID)),
-		slog.Int("body_len", len(body)),
-	)
+	if m == nil || m.DB == nil || m.Queries == nil {
+		return errors.New("signaljudge: SQLTaskMutator missing DB or Queries")
+	}
+	if workspaceID == 0 {
+		return errors.New("signaljudge: AddComment: workspaceID is zero")
+	}
+	if taskInternalID <= 0 {
+		return errors.New("signaljudge: AddComment: taskInternalID is zero")
+	}
+
+	trimmed := strings.TrimSpace(body)
+	if trimmed == "" {
+		// Nothing worth persisting; not an error, no event is emitted.
+		return nil
+	}
+
+	authorID, err := m.resolveCommentAuthor(ctx, workspaceID, taskInternalID)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			m.logger().WarnContext(ctx, "signaljudge: AddComment skipped — no resolvable human author",
+				slog.Uint64("workspace_internal", uint64(workspaceID)),
+				slog.Int64("task_internal", taskInternalID),
+				slog.Uint64("agent_internal", uint64(agentID)),
+			)
+			return nil
+		}
+		return fmt.Errorf("signaljudge: AddComment: resolve author: %w", err)
+	}
+
+	if _, err := m.Queries.AddComment(ctx, generated.AddCommentParams{
+		PublicID:    types.New(),
+		WorkspaceID: workspaceID,
+		TaskID:      sql.NullInt32{Int32: int32(taskInternalID), Valid: true}, //#nosec G115 -- tasks.id (INT UNSIGNED), fits int32
+		AuthorID:    authorID,
+		Body:        agentCommentPrefix + trimmed,
+	}); err != nil {
+		return fmt.Errorf("signaljudge: AddComment: insert comment: %w", err)
+	}
 	return nil
+}
+
+// resolveCommentAuthor picks a real users.id to satisfy the comments
+// author_id FK for an agent-authored comment. Preference order:
+//  1. the task's first enabled human assignee (task_actors), so the
+//     comment surfaces under the owner most likely to act on it;
+//  2. the workspace owner (workspace_members.role='owner'), the stable
+//     fallback every workspace has.
+//
+// Returns sql.ErrNoRows when neither resolves (a degenerate workspace
+// with no owner and no human assignee); the caller treats that as a
+// skip rather than an error.
+func (m *SQLTaskMutator) resolveCommentAuthor(ctx context.Context, workspaceID uint32, taskInternalID int64) (uint32, error) {
+	const q = `
+SELECT COALESCE(
+  (
+    SELECT ta.user_id
+    FROM task_actors ta
+    WHERE ta.workspace_id = ?
+      AND ta.task_id = ?
+      AND ta.enabled = TRUE
+      AND ta.kind = 'user'
+      AND ta.role = 'assignee'
+      AND ta.user_id IS NOT NULL
+    ORDER BY ta.id ASC
+    LIMIT 1
+  ),
+  (
+    SELECT wm.user_id
+    FROM workspace_members wm
+    WHERE wm.workspace_id = ?
+      AND wm.role = 'owner'
+      AND wm.enabled = TRUE
+    ORDER BY wm.id ASC
+    LIMIT 1
+  )
+) AS author_id`
+	var authorID sql.NullInt32
+	if err := m.DB.QueryRowContext(ctx, q, workspaceID, taskInternalID, workspaceID).Scan(&authorID); err != nil {
+		return 0, err
+	}
+	if !authorID.Valid {
+		return 0, sql.ErrNoRows
+	}
+	return uint32(authorID.Int32), nil //#nosec G115 -- users.id (INT UNSIGNED), fits uint32
 }
 
 // DraftRetroTask is the production implementation of the

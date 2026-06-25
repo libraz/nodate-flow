@@ -46,22 +46,29 @@ func (q *Queries) AddDependency(ctx context.Context, arg AddDependencyParams) (i
 	return result.LastInsertId()
 }
 
-const deleteDependency = `-- name: DeleteDependency :exec
+const deleteDependency = `-- name: DeleteDependency :execrows
 UPDATE task_dependencies
 SET enabled = FALSE
 WHERE workspace_id = ?
   AND public_id = ?
+  AND from_task_id = ?
 `
 
 type DeleteDependencyParams struct {
 	WorkspaceID uint32         `json:"-"`
 	PublicID    types.PublicID `json:"publicId"`
+	FromTaskID  uint32         `json:"fromTaskId"`
 }
 
-// Soft-delete a dependency edge.
-func (q *Queries) DeleteDependency(ctx context.Context, arg DeleteDependencyParams) error {
-	_, err := q.db.ExecContext(ctx, deleteDependency, arg.WorkspaceID, arg.PublicID)
-	return err
+// Soft-delete a dependency edge. Scoped by the owning from_task_id so a
+// sibling task's edge cannot be deleted through another task's path; the
+// affected-row count lets the handler return NOT_FOUND on a no-op.
+func (q *Queries) DeleteDependency(ctx context.Context, arg DeleteDependencyParams) (int64, error) {
+	result, err := q.db.ExecContext(ctx, deleteDependency, arg.WorkspaceID, arg.PublicID, arg.FromTaskID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
 }
 
 const findRetroDraftAgent = `-- name: FindRetroDraftAgent :one
@@ -238,6 +245,47 @@ func (q *Queries) ListDependenciesForTask(ctx context.Context, arg ListDependenc
 			&i.CreatedAt,
 			&i.Total,
 		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listDependencyEdgesForWorkspace = `-- name: ListDependencyEdgesForWorkspace :many
+SELECT
+  td.from_task_id,
+  td.to_task_id
+FROM task_dependencies td
+WHERE td.workspace_id = ?
+  AND td.enabled = TRUE
+`
+
+type ListDependencyEdgesForWorkspaceRow struct {
+	FromTaskID uint32 `json:"fromTaskId"`
+	ToTaskID   uint32 `json:"toTaskId"`
+}
+
+// List every enabled dependency edge in the workspace as (from, to) internal
+// id pairs. Used by AddDependency to walk the graph and reject an edge that
+// would close a cycle, keeping the dependency graph a DAG. Internal ids are
+// safe here because the result never leaves the handler (json:"-" on *.id).
+func (q *Queries) ListDependencyEdgesForWorkspace(ctx context.Context, workspaceID uint32) ([]ListDependencyEdgesForWorkspaceRow, error) {
+	rows, err := q.db.QueryContext(ctx, listDependencyEdgesForWorkspace, workspaceID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListDependencyEdgesForWorkspaceRow{}
+	for rows.Next() {
+		var i ListDependencyEdgesForWorkspaceRow
+		if err := rows.Scan(&i.FromTaskID, &i.ToTaskID); err != nil {
 			return nil, err
 		}
 		items = append(items, i)

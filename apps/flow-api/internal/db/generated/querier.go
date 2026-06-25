@@ -39,6 +39,13 @@ type Querier interface {
 	AddProjectMember(ctx context.Context, arg AddProjectMemberParams) (int64, error)
 	// Associate a task with a timebox. Caller must resolve IDs beforehand.
 	AddTaskToTimebox(ctx context.Context, arg AddTaskToTimeboxParams) error
+	// Atomically promote the calling user to the FIRST instance admin.
+	// The INSERT...SELECT only materialises a row when no active admin yet
+	// exists, so two concurrent /admin/setup calls can never both win: the
+	// conditional and the write evaluate as one statement under a single
+	// row lock, and the loser sees zero affected rows. Callers MUST inspect
+	// RowsAffected and treat 0 as "already initialized".
+	AdminBootstrapFirstInstanceAdmin(ctx context.Context, arg AdminBootstrapFirstInstanceAdminParams) (int64, error)
 	// Check if any active instance admin exists (for bootstrap guard).
 	AdminCheckInstanceAdminExists(ctx context.Context) (bool, error)
 	// Count active instance admins (for last-admin guard).
@@ -315,10 +322,14 @@ type Querier interface {
 	DeleteAttachment(ctx context.Context, arg DeleteAttachmentParams) error
 	// Soft-delete a comment.
 	DeleteComment(ctx context.Context, arg DeleteCommentParams) error
-	// Soft-delete a constraint.
-	DeleteConstraint(ctx context.Context, arg DeleteConstraintParams) error
-	// Soft-delete a dependency edge.
-	DeleteDependency(ctx context.Context, arg DeleteDependencyParams) error
+	// Soft-delete a constraint. Scoped by the owning task_id so a sibling task's
+	// constraint cannot be deleted through another task's path; the affected-row
+	// count lets the handler return NOT_FOUND on a no-op.
+	DeleteConstraint(ctx context.Context, arg DeleteConstraintParams) (int64, error)
+	// Soft-delete a dependency edge. Scoped by the owning from_task_id so a
+	// sibling task's edge cannot be deleted through another task's path; the
+	// affected-row count lets the handler return NOT_FOUND on a no-op.
+	DeleteDependency(ctx context.Context, arg DeleteDependencyParams) (int64, error)
 	// Soft-delete a lens.
 	DeleteLens(ctx context.Context, arg DeleteLensParams) error
 	// Remove all mentions for a specific comment (before re-extracting).
@@ -669,10 +680,11 @@ type Querier interface {
 	// treat that as an empty memo. workspace_id is required for tenant scope.
 	GetTaskAgentMemo(ctx context.Context, arg GetTaskAgentMemoParams) (json.RawMessage, error)
 	// Queries dedicated to the constraint engine.
-	// Keyed off the internal task_id so the engine never has to know
-	// about public_id resolution. All workspace scoping is enforced by
-	// the caller before it lands here.
-	GetTaskDueOnForEngine(ctx context.Context, id uint32) (sql.NullTime, error)
+	// Keyed off the internal task_id, but every read also filters on
+	// workspace_id so the SQL boundary enforces tenant isolation even if
+	// an upstream ACL check is bypassed. The engine never has to know
+	// about public_id resolution.
+	GetTaskDueOnForEngine(ctx context.Context, arg GetTaskDueOnForEngineParams) (sql.NullTime, error)
 	// Fetch the embedding row for a single (task_id, model) pair. Returns
 	// sql.ErrNoRows if the task has never been embedded with the given model.
 	GetTaskEmbedding(ctx context.Context, arg GetTaskEmbeddingParams) (GetTaskEmbeddingRow, error)
@@ -717,8 +729,12 @@ type Querier interface {
 	// Check if any events have occurred in the workspace since the given timestamp.
 	// Used by the agent runtime pre-flight check to skip LLM calls when idle.
 	HasRecentEventsForWorkspace(ctx context.Context, arg HasRecentEventsForWorkspaceParams) (bool, error)
-	// Bump the use counter after a successful accept.
-	IncrementInviteUseCount(ctx context.Context, id uint32) error
+	// Atomically bump the use counter, but only while the invite still has
+	// capacity. max_uses IS NULL means unlimited. The conditional WHERE makes
+	// the check-and-increment a single statement so concurrent redemptions
+	// can never push use_count past max_uses (TOCTOU-safe). Returns the number
+	// of affected rows: 0 means the invite was already exhausted.
+	IncrementInviteUseCount(ctx context.Context, id uint32) (int64, error)
 	// Bump ref_count by 1 when an additional referencing row is created
 	// (e.g. dedup hit on a re-upload). Caller MUST run this inside the
 	// same transaction as the referencing INSERT so the count cannot drift
@@ -908,10 +924,17 @@ type Querier interface {
 	ListDependenciesForProject(ctx context.Context, arg ListDependenciesForProjectParams) ([]ListDependenciesForProjectRow, error)
 	// List outgoing dependencies of a task. Returns the target task public_id.
 	ListDependenciesForTask(ctx context.Context, arg ListDependenciesForTaskParams) ([]ListDependenciesForTaskRow, error)
+	// List every enabled dependency edge in the workspace as (from, to) internal
+	// id pairs. Used by AddDependency to walk the graph and reject an edge that
+	// would close a cycle, keeping the dependency graph a DAG. Internal ids are
+	// safe here because the result never leaves the handler (json:"-" on *.id).
+	ListDependencyEdgesForWorkspace(ctx context.Context, workspaceID uint32) ([]ListDependencyEdgesForWorkspaceRow, error)
 	// Outgoing dependencies of a task with the referenced task's
-	// public_id + current derived_state. The engine builds a
-	// map[public_id]state from this rowset.
-	ListDependencyStatesForEngine(ctx context.Context, fromTaskID uint32) ([]ListDependencyStatesForEngineRow, error)
+	// public_id, current derived_state, and dependency kind. The engine
+	// builds a map[public_id]state and a map[public_id]kind from this
+	// rowset; dependency.open_at_most uses the kind to ignore
+	// non-blocking (informational) links.
+	ListDependencyStatesForEngine(ctx context.Context, arg ListDependencyStatesForEngineParams) ([]ListDependencyStatesForEngineRow, error)
 	// List all description versions for a task, newest first.
 	ListDescriptionVersions(ctx context.Context, arg ListDescriptionVersionsParams) ([]ListDescriptionVersionsRow, error)
 	// List a project's timeline via v_task_timeline. Filters events whose
@@ -981,8 +1004,10 @@ type Querier interface {
 	ListLinkedTasksForEvent(ctx context.Context, arg ListLinkedTasksForEventParams) ([]ListLinkedTasksForEventRow, error)
 	// List a user's MCP tokens in a workspace, masked.
 	ListMcpTokensForUser(ctx context.Context, arg ListMcpTokensForUserParams) ([]ListMcpTokensForUserRow, error)
-	// List all mentions within a specific task (description or comments).
-	ListMentionsForTask(ctx context.Context, taskID sql.NullInt32) ([]ListMentionsForTaskRow, error)
+	// List mentions within a specific task (description or comments).
+	// Paginated (LIMIT/OFFSET) so the result set is always bounded; total
+	// carries the pre-page count.
+	ListMentionsForTask(ctx context.Context, arg ListMentionsForTaskParams) ([]ListMentionsForTaskRow, error)
 	// List mentions where a user was mentioned, within a workspace.
 	ListMentionsForUser(ctx context.Context, arg ListMentionsForUserParams) ([]ListMentionsForUserRow, error)
 	// List models registered under a provider. Workspace-scoped.
@@ -1133,10 +1158,12 @@ type Querier interface {
 	//   * due_to         (nullable date) - due_on <= value
 	// All filters are AND-combined; pass empty / NULL to skip a knob.
 	ListPublicLensTasks(ctx context.Context, arg ListPublicLensTasksParams) ([]ListPublicLensTasksRow, error)
-	// List all reactions on a comment.
-	ListReactionsForComment(ctx context.Context, commentID sql.NullInt32) ([]ListReactionsForCommentRow, error)
-	// List all reactions on a task, grouped by emoji with user info.
-	ListReactionsForTask(ctx context.Context, taskID sql.NullInt32) ([]ListReactionsForTaskRow, error)
+	// List reactions on a comment. Paginated (LIMIT/OFFSET) so the result
+	// set is always bounded; total carries the pre-page count.
+	ListReactionsForComment(ctx context.Context, arg ListReactionsForCommentParams) ([]ListReactionsForCommentRow, error)
+	// List reactions on a task with user info. Paginated (LIMIT/OFFSET) so
+	// the result set is always bounded; total carries the pre-page count.
+	ListReactionsForTask(ctx context.Context, arg ListReactionsForTaskParams) ([]ListReactionsForTaskRow, error)
 	// List recent audit log entries for a workspace via v_audit_recent.
 	ListRecentAudit(ctx context.Context, arg ListRecentAuditParams) ([]ListRecentAuditRow, error)
 	// List the most recent visits for a user in a workspace, newest first.
@@ -1182,9 +1209,9 @@ type Querier interface {
 	ListStorageObjectsByWorkspace(ctx context.Context, workspaceID sql.NullInt32) ([]ListStorageObjectsByWorkspaceRow, error)
 	// Distinct role names currently attached to the task via
 	// task_actors. Used to populate Facts.ActorRoles.
-	ListTaskActorRolesForEngine(ctx context.Context, taskID uint32) ([]TaskActorsRole, error)
+	ListTaskActorRolesForEngine(ctx context.Context, arg ListTaskActorRolesForEngineParams) ([]TaskActorsRole, error)
 	// Enabled constraint rows for a task in evaluation order.
-	ListTaskConstraintsForEngine(ctx context.Context, taskID uint32) ([]ListTaskConstraintsForEngineRow, error)
+	ListTaskConstraintsForEngine(ctx context.Context, arg ListTaskConstraintsForEngineParams) ([]ListTaskConstraintsForEngineRow, error)
 	// List labels attached to a task.
 	ListTaskLabels(ctx context.Context, arg ListTaskLabelsParams) ([]ListTaskLabelsRow, error)
 	// List tasks in a project via v_task_list with window-function pagination.

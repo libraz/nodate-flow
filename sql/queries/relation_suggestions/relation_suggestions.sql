@@ -25,7 +25,7 @@ SELECT
 FROM relation_suggestions rs
 INNER JOIN tasks st ON st.id = rs.source_task_id
 INNER JOIN tasks tt ON tt.id = rs.target_task_id
-WHERE rs.workspace_id = st.workspace_id
+WHERE rs.workspace_id = ?
   AND (rs.source_task_id = ? OR rs.target_task_id = ?)
   AND rs.status = 'pending'
 ORDER BY rs.confidence DESC, rs.id DESC

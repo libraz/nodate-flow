@@ -77,6 +77,8 @@ func hashKey(expr []byte, f constraint.Facts) string {
 	h.Write([]byte{0})
 	writeStringMap(h, f.DependencyStates)
 	h.Write([]byte{0})
+	writeStringMap(h, f.DependencyKinds)
+	h.Write([]byte{0})
 	writeBoolMap(h, f.ActorRoles)
 	h.Write([]byte{0})
 	writeBoolMap(h, f.SignalsReceived)

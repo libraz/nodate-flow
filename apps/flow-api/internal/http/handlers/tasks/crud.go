@@ -378,7 +378,6 @@ func Create(deps Deps) func(context.Context, *CreateTaskInput) (*CreateTaskOutpu
 				}); err != nil {
 					return err
 				}
-				return nil
 			}
 			for _, a := range in.Body.Actors {
 				userPub, perr := types.Parse(a.UserID)
@@ -420,6 +419,24 @@ func Create(deps Deps) func(context.Context, *CreateTaskInput) (*CreateTaskOutpu
 					return aerr
 				}
 			}
+			// Append the lifecycle event inside the same tx so a crash
+			// between commit and a post-commit append cannot lose the
+			// timeline/audit row (L-14). On a deadlock retry the whole tx
+			// (including this append) rolls back and re-runs, so no
+			// duplicate row is committed.
+			if err := eventbus.Append(ctx, tx, eventbus.Event{
+				Type:        eventbus.TaskCreated,
+				WorkspaceID: prj.WorkspaceID,
+				ActorUserID: actorPtr(ctx),
+				TaskID:      &taskID,
+				Payload: map[string]any{
+					"taskId":    pub.String(),
+					"projectId": prjPub.String(),
+					"title":     title,
+				},
+			}); err != nil {
+				return err
+			}
 			return nil
 		})
 		if validationFn != nil {
@@ -427,25 +444,6 @@ func Create(deps Deps) func(context.Context, *CreateTaskInput) (*CreateTaskOutpu
 		}
 		if txErr != nil {
 			return nil, httpErr(apierrors.InternalUnexpected)
-		}
-		if err := eventbus.Append(ctx, deps.DB, eventbus.Event{
-			Type:        eventbus.TaskCreated,
-			WorkspaceID: prj.WorkspaceID,
-			ActorUserID: actorPtr(ctx),
-			TaskID:      &taskID,
-			Payload: map[string]any{
-				"taskId":    pub.String(),
-				"projectId": prjPub.String(),
-				"title":     title,
-			},
-		}); err != nil {
-			nflog.LoggerFromContext(ctx).ErrorContext(ctx, "eventbus.Append failed",
-				slog.Any("err", err),
-				slog.String("handler", "tasks.Create"),
-				slog.String("event_type", string(eventbus.TaskCreated)),
-				logutil.LogEntityPID("project", prjPub),
-				slog.String("task_public_id", pub.String()),
-			)
 		}
 		deps.Audit.Record(ctx, audit.Entry{
 			Action:       "task.create",
@@ -801,9 +799,30 @@ func Patch(deps Deps) func(context.Context, *PatchTaskInput) (*PatchTaskOutput, 
 			PublicID:        types.FromUUID(task.PublicID),
 		}
 
+		taskInternal := int64(task.ID)
+		updateEvent := eventbus.Event{
+			Type:        eventbus.TaskUpdated,
+			WorkspaceID: ws.ID,
+			ActorUserID: actorPtr(ctx),
+			TaskID:      &taskInternal,
+			Payload: map[string]any{
+				"taskId": task.PublicID.String(),
+			},
+		}
+
 		if !needsItemkit {
 			if err := deps.Queries.UpdateTask(ctx, updateParams); err != nil {
 				return nil, httpErr(apierrors.InternalUnexpected)
+			}
+			// No tx in scope on this path; append best-effort.
+			if err := eventbus.Append(ctx, deps.DB, updateEvent); err != nil {
+				nflog.LoggerFromContext(ctx).ErrorContext(ctx, "eventbus.Append failed",
+					slog.Any("err", err),
+					slog.String("handler", "tasks.Patch"),
+					slog.String("event_type", string(eventbus.TaskUpdated)),
+					logutil.LogEntity("workspace", ws.PublicID),
+					logutil.LogEntity("task", task.PublicID),
+				)
 			}
 		} else {
 			tx, err := deps.DB.BeginTx(ctx, nil)
@@ -845,6 +864,12 @@ func Patch(deps Deps) func(context.Context, *PatchTaskInput) (*PatchTaskOutput, 
 					return nil, translateItemkitTaskError(err)
 				}
 			}
+			// Append the lifecycle event inside the tx so a crash between
+			// commit and a post-commit append cannot lose the timeline row
+			// (L-14).
+			if err := eventbus.Append(ctx, tx, updateEvent); err != nil {
+				return nil, httpErr(apierrors.InternalUnexpected)
+			}
 			if err := tx.Commit(); err != nil {
 				return nil, httpErr(apierrors.InternalUnexpected)
 			}
@@ -858,24 +883,6 @@ func Patch(deps Deps) func(context.Context, *PatchTaskInput) (*PatchTaskOutput, 
 		})
 		if deps.Embedder != nil && (in.Body.Title != nil || in.Body.Description != nil) {
 			_ = deps.Embedder.EmbedTask(ctx, ws.ID, task.ID, newTitle, nullStr(newDesc))
-		}
-		taskInternal := int64(task.ID)
-		if err := eventbus.Append(ctx, deps.DB, eventbus.Event{
-			Type:        eventbus.TaskUpdated,
-			WorkspaceID: ws.ID,
-			ActorUserID: actorPtr(ctx),
-			TaskID:      &taskInternal,
-			Payload: map[string]any{
-				"taskId": task.PublicID.String(),
-			},
-		}); err != nil {
-			nflog.LoggerFromContext(ctx).ErrorContext(ctx, "eventbus.Append failed",
-				slog.Any("err", err),
-				slog.String("handler", "tasks.Patch"),
-				slog.String("event_type", string(eventbus.TaskUpdated)),
-				logutil.LogEntity("workspace", ws.PublicID),
-				logutil.LogEntity("task", task.PublicID),
-			)
 		}
 
 		row, err := deps.Queries.FindTaskByPublicId(ctx, generated.FindTaskByPublicIdParams{
@@ -946,24 +953,11 @@ func Disable(deps Deps) func(context.Context, *DisableTaskInput) (*DisableTaskOu
 				ResourceID:   task.PublicID.String(),
 			})
 		}
-		taskInternal := int64(task.ID)
-		if err := eventbus.Append(ctx, deps.DB, eventbus.Event{
-			Type:        eventbus.TaskDisabled,
-			WorkspaceID: ws.ID,
-			ActorUserID: actorPtr(ctx),
-			TaskID:      &taskInternal,
-			Payload: map[string]any{
-				"taskId": task.PublicID.String(),
-			},
-		}); err != nil {
-			nflog.LoggerFromContext(ctx).ErrorContext(ctx, "eventbus.Append failed",
-				slog.Any("err", err),
-				slog.String("handler", "tasks.Disable"),
-				slog.String("event_type", string(eventbus.TaskDisabled)),
-				logutil.LogEntity("workspace", ws.PublicID),
-				logutil.LogEntity("task", task.PublicID),
-			)
-		}
+		// No task.disabled append here: itemkit.DeleteTask already emits
+		// item.deleted plus its legacy task.disabled dual-emit inside the
+		// tx above (see itemkit.legacyKindFor). A second post-commit append
+		// here duplicated the task.disabled timeline row for one delete and
+		// risked losing it on a crash between commit and append (L-14).
 		out := &DisableTaskOutput{}
 		out.Body.Ok = true
 		return out, nil

@@ -163,7 +163,7 @@ SELECT
 FROM relation_suggestions rs
 INNER JOIN tasks st ON st.id = rs.source_task_id
 INNER JOIN tasks tt ON tt.id = rs.target_task_id
-WHERE rs.workspace_id = st.workspace_id
+WHERE rs.workspace_id = ?
   AND (rs.source_task_id = ? OR rs.target_task_id = ?)
   AND rs.status = 'pending'
 ORDER BY rs.confidence DESC, rs.id DESC
@@ -171,6 +171,7 @@ LIMIT ?
 `
 
 type ListPendingSuggestionsForTaskParams struct {
+	WorkspaceID  uint32 `json:"-"`
 	SourceTaskID uint32 `json:"-"`
 	TargetTaskID uint32 `json:"-"`
 	Limit        int32  `json:"limit"`
@@ -191,7 +192,12 @@ type ListPendingSuggestionsForTaskRow struct {
 // List pending suggestions where a task is either the source or target.
 // Joins tasks for human-readable titles and public IDs.
 func (q *Queries) ListPendingSuggestionsForTask(ctx context.Context, arg ListPendingSuggestionsForTaskParams) ([]ListPendingSuggestionsForTaskRow, error) {
-	rows, err := q.db.QueryContext(ctx, listPendingSuggestionsForTask, arg.SourceTaskID, arg.TargetTaskID, arg.Limit)
+	rows, err := q.db.QueryContext(ctx, listPendingSuggestionsForTask,
+		arg.WorkspaceID,
+		arg.SourceTaskID,
+		arg.TargetTaskID,
+		arg.Limit,
+	)
 	if err != nil {
 		return nil, err
 	}

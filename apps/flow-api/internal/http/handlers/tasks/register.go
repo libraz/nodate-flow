@@ -295,7 +295,7 @@ func RegisterTaskScopedEditorWrites(api huma.API, deps Deps) {
 		Method:      http.MethodPost,
 		Path:        "/tasks/{id}/constraints",
 		Summary:     "Attach a constraint to a task",
-		Description: "Persists a constraint DSL expression on the task. Subsequent transitions and the constraint engine evaluate against this rule.",
+		Description: "Persists a constraint DSL expression on the task. The expression is parsed up front and an unparseable expression is rejected with a CONSTRAINT.PARSE.* error before persisting. Subsequent transitions and the constraint engine evaluate against this rule.",
 		Tags:        []string{"Tasks"},
 	}, AddConstraint(deps))
 
@@ -331,7 +331,7 @@ func RegisterTaskScopedEditorWrites(api huma.API, deps Deps) {
 		Method:      http.MethodDelete,
 		Path:        "/tasks/{id}/constraints/{cid}",
 		Summary:     "Remove a constraint from a task",
-		Description: "Detaches the named constraint from the task. Subsequent evaluations no longer consider it. Idempotent.",
+		Description: "Detaches the named constraint owned by this task. Subsequent evaluations no longer consider it. Returns 404 when no such constraint exists on this task's path (including a repeat delete), so a no-op is distinguishable from a real delete.",
 		Tags:        []string{"Tasks"},
 	}, RemoveConstraint(deps))
 
@@ -349,7 +349,7 @@ func RegisterTaskScopedEditorWrites(api huma.API, deps Deps) {
 		Method:      http.MethodDelete,
 		Path:        "/tasks/{id}/dependencies/{depId}",
 		Summary:     "Remove a dependency edge",
-		Description: "Removes the named dependency edge. Idempotent.",
+		Description: "Removes the named dependency edge owned by this task. Returns 404 when no such edge exists on this task's path (including a repeat delete), so a no-op is distinguishable from a real delete.",
 		Tags:        []string{"Tasks"},
 	}, RemoveDependency(deps))
 

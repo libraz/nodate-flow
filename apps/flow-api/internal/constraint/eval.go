@@ -21,6 +21,14 @@ type Facts struct {
 	// current derived_state ("open" / "waiting" / "done" / ...). A
 	// missing entry is treated as unresolved → false.
 	DependencyStates map[string]string
+	// DependencyKinds maps a referenced task public_id to its
+	// dependency kind ("blocks" / "relates" / "duplicates" /
+	// "subtask_of" / "retro_of"). dependency.open_at_most only
+	// counts kinds that actually gate progress (see blockingDepKind);
+	// informational links like "relates" / "retro_of" never block.
+	// A public_id absent from this map is treated as blocking so that
+	// callers which do not populate kinds keep counting every dep.
+	DependencyKinds map[string]string
 	// ActorRoles is the set of roles the acting user currently holds
 	// on this task. The map is keyed by role name with true values;
 	// absent keys are false.
@@ -105,10 +113,18 @@ func Evaluate(c Constraint, f Facts) (bool, error) {
 			return false, fmt.Errorf("%w: dependency.open_at_most missing max threshold", ErrEval)
 		}
 		open := 0
-		for _, st := range f.DependencyStates {
-			if st != "done" && st != "cancelled" {
-				open++
+		for id, st := range f.DependencyStates {
+			if st == "done" || st == "cancelled" {
+				continue
 			}
+			// Only blocking-kind dependencies gate progress;
+			// informational links (relates / retro_of / duplicates)
+			// must not inflate the open count. A dep with no recorded
+			// kind is treated as blocking for backward compatibility.
+			if !blockingDepKind(f.DependencyKinds[id]) {
+				continue
+			}
+			open++
 		}
 		return open <= *c.Max, nil
 	case OpActorHasRole:
@@ -121,4 +137,19 @@ func Evaluate(c Constraint, f Facts) (bool, error) {
 		return f.CIStatus == c.Arg, nil
 	}
 	return false, fmt.Errorf("%w: unreachable op %q", ErrEval, c.Op)
+}
+
+// blockingDepKind reports whether a dependency kind actually gates the
+// dependent task's progress. "blocks" and "subtask_of" hold work back;
+// "relates", "duplicates", and "retro_of" are informational and must
+// not count toward dependency.open_at_most. An empty kind is treated
+// as blocking so callers that do not populate kinds keep the prior
+// (count-everything) behaviour.
+func blockingDepKind(kind string) bool {
+	switch kind {
+	case "relates", "duplicates", "retro_of":
+		return false
+	default:
+		return true
+	}
 }

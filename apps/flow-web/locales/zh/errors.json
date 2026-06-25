@@ -274,6 +274,7 @@
   "WS.TASK.ACCESS_DENIED": "您没有访问此任务的权限",
   "WS.TASK.ACTOR_ROLE_INVALID": "任务参与者角色必须为 assignee、reviewer、watcher 或 approver 之一",
   "WS.TASK.ALREADY_ARCHIVED": "该任务已归档",
+  "WS.TASK.DEPENDENCY_CYCLE": "添加此依赖关系会产生循环依赖",
   "WS.TASK.NOT_ARCHIVED": "该任务尚未归档",
   "WS.TASK.NOT_FOUND": "未找到任务",
   "WS.TASK.STATE_TRANSITION_BLOCKED_BY_CONSTRAINT": "任务无法转换为指定状态",

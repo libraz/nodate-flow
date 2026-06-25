@@ -239,7 +239,7 @@ WHERE id = ?
 -- the transition (NULL for system writers / event-bus replays).
 UPDATE tasks
 SET derived_state = ?,
-    completed_at = CASE WHEN ? = 'done' THEN CURRENT_TIMESTAMP ELSE completed_at END,
+    completed_at = CASE WHEN ? = 'done' THEN CURRENT_TIMESTAMP ELSE NULL END,
     updated_by_user_id = ?
 WHERE workspace_id = ?
   AND public_id = ?
