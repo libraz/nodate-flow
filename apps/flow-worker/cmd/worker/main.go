@@ -45,6 +45,12 @@ func registerProductionJobs(cfg *config.Config, logger *slog.Logger) func(*jobs.
 		}
 		userAgent := "flow-worker/" + lifecycle.ResolveVersion()
 		job, err := calendar_event_day.New(db, cfg.FlowAPIBaseURL, cfg.ServiceToken, userAgent, logger)
+		if job != nil {
+			// Keep the fire-once scan window aligned with the cadence the
+			// runner actually ticks the job at; a mismatch would skip a
+			// day boundary that landed between ticks.
+			job.TickInterval = cfg.JobTickInterval
+		}
 		if err != nil {
 			// Surfacing this as a fatal would prevent the rest of the
 			// runner from booting; instead, log loudly and skip

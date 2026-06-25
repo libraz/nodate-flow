@@ -119,3 +119,63 @@ func TestEndOfDayUnixSeconds(t *testing.T) {
 	want := time.Date(2026, time.May, 18, 15, 0, 0, 0, time.UTC).Unix()
 	require.Equal(t, want, got)
 }
+
+// TestLocalDaysArriving_MidDayFiresNoDay is the fire-once guarantee: a
+// tick that lands in the middle of a local day (no midnight crossed in
+// the window) materialises zero days. Without this the scan would re-emit
+// the same event-day on every tick (~1440 POST/event/day at a 60s
+// cadence).
+func TestLocalDaysArriving_MidDayFiresNoDay(t *testing.T) {
+	t.Parallel()
+	loc := mustLoad(t, "UTC")
+
+	// Noon UTC, 60s window: the day's midnight is 12h behind, far outside
+	// the window, so nothing arrives this tick.
+	now := time.Date(2026, time.May, 17, 12, 0, 0, 0, time.UTC)
+	days := localDaysArriving(now, time.Minute, loc)
+	require.Empty(t, days, "a mid-day tick must materialise no event-day")
+}
+
+// TestLocalDaysArriving_BoundaryFiresOneDay pins the single-emit case:
+// when the tick window straddles a local midnight, exactly the day that
+// just began is returned. A subsequent mid-day tick (above) returns
+// nothing, so the pair proves at-most-once-per-day at the window level.
+func TestLocalDaysArriving_BoundaryFiresOneDay(t *testing.T) {
+	t.Parallel()
+	loc := mustLoad(t, "UTC")
+
+	// 30s past UTC midnight with a 60s window: the boundary at 00:00Z is
+	// inside [now-60s, now), so 2026-05-17 arrives exactly once.
+	now := time.Date(2026, time.May, 17, 0, 0, 30, 0, time.UTC)
+	days := localDaysArriving(now, time.Minute, loc)
+	require.Len(t, days, 1, "the just-started day must arrive exactly once")
+	require.Equal(t, "2026-05-17", days[0].day)
+	require.Equal(t,
+		time.Date(2026, time.May, 17, 0, 0, 0, 0, time.UTC), days[0].utcStart)
+	require.Equal(t,
+		time.Date(2026, time.May, 18, 0, 0, 0, 0, time.UTC), days[0].utcEnd)
+}
+
+// TestLocalDaysArriving_CatchUpYieldsMissedDays proves the self-heal: a
+// wide catch-up window (a worker outage across local-day boundaries)
+// returns every skipped day, oldest-first, so the next tick backfills
+// them. The day-scoped dedupe key keeps the backfill idempotent.
+func TestLocalDaysArriving_CatchUpYieldsMissedDays(t *testing.T) {
+	t.Parallel()
+	loc := mustLoad(t, "UTC")
+
+	// Worker comes back at noon on 2026-05-19 after a multi-day outage; a
+	// 3-day window must surface every local midnight it crossed.
+	now := time.Date(2026, time.May, 19, 12, 0, 0, 0, time.UTC)
+	window := 72 * time.Hour
+	days := localDaysArriving(now, window, loc)
+
+	got := make([]string, 0, len(days))
+	for _, d := range days {
+		got = append(got, d.day)
+	}
+	// Midnights in (now-72h, now): 2026-05-17, -05-18, -05-19. The 16th's
+	// midnight (3.5 days back) is outside the window.
+	require.Equal(t, []string{"2026-05-17", "2026-05-18", "2026-05-19"}, got,
+		"catch-up must yield each crossed local day oldest-first")
+}

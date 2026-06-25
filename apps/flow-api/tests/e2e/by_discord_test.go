@@ -8,6 +8,9 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"os"
+	"path/filepath"
+	"runtime"
 	"testing"
 	"time"
 
@@ -204,6 +207,56 @@ func TestByDiscordRejectsMissingBearer(t *testing.T) {
 
 	status, _ := getByDiscord(t, h.baseURL, "", snowflake)
 	require.Equal(t, http.StatusUnauthorized, status)
+}
+
+// repoRootFromTest walks up from this test file's directory until it
+// finds the monorepo root (the directory holding the top-level go.work /
+// CLAUDE.md). Used to locate generated artifacts under packages/.
+func repoRootFromTest(t *testing.T) string {
+	t.Helper()
+	_, thisFile, _, ok := runtime.Caller(0)
+	require.True(t, ok, "runtime.Caller failed")
+	dir := filepath.Dir(thisFile)
+	for i := 0; i < 12; i++ {
+		if _, err := os.Stat(filepath.Join(dir, "CLAUDE.md")); err == nil {
+			if _, err := os.Stat(filepath.Join(dir, "packages")); err == nil {
+				return dir
+			}
+		}
+		parent := filepath.Dir(dir)
+		if parent == dir {
+			break
+		}
+		dir = parent
+	}
+	t.Fatalf("could not locate repo root from %s", filepath.Dir(thisFile))
+	return ""
+}
+
+// TestByDiscordHiddenFromPublicSDK guards P2-7: the internal service-
+// token-only operation must be marked Hidden so it never appears in the
+// generated public OpenAPI document or the TypeScript SDK, even though
+// it remains routable for the service-token caller (asserted by the
+// other tests in this file). A regression here would re-leak the
+// internal resolution mechanism to SDK/CLI consumers.
+func TestByDiscordHiddenFromPublicSDK(t *testing.T) {
+	root := repoRootFromTest(t)
+
+	artifacts := []string{
+		filepath.Join(root, "packages", "sdk", "src", "openapi.ts"),
+		filepath.Join(root, "packages", "sdk", "openapi.json"),
+	}
+	for _, path := range artifacts {
+		data, err := os.ReadFile(path) //#nosec G304 -- path derived from repo root, test-only
+		require.NoErrorf(t, err, "read generated artifact %s", path)
+		content := string(data)
+		require.NotContainsf(t, content, "by-discord",
+			"%s still contains the internal by-discord path; mark the operation Hidden", path)
+		require.NotContainsf(t, content, "internal-users-by-discord",
+			"%s still contains the internal-users-by-discord operationId", path)
+		require.NotContainsf(t, content, "/internal/users/",
+			"%s still exposes an /internal/users/* path", path)
+	}
 }
 
 // TestByDiscordRejectsNonNumericSnowflake asserts that the path-level

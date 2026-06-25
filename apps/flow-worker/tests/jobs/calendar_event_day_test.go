@@ -54,6 +54,22 @@ func setWorkspaceTimezone(t *testing.T, db *sql.DB, wsID uint32, tz string) {
 	require.NoError(t, err, "set workspace timezone")
 }
 
+// disableCalendar soft-deletes a calendar by flipping calendars.enabled
+// to FALSE keyed on its public id. The REST surface deletes a calendar by
+// the same enabled=FALSE write; a direct UPDATE expresses the
+// "parent calendar was removed" precondition without depending on the
+// delete handler's cascade semantics.
+func disableCalendar(t *testing.T, db *sql.DB, calendarPublicID string) {
+	t.Helper()
+	res, err := db.ExecContext(context.Background(),
+		`UPDATE calendars SET enabled = FALSE WHERE public_id = UUID_TO_BIN(?, 0)`,
+		calendarPublicID)
+	require.NoError(t, err, "disable calendar %s", calendarPublicID)
+	n, err := res.RowsAffected()
+	require.NoError(t, err)
+	require.EqualValues(t, 1, n, "exactly one calendar row must be disabled")
+}
+
 // createCalendarViaAPI creates a personal calendar via POST /calendars on
 // the supplied tenant and returns the calendar public id. Matches the
 // pattern in apps/flow-api/tests/calendar/calendar_event_test.go so the
@@ -100,6 +116,38 @@ func createEventViaAPI(
 	return resp.ID
 }
 
+// setEventRecurrence writes the recurrence columns on an existing
+// calendar_events row keyed by its public id. The create REST body exposes
+// recurrenceRule / recurrenceEnd but not recurrenceExceptions, so the tests
+// that need an exclusion (or a precise rule shape) set the columns directly
+// — the same one-row UPDATE escape hatch the suite already uses for the
+// workspace timezone. Passing an empty rule / exceptions string writes SQL
+// NULL so a single helper covers "rule only", "rule + exceptions", and
+// "rule + end".
+func setEventRecurrence(t *testing.T, db *sql.DB, eventPublicID, ruleJSON, exceptionsJSON string, end *time.Time) {
+	t.Helper()
+	var rule, exceptions any
+	if ruleJSON != "" {
+		rule = ruleJSON
+	}
+	if exceptionsJSON != "" {
+		exceptions = exceptionsJSON
+	}
+	var endVal any
+	if end != nil {
+		endVal = end.UTC()
+	}
+	res, err := db.ExecContext(context.Background(),
+		`UPDATE calendar_events
+		    SET recurrence_rule = ?, recurrence_exceptions = ?, recurrence_end = ?
+		  WHERE public_id = UUID_TO_BIN(?, 0)`,
+		rule, exceptions, endVal, eventPublicID)
+	require.NoError(t, err, "set recurrence on %s", eventPublicID)
+	n, err := res.RowsAffected()
+	require.NoError(t, err)
+	require.EqualValues(t, 1, n, "exactly one event row must be updated")
+}
+
 // resolveEventInternalID looks up calendar_events.id for a public UUID.
 // The signal row stores the internal id in subject_id (rule 18), so the
 // assertion needs the same translation the handler does when validating
@@ -115,16 +163,13 @@ func resolveEventInternalID(t *testing.T, db *sql.DB, eventPublicID string) int6
 }
 
 // newJob constructs a calendar_event_day.Job wired against the test
-// harness DB and flow-api server. The returned Job uses the injected
-// Now func so the boundary tests can pin the wall clock; callers that
-// just want "live time" pass nil for now.
-func newJob(t *testing.T, db *sql.DB, baseURL string, now func() time.Time) *calendar_event_day.Job {
+// harness DB and flow-api server. The tick instant is supplied to Tick by
+// the caller (the runner injects it in production); boundary tests pin a
+// fixed instant, live-time tests pass time.Now().
+func newJob(t *testing.T, db *sql.DB, baseURL string) *calendar_event_day.Job {
 	t.Helper()
 	job, err := calendar_event_day.New(db, baseURL, serviceTokenFixture, "flow-worker/test", silentLogger())
 	require.NoError(t, err, "construct calendar_event_day job")
-	if now != nil {
-		job.Now = now
-	}
 	return job
 }
 
@@ -203,8 +248,8 @@ func TestEmitsSignalForTodayEvent(t *testing.T) {
 	tickOKBefore := testutil.ToFloat64(obs.CalendarEventDayTicksTotal.WithLabelValues("ok"))
 	tickErrBefore := testutil.ToFloat64(obs.CalendarEventDayTicksTotal.WithLabelValues("error"))
 
-	job := newJob(t, h.db, h.srv.BaseURL, nil)
-	require.NoError(t, job.Tick(context.Background()), "tick should succeed")
+	job := newJob(t, h.db, h.srv.BaseURL)
+	require.NoError(t, job.Tick(context.Background(), time.Now()), "tick should succeed")
 
 	// The tick counter is a process-wide CounterVec — parallel tests
 	// in the same package contend on it. Asserting the lower bound is
@@ -281,9 +326,14 @@ func TestDedupeOnRetick(t *testing.T) {
 	tickOKBefore := testutil.ToFloat64(obs.CalendarEventDayTicksTotal.WithLabelValues("ok"))
 	tickErrBefore := testutil.ToFloat64(obs.CalendarEventDayTicksTotal.WithLabelValues("error"))
 
-	job := newJob(t, h.db, h.srv.BaseURL, nil)
-	require.NoError(t, job.Tick(context.Background()), "first tick should succeed")
-	require.NoError(t, job.Tick(context.Background()), "second tick should succeed")
+	// Pin both ticks to the same instant (noon of the live UTC day) so
+	// each one sees the local-day boundary inside its fire-once window;
+	// the second emit is what the INSERT IGNORE must collapse.
+	tickNow := utcToday.Add(12 * time.Hour)
+
+	job := newJob(t, h.db, h.srv.BaseURL)
+	require.NoError(t, job.Tick(context.Background(), tickNow), "first tick should succeed")
+	require.NoError(t, job.Tick(context.Background(), tickNow), "second tick should succeed")
 
 	// As in TestEmitsSignalForTodayEvent, the shared CounterVec means
 	// only the lower bound on the ok-status delta is safe under
@@ -317,9 +367,7 @@ func TestWorkspaceTimezoneBoundary(t *testing.T) {
 	// stripped-down test images.
 	_ = mustLoadLocation(t, "Asia/Tokyo")
 
-	fixedNow := func() time.Time {
-		return time.Date(2026, time.May, 17, 15, 30, 0, 0, time.UTC)
-	}
+	fixedNow := time.Date(2026, time.May, 17, 15, 30, 0, 0, time.UTC)
 
 	// Workspace A — Asia/Tokyo. Local "today" is 2026-05-18; the event
 	// at 2026-05-18T03:00Z lands at 12:00 Tokyo local on that same day.
@@ -341,8 +389,8 @@ func TestWorkspaceTimezoneBoundary(t *testing.T) {
 	eventB := createEventViaAPI(t, wsB, calB, startB, endB, "UTC", "UTC Standup")
 	eventBInternalID := resolveEventInternalID(t, h.db, eventB)
 
-	job := newJob(t, h.db, h.srv.BaseURL, fixedNow)
-	require.NoError(t, job.Tick(context.Background()), "tick should succeed")
+	job := newJob(t, h.db, h.srv.BaseURL)
+	require.NoError(t, job.Tick(context.Background(), fixedNow), "tick should succeed")
 
 	// Workspace A → external_id day suffix must be 2026-05-18 (Tokyo).
 	signalsA := loadSignalsForEvent(t, h.db, wsA.WorkspaceID, eventAInternalID)
@@ -373,9 +421,7 @@ func TestExpiresAtIsEndOfDayInWorkspaceTz(t *testing.T) {
 
 	_ = mustLoadLocation(t, "Asia/Tokyo")
 
-	fixedNow := func() time.Time {
-		return time.Date(2026, time.May, 18, 6, 0, 0, 0, time.UTC) // 15:00 Tokyo local on 2026-05-18
-	}
+	fixedNow := time.Date(2026, time.May, 18, 6, 0, 0, 0, time.UTC) // 15:00 Tokyo local on 2026-05-18
 
 	tt := helpers.CreateCalendarTestTenant(t, h.srv)
 	setWorkspaceTimezone(t, h.db, tt.WorkspaceID, "Asia/Tokyo")
@@ -389,8 +435,8 @@ func TestExpiresAtIsEndOfDayInWorkspaceTz(t *testing.T) {
 	eventPublicID := createEventViaAPI(t, tt, calID, startAt, endAt, "Asia/Tokyo", "Tokyo Standup")
 	eventInternalID := resolveEventInternalID(t, h.db, eventPublicID)
 
-	job := newJob(t, h.db, h.srv.BaseURL, fixedNow)
-	require.NoError(t, job.Tick(context.Background()), "tick should succeed")
+	job := newJob(t, h.db, h.srv.BaseURL)
+	require.NoError(t, job.Tick(context.Background(), fixedNow), "tick should succeed")
 
 	signals := loadSignalsForEvent(t, h.db, tt.WorkspaceID, eventInternalID)
 	require.Lenf(t, signals, 1, "expected exactly one signal row, got %d", len(signals))
@@ -401,4 +447,304 @@ func TestExpiresAtIsEndOfDayInWorkspaceTz(t *testing.T) {
 	require.WithinDurationf(t, wantExpires, row.ExpiresAt.Time, time.Second,
 		"expires_at must equal Tokyo-local end-of-day (2026-05-19 00:00 +0900 = 2026-05-18 15:00Z); got %s",
 		row.ExpiresAt.Time.UTC().Format(time.RFC3339))
+}
+
+// TestFireOnceAcrossMidDayTicks proves the worker emits an event-day at
+// most once even when ticked repeatedly through the same local day. The
+// first tick straddles the day boundary (the event-day arrives); two
+// later mid-day ticks find no boundary in their fire-once window and post
+// nothing. Without the windowed scan every tick would re-POST, ballooning
+// the audit trail to ~1440 rows/event/day. The signal row count must stay
+// at exactly one across all three ticks.
+func TestFireOnceAcrossMidDayTicks(t *testing.T) {
+	t.Parallel()
+	h := getHarness(t)
+
+	tt := helpers.CreateCalendarTestTenant(t, h.srv)
+	setWorkspaceTimezone(t, h.db, tt.WorkspaceID, "UTC")
+	calID := createCalendarViaAPI(t, tt)
+
+	// Fix a synthetic UTC day so the boundary / mid-day instants are
+	// deterministic regardless of the wall clock.
+	dayStart := time.Date(2026, time.July, 1, 0, 0, 0, 0, time.UTC)
+	startAt := dayStart.Add(9 * time.Hour) // 09:00Z, inside the day
+	endAt := startAt.Add(time.Hour)
+	eventPublicID := createEventViaAPI(t, tt, calID, startAt, endAt, "UTC", "Standup")
+	eventInternalID := resolveEventInternalID(t, h.db, eventPublicID)
+
+	job := newJob(t, h.db, h.srv.BaseURL)
+	// The job's default catch-up window is wide (26h), so to assert the
+	// fire-once boundary behaviour deterministically we narrow it: with no
+	// catch-up, only a tick whose [now-interval, now) straddles midnight
+	// arrives the day.
+	job.CatchUpWindow = time.Nanosecond
+
+	// Boundary tick: 30s past midnight, 60s interval → 00:00Z is inside
+	// the window, the event-day arrives.
+	boundaryTick := dayStart.Add(30 * time.Second)
+	require.NoError(t, job.Tick(context.Background(), boundaryTick), "boundary tick should succeed")
+
+	// Two mid-day ticks: no midnight in their windows → nothing posted.
+	require.NoError(t, job.Tick(context.Background(), dayStart.Add(8*time.Hour)), "mid-day tick should succeed")
+	require.NoError(t, job.Tick(context.Background(), dayStart.Add(16*time.Hour)), "mid-day tick should succeed")
+
+	signals := loadSignalsForEvent(t, h.db, tt.WorkspaceID, eventInternalID)
+	require.Lenf(t, signals, 1,
+		"event-day must emit exactly once across a boundary tick plus two mid-day ticks, got %d", len(signals))
+	require.True(t, signals[0].ExternalID.Valid)
+	require.Equal(t, "calendar_event_day:"+eventPublicID+":2026-07-01", signals[0].ExternalID.String)
+}
+
+// TestSoftDeletedParentCalendarIsNotScanned proves the INNER JOIN on
+// calendars enforces the parent soft-delete: an event whose parent
+// calendar has enabled=FALSE must never produce a signal, even though the
+// event row itself is still enabled. The judge must not run on a deleted
+// calendar's events.
+func TestSoftDeletedParentCalendarIsNotScanned(t *testing.T) {
+	t.Parallel()
+	h := getHarness(t)
+
+	tt := helpers.CreateCalendarTestTenant(t, h.srv)
+	setWorkspaceTimezone(t, h.db, tt.WorkspaceID, "UTC")
+	calID := createCalendarViaAPI(t, tt)
+
+	dayStart := time.Date(2026, time.July, 2, 0, 0, 0, 0, time.UTC)
+	startAt := dayStart.Add(9 * time.Hour)
+	endAt := startAt.Add(time.Hour)
+	eventPublicID := createEventViaAPI(t, tt, calID, startAt, endAt, "UTC", "Orphaned Standup")
+	eventInternalID := resolveEventInternalID(t, h.db, eventPublicID)
+
+	// Soft-delete the parent calendar; the event row stays enabled.
+	disableCalendar(t, h.db, calID)
+
+	job := newJob(t, h.db, h.srv.BaseURL)
+	// Wide enough window that the event-day would arrive if the join did
+	// not filter it out.
+	require.NoError(t, job.Tick(context.Background(), dayStart.Add(6*time.Hour)), "tick should succeed")
+
+	signals := loadSignalsForEvent(t, h.db, tt.WorkspaceID, eventInternalID)
+	require.Emptyf(t, signals,
+		"an event under a soft-deleted (disabled) calendar must not emit any signal, got %d", len(signals))
+}
+
+// TestCatchUpBackfillsMissedDay simulates a worker outage across a
+// local-day boundary: the next tick's catch-up window reaches back over
+// the missed day and emits its event-day, with the external_id carrying
+// the *missed* day rather than "today". The day-scoped dedupe key keeps
+// the backfill idempotent.
+func TestCatchUpBackfillsMissedDay(t *testing.T) {
+	t.Parallel()
+	h := getHarness(t)
+
+	tt := helpers.CreateCalendarTestTenant(t, h.srv)
+	setWorkspaceTimezone(t, h.db, tt.WorkspaceID, "UTC")
+	calID := createCalendarViaAPI(t, tt)
+
+	// Event sits on 2026-07-03 (the day the worker was down for).
+	missedDay := time.Date(2026, time.July, 3, 0, 0, 0, 0, time.UTC)
+	startAt := missedDay.Add(10 * time.Hour)
+	endAt := startAt.Add(time.Hour)
+	eventPublicID := createEventViaAPI(t, tt, calID, startAt, endAt, "UTC", "Missed Standup")
+	eventInternalID := resolveEventInternalID(t, h.db, eventPublicID)
+
+	// Worker comes back at 01:00Z on 2026-07-04 — past the 07-03 → 07-04
+	// boundary it slept through. The default 26h catch-up window reaches
+	// back across the 2026-07-04 00:00Z boundary into 2026-07-03.
+	recoveryTick := time.Date(2026, time.July, 4, 1, 0, 0, 0, time.UTC)
+	job := newJob(t, h.db, h.srv.BaseURL)
+	require.NoError(t, job.Tick(context.Background(), recoveryTick), "recovery tick should succeed")
+
+	signals := loadSignalsForEvent(t, h.db, tt.WorkspaceID, eventInternalID)
+	require.Lenf(t, signals, 1,
+		"catch-up must backfill the missed event-day exactly once, got %d", len(signals))
+	require.True(t, signals[0].ExternalID.Valid)
+	require.Equal(t, "calendar_event_day:"+eventPublicID+":2026-07-03", signals[0].ExternalID.String,
+		"the backfilled external_id must carry the missed day (2026-07-03), not the recovery day")
+
+	// A second recovery tick must collapse via INSERT IGNORE — no second
+	// row, proving the backfill is idempotent.
+	require.NoError(t, job.Tick(context.Background(), recoveryTick), "second recovery tick should succeed")
+	signals = loadSignalsForEvent(t, h.db, tt.WorkspaceID, eventInternalID)
+	require.Lenf(t, signals, 1, "catch-up backfill must stay idempotent across re-ticks, got %d", len(signals))
+}
+
+// externalIDDaySuffixes returns the YYYY-MM-DD suffix of each signal row's
+// external_id so the recurring-event tests can assert which occurrence-days
+// fired without coupling to the full dedupe key string.
+func externalIDDaySuffixes(rows []signalRow) []string {
+	out := make([]string, 0, len(rows))
+	for _, r := range rows {
+		if !r.ExternalID.Valid {
+			out = append(out, "")
+			continue
+		}
+		s := r.ExternalID.String
+		if i := lastColon(s); i >= 0 {
+			out = append(out, s[i+1:])
+		} else {
+			out = append(out, s)
+		}
+	}
+	return out
+}
+
+// lastColon returns the index of the final ':' in s, or -1. The dedupe key
+// is `calendar_event_day:<uuid>:<day>` and the UUID itself contains no colon,
+// so the last colon always precedes the day suffix.
+func lastColon(s string) int {
+	for i := len(s) - 1; i >= 0; i-- {
+		if s[i] == ':' {
+			return i
+		}
+	}
+	return -1
+}
+
+// TestRecurringEventFiresOnNonBaseDay is the core P2-8 fix: a daily recurring
+// event must emit event_day_arrived on a day after its base start day. The
+// base sits two days before the tick window; the worker must expand the rule
+// and fire the occurrence whose local day the tick just crossed, with the
+// external_id carrying that occurrence's day (not the base day).
+func TestRecurringEventFiresOnNonBaseDay(t *testing.T) {
+	t.Parallel()
+	h := getHarness(t)
+
+	tt := helpers.CreateCalendarTestTenant(t, h.srv)
+	setWorkspaceTimezone(t, h.db, tt.WorkspaceID, "UTC")
+	calID := createCalendarViaAPI(t, tt)
+
+	// Base on 2026-08-01 09:00Z; the tick lands on 2026-08-04, two days
+	// past the base, so only the daily expansion can produce a signal.
+	base := time.Date(2026, time.August, 1, 9, 0, 0, 0, time.UTC)
+	endAt := base.Add(time.Hour)
+	eventPublicID := createEventViaAPI(t, tt, calID, base, endAt, "UTC", "Daily Standup")
+	eventInternalID := resolveEventInternalID(t, h.db, eventPublicID)
+	setEventRecurrence(t, h.db, eventPublicID, `{"freq":"daily"}`, "", nil)
+
+	// Tick 30s past 2026-08-04 midnight with the default catch-up off so the
+	// fire-once window straddles exactly the 08-04 boundary.
+	job := newJob(t, h.db, h.srv.BaseURL)
+	job.CatchUpWindow = time.Nanosecond
+	tick := time.Date(2026, time.August, 4, 0, 0, 30, 0, time.UTC)
+	require.NoError(t, job.Tick(context.Background(), tick), "tick should succeed")
+
+	signals := loadSignalsForEvent(t, h.db, tt.WorkspaceID, eventInternalID)
+	require.Lenf(t, signals, 1, "the 08-04 occurrence must fire exactly once, got %d", len(signals))
+	require.Equal(t, []string{"2026-08-04"}, externalIDDaySuffixes(signals),
+		"the recurring event must fire on the non-base day 2026-08-04")
+
+	// Payload start instant must be the occurrence start (08-04 09:00Z), not
+	// the base (08-01 09:00Z) — downstream judges key off the live instant.
+	var payload map[string]any
+	require.NoError(t, json.Unmarshal(signals[0].PayloadJSON, &payload))
+	startUnix, ok := payload["startAt"].(float64)
+	require.True(t, ok)
+	require.Equal(t, time.Date(2026, time.August, 4, 9, 0, 0, 0, time.UTC).Unix(), int64(startUnix),
+		"payload.startAt must be the occurrence instant, not the base instant")
+}
+
+// TestRecurringExceptionDoesNotFire proves an occurrence listed in
+// recurrence_exceptions is suppressed: the daily rule would fire on 08-04,
+// but an exception for that instant means no signal lands.
+func TestRecurringExceptionDoesNotFire(t *testing.T) {
+	t.Parallel()
+	h := getHarness(t)
+
+	tt := helpers.CreateCalendarTestTenant(t, h.srv)
+	setWorkspaceTimezone(t, h.db, tt.WorkspaceID, "UTC")
+	calID := createCalendarViaAPI(t, tt)
+
+	base := time.Date(2026, time.August, 1, 9, 0, 0, 0, time.UTC)
+	endAt := base.Add(time.Hour)
+	eventPublicID := createEventViaAPI(t, tt, calID, base, endAt, "UTC", "Daily Standup")
+	eventInternalID := resolveEventInternalID(t, h.db, eventPublicID)
+	// Exclude the 2026-08-04 occurrence by its exact UTC instant.
+	setEventRecurrence(t, h.db, eventPublicID,
+		`{"freq":"daily"}`, `["2026-08-04T09:00:00Z"]`, nil)
+
+	job := newJob(t, h.db, h.srv.BaseURL)
+	job.CatchUpWindow = time.Nanosecond
+	tick := time.Date(2026, time.August, 4, 0, 0, 30, 0, time.UTC)
+	require.NoError(t, job.Tick(context.Background(), tick), "tick should succeed")
+
+	signals := loadSignalsForEvent(t, h.db, tt.WorkspaceID, eventInternalID)
+	require.Emptyf(t, signals,
+		"an occurrence excluded by recurrence_exceptions must not fire, got %d", len(signals))
+}
+
+// TestRecurringPastRecurrenceEndDoesNotFire proves an occurrence past the
+// recurrence_end bound is suppressed: recurrence_end falls on 08-03, so the
+// 08-04 occurrence must not fire even though the daily rule would otherwise
+// produce it.
+func TestRecurringPastRecurrenceEndDoesNotFire(t *testing.T) {
+	t.Parallel()
+	h := getHarness(t)
+
+	tt := helpers.CreateCalendarTestTenant(t, h.srv)
+	setWorkspaceTimezone(t, h.db, tt.WorkspaceID, "UTC")
+	calID := createCalendarViaAPI(t, tt)
+
+	base := time.Date(2026, time.August, 1, 9, 0, 0, 0, time.UTC)
+	endAt := base.Add(time.Hour)
+	eventPublicID := createEventViaAPI(t, tt, calID, base, endAt, "UTC", "Daily Standup")
+	eventInternalID := resolveEventInternalID(t, h.db, eventPublicID)
+	recurrenceEnd := time.Date(2026, time.August, 3, 12, 0, 0, 0, time.UTC)
+	setEventRecurrence(t, h.db, eventPublicID, `{"freq":"daily"}`, "", &recurrenceEnd)
+
+	job := newJob(t, h.db, h.srv.BaseURL)
+	job.CatchUpWindow = time.Nanosecond
+	tick := time.Date(2026, time.August, 4, 0, 0, 30, 0, time.UTC)
+	require.NoError(t, job.Tick(context.Background(), tick), "tick should succeed")
+
+	signals := loadSignalsForEvent(t, h.db, tt.WorkspaceID, eventInternalID)
+	require.Emptyf(t, signals,
+		"an occurrence past recurrence_end must not fire, got %d", len(signals))
+}
+
+// TestRecurringFireOnceAndIdempotentAcrossCatchUp proves the per-occurrence-day
+// emit is once-only and survives a catch-up backfill without duplicating. A
+// catch-up tick reaches back over two missed local days of a daily rule and
+// emits one signal per occurrence-day; re-ticking collapses via INSERT IGNORE
+// and a later mid-day tick adds nothing.
+func TestRecurringFireOnceAndIdempotentAcrossCatchUp(t *testing.T) {
+	t.Parallel()
+	h := getHarness(t)
+
+	tt := helpers.CreateCalendarTestTenant(t, h.srv)
+	setWorkspaceTimezone(t, h.db, tt.WorkspaceID, "UTC")
+	calID := createCalendarViaAPI(t, tt)
+
+	base := time.Date(2026, time.September, 1, 9, 0, 0, 0, time.UTC)
+	endAt := base.Add(time.Hour)
+	eventPublicID := createEventViaAPI(t, tt, calID, base, endAt, "UTC", "Daily Standup")
+	eventInternalID := resolveEventInternalID(t, h.db, eventPublicID)
+	setEventRecurrence(t, h.db, eventPublicID, `{"freq":"daily"}`, "", nil)
+
+	// Worker returns at 2026-09-04 01:00Z after sleeping through the 09-03
+	// and 09-04 local-day boundaries. A ~26h catch-up window backfills both
+	// missed occurrence-days (the 09-04 midnight just crossed, and 09-03 is
+	// inside the lookback).
+	job := newJob(t, h.db, h.srv.BaseURL)
+	recoveryTick := time.Date(2026, time.September, 4, 1, 0, 0, 0, time.UTC)
+	require.NoError(t, job.Tick(context.Background(), recoveryTick), "recovery tick should succeed")
+
+	signals := loadSignalsForEvent(t, h.db, tt.WorkspaceID, eventInternalID)
+	require.Equalf(t, []string{"2026-09-03", "2026-09-04"}, externalIDDaySuffixes(signals),
+		"catch-up must backfill each missed occurrence-day exactly once, got %v",
+		externalIDDaySuffixes(signals))
+
+	// Re-tick the same instant: INSERT IGNORE on the day-scoped external_id
+	// must collapse every re-emit, so the row set is unchanged.
+	require.NoError(t, job.Tick(context.Background(), recoveryTick), "second recovery tick should succeed")
+	signals = loadSignalsForEvent(t, h.db, tt.WorkspaceID, eventInternalID)
+	require.Equalf(t, []string{"2026-09-03", "2026-09-04"}, externalIDDaySuffixes(signals),
+		"re-ticking must stay idempotent, got %v", externalIDDaySuffixes(signals))
+
+	// A later mid-day tick crosses no new boundary in its fire-once window,
+	// so it must add nothing — proving no per-tick spam.
+	job.CatchUpWindow = time.Nanosecond
+	require.NoError(t, job.Tick(context.Background(), recoveryTick.Add(8*time.Hour)), "mid-day tick should succeed")
+	signals = loadSignalsForEvent(t, h.db, tt.WorkspaceID, eventInternalID)
+	require.Lenf(t, signals, 2,
+		"a mid-day tick must not add a new occurrence-day signal, got %d", len(signals))
 }

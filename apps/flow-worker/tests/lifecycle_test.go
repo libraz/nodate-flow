@@ -272,7 +272,7 @@ func newBlockingJob() *blockingJob {
 
 func (b *blockingJob) Name() string { return "blocking" }
 
-func (b *blockingJob) Tick(ctx context.Context) error {
+func (b *blockingJob) Tick(ctx context.Context, _ time.Time) error {
 	b.ticks.Add(1)
 	b.startOnce.Do(func() { close(b.started) })
 	select {

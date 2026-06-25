@@ -12,6 +12,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/nodate-flow/nodate-flow/apps/flow-worker/internal/obs"
+	"github.com/nodate-flow/nodate-flow/packages/go-shared/signalwire"
 )
 
 const (
@@ -21,10 +22,9 @@ const (
 	JobName = "calendar_event_day"
 
 	// signalSource is the `source` value sent on every signal this job
-	// emits. Pinned to "calendar" per signal_kinds/calendar.yaml. The
-	// `signals.source` ENUM on flow-api still needs to grow this value
-	// — see scanner.go top-of-package docstring.
-	signalSource = "calendar"
+	// emits. Pinned to the canonical calendar source from
+	// packages/go-shared/signalwire, matching signal_kinds/calendar.yaml.
+	signalSource = string(signalwire.SourceCalendar)
 
 	// signalKind is the closed-enum kind the calendar signal_kinds
 	// registry exposes for the event-day arrival tick.
@@ -33,6 +33,18 @@ const (
 	// signalSubjectType is the SignalsSubjectType enum value flow-api
 	// recognises for calendar_events subjects.
 	signalSubjectType = "calendar_event"
+
+	// defaultTickInterval mirrors the runner's default cadence
+	// (NF_FLOW_WORKER_TICK_INTERVAL, 60s). Used when Job.TickInterval is
+	// left zero so a directly-constructed Job (e.g. in tests) still has a
+	// sane fire-once window.
+	defaultTickInterval = 60 * time.Second
+
+	// defaultCatchUpWindow is the extra lookback the day window carries so
+	// a short worker outage self-heals on the next tick. One day covers a
+	// single missed local-day boundary; the dedupe key makes a longer
+	// backfill harmless if an operator widens it.
+	defaultCatchUpWindow = 26 * time.Hour
 )
 
 // Job emits one calendar.event_day_arrived signal per (workspace, event,
@@ -43,18 +55,25 @@ const (
 // signals INSERT IGNORE on the (workspace_id, source, external_id)
 // UNIQUE constraint collapses repeats.
 type Job struct {
-	// Scanner reads workspaces and today's events per workspace.
-	// Required.
+	// Scanner reads workspaces and the events whose local day arrives in
+	// the current tick window per workspace. Required.
 	Scanner *Scanner
 	// Client posts the signal to flow-api. Required.
 	Client *SignalsClient
 	// Logger receives structured per-tick records. Required.
 	Logger *slog.Logger
-	// Now returns the wall-clock instant the tick observes. Injected
-	// rather than calling time.Now() directly so tests can fix the
-	// day-boundary behaviour deterministically. Defaults to time.Now
-	// when nil.
-	Now func() time.Time
+	// TickInterval is the runner cadence the scan widens into its
+	// fire-once day window. It MUST match the interval the runner ticks
+	// the job at; a value smaller than the real cadence would skip a day
+	// boundary that landed between ticks. Defaults to defaultTickInterval
+	// when non-positive.
+	TickInterval time.Duration
+	// CatchUpWindow extends the day window backwards so a worker outage
+	// across one or more local-day boundaries self-heals: the next tick
+	// re-materialises the skipped days. The day-scoped dedupe key makes
+	// the backfill idempotent. Defaults to defaultCatchUpWindow when
+	// non-positive.
+	CatchUpWindow time.Duration
 }
 
 // New constructs a Job with its Scanner and Client wired against the
@@ -73,10 +92,11 @@ func New(db *sql.DB, baseURL, token, userAgent string, logger *slog.Logger) (*Jo
 		return nil, err
 	}
 	return &Job{
-		Scanner: &Scanner{DB: db},
-		Client:  client,
-		Logger:  logger,
-		Now:     time.Now,
+		Scanner:       &Scanner{DB: db},
+		Client:        client,
+		Logger:        logger,
+		TickInterval:  defaultTickInterval,
+		CatchUpWindow: defaultCatchUpWindow,
 	}, nil
 }
 
@@ -84,9 +104,11 @@ func New(db *sql.DB, baseURL, token, userAgent string, logger *slog.Logger) (*Jo
 // job.
 func (j *Job) Name() string { return JobName }
 
-// Tick performs one cycle of the scan + emit loop. The outcome is
-// recorded on nf_flow_worker_calendar_event_day_ticks_total{status}
-// and the duration on nf_flow_worker_calendar_event_day_tick_seconds.
+// Tick performs one cycle of the scan + emit loop. `now` is the tick
+// instant the runner observed (injected so the day-boundary behaviour is
+// deterministic under test). The outcome is recorded on
+// nf_flow_worker_calendar_event_day_ticks_total{status} and the duration
+// on nf_flow_worker_calendar_event_day_tick_seconds.
 //
 // Status semantics (matches obs.metrics docs):
 //   - "ok"      — workspaces were scanned and signal posting completed
@@ -95,7 +117,7 @@ func (j *Job) Name() string { return JobName }
 //   - "error"   — listing workspaces failed; the runner records the tick
 //     as failed and retries on the next interval.
 //   - "skipped" — there are no enabled workspaces; nothing to do.
-func (j *Job) Tick(ctx context.Context) error {
+func (j *Job) Tick(ctx context.Context, now time.Time) error {
 	timer := prometheus.NewTimer(obs.CalendarEventDayTickSeconds)
 	defer timer.ObserveDuration()
 
@@ -110,9 +132,9 @@ func (j *Job) Tick(ctx context.Context) error {
 		return nil
 	}
 
-	now := j.now()
+	window := j.dayWindow()
 	for _, ws := range workspaces {
-		if err := j.tickForWorkspace(ctx, ws, now); err != nil {
+		if err := j.tickForWorkspace(ctx, ws, now, window); err != nil {
 			// One bad workspace must not block the rest. The runner
 			// metric stays "ok" because the loop made progress; per-
 			// workspace failures surface via the slog stream.
@@ -128,43 +150,38 @@ func (j *Job) Tick(ctx context.Context) error {
 }
 
 // tickForWorkspace runs the scan + emit cycle for a single workspace.
-// Returned errors describe the workspace-level failure (timezone load,
-// event query); per-event POST failures are logged inside the loop and
-// do not abort the workspace — partial progress is better than none.
-func (j *Job) tickForWorkspace(ctx context.Context, ws Workspace, now time.Time) error {
-	loc, err := time.LoadLocation(ws.Timezone)
+// `window` is the fire-once day window (tick interval + catch-up). Only
+// events whose local day arrives inside the window are scanned, so a
+// steady cadence emits each (event, day) once. Returned errors describe
+// the workspace-level failure (event query); per-event POST failures are
+// logged inside the loop and do not abort the workspace — partial
+// progress is better than none.
+func (j *Job) tickForWorkspace(ctx context.Context, ws Workspace, now time.Time, window time.Duration) error {
+	events, err := j.Scanner.ListEventsForDays(ctx, ws.ID, ws.Timezone, now, window)
 	if err != nil {
-		return fmt.Errorf("load workspace timezone %q: %w", ws.Timezone, err)
-	}
-
-	events, err := j.Scanner.ListTodayEvents(ctx, ws.ID, ws.Timezone, now)
-	if err != nil {
-		return fmt.Errorf("list today events: %w", err)
+		return fmt.Errorf("list arriving events: %w", err)
 	}
 	if len(events) == 0 {
-		j.Logger.DebugContext(ctx, "calendar_event_day: no events today for workspace",
+		j.Logger.DebugContext(ctx, "calendar_event_day: no event-day arrivals in window for workspace",
 			slog.String("workspace_public_id", ws.PublicID.String()),
 			slog.String("timezone", ws.Timezone),
 		)
 		return nil
 	}
 
-	day := eventDayString(now, loc)
-	expires := endOfDayUnixSeconds(now, loc)
-
-	for _, ev := range events {
+	for _, eod := range events {
 		// Honour ctx cancellation between events so a shutdown signal
 		// during a long workspace fan-out drains promptly.
 		if ctxErr := ctx.Err(); ctxErr != nil {
 			return ctxErr
 		}
 
-		body, err := j.buildSignalBody(ws, ev, day, expires)
+		body, err := j.buildSignalBody(ws, eod.Event, eod.Day, eod.ExpiresAtUnix)
 		if err != nil {
 			j.Logger.WarnContext(ctx, "calendar_event_day: build signal body failed",
 				slog.Any("err", err),
 				slog.String("workspace_public_id", ws.PublicID.String()),
-				slog.String("event_public_id", ev.PublicID.String()),
+				slog.String("event_public_id", eod.Event.PublicID.String()),
 			)
 			continue
 		}
@@ -177,8 +194,8 @@ func (j *Job) tickForWorkspace(ctx context.Context, ws Workspace, now time.Time)
 			j.Logger.WarnContext(ctx, "calendar_event_day: post signal failed",
 				slog.Any("err", err),
 				slog.String("workspace_public_id", ws.PublicID.String()),
-				slog.String("event_public_id", ev.PublicID.String()),
-				slog.String("event_day", day),
+				slog.String("event_public_id", eod.Event.PublicID.String()),
+				slog.String("event_day", eod.Day),
 			)
 			continue
 		}
@@ -226,12 +243,17 @@ func dedupeKey(eventPublicID, day string) string {
 	return "calendar_event_day:" + eventPublicID + ":" + day
 }
 
-// now resolves the injected clock, defaulting to time.Now when the
-// constructor was not used. Centralised so the Tick path never reads
-// time.Now() directly.
-func (j *Job) now() time.Time {
-	if j.Now != nil {
-		return j.Now()
+// dayWindow resolves the fire-once scan window: the tick interval widened
+// by the catch-up lookback. Both fall back to package defaults so a
+// directly-constructed Job (tests) still gets a sane window.
+func (j *Job) dayWindow() time.Duration {
+	interval := j.TickInterval
+	if interval <= 0 {
+		interval = defaultTickInterval
 	}
-	return time.Now()
+	catchUp := j.CatchUpWindow
+	if catchUp <= 0 {
+		catchUp = defaultCatchUpWindow
+	}
+	return interval + catchUp
 }

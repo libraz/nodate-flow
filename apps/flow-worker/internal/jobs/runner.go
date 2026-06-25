@@ -24,8 +24,11 @@ type Job interface {
 	// Name is used for slog fields and future per-job metric labels.
 	// MUST be stable across restarts and unique within a Runner.
 	Name() string
-	// Tick performs one cycle of work.
-	Tick(ctx context.Context) error
+	// Tick performs one cycle of work. now is the tick instant the runner
+	// observed; jobs that key on a clock (e.g. day boundaries) MUST use
+	// it rather than reading time.Now() so behaviour is deterministic
+	// under test.
+	Tick(ctx context.Context, now time.Time) error
 }
 
 // Runner ticks every registered Job on a shared interval. The W1 scaffold
@@ -121,7 +124,7 @@ func (r *Runner) runOnce(ctx context.Context, jobs []Job, now time.Time) {
 	}
 	for _, j := range jobs {
 		start := time.Now()
-		if err := j.Tick(ctx); err != nil {
+		if err := j.Tick(ctx, now); err != nil {
 			r.Logger.Error("jobs: tick failed",
 				"job", j.Name(),
 				"err", err,
