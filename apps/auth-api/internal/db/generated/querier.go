@@ -12,6 +12,13 @@ import (
 )
 
 type Querier interface {
+	// Atomically promote the calling user to the FIRST instance admin.
+	// The INSERT...SELECT only materialises a row when no active admin yet
+	// exists, so two concurrent /admin/setup calls can never both win: the
+	// conditional and the write evaluate as one statement under a single
+	// row lock, and the loser sees zero affected rows. Callers MUST inspect
+	// RowsAffected and treat 0 as "already initialized".
+	AdminBootstrapFirstInstanceAdmin(ctx context.Context, arg AdminBootstrapFirstInstanceAdminParams) (int64, error)
 	// Check if any active instance admin exists (for bootstrap guard).
 	AdminCheckInstanceAdminExists(ctx context.Context) (bool, error)
 	// Count active instance admins (for last-admin guard).
@@ -283,8 +290,12 @@ type Querier interface {
 	// the storage_objects rows whose blobs the caller already purged from
 	// MinIO).
 	HardDeleteWorkspace(ctx context.Context, id uint32) (sql.Result, error)
-	// Bump the use counter after a successful accept.
-	IncrementInviteUseCount(ctx context.Context, id uint32) error
+	// Atomically bump the use counter, but only while the invite still has
+	// capacity. max_uses IS NULL means unlimited. The conditional WHERE makes
+	// the check-and-increment a single statement so concurrent redemptions
+	// can never push use_count past max_uses (TOCTOU-safe). Returns the number
+	// of affected rows: 0 means the invite was already exhausted.
+	IncrementInviteUseCount(ctx context.Context, id uint32) (int64, error)
 	// Bump ref_count by 1 when an additional referencing row is created
 	// (e.g. dedup hit on a re-upload). Caller MUST run this inside the
 	// same transaction as the referencing INSERT so the count cannot drift

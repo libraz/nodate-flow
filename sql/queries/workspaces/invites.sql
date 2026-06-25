@@ -31,11 +31,17 @@ WHERE wi.workspace_id = ?
 ORDER BY wi.created_at DESC, wi.public_id DESC
 LIMIT ? OFFSET ?;
 
--- name: IncrementInviteUseCount :exec
--- Bump the use counter after a successful accept.
+-- name: IncrementInviteUseCount :execrows
+-- Atomically bump the use counter, but only while the invite still has
+-- capacity. max_uses IS NULL means unlimited. The conditional WHERE makes
+-- the check-and-increment a single statement so concurrent redemptions
+-- can never push use_count past max_uses (TOCTOU-safe). Returns the number
+-- of affected rows: 0 means the invite was already exhausted.
 UPDATE workspace_invites
 SET use_count = use_count + 1
-WHERE id = ?;
+WHERE id = ?
+  AND enabled = TRUE
+  AND (max_uses IS NULL OR use_count < max_uses);
 
 -- name: RevokeWorkspaceInvite :exec
 -- Disable an invite link (soft delete).

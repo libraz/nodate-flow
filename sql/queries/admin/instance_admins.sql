@@ -25,6 +25,20 @@ LIMIT ? OFFSET ?;
 INSERT INTO instance_admins (public_id, user_id, granted_by_user_id, granted_at)
 VALUES (?, ?, ?, NOW());
 
+-- name: AdminBootstrapFirstInstanceAdmin :execrows
+-- Atomically promote the calling user to the FIRST instance admin.
+-- The INSERT...SELECT only materialises a row when no active admin yet
+-- exists, so two concurrent /admin/setup calls can never both win: the
+-- conditional and the write evaluate as one statement under a single
+-- row lock, and the loser sees zero affected rows. Callers MUST inspect
+-- RowsAffected and treat 0 as "already initialized".
+INSERT INTO instance_admins (public_id, user_id, granted_by_user_id, granted_at)
+SELECT ?, ?, ?, NOW()
+FROM DUAL
+WHERE NOT EXISTS (
+  SELECT 1 FROM instance_admins WHERE enabled = TRUE AND revoked_at IS NULL
+);
+
 -- name: AdminRevokeInstanceAdmin :exec
 -- Revoke an instance admin grant by setting revoked_at.
 UPDATE instance_admins

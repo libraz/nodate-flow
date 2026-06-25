@@ -119,16 +119,25 @@ func (q *Queries) FindWorkspaceInviteWorkspaceName(ctx context.Context, tokenHas
 	return i, err
 }
 
-const incrementInviteUseCount = `-- name: IncrementInviteUseCount :exec
+const incrementInviteUseCount = `-- name: IncrementInviteUseCount :execrows
 UPDATE workspace_invites
 SET use_count = use_count + 1
 WHERE id = ?
+  AND enabled = TRUE
+  AND (max_uses IS NULL OR use_count < max_uses)
 `
 
-// Bump the use counter after a successful accept.
-func (q *Queries) IncrementInviteUseCount(ctx context.Context, id uint32) error {
-	_, err := q.db.ExecContext(ctx, incrementInviteUseCount, id)
-	return err
+// Atomically bump the use counter, but only while the invite still has
+// capacity. max_uses IS NULL means unlimited. The conditional WHERE makes
+// the check-and-increment a single statement so concurrent redemptions
+// can never push use_count past max_uses (TOCTOU-safe). Returns the number
+// of affected rows: 0 means the invite was already exhausted.
+func (q *Queries) IncrementInviteUseCount(ctx context.Context, id uint32) (int64, error) {
+	result, err := q.db.ExecContext(ctx, incrementInviteUseCount, id)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
 }
 
 const listWorkspaceInvites = `-- name: ListWorkspaceInvites :many

@@ -445,11 +445,54 @@ func buildSharedDeps(deps Deps) *sharedDeps {
 			ws, ok := middleware.WorkspaceFromContext(ctx)
 			return ws.ID, ok
 		}
+		// Share the orchestrator's cost guard + invocation logger with the
+		// NL endpoints so command-palette / NL query / NL constraint calls
+		// enforce the same per-workspace daily budget and write redacted
+		// ai_invocations rows. Without this the NL surfaces bill the
+		// provider unbounded and untracked (audit C-2 / H-8 / M-6).
+		nlBudget := ai.BudgetReaderFunc(func(ctx context.Context, wsID uint32) (int64, error) {
+			return deps.Queries.SumAiCostTodayForWorkspace(ctx, generated.SumAiCostTodayForWorkspaceParams{
+				WorkspaceID: wsID,
+				InvokedAt:   time.Now().UTC().Truncate(24 * time.Hour),
+			})
+		})
+		nlGuard := ai.NewCostGuard(nlBudget, 0)
+		nlLogger := newDBInvocationLogger(deps.Queries, deps.AiInvocationPublisher)
 		if nlQueryCompiler == nil {
-			nlQueryCompiler = nlquery.New(nlquery.NewWorkspaceProvider(wsResolver, extractWS))
+			prov := nlquery.NewWorkspaceProvider(wsResolver, extractWS).
+				WithMetering(nlGuard, func(ctx context.Context, rec nlquery.InvocationRecord) {
+					nlLogger(ctx, ai.InvocationRecord{
+						WorkspaceID:      rec.WorkspaceID,
+						Purpose:          rec.Purpose,
+						Model:            rec.Model,
+						PromptRedacted:   rec.PromptRedacted,
+						ResponseRedacted: rec.ResponseRedacted,
+						TokensInput:      rec.TokensInput,
+						TokensOutput:     rec.TokensOutput,
+						CostCents:        rec.CostCents,
+						Status:           rec.Status,
+						ErrorCode:        rec.ErrorCode,
+					})
+				}, obs.RecordAIInvocation)
+			nlQueryCompiler = nlquery.New(prov)
 		}
 		if nlConstraintCompiler == nil {
-			nlConstraintCompiler = nlconstraint.New(nlconstraint.NewWorkspaceProvider(wsResolver, extractWS))
+			prov := nlconstraint.NewWorkspaceProvider(wsResolver, extractWS).
+				WithMetering(nlGuard, func(ctx context.Context, rec nlconstraint.InvocationRecord) {
+					nlLogger(ctx, ai.InvocationRecord{
+						WorkspaceID:      rec.WorkspaceID,
+						Purpose:          rec.Purpose,
+						Model:            rec.Model,
+						PromptRedacted:   rec.PromptRedacted,
+						ResponseRedacted: rec.ResponseRedacted,
+						TokensInput:      rec.TokensInput,
+						TokensOutput:     rec.TokensOutput,
+						CostCents:        rec.CostCents,
+						Status:           rec.Status,
+						ErrorCode:        rec.ErrorCode,
+					})
+				}, obs.RecordAIInvocation)
+			nlConstraintCompiler = nlconstraint.New(prov)
 		}
 		if nlCommandResolver == nil {
 			tools := []nlcommand.ToolSpec{
@@ -461,7 +504,22 @@ func buildSharedDeps(deps Deps) *sharedDeps {
 				{Name: "list_tasks", Description: "List tasks in a project", InputSchema: map[string]any{"type": "object", "properties": map[string]any{"projectId": map[string]any{"type": "string"}}}},
 				{Name: "list_projects", Description: "List projects in a workspace", InputSchema: map[string]any{"type": "object", "properties": map[string]any{}}},
 			}
-			nlCommandResolver = nlcommand.New(nlcommand.NewWorkspaceProvider(wsResolver, extractWS), tools)
+			cmdProv := nlcommand.NewWorkspaceProvider(wsResolver, extractWS).
+				WithMetering(nlGuard, func(ctx context.Context, rec nlcommand.InvocationRecord) {
+					nlLogger(ctx, ai.InvocationRecord{
+						WorkspaceID:      rec.WorkspaceID,
+						Purpose:          rec.Purpose,
+						Model:            rec.Model,
+						PromptRedacted:   rec.PromptRedacted,
+						ResponseRedacted: rec.ResponseRedacted,
+						TokensInput:      rec.TokensInput,
+						TokensOutput:     rec.TokensOutput,
+						CostCents:        rec.CostCents,
+						Status:           rec.Status,
+						ErrorCode:        rec.ErrorCode,
+					})
+				}, obs.RecordAIInvocation)
+			nlCommandResolver = nlcommand.New(cmdProv, tools)
 			nlCommandResolver.Cache = nlcommand.NewCache(5 * time.Minute)
 		}
 	}

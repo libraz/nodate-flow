@@ -21,21 +21,23 @@ func Setup(deps Deps) func(context.Context, *struct{}) (*SetupOutput, error) {
 			return nil, httpErr(apierrors.AuthSessionRevoked)
 		}
 
-		hasAdmin, err := deps.Queries.AdminCheckInstanceAdminExists(ctx)
-		if err != nil {
-			return nil, httpErr(apierrors.InternalUnexpected)
-		}
-		if hasAdmin {
-			return nil, httpErr(apierrors.InstanceSetupAlreadyInitialized)
-		}
-
-		_, err = deps.Queries.AdminGrantInstanceAdmin(ctx, generated.AdminGrantInstanceAdminParams{
+		// Atomic bootstrap: the conditional INSERT...SELECT only writes a
+		// row when no active admin exists yet, evaluated as a single
+		// statement. This closes the check-then-act TOCTOU where two
+		// concurrent /admin/setup calls could each pass a separate
+		// existence check and both create an admin. The loser of the race
+		// (and any later caller) sees zero affected rows and gets a clean
+		// already-initialized error.
+		affected, err := deps.Queries.AdminBootstrapFirstInstanceAdmin(ctx, generated.AdminBootstrapFirstInstanceAdminParams{
 			PublicID:        types.New(),
 			UserID:          uid,
 			GrantedByUserID: sql.NullInt32{},
 		})
 		if err != nil {
 			return nil, httpErr(apierrors.InternalUnexpected)
+		}
+		if affected == 0 {
+			return nil, httpErr(apierrors.InstanceSetupAlreadyInitialized)
 		}
 
 		deps.Audit.Record(ctx, audit.Entry{

@@ -13,6 +13,35 @@ import (
 	types "github.com/nodate-flow/nodate-flow/apps/auth-api/internal/db/types"
 )
 
+const adminBootstrapFirstInstanceAdmin = `-- name: AdminBootstrapFirstInstanceAdmin :execrows
+INSERT INTO instance_admins (public_id, user_id, granted_by_user_id, granted_at)
+SELECT ?, ?, ?, NOW()
+FROM DUAL
+WHERE NOT EXISTS (
+  SELECT 1 FROM instance_admins WHERE enabled = TRUE AND revoked_at IS NULL
+)
+`
+
+type AdminBootstrapFirstInstanceAdminParams struct {
+	PublicID        types.PublicID `json:"publicId"`
+	UserID          uint32         `json:"-"`
+	GrantedByUserID sql.NullInt32  `json:"-"`
+}
+
+// Atomically promote the calling user to the FIRST instance admin.
+// The INSERT...SELECT only materialises a row when no active admin yet
+// exists, so two concurrent /admin/setup calls can never both win: the
+// conditional and the write evaluate as one statement under a single
+// row lock, and the loser sees zero affected rows. Callers MUST inspect
+// RowsAffected and treat 0 as "already initialized".
+func (q *Queries) AdminBootstrapFirstInstanceAdmin(ctx context.Context, arg AdminBootstrapFirstInstanceAdminParams) (int64, error) {
+	result, err := q.db.ExecContext(ctx, adminBootstrapFirstInstanceAdmin, arg.PublicID, arg.UserID, arg.GrantedByUserID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
+}
+
 const adminCheckInstanceAdminExists = `-- name: AdminCheckInstanceAdminExists :one
 SELECT EXISTS(
   SELECT 1 FROM instance_admins

@@ -185,7 +185,11 @@ func AcceptInvite(deps InviteDeps) func(context.Context, *AcceptInviteInput) (*A
 			return nil, httpErr(apierrors.WsWorkspaceInviteExpired)
 		}
 
-		// Validate use count.
+		// Fast-path rejection of an already-exhausted invite. This is a
+		// best-effort optimisation only: the authoritative guard is the
+		// atomic conditional increment inside the redemption tx below
+		// (IncrementInviteUseCount), which closes the TOCTOU window that
+		// this non-transactional read cannot.
 		if invite.MaxUses.Valid && int32(invite.UseCount) >= invite.MaxUses.Int32 { //#nosec G115 -- workspace_invites.use_count is INT UNSIGNED capped by max_uses (INT)
 			return nil, httpErr(apierrors.WsWorkspaceInviteExhausted)
 		}
@@ -217,6 +221,22 @@ func AcceptInvite(deps InviteDeps) func(context.Context, *AcceptInviteInput) (*A
 
 		txQueries := deps.Queries.WithTx(tx)
 		now := time.Now()
+
+		// Atomically claim a use slot first. The conditional UPDATE only
+		// affects a row while use_count < max_uses, so concurrent accepts
+		// racing on the same invite can never collectively exceed the cap:
+		// exactly max_uses redemptions see affected == 1; the rest see 0
+		// and bail out as exhausted. Running this inside the tx (before the
+		// member add) means a loser's transaction rolls back cleanly without
+		// having created a half-joined member.
+		affected, err := txQueries.IncrementInviteUseCount(ctx, invite.ID)
+		if err != nil {
+			return nil, httpErr(apierrors.InternalUnexpected)
+		}
+		if affected == 0 {
+			return nil, httpErr(apierrors.WsWorkspaceInviteExhausted)
+		}
+
 		if _, err := memberkit.AddWorkspaceMember(ctx, tx, memberkit.AddWorkspaceMemberArgs{
 			WorkspaceID:              invite.WorkspaceID,
 			UserID:                   actorID,
@@ -227,9 +247,6 @@ func AcceptInvite(deps InviteDeps) func(context.Context, *AcceptInviteInput) (*A
 			EnsurePersonalCalendar:   true,
 			SubscribeHolidayCalendar: true,
 		}); err != nil {
-			return nil, httpErr(apierrors.InternalUnexpected)
-		}
-		if err := txQueries.IncrementInviteUseCount(ctx, invite.ID); err != nil {
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
 		if err := tx.Commit(); err != nil {
