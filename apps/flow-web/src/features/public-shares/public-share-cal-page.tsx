@@ -27,7 +27,7 @@ export interface PublicShareCalPageProps {
 }
 
 export default function PublicShareCalPage({ token }: PublicShareCalPageProps): ReactElement {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { data, isLoading, error } = useShareRenderQuery(token);
 
   if (isLoading) {
@@ -49,6 +49,19 @@ export default function PublicShareCalPage({ token }: PublicShareCalPageProps): 
 
   const { page, events } = data;
   const pageTimezone = page.timezone || 'UTC';
+
+  // Resolve the holidays country code (e.g. "JP") to a locale-aware display
+  // name (e.g. "Japan") via Intl.DisplayNames, mirroring the authenticated
+  // holidays surface; fall back to the raw code if resolution fails.
+  let holidaysCountryLabel = page.showHolidaysCountry ?? '';
+  if (page.showHolidaysCountry) {
+    try {
+      const displayNames = new Intl.DisplayNames([i18n.language], { type: 'region' });
+      holidaysCountryLabel = displayNames.of(page.showHolidaysCountry) ?? page.showHolidaysCountry;
+    } catch {
+      holidaysCountryLabel = page.showHolidaysCountry;
+    }
+  }
 
   const titleHeader = (
     <header
@@ -141,7 +154,7 @@ export default function PublicShareCalPage({ token }: PublicShareCalPageProps): 
         </span>
         {page.showHolidaysCountry ? (
           <span style={{ display: 'inline-flex', alignItems: 'center', gap: 'var(--nf-space-1)' }}>
-            {t('share.holidays_country', { country: page.showHolidaysCountry })}
+            {t('share.holidays_country', { country: holidaysCountryLabel })}
           </span>
         ) : null}
       </div>

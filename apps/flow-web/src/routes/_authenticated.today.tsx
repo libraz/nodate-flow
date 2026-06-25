@@ -211,7 +211,7 @@ function TodayRoute(): ReactElement {
                       borderRadius: '0.5rem',
                       background: isOverdue
                         ? 'var(--nf-color-danger-subtle)'
-                        : 'var(--nf-color-surface))',
+                        : 'var(--nf-color-surface)',
                       borderInlineStart: isOverdue
                         ? '3px solid var(--nf-color-danger)'
                         : '3px solid transparent',

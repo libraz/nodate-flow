@@ -713,18 +713,36 @@ export function useTransitionTask(): UseMutationResult<Task, ApiError, Transitio
         await qc.cancelQueries({ queryKey: [...tasksKeys.all, 'list'] });
       }
       await qc.cancelQueries({ queryKey: tasksKeys.detail(vars.id) });
-      const listSnapshots = qc.getQueriesData<TaskListItem[]>({
+      // The list prefix mixes two cache shapes: the flat `TaskListItem[]`
+      // produced by `useTasksQuery` and the `InfiniteData<TasksPage>`
+      // produced by `useTasksInfiniteQuery` / `useMyTasksInfiniteQuery`.
+      // Snapshot both as `unknown` and branch on the concrete shape so the
+      // optimistic update (and its rollback) never calls `.map` on a
+      // `{ pages, pageParams }` object. Mirrors `useReorderTasks`.
+      const listSnapshots = qc.getQueriesData<unknown>({
         queryKey: [...tasksKeys.all, 'list'],
       });
       const detailSnapshot = qc.getQueryData<Task>(tasksKeys.detail(vars.id));
       if (vars.optimisticState) {
         const nextState = vars.optimisticState;
+        const applyState = (list: TaskListItem[]): TaskListItem[] =>
+          list.map((task) => (task.id === vars.id ? { ...task, derivedState: nextState } : task));
         for (const [key, value] of listSnapshots) {
           if (!value) continue;
-          const updated = value.map((task) =>
-            task.id === vars.id ? { ...task, derivedState: nextState } : task,
-          );
-          qc.setQueryData(key, updated);
+          if (Array.isArray(value)) {
+            qc.setQueryData<TaskListItem[]>(key, applyState(value as TaskListItem[]));
+            continue;
+          }
+          const infinite = value as InfiniteData<TasksPage>;
+          if (Array.isArray(infinite.pages)) {
+            qc.setQueryData<InfiniteData<TasksPage>>(key, {
+              ...infinite,
+              pages: infinite.pages.map((page) => ({
+                ...page,
+                tasks: applyState(page.tasks),
+              })),
+            });
+          }
         }
         if (detailSnapshot) {
           qc.setQueryData(tasksKeys.detail(vars.id), {
@@ -736,9 +754,13 @@ export function useTransitionTask(): UseMutationResult<Task, ApiError, Transitio
       return { listSnapshots, detailSnapshot };
     },
     onError: (_err, vars, ctx) => {
+      // `listSnapshots` holds either flat `TaskListItem[]` or
+      // `InfiniteData<TasksPage>` values (typed as `unknown`); rollback
+      // restores each captured value verbatim, so the shape is irrelevant
+      // here — but the cast must stay `unknown` to match `onMutate`.
       const snap = ctx as
         | {
-            listSnapshots: [readonly unknown[], TaskListItem[] | undefined][];
+            listSnapshots: [readonly unknown[], unknown][];
             detailSnapshot: Task | undefined;
           }
         | undefined;

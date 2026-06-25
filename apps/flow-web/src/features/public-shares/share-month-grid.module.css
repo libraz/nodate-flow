@@ -98,7 +98,7 @@
   background: var(--nf-color-surface);
 }
 
-.root[data-embed='true'] .frame {
+.root[data-embed="true"] .frame {
   background: transparent;
 }
 
@@ -109,7 +109,7 @@
   background: var(--nf-color-bg-elevated);
 }
 
-.root[data-embed='true'] .weekdayRow {
+.root[data-embed="true"] .weekdayRow {
   background: transparent;
 }
 
@@ -157,7 +157,7 @@
   overflow: hidden;
 }
 
-.root[data-embed='true'] .dayCol {
+.root[data-embed="true"] .dayCol {
   min-block-size: 4.5rem;
 }
 
