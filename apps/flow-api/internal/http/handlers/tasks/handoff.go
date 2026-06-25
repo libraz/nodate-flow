@@ -218,7 +218,12 @@ func HandoffToUser(deps Deps) func(context.Context, *HandoffToUserInput) (*Hando
 			if perr != nil {
 				return nil, httpErr(apierrors.WsMemberNotFound)
 			}
-			uid, uerr := deps.Queries.FindUserInternalIdByPublicId(ctx, pub)
+			// Resolve scoped to the task's workspace so a handoff cannot
+			// reassign the task to a user from another tenant.
+			uid, uerr := deps.Queries.FindWorkspaceMemberUserInternalIdByPublicId(ctx, generated.FindWorkspaceMemberUserInternalIdByPublicIdParams{
+				WorkspaceID: ws.ID,
+				PublicID:    pub,
+			})
 			if uerr != nil {
 				return nil, httpErr(apierr.SpecForErrNoRows(uerr, apierrors.WsMemberNotFound, apierrors.InternalUnexpected))
 			}

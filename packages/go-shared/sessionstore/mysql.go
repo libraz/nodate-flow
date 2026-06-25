@@ -22,6 +22,11 @@ type SessionQueries interface {
 	// SHA-256 refresh hash. Returns sql.ErrNoRows when not found.
 	FindSessionByRefreshHash(ctx context.Context, refreshHash string) (FindSessionByRefreshHashRow, error)
 
+	// FindAnySessionByRefreshHash looks up a session by its SHA-256
+	// refresh hash regardless of revoked / enabled state. Returns
+	// sql.ErrNoRows when no row matches.
+	FindAnySessionByRefreshHash(ctx context.Context, refreshHash string) (FindAnySessionByRefreshHashRow, error)
+
 	// RevokeSession marks a session as revoked by (userID, publicID).
 	RevokeSession(ctx context.Context, userID uint32, publicID dbtype.PublicID) error
 
@@ -32,6 +37,9 @@ type SessionQueries interface {
 	// RevokeAllSessionsForUserExcept revokes all active sessions for
 	// a user except one identified by publicID.
 	RevokeAllSessionsForUserExcept(ctx context.Context, userID uint32, publicID dbtype.PublicID) error
+
+	// RevokeAllSessionsForUser revokes every active session for a user.
+	RevokeAllSessionsForUser(ctx context.Context, userID uint32) error
 }
 
 // CreateSessionParams mirrors the sqlc-generated CreateSessionParams
@@ -57,6 +65,22 @@ type FindSessionByRefreshHashRow struct {
 	ExpiresAt   time.Time
 	RevokedAt   sql.NullTime
 	LastUsedAt  sql.NullTime
+	CreatedAt   time.Time
+}
+
+// FindAnySessionByRefreshHashRow mirrors the sqlc-generated row type
+// returned by FindAnySessionByRefreshHash. It omits user_agent /
+// ip_address because the reuse detector only needs identity, ownership,
+// and revocation state.
+type FindAnySessionByRefreshHashRow struct {
+	ID          uint32
+	PublicID    dbtype.PublicID
+	UserID      uint32
+	RefreshHash string
+	ExpiresAt   time.Time
+	RevokedAt   sql.NullTime
+	LastUsedAt  sql.NullTime
+	Enabled     bool
 	CreatedAt   time.Time
 }
 
@@ -117,6 +141,27 @@ func (s *MySQLStore) FindByRefreshHash(ctx context.Context, hash string) (*Sessi
 		RefreshHash: row.RefreshHash,
 		UserAgent:   row.UserAgent.String,
 		IPAddress:   row.IpAddress.String,
+		ExpiresAt:   row.ExpiresAt,
+		RevokedAt:   nullTimePtr(row.RevokedAt),
+		LastUsedAt:  nullTimePtr(row.LastUsedAt),
+		CreatedAt:   row.CreatedAt,
+	}, nil
+}
+
+// FindAnyByRefreshHash implements [Store].
+func (s *MySQLStore) FindAnyByRefreshHash(ctx context.Context, hash string) (*Session, error) {
+	row, err := s.q.FindAnySessionByRefreshHash(ctx, hash)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, ErrNotFound
+		}
+		return nil, fmt.Errorf("sessionstore/mysql: find-any: %w", err)
+	}
+	return &Session{
+		InternalID:  row.ID,
+		PublicID:    row.PublicID,
+		UserID:      row.UserID,
+		RefreshHash: row.RefreshHash,
 		ExpiresAt:   row.ExpiresAt,
 		RevokedAt:   nullTimePtr(row.RevokedAt),
 		LastUsedAt:  nullTimePtr(row.LastUsedAt),
@@ -188,6 +233,14 @@ func (s *MySQLStore) ListActive(ctx context.Context, userID uint32) ([]Session, 
 func (s *MySQLStore) RevokeAllExcept(ctx context.Context, userID uint32, keep dbtype.PublicID) error {
 	if err := s.q.RevokeAllSessionsForUserExcept(ctx, userID, keep); err != nil {
 		return fmt.Errorf("sessionstore/mysql: revoke-all-except: %w", err)
+	}
+	return nil
+}
+
+// RevokeAllForUser implements [Store].
+func (s *MySQLStore) RevokeAllForUser(ctx context.Context, userID uint32) error {
+	if err := s.q.RevokeAllSessionsForUser(ctx, userID); err != nil {
+		return fmt.Errorf("sessionstore/mysql: revoke-all-for-user: %w", err)
 	}
 	return nil
 }

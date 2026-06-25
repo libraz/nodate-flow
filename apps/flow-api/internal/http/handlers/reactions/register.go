@@ -6,11 +6,19 @@ import (
 	"github.com/danielgtaylor/huma/v2"
 )
 
-// RegisterTaskScoped wires the task-scoped reaction routes under
-// /tasks/{id}/reactions. The caller must attach RequireTaskAccess to
-// the underlying chi router so the task / workspace contexts are
-// populated.
+// RegisterTaskScoped wires every task-scoped reaction route on one chi group.
+// Preserved for callers that want uniform middleware; the production router
+// calls the split variants ([RegisterTaskScopedReads] /
+// [RegisterTaskScopedWrites]) so a project viewer cannot leave reactions. The
+// caller must attach RequireTaskAccess.
 func RegisterTaskScoped(api huma.API, deps Deps) {
+	RegisterTaskScopedReads(api, deps)
+	RegisterTaskScopedWrites(api, deps)
+}
+
+// RegisterTaskScopedReads wires the read-only reaction listing under
+// /tasks/{id}/reactions. Gated only by RequireTaskAccess.
+func RegisterTaskScopedReads(api huma.API, deps Deps) {
 	huma.Register(api, huma.Operation{
 		OperationID: "tasks-reactions-list",
 		Method:      http.MethodGet,
@@ -19,7 +27,13 @@ func RegisterTaskScoped(api huma.API, deps Deps) {
 		Description: "Returns the emoji reactions left on the task grouped by glyph, with reactor identities. Used by the task header reaction strip.",
 		Tags:        []string{"Tasks"},
 	}, ListForTask(deps))
+}
 
+// RegisterTaskScopedWrites wires the reaction add / remove routes under
+// /tasks/{id}/reactions. Leaving a reaction is a conversational action, so
+// the caller must attach RequireTaskAccess followed by
+// RequireProjectRole(ProjectRoleCommenter).
+func RegisterTaskScopedWrites(api huma.API, deps Deps) {
 	huma.Register(api, huma.Operation{
 		OperationID: "tasks-reactions-create",
 		Method:      http.MethodPost,

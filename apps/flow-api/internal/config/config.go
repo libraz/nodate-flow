@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/caarlos0/env/v11"
@@ -14,6 +15,18 @@ import (
 type Config struct {
 	Port     string `env:"NF_FLOW_PORT" envDefault:"8080"`
 	LogLevel string `env:"NF_FLOW_LOG_LEVEL" envDefault:"info"`
+
+	// Env selects the runtime environment. "development"/"dev" enables
+	// developer conveniences (ephemeral JWT key fallback, permissive CORS).
+	// Any other value (e.g. "production") is treated as production by
+	// IsProd(), where Validate enforces hard safety guards.
+	Env string `env:"NF_ENV" envDefault:"development"`
+
+	// SecretKey is the master secret (32+ bytes as hex or base64) from
+	// which the JWT signing key and AI cipher are derived. When empty in
+	// development, an ephemeral signing key is generated per boot; Validate
+	// rejects an empty value in production so tokens survive restarts.
+	SecretKey string `env:"NF_SECRET_KEY" envDefault:""`
 
 	// DbDsn is the MySQL DSN used by the api process. Required for the
 	// server to boot; handlers that touch the database panic on a nil
@@ -257,6 +270,55 @@ func Load() (*Config, error) {
 		return nil, err
 	}
 	return cfg, nil
+}
+
+// IsDev reports whether the api is running in a development environment.
+// Developer conveniences (ephemeral JWT key, permissive CORS) are tolerated
+// only when this is true.
+func (c *Config) IsDev() bool {
+	return c.Env == "development" || c.Env == "dev"
+}
+
+// IsProd reports whether the api is running outside a development
+// environment, where Validate enforces hard safety guards.
+func (c *Config) IsProd() bool {
+	return !c.IsDev()
+}
+
+// Validate enforces production safety guards. Development conveniences
+// (ephemeral JWT signing key, wildcard CORS, dev-localhost CORS relaxation)
+// are tolerated only when IsDev() is true; in production they are hard
+// errors so the process fails fast rather than booting insecure. Optional
+// integrations (S3, SMTP) are intentionally not required here — those
+// features degrade gracefully when unconfigured.
+func (c *Config) Validate() error {
+	if c.IsDev() {
+		return nil
+	}
+
+	// Master secret must be set so the JWT signing key is stable across
+	// restarts. Without it, NewJWTIssuer would fall back to an ephemeral
+	// key and every issued token would die on the next restart.
+	if strings.TrimSpace(c.SecretKey) == "" {
+		return fmt.Errorf("config: NF_SECRET_KEY must be set in production (an unset secret yields an ephemeral JWT key that does not survive restarts)")
+	}
+
+	// CORS with credentials cannot use a wildcard or empty origin.
+	if len(c.CorsAllowedOrigins) == 0 {
+		return fmt.Errorf("config: NF_FLOW_CORS must list explicit origins in production")
+	}
+	for _, o := range c.CorsAllowedOrigins {
+		if strings.TrimSpace(o) == "" || strings.TrimSpace(o) == "*" {
+			return fmt.Errorf("config: NF_FLOW_CORS must list explicit origins (no '*') in production")
+		}
+	}
+
+	// The dev-localhost CORS relaxation must never be enabled in production.
+	if c.CorsDevLocalhost {
+		return fmt.Errorf("config: NF_CORS_DEV_LOCALHOST must be false in production")
+	}
+
+	return nil
 }
 
 // validateEnums checks that enum-like configuration fields contain one of

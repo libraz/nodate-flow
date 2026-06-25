@@ -20,8 +20,9 @@ INSERT INTO calendar_memos (
   calendar_id,
   created_by_user_id,
   title,
+  body,
   sort_weight
-) VALUES (?, ?, ?, ?, ?, ?)
+) VALUES (?, ?, ?, ?, ?, ?, ?)
 `
 
 type CreateCalendarMemoParams struct {
@@ -30,6 +31,7 @@ type CreateCalendarMemoParams struct {
 	CalendarID      uint32         `json:"-"`
 	CreatedByUserID uint32         `json:"-"`
 	Title           string         `json:"title"`
+	Body            sql.NullString `json:"body"`
 	SortWeight      int32          `json:"sortWeight"`
 }
 
@@ -41,6 +43,7 @@ func (q *Queries) CreateCalendarMemo(ctx context.Context, arg CreateCalendarMemo
 		arg.CalendarID,
 		arg.CreatedByUserID,
 		arg.Title,
+		arg.Body,
 		arg.SortWeight,
 	)
 	if err != nil {
@@ -75,6 +78,7 @@ SELECT
   public_id,
   calendar_id,
   title,
+  body,
   done,
   sort_weight,
   created_by_user_id,
@@ -100,6 +104,7 @@ type FindCalendarMemoByPublicIdRow struct {
 	PublicID        types.PublicID `json:"publicId"`
 	CalendarID      uint32         `json:"-"`
 	Title           string         `json:"title"`
+	Body            sql.NullString `json:"body"`
 	Done            bool           `json:"done"`
 	SortWeight      int32          `json:"sortWeight"`
 	CreatedByUserID uint32         `json:"-"`
@@ -117,6 +122,7 @@ func (q *Queries) FindCalendarMemoByPublicId(ctx context.Context, arg FindCalend
 		&i.PublicID,
 		&i.CalendarID,
 		&i.Title,
+		&i.Body,
 		&i.Done,
 		&i.SortWeight,
 		&i.CreatedByUserID,
@@ -131,6 +137,7 @@ const listCalendarMemos = `-- name: ListCalendarMemos :many
 SELECT
   m.public_id,
   m.title,
+  m.body,
   m.done,
   m.sort_weight,
   m.created_by_user_id,
@@ -148,6 +155,7 @@ ORDER BY m.sort_weight ASC, m.created_at ASC
 type ListCalendarMemosRow struct {
 	PublicID        types.PublicID `json:"publicId"`
 	Title           string         `json:"title"`
+	Body            sql.NullString `json:"body"`
 	Done            bool           `json:"done"`
 	SortWeight      int32          `json:"sortWeight"`
 	CreatedByUserID uint32         `json:"-"`
@@ -170,6 +178,7 @@ func (q *Queries) ListCalendarMemos(ctx context.Context, calendarID uint32) ([]L
 		if err := rows.Scan(
 			&i.PublicID,
 			&i.Title,
+			&i.Body,
 			&i.Done,
 			&i.SortWeight,
 			&i.CreatedByUserID,
@@ -194,6 +203,7 @@ func (q *Queries) ListCalendarMemos(ctx context.Context, calendarID uint32) ([]L
 const updateCalendarMemo = `-- name: UpdateCalendarMemo :exec
 UPDATE calendar_memos
 SET title       = COALESCE(?, title),
+    body        = COALESCE(?, body),
     done        = COALESCE(?, done),
     sort_weight = COALESCE(?, sort_weight)
 WHERE public_id = ?
@@ -204,6 +214,7 @@ WHERE public_id = ?
 
 type UpdateCalendarMemoParams struct {
 	Title       sql.NullString `json:"title"`
+	Body        sql.NullString `json:"body"`
 	Done        sql.NullBool   `json:"done"`
 	SortWeight  sql.NullInt32  `json:"sortWeight"`
 	PublicID    types.PublicID `json:"publicId"`
@@ -215,6 +226,7 @@ type UpdateCalendarMemoParams struct {
 func (q *Queries) UpdateCalendarMemo(ctx context.Context, arg UpdateCalendarMemoParams) error {
 	_, err := q.db.ExecContext(ctx, updateCalendarMemo,
 		arg.Title,
+		arg.Body,
 		arg.Done,
 		arg.SortWeight,
 		arg.PublicID,

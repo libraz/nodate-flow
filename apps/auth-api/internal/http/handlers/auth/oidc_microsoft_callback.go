@@ -58,6 +58,13 @@ func OIDCMicrosoftCallback(deps Deps) func(context.Context, *OIDCCallbackInput) 
 		if !claims.EmailVerified {
 			return nil, httpErr(apierrors.AuthOidcEmailNotVerified)
 		}
+		// Enforce the opt-in sign-in allowlist on the verified email
+		// before any provisioning or session issuance. Gates both
+		// new-user creation and existing-user login. No-op (allows all)
+		// when the allowlist is unconfigured.
+		if !deps.isSignInEmailAllowed(email) {
+			return nil, httpErr(apierrors.AuthOidcDomainNotAllowed)
+		}
 
 		ident, err := deps.Queries.FindIdentityByProviderSubject(ctx, generated.FindIdentityByProviderSubjectParams{
 			Provider: generated.IdentitiesProvider("microsoft"),

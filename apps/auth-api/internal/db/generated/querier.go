@@ -141,6 +141,12 @@ type Querier interface {
 	DeleteStorageObjectIfUnreferenced(ctx context.Context, id uint32) (sql.Result, error)
 	// Hard-delete a single integration row (user-scoped).
 	DeleteUserIntegration(ctx context.Context, arg DeleteUserIntegrationParams) error
+	// Resolve a session from its SHA-256 refresh hash regardless of its
+	// revoked / enabled state. Used by the refresh-reuse detector: a hash
+	// that matches a row which is already revoked or disabled is evidence
+	// that a previously-rotated (and thus invalidated) refresh token was
+	// replayed, so the whole session family must be torn down.
+	FindAnySessionByRefreshHash(ctx context.Context, refreshHash string) (FindAnySessionByRefreshHashRow, error)
 	// Resolve an identity by (provider, subject) pair for OIDC login flows.
 	FindIdentityByProviderSubject(ctx context.Context, arg FindIdentityByProviderSubjectParams) (FindIdentityByProviderSubjectRow, error)
 	// Resolve a local-password identity by user email for the login pipeline.
@@ -236,6 +242,11 @@ type Querier interface {
 	FindWorkspaceInviteWorkspaceName(ctx context.Context, tokenHash string) (FindWorkspaceInviteWorkspaceNameRow, error)
 	// Resolve a workspace membership by (workspace_id, user_id).
 	FindWorkspaceMemberByUserId(ctx context.Context, arg FindWorkspaceMemberByUserIdParams) (FindWorkspaceMemberByUserIdRow, error)
+	// Resolve a user's internal id from a public UUID, scoped to a workspace.
+	// Returns the id only when the user is an enabled member of the workspace,
+	// so task actor handlers cannot attach users from other tenants.
+	// id is required: returned as the FK value for task_actors.user_id.
+	FindWorkspaceMemberUserInternalIdByPublicId(ctx context.Context, arg FindWorkspaceMemberUserInternalIdByPublicIdParams) (uint32, error)
 	// Fetch just the timezone and country columns by internal id. Used by the
 	// calendar layer when resolving the effective timezone for a request.
 	FindWorkspaceTimezoneCountryById(ctx context.Context, id uint32) (FindWorkspaceTimezoneCountryByIdRow, error)
@@ -384,6 +395,10 @@ type Querier interface {
 	RemoveWorkspaceMemberByUserId(ctx context.Context, arg RemoveWorkspaceMemberByUserIdParams) error
 	// Clear failed login counter and lockout after a successful authentication.
 	ResetIdentityFailedAttempts(ctx context.Context, id uint32) error
+	// Revoke every active session for a user. Used by the refresh-reuse
+	// detector to tear down the entire session family when a rotated /
+	// revoked refresh token is replayed.
+	RevokeAllSessionsForUser(ctx context.Context, userID uint32) error
 	// Revoke every active session for a user except one identified by public_id.
 	// Used by "sign out of all other devices" in /settings/security.
 	RevokeAllSessionsForUserExcept(ctx context.Context, arg RevokeAllSessionsForUserExceptParams) error
@@ -413,6 +428,12 @@ type Querier interface {
 	UpdateConnectionTokens(ctx context.Context, arg UpdateConnectionTokensParams) error
 	// Bump failed login counter and optionally apply a lockout deadline.
 	UpdateIdentityFailedAttempts(ctx context.Context, arg UpdateIdentityFailedAttemptsParams) error
+	// Record the highest TOTP time-step that has been accepted for this
+	// identity. RFC 6238 5.2 one-time-use: a subsequent code whose step is
+	// <= this value must be rejected as a replay. The guard never lowers
+	// the stored value so an out-of-order skew-window match cannot reopen
+	// an already-consumed step.
+	UpdateIdentityMfaLastStep(ctx context.Context, arg UpdateIdentityMfaLastStepParams) error
 	// Replace the Argon2id password hash on a local identity.
 	UpdateIdentityPasswordHash(ctx context.Context, arg UpdateIdentityPasswordHashParams) error
 	// Change a member's role.

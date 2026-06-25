@@ -52,6 +52,10 @@ func main() {
 		logger.Error("config load failed", "err", err)
 		os.Exit(1)
 	}
+	if err := cfg.Validate(); err != nil {
+		logger.Error("config validation failed", "err", err)
+		os.Exit(1)
+	}
 
 	// OpenTelemetry tracing. When NF_FLOW_OTEL_ENDPOINT is empty the provider
 	// is a no-op so the rest of the codebase can call otel.Tracer() freely.
@@ -177,7 +181,7 @@ func main() {
 			"rps", wsRps, "burst", wsBurst)
 	}
 
-	jwtPriv, err := authn.DeriveEd25519Key(os.Getenv("NF_SECRET_KEY"), "nodate-flow:jwt:v1")
+	jwtPriv, err := authn.DeriveEd25519Key(cfg.SecretKey, "nodate-flow:jwt:v1")
 	if err != nil {
 		logger.Error("jwt key derivation failed", "err", err)
 		os.Exit(1)

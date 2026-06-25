@@ -26,39 +26,46 @@ INSERT INTO calendar_events (
 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
 
 -- name: FindCalendarEventByPublicId :one
--- Resolve a calendar event by UUID v7 within a calendar.
+-- Resolve a calendar event by UUID v7 within a calendar. The creator
+-- (created_by_user_id) is LEFT JOINed so a soft-disabled creator yields
+-- NULL identity columns rather than dropping the event row.
 SELECT
-  id,
-  public_id,
-  workspace_id,
-  calendar_id,
-  kind,
-  visibility,
-  show_as,
-  title,
-  all_day,
-  start_at,
-  end_at,
-  timezone,
-  location,
-  memo,
-  url,
-  owner_user_id,
-  created_by_user_id,
-  block_label,
-  COALESCE(recurrence_rule, CAST('null' AS JSON)) AS recurrence_rule,
-  recurrence_end,
-  COALESCE(recurrence_exceptions, CAST('null' AS JSON)) AS recurrence_exceptions,
-  notification_offset,
-  task_id,
-  enabled,
-  updated_at,
-  created_at
-FROM calendar_events
-WHERE public_id = ?
-  AND calendar_id = ?
-  AND workspace_id = ?
-  AND enabled = TRUE
+  ce.id,
+  ce.public_id,
+  ce.workspace_id,
+  ce.calendar_id,
+  ce.kind,
+  ce.visibility,
+  ce.show_as,
+  ce.title,
+  ce.all_day,
+  ce.start_at,
+  ce.end_at,
+  ce.timezone,
+  ce.location,
+  ce.memo,
+  ce.url,
+  ce.owner_user_id,
+  ce.created_by_user_id,
+  uc.public_id AS creator_public_id,
+  uc.display_name AS creator_display_name,
+  uc.avatar_url AS creator_avatar_url,
+  ce.block_label,
+  COALESCE(ce.recurrence_rule, CAST('null' AS JSON)) AS recurrence_rule,
+  ce.recurrence_end,
+  COALESCE(ce.recurrence_exceptions, CAST('null' AS JSON)) AS recurrence_exceptions,
+  ce.notification_offset,
+  ce.task_id,
+  ce.enabled,
+  ce.updated_at,
+  ce.created_at
+FROM calendar_events ce
+LEFT JOIN users uc
+  ON uc.id = ce.created_by_user_id
+WHERE ce.public_id = ?
+  AND ce.calendar_id = ?
+  AND ce.workspace_id = ?
+  AND ce.enabled = TRUE
 LIMIT 1;
 
 -- name: ListCalendarEventsByRange :many
@@ -78,12 +85,17 @@ SELECT
   ce.url,
   ce.owner_user_id,
   ce.created_by_user_id,
+  uc.public_id AS creator_public_id,
+  uc.display_name AS creator_display_name,
+  uc.avatar_url AS creator_avatar_url,
   ce.block_label,
   ce.notification_offset,
   ce.task_id,
   ce.updated_at,
   ce.created_at
 FROM calendar_events ce
+LEFT JOIN users uc
+  ON uc.id = ce.created_by_user_id
 WHERE ce.calendar_id = ?
   AND ce.recurrence_rule IS NULL
   AND ce.start_at < ?
@@ -109,6 +121,9 @@ SELECT
   ce.url,
   ce.owner_user_id,
   ce.created_by_user_id,
+  uc.public_id AS creator_public_id,
+  uc.display_name AS creator_display_name,
+  uc.avatar_url AS creator_avatar_url,
   ce.block_label,
   ce.recurrence_rule,
   ce.recurrence_end,
@@ -118,6 +133,8 @@ SELECT
   ce.updated_at,
   ce.created_at
 FROM calendar_events ce
+LEFT JOIN users uc
+  ON uc.id = ce.created_by_user_id
 WHERE ce.calendar_id = ?
   AND ce.recurrence_rule IS NOT NULL
   AND ce.start_at < ?
@@ -229,6 +246,9 @@ SELECT
   ce.location,
   ce.owner_user_id,
   uo.public_id AS owner_public_id,
+  uc.public_id AS creator_public_id,
+  uc.display_name AS creator_display_name,
+  uc.avatar_url AS creator_avatar_url,
   (SELECT COUNT(*) FROM calendar_event_attendees a
      WHERE a.event_id = ce.id AND a.enabled = TRUE) AS attendee_count,
   EXISTS(SELECT 1 FROM calendar_event_attendees a
@@ -244,6 +264,8 @@ INNER JOIN workspaces w
   ON w.id = ce.workspace_id AND w.enabled = TRUE
 INNER JOIN users uo
   ON uo.id = ce.owner_user_id AND uo.enabled = TRUE
+LEFT JOIN users uc
+  ON uc.id = ce.created_by_user_id
 INNER JOIN workspace_members wm
   ON wm.workspace_id = ce.workspace_id
   AND wm.user_id = ?
@@ -283,6 +305,9 @@ SELECT
   ce.location,
   ce.owner_user_id,
   uo.public_id AS owner_public_id,
+  uc.public_id AS creator_public_id,
+  uc.display_name AS creator_display_name,
+  uc.avatar_url AS creator_avatar_url,
   (SELECT COUNT(*) FROM calendar_event_attendees a
      WHERE a.event_id = ce.id AND a.enabled = TRUE) AS attendee_count,
   EXISTS(SELECT 1 FROM calendar_event_attendees a
@@ -301,6 +326,8 @@ INNER JOIN workspaces w
   ON w.id = ce.workspace_id AND w.enabled = TRUE
 INNER JOIN users uo
   ON uo.id = ce.owner_user_id AND uo.enabled = TRUE
+LEFT JOIN users uc
+  ON uc.id = ce.created_by_user_id
 INNER JOIN workspace_members wm
   ON wm.workspace_id = ce.workspace_id
   AND wm.user_id = ?

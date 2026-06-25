@@ -10,6 +10,7 @@ import (
 
 	"github.com/google/uuid"
 
+	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/audit"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/generated/calendar"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/types"
 	apierrors "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/errors"
@@ -36,6 +37,14 @@ type ListEventsInput struct {
 // EventResponse is the JSON representation of a calendar event.
 // StartAt / EndAt are nullable to support "planning stage" events
 // that may be dateless until scheduled (see calendar_events.sql).
+//
+// CreatorID / CreatorDisplayName / CreatorAvatarURL surface the event's
+// actual creator (calendar_events.created_by_user_id), which may differ
+// from the owner under manager delegation. Only the creator's public_id,
+// display name, and (nullable) avatar URL are exposed — never the
+// internal user id or email (Critical Pattern #18). The shape mirrors the
+// author summary on TaskComment so flow clients can render a consistent
+// user reference.
 type EventResponse struct {
 	ID                   string           `json:"id"`
 	Kind                 string           `json:"kind"`
@@ -49,6 +58,9 @@ type EventResponse struct {
 	Location             *string          `json:"location,omitempty"`
 	Memo                 *string          `json:"memo,omitempty"`
 	URL                  *string          `json:"url,omitempty"`
+	CreatorID            string           `json:"creatorId,omitempty"`
+	CreatorDisplayName   string           `json:"creatorDisplayName,omitempty"`
+	CreatorAvatarURL     *string          `json:"creatorAvatarUrl,omitempty"`
 	BlockLabel           *string          `json:"blockLabel,omitempty"`
 	RecurrenceRule       *json.RawMessage `json:"recurrenceRule,omitempty"`
 	RecurrenceEnd        *int64           `json:"recurrenceEnd,omitempty"`
@@ -329,6 +341,9 @@ func CreateEvent(deps Deps) func(context.Context, *CreateEventInput) (*CreateEve
 			params.BlockLabel = sql.NullString{String: *input.Body.BlockLabel, Valid: true}
 		}
 		if input.Body.RecurrenceRule != nil {
+			if spec := validateRecurrenceRule(input.Body.RecurrenceRule); spec != nil {
+				return nil, httpErr(spec)
+			}
 			params.RecurrenceRule = json.RawMessage(*input.Body.RecurrenceRule)
 		}
 		if input.Body.RecurrenceEnd != nil {
@@ -343,32 +358,20 @@ func CreateEvent(deps Deps) func(context.Context, *CreateEventInput) (*CreateEve
 			return nil, httpErr(apierrors.CalendarEventStoreWriteInterrupted)
 		}
 
+		// Re-read through the creator-joined query so the response carries
+		// the same creator summary (id / display name / avatar) as Get and
+		// Patch, instead of hand-building a partial DTO here.
+		created, err := deps.CalendarQueries.FindCalendarEventByPublicId(ctx, calendar.FindCalendarEventByPublicIdParams{
+			PublicID:    eventPublicID,
+			CalendarID:  cal.ID,
+			WorkspaceID: wsID,
+		})
+		if err != nil {
+			return nil, httpErr(apierrors.CalendarEventStoreReadInterrupted)
+		}
+
 		out := &CreateEventOutput{}
-		out.Body = EventResponse{
-			ID:         eventPublicID.String(),
-			Kind:       input.Body.Kind,
-			Visibility: string(visibility),
-			ShowAs:     string(showAs),
-			Title:      input.Body.Title,
-			AllDay:     input.Body.AllDay,
-			StartAt:    nullTimeUnixPtr(startAtNT),
-			EndAt:      nullTimeUnixPtr(endAtNT),
-			Timezone:   input.Body.Timezone,
-			Location:   input.Body.Location,
-			Memo:       input.Body.Memo,
-			URL:        input.Body.URL,
-			BlockLabel: input.Body.BlockLabel,
-			CreatedAt:  handlerutil.NowUnix(),
-		}
-		if input.Body.RecurrenceRule != nil {
-			out.Body.RecurrenceRule = input.Body.RecurrenceRule
-		}
-		if input.Body.RecurrenceEnd != nil {
-			out.Body.RecurrenceEnd = input.Body.RecurrenceEnd
-		}
-		if input.Body.NotificationOffset != nil {
-			out.Body.NotificationOffset = input.Body.NotificationOffset
-		}
+		out.Body = eventFromFullRow(created)
 
 		eventBusPayload := map[string]any{
 			"eventId":    eventPublicID.String(),
@@ -381,6 +384,19 @@ func CreateEvent(deps Deps) func(context.Context, *CreateEventInput) (*CreateEve
 			eventBusPayload["endAt"] = endAtNT.Time
 		}
 		_ = appendCalendarEvent(ctx, deps.DB, wsID, "calendar.event.created", &actorID, eventBusPayload)
+
+		deps.Audit.Record(ctx, audit.Entry{
+			Action:       "calendar.event.create",
+			ActorID:      actorID,
+			WorkspaceID:  wsID,
+			ResourceType: "calendar.event",
+			ResourceID:   eventPublicID.String(),
+			Metadata: map[string]any{
+				"calendarId": input.CalID,
+				"title":      input.Body.Title,
+				"kind":       input.Body.Kind,
+			},
+		})
 
 		return out, nil
 	}
@@ -573,6 +589,9 @@ func PatchEvent(deps Deps) func(context.Context, *PatchEventInput) (*PatchEventO
 			params.BlockLabel = sql.NullString{String: *input.Body.BlockLabel, Valid: true}
 		}
 		if input.Body.RecurrenceRule != nil {
+			if spec := validateRecurrenceRule(input.Body.RecurrenceRule); spec != nil {
+				return nil, httpErr(spec)
+			}
 			// A task-linked event may not become recurring — invariant
 			// enforced in itemkit. Flag here so the tx rolls back
 			// deterministically.
@@ -624,6 +643,17 @@ func PatchEvent(deps Deps) func(context.Context, *PatchEventInput) (*PatchEventO
 				"calendarId": input.CalID,
 			})
 		}
+
+		deps.Audit.Record(ctx, audit.Entry{
+			Action:       "calendar.event.update",
+			ActorID:      actorID,
+			WorkspaceID:  wsID,
+			ResourceType: "calendar.event",
+			ResourceID:   input.EvtID,
+			Metadata: map[string]any{
+				"calendarId": input.CalID,
+			},
+		})
 
 		return out, nil
 	}
@@ -715,6 +745,18 @@ func DeleteEvent(deps Deps) func(context.Context, *DeleteEventInput) (*DeleteEve
 
 		// itemkit already emitted item.unscheduled + legacy
 		// calendar.event.deleted. No extra append.
+
+		deps.Audit.Record(ctx, audit.Entry{
+			Action:       "calendar.event.delete",
+			ActorID:      actorID,
+			WorkspaceID:  wsID,
+			ResourceType: "calendar.event",
+			ResourceID:   input.EvtID,
+			Metadata: map[string]any{
+				"calendarId": input.CalID,
+				"title":      evt.Title,
+			},
+		})
 
 		return out, nil
 	}

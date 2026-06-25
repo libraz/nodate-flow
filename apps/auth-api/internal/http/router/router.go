@@ -44,6 +44,12 @@ type Deps struct {
 	MinPasswordLength int
 	DisableRateLimit  bool
 
+	// OAuthAllowedDomains / OAuthAllowedEmails carry the opt-in OAuth/OIDC
+	// sign-in allowlist (normalized in config.Load). Empty (both) means
+	// no restriction — any verified email may sign in.
+	OAuthAllowedDomains []string
+	OAuthAllowedEmails  []string
+
 	// Rate-limit tunables (from config).
 	RateLimitGlobalMax        int
 	RateLimitGlobalWindowSec  int
@@ -137,22 +143,24 @@ func BuildResult(deps Deps) Result {
 	}
 	auditRec := audit.New(deps.Queries)
 	authDeps := authhandlers.Deps{
-		DB:                deps.DB,
-		Queries:           deps.Queries,
-		Sessions:          sessionStore,
-		JWT:               deps.JWT,
-		OIDC:              deps.OIDC,
-		OIDCGithub:        deps.OIDCGithub,
-		OIDCMicrosoft:     deps.OIDCMicrosoft,
-		Cipher:            deps.Cipher,
-		CookieSecure:      deps.CookieSecure,
-		RegistrationOpen:  deps.RegistrationOpen,
-		MinPasswordLength: deps.MinPasswordLength,
-		Audit:             auditRec,
-		EmailSender:       deps.EmailSender,
-		AccountsWebURL:    deps.AccountsWebURL,
-		Storage:           deps.Storage,
-		PublicBaseURL:     deps.PublicBaseURL,
+		DB:                  deps.DB,
+		Queries:             deps.Queries,
+		Sessions:            sessionStore,
+		JWT:                 deps.JWT,
+		OIDC:                deps.OIDC,
+		OIDCGithub:          deps.OIDCGithub,
+		OIDCMicrosoft:       deps.OIDCMicrosoft,
+		Cipher:              deps.Cipher,
+		CookieSecure:        deps.CookieSecure,
+		RegistrationOpen:    deps.RegistrationOpen,
+		OAuthAllowedDomains: deps.OAuthAllowedDomains,
+		OAuthAllowedEmails:  deps.OAuthAllowedEmails,
+		MinPasswordLength:   deps.MinPasswordLength,
+		Audit:               auditRec,
+		EmailSender:         deps.EmailSender,
+		AccountsWebURL:      deps.AccountsWebURL,
+		Storage:             deps.Storage,
+		PublicBaseURL:       deps.PublicBaseURL,
 	}
 
 	// Auth capabilities — public, no rate limit, cacheable.

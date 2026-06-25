@@ -120,6 +120,53 @@ func TestRenderPublicShare_HappyPath(t *testing.T) {
 	assert.False(t, hasOwnerID, "render must not expose ownerUserId")
 }
 
+// TestRenderPublicShare_FramingRelaxed asserts that the public,
+// read-only calendar-share render endpoint is embeddable in a
+// cross-origin iframe: it must NOT carry X-Frame-Options: DENY and its
+// CSP frame-ancestors directive must not be 'none'. A normal API
+// endpoint (here /health) must still deny framing, proving the
+// relaxation is scoped to the share path and not applied globally.
+func TestRenderPublicShare_FramingRelaxed(t *testing.T) {
+	bootstrap(t)
+	t.Parallel()
+
+	tt := newTenant(t)
+
+	var share struct {
+		ID    string `json:"id"`
+		Token string `json:"token"`
+	}
+	helpers.DoJSON(t, http.MethodPost, tt.WsPath("public-shares"), tt.AccessToken, map[string]any{
+		"title": "Embeddable Roadmap",
+	}, &share)
+	require.NotEmpty(t, share.Token)
+
+	// Public share render: framing must be relaxed.
+	shareResp, err := http.Get(tt.BaseURL + "/share/cal/" + share.Token)
+	require.NoError(t, err)
+	defer shareResp.Body.Close()
+	require.Equal(t, http.StatusOK, shareResp.StatusCode)
+
+	assert.Empty(t, shareResp.Header.Get("X-Frame-Options"),
+		"public share render must not set X-Frame-Options so a cross-origin iframe can embed it")
+	shareCSP := shareResp.Header.Get("Content-Security-Policy")
+	require.NotEmpty(t, shareCSP, "public share render must still carry a CSP")
+	assert.NotContains(t, shareCSP, "frame-ancestors 'none'",
+		"public share render must not deny all frame-ancestors")
+	assert.Contains(t, shareCSP, "frame-ancestors *",
+		"public share render must allow framing via the default permissive frame-ancestors")
+
+	// A normal endpoint must still deny framing.
+	healthResp, err := http.Get(tt.BaseURL + "/health")
+	require.NoError(t, err)
+	defer healthResp.Body.Close()
+
+	assert.Equal(t, "DENY", healthResp.Header.Get("X-Frame-Options"),
+		"non-share endpoints must keep X-Frame-Options: DENY")
+	assert.Contains(t, healthResp.Header.Get("Content-Security-Policy"), "frame-ancestors 'none'",
+		"non-share endpoints must keep frame-ancestors 'none'")
+}
+
 func TestRenderPublicShare_InvalidToken(t *testing.T) {
 	bootstrap(t)
 	t.Parallel()

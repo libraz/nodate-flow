@@ -365,6 +365,15 @@ resources:
         description: "Returned when the OIDC identity provider indicates the user's email address has not been verified."
         userAction: "Verify your email address with your identity provider, then try again."
 
+      domain_not_allowed:
+        code: AUTH.OIDC.DOMAIN_NOT_ALLOWED
+        status: 403
+        message: "Sign-in is restricted to approved email domains for this instance"
+        message_ja: "このインスタンスではサインインが許可されたメールドメインに制限されています"
+        message_zh: "此实例的登录仅限于受批准的电子邮件域"
+        description: "Returned when an OIDC sign-in succeeds at the identity provider but the authenticated account's email domain is not in the instance's allowed sign-in allowlist, so the session is refused."
+        userAction: "Sign in with an email address on an approved domain, or ask your instance administrator to add your domain to the allowlist."
+
   pat:
     breadcrumb: "Auth > Personal Access Token"
     errors:

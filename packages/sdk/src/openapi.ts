@@ -2358,6 +2358,26 @@ export interface paths {
         patch: operations["workspaces-patch"];
         trace?: never;
     };
+    "/workspaces/{wsId}/activity": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List the unified activity feed for a workspace
+         * @description Returns a cursor-paginated page of the workspace activity feed: a UNION of audit log entries, AI invocations, and MCP invocations ordered newest first. Workspace-member readable; backs the workspace Activity view.
+         */
+        get: operations["workspaces-activity-list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/workspaces/{wsId}/ai/agents": {
         parameters: {
             query?: never;
@@ -3019,13 +3039,13 @@ export interface paths {
         };
         /**
          * List events in a calendar
-         * @description Returns events from the named calendar within the supplied date range. Recurrence rules are expanded server-side; client receives concrete instances.
+         * @description Returns events from the named calendar within the supplied date range. Recurring events are returned as a single master row carrying its recurrenceRule; the client expands concrete instances from that rule.
          */
         get: operations["events-list"];
         put?: never;
         /**
          * Create an event
-         * @description Creates an event in the calendar. Optionally accepts an attendee list which triggers RSVP requests; recurrence rules are validated against RFC 5545.
+         * @description Creates an event in the calendar. Optionally accepts an attendee list which triggers RSVP requests. A recurrenceRule is validated for well-formedness (freq / interval / byDay / until / count bounds) and stored as-is; it is not expanded server-side — clients expand concrete instances from the stored rule.
          */
         post: operations["events-create"];
         delete?: never;
@@ -5810,6 +5830,8 @@ export interface components {
              * @description A URL to the JSON Schema for this object.
              */
             readonly $schema?: string;
+            /** @description User-authored multi-line memo body */
+            body?: string;
             /**
              * Format: int32
              * @description Sort weight for ordering
@@ -6344,6 +6366,24 @@ export interface components {
             readonly $schema?: string;
             body: string;
         };
+        Entry: {
+            action: string;
+            /** @description Actor classification ('user' | 'agent' | 'system') */
+            actorKind: string;
+            actorUserPublicId: string | null;
+            /** Format: int64 */
+            occurredAt: number;
+            /** @description Activity entry public id (UUID v7) */
+            publicId: string;
+            resourcePublicId: string | null;
+            resourceType: string;
+            /** @description Derived severity ('info' | 'warn' | 'error') */
+            severity: string;
+            /** @description Originating stream ('audit' | 'ai' | 'mcp') */
+            source: string;
+            /** @description Source table name (audit_logs | ai_invocations | mcp_invocations) */
+            sourceTable: string;
+        };
         ErrorDetail: {
             /** @description Where the error occurred, e.g. 'body.items[3].tags' or 'path.thing-id' */
             location?: string;
@@ -6444,6 +6484,9 @@ export interface components {
             blockLabel?: string;
             /** Format: int64 */
             createdAt: number;
+            creatorAvatarUrl?: string;
+            creatorDisplayName?: string;
+            creatorId?: string;
             /** Format: int64 */
             endAt?: number;
             id: string;
@@ -6780,6 +6823,17 @@ export interface components {
             };
             groupBy: string | null;
             sort: components["schemas"]["SortSpec"][] | null;
+        };
+        ListActivityOutputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            activity: components["schemas"]["Entry"][] | null;
+            nextCursor: string | null;
+            /** Format: int64 */
+            total: number;
         };
         ListAdminsOutputBody: {
             /**
@@ -7630,6 +7684,7 @@ export interface components {
              * @description A URL to the JSON Schema for this object.
              */
             readonly $schema?: string;
+            body?: string;
             /** Format: int64 */
             createdAt: number;
             done: boolean;
@@ -7680,6 +7735,9 @@ export interface components {
             calendarId: string;
             /** Format: int64 */
             createdAt: number;
+            creatorAvatarUrl?: string;
+            creatorDisplayName?: string;
+            creatorId?: string;
             /** Format: int64 */
             endAt?: number;
             id: string;
@@ -8509,11 +8567,6 @@ export interface components {
             publicToken: string;
         };
         Reaction: {
-            /**
-             * Format: uri
-             * @description A URL to the JSON Schema for this object.
-             */
-            readonly $schema?: string;
             /** Format: int64 */
             createdAt: number;
             emoji: string;
@@ -8971,7 +9024,7 @@ export interface components {
             kind: string;
             payload?: unknown;
             /** @enum {string} */
-            source: "manual" | "github" | "slack" | "email" | "google" | "webhook" | "calendar";
+            source: "manual" | "github" | "slack" | "email" | "google" | "webhook" | "calendar" | "discord";
             /** @description Subject row public id (UUID v7). Required when subjectType is user, task, or calendar_event; ignored when subjectType=workspace. */
             subjectId?: string;
             /**
@@ -9140,11 +9193,6 @@ export interface components {
             workspaceId: string;
         };
         TaskActor: {
-            /**
-             * Format: uri
-             * @description A URL to the JSON Schema for this object.
-             */
-            readonly $schema?: string;
             avatarUrl?: string;
             /** Format: int64 */
             createdAt: number;
@@ -9157,11 +9205,6 @@ export interface components {
             userId: string;
         };
         TaskAgentActor: {
-            /**
-             * Format: uri
-             * @description A URL to the JSON Schema for this object.
-             */
-            readonly $schema?: string;
             agentId: string;
             agentName: string;
             /** Format: int64 */
@@ -9223,11 +9266,6 @@ export interface components {
             title: string;
         };
         TaskComment: {
-            /**
-             * Format: uri
-             * @description A URL to the JSON Schema for this object.
-             */
-            readonly $schema?: string;
             authorAvatarUrl?: string;
             authorDisplayName: string;
             authorId: string;
@@ -9309,11 +9347,6 @@ export interface components {
             taskTitle?: string;
         };
         TaskLabel: {
-            /**
-             * Format: uri
-             * @description A URL to the JSON Schema for this object.
-             */
-            readonly $schema?: string;
             color: string;
             /** Format: int64 */
             createdAt: number;
@@ -9722,6 +9755,8 @@ export interface components {
              * @description A URL to the JSON Schema for this object.
              */
             readonly $schema?: string;
+            /** @description User-authored multi-line memo body */
+            body?: string;
             /** @description Whether the memo is done */
             done?: boolean;
             /**
@@ -10860,7 +10895,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["AuthTokens"];
+                    "application/json": components["schemas"]["LoginBody"];
                 };
             };
             /** @description Error */
@@ -14710,6 +14745,44 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Workspace"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "workspaces-activity-list": {
+        parameters: {
+            query?: {
+                /** @description Filter by originating stream ('audit' | 'ai' | 'mcp'). Omit for all. */
+                source?: "audit" | "ai" | "mcp";
+                /** @description Opaque keyset cursor from a previous response's nextCursor. Omit for the first page. */
+                cursor?: string;
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                /** @description Workspace public id (UUID v7) */
+                wsId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListActivityOutputBody"];
                 };
             };
             /** @description Error */

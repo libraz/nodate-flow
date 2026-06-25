@@ -749,6 +749,7 @@ CREATE TABLE calendar_memos (
   created_by_user_id INT UNSIGNED NOT NULL COMMENT 'Internal FK to users.id',
 
   title VARCHAR(500) NOT NULL COMMENT 'Memo text',
+  body TEXT NULL COMMENT 'User-authored multi-line memo body, distinct from admin notes',
   done BOOLEAN NOT NULL DEFAULT FALSE COMMENT 'Completion flag',
 
   sort_weight INT NOT NULL DEFAULT 0 COMMENT 'Display order',
@@ -1055,6 +1056,7 @@ CREATE TABLE identities (
   password_hash CHAR(97) CHARACTER SET latin1 COLLATE latin1_swedish_ci NULL COMMENT 'Argon2id encoded hash, only for provider=local', -- argon2id encoded form (97 chars)
   mfa_secret_ciphertext VARBINARY(512) NULL COMMENT 'Encrypted TOTP secret (AES-256-GCM)',
   mfa_confirmed_at DATETIME(3) NULL COMMENT 'When the TOTP enrollment was confirmed by submitting a valid code',
+  mfa_last_step BIGINT UNSIGNED NULL COMMENT 'Last accepted TOTP time-step (unix/period). RFC 6238 5.2 one-time-use: a code whose step is <= this value is rejected as a replay',
   failed_attempts INT UNSIGNED NOT NULL DEFAULT 0 COMMENT 'Consecutive failed login attempts',
   locked_until_at DATETIME(3) NULL COMMENT 'Lockout expiry timestamp',
   last_used_at DATETIME(3) NULL COMMENT 'Last successful authentication time',
@@ -1911,7 +1913,7 @@ CREATE TABLE signals (
   task_id INT UNSIGNED NULL COMMENT 'Internal FK to tasks.id, if resolved (legacy fast path; duplicates subject_type=task / subject_id)',
   judge_run_id INT UNSIGNED NULL COMMENT 'Internal FK to agent_runs.id; set when a judge run has evaluated this signal. NULL means "not yet judged".',
 
-  source ENUM('manual','github','slack','email','google','webhook','calendar') NOT NULL COMMENT 'Originating channel. ''calendar'' is reserved for internal scheduler ticks (flow-worker calendar_event_day job, etc.) — not a user-facing webhook source.',
+  source ENUM('manual','github','slack','email','google','webhook','calendar','discord') NOT NULL COMMENT 'Originating channel. ''calendar'' is reserved for internal scheduler ticks (flow-worker calendar_event_day job, etc.) — not a user-facing webhook source. ''discord'' is the presence-discord gateway.',
   kind VARCHAR(64) CHARACTER SET latin1 COLLATE latin1_swedish_ci NOT NULL COMMENT 'Source-specific event kind (e.g., pull_request.opened, discord.presence). Closed enumeration defined by signal_kinds/*.yaml; stays VARCHAR so new kinds do not require a schema change.',
   external_id VARCHAR(255) CHARACTER SET latin1 COLLATE latin1_swedish_ci NULL COMMENT 'External identifier (delivery id, message ts, ...). Dedupe key for webhook double delivery.',
   payload_json JSON NOT NULL CHECK (JSON_VALID(payload_json)) COMMENT 'Raw normalized payload; anything the provider webhook cannot squeeze into the normalized columns stays here for the judge to read.',

@@ -78,6 +78,21 @@ SELECT 1 AS ok FROM workspace_members
 WHERE workspace_id = ? AND user_id = ? AND enabled = TRUE
 LIMIT 1;
 
+-- name: FindWorkspaceMemberUserInternalIdByPublicId :one
+-- Resolve a user's internal id from a public UUID, scoped to a workspace.
+-- Returns the id only when the user is an enabled member of the workspace,
+-- so task actor handlers cannot attach users from other tenants.
+-- id is required: returned as the FK value for task_actors.user_id.
+SELECT u.id
+FROM users u
+INNER JOIN workspace_members wm
+  ON wm.user_id = u.id
+  AND wm.workspace_id = ?
+  AND wm.enabled = TRUE
+WHERE u.public_id = ?
+  AND u.enabled = TRUE
+LIMIT 1;
+
 -- name: GetWorkspaceMemberRole :one
 -- Return the role string for an enabled workspace member. Returns
 -- sql.ErrNoRows when the user is not a member.

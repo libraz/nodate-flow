@@ -1201,6 +1201,7 @@ const (
 	SignalsSourceGoogle   SignalsSource = "google"
 	SignalsSourceWebhook  SignalsSource = "webhook"
 	SignalsSourceCalendar SignalsSource = "calendar"
+	SignalsSourceDiscord  SignalsSource = "discord"
 )
 
 func (e *SignalsSource) Scan(src interface{}) error {
@@ -2683,6 +2684,8 @@ type CalendarMemo struct {
 	CreatedByUserID uint32 `json:"-"`
 	// Memo text
 	Title string `json:"title"`
+	// User-authored multi-line memo body, distinct from admin notes
+	Body sql.NullString `json:"body"`
 	// Completion flag
 	Done bool `json:"done"`
 	// Display order
@@ -2893,6 +2896,8 @@ type Identity struct {
 	MfaSecretCiphertext sql.NullString `json:"mfaSecretCiphertext"`
 	// When the TOTP enrollment was confirmed by submitting a valid code
 	MfaConfirmedAt sql.NullTime `json:"mfaConfirmedAt"`
+	// Last accepted TOTP time-step (unix/period). RFC 6238 5.2 one-time-use: a code whose step is <= this value is rejected as a replay
+	MfaLastStep sql.NullInt64 `json:"mfaLastStep"`
 	// Consecutive failed login attempts
 	FailedAttempts uint32 `json:"failedAttempts"`
 	// Lockout expiry timestamp
@@ -3594,7 +3599,7 @@ type Signal struct {
 	TaskID sql.NullInt32 `json:"taskId"`
 	// Internal FK to agent_runs.id; set when a judge run has evaluated this signal. NULL means "not yet judged".
 	JudgeRunID sql.NullInt32 `json:"judgeRunId"`
-	// Originating channel. 'calendar' is reserved for internal scheduler ticks (flow-worker calendar_event_day job, etc.) — not a user-facing webhook source.
+	// Originating channel. 'calendar' is reserved for internal scheduler ticks (flow-worker calendar_event_day job, etc.) — not a user-facing webhook source. 'discord' is the presence-discord gateway.
 	Source SignalsSource `json:"source"`
 	// Source-specific event kind (e.g., pull_request.opened, discord.presence). Closed enumeration defined by signal_kinds/*.yaml; stays VARCHAR so new kinds do not require a schema change.
 	Kind string `json:"kind"`

@@ -123,22 +123,52 @@ func MagicLinkVerify(deps Deps) func(context.Context, *MagicLinkVerifyInput) (*M
 		if err != nil {
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
-		if uerr := deps.Queries.UpdateUserLastLoginAt(ctx, row.UserID); uerr != nil {
-			// non-fatal
-			_ = uerr
-		}
 		deps.Audit.Record(ctx, audit.Entry{
 			Action:       "auth.magic_link.verified",
 			ActorID:      row.UserID,
 			ResourceType: "user",
 		})
+
+		// Step-up: if the account has confirmed TOTP, the magic link
+		// alone is not sufficient. Mirror the password login path and
+		// return a short-lived totp challenge instead of session tokens;
+		// the client must finish at POST /auth/login/totp. The magic-link
+		// token has already been burned above, so this cannot be replayed.
+		// last_login_at is deferred to the TOTP happy path. A missing
+		// local identity (e.g. OIDC-only account) is not an error here —
+		// it simply means no TOTP gate applies.
+		ident, ierr := deps.Queries.FindLocalIdentityByUserId(ctx, row.UserID)
+		if ierr == nil && ident.MfaConfirmedAt.Valid && len(ident.MfaSecretCiphertext.String) > 0 {
+			challenge, _, cerr := deps.JWT.SignTotpChallenge(pub.String())
+			if cerr != nil {
+				return nil, httpErr(apierrors.InternalUnexpected)
+			}
+			return &MagicLinkVerifyOutput{
+				Body: LoginBody{
+					Step:           "totp_required",
+					ChallengeToken: challenge,
+				},
+			}, nil
+		} else if ierr != nil && !errors.Is(ierr, sql.ErrNoRows) {
+			return nil, httpErr(apierrors.InternalUnexpected)
+		}
+
+		if uerr := deps.Queries.UpdateUserLastLoginAt(ctx, row.UserID); uerr != nil {
+			// non-fatal
+			_ = uerr
+		}
 		tokens, refresh, err := IssueTokens(ctx, deps, row.UserID, pub, in.UserAgent, authn.ClientIPFromContext(ctx))
 		if err != nil {
 			return nil, err
 		}
 		return &MagicLinkVerifyOutput{
 			SetCookie: newRefreshCookie(refresh, deps.CookieSecure),
-			Body:      tokens,
+			Body: LoginBody{
+				Step:        "complete",
+				AccessToken: tokens.AccessToken,
+				ExpiresAt:   tokens.ExpiresAt,
+				UserID:      tokens.UserID,
+			},
 		}, nil
 	}
 }

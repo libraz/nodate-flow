@@ -90,3 +90,25 @@ func (a *queriesAdapter) RevokeAllSessionsForUserExcept(ctx context.Context, use
 		PublicID: publicID,
 	})
 }
+
+func (a *queriesAdapter) FindAnySessionByRefreshHash(ctx context.Context, refreshHash string) (sessionstore.FindAnySessionByRefreshHashRow, error) {
+	row, err := a.q.FindAnySessionByRefreshHash(ctx, refreshHash)
+	if err != nil {
+		return sessionstore.FindAnySessionByRefreshHashRow{}, err
+	}
+	return sessionstore.FindAnySessionByRefreshHashRow{
+		ID:          row.ID,
+		PublicID:    row.PublicID,
+		UserID:      row.UserID,
+		RefreshHash: row.RefreshHash,
+		ExpiresAt:   row.ExpiresAt,
+		RevokedAt:   row.RevokedAt,
+		LastUsedAt:  row.LastUsedAt,
+		Enabled:     row.Enabled,
+		CreatedAt:   row.CreatedAt,
+	}, nil
+}
+
+func (a *queriesAdapter) RevokeAllSessionsForUser(ctx context.Context, userID uint32) error {
+	return a.q.RevokeAllSessionsForUser(ctx, userID)
+}

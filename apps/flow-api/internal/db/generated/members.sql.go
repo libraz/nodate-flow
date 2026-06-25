@@ -223,6 +223,34 @@ func (q *Queries) FindWorkspaceMemberByUserId(ctx context.Context, arg FindWorks
 	return i, err
 }
 
+const findWorkspaceMemberUserInternalIdByPublicId = `-- name: FindWorkspaceMemberUserInternalIdByPublicId :one
+SELECT u.id
+FROM users u
+INNER JOIN workspace_members wm
+  ON wm.user_id = u.id
+  AND wm.workspace_id = ?
+  AND wm.enabled = TRUE
+WHERE u.public_id = ?
+  AND u.enabled = TRUE
+LIMIT 1
+`
+
+type FindWorkspaceMemberUserInternalIdByPublicIdParams struct {
+	WorkspaceID uint32         `json:"-"`
+	PublicID    types.PublicID `json:"publicId"`
+}
+
+// Resolve a user's internal id from a public UUID, scoped to a workspace.
+// Returns the id only when the user is an enabled member of the workspace,
+// so task actor handlers cannot attach users from other tenants.
+// id is required: returned as the FK value for task_actors.user_id.
+func (q *Queries) FindWorkspaceMemberUserInternalIdByPublicId(ctx context.Context, arg FindWorkspaceMemberUserInternalIdByPublicIdParams) (uint32, error) {
+	row := q.db.QueryRowContext(ctx, findWorkspaceMemberUserInternalIdByPublicId, arg.WorkspaceID, arg.PublicID)
+	var id uint32
+	err := row.Scan(&id)
+	return id, err
+}
+
 const getWorkspaceMemberRole = `-- name: GetWorkspaceMemberRole :one
 SELECT role FROM workspace_members
 WHERE workspace_id = ? AND user_id = ? AND enabled = TRUE

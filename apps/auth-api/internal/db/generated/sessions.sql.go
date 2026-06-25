@@ -145,6 +145,56 @@ func (q *Queries) CreateSession(ctx context.Context, arg CreateSessionParams) (i
 	return result.LastInsertId()
 }
 
+const findAnySessionByRefreshHash = `-- name: FindAnySessionByRefreshHash :one
+SELECT
+  id,
+  public_id,
+  user_id,
+  refresh_hash,
+  expires_at,
+  revoked_at,
+  last_used_at,
+  enabled,
+  created_at
+FROM sessions
+WHERE refresh_hash = ?
+LIMIT 1
+`
+
+type FindAnySessionByRefreshHashRow struct {
+	ID          uint32         `json:"-"`
+	PublicID    types.PublicID `json:"publicId"`
+	UserID      uint32         `json:"-"`
+	RefreshHash string         `json:"refreshHash"`
+	ExpiresAt   time.Time      `json:"expiresAt"`
+	RevokedAt   sql.NullTime   `json:"revokedAt"`
+	LastUsedAt  sql.NullTime   `json:"lastUsedAt"`
+	Enabled     bool           `json:"enabled"`
+	CreatedAt   time.Time      `json:"createdAt"`
+}
+
+// Resolve a session from its SHA-256 refresh hash regardless of its
+// revoked / enabled state. Used by the refresh-reuse detector: a hash
+// that matches a row which is already revoked or disabled is evidence
+// that a previously-rotated (and thus invalidated) refresh token was
+// replayed, so the whole session family must be torn down.
+func (q *Queries) FindAnySessionByRefreshHash(ctx context.Context, refreshHash string) (FindAnySessionByRefreshHashRow, error) {
+	row := q.db.QueryRowContext(ctx, findAnySessionByRefreshHash, refreshHash)
+	var i FindAnySessionByRefreshHashRow
+	err := row.Scan(
+		&i.ID,
+		&i.PublicID,
+		&i.UserID,
+		&i.RefreshHash,
+		&i.ExpiresAt,
+		&i.RevokedAt,
+		&i.LastUsedAt,
+		&i.Enabled,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
 const findSessionByPublicId = `-- name: FindSessionByPublicId :one
 SELECT
   id,
@@ -308,6 +358,23 @@ func (q *Queries) ListSessionsForUser(ctx context.Context, arg ListSessionsForUs
 		return nil, err
 	}
 	return items, nil
+}
+
+const revokeAllSessionsForUser = `-- name: RevokeAllSessionsForUser :exec
+UPDATE sessions
+SET revoked_at = CURRENT_TIMESTAMP,
+    enabled = FALSE
+WHERE user_id = ?
+  AND enabled = TRUE
+  AND revoked_at IS NULL
+`
+
+// Revoke every active session for a user. Used by the refresh-reuse
+// detector to tear down the entire session family when a rotated /
+// revoked refresh token is replayed.
+func (q *Queries) RevokeAllSessionsForUser(ctx context.Context, userID uint32) error {
+	_, err := q.db.ExecContext(ctx, revokeAllSessionsForUser, userID)
+	return err
 }
 
 const revokeAllSessionsForUserExcept = `-- name: RevokeAllSessionsForUserExcept :exec

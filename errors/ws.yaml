@@ -255,6 +255,24 @@ resources:
         description: "Returned when the target user is not a member of the workspace."
         userAction: "Invite the user to the workspace first."
 
+      self_modify:
+        code: WS.MEMBER.SELF_MODIFY
+        status: 403
+        message: "You cannot change your own membership."
+        message_ja: "自身のメンバーシップは変更できません。"
+        message_zh: "您无法更改自己的成员资格。"
+        description: "Returned when an actor attempts to change their own workspace membership role or remove themselves from the workspace."
+        userAction: "Ask another workspace owner to change your role or remove you."
+
+      last_owner:
+        code: WS.MEMBER.LAST_OWNER
+        status: 409
+        message: "The workspace must keep at least one owner."
+        message_ja: "ワークスペースには少なくとも 1 名のオーナーが必要です。"
+        message_zh: "工作区必须至少保留一位所有者。"
+        description: "Returned when an operation would remove or demote the last remaining owner of the workspace. At least one owner must remain."
+        userAction: "Promote another member to owner before removing or demoting the current owner."
+
   notification:
     breadcrumb: "Workspace > Notification"
     errors:

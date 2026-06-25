@@ -6,6 +6,7 @@ import (
 
 	"github.com/google/uuid"
 
+	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/audit"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/generated/calendar"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/types"
 	apierrors "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/errors"
@@ -24,14 +25,15 @@ type ListMemosInput struct {
 
 // MemoResponse is the JSON representation of a calendar memo.
 type MemoResponse struct {
-	ID              string `json:"id"`
-	Title           string `json:"title"`
-	Done            bool   `json:"done"`
-	SortWeight      int32  `json:"sortWeight"`
-	UserPublicID    string `json:"userPublicId"`
-	UserDisplayName string `json:"userDisplayName"`
-	UpdatedAt       *int64 `json:"updatedAt,omitempty"`
-	CreatedAt       int64  `json:"createdAt"`
+	ID              string  `json:"id"`
+	Title           string  `json:"title"`
+	Body            *string `json:"body,omitempty"`
+	Done            bool    `json:"done"`
+	SortWeight      int32   `json:"sortWeight"`
+	UserPublicID    string  `json:"userPublicId"`
+	UserDisplayName string  `json:"userDisplayName"`
+	UpdatedAt       *int64  `json:"updatedAt,omitempty"`
+	CreatedAt       int64   `json:"createdAt"`
 }
 
 // ListMemosOutput is the response for the list memos endpoint.
@@ -46,8 +48,9 @@ type CreateMemoInput struct {
 	WsID  string `path:"wsId" doc:"Workspace public ID"`
 	CalID string `path:"calId" doc:"Calendar public ID"`
 	Body  struct {
-		Title      string `json:"title" minLength:"1" maxLength:"500" doc:"Memo title"`
-		SortWeight int32  `json:"sortWeight" required:"false" doc:"Sort weight for ordering"`
+		Title      string  `json:"title" minLength:"1" maxLength:"500" doc:"Memo title"`
+		Body       *string `json:"body,omitempty" maxLength:"10000" required:"false" doc:"User-authored multi-line memo body"`
+		SortWeight int32   `json:"sortWeight" required:"false" doc:"Sort weight for ordering"`
 	}
 }
 
@@ -63,6 +66,7 @@ type UpdateMemoInput struct {
 	MemoID string `path:"memoId" doc:"Memo public ID"`
 	Body   struct {
 		Title      *string `json:"title,omitempty" minLength:"1" maxLength:"500" required:"false" doc:"Memo title"`
+		MemoBody   *string `json:"body,omitempty" maxLength:"10000" required:"false" doc:"User-authored multi-line memo body"`
 		Done       *bool   `json:"done,omitempty" required:"false" doc:"Whether the memo is done"`
 		SortWeight *int32  `json:"sortWeight,omitempty" required:"false" doc:"Sort weight for ordering"`
 	}
@@ -114,6 +118,7 @@ func ListMemos(deps Deps) func(context.Context, *ListMemosInput) (*ListMemosOutp
 			resp := MemoResponse{
 				ID:              r.PublicID.String(),
 				Title:           r.Title,
+				Body:            dbtype.PtrFromNullString(r.Body),
 				Done:            r.Done,
 				SortWeight:      r.SortWeight,
 				UserPublicID:    r.UserPublicID.String(),
@@ -140,12 +145,17 @@ func CreateMemo(deps Deps) func(context.Context, *CreateMemoInput) (*CreateMemoO
 		}
 
 		memoPublicID := types.New()
+		var bodyParam sql.NullString
+		if input.Body.Body != nil {
+			bodyParam = sql.NullString{String: *input.Body.Body, Valid: true}
+		}
 		_, err = deps.CalendarQueries.CreateCalendarMemo(ctx, calendar.CreateCalendarMemoParams{
 			PublicID:        memoPublicID,
 			WorkspaceID:     wsID,
 			CalendarID:      cal.ID,
 			CreatedByUserID: actorID,
 			Title:           input.Body.Title,
+			Body:            bodyParam,
 			SortWeight:      input.Body.SortWeight,
 		})
 		if err != nil {
@@ -156,6 +166,7 @@ func CreateMemo(deps Deps) func(context.Context, *CreateMemoInput) (*CreateMemoO
 		out.Body = MemoResponse{
 			ID:         memoPublicID.String(),
 			Title:      input.Body.Title,
+			Body:       input.Body.Body,
 			Done:       false,
 			SortWeight: input.Body.SortWeight,
 			CreatedAt:  handlerutil.NowUnix(),
@@ -165,6 +176,18 @@ func CreateMemo(deps Deps) func(context.Context, *CreateMemoInput) (*CreateMemoO
 			"memoId":     memoPublicID.String(),
 			"calendarId": input.CalID,
 			"title":      input.Body.Title,
+		})
+
+		deps.Audit.Record(ctx, audit.Entry{
+			Action:       "calendar.memo.create",
+			ActorID:      actorID,
+			WorkspaceID:  wsID,
+			ResourceType: "calendar.memo",
+			ResourceID:   memoPublicID.String(),
+			Metadata: map[string]any{
+				"calendarId": input.CalID,
+				"title":      input.Body.Title,
+			},
 		})
 
 		return out, nil
@@ -205,6 +228,9 @@ func UpdateMemo(deps Deps) func(context.Context, *UpdateMemoInput) (*UpdateMemoO
 		if input.Body.Title != nil {
 			params.Title = sql.NullString{String: *input.Body.Title, Valid: true}
 		}
+		if input.Body.MemoBody != nil {
+			params.Body = sql.NullString{String: *input.Body.MemoBody, Valid: true}
+		}
 		if input.Body.Done != nil {
 			params.Done = sql.NullBool{Bool: *input.Body.Done, Valid: true}
 		}
@@ -223,6 +249,17 @@ func UpdateMemo(deps Deps) func(context.Context, *UpdateMemoInput) (*UpdateMemoO
 		_ = appendCalendarEvent(ctx, deps.DB, wsID, "calendar.memo.updated", &actorID, map[string]any{
 			"memoId":     input.MemoID,
 			"calendarId": input.CalID,
+		})
+
+		deps.Audit.Record(ctx, audit.Entry{
+			Action:       "calendar.memo.update",
+			ActorID:      actorID,
+			WorkspaceID:  wsID,
+			ResourceType: "calendar.memo",
+			ResourceID:   input.MemoID,
+			Metadata: map[string]any{
+				"calendarId": input.CalID,
+			},
 		})
 
 		return out, nil
@@ -270,6 +307,17 @@ func DeleteMemo(deps Deps) func(context.Context, *DeleteMemoInput) (*DeleteMemoO
 		_ = appendCalendarEvent(ctx, deps.DB, wsID, "calendar.memo.deleted", &actorID, map[string]any{
 			"memoId":     input.MemoID,
 			"calendarId": input.CalID,
+		})
+
+		deps.Audit.Record(ctx, audit.Entry{
+			Action:       "calendar.memo.delete",
+			ActorID:      actorID,
+			WorkspaceID:  wsID,
+			ResourceType: "calendar.memo",
+			ResourceID:   input.MemoID,
+			Metadata: map[string]any{
+				"calendarId": input.CalID,
+			},
 		})
 
 		return out, nil

@@ -26,12 +26,12 @@ type RemoveWorkspaceMemberArgs struct {
 // RemoveWorkspaceMemberResult reports counts of the soft-disable
 // cascade so callers (and tests) can verify nothing was missed.
 type RemoveWorkspaceMemberResult struct {
-	MemberDisabled          bool
-	SubscriptionsDisabled   int64
-	PersonalCalsDisabled    int64
-	TaskActorsDisabled      int64
-	ProjectMembersDisabled  int64
-	MemberAlreadyDisabled   bool
+	MemberDisabled         bool
+	SubscriptionsDisabled  int64
+	PersonalCalsDisabled   int64
+	TaskActorsDisabled     int64
+	ProjectMembersDisabled int64
+	MemberAlreadyDisabled  bool
 }
 
 // RemoveWorkspaceMember soft-disables a user's workspace membership
@@ -51,10 +51,27 @@ func RemoveWorkspaceMember(ctx context.Context, tx TX, args RemoveWorkspaceMembe
 
 	var res RemoveWorkspaceMemberResult
 
+	// Self-modify guard: an actor may not remove themselves. Only
+	// enforced when the actor is known (non-zero); a zero actor is a
+	// system/self-leave path handled by the caller, not a guarded
+	// admin action.
+	if args.ActorUserID != 0 && args.ActorUserID == args.UserID {
+		return res, ErrSelfModify
+	}
+
 	// Precondition: the member row must exist. Enabled state is
 	// informational, not blocking, because a partial earlier remove
 	// may have landed the member row but crashed before the cascade.
-	_, enabled, err := findExistingMember(ctx, tx, args.WorkspaceID, args.UserID)
+	// role is read alongside so the last-owner guard can run.
+	var (
+		targetRole string
+		enabled    bool
+	)
+	err := tx.QueryRowContext(ctx,
+		`SELECT role, enabled FROM workspace_members
+		 WHERE workspace_id = ? AND user_id = ?
+		 LIMIT 1`,
+		args.WorkspaceID, args.UserID).Scan(&targetRole, &enabled)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return res, err
@@ -65,6 +82,19 @@ func RemoveWorkspaceMember(ctx context.Context, tx TX, args RemoveWorkspaceMembe
 		res.MemberAlreadyDisabled = true
 		// Still run the cascade — a previous partial remove may have
 		// left downstream rows enabled.
+	}
+
+	// Last-owner guard: removing an owner is only allowed while another
+	// owner remains. Only an enabled owner counts toward the total, so
+	// an already-disabled owner row cannot be the "last" one.
+	if enabled && targetRole == string(RoleOwner) {
+		owners, err := countWorkspaceOwners(ctx, tx, args.WorkspaceID)
+		if err != nil {
+			return res, err
+		}
+		if owners <= 1 {
+			return res, ErrLastOwner
+		}
 	}
 
 	// Step 1: soft-disable subscriptions. Leaf rows, safe first.

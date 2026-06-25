@@ -114,6 +114,9 @@ type MyCalendarEventResponse struct {
 	WorkspaceID          string           `json:"workspaceId"`
 	WorkspaceName        string           `json:"workspaceName"`
 	OwnerUserID          string           `json:"ownerUserId"`
+	CreatorID            string           `json:"creatorId,omitempty"`
+	CreatorDisplayName   string           `json:"creatorDisplayName,omitempty"`
+	CreatorAvatarURL     *string          `json:"creatorAvatarUrl,omitempty"`
 	AttendeeCount        int64            `json:"attendeeCount"`
 	ViewerAttending      bool             `json:"viewerAttending"`
 	Kind                 string           `json:"kind"`
@@ -188,50 +191,56 @@ func ListMyCalendarEvents(deps Deps) func(context.Context, *ListMyCalendarEvents
 
 		for _, r := range rows {
 			resp := MyCalendarEventResponse{
-				ID:              r.PublicID.String(),
-				CalendarID:      r.CalendarPublicID.String(),
-				WorkspaceID:     r.WorkspacePublicID.String(),
-				WorkspaceName:   r.WorkspaceName,
-				OwnerUserID:     r.OwnerPublicID.String(),
-				AttendeeCount:   r.AttendeeCount,
-				ViewerAttending: r.ViewerAttending,
-				Kind:            string(r.Kind),
-				Visibility:      string(r.Visibility),
-				ShowAs:          string(r.ShowAs),
-				Title:           r.Title,
-				AllDay:          r.AllDay,
-				StartAt:         nullTimeUnixPtr(r.StartAt),
-				EndAt:           nullTimeUnixPtr(r.EndAt),
-				Timezone:        r.Timezone,
-				CreatedAt:       r.CreatedAt.Unix(),
+				ID:                 r.PublicID.String(),
+				CalendarID:         r.CalendarPublicID.String(),
+				WorkspaceID:        r.WorkspacePublicID.String(),
+				WorkspaceName:      r.WorkspaceName,
+				OwnerUserID:        r.OwnerPublicID.String(),
+				CreatorID:          creatorPublicIDString(r.CreatorPublicID),
+				CreatorDisplayName: r.CreatorDisplayName.String,
+				AttendeeCount:      r.AttendeeCount,
+				ViewerAttending:    r.ViewerAttending,
+				Kind:               string(r.Kind),
+				Visibility:         string(r.Visibility),
+				ShowAs:             string(r.ShowAs),
+				Title:              r.Title,
+				AllDay:             r.AllDay,
+				StartAt:            nullTimeUnixPtr(r.StartAt),
+				EndAt:              nullTimeUnixPtr(r.EndAt),
+				Timezone:           r.Timezone,
+				CreatedAt:          r.CreatedAt.Unix(),
 			}
 			resp.Location = dbtype.PtrFromNullString(r.Location)
 			resp.BlockLabel = dbtype.PtrFromNullString(r.BlockLabel)
+			resp.CreatorAvatarURL = dbtype.PtrFromNullString(r.CreatorAvatarUrl)
 			resp.UpdatedAt = dbtype.UnixSecondsFromNullTime(r.UpdatedAt)
 			out.Body.Events = append(out.Body.Events, resp)
 		}
 
 		for _, r := range recurringRows {
 			resp := MyCalendarEventResponse{
-				ID:              r.PublicID.String(),
-				CalendarID:      r.CalendarPublicID.String(),
-				WorkspaceID:     r.WorkspacePublicID.String(),
-				WorkspaceName:   r.WorkspaceName,
-				OwnerUserID:     r.OwnerPublicID.String(),
-				AttendeeCount:   r.AttendeeCount,
-				ViewerAttending: r.ViewerAttending,
-				Kind:            string(r.Kind),
-				Visibility:      string(r.Visibility),
-				ShowAs:          string(r.ShowAs),
-				Title:           r.Title,
-				AllDay:          r.AllDay,
-				StartAt:         nullTimeUnixPtr(r.StartAt),
-				EndAt:           nullTimeUnixPtr(r.EndAt),
-				Timezone:        r.Timezone,
-				CreatedAt:       r.CreatedAt.Unix(),
+				ID:                 r.PublicID.String(),
+				CalendarID:         r.CalendarPublicID.String(),
+				WorkspaceID:        r.WorkspacePublicID.String(),
+				WorkspaceName:      r.WorkspaceName,
+				OwnerUserID:        r.OwnerPublicID.String(),
+				CreatorID:          creatorPublicIDString(r.CreatorPublicID),
+				CreatorDisplayName: r.CreatorDisplayName.String,
+				AttendeeCount:      r.AttendeeCount,
+				ViewerAttending:    r.ViewerAttending,
+				Kind:               string(r.Kind),
+				Visibility:         string(r.Visibility),
+				ShowAs:             string(r.ShowAs),
+				Title:              r.Title,
+				AllDay:             r.AllDay,
+				StartAt:            nullTimeUnixPtr(r.StartAt),
+				EndAt:              nullTimeUnixPtr(r.EndAt),
+				Timezone:           r.Timezone,
+				CreatedAt:          r.CreatedAt.Unix(),
 			}
 			resp.Location = dbtype.PtrFromNullString(r.Location)
 			resp.BlockLabel = dbtype.PtrFromNullString(r.BlockLabel)
+			resp.CreatorAvatarURL = dbtype.PtrFromNullString(r.CreatorAvatarUrl)
 			if r.RecurrenceRule != nil {
 				raw := json.RawMessage(r.RecurrenceRule)
 				resp.RecurrenceRule = &raw

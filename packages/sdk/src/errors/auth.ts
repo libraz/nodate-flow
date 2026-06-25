@@ -66,6 +66,11 @@ export const AuthErrors = {
     status: 401,
     message: "Magic link has been revoked",
   },
+  AUTH_OIDC_DOMAIN_NOT_ALLOWED: {
+    code: "AUTH.OIDC.DOMAIN_NOT_ALLOWED",
+    status: 403,
+    message: "Sign-in is restricted to approved email domains for this instance",
+  },
   AUTH_OIDC_EMAIL_NOT_VERIFIED: {
     code: "AUTH.OIDC.EMAIL_NOT_VERIFIED",
     status: 403,

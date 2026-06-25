@@ -12,6 +12,7 @@ CREATE TABLE calendar_memos (
   created_by_user_id INT UNSIGNED NOT NULL COMMENT 'Internal FK to users.id',
 
   title VARCHAR(500) NOT NULL COMMENT 'Memo text',
+  body TEXT NULL COMMENT 'User-authored multi-line memo body, distinct from admin notes',
   done BOOLEAN NOT NULL DEFAULT FALSE COMMENT 'Completion flag',
 
   sort_weight INT NOT NULL DEFAULT 0 COMMENT 'Display order',

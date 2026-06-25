@@ -286,9 +286,10 @@ func ApplySteps(deps StepsDeps) func(context.Context, *ApplyStepsInput) (*ApplyS
 }
 
 // RegisterSteps wires the AI-powered step decomposition endpoints under
-// /tasks/{id}/. The caller must attach RequireTaskAccess to the
-// underlying chi router so task / project / workspace contexts are
-// populated.
+// /tasks/{id}/. Both routes mutate or spend: propose-steps consumes LLM
+// budget and apply-steps creates child tasks, so the caller must attach
+// RequireTaskAccess followed by RequireProjectRole(ProjectRoleEditor) so a
+// read-only project role cannot reach them.
 func RegisterSteps(api huma.API, deps StepsDeps) {
 	huma.Register(api, huma.Operation{
 		OperationID: "tasks-propose-steps",

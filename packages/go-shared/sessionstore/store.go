@@ -34,7 +34,7 @@ var ErrNotFound = errors.New("sessionstore: session not found")
 // session. It intentionally avoids sql.NullXxx so Redis and other
 // non-SQL drivers can map it without importing database/sql.
 type Session struct {
-	InternalID  uint32         // Implementation-specific; zero for stores without integer PKs.
+	InternalID  uint32          // Implementation-specific; zero for stores without integer PKs.
 	PublicID    dbtype.PublicID // UUID v7, the only externally visible id.
 	UserID      uint32
 	RefreshHash string // SHA-256 hex of the refresh token plaintext.
@@ -70,6 +70,13 @@ type Store interface {
 	// when no row matches.
 	FindByRefreshHash(ctx context.Context, hash string) (*Session, error)
 
+	// FindAnyByRefreshHash looks up a session by its SHA-256 refresh
+	// hash regardless of its revoked / enabled state. It powers
+	// refresh-token reuse detection: a hash that resolves only to a
+	// revoked (rotated) row means a previously-invalidated token was
+	// replayed. Returns [ErrNotFound] when no row at all matches.
+	FindAnyByRefreshHash(ctx context.Context, hash string) (*Session, error)
+
 	// RotateRefreshHash replaces the refresh hash and expiry on the
 	// session identified by [Session.InternalID] (MySQL) or
 	// [Session.RefreshHash] (Redis; the implementation may rekey).
@@ -87,4 +94,10 @@ type Store interface {
 	// the one whose publicID matches `keep`. Used by "sign out of all
 	// other devices". A missing match is not an error.
 	RevokeAllExcept(ctx context.Context, userID uint32, keep dbtype.PublicID) error
+
+	// RevokeAllForUser revokes every active session for a user. Used by
+	// the refresh-token reuse detector to tear down the whole session
+	// family the moment a rotated token is replayed. A user with no
+	// active session is not an error.
+	RevokeAllForUser(ctx context.Context, userID uint32) error
 }

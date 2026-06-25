@@ -98,7 +98,9 @@ type Querier interface {
 	FindCalendarEventAttachmentByPublicId(ctx context.Context, arg FindCalendarEventAttachmentByPublicIdParams) (FindCalendarEventAttachmentByPublicIdRow, error)
 	// Look up a specific attendee on an event (for permission checks).
 	FindCalendarEventAttendee(ctx context.Context, arg FindCalendarEventAttendeeParams) (FindCalendarEventAttendeeRow, error)
-	// Resolve a calendar event by UUID v7 within a calendar.
+	// Resolve a calendar event by UUID v7 within a calendar. The creator
+	// (created_by_user_id) is LEFT JOINed so a soft-disabled creator yields
+	// NULL identity columns rather than dropping the event row.
 	FindCalendarEventByPublicId(ctx context.Context, arg FindCalendarEventByPublicIdParams) (FindCalendarEventByPublicIdRow, error)
 	// Resolve a comment by UUID v7.
 	FindCalendarEventCommentByPublicId(ctx context.Context, arg FindCalendarEventCommentByPublicIdParams) (FindCalendarEventCommentByPublicIdRow, error)

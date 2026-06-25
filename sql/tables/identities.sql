@@ -13,6 +13,7 @@ CREATE TABLE identities (
   password_hash CHAR(97) CHARACTER SET latin1 COLLATE latin1_swedish_ci NULL COMMENT 'Argon2id encoded hash, only for provider=local', -- argon2id encoded form (97 chars)
   mfa_secret_ciphertext VARBINARY(512) NULL COMMENT 'Encrypted TOTP secret (AES-256-GCM)',
   mfa_confirmed_at DATETIME(3) NULL COMMENT 'When the TOTP enrollment was confirmed by submitting a valid code',
+  mfa_last_step BIGINT UNSIGNED NULL COMMENT 'Last accepted TOTP time-step (unix/period). RFC 6238 5.2 one-time-use: a code whose step is <= this value is rejected as a replay',
   failed_attempts INT UNSIGNED NOT NULL DEFAULT 0 COMMENT 'Consecutive failed login attempts',
   locked_until_at DATETIME(3) NULL COMMENT 'Lockout expiry timestamp',
   last_used_at DATETIME(3) NULL COMMENT 'Last successful authentication time',

@@ -133,10 +133,22 @@ func TotpConfirm(deps Deps) func(context.Context, *TotpConfirmInput) (*TotpConfi
 		if err != nil {
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
-		if !auth.VerifyTotp(secret, in.Body.Code, time.Now()) {
+		step, okCode := auth.VerifyTotpStep(secret, in.Body.Code, time.Now())
+		// A pending enrollment has mfa_last_step = NULL, but guard against
+		// a replay of the confirmation code anyway in case enrollment was
+		// rotated without clearing the step.
+		if !okCode || (row.MfaLastStep.Valid && step <= row.MfaLastStep.Int64) {
 			return nil, httpErr(apierrors.AuthTotpCodeMismatch)
 		}
 		if err := deps.Queries.ConfirmIdentityMfa(ctx, row.ID); err != nil {
+			return nil, httpErr(apierrors.InternalUnexpected)
+		}
+		// Burn the confirmation step so the very same code cannot be
+		// immediately replayed against POST /auth/login/totp.
+		if err := deps.Queries.UpdateIdentityMfaLastStep(ctx, generated.UpdateIdentityMfaLastStepParams{
+			Step: sql.NullInt64{Int64: step, Valid: true},
+			ID:   row.ID,
+		}); err != nil {
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
 		codes, err := issueRecoveryCodes(ctx, deps, uid)

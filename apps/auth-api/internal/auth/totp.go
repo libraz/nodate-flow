@@ -20,3 +20,16 @@ func TotpOtpauthURL(issuer, accountName string, secret []byte) string {
 func VerifyTotp(secret []byte, code string, now time.Time) bool {
 	return authn.VerifyTotp(secret, code, now)
 }
+
+// VerifyTotpStep constant-time-compares the submitted code against the
+// codes valid at now +/- 1 window and returns the matched TOTP
+// time-step so the caller can enforce RFC 6238 5.2 one-time-use.
+func VerifyTotpStep(secret []byte, code string, now time.Time) (step int64, ok bool) {
+	return authn.VerifyTotpStep(secret, code, now)
+}
+
+// TotpCode returns the TOTP code valid for the secret at the given
+// instant. Mirrors what an authenticator app would display.
+func TotpCode(secret []byte, t time.Time) string {
+	return authn.TotpCode(secret, t)
+}

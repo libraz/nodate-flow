@@ -186,6 +186,11 @@ export const CalendarErrors = {
     status: 500,
     message: "Could not resolve owner user",
   },
+  CALENDAR_EVENT_RECURRENCE_RULE_INVALID: {
+    code: "CALENDAR.EVENT.RECURRENCE_RULE_INVALID",
+    status: 422,
+    message: "The recurrence rule is invalid.",
+  },
   CALENDAR_EVENT_START_END_PAIR_REQUIRED: {
     code: "CALENDAR.EVENT.START_END_PAIR_REQUIRED",
     status: 422,

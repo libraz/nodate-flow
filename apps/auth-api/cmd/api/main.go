@@ -40,6 +40,10 @@ func main() {
 		logger.Error("config load failed", "err", err)
 		os.Exit(1)
 	}
+	if err := cfg.Validate(); err != nil {
+		logger.Error("config validation failed", "err", err)
+		os.Exit(1)
+	}
 
 	if cfg.DbDsn == "" {
 		logger.Error("NF_DB_DSN is not set")
@@ -68,7 +72,7 @@ func main() {
 		logger.Warn("cipher disabled (TOTP unavailable)", "err", cerr)
 	}
 
-	jwtPriv, err := authn.DeriveEd25519Key(os.Getenv("NF_SECRET_KEY"), "nodate-flow:jwt:v1")
+	jwtPriv, err := authn.DeriveEd25519Key(cfg.SecretKey, "nodate-flow:jwt:v1")
 	if err != nil {
 		logger.Error("jwt key derivation failed", "err", err)
 		os.Exit(1)
@@ -195,6 +199,8 @@ func main() {
 		Cipher:                    cipher,
 		CookieSecure:              cfg.CookieSecure,
 		RegistrationOpen:          cfg.RegistrationOpen,
+		OAuthAllowedDomains:       cfg.OAuthAllowedDomains,
+		OAuthAllowedEmails:        cfg.OAuthAllowedEmails,
 		MinPasswordLength:         cfg.MinPasswordLength,
 		DisableRateLimit:          cfg.DisableRateLimit,
 		RateLimitGlobalMax:        cfg.RateLimitGlobalMax,

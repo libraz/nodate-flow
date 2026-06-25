@@ -23,6 +23,13 @@ import (
 type stubRefreshSessions struct {
 	session *sessionstore.Session
 	err     error
+	// anySession is returned by FindAnyByRefreshHash for reuse-detection
+	// tests. anyErr overrides it when non-nil.
+	anySession *sessionstore.Session
+	anyErr     error
+	// revokeAllCalls records the userIDs passed to RevokeAllForUser so
+	// reuse-detection tests can assert the session family was torn down.
+	revokeAllCalls []uint32
 }
 
 func (s *stubRefreshSessions) Create(_ context.Context, _ sessionstore.CreateParams) (uint32, error) {
@@ -50,6 +57,21 @@ func (s *stubRefreshSessions) ListActive(_ context.Context, _ uint32) ([]session
 
 func (s *stubRefreshSessions) RevokeAllExcept(_ context.Context, _ uint32, _ dbtype.PublicID) error {
 	panic("not implemented")
+}
+
+func (s *stubRefreshSessions) FindAnyByRefreshHash(_ context.Context, _ string) (*sessionstore.Session, error) {
+	if s.anyErr != nil {
+		return nil, s.anyErr
+	}
+	if s.anySession == nil {
+		return nil, sessionstore.ErrNotFound
+	}
+	return s.anySession, nil
+}
+
+func (s *stubRefreshSessions) RevokeAllForUser(_ context.Context, userID uint32) error {
+	s.revokeAllCalls = append(s.revokeAllCalls, userID)
+	return nil
 }
 
 // TestRefresh_RejectsIdleSessionPastTimeout is the regression for L2:

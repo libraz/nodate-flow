@@ -171,7 +171,7 @@ func ApplySmart(deps SmartCreateDeps) func(context.Context, *ApplySmartInput) (*
 
 		// Attach assignees to parent task.
 		for _, uid := range in.Body.AssigneeUserIDs {
-			if err := addActorByPublicID(ctx, qtx, deps.DB, ws.ID, uint32(parentID), uid); err != nil { //#nosec G115 -- LastInsertId for tasks.id (BIGINT UNSIGNED), fits uint32 within realistic deployments
+			if err := addActorByPublicID(ctx, qtx, ws.ID, uint32(parentID), uid); err != nil { //#nosec G115 -- LastInsertId for tasks.id (BIGINT UNSIGNED), fits uint32 within realistic deployments
 				return nil, err
 			}
 		}
@@ -199,7 +199,7 @@ func ApplySmart(deps SmartCreateDeps) func(context.Context, *ApplySmartInput) (*
 
 			// Attach subtask assignee if provided.
 			if sub.AssigneeUserID != "" {
-				if err := addActorByPublicID(ctx, qtx, deps.DB, ws.ID, uint32(subID), sub.AssigneeUserID); err != nil { //#nosec G115 -- LastInsertId for tasks.id (BIGINT UNSIGNED), fits uint32 within realistic deployments
+				if err := addActorByPublicID(ctx, qtx, ws.ID, uint32(subID), sub.AssigneeUserID); err != nil { //#nosec G115 -- LastInsertId for tasks.id (BIGINT UNSIGNED), fits uint32 within realistic deployments
 					return nil, err
 				}
 			}
@@ -273,14 +273,18 @@ func RegisterSmartCreate(api huma.API, deps SmartCreateDeps) {
 // addActorByPublicID resolves a user public ID to an internal ID and adds
 // them as an assignee on the given task. It returns an httpErr-wrapped
 // error on failure.
-func addActorByPublicID(ctx context.Context, qtx *generated.Queries, db *sql.DB, wsID, taskID uint32, userPublicID string) error {
+func addActorByPublicID(ctx context.Context, qtx *generated.Queries, wsID, taskID uint32, userPublicID string) error {
 	userPub, err := types.Parse(userPublicID)
 	if err != nil {
 		return httpErr(apierrors.WsMemberNotFound)
 	}
-	const q = `SELECT id FROM users WHERE public_id = ? AND enabled = TRUE LIMIT 1`
-	var uid uint32
-	if err := db.QueryRowContext(ctx, q, userPub).Scan(&uid); err != nil {
+	// Resolve the target user scoped to this workspace so an AI proposal
+	// cannot attach a user from another tenant as an assignee.
+	uid, err := qtx.FindWorkspaceMemberUserInternalIdByPublicId(ctx, generated.FindWorkspaceMemberUserInternalIdByPublicIdParams{
+		WorkspaceID: wsID,
+		PublicID:    userPub,
+	})
+	if err != nil {
 		return httpErr(apierr.SpecForErrNoRows(err, apierrors.WsMemberNotFound, apierrors.InternalUnexpected))
 	}
 	pub := types.New()

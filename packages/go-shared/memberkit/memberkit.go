@@ -25,10 +25,45 @@ package memberkit
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 
 	"github.com/nodate-flow/nodate-flow/packages/go-shared/dbtype"
 )
+
+// Sentinel errors returned by the membership-mutation guards. Callers
+// (auth-api / flow-api workspace handlers) map these to the
+// WS.MEMBER.SELF_MODIFY (403) and WS.MEMBER.LAST_OWNER (409) API error
+// specs via errors.Is. They are defined here — rather than as service
+// apierr specs — because memberkit is the shared writer imported by
+// every service and must not depend on a service's errors package.
+var (
+	// ErrSelfModify is returned when an actor attempts to change their
+	// own membership role or remove themselves from the workspace.
+	ErrSelfModify = errors.New("memberkit: actor cannot modify own membership")
+
+	// ErrLastOwner is returned when an operation would demote or remove
+	// the last remaining owner of the workspace. At least one owner
+	// must always remain.
+	ErrLastOwner = errors.New("memberkit: workspace must keep at least one owner")
+)
+
+// countWorkspaceOwners returns the number of enabled members holding
+// the owner role in the workspace. Used by the last-owner guard so a
+// demote/remove never drops the owner count to zero.
+//
+// owner is the workspace top role in the workspace_members.role enum
+// (owner > admin > member > guest); it is distinct from the project
+// member role hierarchy.
+func countWorkspaceOwners(ctx context.Context, tx TX, wsID uint32) (int, error) {
+	const q = `SELECT COUNT(*) FROM workspace_members
+	           WHERE workspace_id = ? AND role = ? AND enabled = TRUE`
+	var n int
+	if err := tx.QueryRowContext(ctx, q, wsID, string(RoleOwner)).Scan(&n); err != nil {
+		return 0, fmt.Errorf("memberkit: count owners: %w", err)
+	}
+	return n, nil
+}
 
 // Role is the enum value stored in workspace_members.role. The string
 // values must match the SQL ENUM exactly.

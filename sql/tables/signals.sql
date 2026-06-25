@@ -45,7 +45,7 @@ CREATE TABLE signals (
   task_id INT UNSIGNED NULL COMMENT 'Internal FK to tasks.id, if resolved (legacy fast path; duplicates subject_type=task / subject_id)',
   judge_run_id INT UNSIGNED NULL COMMENT 'Internal FK to agent_runs.id; set when a judge run has evaluated this signal. NULL means "not yet judged".',
 
-  source ENUM('manual','github','slack','email','google','webhook','calendar') NOT NULL COMMENT 'Originating channel. ''calendar'' is reserved for internal scheduler ticks (flow-worker calendar_event_day job, etc.) — not a user-facing webhook source.',
+  source ENUM('manual','github','slack','email','google','webhook','calendar','discord') NOT NULL COMMENT 'Originating channel. ''calendar'' is reserved for internal scheduler ticks (flow-worker calendar_event_day job, etc.) — not a user-facing webhook source. ''discord'' is the presence-discord gateway.',
   kind VARCHAR(64) CHARACTER SET latin1 COLLATE latin1_swedish_ci NOT NULL COMMENT 'Source-specific event kind (e.g., pull_request.opened, discord.presence). Closed enumeration defined by signal_kinds/*.yaml; stays VARCHAR so new kinds do not require a schema change.',
   external_id VARCHAR(255) CHARACTER SET latin1 COLLATE latin1_swedish_ci NULL COMMENT 'External identifier (delivery id, message ts, ...). Dedupe key for webhook double delivery.',
   payload_json JSON NOT NULL CHECK (JSON_VALID(payload_json)) COMMENT 'Raw normalized payload; anything the provider webhook cannot squeeze into the normalized columns stays here for the judge to read.',

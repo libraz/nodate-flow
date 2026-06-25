@@ -31,9 +31,13 @@ func AddActor(deps Deps) func(context.Context, *AddTaskActorInput) (*AddTaskActo
 		if err != nil {
 			return nil, httpErr(apierrors.WsMemberNotFound)
 		}
-		const q = `SELECT id FROM users WHERE public_id = ? AND enabled = TRUE LIMIT 1`
-		var uid uint32
-		if err := deps.DB.QueryRowContext(ctx, q, userPub).Scan(&uid); err != nil {
+		// Resolve the target user scoped to this workspace so callers cannot
+		// attach a user from another tenant as a task actor.
+		uid, err := deps.Queries.FindWorkspaceMemberUserInternalIdByPublicId(ctx, generated.FindWorkspaceMemberUserInternalIdByPublicIdParams{
+			WorkspaceID: ws.ID,
+			PublicID:    userPub,
+		})
+		if err != nil {
 			return nil, httpErr(apierr.SpecForErrNoRows(err, apierrors.WsMemberNotFound, apierrors.InternalUnexpected))
 		}
 		role, perr := parseActorRole(in.Body.Role)

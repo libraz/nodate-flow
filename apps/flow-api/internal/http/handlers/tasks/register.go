@@ -59,9 +59,25 @@ func RegisterCollection(api huma.API, deps Deps) {
 }
 
 // RegisterTaskScoped wires the per-task routes that operate on a single
-// {id}. The caller must attach RequireTaskAccess to the underlying chi
-// router so the task / project / workspace contexts are populated.
+// {id}. It is the historical single entry point and is preserved for any
+// caller that wants every task-scoped route on one chi group with uniform
+// middleware. The production router instead calls the split variants
+// ([RegisterTaskScopedReads], [RegisterTaskScopedCommenterWrites],
+// [RegisterTaskScopedEditorWrites]) so a project read-only role cannot
+// reach the mutating routes (see apps/flow-api/internal/http/router).
+//
+// The caller must attach RequireTaskAccess to the underlying chi router so
+// the task / project / workspace contexts are populated.
 func RegisterTaskScoped(api huma.API, deps Deps) {
+	RegisterTaskScopedReads(api, deps)
+	RegisterTaskScopedCommenterWrites(api, deps)
+	RegisterTaskScopedEditorWrites(api, deps)
+}
+
+// RegisterTaskScopedReads wires the read-only per-task routes. These are
+// gated only by RequireTaskAccess (Layer-4 visibility): any role that can
+// see the task — including a project viewer — may call them.
+func RegisterTaskScopedReads(api huma.API, deps Deps) {
 	huma.Register(api, huma.Operation{
 		OperationID: "tasks-get",
 		Method:      http.MethodGet,
@@ -70,24 +86,6 @@ func RegisterTaskScoped(api huma.API, deps Deps) {
 		Description: "Returns a single task with its core fields, derived state, labels, and assignee. Sub-resources (comments, attachments, dependencies) live on dedicated endpoints.",
 		Tags:        []string{"Tasks"},
 	}, Get(deps))
-
-	huma.Register(api, huma.Operation{
-		OperationID: "tasks-patch",
-		Method:      http.MethodPatch,
-		Path:        "/tasks/{id}",
-		Summary:     "Patch a task",
-		Description: "Updates editable task fields (title, description, due_on, priority, assignee). Description edits append a description-version row so history is queryable.",
-		Tags:        []string{"Tasks"},
-	}, Patch(deps))
-
-	huma.Register(api, huma.Operation{
-		OperationID: "tasks-disable",
-		Method:      http.MethodDelete,
-		Path:        "/tasks/{id}",
-		Summary:     "Soft-disable a task",
-		Description: "Marks the task as removed so it disappears from active views without erasing data. Idempotent. Use /unarchive on archived tasks; this endpoint is the destructive variant.",
-		Tags:        []string{"Tasks"},
-	}, Disable(deps))
 
 	huma.Register(api, huma.Operation{
 		OperationID: "tasks-duplicates-list",
@@ -117,6 +115,173 @@ func RegisterTaskScoped(api huma.API, deps Deps) {
 	}, ListAiInvocations(deps))
 
 	huma.Register(api, huma.Operation{
+		OperationID: "tasks-replay",
+		Method:      http.MethodGet,
+		Path:        "/tasks/{id}/replay",
+		Summary:     "Replay transition events and report drift vs stored derived_state",
+		Description: "Replays every state-changing event in the task timeline and reports whether the recomputed derived_state matches the row. Diagnostic; does not mutate state.",
+		Tags:        []string{"Tasks"},
+	}, Replay(deps))
+
+	huma.Register(api, huma.Operation{
+		OperationID: "tasks-dependencies-list",
+		Method:      http.MethodGet,
+		Path:        "/tasks/{id}/dependencies",
+		Summary:     "List incoming and outgoing dependency edges for a task",
+		Description: "Returns both blocks and blocked-by edges connected to the task. Used by the dependency panel and by the project graph view's per-task drilldown.",
+		Tags:        []string{"Tasks"},
+	}, ListDependencies(deps))
+
+	huma.Register(api, huma.Operation{
+		OperationID: "tasks-linked-events-list",
+		Method:      http.MethodGet,
+		Path:        "/tasks/{id}/linked-events",
+		Summary:     "List calendar events a task is linked to via task_event_links",
+		Description: "Returns the calendar events linked to this task with the link kind (contributes_to / blocks / etc.). Used by the task detail's calendar section.",
+		Tags:        []string{"Tasks"},
+	}, ListLinkedEvents(deps))
+
+	huma.Register(api, huma.Operation{
+		OperationID: "tasks-actors-list",
+		Method:      http.MethodGet,
+		Path:        "/tasks/{id}/actors",
+		Summary:     "List actors on a task",
+		Description: "Returns the human actors (assignees, collaborators, watchers) attached to the task with their role.",
+		Tags:        []string{"Tasks"},
+	}, ListActors(deps))
+
+	huma.Register(api, huma.Operation{
+		OperationID: "tasks-agents-list",
+		Method:      http.MethodGet,
+		Path:        "/tasks/{id}/agents",
+		Summary:     "List AI agent actors on a task",
+		Description: "Returns the AI agent actors currently attached to the task. Distinguished from human actors so UI can render differently and quotas can apply per-agent.",
+		Tags:        []string{"Tasks"},
+	}, ListAgentActors(deps))
+
+	huma.Register(api, huma.Operation{
+		OperationID: "tasks-agent-runs-list",
+		Method:      http.MethodGet,
+		Path:        "/tasks/{id}/agent-runs",
+		Summary:     "List recent agent run events scoped to a task",
+		Description: "Returns the agent run lifecycle events (started / completed / failed) the orchestrator has appended for this task. Most recent first. Empty until the orchestrator stamps task_id and actor_agent_id on its ai.agent.run.* events.",
+		Tags:        []string{"Tasks"},
+	}, ListAgentRuns(deps))
+
+	huma.Register(api, huma.Operation{
+		OperationID: "tasks-comments-list",
+		Method:      http.MethodGet,
+		Path:        "/tasks/{id}/comments",
+		Summary:     "List comments on a task",
+		Description: "Returns the comments on the task in chronological order with reaction counts. Cursor-paginated for long threads.",
+		Tags:        []string{"Tasks"},
+	}, ListComments(deps))
+
+	huma.Register(api, huma.Operation{
+		OperationID: "tasks-attachments-list",
+		Method:      http.MethodGet,
+		Path:        "/tasks/{id}/attachments",
+		Summary:     "List attachments on a task",
+		Description: "Returns the attachments registered on the task with metadata only — bytes are fetched separately via /download.",
+		Tags:        []string{"Tasks"},
+	}, ListAttachments(deps))
+
+	huma.Register(api, huma.Operation{
+		OperationID: "tasks-attachments-download",
+		Method:      http.MethodGet,
+		Path:        "/tasks/{id}/attachments/{aid}/download",
+		Summary:     "Get a presigned GET URL for downloading an attachment",
+		Description: "Returns a short-lived presigned GET URL so the client can stream the file straight from object storage. The API never proxies the bytes.",
+		Tags:        []string{"Tasks"},
+	}, DownloadAttachment(deps))
+
+	huma.Register(api, huma.Operation{
+		OperationID: "tasks-description-history-list",
+		Method:      http.MethodGet,
+		Path:        "/tasks/{id}/description-history",
+		Summary:     "List description version history for a task",
+		Description: "Returns a chronological list of description revisions (id, author, edited_at) without the full body so the version chooser is cheap.",
+		Tags:        []string{"Tasks"},
+	}, ListDescriptionVersions(deps))
+
+	huma.Register(api, huma.Operation{
+		OperationID: "tasks-description-history-get",
+		Method:      http.MethodGet,
+		Path:        "/tasks/{id}/description-history/{versionId}",
+		Summary:     "Get a specific description version with full body",
+		Description: "Returns the full body of one description revision so the diff viewer can render the historical content.",
+		Tags:        []string{"Tasks"},
+	}, GetDescriptionVersion(deps))
+}
+
+// RegisterTaskScopedCommenterWrites wires the per-task write routes that a
+// project commenter is allowed to perform: adding, editing, and deleting
+// comments. These are conversational mutations rather than structural edits,
+// matching the product intent that commenters can participate in discussion
+// without changing the task itself. The caller must attach RequireTaskAccess
+// followed by RequireProjectRole(ProjectRoleCommenter).
+//
+// Comment edit / delete additionally enforce author-only / admin-only rules
+// inside the handler, so commenter is the floor, not a blanket grant.
+func RegisterTaskScopedCommenterWrites(api huma.API, deps Deps) {
+	huma.Register(api, huma.Operation{
+		OperationID: "tasks-comments-add",
+		Method:      http.MethodPost,
+		Path:        "/tasks/{id}/comments",
+		Summary:     "Add a comment to a task",
+		Description: "Appends a comment from the caller. Mentions inside the body are parsed and routed through the notifications pipeline.",
+		Tags:        []string{"Tasks"},
+	}, AddComment(deps))
+
+	huma.Register(api, huma.Operation{
+		OperationID: "tasks-comments-edit",
+		Method:      http.MethodPatch,
+		Path:        "/tasks/{id}/comments/{cid}",
+		Summary:     "Edit a comment (author only)",
+		Description: "Replaces the body of the named comment. Only the original author may edit; an edited_at timestamp is set.",
+		Tags:        []string{"Tasks"},
+	}, EditComment(deps))
+
+	huma.Register(api, huma.Operation{
+		OperationID: "tasks-comments-delete",
+		Method:      http.MethodDelete,
+		Path:        "/tasks/{id}/comments/{cid}",
+		Summary:     "Delete a comment (author or workspace admin)",
+		Description: "Removes the named comment. Permitted to the comment author or any workspace admin. Idempotent.",
+		Tags:        []string{"Tasks"},
+	}, DeleteComment(deps))
+}
+
+// RegisterTaskScopedEditorWrites wires the structural per-task mutations:
+// editing the task, soft-deleting it, applying transitions, managing
+// constraints / dependencies / event-links / actors / agents, attachments,
+// archive / unarchive, and description-version restore. All require at least
+// a project editor role. The caller must attach RequireTaskAccess followed by
+// RequireProjectRole(ProjectRoleEditor).
+//
+// The constraint compile / explain endpoints are POSTs that consume LLM
+// budget; they are gated at editor with the rest of the structural surface so
+// a read-only role cannot spend the workspace's AI budget.
+func RegisterTaskScopedEditorWrites(api huma.API, deps Deps) {
+	huma.Register(api, huma.Operation{
+		OperationID: "tasks-patch",
+		Method:      http.MethodPatch,
+		Path:        "/tasks/{id}",
+		Summary:     "Patch a task",
+		Description: "Updates editable task fields (title, description, due_on, priority, assignee). Description edits append a description-version row so history is queryable.",
+		Tags:        []string{"Tasks"},
+	}, Patch(deps))
+
+	huma.Register(api, huma.Operation{
+		OperationID: "tasks-disable",
+		Method:      http.MethodDelete,
+		Path:        "/tasks/{id}",
+		Summary:     "Soft-disable a task",
+		Description: "Marks the task as removed so it disappears from active views without erasing data. Idempotent. Use /unarchive on archived tasks; this endpoint is the destructive variant.",
+		Tags:        []string{"Tasks"},
+	}, Disable(deps))
+
+	huma.Register(api, huma.Operation{
 		OperationID: "tasks-transitions-apply",
 		Method:      http.MethodPost,
 		Path:        "/tasks/{id}/transitions",
@@ -133,15 +298,6 @@ func RegisterTaskScoped(api huma.API, deps Deps) {
 		Description: "Persists a constraint DSL expression on the task. Subsequent transitions and the constraint engine evaluate against this rule.",
 		Tags:        []string{"Tasks"},
 	}, AddConstraint(deps))
-
-	huma.Register(api, huma.Operation{
-		OperationID: "tasks-replay",
-		Method:      http.MethodGet,
-		Path:        "/tasks/{id}/replay",
-		Summary:     "Replay transition events and report drift vs stored derived_state",
-		Description: "Replays every state-changing event in the task timeline and reports whether the recomputed derived_state matches the row. Diagnostic; does not mutate state.",
-		Tags:        []string{"Tasks"},
-	}, Replay(deps))
 
 	huma.Register(api, huma.Operation{
 		OperationID: "tasks-constraints-evaluate",
@@ -180,15 +336,6 @@ func RegisterTaskScoped(api huma.API, deps Deps) {
 	}, RemoveConstraint(deps))
 
 	huma.Register(api, huma.Operation{
-		OperationID: "tasks-dependencies-list",
-		Method:      http.MethodGet,
-		Path:        "/tasks/{id}/dependencies",
-		Summary:     "List incoming and outgoing dependency edges for a task",
-		Description: "Returns both blocks and blocked-by edges connected to the task. Used by the dependency panel and by the project graph view's per-task drilldown.",
-		Tags:        []string{"Tasks"},
-	}, ListDependencies(deps))
-
-	huma.Register(api, huma.Operation{
 		OperationID: "tasks-dependencies-add",
 		Method:      http.MethodPost,
 		Path:        "/tasks/{id}/dependencies",
@@ -205,15 +352,6 @@ func RegisterTaskScoped(api huma.API, deps Deps) {
 		Description: "Removes the named dependency edge. Idempotent.",
 		Tags:        []string{"Tasks"},
 	}, RemoveDependency(deps))
-
-	huma.Register(api, huma.Operation{
-		OperationID: "tasks-linked-events-list",
-		Method:      http.MethodGet,
-		Path:        "/tasks/{id}/linked-events",
-		Summary:     "List calendar events a task is linked to via task_event_links",
-		Description: "Returns the calendar events linked to this task with the link kind (contributes_to / blocks / etc.). Used by the task detail's calendar section.",
-		Tags:        []string{"Tasks"},
-	}, ListLinkedEvents(deps))
 
 	huma.Register(api, huma.Operation{
 		OperationID: "tasks-event-links-create",
@@ -234,15 +372,6 @@ func RegisterTaskScoped(api huma.API, deps Deps) {
 	}, DeleteTaskEventLink(deps))
 
 	huma.Register(api, huma.Operation{
-		OperationID: "tasks-actors-list",
-		Method:      http.MethodGet,
-		Path:        "/tasks/{id}/actors",
-		Summary:     "List actors on a task",
-		Description: "Returns the human actors (assignees, collaborators, watchers) attached to the task with their role.",
-		Tags:        []string{"Tasks"},
-	}, ListActors(deps))
-
-	huma.Register(api, huma.Operation{
 		OperationID: "tasks-actors-add",
 		Method:      http.MethodPost,
 		Path:        "/tasks/{id}/actors",
@@ -259,15 +388,6 @@ func RegisterTaskScoped(api huma.API, deps Deps) {
 		Description: "Detaches the named actor from the task. Idempotent.",
 		Tags:        []string{"Tasks"},
 	}, RemoveActor(deps))
-
-	huma.Register(api, huma.Operation{
-		OperationID: "tasks-agents-list",
-		Method:      http.MethodGet,
-		Path:        "/tasks/{id}/agents",
-		Summary:     "List AI agent actors on a task",
-		Description: "Returns the AI agent actors currently attached to the task. Distinguished from human actors so UI can render differently and quotas can apply per-agent.",
-		Tags:        []string{"Tasks"},
-	}, ListAgentActors(deps))
 
 	huma.Register(api, huma.Operation{
 		OperationID: "tasks-agents-add",
@@ -297,51 +417,6 @@ func RegisterTaskScoped(api huma.API, deps Deps) {
 	}, HandoffToUser(deps))
 
 	huma.Register(api, huma.Operation{
-		OperationID: "tasks-agent-runs-list",
-		Method:      http.MethodGet,
-		Path:        "/tasks/{id}/agent-runs",
-		Summary:     "List recent agent run events scoped to a task",
-		Description: "Returns the agent run lifecycle events (started / completed / failed) the orchestrator has appended for this task. Most recent first. Empty until the orchestrator stamps task_id and actor_agent_id on its ai.agent.run.* events.",
-		Tags:        []string{"Tasks"},
-	}, ListAgentRuns(deps))
-
-	huma.Register(api, huma.Operation{
-		OperationID: "tasks-comments-add",
-		Method:      http.MethodPost,
-		Path:        "/tasks/{id}/comments",
-		Summary:     "Add a comment to a task",
-		Description: "Appends a comment from the caller. Mentions inside the body are parsed and routed through the notifications pipeline.",
-		Tags:        []string{"Tasks"},
-	}, AddComment(deps))
-
-	huma.Register(api, huma.Operation{
-		OperationID: "tasks-comments-list",
-		Method:      http.MethodGet,
-		Path:        "/tasks/{id}/comments",
-		Summary:     "List comments on a task",
-		Description: "Returns the comments on the task in chronological order with reaction counts. Cursor-paginated for long threads.",
-		Tags:        []string{"Tasks"},
-	}, ListComments(deps))
-
-	huma.Register(api, huma.Operation{
-		OperationID: "tasks-comments-edit",
-		Method:      http.MethodPatch,
-		Path:        "/tasks/{id}/comments/{cid}",
-		Summary:     "Edit a comment (author only)",
-		Description: "Replaces the body of the named comment. Only the original author may edit; an edited_at timestamp is set.",
-		Tags:        []string{"Tasks"},
-	}, EditComment(deps))
-
-	huma.Register(api, huma.Operation{
-		OperationID: "tasks-comments-delete",
-		Method:      http.MethodDelete,
-		Path:        "/tasks/{id}/comments/{cid}",
-		Summary:     "Delete a comment (author or workspace admin)",
-		Description: "Removes the named comment. Permitted to the comment author or any workspace admin. Idempotent.",
-		Tags:        []string{"Tasks"},
-	}, DeleteComment(deps))
-
-	huma.Register(api, huma.Operation{
 		OperationID: "tasks-attachments-presign",
 		Method:      http.MethodPost,
 		Path:        "/tasks/{id}/attachments/presign",
@@ -349,24 +424,6 @@ func RegisterTaskScoped(api huma.API, deps Deps) {
 		Description: "Single entry point for adding an attachment to a task. The client supplies the file's SHA-256; the server runs content-addressed dedup and either bumps the ref count on an existing storage_objects row (deduplicated=true, no upload) or returns a presigned PUT URL the client streams the bytes to. The attachment row is always created in the same transaction.",
 		Tags:        []string{"Tasks"},
 	}, PresignUpload(deps))
-
-	huma.Register(api, huma.Operation{
-		OperationID: "tasks-attachments-list",
-		Method:      http.MethodGet,
-		Path:        "/tasks/{id}/attachments",
-		Summary:     "List attachments on a task",
-		Description: "Returns the attachments registered on the task with metadata only — bytes are fetched separately via /download.",
-		Tags:        []string{"Tasks"},
-	}, ListAttachments(deps))
-
-	huma.Register(api, huma.Operation{
-		OperationID: "tasks-attachments-download",
-		Method:      http.MethodGet,
-		Path:        "/tasks/{id}/attachments/{aid}/download",
-		Summary:     "Get a presigned GET URL for downloading an attachment",
-		Description: "Returns a short-lived presigned GET URL so the client can stream the file straight from object storage. The API never proxies the bytes.",
-		Tags:        []string{"Tasks"},
-	}, DownloadAttachment(deps))
 
 	huma.Register(api, huma.Operation{
 		OperationID: "tasks-attachments-delete",
@@ -394,25 +451,6 @@ func RegisterTaskScoped(api huma.API, deps Deps) {
 		Description: "Restores an archived task to active state. Idempotent.",
 		Tags:        []string{"Tasks"},
 	}, Unarchive(deps))
-
-	// Description version history.
-	huma.Register(api, huma.Operation{
-		OperationID: "tasks-description-history-list",
-		Method:      http.MethodGet,
-		Path:        "/tasks/{id}/description-history",
-		Summary:     "List description version history for a task",
-		Description: "Returns a chronological list of description revisions (id, author, edited_at) without the full body so the version chooser is cheap.",
-		Tags:        []string{"Tasks"},
-	}, ListDescriptionVersions(deps))
-
-	huma.Register(api, huma.Operation{
-		OperationID: "tasks-description-history-get",
-		Method:      http.MethodGet,
-		Path:        "/tasks/{id}/description-history/{versionId}",
-		Summary:     "Get a specific description version with full body",
-		Description: "Returns the full body of one description revision so the diff viewer can render the historical content.",
-		Tags:        []string{"Tasks"},
-	}, GetDescriptionVersion(deps))
 
 	huma.Register(api, huma.Operation{
 		OperationID: "tasks-description-history-restore",

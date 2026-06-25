@@ -96,6 +96,7 @@ SELECT
   i.locked_until_at,
   i.mfa_secret_ciphertext,
   i.mfa_confirmed_at,
+  i.mfa_last_step,
   u.public_id AS user_public_id,
   u.enabled AS user_enabled
 FROM identities i
@@ -150,7 +151,8 @@ SELECT
   failed_attempts,
   locked_until_at,
   mfa_secret_ciphertext,
-  mfa_confirmed_at
+  mfa_confirmed_at,
+  mfa_last_step
 FROM identities
 WHERE user_id = ?
   AND provider = 'local'
@@ -162,7 +164,8 @@ LIMIT 1;
 -- secret and clearing any previous confirmation timestamp.
 UPDATE identities
 SET mfa_secret_ciphertext = ?,
-    mfa_confirmed_at = NULL
+    mfa_confirmed_at = NULL,
+    mfa_last_step = NULL
 WHERE id = ?;
 
 -- name: ConfirmIdentityMfa :exec
@@ -177,8 +180,20 @@ WHERE id = ?;
 -- Disable TOTP on a local identity.
 UPDATE identities
 SET mfa_secret_ciphertext = NULL,
-    mfa_confirmed_at = NULL
+    mfa_confirmed_at = NULL,
+    mfa_last_step = NULL
 WHERE id = ?;
+
+-- name: UpdateIdentityMfaLastStep :exec
+-- Record the highest TOTP time-step that has been accepted for this
+-- identity. RFC 6238 5.2 one-time-use: a subsequent code whose step is
+-- <= this value must be rejected as a replay. The guard never lowers
+-- the stored value so an out-of-order skew-window match cannot reopen
+-- an already-consumed step.
+UPDATE identities
+SET mfa_last_step = sqlc.arg(step)
+WHERE id = sqlc.arg(id)
+  AND (mfa_last_step IS NULL OR mfa_last_step < sqlc.arg(step));
 
 -- name: UpdateIdentityPasswordHash :exec
 -- Replace the Argon2id password hash on a local identity.

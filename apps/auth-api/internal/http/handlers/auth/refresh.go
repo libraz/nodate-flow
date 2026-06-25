@@ -5,10 +5,20 @@ import (
 	"errors"
 	"time"
 
+	"github.com/nodate-flow/nodate-flow/apps/auth-api/internal/audit"
 	"github.com/nodate-flow/nodate-flow/apps/auth-api/internal/auth"
 	apierrors "github.com/nodate-flow/nodate-flow/apps/auth-api/internal/errors"
 	"github.com/nodate-flow/nodate-flow/packages/go-shared/sessionstore"
 )
+
+// refreshReuseGrace is the window after a session is rotated/revoked in
+// which presenting the just-superseded refresh token is treated as a
+// benign double-submit (browser retry, duplicated request) rather than a
+// theft signal. Inside the window the stale token is simply rejected;
+// outside it, the presentation is treated as refresh-token reuse and the
+// entire session family is torn down. Kept short so a real stolen token
+// replayed minutes later still trips the detector.
+const refreshReuseGrace = 10 * time.Second
 
 // sessionIdleTimeout is how long a session is allowed to sit unused
 // before refresh is rejected and the user must sign in again. Wall-clock
@@ -33,6 +43,14 @@ func Refresh(deps Deps) func(context.Context, *RefreshInput) (*RefreshOutput, er
 		sess, err := deps.Sessions.FindByRefreshHash(ctx, hash)
 		if err != nil {
 			if errors.Is(err, sessionstore.ErrNotFound) {
+				// The hash matched no active session. Before rejecting,
+				// check whether it matches an already-rotated / revoked
+				// row: that means a previously-invalidated refresh token
+				// was replayed (token theft or a leaked cookie), so the
+				// whole session family is torn down and the event is
+				// audited. A very recent revocation is treated as a benign
+				// double-submit and only rejected.
+				detectRefreshReuse(ctx, deps, hash)
 				return nil, httpErr(apierrors.AuthTokenRefreshInvalid)
 			}
 			return nil, httpErr(apierrors.InternalUnexpected)
@@ -75,5 +93,59 @@ func Refresh(deps Deps) func(context.Context, *RefreshInput) (*RefreshOutput, er
 				UserID:      pub.String(),
 			},
 		}, nil
+	}
+}
+
+// detectRefreshReuse inspects a refresh hash that matched no active
+// session. When the hash resolves to an already-revoked row that was
+// revoked outside the [refreshReuseGrace] window, it concludes a rotated
+// refresh token was replayed: every active session for that user is
+// revoked (session-family teardown) and an "auth.refresh_reuse_detected"
+// audit entry is written. Failures are swallowed — this runs on a path
+// that already returns AUTH.TOKEN.REFRESH_INVALID, and a detection
+// hiccup must never change the user-visible outcome.
+func detectRefreshReuse(ctx context.Context, deps Deps, hash string) {
+	if deps.Sessions == nil {
+		return
+	}
+	prior, err := deps.Sessions.FindAnyByRefreshHash(ctx, hash)
+	if err != nil || prior == nil {
+		// Genuinely unknown hash (never issued): nothing to detect.
+		return
+	}
+	if prior.RevokedAt == nil {
+		// Active row that FindByRefreshHash did not return — should not
+		// happen; do not tear down a live family on an ambiguous signal.
+		return
+	}
+	// Benign double-submit grace: a token presented within a few seconds
+	// of its own rotation is almost certainly a duplicated request, not a
+	// theft. Reject it (already handled by the caller) but do not nuke the
+	// family.
+	if time.Since(*prior.RevokedAt) <= refreshReuseGrace {
+		return
+	}
+
+	if rerr := deps.Sessions.RevokeAllForUser(ctx, prior.UserID); rerr != nil {
+		// Best-effort: still record the detection below.
+		_ = rerr
+	}
+	if deps.Audit != nil {
+		resourceID := ""
+		if pub, perr := deps.Queries.FindUserPublicIdById(ctx, prior.UserID); perr == nil {
+			resourceID = pub.String()
+		}
+		deps.Audit.Record(ctx, audit.Entry{
+			Action:       "auth.refresh_reuse_detected",
+			ActorID:      prior.UserID,
+			ResourceType: "user",
+			ResourceID:   resourceID,
+			Metadata: map[string]any{
+				"severity":          "high",
+				"revoked_session":   prior.PublicID.String(),
+				"sessions_revoked":  "all",
+				"revoked_token_age": time.Since(*prior.RevokedAt).String(),
+			},
+		})
 	}
 }

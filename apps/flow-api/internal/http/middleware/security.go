@@ -5,7 +5,33 @@ import (
 	"crypto/rand"
 	"encoding/base64"
 	"net/http"
+	"os"
+	"strings"
 )
+
+// embedFrameAncestorsEnv is the environment variable that overrides the
+// CSP frame-ancestors directive applied to the public, read-only
+// calendar-share render endpoint (see [publicShareFramePrefix]). It
+// accepts any valid CSP source-list value, e.g. "*" (any origin, the
+// default), "'self'" (same origin only), or a space-separated allowlist
+// like "https://a.example https://b.example".
+const embedFrameAncestorsEnv = "NF_EMBED_FRAME_ANCESTORS"
+
+// defaultEmbedFrameAncestors is the frame-ancestors value used for the
+// public-share render endpoint when [embedFrameAncestorsEnv] is unset.
+// The public calendar share is deliberately published, read-only data
+// that needs no credentials, so embedding it in any third-party iframe
+// carries no clickjacking risk against an authenticated action — the
+// permissive "*" default keeps the embed experience zero-config while
+// staying overridable for operators who want a tighter allowlist.
+const defaultEmbedFrameAncestors = "*"
+
+// publicShareFramePrefix is the request-path prefix for the
+// unauthenticated public calendar-share render endpoint
+// (GET /share/cal/{token}). Requests under this prefix receive a relaxed
+// framing policy (see [SecurityHeaders]); every other path keeps the
+// deny-all framing headers.
+const publicShareFramePrefix = "/share/cal/"
 
 // nonceCtxKey is the context key for the per-request CSP style nonce.
 type nonceCtxKey struct{}
@@ -47,7 +73,24 @@ func generateNonce() string {
 // /api-reference HTML page. If the nonce were omitted, 'unsafe-inline'
 // would be the pragmatic alternative for a JSON-only API, but the nonce
 // approach is strictly safer and ready for any future HTML surface.
+//
+// Framing policy. Every response denies framing by default
+// (X-Frame-Options: DENY plus CSP frame-ancestors 'none') so the
+// authenticated API surface cannot be wrapped in a third-party iframe
+// for clickjacking. The single exception is the public, read-only
+// calendar-share render endpoint (GET /share/cal/{token}, see
+// [publicShareFramePrefix]): it is unauthenticated published data that
+// the chromeless /embed/cal/$token frontend route must be able to fetch
+// from inside a cross-origin <iframe>. For that path the deny headers
+// are dropped and CSP frame-ancestors is set to the configured value
+// (NF_EMBED_FRAME_ANCESTORS, default "*"). X-Frame-Options is omitted
+// rather than relaxed because it has no allowlist syntax — modern
+// browsers honour CSP frame-ancestors, which fully supersedes it.
 func SecurityHeaders() func(http.Handler) http.Handler {
+	frameAncestors := defaultEmbedFrameAncestors
+	if v := strings.TrimSpace(os.Getenv(embedFrameAncestorsEnv)); v != "" {
+		frameAncestors = v
+	}
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			nonce := generateNonce()
@@ -59,12 +102,22 @@ func SecurityHeaders() func(http.Handler) http.Handler {
 			if nonce != "" {
 				styleSrc = "'self' 'nonce-" + nonce + "'"
 			}
+
+			// Public calendar-share render is the only framing-relaxed
+			// surface: drop X-Frame-Options entirely and widen the CSP
+			// frame-ancestors directive to the configured allowlist.
+			frameDirective := "frame-ancestors 'none'"
+			if strings.HasPrefix(r.URL.Path, publicShareFramePrefix) {
+				frameDirective = "frame-ancestors " + frameAncestors
+			} else {
+				h.Set("X-Frame-Options", "DENY")
+			}
+
 			h.Set("Content-Security-Policy",
 				"default-src 'self'; script-src 'self'; style-src "+styleSrc+"; "+
-					"img-src 'self' data: blob:; connect-src 'self'; font-src 'self'; frame-ancestors 'none'")
+					"img-src 'self' data: blob:; connect-src 'self'; font-src 'self'; "+frameDirective)
 			h.Set("Strict-Transport-Security", "max-age=63072000; includeSubDomains; preload")
 			h.Set("X-Content-Type-Options", "nosniff")
-			h.Set("X-Frame-Options", "DENY")
 			h.Set("Referrer-Policy", "strict-origin-when-cross-origin")
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})

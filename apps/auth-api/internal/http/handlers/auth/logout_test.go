@@ -63,6 +63,14 @@ func (f *fakeSessions) RevokeAllExcept(_ context.Context, _ uint32, _ dbtype.Pub
 	panic("not implemented")
 }
 
+func (f *fakeSessions) FindAnyByRefreshHash(_ context.Context, _ string) (*sessionstore.Session, error) {
+	panic("not implemented")
+}
+
+func (f *fakeSessions) RevokeAllForUser(_ context.Context, _ uint32) error {
+	panic("not implemented")
+}
+
 // TestLogout_SuccessfulRevokeWritesAuditEntry asserts that a logout
 // hitting an active session both revokes the session and emits a
 // canonical "auth.logout" audit entry against the actor. The audit

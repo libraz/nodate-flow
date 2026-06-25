@@ -58,6 +58,7 @@ import (
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/generated/calendar"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/types"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/eventbus"
+	activityhandlers "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/handlers/activity"
 	aihandlers "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/handlers/ai"
 	audithandlers "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/handlers/audit"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/handlers/calendars"
@@ -529,6 +530,7 @@ func buildSharedDeps(deps Deps) *sharedDeps {
 			Queries:         deps.Queries,
 			CalendarQueries: deps.CalendarQueries,
 			DB:              deps.DB,
+			Audit:           auditRec,
 			EmailSender:     deps.EmailSender,
 			EmailFrom:       deps.EmailFrom,
 			FlowWebURL:      deps.FlowWebURL,
@@ -796,23 +798,62 @@ func buildAuthenticatedAPI(r chi.Router, deps Deps, shared *sharedDeps, authMW f
 		tasks.RegisterCollection(subAPI, shared.taskDeps)
 	})
 
-	// Task-scoped routes + task timeline.
+	// Task-scoped routes, split into three chi groups by the minimum
+	// project role each operation requires. All three mount
+	// RequireTaskAccess first (which resolves the task / project /
+	// workspace context and enforces Layer-4 read visibility, injecting
+	// the caller's project role into the context); the write groups then
+	// chain RequireProjectRole so that a project viewer / commenter who can
+	// *see* a task cannot mutate it.
+	//
+	//   - reads: RequireTaskAccess only. Any role that can see the task
+	//     (down to viewer) may call these.
+	//   - commenter writes: RequireProjectRole(commenter). Conversational
+	//     mutations (comments, reactions) that the product allows
+	//     commenters to perform.
+	//   - editor writes: RequireProjectRole(editor). Structural mutations
+	//     (patch / delete / transitions / constraints / dependencies /
+	//     actors / agents / labels / attachments / archive / step
+	//     decomposition). Workspace owners / admins pass via the
+	//     ProjectRoleElevated bypass inside RequireProjectRole.
+	labelTaskDeps := labels.Deps{DB: deps.DB, Queries: deps.Queries, Audit: shared.auditRec}
+	relationTaskDeps := relations.Deps{DB: deps.DB, Queries: deps.Queries, Audit: shared.auditRec}
+	reactionDeps := reactions.Deps{DB: deps.DB, Queries: deps.Queries, Audit: shared.auditRec}
+	stepsDeps := tasks.StepsDeps{DB: deps.DB, Queries: deps.Queries, AI: shared.aiOrch, Embedder: shared.embedClient, Audit: shared.auditRec}
+
+	// Read group: RequireTaskAccess only.
 	r.Group(func(sub chi.Router) {
 		sub.Use(authMW)
 		sub.Use(middleware.RequireTaskAccess(shared.aclDB))
 		subAPI := newSubAPI(sub)
 		apis = append(apis, subAPI)
-		tasks.RegisterTaskScoped(subAPI, shared.taskDeps)
-		labelTaskDeps := labels.Deps{DB: deps.DB, Queries: deps.Queries, Audit: shared.auditRec}
-		labels.RegisterTaskScoped(subAPI, labelTaskDeps)
+		tasks.RegisterTaskScopedReads(subAPI, shared.taskDeps)
+		labels.RegisterTaskScopedReads(subAPI, labelTaskDeps)
 		timeline.RegisterTaskScoped(subAPI, shared.tlDeps)
-		relationTaskDeps := relations.Deps{DB: deps.DB, Queries: deps.Queries, Audit: shared.auditRec}
 		relations.RegisterTaskScoped(subAPI, relationTaskDeps)
-		reactionDeps := reactions.Deps{DB: deps.DB, Queries: deps.Queries, Audit: shared.auditRec}
-		reactions.RegisterTaskScoped(subAPI, reactionDeps)
+		reactions.RegisterTaskScopedReads(subAPI, reactionDeps)
+	})
 
-		// AI-powered step decomposition (propose + apply).
-		stepsDeps := tasks.StepsDeps{DB: deps.DB, Queries: deps.Queries, AI: shared.aiOrch, Embedder: shared.embedClient, Audit: shared.auditRec}
+	// Commenter write group: RequireTaskAccess + project commenter.
+	r.Group(func(sub chi.Router) {
+		sub.Use(authMW)
+		sub.Use(middleware.RequireTaskAccess(shared.aclDB))
+		sub.Use(middleware.RequireProjectRole(middleware.ProjectRoleCommenter))
+		subAPI := newSubAPI(sub)
+		apis = append(apis, subAPI)
+		tasks.RegisterTaskScopedCommenterWrites(subAPI, shared.taskDeps)
+		reactions.RegisterTaskScopedWrites(subAPI, reactionDeps)
+	})
+
+	// Editor write group: RequireTaskAccess + project editor.
+	r.Group(func(sub chi.Router) {
+		sub.Use(authMW)
+		sub.Use(middleware.RequireTaskAccess(shared.aclDB))
+		sub.Use(middleware.RequireProjectRole(middleware.ProjectRoleEditor))
+		subAPI := newSubAPI(sub)
+		apis = append(apis, subAPI)
+		tasks.RegisterTaskScopedEditorWrites(subAPI, shared.taskDeps)
+		labels.RegisterTaskScopedWrites(subAPI, labelTaskDeps)
 		tasks.RegisterSteps(subAPI, stepsDeps)
 	})
 
@@ -828,6 +869,7 @@ func buildAuthenticatedAPI(r chi.Router, deps Deps, shared *sharedDeps, authMW f
 		timeline.RegisterWorkspaceScoped(subAPI, shared.tlDeps)
 		eventsDeps := events.Deps{DB: deps.DB, Queries: deps.Queries}
 		events.RegisterWorkspaceScoped(subAPI, eventsDeps)
+		activityhandlers.Register(subAPI, activityhandlers.Deps{DB: deps.DB, Queries: deps.Queries})
 	})
 
 	// Signals collection. POST /signals lives in its own chi group so
@@ -1099,7 +1141,7 @@ func buildAuthenticatedAPI(r chi.Router, deps Deps, shared *sharedDeps, authMW f
 			Method:      http.MethodGet,
 			Path:        "/workspaces/{wsId}/calendars/{calId}/events",
 			Summary:     "List events in a calendar",
-			Description: "Returns events from the named calendar within the supplied date range. Recurrence rules are expanded server-side; client receives concrete instances.",
+			Description: "Returns events from the named calendar within the supplied date range. Recurring events are returned as a single master row carrying its recurrenceRule; the client expands concrete instances from that rule.",
 			Tags:        []string{"Calendar"},
 		}, calendars.ListEvents(shared.calDeps))
 		huma.Register(subAPI, huma.Operation{
@@ -1107,7 +1149,7 @@ func buildAuthenticatedAPI(r chi.Router, deps Deps, shared *sharedDeps, authMW f
 			Method:      http.MethodPost,
 			Path:        "/workspaces/{wsId}/calendars/{calId}/events",
 			Summary:     "Create an event",
-			Description: "Creates an event in the calendar. Optionally accepts an attendee list which triggers RSVP requests; recurrence rules are validated against RFC 5545.",
+			Description: "Creates an event in the calendar. Optionally accepts an attendee list which triggers RSVP requests. A recurrenceRule is validated for well-formedness (freq / interval / byDay / until / count bounds) and stored as-is; it is not expanded server-side — clients expand concrete instances from the stored rule.",
 			Tags:        []string{"Calendar"},
 		}, calendars.CreateEvent(shared.calDeps))
 		huma.Register(subAPI, huma.Operation{

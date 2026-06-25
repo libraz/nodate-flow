@@ -492,6 +492,190 @@ func TestUpdateMemberRole_ChangesRoleAndLogsEvent(t *testing.T) {
 	}
 }
 
+// addOwner seeds a second enabled owner so the last-owner guard does
+// not trip in tests that act on a non-last owner. Returns the new
+// user's internal id.
+func addOwner(t *testing.T, ctx context.Context, db *sql.DB, wsID uint32) uint32 {
+	t.Helper()
+	uid := seedUser(t, ctx, db)
+	if _, err := db.ExecContext(ctx,
+		`INSERT INTO workspace_members (public_id, workspace_id, user_id, role, joined_at)
+		 VALUES (?, ?, ?, 'owner', NOW())`,
+		dbtype.New(), wsID, uid); err != nil {
+		t.Fatalf("seed owner: %v", err)
+	}
+	return uid
+}
+
+// TestUpdateMemberRole_SelfModifyRejected verifies that an actor cannot
+// change their own role: ErrSelfModify is returned and the role is
+// unchanged.
+func TestUpdateMemberRole_SelfModifyRejected(t *testing.T) {
+	db := startDB(t)
+	ctx := context.Background()
+	ws := seedWorkspace(t, ctx, db, "")
+	t.Cleanup(func() { purgeWorkspace(t, db, ws.wsID) })
+
+	withTx(t, db, func(tx *sql.Tx) {
+		err := UpdateMemberRole(ctx, tx, UpdateMemberRoleArgs{
+			WorkspaceID: ws.wsID, UserID: ws.actorID, NewRole: RoleAdmin,
+			ActorUserID: ws.actorID,
+		})
+		if !errors.Is(err, ErrSelfModify) {
+			t.Fatalf("expected ErrSelfModify, got %v", err)
+		}
+	})
+
+	var role string
+	_ = db.QueryRowContext(ctx,
+		`SELECT role FROM workspace_members WHERE workspace_id = ? AND user_id = ?`,
+		ws.wsID, ws.actorID).Scan(&role)
+	if role != "owner" {
+		t.Errorf("role should be unchanged owner, got %q", role)
+	}
+}
+
+// TestUpdateMemberRole_DemoteLastOwnerRejected verifies that demoting
+// the only owner returns ErrLastOwner.
+func TestUpdateMemberRole_DemoteLastOwnerRejected(t *testing.T) {
+	db := startDB(t)
+	ctx := context.Background()
+	ws := seedWorkspace(t, ctx, db, "")
+	t.Cleanup(func() { purgeWorkspace(t, db, ws.wsID) })
+
+	// A different actor demotes the sole owner.
+	otherOwner := addOwner(t, ctx, db, ws.wsID)
+	// Now there are two owners; remove the second so actorID is the
+	// last owner, then have otherOwner attempt the demote.
+	if _, err := db.ExecContext(ctx,
+		`UPDATE workspace_members SET enabled = FALSE WHERE workspace_id = ? AND user_id = ?`,
+		ws.wsID, otherOwner); err != nil {
+		t.Fatalf("disable second owner: %v", err)
+	}
+
+	withTx(t, db, func(tx *sql.Tx) {
+		err := UpdateMemberRole(ctx, tx, UpdateMemberRoleArgs{
+			WorkspaceID: ws.wsID, UserID: ws.actorID, NewRole: RoleAdmin,
+			ActorUserID: otherOwner,
+		})
+		if !errors.Is(err, ErrLastOwner) {
+			t.Fatalf("expected ErrLastOwner, got %v", err)
+		}
+	})
+}
+
+// TestUpdateMemberRole_DemoteNonLastOwnerOK verifies that demoting an
+// owner while another owner remains succeeds.
+func TestUpdateMemberRole_DemoteNonLastOwnerOK(t *testing.T) {
+	db := startDB(t)
+	ctx := context.Background()
+	ws := seedWorkspace(t, ctx, db, "")
+	t.Cleanup(func() { purgeWorkspace(t, db, ws.wsID) })
+
+	secondOwner := addOwner(t, ctx, db, ws.wsID)
+
+	withTx(t, db, func(tx *sql.Tx) {
+		if err := UpdateMemberRole(ctx, tx, UpdateMemberRoleArgs{
+			WorkspaceID: ws.wsID, UserID: secondOwner, NewRole: RoleAdmin,
+			ActorUserID: ws.actorID,
+		}); err != nil {
+			t.Fatalf("expected demote of non-last owner to succeed, got %v", err)
+		}
+	})
+
+	var role string
+	_ = db.QueryRowContext(ctx,
+		`SELECT role FROM workspace_members WHERE workspace_id = ? AND user_id = ?`,
+		ws.wsID, secondOwner).Scan(&role)
+	if role != "admin" {
+		t.Errorf("expected role=admin, got %q", role)
+	}
+}
+
+// TestRemoveWorkspaceMember_SelfModifyRejected verifies that an actor
+// cannot remove themselves.
+func TestRemoveWorkspaceMember_SelfModifyRejected(t *testing.T) {
+	db := startDB(t)
+	ctx := context.Background()
+	ws := seedWorkspace(t, ctx, db, "")
+	t.Cleanup(func() { purgeWorkspace(t, db, ws.wsID) })
+
+	withTx(t, db, func(tx *sql.Tx) {
+		_, err := RemoveWorkspaceMember(ctx, tx, RemoveWorkspaceMemberArgs{
+			WorkspaceID: ws.wsID, UserID: ws.actorID, ActorUserID: ws.actorID,
+		})
+		if !errors.Is(err, ErrSelfModify) {
+			t.Fatalf("expected ErrSelfModify, got %v", err)
+		}
+	})
+
+	var enabled bool
+	_ = db.QueryRowContext(ctx,
+		`SELECT enabled FROM workspace_members WHERE workspace_id = ? AND user_id = ?`,
+		ws.wsID, ws.actorID).Scan(&enabled)
+	if !enabled {
+		t.Error("actor membership should still be enabled")
+	}
+}
+
+// TestRemoveWorkspaceMember_LastOwnerRejected verifies that removing the
+// only owner returns ErrLastOwner and leaves the member enabled.
+func TestRemoveWorkspaceMember_LastOwnerRejected(t *testing.T) {
+	db := startDB(t)
+	ctx := context.Background()
+	ws := seedWorkspace(t, ctx, db, "")
+	t.Cleanup(func() { purgeWorkspace(t, db, ws.wsID) })
+
+	// A separate admin actor attempts to remove the sole owner.
+	adminActor := seedUser(t, ctx, db)
+	if _, err := db.ExecContext(ctx,
+		`INSERT INTO workspace_members (public_id, workspace_id, user_id, role, joined_at)
+		 VALUES (?, ?, ?, 'admin', NOW())`,
+		dbtype.New(), ws.wsID, adminActor); err != nil {
+		t.Fatalf("seed admin: %v", err)
+	}
+
+	withTx(t, db, func(tx *sql.Tx) {
+		_, err := RemoveWorkspaceMember(ctx, tx, RemoveWorkspaceMemberArgs{
+			WorkspaceID: ws.wsID, UserID: ws.actorID, ActorUserID: adminActor,
+		})
+		if !errors.Is(err, ErrLastOwner) {
+			t.Fatalf("expected ErrLastOwner, got %v", err)
+		}
+	})
+
+	var enabled bool
+	_ = db.QueryRowContext(ctx,
+		`SELECT enabled FROM workspace_members WHERE workspace_id = ? AND user_id = ?`,
+		ws.wsID, ws.actorID).Scan(&enabled)
+	if !enabled {
+		t.Error("last owner should still be enabled after blocked removal")
+	}
+}
+
+// TestRemoveWorkspaceMember_NonLastOwnerOK verifies that removing an
+// owner while another owner remains succeeds.
+func TestRemoveWorkspaceMember_NonLastOwnerOK(t *testing.T) {
+	db := startDB(t)
+	ctx := context.Background()
+	ws := seedWorkspace(t, ctx, db, "")
+	t.Cleanup(func() { purgeWorkspace(t, db, ws.wsID) })
+
+	secondOwner := addOwner(t, ctx, db, ws.wsID)
+
+	withTx(t, db, func(tx *sql.Tx) {
+		res, err := RemoveWorkspaceMember(ctx, tx, RemoveWorkspaceMemberArgs{
+			WorkspaceID: ws.wsID, UserID: secondOwner, ActorUserID: ws.actorID,
+		})
+		if err != nil {
+			t.Fatalf("expected removal of non-last owner to succeed, got %v", err)
+		}
+		if !res.MemberDisabled {
+			t.Error("second owner should be disabled")
+		}
+	})
+}
+
 // TestUpdateMemberRole_SameRoleIsNoop verifies that passing the same
 // role does not emit a redundant audit row.
 func TestUpdateMemberRole_SameRoleIsNoop(t *testing.T) {

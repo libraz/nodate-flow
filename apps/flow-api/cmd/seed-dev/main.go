@@ -306,7 +306,51 @@ func run(ctx context.Context, logger *slog.Logger) error {
 		return fmt.Errorf("ensure share event: %w", err)
 	}
 
-	// 12. AI provider + model (placeholder key). Gives the AI-agents
+	// 12. Quick-login fixtures: one user per meaningful ACL role for the
+	// dev-only quick-login UI on the login page. Each user joins the same
+	// default workspace; the project-scoped two also get a row in
+	// project_members on the default seeded project. All credentials are
+	// fixed (no env override) — this set exists only to make role coverage
+	// trivial in local dev.
+	type quickLoginFixture struct {
+		email       string
+		displayName string
+		wsRole      generated.WorkspaceMembersRole
+		projectRole generated.ProjectMembersRole // empty string = no project_members row
+	}
+	const quickLoginPassword = "password123"
+	fixtures := []quickLoginFixture{
+		{email: "owner@example.com", displayName: "Owner", wsRole: generated.WorkspaceMembersRoleOwner},
+		{email: "wsadmin@example.com", displayName: "WsAdmin", wsRole: generated.WorkspaceMembersRoleAdmin},
+		{email: "guest@example.com", displayName: "Guest", wsRole: generated.WorkspaceMembersRoleGuest},
+		{email: "projectlead@example.com", displayName: "ProjectLead", wsRole: generated.WorkspaceMembersRoleMember, projectRole: generated.ProjectMembersRoleLead},
+		{email: "viewer@example.com", displayName: "ProjectViewer", wsRole: generated.WorkspaceMembersRoleMember, projectRole: generated.ProjectMembersRoleViewer},
+	}
+	for _, f := range fixtures {
+		uid, created, err := ensureUser(ctx, q, f.email, f.displayName, cfg.locale)
+		if err != nil {
+			return fmt.Errorf("ensure quick-login user %s: %w", f.email, err)
+		}
+		if created {
+			logger.Info("created user", "email", f.email, "id", uid)
+			if err := createLocalIdentity(ctx, q, uint32(uid), f.email, quickLoginPassword); err != nil { //#nosec G115 -- LastInsertId for users.id (BIGINT UNSIGNED), fits uint32 in dev seed
+				return fmt.Errorf("quick-login identity %s: %w", f.email, err)
+			}
+			logger.Info("created local identity", "email", f.email)
+		} else {
+			logger.Info("user exists", "email", f.email, "id", uid)
+		}
+		if err := ensureMembership(ctx, db, q, uint32(wsID), uint32(uid), f.wsRole, logger); err != nil { //#nosec G115 -- LastInsertIds for workspaces.id and users.id fit uint32 in dev seed
+			return fmt.Errorf("ensure quick-login membership %s: %w", f.email, err)
+		}
+		if f.projectRole != "" {
+			if err := ensureProjectMember(ctx, db, uint32(projID), uint32(uid), f.projectRole, logger); err != nil { //#nosec G115 -- LastInsertIds for projects.id and users.id fit uint32 in dev seed
+				return fmt.Errorf("ensure project member %s: %w", f.email, err)
+			}
+		}
+	}
+
+	// 13. AI provider + model (placeholder key). Gives the AI-agents
 	// settings page at least one row so operators can exercise the
 	// create-agent flow on a fresh dev DB. The api_key_ciphertext is a
 	// seed placeholder; rotate it via PATCH /ai/providers before the
@@ -581,6 +625,39 @@ func ensureSubscription(ctx context.Context, db *sql.DB, wsID, calID, userID uin
 		return err
 	}
 	logger.Info("created calendar subscription", "calendar_id", calID, "user_id", userID)
+	return nil
+}
+
+// ensureProjectMember upserts a project_members row for the given user
+// on the given project. Idempotent on (project_id, user_id): a re-run
+// updates role/enabled to match the requested values without raising a
+// duplicate-key error. Uses BINARY(16) UUID v7 like other seed rows.
+func ensureProjectMember(ctx context.Context, db *sql.DB, projectID, userID uint32, role generated.ProjectMembersRole, logger *slog.Logger) error {
+	// Look up the workspace_id from the project so the insert keeps the
+	// (workspace_id, project_id, user_id) triangle consistent without
+	// asking callers to pass it again.
+	var wsID uint32
+	if err := db.QueryRowContext(ctx,
+		"SELECT workspace_id FROM projects WHERE id = ?",
+		projectID,
+	).Scan(&wsID); err != nil {
+		return fmt.Errorf("lookup project workspace: %w", err)
+	}
+	pub := types.New()
+	now := time.Now()
+	if _, err := db.ExecContext(ctx,
+		`INSERT INTO project_members
+		   (public_id, workspace_id, project_id, user_id, role, added_at, enabled)
+		 VALUES (?, ?, ?, ?, ?, ?, TRUE)
+		 ON DUPLICATE KEY UPDATE
+		   role = VALUES(role),
+		   enabled = TRUE,
+		   added_at = COALESCE(project_members.added_at, VALUES(added_at))`,
+		pub, wsID, projectID, userID, string(role), now,
+	); err != nil {
+		return err
+	}
+	logger.Info("ensured project member", "project_id", projectID, "user_id", userID, "role", string(role))
 	return nil
 }
 

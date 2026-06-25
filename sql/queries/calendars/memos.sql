@@ -6,14 +6,16 @@ INSERT INTO calendar_memos (
   calendar_id,
   created_by_user_id,
   title,
+  body,
   sort_weight
-) VALUES (?, ?, ?, ?, ?, ?);
+) VALUES (?, ?, ?, ?, ?, ?, ?);
 
 -- name: ListCalendarMemos :many
 -- List memos for a calendar in display order.
 SELECT
   m.public_id,
   m.title,
+  m.body,
   m.done,
   m.sort_weight,
   m.created_by_user_id,
@@ -34,6 +36,7 @@ SELECT
   public_id,
   calendar_id,
   title,
+  body,
   done,
   sort_weight,
   created_by_user_id,
@@ -51,6 +54,7 @@ LIMIT 1;
 -- Update a memo's title, done, or sort_weight.
 UPDATE calendar_memos
 SET title       = COALESCE(sqlc.narg('title'), title),
+    body        = COALESCE(sqlc.narg('body'), body),
     done        = COALESCE(sqlc.narg('done'), done),
     sort_weight = COALESCE(sqlc.narg('sort_weight'), sort_weight)
 WHERE public_id = ?

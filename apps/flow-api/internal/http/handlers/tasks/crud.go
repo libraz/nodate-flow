@@ -386,7 +386,12 @@ func Create(deps Deps) func(context.Context, *CreateTaskInput) (*CreateTaskOutpu
 					validationFn = func() error { return httpErr(apierrors.WsMemberNotFound) }
 					return errCreateValidation
 				}
-				uid, lerr := qtx.FindUserInternalIdByPublicId(ctx, userPub)
+				// Resolve scoped to the task's workspace so an explicit actor
+				// list cannot attach a user from another tenant.
+				uid, lerr := qtx.FindWorkspaceMemberUserInternalIdByPublicId(ctx, generated.FindWorkspaceMemberUserInternalIdByPublicIdParams{
+					WorkspaceID: prj.WorkspaceID,
+					PublicID:    userPub,
+				})
 				if lerr != nil {
 					if errors.Is(lerr, sql.ErrNoRows) {
 						validationFn = func() error { return httpErr(apierrors.WsMemberNotFound) }

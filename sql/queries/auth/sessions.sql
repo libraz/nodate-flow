@@ -31,6 +31,26 @@ WHERE refresh_hash = ?
   AND revoked_at IS NULL
 LIMIT 1;
 
+-- name: FindAnySessionByRefreshHash :one
+-- Resolve a session from its SHA-256 refresh hash regardless of its
+-- revoked / enabled state. Used by the refresh-reuse detector: a hash
+-- that matches a row which is already revoked or disabled is evidence
+-- that a previously-rotated (and thus invalidated) refresh token was
+-- replayed, so the whole session family must be torn down.
+SELECT
+  id,
+  public_id,
+  user_id,
+  refresh_hash,
+  expires_at,
+  revoked_at,
+  last_used_at,
+  enabled,
+  created_at
+FROM sessions
+WHERE refresh_hash = ?
+LIMIT 1;
+
 -- name: RevokeSession :exec
 -- Mark a session as revoked. Workspace scoping does not apply (user-scoped).
 UPDATE sessions
@@ -38,6 +58,17 @@ SET revoked_at = CURRENT_TIMESTAMP,
     enabled = FALSE
 WHERE user_id = ?
   AND public_id = ?;
+
+-- name: RevokeAllSessionsForUser :exec
+-- Revoke every active session for a user. Used by the refresh-reuse
+-- detector to tear down the entire session family when a rotated /
+-- revoked refresh token is replayed.
+UPDATE sessions
+SET revoked_at = CURRENT_TIMESTAMP,
+    enabled = FALSE
+WHERE user_id = ?
+  AND enabled = TRUE
+  AND revoked_at IS NULL;
 
 -- name: ListSessionsForUser :many
 -- List a user's active sessions ordered by most recent first.

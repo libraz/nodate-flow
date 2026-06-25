@@ -4,7 +4,10 @@
 !.env.example
 *.key
 *.pem
-secrets/
+# Root-anchored: only ignore a top-level secrets/ mount dir, not a `secrets`
+# Go package nested under apps/*/internal/ (an unanchored rule would silently
+# un-commit such source and break `go build ./...`).
+/secrets/
 
 # ---- Node / TypeScript ----
 node_modules/

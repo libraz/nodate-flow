@@ -56,10 +56,19 @@ func RegisterWorkspaceScoped(api huma.API, deps Deps) {
 	}, Disable(deps))
 }
 
-// RegisterTaskScoped wires the task-scoped label routes under
-// /tasks/{id}/labels. The caller must attach RequireTaskAccess to the
-// underlying chi router.
+// RegisterTaskScoped wires every task-scoped label route on one chi group.
+// Preserved for callers that want uniform middleware; the production router
+// calls the split variants ([RegisterTaskScopedReads] /
+// [RegisterTaskScopedWrites]) so a read-only project role cannot attach or
+// remove labels. The caller must attach RequireTaskAccess.
 func RegisterTaskScoped(api huma.API, deps Deps) {
+	RegisterTaskScopedReads(api, deps)
+	RegisterTaskScopedWrites(api, deps)
+}
+
+// RegisterTaskScopedReads wires the read-only task-scoped label route under
+// /tasks/{id}/labels. Gated only by RequireTaskAccess.
+func RegisterTaskScopedReads(api huma.API, deps Deps) {
 	huma.Register(api, huma.Operation{
 		OperationID: "tasks-labels-list",
 		Method:      http.MethodGet,
@@ -68,7 +77,13 @@ func RegisterTaskScoped(api huma.API, deps Deps) {
 		Description: "Returns the labels currently attached to the task, in the order they were added. Used by the task detail view's label chips.",
 		Tags:        []string{"Labels"},
 	}, ListTaskLabels(deps))
+}
 
+// RegisterTaskScopedWrites wires the label attach / remove routes under
+// /tasks/{id}/labels. Attaching and removing labels is a structural edit, so
+// the caller must attach RequireTaskAccess followed by
+// RequireProjectRole(ProjectRoleEditor).
+func RegisterTaskScopedWrites(api huma.API, deps Deps) {
 	huma.Register(api, huma.Operation{
 		OperationID: "tasks-labels-add",
 		Method:      http.MethodPost,

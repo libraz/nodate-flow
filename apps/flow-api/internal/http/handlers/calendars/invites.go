@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/audit"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/generated/calendar"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/types"
 	apierrors "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/errors"
@@ -274,14 +275,29 @@ func CreateEventInvite(deps Deps) func(context.Context, *CreateEventInviteInput)
 		}
 
 		eventType := "calendar.event.invite.created"
+		auditAction := "calendar.invite.create"
 		if rotated {
 			eventType = "calendar.event.invite.rotated"
+			auditAction = "calendar.invite.rotate"
 		}
 		_ = appendCalendarEvent(ctx, deps.DB, wsID, eventType, &actorID, map[string]any{
 			"eventId":          input.EvtID,
 			"calendarId":       input.CalID,
 			"attendeePublicId": input.AttendeeID,
 			"invitePublicId":   invitePublicID.String(),
+		})
+
+		deps.Audit.Record(ctx, audit.Entry{
+			Action:       auditAction,
+			ActorID:      actorID,
+			WorkspaceID:  wsID,
+			ResourceType: "calendar.invite",
+			ResourceID:   invitePublicID.String(),
+			Metadata: map[string]any{
+				"calendarId":       input.CalID,
+				"eventId":          input.EvtID,
+				"attendeePublicId": input.AttendeeID,
+			},
 		})
 
 		// Dispatch the magic-link email. Best-effort: a delivery
@@ -487,6 +503,20 @@ func AcceptEventInvite(deps Deps) func(context.Context, *AcceptEventInviteInput)
 		out.Body.InviteID = invite.PublicID.String()
 		out.Body.Rsvp = string(rsvp)
 
+		// Unauthenticated magic-link accept: the actor is the anonymous
+		// invite holder, so ActorID stays 0 (recorded as a NULL actor).
+		// The invite row carries its own workspace_id so the entry is
+		// still workspace-scoped and surfaces in v_workspace_activity.
+		deps.Audit.Record(ctx, audit.Entry{
+			Action:       "calendar.invite.accept",
+			WorkspaceID:  invite.WorkspaceID,
+			ResourceType: "calendar.invite",
+			ResourceID:   invite.PublicID.String(),
+			Metadata: map[string]any{
+				"rsvp": string(rsvp),
+			},
+		})
+
 		slog.InfoContext(ctx, "calendar event invite accepted",
 			"inviteId", invite.PublicID.String(),
 			"rsvp", out.Body.Rsvp,
@@ -536,6 +566,17 @@ func RevokeEventInvite(deps Deps) func(context.Context, *RevokeEventInviteInput)
 			"eventId":        input.EvtID,
 			"calendarId":     input.CalID,
 			"invitePublicId": input.InviteID,
+		})
+		deps.Audit.Record(ctx, audit.Entry{
+			Action:       "calendar.invite.revoke",
+			ActorID:      actorID,
+			WorkspaceID:  wsID,
+			ResourceType: "calendar.invite",
+			ResourceID:   input.InviteID,
+			Metadata: map[string]any{
+				"calendarId": input.CalID,
+				"eventId":    input.EvtID,
+			},
 		})
 		out := &RevokeEventInviteOutput{}
 		out.Body.Revoked = true

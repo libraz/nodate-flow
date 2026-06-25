@@ -157,13 +157,25 @@ func LoginTotp(deps Deps) func(context.Context, *LoginTotpInput) (*LoginTotpOutp
 			// Either both supplied or neither.
 			return nil, httpErr(apierrors.AuthTotpRecoveryCodeRequired)
 		}
+		// acceptedStep carries the matched TOTP time-step from the
+		// authenticator branch so it can be persisted as the new
+		// last-used step after the success path resets failed attempts.
+		// It stays -1 on the recovery-code branch (no step to advance).
+		acceptedStep := int64(-1)
 		if hasCode {
 			secret, derr := deps.Cipher.Decrypt([]byte(ident.MfaSecretCiphertext.String))
 			if derr != nil {
 				recordCipherDecryptFailure(ctx, deps, uint32(uid), "login_totp", derr)
 				return nil, httpErr(apierrors.InternalUnexpected)
 			}
-			if !auth.VerifyTotp(secret, in.Body.Code, time.Now()) {
+			step, okCode := auth.VerifyTotpStep(secret, in.Body.Code, time.Now())
+			// RFC 6238 5.2 one-time-use: a syntactically valid code whose
+			// step was already consumed is a replay. Treat it exactly like
+			// a mismatch (same audit + lockout accounting) so an attacker
+			// replaying a captured code cannot distinguish replay from a
+			// wrong code and cannot reuse it inside the skew window.
+			replayed := okCode && ident.MfaLastStep.Valid && step <= ident.MfaLastStep.Int64
+			if !okCode || replayed {
 				bumpFailedByID(ctx, deps, ident.ID, ident.FailedAttempts)
 				deps.Audit.Record(ctx, audit.Entry{
 					Action:       "auth.login_totp_failed",
@@ -175,6 +187,7 @@ func LoginTotp(deps Deps) func(context.Context, *LoginTotpInput) (*LoginTotpOutp
 				}
 				return nil, httpErr(apierrors.AuthTotpCodeMismatch)
 			}
+			acceptedStep = step
 		} else {
 			hash := auth.HashRecoveryCode(in.Body.RecoveryCode)
 			rcID, lerr := deps.Queries.FindUnusedRecoveryCode(ctx, generated.FindUnusedRecoveryCodeParams{UserID: uid, CodeHash: hash})
@@ -221,6 +234,17 @@ func LoginTotp(deps Deps) func(context.Context, *LoginTotpInput) (*LoginTotpOutp
 		// 2FA succeeded — clear any accumulated failed attempts.
 		if err := deps.Queries.ResetIdentityFailedAttempts(ctx, ident.ID); err != nil {
 			slog.ErrorContext(ctx, "login_totp: failed to reset failed attempts", slog.Any("err", err))
+		}
+		// Advance the one-time-use TOTP step so the accepted code (and
+		// every earlier code in the window) cannot be replayed. Skipped
+		// on the recovery-code branch, which has no time-step.
+		if acceptedStep >= 0 {
+			if err := deps.Queries.UpdateIdentityMfaLastStep(ctx, generated.UpdateIdentityMfaLastStepParams{
+				Step: sql.NullInt64{Int64: acceptedStep, Valid: true},
+				ID:   ident.ID,
+			}); err != nil {
+				slog.ErrorContext(ctx, "login_totp: failed to advance mfa last step", slog.Any("err", err))
+			}
 		}
 		u, err := deps.Queries.FindUserProfileById(ctx, uid)
 		if err != nil {

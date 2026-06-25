@@ -36,10 +36,14 @@ var (
 	WsLensNotFound = &Spec{Code: "WS.LENS.NOT_FOUND", Status: 404, Message: "Saved view not found", Description: "Returned when a lens with the given public_id does not exist or has been deleted.", UserAction: "Verify the view ID, or refresh the list to see current saved views."}
 	// WS.LENS.PUBLIC_TOKEN_INVALID — Public share link not found or expired
 	WsLensPublicTokenInvalid = &Spec{Code: "WS.LENS.PUBLIC_TOKEN_INVALID", Status: 404, Message: "Public share link not found or expired", Description: "Returned when a public lens token does not match any published lens.", UserAction: "Verify the share link is correct and the view is still published."}
+	// WS.MEMBER.LAST_OWNER — The workspace must keep at least one owner.
+	WsMemberLastOwner = &Spec{Code: "WS.MEMBER.LAST_OWNER", Status: 409, Message: "The workspace must keep at least one owner.", Description: "Returned when an operation would remove or demote the last remaining owner of the workspace. At least one owner must remain.", UserAction: "Promote another member to owner before removing or demoting the current owner."}
 	// WS.MEMBER.NOT_FOUND — Workspace member not found
 	WsMemberNotFound = &Spec{Code: "WS.MEMBER.NOT_FOUND", Status: 404, Message: "Workspace member not found", Description: "Returned when the target user is not a member of the workspace.", UserAction: "Invite the user to the workspace first."}
 	// WS.MEMBER.ROLE_DENIED — Your role does not permit this action
 	WsMemberRoleDenied = &Spec{Code: "WS.MEMBER.ROLE_DENIED", Status: 403, Message: "Your role does not permit this action", Description: "Returned when the actor's workspace role is insufficient for the attempted operation.", UserAction: "Ask a workspace admin to elevate your role."}
+	// WS.MEMBER.SELF_MODIFY — You cannot change your own membership.
+	WsMemberSelfModify = &Spec{Code: "WS.MEMBER.SELF_MODIFY", Status: 403, Message: "You cannot change your own membership.", Description: "Returned when an actor attempts to change their own workspace membership role or remove themselves from the workspace.", UserAction: "Ask another workspace owner to change your role or remove you."}
 	// WS.MENTION.NOT_FOUND — Mention not found
 	WsMentionNotFound = &Spec{Code: "WS.MENTION.NOT_FOUND", Status: 404, Message: "Mention not found", Description: "Returned when a mention with the given public_id does not exist or has been removed.", UserAction: "Verify the mention ID."}
 	// WS.NOTIFICATION.NOT_FOUND — Notification not found

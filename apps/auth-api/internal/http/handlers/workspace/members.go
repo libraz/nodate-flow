@@ -177,6 +177,12 @@ func UpdateMemberRole(deps Deps) func(context.Context, *UpdateMemberRoleInput) (
 			NewRole:     memberkit.Role(in.Body.Role),
 			ActorUserID: actorID,
 		}); err != nil {
+			switch {
+			case errors.Is(err, memberkit.ErrSelfModify):
+				return nil, httpErr(apierrors.WsMemberSelfModify)
+			case errors.Is(err, memberkit.ErrLastOwner):
+				return nil, httpErr(apierrors.WsMemberLastOwner)
+			}
 			return nil, httpErr(apierr.SpecForErrNoRows(err, apierrors.WsMemberNotFound, apierrors.InternalUnexpected))
 		}
 		if err := tx.Commit(); err != nil {
@@ -228,6 +234,12 @@ func RemoveMember(deps Deps) func(context.Context, *RemoveMemberInput) (*RemoveM
 			UserID:      uid,
 			ActorUserID: actorID,
 		}); err != nil {
+			switch {
+			case errors.Is(err, memberkit.ErrSelfModify):
+				return nil, httpErr(apierrors.WsMemberSelfModify)
+			case errors.Is(err, memberkit.ErrLastOwner):
+				return nil, httpErr(apierrors.WsMemberLastOwner)
+			}
 			return nil, httpErr(apierr.SpecForErrNoRows(err, apierrors.WsMemberNotFound, apierrors.InternalUnexpected))
 		}
 		if err := tx.Commit(); err != nil {

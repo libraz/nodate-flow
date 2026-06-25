@@ -81,6 +81,11 @@ export const WsErrors = {
     status: 404,
     message: "Public share link not found or expired",
   },
+  WS_MEMBER_LAST_OWNER: {
+    code: "WS.MEMBER.LAST_OWNER",
+    status: 409,
+    message: "The workspace must keep at least one owner.",
+  },
   WS_MEMBER_NOT_FOUND: {
     code: "WS.MEMBER.NOT_FOUND",
     status: 404,
@@ -90,6 +95,11 @@ export const WsErrors = {
     code: "WS.MEMBER.ROLE_DENIED",
     status: 403,
     message: "Your role does not permit this action",
+  },
+  WS_MEMBER_SELF_MODIFY: {
+    code: "WS.MEMBER.SELF_MODIFY",
+    status: 403,
+    message: "You cannot change your own membership.",
   },
   WS_MENTION_NOT_FOUND: {
     code: "WS.MENTION.NOT_FOUND",

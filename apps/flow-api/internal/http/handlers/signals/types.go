@@ -91,7 +91,7 @@ type Signal struct {
 // WS.SIGNAL.SUBJECT_MISMATCH.
 type SignalCreateInputBody struct {
 	WorkspaceID string          `json:"workspaceId" required:"true" doc:"Workspace public id (UUID v7)"`
-	Source      string          `json:"source" required:"true" enum:"manual,github,slack,email,google,webhook,calendar"`
+	Source      string          `json:"source" required:"true" enum:"manual,github,slack,email,google,webhook,calendar,discord"`
 	Kind        string          `json:"kind" required:"true" minLength:"1" maxLength:"255" doc:"Signal kind from signal_kinds/*.yaml registry (e.g. discord.presence, manual). Unknown kinds are rejected with WS.SIGNAL.KIND_UNKNOWN."`
 	ExternalID  string          `json:"externalId,omitempty" maxLength:"255"`
 	TaskID      string          `json:"taskId,omitempty" doc:"Legacy fast path equivalent to (subjectType='task', subjectId=<task public id>). When both forms are supplied they must point at the same task."`

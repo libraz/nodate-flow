@@ -219,7 +219,8 @@ func (q *Queries) AdminSuspendUser(ctx context.Context, publicID types.PublicID)
 const clearIdentityMfa = `-- name: ClearIdentityMfa :exec
 UPDATE identities
 SET mfa_secret_ciphertext = NULL,
-    mfa_confirmed_at = NULL
+    mfa_confirmed_at = NULL,
+    mfa_last_step = NULL
 WHERE id = ?
 `
 
@@ -385,6 +386,7 @@ SELECT
   i.locked_until_at,
   i.mfa_secret_ciphertext,
   i.mfa_confirmed_at,
+  i.mfa_last_step,
   u.public_id AS user_public_id,
   u.enabled AS user_enabled
 FROM identities i
@@ -404,6 +406,7 @@ type FindLocalIdentityByEmailRow struct {
 	LockedUntilAt       sql.NullTime   `json:"lockedUntilAt"`
 	MfaSecretCiphertext sql.NullString `json:"mfaSecretCiphertext"`
 	MfaConfirmedAt      sql.NullTime   `json:"mfaConfirmedAt"`
+	MfaLastStep         sql.NullInt64  `json:"mfaLastStep"`
 	UserPublicID        types.PublicID `json:"userPublicId"`
 	UserEnabled         bool           `json:"userEnabled"`
 }
@@ -423,6 +426,7 @@ func (q *Queries) FindLocalIdentityByEmail(ctx context.Context, email string) (F
 		&i.LockedUntilAt,
 		&i.MfaSecretCiphertext,
 		&i.MfaConfirmedAt,
+		&i.MfaLastStep,
 		&i.UserPublicID,
 		&i.UserEnabled,
 	)
@@ -436,7 +440,8 @@ SELECT
   failed_attempts,
   locked_until_at,
   mfa_secret_ciphertext,
-  mfa_confirmed_at
+  mfa_confirmed_at,
+  mfa_last_step
 FROM identities
 WHERE user_id = ?
   AND provider = 'local'
@@ -451,6 +456,7 @@ type FindLocalIdentityByUserIdRow struct {
 	LockedUntilAt       sql.NullTime   `json:"lockedUntilAt"`
 	MfaSecretCiphertext sql.NullString `json:"mfaSecretCiphertext"`
 	MfaConfirmedAt      sql.NullTime   `json:"mfaConfirmedAt"`
+	MfaLastStep         sql.NullInt64  `json:"mfaLastStep"`
 }
 
 // Resolve a local-password identity by internal user id. Used by
@@ -467,6 +473,7 @@ func (q *Queries) FindLocalIdentityByUserId(ctx context.Context, userID uint32) 
 		&i.LockedUntilAt,
 		&i.MfaSecretCiphertext,
 		&i.MfaConfirmedAt,
+		&i.MfaLastStep,
 	)
 	return i, err
 }
@@ -877,7 +884,8 @@ func (q *Queries) ResetIdentityFailedAttempts(ctx context.Context, id uint32) er
 const setIdentityMfaSecret = `-- name: SetIdentityMfaSecret :exec
 UPDATE identities
 SET mfa_secret_ciphertext = ?,
-    mfa_confirmed_at = NULL
+    mfa_confirmed_at = NULL,
+    mfa_last_step = NULL
 WHERE id = ?
 `
 
@@ -952,6 +960,28 @@ type UpdateIdentityFailedAttemptsParams struct {
 // Bump failed login counter and optionally apply a lockout deadline.
 func (q *Queries) UpdateIdentityFailedAttempts(ctx context.Context, arg UpdateIdentityFailedAttemptsParams) error {
 	_, err := q.db.ExecContext(ctx, updateIdentityFailedAttempts, arg.FailedAttempts, arg.LockedUntilAt, arg.ID)
+	return err
+}
+
+const updateIdentityMfaLastStep = `-- name: UpdateIdentityMfaLastStep :exec
+UPDATE identities
+SET mfa_last_step = ?
+WHERE id = ?
+  AND (mfa_last_step IS NULL OR mfa_last_step < ?)
+`
+
+type UpdateIdentityMfaLastStepParams struct {
+	Step sql.NullInt64 `json:"step"`
+	ID   uint32        `json:"-"`
+}
+
+// Record the highest TOTP time-step that has been accepted for this
+// identity. RFC 6238 5.2 one-time-use: a subsequent code whose step is
+// <= this value must be rejected as a replay. The guard never lowers
+// the stored value so an out-of-order skew-window match cannot reopen
+// an already-consumed step.
+func (q *Queries) UpdateIdentityMfaLastStep(ctx context.Context, arg UpdateIdentityMfaLastStepParams) error {
+	_, err := q.db.ExecContext(ctx, updateIdentityMfaLastStep, arg.Step, arg.ID, arg.Step)
 	return err
 }
 

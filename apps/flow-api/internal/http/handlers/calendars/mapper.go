@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/generated/calendar"
+	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/types"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/handlers/handlerutil"
 	"github.com/nodate-flow/nodate-flow/packages/go-shared/dbtype"
 )
@@ -27,6 +28,9 @@ type eventCommon interface {
 	endAt() *int64
 	timezone() string
 	createdAt() int64
+	creatorID() string
+	creatorDisplayName() string
+	creatorAvatarURL() *string
 }
 
 // baseEventResponse populates the columns that every event row carries.
@@ -44,7 +48,22 @@ func baseEventResponse(c eventCommon) EventResponse {
 		EndAt:      c.endAt(),
 		Timezone:   c.timezone(),
 		CreatedAt:  c.createdAt(),
+
+		CreatorID:          c.creatorID(),
+		CreatorDisplayName: c.creatorDisplayName(),
+		CreatorAvatarURL:   c.creatorAvatarURL(),
 	}
+}
+
+// creatorPublicIDString renders a creator public_id to its UUID string,
+// returning "" for the zero value. The creator JOIN is a LEFT JOIN, so a
+// hard-deleted creator (CASCADE normally prevents this) scans as the zero
+// PublicID; we suppress that rather than emit a zero UUID.
+func creatorPublicIDString(id types.PublicID) string {
+	if id == (types.PublicID{}) {
+		return ""
+	}
+	return id.String()
 }
 
 // rangeEvent adapts ListCalendarEventsByRangeRow to eventCommon.
@@ -52,16 +71,19 @@ type rangeEvent struct {
 	r calendar.ListCalendarEventsByRangeRow
 }
 
-func (e rangeEvent) publicIDString() string   { return e.r.PublicID.String() }
-func (e rangeEvent) kindString() string       { return string(e.r.Kind) }
-func (e rangeEvent) visibilityString() string { return string(e.r.Visibility) }
-func (e rangeEvent) showAsString() string     { return string(e.r.ShowAs) }
-func (e rangeEvent) title() string            { return e.r.Title }
-func (e rangeEvent) allDay() bool             { return e.r.AllDay }
-func (e rangeEvent) startAt() *int64          { return nullTimeUnixPtr(e.r.StartAt) }
-func (e rangeEvent) endAt() *int64            { return nullTimeUnixPtr(e.r.EndAt) }
-func (e rangeEvent) timezone() string         { return e.r.Timezone }
-func (e rangeEvent) createdAt() int64         { return handlerutil.TimeToUnix(e.r.CreatedAt) }
+func (e rangeEvent) publicIDString() string     { return e.r.PublicID.String() }
+func (e rangeEvent) kindString() string         { return string(e.r.Kind) }
+func (e rangeEvent) visibilityString() string   { return string(e.r.Visibility) }
+func (e rangeEvent) showAsString() string       { return string(e.r.ShowAs) }
+func (e rangeEvent) title() string              { return e.r.Title }
+func (e rangeEvent) allDay() bool               { return e.r.AllDay }
+func (e rangeEvent) startAt() *int64            { return nullTimeUnixPtr(e.r.StartAt) }
+func (e rangeEvent) endAt() *int64              { return nullTimeUnixPtr(e.r.EndAt) }
+func (e rangeEvent) timezone() string           { return e.r.Timezone }
+func (e rangeEvent) createdAt() int64           { return handlerutil.TimeToUnix(e.r.CreatedAt) }
+func (e rangeEvent) creatorID() string          { return creatorPublicIDString(e.r.CreatorPublicID) }
+func (e rangeEvent) creatorDisplayName() string { return e.r.CreatorDisplayName.String }
+func (e rangeEvent) creatorAvatarURL() *string  { return dbtype.PtrFromNullString(e.r.CreatorAvatarUrl) }
 
 // recurringEvent adapts ListRecurringCalendarEventsByRangeRow.
 type recurringEvent struct {
@@ -78,22 +100,32 @@ func (e recurringEvent) startAt() *int64          { return nullTimeUnixPtr(e.r.S
 func (e recurringEvent) endAt() *int64            { return nullTimeUnixPtr(e.r.EndAt) }
 func (e recurringEvent) timezone() string         { return e.r.Timezone }
 func (e recurringEvent) createdAt() int64         { return handlerutil.TimeToUnix(e.r.CreatedAt) }
+func (e recurringEvent) creatorID() string        { return creatorPublicIDString(e.r.CreatorPublicID) }
+func (e recurringEvent) creatorDisplayName() string {
+	return e.r.CreatorDisplayName.String
+}
+func (e recurringEvent) creatorAvatarURL() *string {
+	return dbtype.PtrFromNullString(e.r.CreatorAvatarUrl)
+}
 
 // fullEvent adapts FindCalendarEventByPublicIdRow.
 type fullEvent struct {
 	r calendar.FindCalendarEventByPublicIdRow
 }
 
-func (e fullEvent) publicIDString() string   { return e.r.PublicID.String() }
-func (e fullEvent) kindString() string       { return string(e.r.Kind) }
-func (e fullEvent) visibilityString() string { return string(e.r.Visibility) }
-func (e fullEvent) showAsString() string     { return string(e.r.ShowAs) }
-func (e fullEvent) title() string            { return e.r.Title }
-func (e fullEvent) allDay() bool             { return e.r.AllDay }
-func (e fullEvent) startAt() *int64          { return nullTimeUnixPtr(e.r.StartAt) }
-func (e fullEvent) endAt() *int64            { return nullTimeUnixPtr(e.r.EndAt) }
-func (e fullEvent) timezone() string         { return e.r.Timezone }
-func (e fullEvent) createdAt() int64         { return handlerutil.TimeToUnix(e.r.CreatedAt) }
+func (e fullEvent) publicIDString() string     { return e.r.PublicID.String() }
+func (e fullEvent) kindString() string         { return string(e.r.Kind) }
+func (e fullEvent) visibilityString() string   { return string(e.r.Visibility) }
+func (e fullEvent) showAsString() string       { return string(e.r.ShowAs) }
+func (e fullEvent) title() string              { return e.r.Title }
+func (e fullEvent) allDay() bool               { return e.r.AllDay }
+func (e fullEvent) startAt() *int64            { return nullTimeUnixPtr(e.r.StartAt) }
+func (e fullEvent) endAt() *int64              { return nullTimeUnixPtr(e.r.EndAt) }
+func (e fullEvent) timezone() string           { return e.r.Timezone }
+func (e fullEvent) createdAt() int64           { return handlerutil.TimeToUnix(e.r.CreatedAt) }
+func (e fullEvent) creatorID() string          { return creatorPublicIDString(e.r.CreatorPublicID) }
+func (e fullEvent) creatorDisplayName() string { return e.r.CreatorDisplayName.String }
+func (e fullEvent) creatorAvatarURL() *string  { return dbtype.PtrFromNullString(e.r.CreatorAvatarUrl) }
 
 // eventFromRangeRow converts a ListCalendarEventsByRange row into the
 // public EventResponse DTO. Used by the per-calendar list endpoint.

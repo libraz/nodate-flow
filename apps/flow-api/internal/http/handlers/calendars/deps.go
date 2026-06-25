@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 
+	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/audit"
 	generated "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/generated"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/generated/calendar"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/eventbus"
@@ -21,6 +22,12 @@ type Deps struct {
 	// *_attendee_*, *_memo_* operation.
 	CalendarQueries *calendar.Queries
 	DB              *sql.DB
+	// Audit appends workspace-scoped audit log entries for calendar
+	// mutations so calendar activity surfaces in v_workspace_activity
+	// alongside the other mutation domains. Nil-safe: a nil recorder
+	// makes every Record call a no-op. Recording is best-effort and
+	// never fails the primary operation.
+	Audit *audit.Recorder
 	// EmailSender dispatches transactional emails (e.g. event-invite
 	// magic links). Nil-safe: when unset, handlers fall back to
 	// [email.NoopSender] so the invite row is still created but no

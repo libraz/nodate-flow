@@ -112,6 +112,32 @@ func (s *RedisStore) FindByRefreshHash(ctx context.Context, hash string) (*Sessi
 	}, nil
 }
 
+// FindAnyByRefreshHash implements [Store]. The Redis driver deletes a
+// session key on rotation rather than tombstoning it, so there is no
+// revoked row to resolve: a rotated hash simply no longer exists. This
+// therefore behaves identically to FindByRefreshHash. Reuse detection
+// on Redis is consequently limited to the in-flight (not-yet-rotated)
+// window; the durable cross-rotation detection lives on the MySQL
+// driver, which keeps revoked rows.
+func (s *RedisStore) FindAnyByRefreshHash(ctx context.Context, hash string) (*Session, error) {
+	return s.FindByRefreshHash(ctx, hash)
+}
+
+// RevokeAllForUser implements [Store]. It revokes every active session
+// for the user by draining the user's session set.
+func (s *RedisStore) RevokeAllForUser(ctx context.Context, userID uint32) error {
+	sessions, err := s.ListActive(ctx, userID)
+	if err != nil {
+		return err
+	}
+	for _, sess := range sessions {
+		if err := s.Revoke(ctx, userID, sess.PublicID); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 // rotateScript is a Lua script that atomically reads an old session
 // key, writes a new one, and deletes the old. This eliminates the
 // TOCTOU race where concurrent refresh requests could both read the

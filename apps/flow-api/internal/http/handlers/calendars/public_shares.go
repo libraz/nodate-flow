@@ -7,6 +7,7 @@ import (
 
 	"github.com/google/uuid"
 
+	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/audit"
 	generated "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/generated"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/generated/calendar"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/types"
@@ -289,6 +290,17 @@ func CreatePublicShare(deps Deps) func(context.Context, *CreatePublicShareInput)
 			"title":   input.Body.Title,
 		})
 
+		deps.Audit.Record(ctx, audit.Entry{
+			Action:       "calendar.share.create",
+			ActorID:      actorID,
+			WorkspaceID:  wsID,
+			ResourceType: "calendar.share",
+			ResourceID:   publicID.String(),
+			Metadata: map[string]any{
+				"title": input.Body.Title,
+			},
+		})
+
 		out := &CreatePublicShareOutput{}
 		out.Body = PublicShareCreateResponse{
 			PublicShareResponse: publicShareFromRow(row, 0),
@@ -413,6 +425,14 @@ func PatchPublicShare(deps Deps) func(context.Context, *PatchPublicShareInput) (
 			"shareId": input.ShareID,
 		})
 
+		deps.Audit.Record(ctx, audit.Entry{
+			Action:       "calendar.share.update",
+			ActorID:      actorID,
+			WorkspaceID:  wsID,
+			ResourceType: "calendar.share",
+			ResourceID:   input.ShareID,
+		})
+
 		out := &PatchPublicShareOutput{}
 		out.Body = publicShareFromRow(row, 0)
 		return out, nil
@@ -458,6 +478,14 @@ func RotatePublicShareToken(deps Deps) func(context.Context, *RotatePublicShareT
 			"shareId": input.ShareID,
 		})
 
+		deps.Audit.Record(ctx, audit.Entry{
+			Action:       "calendar.share.rotate",
+			ActorID:      actorID,
+			WorkspaceID:  wsID,
+			ResourceType: "calendar.share",
+			ResourceID:   input.ShareID,
+		})
+
 		out := &RotatePublicShareTokenOutput{}
 		out.Body = PublicShareRotateResponse{
 			PublicShareResponse: publicShareFromRow(row, 0),
@@ -488,6 +516,13 @@ func DeletePublicShare(deps Deps) func(context.Context, *DeletePublicShareInput)
 		}
 		_ = appendCalendarEvent(ctx, deps.DB, wsID, "public_share.deleted", &actorID, map[string]any{
 			"shareId": input.ShareID,
+		})
+		deps.Audit.Record(ctx, audit.Entry{
+			Action:       "calendar.share.delete",
+			ActorID:      actorID,
+			WorkspaceID:  wsID,
+			ResourceType: "calendar.share",
+			ResourceID:   input.ShareID,
 		})
 		out := &DeletePublicShareOutput{}
 		out.Body.Deleted = true
@@ -557,6 +592,17 @@ func AttachEventsToShare(deps Deps) func(context.Context, *AttachEventsToShareIn
 				"shareId":  input.ShareID,
 				"attached": attached,
 				"skipped":  skipped,
+			})
+			deps.Audit.Record(ctx, audit.Entry{
+				Action:       "calendar.share.events_attach",
+				ActorID:      actorID,
+				WorkspaceID:  wsID,
+				ResourceType: "calendar.share",
+				ResourceID:   input.ShareID,
+				Metadata: map[string]any{
+					"attached": attached,
+					"skipped":  skipped,
+				},
 			})
 		}
 
@@ -663,6 +709,17 @@ func ReorderShareEvents(deps Deps) func(context.Context, *ReorderShareEventsInpu
 			"count":   len(requested),
 		})
 
+		deps.Audit.Record(ctx, audit.Entry{
+			Action:       "calendar.share.events_reorder",
+			ActorID:      actorID,
+			WorkspaceID:  wsID,
+			ResourceType: "calendar.share",
+			ResourceID:   input.ShareID,
+			Metadata: map[string]any{
+				"count": len(requested),
+			},
+		})
+
 		out := &ReorderShareEventsOutput{}
 		out.Body.Reordered = true
 		return out, nil
@@ -713,6 +770,16 @@ func DetachEventFromShare(deps Deps) func(context.Context, *DetachEventFromShare
 		_ = appendCalendarEvent(ctx, deps.DB, wsID, "public_share.event_detached", &actorID, map[string]any{
 			"shareId": input.ShareID,
 			"eventId": input.EvtID,
+		})
+		deps.Audit.Record(ctx, audit.Entry{
+			Action:       "calendar.share.event_detach",
+			ActorID:      actorID,
+			WorkspaceID:  wsID,
+			ResourceType: "calendar.share",
+			ResourceID:   input.ShareID,
+			Metadata: map[string]any{
+				"eventId": input.EvtID,
+			},
 		})
 		out := &DetachEventFromShareOutput{}
 		out.Body.Removed = true
