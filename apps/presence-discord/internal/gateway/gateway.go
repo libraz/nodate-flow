@@ -96,12 +96,13 @@ func New(cfg *config.Config, logger *slog.Logger) *Gateway {
 
 // Start opens the gateway connection and begins consuming presence
 // events. Blocks until ctx is cancelled or a fatal error occurs (the
-// discordgo session failing to open, or a missing bot token).
+// discordgo session failing to open).
 //
 // The boot sequence is:
-//  1. Validate the bot token. Empty token is a config error; the
-//     gateway exits and the operator restarts the binary with the
-//     token set.
+//  1. Validate the bot and signal tokens. An empty token is an operator
+//     misconfiguration, not a fatal error: the gateway logs, sets
+//     GatewayUp to 0, and blocks on ctx.Done() so the process stays up
+//     and /metrics stays scrapable for alerting (see config.Config doc).
 //  2. Construct the HTTP emitter and the debouncer (the emitter
 //     receives debounced events from the debouncer).
 //  3. Open the discordgo session with the GUILD_PRESENCES +
@@ -120,13 +121,24 @@ func (g *Gateway) Start(ctx context.Context) error {
 	g.started = true
 	g.mu.Unlock()
 
+	// Missing credentials are an operator misconfiguration, not a reason
+	// to crash-loop the container. The config docstring promises the
+	// metrics endpoint stays scrapable so alerting can fire on
+	// nf_presence_discord_gateway_up=0; honour that by logging, parking
+	// the gauge at 0, and blocking on ctx.Done() instead of exiting. The
+	// process stays up (and scrapable) until the operator sets the
+	// credential and restarts.
 	if g.cfg.DiscordBotToken == "" {
 		obs.GatewayUp.Set(0)
-		return errors.New("gateway: NF_DISCORD_BOT_TOKEN is empty")
+		g.logger.Error("presence-discord gateway not starting: NF_DISCORD_BOT_TOKEN is empty; staying up with gateway_up=0 so /metrics remains scrapable")
+		<-ctx.Done()
+		return nil
 	}
 	if g.cfg.FlowAPISignalToken == "" {
 		obs.GatewayUp.Set(0)
-		return errors.New("gateway: NF_FLOW_API_SIGNAL_TOKEN is empty")
+		g.logger.Error("presence-discord gateway not starting: NF_FLOW_API_SIGNAL_TOKEN is empty; staying up with gateway_up=0 so /metrics remains scrapable")
+		<-ctx.Done()
+		return nil
 	}
 
 	emitter := NewEmitter(EmitterConfig{

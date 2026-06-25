@@ -614,3 +614,61 @@ func TestGateway_SessionFactoryInvokedOnStart(t *testing.T) {
 	require.Equal(t, int32(1), sess.closeCalls.Load(),
 		"Stop must call session.Close exactly once")
 }
+
+// TestGateway_MissingTokenStaysUpWithGaugeZero asserts the graceful
+// degradation contract: an empty bot token must NOT crash the process.
+// Start must park nf_presence_discord_gateway_up at 0, block on
+// ctx.Done() (so /metrics stays scrapable for alerting), and never
+// invoke the session factory. Returning nil on cancel keeps
+// lifecycle.Run from treating the missing token as a fatal exit.
+func TestGateway_MissingTokenStaysUpWithGaugeZero(t *testing.T) {
+	// Not parallel: this test asserts an exact value on the global
+	// GatewayUp gauge, which sibling tests also mutate. Serialising it
+	// keeps the gauge reading uncontended.
+	fake := newFakeFlowAPI(t)
+	cfg := &config.Config{
+		DiscordBotToken:    "", // missing on purpose
+		FlowAPIBaseURL:     fake.BaseURL(),
+		FlowAPISignalToken: signalTokenFixture,
+		DebounceSeconds:    1,
+		MetricsAddr:        ":0",
+		LogLevel:           "debug",
+		ShutdownTimeout:    time.Second,
+	}
+	logger := slog.New(slog.NewJSONHandler(io.Discard, &slog.HandlerOptions{Level: slog.LevelDebug}))
+	gw := gateway.New(cfg, logger)
+
+	var factoryCalls atomic.Int32
+	gw.SessionFactoryForTest(func(string) (gateway.SessionAdapterForTest, error) {
+		factoryCalls.Add(1)
+		return &fakeSession{}, nil
+	})
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	done := make(chan error, 1)
+	go func() { done <- gw.Start(ctx) }()
+
+	// Start must NOT return while ctx is live — the process stays up.
+	require.Eventually(t, func() bool {
+		return testutil.ToFloat64(obs.GatewayUp) == 0
+	}, 2*time.Second, 5*time.Millisecond,
+		"gateway_up must be parked at 0 while the token is missing")
+	select {
+	case err := <-done:
+		t.Fatalf("Start returned early on missing token (err=%v); it must stay up and block on ctx", err)
+	case <-time.After(100 * time.Millisecond):
+	}
+	require.Equal(t, int32(0), factoryCalls.Load(),
+		"missing token must short-circuit before opening a Discord session")
+
+	// Cancelling ctx must unblock Start cleanly with no error so
+	// lifecycle.Run shuts down gracefully rather than exit(1).
+	cancel()
+	select {
+	case err := <-done:
+		require.NoError(t, err, "Start must return nil on context cancel even with a missing token")
+	case <-time.After(2 * time.Second):
+		t.Fatal("Start did not return after context cancel")
+	}
+}

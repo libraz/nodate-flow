@@ -98,6 +98,18 @@ type Debouncer struct {
 	// fires. Captured from NewDebouncer so timers don't outlive the
 	// gateway's lifetime even after Stop.
 	emitCtx context.Context //nolint:containedctx // intentional — timer fires off-goroutine and must carry its own context.
+
+	// sweepTicker drives the periodic GC of idle lastEmit records so the
+	// table cannot grow without bound across reconnect snapshots.
+	// Stopped by Stop.
+	sweepTicker *time.Ticker
+	// sweepStop is closed by Stop to wake the sweep goroutine even when
+	// the ticker has been halted, so the goroutine never blocks
+	// forever on a quiesced ticker channel.
+	sweepStop chan struct{}
+	// sweepDone is closed by the sweep goroutine once it observes Stop,
+	// letting Stop block until the goroutine has exited.
+	sweepDone chan struct{}
 }
 
 // NewDebouncer constructs a debouncer with the configured window and
@@ -109,14 +121,69 @@ type Debouncer struct {
 // gateway's Start passes its own ctx; cancellation halts in-flight
 // emits via the HTTP client's own context propagation.
 func NewDebouncer(ctx context.Context, window time.Duration, emitter debounceEmitter) *Debouncer {
-	return &Debouncer{
-		window:   window,
-		emitter:  emitter,
-		entries:  map[string]*pendingEntry{},
-		lastEmit: map[string]time.Time{},
-		now:      time.Now,
-		emitCtx:  ctx,
+	d := &Debouncer{
+		window:    window,
+		emitter:   emitter,
+		entries:   map[string]*pendingEntry{},
+		lastEmit:  map[string]time.Time{},
+		now:       time.Now,
+		emitCtx:   ctx,
+		sweepStop: make(chan struct{}),
+		sweepDone: make(chan struct{}),
 	}
+	// Sweep idle records on a cadence proportional to the window. A
+	// distinct user that emits once leaves a lastEmit entry behind for
+	// window gating; without this GC, every snowflake the gateway ever
+	// observes — re-sent in full on each reconnect's READY/resume
+	// snapshot — would accumulate forever and eventually OOM the
+	// process. The sweep removes records that are already past their
+	// gating window, so a churning population stays flat.
+	interval := window
+	if interval <= 0 {
+		interval = time.Second
+	}
+	d.sweepTicker = time.NewTicker(interval)
+	go d.sweepLoop()
+	return d
+}
+
+// sweepLoop runs the periodic GC until Stop fires. It exits promptly
+// once stopped and closes sweepDone so Stop can join it.
+func (d *Debouncer) sweepLoop() {
+	defer close(d.sweepDone)
+	for {
+		select {
+		case <-d.sweepStop:
+			return
+		case <-d.sweepTicker.C:
+			if d.sweep() {
+				return
+			}
+		}
+	}
+}
+
+// sweep removes idle lastEmit records whose gating window has elapsed
+// and any leftover non-pending entries. It returns true once the
+// debouncer has been stopped so the caller exits the loop. Entries with
+// a pending trailing emit are preserved — fire() owns their cleanup.
+func (d *Debouncer) sweep() bool {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	if d.stopped {
+		return true
+	}
+	cutoff := d.now().Add(-d.window)
+	for userID, last := range d.lastEmit {
+		if entry, ok := d.entries[userID]; ok && entry.pending {
+			continue
+		}
+		if !last.After(cutoff) {
+			delete(d.lastEmit, userID)
+			delete(d.entries, userID)
+		}
+	}
+	return false
 }
 
 // Handle ingests a presence event. The leading-edge fires
@@ -189,6 +256,11 @@ func (d *Debouncer) fire(userID string) {
 	ev := entry.nextEvent
 	entry.pending = false
 	entry.timer = nil
+	// The entry no longer holds a scheduled timer; drop it from the
+	// table so a user that has settled stops consuming memory. lastEmit
+	// is retained for window gating and is reclaimed by the periodic
+	// sweep once its window elapses.
+	delete(d.entries, userID)
 	d.lastEmit[userID] = d.now()
 	if d.stopped {
 		d.mu.Unlock()
@@ -209,8 +281,8 @@ func (d *Debouncer) fire(userID string) {
 // shutdown would only ever mislead the judge.
 func (d *Debouncer) Stop() {
 	d.mu.Lock()
-	defer d.mu.Unlock()
 	if d.stopped {
+		d.mu.Unlock()
 		return
 	}
 	d.stopped = true
@@ -220,4 +292,16 @@ func (d *Debouncer) Stop() {
 		}
 		entry.pending = false
 	}
+	ticker := d.sweepTicker
+	d.mu.Unlock()
+
+	// Stop the ticker and wake the sweep goroutine outside the lock so
+	// it can take the mutex, observe stopped, and exit without
+	// deadlocking against Stop. sweepStop guarantees the goroutine wakes
+	// even though Stop halts the ticker channel.
+	if ticker != nil {
+		ticker.Stop()
+	}
+	close(d.sweepStop)
+	<-d.sweepDone
 }

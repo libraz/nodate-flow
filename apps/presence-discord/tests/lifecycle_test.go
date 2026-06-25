@@ -22,6 +22,7 @@ import (
 	"net"
 	"net/http"
 	"strconv"
+	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -162,4 +163,68 @@ func TestGatewayBootsAndExposesMetrics(t *testing.T) {
 
 	require.Equal(t, int32(1), fake.stopCalls.Load(),
 		"Stop should have been called exactly once during graceful shutdown")
+}
+
+// TestMissingTokenKeepsProcessUpWithGaugeZero is the end-to-end
+// counterpart to the gateway-level missing-token test: it drives the
+// REAL gateway through lifecycle.Run (no fake gatewayRunner) with an
+// empty bot token and asserts the process stays up and scrapable rather
+// than crash-looping. The metrics body must expose
+// nf_presence_discord_gateway_up with value 0, and Run must return nil
+// on context cancel.
+func TestMissingTokenKeepsProcessUpWithGaugeZero(t *testing.T) {
+	// Not parallel: asserts an exact value on the global GatewayUp gauge.
+	port := freePort(t)
+	addr := "127.0.0.1:" + strconv.Itoa(port)
+	cfg := &config.Config{
+		DiscordBotToken:    "", // missing on purpose
+		FlowAPIBaseURL:     "http://flow-api:8080",
+		FlowAPISignalToken: "also-empty-but-token-check-comes-first",
+		DebounceSeconds:    5,
+		MetricsAddr:        addr,
+		LogLevel:           "debug",
+		ShutdownTimeout:    500 * time.Millisecond,
+	}
+	require.NoError(t, cfg.Validate())
+
+	logger := slog.New(slog.NewJSONHandler(io.Discard, &slog.HandlerOptions{Level: slog.LevelDebug}))
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	ready := make(chan struct{})
+	runErr := make(chan error, 1)
+	go func() {
+		// No opts.Gateway: lifecycle.Run constructs the real gateway,
+		// which must degrade gracefully on the missing token.
+		runErr <- lifecycle.Run(ctx, cfg, logger, &lifecycle.RunOptions{MetricsReady: ready})
+	}()
+
+	select {
+	case <-ready:
+	case <-time.After(5 * time.Second):
+		t.Fatal("MetricsReady never closed")
+	}
+
+	// The metrics endpoint must remain scrapable and report the gauge at
+	// 0 so alerting can fire on the degraded gateway.
+	require.Eventually(t, func() bool {
+		body := waitForMetricsReady(t, addr, 2*time.Second)
+		return strings.Contains(body, "nf_presence_discord_gateway_up 0")
+	}, 3*time.Second, 50*time.Millisecond,
+		"metrics must export nf_presence_discord_gateway_up 0 while the token is missing")
+
+	// Run must NOT have exited on its own — the process is still up.
+	select {
+	case err := <-runErr:
+		t.Fatalf("Run exited before cancel on missing token (err=%v); it must stay up", err)
+	case <-time.After(100 * time.Millisecond):
+	}
+
+	cancel()
+	select {
+	case err := <-runErr:
+		require.NoError(t, err, "Run must return nil on context-cancelled shutdown even with a missing token")
+	case <-time.After(cfg.ShutdownTimeout + 2*time.Second):
+		t.Fatal("Run did not return after context cancel")
+	}
 }
