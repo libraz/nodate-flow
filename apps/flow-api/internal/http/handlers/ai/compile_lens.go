@@ -44,6 +44,9 @@ func CompileLens(deps Deps) func(context.Context, *CompileLensInput) (*CompileLe
 		}
 		lens, err := deps.NlQuery.Compile(ctx, in.Body.Prompt)
 		if err != nil {
+			if errors.Is(err, nlquery.ErrBudgetExceeded) {
+				return nil, httpErr(apierrors.AiCostGuardExceeded)
+			}
 			if errors.Is(err, nlquery.ErrUnparseable) {
 				return nil, httpErr(apierrors.AiNlQueryUnparseable)
 			}

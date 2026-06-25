@@ -46,6 +46,9 @@ func ResolveCommand(deps Deps) func(context.Context, *ResolveCommandInput) (*Res
 
 		tc, err := deps.NlCommand.Resolve(ctx, in.Body.Prompt)
 		if err != nil {
+			if errors.Is(err, nlcommand.ErrBudgetExceeded) {
+				return nil, httpErr(apierrors.AiCostGuardExceeded)
+			}
 			if errors.Is(err, nlcommand.ErrUnresolvable) {
 				return nil, httpErr(apierrors.AiResponseInvalidJson)
 			}
