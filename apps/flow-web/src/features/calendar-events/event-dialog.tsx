@@ -15,6 +15,7 @@
  */
 
 import type { components } from '@nodate-flow/sdk';
+import type { RecurrenceRule } from '@nodate-flow/ui/calendar/types';
 import Button from '@nodate-flow/ui/primitives/button';
 import Combobox from '@nodate-flow/ui/primitives/combobox';
 import DatePicker from '@nodate-flow/ui/primitives/date-picker';
@@ -59,6 +60,7 @@ import {
   useUpdateEvent,
 } from './api';
 import AttendeesSection from './attendees-section';
+import CreatorChip from './creator-chip';
 import styles from './event-dialog.module.css';
 
 type FlowProject = components['schemas']['Project'];
@@ -176,32 +178,36 @@ function presetToMinutes(preset: NotificationPreset): number | null {
 }
 
 /**
- * Translate a recurrence preset to an RRULE-ish payload. `'custom'` is a
- * stub — the caller passes through whatever the user typed in the raw
- * textarea. `'none'` returns null so the caller omits the field.
+ * Translate a recurrence preset to a recurrence-rule payload. `'custom'`
+ * is a stub — the caller passes through whatever the user typed in the
+ * raw textarea. `'none'` returns null so the caller omits the field.
  *
- * The backend stores `recurrenceRule` as unknown/JSON, so we emit a
- * `{ freq, byDay? }` shape without committing to a full RFC 5545
- * builder. The full builder is out of scope for this PR.
+ * The emitted shape matches the canonical {@link RecurrenceRule} contract
+ * shared with the recurrence expander (`@nodate-flow/ui/calendar`): `freq`
+ * tokens are lowercase (`daily` / `weekly` / `monthly` / `yearly`) and
+ * `byDay` weekday tokens are the lowercase two-letter forms the expander's
+ * day map keys on (`mo` / `tu` / …). These are API enum values — not UI
+ * copy — so they stay literal lowercase. The `@api` validator accepts the
+ * same lowercase canonical set.
  */
 export function presetToRRule(
   preset: RecurrencePreset,
   _startDate: string,
   customRaw?: string,
-): unknown {
+): RecurrenceRule | { raw: string } | null {
   switch (preset) {
     case 'none':
       return null;
     case 'daily':
-      return { freq: 'DAILY' };
+      return { freq: 'daily' };
     case 'weekdays':
-      return { freq: 'WEEKLY', byDay: ['MO', 'TU', 'WE', 'TH', 'FR'] };
+      return { freq: 'weekly', byDay: ['mo', 'tu', 'we', 'th', 'fr'] };
     case 'weekly':
-      return { freq: 'WEEKLY' };
+      return { freq: 'weekly' };
     case 'monthly':
-      return { freq: 'MONTHLY' };
+      return { freq: 'monthly' };
     case 'yearly':
-      return { freq: 'YEARLY' };
+      return { freq: 'yearly' };
     case 'custom':
       return customRaw ? { raw: customRaw } : null;
   }
@@ -819,6 +825,13 @@ export default function EventDialog({
             value={kind}
             onChange={(next) => setKind(next)}
           />
+
+          {mode.kind === 'edit' ? (
+            <CreatorChip
+              displayName={mode.event.creatorDisplayName}
+              avatarUrl={mode.event.creatorAvatarUrl}
+            />
+          ) : null}
 
           <FormField label={t('field.title')} error={titleError ?? undefined}>
             {(control) => (

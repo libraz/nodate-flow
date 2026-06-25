@@ -156,6 +156,10 @@
       "you": "あなた",
       "your_response": "あなたの返事"
     },
+    "creator": {
+      "label": "作成者",
+      "createdBy": "{name} が作成"
+    },
     "detail": {
       "back": "カレンダーに戻る",
       "tab": {

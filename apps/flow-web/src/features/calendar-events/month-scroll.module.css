@@ -1,0 +1,315 @@
+/**
+ * MonthScroll — mobile month view styles.
+ *
+ * All visual values resolve from design tokens (`--nf-color-*`,
+ * `--nf-space-*`, `--nf-radius-*`, `--nf-text-*`, `--nf-cal-*`,
+ * `--nf-duration-*`). No hardcoded colours so the four-theme switcher
+ * keeps working. Logical properties throughout for RTL safety.
+ */
+
+.root {
+  display: flex;
+  flex-direction: column;
+  min-block-size: 0;
+  /* Fill the viewport minus the route chrome above so the inner body
+     can scroll independently. */
+  block-size: min(70vh, 40rem);
+  border: var(--nf-space-px) solid var(--nf-color-border);
+  border-radius: var(--nf-radius-md);
+  overflow: hidden;
+  background: var(--nf-color-surface);
+}
+
+.weekdayRow {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  flex-shrink: 0;
+  border-block-end: var(--nf-space-px) solid var(--nf-color-border);
+  background: var(--nf-color-bg-elevated);
+}
+
+.weekday {
+  padding-block: var(--nf-space-1);
+  text-align: center;
+  font-size: var(--nf-text-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--nf-color-fg-muted);
+}
+
+.weekday--sun {
+  color: var(--nf-color-danger);
+}
+
+.weekday--sat {
+  color: var(--nf-color-info);
+}
+
+.scrollBody {
+  position: relative;
+  flex: 1 1 auto;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
+.monthHeader {
+  position: sticky;
+  inset-block-start: 0;
+  z-index: var(--nf-z-sticky);
+  display: flex;
+  align-items: center;
+  padding-inline: var(--nf-space-3);
+  padding-block: var(--nf-space-1);
+  min-block-size: 2rem;
+  font-size: var(--nf-text-sm);
+  font-weight: var(--nf-weight-semibold);
+  color: var(--nf-color-fg);
+  background: var(--nf-color-bg-elevated);
+  border-block-end: var(--nf-space-px) solid var(--nf-color-border);
+  backdrop-filter: saturate(1.1);
+}
+
+/* ───── week row ───── */
+
+.weekRow {
+  position: relative;
+  border-block-end: var(--nf-space-px) solid var(--nf-color-border);
+}
+
+.dayCols {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+}
+
+.dayCol {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  min-block-size: 5.5rem;
+  min-inline-size: 0;
+  padding: var(--nf-space-px);
+  border-inline-end: var(--nf-space-px) solid var(--nf-color-border);
+  overflow: hidden;
+}
+
+.dayCol:last-child {
+  border-inline-end: none;
+}
+
+.dayHead {
+  all: unset;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  align-self: flex-start;
+  min-inline-size: 1.5rem;
+  block-size: 1.5rem;
+  border-radius: var(--nf-radius-pill);
+  cursor: pointer;
+  transition: background var(--nf-duration-fast);
+}
+
+.dayHead:focus-visible {
+  outline: none;
+  box-shadow: var(--nf-shadow-focus);
+}
+
+.dayHead--today {
+  background: var(--nf-color-accent-subtle);
+}
+
+.dayNumber {
+  font-size: var(--nf-text-xs);
+  font-variant-numeric: tabular-nums;
+  color: var(--nf-color-fg);
+  padding-inline: var(--nf-space-1);
+}
+
+.dayNumber--sat {
+  color: var(--nf-color-info);
+}
+
+.dayNumber--holiday {
+  color: var(--nf-color-danger);
+}
+
+.dayNumber--today {
+  color: var(--nf-color-accent);
+  font-weight: var(--nf-weight-semibold);
+}
+
+.holidayLabel {
+  font-size: 0.625rem;
+  color: var(--nf-color-danger);
+  line-height: var(--nf-leading-tight);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ───── single-day chips (track-aligned) ───── */
+
+.trackArea {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.trackSpacer {
+  block-size: 1.25rem;
+}
+
+.chip {
+  all: unset;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  gap: var(--nf-space-px);
+  block-size: 1.125rem;
+  margin-block: var(--nf-space-px);
+  padding-inline: var(--nf-space-1);
+  border-inline-start: 2px solid transparent;
+  border-radius: var(--nf-radius-sm);
+  font-size: 0.625rem;
+  color: var(--nf-color-fg);
+  cursor: pointer;
+  overflow: hidden;
+}
+
+.chip:focus-visible {
+  outline: none;
+  box-shadow: var(--nf-shadow-focus);
+}
+
+.chipTitle {
+  flex: 1 1 auto;
+  min-inline-size: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.chipAttendees {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--nf-space-px);
+  flex-shrink: 0;
+  font-variant-numeric: tabular-nums;
+  color: var(--nf-color-fg-muted);
+}
+
+.chipAttendeesIcon {
+  inline-size: 0.625rem;
+  block-size: 0.625rem;
+}
+
+/* ───── multi-day bar overlay ───── */
+
+.barOverlay {
+  position: absolute;
+  inset-inline: 0;
+  /* Sits below the date numbers (1.5rem head + tiny gap). */
+  inset-block-start: 1.875rem;
+  z-index: 1;
+  pointer-events: none;
+}
+
+.bar {
+  all: unset;
+  position: absolute;
+  box-sizing: border-box;
+  block-size: 1.125rem;
+  display: flex;
+  align-items: center;
+  padding-inline: var(--nf-space-1);
+  border-inline-start: 2px solid transparent;
+  border-radius: var(--nf-radius-sm);
+  font-size: 0.625rem;
+  font-weight: var(--nf-weight-medium);
+  color: var(--nf-color-fg);
+  cursor: pointer;
+  pointer-events: auto;
+  overflow: hidden;
+}
+
+.bar:focus-visible {
+  outline: none;
+  box-shadow: var(--nf-shadow-focus);
+}
+
+.bar--clipStart {
+  border-start-start-radius: 0;
+  border-end-start-radius: 0;
+  border-inline-start-color: transparent;
+}
+
+.bar--clipEnd {
+  border-start-end-radius: 0;
+  border-end-end-radius: 0;
+}
+
+.barTitle {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ───── task chips ───── */
+
+.taskList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-px);
+}
+
+.taskChip {
+  all: unset;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  gap: var(--nf-space-px);
+  inline-size: 100%;
+  padding-inline: var(--nf-space-1);
+  border-radius: var(--nf-radius-sm);
+  background: var(--nf-color-bg);
+  font-size: 0.625rem;
+  color: var(--nf-color-fg);
+  cursor: pointer;
+  overflow: hidden;
+}
+
+.taskChip:focus-visible {
+  outline: none;
+  box-shadow: var(--nf-shadow-focus);
+}
+
+.taskDot {
+  flex-shrink: 0;
+  inline-size: 0.375rem;
+  block-size: 0.375rem;
+  border-radius: var(--nf-radius-pill);
+}
+
+.taskTitle {
+  flex: 1 1 auto;
+  min-inline-size: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.more {
+  font-size: 0.625rem;
+  color: var(--nf-color-fg-muted);
+  padding-inline: var(--nf-space-1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dayHead {
+    transition: none;
+  }
+}

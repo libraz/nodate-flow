@@ -156,6 +156,10 @@
       "you": "you",
       "your_response": "Your response"
     },
+    "creator": {
+      "label": "Created by",
+      "createdBy": "Created by {name}"
+    },
     "detail": {
       "back": "Back to calendar",
       "tab": {

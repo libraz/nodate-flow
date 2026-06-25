@@ -18,6 +18,15 @@
  *     last edit. The pending timer is cleared on unmount and on
  *     subsequent edits. A blur PATCHes synchronously so a fast
  *     close-and-move-on does not lose the last keystroke.
+ *   - Expandable notes `body`. A single-line row is too cramped for
+ *     multi-line notes, so the body lives behind an expander toggle
+ *     rather than a modal: the panel is an inline edit-in-place surface
+ *     (and already sits inside the drawer's focus-trap), so a Dialog
+ *     would fight that chrome and break the autosave rhythm. The
+ *     expander reveals a `<Textarea>` that shares the row's per-field
+ *     draft + debounced autosave + blur/unmount flush lifecycle, mirror
+ *     of the title path. A subtle dot on the toggle hints that a
+ *     collapsed row carries body text.
  *   - Ghost Delete button. Optimistic removal.
  *
  * The bottom add-row (input + Add button, Enter submits) creates a
@@ -41,8 +50,17 @@
 import Button from '@nodate-flow/ui/primitives/button';
 import Input from '@nodate-flow/ui/primitives/input';
 import Skeleton from '@nodate-flow/ui/primitives/skeleton';
+import Textarea from '@nodate-flow/ui/primitives/textarea';
 import { toaster } from '@nodate-flow/ui/primitives/toast';
-import { type FormEvent, type ReactElement, useCallback, useEffect, useRef, useState } from 'react';
+import {
+  type FormEvent,
+  type ReactElement,
+  useCallback,
+  useEffect,
+  useId,
+  useRef,
+  useState,
+} from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { formatApiError } from '../../lib/api-error';
@@ -58,6 +76,12 @@ import styles from './calendar-memos-panel.module.css';
 
 /** Debounce window for the title autosave, in milliseconds. */
 const TITLE_AUTOSAVE_MS = 800;
+
+/**
+ * Debounce window for the body autosave, in milliseconds. Kept equal to
+ * the title window so both fields on a row feel identical.
+ */
+const BODY_AUTOSAVE_MS = 800;
 
 export interface CalendarMemosPanelProps {
   workspaceId: string;
@@ -208,90 +232,151 @@ interface MemoRowProps {
   workspaceId: string;
   calendarId: string;
   /** Patch dispatcher; the parent owns the mutation so toast state stays in one place. */
-  onUpdate: (body: { title?: string; done?: boolean }) => void;
+  onUpdate: (patch: { title?: string; done?: boolean; body?: string }) => void;
   onDelete: () => void;
 }
 
+/** Max length for the multi-line memo body. */
+const BODY_MAX_LENGTH = 4000;
+
 /**
- * One memo row. Owns the local title draft so debounced autosave can
- * coalesce keystrokes without bouncing the cursor when the cache row
- * is replaced (server echo, SSE invalidation, optimistic merge).
+ * A debounced, flush-on-blur/unmount autosave for a single text field on
+ * a memo row. Owns the local draft so keystrokes coalesce without the
+ * cursor bouncing when the cache row is replaced (server echo, SSE
+ * invalidation, optimistic merge), and only emits a patch when the
+ * trimmed/normalized value actually changed.
+ *
+ * @param canonical Server-truth value for the field.
+ * @param debounceMs Debounce window before the autosave fires.
+ * @param save Emit the field patch. Receives the normalized value.
+ * @param normalize Maps the raw draft to the value sent to the server
+ *   and compared against the canonical snapshot (e.g. trim).
  */
-function MemoRow({ memo, onUpdate, onDelete }: MemoRowProps): ReactElement {
-  const { t } = useTranslation('common');
-  const [title, setTitle] = useState(memo.title);
-  const titleRef = useRef(memo.title);
-  const draftRef = useRef(title);
+function useFieldAutosave(
+  canonical: string,
+  debounceMs: number,
+  save: (value: string) => void,
+  normalize: (raw: string) => string,
+): {
+  value: string;
+  onChange: (next: string) => void;
+  flush: () => void;
+} {
+  const [value, setValue] = useState(canonical);
+  const canonicalRef = useRef(canonical);
+  const draftRef = useRef(value);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Keep draftRef in sync so the blur / unmount flush always sees the
   // latest user input without re-binding the handler.
-  draftRef.current = title;
+  draftRef.current = value;
 
   // When the server echo arrives (or another tab edits the row), replace
-  // the local draft with the canonical title — but only if the user is
-  // not currently in the middle of an edit (timer pending). This avoids
-  // overwriting an in-flight keystroke with an older snapshot.
+  // the local draft with the canonical value — but only when no edit is
+  // mid-flight (timer pending), so an in-flight keystroke is not stomped
+  // by an older snapshot.
   useEffect(() => {
     if (timerRef.current !== null) return;
-    if (memo.title !== titleRef.current) {
-      titleRef.current = memo.title;
-      setTitle(memo.title);
+    if (canonical !== canonicalRef.current) {
+      canonicalRef.current = canonical;
+      setValue(canonical);
     }
-  }, [memo.title]);
+  }, [canonical]);
+
+  const commit = useCallback(() => {
+    const next = normalize(draftRef.current);
+    if (next === canonicalRef.current) return;
+    canonicalRef.current = next;
+    save(next);
+  }, [normalize, save]);
 
   /**
-   * Cancel any pending autosave timer. Used both as a guard before
-   * scheduling a new one and as the unmount cleanup.
+   * Flush the pending edit immediately. Called on blur and on unmount so
+   * a fast close-and-navigate does not silently drop the last keystroke.
+   * No-op when no edit is queued.
    */
-  const cancelPending = useCallback(() => {
-    if (timerRef.current !== null) {
-      clearTimeout(timerRef.current);
-      timerRef.current = null;
-    }
-  }, []);
-
-  /**
-   * Flush the pending edit immediately. Called on blur and on unmount
-   * so a fast close-and-navigate does not silently drop the last
-   * keystroke. No-op if no edit is queued.
-   */
-  const flushPending = useCallback(() => {
+  const flush = useCallback(() => {
     if (timerRef.current === null) return;
     clearTimeout(timerRef.current);
     timerRef.current = null;
-    const next = draftRef.current.trim();
-    if (next.length === 0) return;
-    if (next === titleRef.current) return;
-    titleRef.current = next;
-    onUpdate({ title: next });
-  }, [onUpdate]);
+    commit();
+  }, [commit]);
 
   // Flush on unmount so closing the drawer mid-edit still saves.
   useEffect(() => {
     return () => {
-      flushPending();
+      if (timerRef.current !== null) {
+        clearTimeout(timerRef.current);
+        timerRef.current = null;
+        commit();
+      }
     };
-  }, [flushPending]);
+  }, [commit]);
 
-  const handleTitleChange = (next: string): void => {
-    setTitle(next);
-    cancelPending();
-    timerRef.current = setTimeout(() => {
-      timerRef.current = null;
-      const trimmed = draftRef.current.trim();
-      if (trimmed.length === 0) return;
-      if (trimmed === titleRef.current) return;
-      titleRef.current = trimmed;
-      onUpdate({ title: trimmed });
-    }, TITLE_AUTOSAVE_MS);
-  };
+  const onChange = useCallback(
+    (next: string): void => {
+      setValue(next);
+      if (timerRef.current !== null) clearTimeout(timerRef.current);
+      timerRef.current = setTimeout(() => {
+        timerRef.current = null;
+        commit();
+      }, debounceMs);
+    },
+    [commit, debounceMs],
+  );
+
+  return { value, onChange, flush };
+}
+
+/**
+ * One memo row. Owns the local title and body drafts so debounced
+ * autosave can coalesce keystrokes without bouncing the cursor when the
+ * cache row is replaced. The body lives behind an expander; a collapsed
+ * row with body text shows a subtle dot on the toggle.
+ */
+function MemoRow({ memo, onUpdate, onDelete }: MemoRowProps): ReactElement {
+  const { t } = useTranslation('common');
+  const bodyId = useId();
+  const isOptimistic = memo.id.startsWith('optimistic-');
+  const hasBody = (memo.body ?? '').trim().length > 0;
+  // `null` = follow `hasBody` (open when body exists, collapsed otherwise);
+  // `true` / `false` = user took explicit control of the expander.
+  const [expandIntent, setExpandIntent] = useState<boolean | null>(null);
+  const showBody = expandIntent ?? hasBody;
+
+  const titleField = useFieldAutosave(
+    memo.title,
+    TITLE_AUTOSAVE_MS,
+    useCallback(
+      (next: string) => {
+        // Title is required; never autosave it empty.
+        if (next.length === 0) return;
+        onUpdate({ title: next });
+      },
+      [onUpdate],
+    ),
+    useCallback((raw: string) => raw.trim(), []),
+  );
+
+  const bodyField = useFieldAutosave(
+    memo.body ?? '',
+    BODY_AUTOSAVE_MS,
+    useCallback(
+      (next: string) => {
+        // Body is optional; an emptied body sends an empty string so the
+        // backend can clear it.
+        onUpdate({ body: next });
+      },
+      [onUpdate],
+    ),
+    // Preserve interior whitespace/newlines; only trim the outer edges.
+    useCallback((raw: string) => raw.trim(), []),
+  );
 
   const handleToggleDone = (): void => {
     onUpdate({ done: !memo.done });
   };
 
-  const isOptimistic = memo.id.startsWith('optimistic-');
   const attribution = memo.userDisplayName.trim();
 
   return (
@@ -305,16 +390,59 @@ function MemoRow({ memo, onUpdate, onDelete }: MemoRowProps): ReactElement {
         aria-label={t('calendar.memos.checkbox_label', { title: memo.title })}
       />
       <div className={styles.bodyText}>
-        <input
-          type="text"
-          className={`${styles.titleInput}${memo.done ? ` ${styles.titleInputDone}` : ''}`}
-          aria-label={t('calendar.memos.title_label')}
-          value={title}
-          onChange={(e) => handleTitleChange(e.target.value)}
-          onBlur={flushPending}
-          disabled={isOptimistic}
-          maxLength={200}
-        />
+        <div className={styles.titleLine}>
+          <input
+            type="text"
+            className={`${styles.titleInput}${memo.done ? ` ${styles.titleInputDone}` : ''}`}
+            aria-label={t('calendar.memos.title_label')}
+            value={titleField.value}
+            onChange={(e) => titleField.onChange(e.target.value)}
+            onBlur={titleField.flush}
+            disabled={isOptimistic}
+            maxLength={200}
+          />
+          <button
+            type="button"
+            className={styles.expandToggle}
+            onClick={() => setExpandIntent(!showBody)}
+            aria-expanded={showBody}
+            aria-controls={bodyId}
+            disabled={isOptimistic}
+            aria-label={
+              showBody
+                ? t('calendar.memos.body_collapse')
+                : hasBody
+                  ? t('calendar.memos.body_show')
+                  : t('calendar.memos.body_add')
+            }
+            title={
+              showBody
+                ? t('calendar.memos.body_collapse')
+                : hasBody
+                  ? t('calendar.memos.body_show')
+                  : t('calendar.memos.body_add')
+            }
+          >
+            <span aria-hidden="true" className={styles.expandIcon}>
+              {showBody ? '−' : '+'}
+            </span>
+            {hasBody && !showBody ? <span aria-hidden="true" className={styles.bodyDot} /> : null}
+          </button>
+        </div>
+        {showBody ? (
+          <Textarea
+            id={bodyId}
+            className={styles.bodyTextarea}
+            aria-label={t('calendar.memos.body_label')}
+            placeholder={t('calendar.memos.body_placeholder')}
+            value={bodyField.value}
+            onChange={(e) => bodyField.onChange(e.target.value)}
+            onBlur={bodyField.flush}
+            disabled={isOptimistic}
+            maxLength={BODY_MAX_LENGTH}
+            rows={3}
+          />
+        ) : null}
         {attribution.length > 0 ? (
           <span className={styles.attribution}>
             {t('calendar.memos.author_attribution', { name: attribution })}

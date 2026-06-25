@@ -1,0 +1,30 @@
+/**
+ * CreatorChip layout — a single inline row of secondary metadata:
+ * "Created by · {avatar} {name}". Sized below body text so it reads as
+ * an unobtrusive attribution rather than a hero element. Logical
+ * properties keep it RTL-safe; every value comes from a design token.
+ */
+.root {
+  display: flex;
+  align-items: center;
+  gap: var(--nf-space-2);
+  font-size: var(--nf-text-sm);
+  color: var(--nf-color-fg-muted);
+  min-inline-size: 0;
+}
+
+.prefix {
+  font-size: var(--nf-text-xs);
+  color: var(--nf-color-fg-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+
+.name {
+  color: var(--nf-color-fg);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-inline-size: 0;
+}

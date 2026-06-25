@@ -3,6 +3,7 @@ import i18n from 'i18next';
 import ICU from 'i18next-icu';
 import { initReactI18next } from 'react-i18next';
 
+import enActivity from '../../locales/en/activity.json';
 import enAiSuggestions from '../../locales/en/ai-suggestions.json';
 import enAi from '../../locales/en/ai.json';
 import enAiAgents from '../../locales/en/aiAgents.json';
@@ -27,6 +28,7 @@ import enSharing from '../../locales/en/sharing.json';
 import enSignalKinds from '../../locales/en/signal-kinds.json';
 import enSystemInfo from '../../locales/en/system-info.json';
 import enTimeline from '../../locales/en/timeline.json';
+import jaActivity from '../../locales/ja/activity.json';
 import jaAiSuggestions from '../../locales/ja/ai-suggestions.json';
 import jaAi from '../../locales/ja/ai.json';
 import jaAiAgents from '../../locales/ja/aiAgents.json';
@@ -51,6 +53,7 @@ import jaSharing from '../../locales/ja/sharing.json';
 import jaSignalKinds from '../../locales/ja/signal-kinds.json';
 import jaSystemInfo from '../../locales/ja/system-info.json';
 import jaTimeline from '../../locales/ja/timeline.json';
+import zhActivity from '../../locales/zh/activity.json';
 import zhAiSuggestions from '../../locales/zh/ai-suggestions.json';
 import zhAi from '../../locales/zh/ai.json';
 import zhAiAgents from '../../locales/zh/aiAgents.json';
@@ -117,6 +120,7 @@ export function initI18n(): typeof i18n {
         'settings',
         'inbox',
         'timeline',
+        'activity',
         'calendar-events',
         'ai',
         'ai-suggestions',
@@ -145,6 +149,7 @@ export function initI18n(): typeof i18n {
           settings: enSettings,
           inbox: enInbox,
           timeline: enTimeline,
+          activity: enActivity,
           'calendar-events': enCalendarEvents,
           ai: enAi,
           'ai-suggestions': enAiSuggestions,
@@ -171,6 +176,7 @@ export function initI18n(): typeof i18n {
           settings: jaSettings,
           inbox: jaInbox,
           timeline: jaTimeline,
+          activity: jaActivity,
           'calendar-events': jaCalendarEvents,
           ai: jaAi,
           'ai-suggestions': jaAiSuggestions,
@@ -197,6 +203,7 @@ export function initI18n(): typeof i18n {
           settings: zhSettings,
           inbox: zhInbox,
           timeline: zhTimeline,
+          activity: zhActivity,
           'calendar-events': zhCalendarEvents,
           ai: zhAi,
           'ai-suggestions': zhAiSuggestions,
@@ -221,6 +228,14 @@ export function initI18n(): typeof i18n {
       interpolation: { escapeValue: false },
       react: { useSuspense: true },
     });
+  // Keep <html lang> in sync with the active i18n locale. The index.html boot
+  // script sets it once at load from localStorage; this listener keeps it
+  // accurate after in-session changes (profile form save, post-login bootstrap).
+  i18n.on('languageChanged', (lng) => {
+    if (typeof document !== 'undefined') {
+      document.documentElement.lang = lng;
+    }
+  });
   return i18n;
 }
 

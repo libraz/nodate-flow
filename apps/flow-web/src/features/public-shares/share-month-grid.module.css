@@ -1,0 +1,390 @@
+/**
+ * ShareMonthGrid — read-only public month-grid styles.
+ *
+ * All visual values resolve from design tokens (`--nf-color-*`,
+ * `--nf-space-*`, `--nf-radius-*`, `--nf-text-*`, `--nf-cal-*`,
+ * `--nf-duration-*`). No hardcoded colours so the four-theme switcher
+ * keeps working. Logical properties throughout for RTL safety.
+ *
+ * The grid is shared by the branded `/share/cal` page and the chromeless
+ * `/embed/cal` route. `[data-embed='true']` on the root trims chrome:
+ * transparent/edge-to-edge background and tighter framing suited to an
+ * `<iframe>`.
+ */
+
+.root {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-2);
+  inline-size: 100%;
+}
+
+/* ───── toolbar (month navigation) ───── */
+
+.toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--nf-space-2);
+}
+
+.monthLabel {
+  font-size: var(--nf-text-base);
+  font-weight: var(--nf-weight-semibold);
+  color: var(--nf-color-fg);
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.navGroup {
+  display: flex;
+  align-items: center;
+  gap: var(--nf-space-1);
+}
+
+.navButton {
+  all: unset;
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  inline-size: 2rem;
+  block-size: 2rem;
+  border-radius: var(--nf-radius-md);
+  color: var(--nf-color-fg-muted);
+  cursor: pointer;
+  transition: background var(--nf-duration-fast);
+}
+
+.navButton:hover {
+  background: var(--nf-color-bg-subtle);
+  color: var(--nf-color-fg);
+}
+
+.navButton:focus-visible {
+  outline: none;
+  box-shadow: var(--nf-shadow-focus);
+}
+
+.todayButton {
+  all: unset;
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  padding-inline: var(--nf-space-3);
+  block-size: 2rem;
+  border-radius: var(--nf-radius-md);
+  font-size: var(--nf-text-sm);
+  color: var(--nf-color-fg);
+  cursor: pointer;
+  transition: background var(--nf-duration-fast);
+}
+
+.todayButton:hover {
+  background: var(--nf-color-bg-subtle);
+}
+
+.todayButton:focus-visible {
+  outline: none;
+  box-shadow: var(--nf-shadow-focus);
+}
+
+/* ───── grid frame ───── */
+
+.frame {
+  border: var(--nf-space-px) solid var(--nf-color-border);
+  border-radius: var(--nf-radius-md);
+  overflow: hidden;
+  background: var(--nf-color-surface);
+}
+
+.root[data-embed='true'] .frame {
+  background: transparent;
+}
+
+.weekdayRow {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  border-block-end: var(--nf-space-px) solid var(--nf-color-border);
+  background: var(--nf-color-bg-elevated);
+}
+
+.root[data-embed='true'] .weekdayRow {
+  background: transparent;
+}
+
+.weekday {
+  padding-block: var(--nf-space-1);
+  text-align: center;
+  font-size: var(--nf-text-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--nf-color-fg-muted);
+}
+
+.weekday--sun {
+  color: var(--nf-color-danger);
+}
+
+.weekday--sat {
+  color: var(--nf-color-info);
+}
+
+/* ───── week row ───── */
+
+.weekRow {
+  position: relative;
+  border-block-end: var(--nf-space-px) solid var(--nf-color-border);
+}
+
+.weekRow:last-child {
+  border-block-end: none;
+}
+
+.dayCols {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+}
+
+.dayCol {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  min-block-size: 5.5rem;
+  min-inline-size: 0;
+  padding: var(--nf-space-px);
+  border-inline-end: var(--nf-space-px) solid var(--nf-color-border);
+  overflow: hidden;
+}
+
+.root[data-embed='true'] .dayCol {
+  min-block-size: 4.5rem;
+}
+
+.dayCol:last-child {
+  border-inline-end: none;
+}
+
+.dayCol--outside .dayNumber {
+  color: var(--nf-color-fg-subtle);
+  opacity: 0.6;
+}
+
+.dayHead {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  align-self: flex-start;
+  min-inline-size: 1.5rem;
+  block-size: 1.5rem;
+  border-radius: var(--nf-radius-pill);
+}
+
+.dayHead--today {
+  background: var(--nf-color-accent-subtle);
+}
+
+.dayNumber {
+  font-size: var(--nf-text-xs);
+  font-variant-numeric: tabular-nums;
+  color: var(--nf-color-fg);
+  padding-inline: var(--nf-space-1);
+}
+
+.dayNumber--sat {
+  color: var(--nf-color-info);
+}
+
+.dayNumber--sun {
+  color: var(--nf-color-danger);
+}
+
+.dayNumber--today {
+  color: var(--nf-color-accent);
+  font-weight: var(--nf-weight-semibold);
+}
+
+/* ───── single-day chips (track-aligned) ───── */
+
+.trackArea {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.trackSpacer {
+  block-size: 1.25rem;
+}
+
+.chip {
+  all: unset;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  gap: var(--nf-space-px);
+  block-size: 1.125rem;
+  margin-block: var(--nf-space-px);
+  padding-inline: var(--nf-space-1);
+  border-inline-start: 2px solid transparent;
+  border-radius: var(--nf-radius-sm);
+  font-size: 0.625rem;
+  color: var(--nf-color-fg);
+  cursor: pointer;
+  overflow: hidden;
+}
+
+.chip:focus-visible {
+  outline: none;
+  box-shadow: var(--nf-shadow-focus);
+}
+
+.chipTitle {
+  flex: 1 1 auto;
+  min-inline-size: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ───── multi-day bar overlay ───── */
+
+.barOverlay {
+  position: absolute;
+  inset-inline: 0;
+  /* Sits below the date numbers (1.5rem head + small gap). */
+  inset-block-start: 1.875rem;
+  z-index: 1;
+  pointer-events: none;
+}
+
+.bar {
+  all: unset;
+  position: absolute;
+  box-sizing: border-box;
+  block-size: 1.125rem;
+  display: flex;
+  align-items: center;
+  padding-inline: var(--nf-space-1);
+  border-inline-start: 2px solid transparent;
+  border-radius: var(--nf-radius-sm);
+  font-size: 0.625rem;
+  font-weight: var(--nf-weight-medium);
+  color: var(--nf-color-fg);
+  cursor: pointer;
+  pointer-events: auto;
+  overflow: hidden;
+}
+
+.bar:focus-visible {
+  outline: none;
+  box-shadow: var(--nf-shadow-focus);
+}
+
+.bar--clipStart {
+  border-start-start-radius: 0;
+  border-end-start-radius: 0;
+  border-inline-start-color: transparent;
+}
+
+.bar--clipEnd {
+  border-start-end-radius: 0;
+  border-end-end-radius: 0;
+}
+
+.barTitle {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.more {
+  font-size: 0.625rem;
+  color: var(--nf-color-fg-muted);
+  padding-inline: var(--nf-space-1);
+}
+
+/* ───── read-only event popover ───── */
+
+.popover {
+  margin: 0;
+  border: var(--nf-space-px) solid var(--nf-color-border);
+  border-radius: var(--nf-radius-md);
+  box-shadow: var(--nf-shadow-lg);
+  background: var(--nf-color-surface);
+  color: var(--nf-color-fg);
+  padding: var(--nf-space-4);
+  max-inline-size: min(20rem, 90vw);
+}
+
+.popover::backdrop {
+  background: color-mix(in oklch, var(--nf-color-fg) 30%, transparent);
+}
+
+.popoverHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--nf-space-2);
+}
+
+.popoverTitle {
+  font-size: var(--nf-text-base);
+  font-weight: var(--nf-weight-semibold);
+  margin: 0;
+  color: var(--nf-color-fg);
+}
+
+.popoverClose {
+  all: unset;
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  inline-size: 1.75rem;
+  block-size: 1.75rem;
+  flex-shrink: 0;
+  border-radius: var(--nf-radius-md);
+  color: var(--nf-color-fg-muted);
+  cursor: pointer;
+  transition: background var(--nf-duration-fast);
+}
+
+.popoverClose:hover {
+  background: var(--nf-color-bg-subtle);
+  color: var(--nf-color-fg);
+}
+
+.popoverClose:focus-visible {
+  outline: none;
+  box-shadow: var(--nf-shadow-focus);
+}
+
+.popoverRow {
+  display: flex;
+  align-items: center;
+  gap: var(--nf-space-2);
+  margin-block-start: var(--nf-space-2);
+  font-size: var(--nf-text-sm);
+  color: var(--nf-color-fg-muted);
+}
+
+.popoverMemo {
+  margin-block-start: var(--nf-space-3);
+  font-size: var(--nf-text-sm);
+  color: var(--nf-color-fg-muted);
+  white-space: pre-wrap;
+}
+
+.empty {
+  padding-block: var(--nf-space-12);
+  text-align: center;
+  color: var(--nf-color-fg-subtle);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .navButton,
+  .todayButton,
+  .popoverClose {
+    transition: none;
+  }
+}

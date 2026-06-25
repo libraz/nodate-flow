@@ -38,6 +38,7 @@
     "pages": "文档",
     "settings": "设置",
     "timeboxes": "时间盒",
+    "activity": "动态",
     "insightsPriority": "优先级建议",
     "collapse": "收起侧边栏",
     "expand": "展开侧边栏"
@@ -175,6 +176,14 @@
     "drag_to_reschedule": "拖动以改期",
     "reschedule_success": "已更新截止日期",
     "reschedule_error": "更新截止日期失败",
+    "event_move_success": "已移动事件",
+    "event_move_error": "移动事件失败",
+    "event_recurring_no_drag": "{title} · {workspace}（重复事件无法拖动）",
+    "month_scroll": {
+      "aria_label": "月历，按周垂直滚动",
+      "day_label": "{date}",
+      "day_label_holiday": "{date}，{holiday}"
+    },
     "layers": "图层",
     "layer": {
       "tasks_due": "任务（截止）",
@@ -294,7 +303,12 @@
       "title_label": "备忘标题",
       "checkbox_label": "将 {title} 标记为完成",
       "autosaved": "已保存",
-      "author_attribution": "由 {name} 创建"
+      "author_attribution": "由 {name} 创建",
+      "body_label": "备注",
+      "body_placeholder": "添加备注…",
+      "body_add": "添加备注",
+      "body_show": "显示备注",
+      "body_collapse": "隐藏备注"
     }
   },
   "calendars_rail": {
@@ -1060,6 +1074,15 @@
       "body": "该链接可能已过期或被移除。",
       "body_network": "无法连接到服务器。请检查您的连接并重试。",
       "back": "返回 nodate-flow"
+    },
+    "grid": {
+      "today": "今天",
+      "prev_month": "上个月",
+      "next_month": "下个月",
+      "aria_label": "{month} 的日历",
+      "event_label": "事件：{title}",
+      "more": "还有 {count} 个",
+      "close": "关闭"
     }
   },
   "shortcuts": {

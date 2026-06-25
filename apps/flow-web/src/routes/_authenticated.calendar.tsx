@@ -25,20 +25,32 @@ import type { components } from '@nodate-flow/sdk';
 import { cx } from '@nodate-flow/ui/lib/cx';
 import Badge from '@nodate-flow/ui/primitives/badge';
 import Button from '@nodate-flow/ui/primitives/button';
+import Drawer from '@nodate-flow/ui/primitives/drawer';
 import { toaster } from '@nodate-flow/ui/primitives/toast';
 import { ToggleChip, ToggleChipGroup } from '@nodate-flow/ui/primitives/toggle-chip';
+import { BP } from '@nodate-flow/ui/tokens/breakpoints';
 import { useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Link, createFileRoute } from '@tanstack/react-router';
-import { ChevronLeft, ChevronRight, Users } from 'lucide-react';
-import { type DragEvent, type ReactElement, useCallback, useMemo, useRef, useState } from 'react';
+import { Link, createFileRoute, useNavigate } from '@tanstack/react-router';
+import { CalendarRange, ChevronLeft, ChevronRight, Users } from 'lucide-react';
+import {
+  type DragEvent,
+  type ReactElement,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { type HolidayEntry, getOrCreateProvider } from '@nodate-flow/holidays';
 
+import { useUpdateEvent } from '../features/calendar-events/api';
 import EventDialog, {
   type EventDialogMode,
   type ItemKind,
 } from '../features/calendar-events/event-dialog';
+import MonthScroll from '../features/calendar-events/month-scroll';
 import PendingInvitesPanel from '../features/calendar-invites/pending-invites-panel';
 import calendarLayoutStyles from '../features/calendar-invites/pending-invites-panel.module.css';
 import CalendarsRail from '../features/calendars-rail/calendars-rail';
@@ -203,6 +215,67 @@ function pillStyleForKind(kind: string): {
   }
 }
 
+/**
+ * True when an event carries a recurrence rule. Recurring masters are
+ * not drag-movable on the month grid: shifting a master would silently
+ * rewrite every occurrence, and a per-occurrence this/all override flow
+ * is out of scope here. Such pills stay clickable (tap to edit) but
+ * decline the drag with a tooltip.
+ */
+function isRecurring(event: CalendarEvent): boolean {
+  const rule = event.recurrenceRule;
+  if (rule == null) return false;
+  if (typeof rule === 'string') return rule.trim().length > 0;
+  // Non-string recurrence payloads (object form) count as recurring.
+  return true;
+}
+
+/**
+ * Shift an event's start/end by `dayDelta` whole days while preserving
+ * its duration. The month grid is day-resolution, so only the date part
+ * moves; the time-of-day component carried in the unix timestamps is
+ * left intact. Returns the new `{ startAt, endAt }` in unix seconds.
+ */
+function shiftEventDays(
+  event: CalendarEvent,
+  dayDelta: number,
+): { startAt: number; endAt: number } | null {
+  if (typeof event.startAt !== 'number') return null;
+  const deltaSeconds = dayDelta * 86_400;
+  const startAt = event.startAt + deltaSeconds;
+  const endAt = (typeof event.endAt === 'number' ? event.endAt : event.startAt) + deltaSeconds;
+  return { startAt, endAt };
+}
+
+/** Whole-day difference between two local `YYYY-MM-DD` keys (`to - from`). */
+function dayDeltaBetweenKeys(fromKey: string, toKey: string): number {
+  const [fy, fm, fd] = fromKey.split('-').map(Number);
+  const [ty, tm, td] = toKey.split('-').map(Number);
+  if (!fy || !fm || !fd || !ty || !tm || !td) return 0;
+  const from = new Date(fy, fm - 1, fd).getTime();
+  const to = new Date(ty, tm - 1, td).getTime();
+  return Math.round((to - from) / 86_400_000);
+}
+
+/**
+ * useIsMobile — true when the viewport is below the `md` breakpoint.
+ * Mirrors the sidebar drawer hook so the calendar switches to the
+ * mobile month-scroll + rail-drawer at the same width the app shell
+ * collapses its navigation.
+ */
+function useIsMobile(): boolean {
+  const [mobile, setMobile] = useState(
+    () => typeof window !== 'undefined' && window.innerWidth < BP.md,
+  );
+  useEffect(() => {
+    const mq = window.matchMedia(`(max-width: ${BP.md - 1}px)`);
+    const onChange = (e: MediaQueryListEvent): void => setMobile(e.matches);
+    mq.addEventListener('change', onChange);
+    return () => mq.removeEventListener('change', onChange);
+  }, []);
+  return mobile;
+}
+
 // ---------------------------------------------------------------------------
 // Main calendar route
 // ---------------------------------------------------------------------------
@@ -226,18 +299,40 @@ type EditTarget =
   | { mode: 'create'; date: string; initialItemKind: ItemKind }
   | { mode: 'edit'; event: CalendarEvent };
 
+/**
+ * Active drag payload. A task drag only needs its id and origin day;
+ * an event drag carries the full row so the drop handler can shift the
+ * start/end range by whole days while preserving duration.
+ */
+type DragPayload =
+  | { type: 'task'; taskId: string; fromDate: string }
+  | { type: 'event'; event: CalendarEvent; fromDate: string };
+
 function CalendarRoute(): ReactElement {
   const { t, i18n } = useTranslation('common');
   const locale = i18n.resolvedLanguage ?? 'en';
   const qc = useQueryClient();
+  const navigate = useNavigate();
   const today = new Date();
   const [cursor, setCursor] = useState<{ year: number; month: number }>({
     year: today.getFullYear(),
     month: today.getMonth(),
   });
   const [dragOverKey, setDragOverKey] = useState<string | null>(null);
-  const dragDataRef = useRef<{ taskId: string; fromDate: string } | null>(null);
+  // Drag payload is a discriminated union: tasks reschedule via dueOn,
+  // events shift their whole start/end range by the day delta.
+  const dragDataRef = useRef<DragPayload | null>(null);
   const enterCountRef = useRef<Record<string, number>>({});
+  const isMobile = useIsMobile();
+  const [railOpen, setRailOpen] = useState(false);
+  // Bumped by the "Today" button so the mobile month-scroll re-centers.
+  const [scrollToTodaySignal, setScrollToTodaySignal] = useState(0);
+
+  // Close the mobile rail drawer when growing past the breakpoint
+  // (the Drawer primitive owns Escape / focus-trap while it is open).
+  useEffect(() => {
+    if (!isMobile) setRailOpen(false);
+  }, [isMobile]);
 
   const [editTarget, setEditTarget] = useState<EditTarget | null>(null);
   const [layers, setLayers] = useState<LayerFlags>({
@@ -362,8 +457,13 @@ function CalendarRoute(): ReactElement {
     },
   });
 
-  const handleDragStart = useCallback((taskId: string, fromDate: string) => {
-    dragDataRef.current = { taskId, fromDate };
+  // Event drag-to-move: shifts start/end by whole days (duration
+  // preserved) through the shared events PATCH hook. Recurring masters
+  // never reach this path (their pills are not draggable).
+  const updateEventMut = useUpdateEvent();
+
+  const handleDragStart = useCallback((payload: DragPayload) => {
+    dragDataRef.current = payload;
   }, []);
 
   const handleDragEnter = useCallback((e: DragEvent, cellKey: string) => {
@@ -389,11 +489,36 @@ function CalendarRoute(): ReactElement {
       setDragOverKey(null);
       enterCountRef.current = {};
       const data = dragDataRef.current;
-      if (!data || data.fromDate === cellKey) return;
-      rescheduleMut.mutate({ taskId: data.taskId, dueOn: cellKey });
       dragDataRef.current = null;
+      if (!data || data.fromDate === cellKey) return;
+      if (data.type === 'task') {
+        rescheduleMut.mutate({ taskId: data.taskId, dueOn: cellKey });
+        return;
+      }
+      // Event: shift the whole range by the day delta from its origin
+      // cell to the drop cell, keeping the duration intact.
+      const delta = dayDeltaBetweenKeys(data.fromDate, cellKey);
+      if (delta === 0) return;
+      const shifted = shiftEventDays(data.event, delta);
+      if (!shifted) return;
+      updateEventMut.mutate(
+        {
+          workspaceId: data.event.workspaceId,
+          calendarId: data.event.calendarId,
+          eventId: data.event.id,
+          body: { startAt: shifted.startAt, endAt: shifted.endAt },
+        },
+        {
+          onSuccess: () => {
+            toaster.show({ tone: 'success', message: t('calendar.event_move_success') });
+          },
+          onError: () => {
+            toaster.show({ tone: 'danger', message: t('calendar.event_move_error') });
+          },
+        },
+      );
     },
-    [rescheduleMut],
+    [rescheduleMut, updateEventMut, t],
   );
 
   // Projects per workspace, just for the quick-create project picker.
@@ -478,6 +603,23 @@ function CalendarRoute(): ReactElement {
   }, [events, layers.events, layers.blocks, layers.free, layers.milestone]);
 
   /**
+   * Flat layer-filtered event list for the mobile month-scroll. Mirrors
+   * the kind-gating in {@link eventsByDate} but keeps multi-day events
+   * whole so the week-row layout can stretch them across columns (the
+   * day-keyed map above would otherwise drop their span).
+   */
+  const filteredEvents = useMemo(() => {
+    return events.filter((ev) => {
+      if (typeof ev.startAt !== 'number') return false;
+      const k = ev.kind;
+      if (k === 'block') return layers.blocks;
+      if (k === 'free') return layers.free;
+      if (k === 'milestone') return layers.milestone;
+      return layers.events;
+    });
+  }, [events, layers.events, layers.blocks, layers.free, layers.milestone]);
+
+  /**
    * dateKey → public holidays for the visible grid range. Empty when the
    * user has no country set or when the holidays layer is disabled.
    */
@@ -516,7 +658,26 @@ function CalendarRoute(): ReactElement {
   };
   const goToday = (): void => {
     setCursor({ year: today.getFullYear(), month: today.getMonth() });
+    // Re-center the mobile month-scroll on today's week.
+    setScrollToTodaySignal((n) => n + 1);
   };
+
+  const stateColor = useCallback(
+    (derivedState: string): string =>
+      STATE_COLOR[derivedState as TaskDerivedState] ?? 'var(--nf-color-fg-muted)',
+    [],
+  );
+
+  const handleEventOpen = useCallback((event: CalendarEvent): void => {
+    setEditTarget({ mode: 'edit', event });
+  }, []);
+
+  const handleTaskOpen = useCallback(
+    (task: CalendarTask): void => {
+      void navigate({ to: '/tasks/$taskId', params: { taskId: task.id } });
+    },
+    [navigate],
+  );
 
   return (
     <section className={styles.section}>
@@ -599,177 +760,261 @@ function CalendarRoute(): ReactElement {
         </ToggleChipGroup>
       </div>
 
+      {/* Mobile-only trigger to open the calendars rail as a drawer. */}
+      {isMobile ? (
+        <div className={styles.mobileRailBar}>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={() => setRailOpen(true)}
+            aria-haspopup="dialog"
+            aria-expanded={railOpen}
+          >
+            <CalendarRange size={16} aria-hidden />
+            {t('calendars_rail.title')}
+          </Button>
+        </div>
+      ) : null}
+
       <div className={calendarLayoutStyles.layout}>
-        <CalendarsRail workspaces={railWorkspaces} selfUserId={selfUserId} />
+        {isMobile ? null : <CalendarsRail workspaces={railWorkspaces} selfUserId={selfUserId} />}
         <div className={styles.gridColumn}>
-          <div className={styles.weekdayRow}>
-            {weekdayKeys.map((wk, idx) => (
-              <div key={wk} className={cx(styles.weekday, weekdayHeaderClass(weekdayKeys, idx))}>
-                {t(`calendar.weekday.${wk}`)}
-              </div>
-            ))}
-          </div>
-          <div className={styles.grid}>
-            {cells.map((cell) => {
-              const dayTasks = byDate.get(cell.key) ?? [];
-              const dayEvents = eventsByDate.get(cell.key) ?? [];
-              const dayHolidays = holidaysByDate.get(cell.key) ?? [];
-              const totalCount = dayTasks.length + dayEvents.length;
-              const isToday = cell.key === todayKey;
-              const isDragOver = dragOverKey === cell.key;
-              // Render only the first holiday label on the cell (rare
-              // multi-holiday days append "+N" — full list lives in the
-              // `title` so it stays accessible on hover).
-              const primaryHoliday = dayHolidays[0] ?? null;
-              const extraHolidayCount = Math.max(0, dayHolidays.length - 1);
-              const holidayTitle = dayHolidays.map((h) => h.name).join(', ');
-              const dateNumberCls = dateNumberClass(cell.date, dayHolidays.length > 0);
-              return (
-                <div
-                  key={cell.key}
-                  // data-cell-key exposes the YYYY-MM-DD cell address for
-                  // E2E drag-target selection (otherwise CSS-module hashes
-                  // make cells un-addressable).
-                  data-cell-key={cell.key}
-                  onDragEnter={(e) => {
-                    handleDragEnter(e, cell.key);
-                  }}
-                  onDragOver={handleDragOver}
-                  onDragLeave={() => {
-                    handleDragLeave(cell.key);
-                  }}
-                  onDrop={(e) => {
-                    handleDrop(e, cell.key);
-                  }}
-                  onClick={(e) => {
-                    if ((e.target as HTMLElement).closest('a, button')) return;
-                    if (cell.inMonth) handleCellClick(cell.key, e.shiftKey);
-                  }}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' || e.key === ' ') {
-                      e.preventDefault();
-                      if (cell.inMonth) handleCellClick(cell.key, e.shiftKey);
-                    }
-                  }}
-                  role={cell.inMonth ? 'button' : undefined}
-                  tabIndex={cell.inMonth ? 0 : undefined}
-                  className={cx(
-                    styles.cell,
-                    cell.inMonth && styles['cell--inMonth'],
-                    isToday && styles['cell--today'],
-                    isDragOver && styles['cell--dragOver'],
-                  )}
-                  title={cell.inMonth ? t('calendar.click_to_add') : undefined}
-                >
-                  <div className={styles.cellHeader}>
-                    <span
-                      className={cx(styles.dateNumber, dateNumberCls, isToday && styles.todayPill)}
-                    >
-                      {cell.date.getDate()}
-                    </span>
-                    {primaryHoliday ? (
-                      <span className={styles.holidayLabel} title={holidayTitle}>
-                        {extraHolidayCount > 0
-                          ? t('calendar.holiday_more', {
-                              name: primaryHoliday.name,
-                              count: extraHolidayCount,
-                            })
-                          : primaryHoliday.name}
-                      </span>
-                    ) : totalCount > 0 ? (
-                      <Badge tone="neutral" className={styles.countBadge}>
-                        {totalCount}
-                      </Badge>
-                    ) : null}
+          {isMobile ? (
+            <MonthScroll
+              events={filteredEvents}
+              tasksByDate={byDate}
+              holidaysByDate={holidaysByDate}
+              locale={locale}
+              weekStart={weekStart}
+              stateColor={stateColor}
+              scrollToTodaySignal={scrollToTodaySignal}
+              onDayCreate={(key) => handleCellClick(key, false)}
+              onEventOpen={handleEventOpen}
+              onTaskOpen={handleTaskOpen}
+            />
+          ) : (
+            <>
+              <div className={styles.weekdayRow}>
+                {weekdayKeys.map((wk, idx) => (
+                  <div
+                    key={wk}
+                    className={cx(styles.weekday, weekdayHeaderClass(weekdayKeys, idx))}
+                  >
+                    {t(`calendar.weekday.${wk}`)}
                   </div>
-                  <ul className={styles.pillList}>
-                    {dayTasks.slice(0, 3).map((task) => (
-                      <li key={task.id}>
-                        <Link
-                          to="/tasks/$taskId"
-                          params={{ taskId: task.id }}
-                          title={`${task.title} · ${task.workspaceName}`}
-                          draggable
-                          onDragStart={(e) => {
-                            e.dataTransfer.effectAllowed = 'move';
-                            handleDragStart(task.id, cell.key);
-                          }}
-                          className={styles.taskPill}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                          }}
+                ))}
+              </div>
+              <div className={styles.grid}>
+                {cells.map((cell) => {
+                  const dayTasks = byDate.get(cell.key) ?? [];
+                  const dayEvents = eventsByDate.get(cell.key) ?? [];
+                  const dayHolidays = holidaysByDate.get(cell.key) ?? [];
+                  const totalCount = dayTasks.length + dayEvents.length;
+                  const isToday = cell.key === todayKey;
+                  const isDragOver = dragOverKey === cell.key;
+                  // Render only the first holiday label on the cell (rare
+                  // multi-holiday days append "+N" — full list lives in the
+                  // `title` so it stays accessible on hover).
+                  const primaryHoliday = dayHolidays[0] ?? null;
+                  const extraHolidayCount = Math.max(0, dayHolidays.length - 1);
+                  const holidayTitle = dayHolidays.map((h) => h.name).join(', ');
+                  const dateNumberCls = dateNumberClass(cell.date, dayHolidays.length > 0);
+                  return (
+                    <div
+                      key={cell.key}
+                      // data-cell-key exposes the YYYY-MM-DD cell address for
+                      // E2E drag-target selection (otherwise CSS-module hashes
+                      // make cells un-addressable).
+                      data-cell-key={cell.key}
+                      onDragEnter={(e) => {
+                        handleDragEnter(e, cell.key);
+                      }}
+                      onDragOver={handleDragOver}
+                      onDragLeave={() => {
+                        handleDragLeave(cell.key);
+                      }}
+                      onDrop={(e) => {
+                        handleDrop(e, cell.key);
+                      }}
+                      onClick={(e) => {
+                        if ((e.target as HTMLElement).closest('a, button')) return;
+                        if (cell.inMonth) handleCellClick(cell.key, e.shiftKey);
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          e.preventDefault();
+                          if (cell.inMonth) handleCellClick(cell.key, e.shiftKey);
+                        }
+                      }}
+                      role={cell.inMonth ? 'button' : undefined}
+                      tabIndex={cell.inMonth ? 0 : undefined}
+                      className={cx(
+                        styles.cell,
+                        cell.inMonth && styles['cell--inMonth'],
+                        isToday && styles['cell--today'],
+                        isDragOver && styles['cell--dragOver'],
+                      )}
+                      title={cell.inMonth ? t('calendar.click_to_add') : undefined}
+                    >
+                      <div className={styles.cellHeader}>
+                        <span
+                          className={cx(
+                            styles.dateNumber,
+                            dateNumberCls,
+                            isToday && styles.todayPill,
+                          )}
                         >
-                          <span
-                            aria-hidden
-                            className={styles.taskPill__dot}
-                            style={{
-                              background:
-                                STATE_COLOR[task.derivedState as TaskDerivedState] ??
-                                'var(--nf-color-fg-muted)',
-                            }}
-                          />
-                          <span className={styles.taskPill__title}>{task.title}</span>
-                        </Link>
-                      </li>
-                    ))}
-                    {dayTasks.length > 3 ? (
-                      <li className={styles.morePill}>
-                        {t('calendar.more', { count: dayTasks.length - 3 })}
-                      </li>
-                    ) : null}
-                    {dayEvents.slice(0, 2).map((ev) => {
-                      const pill = pillStyleForKind(ev.kind);
-                      return (
-                        <li key={`ev-${ev.id}`}>
-                          <button
-                            type="button"
-                            title={`${ev.title} · ${ev.workspaceName}`}
-                            aria-label={t('calendar.event_detail.open_label', {
-                              title: ev.title,
-                              workspace: ev.workspaceName,
-                            })}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setEditTarget({ mode: 'edit', event: ev });
-                            }}
-                            className={`${styles.eventPill}${ev.viewerAttending ? ` ${styles['eventPill--viewerAttending']}` : ''}`}
-                            style={pill}
-                          >
-                            <span
-                              aria-hidden
-                              className={styles.eventPill__marker}
-                              style={{ background: pill.markerColor }}
-                            />
-                            <span className={styles.eventPill__title}>{ev.title}</span>
-                            {ev.attendeeCount > 0 ? (
+                          {cell.date.getDate()}
+                        </span>
+                        {primaryHoliday ? (
+                          <span className={styles.holidayLabel} title={holidayTitle}>
+                            {extraHolidayCount > 0
+                              ? t('calendar.holiday_more', {
+                                  name: primaryHoliday.name,
+                                  count: extraHolidayCount,
+                                })
+                              : primaryHoliday.name}
+                          </span>
+                        ) : totalCount > 0 ? (
+                          <Badge tone="neutral" className={styles.countBadge}>
+                            {totalCount}
+                          </Badge>
+                        ) : null}
+                      </div>
+                      <ul className={styles.pillList}>
+                        {dayTasks.slice(0, 3).map((task) => (
+                          <li key={task.id}>
+                            <Link
+                              to="/tasks/$taskId"
+                              params={{ taskId: task.id }}
+                              title={`${task.title} · ${task.workspaceName}`}
+                              draggable
+                              onDragStart={(e) => {
+                                e.dataTransfer.effectAllowed = 'move';
+                                handleDragStart({
+                                  type: 'task',
+                                  taskId: task.id,
+                                  fromDate: cell.key,
+                                });
+                              }}
+                              className={styles.taskPill}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                              }}
+                            >
                               <span
-                                className={styles.eventPill__attendees}
-                                aria-label={t('calendar.event_attendee_count', {
-                                  count: ev.attendeeCount,
+                                aria-hidden
+                                className={styles.taskPill__dot}
+                                style={{
+                                  background:
+                                    STATE_COLOR[task.derivedState as TaskDerivedState] ??
+                                    'var(--nf-color-fg-muted)',
+                                }}
+                              />
+                              <span className={styles.taskPill__title}>{task.title}</span>
+                            </Link>
+                          </li>
+                        ))}
+                        {dayTasks.length > 3 ? (
+                          <li className={styles.morePill}>
+                            {t('calendar.more', { count: dayTasks.length - 3 })}
+                          </li>
+                        ) : null}
+                        {dayEvents.slice(0, 2).map((ev) => {
+                          const pill = pillStyleForKind(ev.kind);
+                          const recurring = isRecurring(ev);
+                          // Recurring masters decline the drag (moving the
+                          // master would rewrite every occurrence); they stay
+                          // tap-to-edit with an explanatory tooltip.
+                          const pillTitle = recurring
+                            ? t('calendar.event_recurring_no_drag', {
+                                title: ev.title,
+                                workspace: ev.workspaceName,
+                              })
+                            : `${ev.title} · ${ev.workspaceName}`;
+                          return (
+                            <li key={`ev-${ev.id}`}>
+                              <button
+                                type="button"
+                                title={pillTitle}
+                                aria-label={t('calendar.event_detail.open_label', {
+                                  title: ev.title,
+                                  workspace: ev.workspaceName,
                                 })}
+                                draggable={!recurring}
+                                onDragStart={(e) => {
+                                  if (recurring) {
+                                    e.preventDefault();
+                                    return;
+                                  }
+                                  e.dataTransfer.effectAllowed = 'move';
+                                  handleDragStart({ type: 'event', event: ev, fromDate: cell.key });
+                                }}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setEditTarget({ mode: 'edit', event: ev });
+                                }}
+                                className={cx(
+                                  styles.eventPill,
+                                  ev.viewerAttending && styles['eventPill--viewerAttending'],
+                                  !recurring && styles['eventPill--draggable'],
+                                )}
+                                style={pill}
                               >
-                                <Users aria-hidden className={styles.eventPill__attendeesIcon} />
-                                {ev.attendeeCount}
-                              </span>
-                            ) : null}
-                          </button>
-                        </li>
-                      );
-                    })}
-                    {dayEvents.length > 2 ? (
-                      <li className={styles.morePill}>
-                        {t('calendar.more', { count: dayEvents.length - 2 })}
-                      </li>
-                    ) : null}
-                  </ul>
-                </div>
-              );
-            })}
-          </div>
+                                <span
+                                  aria-hidden
+                                  className={styles.eventPill__marker}
+                                  style={{ background: pill.markerColor }}
+                                />
+                                <span className={styles.eventPill__title}>{ev.title}</span>
+                                {ev.attendeeCount > 0 ? (
+                                  <span
+                                    className={styles.eventPill__attendees}
+                                    aria-label={t('calendar.event_attendee_count', {
+                                      count: ev.attendeeCount,
+                                    })}
+                                  >
+                                    <Users
+                                      aria-hidden
+                                      className={styles.eventPill__attendeesIcon}
+                                    />
+                                    {ev.attendeeCount}
+                                  </span>
+                                ) : null}
+                              </button>
+                            </li>
+                          );
+                        })}
+                        {dayEvents.length > 2 ? (
+                          <li className={styles.morePill}>
+                            {t('calendar.more', { count: dayEvents.length - 2 })}
+                          </li>
+                        ) : null}
+                      </ul>
+                    </div>
+                  );
+                })}
+              </div>
+            </>
+          )}
         </div>
 
-        <PendingInvitesPanel />
+        {isMobile ? null : <PendingInvitesPanel />}
       </div>
+
+      {/* Mobile calendars-rail drawer — reuses the Drawer primitive for
+          focus trap, overlay lock, Escape, and backdrop a11y. */}
+      {isMobile && railOpen ? (
+        <Drawer
+          open
+          onClose={() => setRailOpen(false)}
+          title={t('calendars_rail.title')}
+          side="inline-end"
+        >
+          <CalendarsRail workspaces={railWorkspaces} selfUserId={selfUserId} />
+        </Drawer>
+      ) : null}
 
       {editTarget !== null ? (
         <EventDialog

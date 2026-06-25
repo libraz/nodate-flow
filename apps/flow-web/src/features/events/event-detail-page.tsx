@@ -5,8 +5,9 @@
  * Layout:
  *   - Back link to `/calendar`.
  *   - Header card: kind badge, title, formatted start/end, all-day flag,
- *     calendar color dot. Owner is intentionally not surfaced because
- *     `EventResponse` does not expose `ownerUserId`.
+ *     calendar color dot, and a subtle "Created by" attribution. Owner /
+ *     email are intentionally NOT surfaced (sensitive); the creator is a
+ *     distinct, non-sensitive identity exposed by `EventResponse`.
  *   - Tabs ({@link Tabs}) with five panes — Attendees, Invites,
  *     Comments, Checklist, Attachments — each wrapped in its own
  *     {@link Suspense} boundary so a failure or load in one pane does
@@ -29,6 +30,7 @@ import { Link, getRouteApi } from '@tanstack/react-router';
 import { type ReactElement, Suspense, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import CreatorChip from '../calendar-events/creator-chip';
 import { useEventQuery } from './api';
 import AttachmentsTab from './attachments-tab';
 import AttendeesTab from './attendees-tab';
@@ -127,6 +129,7 @@ function EventHeader({ workspaceId, calendarId, eventId }: EventHeaderProps): Re
           </div>
         ) : null}
       </dl>
+      <CreatorChip displayName={event.creatorDisplayName} avatarUrl={event.creatorAvatarUrl} />
       {event.startAt !== undefined ? (
         <div className={styles.headerActions}>
           <Button

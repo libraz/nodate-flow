@@ -53,7 +53,15 @@
   gap: var(--nf-space-px);
 }
 
+.titleLine {
+  display: flex;
+  align-items: center;
+  gap: var(--nf-space-1);
+}
+
 .titleInput {
+  flex: 1 1 auto;
+  min-inline-size: 0;
   inline-size: 100%;
   border: 0;
   background: transparent;
@@ -62,6 +70,61 @@
   padding: 0;
   font-family: inherit;
   line-height: var(--nf-leading-tight);
+}
+
+.expandToggle {
+  position: relative;
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  inline-size: var(--nf-space-5);
+  block-size: var(--nf-space-5);
+  padding: 0;
+  border: 0;
+  border-radius: var(--nf-radius-sm);
+  background: transparent;
+  color: var(--nf-color-fg-muted);
+  cursor: pointer;
+  transition:
+    background var(--nf-duration-fast),
+    color var(--nf-duration-fast);
+}
+
+.expandToggle:hover:not(:disabled) {
+  background: var(--nf-color-bg);
+  color: var(--nf-color-fg);
+}
+
+.expandToggle:focus-visible {
+  outline: none;
+  box-shadow: var(--nf-shadow-focus);
+}
+
+.expandToggle:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.expandIcon {
+  font-size: var(--nf-text-base);
+  line-height: 1;
+}
+
+.bodyDot {
+  position: absolute;
+  inset-block-start: var(--nf-space-px);
+  inset-inline-end: var(--nf-space-px);
+  inline-size: var(--nf-space-1);
+  block-size: var(--nf-space-1);
+  border-radius: var(--nf-radius-pill);
+  background: var(--nf-color-accent);
+}
+
+.bodyTextarea {
+  margin-block-start: var(--nf-space-1);
+  font-size: var(--nf-text-sm);
+  min-block-size: var(--nf-space-16);
 }
 
 .titleInput:focus-visible {
@@ -117,4 +180,11 @@
   display: flex;
   flex-direction: column;
   gap: var(--nf-space-2);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .row,
+  .expandToggle {
+    transition: none;
+  }
 }

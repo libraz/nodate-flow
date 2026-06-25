@@ -4,6 +4,7 @@ import Tooltip from '@nodate-flow/ui/primitives/tooltip';
 import { BP } from '@nodate-flow/ui/tokens/breakpoints';
 import { Link, useRouterState } from '@tanstack/react-router';
 import {
+  Activity,
   Briefcase,
   CalendarDays,
   CalendarRange,
@@ -118,6 +119,29 @@ function WorkspaceTimeboxesLink({ workspaceId }: { workspaceId: string }): React
     >
       <Icon icon={Timer} decorative />
       <span className={styles.label}>{t('nav.timeboxes')}</span>
+    </Link>
+  );
+}
+
+/**
+ * WorkspaceActivityLink — single sidebar entry that points at
+ * `/workspaces/{id}/activity`. Sits beside the Timeboxes link so the
+ * unified activity feed (audit + ai + mcp) is reachable directly from the
+ * workspace nav. Static label, no data fetch.
+ */
+function WorkspaceActivityLink({ workspaceId }: { workspaceId: string }): ReactElement {
+  const { t } = useTranslation('common');
+  return (
+    <Link
+      to="/workspaces/$id/activity"
+      params={{ id: workspaceId }}
+      className={cx(styles.item, styles.subItem, 'nf-focus-ring')}
+      activeProps={{
+        className: cx(styles.item, styles.subItem, styles.itemActive, 'nf-focus-ring'),
+      }}
+    >
+      <Icon icon={Activity} decorative />
+      <span className={styles.label}>{t('nav.activity')}</span>
     </Link>
   );
 }
@@ -375,6 +399,7 @@ export default function Sidebar(): ReactElement {
               return (
                 <div key={item.key}>
                   {linkEl}
+                  <WorkspaceActivityLink workspaceId={currentWorkspaceId} />
                   <WorkspaceTimeboxesLink workspaceId={currentWorkspaceId} />
                   <WorkspaceInsightsPriorityLink workspaceId={currentWorkspaceId} />
                   <Suspense fallback={null}>

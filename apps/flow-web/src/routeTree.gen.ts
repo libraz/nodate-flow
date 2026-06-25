@@ -26,6 +26,7 @@ import { Route as AuthenticatedWorkspacesIndexRouteImport } from './routes/_auth
 import { Route as AuthenticatedPagesIndexRouteImport } from './routes/_authenticated.pages.index';
 import { Route as ShareCalTokenRouteImport } from './routes/share.cal.$token';
 import { Route as PublicLensesTokenRouteImport } from './routes/public.lenses.$token';
+import { Route as EmbedCalTokenRouteImport } from './routes/embed.cal.$token';
 import { Route as AuthenticatedWorkspacesIdRouteImport } from './routes/_authenticated.workspaces.$id';
 import { Route as AuthenticatedTasksTaskIdRouteImport } from './routes/_authenticated.tasks.$taskId';
 import { Route as AuthenticatedSettingsSecurityRouteImport } from './routes/_authenticated.settings.security';
@@ -40,6 +41,7 @@ import { Route as AuthenticatedWorkspacesIdTimeboxesRouteImport } from './routes
 import { Route as AuthenticatedWorkspacesIdSettingsRouteImport } from './routes/_authenticated.workspaces.$id.settings';
 import { Route as AuthenticatedWorkspacesIdRemindersRouteImport } from './routes/_authenticated.workspaces.$id.reminders';
 import { Route as AuthenticatedWorkspacesIdProjectsRouteImport } from './routes/_authenticated.workspaces.$id.projects';
+import { Route as AuthenticatedWorkspacesIdActivityRouteImport } from './routes/_authenticated.workspaces.$id.activity';
 import { Route as AuthenticatedProjectsProjectIdTimelineRouteImport } from './routes/_authenticated.projects.$projectId.timeline';
 import { Route as AuthenticatedProjectsProjectIdTasksRouteImport } from './routes/_authenticated.projects.$projectId.tasks';
 import { Route as AuthenticatedProjectsProjectIdGanttRouteImport } from './routes/_authenticated.projects.$projectId.gantt';
@@ -163,6 +165,11 @@ const PublicLensesTokenRoute = PublicLensesTokenRouteImport.update({
   path: '/public/lenses/$token',
   getParentRoute: () => rootRouteImport,
 } as any);
+const EmbedCalTokenRoute = EmbedCalTokenRouteImport.update({
+  id: '/embed/cal/$token',
+  path: '/embed/cal/$token',
+  getParentRoute: () => rootRouteImport,
+} as any);
 const AuthenticatedWorkspacesIdRoute =
   AuthenticatedWorkspacesIdRouteImport.update({
     id: '/$id',
@@ -281,6 +288,16 @@ const AuthenticatedWorkspacesIdProjectsRoute =
     path: '/projects',
     getParentRoute: () => AuthenticatedWorkspacesIdRoute,
   } as any);
+const AuthenticatedWorkspacesIdActivityRoute =
+  AuthenticatedWorkspacesIdActivityRouteImport.update({
+    id: '/activity',
+    path: '/activity',
+    getParentRoute: () => AuthenticatedWorkspacesIdRoute,
+  } as any).lazy(() =>
+    import('./routes/_authenticated.workspaces.$id.activity.lazy').then(
+      (d) => d.Route,
+    ),
+  );
 const AuthenticatedProjectsProjectIdTimelineRoute =
   AuthenticatedProjectsProjectIdTimelineRouteImport.update({
     id: '/timeline',
@@ -577,6 +594,7 @@ export interface FileRoutesByFullPath {
   '/settings/security': typeof AuthenticatedSettingsSecurityRoute;
   '/tasks/$taskId': typeof AuthenticatedTasksTaskIdRoute;
   '/workspaces/$id': typeof AuthenticatedWorkspacesIdRouteWithChildren;
+  '/embed/cal/$token': typeof EmbedCalTokenRoute;
   '/public/lenses/$token': typeof PublicLensesTokenRoute;
   '/share/cal/$token': typeof ShareCalTokenRoute;
   '/pages/': typeof AuthenticatedPagesIndexRoute;
@@ -584,6 +602,7 @@ export interface FileRoutesByFullPath {
   '/projects/$projectId/gantt': typeof AuthenticatedProjectsProjectIdGanttRoute;
   '/projects/$projectId/tasks': typeof AuthenticatedProjectsProjectIdTasksRouteWithChildren;
   '/projects/$projectId/timeline': typeof AuthenticatedProjectsProjectIdTimelineRoute;
+  '/workspaces/$id/activity': typeof AuthenticatedWorkspacesIdActivityRoute;
   '/workspaces/$id/projects': typeof AuthenticatedWorkspacesIdProjectsRouteWithChildren;
   '/workspaces/$id/reminders': typeof AuthenticatedWorkspacesIdRemindersRoute;
   '/workspaces/$id/settings': typeof AuthenticatedWorkspacesIdSettingsRouteWithChildren;
@@ -637,12 +656,14 @@ export interface FileRoutesByTo {
   '/settings/security': typeof AuthenticatedSettingsSecurityRoute;
   '/tasks/$taskId': typeof AuthenticatedTasksTaskIdRoute;
   '/workspaces/$id': typeof AuthenticatedWorkspacesIdRouteWithChildren;
+  '/embed/cal/$token': typeof EmbedCalTokenRoute;
   '/public/lenses/$token': typeof PublicLensesTokenRoute;
   '/share/cal/$token': typeof ShareCalTokenRoute;
   '/pages': typeof AuthenticatedPagesIndexRoute;
   '/workspaces': typeof AuthenticatedWorkspacesIndexRoute;
   '/projects/$projectId/gantt': typeof AuthenticatedProjectsProjectIdGanttRoute;
   '/projects/$projectId/timeline': typeof AuthenticatedProjectsProjectIdTimelineRoute;
+  '/workspaces/$id/activity': typeof AuthenticatedWorkspacesIdActivityRoute;
   '/workspaces/$id/reminders': typeof AuthenticatedWorkspacesIdRemindersRoute;
   '/workspaces/$id/timeboxes': typeof AuthenticatedWorkspacesIdTimeboxesRoute;
   '/workspaces/$id/timeline': typeof AuthenticatedWorkspacesIdTimelineRoute;
@@ -696,6 +717,7 @@ export interface FileRoutesById {
   '/_authenticated/settings/security': typeof AuthenticatedSettingsSecurityRoute;
   '/_authenticated/tasks/$taskId': typeof AuthenticatedTasksTaskIdRoute;
   '/_authenticated/workspaces/$id': typeof AuthenticatedWorkspacesIdRouteWithChildren;
+  '/embed/cal/$token': typeof EmbedCalTokenRoute;
   '/public/lenses/$token': typeof PublicLensesTokenRoute;
   '/share/cal/$token': typeof ShareCalTokenRoute;
   '/_authenticated/pages/': typeof AuthenticatedPagesIndexRoute;
@@ -703,6 +725,7 @@ export interface FileRoutesById {
   '/_authenticated/projects/$projectId/gantt': typeof AuthenticatedProjectsProjectIdGanttRoute;
   '/_authenticated/projects/$projectId/tasks': typeof AuthenticatedProjectsProjectIdTasksRouteWithChildren;
   '/_authenticated/projects/$projectId/timeline': typeof AuthenticatedProjectsProjectIdTimelineRoute;
+  '/_authenticated/workspaces/$id/activity': typeof AuthenticatedWorkspacesIdActivityRoute;
   '/_authenticated/workspaces/$id/projects': typeof AuthenticatedWorkspacesIdProjectsRouteWithChildren;
   '/_authenticated/workspaces/$id/reminders': typeof AuthenticatedWorkspacesIdRemindersRoute;
   '/_authenticated/workspaces/$id/settings': typeof AuthenticatedWorkspacesIdSettingsRouteWithChildren;
@@ -761,6 +784,7 @@ export interface FileRouteTypes {
     | '/settings/security'
     | '/tasks/$taskId'
     | '/workspaces/$id'
+    | '/embed/cal/$token'
     | '/public/lenses/$token'
     | '/share/cal/$token'
     | '/pages/'
@@ -768,6 +792,7 @@ export interface FileRouteTypes {
     | '/projects/$projectId/gantt'
     | '/projects/$projectId/tasks'
     | '/projects/$projectId/timeline'
+    | '/workspaces/$id/activity'
     | '/workspaces/$id/projects'
     | '/workspaces/$id/reminders'
     | '/workspaces/$id/settings'
@@ -821,12 +846,14 @@ export interface FileRouteTypes {
     | '/settings/security'
     | '/tasks/$taskId'
     | '/workspaces/$id'
+    | '/embed/cal/$token'
     | '/public/lenses/$token'
     | '/share/cal/$token'
     | '/pages'
     | '/workspaces'
     | '/projects/$projectId/gantt'
     | '/projects/$projectId/timeline'
+    | '/workspaces/$id/activity'
     | '/workspaces/$id/reminders'
     | '/workspaces/$id/timeboxes'
     | '/workspaces/$id/timeline'
@@ -879,6 +906,7 @@ export interface FileRouteTypes {
     | '/_authenticated/settings/security'
     | '/_authenticated/tasks/$taskId'
     | '/_authenticated/workspaces/$id'
+    | '/embed/cal/$token'
     | '/public/lenses/$token'
     | '/share/cal/$token'
     | '/_authenticated/pages/'
@@ -886,6 +914,7 @@ export interface FileRouteTypes {
     | '/_authenticated/projects/$projectId/gantt'
     | '/_authenticated/projects/$projectId/tasks'
     | '/_authenticated/projects/$projectId/timeline'
+    | '/_authenticated/workspaces/$id/activity'
     | '/_authenticated/workspaces/$id/projects'
     | '/_authenticated/workspaces/$id/reminders'
     | '/_authenticated/workspaces/$id/settings'
@@ -928,6 +957,7 @@ export interface RootRouteChildren {
   SignupRoute: typeof SignupRoute;
   InviteTokenRoute: typeof InviteTokenRoute;
   InvitesAcceptRoute: typeof InvitesAcceptRoute;
+  EmbedCalTokenRoute: typeof EmbedCalTokenRoute;
   PublicLensesTokenRoute: typeof PublicLensesTokenRoute;
   ShareCalTokenRoute: typeof ShareCalTokenRoute;
 }
@@ -1053,6 +1083,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PublicLensesTokenRouteImport;
       parentRoute: typeof rootRouteImport;
     };
+    '/embed/cal/$token': {
+      id: '/embed/cal/$token';
+      path: '/embed/cal/$token';
+      fullPath: '/embed/cal/$token';
+      preLoaderRoute: typeof EmbedCalTokenRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
     '/_authenticated/workspaces/$id': {
       id: '/_authenticated/workspaces/$id';
       path: '/$id';
@@ -1149,6 +1186,13 @@ declare module '@tanstack/react-router' {
       path: '/projects';
       fullPath: '/workspaces/$id/projects';
       preLoaderRoute: typeof AuthenticatedWorkspacesIdProjectsRouteImport;
+      parentRoute: typeof AuthenticatedWorkspacesIdRoute;
+    };
+    '/_authenticated/workspaces/$id/activity': {
+      id: '/_authenticated/workspaces/$id/activity';
+      path: '/activity';
+      fullPath: '/workspaces/$id/activity';
+      preLoaderRoute: typeof AuthenticatedWorkspacesIdActivityRouteImport;
       parentRoute: typeof AuthenticatedWorkspacesIdRoute;
     };
     '/_authenticated/projects/$projectId/timeline': {
@@ -1535,6 +1579,7 @@ const AuthenticatedWorkspacesIdSettingsRouteWithChildren =
   );
 
 interface AuthenticatedWorkspacesIdRouteChildren {
+  AuthenticatedWorkspacesIdActivityRoute: typeof AuthenticatedWorkspacesIdActivityRoute;
   AuthenticatedWorkspacesIdProjectsRoute: typeof AuthenticatedWorkspacesIdProjectsRouteWithChildren;
   AuthenticatedWorkspacesIdRemindersRoute: typeof AuthenticatedWorkspacesIdRemindersRoute;
   AuthenticatedWorkspacesIdSettingsRoute: typeof AuthenticatedWorkspacesIdSettingsRouteWithChildren;
@@ -1548,6 +1593,8 @@ interface AuthenticatedWorkspacesIdRouteChildren {
 
 const AuthenticatedWorkspacesIdRouteChildren: AuthenticatedWorkspacesIdRouteChildren =
   {
+    AuthenticatedWorkspacesIdActivityRoute:
+      AuthenticatedWorkspacesIdActivityRoute,
     AuthenticatedWorkspacesIdProjectsRoute:
       AuthenticatedWorkspacesIdProjectsRouteWithChildren,
     AuthenticatedWorkspacesIdRemindersRoute:
@@ -1665,6 +1712,7 @@ const rootRouteChildren: RootRouteChildren = {
   SignupRoute: SignupRoute,
   InviteTokenRoute: InviteTokenRoute,
   InvitesAcceptRoute: InvitesAcceptRoute,
+  EmbedCalTokenRoute: EmbedCalTokenRoute,
   PublicLensesTokenRoute: PublicLensesTokenRoute,
   ShareCalTokenRoute: ShareCalTokenRoute,
 };

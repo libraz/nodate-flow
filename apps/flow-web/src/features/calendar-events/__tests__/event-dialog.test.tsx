@@ -15,7 +15,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { components } from '@nodate-flow/sdk';
 
 import { renderWithProviders } from '@tests/helpers/render';
-import EventDialog, { type EventDialogMode } from '../event-dialog';
+import EventDialog, { type EventDialogMode, presetToRRule } from '../event-dialog';
 
 type CreateEventInput = components['schemas']['CreateEventInputBody'];
 type CalEventLike = components['schemas']['MyCalendarEventResponse'];
@@ -251,5 +251,40 @@ describe('<EventDialog>', () => {
     renderWithProviders(renderDialog({ mode: editMode() }));
     const taskRadio = screen.getByRole('radio', { name: 'kind.task' });
     expect(taskRadio.hasAttribute('disabled')).toBe(true);
+  });
+});
+
+describe('presetToRRule', () => {
+  it('returns null for the none preset', () => {
+    expect(presetToRRule('none', '2030-06-15')).toBeNull();
+  });
+
+  it('emits canonical lowercase freq tokens matching the expander contract', () => {
+    expect(presetToRRule('daily', '2030-06-15')).toEqual({ freq: 'daily' });
+    expect(presetToRRule('weekly', '2030-06-15')).toEqual({ freq: 'weekly' });
+    expect(presetToRRule('monthly', '2030-06-15')).toEqual({ freq: 'monthly' });
+    expect(presetToRRule('yearly', '2030-06-15')).toEqual({ freq: 'yearly' });
+  });
+
+  it('emits lowercase weekday byDay tokens for the weekdays preset', () => {
+    expect(presetToRRule('weekdays', '2030-06-15')).toEqual({
+      freq: 'weekly',
+      byDay: ['mo', 'tu', 'we', 'th', 'fr'],
+    });
+  });
+
+  it('passes through a raw custom rule, or null when empty', () => {
+    expect(presetToRRule('custom', '2030-06-15', 'FREQ=DAILY')).toEqual({ raw: 'FREQ=DAILY' });
+    expect(presetToRRule('custom', '2030-06-15', '')).toBeNull();
+    expect(presetToRRule('custom', '2030-06-15')).toBeNull();
+  });
+
+  it('never emits an uppercase freq token', () => {
+    for (const preset of ['daily', 'weekdays', 'weekly', 'monthly', 'yearly'] as const) {
+      const rule = presetToRRule(preset, '2030-06-15');
+      expect(rule).not.toBeNull();
+      const freq = (rule as { freq: string }).freq;
+      expect(freq).toBe(freq.toLowerCase());
+    }
   });
 });

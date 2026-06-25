@@ -5,6 +5,7 @@
 export const namespaces = [
   'common',
   'timeline',
+  'activity',
   'calendar-events',
   'inbox',
   'settings',

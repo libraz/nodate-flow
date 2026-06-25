@@ -280,3 +280,44 @@
   color: var(--nf-color-fg-muted);
   padding-inline: var(--nf-space-1);
 }
+
+/* Draggable event pills get the grab affordance + a subtle hover lift,
+   mirroring the task pill. Recurring masters omit this class and keep
+   the default cursor. */
+.eventPill--draggable {
+  cursor: grab;
+}
+
+.eventPill--draggable:active {
+  cursor: grabbing;
+}
+
+.eventPill--draggable:hover {
+  box-shadow: inset 0 0 0 1px var(--nf-color-border);
+}
+
+/* The dragged source pill fades while the ghost is in flight. */
+.eventPill--draggable:active {
+  opacity: 0.6;
+}
+
+/* ───── mobile rail drawer ───── */
+
+.mobileRailBar {
+  display: flex;
+  justify-content: flex-end;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .eventPill--draggable {
+    transition: none;
+  }
+}
+
+/* Tighter section padding on phones so the month-scroll gets more width. */
+@media (max-width: 47.9375rem) {
+  .section {
+    padding: var(--nf-space-4);
+    gap: var(--nf-space-4);
+  }
+}

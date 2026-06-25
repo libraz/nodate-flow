@@ -38,6 +38,7 @@
     "pages": "ページ",
     "settings": "設定",
     "timeboxes": "タイムボックス",
+    "activity": "アクティビティ",
     "insightsPriority": "優先度の提案",
     "collapse": "サイドバーを折りたたむ",
     "expand": "サイドバーを展開する"
@@ -175,6 +176,14 @@
     "drag_to_reschedule": "ドラッグで日付変更",
     "reschedule_success": "期日を更新しました",
     "reschedule_error": "期日の更新に失敗しました",
+    "event_move_success": "イベントを移動しました",
+    "event_move_error": "イベントの移動に失敗しました",
+    "event_recurring_no_drag": "{title} · {workspace}（繰り返しイベントはドラッグできません）",
+    "month_scroll": {
+      "aria_label": "月間カレンダー、週単位で縦にスクロール",
+      "day_label": "{date}",
+      "day_label_holiday": "{date}、{holiday}"
+    },
     "layers": "レイヤー",
     "layer": {
       "tasks_due": "タスク（期日）",
@@ -294,7 +303,12 @@
       "title_label": "メモのタイトル",
       "checkbox_label": "{title} を完了にする",
       "autosaved": "保存しました",
-      "author_attribution": "{name} 作成"
+      "author_attribution": "{name} 作成",
+      "body_label": "メモ本文",
+      "body_placeholder": "本文を入力…",
+      "body_add": "本文を追加",
+      "body_show": "本文を表示",
+      "body_collapse": "本文を非表示"
     }
   },
   "calendars_rail": {
@@ -1060,6 +1074,15 @@
       "body": "このリンクは期限切れか削除された可能性があります。",
       "body_network": "サーバーに接続できませんでした。接続を確認してもう一度お試しください。",
       "back": "nodate-flow に戻る"
+    },
+    "grid": {
+      "today": "今日",
+      "prev_month": "前の月",
+      "next_month": "次の月",
+      "aria_label": "{month} のカレンダー",
+      "event_label": "イベント: {title}",
+      "more": "他 {count} 件",
+      "close": "閉じる"
     }
   },
   "shortcuts": {

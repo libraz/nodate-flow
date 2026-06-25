@@ -156,6 +156,10 @@
       "you": "你",
       "your_response": "你的回应"
     },
+    "creator": {
+      "label": "创建者",
+      "createdBy": "由 {name} 创建"
+    },
     "detail": {
       "back": "返回日历",
       "tab": {

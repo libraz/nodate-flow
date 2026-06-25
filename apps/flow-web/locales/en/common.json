@@ -38,6 +38,7 @@
     "pages": "Pages",
     "settings": "Settings",
     "timeboxes": "Timeboxes",
+    "activity": "Activity",
     "insightsPriority": "Priority suggestions",
     "collapse": "Collapse sidebar",
     "expand": "Expand sidebar"
@@ -85,9 +86,9 @@
       "hint_nav": "Navigate",
       "hint_select": "Select",
       "hint_close": "Close",
-      "placeholder_command": "Type a command in natural language\u2026",
+      "placeholder_command": "Type a command in natural language…",
       "group_command": "AI Command",
-      "resolving": "Resolving command\u2026",
+      "resolving": "Resolving command…",
       "confidence": "Confidence: {score}%",
       "confirm_execute": "Press Enter to execute",
       "confirm_low": "Confirm: {tool}?",
@@ -175,6 +176,14 @@
     "drag_to_reschedule": "Drag to reschedule",
     "reschedule_success": "Due date updated",
     "reschedule_error": "Failed to update due date",
+    "event_move_success": "Event moved",
+    "event_move_error": "Failed to move event",
+    "event_recurring_no_drag": "{title} · {workspace} (recurring events can't be dragged)",
+    "month_scroll": {
+      "aria_label": "Month calendar, scroll vertically by week",
+      "day_label": "{date}",
+      "day_label_holiday": "{date}, {holiday}"
+    },
     "layers": "Layers",
     "layer": {
       "tasks_due": "Tasks (due)",
@@ -294,7 +303,12 @@
       "title_label": "Memo title",
       "checkbox_label": "Mark {title} as done",
       "autosaved": "Saved",
-      "author_attribution": "by {name}"
+      "author_attribution": "by {name}",
+      "body_label": "Notes",
+      "body_placeholder": "Add notes…",
+      "body_add": "Add notes",
+      "body_show": "Show notes",
+      "body_collapse": "Hide notes"
     }
   },
   "calendars_rail": {
@@ -843,7 +857,7 @@
     "steps": {
       "title": "Step decomposition",
       "propose_button": "Decompose into steps",
-      "proposing": "Analyzing task\u2026",
+      "proposing": "Analyzing task…",
       "propose_error": "Could not generate steps. Please try again.",
       "empty": "No steps were suggested.",
       "toggle_step": "Include step: {title}",
@@ -854,7 +868,7 @@
       "expand": "Show description",
       "collapse": "Hide description",
       "apply_button": "Create as subtasks",
-      "applying": "Creating\u2026",
+      "applying": "Creating…",
       "apply_success": "{count, plural, one {# subtask created.} other {# subtasks created.}}",
       "apply_error": "Could not create subtasks. Please try again.",
       "discard": "Discard",
@@ -865,7 +879,7 @@
     },
     "smart_create": {
       "assist_button": "AI Assist",
-      "suggesting": "Analyzing past tasks\u2026",
+      "suggesting": "Analyzing past tasks…",
       "assignee_section": "Suggested assignees",
       "subtask_section": "Suggested subtasks",
       "confidence": "Match: {value}%",
@@ -1060,6 +1074,15 @@
       "body": "This link may have expired or been removed.",
       "body_network": "We could not reach the server. Check your connection and try again.",
       "back": "Back to nodate-flow"
+    },
+    "grid": {
+      "today": "Today",
+      "prev_month": "Previous month",
+      "next_month": "Next month",
+      "aria_label": "Calendar for {month}",
+      "event_label": "Event: {title}",
+      "more": "+{count} more",
+      "close": "Close"
     }
   },
   "shortcuts": {
