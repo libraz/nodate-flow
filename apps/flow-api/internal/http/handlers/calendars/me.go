@@ -7,6 +7,7 @@ import (
 
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/generated/calendar"
 	apierrors "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/errors"
+	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/handlers/handlerutil"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/middleware"
 	"github.com/nodate-flow/nodate-flow/packages/go-shared/dbtype"
 )
@@ -32,10 +33,18 @@ type MyInviteResponse struct {
 	CreatedAt         int64   `json:"createdAt"`
 }
 
+// ListMyInvitesInput is the query for GET /me/invites. Pagination keeps
+// the inbox bounded for users invited to a large number of events.
+type ListMyInvitesInput struct {
+	Limit  int32 `query:"limit" minimum:"1" maximum:"200" default:"50"`
+	Offset int32 `query:"offset" minimum:"0" default:"0"`
+}
+
 // ListMyInvitesOutput wraps the inbox list. The plural "invites" key
 // matches repo conventions; an empty inbox is rendered as `{invites: []}`.
 type ListMyInvitesOutput struct {
 	Body struct {
+		Total   int64              `json:"total" doc:"Total pending invites before paging"`
 		Invites []MyInviteResponse `json:"invites"`
 	}
 }
@@ -49,8 +58,8 @@ type ListMyInvitesOutput struct {
 // without an email produce an empty inbox. No ACL check beyond auth: the
 // invites were addressed to this email, and the user proved email
 // control by signing in.
-func ListMyInvites(deps Deps) func(context.Context, *struct{}) (*ListMyInvitesOutput, error) {
-	return func(ctx context.Context, _ *struct{}) (*ListMyInvitesOutput, error) {
+func ListMyInvites(deps Deps) func(context.Context, *ListMyInvitesInput) (*ListMyInvitesOutput, error) {
+	return func(ctx context.Context, input *ListMyInvitesInput) (*ListMyInvitesOutput, error) {
 		actorID, ok := middleware.ActorFromContext(ctx)
 		if !ok {
 			return nil, httpErr(apierrors.AuthSessionRevoked)
@@ -66,7 +75,12 @@ func ListMyInvites(deps Deps) func(context.Context, *struct{}) (*ListMyInvitesOu
 			return out, nil
 		}
 
-		rows, err := deps.CalendarQueries.ListMyCalendarEventInvites(ctx, profile.Email)
+		page := handlerutil.Bind(input.Limit, input.Offset, handlerutil.DefaultListLimit, handlerutil.MaxListLimit)
+		rows, err := deps.CalendarQueries.ListMyCalendarEventInvites(ctx, calendar.ListMyCalendarEventInvitesParams{
+			Email:  profile.Email,
+			Limit:  page.Limit,
+			Offset: page.Offset,
+		})
 		if err != nil {
 			return nil, httpErr(apierrors.CalendarInviteListQueryInterrupted)
 		}
@@ -88,6 +102,9 @@ func ListMyInvites(deps Deps) func(context.Context, *struct{}) (*ListMyInvitesOu
 			}
 			item.EventLocation = dbtype.PtrFromNullString(r.EventLocation)
 			out.Body.Invites = append(out.Body.Invites, item)
+		}
+		if len(rows) > 0 {
+			out.Body.Total = handlerutil.TotalAsInt64(rows[0].Total)
 		}
 		return out, nil
 	}

@@ -61,12 +61,18 @@ func ListForTask(deps Deps) func(context.Context, *ListForTaskInput) (*ListForTa
 			return nil, httpErr(apierrors.WsTaskNotFound)
 		}
 
+		ws, ok := middleware.WorkspaceFromContext(ctx)
+		if !ok {
+			return nil, httpErr(apierrors.WsWorkspaceNotFound)
+		}
+
 		limit := in.Limit
 		if limit <= 0 {
 			limit = 50
 		}
 
 		rows, err := deps.Queries.ListPendingSuggestionsForTask(ctx, generated.ListPendingSuggestionsForTaskParams{
+			WorkspaceID:  ws.ID,
 			SourceTaskID: tc.ID,
 			TargetTaskID: tc.ID,
 			Limit:        limit,
