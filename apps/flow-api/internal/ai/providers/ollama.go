@@ -64,23 +64,23 @@ func (p *ollamaProvider) Complete(ctx context.Context, req Request) (*Response, 
 
 	resp, err := doLimited(ctx, DestOllama, httpReq)
 	if err != nil {
-		return nil, fmt.Errorf("ollama: do: %w", err)
+		return nil, classifyTransportError(ctx, err)
 	}
 	defer resp.Body.Close()
 	raw, err := io.ReadAll(io.LimitReader(resp.Body, 10<<20))
 	if err != nil {
-		return nil, fmt.Errorf("ollama: read body: %w", err)
+		return nil, classifyTransportError(ctx, err)
 	}
-	if resp.StatusCode/100 != 2 {
-		return nil, fmt.Errorf("ollama: upstream status %d", resp.StatusCode)
+	if uerr := classifyHTTPStatus(resp.StatusCode, resp.Header.Get("Retry-After")); uerr != nil {
+		return nil, uerr
 	}
 
 	var or ollamaResp
 	if err := json.Unmarshal(raw, &or); err != nil {
-		return nil, fmt.Errorf("ollama: parse: %w", err)
+		return nil, &UpstreamError{Sentinel: ErrResponseInvalidJSON, Status: resp.StatusCode}
 	}
 	if or.Error != "" {
-		return nil, fmt.Errorf("ollama: %s", or.Error)
+		return nil, &UpstreamError{Sentinel: ErrUpstreamRequestRejected, Status: resp.StatusCode}
 	}
 	return &Response{
 		Text:         or.Response,

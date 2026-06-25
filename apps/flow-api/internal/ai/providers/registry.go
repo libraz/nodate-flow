@@ -23,11 +23,11 @@ func New(cfg Config, dec Decryptor) (Provider, error) {
 	}
 	switch cfg.Kind {
 	case KindAnthropic:
-		return &anthropicProvider{cfg: cfg, dec: dec}, nil
+		return &anthropicProvider{cfg: cfg, dec: dec, endpoint: cfg.BaseURL}, nil
 	case KindOpenAI:
 		return &openAIProvider{cfg: cfg, dec: dec, baseURL: defaultOpenAIBaseURL}, nil
 	case KindGoogle:
-		return &googleProvider{cfg: cfg, dec: dec}, nil
+		return &googleProvider{cfg: cfg, dec: dec, baseURL: cfg.BaseURL}, nil
 	case KindOllama:
 		return &ollamaProvider{cfg: cfg}, nil
 	case KindOpenAICompat:

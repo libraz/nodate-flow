@@ -18,8 +18,9 @@ const (
 
 // anthropicProvider talks to api.anthropic.com using the Messages API.
 type anthropicProvider struct {
-	cfg Config
-	dec Decryptor
+	cfg      Config
+	dec      Decryptor
+	endpoint string
 }
 
 func (p *anthropicProvider) Name() string { return p.cfg.Name }
@@ -71,7 +72,8 @@ func (p *anthropicProvider) Complete(ctx context.Context, req Request) (*Respons
 		return nil, fmt.Errorf("anthropic: marshal: %w", err)
 	}
 
-	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, anthropicEndpoint, bytes.NewReader(body))
+	endpoint := chooseBaseURL(p.endpoint, anthropicEndpoint)
+	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, bytes.NewReader(body))
 	if err != nil {
 		return nil, fmt.Errorf("anthropic: build request: %w", err)
 	}
@@ -87,24 +89,27 @@ func (p *anthropicProvider) Complete(ctx context.Context, req Request) (*Respons
 
 	resp, err := doLimited(ctx, DestAnthropic, httpReq)
 	if err != nil {
-		return nil, fmt.Errorf("anthropic: do: %w", err)
+		return nil, classifyTransportError(ctx, err)
 	}
 	defer resp.Body.Close()
 
 	raw, err := io.ReadAll(io.LimitReader(resp.Body, 10<<20))
 	if err != nil {
-		return nil, fmt.Errorf("anthropic: read body: %w", err)
+		return nil, classifyTransportError(ctx, err)
 	}
-	if resp.StatusCode/100 != 2 {
-		return nil, fmt.Errorf("anthropic: upstream status %d", resp.StatusCode)
+	if uerr := classifyHTTPStatus(resp.StatusCode, resp.Header.Get("Retry-After")); uerr != nil {
+		return nil, uerr
 	}
 
 	var ar anthropicResp
 	if err := json.Unmarshal(raw, &ar); err != nil {
-		return nil, fmt.Errorf("anthropic: parse: %w", err)
+		return nil, &UpstreamError{Sentinel: ErrResponseInvalidJSON, Status: resp.StatusCode}
 	}
 	if ar.Error != nil {
-		return nil, fmt.Errorf("anthropic: %s: %s", ar.Error.Type, ar.Error.Message)
+		return nil, &UpstreamError{Sentinel: ErrUpstreamRequestRejected, Status: resp.StatusCode}
+	}
+	if len(ar.Content) == 0 {
+		return nil, &UpstreamError{Sentinel: ErrResponseSchemaMismatch, Status: resp.StatusCode}
 	}
 	var text string
 	for _, c := range ar.Content {

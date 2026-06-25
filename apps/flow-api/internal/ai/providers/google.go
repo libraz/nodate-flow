@@ -19,8 +19,9 @@ const (
 // is passed as a query parameter (?key=...) per Google's spec; we still
 // scrub the plaintext immediately after the URL is built.
 type googleProvider struct {
-	cfg Config
-	dec Decryptor
+	cfg     Config
+	dec     Decryptor
+	baseURL string
 }
 
 func (p *googleProvider) Name() string { return p.cfg.Name }
@@ -73,7 +74,8 @@ func (p *googleProvider) Complete(ctx context.Context, req Request) (*Response, 
 	if err != nil {
 		return nil, fmt.Errorf("google: decrypt key: %w", err)
 	}
-	endpoint := fmt.Sprintf("%s/%s:generateContent?key=%s", googleBaseURL, url.PathEscape(model), url.QueryEscape(string(plain)))
+	base := chooseBaseURL(p.baseURL, googleBaseURL)
+	endpoint := fmt.Sprintf("%s/%s:generateContent?key=%s", base, url.PathEscape(model), url.QueryEscape(string(plain)))
 	zero(plain)
 
 	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, bytes.NewReader(body))
@@ -84,31 +86,33 @@ func (p *googleProvider) Complete(ctx context.Context, req Request) (*Response, 
 
 	resp, err := doLimited(ctx, DestGoogle, httpReq)
 	if err != nil {
-		// Redact the URL from the error to avoid leaking the API key
-		// that Google's API design requires in the query string.
-		return nil, fmt.Errorf("google: do: request failed (url redacted)")
+		// classifyTransportError builds its message from a sentinel only,
+		// so the API key Google requires in the query string is never
+		// surfaced in the returned error.
+		return nil, classifyTransportError(ctx, err)
 	}
 	defer resp.Body.Close()
 	raw, err := io.ReadAll(io.LimitReader(resp.Body, 10<<20))
 	if err != nil {
-		return nil, fmt.Errorf("google: read body: %w", err)
+		return nil, classifyTransportError(ctx, err)
 	}
-	if resp.StatusCode/100 != 2 {
-		return nil, fmt.Errorf("google: upstream status %d", resp.StatusCode)
+	if uerr := classifyHTTPStatus(resp.StatusCode, resp.Header.Get("Retry-After")); uerr != nil {
+		return nil, uerr
 	}
 
 	var gr googleResp
 	if err := json.Unmarshal(raw, &gr); err != nil {
-		return nil, fmt.Errorf("google: parse: %w", err)
+		return nil, &UpstreamError{Sentinel: ErrResponseInvalidJSON, Status: resp.StatusCode}
 	}
 	if gr.Error != nil {
-		return nil, fmt.Errorf("google: %d: %s", gr.Error.Code, gr.Error.Message)
+		return nil, &UpstreamError{Sentinel: ErrUpstreamRequestRejected, Status: resp.StatusCode}
+	}
+	if len(gr.Candidates) == 0 {
+		return nil, &UpstreamError{Sentinel: ErrResponseSchemaMismatch, Status: resp.StatusCode}
 	}
 	var text string
-	if len(gr.Candidates) > 0 {
-		for _, part := range gr.Candidates[0].Content.Parts {
-			text += part.Text
-		}
+	for _, part := range gr.Candidates[0].Content.Parts {
+		text += part.Text
 	}
 	return &Response{
 		Text:         text,
