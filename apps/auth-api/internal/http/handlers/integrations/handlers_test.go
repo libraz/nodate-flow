@@ -444,10 +444,11 @@ func TestCallback_HappyPath_CustomRedirect(t *testing.T) {
 	)
 	q := &fakeQueries{
 		consumeStateRow: generated.ConsumeOauthStateRow{
-			UserID:     1,
-			Provider:   "github",
-			ExpiresAt:  time.Now().Add(10 * time.Minute),
-			RedirectTo: sql.NullString{String: "https://custom.app/done", Valid: true},
+			UserID:    1,
+			Provider:  "github",
+			ExpiresAt: time.Now().Add(10 * time.Minute),
+			// Same-origin deep link: shares the WebBaseURL scheme+host.
+			RedirectTo: sql.NullString{String: "https://app.example.com/inbox?welcome=1", Valid: true},
 		},
 	}
 	deps := Deps{
@@ -460,8 +461,133 @@ func TestCallback_HappyPath_CustomRedirect(t *testing.T) {
 	resp := serveNoAuth(t, deps, "callback", http.MethodGet,
 		"/oauth/callback/github?code=c&state=s")
 	loc := resp.Header().Get("Location")
-	assert.True(t, strings.HasPrefix(loc, "https://custom.app/done"),
-		"must honour client-supplied redirectTo from the state row")
+	assert.True(t, strings.HasPrefix(loc, "https://app.example.com/inbox"),
+		"must honour a same-origin client-supplied redirectTo from the state row")
+}
+
+// TestCallback_CrossOriginRedirect_FallsBackToSafeDefault asserts the
+// open-redirect (CWE-601) guard: a stored redirectTo that points at a
+// different origin than WebBaseURL must NOT be emitted as the 302
+// Location. The handler falls back to the safe default integrations
+// settings page on the configured web origin.
+func TestCallback_CrossOriginRedirect_FallsBackToSafeDefault(t *testing.T) {
+	t.Parallel()
+	reg := integrationspkg.NewRegistry(
+		func() (integrationspkg.Provider, error) {
+			return &stubExchangeProvider{
+				stubProvider: stubProvider{name: "github"},
+				tokens:       &integrationspkg.TokenSet{AccessToken: "t"},
+				account:      &integrationspkg.Account{ExternalID: "1", Label: "x"},
+			}, nil
+		},
+	)
+	q := &fakeQueries{
+		consumeStateRow: generated.ConsumeOauthStateRow{
+			UserID:    1,
+			Provider:  "github",
+			ExpiresAt: time.Now().Add(10 * time.Minute),
+			// Cross-origin attacker-controlled target persisted in the state row.
+			RedirectTo: sql.NullString{String: "https://evil.example/phish", Valid: true},
+		},
+	}
+	deps := Deps{
+		Queries:       q,
+		Registry:      reg,
+		Cipher:        newTestCipher(t),
+		PublicBaseURL: "https://auth.example.com",
+		WebBaseURL:    "https://app.example.com",
+	}
+	resp := serveNoAuth(t, deps, "callback", http.MethodGet,
+		"/oauth/callback/github?code=c&state=s")
+	require.Equal(t, http.StatusFound, resp.Code)
+	loc := resp.Header().Get("Location")
+	assert.False(t, strings.Contains(loc, "evil.example"),
+		"cross-origin redirect target must never appear in the Location header")
+	assert.True(t, strings.HasPrefix(loc, "https://app.example.com/settings/integrations"),
+		"must fall back to the safe same-origin default, got %q", loc)
+}
+
+// TestConnect_CrossOriginRedirect_Rejected asserts the Connect handler
+// rejects a cross-origin redirectTo at the source (before persisting an
+// OAuth state row), closing the open-redirect hole one layer earlier
+// than the callback fallback.
+func TestConnect_CrossOriginRedirect_Rejected(t *testing.T) {
+	t.Parallel()
+	reg := integrationspkg.NewRegistry(
+		func() (integrationspkg.Provider, error) {
+			return &stubProvider{name: "github"}, nil
+		},
+	)
+	q := &fakeQueries{}
+	deps := Deps{
+		Queries:       q,
+		Registry:      reg,
+		Cipher:        newTestCipher(t),
+		PublicBaseURL: "https://auth.example.com",
+		WebBaseURL:    "https://app.example.com",
+	}
+	resp := serve(t, deps, "connect", http.MethodPost, "/me/integrations/github/connect", 1,
+		`{"redirectTo":"https://evil.example/phish"}`)
+	assert.Equal(t, http.StatusUnprocessableEntity, resp.Code,
+		"cross-origin redirectTo must be rejected with 422")
+	assert.False(t, q.oauthStateCreated,
+		"no OAuth state row may be created when redirectTo is rejected")
+}
+
+// TestConnect_SameOriginRedirect_Accepted asserts a same-origin
+// redirectTo is accepted and an OAuth state row is created.
+func TestConnect_SameOriginRedirect_Accepted(t *testing.T) {
+	t.Parallel()
+	reg := integrationspkg.NewRegistry(
+		func() (integrationspkg.Provider, error) {
+			return &stubProvider{name: "github"}, nil
+		},
+	)
+	q := &fakeQueries{}
+	deps := Deps{
+		Queries:       q,
+		Registry:      reg,
+		Cipher:        newTestCipher(t),
+		PublicBaseURL: "https://auth.example.com",
+		WebBaseURL:    "https://app.example.com",
+	}
+	resp := serve(t, deps, "connect", http.MethodPost, "/me/integrations/github/connect", 1,
+		`{"redirectTo":"https://app.example.com/inbox"}`)
+	require.Equal(t, http.StatusOK, resp.Code, "body=%s", resp.Body.String())
+	assert.True(t, q.oauthStateCreated,
+		"same-origin redirectTo must be accepted and a state row created")
+}
+
+// TestIsSameOriginAsWeb exercises the open-redirect guard directly.
+func TestIsSameOriginAsWeb(t *testing.T) {
+	t.Parallel()
+	const web = "https://app.example.com"
+	cases := []struct {
+		name      string
+		candidate string
+		want      bool
+	}{
+		{"same origin root", "https://app.example.com", true},
+		{"same origin deep path", "https://app.example.com/settings/x?y=1", true},
+		{"same origin different case host", "https://APP.example.com/x", true},
+		{"different host", "https://evil.example/phish", false},
+		{"subdomain is different origin", "https://evil.app.example.com/x", false},
+		{"different scheme", "http://app.example.com/x", false},
+		{"scheme-relative", "//evil.example/phish", false},
+		{"relative path", "/settings/integrations", false},
+		{"empty", "", false},
+		{"javascript scheme", "javascript:alert(1)", false},
+	}
+	for _, tc := range cases {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			assert.Equal(t, tc.want, isSameOriginAsWeb(web, tc.candidate),
+				"candidate=%q", tc.candidate)
+		})
+	}
+	assert.False(t, isSameOriginAsWeb("", "https://app.example.com/x"),
+		"empty web base must fail closed")
 }
 
 func TestCallback_ExchangeTokensAreEncrypted(t *testing.T) {

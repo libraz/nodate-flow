@@ -97,6 +97,14 @@ func Connect(deps Deps) func(context.Context, *ConnectIntegrationInput) (*Connec
 		}
 		var redirectTo sql.NullString
 		if in.Body.RedirectTo != "" {
+			// Guard against open-redirect (CWE-601): a client-supplied
+			// return URL must point back at the configured web origin.
+			// Reject cross-origin targets at the source so a tampered or
+			// malicious value can never be persisted and later emitted as
+			// a 302 Location.
+			if !isSameOriginAsWeb(deps.WebBaseURL, in.Body.RedirectTo) {
+				return nil, httpErr(apierrors.ValidationBodyFieldInvalid)
+			}
 			redirectTo = sql.NullString{String: in.Body.RedirectTo, Valid: true}
 		}
 		if err := deps.Queries.CreateOauthState(ctx, generated.CreateOauthStateParams{
@@ -284,6 +292,31 @@ func callbackURL(deps Deps, provider string) string {
 	return strings.TrimRight(deps.PublicBaseURL, "/") + "/oauth/callback/" + provider
 }
 
+// isSameOriginAsWeb reports whether candidate is a redirect target that
+// shares the scheme and host (origin) of the configured web base URL.
+// It is the open-redirect (CWE-601) guard for client-supplied return
+// URLs: only same-origin absolute URLs are accepted. A candidate that
+// fails to parse, omits a scheme/host, or whose scheme+host differ from
+// webBase is rejected. If webBase itself is empty or unparseable the
+// guard fails closed (rejects every candidate). Comparison is
+// case-insensitive on scheme and host per RFC 3986.
+func isSameOriginAsWeb(webBase, candidate string) bool {
+	base, err := url.Parse(strings.TrimSpace(webBase))
+	if err != nil || base.Scheme == "" || base.Host == "" {
+		return false
+	}
+	u, err := url.Parse(strings.TrimSpace(candidate))
+	if err != nil {
+		return false
+	}
+	// Reject relative URLs and scheme-relative ("//evil.com") targets:
+	// a safe same-origin redirect must carry an explicit matching origin.
+	if u.Scheme == "" || u.Host == "" {
+		return false
+	}
+	return strings.EqualFold(u.Scheme, base.Scheme) && strings.EqualFold(u.Host, base.Host)
+}
+
 func redirectWithError(deps Deps, reason string) *OAuthCallbackOutput {
 	q := url.Values{}
 	q.Set("integration_error", reason)
@@ -343,7 +376,11 @@ func revokeAtProvider(ctx context.Context, deps Deps, uid uint32, pubID types.Pu
 
 func redirectOnSuccess(deps Deps, provider string, clientRedirect sql.NullString) *OAuthCallbackOutput {
 	target := strings.TrimRight(deps.WebBaseURL, "/") + "/settings/integrations"
-	if clientRedirect.Valid && clientRedirect.String != "" {
+	// Defense-in-depth open-redirect guard (CWE-601): Connect already
+	// rejects cross-origin redirect targets before persisting, but we
+	// re-validate the stored value here so a row that bypassed that check
+	// (e.g. written by an older binary) can never bounce the user off-site.
+	if clientRedirect.Valid && clientRedirect.String != "" && isSameOriginAsWeb(deps.WebBaseURL, clientRedirect.String) {
 		target = clientRedirect.String
 	}
 	sep := "?"
