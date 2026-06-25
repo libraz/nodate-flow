@@ -3599,7 +3599,7 @@ type Signal struct {
 	TaskID sql.NullInt32 `json:"taskId"`
 	// Internal FK to agent_runs.id; set when a judge run has evaluated this signal. NULL means "not yet judged".
 	JudgeRunID sql.NullInt32 `json:"judgeRunId"`
-	// Originating channel. 'calendar' is reserved for internal scheduler ticks (flow-worker calendar_event_day job, etc.) — not a user-facing webhook source. 'discord' is the presence-discord gateway.
+	// Originating channel. Canonical source list lives in packages/go-shared/signalwire (Sources()); this ENUM, the flow-api Huma enum tag, and the signal_kinds registry all derive from / are asserted against it. 'calendar' is reserved for internal scheduler ticks (flow-worker calendar_event_day job, etc.) — not a user-facing webhook source. 'discord' is the presence-discord gateway.
 	Source SignalsSource `json:"source"`
 	// Source-specific event kind (e.g., pull_request.opened, discord.presence). Closed enumeration defined by signal_kinds/*.yaml; stays VARCHAR so new kinds do not require a schema change.
 	Kind string `json:"kind"`
@@ -4381,16 +4381,6 @@ type VUser struct {
 	LastLoginAt                 sql.NullTime              `json:"lastLoginAt"`
 	UpdatedAt                   sql.NullTime              `json:"updatedAt"`
 	CreatedAt                   time.Time                 `json:"createdAt"`
-}
-
-type VUserPresenceCurrent struct {
-	WorkspaceID uint32          `json:"-"`
-	UserID      sql.NullInt32   `json:"-"`
-	Source      SignalsSource   `json:"source"`
-	Kind        string          `json:"kind"`
-	PayloadJson json.RawMessage `json:"payloadJson"`
-	ReceivedAt  time.Time       `json:"receivedAt"`
-	ExpiresAt   sql.NullTime    `json:"expiresAt"`
 }
 
 type VWorkspaceActivity struct {
