@@ -28,6 +28,8 @@ import AuthCard from '../../components/auth-card';
 import { type ProfileFormValues, profileSchema } from '../../features/auth/auth-schemas';
 import { type AuthUser, authStore, selectUser, useAuth } from '../../features/auth/auth-store';
 import { type SupportedLanguage, setLanguage } from '../../i18n';
+import type { ProblemJson } from '../../lib/api-error';
+import { mapAuthError } from '../../lib/auth-errors';
 import { sdk } from '../../lib/sdk';
 import { useSubmitGuard } from '../../lib/use-submit-guard';
 import { type ThemePreference, useTheme } from '../../providers/theme-provider';
@@ -316,7 +318,11 @@ export function ProfilePage(): ReactElement {
         },
       });
       if (error || !data) {
-        setServerError(t('errors.generic'));
+        // Route the server error through the shared auth-error mapper so
+        // validation / session-revoked / specific codes surface their
+        // localized messages; mapAuthError falls back to `errors.unknown`
+        // for anything it cannot classify.
+        setServerError(t(mapAuthError(error as ProblemJson | undefined)));
         return;
       }
       const me = data as MeResponse;

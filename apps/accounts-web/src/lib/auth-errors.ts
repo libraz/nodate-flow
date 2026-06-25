@@ -22,7 +22,6 @@ export type AuthErrorI18nKey =
   | 'auth:errors.network'
   | 'auth:errors.totp_code_required'
   | 'auth:errors.totp_code_mismatch'
-  | 'auth:errors.totp_challenge_expired'
   | 'auth:errors.totp_recovery_invalid'
   | 'auth:errors.totp_recovery_required'
   | 'auth:errors.totp_already_enrolled'
@@ -36,6 +35,8 @@ export type AuthErrorI18nKey =
   | 'auth:errors.oidc_nonce_mismatch'
   | 'auth:errors.oidc_id_token_invalid'
   | 'auth:errors.oidc_provider_unreachable'
+  | 'auth:errors.oidc_provider_rejected'
+  | 'auth:errors.oidc_email_not_verified'
   | 'auth:errors.oidc_github_not_configured'
   | 'auth:errors.oidc_microsoft_not_configured'
   | 'auth:errors.magic_link_malformed'
@@ -103,6 +104,8 @@ const AUTH_ERROR_MAP: Record<string, AuthErrorI18nKey> = {
   [AuthErrors.AUTH_OIDC_NONCE_MISMATCH.code]: 'auth:errors.oidc_nonce_mismatch',
   [AuthErrors.AUTH_OIDC_ID_TOKEN_INVALID.code]: 'auth:errors.oidc_id_token_invalid',
   [AuthErrors.AUTH_OIDC_PROVIDER_UNREACHABLE.code]: 'auth:errors.oidc_provider_unreachable',
+  [AuthErrors.AUTH_OIDC_PROVIDER_REJECTED.code]: 'auth:errors.oidc_provider_rejected',
+  [AuthErrors.AUTH_OIDC_EMAIL_NOT_VERIFIED.code]: 'auth:errors.oidc_email_not_verified',
   [AuthErrors.AUTH_OIDC_GITHUB_NOT_CONFIGURED.code]: 'auth:errors.oidc_github_not_configured',
   [AuthErrors.AUTH_OIDC_MICROSOFT_NOT_CONFIGURED.code]: 'auth:errors.oidc_microsoft_not_configured',
   // magic link
