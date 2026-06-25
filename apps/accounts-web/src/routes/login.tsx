@@ -44,6 +44,232 @@ import { useSubmitGuard } from '../lib/use-submit-guard';
 const RECOVERY_MIN_LEN = 8;
 const RECOVERY_MAX_LEN = 20;
 
+// Module-scope constant so Vite tree-shakes the dev-only panel out of
+// production bundles when used as a JSX guard. A render-scope check would
+// still ship the JSX and seed list to prod.
+const DEV_MODE = import.meta.env.DEV;
+
+const DEV_SEED_PASSWORD = 'password123';
+
+type DevRoleLabelKey =
+  | 'login.devQuickLogin.roles.instanceAdmin'
+  | 'login.devQuickLogin.roles.workspaceOwner'
+  | 'login.devQuickLogin.roles.workspaceAdmin'
+  | 'login.devQuickLogin.roles.workspaceMember'
+  | 'login.devQuickLogin.roles.workspaceGuest'
+  | 'login.devQuickLogin.roles.projectLead'
+  | 'login.devQuickLogin.roles.projectViewer';
+
+interface DevSeedRole {
+  labelKey: DevRoleLabelKey;
+  email: string;
+  rank: 'hero' | 'owner' | 'admin' | 'member' | 'guest' | 'lead' | 'viewer';
+}
+
+const DEV_TIER_INSTANCE: readonly DevSeedRole[] = [
+  { labelKey: 'login.devQuickLogin.roles.instanceAdmin', email: 'admin@example.com', rank: 'hero' },
+];
+
+const DEV_TIER_WORKSPACE: readonly DevSeedRole[] = [
+  {
+    labelKey: 'login.devQuickLogin.roles.workspaceOwner',
+    email: 'owner@example.com',
+    rank: 'owner',
+  },
+  {
+    labelKey: 'login.devQuickLogin.roles.workspaceAdmin',
+    email: 'wsadmin@example.com',
+    rank: 'admin',
+  },
+  {
+    labelKey: 'login.devQuickLogin.roles.workspaceMember',
+    email: 'alice@example.com',
+    rank: 'member',
+  },
+  {
+    labelKey: 'login.devQuickLogin.roles.workspaceGuest',
+    email: 'guest@example.com',
+    rank: 'guest',
+  },
+];
+
+const DEV_TIER_PROJECT: readonly DevSeedRole[] = [
+  {
+    labelKey: 'login.devQuickLogin.roles.projectLead',
+    email: 'projectlead@example.com',
+    rank: 'lead',
+  },
+  {
+    labelKey: 'login.devQuickLogin.roles.projectViewer',
+    email: 'viewer@example.com',
+    rank: 'viewer',
+  },
+];
+
+// Co-located styles. Lives inside the DEV_MODE-gated subtree so the
+// constant-folded JSX drops the entire <style> tag from prod bundles.
+const DEV_PANEL_STYLES = `
+.dql-panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-3);
+  padding: var(--nf-space-4);
+  border: 1px dashed var(--nf-color-border);
+  border-radius: var(--nf-radius-md);
+  background: color-mix(in srgb, var(--nf-color-bg-sunken) 65%, transparent);
+}
+.dql-head {
+  display: flex;
+  align-items: center;
+  gap: var(--nf-space-2);
+}
+.dql-tag {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 6px;
+  border-radius: 3px;
+  background: var(--nf-color-warning);
+  color: var(--nf-color-fg-on-accent);
+  font-family: var(--nf-font-mono);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  line-height: 1;
+  text-transform: uppercase;
+}
+.dql-title {
+  margin: 0;
+  font-size: var(--nf-text-sm);
+  font-weight: var(--nf-weight-medium);
+  color: var(--nf-color-fg);
+}
+.dql-tier {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-2);
+}
+.dql-tier-label {
+  display: flex;
+  align-items: center;
+  gap: var(--nf-space-2);
+  font-family: var(--nf-font-mono);
+  font-size: 10px;
+  font-weight: var(--nf-weight-semibold);
+  color: var(--nf-color-fg-subtle);
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+}
+.dql-tier-label::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: linear-gradient(90deg, var(--nf-color-border), transparent);
+}
+.dql-grid {
+  display: grid;
+  gap: var(--nf-space-2);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.dql-chip {
+  display: flex;
+  align-items: center;
+  gap: var(--nf-space-2);
+  padding: var(--nf-space-2) var(--nf-space-3);
+  border: 1px solid var(--nf-color-border);
+  border-radius: var(--nf-radius-sm);
+  background: var(--nf-color-bg-elevated);
+  color: var(--nf-color-fg);
+  font-family: inherit;
+  font-size: var(--nf-text-sm);
+  text-align: left;
+  cursor: pointer;
+  transition:
+    background-color var(--nf-duration-fast) var(--nf-ease-standard),
+    border-color var(--nf-duration-fast) var(--nf-ease-standard),
+    transform var(--nf-duration-fast) var(--nf-ease-standard);
+}
+.dql-chip:hover:not(:disabled) {
+  background: var(--nf-color-surface-hover);
+  border-color: var(--nf-color-border-strong);
+}
+.dql-chip:active:not(:disabled) {
+  transform: translateY(1px);
+}
+.dql-chip:focus-visible {
+  outline: var(--nf-focus-ring-width) solid var(--nf-color-focus-ring);
+  outline-offset: var(--nf-focus-ring-offset);
+}
+.dql-chip:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.dql-chip--hero {
+  grid-column: 1 / -1;
+  padding-block: var(--nf-space-3);
+  background: color-mix(in srgb, var(--nf-color-warning-subtle) 55%, var(--nf-color-bg-elevated));
+  border-color: color-mix(in srgb, var(--nf-color-warning) 35%, var(--nf-color-border));
+  font-weight: var(--nf-weight-medium);
+}
+.dql-chip--hero:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--nf-color-warning-subtle) 80%, var(--nf-color-bg-elevated));
+  border-color: var(--nf-color-warning);
+}
+.dql-chip--project {
+  border-style: dashed;
+}
+.dql-dot {
+  flex-shrink: 0;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--nf-color-fg-subtle);
+}
+.dql-dot--hero {
+  width: 8px;
+  height: 8px;
+  background: var(--nf-color-warning);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--nf-color-warning) 25%, transparent);
+}
+.dql-dot--owner { background: var(--nf-color-accent); }
+.dql-dot--admin { background: var(--nf-color-info); }
+.dql-dot--member { background: var(--nf-color-fg-muted); }
+.dql-dot--guest {
+  background: transparent;
+  box-shadow: inset 0 0 0 1px var(--nf-color-fg-subtle);
+}
+.dql-dot--lead { background: var(--nf-color-success); }
+.dql-dot--viewer {
+  background: transparent;
+  box-shadow: inset 0 0 0 1px var(--nf-color-info);
+}
+.dql-label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.dql-email {
+  flex-shrink: 0;
+  font-family: var(--nf-font-mono);
+  font-size: var(--nf-text-xs);
+  color: var(--nf-color-fg-subtle);
+}
+.dql-caption {
+  margin: 0;
+  padding-top: var(--nf-space-2);
+  border-top: 1px dashed var(--nf-color-border);
+  font-family: var(--nf-font-mono);
+  font-size: var(--nf-text-xs);
+  color: var(--nf-color-fg-subtle);
+  text-align: center;
+  letter-spacing: 0.02em;
+}
+@media (max-width: 360px) {
+  .dql-email { display: none; }
+}
+`;
+
 export interface LoginSearch {
   redirect?: string;
 }
@@ -67,6 +293,7 @@ function LoginPage(): ReactElement {
   const {
     register,
     handleSubmit,
+    setValue,
     formState: { errors, isSubmitting },
   } = useZodForm<typeof loginSchema>(loginSchema, {
     email: '',
@@ -465,6 +692,12 @@ function LoginPage(): ReactElement {
     },
   );
 
+  const handleDevQuickLogin = (email: string): void => {
+    setValue('email', email, { shouldValidate: true, shouldDirty: true });
+    setValue('password', DEV_SEED_PASSWORD, { shouldValidate: true, shouldDirty: true });
+    void submitWithFocus();
+  };
+
   return (
     <AuthCard>
       <form
@@ -577,6 +810,88 @@ function LoginPage(): ReactElement {
               {t('login.signup_link')}
             </Link>
           </p>
+        )}
+
+        {DEV_MODE && (
+          <section className="dql-panel" aria-label={t('login.devQuickLogin.title')}>
+            <style>{DEV_PANEL_STYLES}</style>
+
+            <header className="dql-head">
+              <span className="dql-tag" aria-hidden="true">
+                {t('login.devQuickLogin.tag')}
+              </span>
+              <h2 className="dql-title">{t('login.devQuickLogin.title')}</h2>
+            </header>
+
+            <div className="dql-tier">
+              <div className="dql-tier-label" aria-hidden="true">
+                {t('login.devQuickLogin.tiers.instance')}
+              </div>
+              <div className="dql-grid">
+                {DEV_TIER_INSTANCE.map((role) => (
+                  <button
+                    key={role.email}
+                    type="button"
+                    className="dql-chip dql-chip--hero"
+                    onClick={() => {
+                      handleDevQuickLogin(role.email);
+                    }}
+                    disabled={isSubmitting || rateLimited}
+                  >
+                    <span className={`dql-dot dql-dot--${role.rank}`} aria-hidden="true" />
+                    <span className="dql-label">{t(role.labelKey)}</span>
+                    <span className="dql-email">{role.email}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="dql-tier">
+              <div className="dql-tier-label" aria-hidden="true">
+                {t('login.devQuickLogin.tiers.workspace')}
+              </div>
+              <div className="dql-grid">
+                {DEV_TIER_WORKSPACE.map((role) => (
+                  <button
+                    key={role.email}
+                    type="button"
+                    className="dql-chip"
+                    onClick={() => {
+                      handleDevQuickLogin(role.email);
+                    }}
+                    disabled={isSubmitting || rateLimited}
+                  >
+                    <span className={`dql-dot dql-dot--${role.rank}`} aria-hidden="true" />
+                    <span className="dql-label">{t(role.labelKey)}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="dql-tier">
+              <div className="dql-tier-label" aria-hidden="true">
+                {t('login.devQuickLogin.tiers.project')}
+              </div>
+              <div className="dql-grid">
+                {DEV_TIER_PROJECT.map((role) => (
+                  <button
+                    key={role.email}
+                    type="button"
+                    className="dql-chip dql-chip--project"
+                    onClick={() => {
+                      handleDevQuickLogin(role.email);
+                    }}
+                    disabled={isSubmitting || rateLimited}
+                  >
+                    <span className={`dql-dot dql-dot--${role.rank}`} aria-hidden="true" />
+                    <span className="dql-label">{t(role.labelKey)}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <p className="dql-caption">{t('login.devQuickLogin.caption')}</p>
+          </section>
         )}
       </form>
     </AuthCard>

@@ -81,6 +81,14 @@ export function initI18n(): typeof i18n {
       interpolation: { escapeValue: false },
       react: { useSuspense: true },
     });
+  // Keep <html lang> in sync with the active i18n locale. The index.html boot
+  // script sets it once at load from localStorage; this listener keeps it
+  // accurate after in-session changes (profile form save, post-login bootstrap).
+  i18n.on('languageChanged', (lng) => {
+    if (typeof document !== 'undefined') {
+      document.documentElement.lang = lng;
+    }
+  });
   return i18n;
 }
 

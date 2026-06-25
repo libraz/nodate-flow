@@ -26,11 +26,13 @@
         }
         try {
           var storedLang = localStorage.getItem('nf.lang');
-          var lang = storedLang && /^(en|ja)$/.test(storedLang)
-            ? storedLang
-            : (navigator.language || 'en').toLowerCase().indexOf('ja') === 0
-              ? 'ja'
-              : 'en';
+          var lang;
+          if (storedLang && /^(en|ja|zh)$/.test(storedLang)) {
+            lang = storedLang;
+          } else {
+            var nav = (navigator.language || 'en').toLowerCase();
+            lang = nav.indexOf('ja') === 0 ? 'ja' : nav.indexOf('zh') === 0 ? 'zh' : 'en';
+          }
           document.documentElement.setAttribute('lang', lang);
         } catch (e) {
           document.documentElement.setAttribute('lang', 'en');
