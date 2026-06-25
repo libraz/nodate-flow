@@ -68,9 +68,10 @@ func TestTaskDirectCompleteFromOpen(t *testing.T) {
 		"directly completed task must have completedAt")
 }
 
-// TestTaskReopenPreservesCompletedAt verifies that reopening a
-// completed task does not clear the completedAt timestamp.
-func TestTaskReopenPreservesCompletedAt(t *testing.T) {
+// TestTaskReopenClearsCompletedAt verifies that reopening a completed
+// task clears the completedAt timestamp, so a non-done task never
+// carries a stale completion time (H-4 / P2-2).
+func TestTaskReopenClearsCompletedAt(t *testing.T) {
 	bootstrap(t)
 	t.Parallel()
 	tt := newTenant(t)
@@ -79,7 +80,7 @@ func TestTaskReopenPreservesCompletedAt(t *testing.T) {
 		ID string `json:"id"`
 	}
 	doJSON(t, http.MethodPost, testServerURL+"/tasks", tt.AccessToken,
-		map[string]any{"projectId": tt.ProjectPublicID, "title": "Reopen preserve"}, &task)
+		map[string]any{"projectId": tt.ProjectPublicID, "title": "Reopen clears"}, &task)
 
 	// Complete the task.
 	doJSON(t, http.MethodPost,
@@ -91,7 +92,7 @@ func TestTaskReopenPreservesCompletedAt(t *testing.T) {
 		testServerURL+"/tasks/"+task.ID+"/transitions",
 		tt.AccessToken, map[string]any{"transition": "reopen"}, nil)
 
-	// completedAt should still be set (not cleared on reopen).
+	// completedAt must be cleared once the task is no longer done.
 	var reopened struct {
 		DerivedState string `json:"derivedState"`
 		CompletedAt  *int64 `json:"completedAt"`
@@ -100,6 +101,6 @@ func TestTaskReopenPreservesCompletedAt(t *testing.T) {
 		testServerURL+"/tasks/"+task.ID,
 		tt.AccessToken, nil, &reopened)
 	require.Equal(t, "waiting", reopened.DerivedState)
-	require.NotNil(t, reopened.CompletedAt,
-		"completedAt must be preserved after reopen")
+	require.Nil(t, reopened.CompletedAt,
+		"completedAt must be cleared after reopen")
 }

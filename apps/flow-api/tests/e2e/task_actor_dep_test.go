@@ -133,7 +133,7 @@ func TestConstraintRemove(t *testing.T) {
 		testServerURL+"/tasks/"+task.ID+"/constraints",
 		tt.AccessToken, map[string]any{
 			"kind":       "deadline",
-			"expression": "due_on<=2026-12-31",
+			"expression": `{"op":"time.due_before","arg":"2026-12-31"}`,
 		}, &constraint)
 	require.NotEmpty(t, constraint.ID)
 

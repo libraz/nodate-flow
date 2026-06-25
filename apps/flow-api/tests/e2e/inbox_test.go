@@ -24,7 +24,7 @@ func TestInboxLifecycle(t *testing.T) {
 	doJSON(t, http.MethodPost, testServerURL+"/signals", tt.AccessToken, map[string]any{
 		"workspaceId": tt.WorkspacePublicID,
 		"source":      "manual",
-		"kind":        "inbox.seed",
+		"kind":        "manual",
 	}, &signal)
 	require.NotEmpty(t, signal.ID)
 
