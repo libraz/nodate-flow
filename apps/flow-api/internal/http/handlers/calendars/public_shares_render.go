@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"time"
 
+	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/generated/calendar"
 	apierrors "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/errors"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/handlers/handlerutil"
 	"github.com/nodate-flow/nodate-flow/packages/go-shared/apierr"
@@ -102,7 +103,7 @@ func RenderPublicShare(deps Deps) func(context.Context, *RenderPublicShareInput)
 		}
 		out.Body.Events = make([]PublicShareRenderEvent, len(events))
 		for i, e := range events {
-			out.Body.Events[i] = PublicShareRenderEvent{
+			ev := PublicShareRenderEvent{
 				ID:             e.EventPublicID.String(),
 				Title:          e.Title,
 				StartAt:        nullTimeUnixPtr(e.StartAt),
@@ -118,9 +119,30 @@ func RenderPublicShare(deps Deps) func(context.Context, *RenderPublicShareInput)
 				RecurrenceRule: rawMessagePtr(e.RecurrenceRule),
 				RecurrenceEnd:  nullTimeUnixPtr(e.RecurrenceEnd),
 			}
+			// `private`-visibility events honour a "time only" contract on
+			// the public, unauthenticated page: the time block stays visible
+			// (start/end/show_as/block_label) but all descriptive content is
+			// stripped so title/notes/location/url never leak. `confidential`
+			// events are excluded entirely by the render query.
+			if e.Visibility == calendar.CalendarEventsVisibilityPrivate {
+				stripPrivateEventDetails(&ev)
+			}
+			out.Body.Events[i] = ev
 		}
 		return out, nil
 	}
+}
+
+// stripPrivateEventDetails enforces the "time only" contract for
+// `private`-visibility events on the public render page. The time block
+// stays observable (start/end, all-day, timezone, show_as, block_label,
+// recurrence) while every descriptive field that could leak content to an
+// unauthenticated viewer is cleared: title, location, memo, and url.
+func stripPrivateEventDetails(ev *PublicShareRenderEvent) {
+	ev.Title = ""
+	ev.Location = nil
+	ev.Memo = nil
+	ev.URL = nil
 }
 
 // rawMessagePtr converts the JSON-encoded recurrence rule into a string
