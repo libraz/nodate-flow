@@ -1211,13 +1211,6 @@
       "ByDiscordOutputBody": {
         "additionalProperties": false,
         "properties": {
-          "$schema": {
-            "description": "A URL to the JSON Schema for this object.",
-            "examples": ["https://example.com/schemas/ByDiscordOutputBody.json"],
-            "format": "uri",
-            "readOnly": true,
-            "type": "string"
-          },
           "userId": {
             "description": "Flow user public_id (UUID v7) bound to the requested Discord snowflake.",
             "type": "string"
@@ -13634,7 +13627,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/AuthTokens"
+                  "$ref": "#/components/schemas/LoginBody"
                 }
               }
             },
@@ -13740,7 +13733,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/AuthTokens"
+                  "$ref": "#/components/schemas/LoginBody"
                 }
               }
             },
@@ -13846,7 +13839,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/AuthTokens"
+                  "$ref": "#/components/schemas/LoginBody"
                 }
               }
             },
@@ -14246,51 +14239,6 @@
         },
         "summary": "Snooze an inbox item",
         "tags": ["Tasks"]
-      }
-    },
-    "/internal/users/by-discord/{snowflake}": {
-      "get": {
-        "description": "Returns the flow user public_id and default workspace public_id bound to the supplied Discord snowflake via user_integrations.metadata_json.external_user_id. Service-token only: requests authenticated as a user receive 401 from the middleware. Used by the presence-discord gateway before emitting a discord.presence signal.",
-        "operationId": "internal-users-by-discord",
-        "parameters": [
-          {
-            "description": "Discord user snowflake (numeric string, 17-19 digits in practice).",
-            "in": "path",
-            "name": "snowflake",
-            "required": true,
-            "schema": {
-              "description": "Discord user snowflake (numeric string, 17-19 digits in practice).",
-              "maxLength": 32,
-              "minLength": 1,
-              "pattern": "^[0-9]{1,32}$",
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ByDiscordOutputBody"
-                }
-              }
-            },
-            "description": "OK"
-          },
-          "default": {
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorModel"
-                }
-              }
-            },
-            "description": "Error"
-          }
-        },
-        "summary": "Resolve a Discord snowflake to a flow user (service-token only)",
-        "tags": ["Internal"]
       }
     },
     "/invites/{token}/accept": {
@@ -17522,7 +17470,7 @@
     },
     "/tasks/{id}/constraints": {
       "post": {
-        "description": "Persists a constraint DSL expression on the task. Subsequent transitions and the constraint engine evaluate against this rule.",
+        "description": "Persists a constraint DSL expression on the task. The expression is parsed up front and an unparseable expression is rejected with a CONSTRAINT.PARSE.* error before persisting. Subsequent transitions and the constraint engine evaluate against this rule.",
         "operationId": "tasks-constraints-add",
         "parameters": [
           {
@@ -17712,7 +17660,7 @@
     },
     "/tasks/{id}/constraints/{cid}": {
       "delete": {
-        "description": "Detaches the named constraint from the task. Subsequent evaluations no longer consider it. Idempotent.",
+        "description": "Detaches the named constraint owned by this task. Subsequent evaluations no longer consider it. Returns 404 when no such constraint exists on this task's path (including a repeat delete), so a no-op is distinguishable from a real delete.",
         "operationId": "tasks-constraints-remove",
         "parameters": [
           {
@@ -17848,7 +17796,7 @@
     },
     "/tasks/{id}/dependencies/{depId}": {
       "delete": {
-        "description": "Removes the named dependency edge. Idempotent.",
+        "description": "Removes the named dependency edge owned by this task. Returns 404 when no such edge exists on this task's path (including a repeat delete), so a no-op is distinguishable from a real delete.",
         "operationId": "tasks-dependencies-remove",
         "parameters": [
           {

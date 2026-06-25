@@ -648,26 +648,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/internal/users/by-discord/{snowflake}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Resolve a Discord snowflake to a flow user (service-token only)
-         * @description Returns the flow user public_id and default workspace public_id bound to the supplied Discord snowflake via user_integrations.metadata_json.external_user_id. Service-token only: requests authenticated as a user receive 401 from the middleware. Used by the presence-discord gateway before emitting a discord.presence signal.
-         */
-        get: operations["internal-users-by-discord"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/invites/{token}/accept": {
         parameters: {
             query?: never;
@@ -1765,7 +1745,7 @@ export interface paths {
         put?: never;
         /**
          * Attach a constraint to a task
-         * @description Persists a constraint DSL expression on the task. Subsequent transitions and the constraint engine evaluate against this rule.
+         * @description Persists a constraint DSL expression on the task. The expression is parsed up front and an unparseable expression is rejected with a CONSTRAINT.PARSE.* error before persisting. Subsequent transitions and the constraint engine evaluate against this rule.
          */
         post: operations["tasks-constraints-add"];
         delete?: never;
@@ -1846,7 +1826,7 @@ export interface paths {
         post?: never;
         /**
          * Remove a constraint from a task
-         * @description Detaches the named constraint from the task. Subsequent evaluations no longer consider it. Idempotent.
+         * @description Detaches the named constraint owned by this task. Subsequent evaluations no longer consider it. Returns 404 when no such constraint exists on this task's path (including a repeat delete), so a no-op is distinguishable from a real delete.
          */
         delete: operations["tasks-constraints-remove"];
         options?: never;
@@ -1890,7 +1870,7 @@ export interface paths {
         post?: never;
         /**
          * Remove a dependency edge
-         * @description Removes the named dependency edge. Idempotent.
+         * @description Removes the named dependency edge owned by this task. Returns 404 when no such edge exists on this task's path (including a repeat delete), so a no-op is distinguishable from a real delete.
          */
         delete: operations["tasks-dependencies-remove"];
         options?: never;
@@ -5310,11 +5290,6 @@ export interface components {
             tasks: components["schemas"]["ExportedTask"][] | null;
         };
         ByDiscordOutputBody: {
-            /**
-             * Format: uri
-             * @description A URL to the JSON Schema for this object.
-             */
-            readonly $schema?: string;
             /** @description Flow user public_id (UUID v7) bound to the requested Discord snowflake. */
             userId: string;
             /** @description Default workspace public_id (UUID v7) for the resolved user. Currently the earliest-joined enabled membership. */
@@ -10932,7 +10907,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["AuthTokens"];
+                    "application/json": components["schemas"]["LoginBody"];
                 };
             };
             /** @description Error */
@@ -10998,7 +10973,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["AuthTokens"];
+                    "application/json": components["schemas"]["LoginBody"];
                 };
             };
             /** @description Error */
@@ -11064,7 +11039,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["AuthTokens"];
+                    "application/json": components["schemas"]["LoginBody"];
                 };
             };
             /** @description Error */
@@ -11329,38 +11304,6 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SnoozeInboxOutputBody"];
-                };
-            };
-            /** @description Error */
-            default: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["ErrorModel"];
-                };
-            };
-        };
-    };
-    "internal-users-by-discord": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /** @description Discord user snowflake (numeric string, 17-19 digits in practice). */
-                snowflake: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ByDiscordOutputBody"];
                 };
             };
             /** @description Error */
