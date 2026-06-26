@@ -20,9 +20,9 @@ jobs:
     name: Lint and typecheck
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@v6
         with:
           go-version: ${{ env.GO_VERSION }}
           cache-dependency-path: |
@@ -46,7 +46,7 @@ jobs:
         run: node scripts/i18n-translate.mjs --check
 
       - name: golangci-lint (flow-api)
-        uses: golangci/golangci-lint-action@v8
+        uses: golangci/golangci-lint-action@v9
         with:
           version: latest
           working-directory: apps/flow-api
@@ -56,7 +56,7 @@ jobs:
         working-directory: apps/flow-api
 
       - name: golangci-lint (auth-api)
-        uses: golangci/golangci-lint-action@v8
+        uses: golangci/golangci-lint-action@v9
         with:
           version: latest
           working-directory: apps/auth-api
@@ -71,9 +71,9 @@ jobs:
     runs-on: ubuntu-latest
     needs: [lint-and-typecheck]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@v6
         with:
           go-version: ${{ env.GO_VERSION }}
           cache-dependency-path: |
@@ -158,9 +158,9 @@ jobs:
       matrix:
         ai_mock: ["1", ""]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@v6
         with:
           go-version: ${{ env.GO_VERSION }}
           cache-dependency-path: |
@@ -218,7 +218,7 @@ jobs:
 
       - name: Upload Playwright report
         if: failure() && matrix.ai_mock == '1'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: playwright-report
           path: apps/flow-web/playwright-report/
@@ -231,9 +231,9 @@ jobs:
     if: github.ref == 'refs/heads/main'
     needs: [test-unit, test-integration]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@v6
         with:
           go-version: ${{ env.GO_VERSION }}
           cache-dependency-path: |
@@ -245,7 +245,7 @@ jobs:
           bun-version: ${{ env.BUN_VERSION }}
 
       - name: Trivy filesystem scan
-        uses: aquasecurity/trivy-action@0.32.0
+        uses: aquasecurity/trivy-action@0.36.0
         with:
           scan-type: fs
           scan-ref: .
@@ -283,9 +283,9 @@ jobs:
     name: OpenAPI drift guard
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@v6
         with:
           go-version: ${{ env.GO_VERSION }}
           cache-dependency-path: |
@@ -318,9 +318,9 @@ jobs:
     needs: [test-integration]
     continue-on-error: true
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@v6
         with:
           go-version: ${{ env.GO_VERSION }}
           cache-dependency-path: |
@@ -341,7 +341,7 @@ jobs:
           cd ../../scripts && go run merge-openapi.go -o ../packages/sdk/openapi.json ../packages/sdk/openapi-flow.json ../packages/sdk/openapi-auth.json
           rm -f packages/sdk/openapi-flow.json packages/sdk/openapi-auth.json
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
 

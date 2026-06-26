@@ -20,10 +20,10 @@ jobs:
   scaffold-ja:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           ref: ${{ github.event.pull_request.head.ref }}
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version: "20"
       - name: Scaffold missing ja keys
@@ -37,7 +37,7 @@ jobs:
           fi
       - name: Open follow-up PR
         if: steps.scaffold.outputs.changed == 'true'
-        uses: peter-evans/create-pull-request@v6
+        uses: peter-evans/create-pull-request@v8
         with:
           branch: i18n/ja-scaffold-${{ github.event.pull_request.number }}
           base: ${{ github.event.pull_request.head.ref }}
@@ -51,8 +51,8 @@ jobs:
   check:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v6
         with:
           node-version: "20"
       - run: node scripts/i18n-translate.mjs --check
