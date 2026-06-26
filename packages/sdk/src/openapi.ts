@@ -6309,6 +6309,15 @@ export interface components {
             /** @description Presigned GET URL with Content-Disposition: attachment */
             downloadUrl: string;
         };
+        DownloadCalendarAttachmentOutputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             */
+            readonly $schema?: string;
+            /** @description Presigned GET URL with Content-Disposition: attachment */
+            downloadUrl: string;
+        };
         DuplicateCandidate: {
             classification: string;
             /** Format: double */
@@ -6920,6 +6929,11 @@ export interface components {
              */
             readonly $schema?: string;
             items: components["schemas"]["ChecklistItemResponse"][] | null;
+            /**
+             * Format: int64
+             * @description Total checklist items before paging
+             */
+            total: number;
         };
         ListChildPagesBody: {
             /**
@@ -6938,6 +6952,11 @@ export interface components {
              */
             readonly $schema?: string;
             comments: components["schemas"]["CommentResponse"][] | null;
+            /**
+             * Format: int64
+             * @description Total comments on the event before paging
+             */
+            total: number;
         };
         ListDeliveriesOutputBody: {
             /**
@@ -6983,6 +7002,11 @@ export interface components {
              */
             readonly $schema?: string;
             invites: components["schemas"]["InviteSummaryResponse"][] | null;
+            /**
+             * Format: int64
+             * @description Total invites on the event before paging
+             */
+            total: number;
         };
         ListEventsOutputBody: {
             /**
@@ -7172,6 +7196,11 @@ export interface components {
              */
             readonly $schema?: string;
             invites: components["schemas"]["MyInviteResponse"][] | null;
+            /**
+             * Format: int64
+             * @description Total pending invites before paging
+             */
+            total: number;
         };
         ListMyTasksBody: {
             /**
@@ -7281,6 +7310,11 @@ export interface components {
              */
             readonly $schema?: string;
             reactions: components["schemas"]["Reaction"][] | null;
+            /**
+             * Format: int64
+             * @description Total reactions on the task before paging
+             */
+            total: number;
         };
         ListRemindersOutputBody: {
             /**
@@ -11740,7 +11774,10 @@ export interface operations {
     };
     "me-invites-list": {
         parameters: {
-            query?: never;
+            query?: {
+                limit?: number;
+                offset?: number;
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -14266,7 +14303,10 @@ export interface operations {
     };
     "tasks-reactions-list": {
         parameters: {
-            query?: never;
+            query?: {
+                limit?: number;
+                offset?: number;
+            };
             header?: never;
             path: {
                 /** @description Task public id (UUID v7) */
@@ -16472,7 +16512,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["DownloadAttachmentOutputBody"];
+                    "application/json": components["schemas"]["DownloadCalendarAttachmentOutputBody"];
                 };
             };
             /** @description Error */
@@ -16726,7 +16766,10 @@ export interface operations {
     };
     "checklist-list": {
         parameters: {
-            query?: never;
+            query?: {
+                limit?: number;
+                offset?: number;
+            };
             header?: never;
             path: {
                 /** @description Workspace public ID */
@@ -16882,7 +16925,10 @@ export interface operations {
     };
     "comments-list": {
         parameters: {
-            query?: never;
+            query?: {
+                limit?: number;
+                offset?: number;
+            };
             header?: never;
             path: {
                 /** @description Workspace public ID */
@@ -17038,7 +17084,10 @@ export interface operations {
     };
     "event-invites-list": {
         parameters: {
-            query?: never;
+            query?: {
+                limit?: number;
+                offset?: number;
+            };
             header?: never;
             path: {
                 /** @description Workspace public ID */

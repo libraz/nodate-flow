@@ -52,7 +52,13 @@ fi
 # under multiple operations again. We allowlist names that are known
 # shared DTOs (e.g. `Task`, `Workspace`, `CalendarResponse`).
 
-ALLOWLIST_PATTERN='^(AdminDeleteOutputBody|AuthTokens|AutoActionSettingsBody|CalendarResponse|EventResponse|ImportJobBody|Label|ListTimelineOutputBody|MeBody|OIDCStartOutputBody|PageDTO|Project|PublicShareResponse|Record|SavedLens|Task|TaskComment|TimeboxDTO|WidgetDTO|Workspace|WorkspaceMember)$'
+# LoginBody is a single auth-api type (handlers/auth/dto.go) deliberately
+# reused as the response Body for every operation that finishes a sign-in:
+# POST /auth/login, magic-link verify, and the OIDC google/github/microsoft
+# callbacks. They all return the same discriminated login envelope
+# (step=complete|totp_required), so the shared schema is intentional, not a
+# silent overwrite.
+ALLOWLIST_PATTERN='^(AdminDeleteOutputBody|AuthTokens|AutoActionSettingsBody|CalendarResponse|EventResponse|ImportJobBody|Label|ListTimelineOutputBody|LoginBody|MeBody|OIDCStartOutputBody|PageDTO|Project|PublicShareResponse|Record|SavedLens|Task|TaskComment|TimeboxDTO|WidgetDTO|Workspace|WorkspaceMember)$'
 
 mapfile -t suspects < <(
   jq -r '

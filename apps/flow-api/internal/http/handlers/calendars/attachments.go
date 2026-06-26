@@ -108,11 +108,17 @@ type DownloadAttachmentInput struct {
 	AttID string `path:"attId" doc:"Attachment public ID"`
 }
 
+// DownloadCalendarAttachmentOutputBody is the response body for the
+// calendar event attachment download endpoint. It carries an
+// operation-specific name to avoid a generated OpenAPI schema collision
+// with the tasks package's DownloadAttachmentOutputBody.
+type DownloadCalendarAttachmentOutputBody struct {
+	DownloadURL string `json:"downloadUrl" doc:"Presigned GET URL with Content-Disposition: attachment"`
+}
+
 // DownloadAttachmentOutput is the response for the download endpoint.
 type DownloadAttachmentOutput struct {
-	Body struct {
-		DownloadURL string `json:"downloadUrl"`
-	}
+	Body DownloadCalendarAttachmentOutputBody
 }
 
 // DeleteAttachmentInput is the input for soft-deleting an attachment.

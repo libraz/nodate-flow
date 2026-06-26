@@ -22,15 +22,15 @@ import { type ReactElement, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import {
-  MAX_VISIBLE_TRACKS,
-  type PositionedEvent,
-  type WeekStart,
   buildMonthGrid,
   eventStartKey,
   isMultiDay,
+  MAX_VISIBLE_TRACKS,
   monthKeyOf,
+  type PositionedEvent,
   shiftMonthAnchor,
   todayKey,
+  type WeekStart,
 } from './lib/share-month-grid';
 import styles from './share-month-grid.module.css';
 
@@ -366,6 +366,7 @@ function EventPopover({ event, timezone, locale, onClose }: EventPopoverProps): 
   const whenLabel = formatWhen({ start, end, allDay: event.allDay, zone, locale, t });
 
   return (
+    // biome-ignore lint/a11y/useKeyWithClickEvents: native <dialog> closes on Escape; backdrop click is a mouse-only convenience
     <dialog
       ref={ref}
       className={styles.popover}
