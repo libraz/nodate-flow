@@ -5,7 +5,7 @@
  * stacked above the outlet (see `_authenticated.settings.module.css`).
  */
 
-import { Link, Outlet, createLazyFileRoute } from '@tanstack/react-router';
+import { createLazyFileRoute, Link, Outlet } from '@tanstack/react-router';
 import type { ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';
 

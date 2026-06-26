@@ -14,7 +14,7 @@ import Dialog from '@nodate-flow/ui/primitives/dialog';
 import FormField from '@nodate-flow/ui/primitives/form-field';
 import Input from '@nodate-flow/ui/primitives/input';
 import { toaster } from '@nodate-flow/ui/primitives/toast';
-import { Link, createFileRoute, useNavigate } from '@tanstack/react-router';
+import { createFileRoute, Link, useNavigate } from '@tanstack/react-router';
 import { type FormEvent, type ReactElement, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 

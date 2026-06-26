@@ -10,8 +10,9 @@
   border: var(--nf-space-px) solid var(--nf-color-border);
   border-radius: var(--nf-radius-md);
   background: var(--nf-color-surface);
-  transition: opacity var(--nf-duration-base) var(--nf-ease-standard), transform
-    var(--nf-duration-base) var(--nf-ease-standard);
+  transition:
+    opacity var(--nf-duration-base) var(--nf-ease-standard),
+    transform var(--nf-duration-base) var(--nf-ease-standard);
   list-style: none;
 }
 

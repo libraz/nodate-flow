@@ -108,8 +108,9 @@
   padding: var(--nf-space-1) var(--nf-space-3);
   border-radius: var(--nf-radius-pill);
   cursor: pointer;
-  transition: background-color var(--nf-duration-fast) var(--nf-ease-standard), color
-    var(--nf-duration-fast) var(--nf-ease-standard);
+  transition:
+    background-color var(--nf-duration-fast) var(--nf-ease-standard),
+    color var(--nf-duration-fast) var(--nf-ease-standard);
 }
 
 .rangePill:hover {
@@ -193,9 +194,10 @@
   font-size: var(--nf-text-sm);
   color: var(--nf-color-fg);
   cursor: default;
-  transition: background-color var(--nf-duration-fast) var(--nf-ease-standard), transform
-    var(--nf-duration-base) var(--nf-ease-standard), opacity var(--nf-duration-base)
-    var(--nf-ease-standard);
+  transition:
+    background-color var(--nf-duration-fast) var(--nf-ease-standard),
+    transform var(--nf-duration-base) var(--nf-ease-standard),
+    opacity var(--nf-duration-base) var(--nf-ease-standard);
 }
 
 .row:hover {

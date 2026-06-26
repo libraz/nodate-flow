@@ -1,10 +1,9 @@
 import { ApiError } from '@nodate-flow/sdk';
-import { Link, Outlet, createRootRouteWithContext, useRouterState } from '@tanstack/react-router';
-import { type ReactElement, Suspense, lazy, useEffect, useRef } from 'react';
+import PageSkeleton from '@nodate-flow/ui/primitives/page-skeleton';
+import { createRootRouteWithContext, Link, Outlet, useRouterState } from '@tanstack/react-router';
+import { lazy, type ReactElement, Suspense, useEffect, useRef } from 'react';
 import { ErrorBoundary } from 'react-error-boundary';
 import { useTranslation } from 'react-i18next';
-
-import PageSkeleton from '@nodate-flow/ui/primitives/page-skeleton';
 import NotFoundContent from '../components/not-found';
 import type { RouterContext } from '../router/router';
 

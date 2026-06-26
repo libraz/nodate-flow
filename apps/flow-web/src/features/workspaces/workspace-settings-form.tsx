@@ -26,11 +26,11 @@ import { clearActiveWorkspaceId } from '../../lib/use-current-workspace';
 import { selectUser, useAuth } from '../auth/auth-store';
 import {
   type PatchWorkspaceInput,
-  type Workspace,
   useDeleteWorkspace,
   useUpdateWorkspace,
   useWorkspaceMembersQuery,
   useWorkspaceQuery,
+  type Workspace,
 } from './api';
 
 export interface WorkspaceSettingsFormProps {

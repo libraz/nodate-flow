@@ -33,7 +33,7 @@ import { useTranslation } from 'react-i18next';
 
 import { formatApiError } from '../../lib/api-error';
 import { type TaskPriority, useUpdateTask } from '../tasks/api';
-import { type PrioritySuggestion, aiPriorityKeys, useAiPrioritySuggestionsQuery } from './api';
+import { aiPriorityKeys, type PrioritySuggestion, useAiPrioritySuggestionsQuery } from './api';
 import { useDismissedSuggestions } from './dismiss-store';
 import PriorityError from './priority-error';
 import styles from './priority-page.module.css';

@@ -12,8 +12,8 @@
  * settles on a common shape.
  */
 
-export { expandRecurrence, expandAllRecurrences } from './recurrence';
 export { getEventStyle } from './event-styles';
+export { expandAllRecurrences, expandRecurrence } from './recurrence';
 
 export type {
   Calendar,

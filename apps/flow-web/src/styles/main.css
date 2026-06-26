@@ -27,6 +27,7 @@ body {
   color: var(--nf-color-fg);
   font-family: var(--nf-font-sans);
   -webkit-font-smoothing: antialiased;
-  transition: background-color var(--nf-motion-duration) var(--nf-motion-easing), color
-    var(--nf-motion-duration) var(--nf-motion-easing);
+  transition:
+    background-color var(--nf-motion-duration) var(--nf-motion-easing),
+    color var(--nf-motion-duration) var(--nf-motion-easing);
 }

@@ -4,10 +4,10 @@
  */
 
 import {
+  forwardRef,
   type InputHTMLAttributes,
   type ReactElement,
   type Ref,
-  forwardRef,
   useEffect,
   useRef,
 } from 'react';

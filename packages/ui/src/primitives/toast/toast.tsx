@@ -143,6 +143,7 @@ function ToastItem({ toast }: ToastItemProps): ReactElement {
           : styles.info;
 
   return (
+    // biome-ignore lint/a11y/noStaticElementInteractions: handlers only pause auto-dismiss on hover/focus; the toast itself is non-interactive content announced via the parent aria-live region
     <div
       className={cx(styles.toast, toneClass)}
       data-tone={toast.tone}

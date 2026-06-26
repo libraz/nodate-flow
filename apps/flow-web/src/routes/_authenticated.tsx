@@ -8,7 +8,7 @@
 import { isSafeRedirect } from '@nodate-flow/sdk';
 import Button from '@nodate-flow/ui/primitives/button';
 import Dialog from '@nodate-flow/ui/primitives/dialog';
-import { Link, Outlet, createFileRoute } from '@tanstack/react-router';
+import { createFileRoute, Link, Outlet } from '@tanstack/react-router';
 import { type ReactElement, useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 

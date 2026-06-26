@@ -10,11 +10,11 @@
 import {
   type ButtonHTMLAttributes,
   type ComponentPropsWithoutRef,
+  createElement,
   type ElementType,
+  forwardRef,
   type ReactElement,
   type Ref,
-  createElement,
-  forwardRef,
 } from 'react';
 import { cx } from '../../lib/cx';
 import styles from './button.module.css';

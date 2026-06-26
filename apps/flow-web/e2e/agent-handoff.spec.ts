@@ -34,16 +34,16 @@
  *      aria-pressed and renders only handoff items.
  */
 
-import { type Page, type Route, expect, test } from '@playwright/test';
+import { expect, type Page, type Route, test } from '@playwright/test';
 
 import enAiAgents from '../locales/en/aiAgents.json' with { type: 'json' };
 import enInbox from '../locales/en/inbox.json' with { type: 'json' };
 import {
   API_BASE_URL,
-  type TestTenant,
   cleanupTenant,
   createTestTenant,
   injectAuth,
+  type TestTenant,
 } from './fixtures/tenant';
 
 const copy = {

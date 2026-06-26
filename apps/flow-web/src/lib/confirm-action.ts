@@ -7,6 +7,6 @@
  */
 
 export {
-  confirmAction,
   type ConfirmActionOptions,
+  confirmAction,
 } from '@nodate-flow/ui/primitives/confirm/action';

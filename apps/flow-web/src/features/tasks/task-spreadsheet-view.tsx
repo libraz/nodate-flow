@@ -26,9 +26,8 @@ import {
   useUpdateTask,
 } from './api';
 import { PRIORITY_COLOR, PRIORITY_KEY, STATE_COLOR, STATE_KEY } from './constants';
-import { useTaskFilters } from './use-task-filters';
-
 import css from './task-spreadsheet-view.module.css';
+import { useTaskFilters } from './use-task-filters';
 
 export interface TaskSpreadsheetViewProps {
   projectId: string;
@@ -519,6 +518,7 @@ export default function TaskSpreadsheetView({ projectId }: TaskSpreadsheetViewPr
   };
 
   return (
+    // biome-ignore lint/a11y/noStaticElementInteractions: layout wrapper that only intercepts grid-level keyboard shortcuts (Escape clears selection); the interactive grid lives in the child with role="grid".
     <div className={css.wrapper} onKeyDown={handleWrapperKeyDown}>
       {selectedIds.length > 0 && (
         <BulkActionBar selectedIds={selectedIds} onClear={clearSelection} />

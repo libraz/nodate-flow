@@ -12,7 +12,7 @@ import type { ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { formatEpochDateTime } from '../../lib/format';
-import { type WorkspaceInvite, useListInvitesQuery, useRevokeInvite } from './invite-api';
+import { useListInvitesQuery, useRevokeInvite, type WorkspaceInvite } from './invite-api';
 
 export interface WorkspaceInvitesListProps {
   workspaceId: string;
@@ -34,7 +34,7 @@ function formatUses(useCount: number, maxUses: number | null, t: (key: string) =
 
 export default function WorkspaceInvitesList({
   workspaceId,
-}: WorkspaceInvitesListProps): ReactElement {
+}: WorkspaceInvitesListProps): ReactElement | null {
   const { t, i18n } = useTranslation('common');
   const { data: invites } = useListInvitesQuery(workspaceId);
   const revokeInvite = useRevokeInvite();
@@ -49,7 +49,7 @@ export default function WorkspaceInvitesList({
     }
   };
 
-  if (invites.length === 0) return <></>;
+  if (invites.length === 0) return null;
 
   const columns: ColumnDef<WorkspaceInvite, unknown>[] = [
     {

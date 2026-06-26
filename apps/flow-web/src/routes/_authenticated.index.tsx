@@ -7,8 +7,9 @@
  */
 
 import type { components } from '@nodate-flow/sdk';
+import Icon from '@nodate-flow/ui/icon';
 import { useSuspenseQuery } from '@tanstack/react-query';
-import { Link, createFileRoute } from '@tanstack/react-router';
+import { createFileRoute, Link } from '@tanstack/react-router';
 import {
   CalendarDays,
   CheckCircle2,
@@ -21,8 +22,6 @@ import {
 } from 'lucide-react';
 import { type ReactElement, Suspense, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-
-import Icon from '@nodate-flow/ui/icon';
 import { OPEN_COMMAND_PALETTE_EVENT } from '../components/layout/glass-dock';
 import { selectUser, useAuth } from '../features/auth/auth-store';
 import DashboardView from '../features/dashboard/dashboard-view';
@@ -286,10 +285,10 @@ function WorkspaceLinks(): ReactElement {
 
 /* ── Dashboard widgets (workspace-scoped) ─────────────────── */
 
-function HomeDashboard(): ReactElement {
+function HomeDashboard(): ReactElement | null {
   const { data: workspaces } = useWorkspacesQuery();
   const firstWs = workspaces[0];
-  if (!firstWs) return <></>;
+  if (!firstWs) return null;
   return <DashboardView workspaceId={firstWs.id} />;
 }
 

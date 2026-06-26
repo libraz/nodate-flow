@@ -5,10 +5,9 @@
     "rootDir": "tests",
     "composite": true,
     "types": ["vite/client", "vitest/globals", "node"],
-    "baseUrl": ".",
     "paths": {
-      "@/*": ["src/*"],
-      "@tests/*": ["tests/*"]
+      "@/*": ["./src/*"],
+      "@tests/*": ["./tests/*"]
     }
   },
   "include": ["tests"]

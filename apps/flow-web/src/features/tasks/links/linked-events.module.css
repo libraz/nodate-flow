@@ -115,9 +115,10 @@
   padding: var(--nf-space-3) var(--nf-space-4);
   border-block-end: 1px solid var(--nf-color-hairline);
   font-size: var(--nf-text-sm);
-  transition: background-color var(--nf-duration-fast) var(--nf-ease-standard), opacity
-    var(--nf-duration-base) var(--nf-ease-standard), transform var(--nf-duration-base)
-    var(--nf-ease-standard);
+  transition:
+    background-color var(--nf-duration-fast) var(--nf-ease-standard),
+    opacity var(--nf-duration-base) var(--nf-ease-standard),
+    transform var(--nf-duration-base) var(--nf-ease-standard);
 }
 
 .row:last-child {
@@ -248,9 +249,10 @@
   border-radius: var(--nf-radius-sm);
   cursor: pointer;
   opacity: 0;
-  transition: background-color var(--nf-duration-fast) var(--nf-ease-standard), color
-    var(--nf-duration-fast) var(--nf-ease-standard), opacity var(--nf-duration-fast)
-    var(--nf-ease-standard);
+  transition:
+    background-color var(--nf-duration-fast) var(--nf-ease-standard),
+    color var(--nf-duration-fast) var(--nf-ease-standard),
+    opacity var(--nf-duration-fast) var(--nf-ease-standard);
 }
 
 .row:hover .unlinkBtn,

@@ -167,13 +167,7 @@ function SettingsPanel({ id }: { id: string }): ReactElement {
   );
 }
 
-function OverviewPanel({
-  id,
-  workspaceId,
-}: {
-  id: string;
-  workspaceId: string;
-}): ReactElement {
+function OverviewPanel({ id, workspaceId }: { id: string; workspaceId: string }): ReactElement {
   const { t } = useTranslation('common');
   const { data: tasks } = useTasksQuery(id);
 

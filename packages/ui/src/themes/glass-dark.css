@@ -50,8 +50,9 @@
   --nf-shadow-md: 0 4px 16px oklch(0% 0 0 / 0.35);
   --nf-shadow-lg: 0 14px 36px oklch(0% 0 0 / 0.4);
   --nf-shadow-elevated: 0 4px 14px oklch(0% 0 0 / 0.4);
-  --nf-shadow-focus: 0 0 0 var(--nf-focus-ring-offset) var(--nf-color-bg), 0 0 0
-    calc(var(--nf-focus-ring-offset) + var(--nf-focus-ring-width)) var(--nf-color-focus-ring);
+  --nf-shadow-focus:
+    0 0 0 var(--nf-focus-ring-offset) var(--nf-color-bg),
+    0 0 0 calc(var(--nf-focus-ring-offset) + var(--nf-focus-ring-width)) var(--nf-color-focus-ring);
 
   --nf-overlay-press: oklch(100% 0 0 / 0.06);
   --nf-overlay-hover: oklch(100% 0 0 / 0.03);

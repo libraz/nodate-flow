@@ -31,11 +31,11 @@ import { expect, test } from '@playwright/test';
 import { loadTenants } from './fixtures/load-tenants';
 import {
   API_BASE_URL,
-  type TestTenant,
   createCalendarEvent,
   createTask,
   ensurePersonalCalendar,
   injectAuth,
+  type TestTenant,
 } from './fixtures/tenant';
 
 const FIXED_YEAR = 2026;

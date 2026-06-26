@@ -28,9 +28,10 @@
   border-radius: var(--nf-radius-md);
   color: var(--nf-color-fg-muted);
   cursor: pointer;
-  transition: background var(--nf-duration-fast) var(--nf-ease-standard), color
-    var(--nf-duration-fast) var(--nf-ease-standard), transform var(--nf-duration-fast)
-    var(--nf-ease-standard);
+  transition:
+    background var(--nf-duration-fast) var(--nf-ease-standard),
+    color var(--nf-duration-fast) var(--nf-ease-standard),
+    transform var(--nf-duration-fast) var(--nf-ease-standard);
 }
 
 .button:hover {

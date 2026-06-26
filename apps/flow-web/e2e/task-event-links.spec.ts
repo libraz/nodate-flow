@@ -38,18 +38,18 @@
  * parallel-safe.
  */
 
-import { type Page, expect, test } from '@playwright/test';
+import { expect, type Page, test } from '@playwright/test';
 
 import enLinkedEvents from '../locales/en/linkedEvents.json' with { type: 'json' };
 import jaLinkedEvents from '../locales/ja/linkedEvents.json' with { type: 'json' };
 import {
   API_BASE_URL,
-  type TestTenant,
   cleanupTenant,
   createCalendarEvent,
   createTestTenant,
   ensurePersonalCalendar,
   injectAuth,
+  type TestTenant,
 } from './fixtures/tenant';
 
 const copy = {

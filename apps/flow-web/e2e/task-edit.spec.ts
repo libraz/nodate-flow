@@ -20,15 +20,15 @@
  * seeded tasks (e.g. auth.spec.ts pins "Seeded smoke task").
  */
 
-import { type Page, expect, test } from '@playwright/test';
+import { expect, type Page, test } from '@playwright/test';
 
 import {
   API_BASE_URL,
-  type TestTenant,
   cleanupTenant,
   createTask,
   createTestTenant,
   injectAuth,
+  type TestTenant,
 } from './fixtures/tenant';
 
 interface TaskResponse {

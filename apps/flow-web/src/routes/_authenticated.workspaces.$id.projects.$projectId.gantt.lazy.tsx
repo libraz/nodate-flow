@@ -19,7 +19,7 @@ import SegmentedControl from '@nodate-flow/ui/primitives/segmented-control';
 import Skeleton from '@nodate-flow/ui/primitives/skeleton';
 import { ToggleChip } from '@nodate-flow/ui/primitives/toggle-chip';
 import { useSuspenseQuery } from '@tanstack/react-query';
-import { Link, createLazyFileRoute, getRouteApi, useNavigate } from '@tanstack/react-router';
+import { createLazyFileRoute, getRouteApi, Link, useNavigate } from '@tanstack/react-router';
 import { ChevronLeft, ChevronRight, Minus, Plus } from 'lucide-react';
 import { type ReactElement, Suspense, useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -729,8 +729,10 @@ function GanttView(): ReactElement {
                   STATE_COLOR[task.derivedState as TaskDerivedState] ?? 'var(--nf-color-fg-muted)';
                 const isCritical = criticalPathIds.has(task.id);
                 return (
+                  // biome-ignore lint/a11y/useSemanticElements: SVG task bars cannot be native <button> elements; role="button" + tabIndex + keyboard handler is the correct interactive pattern inside the chart.
                   <g
                     key={task.id}
+                    role="button"
                     style={{ cursor: 'pointer' }}
                     onClick={() => {
                       void navigate({

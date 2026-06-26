@@ -2,7 +2,7 @@
  * Textarea — primitive multi-line text input.
  */
 
-import { type ReactElement, type TextareaHTMLAttributes, forwardRef } from 'react';
+import { forwardRef, type ReactElement, type TextareaHTMLAttributes } from 'react';
 import { cx } from '../../lib/cx';
 import styles from './textarea.module.css';
 

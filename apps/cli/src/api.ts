@@ -1,7 +1,7 @@
 // API client factory for the tnk CLI.
 // Uses @nodate-flow/sdk with stored credentials.
 
-import { type NodateFlowClient, createClient } from '@nodate-flow/sdk';
+import { createClient, type NodateFlowClient } from '@nodate-flow/sdk';
 
 import { getAuthApiUrl, getFlowApiUrl, loadCredentials } from './config.js';
 

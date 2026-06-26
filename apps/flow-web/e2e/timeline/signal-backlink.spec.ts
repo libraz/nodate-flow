@@ -55,16 +55,16 @@
 
 import { randomUUID } from 'node:crypto';
 
-import { type Page, expect, test } from '@playwright/test';
+import { expect, type Page, test } from '@playwright/test';
 import mysql, { type Pool } from 'mysql2/promise';
 
 import enTimeline from '../../locales/en/timeline.json' with { type: 'json' };
 import {
-  type TestTenant,
   cleanupTenant,
   createTask,
   createTestTenant,
   injectAuth,
+  type TestTenant,
 } from '../fixtures/tenant';
 
 const copy = {

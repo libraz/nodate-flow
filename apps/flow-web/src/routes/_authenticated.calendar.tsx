@@ -21,6 +21,7 @@
  * Sun-red / Sat-blue in the right place.
  */
 
+import { getOrCreateProvider, type HolidayEntry } from '@nodate-flow/holidays';
 import type { components } from '@nodate-flow/sdk';
 import { cx } from '@nodate-flow/ui/lib/cx';
 import Badge from '@nodate-flow/ui/primitives/badge';
@@ -30,7 +31,7 @@ import { toaster } from '@nodate-flow/ui/primitives/toast';
 import { ToggleChip, ToggleChipGroup } from '@nodate-flow/ui/primitives/toggle-chip';
 import { BP } from '@nodate-flow/ui/tokens/breakpoints';
 import { useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Link, createFileRoute, useNavigate } from '@tanstack/react-router';
+import { createFileRoute, Link, useNavigate } from '@tanstack/react-router';
 import { CalendarRange, ChevronLeft, ChevronRight, Users } from 'lucide-react';
 import {
   type DragEvent,
@@ -42,8 +43,6 @@ import {
   useState,
 } from 'react';
 import { useTranslation } from 'react-i18next';
-
-import { type HolidayEntry, getOrCreateProvider } from '@nodate-flow/holidays';
 
 import { useUpdateEvent } from '../features/calendar-events/api';
 import EventDialog, {
@@ -821,6 +820,7 @@ function CalendarRoute(): ReactElement {
                   const holidayTitle = dayHolidays.map((h) => h.name).join(', ');
                   const dateNumberCls = dateNumberClass(cell.date, dayHolidays.length > 0);
                   return (
+                    // biome-ignore lint/a11y/noStaticElementInteractions: month grid cells are pointer drag-and-drop targets for moving events; they expose no keyboard interaction of their own.
                     <div
                       key={cell.key}
                       // data-cell-key exposes the YYYY-MM-DD cell address for
@@ -970,6 +970,7 @@ function CalendarRoute(): ReactElement {
                                 <span className={styles.eventPill__title}>{ev.title}</span>
                                 {ev.attendeeCount > 0 ? (
                                   <span
+                                    role="img"
                                     className={styles.eventPill__attendees}
                                     aria-label={t('calendar.event_attendee_count', {
                                       count: ev.attendeeCount,

@@ -101,7 +101,9 @@
   gap: var(--nf-space-1);
   overflow: hidden;
   cursor: default;
-  transition: background var(--nf-duration-fast), border-color var(--nf-duration-fast),
+  transition:
+    background var(--nf-duration-fast),
+    border-color var(--nf-duration-fast),
     outline-color var(--nf-duration-fast);
 }
 

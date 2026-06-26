@@ -23,11 +23,11 @@
  */
 
 import {
-  type NodateFlowClient,
   createAuthRequestMiddleware,
   createClient,
   createRefreshMiddleware,
   createTokenRefresher,
+  type NodateFlowClient,
 } from '@nodate-flow/sdk';
 
 import { authStore } from '../features/auth/auth-store';

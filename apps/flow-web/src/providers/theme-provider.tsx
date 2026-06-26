@@ -19,19 +19,18 @@ import type { Me } from '../features/settings/api';
 import { authSdk } from '../lib/sdk';
 import { queryClient } from './query-client';
 
-export {
-  type ThemePreference,
-  type ColorMode,
-  type ThemeFamily,
-  type ThemeId,
-  type ThemeContextValue,
-  splitThemeId,
-  joinThemeId,
-  THEME_PREFERENCES,
-} from '@nodate-flow/ui/providers/theme-provider';
-
 /** Backwards-compatible alias for ThemeId. */
 export type { ThemeId as ConcreteTheme } from '@nodate-flow/ui/providers/theme-provider';
+export {
+  type ColorMode,
+  joinThemeId,
+  splitThemeId,
+  THEME_PREFERENCES,
+  type ThemeContextValue,
+  type ThemeFamily,
+  type ThemeId,
+  type ThemePreference,
+} from '@nodate-flow/ui/providers/theme-provider';
 
 /**
  * Legacy exports for backwards compatibility with flow-web consumers

@@ -6,7 +6,7 @@
  */
 
 import { cx } from '@nodate-flow/ui/lib/cx';
-import { Link, Outlet, createLazyFileRoute, getRouteApi } from '@tanstack/react-router';
+import { createLazyFileRoute, getRouteApi, Link, Outlet } from '@tanstack/react-router';
 import type { ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';
 

@@ -50,8 +50,6 @@ import { useTranslation } from 'react-i18next';
 import { ApiError } from '../../lib/api-error';
 import { confirmAction } from '../../lib/confirm-action';
 import {
-  type Webhook,
-  type WebhookDelivery,
   useCreateWebhookMutation,
   useDeleteWebhookMutation,
   useDeliveriesQuery,
@@ -59,6 +57,8 @@ import {
   useToggleWebhookMutation,
   useWebhookQuery,
   useWebhooksQuery,
+  type Webhook,
+  type WebhookDelivery,
 } from './api';
 import styles from './webhooks-settings-page.module.css';
 

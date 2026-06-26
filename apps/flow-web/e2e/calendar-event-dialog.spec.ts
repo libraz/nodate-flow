@@ -25,18 +25,18 @@
  * in sync if copy changes.
  */
 
-import { type Locator, type Page, expect, test } from '@playwright/test';
+import { expect, type Locator, type Page, test } from '@playwright/test';
 
 import enCal from '../locales/en/calendar-events.json' with { type: 'json' };
 import jaCal from '../locales/ja/calendar-events.json' with { type: 'json' };
 import {
   API_BASE_URL,
-  type TestTenant,
   cleanupTenant,
   createCalendarEvent,
   createTestTenant,
   ensurePersonalCalendar,
   injectAuth,
+  type TestTenant,
 } from './fixtures/tenant';
 
 /* ── locale copy ────────────────────────────────────────────────── */

@@ -4,11 +4,11 @@
  */
 
 import {
-  SUPPORTED_COUNTRIES,
   type components,
   detectTimezone,
   formatTimezoneLabel,
   groupTimezonesByRegion,
+  SUPPORTED_COUNTRIES,
 } from '@nodate-flow/sdk';
 import { useZodForm } from '@nodate-flow/ui/hooks/use-zod-form';
 import Button from '@nodate-flow/ui/primitives/button';
@@ -19,7 +19,7 @@ import Input from '@nodate-flow/ui/primitives/input';
 import SegmentedControl, {
   type SegmentedControlOption,
 } from '@nodate-flow/ui/primitives/segmented-control';
-import { Link, createFileRoute } from '@tanstack/react-router';
+import { createFileRoute, Link } from '@tanstack/react-router';
 import { type ReactElement, useEffect, useMemo, useState } from 'react';
 import { Controller } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
@@ -239,7 +239,7 @@ export function ProfilePage(): ReactElement {
     getValues,
     setValue,
     formState: { errors, isSubmitting, isDirty },
-  } = useZodForm<typeof profileSchema>(
+  } = useZodForm<ProfileFormValues>(
     profileSchema,
     {
       displayName: user?.displayName ?? '',

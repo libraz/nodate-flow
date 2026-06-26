@@ -5,7 +5,7 @@
  * input element.
  */
 
-import { type HTMLAttributes, type ReactElement, type ReactNode, forwardRef, useId } from 'react';
+import { forwardRef, type HTMLAttributes, type ReactElement, type ReactNode, useId } from 'react';
 import { cx } from '../../lib/cx';
 import styles from './form-field.module.css';
 

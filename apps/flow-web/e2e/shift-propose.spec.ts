@@ -24,18 +24,18 @@
  *      the new shortcut path.
  */
 
-import { type Page, expect, test } from '@playwright/test';
+import { expect, type Page, test } from '@playwright/test';
 
 import enCalEvents from '../locales/en/calendar-events.json' with { type: 'json' };
 import {
   API_BASE_URL,
   AUTH_API_URL,
-  type TestTenant,
   cleanupTenant,
   createCalendarEvent,
   createTestTenant,
   ensurePersonalCalendar,
   injectAuth,
+  type TestTenant,
 } from './fixtures/tenant';
 
 const copy = {

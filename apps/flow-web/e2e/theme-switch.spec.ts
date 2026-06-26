@@ -24,10 +24,10 @@
  *     reads localStorage and sets `data-theme` BEFORE React renders.
  */
 
-import { type Page, expect, test } from '@playwright/test';
+import { expect, type Page, test } from '@playwright/test';
 
 import { loadTenants } from './fixtures/load-tenants';
-import { AUTH_API_URL, type TestTenant, injectAuth } from './fixtures/tenant';
+import { AUTH_API_URL, injectAuth, type TestTenant } from './fixtures/tenant';
 
 type Family = 'aurora' | 'glass' | 'dotline';
 type Mode = 'light' | 'dark';

@@ -30,11 +30,11 @@
  * via REST + injectAuth + direct URL navigation. Parallel-safe.
  */
 
-import { type Locator, type Page, expect, test } from '@playwright/test';
+import { expect, type Locator, type Page, test } from '@playwright/test';
 
 import enAi from '../../locales/en/ai.json' with { type: 'json' };
 import enSignalKinds from '../../locales/en/signal-kinds.json' with { type: 'json' };
-import { type TestTenant, cleanupTenant, createTestTenant, injectAuth } from '../fixtures/tenant';
+import { cleanupTenant, createTestTenant, injectAuth, type TestTenant } from '../fixtures/tenant';
 
 const copy = {
   matrixTitle: enAi.autonomy.matrix.title,

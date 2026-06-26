@@ -10,7 +10,7 @@
 
 import type { components } from '@nodate-flow/sdk';
 import { useSuspenseQuery } from '@tanstack/react-query';
-import { Link, createFileRoute } from '@tanstack/react-router';
+import { createFileRoute, Link } from '@tanstack/react-router';
 import { CheckCircle } from 'lucide-react';
 import { type ReactElement, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';

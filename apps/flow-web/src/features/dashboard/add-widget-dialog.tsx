@@ -22,7 +22,7 @@ import {
 import { type FormEvent, type ReactElement, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { type WidgetItem, type WidgetType, dashboardKeys, useCreateWidget } from './api';
+import { dashboardKeys, useCreateWidget, type WidgetItem, type WidgetType } from './api';
 import styles from './dashboard.module.css';
 
 // ---------------------------------------------------------------------------

@@ -5,65 +5,60 @@
 // packages/sdk/openapi.json. The error-code modules under ./errors are
 // produced by the errors codegen (scripts/gen-errors).
 
-export type { paths, components, operations } from './openapi.js';
-export { createClient, type CreateClientOptions, type NodateFlowClient } from './client.js';
-export * from './errors/index.js';
-export {
-  SIGNAL_KINDS,
-  lookup as lookupSignalKind,
-  type SignalKind,
-  type SignalKindDefinition,
-  type SignalRetention,
-  type SignalAutonomy,
-  type SignalSubjectType,
-} from './signal-kinds/index.js';
-export {
-  createTokenRefresher,
-  createRefreshMiddleware,
-  createAuthRequestMiddleware,
-  decodeTokenExp,
-  type RefreshMiddlewareOptions,
-  type AuthRequestMiddlewareOptions,
-  type TokenRefresher,
-} from './refresh.js';
-
+// Shared API error utilities
+export { ApiError, type ProblemJson, toApiError } from './api-error.js';
 // Shared auth store (Zustand)
 export {
-  authStore,
-  useAuth,
-  selectAccessToken,
-  selectUser,
-  selectIsAuthenticated,
-  type AuthUser,
   type AuthState,
+  type AuthUser,
+  authStore,
+  selectAccessToken,
+  selectIsAuthenticated,
+  selectUser,
+  useAuth,
 } from './auth-store.js';
-
-// Shared API error utilities
-export { ApiError, toApiError, type ProblemJson } from './api-error.js';
+// Avatar URL helpers (auth-api proxy)
+export { buildAvatarUrl } from './avatar.js';
+export { type CreateClientOptions, createClient, type NodateFlowClient } from './client.js';
+export * from './errors/index.js';
+// Shared i18n provider
+export { I18nProvider, type I18nProviderProps } from './i18n-provider.js';
+export type { components, operations, paths } from './openapi.js';
 
 // Shared TanStack Query client + provider
 export {
   createQueryClient,
   queryClient,
-  setAuthErrorHandler,
   resetAuthErrorHandler,
+  setAuthErrorHandler,
 } from './query-client.js';
 export { QueryProvider } from './query-provider.js';
-
-// Shared i18n provider
-export { I18nProvider, type I18nProviderProps } from './i18n-provider.js';
-
 // Redirect safety utilities
 export { isSafeRedirect } from './redirect.js';
+export {
+  type AuthRequestMiddlewareOptions,
+  createAuthRequestMiddleware,
+  createRefreshMiddleware,
+  createTokenRefresher,
+  decodeTokenExp,
+  type RefreshMiddlewareOptions,
+  type TokenRefresher,
+} from './refresh.js';
 
 // Region helpers (timezone + country)
 export {
-  SUPPORTED_COUNTRIES,
-  listSupportedTimezones,
   detectTimezone,
-  groupTimezonesByRegion,
   formatTimezoneLabel,
+  groupTimezonesByRegion,
+  listSupportedTimezones,
+  SUPPORTED_COUNTRIES,
 } from './region.js';
-
-// Avatar URL helpers (auth-api proxy)
-export { buildAvatarUrl } from './avatar.js';
+export {
+  lookup as lookupSignalKind,
+  SIGNAL_KINDS,
+  type SignalAutonomy,
+  type SignalKind,
+  type SignalKindDefinition,
+  type SignalRetention,
+  type SignalSubjectType,
+} from './signal-kinds/index.js';

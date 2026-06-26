@@ -20,15 +20,15 @@
  * parallel-safe and never leans on the shared pool from global-setup.
  */
 
-import { type Page, expect, test } from '@playwright/test';
+import { expect, type Page, test } from '@playwright/test';
 
 import enCommon from '../locales/en/common.json' with { type: 'json' };
 import {
   API_BASE_URL,
-  type TestTenant,
   cleanupTenant,
   createTestTenant,
   injectAuth,
+  type TestTenant,
 } from './fixtures/tenant';
 
 const copy = {

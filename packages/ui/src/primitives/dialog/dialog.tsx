@@ -15,11 +15,11 @@
  */
 
 import {
+  forwardRef,
   type HTMLAttributes,
   type ReactElement,
   type ReactNode,
   type Ref,
-  forwardRef,
   useCallback,
   useEffect,
   useId,
@@ -127,12 +127,13 @@ function DialogImpl(
   if (!root) return null;
 
   return createPortal(
+    // biome-ignore lint/a11y/noStaticElementInteractions: overlay dismissal; keyboard handled by document keydown Escape
     // biome-ignore lint/a11y/useKeyWithClickEvents: overlay dismissal; keyboard handled by document keydown Escape
-    // biome-ignore lint/a11y/useSemanticElements: native <dialog> is not used; div+role is intentional for happy-dom compat
     <div
       className={cx(styles.overlay, fullScreenOnMobile && styles.overlayMobile)}
       onClick={dismissOnOverlayClick ? onClose : undefined}
     >
+      {/* biome-ignore lint/a11y/useKeyWithClickEvents: onClick only stops overlay-dismiss propagation; dialog keyboard handled at document level */}
       <div
         ref={handleRef}
         role="dialog"

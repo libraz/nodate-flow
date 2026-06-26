@@ -15,8 +15,8 @@ import { type ReactElement, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import {
-  TRANSITIONS_BY_STATE,
   type TaskDerivedState,
+  TRANSITIONS_BY_STATE,
   type TransitionName,
   useArchiveTask,
   useUnarchiveTask,
@@ -51,7 +51,7 @@ export default function TaskMoveMenu({
   onTransition,
   taskId,
   archivedAt,
-}: TaskMoveMenuProps): ReactElement {
+}: TaskMoveMenuProps): ReactElement | null {
   const { t } = useTranslation(['common', 'labels']);
   const [open, setOpen] = useState(false);
   const itemsRef = useRef<(HTMLButtonElement | null)[]>([]);
@@ -118,7 +118,7 @@ export default function TaskMoveMenu({
     }
   };
 
-  if (totalItems === 0) return <></>;
+  if (totalItems === 0) return null;
 
   return (
     <Popover

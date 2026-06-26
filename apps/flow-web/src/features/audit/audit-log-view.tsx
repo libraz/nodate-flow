@@ -232,11 +232,7 @@ function AuditRow({ entry }: { entry: AuditLogEntry }): ReactElement {
   );
 }
 
-export default function AuditLogView({
-  workspaceId,
-}: {
-  workspaceId: string;
-}): ReactElement {
+export default function AuditLogView({ workspaceId }: { workspaceId: string }): ReactElement {
   const { t } = useTranslation('settings');
   const { t: tCommon, i18n } = useTranslation('common');
   const locale = i18n.resolvedLanguage ?? 'en';

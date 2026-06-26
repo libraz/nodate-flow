@@ -21,7 +21,7 @@
 
 import { expect, test } from '@playwright/test';
 
-import { type TestTenant, cleanupTenant, createTestTenant, injectAuth } from './fixtures/tenant';
+import { cleanupTenant, createTestTenant, injectAuth, type TestTenant } from './fixtures/tenant';
 
 test.describe('invite create', () => {
   let tenant: TestTenant | null = null;

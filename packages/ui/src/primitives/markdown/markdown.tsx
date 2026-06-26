@@ -14,7 +14,7 @@
  * ```
  */
 
-import { type ReactElement, memo } from 'react';
+import { memo, type ReactElement } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 

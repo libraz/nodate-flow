@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { type StreamEvent, keysForEvent } from '../event-to-keys';
+import { keysForEvent, type StreamEvent } from '../event-to-keys';
 
 const evt = (kind: StreamEvent['kind']): StreamEvent => ({
   kind,

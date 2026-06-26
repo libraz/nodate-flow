@@ -38,9 +38,9 @@ import { useLinkEvent } from './hooks/use-link-event';
 import { linkedEventsKeys, useLinkedEventsQuery } from './hooks/use-linked-events';
 import { useUnlinkEvent } from './hooks/use-unlink-event';
 import LinkedEventRow from './linked-event-row';
+import styles from './linked-events.module.css';
 import LinkedEventsEmpty from './linked-events-empty';
 import LinkedEventsError from './linked-events-error';
-import styles from './linked-events.module.css';
 import type { CalendarEventListItem, LinkKind, TaskEventLink } from './types';
 
 const COLLAPSE_KEY = 'linked-events';

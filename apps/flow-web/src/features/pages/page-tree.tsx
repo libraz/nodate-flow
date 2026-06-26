@@ -33,9 +33,9 @@ function ChildTreeContent({
   parentId: string;
   workspaceId: string;
   activePageId: string | undefined;
-}): ReactElement {
+}): ReactElement | null {
   const { data: children } = useChildPagesQuery(workspaceId, parentId);
-  if (children.length === 0) return <></>;
+  if (children.length === 0) return null;
   return (
     <ul className={styles.treeChildren}>
       {children.map((child) => (

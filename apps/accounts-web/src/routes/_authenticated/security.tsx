@@ -9,7 +9,7 @@ import Button from '@nodate-flow/ui/primitives/button';
 import FormField from '@nodate-flow/ui/primitives/form-field';
 import Input from '@nodate-flow/ui/primitives/input';
 import { toaster } from '@nodate-flow/ui/primitives/toast';
-import { Link, createFileRoute } from '@tanstack/react-router';
+import { createFileRoute, Link } from '@tanstack/react-router';
 import QRCode from 'qrcode';
 import { type FormEvent, type ReactElement, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -175,7 +175,7 @@ export function SecurityPage(): ReactElement {
     handleSubmit,
     reset,
     formState: { errors, isSubmitting },
-  } = useZodForm<typeof changePasswordSchema>(changePasswordSchema, {
+  } = useZodForm<ChangePasswordFormValues>(changePasswordSchema, {
     currentPassword: '',
     newPassword: '',
   });

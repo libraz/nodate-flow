@@ -3,7 +3,7 @@
  * otherwise falls back to `initials` text. Always requires an `alt` for a11y.
  */
 
-import { type HTMLAttributes, type ReactElement, forwardRef } from 'react';
+import { forwardRef, type HTMLAttributes, type ReactElement } from 'react';
 import { cx } from '../../lib/cx';
 import styles from './avatar.module.css';
 

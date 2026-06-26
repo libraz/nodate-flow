@@ -151,7 +151,11 @@ function PanelHeader({ count }: { count: number | null }): ReactElement {
     <header className={styles.header}>
       <h2 className={styles.headerTitle}>{t('invites.inbox.title')}</h2>
       {count !== null && count > 0 ? (
-        <span aria-label={t('invites.inbox.count_badge', { count })} className={styles.countBadge}>
+        <span
+          role="img"
+          aria-label={t('invites.inbox.count_badge', { count })}
+          className={styles.countBadge}
+        >
           {count}
         </span>
       ) : null}

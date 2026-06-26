@@ -166,7 +166,6 @@ export default function NotificationDropdown({
   return (
     <>
       {/* Invisible backdrop to capture outside clicks */}
-      {/* biome-ignore lint/a11y/useKeyWithClickEvents: backdrop dismiss */}
       <div className={styles.backdrop} onClick={onClose} aria-hidden="true" />
       <div id={id} className={styles.dropdown} role="dialog" aria-label={t('view.title')}>
         <div className={styles.dropdownHeader}>

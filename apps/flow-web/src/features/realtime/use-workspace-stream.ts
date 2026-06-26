@@ -24,7 +24,7 @@ import { useEffect } from 'react';
 import { i18n } from '../../i18n';
 import { apiBaseUrl } from '../../lib/sdk';
 import { authStore } from '../auth/auth-store';
-import { type StreamEvent, keysForEvent } from './event-to-keys';
+import { keysForEvent, type StreamEvent } from './event-to-keys';
 import { setStreamHealthy } from './stream-health';
 
 const RECONNECT_BASE_MS = 1_000;

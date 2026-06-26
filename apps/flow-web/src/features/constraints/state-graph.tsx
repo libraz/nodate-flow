@@ -103,11 +103,11 @@ export default function StateGraph({ current, activeSources }: StateGraphProps):
             </g>
           );
         })}
-        {EDGES.map((e, i) => {
+        {EDGES.map((e) => {
           const a = POSITIONS[e.from];
           const b = POSITIONS[e.to];
           return (
-            <g key={`${e.from}-${e.to}-${i}`} stroke="currentColor" fill="none">
+            <g key={`${e.from}-${e.to}-${e.label}`} stroke="currentColor" fill="none">
               <line x1={a.x} y1={a.y} x2={b.x} y2={b.y} markerEnd="url(#arrow)" strokeWidth={1} />
               <text
                 x={(a.x + b.x) / 2}

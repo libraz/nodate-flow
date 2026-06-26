@@ -18,7 +18,7 @@
 //   node scripts/i18n-translate.mjs --check   # exit 1 if ja is missing keys or any value is empty
 //   node scripts/i18n-translate.mjs --write   # patch ja files in place
 
-import { readFileSync, readdirSync, statSync, writeFileSync } from 'node:fs';
+import { readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 

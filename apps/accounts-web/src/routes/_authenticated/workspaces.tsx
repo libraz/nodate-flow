@@ -4,7 +4,7 @@
  */
 
 import type { components } from '@nodate-flow/sdk';
-import { Link, createFileRoute } from '@tanstack/react-router';
+import { createFileRoute, Link } from '@tanstack/react-router';
 import { type ReactElement, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 

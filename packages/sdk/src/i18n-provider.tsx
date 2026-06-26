@@ -1,7 +1,6 @@
+import type { i18n as I18nInstance } from 'i18next';
 import { type ReactElement, type ReactNode, Suspense, useEffect } from 'react';
 import { I18nextProvider } from 'react-i18next';
-
-import type { i18n as I18nInstance } from 'i18next';
 
 /** Props for the shared I18nProvider. Each app passes its own i18n instance. */
 export interface I18nProviderProps {

@@ -7,10 +7,9 @@
 
 import { screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { renderWithProviders } from '@tests/helpers/render';
 import { describe, expect, it, vi } from 'vitest';
 import { axe } from 'vitest-axe';
-
-import { renderWithProviders } from '@tests/helpers/render';
 import type { InboxItem } from '../api';
 import InboxItemRow from '../inbox-item-row';
 

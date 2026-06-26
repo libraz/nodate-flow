@@ -42,7 +42,7 @@
  *      of the spec.
  */
 
-import { type ConsoleMessage, type Route, expect, test } from '@playwright/test';
+import { type ConsoleMessage, expect, type Route, test } from '@playwright/test';
 
 import enSettings from '../../locales/en/settings.json' with { type: 'json' };
 import { loadTenants } from '../fixtures/load-tenants';

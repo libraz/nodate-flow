@@ -30,15 +30,15 @@
  * defects must go through the right agent (chrome-verify skill rule).
  */
 
-import { type ConsoleMessage, type Page, expect, test } from '@playwright/test';
+import { type ConsoleMessage, expect, type Page, test } from '@playwright/test';
 
 import {
-  type TestTenant,
   cleanupTenant,
   createCalendarEvent,
   createTestTenant,
   ensurePersonalCalendar,
   injectAuth,
+  type TestTenant,
 } from '../fixtures/tenant';
 
 interface PageGuards {

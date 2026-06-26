@@ -129,8 +129,9 @@
   font-size: var(--nf-text-xs);
   font-weight: var(--nf-weight-medium);
   color: var(--nf-color-fg-muted);
-  transition: background var(--nf-duration-fast) var(--nf-ease-standard), color
-    var(--nf-duration-fast) var(--nf-ease-standard);
+  transition:
+    background var(--nf-duration-fast) var(--nf-ease-standard),
+    color var(--nf-duration-fast) var(--nf-ease-standard);
 }
 
 .clearBtn:hover {

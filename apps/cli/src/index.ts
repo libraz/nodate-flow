@@ -8,19 +8,19 @@ import { c, createCLI, prompt, table } from '@libraz/node-cli';
 import { createAuthClient, createFlowClient } from './api.js';
 import { clearCredentials, getFlowApiUrl, loadCredentials, saveCredentials } from './config.js';
 import {
-  STATE_TRANSITIONS,
-  type SdkClientLike,
-  type SearchOptions as SearchOptionsInput,
-  type UpdateOptions as UpdateOptionsInput,
   buildSearchQuery,
   buildUpdatePlan,
   executeSearch,
   executeUpdate,
+  type SdkClientLike,
+  type SearchOptions as SearchOptionsInput,
+  STATE_TRANSITIONS,
+  type UpdateOptions as UpdateOptionsInput,
 } from './task-builders.js';
-import { DateValidationError, assertYmd } from './util/date.js';
+import { assertYmd, DateValidationError } from './util/date.js';
 import { EXIT_AUTH, EXIT_RUNTIME, EXIT_VALIDATION, isAuthRequiredError } from './util/exit.js';
 import { optionalYmd, resolveDeprecatedFlag } from './util/flags.js';
-import { type ExamplesByPath, attachExamples } from './util/help.js';
+import { attachExamples, type ExamplesByPath } from './util/help.js';
 
 const cli = createCLI({
   name: 'tnk',

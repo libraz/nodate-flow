@@ -74,11 +74,11 @@ function readInitialCollapsed(): boolean {
  * load; the outer Sidebar wraps this in a Suspense with a null
  * fallback so the rest of the nav renders immediately.
  */
-function WorkspaceProjectsSection({ workspaceId }: { workspaceId: string }): ReactElement {
+function WorkspaceProjectsSection({ workspaceId }: { workspaceId: string }): ReactElement | null {
   const { t } = useTranslation('common');
   const { data: projects } = useProjectsQuery(workspaceId);
   const visible = projects.filter((p) => !p.isArchived);
-  if (visible.length === 0) return <></>;
+  if (visible.length === 0) return null;
   return (
     <div className={styles.section}>
       <div className={styles.sectionLabel}>{t('nav.workspaceProjects')}</div>
@@ -239,10 +239,10 @@ function FavoriteRow({
  * load; the outer Sidebar wraps this in a Suspense with a null
  * fallback so the rest of the nav renders immediately.
  */
-function FavoritesSection({ workspaceId }: { workspaceId: string }): ReactElement {
+function FavoritesSection({ workspaceId }: { workspaceId: string }): ReactElement | null {
   const { t } = useTranslation('labels');
   const { data: favorites } = useFavoritesQuery(workspaceId);
-  if (favorites.length === 0) return <></>;
+  if (favorites.length === 0) return null;
   return (
     <div className={styles.section}>
       <div className={styles.sectionLabel}>{t('favorites.sidebar_title')}</div>
@@ -325,6 +325,7 @@ export default function Sidebar(): ReactElement {
     <>
       {/* Mobile backdrop */}
       {isMobile && mobileOpen ? (
+        // biome-ignore lint/a11y/noStaticElementInteractions: decorative click-outside backdrop for the mobile drawer; carries no accessible semantics (role="presentation"). Keyboard users dismiss via the drawer's own close control.
         <div
           className={styles.backdrop}
           onClick={() => setMobileOpen(false)}

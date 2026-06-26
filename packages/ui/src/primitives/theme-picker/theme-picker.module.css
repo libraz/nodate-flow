@@ -30,8 +30,9 @@
   border: 1.5px solid var(--nf-color-border);
   border-radius: var(--nf-radius-md);
   cursor: pointer;
-  transition: border-color var(--nf-duration-fast) var(--nf-ease-standard), background-color
-    var(--nf-duration-fast) var(--nf-ease-standard);
+  transition:
+    border-color var(--nf-duration-fast) var(--nf-ease-standard),
+    background-color var(--nf-duration-fast) var(--nf-ease-standard);
 }
 
 .themeCard:hover {
@@ -96,8 +97,9 @@
   border: 1.5px solid var(--nf-color-border);
   border-radius: var(--nf-radius-md);
   cursor: pointer;
-  transition: border-color var(--nf-duration-fast) var(--nf-ease-standard), background-color
-    var(--nf-duration-fast) var(--nf-ease-standard);
+  transition:
+    border-color var(--nf-duration-fast) var(--nf-ease-standard),
+    background-color var(--nf-duration-fast) var(--nf-ease-standard);
 }
 
 .modeButton:hover {

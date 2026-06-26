@@ -86,7 +86,9 @@
   background: transparent;
   color: var(--nf-color-fg-muted);
   cursor: pointer;
-  transition: background var(--nf-duration-fast), color var(--nf-duration-fast);
+  transition:
+    background var(--nf-duration-fast),
+    color var(--nf-duration-fast);
 }
 
 .expandToggle:hover:not(:disabled) {

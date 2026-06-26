@@ -14,6 +14,7 @@ export default function MaskedKey({ value }: MaskedKeyProps): ReactElement {
   const { t } = useTranslation('ai');
   return (
     <span
+      role="img"
       aria-label={t('providers.masked_key_label')}
       style={{
         display: 'inline-flex',

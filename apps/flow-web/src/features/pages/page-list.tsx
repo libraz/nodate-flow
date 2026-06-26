@@ -7,11 +7,10 @@
  * workspace is selected.
  */
 
+import Skeleton from '@nodate-flow/ui/primitives/skeleton';
 import { Link, useNavigate } from '@tanstack/react-router';
 import { type ChangeEvent, type ReactElement, Suspense, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-
-import Skeleton from '@nodate-flow/ui/primitives/skeleton';
 
 import { useCurrentWorkspaceId } from '../../lib/use-current-workspace';
 import { useWorkspacesQuery } from '../workspaces/api';

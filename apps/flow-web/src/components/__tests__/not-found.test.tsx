@@ -7,10 +7,9 @@
 
 import { createMemoryHistory, createRootRoute, createRouter } from '@tanstack/react-router';
 import { screen } from '@testing-library/react';
+import { renderWithProviders } from '@tests/helpers/render';
 import { describe, expect, it } from 'vitest';
 import { axe } from 'vitest-axe';
-
-import { renderWithProviders } from '@tests/helpers/render';
 import NotFound from '../not-found';
 
 /**

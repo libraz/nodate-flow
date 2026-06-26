@@ -8,7 +8,7 @@
  */
 
 import Skeleton from '@nodate-flow/ui/primitives/skeleton';
-import { Outlet, createLazyFileRoute } from '@tanstack/react-router';
+import { createLazyFileRoute, Outlet } from '@tanstack/react-router';
 import { type ReactElement, Suspense } from 'react';
 
 function WorkspacePublicSharesLayout(): ReactElement {

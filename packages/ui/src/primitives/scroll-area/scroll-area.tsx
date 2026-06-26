@@ -7,7 +7,7 @@
  * as children.
  */
 
-import { type HTMLAttributes, type ReactElement, type Ref, forwardRef } from 'react';
+import { forwardRef, type HTMLAttributes, type ReactElement, type Ref } from 'react';
 import { cx } from '../../lib/cx';
 import styles from './scroll-area.module.css';
 

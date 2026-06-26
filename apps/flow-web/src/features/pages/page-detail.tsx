@@ -12,12 +12,11 @@ import {
   BreadcrumbSeparator,
 } from '@nodate-flow/ui/primitives/breadcrumb';
 import Button from '@nodate-flow/ui/primitives/button';
+import Markdown from '@nodate-flow/ui/primitives/markdown';
 import { Link, useNavigate } from '@tanstack/react-router';
 import { FileText, Pencil, Sparkles, Trash2 } from 'lucide-react';
 import { type ReactElement, Suspense } from 'react';
 import { useTranslation } from 'react-i18next';
-
-import Markdown from '@nodate-flow/ui/primitives/markdown';
 import { confirmAction } from '../../lib/confirm-action';
 import { type PageItem, useChildPagesQuery, useDeletePage, usePageQuery } from './api';
 import styles from './pages.module.css';
@@ -32,11 +31,11 @@ function ChildPagesSection({
 }: {
   workspaceId: string;
   pageId: string;
-}): ReactElement {
+}): ReactElement | null {
   const { t } = useTranslation('pages');
   const { data: children } = useChildPagesQuery(workspaceId, pageId);
 
-  if (children.length === 0) return <></>;
+  if (children.length === 0) return null;
 
   return (
     <section className={styles.childrenSection}>

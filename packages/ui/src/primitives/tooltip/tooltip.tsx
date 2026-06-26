@@ -7,11 +7,11 @@
  */
 
 import {
-  FloatingPortal,
-  type Placement,
   autoUpdate,
+  FloatingPortal,
   flip,
   offset,
+  type Placement,
   shift,
   useDismiss,
   useFloating,
@@ -21,10 +21,10 @@ import {
   useRole,
 } from '@floating-ui/react';
 import {
-  type ReactElement,
-  type ReactNode,
   cloneElement,
   isValidElement,
+  type ReactElement,
+  type ReactNode,
   useState,
   useSyncExternalStore,
 } from 'react';

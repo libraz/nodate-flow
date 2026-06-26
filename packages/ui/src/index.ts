@@ -6,24 +6,20 @@
  * re-exports the stable, type-only surface.
  */
 
-export { default as Icon } from './icon';
-export type { IconProps } from './icon';
-
-export { useTheme, THEME_IDS } from './hooks/use-theme';
-export type { ThemeId, UseThemeOptions, UseThemeResult } from './hooks/use-theme';
-
+export { default as LiveRegion } from './a11y/live-region';
+export { default as SkipLink } from './a11y/skip-link';
+export { default as VisuallyHidden } from './a11y/visually-hidden';
 export { useControllableState } from './hooks/use-controllable-state';
 export { useFocusTrap } from './hooks/use-focus-trap';
-export { useZodForm } from './hooks/use-zod-form';
+export type { ThemeId, UseThemeOptions, UseThemeResult } from './hooks/use-theme';
+export { THEME_IDS, useTheme } from './hooks/use-theme';
 export type {
   ApiFieldError,
   UseZodFormOptions,
   UseZodFormReturn,
 } from './hooks/use-zod-form';
-
-export { default as SkipLink } from './a11y/skip-link';
-export { default as VisuallyHidden } from './a11y/visually-hidden';
-export { default as LiveRegion } from './a11y/live-region';
-
-export { cx, clsx } from './lib/cx';
+export { useZodForm } from './hooks/use-zod-form';
+export type { IconProps } from './icon';
+export { default as Icon } from './icon';
 export type { ClassValue } from './lib/cx';
+export { clsx, cx } from './lib/cx';

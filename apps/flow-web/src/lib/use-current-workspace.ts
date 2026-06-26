@@ -142,8 +142,13 @@ export function useCurrentWorkspaceId(): string | null {
   });
 
   // Derive the URL-strict value first so persistence can mirror it.
+  // The matched workspace id is extracted to its own binding so the
+  // `??` chain below sees a plain `string | null` operand: inlining the
+  // ternary trips a TypeScript false positive (TS2871 "always nullish")
+  // in the `??` analysis even though the ternary is `string | null`.
+  const wsMatchId: string | null = wsMatch ? (wsMatch[1] ?? null) : null;
   const urlWsId: string | null =
-    (wsMatch ? (wsMatch[1] ?? null) : null) ??
+    wsMatchId ??
     (projectQuery.data ? projectQuery.data.workspaceId : null) ??
     (taskQuery.data ? taskQuery.data.workspaceId : null);
 

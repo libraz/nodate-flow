@@ -3,5 +3,5 @@
  * system has a single canonical import path.
  */
 
-export { clsx as cx, clsx } from 'clsx';
 export type { ClassValue } from 'clsx';
+export { clsx as cx, clsx } from 'clsx';

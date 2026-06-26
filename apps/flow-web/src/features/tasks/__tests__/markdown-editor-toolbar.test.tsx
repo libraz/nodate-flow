@@ -8,9 +8,8 @@
  */
 
 import { screen } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
-
 import { renderWithProviders } from '@tests/helpers/render';
+import { describe, expect, it } from 'vitest';
 import MarkdownEditor from '../markdown-editor';
 
 describe('<MarkdownEditor> toolbar glyphs', () => {

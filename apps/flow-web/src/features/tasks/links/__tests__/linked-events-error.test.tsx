@@ -8,9 +8,8 @@
  */
 
 import { fireEvent, screen } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
-
 import { renderWithProviders } from '@tests/helpers/render';
+import { describe, expect, it, vi } from 'vitest';
 import LinkedEventsError from '../linked-events-error';
 
 describe('<LinkedEventsError>', () => {

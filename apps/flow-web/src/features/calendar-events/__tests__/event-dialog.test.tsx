@@ -7,14 +7,12 @@
  * independent of the generated SDKs and from a running backend.
  */
 
+import type { components } from '@nodate-flow/sdk';
 import { screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { renderWithProviders } from '@tests/helpers/render';
 import type { ReactElement } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-
-import type { components } from '@nodate-flow/sdk';
-
-import { renderWithProviders } from '@tests/helpers/render';
 import EventDialog, { type EventDialogMode, presetToRRule } from '../event-dialog';
 
 type CreateEventInput = components['schemas']['CreateEventInputBody'];

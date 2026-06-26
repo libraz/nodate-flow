@@ -13,7 +13,7 @@ import { type ReactElement, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { formatEpoch } from '../../lib/format';
-import { type Workspace, useWorkspacesQuery } from './api';
+import { useWorkspacesQuery, type Workspace } from './api';
 import WorkspaceCreateDialog from './workspace-create-dialog';
 
 export default function WorkspaceList(): ReactElement {

@@ -11,11 +11,10 @@
  * branded retry page.
  */
 
+import Skeleton from '@nodate-flow/ui/primitives/skeleton';
 import { Calendar as CalendarIcon, Globe } from 'lucide-react';
 import type { ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';
-
-import Skeleton from '@nodate-flow/ui/primitives/skeleton';
 
 import PublicPageLayout from '../../components/public-page-layout';
 import ShareErrorView from './share-error-view';

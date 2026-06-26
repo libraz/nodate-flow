@@ -56,7 +56,7 @@ export default function CreatorChip({
   const label = t('event.creator.createdBy', { name });
 
   return (
-    <div className={styles.root} aria-label={label}>
+    <div className={styles.root} role="group" aria-label={label}>
       <span className={styles.prefix}>{t('event.creator.label')}</span>
       <Avatar
         size="sm"

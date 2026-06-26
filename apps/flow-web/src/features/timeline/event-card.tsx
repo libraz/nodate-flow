@@ -379,6 +379,7 @@ export default function EventCard({ event }: EventCardProps): ReactElement {
         >
           {isAgent ? (
             <span
+              role="img"
               aria-label={actorLabel}
               style={{
                 inlineSize: '1.25rem',

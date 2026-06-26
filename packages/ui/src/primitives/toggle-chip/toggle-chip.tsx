@@ -13,9 +13,9 @@
 import {
   type ButtonHTMLAttributes,
   type CSSProperties,
+  forwardRef,
   type ReactElement,
   type ReactNode,
-  forwardRef,
 } from 'react';
 import { cx } from '../../lib/cx';
 import styles from './toggle-chip.module.css';

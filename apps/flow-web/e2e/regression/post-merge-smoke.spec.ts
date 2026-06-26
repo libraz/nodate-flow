@@ -16,17 +16,17 @@
  * already cover edge cases.
  */
 
-import { type Page, expect, test } from '@playwright/test';
+import { expect, type Page, test } from '@playwright/test';
 
 import {
   API_BASE_URL,
-  type TestTenant,
   cleanupTenant,
   createCalendarEvent,
   createTask,
   createTestTenant,
   ensurePersonalCalendar,
   injectAuth,
+  type TestTenant,
 } from '../fixtures/tenant';
 
 interface ResponseGuard {

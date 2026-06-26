@@ -10,12 +10,12 @@
 
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import {
-  Outlet,
-  RouterProvider,
   createMemoryHistory,
   createRootRoute,
   createRoute,
   createRouter,
+  Outlet,
+  RouterProvider,
 } from '@tanstack/react-router';
 import { render, screen } from '@testing-library/react';
 import i18n from 'i18next';

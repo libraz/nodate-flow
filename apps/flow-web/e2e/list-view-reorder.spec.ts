@@ -24,7 +24,7 @@ import type { Page } from '@playwright/test';
 import { expect, test } from '@playwright/test';
 
 import { loadTenants } from './fixtures/load-tenants';
-import { API_BASE_URL, type TestTenant, createTask, injectAuth } from './fixtures/tenant';
+import { API_BASE_URL, createTask, injectAuth, type TestTenant } from './fixtures/tenant';
 
 interface SeededTaskRow {
   id: string;

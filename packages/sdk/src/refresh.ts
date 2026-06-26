@@ -55,6 +55,39 @@ const REFRESH_GRACE_MS = 1500;
  */
 const EXPIRY_BUFFER_SECONDS = 10;
 
+/** Standard base64 alphabet, used by the runtime-agnostic decoder below. */
+const BASE64_ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
+
+/**
+ * Decode a padded standard-base64 string to a UTF-8 string without
+ * relying on `atob` (browser) or `Buffer` (Node). The SDK is shipped to
+ * browser bundles, so it must not depend on Node globals; this pure
+ * fallback keeps decoding working in runtimes that lack `atob` (some
+ * SSR/test probes) without pulling in `@types/node`.
+ *
+ * Throws if the input contains characters outside the base64 alphabet,
+ * letting {@link decodeTokenExp} treat malformed payloads as "no exp".
+ */
+function base64ToUtf8(input: string): string {
+  const clean = input.replace(/=+$/, '');
+  const bytes: number[] = [];
+  let buffer = 0;
+  let bits = 0;
+  for (const char of clean) {
+    const value = BASE64_ALPHABET.indexOf(char);
+    if (value === -1) throw new Error('invalid base64');
+    buffer = (buffer << 6) | value;
+    bits += 6;
+    if (bits >= 8) {
+      bits -= 8;
+      bytes.push((buffer >> bits) & 0xff);
+    }
+  }
+  // Decode the raw bytes as UTF-8. JWT payloads are JSON, so any
+  // multi-byte sequences must be reconstructed before JSON.parse.
+  return decodeURIComponent(bytes.map((byte) => `%${byte.toString(16).padStart(2, '0')}`).join(''));
+}
+
 /**
  * Decode the `exp` claim from a JWT access token without verifying the
  * signature. Returns the expiry as a unix epoch seconds value, or null
@@ -76,8 +109,9 @@ export function decodeTokenExp(token: string): number | null {
     const json =
       typeof atob === 'function'
         ? atob(padded)
-        : // Fallback for non-browser runtimes (tests, SSR probes).
-          Buffer.from(padded, 'base64').toString('utf8');
+        : // Fallback for non-browser runtimes (tests, SSR probes) that
+          // lack `atob`. Pure JS so the SDK stays free of Node globals.
+          base64ToUtf8(padded);
     const claims = JSON.parse(json) as { exp?: unknown };
     if (typeof claims.exp === 'number' && Number.isFinite(claims.exp)) {
       return claims.exp;

@@ -7,12 +7,12 @@
  */
 
 import {
+  autoUpdate,
   FloatingFocusManager,
   FloatingPortal,
-  type Placement,
-  autoUpdate,
   flip,
   offset,
+  type Placement,
   shift,
   useClick,
   useDismiss,
@@ -22,10 +22,10 @@ import {
 } from '@floating-ui/react';
 import {
   type CSSProperties,
-  type ReactElement,
-  type ReactNode,
   cloneElement,
   isValidElement,
+  type ReactElement,
+  type ReactNode,
   useState,
 } from 'react';
 import { cx } from '../../lib/cx';

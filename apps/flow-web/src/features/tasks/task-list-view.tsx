@@ -594,6 +594,8 @@ export default function TaskListView({ projectId }: TaskListViewProps): ReactEle
       cell: ({ row }) => (
         <span
           draggable
+          role="button"
+          tabIndex={0}
           aria-label={t('tasks.reorder.drag_handle')}
           title={t('tasks.reorder.drag_handle')}
           onDragStart={(e) => handleDragStart(e, row.index)}

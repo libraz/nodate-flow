@@ -5,10 +5,10 @@
  */
 
 import {
-  SUPPORTED_COUNTRIES,
   detectTimezone,
   formatTimezoneLabel,
   groupTimezonesByRegion,
+  SUPPORTED_COUNTRIES,
 } from '@nodate-flow/sdk';
 import { useZodForm } from '@nodate-flow/ui/hooks/use-zod-form';
 import Button from '@nodate-flow/ui/primitives/button';
@@ -25,10 +25,10 @@ import ThemePicker, {
 import { toaster } from '@nodate-flow/ui/primitives/toast';
 import {
   type ColorMode,
-  type ThemeFamily,
-  type ThemeId,
   joinThemeId,
   splitThemeId,
+  type ThemeFamily,
+  type ThemeId,
 } from '@nodate-flow/ui/providers/theme-provider';
 import { type ReactElement, useMemo } from 'react';
 import { Controller } from 'react-hook-form';
@@ -168,7 +168,7 @@ export default function ProfileForm(): ReactElement {
     getValues,
     setValue,
     formState: { errors, isSubmitting },
-  } = useZodForm<typeof profileSchema>(profileSchema, {
+  } = useZodForm<ProfileFormValues>(profileSchema, {
     displayName: me.displayName,
     locale: (me.locale as ProfileFormValues['locale']) ?? 'en',
     timezone: me.timezone || detectTimezone(),

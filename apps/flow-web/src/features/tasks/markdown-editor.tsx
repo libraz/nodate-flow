@@ -9,11 +9,10 @@
  */
 
 import Button from '@nodate-flow/ui/primitives/button';
+import Markdown from '@nodate-flow/ui/primitives/markdown';
 import Textarea from '@nodate-flow/ui/primitives/textarea';
 import { type ChangeEvent, type ReactElement, type RefObject, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-
-import Markdown from '@nodate-flow/ui/primitives/markdown';
 
 interface MarkdownEditorProps {
   /** Current Markdown source text. */

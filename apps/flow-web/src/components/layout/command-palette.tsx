@@ -466,7 +466,6 @@ function PaletteBody({ onSelect, initialCommandMode }: InnerProps): ReactElement
         aria-label={t('dock.command_palette.title')}
         className={css.input}
       />
-
       {mode === 'command' ? (
         <CommandModeBody
           prompt={commandPrompt}
@@ -474,55 +473,46 @@ function PaletteBody({ onSelect, initialCommandMode }: InnerProps): ReactElement
           onSelect={onSelect}
           submitHandlerRef={commandSubmitRef}
         />
+      ) : isSearching && filtered.length === 0 ? (
+        <p className={css.emptyText} aria-live="polite">
+          {t('dock.command_palette.searching')}
+        </p>
+      ) : filtered.length === 0 ? (
+        <p className={css.emptyText}>{t('dock.command_palette.empty')}</p>
       ) : (
-        <>
-          {isSearching && filtered.length === 0 ? (
-            <p className={css.emptyText} aria-live="polite">
-              {t('dock.command_palette.searching')}
-            </p>
-          ) : filtered.length === 0 ? (
-            <p className={css.emptyText}>{t('dock.command_palette.empty')}</p>
-          ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-              {grouped.map(([group, its]) => (
-                <div key={group}>
-                  <div className={css.groupLabel}>{group}</div>
-                  <ul className={css.resultList}>
-                    {its.map((it) => {
-                      flatIdx += 1;
-                      const isActive = flatIdx === active;
-                      return (
-                        <li key={it.id}>
-                          <button
-                            type="button"
-                            aria-current={isActive ? 'true' : undefined}
-                            onClick={() => onSelect(it)}
-                            onMouseEnter={() => {
-                              const idx = filtered.findIndex((f) => f.id === it.id);
-                              if (idx >= 0) setActive(idx);
-                            }}
-                            className={cx(css.resultItem, isActive && css.resultItemActive)}
-                          >
-                            {it.icon ? (
-                              <Icon
-                                icon={it.icon}
-                                decorative
-                                style={{ flexShrink: 0, opacity: 0.6 }}
-                              />
-                            ) : null}
-                            {it.label}
-                          </button>
-                        </li>
-                      );
-                    })}
-                  </ul>
-                </div>
-              ))}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+          {grouped.map(([group, its]) => (
+            <div key={group}>
+              <div className={css.groupLabel}>{group}</div>
+              <ul className={css.resultList}>
+                {its.map((it) => {
+                  flatIdx += 1;
+                  const isActive = flatIdx === active;
+                  return (
+                    <li key={it.id}>
+                      <button
+                        type="button"
+                        aria-current={isActive ? 'true' : undefined}
+                        onClick={() => onSelect(it)}
+                        onMouseEnter={() => {
+                          const idx = filtered.findIndex((f) => f.id === it.id);
+                          if (idx >= 0) setActive(idx);
+                        }}
+                        className={cx(css.resultItem, isActive && css.resultItemActive)}
+                      >
+                        {it.icon ? (
+                          <Icon icon={it.icon} decorative style={{ flexShrink: 0, opacity: 0.6 }} />
+                        ) : null}
+                        {it.label}
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
             </div>
-          )}
-        </>
+          ))}
+        </div>
       )}
-
       <div className={css.hintBar}>
         <span className={css.hintGroup}>
           <kbd className={css.kbd}>↑</kbd>
@@ -544,6 +534,7 @@ function PaletteBody({ onSelect, initialCommandMode }: InnerProps): ReactElement
           </span>
         )}
       </div>
+      ;
     </div>
   );
 }

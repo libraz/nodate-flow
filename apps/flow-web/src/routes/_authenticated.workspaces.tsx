@@ -3,7 +3,7 @@
  * has its own route namespace under the authenticated shell.
  */
 
-import { Outlet, createFileRoute } from '@tanstack/react-router';
+import { createFileRoute, Outlet } from '@tanstack/react-router';
 import type { ReactElement } from 'react';
 
 function WorkspacesLayout(): ReactElement {

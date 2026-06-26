@@ -35,7 +35,10 @@ import { usePanelSubmission } from './use-panel-submission';
 function RecoveryCodesView({
   codes,
   onDismiss,
-}: { codes: string[]; onDismiss: () => void }): ReactElement {
+}: {
+  codes: string[];
+  onDismiss: () => void;
+}): ReactElement {
   const { t } = useTranslation('settings');
   const handleCopyAll = (): void => {
     navigator.clipboard.writeText(codes.join('\n')).then(

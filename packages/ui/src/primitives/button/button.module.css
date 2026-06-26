@@ -14,9 +14,10 @@
   font-weight: var(--nf-weight-medium);
   line-height: var(--nf-leading-tight);
   cursor: pointer;
-  transition: background var(--nf-duration-fast) var(--nf-ease-standard), border-color
-    var(--nf-duration-fast) var(--nf-ease-standard), color var(--nf-duration-fast)
-    var(--nf-ease-standard);
+  transition:
+    background var(--nf-duration-fast) var(--nf-ease-standard),
+    border-color var(--nf-duration-fast) var(--nf-ease-standard),
+    color var(--nf-duration-fast) var(--nf-ease-standard);
 }
 
 .root:hover:not(:disabled) {

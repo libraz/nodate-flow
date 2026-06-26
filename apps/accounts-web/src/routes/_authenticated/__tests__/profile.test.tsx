@@ -12,10 +12,10 @@
 import { type AuthUser, authStore } from '@nodate-flow/sdk';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import {
-  RouterProvider,
   createMemoryHistory,
   createRootRoute,
   createRouter,
+  RouterProvider,
 } from '@tanstack/react-router';
 import { render, screen, waitFor } from '@testing-library/react';
 import i18n from 'i18next';

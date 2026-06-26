@@ -21,8 +21,8 @@
  */
 
 import {
-  FloatingPortal,
   autoUpdate,
+  FloatingPortal,
   flip,
   offset,
   shift,
@@ -37,12 +37,12 @@ import {
 import {
   type ChangeEvent,
   type FocusEvent,
+  forwardRef,
   type KeyboardEvent,
   type ReactElement,
   type ReactNode,
   type Ref,
   type SyntheticEvent,
-  forwardRef,
   useCallback,
   useEffect,
   useId,

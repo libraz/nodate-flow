@@ -23,9 +23,8 @@
 
 import { useQuery } from '@tanstack/react-query';
 import { useRouterState } from '@tanstack/react-router';
-
-import { projectsKeys } from '../features/projects/api';
 import type { Project } from '../features/projects/api';
+import { projectsKeys } from '../features/projects/api';
 import { sdk } from './sdk';
 import { useActiveWorkspaceId } from './use-current-workspace';
 

@@ -15,13 +15,14 @@ import type { ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';
 
 export interface LinkedEventsErrorProps {
-  error: Error;
+  error: unknown;
   /**
-   * Reset handler. Compatible with react-error-boundary's FallbackProps
-   * (`resetErrorBoundary`). The legacy `onRetry` alias remains for
-   * direct callers that bypass the boundary.
+   * Reset handler. Compatible with react-error-boundary v6's
+   * FallbackProps (`resetErrorBoundary: (...args: unknown[]) => void`).
+   * The legacy `onRetry` alias remains for direct callers that bypass
+   * the boundary.
    */
-  resetErrorBoundary?: () => void;
+  resetErrorBoundary?: (...args: unknown[]) => void;
   onRetry?: () => void;
 }
 
@@ -31,7 +32,10 @@ export default function LinkedEventsError({
   onRetry,
 }: LinkedEventsErrorProps): ReactElement {
   const { t } = useTranslation('linkedEvents');
-  const handleRetry = resetErrorBoundary ?? onRetry ?? ((): void => {});
+  const reset = resetErrorBoundary ?? onRetry;
+  const handleRetry = (): void => {
+    reset?.();
+  };
   return (
     <ErrorFallback
       tone="inline"

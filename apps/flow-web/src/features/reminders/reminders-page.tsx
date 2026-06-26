@@ -29,7 +29,7 @@
 import Badge, { type BadgeTone } from '@nodate-flow/ui/primitives/badge';
 import Button from '@nodate-flow/ui/primitives/button';
 import Card from '@nodate-flow/ui/primitives/card';
-import { Link, getRouteApi } from '@tanstack/react-router';
+import { getRouteApi, Link } from '@tanstack/react-router';
 import { type ReactElement, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 

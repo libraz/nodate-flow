@@ -4,17 +4,17 @@
  */
 
 import {
-  SUPPORTED_COUNTRIES,
   type components,
   detectTimezone,
   formatTimezoneLabel,
   groupTimezonesByRegion,
+  SUPPORTED_COUNTRIES,
 } from '@nodate-flow/sdk';
 import { useZodForm } from '@nodate-flow/ui/hooks/use-zod-form';
 import Button from '@nodate-flow/ui/primitives/button';
 import FormField from '@nodate-flow/ui/primitives/form-field';
 import Input from '@nodate-flow/ui/primitives/input';
-import { Link, createFileRoute, useParams } from '@tanstack/react-router';
+import { createFileRoute, Link, useParams } from '@tanstack/react-router';
 import { type ReactElement, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { z } from 'zod';
@@ -63,7 +63,7 @@ function WorkspaceEditPage(): ReactElement {
     register,
     handleSubmit,
     formState: { errors, isSubmitting, isDirty },
-  } = useZodForm<typeof schema>(
+  } = useZodForm<FormValues>(
     schema,
     {
       name: '',

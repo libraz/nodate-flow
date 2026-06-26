@@ -22,7 +22,7 @@ import type { ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { confirmAction } from '../../lib/confirm-action';
-import { type Workspace, useWorkspacesQuery } from '../workspaces/api';
+import { useWorkspacesQuery, type Workspace } from '../workspaces/api';
 import styles from './active-timebox-bar.module.css';
 import {
   type ActiveTimeboxRow,

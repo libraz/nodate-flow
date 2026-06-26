@@ -1,6 +1,6 @@
 import { ApiError } from '@nodate-flow/sdk';
-import { Link, Outlet, createRootRouteWithContext, useRouterState } from '@tanstack/react-router';
-import { type ReactElement, Suspense, lazy, useEffect, useRef } from 'react';
+import { createRootRouteWithContext, Link, Outlet, useRouterState } from '@tanstack/react-router';
+import { lazy, type ReactElement, Suspense, useEffect, useRef } from 'react';
 import { ErrorBoundary } from 'react-error-boundary';
 import { useTranslation } from 'react-i18next';
 

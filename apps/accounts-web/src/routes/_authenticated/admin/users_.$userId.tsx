@@ -11,11 +11,9 @@ import Dialog from '@nodate-flow/ui/primitives/dialog';
 import FormField from '@nodate-flow/ui/primitives/form-field';
 import Input from '@nodate-flow/ui/primitives/input';
 import { toaster } from '@nodate-flow/ui/primitives/toast';
-import { Link, createFileRoute, useNavigate } from '@tanstack/react-router';
+import { createFileRoute, Link, useNavigate } from '@tanstack/react-router';
 import { type FormEvent, type ReactElement, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-
-import { useInvalidateInstanceStats } from '../../../features/admin-stats/api';
 import {
   adminBadgeBase,
   adminLabelStyle,
@@ -23,6 +21,7 @@ import {
   adminThStyle,
   adminValueStyle,
 } from '../../../features/admin/styles';
+import { useInvalidateInstanceStats } from '../../../features/admin-stats/api';
 import { selectUser, useAuth } from '../../../features/auth/auth-store';
 import type { ProblemJson } from '../../../lib/api-error';
 import { extractErrorCode } from '../../../lib/auth-errors';

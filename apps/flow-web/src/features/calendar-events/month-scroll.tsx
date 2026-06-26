@@ -18,21 +18,20 @@
  * this surface is tap-to-open.
  */
 
+import type { HolidayEntry } from '@nodate-flow/holidays';
 import type { components } from '@nodate-flow/sdk';
 import { cx } from '@nodate-flow/ui/lib/cx';
 import { Users } from 'lucide-react';
 import { type ReactElement, useCallback, useEffect, useLayoutEffect, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import type { HolidayEntry } from '@nodate-flow/holidays';
-
 import { dateKey } from '../../lib/date-utils';
 import {
-  MAX_VISIBLE_TRACKS,
-  type PositionedEvent,
   eventStartKey,
   isMultiDay,
   layoutWeek,
+  MAX_VISIBLE_TRACKS,
+  type PositionedEvent,
   startOfDay,
 } from './lib/week-layout';
 import styles from './month-scroll.module.css';

@@ -8,8 +8,8 @@
 import { ApiError, type ProblemJson, toApiError } from '@nodate-flow/sdk';
 import type { TFunction } from 'i18next';
 
-export { ApiError, toApiError };
 export type { ProblemJson };
+export { ApiError, toApiError };
 
 /**
  * Format an unknown error caught from a TanStack Query mutation or query

@@ -55,7 +55,9 @@
   cursor: pointer;
   isolation: isolate;
   box-shadow: var(--nf-shadow-sm);
-  transition: transform var(--nf-duration-fast) ease, box-shadow var(--nf-duration-fast) ease;
+  transition:
+    transform var(--nf-duration-fast) ease,
+    box-shadow var(--nf-duration-fast) ease;
   flex: 0 0 auto;
 }
 

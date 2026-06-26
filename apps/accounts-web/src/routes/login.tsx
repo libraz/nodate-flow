@@ -12,11 +12,9 @@ import { useZodForm } from '@nodate-flow/ui/hooks/use-zod-form';
 import Button from '@nodate-flow/ui/primitives/button';
 import FormField from '@nodate-flow/ui/primitives/form-field';
 import Input from '@nodate-flow/ui/primitives/input';
-import { Link, createFileRoute, useNavigate, useSearch } from '@tanstack/react-router';
+import { createFileRoute, Link, useNavigate, useSearch } from '@tanstack/react-router';
 import { type FormEvent, type ReactElement, useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useCapabilities } from '../features/auth/use-capabilities';
-
 import AuthCard from '../components/auth-card';
 import { type LoginFormValues, loginSchema } from '../features/auth/auth-schemas';
 import {
@@ -26,6 +24,7 @@ import {
   useAuth,
 } from '../features/auth/auth-store';
 import PasswordInput from '../features/auth/password-input';
+import { useCapabilities } from '../features/auth/use-capabilities';
 import { useCapsLockHint } from '../features/auth/use-caps-lock-hint';
 import { useRateLimitCountdown } from '../features/auth/use-rate-limit-countdown';
 import OAuthButtonRow from '../features/oauth/oauth-button-row';
@@ -295,7 +294,7 @@ function LoginPage(): ReactElement {
     handleSubmit,
     setValue,
     formState: { errors, isSubmitting },
-  } = useZodForm<typeof loginSchema>(loginSchema, {
+  } = useZodForm<LoginFormValues>(loginSchema, {
     email: '',
     password: '',
   });

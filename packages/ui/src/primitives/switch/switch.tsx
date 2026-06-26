@@ -4,7 +4,7 @@
  * (`defaultChecked`) usage. Space / Enter toggle via native button behavior.
  */
 
-import { type ButtonHTMLAttributes, type ReactElement, forwardRef } from 'react';
+import { type ButtonHTMLAttributes, forwardRef, type ReactElement } from 'react';
 import { useControllableState } from '../../hooks/use-controllable-state';
 import { cx } from '../../lib/cx';
 import styles from './switch.module.css';

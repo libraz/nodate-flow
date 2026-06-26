@@ -18,7 +18,7 @@ import { ErrorBoundary, type FallbackProps } from 'react-error-boundary';
 import { useTranslation } from 'react-i18next';
 
 import styles from '../features/ai-metrics/ai-metrics.module.css';
-import { type AiMetricsWindow, DEFAULT_WINDOW, coerceWindowDays } from '../features/ai-metrics/api';
+import { type AiMetricsWindow, coerceWindowDays, DEFAULT_WINDOW } from '../features/ai-metrics/api';
 import MetricsDashboard from '../features/ai-metrics/metrics-dashboard';
 import MetricsError from '../features/ai-metrics/metrics-error';
 import MetricsSkeleton from '../features/ai-metrics/metrics-skeleton';

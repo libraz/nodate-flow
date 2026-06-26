@@ -5,10 +5,9 @@
     "rootDir": "src",
     "composite": true,
     "types": ["vite/client"],
-    "baseUrl": ".",
     "paths": {
-      "@/*": ["src/*"],
-      "@tests/*": ["tests/*"]
+      "@/*": ["./src/*"],
+      "@tests/*": ["./tests/*"]
     }
   },
   "include": ["src"],

@@ -28,16 +28,16 @@
  * parallel-safe.
  */
 
-import { type Page, expect, test } from '@playwright/test';
+import { expect, type Page, test } from '@playwright/test';
 
 import enAiMetrics from '../locales/en/aiMetrics.json' with { type: 'json' };
 import jaAiMetrics from '../locales/ja/aiMetrics.json' with { type: 'json' };
 import {
   API_BASE_URL,
-  type TestTenant,
   cleanupTenant,
   createTestTenant,
   injectAuth,
+  type TestTenant,
 } from './fixtures/tenant';
 
 const copy = {

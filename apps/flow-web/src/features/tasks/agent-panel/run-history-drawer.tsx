@@ -102,6 +102,7 @@ function RunRow({ run, locale }: { run: AgentRunEvent; locale: string }): ReactE
       {decoded.toolCalls && decoded.toolCalls.length > 0 ? (
         <ul className={styles.toolCalls}>
           {decoded.toolCalls.map((call, idx) => (
+            // biome-ignore lint/suspicious/noArrayIndexKey: tool-call strings can legitimately repeat within a run, so array position is required to keep sibling keys unique and stable.
             <li key={`${run.eventId}-tc-${idx}-${call.slice(0, 16)}`}>
               {truncate(call, MAX_THOUGHT_LENGTH)}
             </li>

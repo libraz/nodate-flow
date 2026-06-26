@@ -5,6 +5,9 @@ exports[`tnk help output > matches snapshot for \`auth login\` 1`] = `
 
 Log in with email and password
 
+Options:
+  -h, --help    Show help for this command
+
 Examples:
   tnk auth login"
 `;
@@ -14,6 +17,9 @@ exports[`tnk help output > matches snapshot for \`auth logout\` 1`] = `
 
 Clear stored credentials
 
+Options:
+  -h, --help    Show help for this command
+
 Examples:
   tnk auth logout"
 `;
@@ -22,6 +28,9 @@ exports[`tnk help output > matches snapshot for \`auth status\` 1`] = `
 "Usage: auth status
 
 Show current authentication status
+
+Options:
+  -h, --help    Show help for this command
 
 Examples:
   tnk auth status"
@@ -41,6 +50,7 @@ Options:
       --start <start>                Start date (YYYY-MM-DD)
       --priority <priority>          Priority (0-3) (default: 0)
       --visibility <visibility>      Visibility: public, project, or private (default: "public") [public, project, private]
+  -h, --help                         Show help for this command
 
 Examples:
   tnk task create --title "Write report" --project-id 9c2ad1d8-1f2c-7e1c-9a8a-44c0c9f0c1ab
@@ -60,6 +70,7 @@ Options:
   -w, --workspace-id <workspace-id>    Workspace public id
       --workspace <workspace>          (DEPRECATED, use --workspace-id instead) Workspace public id
   -l, --limit <limit>                  Maximum number of tasks to return (default: 25)
+  -h, --help                           Show help for this command
 
 Examples:
   tnk task list
@@ -81,6 +92,7 @@ Options:
   -p, --project-id <project-id>        Project public id (alternative to --workspace-id)
       --project <project>              (DEPRECATED, use --project-id instead) Project public id
   -l, --limit <limit>                  Maximum number of tasks to return (default: 20)
+  -h, --help                           Show help for this command
 
 Examples:
   tnk task search "release" --workspace-id 0190f3a6-4e6c-7d2a-94c9-aa86b1f72c11
@@ -103,6 +115,7 @@ Options:
       --priority <priority>          Priority (0-3)
       --state <state>                Apply a state-machine transition: start, block, unblock, submit, complete, reopen, cancel [start, block, unblock, submit, complete, reopen, cancel]
       --visibility <visibility>      Visibility: public, project, or private [public, project, private]
+  -h, --help                         Show help for this command
 
 Examples:
   tnk task update 9c2ad1d8 --title "Updated title"
@@ -118,6 +131,9 @@ View task details
 
 Arguments:
   id (required)
+
+Options:
+  -h, --help    Show help for this command
 
 Examples:
   tnk task view 9c2ad1d8-1f2c-7e1c-9a8a-44c0c9f0c1ab"

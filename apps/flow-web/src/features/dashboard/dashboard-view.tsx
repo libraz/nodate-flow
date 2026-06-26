@@ -12,7 +12,7 @@ import { type ReactElement, Suspense, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next';
 
 import AddWidgetDialog from './add-widget-dialog';
-import { type WidgetItem, useDeleteWidget, useUpdateWidgetPosition, useWidgetsQuery } from './api';
+import { useDeleteWidget, useUpdateWidgetPosition, useWidgetsQuery, type WidgetItem } from './api';
 import styles from './dashboard.module.css';
 import WidgetCard from './widget-card';
 

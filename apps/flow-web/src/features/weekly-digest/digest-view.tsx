@@ -11,7 +11,7 @@ import Card from '@nodate-flow/ui/primitives/card';
 import type { ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { type WeeklyDigestCounts, type WeeklyDigestTask, useWeeklyDigestQuery } from './api';
+import { useWeeklyDigestQuery, type WeeklyDigestCounts, type WeeklyDigestTask } from './api';
 
 function CountsRow({ counts }: { counts: WeeklyDigestCounts }): ReactElement {
   const { t } = useTranslation('settings');

@@ -44,7 +44,9 @@
   padding: 0;
   background-clip: content-box;
   background-origin: content-box;
-  transition: transform var(--nf-duration-fast), border-color var(--nf-duration-fast);
+  transition:
+    transform var(--nf-duration-fast),
+    border-color var(--nf-duration-fast);
 }
 
 .swatch:hover {

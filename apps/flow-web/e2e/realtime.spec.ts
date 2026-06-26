@@ -24,10 +24,10 @@ import { expect, test } from '@playwright/test';
 
 import {
   API_BASE_URL,
-  type TestTenant,
   cleanupTenant,
   createTestTenant,
   injectAuth,
+  type TestTenant,
 } from './fixtures/tenant';
 
 interface TaskResponse {

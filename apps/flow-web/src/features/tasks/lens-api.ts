@@ -18,6 +18,7 @@
  * caches that share neighbouring routes.
  */
 
+import type { components } from '@nodate-flow/sdk';
 import {
   type UseMutationResult,
   type UseSuspenseQueryResult,
@@ -25,8 +26,6 @@ import {
   useQueryClient,
   useSuspenseQuery,
 } from '@tanstack/react-query';
-
-import type { components } from '@nodate-flow/sdk';
 
 import { sdk } from '../../lib/sdk';
 

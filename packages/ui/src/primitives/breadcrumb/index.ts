@@ -3,5 +3,5 @@
  * `@nodate-flow/ui/primitives/breadcrumb` from app code.
  */
 
-export { default, Breadcrumb, BreadcrumbItem, BreadcrumbSeparator } from './breadcrumb';
-export type { BreadcrumbProps, BreadcrumbItemProps, BreadcrumbSeparatorProps } from './breadcrumb';
+export type { BreadcrumbItemProps, BreadcrumbProps, BreadcrumbSeparatorProps } from './breadcrumb';
+export { Breadcrumb, BreadcrumbItem, BreadcrumbSeparator, default } from './breadcrumb';

@@ -10,9 +10,9 @@ import { act, render } from '@testing-library/react';
 import i18n from 'i18next';
 import ICU from 'i18next-icu';
 import {
+  memo,
   type ReactElement,
   type ReactNode,
-  memo,
   useCallback,
   useEffect,
   useRef,

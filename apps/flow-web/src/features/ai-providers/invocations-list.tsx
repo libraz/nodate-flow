@@ -78,11 +78,7 @@ function InvocationRow({ row }: { row: AiInvocation }): ReactElement {
   );
 }
 
-export default function InvocationsList({
-  workspaceId,
-}: {
-  workspaceId: string;
-}): ReactElement {
+export default function InvocationsList({ workspaceId }: { workspaceId: string }): ReactElement {
   const { t } = useTranslation('settings');
   const { data } = useAiInvocationsQuery(workspaceId);
   return (

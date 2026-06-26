@@ -27,9 +27,8 @@
 
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { describe, expect, it } from 'vitest';
-
 import type { TFunction } from 'i18next';
+import { describe, expect, it } from 'vitest';
 import { ApiError, formatApiError } from '../../../lib/api-error';
 
 /**

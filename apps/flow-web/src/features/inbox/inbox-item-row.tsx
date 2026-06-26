@@ -9,7 +9,7 @@ import Button from '@nodate-flow/ui/primitives/button';
 import Card from '@nodate-flow/ui/primitives/card';
 import { Link } from '@tanstack/react-router';
 import {
-  Github,
+  GitPullRequest,
   Inbox as InboxIcon,
   type LucideIcon,
   Mail,
@@ -30,7 +30,7 @@ export interface InboxItemRowProps {
 }
 
 const SOURCE_ICON: Record<string, LucideIcon> = {
-  github: Github,
+  github: GitPullRequest,
   slack: MessageSquare,
   email: Mail,
   manual: Pencil,

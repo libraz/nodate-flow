@@ -19,6 +19,7 @@ import Combobox from '@nodate-flow/ui/primitives/combobox';
 import DatePicker from '@nodate-flow/ui/primitives/date-picker';
 import FormField from '@nodate-flow/ui/primitives/form-field';
 import Input from '@nodate-flow/ui/primitives/input';
+import Markdown from '@nodate-flow/ui/primitives/markdown';
 import SegmentedControl from '@nodate-flow/ui/primitives/segmented-control';
 import Separator from '@nodate-flow/ui/primitives/separator';
 import Skeleton from '@nodate-flow/ui/primitives/skeleton';
@@ -26,11 +27,9 @@ import Spinner from '@nodate-flow/ui/primitives/spinner';
 import Textarea from '@nodate-flow/ui/primitives/textarea';
 import { toaster } from '@nodate-flow/ui/primitives/toast';
 import { BP } from '@nodate-flow/ui/tokens/breakpoints';
-import { Link, createLazyFileRoute, getRouteApi } from '@tanstack/react-router';
+import { createLazyFileRoute, getRouteApi, Link } from '@tanstack/react-router';
 import { type FormEvent, type ReactElement, Suspense, useEffect, useId, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-
-import Markdown from '@nodate-flow/ui/primitives/markdown';
 import { selectUser, useAuth } from '../features/auth/auth-store';
 import ConstraintEditor from '../features/constraints/constraint-editor';
 import StateGraph from '../features/constraints/state-graph';
@@ -44,9 +43,9 @@ import AIAgentsSection from '../features/tasks/ai-agents/section';
 import AIAgentsSkeleton from '../features/tasks/ai-agents/skeleton';
 import {
   TASK_PRIORITIES,
-  TRANSITIONS_BY_STATE,
   type TaskDerivedState,
   type TaskPriority,
+  TRANSITIONS_BY_STATE,
   type TransitionName,
   useAddTaskActor,
   useAddTaskComment,
@@ -328,13 +327,7 @@ function TitleEditor({
   );
 }
 
-function DescriptionEditor({
-  id,
-  initial,
-}: {
-  id: string;
-  initial: string;
-}): ReactElement {
+function DescriptionEditor({ id, initial }: { id: string; initial: string }): ReactElement {
   const { t } = useTranslation('common');
   const [editing, setEditing] = useState(false);
   const [value, setValue] = useState(initial);
@@ -348,6 +341,7 @@ function DescriptionEditor({
     const isEmpty = initial.length === 0;
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+        {/* biome-ignore lint/a11y/noStaticElementInteractions: interactive only in the empty state, where it carries role="button" + tabIndex + a keyboard handler; otherwise an inert description renderer. */}
         <div
           role={isEmpty ? 'button' : undefined}
           tabIndex={isEmpty ? 0 : undefined}

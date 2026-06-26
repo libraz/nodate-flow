@@ -17,14 +17,14 @@ import { authStore } from '../features/auth/auth-store';
 import { sdk } from '../lib/sdk';
 
 export {
-  type ThemePreference,
   type ColorMode,
+  joinThemeId,
+  splitThemeId,
+  THEME_PREFERENCES,
+  type ThemeContextValue,
   type ThemeFamily,
   type ThemeId,
-  type ThemeContextValue,
-  splitThemeId,
-  joinThemeId,
-  THEME_PREFERENCES,
+  type ThemePreference,
 } from '@nodate-flow/ui/providers/theme-provider';
 
 const LEGACY_KEYS = ['libsonare-theme', 'vitepress-theme-appearance'] as const;

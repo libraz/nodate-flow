@@ -41,11 +41,11 @@
 
 import { randomUUID } from 'node:crypto';
 
-import { type Page, expect, test } from '@playwright/test';
+import { expect, type Page, test } from '@playwright/test';
 import mysql, { type Pool } from 'mysql2/promise';
 
 import enCommon from '../../locales/en/common.json' with { type: 'json' };
-import { type TestTenant, cleanupTenant, createTestTenant, injectAuth } from '../fixtures/tenant';
+import { cleanupTenant, createTestTenant, injectAuth, type TestTenant } from '../fixtures/tenant';
 
 const copy = {
   title: enCommon.tasks.retro.queue.title,

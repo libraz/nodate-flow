@@ -356,8 +356,6 @@ function ResultRow({
   const dateText = formatPickerDate(event.startAt, locale, event.allDay ?? false);
   return (
     // biome-ignore lint/a11y/useKeyWithClickEvents: keyboard handled at the combobox input level
-    // biome-ignore lint/a11y/useFocusableInteractive: activedescendant pattern keeps focus on the input; options are not individually focusable by design
-    // biome-ignore lint/a11y/useSemanticElements: <option> cannot host the date/title/already-linked tri-column layout or arbitrary children
     <li
       role="option"
       id={optionId}

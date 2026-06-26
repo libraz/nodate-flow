@@ -9,9 +9,8 @@ import { confirmAction } from '@nodate-flow/ui/primitives/confirm/action';
 import { createFileRoute } from '@tanstack/react-router';
 import { type ReactElement, useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-
-import { useInvalidateInstanceStats } from '../../../features/admin-stats/api';
 import { adminTableStyle, adminTdStyle, adminThStyle } from '../../../features/admin/styles';
+import { useInvalidateInstanceStats } from '../../../features/admin-stats/api';
 import { formatTimestamp } from '../../../lib/format-timestamp';
 import { sdk } from '../../../lib/sdk';
 import { useSubmitGuard } from '../../../lib/use-submit-guard';

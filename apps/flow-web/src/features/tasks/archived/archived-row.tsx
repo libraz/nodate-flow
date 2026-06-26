@@ -22,9 +22,9 @@ import { Link } from '@tanstack/react-router';
 import {
   type KeyboardEvent,
   type MouseEvent,
+  memo,
   type ReactElement,
   type Ref,
-  memo,
   useEffect,
   useRef,
   useState,

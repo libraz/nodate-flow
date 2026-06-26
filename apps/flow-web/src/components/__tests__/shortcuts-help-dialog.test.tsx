@@ -7,10 +7,9 @@
 
 import { screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { renderWithProviders } from '@tests/helpers/render';
 import { describe, expect, it, vi } from 'vitest';
 import { axe } from 'vitest-axe';
-
-import { renderWithProviders } from '@tests/helpers/render';
 import { SHORTCUT_BINDINGS } from '../../lib/use-keyboard-shortcuts';
 import ShortcutsHelpDialog from '../shortcuts-help-dialog';
 

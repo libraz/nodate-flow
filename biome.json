@@ -1,27 +1,28 @@
 {
-  "$schema": "https://biomejs.dev/schemas/1.9.4/schema.json",
+  "$schema": "https://biomejs.dev/schemas/2.5.1/schema.json",
   "vcs": {
     "enabled": true,
     "clientKind": "git",
     "useIgnoreFile": true
   },
   "files": {
-    "ignore": [
-      "**/node_modules",
-      "**/dist",
-      "**/build",
-      "**/.next",
-      "apps/flow-api/internal/db/generated/**",
-      "apps/flow-api/internal/errors/**",
-      "packages/sdk/src/errors/**",
-      "packages/sdk/src/signal-kinds/**",
-      "apps/flow-web/locales/en/signal-kinds.json",
-      "apps/flow-web/locales/ja/signal-kinds.json",
-      "apps/flow-web/locales/zh/signal-kinds.json",
-      "apps/flow-web/src/routeTree.gen.ts",
-      "apps/accounts-web/src/routeTree.gen.ts",
-      "packages/sdk/src/openapi.ts",
-      "packages/sdk/src/schema.d.ts"
+    "includes": [
+      "**",
+      "!**/node_modules",
+      "!**/dist",
+      "!**/build",
+      "!**/.next",
+      "!**/apps/flow-api/internal/db/generated",
+      "!**/apps/flow-api/internal/errors",
+      "!**/packages/sdk/src/errors",
+      "!**/packages/sdk/src/signal-kinds",
+      "!**/apps/flow-web/locales/en/signal-kinds.json",
+      "!**/apps/flow-web/locales/ja/signal-kinds.json",
+      "!**/apps/flow-web/locales/zh/signal-kinds.json",
+      "!**/apps/flow-web/src/routeTree.gen.ts",
+      "!**/apps/accounts-web/src/routeTree.gen.ts",
+      "!**/packages/sdk/src/openapi.ts",
+      "!**/packages/sdk/src/schema.d.ts"
     ]
   },
   "formatter": {
@@ -31,13 +32,11 @@
     "lineWidth": 100,
     "lineEnding": "lf"
   },
-  "organizeImports": {
-    "enabled": true
-  },
+  "assist": { "actions": { "source": { "organizeImports": "on" } } },
   "linter": {
     "enabled": true,
     "rules": {
-      "recommended": true,
+      "preset": "recommended",
       "style": {
         "useNamingConvention": {
           "level": "error",
@@ -67,10 +66,11 @@
         }
       },
       "suspicious": {
-        "noConsoleLog": "warn"
+        "noConsole": { "level": "warn", "options": { "allow": ["log"] } }
       },
       "correctness": {
-        "noUnusedVariables": "error"
+        "noUnusedVariables": "error",
+        "useHookAtTopLevel": "off"
       }
     }
   },
@@ -93,7 +93,17 @@
   },
   "overrides": [
     {
-      "include": ["**/*.test.tsx", "**/*.test.ts"],
+      "includes": ["**/scripts/**", "**/e2e/**", "**/tests/**", "**/*.test.ts", "**/*.test.tsx"],
+      "linter": {
+        "rules": {
+          "suspicious": {
+            "noConsole": "off"
+          }
+        }
+      }
+    },
+    {
+      "includes": ["**/*.test.tsx", "**/*.test.ts"],
       "linter": {
         "rules": {
           "a11y": {
@@ -103,7 +113,7 @@
       }
     },
     {
-      "include": ["packages/ui/src/primitives/**", "apps/flow-web/src/features/**"],
+      "includes": ["**/packages/ui/src/primitives/**", "**/apps/flow-web/src/features/**"],
       "linter": {
         "rules": {
           "a11y": {

@@ -10,13 +10,13 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import {
-  STATE_TRANSITIONS,
-  type SdkClientLike,
   buildSearchQuery,
   buildUpdatePlan,
   executeSearch,
   executeUpdate,
   isStateTransition,
+  type SdkClientLike,
+  STATE_TRANSITIONS,
 } from '../src/task-builders.js';
 
 /* ── Test fixtures ────────────────────────────────────────────── */

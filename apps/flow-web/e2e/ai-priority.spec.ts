@@ -45,17 +45,17 @@
  * parallel-safe.
  */
 
-import { type Page, expect, test } from '@playwright/test';
+import { expect, type Page, test } from '@playwright/test';
 
 import enAiPriority from '../locales/en/aiPriority.json' with { type: 'json' };
 import enCommon from '../locales/en/common.json' with { type: 'json' };
 import jaAiPriority from '../locales/ja/aiPriority.json' with { type: 'json' };
 import {
-  type TestTenant,
   cleanupTenant,
   createTask,
   createTestTenant,
   injectAuth,
+  type TestTenant,
 } from './fixtures/tenant';
 
 const copy = {

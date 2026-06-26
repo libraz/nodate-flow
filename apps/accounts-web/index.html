@@ -11,30 +11,29 @@
       rel="stylesheet"
     />
     <script>
-      (function () {
+      (() => {
         try {
-          var stored = localStorage.getItem('nf.theme');
-          var theme = stored;
+          let theme = localStorage.getItem('nf.theme');
           if (!theme || theme === 'system') {
             theme = window.matchMedia('(prefers-color-scheme: dark)').matches
               ? 'aurora-dark'
               : 'aurora-light';
           }
           document.documentElement.setAttribute('data-theme', theme);
-        } catch (e) {
+        } catch {
           document.documentElement.setAttribute('data-theme', 'aurora-dark');
         }
         try {
-          var storedLang = localStorage.getItem('nf.lang');
-          var lang;
+          const storedLang = localStorage.getItem('nf.lang');
+          let lang;
           if (storedLang && /^(en|ja|zh)$/.test(storedLang)) {
             lang = storedLang;
           } else {
-            var nav = (navigator.language || 'en').toLowerCase();
+            const nav = (navigator.language || 'en').toLowerCase();
             lang = nav.indexOf('ja') === 0 ? 'ja' : nav.indexOf('zh') === 0 ? 'zh' : 'en';
           }
           document.documentElement.setAttribute('lang', lang);
-        } catch (e) {
+        } catch {
           document.documentElement.setAttribute('lang', 'en');
         }
       })();

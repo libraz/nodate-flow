@@ -302,11 +302,13 @@
  */
 @media print {
   body.nf-print-recovery-codes * {
+    /* biome-ignore lint/complexity/noImportantStyles: print-only visibility reset must beat every author rule so only the recovery-code area prints. */
     visibility: hidden !important;
   }
 
   body.nf-print-recovery-codes .aw-print-only-area,
   body.nf-print-recovery-codes .aw-print-only-area * {
+    /* biome-ignore lint/complexity/noImportantStyles: print-only override re-shows the recovery-code area against the blanket hide above. */
     visibility: visible !important;
   }
 

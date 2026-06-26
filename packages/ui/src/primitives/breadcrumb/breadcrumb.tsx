@@ -32,13 +32,13 @@
 import {
   type AnchorHTMLAttributes,
   Children,
+  cloneElement,
+  forwardRef,
   type HTMLAttributes,
+  isValidElement,
   type ReactElement,
   type MouseEvent as ReactMouseEvent,
   type ReactNode,
-  cloneElement,
-  forwardRef,
-  isValidElement,
 } from 'react';
 import { cx } from '../../lib/cx';
 import styles from './breadcrumb.module.css';

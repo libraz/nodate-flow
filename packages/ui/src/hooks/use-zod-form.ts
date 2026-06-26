@@ -43,11 +43,12 @@ import {
   type DefaultValues,
   type FieldValues,
   type Path,
+  type Resolver,
   type UseFormProps,
   type UseFormReturn,
   useForm,
 } from 'react-hook-form';
-import type { ZodType } from 'zod';
+import type { z } from 'zod';
 
 /**
  * @brief A single server-side validation error pinned to a form field.
@@ -70,22 +71,28 @@ export interface ApiFieldError<TValues extends FieldValues = FieldValues> {
  * be passed via this object. The `resolver` field is intentionally omitted
  * — the hook always supplies `zodResolver(schema)`.
  */
-export type UseZodFormOptions<TValues extends FieldValues> = Omit<
-  UseFormProps<TValues>,
-  'resolver' | 'defaultValues'
->;
+export type UseZodFormOptions<
+  TInput extends FieldValues,
+  TOutput extends FieldValues = TInput,
+> = Omit<UseFormProps<TInput, unknown, TOutput>, 'resolver' | 'defaultValues'>;
 
 /**
  * @brief Return shape of `useZodForm`. Adds `setApiErrors` to the standard
  *        `UseFormReturn`.
+ *
+ * `TInput` is the schema's input type (the raw field values held by the form
+ * controls) and `TOutput` is its output type (the values produced after any
+ * Zod transforms run on a successful submit). For schemas without transforms
+ * the two coincide.
  */
-export interface UseZodFormReturn<TValues extends FieldValues> extends UseFormReturn<TValues> {
+export interface UseZodFormReturn<TInput extends FieldValues, TOutput extends FieldValues = TInput>
+  extends UseFormReturn<TInput, unknown, TOutput> {
   /**
    * @brief Map an iterable of server-side field errors back onto the form.
    * Errors with an unknown `field` are silently ignored so callers can pass
    * raw API responses without filtering.
    */
-  setApiErrors: (errors: Iterable<ApiFieldError<TValues>>) => void;
+  setApiErrors: (errors: Iterable<ApiFieldError<TInput>>) => void;
 }
 
 /**
@@ -95,22 +102,26 @@ export interface UseZodFormReturn<TValues extends FieldValues> extends UseFormRe
  * @param defaultValues Initial values; required because controlled inputs
  *                  must always have a defined initial value.
  * @param options   Any other `UseFormProps` to forward (e.g. `mode`).
+ *
+ * The form's field values are typed as the schema's input (`z.input`); the
+ * submit handler receives the schema's output (`z.output`). With
+ * `@hookform/resolvers` v5 the Zod resolver is a Standard Schema adapter, so
+ * the schema is constrained to `z.ZodType` and the input/output types are
+ * read off it rather than from a `parse()` return type.
  */
-export function useZodForm<TSchema extends ZodType<FieldValues>>(
-  schema: TSchema,
-  defaultValues: DefaultValues<ReturnType<TSchema['parse']>>,
-  options?: UseZodFormOptions<ReturnType<TSchema['parse']>>,
-): UseZodFormReturn<ReturnType<TSchema['parse']>> {
-  type TValues = ReturnType<TSchema['parse']>;
-
-  const form = useForm<TValues>({
+export function useZodForm<TInput extends FieldValues, TOutput extends FieldValues = TInput>(
+  schema: z.ZodType<TOutput, TInput>,
+  defaultValues: DefaultValues<TInput>,
+  options?: UseZodFormOptions<TInput, TOutput>,
+): UseZodFormReturn<TInput, TOutput> {
+  const form = useForm<TInput, unknown, TOutput>({
     ...options,
-    resolver: zodResolver(schema),
+    resolver: zodResolver(schema) as Resolver<TInput, unknown, TOutput>,
     defaultValues,
   });
 
   const setApiErrors = useCallback(
-    (errors: Iterable<ApiFieldError<TValues>>) => {
+    (errors: Iterable<ApiFieldError<TInput>>) => {
       for (const e of errors) {
         form.setError(
           e.field,

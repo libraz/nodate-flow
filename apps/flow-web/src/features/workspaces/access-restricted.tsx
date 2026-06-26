@@ -11,7 +11,7 @@
  * 401 / 403 for a non-admin member.
  */
 
-import { Link, getRouteApi } from '@tanstack/react-router';
+import { getRouteApi, Link } from '@tanstack/react-router';
 import type { ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';
 

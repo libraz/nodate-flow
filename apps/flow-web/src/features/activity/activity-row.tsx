@@ -57,6 +57,7 @@ function ActorGlyph({
   if (entry.actorKind === 'agent') {
     return (
       <span
+        role="img"
         aria-label={actorLabel}
         style={{
           inlineSize: '1.75rem',
@@ -76,6 +77,7 @@ function ActorGlyph({
   if (entry.actorKind === 'system' || !entry.actorUserPublicId) {
     return (
       <span
+        role="img"
         aria-label={actorLabel}
         style={{
           inlineSize: '1.75rem',

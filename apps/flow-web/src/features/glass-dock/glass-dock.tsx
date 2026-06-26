@@ -113,9 +113,7 @@ function NlQueryPanel({ workspaceId }: { workspaceId: string | undefined }): Rea
   const disabled = !workspaceId || prompt.trim().length === 0 || mutation.isPending;
 
   /** Extract TaskFilters from a Lens and apply them. */
-  const applyLensFilter = (lens: {
-    filter?: Record<string, Record<string, unknown>>;
-  }): void => {
+  const applyLensFilter = (lens: { filter?: Record<string, Record<string, unknown>> }): void => {
     if (!projectId || !workspaceId) return;
     const priorityFilter = lens.filter?.priority;
     const statusFilter = lens.filter?.status;
@@ -418,11 +416,7 @@ function StateSuggestionsPanel({
   );
 }
 
-function RemindersPanel({
-  workspaceId,
-}: {
-  workspaceId: string | undefined;
-}): ReactElement | null {
+function RemindersPanel({ workspaceId }: { workspaceId: string | undefined }): ReactElement | null {
   const { t } = useTranslation('ai-suggestions');
   const { data } = useRemindersQuery(workspaceId);
   const items: TaskReminder[] = data ?? [];

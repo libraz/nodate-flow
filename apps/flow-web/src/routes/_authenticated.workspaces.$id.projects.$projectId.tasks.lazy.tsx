@@ -8,7 +8,7 @@
 
 import Button from '@nodate-flow/ui/primitives/button';
 import Skeleton from '@nodate-flow/ui/primitives/skeleton';
-import { Outlet, createLazyFileRoute, getRouteApi, useNavigate } from '@tanstack/react-router';
+import { createLazyFileRoute, getRouteApi, Outlet, useNavigate } from '@tanstack/react-router';
 import { type ReactElement, Suspense, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 

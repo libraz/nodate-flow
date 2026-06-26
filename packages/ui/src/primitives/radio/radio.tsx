@@ -3,7 +3,7 @@
  * Group multiple Radios via a shared `name` prop, same as a raw `<input type="radio">`.
  */
 
-import { type InputHTMLAttributes, type ReactElement, type Ref, forwardRef } from 'react';
+import { forwardRef, type InputHTMLAttributes, type ReactElement, type Ref } from 'react';
 import { cx } from '../../lib/cx';
 import styles from './radio.module.css';
 

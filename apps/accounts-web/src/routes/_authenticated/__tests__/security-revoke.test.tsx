@@ -8,10 +8,10 @@
 
 import { authStore } from '@nodate-flow/sdk';
 import {
-  RouterProvider,
   createMemoryHistory,
   createRootRoute,
   createRouter,
+  RouterProvider,
 } from '@tanstack/react-router';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import i18n from 'i18next';

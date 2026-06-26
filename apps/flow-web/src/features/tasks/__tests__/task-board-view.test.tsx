@@ -10,10 +10,9 @@
  */
 
 import { screen, within } from '@testing-library/react';
+import { renderWithProviders } from '@tests/helpers/render';
 import { describe, expect, it, vi } from 'vitest';
 import { axe } from 'vitest-axe';
-
-import { renderWithProviders } from '@tests/helpers/render';
 import type { TaskListItem } from '../api';
 import TaskBoardView from '../task-board-view';
 

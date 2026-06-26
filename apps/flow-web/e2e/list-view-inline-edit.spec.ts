@@ -26,10 +26,10 @@
  * title reverts. All other tests hit the real flow-api / auth-api.
  */
 
-import { type Locator, type Page, expect, test } from '@playwright/test';
+import { expect, type Locator, type Page, test } from '@playwright/test';
 
 import { loadTenants } from './fixtures/load-tenants';
-import { API_BASE_URL, type TestTenant, createTask, injectAuth } from './fixtures/tenant';
+import { API_BASE_URL, createTask, injectAuth, type TestTenant } from './fixtures/tenant';
 
 interface TaskFetchResponse {
   id: string;

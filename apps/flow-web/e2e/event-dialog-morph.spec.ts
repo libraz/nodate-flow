@@ -25,15 +25,15 @@
  *    byte-for-byte stable across kind switches.
  */
 
-import { type Page, expect, test } from '@playwright/test';
+import { expect, type Page, test } from '@playwright/test';
 
 import enCal from '../locales/en/calendar-events.json' with { type: 'json' };
 import {
-  type TestTenant,
   cleanupTenant,
   createTestTenant,
   ensurePersonalCalendar,
   injectAuth,
+  type TestTenant,
 } from './fixtures/tenant';
 
 const copy = {

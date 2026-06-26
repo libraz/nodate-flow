@@ -26,7 +26,7 @@
  * of rows after each page advance.
  */
 
-import { type Route, expect, test } from '@playwright/test';
+import { expect, type Route, test } from '@playwright/test';
 
 import { loadTenants } from './fixtures/load-tenants';
 import { API_BASE_URL, injectAuth } from './fixtures/tenant';

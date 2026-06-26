@@ -49,9 +49,8 @@ import {
 import { useTranslation } from 'react-i18next';
 
 import type { TaskListItem } from '../api';
-
-import ArchivedRow from './archived-row';
 import styles from './archived.module.css';
+import ArchivedRow from './archived-row';
 import type { ChapterGroup, ChapterId } from './hooks/use-time-strata';
 
 const ROW_HEIGHT = 48;
@@ -263,6 +262,7 @@ export default function ArchivedList({
     stickyChapter !== null ? (groups.find((g) => g.id === stickyChapter)?.rows.length ?? 0) : 0;
 
   return (
+    // biome-ignore lint/a11y/noStaticElementInteractions: scroll container coordinates roving keyboard navigation for its list rows; not an interactive control itself (role="presentation").
     <div
       ref={parentRef}
       className={styles.virtualScroll}

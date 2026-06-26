@@ -21,7 +21,7 @@
  * and the network call, not on inbox state.
  */
 
-import { type Page, expect, test } from '@playwright/test';
+import { expect, type Page, test } from '@playwright/test';
 
 import enAuth from '../locales/en/auth.json' with { type: 'json' };
 import { AUTH_API_URL, createTestTenant } from './fixtures/tenant';

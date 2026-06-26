@@ -12,7 +12,7 @@
 
 import { useEffect, useState } from 'react';
 
-import { type SupportedLanguage, i18n, setLanguage, supportedLanguages } from '../../i18n';
+import { i18n, type SupportedLanguage, setLanguage, supportedLanguages } from '../../i18n';
 import { authSdk, refreshAccessToken } from '../../lib/sdk';
 import { queryClient } from '../../providers/query-client';
 import { type AuthUser, authStore } from './auth-store';

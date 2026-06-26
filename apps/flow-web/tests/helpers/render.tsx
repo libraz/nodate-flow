@@ -11,10 +11,10 @@
 
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import {
-  RouterContextProvider,
   createMemoryHistory,
   createRootRoute,
   createRouter,
+  RouterContextProvider,
 } from '@tanstack/react-router';
 import { type RenderOptions, type RenderResult, render } from '@testing-library/react';
 import i18n from 'i18next';

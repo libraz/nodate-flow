@@ -11,10 +11,9 @@
  * apply from the document root.
  */
 
+import Skeleton from '@nodate-flow/ui/primitives/skeleton';
 import type { ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';
-
-import Skeleton from '@nodate-flow/ui/primitives/skeleton';
 
 import ShareErrorView from './share-error-view';
 import ShareMonthGrid from './share-month-grid';

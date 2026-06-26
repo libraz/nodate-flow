@@ -6,7 +6,7 @@
 
 import { describe, expect, it } from 'vitest';
 
-import { DateValidationError, assertYmd } from '../src/util/date.js';
+import { assertYmd, DateValidationError } from '../src/util/date.js';
 
 describe('assertYmd', () => {
   describe('valid input', () => {

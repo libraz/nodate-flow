@@ -3,7 +3,7 @@
  * wrap with an `aria-busy` region to convey loading state to AT.
  */
 
-import { type HTMLAttributes, type ReactElement, forwardRef } from 'react';
+import { forwardRef, type HTMLAttributes, type ReactElement } from 'react';
 import { cx } from '../../lib/cx';
 import styles from './skeleton.module.css';
 

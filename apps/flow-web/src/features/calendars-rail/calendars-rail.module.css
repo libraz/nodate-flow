@@ -105,7 +105,9 @@
   color: var(--nf-color-fg-muted);
   border-radius: var(--nf-radius-sm);
   cursor: pointer;
-  transition: background var(--nf-duration-fast), color var(--nf-duration-fast);
+  transition:
+    background var(--nf-duration-fast),
+    color var(--nf-duration-fast);
 }
 
 .iconButton:hover:not(:disabled) {
@@ -203,7 +205,9 @@
   color: var(--nf-color-fg-muted);
   border-radius: var(--nf-radius-sm);
   cursor: pointer;
-  transition: background var(--nf-duration-fast), color var(--nf-duration-fast);
+  transition:
+    background var(--nf-duration-fast),
+    color var(--nf-duration-fast);
 }
 
 .backButton:hover {

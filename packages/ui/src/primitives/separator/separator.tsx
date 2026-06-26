@@ -3,7 +3,7 @@
  * Decorative separators are marked `aria-hidden` and given `role="none"`.
  */
 
-import { type HTMLAttributes, type ReactElement, forwardRef } from 'react';
+import { forwardRef, type HTMLAttributes, type ReactElement } from 'react';
 import { cx } from '../../lib/cx';
 import styles from './separator.module.css';
 
@@ -29,6 +29,7 @@ const Separator = forwardRef<HTMLDivElement, SeparatorProps>(
     },
     ref,
   ): ReactElement => (
+    // biome-ignore lint/a11y/useAriaPropsSupportedByRole: aria-orientation is only emitted in the non-decorative branch, where the role resolves to "separator" which supports it; the conditional is not statically narrowable
     <div
       ref={ref}
       role={role ?? (decorative ? 'none' : 'separator')}

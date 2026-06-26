@@ -252,11 +252,16 @@ export default function DatePicker({
 
           {/* Weekday labels */}
           <div className={styles.weekdays}>
-            {resolvedWeekdayLabels.map((wd, i) => (
-              <div key={`${i}-${wd}`} className={styles.weekday}>
-                {wd}
-              </div>
-            ))}
+            {resolvedWeekdayLabels.map((wd, i) => {
+              // Canonical Sunday-based day-of-week (0=Sun..6=Sat) for a stable key
+              // independent of label content or week-start offset.
+              const dow = weekStart === 'monday' ? (i + 1) % 7 : i;
+              return (
+                <div key={`dow-${dow}`} className={styles.weekday}>
+                  {wd}
+                </div>
+              );
+            })}
           </div>
 
           {/* Day grid */}

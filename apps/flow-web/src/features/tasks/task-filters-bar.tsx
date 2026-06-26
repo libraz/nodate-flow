@@ -10,12 +10,10 @@ import Combobox from '@nodate-flow/ui/primitives/combobox';
 import Input from '@nodate-flow/ui/primitives/input';
 import { type ReactElement, Suspense } from 'react';
 import { useTranslation } from 'react-i18next';
-
-import LensPicker from './lens-picker';
-
 import { useWorkspaceUsersQuery } from '../workspaces/api';
 import { TASK_PRIORITIES, TASK_STATES, type TaskDerivedState, type TaskPriority } from './api';
 import { PRIORITY_KEY, STATE_KEY } from './constants';
+import LensPicker from './lens-picker';
 import styles from './task-filters-bar.module.css';
 import {
   resetTaskFilters,

@@ -17,13 +17,12 @@
 import Button from '@nodate-flow/ui/primitives/button';
 import Card from '@nodate-flow/ui/primitives/card';
 import { Link } from '@tanstack/react-router';
-import { type ReactElement, memo } from 'react';
+import { memo, type ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { formatTimeAgo } from '../archived/relative-time';
-
-import type { RetroDraft } from './retro-drafts-api';
 import styles from './retro-drafts.module.css';
+import type { RetroDraft } from './retro-drafts-api';
 
 export interface RetroDraftRowProps {
   draft: RetroDraft;

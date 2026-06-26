@@ -102,6 +102,7 @@ export default function WidgetCard({
     .join(' ');
 
   return (
+    // biome-ignore lint/a11y/noStaticElementInteractions: container only takes a pointer-drag affordance while editing; all real actions live on focusable child buttons.
     <div
       className={classNames}
       style={{

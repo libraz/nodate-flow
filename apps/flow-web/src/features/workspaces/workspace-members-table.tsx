@@ -17,10 +17,10 @@ import { useTranslation } from 'react-i18next';
 import { formatEpoch } from '../../lib/format';
 import { selectUser, useAuth } from '../auth/auth-store';
 import {
-  type WorkspaceMember,
   useRemoveMember,
   useUpdateMemberRole,
   useWorkspaceMembersQuery,
+  type WorkspaceMember,
 } from './api';
 import WorkspaceAddMemberDialog from './workspace-add-member-dialog';
 import WorkspaceInviteDialog from './workspace-invite-dialog';

@@ -20,15 +20,15 @@
  * surfaced during page navigation fail the spec.
  */
 
-import { type ConsoleMessage, type Page, expect, test } from '@playwright/test';
+import { type ConsoleMessage, expect, type Page, test } from '@playwright/test';
 
 import {
   AUTH_API_URL,
-  type TestTenant,
   cleanupTenant,
   createTask,
   createTestTenant,
   injectAuth,
+  type TestTenant,
 } from './fixtures/tenant';
 import { checkA11y } from './helpers/a11y';
 

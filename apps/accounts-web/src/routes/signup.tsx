@@ -10,7 +10,7 @@ import Button from '@nodate-flow/ui/primitives/button';
 import FormField from '@nodate-flow/ui/primitives/form-field';
 import Input from '@nodate-flow/ui/primitives/input';
 import { toaster } from '@nodate-flow/ui/primitives/toast';
-import { Link, createFileRoute, useNavigate } from '@tanstack/react-router';
+import { createFileRoute, Link, useNavigate } from '@tanstack/react-router';
 import { type ReactElement, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -45,7 +45,7 @@ function SignupPage(): ReactElement {
     register,
     handleSubmit,
     formState: { errors, isSubmitting },
-  } = useZodForm<typeof signupSchema>(signupSchema, {
+  } = useZodForm<SignupFormValues>(signupSchema, {
     email: '',
     password: '',
     newPasswordConfirm: '',

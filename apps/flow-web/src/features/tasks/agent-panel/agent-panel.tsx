@@ -20,8 +20,8 @@ import { useTranslation } from 'react-i18next';
 
 import {
   type AgentHandoffStatus,
-  type TaskAgentContext,
   deriveAgentStatus,
+  type TaskAgentContext,
   useHandoffToUser,
 } from '../api';
 import styles from './agent-panel.module.css';

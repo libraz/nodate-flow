@@ -39,14 +39,13 @@ import { useTranslation } from 'react-i18next';
 import { useProjectsQuery } from '../../projects/api';
 import { useWorkspaceMembersQuery } from '../../workspaces/api';
 import { type TaskListItem, useUnarchiveTask } from '../api';
-
+import styles from './archived.module.css';
 import ArchivedBulkActionBar from './archived-bulk-action-bar';
 import ArchivedEmptyFiltered from './archived-empty-filtered';
 import ArchivedEmptyState from './archived-empty-state';
 import ArchivedFilters from './archived-filters';
 import ArchivedHeader from './archived-header';
 import ArchivedList from './archived-list';
-import styles from './archived.module.css';
 import { type ArchiveRange, useArchiveFilters } from './hooks/use-archive-filters';
 import { useArchivedTasksQuery } from './hooks/use-archived-tasks';
 import { useBulkSelection } from './hooks/use-bulk-selection';

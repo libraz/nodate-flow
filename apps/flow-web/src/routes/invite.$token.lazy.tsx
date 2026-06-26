@@ -9,7 +9,7 @@
  */
 
 import Button from '@nodate-flow/ui/primitives/button';
-import { Link, createLazyFileRoute, getRouteApi, useNavigate } from '@tanstack/react-router';
+import { createLazyFileRoute, getRouteApi, Link, useNavigate } from '@tanstack/react-router';
 import { type ReactElement, type ReactNode, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 

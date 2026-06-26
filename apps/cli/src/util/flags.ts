@@ -8,7 +8,7 @@
 
 import { c } from '@libraz/node-cli';
 
-import { DateValidationError, assertYmd } from './date.js';
+import { assertYmd, DateValidationError } from './date.js';
 
 /**
  * Resolve the value of a flag that has both a canonical long form

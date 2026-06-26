@@ -7,10 +7,9 @@
  * UI are consumers.
  */
 
+import type { components } from '@nodate-flow/sdk';
 import { useStore } from 'zustand';
 import { createStore } from 'zustand/vanilla';
-
-import type { components } from '@nodate-flow/sdk';
 
 /** Suggestion DTO mirrored from the SDK. */
 export type Suggestion = components['schemas']['TriageSuggestion'];

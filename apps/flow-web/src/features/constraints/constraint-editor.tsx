@@ -207,7 +207,7 @@ export default function ConstraintEditor({ taskId }: ConstraintEditorProps): Rea
       {error ? <p role="alert">{error}</p> : null}
 
       {outcomes ? (
-        <div aria-label={t('editor.outcomes')}>
+        <div role="group" aria-label={t('editor.outcomes')}>
           <h4>{t('editor.outcomes')}</h4>
           <ul>
             {outcomes.map((o) => (

@@ -26,7 +26,7 @@
  * setQueryData → rollback on error → invalidate on settled.
  */
 
-import { SIGNAL_KINDS, type SignalKindDefinition, lookupSignalKind } from '@nodate-flow/sdk';
+import { lookupSignalKind, SIGNAL_KINDS, type SignalKindDefinition } from '@nodate-flow/sdk';
 import Button from '@nodate-flow/ui/primitives/button';
 import Card from '@nodate-flow/ui/primitives/card';
 import SegmentedControl from '@nodate-flow/ui/primitives/segmented-control';
@@ -47,8 +47,8 @@ import {
   type AutoActionRule,
   type AutoActionRuleKind,
   type AutonomyLevel,
-  type PatchAutoActionRule,
   autoActionRulesKeys,
+  type PatchAutoActionRule,
   useAutoActionRulesQuery,
 } from '../../workspaces/auto-action-rules-api';
 

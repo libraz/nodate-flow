@@ -1,10 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
-  type RefreshMiddlewareOptions,
   createAuthRequestMiddleware,
   createRefreshMiddleware,
   createTokenRefresher,
   decodeTokenExp,
+  type RefreshMiddlewareOptions,
 } from '../refresh';
 
 // ---------------------------------------------------------------------------
@@ -277,10 +277,18 @@ describe('createRefreshMiddleware', () => {
 // decodeTokenExp
 // ---------------------------------------------------------------------------
 
+/**
+ * Encode an ASCII JSON string as base64url (no padding) without relying
+ * on `Buffer`, mirroring the runtime-agnostic decoder in the SDK.
+ */
+function toBase64Url(json: string): string {
+  return btoa(json).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+
 /** Mint a fake JWT with a given exp (unix seconds). Signature is unused. */
 function makeJwt(exp: number): string {
-  const header = Buffer.from(JSON.stringify({ alg: 'none', typ: 'JWT' })).toString('base64url');
-  const payload = Buffer.from(JSON.stringify({ exp })).toString('base64url');
+  const header = toBase64Url(JSON.stringify({ alg: 'none', typ: 'JWT' }));
+  const payload = toBase64Url(JSON.stringify({ exp }));
   return `${header}.${payload}.sig`;
 }
 
@@ -299,9 +307,9 @@ describe('decodeTokenExp', () => {
   });
 
   it('returns null when exp is missing or non-numeric', () => {
-    const noExp = `aaa.${Buffer.from(JSON.stringify({ sub: 'x' })).toString('base64url')}.bbb`;
+    const noExp = `aaa.${toBase64Url(JSON.stringify({ sub: 'x' }))}.bbb`;
     expect(decodeTokenExp(noExp)).toBeNull();
-    const stringExp = `aaa.${Buffer.from(JSON.stringify({ exp: 'soon' })).toString('base64url')}.bbb`;
+    const stringExp = `aaa.${toBase64Url(JSON.stringify({ exp: 'soon' }))}.bbb`;
     expect(decodeTokenExp(stringExp)).toBeNull();
   });
 });

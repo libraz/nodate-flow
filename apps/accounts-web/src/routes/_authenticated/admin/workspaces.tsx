@@ -5,7 +5,7 @@
 import type { components } from '@nodate-flow/sdk';
 import Button from '@nodate-flow/ui/primitives/button';
 import Input from '@nodate-flow/ui/primitives/input';
-import { Link, createFileRoute } from '@tanstack/react-router';
+import { createFileRoute, Link } from '@tanstack/react-router';
 import { type ReactElement, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 

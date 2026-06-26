@@ -7,15 +7,14 @@ import { useNavigate } from '@tanstack/react-router';
 import { Bell, LogOut, Search, Settings } from 'lucide-react';
 import { type ReactElement, Suspense, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import CommandPalette from './command-palette';
-
 import AiCostMeter from '../../features/ai-providers/cost-meter';
 import { authStore, selectUser, useAuth } from '../../features/auth/auth-store';
 import NotificationBell from '../../features/notifications/notification-bell';
 import { authSdk } from '../../lib/sdk';
 import { clearActiveWorkspaceId } from '../../lib/use-current-workspace';
-import TopBarBreadcrumb from './top-bar-breadcrumb';
+import CommandPalette from './command-palette';
 import styles from './top-bar.module.css';
+import TopBarBreadcrumb from './top-bar-breadcrumb';
 import WorkspaceSwitcher from './workspace-switcher';
 
 /** Two-letter initials from a display name (falls back to "?"). */
@@ -63,6 +62,7 @@ export default function TopBar(): ReactElement {
           {user.email ? <span className={styles.userMenuEmail}>{user.email}</span> : null}
         </div>
       ) : null}
+      {/* biome-ignore lint/a11y/noNoninteractiveElementToInteractiveRole: deliberate ARIA menu — the ul / li role="presentation" / button role="menuitem" structure is the standard menu pattern. */}
       <ul className={styles.userMenuList} role="menu">
         <li role="presentation">
           <button

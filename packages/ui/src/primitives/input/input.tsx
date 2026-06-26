@@ -3,7 +3,7 @@
  * design-system styling plus an `invalid` style hook driven by `aria-invalid`.
  */
 
-import { type InputHTMLAttributes, type ReactElement, forwardRef } from 'react';
+import { forwardRef, type InputHTMLAttributes, type ReactElement } from 'react';
 import { cx } from '../../lib/cx';
 import styles from './input.module.css';
 

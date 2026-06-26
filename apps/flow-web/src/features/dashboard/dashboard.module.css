@@ -53,8 +53,9 @@
   box-shadow: var(--nf-shadow-sm);
   overflow: hidden;
   min-block-size: 10rem;
-  transition: box-shadow var(--nf-duration-fast) var(--nf-ease-standard), border-color
-    var(--nf-duration-fast) var(--nf-ease-standard);
+  transition:
+    box-shadow var(--nf-duration-fast) var(--nf-ease-standard),
+    border-color var(--nf-duration-fast) var(--nf-ease-standard);
 }
 
 .widget:hover {
@@ -205,8 +206,9 @@
   border-radius: var(--nf-radius-md);
   background: var(--nf-color-bg-elevated);
   cursor: pointer;
-  transition: border-color var(--nf-duration-fast) var(--nf-ease-standard), box-shadow
-    var(--nf-duration-fast) var(--nf-ease-standard);
+  transition:
+    border-color var(--nf-duration-fast) var(--nf-ease-standard),
+    box-shadow var(--nf-duration-fast) var(--nf-ease-standard);
 }
 
 .typeCard:hover {

@@ -26,7 +26,7 @@ import Badge from '@nodate-flow/ui/primitives/badge';
 import Button from '@nodate-flow/ui/primitives/button';
 import Spinner from '@nodate-flow/ui/primitives/spinner';
 import Tabs, { type TabItem } from '@nodate-flow/ui/primitives/tabs';
-import { Link, getRouteApi } from '@tanstack/react-router';
+import { getRouteApi, Link } from '@tanstack/react-router';
 import { type ReactElement, Suspense, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 

@@ -11,22 +11,22 @@
 import {
   type ColumnDef,
   type ColumnPinningState,
-  type OnChangeFn,
-  type RowSelectionState,
-  type SortingState,
   flexRender,
   getCoreRowModel,
   getSortedRowModel,
+  type OnChangeFn,
+  type RowSelectionState,
+  type SortingState,
   useReactTable,
 } from '@tanstack/react-table';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import {
   type CSSProperties,
+  forwardRef,
   type KeyboardEvent,
   type ReactElement,
   type ReactNode,
   type Ref,
-  forwardRef,
   useCallback,
   useImperativeHandle,
   useMemo,
@@ -360,6 +360,7 @@ function DataGridInner<TData>(
                       onMouseDown={header.getResizeHandler()}
                       onTouchStart={header.getResizeHandler()}
                       onDoubleClick={() => header.column.resetSize()}
+                      // biome-ignore lint/a11y/useAriaPropsForRole: pointer-only column-resize affordance; exposed as a vertical separator without value attributes since it is not a focusable window-splitter widget
                       role="separator"
                       aria-orientation="vertical"
                     />

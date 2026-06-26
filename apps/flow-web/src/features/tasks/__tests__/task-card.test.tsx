@@ -8,10 +8,9 @@
 
 import { screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { renderWithProviders } from '@tests/helpers/render';
 import { describe, expect, it, vi } from 'vitest';
 import { axe } from 'vitest-axe';
-
-import { renderWithProviders } from '@tests/helpers/render';
 import type { TaskListItem } from '../api';
 import TaskCard, { type TaskCardProps } from '../task-card';
 

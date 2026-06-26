@@ -19,10 +19,10 @@
  *   - `Toast` portals into a separate `#nf-toast-root` at z-index 1500.
  */
 
-import { type Locator, type Page, expect, test } from '@playwright/test';
+import { expect, type Locator, type Page, test } from '@playwright/test';
 
 import { loadTenants } from './fixtures/load-tenants';
-import { type TestTenant, injectAuth } from './fixtures/tenant';
+import { injectAuth, type TestTenant } from './fixtures/tenant';
 
 /**
  * Authenticated bootstrap shared by every spec in this file. Lands the

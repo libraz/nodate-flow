@@ -3,7 +3,7 @@
  * Children are the `<option>` nodes supplied by the caller.
  */
 
-import { type ReactElement, type SelectHTMLAttributes, forwardRef } from 'react';
+import { forwardRef, type ReactElement, type SelectHTMLAttributes } from 'react';
 import { cx } from '../../lib/cx';
 import styles from './select.module.css';
 

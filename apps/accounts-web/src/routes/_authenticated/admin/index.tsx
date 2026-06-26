@@ -2,7 +2,7 @@
  * /admin -- Redirects to /admin/users.
  */
 
-import { Navigate, createFileRoute } from '@tanstack/react-router';
+import { createFileRoute, Navigate } from '@tanstack/react-router';
 
 function AdminIndex() {
   return <Navigate to="/admin/users" replace />;

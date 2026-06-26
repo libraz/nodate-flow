@@ -24,21 +24,20 @@
  */
 
 import Button from '@nodate-flow/ui/primitives/button';
+import { confirm } from '@nodate-flow/ui/primitives/confirm';
 import EmptyState from '@nodate-flow/ui/primitives/empty-state';
 import { toaster } from '@nodate-flow/ui/primitives/toast';
 import { type ReactElement, useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { confirm } from '@nodate-flow/ui/primitives/confirm';
-
 import RetroDraftRow from './retro-draft-row';
+import styles from './retro-drafts.module.css';
 import {
   RETRO_DRAFTS_PAGE_SIZE,
   useAcceptRetroDraft,
   useDiscardRetroDraft,
   useRetroDraftsQuery,
 } from './retro-drafts-api';
-import styles from './retro-drafts.module.css';
 
 interface RetroDraftsPageProps {
   workspaceId: string;

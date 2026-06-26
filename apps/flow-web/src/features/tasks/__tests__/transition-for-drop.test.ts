@@ -2,8 +2,8 @@ import { describe, expect, it } from 'vitest';
 
 import {
   TASK_STATES,
-  TRANSITIONS_BY_STATE,
   type TaskDerivedState,
+  TRANSITIONS_BY_STATE,
   transitionForDrop,
 } from '../api';
 
@@ -40,15 +40,12 @@ describe('transitionForDrop', () => {
     ['review', 'open', 'reopen', 'waiting'],
     // cancelled → waiting resolves to reopen, but actually lands in open
     ['cancelled', 'waiting', 'reopen', 'open'],
-  ])(
-    'lenient: %s → %s resolves to transition=%s landing=%s',
-    (from, to, transition, landingState) => {
-      const result = transitionForDrop(from, to);
-      expect(result).not.toBeNull();
-      expect(result?.transition).toBe(transition);
-      expect(result?.landingState).toBe(landingState);
-    },
-  );
+  ])('lenient: %s → %s resolves to transition=%s landing=%s', (from, to, transition, landingState) => {
+    const result = transitionForDrop(from, to);
+    expect(result).not.toBeNull();
+    expect(result?.transition).toBe(transition);
+    expect(result?.landingState).toBe(landingState);
+  });
 
   // ── Illegal transitions (must return null) ──────────────────
 

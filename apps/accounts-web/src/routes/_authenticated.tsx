@@ -4,7 +4,7 @@
  * the user is redirected to /login.
  */
 
-import { Link, Outlet, createFileRoute, useNavigate } from '@tanstack/react-router';
+import { createFileRoute, Link, Outlet, useNavigate } from '@tanstack/react-router';
 import { type ReactElement, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 
