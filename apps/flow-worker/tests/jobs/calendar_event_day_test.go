@@ -701,6 +701,35 @@ func TestRecurringPastRecurrenceEndDoesNotFire(t *testing.T) {
 		"an occurrence past recurrence_end must not fire, got %d", len(signals))
 }
 
+func TestMalformedRecurrenceDoesNotBlockWorkspaceScan(t *testing.T) {
+	t.Parallel()
+	h := getHarness(t)
+
+	tt := helpers.CreateCalendarTestTenant(t, h.srv)
+	setWorkspaceTimezone(t, h.db, tt.WorkspaceID, "UTC")
+	calID := createCalendarViaAPI(t, tt)
+
+	base := time.Date(2026, time.August, 1, 9, 0, 0, 0, time.UTC)
+	badEventPublicID := createEventViaAPI(t, tt, calID, base, base.Add(time.Hour), "UTC", "Bad Rule")
+	badEventInternalID := resolveEventInternalID(t, h.db, badEventPublicID)
+	setEventRecurrence(t, h.db, badEventPublicID, `{"freq":"unsupported"}`, "", nil)
+
+	goodStart := time.Date(2026, time.August, 4, 10, 0, 0, 0, time.UTC)
+	goodEventPublicID := createEventViaAPI(t, tt, calID, goodStart, goodStart.Add(time.Hour), "UTC", "Good Event")
+	goodEventInternalID := resolveEventInternalID(t, h.db, goodEventPublicID)
+
+	job := newJob(t, h.db, h.srv.BaseURL)
+	job.CatchUpWindow = time.Nanosecond
+	tick := time.Date(2026, time.August, 4, 0, 0, 30, 0, time.UTC)
+	require.NoError(t, job.Tick(context.Background(), tick), "malformed recurrence row must not fail the workspace tick")
+
+	require.Empty(t, loadSignalsForEvent(t, h.db, tt.WorkspaceID, badEventInternalID),
+		"the malformed recurrence row itself must be skipped")
+	goodSignals := loadSignalsForEvent(t, h.db, tt.WorkspaceID, goodEventInternalID)
+	require.Lenf(t, goodSignals, 1, "later valid events in the same workspace must still emit, got %d", len(goodSignals))
+	require.Equal(t, "calendar_event_day:"+goodEventPublicID+":2026-08-04", goodSignals[0].ExternalID.String)
+}
+
 // TestRecurringFireOnceAndIdempotentAcrossCatchUp proves the per-occurrence-day
 // emit is once-only and survives a catch-up backfill without duplicating. A
 // catch-up tick reaches back over two missed local days of a daily rule and

@@ -24,6 +24,7 @@ import { useTranslation } from 'react-i18next';
 import {
   buildMonthGrid,
   eventStartKey,
+  expandShareEventsForMonth,
   isMultiDay,
   MAX_VISIBLE_TRACKS,
   monthKeyOf,
@@ -92,7 +93,8 @@ export default function ShareMonthGrid({
   const [monthAnchor, setMonthAnchor] = useState(() => initialMonthAnchor(events, timezone));
   const [selected, setSelected] = useState<ShareEvent | null>(null);
 
-  const grid = buildMonthGrid(monthAnchor, events, timezone, weekStart);
+  const visibleEvents = expandShareEventsForMonth(monthAnchor, events, timezone, weekStart);
+  const grid = buildMonthGrid(monthAnchor, visibleEvents, timezone, weekStart);
 
   const monthLabel = new Intl.DateTimeFormat(locale, {
     year: 'numeric',
@@ -159,7 +161,7 @@ export default function ShareMonthGrid({
             <ShareWeekRow
               key={week.key}
               week={week}
-              events={events}
+              events={visibleEvents}
               timezone={timezone}
               onEventOpen={setSelected}
             />

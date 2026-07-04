@@ -17,8 +17,18 @@
  */
 
 import type { components } from '@nodate-flow/sdk';
+import { expandAllRecurrences, type RecurrenceRule } from '@nodate-flow/ui/calendar';
+import { DateTime } from 'luxon';
 
 type ShareEvent = components['schemas']['PublicShareRenderEvent'];
+type RecurrenceExpansionInput<T> = {
+  event: T;
+  startAt: string;
+  endAt: string;
+  timezone: string;
+  recurrenceRule: RecurrenceRule | null;
+  recurrenceExceptions?: string[];
+};
 
 /**
  * Maximum number of event tracks rendered per day cell before the
@@ -110,6 +120,22 @@ function keyToUtcMidnight(key: string): Date {
 /** Add `n` whole days to a UTC-midnight day token. */
 function addDays(d: Date, n: number): Date {
   return new Date(d.getTime() + n * MS_PER_DAY);
+}
+
+function monthGridBounds(
+  monthAnchorKey: string,
+  weekStart: WeekStart,
+): {
+  firstOfMonth: Date;
+  gridStart: Date;
+  gridEndExclusive: Date;
+} {
+  const anchor = keyToUtcMidnight(monthAnchorKey);
+  const firstOfMonth = new Date(Date.UTC(anchor.getUTCFullYear(), anchor.getUTCMonth(), 1));
+  const startDow = WEEKSTART_TO_DOW[weekStart];
+  const lead = (firstOfMonth.getUTCDay() - startDow + 7) % 7;
+  const gridStart = addDays(firstOfMonth, -lead);
+  return { firstOfMonth, gridStart, gridEndExclusive: addDays(gridStart, 42) };
 }
 
 /** Whole-day difference `a - b` between two UTC-midnight day tokens. */
@@ -216,14 +242,9 @@ export function buildMonthGrid(
   zone: string,
   weekStart: WeekStart,
 ): MonthGrid {
-  const anchor = keyToUtcMidnight(monthAnchorKey);
-  const firstOfMonth = new Date(Date.UTC(anchor.getUTCFullYear(), anchor.getUTCMonth(), 1));
+  const { firstOfMonth, gridStart } = monthGridBounds(monthAnchorKey, weekStart);
   const monthIndex = firstOfMonth.getUTCMonth();
   const startDow = WEEKSTART_TO_DOW[weekStart];
-
-  // Back up to the week-start on or before the 1st.
-  const lead = (firstOfMonth.getUTCDay() - startDow + 7) % 7;
-  const gridStart = addDays(firstOfMonth, -lead);
 
   const tnow = todayKey(zone);
   const weeks: WeekRow[] = [];
@@ -267,4 +288,82 @@ export function shiftMonthAnchor(monthAnchorKey: string, n: number): string {
   const d = keyToUtcMidnight(monthAnchorKey);
   const next = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + n, 1));
   return `${next.getUTCFullYear()}-${String(next.getUTCMonth() + 1).padStart(2, '0')}-01`;
+}
+
+function parseJsonMaybe(value: unknown): unknown {
+  if (typeof value !== 'string') return value;
+  const trimmed = value.trim();
+  if (!trimmed || trimmed === 'null') return null;
+  try {
+    return JSON.parse(trimmed) as unknown;
+  } catch {
+    return null;
+  }
+}
+
+function recurrenceRule(value: unknown): RecurrenceRule | null {
+  const parsed = parseJsonMaybe(value);
+  if (!parsed || typeof parsed !== 'object') return null;
+  const freq = (parsed as { freq?: unknown }).freq;
+  if (freq !== 'daily' && freq !== 'weekly' && freq !== 'monthly' && freq !== 'yearly') return null;
+  return parsed as RecurrenceRule;
+}
+
+function recurrenceExceptions(value: unknown): string[] | undefined {
+  const parsed = parseJsonMaybe(value);
+  if (!Array.isArray(parsed)) return undefined;
+  const strings = parsed.filter((v): v is string => typeof v === 'string');
+  return strings.length > 0 ? strings : undefined;
+}
+
+function secondsToIso(seconds: number): string {
+  return new Date(seconds * 1000).toISOString();
+}
+
+function isoToSeconds(iso: string): number | undefined {
+  const millis = Date.parse(iso);
+  if (Number.isNaN(millis)) return undefined;
+  return Math.floor(millis / 1000);
+}
+
+/** Expand recurring public-share event masters into concrete visible instances. */
+export function expandShareEventsForMonth(
+  monthAnchorKey: string,
+  events: ShareEvent[],
+  zone: string,
+  weekStart: WeekStart,
+): ShareEvent[] {
+  const { gridStart, gridEndExclusive } = monthGridBounds(monthAnchorKey, weekStart);
+  const recurrenceInput: RecurrenceExpansionInput<ShareEvent>[] = events.map((event) => {
+    const rule = recurrenceRule(event.recurrenceRule);
+    const exceptions = recurrenceExceptions(event.recurrenceExceptions);
+    const input: RecurrenceExpansionInput<ShareEvent> = {
+      event,
+      startAt: typeof event.startAt === 'number' ? secondsToIso(event.startAt) : '',
+      endAt:
+        typeof event.endAt === 'number'
+          ? secondsToIso(event.endAt)
+          : typeof event.startAt === 'number'
+            ? secondsToIso(event.startAt)
+            : '',
+      timezone: event.timezone || zone,
+      recurrenceRule: rule,
+    };
+    if (exceptions) input.recurrenceExceptions = exceptions;
+    return input;
+  });
+
+  return expandAllRecurrences(
+    recurrenceInput,
+    DateTime.fromJSDate(gridStart, { zone: 'utc' }),
+    DateTime.fromJSDate(gridEndExclusive, { zone: 'utc' }),
+  ).map((instance) => ({
+    ...instance.event,
+    ...((isoToSeconds(instance.startAt) ?? instance.event.startAt)
+      ? { startAt: isoToSeconds(instance.startAt) ?? instance.event.startAt }
+      : {}),
+    ...((isoToSeconds(instance.endAt) ?? instance.event.endAt)
+      ? { endAt: isoToSeconds(instance.endAt) ?? instance.event.endAt }
+      : {}),
+  }));
 }

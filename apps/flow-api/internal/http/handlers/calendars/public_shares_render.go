@@ -34,6 +34,8 @@ type PublicShareRenderEvent struct {
 	BlockLabel     *string `json:"blockLabel,omitempty"`
 	RecurrenceRule *string `json:"recurrenceRule,omitempty"`
 	RecurrenceEnd  *int64  `json:"recurrenceEnd,omitempty"`
+	// JSON array of ISO 8601 dates/times to exclude from recurrence.
+	RecurrenceExceptions *string `json:"recurrenceExceptions,omitempty"`
 }
 
 // PublicShareRenderPage is the workspace-facing metadata exposed on the
@@ -118,6 +120,9 @@ func RenderPublicShare(deps Deps) func(context.Context, *RenderPublicShareInput)
 				BlockLabel:     nullStringPtr(e.BlockLabel),
 				RecurrenceRule: rawMessagePtr(e.RecurrenceRule),
 				RecurrenceEnd:  nullTimeUnixPtr(e.RecurrenceEnd),
+				RecurrenceExceptions: rawMessagePtr(
+					e.RecurrenceExceptions,
+				),
 			}
 			// `private`-visibility events honour a "time only" contract on
 			// the public, unauthenticated page: the time block stays visible

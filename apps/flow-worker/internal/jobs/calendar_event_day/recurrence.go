@@ -127,11 +127,10 @@ func twoDigits(v int) string {
 	return strconv.Itoa(v)
 }
 
-// maxOccurrences caps how many candidate steps expandOccurrences walks. It
-// bounds the work a pathological rule (e.g. FREQ=DAILY with no UNTIL/COUNT)
-// can fan out per event per arriving day. Each step is one freq advance, so
-// ~10 years of daily steps stays well inside this ceiling; weekly/monthly/
-// yearly rules consume far fewer.
+// maxOccurrences is the minimum candidate-step budget expandOccurrences
+// walks. The actual scan budget expands when the requested window is farther
+// from the event's base occurrence, so old recurring masters still reach the
+// current window instead of silently stopping after about eleven years.
 const maxOccurrences = 4000
 
 // expandOccurrences returns the occurrence start instants of a recurring
@@ -184,8 +183,9 @@ func expandOccurrences(
 	var out []time.Time
 	cursor := base.In(loc)
 	emitted := 0
+	scanLimit := scanStepLimit(rule.Freq, interval, base, loc, windowEnd)
 
-	for step := 0; step < maxOccurrences; step++ {
+	for step := 0; step < scanLimit; step++ {
 		if maxCount >= 0 && emitted >= maxCount {
 			break
 		}
@@ -220,6 +220,38 @@ func expandOccurrences(
 		cursor = advanceByFreq(cursor, rule.Freq, interval, loc)
 	}
 	return out
+}
+
+func scanStepLimit(freq string, interval int, base time.Time, loc *time.Location, windowEnd time.Time) int {
+	if interval <= 0 {
+		interval = 1
+	}
+	if !base.Before(windowEnd) {
+		return maxOccurrences
+	}
+
+	baseLocal := base.In(loc)
+	endLocal := windowEnd.In(loc)
+	needed := 0
+	switch freq {
+	case "daily":
+		needed = int(endLocal.Sub(baseLocal).Hours()/24)/interval + 2
+	case "weekly":
+		needed = int(endLocal.Sub(baseLocal).Hours()/(24*7))/interval + 2
+	case "monthly":
+		by, bm, _ := baseLocal.Date()
+		ey, em, _ := endLocal.Date()
+		months := (ey-by)*12 + int(em-bm)
+		needed = months/interval + 2
+	case "yearly":
+		by, _, _ := baseLocal.Date()
+		ey, _, _ := endLocal.Date()
+		needed = (ey-by)/interval + 2
+	}
+	if needed > maxOccurrences {
+		return needed
+	}
+	return maxOccurrences
 }
 
 // matchesByDay reports whether the local weekday of t is in the byDay token

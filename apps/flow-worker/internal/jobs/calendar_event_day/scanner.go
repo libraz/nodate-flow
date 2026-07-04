@@ -44,6 +44,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"log/slog"
 	"time"
 
 	"github.com/nodate-flow/nodate-flow/packages/go-shared/dbtype"
@@ -57,6 +58,8 @@ import (
 type Scanner struct {
 	// DB is the MySQL pool used for read queries. Required.
 	DB *sql.DB
+	// Logger receives per-row scan failures. Optional for tests.
+	Logger *slog.Logger
 }
 
 // Workspace is the subset of workspaces columns the calendar event-day
@@ -237,10 +240,18 @@ func (s *Scanner) ListEventsForDays(ctx context.Context, workspaceID uint32, tz 
 			}
 			tuples, expandErr := s.expandCandidate(c, d)
 			if expandErr != nil {
-				// A single malformed rule must not abort the workspace scan;
-				// the caller logs per-event failures and keeps going.
-				_ = rows.Close()
-				return nil, fmt.Errorf("expand event %s on %s: %w", c.event.PublicID.String(), d.day, expandErr)
+				// A single malformed rule must not abort the workspace scan.
+				// Log the bad row and keep scanning later events in the same
+				// workspace so one typo cannot permanently block the day.
+				if s.Logger != nil {
+					s.Logger.WarnContext(ctx, "calendar_event_day: expand event failed",
+						slog.Any("err", expandErr),
+						slog.Uint64("workspace_internal_id", uint64(workspaceID)),
+						slog.String("event_public_id", c.event.PublicID.String()),
+						slog.String("event_day", d.day),
+					)
+				}
+				continue
 			}
 			out = append(out, tuples...)
 		}

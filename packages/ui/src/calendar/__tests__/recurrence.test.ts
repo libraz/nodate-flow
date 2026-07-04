@@ -116,3 +116,30 @@ describe('expandRecurrence — shared golden fixtures', () => {
     });
   }
 });
+
+describe('expandRecurrence — empty filters', () => {
+  it('treats empty byDay/byMonthDay arrays as unspecified filters', () => {
+    const event = {
+      startAt: '2026-07-01T09:00:00Z',
+      endAt: '2026-07-01T10:00:00Z',
+      recurrenceRule: {
+        freq: 'daily' as const,
+        interval: 1,
+        count: 2,
+        byDay: [],
+        byMonthDay: [],
+      },
+    };
+
+    const instances = expandRecurrence(
+      event,
+      DateTime.fromISO('2026-07-01T00:00:00Z'),
+      DateTime.fromISO('2026-07-04T00:00:00Z'),
+    );
+
+    expect(instances.map((i) => i.startAt.toUTC().toFormat('yyyy-MM-dd'))).toEqual([
+      '2026-07-01',
+      '2026-07-02',
+    ]);
+  });
+});

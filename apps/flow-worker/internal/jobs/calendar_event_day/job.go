@@ -79,6 +79,7 @@ type Job struct {
 
 	mu                 sync.Mutex
 	lastSuccessfulTick time.Time
+	lastSuccessfulByWS map[uint32]time.Time
 }
 
 // New constructs a Job with its Scanner and Client wired against the
@@ -97,7 +98,7 @@ func New(db *sql.DB, baseURL, token, userAgent string, logger *slog.Logger) (*Jo
 		return nil, err
 	}
 	return &Job{
-		Scanner:       &Scanner{DB: db},
+		Scanner:       &Scanner{DB: db, Logger: logger},
 		Client:        client,
 		Logger:        logger,
 		TickInterval:  defaultTickInterval,
@@ -137,8 +138,8 @@ func (j *Job) Tick(ctx context.Context, now time.Time) error {
 		return nil
 	}
 
-	window := j.dayWindow(now)
 	for _, ws := range workspaces {
+		window := j.dayWindowForWorkspace(ws.ID, now)
 		if err := j.tickForWorkspace(ctx, ws, now, window); err != nil {
 			// One bad workspace must not block the rest. The runner
 			// metric stays "ok" because the loop made progress; per-
@@ -148,10 +149,11 @@ func (j *Job) Tick(ctx context.Context, now time.Time) error {
 				slog.Uint64("workspace_internal_id", uint64(ws.ID)),
 				slog.String("workspace_public_id", ws.PublicID.String()),
 			)
+			continue
 		}
+		j.markWorkspaceSuccessfulTick(ws.ID, now)
 	}
 	obs.CalendarEventDayTicksTotal.WithLabelValues("ok").Inc()
-	j.markSuccessfulTick(now)
 	return nil
 }
 
@@ -252,6 +254,14 @@ func dedupeKey(eventPublicID, day string) string {
 // last successful tick, bounded below by TickInterval for minor scheduler
 // jitter and bounded above by TickInterval+CatchUpWindow for outages.
 func (j *Job) dayWindow(now time.Time) time.Duration {
+	return j.windowSinceLast(j.lastTickForWorkspace(0), now)
+}
+
+func (j *Job) dayWindowForWorkspace(workspaceID uint32, now time.Time) time.Duration {
+	return j.windowSinceLast(j.lastTickForWorkspace(workspaceID), now)
+}
+
+func (j *Job) windowSinceLast(last, now time.Time) time.Duration {
 	interval := j.TickInterval
 	if interval <= 0 {
 		interval = defaultTickInterval
@@ -262,9 +272,6 @@ func (j *Job) dayWindow(now time.Time) time.Duration {
 	}
 	maxWindow := interval + catchUp
 
-	j.mu.Lock()
-	last := j.lastSuccessfulTick
-	j.mu.Unlock()
 	if last.IsZero() {
 		return maxWindow
 	}
@@ -280,7 +287,27 @@ func (j *Job) dayWindow(now time.Time) time.Duration {
 }
 
 func (j *Job) markSuccessfulTick(now time.Time) {
+	j.markWorkspaceSuccessfulTick(0, now)
+}
+
+func (j *Job) markWorkspaceSuccessfulTick(workspaceID uint32, now time.Time) {
 	j.mu.Lock()
-	j.lastSuccessfulTick = now
+	if workspaceID == 0 {
+		j.lastSuccessfulTick = now
+	} else {
+		if j.lastSuccessfulByWS == nil {
+			j.lastSuccessfulByWS = make(map[uint32]time.Time)
+		}
+		j.lastSuccessfulByWS[workspaceID] = now
+	}
 	j.mu.Unlock()
+}
+
+func (j *Job) lastTickForWorkspace(workspaceID uint32) time.Time {
+	j.mu.Lock()
+	defer j.mu.Unlock()
+	if workspaceID == 0 {
+		return j.lastSuccessfulTick
+	}
+	return j.lastSuccessfulByWS[workspaceID]
 }

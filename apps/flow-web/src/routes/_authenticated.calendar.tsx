@@ -23,6 +23,7 @@
 
 import { getOrCreateProvider, type HolidayEntry } from '@nodate-flow/holidays';
 import type { components } from '@nodate-flow/sdk';
+import { expandAllRecurrences, type RecurrenceRule } from '@nodate-flow/ui/calendar';
 import { cx } from '@nodate-flow/ui/lib/cx';
 import Badge from '@nodate-flow/ui/primitives/badge';
 import Button from '@nodate-flow/ui/primitives/button';
@@ -33,6 +34,7 @@ import { BP } from '@nodate-flow/ui/tokens/breakpoints';
 import { useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
 import { createFileRoute, Link, useNavigate } from '@tanstack/react-router';
 import { CalendarRange, ChevronLeft, ChevronRight, Users } from 'lucide-react';
+import { DateTime } from 'luxon';
 import {
   type DragEvent,
   type ReactElement,
@@ -73,6 +75,14 @@ const DUE_BEFORE_START_CODE = 'VALIDATION.BODY.DUE_BEFORE_START';
 
 type CalendarTask = components['schemas']['MyTaskListItem'];
 type CalendarEvent = components['schemas']['MyCalendarEventResponse'];
+type RecurrenceExpansionInput<T> = {
+  event: T;
+  startAt: string;
+  endAt: string;
+  timezone: string;
+  recurrenceRule: RecurrenceRule | null;
+  recurrenceExceptions?: string[];
+};
 type WeekStart = 'mon' | 'sun' | 'sat';
 type Weekday = 'mon' | 'tue' | 'wed' | 'thu' | 'fri' | 'sat' | 'sun';
 
@@ -227,6 +237,68 @@ function isRecurring(event: CalendarEvent): boolean {
   if (typeof rule === 'string') return rule.trim().length > 0;
   // Non-string recurrence payloads (object form) count as recurring.
   return true;
+}
+
+function recurrenceRule(value: unknown): RecurrenceRule | null {
+  if (!value || typeof value !== 'object') return null;
+  const freq = (value as { freq?: unknown }).freq;
+  if (freq !== 'daily' && freq !== 'weekly' && freq !== 'monthly' && freq !== 'yearly') return null;
+  return value as RecurrenceRule;
+}
+
+function recurrenceExceptions(value: unknown): string[] | undefined {
+  if (!Array.isArray(value)) return undefined;
+  const strings = value.filter((v): v is string => typeof v === 'string');
+  return strings.length > 0 ? strings : undefined;
+}
+
+function secondsToIso(seconds: number): string {
+  return new Date(seconds * 1000).toISOString();
+}
+
+function isoToSeconds(iso: string): number | undefined {
+  const millis = Date.parse(iso);
+  if (Number.isNaN(millis)) return undefined;
+  return Math.floor(millis / 1000);
+}
+
+function expandCalendarEvents(
+  events: CalendarEvent[],
+  rangeStart: Date,
+  rangeEnd: Date,
+): CalendarEvent[] {
+  const recurrenceInput: RecurrenceExpansionInput<CalendarEvent>[] = events.map((event) => {
+    const rule = recurrenceRule(event.recurrenceRule);
+    const exceptions = recurrenceExceptions(event.recurrenceExceptions);
+    const input: RecurrenceExpansionInput<CalendarEvent> = {
+      event,
+      startAt: typeof event.startAt === 'number' ? secondsToIso(event.startAt) : '',
+      endAt:
+        typeof event.endAt === 'number'
+          ? secondsToIso(event.endAt)
+          : typeof event.startAt === 'number'
+            ? secondsToIso(event.startAt)
+            : '',
+      timezone: event.timezone,
+      recurrenceRule: rule,
+    };
+    if (exceptions) input.recurrenceExceptions = exceptions;
+    return input;
+  });
+
+  return expandAllRecurrences(
+    recurrenceInput,
+    DateTime.fromJSDate(rangeStart),
+    DateTime.fromJSDate(rangeEnd).plus({ milliseconds: 1 }),
+  ).map((instance) => ({
+    ...instance.event,
+    ...((isoToSeconds(instance.startAt) ?? instance.event.startAt)
+      ? { startAt: isoToSeconds(instance.startAt) ?? instance.event.startAt }
+      : {}),
+    ...((isoToSeconds(instance.endAt) ?? instance.event.endAt)
+      ? { endAt: isoToSeconds(instance.endAt) ?? instance.event.endAt }
+      : {}),
+  }));
 }
 
 /**
@@ -418,6 +490,10 @@ function CalendarRoute(): ReactElement {
   });
 
   const events = eventsQuery.data ?? [];
+  const expandedEvents = useMemo(
+    () => expandCalendarEvents(events, rangeStart, rangeEnd),
+    [events, rangeStart, rangeEnd],
+  );
 
   const rescheduleMut = useMutation<
     components['schemas']['Task'],
@@ -581,7 +657,7 @@ function CalendarRoute(): ReactElement {
   /** dateKey → calendar events (after layer filtering by kind). */
   const eventsByDate = useMemo(() => {
     const map = new Map<string, CalendarEvent[]>();
-    for (const ev of events) {
+    for (const ev of expandedEvents) {
       if (!ev.startAt) continue;
       // Each kind gates on its own layer flag; unknown kinds fall through
       // to the generic `events` flag so the UI never silently hides them.
@@ -599,7 +675,7 @@ function CalendarRoute(): ReactElement {
       arr.sort((a, b) => (a.startAt ?? 0) - (b.startAt ?? 0));
     }
     return map;
-  }, [events, layers.events, layers.blocks, layers.free, layers.milestone]);
+  }, [expandedEvents, layers.events, layers.blocks, layers.free, layers.milestone]);
 
   /**
    * Flat layer-filtered event list for the mobile month-scroll. Mirrors
@@ -608,7 +684,7 @@ function CalendarRoute(): ReactElement {
    * day-keyed map above would otherwise drop their span).
    */
   const filteredEvents = useMemo(() => {
-    return events.filter((ev) => {
+    return expandedEvents.filter((ev) => {
       if (typeof ev.startAt !== 'number') return false;
       const k = ev.kind;
       if (k === 'block') return layers.blocks;
@@ -616,7 +692,7 @@ function CalendarRoute(): ReactElement {
       if (k === 'milestone') return layers.milestone;
       return layers.events;
     });
-  }, [events, layers.events, layers.blocks, layers.free, layers.milestone]);
+  }, [expandedEvents, layers.events, layers.blocks, layers.free, layers.milestone]);
 
   /**
    * dateKey → public holidays for the visible grid range. Empty when the

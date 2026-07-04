@@ -10,6 +10,7 @@ import { describe, expect, it } from 'vitest';
 import {
   buildMonthGrid,
   eventStartKey,
+  expandShareEventsForMonth,
   isMultiDay,
   shiftMonthAnchor,
 } from '../lib/share-month-grid';
@@ -91,6 +92,22 @@ describe('buildMonthGrid', () => {
     const e = evt({ id: 'tz', startAt: utc(2024, 3, 6, 23), endAt: utc(2024, 3, 6, 23) });
     expect(eventStartKey(e, 'UTC')).toBe('2024-03-06');
     expect(eventStartKey(e, 'Asia/Tokyo')).toBe('2024-03-07');
+  });
+
+  it('expands recurring masters before month-grid layout', () => {
+    const e = evt({
+      id: 'r1',
+      startAt: utc(2024, 3, 5, 9),
+      endAt: utc(2024, 3, 5, 10),
+      recurrenceRule: JSON.stringify({ freq: 'daily', interval: 1, count: 2 }),
+    });
+
+    const expanded = expandShareEventsForMonth('2024-03-01', [e], 'UTC', 'sun');
+
+    expect(expanded.map((event) => eventStartKey(event, 'UTC'))).toEqual([
+      '2024-03-05',
+      '2024-03-06',
+    ]);
   });
 });
 

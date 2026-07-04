@@ -149,6 +149,19 @@ func TestExpandDaily_CountCaps(t *testing.T) {
 	require.Empty(t, occ4, "the 4th occurrence must not fire when count=3")
 }
 
+func TestExpandDaily_OldMasterReachesCurrentWindow(t *testing.T) {
+	t.Parallel()
+	loc := time.UTC
+	base := time.Date(2010, time.January, 1, 9, 0, 0, 0, time.UTC)
+	rule := &recurrenceRule{Freq: "daily"}
+
+	ws, we := dayRange(t, loc, 2026, time.July, 4)
+	occ := expandOccurrences(rule, base, loc, time.Time{}, time.Time{}, nil, ws, we)
+
+	require.Len(t, occ, 1, "daily recurrences older than maxOccurrences days must still reach the requested window")
+	require.Equal(t, time.Date(2026, time.July, 4, 9, 0, 0, 0, time.UTC), occ[0])
+}
+
 // TestExpandWeekly_Interval proves FREQ=WEEKLY;INTERVAL=2 skips the off-week:
 // base 07-01 (Wed) fires on 07-15, not 07-08.
 func TestExpandWeekly_Interval(t *testing.T) {

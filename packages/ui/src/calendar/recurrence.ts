@@ -110,8 +110,11 @@ export function expandRecurrence(
     if (until && current > until) break;
 
     const candidate = current;
-    const passesDay = !rule.byDay || matchesByDay(candidate, rule.byDay);
-    const passesMonthDay = !rule.byMonthDay || matchesByMonthDay(candidate, rule.byMonthDay);
+    const passesDay = !rule.byDay || rule.byDay.length === 0 || matchesByDay(candidate, rule.byDay);
+    const passesMonthDay =
+      !rule.byMonthDay ||
+      rule.byMonthDay.length === 0 ||
+      matchesByMonthDay(candidate, rule.byMonthDay);
 
     if (passesDay && passesMonthDay) {
       emitted++;
