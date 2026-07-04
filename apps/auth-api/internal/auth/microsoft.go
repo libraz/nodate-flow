@@ -31,10 +31,10 @@ type MicrosoftClaims struct {
 	Name              string `json:"name"`
 	PreferredUsername string `json:"preferred_username"`
 	TenantID          string `json:"tid"`
-	// EmailVerified reflects the email_verified claim from the
-	// id_token. Microsoft Entra ID may omit it for personal accounts
-	// whose email has not been confirmed; the handler must reject the
-	// exchange in that case.
+	// EmailVerified reflects the generic email_verified claim when
+	// Microsoft emits it. It is not the trust signal used by this
+	// provider: Entra v2.0 may omit it, so validation relies on the
+	// tenant allowlist plus xms_edov instead.
 	EmailVerified bool `json:"email_verified"`
 	// EmailDomainOwnerVerified reflects Microsoft's xms_edov claim.
 	// It proves the domain owner has verified the email domain with

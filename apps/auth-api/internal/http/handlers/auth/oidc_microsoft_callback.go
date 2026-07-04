@@ -49,15 +49,11 @@ func OIDCMicrosoftCallback(deps Deps) func(context.Context, *OIDCCallbackInput) 
 		if email == "" {
 			return nil, httpErr(apierrors.AuthOidcIdTokenInvalid)
 		}
-		// Reject unverified emails. Microsoft Entra ID may omit
-		// email_verified or set it to false for personal Microsoft
-		// accounts whose email has not been confirmed; auto-provisioning
-		// an account with an unverified email would let an attacker
-		// claim a victim's email by creating an unverified Microsoft
-		// account first.
-		if !claims.EmailVerified {
-			return nil, httpErr(apierrors.AuthOidcEmailNotVerified)
-		}
+		// Email trust for Microsoft is enforced by
+		// ValidateMicrosoftClaims: the allowed tenant must match and
+		// xms_edov must be true. Entra v2.0 commonly omits the generic
+		// email_verified claim, so the callback must not apply a second
+		// provider-agnostic gate here.
 		// Enforce the opt-in sign-in allowlist on the verified email
 		// before any provisioning or session issuance. Gates both
 		// new-user creation and existing-user login. No-op (allows all)
