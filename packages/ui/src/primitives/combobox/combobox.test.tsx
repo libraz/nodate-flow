@@ -104,6 +104,21 @@ describe.each(THEMES)('Combobox [%s]', (theme) => {
     await waitFor(() => expect(screen.queryByRole('listbox')).toBeNull());
   });
 
+  it('restores the selected label when dismissed after a partial query', async () => {
+    const user = userEvent.setup();
+    render(<Combobox options={OPTIONS} defaultValue="banana" aria-label="fruit" />);
+    const input = screen.getByRole('combobox') as HTMLInputElement;
+    await user.click(input);
+    await user.clear(input);
+    await user.type(input, 'ch');
+    expect(input.value).toBe('ch');
+
+    await user.keyboard('{Escape}');
+
+    await waitFor(() => expect(screen.queryByRole('listbox')).toBeNull());
+    expect(input.value).toBe('Banana');
+  });
+
   it('ArrowDown moves the active option and aria-activedescendant follows', async () => {
     const user = userEvent.setup();
     render(<Combobox options={OPTIONS} aria-label="fruit" />);

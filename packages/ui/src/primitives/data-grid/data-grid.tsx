@@ -158,6 +158,7 @@ function DataGridInner<TData>(
         <input
           type="checkbox"
           aria-label={selectAllRowsLabel}
+          tabIndex={-1}
           checked={table.getIsAllRowsSelected()}
           ref={(el) => {
             if (el) el.indeterminate = table.getIsSomeRowsSelected();
@@ -169,6 +170,7 @@ function DataGridInner<TData>(
         <input
           type="checkbox"
           aria-label={selectRowLabel(row.index + 1)}
+          tabIndex={-1}
           checked={row.getIsSelected()}
           onChange={row.getToggleSelectedHandler()}
         />
@@ -210,21 +212,25 @@ function DataGridInner<TData>(
   const useFallback = virtualRows.length === 0 && rows.length > 0;
   const totalSize = useFallback ? rows.length * estimateSize : virtualizer.getTotalSize();
 
-  const [focused, setFocused] = useState<FocusedCell>({ row: 0, col: 0 });
+  const headerGroups = table.getHeaderGroups();
+  const firstHeaderRow = -headerGroups.length;
+
+  const [focused, setFocused] = useState<FocusedCell>({ row: firstHeaderRow, col: 0 });
 
   const moveFocus = useCallback(
     (nextRow: number, nextCol: number) => {
-      const r = Math.max(0, Math.min(rows.length - 1, nextRow));
+      const maxRow = rows.length > 0 ? rows.length - 1 : firstHeaderRow;
+      const r = Math.max(firstHeaderRow, Math.min(maxRow, nextRow));
       const c = Math.max(0, Math.min(colCount - 1, nextCol));
       setFocused({ row: r, col: c });
       requestAnimationFrame(() => {
         const el = scrollRef.current?.querySelector<HTMLElement>(
-          `[data-row-index="${r}"][data-col-index="${c}"]`,
+          `[data-focus-row="${r}"][data-col-index="${c}"]`,
         );
         el?.focus();
       });
     },
-    [rows.length, colCount],
+    [rows.length, colCount, firstHeaderRow],
   );
 
   const onCellKeyDown = useCallback(
@@ -248,7 +254,7 @@ function DataGridInner<TData>(
           break;
         case 'Home':
           e.preventDefault();
-          moveFocus(e.ctrlKey ? 0 : rowIdx, 0);
+          moveFocus(e.ctrlKey ? firstHeaderRow : rowIdx, 0);
           break;
         case 'End':
           e.preventDefault();
@@ -266,10 +272,8 @@ function DataGridInner<TData>(
           break;
       }
     },
-    [moveFocus, rows.length, colCount],
+    [moveFocus, rows.length, colCount, firstHeaderRow],
   );
-
-  const headerGroups = table.getHeaderGroups();
 
   /**
    * When resizing is active, derive column widths from the table sizing state
@@ -316,6 +320,7 @@ function DataGridInner<TData>(
         {headerGroups.map((group, gIdx) => (
           <div key={group.id} role="row" aria-rowindex={gIdx + 1} className={styles.headerRow}>
             {group.headers.map((header, hIdx) => {
+              const focusRow = gIdx - headerGroups.length;
               const canSort = header.column.getCanSort();
               const sortDir = header.column.getIsSorted();
               const ariaSort: 'ascending' | 'descending' | 'none' | undefined = canSort
@@ -340,11 +345,23 @@ function DataGridInner<TData>(
                   role="columnheader"
                   aria-colindex={hIdx + 1}
                   aria-sort={ariaSort}
-                  tabIndex={-1}
+                  data-focus-row={focusRow}
+                  data-col-index={hIdx}
+                  tabIndex={focused.row === focusRow && focused.col === hIdx ? 0 : -1}
                   className={cx(styles.headerCell, isPinned === 'left' && styles.pinnedLeft)}
                   style={headerStyle}
+                  onFocus={() => setFocused({ row: focusRow, col: hIdx })}
                   onClick={canSort ? header.column.getToggleSortingHandler() : undefined}
                   onKeyDown={(e) => {
+                    onCellKeyDown(e, focusRow, hIdx);
+                    if (
+                      header.column.id === '__select' &&
+                      (e.key === ' ' || e.key === 'Spacebar')
+                    ) {
+                      e.preventDefault();
+                      table.toggleAllRowsSelected(!table.getIsAllRowsSelected());
+                      return;
+                    }
                     if (canSort && (e.key === 'Enter' || e.key === ' ')) {
                       e.preventDefault();
                       header.column.toggleSorting();
@@ -423,13 +440,24 @@ function DataGridInner<TData>(
                         key={cell.id}
                         role="gridcell"
                         aria-colindex={cIdx + 1}
+                        data-focus-row={idx}
                         data-row-index={idx}
                         data-col-index={cIdx}
                         tabIndex={isFocused ? 0 : -1}
                         className={cx(styles.cell, isPinned === 'left' && styles.pinnedLeft)}
                         style={cellStyle}
                         onFocus={() => setFocused({ row: idx, col: cIdx })}
-                        onKeyDown={(e) => onCellKeyDown(e, idx, cIdx)}
+                        onKeyDown={(e) => {
+                          if (
+                            cell.column.id === '__select' &&
+                            (e.key === ' ' || e.key === 'Spacebar')
+                          ) {
+                            e.preventDefault();
+                            row.toggleSelected();
+                            return;
+                          }
+                          onCellKeyDown(e, idx, cIdx);
+                        }}
                       >
                         {flexRender(cell.column.columnDef.cell, cell.getContext())}
                       </div>

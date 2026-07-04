@@ -194,6 +194,7 @@ const Tabs = forwardRef<HTMLDivElement, TabsProps>(
               id={panelId}
               aria-labelledby={tabId}
               hidden={!selected}
+              tabIndex={0}
               className={styles.panel}
             >
               {selected ? item.content : null}

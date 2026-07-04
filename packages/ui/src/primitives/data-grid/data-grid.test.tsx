@@ -1,5 +1,5 @@
 import type { ColumnDef, ColumnPinningState, RowSelectionState } from '@tanstack/react-table';
-import { fireEvent, render, screen, within } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { type ReactElement, useState } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -64,13 +64,30 @@ describe.each(THEMES)('DataGrid [%s]', (theme) => {
     expect(nameHeader.getAttribute('aria-sort')).toBe('descending');
   });
 
+  it('lets keyboard users focus a sortable header and toggle sorting', async () => {
+    const user = userEvent.setup();
+    renderGrid();
+    const idHeader = screen.getByRole('columnheader', { name: /ID/ }) as HTMLElement;
+    const nameHeader = screen.getByRole('columnheader', { name: /Name/ }) as HTMLElement;
+
+    await user.tab();
+    expect(document.activeElement).toBe(idHeader);
+
+    await user.keyboard('{ArrowRight}');
+    await waitFor(() => expect(document.activeElement).toBe(nameHeader));
+
+    expect(nameHeader.getAttribute('aria-sort')).toBe('none');
+    await user.keyboard('{Enter}');
+    expect(nameHeader.getAttribute('aria-sort')).toBe('ascending');
+  });
+
   it('moves focus with ArrowRight and ArrowDown (roving tabindex)', async () => {
     const user = userEvent.setup();
     renderGrid();
     const cells = screen.getAllByRole('gridcell');
     const first = cells[0] as HTMLElement;
     first.focus();
-    expect(first.getAttribute('tabindex')).toBe('0');
+    await waitFor(() => expect(first.getAttribute('tabindex')).toBe('0'));
 
     await user.keyboard('{ArrowRight}');
     const right = document.querySelector<HTMLElement>('[data-row-index="0"][data-col-index="1"]');
@@ -125,6 +142,44 @@ describe.each(THEMES)('DataGrid [%s]', (theme) => {
     fireEvent.click(checkbox);
     expect(onChange).toHaveBeenCalled();
     expect(checkbox.checked).toBe(true);
+  });
+
+  it('keeps selection checkboxes out of the tab order and toggles from the roving cell', async () => {
+    const user = userEvent.setup();
+    const onChange = vi.fn();
+
+    function Wrapper(): ReactElement {
+      const [sel, setSel] = useState<RowSelectionState>({});
+      return (
+        <DataGrid<Row>
+          aria-label="selectable"
+          columns={COLS}
+          data={ROWS}
+          enableRowSelection
+          rowSelection={sel}
+          onRowSelectionChange={(next) => {
+            onChange(next);
+            setSel(next);
+          }}
+        />
+      );
+    }
+
+    render(<Wrapper />);
+    const firstBodyRow = screen.getAllByRole('row')[1] as HTMLElement;
+    const selectionCell = within(firstBodyRow).getAllByRole('gridcell')[0] as HTMLElement;
+    const checkbox = within(selectionCell).getByRole('checkbox') as HTMLInputElement;
+
+    expect(checkbox.getAttribute('tabindex')).toBe('-1');
+    selectionCell.focus();
+    await waitFor(() => expect(selectionCell.getAttribute('tabindex')).toBe('0'));
+    await user.keyboard(' ');
+
+    expect(onChange).toHaveBeenCalled();
+    await waitFor(() => {
+      const updated = within(selectionCell).getByRole('checkbox') as HTMLInputElement;
+      expect(updated.checked).toBe(true);
+    });
   });
 
   it('keys row selection with getRowId when provided', () => {

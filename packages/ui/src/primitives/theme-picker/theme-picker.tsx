@@ -71,7 +71,10 @@ export interface ThemePickerProps {
 // Defaults
 // ---------------------------------------------------------------------------
 
-/** Default preview styles for the built-in theme families. */
+/** Default preview styles for the built-in theme families.
+ * nf-token-override: miniature previews intentionally hardcode theme sample
+ * colors so they can show each family before that family is active.
+ */
 export const DEFAULT_THEME_PREVIEWS: Record<ThemeFamily, ThemePreviewStyle> = {
   glass: {
     bg: 'linear-gradient(135deg, oklch(96% 0.01 260), oklch(94% 0.008 280))',

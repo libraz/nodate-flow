@@ -210,7 +210,12 @@ function ComboboxImpl(
     open,
     onOpenChange: (next) => {
       setOpen(next);
-      if (next && activeIndex === null) setActiveIndex(0);
+      if (next) {
+        if (activeIndex === null) setActiveIndex(0);
+        return;
+      }
+      setQuery(initialLabel);
+      setActiveIndex(null);
     },
     middleware: [
       offset(4),

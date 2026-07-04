@@ -101,4 +101,10 @@ describe.each(THEMES)('Tabs [%s]', (theme) => {
     expect(screen.getByRole('tab', { name: 'Alpha' }).getAttribute('tabindex')).toBe('-1');
     expect(screen.getByRole('tab', { name: 'Bravo' }).getAttribute('tabindex')).toBe('0');
   });
+
+  it('makes the active tabpanel focusable', () => {
+    render(<Tabs items={ITEMS} aria-label="demo" defaultValue="b" />);
+    const panel = screen.getByRole('tabpanel', { name: 'Bravo' });
+    expect(panel.getAttribute('tabindex')).toBe('0');
+  });
 });
