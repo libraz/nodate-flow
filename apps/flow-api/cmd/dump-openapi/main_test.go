@@ -1,31 +1,55 @@
 package main
 
 import (
+	"encoding/json"
+	"net/http"
+	"net/http/httptest"
+	"reflect"
 	"testing"
+	"time"
 
-	"github.com/danielgtaylor/huma/v2"
+	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/auth"
+	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/router"
+	"github.com/nodate-flow/nodate-flow/packages/go-shared/openapiutil"
 )
 
-func TestPatchErrorModelSchemaAddsExtensions(t *testing.T) {
+func TestDumpOpenAPIMatchesLiveServedSpec(t *testing.T) {
 	t.Parallel()
 
-	spec := &huma.OpenAPI{
-		Components: &huma.Components{
-			Schemas: huma.NewMapRegistry("#/components/schemas/", huma.DefaultSchemaNamer),
-		},
+	issuer, err := auth.NewJWTIssuer(nil, "nodate-flow", "api", 15*time.Minute)
+	if err != nil {
+		t.Fatalf("jwt issuer: %v", err)
 	}
-	spec.Components.Schemas.Map()["ErrorModel"] = &huma.Schema{}
 
-	patchErrorModelSchema(spec)
+	res := router.BuildResult(router.Deps{
+		JWT:              issuer,
+		DisableRateLimit: true,
+	})
 
-	extensions := spec.Components.Schemas.Map()["ErrorModel"].Properties["extensions"]
-	if extensions == nil {
-		t.Fatalf("extensions schema was not added")
+	rr := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/openapi.json", nil)
+	res.Handler.ServeHTTP(rr, req)
+	if rr.Code != http.StatusOK {
+		t.Fatalf("GET /openapi.json status = %d, want 200", rr.Code)
 	}
-	if extensions.Type != "object" {
-		t.Fatalf("extensions type = %q, want object", extensions.Type)
+
+	var live any
+	if err := json.Unmarshal(rr.Body.Bytes(), &live); err != nil {
+		t.Fatalf("unmarshal live openapi: %v", err)
 	}
-	if extensions.AdditionalProperties != true {
-		t.Fatalf("extensions additionalProperties = %#v, want true", extensions.AdditionalProperties)
+
+	merged := mergeSpecs(res.APIs)
+	openapiutil.PatchErrorModelSchema(merged)
+	dumpBytes, err := json.Marshal(merged)
+	if err != nil {
+		t.Fatalf("marshal dump openapi: %v", err)
+	}
+	var dumped any
+	if err := json.Unmarshal(dumpBytes, &dumped); err != nil {
+		t.Fatalf("unmarshal dump openapi: %v", err)
+	}
+
+	if !reflect.DeepEqual(live, dumped) {
+		t.Fatalf("dump-openapi output diverges from live /openapi.json")
 	}
 }
