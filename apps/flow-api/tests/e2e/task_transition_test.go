@@ -74,6 +74,39 @@ func TestTaskReopenFromDone(t *testing.T) {
 	require.Equal(t, "waiting", result.DerivedState)
 }
 
+// TestTaskBlockAndUnblock verifies the advertised block/unblock verbs
+// work in the ADR 0001 direction: block moves active work into waiting,
+// and unblock returns waiting work to open.
+func TestTaskBlockAndUnblock(t *testing.T) {
+	bootstrap(t)
+	t.Parallel()
+	tt := newTenant(t)
+
+	var task struct {
+		ID           string `json:"id"`
+		DerivedState string `json:"derivedState"`
+	}
+	doJSON(t, http.MethodPost, testServerURL+"/tasks", tt.AccessToken,
+		map[string]any{"projectId": tt.ProjectPublicID, "title": "Block/unblock test"}, &task)
+	require.Equal(t, "open", task.DerivedState)
+
+	var blocked struct {
+		DerivedState string `json:"derivedState"`
+	}
+	doJSON(t, http.MethodPost,
+		testServerURL+"/tasks/"+task.ID+"/transitions",
+		tt.AccessToken, map[string]any{"transition": "block"}, &blocked)
+	require.Equal(t, "waiting", blocked.DerivedState)
+
+	var unblocked struct {
+		DerivedState string `json:"derivedState"`
+	}
+	doJSON(t, http.MethodPost,
+		testServerURL+"/tasks/"+task.ID+"/transitions",
+		tt.AccessToken, map[string]any{"transition": "unblock"}, &unblocked)
+	require.Equal(t, "open", unblocked.DerivedState)
+}
+
 // TestTaskCancelFromOpen verifies that cancelling an open task works.
 func TestTaskCancelFromOpen(t *testing.T) {
 	bootstrap(t)

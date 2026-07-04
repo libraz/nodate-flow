@@ -87,7 +87,7 @@ function makeWrapper(client: QueryClient): (props: { children: ReactNode }) => R
 function primeInfinite(client: QueryClient, tasks: TaskListItem[]): readonly unknown[] {
   const key = tasksKeys.infinite('prj-1');
   const data: InfiniteData<TasksPage> = {
-    pages: [{ tasks, nextCursor: null, total: tasks.length, offset: 0 }],
+    pages: [{ tasks, nextCursor: null, total: tasks.length, offset: 0, nextOffset: tasks.length }],
     pageParams: [0],
   };
   client.setQueryData(key, data);

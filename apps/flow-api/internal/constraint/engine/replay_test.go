@@ -28,6 +28,45 @@ func TestReplay_ReopenLoop(t *testing.T) {
 	}
 }
 
+func TestReplay_BlockUnblockDirections(t *testing.T) {
+	cases := []struct {
+		name string
+		evs  []TransitionEvent
+		want DerivedState
+	}{
+		{
+			name: "open block to waiting",
+			evs:  []TransitionEvent{{Name: "block"}},
+			want: StateWaiting,
+		},
+		{
+			name: "waiting unblock to open",
+			evs:  []TransitionEvent{{Name: "block"}, {Name: "unblock"}},
+			want: StateOpen,
+		},
+		{
+			name: "review block to waiting",
+			evs:  []TransitionEvent{{Name: "start"}, {Name: "submit"}, {Name: "block"}},
+			want: StateWaiting,
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			st, err := Replay(tc.evs)
+			if err != nil || st != tc.want {
+				t.Fatalf("expected %s, got %v %v", tc.want, st, err)
+			}
+		})
+	}
+}
+
+func TestReplay_WaitingBlockIsIllegal(t *testing.T) {
+	_, err := Replay([]TransitionEvent{{Name: "start"}, {Name: "block"}})
+	if err != ErrIllegalTransition {
+		t.Fatalf("expected ErrIllegalTransition, got %v", err)
+	}
+}
+
 func TestReplay_IllegalTransition(t *testing.T) {
 	_, err := Replay([]TransitionEvent{{Name: "submit"}}) // open→submit is illegal
 	if err != ErrIllegalTransition {
@@ -61,6 +100,7 @@ func TestParseTransitionName(t *testing.T) {
 		ok   bool
 	}{
 		"task.transition.start":    {"start", true},
+		"task.transition.unblock":  {"unblock", true},
 		"task.transition.complete": {"complete", true},
 		"task.transition.":         {"", false},
 		"task.created":             {"", false},

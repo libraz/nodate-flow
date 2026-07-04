@@ -638,7 +638,7 @@ type ListTransitionEventsForReplayParams struct {
 }
 
 type ListTransitionEventsForReplayRow struct {
-	ID              int64         `json:"-"`
+	ID              uint64        `json:"-"`
 	Type            string        `json:"type"`
 	OccurredAt      time.Time     `json:"occurredAt"`
 	ReversesEventID sql.NullInt64 `json:"-"`
@@ -656,7 +656,12 @@ func (q *Queries) ListTransitionEventsForReplay(ctx context.Context, arg ListTra
 	items := []ListTransitionEventsForReplayRow{}
 	for rows.Next() {
 		var i ListTransitionEventsForReplayRow
-		if err := rows.Scan(&i.ID, &i.Type, &i.OccurredAt, &i.ReversesEventID); err != nil {
+		if err := rows.Scan(
+			&i.ID,
+			&i.Type,
+			&i.OccurredAt,
+			&i.ReversesEventID,
+		); err != nil {
 			return nil, err
 		}
 		items = append(items, i)

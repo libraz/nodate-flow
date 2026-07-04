@@ -28,19 +28,19 @@ func TestBoardDropTransitionsMatchBackend(t *testing.T) {
 
 	cases := []dropCase{
 		// Direct transitions
-		{name: "open→waiting (start)", setup: nil, transition: "start", expect: "waiting"},
+		{name: "open→waiting (block)", setup: nil, transition: "block", expect: "waiting"},
 		{name: "open→done (complete)", setup: nil, transition: "complete", expect: "done"},
 		{name: "open→cancelled (cancel)", setup: nil, transition: "cancel", expect: "cancelled"},
 		{name: "waiting→review (submit)", setup: []string{"start"}, transition: "submit", expect: "review"},
-		{name: "waiting→open (block)", setup: []string{"start"}, transition: "block", expect: "open"},
+		{name: "waiting→open (unblock)", setup: []string{"start"}, transition: "unblock", expect: "open"},
 		{name: "waiting→cancelled (cancel)", setup: []string{"start"}, transition: "cancel", expect: "cancelled"},
+		{name: "review→waiting (block)", setup: []string{"start", "submit"}, transition: "block", expect: "waiting"},
 		{name: "review→done (complete)", setup: []string{"start", "submit"}, transition: "complete", expect: "done"},
 		{name: "review→cancelled (cancel)", setup: []string{"start", "submit"}, transition: "cancel", expect: "cancelled"},
 		{name: "cancelled→open (reopen)", setup: []string{"cancel"}, transition: "reopen", expect: "open"},
 
 		// Lenient transitions (frontend resolves to the closest legal verb)
 		{name: "done→waiting (reopen)", setup: []string{"complete"}, transition: "reopen", expect: "waiting"},
-		{name: "review→waiting (reopen)", setup: []string{"start", "submit"}, transition: "reopen", expect: "waiting"},
 	}
 
 	for _, tc := range cases {
@@ -90,6 +90,8 @@ func TestBoardDropIllegalTransitionsRejected(t *testing.T) {
 	cases := []illegalCase{
 		// open → review: no direct transition
 		{name: "open→review (submit)", setup: nil, transition: "submit"},
+		// waiting → blocked is not a valid block direction; use unblock to return to open.
+		{name: "waiting→block", setup: []string{"start"}, transition: "block"},
 		// done → cancelled: needs two steps
 		{name: "done→cancel", setup: []string{"complete"}, transition: "cancel"},
 	}

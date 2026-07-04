@@ -11,12 +11,13 @@ describe('transitionForDrop', () => {
   // ── Direct (exact) transitions ──────────────────────────────
 
   it.each<[TaskDerivedState, TaskDerivedState, string, TaskDerivedState]>([
-    ['open', 'waiting', 'start', 'waiting'],
+    ['open', 'waiting', 'block', 'waiting'],
     ['open', 'done', 'complete', 'done'],
     ['open', 'cancelled', 'cancel', 'cancelled'],
     ['waiting', 'review', 'submit', 'review'],
-    ['waiting', 'open', 'block', 'open'],
+    ['waiting', 'open', 'unblock', 'open'],
     ['waiting', 'cancelled', 'cancel', 'cancelled'],
+    ['review', 'waiting', 'block', 'waiting'],
     ['review', 'done', 'complete', 'done'],
     ['review', 'cancelled', 'cancel', 'cancelled'],
     ['cancelled', 'open', 'reopen', 'open'],
@@ -34,8 +35,6 @@ describe('transitionForDrop', () => {
     ['done', 'open', 'reopen', 'waiting'],
     // done → waiting resolves to reopen, landing in waiting
     ['done', 'waiting', 'reopen', 'waiting'],
-    // review → waiting resolves to reopen, landing in waiting
-    ['review', 'waiting', 'reopen', 'waiting'],
     // review → open resolves to reopen, landing in waiting (not open)
     ['review', 'open', 'reopen', 'waiting'],
     // cancelled → waiting resolves to reopen, but actually lands in open

@@ -201,18 +201,30 @@ function InlineTitleCell({
   const { t } = useTranslation('common');
   const inputRef = useRef<HTMLInputElement>(null);
   const [draft, setDraft] = useState(task.title);
+  /* Distinguish single click (navigate) from double click (edit).
+     We delay navigation by 250ms; a double-click within that window
+     cancels the pending navigate and enters edit mode instead. */
+  const clickTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  /* Reset draft when entering edit mode via a re-render. */
-  const prevEditing = useRef(false);
-  if (editing && !prevEditing.current) {
+  /* Reset draft and focus when switching to edit mode. */
+  useEffect(() => {
+    if (!editing) return;
     setDraft(task.title);
-  }
-  prevEditing.current = editing;
+    requestAnimationFrame(() => {
+      if (inputRef.current && document.activeElement !== inputRef.current) {
+        inputRef.current.focus();
+      }
+    });
+  }, [editing, task.title]);
 
-  /* Auto-focus when switching to edit mode. */
-  if (editing && inputRef.current && document.activeElement !== inputRef.current) {
-    requestAnimationFrame(() => inputRef.current?.focus());
-  }
+  // Clean up pending click timer on unmount to prevent stale navigation.
+  useEffect(() => {
+    return () => {
+      if (clickTimer.current !== null) {
+        clearTimeout(clickTimer.current);
+      }
+    };
+  }, []);
 
   if (editing) {
     return (
@@ -249,20 +261,6 @@ function InlineTitleCell({
       />
     );
   }
-
-  /* Distinguish single click (navigate) from double click (edit).
-     We delay navigation by 250ms; a double-click within that window
-     cancels the pending navigate and enters edit mode instead. */
-  const clickTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  // Clean up pending click timer on unmount to prevent stale navigation.
-  useEffect(() => {
-    return () => {
-      if (clickTimer.current !== null) {
-        clearTimeout(clickTimer.current);
-      }
-    };
-  }, []);
 
   return (
     <Link

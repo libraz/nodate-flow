@@ -70,6 +70,8 @@ func NextState(current generated.TasksDerivedState, transition string) (generate
 		switch transition {
 		case TransitionStart:
 			return generated.TasksDerivedStateWaiting, true
+		case TransitionBlock:
+			return generated.TasksDerivedStateWaiting, true
 		case TransitionCancel:
 			return generated.TasksDerivedStateCancelled, true
 		case TransitionComplete:
@@ -79,13 +81,15 @@ func NextState(current generated.TasksDerivedState, transition string) (generate
 		switch transition {
 		case TransitionSubmit:
 			return generated.TasksDerivedStateReview, true
-		case TransitionBlock:
+		case TransitionUnblock:
 			return generated.TasksDerivedStateOpen, true
 		case TransitionCancel:
 			return generated.TasksDerivedStateCancelled, true
 		}
 	case generated.TasksDerivedStateReview:
 		switch transition {
+		case TransitionBlock:
+			return generated.TasksDerivedStateWaiting, true
 		case TransitionComplete:
 			return generated.TasksDerivedStateDone, true
 		case TransitionReopen:

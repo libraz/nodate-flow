@@ -24,6 +24,7 @@ import (
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/eventbus"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/itemkit"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/tasknumber"
+	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/taskstate"
 )
 
 // countLinkedEvents returns how many enabled calendar_events are
@@ -1160,56 +1161,6 @@ func translateItemkitMCPError(err error) error {
 	return apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
 }
 
-// mcpKnownTransitions is the set of transitions accepted by the
-// transition_task MCP tool. Mirrors the HTTP handler's knownTransitions.
-var mcpKnownTransitions = map[string]struct{}{
-	"start": {}, "block": {}, "unblock": {}, "submit": {},
-	"complete": {}, "reopen": {}, "cancel": {},
-}
-
-// mcpNextState mirrors the v1 state machine from the HTTP handler layer.
-// Duplicated here to avoid importing the handler package from MCP.
-func mcpNextState(current generated.TasksDerivedState, transition string) (generated.TasksDerivedState, bool) {
-	switch current {
-	case generated.TasksDerivedStateOpen:
-		switch transition {
-		case "start":
-			return generated.TasksDerivedStateWaiting, true
-		case "cancel":
-			return generated.TasksDerivedStateCancelled, true
-		case "complete":
-			return generated.TasksDerivedStateDone, true
-		}
-	case generated.TasksDerivedStateWaiting:
-		switch transition {
-		case "submit":
-			return generated.TasksDerivedStateReview, true
-		case "block":
-			return generated.TasksDerivedStateOpen, true
-		case "cancel":
-			return generated.TasksDerivedStateCancelled, true
-		}
-	case generated.TasksDerivedStateReview:
-		switch transition {
-		case "complete":
-			return generated.TasksDerivedStateDone, true
-		case "reopen":
-			return generated.TasksDerivedStateWaiting, true
-		case "cancel":
-			return generated.TasksDerivedStateCancelled, true
-		}
-	case generated.TasksDerivedStateDone:
-		if transition == "reopen" {
-			return generated.TasksDerivedStateWaiting, true
-		}
-	case generated.TasksDerivedStateCancelled:
-		if transition == "reopen" {
-			return generated.TasksDerivedStateOpen, true
-		}
-	}
-	return "", false
-}
-
 func runTransitionTask(ctx context.Context, deps Deps, s *session, raw json.RawMessage) (any, error) {
 	var in struct {
 		TaskID     string  `json:"taskId"`
@@ -1219,7 +1170,7 @@ func runTransitionTask(ctx context.Context, deps Deps, s *session, raw json.RawM
 	if err := parseArgs(raw, &in); err != nil {
 		return nil, err
 	}
-	if _, ok := mcpKnownTransitions[in.Transition]; !ok {
+	if !taskstate.IsKnownTransition(in.Transition) {
 		return nil, apierrors.New(apierrors.McpToolArgumentsInvalid)
 	}
 	if _, err := requireWorkspaceMember(ctx, deps, s); err != nil {
@@ -1229,20 +1180,6 @@ func runTransitionTask(ctx context.Context, deps Deps, s *session, raw json.RawM
 	if err != nil {
 		return nil, err
 	}
-	current, err := deps.Queries.FindTaskByPublicId(ctx, generated.FindTaskByPublicIdParams{
-		WorkspaceID: s.workspaceID,
-		PublicID:    pub,
-	})
-	if err != nil {
-		if stderrors.Is(err, sql.ErrNoRows) {
-			return nil, apierrors.New(apierrors.McpToolExecutionFailed)
-		}
-		return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
-	}
-	nextDerived, ok := mcpNextState(current.DerivedState, in.Transition)
-	if !ok {
-		return nil, apierrors.New(apierrors.WsTaskTransitionRejected)
-	}
 
 	tx, err := deps.DB.BeginTx(ctx, nil)
 	if err != nil {
@@ -1250,38 +1187,26 @@ func runTransitionTask(ctx context.Context, deps Deps, s *session, raw json.RawM
 	}
 	defer func() { _ = tx.Rollback() }()
 
-	qtx := generated.New(tx)
-	if err := qtx.TransitionTaskState(ctx, generated.TransitionTaskStateParams{
-		DerivedState:    nextDerived,
-		Column2:         string(nextDerived),
-		UpdatedByUserID: sql.NullInt32{Int32: int32(s.userID), Valid: true}, //#nosec G115 -- session user id is users.id (BIGINT UNSIGNED), fits int32 within realistic deployments
-		WorkspaceID:     s.workspaceID,
-		PublicID:        pub,
-	}); err != nil {
-		return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
-	}
-
-	taskID64 := int64(taskInternal)
 	actor := int64(s.userID)
 	reason := ""
 	if in.Reason != nil {
 		reason = *in.Reason
 	}
-	if err := eventbus.Append(ctx, tx, eventbus.Event{
-		Type:        eventbus.TaskTransition(in.Transition),
-		WorkspaceID: s.workspaceID,
-		ActorUserID: &actor,
-		TaskID:      &taskID64,
-		Payload: map[string]any{
-			"taskId":     pub.String(),
-			"transition": in.Transition,
-			"fromState":  string(current.DerivedState),
-			"toState":    string(nextDerived),
-			"reason":     reason,
-			"via":        "mcp",
-		},
-	}); err != nil {
-		return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
+	result, spec, applyErr := taskstate.ApplyTransitionTx(ctx, tx, taskstate.ApplyParams{
+		WorkspaceID:  s.workspaceID,
+		TaskID:       taskInternal,
+		PublicID:     pub,
+		Transition:   in.Transition,
+		ActorUserID:  &actor,
+		Reason:       reason,
+		Via:          "mcp",
+		ExtraPayload: nil,
+	})
+	if applyErr != nil {
+		return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, applyErr)
+	}
+	if spec != nil {
+		return nil, apierrors.New(spec)
 	}
 
 	if err := tx.Commit(); err != nil {
@@ -1289,8 +1214,8 @@ func runTransitionTask(ctx context.Context, deps Deps, s *session, raw json.RawM
 	}
 	return map[string]any{
 		"id":         pub.String(),
-		"fromState":  string(current.DerivedState),
-		"toState":    string(nextDerived),
+		"fromState":  string(result.FromState),
+		"toState":    string(result.ToState),
 		"transition": in.Transition,
 	}, nil
 }
@@ -1349,7 +1274,8 @@ func runSearchTasks(ctx context.Context, deps Deps, s *session, raw json.RawMess
 	if err := parseArgs(raw, &in); err != nil {
 		return nil, err
 	}
-	if _, err := requireWorkspaceMember(ctx, deps, s); err != nil {
+	wsRole, err := requireWorkspaceMember(ctx, deps, s)
+	if err != nil {
 		return nil, err
 	}
 	if in.Query == "" {
@@ -1360,22 +1286,68 @@ func runSearchTasks(ctx context.Context, deps Deps, s *session, raw json.RawMess
 	}
 
 	pattern := "%" + in.Query + "%"
-	rows, err := deps.Queries.SearchTasks(ctx, generated.SearchTasksParams{
-		WorkspaceID: s.workspaceID,
-		Title:       pattern,
-		Description: sql.NullString{String: pattern, Valid: true},
-		Limit:       in.Limit,
-		Offset:      in.Offset,
-	})
+	rows, err := searchMCPTasks(ctx, deps.DB, s.workspaceID, s.userID, wsRole, pattern, in.Limit, in.Offset)
 	if err != nil {
 		return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
 	}
 
 	items := make([]map[string]any, 0, len(rows))
 	for _, r := range rows {
-		items = append(items, taskListRowToMap(r.PublicID, r.Title, string(r.DerivedState), r.Priority, r.DueOn))
+		items = append(items, taskListRowToMap(r.publicID, r.title, r.derivedState, r.priority, r.dueOn))
 	}
 	return map[string]any{"tasks": items}, nil
+}
+
+func searchMCPTasks(
+	ctx context.Context,
+	db *sql.DB,
+	workspaceID uint32,
+	actorID uint32,
+	wsRole acl.WorkspaceRole,
+	pattern string,
+	limit int32,
+	offset int32,
+) ([]mcpTaskListRow, error) {
+	where := []string{"v.workspace_id = ?", "(v.title LIKE ? OR t.description LIKE ?)"}
+	args := []any{workspaceID, pattern, pattern}
+	if visFrag, visArgs := acl.TaskVisibilityFilter(actorID, wsRole); visFrag != "" {
+		where = append(where, visFrag)
+		args = append(args, visArgs...)
+	}
+
+	//#nosec G201 -- WHERE fragments are static literals; user values are bound.
+	query := fmt.Sprintf(`SELECT
+  v.public_id,
+  v.title,
+  v.derived_state,
+  v.priority,
+  v.due_on
+FROM v_task_list v
+INNER JOIN tasks t
+  ON t.public_id = v.public_id AND t.workspace_id = v.workspace_id
+WHERE %s
+ORDER BY v.priority DESC, v.due_on ASC, v.created_at DESC, v.public_id DESC
+LIMIT ? OFFSET ?`, strings.Join(where, " AND "))
+	args = append(args, limit, offset)
+
+	rows, err := db.QueryContext(ctx, query, args...) //#nosec G701 -- query is assembled from static WHERE fragments; all user values are bound args.
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	out := []mcpTaskListRow{}
+	for rows.Next() {
+		var r mcpTaskListRow
+		if err := rows.Scan(&r.publicID, &r.title, &r.derivedState, &r.priority, &r.dueOn); err != nil {
+			return nil, err
+		}
+		out = append(out, r)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return out, nil
 }
 
 // runProposeTasksFrom asks the workspace's LLM provider to turn a free-text
@@ -1912,9 +1884,11 @@ func runExportTasks(ctx context.Context, deps Deps, s *session, raw json.RawMess
 	if err := parseArgs(raw, &in); err != nil {
 		return nil, err
 	}
-	if _, err := requireWorkspaceMember(ctx, deps, s); err != nil {
+	wsRole, err := requireWorkspaceMember(ctx, deps, s)
+	if err != nil {
 		return nil, err
 	}
+	visibility := mcpExportVisibilityParams(s.userID, wsRole)
 	if in.Limit <= 0 || in.Limit > 200 {
 		in.Limit = 200
 	}
@@ -1936,9 +1910,13 @@ func runExportTasks(ctx context.Context, deps Deps, s *session, raw json.RawMess
 			return nil, err
 		}
 		dbRows, err := deps.Queries.ExportTasksForLens(ctx, generated.ExportTasksForLensParams{
-			WorkspaceID: s.workspaceID,
-			ProjectID:   prjID,
-			Limit:       in.Limit,
+			WorkspaceID:   s.workspaceID,
+			ProjectID:     prjID,
+			IsElevated:    visibility.isElevated,
+			ActorUserID:   visibility.actorUserID,
+			ActorUserID_2: visibility.actorUserID,
+			ActorUserID_3: visibility.actorUserID,
+			Limit:         in.Limit,
 		})
 		if err != nil {
 			return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
@@ -1958,8 +1936,12 @@ func runExportTasks(ctx context.Context, deps Deps, s *session, raw json.RawMess
 		}
 	} else {
 		dbRows, err := deps.Queries.ExportTasksForWorkspace(ctx, generated.ExportTasksForWorkspaceParams{
-			WorkspaceID: s.workspaceID,
-			Limit:       in.Limit,
+			WorkspaceID:   s.workspaceID,
+			IsElevated:    visibility.isElevated,
+			ActorUserID:   visibility.actorUserID,
+			ActorUserID_2: visibility.actorUserID,
+			ActorUserID_3: visibility.actorUserID,
+			Limit:         in.Limit,
 		})
 		if err != nil {
 			return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
@@ -1999,6 +1981,22 @@ func runExportTasks(ctx context.Context, deps Deps, s *session, raw json.RawMess
 		items = append(items, m)
 	}
 	return map[string]any{"tasks": items}, nil
+}
+
+type mcpExportVisibility struct {
+	isElevated  int64
+	actorUserID int64
+}
+
+func mcpExportVisibilityParams(actorID uint32, wsRole acl.WorkspaceRole) mcpExportVisibility {
+	var elevated int64
+	if wsRole.AtLeast(acl.WorkspaceRoleAdmin) {
+		elevated = 1
+	}
+	return mcpExportVisibility{
+		isElevated:  elevated,
+		actorUserID: int64(actorID),
+	}
 }
 
 // runProposeRelations finds related or duplicate tasks for a given task

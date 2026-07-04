@@ -90,7 +90,7 @@ func Replay(events []TransitionEvent) (DerivedState, error) {
 }
 
 // nextState is a string-typed copy of the state machine in
-// apps/flow-api/internal/http/handlers/tasks/transitions.go so the
+// apps/flow-api/internal/taskstate/state.go so the
 // replay package stays free of the generated enum dependency. Any
 // change to the canonical state machine MUST be reflected here
 // and covered by replay equivalence tests.
@@ -99,6 +99,8 @@ func nextState(current DerivedState, transition string) (DerivedState, bool) {
 	case StateOpen:
 		switch transition {
 		case "start":
+			return StateWaiting, true
+		case "block":
 			return StateWaiting, true
 		case "cancel":
 			return StateCancelled, true
@@ -109,13 +111,15 @@ func nextState(current DerivedState, transition string) (DerivedState, bool) {
 		switch transition {
 		case "submit":
 			return StateReview, true
-		case "block":
+		case "unblock":
 			return StateOpen, true
 		case "cancel":
 			return StateCancelled, true
 		}
 	case StateReview:
 		switch transition {
+		case "block":
+			return StateWaiting, true
 		case "complete":
 			return StateDone, true
 		case "reopen":

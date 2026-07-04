@@ -3,6 +3,8 @@ package constraint
 import (
 	"errors"
 	"testing"
+
+	apierrors "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/errors"
 )
 
 func codeOf(t *testing.T, raw string) string {
@@ -34,6 +36,26 @@ func TestParseError_Codes(t *testing.T) {
 	for in, want := range cases {
 		if got := codeOf(t, in); got != want {
 			t.Errorf("Parse(%q) code = %q, want %q", in, got, want)
+		}
+	}
+}
+
+func TestParseErrorCodesMatchGeneratedCatalog(t *testing.T) {
+	cases := map[string]string{
+		"invalid json":         apierrors.ConstraintParseInvalidJson.Code,
+		"unsupported operator": apierrors.ConstraintParseUnsupportedOperator.Code,
+		"missing arg":          apierrors.ConstraintParseMissingArg.Code,
+		"empty terms":          apierrors.ConstraintParseEmptyTerms.Code,
+	}
+	local := map[string]string{
+		"invalid json":         CodeInvalidJSON,
+		"unsupported operator": CodeUnsupportedOperator,
+		"missing arg":          CodeMissingArg,
+		"empty terms":          CodeEmptyTerms,
+	}
+	for name, want := range cases {
+		if got := local[name]; got != want {
+			t.Fatalf("%s code drifted: local=%q generated=%q", name, got, want)
 		}
 	}
 }

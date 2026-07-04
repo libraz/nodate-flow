@@ -105,6 +105,36 @@ func TestCheckConstraintRelationSuggestionsNoSelf(t *testing.T) {
 		"error must reference the CHECK constraint name")
 }
 
+// TestTriggerRejectsDirectDerivedStateUpdate verifies that the test schema
+// loader applies sql/triggers/tasks_derived_state_guard.sql. Direct writes to
+// tasks.derived_state must fail unless the canonical state engine opt-in is
+// set on the session.
+func TestTriggerRejectsDirectDerivedStateUpdate(t *testing.T) {
+	bootstrap(t)
+	t.Parallel()
+
+	tt := newTenant(t)
+
+	var task struct {
+		ID string `json:"id"`
+	}
+	doJSON(t, http.MethodPost, testServerURL+"/tasks", tt.AccessToken,
+		map[string]any{"projectId": tt.ProjectPublicID, "title": "Trigger guard test"},
+		&task)
+	require.NotEmpty(t, task.ID)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	_, err := testDB.ExecContext(ctx,
+		`UPDATE tasks
+		   SET derived_state = 'waiting'
+		 WHERE public_id = UUID_TO_BIN(?, 0)`,
+		task.ID)
+	require.Error(t, err, "direct derived_state update must be rejected by trigger")
+	require.Contains(t, err.Error(), "derived_state mutation must go through the events engine")
+}
+
 // ---------------------------------------------------------------------------
 // 2. Soft-delete UNIQUE constraint behavior
 // ---------------------------------------------------------------------------

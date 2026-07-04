@@ -12,7 +12,7 @@ import DatePicker from '@nodate-flow/ui/primitives/date-picker';
 import { toaster } from '@nodate-flow/ui/primitives/toast';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import type { ReactElement } from 'react';
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { formatApiError } from '../../lib/api-error';
@@ -183,6 +183,19 @@ export default function TaskSpreadsheetView({ projectId }: TaskSpreadsheetViewPr
   const [editDraft, setEditDraft] = useState('');
 
   const parentRef = useRef<HTMLDivElement>(null);
+  const selectionResetKey = [
+    filters.search ?? '',
+    filters.assigneeId ?? '',
+    (filters.states ?? []).join(','),
+    (filters.priority ?? []).join(','),
+  ].join('\0');
+  const previousSelectionResetKey = useRef(selectionResetKey);
+
+  useEffect(() => {
+    if (previousSelectionResetKey.current === selectionResetKey) return;
+    previousSelectionResetKey.current = selectionResetKey;
+    setSelectedRows(new Set());
+  }, [selectionResetKey]);
 
   const virtualizer = useVirtualizer({
     count: tasks.length,

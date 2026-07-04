@@ -34,14 +34,14 @@ import { type TaskListItem, tasksKeys, useTasksInfiniteQuery } from '../api';
 
 /* ── Fixture helpers ──────────────────────────────────────── */
 
-function aTask(id: string): TaskListItem {
+function aTask(id: string, priority = 0): TaskListItem {
   return {
     id,
     projectId: 'prj-1',
     workspaceId: 'ws-1',
     title: `Task ${id}`,
     derivedState: 'open',
-    priority: 0,
+    priority,
     primaryAssigneeId: null,
     assigneeCount: 0,
     sortWeight: 0,
@@ -150,6 +150,59 @@ describe('useTasksInfiniteQuery', () => {
     expect(flat).toHaveLength(250);
     expect(flat[0]?.id).toBe('t-0');
     expect(flat.at(-1)?.id).toBe('t-249');
+    expect(result.current.hasNextPage).toBe(false);
+  });
+
+  it('skips empty backend pages when applying the priority filter client-side', async () => {
+    const pageOne = {
+      tasks: Array.from({ length: 100 }, (_, i) => aTask(`low-${i}`, 1)),
+      total: 250,
+    };
+    const pageTwo = {
+      tasks: [aTask('urgent-1', 4), ...Array.from({ length: 99 }, (_, i) => aTask(`mid-${i}`, 2))],
+      total: 250,
+    };
+    const pageThree = {
+      tasks: Array.from({ length: 50 }, (_, i) => aTask(`tail-${i}`, 1)),
+      total: 250,
+    };
+    sdkMocks.get
+      .mockResolvedValueOnce({ data: pageOne, error: null })
+      .mockResolvedValueOnce({ data: pageTwo, error: null })
+      .mockResolvedValueOnce({ data: pageThree, error: null });
+
+    const client = buildClient();
+    const { result } = renderHook(() => useTasksInfiniteQuery('prj-1', { priority: [4] }), {
+      wrapper: makeWrapper(client),
+    });
+
+    await waitFor(() => {
+      expect(result.current.data).toBeDefined();
+    });
+
+    expect(result.current.data.pages).toHaveLength(1);
+    expect(result.current.data.pages[0]?.tasks.map((task) => task.id)).toEqual(['urgent-1']);
+    expect(result.current.hasNextPage).toBe(true);
+
+    const firstQuery = sdkMocks.get.mock.calls[0]?.[1]?.params?.query as
+      | Record<string, unknown>
+      | undefined;
+    const secondQuery = sdkMocks.get.mock.calls[1]?.[1]?.params?.query as
+      | Record<string, unknown>
+      | undefined;
+    expect(firstQuery?.offset).toBe(0);
+    expect(secondQuery?.offset).toBe(100);
+
+    await result.current.fetchNextPage();
+    await waitFor(() => {
+      expect(result.current.data.pages).toHaveLength(2);
+    });
+
+    const thirdQuery = sdkMocks.get.mock.calls[2]?.[1]?.params?.query as
+      | Record<string, unknown>
+      | undefined;
+    expect(thirdQuery?.offset).toBe(200);
+    expect(result.current.data.pages[1]?.tasks).toHaveLength(0);
     expect(result.current.hasNextPage).toBe(false);
   });
 

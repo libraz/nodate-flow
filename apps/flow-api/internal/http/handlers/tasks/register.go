@@ -286,7 +286,7 @@ func RegisterTaskScopedEditorWrites(api huma.API, deps Deps) {
 		Method:      http.MethodPost,
 		Path:        "/tasks/{id}/transitions",
 		Summary:     "Apply a state machine transition to a task",
-		Description: "Applies the named transition to the task. Validates against the state machine and emits a task.transitioned event. Refuses transitions that violate attached constraints.",
+		Description: "Applies the named transition to the task. Validates against the state machine and emits a task.transitioned event. Attached constraints are advisory markers evaluated by the constraint engine; they do not reject transitions.",
 		Tags:        []string{"Tasks"},
 	}, Transition(deps))
 

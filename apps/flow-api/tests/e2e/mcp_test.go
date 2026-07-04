@@ -69,6 +69,61 @@ func TestMCPTokenAndJSONRPC(t *testing.T) {
 	require.Greater(t, invocations, 0, "tools/call must record mcp_invocations row")
 }
 
+// TestMCPTransitionTaskUsesCanonicalStateEngine verifies that MCP task
+// transitions go through the same trigger-aware state engine as REST. With
+// trg_tasks_derived_state_guard loaded, a direct TransitionTaskState update
+// would fail; this test must still transition the task successfully.
+func TestMCPTransitionTaskUsesCanonicalStateEngine(t *testing.T) {
+	bootstrap(t)
+	t.Parallel()
+
+	tt := newTenant(t)
+
+	var tokenResp struct {
+		Token string `json:"token"`
+	}
+	doJSON(t, http.MethodPost,
+		testServerURL+"/workspaces/"+tt.WorkspacePublicID+"/me/mcp-tokens",
+		tt.AccessToken, map[string]any{
+			"name":   "transition-token",
+			"scopes": []string{"read:workspace", "write:workspace"},
+		}, &tokenResp)
+	require.NotEmpty(t, tokenResp.Token)
+
+	var task struct {
+		ID string `json:"id"`
+	}
+	doJSON(t, http.MethodPost, testServerURL+"/tasks", tt.AccessToken, map[string]any{
+		"projectId": tt.ProjectPublicID,
+		"title":     "MCP transition target",
+	}, &task)
+	require.NotEmpty(t, task.ID)
+
+	body := mcpCall(t, tokenResp.Token, "tools/call", map[string]any{
+		"name": "transition_task",
+		"arguments": map[string]any{
+			"taskId":     task.ID,
+			"transition": "start",
+			"reason":     "e2e",
+		},
+	})
+	transition := mcpToolTextJSON[struct {
+		FromState  string `json:"fromState"`
+		ToState    string `json:"toState"`
+		Transition string `json:"transition"`
+	}](t, body)
+	require.Equal(t, "open", transition.FromState, "transition response=%s", string(body))
+	require.Equal(t, "waiting", transition.ToState, "transition response=%s", string(body))
+	require.Equal(t, "start", transition.Transition, "transition response=%s", string(body))
+
+	var derivedState string
+	err := testDB.QueryRow(
+		`SELECT derived_state FROM tasks WHERE public_id = UUID_TO_BIN(?, 0)`,
+		task.ID).Scan(&derivedState)
+	require.NoError(t, err)
+	require.Equal(t, "waiting", derivedState)
+}
+
 // TestMCPStreamableHTTPClientHandshake exercises the message sequence a
 // streamable-HTTP MCP client sends before tool use: initialize request,
 // initialized notification, tools/list, and tools/call over the same
@@ -181,6 +236,30 @@ func mcpCall(t *testing.T, token, method string, params any) []byte {
 	require.NoError(t, err)
 	require.Equal(t, http.StatusOK, resp.StatusCode, "mcp %s -> %d body=%s", method, resp.StatusCode, string(raw))
 	return raw
+}
+
+func mcpToolTextJSON[T any](t *testing.T, body []byte) T {
+	t.Helper()
+	var env struct {
+		Result struct {
+			Content []struct {
+				Type string `json:"type"`
+				Text string `json:"text"`
+			} `json:"content"`
+			IsError bool `json:"isError"`
+		} `json:"result"`
+		Error any `json:"error"`
+	}
+	require.NoError(t, json.Unmarshal(body, &env), "decode jsonrpc envelope: %s", string(body))
+	require.Nil(t, env.Error, "jsonrpc error: %s", string(body))
+	require.False(t, env.Result.IsError, "tool returned isError: %s", string(body))
+	require.NotEmpty(t, env.Result.Content, "tool returned no content: %s", string(body))
+	require.Equal(t, "text", env.Result.Content[0].Type, "tool content type: %s", string(body))
+
+	var out T
+	require.NoError(t, json.Unmarshal([]byte(env.Result.Content[0].Text), &out),
+		"decode tool text json: %s", env.Result.Content[0].Text)
+	return out
 }
 
 func mcpPostFrame(t *testing.T, token string, frame map[string]any) (int, []byte) {

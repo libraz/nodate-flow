@@ -37,7 +37,7 @@ func (l *ReplayLoader) Load(ctx context.Context, taskID uint32) ([]TransitionEve
 			v := r.ReversesEventID.Int64
 			reverses = &v
 		}
-		out = append(out, TransitionEvent{ID: r.ID, Name: name, ReversesEventID: reverses})
+		out = append(out, TransitionEvent{ID: int64(r.ID), Name: name, ReversesEventID: reverses}) //#nosec G115 -- events.id is BIGINT UNSIGNED; replay ids are internal monotonic ids within int64 range in supported deployments
 	}
 	return out, nil
 }

@@ -187,11 +187,11 @@ export { ApiError as TaskApiError };
  * the (from, to) column pair.
  */
 export const TRANSITIONS_BY_STATE: Record<TaskDerivedState, readonly TransitionName[]> = {
-  // Must stay in lockstep with apps/flow-api/internal/constraint/engine/replay.go
-  // (ADR 0001 v1 state machine).
-  open: ['start', 'complete', 'cancel'],
-  waiting: ['submit', 'block', 'cancel'],
-  review: ['complete', 'reopen', 'cancel'],
+  // Must stay in lockstep with apps/flow-api/internal/taskstate/state.go
+  // and apps/flow-api/internal/constraint/engine/replay.go.
+  open: ['start', 'block', 'complete', 'cancel'],
+  waiting: ['unblock', 'submit', 'cancel'],
+  review: ['block', 'complete', 'reopen', 'cancel'],
   done: ['reopen'],
   cancelled: ['reopen'],
 };
@@ -229,8 +229,8 @@ export function transitionForDrop(
   if (from === to) return null;
   switch (to) {
     case 'waiting':
-      if (from === 'open') return { transition: 'start', landingState: 'waiting' };
-      if (from === 'review') return { transition: 'reopen', landingState: 'waiting' };
+      if (from === 'open') return { transition: 'block', landingState: 'waiting' };
+      if (from === 'review') return { transition: 'block', landingState: 'waiting' };
       if (from === 'done') return { transition: 'reopen', landingState: 'waiting' };
       // Lenient: dragging a cancelled card "back" toward waiting reopens it,
       // which the backend lands in `open`.
@@ -244,7 +244,7 @@ export function transitionForDrop(
       if (from === 'review') return { transition: 'complete', landingState: 'done' };
       return null;
     case 'open':
-      if (from === 'waiting') return { transition: 'block', landingState: 'open' };
+      if (from === 'waiting') return { transition: 'unblock', landingState: 'open' };
       if (from === 'cancelled') return { transition: 'reopen', landingState: 'open' };
       // Lenient go-back: done/review dropped on open both reopen, landing in
       // waiting (the only legal target for `reopen` from those states).
@@ -313,6 +313,7 @@ export interface TasksPage {
   nextCursor: string | null;
   total: number;
   offset: number;
+  nextOffset: number;
 }
 
 /**
@@ -343,40 +344,49 @@ export function useTasksInfiniteQuery(
       const states = filters?.states ?? [];
       const assignee = filters?.assigneeId?.trim() ?? '';
       const priorities = filters?.priority ?? [];
-      const query: {
-        projectId: string;
-        limit: number;
-        offset: number;
-        q?: string;
-        state?: string[];
-        assignee?: string;
-      } = {
-        projectId,
-        limit: TASKS_PAGE_SIZE,
-        offset: pageParam,
-      };
-      if (search.length > 0) query.q = search;
-      if (states.length > 0) query.state = [...states];
-      if (assignee.length > 0) query.assignee = assignee;
-      const { data, error } = await sdk.GET('/tasks', { params: { query } });
-      if (error || !data) throw toApiError(error, 'Failed to load tasks');
-      let tasks = data.tasks ?? [];
-      // Client-side priority filter (API does not support priority param yet).
-      // Applied per page so subsequent pages use the same predicate.
-      if (priorities.length > 0) {
-        const allowed = new Set<number>(priorities);
-        tasks = tasks.filter((t) => allowed.has(t.priority));
+      const allowed = priorities.length > 0 ? new Set<number>(priorities) : null;
+      let offset = pageParam;
+      let total = 0;
+
+      for (;;) {
+        const query: {
+          projectId: string;
+          limit: number;
+          offset: number;
+          q?: string;
+          state?: string[];
+          assignee?: string;
+        } = {
+          projectId,
+          limit: TASKS_PAGE_SIZE,
+          offset,
+        };
+        if (search.length > 0) query.q = search;
+        if (states.length > 0) query.state = [...states];
+        if (assignee.length > 0) query.assignee = assignee;
+        const { data, error } = await sdk.GET('/tasks', { params: { query } });
+        if (error || !data) throw toApiError(error, 'Failed to load tasks');
+
+        const rawTasks = data.tasks ?? [];
+        total = data.total ?? rawTasks.length;
+        const nextOffset = offset + TASKS_PAGE_SIZE;
+        const tasks = allowed ? rawTasks.filter((t) => allowed.has(t.priority)) : rawTasks;
+
+        if (!allowed || tasks.length > 0 || nextOffset >= total) {
+          return {
+            tasks,
+            nextCursor: data.nextCursor ?? null,
+            total,
+            offset: pageParam,
+            nextOffset,
+          };
+        }
+
+        offset = nextOffset;
       }
-      return {
-        tasks,
-        nextCursor: data.nextCursor ?? null,
-        total: data.total ?? tasks.length,
-        offset: pageParam,
-      };
     },
     getNextPageParam: (lastPage) => {
-      const nextOffset = lastPage.offset + TASKS_PAGE_SIZE;
-      return nextOffset < lastPage.total ? nextOffset : undefined;
+      return lastPage.nextOffset < lastPage.total ? lastPage.nextOffset : undefined;
     },
   });
 }

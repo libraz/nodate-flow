@@ -24,6 +24,7 @@ func TestNextState(t *testing.T) {
 	cases := []tc{
 		// open -> ...
 		{generated.TasksDerivedStateOpen, TransitionStart, generated.TasksDerivedStateWaiting, true},
+		{generated.TasksDerivedStateOpen, TransitionBlock, generated.TasksDerivedStateWaiting, true},
 		{generated.TasksDerivedStateOpen, TransitionCancel, generated.TasksDerivedStateCancelled, true},
 		{generated.TasksDerivedStateOpen, TransitionComplete, generated.TasksDerivedStateDone, true},
 		{generated.TasksDerivedStateOpen, TransitionSubmit, "", false},
@@ -31,11 +32,13 @@ func TestNextState(t *testing.T) {
 
 		// waiting -> ...
 		{generated.TasksDerivedStateWaiting, TransitionSubmit, generated.TasksDerivedStateReview, true},
-		{generated.TasksDerivedStateWaiting, TransitionBlock, generated.TasksDerivedStateOpen, true},
+		{generated.TasksDerivedStateWaiting, TransitionUnblock, generated.TasksDerivedStateOpen, true},
 		{generated.TasksDerivedStateWaiting, TransitionCancel, generated.TasksDerivedStateCancelled, true},
+		{generated.TasksDerivedStateWaiting, TransitionBlock, "", false},
 		{generated.TasksDerivedStateWaiting, TransitionStart, "", false},
 
 		// review -> ...
+		{generated.TasksDerivedStateReview, TransitionBlock, generated.TasksDerivedStateWaiting, true},
 		{generated.TasksDerivedStateReview, TransitionComplete, generated.TasksDerivedStateDone, true},
 		{generated.TasksDerivedStateReview, TransitionReopen, generated.TasksDerivedStateWaiting, true},
 		{generated.TasksDerivedStateReview, TransitionCancel, generated.TasksDerivedStateCancelled, true},
@@ -60,6 +63,44 @@ func TestNextState(t *testing.T) {
 			if got != c.want {
 				t.Fatalf("NextState(%q,%q) got=%q want=%q", c.from, c.via, got, c.want)
 			}
+		})
+	}
+}
+
+// TestEveryAdvertisedTransitionHasALegalState proves the public enum is
+// not wider than the canonical state machine. This specifically catches
+// regressions where a transition like "unblock" is advertised by REST,
+// MCP, SDK, and CLI but NextState can never accept it.
+func TestEveryAdvertisedTransitionHasALegalState(t *testing.T) {
+	t.Parallel()
+
+	states := []generated.TasksDerivedState{
+		generated.TasksDerivedStateOpen,
+		generated.TasksDerivedStateWaiting,
+		generated.TasksDerivedStateReview,
+		generated.TasksDerivedStateDone,
+		generated.TasksDerivedStateCancelled,
+	}
+	transitions := []string{
+		TransitionStart,
+		TransitionBlock,
+		TransitionUnblock,
+		TransitionSubmit,
+		TransitionComplete,
+		TransitionReopen,
+		TransitionCancel,
+	}
+
+	for _, transition := range transitions {
+		transition := transition
+		t.Run(transition, func(t *testing.T) {
+			t.Parallel()
+			for _, state := range states {
+				if _, ok := NextState(state, transition); ok {
+					return
+				}
+			}
+			t.Fatalf("advertised transition %q is never accepted by NextState", transition)
 		})
 	}
 }
