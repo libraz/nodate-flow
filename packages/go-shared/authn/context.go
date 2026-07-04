@@ -17,6 +17,7 @@ const (
 	ctxKeyAuthMode
 	ctxKeyTokenKind
 	ctxKeyTokenScopes
+	ctxKeyTokenWorkspaceID
 )
 
 // TokenKind identifies the concrete bearer token family that admitted the
@@ -97,6 +98,23 @@ func TokenScopesFromContext(ctx context.Context) ([]string, bool) {
 		return nil, false
 	}
 	return append([]string(nil), v...), true
+}
+
+// WithTokenWorkspaceID returns a new context carrying the workspace id an
+// opaque bearer token is bound to. JWT sessions do not set this value.
+func WithTokenWorkspaceID(ctx context.Context, workspaceID uint32) context.Context {
+	return context.WithValue(ctx, ctxKeyTokenWorkspaceID, workspaceID)
+}
+
+// TokenWorkspaceIDFromContext extracts the workspace id bound to the bearer
+// token that admitted the request. The boolean is false for JWT sessions and
+// for token families that are not workspace-bound.
+func TokenWorkspaceIDFromContext(ctx context.Context) (uint32, bool) {
+	v, ok := ctx.Value(ctxKeyTokenWorkspaceID).(uint32)
+	if !ok || v == 0 {
+		return 0, false
+	}
+	return v, true
 }
 
 // WithActor returns a new context carrying the authenticated user's

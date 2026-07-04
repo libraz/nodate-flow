@@ -52,6 +52,7 @@ FROM v_task_list v
 LEFT JOIN users u
   ON u.public_id = v.primary_assignee_public_id AND u.enabled = TRUE
 WHERE v.workspace_id = ?
+  AND v.visibility = 'public'
   AND (sqlc.narg(project_id) IS NULL OR v.project_id = sqlc.narg(project_id))
   AND (sqlc.arg(state_filter) = '' OR v.derived_state = sqlc.arg(state_filter))
   AND (sqlc.narg(priority_min) IS NULL OR v.priority >= sqlc.narg(priority_min))

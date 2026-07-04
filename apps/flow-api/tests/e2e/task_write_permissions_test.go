@@ -82,6 +82,27 @@ func seedElevatedMember(t *testing.T, owner *helpers.TestTenant) *helpers.TestTe
 	return admin
 }
 
+// seedWorkspaceMemberWithoutProjectRole invites a fresh user into the owner's
+// workspace as a plain member and deliberately does not add a project_members
+// row. Public tasks are visible to this user, but task-scoped write gates must
+// still reject them because they have no project role.
+func seedWorkspaceMemberWithoutProjectRole(t *testing.T, owner *helpers.TestTenant) *helpers.TestTenant {
+	t.Helper()
+	member := newTenant(t)
+
+	var invite struct {
+		Token string `json:"token"`
+	}
+	doJSON(t, http.MethodPost,
+		testServerURL+"/workspaces/"+owner.WorkspacePublicID+"/invites",
+		owner.AccessToken, map[string]any{"role": "member"}, &invite)
+	doJSON(t, http.MethodPost,
+		testServerURL+"/invites/"+invite.Token+"/accept",
+		member.AccessToken, nil, nil)
+
+	return member
+}
+
 // seedPublicTask creates a public-visibility task in the owner's default
 // project and returns its public id. Public visibility lets every project
 // role (down to viewer) read it, so the negative tests fail on the project
@@ -129,6 +150,8 @@ func seedWorkspaceLabel(t *testing.T, owner *helpers.TestTenant, name string) st
 //   - POST   /tasks/{id}/labels          -> 403 WS.PROJECT.ACCESS_DENIED (editor group)
 //   - POST   /tasks/{id}/comments        -> 403 WS.PROJECT.ACCESS_DENIED (commenter group)
 //   - POST   /tasks/{id}/reactions       -> 403 WS.PROJECT.ACCESS_DENIED (commenter group)
+//   - POST   /tasks                      -> 403 WS.PROJECT.ACCESS_DENIED (project editor required)
+//   - POST   /tasks/reorder              -> 403 WS.PROJECT.ACCESS_DENIED (project editor required)
 //   - GET    /tasks/{id}                 -> 200 (read group, RequireTaskAccess only)
 func TestProjectViewerCannotWriteTask(t *testing.T) {
 	bootstrap(t)
@@ -152,6 +175,11 @@ func TestProjectViewerCannotWriteTask(t *testing.T) {
 		{"label add", http.MethodPost, base + "/labels", map[string]any{"labelId": seedWorkspaceLabel(t, owner, "viewer-label")}},
 		{"comment add", http.MethodPost, base + "/comments", map[string]any{"body": "viewer comment"}},
 		{"reaction add", http.MethodPost, base + "/reactions", map[string]any{"emoji": "👍"}},
+		{"create task", http.MethodPost, testServerURL + "/tasks", map[string]any{"projectId": owner.ProjectPublicID, "title": "viewer create"}},
+		{"reorder tasks", http.MethodPost, testServerURL + "/tasks/reorder", map[string]any{
+			"projectId": owner.ProjectPublicID,
+			"items":     []map[string]any{{"id": taskID, "sortWeight": 100}},
+		}},
 	}
 
 	for _, d := range denials {
@@ -178,6 +206,32 @@ func TestProjectViewerCannotWriteTask(t *testing.T) {
 	})
 }
 
+// TestWorkspaceMemberWithoutProjectRoleCannotWritePublicTask locks in the
+// C-2 regression: workspace members with no project_members row may read a
+// public task, but they must not pass RequireProjectRole for mutations.
+func TestWorkspaceMemberWithoutProjectRoleCannotWritePublicTask(t *testing.T) {
+	bootstrap(t)
+	t.Parallel()
+
+	owner := newTenant(t)
+	member := seedWorkspaceMemberWithoutProjectRole(t, owner)
+	taskID := seedPublicTask(t, owner, "No Project Role Boundary")
+	base := testServerURL + "/tasks/" + taskID
+
+	var got struct {
+		ID string `json:"id"`
+	}
+	doJSON(t, http.MethodGet, base, member.AccessToken, nil, &got)
+	require.Equal(t, taskID, got.ID, "workspace member must be able to read public task")
+
+	status, raw := doJSONStatus(t, http.MethodPatch, base,
+		member.AccessToken, map[string]any{"title": "non-member rename"})
+	require.Equal(t, http.StatusForbidden, status,
+		"workspace member without project role must not patch public task, body=%s", string(raw))
+	require.Equal(t, projectACLDenied, problemType(t, raw),
+		"non-member patch must surface %s, body=%s", projectACLDenied, string(raw))
+}
+
 // TestProjectCommenterPermissions locks in the commenter boundary: a
 // project commenter may post comments and reactions (the commenter write
 // group) but is still blocked from structural editor mutations.
@@ -187,6 +241,8 @@ func TestProjectViewerCannotWriteTask(t *testing.T) {
 //   - POST  /tasks/{id}/reactions  -> 2xx (commenter group)
 //   - PATCH /tasks/{id}            -> 403 WS.PROJECT.ACCESS_DENIED (editor group)
 //   - POST  /tasks/{id}/actors     -> 403 WS.PROJECT.ACCESS_DENIED (editor group)
+//   - POST  /tasks                 -> 403 WS.PROJECT.ACCESS_DENIED (project editor required)
+//   - POST  /tasks/reorder         -> 403 WS.PROJECT.ACCESS_DENIED (project editor required)
 func TestProjectCommenterPermissions(t *testing.T) {
 	bootstrap(t)
 	t.Parallel()
@@ -233,6 +289,29 @@ func TestProjectCommenterPermissions(t *testing.T) {
 		require.Equal(t, projectACLDenied, problemType(t, raw),
 			"commenter actor add must surface %s, body=%s", projectACLDenied, string(raw))
 	})
+
+	t.Run("create denied", func(t *testing.T) {
+		t.Parallel()
+		status, raw := doJSONStatus(t, http.MethodPost, testServerURL+"/tasks",
+			commenter.AccessToken, map[string]any{"projectId": owner.ProjectPublicID, "title": "commenter create"})
+		require.Equal(t, http.StatusForbidden, status,
+			"commenter must not create tasks, body=%s", string(raw))
+		require.Equal(t, projectACLDenied, problemType(t, raw),
+			"commenter create must surface %s, body=%s", projectACLDenied, string(raw))
+	})
+
+	t.Run("reorder denied", func(t *testing.T) {
+		t.Parallel()
+		status, raw := doJSONStatus(t, http.MethodPost, testServerURL+"/tasks/reorder",
+			commenter.AccessToken, map[string]any{
+				"projectId": owner.ProjectPublicID,
+				"items":     []map[string]any{{"id": taskID, "sortWeight": 100}},
+			})
+		require.Equal(t, http.StatusForbidden, status,
+			"commenter must not reorder tasks, body=%s", string(raw))
+		require.Equal(t, projectACLDenied, problemType(t, raw),
+			"commenter reorder must surface %s, body=%s", projectACLDenied, string(raw))
+	})
 }
 
 // TestProjectEditorPermissions locks in that a project editor passes the
@@ -243,6 +322,8 @@ func TestProjectCommenterPermissions(t *testing.T) {
 //   - PATCH /tasks/{id}              -> 2xx (editor group)
 //   - POST  /tasks/{id}/transitions  -> 2xx (editor group)
 //   - POST  /tasks/{id}/labels       -> 2xx (editor group)
+//   - POST  /tasks                   -> 2xx (project editor required)
+//   - POST  /tasks/reorder           -> 2xx (project editor required)
 func TestProjectEditorPermissions(t *testing.T) {
 	bootstrap(t)
 	t.Parallel()
@@ -274,6 +355,25 @@ func TestProjectEditorPermissions(t *testing.T) {
 			editor.AccessToken, map[string]any{"labelId": labelID})
 		require.GreaterOrEqualf(t, status, 200, "label add body=%s", string(raw))
 		require.Lessf(t, status, 300, "editor label add must succeed, body=%s", string(raw))
+	})
+
+	t.Run("create allowed", func(t *testing.T) {
+		var created struct {
+			ID string `json:"id"`
+		}
+		doJSON(t, http.MethodPost, testServerURL+"/tasks",
+			editor.AccessToken, map[string]any{"projectId": owner.ProjectPublicID, "title": "editor create"}, &created)
+		require.NotEmpty(t, created.ID, "editor create must return an id")
+	})
+
+	t.Run("reorder allowed", func(t *testing.T) {
+		status, raw := doJSONStatus(t, http.MethodPost, testServerURL+"/tasks/reorder",
+			editor.AccessToken, map[string]any{
+				"projectId": owner.ProjectPublicID,
+				"items":     []map[string]any{{"id": taskID, "sortWeight": 200}},
+			})
+		require.GreaterOrEqualf(t, status, 200, "reorder body=%s", string(raw))
+		require.Lessf(t, status, 300, "editor reorder must succeed, body=%s", string(raw))
 	})
 }
 

@@ -145,9 +145,10 @@ func (r *patResolver) ResolveDetailed(ctx context.Context, token string) (authn.
 		return authn.TokenDetails{}, apierrors.New(apierrors.AuthPatExpired)
 	}
 	return authn.TokenDetails{
-		UserID: row.UserID,
-		Kind:   authn.TokenKindPAT,
-		Scopes: parseBearerScopes(row.ScopesJson),
+		UserID:      row.UserID,
+		Kind:        authn.TokenKindPAT,
+		Scopes:      parseBearerScopes(row.ScopesJson),
+		WorkspaceID: row.WorkspaceID,
 	}, nil
 }
 
@@ -180,8 +181,9 @@ func (r *mcpResolver) ResolveDetailed(ctx context.Context, token string) (authn.
 		return authn.TokenDetails{}, apierrors.New(apierrors.AuthPatExpired)
 	}
 	return authn.TokenDetails{
-		UserID: row.UserID,
-		Kind:   authn.TokenKindMCP,
-		Scopes: parseBearerScopes(row.ScopesJson),
+		UserID:      row.UserID,
+		Kind:        authn.TokenKindMCP,
+		Scopes:      parseBearerScopes(row.ScopesJson),
+		WorkspaceID: row.WorkspaceID,
 	}, nil
 }

@@ -144,6 +144,66 @@ func TestMCPScopeInsufficient(t *testing.T) {
 		"read-only token must surface MCP.SCOPE.INSUFFICIENT, body=%s", string(body))
 }
 
+// TestMCPSearchTasksAppliesTaskVisibilityFilter locks in that search_tasks
+// applies the same Layer-4 task visibility rules as list_tasks and REST task
+// list/search surfaces. A workspace member without a project_members row may
+// find public tasks, but must not enumerate project/private tasks by title.
+func TestMCPSearchTasksAppliesTaskVisibilityFilter(t *testing.T) {
+	bootstrap(t)
+	t.Parallel()
+
+	owner := newTenant(t)
+	member := seedWorkspaceMemberWithoutProjectRole(t, owner)
+	tok := mintMCPToken(t, member.AccessToken, owner.WorkspacePublicID,
+		"search-visibility-token", []string{"read:workspace"})
+
+	var publicTask, projectTask, privateTask struct {
+		ID string `json:"id"`
+	}
+	doJSON(t, http.MethodPost, testServerURL+"/tasks", owner.AccessToken, map[string]any{
+		"projectId":  owner.ProjectPublicID,
+		"title":      "mcp visibility needle public",
+		"visibility": "public",
+	}, &publicTask)
+	doJSON(t, http.MethodPost, testServerURL+"/tasks", owner.AccessToken, map[string]any{
+		"projectId":  owner.ProjectPublicID,
+		"title":      "mcp visibility needle project",
+		"visibility": "project",
+	}, &projectTask)
+	doJSON(t, http.MethodPost, testServerURL+"/tasks", owner.AccessToken, map[string]any{
+		"projectId":  owner.ProjectPublicID,
+		"title":      "mcp visibility needle private",
+		"visibility": "private",
+	}, &privateTask)
+	require.NotEmpty(t, publicTask.ID)
+	require.NotEmpty(t, projectTask.ID)
+	require.NotEmpty(t, privateTask.ID)
+
+	body := mcpCall(t, tok, "tools/call", map[string]any{
+		"name": "search_tasks",
+		"arguments": map[string]any{
+			"query": "mcp visibility needle",
+			"limit": 10,
+		},
+	})
+	result := mcpToolTextJSON[struct {
+		Tasks []struct {
+			ID    string `json:"id"`
+			Title string `json:"title"`
+		} `json:"tasks"`
+	}](t, body)
+	seenTasks := map[string]string{}
+	for _, task := range result.Tasks {
+		seenTasks[task.ID] = task.Title
+	}
+	require.Equal(t, "mcp visibility needle public", seenTasks[publicTask.ID],
+		"public task must be searchable by workspace member")
+	require.NotContains(t, seenTasks, projectTask.ID,
+		"project-visibility task must not be searchable without project membership")
+	require.NotContains(t, seenTasks, privateTask.ID,
+		"private task must not be searchable without actor/creator access")
+}
+
 // TestMCPMemberRemoved disables the workspace_members row for the
 // session user after the token was minted. The next /mcp call hits
 // requireWorkspaceMember -> acl.CheckWorkspaceMember which returns

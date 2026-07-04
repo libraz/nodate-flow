@@ -294,10 +294,10 @@ func Create(deps Deps) func(context.Context, *CreateTaskInput) (*CreateTaskOutpu
 		if err != nil {
 			return nil, httpErr(apierr.SpecForErrNoRows(err, apierrors.WsProjectNotFound, apierrors.InternalUnexpected))
 		}
-		// Workspace membership check (handler-level since /tasks has no
-		// workspace path parameter to attach RequireWorkspaceMember to).
-		if err := handlerutil.CheckWorkspaceMember(ctx, deps.DB, prj.WorkspaceID, actorID); err != nil {
-			return nil, httpErr(apierr.SpecForErrNoRows(err, apierrors.WsProjectAccessDenied, apierrors.InternalUnexpected))
+		// Project editor check (handler-level since /tasks has no workspace
+		// path parameter to attach RequireProjectRole to).
+		if spec := requireProjectEditor(ctx, deps.DB, prj.WorkspaceID, prj.ID, actorID); spec != nil {
+			return nil, httpErr(spec)
 		}
 
 		due, err := parseDateOrNullTime(in.Body.DueOn)

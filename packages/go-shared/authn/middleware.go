@@ -40,6 +40,9 @@ func RequireAuth(resolvers ...TokenResolver) func(http.Handler) http.Handler {
 			ctx = WithAuthMode(ctx, AuthModeJWT)
 			ctx = WithTokenKind(ctx, details.Kind)
 			ctx = WithTokenScopes(ctx, details.Scopes)
+			if details.WorkspaceID != 0 {
+				ctx = WithTokenWorkspaceID(ctx, details.WorkspaceID)
+			}
 			var zero dbtype.PublicID
 			if details.SessionPublicID != zero {
 				ctx = WithSessionPublicID(ctx, details.SessionPublicID)

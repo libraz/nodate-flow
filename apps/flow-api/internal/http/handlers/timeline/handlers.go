@@ -60,23 +60,13 @@ func queryTimeline(
 	where := append([]string{}, baseWhere...)
 	args := append([]any{}, baseArgs...)
 
-	// 4-layer ACL visibility predicate (defense-in-depth). An event is
-	// visible to the caller if any of the following hold:
-	//   - the event has no associated task (workspace-root event), OR
-	//   - the associated task has no project (workspace-scoped task and
-	//     the caller is already guaranteed a workspace member by the
-	//     route middleware), OR
-	//   - the associated task's project is one the caller is a project
-	//     member of.
-	// This mirrors the per-task ACL enforced by RequireTaskAccess so the
-	// workspace timeline cannot leak task titles/payloads for projects
-	// the caller cannot otherwise access.
-	// Workspace owner/admin see everything in their workspace (escape
-	// hatch); other members only see events for projects they belong to
-	// or workspace-root / non-task events.
+	// 4-layer ACL visibility predicate (defense-in-depth). This mirrors
+	// CheckTaskVisibility for timeline rows: public tasks are visible to
+	// workspace members, project tasks require project membership, private
+	// tasks require creator/actor access, and workspace owner/admin bypass.
+	// Events with no associated task remain workspace-root events.
 	where = append(where, `(
   v.task_public_id IS NULL
-  OR v.project_public_id IS NULL
   OR EXISTS (
     SELECT 1 FROM workspace_members wm
     WHERE wm.user_id = ?
@@ -84,14 +74,43 @@ func queryTimeline(
       AND wm.role IN ('owner','admin')
       AND wm.enabled = TRUE
   )
-  OR v.project_public_id IN (
-    SELECT p.public_id
-    FROM project_members pm
-    INNER JOIN projects p ON p.id = pm.project_id AND p.enabled = TRUE
-    WHERE pm.user_id = ? AND pm.enabled = TRUE
+  OR EXISTS (
+    SELECT 1
+    FROM tasks tv
+    WHERE tv.workspace_id = v.workspace_id
+      AND tv.public_id = v.task_public_id
+      AND tv.enabled = TRUE
+      AND (
+        tv.visibility = 'public'
+        OR (
+          tv.visibility = 'project'
+          AND EXISTS (
+            SELECT 1
+            FROM project_members pm
+            WHERE pm.workspace_id = tv.workspace_id
+              AND pm.project_id = tv.project_id
+              AND pm.user_id = ?
+              AND pm.enabled = TRUE
+          )
+        )
+        OR (
+          tv.visibility = 'private'
+          AND (
+            tv.created_by_user_id = ?
+            OR EXISTS (
+              SELECT 1
+              FROM task_actors ta
+              WHERE ta.workspace_id = tv.workspace_id
+                AND ta.task_id = tv.id
+                AND ta.user_id = ?
+                AND ta.enabled = TRUE
+            )
+          )
+        )
+      )
   )
 )`)
-	args = append(args, callerUserID, callerUserID)
+	args = append(args, callerUserID, callerUserID, callerUserID, callerUserID)
 
 	if len(kinds) > 0 {
 		placeholders := make([]string, 0, len(kinds))

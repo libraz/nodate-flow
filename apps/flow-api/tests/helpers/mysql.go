@@ -23,6 +23,7 @@ import (
 	// Side effect: register the MySQL database/sql driver.
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/stretchr/testify/require"
+	"github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/modules/mysql"
 )
 
@@ -91,7 +92,7 @@ func StartIsolated(t *testing.T) *MySQLInstance {
 }
 
 // startMySQL boots a MySQL 9.6 testcontainer, opens a *sql.DB handle,
-// and applies the full schema (sql/tables + sql/views).
+// and applies the full schema (sql/tables + sql/views + sql/triggers).
 func startMySQL(ctx context.Context) (*MySQLInstance, error) {
 	startCtx, cancel := context.WithTimeout(ctx, 3*time.Minute)
 	defer cancel()
@@ -101,6 +102,7 @@ func startMySQL(ctx context.Context) (*MySQLInstance, error) {
 		mysql.WithDatabase(mysqlDatabase),
 		mysql.WithUsername(mysqlUser),
 		mysql.WithPassword(mysqlPassword),
+		testcontainers.WithCmdArgs("--log-bin-trust-function-creators=1"),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("start mysql container: %w", err)
@@ -150,7 +152,8 @@ func waitForPing(ctx context.Context, db *sql.DB, timeout time.Duration) error {
 	return fmt.Errorf("mysql ping never succeeded: %w", lastErr)
 }
 
-// applySchema loads every file in sql/tables/*.sql and sql/views/*.sql
+// applySchema loads every file in sql/tables/*.sql, sql/views/*.sql,
+// and sql/triggers/*.sql
 // (alphabetical, with FK checks disabled) into the database. This
 // mirrors the behaviour of sql/build-schema.sh but stays in-process so
 // no shell is required.
@@ -161,6 +164,7 @@ func applySchema(ctx context.Context, db *sql.DB) error {
 	}
 	tablesDir := filepath.Join(root, "sql", "tables")
 	viewsDir := filepath.Join(root, "sql", "views")
+	triggersDir := filepath.Join(root, "sql", "triggers")
 
 	if _, err := db.ExecContext(ctx, "SET FOREIGN_KEY_CHECKS = 0"); err != nil {
 		return err
@@ -174,6 +178,9 @@ func applySchema(ctx context.Context, db *sql.DB) error {
 	}
 	if err := execSQLDir(ctx, db, viewsDir); err != nil {
 		return fmt.Errorf("views: %w", err)
+	}
+	if err := execSQLDir(ctx, db, triggersDir); err != nil {
+		return fmt.Errorf("triggers: %w", err)
 	}
 
 	if _, err := db.ExecContext(ctx, "SET UNIQUE_CHECKS = 1"); err != nil {
@@ -199,13 +206,45 @@ func execSQLDir(ctx context.Context, db *sql.DB, dir string) error {
 		if err != nil {
 			return err
 		}
-		// multiStatements=true lets the driver execute all statements
-		// in the file in a single Exec call.
-		if _, err := db.ExecContext(ctx, string(raw)); err != nil {
-			return fmt.Errorf("exec %s: %w", e.Name(), err)
+		for _, stmt := range splitSQLStatements(string(raw)) {
+			if strings.TrimSpace(stmt) == "" {
+				continue
+			}
+			if _, err := db.ExecContext(ctx, stmt); err != nil {
+				return fmt.Errorf("exec %s: %w", e.Name(), err)
+			}
 		}
 	}
 	return nil
+}
+
+func splitSQLStatements(raw string) []string {
+	delimiter := ";"
+	var out []string
+	var current strings.Builder
+	for _, line := range strings.Split(raw, "\n") {
+		trimmed := strings.TrimSpace(line)
+		if strings.HasPrefix(strings.ToUpper(trimmed), "DELIMITER ") {
+			if stmt := strings.TrimSpace(current.String()); stmt != "" {
+				out = append(out, stmt)
+				current.Reset()
+			}
+			delimiter = strings.TrimSpace(strings.TrimPrefix(trimmed, "DELIMITER "))
+			continue
+		}
+		current.WriteString(line)
+		current.WriteByte('\n')
+		if strings.HasSuffix(strings.TrimSpace(current.String()), delimiter) {
+			stmt := strings.TrimSpace(current.String())
+			stmt = strings.TrimSuffix(stmt, delimiter)
+			out = append(out, strings.TrimSpace(stmt))
+			current.Reset()
+		}
+	}
+	if stmt := strings.TrimSpace(current.String()); stmt != "" {
+		out = append(out, stmt)
+	}
+	return out
 }
 
 // repoRoot walks up from this file's location until it finds the

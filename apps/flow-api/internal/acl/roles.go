@@ -57,7 +57,10 @@ type ProjectRole string
 const (
 	// ProjectRoleElevated indicates that the caller has elevated workspace-level
 	// access (owner or admin) and is not scoped to a specific project role.
-	ProjectRoleElevated  ProjectRole = ""
+	ProjectRoleElevated ProjectRole = ""
+	// ProjectRoleNone indicates that the caller is a workspace member who can
+	// see a public task but has no membership row in its parent project.
+	ProjectRoleNone      ProjectRole = "__none"
 	ProjectRoleViewer    ProjectRole = "viewer"
 	ProjectRoleCommenter ProjectRole = "commenter"
 	ProjectRoleEditor    ProjectRole = "editor"
@@ -83,7 +86,7 @@ func (r ProjectRole) AtLeast(minRole ProjectRole) bool {
 // elevation. Any other unknown value is treated as a server-side
 // data invariant violation by the caller.
 func (r ProjectRole) IsValid() bool {
-	if r == ProjectRoleElevated {
+	if r == ProjectRoleElevated || r == ProjectRoleNone {
 		return true
 	}
 	_, ok := projectRoleRank[r]

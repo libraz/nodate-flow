@@ -104,6 +104,29 @@ func TestLensPublishUnpublish(t *testing.T) {
 	require.NotNil(t, created.Description)
 	require.Equal(t, lensDescription, *created.Description)
 
+	// Public lens shares must expose only public-visibility task rows.
+	var publicTask, projectTask, privateTask struct {
+		ID string `json:"id"`
+	}
+	doJSON(t, http.MethodPost, testServerURL+"/tasks", tt.AccessToken, map[string]any{
+		"projectId":  tt.ProjectPublicID,
+		"title":      "public lens visible",
+		"visibility": "public",
+	}, &publicTask)
+	doJSON(t, http.MethodPost, testServerURL+"/tasks", tt.AccessToken, map[string]any{
+		"projectId":  tt.ProjectPublicID,
+		"title":      "public lens project hidden",
+		"visibility": "project",
+	}, &projectTask)
+	doJSON(t, http.MethodPost, testServerURL+"/tasks", tt.AccessToken, map[string]any{
+		"projectId":  tt.ProjectPublicID,
+		"title":      "public lens private hidden",
+		"visibility": "private",
+	}, &privateTask)
+	require.NotEmpty(t, publicTask.ID)
+	require.NotEmpty(t, projectTask.ID)
+	require.NotEmpty(t, privateTask.ID)
+
 	// Publish the lens.
 	var published struct {
 		PublicToken string `json:"publicToken"`
@@ -131,6 +154,16 @@ func TestLensPublishUnpublish(t *testing.T) {
 	require.NotNil(t, pub.Description, "public payload must include the description")
 	require.Equal(t, lensDescription, *pub.Description)
 	require.NotNil(t, pub.Tasks, "tasks must be present even when empty")
+	seenTasks := map[string]string{}
+	for _, task := range pub.Tasks {
+		seenTasks[task.ID] = task.Title
+	}
+	require.Equal(t, "public lens visible", seenTasks[publicTask.ID],
+		"public task must be visible through public lens")
+	require.NotContains(t, seenTasks, projectTask.ID,
+		"project-visibility task must not leak through public lens")
+	require.NotContains(t, seenTasks, privateTask.ID,
+		"private task must not leak through public lens")
 
 	// Unpublish revokes access.
 	doJSON(t, http.MethodPost, base+"/"+created.ID+"/unpublish",

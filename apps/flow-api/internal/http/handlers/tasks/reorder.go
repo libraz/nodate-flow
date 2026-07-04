@@ -2,11 +2,12 @@ package tasks
 
 import (
 	"context"
+	"database/sql"
 
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/audit"
+	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/generated"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/types"
 	apierrors "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/errors"
-	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/handlers/handlerutil"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/middleware"
 	"github.com/nodate-flow/nodate-flow/packages/go-shared/apierr"
 )
@@ -31,9 +32,8 @@ func Reorder(deps Deps) func(context.Context, *ReorderTasksInput) (*ReorderTasks
 			return nil, httpErr(apierr.SpecForErrNoRows(err, apierrors.WsProjectNotFound, apierrors.InternalUnexpected))
 		}
 
-		// Workspace membership check.
-		if err := handlerutil.CheckWorkspaceMember(ctx, deps.DB, prj.WorkspaceID, actorID); err != nil {
-			return nil, httpErr(apierr.SpecForErrNoRows(err, apierrors.WsProjectAccessDenied, apierrors.InternalUnexpected))
+		if spec := requireProjectEditor(ctx, deps.DB, prj.WorkspaceID, prj.ID, actorID); spec != nil {
+			return nil, httpErr(spec)
 		}
 
 		// Resolve all public IDs to internal IDs and verify project membership.
@@ -68,9 +68,15 @@ WHERE public_id = ? AND workspace_id = ? AND enabled = TRUE LIMIT 1`
 		}
 		defer func() { _ = tx.Rollback() }()
 
-		const updateSQL = `UPDATE tasks SET sort_weight = ? WHERE id = ? AND workspace_id = ? AND enabled = TRUE`
+		qtx := deps.Queries.WithTx(tx)
+		actorAuditID := sql.NullInt32{Int32: int32(actorID), Valid: actorID != 0}
 		for _, item := range items {
-			if _, err := tx.ExecContext(ctx, updateSQL, item.sortWeight, item.internalID, prj.WorkspaceID); err != nil {
+			if err := qtx.UpdateTaskSortWeight(ctx, generated.UpdateTaskSortWeightParams{
+				SortWeight:      item.sortWeight,
+				UpdatedByUserID: actorAuditID,
+				ID:              item.internalID,
+				WorkspaceID:     prj.WorkspaceID,
+			}); err != nil {
 				return nil, httpErr(apierrors.InternalUnexpected)
 			}
 		}

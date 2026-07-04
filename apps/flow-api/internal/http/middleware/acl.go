@@ -51,6 +51,7 @@ type ProjectRole = acl.ProjectRole
 // Project role constants.
 const (
 	ProjectRoleElevated  = acl.ProjectRoleElevated
+	ProjectRoleNone      = acl.ProjectRoleNone
 	ProjectRoleViewer    = acl.ProjectRoleViewer
 	ProjectRoleCommenter = acl.ProjectRoleCommenter
 	ProjectRoleEditor    = acl.ProjectRoleEditor
@@ -169,7 +170,8 @@ type ProjectContext struct {
 	// PublicID is the project UUID v7.
 	PublicID uuid.UUID
 	// Role is the actor's role inside this project. Empty when access is
-	// granted purely via workspace admin/owner elevation.
+	// granted purely via workspace admin/owner elevation. ProjectRoleNone
+	// means the actor can see a public task but has no project_members row.
 	Role ProjectRole
 }
 
@@ -375,6 +377,9 @@ func RequireWorkspaceMember(db ACLDB) func(http.Handler) http.Handler {
 				writeAPIError(w, err)
 				return
 			}
+			if !enforceBearerTokenWorkspace(w, r, access.ID) {
+				return
+			}
 			ctx := context.WithValue(r.Context(), ctxKeyWorkspaceID, access.ID)
 			ctx = context.WithValue(ctx, ctxKeyWorkspaceIDPublic, pub)
 			ctx = context.WithValue(ctx, ctxKeyWorkspaceRole, access.Role)
@@ -482,6 +487,9 @@ func RequireProjectMemberByGlobalID(db ACLDB) func(http.Handler) http.Handler {
 				writeAPIError(w, err)
 				return
 			}
+			if !enforceBearerTokenWorkspace(w, r, prj.WorkspaceID) {
+				return
+			}
 			wsPubID, err := acl.ResolveWorkspacePublicByID(r.Context(), db, prj.WorkspaceID)
 			if err != nil {
 				// Workspace-not-found leaks here as project-not-found to
@@ -554,6 +562,9 @@ func RequireTaskAccess(db ACLDB) func(http.Handler) http.Handler {
 				return
 			}
 			rec := access.Task
+			if !enforceBearerTokenWorkspace(w, r, rec.WorkspaceID) {
+				return
+			}
 			wsPubID, err := acl.ResolveWorkspacePublicByID(r.Context(), db, rec.WorkspaceID)
 			if err != nil {
 				// Workspace-not-found leaks as task-not-found to avoid
@@ -591,6 +602,20 @@ func RequireTaskAccess(db ACLDB) func(http.Handler) http.Handler {
 // See [acl.TaskVisibilityFilter] for the full contract.
 func TaskVisibilityFilter(userID uint32, wsRole WorkspaceRole) (fragment string, args []any) {
 	return acl.TaskVisibilityFilter(userID, wsRole)
+}
+
+func enforceBearerTokenWorkspace(w http.ResponseWriter, r *http.Request, workspaceID uint32) bool {
+	boundWorkspaceID, ok := authn.TokenWorkspaceIDFromContext(r.Context())
+	if !ok || boundWorkspaceID == workspaceID {
+		return true
+	}
+	kind, _ := authn.TokenKindFromContext(r.Context())
+	if kind == authn.TokenKindMCP {
+		writeSpecError(w, apierrors.McpTokenWorkspaceMismatch)
+		return false
+	}
+	writeSpecError(w, apierrors.WsWorkspaceAccessDenied)
+	return false
 }
 
 // RequireProjectRole returns a middleware that asserts the actor's project

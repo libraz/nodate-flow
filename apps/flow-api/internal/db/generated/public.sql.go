@@ -82,6 +82,7 @@ FROM v_task_list v
 LEFT JOIN users u
   ON u.public_id = v.primary_assignee_public_id AND u.enabled = TRUE
 WHERE v.workspace_id = ?
+  AND v.visibility = 'public'
   AND (? IS NULL OR v.project_id = ?)
   AND (? = '' OR v.derived_state = ?)
   AND (? IS NULL OR v.priority >= ?)

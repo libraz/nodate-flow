@@ -34,6 +34,7 @@ type TokenDetails struct {
 	SessionPublicID dbtype.PublicID
 	Kind            TokenKind
 	Scopes          []string
+	WorkspaceID     uint32
 }
 
 // DetailedTokenResolver may be implemented by resolvers that can return

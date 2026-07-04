@@ -93,3 +93,54 @@ func TestProjectTimelinePagination(t *testing.T) {
 	require.NotEqual(t, page1.Events[0].ID, page2.Events[0].ID,
 		"paginated timeline pages must not overlap")
 }
+
+// TestProjectAndWorkspaceTimelineHidePrivateTaskEvents verifies that timeline
+// endpoints apply Layer-4 private task visibility, not just project membership.
+// A project viewer can see non-private project events but must not receive
+// payloads or task ids for a private task created by someone else.
+func TestProjectAndWorkspaceTimelineHidePrivateTaskEvents(t *testing.T) {
+	bootstrap(t)
+	t.Parallel()
+
+	owner := newTenant(t)
+	viewer := seedProjectRoleMember(t, owner, "viewer")
+
+	var publicTask, privateTask struct {
+		ID string `json:"id"`
+	}
+	doJSON(t, http.MethodPost, testServerURL+"/tasks", owner.AccessToken,
+		map[string]any{
+			"projectId":  owner.ProjectPublicID,
+			"title":      "Timeline public visible",
+			"visibility": "public",
+		}, &publicTask)
+	doJSON(t, http.MethodPost, testServerURL+"/tasks", owner.AccessToken,
+		map[string]any{
+			"projectId":  owner.ProjectPublicID,
+			"title":      "Timeline private hidden",
+			"visibility": "private",
+		}, &privateTask)
+	require.NotEmpty(t, publicTask.ID)
+	require.NotEmpty(t, privateTask.ID)
+
+	assertTimelineVisibility := func(t *testing.T, url string) {
+		t.Helper()
+		var timeline struct {
+			Events []struct {
+				TaskID string `json:"taskId"`
+			} `json:"events"`
+		}
+		doJSON(t, http.MethodGet, url, viewer.AccessToken, nil, &timeline)
+		seen := map[string]bool{}
+		for _, ev := range timeline.Events {
+			if ev.TaskID != "" {
+				seen[ev.TaskID] = true
+			}
+		}
+		require.True(t, seen[publicTask.ID], "viewer must still see public task events from %s", url)
+		require.False(t, seen[privateTask.ID], "viewer must not see private task events from %s", url)
+	}
+
+	assertTimelineVisibility(t, testServerURL+"/projects/"+owner.ProjectPublicID+"/timeline")
+	assertTimelineVisibility(t, testServerURL+"/workspaces/"+owner.WorkspacePublicID+"/timeline")
+}

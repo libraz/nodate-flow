@@ -256,7 +256,9 @@ WHERE workspace_id = ? AND project_id = ? AND user_id = ? AND enabled = TRUE LIM
 // Workspace owners/admins are returned as [ProjectRoleElevated]. Unlike
 // [CheckProjectMembership], a workspace member who is not on the project is not
 // an error; callers can feed the isMember result into a higher-level visibility
-// decision.
+// decision. Non-elevated workspace members without a project_members row get
+// [ProjectRoleNone], which can read public tasks but must fail project-role
+// write gates.
 func LookupProjectMembership(
 	ctx context.Context,
 	db DB,
@@ -278,7 +280,7 @@ WHERE workspace_id = ? AND project_id = ? AND user_id = ? AND enabled = TRUE LIM
 		if wsRole.AtLeast(WorkspaceRoleAdmin) {
 			return ProjectRoleElevated, false, nil
 		}
-		return ProjectRoleElevated, false, nil
+		return ProjectRoleNone, false, nil
 	default:
 		return "", false, scanErr
 	}

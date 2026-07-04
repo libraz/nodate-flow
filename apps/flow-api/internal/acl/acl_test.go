@@ -57,6 +57,7 @@ func TestProjectRoleAtLeast(t *testing.T) {
 		{"lead>=lead", acl.ProjectRoleLead, acl.ProjectRoleLead, true},
 		{"unknown<<viewer", acl.ProjectRole("nope"), acl.ProjectRoleViewer, false},
 		{"empty<<viewer", acl.ProjectRoleElevated, acl.ProjectRoleViewer, false},
+		{"none<<viewer", acl.ProjectRoleNone, acl.ProjectRoleViewer, false},
 	}
 	for _, tc := range cases {
 		tc := tc
@@ -102,6 +103,7 @@ func TestProjectRoleIsValid(t *testing.T) {
 		{"commenter", acl.ProjectRoleCommenter, true},
 		{"viewer", acl.ProjectRoleViewer, true},
 		{"elevated/empty", acl.ProjectRoleElevated, true},
+		{"none/internal", acl.ProjectRoleNone, true},
 		{"unknown", acl.ProjectRole("nope"), false},
 		{"capitalized", acl.ProjectRole("Lead"), false},
 	}
@@ -429,7 +431,7 @@ func TestACLLayered(t *testing.T) {
 			ctx, db, fx.wsID, fx.prjID, fx.creatorUserID, acl.WorkspaceRoleMember)
 		require.NoError(t, err)
 		require.False(t, isMember)
-		require.Equal(t, acl.ProjectRoleElevated, role)
+		require.Equal(t, acl.ProjectRoleNone, role)
 	})
 
 	// -----------------------------------------------------------------

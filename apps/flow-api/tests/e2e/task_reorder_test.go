@@ -63,4 +63,14 @@ func TestTaskReorder(t *testing.T) {
 	require.Equal(t, int32(10), weights[ids[2]])
 	require.Equal(t, int32(20), weights[ids[1]])
 	require.Equal(t, int32(30), weights[ids[0]])
+
+	var updatedByMatches int
+	err := testDB.QueryRow(
+		`SELECT COUNT(*) FROM tasks
+		 WHERE public_id IN (UUID_TO_BIN(?, 0), UUID_TO_BIN(?, 0), UUID_TO_BIN(?, 0))
+		   AND updated_by_user_id = (SELECT id FROM users WHERE public_id = UUID_TO_BIN(?, 0))`,
+		ids[0], ids[1], ids[2], tt.UserPublicID).Scan(&updatedByMatches)
+	require.NoError(t, err)
+	require.Equal(t, 3, updatedByMatches,
+		"POST /tasks/reorder must record actor in updated_by_user_id for every reordered task")
 }
