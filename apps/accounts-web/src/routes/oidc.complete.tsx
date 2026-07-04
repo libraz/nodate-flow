@@ -1,16 +1,17 @@
 /**
- * /magic-link -- passwordless login callback.
+ * /oidc/complete -- browser landing page for auth-api OIDC callbacks.
  *
- * Auth-api emails point here with `?token=<opaque one-time token>`.
- * The page consumes the token, then either completes the session or
- * asks for the account's configured TOTP second factor.
+ * auth-api redirects here after the IdP callback. Successful single-factor
+ * OIDC has already set the httpOnly refresh cookie, so this page refreshes
+ * an access token and loads /me. TOTP-required OIDC carries only a short-lived
+ * challenge token in the URL fragment and finishes through /auth/login/totp.
  */
 
 import type { components } from '@nodate-flow/sdk';
 import Button from '@nodate-flow/ui/primitives/button';
 import FormField from '@nodate-flow/ui/primitives/form-field';
 import Input from '@nodate-flow/ui/primitives/input';
-import { createFileRoute, Link, useNavigate, useSearch } from '@tanstack/react-router';
+import { createFileRoute, Link, useLocation, useNavigate } from '@tanstack/react-router';
 import { type FormEvent, type ReactElement, useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -20,56 +21,30 @@ import { useCapsLockHint } from '../features/auth/use-caps-lock-hint';
 import { userFromMe, type MeResponse } from '../features/auth/user-from-me';
 import type { ProblemJson } from '../lib/api-error';
 import { type AuthErrorI18nKey, mapAuthError, mapAuthThrown } from '../lib/auth-errors';
-import { sdk } from '../lib/sdk';
+import { refreshAccessToken, sdk } from '../lib/sdk';
 import { useSubmitGuard } from '../lib/use-submit-guard';
 
 const RECOVERY_MIN_LEN = 8;
 const RECOVERY_MAX_LEN = 20;
-const VERIFY_CACHE_MS = 60_000;
 
-type LoginResponse = components['schemas']['LoginBody'];
 type TotpResponse = components['schemas']['AuthTokens'];
 
-export interface MagicLinkSearch {
-  token?: string;
+function readOIDCFragment(hash: string): { step: string; challengeToken: string } {
+  const trimmed = hash.startsWith('#') ? hash.slice(1) : hash;
+  const params = new URLSearchParams(trimmed);
+  return {
+    step: params.get('step') ?? '',
+    challengeToken: params.get('challengeToken') ?? '',
+  };
 }
 
-type VerifyResult =
-  | { ok: true; body: LoginResponse }
-  | { ok: false; error: ProblemJson | undefined };
-
-const verifyPromises = new Map<string, Promise<VerifyResult>>();
-
-function verifyMagicLink(token: string): Promise<VerifyResult> {
-  const cached = verifyPromises.get(token);
-  if (cached) return cached;
-
-  const promise: Promise<VerifyResult> = sdk
-    .GET('/auth/magic-link/verify', { params: { query: { token } } })
-    .then(({ data, error }) => {
-      if (error || !data) {
-        const result: VerifyResult = { ok: false, error: error as ProblemJson | undefined };
-        return result;
-      }
-      const result: VerifyResult = { ok: true, body: data as LoginResponse };
-      return result;
-    })
-    .finally(() => {
-      window.setTimeout(() => {
-        verifyPromises.delete(token);
-      }, VERIFY_CACHE_MS);
-    });
-  verifyPromises.set(token, promise);
-  return promise;
-}
-
-export function MagicLinkPage(): ReactElement {
+export function OIDCCompletePage(): ReactElement {
   const { t } = useTranslation('auth');
   const navigate = useNavigate();
-  const { token } = useSearch({ from: '/magic-link' });
+  const location = useLocation();
   const [status, setStatus] = useState<'verifying' | 'totp' | 'error'>('verifying');
   const [error, setError] = useState<AuthErrorI18nKey | null>(null);
-  const [challengeToken, setChallengeToken] = useState<string | null>(null);
+  const [challengeToken, setChallengeToken] = useState('');
   const [totpCode, setTotpCode] = useState('');
   const [useRecovery, setUseRecovery] = useState(false);
   const [recoveryCode, setRecoveryCode] = useState('');
@@ -94,34 +69,36 @@ export function MagicLinkPage(): ReactElement {
 
   useEffect(() => {
     let cancelled = false;
+    const hash = location.hash || window.location.hash;
+    const fragment = readOIDCFragment(hash);
 
     async function run(): Promise<void> {
-      if (!token) {
-        setError('auth:errors.magic_link_malformed');
-        setStatus('error');
-        return;
-      }
       setStatus('verifying');
       setError(null);
-      try {
-        const result = await verifyMagicLink(token);
-        if (cancelled) return;
-        if (!result.ok) {
-          setError(mapAuthError(result.error));
-          setStatus('error');
-          return;
-        }
-        if (result.body.step === 'totp_required') {
-          setChallengeToken(result.body.challengeToken ?? '');
-          setStatus('totp');
-          return;
-        }
-        if (!result.body.accessToken) {
+      if (fragment.step === 'totp_required') {
+        if (!fragment.challengeToken) {
           setError('auth:errors.generic');
           setStatus('error');
           return;
         }
-        await completeSignIn(result.body.accessToken);
+        setChallengeToken(fragment.challengeToken);
+        setStatus('totp');
+        return;
+      }
+      if (fragment.step !== 'complete') {
+        setError('auth:errors.generic');
+        setStatus('error');
+        return;
+      }
+      try {
+        const token = await refreshAccessToken();
+        if (cancelled) return;
+        if (!token) {
+          setError('auth:errors.token_refresh_invalid');
+          setStatus('error');
+          return;
+        }
+        await completeSignIn(token);
       } catch (err) {
         if (!cancelled) {
           setError(mapAuthThrown(err));
@@ -134,11 +111,10 @@ export function MagicLinkPage(): ReactElement {
     return () => {
       cancelled = true;
     };
-  }, [token, completeSignIn]);
+  }, [location.hash, completeSignIn]);
 
   const handleTotpSubmit = async (e: FormEvent<HTMLFormElement>): Promise<void> => {
     e.preventDefault();
-    if (challengeToken == null) return;
     if (useRecovery ? recoveryCode.trim().length < RECOVERY_MIN_LEN : totpCode.length !== 6) return;
     if (totpGuard.guard()) return;
     setError(null);
@@ -152,8 +128,7 @@ export function MagicLinkPage(): ReactElement {
         setError(mapAuthError(totpError as ProblemJson | undefined));
         return;
       }
-      const totp = data as TotpResponse;
-      await completeSignIn(totp.accessToken);
+      await completeSignIn((data as TotpResponse).accessToken);
     } catch (err) {
       setError(mapAuthThrown(err));
     } finally {
@@ -257,9 +232,6 @@ export function MagicLinkPage(): ReactElement {
           >
             {useRecovery ? t('login.recovery_submit') : t('login.totp_submit')}
           </Button>
-          <Link to="/login" className="aw-link">
-            {t('login.totp_cancel')}
-          </Link>
         </form>
       </AuthCard>
     );
@@ -267,17 +239,13 @@ export function MagicLinkPage(): ReactElement {
 
   return (
     <AuthCard>
-      <div className="aw-stack aw-stack-5">
+      <div className="aw-stack aw-stack-5" role={status === 'error' ? 'alert' : undefined}>
         <h1 className="aw-page-title">{t('login.magic_link_title')}</h1>
         {status === 'verifying' ? (
-          <p className="aw-flush aw-muted aw-text-sm" aria-live="polite">
-            {t('login.magic_link_verifying')}
-          </p>
+          <p className="aw-flush aw-muted">{t('login.magic_link_verifying')}</p>
         ) : (
           <>
-            <p role="alert" className="aw-error">
-              {t(error ?? 'auth:errors.generic')}
-            </p>
+            <p className="aw-flush aw-error">{error ? t(error) : t('errors.generic')}</p>
             <Link to="/login" className="aw-link">
               {t('login.magic_link_back')}
             </Link>
@@ -288,10 +256,6 @@ export function MagicLinkPage(): ReactElement {
   );
 }
 
-export const Route = createFileRoute('/magic-link')({
-  validateSearch: (search: Record<string, unknown>): MagicLinkSearch => {
-    const token = typeof search.token === 'string' ? search.token : undefined;
-    return token ? { token } : {};
-  },
-  component: MagicLinkPage,
+export const Route = createFileRoute('/oidc/complete')({
+  component: OIDCCompletePage,
 });

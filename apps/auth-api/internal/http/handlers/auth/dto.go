@@ -304,14 +304,12 @@ type OIDCCallbackInput struct {
 	ErrorDescription string `query:"error_description"`
 }
 
-// OIDCCallbackOutput is the response for OIDC callback. It is a
-// discriminated envelope (LoginBody): when step="complete" the tokens
-// are populated and the refresh cookie is set; when step="totp_required"
-// only challengeToken is populated and the client must finish at
-// POST /auth/login/totp. This mirrors the password and magic-link login
-// paths so an account that enrolled app-level TOTP is challenged on
-// every login surface.
+// OIDCCallbackOutput is a browser redirect back to accounts-web after
+// the IdP callback. Body is still populated for direct handler tests and
+// generated schema compatibility; browsers follow Location.
 type OIDCCallbackOutput struct {
+	Status    int
+	Location  string      `header:"Location"`
 	SetCookie http.Cookie `header:"Set-Cookie"`
 	Body      LoginBody
 }

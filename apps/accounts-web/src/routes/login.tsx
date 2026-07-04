@@ -17,16 +17,12 @@ import { type FormEvent, type ReactElement, useCallback, useEffect, useRef, useS
 import { useTranslation } from 'react-i18next';
 import AuthCard from '../components/auth-card';
 import { type LoginFormValues, loginSchema } from '../features/auth/auth-schemas';
-import {
-  type AuthUser,
-  authStore,
-  selectIsAuthenticated,
-  useAuth,
-} from '../features/auth/auth-store';
+import { authStore, selectIsAuthenticated, useAuth } from '../features/auth/auth-store';
 import PasswordInput from '../features/auth/password-input';
 import { useCapabilities } from '../features/auth/use-capabilities';
 import { useCapsLockHint } from '../features/auth/use-caps-lock-hint';
 import { useRateLimitCountdown } from '../features/auth/use-rate-limit-countdown';
+import { userFromMe, type MeResponse } from '../features/auth/user-from-me';
 import OAuthButtonRow from '../features/oauth/oauth-button-row';
 import type { ProblemJson } from '../lib/api-error';
 import { type AuthErrorI18nKey, mapAuthError, mapAuthThrown } from '../lib/auth-errors';
@@ -280,7 +276,6 @@ export interface LoginSearch {
  */
 type LoginResponse = components['schemas']['LoginBody'];
 type TotpResponse = components['schemas']['AuthTokens'];
-type MeResponse = components['schemas']['MeBody'];
 
 function LoginPage(): ReactElement {
   const { t } = useTranslation('auth');
@@ -369,18 +364,7 @@ function LoginPage(): ReactElement {
       authStore.getState().clearSession();
       return;
     }
-    const me = data as MeResponse;
-    const user: AuthUser = {
-      id: me.id,
-      email: me.email,
-      displayName: me.displayName,
-      locale: me.locale,
-      timezone: me.timezone,
-      country: me.country,
-      themePreference: me.themePreference,
-      isInstanceAdmin: me.isInstanceAdmin,
-    };
-    authStore.getState().setSession(accessToken, user);
+    authStore.getState().setSession(accessToken, userFromMe(data as MeResponse));
     redirectAfterLogin();
   };
 

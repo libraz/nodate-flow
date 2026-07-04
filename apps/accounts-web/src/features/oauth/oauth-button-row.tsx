@@ -39,6 +39,15 @@ export type OAuthMode = 'login' | 'signup';
 /** Supported OIDC providers, mirrored from the auth-api capabilities flags. */
 export type OAuthProvider = 'google' | 'github' | 'microsoft';
 
+const oidcStartPath: Record<
+  OAuthProvider,
+  '/auth/oidc/google/start' | '/auth/oidc/github/start' | '/auth/oidc/microsoft/start'
+> = {
+  google: '/auth/oidc/google/start',
+  github: '/auth/oidc/github/start',
+  microsoft: '/auth/oidc/microsoft/start',
+};
+
 export interface OAuthButtonRowProps {
   /** Discriminator -- which page this row is rendered on. */
   mode: OAuthMode;
@@ -83,19 +92,18 @@ function OAuthButtonRow({ mode, onError }: OAuthButtonRowProps): ReactElement | 
     setPendingProvider(provider);
     setBusyProvider(provider);
     try {
-      const { data, error } = await sdk.GET(`/auth/oidc/${provider}/start` as never);
+      const { data, error } = await sdk.GET(oidcStartPath[provider]);
       if (error || !data) {
         onError?.(mapAuthError(error as ProblemJson | undefined));
         setBusyProvider(null);
         setPendingProvider(null);
         return;
       }
-      const result = data as { authorizationUrl: string };
       // Leave `pendingProvider` set on success: the browser is about to
       // navigate away, so re-enabling the buttons would only flash a
       // brief idle UX and re-open the multi-click race we are guarding
       // against.
-      window.location.href = result.authorizationUrl;
+      window.location.href = data.authorizationUrl;
     } catch (err) {
       onError?.(mapAuthThrown(err));
       setBusyProvider(null);

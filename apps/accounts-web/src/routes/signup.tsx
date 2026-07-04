@@ -16,13 +16,9 @@ import { useTranslation } from 'react-i18next';
 
 import AuthCard from '../components/auth-card';
 import { type SignupFormValues, signupSchema } from '../features/auth/auth-schemas';
-import {
-  type AuthUser,
-  authStore,
-  selectIsAuthenticated,
-  useAuth,
-} from '../features/auth/auth-store';
+import { authStore, selectIsAuthenticated, useAuth } from '../features/auth/auth-store';
 import PasswordInput from '../features/auth/password-input';
+import { userFromMe, type MeResponse } from '../features/auth/user-from-me';
 import OAuthButtonRow from '../features/oauth/oauth-button-row';
 import type { ProblemJson } from '../lib/api-error';
 import { type AuthErrorI18nKey, mapAuthError, mapAuthThrown } from '../lib/auth-errors';
@@ -34,7 +30,6 @@ import { useSubmitGuard } from '../lib/use-submit-guard';
  * gen-sdk`; mirrors auth-api's POST /auth/register and GET /me exactly.
  */
 type RegisterResponse = components['schemas']['AuthTokens'];
-type MeResponse = components['schemas']['MeBody'];
 
 function SignupPage(): ReactElement {
   const { t } = useTranslation('auth');
@@ -101,18 +96,7 @@ function SignupPage(): ReactElement {
         authStore.getState().clearSession();
         return;
       }
-      const me = meData as MeResponse;
-      const user: AuthUser = {
-        id: me.id,
-        email: me.email,
-        displayName: me.displayName,
-        locale: me.locale,
-        timezone: me.timezone,
-        country: me.country,
-        themePreference: me.themePreference,
-        isInstanceAdmin: me.isInstanceAdmin,
-      };
-      authStore.getState().setSession(reg.accessToken, user);
+      authStore.getState().setSession(reg.accessToken, userFromMe(meData as MeResponse));
       toaster.show({ message: t('signup.success'), tone: 'success' });
       void navigate({ to: '/profile', replace: true });
     } catch (err) {

@@ -1,16 +1,9 @@
 import { useEffect, useState } from 'react';
+import type { components } from '@nodate-flow/sdk';
 import { sdk } from '../../lib/sdk';
 
 /** Boolean flags describing which auth methods are available. */
-export interface AuthCapabilities {
-  passwordLogin: boolean;
-  oidcGoogle: boolean;
-  oidcGithub: boolean;
-  oidcMicrosoft: boolean;
-  magicLink: boolean;
-  totp: boolean;
-  registrationOpen: boolean;
-}
+export type AuthCapabilities = components['schemas']['CapabilitiesBody'];
 
 /** Conservative default: only password login shown until the server responds. */
 const defaultCaps: AuthCapabilities = {
@@ -37,10 +30,10 @@ export function useCapabilities(): AuthCapabilities | null {
     if (cached) return;
     let cancelled = false;
     void sdk
-      .GET('/auth/capabilities' as never)
+      .GET('/auth/capabilities')
       .then(({ data }) => {
         if (cancelled) return;
-        const result = (data as AuthCapabilities | undefined) ?? defaultCaps;
+        const result = data ?? defaultCaps;
         cached = result;
         setCaps(result);
       })

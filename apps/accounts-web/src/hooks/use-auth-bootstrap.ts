@@ -10,11 +10,10 @@
  * memoizes its in-flight promise).
  */
 
-import type { components } from '@nodate-flow/sdk';
 import { useEffect, useState } from 'react';
 
-import type { AuthUser } from '../features/auth/auth-store';
 import { authStore } from '../features/auth/auth-store';
+import { userFromMe, type MeResponse } from '../features/auth/user-from-me';
 import { refreshAccessToken, sdk } from '../lib/sdk';
 
 export type AuthBootstrapStatus = 'loading' | 'authenticated' | 'unauthenticated';
@@ -22,12 +21,6 @@ export type AuthBootstrapStatus = 'loading' | 'authenticated' | 'unauthenticated
 interface BootstrapResult {
   status: AuthBootstrapStatus;
 }
-
-/**
- * SDK-derived response body. Generated from the Go schema by `make
- * gen-sdk`; mirrors auth-api's GET /me exactly.
- */
-type MeResponse = components['schemas']['MeBody'];
 
 let bootstrapPromise: Promise<AuthBootstrapStatus> | null = null;
 
@@ -39,19 +32,7 @@ async function runBootstrap(): Promise<AuthBootstrapStatus> {
     authStore.getState().clearSession();
     return 'unauthenticated';
   }
-  const me = data as MeResponse;
-  const user: AuthUser = {
-    id: me.id,
-    email: me.email,
-    displayName: me.displayName,
-    locale: me.locale,
-    timezone: me.timezone,
-    country: me.country,
-    themePreference: me.themePreference,
-    isInstanceAdmin: me.isInstanceAdmin,
-    avatarUrl: me.avatarUrl ?? null,
-  };
-  authStore.getState().setSession(token, user);
+  authStore.getState().setSession(token, userFromMe(data as MeResponse));
   return 'authenticated';
 }
 

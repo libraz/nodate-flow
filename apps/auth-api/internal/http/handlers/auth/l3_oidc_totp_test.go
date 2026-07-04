@@ -51,6 +51,10 @@ func TestOIDCCallback_2FAAccountReturnsChallenge(t *testing.T) {
 	assert.NotEmpty(t, out.Body.ChallengeToken, "a challenge token must be returned")
 	assert.Empty(t, out.Body.AccessToken, "no access token before the second factor")
 	assert.Empty(t, out.SetCookie.Value, "no refresh cookie before the second factor")
+	assert.Equal(t, 302, out.Status, "OIDC browser callback must redirect to accounts-web")
+	assert.Contains(t, out.Location, "/oidc/complete#")
+	assert.Contains(t, out.Location, "step=totp_required")
+	assert.Contains(t, out.Location, "challengeToken=")
 
 	// The challenge must be a valid step-up token; the client presents it
 	// to POST /auth/login/totp to finish login.
@@ -99,4 +103,7 @@ func TestOIDCCallback_NoMFACompletesDirectly(t *testing.T) {
 	assert.NotEmpty(t, out.Body.UserID)
 	assert.NotEmpty(t, out.SetCookie.Value, "refresh cookie set on completion")
 	assert.Empty(t, out.Body.ChallengeToken, "no challenge for a non-2FA account")
+	assert.Equal(t, 302, out.Status, "OIDC browser callback must redirect to accounts-web")
+	assert.Contains(t, out.Location, "/oidc/complete#step=complete")
+	assert.NotContains(t, out.Location, out.Body.AccessToken, "access token must not be put in the redirect URL")
 }

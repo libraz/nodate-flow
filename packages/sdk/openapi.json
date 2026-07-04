@@ -8653,6 +8653,9 @@
             "format": "int64",
             "type": "integer"
           },
+          "recurrenceExceptions": {
+            "type": "string"
+          },
           "recurrenceRule": {
             "type": "string"
           },
@@ -13705,6 +13708,11 @@
             },
             "description": "OK",
             "headers": {
+              "Location": {
+                "schema": {
+                  "type": "string"
+                }
+              },
               "Set-Cookie": {
                 "schema": {
                   "type": "string"
@@ -13811,6 +13819,11 @@
             },
             "description": "OK",
             "headers": {
+              "Location": {
+                "schema": {
+                  "type": "string"
+                }
+              },
               "Set-Cookie": {
                 "schema": {
                   "type": "string"
@@ -13917,6 +13930,11 @@
             },
             "description": "OK",
             "headers": {
+              "Location": {
+                "schema": {
+                  "type": "string"
+                }
+              },
               "Set-Cookie": {
                 "schema": {
                   "type": "string"

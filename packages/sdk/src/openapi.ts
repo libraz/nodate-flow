@@ -8765,6 +8765,7 @@ export interface components {
             memo?: string;
             /** Format: int64 */
             recurrenceEnd?: number;
+            recurrenceExceptions?: string;
             recurrenceRule?: string;
             showAs: string;
             /** Format: int64 */
@@ -11312,6 +11313,7 @@ export interface operations {
             /** @description OK */
             200: {
                 headers: {
+                    Location?: string;
                     "Set-Cookie"?: string;
                     [name: string]: unknown;
                 };
@@ -11378,6 +11380,7 @@ export interface operations {
             /** @description OK */
             200: {
                 headers: {
+                    Location?: string;
                     "Set-Cookie"?: string;
                     [name: string]: unknown;
                 };
@@ -11444,6 +11447,7 @@ export interface operations {
             /** @description OK */
             200: {
                 headers: {
+                    Location?: string;
                     "Set-Cookie"?: string;
                     [name: string]: unknown;
                 };

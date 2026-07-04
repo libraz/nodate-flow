@@ -4,6 +4,9 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"net/http"
+	"net/url"
+	"strings"
 
 	"github.com/nodate-flow/nodate-flow/apps/auth-api/internal/db/generated"
 	"github.com/nodate-flow/nodate-flow/apps/auth-api/internal/db/types"
@@ -151,6 +154,11 @@ func (d Deps) finishOIDCLogin(ctx context.Context, userID uint32, userPub types.
 				return nil, httpErr(apierrors.InternalUnexpected)
 			}
 			return &OIDCCallbackOutput{
+				Status: http.StatusFound,
+				Location: oidcCompleteURL(d.AccountsWebURL, url.Values{
+					"step":           []string{"totp_required"},
+					"challengeToken": []string{challenge},
+				}),
 				Body: LoginBody{
 					Step:           "totp_required",
 					ChallengeToken: challenge,
@@ -168,6 +176,8 @@ func (d Deps) finishOIDCLogin(ctx context.Context, userID uint32, userPub types.
 		return nil, err
 	}
 	return &OIDCCallbackOutput{
+		Status:    http.StatusFound,
+		Location:  oidcCompleteURL(d.AccountsWebURL, url.Values{"step": []string{"complete"}}),
 		SetCookie: newRefreshCookie(refresh, d.CookieSecure),
 		Body: LoginBody{
 			Step:        "complete",
@@ -176,6 +186,18 @@ func (d Deps) finishOIDCLogin(ctx context.Context, userID uint32, userPub types.
 			UserID:      tokens.UserID,
 		},
 	}, nil
+}
+
+func oidcCompleteURL(accountsWebURL string, fragment url.Values) string {
+	base := strings.TrimRight(accountsWebURL, "/")
+	if base == "" {
+		base = "/"
+	}
+	target := base + "/oidc/complete"
+	if encoded := fragment.Encode(); encoded != "" {
+		target += "#" + encoded
+	}
+	return target
 }
 
 // createOIDCIdentity inserts an identities row binding an OIDC
