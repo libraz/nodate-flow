@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/nodate-flow/nodate-flow/packages/go-shared/apierr"
 	"github.com/nodate-flow/nodate-flow/packages/go-shared/authn"
 	"github.com/nodate-flow/nodate-flow/packages/go-shared/ratelimit"
 )
@@ -65,7 +66,7 @@ func (rl *IPRateLimiter) Middleware() func(http.Handler) http.Handler {
 
 			if !res.Allowed {
 				w.Header().Set("Retry-After", ratelimit.FormatRetryAfter(res.RetryAfter))
-				WriteJSONError(w, http.StatusTooManyRequests, "RATE.LIMIT_EXCEEDED", "429 Too Many Requests")
+				WriteJSONError(w, http.StatusTooManyRequests, apierr.CodeRateLimitExceeded, "429 Too Many Requests")
 				return
 			}
 
@@ -153,7 +154,7 @@ func (rl *APIRateLimiter) Middleware() func(http.Handler) http.Handler {
 
 			if !res.Allowed {
 				w.Header().Set("Retry-After", ratelimit.FormatRetryAfter(res.RetryAfter))
-				WriteJSONError(w, http.StatusTooManyRequests, "RATE.LIMIT_EXCEEDED", "429 Too Many Requests")
+				WriteJSONError(w, http.StatusTooManyRequests, apierr.CodeRateLimitExceeded, "429 Too Many Requests")
 				return
 			}
 

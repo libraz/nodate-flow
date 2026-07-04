@@ -7,6 +7,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/errors"
+	"github.com/nodate-flow/nodate-flow/packages/go-shared/apierr"
 	"github.com/nodate-flow/nodate-flow/packages/go-shared/authn"
 	"github.com/nodate-flow/nodate-flow/packages/go-shared/httputil"
 	"github.com/stretchr/testify/require"
@@ -293,7 +295,7 @@ func TestIPRateLimiter_Middleware_BlockedResponseIsJSON(t *testing.T) {
 
 	// Verify the envelope fields.
 	require.Equal(t, float64(http.StatusTooManyRequests), body["status"], "status field must be 429")
-	require.Equal(t, "RATE.LIMIT_EXCEEDED", body["code"], "code field must match")
+	require.Equal(t, apierr.CodeRateLimitExceeded, body["code"], "code field must match")
 	require.Equal(t, "429 Too Many Requests", body["message"], "message field must match")
 }
 
@@ -336,8 +338,14 @@ func TestAPIRateLimiter_Middleware_BlockedResponseIsJSON(t *testing.T) {
 	require.NoError(t, err, "response body must be valid JSON")
 
 	require.Equal(t, float64(http.StatusTooManyRequests), body["status"])
-	require.Equal(t, "RATE.LIMIT_EXCEEDED", body["code"])
+	require.Equal(t, apierr.CodeRateLimitExceeded, body["code"])
 	require.Equal(t, "429 Too Many Requests", body["message"])
+}
+
+func TestRateLimitCodeMatchesGeneratedCatalog(t *testing.T) {
+	t.Parallel()
+
+	require.Equal(t, errors.RateLimitExceeded.Code, apierr.CodeRateLimitExceeded)
 }
 
 func TestWriteJSONError_EnvelopeStructure(t *testing.T) {

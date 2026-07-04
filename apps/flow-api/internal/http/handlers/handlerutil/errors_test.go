@@ -47,7 +47,7 @@ func TestHTTPErr_EnvelopeShape(t *testing.T) {
 	t.Parallel()
 
 	spec := &apierrors.Spec{
-		Code:    "RATE.LIMIT_EXCEEDED",
+		Code:    "RATE.LIMIT.EXCEEDED",
 		Status:  429,
 		Message: "Too many requests",
 	}
@@ -59,8 +59,8 @@ func TestHTTPErr_EnvelopeShape(t *testing.T) {
 		t.Fatalf("expected *ProblemDetails, got %T", err)
 	}
 
-	if pd.Type != "RATE.LIMIT_EXCEEDED" {
-		t.Errorf("type: got %q, want %q", pd.Type, "RATE.LIMIT_EXCEEDED")
+	if pd.Type != "RATE.LIMIT.EXCEEDED" {
+		t.Errorf("type: got %q, want %q", pd.Type, "RATE.LIMIT.EXCEEDED")
 	}
 	if pd.Title != "Too Many Requests" {
 		t.Errorf("title: got %q, want %q", pd.Title, "Too Many Requests")

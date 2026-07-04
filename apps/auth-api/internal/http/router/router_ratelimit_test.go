@@ -2,6 +2,7 @@ package router
 
 import (
 	"database/sql"
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -13,6 +14,7 @@ import (
 
 	"github.com/nodate-flow/nodate-flow/apps/auth-api/internal/auth"
 	"github.com/nodate-flow/nodate-flow/apps/auth-api/internal/db/generated"
+	"github.com/nodate-flow/nodate-flow/packages/go-shared/apierr"
 )
 
 // rateLimitDeps mirrors stubDeps but with rate-limiting enabled and a
@@ -80,6 +82,17 @@ func TestMagicLinkVerify_RateLimitedReturns429(t *testing.T) {
 			"get 429; statuses observed: %v", statuses)
 	assert.Equal(t, http.StatusTooManyRequests, statuses[totalRequests-1],
 		"the last request must be rejected with 429")
+
+	lastReq := httptest.NewRequest(http.MethodGet, "/auth/magic-link/verify?token=bogus", nil)
+	lastReq.RemoteAddr = "203.0.113.7:54321"
+	lastRec := httptest.NewRecorder()
+	h.ServeHTTP(lastRec, lastReq)
+	require.Equal(t, http.StatusTooManyRequests, lastRec.Code)
+	var body struct {
+		Code string `json:"code"`
+	}
+	require.NoError(t, json.NewDecoder(lastRec.Body).Decode(&body))
+	assert.Equal(t, apierr.CodeRateLimitExceeded, body.Code)
 }
 
 // TestMagicLinkVerify_IsBehindAuthRateLimitGroup is a structural check:
