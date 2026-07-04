@@ -22,6 +22,7 @@ import { useNavigate } from '@tanstack/react-router';
 import { type FormEvent, Fragment, type ReactElement, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { formatApiError } from '../../lib/api-error';
 import { clearActiveWorkspaceId } from '../../lib/use-current-workspace';
 import { selectUser, useAuth } from '../auth/auth-store';
 import {
@@ -243,10 +244,10 @@ export default function WorkspaceSettingsForm({
     try {
       await deleteWs.mutateAsync({ wsId: workspaceId, confirm: true });
       toaster.show({ tone: 'success', message: t('workspace.general.danger.deleted') });
-    } catch {
+    } catch (err) {
       toaster.show({
         tone: 'danger',
-        message: t('workspace.general.danger.errors.delete_failed'),
+        message: formatApiError(err, t, 'workspace.general.danger.errors.delete_failed'),
       });
     }
   };
@@ -266,10 +267,10 @@ export default function WorkspaceSettingsForm({
     try {
       await update.mutateAsync({ id: workspaceId, patch });
       toaster.show({ tone: 'success', message: t('workspace.general.saved') });
-    } catch {
+    } catch (err) {
       toaster.show({
         tone: 'danger',
-        message: t('workspace.general.errors.update_failed'),
+        message: formatApiError(err, t, 'workspace.general.errors.update_failed'),
       });
     } finally {
       setSubmitting(false);

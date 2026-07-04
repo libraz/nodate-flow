@@ -28,6 +28,7 @@ const mocks = vi.hoisted(() => ({
   deleteEvent: vi.fn(),
   createTask: vi.fn(),
   rememberCalendarChoice: vi.fn(),
+  toastShow: vi.fn(),
 }));
 
 vi.mock('../api', () => ({
@@ -48,7 +49,7 @@ vi.mock('../api', () => ({
 
 // The toast implementation isn't under test — silence it.
 vi.mock('@nodate-flow/ui/primitives/toast', () => ({
-  toaster: { show: vi.fn() },
+  toaster: { show: mocks.toastShow },
 }));
 
 // AttendeesSection pulls workspace members + per-event attendees via
@@ -120,6 +121,7 @@ beforeEach(() => {
   mocks.deleteEvent.mockReset().mockResolvedValue(undefined);
   mocks.createTask.mockReset().mockResolvedValue({ id: 'task-new' });
   mocks.rememberCalendarChoice.mockReset();
+  mocks.toastShow.mockReset();
 });
 
 /* ── tests ────────────────────────────────────────────────────── */
@@ -249,6 +251,20 @@ describe('<EventDialog>', () => {
     renderWithProviders(renderDialog({ mode: editMode() }));
     const taskRadio = screen.getByRole('radio', { name: 'kind.task' });
     expect(taskRadio.hasAttribute('disabled')).toBe(true);
+  });
+
+  it('preserves backend error detail in mutation failure toasts', async () => {
+    const user = userEvent.setup();
+    mocks.createEvent.mockRejectedValueOnce(new Error('Calendar slug already exists'));
+    renderWithProviders(renderDialog());
+
+    await user.type(screen.getByRole('textbox', { name: 'field.title' }), 'Conflicting event');
+    await user.click(screen.getByRole('button', { name: 'action.submit.create' }));
+
+    expect(mocks.toastShow).toHaveBeenCalledWith({
+      tone: 'danger',
+      message: 'Calendar slug already exists',
+    });
   });
 });
 

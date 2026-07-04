@@ -26,6 +26,14 @@ const settingKeys = {
   maxMembersPerWorkspace: 'max_members_per_workspace',
 } as const;
 
+function formatSettingsSaveError(err: ProblemJson | undefined, fallback: string): string {
+  if (!err) return fallback;
+  if (typeof err.detail === 'string' && err.detail.length > 0) return err.detail;
+  if (typeof err.title === 'string' && err.title.length > 0) return err.title;
+  const code = extractErrorCode(err);
+  return code ? `${fallback} (${code})` : fallback;
+}
+
 export function SettingsPage(): ReactElement {
   const { t } = useTranslation('admin');
   const [loading, setLoading] = useState(true);
@@ -85,8 +93,7 @@ export function SettingsPage(): ReactElement {
     setSaving(false);
 
     if (err) {
-      const code = extractErrorCode(err as ProblemJson);
-      setError(code ? `${t('errors.generic')} (${code})` : t('errors.generic'));
+      setError(formatSettingsSaveError(err as ProblemJson | undefined, t('errors.generic')));
     } else {
       setSuccess(true);
     }

@@ -28,6 +28,7 @@ describe('admin mutation error handling source guard', () => {
     );
     expect(admins).toContain("setError(t('errors.generic'))");
     expect(settings).toContain("const { error: err } = await sdk.PATCH('/admin/settings'");
-    expect(settings).toContain('setError(code ? `$' + "{t('errors.generic')} ($" + '{code})`');
+    expect(settings).toContain('formatSettingsSaveError');
+    expect(settings).toContain("typeof err.detail === 'string'");
   });
 });

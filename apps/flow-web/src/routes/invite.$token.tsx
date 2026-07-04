@@ -24,22 +24,7 @@ import { useTranslation } from 'react-i18next';
 
 import AuthCard from '../components/auth/auth-card';
 import { inviteInfoQueryOptions } from '../features/workspaces/invite-api';
-import { ApiError, isNetworkError } from '../lib/api-error';
-
-function resolveInviteErrorKey(error: unknown): string {
-  if (isNetworkError(error)) return 'workspaces.invites.error_network';
-  if (error instanceof ApiError) {
-    switch (error.code) {
-      case 'WS.WORKSPACE_INVITE.EXPIRED':
-        return 'workspaces.invites.expired';
-      case 'WS.WORKSPACE_INVITE.EXHAUSTED':
-        return 'workspaces.invites.full';
-      default:
-        return 'workspaces.invites.invalid';
-    }
-  }
-  return 'workspaces.invites.invalid';
-}
+import { resolveInviteErrorKey } from '../features/workspaces/invite-errors';
 
 function InviteErrorComponent({ error }: { error: unknown }): ReactElement {
   const { t } = useTranslation('common');

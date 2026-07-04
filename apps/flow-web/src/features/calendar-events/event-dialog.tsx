@@ -43,6 +43,7 @@ import {
 import { useTranslation } from 'react-i18next';
 
 import { confirmAction } from '../../lib/confirm-action';
+import { formatApiError } from '../../lib/api-error';
 import { dateKey } from '../../lib/date-utils';
 import { formatDate } from '../../lib/format';
 import { selectUser, useAuth } from '../auth/auth-store';
@@ -623,10 +624,10 @@ export default function EventDialog({
         toaster.show({ tone: 'success', message: t(TOAST_UPDATED_KEYS[kind]) });
       }
       onSaved();
-    } catch {
+    } catch (err) {
       toaster.show({
         tone: 'danger',
-        message: t(isCreate ? 'toast.createFailed' : 'toast.updateFailed'),
+        message: formatApiError(err, t, isCreate ? 'toast.createFailed' : 'toast.updateFailed'),
       });
     }
   }
@@ -717,8 +718,11 @@ export default function EventDialog({
       });
       toaster.show({ tone: 'success', message: t(TOAST_DELETED_KEYS[kind]) });
       onSaved();
-    } catch {
-      toaster.show({ tone: 'danger', message: t('toast.deleteFailed') });
+    } catch (err) {
+      toaster.show({
+        tone: 'danger',
+        message: formatApiError(err, t, 'toast.deleteFailed'),
+      });
     }
   }
 

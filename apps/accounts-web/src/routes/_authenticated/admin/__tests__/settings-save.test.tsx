@@ -108,4 +108,31 @@ describe('admin settings save', () => {
       },
     });
   });
+
+  it('shows backend save error detail instead of only the generic fallback', async () => {
+    sdkMocks.get.mockResolvedValueOnce({
+      data: {
+        items: [
+          { key: 'registration_open', value: 'true' },
+          { key: 'mfa_enforcement', value: 'optional' },
+        ],
+      },
+    });
+    sdkMocks.patch.mockResolvedValueOnce({
+      error: {
+        type: 'ADMIN.SETTINGS.INVALID',
+        title: 'Invalid setting',
+        detail: 'max members per workspace must be a positive integer',
+      },
+    });
+
+    mount();
+
+    await screen.findByRole('heading', { name: enAdmin.settings.title });
+    await userEvent.click(screen.getByRole('button', { name: enAdmin.settings.save }));
+
+    expect((await screen.findByRole('alert')).textContent).toBe(
+      'max members per workspace must be a positive integer',
+    );
+  });
 });

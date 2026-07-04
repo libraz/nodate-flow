@@ -51,20 +51,38 @@ const jaKeys = flattenKeys(ja as Record<string, unknown>);
 const zhKeys = flattenKeys(zh as Record<string, unknown>);
 
 describe('mapAuthError', () => {
-  it('maps the previously-unmapped OIDC codes to dedicated keys', () => {
+  it('uses curated i18n keys from the generated SDK catalog', () => {
     expect(mapAuthError({ type: AuthErrors.AUTH_OIDC_PROVIDER_REJECTED.code })).toBe(
       'auth:errors.oidc_provider_rejected',
     );
-    expect(mapAuthError({ type: AuthErrors.AUTH_OIDC_EMAIL_NOT_VERIFIED.code })).toBe(
-      'auth:errors.oidc_email_not_verified',
+    expect(mapAuthError({ type: AuthErrors.AUTH_SESSION_UNAUTHORIZED.code })).toBe(
+      'auth:errors.session_unauthorized',
     );
   });
 
-  it('maps a session-revoked error to its specific (non-generic) key', () => {
+  it('uses extension i18n keys ahead of catalog and generated error-code fallbacks', () => {
+    expect(mapAuthError({ type: AuthErrors.AUTH_OIDC_EMAIL_NOT_VERIFIED.code })).toBe(
+      'errors:AUTH.OIDC.EMAIL_NOT_VERIFIED',
+    );
+    expect(
+      mapAuthError({
+        type: AuthErrors.AUTH_OIDC_EMAIL_NOT_VERIFIED.code,
+        extensions: { 'x-i18n-key': 'auth.errors.oidc_email_not_verified' },
+      }),
+    ).toBe('auth:errors.oidc_email_not_verified');
+  });
+
+  it('maps generated auth catalog codes to the errors namespace instead of unknown', () => {
     const key = mapAuthError({ type: AuthErrors.AUTH_SESSION_REVOKED.code });
-    expect(key).toBe('auth:errors.session_revoked');
+    expect(key).toBe('errors:AUTH.SESSION.REVOKED');
     expect(key).not.toBe('auth:errors.generic');
     expect(key).not.toBe('auth:errors.unknown');
+  });
+
+  it('keeps every generated auth error code out of the unknown fallback', () => {
+    for (const def of Object.values(AuthErrors)) {
+      expect(mapAuthError({ type: def.code }), def.code).not.toBe('auth:errors.unknown');
+    }
   });
 
   it('falls back to unknown only for unrecognized codes', () => {

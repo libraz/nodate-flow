@@ -15,8 +15,8 @@ import { useTranslation } from 'react-i18next';
 
 import AuthCard from '../components/auth/auth-card';
 import { selectIsAuthenticated, useAuth } from '../features/auth/auth-store';
+import { resolveInviteErrorKey } from '../features/workspaces/invite-errors';
 import { useAcceptInvite, useInviteInfoQuery } from '../features/workspaces/invite-api';
-import { isNetworkError } from '../lib/api-error';
 import { formatEpochDateTime } from '../lib/format';
 import { useSubmitGuard } from '../lib/use-submit-guard';
 
@@ -102,12 +102,7 @@ function InviteAcceptPage(): ReactElement {
       const result = await acceptInvite.mutateAsync(token);
       void navigate({ to: '/workspaces/$id', params: { id: result.workspaceId }, replace: true });
     } catch (err) {
-      // Distinguish a transport failure (no server response) from a
-      // server-rejected accept call so the user sees actionable copy
-      // instead of the generic "could not accept" message in both cases.
-      setError(
-        isNetworkError(err) ? t('common.network_error') : t('workspaces.invites.accept_failed'),
-      );
+      setError(t(resolveInviteErrorKey(err)));
     } finally {
       submitGuard.end();
     }
