@@ -99,7 +99,10 @@ type Debouncer struct {
 	// emitCtx is the context passed to emitter.Emit when the timer
 	// fires. Captured from NewDebouncer so timers don't outlive the
 	// gateway's lifetime even after Stop.
-	emitCtx context.Context //nolint:containedctx // intentional — timer fires off-goroutine and must carry its own context.
+	emitCtx  context.Context //nolint:containedctx // intentional — timer fires off-goroutine and must carry its own context.
+	emitCh   chan PresenceEvent
+	emitStop chan struct{}
+	emitDone chan struct{}
 
 	// sweepTicker drives the periodic GC of idle lastEmit records so the
 	// table cannot grow without bound across reconnect snapshots.
@@ -130,6 +133,9 @@ func NewDebouncer(ctx context.Context, window time.Duration, emitter debounceEmi
 		lastEmit:  map[string]time.Time{},
 		now:       time.Now,
 		emitCtx:   ctx,
+		emitCh:    make(chan PresenceEvent, 16_384),
+		emitStop:  make(chan struct{}),
+		emitDone:  make(chan struct{}),
 		sweepStop: make(chan struct{}),
 		sweepDone: make(chan struct{}),
 	}
@@ -145,8 +151,29 @@ func NewDebouncer(ctx context.Context, window time.Duration, emitter debounceEmi
 		interval = time.Second
 	}
 	d.sweepTicker = time.NewTicker(interval)
+	go d.emitLoop()
 	go d.sweepLoop()
 	return d
+}
+
+func (d *Debouncer) emitLoop() {
+	defer close(d.emitDone)
+	for {
+		select {
+		case <-d.emitStop:
+			return
+		case ev := <-d.emitCh:
+			d.emitter.Emit(d.emitCtx, ev)
+		}
+	}
+}
+
+func (d *Debouncer) emitAsync(ev PresenceEvent) {
+	select {
+	case d.emitCh <- ev:
+	case <-d.emitStop:
+	case <-d.emitCtx.Done():
+	}
 }
 
 // sweepLoop runs the periodic GC until Stop fires. It exits promptly
@@ -188,10 +215,9 @@ func (d *Debouncer) sweep() bool {
 	return false
 }
 
-// Handle ingests a presence event. The leading-edge fires
-// synchronously through the emitter (so the caller observes the same
-// goroutine-ordering guarantees as discordgo's handler dispatch); the
-// trailing-edge fires on a time.AfterFunc goroutine.
+// Handle ingests a presence event. Leading and trailing emits both run
+// outside the caller's goroutine so discordgo's dispatch path is not
+// blocked by flow-api lookup or signal POST latency.
 func (d *Debouncer) Handle(ev PresenceEvent) {
 	d.mu.Lock()
 
@@ -216,7 +242,7 @@ func (d *Debouncer) Handle(ev PresenceEvent) {
 		}
 		d.lastEmit[ev.UserID] = now
 		d.mu.Unlock()
-		d.emitter.Emit(d.emitCtx, ev)
+		d.emitAsync(ev)
 		return
 	}
 
@@ -253,8 +279,8 @@ func (d *Debouncer) Handle(ev PresenceEvent) {
 }
 
 // fire is the trailing-timer callback. It clears the pending entry,
-// records the emit timestamp, and pushes the captured event through
-// the emitter on the caller's goroutine (i.e. AfterFunc's goroutine).
+// records the emit timestamp, and queues the captured event for the
+// single emit worker so leading/trailing event order is preserved.
 func (d *Debouncer) fire(userID string) {
 	d.mu.Lock()
 	entry, ok := d.entries[userID]
@@ -276,7 +302,7 @@ func (d *Debouncer) fire(userID string) {
 		return
 	}
 	d.mu.Unlock()
-	d.emitter.Emit(d.emitCtx, ev)
+	d.emitAsync(ev)
 }
 
 // Stop cancels every pending trailing timer and prevents Handle from
@@ -313,4 +339,7 @@ func (d *Debouncer) Stop() {
 	}
 	close(d.sweepStop)
 	<-d.sweepDone
+
+	close(d.emitStop)
+	<-d.emitDone
 }

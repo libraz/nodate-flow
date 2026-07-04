@@ -53,6 +53,16 @@ func eventFor(userID, status string) PresenceEvent {
 	}
 }
 
+type blockingEmitter struct {
+	started chan struct{}
+	release chan struct{}
+}
+
+func (b *blockingEmitter) Emit(_ context.Context, _ PresenceEvent) {
+	close(b.started)
+	<-b.release
+}
+
 // waitForEmitCount blocks until rec has at least n events or the
 // deadline expires, then returns the snapshot. The polling interval
 // is short (1ms) because trailing timers in these tests fire on the
@@ -70,19 +80,48 @@ func waitForEmitCount(t *testing.T, rec *recordingEmitter, n int, timeout time.D
 	return nil
 }
 
-// TestDebouncer_SingleEventEmitsImmediately verifies the leading-edge
-// fast path: the first event for a user must be emitted on the
-// caller's goroutine before Handle returns.
+// TestDebouncer_SingleEventEmitsOnLeadingEdge verifies the leading-edge
+// fast path: the first event for a user is emitted without waiting for
+// the debounce window.
 func TestDebouncer_SingleEventEmitsImmediately(t *testing.T) {
 	d, rec, _ := newTestDebouncer(t, 50*time.Millisecond)
 	defer d.Stop()
 
 	d.Handle(eventFor("user-A", "online"))
 
-	snap := rec.snapshot()
+	snap := waitForEmitCount(t, rec, 1, 50*time.Millisecond)
 	require.Len(t, snap, 1)
 	require.Equal(t, "user-A", snap[0].UserID)
 	require.Equal(t, "online", snap[0].Status)
+}
+
+func TestDebouncer_LeadingEmitDoesNotBlockCaller(t *testing.T) {
+	emitter := &blockingEmitter{
+		started: make(chan struct{}),
+		release: make(chan struct{}),
+	}
+	d := NewDebouncer(t.Context(), time.Minute, emitter)
+	defer func() {
+		close(emitter.release)
+		d.Stop()
+	}()
+
+	done := make(chan struct{})
+	go func() {
+		d.Handle(eventFor("user-A", "online"))
+		close(done)
+	}()
+
+	select {
+	case <-done:
+	case <-time.After(50 * time.Millisecond):
+		t.Fatal("Handle blocked on leading-edge emit")
+	}
+	select {
+	case <-emitter.started:
+	case <-time.After(50 * time.Millisecond):
+		t.Fatal("leading-edge emit did not start")
+	}
 }
 
 // TestDebouncer_BurstCollapses verifies the core suppression: 3
@@ -125,8 +164,8 @@ func TestDebouncer_AcrossWindowsPassThrough(t *testing.T) {
 	*now = now.Add(window + time.Millisecond)
 	d.Handle(eventFor("user-A", "offline"))
 
-	// Both should be observable immediately (no trailing-timer wait).
-	snap := rec.snapshot()
+	// Both should be observable without waiting for a trailing timer.
+	snap := waitForEmitCount(t, rec, 2, 50*time.Millisecond)
 	require.Len(t, snap, 2)
 	require.Equal(t, "online", snap[0].Status)
 	require.Equal(t, "offline", snap[1].Status)
@@ -148,8 +187,7 @@ func TestDebouncer_LeadingEdgeCancelsPendingTrailing(t *testing.T) {
 	*now = now.Add(window + time.Millisecond)
 	d.Handle(eventFor("user-A", "dnd"))
 
-	time.Sleep(2 * window)
-	snap := rec.snapshot()
+	snap := waitForEmitCount(t, rec, 2, 3*window)
 	require.Len(t, snap, 2, "stale trailing payload must be cancelled")
 	require.Equal(t, "online", snap[0].Status)
 	require.Equal(t, "dnd", snap[1].Status)
@@ -167,7 +205,7 @@ func TestDebouncer_StopDrainsWithoutPanic(t *testing.T) {
 	*now = now.Add(2 * time.Millisecond)
 	d.Handle(eventFor("user-A", "idle"))
 
-	preStop := rec.snapshot()
+	preStop := waitForEmitCount(t, rec, 1, 50*time.Millisecond)
 	require.Len(t, preStop, 1, "expected only the leading emit before Stop")
 
 	d.Stop()
@@ -247,7 +285,7 @@ func TestDebouncer_SweepReclaimsIdleUsers(t *testing.T) {
 
 	// Every distinct user emitted on the leading edge, so the table
 	// holds one lastEmit record each and zero pending entries.
-	if got := len(rec.snapshot()); got != userCount {
+	if got := len(waitForEmitCount(t, rec, userCount, 2*time.Second)); got != userCount {
 		t.Fatalf("expected %d leading-edge emits, got %d", userCount, got)
 	}
 	if entries, lastEmit := d.mapSizes(); entries != 0 || lastEmit != userCount {
@@ -306,6 +344,6 @@ func TestDebouncer_DistinctUsersDontCrossContaminate(t *testing.T) {
 	d.Handle(eventFor("user-B", "online"))
 	d.Handle(eventFor("user-C", "online"))
 
-	snap := rec.snapshot()
+	snap := waitForEmitCount(t, rec, 3, 50*time.Millisecond)
 	require.Len(t, snap, 3, "each user gets its own leading-edge emit")
 }
