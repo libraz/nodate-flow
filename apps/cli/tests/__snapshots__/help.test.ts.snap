@@ -48,7 +48,7 @@ Options:
       --project <project>            (DEPRECATED, use --project-id instead) Project public id
       --due <due>                    Due date (YYYY-MM-DD)
       --start <start>                Start date (YYYY-MM-DD)
-      --priority <priority>          Priority (0-3) (default: 0)
+      --priority <priority>          Priority (0-4) (default: 0)
       --visibility <visibility>      Visibility: public, project, or private (default: "public") [public, project, private]
   -h, --help                         Show help for this command
 
@@ -112,7 +112,7 @@ Options:
   -d, --description <description>    New description
       --due <due>                    Due date (YYYY-MM-DD, empty to clear)
       --start <start>                Start date (YYYY-MM-DD, empty to clear)
-      --priority <priority>          Priority (0-3)
+      --priority <priority>          Priority (0-4)
       --state <state>                Apply a state-machine transition: start, block, unblock, submit, complete, reopen, cancel [start, block, unblock, submit, complete, reopen, cancel]
       --visibility <visibility>      Visibility: public, project, or private [public, project, private]
   -h, --help                         Show help for this command

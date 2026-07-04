@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest';
 
-import { getAuthApiUrl } from '../src/config.js';
+import { getAuthApiUrl, resolveAuthApiUrl } from '../src/config.js';
 
 describe('getAuthApiUrl', () => {
   const original = process.env.NF_AUTH_API_URL;
@@ -21,5 +21,19 @@ describe('getAuthApiUrl', () => {
   it('honors NF_AUTH_API_URL', () => {
     process.env.NF_AUTH_API_URL = 'https://auth.example.test';
     expect(getAuthApiUrl()).toBe('https://auth.example.test');
+  });
+
+  it('uses stored authApiBaseUrl when env is unset', () => {
+    delete process.env.NF_AUTH_API_URL;
+    expect(resolveAuthApiUrl({ authApiBaseUrl: 'https://stored-auth.example.test' })).toBe(
+      'https://stored-auth.example.test',
+    );
+  });
+
+  it('lets NF_AUTH_API_URL override stored authApiBaseUrl', () => {
+    process.env.NF_AUTH_API_URL = 'https://env-auth.example.test';
+    expect(resolveAuthApiUrl({ authApiBaseUrl: 'https://stored-auth.example.test' })).toBe(
+      'https://env-auth.example.test',
+    );
   });
 });

@@ -4,16 +4,25 @@
 import { pathToFileURL } from 'node:url';
 
 import { c, createCLI, prompt, table } from '@libraz/node-cli';
+import type { components } from '@nodate-flow/sdk';
 
 import { createAuthClient, createFlowClient, extractRefreshTokenFromSetCookie } from './api.js';
 import { authErrorMessage, completeLogin } from './auth-login.js';
-import { clearCredentials, getFlowApiUrl, loadCredentials, saveCredentials } from './config.js';
+import {
+  clearCredentials,
+  getAuthApiUrl,
+  getFlowApiUrl,
+  loadCredentials,
+  saveCredentials,
+} from './config.js';
+import { buildListQuery, executeProjectList, executeWorkspaceList } from './resource-builders.js';
 import {
   buildSearchQuery,
   buildUpdatePlan,
   executeSearchPaginated,
   executeTaskListPaginated,
   executeUpdate,
+  isValidPriority,
   type SdkClientLike,
   type SearchOptions as SearchOptionsInput,
   STATE_TRANSITIONS,
@@ -41,6 +50,20 @@ interface CliTaskRow {
   dueOn?: string | null;
 }
 
+interface CliWorkspaceRow {
+  id: string;
+  name: string;
+  slug: string;
+  role?: string;
+}
+
+interface CliProjectRow {
+  id: string;
+  identifier: string;
+  name: string;
+  slug: string;
+}
+
 function asCliTaskRows(tasks: unknown[] | undefined): CliTaskRow[] {
   return (tasks ?? []).filter((task): task is CliTaskRow => {
     if (typeof task !== 'object' || task === null) return false;
@@ -50,6 +73,32 @@ function asCliTaskRows(tasks: unknown[] | undefined): CliTaskRow[] {
       typeof candidate.title === 'string' &&
       typeof candidate.derivedState === 'string' &&
       typeof candidate.priority === 'number'
+    );
+  });
+}
+
+function asCliWorkspaceRows(workspaces: unknown[] | undefined): CliWorkspaceRow[] {
+  return (workspaces ?? []).filter((workspace): workspace is CliWorkspaceRow => {
+    if (typeof workspace !== 'object' || workspace === null) return false;
+    const candidate = workspace as Record<string, unknown>;
+    return (
+      typeof candidate.id === 'string' &&
+      typeof candidate.name === 'string' &&
+      typeof candidate.slug === 'string' &&
+      (candidate.role === undefined || typeof candidate.role === 'string')
+    );
+  });
+}
+
+function asCliProjectRows(projects: unknown[] | undefined): CliProjectRow[] {
+  return (projects ?? []).filter((project): project is CliProjectRow => {
+    if (typeof project !== 'object' || project === null) return false;
+    const candidate = project as Record<string, unknown>;
+    return (
+      typeof candidate.id === 'string' &&
+      typeof candidate.identifier === 'string' &&
+      typeof candidate.name === 'string' &&
+      typeof candidate.slug === 'string'
     );
   });
 }
@@ -68,9 +117,7 @@ auth
 
     const client = createAuthClient();
     const { data, error, response } = await completeLogin({
-      client: {
-        post: (path, init) => client.POST(path as never, init as never),
-      },
+      client,
       email,
       password,
       promptTotp: () => prompt.password('TOTP code or recovery code:'),
@@ -92,6 +139,7 @@ auth
       accessToken: data.accessToken,
       refreshToken: extractRefreshTokenFromSetCookie(response.headers.get('set-cookie')) ?? '',
       apiBaseUrl: getFlowApiUrl(),
+      authApiBaseUrl: getAuthApiUrl(),
     });
 
     stdout.write(c`{green Logged in} as ${email}\n`);
@@ -120,9 +168,155 @@ auth
     if (creds) {
       stdout.write(c`{green Authenticated}\n`);
       stdout.write(`API: ${creds.apiBaseUrl}\n`);
+      stdout.write(`Auth API: ${creds.authApiBaseUrl ?? getAuthApiUrl()}\n`);
     } else {
       stdout.write(c`{dim Not logged in}\n`);
     }
+  });
+
+// ---------------------------------------------------------------------------
+// tnk workspace list
+// ---------------------------------------------------------------------------
+const workspace = cli.command('workspace').description('Workspace commands');
+
+workspace
+  .command('list')
+  .description('List workspaces')
+  .option('-l, --limit <limit>', {
+    description: 'Maximum number of workspaces to return',
+    type: 'number',
+    default: 100,
+  })
+  .option('--offset <offset>', {
+    description: 'Result offset',
+    type: 'number',
+    default: 0,
+  })
+  .action(async ({ options, stdout, stderr }) => {
+    let client: ReturnType<typeof createFlowClient>;
+    try {
+      client = createFlowClient();
+    } catch (err) {
+      if (isAuthRequiredError(err)) {
+        stderr.write(c`{red Error}: ${(err as Error).message}\n`);
+        process.exitCode = EXIT_AUTH;
+        return;
+      }
+      throw err;
+    }
+
+    const { data, error } = await executeWorkspaceList(
+      client,
+      buildListQuery(options.limit as number | undefined, options.offset as number | undefined),
+    );
+
+    if (error) {
+      stderr.write(c`{red Error}: ${apiErrorMessage(error, 'Failed to list workspaces')}\n`);
+      process.exitCode = EXIT_RUNTIME;
+      return;
+    }
+
+    const workspaces = asCliWorkspaceRows(data?.workspaces ?? undefined);
+    if (workspaces.length === 0) {
+      stdout.write('No workspaces found.\n');
+      return;
+    }
+
+    stdout.write(
+      table(
+        workspaces.map((ws) => ({
+          id: ws.id,
+          name: ws.name,
+          slug: ws.slug,
+          role: ws.role ?? '-',
+        })),
+        {
+          columns: ['id', 'name', 'slug', 'role'],
+          headerLabels: { id: 'ID', name: 'Name', slug: 'Slug', role: 'Role' },
+          border: 'simple',
+        },
+      ),
+    );
+    stdout.write(`\n${data?.total ?? workspaces.length} workspace(s) total\n`);
+  });
+
+// ---------------------------------------------------------------------------
+// tnk project list
+// ---------------------------------------------------------------------------
+const project = cli.command('project').description('Project commands');
+
+project
+  .command('list')
+  .description('List projects in a workspace')
+  .option('-w, --workspace-id <workspaceId>', {
+    description: 'Workspace public id',
+    type: 'string',
+    required: true,
+  })
+  .option('-l, --limit <limit>', {
+    description: 'Maximum number of projects to return',
+    type: 'number',
+    default: 100,
+  })
+  .option('--offset <offset>', {
+    description: 'Result offset',
+    type: 'number',
+    default: 0,
+  })
+  .action(async ({ options, stdout, stderr }) => {
+    const workspaceId = options['workspace-id'] as string | undefined;
+    if (!workspaceId) {
+      stderr.write(c`{red Error}: --workspace-id is required.\n`);
+      process.exitCode = EXIT_VALIDATION;
+      return;
+    }
+
+    let client: ReturnType<typeof createFlowClient>;
+    try {
+      client = createFlowClient();
+    } catch (err) {
+      if (isAuthRequiredError(err)) {
+        stderr.write(c`{red Error}: ${(err as Error).message}\n`);
+        process.exitCode = EXIT_AUTH;
+        return;
+      }
+      throw err;
+    }
+
+    const { data, error } = await executeProjectList(
+      client,
+      workspaceId,
+      buildListQuery(options.limit as number | undefined, options.offset as number | undefined),
+    );
+
+    if (error) {
+      stderr.write(c`{red Error}: ${apiErrorMessage(error, 'Failed to list projects')}\n`);
+      process.exitCode = EXIT_RUNTIME;
+      return;
+    }
+
+    const projects = asCliProjectRows(data?.projects ?? undefined);
+    if (projects.length === 0) {
+      stdout.write('No projects found.\n');
+      return;
+    }
+
+    stdout.write(
+      table(
+        projects.map((prj) => ({
+          id: prj.id,
+          key: prj.identifier,
+          name: prj.name,
+          slug: prj.slug,
+        })),
+        {
+          columns: ['id', 'key', 'name', 'slug'],
+          headerLabels: { id: 'ID', key: 'Key', name: 'Name', slug: 'Slug' },
+          border: 'simple',
+        },
+      ),
+    );
+    stdout.write(`\n${data?.total ?? projects.length} project(s) total\n`);
   });
 
 // ---------------------------------------------------------------------------
@@ -195,10 +389,7 @@ task
     if (workspaceId) query.workspaceId = workspaceId;
     if (status) query.state = [status];
 
-    const { data, error } = await executeTaskListPaginated(
-      client as unknown as SdkClientLike,
-      query,
-    );
+    const { data, error } = await executeTaskListPaginated(client, query);
 
     if (error) {
       stderr.write(c`{red Error}: ${apiErrorMessage(error, 'Failed to list tasks')}\n`);
@@ -269,7 +460,7 @@ task
     type: 'string',
   })
   .option('--priority <priority>', {
-    description: 'Priority (0-3)',
+    description: 'Priority (0-4)',
     type: 'number',
     default: 0,
   })
@@ -312,6 +503,11 @@ task
       throw err;
     }
     const priority = options.priority as number;
+    if (!isValidPriority(priority)) {
+      stderr.write(c`{red Error}: --priority must be an integer between 0 and 4.\n`);
+      process.exitCode = EXIT_VALIDATION;
+      return;
+    }
     const visibility = (options.visibility as 'public' | 'project' | 'private') ?? 'public';
 
     let client: ReturnType<typeof createFlowClient>;
@@ -326,7 +522,7 @@ task
       throw err;
     }
 
-    const body: Record<string, unknown> = {
+    const body: components['schemas']['CreateTaskBody'] = {
       title,
       projectId,
       visibility,
@@ -336,8 +532,7 @@ task
     if (dueOn) body.dueOn = dueOn;
     if (startOn) body.startOn = startOn;
 
-    // biome-ignore lint/suspicious/noExplicitAny: body is built dynamically
-    const { data, error } = await client.POST('/tasks', { body } as any);
+    const { data, error } = await client.POST('/tasks', { body });
 
     if (error) {
       stderr.write(c`{red Error}: ${apiErrorMessage(error, 'Failed to create task')}\n`);
@@ -379,7 +574,7 @@ task
     type: 'string',
   })
   .option('--priority <priority>', {
-    description: 'Priority (0-3)',
+    description: 'Priority (0-4)',
     type: 'number',
   })
   .option('--state <state>', {
@@ -424,7 +619,15 @@ task
       }
       throw err;
     }
-    if (options.priority !== undefined) updateOptions.priority = options.priority as number;
+    if (options.priority !== undefined) {
+      const priority = options.priority as number;
+      if (!isValidPriority(priority)) {
+        stderr.write(c`{red Error}: --priority must be an integer between 0 and 4.\n`);
+        process.exitCode = EXIT_VALIDATION;
+        return;
+      }
+      updateOptions.priority = priority;
+    }
     if (options.state !== undefined) updateOptions.state = options.state as string;
     if (options.visibility !== undefined)
       updateOptions.visibility = options.visibility as 'public' | 'project' | 'private';
@@ -441,7 +644,7 @@ task
 
     let client: SdkClientLike;
     try {
-      client = createFlowClient() as unknown as SdkClientLike;
+      client = createFlowClient();
     } catch (err) {
       if (isAuthRequiredError(err)) {
         stderr.write(c`{red Error}: ${(err as Error).message}\n`);
@@ -540,7 +743,7 @@ task
 
     let client: SdkClientLike;
     try {
-      client = createFlowClient() as unknown as SdkClientLike;
+      client = createFlowClient();
     } catch (err) {
       if (isAuthRequiredError(err)) {
         stderr.write(c`{red Error}: ${(err as Error).message}\n`);
@@ -650,6 +853,8 @@ const examples: ExamplesByPath = {
   'auth login': ['tnk auth login'],
   'auth logout': ['tnk auth logout'],
   'auth status': ['tnk auth status'],
+  'workspace list': ['tnk workspace list', 'tnk workspace list --limit 50'],
+  'project list': ['tnk project list --workspace-id 0190f3a6-4e6c-7d2a-94c9-aa86b1f72c11'],
   'task list': [
     'tnk task list',
     'tnk task list --project-id 9c2ad1d8-1f2c-7e1c-9a8a-44c0c9f0c1ab',

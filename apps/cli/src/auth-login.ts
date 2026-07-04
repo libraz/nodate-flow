@@ -1,14 +1,8 @@
+import type { components, NodateFlowClient } from '@nodate-flow/sdk';
+
 import { apiErrorMessage } from './util/api-error.js';
 
-type AuthClientResult = {
-  data?: unknown;
-  error?: unknown;
-  response: Response;
-};
-
-type AuthClientLike = {
-  post: (path: string, init: { body: Record<string, unknown> }) => Promise<AuthClientResult>;
-};
+type AuthClientLike = Pick<NodateFlowClient, 'POST'>;
 
 export interface CompleteLoginOptions {
   client: AuthClientLike;
@@ -28,7 +22,7 @@ export function authErrorMessage(error: unknown, fallback: string): string {
 }
 
 export async function completeLogin(options: CompleteLoginOptions): Promise<CompleteLoginResult> {
-  const first = await options.client.post('/auth/login', {
+  const first = await options.client.POST('/auth/login', {
     body: { email: options.email, password: options.password },
   });
   if (first.error) {
@@ -46,14 +40,14 @@ export async function completeLogin(options: CompleteLoginOptions): Promise<Comp
   }
 
   const value = (await options.promptTotp()).trim();
-  const body: Record<string, unknown> = { challengeToken };
-  if (/^\d{6}$/.test(value)) {
+  const body: components['schemas']['LoginTotpInputBody'] = { challengeToken };
+  if (isSixDigitCode(value)) {
     body.code = value;
   } else {
     body.recoveryCode = value;
   }
 
-  const second = await options.client.post('/auth/login/totp', { body });
+  const second = await options.client.POST('/auth/login/totp', { body });
   if (second.error) {
     return { error: second.error, response: second.response };
   }
@@ -62,4 +56,13 @@ export async function completeLogin(options: CompleteLoginOptions): Promise<Comp
 
 function recordOrEmpty(value: unknown): Record<string, unknown> {
   return typeof value === 'object' && value !== null ? (value as Record<string, unknown>) : {};
+}
+
+function isSixDigitCode(value: string): boolean {
+  if (value.length !== 6) return false;
+  for (let i = 0; i < value.length; i++) {
+    const code = value.charCodeAt(i);
+    if (code < 48 || code > 57) return false;
+  }
+  return true;
 }

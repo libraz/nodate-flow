@@ -16,6 +16,7 @@ import {
   executeSearchPaginated,
   executeTaskListPaginated,
   executeUpdate,
+  isValidPriority,
   isStateTransition,
   type SdkClientLike,
   STATE_TRANSITIONS,
@@ -101,6 +102,19 @@ describe('isStateTransition', () => {
     expect(isStateTransition('')).toBe(false);
     expect(isStateTransition(undefined)).toBe(false);
     expect(isStateTransition(42)).toBe(false);
+  });
+});
+
+describe('isValidPriority', () => {
+  it('accepts the server priority range', () => {
+    expect(isValidPriority(0)).toBe(true);
+    expect(isValidPriority(4)).toBe(true);
+  });
+
+  it('rejects out-of-range and non-integer priorities', () => {
+    expect(isValidPriority(-1)).toBe(false);
+    expect(isValidPriority(5)).toBe(false);
+    expect(isValidPriority(1.5)).toBe(false);
   });
 });
 
@@ -235,15 +249,33 @@ describe('executeTaskListPaginated', () => {
       PATCH: vi.fn(),
     };
 
-    const result = await executeTaskListPaginated(sdk, { limit: 1, projectId: 'p' });
+    const result = await executeTaskListPaginated(sdk, { limit: 3, projectId: 'p' });
 
     expect(result.data).toEqual({ tasks: [{ id: 'a' }, { id: 'b' }, { id: 'c' }], total: 3 });
     expect(sdk.GET).toHaveBeenNthCalledWith(1, '/tasks', {
-      params: { query: { limit: 1, projectId: 'p', offset: 0 } },
+      params: { query: { limit: 3, projectId: 'p', offset: 0 } },
     });
     expect(sdk.GET).toHaveBeenNthCalledWith(2, '/tasks', {
-      params: { query: { limit: 1, projectId: 'p', cursor: 'cursor-2' } },
+      params: { query: { limit: 3, projectId: 'p', cursor: 'cursor-2' } },
     });
+  });
+
+  it('stops once the requested limit is reached', async () => {
+    const sdk: SdkClientLike = {
+      // biome-ignore lint/style/useNamingConvention: SDK method name
+      GET: vi.fn().mockResolvedValue({
+        data: { tasks: [{ id: 'a' }, { id: 'b' }], total: 5, nextCursor: 'cursor-2' },
+      }),
+      // biome-ignore lint/style/useNamingConvention: SDK method name
+      POST: vi.fn(),
+      // biome-ignore lint/style/useNamingConvention: SDK method name
+      PATCH: vi.fn(),
+    };
+
+    const result = await executeTaskListPaginated(sdk, { limit: 1, projectId: 'p' });
+
+    expect(result.data).toEqual({ tasks: [{ id: 'a' }], total: 5 });
+    expect(sdk.GET).toHaveBeenCalledTimes(1);
   });
 
   it('falls back to offset paging when a filtered response has no cursor', async () => {
@@ -259,14 +291,14 @@ describe('executeTaskListPaginated', () => {
       PATCH: vi.fn(),
     };
 
-    const result = await executeSearchPaginated(sdk, { q: 'ship', limit: 1, workspaceId: 'ws' });
+    const result = await executeSearchPaginated(sdk, { q: 'ship', limit: 2, workspaceId: 'ws' });
 
     expect(result.data).toEqual({ tasks: [{ id: 'a' }, { id: 'b' }], total: 2 });
     expect(sdk.GET).toHaveBeenNthCalledWith(1, '/tasks', {
-      params: { query: { q: 'ship', limit: 1, workspaceId: 'ws', offset: 0 } },
+      params: { query: { q: 'ship', limit: 2, workspaceId: 'ws', offset: 0 } },
     });
     expect(sdk.GET).toHaveBeenNthCalledWith(2, '/tasks', {
-      params: { query: { q: 'ship', limit: 1, workspaceId: 'ws', offset: 1 } },
+      params: { query: { q: 'ship', limit: 2, workspaceId: 'ws', offset: 1 } },
     });
   });
 

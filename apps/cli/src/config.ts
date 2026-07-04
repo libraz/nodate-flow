@@ -10,6 +10,7 @@ export interface Credentials {
   accessToken: string;
   refreshToken: string;
   apiBaseUrl: string;
+  authApiBaseUrl?: string;
 }
 
 const CONFIG_DIR = path.join(os.homedir(), '.config', 'tnk');
@@ -64,6 +65,11 @@ export function clearCredentials(): void {
  */
 export function getAuthApiUrl(): string {
   return process.env.NF_AUTH_API_URL ?? DEFAULT_AUTH_API_URL;
+}
+
+/** Returns the auth API URL from env, credentials, then the local default. */
+export function resolveAuthApiUrl(creds: Pick<Credentials, 'authApiBaseUrl'> | undefined): string {
+  return process.env.NF_AUTH_API_URL ?? creds?.authApiBaseUrl ?? DEFAULT_AUTH_API_URL;
 }
 
 /**

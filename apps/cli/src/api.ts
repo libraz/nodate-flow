@@ -3,7 +3,13 @@
 
 import { createClient, type NodateFlowClient } from '@nodate-flow/sdk';
 
-import { getAuthApiUrl, getFlowApiUrl, loadCredentials, saveCredentials } from './config.js';
+import {
+  getAuthApiUrl,
+  getFlowApiUrl,
+  loadCredentials,
+  resolveAuthApiUrl,
+  saveCredentials,
+} from './config.js';
 import { AuthRequiredError } from './util/exit.js';
 
 const REFRESH_COOKIE_NAME = 'nd_rt';
@@ -25,9 +31,34 @@ export function extractRefreshTokenFromSetCookie(
   setCookie: string | null | undefined,
 ): string | undefined {
   if (!setCookie) return undefined;
-  const match = setCookie.match(/(?:^|,\s*)nd_rt=([^;,]+)/);
-  if (!match) return undefined;
-  return decodeURIComponent(match[1] as string);
+  const needle = `${REFRESH_COOKIE_NAME}=`;
+  let searchFrom = 0;
+  while (searchFrom < setCookie.length) {
+    const start = setCookie.indexOf(needle, searchFrom);
+    if (start < 0) return undefined;
+
+    let boundary = start === 0;
+    if (!boundary) {
+      let prev = start - 1;
+      while (prev >= 0 && setCookie[prev] === ' ') prev--;
+      boundary = setCookie[prev] === ',';
+    }
+    if (!boundary) {
+      searchFrom = start + needle.length;
+      continue;
+    }
+
+    const valueStart = start + needle.length;
+    let valueEnd = valueStart;
+    while (valueEnd < setCookie.length) {
+      const ch = setCookie[valueEnd];
+      if (ch === ';' || ch === ',') break;
+      valueEnd++;
+    }
+    if (valueEnd === valueStart) return undefined;
+    return decodeURIComponent(setCookie.slice(valueStart, valueEnd));
+  }
+  return undefined;
 }
 
 function refreshCookieHeader(refreshToken: string): string {
@@ -97,7 +128,7 @@ export function createFlowClient(): NodateFlowClient {
     tokenProvider: () => creds?.accessToken,
     fetchOptions: {
       fetch: createAuthenticatedFetch({
-        authApiBaseUrl: getAuthApiUrl(),
+        authApiBaseUrl: resolveAuthApiUrl(creds),
         getAccessToken: () => creds?.accessToken ?? '',
         getRefreshToken: () => creds?.refreshToken,
         setTokens: ({ accessToken, refreshToken }) => {

@@ -7,6 +7,8 @@
  * unit tests independent from the CLI parser.
  */
 
+import type { components, NodateFlowClient } from '@nodate-flow/sdk';
+
 /* ── State transition helpers ──────────────────────────────────── */
 
 /**
@@ -26,6 +28,18 @@ export const STATE_TRANSITIONS = [
 ] as const;
 export type StateTransition = (typeof STATE_TRANSITIONS)[number];
 
+export const MIN_PRIORITY = 0;
+export const MAX_PRIORITY = 4;
+
+export function isValidPriority(value: unknown): value is number {
+  return (
+    typeof value === 'number' &&
+    Number.isInteger(value) &&
+    value >= MIN_PRIORITY &&
+    value <= MAX_PRIORITY
+  );
+}
+
 /* ── Update builder ────────────────────────────────────────────── */
 
 /** Raw options accepted by `tnk task update <id>`. */
@@ -44,7 +58,7 @@ export interface UpdateOptions {
 /** Resolved request shape for the patch + transition steps. */
 export interface UpdatePlan {
   /** Body for `PATCH /tasks/{id}`; absent when no patch fields were given. */
-  patchBody?: Record<string, unknown>;
+  patchBody?: components['schemas']['PatchTaskBody'];
   /** Transition to issue against `POST /tasks/{id}/transitions`. */
   stateTransition?: StateTransition;
 }
@@ -56,7 +70,7 @@ export interface UpdatePlan {
  * caller can surface the "no fields to update" error.
  */
 export function buildUpdatePlan(options: UpdateOptions): UpdatePlan | undefined {
-  const patchBody: Record<string, unknown> = {};
+  const patchBody: components['schemas']['PatchTaskBody'] = {};
   if (options.title !== undefined) patchBody.title = options.title;
   if (options.description !== undefined) patchBody.description = options.description;
   if (options.due !== undefined) patchBody.dueOn = options.due;
@@ -128,22 +142,8 @@ export function buildSearchQuery(
 
 /* ── SDK-shape helpers ─────────────────────────────────────────── */
 
-/**
- * Minimal SDK surface used by the executors below. Method names are
- * uppercase to match the openapi-fetch / SDK shape; the linter's
- * camelCase rule is intentionally suppressed for this contract.
- */
-export interface SdkClientLike {
-  // biome-ignore lint/style/useNamingConvention: SDK method name
-  // biome-ignore lint/suspicious/noExplicitAny: matches openapi-fetch dynamic shape
-  GET: (url: string, opts: any) => Promise<{ data?: unknown; error?: unknown }>;
-  // biome-ignore lint/style/useNamingConvention: SDK method name
-  // biome-ignore lint/suspicious/noExplicitAny: matches openapi-fetch dynamic shape
-  POST: (url: string, opts: any) => Promise<{ data?: unknown; error?: unknown }>;
-  // biome-ignore lint/style/useNamingConvention: SDK method name
-  // biome-ignore lint/suspicious/noExplicitAny: matches openapi-fetch dynamic shape
-  PATCH: (url: string, opts: any) => Promise<{ data?: unknown; error?: unknown }>;
-}
+/** Minimal typed SDK surface used by the executors below. */
+export type SdkClientLike = Pick<NodateFlowClient, 'GET' | 'POST' | 'PATCH'>;
 
 export interface TaskListQuery {
   limit: number;
@@ -155,11 +155,7 @@ export interface TaskListQuery {
   state?: string[];
 }
 
-export interface TaskListPage {
-  tasks?: unknown[];
-  total?: number;
-  nextCursor?: string | null;
-}
+export type TaskListPage = components['schemas']['ListTasksBody'];
 
 export interface TaskListResult {
   tasks: unknown[];
@@ -186,6 +182,7 @@ export async function executeTaskListPaginated(
   query: TaskListQuery,
 ): Promise<{ data?: TaskListResult; error?: unknown }> {
   const tasks: unknown[] = [];
+  const requestedLimit = query.limit;
   let total: number | undefined;
   let nextQuery: TaskListQuery = { ...query, offset: query.offset ?? 0 };
   let lastCursor: string | undefined;
@@ -198,6 +195,9 @@ export async function executeTaskListPaginated(
     tasks.push(...pageTasks);
     if (typeof result.data?.total === 'number') {
       total = result.data.total;
+    }
+    if (tasks.length >= requestedLimit) {
+      return { data: { tasks: tasks.slice(0, requestedLimit), total: total ?? tasks.length } };
     }
 
     const nextCursor =

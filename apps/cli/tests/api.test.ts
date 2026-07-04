@@ -21,6 +21,13 @@ describe('extractRefreshTokenFromSetCookie', () => {
     expect(extractRefreshTokenFromSetCookie('other=value; Path=/')).toBeUndefined();
     expect(extractRefreshTokenFromSetCookie(null)).toBeUndefined();
   });
+
+  it('does not match cookie names that merely end with nd_rt', () => {
+    expect(extractRefreshTokenFromSetCookie('xnd_rt=wrong; Path=/')).toBeUndefined();
+    expect(extractRefreshTokenFromSetCookie('xnd_rt=wrong; Path=/, nd_rt=right; Path=/auth')).toBe(
+      'right',
+    );
+  });
 });
 
 describe('createAuthenticatedFetch', () => {
