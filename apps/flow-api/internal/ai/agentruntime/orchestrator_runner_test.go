@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/generated"
+	apierrors "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/errors"
 )
 
 // fakeRunnerQuerier is the in-memory stand-in for the sqlc bundle the
@@ -279,8 +280,8 @@ func TestRunnerHandoffLoopBudget(t *testing.T) {
 	}
 	var payload map[string]any
 	_ = json.Unmarshal(q.agentEvents[0].PayloadJson, &payload)
-	if got := payload["error"]; got != "WS.TASK_AGENT.HANDOFF_LOOP_DETECTED" {
-		t.Fatalf("error = %v, want WS.TASK_AGENT.HANDOFF_LOOP_DETECTED", got)
+	if got := payload["error"]; got != apierrors.WsTaskAgentHandoffLoopDetected.Code {
+		t.Fatalf("error = %v, want %s", got, apierrors.WsTaskAgentHandoffLoopDetected.Code)
 	}
 	memo := q.snapshotMemo(99)
 	if got := memo["handoff_status"]; got != "loop_detected" {
@@ -333,6 +334,25 @@ func TestRunnerSuccessClearsHandoffStatus(t *testing.T) {
 	// survives across a healthy run / retry cycle.
 	if got := memo["handoff_count"]; got != float64(1) {
 		t.Fatalf("handoff_count = %v, want 1", got)
+	}
+}
+
+func TestRunnerSuccessMemoPreservesSubCentCost(t *testing.T) {
+	t.Parallel()
+	q := newFakeQuerier()
+	r := newRunnerWithFakes(q, nil)
+
+	r.recordSuccessMemo(context.Background(), 9, 22, time.Unix(1_700_000_900, 0).UTC(), ExecutionResult{
+		LastThought: "ok",
+		CostMicros:  450,
+	})
+
+	memo := q.snapshotMemo(22)
+	if got := memo["last_cost_micros"]; got != float64(450) {
+		t.Fatalf("last_cost_micros = %v, want 450", got)
+	}
+	if got := memo["last_cost_cents"]; got != float64(0) {
+		t.Fatalf("last_cost_cents = %v, want 0", got)
 	}
 }
 

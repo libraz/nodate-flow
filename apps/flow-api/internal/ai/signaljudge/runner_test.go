@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"strings"
 	"testing"
 
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/ai/providers"
@@ -212,5 +213,26 @@ func TestComposeJudgePromptShape(t *testing.T) {
 	}
 	if parsed.Signal.Payload["status"] != "online" {
 		t.Fatalf("payload not surfaced verbatim: %+v", parsed.Signal.Payload)
+	}
+}
+
+func TestComposeJudgePromptRedactsLegacyPayload(t *testing.T) {
+	t.Parallel()
+	got, err := composeJudgePrompt(SignalSnapshot{
+		SignalID:    9,
+		WorkspaceID: 1,
+		Kind:        "webhook.received",
+		Source:      "webhook",
+		SubjectType: "workspace",
+		PayloadJSON: json.RawMessage(`{"authorization":"Bearer secret","nested":{"refresh_token":"also-secret"},"status":"ok"}`),
+	})
+	if err != nil {
+		t.Fatalf("composeJudgePrompt: %v", err)
+	}
+	if strings.Contains(got, "secret") || strings.Contains(got, "also-secret") {
+		t.Fatalf("legacy prompt leaked secret payload: %s", got)
+	}
+	if !strings.Contains(got, "[REDACTED]") {
+		t.Fatalf("legacy prompt did not include redaction marker: %s", got)
 	}
 }

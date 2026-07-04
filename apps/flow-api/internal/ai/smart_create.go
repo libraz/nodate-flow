@@ -241,7 +241,7 @@ func (o *Orchestrator) ProposeSmartCreate(
 		o.logFailure(ctx, workspaceID, "propose_smart_create", req, err)
 		return nil, fmt.Errorf("ai: provider call failed: %w", err)
 	}
-	o.recordMetrics(string(prov.Kind()), req.Model, wsIDStr, resp.CostCents)
+	o.recordMetrics(string(prov.Kind()), req.Model, wsIDStr, resp.EstimatedCostMicros())
 	o.logSuccess(ctx, workspaceID, "propose_smart_create", req, resp)
 
 	// ---- parse response ----

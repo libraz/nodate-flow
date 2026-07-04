@@ -45,6 +45,7 @@ type InvocationRecord struct {
 	ResponseRedacted string
 	TokensInput      int
 	TokensOutput     int
+	CostMicros       int64
 	CostCents        int64
 	Status           string
 	ErrorCode        string
@@ -53,7 +54,7 @@ type InvocationRecord struct {
 // InvocationMetricsHook is called after each LLM provider call. Same
 // shape as ai.InvocationMetricsHook so obs.RecordAIInvocation is reused
 // without an adapter.
-type InvocationMetricsHook func(provider, model, workspaceID string, costCents int64)
+type InvocationMetricsHook func(provider, model, workspaceID string, costMicros int64)
 
 // resolveCommandSystem is the system prompt sent to the LLM when
 // resolving natural-language commands into MCP tool invocations. The
@@ -137,7 +138,7 @@ func (w *WorkspaceProvider) WithMetering(guard CostGuard, log InvocationLogger, 
 // successful provider call.
 func (w *WorkspaceProvider) logSuccess(ctx context.Context, wsID uint32, model, wsIDStr, prompt string, resp *providers.Response, kind string) {
 	if w.OnInvocation != nil {
-		w.OnInvocation(kind, model, wsIDStr, resp.CostCents)
+		w.OnInvocation(kind, model, wsIDStr, resp.EstimatedCostMicros())
 	}
 	if w.LogInvoke != nil {
 		loggedModel := resp.Model
@@ -152,7 +153,8 @@ func (w *WorkspaceProvider) logSuccess(ctx context.Context, wsID uint32, model, 
 			ResponseRedacted: logutil.Redact(resp.Text),
 			TokensInput:      resp.InputTokens,
 			TokensOutput:     resp.OutputTokens,
-			CostCents:        resp.CostCents,
+			CostMicros:       resp.EstimatedCostMicros(),
+			CostCents:        resp.EstimatedCostCents(),
 			Status:           "ok",
 		})
 	}

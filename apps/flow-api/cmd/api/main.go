@@ -301,6 +301,7 @@ func main() {
 						ResponseRedacted: rec.ResponseRedacted,
 						TokensInput:      rec.TokensInput,
 						TokensOutput:     rec.TokensOutput,
+						CostMicros:       rec.CostMicros,
 						CostCents:        rec.CostCents,
 						Status:           rec.Status,
 						ErrorCode:        rec.ErrorCode,

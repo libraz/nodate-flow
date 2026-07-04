@@ -114,11 +114,13 @@ func (p *googleProvider) Complete(ctx context.Context, req Request) (*Response, 
 	for _, part := range gr.Candidates[0].Content.Parts {
 		text += part.Text
 	}
+	costMicros := EstimateCostMicrosUSD(model, gr.UsageMetadata.PromptTokenCount, gr.UsageMetadata.CandidatesTokenCount)
 	return &Response{
 		Model:        model,
 		Text:         text,
 		InputTokens:  gr.UsageMetadata.PromptTokenCount,
 		OutputTokens: gr.UsageMetadata.CandidatesTokenCount,
-		CostCents:    estimateCostCents(model, gr.UsageMetadata.PromptTokenCount, gr.UsageMetadata.CandidatesTokenCount),
+		CostMicros:   costMicros,
+		CostCents:    costMicros / 10_000,
 	}, nil
 }

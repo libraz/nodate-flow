@@ -84,7 +84,7 @@ func (o *Orchestrator) GeneratePageBody(
 		o.logFailure(ctx, workspaceID, "generate_page", req, err)
 		return "", fmt.Errorf("ai: provider call failed: %w", err)
 	}
-	o.recordMetrics(string(prov.Kind()), req.Model, wsIDStr, resp.CostCents)
+	o.recordMetrics(string(prov.Kind()), req.Model, wsIDStr, resp.EstimatedCostMicros())
 	o.logSuccess(ctx, workspaceID, "generate_page", req, resp)
 
 	body := strings.TrimSpace(resp.Text)

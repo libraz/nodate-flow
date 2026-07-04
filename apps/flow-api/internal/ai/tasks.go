@@ -48,10 +48,10 @@ func (f ProviderResolverFunc) Default(ctx context.Context, workspaceID uint32) (
 }
 
 // InvocationMetricsHook is called after every LLM provider call (success or
-// failure) with the provider name, model, workspace ID, and cost in cents.
+// failure) with the provider name, model, workspace ID, and cost in micro-USD.
 // It allows the obs package to record Prometheus metrics without creating
 // an import cycle (ai → obs → log → ai).
-type InvocationMetricsHook func(provider, model, workspaceID string, costCents int64)
+type InvocationMetricsHook func(provider, model, workspaceID string, costMicros int64)
 
 // Orchestrator wires a Provider source, the cost guard, and an invocation
 // logger. The HTTP and MCP layers depend on this struct rather than calling
@@ -81,9 +81,9 @@ type Orchestrator struct {
 }
 
 // recordMetrics calls the OnInvocation hook if set.
-func (o *Orchestrator) recordMetrics(provider, model, wsID string, costCents int64) {
+func (o *Orchestrator) recordMetrics(provider, model, wsID string, costMicros int64) {
 	if o.OnInvocation != nil {
-		o.OnInvocation(provider, model, wsID, costCents)
+		o.OnInvocation(provider, model, wsID, costMicros)
 	}
 }
 
@@ -119,6 +119,7 @@ type InvocationRecord struct {
 	ResponseRedacted string
 	TokensInput      int
 	TokensOutput     int
+	CostMicros       int64
 	CostCents        int64
 	Status           string
 	ErrorCode        string
@@ -196,7 +197,7 @@ func (o *Orchestrator) ProposeTasksFrom(ctx context.Context, workspaceID uint32,
 		o.logFailure(ctx, workspaceID, "propose_tasks_from", req, err)
 		return nil, fmt.Errorf("ai: provider call failed: %w", err)
 	}
-	o.recordMetrics(string(prov.Kind()), req.Model, wsIDStr, resp.CostCents)
+	o.recordMetrics(string(prov.Kind()), req.Model, wsIDStr, resp.EstimatedCostMicros())
 	o.logSuccess(ctx, workspaceID, "propose_tasks_from", req, resp)
 
 	tasks, parseErr := parseProposedTasks(resp.Text)
@@ -234,7 +235,7 @@ func (o *Orchestrator) ProposePriority(ctx context.Context, workspaceID uint32, 
 		o.logFailure(ctx, workspaceID, "propose_priority", req, err)
 		return "", fmt.Errorf("ai: provider call failed: %w", err)
 	}
-	o.recordMetrics(string(prov.Kind()), req.Model, wsIDStr, resp.CostCents)
+	o.recordMetrics(string(prov.Kind()), req.Model, wsIDStr, resp.EstimatedCostMicros())
 	o.logSuccess(ctx, workspaceID, "propose_priority", req, resp)
 
 	var parsed struct {
@@ -388,7 +389,7 @@ func (o *Orchestrator) ProposeSteps(
 		o.logFailure(ctx, workspaceID, "propose_steps", req, err)
 		return nil, fmt.Errorf("ai: provider call failed: %w", err)
 	}
-	o.recordMetrics(string(prov.Kind()), req.Model, wsIDStr, resp.CostCents)
+	o.recordMetrics(string(prov.Kind()), req.Model, wsIDStr, resp.EstimatedCostMicros())
 	o.logSuccess(ctx, workspaceID, "propose_steps", req, resp)
 
 	// ---- parse response ----
@@ -530,7 +531,8 @@ func (o *Orchestrator) logSuccess(ctx context.Context, workspaceID uint32, purpo
 		ResponseRedacted: Redact(resp.Text),
 		TokensInput:      resp.InputTokens,
 		TokensOutput:     resp.OutputTokens,
-		CostCents:        resp.CostCents,
+		CostMicros:       resp.EstimatedCostMicros(),
+		CostCents:        resp.EstimatedCostCents(),
 		Status:           "ok",
 	})
 }

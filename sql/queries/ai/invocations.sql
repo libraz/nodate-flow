@@ -72,6 +72,16 @@ FROM ai_invocations
 WHERE workspace_id = ?
   AND invoked_at >= ?;
 
+-- name: SumEmbedCostTodayForWorkspace :one
+-- Sum the estimated cost (in whole cents) of embedding calls made today for a
+-- workspace. Embeddings have their own ai_settings.embed_budget_cents_day
+-- bucket, separate from chat/agent LLM budget.
+SELECT CAST(COALESCE(ROUND(SUM(cost_estimate) * 100), 0) AS SIGNED) AS total_cents
+FROM ai_invocations
+WHERE workspace_id = ?
+  AND purpose LIKE 'embed\_%'
+  AND invoked_at >= ?;
+
 -- name: SumAiCostForAgentSince :one
 -- Sum the estimated cost (cents) of LLM calls attributed to a given AI
 -- agent since a lower bound. Used by agentguard to enforce the

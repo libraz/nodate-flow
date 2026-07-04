@@ -49,9 +49,31 @@ type Response struct {
 	Text         string
 	InputTokens  int
 	OutputTokens int
-	// CostCents is the provider's best-effort cost estimate, or zero if the
-	// provider does not surface pricing in its response.
+	// CostMicros is the provider's best-effort cost estimate in millionths
+	// of a US dollar, or zero if pricing is unknown.
+	CostMicros int64
+	// CostCents is a legacy whole-cent estimate kept for older call sites
+	// and tests. New code should use [Response.EstimatedCostMicros] and
+	// round only at display boundaries.
 	CostCents int64
+}
+
+// EstimatedCostMicros returns the precise micro-USD estimate when present,
+// falling back to the legacy whole-cent field for older tests and adapters.
+func (r *Response) EstimatedCostMicros() int64 {
+	if r == nil {
+		return 0
+	}
+	if r.CostMicros > 0 {
+		return r.CostMicros
+	}
+	return r.CostCents * 10_000
+}
+
+// EstimatedCostCents rounds the estimate down to whole cents for legacy
+// display-only fields that still carry "cents" in their storage name.
+func (r *Response) EstimatedCostCents() int64 {
+	return r.EstimatedCostMicros() / 10_000
 }
 
 // Decryptor is the narrow contract that providers depend on for unsealing

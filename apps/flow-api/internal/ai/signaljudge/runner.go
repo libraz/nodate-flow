@@ -53,6 +53,7 @@ type InvocationRecord struct {
 	ResponseRedacted string
 	TokensInput      int
 	TokensOutput     int
+	CostMicros       int64
 	CostCents        int64
 	Status           string
 	ErrorCode        string
@@ -61,7 +62,7 @@ type InvocationRecord struct {
 // InvocationMetricsHook is called after each LLM provider call. Same
 // shape as [ai.InvocationMetricsHook] so the obs package's
 // RecordAIInvocation can be reused without an adapter.
-type InvocationMetricsHook func(provider, model, workspaceID string, costCents int64)
+type InvocationMetricsHook func(provider, model, workspaceID string, costMicros int64)
 
 // AgentLookup is the narrow surface the runner needs to read an
 // agent's system prompt + kind by internal id. The production wiring
@@ -264,7 +265,7 @@ func (r *Runner) ExecuteJudge(ctx context.Context, workspaceID, agentID uint32, 
 	}
 
 	if r.OnInvocation != nil {
-		r.OnInvocation(string(prov.Kind()), req.Model, wsIDStr, resp.CostCents)
+		r.OnInvocation(string(prov.Kind()), req.Model, wsIDStr, resp.EstimatedCostMicros())
 	}
 	model := resp.Model
 	if model == "" {
@@ -279,10 +280,12 @@ func (r *Runner) ExecuteJudge(ctx context.Context, workspaceID, agentID uint32, 
 		ResponseRedacted: logutil.Redact(resp.Text),
 		TokensInput:      resp.InputTokens,
 		TokensOutput:     resp.OutputTokens,
-		CostCents:        resp.CostCents,
+		CostMicros:       resp.EstimatedCostMicros(),
+		CostCents:        resp.EstimatedCostCents(),
 		Status:           "ok",
 	})
-	result.CostCents = resp.CostCents
+	result.CostMicros = resp.EstimatedCostMicros()
+	result.CostCents = resp.EstimatedCostCents()
 	result.LastThought = resp.Text
 
 	// If the response does not parse into a valid Verdict, retry
@@ -302,7 +305,7 @@ func (r *Runner) ExecuteJudge(ctx context.Context, workspaceID, agentID uint32, 
 		retryResp, retryErr := prov.Complete(ctx, retryReq)
 		if retryErr == nil && retryResp != nil {
 			if r.OnInvocation != nil {
-				r.OnInvocation(string(prov.Kind()), retryReq.Model, wsIDStr, retryResp.CostCents)
+				r.OnInvocation(string(prov.Kind()), retryReq.Model, wsIDStr, retryResp.EstimatedCostMicros())
 			}
 			retryModel := retryResp.Model
 			if retryModel == "" {
@@ -317,10 +320,12 @@ func (r *Runner) ExecuteJudge(ctx context.Context, workspaceID, agentID uint32, 
 				ResponseRedacted: logutil.Redact(retryResp.Text),
 				TokensInput:      retryResp.InputTokens,
 				TokensOutput:     retryResp.OutputTokens,
-				CostCents:        retryResp.CostCents,
+				CostMicros:       retryResp.EstimatedCostMicros(),
+				CostCents:        retryResp.EstimatedCostCents(),
 				Status:           "ok",
 			})
-			result.CostCents += retryResp.CostCents
+			result.CostMicros += retryResp.EstimatedCostMicros()
+			result.CostCents = result.CostMicros / 10_000
 			result.LastThought = retryResp.Text
 			verdictText = retryResp.Text
 		}
@@ -467,16 +472,17 @@ func composeJudgePrompt(s SignalSnapshot) (string, error) {
 	if s.SubjectID.Valid {
 		payload["signal"].(map[string]any)["subjectId"] = s.SubjectID.Int32
 	}
-	if len(s.PayloadJSON) > 0 {
+	redactedPayload := redactJSONPayload(s.PayloadJSON)
+	if len(redactedPayload) > 0 {
 		var raw any
-		if err := json.Unmarshal(s.PayloadJSON, &raw); err == nil {
+		if err := json.Unmarshal(redactedPayload, &raw); err == nil {
 			payload["signal"].(map[string]any)["payload"] = raw
 		} else {
 			// Provider-shaped payload is not valid JSON (should not
 			// happen in practice — the ingestion handlers reject
 			// non-JSON bodies — but defensive serialisation keeps the
 			// judge prompt well-formed even then).
-			payload["signal"].(map[string]any)["payload"] = string(s.PayloadJSON)
+			payload["signal"].(map[string]any)["payload"] = string(redactedPayload)
 		}
 	}
 	out, err := json.Marshal(payload)

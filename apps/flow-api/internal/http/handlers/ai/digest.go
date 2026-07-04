@@ -2,11 +2,13 @@ package ai
 
 import (
 	"context"
+	"database/sql"
 	"time"
 
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/ai/digest"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/generated"
 	apierrors "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/errors"
+	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/handlers/handlerutil"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/middleware"
 )
 
@@ -100,7 +102,7 @@ func WeeklyDigest(deps Deps) func(context.Context, *WeeklyDigestInput) (*WeeklyD
 			out.Body.CompletedThisWeek = append(out.Body.CompletedThisWeek, WeeklyDigestTask{
 				TaskID: t.TaskID,
 				Title:  t.Title,
-				Date:   t.CompletedAt.Format("2006-01-02"),
+				Date:   handlerutil.NullTimeDateStr(sql.NullTime{Time: t.CompletedAt, Valid: true}),
 			})
 		}
 		out.Body.OverdueOpen = make([]WeeklyDigestTask, 0, len(d.OverdueOpen))
@@ -108,7 +110,7 @@ func WeeklyDigest(deps Deps) func(context.Context, *WeeklyDigestInput) (*WeeklyD
 			out.Body.OverdueOpen = append(out.Body.OverdueOpen, WeeklyDigestTask{
 				TaskID: t.TaskID,
 				Title:  t.Title,
-				Date:   t.DueOn.Format("2006-01-02"),
+				Date:   handlerutil.NullTimeDateStr(sql.NullTime{Time: t.DueOn, Valid: true}),
 			})
 		}
 		out.Body.Markdown = d.Markdown

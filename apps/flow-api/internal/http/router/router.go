@@ -89,6 +89,7 @@ import (
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/stream"
 	"github.com/nodate-flow/nodate-flow/packages/go-shared/crypto"
 	"github.com/nodate-flow/nodate-flow/packages/go-shared/email"
+	"github.com/nodate-flow/nodate-flow/packages/go-shared/openapiutil"
 )
 
 // Deps is the dependency bundle Build needs in order to wire every
@@ -396,6 +397,7 @@ type sharedDeps struct {
 func buildSharedDeps(deps Deps) *sharedDeps {
 	auditRec := audit.New(deps.Queries)
 	aclDB := passthroughDB{deps.DB}
+	invocationLogger := newDBInvocationLogger(deps.Queries, deps.AiInvocationPublisher)
 
 	// Write-time embedding client (ADR 0003). Uses the OpenAI provider
 	// when NF_EMBED_OPENAI_KEY is set, otherwise the deterministic mock.
@@ -436,6 +438,28 @@ func buildSharedDeps(deps Deps) *sharedDeps {
 		}
 		embedClient = embed.New(embed.NewOpenAIProvider(keyCipher, dec, opts...), deps.Queries)
 	}
+	if embedClient != nil {
+		embedClient.WithMetering(
+			&embedBudgetGuard{Queries: deps.Queries},
+			func(ctx context.Context, rec embed.InvocationRecord) {
+				invocationLogger(ctx, ai.InvocationRecord{
+					WorkspaceID:      rec.WorkspaceID,
+					Purpose:          rec.Purpose,
+					Model:            rec.Model,
+					PromptRedacted:   rec.PromptRedacted,
+					ResponseRedacted: rec.ResponseRedacted,
+					TokensInput:      rec.TokensInput,
+					TokensOutput:     rec.TokensOutput,
+					CostMicros:       rec.CostMicros,
+					CostCents:        rec.CostCents,
+					Status:           rec.Status,
+					ErrorCode:        rec.ErrorCode,
+				})
+			},
+			obs.RecordAIInvocation,
+			ai.Redact,
+		)
+	}
 	// When a real cipher is available but the NL compilers were not
 	// set up by the embed-key path above, wire them to the workspace's
 	// configured AI provider so the AI endpoints work without
@@ -458,7 +482,7 @@ func buildSharedDeps(deps Deps) *sharedDeps {
 			})
 		})
 		nlGuard := ai.NewCostGuard(nlBudget, 0)
-		nlLogger := newDBInvocationLogger(deps.Queries, deps.AiInvocationPublisher)
+		nlLogger := invocationLogger
 		if nlQueryCompiler == nil {
 			prov := nlquery.NewWorkspaceProvider(wsResolver, extractWS).
 				WithMetering(nlGuard, func(ctx context.Context, rec nlquery.InvocationRecord) {
@@ -470,6 +494,7 @@ func buildSharedDeps(deps Deps) *sharedDeps {
 						ResponseRedacted: rec.ResponseRedacted,
 						TokensInput:      rec.TokensInput,
 						TokensOutput:     rec.TokensOutput,
+						CostMicros:       rec.CostMicros,
 						CostCents:        rec.CostCents,
 						Status:           rec.Status,
 						ErrorCode:        rec.ErrorCode,
@@ -488,6 +513,7 @@ func buildSharedDeps(deps Deps) *sharedDeps {
 						ResponseRedacted: rec.ResponseRedacted,
 						TokensInput:      rec.TokensInput,
 						TokensOutput:     rec.TokensOutput,
+						CostMicros:       rec.CostMicros,
 						CostCents:        rec.CostCents,
 						Status:           rec.Status,
 						ErrorCode:        rec.ErrorCode,
@@ -515,6 +541,7 @@ func buildSharedDeps(deps Deps) *sharedDeps {
 						ResponseRedacted: rec.ResponseRedacted,
 						TokensInput:      rec.TokensInput,
 						TokensOutput:     rec.TokensOutput,
+						CostMicros:       rec.CostMicros,
 						CostCents:        rec.CostCents,
 						Status:           rec.Status,
 						ErrorCode:        rec.ErrorCode,
@@ -555,7 +582,7 @@ func buildSharedDeps(deps Deps) *sharedDeps {
 			Guard:         ai.NewCostGuard(budget, 0),
 			DB:            deps.DB,
 			Queries:       deps.Queries,
-			LogInvoke:     newDBInvocationLogger(deps.Queries, deps.AiInvocationPublisher),
+			LogInvoke:     invocationLogger,
 			OnInvocation:  obs.RecordAIInvocation,
 			ProposalCache: ai.NewProposalCache(10 * time.Minute),
 		}
@@ -1653,7 +1680,10 @@ func newDBInvocationLogger(q *generated.Queries, publish func(context.Context, u
 		}
 		model := rec.Model
 		var cost sql.NullString
-		costMicros := providers.EstimateCostMicrosUSD(model, rec.TokensInput, rec.TokensOutput)
+		costMicros := rec.CostMicros
+		if costMicros == 0 {
+			costMicros = providers.EstimateCostMicrosUSD(model, rec.TokensInput, rec.TokensOutput)
+		}
 		if costMicros == 0 && rec.CostCents > 0 {
 			costMicros = rec.CostCents * 10_000
 		}
@@ -1694,6 +1724,34 @@ func newDBInvocationLogger(q *generated.Queries, publish func(context.Context, u
 	}
 }
 
+type embedBudgetGuard struct {
+	Queries *generated.Queries
+}
+
+func (g *embedBudgetGuard) Check(ctx context.Context, workspaceID uint32) error {
+	if g == nil || g.Queries == nil {
+		return nil
+	}
+	budgetCents := int64(100)
+	settings, err := g.Queries.GetAiSettings(ctx, workspaceID)
+	if err == nil {
+		budgetCents = int64(settings.EmbedBudgetCentsDay)
+	} else if err != sql.ErrNoRows {
+		return err
+	}
+	spent, err := g.Queries.SumEmbedCostTodayForWorkspace(ctx, generated.SumEmbedCostTodayForWorkspaceParams{
+		WorkspaceID: workspaceID,
+		InvokedAt:   time.Now().UTC().Truncate(24 * time.Hour),
+	})
+	if err != nil {
+		return err
+	}
+	if spent >= budgetCents {
+		return ai.ErrDailyBudgetExceeded
+	}
+	return nil
+}
+
 // scalarHTML is the self-contained HTML page that loads the Scalar API
 // reference UI from their CDN. It points at the co-located /openapi.json
 // route so the spec is always in sync with the running server.
@@ -1716,7 +1774,7 @@ const scalarHTML = `<!DOCTYPE html>
 // so the running server can serve the spec without a filesystem artifact.
 func buildOpenAPIJSON(apis []huma.API) []byte {
 	merged := mergeAPIs(apis)
-	patchErrorModelSchema(merged)
+	openapiutil.PatchErrorModelSchema(merged)
 	buf, err := json.Marshal(merged)
 	if err != nil {
 		// Should never happen: Huma's OpenAPI types are always
@@ -1764,37 +1822,8 @@ func mergeAPIs(apis []huma.API) *huma.OpenAPI {
 			}
 		}
 	}
-	patchErrorModelSchema(root)
+	openapiutil.PatchErrorModelSchema(root)
 	return root
-}
-
-func patchErrorModelSchema(spec *huma.OpenAPI) {
-	if spec == nil || spec.Components == nil || spec.Components.Schemas == nil {
-		return
-	}
-	schema := spec.Components.Schemas.Map()["ErrorModel"]
-	if schema == nil {
-		return
-	}
-	if schema.Properties == nil {
-		schema.Properties = map[string]*huma.Schema{}
-	}
-	if typeSchema := schema.Properties["type"]; typeSchema != nil {
-		typeSchema.Format = ""
-	}
-	schema.Properties["description"] = &huma.Schema{
-		Type:        "string",
-		Description: "Developer-facing explanation of when this error fires.",
-	}
-	schema.Properties["userAction"] = &huma.Schema{
-		Type:        "string",
-		Description: "Short imperative the UI can render to tell the end user how to recover.",
-	}
-	schema.Properties["extensions"] = &huma.Schema{
-		Type:                 "object",
-		AdditionalProperties: true,
-		Description:          "Optional RFC 9457 extension members carrying diagnostic detail.",
-	}
 }
 
 // mergePathItem copies operations from src into dst for HTTP verbs that

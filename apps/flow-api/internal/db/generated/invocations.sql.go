@@ -337,3 +337,26 @@ func (q *Queries) SumAiCostTodayForWorkspace(ctx context.Context, arg SumAiCostT
 	err := row.Scan(&total_cents)
 	return total_cents, err
 }
+
+const sumEmbedCostTodayForWorkspace = `-- name: SumEmbedCostTodayForWorkspace :one
+SELECT CAST(COALESCE(ROUND(SUM(cost_estimate) * 100), 0) AS SIGNED) AS total_cents
+FROM ai_invocations
+WHERE workspace_id = ?
+  AND purpose LIKE 'embed\_%'
+  AND invoked_at >= ?
+`
+
+type SumEmbedCostTodayForWorkspaceParams struct {
+	WorkspaceID uint32    `json:"-"`
+	InvokedAt   time.Time `json:"invokedAt"`
+}
+
+// Sum the estimated cost (in whole cents) of embedding calls made today for a
+// workspace. Embeddings have their own ai_settings.embed_budget_cents_day
+// bucket, separate from chat/agent LLM budget.
+func (q *Queries) SumEmbedCostTodayForWorkspace(ctx context.Context, arg SumEmbedCostTodayForWorkspaceParams) (int64, error) {
+	row := q.db.QueryRowContext(ctx, sumEmbedCostTodayForWorkspace, arg.WorkspaceID, arg.InvokedAt)
+	var total_cents int64
+	err := row.Scan(&total_cents)
+	return total_cents, err
+}

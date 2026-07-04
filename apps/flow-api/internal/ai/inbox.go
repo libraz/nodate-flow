@@ -93,7 +93,7 @@ func (o *Orchestrator) ProposeInboxTriage(ctx context.Context, workspaceID uint3
 		o.logFailure(ctx, workspaceID, "propose_inbox_triage", req, err)
 		return nil, fmt.Errorf("ai: provider call failed: %w", err)
 	}
-	o.recordMetrics(string(prov.Kind()), req.Model, wsIDStr, resp.CostCents)
+	o.recordMetrics(string(prov.Kind()), req.Model, wsIDStr, resp.EstimatedCostMicros())
 	o.logSuccess(ctx, workspaceID, "propose_inbox_triage", req, resp)
 
 	suggestions, parseErr := parseInboxTriageSuggestions(resp.Text)

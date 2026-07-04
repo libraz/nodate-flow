@@ -8,6 +8,7 @@ import (
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/ai/reminders"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/generated"
 	apierrors "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/errors"
+	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/handlers/handlerutil"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/middleware"
 )
 
@@ -88,7 +89,7 @@ func ListReminders(deps Deps) func(context.Context, *ListRemindersInput) (*ListR
 				TaskID:       r.PublicID.String(),
 				Title:        r.Title,
 				State:        string(r.DerivedState),
-				DueOn:        r.DueOn.Time.Format("2006-01-02"),
+				DueOn:        handlerutil.NullTimeDateStr(r.DueOn),
 				Kind:         string(rm.Kind),
 				DaysUntilDue: rm.DaysUntilDue,
 				Message:      rm.Message,

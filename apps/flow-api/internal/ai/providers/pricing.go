@@ -43,6 +43,8 @@ var knownPrices = []struct {
 	{"gpt-4o", modelPrice{2_500_000, 10_000_000}},       // $2.50 / $10
 	{"gpt-4-turbo", modelPrice{10_000_000, 30_000_000}}, // $10 / $30 (legacy)
 	{"gpt-3.5-turbo", modelPrice{500_000, 1_500_000}},   // $0.50 / $1.50 (legacy)
+	{"text-embedding-3-small", modelPrice{20_000, 0}},   // $0.02 / 1M input tokens
+	{"text-embedding-3-large", modelPrice{130_000, 0}},  // $0.13 / 1M input tokens
 
 	// Google (ai.google.dev/gemini-api/docs/pricing)
 	{"gemini-3.1-pro", modelPrice{2_000_000, 12_000_000}},   // $2 / $12 (≤200k ctx)
@@ -69,9 +71,9 @@ func EstimateCostMicrosUSD(model string, inputTokens, outputTokens int) int64 {
 	return 0
 }
 
-// estimateCostCents returns a whole-cent cost for legacy metrics and memo
-// fields. The precise ai_invocations audit path recomputes
-// [EstimateCostMicrosUSD] from token counts before persistence.
+// estimateCostCents returns a whole-cent cost for legacy display fields.
+// Runtime metering should carry [EstimateCostMicrosUSD] end-to-end and round
+// only at display boundaries.
 func estimateCostCents(model string, inputTokens, outputTokens int) int64 {
 	return EstimateCostMicrosUSD(model, inputTokens, outputTokens) / 10_000
 }

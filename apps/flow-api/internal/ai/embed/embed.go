@@ -21,6 +21,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/ai/providers"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/generated"
 )
 
@@ -36,20 +37,72 @@ type Provider interface {
 	Embed(ctx context.Context, text string) ([]float32, error)
 }
 
+// Store is the sqlc query subset Client needs. generated.Queries
+// satisfies it in production; tests can inject a narrow fake.
+type Store interface {
+	GetTaskEmbedding(ctx context.Context, arg generated.GetTaskEmbeddingParams) (generated.GetTaskEmbeddingRow, error)
+	UpsertTaskEmbedding(ctx context.Context, arg generated.UpsertTaskEmbeddingParams) error
+}
+
+// CostGuard is the narrow budget-gate contract used by Client.
+type CostGuard interface {
+	Check(ctx context.Context, workspaceID uint32) error
+}
+
+// InvocationMetricsHook is called after each embedding provider call.
+type InvocationMetricsHook func(provider, model, workspaceID string, costMicros int64)
+
+// InvocationLogger persists a redacted embedding invocation record.
+type InvocationLogger func(ctx context.Context, rec InvocationRecord)
+
+// InvocationRecord mirrors the ai_invocations payload without importing
+// the parent ai package, which would create an import cycle.
+type InvocationRecord struct {
+	WorkspaceID      uint32
+	Purpose          string
+	Model            string
+	PromptRedacted   string
+	ResponseRedacted string
+	TokensInput      int
+	TokensOutput     int
+	CostMicros       int64
+	CostCents        int64
+	Status           string
+	ErrorCode        string
+}
+
+// Redactor scrubs task text before it is written to ai_invocations.
+type Redactor func(string) string
+
 // Client upserts task embeddings through a Provider. It is safe for
 // concurrent use.
 type Client struct {
 	Provider Provider
-	Queries  *generated.Queries
+	Queries  Store
+
+	Guard        CostGuard
+	LogInvoke    InvocationLogger
+	OnInvocation InvocationMetricsHook
+	Redact       Redactor
 }
 
 // New constructs a Client. Panics if provider or queries is nil so
 // wiring mistakes fail loudly at boot.
-func New(provider Provider, q *generated.Queries) *Client {
+func New(provider Provider, q Store) *Client {
 	if provider == nil || q == nil {
 		panic("embed.New: provider and queries must be non-nil")
 	}
 	return &Client{Provider: provider, Queries: q}
+}
+
+// WithMetering wires budget enforcement, metrics, and audit logging for
+// embedding provider calls. It returns c for compact startup wiring.
+func (c *Client) WithMetering(guard CostGuard, log InvocationLogger, onInvocation InvocationMetricsHook, redact Redactor) *Client {
+	c.Guard = guard
+	c.LogInvoke = log
+	c.OnInvocation = onInvocation
+	c.Redact = redact
+	return c
 }
 
 // EmbedTask generates and upserts the embedding for a task. If the
@@ -76,24 +129,108 @@ func (c *Client) EmbedTask(ctx context.Context, workspaceID, taskID uint32, titl
 	if err == nil && existing.ContentHash == hash {
 		return nil
 	}
+	if c.Guard != nil {
+		if err := c.Guard.Check(ctx, workspaceID); err != nil {
+			return err
+		}
+	}
 
 	raw, err := c.Provider.Embed(ctx, text)
 	if err != nil {
+		c.recordMetrics(workspaceID, 0)
+		c.logFailure(ctx, workspaceID, text, err)
 		return fmt.Errorf("provider embed: %w", err)
 	}
 	if len(raw) == 0 {
-		return errors.New("embed: provider returned empty vector")
+		err := errors.New("embed: provider returned empty vector")
+		c.recordMetrics(workspaceID, 0)
+		c.logFailure(ctx, workspaceID, text, err)
+		return err
 	}
 	Normalize(raw)
 
-	return c.Queries.UpsertTaskEmbedding(ctx, generated.UpsertTaskEmbeddingParams{
+	if err := c.Queries.UpsertTaskEmbedding(ctx, generated.UpsertTaskEmbeddingParams{
 		TaskID:         taskID,
 		WorkspaceID:    workspaceID,
 		Model:          model,
 		Dim:            uint16(len(raw)), //#nosec G115 -- embedding dimensions cap at the upstream model's MaxDim (~3072 today), well below uint16
 		StringToVector: Encode(raw),
 		ContentHash:    hash,
+	}); err != nil {
+		return err
+	}
+	costMicros := estimateCostMicros(model, text)
+	c.recordMetrics(workspaceID, costMicros)
+	c.logSuccess(ctx, workspaceID, text, costMicros)
+	return nil
+}
+
+func (c *Client) recordMetrics(workspaceID uint32, costMicros int64) {
+	if c.OnInvocation == nil {
+		return
+	}
+	c.OnInvocation(providerName(c.Provider), c.Provider.Model(), strconv.FormatUint(uint64(workspaceID), 10), costMicros)
+}
+
+func (c *Client) logSuccess(ctx context.Context, workspaceID uint32, text string, costMicros int64) {
+	if c.LogInvoke == nil {
+		return
+	}
+	c.LogInvoke(ctx, InvocationRecord{
+		WorkspaceID:      workspaceID,
+		Purpose:          "embed_task",
+		Model:            c.Provider.Model(),
+		PromptRedacted:   c.redact(text),
+		ResponseRedacted: "embedding vector omitted",
+		TokensInput:      estimateTokens(text),
+		CostMicros:       costMicros,
+		CostCents:        costMicros / 10_000,
+		Status:           "ok",
 	})
+}
+
+func (c *Client) logFailure(ctx context.Context, workspaceID uint32, text string, err error) {
+	if c.LogInvoke == nil {
+		return
+	}
+	c.LogInvoke(ctx, InvocationRecord{
+		WorkspaceID:    workspaceID,
+		Purpose:        "embed_task",
+		Model:          c.Provider.Model(),
+		PromptRedacted: c.redact(text),
+		Status:         "error",
+		ErrorCode:      c.redact(err.Error()),
+	})
+}
+
+func (c *Client) redact(s string) string {
+	if c.Redact != nil {
+		return c.Redact(s)
+	}
+	return s
+}
+
+func estimateTokens(text string) int {
+	text = strings.TrimSpace(text)
+	if text == "" {
+		return 0
+	}
+	return max(1, (len(text)+3)/4)
+}
+
+func estimateCostMicros(model, text string) int64 {
+	return providers.EstimateCostMicrosUSD(model, estimateTokens(text), 0)
+}
+
+type namedProvider interface {
+	ProviderName() string
+}
+
+func providerName(p Provider) string {
+	if named, ok := p.(namedProvider); ok {
+		return named.ProviderName()
+	}
+	return "embed"
 }
 
 // Normalize rescales v in place to unit length (L2). A zero vector is

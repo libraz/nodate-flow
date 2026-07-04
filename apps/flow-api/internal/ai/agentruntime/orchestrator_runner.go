@@ -9,6 +9,7 @@ import (
 
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/generated"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/types"
+	apierrors "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/errors"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/eventbus"
 )
 
@@ -24,8 +25,9 @@ import (
 //   - ToolCalls counts tool invocations made during the run.
 //   - ConsecutiveToolFailures counts trailing tool-call failures —
 //     three or more triggers a tool_error handoff.
-//   - CostCents is the spend (rounded cents) for this run; surfaces in
-//     agent_memo.last_cost_cents.
+//   - CostMicros is the spend in millionths of a USD for this run; surfaces
+//     in agent_memo.last_cost_micros. CostCents remains as a legacy display
+//     field rounded down from CostMicros.
 //   - CostCapHit is true when the cost guard rejected the call;
 //     triggers the cost_cap handoff and pauses the agent.
 type ExecutionResult struct {
@@ -33,6 +35,7 @@ type ExecutionResult struct {
 	LastThought             string
 	ToolCalls               int
 	ConsecutiveToolFailures int
+	CostMicros              int64
 	CostCents               int64
 	CostCapHit              bool
 }
@@ -455,10 +458,15 @@ func (r *OrchestratorRunner) recordSuccessMemo(ctx context.Context, workspaceID,
 	if taskID == 0 {
 		return
 	}
+	costMicros := result.CostMicros
+	if costMicros == 0 && result.CostCents > 0 {
+		costMicros = result.CostCents * 10_000
+	}
 	patch := map[string]any{
 		"last_finished_at": at.Unix(),
 		"last_tool_calls":  result.ToolCalls,
-		"last_cost_cents":  result.CostCents,
+		"last_cost_micros": costMicros,
+		"last_cost_cents":  costMicros / 10_000,
 	}
 	if result.LastThought != "" {
 		patch["last_thought"] = truncate(result.LastThought, 500)
@@ -511,7 +519,7 @@ func (r *OrchestratorRunner) handleHandoff(ctx context.Context, reason string, j
 			payload: map[string]any{
 				"agentId":      agentPubID,
 				"finishedAt":   at.Unix(),
-				"error":        "WS.TASK_AGENT.HANDOFF_LOOP_DETECTED",
+				"error":        apierrors.WsTaskAgentHandoffLoopDetected.Code,
 				"reason":       reason,
 				"handoffCount": prior.HandoffCount,
 			},

@@ -14,6 +14,26 @@ func TestEstimateCostMicrosUSDTracksSubCentDefaultModels(t *testing.T) {
 	}
 }
 
+func TestResponseEstimatedCostUsesMicrosBeforeLegacyCents(t *testing.T) {
+	t.Parallel()
+
+	subCent := &Response{CostMicros: 450}
+	if got := subCent.EstimatedCostMicros(); got != 450 {
+		t.Fatalf("EstimatedCostMicros() = %d, want 450", got)
+	}
+	if got := subCent.EstimatedCostCents(); got != 0 {
+		t.Fatalf("EstimatedCostCents() floors display cents = %d, want 0", got)
+	}
+
+	legacy := &Response{CostCents: 2}
+	if got := legacy.EstimatedCostMicros(); got != 20_000 {
+		t.Fatalf("legacy EstimatedCostMicros() = %d, want 20000", got)
+	}
+	if got := legacy.EstimatedCostCents(); got != 2 {
+		t.Fatalf("legacy EstimatedCostCents() = %d, want 2", got)
+	}
+}
+
 func TestEstimateCostMicrosUSDHandlesFractionalCentPerMillionPricing(t *testing.T) {
 	t.Parallel()
 

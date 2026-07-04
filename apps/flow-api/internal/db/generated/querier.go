@@ -1462,6 +1462,10 @@ type Querier interface {
 	// workspace. cost_estimate is stored as DECIMAL(10,6) USD; multiply by 100
 	// and round to produce a cent-scale integer suitable for CostGuard.
 	SumAiCostTodayForWorkspace(ctx context.Context, arg SumAiCostTodayForWorkspaceParams) (int64, error)
+	// Sum the estimated cost (in whole cents) of embedding calls made today for a
+	// workspace. Embeddings have their own ai_settings.embed_budget_cents_day
+	// bucket, separate from chat/agent LLM budget.
+	SumEmbedCostTodayForWorkspace(ctx context.Context, arg SumEmbedCostTodayForWorkspaceParams) (int64, error)
 	ToggleWebhookSubscription(ctx context.Context, arg ToggleWebhookSubscriptionParams) error
 	// Write the new derived_state computed by the transition handler. This is
 	// the only path allowed to mutate derived_state and must be called inside

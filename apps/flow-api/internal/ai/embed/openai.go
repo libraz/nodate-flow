@@ -4,11 +4,16 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
+
+	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/ai/providers"
 )
 
 // Decryptor is the narrow contract used by OpenAIProvider to unseal the
@@ -98,6 +103,9 @@ func NewOpenAIProvider(keyCiphertext []byte, dec Decryptor, opts ...OpenAIOption
 // Model implements Provider.
 func (p *OpenAIProvider) Model() string { return p.model }
 
+// ProviderName returns the metrics/audit provider label for embedding calls.
+func (p *OpenAIProvider) ProviderName() string { return "openai" }
+
 type openAIEmbedReq struct {
 	Model      string `json:"model"`
 	Input      string `json:"input"`
@@ -146,33 +154,55 @@ func (p *OpenAIProvider) Embed(ctx context.Context, text string) ([]float32, err
 
 	resp, err := p.client.Do(httpReq)
 	if err != nil {
-		return nil, fmt.Errorf("openai embed: do: %w", err)
+		return nil, fmt.Errorf("openai embed: do: %w", classifyEmbedTransportError(ctx, err))
 	}
 	defer resp.Body.Close()
 
 	raw, _ := io.ReadAll(io.LimitReader(resp.Body, 10<<20))
 	if resp.StatusCode/100 != 2 {
-		return nil, fmt.Errorf("openai embed: upstream status %d: %s", resp.StatusCode, truncate(raw, 200))
+		return nil, fmt.Errorf("openai embed: upstream status %d: %w", resp.StatusCode, classifyEmbedHTTPStatus(resp.StatusCode))
 	}
 
 	var or openAIEmbedResp
 	if err := json.Unmarshal(raw, &or); err != nil {
-		return nil, fmt.Errorf("openai embed: parse: %w", err)
+		return nil, fmt.Errorf("openai embed: parse: %w", providers.ErrResponseInvalidJSON)
 	}
 	if or.Error != nil {
-		return nil, fmt.Errorf("openai embed: %s: %s", or.Error.Type, or.Error.Message)
+		return nil, fmt.Errorf("openai embed: upstream error type %q: %w", or.Error.Type, providers.ErrUpstreamRequestRejected)
 	}
 	if len(or.Data) == 0 || len(or.Data[0].Embedding) == 0 {
-		return nil, fmt.Errorf("openai embed: empty embedding in response")
+		return nil, fmt.Errorf("openai embed: empty embedding in response: %w", providers.ErrResponseSchemaMismatch)
 	}
 	return or.Data[0].Embedding, nil
 }
 
-func truncate(b []byte, n int) string {
-	if len(b) <= n {
-		return string(b)
+func classifyEmbedTransportError(ctx context.Context, err error) error {
+	if errors.Is(err, context.DeadlineExceeded) {
+		return providers.ErrUpstreamTimeout
 	}
-	return string(b[:n]) + "..."
+	if ctx != nil && errors.Is(ctx.Err(), context.DeadlineExceeded) {
+		return providers.ErrUpstreamTimeout
+	}
+	var netErr net.Error
+	if errors.As(err, &netErr) && netErr.Timeout() {
+		return providers.ErrUpstreamTimeout
+	}
+	var urlErr *url.Error
+	if errors.As(err, &urlErr) && urlErr.Timeout() {
+		return providers.ErrUpstreamTimeout
+	}
+	return providers.ErrUpstreamUnreachable
+}
+
+func classifyEmbedHTTPStatus(status int) error {
+	switch status {
+	case http.StatusUnauthorized, http.StatusForbidden:
+		return providers.ErrUpstreamAuthRejected
+	case http.StatusTooManyRequests:
+		return providers.ErrUpstreamRateLimited
+	default:
+		return providers.ErrUpstreamRequestRejected
+	}
 }
 
 // zero overwrites b with zero bytes. Used to scrub plaintext API keys

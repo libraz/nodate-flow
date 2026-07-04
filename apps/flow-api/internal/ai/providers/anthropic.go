@@ -117,11 +117,13 @@ func (p *anthropicProvider) Complete(ctx context.Context, req Request) (*Respons
 			text += c.Text
 		}
 	}
+	costMicros := EstimateCostMicrosUSD(model, ar.Usage.InputTokens, ar.Usage.OutputTokens)
 	return &Response{
 		Model:        model,
 		Text:         text,
 		InputTokens:  ar.Usage.InputTokens,
 		OutputTokens: ar.Usage.OutputTokens,
-		CostCents:    estimateCostCents(model, ar.Usage.InputTokens, ar.Usage.OutputTokens),
+		CostMicros:   costMicros,
+		CostCents:    costMicros / 10_000,
 	}, nil
 }

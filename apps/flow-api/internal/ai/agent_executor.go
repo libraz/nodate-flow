@@ -105,12 +105,13 @@ func (e *AgentExecutor) ExecuteAgent(ctx context.Context, workspaceID, agentID u
 		return result, fmt.Errorf("ai: agent provider call failed: %w", err)
 	}
 	if e.OnInvocation != nil {
-		e.OnInvocation(string(prov.Kind()), req.Model, wsIDStr, resp.CostCents)
+		e.OnInvocation(string(prov.Kind()), req.Model, wsIDStr, resp.EstimatedCostMicros())
 	}
 	if o := (&Orchestrator{LogInvoke: e.Log}); o.LogInvoke != nil {
 		o.logSuccess(ctx, workspaceID, "agent_tick", req, resp)
 	}
-	result.CostCents = resp.CostCents
+	result.CostMicros = resp.EstimatedCostMicros()
+	result.CostCents = resp.EstimatedCostCents()
 	result.LastThought = resp.Text
 	return result, nil
 }

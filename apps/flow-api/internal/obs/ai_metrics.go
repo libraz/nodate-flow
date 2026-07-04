@@ -41,14 +41,12 @@ func init() {
 }
 
 // RecordAIInvocation increments the invocation counter and adds the cost for a
-// single completed LLM call. costCents is the estimated cost in cents as
-// returned by providers.Response.CostCents; it is converted to dollars
-// internally. Pass 0 for costCents when pricing is unknown (e.g. local
-// Ollama).
-func RecordAIInvocation(provider, model, workspaceID string, costCents int64) {
+// single completed LLM call. costMicros is the estimated cost in millionths of
+// a US dollar. Pass 0 when pricing is unknown (e.g. local Ollama).
+func RecordAIInvocation(provider, model, workspaceID string, costMicros int64) {
 	aiInvocationsTotal.WithLabelValues(provider, model, workspaceID).Inc()
-	if costCents > 0 {
-		dollars := float64(costCents) / 100.0
+	if costMicros > 0 {
+		dollars := float64(costMicros) / 1_000_000.0
 		aiCostDollarsTotal.WithLabelValues(provider, model, workspaceID).Add(dollars)
 	}
 }
