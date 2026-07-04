@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"mime"
+	"net/mail"
 	"net/smtp"
 	"strings"
 )
@@ -67,6 +68,11 @@ func (s *SMTPSender) Send(_ context.Context, m Message) error {
 	if err := validateHeaderValues(headerValues...); err != nil {
 		return err
 	}
+	envelopeFrom := envelopeAddress(from)
+	envelopeTo := make([]string, 0, len(m.To))
+	for _, to := range m.To {
+		envelopeTo = append(envelopeTo, envelopeAddress(to))
+	}
 	var auth smtp.Auth
 	if s.cfg.Username != "" {
 		auth = smtp.PlainAuth("", s.cfg.Username, s.cfg.Password, s.cfg.Host)
@@ -74,10 +80,10 @@ func (s *SMTPSender) Send(_ context.Context, m Message) error {
 	addr := fmt.Sprintf("%s:%d", s.cfg.Host, s.cfg.Port)
 
 	var b strings.Builder
-	fmt.Fprintf(&b, "From: %s\r\n", encodeHeader(from))
-	fmt.Fprintf(&b, "To: %s\r\n", encodeHeader(strings.Join(m.To, ", ")))
+	fmt.Fprintf(&b, "From: %s\r\n", encodeAddressHeader(from))
+	fmt.Fprintf(&b, "To: %s\r\n", encodeAddressListHeader(m.To))
 	if m.ReplyTo != "" {
-		fmt.Fprintf(&b, "Reply-To: %s\r\n", encodeHeader(m.ReplyTo))
+		fmt.Fprintf(&b, "Reply-To: %s\r\n", encodeAddressHeader(m.ReplyTo))
 	}
 	fmt.Fprintf(&b, "Subject: %s\r\n", encodeHeader(m.Subject))
 	b.WriteString("MIME-Version: 1.0\r\n")
@@ -85,7 +91,7 @@ func (s *SMTPSender) Send(_ context.Context, m Message) error {
 	b.WriteString("\r\n")
 	b.WriteString(m.Body)
 
-	return smtp.SendMail(addr, auth, from, m.To, []byte(b.String()))
+	return smtp.SendMail(addr, auth, envelopeFrom, envelopeTo, []byte(b.String()))
 }
 
 func validateHeaderValues(values ...string) error {
@@ -99,6 +105,33 @@ func validateHeaderValues(values ...string) error {
 
 func encodeHeader(value string) string {
 	return mime.QEncoding.Encode("utf-8", value)
+}
+
+func encodeAddressListHeader(values []string) string {
+	encoded := make([]string, 0, len(values))
+	for _, value := range values {
+		encoded = append(encoded, encodeAddressHeader(value))
+	}
+	return strings.Join(encoded, ", ")
+}
+
+func encodeAddressHeader(value string) string {
+	addr, err := mail.ParseAddress(value)
+	if err != nil {
+		return encodeHeader(value)
+	}
+	if addr.Name == "" {
+		return addr.Address
+	}
+	return encodeHeader(addr.Name) + " <" + addr.Address + ">"
+}
+
+func envelopeAddress(value string) string {
+	addr, err := mail.ParseAddress(value)
+	if err != nil {
+		return value
+	}
+	return addr.Address
 }
 
 // compile-time check

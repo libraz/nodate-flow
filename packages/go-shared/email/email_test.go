@@ -107,6 +107,52 @@ func TestSMTPSenderDeliversRFC5322MessageToServer(t *testing.T) {
 	}
 }
 
+func TestSMTPSenderEncodesDisplayNamesPerAddress(t *testing.T) {
+	t.Parallel()
+
+	srv := newTestSMTPServer(t)
+	sender, err := NewSMTPSender(SMTPConfig{
+		Host: "127.0.0.1",
+		Port: srv.port,
+		From: "fallback@example.test",
+	})
+	if err != nil {
+		t.Fatalf("NewSMTPSender: %v", err)
+	}
+
+	err = sender.Send(context.Background(), Message{
+		From:    "送信者 <sender@example.test>",
+		To:      []string{"太郎 <taro@example.test>", "花子 <hanako@example.test>"},
+		ReplyTo: "返信先 <reply@example.test>",
+		Subject: "hello",
+		Body:    "body",
+	})
+	if err != nil {
+		t.Fatalf("Send: %v", err)
+	}
+	got := srv.message(t)
+
+	if got.mailFrom != "FROM:<sender@example.test>" {
+		t.Fatalf("MAIL command = %q", got.mailFrom)
+	}
+	if got.rcptTo[0] != "TO:<taro@example.test>" || got.rcptTo[1] != "TO:<hanako@example.test>" {
+		t.Fatalf("unexpected RCPT commands: %#v", got.rcptTo)
+	}
+	for _, want := range []string{
+		"From: =?utf-8?q?",
+		" <sender@example.test>\r\n",
+		"To: =?utf-8?q?",
+		" <taro@example.test>, =?utf-8?q?",
+		" <hanako@example.test>\r\n",
+		"Reply-To: =?utf-8?q?",
+		" <reply@example.test>\r\n",
+	} {
+		if !strings.Contains(got.data, want) {
+			t.Fatalf("SMTP DATA missing %q in:\n%s", want, got.data)
+		}
+	}
+}
+
 func TestSMTPSenderAuthenticatesWhenConfigured(t *testing.T) {
 	t.Parallel()
 
