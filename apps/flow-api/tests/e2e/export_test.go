@@ -148,3 +148,132 @@ func TestExportTasksExcludesDisabledProjectTasks(t *testing.T) {
 	require.NotContains(t, titles, "Hidden task in disabled project",
 		"tasks under disabled projects must not appear in workspace export")
 }
+
+func TestExportTasksAppliesTaskVisibilityFilter(t *testing.T) {
+	bootstrap(t)
+	t.Parallel()
+	owner := newTenant(t)
+	member := seedWorkspaceMemberWithoutProjectRole(t, owner)
+
+	needle := "export visibility " + randomHex(6)
+	publicTitle := needle + " public"
+	projectTitle := needle + " project"
+	privateTitle := needle + " private"
+
+	var publicTask, projectTask, privateTask struct {
+		ID string `json:"id"`
+	}
+	doJSON(t, http.MethodPost, testServerURL+"/tasks", owner.AccessToken,
+		map[string]any{
+			"projectId":  owner.ProjectPublicID,
+			"title":      publicTitle,
+			"visibility": "public",
+		}, &publicTask)
+	doJSON(t, http.MethodPost, testServerURL+"/tasks", owner.AccessToken,
+		map[string]any{
+			"projectId":  owner.ProjectPublicID,
+			"title":      projectTitle,
+			"visibility": "project",
+		}, &projectTask)
+	doJSON(t, http.MethodPost, testServerURL+"/tasks", owner.AccessToken,
+		map[string]any{
+			"projectId":  owner.ProjectPublicID,
+			"title":      privateTitle,
+			"visibility": "private",
+		}, &privateTask)
+	require.NotEmpty(t, publicTask.ID)
+	require.NotEmpty(t, projectTask.ID)
+	require.NotEmpty(t, privateTask.ID)
+
+	wsURL := testServerURL + "/workspaces/" + owner.WorkspacePublicID
+	var exported struct {
+		Tasks []struct {
+			ID    string `json:"id"`
+			Title string `json:"title"`
+		} `json:"tasks"`
+	}
+	doJSON(t, http.MethodGet, wsURL+"/export/tasks?format=json&limit=100",
+		member.AccessToken, nil, &exported)
+
+	jsonTitles := make([]string, 0, len(exported.Tasks))
+	for _, task := range exported.Tasks {
+		jsonTitles = append(jsonTitles, task.Title)
+	}
+	require.Contains(t, jsonTitles, publicTitle,
+		"workspace member should export public tasks")
+	require.NotContains(t, jsonTitles, projectTitle,
+		"workspace member without project membership must not export project-visibility tasks")
+	require.NotContains(t, jsonTitles, privateTitle,
+		"workspace member without actor/creator access must not export private tasks")
+
+	status, body := doJSONStatus(t, http.MethodGet, wsURL+"/export/tasks.csv?limit=100",
+		member.AccessToken, nil)
+	require.Equal(t, http.StatusOK, status)
+	csv := string(body)
+	require.Contains(t, csv, publicTitle)
+	require.NotContains(t, csv, projectTitle)
+	require.NotContains(t, csv, privateTitle)
+}
+
+func TestMCPExportTasksAppliesTaskVisibilityFilter(t *testing.T) {
+	bootstrap(t)
+	t.Parallel()
+	owner := newTenant(t)
+	member := seedWorkspaceMemberWithoutProjectRole(t, owner)
+	tok := mintMCPToken(t, member.AccessToken, owner.WorkspacePublicID,
+		"export-visibility", []string{"read:workspace"})
+
+	needle := "mcp export visibility " + randomHex(6)
+	publicTitle := needle + " public"
+	projectTitle := needle + " project"
+	privateTitle := needle + " private"
+
+	var publicTask, projectTask, privateTask struct {
+		ID string `json:"id"`
+	}
+	doJSON(t, http.MethodPost, testServerURL+"/tasks", owner.AccessToken,
+		map[string]any{
+			"projectId":  owner.ProjectPublicID,
+			"title":      publicTitle,
+			"visibility": "public",
+		}, &publicTask)
+	doJSON(t, http.MethodPost, testServerURL+"/tasks", owner.AccessToken,
+		map[string]any{
+			"projectId":  owner.ProjectPublicID,
+			"title":      projectTitle,
+			"visibility": "project",
+		}, &projectTask)
+	doJSON(t, http.MethodPost, testServerURL+"/tasks", owner.AccessToken,
+		map[string]any{
+			"projectId":  owner.ProjectPublicID,
+			"title":      privateTitle,
+			"visibility": "private",
+		}, &privateTask)
+	require.NotEmpty(t, publicTask.ID)
+	require.NotEmpty(t, projectTask.ID)
+	require.NotEmpty(t, privateTask.ID)
+
+	body := mcpCall(t, tok, "tools/call", map[string]any{
+		"name": "export_tasks",
+		"arguments": map[string]any{
+			"limit": 100,
+		},
+	})
+	result := mcpToolTextJSON[struct {
+		Tasks []struct {
+			ID    string `json:"id"`
+			Title string `json:"title"`
+		} `json:"tasks"`
+	}](t, body)
+
+	titles := make([]string, 0, len(result.Tasks))
+	for _, task := range result.Tasks {
+		titles = append(titles, task.Title)
+	}
+	require.Contains(t, titles, publicTitle,
+		"workspace member should export public tasks over MCP")
+	require.NotContains(t, titles, projectTitle,
+		"MCP export must hide project-visibility tasks without project membership")
+	require.NotContains(t, titles, privateTitle,
+		"MCP export must hide private tasks without actor/creator access")
+}

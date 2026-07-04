@@ -23,8 +23,36 @@ LEFT JOIN task_actors ta ON ta.task_id = t.id
   AND ta.kind = 'user'
   AND ta.enabled = TRUE
 LEFT JOIN users a_user ON a_user.id = ta.user_id AND a_user.enabled = TRUE
-WHERE t.workspace_id = ?
+WHERE t.workspace_id = sqlc.arg('workspace_id')
   AND t.enabled = TRUE
+  AND (
+    CAST(sqlc.arg('is_elevated') AS SIGNED) = 1
+    OR t.visibility = 'public'
+    OR (
+      t.visibility = 'project'
+      AND EXISTS (
+        SELECT 1
+        FROM project_members pm
+        WHERE pm.project_id = t.project_id
+          AND pm.user_id = CAST(sqlc.arg('actor_user_id') AS UNSIGNED)
+          AND pm.enabled = TRUE
+      )
+    )
+    OR (
+      t.visibility = 'private'
+      AND (
+        t.created_by_user_id = CAST(sqlc.arg('actor_user_id') AS UNSIGNED)
+        OR EXISTS (
+          SELECT 1
+          FROM task_actors ta_vis
+          WHERE ta_vis.task_id = t.id
+            AND ta_vis.kind = 'user'
+            AND ta_vis.user_id = CAST(sqlc.arg('actor_user_id') AS UNSIGNED)
+            AND ta_vis.enabled = TRUE
+        )
+      )
+    )
+  )
 ORDER BY t.created_at DESC, t.id DESC
 LIMIT ?;
 
@@ -53,8 +81,36 @@ LEFT JOIN task_actors ta ON ta.task_id = t.id
   AND ta.kind = 'user'
   AND ta.enabled = TRUE
 LEFT JOIN users a_user ON a_user.id = ta.user_id AND a_user.enabled = TRUE
-WHERE t.workspace_id = ?
-  AND t.project_id = ?
+WHERE t.workspace_id = sqlc.arg('workspace_id')
+  AND t.project_id = sqlc.arg('project_id')
   AND t.enabled = TRUE
+  AND (
+    CAST(sqlc.arg('is_elevated') AS SIGNED) = 1
+    OR t.visibility = 'public'
+    OR (
+      t.visibility = 'project'
+      AND EXISTS (
+        SELECT 1
+        FROM project_members pm
+        WHERE pm.project_id = t.project_id
+          AND pm.user_id = CAST(sqlc.arg('actor_user_id') AS UNSIGNED)
+          AND pm.enabled = TRUE
+      )
+    )
+    OR (
+      t.visibility = 'private'
+      AND (
+        t.created_by_user_id = CAST(sqlc.arg('actor_user_id') AS UNSIGNED)
+        OR EXISTS (
+          SELECT 1
+          FROM task_actors ta_vis
+          WHERE ta_vis.task_id = t.id
+            AND ta_vis.kind = 'user'
+            AND ta_vis.user_id = CAST(sqlc.arg('actor_user_id') AS UNSIGNED)
+            AND ta_vis.enabled = TRUE
+        )
+      )
+    )
+  )
 ORDER BY t.created_at DESC, t.id DESC
 LIMIT ?;

@@ -39,14 +39,46 @@ LEFT JOIN users a_user ON a_user.id = ta.user_id AND a_user.enabled = TRUE
 WHERE t.workspace_id = ?
   AND t.project_id = ?
   AND t.enabled = TRUE
+  AND (
+    CAST(? AS SIGNED) = 1
+    OR t.visibility = 'public'
+    OR (
+      t.visibility = 'project'
+      AND EXISTS (
+        SELECT 1
+        FROM project_members pm
+        WHERE pm.project_id = t.project_id
+          AND pm.user_id = CAST(? AS UNSIGNED)
+          AND pm.enabled = TRUE
+      )
+    )
+    OR (
+      t.visibility = 'private'
+      AND (
+        t.created_by_user_id = CAST(? AS UNSIGNED)
+        OR EXISTS (
+          SELECT 1
+          FROM task_actors ta_vis
+          WHERE ta_vis.task_id = t.id
+            AND ta_vis.kind = 'user'
+            AND ta_vis.user_id = CAST(? AS UNSIGNED)
+            AND ta_vis.enabled = TRUE
+        )
+      )
+    )
+  )
 ORDER BY t.created_at DESC, t.id DESC
 LIMIT ?
 `
 
 type ExportTasksForLensParams struct {
-	WorkspaceID uint32 `json:"-"`
-	ProjectID   uint32 `json:"-"`
-	Limit       int32  `json:"limit"`
+	WorkspaceID   uint32 `json:"-"`
+	ProjectID     uint32 `json:"-"`
+	IsElevated    int64  `json:"isElevated"`
+	ActorUserID   int64  `json:"actorUserId"`
+	ActorUserID_2 int64  `json:"actorUserId2"`
+	ActorUserID_3 int64  `json:"actorUserId3"`
+	Limit         int32  `json:"limit"`
 }
 
 type ExportTasksForLensRow struct {
@@ -69,7 +101,15 @@ type ExportTasksForLensRow struct {
 // Fetch tasks for export scoped to a workspace + project (lens-scoped).
 // Lens filter/sort logic is applied in Go code; this provides the data set.
 func (q *Queries) ExportTasksForLens(ctx context.Context, arg ExportTasksForLensParams) ([]ExportTasksForLensRow, error) {
-	rows, err := q.db.QueryContext(ctx, exportTasksForLens, arg.WorkspaceID, arg.ProjectID, arg.Limit)
+	rows, err := q.db.QueryContext(ctx, exportTasksForLens,
+		arg.WorkspaceID,
+		arg.ProjectID,
+		arg.IsElevated,
+		arg.ActorUserID,
+		arg.ActorUserID_2,
+		arg.ActorUserID_3,
+		arg.Limit,
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -131,13 +171,45 @@ LEFT JOIN task_actors ta ON ta.task_id = t.id
 LEFT JOIN users a_user ON a_user.id = ta.user_id AND a_user.enabled = TRUE
 WHERE t.workspace_id = ?
   AND t.enabled = TRUE
+  AND (
+    CAST(? AS SIGNED) = 1
+    OR t.visibility = 'public'
+    OR (
+      t.visibility = 'project'
+      AND EXISTS (
+        SELECT 1
+        FROM project_members pm
+        WHERE pm.project_id = t.project_id
+          AND pm.user_id = CAST(? AS UNSIGNED)
+          AND pm.enabled = TRUE
+      )
+    )
+    OR (
+      t.visibility = 'private'
+      AND (
+        t.created_by_user_id = CAST(? AS UNSIGNED)
+        OR EXISTS (
+          SELECT 1
+          FROM task_actors ta_vis
+          WHERE ta_vis.task_id = t.id
+            AND ta_vis.kind = 'user'
+            AND ta_vis.user_id = CAST(? AS UNSIGNED)
+            AND ta_vis.enabled = TRUE
+        )
+      )
+    )
+  )
 ORDER BY t.created_at DESC, t.id DESC
 LIMIT ?
 `
 
 type ExportTasksForWorkspaceParams struct {
-	WorkspaceID uint32 `json:"-"`
-	Limit       int32  `json:"limit"`
+	WorkspaceID   uint32 `json:"-"`
+	IsElevated    int64  `json:"isElevated"`
+	ActorUserID   int64  `json:"actorUserId"`
+	ActorUserID_2 int64  `json:"actorUserId2"`
+	ActorUserID_3 int64  `json:"actorUserId3"`
+	Limit         int32  `json:"limit"`
 }
 
 type ExportTasksForWorkspaceRow struct {
@@ -160,7 +232,14 @@ type ExportTasksForWorkspaceRow struct {
 // Fetch tasks for CSV/JSON export across an entire workspace.
 // Includes project name and primary assignee for human-readable output.
 func (q *Queries) ExportTasksForWorkspace(ctx context.Context, arg ExportTasksForWorkspaceParams) ([]ExportTasksForWorkspaceRow, error) {
-	rows, err := q.db.QueryContext(ctx, exportTasksForWorkspace, arg.WorkspaceID, arg.Limit)
+	rows, err := q.db.QueryContext(ctx, exportTasksForWorkspace,
+		arg.WorkspaceID,
+		arg.IsElevated,
+		arg.ActorUserID,
+		arg.ActorUserID_2,
+		arg.ActorUserID_3,
+		arg.Limit,
+	)
 	if err != nil {
 		return nil, err
 	}

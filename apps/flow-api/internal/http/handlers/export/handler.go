@@ -53,9 +53,9 @@ func Export(deps Deps) func(ctx context.Context, in *Input) (*Output, error) {
 		var err error
 
 		if in.LensID != "" {
-			rows, err = fetchForLens(ctx, deps, ws, in.LensID, limit)
+			rows, err = fetchForLens(ctx, deps, ws, actorID, in.LensID, limit)
 		} else {
-			rows, err = fetchForWorkspace(ctx, deps, ws, limit)
+			rows, err = fetchForWorkspace(ctx, deps, ws, actorID, limit)
 		}
 		if err != nil {
 			return nil, err
@@ -132,9 +132,9 @@ func CSV(deps Deps) http.HandlerFunc {
 		source := "workspace"
 		if lensID != "" {
 			source = "lens"
-			rows, err = fetchForLens(ctx, deps, ws, lensID, limit)
+			rows, err = fetchForLens(ctx, deps, ws, actorID, lensID, limit)
 		} else {
-			rows, err = fetchForWorkspace(ctx, deps, ws, limit)
+			rows, err = fetchForWorkspace(ctx, deps, ws, actorID, limit)
 		}
 		if err != nil {
 			writeFetchError(ctx, w, source, err)
@@ -239,11 +239,16 @@ type exportRow struct {
 
 // fetchForWorkspace fetches export rows across the entire workspace.
 func fetchForWorkspace(
-	ctx context.Context, deps Deps, ws middleware.WorkspaceContext, limit int32,
+	ctx context.Context, deps Deps, ws middleware.WorkspaceContext, actorID uint32, limit int32,
 ) ([]exportRow, error) {
+	visibility := exportVisibilityParams(actorID, ws.Role)
 	dbRows, err := deps.Queries.ExportTasksForWorkspace(ctx, generated.ExportTasksForWorkspaceParams{
-		WorkspaceID: ws.ID,
-		Limit:       limit,
+		WorkspaceID:   ws.ID,
+		IsElevated:    visibility.isElevated,
+		ActorUserID:   visibility.actorUserID,
+		ActorUserID_2: visibility.actorUserID,
+		ActorUserID_3: visibility.actorUserID,
+		Limit:         limit,
 	})
 	if err != nil {
 		return nil, httpErr(apierrors.ExportTaskDatasetQueryFailed)
@@ -272,7 +277,7 @@ func fetchForWorkspace(
 
 // fetchForLens resolves the lens and fetches export rows scoped to its project.
 func fetchForLens(
-	ctx context.Context, deps Deps, ws middleware.WorkspaceContext, lensID string, limit int32,
+	ctx context.Context, deps Deps, ws middleware.WorkspaceContext, actorID uint32, lensID string, limit int32,
 ) ([]exportRow, error) {
 	lid, err := types.Parse(lensID)
 	if err != nil {
@@ -289,10 +294,15 @@ func fetchForLens(
 
 	// If the lens has a project scope, use the project-scoped query.
 	if projectID.Valid {
+		visibility := exportVisibilityParams(actorID, ws.Role)
 		dbRows, err := deps.Queries.ExportTasksForLens(ctx, generated.ExportTasksForLensParams{
-			WorkspaceID: ws.ID,
-			ProjectID:   uint32(projectID.Int32), //#nosec G115 -- project_id is projects.id (BIGINT UNSIGNED), fits uint32 within realistic deployments
-			Limit:       limit,
+			WorkspaceID:   ws.ID,
+			ProjectID:     uint32(projectID.Int32), //#nosec G115 -- project_id is projects.id (BIGINT UNSIGNED), fits uint32 within realistic deployments
+			IsElevated:    visibility.isElevated,
+			ActorUserID:   visibility.actorUserID,
+			ActorUserID_2: visibility.actorUserID,
+			ActorUserID_3: visibility.actorUserID,
+			Limit:         limit,
 		})
 		if err != nil {
 			return nil, httpErr(apierrors.ExportTaskDatasetQueryFailed)
@@ -320,7 +330,23 @@ func fetchForLens(
 	}
 
 	// Workspace-wide lens: fall back to the workspace query.
-	return fetchForWorkspace(ctx, deps, ws, limit)
+	return fetchForWorkspace(ctx, deps, ws, actorID, limit)
+}
+
+type exportVisibility struct {
+	isElevated  int64
+	actorUserID int64
+}
+
+func exportVisibilityParams(actorID uint32, wsRole middleware.WorkspaceRole) exportVisibility {
+	var elevated int64
+	if wsRole.AtLeast(middleware.WorkspaceRoleAdmin) {
+		elevated = 1
+	}
+	return exportVisibility{
+		isElevated:  elevated,
+		actorUserID: int64(actorID),
+	}
 }
 
 // mapRows converts internal exportRow slices to the public DTO.
