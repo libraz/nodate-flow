@@ -32,7 +32,7 @@ export function getPublicBaseUrl(): string {
   if (typeof window !== 'undefined' && typeof window.location !== 'undefined') {
     if (import.meta.env.DEV && !warned) {
       warned = true;
-      // eslint-disable-next-line no-console
+      // biome-ignore lint/suspicious/noConsole: dev-only config warning for local setup.
       console.warn(
         '[flow-web] VITE_PUBLIC_BASE_URL is not set; falling back to window.location.origin. ' +
           'Set VITE_PUBLIC_BASE_URL in apps/flow-web/.env to the canonical user-facing origin.',

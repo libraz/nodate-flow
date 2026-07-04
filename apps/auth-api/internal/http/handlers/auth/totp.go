@@ -1,11 +1,13 @@
 // TOTP 2FA handlers for /settings/security. Enrollment is a two-step
 // flow:
 //
-//  1. POST /me/totp/enroll   — server generates a 20-byte secret,
-//     encrypts it, writes it to identities.mfa_secret_ciphertext with
-//     mfa_confirmed_at = NULL, and returns the otpauth URL.
+//  1. POST /me/totp/enroll   — after password reverification, server
+//     generates a 20-byte secret, encrypts it, writes it to
+//     identities.mfa_secret_ciphertext with mfa_confirmed_at = NULL,
+//     and returns the otpauth URL.
 //  2. POST /me/totp/confirm  — client submits the current 6-digit
-//     code; if it verifies, mfa_confirmed_at is stamped.
+//     code plus current password; if both verify, mfa_confirmed_at is
+//     stamped.
 //
 // Until confirm succeeds the account's 2FA state is "pending" and
 // login is still single-factor. DELETE /me/totp disables 2FA after
@@ -59,8 +61,8 @@ func TotpStatus(deps Deps) func(context.Context, *struct{}) (*TotpStatusOutput, 
 // already-enabled account returns AUTH.TOTP.ALREADY_ENROLLED so the
 // caller must disable 2FA first. Calling enroll while in the
 // "pending" state is allowed and rotates the secret.
-func TotpEnroll(deps Deps) func(context.Context, *struct{}) (*TotpEnrollOutput, error) {
-	return func(ctx context.Context, _ *struct{}) (*TotpEnrollOutput, error) {
+func TotpEnroll(deps Deps) func(context.Context, *TotpEnrollInput) (*TotpEnrollOutput, error) {
+	return func(ctx context.Context, in *TotpEnrollInput) (*TotpEnrollOutput, error) {
 		if deps.Cipher == nil {
 			return nil, httpErr(apierrors.AuthTotpNotConfigured)
 		}
@@ -74,6 +76,9 @@ func TotpEnroll(deps Deps) func(context.Context, *struct{}) (*TotpEnrollOutput, 
 		}
 		if row.MfaConfirmedAt.Valid {
 			return nil, httpErr(apierrors.AuthTotpAlreadyEnrolled)
+		}
+		if err := verifyLocalIdentityPassword(row, in.Body.Password); err != nil {
+			return nil, err
 		}
 		secret, err := auth.GenerateTotpSecret()
 		if err != nil {
@@ -128,6 +133,9 @@ func TotpConfirm(deps Deps) func(context.Context, *TotpConfirmInput) (*TotpConfi
 		}
 		if row.MfaConfirmedAt.Valid {
 			return nil, httpErr(apierrors.AuthTotpAlreadyEnrolled)
+		}
+		if err := verifyLocalIdentityPassword(row, in.Body.Password); err != nil {
+			return nil, err
 		}
 		secret, err := deps.Cipher.Decrypt([]byte(row.MfaSecretCiphertext.String))
 		if err != nil {
@@ -196,12 +204,8 @@ func TotpRegenerateRecoveryCodes(deps Deps) func(context.Context, *TotpRegenerat
 		if !row.MfaConfirmedAt.Valid {
 			return nil, httpErr(apierrors.AuthTotpNotEnrolled)
 		}
-		if !row.PasswordHash.Valid {
-			return nil, httpErr(apierrors.AuthPasswordNoLocalIdentity)
-		}
-		okPw, err := auth.VerifyPassword(row.PasswordHash.String, in.Body.Password)
-		if err != nil || !okPw {
-			return nil, httpErr(apierrors.AuthPasswordCurrentMismatch)
+		if err := verifyLocalIdentityPassword(row, in.Body.Password); err != nil {
+			return nil, err
 		}
 		codes, err := issueRecoveryCodes(ctx, deps, uid)
 		if err != nil {
@@ -246,12 +250,8 @@ func TotpDisable(deps Deps) func(context.Context, *TotpDisableInput) (*TotpDisab
 		if len(row.MfaSecretCiphertext.String) == 0 {
 			return nil, httpErr(apierrors.AuthTotpNotEnrolled)
 		}
-		if !row.PasswordHash.Valid {
-			return nil, httpErr(apierrors.AuthPasswordNoLocalIdentity)
-		}
-		okPw, err := auth.VerifyPassword(row.PasswordHash.String, in.Body.Password)
-		if err != nil || !okPw {
-			return nil, httpErr(apierrors.AuthPasswordCurrentMismatch)
+		if err := verifyLocalIdentityPassword(row, in.Body.Password); err != nil {
+			return nil, err
 		}
 		if err := deps.Queries.ClearIdentityMfa(ctx, row.ID); err != nil {
 			return nil, httpErr(apierrors.InternalUnexpected)
@@ -272,6 +272,17 @@ func loadLocalIdentity(ctx context.Context, deps Deps, uid uint32) (generated.Fi
 		return row, httpErr(apierr.SpecForErrNoRows(err, apierrors.AuthPasswordNoLocalIdentity, apierrors.InternalUnexpected))
 	}
 	return row, nil
+}
+
+func verifyLocalIdentityPassword(row generated.FindLocalIdentityByUserIdRow, password string) error {
+	if !row.PasswordHash.Valid {
+		return httpErr(apierrors.AuthPasswordNoLocalIdentity)
+	}
+	okPw, err := auth.VerifyPassword(row.PasswordHash.String, password)
+	if err != nil || !okPw {
+		return httpErr(apierrors.AuthPasswordCurrentMismatch)
+	}
+	return nil
 }
 
 // recordTotpEnrolledAudit emits the audit entry for a successful TOTP

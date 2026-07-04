@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"mime"
 	"net/smtp"
 	"strings"
 )
@@ -59,6 +60,13 @@ func (s *SMTPSender) Send(_ context.Context, m Message) error {
 	if from == "" {
 		from = s.cfg.From
 	}
+	headerValues := make([]string, 0, len(m.To)+3)
+	headerValues = append(headerValues, from)
+	headerValues = append(headerValues, m.To...)
+	headerValues = append(headerValues, m.ReplyTo, m.Subject)
+	if err := validateHeaderValues(headerValues...); err != nil {
+		return err
+	}
 	var auth smtp.Auth
 	if s.cfg.Username != "" {
 		auth = smtp.PlainAuth("", s.cfg.Username, s.cfg.Password, s.cfg.Host)
@@ -66,18 +74,31 @@ func (s *SMTPSender) Send(_ context.Context, m Message) error {
 	addr := fmt.Sprintf("%s:%d", s.cfg.Host, s.cfg.Port)
 
 	var b strings.Builder
-	fmt.Fprintf(&b, "From: %s\r\n", from)
-	fmt.Fprintf(&b, "To: %s\r\n", strings.Join(m.To, ", "))
+	fmt.Fprintf(&b, "From: %s\r\n", encodeHeader(from))
+	fmt.Fprintf(&b, "To: %s\r\n", encodeHeader(strings.Join(m.To, ", ")))
 	if m.ReplyTo != "" {
-		fmt.Fprintf(&b, "Reply-To: %s\r\n", m.ReplyTo)
+		fmt.Fprintf(&b, "Reply-To: %s\r\n", encodeHeader(m.ReplyTo))
 	}
-	fmt.Fprintf(&b, "Subject: %s\r\n", m.Subject)
+	fmt.Fprintf(&b, "Subject: %s\r\n", encodeHeader(m.Subject))
 	b.WriteString("MIME-Version: 1.0\r\n")
 	b.WriteString("Content-Type: text/plain; charset=utf-8\r\n")
 	b.WriteString("\r\n")
 	b.WriteString(m.Body)
 
 	return smtp.SendMail(addr, auth, from, m.To, []byte(b.String()))
+}
+
+func validateHeaderValues(values ...string) error {
+	for _, value := range values {
+		if strings.ContainsAny(value, "\r\n") {
+			return errors.New("email/smtp: header values must not contain CR or LF")
+		}
+	}
+	return nil
+}
+
+func encodeHeader(value string) string {
+	return mime.QEncoding.Encode("utf-8", value)
 }
 
 // compile-time check

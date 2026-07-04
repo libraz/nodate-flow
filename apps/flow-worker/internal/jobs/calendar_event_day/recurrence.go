@@ -3,6 +3,7 @@ package calendar_event_day
 import (
 	"encoding/json"
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -61,14 +62,17 @@ func parseRecurrenceRule(raw []byte) (*recurrenceRule, error) {
 	return &rule, nil
 }
 
+type recurrenceExceptions struct {
+	instants     map[int64]struct{}
+	localDayKeys map[string]struct{}
+}
+
 // parseRecurrenceExceptions decodes the recurrence_exceptions JSON column
-// (an array of ISO 8601 date / datetime strings) into the set of UTC
-// instants to exclude from the expansion. Each string is parsed as either a
-// full RFC 3339 timestamp or a bare YYYY-MM-DD date (interpreted in loc, the
-// event timezone, to match the wall-clock anchoring of the expansion). A
-// value that parses as neither is skipped rather than failing the whole
-// scan — a single bad exception must not suppress every occurrence.
-func parseRecurrenceExceptions(raw []byte, loc *time.Location) (map[int64]struct{}, error) {
+// (an array of ISO 8601 date / datetime strings). RFC3339 timestamps exclude
+// that exact UTC instant. Bare YYYY-MM-DD dates exclude every occurrence whose
+// event-local calendar day matches the date, so timed events are suppressed
+// as users expect.
+func parseRecurrenceExceptions(raw []byte, loc *time.Location) (*recurrenceExceptions, error) {
 	trimmed := strings.TrimSpace(string(raw))
 	if trimmed == "" || trimmed == "null" {
 		return nil, nil
@@ -77,24 +81,50 @@ func parseRecurrenceExceptions(raw []byte, loc *time.Location) (map[int64]struct
 	if err := json.Unmarshal([]byte(trimmed), &values); err != nil {
 		return nil, fmt.Errorf("decode recurrence_exceptions: %w", err)
 	}
-	out := make(map[int64]struct{}, len(values))
+	out := &recurrenceExceptions{
+		instants:     make(map[int64]struct{}, len(values)),
+		localDayKeys: make(map[string]struct{}, len(values)),
+	}
 	for _, v := range values {
 		v = strings.TrimSpace(v)
 		if v == "" {
 			continue
 		}
 		if t, err := time.Parse(time.RFC3339, v); err == nil {
-			out[t.Unix()] = struct{}{}
+			out.instants[t.Unix()] = struct{}{}
 			continue
 		}
 		if t, err := time.ParseInLocation("2006-01-02", v, loc); err == nil {
-			out[t.Unix()] = struct{}{}
+			out.localDayKeys[localDayKey(t)] = struct{}{}
 			continue
 		}
 		// Unparseable exception: ignore it. Skipping is safer than
 		// dropping every occurrence on one typo'd exclusion.
 	}
 	return out, nil
+}
+
+func (e *recurrenceExceptions) excludes(t time.Time, loc *time.Location) bool {
+	if e == nil {
+		return false
+	}
+	if _, ok := e.instants[t.Unix()]; ok {
+		return true
+	}
+	_, ok := e.localDayKeys[localDayKey(t.In(loc))]
+	return ok
+}
+
+func localDayKey(t time.Time) string {
+	y, m, d := t.Date()
+	return strconv.Itoa(y) + "-" + twoDigits(int(m)) + "-" + twoDigits(d)
+}
+
+func twoDigits(v int) string {
+	if v < 10 {
+		return "0" + strconv.Itoa(v)
+	}
+	return strconv.Itoa(v)
 }
 
 // maxOccurrences caps how many candidate steps expandOccurrences walks. It
@@ -138,7 +168,7 @@ func expandOccurrences(
 	loc *time.Location,
 	recurrenceEnd time.Time,
 	until time.Time,
-	exceptions map[int64]struct{},
+	exceptions *recurrenceExceptions,
 	windowStart, windowEnd time.Time,
 ) []time.Time {
 	interval := 1
@@ -180,7 +210,7 @@ func expandOccurrences(
 
 		if passesDay && passesMonthDay {
 			emitted++
-			if _, excluded := exceptions[candidateUTC.Unix()]; !excluded {
+			if !exceptions.excludes(candidateUTC, loc) {
 				if !candidateUTC.Before(windowStart) {
 					out = append(out, candidateUTC)
 				}
@@ -233,8 +263,21 @@ func advanceByFreq(cursor time.Time, freq string, interval int, loc *time.Locati
 		d += 7 * interval
 	case "monthly":
 		m += time.Month(interval)
+		d = min(d, daysInMonth(y, m, loc))
 	case "yearly":
 		y += interval
+		d = min(d, daysInMonth(y, m, loc))
 	}
 	return time.Date(y, m, d, hh, mm, ss, local.Nanosecond(), loc)
+}
+
+func daysInMonth(year int, month time.Month, loc *time.Location) int {
+	return time.Date(year, month+1, 0, 0, 0, 0, 0, loc).Day()
+}
+
+func min(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
 }

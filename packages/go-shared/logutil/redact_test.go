@@ -56,6 +56,28 @@ func TestRedactHandler_SensitiveKeysAreRedacted(t *testing.T) {
 	}
 }
 
+func TestRedactHandler_CamelCaseSensitiveKeysAreRedacted(t *testing.T) {
+	t.Parallel()
+
+	keys := []string{"clientSecret", "idToken", "refreshToken", "authorizationCode"}
+	for _, key := range keys {
+		t.Run(key, func(t *testing.T) {
+			t.Parallel()
+
+			var buf bytes.Buffer
+			l := newTestLogger(&buf)
+			l.Info("test", key, "some-value-that-should-be-hidden")
+
+			if strings.Contains(buf.String(), "some-value-that-should-be-hidden") {
+				t.Fatalf("raw value leaked for key %q: %s", key, buf.String())
+			}
+			if !strings.Contains(buf.String(), `"`+key+`":"[REDACTED]"`) {
+				t.Fatalf("key %q was not redacted: %s", key, buf.String())
+			}
+		})
+	}
+}
+
 func TestRedactHandler_NormalKeysNotRedacted(t *testing.T) {
 	t.Parallel()
 
@@ -276,6 +298,27 @@ func TestRedactJSONFields_OAuthKeys(t *testing.T) {
 				t.Fatalf("raw value leaked for key %q: %s", tc.key, got)
 			}
 			expected := `"` + tc.key + `":"[REDACTED]"`
+			if !strings.Contains(got, expected) {
+				t.Fatalf("expected %q in output, got: %s", expected, got)
+			}
+		})
+	}
+}
+
+func TestRedactJSONFields_CamelCaseOAuthKeys(t *testing.T) {
+	t.Parallel()
+
+	for _, key := range []string{"clientSecret", "idToken", "refreshToken", "authorizationCode"} {
+		t.Run(key, func(t *testing.T) {
+			t.Parallel()
+
+			input := `{"` + key + `":"super-sensitive-value-xyz"}`
+			got := RedactJSONFields(input)
+
+			if strings.Contains(got, "super-sensitive-value-xyz") {
+				t.Fatalf("raw value leaked for key %q: %s", key, got)
+			}
+			expected := `"` + key + `":"[REDACTED]"`
 			if !strings.Contains(got, expected) {
 				t.Fatalf("expected %q in output, got: %s", expected, got)
 			}

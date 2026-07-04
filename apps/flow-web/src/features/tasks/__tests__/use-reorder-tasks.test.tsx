@@ -1,7 +1,7 @@
 /**
  * useReorderTasks cache update coverage.
  *
- * Regression: the list view's drag-to-reorder consumes the cursor-paginated
+ * Regression: the list view's drag-to-reorder consumes the infinite
  * `useTasksInfiniteQuery`, whose cache value is `InfiniteData<TasksPage>`.
  * The previous implementation of `onMutate` treated the cached value as a
  * flat `TaskListItem[]` and called `value.map(...)`, which threw a
@@ -68,8 +68,8 @@ function makeWrapper(client: QueryClient): (props: { children: ReactNode }) => R
 function primeInfinite(client: QueryClient, tasks: TaskListItem[]): readonly unknown[] {
   const key = tasksKeys.infinite('prj-1');
   const data: InfiniteData<TasksPage> = {
-    pages: [{ tasks, nextCursor: null }],
-    pageParams: [undefined],
+    pages: [{ tasks, nextCursor: null, total: tasks.length, offset: 0 }],
+    pageParams: [0],
   };
   client.setQueryData(key, data);
   return key;

@@ -6,7 +6,7 @@ import (
 	"github.com/nodate-flow/nodate-flow/packages/go-shared/httputil"
 )
 
-// ClientIP delegates to [httputil.ClientIPMiddleware].
-func ClientIP() func(http.Handler) http.Handler {
-	return httputil.ClientIPMiddleware()
+// ClientIP delegates to [httputil.ClientIPMiddlewareWithTrustedProxyHops].
+func ClientIP(trustedProxyHops int) func(http.Handler) http.Handler {
+	return httputil.ClientIPMiddlewareWithTrustedProxyHops(trustedProxyHops)
 }

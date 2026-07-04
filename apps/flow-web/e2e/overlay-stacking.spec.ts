@@ -323,7 +323,7 @@ test.describe('overlay stacking', () => {
       const inside = await page.evaluate(() => {
         const a = document.activeElement;
         const dialog = document.querySelector('[role="dialog"][aria-modal="true"]');
-        return !!(a && dialog && dialog.contains(a));
+        return !!(a && dialog?.contains(a));
       });
       expect(inside, `focus must remain inside dialog after Tab #${i + 1}`).toBe(true);
     }

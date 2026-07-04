@@ -6,12 +6,14 @@ import (
 	"database/sql"
 	"encoding/json"
 	stderrors "errors"
+	"fmt"
 	"time"
 
 	"sort"
 	"strconv"
 	"strings"
 
+	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/acl"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/ai"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/ai/embed"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/ai/nlquery"
@@ -21,6 +23,7 @@ import (
 	apierrors "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/errors"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/eventbus"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/itemkit"
+	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/tasknumber"
 )
 
 // countLinkedEvents returns how many enabled calendar_events are
@@ -453,17 +456,6 @@ func registerTools(h *Handler) {
 		}, []string{"memoId", "calendarId", "done"}),
 		run: runToggleCalendarMemo,
 	})
-	h.register(tool{
-		name:          "smart_create_event",
-		description:   "Parse natural language into a calendar event (AI-powered, coming soon).",
-		requiredScope: "write:workspace",
-		inputSchema: objectSchema(map[string]any{
-			"text":       stringSchema("Natural language description of the event.", Constraints{MinLength: intPtr(1)}),
-			"calendarId": stringSchema("Calendar public id (UUID v7).", Constraints{Pattern: publicIDPattern}),
-		}, []string{"text", "calendarId"}),
-		run: runSmartCreateEvent,
-	})
-
 	// Label & archive tools.
 	h.register(tool{
 		name:          "list_labels",
@@ -796,13 +788,14 @@ func runListTasks(ctx context.Context, deps Deps, s *session, raw json.RawMessag
 	if err := parseArgs(raw, &in); err != nil {
 		return nil, err
 	}
-	if _, err := requireWorkspaceMember(ctx, deps, s); err != nil {
-		return nil, err
-	}
 	if in.Limit <= 0 || in.Limit > 200 {
 		in.Limit = 50
 	}
-	items := []map[string]any{}
+	wsRole, err := requireWorkspaceMember(ctx, deps, s)
+	if err != nil {
+		return nil, err
+	}
+	var projectPublicID []byte
 	if in.ProjectID != "" {
 		prjPub, err := types.Parse(in.ProjectID)
 		if err != nil {
@@ -812,32 +805,79 @@ func runListTasks(ctx context.Context, deps Deps, s *session, raw json.RawMessag
 			return nil, err
 		}
 		pb := prjPub.UUID()
-		rows, err := deps.Queries.ListTasksForProject(ctx, generated.ListTasksForProjectParams{
-			WorkspaceID:     s.workspaceID,
-			ProjectPublicID: pb[:],
-			Limit:           in.Limit,
-			Offset:          in.Offset,
-		})
-		if err != nil {
-			return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
-		}
-		for _, r := range rows {
-			items = append(items, taskListRowToMap(r.PublicID, r.Title, string(r.DerivedState), r.Priority, r.DueOn))
-		}
-	} else {
-		rows, err := deps.Queries.ListTasksForWorkspace(ctx, generated.ListTasksForWorkspaceParams{
-			WorkspaceID: s.workspaceID,
-			Limit:       in.Limit,
-			Offset:      in.Offset,
-		})
-		if err != nil {
-			return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
-		}
-		for _, r := range rows {
-			items = append(items, taskListRowToMap(r.PublicID, r.Title, string(r.DerivedState), r.Priority, r.DueOn))
-		}
+		projectPublicID = pb[:]
+	}
+	rows, err := listMCPTasks(ctx, deps.DB, s.workspaceID, projectPublicID, s.userID, wsRole, in.Limit, in.Offset)
+	if err != nil {
+		return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
+	}
+	items := make([]map[string]any, 0, len(rows))
+	for _, r := range rows {
+		items = append(items, taskListRowToMap(r.publicID, r.title, r.derivedState, r.priority, r.dueOn))
 	}
 	return map[string]any{"tasks": items}, nil
+}
+
+type mcpTaskListRow struct {
+	publicID     types.PublicID
+	title        string
+	derivedState string
+	priority     int32
+	dueOn        sql.NullTime
+}
+
+func listMCPTasks(
+	ctx context.Context,
+	db *sql.DB,
+	workspaceID uint32,
+	projectPublicID []byte,
+	actorID uint32,
+	wsRole acl.WorkspaceRole,
+	limit int32,
+	offset int32,
+) ([]mcpTaskListRow, error) {
+	where := []string{"v.workspace_id = ?"}
+	args := []any{workspaceID}
+	if len(projectPublicID) > 0 {
+		where = append(where, "v.project_public_id = ?")
+		args = append(args, projectPublicID)
+	}
+	if visFrag, visArgs := acl.TaskVisibilityFilter(actorID, wsRole); visFrag != "" {
+		where = append(where, visFrag)
+		args = append(args, visArgs...)
+	}
+
+	//#nosec G201 -- WHERE fragments are static literals; user values are bound.
+	query := fmt.Sprintf(`SELECT
+  v.public_id,
+  v.title,
+  v.derived_state,
+  v.priority,
+  v.due_on
+FROM v_task_list v
+WHERE %s
+ORDER BY v.sort_weight ASC, v.priority DESC, v.due_on ASC, v.created_at DESC, v.public_id DESC
+LIMIT ? OFFSET ?`, strings.Join(where, " AND "))
+	args = append(args, limit, offset)
+
+	rows, err := db.QueryContext(ctx, query, args...) //#nosec G701 -- query is assembled from static WHERE fragments; all user values are bound args.
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	out := []mcpTaskListRow{}
+	for rows.Next() {
+		var r mcpTaskListRow
+		if err := rows.Scan(&r.publicID, &r.title, &r.derivedState, &r.priority, &r.dueOn); err != nil {
+			return nil, err
+		}
+		out = append(out, r)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return out, nil
 }
 
 func taskListRowToMap(pub types.PublicID, title, state string, priority int32, due sql.NullTime) map[string]any {
@@ -863,9 +903,9 @@ func runGetTask(ctx context.Context, deps Deps, s *session, raw json.RawMessage)
 	if _, err := requireWorkspaceMember(ctx, deps, s); err != nil {
 		return nil, err
 	}
-	pub, err := types.Parse(in.TaskID)
+	_, pub, err := resolveTask(ctx, deps, s, in.TaskID)
 	if err != nil {
-		return nil, apierrors.New(apierrors.WsTaskNotFound)
+		return nil, err
 	}
 	row, err := deps.Queries.FindTaskByPublicId(ctx, generated.FindTaskByPublicIdParams{
 		WorkspaceID: s.workspaceID,
@@ -925,13 +965,25 @@ func runCreateTask(ctx context.Context, deps Deps, s *session, raw json.RawMessa
 	}
 	pub := newPublicID()
 	desc := sql.NullString{String: in.Description, Valid: in.Description != ""}
-	taskID, err := deps.Queries.CreateTask(ctx, generated.CreateTaskParams{
+	tx, err := deps.DB.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
+	}
+	defer tx.Rollback() //nolint:errcheck
+	qtx := deps.Queries.WithTx(tx)
+
+	nextNum, err := tasknumber.Allocate(ctx, qtx, s.workspaceID, prjID)
+	if err != nil {
+		return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
+	}
+	taskID, err := qtx.CreateTask(ctx, generated.CreateTaskParams{
 		PublicID:        pub,
 		WorkspaceID:     s.workspaceID,
 		ProjectID:       prjID,
 		ParentTaskID:    sql.NullInt32{},
 		CreatedByUserID: sql.NullInt32{Int32: int32(s.userID), Valid: true}, //#nosec G115 -- session user id is users.id (BIGINT UNSIGNED), fits int32 within realistic deployments
 		UpdatedByUserID: sql.NullInt32{Int32: int32(s.userID), Valid: true}, //#nosec G115 -- session user id is users.id (BIGINT UNSIGNED), fits int32 within realistic deployments
+		TaskNumber:      uint32(nextNum),                                    //#nosec G115 -- per-project sequence, fits uint32
 		Title:           in.Title,
 		Description:     desc,
 		Priority:        in.Priority,
@@ -939,6 +991,9 @@ func runCreateTask(ctx context.Context, deps Deps, s *session, raw json.RawMessa
 		StartedOn:       start,
 	})
 	if err != nil {
+		return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
+	}
+	if err := tx.Commit(); err != nil {
 		return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
 	}
 	actor := int64(s.userID)
@@ -3408,8 +3463,4 @@ func runToggleCalendarMemo(ctx context.Context, deps Deps, s *session, raw json.
 		return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
 	}
 	return map[string]any{"success": true}, nil
-}
-
-func runSmartCreateEvent(_ context.Context, _ Deps, _ *session, _ json.RawMessage) (any, error) {
-	return nil, apierrors.Newf(apierrors.AiProviderNotConfigured, "AI-powered event creation coming soon")
 }

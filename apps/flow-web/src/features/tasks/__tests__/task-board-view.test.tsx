@@ -11,16 +11,18 @@
 
 import { screen, within } from '@testing-library/react';
 import { renderWithProviders } from '@tests/helpers/render';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { axe } from 'vitest-axe';
 import type { TaskListItem } from '../api';
 import TaskBoardView from '../task-board-view';
+
+let mockTasks: TaskListItem[] = [];
 
 vi.mock('../api', async () => {
   const actual = await vi.importActual<typeof import('../api')>('../api');
   return {
     ...actual,
-    useTasksQuery: () => ({ data: [] as TaskListItem[] }),
+    useTasksQuery: () => ({ data: mockTasks }),
     useTransitionTask: () => ({ mutate: vi.fn(), isPending: false }),
   };
 });
@@ -38,6 +40,10 @@ vi.mock('@nodate-flow/ui/primitives/toast', () => ({
 }));
 
 describe('<TaskBoardView>', () => {
+  beforeEach(() => {
+    mockTasks = [];
+  });
+
   it('renders a listitem placeholder inside every empty column', () => {
     renderWithProviders(<TaskBoardView projectId="proj-001" />);
 
@@ -58,5 +64,21 @@ describe('<TaskBoardView>', () => {
 
     const results = await axe(container);
     expect(results).toHaveNoViolations();
+  });
+
+  it('shows a visible limit notice when the board reaches the query cap', () => {
+    mockTasks = Array.from({ length: 200 }, (_, idx) => ({
+      id: `task-${idx}`,
+      title: `Task ${idx}`,
+      derivedState: 'open',
+      priority: 1,
+      updatedAt: 0,
+      projectId: 'proj-001',
+      visibility: 'public',
+    })) as TaskListItem[];
+
+    renderWithProviders(<TaskBoardView projectId="proj-001" />);
+
+    expect(screen.getByText(/tasks\.limit_notice/i)).toBeDefined();
   });
 });

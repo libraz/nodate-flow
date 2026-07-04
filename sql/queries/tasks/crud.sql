@@ -574,9 +574,20 @@ WHERE v.workspace_id = ?
 ORDER BY v.archived_at DESC, v.public_id DESC
 LIMIT ?;
 
+-- name: LockProjectForTaskNumber :one
+-- Lock the owning project row before task-number allocation. This serializes
+-- concurrent creators for the same project while still allowing different
+-- projects to allocate independently.
+SELECT id
+FROM projects
+WHERE workspace_id = ?
+  AND id = ?
+  AND enabled = TRUE
+FOR UPDATE;
+
 -- name: AssignTaskNumber :one
 -- Allocate the next task number for a project. Must be called inside a
--- transaction with the project row locked (SELECT ... FOR UPDATE).
+-- transaction after LockProjectForTaskNumber.
 -- workspace_id is included so the index (workspace_id, project_id) is used and
 -- the query is bounded to the caller's workspace as a defence-in-depth check.
 SELECT COALESCE(MAX(task_number), 0) + 1 AS next_number

@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/nodate-flow/nodate-flow/apps/auth-api/internal/audit"
+	internauth "github.com/nodate-flow/nodate-flow/apps/auth-api/internal/auth"
 	"github.com/nodate-flow/nodate-flow/apps/auth-api/internal/db/generated"
 	apierrors "github.com/nodate-flow/nodate-flow/apps/auth-api/internal/errors"
 )
@@ -37,6 +38,9 @@ func OIDCMicrosoftCallback(deps Deps) func(context.Context, *OIDCCallbackInput) 
 		if err != nil {
 			return nil, httpErr(apierrors.AuthOidcIdTokenInvalid)
 		}
+		if err := internauth.ValidateMicrosoftClaims(claims, deps.MicrosoftAllowedTenantIDs); err != nil {
+			return nil, httpErr(apierrors.AuthOidcIdTokenInvalid)
+		}
 		// Microsoft sometimes returns preferred_username instead of email.
 		email := claims.Email
 		if email == "" {
@@ -67,11 +71,12 @@ func OIDCMicrosoftCallback(deps Deps) func(context.Context, *OIDCCallbackInput) 
 		// auto-provision a fresh user (gated by RegistrationOpen). See
 		// resolveOIDCUser for the full ordering.
 		userID, userPub, err := deps.resolveOIDCUser(ctx, oidcProvisionParams{
-			Provider:    generated.IdentitiesProvider("microsoft"),
-			Subject:     claims.Sub,
-			Email:       email,
-			DisplayName: claims.Name,
-			Locale:      "en",
+			Provider:       generated.IdentitiesProvider("microsoft"),
+			Subject:        claims.Sub,
+			Email:          email,
+			DisplayName:    claims.Name,
+			Locale:         "en",
+			AllowEmailLink: false,
 		})
 		if err != nil {
 			return nil, err

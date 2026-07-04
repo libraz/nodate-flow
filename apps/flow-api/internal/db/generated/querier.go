@@ -156,7 +156,7 @@ type Querier interface {
 	// the row (NULL for system writers).
 	ArchiveTask(ctx context.Context, arg ArchiveTaskParams) error
 	// Allocate the next task number for a project. Must be called inside a
-	// transaction with the project row locked (SELECT ... FOR UPDATE).
+	// transaction after LockProjectForTaskNumber.
 	// workspace_id is included so the index (workspace_id, project_id) is used and
 	// the query is bounded to the caller's workspace as a defence-in-depth check.
 	AssignTaskNumber(ctx context.Context, arg AssignTaskNumberParams) (int32, error)
@@ -991,6 +991,8 @@ type Querier interface {
 	ListIncomingDependenciesForTask(ctx context.Context, arg ListIncomingDependenciesForTaskParams) ([]ListIncomingDependenciesForTaskRow, error)
 	// List intake items for a workspace, filtered by status.
 	ListIntakeItemsForWorkspace(ctx context.Context, arg ListIntakeItemsForWorkspaceParams) ([]ListIntakeItemsForWorkspaceRow, error)
+	// Cursor-paginated intake items for a workspace, filtered by status.
+	ListIntakeItemsForWorkspaceKeyset(ctx context.Context, arg ListIntakeItemsForWorkspaceKeysetParams) ([]ListIntakeItemsForWorkspaceKeysetRow, error)
 	// List labels scoped to a specific project (includes workspace-wide labels).
 	ListLabelsForProject(ctx context.Context, arg ListLabelsForProjectParams) ([]ListLabelsForProjectRow, error)
 	// List all labels in a workspace, optionally filtered by project.
@@ -1305,6 +1307,10 @@ type Querier interface {
 	ListWorkspaceMembersForSmartCreate(ctx context.Context, workspaceID uint32) ([]ListWorkspaceMembersForSmartCreateRow, error)
 	// List workspaces a user belongs to.
 	ListWorkspacesForUser(ctx context.Context, arg ListWorkspacesForUserParams) ([]ListWorkspacesForUserRow, error)
+	// Lock the owning project row before task-number allocation. This serializes
+	// concurrent creators for the same project while still allowing different
+	// projects to allocate independently.
+	LockProjectForTaskNumber(ctx context.Context, arg LockProjectForTaskNumberParams) (uint32, error)
 	// Acquire a row-level lock on the task inside an open transaction so that
 	// concurrent transition requests serialize correctly. Without FOR UPDATE two
 	// requests can read the same derived_state, both validate the transition,

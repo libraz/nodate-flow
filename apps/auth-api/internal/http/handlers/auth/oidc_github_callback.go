@@ -73,11 +73,12 @@ func OIDCGithubCallback(deps Deps) func(context.Context, *OIDCCallbackInput) (*O
 		// auto-provision a fresh user (gated by RegistrationOpen). See
 		// resolveOIDCUser for the full ordering.
 		userID, userPub, err := deps.resolveOIDCUser(ctx, oidcProvisionParams{
-			Provider:    generated.IdentitiesProvider("github"),
-			Subject:     claims.Sub,
-			Email:       claims.Email,
-			DisplayName: name,
-			Locale:      "en",
+			Provider:       generated.IdentitiesProvider("github"),
+			Subject:        claims.Sub,
+			Email:          claims.Email,
+			DisplayName:    name,
+			Locale:         "en",
+			AllowEmailLink: true,
 		})
 		if err != nil {
 			return nil, err

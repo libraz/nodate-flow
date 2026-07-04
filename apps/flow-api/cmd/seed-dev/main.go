@@ -63,6 +63,7 @@ import (
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/generated"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/generated/calendar"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/types"
+	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/tasknumber"
 )
 
 //go:embed locales/*.json
@@ -496,16 +497,20 @@ func ensureTasks(ctx context.Context, db *sql.DB, q *generated.Queries, wsID, pr
 		return 0, err
 	}
 	if count == 0 {
+		tx, err := db.BeginTx(ctx, nil)
+		if err != nil {
+			return 0, err
+		}
+		defer tx.Rollback() //nolint:errcheck
+		qtx := q.WithTx(tx)
+
 		createdBy := sql.NullInt32{Int32: int32(userID), Valid: true} //#nosec G115 -- user id sourced from seed flow, fits int32
 		for _, s := range l.Tasks {
-			nextNum, err := q.AssignTaskNumber(ctx, generated.AssignTaskNumberParams{
-				WorkspaceID: wsID,
-				ProjectID:   projID,
-			})
+			nextNum, err := tasknumber.Allocate(ctx, qtx, wsID, projID)
 			if err != nil {
 				return 0, fmt.Errorf("assign task number: %w", err)
 			}
-			if _, err := q.CreateTask(ctx, generated.CreateTaskParams{
+			if _, err := qtx.CreateTask(ctx, generated.CreateTaskParams{
 				PublicID:        types.New(),
 				WorkspaceID:     wsID,
 				ProjectID:       projID,
@@ -518,6 +523,9 @@ func ensureTasks(ctx context.Context, db *sql.DB, q *generated.Queries, wsID, pr
 			}); err != nil {
 				return 0, err
 			}
+		}
+		if err := tx.Commit(); err != nil {
+			return 0, err
 		}
 		logger.Info("created seed tasks", "project_id", projID, "count", len(l.Tasks))
 	} else {

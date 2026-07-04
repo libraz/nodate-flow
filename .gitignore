@@ -89,4 +89,7 @@ CLAUDE.md
 # ---- Docs (local only) ----
 docs/
 
+# ---- Local-only backups ----
+backup/
+
 apps/flow-api/seed-dev

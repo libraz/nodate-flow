@@ -17,6 +17,7 @@ import { toaster } from '@nodate-flow/ui/primitives/toast';
 import { type FormEvent, type ReactElement, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { formatApiError } from '../../lib/api-error';
 import { useCreateTask } from './api';
 import { useTaskFormState } from './use-task-form-state';
 
@@ -72,8 +73,11 @@ export default function QuickCaptureDialog({
       });
       reset();
       onClose();
-    } catch {
-      toaster.show({ tone: 'danger', message: t('tasks.errors.create_failed') });
+    } catch (err) {
+      toaster.show({
+        tone: 'danger',
+        message: formatApiError(err, t, 'tasks.errors.create_failed'),
+      });
     } finally {
       setSubmitting(false);
     }

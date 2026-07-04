@@ -424,6 +424,13 @@ func TestACLLayered(t *testing.T) {
 			apierrors.WsTaskAccessDenied)
 		requireSpec(t, err, apierrors.WsTaskAccessDenied)
 	})
+	t.Run("project/membership/lookup_non_member_no_error", func(t *testing.T) {
+		role, isMember, err := acl.LookupProjectMembership(
+			ctx, db, fx.wsID, fx.prjID, fx.creatorUserID, acl.WorkspaceRoleMember)
+		require.NoError(t, err)
+		require.False(t, isMember)
+		require.Equal(t, acl.ProjectRoleElevated, role)
+	})
 
 	// -----------------------------------------------------------------
 	// Layer 4: task
@@ -519,4 +526,51 @@ func TestACLLayered(t *testing.T) {
 		}
 		require.NoError(t, acl.CheckTaskVisibility(ctx, db, rec, fx.memberUserID, acl.WorkspaceRoleMember, true))
 	})
+
+	t.Run("task/authorize/shared_matrix", func(t *testing.T) {
+		access, err := acl.AuthorizeTaskAccess(ctx, db, fx.taskPublicPub, fx.creatorUserID)
+		require.NoError(t, err)
+		require.Equal(t, fx.taskPublicID, access.Task.ID)
+		require.False(t, access.IsProjectMember)
+
+		_, err = acl.AuthorizeTaskAccess(ctx, db, uuidFromTaskID(t, db, fx.taskProject), fx.creatorUserID)
+		requireSpec(t, err, apierrors.WsTaskNotFound)
+
+		access, err = acl.AuthorizeTaskAccess(ctx, db, uuidFromTaskID(t, db, fx.taskProject), fx.memberUserID)
+		require.NoError(t, err)
+		require.True(t, access.IsProjectMember)
+
+		nonActorUserID := insertWorkspaceOnlyUser(t, db, fx.wsID)
+		_, err = acl.AuthorizeTaskAccess(ctx, db, uuidFromTaskID(t, db, fx.taskPrivate), nonActorUserID)
+		requireSpec(t, err, apierrors.WsTaskNotFound)
+	})
+}
+
+func insertWorkspaceOnlyUser(t *testing.T, db *sql.DB, wsID uint32) uint32 {
+	t.Helper()
+	pub := uuid.Must(uuid.NewV7())
+	res, err := db.ExecContext(context.Background(),
+		`INSERT INTO users (public_id, email, display_name, locale)
+		 VALUES (?, ?, ?, 'en')`,
+		pub[:], "acl-non-actor-"+uuid.New().String()+"@example.test", "ACL Non Actor")
+	require.NoError(t, err)
+	id, err := res.LastInsertId()
+	require.NoError(t, err)
+
+	memberPub := uuid.Must(uuid.NewV7())
+	_, err = db.ExecContext(context.Background(),
+		`INSERT INTO workspace_members (public_id, workspace_id, user_id, role)
+		 VALUES (?, ?, ?, 'member')`,
+		memberPub[:], wsID, uint32(id)) //#nosec G115 -- LastInsertId in test seed, fits uint32
+	require.NoError(t, err)
+	return uint32(id) //#nosec G115 -- LastInsertId in test seed, fits uint32
+}
+
+func uuidFromTaskID(t *testing.T, db *sql.DB, taskID uint32) uuid.UUID {
+	t.Helper()
+	var raw []byte
+	require.NoError(t, db.QueryRowContext(context.Background(), `SELECT public_id FROM tasks WHERE id = ?`, taskID).Scan(&raw))
+	got, err := uuid.FromBytes(raw)
+	require.NoError(t, err)
+	return got
 }

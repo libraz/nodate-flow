@@ -16,7 +16,7 @@ const CONFIG_DIR = path.join(os.homedir(), '.config', 'tnk');
 const CREDENTIALS_PATH = path.join(CONFIG_DIR, 'credentials.json');
 
 /** Default API base URLs when none is configured. */
-const DEFAULT_AUTH_API_URL = 'http://localhost:8081';
+const DEFAULT_AUTH_API_URL = 'http://localhost:8082';
 const DEFAULT_FLOW_API_URL = 'http://localhost:8080';
 
 /**
@@ -60,7 +60,7 @@ export function clearCredentials(): void {
 
 /**
  * Returns the auth API base URL. Checks NF_AUTH_API_URL env, then
- * stored credentials, then falls back to localhost.
+ * falls back to localhost.
  */
 export function getAuthApiUrl(): string {
   return process.env.NF_AUTH_API_URL ?? DEFAULT_AUTH_API_URL;

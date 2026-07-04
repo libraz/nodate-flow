@@ -56,7 +56,8 @@ func setupNewUser(t *testing.T, q *generated.Queries) uint32 {
 		ThemePreference: generated.UsersThemePreferenceSystem,
 	})
 	require.NoError(t, err)
-	uid := uint32(uid64)
+	require.GreaterOrEqual(t, uid64, int64(0))
+	uid := uint32(uid64) //#nosec G115 -- test fixture LastInsertId is asserted non-negative and fits users.id.
 	_, err = q.CreateIdentity(ctx, generated.CreateIdentityParams{
 		PublicID:     types.New(),
 		UserID:       uid,

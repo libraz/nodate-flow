@@ -4,8 +4,8 @@
  * `NotFound` and `FatalFallback` both render a centered single-column
  * `<main>` with display headlines on a token-driven background. This
  * module replaces the inline `style={{ ... }}` objects so that all
- * lengths / colours route through `--nf-*` custom properties and the
- * four themes can override them without touching this file.
+ * lengths / colours route through `--nf-*` custom properties and themes
+ * can override them without touching this file.
  */
 
 .shell {

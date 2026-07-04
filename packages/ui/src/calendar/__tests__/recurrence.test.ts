@@ -1,7 +1,47 @@
+import { existsSync, readFileSync } from 'node:fs';
+import path from 'node:path';
+
 import { DateTime } from 'luxon';
 import { describe, expect, it } from 'vitest';
 
 import { expandRecurrence } from '../recurrence';
+
+interface RecurrenceGoldenFixture {
+  name: string;
+  event: {
+    startAt: string;
+    endAt: string;
+    timezone?: string;
+    recurrenceRule: {
+      freq: 'daily' | 'weekly' | 'monthly' | 'yearly';
+      interval?: number;
+      byDay?: string[];
+      byMonthDay?: number[];
+      bySetPos?: number;
+      until?: string;
+      count?: number;
+    };
+    recurrenceExceptions?: string[];
+  };
+  rangeStart: string;
+  rangeEnd: string;
+  expectedStartAt: string[];
+}
+
+function loadRecurrenceGolden(): RecurrenceGoldenFixture[] {
+  let dir = process.cwd();
+  for (;;) {
+    const candidate = path.join(dir, 'testdata', 'recurrence_golden.json');
+    if (existsSync(candidate)) {
+      return JSON.parse(readFileSync(candidate, 'utf8')) as RecurrenceGoldenFixture[];
+    }
+    const parent = path.dirname(dir);
+    if (parent === dir) {
+      throw new Error('could not find testdata/recurrence_golden.json');
+    }
+    dir = parent;
+  }
+}
 
 describe('expandRecurrence — timezone awareness', () => {
   it('preserves wall-clock time across a US DST spring-forward transition', () => {
@@ -59,4 +99,20 @@ describe('expandRecurrence — timezone awareness', () => {
     const delta = (instances[1]?.startAt.toMillis() ?? 0) - (instances[0]?.startAt.toMillis() ?? 0);
     expect(delta).toBe(7 * 24 * 60 * 60 * 1000);
   });
+});
+
+describe('expandRecurrence — shared golden fixtures', () => {
+  for (const fixture of loadRecurrenceGolden()) {
+    it(fixture.name, () => {
+      const instances = expandRecurrence(
+        fixture.event,
+        DateTime.fromISO(fixture.rangeStart),
+        DateTime.fromISO(fixture.rangeEnd),
+      );
+
+      expect(instances.map((i) => i.startAt.toUTC().toFormat("yyyy-MM-dd'T'HH:mm:ss'Z'"))).toEqual(
+        fixture.expectedStartAt,
+      );
+    });
+  }
 });

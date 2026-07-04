@@ -2,7 +2,7 @@
  * nodate-flow semantic token contract.
  *
  * Every theme MUST define every variable declared here.
- * scripts/check-theme-parity.ts parses this file and asserts parity across the 4 themes.
+ * scripts/check-theme-parity.ts parses this file and asserts parity across all themes.
  *
  * This file ALSO provides safe defaults (matching aurora-light) so that an unthemed
  * document still renders. Real apps must apply a [data-theme] attribute on <html>.
@@ -148,7 +148,7 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  :where(:root) {
+  :root:root {
     --nf-surface-blur: 0px;
     --nf-color-surface: var(--nf-color-bg-elevated);
     --nf-color-surface-hover: var(--nf-color-bg-elevated);

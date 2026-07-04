@@ -87,6 +87,12 @@ func runAddFavorite(ctx context.Context, deps Deps, s *session, raw json.RawMess
 	if err != nil {
 		return nil, apierrors.New(apierrors.McpToolArgumentsInvalid)
 	}
+	if err := ensureMCPFavoriteTargetExists(ctx, deps.Queries, s.workspaceID, tt, targetPub); err != nil {
+		if stderrors.Is(err, sql.ErrNoRows) {
+			return nil, apierrors.New(apierrors.McpToolArgumentsInvalid)
+		}
+		return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
+	}
 	// Check for existing favorite to avoid duplicates.
 	_, err = deps.Queries.FindFavoriteByTarget(ctx, generated.FindFavoriteByTargetParams{
 		WorkspaceID:    s.workspaceID,
@@ -120,6 +126,34 @@ func runAddFavorite(ctx context.Context, deps Deps, s *session, raw json.RawMess
 		Payload:     map[string]any{"targetType": in.TargetType, "targetId": in.TargetID, "via": "mcp"},
 	})
 	return map[string]any{"ok": true, "id": pub.String()}, nil
+}
+
+func ensureMCPFavoriteTargetExists(
+	ctx context.Context,
+	q *generated.Queries,
+	workspaceID uint32,
+	targetType generated.UserFavoritesTargetType,
+	targetPublicID types.PublicID,
+) error {
+	switch targetType {
+	case generated.UserFavoritesTargetTypeProject:
+		_, err := q.FindProjectByPublicId(ctx, generated.FindProjectByPublicIdParams{WorkspaceID: workspaceID, PublicID: targetPublicID})
+		return err
+	case generated.UserFavoritesTargetTypeTask:
+		_, err := q.FindTaskByPublicId(ctx, generated.FindTaskByPublicIdParams{WorkspaceID: workspaceID, PublicID: targetPublicID})
+		return err
+	case generated.UserFavoritesTargetTypePage:
+		_, err := q.GetPageByPublicId(ctx, generated.GetPageByPublicIdParams{WorkspaceID: workspaceID, PublicID: targetPublicID})
+		return err
+	case generated.UserFavoritesTargetTypeLens:
+		_, err := q.GetLensByPublicID(ctx, generated.GetLensByPublicIDParams{WorkspaceID: workspaceID, PublicID: targetPublicID})
+		return err
+	case generated.UserFavoritesTargetTypeTimebox:
+		_, err := q.GetTimeboxByPublicId(ctx, generated.GetTimeboxByPublicIdParams{WorkspaceID: workspaceID, PublicID: targetPublicID})
+		return err
+	default:
+		return sql.ErrNoRows
+	}
 }
 
 func runAddReaction(ctx context.Context, deps Deps, s *session, raw json.RawMessage) (any, error) {

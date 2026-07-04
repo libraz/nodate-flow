@@ -88,10 +88,12 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  :where(:root) {
+  :root:root {
     --nf-duration-instant: 0ms;
     --nf-duration-fast: 0ms;
     --nf-duration-base: 0ms;
     --nf-duration-slow: 0ms;
+    --nf-motion-duration: 0ms;
+    --nf-motion-easing: linear;
   }
 }

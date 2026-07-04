@@ -156,12 +156,12 @@ func (c *Client) Bucket() string {
 	return c.bucket
 }
 
-// StorageKeyForUser builds the canonical content-addressed key for a
-// user-scoped blob (avatars). Mirrors flow-api's storage.StorageKeyForUser
+// KeyForUser builds the canonical content-addressed key for a
+// user-scoped blob (avatars). Mirrors flow-api's storage.KeyForUser
 // so the two services produce identical keys when they touch the same
 // user's avatar bytes. userPublicIDHex must be the user's public_id as
 // 32 hex chars (no dashes); sha256Hex must be the lowercase 64-char hex
 // digest of the file body.
-func StorageKeyForUser(userPublicIDHex, sha256Hex string) string {
+func KeyForUser(userPublicIDHex, sha256Hex string) string {
 	return fmt.Sprintf("user/%s/%s", userPublicIDHex, sha256Hex)
 }

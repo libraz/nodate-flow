@@ -35,6 +35,19 @@ func TestReplay_IllegalTransition(t *testing.T) {
 	}
 }
 
+func TestReplay_SkipsReversedTransitionPair(t *testing.T) {
+	reversesStart := int64(1)
+	evs := []TransitionEvent{
+		{ID: 1, Name: "start"},
+		{ID: 2, Name: "start", ReversesEventID: &reversesStart},
+		{ID: 3, Name: "complete"},
+	}
+	st, err := Replay(evs)
+	if err != nil || st != StateDone {
+		t.Fatalf("expected reversed start pair to replay as open→complete=done, got %v %v", st, err)
+	}
+}
+
 func TestReplay_Empty(t *testing.T) {
 	st, err := Replay(nil)
 	if err != nil || st != StateOpen {

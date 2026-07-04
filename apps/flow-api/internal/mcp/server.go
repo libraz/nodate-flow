@@ -215,6 +215,11 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if len(req.ID) == 0 && req.Method == "notifications/initialized" {
+		w.WriteHeader(http.StatusNoContent)
+		return
+	}
+
 	switch req.Method {
 	case "initialize":
 		writeRPCResult(w, req.ID, map[string]any{
@@ -243,15 +248,21 @@ func (h *Handler) handleToolCall(w http.ResponseWriter, r *http.Request, s *sess
 		Arguments json.RawMessage `json:"arguments"`
 	}
 	if len(req.Params) == 0 {
+		h.audit(r.Context(), s, "", nil, nil,
+			generated.McpInvocationsStatusError, apierrors.McpProtocolFrameMalformed.Code, 0)
 		writeRPCAppError(w, req.ID, apierrors.McpProtocolFrameMalformed, "missing params")
 		return
 	}
 	if err := json.Unmarshal(req.Params, &params); err != nil {
+		h.audit(r.Context(), s, "", req.Params, nil,
+			generated.McpInvocationsStatusError, apierrors.McpProtocolFrameMalformed.Code, 0)
 		writeRPCAppError(w, req.ID, apierrors.McpProtocolFrameMalformed, "invalid params")
 		return
 	}
 	t, ok := h.tools[params.Name]
 	if !ok {
+		h.audit(r.Context(), s, params.Name, params.Arguments, nil,
+			generated.McpInvocationsStatusError, apierrors.McpToolNotFound.Code, 0)
 		writeRPCAppError(w, req.ID, apierrors.McpToolNotFound, "tool not found: "+params.Name)
 		return
 	}
@@ -341,6 +352,8 @@ func (h *Handler) handleToolCall(w http.ResponseWriter, r *http.Request, s *sess
 	// Validate individual argument sizes before execution to prevent
 	// excessively large payloads from reaching tool handlers.
 	if valErr := validateToolArgs(params.Arguments); valErr != nil {
+		h.audit(r.Context(), s, params.Name, params.Arguments, nil,
+			generated.McpInvocationsStatusError, apierrors.McpProtocolFrameMalformed.Code, 0)
 		writeRPCAppError(w, req.ID, apierrors.McpProtocolFrameMalformed, valErr.Error())
 		return
 	}

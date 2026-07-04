@@ -21,6 +21,7 @@ import (
 	apierrors "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/errors"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/middleware"
 	"github.com/nodate-flow/nodate-flow/packages/go-shared/apierr"
+	"github.com/nodate-flow/nodate-flow/packages/go-shared/dbtype"
 )
 
 // ProblemDetails extends huma.ErrorModel with the developer-facing
@@ -258,19 +259,13 @@ func Int32ToUint32(n sql.NullInt32) uint32 {
 // NullStr converts a sql.NullString to a plain Go string, returning the
 // empty string when the column is NULL.
 func NullStr(s sql.NullString) string {
-	if s.Valid {
-		return s.String
-	}
-	return ""
+	return dbtype.StringFromNullString(s)
 }
 
 // NullStrPtr converts a sql.NullString to a *string, returning nil when
 // the column is NULL so the field is omitted from JSON.
 func NullStrPtr(s sql.NullString) *string {
-	if !s.Valid {
-		return nil
-	}
-	return &s.String
+	return dbtype.PtrFromNullString(s)
 }
 
 // NullTime converts a sql.NullTime to a *time.Time, returning nil when the
@@ -288,11 +283,7 @@ func NullTime(t sql.NullTime) *time.Time {
 // for the NULL case so the field is omitted from JSON. This is the single
 // conversion point for nullable _at columns, per the api-types convention.
 func NullTimeUnix(t sql.NullTime) *int64 {
-	if !t.Valid {
-		return nil
-	}
-	v := t.Time.Unix()
-	return &v
+	return dbtype.UnixSecondsFromNullTime(t)
 }
 
 // NullTimeUnixVal converts a sql.NullTime to a unix-seconds int64 value.
@@ -316,21 +307,14 @@ func NullTimeUnixVal(t sql.NullTime) int64 {
 // timezone) would otherwise format to a different calendar day depending
 // on which helper a mapper happened to call. Both helpers must agree.
 func NullTimeDate(t sql.NullTime) *string {
-	if !t.Valid {
-		return nil
-	}
-	s := t.Time.UTC().Format("2006-01-02")
-	return &s
+	return dbtype.DateStringFromNullTime(t)
 }
 
 // NullTimeDateStr is the value-returning twin of [NullTimeDate]. It returns
 // the empty string for NULL, suitable for DTOs whose `dueOn` / `startedOn`
 // fields are declared as `string` with `omitempty` rather than `*string`.
 func NullTimeDateStr(t sql.NullTime) string {
-	if !t.Valid {
-		return ""
-	}
-	return t.Time.UTC().Format("2006-01-02")
+	return dbtype.DateStringValueFromNullTime(t)
 }
 
 // BytesToUUIDString converts a raw BINARY(16) public_id column into a

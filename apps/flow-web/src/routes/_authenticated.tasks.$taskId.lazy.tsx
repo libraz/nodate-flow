@@ -71,6 +71,7 @@ import { useTaskTimelineQuery } from '../features/timeline/api';
 import ReplayPanel from '../features/timeline/replay-panel';
 import TaskMiniTimeline from '../features/timeline/task-mini-timeline';
 import { useWorkspaceMembersQuery, useWorkspaceQuery } from '../features/workspaces/api';
+import { formatApiError } from '../lib/api-error';
 import { formatDate } from '../lib/format';
 import { formatDueDate } from '../lib/format-date';
 
@@ -258,8 +259,11 @@ function TitleEditor({
       await update.mutateAsync({ id, patch: { title: trimmed } });
       setEditing(false);
       setShowEmptyError(false);
-    } catch {
-      toaster.show({ tone: 'danger', message: t('tasks.errors.update_failed') });
+    } catch (err) {
+      toaster.show({
+        tone: 'danger',
+        message: formatApiError(err, t, 'tasks.errors.update_failed'),
+      });
     }
   };
 
@@ -388,8 +392,11 @@ function DescriptionEditor({ id, initial }: { id: string; initial: string }): Re
     try {
       await update.mutateAsync({ id, patch: { description: value } });
       setEditing(false);
-    } catch {
-      toaster.show({ tone: 'danger', message: t('tasks.errors.update_failed') });
+    } catch (err) {
+      toaster.show({
+        tone: 'danger',
+        message: formatApiError(err, t, 'tasks.errors.update_failed'),
+      });
     }
   };
 
@@ -527,8 +534,11 @@ function CommentsFeed({ taskId }: { taskId: string }): ReactElement {
     try {
       await add.mutateAsync({ taskId, body: trimmed });
       setBody('');
-    } catch {
-      toaster.show({ tone: 'danger', message: t('tasks.errors.comment_add_failed') });
+    } catch (err) {
+      toaster.show({
+        tone: 'danger',
+        message: formatApiError(err, t, 'tasks.errors.comment_add_failed'),
+      });
     }
   };
 
@@ -612,16 +622,22 @@ function AssigneesSection({
     try {
       await addActor.mutateAsync({ taskId, input: { role: 'assignee', userId } });
       setPicking(false);
-    } catch {
-      toaster.show({ tone: 'danger', message: t('tasks.errors.update_failed') });
+    } catch (err) {
+      toaster.show({
+        tone: 'danger',
+        message: formatApiError(err, t, 'tasks.errors.update_failed'),
+      });
     }
   };
 
   const handleRemove = async (actorId: string): Promise<void> => {
     try {
       await removeActor.mutateAsync({ taskId, actorId });
-    } catch {
-      toaster.show({ tone: 'danger', message: t('tasks.errors.update_failed') });
+    } catch (err) {
+      toaster.show({
+        tone: 'danger',
+        message: formatApiError(err, t, 'tasks.errors.update_failed'),
+      });
     }
   };
 
@@ -724,8 +740,11 @@ function Sidebar({
   const handlePriorityChange = async (next: TaskPriority): Promise<void> => {
     try {
       await update.mutateAsync({ id, patch: { priority: next } });
-    } catch {
-      toaster.show({ tone: 'danger', message: t('tasks.errors.update_failed') });
+    } catch (err) {
+      toaster.show({
+        tone: 'danger',
+        message: formatApiError(err, t, 'tasks.errors.update_failed'),
+      });
     }
   };
 
@@ -744,7 +763,7 @@ function Sidebar({
       });
       return;
     }
-    toaster.show({ tone: 'danger', message: t('tasks.errors.update_failed') });
+    toaster.show({ tone: 'danger', message: formatApiError(err, t, 'tasks.errors.update_failed') });
   };
 
   const handleStartChange = async (next: string): Promise<void> => {
@@ -767,8 +786,11 @@ function Sidebar({
     transition.mutate(
       { id, transition: name, projectId },
       {
-        onError: () => {
-          toaster.show({ tone: 'warning', message: t('tasks.errors.illegal_transition') });
+        onError: (err) => {
+          toaster.show({
+            tone: 'warning',
+            message: formatApiError(err, t, 'tasks.errors.illegal_transition'),
+          });
         },
       },
     );

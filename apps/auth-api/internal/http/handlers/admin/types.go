@@ -1,6 +1,8 @@
 // Package admin contains Huma operation handlers for the instance
 // administration panel: user management, workspace management, session
 // oversight, audit log viewing, instance admin grants, and settings.
+//
+//nolint:revive // DTO names intentionally keep admin/workspace prefixes for stable generated OpenAPI schema names.
 package admin
 
 import (

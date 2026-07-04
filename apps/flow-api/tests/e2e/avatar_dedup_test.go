@@ -70,9 +70,9 @@ func sha256Of(b []byte) string {
 	return fmt.Sprintf("%x", sum[:])
 }
 
-// userInternalIdAndAvatar returns (id, avatar_storage_object_id, has_avatar)
+// userInternalIDAndAvatar returns (id, avatar_storage_object_id, has_avatar)
 // for a user identified by public id (UUID v7 textual form).
-func userInternalIdAndAvatar(t *testing.T, db *sql.DB, userPublicID string) (uint32, sql.NullInt32) {
+func userInternalIDAndAvatar(t *testing.T, db *sql.DB, userPublicID string) (uint32, sql.NullInt32) {
 	t.Helper()
 	var (
 		id     uint32
@@ -103,7 +103,7 @@ func countAvatarStorageObjectsForUser(t *testing.T, db *sql.DB, userID uint32) i
 // storageKeyByObjectID resolves a storage_objects row by internal id and
 // returns its storage_key. Used by the replace test to capture the key
 // of the soon-to-be-deleted previous avatar.
-func storageKeyByObjectID(t *testing.T, db *sql.DB, id uint32) string {
+func storageKeyByObjectID(t *testing.T, db *sql.DB, id int32) string {
 	t.Helper()
 	var key string
 	err := db.QueryRowContext(context.Background(),
@@ -130,10 +130,10 @@ func TestAvatarDedup(t *testing.T) {
 	require.NotNil(t, body1.AvatarURL, "first avatar upload must populate avatarUrl")
 	require.NotEmpty(t, *body1.AvatarURL)
 
-	uid, avatar1 := userInternalIdAndAvatar(t, testDB, tt.UserPublicID)
+	uid, avatar1 := userInternalIDAndAvatar(t, testDB, tt.UserPublicID)
 	require.True(t, avatar1.Valid, "users.avatar_storage_object_id must be set after first upload")
 	require.Equal(t, 1, countAvatarStorageObjectsForUser(t, testDB, uid))
-	key1 := storageKeyByObjectID(t, testDB, uint32(avatar1.Int32))
+	key1 := storageKeyByObjectID(t, testDB, avatar1.Int32)
 	testStorage.MustExist(t, key1)
 
 	// Second upload: same bytes -> dedup hit. The DB row should NOT
@@ -144,7 +144,7 @@ func TestAvatarDedup(t *testing.T) {
 	require.Equal(t, http.StatusOK, status2)
 	require.NotNil(t, body2.AvatarURL)
 
-	_, avatar2 := userInternalIdAndAvatar(t, testDB, tt.UserPublicID)
+	_, avatar2 := userInternalIDAndAvatar(t, testDB, tt.UserPublicID)
 	require.True(t, avatar2.Valid)
 	require.Equal(t, avatar1.Int32, avatar2.Int32,
 		"dedup must keep the same storage_objects row")
@@ -171,9 +171,9 @@ func TestAvatarReplaceCleansOld(t *testing.T) {
 	require.Equal(t, http.StatusOK, status1)
 	require.NotNil(t, body1.AvatarURL)
 
-	uid, avatar1 := userInternalIdAndAvatar(t, testDB, tt.UserPublicID)
+	uid, avatar1 := userInternalIDAndAvatar(t, testDB, tt.UserPublicID)
 	require.True(t, avatar1.Valid)
-	prevID := uint32(avatar1.Int32)
+	prevID := avatar1.Int32
 	prevKey := storageKeyByObjectID(t, testDB, prevID)
 	testStorage.MustExist(t, prevKey)
 
@@ -183,7 +183,7 @@ func TestAvatarReplaceCleansOld(t *testing.T) {
 	require.NotEqual(t, *body1.AvatarURL, *body2.AvatarURL,
 		"replacing the avatar must change the proxy URL (cache-buster suffix derives from new id)")
 
-	_, avatar2 := userInternalIdAndAvatar(t, testDB, tt.UserPublicID)
+	_, avatar2 := userInternalIDAndAvatar(t, testDB, tt.UserPublicID)
 	require.True(t, avatar2.Valid)
 	require.NotEqual(t, avatar1.Int32, avatar2.Int32,
 		"replace must point users.avatar_storage_object_id at a new row")
@@ -222,14 +222,14 @@ func TestAvatarDifferentUsers(t *testing.T) {
 	require.Equal(t, http.StatusOK, statusB)
 	require.NotNil(t, bodyB.AvatarURL)
 
-	uidA, avatarA := userInternalIdAndAvatar(t, testDB, a.UserPublicID)
-	uidB, avatarB := userInternalIdAndAvatar(t, testDB, b.UserPublicID)
+	uidA, avatarA := userInternalIDAndAvatar(t, testDB, a.UserPublicID)
+	uidB, avatarB := userInternalIDAndAvatar(t, testDB, b.UserPublicID)
 	require.True(t, avatarA.Valid && avatarB.Valid)
 	require.NotEqual(t, avatarA.Int32, avatarB.Int32,
 		"per-user scoped dedup must produce distinct storage_objects rows across users")
 
-	keyA := storageKeyByObjectID(t, testDB, uint32(avatarA.Int32))
-	keyB := storageKeyByObjectID(t, testDB, uint32(avatarB.Int32))
+	keyA := storageKeyByObjectID(t, testDB, avatarA.Int32)
+	keyB := storageKeyByObjectID(t, testDB, avatarB.Int32)
 	require.NotEqual(t, keyA, keyB,
 		"distinct user-scoped storage keys (path includes user public id hex)")
 	require.True(t, strings.HasPrefix(keyA, "user/"))

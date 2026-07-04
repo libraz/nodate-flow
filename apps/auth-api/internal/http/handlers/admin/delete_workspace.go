@@ -1,3 +1,4 @@
+//nolint:revive // DTO names intentionally keep admin prefixes for stable generated OpenAPI schema names.
 package admin
 
 import (

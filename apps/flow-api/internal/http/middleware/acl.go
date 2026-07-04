@@ -548,11 +548,12 @@ func RequireTaskAccess(db ACLDB) func(http.Handler) http.Handler {
 				writeSpecError(w, apierrors.WsTaskNotFound)
 				return
 			}
-			rec, err := acl.ResolveTaskByPublicID(r.Context(), db, pub)
+			access, err := acl.AuthorizeTaskAccess(r.Context(), db, pub, userID)
 			if err != nil {
 				writeAPIError(w, err)
 				return
 			}
+			rec := access.Task
 			wsPubID, err := acl.ResolveWorkspacePublicByID(r.Context(), db, rec.WorkspaceID)
 			if err != nil {
 				// Workspace-not-found leaks as task-not-found to avoid
@@ -565,34 +566,18 @@ func RequireTaskAccess(db ACLDB) func(http.Handler) http.Handler {
 				writeAPIError(w, err)
 				return
 			}
-			wsRole, err := acl.CheckWorkspaceMember(r.Context(), db, rec.WorkspaceID, userID, apierrors.WsTaskAccessDenied)
-			if err != nil {
-				writeAPIError(w, err)
-				return
-			}
 			prjPubID, err := acl.ResolveProjectPublicByID(r.Context(), db, rec.ProjectID, apierrors.WsTaskNotFound)
 			if err != nil {
-				writeAPIError(w, err)
-				return
-			}
-			prjRole, isProjectMember, err := acl.CheckProjectMembership(
-				r.Context(), db, rec.WorkspaceID, rec.ProjectID, userID, wsRole, apierrors.WsTaskAccessDenied,
-			)
-			if err != nil {
-				writeAPIError(w, err)
-				return
-			}
-			if err := acl.CheckTaskVisibility(r.Context(), db, rec, userID, wsRole, isProjectMember); err != nil {
 				writeAPIError(w, err)
 				return
 			}
 
 			ctx := context.WithValue(r.Context(), ctxKeyWorkspaceID, rec.WorkspaceID)
 			ctx = context.WithValue(ctx, ctxKeyWorkspaceIDPublic, wsPubID.UUID())
-			ctx = context.WithValue(ctx, ctxKeyWorkspaceRole, wsRole)
+			ctx = context.WithValue(ctx, ctxKeyWorkspaceRole, access.WorkspaceRole)
 			ctx = context.WithValue(ctx, ctxKeyProjectID, rec.ProjectID)
 			ctx = context.WithValue(ctx, ctxKeyProjectIDPublic, prjPubID.UUID())
-			ctx = context.WithValue(ctx, ctxKeyProjectRole, prjRole)
+			ctx = context.WithValue(ctx, ctxKeyProjectRole, access.ProjectRole)
 			ctx = context.WithValue(ctx, ctxKeyTaskID, rec.ID)
 			ctx = context.WithValue(ctx, ctxKeyTaskIDPublic, pub)
 			ctx = enrichLoggerWithWorkspace(ctx, rec.WorkspaceID, wsPubID.UUID())

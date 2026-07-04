@@ -32,7 +32,12 @@ func (l *ReplayLoader) Load(ctx context.Context, taskID uint32) ([]TransitionEve
 		if !ok {
 			continue
 		}
-		out = append(out, TransitionEvent{Name: name})
+		var reverses *int64
+		if r.ReversesEventID.Valid {
+			v := r.ReversesEventID.Int64
+			reverses = &v
+		}
+		out = append(out, TransitionEvent{ID: r.ID, Name: name, ReversesEventID: reverses})
 	}
 	return out, nil
 }

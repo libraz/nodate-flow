@@ -20,6 +20,7 @@ import { computeBlockedByOpen, useProjectDependenciesQuery } from '../projects/a
 
 import {
   TASK_STATES,
+  TASKS_QUERY_LIMIT,
   type TaskDerivedState,
   type TaskListItem,
   type TransitionName,
@@ -61,6 +62,7 @@ export default function TaskBoardView({ projectId }: TaskBoardViewProps): ReactE
   const transition = useTransitionTask();
 
   const groups = groupByState(tasks);
+  const mayBeTruncated = tasks.length >= TASKS_QUERY_LIMIT;
 
   const handleTransition = useCallback(
     (taskId: string, transitionName: TransitionName, landingState: TaskDerivedState): void => {
@@ -86,48 +88,53 @@ export default function TaskBoardView({ projectId }: TaskBoardViewProps): ReactE
   };
 
   return (
-    <div
-      role="region"
-      aria-label={t('tasks.views.board')}
-      className={css.board}
-      style={{ '--col-count': TASK_STATES.length } as React.CSSProperties}
-    >
-      {TASK_STATES.map((state, index) => {
-        const items = groups[state];
-        return (
-          <section key={state} aria-label={t(STATE_KEY[state])} className={css.column}>
-            <Card className={css.headerCard}>
-              <header className={css.columnHeader}>
-                <span className={css.columnHeaderLabel}>{t(STATE_KEY[state])}</span>
-                <span className={css.columnHeaderCount}>{items.length}</span>
-              </header>
-              {/* Show the D&D-disabled hint once, on the first column,
-                  so it isn't repeated five times across the board. */}
-              {index === 0 ? (
-                <p className={css.dndHint}>{t('tasks.board.dnd_disabled_hint')}</p>
-              ) : null}
-            </Card>
-            <div role="list" aria-label={t(STATE_KEY[state])} className={css.dropZone}>
-              {items.length === 0 ? (
-                <div role="listitem" className={css.emptyColumn}>
-                  {t('tasks.board.empty_column')}
-                </div>
-              ) : (
-                items.map((task) => (
-                  <div key={task.id} role="listitem">
-                    <TaskCard
-                      task={task}
-                      blockedByOpenCount={blockedByOpen.get(task.id) ?? 0}
-                      onSelect={handleSelect}
-                      onTransition={handleTransition}
-                    />
+    <>
+      {mayBeTruncated ? (
+        <p className={css.limitNotice}>{t('tasks.limit_notice', { count: TASKS_QUERY_LIMIT })}</p>
+      ) : null}
+      <div
+        role="region"
+        aria-label={t('tasks.views.board')}
+        className={css.board}
+        style={{ '--col-count': TASK_STATES.length } as React.CSSProperties}
+      >
+        {TASK_STATES.map((state, index) => {
+          const items = groups[state];
+          return (
+            <section key={state} aria-label={t(STATE_KEY[state])} className={css.column}>
+              <Card className={css.headerCard}>
+                <header className={css.columnHeader}>
+                  <span className={css.columnHeaderLabel}>{t(STATE_KEY[state])}</span>
+                  <span className={css.columnHeaderCount}>{items.length}</span>
+                </header>
+                {/* Show the D&D-disabled hint once, on the first column,
+                    so it isn't repeated five times across the board. */}
+                {index === 0 ? (
+                  <p className={css.dndHint}>{t('tasks.board.dnd_disabled_hint')}</p>
+                ) : null}
+              </Card>
+              <div role="list" aria-label={t(STATE_KEY[state])} className={css.dropZone}>
+                {items.length === 0 ? (
+                  <div role="listitem" className={css.emptyColumn}>
+                    {t('tasks.board.empty_column')}
                   </div>
-                ))
-              )}
-            </div>
-          </section>
-        );
-      })}
-    </div>
+                ) : (
+                  items.map((task) => (
+                    <div key={task.id} role="listitem">
+                      <TaskCard
+                        task={task}
+                        blockedByOpenCount={blockedByOpen.get(task.id) ?? 0}
+                        onSelect={handleSelect}
+                        onTransition={handleTransition}
+                      />
+                    </div>
+                  ))
+                )}
+              </div>
+            </section>
+          );
+        })}
+      </div>
+    </>
   );
 }

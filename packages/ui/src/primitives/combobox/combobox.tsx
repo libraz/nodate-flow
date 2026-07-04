@@ -317,13 +317,21 @@ function ComboboxImpl(
           if (typeof ref === 'function') ref(node);
           else if (ref) ref.current = node;
         }}
+        {...getReferenceProps({
+          onChange: (event: SyntheticEvent) => handleChange(event as ChangeEvent<HTMLInputElement>),
+          onKeyDown: (event: SyntheticEvent) =>
+            handleKeyDown(event as KeyboardEvent<HTMLInputElement>),
+          onFocus: (event: SyntheticEvent) => {
+            (event as FocusEvent<HTMLInputElement>).currentTarget.select();
+          },
+        })}
         id={inputId}
         type="text"
         role="combobox"
         dir={dir}
         aria-label={ariaLabel}
-        aria-expanded={open}
-        aria-controls={open ? listId : undefined}
+        aria-expanded={showFloating}
+        aria-controls={showFloating ? listId : undefined}
         aria-autocomplete="list"
         aria-activedescendant={
           open && activeIndex !== null && filtered.length > 0
@@ -336,14 +344,6 @@ function ComboboxImpl(
         className={styles.input}
         placeholder={placeholder}
         value={query}
-        {...getReferenceProps({
-          onChange: (event: SyntheticEvent) => handleChange(event as ChangeEvent<HTMLInputElement>),
-          onKeyDown: (event: SyntheticEvent) =>
-            handleKeyDown(event as KeyboardEvent<HTMLInputElement>),
-          onFocus: (event: SyntheticEvent) => {
-            (event as FocusEvent<HTMLInputElement>).currentTarget.select();
-          },
-        })}
       />
       {showFloating ? (
         <FloatingPortal>

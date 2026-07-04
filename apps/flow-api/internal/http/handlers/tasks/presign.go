@@ -145,7 +145,7 @@ func PresignUpload(deps Deps) func(context.Context, *PresignUploadInput) (*Presi
 
 		wsHex := hex.EncodeToString(ws.PublicID[:])
 		shaHex := strings.ToLower(in.Body.Sha256)
-		baseStorageKey := storage.StorageKeyForWorkspace(wsHex, shaHex)
+		baseStorageKey := storage.KeyForWorkspace(wsHex, shaHex)
 
 		var (
 			storageObjectID uint32

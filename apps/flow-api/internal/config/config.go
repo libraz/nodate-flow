@@ -67,6 +67,11 @@ type Config struct {
 	// NF_COOKIE_SECURE=false explicitly.
 	CookieSecure bool `env:"NF_COOKIE_SECURE" envDefault:"true"`
 
+	// TrustedProxyHops is the fixed number of reverse-proxy hops in
+	// front of the API. 0 ignores X-Forwarded-For / X-Real-Ip and uses
+	// RemoteAddr, which is the safe default for direct exposure.
+	TrustedProxyHops int `env:"NF_TRUSTED_PROXY_HOPS" envDefault:"0"`
+
 	// AiMock toggles the deterministic in-memory AI provider. When true,
 	// every workspace.ai_providers row is ignored and ai.Orchestrator
 	// routes to a fixture-backed Provider that loads JSON from

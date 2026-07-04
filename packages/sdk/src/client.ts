@@ -22,7 +22,7 @@ export interface CreateClientOptions {
    * Optional per-request token provider. Invoked on every request; the
    * returned string (if any) is attached as `Authorization: Bearer <token>`.
    * Takes precedence over {@link token}. Send credentials include cookies
-   * so the refresh cookie (nf_rt) is forwarded automatically.
+   * so the refresh cookie (nd_rt) is forwarded automatically.
    */
   tokenProvider?: () => string | undefined;
   /** Extra fetch options forwarded to openapi-fetch. */

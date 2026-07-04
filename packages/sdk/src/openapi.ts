@@ -1040,7 +1040,7 @@ export interface paths {
         post?: never;
         /**
          * Disable TOTP 2FA
-         * @description Removes the TOTP secret and recovery codes for the caller. Requires a valid current TOTP code (or recovery code) to authorize the change.
+         * @description Removes the TOTP secret and recovery codes for the caller. Requires the current password to authorize the change.
          */
         delete: operations["me-totp-disable"];
         options?: never;
@@ -1059,7 +1059,7 @@ export interface paths {
         put?: never;
         /**
          * Confirm TOTP 2FA enrollment
-         * @description Validates a 6-digit code against the pending secret from /me/totp/enroll. On success activates TOTP for the caller and returns a fresh batch of recovery codes (shown once).
+         * @description After password reverification, validates a 6-digit code against the pending secret from /me/totp/enroll. On success activates TOTP for the caller and returns a fresh batch of recovery codes (shown once).
          */
         post: operations["me-totp-confirm"];
         delete?: never;
@@ -1079,7 +1079,7 @@ export interface paths {
         put?: never;
         /**
          * Begin TOTP 2FA enrollment
-         * @description Generates a fresh TOTP secret and otpauth:// provisioning URL for the caller to scan. The secret is stored as pending until /me/totp/confirm validates a code.
+         * @description After password reverification, generates a fresh TOTP secret and otpauth:// provisioning URL for the caller to scan. The secret is stored as pending until /me/totp/confirm validates a code.
          */
         post: operations["me-totp-enroll"];
         delete?: never;
@@ -1103,7 +1103,7 @@ export interface paths {
         put?: never;
         /**
          * Regenerate TOTP recovery codes
-         * @description Replaces the caller's recovery code batch with a fresh set, invalidating any unused old codes. Returns the new codes (shown once) and requires a valid TOTP code.
+         * @description Replaces the caller's recovery code batch with a fresh set, invalidating any unused old codes. Returns the new codes (shown once) and requires the current password.
          */
         post: operations["me-totp-recovery-regenerate"];
         delete?: never;
@@ -4782,6 +4782,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/AcceptEventInviteInputBody.json
              */
             readonly $schema?: string;
             /**
@@ -4796,6 +4797,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/AcceptEventInviteResponse.json
              */
             readonly $schema?: string;
             calendarName?: string;
@@ -4812,6 +4814,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/AcceptWorkspaceInviteOutputBody.json
              */
             readonly $schema?: string;
             role: string;
@@ -4823,6 +4826,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/AddAttendeesInputBody.json
              */
             readonly $schema?: string;
             /** @description List of user public IDs to add */
@@ -4832,6 +4836,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/AddAttendeesOutputBody.json
              */
             readonly $schema?: string;
             attendees: components["schemas"]["AttendeeResponse"][] | null;
@@ -4840,6 +4845,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/AddMemberInputBody.json
              */
             readonly $schema?: string;
             /** @description Email of the user to add */
@@ -4854,6 +4860,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/AddProjectMemberBody.json
              */
             readonly $schema?: string;
             /** @enum {string} */
@@ -4865,6 +4872,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/AddTaskActorBody.json
              */
             readonly $schema?: string;
             /** @enum {string} */
@@ -4876,6 +4884,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/AddTaskAgentActorBody.json
              */
             readonly $schema?: string;
             /** @description AI agent public id (UUID v7) */
@@ -4887,6 +4896,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/AddTaskBody.json
              */
             readonly $schema?: string;
             /** @description Task public id (UUID v7) */
@@ -4896,6 +4906,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/AddTaskCommentBody.json
              */
             readonly $schema?: string;
             body: string;
@@ -4904,6 +4915,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/AddTaskConstraintBody.json
              */
             readonly $schema?: string;
             expression: string;
@@ -4914,6 +4926,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/AddTaskDependencyBody.json
              */
             readonly $schema?: string;
             /** @enum {string} */
@@ -4925,6 +4938,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/AddTaskLabelBody.json
              */
             readonly $schema?: string;
             /** @description Label public id (UUID v7) */
@@ -4934,6 +4948,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/AddTaskOutputBody.json
              */
             readonly $schema?: string;
             ok: boolean;
@@ -4942,6 +4957,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/AddWorkspaceMemberInputBody.json
              */
             readonly $schema?: string;
             /** Format: email */
@@ -4953,6 +4969,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/AdminDeleteOutputBody.json
              */
             readonly $schema?: string;
             deleted: boolean;
@@ -4965,6 +4982,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/AdminListWorkspacesOutputBody.json
              */
             readonly $schema?: string;
             items: components["schemas"]["AdminWorkspace"][] | null;
@@ -4975,6 +4993,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/AdminPatchWorkspaceInputBody.json
              */
             readonly $schema?: string;
             enabled: boolean | null;
@@ -4983,6 +5002,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/AdminRevokeSessionOutputBody.json
              */
             readonly $schema?: string;
             ok: boolean;
@@ -4991,6 +5011,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/AdminWorkspace.json
              */
             readonly $schema?: string;
             /** Format: int64 */
@@ -5028,6 +5049,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/AgentSummary.json
              */
             readonly $schema?: string;
             /** Format: int64 */
@@ -5049,6 +5071,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/AiSuggestionListBody.json
              */
             readonly $schema?: string;
             suggestions: components["schemas"]["AiSuggestionSummary"][] | null;
@@ -5067,6 +5090,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/ApplyShiftBody.json
              */
             readonly $schema?: string;
             /** @description Public IDs of tasks the user agreed to shift along with the umbrella event */
@@ -5081,6 +5105,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/ApplyShiftOutputBody.json
              */
             readonly $schema?: string;
             /** Format: int64 */
@@ -5095,6 +5120,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/ApplySmartInputBody.json
              */
             readonly $schema?: string;
             assigneeUserIds?: string[] | null;
@@ -5109,6 +5135,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/ApplySmartOutputBody.json
              */
             readonly $schema?: string;
             subtaskIds: string[] | null;
@@ -5131,6 +5158,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/ApplyStepsInputBody.json
              */
             readonly $schema?: string;
             steps: components["schemas"]["ApplyStep"][] | null;
@@ -5139,6 +5167,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/ApplyStepsOutputBody.json
              */
             readonly $schema?: string;
             created: string[] | null;
@@ -5147,6 +5176,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/ArchiveInboxOutputBody.json
              */
             readonly $schema?: string;
             ok: boolean;
@@ -5155,6 +5185,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/ArchiveOutputBody.json
              */
             readonly $schema?: string;
             ok: boolean;
@@ -5163,6 +5194,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/ArchiveTaskOutputBody.json
              */
             readonly $schema?: string;
             ok: boolean;
@@ -5178,6 +5210,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/AttachEventsToShareInputBody.json
              */
             readonly $schema?: string;
             /** @description Event public IDs to attach; confidential events are rejected */
@@ -5187,6 +5220,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/AttachEventsToShareOutputBody.json
              */
             readonly $schema?: string;
             /** Format: int64 */
@@ -5237,6 +5271,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/AuthTokens.json
              */
             readonly $schema?: string;
             accessToken: string;
@@ -5266,6 +5301,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/AutoActionSettingsBody.json
              */
             readonly $schema?: string;
             enabled: boolean;
@@ -5278,6 +5314,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/Body.json
              */
             readonly $schema?: string;
             /**
@@ -5299,6 +5336,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/CalendarRemoveMemberOutputBody.json
              */
             readonly $schema?: string;
             removed: boolean;
@@ -5307,6 +5345,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/CalendarResponse.json
              */
             readonly $schema?: string;
             color: string;
@@ -5331,6 +5370,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/CancelImportOutputBody.json
              */
             readonly $schema?: string;
             ok: boolean;
@@ -5339,6 +5379,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/CapabilitiesBody.json
              */
             readonly $schema?: string;
             magicLink: boolean;
@@ -5353,6 +5394,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/ChangePasswordInputBody.json
              */
             readonly $schema?: string;
             currentPassword: string;
@@ -5362,6 +5404,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/ChangePasswordOutputBody.json
              */
             readonly $schema?: string;
             ok: boolean;
@@ -5372,6 +5415,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/ChecklistItemResponse.json
              */
             readonly $schema?: string;
             /** Format: int64 */
@@ -5386,6 +5430,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/CommentResponse.json
              */
             readonly $schema?: string;
             avatarUrl?: string;
@@ -5402,6 +5447,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/CompileConstraintBody.json
              */
             readonly $schema?: string;
             /** @description Natural language description of the constraint */
@@ -5411,6 +5457,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/CompileConstraintOutputBody.json
              */
             readonly $schema?: string;
             /** @description DSL expression */
@@ -5422,6 +5469,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/CompileLensInputBody.json
              */
             readonly $schema?: string;
             prompt: string;
@@ -5430,6 +5478,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/CompileLensOutputBody.json
              */
             readonly $schema?: string;
             lens: components["schemas"]["Lens"];
@@ -5439,6 +5488,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/ConnectIntegrationInputBody.json
              */
             readonly $schema?: string;
             /** @description Optional client-supplied return URL; defaults to the integrations settings page */
@@ -5448,6 +5498,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/ConnectIntegrationOutputBody.json
              */
             readonly $schema?: string;
             authorizeUrl: string;
@@ -5471,6 +5522,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/ConvertIntakeItemBody.json
              */
             readonly $schema?: string;
             /** @description Project public id (UUID v7) to create the task in */
@@ -5480,6 +5532,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/ConvertIntakeItemOutputBody.json
              */
             readonly $schema?: string;
             ok: boolean;
@@ -5509,6 +5562,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/CostTodayOutputBody.json
              */
             readonly $schema?: string;
             /** Format: double */
@@ -5522,6 +5576,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/CountUnreadOutputBody.json
              */
             readonly $schema?: string;
             /** Format: int64 */
@@ -5531,6 +5586,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/CreateAgentInputBody.json
              */
             readonly $schema?: string;
             description?: string;
@@ -5555,6 +5611,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/CreateCalendarInputBody.json
              */
             readonly $schema?: string;
             /** @description Display color (hex) */
@@ -5577,6 +5634,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/CreateChecklistItemInputBody.json
              */
             readonly $schema?: string;
             /**
@@ -5591,6 +5649,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/CreateCommentInputBody.json
              */
             readonly $schema?: string;
             /** @description Comment text */
@@ -5600,6 +5659,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/CreateEventFromTaskInputBody.json
              */
             readonly $schema?: string;
             /** @description Task public ID (UUID) */
@@ -5611,6 +5671,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/CreateEventInputBody.json
              */
             readonly $schema?: string;
             /** @description All-day event flag */
@@ -5671,6 +5732,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/CreateEventInviteInputBody.json
              */
             readonly $schema?: string;
             /**
@@ -5683,6 +5745,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/CreateFavoriteBody.json
              */
             readonly $schema?: string;
             folderName?: string;
@@ -5697,6 +5760,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/CreateImportBody.json
              */
             readonly $schema?: string;
             /** @description Source-specific configuration */
@@ -5712,6 +5776,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/CreateInputBody.json
              */
             readonly $schema?: string;
             /** @description Human-readable description */
@@ -5725,6 +5790,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/CreateIntakeItemBody.json
              */
             readonly $schema?: string;
             body?: string;
@@ -5734,6 +5800,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/CreateInviteOutputBody.json
              */
             readonly $schema?: string;
             invite: components["schemas"]["WorkspaceInvite"];
@@ -5744,6 +5811,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/CreateLabelBody.json
              */
             readonly $schema?: string;
             /** @default #6b7280 */
@@ -5759,6 +5827,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/CreateLensBody.json
              */
             readonly $schema?: string;
             /** @description Optional public-facing description shown on the share page */
@@ -5775,6 +5844,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/CreateMcpTokenInputBody.json
              */
             readonly $schema?: string;
             /** @description Optional ai_agents public_id to bind this token to; tool calls will be attributed to the agent and subject to its cost cap */
@@ -5786,6 +5856,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/CreateMcpTokenOutputBody.json
              */
             readonly $schema?: string;
             agentId?: string;
@@ -5803,6 +5874,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/CreateMemoInputBody.json
              */
             readonly $schema?: string;
             /** @description User-authored multi-line memo body */
@@ -5819,6 +5891,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/CreateOutputBody.json
              */
             readonly $schema?: string;
             webhook: components["schemas"]["WebhookSubscriptionDetailDTO"];
@@ -5827,6 +5900,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/CreatePageBody.json
              */
             readonly $schema?: string;
             body?: string;
@@ -5840,6 +5914,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/CreateProjectBody.json
              */
             readonly $schema?: string;
             color?: string;
@@ -5853,6 +5928,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/CreateProviderInputBody.json
              */
             readonly $schema?: string;
             /** @description Plaintext provider API key (write-only) */
@@ -5867,6 +5943,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/CreatePublicShareInputBody.json
              */
             readonly $schema?: string;
             /** @description Cover image URL */
@@ -5891,6 +5968,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/CreateReactionBody.json
              */
             readonly $schema?: string;
             emoji: string;
@@ -5908,6 +5986,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/CreateTaskBody.json
              */
             readonly $schema?: string;
             /** @description Optional explicit actor list. When omitted or empty, the caller is auto-attached as the sole assignee. */
@@ -5933,6 +6012,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/CreateTaskEventLinkBody.json
              */
             readonly $schema?: string;
             /** @description Target calendar event public id */
@@ -5952,6 +6032,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/CreateTimeboxBody.json
              */
             readonly $schema?: string;
             description?: string;
@@ -5967,6 +6048,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/CreateWidgetBody.json
              */
             readonly $schema?: string;
             /** @description Arbitrary JSON configuration blob */
@@ -5987,6 +6069,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/CreateWorkspaceInputBody.json
              */
             readonly $schema?: string;
             country?: string;
@@ -6000,6 +6083,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/CreateWorkspaceInviteInputBody.json
              */
             readonly $schema?: string;
             email?: string;
@@ -6042,6 +6126,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/DeleteAttachmentOutputBody.json
              */
             readonly $schema?: string;
             deleted: boolean;
@@ -6050,6 +6135,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/DeleteCalendarOutputBody.json
              */
             readonly $schema?: string;
             deleted: boolean;
@@ -6058,6 +6144,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/DeleteChecklistItemOutputBody.json
              */
             readonly $schema?: string;
             deleted: boolean;
@@ -6066,6 +6153,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/DeleteCommentOutputBody.json
              */
             readonly $schema?: string;
             deleted: boolean;
@@ -6074,6 +6162,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/DeleteEventOutputBody.json
              */
             readonly $schema?: string;
             deleted: boolean;
@@ -6082,6 +6171,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/DeleteFavoriteOutputBody.json
              */
             readonly $schema?: string;
             ok: boolean;
@@ -6090,6 +6180,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/DeleteLensBody.json
              */
             readonly $schema?: string;
             ok: boolean;
@@ -6098,6 +6189,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/DeleteMcpTokenOutputBody.json
              */
             readonly $schema?: string;
             ok: boolean;
@@ -6106,6 +6198,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/DeleteMemoOutputBody.json
              */
             readonly $schema?: string;
             deleted: boolean;
@@ -6114,6 +6207,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/DeleteOutputBody.json
              */
             readonly $schema?: string;
             ok: boolean;
@@ -6122,6 +6216,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/DeletePageBody.json
              */
             readonly $schema?: string;
             ok: boolean;
@@ -6130,6 +6225,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/DeleteProviderOutputBody.json
              */
             readonly $schema?: string;
             ok: boolean;
@@ -6138,6 +6234,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/DeletePublicShareOutputBody.json
              */
             readonly $schema?: string;
             deleted: boolean;
@@ -6146,6 +6243,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/DeleteReactionOutputBody.json
              */
             readonly $schema?: string;
             ok: boolean;
@@ -6154,6 +6252,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/DeleteTaskAttachmentBody.json
              */
             readonly $schema?: string;
             ok: boolean;
@@ -6162,6 +6261,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/DeleteTaskCommentBody.json
              */
             readonly $schema?: string;
             ok: boolean;
@@ -6170,6 +6270,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/DeleteTaskEventLinkOutputBody.json
              */
             readonly $schema?: string;
             ok: boolean;
@@ -6178,6 +6279,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/DeleteTimeboxBody.json
              */
             readonly $schema?: string;
             ok: boolean;
@@ -6186,6 +6288,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/DeleteUserInputBody.json
              */
             readonly $schema?: string;
             /** @description Must be true to acknowledge irreversible deletion */
@@ -6195,6 +6298,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/DeleteWidgetBody.json
              */
             readonly $schema?: string;
             ok: boolean;
@@ -6203,6 +6307,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/DeleteWorkspaceInputBody.json
              */
             readonly $schema?: string;
             /** @description Must be true to acknowledge irreversible deletion */
@@ -6212,6 +6317,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/DeleteWorkspaceOutputBody.json
              */
             readonly $schema?: string;
             deleted: boolean;
@@ -6235,6 +6341,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/DescriptionVersionFull.json
              */
             readonly $schema?: string;
             authorDisplayName?: string;
@@ -6252,6 +6359,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/DetachEventFromShareOutputBody.json
              */
             readonly $schema?: string;
             removed: boolean;
@@ -6260,6 +6368,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/DisableLabelOutputBody.json
              */
             readonly $schema?: string;
             ok: boolean;
@@ -6268,6 +6377,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/DisableProjectBody.json
              */
             readonly $schema?: string;
             ok: boolean;
@@ -6276,6 +6386,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/DisableTaskBody.json
              */
             readonly $schema?: string;
             ok: boolean;
@@ -6284,6 +6395,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/DisconnectOutputBody.json
              */
             readonly $schema?: string;
             ok: boolean;
@@ -6304,6 +6416,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/DownloadAttachmentOutputBody.json
              */
             readonly $schema?: string;
             /** @description Presigned GET URL with Content-Disposition: attachment */
@@ -6313,6 +6426,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/DownloadCalendarAttachmentOutputBody.json
              */
             readonly $schema?: string;
             /** @description Presigned GET URL with Content-Disposition: attachment */
@@ -6329,6 +6443,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/EditCommentInputBody.json
              */
             readonly $schema?: string;
             /** @description Updated comment text */
@@ -6338,6 +6453,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/EditCommentOutputBody.json
              */
             readonly $schema?: string;
             updated: boolean;
@@ -6346,6 +6462,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/EditTaskCommentBody.json
              */
             readonly $schema?: string;
             body: string;
@@ -6380,29 +6497,43 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/ErrorModel.json
              */
             readonly $schema?: string;
             /** @description Developer-facing explanation of when this error fires. */
             description?: string;
-            /** @description A human-readable explanation specific to this occurrence of the problem. */
+            /**
+             * @description A human-readable explanation specific to this occurrence of the problem.
+             * @example Property foo is required but is missing.
+             */
             detail?: string;
             /** @description Optional list of individual error details */
             errors?: components["schemas"]["ErrorDetail"][] | null;
+            /** @description Optional RFC 9457 extension members carrying diagnostic detail. */
+            extensions?: {
+                [key: string]: unknown;
+            };
             /**
              * Format: uri
              * @description A URI reference that identifies the specific occurrence of the problem.
+             * @example https://example.com/error-log/abc123
              */
             instance?: string;
             /**
              * Format: int64
              * @description HTTP status code
+             * @example 400
              */
             status?: number;
-            /** @description A short, human-readable summary of the problem type. This value should not change between occurrences of the error. */
+            /**
+             * @description A short, human-readable summary of the problem type. This value should not change between occurrences of the error.
+             * @example Bad Request
+             */
             title?: string;
             /**
              * @description A URI reference to human-readable documentation for the error.
              * @default about:blank
+             * @example https://example.com/errors/example
              */
             type: string;
             /** @description Short imperative the UI can render to tell the end user how to recover. */
@@ -6417,6 +6548,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/EvaluateConstraintsOutputBody.json
              */
             readonly $schema?: string;
             outcomes: components["schemas"]["EvaluateConstraintsOutcome"][] | null;
@@ -6442,6 +6574,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/EventInviteCreateResponse.json
              */
             readonly $schema?: string;
             /** Format: int64 */
@@ -6462,6 +6595,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/EventResponse.json
              */
             readonly $schema?: string;
             allDay: boolean;
@@ -6497,6 +6631,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/ExplainConstraintBody.json
              */
             readonly $schema?: string;
             /** @description DSL expression to explain */
@@ -6506,6 +6641,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/ExplainConstraintOutputBody.json
              */
             readonly $schema?: string;
             /** @description Human-readable explanation */
@@ -6550,6 +6686,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/Favorite.json
              */
             readonly $schema?: string;
             /** Format: int64 */
@@ -6573,6 +6710,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/GeneratePageBody.json
              */
             readonly $schema?: string;
             /** @description Scope to a project */
@@ -6586,6 +6724,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/GetAutoActionRulesOutputBody.json
              */
             readonly $schema?: string;
             rules: components["schemas"]["AutoActionRuleBody"][] | null;
@@ -6594,6 +6733,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/GetOutputBody.json
              */
             readonly $schema?: string;
             webhook: components["schemas"]["WebhookSubscriptionDetailDTO"];
@@ -6602,6 +6742,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/GetPublicShareOutputBody.json
              */
             readonly $schema?: string;
             events: components["schemas"]["ShareEventResponse"][] | null;
@@ -6611,6 +6752,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/GrantAdminInputBody.json
              */
             readonly $schema?: string;
             /** @description User public id (UUID v7) */
@@ -6620,6 +6762,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/GrantAdminOutputBody.json
              */
             readonly $schema?: string;
             ok: boolean;
@@ -6628,6 +6771,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/HandoffToAgentBody.json
              */
             readonly $schema?: string;
             /** @description Target AI agent public id (UUID v7) */
@@ -6637,6 +6781,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/HandoffToUserBody.json
              */
             readonly $schema?: string;
             /**
@@ -6651,6 +6796,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/HealthOutputBody.json
              */
             readonly $schema?: string;
             status: string;
@@ -6659,6 +6805,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/ImportJobBody.json
              */
             readonly $schema?: string;
             /** Format: int64 */
@@ -6683,6 +6830,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/InferStateOutputBody.json
              */
             readonly $schema?: string;
             proposal?: components["schemas"]["InferStateProposal"];
@@ -6716,6 +6864,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/InstanceStatsOutputBody.json
              */
             readonly $schema?: string;
             /** Format: int64 */
@@ -6727,6 +6876,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/InviteInfoOutputBody.json
              */
             readonly $schema?: string;
             /** Format: int64 */
@@ -6783,6 +6933,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/Label.json
              */
             readonly $schema?: string;
             color: string;
@@ -6812,6 +6963,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/ListActivityOutputBody.json
              */
             readonly $schema?: string;
             activity: components["schemas"]["Entry"][] | null;
@@ -6823,6 +6975,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/ListAdminsOutputBody.json
              */
             readonly $schema?: string;
             items: components["schemas"]["InstanceAdmin"][] | null;
@@ -6833,6 +6986,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/ListAgentRunsBody.json
              */
             readonly $schema?: string;
             runs: components["schemas"]["AgentRunEvent"][] | null;
@@ -6843,6 +6997,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/ListAgentsOutputBody.json
              */
             readonly $schema?: string;
             agents: components["schemas"]["AgentSummary"][] | null;
@@ -6853,6 +7008,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/ListArchivedTasksBody.json
              */
             readonly $schema?: string;
             nextCursor: string | null;
@@ -6864,6 +7020,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/ListAttachmentsOutputBody.json
              */
             readonly $schema?: string;
             attachments: components["schemas"]["AttachmentResponse"][] | null;
@@ -6872,6 +7029,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/ListAttendeesOutputBody.json
              */
             readonly $schema?: string;
             attendees: components["schemas"]["AttendeeResponse"][] | null;
@@ -6880,6 +7038,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/ListAuditLogsBody.json
              */
             readonly $schema?: string;
             entries: components["schemas"]["LogEntryDTO"][] | null;
@@ -6890,6 +7049,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/ListAuditLogsOutputBody.json
              */
             readonly $schema?: string;
             items: components["schemas"]["AuditEntry"][] | null;
@@ -6900,6 +7060,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/ListAutoActionsOutputBody.json
              */
             readonly $schema?: string;
             actions: components["schemas"]["TaskAutoAction"][] | null;
@@ -6910,6 +7071,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/ListCalendarEventsOutputBody.json
              */
             readonly $schema?: string;
             events: components["schemas"]["CrossCalendarEventResponse"][] | null;
@@ -6918,6 +7080,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/ListCalendarsOutputBody.json
              */
             readonly $schema?: string;
             calendars: components["schemas"]["CalendarResponse"][] | null;
@@ -6926,6 +7089,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/ListChecklistOutputBody.json
              */
             readonly $schema?: string;
             items: components["schemas"]["ChecklistItemResponse"][] | null;
@@ -6939,6 +7103,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/ListChildPagesBody.json
              */
             readonly $schema?: string;
             pages: components["schemas"]["PageSummaryDTO"][] | null;
@@ -6949,6 +7114,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/ListCommentsOutputBody.json
              */
             readonly $schema?: string;
             comments: components["schemas"]["CommentResponse"][] | null;
@@ -6962,6 +7128,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/ListDeliveriesOutputBody.json
              */
             readonly $schema?: string;
             deliveries: components["schemas"]["WebhookDeliveryDTO"][] | null;
@@ -6973,6 +7140,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/ListDescriptionVersionsBody.json
              */
             readonly $schema?: string;
             versions: components["schemas"]["DescriptionVersion"][] | null;
@@ -6981,6 +7149,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/ListDiscoverableCalendarsOutputBody.json
              */
             readonly $schema?: string;
             calendars: components["schemas"]["DiscoverableCalendarResponse"][] | null;
@@ -6989,6 +7158,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/ListDuplicatesOutputBody.json
              */
             readonly $schema?: string;
             candidates: components["schemas"]["DuplicateCandidate"][] | null;
@@ -6999,6 +7169,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/ListEventInvitesOutputBody.json
              */
             readonly $schema?: string;
             invites: components["schemas"]["InviteSummaryResponse"][] | null;
@@ -7012,6 +7183,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/ListEventsOutputBody.json
              */
             readonly $schema?: string;
             events: components["schemas"]["EventResponse"][] | null;
@@ -7020,6 +7192,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/ListFavoritesBody.json
              */
             readonly $schema?: string;
             favorites: components["schemas"]["Favorite"][] | null;
@@ -7030,6 +7203,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/ListForTaskBody.json
              */
             readonly $schema?: string;
             suggestions: components["schemas"]["SuggestionDTO"][] | null;
@@ -7038,6 +7212,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/ListForWorkspaceBody.json
              */
             readonly $schema?: string;
             nextCursor: string | null;
@@ -7049,6 +7224,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/ListImportsBody.json
              */
             readonly $schema?: string;
             items: components["schemas"]["ImportJobBody"][] | null;
@@ -7060,6 +7236,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/ListInboxOutputBody.json
              */
             readonly $schema?: string;
             items: components["schemas"]["Item"][] | null;
@@ -7071,6 +7248,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/ListIntakeItemsBody.json
              */
             readonly $schema?: string;
             items: components["schemas"]["Record"][] | null;
@@ -7082,6 +7260,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/ListIntegrationsOutputBody.json
              */
             readonly $schema?: string;
             providers: components["schemas"]["ProviderStatus"][] | null;
@@ -7090,6 +7269,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/ListInvitesOutputBody.json
              */
             readonly $schema?: string;
             invites: components["schemas"]["WorkspaceInvite"][] | null;
@@ -7101,6 +7281,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/ListInvocationsOutputBody.json
              */
             readonly $schema?: string;
             invocations: components["schemas"]["Invocation"][] | null;
@@ -7109,6 +7290,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/ListLabelsBody.json
              */
             readonly $schema?: string;
             labels: components["schemas"]["Label"][] | null;
@@ -7119,6 +7301,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/ListLensesBody.json
              */
             readonly $schema?: string;
             lenses: components["schemas"]["SavedLens"][] | null;
@@ -7129,6 +7312,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/ListLinkedEventsOutputBody.json
              */
             readonly $schema?: string;
             links: components["schemas"]["TaskEventLink"][] | null;
@@ -7139,6 +7323,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/ListLinkedTasksOutputBody.json
              */
             readonly $schema?: string;
             links: components["schemas"]["TaskEventLink"][] | null;
@@ -7149,6 +7334,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/ListMcpTokensOutputBody.json
              */
             readonly $schema?: string;
             tokens: components["schemas"]["McpTokenSummary"][] | null;
@@ -7159,6 +7345,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/ListMembersOutputBody.json
              */
             readonly $schema?: string;
             members: components["schemas"]["MemberResponse"][] | null;
@@ -7167,6 +7354,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/ListMemosOutputBody.json
              */
             readonly $schema?: string;
             memos: components["schemas"]["MemoResponse"][] | null;
@@ -7175,6 +7363,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/ListModelsOutputBody.json
              */
             readonly $schema?: string;
             models: components["schemas"]["ModelSummary"][] | null;
@@ -7185,6 +7374,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/ListMyCalendarEventsOutputBody.json
              */
             readonly $schema?: string;
             events: components["schemas"]["MyCalendarEventResponse"][] | null;
@@ -7193,6 +7383,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/ListMyInvitesOutputBody.json
              */
             readonly $schema?: string;
             invites: components["schemas"]["MyInviteResponse"][] | null;
@@ -7206,6 +7397,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/ListMyTasksBody.json
              */
             readonly $schema?: string;
             nextCursor: string | null;
@@ -7217,6 +7409,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/ListMyTasksWithDatesBody.json
              */
             readonly $schema?: string;
             nextCursor: string | null;
@@ -7228,6 +7421,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/ListOutputBody.json
              */
             readonly $schema?: string;
             nextCursor: string | null;
@@ -7239,6 +7433,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/ListPagesBody.json
              */
             readonly $schema?: string;
             pages: components["schemas"]["PageSummaryDTO"][] | null;
@@ -7249,6 +7444,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/ListPrioritySuggestionsOutputBody.json
              */
             readonly $schema?: string;
             suggestions: components["schemas"]["TaskPrioritySuggestion"][] | null;
@@ -7259,6 +7455,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/ListProjectDependenciesBody.json
              */
             readonly $schema?: string;
             edges: components["schemas"]["ProjectDependencyEdge"][] | null;
@@ -7267,6 +7464,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/ListProjectMembersBody.json
              */
             readonly $schema?: string;
             members: components["schemas"]["ProjectMember"][] | null;
@@ -7278,6 +7476,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/ListProjectsBody.json
              */
             readonly $schema?: string;
             nextCursor: string | null;
@@ -7289,6 +7488,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/ListProvidersOutputBody.json
              */
             readonly $schema?: string;
             providers: components["schemas"]["Provider"][] | null;
@@ -7299,6 +7499,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/ListPublicSharesOutputBody.json
              */
             readonly $schema?: string;
             shares: components["schemas"]["PublicShareResponse"][] | null;
@@ -7307,6 +7508,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/ListReactionsBody.json
              */
             readonly $schema?: string;
             reactions: components["schemas"]["Reaction"][] | null;
@@ -7320,6 +7522,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/ListRemindersOutputBody.json
              */
             readonly $schema?: string;
             reminders: components["schemas"]["TaskReminder"][] | null;
@@ -7330,6 +7533,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/ListRetroDraftsBody.json
              */
             readonly $schema?: string;
             drafts: components["schemas"]["RetroDraft"][] | null;
@@ -7340,6 +7544,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/ListSessionsOutputBody.json
              */
             readonly $schema?: string;
             items: components["schemas"]["SessionSummary"][] | null;
@@ -7348,6 +7553,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/ListSettingsOutputBody.json
              */
             readonly $schema?: string;
             items: components["schemas"]["InstanceSetting"][] | null;
@@ -7356,6 +7562,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/ListStateSuggestionsOutputBody.json
              */
             readonly $schema?: string;
             suggestions: components["schemas"]["StateSuggestion"][] | null;
@@ -7366,6 +7573,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/ListTaskActorsBody.json
              */
             readonly $schema?: string;
             actors: components["schemas"]["TaskActor"][] | null;
@@ -7377,6 +7585,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/ListTaskAgentActorsBody.json
              */
             readonly $schema?: string;
             agents: components["schemas"]["TaskAgentActor"][] | null;
@@ -7387,6 +7596,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/ListTaskAiInvocationsOutputBody.json
              */
             readonly $schema?: string;
             invocations: components["schemas"]["TaskAiInvocation"][] | null;
@@ -7395,6 +7605,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/ListTaskAttachmentsBody.json
              */
             readonly $schema?: string;
             attachments: components["schemas"]["TaskAttachment"][] | null;
@@ -7406,6 +7617,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/ListTaskCommentsBody.json
              */
             readonly $schema?: string;
             comments: components["schemas"]["TaskComment"][] | null;
@@ -7417,6 +7629,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/ListTaskDependenciesBody.json
              */
             readonly $schema?: string;
             incoming: components["schemas"]["TaskDependencyEdge"][] | null;
@@ -7426,6 +7639,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/ListTaskLabelsBody.json
              */
             readonly $schema?: string;
             labels: components["schemas"]["TaskLabel"][] | null;
@@ -7434,6 +7648,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/ListTasksBody.json
              */
             readonly $schema?: string;
             nextCursor: string | null;
@@ -7445,6 +7660,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/ListTimeboxTasksBody.json
              */
             readonly $schema?: string;
             /** Format: int64 */
@@ -7459,6 +7675,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/ListTimeboxesBody.json
              */
             readonly $schema?: string;
             timeboxes: components["schemas"]["TimeboxDTO"][] | null;
@@ -7469,6 +7686,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/ListTimelineOutputBody.json
              */
             readonly $schema?: string;
             events: components["schemas"]["Event"][] | null;
@@ -7480,6 +7698,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/ListUserSessionsOutputBody.json
              */
             readonly $schema?: string;
             items: components["schemas"]["Session"][] | null;
@@ -7490,6 +7709,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/ListUsersOutputBody.json
              */
             readonly $schema?: string;
             items: components["schemas"]["User"][] | null;
@@ -7500,6 +7720,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/ListWidgetsBody.json
              */
             readonly $schema?: string;
             /** Format: int64 */
@@ -7510,6 +7731,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/ListWorkspaceMembersOutputBody.json
              */
             readonly $schema?: string;
             members: components["schemas"]["WorkspaceMember"][] | null;
@@ -7521,6 +7743,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/ListWorkspaceUsersOutputBody.json
              */
             readonly $schema?: string;
             users: components["schemas"]["WorkspaceUserSummary"][] | null;
@@ -7543,6 +7766,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/LoginBody.json
              */
             readonly $schema?: string;
             accessToken?: string;
@@ -7562,6 +7786,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/LoginInputBody.json
              */
             readonly $schema?: string;
             /** Format: email */
@@ -7572,6 +7797,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/LoginTotpInputBody.json
              */
             readonly $schema?: string;
             challengeToken: string;
@@ -7582,6 +7808,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/LogoutOutputBody.json
              */
             readonly $schema?: string;
             ok: boolean;
@@ -7590,6 +7817,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/MagicLinkRequestInputBody.json
              */
             readonly $schema?: string;
             /** Format: email */
@@ -7599,6 +7827,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/MagicLinkRequestOutputBody.json
              */
             readonly $schema?: string;
             ok: boolean;
@@ -7607,6 +7836,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/MarkAllReadOutputBody.json
              */
             readonly $schema?: string;
             ok: boolean;
@@ -7615,6 +7845,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/MarkReadOutputBody.json
              */
             readonly $schema?: string;
             ok: boolean;
@@ -7639,6 +7870,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/MeBody.json
              */
             readonly $schema?: string;
             avatarUrl?: string;
@@ -7668,6 +7900,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/MeRevokeSessionOutputBody.json
              */
             readonly $schema?: string;
             ok: boolean;
@@ -7676,6 +7909,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/MemberResponse.json
              */
             readonly $schema?: string;
             avatarUrl?: string;
@@ -7691,6 +7925,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/MemoResponse.json
              */
             readonly $schema?: string;
             body?: string;
@@ -7710,6 +7945,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/MetricsOutputBody.json
              */
             readonly $schema?: string;
             /**
@@ -7829,6 +8065,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/OIDCStartOutputBody.json
              */
             readonly $schema?: string;
             authorizationUrl: string;
@@ -7853,6 +8090,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/PageDTO.json
              */
             readonly $schema?: string;
             body: string;
@@ -7928,6 +8166,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/PatchAutoActionRulesInputBody.json
              */
             readonly $schema?: string;
             rules: components["schemas"]["PatchAutoActionRuleItem"][] | null;
@@ -7936,6 +8175,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/PatchAutoActionRulesOutputBody.json
              */
             readonly $schema?: string;
             rules: components["schemas"]["AutoActionRuleBody"][] | null;
@@ -7944,6 +8184,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/PatchAutoActionSettingsInputBody.json
              */
             readonly $schema?: string;
             enabled?: boolean;
@@ -7956,6 +8197,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/PatchCalendarInputBody.json
              */
             readonly $schema?: string;
             /** @description Display color */
@@ -7971,6 +8213,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/PatchEventInputBody.json
              */
             readonly $schema?: string;
             /** @description All-day flag */
@@ -8022,6 +8265,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/PatchLabelBody.json
              */
             readonly $schema?: string;
             color?: string;
@@ -8035,6 +8279,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/PatchMeInputBody.json
              */
             readonly $schema?: string;
             avatarUrl?: string;
@@ -8061,6 +8306,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/PatchOwnSubscriptionInputBody.json
              */
             readonly $schema?: string;
             /** @description Caller-specific display color (hex) */
@@ -8077,6 +8323,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/PatchOwnSubscriptionOutputBody.json
              */
             readonly $schema?: string;
             updated: boolean;
@@ -8085,6 +8332,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/PatchProjectBody.json
              */
             readonly $schema?: string;
             description?: string;
@@ -8095,6 +8343,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/PatchProviderInputBody.json
              */
             readonly $schema?: string;
             /** @description New plaintext provider API key (write-only) */
@@ -8104,6 +8353,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/PatchProviderOutputBody.json
              */
             readonly $schema?: string;
             ok: boolean;
@@ -8112,6 +8362,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/PatchPublicShareInputBody.json
              */
             readonly $schema?: string;
             clearExpiresAt?: boolean;
@@ -8131,6 +8382,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/PatchSettingsInputBody.json
              */
             readonly $schema?: string;
             /** @description Key-value pairs to upsert */
@@ -8142,6 +8394,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/PatchSettingsOutputBody.json
              */
             readonly $schema?: string;
             ok: boolean;
@@ -8150,6 +8403,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/PatchTaskBody.json
              */
             readonly $schema?: string;
             description?: string;
@@ -8175,6 +8429,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/PatchUserInputBody.json
              */
             readonly $schema?: string;
             enabled: boolean | null;
@@ -8183,6 +8438,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/PatchUserOutputBody.json
              */
             readonly $schema?: string;
             ok: boolean;
@@ -8191,6 +8447,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/PatchWorkspaceOutputBody.json
              */
             readonly $schema?: string;
             ok: boolean;
@@ -8199,6 +8456,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/PauseAgentInputBody.json
              */
             readonly $schema?: string;
             paused: boolean;
@@ -8207,6 +8465,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/PauseAgentOutputBody.json
              */
             readonly $schema?: string;
             ok: boolean;
@@ -8215,6 +8474,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/PresignAttachmentInputBody.json
              */
             readonly $schema?: string;
             /**
@@ -8233,6 +8493,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/PresignAttachmentOutputBody.json
              */
             readonly $schema?: string;
             /** @description Public ID of the created attachment row */
@@ -8252,6 +8513,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/PresignUploadBody.json
              */
             readonly $schema?: string;
             /**
@@ -8270,6 +8532,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/PresignUploadOutputBody.json
              */
             readonly $schema?: string;
             /** @description Public ID of the created attachment row */
@@ -8321,6 +8584,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/ProjectMember.json
              */
             readonly $schema?: string;
             /** Format: int64 */
@@ -8339,6 +8603,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/ProposeShiftBody.json
              */
             readonly $schema?: string;
             /**
@@ -8351,6 +8616,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/ProposeShiftOutputBody.json
              */
             readonly $schema?: string;
             conflictTasks: components["schemas"]["ShiftCandidateDTO"][] | null;
@@ -8367,6 +8633,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/ProposeSmartInputBody.json
              */
             readonly $schema?: string;
             description?: string;
@@ -8377,6 +8644,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/ProposeStepsInputBody.json
              */
             readonly $schema?: string;
             /**
@@ -8390,6 +8658,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/ProposeStepsOutputBody.json
              */
             readonly $schema?: string;
             parentTaskId: string;
@@ -8404,6 +8673,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/Provider.json
              */
             readonly $schema?: string;
             apiKeyMasked: string;
@@ -8429,6 +8699,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/PublicLens.json
              */
             readonly $schema?: string;
             /** @description Optional public-facing description shown on the share page */
@@ -8459,6 +8730,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/PublicShareCreateResponse.json
              */
             readonly $schema?: string;
             coverUrl?: string;
@@ -8517,6 +8789,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/PublicShareResponse.json
              */
             readonly $schema?: string;
             coverUrl?: string;
@@ -8543,6 +8816,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/PublicShareRotateResponse.json
              */
             readonly $schema?: string;
             coverUrl?: string;
@@ -8570,6 +8844,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/PublishLensBody.json
              */
             readonly $schema?: string;
             /** @description 32-char hex token for the public share URL */
@@ -8588,6 +8863,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/Record.json
              */
             readonly $schema?: string;
             aiReasoning?: string;
@@ -8610,6 +8886,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/RegisterInputBody.json
              */
             readonly $schema?: string;
             country?: string;
@@ -8624,6 +8901,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/RemoveAttendeeOutputBody.json
              */
             readonly $schema?: string;
             removed: boolean;
@@ -8632,6 +8910,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/RemoveProjectMemberBody.json
              */
             readonly $schema?: string;
             ok: boolean;
@@ -8640,6 +8919,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/RemoveTaskActorBody.json
              */
             readonly $schema?: string;
             ok: boolean;
@@ -8648,6 +8928,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/RemoveTaskConstraintBody.json
              */
             readonly $schema?: string;
             ok: boolean;
@@ -8656,6 +8937,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/RemoveTaskDependencyBody.json
              */
             readonly $schema?: string;
             ok: boolean;
@@ -8664,6 +8946,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/RemoveTaskLabelOutputBody.json
              */
             readonly $schema?: string;
             ok: boolean;
@@ -8672,6 +8955,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/RemoveTaskOutputBody.json
              */
             readonly $schema?: string;
             ok: boolean;
@@ -8680,6 +8964,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/RenderPublicShareOutputBody.json
              */
             readonly $schema?: string;
             events: components["schemas"]["PublicShareRenderEvent"][] | null;
@@ -8698,6 +8983,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/ReorderShareEventsInputBody.json
              */
             readonly $schema?: string;
             /** @description Complete new ordering of share-event link public IDs; must be a permutation of the share's current links */
@@ -8707,6 +8993,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/ReorderShareEventsOutputBody.json
              */
             readonly $schema?: string;
             reordered: boolean;
@@ -8715,6 +9002,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/ReorderTasksBody.json
              */
             readonly $schema?: string;
             /** @description Tasks with new sort weights */
@@ -8726,6 +9014,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/ReorderTasksOkBody.json
              */
             readonly $schema?: string;
             ok: boolean;
@@ -8734,6 +9023,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/ReplayOutputBody.json
              */
             readonly $schema?: string;
             derivedState: string;
@@ -8744,6 +9034,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/ResolveBody.json
              */
             readonly $schema?: string;
             /**
@@ -8756,6 +9047,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/ResolveCommandInputBody.json
              */
             readonly $schema?: string;
             /** @description Natural language command */
@@ -8765,6 +9057,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/ResolveCommandOutputBody.json
              */
             readonly $schema?: string;
             /** @description Tool arguments */
@@ -8783,6 +9076,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/ResolveOutputBody.json
              */
             readonly $schema?: string;
             ok: boolean;
@@ -8791,6 +9085,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/RestoreDescriptionVersionOutputBody.json
              */
             readonly $schema?: string;
             ok: boolean;
@@ -8816,6 +9111,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/ReverseOutputBody.json
              */
             readonly $schema?: string;
             /**
@@ -8830,6 +9126,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/RevokeAdminOutputBody.json
              */
             readonly $schema?: string;
             ok: boolean;
@@ -8838,6 +9135,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/RevokeAllOtherSessionsOutputBody.json
              */
             readonly $schema?: string;
             ok: boolean;
@@ -8851,6 +9149,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/RevokeEventInviteOutputBody.json
              */
             readonly $schema?: string;
             revoked: boolean;
@@ -8859,6 +9158,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/RevokeInviteOutputBody.json
              */
             readonly $schema?: string;
             ok: boolean;
@@ -8867,6 +9167,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/SavedLens.json
              */
             readonly $schema?: string;
             /** Format: int64 */
@@ -8904,6 +9205,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/SearchPagesBody.json
              */
             readonly $schema?: string;
             pages: components["schemas"]["PageSummaryDTO"][] | null;
@@ -8914,6 +9216,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/SelfSubscribeOutputBody.json
              */
             readonly $schema?: string;
             alreadySubscribed: boolean;
@@ -8958,6 +9261,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/SetupOutputBody.json
              */
             readonly $schema?: string;
             ok: boolean;
@@ -8991,6 +9295,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/Signal.json
              */
             readonly $schema?: string;
             /** Format: int64 */
@@ -9021,6 +9326,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/SignalCreateInputBody.json
              */
             readonly $schema?: string;
             /**
@@ -9050,6 +9356,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/SmartCreateInputBody.json
              */
             readonly $schema?: string;
             /** @description Natural language event description */
@@ -9061,6 +9368,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/SmartCreateOutputBody.json
              */
             readonly $schema?: string;
             proposal: components["schemas"]["EventProposal"];
@@ -9069,6 +9377,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/SmartProposal.json
              */
             readonly $schema?: string;
             subtasks: components["schemas"]["SubtaskProposal"][] | null;
@@ -9078,6 +9387,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/SnoozeInboxInputBody.json
              */
             readonly $schema?: string;
             /**
@@ -9090,6 +9400,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/SnoozeInboxOutputBody.json
              */
             readonly $schema?: string;
             ok: boolean;
@@ -9111,6 +9422,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/SubscribeSystemCalendarInputBody.json
              */
             readonly $schema?: string;
             country: string;
@@ -9119,6 +9431,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/SubscribeSystemCalendarOutputBody.json
              */
             readonly $schema?: string;
             ok: boolean;
@@ -9159,6 +9472,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/Task.json
              */
             readonly $schema?: string;
             /** Format: int64 */
@@ -9291,6 +9605,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/TaskConstraint.json
              */
             readonly $schema?: string;
             /** Format: int64 */
@@ -9311,6 +9626,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/TaskDependency.json
              */
             readonly $schema?: string;
             /** Format: int64 */
@@ -9421,6 +9737,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/TestDeliveryOutputBody.json
              */
             readonly $schema?: string;
             deliveryId: string;
@@ -9429,6 +9746,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/TimeboxDTO.json
              */
             readonly $schema?: string;
             /** Format: int64 */
@@ -9471,6 +9789,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/ToggleCanEditInputBody.json
              */
             readonly $schema?: string;
             /** @description Whether the attendee can edit the event */
@@ -9480,6 +9799,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/ToggleCanEditOutputBody.json
              */
             readonly $schema?: string;
             updated: boolean;
@@ -9488,6 +9808,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/ToggleInputBody.json
              */
             readonly $schema?: string;
             /** @description Desired active state */
@@ -9497,6 +9818,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/ToggleOutputBody.json
              */
             readonly $schema?: string;
             ok: boolean;
@@ -9505,14 +9827,17 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/TotpConfirmInputBody.json
              */
             readonly $schema?: string;
             code: string;
+            password: string;
         };
         TotpConfirmOutputBody: {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/TotpConfirmOutputBody.json
              */
             readonly $schema?: string;
             ok: boolean;
@@ -9522,6 +9847,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/TotpDisableInputBody.json
              */
             readonly $schema?: string;
             password: string;
@@ -9530,14 +9856,25 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/TotpDisableOutputBody.json
              */
             readonly $schema?: string;
             ok: boolean;
+        };
+        TotpEnrollInputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/TotpEnrollInputBody.json
+             */
+            readonly $schema?: string;
+            password: string;
         };
         TotpEnrollOutputBody: {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/TotpEnrollOutputBody.json
              */
             readonly $schema?: string;
             otpauthUrl: string;
@@ -9548,6 +9885,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/TotpRecoveryCodesStatusOutputBody.json
              */
             readonly $schema?: string;
             /** Format: int64 */
@@ -9557,6 +9895,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/TotpRegenerateRecoveryCodesInputBody.json
              */
             readonly $schema?: string;
             password: string;
@@ -9565,6 +9904,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/TotpRegenerateRecoveryCodesOutputBody.json
              */
             readonly $schema?: string;
             recoveryCodes: string[] | null;
@@ -9573,6 +9913,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/TotpStatusOutputBody.json
              */
             readonly $schema?: string;
             /**
@@ -9585,6 +9926,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/TransitionTaskBody.json
              */
             readonly $schema?: string;
             /**
@@ -9604,6 +9946,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/TriageInputBody.json
              */
             readonly $schema?: string;
             /**
@@ -9616,6 +9959,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/TriageIntakeItemBody.json
              */
             readonly $schema?: string;
             /**
@@ -9630,6 +9974,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/TriageOutputBody.json
              */
             readonly $schema?: string;
             suggestions: components["schemas"]["TriageSuggestion"][] | null;
@@ -9645,6 +9990,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/TriggerAgentOutputBody.json
              */
             readonly $schema?: string;
             dedupeKey: string;
@@ -9654,6 +10000,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/UnarchiveTaskOutputBody.json
              */
             readonly $schema?: string;
             ok: boolean;
@@ -9662,6 +10009,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/UnpublishLensBody.json
              */
             readonly $schema?: string;
             ok: boolean;
@@ -9670,6 +10018,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/UpdateAgentEventTriggersInputBody.json
              */
             readonly $schema?: string;
             /** @description Pass [] to clear; otherwise list of eventbus kinds */
@@ -9679,6 +10028,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/UpdateAgentEventTriggersOutputBody.json
              */
             readonly $schema?: string;
             ok: boolean;
@@ -9687,6 +10037,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/UpdateAgentScheduleInputBody.json
              */
             readonly $schema?: string;
             /** @enum {string} */
@@ -9696,6 +10047,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/UpdateAgentScheduleOutputBody.json
              */
             readonly $schema?: string;
             ok: boolean;
@@ -9704,6 +10056,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/UpdateChecklistItemInputBody.json
              */
             readonly $schema?: string;
             /** @description Done flag */
@@ -9720,6 +10073,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/UpdateChecklistItemOutputBody.json
              */
             readonly $schema?: string;
             updated: boolean;
@@ -9728,6 +10082,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/UpdateLensBody.json
              */
             readonly $schema?: string;
             /** @description Optional public-facing description shown on the share page; pass null to clear */
@@ -9742,6 +10097,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/UpdateMemberRoleInputBody.json
              */
             readonly $schema?: string;
             /**
@@ -9754,6 +10110,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/UpdateMemberRoleOutputBody.json
              */
             readonly $schema?: string;
             updated: boolean;
@@ -9762,6 +10119,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/UpdateMemoInputBody.json
              */
             readonly $schema?: string;
             /** @description User-authored multi-line memo body */
@@ -9780,6 +10138,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/UpdateMemoOutputBody.json
              */
             readonly $schema?: string;
             updated: boolean;
@@ -9788,6 +10147,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/UpdatePageBody.json
              */
             readonly $schema?: string;
             body?: string;
@@ -9801,6 +10161,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/UpdateRsvpInputBody.json
              */
             readonly $schema?: string;
             /**
@@ -9813,6 +10174,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/UpdateRsvpOutputBody.json
              */
             readonly $schema?: string;
             updated: boolean;
@@ -9821,6 +10183,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/UpdateTimeboxBody.json
              */
             readonly $schema?: string;
             description?: string;
@@ -9834,6 +10197,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/UpdateTimeboxStatusBody.json
              */
             readonly $schema?: string;
             /** @description Target status: planned, active, completed, cancelled */
@@ -9843,6 +10207,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/UpdateWidgetBody.json
              */
             readonly $schema?: string;
             /** @description Arbitrary JSON configuration blob */
@@ -9861,6 +10226,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/UpdateWidgetPositionBody.json
              */
             readonly $schema?: string;
             /** Format: int64 */
@@ -9878,6 +10244,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/UpdateWorkspaceMemberRoleInputBody.json
              */
             readonly $schema?: string;
             /** @enum {string} */
@@ -9887,6 +10254,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/User.json
              */
             readonly $schema?: string;
             avatarUrl?: string;
@@ -9929,6 +10297,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/WebhookListOutputBody.json
              */
             readonly $schema?: string;
             nextCursor: string | null;
@@ -9981,6 +10350,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/WeeklyDigestOutputBody.json
              */
             readonly $schema?: string;
             completedThisWeek: components["schemas"]["WeeklyDigestTask"][] | null;
@@ -9997,6 +10367,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/WidgetDTO.json
              */
             readonly $schema?: string;
             config?: unknown;
@@ -10025,6 +10396,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/Workspace.json
              */
             readonly $schema?: string;
             country: string;
@@ -10083,6 +10455,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/WorkspacePatchWorkspaceInputBody.json
              */
             readonly $schema?: string;
             country?: string;
@@ -10096,6 +10469,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/WorkspaceRemoveMemberOutputBody.json
              */
             readonly $schema?: string;
             ok: boolean;
@@ -10110,6 +10484,7 @@ export interface components {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/WorkspacesListOutputBody.json
              */
             readonly $schema?: string;
             nextCursor: string | null;
@@ -12175,7 +12550,11 @@ export interface operations {
             path?: never;
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TotpEnrollInputBody"];
+            };
+        };
         responses: {
             /** @description OK */
             200: {
@@ -18008,6 +18387,8 @@ export interface operations {
             query?: {
                 /** @description Filter by triage status: pending, accepted, rejected, snoozed, duplicate */
                 status?: string;
+                /** @description Opaque cursor returned by previous page; pass to fetch next page. Empty when at end. */
+                cursor?: string;
                 limit?: number;
                 offset?: number;
             };

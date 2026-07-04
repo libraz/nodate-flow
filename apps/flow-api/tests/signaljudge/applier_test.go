@@ -20,6 +20,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"slices"
 	"strings"
 	"sync"
 	"testing"
@@ -528,13 +529,5 @@ func TestApplierBusFailurePropagates(t *testing.T) {
 // equalStrSlice is a tiny helper that returns true when two []string
 // slices have identical length and elements in order.
 func equalStrSlice(a, b []string) bool {
-	if len(a) != len(b) {
-		return false
-	}
-	for i := range a {
-		if a[i] != b[i] {
-			return false
-		}
-	}
-	return true
+	return slices.Equal(a, b)
 }

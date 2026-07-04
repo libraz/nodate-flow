@@ -27,6 +27,21 @@ type TokenResolver interface {
 	Resolve(ctx context.Context, token string) (userID uint32, sessionPID dbtype.PublicID, err error)
 }
 
+// TokenDetails is the richer resolver result used by token families that
+// carry metadata beyond the actor id, such as PAT scopes.
+type TokenDetails struct {
+	UserID          uint32
+	SessionPublicID dbtype.PublicID
+	Kind            TokenKind
+	Scopes          []string
+}
+
+// DetailedTokenResolver may be implemented by resolvers that can return
+// token-family metadata for downstream authorization middleware.
+type DetailedTokenResolver interface {
+	ResolveDetailed(ctx context.Context, token string) (TokenDetails, error)
+}
+
 // ResolverDB is the minimal database interface needed by [JWTResolver]
 // to look up the internal user id from a public id.
 type ResolverDB interface {
@@ -60,5 +75,33 @@ func (r *JWTResolver) Resolve(ctx context.Context, token string) (uint32, dbtype
 		}
 		return 0, dbtype.PublicID{}, err
 	}
+	var zero dbtype.PublicID
+	if claims.SessionPublicID != zero {
+		const sessionQ = `
+SELECT id
+FROM sessions
+WHERE public_id = ?
+  AND user_id = ?
+  AND enabled = TRUE
+  AND revoked_at IS NULL
+  AND expires_at > CURRENT_TIMESTAMP
+LIMIT 1`
+		var sessionID uint32
+		if err := r.DB.QueryRowContext(ctx, sessionQ, claims.SessionPublicID, uid).Scan(&sessionID); err != nil {
+			if errors.Is(err, sql.ErrNoRows) {
+				return 0, dbtype.PublicID{}, ErrTokenInvalid
+			}
+			return 0, dbtype.PublicID{}, err
+		}
+	}
 	return uid, claims.SessionPublicID, nil
+}
+
+// ResolveDetailed validates a JWT and returns metadata for context storage.
+func (r *JWTResolver) ResolveDetailed(ctx context.Context, token string) (TokenDetails, error) {
+	uid, sid, err := r.Resolve(ctx, token)
+	if err != nil {
+		return TokenDetails{}, err
+	}
+	return TokenDetails{UserID: uid, SessionPublicID: sid, Kind: TokenKindJWT}, nil
 }

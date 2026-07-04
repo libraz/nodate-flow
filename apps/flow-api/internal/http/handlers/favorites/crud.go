@@ -34,12 +34,16 @@ func Create(deps Deps) func(context.Context, *CreateFavoriteInput) (*CreateFavor
 		if err != nil {
 			return nil, httpErr(apierrors.WsFavoriteNotFound)
 		}
+		targetType := generated.UserFavoritesTargetType(in.Body.TargetType)
+		if err := ensureFavoriteTargetExists(ctx, deps.Queries, wsID, targetType, targetPub); err != nil {
+			return nil, httpErr(apierrors.WsFavoriteNotFound)
+		}
 
 		// Check for duplicate favorite on the same target.
 		_, dupErr := deps.Queries.FindFavoriteByTarget(ctx, generated.FindFavoriteByTargetParams{
 			WorkspaceID:    wsID,
 			UserID:         actorID,
-			TargetType:     generated.UserFavoritesTargetType(in.Body.TargetType),
+			TargetType:     targetType,
 			TargetPublicID: targetPub,
 		})
 		if dupErr == nil {
@@ -59,7 +63,7 @@ func Create(deps Deps) func(context.Context, *CreateFavoriteInput) (*CreateFavor
 			PublicID:       pub,
 			WorkspaceID:    wsID,
 			UserID:         actorID,
-			TargetType:     generated.UserFavoritesTargetType(in.Body.TargetType),
+			TargetType:     targetType,
 			TargetPublicID: targetPub,
 			FolderName:     folderName,
 		}); err != nil {
@@ -109,6 +113,34 @@ func Create(deps Deps) func(context.Context, *CreateFavoriteInput) (*CreateFavor
 		}
 
 		return &CreateFavoriteOutput{Body: mapFindRow(row)}, nil
+	}
+}
+
+func ensureFavoriteTargetExists(
+	ctx context.Context,
+	q *generated.Queries,
+	workspaceID uint32,
+	targetType generated.UserFavoritesTargetType,
+	targetPublicID types.PublicID,
+) error {
+	switch targetType {
+	case generated.UserFavoritesTargetTypeProject:
+		_, err := q.FindProjectByPublicId(ctx, generated.FindProjectByPublicIdParams{WorkspaceID: workspaceID, PublicID: targetPublicID})
+		return err
+	case generated.UserFavoritesTargetTypeTask:
+		_, err := q.FindTaskByPublicId(ctx, generated.FindTaskByPublicIdParams{WorkspaceID: workspaceID, PublicID: targetPublicID})
+		return err
+	case generated.UserFavoritesTargetTypePage:
+		_, err := q.GetPageByPublicId(ctx, generated.GetPageByPublicIdParams{WorkspaceID: workspaceID, PublicID: targetPublicID})
+		return err
+	case generated.UserFavoritesTargetTypeLens:
+		_, err := q.GetLensByPublicID(ctx, generated.GetLensByPublicIDParams{WorkspaceID: workspaceID, PublicID: targetPublicID})
+		return err
+	case generated.UserFavoritesTargetTypeTimebox:
+		_, err := q.GetTimeboxByPublicId(ctx, generated.GetTimeboxByPublicIdParams{WorkspaceID: workspaceID, PublicID: targetPublicID})
+		return err
+	default:
+		return sql.ErrNoRows
 	}
 }
 

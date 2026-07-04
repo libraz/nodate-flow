@@ -23,10 +23,18 @@ const (
 // Non-transition events are filtered out by the caller before they
 // reach Replay so this struct stays minimal.
 type TransitionEvent struct {
+	// ID is the internal events.id for this transition event. It is
+	// used only to cancel events referenced by another event's
+	// ReversesEventID.
+	ID int64
 	// Name is the transition verb ("start", "complete", ...). It
 	// is usually parsed from the event Type suffix via
 	// [ParseTransitionName].
 	Name string
+	// ReversesEventID points at the internal events.id this event
+	// compensates. When present, replay skips both this compensating
+	// event and the original event it references.
+	ReversesEventID *int64
 }
 
 // ParseTransitionName extracts the verb from an event type string
@@ -57,8 +65,21 @@ var ErrIllegalTransition = errors.New("engine: illegal transition")
 //
 // Replay is a pure function of its input slice.
 func Replay(events []TransitionEvent) (DerivedState, error) {
+	reversed := make(map[int64]struct{})
+	for _, ev := range events {
+		if ev.ReversesEventID != nil {
+			reversed[*ev.ReversesEventID] = struct{}{}
+		}
+	}
+
 	state := StateOpen
 	for _, ev := range events {
+		if ev.ReversesEventID != nil {
+			continue
+		}
+		if _, ok := reversed[ev.ID]; ok {
+			continue
+		}
 		next, ok := nextState(state, ev.Name)
 		if !ok {
 			return state, ErrIllegalTransition

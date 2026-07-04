@@ -1,5 +1,7 @@
 // Package workspace contains Huma operation handlers for the
 // /workspaces, /workspaces/{wsId}/members, and invite endpoints.
+//
+//nolint:revive // DTO names intentionally keep workspace prefixes for stable generated OpenAPI schema names.
 package workspace
 
 import (

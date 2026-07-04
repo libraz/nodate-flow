@@ -15,9 +15,18 @@ import Select from '@nodate-flow/ui/primitives/select';
 import { toaster } from '@nodate-flow/ui/primitives/toast';
 import { Link, useNavigate } from '@tanstack/react-router';
 import type { ColumnDef, RowSelectionState } from '@tanstack/react-table';
-import { type DragEvent, type ReactElement, useCallback, useEffect, useRef, useState } from 'react';
+import {
+  type DragEvent,
+  type KeyboardEvent,
+  type ReactElement,
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+} from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { formatApiError } from '../../lib/api-error';
 import { formatDate, formatEpoch, isOverdue } from '../../lib/format';
 import { computeBlockedByOpen, useProjectDependenciesQuery } from '../projects/api';
 
@@ -64,7 +73,11 @@ function BulkActionBar({
           toaster.show({ tone: 'success', message: t('tasks.bulk.priority_updated') });
           onClear();
         } else if (failed === results.length) {
-          toaster.show({ tone: 'danger', message: t('tasks.bulk.update_failed') });
+          const first = results.find((r) => r.status === 'rejected');
+          toaster.show({
+            tone: 'danger',
+            message: formatApiError(first?.reason, t, 'tasks.bulk.update_failed'),
+          });
         } else {
           toaster.show({
             tone: 'danger',
@@ -87,7 +100,11 @@ function BulkActionBar({
         toaster.show({ tone: 'success', message: t('tasks.bulk.deleted') });
         onClear();
       } else if (failed === results.length) {
-        toaster.show({ tone: 'danger', message: t('tasks.bulk.delete_failed') });
+        const first = results.find((r) => r.status === 'rejected');
+        toaster.show({
+          tone: 'danger',
+          message: formatApiError(first?.reason, t, 'tasks.bulk.delete_failed'),
+        });
       } else {
         toaster.show({
           tone: 'danger',
@@ -454,8 +471,9 @@ function InlineDueCell({
 export default function TaskListView({ projectId }: TaskListViewProps): ReactElement {
   const { t, i18n } = useTranslation('common');
   const filters = useTaskFilters(projectId);
-  // Cursor-paginated infinite list. We flat-map pages here — the order is
-  // stable because the cursor is keyset (created_at, id) on the server.
+  // OFFSET-paginated infinite list. We flat-map pages here; the project list
+  // intentionally stays on the backend sort_weight order so DnD reorder works
+  // beyond the first fetched page.
   const { data, hasNextPage, isFetchingNextPage, fetchNextPage } = useTasksInfiniteQuery(
     projectId,
     filters,
@@ -501,6 +519,19 @@ export default function TaskListView({ projectId }: TaskListViewProps): ReactEle
   }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
 
   const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
+  const selectionResetKey = [
+    filters.search ?? '',
+    filters.assigneeId ?? '',
+    (filters.states ?? []).join(','),
+    (filters.priority ?? []).join(','),
+  ].join('\0');
+  const previousSelectionResetKey = useRef(selectionResetKey);
+
+  useEffect(() => {
+    if (previousSelectionResetKey.current === selectionResetKey) return;
+    previousSelectionResetKey.current = selectionResetKey;
+    setRowSelection({});
+  }, [selectionResetKey]);
 
   /* ── DnD row reorder state ──────────────────────────────────── */
   const [dragIdx, setDragIdx] = useState<number | null>(null);
@@ -530,41 +561,55 @@ export default function TaskListView({ projectId }: TaskListViewProps): ReactEle
     setDropIdx(null);
   }, []);
 
+  const reorderRows = useCallback(
+    (sourceIdx: number, targetIdx: number) => {
+      if (Number.isNaN(sourceIdx) || sourceIdx === targetIdx) return;
+      if (sourceIdx < 0 || targetIdx < 0 || sourceIdx >= tasks.length || targetIdx >= tasks.length)
+        return;
+      if (tasks.length < 2) return;
+
+      const reordered = [...tasks];
+      const [moved] = reordered.splice(sourceIdx, 1);
+      if (!moved) return;
+      reordered.splice(targetIdx, 0, moved);
+
+      const items = reordered.map((task, i) => ({
+        id: task.id,
+        sortWeight: (i + 1) * 1000,
+      }));
+
+      void reorderTasks.mutateAsync({ projectId, items }).catch((err) => {
+        toaster.show({ tone: 'danger', message: formatApiError(err, t, 'tasks.reorder.failed') });
+      });
+    },
+    [tasks, projectId, reorderTasks, t],
+  );
+
   const handleDrop = useCallback(
     (e: DragEvent, targetIdx: number) => {
       e.preventDefault();
       const sourceIdx = Number(e.dataTransfer.getData('text/plain'));
       setDragIdx(null);
       setDropIdx(null);
-      if (Number.isNaN(sourceIdx) || sourceIdx === targetIdx) return;
-      if (tasks.length < 2) return;
-
-      // Build the new order by moving source to target position
-      const reordered = [...tasks];
-      const [moved] = reordered.splice(sourceIdx, 1);
-      if (!moved) return;
-      reordered.splice(targetIdx, 0, moved);
-
-      // Assign sequential sort weights (gap of 1000 for future inserts)
-      const items = reordered.map((task, i) => ({
-        id: task.id,
-        sortWeight: (i + 1) * 1000,
-      }));
-
-      void reorderTasks.mutateAsync({ projectId, items }).catch(() => {
-        toaster.show({ tone: 'danger', message: t('tasks.reorder.failed') });
-      });
+      reorderRows(sourceIdx, targetIdx);
     },
-    [tasks, projectId, reorderTasks, t],
+    [reorderRows],
   );
 
-  const selectedIds = Object.keys(rowSelection)
-    .filter((k) => rowSelection[k])
-    .map((idx) => {
-      const task = tasks[Number(idx)];
-      return task?.id ?? '';
-    })
-    .filter(Boolean);
+  const handleReorderKeyDown = useCallback(
+    (e: KeyboardEvent, sourceIdx: number) => {
+      if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        reorderRows(sourceIdx, sourceIdx - 1);
+      } else if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        reorderRows(sourceIdx, sourceIdx + 1);
+      }
+    },
+    [reorderRows],
+  );
+
+  const selectedIds = Object.keys(rowSelection).filter((id) => rowSelection[id]);
 
   const handleClearSelection = useCallback(() => {
     setRowSelection({});
@@ -580,8 +625,11 @@ export default function TaskListView({ projectId }: TaskListViewProps): ReactEle
       ...(patch.priority !== undefined && { priority: patch.priority }),
       ...(patch.dueOn !== undefined && { dueOn: patch.dueOn ?? '' }),
     };
-    void updateTask.mutateAsync({ id, patch: wirePatch }).catch(() => {
-      toaster.show({ tone: 'danger', message: t('tasks.inline.save_failed') });
+    void updateTask.mutateAsync({ id, patch: wirePatch }).catch((err) => {
+      toaster.show({
+        tone: 'danger',
+        message: formatApiError(err, t, 'tasks.inline.save_failed'),
+      });
     });
   };
 
@@ -603,6 +651,8 @@ export default function TaskListView({ projectId }: TaskListViewProps): ReactEle
           onDragLeave={handleDragLeave}
           onDragEnd={handleDragEnd}
           onDrop={(e) => handleDrop(e, row.index)}
+          onKeyDown={(e) => handleReorderKeyDown(e, row.index)}
+          aria-keyshortcuts="ArrowUp ArrowDown"
           style={{
             cursor: 'grab',
             display: 'inline-flex',
@@ -785,6 +835,7 @@ export default function TaskListView({ projectId }: TaskListViewProps): ReactEle
         aria-label={t('tasks.title')}
         columns={columns}
         data={tasks}
+        getRowId={(row) => row.id}
         emptyContent={t('tasks.empty')}
         enableRowSelection
         rowSelection={rowSelection}

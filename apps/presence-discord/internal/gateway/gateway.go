@@ -220,6 +220,7 @@ func defaultSessionFactory(token string) (sessionAdapter, error) {
 		return nil, err
 	}
 	s.Identify.Intents = discordgo.IntentsGuildPresences | discordgo.IntentsGuildMembers
+	s.SyncEvents = true
 	// Keep State enabled (the default) so State.SessionID is
 	// populated for PresenceUpdate correlation. The cache cost is
 	// modest for a presence-only bot — we are not tracking messages

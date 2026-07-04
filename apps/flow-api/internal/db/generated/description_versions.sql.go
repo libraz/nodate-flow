@@ -59,12 +59,14 @@ SELECT
 FROM task_description_versions tdv
 LEFT JOIN users au ON au.id = tdv.author_user_id
 WHERE tdv.workspace_id = ?
+  AND tdv.task_id = ?
   AND tdv.public_id = ?
   AND tdv.enabled = TRUE
 `
 
 type FindDescriptionVersionParams struct {
 	WorkspaceID uint32         `json:"-"`
+	TaskID      uint32         `json:"-"`
 	PublicID    types.PublicID `json:"publicId"`
 }
 
@@ -81,7 +83,7 @@ type FindDescriptionVersionRow struct {
 
 // Find a specific description version by public id.
 func (q *Queries) FindDescriptionVersion(ctx context.Context, arg FindDescriptionVersionParams) (FindDescriptionVersionRow, error) {
-	row := q.db.QueryRowContext(ctx, findDescriptionVersion, arg.WorkspaceID, arg.PublicID)
+	row := q.db.QueryRowContext(ctx, findDescriptionVersion, arg.WorkspaceID, arg.TaskID, arg.PublicID)
 	var i FindDescriptionVersionRow
 	err := row.Scan(
 		&i.PublicID,

@@ -416,7 +416,7 @@ func mustNewJSONRequest(t *testing.T, method, url, bearer string, body any) *htt
 
 func mustDoJSON(t *testing.T, req *http.Request, out any) {
 	t.Helper()
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := http.DefaultClient.Do(req) //#nosec G704 -- test helper only calls the in-process httptest server URL.
 	require.NoError(t, err, "%s %s", req.Method, req.URL.String())
 	defer func() { _ = resp.Body.Close() }()
 	var raw []byte

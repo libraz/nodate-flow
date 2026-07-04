@@ -236,10 +236,12 @@ func main() {
 					InvokedAt:   time.Now().UTC().Truncate(24 * time.Hour),
 				})
 			})
+			invocationLogger := router.NewDBInvocationLogger(queries, aiInvocationPublisher)
 			executor = &ai.AgentExecutor{
 				Queries:      queries,
 				Resolver:     resolver,
 				Guard:        ai.NewCostGuard(budget, 0),
+				Log:          invocationLogger,
 				OnInvocation: obs.RecordAIInvocation,
 				PreFlight:    &ai.PreFlight{Queries: queries},
 			}
@@ -289,7 +291,22 @@ func main() {
 				Resolver:     resolver,
 				Guard:        ai.NewCostGuard(budget, 0),
 				OnInvocation: obs.RecordAIInvocation,
-				Applier:      judgeApplier,
+				Log: func(ctx context.Context, rec signaljudge.InvocationRecord) {
+					invocationLogger(ctx, ai.InvocationRecord{
+						WorkspaceID:      rec.WorkspaceID,
+						AgentID:          rec.AgentID,
+						Purpose:          rec.Purpose,
+						Model:            rec.Model,
+						PromptRedacted:   rec.PromptRedacted,
+						ResponseRedacted: rec.ResponseRedacted,
+						TokensInput:      rec.TokensInput,
+						TokensOutput:     rec.TokensOutput,
+						CostCents:        rec.CostCents,
+						Status:           rec.Status,
+						ErrorCode:        rec.ErrorCode,
+					})
+				},
+				Applier: judgeApplier,
 				// Phase 6 / L1 — wire the three PromptDeps lookups so
 				// the runner renders the full context window
 				// (recent tasks + linked tasks + judge_instructions +
@@ -438,6 +455,7 @@ func main() {
 		EmbedModel:            cfg.EmbedModel,
 		EmbedBaseURL:          cfg.EmbedBaseURL,
 		DisableRateLimit:      cfg.DisableRateLimit,
+		TrustedProxyHops:      cfg.TrustedProxyHops,
 	})
 
 	// Wrap the router with the request logger so the prod binary keeps

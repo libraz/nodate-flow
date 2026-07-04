@@ -79,6 +79,10 @@ func GetDescriptionVersion(deps Deps) func(context.Context, *GetDescriptionVersi
 		if !ok {
 			return nil, httpErr(apierrors.WsWorkspaceNotFound)
 		}
+		task, ok := middleware.TaskFromContext(ctx)
+		if !ok {
+			return nil, httpErr(apierrors.WsTaskNotFound)
+		}
 
 		versionPub, err := types.Parse(in.VersionID)
 		if err != nil {
@@ -87,6 +91,7 @@ func GetDescriptionVersion(deps Deps) func(context.Context, *GetDescriptionVersi
 
 		row, err := deps.Queries.FindDescriptionVersion(ctx, generated.FindDescriptionVersionParams{
 			WorkspaceID: ws.ID,
+			TaskID:      task.ID,
 			PublicID:    versionPub,
 		})
 		if err != nil {
@@ -117,6 +122,7 @@ func RestoreDescriptionVersion(deps Deps) func(context.Context, *RestoreDescript
 		// Find the version to restore.
 		version, err := deps.Queries.FindDescriptionVersion(ctx, generated.FindDescriptionVersionParams{
 			WorkspaceID: ws.ID,
+			TaskID:      task.ID,
 			PublicID:    versionPub,
 		})
 		if err != nil {

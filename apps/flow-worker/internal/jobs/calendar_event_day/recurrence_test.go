@@ -1,6 +1,10 @@
 package calendar_event_day
 
 import (
+	"encoding/json"
+	"os"
+	"path/filepath"
+	"runtime"
 	"testing"
 	"time"
 
@@ -91,7 +95,7 @@ func TestExpandDaily_ExceptionSuppresses(t *testing.T) {
 	rule := &recurrenceRule{Freq: "daily"}
 
 	excludedInstant := time.Date(2026, time.July, 5, 9, 0, 0, 0, time.UTC)
-	exceptions := map[int64]struct{}{excludedInstant.Unix(): {}}
+	exceptions := &recurrenceExceptions{instants: map[int64]struct{}{excludedInstant.Unix(): {}}}
 
 	ws, we := dayRange(t, loc, 2026, time.July, 5)
 	occ := expandOccurrences(rule, base, loc, time.Time{}, time.Time{}, exceptions, ws, we)
@@ -233,9 +237,10 @@ func TestParseRecurrenceExceptions_MixedFormats(t *testing.T) {
 	raw := []byte(`["2026-07-05T09:00:00Z","2026-07-06","not-a-date"]`)
 	set, err := parseRecurrenceExceptions(raw, loc)
 	require.NoError(t, err)
-	require.Contains(t, set, time.Date(2026, time.July, 5, 9, 0, 0, 0, time.UTC).Unix())
-	require.Contains(t, set, time.Date(2026, time.July, 6, 0, 0, 0, 0, time.UTC).Unix())
-	require.Len(t, set, 2, "the unparseable exception must be skipped, not fatal")
+	require.Contains(t, set.instants, time.Date(2026, time.July, 5, 9, 0, 0, 0, time.UTC).Unix())
+	require.Contains(t, set.localDayKeys, "2026-07-06")
+	require.Len(t, set.instants, 1, "the RFC3339 exception must be tracked as an instant")
+	require.Len(t, set.localDayKeys, 1, "the bare date exception must be tracked as a local day")
 }
 
 // TestExpandRule_UntilPtr exercises the rule field decode path end-to-end via
@@ -253,4 +258,69 @@ func TestExpandRule_UntilPtr(t *testing.T) {
 	require.Len(t, expandOccurrences(rule, base, loc, time.Time{}, until, nil, ws3, we3), 1)
 	ws4, we4 := dayRange(t, loc, 2026, time.July, 4)
 	require.Empty(t, expandOccurrences(rule, base, loc, time.Time{}, until, nil, ws4, we4))
+}
+
+func TestRecurrenceGoldenFixtures(t *testing.T) {
+	t.Parallel()
+	for _, fx := range loadRecurrenceGolden(t) {
+		t.Run(fx.Name, func(t *testing.T) {
+			t.Parallel()
+			loc := time.UTC
+			if fx.Event.Timezone != "" {
+				var err error
+				loc, err = time.LoadLocation(fx.Event.Timezone)
+				require.NoError(t, err)
+			}
+			base, err := time.Parse(time.RFC3339, fx.Event.StartAt)
+			require.NoError(t, err)
+			rangeStart, err := time.Parse(time.RFC3339, fx.RangeStart)
+			require.NoError(t, err)
+			rangeEnd, err := time.Parse(time.RFC3339, fx.RangeEnd)
+			require.NoError(t, err)
+
+			rawExceptions, err := json.Marshal(fx.Event.RecurrenceExceptions)
+			require.NoError(t, err)
+			exceptions, err := parseRecurrenceExceptions(rawExceptions, loc)
+			require.NoError(t, err)
+
+			occ := expandOccurrences(&fx.Event.RecurrenceRule, base, loc, time.Time{}, time.Time{}, exceptions, rangeStart, rangeEnd)
+			got := make([]string, 0, len(occ))
+			for _, o := range occ {
+				got = append(got, o.UTC().Format(time.RFC3339))
+			}
+			require.Equal(t, fx.ExpectedStartAt, got)
+		})
+	}
+}
+
+type recurrenceGoldenFixture struct {
+	Name  string `json:"name"`
+	Event struct {
+		StartAt              string         `json:"startAt"`
+		EndAt                string         `json:"endAt"`
+		Timezone             string         `json:"timezone"`
+		RecurrenceRule       recurrenceRule `json:"recurrenceRule"`
+		RecurrenceExceptions []string       `json:"recurrenceExceptions"`
+	} `json:"event"`
+	RangeStart      string   `json:"rangeStart"`
+	RangeEnd        string   `json:"rangeEnd"`
+	ExpectedStartAt []string `json:"expectedStartAt"`
+}
+
+func loadRecurrenceGolden(t *testing.T) []recurrenceGoldenFixture {
+	t.Helper()
+	_, file, _, ok := runtime.Caller(0)
+	require.True(t, ok)
+	dir := filepath.Dir(file)
+	for {
+		candidate := filepath.Join(dir, "testdata", "recurrence_golden.json")
+		if b, err := os.ReadFile(candidate); err == nil {
+			var out []recurrenceGoldenFixture
+			require.NoError(t, json.Unmarshal(b, &out))
+			return out
+		}
+		parent := filepath.Dir(dir)
+		require.NotEqual(t, dir, parent, "could not find testdata/recurrence_golden.json")
+		dir = parent
+	}
 }

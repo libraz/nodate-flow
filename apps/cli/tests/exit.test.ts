@@ -2,9 +2,8 @@
  * Unit tests for the structured exit-code policy in `src/util/exit.ts`.
  *
  * The constants themselves are trivial; the interesting behaviour is
- * `isAuthRequiredError`, which detects both `AuthRequiredError`
- * instances and the plain-`Error` shape that `createFlowClient`
- * throws when no credentials are stored on disk.
+ * `isAuthRequiredError`, which detects the dedicated
+ * `AuthRequiredError` class without matching human-readable strings.
  */
 
 import { describe, expect, it } from 'vitest';
@@ -42,9 +41,9 @@ describe('isAuthRequiredError', () => {
     expect(isAuthRequiredError(new AuthRequiredError('custom'))).toBe(true);
   });
 
-  it('recognises the plain Error thrown by createFlowClient when not logged in', () => {
+  it('does not recognise plain errors with the same message', () => {
     const err = new Error('Not logged in. Run `tnk auth login` to authenticate first.');
-    expect(isAuthRequiredError(err)).toBe(true);
+    expect(isAuthRequiredError(err)).toBe(false);
   });
 
   it('does not match unrelated errors', () => {
@@ -74,7 +73,7 @@ describe('action error handling shape', () => {
     process.exitCode = 0;
     try {
       try {
-        throw new Error('Not logged in. Run `tnk auth login` to authenticate first.');
+        throw new AuthRequiredError();
       } catch (err) {
         if (isAuthRequiredError(err)) {
           process.exitCode = EXIT_AUTH;

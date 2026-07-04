@@ -2,6 +2,9 @@ package calendars
 
 import (
 	"encoding/json"
+	"os"
+	"path/filepath"
+	"runtime"
 	"testing"
 )
 
@@ -55,5 +58,53 @@ func TestValidateRecurrenceRule(t *testing.T) {
 				t.Fatalf("validateRecurrenceRule(%v) = %v, wantErr = %v", tt.rule, got, tt.wantErr)
 			}
 		})
+	}
+}
+
+func TestValidateRecurrenceRule_GoldenFixtures(t *testing.T) {
+	t.Parallel()
+	for _, fx := range loadRecurrenceValidationGolden(t) {
+		t.Run(fx.Name, func(t *testing.T) {
+			t.Parallel()
+			raw, err := json.Marshal(fx.Event.RecurrenceRule)
+			if err != nil {
+				t.Fatalf("marshal recurrence rule: %v", err)
+			}
+			msg := json.RawMessage(raw)
+			if got := validateRecurrenceRule(&msg); got != nil {
+				t.Fatalf("validateRecurrenceRule(%s) = %v, want nil", string(raw), got)
+			}
+		})
+	}
+}
+
+type recurrenceValidationGoldenFixture struct {
+	Name  string `json:"name"`
+	Event struct {
+		RecurrenceRule recurrenceRulePayload `json:"recurrenceRule"`
+	} `json:"event"`
+}
+
+func loadRecurrenceValidationGolden(t *testing.T) []recurrenceValidationGoldenFixture {
+	t.Helper()
+	_, file, _, ok := runtime.Caller(0)
+	if !ok {
+		t.Fatal("could not resolve current test file")
+	}
+	dir := filepath.Dir(file)
+	for {
+		candidate := filepath.Join(dir, "testdata", "recurrence_golden.json")
+		if b, err := os.ReadFile(candidate); err == nil {
+			var out []recurrenceValidationGoldenFixture
+			if err := json.Unmarshal(b, &out); err != nil {
+				t.Fatalf("decode %s: %v", candidate, err)
+			}
+			return out
+		}
+		parent := filepath.Dir(dir)
+		if parent == dir {
+			t.Fatal("could not find testdata/recurrence_golden.json")
+		}
+		dir = parent
 	}
 }

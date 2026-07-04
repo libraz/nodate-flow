@@ -468,7 +468,10 @@
       "expires_at": "该邀请将于 {date} 过期。",
       "accept_failed": "无法接受邀请，请重试。",
       "login_required": "需要登录后才能接受邀请。",
-      "go_to_login": "前往登录"
+      "go_to_login": "前往登录",
+      "error_title": "邀请不可用",
+      "error_network": "无法检查此邀请。请检查网络连接后重试。",
+      "error_back": "返回首页"
     },
     "roles": {
       "owner": "所有者",
@@ -598,6 +601,7 @@
     "title": "任务",
     "new": "新建任务",
     "empty": "暂无任务，创建你的第一个任务开始使用吧。",
+    "limit_notice": "正在显示前 {count} 个任务。请使用筛选条件缩小范围。",
     "title_placeholder": "任务标题…",
     "select_project": "选择项目",
     "create_error": "创建任务失败",
@@ -887,7 +891,9 @@
       "apply": "应用建议并创建",
       "no_suggestions": "暂无建议。",
       "error": "无法生成建议，你仍可手动创建任务。",
-      "no_provider": "此工作区未配置 AI 服务商。"
+      "no_provider": "此工作区未配置 AI 服务商。",
+      "priority_urgent": "紧急",
+      "priority_unknown": "{value}"
     },
     "attachments": {
       "title": "附件",

@@ -118,6 +118,7 @@ func (p *anthropicProvider) Complete(ctx context.Context, req Request) (*Respons
 		}
 	}
 	return &Response{
+		Model:        model,
 		Text:         text,
 		InputTokens:  ar.Usage.InputTokens,
 		OutputTokens: ar.Usage.OutputTokens,

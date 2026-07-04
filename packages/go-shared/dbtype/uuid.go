@@ -7,6 +7,7 @@ package dbtype
 import (
 	"database/sql/driver"
 	"fmt"
+	"strings"
 
 	"github.com/google/uuid"
 )
@@ -80,6 +81,10 @@ func (p PublicID) MarshalJSON() ([]byte, error) {
 
 // UnmarshalJSON decodes a canonical UUID JSON string into a PublicID.
 func (p *PublicID) UnmarshalJSON(b []byte) error {
+	if strings.TrimSpace(string(b)) == "null" {
+		*p = PublicID{}
+		return nil
+	}
 	if len(b) < 2 {
 		return fmt.Errorf("PublicID: invalid json")
 	}

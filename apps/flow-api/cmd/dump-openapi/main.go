@@ -111,6 +111,11 @@ func patchErrorModelSchema(spec *huma.OpenAPI) {
 		Type:        "string",
 		Description: "Short imperative the UI can render to tell the end user how to recover.",
 	}
+	schema.Properties["extensions"] = &huma.Schema{
+		Type:                 "object",
+		AdditionalProperties: true,
+		Description:          "Optional RFC 9457 extension members carrying diagnostic detail.",
+	}
 }
 
 // mergePathItem copies operations from src into dst for verbs that dst

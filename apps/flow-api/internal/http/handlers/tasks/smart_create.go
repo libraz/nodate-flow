@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"log/slog"
+	"math"
 	"net/http"
 
 	"github.com/danielgtaylor/huma/v2"
@@ -286,6 +287,9 @@ func addActorByPublicID(ctx context.Context, qtx *generated.Queries, wsID, taskI
 	})
 	if err != nil {
 		return httpErr(apierr.SpecForErrNoRows(err, apierrors.WsMemberNotFound, apierrors.InternalUnexpected))
+	}
+	if uid > math.MaxInt32 {
+		return httpErr(apierrors.InternalUnexpected)
 	}
 	pub := types.New()
 	if _, err := qtx.AddActor(ctx, generated.AddActorParams{

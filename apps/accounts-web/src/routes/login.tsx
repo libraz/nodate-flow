@@ -463,7 +463,7 @@ function LoginPage(): ReactElement {
     if (magicLinkGuard.guard()) return;
     setServerError(null);
     try {
-      const { error } = await sdk.POST('/auth/magic-link/request' as never, {
+      const { error } = await sdk.POST('/auth/magic-link/request', {
         body: { email: magicLinkEmail.trim() },
       });
       if (error) {
@@ -505,6 +505,7 @@ function LoginPage(): ReactElement {
     return (
       <AuthCard>
         <form
+          key="magic-link-request"
           onSubmit={(e) => {
             void handleMagicLinkSubmit(e);
           }}
@@ -574,6 +575,7 @@ function LoginPage(): ReactElement {
     return (
       <AuthCard>
         <form
+          key="totp-challenge"
           onSubmit={(e) => {
             void handleTotpSubmit(e);
           }}
@@ -700,6 +702,7 @@ function LoginPage(): ReactElement {
   return (
     <AuthCard>
       <form
+        key="password-login"
         onSubmit={(e) => {
           void submitWithFocus(e);
         }}

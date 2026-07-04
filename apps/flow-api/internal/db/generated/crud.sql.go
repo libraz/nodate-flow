@@ -51,7 +51,7 @@ type AssignTaskNumberParams struct {
 }
 
 // Allocate the next task number for a project. Must be called inside a
-// transaction with the project row locked (SELECT ... FOR UPDATE).
+// transaction after LockProjectForTaskNumber.
 // workspace_id is included so the index (workspace_id, project_id) is used and
 // the query is bounded to the caller's workspace as a defence-in-depth check.
 func (q *Queries) AssignTaskNumber(ctx context.Context, arg AssignTaskNumberParams) (int32, error) {
@@ -2029,6 +2029,30 @@ func (q *Queries) ListTasksForWorkspaceKeyset(ctx context.Context, arg ListTasks
 		return nil, err
 	}
 	return items, nil
+}
+
+const lockProjectForTaskNumber = `-- name: LockProjectForTaskNumber :one
+SELECT id
+FROM projects
+WHERE workspace_id = ?
+  AND id = ?
+  AND enabled = TRUE
+FOR UPDATE
+`
+
+type LockProjectForTaskNumberParams struct {
+	WorkspaceID uint32 `json:"-"`
+	ID          uint32 `json:"-"`
+}
+
+// Lock the owning project row before task-number allocation. This serializes
+// concurrent creators for the same project while still allowing different
+// projects to allocate independently.
+func (q *Queries) LockProjectForTaskNumber(ctx context.Context, arg LockProjectForTaskNumberParams) (uint32, error) {
+	row := q.db.QueryRowContext(ctx, lockProjectForTaskNumber, arg.WorkspaceID, arg.ID)
+	var id uint32
+	err := row.Scan(&id)
+	return id, err
 }
 
 const resolveTaskRef = `-- name: ResolveTaskRef :one

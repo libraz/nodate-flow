@@ -75,7 +75,8 @@ func rowToMe(row generated.FindUserProfileByIdRow, publicBaseURL string) MeBody 
 		// derive a cache buster from. The id is monotonic, so a
 		// fresh upload produces a fresh URL and the browser cache
 		// invalidates without us having to touch the URL shape.
-		key := "user/" + row.PublicID.String() + "/" + strconvUint(uint64(row.AvatarStorageObjectID.Int32))
+		avatarID := uint64(row.AvatarStorageObjectID.Int32) //#nosec G115 -- avatar_storage_object_id is an unsigned DB id exposed via sql.NullInt32.
+		key := "user/" + row.PublicID.String() + "/" + strconvUint(avatarID)
 		s := avatarutil.URLForClient(key, row.PublicID.String(), publicBaseURL)
 		avatar = &s
 	case row.AvatarUrl.Valid:

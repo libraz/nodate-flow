@@ -157,9 +157,9 @@ func TestUserDeleteRemovesAvatarRowAndBlob(t *testing.T) {
 	require.NotNil(t, body.AvatarURL)
 
 	uid := internalUserID(t, testDB, target.UserPublicID)
-	_, avatar := userInternalIdAndAvatar(t, testDB, target.UserPublicID)
+	_, avatar := userInternalIDAndAvatar(t, testDB, target.UserPublicID)
 	require.True(t, avatar.Valid, "baseline: avatar must be set")
-	avatarKey := storageKeyByObjectID(t, testDB, uint32(avatar.Int32))
+	avatarKey := storageKeyByObjectID(t, testDB, avatar.Int32)
 	require.Equalf(t, 1, countStorageObjectsForUser(t, testDB, uid),
 		"baseline: user must own exactly one storage_objects row")
 	testStorage.MustExist(t, avatarKey)

@@ -77,6 +77,7 @@ function InviteAcceptPage(): ReactElement {
         </p>
         <Link
           to="/login"
+          search={{ returnTo: `/invite/${token}` }}
           style={{
             display: 'inline-block',
             padding: '0.625rem 1.25rem',

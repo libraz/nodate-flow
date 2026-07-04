@@ -126,12 +126,12 @@ func parseScopes(raw []byte) []string {
 //
 // Delegates to the shared [acl.CheckWorkspaceMember] so the rule
 // cannot drift from the HTTP middleware's behavior.
-func requireWorkspaceMember(ctx context.Context, deps Deps, s *session) (string, error) {
+func requireWorkspaceMember(ctx context.Context, deps Deps, s *session) (acl.WorkspaceRole, error) {
 	role, err := acl.CheckWorkspaceMember(ctx, deps.DB, s.workspaceID, s.userID, nil)
 	if err != nil {
-		return "", err
+		return acl.WorkspaceRole(""), err
 	}
-	return string(role), nil
+	return role, nil
 }
 
 // resolveProject resolves a project public id to its internal id and
@@ -155,21 +155,23 @@ func resolveProject(ctx context.Context, deps Deps, s *session, publicID string)
 	return prj.ID, nil
 }
 
-// resolveTask resolves a task public id to its internal id and verifies
-// it belongs to the session workspace.
-//
-// Delegates to [acl.ResolveTaskInWorkspace] which performs the bounded
-// "by workspace + public id" lookup the MCP transport expects.
+// resolveTask resolves a task public id, verifies it belongs to the session
+// workspace, and enforces the same project-membership / task-visibility
+// decision used by REST RequireTaskAccess.
 func resolveTask(ctx context.Context, deps Deps, s *session, publicID string) (uint32, types.PublicID, error) {
 	pub, err := types.Parse(publicID)
 	if err != nil {
 		return 0, types.PublicID{}, apierrors.New(apierrors.WsTaskNotFound)
 	}
-	id, err := acl.ResolveTaskInWorkspace(ctx, deps.DB, s.workspaceID, pub.UUID())
+	access, err := acl.AuthorizeTaskAccess(ctx, deps.DB, pub.UUID(), s.userID)
 	if err != nil {
 		return 0, types.PublicID{}, err
 	}
-	return id, pub, nil
+	rec := access.Task
+	if rec.WorkspaceID != s.workspaceID {
+		return 0, types.PublicID{}, apierrors.New(apierrors.McpTokenWorkspaceMismatch)
+	}
+	return rec.ID, pub, nil
 }
 
 // resolvePage resolves a page public id to its internal id and verifies
@@ -206,6 +208,15 @@ func resolveCalendar(ctx context.Context, deps Deps, s *session, publicID string
 	if err != nil {
 		if stderrors.Is(err, sql.ErrNoRows) {
 			return 0, apierrors.Newf(apierrors.McpToolExecutionFailed, "calendar not found")
+		}
+		return 0, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
+	}
+	if _, err := deps.CalendarQueries.FindCalendarSubscription(ctx, calendar.FindCalendarSubscriptionParams{
+		CalendarID: row.ID,
+		UserID:     s.userID,
+	}); err != nil {
+		if stderrors.Is(err, sql.ErrNoRows) {
+			return 0, apierrors.New(apierrors.CalendarCalendarAccessDenied)
 		}
 		return 0, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
 	}

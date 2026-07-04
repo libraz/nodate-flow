@@ -5,9 +5,10 @@
  * loop on a freshly created tenant:
  *
  *   1. Register a new user via auth-api.
- *   2. Enroll TOTP via REST: POST /me/totp/enroll returns the secret;
- *      POST /me/totp/confirm with a code computed from that secret
- *      flips MFA into the "confirmed" state and emits recovery codes.
+ *   2. Enroll TOTP via REST with current-password reverification:
+ *      POST /me/totp/enroll returns the secret; POST /me/totp/confirm
+ *      with the password plus a code computed from that secret flips MFA
+ *      into the "confirmed" state and emits recovery codes.
  *   3. Log out (so the next /auth/login starts a fresh session).
  *   4. Visit /login and submit email + password — server returns
  *      `{ step: 'totp_required', challengeToken }` and the UI swaps the
@@ -66,6 +67,10 @@ function totpCode(secretBase32: string, nowMs: number = Date.now()): string {
   return (bin % 1_000_000).toString().padStart(6, '0');
 }
 
+function previousTotpCode(secretBase32: string): string {
+  return totpCode(secretBase32, Date.now() - 30_000);
+}
+
 interface EnrollOutput {
   otpauthUrl: string;
   secret: string;
@@ -76,16 +81,25 @@ interface ConfirmOutput {
   recoveryCodes: string[];
 }
 
-async function enrollTotp(accessToken: string): Promise<EnrollOutput> {
+async function enrollTotp(accessToken: string, password: string): Promise<EnrollOutput> {
   const res = await fetch(`${AUTH_API_URL}/me/totp/enroll`, {
     method: 'POST',
-    headers: { authorization: `Bearer ${accessToken}`, accept: 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      accept: 'application/json',
+      authorization: `Bearer ${accessToken}`,
+    },
+    body: JSON.stringify({ password }),
   });
   if (!res.ok) throw new Error(`POST /me/totp/enroll -> ${res.status} ${await res.text()}`);
   return (await res.json()) as EnrollOutput;
 }
 
-async function confirmTotp(accessToken: string, code: string): Promise<ConfirmOutput> {
+async function confirmTotp(
+  accessToken: string,
+  password: string,
+  code: string,
+): Promise<ConfirmOutput> {
   const res = await fetch(`${AUTH_API_URL}/me/totp/confirm`, {
     method: 'POST',
     headers: {
@@ -93,7 +107,7 @@ async function confirmTotp(accessToken: string, code: string): Promise<ConfirmOu
       accept: 'application/json',
       authorization: `Bearer ${accessToken}`,
     },
-    body: JSON.stringify({ code }),
+    body: JSON.stringify({ code, password }),
   });
   if (!res.ok) throw new Error(`POST /me/totp/confirm -> ${res.status} ${await res.text()}`);
   return (await res.json()) as ConfirmOutput;
@@ -113,8 +127,10 @@ test.describe('TOTP login', () => {
     page,
   }) => {
     const tenant = await createTestTenant();
-    const enroll = await enrollTotp(tenant.accessToken);
-    await confirmTotp(tenant.accessToken, totpCode(enroll.secret));
+    const enroll = await enrollTotp(tenant.accessToken, tenant.password);
+    // Confirm with the previous accepted window so the current code can be
+    // used during the login challenge without tripping replay protection.
+    await confirmTotp(tenant.accessToken, tenant.password, previousTotpCode(enroll.secret));
 
     // Drop the bearer-token session that confirm() left active so the
     // next login starts clean.
@@ -146,8 +162,12 @@ test.describe('TOTP login', () => {
 
   test('recovery code completes the challenge and is consumed', async ({ page }) => {
     const tenant = await createTestTenant();
-    const enroll = await enrollTotp(tenant.accessToken);
-    const confirm = await confirmTotp(tenant.accessToken, totpCode(enroll.secret));
+    const enroll = await enrollTotp(tenant.accessToken, tenant.password);
+    const confirm = await confirmTotp(
+      tenant.accessToken,
+      tenant.password,
+      previousTotpCode(enroll.secret),
+    );
     expect(confirm.recoveryCodes.length).toBeGreaterThan(0);
 
     await fetch(`${AUTH_API_URL}/auth/logout`, {

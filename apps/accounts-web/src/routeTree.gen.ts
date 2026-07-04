@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root';
 import { Route as SignupRouteImport } from './routes/signup';
+import { Route as MagicLinkRouteImport } from './routes/magic-link';
 import { Route as LoginRouteImport } from './routes/login';
 import { Route as AuthenticatedRouteImport } from './routes/_authenticated';
 import { Route as IndexRouteImport } from './routes/index';
@@ -31,6 +32,11 @@ import { Route as AuthenticatedAdminUsersUserIdRouteImport } from './routes/_aut
 const SignupRoute = SignupRouteImport.update({
   id: '/signup',
   path: '/signup',
+  getParentRoute: () => rootRouteImport,
+} as any);
+const MagicLinkRoute = MagicLinkRouteImport.update({
+  id: '/magic-link',
+  path: '/magic-link',
   getParentRoute: () => rootRouteImport,
 } as any);
 const LoginRoute = LoginRouteImport.update({
@@ -128,6 +134,7 @@ const AuthenticatedAdminUsersUserIdRoute =
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute;
   '/login': typeof LoginRoute;
+  '/magic-link': typeof MagicLinkRoute;
   '/signup': typeof SignupRoute;
   '/admin': typeof AuthenticatedAdminRouteWithChildren;
   '/profile': typeof AuthenticatedProfileRoute;
@@ -147,6 +154,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute;
   '/login': typeof LoginRoute;
+  '/magic-link': typeof MagicLinkRoute;
   '/signup': typeof SignupRoute;
   '/profile': typeof AuthenticatedProfileRoute;
   '/security': typeof AuthenticatedSecurityRoute;
@@ -167,6 +175,7 @@ export interface FileRoutesById {
   '/': typeof IndexRoute;
   '/_authenticated': typeof AuthenticatedRouteWithChildren;
   '/login': typeof LoginRoute;
+  '/magic-link': typeof MagicLinkRoute;
   '/signup': typeof SignupRoute;
   '/_authenticated/admin': typeof AuthenticatedAdminRouteWithChildren;
   '/_authenticated/profile': typeof AuthenticatedProfileRoute;
@@ -188,6 +197,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/login'
+    | '/magic-link'
     | '/signup'
     | '/admin'
     | '/profile'
@@ -207,6 +217,7 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/login'
+    | '/magic-link'
     | '/signup'
     | '/profile'
     | '/security'
@@ -226,6 +237,7 @@ export interface FileRouteTypes {
     | '/'
     | '/_authenticated'
     | '/login'
+    | '/magic-link'
     | '/signup'
     | '/_authenticated/admin'
     | '/_authenticated/profile'
@@ -247,6 +259,7 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute;
   AuthenticatedRoute: typeof AuthenticatedRouteWithChildren;
   LoginRoute: typeof LoginRoute;
+  MagicLinkRoute: typeof MagicLinkRoute;
   SignupRoute: typeof SignupRoute;
 }
 
@@ -257,6 +270,13 @@ declare module '@tanstack/react-router' {
       path: '/signup';
       fullPath: '/signup';
       preLoaderRoute: typeof SignupRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
+    '/magic-link': {
+      id: '/magic-link';
+      path: '/magic-link';
+      fullPath: '/magic-link';
+      preLoaderRoute: typeof MagicLinkRouteImport;
       parentRoute: typeof rootRouteImport;
     };
     '/login': {
@@ -432,6 +452,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AuthenticatedRoute: AuthenticatedRouteWithChildren,
   LoginRoute: LoginRoute,
+  MagicLinkRoute: MagicLinkRoute,
   SignupRoute: SignupRoute,
 };
 export const routeTree = rootRouteImport

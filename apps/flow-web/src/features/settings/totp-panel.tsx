@@ -2,8 +2,8 @@
  * TotpPanel — /settings/security TOTP 2FA management. Suspense mode.
  *
  * State machine:
- *   disabled  → "Enable 2FA" button → calls enroll → moves to enrolling
- *   enrolling → shows secret + code input → calls confirm → moves to enabled
+ *   disabled  → password reverify + "Enable 2FA" → calls enroll → moves to enrolling
+ *   enrolling → shows secret + code/password input → calls confirm → moves to enabled
  *   pending   → server-side "has secret but never confirmed": same UI as
  *               enrolling, we reuse the secret by calling enroll again
  *               (idempotent rotate)
@@ -22,6 +22,7 @@ import { confirmAction } from '../../lib/confirm-action';
 import {
   type SettingsApiError,
   type TotpEnrollResponse,
+  type TotpStatus,
   useRecoveryCodesStatusQuery,
   useRegenerateRecoveryCodes,
   useTotpConfirm,
@@ -88,6 +89,7 @@ function EnrollmentForm({
   const { t } = useTranslation('settings');
   const confirm = useTotpConfirm();
   const [code, setCode] = useState('');
+  const [password, setPassword] = useState('');
   const { submitting, run } = usePanelSubmission();
   const [qrDataUrl, setQrDataUrl] = useState<string | null>(null);
 
@@ -109,7 +111,8 @@ function EnrollmentForm({
     e.preventDefault();
     await run(
       async () => {
-        const result = await confirm.mutateAsync(code);
+        const result = await confirm.mutateAsync({ code, password });
+        setPassword('');
         toaster.show({ tone: 'success', message: t('security.totp.enabled_toast') });
         onConfirmed(result.recoveryCodes);
       },
@@ -117,6 +120,8 @@ function EnrollmentForm({
         const apiErr = err as SettingsApiError;
         if (apiErr.code === 'AUTH.TOTP.CODE_MISMATCH') {
           toaster.show({ tone: 'danger', message: t('security.totp.errors.code_mismatch') });
+        } else if (apiErr.code === 'AUTH.PASSWORD.CURRENT_MISMATCH') {
+          toaster.show({ tone: 'danger', message: t('security.totp.errors.password_mismatch') });
         } else {
           toaster.show({ tone: 'danger', message: t('security.totp.errors.confirm_failed') });
         }
@@ -176,9 +181,86 @@ function EnrollmentForm({
           />
         )}
       </FormField>
+      <FormField label={t('security.totp.password_label')} required>
+        {(control) => (
+          <Input
+            {...control}
+            type="password"
+            autoComplete="current-password"
+            value={password}
+            onChange={(e) => {
+              setPassword(e.target.value);
+            }}
+            required
+          />
+        )}
+      </FormField>
       <div className={styles.endActions}>
-        <Button type="submit" variant="primary" disabled={submitting || code.length !== 6}>
+        <Button
+          type="submit"
+          variant="primary"
+          disabled={submitting || code.length !== 6 || password === ''}
+        >
           {submitting ? t('security.totp.confirming') : t('security.totp.confirm')}
+        </Button>
+      </div>
+    </form>
+  );
+}
+
+function StartEnrollmentForm({
+  status,
+  onEnroll,
+  disabled,
+}: {
+  status: TotpStatus;
+  onEnroll: (password: string) => Promise<void>;
+  disabled: boolean;
+}): ReactElement {
+  const { t } = useTranslation('settings');
+  const [password, setPassword] = useState('');
+  const { submitting, run } = usePanelSubmission();
+  const isPending = status === 'pending';
+
+  const handleSubmit = async (e: FormEvent<HTMLFormElement>): Promise<void> => {
+    e.preventDefault();
+    await run(async () => {
+      await onEnroll(password);
+      setPassword('');
+    });
+  };
+
+  return (
+    <form
+      onSubmit={(e) => {
+        void handleSubmit(e);
+      }}
+      className={styles.column}
+    >
+      <p className={styles.bareParagraph}>
+        {t(isPending ? 'security.totp.pending_description' : 'security.totp.disabled_description')}
+      </p>
+      <FormField label={t('security.totp.password_label')} required>
+        {(control) => (
+          <Input
+            {...control}
+            type="password"
+            autoComplete="current-password"
+            value={password}
+            onChange={(e) => {
+              setPassword(e.target.value);
+            }}
+            required
+          />
+        )}
+      </FormField>
+      <div>
+        <Button
+          type="submit"
+          variant="primary"
+          disabled={disabled || submitting || password === ''}
+        >
+          {t(isPending ? 'security.totp.resume_enroll' : 'security.totp.enable')}
         </Button>
       </div>
     </form>
@@ -332,17 +414,20 @@ export default function TotpPanel(): ReactElement {
   const [enrollment, setEnrollment] = useState<TotpEnrollResponse | null>(null);
   const [postConfirmCodes, setPostConfirmCodes] = useState<string[] | null>(null);
 
-  const handleEnroll = async (): Promise<void> => {
+  const handleEnroll = async (password: string): Promise<void> => {
     try {
-      const data = await enroll.mutateAsync();
+      const data = await enroll.mutateAsync(password);
       setEnrollment(data);
     } catch (err) {
       const apiErr = err as SettingsApiError;
       if (apiErr.code === 'AUTH.TOTP.NOT_CONFIGURED') {
         toaster.show({ tone: 'danger', message: t('security.totp.errors.not_configured') });
+      } else if (apiErr.code === 'AUTH.PASSWORD.CURRENT_MISMATCH') {
+        toaster.show({ tone: 'danger', message: t('security.totp.errors.password_mismatch') });
       } else {
         toaster.show({ tone: 'danger', message: t('security.totp.errors.enroll_failed') });
       }
+      throw err;
     }
   };
 
@@ -366,21 +451,7 @@ export default function TotpPanel(): ReactElement {
       // pending server-side but we don't have the secret in this tab;
       // offer to regenerate.
       return (
-        <div className={styles.column}>
-          <p className={styles.bareParagraph}>{t('security.totp.pending_description')}</p>
-          <div>
-            <Button
-              type="button"
-              variant="primary"
-              onClick={() => {
-                void handleEnroll();
-              }}
-              disabled={enroll.isPending}
-            >
-              {t('security.totp.resume_enroll')}
-            </Button>
-          </div>
-        </div>
+        <StartEnrollmentForm status={status} onEnroll={handleEnroll} disabled={enroll.isPending} />
       );
     }
     return (
@@ -395,20 +466,6 @@ export default function TotpPanel(): ReactElement {
   }
 
   return (
-    <div className={styles.column}>
-      <p className={styles.bareParagraph}>{t('security.totp.disabled_description')}</p>
-      <div>
-        <Button
-          type="button"
-          variant="primary"
-          onClick={() => {
-            void handleEnroll();
-          }}
-          disabled={enroll.isPending}
-        >
-          {t('security.totp.enable')}
-        </Button>
-      </div>
-    </div>
+    <StartEnrollmentForm status={status} onEnroll={handleEnroll} disabled={enroll.isPending} />
   );
 }

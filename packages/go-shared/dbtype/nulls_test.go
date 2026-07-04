@@ -32,6 +32,20 @@ func TestPtrFromNullString(t *testing.T) {
 	})
 }
 
+func TestStringFromNullString(t *testing.T) {
+	t.Parallel()
+
+	t.Run("invalid returns empty", func(t *testing.T) {
+		t.Parallel()
+		assert.Equal(t, "", StringFromNullString(sql.NullString{Valid: false, String: "ignored"}))
+	})
+
+	t.Run("valid returns string", func(t *testing.T) {
+		t.Parallel()
+		assert.Equal(t, "hello", StringFromNullString(sql.NullString{Valid: true, String: "hello"}))
+	})
+}
+
 func TestPtrFromNullInt32(t *testing.T) {
 	t.Parallel()
 
@@ -180,5 +194,21 @@ func TestDateStringFromNullTime(t *testing.T) {
 		got := DateStringFromNullTime(sql.NullTime{Valid: true, Time: ts})
 		require.NotNil(t, got)
 		assert.Equal(t, "0001-01-01", *got)
+	})
+}
+
+func TestDateStringValueFromNullTime(t *testing.T) {
+	t.Parallel()
+
+	t.Run("invalid returns empty", func(t *testing.T) {
+		t.Parallel()
+		assert.Equal(t, "", DateStringValueFromNullTime(sql.NullTime{Valid: false}))
+	})
+
+	t.Run("valid returns UTC date", func(t *testing.T) {
+		t.Parallel()
+		jst := time.FixedZone("JST", 9*3600)
+		ts := time.Date(2024, 1, 2, 3, 0, 0, 0, jst)
+		assert.Equal(t, "2024-01-01", DateStringValueFromNullTime(sql.NullTime{Valid: true, Time: ts}))
 	})
 }

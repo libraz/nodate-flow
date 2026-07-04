@@ -132,6 +132,29 @@ func TestDebouncer_AcrossWindowsPassThrough(t *testing.T) {
 	require.Equal(t, "offline", snap[1].Status)
 }
 
+// TestDebouncer_LeadingEdgeCancelsPendingTrailing covers the race where
+// the logical debounce window has elapsed, but a previous trailing timer
+// has not fired yet. The new leading-edge event must cancel that stale
+// trailing payload so an older status cannot emit after the newer one.
+func TestDebouncer_LeadingEdgeCancelsPendingTrailing(t *testing.T) {
+	window := 40 * time.Millisecond
+	d, rec, now := newTestDebouncer(t, window)
+	defer d.Stop()
+
+	d.Handle(eventFor("user-A", "online"))
+	*now = now.Add(2 * time.Millisecond)
+	d.Handle(eventFor("user-A", "idle"))
+
+	*now = now.Add(window + time.Millisecond)
+	d.Handle(eventFor("user-A", "dnd"))
+
+	time.Sleep(2 * window)
+	snap := rec.snapshot()
+	require.Len(t, snap, 2, "stale trailing payload must be cancelled")
+	require.Equal(t, "online", snap[0].Status)
+	require.Equal(t, "dnd", snap[1].Status)
+}
+
 // TestDebouncer_StopDrainsWithoutPanic verifies graceful shutdown:
 // pending trailing timers must be cancelled, Handle must become a
 // no-op, and no events must be emitted after Stop returns.

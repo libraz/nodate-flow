@@ -15,9 +15,11 @@ import type { ReactElement } from 'react';
 import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { formatApiError } from '../../lib/api-error';
 import { formatDate, formatEpoch, isOverdue } from '../../lib/format';
 
 import {
+  TASKS_QUERY_LIMIT,
   type TaskDerivedState,
   type TaskListItem,
   type TaskPriority,
@@ -42,6 +44,7 @@ type EditableColumn = (typeof EDITABLE_COLUMNS)[number];
 
 interface CellAddress {
   rowIdx: number;
+  taskId: string;
   column: EditableColumn;
 }
 
@@ -76,7 +79,11 @@ function BulkActionBar({
         toaster.show({ tone: 'success', message: t('tasks.bulk.priority_updated') });
         onClear();
       } else if (failed === results.length) {
-        toaster.show({ tone: 'danger', message: t('tasks.bulk.update_failed') });
+        const first = results.find((r) => r.status === 'rejected');
+        toaster.show({
+          tone: 'danger',
+          message: formatApiError(first?.reason, t, 'tasks.bulk.update_failed'),
+        });
       } else {
         toaster.show({
           tone: 'danger',
@@ -97,7 +104,11 @@ function BulkActionBar({
         toaster.show({ tone: 'success', message: t('tasks.bulk.deleted') });
         onClear();
       } else if (failed === results.length) {
-        toaster.show({ tone: 'danger', message: t('tasks.bulk.delete_failed') });
+        const first = results.find((r) => r.status === 'rejected');
+        toaster.show({
+          tone: 'danger',
+          message: formatApiError(first?.reason, t, 'tasks.bulk.delete_failed'),
+        });
       } else {
         toaster.show({
           tone: 'danger',
@@ -207,6 +218,7 @@ export default function TaskSpreadsheetView({ projectId }: TaskSpreadsheetViewPr
   };
 
   const selectedIds = [...selectedRows];
+  const mayBeTruncated = tasks.length >= TASKS_QUERY_LIMIT;
 
   /* ── Edit lifecycle ────────────────────────────────────────── */
 
@@ -233,14 +245,14 @@ export default function TaskSpreadsheetView({ projectId }: TaskSpreadsheetViewPr
         break;
     }
     setEditDraft(draft);
-    setEditingCell({ rowIdx, column });
-    setActiveCell({ rowIdx, column });
+    setEditingCell({ rowIdx, taskId: task.id, column });
+    setActiveCell({ rowIdx, taskId: task.id, column });
   };
 
   const commitEdit = (rowIdx: number, column: EditableColumn, value: string) => {
     // Look up by the task ID stored when editing started to avoid stale
     // rowIdx if the tasks array was reordered/refreshed mid-edit.
-    const editTaskId = editingCell?.rowIdx === rowIdx ? tasks[rowIdx]?.id : undefined;
+    const editTaskId = editingCell?.column === column ? editingCell.taskId : tasks[rowIdx]?.id;
     const task = editTaskId ? tasks.find((t) => t.id === editTaskId) : tasks[rowIdx];
     if (!task) return;
 
@@ -276,8 +288,11 @@ export default function TaskSpreadsheetView({ projectId }: TaskSpreadsheetViewPr
     }
 
     if (patch) {
-      void updateTask.mutateAsync({ id: task.id, patch }).catch(() => {
-        toaster.show({ tone: 'danger', message: t('tasks.inline.save_failed') });
+      void updateTask.mutateAsync({ id: task.id, patch }).catch((err) => {
+        toaster.show({
+          tone: 'danger',
+          message: formatApiError(err, t, 'tasks.inline.save_failed'),
+        });
       });
     }
   };
@@ -523,6 +538,9 @@ export default function TaskSpreadsheetView({ projectId }: TaskSpreadsheetViewPr
       {selectedIds.length > 0 && (
         <BulkActionBar selectedIds={selectedIds} onClear={clearSelection} />
       )}
+      {mayBeTruncated ? (
+        <p className={css.limitNotice}>{t('tasks.limit_notice', { count: TASKS_QUERY_LIMIT })}</p>
+      ) : null}
 
       <div
         ref={parentRef}

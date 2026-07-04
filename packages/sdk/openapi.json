@@ -3653,6 +3653,11 @@
             },
             "type": ["array", "null"]
           },
+          "extensions": {
+            "additionalProperties": true,
+            "description": "Optional RFC 9457 extension members carrying diagnostic detail.",
+            "type": "object"
+          },
           "instance": {
             "description": "A URI reference that identifies the specific occurrence of the problem.",
             "examples": ["https://example.com/error-log/abc123"],
@@ -11072,9 +11077,14 @@
             "minLength": 6,
             "pattern": "^[0-9]{6}$",
             "type": "string"
+          },
+          "password": {
+            "maxLength": 256,
+            "minLength": 1,
+            "type": "string"
           }
         },
-        "required": ["code"],
+        "required": ["code", "password"],
         "type": "object"
       },
       "TotpConfirmOutputBody": {
@@ -11134,6 +11144,25 @@
           }
         },
         "required": ["ok"],
+        "type": "object"
+      },
+      "TotpEnrollInputBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/TotpEnrollInputBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "password": {
+            "maxLength": 256,
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": ["password"],
         "type": "object"
       },
       "TotpEnrollOutputBody": {
@@ -15330,7 +15359,7 @@
     },
     "/me/totp": {
       "delete": {
-        "description": "Removes the TOTP secret and recovery codes for the caller. Requires a valid current TOTP code (or recovery code) to authorize the change.",
+        "description": "Removes the TOTP secret and recovery codes for the caller. Requires the current password to authorize the change.",
         "operationId": "me-totp-disable",
         "requestBody": {
           "content": {
@@ -15396,7 +15425,7 @@
     },
     "/me/totp/confirm": {
       "post": {
-        "description": "Validates a 6-digit code against the pending secret from /me/totp/enroll. On success activates TOTP for the caller and returns a fresh batch of recovery codes (shown once).",
+        "description": "After password reverification, validates a 6-digit code against the pending secret from /me/totp/enroll. On success activates TOTP for the caller and returns a fresh batch of recovery codes (shown once).",
         "operationId": "me-totp-confirm",
         "requestBody": {
           "content": {
@@ -15435,8 +15464,18 @@
     },
     "/me/totp/enroll": {
       "post": {
-        "description": "Generates a fresh TOTP secret and otpauth:// provisioning URL for the caller to scan. The secret is stored as pending until /me/totp/confirm validates a code.",
+        "description": "After password reverification, generates a fresh TOTP secret and otpauth:// provisioning URL for the caller to scan. The secret is stored as pending until /me/totp/confirm validates a code.",
         "operationId": "me-totp-enroll",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TotpEnrollInputBody"
+              }
+            }
+          },
+          "required": true
+        },
         "responses": {
           "200": {
             "content": {
@@ -15491,7 +15530,7 @@
         "summary": "Return remaining recovery code count"
       },
       "post": {
-        "description": "Replaces the caller's recovery code batch with a fresh set, invalidating any unused old codes. Returns the new codes (shown once) and requires a valid TOTP code.",
+        "description": "Replaces the caller's recovery code batch with a fresh set, invalidating any unused old codes. Returns the new codes (shown once) and requires the current password.",
         "operationId": "me-totp-recovery-regenerate",
         "requestBody": {
           "content": {
@@ -24686,6 +24725,16 @@
             "name": "status",
             "schema": {
               "description": "Filter by triage status: pending, accepted, rejected, snoozed, duplicate",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Opaque cursor returned by previous page; pass to fetch next page. Empty when at end.",
+            "explode": false,
+            "in": "query",
+            "name": "cursor",
+            "schema": {
+              "description": "Opaque cursor returned by previous page; pass to fetch next page. Empty when at end.",
               "type": "string"
             }
           },

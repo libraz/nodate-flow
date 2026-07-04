@@ -56,6 +56,8 @@ var (
 	AuthPasswordTooWeak = &Spec{Code: "AUTH.PASSWORD.TOO_WEAK", Status: 422, Message: "Password does not meet strength requirements", Description: "Returned by /me/password when the new password is shorter than the minimum length.", UserAction: "Choose a longer password."}
 	// AUTH.PAT.EXPIRED — Personal access token has expired
 	AuthPatExpired = &Spec{Code: "AUTH.PAT.EXPIRED", Status: 401, Message: "Personal access token has expired", Description: "Returned when the PAT's expiration timestamp has passed.", UserAction: "Create a new personal access token."}
+	// AUTH.PAT.SCOPE_INSUFFICIENT — Personal access token does not have the required scope
+	AuthPatScopeInsufficient = &Spec{Code: "AUTH.PAT.SCOPE_INSUFFICIENT", Status: 403, Message: "Personal access token does not have the required scope", Description: "Returned when a PAT-authenticated REST request requires a read or write scope that was not granted to the token.", UserAction: "Create a new personal access token with the required scope."}
 	// AUTH.PAT.TOKEN_UNKNOWN — Personal access token is invalid
 	AuthPatTokenUnknown = &Spec{Code: "AUTH.PAT.TOKEN_UNKNOWN", Status: 401, Message: "Personal access token is invalid", Description: "Returned when the supplied personal access token is unknown, malformed, or has been revoked.", UserAction: "Generate a new personal access token and update the client configuration."}
 	// AUTH.PERMISSION.INSTANCE_ADMIN_REQUIRED — Instance administrator privileges are required

@@ -153,16 +153,15 @@ func TestAcceptInvite_ConcurrentRedemptions_RespectMaxUses(t *testing.T) {
 			_, herr := handler(actorCtx, &AcceptInviteInput{Token: token})
 			mu.Lock()
 			defer mu.Unlock()
-			switch {
-			case herr == nil:
+			if herr == nil {
 				okCount++
-			default:
-				var problem *handlerutil.ProblemDetails
-				if assertExhausted(herr, &problem) {
-					exhaustCount++
-				} else {
-					unexpectedErr = herr
-				}
+				return
+			}
+			var problem *handlerutil.ProblemDetails
+			if assertExhausted(herr, &problem) {
+				exhaustCount++
+			} else {
+				unexpectedErr = herr
 			}
 		}(uids[i])
 	}

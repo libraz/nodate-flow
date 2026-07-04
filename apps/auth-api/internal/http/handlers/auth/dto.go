@@ -1,5 +1,7 @@
 // Package auth contains Huma operation handlers for the authentication
 // endpoints: register, login, refresh, logout, OIDC, and /me.
+//
+//nolint:revive // DTO names intentionally keep auth prefixes for stable generated OpenAPI schema names.
 package auth
 
 import (
@@ -49,6 +51,11 @@ type Deps struct {
 	// the NF_AUTH_MICROSOFT_OIDC_CLIENT_ID env is unset. Declared as an
 	// interface so unit tests can substitute a fake exchanger.
 	OIDCMicrosoft MicrosoftExchanger
+	// MicrosoftAllowedTenantIDs is the tenant allowlist configured by
+	// NF_AUTH_MICROSOFT_OIDC_ALLOWED_TENANTS. The real exchanger
+	// validates it after id_token verification; handlers also enforce it
+	// so test doubles cannot bypass the boundary.
+	MicrosoftAllowedTenantIDs []string
 	// Cipher encrypts/decrypts TOTP secrets. Nil when NF_SECRET_KEY is
 	// unset; the TOTP endpoints return AUTH.TOTP.NOT_CONFIGURED in that
 	// case so the rest of the api still boots.
@@ -467,6 +474,15 @@ type TotpStatusOutput struct {
 	}
 }
 
+// TotpEnrollInput is the body for POST /me/totp/enroll. Starting a
+// pending TOTP secret requires password reverification so a stolen
+// bearer token cannot enroll a second factor.
+type TotpEnrollInput struct {
+	Body struct {
+		Password string `json:"password" minLength:"1" maxLength:"256"`
+	}
+}
+
 // TotpEnrollOutput is the response for POST /me/totp/enroll. The
 // server returns the otpauth:// URL (for QR rendering on the client)
 // plus the raw base32 secret so the user can type it in manually.
@@ -480,7 +496,8 @@ type TotpEnrollOutput struct {
 // TotpConfirmInput is the body for POST /me/totp/confirm.
 type TotpConfirmInput struct {
 	Body struct {
-		Code string `json:"code" minLength:"6" maxLength:"6" pattern:"^[0-9]{6}$"`
+		Code     string `json:"code" minLength:"6" maxLength:"6" pattern:"^[0-9]{6}$"`
+		Password string `json:"password" minLength:"1" maxLength:"256"`
 	}
 }
 

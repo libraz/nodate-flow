@@ -226,10 +226,18 @@ export function UserDetailPage(): ReactElement {
     if (!ok) return;
     if (enabledGuard.guard()) return;
     try {
-      await sdk.PATCH('/admin/users/{userId}', {
+      const { error: err } = await sdk.PATCH('/admin/users/{userId}', {
         params: { path: { userId } },
         body: { enabled: !user.enabled },
       });
+      if (err) {
+        const code = extractErrorCode(err as ProblemJson);
+        toaster.show({
+          tone: 'danger',
+          message: code ? `${t('errors.generic')} (${code})` : t('errors.generic'),
+        });
+        return;
+      }
       // Refetch to get updated state
       const result = await sdk.GET('/admin/users/{userId}', { params: { path: { userId } } });
       if (result.data) {
@@ -253,18 +261,34 @@ export function UserDetailPage(): ReactElement {
       if (!ok) return;
       if (adminGuard.guard()) return;
       try {
-        await sdk.DELETE('/admin/instance-admins/{adminId}', {
-          params: { path: { adminId: userId } },
+        const { error: err } = await sdk.DELETE('/admin/instance-admins/{userId}', {
+          params: { path: { userId } },
         });
+        if (err) {
+          const code = extractErrorCode(err as ProblemJson);
+          toaster.show({
+            tone: 'danger',
+            message: code ? `${t('errors.generic')} (${code})` : t('errors.generic'),
+          });
+          return;
+        }
       } finally {
         adminGuard.end();
       }
     } else {
       if (adminGuard.guard()) return;
       try {
-        await sdk.POST('/admin/instance-admins', {
+        const { error: err } = await sdk.POST('/admin/instance-admins', {
           body: { userId: user.id },
         });
+        if (err) {
+          const code = extractErrorCode(err as ProblemJson);
+          toaster.show({
+            tone: 'danger',
+            message: code ? `${t('errors.generic')} (${code})` : t('errors.generic'),
+          });
+          return;
+        }
       } finally {
         adminGuard.end();
       }
@@ -284,9 +308,15 @@ export function UserDetailPage(): ReactElement {
       const { error: err } = await sdk.DELETE('/admin/sessions/{sessionId}', {
         params: { path: { sessionId } },
       });
-      if (!err) {
-        setSessions((prev) => prev.filter((s) => s.id !== sessionId));
+      if (err) {
+        const code = extractErrorCode(err as ProblemJson);
+        toaster.show({
+          tone: 'danger',
+          message: code ? `${t('errors.generic')} (${code})` : t('errors.generic'),
+        });
+        return;
       }
+      setSessions((prev) => prev.filter((s) => s.id !== sessionId));
     } finally {
       sessionGuard.end();
     }

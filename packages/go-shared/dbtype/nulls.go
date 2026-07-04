@@ -34,6 +34,16 @@ func PtrFromNullString(v sql.NullString) *string {
 	return &s
 }
 
+// StringFromNullString returns an empty string if v is not Valid, otherwise
+// v.String. Use this for nullable VARCHAR / TEXT columns whose DTO field is
+// a plain string and where NULL should serialize as "".
+func StringFromNullString(v sql.NullString) string {
+	if !v.Valid {
+		return ""
+	}
+	return v.String
+}
+
 // PtrFromNullInt32 returns nil if v is not Valid, otherwise a pointer to a
 // copy of v.Int32. Use this for nullable INT columns whose DTO field is
 // *int32 with `json:",omitempty"`.
@@ -105,4 +115,14 @@ func DateStringFromNullTime(v sql.NullTime) *string {
 	}
 	s := v.Time.UTC().Format(dateLayout)
 	return &s
+}
+
+// DateStringValueFromNullTime is the value-returning twin of
+// DateStringFromNullTime. It returns "" for NULL and formats valid values in
+// UTC using the canonical YYYY-MM-DD layout.
+func DateStringValueFromNullTime(v sql.NullTime) string {
+	if !v.Valid {
+		return ""
+	}
+	return v.Time.UTC().Format(dateLayout)
 }

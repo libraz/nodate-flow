@@ -1,0 +1,41 @@
+package providers
+
+import "testing"
+
+func TestEstimateCostMicrosUSDTracksSubCentDefaultModels(t *testing.T) {
+	t.Parallel()
+
+	micros := EstimateCostMicrosUSD("gpt-4o-mini", 1000, 500)
+	if micros != 450 {
+		t.Fatalf("EstimateCostMicrosUSD(gpt-4o-mini, 1000, 500) = %d, want 450", micros)
+	}
+	if cents := estimateCostCents("gpt-4o-mini", 1000, 500); cents != 0 {
+		t.Fatalf("estimateCostCents remains whole-cent floor for legacy metrics = %d, want 0", cents)
+	}
+}
+
+func TestEstimateCostMicrosUSDHandlesFractionalCentPerMillionPricing(t *testing.T) {
+	t.Parallel()
+
+	if got := EstimateCostMicrosUSD("gemini-1.5-flash-latest", 1_000_000, 0); got != 75_000 {
+		t.Fatalf("gemini-1.5-flash input price = %d micros, want 75000", got)
+	}
+	if got := EstimateCostMicrosUSD("gemini-1.5-flash-latest", 0, 1_000_000); got != 300_000 {
+		t.Fatalf("gemini-1.5-flash output price = %d micros, want 300000", got)
+	}
+}
+
+func TestEstimateCostMicrosUSDCoversRuntimeDefaultModels(t *testing.T) {
+	t.Parallel()
+
+	for _, model := range []string{
+		openAIDefaultModel,
+		anthropicDefaultMdl,
+		googleDefaultModel,
+		"claude-sonnet-4-6",
+	} {
+		if got := EstimateCostMicrosUSD(model, 1_000, 1_000); got <= 0 {
+			t.Fatalf("runtime default model %q has no positive price", model)
+		}
+	}
+}

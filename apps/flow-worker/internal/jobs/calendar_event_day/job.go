@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"sync"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -70,10 +71,14 @@ type Job struct {
 	TickInterval time.Duration
 	// CatchUpWindow extends the day window backwards so a worker outage
 	// across one or more local-day boundaries self-heals: the next tick
-	// re-materialises the skipped days. The day-scoped dedupe key makes
-	// the backfill idempotent. Defaults to defaultCatchUpWindow when
-	// non-positive.
+	// after process start or after a long gap re-materialises the skipped
+	// days. Steady-state ticks use only the elapsed time since the last
+	// successful tick so the 26h lookback does not re-scan yesterday on
+	// every minute. Defaults to defaultCatchUpWindow when non-positive.
 	CatchUpWindow time.Duration
+
+	mu                 sync.Mutex
+	lastSuccessfulTick time.Time
 }
 
 // New constructs a Job with its Scanner and Client wired against the
@@ -132,7 +137,7 @@ func (j *Job) Tick(ctx context.Context, now time.Time) error {
 		return nil
 	}
 
-	window := j.dayWindow()
+	window := j.dayWindow(now)
 	for _, ws := range workspaces {
 		if err := j.tickForWorkspace(ctx, ws, now, window); err != nil {
 			// One bad workspace must not block the rest. The runner
@@ -146,6 +151,7 @@ func (j *Job) Tick(ctx context.Context, now time.Time) error {
 		}
 	}
 	obs.CalendarEventDayTicksTotal.WithLabelValues("ok").Inc()
+	j.markSuccessfulTick(now)
 	return nil
 }
 
@@ -210,13 +216,10 @@ func (j *Job) buildSignalBody(ws Workspace, ev Event, day string, expires int64)
 	payload, err := json.Marshal(map[string]any{
 		"startAt": ev.StartAt.UTC().Unix(),
 		"allDay":  ev.AllDay,
-		// linked_task_public_ids is intentionally omitted in W2: the
-		// brief calls it out as a follow-up if the task_event_links
-		// lookup does not fit in ~10 lines, and an unauthenticated
-		// JOIN on every tick would dwarf the rest of the work. The
-		// field can be added in a Phase 6 follow-up alongside the
-		// judge prompt context build, which already needs the same
-		// join.
+		// linked_task_public_ids is intentionally omitted here: adding
+		// the task_event_links lookup would put an unauthenticated JOIN
+		// on every tick. Add the field alongside the prompt context
+		// lookup if both paths need the same join.
 	})
 	if err != nil {
 		return PostSignalBody{}, fmt.Errorf("marshal payload: %w", err)
@@ -237,16 +240,18 @@ func (j *Job) buildSignalBody(ws Workspace, ev Event, day string, expires int64)
 }
 
 // dedupeKey assembles the `external_id` flow-api collapses on. Format
-// matches the W2 brief and the calendar.yaml registry entry:
+// matches the calendar.yaml registry entry:
 // `calendar_event_day:<event_public_id>:<YYYY-MM-DD>`.
 func dedupeKey(eventPublicID, day string) string {
 	return "calendar_event_day:" + eventPublicID + ":" + day
 }
 
-// dayWindow resolves the fire-once scan window: the tick interval widened
-// by the catch-up lookback. Both fall back to package defaults so a
-// directly-constructed Job (tests) still gets a sane window.
-func (j *Job) dayWindow() time.Duration {
+// dayWindow resolves the fire-once scan window. The first tick gets the
+// configured catch-up allowance because an in-memory job has no durable
+// cursor. After that, steady-state ticks use the elapsed time since the
+// last successful tick, bounded below by TickInterval for minor scheduler
+// jitter and bounded above by TickInterval+CatchUpWindow for outages.
+func (j *Job) dayWindow(now time.Time) time.Duration {
 	interval := j.TickInterval
 	if interval <= 0 {
 		interval = defaultTickInterval
@@ -255,5 +260,27 @@ func (j *Job) dayWindow() time.Duration {
 	if catchUp <= 0 {
 		catchUp = defaultCatchUpWindow
 	}
-	return interval + catchUp
+	maxWindow := interval + catchUp
+
+	j.mu.Lock()
+	last := j.lastSuccessfulTick
+	j.mu.Unlock()
+	if last.IsZero() {
+		return maxWindow
+	}
+
+	elapsed := now.Sub(last)
+	if elapsed <= interval {
+		return interval
+	}
+	if elapsed > maxWindow {
+		return maxWindow
+	}
+	return elapsed
+}
+
+func (j *Job) markSuccessfulTick(now time.Time) {
+	j.mu.Lock()
+	j.lastSuccessfulTick = now
+	j.mu.Unlock()
 }

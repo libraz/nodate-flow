@@ -23,7 +23,7 @@ import { toaster } from '@nodate-flow/ui/primitives/toast';
 import { MoreHorizontal } from 'lucide-react';
 import { type ReactElement, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-
+import { formatApiError } from '../../lib/api-error';
 import { confirmAction } from '../../lib/confirm-action';
 import { formatEpochDateTime } from '../../lib/format';
 import { type TaskComment, useDeleteTaskComment, useEditTaskComment } from './api';
@@ -91,8 +91,11 @@ export default function CommentRow({
     try {
       await edit.mutateAsync({ taskId, commentId: comment.id, body: trimmed });
       setEditing(false);
-    } catch {
-      toaster.show({ tone: 'danger', message: t('tasks.comments.edit_failed') });
+    } catch (err) {
+      toaster.show({
+        tone: 'danger',
+        message: formatApiError(err, t, 'tasks.comments.edit_failed'),
+      });
     }
   };
 
@@ -102,8 +105,11 @@ export default function CommentRow({
     if (!ok) return;
     try {
       await del.mutateAsync({ taskId, commentId: comment.id });
-    } catch {
-      toaster.show({ tone: 'danger', message: t('tasks.comments.delete_failed') });
+    } catch (err) {
+      toaster.show({
+        tone: 'danger',
+        message: formatApiError(err, t, 'tasks.comments.delete_failed'),
+      });
     }
   };
 

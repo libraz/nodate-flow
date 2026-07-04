@@ -1,8 +1,8 @@
 // Package calendar_event_day implements the worker job that emits one
 // calendar.event_day_arrived signal per (workspace, event, event_day)
 // tuple when an event's start_date arrives in the workspace's local
-// timezone. The job is the first concrete materialiser hosted by
-// apps/flow-worker (Phase 5 / W2 of release-8-signals-and-judge-loop).
+// timezone. The job is hosted by apps/flow-worker as a concrete
+// signal materialiser.
 //
 // The package is split into:
 //

@@ -5,28 +5,54 @@ import { pathToFileURL } from 'node:url';
 
 import { c, createCLI, prompt, table } from '@libraz/node-cli';
 
-import { createAuthClient, createFlowClient } from './api.js';
+import { createAuthClient, createFlowClient, extractRefreshTokenFromSetCookie } from './api.js';
+import { authErrorMessage, completeLogin } from './auth-login.js';
 import { clearCredentials, getFlowApiUrl, loadCredentials, saveCredentials } from './config.js';
 import {
   buildSearchQuery,
   buildUpdatePlan,
-  executeSearch,
+  executeSearchPaginated,
+  executeTaskListPaginated,
   executeUpdate,
   type SdkClientLike,
   type SearchOptions as SearchOptionsInput,
   STATE_TRANSITIONS,
+  type TaskListQuery,
   type UpdateOptions as UpdateOptionsInput,
 } from './task-builders.js';
+import { apiErrorMessage } from './util/api-error.js';
 import { assertYmd, DateValidationError } from './util/date.js';
 import { EXIT_AUTH, EXIT_RUNTIME, EXIT_VALIDATION, isAuthRequiredError } from './util/exit.js';
 import { optionalYmd, resolveDeprecatedFlag } from './util/flags.js';
 import { attachExamples, type ExamplesByPath } from './util/help.js';
+import { getPackageVersion } from './version.js';
 
 const cli = createCLI({
   name: 'tnk',
-  version: '0.0.0',
+  version: getPackageVersion(),
   description: 'nodate-flow CLI',
 });
+
+interface CliTaskRow {
+  id: string;
+  title: string;
+  derivedState: string;
+  priority: number;
+  dueOn?: string | null;
+}
+
+function asCliTaskRows(tasks: unknown[] | undefined): CliTaskRow[] {
+  return (tasks ?? []).filter((task): task is CliTaskRow => {
+    if (typeof task !== 'object' || task === null) return false;
+    const candidate = task as Record<string, unknown>;
+    return (
+      typeof candidate.id === 'string' &&
+      typeof candidate.title === 'string' &&
+      typeof candidate.derivedState === 'string' &&
+      typeof candidate.priority === 'number'
+    );
+  });
+}
 
 // ---------------------------------------------------------------------------
 // tnk auth login
@@ -41,27 +67,22 @@ auth
     const password = await prompt.password('Password:');
 
     const client = createAuthClient();
-    const { data, error } = await client.POST('/auth/login', {
-      body: { email, password },
+    const { data, error, response } = await completeLogin({
+      client: {
+        post: (path, init) => client.POST(path as never, init as never),
+      },
+      email,
+      password,
+      promptTotp: () => prompt.password('TOTP code or recovery code:'),
     });
 
     if (error) {
-      const msg =
-        typeof error === 'object' && error !== null && 'detail' in error
-          ? String((error as Record<string, unknown>).detail)
-          : 'Login failed';
-      stderr.write(c`{red Error}: ${msg}\n`);
+      stderr.write(c`{red Error}: ${authErrorMessage(error, 'Login failed')}\n`);
       process.exitCode = EXIT_AUTH;
       return;
     }
 
-    if (data.step === 'totp_required') {
-      stderr.write(c`{yellow TOTP required}. Use the web UI to complete login.\n`);
-      process.exitCode = EXIT_AUTH;
-      return;
-    }
-
-    if (!data.accessToken) {
+    if (typeof data?.accessToken !== 'string' || data.accessToken.length === 0 || !response) {
       stderr.write(c`{red Error}: No access token in response\n`);
       process.exitCode = EXIT_AUTH;
       return;
@@ -69,7 +90,7 @@ auth
 
     saveCredentials({
       accessToken: data.accessToken,
-      refreshToken: '',
+      refreshToken: extractRefreshTokenFromSetCookie(response.headers.get('set-cookie')) ?? '',
       apiBaseUrl: getFlowApiUrl(),
     });
 
@@ -169,45 +190,35 @@ task
       throw err;
     }
 
-    const query: Record<string, unknown> = { limit };
+    const query: TaskListQuery = { limit };
     if (projectId) query.projectId = projectId;
     if (workspaceId) query.workspaceId = workspaceId;
     if (status) query.state = [status];
 
-    // biome-ignore lint/suspicious/noExplicitAny: query is built dynamically
-    const { data, error } = await client.GET('/tasks', { params: { query } } as any);
+    const { data, error } = await executeTaskListPaginated(
+      client as unknown as SdkClientLike,
+      query,
+    );
 
     if (error) {
-      const msg =
-        typeof error === 'object' && error !== null && 'detail' in error
-          ? String((error as Record<string, unknown>).detail)
-          : 'Failed to list tasks';
-      stderr.write(c`{red Error}: ${msg}\n`);
+      stderr.write(c`{red Error}: ${apiErrorMessage(error, 'Failed to list tasks')}\n`);
       process.exitCode = EXIT_RUNTIME;
       return;
     }
 
-    const tasks = data.tasks;
-    if (!tasks || tasks.length === 0) {
+    const tasks = asCliTaskRows(data?.tasks);
+    if (tasks.length === 0) {
       stdout.write('No tasks found.\n');
       return;
     }
 
-    const rows = tasks.map(
-      (t: {
-        id: string;
-        title: string;
-        derivedState: string;
-        priority: number;
-        dueOn?: string | null;
-      }) => ({
-        id: t.id.slice(0, 8),
-        title: t.title.length > 50 ? `${t.title.slice(0, 47)}...` : t.title,
-        state: t.derivedState,
-        priority: String(t.priority),
-        due: t.dueOn ?? '-',
-      }),
-    );
+    const rows = tasks.map((t) => ({
+      id: t.id.slice(0, 8),
+      title: t.title.length > 50 ? `${t.title.slice(0, 47)}...` : t.title,
+      state: t.derivedState,
+      priority: String(t.priority),
+      due: t.dueOn ?? '-',
+    }));
 
     const output = table(rows, {
       columns: ['id', 'title', 'state', 'priority', 'due'],
@@ -222,7 +233,7 @@ task
     });
 
     stdout.write(output);
-    stdout.write(`\n${data.total} task(s) total\n`);
+    stdout.write(`\n${data?.total ?? tasks.length} task(s) total\n`);
   });
 
 // ---------------------------------------------------------------------------
@@ -329,11 +340,7 @@ task
     const { data, error } = await client.POST('/tasks', { body } as any);
 
     if (error) {
-      const msg =
-        typeof error === 'object' && error !== null && 'detail' in error
-          ? String((error as Record<string, unknown>).detail)
-          : 'Failed to create task';
-      stderr.write(c`{red Error}: ${msg}\n`);
+      stderr.write(c`{red Error}: ${apiErrorMessage(error, 'Failed to create task')}\n`);
       process.exitCode = EXIT_RUNTIME;
       return;
     }
@@ -446,11 +453,7 @@ task
     const { data, error } = await executeUpdate(client, id, plan);
 
     if (error) {
-      const msg =
-        typeof error === 'object' && error !== null && 'detail' in error
-          ? String((error as Record<string, unknown>).detail)
-          : 'Failed to update task';
-      stderr.write(c`{red Error}: ${msg}\n`);
+      stderr.write(c`{red Error}: ${apiErrorMessage(error, 'Failed to update task')}\n`);
       process.exitCode = EXIT_RUNTIME;
       return;
     }
@@ -546,14 +549,10 @@ task
       }
       throw err;
     }
-    const { data, error } = await executeSearch(client, result);
+    const { data, error } = await executeSearchPaginated(client, result);
 
     if (error) {
-      const msg =
-        typeof error === 'object' && error !== null && 'detail' in error
-          ? String((error as Record<string, unknown>).detail)
-          : 'Failed to search tasks';
-      stderr.write(c`{red Error}: ${msg}\n`);
+      stderr.write(c`{red Error}: ${apiErrorMessage(error, 'Failed to search tasks')}\n`);
       process.exitCode = EXIT_RUNTIME;
       return;
     }
@@ -571,8 +570,8 @@ task
         }
       | undefined;
 
-    const tasks = payload?.tasks;
-    if (!tasks || tasks.length === 0) {
+    const tasks = asCliTaskRows(payload?.tasks);
+    if (tasks.length === 0) {
       stdout.write('No tasks found.\n');
       return;
     }
@@ -626,11 +625,7 @@ task
     });
 
     if (error) {
-      const msg =
-        typeof error === 'object' && error !== null && 'detail' in error
-          ? String((error as Record<string, unknown>).detail)
-          : 'Failed to fetch task';
-      stderr.write(c`{red Error}: ${msg}\n`);
+      stderr.write(c`{red Error}: ${apiErrorMessage(error, 'Failed to fetch task')}\n`);
       process.exitCode = EXIT_RUNTIME;
       return;
     }

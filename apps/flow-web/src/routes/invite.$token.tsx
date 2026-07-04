@@ -17,9 +17,76 @@
  * one).
  */
 
-import { createFileRoute } from '@tanstack/react-router';
+import { createFileRoute, Link } from '@tanstack/react-router';
+import { AlertCircle } from 'lucide-react';
+import type { ReactElement } from 'react';
+import { useTranslation } from 'react-i18next';
 
+import AuthCard from '../components/auth/auth-card';
 import { inviteInfoQueryOptions } from '../features/workspaces/invite-api';
+import { ApiError, isNetworkError } from '../lib/api-error';
+
+function resolveInviteErrorKey(error: unknown): string {
+  if (isNetworkError(error)) return 'workspaces.invites.error_network';
+  if (error instanceof ApiError) {
+    switch (error.code) {
+      case 'WS.WORKSPACE_INVITE.EXPIRED':
+        return 'workspaces.invites.expired';
+      case 'WS.WORKSPACE_INVITE.EXHAUSTED':
+        return 'workspaces.invites.full';
+      default:
+        return 'workspaces.invites.invalid';
+    }
+  }
+  return 'workspaces.invites.invalid';
+}
+
+function InviteErrorComponent({ error }: { error: unknown }): ReactElement {
+  const { t } = useTranslation('common');
+  return (
+    <AuthCard>
+      <main
+        aria-label={t('workspaces.invites.error_title')}
+        style={{
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          gap: 'var(--nf-space-4)',
+          textAlign: 'center',
+        }}
+      >
+        <AlertCircle size={44} aria-hidden="true" style={{ color: 'var(--nf-color-danger)' }} />
+        <h1
+          style={{
+            margin: 0,
+            fontSize: 'var(--nf-text-2xl)',
+            fontWeight: 'var(--nf-weight-semibold)',
+          }}
+        >
+          {t('workspaces.invites.error_title')}
+        </h1>
+        <p style={{ margin: 0, color: 'var(--nf-color-fg-muted)' }}>
+          {t(resolveInviteErrorKey(error))}
+        </p>
+        <Link
+          to="/"
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            padding: '0.625rem 1.25rem',
+            borderRadius: '0.5rem',
+            border: '1px solid var(--nf-color-border)',
+            color: 'var(--nf-color-fg)',
+            textDecoration: 'none',
+            fontWeight: 500,
+          }}
+        >
+          {t('workspaces.invites.error_back')}
+        </Link>
+      </main>
+    </AuthCard>
+  );
+}
 
 export const Route = createFileRoute('/invite/$token')({
   beforeLoad: async ({ params, context: { queryClient } }) => {
@@ -28,4 +95,5 @@ export const Route = createFileRoute('/invite/$token')({
       // useSuspenseQuery and renders its branded error UI.
     });
   },
+  errorComponent: InviteErrorComponent,
 });

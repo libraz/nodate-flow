@@ -1,11 +1,11 @@
 /**
- * Maps backend error codes (RFC 7807 `type` URI suffix or matching
+ * Maps backend error codes (RFC 7807 `type` value or matching
  * substring on `detail`/`title`) to i18n keys under `auth:errors.*`.
  *
  * The Huma backend serialises errors as application/problem+json with
- * the canonical code embedded in the `type` URI (e.g.
- * `https://nodate-flow.dev/errors/AUTH.LOGIN.INVALID_CREDENTIALS`).
- * We match by suffix to stay independent of the host portion.
+ * the canonical code embedded in `type` (e.g.
+ * `AUTH.LOGIN.INVALID_CREDENTIALS`). We also accept legacy URI-shaped
+ * values by matching the last path segment.
  */
 
 import { AuthErrors } from '@nodate-flow/sdk';

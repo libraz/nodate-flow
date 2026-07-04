@@ -127,6 +127,36 @@ describe.each(THEMES)('DataGrid [%s]', (theme) => {
     expect(checkbox.checked).toBe(true);
   });
 
+  it('keys row selection with getRowId when provided', () => {
+    const onChange = vi.fn();
+
+    function Wrapper(): ReactElement {
+      const [sel, setSel] = useState<RowSelectionState>({});
+      return (
+        <DataGrid<Row>
+          aria-label="selectable"
+          columns={COLS}
+          data={ROWS}
+          getRowId={(row) => `row-${row.id}`}
+          enableRowSelection
+          rowSelection={sel}
+          onRowSelectionChange={(next) => {
+            onChange(next);
+            setSel(next);
+          }}
+        />
+      );
+    }
+
+    render(<Wrapper />);
+    const firstBodyRow = screen.getAllByRole('row')[1] as HTMLElement;
+    const checkbox = within(firstBodyRow).getByRole('checkbox') as HTMLInputElement;
+
+    fireEvent.click(checkbox);
+
+    expect(onChange).toHaveBeenLastCalledWith({ 'row-1': true });
+  });
+
   it('renders resize handles when enableColumnResizing is true', async () => {
     const container = renderGrid({ enableColumnResizing: true });
     const separators = container.querySelectorAll('[role="separator"]');

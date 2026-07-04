@@ -57,6 +57,45 @@ describe.each(THEMES)('Tabs [%s]', (theme) => {
     expect(document.activeElement).toBe(screen.getByRole('tab', { name: 'Charlie' }));
   });
 
+  it('keeps disabled tabs in the tablist and skips them during keyboard navigation', async () => {
+    const user = userEvent.setup();
+    render(
+      <Tabs
+        items={[
+          ITEMS[0] as TabItem,
+          { ...(ITEMS[1] as TabItem), disabled: true },
+          ITEMS[2] as TabItem,
+        ]}
+        aria-label="demo"
+      />,
+    );
+
+    const disabled = screen.getByRole('tab', { name: 'Bravo' });
+    expect(disabled.getAttribute('aria-disabled')).toBe('true');
+
+    const first = screen.getByRole('tab', { name: 'Alpha' });
+    first.focus();
+    await user.keyboard('{ArrowRight}');
+
+    expect(document.activeElement).toBe(screen.getByRole('tab', { name: 'Charlie' }));
+  });
+
+  it('uses RTL-aware horizontal arrow navigation', async () => {
+    const user = userEvent.setup();
+    const { container } = render(
+      <div dir="rtl">
+        <Tabs items={ITEMS} aria-label="demo" />
+      </div>,
+    );
+
+    const first = screen.getByRole('tab', { name: 'Alpha' });
+    first.focus();
+    await user.keyboard('{ArrowRight}');
+
+    expect(document.activeElement).toBe(screen.getByRole('tab', { name: 'Charlie' }));
+    expect(await axe(container)).toHaveNoViolations();
+  });
+
   it('uses roving tabindex', () => {
     render(<Tabs items={ITEMS} aria-label="demo" defaultValue="b" />);
     expect(screen.getByRole('tab', { name: 'Alpha' }).getAttribute('tabindex')).toBe('-1');

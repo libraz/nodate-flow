@@ -8,6 +8,8 @@ import { createFileRoute } from '@tanstack/react-router';
 import { type ReactElement, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import type { ProblemJson } from '../../../lib/api-error';
+import { extractErrorCode } from '../../../lib/auth-errors';
 import { sdk } from '../../../lib/sdk';
 import styles from './settings.module.css';
 
@@ -17,7 +19,14 @@ import styles from './settings.module.css';
  */
 type SettingsResponse = components['schemas']['ListSettingsOutputBody'];
 
-function SettingsPage(): ReactElement {
+const settingKeys = {
+  registrationOpen: 'registration_open',
+  mfaEnforcement: 'mfa_enforcement',
+  maxWorkspacesPerUser: 'max_workspaces_per_user',
+  maxMembersPerWorkspace: 'max_members_per_workspace',
+} as const;
+
+export function SettingsPage(): ReactElement {
   const { t } = useTranslation('admin');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -60,14 +69,14 @@ function SettingsPage(): ReactElement {
     setSuccess(false);
 
     const settings: Record<string, string> = {
-      registrationOpen: registrationOpen,
-      mfaEnforcement: mfaEnforcement,
+      [settingKeys.registrationOpen]: registrationOpen,
+      [settingKeys.mfaEnforcement]: mfaEnforcement,
     };
     if (maxWorkspacesPerUser) {
-      settings.max_workspaces_per_user = maxWorkspacesPerUser;
+      settings[settingKeys.maxWorkspacesPerUser] = maxWorkspacesPerUser;
     }
     if (maxMembersPerWorkspace) {
-      settings.max_members_per_workspace = maxMembersPerWorkspace;
+      settings[settingKeys.maxMembersPerWorkspace] = maxMembersPerWorkspace;
     }
 
     const { error: err } = await sdk.PATCH('/admin/settings', {
@@ -76,7 +85,8 @@ function SettingsPage(): ReactElement {
     setSaving(false);
 
     if (err) {
-      setError(t('errors.generic'));
+      const code = extractErrorCode(err as ProblemJson);
+      setError(code ? `${t('errors.generic')} (${code})` : t('errors.generic'));
     } else {
       setSuccess(true);
     }

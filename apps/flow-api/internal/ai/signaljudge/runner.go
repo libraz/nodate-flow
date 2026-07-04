@@ -266,13 +266,19 @@ func (r *Runner) ExecuteJudge(ctx context.Context, workspaceID, agentID uint32, 
 	if r.OnInvocation != nil {
 		r.OnInvocation(string(prov.Kind()), req.Model, wsIDStr, resp.CostCents)
 	}
+	model := resp.Model
+	if model == "" {
+		model = req.Model
+	}
 	r.logInvocation(ctx, InvocationRecord{
 		WorkspaceID:      workspaceID,
 		AgentID:          agentID,
 		Purpose:          "signal_judge",
-		Model:            req.Model,
+		Model:            model,
 		PromptRedacted:   combinedPrompt,
 		ResponseRedacted: logutil.Redact(resp.Text),
+		TokensInput:      resp.InputTokens,
+		TokensOutput:     resp.OutputTokens,
 		CostCents:        resp.CostCents,
 		Status:           "ok",
 	})
@@ -298,13 +304,19 @@ func (r *Runner) ExecuteJudge(ctx context.Context, workspaceID, agentID uint32, 
 			if r.OnInvocation != nil {
 				r.OnInvocation(string(prov.Kind()), retryReq.Model, wsIDStr, retryResp.CostCents)
 			}
+			retryModel := retryResp.Model
+			if retryModel == "" {
+				retryModel = retryReq.Model
+			}
 			r.logInvocation(ctx, InvocationRecord{
 				WorkspaceID:      workspaceID,
 				AgentID:          agentID,
 				Purpose:          "signal_judge",
-				Model:            retryReq.Model,
+				Model:            retryModel,
 				PromptRedacted:   logutil.Redact(strings.TrimSpace(retryReq.System + "\n" + retryReq.Prompt)),
 				ResponseRedacted: logutil.Redact(retryResp.Text),
+				TokensInput:      retryResp.InputTokens,
+				TokensOutput:     retryResp.OutputTokens,
 				CostCents:        retryResp.CostCents,
 				Status:           "ok",
 			})

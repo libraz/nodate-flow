@@ -147,7 +147,6 @@ func AvatarUpload(deps Deps) func(context.Context, *AvatarUploadInput) (*AvatarU
 			return nil, httpErr(apierrors.AuthSessionRevoked)
 		}
 		userHex := hex.EncodeToString(userPublicID[:])
-		storageKey := storage.StorageKeyForUser(userHex, shaHex)
 
 		// Snapshot the current avatar_storage_object_id BEFORE the
 		// txn so we know which previous row (if any) needs its
@@ -193,7 +192,7 @@ func AvatarUpload(deps Deps) func(context.Context, *AvatarUploadInput) (*AvatarU
 			// Reset per-attempt state. storageKey is restored from
 			// the content-addressed default; a dedup hit further
 			// down may overwrite it with the winner's recorded key.
-			storageKey = storage.StorageKeyForUser(userHex, shaHex)
+			storageKey := storage.KeyForUser(userHex, shaHex)
 			prevStorageKeyToRemove = ""
 			finalAttemptDeduped = false
 

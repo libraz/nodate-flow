@@ -115,6 +115,7 @@ func (p *googleProvider) Complete(ctx context.Context, req Request) (*Response, 
 		text += part.Text
 	}
 	return &Response{
+		Model:        model,
 		Text:         text,
 		InputTokens:  gr.UsageMetadata.PromptTokenCount,
 		OutputTokens: gr.UsageMetadata.CandidatesTokenCount,

@@ -11,7 +11,7 @@
  */
 
 import { Monitor, Moon, Sun } from 'lucide-react';
-import type { ReactElement } from 'react';
+import { type KeyboardEvent, type MutableRefObject, type ReactElement, useRef } from 'react';
 
 import type { ColorMode, ThemeFamily } from '../../providers/theme-provider';
 import styles from './theme-picker.module.css';
@@ -127,6 +127,51 @@ export default function ThemePicker({
   themeLabel,
   colorModeLabel,
 }: ThemePickerProps): ReactElement {
+  const themeRefs = useRef<Array<HTMLButtonElement | null>>([]);
+  const colorModeRefs = useRef<Array<HTMLButtonElement | null>>([]);
+
+  const handleRadioKeyDown = <T,>(
+    event: KeyboardEvent<HTMLButtonElement>,
+    entries: readonly T[],
+    currentIndex: number,
+    refs: MutableRefObject<Array<HTMLButtonElement | null>>,
+    select: (entry: T) => void,
+  ): void => {
+    let nextIndex = currentIndex;
+    const rtl =
+      event.currentTarget.closest('[dir="rtl"]') !== null || document.documentElement.dir === 'rtl';
+    switch (event.key) {
+      case 'ArrowRight':
+      case 'ArrowDown':
+        nextIndex =
+          event.key === 'ArrowRight' && rtl
+            ? (currentIndex - 1 + entries.length) % entries.length
+            : (currentIndex + 1) % entries.length;
+        break;
+      case 'ArrowLeft':
+      case 'ArrowUp':
+        nextIndex =
+          event.key === 'ArrowLeft' && rtl
+            ? (currentIndex + 1) % entries.length
+            : (currentIndex - 1 + entries.length) % entries.length;
+        break;
+      case 'Home':
+        nextIndex = 0;
+        break;
+      case 'End':
+        nextIndex = entries.length - 1;
+        break;
+      default:
+        return;
+    }
+
+    event.preventDefault();
+    const next = entries[nextIndex];
+    if (next === undefined) return;
+    select(next);
+    refs.current[nextIndex]?.focus();
+  };
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--nf-space-5)' }}>
       {/* Theme families */}
@@ -134,16 +179,26 @@ export default function ThemePicker({
         {themeLabel ? <span className={styles.label}>{themeLabel}</span> : null}
         <div className={styles.themeGrid} role="radiogroup" aria-label={themeLabel ?? 'Theme'}>
           {themes.map((entry) => {
+            const index = themes.indexOf(entry);
             const selected = entry.id === selectedTheme;
             return (
               <button
                 key={entry.id}
+                ref={(node) => {
+                  themeRefs.current[index] = node;
+                }}
                 type="button"
                 role="radio"
                 aria-checked={selected}
+                tabIndex={selected ? 0 : -1}
                 data-selected={selected}
                 className={styles.themeCard}
                 onClick={() => onThemeChange(entry.id)}
+                onKeyDown={(event) =>
+                  handleRadioKeyDown(event, themes, index, themeRefs, (next) =>
+                    onThemeChange(next.id),
+                  )
+                }
               >
                 <div
                   className={styles.preview}
@@ -180,16 +235,26 @@ export default function ThemePicker({
           aria-label={colorModeLabel ?? 'Color mode'}
         >
           {colorModes.map((entry) => {
+            const index = colorModes.indexOf(entry);
             const selected = entry.mode === selectedColorMode;
             return (
               <button
                 key={entry.mode}
+                ref={(node) => {
+                  colorModeRefs.current[index] = node;
+                }}
                 type="button"
                 role="radio"
                 aria-checked={selected}
+                tabIndex={selected ? 0 : -1}
                 data-selected={selected}
                 className={styles.modeButton}
                 onClick={() => onColorModeChange(entry.mode)}
+                onKeyDown={(event) =>
+                  handleRadioKeyDown(event, colorModes, index, colorModeRefs, (next) =>
+                    onColorModeChange(next.mode),
+                  )
+                }
               >
                 <ModeIcon mode={entry.mode} />
                 <span className={styles.modeName}>{entry.label}</span>

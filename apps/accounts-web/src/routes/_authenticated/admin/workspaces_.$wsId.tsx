@@ -208,11 +208,24 @@ function WorkspaceDetailPage(): ReactElement {
     if (!ok) return;
 
     setActionLoading(true);
-    await sdk.PATCH('/admin/workspaces/{wsId}', {
-      params: { path: { wsId } },
-      body: { enabled: !workspace.enabled },
-    });
-    setActionLoading(false);
+    const { error: err } = await (async () => {
+      try {
+        return await sdk.PATCH('/admin/workspaces/{wsId}', {
+          params: { path: { wsId } },
+          body: { enabled: !workspace.enabled },
+        });
+      } finally {
+        setActionLoading(false);
+      }
+    })();
+    if (err) {
+      const code = extractErrorCode(err as ProblemJson);
+      toaster.show({
+        tone: 'danger',
+        message: code ? `${t('errors.generic')} (${code})` : t('errors.generic'),
+      });
+      return;
+    }
 
     // Refetch
     const result = await sdk.GET('/admin/workspaces/{wsId}', { params: { path: { wsId } } });

@@ -153,7 +153,8 @@ func nextTaskNumber(t *testing.T, tx *sql.Tx, projectID uint32) uint32 {
 	if !n.Valid {
 		return 1
 	}
-	return uint32(n.Int32) + 1
+	require.GreaterOrEqual(t, n.Int32, int32(0))
+	return uint32(n.Int32) + 1 //#nosec G115 -- bounded by non-negative INT task_number fixture above.
 }
 
 // TestListRetroDraftsHappyPath seeds a retro draft and asserts the

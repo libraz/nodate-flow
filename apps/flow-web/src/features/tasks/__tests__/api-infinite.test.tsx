@@ -1,10 +1,10 @@
 /**
- * Cursor-paginated tasks hook coverage.
+ * Infinite project tasks hook coverage.
  *
  * Verifies:
  *   1. `useTasksInfiniteQuery` flat-maps `data.pages` correctly across
- *      3 pages of 10 items, with `nextCursor` advancing each time, and
- *      the cursor is threaded through `pageParam` (NOT into the query
+ *      3 pages, with OFFSET advancing each time, and the offset is
+ *      threaded through `pageParam` (NOT into the query
  *      key).
  *   2. `tasksKeys.infinite` lives under the shared `[...all, 'list']`
  *      prefix so the W5 mutation invalidation policy refreshes it.
@@ -52,17 +52,16 @@ function aTask(id: string): TaskListItem {
 
 interface FakePage {
   tasks: TaskListItem[];
-  nextCursor: string | null;
   total: number;
 }
 
 function buildPages(): { pageOne: FakePage; pageTwo: FakePage; pageThree: FakePage } {
-  const make = (start: number): TaskListItem[] =>
-    Array.from({ length: 10 }, (_, i) => aTask(`t-${start + i}`));
+  const make = (start: number, count: number): TaskListItem[] =>
+    Array.from({ length: count }, (_, i) => aTask(`t-${start + i}`));
   return {
-    pageOne: { tasks: make(0), nextCursor: 'cursor-2', total: 30 },
-    pageTwo: { tasks: make(10), nextCursor: 'cursor-3', total: 30 },
-    pageThree: { tasks: make(20), nextCursor: null, total: 30 },
+    pageOne: { tasks: make(0, 100), total: 250 },
+    pageTwo: { tasks: make(100, 100), total: 250 },
+    pageThree: { tasks: make(200, 50), total: 250 },
   };
 }
 
@@ -94,7 +93,7 @@ beforeEach(() => {
 /* ── Tests ───────────────────────────────────────────────── */
 
 describe('useTasksInfiniteQuery', () => {
-  it('flat-maps 3 pages of 10 tasks across keyset cursor advances', async () => {
+  it('flat-maps 3 pages of tasks across offset advances', async () => {
     const { pageOne, pageTwo, pageThree } = buildPages();
     sdkMocks.get
       .mockResolvedValueOnce({ data: pageOne, error: null })
@@ -111,18 +110,20 @@ describe('useTasksInfiniteQuery', () => {
       expect(result.current.data).toBeDefined();
     });
     expect(result.current.data.pages).toHaveLength(1);
-    expect(result.current.data.pages[0]?.tasks).toHaveLength(10);
+    expect(result.current.data.pages[0]?.tasks).toHaveLength(100);
     expect(result.current.hasNextPage).toBe(true);
 
-    // First call must NOT carry a cursor.
+    // First call starts at offset 0 and must NOT carry a cursor; the
+    // project list needs OFFSET to preserve sort_weight ordering.
     const firstCall = sdkMocks.get.mock.calls[0];
     expect(firstCall?.[0]).toBe('/tasks');
     const firstQuery = firstCall?.[1]?.params?.query as Record<string, unknown> | undefined;
     expect(firstQuery?.projectId).toBe('prj-1');
     expect(firstQuery?.cursor).toBeUndefined();
     expect(firstQuery?.limit).toBe(100);
+    expect(firstQuery?.offset).toBe(0);
 
-    // Page 2 — cursor advances.
+    // Page 2 — offset advances by page size.
     await result.current.fetchNextPage();
     await waitFor(() => {
       expect(result.current.data.pages).toHaveLength(2);
@@ -130,9 +131,10 @@ describe('useTasksInfiniteQuery', () => {
     const secondQuery = sdkMocks.get.mock.calls[1]?.[1]?.params?.query as
       | Record<string, unknown>
       | undefined;
-    expect(secondQuery?.cursor).toBe('cursor-2');
+    expect(secondQuery?.cursor).toBeUndefined();
+    expect(secondQuery?.offset).toBe(100);
 
-    // Page 3 — cursor advances again.
+    // Page 3 — offset advances again.
     await result.current.fetchNextPage();
     await waitFor(() => {
       expect(result.current.data.pages).toHaveLength(3);
@@ -140,24 +142,26 @@ describe('useTasksInfiniteQuery', () => {
     const thirdQuery = sdkMocks.get.mock.calls[2]?.[1]?.params?.query as
       | Record<string, unknown>
       | undefined;
-    expect(thirdQuery?.cursor).toBe('cursor-3');
+    expect(thirdQuery?.cursor).toBeUndefined();
+    expect(thirdQuery?.offset).toBe(200);
 
     // Final state.
     const flat = result.current.data.pages.flatMap((p) => p.tasks);
-    expect(flat).toHaveLength(30);
+    expect(flat).toHaveLength(250);
     expect(flat[0]?.id).toBe('t-0');
-    expect(flat.at(-1)?.id).toBe('t-29');
+    expect(flat.at(-1)?.id).toBe('t-249');
     expect(result.current.hasNextPage).toBe(false);
   });
 
-  it('keeps the cursor out of the queryKey', () => {
-    // The keyset cursor must NOT be folded into the queryKey explicitly —
+  it('keeps pagination state out of the queryKey', () => {
+    // The offset must NOT be folded into the queryKey explicitly —
     // TanStack threads it via `pageParam` so cache layout stays stable
     // across page advances. The key shape must therefore be independent
-    // of any cursor.
+    // of any page position.
     const key = tasksKeys.infinite('prj-1');
     const flat = JSON.stringify(key);
     expect(flat).not.toContain('cursor');
+    expect(flat).not.toContain('offset');
   });
 });
 

@@ -89,8 +89,12 @@ func PatchSettings(deps Deps) func(context.Context, *PatchSettingsInput) (*Patch
 // Returns nil on success or an error suitable for returning from the handler.
 func validateSettingValue(key, value string) error {
 	switch key {
-	case "registration_open", "mfa_enforcement":
+	case "registration_open":
 		if value != "true" && value != "false" {
+			return httpErr(apierrors.InstanceSettingsInvalidValue)
+		}
+	case "mfa_enforcement":
+		if value != "none" && value != "optional" && value != "required" {
 			return httpErr(apierrors.InstanceSettingsInvalidValue)
 		}
 	case "max_workspaces_per_user", "max_members_per_workspace":

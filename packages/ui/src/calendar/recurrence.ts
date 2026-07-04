@@ -47,11 +47,41 @@ function matchesByMonthDay(dt: DateTime, byMonthDay: number[]): boolean {
   return byMonthDay.includes(dt.day);
 }
 
+interface RecurrenceExceptionSets {
+  instants: Set<number>;
+  localDayKeys: Set<string>;
+}
+
 // Parse an ISO timestamp and anchor it to `zone` if provided, so subsequent
 // calendar arithmetic preserves wall-clock time across DST transitions.
 // Returns an invalid DateTime if parsing fails.
 function parseInZone(iso: string, zone: string | undefined): DateTime {
   return zone ? DateTime.fromISO(iso, { zone }) : DateTime.fromISO(iso);
+}
+
+function buildRecurrenceExceptionSets(
+  values: string[] | undefined,
+  zone: string | undefined,
+): RecurrenceExceptionSets {
+  const instants = new Set<number>();
+  const localDayKeys = new Set<string>();
+
+  for (const raw of values ?? []) {
+    const value = raw.trim();
+    if (!value) continue;
+    if (/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+      localDayKeys.add(value);
+      continue;
+    }
+
+    const withOffset = DateTime.fromISO(value, { setZone: true });
+    const parsed = withOffset.isValid ? withOffset : parseInZone(value, zone);
+    if (parsed.isValid) {
+      instants.add(parsed.toMillis());
+    }
+  }
+
+  return { instants, localDayKeys };
 }
 
 /** Expand a recurring event into concrete instances within `[rangeStart, rangeEnd)`. */
@@ -70,11 +100,7 @@ export function expandRecurrence(
   const interval = rule.interval ?? 1;
   const until = rule.until ? parseInZone(rule.until, zone) : null;
   const maxCount = rule.count ?? Number.POSITIVE_INFINITY;
-
-  // Exceptions compare instants (UTC ms), so zone doesn't matter for the key.
-  const exceptions = new Set(
-    event.recurrenceExceptions?.map((d) => DateTime.fromISO(d).toMillis()) ?? [],
-  );
+  const exceptions = buildRecurrenceExceptionSets(event.recurrenceExceptions, zone);
 
   const results: ExpandedInstance[] = [];
   let current = eventStart;
@@ -89,7 +115,10 @@ export function expandRecurrence(
 
     if (passesDay && passesMonthDay) {
       emitted++;
-      if (!exceptions.has(candidate.toMillis())) {
+      const excluded =
+        exceptions.instants.has(candidate.toMillis()) ||
+        exceptions.localDayKeys.has(candidate.toFormat('yyyy-MM-dd'));
+      if (!excluded) {
         const instanceEnd = candidate.plus(duration);
         if (instanceEnd > rangeStart) {
           results.push({ startAt: candidate, endAt: instanceEnd });

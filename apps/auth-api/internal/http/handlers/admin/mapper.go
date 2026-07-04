@@ -1,28 +1,17 @@
 package admin
 
 import (
-	"database/sql"
 	"encoding/json"
 
 	"github.com/nodate-flow/nodate-flow/apps/auth-api/internal/db/generated"
 	"github.com/nodate-flow/nodate-flow/apps/auth-api/internal/db/types"
+	"github.com/nodate-flow/nodate-flow/packages/go-shared/dbtype"
 )
 
-func nullStr(ns sql.NullString) *string {
-	if !ns.Valid {
-		return nil
-	}
-	s := ns.String
-	return &s
-}
-
-func nullTimeUnix(nt sql.NullTime) *int64 {
-	if !nt.Valid {
-		return nil
-	}
-	v := nt.Time.Unix()
-	return &v
-}
+var (
+	nullStr      = dbtype.PtrFromNullString
+	nullTimeUnix = dbtype.UnixSecondsFromNullTime
+)
 
 // nullPubID converts a PublicID to a *string, returning nil for the zero UUID.
 func nullPubID(pid types.PublicID) *string {

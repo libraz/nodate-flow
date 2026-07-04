@@ -67,11 +67,11 @@ func TestDiscord_Exchange_HappyPath_GlobalName(t *testing.T) {
 		switch r.URL.Path {
 		case "/api/oauth2/token":
 			require.Equal(t, http.MethodPost, r.Method)
-			require.NoError(t, r.ParseForm()) //#nosec G120 -- httptest receives small fixed test bodies
-			assert.Equal(t, "authorization_code", r.PostFormValue("grant_type"))
-			assert.Equal(t, "test-code", r.PostFormValue("code"))
-			assert.Equal(t, "my-id", r.PostFormValue("client_id"))
-			assert.Equal(t, "my-secret", r.PostFormValue("client_secret"))
+			require.NoError(t, r.ParseForm())                                    //#nosec G120 -- httptest receives small fixed test bodies
+			assert.Equal(t, "authorization_code", r.PostFormValue("grant_type")) //#nosec G120 -- httptest receives small fixed test bodies.
+			assert.Equal(t, "test-code", r.PostFormValue("code"))                //#nosec G120 -- httptest receives small fixed test bodies.
+			assert.Equal(t, "my-id", r.PostFormValue("client_id"))               //#nosec G120 -- httptest receives small fixed test bodies.
+			assert.Equal(t, "my-secret", r.PostFormValue("client_secret"))       //#nosec G120 -- httptest receives small fixed test bodies.
 			_, _ = w.Write([]byte(`{
 				"access_token":"dtok_abc",
 				"refresh_token":"drt_xyz",
@@ -223,9 +223,9 @@ func TestDiscord_Refresh_EmptyTokenReturnsErrRefreshNotSupported(t *testing.T) {
 func TestDiscord_Refresh_RotatedTokenIsAdopted(t *testing.T) {
 	t.Parallel()
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		require.NoError(t, r.ParseForm()) //#nosec G120 -- httptest receives small fixed test bodies
-		assert.Equal(t, "refresh_token", r.PostFormValue("grant_type"))
-		assert.Equal(t, "old-rt", r.PostFormValue("refresh_token"))
+		require.NoError(t, r.ParseForm())                               //#nosec G120 -- httptest receives small fixed test bodies
+		assert.Equal(t, "refresh_token", r.PostFormValue("grant_type")) //#nosec G120 -- httptest receives small fixed test bodies.
+		assert.Equal(t, "old-rt", r.PostFormValue("refresh_token"))     //#nosec G120 -- httptest receives small fixed test bodies.
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = w.Write([]byte(`{
 			"access_token":"new-access",
@@ -281,11 +281,11 @@ func TestDiscord_Revoke_EmptyTokenIsNoop(t *testing.T) {
 func TestDiscord_Revoke_PrefersRefreshTokenAndPostsClientCreds(t *testing.T) {
 	t.Parallel()
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		require.NoError(t, r.ParseForm()) //#nosec G120 -- httptest receives small fixed test bodies
-		assert.Equal(t, "rt-value", r.PostFormValue("token"),
+		require.NoError(t, r.ParseForm())                     //#nosec G120 -- httptest receives small fixed test bodies
+		assert.Equal(t, "rt-value", r.PostFormValue("token"), //#nosec G120 -- httptest receives small fixed test bodies.
 			"Discord revoke must prefer the refresh token over the access token")
-		assert.Equal(t, "my-id", r.PostFormValue("client_id"))
-		assert.Equal(t, "my-secret", r.PostFormValue("client_secret"))
+		assert.Equal(t, "my-id", r.PostFormValue("client_id"))         //#nosec G120 -- httptest receives small fixed test bodies.
+		assert.Equal(t, "my-secret", r.PostFormValue("client_secret")) //#nosec G120 -- httptest receives small fixed test bodies.
 		w.WriteHeader(http.StatusOK)
 	}))
 	defer srv.Close()
@@ -304,8 +304,8 @@ func TestDiscord_Revoke_PrefersRefreshTokenAndPostsClientCreds(t *testing.T) {
 func TestDiscord_Revoke_FallsBackToAccessTokenWhenNoRefresh(t *testing.T) {
 	t.Parallel()
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		require.NoError(t, r.ParseForm()) //#nosec G120 -- httptest receives small fixed test bodies
-		assert.Equal(t, "access-only", r.PostFormValue("token"),
+		require.NoError(t, r.ParseForm())                        //#nosec G120 -- httptest receives small fixed test bodies
+		assert.Equal(t, "access-only", r.PostFormValue("token"), //#nosec G120 -- httptest receives small fixed test bodies.
 			"must revoke the access token when no refresh token is stored")
 		w.WriteHeader(http.StatusOK)
 	}))

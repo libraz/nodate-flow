@@ -47,6 +47,7 @@
   "AUTH.PASSWORD.NO_LOCAL_IDENTITY": "此账户没有可修改的本地密码",
   "AUTH.PASSWORD.TOO_WEAK": "密码强度不符合要求",
   "AUTH.PAT.EXPIRED": "个人访问令牌已过期",
+  "AUTH.PAT.SCOPE_INSUFFICIENT": "个人访问令牌缺少所需的作用域",
   "AUTH.PAT.TOKEN_UNKNOWN": "个人访问令牌无效",
   "AUTH.PERMISSION.INSTANCE_ADMIN_REQUIRED": "此操作需要实例管理员权限",
   "AUTH.REGISTER.EMAIL_ALREADY_TAKEN": "该邮箱地址已被注册",

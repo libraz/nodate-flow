@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/nodate-flow/nodate-flow/packages/go-shared/apierr"
 	"github.com/nodate-flow/nodate-flow/packages/go-shared/dbtype"
 )
 
@@ -30,43 +31,56 @@ func RequireAuth(resolvers ...TokenResolver) func(http.Handler) http.Handler {
 				writeJSON401Missing(w)
 				return
 			}
-			userID, sid, err := resolveChain(r.Context(), tok, resolvers)
+			details, err := resolveChain(r.Context(), tok, resolvers)
 			if err != nil {
-				writeJSON401SignatureInvalid(w)
+				writeJSONResolveError(w, err)
 				return
 			}
-			ctx := WithActor(r.Context(), userID)
+			ctx := WithActor(r.Context(), details.UserID)
 			ctx = WithAuthMode(ctx, AuthModeJWT)
+			ctx = WithTokenKind(ctx, details.Kind)
+			ctx = WithTokenScopes(ctx, details.Scopes)
 			var zero dbtype.PublicID
-			if sid != zero {
-				ctx = WithSessionPublicID(ctx, sid)
+			if details.SessionPublicID != zero {
+				ctx = WithSessionPublicID(ctx, details.SessionPublicID)
 			}
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})
 	}
 }
 
-func resolveChain(ctx context.Context, token string, resolvers []TokenResolver) (uint32, dbtype.PublicID, error) {
+func resolveChain(ctx context.Context, token string, resolvers []TokenResolver) (TokenDetails, error) {
 	var lastErr error
 	for _, r := range resolvers {
 		if r == nil {
 			continue
 		}
+		if detailed, ok := r.(DetailedTokenResolver); ok {
+			details, err := detailed.ResolveDetailed(ctx, token)
+			if err == nil {
+				return details, nil
+			}
+			lastErr = err
+			if !errors.Is(err, ErrTokenInvalid) {
+				return TokenDetails{}, err
+			}
+			continue
+		}
 		uid, sid, err := r.Resolve(ctx, token)
 		if err == nil {
-			return uid, sid, nil
+			return TokenDetails{UserID: uid, SessionPublicID: sid, Kind: TokenKindJWT}, nil
 		}
 		lastErr = err
 		// If the resolver recognized the token but it was invalid
 		// (e.g. expired PAT), stop trying other resolvers.
 		if !errors.Is(err, ErrTokenInvalid) {
-			return 0, dbtype.PublicID{}, err
+			return TokenDetails{}, err
 		}
 	}
 	if lastErr != nil {
-		return 0, dbtype.PublicID{}, lastErr
+		return TokenDetails{}, lastErr
 	}
-	return 0, dbtype.PublicID{}, ErrTokenInvalid
+	return TokenDetails{}, ErrTokenInvalid
 }
 
 func bearerFromHeader(h string) (string, bool) {
@@ -99,10 +113,31 @@ func writeJSON401Missing(w http.ResponseWriter) {
 }
 
 func writeJSON401SignatureInvalid(w http.ResponseWriter) {
+	writeJSONError(w, http.StatusUnauthorized, "AUTH.TOKEN.SIGNATURE_INVALID", "Token signature is invalid")
+}
+
+func writeJSONResolveError(w http.ResponseWriter, err error) {
+	var ae *apierr.APIError
+	if errors.As(err, &ae) && ae.Spec != nil {
+		writeJSONError(w, ae.Spec.Status, ae.Spec.Code, ae.Spec.Message)
+		return
+	}
+	if errors.Is(err, ErrUserDisabled) {
+		writeJSONError(w, http.StatusUnauthorized, "AUTH.SESSION.UNAUTHORIZED", "You must be signed in to access this resource")
+		return
+	}
+	if errors.Is(err, ErrTokenInvalid) {
+		writeJSON401SignatureInvalid(w)
+		return
+	}
+	writeJSONError(w, http.StatusInternalServerError, "INTERNAL.UNEXPECTED", "Unexpected server error")
+}
+
+func writeJSONError(w http.ResponseWriter, status int, code, message string) {
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
-	w.WriteHeader(http.StatusUnauthorized)
+	w.WriteHeader(status)
 	_ = json.NewEncoder(w).Encode(errorBody{
-		Code:    "AUTH.TOKEN.SIGNATURE_INVALID",
-		Message: "Token signature is invalid",
+		Code:    code,
+		Message: message,
 	})
 }

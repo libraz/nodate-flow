@@ -6,6 +6,7 @@ import Button from '@nodate-flow/ui/primitives/button';
 import { toaster } from '@nodate-flow/ui/primitives/toast';
 import { type ChangeEvent, type ReactElement, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
+import { formatApiError } from '../../lib/api-error';
 import { confirmAction } from '../../lib/confirm-action';
 import { formatBytes } from '../../lib/format-bytes';
 import {
@@ -40,8 +41,11 @@ function AttachmentRow({
     if (!confirmed) return;
     try {
       await deleteAttachment.mutateAsync({ taskId, attachmentId: attachment.id });
-    } catch {
-      toaster.show({ tone: 'danger', message: t('tasks.errors.update_failed') });
+    } catch (err) {
+      toaster.show({
+        tone: 'danger',
+        message: formatApiError(err, t, 'tasks.errors.update_failed'),
+      });
     }
   };
 
@@ -49,8 +53,11 @@ function AttachmentRow({
     try {
       const url = await fetchDownloadUrl(taskId, attachment.id);
       window.open(url, '_blank');
-    } catch {
-      toaster.show({ tone: 'danger', message: t('tasks.errors.update_failed') });
+    } catch (err) {
+      toaster.show({
+        tone: 'danger',
+        message: formatApiError(err, t, 'tasks.errors.update_failed'),
+      });
     }
   };
 
@@ -132,8 +139,11 @@ export default function TaskAttachments({ taskId }: TaskAttachmentsProps): React
     if (!file) return;
     try {
       await presignUpload.mutateAsync({ taskId, file });
-    } catch {
-      toaster.show({ tone: 'danger', message: t('tasks.attachments.upload_failed') });
+    } catch (err) {
+      toaster.show({
+        tone: 'danger',
+        message: formatApiError(err, t, 'tasks.attachments.upload_failed'),
+      });
     }
     // Reset the file input so the same file can be re-selected.
     if (fileInputRef.current) {

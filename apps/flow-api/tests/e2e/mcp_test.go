@@ -69,6 +69,93 @@ func TestMCPTokenAndJSONRPC(t *testing.T) {
 	require.Greater(t, invocations, 0, "tools/call must record mcp_invocations row")
 }
 
+// TestMCPStreamableHTTPClientHandshake exercises the message sequence a
+// streamable-HTTP MCP client sends before tool use: initialize request,
+// initialized notification, tools/list, and tools/call over the same
+// authenticated /mcp HTTP endpoint.
+func TestMCPStreamableHTTPClientHandshake(t *testing.T) {
+	bootstrap(t)
+	t.Parallel()
+
+	tt := newTenant(t)
+	var tokenResp struct {
+		Token string `json:"token"`
+	}
+	doJSON(t, http.MethodPost,
+		testServerURL+"/workspaces/"+tt.WorkspacePublicID+"/me/mcp-tokens",
+		tt.AccessToken, map[string]any{
+			"name":   "streamable-http-client",
+			"scopes": []string{"read:workspace", "write:workspace"},
+		}, &tokenResp)
+	require.NotEmpty(t, tokenResp.Token)
+
+	var task struct {
+		ID string `json:"id"`
+	}
+	doJSON(t, http.MethodPost, testServerURL+"/tasks", tt.AccessToken, map[string]any{
+		"projectId": tt.ProjectPublicID,
+		"title":     "MCP handshake target",
+	}, &task)
+
+	initStatus, initBody := mcpPostFrame(t, tokenResp.Token, map[string]any{
+		"jsonrpc": "2.0",
+		"id":      "init-1",
+		"method":  "initialize",
+		"params": map[string]any{
+			"protocolVersion": "2024-11-05",
+			"capabilities":    map[string]any{},
+			"clientInfo": map[string]any{
+				"name":    "nodate-flow-e2e-client",
+				"version": "0.0.0-test",
+			},
+		},
+	})
+	require.Equal(t, http.StatusOK, initStatus, "initialize body=%s", string(initBody))
+	var initResp struct {
+		Result struct {
+			ProtocolVersion string `json:"protocolVersion"`
+			ServerInfo      struct {
+				Name string `json:"name"`
+			} `json:"serverInfo"`
+			Capabilities map[string]any `json:"capabilities"`
+		} `json:"result"`
+		Error any `json:"error"`
+	}
+	require.NoError(t, json.Unmarshal(initBody, &initResp), "initialize response=%s", string(initBody))
+	require.Nil(t, initResp.Error, "initialize returned error: %s", string(initBody))
+	require.Equal(t, "2024-11-05", initResp.Result.ProtocolVersion)
+	require.Equal(t, "nodate-flow", initResp.Result.ServerInfo.Name)
+	require.Contains(t, initResp.Result.Capabilities, "tools")
+
+	notifyStatus, notifyBody := mcpPostFrame(t, tokenResp.Token, map[string]any{
+		"jsonrpc": "2.0",
+		"method":  "notifications/initialized",
+	})
+	require.Equal(t, http.StatusNoContent, notifyStatus, "initialized notification body=%s", string(notifyBody))
+	require.Empty(t, notifyBody, "JSON-RPC notifications must not produce a response body")
+
+	listStatus, listBody := mcpPostFrame(t, tokenResp.Token, map[string]any{
+		"jsonrpc": "2.0",
+		"id":      "tools-1",
+		"method":  "tools/list",
+	})
+	require.Equal(t, http.StatusOK, listStatus, "tools/list body=%s", string(listBody))
+	require.Contains(t, string(listBody), `"tools"`)
+	require.Contains(t, string(listBody), `"get_task"`)
+
+	callStatus, callBody := mcpPostFrame(t, tokenResp.Token, map[string]any{
+		"jsonrpc": "2.0",
+		"id":      "call-1",
+		"method":  "tools/call",
+		"params": map[string]any{
+			"name":      "get_task",
+			"arguments": map[string]any{"taskId": task.ID},
+		},
+	})
+	require.Equal(t, http.StatusOK, callStatus, "tools/call body=%s", string(callBody))
+	require.Contains(t, string(callBody), task.ID)
+}
+
 // mcpCall sends a single JSON-RPC 2.0 request frame to /mcp with the
 // given MCP bearer token. It returns the raw response body.
 func mcpCall(t *testing.T, token, method string, params any) []byte {
@@ -94,4 +181,22 @@ func mcpCall(t *testing.T, token, method string, params any) []byte {
 	require.NoError(t, err)
 	require.Equal(t, http.StatusOK, resp.StatusCode, "mcp %s -> %d body=%s", method, resp.StatusCode, string(raw))
 	return raw
+}
+
+func mcpPostFrame(t *testing.T, token string, frame map[string]any) (int, []byte) {
+	t.Helper()
+	buf, err := json.Marshal(frame)
+	require.NoError(t, err)
+	req, err := http.NewRequest(http.MethodPost, testServerURL+"/mcp", bytes.NewReader(buf))
+	require.NoError(t, err)
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Accept", "application/json, text/event-stream")
+	req.Header.Set("MCP-Protocol-Version", "2024-11-05")
+	req.Header.Set("Authorization", "Bearer "+token)
+	resp, err := http.DefaultClient.Do(req)
+	require.NoError(t, err)
+	defer func() { _ = resp.Body.Close() }()
+	raw, err := io.ReadAll(resp.Body)
+	require.NoError(t, err)
+	return resp.StatusCode, raw
 }

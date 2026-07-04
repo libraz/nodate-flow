@@ -62,6 +62,7 @@ import (
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/generated"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/types"
 	apierrors "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/errors"
+	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/tasknumber"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/taskstate"
 )
 
@@ -428,10 +429,7 @@ func (m *SQLTaskMutator) DraftRetroTask(
 		// Allocate the next per-project task_number. CreateTask
 		// requires this — without it the row would collide on the
 		// uniq_tasks_project_id_task_number index.
-		nextNum, err := qtx.AssignTaskNumber(ctx, generated.AssignTaskNumberParams{
-			WorkspaceID: workspaceID,
-			ProjectID:   src.ProjectID,
-		})
+		nextNum, err := tasknumber.Allocate(ctx, qtx, workspaceID, src.ProjectID)
 		if err != nil {
 			return fmt.Errorf("AssignTaskNumber: %w", err)
 		}

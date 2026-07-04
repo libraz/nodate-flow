@@ -43,17 +43,22 @@ var SecretPrefixes = []string{
 // included so token-exchange form bodies cannot leak through HTTP
 // middleware traces or upstream error responses.
 var redactedSensitiveJSONKeys = map[string]struct{}{
-	"api_key":            {},
-	"apikey":             {},
-	"authorization":      {},
-	"authorization_code": {},
-	"client_secret":      {},
-	"code":               {},
-	"id_token":           {},
-	"password":           {},
-	"refresh_token":      {},
-	"secret":             {},
-	"token":              {},
+	"api_key":           {},
+	"apikey":            {},
+	"authorization":     {},
+	"authorizationcode": {},
+	"clientsecret":      {},
+	"code":              {},
+	"idtoken":           {},
+	"password":          {},
+	"refreshtoken":      {},
+	"secret":            {},
+	"token":             {},
+}
+
+func normalizedSensitiveKey(key string) string {
+	key = strings.ToLower(key)
+	return strings.ReplaceAll(key, "_", "")
 }
 
 var (
@@ -184,7 +189,7 @@ func redactJSONOnce(s string) string {
 		if j >= len(s) || s[j] != ':' {
 			continue
 		}
-		_, sensitive := redactedSensitiveJSONKeys[strings.ToLower(key)]
+		_, sensitive := redactedSensitiveJSONKeys[normalizedSensitiveKey(key)]
 		if !sensitive {
 			continue
 		}
@@ -224,17 +229,17 @@ func redactJSONOnce(s string) string {
 // as a structured slog attr is scrubbed identically to one embedded in a
 // JSON-encoded log line.
 var sensitiveAttrKeys = map[string]struct{}{
-	"api_key":            {},
-	"apikey":             {},
-	"authorization":      {},
-	"authorization_code": {},
-	"client_secret":      {},
-	"code":               {},
-	"id_token":           {},
-	"password":           {},
-	"refresh_token":      {},
-	"secret":             {},
-	"token":              {},
+	"api_key":           {},
+	"apikey":            {},
+	"authorization":     {},
+	"authorizationcode": {},
+	"clientsecret":      {},
+	"code":              {},
+	"idtoken":           {},
+	"password":          {},
+	"refreshtoken":      {},
+	"secret":            {},
+	"token":             {},
 }
 
 // RedactHandler wraps another slog.Handler and scrubs secret-looking
@@ -281,7 +286,7 @@ func (h *RedactHandler) WithGroup(name string) slog.Handler {
 
 // redactAttr returns a copy of a with its value scrubbed if necessary.
 func redactAttr(a slog.Attr) slog.Attr {
-	if _, hit := sensitiveAttrKeys[strings.ToLower(a.Key)]; hit {
+	if _, hit := sensitiveAttrKeys[normalizedSensitiveKey(a.Key)]; hit {
 		return slog.String(a.Key, "[REDACTED]")
 	}
 	v := a.Value

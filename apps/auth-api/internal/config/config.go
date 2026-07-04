@@ -42,6 +42,11 @@ type Config struct {
 	// NF_COOKIE_SECURE=false explicitly.
 	CookieSecure bool `env:"NF_COOKIE_SECURE" envDefault:"true"`
 
+	// TrustedProxyHops is the fixed number of reverse-proxy hops in
+	// front of the API. 0 ignores X-Forwarded-For / X-Real-Ip and uses
+	// RemoteAddr, which is the safe default for direct exposure.
+	TrustedProxyHops int `env:"NF_TRUSTED_PROXY_HOPS" envDefault:"0"`
+
 	// RegistrationOpen controls whether new user sign-up is allowed.
 	RegistrationOpen bool `env:"NF_REGISTRATION_OPEN" envDefault:"true"`
 
@@ -116,8 +121,9 @@ type Config struct {
 	GithubOIDCClientSecret string `env:"NF_AUTH_GITHUB_OIDC_CLIENT_SECRET" envDefault:""`
 
 	// OIDC Microsoft configuration (login via Microsoft).
-	MicrosoftOIDCClientID     string `env:"NF_AUTH_MICROSOFT_OIDC_CLIENT_ID" envDefault:""`
-	MicrosoftOIDCClientSecret string `env:"NF_AUTH_MICROSOFT_OIDC_CLIENT_SECRET" envDefault:""`
+	MicrosoftOIDCClientID       string   `env:"NF_AUTH_MICROSOFT_OIDC_CLIENT_ID" envDefault:""`
+	MicrosoftOIDCClientSecret   string   `env:"NF_AUTH_MICROSOFT_OIDC_CLIENT_SECRET" envDefault:""`
+	MicrosoftOIDCAllowedTenants []string `env:"NF_AUTH_MICROSOFT_OIDC_ALLOWED_TENANTS" envSeparator:"," envDefault:""`
 
 	// PublicBaseURL is the externally-visible origin of the auth-api,
 	// used to build OIDC callback URLs.
@@ -192,6 +198,7 @@ func Load() (*Config, error) {
 	// can write either "example.com" or "@example.com".
 	cfg.OAuthAllowedDomains = normalizeAllowlist(cfg.OAuthAllowedDomains, true)
 	cfg.OAuthAllowedEmails = normalizeAllowlist(cfg.OAuthAllowedEmails, false)
+	cfg.MicrosoftOIDCAllowedTenants = normalizeAllowlist(cfg.MicrosoftOIDCAllowedTenants, false)
 	if err := validateEnums(cfg); err != nil {
 		return nil, err
 	}

@@ -216,6 +216,18 @@ describe.each(THEMES)('Combobox [%s]', (theme) => {
     await waitFor(() => expect(screen.getByText('No users found')).toBeDefined());
   });
 
+  it('does not point aria-controls at a missing popup when no rows are rendered', async () => {
+    const user = userEvent.setup();
+    render(<Combobox options={[]} aria-label="users" />);
+
+    const input = screen.getByRole('combobox');
+    await user.click(input);
+
+    expect(screen.queryByRole('listbox')).toBeNull();
+    expect(input.getAttribute('aria-expanded')).toBe('false');
+    expect(input.hasAttribute('aria-controls')).toBe(false);
+  });
+
   it('shows loading row when isLoading and options is empty', async () => {
     const user = userEvent.setup();
     render(

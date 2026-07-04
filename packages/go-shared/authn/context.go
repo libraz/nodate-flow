@@ -15,6 +15,19 @@ const (
 	ctxKeySessionPublicID
 	ctxKeyClientIP
 	ctxKeyAuthMode
+	ctxKeyTokenKind
+	ctxKeyTokenScopes
+)
+
+// TokenKind identifies the concrete bearer token family that admitted the
+// request. It lets downstream middleware enforce token-family-specific
+// policies such as PAT scopes without re-parsing the Authorization header.
+type TokenKind string
+
+const (
+	TokenKindJWT TokenKind = "jwt"
+	TokenKindPAT TokenKind = "pat"
+	TokenKindMCP TokenKind = "mcp"
 )
 
 // AuthMode classifies how the request was authenticated. It is set by
@@ -51,6 +64,39 @@ func AuthModeFromContext(ctx context.Context) (AuthMode, bool) {
 		return "", false
 	}
 	return v, true
+}
+
+// WithTokenKind returns a new context carrying the concrete bearer-token
+// family that admitted the request.
+func WithTokenKind(ctx context.Context, kind TokenKind) context.Context {
+	return context.WithValue(ctx, ctxKeyTokenKind, kind)
+}
+
+// TokenKindFromContext extracts the concrete bearer-token family populated
+// by the auth middleware.
+func TokenKindFromContext(ctx context.Context) (TokenKind, bool) {
+	v, ok := ctx.Value(ctxKeyTokenKind).(TokenKind)
+	if !ok || v == "" {
+		return "", false
+	}
+	return v, true
+}
+
+// WithTokenScopes returns a new context carrying the granted bearer-token
+// scopes. The slice is copied so callers cannot mutate context state after
+// storing it.
+func WithTokenScopes(ctx context.Context, scopes []string) context.Context {
+	cp := append([]string(nil), scopes...)
+	return context.WithValue(ctx, ctxKeyTokenScopes, cp)
+}
+
+// TokenScopesFromContext extracts granted bearer-token scopes from context.
+func TokenScopesFromContext(ctx context.Context) ([]string, bool) {
+	v, ok := ctx.Value(ctxKeyTokenScopes).([]string)
+	if !ok {
+		return nil, false
+	}
+	return append([]string(nil), v...), true
 }
 
 // WithActor returns a new context carrying the authenticated user's

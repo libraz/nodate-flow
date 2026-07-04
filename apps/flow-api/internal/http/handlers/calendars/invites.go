@@ -268,6 +268,25 @@ func CreateEventInvite(deps Deps) func(context.Context, *CreateEventInviteInput)
 				ExpiresAt:   expiresAt,
 			})
 			if cerr != nil {
+				if handlerutil.IsDuplicateEntry(cerr) {
+					existing, rerr := deps.CalendarQueries.FindActiveCalendarEventInvite(ctx, calendar.FindActiveCalendarEventInviteParams{
+						EventID:    handlerutil.NullInt32From(evt.ID),
+						AttendeeID: handlerutil.NullInt32From(attRow.ID),
+					})
+					if rerr == nil {
+						if rerr = deps.CalendarQueries.RotateCalendarEventInviteToken(ctx, calendar.RotateCalendarEventInviteTokenParams{
+							TokenHash: tokenHash,
+							ExpiresAt: expiresAt,
+							ID:        existing.ID,
+						}); rerr != nil {
+							return nil, httpErr(apierrors.CalendarInviteStoreWriteInterrupted)
+						}
+						rotated = true
+						invitePublicID = existing.PublicID
+						inviteInternalID = existing.ID
+						break
+					}
+				}
 				return nil, httpErr(apierrors.CalendarInviteStoreWriteInterrupted)
 			}
 			if id, idErr := res.LastInsertId(); idErr == nil && id > 0 {
@@ -478,19 +497,31 @@ func AcceptEventInvite(deps Deps) func(context.Context, *AcceptEventInviteInput)
 			return nil, httpErr(apierrors.CalendarInviteNotFound)
 		}
 
+		tx, err := deps.DB.BeginTx(ctx, nil)
+		if err != nil {
+			return nil, httpErr(apierrors.CalendarInviteStoreWriteInterrupted)
+		}
+		defer func() { _ = tx.Rollback() }()
+		txCalendarQueries := calendar.New(tx)
+
 		// Stamp the invite accepted even if the RSVP is "declined" — the
 		// invite is considered consumed once the recipient interacts
 		// with it. The caller can still flip RSVP later while the token
-		// is valid.
-		if err := deps.CalendarQueries.MarkCalendarEventInviteAccepted(ctx, invite.ID); err != nil {
+		// is valid. Keep this and the RSVP write in one transaction so a
+		// later attendee update failure cannot leave accepted_at stamped
+		// without the visible RSVP change.
+		if err := txCalendarQueries.MarkCalendarEventInviteAccepted(ctx, invite.ID); err != nil {
 			return nil, httpErr(apierrors.CalendarInviteStoreWriteInterrupted)
 		}
-		if err := deps.CalendarQueries.UpdateAttendeeRsvp(ctx, calendar.UpdateAttendeeRsvpParams{
+		if err := txCalendarQueries.UpdateAttendeeRsvp(ctx, calendar.UpdateAttendeeRsvpParams{
 			Rsvp:    rsvp,
 			EventID: invite.EventID,
 			UserID:  targetUserID,
 		}); err != nil {
 			return nil, httpErr(apierrors.CalendarAttendeeRsvpUpdateInterrupted)
+		}
+		if err := tx.Commit(); err != nil {
+			return nil, httpErr(apierrors.CalendarInviteStoreWriteInterrupted)
 		}
 
 		// The confirmation payload is intentionally minimal: the

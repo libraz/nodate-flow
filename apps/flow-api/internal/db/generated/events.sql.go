@@ -624,7 +624,7 @@ func (q *Queries) ListPendingAiSuggestions(ctx context.Context, workspaceID uint
 }
 
 const listTransitionEventsForReplay = `-- name: ListTransitionEventsForReplay :many
-SELECT type, occurred_at
+SELECT id, type, occurred_at, reverses_event_id
 FROM events
 WHERE workspace_id = ?
   AND task_id = ?
@@ -638,8 +638,10 @@ type ListTransitionEventsForReplayParams struct {
 }
 
 type ListTransitionEventsForReplayRow struct {
-	Type       string    `json:"type"`
-	OccurredAt time.Time `json:"occurredAt"`
+	ID              int64         `json:"-"`
+	Type            string        `json:"type"`
+	OccurredAt      time.Time     `json:"occurredAt"`
+	ReversesEventID sql.NullInt64 `json:"-"`
 }
 
 // Ordered list of task.transition.* events for a single task,
@@ -654,7 +656,7 @@ func (q *Queries) ListTransitionEventsForReplay(ctx context.Context, arg ListTra
 	items := []ListTransitionEventsForReplayRow{}
 	for rows.Next() {
 		var i ListTransitionEventsForReplayRow
-		if err := rows.Scan(&i.Type, &i.OccurredAt); err != nil {
+		if err := rows.Scan(&i.ID, &i.Type, &i.OccurredAt, &i.ReversesEventID); err != nil {
 			return nil, err
 		}
 		items = append(items, i)

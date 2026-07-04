@@ -132,6 +132,11 @@ export const AuthErrors = {
     status: 401,
     message: "Personal access token has expired",
   },
+  AUTH_PAT_SCOPE_INSUFFICIENT: {
+    code: "AUTH.PAT.SCOPE_INSUFFICIENT",
+    status: 403,
+    message: "Personal access token does not have the required scope",
+  },
   AUTH_PAT_TOKEN_UNKNOWN: {
     code: "AUTH.PAT.TOKEN_UNKNOWN",
     status: 401,

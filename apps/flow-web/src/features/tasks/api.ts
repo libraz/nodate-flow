@@ -10,8 +10,9 @@
  * goes stale after concurrent operations and we never broadcast a
  * `tasksKeys.all` nuke without justification:
  *
- *   - Create  → invalidate the parent list key only
- *               (`[...tasksKeys.all, 'list', projectId]`).
+ *   - Create  → invalidate every list key (`[...tasksKeys.all, 'list']`)
+ *               because a new task may surface in project, filtered,
+ *               infinite, or cross-workspace "my tasks" lists.
  *   - Update  → setQueryData(detail) + invalidate(detail) +
  *               invalidate every list key (`[...tasksKeys.all, 'list']`)
  *               because the patch may move the task between filtered
@@ -31,12 +32,14 @@
  * Wherever a mutation broadcasts `[...tasksKeys.all, 'list']`
  * (i.e. across all projects) the use site is documented inline.
  *
- * Cursor-paginated lists (W7)
- * ---------------------------
+ * Infinite lists (W7/M-9)
+ * ----------------------
  * `tasksKeys.infinite(projectId, filters)` and `tasksKeys.myInfinite()`
  * both sit under the `[...tasksKeys.all, 'list']` prefix, so every
- * mutation that broadcasts list invalidation also refreshes the
- * cursor-paginated surfaces. No new mutation paths are required.
+ * mutation that broadcasts list invalidation also refreshes the infinite
+ * surfaces. Project task lists use OFFSET to preserve sort_weight order
+ * for drag reorder; "my tasks" keeps cursor pagination because it is not
+ * manually reorderable.
  */
 
 import type { components } from '@nodate-flow/sdk';
@@ -103,15 +106,16 @@ export interface TaskFilters {
  *
  * Keyset pagination keys (W7)
  * ---------------------------
- * `infinite` is the cursor-paginated key used by `useTasksInfiniteQuery`,
- * threading the cursor via TanStack's `pageParam` (NOT into the key
- * itself — see W7 phase-3 plan). It shares the `[...tasksKeys.all, 'list']`
- * prefix with `list`, so a mutation that broadcasts
+ * `infinite` is the task-list infinite key used by `useTasksInfiniteQuery`,
+ * threading the OFFSET page via TanStack's `pageParam` (NOT into the key
+ * itself). Project task lists need the backend's sort_weight ordering for
+ * drag reorder, and that ordering is only guaranteed by the OFFSET endpoint.
+ * It shares the `[...tasksKeys.all, 'list']` prefix with `list`, so a mutation that broadcasts
  * `invalidateQueries({ queryKey: [...tasksKeys.all, 'list'] })` refreshes
  * both surfaces atomically.
  *
- * `myInfinite` is the cross-workspace `/me/tasks` infinite list. It is
- * scoped under `tasksKeys.all` so it picks up the same broadcast.
+ * `myInfinite` is the cross-workspace `/me/tasks` cursor list. It is scoped
+ * under `tasksKeys.all` so it picks up the same broadcast.
  */
 export const tasksKeys = {
   all: ['tasks'] as const,
@@ -259,6 +263,8 @@ export function transitionForDrop(
   }
 }
 
+export const TASKS_QUERY_LIMIT = 200;
+
 export function useTasksQuery(
   projectId: string,
   filters?: TaskFilters,
@@ -279,7 +285,7 @@ export function useTasksQuery(
         assignee?: string;
       } = {
         projectId,
-        limit: 200,
+        limit: TASKS_QUERY_LIMIT,
         offset: 0,
       };
       if (search.length > 0) query.q = search;
@@ -305,15 +311,17 @@ const TASKS_PAGE_SIZE = 100;
 export interface TasksPage {
   tasks: TaskListItem[];
   nextCursor: string | null;
+  total: number;
+  offset: number;
 }
 
 /**
- * GET /tasks — cursor-paginated infinite query for a project.
+ * GET /tasks — OFFSET-paginated infinite query for a project.
  *
- * Pre-v1 contract: an empty cursor fetches the first page; the response
- * carries `nextCursor: string | null`, where `null` means no more pages.
- * The cursor is threaded through `pageParam` and MUST NOT be folded into
- * the queryKey explicitly.
+ * Project task lists must preserve backend `sort_weight` order because the
+ * list view's drag reorder writes those weights. The keyset path orders by
+ * `(created_at, public_id)` for cursor monotonicity, so this hook deliberately
+ * uses OFFSET pagination and threads the offset through `pageParam`.
  *
  * Mirrors `useTasksQuery` in shape (same project + filter args, same
  * client-side priority filter) but exposes the standard infinite-query
@@ -326,13 +334,10 @@ export interface TasksPage {
 export function useTasksInfiniteQuery(
   projectId: string,
   filters?: TaskFilters,
-): UseSuspenseInfiniteQueryResult<
-  { pages: TasksPage[]; pageParams: readonly (string | undefined)[] },
-  ApiError
-> {
+): UseSuspenseInfiniteQueryResult<{ pages: TasksPage[]; pageParams: readonly number[] }, ApiError> {
   return useSuspenseInfiniteQuery({
     queryKey: tasksKeys.infinite(projectId, filters),
-    initialPageParam: undefined as string | undefined,
+    initialPageParam: 0,
     queryFn: async ({ pageParam }): Promise<TasksPage> => {
       const search = filters?.search?.trim() ?? '';
       const states = filters?.states ?? [];
@@ -341,15 +346,15 @@ export function useTasksInfiniteQuery(
       const query: {
         projectId: string;
         limit: number;
-        cursor?: string;
+        offset: number;
         q?: string;
         state?: string[];
         assignee?: string;
       } = {
         projectId,
         limit: TASKS_PAGE_SIZE,
+        offset: pageParam,
       };
-      if (pageParam) query.cursor = pageParam;
       if (search.length > 0) query.q = search;
       if (states.length > 0) query.state = [...states];
       if (assignee.length > 0) query.assignee = assignee;
@@ -365,9 +370,14 @@ export function useTasksInfiniteQuery(
       return {
         tasks,
         nextCursor: data.nextCursor ?? null,
+        total: data.total ?? tasks.length,
+        offset: pageParam,
       };
     },
-    getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
+    getNextPageParam: (lastPage) => {
+      const nextOffset = lastPage.offset + TASKS_PAGE_SIZE;
+      return nextOffset < lastPage.total ? nextOffset : undefined;
+    },
   });
 }
 
@@ -543,11 +553,11 @@ export function useCreateTask(): UseMutationResult<Task, ApiError, CreateTaskInp
       if (error || !data) throw toApiError(error, 'Failed to create task');
       return data;
     },
-    onSuccess: (_data, vars) => {
-      void qc.invalidateQueries({ queryKey: [...tasksKeys.all, 'list', vars.projectId] });
-      // The new task may surface in `me` lists or any cross-project list (e.g.
-      // workspace timeline / today view), so also broadcast the broader prefix.
-      void qc.invalidateQueries({ queryKey: tasksKeys.myInfinite() });
+    onSuccess: () => {
+      // A created task may surface in project, filtered, infinite, or
+      // cross-workspace "my tasks" lists. Broadcast the shared list prefix so
+      // all task-list surfaces refresh together.
+      void qc.invalidateQueries({ queryKey: [...tasksKeys.all, 'list'] });
     },
   });
 }

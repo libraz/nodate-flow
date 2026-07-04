@@ -45,6 +45,7 @@ type Request struct {
 
 // Response is a minimal LLM call result.
 type Response struct {
+	Model        string
 	Text         string
 	InputTokens  int
 	OutputTokens int

@@ -97,7 +97,7 @@ LIMIT ? OFFSET ?;
 -- Ordered list of task.transition.* events for a single task,
 -- ascending by occurred_at + id. Used by the replay tool to derive
 -- the expected derived_state from scratch.
-SELECT type, occurred_at
+SELECT id, type, occurred_at, reverses_event_id
 FROM events
 WHERE workspace_id = ?
   AND task_id = ?

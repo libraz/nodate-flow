@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"log/slog"
+	"math"
 
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/audit"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/generated"
@@ -43,6 +44,9 @@ func AddActor(deps Deps) func(context.Context, *AddTaskActorInput) (*AddTaskActo
 		role, perr := parseActorRole(in.Body.Role)
 		if perr != nil {
 			return nil, translateActorRoleError(perr)
+		}
+		if uid > math.MaxInt32 {
+			return nil, httpErr(apierrors.InternalUnexpected)
 		}
 		pub := types.New()
 		if _, err := deps.Queries.AddActor(ctx, generated.AddActorParams{

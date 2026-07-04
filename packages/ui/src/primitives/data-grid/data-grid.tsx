@@ -15,6 +15,7 @@ import {
   getCoreRowModel,
   getSortedRowModel,
   type OnChangeFn,
+  type Row,
   type RowSelectionState,
   type SortingState,
   useReactTable,
@@ -46,6 +47,8 @@ export interface DataGridProps<TData> {
   columns: ColumnDef<TData, unknown>[];
   /** Row data. */
   data: TData[];
+  /** Stable row id factory used by TanStack state such as selection. */
+  getRowId?: (originalRow: TData, index: number, parent?: Row<TData>) => string;
   /** Estimated row height in pixels for the virtualizer. Defaults to 36. */
   estimateSize?: number;
   /** Overscan rows above/below the viewport. Defaults to 5. */
@@ -101,6 +104,7 @@ function DataGridInner<TData>(
   const {
     columns,
     data,
+    getRowId,
     estimateSize = 36,
     overscan = 5,
     emptyContent,
@@ -185,6 +189,7 @@ function DataGridInner<TData>(
     enableColumnResizing,
     columnResizeMode: 'onChange',
     enableColumnPinning,
+    ...(getRowId ? { getRowId } : {}),
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
   });

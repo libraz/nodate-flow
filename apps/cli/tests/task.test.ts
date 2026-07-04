@@ -13,6 +13,8 @@ import {
   buildSearchQuery,
   buildUpdatePlan,
   executeSearch,
+  executeSearchPaginated,
+  executeTaskListPaginated,
   executeUpdate,
   isStateTransition,
   type SdkClientLike,
@@ -210,5 +212,77 @@ describe('executeSearch', () => {
     };
     const result = await executeSearch(sdk, { q: 'x', limit: 1, projectId: 'p' });
     expect(result.error).toEqual({ detail: 'boom' });
+  });
+});
+
+/* ── paginated task listing/search ────────────────────────────── */
+
+describe('executeTaskListPaginated', () => {
+  it('follows nextCursor until the terminal page', async () => {
+    const sdk: SdkClientLike = {
+      // biome-ignore lint/style/useNamingConvention: SDK method name
+      GET: vi
+        .fn()
+        .mockResolvedValueOnce({
+          data: { tasks: [{ id: 'a' }], total: 3, nextCursor: 'cursor-2' },
+        })
+        .mockResolvedValueOnce({
+          data: { tasks: [{ id: 'b' }, { id: 'c' }], nextCursor: null },
+        }),
+      // biome-ignore lint/style/useNamingConvention: SDK method name
+      POST: vi.fn(),
+      // biome-ignore lint/style/useNamingConvention: SDK method name
+      PATCH: vi.fn(),
+    };
+
+    const result = await executeTaskListPaginated(sdk, { limit: 1, projectId: 'p' });
+
+    expect(result.data).toEqual({ tasks: [{ id: 'a' }, { id: 'b' }, { id: 'c' }], total: 3 });
+    expect(sdk.GET).toHaveBeenNthCalledWith(1, '/tasks', {
+      params: { query: { limit: 1, projectId: 'p', offset: 0 } },
+    });
+    expect(sdk.GET).toHaveBeenNthCalledWith(2, '/tasks', {
+      params: { query: { limit: 1, projectId: 'p', cursor: 'cursor-2' } },
+    });
+  });
+
+  it('falls back to offset paging when a filtered response has no cursor', async () => {
+    const sdk: SdkClientLike = {
+      // biome-ignore lint/style/useNamingConvention: SDK method name
+      GET: vi
+        .fn()
+        .mockResolvedValueOnce({ data: { tasks: [{ id: 'a' }], total: 2 } })
+        .mockResolvedValueOnce({ data: { tasks: [{ id: 'b' }], total: 2 } }),
+      // biome-ignore lint/style/useNamingConvention: SDK method name
+      POST: vi.fn(),
+      // biome-ignore lint/style/useNamingConvention: SDK method name
+      PATCH: vi.fn(),
+    };
+
+    const result = await executeSearchPaginated(sdk, { q: 'ship', limit: 1, workspaceId: 'ws' });
+
+    expect(result.data).toEqual({ tasks: [{ id: 'a' }, { id: 'b' }], total: 2 });
+    expect(sdk.GET).toHaveBeenNthCalledWith(1, '/tasks', {
+      params: { query: { q: 'ship', limit: 1, workspaceId: 'ws', offset: 0 } },
+    });
+    expect(sdk.GET).toHaveBeenNthCalledWith(2, '/tasks', {
+      params: { query: { q: 'ship', limit: 1, workspaceId: 'ws', offset: 1 } },
+    });
+  });
+
+  it('forwards page errors without issuing later requests', async () => {
+    const sdk: SdkClientLike = {
+      // biome-ignore lint/style/useNamingConvention: SDK method name
+      GET: vi.fn().mockResolvedValue({ error: { detail: 'boom' } }),
+      // biome-ignore lint/style/useNamingConvention: SDK method name
+      POST: vi.fn(),
+      // biome-ignore lint/style/useNamingConvention: SDK method name
+      PATCH: vi.fn(),
+    };
+
+    const result = await executeTaskListPaginated(sdk, { limit: 20, workspaceId: 'ws' });
+
+    expect(result.error).toEqual({ detail: 'boom' });
+    expect(sdk.GET).toHaveBeenCalledTimes(1);
   });
 });

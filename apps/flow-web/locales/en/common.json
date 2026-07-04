@@ -468,7 +468,10 @@
       "expires_at": "This invite expires on {date}.",
       "accept_failed": "Could not accept the invite. Please try again.",
       "login_required": "You need to sign in to accept this invite.",
-      "go_to_login": "Go to sign in"
+      "go_to_login": "Go to sign in",
+      "error_title": "Invite unavailable",
+      "error_network": "We could not check this invite. Check your connection and try again.",
+      "error_back": "Go home"
     },
     "roles": {
       "owner": "Owner",
@@ -598,6 +601,7 @@
     "title": "Tasks",
     "new": "New task",
     "empty": "No tasks yet. Create your first one to get started.",
+    "limit_notice": "Showing the first {count} tasks. Refine filters to narrow the view.",
     "title_placeholder": "Task title…",
     "select_project": "Select project",
     "create_error": "Failed to create task",
@@ -887,7 +891,9 @@
       "apply": "Apply suggestions and create",
       "no_suggestions": "No suggestions available.",
       "error": "Could not generate suggestions. You can still create the task manually.",
-      "no_provider": "No AI provider configured for this workspace."
+      "no_provider": "No AI provider configured for this workspace.",
+      "priority_urgent": "Urgent",
+      "priority_unknown": "{value}"
     },
     "attachments": {
       "title": "Attachments",

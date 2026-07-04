@@ -87,13 +87,15 @@ export function AdminsPage(): ReactElement {
     if (!ok) return;
     if (guardSubmit()) return;
     try {
-      const { error: err } = await sdk.DELETE('/admin/instance-admins/{adminId}', {
-        params: { path: { adminId } },
+      const { error: err } = await sdk.DELETE('/admin/instance-admins/{userId}', {
+        params: { path: { userId: adminId } },
       });
-      if (!err) {
-        setAdmins((prev) => prev.filter((a) => a.id !== adminId));
-        void invalidateInstanceStats();
+      if (err) {
+        setError(t('errors.generic'));
+        return;
       }
+      setAdmins((prev) => prev.filter((a) => a.id !== adminId));
+      void invalidateInstanceStats();
     } finally {
       endSubmit();
     }

@@ -146,8 +146,8 @@ resources:
         message: "Task cannot transition to the requested state"
         message_ja: "タスクを指定した状態に遷移できません"
         message_zh: "任务无法转换为指定状态"
-        description: "Returned when an unsatisfied constraint blocks the requested lifecycle transition."
-        userAction: "Review unmet constraints in the task detail panel and resolve them before retrying."
+        description: "Reserved for a future hard-gated constraint mode. Current task transitions are gated by the taskstate state machine; unsatisfied task constraints are advisory markers and do not emit this error."
+        userAction: "Review unmet constraints in the task detail panel. If hard-gated constraints are enabled in a future release, resolve them before retrying the transition."
 
       transition_unknown:
         code: WS.TASK.TRANSITION_UNKNOWN

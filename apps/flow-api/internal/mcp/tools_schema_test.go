@@ -62,6 +62,18 @@ func TestPublicIDPropertiesHavePattern(t *testing.T) {
 	})
 }
 
+func TestNoComingSoonToolsRegistered(t *testing.T) {
+	h := NewHandler(Deps{})
+	if _, ok := h.tools["smart_create_event"]; ok {
+		t.Fatal("smart_create_event is a stub and must not be advertised until implemented")
+	}
+	for name, tl := range h.tools {
+		if strings.Contains(strings.ToLower(tl.description), "coming soon") {
+			t.Fatalf("tool %q advertises coming-soon behavior: %q", name, tl.description)
+		}
+	}
+}
+
 // walkProperties iterates every tool's inputSchema, descending into
 // nested object schemas (under "properties") and array item schemas
 // (under "items"), invoking visit on every leaf property descriptor.

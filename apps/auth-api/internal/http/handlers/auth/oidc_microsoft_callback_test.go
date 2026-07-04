@@ -15,6 +15,8 @@ import (
 	"github.com/nodate-flow/nodate-flow/apps/auth-api/internal/http/handlers/handlerutil"
 )
 
+const testMicrosoftTenantID = "11111111-1111-1111-1111-111111111111"
+
 // fakeMicrosoftExchanger captures the inputs supplied to Exchange and
 // returns canned MicrosoftClaims so the callback handler's branches
 // (state validation, email_verified rejection) can be covered without
@@ -55,16 +57,19 @@ func TestOIDCMicrosoftCallback_RejectsUnverifiedEmail(t *testing.T) {
 
 	ms := &fakeMicrosoftExchanger{
 		claims: &internauth.MicrosoftClaims{
-			Sub:           "ms-subject-id",
-			Email:         "alice@example.com",
-			Name:          "Alice",
-			EmailVerified: false,
+			Sub:                      "ms-subject-id",
+			Email:                    "alice@example.com",
+			Name:                     "Alice",
+			TenantID:                 testMicrosoftTenantID,
+			EmailVerified:            false,
+			EmailDomainOwnerVerified: true,
 		},
 	}
 	deps := Deps{
-		JWT:           jwt,
-		OIDCMicrosoft: ms,
-		Audit:         audit.NoopSink{},
+		JWT:                       jwt,
+		OIDCMicrosoft:             ms,
+		MicrosoftAllowedTenantIDs: []string{testMicrosoftTenantID},
+		Audit:                     audit.NoopSink{},
 	}
 	handler := OIDCMicrosoftCallback(deps)
 	_, err = handler(context.Background(), &OIDCCallbackInput{Code: "auth-code", State: state})
@@ -91,16 +96,19 @@ func TestOIDCMicrosoftCallback_AcceptsVerifiedEmailWithoutDB(t *testing.T) {
 
 	ms := &fakeMicrosoftExchanger{
 		claims: &internauth.MicrosoftClaims{
-			Sub:           "ms-subject-id",
-			Email:         "alice@example.com",
-			Name:          "Alice",
-			EmailVerified: true,
+			Sub:                      "ms-subject-id",
+			Email:                    "alice@example.com",
+			Name:                     "Alice",
+			TenantID:                 testMicrosoftTenantID,
+			EmailVerified:            true,
+			EmailDomainOwnerVerified: true,
 		},
 	}
 	deps := Deps{
-		JWT:           jwt,
-		OIDCMicrosoft: ms,
-		Audit:         audit.NoopSink{},
+		JWT:                       jwt,
+		OIDCMicrosoft:             ms,
+		MicrosoftAllowedTenantIDs: []string{testMicrosoftTenantID},
+		Audit:                     audit.NoopSink{},
 		// Queries is nil — the handler will panic when it reaches the
 		// FindIdentityByProviderSubject call. That's the assertion: we
 		// got past the email_verified gate without being short-circuited.
@@ -151,9 +159,10 @@ func TestOIDCMicrosoftCallback_SurfacesProviderRejection(t *testing.T) {
 
 	ms := &fakeMicrosoftExchanger{}
 	deps := Deps{
-		JWT:           jwt,
-		OIDCMicrosoft: ms,
-		Audit:         audit.NoopSink{},
+		JWT:                       jwt,
+		OIDCMicrosoft:             ms,
+		MicrosoftAllowedTenantIDs: []string{testMicrosoftTenantID},
+		Audit:                     audit.NoopSink{},
 	}
 	handler := OIDCMicrosoftCallback(deps)
 	_, err = handler(context.Background(), &OIDCCallbackInput{
@@ -187,17 +196,20 @@ func TestOIDCMicrosoftCallback_PreferredUsernameFallback(t *testing.T) {
 
 	ms := &fakeMicrosoftExchanger{
 		claims: &internauth.MicrosoftClaims{
-			Sub:               "ms-subject-id",
-			Email:             "",
-			PreferredUsername: "alice@example.com",
-			Name:              "Alice",
-			EmailVerified:     true,
+			Sub:                      "ms-subject-id",
+			Email:                    "",
+			PreferredUsername:        "alice@example.com",
+			Name:                     "Alice",
+			TenantID:                 testMicrosoftTenantID,
+			EmailVerified:            true,
+			EmailDomainOwnerVerified: true,
 		},
 	}
 	deps := Deps{
-		JWT:           jwt,
-		OIDCMicrosoft: ms,
-		Audit:         audit.NoopSink{},
+		JWT:                       jwt,
+		OIDCMicrosoft:             ms,
+		MicrosoftAllowedTenantIDs: []string{testMicrosoftTenantID},
+		Audit:                     audit.NoopSink{},
 	}
 	handler := OIDCMicrosoftCallback(deps)
 	defer func() {
@@ -208,4 +220,67 @@ func TestOIDCMicrosoftCallback_PreferredUsernameFallback(t *testing.T) {
 		_ = recover()
 	}()
 	_, _ = handler(context.Background(), &OIDCCallbackInput{Code: "c", State: state})
+}
+
+func TestOIDCMicrosoftCallback_RejectsUnlistedTenant(t *testing.T) {
+	t.Parallel()
+	jwt, err := internauth.NewJWTIssuer(nil, "iss", "aud", time.Minute)
+	require.NoError(t, err)
+	state, err := jwt.SignOIDCStateForProvider("nonce-value", "microsoft")
+	require.NoError(t, err)
+
+	ms := &fakeMicrosoftExchanger{
+		claims: &internauth.MicrosoftClaims{
+			Sub:                      "ms-subject-id",
+			Email:                    "alice@example.com",
+			Name:                     "Alice",
+			TenantID:                 "22222222-2222-2222-2222-222222222222",
+			EmailVerified:            true,
+			EmailDomainOwnerVerified: true,
+		},
+	}
+	deps := Deps{
+		JWT:                       jwt,
+		OIDCMicrosoft:             ms,
+		MicrosoftAllowedTenantIDs: []string{testMicrosoftTenantID},
+		Audit:                     audit.NoopSink{},
+	}
+	handler := OIDCMicrosoftCallback(deps)
+	_, err = handler(context.Background(), &OIDCCallbackInput{Code: "auth-code", State: state})
+	require.Error(t, err)
+
+	var problem *handlerutil.ProblemDetails
+	require.True(t, errors.As(err, &problem))
+	assert.Equal(t, apierrors.AuthOidcIdTokenInvalid.Code, problem.Type)
+}
+
+func TestOIDCMicrosoftCallback_RejectsMissingXmsEdov(t *testing.T) {
+	t.Parallel()
+	jwt, err := internauth.NewJWTIssuer(nil, "iss", "aud", time.Minute)
+	require.NoError(t, err)
+	state, err := jwt.SignOIDCStateForProvider("nonce-value", "microsoft")
+	require.NoError(t, err)
+
+	ms := &fakeMicrosoftExchanger{
+		claims: &internauth.MicrosoftClaims{
+			Sub:           "ms-subject-id",
+			Email:         "alice@example.com",
+			Name:          "Alice",
+			TenantID:      testMicrosoftTenantID,
+			EmailVerified: true,
+		},
+	}
+	deps := Deps{
+		JWT:                       jwt,
+		OIDCMicrosoft:             ms,
+		MicrosoftAllowedTenantIDs: []string{testMicrosoftTenantID},
+		Audit:                     audit.NoopSink{},
+	}
+	handler := OIDCMicrosoftCallback(deps)
+	_, err = handler(context.Background(), &OIDCCallbackInput{Code: "auth-code", State: state})
+	require.Error(t, err)
+
+	var problem *handlerutil.ProblemDetails
+	require.True(t, errors.As(err, &problem))
+	assert.Equal(t, apierrors.AuthOidcIdTokenInvalid.Code, problem.Type)
 }

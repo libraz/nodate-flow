@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/subtle"
 	"fmt"
+	"strings"
 	"sync"
 
 	"github.com/coreos/go-oidc/v3/oidc"
@@ -13,9 +14,10 @@ import (
 
 // MicrosoftOIDCConfig configures a Microsoft Entra ID OIDC client.
 type MicrosoftOIDCConfig struct {
-	ClientID     string
-	ClientSecret string
-	RedirectURL  string
+	ClientID         string
+	ClientSecret     string
+	RedirectURL      string
+	AllowedTenantIDs []string
 }
 
 // MicrosoftClaims holds the subset of id_token claims the callback
@@ -28,11 +30,17 @@ type MicrosoftClaims struct {
 	Email             string `json:"email"`
 	Name              string `json:"name"`
 	PreferredUsername string `json:"preferred_username"`
+	TenantID          string `json:"tid"`
 	// EmailVerified reflects the email_verified claim from the
 	// id_token. Microsoft Entra ID may omit it for personal accounts
 	// whose email has not been confirmed; the handler must reject the
 	// exchange in that case.
 	EmailVerified bool `json:"email_verified"`
+	// EmailDomainOwnerVerified reflects Microsoft's xms_edov claim.
+	// It proves the domain owner has verified the email domain with
+	// Microsoft and is required before trusting Microsoft email claims
+	// from the multi-tenant "common" endpoint.
+	EmailDomainOwnerVerified bool `json:"xms_edov"`
 }
 
 // MicrosoftOIDCClient wraps the standard OIDC discovery flow for
@@ -50,6 +58,7 @@ type MicrosoftOIDCClient struct {
 // NewMicrosoftOIDC builds a MicrosoftOIDCClient. The provider discovery
 // is deferred to the first call to AuthCodeURL or Exchange.
 func NewMicrosoftOIDC(cfg MicrosoftOIDCConfig) *MicrosoftOIDCClient {
+	cfg.AllowedTenantIDs = normalizeTenantIDs(cfg.AllowedTenantIDs)
 	return &MicrosoftOIDCClient{cfg: cfg}
 }
 
@@ -111,5 +120,46 @@ func (c *MicrosoftOIDCClient) Exchange(ctx context.Context, code, expectedNonce 
 	if err := idTok.Claims(&claims); err != nil {
 		return nil, fmt.Errorf("microsoft: decode claims: %w", err)
 	}
+	if err := ValidateMicrosoftClaims(&claims, c.cfg.AllowedTenantIDs); err != nil {
+		return nil, err
+	}
 	return &claims, nil
+}
+
+// ValidateMicrosoftClaims enforces the tenant and email-domain proof
+// required before the auth-api trusts a Microsoft id_token from the
+// multi-tenant "common" endpoint.
+func ValidateMicrosoftClaims(claims *MicrosoftClaims, allowedTenantIDs []string) error {
+	if claims == nil {
+		return fmt.Errorf("microsoft: claims missing")
+	}
+	allowed := normalizeTenantIDs(allowedTenantIDs)
+	if len(allowed) == 0 {
+		return fmt.Errorf("microsoft: no allowed tenant ids configured")
+	}
+	tid := strings.ToLower(strings.TrimSpace(claims.TenantID))
+	if tid == "" {
+		return fmt.Errorf("microsoft: tid claim missing")
+	}
+	for _, allowedID := range allowed {
+		if tid == allowedID {
+			if !claims.EmailDomainOwnerVerified {
+				return fmt.Errorf("microsoft: xms_edov claim missing or false")
+			}
+			return nil
+		}
+	}
+	return fmt.Errorf("microsoft: tenant %q is not allowed", claims.TenantID)
+}
+
+func normalizeTenantIDs(in []string) []string {
+	out := make([]string, 0, len(in))
+	for _, raw := range in {
+		v := strings.ToLower(strings.TrimSpace(raw))
+		if v == "" {
+			continue
+		}
+		out = append(out, v)
+	}
+	return out
 }

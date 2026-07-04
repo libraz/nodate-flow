@@ -67,11 +67,12 @@ func OIDCGoogleCallback(deps Deps) func(context.Context, *OIDCCallbackInput) (*O
 		// auto-provision a fresh user (gated by RegistrationOpen). See
 		// resolveOIDCUser for the full ordering.
 		userID, userPub, err := deps.resolveOIDCUser(ctx, oidcProvisionParams{
-			Provider:    generated.IdentitiesProvider("google"),
-			Subject:     claims.Sub,
-			Email:       claims.Email,
-			DisplayName: claims.Name,
-			Locale:      claims.Locale,
+			Provider:       generated.IdentitiesProvider("google"),
+			Subject:        claims.Sub,
+			Email:          claims.Email,
+			DisplayName:    claims.Name,
+			Locale:         claims.Locale,
+			AllowEmailLink: true,
 		})
 		if err != nil {
 			return nil, err

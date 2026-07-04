@@ -468,7 +468,10 @@
       "expires_at": "この招待は {date} に期限切れになります。",
       "accept_failed": "招待の承諾に失敗しました。もう一度お試しください。",
       "login_required": "招待を承諾するにはサインインしてください。",
-      "go_to_login": "サインインへ"
+      "go_to_login": "サインインへ",
+      "error_title": "招待を利用できません",
+      "error_network": "招待を確認できませんでした。接続を確認してもう一度お試しください。",
+      "error_back": "ホームへ"
     },
     "roles": {
       "owner": "オーナー",
@@ -598,6 +601,7 @@
     "title": "タスク",
     "new": "タスクを作成",
     "empty": "タスクがまだありません。最初のタスクを作成しましょう。",
+    "limit_notice": "最初の {count} 件のタスクを表示しています。フィルターで絞り込んでください。",
     "title_placeholder": "タスク名…",
     "select_project": "プロジェクトを選択",
     "create_error": "タスクの作成に失敗しました",
@@ -887,7 +891,9 @@
       "apply": "提案を適用して作成",
       "no_suggestions": "提案がありません。",
       "error": "提案を生成できませんでした。手動でタスクを作成できます。",
-      "no_provider": "このワークスペースに AI プロバイダが設定されていません。"
+      "no_provider": "このワークスペースに AI プロバイダが設定されていません。",
+      "priority_urgent": "緊急",
+      "priority_unknown": "{value}"
     },
     "attachments": {
       "title": "添付ファイル",

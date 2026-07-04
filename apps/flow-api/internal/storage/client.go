@@ -172,21 +172,21 @@ func (c *Client) Bucket() string {
 	return c.bucket
 }
 
-// StorageKeyForWorkspace builds the canonical content-addressed key for a
+// KeyForWorkspace builds the canonical content-addressed key for a
 // workspace-scoped blob. wsPublicIDHex must be the workspace's public_id
 // rendered as 32 hex chars (no dashes); sha256Hex must be the lowercase
 // 64-char hex digest of the file body. Two uploads of the same bytes in
 // the same workspace produce the same key, which is what lets the
 // ref-counted storage_objects table dedup at the DB layer.
-func StorageKeyForWorkspace(wsPublicIDHex, sha256Hex string) string {
+func KeyForWorkspace(wsPublicIDHex, sha256Hex string) string {
 	return fmt.Sprintf("workspace/%s/%s", wsPublicIDHex, sha256Hex)
 }
 
-// StorageKeyForUser builds the canonical content-addressed key for a
+// KeyForUser builds the canonical content-addressed key for a
 // user-scoped blob (currently avatars). userPublicIDHex must be the
 // user's public_id as 32 hex chars; sha256Hex must be the lowercase
 // 64-char hex digest of the file body.
-func StorageKeyForUser(userPublicIDHex, sha256Hex string) string {
+func KeyForUser(userPublicIDHex, sha256Hex string) string {
 	return fmt.Sprintf("user/%s/%s", userPublicIDHex, sha256Hex)
 }
 

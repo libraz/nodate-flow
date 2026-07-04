@@ -110,6 +110,7 @@ func (p *openAIProvider) Complete(ctx context.Context, req Request) (*Response, 
 	}
 	text := or.Choices[0].Message.Content
 	return &Response{
+		Model:        model,
 		Text:         text,
 		InputTokens:  or.Usage.PromptTokens,
 		OutputTokens: or.Usage.CompletionTokens,

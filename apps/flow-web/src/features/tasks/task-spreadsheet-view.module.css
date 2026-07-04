@@ -8,6 +8,12 @@
   overflow: hidden;
 }
 
+.limitNotice {
+  margin: 0;
+  color: var(--nf-color-fg-muted);
+  font-size: var(--nf-text-sm);
+}
+
 .tableContainer {
   flex: 1;
   overflow: auto;

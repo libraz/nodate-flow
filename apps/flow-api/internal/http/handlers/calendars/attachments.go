@@ -225,7 +225,7 @@ func PresignAttachment(deps Deps) func(context.Context, *PresignAttachmentInput)
 		}
 		wsHex := hex.EncodeToString(wsUID[:])
 		shaHex := strings.ToLower(input.Body.Sha256)
-		baseStorageKey := storage.StorageKeyForWorkspace(wsHex, shaHex)
+		baseStorageKey := storage.KeyForWorkspace(wsHex, shaHex)
 
 		var (
 			storageObjectID uint32

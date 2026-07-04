@@ -10,6 +10,13 @@ import { defineConfig, devices } from '@playwright/test';
 const isCI = !!process.env.CI;
 
 const WEB_BASE_URL = process.env.NF_ACCOUNTS_WEB_URL ?? 'http://localhost:5175';
+const WEB_PORT = (() => {
+  try {
+    return new URL(WEB_BASE_URL).port || '5175';
+  } catch {
+    return '5175';
+  }
+})();
 
 export default defineConfig({
   globalSetup: './e2e/fixtures/global-setup.ts',
@@ -40,7 +47,7 @@ export default defineConfig({
     },
   ],
   webServer: {
-    command: 'bun run dev',
+    command: `bun run dev -- --port=${WEB_PORT} --strictPort`,
     url: WEB_BASE_URL,
     reuseExistingServer: !isCI,
     timeout: 120_000,

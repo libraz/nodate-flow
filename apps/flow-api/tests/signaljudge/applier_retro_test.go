@@ -208,11 +208,12 @@ func TestApplierGenerateRetroCreatesDraftTaskAndDependency(t *testing.T) {
 	// 3. task_dependencies row: kind='retro_of', from=new task,
 	//    to=source, enabled=true. Confirms the orientation pinned in
 	//    sql/tables/task_dependencies.sql.
-	dep := loadRetroDependency(t, testDB, wsID, newTask.id, uint32(srcInternalID))
+	require.LessOrEqual(t, srcInternalID, int64(^uint32(0)))
+	dep := loadRetroDependency(t, testDB, wsID, newTask.id, uint32(srcInternalID)) //#nosec G115 -- bounded by assertion above.
 	require.Equal(t, "retro_of", dep.kind)
 	require.True(t, dep.enabled)
 	require.Equal(t, newTask.id, dep.fromTaskID)
-	require.Equal(t, uint32(srcInternalID), dep.toTaskID)
+	require.EqualValues(t, srcInternalID, dep.toTaskID)
 }
 
 // TestApplierGenerateRetroOnMissingTargetTaskRejectsSignal pins that

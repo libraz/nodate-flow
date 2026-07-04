@@ -255,6 +255,7 @@ test.describe('chrome-verify substitute (calendar surfaces)', () => {
       expect(jaGuards.serverErrors, 'ja: no 5xx').toEqual([]);
       expect(jaGuards.rawKeyLeaks, 'ja: no raw i18n keys').toEqual([]);
     } finally {
+      await page.context().unrouteAll({ behavior: 'ignoreErrors' });
       await jaContext.close();
     }
   });

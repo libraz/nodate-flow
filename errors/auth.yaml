@@ -395,6 +395,15 @@ resources:
         description: "Returned when the PAT's expiration timestamp has passed."
         userAction: "Create a new personal access token."
 
+      scope_insufficient:
+        code: AUTH.PAT.SCOPE_INSUFFICIENT
+        status: 403
+        message: "Personal access token does not have the required scope"
+        message_ja: "パーソナルアクセストークンに必要なスコープが付与されていません"
+        message_zh: "个人访问令牌缺少所需的作用域"
+        description: "Returned when a PAT-authenticated REST request requires a read or write scope that was not granted to the token."
+        userAction: "Create a new personal access token with the required scope."
+
   avatar:
     breadcrumb: "Auth > Avatar"
     errors:

@@ -105,24 +105,29 @@ func TestOIDCGithubCallback_LinksExistingPasswordAccount(t *testing.T) {
 	assert.Equal(t, existingPub.String(), pub.String())
 }
 
-// TestOIDCMicrosoftCallback_LinksExistingPasswordAccount mirrors the
-// GitHub linking proof for the Microsoft callback so all three providers
-// stay aligned on the account-linking contract.
-func TestOIDCMicrosoftCallback_LinksExistingPasswordAccount(t *testing.T) {
+// TestOIDCMicrosoftCallback_DoesNotAutoLinkExistingPasswordAccount proves
+// Microsoft sign-in does not bind a new tenant subject onto a same-email
+// local account by email alone. The account can still sign in after an
+// explicit Microsoft identity exists, but first contact must not silently
+// link across tenants.
+func TestOIDCMicrosoftCallback_DoesNotAutoLinkExistingPasswordAccount(t *testing.T) {
 	t.Parallel()
 	db := requireB2DB(t)
 	deps, _ := b2Deps(t, db)
 	deps.RegistrationOpen = true
+	deps.MicrosoftAllowedTenantIDs = []string{testMicrosoftTenantID}
 
-	existingUID, _, email := b2NewUser(t, deps.Queries)
+	_, _, email := b2NewUser(t, deps.Queries)
 
 	const msSub = "ms-link-subject-2002"
 	deps.OIDCMicrosoft = &fakeMicrosoftExchanger{
 		claims: &internauth.MicrosoftClaims{
-			Sub:           msSub,
-			Email:         email,
-			Name:          "Alice",
-			EmailVerified: true,
+			Sub:                      msSub,
+			Email:                    email,
+			Name:                     "Alice",
+			TenantID:                 testMicrosoftTenantID,
+			EmailVerified:            true,
+			EmailDomainOwnerVerified: true,
 		},
 	}
 
@@ -130,14 +135,12 @@ func TestOIDCMicrosoftCallback_LinksExistingPasswordAccount(t *testing.T) {
 		Code:  "auth-code",
 		State: signedMicrosoftState(t, deps),
 	})
-	require.NoError(t, err, "same-email Microsoft sign-in must link, not 500")
-	require.NotNil(t, out)
-	assert.NotEmpty(t, out.Body.AccessToken)
-	assert.NotEmpty(t, out.SetCookie.Value)
+	require.Error(t, err, "same-email Microsoft sign-in must not auto-link")
+	assert.Nil(t, out)
 
 	linkedUID, ok := findIdentityUserID(t, db, "microsoft", msSub)
-	require.True(t, ok, "a microsoft identity row must have been created")
-	assert.Equal(t, existingUID, linkedUID, "microsoft identity must link onto the existing user")
+	assert.False(t, ok, "a microsoft identity row must not be created by email-only linking")
+	assert.Zero(t, linkedUID)
 	assert.Equal(t, 1, countUsersByEmail(t, db, email))
 }
 

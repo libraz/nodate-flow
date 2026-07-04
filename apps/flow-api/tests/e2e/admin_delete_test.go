@@ -295,9 +295,9 @@ func TestAdminDeleteWorkspaceHappyPath(t *testing.T) {
 	avBody, avStatus := uploadAvatar(t, other.AccessToken, "other.png", "image/png", otherAvatar)
 	require.Equal(t, http.StatusOK, avStatus)
 	require.NotNil(t, avBody.AvatarURL)
-	otherUID, otherAvatarRow := userInternalIdAndAvatar(t, testDB, other.UserPublicID)
+	otherUID, otherAvatarRow := userInternalIDAndAvatar(t, testDB, other.UserPublicID)
 	require.True(t, otherAvatarRow.Valid)
-	otherAvatarKey := storageKeyByObjectID(t, testDB, uint32(otherAvatarRow.Int32))
+	otherAvatarKey := storageKeyByObjectID(t, testDB, otherAvatarRow.Int32)
 	testStorage.MustExist(t, otherAvatarKey)
 
 	wsID := internalWorkspaceID(t, testDB, tt.WorkspacePublicID)
@@ -485,9 +485,9 @@ func TestAdminDeleteUserHappyPath(t *testing.T) {
 	require.Equal(t, http.StatusOK, avStatus)
 	require.NotNil(t, avBody.AvatarURL)
 
-	uid, avatarRow := userInternalIdAndAvatar(t, testDB, target.UserPublicID)
+	uid, avatarRow := userInternalIDAndAvatar(t, testDB, target.UserPublicID)
 	require.True(t, avatarRow.Valid)
-	avatarKey := storageKeyByObjectID(t, testDB, uint32(avatarRow.Int32))
+	avatarKey := storageKeyByObjectID(t, testDB, avatarRow.Int32)
 	testStorage.MustExist(t, avatarKey)
 
 	// Target also uploads a workspace attachment so we exercise the

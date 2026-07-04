@@ -146,10 +146,14 @@ func (w *WorkspaceProvider) logSuccess(ctx context.Context, wsID uint32, model, 
 		w.OnInvocation(kind, model, wsIDStr, resp.CostCents)
 	}
 	if w.LogInvoke != nil {
+		loggedModel := resp.Model
+		if loggedModel == "" {
+			loggedModel = model
+		}
 		w.LogInvoke(ctx, InvocationRecord{
 			WorkspaceID:      wsID,
 			Purpose:          "compile_lens",
-			Model:            model,
+			Model:            loggedModel,
 			PromptRedacted:   prompt,
 			ResponseRedacted: logutil.Redact(resp.Text),
 			TokensInput:      resp.InputTokens,

@@ -47,6 +47,7 @@
   "AUTH.PASSWORD.NO_LOCAL_IDENTITY": "このアカウントには変更可能なパスワードがありません",
   "AUTH.PASSWORD.TOO_WEAK": "パスワードの強度が不足しています",
   "AUTH.PAT.EXPIRED": "パーソナルアクセストークンの有効期限が切れました",
+  "AUTH.PAT.SCOPE_INSUFFICIENT": "パーソナルアクセストークンに必要なスコープが付与されていません",
   "AUTH.PAT.TOKEN_UNKNOWN": "パーソナルアクセストークンが無効です",
   "AUTH.PERMISSION.INSTANCE_ADMIN_REQUIRED": "インスタンス管理者権限が必要です",
   "AUTH.REGISTER.EMAIL_ALREADY_TAKEN": "このメールアドレスは既に登録されています",

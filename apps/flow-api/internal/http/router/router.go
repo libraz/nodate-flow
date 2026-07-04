@@ -128,6 +128,7 @@ type Deps struct {
 	// integration tests where many parallel tenants register from
 	// the same loopback address.
 	DisableRateLimit bool
+	TrustedProxyHops int
 	// AiMock toggles the deterministic in-memory AI provider used by
 	// development and tests. When true the orchestrator routes
 	// every workspace to a fixture-backed Provider regardless of the
@@ -289,7 +290,7 @@ func BuildResult(deps Deps) Result {
 	// Outermost layer: extract and stash the client IP so auth
 	// handlers can record it on new sessions without re-parsing
 	// X-Forwarded-For themselves.
-	r.Use(middleware.ClientIP())
+	r.Use(middleware.ClientIP(deps.TrustedProxyHops))
 	// Security response headers: CSP, HSTS, X-Content-Type-Options, etc.
 	r.Use(middleware.SecurityHeaders())
 	// Global per-IP rate limiter: defence-in-depth against floods
@@ -321,7 +322,7 @@ func BuildResult(deps Deps) Result {
 	// a "log-after-acl" wrapper through every group.
 	loggerCtx := middleware.LoggerContext()
 	authMW := func(next http.Handler) http.Handler {
-		return rawAuthMW(loggerCtx(next))
+		return rawAuthMW(middleware.RequireBearerTokenScope(loggerCtx(next)))
 	}
 
 	authedAPIs := buildAuthenticatedAPI(r, deps, shared, authMW)
@@ -1621,6 +1622,10 @@ type healthOutput struct {
 // enabled provider the record is dropped silently — LogInvoke is a
 // best-effort audit path and must never break a user-visible AI
 // response.
+func NewDBInvocationLogger(q *generated.Queries, publish func(context.Context, uint32)) ai.InvocationLogger {
+	return newDBInvocationLogger(q, publish)
+}
+
 func newDBInvocationLogger(q *generated.Queries, publish func(context.Context, uint32)) ai.InvocationLogger {
 	return func(ctx context.Context, rec ai.InvocationRecord) {
 		if q == nil || rec.WorkspaceID == 0 {
@@ -1646,9 +1651,14 @@ func newDBInvocationLogger(q *generated.Queries, publish func(context.Context, u
 		if rec.TokensOutput > 0 {
 			tOut = sql.NullInt32{Int32: int32(rec.TokensOutput), Valid: true} //#nosec G115 -- LLM token counts cap well below int32
 		}
+		model := rec.Model
 		var cost sql.NullString
-		if rec.CostCents > 0 {
-			cost = sql.NullString{String: fmt.Sprintf("%d.%06d", rec.CostCents/100, (rec.CostCents%100)*10000), Valid: true}
+		costMicros := providers.EstimateCostMicrosUSD(model, rec.TokensInput, rec.TokensOutput)
+		if costMicros == 0 && rec.CostCents > 0 {
+			costMicros = rec.CostCents * 10_000
+		}
+		if costMicros > 0 {
+			cost = sql.NullString{String: fmt.Sprintf("%d.%06d", costMicros/1_000_000, costMicros%1_000_000), Valid: true}
 		}
 		status := generated.AiInvocationsStatusOk
 		switch rec.Status {
@@ -1669,7 +1679,7 @@ func newDBInvocationLogger(q *generated.Queries, publish func(context.Context, u
 			AgentID:          agentID,
 			TaskID:           sql.NullInt32{},
 			Purpose:          rec.Purpose,
-			Model:            rec.Model,
+			Model:            model,
 			PromptRedacted:   rec.PromptRedacted,
 			ResponseRedacted: response,
 			TokensInput:      tIn,
@@ -1779,6 +1789,11 @@ func patchErrorModelSchema(spec *huma.OpenAPI) {
 	schema.Properties["userAction"] = &huma.Schema{
 		Type:        "string",
 		Description: "Short imperative the UI can render to tell the end user how to recover.",
+	}
+	schema.Properties["extensions"] = &huma.Schema{
+		Type:                 "object",
+		AdditionalProperties: true,
+		Description:          "Optional RFC 9457 extension members carrying diagnostic detail.",
 	}
 }
 

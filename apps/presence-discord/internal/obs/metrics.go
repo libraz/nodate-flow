@@ -50,9 +50,10 @@ var EventsTotal = prometheus.NewCounterVec(
 	[]string{"kind"},
 )
 
-// DebounceDroppedTotal counts presence updates that were collapsed into
-// a later event within the per-user debounce window. A non-zero rate is
-// expected and healthy — it confirms the storm-suppression is active.
+// DebounceDroppedTotal counts pending trailing presence updates that
+// were replaced by a newer event before they could emit. A non-zero
+// rate is expected and healthy — it confirms storm-suppression is
+// active without counting the final trailing emit as dropped.
 //
 //nolint:gochecknoglobals // process-wide metric, matches flow-api / flow-worker pattern.
 var DebounceDroppedTotal = prometheus.NewCounter(prometheus.CounterOpts{

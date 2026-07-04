@@ -70,6 +70,12 @@
   color: var(--nf-color-fg-muted);
 }
 
+.limitNotice {
+  margin: 0 0 var(--nf-space-3);
+  color: var(--nf-color-fg-muted);
+  font-size: var(--nf-text-sm);
+}
+
 @media (max-width: 767px) {
   .board {
     grid-auto-flow: row;

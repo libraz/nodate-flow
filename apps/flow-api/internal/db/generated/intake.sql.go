@@ -106,6 +106,109 @@ func (q *Queries) FindIntakeItemByPublicId(ctx context.Context, arg FindIntakeIt
 	return i, err
 }
 
+const listIntakeItemsForWorkspaceKeyset = `-- name: ListIntakeItemsForWorkspaceKeyset :many
+SELECT
+  ii.public_id,
+  ii.workspace_id,
+  ii.title,
+  ii.body,
+  ii.triage_status,
+  ii.snooze_until,
+  ii.ai_score,
+  ii.ai_reasoning,
+  ii.scored_at,
+  ii.task_id,
+  ii.triaged_by_user_id,
+  tu.public_id AS triaged_by_public_id,
+  tu.display_name AS triaged_by_display_name,
+  ii.created_at
+FROM intake_items ii
+LEFT JOIN users tu ON tu.id = ii.triaged_by_user_id
+WHERE ii.workspace_id = ?
+  AND ii.enabled = TRUE
+  AND (? = '' OR ii.triage_status = ?)
+  AND (
+    ? IS NULL
+    OR ii.created_at < ?
+    OR (ii.created_at = ? AND ii.public_id < ?)
+  )
+ORDER BY ii.created_at DESC, ii.public_id DESC
+LIMIT ?
+`
+
+type ListIntakeItemsForWorkspaceKeysetParams struct {
+	WorkspaceID     uint32                  `json:"-"`
+	StatusFilter    IntakeItemsTriageStatus `json:"triageStatus"`
+	CursorCreatedAt sql.NullTime            `json:"cursorCreatedAt"`
+	CursorPublicID  types.PublicID          `json:"cursorPublicId"`
+	Limit           int32                   `json:"limit"`
+}
+
+type ListIntakeItemsForWorkspaceKeysetRow struct {
+	PublicID             types.PublicID          `json:"publicId"`
+	WorkspaceID          uint32                  `json:"-"`
+	Title                string                  `json:"title"`
+	Body                 sql.NullString          `json:"body"`
+	TriageStatus         IntakeItemsTriageStatus `json:"triageStatus"`
+	SnoozeUntil          sql.NullTime            `json:"snoozeUntil"`
+	AiScore              sql.NullString          `json:"aiScore"`
+	AiReasoning          sql.NullString          `json:"aiReasoning"`
+	ScoredAt             sql.NullTime            `json:"scoredAt"`
+	TaskID               sql.NullInt32           `json:"-"`
+	TriagedByUserID      sql.NullInt32           `json:"-"`
+	TriagedByPublicID    types.PublicID          `json:"triagedByPublicId"`
+	TriagedByDisplayName sql.NullString          `json:"triagedByDisplayName"`
+	CreatedAt            time.Time               `json:"createdAt"`
+}
+
+// Cursor-paginated intake items for a workspace, filtered by status.
+func (q *Queries) ListIntakeItemsForWorkspaceKeyset(ctx context.Context, arg ListIntakeItemsForWorkspaceKeysetParams) ([]ListIntakeItemsForWorkspaceKeysetRow, error) {
+	rows, err := q.db.QueryContext(ctx, listIntakeItemsForWorkspaceKeyset,
+		arg.WorkspaceID,
+		arg.StatusFilter,
+		arg.StatusFilter,
+		arg.CursorCreatedAt,
+		arg.CursorCreatedAt,
+		arg.CursorCreatedAt,
+		arg.CursorPublicID,
+		arg.Limit,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListIntakeItemsForWorkspaceKeysetRow{}
+	for rows.Next() {
+		var i ListIntakeItemsForWorkspaceKeysetRow
+		if err := rows.Scan(
+			&i.PublicID,
+			&i.WorkspaceID,
+			&i.Title,
+			&i.Body,
+			&i.TriageStatus,
+			&i.SnoozeUntil,
+			&i.AiScore,
+			&i.AiReasoning,
+			&i.ScoredAt,
+			&i.TaskID,
+			&i.TriagedByUserID,
+			&i.TriagedByPublicID,
+			&i.TriagedByDisplayName,
+			&i.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listIntakeItemsForWorkspace = `-- name: ListIntakeItemsForWorkspace :many
 SELECT
   ii.public_id,

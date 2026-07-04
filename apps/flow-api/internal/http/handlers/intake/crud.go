@@ -11,7 +11,9 @@ import (
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/types"
 	apierrors "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/errors"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/eventbus"
+	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/handlers/handlerutil"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/middleware"
+	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/tasknumber"
 	"github.com/nodate-flow/nodate-flow/packages/go-shared/apierr"
 	"github.com/nodate-flow/nodate-flow/packages/go-shared/logutil"
 )
@@ -89,17 +91,49 @@ func List(deps Deps) func(context.Context, *ListIntakeItemsInput) (*ListIntakeIt
 		if limit <= 0 {
 			limit = 50
 		}
+		status := generated.IntakeItemsTriageStatus(in.Status)
+
+		if in.Cursor != "" {
+			cursorAt, cursorPID, derr := handlerutil.DecodeCursor(in.Cursor)
+			if derr != nil {
+				return nil, httpErr(apierrors.ValidationQueryFieldInvalid)
+			}
+			rows, err := deps.Queries.ListIntakeItemsForWorkspaceKeyset(ctx, generated.ListIntakeItemsForWorkspaceKeysetParams{
+				WorkspaceID:     ws.ID,
+				StatusFilter:    status,
+				CursorCreatedAt: sql.NullTime{Time: cursorAt, Valid: !cursorAt.IsZero()},
+				CursorPublicID:  cursorPID,
+				Limit:           limit + 1,
+			})
+			if err != nil {
+				return nil, httpErr(apierrors.InternalUnexpected)
+			}
+			hasMore := int32(len(rows)) > limit //#nosec G115 -- rows length capped at limit+1 with limit validated to maximum:200
+			if hasMore {
+				rows = rows[:limit]
+			}
+			out := &ListIntakeItemsOutput{}
+			out.Body.Items = make([]Record, 0, len(rows))
+			for _, r := range rows {
+				out.Body.Items = append(out.Body.Items, mapKeysetListRow(r))
+			}
+			if hasMore {
+				last := rows[len(rows)-1]
+				nc := handlerutil.EncodeCursor(last.CreatedAt, last.PublicID)
+				out.Body.NextCursor = &nc
+			}
+			return out, nil
+		}
 
 		rows, err := deps.Queries.ListIntakeItemsForWorkspace(ctx, generated.ListIntakeItemsForWorkspaceParams{
 			WorkspaceID:  ws.ID,
-			StatusFilter: generated.IntakeItemsTriageStatus(in.Status),
+			StatusFilter: status,
 			Limit:        limit,
 			Offset:       in.Offset,
 		})
 		if err != nil {
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
-
 		out := &ListIntakeItemsOutput{}
 		out.Body.Items = make([]Record, 0, len(rows))
 		for _, r := range rows {
@@ -107,6 +141,11 @@ func List(deps Deps) func(context.Context, *ListIntakeItemsInput) (*ListIntakeIt
 		}
 		if len(rows) > 0 {
 			out.Body.Total = totalAsInt64(rows[0].Total)
+			if int64(in.Offset+limit) < out.Body.Total {
+				last := rows[len(rows)-1]
+				nc := handlerutil.EncodeCursor(last.CreatedAt, last.PublicID)
+				out.Body.NextCursor = &nc
+			}
 		}
 		return out, nil
 	}
@@ -288,10 +327,7 @@ func Convert(deps Deps) func(context.Context, *ConvertIntakeItemInput) (*Convert
 		defer tx.Rollback() //nolint:errcheck
 		qtx := deps.Queries.WithTx(tx)
 
-		nextNum, err := qtx.AssignTaskNumber(ctx, generated.AssignTaskNumberParams{
-			WorkspaceID: prj.WorkspaceID,
-			ProjectID:   prj.ID,
-		})
+		nextNum, err := tasknumber.Allocate(ctx, qtx, prj.WorkspaceID, prj.ID)
 		if err != nil {
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}

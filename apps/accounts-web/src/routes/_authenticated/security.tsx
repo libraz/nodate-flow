@@ -409,6 +409,7 @@ function TotpSection(): ReactElement {
   const [recoveryCodes, setRecoveryCodes] = useState<string[] | null>(null);
   const [errorKey, setErrorKey] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [startPassword, setStartPassword] = useState('');
 
   // Load initial status. The server only returns `status`, not the
   // otpauth URL / secret, so a page reload mid-enrollment drops us
@@ -433,18 +434,24 @@ function TotpSection(): ReactElement {
     };
   }, []);
 
-  const startEnroll = async (): Promise<void> => {
+  const startEnroll = async (password: string): Promise<void> => {
     setErrorKey(null);
     setBusy(true);
     try {
-      const { data, error } = await sdk.POST('/me/totp/enroll');
+      const { data, error } = await sdk.POST('/me/totp/enroll', { body: { password } });
       if (error) {
-        setErrorKey('security.totp.errors.enroll_failed');
+        const errCode = extractErrorCode(error as ProblemJson | undefined);
+        setErrorKey(
+          errCode === 'AUTH.PASSWORD.CURRENT_MISMATCH'
+            ? 'security.totp.errors.password_mismatch'
+            : 'security.totp.errors.enroll_failed',
+        );
         return;
       }
       const body = data as TotpEnrollOutputBody;
       setEnrollment(body);
       setStatus('pending');
+      setStartPassword('');
     } catch {
       setErrorKey('security.totp.errors.enroll_failed');
     } finally {
@@ -466,15 +473,17 @@ function TotpSection(): ReactElement {
     }
   };
 
-  const confirmEnroll = async (code: string): Promise<void> => {
+  const confirmEnroll = async (code: string, password: string): Promise<void> => {
     setErrorKey(null);
     setBusy(true);
     try {
-      const { data, error } = await sdk.POST('/me/totp/confirm', { body: { code } });
+      const { data, error } = await sdk.POST('/me/totp/confirm', { body: { code, password } });
       if (error) {
         const errCode = extractErrorCode(error as ProblemJson | undefined);
         if (errCode === 'AUTH.TOTP.CODE_MISMATCH') {
           setErrorKey('security.totp.errors.code_mismatch');
+        } else if (errCode === 'AUTH.PASSWORD.CURRENT_MISMATCH') {
+          setErrorKey('security.totp.errors.password_mismatch');
         } else {
           setErrorKey('security.totp.errors.confirm_failed');
         }
@@ -516,13 +525,26 @@ function TotpSection(): ReactElement {
             {t(errorKey)}
           </p>
         ) : null}
+        <FormField label={t('security.totp.password_required')} required>
+          {(control) => (
+            <PasswordInput
+              {...control}
+              value={startPassword}
+              autoComplete="current-password"
+              onChange={(e) => {
+                setStartPassword(e.target.value);
+              }}
+              required
+            />
+          )}
+        </FormField>
         <div>
           <Button
             type="button"
             variant="primary"
-            disabled={busy}
+            disabled={busy || startPassword === ''}
             onClick={() => {
-              void startEnroll();
+              void startEnroll(startPassword);
             }}
           >
             {t('security.totp.start_setup')}
@@ -546,13 +568,26 @@ function TotpSection(): ReactElement {
               {t(errorKey)}
             </p>
           ) : null}
+          <FormField label={t('security.totp.password_required')} required>
+            {(control) => (
+              <PasswordInput
+                {...control}
+                value={startPassword}
+                autoComplete="current-password"
+                onChange={(e) => {
+                  setStartPassword(e.target.value);
+                }}
+                required
+              />
+            )}
+          </FormField>
           <div className="aw-actions">
             <Button
               type="button"
               variant="primary"
-              disabled={busy}
+              disabled={busy || startPassword === ''}
               onClick={() => {
-                void startEnroll();
+                void startEnroll(startPassword);
               }}
             >
               {t('security.totp.resume_restart')}
@@ -576,8 +611,8 @@ function TotpSection(): ReactElement {
         enrollment={enrollment}
         busy={busy}
         errorKey={errorKey}
-        onConfirm={(code) => {
-          void confirmEnroll(code);
+        onConfirm={(code, password) => {
+          void confirmEnroll(code, password);
         }}
         onCancel={() => {
           void cancelEnroll();
@@ -616,11 +651,12 @@ function EnrollmentStep({
   enrollment: TotpEnrollOutputBody;
   busy: boolean;
   errorKey: string | null;
-  onConfirm: (code: string) => void;
+  onConfirm: (code: string, password: string) => void;
   onCancel: () => void;
 }): ReactElement {
   const { t } = useTranslation('auth');
   const [code, setCode] = useState('');
+  const [password, setPassword] = useState('');
   const [qrDataUrl, setQrDataUrl] = useState<string | null>(null);
   const [qrFailed, setQrFailed] = useState(false);
   const capsHint = useCapsLockHint();
@@ -645,7 +681,7 @@ function EnrollmentStep({
 
   const handleSubmit = (e: FormEvent<HTMLFormElement>): void => {
     e.preventDefault();
-    if (code.length === 6) onConfirm(code);
+    if (code.length === 6 && password !== '') onConfirm(code, password);
   };
 
   return (
@@ -691,6 +727,19 @@ function EnrollmentStep({
           />
         )}
       </FormField>
+      <FormField label={t('security.totp.password_required')} required>
+        {(control) => (
+          <PasswordInput
+            {...control}
+            value={password}
+            autoComplete="current-password"
+            onChange={(e) => {
+              setPassword(e.target.value);
+            }}
+            required
+          />
+        )}
+      </FormField>
       {capsHint.capsLockOn ? (
         <output aria-live="polite" className="aw-flush aw-muted aw-text-xs">
           {t('login.caps_lock_on')}
@@ -702,7 +751,11 @@ function EnrollmentStep({
         </p>
       ) : null}
       <div className="aw-actions">
-        <Button type="submit" variant="primary" disabled={busy || code.length !== 6}>
+        <Button
+          type="submit"
+          variant="primary"
+          disabled={busy || code.length !== 6 || password === ''}
+        >
           {busy ? t('security.totp.confirming') : t('security.totp.confirm')}
         </Button>
         <Button type="button" variant="ghost" disabled={busy} onClick={onCancel}>

@@ -13,11 +13,13 @@
 export class ApiError extends Error {
   readonly code: string | undefined;
   readonly httpStatus: number | undefined;
-  constructor(code: string | undefined, message: string, httpStatus?: number) {
+  readonly userAction: string | undefined;
+  constructor(code: string | undefined, message: string, httpStatus?: number, userAction?: string) {
     super(message);
     this.name = 'ApiError';
     this.code = code;
     this.httpStatus = httpStatus;
+    this.userAction = userAction;
   }
 }
 
@@ -35,6 +37,7 @@ export function toApiError(err: unknown, fallback: string, httpStatus?: number):
       title?: unknown;
       type?: unknown;
       status?: unknown;
+      userAction?: unknown;
     };
     const message =
       (typeof obj.detail === 'string' && obj.detail) ||
@@ -42,7 +45,8 @@ export function toApiError(err: unknown, fallback: string, httpStatus?: number):
       fallback;
     const code = typeof obj.type === 'string' ? obj.type : undefined;
     const resolvedStatus = httpStatus ?? (typeof obj.status === 'number' ? obj.status : undefined);
-    return new ApiError(code, message, resolvedStatus);
+    const userAction = typeof obj.userAction === 'string' ? obj.userAction : undefined;
+    return new ApiError(code, message, resolvedStatus, userAction);
   }
   return new ApiError(undefined, fallback, httpStatus);
 }
@@ -53,4 +57,5 @@ export interface ProblemJson {
   title?: string;
   detail?: string;
   status?: number;
+  userAction?: string;
 }

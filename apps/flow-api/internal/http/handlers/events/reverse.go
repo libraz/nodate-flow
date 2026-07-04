@@ -150,8 +150,8 @@ func Reverse(deps Deps) func(context.Context, *ReverseInput) (*ReverseOutput, er
 		// projection / UI cancels matching reversed_event_id pairs out
 		// symmetrically), the reverser is the user, and the payload
 		// carries enough lineage for the timeline renderer.
-		actor := int64(actorInternal) //#nosec G115 -- actor user id from session, fits int64
-		origInternal := int64(target.ID)
+		actor := int64(actorInternal)    //#nosec G115 -- actor user id from session, fits int64
+		origInternal := int64(target.ID) //#nosec G115 -- event ids are auto-increment DB ids and fit int64.
 		result, err := eventbus.AppendReverseEvent(ctx, tx, eventbus.Event{
 			Type:            target.Type,
 			WorkspaceID:     ws.ID,

@@ -19,6 +19,7 @@ import (
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/middleware"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/itemkit"
 	nflog "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/log"
+	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/tasknumber"
 	"github.com/nodate-flow/nodate-flow/packages/go-shared/apierr"
 	"github.com/nodate-flow/nodate-flow/packages/go-shared/logutil"
 	"github.com/nodate-flow/nodate-flow/packages/go-shared/stringutil"
@@ -323,8 +324,8 @@ func Create(deps Deps) func(context.Context, *CreateTaskInput) (*CreateTaskOutpu
 
 		// Run the create transaction inside a deadlock-aware retry
 		// wrapper. The tx body acquires FK record locks against
-		// workspaces, projects, users, and gap locks during
-		// AssignTaskNumber, so it routinely deadlocks with concurrent
+		// workspaces, projects, users, and the project-row lock used by
+		// task-number allocation, so it can deadlock with concurrent
 		// transitions and fan-out under heavy parallel test load.
 		// Restarting the whole tx on ER_LOCK_DEADLOCK is the standard
 		// MySQL recipe.
@@ -335,10 +336,7 @@ func Create(deps Deps) func(context.Context, *CreateTaskInput) (*CreateTaskOutpu
 		txErr := dbretry.InTx(ctx, deps.DB, "tasks.Create", nil, func(ctx context.Context, tx *sql.Tx) error {
 			validationFn = nil
 			qtx := deps.Queries.WithTx(tx)
-			nextNum, err := qtx.AssignTaskNumber(ctx, generated.AssignTaskNumberParams{
-				WorkspaceID: prj.WorkspaceID,
-				ProjectID:   prj.ID,
-			})
+			nextNum, err := tasknumber.Allocate(ctx, qtx, prj.WorkspaceID, prj.ID)
 			if err != nil {
 				return err
 			}

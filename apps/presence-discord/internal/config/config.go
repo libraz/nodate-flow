@@ -112,8 +112,8 @@ func (c *Config) Validate() error {
 		return fmt.Errorf("config: NF_PRESENCE_LOG_LEVEL must be one of debug/info/warn/error, got %q", c.LogLevel)
 	}
 
-	if c.DebounceSeconds < 0 {
-		return fmt.Errorf("config: NF_PRESENCE_DEBOUNCE_SECONDS must be non-negative, got %d", c.DebounceSeconds)
+	if c.DebounceSeconds <= 0 {
+		return fmt.Errorf("config: NF_PRESENCE_DEBOUNCE_SECONDS must be positive, got %d", c.DebounceSeconds)
 	}
 	if c.ShutdownTimeout <= 0 {
 		return fmt.Errorf("config: NF_PRESENCE_SHUTDOWN_TIMEOUT must be positive, got %s", c.ShutdownTimeout)

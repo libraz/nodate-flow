@@ -83,7 +83,7 @@ var (
 	// WS.TASK.NOT_FOUND — Task not found
 	WsTaskNotFound = &Spec{Code: "WS.TASK.NOT_FOUND", Status: 404, Message: "Task not found", Description: "Returned when a task with the given public_id does not exist or has been deleted in the current workspace.", UserAction: "Verify the task ID, or refresh the list to see current tasks."}
 	// WS.TASK.STATE_TRANSITION_BLOCKED_BY_CONSTRAINT — Task cannot transition to the requested state
-	WsTaskStateTransitionBlockedByConstraint = &Spec{Code: "WS.TASK.STATE_TRANSITION_BLOCKED_BY_CONSTRAINT", Status: 422, Message: "Task cannot transition to the requested state", Description: "Returned when an unsatisfied constraint blocks the requested lifecycle transition.", UserAction: "Review unmet constraints in the task detail panel and resolve them before retrying."}
+	WsTaskStateTransitionBlockedByConstraint = &Spec{Code: "WS.TASK.STATE_TRANSITION_BLOCKED_BY_CONSTRAINT", Status: 422, Message: "Task cannot transition to the requested state", Description: "Reserved for a future hard-gated constraint mode. Current task transitions are gated by the taskstate state machine; unsatisfied task constraints are advisory markers and do not emit this error.", UserAction: "Review unmet constraints in the task detail panel. If hard-gated constraints are enabled in a future release, resolve them before retrying the transition."}
 	// WS.TASK.TITLE_TOO_LONG — Task title is too long
 	WsTaskTitleTooLong = &Spec{Code: "WS.TASK.TITLE_TOO_LONG", Status: 422, Message: "Task title is too long", Description: "Returned when the submitted title exceeds the maximum allowed length.", UserAction: "Shorten the title and retry."}
 	// WS.TASK.TRANSITION_REJECTED — Task transition not allowed in current state

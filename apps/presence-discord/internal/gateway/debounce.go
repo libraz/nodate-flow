@@ -16,8 +16,10 @@
 //     the existing trailing timer and schedules a new one that fires
 //     `window` after the most recent event arrival. The latest event
 //     payload is the one that fires.
-//  3. Each event replaced by step (2) increments
-//     DebounceDroppedTotal so dashboards see suppression activity.
+//  3. Each pending trailing event that gets replaced before it can
+//     emit increments DebounceDroppedTotal so dashboards see
+//     suppression activity without counting the final trailing emit as
+//     dropped.
 //  4. Stop() drains pending timers without firing them — at shutdown
 //     the next session will receive fresh PresenceUpdate snapshots so
 //     replaying stale state would only ever mislead the judge.
@@ -205,6 +207,13 @@ func (d *Debouncer) Handle(ev PresenceEvent) {
 	// Leading-edge fast path: no recent emit for this user, so push
 	// through immediately. The window starts at this emit.
 	if !hasLast || now.Sub(last) >= d.window {
+		if hasEntry && entry.pending {
+			if entry.timer != nil {
+				entry.timer.Stop()
+			}
+			delete(d.entries, ev.UserID)
+			obs.DebounceDroppedTotal.Inc()
+		}
 		d.lastEmit[ev.UserID] = now
 		d.mu.Unlock()
 		d.emitter.Emit(d.emitCtx, ev)
@@ -214,7 +223,7 @@ func (d *Debouncer) Handle(ev PresenceEvent) {
 	// Within the window. Schedule (or reschedule) a trailing emit so
 	// the latest snapshot wins. Bumping DebounceDroppedTotal on each
 	// replacement lets the dashboard show the storm rate without
-	// needing per-user series.
+	// counting the trailing event that eventually emits.
 	if hasEntry && entry.pending {
 		// Cancel the prior trailing timer; the old payload is being
 		// replaced by ev.

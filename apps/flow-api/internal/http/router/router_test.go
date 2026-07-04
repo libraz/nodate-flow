@@ -342,3 +342,25 @@ func TestEveryOperationHasTags(t *testing.T) {
 		}
 	}
 }
+
+func TestP3SDKAdvertisedEndpointsHaveHandlers(t *testing.T) {
+	t.Parallel()
+	res := BuildResult(stubDeps(t))
+	want := map[string]struct{}{
+		"GET /tasks/{id}/agents":                                      {},
+		"POST /tasks/{id}/agents":                                     {},
+		"GET /workspaces/{wsId}/calendar-events/{evtId}/linked-tasks": {},
+		"GET /workspaces/{wsId}/relation-suggestions":                 {},
+		"GET /tasks/{id}/relation-suggestions":                        {},
+		"POST /relation-suggestions/{suggestionId}/resolve":           {},
+	}
+	seen := map[string]struct{}{}
+	for _, op := range res.AuthenticatedOps {
+		seen[op.Method+" "+op.Path] = struct{}{}
+	}
+	for endpoint := range want {
+		if _, ok := seen[endpoint]; !ok {
+			t.Errorf("SDK-advertised endpoint %s is missing from authenticated router registration", endpoint)
+		}
+	}
+}

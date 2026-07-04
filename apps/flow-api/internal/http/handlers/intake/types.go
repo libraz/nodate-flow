@@ -72,6 +72,7 @@ type CreateIntakeItemOutput struct {
 type ListIntakeItemsInput struct {
 	WsID   string `path:"wsId"`
 	Status string `query:"status" doc:"Filter by triage status: pending, accepted, rejected, snoozed, duplicate"`
+	Cursor string `query:"cursor" doc:"Opaque cursor returned by previous page; pass to fetch next page. Empty when at end."`
 	Limit  int32  `query:"limit" minimum:"1" maximum:"200" default:"50"`
 	Offset int32  `query:"offset" minimum:"0" default:"0"`
 }

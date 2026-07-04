@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"math"
 	"net/http"
 	"strings"
 	"testing"
@@ -55,7 +56,8 @@ func appendAgentEventForTask(t *testing.T, db *sql.DB, wsID, taskID, agentID uin
 	require.NoError(t, err)
 	id, err := res.LastInsertId()
 	require.NoError(t, err)
-	return uint64(id), pub.UUID().String()
+	require.GreaterOrEqual(t, id, int64(0))
+	return uint64(id), pub.UUID().String() //#nosec G115 -- LastInsertId is asserted non-negative above.
 }
 
 // appendUserEventForTask inserts a user-actor event for the given
@@ -322,9 +324,10 @@ func TestReverseCancelsDerivedState(t *testing.T) {
 	// Read the public_id of the row we just inserted so we can target
 	// it via the reverse endpoint.
 	q := generated.New(testDB)
+	require.LessOrEqual(t, taskInternalID, uint32(math.MaxInt32))
 	rows, err := q.ListAgentRunsByTask(context.Background(), generated.ListAgentRunsByTaskParams{
 		WorkspaceID: wsID,
-		TaskID:      sql.NullInt32{Int32: int32(taskInternalID), Valid: true},
+		TaskID:      sql.NullInt32{Int32: int32(taskInternalID), Valid: true}, //#nosec G115 -- bounded by assertion above.
 		Limit:       50,
 	})
 	require.NoError(t, err)

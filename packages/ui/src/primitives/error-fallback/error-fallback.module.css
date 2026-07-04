@@ -2,8 +2,8 @@
  * ErrorFallback — section-level error placeholder.
  *
  * Token-only: every colour, spacing, radius, and shadow comes from
- * `var(--nf-*)` so the four themes (aurora / dotline / glass-light /
- * glass-dark) inherit the correct palette without per-theme overrides.
+ * `var(--nf-*)` so themes inherit the correct palette without per-theme
+ * overrides.
  *
  * Designed for per-section use — sized to fit inside a card / list /
  * sub-section body, not the full viewport. Pair with a per-section

@@ -390,7 +390,7 @@ func TestPresignFilenameEdgeCases(t *testing.T) {
 	t.Run("filename with zero-width space round-trips as UTF-8", func(t *testing.T) {
 		// U+200B between "ファイル" and "名".
 		payload := makePNG(t, 8, 8, color.RGBA{R: 11, G: 22, B: 33, A: 255})
-		original := "ファイル​名.png"
+		original := "ファイル\u200b名.png"
 		res := presignAttachment(t, tt.AccessToken, taskID, original, "image/png", payload)
 		require.False(t, res.Deduplicated)
 		uploadViaPresignedURL(t, res.UploadURL, "image/png", payload, res.RequiredHeaders)

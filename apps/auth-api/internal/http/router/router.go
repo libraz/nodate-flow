@@ -31,18 +31,20 @@ import (
 
 // Deps is the dependency bundle Build needs.
 type Deps struct {
-	DB                *sql.DB
-	Queries           *generated.Queries
-	JWT               *auth.JWTIssuer
-	OIDC              *auth.OIDCClient
-	OIDCGithub        *auth.GithubOAuthClient
-	OIDCMicrosoft     *auth.MicrosoftOIDCClient
-	Sessions          sessionstore.Store
-	Cipher            *crypto.Cipher
-	CookieSecure      bool
-	RegistrationOpen  bool
-	MinPasswordLength int
-	DisableRateLimit  bool
+	DB                        *sql.DB
+	Queries                   *generated.Queries
+	JWT                       *auth.JWTIssuer
+	OIDC                      *auth.OIDCClient
+	OIDCGithub                *auth.GithubOAuthClient
+	OIDCMicrosoft             *auth.MicrosoftOIDCClient
+	MicrosoftAllowedTenantIDs []string
+	Sessions                  sessionstore.Store
+	Cipher                    *crypto.Cipher
+	CookieSecure              bool
+	RegistrationOpen          bool
+	MinPasswordLength         int
+	DisableRateLimit          bool
+	TrustedProxyHops          int
 
 	// OAuthAllowedDomains / OAuthAllowedEmails carry the opt-in OAuth/OIDC
 	// sign-in allowlist (normalized in config.Load). Empty (both) means
@@ -97,7 +99,7 @@ func Build(deps Deps) http.Handler {
 // returns the handler together with the list of huma.API instances used.
 func BuildResult(deps Deps) Result {
 	r := chi.NewRouter()
-	r.Use(middleware.ClientIP())
+	r.Use(middleware.ClientIP(deps.TrustedProxyHops))
 	r.Use(middleware.SecurityHeaders())
 	// Global per-IP rate limiter: defence-in-depth against floods
 	// from a single source. Auth-specific endpoints (login, register)
@@ -143,24 +145,25 @@ func BuildResult(deps Deps) Result {
 	}
 	auditRec := audit.New(deps.Queries)
 	authDeps := authhandlers.Deps{
-		DB:                  deps.DB,
-		Queries:             deps.Queries,
-		Sessions:            sessionStore,
-		JWT:                 deps.JWT,
-		OIDC:                deps.OIDC,
-		OIDCGithub:          deps.OIDCGithub,
-		OIDCMicrosoft:       deps.OIDCMicrosoft,
-		Cipher:              deps.Cipher,
-		CookieSecure:        deps.CookieSecure,
-		RegistrationOpen:    deps.RegistrationOpen,
-		OAuthAllowedDomains: deps.OAuthAllowedDomains,
-		OAuthAllowedEmails:  deps.OAuthAllowedEmails,
-		MinPasswordLength:   deps.MinPasswordLength,
-		Audit:               auditRec,
-		EmailSender:         deps.EmailSender,
-		AccountsWebURL:      deps.AccountsWebURL,
-		Storage:             deps.Storage,
-		PublicBaseURL:       deps.PublicBaseURL,
+		DB:                        deps.DB,
+		Queries:                   deps.Queries,
+		Sessions:                  sessionStore,
+		JWT:                       deps.JWT,
+		OIDC:                      deps.OIDC,
+		OIDCGithub:                deps.OIDCGithub,
+		OIDCMicrosoft:             deps.OIDCMicrosoft,
+		MicrosoftAllowedTenantIDs: deps.MicrosoftAllowedTenantIDs,
+		Cipher:                    deps.Cipher,
+		CookieSecure:              deps.CookieSecure,
+		RegistrationOpen:          deps.RegistrationOpen,
+		OAuthAllowedDomains:       deps.OAuthAllowedDomains,
+		OAuthAllowedEmails:        deps.OAuthAllowedEmails,
+		MinPasswordLength:         deps.MinPasswordLength,
+		Audit:                     auditRec,
+		EmailSender:               deps.EmailSender,
+		AccountsWebURL:            deps.AccountsWebURL,
+		Storage:                   deps.Storage,
+		PublicBaseURL:             deps.PublicBaseURL,
 	}
 
 	// Auth capabilities — public, no rate limit, cacheable.
@@ -397,21 +400,21 @@ func BuildResult(deps Deps) Result {
 			Method:      http.MethodPost,
 			Path:        "/me/totp/enroll",
 			Summary:     "Begin TOTP 2FA enrollment",
-			Description: "Generates a fresh TOTP secret and otpauth:// provisioning URL for the caller to scan. The secret is stored as pending until /me/totp/confirm validates a code.",
+			Description: "After password reverification, generates a fresh TOTP secret and otpauth:// provisioning URL for the caller to scan. The secret is stored as pending until /me/totp/confirm validates a code.",
 		}, authhandlers.TotpEnroll(authDeps))
 		huma.Register(subAPI, huma.Operation{
 			OperationID: "me-totp-confirm",
 			Method:      http.MethodPost,
 			Path:        "/me/totp/confirm",
 			Summary:     "Confirm TOTP 2FA enrollment",
-			Description: "Validates a 6-digit code against the pending secret from /me/totp/enroll. On success activates TOTP for the caller and returns a fresh batch of recovery codes (shown once).",
+			Description: "After password reverification, validates a 6-digit code against the pending secret from /me/totp/enroll. On success activates TOTP for the caller and returns a fresh batch of recovery codes (shown once).",
 		}, authhandlers.TotpConfirm(authDeps))
 		huma.Register(subAPI, huma.Operation{
 			OperationID: "me-totp-disable",
 			Method:      http.MethodDelete,
 			Path:        "/me/totp",
 			Summary:     "Disable TOTP 2FA",
-			Description: "Removes the TOTP secret and recovery codes for the caller. Requires a valid current TOTP code (or recovery code) to authorize the change.",
+			Description: "Removes the TOTP secret and recovery codes for the caller. Requires the current password to authorize the change.",
 		}, authhandlers.TotpDisable(authDeps))
 		huma.Register(subAPI, huma.Operation{
 			OperationID: "me-totp-recovery-status",
@@ -425,7 +428,7 @@ func BuildResult(deps Deps) Result {
 			Method:      http.MethodPost,
 			Path:        "/me/totp/recovery-codes",
 			Summary:     "Regenerate TOTP recovery codes",
-			Description: "Replaces the caller's recovery code batch with a fresh set, invalidating any unused old codes. Returns the new codes (shown once) and requires a valid TOTP code.",
+			Description: "Replaces the caller's recovery code batch with a fresh set, invalidating any unused old codes. Returns the new codes (shown once) and requires the current password.",
 		}, authhandlers.TotpRegenerateRecoveryCodes(authDeps))
 	})
 

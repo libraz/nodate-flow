@@ -14,6 +14,7 @@ import { toaster } from '@nodate-flow/ui/primitives/toast';
 import { type ReactElement, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { formatApiError } from '../../lib/api-error';
 import {
   type StepGranularity,
   type StepProposalUI,
@@ -151,8 +152,11 @@ export default function TaskStepsPanel({ taskId }: TaskStepsPanelProps): ReactEl
       setChecked(result.steps.map(() => true));
       setTitles(result.steps.map((s) => s.title));
       setHasProposed(true);
-    } catch {
-      toaster.show({ tone: 'danger', message: t('tasks.steps.propose_error') });
+    } catch (err) {
+      toaster.show({
+        tone: 'danger',
+        message: formatApiError(err, t, 'tasks.steps.propose_error'),
+      });
     }
   };
 
@@ -186,8 +190,8 @@ export default function TaskStepsPanel({ taskId }: TaskStepsPanelProps): ReactEl
       setChecked([]);
       setTitles([]);
       setHasProposed(false);
-    } catch {
-      toaster.show({ tone: 'danger', message: t('tasks.steps.apply_error') });
+    } catch (err) {
+      toaster.show({ tone: 'danger', message: formatApiError(err, t, 'tasks.steps.apply_error') });
     }
   };
 

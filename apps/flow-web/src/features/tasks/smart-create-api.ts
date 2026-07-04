@@ -115,11 +115,11 @@ export function useApplySmartTask() {
       }
       return data as ApplySmartResult;
     },
-    onSuccess: (_data, vars) => {
-      void qc.invalidateQueries({ queryKey: [...tasksKeys.all, 'list', vars.projectId] });
-      // Subtasks may also appear in `me` lists when an assignee was supplied,
-      // so broadcast the broader prefix as well.
-      void qc.invalidateQueries({ queryKey: tasksKeys.myInfinite() });
+    onSuccess: () => {
+      // Parent tasks and subtasks can appear in project, filtered, infinite,
+      // and cross-workspace "my tasks" lists, depending on assignees and
+      // current filters. Refresh the shared task-list prefix.
+      void qc.invalidateQueries({ queryKey: [...tasksKeys.all, 'list'] });
     },
   });
 }

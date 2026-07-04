@@ -18,10 +18,10 @@ import Select from '@nodate-flow/ui/primitives/select';
 import Spinner from '@nodate-flow/ui/primitives/spinner';
 import Textarea from '@nodate-flow/ui/primitives/textarea';
 import { toaster } from '@nodate-flow/ui/primitives/toast';
-import { type FormEvent, type ReactElement, useState } from 'react';
+import { type FormEvent, type ReactElement, useId, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { z } from 'zod';
-
+import { formatApiError } from '../../lib/api-error';
 import { formatDate } from '../../lib/format';
 import { useSubmitGuard } from '../../lib/use-submit-guard';
 
@@ -191,8 +191,11 @@ export default function TaskCreateDialog({
       });
       reset();
       onClose();
-    } catch {
-      toaster.show({ tone: 'danger', message: t('tasks.errors.create_failed') });
+    } catch (err) {
+      toaster.show({
+        tone: 'danger',
+        message: formatApiError(err, t, 'tasks.errors.create_failed'),
+      });
     } finally {
       end();
     }
@@ -231,8 +234,11 @@ export default function TaskCreateDialog({
       });
       reset();
       onClose();
-    } catch {
-      toaster.show({ tone: 'danger', message: t('tasks.errors.create_failed') });
+    } catch (err) {
+      toaster.show({
+        tone: 'danger',
+        message: formatApiError(err, t, 'tasks.errors.create_failed'),
+      });
     } finally {
       end();
     }
@@ -462,6 +468,7 @@ function SmartCreateSection({
                 {proposal.subtasks.map((st, idx) => (
                   <SubtaskProposalRow
                     key={`${st.title}-${String(idx)}`}
+                    index={idx}
                     subtask={st}
                     checked={selectedSubtasks.has(idx)}
                     onToggle={() => {
@@ -524,13 +531,31 @@ function AssigneeSuggestionRow({
 }
 
 interface SubtaskProposalRowProps {
+  index: number;
   subtask: SubtaskProposal;
   checked: boolean;
   onToggle: () => void;
 }
 
-function SubtaskProposalRow({ subtask, checked, onToggle }: SubtaskProposalRowProps): ReactElement {
-  const checkboxId = `subtask-${subtask.title.replaceAll(/\s+/g, '-').slice(0, 32)}`;
+function SubtaskProposalRow({
+  index,
+  subtask,
+  checked,
+  onToggle,
+}: SubtaskProposalRowProps): ReactElement {
+  const { t } = useTranslation('common');
+  const baseId = useId();
+  const checkboxId = `${baseId}-subtask-${index}`;
+  const priorityLabel =
+    subtask.priority === 'low'
+      ? t('tasks.steps.priority_low')
+      : subtask.priority === 'medium'
+        ? t('tasks.steps.priority_medium')
+        : subtask.priority === 'high'
+          ? t('tasks.steps.priority_high')
+          : subtask.priority === 'urgent'
+            ? t('tasks.smart_create.priority_urgent')
+            : t('tasks.smart_create.priority_unknown', { value: subtask.priority });
 
   return (
     <li className={styles.subtaskRow}>
@@ -543,7 +568,7 @@ function SubtaskProposalRow({ subtask, checked, onToggle }: SubtaskProposalRowPr
       <label htmlFor={checkboxId} className={styles.subtaskLabel}>
         <div className={styles.subtaskHeader}>
           <span className={styles.subtaskTitle}>{subtask.title}</span>
-          <Badge tone={priorityTone(subtask.priority)}>{subtask.priority}</Badge>
+          <Badge tone={priorityTone(subtask.priority)}>{priorityLabel}</Badge>
         </div>
         {subtask.description && <p className={styles.subtaskDescription}>{subtask.description}</p>}
         {subtask.assignee && (

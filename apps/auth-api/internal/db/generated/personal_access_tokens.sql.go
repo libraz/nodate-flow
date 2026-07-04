@@ -58,23 +58,24 @@ func (q *Queries) CreatePat(ctx context.Context, arg CreatePatParams) (int64, er
 
 const findPatByHash = `-- name: FindPatByHash :one
 SELECT
-  id,
-  public_id,
-  workspace_id,
-  user_id,
-  name,
-  token_prefix,
-  scopes_json,
-  expires_at,
-  last_used_at,
-  revoked_at,
-  enabled,
-  updated_at,
-  created_at
-FROM personal_access_tokens
-WHERE token_hash = ?
-  AND enabled = TRUE
-  AND revoked_at IS NULL
+  pat.id,
+  pat.public_id,
+  pat.workspace_id,
+  pat.user_id,
+  pat.name,
+  pat.token_prefix,
+  pat.scopes_json,
+  pat.expires_at,
+  pat.last_used_at,
+  pat.revoked_at,
+  pat.enabled,
+  pat.updated_at,
+  pat.created_at
+FROM personal_access_tokens pat
+INNER JOIN users u ON u.id = pat.user_id AND u.enabled = TRUE
+WHERE pat.token_hash = ?
+  AND pat.enabled = TRUE
+  AND pat.revoked_at IS NULL
 LIMIT 1
 `
 

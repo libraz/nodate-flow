@@ -17,7 +17,7 @@ import { toaster } from '@nodate-flow/ui/primitives/toast';
 import { Bot, History } from 'lucide-react';
 import { type ReactElement, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-
+import { formatApiError } from '../../../lib/api-error';
 import {
   type AgentHandoffStatus,
   deriveAgentStatus,
@@ -112,7 +112,7 @@ export default function AgentPanel({
       { taskId, input: { reason: 'manual' } },
       {
         onError: (err) => {
-          toaster.show({ tone: 'danger', message: err.message ?? t('error.fetchFailed') });
+          toaster.show({ tone: 'danger', message: formatApiError(err, t, 'error.fetchFailed') });
         },
       },
     );

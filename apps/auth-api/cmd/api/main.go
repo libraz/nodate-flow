@@ -151,13 +151,16 @@ func main() {
 	}
 
 	var microsoftOIDC *auth.MicrosoftOIDCClient
-	if cfg.MicrosoftOIDCClientID != "" && cfg.MicrosoftOIDCClientSecret != "" {
+	if cfg.MicrosoftOIDCClientID != "" && cfg.MicrosoftOIDCClientSecret != "" && len(cfg.MicrosoftOIDCAllowedTenants) > 0 {
 		microsoftOIDC = auth.NewMicrosoftOIDC(auth.MicrosoftOIDCConfig{
-			ClientID:     cfg.MicrosoftOIDCClientID,
-			ClientSecret: cfg.MicrosoftOIDCClientSecret,
-			RedirectURL:  cfg.PublicBaseURL + "/auth/oidc/microsoft/callback",
+			ClientID:         cfg.MicrosoftOIDCClientID,
+			ClientSecret:     cfg.MicrosoftOIDCClientSecret,
+			RedirectURL:      cfg.PublicBaseURL + "/auth/oidc/microsoft/callback",
+			AllowedTenantIDs: cfg.MicrosoftOIDCAllowedTenants,
 		})
 		logger.Info("microsoft OIDC login client configured")
+	} else if cfg.MicrosoftOIDCClientID != "" && cfg.MicrosoftOIDCClientSecret != "" {
+		logger.Warn("microsoft OIDC login disabled (NF_AUTH_MICROSOFT_OIDC_ALLOWED_TENANTS is required)")
 	} else {
 		logger.Warn("microsoft OIDC login disabled (NF_AUTH_MICROSOFT_OIDC_CLIENT_ID / NF_AUTH_MICROSOFT_OIDC_CLIENT_SECRET not set)")
 	}
@@ -196,6 +199,7 @@ func main() {
 		OIDC:                      oidcClient,
 		OIDCGithub:                githubOAuth,
 		OIDCMicrosoft:             microsoftOIDC,
+		MicrosoftAllowedTenantIDs: cfg.MicrosoftOIDCAllowedTenants,
 		Cipher:                    cipher,
 		CookieSecure:              cfg.CookieSecure,
 		RegistrationOpen:          cfg.RegistrationOpen,
@@ -203,6 +207,7 @@ func main() {
 		OAuthAllowedEmails:        cfg.OAuthAllowedEmails,
 		MinPasswordLength:         cfg.MinPasswordLength,
 		DisableRateLimit:          cfg.DisableRateLimit,
+		TrustedProxyHops:          cfg.TrustedProxyHops,
 		RateLimitGlobalMax:        cfg.RateLimitGlobalMax,
 		RateLimitGlobalWindowSec:  cfg.RateLimitGlobalWindowSec,
 		RateLimitAuthMax:          cfg.RateLimitAuthMax,

@@ -26,7 +26,7 @@
  */
 export function logError(message: string, err?: unknown): void {
   if (import.meta.env.DEV) {
-    // eslint-disable-next-line no-console
+    // biome-ignore lint/suspicious/noConsole: dev-only centralized logger intentionally forwards to console.
     console.error(`[flow-web] ${message}`, err);
   }
 }

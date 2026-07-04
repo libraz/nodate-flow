@@ -133,12 +133,12 @@ export interface TotpEnrollResponse {
   secret: string;
 }
 
-export function useTotpEnroll(): UseMutationResult<TotpEnrollResponse, ApiError, void> {
+export function useTotpEnroll(): UseMutationResult<TotpEnrollResponse, ApiError, string> {
   const qc = useQueryClient();
-  return useMutation<TotpEnrollResponse, ApiError, void>({
+  return useMutation<TotpEnrollResponse, ApiError, string>({
     throwOnError: false,
-    mutationFn: async (): Promise<TotpEnrollResponse> => {
-      const { data, error } = await sdk.POST('/me/totp/enroll');
+    mutationFn: async (password: string): Promise<TotpEnrollResponse> => {
+      const { data, error } = await sdk.POST('/me/totp/enroll', { body: { password } });
       if (error || !data) throw toApiError(error, 'Failed to start 2FA enrollment');
       return { otpauthUrl: data.otpauthUrl, secret: data.secret };
     },
@@ -152,12 +152,21 @@ export interface TotpConfirmResponse {
   recoveryCodes: string[];
 }
 
-export function useTotpConfirm(): UseMutationResult<TotpConfirmResponse, ApiError, string> {
+export interface TotpConfirmRequest {
+  code: string;
+  password: string;
+}
+
+export function useTotpConfirm(): UseMutationResult<
+  TotpConfirmResponse,
+  ApiError,
+  TotpConfirmRequest
+> {
   const qc = useQueryClient();
-  return useMutation<TotpConfirmResponse, ApiError, string>({
+  return useMutation<TotpConfirmResponse, ApiError, TotpConfirmRequest>({
     throwOnError: false,
-    mutationFn: async (code: string): Promise<TotpConfirmResponse> => {
-      const { data, error } = await sdk.POST('/me/totp/confirm', { body: { code } });
+    mutationFn: async ({ code, password }: TotpConfirmRequest): Promise<TotpConfirmResponse> => {
+      const { data, error } = await sdk.POST('/me/totp/confirm', { body: { code, password } });
       if (error || !data) throw toApiError(error, 'Failed to confirm 2FA code');
       return { recoveryCodes: data.recoveryCodes ?? [] };
     },

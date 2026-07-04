@@ -35,6 +35,7 @@ SELECT
 FROM task_description_versions tdv
 LEFT JOIN users au ON au.id = tdv.author_user_id
 WHERE tdv.workspace_id = ?
+  AND tdv.task_id = ?
   AND tdv.public_id = ?
   AND tdv.enabled = TRUE;
 

@@ -94,6 +94,8 @@ export interface SearchOptions {
 export interface SearchQuery {
   q: string;
   limit: number;
+  offset?: number;
+  cursor?: string;
   workspaceId?: string;
   projectId?: string;
 }
@@ -143,6 +145,85 @@ export interface SdkClientLike {
   PATCH: (url: string, opts: any) => Promise<{ data?: unknown; error?: unknown }>;
 }
 
+export interface TaskListQuery {
+  limit: number;
+  offset?: number;
+  cursor?: string;
+  workspaceId?: string;
+  projectId?: string;
+  q?: string;
+  state?: string[];
+}
+
+export interface TaskListPage {
+  tasks?: unknown[];
+  total?: number;
+  nextCursor?: string | null;
+}
+
+export interface TaskListResult {
+  tasks: unknown[];
+  total: number;
+}
+
+async function executeTaskListPage(
+  client: SdkClientLike,
+  query: TaskListQuery,
+): Promise<{ data?: TaskListPage; error?: unknown }> {
+  return client.GET('/tasks', { params: { query } }) as Promise<{
+    data?: TaskListPage;
+    error?: unknown;
+  }>;
+}
+
+/**
+ * Fetch every page for list/search commands. The backend can return a
+ * `nextCursor` on unfiltered first pages; filtered paths may only expose
+ * `total`, so this falls back to offset paging when no cursor is present.
+ */
+export async function executeTaskListPaginated(
+  client: SdkClientLike,
+  query: TaskListQuery,
+): Promise<{ data?: TaskListResult; error?: unknown }> {
+  const tasks: unknown[] = [];
+  let total: number | undefined;
+  let nextQuery: TaskListQuery = { ...query, offset: query.offset ?? 0 };
+  let lastCursor: string | undefined;
+
+  for (let page = 0; page < 1000; page += 1) {
+    const result = await executeTaskListPage(client, nextQuery);
+    if (result.error) return { error: result.error };
+
+    const pageTasks = Array.isArray(result.data?.tasks) ? result.data.tasks : [];
+    tasks.push(...pageTasks);
+    if (typeof result.data?.total === 'number') {
+      total = result.data.total;
+    }
+
+    const nextCursor =
+      typeof result.data?.nextCursor === 'string' && result.data.nextCursor.length > 0
+        ? result.data.nextCursor
+        : undefined;
+    if (nextCursor) {
+      if (nextCursor === lastCursor) break;
+      lastCursor = nextCursor;
+      nextQuery = { ...nextQuery, cursor: nextCursor };
+      delete nextQuery.offset;
+      continue;
+    }
+
+    if (total !== undefined && tasks.length < total && pageTasks.length > 0) {
+      nextQuery = { ...nextQuery, offset: (nextQuery.offset ?? 0) + pageTasks.length };
+      delete nextQuery.cursor;
+      continue;
+    }
+
+    break;
+  }
+
+  return { data: { tasks, total: total ?? tasks.length } };
+}
+
 /**
  * Issue the patch + transition calls described by `plan`. The latest
  * task representation seen on either response is returned to the
@@ -185,4 +266,11 @@ export async function executeSearch(
   query: SearchQuery,
 ): Promise<{ data?: unknown; error?: unknown }> {
   return client.GET('/tasks', { params: { query } });
+}
+
+export async function executeSearchPaginated(
+  client: SdkClientLike,
+  query: SearchQuery,
+): Promise<{ data?: TaskListResult; error?: unknown }> {
+  return executeTaskListPaginated(client, query);
 }

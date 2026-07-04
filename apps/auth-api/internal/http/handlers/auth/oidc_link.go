@@ -31,6 +31,11 @@ type oidcProvisionParams struct {
 	// Locale seeds users.locale on first provisioning. Defaults to "en"
 	// when empty.
 	Locale string
+	// AllowEmailLink controls whether this provider may bind a new
+	// identity onto an existing same-email account. Microsoft disables
+	// this because email_verified alone is not enough cross-tenant
+	// account-linking proof.
+	AllowEmailLink bool
 }
 
 // resolveOIDCUser maps a verified OIDC sign-in to an internal user,
@@ -69,20 +74,32 @@ func (d Deps) resolveOIDCUser(ctx context.Context, p oidcProvisionParams) (uint3
 		return 0, types.PublicID{}, httpErr(apierrors.InternalUnexpected)
 	}
 
-	// No identity for (provider, subject). Try to link onto an existing
-	// account that already holds this verified email.
-	existing, ferr := d.Queries.FindUserByEmail(ctx, p.Email)
-	switch {
-	case ferr == nil:
-		// Account linking: bind this provider to the existing user.
-		if cerr := d.createOIDCIdentity(ctx, existing.ID, p.Provider, p.Subject); cerr != nil {
-			return 0, types.PublicID{}, cerr
+	if p.AllowEmailLink {
+		// No identity for (provider, subject). Try to link onto an
+		// existing account that already holds this verified email.
+		existing, ferr := d.Queries.FindUserByEmail(ctx, p.Email)
+		switch {
+		case ferr == nil:
+			// Account linking: bind this provider to the existing user.
+			if cerr := d.createOIDCIdentity(ctx, existing.ID, p.Provider, p.Subject); cerr != nil {
+				return 0, types.PublicID{}, cerr
+			}
+			return existing.ID, existing.PublicID, nil
+		case errors.Is(ferr, sql.ErrNoRows):
+			// No user holds this email: fall through to fresh provisioning.
+		default:
+			return 0, types.PublicID{}, httpErr(apierrors.InternalUnexpected)
 		}
-		return existing.ID, existing.PublicID, nil
-	case errors.Is(ferr, sql.ErrNoRows):
-		// No user holds this email: fall through to fresh provisioning.
-	default:
-		return 0, types.PublicID{}, httpErr(apierrors.InternalUnexpected)
+	} else {
+		_, ferr := d.Queries.FindUserByEmail(ctx, p.Email)
+		switch {
+		case ferr == nil:
+			return 0, types.PublicID{}, httpErr(apierrors.AuthOidcIdTokenInvalid)
+		case errors.Is(ferr, sql.ErrNoRows):
+			// No user holds this email: fall through to fresh provisioning.
+		default:
+			return 0, types.PublicID{}, httpErr(apierrors.InternalUnexpected)
+		}
 	}
 
 	// Brand-new email: provision a new user, gated by RegistrationOpen.

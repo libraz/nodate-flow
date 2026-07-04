@@ -34,10 +34,8 @@ export type ExitCode = typeof EXIT_RUNTIME | typeof EXIT_VALIDATION | typeof EXI
 
 /**
  * Marker error thrown to signal that the CLI should exit with
- * `EXIT_AUTH` (3). `createFlowClient()` throws a plain `Error` when
- * credentials are missing; action handlers catch it and re-throw as
- * `AuthRequiredError` (or check via `isAuthRequiredError`) so the
- * top-level error trap in `index.ts` knows which exit code to set.
+ * `EXIT_AUTH` (3). Action handlers check this dedicated class instead
+ * of matching human-readable error strings.
  */
 export class AuthRequiredError extends Error {
   /**
@@ -52,15 +50,11 @@ export class AuthRequiredError extends Error {
 }
 
 /**
- * Heuristic to decide whether an arbitrary thrown value should be
- * treated as an auth failure. Recognises both `AuthRequiredError`
- * instances and the plain-`Error` shape thrown by
- * `createFlowClient()` (whose message starts with `"Not logged in"`).
+ * Decide whether an arbitrary thrown value should be treated as an
+ * auth failure.
  *
  * @param err Value caught from a throwing action.
  */
 export function isAuthRequiredError(err: unknown): boolean {
-  if (err instanceof AuthRequiredError) return true;
-  if (err instanceof Error && err.message.startsWith('Not logged in')) return true;
-  return false;
+  return err instanceof AuthRequiredError;
 }

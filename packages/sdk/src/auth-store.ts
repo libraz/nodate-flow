@@ -2,7 +2,7 @@
  * Auth slice (Zustand). Holds the in-memory access token and the
  * authenticated user profile. The access token is intentionally NOT
  * persisted to localStorage; on a fresh page load we re-establish the
- * session via the httpOnly nf_rt refresh cookie (see use-auth-bootstrap).
+ * session via the httpOnly nd_rt refresh cookie (see use-auth-bootstrap).
  */
 
 import { useStore } from 'zustand';

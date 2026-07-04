@@ -252,6 +252,38 @@ WHERE workspace_id = ? AND project_id = ? AND user_id = ? AND enabled = TRUE LIM
 	}
 }
 
+// LookupProjectMembership returns the actor's direct project role when present.
+// Workspace owners/admins are returned as [ProjectRoleElevated]. Unlike
+// [CheckProjectMembership], a workspace member who is not on the project is not
+// an error; callers can feed the isMember result into a higher-level visibility
+// decision.
+func LookupProjectMembership(
+	ctx context.Context,
+	db DB,
+	wsID, prjID, userID uint32,
+	wsRole WorkspaceRole,
+) (role ProjectRole, isMember bool, err error) {
+	const q = `SELECT role FROM project_members
+WHERE workspace_id = ? AND project_id = ? AND user_id = ? AND enabled = TRUE LIMIT 1`
+	var roleStr string
+	scanErr := db.QueryRowContext(ctx, q, wsID, prjID, userID).Scan(&roleStr)
+	switch {
+	case scanErr == nil:
+		pr := ProjectRole(roleStr)
+		if !pr.IsValid() || pr == ProjectRoleElevated {
+			return "", false, apierrors.New(apierrors.InternalUnexpected)
+		}
+		return pr, true, nil
+	case stderrors.Is(scanErr, sql.ErrNoRows):
+		if wsRole.AtLeast(WorkspaceRoleAdmin) {
+			return ProjectRoleElevated, false, nil
+		}
+		return ProjectRoleElevated, false, nil
+	default:
+		return "", false, scanErr
+	}
+}
+
 // ----------------------------------------------------------------------------
 // Layer 4: task
 // ----------------------------------------------------------------------------
@@ -263,6 +295,14 @@ type TaskRecord struct {
 	ProjectID       uint32
 	Visibility      TaskVisibility
 	CreatedByUserID sql.NullInt32
+}
+
+// TaskAccess is the full Layer 3/4 authorization result for a task.
+type TaskAccess struct {
+	Task            TaskRecord
+	WorkspaceRole   WorkspaceRole
+	ProjectRole     ProjectRole
+	IsProjectMember bool
 }
 
 // ResolveTaskByPublicID looks up a task by public id and returns the
@@ -369,6 +409,34 @@ func CheckTaskVisibility(
 		// new visibility kind without updating this switch fails closed.
 		return apierrors.New(apierrors.WsTaskNotFound)
 	}
+}
+
+// AuthorizeTaskAccess resolves a task by public id, verifies workspace
+// membership, looks up optional project membership, and enforces task
+// visibility. It is the shared Layer 3/4 decision used by REST task
+// middleware and MCP task resolvers.
+func AuthorizeTaskAccess(ctx context.Context, db DB, pub uuid.UUID, userID uint32) (TaskAccess, error) {
+	rec, err := ResolveTaskByPublicID(ctx, db, pub)
+	if err != nil {
+		return TaskAccess{}, err
+	}
+	wsRole, err := CheckWorkspaceMember(ctx, db, rec.WorkspaceID, userID, apierrors.WsTaskAccessDenied)
+	if err != nil {
+		return TaskAccess{}, err
+	}
+	prjRole, isProjectMember, err := LookupProjectMembership(ctx, db, rec.WorkspaceID, rec.ProjectID, userID, wsRole)
+	if err != nil {
+		return TaskAccess{}, err
+	}
+	if err := CheckTaskVisibility(ctx, db, rec, userID, wsRole, isProjectMember); err != nil {
+		return TaskAccess{}, err
+	}
+	return TaskAccess{
+		Task:            rec,
+		WorkspaceRole:   wsRole,
+		ProjectRole:     prjRole,
+		IsProjectMember: isProjectMember,
+	}, nil
 }
 
 // ----------------------------------------------------------------------------

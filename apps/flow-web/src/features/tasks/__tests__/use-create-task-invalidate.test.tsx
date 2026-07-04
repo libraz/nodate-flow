@@ -1,8 +1,7 @@
 /**
- * Verify that useCreateTask broadcasts invalidation to both the per-project
- * task list AND the cross-workspace `me` infinite list. Both surfaces can
- * display a freshly created task, so a missing invalidate would leave the
- * UI showing stale data until manual refresh.
+ * Verify that useCreateTask broadcasts invalidation to the shared list prefix.
+ * Project, filtered, infinite, and cross-workspace `me` lists all live under
+ * this prefix, so a narrower invalidate can leave one surface stale.
  */
 
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -34,7 +33,7 @@ function makeWrapper(qc: QueryClient): (props: { children: ReactNode }) => React
 }
 
 describe('useCreateTask invalidation', () => {
-  it('invalidates the per-project list and the me list on success', async () => {
+  it('invalidates the shared task-list prefix on success', async () => {
     const qc = new QueryClient({
       defaultOptions: {
         queries: { retry: false },
@@ -55,10 +54,7 @@ describe('useCreateTask invalidation', () => {
 
     await waitFor(() => {
       expect(invalidateSpy).toHaveBeenCalledWith({
-        queryKey: [...tasksKeys.all, 'list', 'proj-1'],
-      });
-      expect(invalidateSpy).toHaveBeenCalledWith({
-        queryKey: tasksKeys.myInfinite(),
+        queryKey: [...tasksKeys.all, 'list'],
       });
     });
   });

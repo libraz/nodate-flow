@@ -88,7 +88,8 @@ const Tabs = forwardRef<HTMLDivElement, TabsProps>(
     },
     ref,
   ): ReactElement => {
-    const fallback = items[0]?.value ?? '';
+    const enabledItems = items.filter((it) => !it.disabled);
+    const fallback = enabledItems[0]?.value ?? items[0]?.value ?? '';
     // `onValueChange` takes precedence; `onChange` is preserved for backward
     // compatibility with existing consumers.
     const handleChange = onValueChange ?? onChange;
@@ -101,7 +102,8 @@ const Tabs = forwardRef<HTMLDivElement, TabsProps>(
     const baseId = useId();
     const tabRefs = useRef<Map<string, HTMLButtonElement>>(new Map());
 
-    const enabledItems = items.filter((it) => !it.disabled);
+    const currentItem = items.find((it) => it.value === current);
+    const activePanelValue = currentItem && !currentItem.disabled ? current : fallback;
 
     const focusValue = useCallback((next: string) => {
       const node = tabRefs.current.get(next);
@@ -109,18 +111,24 @@ const Tabs = forwardRef<HTMLDivElement, TabsProps>(
     }, []);
 
     const onKeyDown = useCallback(
-      (event: KeyboardEvent<HTMLButtonElement>, idx: number) => {
+      (event: KeyboardEvent<HTMLButtonElement>, itemValue: string) => {
         if (enabledItems.length === 0) return;
-        const currentEnabledIdx = enabledItems.findIndex(
-          (it) => it.value === enabledItems[idx]?.value,
-        );
+        const currentEnabledIdx = enabledItems.findIndex((it) => it.value === itemValue);
+        if (currentEnabledIdx < 0) return;
         let nextIdx = currentEnabledIdx;
+        const rtl =
+          event.currentTarget.closest('[dir="rtl"]') !== null ||
+          document.documentElement.dir === 'rtl';
         switch (event.key) {
           case 'ArrowRight':
-            nextIdx = (currentEnabledIdx + 1) % enabledItems.length;
+            nextIdx = rtl
+              ? (currentEnabledIdx - 1 + enabledItems.length) % enabledItems.length
+              : (currentEnabledIdx + 1) % enabledItems.length;
             break;
           case 'ArrowLeft':
-            nextIdx = (currentEnabledIdx - 1 + enabledItems.length) % enabledItems.length;
+            nextIdx = rtl
+              ? (currentEnabledIdx + 1) % enabledItems.length
+              : (currentEnabledIdx - 1 + enabledItems.length) % enabledItems.length;
             break;
           case 'Home':
             nextIdx = 0;
@@ -143,8 +151,8 @@ const Tabs = forwardRef<HTMLDivElement, TabsProps>(
     return (
       <div ref={ref} className={cx(styles.root, className)} {...rest}>
         <div role="tablist" aria-label={ariaLabel} className={styles.tablist}>
-          {enabledItems.map((item, idx) => {
-            const selected = item.value === current;
+          {items.map((item) => {
+            const selected = item.value === activePanelValue;
             const tabId = `${baseId}-tab-${item.value}`;
             const panelId = `${baseId}-panel-${item.value}`;
             return (
@@ -161,19 +169,22 @@ const Tabs = forwardRef<HTMLDivElement, TabsProps>(
                 role="tab"
                 id={tabId}
                 aria-selected={selected}
+                aria-disabled={item.disabled || undefined}
                 aria-controls={panelId}
-                tabIndex={selected ? 0 : -1}
+                tabIndex={selected && !item.disabled ? 0 : -1}
                 className={cx(styles.tab, selected && styles.tabActive)}
-                onClick={() => setActive(item.value)}
-                onKeyDown={(e) => onKeyDown(e, idx)}
+                onClick={() => {
+                  if (!item.disabled) setActive(item.value);
+                }}
+                onKeyDown={(e) => onKeyDown(e, item.value)}
               >
                 {item.label}
               </button>
             );
           })}
         </div>
-        {enabledItems.map((item) => {
-          const selected = item.value === current;
+        {items.map((item) => {
+          const selected = item.value === activePanelValue;
           const tabId = `${baseId}-tab-${item.value}`;
           const panelId = `${baseId}-panel-${item.value}`;
           return (

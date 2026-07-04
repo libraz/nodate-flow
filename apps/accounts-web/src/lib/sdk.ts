@@ -25,6 +25,7 @@ import {
   createClient,
   createRefreshMiddleware,
   createTokenRefresher,
+  type NodateFlowClient,
 } from '@nodate-flow/sdk';
 
 import { authStore } from '../features/auth/auth-store';
@@ -33,29 +34,10 @@ import { authStore } from '../features/auth/auth-store';
 export const authApiBaseUrl =
   (import.meta.env.VITE_AUTH_API_BASE_URL as string | undefined) ?? 'http://localhost:8082';
 
-/**
- * Untyped SDK helper. The auth-api endpoints are not in the shared
- * OpenAPI spec, so we expose GET / POST / PATCH / DELETE as loose
- * functions that accept arbitrary paths. Callers cast responses to
- * the expected shape locally.
- */
-interface UntypedSdkResult {
-  data?: unknown;
-  error?: unknown;
-  response: Response;
-}
-
-type AnySdk = {
-  // biome-ignore lint/suspicious/noExplicitAny: auth-api paths not in OpenAPI spec
-  [K in 'GET' | 'POST' | 'PATCH' | 'PUT' | 'DELETE']: (...args: any[]) => Promise<UntypedSdkResult>;
-} & { use: (middleware: unknown) => void };
-
-const typedSdk = createClient({
+export const sdk: NodateFlowClient = createClient({
   baseUrl: authApiBaseUrl,
   tokenProvider: () => authStore.getState().accessToken ?? undefined,
 });
-
-export const sdk = typedSdk as unknown as AnySdk;
 
 /**
  * Memoized token refresh function with grace-window deduplication.

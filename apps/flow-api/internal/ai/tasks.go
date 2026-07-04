@@ -517,11 +517,15 @@ func (o *Orchestrator) logSuccess(ctx context.Context, workspaceID uint32, purpo
 	if o.LogInvoke == nil {
 		return
 	}
+	model := resp.Model
+	if model == "" {
+		model = req.Model
+	}
 	o.LogInvoke(ctx, InvocationRecord{
 		WorkspaceID:      workspaceID,
 		AgentID:          AgentIDFromContext(ctx),
 		Purpose:          purpose,
-		Model:            req.Model,
+		Model:            model,
 		PromptRedacted:   Redact(strings.TrimSpace(req.System + "\n" + req.Prompt)),
 		ResponseRedacted: Redact(resp.Text),
 		TokensInput:      resp.InputTokens,

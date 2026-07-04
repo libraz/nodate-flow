@@ -12,6 +12,7 @@ import (
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/types"
 	apierrors "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/errors"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/eventbus"
+	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/tasknumber"
 )
 
 func runListIntakeItems(ctx context.Context, deps Deps, s *session, raw json.RawMessage) (any, error) {
@@ -206,10 +207,7 @@ func runConvertIntakeToTask(ctx context.Context, deps Deps, s *session, raw json
 	defer tx.Rollback() //nolint:errcheck
 	qtx := deps.Queries.WithTx(tx)
 
-	nextNum, err := qtx.AssignTaskNumber(ctx, generated.AssignTaskNumberParams{
-		WorkspaceID: prj.WorkspaceID,
-		ProjectID:   prj.ID,
-	})
+	nextNum, err := tasknumber.Allocate(ctx, qtx, prj.WorkspaceID, prj.ID)
 	if err != nil {
 		return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
 	}
@@ -340,6 +338,7 @@ func runRestoreDescriptionVersion(ctx context.Context, deps Deps, s *session, ra
 
 	version, err := deps.Queries.FindDescriptionVersion(ctx, generated.FindDescriptionVersionParams{
 		WorkspaceID: s.workspaceID,
+		TaskID:      taskInternal,
 		PublicID:    versionPub,
 	})
 	if err != nil {

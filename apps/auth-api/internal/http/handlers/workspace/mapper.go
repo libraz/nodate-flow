@@ -1,37 +1,17 @@
 package workspace
 
 import (
-	"database/sql"
 	"strconv"
 
 	"github.com/nodate-flow/nodate-flow/apps/auth-api/internal/db/generated"
+	"github.com/nodate-flow/nodate-flow/packages/go-shared/dbtype"
 )
 
-// nullStr converts a sql.NullString to a plain string (empty when NULL).
-func nullStr(s sql.NullString) string {
-	if s.Valid {
-		return s.String
-	}
-	return ""
-}
-
-// nullTimeUnix converts a sql.NullTime to *int64 unix seconds (nil when NULL).
-func nullTimeUnix(t sql.NullTime) *int64 {
-	if !t.Valid {
-		return nil
-	}
-	v := t.Time.Unix()
-	return &v
-}
-
-// nullInt32Ptr converts a sql.NullInt32 to *int32 (nil when NULL).
-func nullInt32Ptr(n sql.NullInt32) *int32 {
-	if n.Valid {
-		v := n.Int32
-		return &v
-	}
-	return nil
-}
+var (
+	nullStr      = dbtype.StringFromNullString
+	nullTimeUnix = dbtype.UnixSecondsFromNullTime
+	nullInt32Ptr = dbtype.PtrFromNullInt32
+)
 
 // totalAsInt64 converts the MySQL COUNT(*) OVER() result (which the
 // Go driver delivers as []uint8) to a plain int64.

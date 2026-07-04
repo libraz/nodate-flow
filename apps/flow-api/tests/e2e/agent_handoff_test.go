@@ -201,7 +201,7 @@ func TestHandoffSuccessPath(t *testing.T) {
 	// actor_agent_id is set, actor_user_id is NULL.
 	for _, e := range append(started, completed...) {
 		require.True(t, e.ActorAgentID.Valid, "%s missing actor_agent_id", e.Type)
-		require.Equal(t, int32(agent.AgentID), e.ActorAgentID.Int32)
+		require.EqualValues(t, agent.AgentID, e.ActorAgentID.Int32)
 		require.False(t, e.ActorUserID.Valid, "%s actor_user_id must be NULL", e.Type)
 	}
 
@@ -239,7 +239,7 @@ func TestHandoffLowConfidence(t *testing.T) {
 	handoffs := selectEventsForTask(t, testDB, wsID, taskInternalID, "agent.task.handoff_to_user")
 	require.Len(t, handoffs, 1, "low_confidence must emit exactly one handoff_to_user event")
 	require.True(t, handoffs[0].ActorAgentID.Valid)
-	require.Equal(t, int32(agent.AgentID), handoffs[0].ActorAgentID.Int32)
+	require.EqualValues(t, agent.AgentID, handoffs[0].ActorAgentID.Int32)
 	require.False(t, handoffs[0].ActorUserID.Valid)
 
 	var payload map[string]any
@@ -416,7 +416,7 @@ func TestManualHandbackEndpoint(t *testing.T) {
 	evs := selectEventsForTask(t, testDB, wsID, taskInternalID, "agent.task.handoff_to_user")
 	require.Len(t, evs, 1)
 	require.True(t, evs[0].ActorAgentID.Valid, "handoff_to_user must stamp the prior agent as actor")
-	require.Equal(t, int32(agent.AgentID), evs[0].ActorAgentID.Int32)
+	require.EqualValues(t, agent.AgentID, evs[0].ActorAgentID.Int32)
 	require.False(t, evs[0].ActorUserID.Valid)
 	var payload map[string]any
 	require.NoError(t, json.Unmarshal(evs[0].Payload, &payload))
@@ -463,7 +463,7 @@ func TestManualHandbackEndpoint(t *testing.T) {
 	`, userInternalID).Scan(&gotRecipientID, &gotSourceEvent, &gotEventType, &gotResourceType, &gotSeverity))
 	require.Equal(t, userInternalID, gotRecipientID)
 	require.True(t, gotSourceEvent.Valid, "source_event_id must be populated by fan-out")
-	require.Equal(t, int64(evs[0].ID), gotSourceEvent.Int64)
+	require.EqualValues(t, evs[0].ID, gotSourceEvent.Int64)
 	require.Equal(t, "agent.task.handoff_to_user", gotEventType)
 	require.Equal(t, "task", gotResourceType)
 	require.Equal(t, "high", gotSeverity)
