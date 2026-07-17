@@ -55,8 +55,10 @@ export function AdminsPage(): ReactElement {
           setSearching(false);
           if (result.error || !result.data) return;
           const body = result.data as components['schemas']['ListUsersOutputBody'];
-          // Exclude users already promoted to instance admin.
-          const adminIds = new Set(admins.map((a) => a.id));
+          // Exclude users already promoted to instance admin. Compare against
+          // the admin row's `userId` (the user's public_id), not `id` (the
+          // grant row's public_id), so the exclusion actually matches.
+          const adminIds = new Set(admins.map((a) => a.userId));
           setUserResults((body.items ?? []).filter((u) => !adminIds.has(u.id)));
         });
     },
@@ -78,7 +80,7 @@ export function AdminsPage(): ReactElement {
     });
   }, [t]);
 
-  const handleRevoke = async (adminId: string) => {
+  const handleRevoke = async (userId: string) => {
     const ok = await confirmAction({
       tone: 'danger',
       message: t('admins.confirm_revoke'),
@@ -88,13 +90,13 @@ export function AdminsPage(): ReactElement {
     if (guardSubmit()) return;
     try {
       const { error: err } = await sdk.DELETE('/admin/instance-admins/{userId}', {
-        params: { path: { userId: adminId } },
+        params: { path: { userId } },
       });
       if (err) {
         setError(t('errors.generic'));
         return;
       }
-      setAdmins((prev) => prev.filter((a) => a.id !== adminId));
+      setAdmins((prev) => prev.filter((a) => a.userId !== userId));
       void invalidateInstanceStats();
     } finally {
       endSubmit();
@@ -180,7 +182,7 @@ export function AdminsPage(): ReactElement {
                     <Button
                       variant="danger"
                       disabled={actionLoading}
-                      onClick={() => void handleRevoke(admin.id)}
+                      onClick={() => void handleRevoke(admin.userId)}
                     >
                       {t('admins.revoke')}
                     </Button>
