@@ -245,10 +245,10 @@ func ListEvents(deps Deps) func(context.Context, *ListEventsInput) (*ListEventsO
 		out := &ListEventsOutput{}
 		events := make([]EventResponse, 0, len(nonRecurring)+len(recurring))
 		for _, e := range nonRecurring {
-			events = append(events, eventFromRangeRow(e))
+			events = append(events, eventFromRangeRow(e, actorID))
 		}
 		for _, e := range recurring {
-			events = append(events, eventFromRecurringRow(e))
+			events = append(events, eventFromRecurringRow(e, actorID))
 		}
 		out.Body.Events = events
 		return out, nil
@@ -432,13 +432,10 @@ func GetEvent(deps Deps) func(context.Context, *GetEventInput) (*GetEventOutput,
 
 		// Visibility filtering: private events scrub memo/location/url for
 		// ws members other than the owner. Event-level visibility is the
-		// real ACL; ws membership is the edit gate.
+		// real ACL; ws membership is the edit gate. Routed through the
+		// shared scrub helper so every read path applies the same rule.
 		resp := eventFromFullRow(evt)
-		if evt.Visibility == calendar.CalendarEventsVisibilityPrivate && evt.OwnerUserID != actorID {
-			resp.Memo = nil
-			resp.Location = nil
-			resp.URL = nil
-		}
+		scrubPrivateEvent(string(evt.Visibility), evt.OwnerUserID, actorID, &resp.Location, &resp.Memo, &resp.URL)
 
 		out := &GetEventOutput{}
 		out.Body = resp
@@ -822,6 +819,7 @@ func ListCalendarEvents(deps Deps) func(context.Context, *ListCalendarEventsInpu
 			resp.Location = dbtype.PtrFromNullString(r.Location)
 			resp.BlockLabel = dbtype.PtrFromNullString(r.BlockLabel)
 			resp.UpdatedAt = dbtype.UnixSecondsFromNullTime(r.UpdatedAt)
+			scrubPrivateEvent(string(r.Visibility), r.OwnerUserID, actorID, &resp.Location, nil, nil)
 			out.Body.Events = append(out.Body.Events, resp)
 		}
 
@@ -851,6 +849,7 @@ func ListCalendarEvents(deps Deps) func(context.Context, *ListCalendarEventsInpu
 				resp.RecurrenceExceptions = &raw
 			}
 			resp.UpdatedAt = dbtype.UnixSecondsFromNullTime(r.UpdatedAt)
+			scrubPrivateEvent(string(r.Visibility), r.OwnerUserID, actorID, &resp.Location, nil, nil)
 			out.Body.Events = append(out.Body.Events, resp)
 		}
 

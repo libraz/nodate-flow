@@ -9,6 +9,29 @@ import (
 	"github.com/nodate-flow/nodate-flow/packages/go-shared/dbtype"
 )
 
+// scrubPrivateEvent redacts the free-text fields of a private event from
+// every viewer except its owner. Calendar event visibility is the real
+// access control: workspace membership only gates who may edit, so a
+// private event's location, memo, and URL must never leak to co-members
+// on any read path (single GET, per-calendar list, cross-calendar list,
+// cross-workspace feed). This helper is the single source of truth for
+// that rule; each read path routes the fields it projects through it and
+// passes nil for the fields its DTO does not carry.
+func scrubPrivateEvent(visibility string, ownerUserID, viewerUserID uint32, location, memo, url **string) {
+	if visibility != string(calendar.CalendarEventsVisibilityPrivate) || ownerUserID == viewerUserID {
+		return
+	}
+	if location != nil {
+		*location = nil
+	}
+	if memo != nil {
+		*memo = nil
+	}
+	if url != nil {
+		*url = nil
+	}
+}
+
 // eventCommon captures the columns shared between every calendar_events
 // query shape (full row, range row, recurring-range row). The mappers
 // in this file pull the common columns into a baseline EventResponse so
@@ -129,7 +152,7 @@ func (e fullEvent) creatorAvatarURL() *string  { return dbtype.PtrFromNullString
 
 // eventFromRangeRow converts a ListCalendarEventsByRange row into the
 // public EventResponse DTO. Used by the per-calendar list endpoint.
-func eventFromRangeRow(r calendar.ListCalendarEventsByRangeRow) EventResponse {
+func eventFromRangeRow(r calendar.ListCalendarEventsByRangeRow, viewerUserID uint32) EventResponse {
 	resp := baseEventResponse(rangeEvent{r})
 	resp.Location = dbtype.PtrFromNullString(r.Location)
 	resp.Memo = dbtype.PtrFromNullString(r.Memo)
@@ -137,18 +160,20 @@ func eventFromRangeRow(r calendar.ListCalendarEventsByRangeRow) EventResponse {
 	resp.BlockLabel = dbtype.PtrFromNullString(r.BlockLabel)
 	resp.NotificationOffset = dbtype.PtrFromNullInt32(r.NotificationOffset)
 	resp.UpdatedAt = dbtype.UnixSecondsFromNullTime(r.UpdatedAt)
+	scrubPrivateEvent(string(r.Visibility), r.OwnerUserID, viewerUserID, &resp.Location, &resp.Memo, &resp.URL)
 	return resp
 }
 
 // eventFromRecurringRow converts a ListRecurringCalendarEventsByRange
 // row into the public EventResponse DTO, attaching the recurrence rule
 // + exception list so the client can expand instances locally.
-func eventFromRecurringRow(r calendar.ListRecurringCalendarEventsByRangeRow) EventResponse {
+func eventFromRecurringRow(r calendar.ListRecurringCalendarEventsByRangeRow, viewerUserID uint32) EventResponse {
 	resp := baseEventResponse(recurringEvent{r})
 	resp.Location = dbtype.PtrFromNullString(r.Location)
 	resp.Memo = dbtype.PtrFromNullString(r.Memo)
 	resp.URL = dbtype.PtrFromNullString(r.Url)
 	resp.BlockLabel = dbtype.PtrFromNullString(r.BlockLabel)
+	scrubPrivateEvent(string(r.Visibility), r.OwnerUserID, viewerUserID, &resp.Location, &resp.Memo, &resp.URL)
 	if r.RecurrenceRule != nil {
 		raw := json.RawMessage(r.RecurrenceRule)
 		resp.RecurrenceRule = &raw

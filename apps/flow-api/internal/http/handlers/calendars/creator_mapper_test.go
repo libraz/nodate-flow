@@ -102,7 +102,7 @@ func TestEventFromRangeRow_MixedCreatorsNoPerRowLookup(t *testing.T) {
 	wantIDs := []string{c1.String(), c2.String(), c3.String(), c1.String()}
 
 	for i, r := range rows {
-		resp := eventFromRangeRow(r)
+		resp := eventFromRangeRow(r, 0)
 		if resp.CreatorDisplayName != wantNames[i] {
 			t.Fatalf("row %d CreatorDisplayName = %q, want %q", i, resp.CreatorDisplayName, wantNames[i])
 		}
@@ -129,7 +129,7 @@ func TestEventFromRecurringRow_PopulatesCreator(t *testing.T) {
 		CreatorAvatarUrl:   nullStringOf("https://cdn.example/e.png"),
 	}
 
-	resp := eventFromRecurringRow(row)
+	resp := eventFromRecurringRow(row, 0)
 	if resp.CreatorID != cid.String() {
 		t.Fatalf("CreatorID = %q, want %q", resp.CreatorID, cid.String())
 	}
