@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
+	"fmt"
 	"log/slog"
 	"strings"
 	"testing"
@@ -323,6 +325,101 @@ func TestRedactJSONFields_CamelCaseOAuthKeys(t *testing.T) {
 				t.Fatalf("expected %q in output, got: %s", expected, got)
 			}
 		})
+	}
+}
+
+// stringerSecret is a fmt.Stringer whose textual form embeds a prefixed
+// secret, mirroring config/DTO values that are logged via slog.Any.
+type stringerSecret struct {
+	token string
+}
+
+func (s stringerSecret) String() string {
+	return "upstream config token=" + s.token
+}
+
+func TestRedactHandler_SecretEmbeddedInErrorViaAny(t *testing.T) {
+	t.Parallel()
+
+	// Simulate the dominant leak vector: an upstream OAuth error whose
+	// message embeds a prefixed secret from the response body, logged as
+	// slog.Any("err", err). forbidigo only matches slog.* helpers, so the
+	// error path here (slog.Any) is the exact shape that must be scrubbed.
+	err := fmt.Errorf("token exchange failed: upstream returned sk-ant-api03-leakedsecret123")
+
+	var buf bytes.Buffer
+	l := newTestLogger(&buf)
+	l.LogAttrs(context.Background(), slog.LevelError, "oauth failure",
+		slog.Any("err", err),
+	)
+
+	out := buf.String()
+	if strings.Contains(out, "leakedsecret123") {
+		t.Fatalf("raw secret body leaked through slog.Any(error): %s", out)
+	}
+	if !strings.Contains(out, "[REDACTED:sk-ant-]") {
+		t.Fatalf("expected sk-ant- redaction marker for error value, got: %s", out)
+	}
+}
+
+func TestRedactHandler_SecretInWrappedErrorViaAny(t *testing.T) {
+	t.Parallel()
+
+	base := errors.New("bad credentials ghp_aB1cD2eF3gH4iJ5kL6mN7oP8qR9sT0")
+	wrapped := fmt.Errorf("refresh failed: %w", base)
+
+	var buf bytes.Buffer
+	l := newTestLogger(&buf)
+	l.LogAttrs(context.Background(), slog.LevelError, "refresh failure",
+		slog.Any("err", wrapped),
+	)
+
+	out := buf.String()
+	if strings.Contains(out, "aB1cD2eF3gH4iJ5kL6mN7oP8qR9sT0") {
+		t.Fatalf("raw secret body leaked through wrapped error: %s", out)
+	}
+	if !strings.Contains(out, "[REDACTED:ghp_]") {
+		t.Fatalf("expected ghp_ redaction marker for wrapped error, got: %s", out)
+	}
+}
+
+func TestRedactHandler_SecretInStringerViaAny(t *testing.T) {
+	t.Parallel()
+
+	var buf bytes.Buffer
+	l := newTestLogger(&buf)
+	l.LogAttrs(context.Background(), slog.LevelInfo, "config loaded",
+		slog.Any("cfg", stringerSecret{token: "xoxb-123456789-leaked"}),
+	)
+
+	out := buf.String()
+	if strings.Contains(out, "123456789-leaked") {
+		t.Fatalf("raw secret body leaked through fmt.Stringer value: %s", out)
+	}
+	if !strings.Contains(out, "[REDACTED:xoxb-]") {
+		t.Fatalf("expected xoxb- redaction marker for stringer value, got: %s", out)
+	}
+}
+
+func TestRedactHandler_NonStringScalarUnchanged(t *testing.T) {
+	t.Parallel()
+
+	var buf bytes.Buffer
+	l := newTestLogger(&buf)
+	l.LogAttrs(context.Background(), slog.LevelInfo, "scalar",
+		slog.Int("count", 42),
+		slog.Bool("ok", true),
+	)
+
+	var rec map[string]any
+	if err := json.Unmarshal(buf.Bytes(), &rec); err != nil {
+		t.Fatalf("invalid json output: %v: %s", err, buf.String())
+	}
+	if rec["count"] != float64(42) {
+		t.Fatalf("int scalar altered: got %v, want 42", rec["count"])
+	}
+	if rec["ok"] != true {
+		t.Fatalf("bool scalar altered: got %v, want true", rec["ok"])
 	}
 }
 

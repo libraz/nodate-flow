@@ -6,6 +6,7 @@ package logutil
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 	"strings"
 	"sync"
@@ -305,6 +306,19 @@ func redactAttr(a slog.Attr) slog.Attr {
 		resolved := v.Resolve()
 		return redactAttr(slog.Attr{Key: a.Key, Value: resolved})
 	default:
-		return a
+		// Non-string values (typically slog.Any) still carry secrets in
+		// their textual form. The dominant case is slog.Any("err", err):
+		// error messages routinely embed upstream OAuth/OIDC response
+		// bodies. Re-wrap error and fmt.Stringer values as a redacted
+		// string; other Kinds (int, bool, time, duration, ...) cannot
+		// hold prefixed secrets and pass through unchanged.
+		switch inner := v.Any().(type) {
+		case error:
+			return slog.String(a.Key, Redact(inner.Error()))
+		case fmt.Stringer:
+			return slog.String(a.Key, Redact(inner.String()))
+		default:
+			return a
+		}
 	}
 }

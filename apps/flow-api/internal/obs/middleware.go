@@ -70,9 +70,11 @@ func TraceMiddleware() func(http.Handler) http.Handler {
 			if reqID := nflog.RequestIDFromContext(ctx); reqID != "" {
 				attrs = append(attrs, attribute.String("request_id", reqID))
 			}
-			if uid, ok := middleware.ActorFromContext(ctx); ok {
-				attrs = append(attrs, attribute.Int64("user_id", int64(uid)))
-			}
+			// user_id intentionally omitted: the actor context only carries
+			// the internal sequential id, which must never be exposed (see
+			// requirements §11.9). The public actor UUID is not available in
+			// the request context without a DB lookup, so the attribute is
+			// dropped rather than leaking the internal id.
 			if ws, ok := middleware.WorkspaceFromContext(ctx); ok {
 				attrs = append(attrs, attribute.String("workspace_id", ws.PublicID.String()))
 			}
@@ -84,13 +86,45 @@ func TraceMiddleware() func(http.Handler) http.Handler {
 			rec := &statusCapture{ResponseWriter: w, status: http.StatusOK}
 			next.ServeHTTP(rec, r.WithContext(ctx))
 
+			// Never record r.URL.String(): the query string and capability
+			// tokens embedded in path params (/share/cal/{token},
+			// /public/lenses/{token}) are unguessable random strings with no
+			// redactable prefix. Record the chi route pattern (fully
+			// templated) plus a path with param values masked, and drop the
+			// query string entirely.
 			span.SetAttributes(
 				attribute.String("http.method", r.Method),
-				attribute.String("http.url", r.URL.String()),
+				attribute.String("http.route", routePattern),
+				attribute.String("http.target", maskPathParams(r)),
 				attribute.Int("http.status_code", rec.status),
 			)
 		})
 	}
+}
+
+// maskPathParams returns the request path with every chi URL-param value
+// replaced by its "{name}" placeholder, so capability tokens carried in the
+// path (share/lens tokens, ids) never reach the trace exporter. The query
+// string is dropped. When no route context is available the raw path is
+// returned unchanged.
+func maskPathParams(r *http.Request) string {
+	path := r.URL.Path
+	rctx := chi.RouteContext(r.Context())
+	if rctx == nil {
+		return path
+	}
+	params := rctx.URLParams
+	for i, key := range params.Keys {
+		if i >= len(params.Values) {
+			break
+		}
+		val := params.Values[i]
+		if val == "" || key == "*" {
+			continue
+		}
+		path = strings.Replace(path, val, "{"+key+"}", 1)
+	}
+	return path
 }
 
 // statusCapture wraps an http.ResponseWriter to capture the response status

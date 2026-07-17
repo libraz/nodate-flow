@@ -4,8 +4,10 @@ import (
 	"context"
 	"log/slog"
 	"net/http"
+	"strings"
 	"time"
 
+	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 )
 
@@ -47,7 +49,7 @@ func RequestLogger(logger *slog.Logger) func(http.Handler) http.Handler {
 
 			reqLogger.LogAttrs(ctx, slog.LevelInfo, "http_request",
 				slog.String("method", r.Method),
-				slog.String("path", r.URL.Path),
+				slog.String("path", sanitizePath(r)),
 				slog.Int("status", rec.status),
 				slog.Int64("duration_ms", dur.Milliseconds()),
 				slog.String("remote_addr", r.RemoteAddr),
@@ -78,6 +80,42 @@ func RequestIDFromContext(ctx context.Context) string {
 		return s
 	}
 	return ""
+}
+
+// tokenPathPrefixes are path prefixes whose next segment is an unguessable
+// capability token (share/lens links). The tokens are random with no
+// redactable prefix, so Redact cannot catch them; the trailing segment is
+// masked explicitly instead.
+var tokenPathPrefixes = []string{"/share/cal/", "/public/lenses/"}
+
+// sanitizePath returns a log-safe request path. It prefers the chi route
+// pattern (already fully templated, e.g. "/share/cal/{token}") and falls
+// back to masking the token segment of known capability-link prefixes when
+// no route context is available. The query string is never included.
+func sanitizePath(r *http.Request) string {
+	if rctx := chi.RouteContext(r.Context()); rctx != nil {
+		if pat := rctx.RoutePattern(); pat != "" {
+			return pat
+		}
+	}
+	return maskTokenPath(r.URL.Path)
+}
+
+// maskTokenPath replaces the segment following a known capability-link
+// prefix with "{token}", preserving any deeper path. Paths that do not match
+// a known prefix are returned unchanged.
+func maskTokenPath(path string) string {
+	for _, prefix := range tokenPathPrefixes {
+		if !strings.HasPrefix(path, prefix) {
+			continue
+		}
+		rest := path[len(prefix):]
+		if slash := strings.IndexByte(rest, '/'); slash >= 0 {
+			return prefix + "{token}" + rest[slash:]
+		}
+		return prefix + "{token}"
+	}
+	return path
 }
 
 // newRequestID returns a UUID v7 string, or a v4 fallback on error.
