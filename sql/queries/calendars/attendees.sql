@@ -23,6 +23,7 @@ SELECT
 FROM calendar_event_attendees a
 INNER JOIN users u ON u.id = a.user_id AND u.enabled = TRUE
 WHERE a.event_id = ?
+  AND a.workspace_id = ?
   AND a.enabled = TRUE
 ORDER BY a.sort_weight ASC, a.created_at ASC;
 

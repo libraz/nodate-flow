@@ -112,9 +112,10 @@ func ListComments(deps Deps) func(context.Context, *ListCommentsInput) (*ListCom
 
 		page := handlerutil.Bind(input.Limit, input.Offset, handlerutil.DefaultListLimit, handlerutil.MaxListLimit)
 		rows, err := deps.CalendarQueries.ListCalendarEventComments(ctx, calendar.ListCalendarEventCommentsParams{
-			EventID: handlerutil.NullInt32From(evt.ID),
-			Limit:   page.Limit,
-			Offset:  page.Offset,
+			EventID:     handlerutil.NullInt32From(evt.ID),
+			WorkspaceID: wsID,
+			Limit:       page.Limit,
+			Offset:      page.Offset,
 		})
 		if err != nil {
 			return nil, httpErr(apierrors.CalendarCommentListQueryInterrupted)

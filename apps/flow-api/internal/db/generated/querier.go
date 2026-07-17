@@ -171,6 +171,37 @@ type Querier interface {
 	// Callers wrap this in BEGIN / COMMIT; SELECT ... FOR UPDATE SKIP LOCKED
 	// lets multiple workers race for rows without contention.
 	ClaimNextAgentRun(ctx context.Context) (ClaimNextAgentRunRow, error)
+	// Atomically claim a batch of deliveries ready for (re)delivery.
+	// Modeled after ClaimNextAgentRun: callers wrap this SELECT and the
+	// companion MarkDeliveriesClaimed in a single BEGIN / COMMIT.
+	// FOR UPDATE SKIP LOCKED lets multiple worker replicas race for rows
+	// without blocking each other; each replica only sees rows no other
+	// transaction currently holds. After the caller flips the returned rows
+	// to 'delivering' (see MarkDeliveriesClaimed) and COMMITs, the rows no
+	// longer satisfy status IN ('pending', 'failed'), so a second replica
+	// skips them on its next scan. attempts is NOT incremented here; the
+	// terminal Mark* queries own the attempt count.
+	// d.id is required: fed into MarkDeliveriesClaimed and the terminal
+	// MarkDeliveryDelivered/Failed/Dead (WHERE id = ?).
+	// ORDER BY carries d.id as a stable tie-breaker.
+	ClaimPendingDeliveries(ctx context.Context, limit int32) ([]ClaimPendingDeliveriesRow, error)
+	// Atomically claim a calendar event's reminder for delivery. The
+	// conditional predicate notified_at IS NULL is what makes the claim
+	// safe: a single UPDATE lets exactly one caller flip the row from
+	// NULL to NOW(), so the affected-rows count (RowsAffected) is 1 for
+	// the winner and 0 for every racing loser. Callers MUST claim first
+	// and dispatch the reminder only when the count is 1, replacing the
+	// read-then-blind-UPDATE pattern that could double-send when more
+	// than one scheduler tick or process observes the same due event.
+	//
+	// On a dispatch failure the caller should reset notified_at back to
+	// NULL so the next tick can re-claim and retry the send.
+	//
+	// The WHERE targets the primary key directly; unlike the notifications
+	// reads in this file it does not lead with workspace_id because the
+	// claim is a single-row primary-key mutation, not a tenant-scoped
+	// scan — the id already uniquely identifies the workspace's event.
+	ClaimReminderForDelivery(ctx context.Context, id uint32) (int64, error)
 	// Delete tokens that are either expired-and-used or expired-and-unused, for periodic cleanup.
 	CleanupExpiredMagicLinks(ctx context.Context) error
 	// Disable TOTP on a local identity.
@@ -532,10 +563,6 @@ type Querier interface {
 	// Used at upload time so that re-uploading the same avatar bytes reuses
 	// the existing object instead of allocating a fresh row in MinIO.
 	FindStorageObjectByOwnerUserSha(ctx context.Context, arg FindStorageObjectByOwnerUserShaParams) (FindStorageObjectByOwnerUserShaRow, error)
-	// Resolve a storage object by its externally visible UUID v7.
-	// The public_id is what handlers receive from the SDK; internal id is
-	// only ever exchanged via the FK on the referencing rows.
-	FindStorageObjectByPublicID(ctx context.Context, publicID types.PublicID) (FindStorageObjectByPublicIDRow, error)
 	// Look up a workspace-scoped storage object by its content hash.
 	// Used at upload time to detect a dedup hit and bump ref_count instead
 	// of inserting a new row. Matches the (workspace_id, sha256) UNIQUE key.
@@ -1336,6 +1363,13 @@ type Querier interface {
 	MarkAgentRunClaimed(ctx context.Context, arg MarkAgentRunClaimedParams) error
 	// Mark all unread notifications as read for a user in a workspace.
 	MarkAllNotificationsRead(ctx context.Context, arg MarkAllNotificationsReadParams) error
+	// Flip the rows returned by ClaimPendingDeliveries to the in-flight
+	// 'delivering' state inside the same transaction, before the POST.
+	// Once committed, these rows drop out of the ClaimPendingDeliveries
+	// WHERE clause so no other replica re-claims them. Guarded on the
+	// pending/failed states so a concurrently-terminal row is never
+	// resurrected. attempts is left untouched here.
+	MarkDeliveriesClaimed(ctx context.Context, ids []uint32) error
 	// Mark a delivery as dead (all retries exhausted).
 	MarkDeliveryDead(ctx context.Context, arg MarkDeliveryDeadParams) error
 	MarkDeliveryDelivered(ctx context.Context, arg MarkDeliveryDeliveredParams) error
@@ -1347,8 +1381,11 @@ type Querier interface {
 	// and the loser sees zero affected rows. Callers MUST inspect
 	// RowsAffected and treat 0 as "already consumed" (return ALREADY_USED).
 	MarkMagicLinkUsed(ctx context.Context, id uint32) (int64, error)
-	// Mark a notification as delivered (email/push sent).
-	MarkNotificationDelivered(ctx context.Context, publicID types.PublicID) error
+	// Mark a notification as delivered (email/push sent). Scoped to the
+	// recipient so a delivery flag can never be flipped on another user's
+	// notification, matching the recipient predicate on the sibling
+	// MarkNotificationRead / ArchiveNotification mutations.
+	MarkNotificationDelivered(ctx context.Context, arg MarkNotificationDeliveredParams) error
 	// Mark a single notification as read.
 	MarkNotificationRead(ctx context.Context, arg MarkNotificationReadParams) error
 	// Stamp used_at on a recovery code by internal id.
@@ -1427,9 +1464,6 @@ type Querier interface {
 	// soft-disabled row, matching the propagation enforced by the list and
 	// get queries so search cannot surface a child of a disabled subtree.
 	SearchPages(ctx context.Context, arg SearchPagesParams) ([]SearchPagesRow, error)
-	// Search tasks by title or description using LIKE. Workspace-scoped.
-	// The caller supplies the pattern already wrapped in '%…%'.
-	SearchTasks(ctx context.Context, arg SearchTasksParams) ([]SearchTasksRow, error)
 	// Begin (or restart) TOTP enrollment by writing a fresh encrypted
 	// secret and clearing any previous confirmation timestamp.
 	SetIdentityMfaSecret(ctx context.Context, arg SetIdentityMfaSecretParams) error

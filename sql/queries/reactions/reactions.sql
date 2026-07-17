@@ -23,6 +23,7 @@ SELECT
 FROM reactions r
 INNER JOIN users u ON u.id = r.user_id
 WHERE r.task_id = ?
+  AND r.workspace_id = ?
   AND r.enabled = TRUE
 ORDER BY r.created_at ASC, r.public_id ASC
 LIMIT ? OFFSET ?;
@@ -41,6 +42,7 @@ SELECT
 FROM reactions r
 INNER JOIN users u ON u.id = r.user_id
 WHERE r.comment_id = ?
+  AND r.workspace_id = ?
   AND r.enabled = TRUE
 ORDER BY r.created_at ASC, r.public_id ASC
 LIMIT ? OFFSET ?;

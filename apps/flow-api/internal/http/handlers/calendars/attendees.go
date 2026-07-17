@@ -233,7 +233,10 @@ func ListAttendees(deps Deps) func(context.Context, *ListAttendeesInput) (*ListA
 			return nil, err
 		}
 
-		rows, err := deps.CalendarQueries.ListCalendarEventAttendees(ctx, handlerutil.NullInt32From(evt.ID))
+		rows, err := deps.CalendarQueries.ListCalendarEventAttendees(ctx, calendar.ListCalendarEventAttendeesParams{
+			EventID:     handlerutil.NullInt32From(evt.ID),
+			WorkspaceID: wsID,
+		})
 		if err != nil {
 			return nil, httpErr(apierrors.CalendarAttendeeListQueryInterrupted)
 		}

@@ -150,15 +150,17 @@ SELECT
 FROM reactions r
 INNER JOIN users u ON u.id = r.user_id
 WHERE r.comment_id = ?
+  AND r.workspace_id = ?
   AND r.enabled = TRUE
 ORDER BY r.created_at ASC, r.public_id ASC
 LIMIT ? OFFSET ?
 `
 
 type ListReactionsForCommentParams struct {
-	CommentID sql.NullInt32 `json:"-"`
-	Limit     int32         `json:"limit"`
-	Offset    int32         `json:"offset"`
+	CommentID   sql.NullInt32 `json:"-"`
+	WorkspaceID uint32        `json:"-"`
+	Limit       int32         `json:"limit"`
+	Offset      int32         `json:"offset"`
 }
 
 type ListReactionsForCommentRow struct {
@@ -174,7 +176,12 @@ type ListReactionsForCommentRow struct {
 // List reactions on a comment. Paginated (LIMIT/OFFSET) so the result
 // set is always bounded; total carries the pre-page count.
 func (q *Queries) ListReactionsForComment(ctx context.Context, arg ListReactionsForCommentParams) ([]ListReactionsForCommentRow, error) {
-	rows, err := q.db.QueryContext(ctx, listReactionsForComment, arg.CommentID, arg.Limit, arg.Offset)
+	rows, err := q.db.QueryContext(ctx, listReactionsForComment,
+		arg.CommentID,
+		arg.WorkspaceID,
+		arg.Limit,
+		arg.Offset,
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -216,15 +223,17 @@ SELECT
 FROM reactions r
 INNER JOIN users u ON u.id = r.user_id
 WHERE r.task_id = ?
+  AND r.workspace_id = ?
   AND r.enabled = TRUE
 ORDER BY r.created_at ASC, r.public_id ASC
 LIMIT ? OFFSET ?
 `
 
 type ListReactionsForTaskParams struct {
-	TaskID sql.NullInt32 `json:"-"`
-	Limit  int32         `json:"limit"`
-	Offset int32         `json:"offset"`
+	TaskID      sql.NullInt32 `json:"-"`
+	WorkspaceID uint32        `json:"-"`
+	Limit       int32         `json:"limit"`
+	Offset      int32         `json:"offset"`
 }
 
 type ListReactionsForTaskRow struct {
@@ -240,7 +249,12 @@ type ListReactionsForTaskRow struct {
 // List reactions on a task with user info. Paginated (LIMIT/OFFSET) so
 // the result set is always bounded; total carries the pre-page count.
 func (q *Queries) ListReactionsForTask(ctx context.Context, arg ListReactionsForTaskParams) ([]ListReactionsForTaskRow, error) {
-	rows, err := q.db.QueryContext(ctx, listReactionsForTask, arg.TaskID, arg.Limit, arg.Offset)
+	rows, err := q.db.QueryContext(ctx, listReactionsForTask,
+		arg.TaskID,
+		arg.WorkspaceID,
+		arg.Limit,
+		arg.Offset,
+	)
 	if err != nil {
 		return nil, err
 	}

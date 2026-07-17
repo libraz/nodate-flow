@@ -165,64 +165,6 @@ func (q *Queries) FindStorageObjectByOwnerUserSha(ctx context.Context, arg FindS
 	return i, err
 }
 
-const findStorageObjectByPublicID = `-- name: FindStorageObjectByPublicID :one
-SELECT
-  id,
-  public_id,
-  workspace_id,
-  owner_user_id,
-  sha256,
-  byte_size,
-  content_type,
-  storage_key,
-  ref_count,
-  enabled,
-  updated_at,
-  created_at
-FROM storage_objects
-WHERE public_id = ?
-  AND enabled = TRUE
-LIMIT 1
-`
-
-type FindStorageObjectByPublicIDRow struct {
-	ID          uint32         `json:"-"`
-	PublicID    types.PublicID `json:"publicId"`
-	WorkspaceID sql.NullInt32  `json:"-"`
-	OwnerUserID sql.NullInt32  `json:"-"`
-	Sha256      []byte         `json:"sha256"`
-	ByteSize    uint64         `json:"byteSize"`
-	ContentType string         `json:"contentType"`
-	StorageKey  string         `json:"storageKey"`
-	RefCount    uint32         `json:"refCount"`
-	Enabled     bool           `json:"enabled"`
-	UpdatedAt   sql.NullTime   `json:"updatedAt"`
-	CreatedAt   time.Time      `json:"createdAt"`
-}
-
-// Resolve a storage object by its externally visible UUID v7.
-// The public_id is what handlers receive from the SDK; internal id is
-// only ever exchanged via the FK on the referencing rows.
-func (q *Queries) FindStorageObjectByPublicID(ctx context.Context, publicID types.PublicID) (FindStorageObjectByPublicIDRow, error) {
-	row := q.db.QueryRowContext(ctx, findStorageObjectByPublicID, publicID)
-	var i FindStorageObjectByPublicIDRow
-	err := row.Scan(
-		&i.ID,
-		&i.PublicID,
-		&i.WorkspaceID,
-		&i.OwnerUserID,
-		&i.Sha256,
-		&i.ByteSize,
-		&i.ContentType,
-		&i.StorageKey,
-		&i.RefCount,
-		&i.Enabled,
-		&i.UpdatedAt,
-		&i.CreatedAt,
-	)
-	return i, err
-}
-
 const findStorageObjectByWorkspaceSha = `-- name: FindStorageObjectByWorkspaceSha :one
 SELECT
   id,

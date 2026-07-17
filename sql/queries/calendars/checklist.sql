@@ -23,6 +23,7 @@ SELECT
   COUNT(*) OVER() AS total
 FROM calendar_event_checklist_items
 WHERE event_id = ?
+  AND workspace_id = ?
   AND enabled = TRUE
 ORDER BY sort_weight ASC, created_at ASC, public_id ASC
 LIMIT ? OFFSET ?;

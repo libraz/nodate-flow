@@ -135,15 +135,17 @@ SELECT
   COUNT(*) OVER() AS total
 FROM calendar_event_checklist_items
 WHERE event_id = ?
+  AND workspace_id = ?
   AND enabled = TRUE
 ORDER BY sort_weight ASC, created_at ASC, public_id ASC
 LIMIT ? OFFSET ?
 `
 
 type ListCalendarChecklistItemsParams struct {
-	EventID uint32 `json:"-"`
-	Limit   int32  `json:"limit"`
-	Offset  int32  `json:"offset"`
+	EventID     uint32 `json:"-"`
+	WorkspaceID uint32 `json:"-"`
+	Limit       int32  `json:"limit"`
+	Offset      int32  `json:"offset"`
 }
 
 type ListCalendarChecklistItemsRow struct {
@@ -160,7 +162,12 @@ type ListCalendarChecklistItemsRow struct {
 // (LIMIT/OFFSET) so the result set is always bounded; total carries the
 // pre-page count.
 func (q *Queries) ListCalendarChecklistItems(ctx context.Context, arg ListCalendarChecklistItemsParams) ([]ListCalendarChecklistItemsRow, error) {
-	rows, err := q.db.QueryContext(ctx, listCalendarChecklistItems, arg.EventID, arg.Limit, arg.Offset)
+	rows, err := q.db.QueryContext(ctx, listCalendarChecklistItems,
+		arg.EventID,
+		arg.WorkspaceID,
+		arg.Limit,
+		arg.Offset,
+	)
 	if err != nil {
 		return nil, err
 	}

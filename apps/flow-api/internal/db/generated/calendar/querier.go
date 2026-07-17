@@ -141,7 +141,7 @@ type Querier interface {
 	// created_at then public_id.
 	ListCalendarEventAttachments(ctx context.Context, arg ListCalendarEventAttachmentsParams) ([]ListCalendarEventAttachmentsRow, error)
 	// List all attendees for an event with user profile info.
-	ListCalendarEventAttendees(ctx context.Context, eventID sql.NullInt32) ([]ListCalendarEventAttendeesRow, error)
+	ListCalendarEventAttendees(ctx context.Context, arg ListCalendarEventAttendeesParams) ([]ListCalendarEventAttendeesRow, error)
 	// List comments on an event in chronological order. Paginated
 	// (LIMIT/OFFSET) so the result set is always bounded; total carries the
 	// pre-page count.
@@ -156,7 +156,7 @@ type Querier interface {
 	// List non-recurring events in a calendar within a time range.
 	ListCalendarEventsByRange(ctx context.Context, arg ListCalendarEventsByRangeParams) ([]ListCalendarEventsByRangeRow, error)
 	// List memos for a calendar in display order.
-	ListCalendarMemos(ctx context.Context, calendarID uint32) ([]ListCalendarMemosRow, error)
+	ListCalendarMemos(ctx context.Context, arg ListCalendarMemosParams) ([]ListCalendarMemosRow, error)
 	// List all subscribers of a calendar (for member list, color resolution).
 	ListCalendarSubscribers(ctx context.Context, arg ListCalendarSubscribersParams) ([]ListCalendarSubscribersRow, error)
 	// List all calendars a user subscribes to within a workspace.

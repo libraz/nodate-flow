@@ -52,6 +52,7 @@ FROM mentions m
 INNER JOIN users mu ON mu.id = m.mentioned_user_id
 LEFT JOIN users au ON au.id = m.actor_user_id
 WHERE m.task_id = ?
+  AND m.workspace_id = ?
   AND m.enabled = TRUE
 ORDER BY m.created_at ASC, m.public_id ASC
 LIMIT ? OFFSET ?;

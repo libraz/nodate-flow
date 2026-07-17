@@ -112,9 +112,10 @@ func ListChecklist(deps Deps) func(context.Context, *ListChecklistInput) (*ListC
 
 		page := handlerutil.Bind(input.Limit, input.Offset, handlerutil.DefaultListLimit, handlerutil.MaxListLimit)
 		rows, err := deps.CalendarQueries.ListCalendarChecklistItems(ctx, calendar.ListCalendarChecklistItemsParams{
-			EventID: evt.ID,
-			Limit:   page.Limit,
-			Offset:  page.Offset,
+			EventID:     evt.ID,
+			WorkspaceID: wsID,
+			Limit:       page.Limit,
+			Offset:      page.Offset,
 		})
 		if err != nil {
 			return nil, httpErr(apierrors.CalendarChecklistListQueryInterrupted)

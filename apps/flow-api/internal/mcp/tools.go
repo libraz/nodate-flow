@@ -3350,7 +3350,10 @@ func runListCalendarMemos(ctx context.Context, deps Deps, s *session, raw json.R
 	if err != nil {
 		return nil, err
 	}
-	rows, err := deps.CalendarQueries.ListCalendarMemos(ctx, calID)
+	rows, err := deps.CalendarQueries.ListCalendarMemos(ctx, calendar.ListCalendarMemosParams{
+		CalendarID:  calID,
+		WorkspaceID: s.workspaceID,
+	})
 	if err != nil {
 		return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
 	}

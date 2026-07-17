@@ -104,9 +104,10 @@ func Create(deps Deps) func(context.Context, *CreateReactionInput) (*CreateReact
 		// row. A generous bound caps the scan while still covering any
 		// realistic per-task reaction count.
 		reactions, err := deps.Queries.ListReactionsForTask(ctx, generated.ListReactionsForTaskParams{
-			TaskID: taskID,
-			Limit:  handlerutil.MaxListLimit,
-			Offset: 0,
+			TaskID:      taskID,
+			WorkspaceID: ws.ID,
+			Limit:       handlerutil.MaxListLimit,
+			Offset:      0,
 		})
 		if err != nil {
 			return nil, httpErr(apierrors.InternalUnexpected)
@@ -130,7 +131,7 @@ func Create(deps Deps) func(context.Context, *CreateReactionInput) (*CreateReact
 // ListForTask handles GET /tasks/{id}/reactions.
 func ListForTask(deps Deps) func(context.Context, *ListReactionsInput) (*ListReactionsOutput, error) {
 	return func(ctx context.Context, in *ListReactionsInput) (*ListReactionsOutput, error) {
-		_, ok := middleware.WorkspaceFromContext(ctx)
+		ws, ok := middleware.WorkspaceFromContext(ctx)
 		if !ok {
 			return nil, httpErr(apierrors.WsWorkspaceNotFound)
 		}
@@ -142,9 +143,10 @@ func ListForTask(deps Deps) func(context.Context, *ListReactionsInput) (*ListRea
 		page := handlerutil.Bind(in.Limit, in.Offset, handlerutil.DefaultListLimit, handlerutil.MaxListLimit)
 		taskID := sql.NullInt32{Int32: int32(task.ID), Valid: true} //#nosec G115 -- task_id is tasks.id (BIGINT UNSIGNED), fits int32 within realistic deployments
 		rows, err := deps.Queries.ListReactionsForTask(ctx, generated.ListReactionsForTaskParams{
-			TaskID: taskID,
-			Limit:  page.Limit,
-			Offset: page.Offset,
+			TaskID:      taskID,
+			WorkspaceID: ws.ID,
+			Limit:       page.Limit,
+			Offset:      page.Offset,
 		})
 		if err != nil {
 			return nil, httpErr(apierrors.InternalUnexpected)

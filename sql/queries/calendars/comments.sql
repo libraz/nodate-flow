@@ -25,6 +25,7 @@ SELECT
 FROM calendar_event_comments c
 INNER JOIN users u ON u.id = c.author_id AND u.enabled = TRUE
 WHERE c.event_id = ?
+  AND c.workspace_id = ?
   AND c.enabled = TRUE
   AND c.deleted_at IS NULL
 ORDER BY c.created_at ASC, c.public_id ASC

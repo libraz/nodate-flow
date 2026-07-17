@@ -182,7 +182,10 @@ func CreateEventInvite(deps Deps) func(context.Context, *CreateEventInviteInput)
 		if err != nil {
 			return nil, httpErr(apierrors.CalendarAttendeeUserNotFound)
 		}
-		attendees, err := deps.CalendarQueries.ListCalendarEventAttendees(ctx, handlerutil.NullInt32From(evt.ID))
+		attendees, err := deps.CalendarQueries.ListCalendarEventAttendees(ctx, calendar.ListCalendarEventAttendeesParams{
+			EventID:     handlerutil.NullInt32From(evt.ID),
+			WorkspaceID: wsID,
+		})
 		if err != nil {
 			return nil, httpErr(apierrors.CalendarInviteStoreLookupInterrupted)
 		}
@@ -469,7 +472,10 @@ func AcceptEventInvite(deps Deps) func(context.Context, *AcceptEventInviteInput)
 		// ListCalendarEventAttendees is the cheapest available path
 		// since the schema doesn't expose a (attendee_id → user_id)
 		// lookup directly.
-		attendees, err := deps.CalendarQueries.ListCalendarEventAttendees(ctx, invite.EventID)
+		attendees, err := deps.CalendarQueries.ListCalendarEventAttendees(ctx, calendar.ListCalendarEventAttendeesParams{
+			EventID:     invite.EventID,
+			WorkspaceID: invite.WorkspaceID,
+		})
 		if err != nil {
 			return nil, httpErr(apierrors.CalendarInviteStoreLookupInterrupted)
 		}
@@ -649,7 +655,10 @@ func ListEventInvites(deps Deps) func(context.Context, *ListEventInvitesInput) (
 
 		// Build a (internal attendee id → public ID) index so we can
 		// attach attendeePublicId to each invite without N round-trips.
-		attendees, err := deps.CalendarQueries.ListCalendarEventAttendees(ctx, handlerutil.NullInt32From(evt.ID))
+		attendees, err := deps.CalendarQueries.ListCalendarEventAttendees(ctx, calendar.ListCalendarEventAttendeesParams{
+			EventID:     handlerutil.NullInt32From(evt.ID),
+			WorkspaceID: wsID,
+		})
 		if err != nil {
 			return nil, httpErr(apierrors.CalendarInviteListQueryInterrupted)
 		}

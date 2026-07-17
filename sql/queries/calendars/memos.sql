@@ -26,6 +26,7 @@ SELECT
 FROM calendar_memos m
 INNER JOIN users u ON u.id = m.created_by_user_id AND u.enabled = TRUE
 WHERE m.calendar_id = ?
+  AND m.workspace_id = ?
   AND m.enabled = TRUE
 ORDER BY m.sort_weight ASC, m.created_at ASC;
 

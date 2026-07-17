@@ -148,9 +148,15 @@ SELECT
 FROM calendar_memos m
 INNER JOIN users u ON u.id = m.created_by_user_id AND u.enabled = TRUE
 WHERE m.calendar_id = ?
+  AND m.workspace_id = ?
   AND m.enabled = TRUE
 ORDER BY m.sort_weight ASC, m.created_at ASC
 `
+
+type ListCalendarMemosParams struct {
+	CalendarID  uint32 `json:"-"`
+	WorkspaceID uint32 `json:"-"`
+}
 
 type ListCalendarMemosRow struct {
 	PublicID        types.PublicID `json:"publicId"`
@@ -166,8 +172,8 @@ type ListCalendarMemosRow struct {
 }
 
 // List memos for a calendar in display order.
-func (q *Queries) ListCalendarMemos(ctx context.Context, calendarID uint32) ([]ListCalendarMemosRow, error) {
-	rows, err := q.db.QueryContext(ctx, listCalendarMemos, calendarID)
+func (q *Queries) ListCalendarMemos(ctx context.Context, arg ListCalendarMemosParams) ([]ListCalendarMemosRow, error) {
+	rows, err := q.db.QueryContext(ctx, listCalendarMemos, arg.CalendarID, arg.WorkspaceID)
 	if err != nil {
 		return nil, err
 	}

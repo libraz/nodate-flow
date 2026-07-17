@@ -92,15 +92,17 @@ FROM mentions m
 INNER JOIN users mu ON mu.id = m.mentioned_user_id
 LEFT JOIN users au ON au.id = m.actor_user_id
 WHERE m.task_id = ?
+  AND m.workspace_id = ?
   AND m.enabled = TRUE
 ORDER BY m.created_at ASC, m.public_id ASC
 LIMIT ? OFFSET ?
 `
 
 type ListMentionsForTaskParams struct {
-	TaskID sql.NullInt32 `json:"-"`
-	Limit  int32         `json:"limit"`
-	Offset int32         `json:"offset"`
+	TaskID      sql.NullInt32 `json:"-"`
+	WorkspaceID uint32        `json:"-"`
+	Limit       int32         `json:"limit"`
+	Offset      int32         `json:"offset"`
 }
 
 type ListMentionsForTaskRow struct {
@@ -119,7 +121,12 @@ type ListMentionsForTaskRow struct {
 // Paginated (LIMIT/OFFSET) so the result set is always bounded; total
 // carries the pre-page count.
 func (q *Queries) ListMentionsForTask(ctx context.Context, arg ListMentionsForTaskParams) ([]ListMentionsForTaskRow, error) {
-	rows, err := q.db.QueryContext(ctx, listMentionsForTask, arg.TaskID, arg.Limit, arg.Offset)
+	rows, err := q.db.QueryContext(ctx, listMentionsForTask,
+		arg.TaskID,
+		arg.WorkspaceID,
+		arg.Limit,
+		arg.Offset,
+	)
 	if err != nil {
 		return nil, err
 	}

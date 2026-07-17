@@ -44,28 +44,6 @@ WHERE owner_user_id = ?
   AND enabled = TRUE
 LIMIT 1;
 
--- name: FindStorageObjectByPublicID :one
--- Resolve a storage object by its externally visible UUID v7.
--- The public_id is what handlers receive from the SDK; internal id is
--- only ever exchanged via the FK on the referencing rows.
-SELECT
-  id,
-  public_id,
-  workspace_id,
-  owner_user_id,
-  sha256,
-  byte_size,
-  content_type,
-  storage_key,
-  ref_count,
-  enabled,
-  updated_at,
-  created_at
-FROM storage_objects
-WHERE public_id = ?
-  AND enabled = TRUE
-LIMIT 1;
-
 -- name: FindStorageObjectByID :one
 -- Resolve a storage object by its internal id. Used inside the same
 -- transaction as the referencing row insert/delete, where the FK id is

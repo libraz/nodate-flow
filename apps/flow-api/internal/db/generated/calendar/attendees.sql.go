@@ -130,9 +130,15 @@ SELECT
 FROM calendar_event_attendees a
 INNER JOIN users u ON u.id = a.user_id AND u.enabled = TRUE
 WHERE a.event_id = ?
+  AND a.workspace_id = ?
   AND a.enabled = TRUE
 ORDER BY a.sort_weight ASC, a.created_at ASC
 `
+
+type ListCalendarEventAttendeesParams struct {
+	EventID     sql.NullInt32 `json:"-"`
+	WorkspaceID uint32        `json:"-"`
+}
 
 type ListCalendarEventAttendeesRow struct {
 	PublicID     types.PublicID             `json:"publicId"`
@@ -146,8 +152,8 @@ type ListCalendarEventAttendeesRow struct {
 }
 
 // List all attendees for an event with user profile info.
-func (q *Queries) ListCalendarEventAttendees(ctx context.Context, eventID sql.NullInt32) ([]ListCalendarEventAttendeesRow, error) {
-	rows, err := q.db.QueryContext(ctx, listCalendarEventAttendees, eventID)
+func (q *Queries) ListCalendarEventAttendees(ctx context.Context, arg ListCalendarEventAttendeesParams) ([]ListCalendarEventAttendeesRow, error) {
+	rows, err := q.db.QueryContext(ctx, listCalendarEventAttendees, arg.EventID, arg.WorkspaceID)
 	if err != nil {
 		return nil, err
 	}

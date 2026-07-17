@@ -107,7 +107,10 @@ func ListMemos(deps Deps) func(context.Context, *ListMemosInput) (*ListMemosOutp
 			return nil, err
 		}
 
-		rows, err := deps.CalendarQueries.ListCalendarMemos(ctx, cal.ID)
+		rows, err := deps.CalendarQueries.ListCalendarMemos(ctx, calendar.ListCalendarMemosParams{
+			CalendarID:  cal.ID,
+			WorkspaceID: wsID,
+		})
 		if err != nil {
 			return nil, httpErr(apierrors.CalendarMemoListQueryInterrupted)
 		}

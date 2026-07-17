@@ -184,10 +184,6 @@ type Querier interface {
 	// Used at upload time so that re-uploading the same avatar bytes reuses
 	// the existing object instead of allocating a fresh row in MinIO.
 	FindStorageObjectByOwnerUserSha(ctx context.Context, arg FindStorageObjectByOwnerUserShaParams) (FindStorageObjectByOwnerUserShaRow, error)
-	// Resolve a storage object by its externally visible UUID v7.
-	// The public_id is what handlers receive from the SDK; internal id is
-	// only ever exchanged via the FK on the referencing rows.
-	FindStorageObjectByPublicID(ctx context.Context, publicID types.PublicID) (FindStorageObjectByPublicIDRow, error)
 	// Look up a workspace-scoped storage object by its content hash.
 	// Used at upload time to detect a dedup hit and bump ref_count instead
 	// of inserting a new row. Matches the (workspace_id, sha256) UNIQUE key.
