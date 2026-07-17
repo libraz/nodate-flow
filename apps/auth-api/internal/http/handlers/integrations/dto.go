@@ -20,8 +20,8 @@ import (
 type HandlerQuerier interface {
 	ListUserIntegrations(ctx context.Context, userID uint32) ([]generated.ListUserIntegrationsRow, error)
 	CreateOauthState(ctx context.Context, arg generated.CreateOauthStateParams) error
-	ConsumeOauthState(ctx context.Context, state string) (generated.ConsumeOauthStateRow, error)
-	DeleteOauthState(ctx context.Context, state string) error
+	FindOauthState(ctx context.Context, state string) (generated.FindOauthStateRow, error)
+	ClaimOauthState(ctx context.Context, state string) (int64, error)
 	PurgeExpiredOauthStates(ctx context.Context) error
 	UpsertUserIntegration(ctx context.Context, arg generated.UpsertUserIntegrationParams) (int64, error)
 	FindUserIntegrationByPublicId(ctx context.Context, arg generated.FindUserIntegrationByPublicIdParams) (generated.FindUserIntegrationByPublicIdRow, error)

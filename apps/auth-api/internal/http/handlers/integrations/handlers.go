@@ -146,13 +146,27 @@ func Callback(deps Deps) func(context.Context, *OAuthCallbackInput) (*OAuthCallb
 		// Opportunistic GC before lookup.
 		_ = deps.Queries.PurgeExpiredOauthStates(ctx)
 
-		row, err := deps.Queries.ConsumeOauthState(ctx, in.State)
+		// Two-step atomic consume: read the state payload first, then
+		// claim it with a guarded DELETE. The read alone carries no
+		// single-use guarantee; only the claim (RowsAffected == 1)
+		// elects the winner, so two concurrent callbacks racing on the
+		// same state can never both proceed to the token exchange.
+		row, err := deps.Queries.FindOauthState(ctx, in.State)
 		if err != nil {
 			return redirectWithError(deps, "state_invalid"), nil
 		}
-		_ = deps.Queries.DeleteOauthState(ctx, in.State)
 		if row.ExpiresAt.Before(time.Now()) {
 			return redirectWithError(deps, "state_expired"), nil
+		}
+		claimed, err := deps.Queries.ClaimOauthState(ctx, in.State)
+		if err != nil {
+			return nil, httpErr(apierrors.InternalUnexpected)
+		}
+		if claimed == 0 {
+			// Another request consumed the state first (or it expired
+			// between the read and the claim). The payload read above
+			// must not be trusted.
+			return redirectWithError(deps, "state_invalid"), nil
 		}
 		if string(row.Provider) != in.Provider {
 			return redirectWithError(deps, "state_provider_mismatch"), nil

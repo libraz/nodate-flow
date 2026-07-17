@@ -316,7 +316,7 @@ func TestCallback_InvalidState_RedirectsWithError(t *testing.T) {
 			return &stubProvider{name: "github"}, nil
 		},
 	)
-	q := &fakeQueries{consumeStateErr: sql.ErrNoRows}
+	q := &fakeQueries{findStateErr: sql.ErrNoRows}
 	deps := Deps{
 		Queries:    q,
 		Registry:   reg,
@@ -339,7 +339,7 @@ func TestCallback_ExpiredState_RedirectsWithError(t *testing.T) {
 		},
 	)
 	q := &fakeQueries{
-		consumeStateRow: generated.ConsumeOauthStateRow{
+		findStateRow: generated.FindOauthStateRow{
 			UserID:    1,
 			Provider:  "github",
 			ExpiresAt: time.Now().Add(-time.Hour), // expired
@@ -369,7 +369,7 @@ func TestCallback_ProviderMismatch_RedirectsWithError(t *testing.T) {
 		},
 	)
 	q := &fakeQueries{
-		consumeStateRow: generated.ConsumeOauthStateRow{
+		findStateRow: generated.FindOauthStateRow{
 			UserID:    1,
 			Provider:  "slack", // mismatch with URL path "github"
 			ExpiresAt: time.Now().Add(time.Hour),
@@ -407,7 +407,7 @@ func TestCallback_HappyPath_RedirectsToSettings(t *testing.T) {
 		},
 	)
 	q := &fakeQueries{
-		consumeStateRow: generated.ConsumeOauthStateRow{
+		findStateRow: generated.FindOauthStateRow{
 			UserID:    1,
 			Provider:  "github",
 			ExpiresAt: time.Now().Add(10 * time.Minute),
@@ -443,7 +443,7 @@ func TestCallback_HappyPath_CustomRedirect(t *testing.T) {
 		},
 	)
 	q := &fakeQueries{
-		consumeStateRow: generated.ConsumeOauthStateRow{
+		findStateRow: generated.FindOauthStateRow{
 			UserID:    1,
 			Provider:  "github",
 			ExpiresAt: time.Now().Add(10 * time.Minute),
@@ -482,7 +482,7 @@ func TestCallback_CrossOriginRedirect_FallsBackToSafeDefault(t *testing.T) {
 		},
 	)
 	q := &fakeQueries{
-		consumeStateRow: generated.ConsumeOauthStateRow{
+		findStateRow: generated.FindOauthStateRow{
 			UserID:    1,
 			Provider:  "github",
 			ExpiresAt: time.Now().Add(10 * time.Minute),
@@ -607,7 +607,7 @@ func TestCallback_ExchangeTokensAreEncrypted(t *testing.T) {
 		},
 	)
 	q := &fakeQueries{
-		consumeStateRow: generated.ConsumeOauthStateRow{
+		findStateRow: generated.FindOauthStateRow{
 			UserID:    1,
 			Provider:  "github",
 			ExpiresAt: time.Now().Add(10 * time.Minute),
@@ -639,15 +639,15 @@ func TestCallback_ExchangeTokensAreEncrypted(t *testing.T) {
 	assert.Equal(t, "secret-refresh-token", string(decryptedRefresh))
 }
 
-// TestCallback_DeletesStateBeforeExchange asserts that the OAuth state
-// row is removed from the database before the (potentially expensive)
-// provider Exchange call runs. If a network blip caused Exchange to
-// retry, the state row must already be gone so the same code cannot be
-// replayed.
-func TestCallback_DeletesStateBeforeExchange(t *testing.T) {
+// TestCallback_ClaimsStateBeforeExchange asserts that the OAuth state
+// row is atomically claimed (deleted) before the (potentially
+// expensive) provider Exchange call runs. If a network blip caused
+// Exchange to retry, the state row must already be gone so the same
+// code cannot be replayed.
+func TestCallback_ClaimsStateBeforeExchange(t *testing.T) {
 	t.Parallel()
 	q := &fakeQueries{
-		consumeStateRow: generated.ConsumeOauthStateRow{
+		findStateRow: generated.FindOauthStateRow{
 			UserID:    1,
 			Provider:  "github",
 			ExpiresAt: time.Now().Add(10 * time.Minute),
@@ -673,25 +673,67 @@ func TestCallback_DeletesStateBeforeExchange(t *testing.T) {
 	_ = serveNoAuth(t, deps, "callback", http.MethodGet,
 		"/oauth/callback/github?code=c&state=valid-state")
 
-	require.Contains(t, q.callLog, "DeleteOauthState",
-		"DeleteOauthState must be called for the consumed state")
+	require.Contains(t, q.callLog, "ClaimOauthState",
+		"ClaimOauthState must be called for the consumed state")
 	require.Contains(t, q.callLog, "Exchange",
 		"provider Exchange must be called on the happy path")
 
-	deleteIdx := -1
+	claimIdx := -1
 	exchIdx := -1
 	for i, ev := range q.callLog {
-		if ev == "DeleteOauthState" && deleteIdx == -1 {
-			deleteIdx = i
+		if ev == "ClaimOauthState" && claimIdx == -1 {
+			claimIdx = i
 		}
 		if ev == "Exchange" && exchIdx == -1 {
 			exchIdx = i
 		}
 	}
-	assert.Less(t, deleteIdx, exchIdx,
-		"DeleteOauthState must run BEFORE provider Exchange to close the re-use window")
-	assert.Contains(t, q.deletedStates, "valid-state",
-		"the consumed state value must be the one deleted")
+	assert.Less(t, claimIdx, exchIdx,
+		"ClaimOauthState must run BEFORE provider Exchange to close the re-use window")
+	assert.Contains(t, q.claimedStates, "valid-state",
+		"the consumed state value must be the one claimed")
+}
+
+// TestCallback_LostClaimRace_RedirectsWithError asserts a callback that
+// loses the atomic claim (FindOauthState returned a row but the guarded
+// DELETE affected zero rows because a concurrent request consumed the
+// state first) is rejected and never reaches the provider Exchange.
+func TestCallback_LostClaimRace_RedirectsWithError(t *testing.T) {
+	t.Parallel()
+	q := &fakeQueries{
+		findStateRow: generated.FindOauthStateRow{
+			UserID:    1,
+			Provider:  "github",
+			ExpiresAt: time.Now().Add(10 * time.Minute),
+		},
+		claimLost: true,
+	}
+	reg := integrationspkg.NewRegistry(
+		func() (integrationspkg.Provider, error) {
+			return &stubExchangeProvider{
+				stubProvider: stubProvider{name: "github"},
+				tokens:       &integrationspkg.TokenSet{AccessToken: "t"},
+				account:      &integrationspkg.Account{ExternalID: "1", Label: "x"},
+				onCall:       func() { q.log("Exchange") },
+			}, nil
+		},
+	)
+	deps := Deps{
+		Queries:       q,
+		Registry:      reg,
+		Cipher:        newTestCipher(t),
+		PublicBaseURL: "https://auth.example.com",
+		WebBaseURL:    "https://app.example.com",
+	}
+	resp := serveNoAuth(t, deps, "callback", http.MethodGet,
+		"/oauth/callback/github?code=c&state=raced-state")
+
+	assert.Equal(t, http.StatusFound, resp.Code)
+	assert.Contains(t, resp.Header().Get("Location"), "integration_error=state_invalid",
+		"a lost claim race must be reported as state_invalid")
+	assert.NotContains(t, q.callLog, "Exchange",
+		"the race loser must never reach the provider Exchange")
+	assert.False(t, q.upserted, "the race loser must not upsert an integration row")
 }
 
 // TestCallback_HappyPath_RecordsLinkedAudit asserts that a successful
@@ -701,7 +743,7 @@ func TestCallback_HappyPath_RecordsLinkedAudit(t *testing.T) {
 	t.Parallel()
 	sink := &captureSink{}
 	q := &fakeQueries{
-		consumeStateRow: generated.ConsumeOauthStateRow{
+		findStateRow: generated.FindOauthStateRow{
 			UserID:    77,
 			Provider:  "github",
 			ExpiresAt: time.Now().Add(10 * time.Minute),
@@ -743,7 +785,7 @@ func TestCallback_ExchangeFailure_NoLinkedAudit(t *testing.T) {
 	t.Parallel()
 	sink := &captureSink{}
 	q := &fakeQueries{
-		consumeStateRow: generated.ConsumeOauthStateRow{
+		findStateRow: generated.FindOauthStateRow{
 			UserID:    1,
 			Provider:  "github",
 			ExpiresAt: time.Now().Add(10 * time.Minute),
@@ -1021,7 +1063,7 @@ type fakeQueries struct {
 	mu sync.Mutex
 	// callLog records the order in which fake methods are invoked so
 	// tests can assert ordering invariants such as
-	// DeleteOauthState-before-Exchange.
+	// ClaimOauthState-before-Exchange.
 	callLog []string
 
 	// ListUserIntegrations
@@ -1030,12 +1072,16 @@ type fakeQueries struct {
 	// CreateOauthState
 	oauthStateCreated bool
 
-	// ConsumeOauthState
-	consumeStateRow generated.ConsumeOauthStateRow
-	consumeStateErr error
+	// FindOauthState
+	findStateRow generated.FindOauthStateRow
+	findStateErr error
 
-	// DeleteOauthState
-	deletedStates []string
+	// ClaimOauthState
+	claimedStates []string
+	// claimLost simulates losing the atomic claim race: ClaimOauthState
+	// reports zero affected rows while FindOauthState still returns a
+	// row, mirroring a concurrent callback consuming the state first.
+	claimLost bool
 
 	// UpsertUserIntegration
 	upserted     bool
@@ -1070,20 +1116,23 @@ func (f *fakeQueries) CreateOauthState(_ context.Context, _ generated.CreateOaut
 	return nil
 }
 
-func (f *fakeQueries) ConsumeOauthState(_ context.Context, _ string) (generated.ConsumeOauthStateRow, error) {
-	f.log("ConsumeOauthState")
-	if f.consumeStateErr != nil {
-		return generated.ConsumeOauthStateRow{}, f.consumeStateErr
+func (f *fakeQueries) FindOauthState(_ context.Context, _ string) (generated.FindOauthStateRow, error) {
+	f.log("FindOauthState")
+	if f.findStateErr != nil {
+		return generated.FindOauthStateRow{}, f.findStateErr
 	}
-	return f.consumeStateRow, nil
+	return f.findStateRow, nil
 }
 
-func (f *fakeQueries) DeleteOauthState(_ context.Context, state string) error {
-	f.log("DeleteOauthState")
+func (f *fakeQueries) ClaimOauthState(_ context.Context, state string) (int64, error) {
+	f.log("ClaimOauthState")
+	if f.claimLost {
+		return 0, nil
+	}
 	f.mu.Lock()
-	f.deletedStates = append(f.deletedStates, state)
+	f.claimedStates = append(f.claimedStates, state)
 	f.mu.Unlock()
-	return nil
+	return 1, nil
 }
 
 func (f *fakeQueries) PurgeExpiredOauthStates(_ context.Context) error {

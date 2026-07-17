@@ -121,10 +121,13 @@ INSERT INTO oauth_states (
   expires_at
 ) VALUES (?, ?, ?, ?, ?);
 
--- name: ConsumeOauthState :one
--- Atomically look up and delete an OAuth state row. The caller MUST
--- still check expires_at against CURRENT_TIMESTAMP before trusting
--- the returned row.
+-- name: FindOauthState :one
+-- Read the payload of an OAuth state row so the callback handler can
+-- recover (user_id, provider, redirect_to). This is a plain read and
+-- carries NO single-use guarantee on its own: the caller MUST follow
+-- it with ClaimOauthState and only trust this payload when the claim
+-- reports exactly one affected row. Expiry is enforced by the claim,
+-- not here.
 SELECT
   state,
   user_id,
@@ -135,10 +138,18 @@ FROM oauth_states
 WHERE state = ?
 LIMIT 1;
 
--- name: DeleteOauthState :exec
--- Explicit delete for the state row that :one above just returned.
+-- name: ClaimOauthState :execrows
+-- Atomically consume an OAuth state row. MySQL 8.4 has no
+-- DELETE ... RETURNING, so the row payload is read via FindOauthState
+-- and this guarded DELETE is the actual claim: the expires_at guard
+-- rejects stale states and the delete itself elects a single winner.
+-- Two concurrent callbacks racing on the same state can never both
+-- succeed -- exactly one DELETE matches the still-present row and the
+-- loser sees zero affected rows. Callers MUST inspect RowsAffected and
+-- treat 0 as "invalid, expired, or already consumed".
 DELETE FROM oauth_states
-WHERE state = ?;
+WHERE state = ?
+  AND expires_at > CURRENT_TIMESTAMP;
 
 -- name: PurgeExpiredOauthStates :exec
 -- Garbage-collect oauth_states rows past their expires_at. Called

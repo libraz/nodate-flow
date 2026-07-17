@@ -14,40 +14,26 @@ import (
 	types "github.com/nodate-flow/nodate-flow/apps/auth-api/internal/db/types"
 )
 
-const consumeOauthState = `-- name: ConsumeOauthState :one
-SELECT
-  state,
-  user_id,
-  provider,
-  redirect_to,
-  expires_at
-FROM oauth_states
+const claimOauthState = `-- name: ClaimOauthState :execrows
+DELETE FROM oauth_states
 WHERE state = ?
-LIMIT 1
+  AND expires_at > CURRENT_TIMESTAMP
 `
 
-type ConsumeOauthStateRow struct {
-	State      string              `json:"state"`
-	UserID     uint32              `json:"-"`
-	Provider   OauthStatesProvider `json:"provider"`
-	RedirectTo sql.NullString      `json:"redirectTo"`
-	ExpiresAt  time.Time           `json:"expiresAt"`
-}
-
-// Atomically look up and delete an OAuth state row. The caller MUST
-// still check expires_at against CURRENT_TIMESTAMP before trusting
-// the returned row.
-func (q *Queries) ConsumeOauthState(ctx context.Context, state string) (ConsumeOauthStateRow, error) {
-	row := q.db.QueryRowContext(ctx, consumeOauthState, state)
-	var i ConsumeOauthStateRow
-	err := row.Scan(
-		&i.State,
-		&i.UserID,
-		&i.Provider,
-		&i.RedirectTo,
-		&i.ExpiresAt,
-	)
-	return i, err
+// Atomically consume an OAuth state row. MySQL 8.4 has no
+// DELETE ... RETURNING, so the row payload is read via FindOauthState
+// and this guarded DELETE is the actual claim: the expires_at guard
+// rejects stale states and the delete itself elects a single winner.
+// Two concurrent callbacks racing on the same state can never both
+// succeed -- exactly one DELETE matches the still-present row and the
+// loser sees zero affected rows. Callers MUST inspect RowsAffected and
+// treat 0 as "invalid, expired, or already consumed".
+func (q *Queries) ClaimOauthState(ctx context.Context, state string) (int64, error) {
+	result, err := q.db.ExecContext(ctx, claimOauthState, state)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
 }
 
 const createOauthState = `-- name: CreateOauthState :exec
@@ -80,17 +66,6 @@ func (q *Queries) CreateOauthState(ctx context.Context, arg CreateOauthStatePara
 	return err
 }
 
-const deleteOauthState = `-- name: DeleteOauthState :exec
-DELETE FROM oauth_states
-WHERE state = ?
-`
-
-// Explicit delete for the state row that :one above just returned.
-func (q *Queries) DeleteOauthState(ctx context.Context, state string) error {
-	_, err := q.db.ExecContext(ctx, deleteOauthState, state)
-	return err
-}
-
 const deleteUserIntegration = `-- name: DeleteUserIntegration :exec
 DELETE FROM user_integrations
 WHERE id = ?
@@ -106,6 +81,45 @@ type DeleteUserIntegrationParams struct {
 func (q *Queries) DeleteUserIntegration(ctx context.Context, arg DeleteUserIntegrationParams) error {
 	_, err := q.db.ExecContext(ctx, deleteUserIntegration, arg.ID, arg.UserID)
 	return err
+}
+
+const findOauthState = `-- name: FindOauthState :one
+SELECT
+  state,
+  user_id,
+  provider,
+  redirect_to,
+  expires_at
+FROM oauth_states
+WHERE state = ?
+LIMIT 1
+`
+
+type FindOauthStateRow struct {
+	State      string              `json:"state"`
+	UserID     uint32              `json:"-"`
+	Provider   OauthStatesProvider `json:"provider"`
+	RedirectTo sql.NullString      `json:"redirectTo"`
+	ExpiresAt  time.Time           `json:"expiresAt"`
+}
+
+// Read the payload of an OAuth state row so the callback handler can
+// recover (user_id, provider, redirect_to). This is a plain read and
+// carries NO single-use guarantee on its own: the caller MUST follow
+// it with ClaimOauthState and only trust this payload when the claim
+// reports exactly one affected row. Expiry is enforced by the claim,
+// not here.
+func (q *Queries) FindOauthState(ctx context.Context, state string) (FindOauthStateRow, error) {
+	row := q.db.QueryRowContext(ctx, findOauthState, state)
+	var i FindOauthStateRow
+	err := row.Scan(
+		&i.State,
+		&i.UserID,
+		&i.Provider,
+		&i.RedirectTo,
+		&i.ExpiresAt,
+	)
+	return i, err
 }
 
 const findUserByDiscordSnowflake = `-- name: FindUserByDiscordSnowflake :one
