@@ -45,6 +45,36 @@ func TestEstimateCostMicrosUSDHandlesFractionalCentPerMillionPricing(t *testing.
 	}
 }
 
+func TestEstimateCostMicrosUSDChargesUnknownModelsConservatively(t *testing.T) {
+	t.Parallel()
+
+	// Models routed through openai_compat gateways (LiteLLM/vLLM/OpenRouter/
+	// LM Studio) or newer than the price table must not cost 0, otherwise the
+	// budget and quota guards go silent.
+	for _, model := range []string{
+		"litellm/some-proxied-model",
+		"openrouter/anthropic/claude-future",
+		"gpt-9-supernova",
+		"local-model",
+		"",
+	} {
+		got := EstimateCostMicrosUSD(model, 1_000, 1_000)
+		if got <= 0 {
+			t.Fatalf("unknown model %q priced at %d micros, want nonzero conservative cost", model, got)
+		}
+	}
+
+	// The fallback must equal the highest known input/output rate so it never
+	// undercounts relative to any table entry.
+	want := (int64(1_000)*conservativePrice.inputMicrosPerMTok + int64(1_000)*conservativePrice.outputMicrosPerMTok) / 1_000_000
+	if got := EstimateCostMicrosUSD("totally-unknown-model", 1_000, 1_000); got != want {
+		t.Fatalf("unknown model cost = %d micros, want conservative %d", got, want)
+	}
+	if conservativePrice.inputMicrosPerMTok <= 0 || conservativePrice.outputMicrosPerMTok <= 0 {
+		t.Fatalf("conservative price must be positive, got %+v", conservativePrice)
+	}
+}
+
 func TestEstimateCostMicrosUSDCoversRuntimeDefaultModels(t *testing.T) {
 	t.Parallel()
 

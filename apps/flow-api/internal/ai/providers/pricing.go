@@ -56,19 +56,51 @@ var knownPrices = []struct {
 	{"gemini-1.5-flash", modelPrice{75_000, 300_000}},       // $0.075 / $0.30 (≤128k ctx)
 }
 
+// conservativePrice is the fallback applied to any model whose prefix is not
+// in knownPrices. It uses the highest input/output per-MTok rate present in
+// the table so that unpriced models (openai_compat routes such as LiteLLM,
+// vLLM, OpenRouter, LM Studio, or any model newer than the table) still
+// contribute a nonzero cost. The bias is deliberately toward over-counting:
+// a silent zero would let the workspace daily budget and agent monthly cap
+// be bypassed entirely.
+//
+// Local providers (Ollama) cannot be reliably identified from the model name
+// alone -- the same name (e.g. "llama3.2") is also served by paid gateways --
+// so unknown models are charged the conservative rate rather than assumed
+// free. The Ollama provider itself reports a zero cost from its own response.
+var conservativePrice = maxKnownPrice()
+
+// maxKnownPrice returns a modelPrice whose input/output rates are the maxima
+// observed across knownPrices.
+func maxKnownPrice() modelPrice {
+	var m modelPrice
+	for _, entry := range knownPrices {
+		if entry.price.inputMicrosPerMTok > m.inputMicrosPerMTok {
+			m.inputMicrosPerMTok = entry.price.inputMicrosPerMTok
+		}
+		if entry.price.outputMicrosPerMTok > m.outputMicrosPerMTok {
+			m.outputMicrosPerMTok = entry.price.outputMicrosPerMTok
+		}
+	}
+	return m
+}
+
 // EstimateCostMicrosUSD returns a best-effort cost in millionths of a US
-// dollar for the given model and token counts. Returns 0 when the model is
-// unknown or local (Ollama).
+// dollar for the given model and token counts. Unknown models fall back to a
+// conservative rate (the highest known input/output price) so budget and
+// quota guards never silently see a zero cost.
 func EstimateCostMicrosUSD(model string, inputTokens, outputTokens int) int64 {
+	price := conservativePrice
 	lower := strings.ToLower(model)
 	for _, entry := range knownPrices {
 		if strings.HasPrefix(lower, entry.prefix) {
-			in := int64(inputTokens) * entry.price.inputMicrosPerMTok
-			out := int64(outputTokens) * entry.price.outputMicrosPerMTok
-			return (in + out) / 1_000_000
+			price = entry.price
+			break
 		}
 	}
-	return 0
+	in := int64(inputTokens) * price.inputMicrosPerMTok
+	out := int64(outputTokens) * price.outputMicrosPerMTok
+	return (in + out) / 1_000_000
 }
 
 // estimateCostCents returns a whole-cent cost for legacy display fields.
