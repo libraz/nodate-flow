@@ -459,16 +459,37 @@ function TotpSection(): ReactElement {
     }
   };
 
-  const cancelEnroll = async (): Promise<void> => {
+  const cancelEnroll = async (password: string): Promise<void> => {
     setErrorKey(null);
+    // Clearing a pending secret goes through the same password-gated
+    // DELETE /me/totp as a full disable — there is no separate abort
+    // endpoint. Never send an empty password: the server rejects it and
+    // keeps the pending secret, so optimistically flipping the UI to
+    // "disabled" would lie about the account's real state.
+    if (password === '') {
+      setErrorKey('validation.current_password_required');
+      return;
+    }
     setBusy(true);
     try {
-      await sdk.DELETE('/me/totp', { body: { password: '' } });
-    } catch {
-      // ignore — best-effort cancel
-    } finally {
+      const { error, response } = await sdk.DELETE('/me/totp', { body: { password } });
+      if (error || !response.ok) {
+        const errCode = extractErrorCode(error as ProblemJson | undefined);
+        setErrorKey(
+          errCode === 'AUTH.PASSWORD.CURRENT_MISMATCH'
+            ? 'security.totp.errors.password_mismatch'
+            : 'security.totp.errors.cancel_failed',
+        );
+        toaster.show({ message: t('security.totp.errors.cancel_failed'), tone: 'danger' });
+        // Keep the real (pending) state — the secret still exists server-side.
+        return;
+      }
       setEnrollment(null);
       setStatus('disabled');
+    } catch {
+      setErrorKey('security.totp.errors.cancel_failed');
+      toaster.show({ message: t('security.totp.errors.cancel_failed'), tone: 'danger' });
+    } finally {
       setBusy(false);
     }
   };
@@ -597,7 +618,7 @@ function TotpSection(): ReactElement {
               variant="ghost"
               disabled={busy}
               onClick={() => {
-                void cancelEnroll();
+                void cancelEnroll(startPassword);
               }}
             >
               {t('security.totp.cancel')}
@@ -614,8 +635,8 @@ function TotpSection(): ReactElement {
         onConfirm={(code, password) => {
           void confirmEnroll(code, password);
         }}
-        onCancel={() => {
-          void cancelEnroll();
+        onCancel={(password) => {
+          void cancelEnroll(password);
         }}
       />
     );
@@ -652,7 +673,7 @@ function EnrollmentStep({
   busy: boolean;
   errorKey: string | null;
   onConfirm: (code: string, password: string) => void;
-  onCancel: () => void;
+  onCancel: (password: string) => void;
 }): ReactElement {
   const { t } = useTranslation('auth');
   const [code, setCode] = useState('');
@@ -758,7 +779,14 @@ function EnrollmentStep({
         >
           {busy ? t('security.totp.confirming') : t('security.totp.confirm')}
         </Button>
-        <Button type="button" variant="ghost" disabled={busy} onClick={onCancel}>
+        <Button
+          type="button"
+          variant="ghost"
+          disabled={busy}
+          onClick={() => {
+            onCancel(password);
+          }}
+        >
           {t('security.totp.cancel')}
         </Button>
       </div>
