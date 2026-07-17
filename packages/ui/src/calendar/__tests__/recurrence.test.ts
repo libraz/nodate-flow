@@ -117,6 +117,185 @@ describe('expandRecurrence — shared golden fixtures', () => {
   }
 });
 
+describe('expandRecurrence — weekly byDay expansion', () => {
+  it('expands every listed weekday within each week (weekdays preset)', () => {
+    // 2026-07-06 is a Monday. WEEKLY;BYDAY=MO,TU,WE,TH,FR must produce five
+    // occurrences per week, not just the DTSTART weekday.
+    const event = {
+      startAt: '2026-07-06T09:00:00Z',
+      endAt: '2026-07-06T10:00:00Z',
+      recurrenceRule: {
+        freq: 'weekly' as const,
+        interval: 1,
+        byDay: ['MO', 'TU', 'WE', 'TH', 'FR'],
+      },
+    };
+    const instances = expandRecurrence(
+      event,
+      DateTime.fromISO('2026-07-06T00:00:00Z'),
+      DateTime.fromISO('2026-07-20T00:00:00Z'),
+    );
+    expect(instances.map((i) => i.startAt.toUTC().toFormat('yyyy-MM-dd'))).toEqual([
+      '2026-07-06',
+      '2026-07-07',
+      '2026-07-08',
+      '2026-07-09',
+      '2026-07-10',
+      '2026-07-13',
+      '2026-07-14',
+      '2026-07-15',
+      '2026-07-16',
+      '2026-07-17',
+    ]);
+  });
+
+  it('applies interval to the ISO week, keeping all listed weekdays of included weeks', () => {
+    // Every second week, Monday and Wednesday: weeks starting Jul 6 and Jul 20.
+    const event = {
+      startAt: '2026-07-06T09:00:00Z',
+      endAt: '2026-07-06T10:00:00Z',
+      recurrenceRule: { freq: 'weekly' as const, interval: 2, byDay: ['MO', 'WE'] },
+    };
+    const instances = expandRecurrence(
+      event,
+      DateTime.fromISO('2026-07-06T00:00:00Z'),
+      DateTime.fromISO('2026-08-03T00:00:00Z'),
+    );
+    expect(instances.map((i) => i.startAt.toUTC().toFormat('yyyy-MM-dd'))).toEqual([
+      '2026-07-06',
+      '2026-07-08',
+      '2026-07-20',
+      '2026-07-22',
+    ]);
+  });
+
+  it('starts mid-week without emitting listed weekdays before DTSTART', () => {
+    // DTSTART on Wednesday 2026-07-08: the Monday of the same week is in the
+    // past relative to DTSTART and must not appear. count applies to actual
+    // occurrences.
+    const event = {
+      startAt: '2026-07-08T09:00:00Z',
+      endAt: '2026-07-08T10:00:00Z',
+      recurrenceRule: { freq: 'weekly' as const, byDay: ['MO', 'WE', 'FR'], count: 5 },
+    };
+    const instances = expandRecurrence(
+      event,
+      DateTime.fromISO('2026-07-01T00:00:00Z'),
+      DateTime.fromISO('2026-08-01T00:00:00Z'),
+    );
+    expect(instances.map((i) => i.startAt.toUTC().toFormat('yyyy-MM-dd'))).toEqual([
+      '2026-07-08',
+      '2026-07-10',
+      '2026-07-13',
+      '2026-07-15',
+      '2026-07-17',
+    ]);
+  });
+});
+
+describe('expandRecurrence — anchor-based month/year arithmetic', () => {
+  it('monthly Jan 31 clamps to each month last-valid day for 12 months without drifting to the 28th', () => {
+    // The anchor-based expansion must derive every occurrence from Jan 31, so
+    // February clamps to the 28th while March/May/etc. recover the 31st. A
+    // chained implementation would stick at the 28th from February onward.
+    const event = {
+      startAt: '2026-01-31T09:00:00Z',
+      endAt: '2026-01-31T10:00:00Z',
+      recurrenceRule: { freq: 'monthly' as const, count: 12 },
+    };
+    const instances = expandRecurrence(
+      event,
+      DateTime.fromISO('2026-01-01T00:00:00Z'),
+      DateTime.fromISO('2027-01-01T00:00:00Z'),
+    );
+    const days = instances.map((i) => i.startAt.toUTC().toFormat('yyyy-MM-dd'));
+    expect(days).toEqual([
+      '2026-01-31',
+      '2026-02-28',
+      '2026-03-31',
+      '2026-04-30',
+      '2026-05-31',
+      '2026-06-30',
+      '2026-07-31',
+      '2026-08-31',
+      '2026-09-30',
+      '2026-10-31',
+      '2026-11-30',
+      '2026-12-31',
+    ]);
+    // February clamps to its last valid day; the rest of the year does not
+    // inherit that clamp (no 28th drift after February).
+    expect(days[1]).toBe('2026-02-28');
+    expect(days[3]).toBe('2026-04-30');
+    expect(days.slice(2).filter((d) => d.endsWith('-28'))).toEqual([]);
+  });
+
+  it('yearly Feb 29 clamps per occurrence and returns to Feb 29 on leap years', () => {
+    // Chained arithmetic would stick at Feb 28 after the first clamp; the
+    // anchor-based expansion recovers Feb 29 in 2028.
+    const event = {
+      startAt: '2024-02-29T09:00:00Z',
+      endAt: '2024-02-29T10:00:00Z',
+      recurrenceRule: { freq: 'yearly' as const, count: 5 },
+    };
+    const instances = expandRecurrence(
+      event,
+      DateTime.fromISO('2024-01-01T00:00:00Z'),
+      DateTime.fromISO('2029-01-01T00:00:00Z'),
+    );
+    expect(instances.map((i) => i.startAt.toUTC().toFormat('yyyy-MM-dd'))).toEqual([
+      '2024-02-29',
+      '2025-02-28',
+      '2026-02-28',
+      '2027-02-28',
+      '2028-02-29',
+    ]);
+  });
+});
+
+describe('expandRecurrence — UNTIL bounds', () => {
+  it('includes the occurrence landing on a date-only UNTIL day', () => {
+    const event = {
+      startAt: '2026-07-08T09:00:00Z',
+      endAt: '2026-07-08T10:00:00Z',
+      recurrenceRule: { freq: 'daily' as const, until: '2026-07-10' },
+    };
+    const instances = expandRecurrence(
+      event,
+      DateTime.fromISO('2026-07-01T00:00:00Z'),
+      DateTime.fromISO('2026-08-01T00:00:00Z'),
+    );
+    expect(instances.map((i) => i.startAt.toUTC().toFormat('yyyy-MM-dd'))).toEqual([
+      '2026-07-08',
+      '2026-07-09',
+      '2026-07-10',
+    ]);
+  });
+
+  it('treats a datetime UNTIL as an exact inclusive instant', () => {
+    const base = {
+      startAt: '2026-07-08T09:00:00Z',
+      endAt: '2026-07-08T10:00:00Z',
+    };
+    const rangeStart = DateTime.fromISO('2026-07-01T00:00:00Z');
+    const rangeEnd = DateTime.fromISO('2026-08-01T00:00:00Z');
+
+    const onInstant = expandRecurrence(
+      { ...base, recurrenceRule: { freq: 'daily' as const, until: '2026-07-10T09:00:00Z' } },
+      rangeStart,
+      rangeEnd,
+    );
+    expect(onInstant).toHaveLength(3);
+
+    const justBefore = expandRecurrence(
+      { ...base, recurrenceRule: { freq: 'daily' as const, until: '2026-07-10T08:59:59Z' } },
+      rangeStart,
+      rangeEnd,
+    );
+    expect(justBefore).toHaveLength(2);
+  });
+});
+
 describe('expandRecurrence — empty filters', () => {
   it('treats empty byDay/byMonthDay arrays as unspecified filters', () => {
     const event = {

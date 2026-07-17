@@ -25,26 +25,52 @@ const DAY_MAP: Record<string, number> = {
   su: 7,
 };
 
-function advanceByFreq(dt: DateTime, freq: RecurrenceRule['freq'], interval: number): DateTime {
+/**
+ * Compute occurrence `n` of a rule directly from the DTSTART anchor.
+ *
+ * Every candidate is derived as `anchor + n * interval` in the freq unit,
+ * never from the previous occurrence: chaining `plus({ months })` off an
+ * already-clamped value would turn Jan 31 -> Feb 28 -> Mar 28 and drift every
+ * later month to the 28th. Anchor-based arithmetic lets luxon clamp each
+ * occurrence independently (Jan 31 -> Feb 28 -> Mar 31 -> Apr 30), matching
+ * RFC 5545 expansion of a monthly rule anchored on day 31. The same applies
+ * to yearly rules anchored on Feb 29.
+ */
+function occurrenceFromAnchor(
+  anchor: DateTime,
+  freq: RecurrenceRule['freq'],
+  offset: number,
+): DateTime {
   switch (freq) {
     case 'daily':
-      return dt.plus({ days: interval });
+      return anchor.plus({ days: offset });
     case 'weekly':
-      return dt.plus({ weeks: interval });
+      return anchor.plus({ weeks: offset });
     case 'monthly':
-      return dt.plus({ months: interval });
+      return anchor.plus({ months: offset });
     case 'yearly':
-      return dt.plus({ years: interval });
+      return anchor.plus({ years: offset });
   }
 }
 
 function matchesByDay(dt: DateTime, byDay: string[]): boolean {
   const isoWeekday = dt.weekday;
-  return byDay.some((d) => DAY_MAP[d.toLowerCase()] === isoWeekday);
+  return byDay.some((d) => DAY_MAP[d.trim().toLowerCase()] === isoWeekday);
 }
 
 function matchesByMonthDay(dt: DateTime, byMonthDay: number[]): boolean {
   return byMonthDay.includes(dt.day);
+}
+
+/**
+ * Number of whole ISO weeks (Monday start) between the anchor's week and the
+ * candidate's week, in the event timezone. Used to decide whether a day
+ * belongs to an "included" week of a WEEKLY;INTERVAL=n rule. Rounded because
+ * a DST transition can make the wall-clock span between two week starts a
+ * non-integral number of 7-day blocks.
+ */
+function isoWeekOffset(candidate: DateTime, anchorWeekStart: DateTime): number {
+  return Math.round(candidate.startOf('week').diff(anchorWeekStart, 'weeks').weeks);
 }
 
 interface RecurrenceExceptionSets {
@@ -57,6 +83,22 @@ interface RecurrenceExceptionSets {
 // Returns an invalid DateTime if parsing fails.
 function parseInZone(iso: string, zone: string | undefined): DateTime {
   return zone ? DateTime.fromISO(iso, { zone }) : DateTime.fromISO(iso);
+}
+
+/**
+ * Parse an RFC 5545 UNTIL value as an inclusive upper bound.
+ *
+ * A date-only UNTIL means "through the end of that local day". Parsing it at
+ * local midnight would exclude every timed occurrence landing on the UNTIL
+ * day itself, so widen bare dates to `endOf('day')`. Datetime values stay an
+ * exact inclusive instant.
+ */
+function parseUntil(until: string, zone: string | undefined): DateTime {
+  const parsed = parseInZone(until, zone);
+  if (/^\d{4}-\d{2}-\d{2}$/.test(until.trim())) {
+    return parsed.endOf('day');
+  }
+  return parsed;
 }
 
 function buildRecurrenceExceptionSets(
@@ -98,25 +140,42 @@ export function expandRecurrence(
   const eventEnd = parseInZone(event.endAt, zone);
   const duration = eventEnd.diff(eventStart);
   const interval = rule.interval ?? 1;
-  const until = rule.until ? parseInZone(rule.until, zone) : null;
+  const until = rule.until ? parseUntil(rule.until, zone) : null;
   const maxCount = rule.count ?? Number.POSITIVE_INFINITY;
   const exceptions = buildRecurrenceExceptionSets(event.recurrenceExceptions, zone);
 
+  const byDay = rule.byDay && rule.byDay.length > 0 ? rule.byDay : null;
+  const byMonthDay = rule.byMonthDay && rule.byMonthDay.length > 0 ? rule.byMonthDay : null;
+
+  // RFC 5545 BYDAY *expands* a WEEKLY rule: WEEKLY;BYDAY=MO,TU,WE,TH,FR
+  // yields one occurrence per listed weekday in every included week, not just
+  // the DTSTART weekday. That path scans day by day and keeps a day when its
+  // weekday is listed and its ISO-week offset from DTSTART is a multiple of
+  // the interval. For every other supported combination byDay/byMonthDay act
+  // as limits on the freq cursor.
+  const expandsWeekdays = rule.freq === 'weekly' && byDay !== null;
+  const anchorWeekStart = eventStart.startOf('week');
+
   const results: ExpandedInstance[] = [];
-  let current = eventStart;
   let emitted = 0;
 
-  while (current < rangeEnd && emitted < maxCount) {
-    if (until && current > until) break;
+  for (let n = 0; emitted < maxCount; n++) {
+    const candidate = expandsWeekdays
+      ? eventStart.plus({ days: n })
+      : occurrenceFromAnchor(eventStart, rule.freq, n * interval);
 
-    const candidate = current;
-    const passesDay = !rule.byDay || rule.byDay.length === 0 || matchesByDay(candidate, rule.byDay);
-    const passesMonthDay =
-      !rule.byMonthDay ||
-      rule.byMonthDay.length === 0 ||
-      matchesByMonthDay(candidate, rule.byMonthDay);
+    // Negated comparison so an invalid candidate or range still terminates.
+    if (!(candidate < rangeEnd)) break;
+    if (until && candidate > until) break;
 
-    if (passesDay && passesMonthDay) {
+    const passes = expandsWeekdays
+      ? matchesByDay(candidate, byDay) &&
+        isoWeekOffset(candidate, anchorWeekStart) % interval === 0 &&
+        (!byMonthDay || matchesByMonthDay(candidate, byMonthDay))
+      : (!byDay || matchesByDay(candidate, byDay)) &&
+        (!byMonthDay || matchesByMonthDay(candidate, byMonthDay));
+
+    if (passes) {
       emitted++;
       const excluded =
         exceptions.instants.has(candidate.toMillis()) ||
@@ -128,8 +187,6 @@ export function expandRecurrence(
         }
       }
     }
-
-    current = advanceByFreq(current, rule.freq, interval);
   }
 
   return results;

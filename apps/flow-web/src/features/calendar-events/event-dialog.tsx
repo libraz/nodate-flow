@@ -41,9 +41,8 @@ import {
   useState,
 } from 'react';
 import { useTranslation } from 'react-i18next';
-
-import { confirmAction } from '../../lib/confirm-action';
 import { formatApiError } from '../../lib/api-error';
+import { confirmAction } from '../../lib/confirm-action';
 import { dateKey } from '../../lib/date-utils';
 import { formatDate } from '../../lib/format';
 import { selectUser, useAuth } from '../auth/auth-store';
@@ -79,14 +78,7 @@ export type ShowAs = 'busy' | 'free' | 'tentative' | 'oof';
 export type BlockPreset = 'working' | 'focus' | 'oof' | 'custom';
 
 /** Recurrence preset identifiers stored in component state. */
-export type RecurrencePreset =
-  | 'none'
-  | 'daily'
-  | 'weekdays'
-  | 'weekly'
-  | 'monthly'
-  | 'yearly'
-  | 'custom';
+export type RecurrencePreset = 'none' | 'daily' | 'weekdays' | 'weekly' | 'monthly' | 'yearly';
 
 /** Notification preset identifiers. `none` omits the field on submit. */
 export type NotificationPreset =
@@ -179,9 +171,8 @@ function presetToMinutes(preset: NotificationPreset): number | null {
 }
 
 /**
- * Translate a recurrence preset to a recurrence-rule payload. `'custom'`
- * is a stub — the caller passes through whatever the user typed in the
- * raw textarea. `'none'` returns null so the caller omits the field.
+ * Translate a recurrence preset to a recurrence-rule payload. `'none'`
+ * returns null so the caller omits the field.
  *
  * The emitted shape matches the canonical {@link RecurrenceRule} contract
  * shared with the recurrence expander (`@nodate-flow/ui/calendar`): `freq`
@@ -191,11 +182,7 @@ function presetToMinutes(preset: NotificationPreset): number | null {
  * copy — so they stay literal lowercase. The `@api` validator accepts the
  * same lowercase canonical set.
  */
-export function presetToRRule(
-  preset: RecurrencePreset,
-  _startDate: string,
-  customRaw?: string,
-): RecurrenceRule | { raw: string } | null {
+export function presetToRRule(preset: RecurrencePreset, _startDate: string): RecurrenceRule | null {
   switch (preset) {
     case 'none':
       return null;
@@ -209,8 +196,6 @@ export function presetToRRule(
       return { freq: 'monthly' };
     case 'yearly':
       return { freq: 'yearly' };
-    case 'custom':
-      return customRaw ? { raw: customRaw } : null;
   }
 }
 
@@ -330,7 +315,6 @@ const RECURRENCE_PRESET_KEYS = {
   weekly: 'recurrence.preset.weekly',
   monthly: 'recurrence.preset.monthly',
   yearly: 'recurrence.preset.yearly',
-  custom: 'recurrence.preset.custom',
 } as const satisfies Record<RecurrencePreset, string>;
 
 const NOTIFICATION_PRESET_KEYS = {
@@ -452,7 +436,6 @@ export default function EventDialog({
   // More options (recurrence, notification, memo/description).
   const [expanded, setExpanded] = useState<boolean>(false);
   const [recurrence, setRecurrence] = useState<RecurrencePreset>('none');
-  const [recurrenceCustom, setRecurrenceCustom] = useState<string>('');
   const [notification, setNotification] = useState<NotificationPreset>('none');
   // MyCalendarEventResponse (the `/me/calendar-events` aggregate shape used by
   // the calendar grid) omits `memo`. Starting empty keeps the round-trip
@@ -661,7 +644,7 @@ export default function EventDialog({
       if (label) body.blockLabel = label;
       body.showAs = blockPreset === 'oof' ? 'oof' : 'busy';
     }
-    const rrule = presetToRRule(recurrence, startDate, recurrenceCustom);
+    const rrule = presetToRRule(recurrence, startDate);
     if (rrule) body.recurrenceRule = rrule;
     const minutes = presetToMinutes(notification);
     if (minutes !== null) body.notificationOffset = minutes;
@@ -695,7 +678,7 @@ export default function EventDialog({
       body.blockLabel = label;
       body.showAs = blockPreset === 'oof' ? 'oof' : 'busy';
     }
-    const rrule = presetToRRule(recurrence, startDate, recurrenceCustom);
+    const rrule = presetToRRule(recurrence, startDate);
     if (rrule !== null) body.recurrenceRule = rrule;
     const minutes = presetToMinutes(notification);
     if (minutes !== null) body.notificationOffset = minutes;
@@ -757,7 +740,6 @@ export default function EventDialog({
       blockPreset,
       blockCustomLabel,
       recurrence,
-      recurrenceCustom,
       notification,
       memo,
     });
@@ -780,7 +762,6 @@ export default function EventDialog({
       blockPreset,
       blockCustomLabel,
       recurrence,
-      recurrenceCustom,
       notification,
       memo,
     });
@@ -1120,32 +1101,16 @@ export default function EventDialog({
                     value={recurrence}
                     onChange={(e) => setRecurrence(e.currentTarget.value as RecurrencePreset)}
                   >
-                    {(
-                      [
-                        'none',
-                        'daily',
-                        'weekdays',
-                        'weekly',
-                        'monthly',
-                        'yearly',
-                        'custom',
-                      ] as const
-                    ).map((v) => (
-                      <option key={v} value={v}>
-                        {t(RECURRENCE_PRESET_KEYS[v])}
-                      </option>
-                    ))}
+                    {(['none', 'daily', 'weekdays', 'weekly', 'monthly', 'yearly'] as const).map(
+                      (v) => (
+                        <option key={v} value={v}>
+                          {t(RECURRENCE_PRESET_KEYS[v])}
+                        </option>
+                      ),
+                    )}
                   </Select>
                 )}
               </FormField>
-              {recurrence === 'custom' ? (
-                <Textarea
-                  value={recurrenceCustom}
-                  onChange={(e) => setRecurrenceCustom(e.currentTarget.value)}
-                  rows={2}
-                  placeholder={t('placeholder.recurrenceCustom')}
-                />
-              ) : null}
               <FormField label={t('field.notification')}>
                 {(control) => (
                   <Select

@@ -182,8 +182,24 @@ func expandOccurrences(
 
 	var out []time.Time
 	cursor := base.In(loc)
+	// anchorDay is the DTSTART day-of-month. Monthly/yearly stepping clamps
+	// each occurrence from this anchor (not the previously clamped cursor day)
+	// so a Jan-31 series yields Feb-28, Mar-31, Apr-30, ... instead of drifting
+	// permanently to the 28th (RFC 5545 clamp-per-occurrence).
+	anchorDay := cursor.Day()
 	emitted := 0
-	scanLimit := scanStepLimit(rule.Freq, interval, base, loc, windowEnd)
+
+	// Weekly + BYDAY expands multiple weekdays per week, so it must be scanned
+	// day by day (not week by week, which would only ever land on the DTSTART
+	// weekday). A day qualifies when its weekday is listed AND its ISO-week
+	// offset from DTSTART is a multiple of interval. Every other frequency
+	// steps by its own unit.
+	weeklyByDay := rule.Freq == "weekly" && len(rule.ByDay) > 0
+	scanFreq, scanInterval := rule.Freq, interval
+	if weeklyByDay {
+		scanFreq, scanInterval = "daily", 1
+	}
+	scanLimit := scanStepLimit(scanFreq, scanInterval, base, loc, windowEnd)
 
 	for step := 0; step < scanLimit; step++ {
 		if maxCount >= 0 && emitted >= maxCount {
@@ -206,6 +222,9 @@ func expandOccurrences(
 		}
 
 		passesDay := len(rule.ByDay) == 0 || matchesByDay(cursor, rule.ByDay)
+		if weeklyByDay && passesDay && weekOffset(base, cursor, loc)%interval != 0 {
+			passesDay = false
+		}
 		passesMonthDay := len(rule.ByMonthDay) == 0 || matchesByMonthDay(cursor, rule.ByMonthDay)
 
 		if passesDay && passesMonthDay {
@@ -217,7 +236,7 @@ func expandOccurrences(
 			}
 		}
 
-		cursor = advanceByFreq(cursor, rule.Freq, interval, loc)
+		cursor = advanceByFreq(cursor, scanFreq, scanInterval, anchorDay, loc)
 	}
 	return out
 }
@@ -283,8 +302,10 @@ func matchesByMonthDay(t time.Time, byMonthDay []int) bool {
 // the wall-clock time-of-day in loc. Constructing the next instant via
 // time.Date in loc (rather than adding a fixed duration) keeps a daily 09:00
 // meeting at 09:00 local across a DST transition, matching the client
-// expander's luxon plus({...}) behaviour.
-func advanceByFreq(cursor time.Time, freq string, interval int, loc *time.Location) time.Time {
+// expander's luxon plus({...}) behaviour. For monthly/yearly, anchorDay is the
+// DTSTART day-of-month so each occurrence clamps from the anchor rather than
+// the previously clamped cursor day (no permanent month-end drift).
+func advanceByFreq(cursor time.Time, freq string, interval, anchorDay int, loc *time.Location) time.Time {
 	local := cursor.In(loc)
 	y, m, d := local.Date()
 	hh, mm, ss := local.Clock()
@@ -295,12 +316,30 @@ func advanceByFreq(cursor time.Time, freq string, interval int, loc *time.Locati
 		d += 7 * interval
 	case "monthly":
 		m += time.Month(interval)
-		d = min(d, daysInMonth(y, m, loc))
+		d = min(anchorDay, daysInMonth(y, m, loc))
 	case "yearly":
 		y += interval
-		d = min(d, daysInMonth(y, m, loc))
+		d = min(anchorDay, daysInMonth(y, m, loc))
 	}
 	return time.Date(y, m, d, hh, mm, ss, local.Nanosecond(), loc)
+}
+
+// weekOffset returns the number of whole ISO weeks (Monday-anchored) between
+// the DTSTART week and the cursor week, both taken in loc. It drives the
+// interval gate for weekly + BYDAY expansion so INTERVAL=2 skips alternate
+// weeks for every listed weekday.
+func weekOffset(base, cursor time.Time, loc *time.Location) int {
+	bMon := startOfISOWeek(base.In(loc))
+	cMon := startOfISOWeek(cursor.In(loc))
+	return int(cMon.Sub(bMon).Hours()/24) / 7
+}
+
+// startOfISOWeek truncates t to 00:00 local on the Monday of its ISO week.
+func startOfISOWeek(t time.Time) time.Time {
+	// Go's Weekday has Sunday=0; shift so Monday=0.
+	offset := (int(t.Weekday()) + 6) % 7
+	d := time.Date(t.Year(), t.Month(), t.Day(), 0, 0, 0, 0, t.Location())
+	return d.AddDate(0, 0, -offset)
 }
 
 func daysInMonth(year int, month time.Month, loc *time.Location) int {

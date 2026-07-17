@@ -287,12 +287,6 @@ describe('presetToRRule', () => {
     });
   });
 
-  it('passes through a raw custom rule, or null when empty', () => {
-    expect(presetToRRule('custom', '2030-06-15', 'FREQ=DAILY')).toEqual({ raw: 'FREQ=DAILY' });
-    expect(presetToRRule('custom', '2030-06-15', '')).toBeNull();
-    expect(presetToRRule('custom', '2030-06-15')).toBeNull();
-  });
-
   it('never emits an uppercase freq token', () => {
     for (const preset of ['daily', 'weekdays', 'weekly', 'monthly', 'yearly'] as const) {
       const rule = presetToRRule(preset, '2030-06-15');

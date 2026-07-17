@@ -198,11 +198,12 @@ func TestExpandWeekly_ByDay(t *testing.T) {
 	require.Len(t, expandOccurrences(rule, base, loc, time.Time{}, time.Time{}, nil, wsMon, weMon), 1,
 		"the base Monday matches byDay MO and must fire")
 
-	// Wednesday 2026-07-08 is not visited by the weekly cursor → no fire,
-	// matching the client expander.
+	// Wednesday 2026-07-08 is listed in byDay (WE) and must also fire: weekly
+	// BYDAY expands every listed weekday within the week, not just the DTSTART
+	// weekday (parity with the client expander).
 	wsWed, weWed := dayRange(t, loc, 2026, time.July, 8)
-	require.Empty(t, expandOccurrences(rule, base, loc, time.Time{}, time.Time{}, nil, wsWed, weWed),
-		"intra-week byDay weekdays are not expanded (parity with the client)")
+	require.Len(t, expandOccurrences(rule, base, loc, time.Time{}, time.Time{}, nil, wsWed, weWed), 1,
+		"intra-week byDay weekdays are expanded (parity with the client)")
 
 	// The following Monday 2026-07-13 fires again.
 	wsNext, weNext := dayRange(t, loc, 2026, time.July, 13)
@@ -232,14 +233,42 @@ func TestExpandDaily_DSTPreservesWallClock(t *testing.T) {
 }
 
 // TestParseRuleUntil_BareDate proves a YYYY-MM-DD until parses in the event
-// timezone to that local midnight.
+// timezone to the final instant of that local day, so the until day is an
+// inclusive upper bound across every wall-clock time-of-day.
 func TestParseRuleUntil_BareDate(t *testing.T) {
 	t.Parallel()
 	ny, err := time.LoadLocation("America/New_York")
 	require.NoError(t, err)
 	got := parseRuleUntil("2026-07-10", ny)
-	want := time.Date(2026, time.July, 10, 0, 0, 0, 0, ny).UTC()
+	want := time.Date(2026, time.July, 11, 0, 0, 0, 0, ny).Add(-time.Nanosecond).UTC()
 	require.Equal(t, want, got)
+	require.Truef(t, got.After(time.Date(2026, time.July, 10, 9, 0, 0, 0, ny).UTC()),
+		"a bare-date until must sit past a 09:00 occurrence on the until day")
+}
+
+// TestExpandDaily_BareDateUntilIncludesUntilDay proves the regression the
+// worker shares with the client expander: a daily 09:00 event with a bare
+// YYYY-MM-DD until must still fire on the until day itself. Resolving the
+// until to local midnight (instead of end-of-day) would drop the 09:00
+// occurrence on that day because 09:00 > 00:00.
+func TestExpandDaily_BareDateUntilIncludesUntilDay(t *testing.T) {
+	t.Parallel()
+	ny, err := time.LoadLocation("America/New_York")
+	require.NoError(t, err)
+
+	base := time.Date(2026, time.July, 1, 9, 0, 0, 0, ny)
+	rule := &recurrenceRule{Freq: "daily", Until: ptrStr("2026-07-10")}
+	until := parseRuleUntil(*rule.Until, ny)
+
+	// The until day (07-10) is inclusive: its 09:00 occurrence must fire.
+	wsUntil, weUntil := dayRange(t, ny, 2026, time.July, 10)
+	require.Len(t, expandOccurrences(rule, base.UTC(), ny, time.Time{}, until, nil, wsUntil, weUntil), 1,
+		"the 09:00 occurrence on the bare-date until day must fire (inclusive UNTIL)")
+
+	// The day after the until (07-11) must not fire.
+	wsAfter, weAfter := dayRange(t, ny, 2026, time.July, 11)
+	require.Empty(t, expandOccurrences(rule, base.UTC(), ny, time.Time{}, until, nil, wsAfter, weAfter),
+		"an occurrence past the bare-date until day must not fire")
 }
 
 // TestParseRecurrenceExceptions_MixedFormats proves both RFC 3339 and bare
@@ -296,7 +325,12 @@ func TestRecurrenceGoldenFixtures(t *testing.T) {
 			exceptions, err := parseRecurrenceExceptions(rawExceptions, loc)
 			require.NoError(t, err)
 
-			occ := expandOccurrences(&fx.Event.RecurrenceRule, base, loc, time.Time{}, time.Time{}, exceptions, rangeStart, rangeEnd)
+			var until time.Time
+			if fx.Event.RecurrenceRule.Until != nil && *fx.Event.RecurrenceRule.Until != "" {
+				until = parseRuleUntil(*fx.Event.RecurrenceRule.Until, loc)
+			}
+
+			occ := expandOccurrences(&fx.Event.RecurrenceRule, base, loc, time.Time{}, until, exceptions, rangeStart, rangeEnd)
 			got := make([]string, 0, len(occ))
 			for _, o := range occ {
 				got = append(got, o.UTC().Format(time.RFC3339))

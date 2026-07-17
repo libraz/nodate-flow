@@ -330,17 +330,25 @@ func (s *Scanner) expandCandidate(c candidateRow, d arrivingDay) ([]EventOnDay, 
 
 // parseRuleUntil parses the recurrence rule's `until` field, accepting an
 // RFC 3339 timestamp or a bare YYYY-MM-DD date (interpreted in loc, the
-// event timezone). A bare date resolves to that local midnight; because
+// event timezone). A bare date names the whole local day as the inclusive
+// upper bound, so it resolves to the final instant of that local day
+// (23:59:59.999999999 local) rather than its midnight: because
 // expandOccurrences treats until as an inclusive upper bound on the
-// candidate instant, an occurrence exactly at local midnight on the until
-// day still qualifies. Returns the zero time when neither form parses, so
-// an unparseable until simply leaves the sequence unbounded by until.
+// candidate instant, an occurrence at any wall-clock time on the until day
+// still qualifies. Resolving to midnight would drop occurrences whose
+// time-of-day is past 00:00. Returns the zero time when neither form
+// parses, so an unparseable until simply leaves the sequence unbounded by
+// until.
 func parseRuleUntil(value string, loc *time.Location) time.Time {
 	if t, err := time.Parse(time.RFC3339, value); err == nil {
 		return t.UTC()
 	}
 	if t, err := time.ParseInLocation("2006-01-02", value, loc); err == nil {
-		return t.UTC()
+		// Extend the bare date to the end of that local day so the until
+		// day is inclusive across every wall-clock time-of-day; stepping to
+		// the next local midnight and backing off a nanosecond keeps the
+		// boundary correct across DST transitions.
+		return t.AddDate(0, 0, 1).Add(-time.Nanosecond).UTC()
 	}
 	return time.Time{}
 }
