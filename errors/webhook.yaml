@@ -15,6 +15,15 @@ resources:
         description: "Returned when a webhook subscription with the given public_id does not exist or the actor does not have access to it."
         userAction: "Verify the subscription ID, or refresh the list to see current webhook subscriptions."
 
+      url_invalid:
+        code: WEBHOOK.SUBSCRIPTION.URL_INVALID
+        status: 422
+        message: "Webhook URL is not an allowed destination"
+        message_ja: "Webhook の URL は許可されていない宛先です"
+        message_zh: "Webhook URL 不是允许的目标地址"
+        description: "Returned when the webhook URL is not a valid https URL, embeds credentials, or its host resolves to a private, loopback, link-local, or otherwise non-public address."
+        userAction: "Use a public https URL without embedded credentials as the webhook destination."
+
       url_unreachable:
         code: WEBHOOK.SUBSCRIPTION.URL_UNREACHABLE
         status: 400

@@ -29,6 +29,11 @@ func Create(deps Deps) func(context.Context, *CreateInput) (*CreateOutput, error
 			return nil, httpErr(apierrors.WsWorkspaceNotFound)
 		}
 
+		// SSRF guard: only public https destinations may be registered.
+		if err := webhook.ValidateURL(ctx, in.Body.URL); err != nil {
+			return nil, httpErr(apierrors.WebhookSubscriptionUrlInvalid)
+		}
+
 		secret, err := webhook.GenerateSecret()
 		if err != nil {
 			return nil, httpErr(apierrors.InternalUnexpected)
@@ -309,7 +314,12 @@ func TestDelivery(deps Deps) func(context.Context, *TestDeliveryInput) (*TestDel
 		if err != nil {
 			return nil, httpErr(apierr.SpecForErrNoRows(err, apierrors.WebhookSubscriptionNotFound, apierrors.InternalUnexpected))
 		}
-		_ = sub // subscription is valid
+
+		// SSRF guard: refuse to enqueue a test delivery when the stored
+		// URL is (or has become) a non-public destination.
+		if err := webhook.ValidateURL(ctx, sub.Url); err != nil {
+			return nil, httpErr(apierrors.WebhookSubscriptionUrlInvalid)
+		}
 
 		// Build a test ping payload.
 		payload, _ := json.Marshal(map[string]any{

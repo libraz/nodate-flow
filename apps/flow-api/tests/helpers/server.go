@@ -55,6 +55,15 @@ func mustDecodeHex(s string) []byte {
 	return b
 }
 
+// The webhook SSRF guard rejects loopback / private destinations, but
+// the e2e suite delivers to httptest servers bound to 127.0.0.1. Opt
+// the whole test process into private targets before any handler or
+// delivery worker reads the flag. This escape hatch exists only for
+// tests and local development; production never sets it.
+func init() {
+	_ = os.Setenv("NF_WEBHOOK_ALLOW_PRIVATE", "1")
+}
+
 // StartTestServer boots an httptest.Server that mounts both the
 // auth-api and flow-api routers against the supplied *sql.DB. Auth
 // routes (/auth/*, /me/*, /workspaces CRUD, /invites/*) are served by

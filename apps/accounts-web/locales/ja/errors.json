@@ -237,6 +237,7 @@
   "WEBHOOK.DELIVERY.NOT_FOUND": "Webhook 配信が見つかりません",
   "WEBHOOK.SUBSCRIPTION.LIMIT_EXCEEDED": "ワークスペースの Webhook 購読数が上限に達しました",
   "WEBHOOK.SUBSCRIPTION.NOT_FOUND": "Webhook 購読が見つかりません",
+  "WEBHOOK.SUBSCRIPTION.URL_INVALID": "Webhook の URL は許可されていない宛先です",
   "WEBHOOK.SUBSCRIPTION.URL_UNREACHABLE": "Webhook の URL に接続できません",
   "WORKSPACE.DELETE.CONFIRM_REQUIRED": "このワークスペースを削除するには確認が必要です。confirm=true を付けて再送信してください。",
   "WS.DESCRIPTION_VERSION.NOT_FOUND": "説明文のバージョンが見つかりません",

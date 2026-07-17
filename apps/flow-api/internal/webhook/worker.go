@@ -64,10 +64,8 @@ func NewWorker(db *sql.DB, q *generated.Queries) *Worker {
 	return &Worker{
 		db:      db,
 		queries: q,
-		client: &http.Client{
-			Timeout: 10 * time.Second,
-		},
-		done: make(chan struct{}),
+		client:  NewSafeClient(10 * time.Second),
+		done:    make(chan struct{}),
 	}
 }
 
@@ -321,6 +319,17 @@ func (w *Worker) deliver(ctx context.Context, row generated.FindPendingDeliverie
 	payload := row.PayloadJson
 	if len(payload) == 0 {
 		payload = json.RawMessage(`{}`)
+	}
+
+	// Re-check the stored URL before every attempt: subscriptions created
+	// before the SSRF policy existed (or whose DNS now points at a
+	// non-public address) must not be delivered. The safe client's dialer
+	// Control re-checks the actual connect address as well, so a DNS
+	// record that flips between this check and the connect (rebinding)
+	// is still blocked.
+	if err := ValidateURL(ctx, row.Url); err != nil {
+		w.markFailed(ctx, row, 0, fmt.Sprintf("destination rejected: %v", err))
+		return
 	}
 
 	signature := sign(row.Secret, payload)

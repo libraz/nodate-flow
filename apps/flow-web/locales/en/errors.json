@@ -237,6 +237,7 @@
   "WEBHOOK.DELIVERY.NOT_FOUND": "Webhook delivery not found",
   "WEBHOOK.SUBSCRIPTION.LIMIT_EXCEEDED": "Maximum webhook subscriptions per workspace reached",
   "WEBHOOK.SUBSCRIPTION.NOT_FOUND": "Webhook subscription not found",
+  "WEBHOOK.SUBSCRIPTION.URL_INVALID": "Webhook URL is not an allowed destination",
   "WEBHOOK.SUBSCRIPTION.URL_UNREACHABLE": "Webhook URL is not reachable",
   "WORKSPACE.DELETE.CONFIRM_REQUIRED": "Confirmation required to delete this workspace. Resend with confirm=true.",
   "WS.DESCRIPTION_VERSION.NOT_FOUND": "Description version not found",

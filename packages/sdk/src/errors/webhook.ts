@@ -21,6 +21,11 @@ export const WebhookErrors = {
     status: 404,
     message: "Webhook subscription not found",
   },
+  WEBHOOK_SUBSCRIPTION_URL_INVALID: {
+    code: "WEBHOOK.SUBSCRIPTION.URL_INVALID",
+    status: 422,
+    message: "Webhook URL is not an allowed destination",
+  },
   WEBHOOK_SUBSCRIPTION_URL_UNREACHABLE: {
     code: "WEBHOOK.SUBSCRIPTION.URL_UNREACHABLE",
     status: 400,
