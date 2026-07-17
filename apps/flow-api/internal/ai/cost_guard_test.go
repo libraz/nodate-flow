@@ -3,6 +3,8 @@ package ai
 import (
 	"context"
 	"errors"
+	"sync"
+	"sync/atomic"
 	"testing"
 
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/ai/providers"
@@ -76,5 +78,86 @@ func TestCostGuardEffectiveBudget(t *testing.T) {
 	}
 	if err := fallback.Check(context.Background(), 1); err != nil {
 		t.Fatalf("fallback.Check = %v, want nil", err)
+	}
+}
+
+// TestCostGuardConcurrentOverspendBoundedBySafetyMargin exercises the
+// check-then-spend race directly: N goroutines all call Check before any of
+// them records its cost, so every one observes the same pre-race spend. The
+// safety margin must absorb the resulting overrun — total spend stays within
+// the full configured budget (one margin's worth past the effective cap),
+// not N x per-call cost past the budget.
+func TestCostGuardConcurrentOverspendBoundedBySafetyMargin(t *testing.T) {
+	t.Parallel()
+
+	const (
+		budget  int64 = 10000
+		callers int   = 50
+		perCall int64 = 10 // callers x perCall == the reserved 5% margin
+	)
+
+	var spent atomic.Int64
+	guard := NewCostGuard(BudgetReaderFunc(func(context.Context, uint32) (int64, error) {
+		return spent.Load(), nil
+	}), budget)
+
+	effective := guard.EffectiveBudget()
+	if margin := budget - effective; int64(callers)*perCall > margin {
+		t.Fatalf("test setup: callers x perCall = %d exceeds margin %d", int64(callers)*perCall, margin)
+	}
+
+	// Worst case: the workspace is one cent short of the effective cap when
+	// the burst arrives.
+	spent.Store(effective - 1)
+
+	// Phase 1: all callers check concurrently, none has recorded cost yet.
+	results := make([]error, callers)
+	var wg sync.WaitGroup
+	for i := range callers {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			results[i] = guard.Check(context.Background(), 1)
+		}()
+	}
+	wg.Wait()
+
+	// Phase 2: every caller that passed the check settles its real cost.
+	allowed := 0
+	for _, err := range results {
+		if err == nil {
+			allowed++
+			spent.Add(perCall)
+		} else if !errors.Is(err, ErrDailyBudgetExceeded) {
+			t.Fatalf("guard.Check = %v, want nil or ErrDailyBudgetExceeded", err)
+		}
+	}
+	if allowed == 0 {
+		t.Fatal("no caller passed the guard; race scenario was not exercised")
+	}
+
+	if total := spent.Load(); total > budget {
+		t.Fatalf("total spend %d exceeds configured budget %d (overspend not bounded by safety margin)", total, budget)
+	}
+
+	// The guard must now be closed for the next caller.
+	if err := guard.Check(context.Background(), 1); !errors.Is(err, ErrDailyBudgetExceeded) {
+		t.Fatalf("post-burst guard.Check = %v, want ErrDailyBudgetExceeded", err)
+	}
+}
+
+// TestCostGuardEffectiveBudgetFloor proves a tiny positive budget is not
+// rounded down to zero (which would mean "always allow").
+func TestCostGuardEffectiveBudgetFloor(t *testing.T) {
+	t.Parallel()
+
+	guard := NewCostGuard(BudgetReaderFunc(func(context.Context, uint32) (int64, error) {
+		return 1, nil
+	}), 1)
+	if eff := guard.EffectiveBudget(); eff != 1 {
+		t.Fatalf("EffectiveBudget = %d, want 1", eff)
+	}
+	if err := guard.Check(context.Background(), 1); !errors.Is(err, ErrDailyBudgetExceeded) {
+		t.Fatalf("guard.Check = %v, want ErrDailyBudgetExceeded", err)
 	}
 }
