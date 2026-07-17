@@ -10,6 +10,7 @@ import (
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/types"
 	apierrors "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/errors"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/eventbus"
+	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/handlers/handlerutil"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/middleware"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/taskstate"
 )
@@ -47,7 +48,12 @@ var reverseStateRollback = map[string]string{
 //     columns must agree.
 //  4. Idempotency: a row that is already the target of an enabled
 //     reverse returns AI.REVERSE.ALREADY_REVERSED (409). The plan
-//     scopes reversal to a single compensating event per origin.
+//     scopes reversal to a single compensating event per origin. The
+//     UNIQUE (workspace_id, reverses_event_id) index on `events`
+//     backs this check at the storage layer: two concurrent reverses
+//     of the same target can both pass the WasReversed read, but only
+//     one compensating INSERT commits — the loser's INSERT fails with
+//     ER_DUP_ENTRY and is mapped to the same 409 (see step 5).
 //  5. The compensating event is appended via eventbus.AppendReverseEvent
 //     (the dedicated entry point that bypasses the judge-kind guard;
 //     see the helper's docstring for the rationale). It re-uses the
@@ -163,6 +169,20 @@ func Reverse(deps Deps) func(context.Context, *ReverseInput) (*ReverseOutput, er
 			},
 		})
 		if err != nil {
+			if handlerutil.IsDuplicateEntry(err) {
+				// A concurrent reverse of the same target committed its
+				// compensating row between our FindEventForReverse read
+				// and this INSERT; the UNIQUE (workspace_id,
+				// reverses_event_id) index rejected ours. The event is
+				// already reversed, so surface the same canonical 409 as
+				// the WasReversed pre-check instead of a 500. The tx
+				// (including any state rollback we attempted) is rolled
+				// back by the deferred Rollback — the winner's rollback
+				// transition is the one that stands. public_id is UUID
+				// v7, so realistically the only unique key this INSERT
+				// can violate is the reverses index.
+				return nil, httpErr(apierrors.AiReverseAlreadyReversed)
+			}
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
 

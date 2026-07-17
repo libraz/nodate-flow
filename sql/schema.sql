@@ -1030,7 +1030,12 @@ CREATE TABLE events (
   KEY idx_events_workspace_id_type (workspace_id, type),
   KEY idx_events_workspace_id_actor_agent_id (workspace_id, actor_agent_id),
   KEY idx_events_triggered_by_signal (triggered_by_signal_id),
-  KEY idx_events_reverses (workspace_id, reverses_event_id),
+  -- UNIQUE guards against duplicate compensating reversals: two concurrent
+  -- reverses of the same event would otherwise both insert a compensating
+  -- row and double-cancel in the derived_state projection. MySQL treats
+  -- multiple NULLs as distinct, so ordinary (non-reverse) events with
+  -- reverses_event_id IS NULL are unaffected; only genuine reverses dedupe.
+  UNIQUE KEY uniq_events_reverses (workspace_id, reverses_event_id),
 
   CONSTRAINT fk_events_workspace FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
   CONSTRAINT fk_events_task FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE CASCADE,
