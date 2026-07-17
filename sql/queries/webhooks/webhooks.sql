@@ -80,6 +80,45 @@ WHERE d.status IN ('pending', 'failed')
 ORDER BY d.next_retry_at ASC
 LIMIT ?;
 
+-- name: ClaimPendingDeliveries :many
+-- Atomically claim a batch of deliveries ready for (re)delivery.
+-- Modeled after ClaimNextAgentRun: callers wrap this SELECT and the
+-- companion MarkDeliveriesClaimed in a single BEGIN / COMMIT.
+-- FOR UPDATE SKIP LOCKED lets multiple worker replicas race for rows
+-- without blocking each other; each replica only sees rows no other
+-- transaction currently holds. After the caller flips the returned rows
+-- to 'delivering' (see MarkDeliveriesClaimed) and COMMITs, the rows no
+-- longer satisfy status IN ('pending', 'failed'), so a second replica
+-- skips them on its next scan. attempts is NOT incremented here; the
+-- terminal Mark* queries own the attempt count.
+-- d.id is required: fed into MarkDeliveriesClaimed and the terminal
+-- MarkDeliveryDelivered/Failed/Dead (WHERE id = ?).
+-- ORDER BY carries d.id as a stable tie-breaker.
+SELECT d.id, d.public_id, d.workspace_id, d.subscription_id,
+  d.event_type, d.payload_json, d.attempts, d.max_attempts,
+  ws.url, ws.secret
+FROM webhook_deliveries d
+INNER JOIN webhook_subscriptions ws ON ws.id = d.subscription_id
+WHERE d.status IN ('pending', 'failed')
+  AND d.next_retry_at <= NOW()
+  AND d.attempts < d.max_attempts
+  AND d.enabled = TRUE
+ORDER BY d.next_retry_at ASC, d.id ASC
+LIMIT ?
+FOR UPDATE SKIP LOCKED;
+
+-- name: MarkDeliveriesClaimed :exec
+-- Flip the rows returned by ClaimPendingDeliveries to the in-flight
+-- 'delivering' state inside the same transaction, before the POST.
+-- Once committed, these rows drop out of the ClaimPendingDeliveries
+-- WHERE clause so no other replica re-claims them. Guarded on the
+-- pending/failed states so a concurrently-terminal row is never
+-- resurrected. attempts is left untouched here.
+UPDATE webhook_deliveries
+SET status = 'delivering'
+WHERE id IN (sqlc.slice('ids'))
+  AND status IN ('pending', 'failed');
+
 -- name: MarkDeliveryDelivered :exec
 UPDATE webhook_deliveries
 SET status = 'delivered', http_status = ?, response_body = ?,

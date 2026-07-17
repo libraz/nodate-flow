@@ -222,10 +222,14 @@ WHERE public_id = ?
   AND archived_at IS NULL;
 
 -- name: MarkNotificationDelivered :exec
--- Mark a notification as delivered (email/push sent).
+-- Mark a notification as delivered (email/push sent). Scoped to the
+-- recipient so a delivery flag can never be flipped on another user's
+-- notification, matching the recipient predicate on the sibling
+-- MarkNotificationRead / ArchiveNotification mutations.
 UPDATE notifications
 SET delivered_at = NOW()
 WHERE public_id = ?
+  AND recipient_user_id = ?
   AND delivered_at IS NULL;
 
 -- name: GetEnabledChannelsForRecipients :many
@@ -247,3 +251,25 @@ WHERE workspace_id = ?
   AND user_id IN (sqlc.slice('user_ids'))
   AND is_muted = FALSE
   AND enabled = TRUE;
+
+-- name: ClaimReminderForDelivery :execrows
+-- Atomically claim a calendar event's reminder for delivery. The
+-- conditional predicate notified_at IS NULL is what makes the claim
+-- safe: a single UPDATE lets exactly one caller flip the row from
+-- NULL to NOW(), so the affected-rows count (RowsAffected) is 1 for
+-- the winner and 0 for every racing loser. Callers MUST claim first
+-- and dispatch the reminder only when the count is 1, replacing the
+-- read-then-blind-UPDATE pattern that could double-send when more
+-- than one scheduler tick or process observes the same due event.
+--
+-- On a dispatch failure the caller should reset notified_at back to
+-- NULL so the next tick can re-claim and retry the send.
+--
+-- The WHERE targets the primary key directly; unlike the notifications
+-- reads in this file it does not lead with workspace_id because the
+-- claim is a single-row primary-key mutation, not a tenant-scoped
+-- scan — the id already uniquely identifies the workspace's event.
+UPDATE calendar_events
+SET notified_at = NOW()
+WHERE id = ?
+  AND notified_at IS NULL;

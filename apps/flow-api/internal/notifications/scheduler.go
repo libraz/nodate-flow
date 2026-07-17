@@ -8,16 +8,33 @@ package notifications
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"log/slog"
 	"time"
 
+	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/generated"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/types"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/notification"
 )
 
+// reminderEventType is the events.type (and notifications.event_type)
+// value for a scheduler-driven calendar reminder.
+const reminderEventType = "calendar.reminder"
+
+// reminderSystemSource is the events.actor_system_source value stamped
+// on reminder event rows. Reminders are time-driven — no user or agent
+// actor exists — so the system-source column names the emitting loop.
+const reminderSystemSource = "scheduler:calendar"
+
 // ReminderDispatcher is the subset of [notification.Fanout] that the
 // scheduler needs. It is declared as an interface so tests can stub the
 // dispatch path without standing up a full Fanout instance.
+//
+// sourceEventID is the events.id of the calendar.reminder row appended
+// by the scheduler for this claim. Implementations must thread it into
+// notifications.source_event_id so the
+// (recipient_user_id, source_event_id, channel) unique key dedupes
+// concurrent or replayed fan-outs of the same reminder.
 type ReminderDispatcher interface {
 	DeliverCalendarReminder(
 		ctx context.Context,
@@ -25,6 +42,7 @@ type ReminderDispatcher interface {
 		eventPublicID types.PublicID,
 		title string,
 		recipientUserIDs []uint32,
+		sourceEventID int64,
 	) error
 }
 
@@ -39,10 +57,11 @@ func schedLog() *slog.Logger {
 // notifications and dispatches them to the [notification.Fanout] so each
 // recipient receives an in-app notification row.
 //
-// The scheduler marks each event's notified_at column only after the
-// dispatch returns without error, so a transient DB failure causes the
-// event to be retried on the next tick instead of silently dropping the
-// reminder.
+// Each due event is first claimed atomically (notified_at NULL -> NOW()
+// via a conditional UPDATE), so when multiple replicas run this loop
+// only the claim winner dispatches. On a dispatch failure the claim is
+// released (notified_at reset to NULL) so the next tick retries instead
+// of silently dropping the reminder.
 func StartNotificationScheduler(
 	ctx context.Context,
 	db *sql.DB,
@@ -76,8 +95,17 @@ type pendingNotification struct {
 
 // CheckAndNotify queries for events whose notification window has opened
 // and dispatches a reminder for each recipient through the dispatcher.
-// After a successful dispatch it marks notified_at so the event is not
-// picked up again on the next tick.
+//
+// Delivery is claim-first: for each candidate the scheduler runs the
+// atomic [generated.Queries.ClaimReminderForDelivery] UPDATE and only
+// dispatches when it affected exactly one row. Racing replicas (or
+// overlapping ticks in one process) observe zero affected rows and skip
+// the event, so each reminder is dispatched by at most one claimant.
+// After winning the claim the scheduler appends a calendar.reminder row
+// to the events log and threads its id into the dispatcher so the
+// notifications unique key dedupes any concurrently replayed fan-out.
+// If the event append or the dispatch fails, the claim is released so
+// the next tick retries.
 func CheckAndNotify(ctx context.Context, db *sql.DB, dispatcher ReminderDispatcher) {
 	log := schedLog()
 	// Find events where the notification window has opened but the event
@@ -123,28 +151,53 @@ func CheckAndNotify(ctx context.Context, db *sql.DB, dispatcher ReminderDispatch
 		return
 	}
 
+	queries := generated.New(db)
 	delivered := 0
 	for _, n := range notifications {
+		// Load recipients before claiming so a read failure does not
+		// consume the claim (nothing to release, next tick retries).
 		recipients, err := reminderRecipients(ctx, db, n.ID, n.OwnerUserID)
 		if err != nil {
 			log.Error("notification scheduler: failed to load recipients",
 				"eventId", n.PublicID.String(), "err", err)
 			continue
 		}
-		if err := dispatcher.DeliverCalendarReminder(
-			ctx, n.WorkspaceID, n.PublicID, n.Title, recipients,
-		); err != nil {
-			// Surface the error and leave notified_at NULL so the next
-			// tick retries the dispatch.
-			log.Error("notification scheduler: dispatch failed; will retry next tick",
+
+		// Atomic claim: only the caller whose UPDATE flipped notified_at
+		// from NULL to NOW() (RowsAffected == 1) may dispatch. Zero
+		// affected rows means another replica or tick won the race.
+		affected, err := queries.ClaimReminderForDelivery(ctx, n.ID)
+		if err != nil {
+			log.Error("notification scheduler: failed to claim reminder",
 				"eventId", n.PublicID.String(), "err", err)
 			continue
 		}
+		if affected == 0 {
+			log.Debug("notification scheduler: reminder already claimed elsewhere",
+				"eventId", n.PublicID.String())
+			continue
+		}
 
-		if _, err := db.ExecContext(ctx,
-			`UPDATE calendar_events SET notified_at = NOW() WHERE id = ?`, n.ID); err != nil {
-			log.Error("notification scheduler: failed to mark event as notified",
+		sourceEventID, err := appendReminderEvent(ctx, queries, n)
+		if err != nil {
+			log.Error("notification scheduler: failed to append reminder event; will retry next tick",
 				"eventId", n.PublicID.String(), "err", err)
+			releaseReminderClaim(ctx, db, n)
+			continue
+		}
+
+		if err := dispatcher.DeliverCalendarReminder(
+			ctx, n.WorkspaceID, n.PublicID, n.Title, recipients, sourceEventID,
+		); err != nil {
+			// Release the claim so the next tick re-claims and retries
+			// the dispatch. Within one dispatch (and any concurrent
+			// replay of the same source event) the notifications unique
+			// key dedupes; a next-tick retry appends a fresh event row,
+			// which trades a possible duplicate row after a partial
+			// failure for never losing the reminder.
+			log.Error("notification scheduler: dispatch failed; will retry next tick",
+				"eventId", n.PublicID.String(), "err", err)
+			releaseReminderClaim(ctx, db, n)
 			continue
 		}
 		delivered++
@@ -152,6 +205,52 @@ func CheckAndNotify(ctx context.Context, db *sql.DB, dispatcher ReminderDispatch
 
 	if delivered > 0 {
 		log.Info("notification scheduler: delivered reminders", "count", delivered)
+	}
+}
+
+// appendReminderEvent appends a calendar.reminder row to the append-only
+// events log for a claimed reminder and returns the new events.id. The
+// id becomes notifications.source_event_id so the
+// (recipient_user_id, source_event_id, channel) unique key dedupes
+// concurrent fan-outs of the same reminder.
+//
+// It calls [generated.Queries.AppendEvent] directly instead of going
+// through eventbus.Append because the fan-out needs the inserted
+// events.id, which eventbus.Append does not surface. The trade-off is
+// that eventbus notify hooks do not fire for this row; that is safe
+// because calendar.reminder is not a classified fan-out type, so the
+// hook path would be a no-op anyway.
+func appendReminderEvent(
+	ctx context.Context,
+	queries *generated.Queries,
+	n pendingNotification,
+) (int64, error) {
+	payload, err := json.Marshal(map[string]string{
+		"calendarEventId": n.PublicID.String(),
+	})
+	if err != nil {
+		return 0, err
+	}
+	return queries.AppendEvent(ctx, generated.AppendEventParams{
+		PublicID:          types.New(),
+		WorkspaceID:       n.WorkspaceID,
+		ActorSystemSource: sql.NullString{String: reminderSystemSource, Valid: true},
+		Type:              reminderEventType,
+		PayloadJson:       payload,
+		OccurredAt:        time.Now().UTC(),
+	})
+}
+
+// releaseReminderClaim resets notified_at back to NULL for a claimed
+// calendar event whose reminder could not be dispatched, so the next
+// scheduler tick can re-claim and retry. A failure here is only logged:
+// the row then stays claimed and the reminder is dropped, which is the
+// same outcome as failing silently but with an audit trail.
+func releaseReminderClaim(ctx context.Context, db *sql.DB, n pendingNotification) {
+	if _, err := db.ExecContext(ctx,
+		`UPDATE calendar_events SET notified_at = NULL WHERE id = ?`, n.ID); err != nil {
+		schedLog().Error("notification scheduler: failed to release reminder claim",
+			"eventId", n.PublicID.String(), "err", err)
 	}
 }
 

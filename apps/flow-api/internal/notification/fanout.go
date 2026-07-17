@@ -335,13 +335,17 @@ func (f *Fanout) fanout(ctx context.Context, workspaceID uint32, eventType strin
 }
 
 // DeliverCalendarReminder creates one in-app notification per recipient
-// for a calendar event reminder. Unlike the eventbus-driven [Fanout.fanout]
-// path it is not anchored to an events.id row — calendar reminders are
-// produced by the time-based scheduler, so source_event_id is left NULL
-// (the schema documents this case as "non-event-driven paths").
+// for a calendar event reminder. sourceEventID is the events.id of the
+// calendar.reminder row the scheduler appended when it claimed the
+// reminder; threading it into notifications.source_event_id arms the
+// (recipient_user_id, source_event_id, channel) unique key so a
+// concurrent or replayed fan-out of the same reminder collides on the
+// INSERT IGNORE instead of producing duplicate rows. A zero
+// sourceEventID falls back to NULL (no dedupe), preserved only for
+// callers that genuinely have no event row.
 //
 // Returns an error when any insert fails so the caller (the scheduler)
-// can decide whether to mark the event as notified. Errors for individual
+// can decide whether to keep the reminder claimed. Errors for individual
 // recipients are logged and aggregated into the returned error; the
 // method does not short-circuit on the first failure so that a transient
 // problem with one row does not silently skip the rest.
@@ -351,19 +355,25 @@ func (f *Fanout) DeliverCalendarReminder(
 	eventPublicID types.PublicID,
 	title string,
 	recipientUserIDs []uint32,
+	sourceEventID int64,
 ) error {
 	if len(recipientUserIDs) == 0 {
 		return nil
 	}
 
+	srcEventID := sql.NullInt64{}
+	if sourceEventID != 0 {
+		srcEventID = sql.NullInt64{Int64: sourceEventID, Valid: true}
+	}
+
 	var firstErr error
 	for _, recipientID := range recipientUserIDs {
-		if _, err := f.queries.CreateNotification(ctx, generated.CreateNotificationParams{
+		affected, err := f.queries.CreateNotification(ctx, generated.CreateNotificationParams{
 			PublicID:         types.New(),
 			WorkspaceID:      workspaceID,
 			RecipientUserID:  recipientID,
 			ActorUserID:      sql.NullInt32{},
-			SourceEventID:    sql.NullInt64{},
+			SourceEventID:    srcEventID,
 			EventType:        "calendar.reminder",
 			ResourceType:     "calendar_event",
 			ResourcePublicID: eventPublicID,
@@ -371,7 +381,8 @@ func (f *Fanout) DeliverCalendarReminder(
 			Body:             sql.NullString{},
 			Severity:         generated.NotificationsSeverityNormal,
 			Channel:          generated.NotificationsChannelInApp,
-		}); err != nil {
+		})
+		if err != nil {
 			slog.ErrorContext(ctx, "calendar reminder fanout: failed to create notification",
 				slog.Uint64("workspace_id", uint64(workspaceID)),
 				slog.Uint64("recipient_user_id", uint64(recipientID)),
@@ -380,6 +391,20 @@ func (f *Fanout) DeliverCalendarReminder(
 			if firstErr == nil {
 				firstErr = fmt.Errorf("DeliverCalendarReminder: recipient=%d: %w", recipientID, err)
 			}
+			continue
+		}
+		if affected == 0 {
+			// The INSERT IGNORE collided with the (recipient,
+			// source_event, channel) unique key — a concurrent or
+			// replayed fan-out already delivered this reminder to this
+			// recipient. At-least-once happy path; count it so
+			// dashboards can watch the dedup rate.
+			slog.DebugContext(ctx, "calendar reminder fanout: deduplicated",
+				slog.Uint64("workspace_id", uint64(workspaceID)),
+				slog.Uint64("recipient_user_id", uint64(recipientID)),
+				slog.String("event_public_id", eventPublicID.String()),
+				slog.Int64("source_event_id", sourceEventID))
+			obs.IncNotificationFanoutDedup("unique_collision")
 		}
 	}
 	return firstErr

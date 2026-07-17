@@ -33,6 +33,37 @@ func (q *Queries) ArchiveNotification(ctx context.Context, arg ArchiveNotificati
 	return err
 }
 
+const claimReminderForDelivery = `-- name: ClaimReminderForDelivery :execrows
+UPDATE calendar_events
+SET notified_at = NOW()
+WHERE id = ?
+  AND notified_at IS NULL
+`
+
+// Atomically claim a calendar event's reminder for delivery. The
+// conditional predicate notified_at IS NULL is what makes the claim
+// safe: a single UPDATE lets exactly one caller flip the row from
+// NULL to NOW(), so the affected-rows count (RowsAffected) is 1 for
+// the winner and 0 for every racing loser. Callers MUST claim first
+// and dispatch the reminder only when the count is 1, replacing the
+// read-then-blind-UPDATE pattern that could double-send when more
+// than one scheduler tick or process observes the same due event.
+//
+// On a dispatch failure the caller should reset notified_at back to
+// NULL so the next tick can re-claim and retry the send.
+//
+// The WHERE targets the primary key directly; unlike the notifications
+// reads in this file it does not lead with workspace_id because the
+// claim is a single-row primary-key mutation, not a tenant-scoped
+// scan — the id already uniquely identifies the workspace's event.
+func (q *Queries) ClaimReminderForDelivery(ctx context.Context, id uint32) (int64, error) {
+	result, err := q.db.ExecContext(ctx, claimReminderForDelivery, id)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
+}
+
 const countUnreadNotifications = `-- name: CountUnreadNotifications :one
 SELECT COUNT(*) AS unread_count
 FROM notifications
@@ -680,12 +711,21 @@ const markNotificationDelivered = `-- name: MarkNotificationDelivered :exec
 UPDATE notifications
 SET delivered_at = NOW()
 WHERE public_id = ?
+  AND recipient_user_id = ?
   AND delivered_at IS NULL
 `
 
-// Mark a notification as delivered (email/push sent).
-func (q *Queries) MarkNotificationDelivered(ctx context.Context, publicID types.PublicID) error {
-	_, err := q.db.ExecContext(ctx, markNotificationDelivered, publicID)
+type MarkNotificationDeliveredParams struct {
+	PublicID        types.PublicID `json:"publicId"`
+	RecipientUserID uint32         `json:"-"`
+}
+
+// Mark a notification as delivered (email/push sent). Scoped to the
+// recipient so a delivery flag can never be flipped on another user's
+// notification, matching the recipient predicate on the sibling
+// MarkNotificationRead / ArchiveNotification mutations.
+func (q *Queries) MarkNotificationDelivered(ctx context.Context, arg MarkNotificationDeliveredParams) error {
+	_, err := q.db.ExecContext(ctx, markNotificationDelivered, arg.PublicID, arg.RecipientUserID)
 	return err
 }
 

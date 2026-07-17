@@ -9,10 +9,86 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"strings"
 	"time"
 
 	types "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/types"
 )
+
+const claimPendingDeliveries = `-- name: ClaimPendingDeliveries :many
+SELECT d.id, d.public_id, d.workspace_id, d.subscription_id,
+  d.event_type, d.payload_json, d.attempts, d.max_attempts,
+  ws.url, ws.secret
+FROM webhook_deliveries d
+INNER JOIN webhook_subscriptions ws ON ws.id = d.subscription_id
+WHERE d.status IN ('pending', 'failed')
+  AND d.next_retry_at <= NOW()
+  AND d.attempts < d.max_attempts
+  AND d.enabled = TRUE
+ORDER BY d.next_retry_at ASC, d.id ASC
+LIMIT ?
+FOR UPDATE SKIP LOCKED
+`
+
+type ClaimPendingDeliveriesRow struct {
+	ID             uint32          `json:"-"`
+	PublicID       types.PublicID  `json:"publicId"`
+	WorkspaceID    uint32          `json:"-"`
+	SubscriptionID uint32          `json:"-"`
+	EventType      string          `json:"eventType"`
+	PayloadJson    json.RawMessage `json:"payloadJson"`
+	Attempts       uint8           `json:"attempts"`
+	MaxAttempts    uint8           `json:"maxAttempts"`
+	Url            string          `json:"url"`
+	Secret         string          `json:"secret"`
+}
+
+// Atomically claim a batch of deliveries ready for (re)delivery.
+// Modeled after ClaimNextAgentRun: callers wrap this SELECT and the
+// companion MarkDeliveriesClaimed in a single BEGIN / COMMIT.
+// FOR UPDATE SKIP LOCKED lets multiple worker replicas race for rows
+// without blocking each other; each replica only sees rows no other
+// transaction currently holds. After the caller flips the returned rows
+// to 'delivering' (see MarkDeliveriesClaimed) and COMMITs, the rows no
+// longer satisfy status IN ('pending', 'failed'), so a second replica
+// skips them on its next scan. attempts is NOT incremented here; the
+// terminal Mark* queries own the attempt count.
+// d.id is required: fed into MarkDeliveriesClaimed and the terminal
+// MarkDeliveryDelivered/Failed/Dead (WHERE id = ?).
+// ORDER BY carries d.id as a stable tie-breaker.
+func (q *Queries) ClaimPendingDeliveries(ctx context.Context, limit int32) ([]ClaimPendingDeliveriesRow, error) {
+	rows, err := q.db.QueryContext(ctx, claimPendingDeliveries, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ClaimPendingDeliveriesRow{}
+	for rows.Next() {
+		var i ClaimPendingDeliveriesRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.PublicID,
+			&i.WorkspaceID,
+			&i.SubscriptionID,
+			&i.EventType,
+			&i.PayloadJson,
+			&i.Attempts,
+			&i.MaxAttempts,
+			&i.Url,
+			&i.Secret,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
 
 const createWebhookDelivery = `-- name: CreateWebhookDelivery :execrows
 INSERT IGNORE INTO webhook_deliveries (
@@ -394,6 +470,34 @@ func (q *Queries) ListWebhookSubscriptions(ctx context.Context, arg ListWebhookS
 		return nil, err
 	}
 	return items, nil
+}
+
+const markDeliveriesClaimed = `-- name: MarkDeliveriesClaimed :exec
+UPDATE webhook_deliveries
+SET status = 'delivering'
+WHERE id IN (/*SLICE:ids*/?)
+  AND status IN ('pending', 'failed')
+`
+
+// Flip the rows returned by ClaimPendingDeliveries to the in-flight
+// 'delivering' state inside the same transaction, before the POST.
+// Once committed, these rows drop out of the ClaimPendingDeliveries
+// WHERE clause so no other replica re-claims them. Guarded on the
+// pending/failed states so a concurrently-terminal row is never
+// resurrected. attempts is left untouched here.
+func (q *Queries) MarkDeliveriesClaimed(ctx context.Context, ids []uint32) error {
+	query := markDeliveriesClaimed
+	var queryParams []interface{}
+	if len(ids) > 0 {
+		for _, v := range ids {
+			queryParams = append(queryParams, v)
+		}
+		query = strings.Replace(query, "/*SLICE:ids*/?", strings.Repeat(",?", len(ids))[1:], 1)
+	} else {
+		query = strings.Replace(query, "/*SLICE:ids*/?", "NULL", 1)
+	}
+	_, err := q.db.ExecContext(ctx, query, queryParams...)
+	return err
 }
 
 const markDeliveryDead = `-- name: MarkDeliveryDead :exec

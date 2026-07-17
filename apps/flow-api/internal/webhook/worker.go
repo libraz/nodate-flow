@@ -1,8 +1,11 @@
 // Package webhook implements the background webhook delivery worker. It
 // subscribes to eventbus events via [Worker.Hook], creates pending
 // delivery rows for matching subscriptions, and periodically processes
-// those deliveries with HMAC-SHA256 signed POST requests. Failed
-// deliveries are retried with exponential backoff up to six attempts.
+// those deliveries with HMAC-SHA256 signed POST requests. Each batch is
+// first claimed atomically (FOR UPDATE SKIP LOCKED + status flip to
+// 'delivering') so multiple worker replicas partition the queue instead
+// of each delivering every row. Failed deliveries are retried with
+// exponential backoff up to six attempts.
 package webhook
 
 import (
@@ -257,9 +260,31 @@ func (w *Worker) ProcessOnce(ctx context.Context) {
 // ProcessOnceForSubscription is the tightly-scoped variant of ProcessOnce
 // used by parallel-safe e2e tests: it only delivers rows belonging to a
 // single subscription, so concurrent tests cannot accidentally consume
-// each other's pending rows. Production callers must use [Worker.Start]
+// each other's pending rows. It runs the same claim-then-POST state
+// machine as processBatch. Production callers must use [Worker.Start]
 // or [Worker.ProcessOnce] instead.
 func (w *Worker) ProcessOnceForSubscription(ctx context.Context, subscriptionID uint32) {
+	claimed, err := w.claimForSubscription(ctx, subscriptionID)
+	if err != nil {
+		slog.Warn("webhook: ProcessOnceForSubscription: claim failed",
+			slog.String("err", err.Error()))
+		return
+	}
+	for _, row := range claimed {
+		w.deliver(ctx, row)
+	}
+}
+
+// claimForSubscription is the subscription-scoped mirror of claimBatch:
+// same FOR UPDATE SKIP LOCKED select and 'delivering' flip inside one
+// short transaction, restricted to a single subscription's rows.
+func (w *Worker) claimForSubscription(ctx context.Context, subscriptionID uint32) ([]generated.ClaimPendingDeliveriesRow, error) {
+	tx, err := w.db.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = tx.Rollback() }()
+
 	const q = `
 		SELECT d.id, d.public_id, d.workspace_id, d.subscription_id,
 		       d.event_type, d.payload_json, d.attempts, d.max_attempts,
@@ -271,40 +296,54 @@ func (w *Worker) ProcessOnceForSubscription(ctx context.Context, subscriptionID 
 		  AND d.next_retry_at <= NOW()
 		  AND d.attempts < d.max_attempts
 		  AND d.enabled = TRUE
-		ORDER BY d.next_retry_at ASC
+		ORDER BY d.next_retry_at ASC, d.id ASC
 		LIMIT ?
+		FOR UPDATE SKIP LOCKED
 	`
-	rows, err := w.db.QueryContext(ctx, q, subscriptionID, batchSize)
+	rows, err := tx.QueryContext(ctx, q, subscriptionID, batchSize)
 	if err != nil {
-		slog.Warn("webhook: ProcessOnceForSubscription: query failed",
-			slog.String("err", err.Error()))
-		return
+		return nil, err
 	}
 	defer rows.Close()
-	var pending []generated.FindPendingDeliveriesRow
+	var claimed []generated.ClaimPendingDeliveriesRow
 	for rows.Next() {
-		var r generated.FindPendingDeliveriesRow
+		var r generated.ClaimPendingDeliveriesRow
 		if err := rows.Scan(
 			&r.ID, &r.PublicID, &r.WorkspaceID, &r.SubscriptionID,
 			&r.EventType, &r.PayloadJson, &r.Attempts, &r.MaxAttempts,
 			&r.Url, &r.Secret,
 		); err != nil {
-			slog.Warn("webhook: ProcessOnceForSubscription: scan failed",
-				slog.String("err", err.Error()))
-			return
+			return nil, err
 		}
-		pending = append(pending, r)
+		claimed = append(claimed, r)
 	}
-	for _, row := range pending {
-		w.deliver(ctx, row)
+	if err := rows.Err(); err != nil {
+		return nil, err
 	}
+	if len(claimed) == 0 {
+		return nil, nil
+	}
+
+	ids := make([]uint32, len(claimed))
+	for i, r := range claimed {
+		ids[i] = r.ID
+	}
+	if err := w.queries.WithTx(tx).MarkDeliveriesClaimed(ctx, ids); err != nil {
+		return nil, err
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+	return claimed, nil
 }
 
-// processBatch fetches and delivers a batch of pending webhook deliveries.
+// processBatch atomically claims a batch of pending webhook deliveries
+// and POSTs them. The claim commits before any network I/O, so with N
+// worker replicas each due row is delivered by exactly one replica.
 func (w *Worker) processBatch(ctx context.Context) {
-	rows, err := w.queries.FindPendingDeliveries(ctx, batchSize)
+	rows, err := w.claimBatch(ctx)
 	if err != nil {
-		slog.Warn("webhook: failed to find pending deliveries",
+		slog.Warn("webhook: failed to claim pending deliveries",
 			slog.String("err", err.Error()))
 		return
 	}
@@ -314,8 +353,46 @@ func (w *Worker) processBatch(ctx context.Context) {
 	}
 }
 
-// deliver performs the HTTP POST for a single delivery row.
-func (w *Worker) deliver(ctx context.Context, row generated.FindPendingDeliveriesRow) {
+// claimBatch selects up to batchSize due deliveries with
+// FOR UPDATE SKIP LOCKED and flips them to 'delivering' inside a single
+// short transaction. Once committed the rows no longer match the claim
+// query's status filter, so a concurrent replica scanning the queue
+// skips them instead of double-delivering. The row locks are held only
+// for the two statements — the HTTP POST happens after COMMIT. On any
+// error the deferred rollback releases the locks and the rows stay
+// pending/failed for the next tick.
+func (w *Worker) claimBatch(ctx context.Context) ([]generated.ClaimPendingDeliveriesRow, error) {
+	tx, err := w.db.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	qtx := w.queries.WithTx(tx)
+	rows, err := qtx.ClaimPendingDeliveries(ctx, batchSize)
+	if err != nil {
+		return nil, err
+	}
+	if len(rows) == 0 {
+		return nil, nil
+	}
+
+	ids := make([]uint32, len(rows))
+	for i, r := range rows {
+		ids[i] = r.ID
+	}
+	if err := qtx.MarkDeliveriesClaimed(ctx, ids); err != nil {
+		return nil, err
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+	return rows, nil
+}
+
+// deliver performs the HTTP POST for a single claimed ('delivering')
+// row and records the terminal outcome (delivered / failed / dead).
+func (w *Worker) deliver(ctx context.Context, row generated.ClaimPendingDeliveriesRow) {
 	payload := row.PayloadJson
 	if len(payload) == 0 {
 		payload = json.RawMessage(`{}`)
@@ -372,7 +449,7 @@ func (w *Worker) deliver(ctx context.Context, row generated.FindPendingDeliverie
 
 // markFailed marks a delivery attempt as failed. If max retries are
 // exhausted the delivery is marked dead.
-func (w *Worker) markFailed(ctx context.Context, row generated.FindPendingDeliveriesRow, httpStatus int, responseBody string) {
+func (w *Worker) markFailed(ctx context.Context, row generated.ClaimPendingDeliveriesRow, httpStatus int, responseBody string) {
 	nextAttempt := int(row.Attempts) // attempts is pre-increment; current index
 	httpSt := sql.NullInt16{}
 	if httpStatus > 0 {
