@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -13,11 +14,43 @@ import (
 const (
 	googleBaseURL      = "https://generativelanguage.googleapis.com/v1beta/models"
 	googleDefaultModel = "gemini-1.5-flash-latest"
+	// googleAPIKeyHeader is Gemini's supported alternative to the ?key=
+	// query parameter. Passing the key in a header keeps it out of the
+	// request URL, so it can never leak through a url.Error message,
+	// transport log, or proxy access log built from the URL.
+	googleAPIKeyHeader = "x-goog-api-key"
 )
 
+// ErrInvalidBaseURL is returned by [New] when a provider's configured
+// base URL is present but not a parseable absolute http(s) URL. Validating
+// at construction turns a malformed ai_providers.base_url into a fast,
+// stable failure instead of an opaque transport error mid-call.
+var ErrInvalidBaseURL = errors.New("ai/providers: invalid base url")
+
+// validateBaseURL parses raw and rejects anything that is not an absolute
+// http or https URL. An empty string is accepted: it means "use the
+// provider default endpoint".
+func validateBaseURL(raw string) error {
+	if raw == "" {
+		return nil
+	}
+	u, err := url.Parse(raw)
+	if err != nil {
+		return fmt.Errorf("%w: %v", ErrInvalidBaseURL, err)
+	}
+	if u.Scheme != "http" && u.Scheme != "https" {
+		return fmt.Errorf("%w: scheme must be http or https", ErrInvalidBaseURL)
+	}
+	if u.Host == "" {
+		return fmt.Errorf("%w: missing host", ErrInvalidBaseURL)
+	}
+	return nil
+}
+
 // googleProvider talks to Gemini's generateContent endpoint. The API key
-// is passed as a query parameter (?key=...) per Google's spec; we still
-// scrub the plaintext immediately after the URL is built.
+// is passed via the x-goog-api-key request header (never the URL query),
+// and the decrypted plaintext is zeroed immediately after the header is
+// set so it is never held beyond the single upstream call.
 type googleProvider struct {
 	cfg     Config
 	dec     Decryptor
@@ -70,13 +103,8 @@ func (p *googleProvider) Complete(ctx context.Context, req Request) (*Response, 
 		return nil, fmt.Errorf("google: marshal: %w", err)
 	}
 
-	plain, err := p.dec.Decrypt(p.cfg.EncryptedKey)
-	if err != nil {
-		return nil, fmt.Errorf("google: decrypt key: %w", err)
-	}
 	base := chooseBaseURL(p.baseURL, googleBaseURL)
-	endpoint := fmt.Sprintf("%s/%s:generateContent?key=%s", base, url.PathEscape(model), url.QueryEscape(string(plain)))
-	zero(plain)
+	endpoint := fmt.Sprintf("%s/%s:generateContent", base, url.PathEscape(model))
 
 	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, bytes.NewReader(body))
 	if err != nil {
@@ -84,11 +112,22 @@ func (p *googleProvider) Complete(ctx context.Context, req Request) (*Response, 
 	}
 	httpReq.Header.Set("Content-Type", "application/json")
 
+	plain, err := p.dec.Decrypt(p.cfg.EncryptedKey)
+	if err != nil {
+		return nil, fmt.Errorf("google: decrypt key: %w", err)
+	}
+	// string(plain) copies the bytes into the immutable header value, so
+	// zeroing the plaintext slice afterwards drops our only mutable copy;
+	// the key never appears in the request URL.
+	httpReq.Header.Set(googleAPIKeyHeader, string(plain))
+	zero(plain)
+
 	resp, err := doLimited(ctx, DestGoogle, httpReq)
 	if err != nil {
 		// classifyTransportError builds its message from a sentinel only,
-		// so the API key Google requires in the query string is never
-		// surfaced in the returned error.
+		// so even a transport error whose wrapped url.Error embeds the
+		// request URL cannot surface the API key (it rides in the header,
+		// not the URL).
 		return nil, classifyTransportError(ctx, err)
 	}
 	defer resp.Body.Close()

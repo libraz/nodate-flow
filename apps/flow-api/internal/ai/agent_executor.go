@@ -9,6 +9,7 @@ import (
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/ai/agentruntime"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/ai/providers"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/generated"
+	"github.com/nodate-flow/nodate-flow/packages/go-shared/logutil"
 )
 
 // ErrAgentPaused is returned by [AgentExecutor.ExecuteAgent] when the
@@ -112,6 +113,10 @@ func (e *AgentExecutor) ExecuteAgent(ctx context.Context, workspaceID, agentID u
 	}
 	result.CostMicros = resp.EstimatedCostMicros()
 	result.CostCents = resp.EstimatedCostCents()
-	result.LastThought = resp.Text
+	// The raw LLM response is persisted to tasks.agent_memo.last_thought
+	// and served back through the API lastThought field; redact any
+	// secret-prefixed token the model may have echoed before it leaves
+	// this call and reaches storage.
+	result.LastThought = logutil.Redact(resp.Text)
 	return result, nil
 }

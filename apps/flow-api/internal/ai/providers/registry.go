@@ -27,6 +27,9 @@ func New(cfg Config, dec Decryptor) (Provider, error) {
 	case KindOpenAI:
 		return &openAIProvider{cfg: cfg, dec: dec, baseURL: defaultOpenAIBaseURL}, nil
 	case KindGoogle:
+		if err := validateBaseURL(cfg.BaseURL); err != nil {
+			return nil, err
+		}
 		return &googleProvider{cfg: cfg, dec: dec, baseURL: cfg.BaseURL}, nil
 	case KindOllama:
 		return &ollamaProvider{cfg: cfg}, nil

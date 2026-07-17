@@ -286,7 +286,10 @@ func (r *Runner) ExecuteJudge(ctx context.Context, workspaceID, agentID uint32, 
 	})
 	result.CostMicros = resp.EstimatedCostMicros()
 	result.CostCents = resp.EstimatedCostCents()
-	result.LastThought = resp.Text
+	// LastThought is persisted to agent_memo and exposed via the API; the
+	// raw parse text (verdictText) stays unredacted below since it must
+	// round-trip through the JSON verdict parser.
+	result.LastThought = logutil.Redact(resp.Text)
 
 	// If the response does not parse into a valid Verdict, retry
 	// once with the same prompt plus a stern reminder appended.
@@ -326,7 +329,7 @@ func (r *Runner) ExecuteJudge(ctx context.Context, workspaceID, agentID uint32, 
 			})
 			result.CostMicros += retryResp.EstimatedCostMicros()
 			result.CostCents = result.CostMicros / 10_000
-			result.LastThought = retryResp.Text
+			result.LastThought = logutil.Redact(retryResp.Text)
 			verdictText = retryResp.Text
 		}
 		// A retry that also errors is treated like an unparseable

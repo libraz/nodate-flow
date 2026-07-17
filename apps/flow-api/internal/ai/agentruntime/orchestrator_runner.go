@@ -11,6 +11,7 @@ import (
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/types"
 	apierrors "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/errors"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/eventbus"
+	"github.com/nodate-flow/nodate-flow/packages/go-shared/logutil"
 )
 
 // ExecutionResult is the optional rich return value an [AgentExecutor]
@@ -469,7 +470,11 @@ func (r *OrchestratorRunner) recordSuccessMemo(ctx context.Context, workspaceID,
 		"last_cost_cents":  costMicros / 10_000,
 	}
 	if result.LastThought != "" {
-		patch["last_thought"] = truncate(result.LastThought, 500)
+		// Executors redact LastThought at the source, but this is the
+		// actual agent_memo write site: redact again as a persistence
+		// guard so a future executor that forgets cannot leak a
+		// secret-prefixed token into storage. Redact is idempotent.
+		patch["last_thought"] = logutil.Redact(truncate(result.LastThought, 500))
 	}
 	prior := r.readMemo(ctx, workspaceID, taskID)
 	if prior.HandoffStatus != "" {

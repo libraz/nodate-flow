@@ -119,6 +119,49 @@ func TestExecuteJudgeHappyPath(t *testing.T) {
 	}
 }
 
+// TestExecuteJudgeRedactsLastThought asserts that a secret-prefixed token
+// echoed inside the raw LLM response is redacted before it lands in
+// ExecutionResult.LastThought (persisted to agent_memo and exposed via the
+// API lastThought field) and before it reaches the ai_invocations log.
+func TestExecuteJudgeRedactsLastThought(t *testing.T) {
+	t.Parallel()
+	const secret = "sk-ant-LEAKEDKEY0123456789"
+	prov := &recordingProvider{
+		kind: providers.Kind("mock"),
+		// Valid verdict JSON so the parse/validate retry loop does not fire;
+		// the secret is embedded in reasoning_excerpt exactly as a
+		// misbehaving model might echo it back.
+		resp: &providers.Response{
+			Text:      `{"action":"noop","confidence":0.1,"reasoning_excerpt":"echoing key ` + secret + ` verbatim"}`,
+			CostCents: 3,
+		},
+	}
+	var logged []InvocationRecord
+	r := &Runner{
+		Agents:   &fakeAgentLookup{snap: AgentSnapshot{AgentID: 5, WorkspaceID: 2}},
+		Signals:  &fakeSignalLookup{snap: SignalSnapshot{SignalID: 1, WorkspaceID: 2, Kind: "manual"}},
+		Resolver: &fakeResolver{provider: prov},
+		Log:      func(_ context.Context, rec InvocationRecord) { logged = append(logged, rec) },
+	}
+
+	result, err := r.ExecuteJudge(context.Background(), 2, 5, 1)
+	if err != nil {
+		t.Fatalf("ExecuteJudge: %v", err)
+	}
+	if strings.Contains(result.LastThought, secret) {
+		t.Fatalf("LastThought leaked the secret: %q", result.LastThought)
+	}
+	if !strings.Contains(result.LastThought, "[REDACTED:sk-ant-]") {
+		t.Fatalf("LastThought was not redacted: %q", result.LastThought)
+	}
+	if len(logged) != 1 {
+		t.Fatalf("want one invocation record, got %d", len(logged))
+	}
+	if strings.Contains(logged[0].ResponseRedacted, secret) {
+		t.Fatalf("ai_invocations response leaked the secret: %q", logged[0].ResponseRedacted)
+	}
+}
+
 // TestExecuteJudgeCostCap asserts the CostGuard's ErrDailyBudgetExceeded
 // surfaces as CostCapHit and short-circuits before any provider call.
 func TestExecuteJudgeCostCap(t *testing.T) {
