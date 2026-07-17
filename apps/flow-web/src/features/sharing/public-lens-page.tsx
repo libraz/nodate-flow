@@ -12,22 +12,12 @@ import type { ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import PublicPageLayout from '../../components/public-page-layout';
-import { ApiError, isNetworkError } from '../../lib/api-error';
+import { isNetworkError } from '../../lib/api-error';
 import { usePublicLensQuery } from './api';
 import styles from './sharing.module.css';
 
 export interface PublicLensPageProps {
   token: string;
-}
-
-/**
- * Treat the same lens-publish lifecycle codes the API surfaces as
- * deterministic terminal states: `EXPIRED` (the publish window closed)
- * and `NOT_FOUND` (the lens was unpublished or the token was always
- * bogus). Anything else routes through the generic invalid copy.
- */
-function isExpiredLensError(err: unknown): boolean {
-  return err instanceof ApiError && err.code === 'LENS.PUBLIC.EXPIRED';
 }
 
 export default function PublicLensPage({ token }: PublicLensPageProps): ReactElement {
@@ -46,17 +36,10 @@ export default function PublicLensPage({ token }: PublicLensPageProps): ReactEle
 
   if (error || !data) {
     const network = isNetworkError(error);
-    const expired = isExpiredLensError(error);
     const titleKey = network
       ? 'public_page.errors.network_title'
-      : expired
-        ? 'public_page.errors.expired_title'
-        : 'public_page.errors.invalid_title';
-    const bodyKey = network
-      ? 'public_page.errors.network_body'
-      : expired
-        ? 'public_page.errors.expired_body'
-        : 'public_page.errors.invalid_body';
+      : 'public_page.errors.invalid_title';
+    const bodyKey = network ? 'public_page.errors.network_body' : 'public_page.errors.invalid_body';
     return (
       <PublicPageLayout showBrandHeader alignMain="center" mainLabel={t(titleKey)}>
         <CircleAlert
