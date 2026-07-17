@@ -1528,15 +1528,21 @@ type Querier interface {
 	// agent since a lower bound. Used by agentguard to enforce the
 	// agent's monthly cost cap.
 	SumAiCostForAgentSince(ctx context.Context, arg SumAiCostForAgentSinceParams) (int64, error)
-	// Sum the estimated cost (in whole cents) of LLM calls made today for a
-	// workspace. cost_estimate is stored as DECIMAL(10,6) USD; multiply by 100
-	// and round to produce a cent-scale integer suitable for CostGuard.
+	// Sum the estimated cost (in whole cents) of chat/agent LLM calls made today
+	// for a workspace. cost_estimate is stored as DECIMAL(10,6) USD; multiply by
+	// 100 and round to produce a cent-scale integer suitable for CostGuard.
+	// Embedding calls are excluded here: they have their own
+	// ai_settings.embed_budget_cents_day bucket (see SumEmbedCostTodayForWorkspace)
+	// and must not be double-counted against the chat/agent daily budget.
 	SumAiCostTodayForWorkspace(ctx context.Context, arg SumAiCostTodayForWorkspaceParams) (int64, error)
 	// Sum the estimated cost (in whole cents) of embedding calls made today for a
 	// workspace. Embeddings have their own ai_settings.embed_budget_cents_day
 	// bucket, separate from chat/agent LLM budget.
 	SumEmbedCostTodayForWorkspace(ctx context.Context, arg SumEmbedCostTodayForWorkspaceParams) (int64, error)
 	ToggleWebhookSubscription(ctx context.Context, arg ToggleWebhookSubscriptionParams) error
+	// Stamp an MCP token's last_used_at after a successful bearer auth.
+	// Called with the internal token id resolved by FindUserForMcpToken.
+	TouchMcpTokenLastUsed(ctx context.Context, id uint32) (int64, error)
 	// Write the new derived_state computed by the transition handler. This is
 	// the only path allowed to mutate derived_state and must be called inside
 	// the same transaction as the events append.

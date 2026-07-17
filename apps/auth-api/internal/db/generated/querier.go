@@ -445,6 +445,9 @@ type Querier interface {
 	// PatchMe query cannot be reused because it treats NULL as "leave alone"
 	// rather than "overwrite with this value".
 	SetMyAvatarURL(ctx context.Context, arg SetMyAvatarURLParams) error
+	// Stamp an MCP token's last_used_at after a successful bearer auth.
+	// Called with the internal token id resolved by FindUserForMcpToken.
+	TouchMcpTokenLastUsed(ctx context.Context, id uint32) (int64, error)
 	// Replace stored tokens after a successful refresh.
 	UpdateConnectionTokens(ctx context.Context, arg UpdateConnectionTokensParams) error
 	// Bump failed login counter and optionally apply a lockout deadline.

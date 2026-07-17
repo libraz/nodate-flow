@@ -268,10 +268,9 @@ func (h *Handler) handleToolCall(w http.ResponseWriter, r *http.Request, s *sess
 	}
 	// Scope gate. By design this is a coarse read/write tier check, not
 	// a per-tool or per-resource capability. Each tool declares a single
-	// requiredScope drawn from a fixed two-tier vocabulary
-	// (read:workspace / write:workspace, plus the project-tier aliases
-	// read:project / write:project — see [session.hasScope]); a token's
-	// granted scopes are matched against it with write-implies-read
+	// requiredScope drawn from the fixed vocabulary in [SupportedScopes]
+	// (read:workspace / write:workspace — see [session.hasScope]); a
+	// token's granted scopes are matched against it with write-implies-read
 	// widening. There is intentionally no scope like "read:calendar" or
 	// "write:task:complete": a token that can write the workspace can
 	// invoke every mutating tool in it.

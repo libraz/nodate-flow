@@ -36,25 +36,21 @@ type session struct {
 // hasScope reports whether the session's granted scopes satisfy the
 // tool's required scope.
 //
-// Scopes are coarse access *tiers*, not per-tool or per-resource
-// capabilities. The vocabulary is fixed and two-tiered:
+// The vocabulary is the closed set in [SupportedScopes]:
 //
 //   - read:workspace  — invoke read-only tools across the workspace.
 //   - write:workspace — additionally invoke every mutating tool; it
-//     widens to read:workspace and to both project-tier scopes.
-//   - read:project / write:project — the same two tiers narrowed to a
-//     project; write:project widens to read:project, and write:workspace
-//     widens to both.
+//     widens to read:workspace.
 //
-// Matching is therefore a membership test with write-implies-read (and
-// workspace-implies-project) widening — there is no "read:calendar" or
-// "write:task:complete" granularity. A token holding write:workspace can
-// invoke any mutating tool; the resource it touches is still constrained,
-// but by the workspace-scoped resolvers in this file (resolveTask /
-// resolveCalendar / resolveWorkspaceUser, …) and the agent guard, not by
-// the scope string. This keeps the scope surface small and auditable;
-// per-resource least privilege is a deliberate future extension, not an
-// isolation gap (the resolvers, not the scopes, enforce tenancy).
+// Matching is therefore a membership test with write-implies-read
+// widening — there is no "read:calendar" or "write:task:complete"
+// granularity. A token holding write:workspace can invoke any mutating
+// tool; the resource it touches is still constrained, but by the
+// workspace-scoped resolvers in this file (resolveTask / resolveCalendar /
+// resolveWorkspaceUser, …) and the agent guard, not by the scope string.
+// This keeps the scope surface small and auditable; per-resource least
+// privilege is a deliberate future extension, not an isolation gap (the
+// resolvers, not the scopes, enforce tenancy).
 func (s *session) hasScope(required string) bool {
 	if required == "" {
 		return true
@@ -63,11 +59,8 @@ func (s *session) hasScope(required string) bool {
 		if sc == required {
 			return true
 		}
-		// write:* implies read:* at the same resource tier.
-		if required == "read:workspace" && sc == "write:workspace" {
-			return true
-		}
-		if required == "read:project" && (sc == "write:project" || sc == "write:workspace") {
+		// write:workspace widens to read:workspace.
+		if required == ScopeReadWorkspace && sc == ScopeWriteWorkspace {
 			return true
 		}
 	}
@@ -97,12 +90,33 @@ func (h *Handler) authenticate(ctx context.Context, tok string) (*session, error
 	if row.AgentID.Valid {
 		agentID = uint32(row.AgentID.Int32) //#nosec G115 -- agent_id is agents.id (BIGINT UNSIGNED), fits uint32 within realistic deployments
 	}
+	// Stamp last_used_at so the token-list UI can surface usage and a
+	// leaked-token signal is not dead. Best-effort only: auth must never
+	// fail on the stamp, so it runs fire-and-forget on a detached context.
+	h.touchTokenLastUsed(ctx, row.TokenID)
 	return &session{
 		userID:      row.UserID,
 		workspaceID: row.WorkspaceID,
 		agentID:     agentID,
 		scopes:      scopes,
 	}, nil
+}
+
+// touchTokenLastUsed records that an MCP token was just used for a
+// successful authentication. It is intentionally non-blocking and
+// error-swallowing: the request must not wait on, or fail because of, the
+// usage stamp. The context is detached from the request so the update can
+// complete even after the caller's context is cancelled.
+func (h *Handler) touchTokenLastUsed(ctx context.Context, tokenID uint32) {
+	q := h.deps.Queries
+	if q == nil {
+		return
+	}
+	go func() {
+		stampCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 2*time.Second)
+		defer cancel()
+		_, _ = q.TouchMcpTokenLastUsed(stampCtx, tokenID)
+	}()
 }
 
 // parseScopes tolerantly decodes the scopes_json column. The column is

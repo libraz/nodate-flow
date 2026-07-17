@@ -18,3 +18,10 @@ WHERE m.token_hash = ?
   AND m.enabled = TRUE
   AND m.revoked_at IS NULL
 LIMIT 1;
+
+-- name: TouchMcpTokenLastUsed :execrows
+-- Stamp an MCP token's last_used_at after a successful bearer auth.
+-- Called with the internal token id resolved by FindUserForMcpToken.
+UPDATE mcp_tokens
+SET last_used_at = NOW()
+WHERE id = ?;

@@ -12,6 +12,7 @@ import (
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/types"
 	apierrors "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/errors"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/middleware"
+	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/mcp"
 )
 
 // mcpTokenDisplayPrefixLen is the number of leading plaintext characters
@@ -36,6 +37,15 @@ func CreateMcpToken(deps Deps) func(context.Context, *CreateMcpTokenInput) (*Cre
 		}
 		if in.Body.Scopes == nil {
 			in.Body.Scopes = []string{}
+		}
+		// Reject any requested scope outside the supported allowlist so a
+		// token can never carry free-text, unmatched (dead) scopes. The
+		// allowlist is shared with the MCP scope gate (mcp.SupportedScopes)
+		// so issuance and enforcement cannot drift.
+		for _, sc := range in.Body.Scopes {
+			if !mcp.IsSupportedScope(sc) {
+				return nil, httpErr(apierrors.ValidationBodyFieldInvalid)
+			}
 		}
 		scopesJSON, err := json.Marshal(in.Body.Scopes)
 		if err != nil {

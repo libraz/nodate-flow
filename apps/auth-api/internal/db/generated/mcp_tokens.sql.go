@@ -65,3 +65,19 @@ func (q *Queries) FindUserForMcpToken(ctx context.Context, tokenHash string) (Fi
 	)
 	return i, err
 }
+
+const touchMcpTokenLastUsed = `-- name: TouchMcpTokenLastUsed :execrows
+UPDATE mcp_tokens
+SET last_used_at = NOW()
+WHERE id = ?
+`
+
+// Stamp an MCP token's last_used_at after a successful bearer auth.
+// Called with the internal token id resolved by FindUserForMcpToken.
+func (q *Queries) TouchMcpTokenLastUsed(ctx context.Context, id uint32) (int64, error) {
+	result, err := q.db.ExecContext(ctx, touchMcpTokenLastUsed, id)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
+}
