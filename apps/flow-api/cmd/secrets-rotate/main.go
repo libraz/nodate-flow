@@ -1,22 +1,46 @@
-// Command secrets-rotate re-encrypts ai_providers.api_key_ciphertext rows
-// from an old NF_SECRET_KEY master key to a new one.
+// Command secrets-rotate re-encrypts every ciphertext column sealed with
+// NF_SECRET_KEY from an old master key to a new one.
+//
+// All stores share a single master key and HKDF label
+// (packages/go-shared/crypto), so rotation MUST cover all of them in one
+// run — rotating only one table would permanently break decryption of the
+// others once the old key is retired. The covered stores are:
+//
+//   - ai_providers.api_key_ciphertext        (LLM provider API keys)
+//   - identities.mfa_secret_ciphertext       (TOTP secrets)
+//   - user_integrations.access_token_ciphertext / refresh_token_ciphertext
+//     (personal OAuth tokens)
+//
+// There is deliberately NO per-store selection flag: a partial rotation is
+// never a valid end state.
 //
 // Usage:
 //
+//	NF_SECRET_KEY_OLD=<hex-or-base64> \
+//	NF_SECRET_KEY_NEW=<hex-or-base64> \
 //	secrets-rotate \
-//	  --old-key <hex-or-base64> \
-//	  --new-key <hex-or-base64> \
 //	  --dsn <mysql-dsn>           # or NF_DB_DSN env
 //	  [--dry-run] \
 //	  [--batch-size 100]
 //
-// The CLI decrypts each row with the old key and re-encrypts it with the
-// new key inside a per-batch transaction, so a failure mid-rotation never
-// leaves a mix of half-rotated and corrupt rows in a single batch.
+// NF_SECRET_KEY_OLD falls back to NF_SECRET_KEY when unset, matching the
+// documented flow where the currently deployed key is the "old" one.
 //
-// Security: plaintext API keys are held only for the duration of a single
-// re-encrypt and zeroed immediately afterwards. Nothing secret is ever
-// logged; progress lines reference only the already-public api_key_prefix.
+// Keys are read from the environment (or --old-key/--new-key argv flags,
+// which are refused unless --allow-insecure-argv is also given, because
+// argv is visible to other local users via ps and lands in shell history).
+//
+// The CLI decrypts each row with the old key and re-encrypts it with the
+// new key inside a per-batch transaction. Rows already sealed with the new
+// key are skipped, so an interrupted run can simply be re-executed with the
+// same keys until it reports success. After rotating every store the CLI
+// re-reads all rows and verifies each blob opens under the NEW key; it only
+// exits 0 when that verification passes, so a clean exit means it is safe
+// to retire the old key.
+//
+// Security: plaintext secrets never leave the crypto package (Reencrypt /
+// CanDecrypt operate on blobs). Nothing secret is ever logged; progress
+// lines reference only table names and internal row ids.
 package main
 
 import (
@@ -36,6 +60,65 @@ import (
 	"github.com/nodate-flow/nodate-flow/packages/go-shared/crypto"
 )
 
+// envOldKey and envNewKey name the environment variables holding the
+// rotation key pair. envOldKey falls back to crypto.EnvVar (NF_SECRET_KEY).
+const (
+	envOldKey = "NF_SECRET_KEY_OLD"
+	envNewKey = "NF_SECRET_KEY_NEW"
+)
+
+// store describes one table whose ciphertext columns are sealed with
+// NF_SECRET_KEY. selectSQL must return (id, col...) keyset-paginated by id;
+// updateSQL must accept the same columns in order followed by the id.
+type store struct {
+	name      string
+	countSQL  string
+	selectSQL string
+	updateSQL string
+	// numCols is the number of ciphertext columns per row (1 or 2).
+	// NULL / empty columns are passed through unchanged.
+	numCols int
+}
+
+// stores is the exhaustive list of NF_SECRET_KEY ciphertext stores. Adding
+// a new encrypted column anywhere in sql/ REQUIRES adding it here, or the
+// next key rotation will corrupt it.
+var stores = []store{
+	{
+		name: "ai_providers.api_key_ciphertext",
+		countSQL: "SELECT COUNT(*) FROM ai_providers " +
+			"WHERE LENGTH(api_key_ciphertext) > 0",
+		selectSQL: "SELECT id, api_key_ciphertext FROM ai_providers " +
+			"WHERE LENGTH(api_key_ciphertext) > 0 AND id > ? ORDER BY id LIMIT ?",
+		updateSQL: "UPDATE ai_providers SET api_key_ciphertext = ? WHERE id = ?",
+		numCols:   1,
+	},
+	{
+		name: "identities.mfa_secret_ciphertext",
+		countSQL: "SELECT COUNT(*) FROM identities " +
+			"WHERE mfa_secret_ciphertext IS NOT NULL AND LENGTH(mfa_secret_ciphertext) > 0",
+		selectSQL: "SELECT id, mfa_secret_ciphertext FROM identities " +
+			"WHERE mfa_secret_ciphertext IS NOT NULL AND LENGTH(mfa_secret_ciphertext) > 0 " +
+			"AND id > ? ORDER BY id LIMIT ?",
+		updateSQL: "UPDATE identities SET mfa_secret_ciphertext = ? WHERE id = ?",
+		numCols:   1,
+	},
+	{
+		name: "user_integrations.{access,refresh}_token_ciphertext",
+		countSQL: "SELECT COUNT(*) FROM user_integrations " +
+			"WHERE LENGTH(access_token_ciphertext) > 0 " +
+			"OR LENGTH(COALESCE(refresh_token_ciphertext, '')) > 0",
+		selectSQL: "SELECT id, access_token_ciphertext, refresh_token_ciphertext " +
+			"FROM user_integrations " +
+			"WHERE (LENGTH(access_token_ciphertext) > 0 " +
+			"OR LENGTH(COALESCE(refresh_token_ciphertext, '')) > 0) " +
+			"AND id > ? ORDER BY id LIMIT ?",
+		updateSQL: "UPDATE user_integrations " +
+			"SET access_token_ciphertext = ?, refresh_token_ciphertext = ? WHERE id = ?",
+		numCols: 2,
+	},
+}
+
 func main() {
 	if err := run(); err != nil {
 		fmt.Fprintf(os.Stderr, "secrets-rotate: %v\n", err)
@@ -45,21 +128,28 @@ func main() {
 
 func run() error {
 	var (
-		oldKeyRaw string
-		newKeyRaw string
-		dsn       string
-		dryRun    bool
-		batchSize int
+		oldKeyArgv    string
+		newKeyArgv    string
+		dsn           string
+		dryRun        bool
+		batchSize     int
+		allowInsecure bool
 	)
-	flag.StringVar(&oldKeyRaw, "old-key", "", "old NF_SECRET_KEY (hex or base64, 32 bytes)")
-	flag.StringVar(&newKeyRaw, "new-key", "", "new NF_SECRET_KEY (hex or base64, 32 bytes)")
+	flag.StringVar(&oldKeyArgv, "old-key", "",
+		"old master key (INSECURE: requires --allow-insecure-argv; prefer "+envOldKey+" env)")
+	flag.StringVar(&newKeyArgv, "new-key", "",
+		"new master key (INSECURE: requires --allow-insecure-argv; prefer "+envNewKey+" env)")
 	flag.StringVar(&dsn, "dsn", os.Getenv("NF_DB_DSN"), "MySQL DSN (defaults to NF_DB_DSN env)")
-	flag.BoolVar(&dryRun, "dry-run", false, "report how many rows would be rotated without writing")
+	flag.BoolVar(&dryRun, "dry-run", false,
+		"classify every row (needs rotation / already rotated / undecryptable) without writing")
 	flag.IntVar(&batchSize, "batch-size", 100, "rows per transaction")
+	flag.BoolVar(&allowInsecure, "allow-insecure-argv", false,
+		"permit passing keys via --old-key/--new-key argv (visible in ps and shell history)")
 	flag.Parse()
 
-	if oldKeyRaw == "" || newKeyRaw == "" {
-		return errors.New("--old-key and --new-key are required")
+	oldKeyRaw, newKeyRaw, err := resolveKeys(oldKeyArgv, newKeyArgv, allowInsecure)
+	if err != nil {
+		return err
 	}
 	if dsn == "" {
 		return errors.New("--dsn or NF_DB_DSN is required")
@@ -70,11 +160,11 @@ func run() error {
 
 	oldKey, err := decodeKey(oldKeyRaw)
 	if err != nil {
-		return fmt.Errorf("old-key: %w", err)
+		return fmt.Errorf("old key: %w", err)
 	}
 	newKey, err := decodeKey(newKeyRaw)
 	if err != nil {
-		return fmt.Errorf("new-key: %w", err)
+		return fmt.Errorf("new key: %w", err)
 	}
 	oldCipher, err := crypto.New(oldKey)
 	zero(oldKey)
@@ -99,119 +189,299 @@ func run() error {
 		return fmt.Errorf("ping db: %w", err)
 	}
 
-	var total int
-	if err := db.QueryRowContext(ctx,
-		"SELECT COUNT(*) FROM ai_providers WHERE api_key_ciphertext IS NOT NULL",
-	).Scan(&total); err != nil {
-		return fmt.Errorf("count rows: %w", err)
-	}
-	fmt.Printf("secrets-rotate: %d candidate rows\n", total)
 	if dryRun {
-		fmt.Println("secrets-rotate: dry-run, no writes performed")
-		return nil
-	}
-	if total == 0 {
-		return nil
+		return dryRunReport(ctx, db, oldCipher, newCipher, batchSize)
 	}
 
-	rotated := 0
-	lastID := uint64(0)
-	for {
-		n, nextID, err := rotateBatch(ctx, db, oldCipher, newCipher, lastID, batchSize)
-		if err != nil {
-			return fmt.Errorf("batch starting after id=%d: %w", lastID, err)
+	for _, st := range stores {
+		var total int
+		if err := db.QueryRowContext(ctx, st.countSQL).Scan(&total); err != nil {
+			return fmt.Errorf("%s: count rows: %w", st.name, err)
 		}
-		if n == 0 {
-			break
+		fmt.Printf("secrets-rotate: %s: %d candidate rows\n", st.name, total)
+
+		rotated := 0
+		skipped := 0
+		lastID := uint64(0)
+		for {
+			res, err := rotateBatch(ctx, db, oldCipher, newCipher, st, lastID, batchSize)
+			if err != nil {
+				return fmt.Errorf(
+					"%s: batch starting after id=%d: %w "+
+						"(rotation is INCOMPLETE — fix the cause and re-run with the same keys; "+
+						"do NOT retire the old key until this command exits 0)",
+					st.name, lastID, err)
+			}
+			if res.processed == 0 {
+				break
+			}
+			rotated += res.rotated
+			skipped += res.skipped
+			lastID = res.maxID
+			fmt.Printf("secrets-rotate: %s: rotated %d, already current %d\n",
+				st.name, rotated, skipped)
 		}
-		rotated += n
-		lastID = nextID
-		fmt.Printf("secrets-rotate: rotated %d/%d\n", rotated, total)
+		fmt.Printf("secrets-rotate: %s: done (%d rotated, %d already current)\n",
+			st.name, rotated, skipped)
 	}
-	fmt.Printf("secrets-rotate: done, %d rows rotated\n", rotated)
+
+	if err := verifyAll(ctx, db, newCipher, batchSize); err != nil {
+		return fmt.Errorf(
+			"post-rotation verification FAILED — do NOT retire the old key: %w", err)
+	}
+	fmt.Println("secrets-rotate: verification passed, all stores decrypt with the new key")
 	return nil
 }
 
-// rotateBatch reads up to batchSize rows with id > afterID, re-encrypts them
-// inside a single transaction, and returns (count, maxID) of rows processed.
+// resolveKeys returns the raw old/new key material, preferring environment
+// variables over argv. Argv keys are refused unless allowInsecure is set,
+// because process arguments leak via ps and shell history.
+func resolveKeys(oldArgv, newArgv string, allowInsecure bool) (string, string, error) {
+	if (oldArgv != "" || newArgv != "") && !allowInsecure {
+		return "", "", errors.New(
+			"--old-key/--new-key on the command line are visible to other processes; " +
+				"set " + envOldKey + " and " + envNewKey + " environment variables instead, " +
+				"or pass --allow-insecure-argv to override")
+	}
+	oldRaw := os.Getenv(envOldKey)
+	if oldRaw == "" {
+		oldRaw = os.Getenv(crypto.EnvVar)
+	}
+	newRaw := os.Getenv(envNewKey)
+	if allowInsecure {
+		if oldArgv != "" {
+			oldRaw = oldArgv
+		}
+		if newArgv != "" {
+			newRaw = newArgv
+		}
+	}
+	if oldRaw == "" || newRaw == "" {
+		return "", "", errors.New(
+			envOldKey + " (or " + crypto.EnvVar + ") and " + envNewKey + " must be set")
+	}
+	return oldRaw, newRaw, nil
+}
+
+// batchResult reports one rotateBatch pass. skipped counts rows whose every
+// column was already sealed with the new key (idempotent re-runs).
+type batchResult struct {
+	processed int
+	rotated   int
+	skipped   int
+	maxID     uint64
+}
+
+// rotateBatch reads up to batchSize rows with id > afterID from one store,
+// re-encrypts their ciphertext columns inside a single transaction, and
+// returns the ids processed. Columns that already open under the new key
+// are left untouched; a column that opens under NEITHER key aborts the run.
 func rotateBatch(
 	ctx context.Context,
 	db *sql.DB,
 	oldCipher, newCipher *crypto.Cipher,
+	st store,
 	afterID uint64,
 	batchSize int,
-) (int, uint64, error) {
+) (batchResult, error) {
 	tx, err := db.BeginTx(ctx, nil)
 	if err != nil {
-		return 0, 0, fmt.Errorf("begin tx: %w", err)
+		return batchResult{}, fmt.Errorf("begin tx: %w", err)
 	}
 	defer func() { _ = tx.Rollback() }()
 
-	rows, err := tx.QueryContext(ctx,
-		"SELECT id, api_key_ciphertext, api_key_prefix "+
-			"FROM ai_providers "+
-			"WHERE api_key_ciphertext IS NOT NULL AND id > ? "+
-			"ORDER BY id LIMIT ?",
-		afterID, batchSize,
-	)
+	batch, err := loadBatch(ctx, tx, st, afterID, batchSize)
 	if err != nil {
-		return 0, 0, fmt.Errorf("select: %w", err)
+		return batchResult{}, err
 	}
-
-	type pending struct {
-		id         uint64
-		prefix     string
-		ciphertext []byte
-	}
-	var batch []pending
-	for rows.Next() {
-		var p pending
-		if err := rows.Scan(&p.id, &p.ciphertext, &p.prefix); err != nil {
-			rows.Close()
-			return 0, 0, fmt.Errorf("scan: %w", err)
-		}
-		batch = append(batch, p)
-	}
-	if err := rows.Err(); err != nil {
-		rows.Close()
-		return 0, 0, fmt.Errorf("rows: %w", err)
-	}
-	rows.Close()
-
 	if len(batch) == 0 {
-		return 0, afterID, nil
+		return batchResult{maxID: afterID}, nil
 	}
 
-	stmt, err := tx.PrepareContext(ctx,
-		"UPDATE ai_providers SET api_key_ciphertext = ? WHERE id = ?",
-	)
+	stmt, err := tx.PrepareContext(ctx, st.updateSQL)
 	if err != nil {
-		return 0, 0, fmt.Errorf("prepare update: %w", err)
+		return batchResult{}, fmt.Errorf("prepare update: %w", err)
 	}
 	defer stmt.Close()
 
-	var maxID uint64
-	for _, p := range batch {
-		plaintext, err := oldCipher.Decrypt(p.ciphertext)
-		if err != nil {
-			return 0, 0, fmt.Errorf("decrypt id=%d prefix=%s: %w", p.id, p.prefix, err)
+	res := batchResult{}
+	for _, row := range batch {
+		changed := false
+		for i, blob := range row.cols {
+			if len(blob) == 0 {
+				continue // NULL / empty column: nothing sealed here
+			}
+			sealed, reErr := crypto.Reencrypt(oldCipher, newCipher, blob)
+			if reErr != nil {
+				if errors.Is(reErr, crypto.ErrAlreadyRotated) {
+					continue
+				}
+				return batchResult{}, fmt.Errorf(
+					"id=%d: ciphertext opens under neither key: %w", row.id, reErr)
+			}
+			row.cols[i] = sealed
+			changed = true
 		}
-		sealed, err := newCipher.Encrypt(plaintext)
-		zero(plaintext)
-		if err != nil {
-			return 0, 0, fmt.Errorf("encrypt id=%d prefix=%s: %w", p.id, p.prefix, err)
+		if changed {
+			args := make([]any, 0, st.numCols+1)
+			for _, blob := range row.cols {
+				if len(blob) == 0 {
+					args = append(args, nil)
+				} else {
+					args = append(args, blob)
+				}
+			}
+			args = append(args, row.id)
+			if _, err := stmt.ExecContext(ctx, args...); err != nil {
+				return batchResult{}, fmt.Errorf("update id=%d: %w", row.id, err)
+			}
+			res.rotated++
+		} else {
+			res.skipped++
 		}
-		if _, err := stmt.ExecContext(ctx, sealed, p.id); err != nil {
-			return 0, 0, fmt.Errorf("update id=%d prefix=%s: %w", p.id, p.prefix, err)
-		}
-		if p.id > maxID {
-			maxID = p.id
+		res.processed++
+		if row.id > res.maxID {
+			res.maxID = row.id
 		}
 	}
 	if err := tx.Commit(); err != nil {
-		return 0, 0, fmt.Errorf("commit: %w", err)
+		return batchResult{}, fmt.Errorf("commit: %w", err)
 	}
-	return len(batch), maxID, nil
+	return res, nil
+}
+
+// cipherRow is one fetched row: the internal id plus numCols ciphertext
+// blobs (nil for NULL columns).
+type cipherRow struct {
+	id   uint64
+	cols [][]byte
+}
+
+// querier abstracts *sql.Tx / *sql.DB for loadBatch.
+type querier interface {
+	QueryContext(ctx context.Context, query string, args ...any) (*sql.Rows, error)
+}
+
+// loadBatch fetches one keyset page of ciphertext rows for a store.
+func loadBatch(
+	ctx context.Context,
+	q querier,
+	st store,
+	afterID uint64,
+	batchSize int,
+) ([]cipherRow, error) {
+	rows, err := q.QueryContext(ctx, st.selectSQL, afterID, batchSize)
+	if err != nil {
+		return nil, fmt.Errorf("select: %w", err)
+	}
+	defer rows.Close()
+
+	var batch []cipherRow
+	for rows.Next() {
+		row := cipherRow{cols: make([][]byte, st.numCols)}
+		dest := make([]any, 0, st.numCols+1)
+		dest = append(dest, &row.id)
+		for i := range row.cols {
+			dest = append(dest, &row.cols[i])
+		}
+		if err := rows.Scan(dest...); err != nil {
+			return nil, fmt.Errorf("scan: %w", err)
+		}
+		batch = append(batch, row)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("rows: %w", err)
+	}
+	return batch, nil
+}
+
+// dryRunReport walks every store read-only and classifies each ciphertext
+// column as needing rotation, already rotated, or undecryptable. It fails
+// when any blob opens under neither key, since a real run would abort there.
+func dryRunReport(
+	ctx context.Context,
+	db *sql.DB,
+	oldCipher, newCipher *crypto.Cipher,
+	batchSize int,
+) error {
+	badTotal := 0
+	for _, st := range stores {
+		needs, current, bad := 0, 0, 0
+		lastID := uint64(0)
+		for {
+			batch, err := loadBatch(ctx, db, st, lastID, batchSize)
+			if err != nil {
+				return fmt.Errorf("%s: %w", st.name, err)
+			}
+			if len(batch) == 0 {
+				break
+			}
+			for _, row := range batch {
+				for _, blob := range row.cols {
+					switch {
+					case len(blob) == 0:
+					case oldCipher.CanDecrypt(blob):
+						needs++
+					case newCipher.CanDecrypt(blob):
+						current++
+					default:
+						bad++
+						fmt.Printf("secrets-rotate: dry-run: %s id=%d opens under NEITHER key\n",
+							st.name, row.id)
+					}
+				}
+				if row.id > lastID {
+					lastID = row.id
+				}
+			}
+		}
+		fmt.Printf("secrets-rotate: dry-run: %s: %d to rotate, %d already current, %d undecryptable\n",
+			st.name, needs, current, bad)
+		badTotal += bad
+	}
+	if badTotal > 0 {
+		return fmt.Errorf("dry-run found %d undecryptable blobs; rotation would abort", badTotal)
+	}
+	fmt.Println("secrets-rotate: dry-run OK, no writes performed")
+	return nil
+}
+
+// verifyAll re-reads every ciphertext row in every store and confirms it
+// opens under the new key. Rotation only reports success when this passes,
+// which is the operator's signal that the old key can be retired.
+func verifyAll(
+	ctx context.Context,
+	db *sql.DB,
+	newCipher *crypto.Cipher,
+	batchSize int,
+) error {
+	for _, st := range stores {
+		lastID := uint64(0)
+		for {
+			batch, err := loadBatch(ctx, db, st, lastID, batchSize)
+			if err != nil {
+				return fmt.Errorf("%s: %w", st.name, err)
+			}
+			if len(batch) == 0 {
+				break
+			}
+			for _, row := range batch {
+				for _, blob := range row.cols {
+					if len(blob) == 0 {
+						continue
+					}
+					if !newCipher.CanDecrypt(blob) {
+						return fmt.Errorf("%s: id=%d does not decrypt with the new key",
+							st.name, row.id)
+					}
+				}
+				if row.id > lastID {
+					lastID = row.id
+				}
+			}
+		}
+	}
+	return nil
 }
 
 // decodeKey accepts a 32-byte master key encoded as 64-char hex or base64
@@ -231,8 +501,8 @@ func decodeKey(raw string) ([]byte, error) {
 	return nil, errors.New("must be 32-byte hex or base64")
 }
 
-// zero overwrites b with zeros to shorten the lifetime of plaintext secrets
-// in process memory. It is best-effort; the Go runtime may still retain
+// zero overwrites b with zeros to shorten the lifetime of key material in
+// process memory. It is best-effort; the Go runtime may still retain
 // copies in GC'd frames.
 func zero(b []byte) {
 	for i := range b {

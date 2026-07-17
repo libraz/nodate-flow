@@ -118,6 +118,49 @@ func (c *Cipher) Decrypt(blob []byte) ([]byte, error) {
 	return plain, nil
 }
 
+// ErrAlreadyRotated is returned by Reencrypt when the blob cannot be opened
+// with the old key but opens cleanly with the new one, i.e. the row was
+// already rotated by a previous (possibly interrupted) run.
+var ErrAlreadyRotated = errors.New("crypto: blob already sealed with new key")
+
+// Reencrypt opens blob with oldCipher and seals the plaintext again with
+// newCipher, keeping the plaintext confined to this package. If the blob is
+// already sealed with the new key it returns ErrAlreadyRotated so callers
+// can make key rotation idempotent and safely resumable.
+func Reencrypt(oldCipher, newCipher *Cipher, blob []byte) ([]byte, error) {
+	plain, err := oldCipher.Decrypt(blob)
+	if err != nil {
+		if p, newErr := newCipher.Decrypt(blob); newErr == nil {
+			zeroBytes(p)
+			return nil, ErrAlreadyRotated
+		}
+		return nil, err
+	}
+	sealed, sealErr := newCipher.Encrypt(plain)
+	zeroBytes(plain)
+	return sealed, sealErr
+}
+
+// CanDecrypt reports whether blob opens under the cipher's key without
+// exposing the plaintext to the caller. It exists for rotation tooling to
+// verify final state; it must not be used as an authentication oracle.
+func (c *Cipher) CanDecrypt(blob []byte) bool {
+	plain, err := c.Decrypt(blob)
+	if err != nil {
+		return false
+	}
+	zeroBytes(plain)
+	return true
+}
+
+// zeroBytes overwrites b to shorten the lifetime of plaintext secrets in
+// process memory. Best-effort: the runtime may retain copies in GC'd frames.
+func zeroBytes(b []byte) {
+	for i := range b {
+		b[i] = 0
+	}
+}
+
 // APIKeyPrefix returns the first 8 characters of an LLM provider API key
 // for masked display (e.g. "sk-ant-A"). Shorter keys return what they have.
 func APIKeyPrefix(plaintext string) string {
