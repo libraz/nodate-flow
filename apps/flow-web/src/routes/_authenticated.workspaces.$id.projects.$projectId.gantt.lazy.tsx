@@ -526,22 +526,22 @@ function GanttView(): ReactElement {
           style={{
             display: 'grid',
             gridTemplateColumns: `${LABEL_WIDTH}px minmax(0, 1fr)`,
-            border: '1px solid var(--nf-color-border))',
+            border: '1px solid var(--nf-color-border)',
             borderRadius: '0.5rem',
             overflow: 'hidden',
-            background: 'var(--nf-color-surface))',
+            background: 'var(--nf-color-surface)',
           }}
         >
           {/* Label column */}
           <div
             style={{
-              borderInlineEnd: '1px solid var(--nf-color-border))',
+              borderInlineEnd: '1px solid var(--nf-color-border)',
             }}
           >
             <div
               style={{
                 blockSize: HEADER_HEIGHT,
-                borderBlockEnd: '1px solid var(--nf-color-border))',
+                borderBlockEnd: '1px solid var(--nf-color-border)',
               }}
             />
             {scheduled.map(({ task }) => (

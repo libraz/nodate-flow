@@ -51,7 +51,7 @@ function StatCard({
         gap: '0.75rem',
         padding: '1rem 1.25rem',
         borderRadius: '0.75rem',
-        background: 'var(--nf-color-surface))',
+        background: 'var(--nf-color-surface)',
         border: '1px solid var(--nf-color-border)',
         flex: '1 1 0',
         minWidth: '10rem',
@@ -193,7 +193,7 @@ function TaskSummary(): ReactElement {
                   gap: '0.75rem',
                   padding: '0.6rem 0.75rem',
                   borderRadius: '0.5rem',
-                  background: 'var(--nf-color-surface))',
+                  background: 'var(--nf-color-surface)',
                 }}
               >
                 <Link
@@ -295,7 +295,7 @@ function WorkspaceLinks(): ReactElement {
             gap: '0.5rem',
             padding: '0.5rem 1rem',
             borderRadius: '0.5rem',
-            background: 'var(--nf-color-surface))',
+            background: 'var(--nf-color-surface)',
             border: '1px solid var(--nf-color-border)',
             color: 'inherit',
             textDecoration: 'none',

@@ -195,7 +195,7 @@ function renderRawPayload(payload: unknown): ReactNode {
       style={{
         marginBlockStart: '0.25rem',
         padding: '0.5rem',
-        background: 'var(--nf-color-surface))',
+        background: 'var(--nf-color-surface)',
         borderRadius: '0.25rem',
         fontSize: '0.7rem',
         overflowX: 'auto',
@@ -274,7 +274,7 @@ function humanizePayload(type: string, payload: unknown, t: TFunction, locale: s
       style={{
         marginBlockStart: '0.25rem',
         padding: '0.5rem',
-        background: 'var(--nf-color-surface))',
+        background: 'var(--nf-color-surface)',
         borderRadius: '0.25rem',
         fontSize: 'var(--nf-text-xs)',
         display: 'flex',

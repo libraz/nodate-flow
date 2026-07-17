@@ -137,7 +137,7 @@ export default function EventFilterBar({
           padding: '0.25rem 0.625rem',
           borderRadius: '999px',
           border: `1px solid ${active ? 'var(--nf-color-accent)' : 'var(--nf-color-border)'}`,
-          background: active ? 'var(--nf-color-accent-subtle))' : 'var(--nf-color-surface)',
+          background: active ? 'var(--nf-color-accent-subtle)' : 'var(--nf-color-surface)',
           color: active ? 'var(--nf-color-accent)' : 'var(--nf-color-fg)',
           fontSize: '0.8125rem',
           cursor: 'pointer',
@@ -173,7 +173,7 @@ export default function EventFilterBar({
             style={{
               padding: '0 0.5rem',
               borderRadius: '999px',
-              background: 'var(--nf-color-accent-subtle))',
+              background: 'var(--nf-color-accent-subtle)',
               color: 'var(--nf-color-accent)',
               fontSize: '0.6875rem',
             }}

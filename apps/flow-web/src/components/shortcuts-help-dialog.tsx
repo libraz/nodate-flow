@@ -69,8 +69,8 @@ export default function ShortcutsHelpDialog({
                           height: '1.5rem',
                           padding: '0 0.375rem',
                           borderRadius: '0.25rem',
-                          border: '1px solid var(--nf-color-border))',
-                          backgroundColor: 'var(--nf-color-bg-elevated))',
+                          border: '1px solid var(--nf-color-border)',
+                          backgroundColor: 'var(--nf-color-bg-elevated)',
                           fontSize: 'var(--nf-text-xs)',
                           fontFamily: 'inherit',
                         }}

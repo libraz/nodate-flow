@@ -175,11 +175,14 @@ lighthouse: build-web ## Run Lighthouse CI (a11y 95+, perf 70+)
 
 # ---------- lint / format / typecheck ----------
 
-.PHONY: check lint format typecheck vet check-dtos
-check: lint typecheck vet i18n-check check-dtos ## Lint + typecheck + go vet + i18n locale guard + DTO drift guard
+.PHONY: check lint format typecheck vet check-dtos check-css-var-parens
+check: lint typecheck vet i18n-check check-dtos check-css-var-parens ## Lint + typecheck + go vet + i18n locale guard + DTO drift guard + CSS var() paren guard
 
 check-dtos: ## Fail when web routes/features hand-roll response DTOs instead of using SDK schemas
 	bash scripts/check-handrolled-dtos.sh
+
+check-css-var-parens: ## Fail when a var(--nf-...) token reference has a stray extra closing paren
+	bash scripts/check-css-var-parens.sh --ci
 
 lint: ## biome check + golangci-lint
 	$(PKG_RUN) check

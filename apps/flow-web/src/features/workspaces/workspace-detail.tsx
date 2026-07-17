@@ -82,7 +82,7 @@ function OverviewPanel({ workspaceId }: { workspaceId: string }): ReactElement {
                 gap: '0.75rem',
                 padding: '0.6rem 0.75rem',
                 borderRadius: '0.5rem',
-                background: 'var(--nf-color-surface))',
+                background: 'var(--nf-color-surface)',
                 color: 'inherit',
                 textDecoration: 'none',
               }}

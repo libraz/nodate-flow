@@ -231,7 +231,7 @@ function OverviewPanel({ id, workspaceId }: { id: string; workspaceId: string })
           blockSize: '0.5rem',
           borderRadius: '999px',
           overflow: 'hidden',
-          background: 'var(--nf-color-surface))',
+          background: 'var(--nf-color-surface)',
         }}
       >
         {STATE_ORDER.map((s) =>
@@ -263,7 +263,7 @@ function OverviewPanel({ id, workspaceId }: { id: string; workspaceId: string })
             style={{
               padding: '0.5rem 0.75rem',
               borderRadius: '0.5rem',
-              background: 'var(--nf-color-surface))',
+              background: 'var(--nf-color-surface)',
               display: 'flex',
               flexDirection: 'column',
               gap: '0.125rem',
