@@ -55,6 +55,12 @@ func CreateInvite(deps InviteDeps) func(context.Context, *CreateInviteInput) (*C
 		pub := types.New()
 		role := generated.WorkspaceInvitesRole(in.Body.Role)
 
+		// Privilege-escalation guard: an actor may not issue an invite for
+		// a role that outranks their own (only an owner may grant owner).
+		if err := memberkit.EnsureRoleWithinActor(memberkit.Role(ws.Role), memberkit.Role(role)); err != nil {
+			return nil, httpErr(apierrors.WsMemberRoleDenied)
+		}
+
 		var maxUses sql.NullInt32
 		if in.Body.MaxUses != nil {
 			maxUses = sql.NullInt32{Int32: *in.Body.MaxUses, Valid: true}

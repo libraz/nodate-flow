@@ -90,28 +90,28 @@ func DeleteAttachment(deps Deps) func(context.Context, *DeleteTaskAttachmentInpu
 		qtx := deps.Queries.WithTx(tx)
 
 		// Resolve the storage_object_id BEFORE the soft-delete so we
-		// can decrement its ref count in the same transaction. If the
-		// attachment row is already gone (idempotent re-delete) treat
-		// it as success and skip the GC dance.
+		// can decrement its ref count in the same transaction. The
+		// lookup is scoped to the task whose ACL the caller already
+		// cleared (task_id predicate), so an attachment on a different
+		// (or unauthorized) task returns no row. A missing row - whether
+		// the attachment never existed under this task, belongs to
+		// another task, or was already deleted - is reported as 404 via
+		// WS.TASK.NOT_FOUND so cross-task existence stays hidden.
 		soRow, err := qtx.GetAttachmentStorageObjectIDForDelete(ctx, generated.GetAttachmentStorageObjectIDForDeleteParams{
 			WorkspaceID: ws.ID,
+			TaskID:      sql.NullInt32{Int32: int32(task.ID), Valid: true},
 			PublicID:    aid,
 		})
 		if err != nil {
 			if stderrors.Is(err, sql.ErrNoRows) {
-				// Already deleted; treat as idempotent success.
-				if commitErr := tx.Commit(); commitErr != nil {
-					return nil, httpErr(apierrors.InternalUnexpected)
-				}
-				out := &DeleteTaskAttachmentOutput{}
-				out.Body.Ok = true
-				return out, nil
+				return nil, httpErr(apierrors.WsTaskNotFound)
 			}
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
 
 		if err := qtx.DeleteAttachment(ctx, generated.DeleteAttachmentParams{
 			WorkspaceID: ws.ID,
+			TaskID:      sql.NullInt32{Int32: int32(task.ID), Valid: true},
 			PublicID:    aid,
 		}); err != nil {
 			return nil, httpErr(apierrors.InternalUnexpected)

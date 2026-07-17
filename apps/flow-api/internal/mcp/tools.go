@@ -904,19 +904,9 @@ func runGetTask(ctx context.Context, deps Deps, s *session, raw json.RawMessage)
 	if _, err := requireWorkspaceMember(ctx, deps, s); err != nil {
 		return nil, err
 	}
-	_, pub, err := resolveTask(ctx, deps, s, in.TaskID)
+	_, row, err := resolveTaskRow(ctx, deps, s, in.TaskID)
 	if err != nil {
 		return nil, err
-	}
-	row, err := deps.Queries.FindTaskByPublicId(ctx, generated.FindTaskByPublicIdParams{
-		WorkspaceID: s.workspaceID,
-		PublicID:    pub,
-	})
-	if err != nil {
-		if stderrors.Is(err, sql.ErrNoRows) {
-			return nil, apierrors.New(apierrors.WsTaskNotFound)
-		}
-		return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
 	}
 	out := map[string]any{
 		"id":           row.PublicID.String(),
@@ -1027,16 +1017,9 @@ func runUpdateTask(ctx context.Context, deps Deps, s *session, raw json.RawMessa
 	if _, err := requireWorkspaceMember(ctx, deps, s); err != nil {
 		return nil, err
 	}
-	taskInternal, pub, err := resolveTask(ctx, deps, s, in.TaskID)
+	taskInternal, current, err := resolveTaskRow(ctx, deps, s, in.TaskID)
 	if err != nil {
 		return nil, err
-	}
-	current, err := deps.Queries.FindTaskByPublicId(ctx, generated.FindTaskByPublicIdParams{
-		WorkspaceID: s.workspaceID,
-		PublicID:    pub,
-	})
-	if err != nil {
-		return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
 	}
 	title := current.Title
 	if in.Title != nil && *in.Title != "" {
@@ -1089,7 +1072,7 @@ func runUpdateTask(ctx context.Context, deps Deps, s *session, raw json.RawMessa
 		Visibility:      current.Visibility,
 		UpdatedByUserID: sql.NullInt32{Int32: int32(s.userID), Valid: true}, //#nosec G115 -- session user id is users.id (BIGINT UNSIGNED), fits int32 within realistic deployments
 		WorkspaceID:     s.workspaceID,
-		PublicID:        pub,
+		PublicID:        current.PublicID,
 	}
 
 	if !needsItemkit {
@@ -1143,9 +1126,9 @@ func runUpdateTask(ctx context.Context, deps Deps, s *session, raw json.RawMessa
 		WorkspaceID: s.workspaceID,
 		ActorUserID: &actor,
 		TaskID:      &taskID64,
-		Payload:     map[string]any{"taskId": pub.String(), "via": "mcp"},
+		Payload:     map[string]any{"taskId": current.PublicID.String(), "via": "mcp"},
 	})
-	return map[string]any{"id": pub.String()}, nil
+	return map[string]any{"id": current.PublicID.String()}, nil
 }
 
 // translateItemkitMCPError maps an itemkit invariant into a stable MCP
@@ -1397,19 +1380,9 @@ func runProposePriority(ctx context.Context, deps Deps, s *session, raw json.Raw
 	if _, err := requireWorkspaceMember(ctx, deps, s); err != nil {
 		return nil, err
 	}
-	pub, err := types.Parse(in.TaskID)
+	_, row, err := resolveTaskRow(ctx, deps, s, in.TaskID)
 	if err != nil {
-		return nil, apierrors.New(apierrors.WsTaskNotFound)
-	}
-	row, err := deps.Queries.FindTaskByPublicId(ctx, generated.FindTaskByPublicIdParams{
-		WorkspaceID: s.workspaceID,
-		PublicID:    pub,
-	})
-	if err != nil {
-		if stderrors.Is(err, sql.ErrNoRows) {
-			return nil, apierrors.New(apierrors.WsTaskNotFound)
-		}
-		return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
+		return nil, err
 	}
 	if deps.AI == nil {
 		return nil, apierrors.New(apierrors.AiProviderNotConfigured)
@@ -1445,7 +1418,7 @@ func runProposeDuplicates(ctx context.Context, deps Deps, s *session, raw json.R
 	if deps.Embedder == nil {
 		return nil, apierrors.New(apierrors.AiProviderNotConfigured)
 	}
-	taskInternal, pub, err := resolveTask(ctx, deps, s, in.TaskID)
+	taskInternal, row, err := resolveTaskRow(ctx, deps, s, in.TaskID)
 	if err != nil {
 		return nil, err
 	}
@@ -1472,13 +1445,6 @@ func runProposeDuplicates(ctx context.Context, deps Deps, s *session, raw json.R
 		Model:  model,
 	})
 	if stderrors.Is(err, sql.ErrNoRows) {
-		row, ferr := deps.Queries.FindTaskByPublicId(ctx, generated.FindTaskByPublicIdParams{
-			WorkspaceID: s.workspaceID,
-			PublicID:    pub,
-		})
-		if ferr != nil {
-			return map[string]any{"candidates": []any{}, "model": model}, nil
-		}
 		desc := ""
 		if row.Description.Valid {
 			desc = row.Description.String
@@ -1566,19 +1532,9 @@ func runProposeSteps(ctx context.Context, deps Deps, s *session, raw json.RawMes
 	if _, err := requireWorkspaceMember(ctx, deps, s); err != nil {
 		return nil, err
 	}
-	pub, err := types.Parse(in.TaskID)
+	_, row, err := resolveTaskRow(ctx, deps, s, in.TaskID)
 	if err != nil {
-		return nil, apierrors.New(apierrors.WsTaskNotFound)
-	}
-	row, err := deps.Queries.FindTaskByPublicId(ctx, generated.FindTaskByPublicIdParams{
-		WorkspaceID: s.workspaceID,
-		PublicID:    pub,
-	})
-	if err != nil {
-		if stderrors.Is(err, sql.ErrNoRows) {
-			return nil, apierrors.New(apierrors.WsTaskNotFound)
-		}
-		return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
+		return nil, err
 	}
 	if deps.AI == nil {
 		return nil, apierrors.New(apierrors.AiProviderNotConfigured)
@@ -2016,7 +1972,7 @@ func runProposeRelations(ctx context.Context, deps Deps, s *session, raw json.Ra
 	if deps.Embedder == nil {
 		return nil, apierrors.New(apierrors.AiProviderNotConfigured)
 	}
-	taskInternal, pub, err := resolveTask(ctx, deps, s, in.TaskID)
+	taskInternal, row, err := resolveTaskRow(ctx, deps, s, in.TaskID)
 	if err != nil {
 		return nil, err
 	}
@@ -2042,13 +1998,6 @@ func runProposeRelations(ctx context.Context, deps Deps, s *session, raw json.Ra
 		Model:  model,
 	})
 	if stderrors.Is(err, sql.ErrNoRows) {
-		row, ferr := deps.Queries.FindTaskByPublicId(ctx, generated.FindTaskByPublicIdParams{
-			WorkspaceID: s.workspaceID,
-			PublicID:    pub,
-		})
-		if ferr != nil {
-			return map[string]any{"candidates": []any{}, "model": model}, nil
-		}
 		desc := ""
 		if row.Description.Valid {
 			desc = row.Description.String
@@ -2455,19 +2404,16 @@ func runGeneratePage(ctx context.Context, deps Deps, s *session, raw json.RawMes
 		projectID = sql.NullInt32{Int32: int32(prjID), Valid: true} //#nosec G115 -- project id is projects.id (BIGINT UNSIGNED), fits int32 within realistic deployments
 	}
 
-	// Build context from task data if task ids are provided.
+	// Build context from task data if task ids are provided. Each task id
+	// must resolve through the shared task-visibility ACL: a task the
+	// caller cannot access is rejected outright rather than silently
+	// skipped, so generated page content can never incorporate task data
+	// the caller is not permitted to read.
 	contextParts := []string{in.ContextDescription}
 	for _, tid := range in.TaskIDs {
-		tPub, err := types.Parse(tid)
+		_, tRow, err := resolveTaskRow(ctx, deps, s, tid)
 		if err != nil {
-			continue
-		}
-		tRow, err := deps.Queries.FindTaskByPublicId(ctx, generated.FindTaskByPublicIdParams{
-			WorkspaceID: s.workspaceID,
-			PublicID:    tPub,
-		})
-		if err != nil {
-			continue
+			return nil, err
 		}
 		taskCtx := "\n\nTask: " + tRow.Title
 		if tRow.Description.Valid && tRow.Description.String != "" {
@@ -3340,7 +3286,7 @@ func runCreateEventFromTask(ctx context.Context, deps Deps, s *session, raw json
 		return nil, err
 	}
 
-	taskInternal, taskPub, err := resolveTask(ctx, deps, s, in.TaskID)
+	taskInternal, task, err := resolveTaskRow(ctx, deps, s, in.TaskID)
 	if err != nil {
 		return nil, err
 	}
@@ -3350,15 +3296,6 @@ func runCreateEventFromTask(ctx context.Context, deps Deps, s *session, raw json
 	}
 	startAt := time.Unix(*in.StartAt, 0).UTC()
 	endAt := time.Unix(*in.EndAt, 0).UTC()
-
-	// Look up the task to get its title.
-	task, err := deps.Queries.FindTaskByPublicId(ctx, generated.FindTaskByPublicIdParams{
-		WorkspaceID: s.workspaceID,
-		PublicID:    taskPub,
-	})
-	if err != nil {
-		return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
-	}
 
 	pub := newPublicID()
 	_, err = deps.CalendarQueries.CreateCalendarEvent(ctx, calendar.CreateCalendarEventParams{
@@ -3392,7 +3329,7 @@ func runCreateEventFromTask(ctx context.Context, deps Deps, s *session, raw json
 		"title":   task.Title,
 		"startAt": startAt.Unix(),
 		"endAt":   endAt.Unix(),
-		"taskId":  taskPub.String(),
+		"taskId":  task.PublicID.String(),
 	}, nil
 }
 

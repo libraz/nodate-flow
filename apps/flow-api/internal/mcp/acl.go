@@ -174,6 +174,40 @@ func resolveTask(ctx context.Context, deps Deps, s *session, publicID string) (u
 	return rec.ID, pub, nil
 }
 
+// loadTaskRow is the single MCP entry point to the tasks public-id lookup.
+// Every FindTaskByPublicId call in this package routes through here so a
+// static guard (acl_static_test.go) can prove no tool reads task rows
+// without first authorizing access via resolveTask / resolveTaskRow. The
+// raw sql.ErrNoRows is preserved so callers that only probe existence
+// (e.g. favorites) keep their own not-found handling.
+func loadTaskRow(ctx context.Context, q *generated.Queries, workspaceID uint32, pub types.PublicID) (generated.FindTaskByPublicIdRow, error) {
+	return q.FindTaskByPublicId(ctx, generated.FindTaskByPublicIdParams{
+		WorkspaceID: workspaceID,
+		PublicID:    pub,
+	})
+}
+
+// resolveTaskRow authorizes access to a task through the shared
+// task-visibility ACL (resolveTask) and then loads its full row. Tools
+// that need task fields must use this instead of loading the row directly,
+// so a caller can never read task data it is not permitted to see. Missing
+// and access-denied both surface as WS.TASK.NOT_FOUND, so the tool is not
+// an existence oracle.
+func resolveTaskRow(ctx context.Context, deps Deps, s *session, publicID string) (uint32, generated.FindTaskByPublicIdRow, error) {
+	internalID, pub, err := resolveTask(ctx, deps, s, publicID)
+	if err != nil {
+		return 0, generated.FindTaskByPublicIdRow{}, err
+	}
+	row, err := loadTaskRow(ctx, deps.Queries, s.workspaceID, pub)
+	if err != nil {
+		if stderrors.Is(err, sql.ErrNoRows) {
+			return 0, generated.FindTaskByPublicIdRow{}, apierrors.New(apierrors.WsTaskNotFound)
+		}
+		return 0, generated.FindTaskByPublicIdRow{}, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
+	}
+	return internalID, row, nil
+}
+
 // resolvePage resolves a page public id to its internal id and verifies
 // it belongs to the session workspace.
 func resolvePage(ctx context.Context, deps Deps, s *session, publicID string) (uint32, types.PublicID, error) {

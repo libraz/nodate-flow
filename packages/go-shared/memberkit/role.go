@@ -10,6 +10,38 @@ import (
 	"github.com/nodate-flow/nodate-flow/packages/go-shared/eventlog"
 )
 
+// roleRank orders workspace roles for privilege comparison. Mirrors the
+// workspace_members.role hierarchy: owner > admin > member > guest.
+var roleRank = map[Role]int{
+	RoleGuest:  1,
+	RoleMember: 2,
+	RoleAdmin:  3,
+	RoleOwner:  4,
+}
+
+// EnsureRoleWithinActor reports whether an actor holding actorRole may
+// assign, grant, or promote a member to targetRole. A role may only be
+// granted when it does not outrank the actor's own role in the workspace
+// hierarchy (owner > admin > member > guest), so an admin can never mint
+// an owner — only an owner may grant the owner role.
+//
+// This is the single guard that prevents privilege escalation across the
+// add-member, update-role, and create-invite paths. Returns
+// ErrRoleEscalation when targetRole outranks actorRole, or a descriptive
+// error when either role is not a recognised value.
+func EnsureRoleWithinActor(actorRole, targetRole Role) error {
+	if !actorRole.IsValid() {
+		return fmt.Errorf("memberkit: invalid actor role %q", actorRole)
+	}
+	if !targetRole.IsValid() {
+		return fmt.Errorf("memberkit: invalid target role %q", targetRole)
+	}
+	if roleRank[targetRole] > roleRank[actorRole] {
+		return ErrRoleEscalation
+	}
+	return nil
+}
+
 // UpdateMemberRoleArgs carries the arguments for UpdateMemberRole.
 type UpdateMemberRoleArgs struct {
 	WorkspaceID uint32

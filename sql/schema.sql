@@ -2779,8 +2779,8 @@ DROP VIEW IF EXISTS `v_instance_audit_logs`;
 DROP VIEW IF EXISTS `v_my_tasks`;
 DROP VIEW IF EXISTS `v_projects`;
 DROP VIEW IF EXISTS `v_task_detail`;
-DROP VIEW IF EXISTS `v_task_list`;
 DROP VIEW IF EXISTS `v_task_list_archived`;
+DROP VIEW IF EXISTS `v_task_list`;
 DROP VIEW IF EXISTS `v_task_timeline`;
 DROP VIEW IF EXISTS `v_users`;
 DROP VIEW IF EXISTS `v_workspace_activity`;
@@ -3123,15 +3123,6 @@ LEFT JOIN users creator
 WHERE t.enabled = TRUE
   AND t.archived_at IS NULL;
 
--- >>> v_task_list.sql
--- v_task_list
--- Active (non-archived) task projection for list / board views.
--- Thin filter over v_task_list_all; column definitions live in the base view.
-CREATE OR REPLACE ALGORITHM=MERGE VIEW v_task_list AS
-SELECT v.*
-FROM v_task_list_all v
-WHERE v.archived_at IS NULL;
-
 -- >>> v_task_list_archived.sql
 -- v_task_list_archived
 -- Archived-only task projection. Thin filter over v_task_list_all;
@@ -3140,6 +3131,15 @@ CREATE OR REPLACE ALGORITHM=MERGE VIEW v_task_list_archived AS
 SELECT v.*
 FROM v_task_list_all v
 WHERE v.archived_at IS NOT NULL;
+
+-- >>> v_task_list.sql
+-- v_task_list
+-- Active (non-archived) task projection for list / board views.
+-- Thin filter over v_task_list_all; column definitions live in the base view.
+CREATE OR REPLACE ALGORITHM=MERGE VIEW v_task_list AS
+SELECT v.*
+FROM v_task_list_all v
+WHERE v.archived_at IS NULL;
 
 -- >>> v_task_timeline.sql
 -- v_task_timeline

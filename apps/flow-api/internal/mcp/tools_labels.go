@@ -224,6 +224,14 @@ func runResolveTaskRef(ctx context.Context, deps Deps, s *session, raw json.RawM
 		}
 		return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
 	}
+	// Authorize the resolved task through the shared task-visibility ACL.
+	// A task the caller cannot see must be indistinguishable from a
+	// missing one, so this tool never becomes an existence oracle:
+	// visibility denial surfaces as WS.TASK.NOT_FOUND, the same code the
+	// ErrNoRows branch above returns.
+	if _, _, err := resolveTask(ctx, deps, s, row.PublicID.String()); err != nil {
+		return nil, err
+	}
 	return map[string]any{
 		"taskId": row.PublicID.String(),
 		"title":  row.Title,
@@ -240,9 +248,9 @@ func runArchiveTask(ctx context.Context, deps Deps, s *session, raw json.RawMess
 	if err := parseArgs(raw, &in); err != nil {
 		return nil, err
 	}
-	taskPub, err := types.Parse(in.TaskID)
+	_, taskPub, err := resolveTask(ctx, deps, s, in.TaskID)
 	if err != nil {
-		return nil, apierrors.New(apierrors.McpToolArgumentsInvalid)
+		return nil, err
 	}
 	if err := deps.Queries.ArchiveTask(ctx, generated.ArchiveTaskParams{
 		UpdatedByUserID: sql.NullInt32{Int32: int32(s.userID), Valid: true}, //#nosec G115 -- session user id is users.id (BIGINT UNSIGNED), fits int32 within realistic deployments
@@ -271,9 +279,9 @@ func runUnarchiveTask(ctx context.Context, deps Deps, s *session, raw json.RawMe
 	if err := parseArgs(raw, &in); err != nil {
 		return nil, err
 	}
-	taskPub, err := types.Parse(in.TaskID)
+	_, taskPub, err := resolveTask(ctx, deps, s, in.TaskID)
 	if err != nil {
-		return nil, apierrors.New(apierrors.McpToolArgumentsInvalid)
+		return nil, err
 	}
 	if err := deps.Queries.UnarchiveTask(ctx, generated.UnarchiveTaskParams{
 		UpdatedByUserID: sql.NullInt32{Int32: int32(s.userID), Valid: true}, //#nosec G115 -- session user id is users.id (BIGINT UNSIGNED), fits int32 within realistic deployments

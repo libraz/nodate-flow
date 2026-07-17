@@ -355,11 +355,10 @@ func runRestoreDescriptionVersion(ctx context.Context, deps Deps, s *session, ra
 	defer tx.Rollback() //nolint:errcheck
 	qtx := deps.Queries.WithTx(tx)
 
-	// Get current task state for the UpdateTask call.
-	taskRow, err := qtx.FindTaskByPublicId(ctx, generated.FindTaskByPublicIdParams{
-		WorkspaceID: s.workspaceID,
-		PublicID:    taskPub,
-	})
+	// Get current task state for the UpdateTask call. Access was already
+	// authorized by resolveTask above; this transaction-scoped load reads
+	// the row for a consistent update.
+	taskRow, err := loadTaskRow(ctx, qtx, s.workspaceID, taskPub)
 	if err != nil {
 		return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
 	}

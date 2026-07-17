@@ -55,11 +55,13 @@ func (q *Queries) AddAttachment(ctx context.Context, arg AddAttachmentParams) (i
 const deleteAttachment = `-- name: DeleteAttachment :exec
 DELETE FROM attachments
 WHERE workspace_id = ?
+  AND task_id = ?
   AND public_id = ?
 `
 
 type DeleteAttachmentParams struct {
 	WorkspaceID uint32         `json:"-"`
+	TaskID      sql.NullInt32  `json:"-"`
 	PublicID    types.PublicID `json:"publicId"`
 }
 
@@ -68,8 +70,11 @@ type DeleteAttachmentParams struct {
 // the same transaction; this row holding the FK reference must go
 // away before DeleteStorageObjectIfUnreferenced can free the storage
 // object (FK is ON DELETE RESTRICT). Audit trail survives via events.
+// The task_id predicate binds the delete to the task whose ACL the caller
+// already cleared, so an attachment on a different (or unauthorized) task
+// cannot be removed; a mismatch affects zero rows.
 func (q *Queries) DeleteAttachment(ctx context.Context, arg DeleteAttachmentParams) error {
-	_, err := q.db.ExecContext(ctx, deleteAttachment, arg.WorkspaceID, arg.PublicID)
+	_, err := q.db.ExecContext(ctx, deleteAttachment, arg.WorkspaceID, arg.TaskID, arg.PublicID)
 	return err
 }
 
@@ -88,12 +93,14 @@ SELECT
 FROM attachments a
 INNER JOIN storage_objects so ON so.id = a.storage_object_id AND so.enabled = TRUE
 WHERE a.workspace_id = ?
+  AND a.task_id = ?
   AND a.public_id = ?
   AND a.enabled = TRUE
 `
 
 type GetAttachmentByPublicIDParams struct {
 	WorkspaceID uint32         `json:"-"`
+	TaskID      sql.NullInt32  `json:"-"`
 	PublicID    types.PublicID `json:"publicId"`
 }
 
@@ -112,8 +119,12 @@ type GetAttachmentByPublicIDRow struct {
 
 // Fetch a single attachment by its public id within a workspace, with the
 // backing storage_objects metadata. Used by download / detail handlers.
+// The task_id predicate binds the attachment to the task whose ACL the
+// caller already passed, so an attachment id cannot be dereferenced under
+// a different (or unauthorized) task; a mismatch returns no row, hiding
+// existence.
 func (q *Queries) GetAttachmentByPublicID(ctx context.Context, arg GetAttachmentByPublicIDParams) (GetAttachmentByPublicIDRow, error) {
-	row := q.db.QueryRowContext(ctx, getAttachmentByPublicID, arg.WorkspaceID, arg.PublicID)
+	row := q.db.QueryRowContext(ctx, getAttachmentByPublicID, arg.WorkspaceID, arg.TaskID, arg.PublicID)
 	var i GetAttachmentByPublicIDRow
 	err := row.Scan(
 		&i.PublicID,
@@ -136,6 +147,7 @@ SELECT
   a.storage_object_id
 FROM attachments a
 WHERE a.workspace_id = ?
+  AND a.task_id = ?
   AND a.public_id = ?
   AND a.enabled = TRUE
 LIMIT 1
@@ -143,6 +155,7 @@ LIMIT 1
 
 type GetAttachmentStorageObjectIDForDeleteParams struct {
 	WorkspaceID uint32         `json:"-"`
+	TaskID      sql.NullInt32  `json:"-"`
 	PublicID    types.PublicID `json:"publicId"`
 }
 
@@ -155,8 +168,11 @@ type GetAttachmentStorageObjectIDForDeleteRow struct {
 // handler can decrement ref_count (and possibly GC the underlying blob)
 // in the same transaction as the hard-delete below. Returns the internal
 // attachment id as well so the caller does not have to round-trip.
+// The task_id predicate scopes the lookup to the task whose ACL the
+// caller already cleared, so a delete cannot target an attachment on a
+// different (or unauthorized) task; a mismatch returns no row.
 func (q *Queries) GetAttachmentStorageObjectIDForDelete(ctx context.Context, arg GetAttachmentStorageObjectIDForDeleteParams) (GetAttachmentStorageObjectIDForDeleteRow, error) {
-	row := q.db.QueryRowContext(ctx, getAttachmentStorageObjectIDForDelete, arg.WorkspaceID, arg.PublicID)
+	row := q.db.QueryRowContext(ctx, getAttachmentStorageObjectIDForDelete, arg.WorkspaceID, arg.TaskID, arg.PublicID)
 	var i GetAttachmentStorageObjectIDForDeleteRow
 	err := row.Scan(&i.ID, &i.StorageObjectID)
 	return i, err

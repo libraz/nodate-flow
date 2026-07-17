@@ -46,6 +46,13 @@ var (
 	// the last remaining owner of the workspace. At least one owner
 	// must always remain.
 	ErrLastOwner = errors.New("memberkit: workspace must keep at least one owner")
+
+	// ErrRoleEscalation is returned when an actor attempts to grant,
+	// assign, or promote to a role that outranks their own workspace
+	// role (e.g. an admin granting owner). Callers map it to the
+	// WS.MEMBER.ROLE_DENIED (403) API error spec via errors.Is. See
+	// EnsureRoleWithinActor.
+	ErrRoleEscalation = errors.New("memberkit: target role exceeds actor role")
 )
 
 // countWorkspaceOwners returns the number of enabled members holding

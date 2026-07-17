@@ -140,7 +140,7 @@ func ensureMCPFavoriteTargetExists(
 		_, err := q.FindProjectByPublicId(ctx, generated.FindProjectByPublicIdParams{WorkspaceID: workspaceID, PublicID: targetPublicID})
 		return err
 	case generated.UserFavoritesTargetTypeTask:
-		_, err := q.FindTaskByPublicId(ctx, generated.FindTaskByPublicIdParams{WorkspaceID: workspaceID, PublicID: targetPublicID})
+		_, err := loadTaskRow(ctx, q, workspaceID, targetPublicID)
 		return err
 	case generated.UserFavoritesTargetTypePage:
 		_, err := q.GetPageByPublicId(ctx, generated.GetPageByPublicIdParams{WorkspaceID: workspaceID, PublicID: targetPublicID})

@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"time"
 
+	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/acl"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/audit"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/generated"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/types"
@@ -18,12 +19,42 @@ import (
 	"github.com/nodate-flow/nodate-flow/packages/go-shared/logutil"
 )
 
+// requireNonGuest rejects workspace guests. Guests have read-only access to
+// the intake queue (list/get); creating, triaging, and converting items are
+// write actions reserved for members and above. The workspace role is resolved
+// upstream by RequireWorkspaceMember and carried on the request context.
+func requireNonGuest(ws middleware.WorkspaceContext) *apierr.Spec {
+	if !ws.Role.AtLeast(middleware.WorkspaceRoleMember) {
+		return apierrors.WsMemberRoleDenied
+	}
+	return nil
+}
+
+// requireProjectEditor mirrors tasks.requireProjectEditor: converting an intake
+// item into a task writes into the target project, so the actor must hold an
+// editor (or higher) project role, or be a workspace-elevated admin/owner. The
+// workspace role is already resolved by RequireWorkspaceMember and carried on
+// the request context, so it is passed in rather than re-checked here.
+func requireProjectEditor(ctx context.Context, db *sql.DB, wsID, prjID, actorID uint32, wsRole acl.WorkspaceRole) *apierr.Spec {
+	prjRole, _, err := acl.LookupProjectMembership(ctx, db, wsID, prjID, actorID, wsRole)
+	if err != nil {
+		return apierr.SpecForErrNoRows(err, apierrors.WsProjectAccessDenied, apierrors.InternalUnexpected)
+	}
+	if prjRole == acl.ProjectRoleElevated || prjRole.AtLeast(acl.ProjectRoleEditor) {
+		return nil
+	}
+	return apierrors.WsProjectAccessDenied
+}
+
 // Create handles POST /workspaces/{wsId}/intake.
 func Create(deps Deps) func(context.Context, *CreateIntakeItemInput) (*CreateIntakeItemOutput, error) {
 	return func(ctx context.Context, in *CreateIntakeItemInput) (*CreateIntakeItemOutput, error) {
 		ws, ok := middleware.WorkspaceFromContext(ctx)
 		if !ok {
 			return nil, httpErr(apierrors.WsWorkspaceNotFound)
+		}
+		if spec := requireNonGuest(ws); spec != nil {
+			return nil, httpErr(spec)
 		}
 
 		pub := types.New()
@@ -199,6 +230,9 @@ func Triage(deps Deps) func(context.Context, *TriageIntakeItemInput) (*TriageInt
 		if !ok {
 			return nil, httpErr(apierrors.WsWorkspaceNotFound)
 		}
+		if spec := requireNonGuest(ws); spec != nil {
+			return nil, httpErr(spec)
+		}
 
 		pub, err := types.Parse(in.ID)
 		if err != nil {
@@ -282,6 +316,9 @@ func Convert(deps Deps) func(context.Context, *ConvertIntakeItemInput) (*Convert
 		if !ok {
 			return nil, httpErr(apierrors.WsWorkspaceNotFound)
 		}
+		if spec := requireNonGuest(ws); spec != nil {
+			return nil, httpErr(spec)
+		}
 
 		pub, err := types.Parse(in.ID)
 		if err != nil {
@@ -315,6 +352,12 @@ func Convert(deps Deps) func(context.Context, *ConvertIntakeItemInput) (*Convert
 		}
 
 		actorID, _ := middleware.ActorFromContext(ctx)
+
+		// Converting writes a task into the target project, so the actor must
+		// be a project editor (or workspace-elevated), matching tasks.Create.
+		if spec := requireProjectEditor(ctx, deps.DB, ws.ID, prj.ID, actorID, ws.Role); spec != nil {
+			return nil, httpErr(spec)
+		}
 
 		taskPub := types.New()
 		desc := sql.NullString{String: nullStr(item.Body), Valid: item.Body.Valid}

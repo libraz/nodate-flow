@@ -69,6 +69,12 @@ func InviteMember(deps Deps) func(context.Context, *AddMemberInput) (*AddMemberO
 		emailAddr := strings.ToLower(strings.TrimSpace(in.Body.Email))
 		role := generated.WorkspaceMembersRole(in.Body.Role)
 
+		// Privilege-escalation guard: an actor may not grant a role that
+		// outranks their own (only an owner may grant owner).
+		if err := memberkit.EnsureRoleWithinActor(memberkit.Role(ws.Role), memberkit.Role(role)); err != nil {
+			return nil, httpErr(apierrors.WsMemberRoleDenied)
+		}
+
 		var userID uint32
 		var userPub types.PublicID
 		var displayName string
@@ -157,6 +163,13 @@ func UpdateMemberRole(deps Deps) func(context.Context, *UpdateMemberRoleInput) (
 			return nil, httpErr(apierrors.WsWorkspaceNotFound)
 		}
 		actorID, _ := authn.ActorFromContext(ctx)
+
+		// Privilege-escalation guard: an actor may not promote a member to
+		// a role that outranks their own (only an owner may grant owner).
+		if err := memberkit.EnsureRoleWithinActor(memberkit.Role(ws.Role), memberkit.Role(in.Body.Role)); err != nil {
+			return nil, httpErr(apierrors.WsMemberRoleDenied)
+		}
+
 		userPub, err := types.Parse(in.UserID)
 		if err != nil {
 			return nil, httpErr(apierrors.WsMemberNotFound)

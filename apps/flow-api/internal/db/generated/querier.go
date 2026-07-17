@@ -319,6 +319,9 @@ type Querier interface {
 	// the same transaction; this row holding the FK reference must go
 	// away before DeleteStorageObjectIfUnreferenced can free the storage
 	// object (FK is ON DELETE RESTRICT). Audit trail survives via events.
+	// The task_id predicate binds the delete to the task whose ACL the caller
+	// already cleared, so an attachment on a different (or unauthorized) task
+	// cannot be removed; a mismatch affects zero rows.
 	DeleteAttachment(ctx context.Context, arg DeleteAttachmentParams) error
 	// Soft-delete a comment.
 	DeleteComment(ctx context.Context, arg DeleteCommentParams) error
@@ -628,11 +631,18 @@ type Querier interface {
 	GetAiSettings(ctx context.Context, workspaceID uint32) (GetAiSettingsRow, error)
 	// Fetch a single attachment by its public id within a workspace, with the
 	// backing storage_objects metadata. Used by download / detail handlers.
+	// The task_id predicate binds the attachment to the task whose ACL the
+	// caller already passed, so an attachment id cannot be dereferenced under
+	// a different (or unauthorized) task; a mismatch returns no row, hiding
+	// existence.
 	GetAttachmentByPublicID(ctx context.Context, arg GetAttachmentByPublicIDParams) (GetAttachmentByPublicIDRow, error)
 	// Resolve the internal storage_object_id for an attachment so the delete
 	// handler can decrement ref_count (and possibly GC the underlying blob)
 	// in the same transaction as the hard-delete below. Returns the internal
 	// attachment id as well so the caller does not have to round-trip.
+	// The task_id predicate scopes the lookup to the task whose ACL the
+	// caller already cleared, so a delete cannot target an attachment on a
+	// different (or unauthorized) task; a mismatch returns no row.
 	GetAttachmentStorageObjectIDForDelete(ctx context.Context, arg GetAttachmentStorageObjectIDForDeleteParams) (GetAttachmentStorageObjectIDForDeleteRow, error)
 	// Resolve, for a set of recipients in one workspace, which delivery
 	// channels are enabled for a given event_category. A recipient with
