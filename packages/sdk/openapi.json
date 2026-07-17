@@ -1563,6 +1563,52 @@
         "required": ["prompt", "lens"],
         "type": "object"
       },
+      "ConfirmAttachmentOutputBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/ConfirmAttachmentOutputBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "byteSize": {
+            "description": "The object's true stored size in bytes.",
+            "format": "int64",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "ok": {
+            "description": "True when the uploaded object passed the size check.",
+            "type": "boolean"
+          }
+        },
+        "required": ["ok", "byteSize"],
+        "type": "object"
+      },
+      "ConfirmTaskAttachmentBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/ConfirmTaskAttachmentBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "byteSize": {
+            "format": "int64",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "ok": {
+            "type": "boolean"
+          }
+        },
+        "required": ["ok", "byteSize"],
+        "type": "object"
+      },
       "ConnectIntegrationInputBody": {
         "additionalProperties": false,
         "properties": {
@@ -7995,8 +8041,9 @@
             "type": "string"
           },
           "byteSize": {
-            "description": "File size in bytes",
+            "description": "File size in bytes (max 100 MB)",
             "format": "int64",
+            "maximum": 104857600,
             "minimum": 1,
             "type": "integer"
           },
@@ -17320,6 +17367,54 @@
         "tags": ["Tasks"]
       }
     },
+    "/tasks/{id}/attachments/{aid}/confirm": {
+      "post": {
+        "description": "Called after the client finishes the presigned PUT. The server StatObjects the stored blob and rejects it (deleting the attachment row and, if now unreferenced, the blob) when the actual size exceeds the per-file ceiling — the presigned PUT binds only the SHA-256, not the length, so the client-declared byteSize cannot be trusted. Returns the object's true size on success.",
+        "operationId": "tasks-attachments-confirm",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "aid",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConfirmTaskAttachmentBody"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Confirm an uploaded attachment and enforce its real size",
+        "tags": ["Tasks"]
+      }
+    },
     "/tasks/{id}/attachments/{aid}/download": {
       "get": {
         "description": "Returns a short-lived presigned GET URL so the client can stream the file straight from object storage. The API never proxies the bytes.",
@@ -18990,7 +19085,7 @@
     },
     "/tasks/{id}/transitions": {
       "post": {
-        "description": "Applies the named transition to the task. Validates against the state machine and emits a task.transitioned event. Refuses transitions that violate attached constraints.",
+        "description": "Applies the named transition to the task. Validates against the state machine and emits a task.transitioned event. Attached constraints are advisory markers evaluated by the constraint engine; they do not reject transitions.",
         "operationId": "tasks-transitions-apply",
         "parameters": [
           {
@@ -22091,6 +22186,78 @@
           }
         },
         "summary": "Delete an attachment from an event",
+        "tags": ["Calendar"]
+      }
+    },
+    "/workspaces/{wsId}/calendars/{calId}/events/{evtId}/attachments/{attId}/confirm": {
+      "post": {
+        "description": "Called after the client finishes the presigned PUT. The server StatObjects the stored blob and rejects it (deleting the attachment row and, if now unreferenced, the blob) when the actual size exceeds the per-file ceiling — the presigned PUT binds only the SHA-256, not the length, so the client-declared byteSize cannot be trusted. Returns the object's true size on success.",
+        "operationId": "attachments-confirm",
+        "parameters": [
+          {
+            "description": "Workspace public ID",
+            "in": "path",
+            "name": "wsId",
+            "required": true,
+            "schema": {
+              "description": "Workspace public ID",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Calendar public ID",
+            "in": "path",
+            "name": "calId",
+            "required": true,
+            "schema": {
+              "description": "Calendar public ID",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Event public ID",
+            "in": "path",
+            "name": "evtId",
+            "required": true,
+            "schema": {
+              "description": "Event public ID",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Attachment public ID",
+            "in": "path",
+            "name": "attId",
+            "required": true,
+            "schema": {
+              "description": "Attachment public ID",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConfirmAttachmentOutputBody"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Confirm an uploaded attachment and enforce its real size",
         "tags": ["Calendar"]
       }
     },

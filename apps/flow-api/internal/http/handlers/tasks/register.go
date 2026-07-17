@@ -426,6 +426,15 @@ func RegisterTaskScopedEditorWrites(api huma.API, deps Deps) {
 	}, PresignUpload(deps))
 
 	huma.Register(api, huma.Operation{
+		OperationID: "tasks-attachments-confirm",
+		Method:      http.MethodPost,
+		Path:        "/tasks/{id}/attachments/{aid}/confirm",
+		Summary:     "Confirm an uploaded attachment and enforce its real size",
+		Description: "Called after the client finishes the presigned PUT. The server StatObjects the stored blob and rejects it (deleting the attachment row and, if now unreferenced, the blob) when the actual size exceeds the per-file ceiling — the presigned PUT binds only the SHA-256, not the length, so the client-declared byteSize cannot be trusted. Returns the object's true size on success.",
+		Tags:        []string{"Tasks"},
+	}, ConfirmUpload(deps))
+
+	huma.Register(api, huma.Operation{
 		OperationID: "tasks-attachments-delete",
 		Method:      http.MethodDelete,
 		Path:        "/tasks/{id}/attachments/{aid}",

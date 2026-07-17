@@ -131,6 +131,24 @@ export function usePresignEventAttachmentMutation(): UseMutationResult<
       });
       if (!res.ok) throw new ApiError('UPLOAD_FAILED', 'File upload failed');
 
+      // Post-upload size enforcement. The presigned PUT binds only the
+      // SHA-256, not the length, so the server StatObjects the stored
+      // blob and rejects it (deleting the attachment row and, if now
+      // unreferenced, the blob) when the actual size exceeds the
+      // per-file ceiling. Only reachable on the non-deduplicated branch
+      // where a fresh blob was actually stored.
+      const { error: confirmError } = await sdk.POST(
+        '/workspaces/{wsId}/calendars/{calId}/events/{evtId}/attachments/{attId}/confirm',
+        { params: { path: { wsId, calId, evtId, attId: data.attachmentId } } },
+      );
+      if (confirmError) {
+        // The server already deleted the oversized attachment row;
+        // refresh the list so the phantom row disappears before we
+        // surface the error to the UI.
+        void qc.invalidateQueries({ queryKey: eventAttachmentKeys.list(wsId, calId, evtId) });
+        throw toApiError(confirmError, 'Attachment rejected by size check');
+      }
+
       return data;
     },
     onSuccess: (_data, { wsId, calId, evtId }) => {

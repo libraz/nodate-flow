@@ -76,7 +76,7 @@ type PresignAttachmentInput struct {
 	Body  struct {
 		Filename    string `json:"filename" minLength:"1" maxLength:"512" doc:"Original filename"`
 		ContentType string `json:"contentType" minLength:"1" maxLength:"255" doc:"MIME type"`
-		ByteSize    uint64 `json:"byteSize" minimum:"1" doc:"File size in bytes"`
+		ByteSize    uint64 `json:"byteSize" minimum:"1" maximum:"104857600" doc:"File size in bytes (max 100 MB)"`
 		Sha256      string `json:"sha256" minLength:"64" maxLength:"64" pattern:"^[0-9a-f]{64}$" doc:"Lowercase hex SHA-256 digest of the file body (64 chars). Drives content-addressed dedup."`
 	}
 }
@@ -195,6 +195,18 @@ func PresignAttachment(deps Deps) func(context.Context, *PresignAttachmentInput)
 	return func(ctx context.Context, input *PresignAttachmentInput) (*PresignAttachmentOutput, error) {
 		if deps.Storage == nil {
 			return nil, httpErr(apierrors.InternalStorageNotConfigured)
+		}
+		// Cross-surface upload validation: mirror the task presign path
+		// so calendar attachments enforce the same MIME allowlist,
+		// blocked-extension deny list, and per-file size ceiling.
+		if !handlerutil.IsAllowedContentType(input.Body.ContentType) {
+			return nil, httpErr(apierrors.ValidationFileTypeNotAllowed)
+		}
+		if handlerutil.HasBlockedExtension(input.Body.Filename) {
+			return nil, httpErr(apierrors.ValidationFileTypeNotAllowed)
+		}
+		if input.Body.ByteSize > handlerutil.MaxUploadSize {
+			return nil, httpErr(apierrors.ValidationFileTooLarge)
 		}
 		shaBytes, err := hex.DecodeString(input.Body.Sha256)
 		if err != nil || len(shaBytes) != 32 {

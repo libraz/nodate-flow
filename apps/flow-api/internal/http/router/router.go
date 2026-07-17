@@ -1521,6 +1521,14 @@ func buildAuthenticatedAPI(r chi.Router, deps Deps, shared *sharedDeps, authMW f
 			Tags:        []string{"Calendar"},
 		}, calendars.DownloadAttachment(shared.calDeps))
 		huma.Register(subAPI, huma.Operation{
+			OperationID: "attachments-confirm",
+			Method:      http.MethodPost,
+			Path:        "/workspaces/{wsId}/calendars/{calId}/events/{evtId}/attachments/{attId}/confirm",
+			Summary:     "Confirm an uploaded attachment and enforce its real size",
+			Description: "Called after the client finishes the presigned PUT. The server StatObjects the stored blob and rejects it (deleting the attachment row and, if now unreferenced, the blob) when the actual size exceeds the per-file ceiling — the presigned PUT binds only the SHA-256, not the length, so the client-declared byteSize cannot be trusted. Returns the object's true size on success.",
+			Tags:        []string{"Calendar"},
+		}, calendars.ConfirmAttachment(shared.calDeps))
+		huma.Register(subAPI, huma.Operation{
 			OperationID: "attachments-delete",
 			Method:      http.MethodDelete,
 			Path:        "/workspaces/{wsId}/calendars/{calId}/events/{evtId}/attachments/{attId}",

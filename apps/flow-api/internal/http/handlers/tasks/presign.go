@@ -20,57 +20,6 @@ import (
 
 const presignExpiry = 15 * time.Minute
 
-// maxFileSize is the per-file upload limit (100 MB).
-const maxFileSize = 100 * 1024 * 1024
-
-// allowedMIMEPrefixes lists safe MIME type prefixes for uploads.
-// Intentionally excludes application/octet-stream (catch-all) and
-// limits application/vnd.ms-* to safe Office types.
-var allowedMIMEPrefixes = []string{
-	"image/",
-	"text/",
-	"application/pdf",
-	"application/json",
-	"application/xml",
-	"application/zip",
-	"application/gzip",
-	"application/x-tar",
-	"application/vnd.openxmlformats-officedocument",
-	"application/vnd.ms-excel",
-	"application/vnd.ms-powerpoint",
-	"application/vnd.oasis.opendocument",
-	"video/",
-	"audio/",
-}
-
-// blockedExtensions rejects dangerous file extensions regardless of
-// the declared MIME type.
-var blockedExtensions = []string{
-	".exe", ".dll", ".bat", ".cmd", ".com", ".scr", ".pif",
-	".msi", ".msp", ".mst", ".vbs", ".vbe", ".js", ".jse",
-	".wsf", ".wsh", ".ps1", ".psm1",
-}
-
-func isAllowedContentType(ct string) bool {
-	ct = strings.ToLower(strings.TrimSpace(ct))
-	for _, prefix := range allowedMIMEPrefixes {
-		if strings.HasPrefix(ct, prefix) {
-			return true
-		}
-	}
-	return false
-}
-
-func hasBlockedExtension(filename string) bool {
-	lower := strings.ToLower(filename)
-	for _, ext := range blockedExtensions {
-		if strings.HasSuffix(lower, ext) {
-			return true
-		}
-	}
-	return false
-}
-
 // presignMaxAttempts bounds the duplicate-entry retry loop in
 // PresignUpload. We restart the transaction (not just the SELECT)
 // when InsertStorageObject hits MySQL 1062, because the same
@@ -117,13 +66,13 @@ func PresignUpload(deps Deps) func(context.Context, *PresignUploadInput) (*Presi
 		if deps.Storage == nil {
 			return nil, httpErr(apierrors.InternalStorageNotConfigured)
 		}
-		if !isAllowedContentType(in.Body.ContentType) {
+		if !handlerutil.IsAllowedContentType(in.Body.ContentType) {
 			return nil, httpErr(apierrors.ValidationFileTypeNotAllowed)
 		}
-		if hasBlockedExtension(in.Body.Filename) {
+		if handlerutil.HasBlockedExtension(in.Body.Filename) {
 			return nil, httpErr(apierrors.ValidationFileTypeNotAllowed)
 		}
-		if in.Body.ByteSize > maxFileSize {
+		if in.Body.ByteSize > handlerutil.MaxUploadSize {
 			return nil, httpErr(apierrors.ValidationFileTooLarge)
 		}
 		shaBytes, err := hex.DecodeString(in.Body.Sha256)

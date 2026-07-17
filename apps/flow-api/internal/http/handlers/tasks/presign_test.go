@@ -1,69 +1,23 @@
 package tasks
 
-import "testing"
+import (
+	"testing"
 
-func TestIsAllowedContentType(t *testing.T) {
+	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/handlers/handlerutil"
+)
+
+// TestPresignSharedValidation guards that the task presign surface routes
+// its content-type / extension checks through the shared handlerutil
+// helpers, keeping the task and calendar upload flows consistent.
+func TestPresignSharedValidation(t *testing.T) {
 	t.Parallel()
-	allowed := []string{
-		"image/png",
-		"image/jpeg",
-		"text/plain",
-		"application/pdf",
-		"application/json",
-		"application/zip",
-		"application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-		"application/vnd.ms-excel",
-		"application/vnd.ms-powerpoint",
-		"video/mp4",
-		"audio/mpeg",
+	if !handlerutil.IsAllowedContentType("image/png") {
+		t.Error("expected image/png to be allowed")
 	}
-	for _, ct := range allowed {
-		if !isAllowedContentType(ct) {
-			t.Errorf("expected %q to be allowed", ct)
-		}
+	if handlerutil.IsAllowedContentType("application/octet-stream") {
+		t.Error("expected application/octet-stream to be blocked")
 	}
-
-	blocked := []string{
-		"application/octet-stream",
-		"application/x-msdownload",
-		"application/vnd.ms-dos-executable",
-	}
-	for _, ct := range blocked {
-		if isAllowedContentType(ct) {
-			t.Errorf("expected %q to be blocked", ct)
-		}
-	}
-}
-
-func TestHasBlockedExtension(t *testing.T) {
-	t.Parallel()
-	dangerous := []string{
-		"malware.exe",
-		"script.bat",
-		"TROJAN.EXE",
-		"payload.dll",
-		"hack.ps1",
-		"install.msi",
-		"run.cmd",
-		"evil.vbs",
-	}
-	for _, f := range dangerous {
-		if !hasBlockedExtension(f) {
-			t.Errorf("expected %q to be blocked", f)
-		}
-	}
-
-	safe := []string{
-		"document.pdf",
-		"photo.png",
-		"report.xlsx",
-		"readme.txt",
-		"archive.zip",
-		"video.mp4",
-	}
-	for _, f := range safe {
-		if hasBlockedExtension(f) {
-			t.Errorf("expected %q to be safe", f)
-		}
+	if !handlerutil.HasBlockedExtension("malware.exe") {
+		t.Error("expected .exe to be a blocked extension")
 	}
 }

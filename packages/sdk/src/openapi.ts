@@ -1666,6 +1666,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/tasks/{id}/attachments/{aid}/confirm": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Confirm an uploaded attachment and enforce its real size
+         * @description Called after the client finishes the presigned PUT. The server StatObjects the stored blob and rejects it (deleting the attachment row and, if now unreferenced, the blob) when the actual size exceeds the per-file ceiling — the presigned PUT binds only the SHA-256, not the length, so the client-declared byteSize cannot be trusted. Returns the object's true size on success.
+         */
+        post: operations["tasks-attachments-confirm"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/tasks/{id}/attachments/{aid}/download": {
         parameters: {
             query?: never;
@@ -2257,7 +2277,7 @@ export interface paths {
         put?: never;
         /**
          * Apply a state machine transition to a task
-         * @description Applies the named transition to the task. Validates against the state machine and emits a task.transitioned event. Refuses transitions that violate attached constraints.
+         * @description Applies the named transition to the task. Validates against the state machine and emits a task.transitioned event. Attached constraints are advisory markers evaluated by the constraint engine; they do not reject transitions.
          */
         post: operations["tasks-transitions-apply"];
         delete?: never;
@@ -3157,6 +3177,26 @@ export interface paths {
          * @description Marks the attachment as removed, decrements the storage_objects ref_count, and best-effort deletes the underlying blob if no references remain. Idempotent.
          */
         delete: operations["attachments-delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/workspaces/{wsId}/calendars/{calId}/events/{evtId}/attachments/{attId}/confirm": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Confirm an uploaded attachment and enforce its real size
+         * @description Called after the client finishes the presigned PUT. The server StatObjects the stored blob and rejects it (deleting the attachment row and, if now unreferenced, the blob) when the actual size exceeds the per-file ceiling — the presigned PUT binds only the SHA-256, not the length, so the client-declared byteSize cannot be trusted. Returns the object's true size on success.
+         */
+        post: operations["attachments-confirm"];
+        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -5483,6 +5523,32 @@ export interface components {
             readonly $schema?: string;
             lens: components["schemas"]["Lens"];
             prompt: string;
+        };
+        ConfirmAttachmentOutputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/ConfirmAttachmentOutputBody.json
+             */
+            readonly $schema?: string;
+            /**
+             * Format: int64
+             * @description The object's true stored size in bytes.
+             */
+            byteSize: number;
+            /** @description True when the uploaded object passed the size check. */
+            ok: boolean;
+        };
+        ConfirmTaskAttachmentBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/ConfirmTaskAttachmentBody.json
+             */
+            readonly $schema?: string;
+            /** Format: int64 */
+            byteSize: number;
+            ok: boolean;
         };
         ConnectIntegrationInputBody: {
             /**
@@ -8479,7 +8545,7 @@ export interface components {
             readonly $schema?: string;
             /**
              * Format: int64
-             * @description File size in bytes
+             * @description File size in bytes (max 100 MB)
              */
             byteSize: number;
             /** @description MIME type */
@@ -13784,6 +13850,38 @@ export interface operations {
             };
         };
     };
+    "tasks-attachments-confirm": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                aid: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConfirmTaskAttachmentBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
     "tasks-attachments-download": {
         parameters: {
             query?: never;
@@ -16858,6 +16956,44 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["DeleteAttachmentOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "attachments-confirm": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Workspace public ID */
+                wsId: string;
+                /** @description Calendar public ID */
+                calId: string;
+                /** @description Event public ID */
+                evtId: string;
+                /** @description Attachment public ID */
+                attId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConfirmAttachmentOutputBody"];
                 };
             };
             /** @description Error */
