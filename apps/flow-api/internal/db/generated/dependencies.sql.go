@@ -465,3 +465,33 @@ func (q *Queries) ListRetroDraftsForWorkspace(ctx context.Context, arg ListRetro
 	}
 	return items, nil
 }
+
+const lockProjectForDependency = `-- name: LockProjectForDependency :one
+SELECT id
+FROM projects
+WHERE workspace_id = ?
+  AND id = ?
+  AND enabled = TRUE
+FOR UPDATE
+`
+
+type LockProjectForDependencyParams struct {
+	WorkspaceID uint32 `json:"-"`
+	ID          uint32 `json:"-"`
+}
+
+// Acquire a row-level lock on the owning project before creating a dependency
+// edge. The AddDependency handler reads the workspace's edge set and walks it
+// to reject an edge that would close a cycle; without serialization two
+// concurrent POSTs (A->B and B->A) both pass the cycle check and commit,
+// forming a cycle / mutual-block. Calling this inside the transaction first
+// makes concurrent dependency writers for the same project serialize, while
+// different projects still proceed independently. Mirrors
+// LockProjectForTaskNumber. Both endpoints of a dependency share a project,
+// so locking that project row is sufficient to serialize the check-then-insert.
+func (q *Queries) LockProjectForDependency(ctx context.Context, arg LockProjectForDependencyParams) (uint32, error) {
+	row := q.db.QueryRowContext(ctx, lockProjectForDependency, arg.WorkspaceID, arg.ID)
+	var id uint32
+	err := row.Scan(&id)
+	return id, err
+}

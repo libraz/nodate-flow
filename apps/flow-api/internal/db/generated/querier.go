@@ -171,6 +171,15 @@ type Querier interface {
 	// Callers wrap this in BEGIN / COMMIT; SELECT ... FOR UPDATE SKIP LOCKED
 	// lets multiple workers race for rows without contention.
 	ClaimNextAgentRun(ctx context.Context) (ClaimNextAgentRunRow, error)
+	// Atomically consume an OAuth state row. MySQL 8.4 has no
+	// DELETE ... RETURNING, so the row payload is read via FindOauthState
+	// and this guarded DELETE is the actual claim: the expires_at guard
+	// rejects stale states and the delete itself elects a single winner.
+	// Two concurrent callbacks racing on the same state can never both
+	// succeed -- exactly one DELETE matches the still-present row and the
+	// loser sees zero affected rows. Callers MUST inspect RowsAffected and
+	// treat 0 as "invalid, expired, or already consumed".
+	ClaimOauthState(ctx context.Context, state string) (int64, error)
 	// Atomically claim a batch of deliveries ready for (re)delivery.
 	// Modeled after ClaimNextAgentRun: callers wrap this SELECT and the
 	// companion MarkDeliveriesClaimed in a single BEGIN / COMMIT.
@@ -220,10 +229,6 @@ type Querier interface {
 	// mfa_confirmed_at. The caller must have already validated a code
 	// against the stored secret.
 	ConfirmIdentityMfa(ctx context.Context, id uint32) error
-	// Atomically look up and delete an OAuth state row. The caller MUST
-	// still check expires_at against CURRENT_TIMESTAMP before trusting
-	// the returned row.
-	ConsumeOauthState(ctx context.Context, state string) (ConsumeOauthStateRow, error)
 	// Cross-domain count of active calendar events linked to a task.
 	// Lives in the tasks query package so the task GET hot path keeps a single
 	// generated Queries surface even when the calendars query glob narrows.
@@ -370,8 +375,6 @@ type Querier interface {
 	DeleteMentionsForComment(ctx context.Context, commentID sql.NullInt32) error
 	// Remove all task_description mentions for a task (before re-extracting).
 	DeleteMentionsForTaskDescription(ctx context.Context, taskID sql.NullInt32) error
-	// Explicit delete for the state row that :one above just returned.
-	DeleteOauthState(ctx context.Context, state string) error
 	// Soft-delete a provider. Returns rows-affected so the handler can detect a
 	// not-found / wrong-workspace target (0 rows) instead of reporting a false
 	// success.
@@ -520,6 +523,13 @@ type Querier interface {
 	FindMcpTokenByHash(ctx context.Context, tokenHash string) (FindMcpTokenByHashRow, error)
 	// Check if a specific event category + channel is muted for a user.
 	FindNotificationPreference(ctx context.Context, arg FindNotificationPreferenceParams) (FindNotificationPreferenceRow, error)
+	// Read the payload of an OAuth state row so the callback handler can
+	// recover (user_id, provider, redirect_to). This is a plain read and
+	// carries NO single-use guarantee on its own: the caller MUST follow
+	// it with ClaimOauthState and only trust this payload when the claim
+	// reports exactly one affected row. Expiry is enforced by the claim,
+	// not here.
+	FindOauthState(ctx context.Context, state string) (FindOauthStateRow, error)
 	// Resolve a PAT row from its SHA-256 hash for bearer auth.
 	FindPatByHash(ctx context.Context, tokenHash string) (FindPatByHashRow, error)
 	// Find deliveries ready for (re)delivery. Used by the background worker.
@@ -1346,6 +1356,16 @@ type Querier interface {
 	ListWorkspaceMembersForSmartCreate(ctx context.Context, workspaceID uint32) ([]ListWorkspaceMembersForSmartCreateRow, error)
 	// List workspaces a user belongs to.
 	ListWorkspacesForUser(ctx context.Context, arg ListWorkspacesForUserParams) ([]ListWorkspacesForUserRow, error)
+	// Acquire a row-level lock on the owning project before creating a dependency
+	// edge. The AddDependency handler reads the workspace's edge set and walks it
+	// to reject an edge that would close a cycle; without serialization two
+	// concurrent POSTs (A->B and B->A) both pass the cycle check and commit,
+	// forming a cycle / mutual-block. Calling this inside the transaction first
+	// makes concurrent dependency writers for the same project serialize, while
+	// different projects still proceed independently. Mirrors
+	// LockProjectForTaskNumber. Both endpoints of a dependency share a project,
+	// so locking that project row is sufficient to serialize the check-then-insert.
+	LockProjectForDependency(ctx context.Context, arg LockProjectForDependencyParams) (uint32, error)
 	// Lock the owning project row before task-number allocation. This serializes
 	// concurrent creators for the same project while still allowing different
 	// projects to allocate independently.
@@ -1390,8 +1410,12 @@ type Querier interface {
 	MarkNotificationDelivered(ctx context.Context, arg MarkNotificationDeliveredParams) error
 	// Mark a single notification as read.
 	MarkNotificationRead(ctx context.Context, arg MarkNotificationReadParams) error
-	// Stamp used_at on a recovery code by internal id.
-	MarkRecoveryCodeUsed(ctx context.Context, id uint32) error
+	// Atomically claim a recovery code by internal id. The WHERE clause
+	// includes used_at IS NULL so two concurrent login requests racing on
+	// the same code can never both succeed: exactly one UPDATE will match
+	// and the loser sees zero affected rows. Callers MUST inspect
+	// RowsAffected and treat 0 as "already consumed" (reject the attempt).
+	MarkRecoveryCodeUsed(ctx context.Context, id uint32) (int64, error)
 	// Resolve the most specific auto-action rule for a (workspace, kind, signal_kind)
 	// triple. Ordering:
 	//   1) exact signal_kind match (signal_kind = sqlc.arg(signal_kind))

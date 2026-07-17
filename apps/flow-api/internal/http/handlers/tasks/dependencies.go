@@ -3,7 +3,7 @@ package tasks
 import (
 	"context"
 	"database/sql"
-	"log/slog"
+	stderrors "errors"
 
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/audit"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/dbretry"
@@ -12,10 +12,19 @@ import (
 	apierrors "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/errors"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/eventbus"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/middleware"
-	nflog "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/log"
 	"github.com/nodate-flow/nodate-flow/packages/go-shared/apierr"
-	"github.com/nodate-flow/nodate-flow/packages/go-shared/logutil"
 )
+
+// errDependencyCycle is the sentinel returned from the AddDependency tx
+// callback when the locked cycle re-check detects that the new edge
+// would close a cycle. It is not a transient MySQL error, so dbretry
+// returns it verbatim without retrying and the handler maps it to
+// WS.TASK.DEPENDENCY_CYCLE.
+var errDependencyCycle = errDependencyCycleValue{}
+
+type errDependencyCycleValue struct{}
+
+func (errDependencyCycleValue) Error() string { return "tasks: dependency edge would close a cycle" }
 
 // ListDependencies handles GET /tasks/{id}/dependencies. Returns both
 // outgoing edges (this task → other) and incoming edges (other → this).
@@ -91,32 +100,69 @@ func AddDependency(deps Deps) func(context.Context, *AddTaskDependencyInput) (*A
 		if err != nil {
 			return nil, httpErr(apierrors.WsTaskNotFound)
 		}
-		// Resolve target task internal id within the same workspace.
-		const q = `SELECT id FROM tasks WHERE workspace_id = ? AND public_id = ? AND enabled = TRUE LIMIT 1`
-		var toID uint32
-		if err := deps.DB.QueryRowContext(ctx, q, ws.ID, toPub).Scan(&toID); err != nil {
+		// Resolve target task internal id and owning project within the
+		// same workspace. The project id feeds the row locks below.
+		const q = `SELECT id, project_id FROM tasks WHERE workspace_id = ? AND public_id = ? AND enabled = TRUE LIMIT 1`
+		var toID, toProjectID uint32
+		if err := deps.DB.QueryRowContext(ctx, q, ws.ID, toPub).Scan(&toID, &toProjectID); err != nil {
 			return nil, httpErr(apierr.SpecForErrNoRows(err, apierrors.WsTaskNotFound, apierrors.InternalUnexpected))
 		}
-		// Reject any edge that would close a cycle so the dependency graph
-		// stays a DAG (the documented contract). The new edge is
-		// task.ID -> toID; it closes a cycle iff toID can already reach
-		// task.ID along existing edges.
-		edges, err := deps.Queries.ListDependencyEdgesForWorkspace(ctx, ws.ID)
-		if err != nil {
+		prj, ok := middleware.ProjectFromContext(ctx)
+		if !ok {
 			return nil, httpErr(apierrors.InternalUnexpected)
-		}
-		if dependencyEdgeClosesCycle(edges, task.ID, toID) {
-			return nil, httpErr(apierrors.WsTaskDependencyCycle)
 		}
 		pub := types.New()
 		taskInternal := int64(task.ID)
 		// Insert the edge and append the event atomically inside one tx so
 		// a crash between insert and a post-commit append cannot lose the
-		// timeline row (L-14). Retry on transient FK deadlocks:
+		// timeline row. The cycle check also runs INSIDE this tx, after
+		// locking the endpoint project rows (LockProjectForDependency,
+		// mirroring tasknumber.Allocate): without the lock two concurrent
+		// POSTs (A->B and B->A) each read an edge set that misses the
+		// other's insert, both pass the check, and both commit — forming a
+		// cycle. The lock serializes the check-then-insert, so the loser
+		// re-reads the winner's committed edge and is rejected with
+		// WS.TASK.DEPENDENCY_CYCLE. Both endpoint projects are locked in
+		// ascending id order so two cross-project writers cannot deadlock
+		// on each other's lock. dbretry retries transient FK deadlocks:
 		// task_dependencies has FKs into tasks/workspaces and races with
 		// concurrent transition transactions on the same task rows.
-		if err := dbretry.InTx(ctx, deps.DB, "tasks.AddDependency", nil, func(ctx context.Context, tx *sql.Tx) error {
+		txErr := dbretry.InTx(ctx, deps.DB, "tasks.AddDependency", nil, func(ctx context.Context, tx *sql.Tx) error {
 			qtx := deps.Queries.WithTx(tx)
+			first, second := prj.ID, toProjectID
+			if second < first {
+				first, second = second, first
+			}
+			if _, e := qtx.LockProjectForDependency(ctx, generated.LockProjectForDependencyParams{
+				WorkspaceID: ws.ID,
+				ID:          first,
+			}); e != nil {
+				return e
+			}
+			if second != first {
+				if _, e := qtx.LockProjectForDependency(ctx, generated.LockProjectForDependencyParams{
+					WorkspaceID: ws.ID,
+					ID:          second,
+				}); e != nil {
+					return e
+				}
+			}
+			// Read the edge set only after the locks are granted: under
+			// REPEATABLE READ the consistent snapshot is established at
+			// the first plain SELECT, which here runs after any concurrent
+			// dependency writer on these projects has committed, so the
+			// walk sees that writer's edge.
+			edges, e := qtx.ListDependencyEdgesForWorkspace(ctx, ws.ID)
+			if e != nil {
+				return e
+			}
+			// Reject any edge that would close a cycle so the dependency
+			// graph stays a DAG (the documented contract). The new edge
+			// is task.ID -> toID; it closes a cycle iff toID can already
+			// reach task.ID along existing edges.
+			if dependencyEdgeClosesCycle(edges, task.ID, toID) {
+				return errDependencyCycle
+			}
 			if _, e := qtx.AddDependency(ctx, generated.AddDependencyParams{
 				PublicID:    pub,
 				WorkspaceID: ws.ID,
@@ -138,8 +184,14 @@ func AddDependency(deps Deps) func(context.Context, *AddTaskDependencyInput) (*A
 					"kind":         in.Body.Kind,
 				},
 			})
-		}); err != nil {
-			return nil, httpErr(apierrors.InternalUnexpected)
+		})
+		if txErr != nil {
+			if stderrors.Is(txErr, errDependencyCycle) {
+				return nil, httpErr(apierrors.WsTaskDependencyCycle)
+			}
+			// ErrNoRows from the project lock means an endpoint project
+			// vanished (disabled) between the resolve and the tx.
+			return nil, httpErr(apierr.SpecForErrNoRows(txErr, apierrors.WsTaskNotFound, apierrors.InternalUnexpected))
 		}
 		if aID, aOk := middleware.ActorFromContext(ctx); aOk {
 			deps.Audit.Record(ctx, audit.Entry{
@@ -175,12 +227,41 @@ func RemoveDependency(deps Deps) func(context.Context, *RemoveTaskDependencyInpu
 		if err != nil {
 			return nil, httpErr(apierrors.ValidationPathParamInvalid)
 		}
-		affected, err := deps.Queries.DeleteDependency(ctx, generated.DeleteDependencyParams{
-			WorkspaceID: ws.ID,
-			PublicID:    depID,
-			FromTaskID:  task.ID,
+		taskInternal := int64(task.ID)
+		// Delete the edge and append the event atomically inside one tx so
+		// the timeline row cannot be lost between the UPDATE and a
+		// post-commit append (the AddDependency path already commits both
+		// in one tx). dbretry retries transient FK deadlocks with
+		// concurrent transition transactions on the same task rows.
+		var affected int64
+		txErr := dbretry.InTx(ctx, deps.DB, "tasks.RemoveDependency", nil, func(ctx context.Context, tx *sql.Tx) error {
+			qtx := deps.Queries.WithTx(tx)
+			n, e := qtx.DeleteDependency(ctx, generated.DeleteDependencyParams{
+				WorkspaceID: ws.ID,
+				PublicID:    depID,
+				FromTaskID:  task.ID,
+			})
+			if e != nil {
+				return e
+			}
+			affected = n
+			if n == 0 {
+				// Nothing was deleted, so no event must be appended; the
+				// NOT_FOUND mapping happens outside the tx.
+				return nil
+			}
+			return eventbus.Append(ctx, tx, eventbus.Event{
+				Type:        eventbus.TaskDependencyRemoved,
+				WorkspaceID: ws.ID,
+				ActorUserID: actorPtr(ctx),
+				TaskID:      &taskInternal,
+				Payload: map[string]any{
+					"taskId":       task.PublicID.String(),
+					"dependencyId": depID.String(),
+				},
+			})
 		})
-		if err != nil {
+		if txErr != nil {
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
 		// 0 rows means the edge does not exist on this task's path (it may
@@ -189,26 +270,6 @@ func RemoveDependency(deps Deps) func(context.Context, *RemoveTaskDependencyInpu
 		// another task's edge.
 		if affected == 0 {
 			return nil, httpErr(apierrors.WsTaskNotFound)
-		}
-		taskInternal := int64(task.ID)
-		if err := eventbus.Append(ctx, deps.DB, eventbus.Event{
-			Type:        eventbus.TaskDependencyRemoved,
-			WorkspaceID: ws.ID,
-			ActorUserID: actorPtr(ctx),
-			TaskID:      &taskInternal,
-			Payload: map[string]any{
-				"taskId":       task.PublicID.String(),
-				"dependencyId": depID.String(),
-			},
-		}); err != nil {
-			nflog.LoggerFromContext(ctx).ErrorContext(ctx, "eventbus.Append failed",
-				slog.Any("err", err),
-				slog.String("handler", "tasks.RemoveDependency"),
-				slog.String("event_type", string(eventbus.TaskDependencyRemoved)),
-				logutil.LogEntity("workspace", ws.PublicID),
-				logutil.LogEntity("task", task.PublicID),
-				slog.String("dependency_public_id", depID.String()),
-			)
 		}
 		if aID, aOk := middleware.ActorFromContext(ctx); aOk {
 			deps.Audit.Record(ctx, audit.Entry{
