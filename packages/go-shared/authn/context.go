@@ -18,6 +18,7 @@ const (
 	ctxKeyTokenKind
 	ctxKeyTokenScopes
 	ctxKeyTokenWorkspaceID
+	ctxKeyUserAgent
 )
 
 // TokenKind identifies the concrete bearer token family that admitted the
@@ -163,5 +164,20 @@ func WithClientIP(ctx context.Context, ip string) context.Context {
 // no middleware has populated the context.
 func ClientIPFromContext(ctx context.Context) string {
 	v, _ := ctx.Value(ctxKeyClientIP).(string)
+	return v
+}
+
+// WithUserAgent returns a new context carrying the caller's User-Agent
+// header (already length-capped by the ClientIP middleware). It is used
+// by the audit recorder to attribute audit rows to a client.
+func WithUserAgent(ctx context.Context, ua string) context.Context {
+	return context.WithValue(ctx, ctxKeyUserAgent, ua)
+}
+
+// UserAgentFromContext extracts the caller's User-Agent header as
+// populated by the ClientIP middleware. Returns an empty string when
+// no middleware has populated the context.
+func UserAgentFromContext(ctx context.Context) string {
+	v, _ := ctx.Value(ctxKeyUserAgent).(string)
 	return v
 }

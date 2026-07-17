@@ -10,6 +10,11 @@ import (
 // X-Forwarded-For header abuse (legitimate IPv6 is <= 45 chars).
 const ClientIPMaxLen = 64
 
+// UserAgentMaxLen caps the User-Agent stashed on the request context so a
+// malicious client cannot use it as a write-amplification vector. It
+// matches the audit_logs.user_agent column width.
+const UserAgentMaxLen = 512
+
 // ClientIPMiddleware is a chi-compatible middleware that extracts the
 // caller's IP address from RemoteAddr and stashes it on the request
 // context via [authn.WithClientIP] for downstream handlers. It does not
@@ -29,6 +34,12 @@ func ClientIPMiddlewareWithTrustedProxyHops(trustedProxyHops int) func(http.Hand
 				ip = ip[:ClientIPMaxLen]
 			}
 			ctx := authn.WithClientIP(r.Context(), ip)
+			if ua := r.UserAgent(); ua != "" {
+				if len(ua) > UserAgentMaxLen {
+					ua = ua[:UserAgentMaxLen]
+				}
+				ctx = authn.WithUserAgent(ctx, ua)
+			}
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})
 	}
