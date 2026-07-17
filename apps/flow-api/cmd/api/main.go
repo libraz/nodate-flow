@@ -233,7 +233,7 @@ func main() {
 			budget := ai.BudgetReaderFunc(func(ctx context.Context, wsID uint32) (int64, error) {
 				return queries.SumAiCostTodayForWorkspace(ctx, generated.SumAiCostTodayForWorkspaceParams{
 					WorkspaceID: wsID,
-					InvokedAt:   time.Now().UTC().Truncate(24 * time.Hour),
+					InvokedAt:   ai.WorkspaceDayStart(ctx, queries, wsID),
 				})
 			})
 			invocationLogger := router.NewDBInvocationLogger(queries, aiInvocationPublisher)

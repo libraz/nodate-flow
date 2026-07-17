@@ -482,7 +482,7 @@ func buildSharedDeps(deps Deps) *sharedDeps {
 		nlBudget := ai.BudgetReaderFunc(func(ctx context.Context, wsID uint32) (int64, error) {
 			return deps.Queries.SumAiCostTodayForWorkspace(ctx, generated.SumAiCostTodayForWorkspaceParams{
 				WorkspaceID: wsID,
-				InvokedAt:   time.Now().UTC().Truncate(24 * time.Hour),
+				InvokedAt:   ai.WorkspaceDayStart(ctx, deps.Queries, wsID),
 			})
 		})
 		nlGuard := ai.NewCostGuard(nlBudget, deps.AiDailyBudgetCents)
@@ -578,7 +578,7 @@ func buildSharedDeps(deps Deps) *sharedDeps {
 		budget := ai.BudgetReaderFunc(func(ctx context.Context, wsID uint32) (int64, error) {
 			return deps.Queries.SumAiCostTodayForWorkspace(ctx, generated.SumAiCostTodayForWorkspaceParams{
 				WorkspaceID: wsID,
-				InvokedAt:   time.Now().UTC().Truncate(24 * time.Hour),
+				InvokedAt:   ai.WorkspaceDayStart(ctx, deps.Queries, wsID),
 			})
 		})
 		aiOrch = &ai.Orchestrator{
