@@ -64,12 +64,16 @@ ORDER BY invoked_at DESC, id DESC
 LIMIT ? OFFSET ?;
 
 -- name: SumAiCostTodayForWorkspace :one
--- Sum the estimated cost (in whole cents) of LLM calls made today for a
--- workspace. cost_estimate is stored as DECIMAL(10,6) USD; multiply by 100
--- and round to produce a cent-scale integer suitable for CostGuard.
+-- Sum the estimated cost (in whole cents) of chat/agent LLM calls made today
+-- for a workspace. cost_estimate is stored as DECIMAL(10,6) USD; multiply by
+-- 100 and round to produce a cent-scale integer suitable for CostGuard.
+-- Embedding calls are excluded here: they have their own
+-- ai_settings.embed_budget_cents_day bucket (see SumEmbedCostTodayForWorkspace)
+-- and must not be double-counted against the chat/agent daily budget.
 SELECT CAST(COALESCE(ROUND(SUM(cost_estimate) * 100), 0) AS SIGNED) AS total_cents
 FROM ai_invocations
 WHERE workspace_id = ?
+  AND purpose NOT LIKE 'embed\_%'
   AND invoked_at >= ?;
 
 -- name: SumEmbedCostTodayForWorkspace :one
