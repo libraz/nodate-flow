@@ -10,7 +10,7 @@
  * already carry their own `status: number` field continue to compile
  * without needing an `override` modifier.
  */
-import { lookupErrorI18nKey } from './errors/lookup.js';
+import { lookupErrorI18nKey } from './error-lookup.js';
 
 export class ApiError extends Error {
   readonly code: string | undefined;

@@ -12,7 +12,6 @@ export * from "./integration-slack.js";
 export * from "./integrations.js";
 export * from "./internal.js";
 export * from "./item.js";
-export * from "./lookup.js";
 export * from "./mcp.js";
 export * from "./page.js";
 export * from "./rate.js";

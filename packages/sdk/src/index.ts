@@ -20,6 +20,13 @@ export {
 // Avatar URL helpers (auth-api proxy)
 export { buildAvatarUrl } from './avatar.js';
 export { type CreateClientOptions, createClient, type NodateFlowClient } from './client.js';
+// Hand-authored lookup over the generated catalog; kept outside ./errors so
+// the codegen barrel never clobbers it.
+export {
+  type ErrorDefinition,
+  lookupErrorDefinition,
+  lookupErrorI18nKey,
+} from './error-lookup.js';
 export * from './errors/index.js';
 // Shared i18n provider
 export { I18nProvider, type I18nProviderProps } from './i18n-provider.js';
