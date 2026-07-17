@@ -82,6 +82,15 @@ type Querier interface {
 	// Verify that a user is an enabled member of a workspace. Returns 1 if
 	// the membership exists, sql.ErrNoRows otherwise.
 	CheckWorkspaceMemberExists(ctx context.Context, arg CheckWorkspaceMemberExistsParams) (int32, error)
+	// Atomically consume an OAuth state row. MySQL 8.4 has no
+	// DELETE ... RETURNING, so the row payload is read via FindOauthState
+	// and this guarded DELETE is the actual claim: the expires_at guard
+	// rejects stale states and the delete itself elects a single winner.
+	// Two concurrent callbacks racing on the same state can never both
+	// succeed -- exactly one DELETE matches the still-present row and the
+	// loser sees zero affected rows. Callers MUST inspect RowsAffected and
+	// treat 0 as "invalid, expired, or already consumed".
+	ClaimOauthState(ctx context.Context, state string) (int64, error)
 	// Delete tokens that are either expired-and-used or expired-and-unused, for periodic cleanup.
 	CleanupExpiredMagicLinks(ctx context.Context) error
 	// Disable TOTP on a local identity.
@@ -100,10 +109,6 @@ type Querier interface {
 	// mfa_confirmed_at. The caller must have already validated a code
 	// against the stored secret.
 	ConfirmIdentityMfa(ctx context.Context, id uint32) error
-	// Atomically look up and delete an OAuth state row. The caller MUST
-	// still check expires_at against CURRENT_TIMESTAMP before trusting
-	// the returned row.
-	ConsumeOauthState(ctx context.Context, state string) (ConsumeOauthStateRow, error)
 	// Count unused recovery codes for a user.
 	CountActiveRecoveryCodes(ctx context.Context, userID uint32) (int64, error)
 	// Count all active (non-disabled) users.
@@ -138,8 +143,6 @@ type Querier interface {
 	DecrementStorageObjectRefCount(ctx context.Context, id uint32) (sql.Result, error)
 	// Delete every recovery code (used or not) for a user.
 	DeleteAllRecoveryCodesForUser(ctx context.Context, userID uint32) error
-	// Explicit delete for the state row that :one above just returned.
-	DeleteOauthState(ctx context.Context, state string) error
 	// Hard-delete a storage object row only if no referencing rows remain.
 	// The WHERE ref_count = 0 makes this race-safe against a concurrent
 	// IncrementStorageObjectRefCount: if another transaction grabbed the
@@ -168,6 +171,13 @@ type Querier interface {
 	FindLocalIdentityByUserId(ctx context.Context, userID uint32) (FindLocalIdentityByUserIdRow, error)
 	// Resolve a magic link token by its SHA-256 hash. Caller validates expiry.
 	FindMagicLinkByTokenHash(ctx context.Context, tokenHash string) (FindMagicLinkByTokenHashRow, error)
+	// Read the payload of an OAuth state row so the callback handler can
+	// recover (user_id, provider, redirect_to). This is a plain read and
+	// carries NO single-use guarantee on its own: the caller MUST follow
+	// it with ClaimOauthState and only trust this payload when the claim
+	// reports exactly one affected row. Expiry is enforced by the claim,
+	// not here.
+	FindOauthState(ctx context.Context, state string) (FindOauthStateRow, error)
 	// Resolve a PAT row from its SHA-256 hash for bearer auth.
 	FindPatByHash(ctx context.Context, tokenHash string) (FindPatByHashRow, error)
 	// Resolve a session by its external public_id (UUID v7).
@@ -385,8 +395,12 @@ type Querier interface {
 	// and the loser sees zero affected rows. Callers MUST inspect
 	// RowsAffected and treat 0 as "already consumed" (return ALREADY_USED).
 	MarkMagicLinkUsed(ctx context.Context, id uint32) (int64, error)
-	// Stamp used_at on a recovery code by internal id.
-	MarkRecoveryCodeUsed(ctx context.Context, id uint32) error
+	// Atomically claim a recovery code by internal id. The WHERE clause
+	// includes used_at IS NULL so two concurrent login requests racing on
+	// the same code can never both succeed: exactly one UPDATE will match
+	// and the loser sees zero affected rows. Callers MUST inspect
+	// RowsAffected and treat 0 as "already consumed" (reject the attempt).
+	MarkRecoveryCodeUsed(ctx context.Context, id uint32) (int64, error)
 	// Patch the authenticated user's profile. NULL params leave the column untouched.
 	PatchMe(ctx context.Context, arg PatchMeParams) error
 	// Patch a workspace via COALESCE; NULL params leave existing columns untouched.

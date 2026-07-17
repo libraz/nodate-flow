@@ -222,8 +222,20 @@ func LoginTotp(deps Deps) func(context.Context, *LoginTotpInput) (*LoginTotpOutp
 			if !auth.VerifyRecoveryCodeHash(in.Body.RecoveryCode, hash) {
 				return nil, recordRecoveryFailure()
 			}
-			if merr := deps.Queries.MarkRecoveryCodeUsed(ctx, rcID); merr != nil {
+			// Atomic single-use claim: the UPDATE only matches while
+			// used_at IS NULL, so two logins racing on the same
+			// recovery code elect exactly one winner. Zero affected
+			// rows means a concurrent request consumed the code
+			// between the lookup above and this claim; treat it
+			// exactly like an invalid code (same audit + lockout
+			// accounting) so a race loss is indistinguishable from a
+			// mismatch and the code can never be redeemed twice.
+			claimed, merr := deps.Queries.MarkRecoveryCodeUsed(ctx, rcID)
+			if merr != nil {
 				return nil, httpErr(apierrors.InternalUnexpected)
+			}
+			if claimed == 0 {
+				return nil, recordRecoveryFailure()
 			}
 			deps.Audit.Record(ctx, audit.Entry{
 				Action:       "auth.recovery_code_used",

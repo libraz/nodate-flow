@@ -16,6 +16,13 @@ SELECT id FROM user_recovery_codes
 WHERE user_id = ? AND code_hash = ? AND used_at IS NULL
 LIMIT 1;
 
--- name: MarkRecoveryCodeUsed :exec
--- Stamp used_at on a recovery code by internal id.
-UPDATE user_recovery_codes SET used_at = CURRENT_TIMESTAMP WHERE id = ?;
+-- name: MarkRecoveryCodeUsed :execrows
+-- Atomically claim a recovery code by internal id. The WHERE clause
+-- includes used_at IS NULL so two concurrent login requests racing on
+-- the same code can never both succeed: exactly one UPDATE will match
+-- and the loser sees zero affected rows. Callers MUST inspect
+-- RowsAffected and treat 0 as "already consumed" (reject the attempt).
+UPDATE user_recovery_codes
+SET used_at = CURRENT_TIMESTAMP
+WHERE id = ?
+  AND used_at IS NULL;

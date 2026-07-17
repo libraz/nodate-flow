@@ -65,12 +65,22 @@ func (q *Queries) InsertRecoveryCode(ctx context.Context, arg InsertRecoveryCode
 	return err
 }
 
-const markRecoveryCodeUsed = `-- name: MarkRecoveryCodeUsed :exec
-UPDATE user_recovery_codes SET used_at = CURRENT_TIMESTAMP WHERE id = ?
+const markRecoveryCodeUsed = `-- name: MarkRecoveryCodeUsed :execrows
+UPDATE user_recovery_codes
+SET used_at = CURRENT_TIMESTAMP
+WHERE id = ?
+  AND used_at IS NULL
 `
 
-// Stamp used_at on a recovery code by internal id.
-func (q *Queries) MarkRecoveryCodeUsed(ctx context.Context, id uint32) error {
-	_, err := q.db.ExecContext(ctx, markRecoveryCodeUsed, id)
-	return err
+// Atomically claim a recovery code by internal id. The WHERE clause
+// includes used_at IS NULL so two concurrent login requests racing on
+// the same code can never both succeed: exactly one UPDATE will match
+// and the loser sees zero affected rows. Callers MUST inspect
+// RowsAffected and treat 0 as "already consumed" (reject the attempt).
+func (q *Queries) MarkRecoveryCodeUsed(ctx context.Context, id uint32) (int64, error) {
+	result, err := q.db.ExecContext(ctx, markRecoveryCodeUsed, id)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
 }
