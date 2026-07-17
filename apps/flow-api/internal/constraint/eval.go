@@ -103,7 +103,11 @@ func Evaluate(c Constraint, f Facts) (bool, error) {
 		return f.DueOn.After(cutoff), nil
 	case OpDepAllDone:
 		for _, id := range c.TaskIDs {
-			if f.DependencyStates[id] != "done" {
+			// A cancelled dependency is terminal: it will never
+			// transition back to open, so it satisfies all_done just
+			// like "done". Treating cancelled as unresolved would
+			// permanently stall goal/sprint constraints.
+			if !isTerminalState(f.DependencyStates[id]) {
 				return false, nil
 			}
 		}
@@ -114,7 +118,7 @@ func Evaluate(c Constraint, f Facts) (bool, error) {
 		}
 		open := 0
 		for id, st := range f.DependencyStates {
-			if st == "done" || st == "cancelled" {
+			if isTerminalState(st) {
 				continue
 			}
 			// Only blocking-kind dependencies gate progress;
@@ -137,6 +141,20 @@ func Evaluate(c Constraint, f Facts) (bool, error) {
 		return f.CIStatus == c.Arg, nil
 	}
 	return false, fmt.Errorf("%w: unreachable op %q", ErrEval, c.Op)
+}
+
+// isTerminalState reports whether a dependency's derived_state is
+// terminal — i.e. it will never transition back to an unresolved state.
+// Both "done" and "cancelled" are terminal and count as resolved for
+// dependency.all_done and dependency.open_at_most. Keeping this shared
+// prevents the two operators from drifting on what "resolved" means.
+func isTerminalState(state string) bool {
+	switch state {
+	case "done", "cancelled":
+		return true
+	default:
+		return false
+	}
 }
 
 // blockingDepKind reports whether a dependency kind actually gates the

@@ -68,6 +68,17 @@ func TestEvaluate_DepAllDone(t *testing.T) {
 	if ok {
 		t.Fatal("expected false on missing dep")
 	}
+	// A cancelled dependency is terminal and satisfies all_done just
+	// like "done": a goal with a cancelled child must not stall forever.
+	ok, _ = Evaluate(c, Facts{DependencyStates: map[string]string{"a": "done", "b": "cancelled"}})
+	if !ok {
+		t.Fatal("expected true: cancelled dep is terminal and satisfies all_done")
+	}
+	// All-cancelled is also satisfied.
+	ok, _ = Evaluate(c, Facts{DependencyStates: map[string]string{"a": "cancelled", "b": "cancelled"}})
+	if !ok {
+		t.Fatal("expected true: all-cancelled deps satisfy all_done")
+	}
 }
 
 func TestEvaluate_DepOpenAtMost_IgnoresNonBlockingKinds(t *testing.T) {
