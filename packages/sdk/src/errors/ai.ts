@@ -19,7 +19,7 @@ export const AiErrors = {
   AI_COST_GUARD_EXCEEDED: {
     code: "AI.COST.GUARD_EXCEEDED",
     status: 402,
-    message: "AI cost guard threshold exceeded",
+    message: "Daily AI spend limit reached",
   },
   AI_MODEL_NOT_FOUND: {
     code: "AI.MODEL.NOT_FOUND",
@@ -35,6 +35,11 @@ export const AiErrors = {
     code: "AI.PROVIDER.NOT_CONFIGURED",
     status: 412,
     message: "AI provider is not configured",
+  },
+  AI_PROVIDER_NOT_FOUND: {
+    code: "AI.PROVIDER.NOT_FOUND",
+    status: 404,
+    message: "AI provider not found",
   },
   AI_PROVIDER_UPSTREAM_AUTH_REJECTED: {
     code: "AI.PROVIDER.UPSTREAM_AUTH_REJECTED",

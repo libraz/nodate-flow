@@ -14,6 +14,15 @@ resources:
         description: "Returned when an AI feature is invoked but no provider credentials have been configured for the workspace or instance."
         userAction: "Configure an AI provider in workspace or instance settings."
 
+      not_found:
+        code: AI.PROVIDER.NOT_FOUND
+        status: 404
+        message: "AI provider not found"
+        message_ja: "AI プロバイダが見つかりません"
+        message_zh: "未找到 AI 服务提供商"
+        description: "Returned when an update or delete targets an ai_providers row that does not exist in the workspace, matching zero rows."
+        userAction: "Verify the provider id and that it belongs to this workspace."
+
       upstream_unreachable:
         code: AI.PROVIDER.UPSTREAM_UNREACHABLE
         status: 502
@@ -65,11 +74,11 @@ resources:
       guard_exceeded:
         code: AI.COST.GUARD_EXCEEDED
         status: 402
-        message: "AI cost guard threshold exceeded"
-        message_ja: "AI の利用上限に達しました"
-        message_zh: "AI 成本上限已超出"
-        description: "Returned when the workspace's monthly AI spend has reached the configured cost guard limit."
-        userAction: "Wait for the next billing period or raise the cost guard in workspace settings."
+        message: "Daily AI spend limit reached"
+        message_ja: "本日の AI 利用上限に達しました"
+        message_zh: "今日的 AI 使用上限已达到"
+        description: "Returned when the workspace has reached its daily AI spend cap for today. The cap is set by the NF_FLOW_AI_DAILY_BUDGET_CENTS deployment setting and is not editable from workspace settings."
+        userAction: "Wait until tomorrow when the daily limit resets, or ask your administrator to raise the deployment's daily AI budget."
 
   response:
     breadcrumb: "AI > Response"

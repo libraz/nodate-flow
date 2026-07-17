@@ -66,7 +66,7 @@ func (q *Queries) CreateProvider(ctx context.Context, arg CreateProviderParams) 
 	return result.LastInsertId()
 }
 
-const deleteProvider = `-- name: DeleteProvider :exec
+const deleteProvider = `-- name: DeleteProvider :execrows
 UPDATE ai_providers
 SET enabled = FALSE
 WHERE workspace_id = ?
@@ -78,10 +78,15 @@ type DeleteProviderParams struct {
 	PublicID    types.PublicID `json:"publicId"`
 }
 
-// Soft-delete a provider.
-func (q *Queries) DeleteProvider(ctx context.Context, arg DeleteProviderParams) error {
-	_, err := q.db.ExecContext(ctx, deleteProvider, arg.WorkspaceID, arg.PublicID)
-	return err
+// Soft-delete a provider. Returns rows-affected so the handler can detect a
+// not-found / wrong-workspace target (0 rows) instead of reporting a false
+// success.
+func (q *Queries) DeleteProvider(ctx context.Context, arg DeleteProviderParams) (int64, error) {
+	result, err := q.db.ExecContext(ctx, deleteProvider, arg.WorkspaceID, arg.PublicID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
 }
 
 const findDefaultProviderIDForWorkspace = `-- name: FindDefaultProviderIDForWorkspace :one
@@ -245,7 +250,7 @@ func (q *Queries) ListProvidersForWorkspace(ctx context.Context, arg ListProvide
 	return items, nil
 }
 
-const updateProviderKey = `-- name: UpdateProviderKey :exec
+const updateProviderKey = `-- name: UpdateProviderKey :execrows
 UPDATE ai_providers
 SET api_key_ciphertext = ?,
     api_key_prefix = ?,
@@ -264,13 +269,18 @@ type UpdateProviderKeyParams struct {
 }
 
 // Rotate a provider's API key. Caller passes new ciphertext + prefix + suffix.
-func (q *Queries) UpdateProviderKey(ctx context.Context, arg UpdateProviderKeyParams) error {
-	_, err := q.db.ExecContext(ctx, updateProviderKey,
+// Returns rows-affected so the handler can detect a not-found / wrong-workspace
+// target (0 rows) instead of reporting a false success.
+func (q *Queries) UpdateProviderKey(ctx context.Context, arg UpdateProviderKeyParams) (int64, error) {
+	result, err := q.db.ExecContext(ctx, updateProviderKey,
 		arg.ApiKeyCiphertext,
 		arg.ApiKeyPrefix,
 		arg.ApiKeySuffix,
 		arg.WorkspaceID,
 		arg.PublicID,
 	)
-	return err
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
 }

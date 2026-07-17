@@ -229,14 +229,18 @@ func PatchProvider(deps Deps) func(context.Context, *PatchProviderInput) (*Patch
 		}
 		in.Body.APIKey = ""
 
-		if err := deps.Queries.UpdateProviderKey(ctx, generated.UpdateProviderKeyParams{
+		rows, err := deps.Queries.UpdateProviderKey(ctx, generated.UpdateProviderKeyParams{
 			ApiKeyCiphertext: sealed,
 			ApiKeyPrefix:     prefix,
 			ApiKeySuffix:     suffix,
 			WorkspaceID:      ws.ID,
 			PublicID:         pub,
-		}); err != nil {
+		})
+		if err != nil {
 			return nil, httpErr(apierrors.InternalUnexpected)
+		}
+		if rows == 0 {
+			return nil, httpErr(apierrors.AiProviderNotFound)
 		}
 		if actorID, ok := middleware.ActorFromContext(ctx); ok {
 			deps.Audit.Record(ctx, audit.Entry{
@@ -264,11 +268,15 @@ func DeleteProvider(deps Deps) func(context.Context, *DeleteProviderInput) (*Del
 		if err != nil {
 			return nil, httpErr(apierrors.ValidationPathParamInvalid)
 		}
-		if err := deps.Queries.DeleteProvider(ctx, generated.DeleteProviderParams{
+		rows, err := deps.Queries.DeleteProvider(ctx, generated.DeleteProviderParams{
 			WorkspaceID: ws.ID,
 			PublicID:    pub,
-		}); err != nil {
+		})
+		if err != nil {
 			return nil, httpErr(apierrors.InternalUnexpected)
+		}
+		if rows == 0 {
+			return nil, httpErr(apierrors.AiProviderNotFound)
 		}
 		if actorID, ok := middleware.ActorFromContext(ctx); ok {
 			deps.Audit.Record(ctx, audit.Entry{

@@ -372,8 +372,10 @@ type Querier interface {
 	DeleteMentionsForTaskDescription(ctx context.Context, taskID sql.NullInt32) error
 	// Explicit delete for the state row that :one above just returned.
 	DeleteOauthState(ctx context.Context, state string) error
-	// Soft-delete a provider.
-	DeleteProvider(ctx context.Context, arg DeleteProviderParams) error
+	// Soft-delete a provider. Returns rows-affected so the handler can detect a
+	// not-found / wrong-workspace target (0 rows) instead of reporting a false
+	// success.
+	DeleteProvider(ctx context.Context, arg DeleteProviderParams) (int64, error)
 	// Soft-delete a mapping by setting enabled = FALSE. Scoped to the
 	// workspace and identified by public_id.
 	DeleteRepoMapping(ctx context.Context, arg DeleteRepoMappingParams) error
@@ -1558,7 +1560,9 @@ type Querier interface {
 	// Update project name, slug and description by public_id.
 	UpdateProjectFull(ctx context.Context, arg UpdateProjectFullParams) error
 	// Rotate a provider's API key. Caller passes new ciphertext + prefix + suffix.
-	UpdateProviderKey(ctx context.Context, arg UpdateProviderKeyParams) error
+	// Returns rows-affected so the handler can detect a not-found / wrong-workspace
+	// target (0 rows) instead of reporting a false success.
+	UpdateProviderKey(ctx context.Context, arg UpdateProviderKeyParams) (int64, error)
 	// Update mutable task fields. derived_state is intentionally NOT writable.
 	// updated_by_user_id is appended to the SET list so callers can attribute
 	// the edit; pass the acting user's internal id (NULL for system writers).

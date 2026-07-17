@@ -76,8 +76,10 @@ WHERE workspace_id = ?
   AND enabled = TRUE
 LIMIT 1;
 
--- name: UpdateProviderKey :exec
+-- name: UpdateProviderKey :execrows
 -- Rotate a provider's API key. Caller passes new ciphertext + prefix + suffix.
+-- Returns rows-affected so the handler can detect a not-found / wrong-workspace
+-- target (0 rows) instead of reporting a false success.
 UPDATE ai_providers
 SET api_key_ciphertext = ?,
     api_key_prefix = ?,
@@ -86,8 +88,10 @@ WHERE workspace_id = ?
   AND public_id = ?
   AND enabled = TRUE;
 
--- name: DeleteProvider :exec
--- Soft-delete a provider.
+-- name: DeleteProvider :execrows
+-- Soft-delete a provider. Returns rows-affected so the handler can detect a
+-- not-found / wrong-workspace target (0 rows) instead of reporting a false
+-- success.
 UPDATE ai_providers
 SET enabled = FALSE
 WHERE workspace_id = ?
