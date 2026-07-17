@@ -70,9 +70,10 @@ func TestListReactionsForTaskRespectsLimit(t *testing.T) {
 
 	// First page: at most pageLimit rows, total reflects the full count.
 	page1, err := queries.ListReactionsForTask(ctx, generated.ListReactionsForTaskParams{
-		TaskID: taskID,
-		Limit:  pageLimit,
-		Offset: 0,
+		TaskID:      taskID,
+		WorkspaceID: wsInternalID,
+		Limit:       pageLimit,
+		Offset:      0,
 	})
 	require.NoError(t, err)
 	require.Lenf(t, page1, pageLimit, "first page must be clamped to the LIMIT")
@@ -84,9 +85,10 @@ func TestListReactionsForTaskRespectsLimit(t *testing.T) {
 	seen := make(map[string]struct{}, totalReactions)
 	for offset := int32(0); ; offset += pageLimit {
 		rows, perr := queries.ListReactionsForTask(ctx, generated.ListReactionsForTaskParams{
-			TaskID: taskID,
-			Limit:  pageLimit,
-			Offset: offset,
+			TaskID:      taskID,
+			WorkspaceID: wsInternalID,
+			Limit:       pageLimit,
+			Offset:      offset,
 		})
 		require.NoError(t, perr)
 		if len(rows) == 0 {

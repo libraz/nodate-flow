@@ -46,7 +46,7 @@ func TestSecretLeakMeta(t *testing.T) {
 		testServerURL+"/workspaces/"+tt.WorkspacePublicID+"/me/mcp-tokens",
 		tt.AccessToken, map[string]any{
 			"name":   "leak-probe",
-			"scopes": []string{"tasks.read"},
+			"scopes": []string{"read:workspace"},
 		}, &mcpTok)
 
 	// Create a task + comment so the task/timeline responses have

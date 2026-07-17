@@ -276,11 +276,23 @@ func setDerivedStateDirect(t *testing.T, db *sql.DB, workspaceID, taskID uint32,
 	t.Helper()
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	_, err := db.ExecContext(ctx,
+	// trg_tasks_derived_state_guard rejects any non-engine derived_state
+	// mutation unless @nf_derived_state_engine = 1 on the same connection.
+	// A session variable is connection-scoped, so pin one connection for the
+	// SET + UPDATE (mirrors internal/taskstate/state.go); using db.ExecContext
+	// on the pool would run the two statements on different connections and the
+	// guard would fire.
+	conn, err := db.Conn(ctx)
+	require.NoError(t, err)
+	defer conn.Close()
+	_, err = conn.ExecContext(ctx, "SET @nf_derived_state_engine = 1")
+	require.NoError(t, err)
+	_, err = conn.ExecContext(ctx,
 		`UPDATE tasks SET derived_state = ? WHERE workspace_id = ? AND id = ?`,
 		state, workspaceID, taskID,
 	)
 	require.NoError(t, err)
+	_, _ = conn.ExecContext(ctx, "SET @nf_derived_state_engine = NULL")
 }
 
 // upsertJudgeInstructions writes ai_settings.judge_instructions for the

@@ -149,11 +149,22 @@ func TestAutoActionExecutorAutoClosesStaleViaCanonicalPath(t *testing.T) {
 // path.
 func setTaskStateAndUpdatedAt(ctx context.Context, t *testing.T, taskID uint32, state string, updatedAt time.Time) {
 	t.Helper()
-	_, err := testDB.ExecContext(ctx,
+	// trg_tasks_derived_state_guard rejects a non-engine derived_state write
+	// unless @nf_derived_state_engine = 1 on the same connection. The session
+	// variable is connection-scoped, so pin one connection for the SET +
+	// UPDATE (mirrors internal/taskstate/state.go); db.ExecContext on the pool
+	// would run them on different connections and the guard would fire.
+	conn, err := testDB.Conn(ctx)
+	require.NoError(t, err)
+	defer conn.Close()
+	_, err = conn.ExecContext(ctx, "SET @nf_derived_state_engine = 1")
+	require.NoError(t, err)
+	_, err = conn.ExecContext(ctx,
 		`UPDATE tasks SET derived_state = ?, updated_at = ? WHERE id = ?`,
 		state, updatedAt.UTC(), taskID,
 	)
 	require.NoError(t, err)
+	_, _ = conn.ExecContext(ctx, "SET @nf_derived_state_engine = NULL")
 }
 
 // setWorkspaceAutoActionThreshold upserts an ai_settings row that
