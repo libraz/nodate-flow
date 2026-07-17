@@ -25,9 +25,11 @@
  */
 
 import Button from '@nodate-flow/ui/primitives/button';
+import { Link } from '@tanstack/react-router';
 import { type ReactElement, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { useActiveWorkspaceId } from '../../../lib/use-current-workspace';
 import LinkedEventGlyph from './linked-event-glyph';
 import LinkedEventTime, { isToday } from './linked-event-time';
 import styles from './linked-events.module.css';
@@ -60,6 +62,7 @@ export default function LinkedEventRow({
   isOptimistic,
 }: LinkedEventRowProps): ReactElement {
   const { t } = useTranslation('linkedEvents');
+  const workspaceId = useActiveWorkspaceId();
   const [isRemoving, setIsRemoving] = useState(false);
   const timerRef = useRef<number | null>(null);
 
@@ -77,6 +80,16 @@ export default function LinkedEventRow({
   const kind = relationToKind(link.relation as LinkRelation);
   const title = link.eventTitle ?? '';
   const today = isToday(link.eventStartAt);
+
+  // Deep-link target for the calendar event detail route. Linked events
+  // are always searched within the task's own workspace, so the active
+  // workspace id (resolved from the `/tasks/$taskId` route) owns the
+  // calendar the event lives on. Null when any coordinate is missing, in
+  // which case the title renders as plain, non-interactive text.
+  const eventTarget =
+    workspaceId && link.calendarId && link.eventId
+      ? { id: workspaceId, calId: link.calendarId, evtId: link.eventId }
+      : null;
 
   const handleUnlinkClick = (): void => {
     if (isOptimistic) return;
@@ -106,20 +119,21 @@ export default function LinkedEventRow({
           {kind === 'blocks' ? t('kind.blocks') : t('kind.contributesTo')}
         </span>
       </span>
-      {/* biome-ignore lint/a11y/useValidAnchor: placeholder until /calendar?event= deep-link lands; the row navigates to the calendar event detail page in a follow-up */}
-      <a
-        href="#"
-        className={styles.rowTitle}
-        aria-label={t('row.openEvent', { title })}
-        onClick={(e) => {
-          // Placeholder href; the full /calendar?event= deep-link is a
-          // follow-up. Prevent the default jump to top so the row stays
-          // visible on click.
-          e.preventDefault();
-        }}
-      >
-        {title}
-      </a>
+      {eventTarget ? (
+        <Link
+          to="/workspaces/$id/calendars/$calId/events/$evtId"
+          params={eventTarget}
+          className={styles.rowTitle}
+          aria-label={t('row.openEvent', { title })}
+        >
+          {title}
+        </Link>
+      ) : (
+        // Missing workspace context or event coordinates: render the
+        // title as plain text rather than advertise navigation the row
+        // cannot perform.
+        <span className={styles.rowTitle}>{title}</span>
+      )}
       <LinkedEventTime
         epochStartSec={link.eventStartAt}
         allDay={link.eventAllDay ?? false}
