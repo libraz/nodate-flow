@@ -240,7 +240,7 @@ func main() {
 			executor = &ai.AgentExecutor{
 				Queries:      queries,
 				Resolver:     resolver,
-				Guard:        ai.NewCostGuard(budget, 0),
+				Guard:        ai.NewCostGuard(budget, cfg.AiDailyBudgetCents),
 				Log:          invocationLogger,
 				OnInvocation: obs.RecordAIInvocation,
 				PreFlight:    &ai.PreFlight{Queries: queries},
@@ -289,7 +289,7 @@ func main() {
 				Agents:       &signaljudge.SQLAgentLookup{DB: db},
 				Signals:      &signaljudge.SQLSignalLookup{DB: db},
 				Resolver:     resolver,
-				Guard:        ai.NewCostGuard(budget, 0),
+				Guard:        ai.NewCostGuard(budget, cfg.AiDailyBudgetCents),
 				OnInvocation: obs.RecordAIInvocation,
 				Log: func(ctx context.Context, rec signaljudge.InvocationRecord) {
 					invocationLogger(ctx, ai.InvocationRecord{
@@ -441,6 +441,7 @@ func main() {
 		GoogleChannelToken:    cfg.GoogleChannelToken,
 		DefaultWorkspaceID:    cfg.DefaultWorkspaceID,
 		AiMock:                cfg.AiMock,
+		AiDailyBudgetCents:    cfg.AiDailyBudgetCents,
 		StreamNotifier:        notifier,
 		StreamRemember:        streamRemember,
 		AiInvocationPublisher: aiInvocationPublisher,

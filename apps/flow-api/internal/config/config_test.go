@@ -201,6 +201,37 @@ func TestValidateProductionGuards(t *testing.T) {
 	}
 }
 
+func TestLoadReadsAiDailyBudgetOverride(t *testing.T) {
+	// t.Setenv forbids t.Parallel; webhook verification is disabled so
+	// Load's enum/secret guards pass with only the budget override set.
+	// NF_DB_DSN is the one required env Load() enforces before it maps the
+	// optional budget override; a dummy value is enough since Load only
+	// parses env and does not connect.
+	t.Setenv("NF_DB_DSN", "user:pass@tcp(127.0.0.1:3306)/nodate_flow")
+	t.Setenv("NF_FLOW_WEBHOOKS_INSECURE", "true")
+
+	t.Run("override is parsed", func(t *testing.T) {
+		t.Setenv("NF_FLOW_AI_DAILY_BUDGET_CENTS", "2500")
+		cfg, err := Load()
+		if err != nil {
+			t.Fatalf("Load() error = %v", err)
+		}
+		if cfg.AiDailyBudgetCents != 2500 {
+			t.Fatalf("AiDailyBudgetCents = %d, want 2500", cfg.AiDailyBudgetCents)
+		}
+	})
+
+	t.Run("unset defaults to zero for guard fallback", func(t *testing.T) {
+		cfg, err := Load()
+		if err != nil {
+			t.Fatalf("Load() error = %v", err)
+		}
+		if cfg.AiDailyBudgetCents != 0 {
+			t.Fatalf("AiDailyBudgetCents = %d, want 0 (falls back to default in NewCostGuard)", cfg.AiDailyBudgetCents)
+		}
+	})
+}
+
 func TestValidateDevModeSkipsGuards(t *testing.T) {
 	t.Parallel()
 	// In development the same insecure settings are tolerated.

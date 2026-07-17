@@ -5,13 +5,15 @@ import (
 	"errors"
 )
 
-// DefaultDailyBudgetCents is the per-workspace cap when NF_AI_DAILY_BUDGET_CENTS
-// is unset. $100/day is generous for development and obvious in audit.
+// DefaultDailyBudgetCents is the per-workspace daily cap when
+// NF_FLOW_AI_DAILY_BUDGET_CENTS is unset. $100/day is generous for development
+// and obvious in audit. The budget is per-day and set by the deployment, not
+// editable from workspace settings.
 const DefaultDailyBudgetCents int64 = 10000
 
 // ErrDailyBudgetExceeded is returned by CostGuard.Check when the workspace
 // has already spent more than its daily budget. Callers should map it to
-// the AI.BUDGET.DAILY_EXCEEDED error code at the HTTP boundary.
+// the AI.COST.GUARD_EXCEEDED error code at the HTTP boundary.
 var ErrDailyBudgetExceeded = errors.New("ai: daily budget exceeded")
 
 // BudgetReader returns the cost-cents already spent today for a workspace.

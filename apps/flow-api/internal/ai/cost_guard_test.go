@@ -46,3 +46,35 @@ func TestCostGuardAllowsSpendUnderBudget(t *testing.T) {
 		t.Fatalf("guard.Check = %v, want nil", err)
 	}
 }
+
+// TestCostGuardEffectiveBudget proves that the daily budget supplied to
+// NewCostGuard (sourced from NF_FLOW_AI_DAILY_BUDGET_CENTS at startup)
+// becomes the effective spend threshold, and that a zero value falls back
+// to DefaultDailyBudgetCents.
+func TestCostGuardEffectiveBudget(t *testing.T) {
+	t.Parallel()
+
+	reader := BudgetReaderFunc(func(context.Context, uint32) (int64, error) {
+		return 5000, nil
+	})
+
+	// A tighter override than the default must trip at the overridden cap:
+	// 5000 spent >= 5000 budget.
+	tight := NewCostGuard(reader, 5000)
+	if tight.DailyBudget != 5000 {
+		t.Fatalf("override DailyBudget = %d, want 5000", tight.DailyBudget)
+	}
+	if err := tight.Check(context.Background(), 1); !errors.Is(err, ErrDailyBudgetExceeded) {
+		t.Fatalf("tight.Check = %v, want ErrDailyBudgetExceeded", err)
+	}
+
+	// A zero (unset env) budget falls back to the built-in default, under
+	// which the same 5000-cent spend is still allowed.
+	fallback := NewCostGuard(reader, 0)
+	if fallback.DailyBudget != DefaultDailyBudgetCents {
+		t.Fatalf("fallback DailyBudget = %d, want %d", fallback.DailyBudget, DefaultDailyBudgetCents)
+	}
+	if err := fallback.Check(context.Background(), 1); err != nil {
+		t.Fatalf("fallback.Check = %v, want nil", err)
+	}
+}

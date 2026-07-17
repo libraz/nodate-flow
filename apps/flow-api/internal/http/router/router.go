@@ -135,6 +135,10 @@ type Deps struct {
 	// every workspace to a fixture-backed Provider regardless of the
 	// workspace.ai_providers rows.
 	AiMock bool
+	// AiDailyBudgetCents is the per-workspace daily LLM spend cap in
+	// cents passed to ai.NewCostGuard. Zero falls back to
+	// ai.DefaultDailyBudgetCents. Sourced from NF_FLOW_AI_DAILY_BUDGET_CENTS.
+	AiDailyBudgetCents int64
 	// StreamNotifier is the realtime fan-out for SSE subscribers.
 	// Nil means realtime is disabled: the SSE route still mounts
 	// but serves only heartbeats, and eventbus.Append does not
@@ -481,7 +485,7 @@ func buildSharedDeps(deps Deps) *sharedDeps {
 				InvokedAt:   time.Now().UTC().Truncate(24 * time.Hour),
 			})
 		})
-		nlGuard := ai.NewCostGuard(nlBudget, 0)
+		nlGuard := ai.NewCostGuard(nlBudget, deps.AiDailyBudgetCents)
 		nlLogger := invocationLogger
 		if nlQueryCompiler == nil {
 			prov := nlquery.NewWorkspaceProvider(wsResolver, extractWS).
@@ -563,7 +567,7 @@ func buildSharedDeps(deps Deps) *sharedDeps {
 		budget := ai.BudgetReaderFunc(func(_ context.Context, _ uint32) (int64, error) { return 0, nil })
 		aiOrch = &ai.Orchestrator{
 			Resolver:      mockResolver,
-			Guard:         ai.NewCostGuard(budget, 0),
+			Guard:         ai.NewCostGuard(budget, deps.AiDailyBudgetCents),
 			DB:            deps.DB,
 			Queries:       deps.Queries,
 			OnInvocation:  obs.RecordAIInvocation,
@@ -579,7 +583,7 @@ func buildSharedDeps(deps Deps) *sharedDeps {
 		})
 		aiOrch = &ai.Orchestrator{
 			Resolver:      resolver,
-			Guard:         ai.NewCostGuard(budget, 0),
+			Guard:         ai.NewCostGuard(budget, deps.AiDailyBudgetCents),
 			DB:            deps.DB,
 			Queries:       deps.Queries,
 			LogInvoke:     invocationLogger,

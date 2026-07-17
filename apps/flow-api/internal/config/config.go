@@ -78,6 +78,13 @@ type Config struct {
 	// apps/flow-api/testdata/ai/. Used by development and tests.
 	AiMock bool `env:"NF_FLOW_AI_MOCK" envDefault:"false"`
 
+	// AiDailyBudgetCents is the per-workspace daily LLM spend cap in
+	// cents, enforced by ai.CostGuard. A zero or unset value falls back
+	// to ai.DefaultDailyBudgetCents inside NewCostGuard. The cap is a
+	// deployment-wide setting and is not editable from workspace
+	// settings.
+	AiDailyBudgetCents int64 `env:"NF_FLOW_AI_DAILY_BUDGET_CENTS" envDefault:"0"`
+
 	// StreamEnabled toggles the realtime SSE fan-out (ADR 0005). When
 	// false the /workspaces/{wsId}/stream route still mounts but uses
 	// a [stream.NopNotifier] so eventbus.Append becomes a no-op for
