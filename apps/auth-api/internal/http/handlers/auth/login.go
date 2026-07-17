@@ -46,9 +46,18 @@ func Login(deps Deps) func(context.Context, *LoginInput) (*LoginOutput, error) {
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
 		if row.LockedUntilAt.Valid && row.LockedUntilAt.Time.After(time.Now()) {
-			// Also equalise timing for locked accounts.
+			// The account is locked, but we must not tell an
+			// unauthenticated caller that: a distinct "account locked"
+			// response only ever appears for a real, existing email, so
+			// it becomes an enumeration oracle (an unknown email can
+			// never accumulate a lock and always sees invalid
+			// credentials). Collapse it into the same invalid-credentials
+			// code and equalise timing with a dummy verify. The lockout
+			// itself is still fully enforced — the early return below
+			// means even the correct password cannot authenticate while
+			// the lock window is active.
 			_, _ = auth.VerifyPassword(auth.DummyHash(), in.Body.Password)
-			return nil, httpErr(apierrors.AuthLoginAccountLocked)
+			return nil, httpErr(apierrors.AuthLoginInvalidCredentials)
 		}
 		if !row.PasswordHash.Valid {
 			_, _ = auth.VerifyPassword(auth.DummyHash(), in.Body.Password)
@@ -63,9 +72,14 @@ func Login(deps Deps) func(context.Context, *LoginInput) (*LoginOutput, error) {
 				ResourceType: "user",
 				Metadata:     map[string]any{"email": email},
 			})
-			if row.FailedAttempts+1 >= maxFailedBeforeLock {
-				return nil, httpErr(apierrors.AuthLoginRateLimitedAfterRetries)
-			}
+			// bumpFailed above still sets locked_until_at once the
+			// threshold is reached, so the lockout remains fully in force.
+			// We deliberately do NOT surface a distinct rate-limited /
+			// locked response here: only a real email can ever reach the
+			// threshold, so a different code at attempt N would let an
+			// attacker enumerate valid accounts by watching for the
+			// response to change. Every failed attempt — before and after
+			// the threshold — returns the same invalid-credentials code.
 			return nil, httpErr(apierrors.AuthLoginInvalidCredentials)
 		}
 		// Password OK. Clear counters immediately so a second-factor
