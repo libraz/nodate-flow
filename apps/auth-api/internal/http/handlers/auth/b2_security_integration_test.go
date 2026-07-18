@@ -289,7 +289,7 @@ func TestRefresh_ReusedTokenRevokesFamilyAndAudits(t *testing.T) {
 
 	// Replay the (now revoked) original refresh token.
 	_, err = Refresh(deps)(ctx, &RefreshInput{
-		RefreshCookie: http.Cookie{Name: "nd_rt", Value: origPlain},
+		RefreshCookie: http.Cookie{Name: "nd_rt", Value: origPlain}, //#nosec G124 -- test cookie
 	})
 	problem := problemFor(t, err)
 	assert.Equal(t, apierrors.AuthTokenRefreshInvalid.Code, problem.Type)
@@ -350,7 +350,7 @@ func TestRefresh_GraceWindowDoesNotRevokeFamily(t *testing.T) {
 	require.NoError(t, err)
 
 	_, err = Refresh(deps)(ctx, &RefreshInput{
-		RefreshCookie: http.Cookie{Name: "nd_rt", Value: origPlain},
+		RefreshCookie: http.Cookie{Name: "nd_rt", Value: origPlain}, //#nosec G124 -- test cookie
 	})
 	problem := problemFor(t, err)
 	assert.Equal(t, apierrors.AuthTokenRefreshInvalid.Code, problem.Type)

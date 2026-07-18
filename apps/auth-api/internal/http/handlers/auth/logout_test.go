@@ -95,7 +95,7 @@ func TestLogout_SuccessfulRevokeWritesAuditEntry(t *testing.T) {
 
 	plain := "refresh-token-plaintext"
 	in := &LogoutInput{
-		RefreshCookie: http.Cookie{Name: "nd_rt", Value: plain},
+		RefreshCookie: http.Cookie{Name: "nd_rt", Value: plain}, //#nosec G124 -- test cookie
 	}
 	out, err := Logout(deps)(context.Background(), in)
 	require.NoError(t, err)
@@ -163,7 +163,7 @@ func TestLogout_RevokeFailureIsLoggedNotReturned(t *testing.T) {
 	deps := Deps{Sessions: sessions, Audit: sink}
 
 	out, err := Logout(deps)(context.Background(), &LogoutInput{
-		RefreshCookie: http.Cookie{Name: "nd_rt", Value: "x"},
+		RefreshCookie: http.Cookie{Name: "nd_rt", Value: "x"}, //#nosec G124 -- test cookie
 	})
 	require.NoError(t, err, "logout must remain idempotent even on revoke failure")
 	assert.True(t, out.Body.Ok)
@@ -186,7 +186,7 @@ func TestLogout_FindFailureIsIdempotent(t *testing.T) {
 	deps := Deps{Sessions: sessions, Audit: sink}
 
 	out, err := Logout(deps)(context.Background(), &LogoutInput{
-		RefreshCookie: http.Cookie{Name: "nd_rt", Value: "stale"},
+		RefreshCookie: http.Cookie{Name: "nd_rt", Value: "stale"}, //#nosec G124 -- test cookie
 	})
 	require.NoError(t, err)
 	assert.True(t, out.Body.Ok)

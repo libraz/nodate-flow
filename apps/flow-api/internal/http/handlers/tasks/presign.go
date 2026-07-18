@@ -290,7 +290,7 @@ func DownloadAttachment(deps Deps) func(context.Context, *DownloadAttachmentInpu
 
 		row, err := deps.Queries.GetAttachmentByPublicID(ctx, generated.GetAttachmentByPublicIDParams{
 			WorkspaceID: ws.ID,
-			TaskID:      sql.NullInt32{Int32: int32(task.ID), Valid: true},
+			TaskID:      handlerutil.NullInt32From(task.ID),
 			PublicID:    aid,
 		})
 		if err != nil {

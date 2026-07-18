@@ -12,6 +12,7 @@ import (
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/types"
 	apierrors "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/errors"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/eventbus"
+	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/handlers/handlerutil"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/middleware"
 	nflog "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/log"
 	"github.com/nodate-flow/nodate-flow/packages/go-shared/ctxutil"
@@ -99,7 +100,7 @@ func DeleteAttachment(deps Deps) func(context.Context, *DeleteTaskAttachmentInpu
 		// WS.TASK.NOT_FOUND so cross-task existence stays hidden.
 		soRow, err := qtx.GetAttachmentStorageObjectIDForDelete(ctx, generated.GetAttachmentStorageObjectIDForDeleteParams{
 			WorkspaceID: ws.ID,
-			TaskID:      sql.NullInt32{Int32: int32(task.ID), Valid: true},
+			TaskID:      handlerutil.NullInt32From(task.ID),
 			PublicID:    aid,
 		})
 		if err != nil {
@@ -111,7 +112,7 @@ func DeleteAttachment(deps Deps) func(context.Context, *DeleteTaskAttachmentInpu
 
 		if err := qtx.DeleteAttachment(ctx, generated.DeleteAttachmentParams{
 			WorkspaceID: ws.ID,
-			TaskID:      sql.NullInt32{Int32: int32(task.ID), Valid: true},
+			TaskID:      handlerutil.NullInt32From(task.ID),
 			PublicID:    aid,
 		}); err != nil {
 			return nil, httpErr(apierrors.InternalUnexpected)

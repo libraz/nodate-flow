@@ -49,9 +49,9 @@ func TestPrivateEventFieldLeak_HiddenFromCoMemberAcrossListEndpoints(t *testing.
 
 	eventStart := time.Date(2026, 8, 3, 10, 0, 0, 0, time.UTC)
 	const (
-		secretLocation = "Room 5F, Building A"
-		secretMemo     = "1:1 salary review notes"
-		secretURL      = "https://example.test/private-doc"
+		secretLocation = "Room 5F, Building A"              //#nosec G101 -- test fixture, not a real credential
+		secretMemo     = "1:1 salary review notes"          //#nosec G101 -- test fixture, not a real credential
+		secretURL      = "https://example.test/private-doc" //#nosec G101 -- test fixture, not a real credential
 	)
 
 	var evt struct {

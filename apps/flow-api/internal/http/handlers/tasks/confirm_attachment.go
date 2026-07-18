@@ -66,7 +66,7 @@ func ConfirmUpload(deps Deps) func(context.Context, *ConfirmTaskAttachmentInput)
 
 		row, err := deps.Queries.GetAttachmentByPublicID(ctx, generated.GetAttachmentByPublicIDParams{
 			WorkspaceID: ws.ID,
-			TaskID:      sql.NullInt32{Int32: int32(task.ID), Valid: true},
+			TaskID:      handlerutil.NullInt32From(task.ID),
 			PublicID:    aid,
 		})
 		if err != nil {
@@ -82,17 +82,18 @@ func ConfirmUpload(deps Deps) func(context.Context, *ConfirmTaskAttachmentInput)
 			// completed, so there is nothing to confirm.
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
+		size := uint64(actual) //#nosec G115 -- StatObject returns a non-negative object size
 
-		if !storage.ExceedsUploadLimit(uint64(actual), handlerutil.MaxUploadSize) {
+		if !storage.ExceedsUploadLimit(size, handlerutil.MaxUploadSize) {
 			out := &ConfirmTaskAttachmentOutput{}
 			out.Body.Ok = true
-			out.Body.ByteSize = uint64(actual)
+			out.Body.ByteSize = size
 			return out, nil
 		}
 
 		// Oversize upload: purge the attachment row and (if it drops to
 		// zero references) the underlying storage object before rejecting.
-		if err := rejectOversizeTaskAttachment(ctx, deps, ws.ID, int32(task.ID), aid, row.StorageObjectID); err != nil {
+		if err := rejectOversizeTaskAttachment(ctx, deps, ws.ID, task.ID, aid, row.StorageObjectID); err != nil {
 			return nil, err
 		}
 
@@ -124,7 +125,7 @@ func ConfirmUpload(deps Deps) func(context.Context, *ConfirmTaskAttachmentInput)
 // ref count on its storage object, GCs the blob if now unreferenced, and
 // removes it from object storage. It mirrors DeleteAttachment's
 // transactional ordering so the ref count cannot drift.
-func rejectOversizeTaskAttachment(ctx context.Context, deps Deps, wsID uint32, taskID int32, aid types.PublicID, storageObjectID uint32) error {
+func rejectOversizeTaskAttachment(ctx context.Context, deps Deps, wsID uint32, taskID uint32, aid types.PublicID, storageObjectID uint32) error {
 	tx, err := deps.DB.BeginTx(ctx, nil)
 	if err != nil {
 		return httpErr(apierrors.InternalUnexpected)
@@ -134,7 +135,7 @@ func rejectOversizeTaskAttachment(ctx context.Context, deps Deps, wsID uint32, t
 
 	if err := qtx.DeleteAttachment(ctx, generated.DeleteAttachmentParams{
 		WorkspaceID: wsID,
-		TaskID:      sql.NullInt32{Int32: taskID, Valid: true},
+		TaskID:      handlerutil.NullInt32From(taskID),
 		PublicID:    aid,
 	}); err != nil {
 		return httpErr(apierrors.InternalUnexpected)

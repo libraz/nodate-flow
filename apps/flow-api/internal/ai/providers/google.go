@@ -18,7 +18,7 @@ const (
 	// query parameter. Passing the key in a header keeps it out of the
 	// request URL, so it can never leak through a url.Error message,
 	// transport log, or proxy access log built from the URL.
-	googleAPIKeyHeader = "x-goog-api-key"
+	googleAPIKeyHeader = "x-goog-api-key" //#nosec G101 -- HTTP header name, not a credential
 )
 
 // ErrInvalidBaseURL is returned by [New] when a provider's configured

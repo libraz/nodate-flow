@@ -125,7 +125,7 @@ func TestExecuteJudgeHappyPath(t *testing.T) {
 // API lastThought field) and before it reaches the ai_invocations log.
 func TestExecuteJudgeRedactsLastThought(t *testing.T) {
 	t.Parallel()
-	const secret = "sk-ant-LEAKEDKEY0123456789"
+	const secret = "sk-ant-LEAKEDKEY0123456789" //#nosec G101 -- test fixture, not a real credential
 	prov := &recordingProvider{
 		kind: providers.Kind("mock"),
 		// Valid verdict JSON so the parse/validate retry loop does not fire;

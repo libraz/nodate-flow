@@ -62,7 +62,7 @@ func TestAuthLifecycle(t *testing.T) {
 	// Refresh rotates the refresh cookie and issues a new access token.
 	// No request body is sent; the token travels in the cookie header.
 	refStatus, refBody, refResp := doRaw(t, http.MethodPost, testServerURL+"/auth/refresh", login.AccessToken,
-		[]*http.Cookie{{Name: "nd_rt", Value: loginCookie.Value}}, nil)
+		[]*http.Cookie{{Name: "nd_rt", Value: loginCookie.Value}}, nil) //#nosec G124 -- test cookie
 	require.Equal(t, http.StatusOK, refStatus, "refresh body=%s", string(refBody))
 	require.NotContainsf(t, string(refBody), "refreshToken", "refresh body leaked refreshToken: %s", string(refBody))
 
@@ -78,7 +78,7 @@ func TestAuthLifecycle(t *testing.T) {
 
 	// Logout clears the refresh cookie.
 	outStatus, _, outResp := doRaw(t, http.MethodPost, testServerURL+"/auth/logout", refreshed.AccessToken,
-		[]*http.Cookie{{Name: "nd_rt", Value: rotated.Value}}, nil)
+		[]*http.Cookie{{Name: "nd_rt", Value: rotated.Value}}, nil) //#nosec G124 -- test cookie
 	require.Equal(t, http.StatusOK, outStatus)
 	cleared := pickCookie(outResp, "nd_rt")
 	require.NotNil(t, cleared, "logout must emit a Set-Cookie to clear nd_rt")

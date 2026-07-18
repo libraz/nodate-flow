@@ -60,7 +60,7 @@ type fakeTZLoader struct {
 	err error
 }
 
-func (f fakeTZLoader) FindWorkspaceTimezoneCountryById(_ context.Context, _ uint32) (generated.FindWorkspaceTimezoneCountryByIdRow, error) {
+func (f fakeTZLoader) FindWorkspaceTimezoneCountryById(_ context.Context, _ uint32) (generated.FindWorkspaceTimezoneCountryByIdRow, error) { //nolint:revive // method name mirrors the sqlc-generated Querier; renaming breaks interface satisfaction
 	if f.err != nil {
 		return generated.FindWorkspaceTimezoneCountryByIdRow{}, f.err
 	}

@@ -79,11 +79,12 @@ func ConfirmAttachment(deps Deps) func(context.Context, *ConfirmAttachmentInput)
 			// Upload never completed — nothing to confirm.
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
+		size := uint64(actual) //#nosec G115 -- StatObject returns a non-negative object size
 
-		if !storage.ExceedsUploadLimit(uint64(actual), handlerutil.MaxUploadSize) {
+		if !storage.ExceedsUploadLimit(size, handlerutil.MaxUploadSize) {
 			out := &ConfirmAttachmentOutput{}
 			out.Body.Ok = true
-			out.Body.ByteSize = uint64(actual)
+			out.Body.ByteSize = size
 			return out, nil
 		}
 

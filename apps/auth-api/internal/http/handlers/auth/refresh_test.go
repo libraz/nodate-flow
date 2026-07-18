@@ -100,7 +100,7 @@ func TestRefresh_RejectsIdleSessionPastTimeout(t *testing.T) {
 	}
 
 	_, err = Refresh(deps)(context.Background(), &RefreshInput{
-		RefreshCookie: http.Cookie{Name: "nd_rt", Value: "anything"},
+		RefreshCookie: http.Cookie{Name: "nd_rt", Value: "anything"}, //#nosec G124 -- test cookie
 	})
 	require.Error(t, err)
 
@@ -148,7 +148,7 @@ func TestRefresh_AcceptsActiveSession(t *testing.T) {
 		}
 	}()
 	_, _ = Refresh(deps)(context.Background(), &RefreshInput{
-		RefreshCookie: http.Cookie{Name: "nd_rt", Value: "anything"},
+		RefreshCookie: http.Cookie{Name: "nd_rt", Value: "anything"}, //#nosec G124 -- test cookie
 	})
 }
 
@@ -181,7 +181,7 @@ func TestRefresh_FreshSessionWithNilLastUsedFallsBackToCreatedAt(t *testing.T) {
 		}
 	}()
 	_, _ = Refresh(deps)(context.Background(), &RefreshInput{
-		RefreshCookie: http.Cookie{Name: "nd_rt", Value: "anything"},
+		RefreshCookie: http.Cookie{Name: "nd_rt", Value: "anything"}, //#nosec G124 -- test cookie
 	})
 }
 
@@ -209,7 +209,7 @@ func TestRefresh_FreshSessionWithStaleCreatedAtIsRejected(t *testing.T) {
 	}
 
 	_, err = Refresh(deps)(context.Background(), &RefreshInput{
-		RefreshCookie: http.Cookie{Name: "nd_rt", Value: "anything"},
+		RefreshCookie: http.Cookie{Name: "nd_rt", Value: "anything"}, //#nosec G124 -- test cookie
 	})
 	require.Error(t, err)
 	var problem *handlerutil.ProblemDetails

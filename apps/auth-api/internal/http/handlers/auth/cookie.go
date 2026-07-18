@@ -43,7 +43,7 @@ func refreshCookieSameSite(secure bool) http.SameSite {
 // SameSite are derived from cfg so local http dev still works while
 // production https remains cross-site safe.
 func newRefreshCookie(token string, secure bool) http.Cookie {
-	return http.Cookie{
+	return http.Cookie{ //#nosec G124 -- HttpOnly always set; Secure/SameSite intentionally derived from cfg (http dev vs https prod)
 		Name:     refreshCookieName,
 		Value:    token,
 		Path:     refreshCookiePath,
@@ -59,7 +59,7 @@ func newRefreshCookie(token string, secure bool) http.Cookie {
 // SameSite/Secure attributes must mirror newRefreshCookie or browsers
 // treat it as a different cookie and refuse to evict the original.
 func clearedRefreshCookie(secure bool) http.Cookie {
-	return http.Cookie{
+	return http.Cookie{ //#nosec G124 -- HttpOnly always set; Secure/SameSite intentionally derived from cfg (http dev vs https prod)
 		Name:     refreshCookieName,
 		Value:    "",
 		Path:     refreshCookiePath,

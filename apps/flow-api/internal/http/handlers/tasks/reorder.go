@@ -69,7 +69,7 @@ WHERE public_id = ? AND workspace_id = ? AND enabled = TRUE LIMIT 1`
 		defer func() { _ = tx.Rollback() }()
 
 		qtx := deps.Queries.WithTx(tx)
-		actorAuditID := sql.NullInt32{Int32: int32(actorID), Valid: actorID != 0}
+		actorAuditID := sql.NullInt32{Int32: int32(actorID), Valid: actorID != 0} //#nosec G115 -- actor user id sourced from session, fits int32 within realistic deployments
 		for _, item := range items {
 			if err := qtx.UpdateTaskSortWeight(ctx, generated.UpdateTaskSortWeightParams{
 				SortWeight:      item.sortWeight,

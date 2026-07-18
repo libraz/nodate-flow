@@ -101,10 +101,10 @@ func TestReverseConcurrentDoubleReverse(t *testing.T) {
 		var created, conflicted int
 		for _, r := range results {
 			require.NoError(t, r.err, "round %d: reverse request failed", round)
-			switch {
-			case r.status == http.StatusCreated:
+			switch r.status {
+			case http.StatusCreated:
 				created++
-			case r.status == http.StatusConflict:
+			case http.StatusConflict:
 				conflicted++
 				require.True(t, strings.Contains(r.body, "AI.REVERSE.ALREADY_REVERSED"),
 					"round %d: 409 must carry the canonical code; body=%s", round, r.body)

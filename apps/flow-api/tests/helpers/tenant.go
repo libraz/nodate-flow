@@ -156,7 +156,7 @@ func CleanupTenant(t *testing.T, tt *TestTenant) {
 	}
 	req := newJSONRequest(t, http.MethodPost, tt.BaseURL+"/auth/logout", tt.AccessToken, nil)
 	if tt.RefreshToken != "" {
-		req.AddCookie(&http.Cookie{Name: "nd_rt", Value: tt.RefreshToken})
+		req.AddCookie(&http.Cookie{Name: "nd_rt", Value: tt.RefreshToken}) //#nosec G124 -- test cookie
 	}
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
@@ -306,7 +306,7 @@ func doJSONCapturingRefreshCookie(t *testing.T, method, url, bearer, refreshCook
 	t.Helper()
 	req := newJSONRequest(t, method, url, bearer, body)
 	if refreshCookie != "" {
-		req.AddCookie(&http.Cookie{Name: "nd_rt", Value: refreshCookie})
+		req.AddCookie(&http.Cookie{Name: "nd_rt", Value: refreshCookie}) //#nosec G124 -- test cookie
 	}
 	resp, err := http.DefaultClient.Do(req)
 	require.NoError(t, err, "%s %s", method, url)
