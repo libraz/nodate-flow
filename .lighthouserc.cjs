@@ -1,5 +1,5 @@
 /** @type {import('@lhci/cli').LighthouseConfig} */
-export default {
+module.exports = {
   ci: {
     collect: {
       startServerCommand: 'cd apps/flow-web && bun run preview',

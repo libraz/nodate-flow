@@ -5,7 +5,7 @@ on:
     paths:
       - 'apps/flow-web/**'
       - 'packages/ui/**'
-      - '.lighthouserc.js'
+      - '.lighthouserc.cjs'
       - '.github/workflows/lighthouse.yml'
   push:
     branches: [main]
@@ -29,4 +29,4 @@ jobs:
       - name: Run Lighthouse CI
         uses: treosh/lighthouse-ci-action@v12
         with:
-          configPath: ./.lighthouserc.js
+          configPath: ./.lighthouserc.cjs
