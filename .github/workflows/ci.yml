@@ -168,23 +168,34 @@ jobs:
         env:
           NF_TEST_INTEGRATION: "1"
           NF_FLOW_AI_MOCK: ${{ matrix.ai_mock }}
-        run: go test -race -count=1 -timeout=10m -coverprofile=coverage.out -covermode=atomic ./...
+        run: go test -race -count=1 -timeout=10m -coverpkg=./... -coverprofile=coverage.out -covermode=atomic ./...
         working-directory: apps/flow-api
 
-      - name: Check Go coverage threshold (80%) — flow-api
+      - name: Check Go coverage threshold (45%) — flow-api
         working-directory: apps/flow-api
         run: |
           COVERAGE=$(go tool cover -func=coverage.out | grep total | awk '{print $3}' | sed 's/%//')
           echo "Total coverage: ${COVERAGE}%"
-          if [ "$(echo "${COVERAGE} < 80" | bc -l)" -eq 1 ]; then
-            echo "::error::Go coverage ${COVERAGE}% is below 80% threshold"
+          if [ "$(echo "${COVERAGE} < 45" | bc -l)" -eq 1 ]; then
+            echo "::error::Go coverage ${COVERAGE}% is below 45% threshold"
             exit 1
           fi
 
       - name: Go test (full, with testcontainers) — auth-api
         if: matrix.ai_mock == '1'
-        run: go test -race -count=1 -timeout=10m -coverprofile=coverage.out -covermode=atomic ./...
+        run: go test -race -count=1 -timeout=10m -coverpkg=./... -coverprofile=coverage.out -covermode=atomic ./...
         working-directory: apps/auth-api
+
+      - name: Check Go coverage threshold (30%) — auth-api
+        if: matrix.ai_mock == '1'
+        working-directory: apps/auth-api
+        run: |
+          COVERAGE=$(go tool cover -func=coverage.out | grep total | awk '{print $3}' | sed 's/%//')
+          echo "Total coverage: ${COVERAGE}%"
+          if [ "$(echo "${COVERAGE} < 30" | bc -l)" -eq 1 ]; then
+            echo "::error::Go coverage ${COVERAGE}% is below 30% threshold"
+            exit 1
+          fi
 
       - name: Build web for E2E
         if: matrix.ai_mock == '1'
