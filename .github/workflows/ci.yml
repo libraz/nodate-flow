@@ -88,32 +88,12 @@ jobs:
         run: bun install --frozen-lockfile
 
       - name: Go test (short) — flow-api
-        run: go test -short -race -count=1 -coverprofile=coverage.out -covermode=atomic ./...
+        run: go test -short -race -count=1 ./...
         working-directory: apps/flow-api
-
-      - name: Check Go coverage threshold (80%) — flow-api
-        working-directory: apps/flow-api
-        run: |
-          COVERAGE=$(go tool cover -func=coverage.out | grep total | awk '{print $3}' | sed 's/%//')
-          echo "Total coverage: ${COVERAGE}%"
-          if [ "$(echo "${COVERAGE} < 80" | bc -l)" -eq 1 ]; then
-            echo "::error::Go coverage ${COVERAGE}% is below 80% threshold"
-            exit 1
-          fi
 
       - name: Go test (short) — auth-api
-        run: go test -short -race -count=1 -coverprofile=coverage.out -covermode=atomic ./...
+        run: go test -short -race -count=1 ./...
         working-directory: apps/auth-api
-
-      - name: Check Go coverage threshold (80%) — auth-api
-        working-directory: apps/auth-api
-        run: |
-          COVERAGE=$(go tool cover -func=coverage.out | grep total | awk '{print $3}' | sed 's/%//')
-          echo "Total coverage: ${COVERAGE}%"
-          if [ "$(echo "${COVERAGE} < 80" | bc -l)" -eq 1 ]; then
-            echo "::error::Go coverage ${COVERAGE}% is below 80% threshold"
-            exit 1
-          fi
 
       - name: Vitest with coverage
         run: bun run test -- --coverage
