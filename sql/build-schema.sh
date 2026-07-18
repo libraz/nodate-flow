@@ -10,6 +10,12 @@
 
 set -euo pipefail
 
+# Pin the collation so filename glob expansion is byte-ordered and identical
+# across platforms. Without this, the default locale (e.g. UTF-8 on macOS vs C
+# on Linux CI) reorders sibling view files, producing a schema.sql that differs
+# between a local run and the CI drift guard.
+export LC_ALL=C
+
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 TABLES_DIR="${SCRIPT_DIR}/tables"
 VIEWS_DIR="${SCRIPT_DIR}/views"
