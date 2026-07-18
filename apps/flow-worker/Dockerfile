@@ -2,7 +2,7 @@
 # Multi-stage build for the nodate-flow scheduled job worker.
 # Build context is the repo root so go.work is visible.
 
-FROM golang:1.25-alpine AS build
+FROM golang:1.26-alpine AS build
 WORKDIR /src
 
 # Copy workspace + module manifests first for layer caching.

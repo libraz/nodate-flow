@@ -1,5 +1,3 @@
 module github.com/nodate-flow/nodate-flow/scripts
 
-go 1.25.0
-
-require gopkg.in/yaml.v3 v3.0.1
+go 1.26.0
