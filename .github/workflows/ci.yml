@@ -113,9 +113,9 @@ jobs:
             echo "::warning::No coverage summary found, skipping threshold check"
           fi
 
-  # ---------- Job 3: Integration tests (Go E2E + Playwright) ----------
+  # ---------- Job 3: Integration tests (Go, testcontainers) ----------
   #
-  # The matrix runs the flow-api E2E suite twice:
+  # The matrix runs the flow-api integration suite twice:
   #
   #   - ai_mock="1"  exercises tests gated on NF_FLOW_AI_MOCK=1 (deterministic
   #     mock AI orchestrator: ai_triage / ai_compile_lens / mcp_duplicates /
@@ -126,9 +126,10 @@ jobs:
   #
   # Both modes share the same testcontainers boot cost (~30s cold), so the
   # matrix roughly doubles the integration job wall time vs a single run
-  # but keeps both surfaces honest. Playwright + auth-api + the heavier
-  # web build only run in the mock-on shard to avoid duplicating work
-  # that does not depend on NF_FLOW_AI_MOCK.
+  # but keeps both surfaces honest. auth-api and the flow-web production
+  # build only run in the mock-on shard to avoid duplicating work that does
+  # not depend on NF_FLOW_AI_MOCK. There is no browser E2E here: the
+  # Playwright job was removed pending a dedicated backend-stack harness.
   test-integration:
     name: Integration tests (ai_mock=${{ matrix.ai_mock || 'off' }})
     runs-on: ubuntu-latest
@@ -153,11 +154,6 @@ jobs:
 
       - name: Install JS dependencies
         run: bun install --frozen-lockfile
-
-      - name: Install Playwright browsers
-        if: matrix.ai_mock == '1'
-        run: bunx playwright install --with-deps chromium
-        working-directory: apps/flow-web
 
       # Integration tests use testcontainers (MySQL, MinIO, Redis).
       # The containers are started automatically by Go test helpers.
@@ -197,23 +193,16 @@ jobs:
             exit 1
           fi
 
-      - name: Build web for E2E
+      # The Playwright E2E step was removed: it needs a running backend stack
+      # (flow-api + auth-api + MySQL/Redis/MinIO reachable via NF_API_URL /
+      # NF_AUTH_API_URL) that CI never stood up, so it always failed at global
+      # setup. Do not re-add `bun run e2e` here until a dedicated backend-stack
+      # E2E harness exists. This step only builds flow-web (no backend needed)
+      # as a production-build smoke check.
+      - name: Build web (flow-web production build)
         if: matrix.ai_mock == '1'
         run: bun run build
         working-directory: apps/flow-web
-
-      - name: Playwright E2E
-        if: matrix.ai_mock == '1'
-        run: bun run e2e
-        working-directory: apps/flow-web
-
-      - name: Upload Playwright report
-        if: failure() && matrix.ai_mock == '1'
-        uses: actions/upload-artifact@v7
-        with:
-          name: playwright-report
-          path: apps/flow-web/playwright-report/
-          retention-days: 14
 
   # ---------- Job 4: Security (main only, placeholder) ----------
   security:
