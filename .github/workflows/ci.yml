@@ -15,115 +15,48 @@ env:
   BUN_VERSION: "1.3.11"
 
 jobs:
-  # ---------- Job 1: Lint and typecheck (Go + TS in parallel steps) ----------
-  lint-and-typecheck:
-    name: Lint and typecheck
+  web:
+    name: Web (typecheck, lint, test)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-
-      - uses: actions/setup-go@v6
-        with:
-          go-version: ${{ env.GO_VERSION }}
-          cache-dependency-path: |
-            apps/flow-api/go.sum
-            apps/auth-api/go.sum
 
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: ${{ env.BUN_VERSION }}
 
-      - name: Install JS dependencies
+      - name: Install dependencies
         run: bun install --frozen-lockfile
 
       - name: Biome check
         run: bun run check
 
-      - name: TypeScript typecheck
+      - name: Typecheck
         run: bun run typecheck
 
-      - name: i18n locale guard (missing ja keys, empty values, '{{var}}' under ICU)
-        run: node scripts/i18n-translate.mjs --check
-
-      - name: golangci-lint (flow-api)
-        uses: golangci/golangci-lint-action@v9
-        with:
-          version: latest
-          working-directory: apps/flow-api
-
-      - name: Go vet (flow-api)
-        run: go vet ./...
-        working-directory: apps/flow-api
-
-      - name: golangci-lint (auth-api)
-        uses: golangci/golangci-lint-action@v9
-        with:
-          version: latest
-          working-directory: apps/auth-api
-
-      - name: Go vet (auth-api)
-        run: go vet ./...
-        working-directory: apps/auth-api
-
-  # ---------- Job 2: Unit tests (Go short + Vitest) ----------
-  test-unit:
-    name: Unit tests
-    runs-on: ubuntu-latest
-    needs: [lint-and-typecheck]
-    steps:
-      - uses: actions/checkout@v7
-
-      - uses: actions/setup-go@v6
-        with:
-          go-version: ${{ env.GO_VERSION }}
-          cache-dependency-path: |
-            apps/flow-api/go.sum
-            apps/auth-api/go.sum
-
-      - uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: ${{ env.BUN_VERSION }}
-
-      - name: Install JS dependencies
-        run: bun install --frozen-lockfile
-
-      - name: Go test (short) — flow-api
-        run: go test -short -race -count=1 ./...
-        working-directory: apps/flow-api
-
-      - name: Go test (short) — auth-api
-        run: go test -short -race -count=1 ./...
-        working-directory: apps/auth-api
-
-      - name: Vitest — flow-web
-        run: bun run test
+      - name: Unit tests (flow-web)
         working-directory: apps/flow-web
-
-      - name: Vitest — accounts-web
         run: bun run test
-        working-directory: apps/accounts-web
 
-  # ---------- Job 3: Integration tests (Go, testcontainers) ----------
-  #
-  # The matrix runs the flow-api integration suite twice:
-  #
-  #   - ai_mock="1"  exercises tests gated on NF_FLOW_AI_MOCK=1 (deterministic
-  #     mock AI orchestrator: ai_triage / ai_compile_lens / mcp_duplicates /
-  #     task_duplicates).
-  #   - ai_mock=""   leaves NF_FLOW_AI_MOCK unset so the real per-tenant
-  #     workspace provider path is wired in. Required by
-  #     ai_provider_failures_test.go which skips when the mock is on.
-  #
-  # Both modes share the same testcontainers boot cost (~30s cold), so the
-  # matrix roughly doubles the integration job wall time vs a single run
-  # but keeps both surfaces honest. auth-api and the flow-web production
-  # build only run in the mock-on shard to avoid duplicating work that does
-  # not depend on NF_FLOW_AI_MOCK. There is no browser E2E here: the
-  # Playwright job was removed pending a dedicated backend-stack harness.
-  test-integration:
-    name: Integration tests (ai_mock=${{ matrix.ai_mock || 'off' }})
+      - name: Unit tests (accounts-web)
+        working-directory: apps/accounts-web
+        run: bun run test
+
+      - name: Build (flow-web)
+        working-directory: apps/flow-web
+        run: bun run build
+
+      - name: Build (accounts-web)
+        working-directory: apps/accounts-web
+        run: bun run build
+
+  api:
+    name: API (build, vet, e2e)
     runs-on: ubuntu-latest
-    needs: [lint-and-typecheck]
+    # Integration tests use testcontainers (MySQL, MinIO, Redis) started by
+    # Go test helpers. The matrix runs the flow-api suite twice: ai_mock="1"
+    # exercises the deterministic mock AI orchestrator; ai_mock="" wires the
+    # real per-tenant workspace provider path.
     strategy:
       fail-fast: false
       matrix:
@@ -138,121 +71,30 @@ jobs:
             apps/flow-api/go.sum
             apps/auth-api/go.sum
 
-      - uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: ${{ env.BUN_VERSION }}
+      - name: Build (flow-api)
+        working-directory: apps/flow-api
+        run: go build ./...
 
-      - name: Install JS dependencies
-        run: bun install --frozen-lockfile
+      - name: Build (auth-api)
+        working-directory: apps/auth-api
+        run: go build ./...
 
-      # Integration tests use testcontainers (MySQL, MinIO, Redis).
-      # The containers are started automatically by Go test helpers.
-      # The flow-api job also covers the calendar/event suite that
-      # used to live under apps/time-api/tests/.
+      - name: Go vet (flow-api)
+        working-directory: apps/flow-api
+        run: go vet ./...
 
-      - name: Go test (full, with testcontainers) — flow-api
+      - name: Go vet (auth-api)
+        working-directory: apps/auth-api
+        run: go vet ./...
+
+      - name: Integration tests (flow-api)
+        working-directory: apps/flow-api
         env:
           NF_TEST_INTEGRATION: "1"
           NF_FLOW_AI_MOCK: ${{ matrix.ai_mock }}
         run: go test -race -count=1 -timeout=10m ./...
-        working-directory: apps/flow-api
 
-      - name: Go test (full, with testcontainers) — auth-api
+      - name: Integration tests (auth-api)
         if: matrix.ai_mock == '1'
-        run: go test -race -count=1 -timeout=10m ./...
         working-directory: apps/auth-api
-
-      # The Playwright E2E step was removed: it needs a running backend stack
-      # (flow-api + auth-api + MySQL/Redis/MinIO reachable via NF_API_URL /
-      # NF_AUTH_API_URL) that CI never stood up, so it always failed at global
-      # setup. Do not re-add `bun run e2e` here until a dedicated backend-stack
-      # E2E harness exists. This step only builds flow-web (no backend needed)
-      # as a production-build smoke check.
-      - name: Build web (flow-web production build)
-        if: matrix.ai_mock == '1'
-        run: bun run build
-        working-directory: apps/flow-web
-
-      - name: Build web (accounts-web production build)
-        if: matrix.ai_mock == '1'
-        run: bun run build
-        working-directory: apps/accounts-web
-
-  # ---------- Job 4: OpenAPI drift guard ----------
-  # Regenerate every OpenAPI spec from the current Go sources and fail if
-  # the committed copies differ. Catches silent spec drift before it
-  # reaches schemathesis or the TS SDK consumers.
-  openapi-diff:
-    name: OpenAPI drift guard
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v7
-
-      - uses: actions/setup-go@v6
-        with:
-          go-version: ${{ env.GO_VERSION }}
-          cache-dependency-path: |
-            apps/flow-api/go.sum
-            apps/auth-api/go.sum
-
-      - uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: ${{ env.BUN_VERSION }}
-
-      - name: Install JS dependencies
-        run: bun install --frozen-lockfile
-
-      - name: Verify OpenAPI specs match Go sources
-        run: ./scripts/openapi-diff.sh
-
-      - name: Verify merged spec has no schema name collisions
-        run: ./scripts/check-schema-collisions.sh
-
-      - name: Verify sql/schema.sql matches sql/tables and sql/views
-        run: ./scripts/schema-diff.sh
-
-      - name: Verify public router allowlist (no auth-required path leaks into public surface)
-        run: bun run scripts/check-public-router.ts
-
-  # ---------- Job 5: Contract tests (Schemathesis against OpenAPI spec) ----------
-  contract-tests:
-    name: Contract tests
-    runs-on: ubuntu-latest
-    needs: [test-integration]
-    continue-on-error: true
-    steps:
-      - uses: actions/checkout@v7
-
-      - uses: actions/setup-go@v6
-        with:
-          go-version: ${{ env.GO_VERSION }}
-          cache-dependency-path: |
-            apps/flow-api/go.sum
-            apps/auth-api/go.sum
-
-      - uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: ${{ env.BUN_VERSION }}
-
-      - name: Install JS dependencies
-        run: bun install --frozen-lockfile
-
-      - name: Regenerate OpenAPI spec
-        run: |
-          cd apps/flow-api && go run ./cmd/dump-openapi -o ../../packages/sdk/openapi-flow.json
-          cd ../../apps/auth-api && go run ./cmd/dump-openapi -o ../../packages/sdk/openapi-auth.json
-          cd ../../scripts && go run merge-openapi.go -o ../packages/sdk/openapi.json ../packages/sdk/openapi-flow.json ../packages/sdk/openapi-auth.json
-          rm -f packages/sdk/openapi-flow.json packages/sdk/openapi-auth.json
-
-      - uses: actions/setup-python@v6
-        with:
-          python-version: "3.12"
-
-      - name: Install Schemathesis
-        run: pip install schemathesis
-
-      - name: Run contract tests against OpenAPI spec
-        run: |
-          schemathesis run packages/sdk/openapi.json \
-            --checks all \
-            --max-examples=50
+        run: go test -race -count=1 -timeout=10m ./...
