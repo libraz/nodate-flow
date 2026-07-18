@@ -5366,12 +5366,6 @@ export interface components {
             format: string;
             tasks: components["schemas"]["ExportedTask"][] | null;
         };
-        ByDiscordOutputBody: {
-            /** @description Flow user public_id (UUID v7) bound to the requested Discord snowflake. */
-            userId: string;
-            /** @description Default workspace public_id (UUID v7) for the resolved user. Currently the earliest-joined enabled membership. */
-            workspaceId: string;
-        };
         CalendarRemoveMemberOutputBody: {
             /**
              * Format: uri
@@ -6764,13 +6758,6 @@ export interface components {
             sortWeight: number;
             targetId: string;
             targetType: string;
-        };
-        FormFile: {
-            ContentType: string;
-            Filename: string;
-            IsSet: boolean;
-            /** Format: int64 */
-            Size: number;
         };
         GeneratePageBody: {
             /**

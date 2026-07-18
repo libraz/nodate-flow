@@ -1208,21 +1208,6 @@
         "required": ["format", "count", "tasks"],
         "type": "object"
       },
-      "ByDiscordOutputBody": {
-        "additionalProperties": false,
-        "properties": {
-          "userId": {
-            "description": "Flow user public_id (UUID v7) bound to the requested Discord snowflake.",
-            "type": "string"
-          },
-          "workspaceId": {
-            "description": "Default workspace public_id (UUID v7) for the resolved user. Currently the earliest-joined enabled membership.",
-            "type": "string"
-          }
-        },
-        "required": ["userId", "workspaceId"],
-        "type": "object"
-      },
       "CalendarRemoveMemberOutputBody": {
         "additionalProperties": false,
         "properties": {
@@ -4087,26 +4072,6 @@
           }
         },
         "required": ["id", "targetType", "targetId", "sortWeight", "createdAt"],
-        "type": "object"
-      },
-      "FormFile": {
-        "additionalProperties": false,
-        "properties": {
-          "ContentType": {
-            "type": "string"
-          },
-          "Filename": {
-            "type": "string"
-          },
-          "IsSet": {
-            "type": "boolean"
-          },
-          "Size": {
-            "format": "int64",
-            "type": "integer"
-          }
-        },
-        "required": ["ContentType", "IsSet", "Size", "Filename"],
         "type": "object"
       },
       "GeneratePageBody": {
