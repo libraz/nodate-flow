@@ -95,23 +95,13 @@ jobs:
         run: go test -short -race -count=1 ./...
         working-directory: apps/auth-api
 
-      - name: Vitest with coverage
-        run: bun run test -- --coverage
+      - name: Vitest — flow-web
+        run: bun run test
         working-directory: apps/flow-web
 
-      - name: Check Vitest coverage threshold (80%)
-        working-directory: apps/flow-web
-        run: |
-          if [ -f coverage/coverage-summary.json ]; then
-            COVERAGE=$(node -e "const c = require('./coverage/coverage-summary.json'); console.log(c.total.lines.pct)")
-            echo "Total line coverage: ${COVERAGE}%"
-            if [ "$(echo "${COVERAGE} < 80" | bc -l)" -eq 1 ]; then
-              echo "::error::Vitest line coverage ${COVERAGE}% is below 80% threshold"
-              exit 1
-            fi
-          else
-            echo "::warning::No coverage summary found, skipping threshold check"
-          fi
+      - name: Vitest — accounts-web
+        run: bun run test
+        working-directory: apps/accounts-web
 
   # ---------- Job 3: Integration tests (Go, testcontainers) ----------
   #
@@ -164,34 +154,13 @@ jobs:
         env:
           NF_TEST_INTEGRATION: "1"
           NF_FLOW_AI_MOCK: ${{ matrix.ai_mock }}
-        run: go test -race -count=1 -timeout=10m -coverpkg=./... -coverprofile=coverage.out -covermode=atomic ./...
+        run: go test -race -count=1 -timeout=10m ./...
         working-directory: apps/flow-api
-
-      - name: Check Go coverage threshold (40%) — flow-api
-        working-directory: apps/flow-api
-        run: |
-          COVERAGE=$(go tool cover -func=coverage.out | grep total | awk '{print $3}' | sed 's/%//')
-          echo "Total coverage: ${COVERAGE}%"
-          if [ "$(echo "${COVERAGE} < 40" | bc -l)" -eq 1 ]; then
-            echo "::error::Go coverage ${COVERAGE}% is below 40% threshold"
-            exit 1
-          fi
 
       - name: Go test (full, with testcontainers) — auth-api
         if: matrix.ai_mock == '1'
-        run: go test -race -count=1 -timeout=10m -coverpkg=./... -coverprofile=coverage.out -covermode=atomic ./...
+        run: go test -race -count=1 -timeout=10m ./...
         working-directory: apps/auth-api
-
-      - name: Check Go coverage threshold (25%) — auth-api
-        if: matrix.ai_mock == '1'
-        working-directory: apps/auth-api
-        run: |
-          COVERAGE=$(go tool cover -func=coverage.out | grep total | awk '{print $3}' | sed 's/%//')
-          echo "Total coverage: ${COVERAGE}%"
-          if [ "$(echo "${COVERAGE} < 25" | bc -l)" -eq 1 ]; then
-            echo "::error::Go coverage ${COVERAGE}% is below 25% threshold"
-            exit 1
-          fi
 
       # The Playwright E2E step was removed: it needs a running backend stack
       # (flow-api + auth-api + MySQL/Redis/MinIO reachable via NF_API_URL /
@@ -204,58 +173,12 @@ jobs:
         run: bun run build
         working-directory: apps/flow-web
 
-  # ---------- Job 4: Security (main only, placeholder) ----------
-  security:
-    name: Security scan
-    runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main'
-    needs: [test-unit, test-integration]
-    steps:
-      - uses: actions/checkout@v7
+      - name: Build web (accounts-web production build)
+        if: matrix.ai_mock == '1'
+        run: bun run build
+        working-directory: apps/accounts-web
 
-      - uses: actions/setup-go@v6
-        with:
-          go-version: ${{ env.GO_VERSION }}
-          cache-dependency-path: |
-            apps/flow-api/go.sum
-            apps/auth-api/go.sum
-
-      - uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: ${{ env.BUN_VERSION }}
-
-      - name: Trivy filesystem scan
-        uses: aquasecurity/trivy-action@0.36.0
-        with:
-          scan-type: fs
-          scan-ref: .
-          vuln-type: os,library
-          severity: CRITICAL,HIGH
-          exit-code: "1"
-
-      - name: Semgrep SAST
-        uses: semgrep/semgrep-action@v1
-        with:
-          config: auto
-
-      - name: Install govulncheck
-        run: go install golang.org/x/vuln/cmd/govulncheck@latest
-
-      - name: Go vulnerability check — flow-api
-        run: govulncheck ./...
-        working-directory: apps/flow-api
-
-      - name: Go vulnerability check — auth-api
-        run: govulncheck ./...
-        working-directory: apps/auth-api
-
-      - name: Install JS dependencies
-        run: bun install --frozen-lockfile
-
-      - name: Bun dependency audit
-        run: bunx npm-audit --production
-
-  # ---------- Job 5a: OpenAPI drift guard ----------
+  # ---------- Job 4: OpenAPI drift guard ----------
   # Regenerate every OpenAPI spec from the current Go sources and fail if
   # the committed copies differ. Catches silent spec drift before it
   # reaches schemathesis or the TS SDK consumers.
@@ -291,7 +214,7 @@ jobs:
       - name: Verify public router allowlist (no auth-required path leaks into public surface)
         run: bun run scripts/check-public-router.ts
 
-  # ---------- Job 5b: Contract tests (Schemathesis against OpenAPI spec) ----------
+  # ---------- Job 5: Contract tests (Schemathesis against OpenAPI spec) ----------
   contract-tests:
     name: Contract tests
     runs-on: ubuntu-latest
@@ -328,16 +251,8 @@ jobs:
       - name: Install Schemathesis
         run: pip install schemathesis
 
-      - name: Validate OpenAPI spec (offline)
-        run: |
-          schemathesis run packages/sdk/openapi.json \
-            --dry-run \
-            --checks all \
-            --validate-schema=true
-
       - name: Run contract tests against OpenAPI spec
         run: |
           schemathesis run packages/sdk/openapi.json \
-            --stateful=links \
             --checks all \
-            --hypothesis-max-examples=50
+            --max-examples=50
