@@ -210,15 +210,15 @@ func TestByDiscordRejectsMissingBearer(t *testing.T) {
 }
 
 // repoRootFromTest walks up from this test file's directory until it
-// finds the monorepo root (the directory holding the top-level go.work /
-// CLAUDE.md). Used to locate generated artifacts under packages/.
+// finds the monorepo root (the directory holding the top-level go.work).
+// Used to locate generated artifacts under packages/.
 func repoRootFromTest(t *testing.T) string {
 	t.Helper()
 	_, thisFile, _, ok := runtime.Caller(0)
 	require.True(t, ok, "runtime.Caller failed")
 	dir := filepath.Dir(thisFile)
 	for i := 0; i < 12; i++ {
-		if _, err := os.Stat(filepath.Join(dir, "CLAUDE.md")); err == nil {
+		if _, err := os.Stat(filepath.Join(dir, "go.work")); err == nil {
 			if _, err := os.Stat(filepath.Join(dir, "packages")); err == nil {
 				return dir
 			}
