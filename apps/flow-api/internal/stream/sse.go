@@ -81,6 +81,17 @@ func SSEHandler(notifier Notifier, remember RememberWorkspaceFunc) http.HandlerF
 		h.Set("X-Accel-Buffering", "no")
 		w.WriteHeader(http.StatusOK)
 
+		// Register the subscription BEFORE emitting the resync frame.
+		// The client treats "received resync" as "I am subscribed,
+		// safe to act", so the subscriber must already be in the
+		// notifier registry when the frame is flushed. Subscribing
+		// afterwards would drop any event published in the window
+		// between the flush and Subscribe. The per-subscriber inbox is
+		// buffered, so any event published between here and the read
+		// loop below is queued, not lost.
+		ctx := r.Context()
+		ch := notifier.Subscribe(ctx, ws.PublicID.String())
+
 		// Initial retry hint + a synthetic resync marker so the
 		// client can invalidate its workspace queries once on
 		// connect and stay in sync regardless of what happened
@@ -93,8 +104,6 @@ func SSEHandler(notifier Notifier, remember RememberWorkspaceFunc) http.HandlerF
 		})
 		flush()
 
-		ctx := r.Context()
-		ch := notifier.Subscribe(ctx, ws.PublicID.String())
 		ticker := time.NewTicker(heartbeatInterval)
 		defer ticker.Stop()
 

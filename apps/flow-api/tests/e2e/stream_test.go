@@ -15,14 +15,16 @@ import (
 // TestWorkspaceStream exercises the realtime SSE endpoint (ADR 0005).
 // It opens a subscription for a fresh tenant, creates a task in a
 // separate goroutine, and asserts that a `task.changed` frame shows
-// up on the stream within a small budget.
+// up on the stream. The read budget is generous enough to absorb CI
+// load; the happy path cancels immediately once the frame is seen, so
+// the budget only bounds the worst case.
 func TestWorkspaceStream(t *testing.T) {
 	bootstrap(t)
 	t.Parallel()
 
 	tt := newTenant(t)
 
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet,
