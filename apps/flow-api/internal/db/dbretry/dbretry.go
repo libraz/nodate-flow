@@ -31,10 +31,72 @@ import (
 	stdsqlerr "errors"
 	"log/slog"
 	"math/rand/v2"
+	"sync"
 	"time"
 
 	"github.com/go-sql-driver/mysql"
 )
+
+// commitHookKey is the context key under which [InTx] stores the
+// per-attempt commit-hook collector.
+type commitHookKey struct{}
+
+// commitHooks collects callbacks to run only after the enclosing
+// transaction commits successfully. It is attached to the context
+// [InTx] passes to fn so transaction-aware code (the eventbus append
+// path) can defer non-transactional side effects — realtime SSE
+// fan-out, notification goroutines — until the row is durably
+// committed. Deferring matters for two reasons: fan-out goroutines run
+// on a separate connection and would otherwise contend on FK locks the
+// still-open transaction holds against its own freshly-inserted rows
+// (a self-inflicted deadlock source), and a hook that fires before a
+// commit that later rolls back leaks a phantom event for a change that
+// never happened.
+type commitHooks struct {
+	mu  sync.Mutex
+	fns []func()
+}
+
+// WithCommitHooks returns a child context carrying a fresh commit-hook
+// collector. [InTx] calls this once per transaction attempt so hooks
+// registered by a rolled-back attempt are discarded and never fire.
+func WithCommitHooks(ctx context.Context) context.Context {
+	return context.WithValue(ctx, commitHookKey{}, &commitHooks{})
+}
+
+// AddCommitHook registers fn to run when the transaction enclosing ctx
+// commits. When ctx carries no collector — the auto-commit path, or a
+// caller that manages its own transaction without [InTx] — there is no
+// commit boundary to wait for, so fn runs immediately, preserving the
+// historical fire-on-append behavior for those callers.
+func AddCommitHook(ctx context.Context, fn func()) {
+	if fn == nil {
+		return
+	}
+	if c, ok := ctx.Value(commitHookKey{}).(*commitHooks); ok {
+		c.mu.Lock()
+		c.fns = append(c.fns, fn)
+		c.mu.Unlock()
+		return
+	}
+	fn()
+}
+
+// runCommitHooks fires and clears every callback registered on ctx's
+// collector. Called by [InTx] only after a successful commit.
+func runCommitHooks(ctx context.Context) {
+	c, ok := ctx.Value(commitHookKey{}).(*commitHooks)
+	if !ok {
+		return
+	}
+	c.mu.Lock()
+	fns := c.fns
+	c.fns = nil
+	c.mu.Unlock()
+	for _, fn := range fns {
+		fn()
+	}
+}
 
 // MySQL transient error numbers eligible for retry. See the package
 // doc for the rationale; the numeric values match server source
@@ -135,14 +197,20 @@ type TxBeginner interface {
 // fn must be re-entrant: it will be called multiple times on retry.
 // In practice that means avoiding side effects between
 // [TxBeginner.BeginTx] and [sql.Tx.Commit] that are not transaction
-// scoped (e.g. publishing to a queue). The eventbus hook fan-out is
-// fine because it fires only after the inner Append succeeds and the
-// retry loop runs only on commit failure.
+// scoped (e.g. publishing to a queue). Non-transactional fan-out that
+// must observe the committed row — the eventbus SSE tap and
+// notification goroutines — should be registered with [AddCommitHook]
+// on the context fn receives; InTx runs those callbacks only after the
+// commit succeeds and drops them when an attempt rolls back, so a
+// retried or aborted transaction never leaks a spurious event.
 //
 // opts is forwarded to BeginTx untouched. Pass nil for the default
 // isolation level.
 func InTx(ctx context.Context, db TxBeginner, label string, opts *sql.TxOptions, fn func(ctx context.Context, tx *sql.Tx) error) error {
 	return Do(ctx, label, func(ctx context.Context) error {
+		// Fresh collector per attempt: hooks registered by an attempt
+		// that later rolls back (or fails to commit) are abandoned.
+		ctx = WithCommitHooks(ctx)
 		tx, err := db.BeginTx(ctx, opts)
 		if err != nil {
 			return err
@@ -164,6 +232,10 @@ func InTx(ctx context.Context, db TxBeginner, label string, opts *sql.TxOptions,
 			return err
 		}
 		committed = true
+		// Commit succeeded and locks are released; fire the deferred
+		// fan-out now so it observes the committed rows without
+		// contending on this transaction's locks.
+		runCommitHooks(ctx)
 		return nil
 	})
 }

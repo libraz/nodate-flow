@@ -145,32 +145,37 @@ type Event struct {
 type NotifyHook = func(ctx context.Context, workspaceInternalID uint32, eventType string, eventInternalID uint32)
 
 var (
-	notifyMu    sync.RWMutex
-	notifyHooks []NotifyHook
+	notifyMu      sync.RWMutex
+	notifyHooks   = map[int]NotifyHook{}
+	notifyHookSeq int
 )
 
-// SetNotifyHook replaces the hook list with a single subscriber.
-// Kept for backwards compatibility with the previous single-hook
-// API; new call sites should prefer [AddNotifyHook]. Calling
-// SetNotifyHook(nil) clears the list.
-func SetNotifyHook(hook NotifyHook) {
-	notifyMu.Lock()
-	defer notifyMu.Unlock()
-	if hook == nil {
-		notifyHooks = nil
-		return
-	}
-	notifyHooks = []NotifyHook{hook}
-}
-
-// AddNotifyHook appends a subscriber to the notify fan-out. Returns
-// an index that can be passed to [RemoveNotifyHook]; tests use this
-// to unregister a hook when they tear down.
+// AddNotifyHook registers a subscriber on the notify fan-out and
+// returns a stable handle for [RemoveNotifyHook]. Registration is
+// purely additive: the SSE tap, notification fan-out, MCP event
+// source, on_event triggers, and webhook worker all coexist off the
+// same dispatch, so each subscriber must be able to unregister itself
+// without disturbing the others. The handle stays valid regardless of
+// how many other subscribers are added or removed in the meantime,
+// which is what lets several servers share the process-global registry
+// (the test harness runs a long-lived shared server alongside
+// short-lived per-test servers) without clobbering each other's hooks.
 func AddNotifyHook(hook NotifyHook) int {
 	notifyMu.Lock()
 	defer notifyMu.Unlock()
-	notifyHooks = append(notifyHooks, hook)
-	return len(notifyHooks) - 1
+	notifyHookSeq++
+	handle := notifyHookSeq
+	notifyHooks[handle] = hook
+	return handle
+}
+
+// RemoveNotifyHook unregisters the subscriber previously registered
+// under handle. Unknown or already-removed handles are ignored so
+// double teardown is safe.
+func RemoveNotifyHook(handle int) {
+	notifyMu.Lock()
+	defer notifyMu.Unlock()
+	delete(notifyHooks, handle)
 }
 
 // ClearNotifyHooks drops every registered subscriber. Used by tests
@@ -178,7 +183,7 @@ func AddNotifyHook(hook NotifyHook) int {
 func ClearNotifyHooks() {
 	notifyMu.Lock()
 	defer notifyMu.Unlock()
-	notifyHooks = nil
+	notifyHooks = map[int]NotifyHook{}
 }
 
 type seqCtxKey struct{}
@@ -229,7 +234,10 @@ func ActorAgentIDFromContext(ctx context.Context) uint32 {
 
 func fireNotifyHooks(ctx context.Context, workspaceInternalID uint32, eventType string, eventInternalID uint32) {
 	notifyMu.RLock()
-	hooks := notifyHooks
+	hooks := make([]NotifyHook, 0, len(notifyHooks))
+	for _, h := range notifyHooks {
+		hooks = append(hooks, h)
+	}
 	notifyMu.RUnlock()
 	for _, h := range hooks {
 		h(ctx, workspaceInternalID, eventType, eventInternalID)
@@ -488,6 +496,18 @@ func appendInternalWithMeta(ctx context.Context, db DBTX, evt Event, fromApplier
 	eventInternalID := uint32(lastID) //#nosec G115 -- LastInsertId for events.id (BIGINT UNSIGNED), fits uint32 within realistic deployments
 	seq := globalSeq.Add(1)
 	seqCtx := WithSeq(ctx, seq)
-	fireNotifyHooks(seqCtx, evt.WorkspaceID, evt.Type, eventInternalID)
+	// Fan-out (SSE tap, notification goroutines, on_event triggers) must
+	// observe a committed row, and must not run while this call's
+	// enclosing transaction still holds locks on the just-inserted rows
+	// — the notification goroutine writes rows that FK-reference the new
+	// event/task and would otherwise block on this transaction's own
+	// locks, a self-inflicted deadlock that InnoDB resolves by rolling
+	// one side back. AddCommitHook defers the fan-out until the
+	// transaction commits when the caller ran us via dbretry.InTx; on
+	// the auto-commit path (and for callers managing their own
+	// transaction) it fires immediately, preserving prior behavior.
+	dbretry.AddCommitHook(seqCtx, func() {
+		fireNotifyHooks(seqCtx, evt.WorkspaceID, evt.Type, eventInternalID)
+	})
 	return ReverseAppendResult{PublicID: pubID, OccurredAt: now}, nil
 }

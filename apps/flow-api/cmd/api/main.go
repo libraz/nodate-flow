@@ -215,7 +215,7 @@ func main() {
 			notifier = in
 			tap = stream.NewEventbusTap(in)
 		}
-		eventbus.SetNotifyHook(tap.Publish)
+		eventbus.AddNotifyHook(tap.Publish)
 		streamRemember = tap.RememberWorkspace
 		aiInvocationPublisher = tap.PublishAiInvocation
 	}

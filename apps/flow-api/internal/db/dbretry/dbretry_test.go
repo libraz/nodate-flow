@@ -113,6 +113,58 @@ func TestDoHonoursContextCancel(t *testing.T) {
 	}
 }
 
+// TestAddCommitHookFiresImmediatelyWithoutCollector verifies that on a
+// context with no commit-hook collector (the auto-commit path, or a
+// caller not using InTx) the callback runs synchronously, preserving
+// the historical fire-on-append behavior.
+func TestAddCommitHookFiresImmediatelyWithoutCollector(t *testing.T) {
+	t.Parallel()
+	fired := 0
+	AddCommitHook(context.Background(), func() { fired++ })
+	if fired != 1 {
+		t.Fatalf("fired = %d, want 1 (immediate)", fired)
+	}
+}
+
+// TestCommitHooksDeferUntilRun verifies that a callback registered on a
+// context carrying a collector does not fire until runCommitHooks is
+// invoked — the post-commit trigger InTx uses.
+func TestCommitHooksDeferUntilRun(t *testing.T) {
+	t.Parallel()
+	ctx := WithCommitHooks(context.Background())
+	fired := 0
+	AddCommitHook(ctx, func() { fired++ })
+	AddCommitHook(ctx, func() { fired++ })
+	if fired != 0 {
+		t.Fatalf("fired = %d before run, want 0 (deferred)", fired)
+	}
+	runCommitHooks(ctx)
+	if fired != 2 {
+		t.Fatalf("fired = %d after run, want 2", fired)
+	}
+	// A second run must not re-fire the drained callbacks.
+	runCommitHooks(ctx)
+	if fired != 2 {
+		t.Fatalf("fired = %d after second run, want 2 (drained once)", fired)
+	}
+}
+
+// TestCommitHooksDroppedWhenNeverRun verifies that hooks registered on
+// an attempt's collector simply never fire when runCommitHooks is not
+// called (the rollback / failed-commit path), so an aborted transaction
+// leaks no side effects.
+func TestCommitHooksDroppedWhenNeverRun(t *testing.T) {
+	t.Parallel()
+	ctx := WithCommitHooks(context.Background())
+	fired := 0
+	AddCommitHook(ctx, func() { fired++ })
+	// Simulate a rolled-back attempt: the collector is discarded without
+	// runCommitHooks ever being called.
+	if fired != 0 {
+		t.Fatalf("fired = %d, want 0 (dropped)", fired)
+	}
+}
+
 // wrap reproduces fmt.Errorf("...: %w", err) without pulling fmt into
 // the test file imports.
 type wrappedErr struct{ inner error }

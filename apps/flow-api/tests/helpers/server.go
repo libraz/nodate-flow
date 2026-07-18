@@ -95,7 +95,13 @@ func StartTestServer(t *testing.T, db *sql.DB) *TestServer {
 
 	notifier := stream.NewInProcessNotifier()
 	tap := stream.NewEventbusTap(notifier)
-	eventbus.SetNotifyHook(tap.Publish)
+	// Register additively and remove only this server's hook on
+	// teardown. The eventbus notify registry is process-global, so a
+	// replace-style SetNotifyHook would clobber the long-lived shared
+	// test server's tap whenever a per-test auxiliary server starts or
+	// stops, silently dropping realtime events for the shared server's
+	// subscribers.
+	hookHandle := eventbus.AddNotifyHook(tap.Publish)
 
 	flowHandler := router.Build(router.Deps{
 		DB:                 db,
@@ -120,7 +126,7 @@ func StartTestServer(t *testing.T, db *sql.DB) *TestServer {
 	composite := newCompositeHandler(authHandler, flowHandler)
 	srv := httptest.NewServer(composite)
 	t.Cleanup(func() {
-		eventbus.SetNotifyHook(nil)
+		eventbus.RemoveNotifyHook(hookHandle)
 		srv.Close()
 	})
 
@@ -149,7 +155,10 @@ func NewTestServer(db *sql.DB) (*TestServer, func(), error) {
 	}
 	notifier := stream.NewInProcessNotifier()
 	tap := stream.NewEventbusTap(notifier)
-	eventbus.SetNotifyHook(tap.Publish)
+	// Additive registration; removed by handle on cleanup so this
+	// server never clobbers a sibling server's tap on the shared,
+	// process-global eventbus notify registry (see StartTestServer).
+	hookHandle := eventbus.AddNotifyHook(tap.Publish)
 
 	flowHandler := router.Build(router.Deps{
 		DB:                 db,
@@ -174,7 +183,7 @@ func NewTestServer(db *sql.DB) (*TestServer, func(), error) {
 	composite := newCompositeHandler(authHandler, flowHandler)
 	srv := httptest.NewServer(composite)
 	cleanup := func() {
-		eventbus.SetNotifyHook(nil)
+		eventbus.RemoveNotifyHook(hookHandle)
 		srv.Close()
 	}
 	return &TestServer{BaseURL: srv.URL, Server: srv, DB: db, JWT: jwtIssuer}, cleanup, nil
@@ -206,7 +215,10 @@ func NewTestServerWithStorage(db *sql.DB, bundle *StorageBundle) (*TestServer, f
 	}
 	notifier := stream.NewInProcessNotifier()
 	tap := stream.NewEventbusTap(notifier)
-	eventbus.SetNotifyHook(tap.Publish)
+	// Additive registration; removed by handle on cleanup so this
+	// server never clobbers a sibling server's tap on the shared,
+	// process-global eventbus notify registry (see StartTestServer).
+	hookHandle := eventbus.AddNotifyHook(tap.Publish)
 
 	var flowStorage *flowstorage.Client
 	if bundle != nil {
@@ -242,7 +254,7 @@ func NewTestServerWithStorage(db *sql.DB, bundle *StorageBundle) (*TestServer, f
 	composite := newCompositeHandler(authHandler, flowHandler)
 	srv := httptest.NewServer(composite)
 	cleanup := func() {
-		eventbus.SetNotifyHook(nil)
+		eventbus.RemoveNotifyHook(hookHandle)
 		srv.Close()
 	}
 	return &TestServer{BaseURL: srv.URL, Server: srv, DB: db, JWT: jwtIssuer}, cleanup, nil
@@ -273,7 +285,10 @@ func NewTestServerWithServiceToken(db *sql.DB, serviceToken string) (*TestServer
 	}
 	notifier := stream.NewInProcessNotifier()
 	tap := stream.NewEventbusTap(notifier)
-	eventbus.SetNotifyHook(tap.Publish)
+	// Additive registration; removed by handle on cleanup so this
+	// server never clobbers a sibling server's tap on the shared,
+	// process-global eventbus notify registry (see StartTestServer).
+	hookHandle := eventbus.AddNotifyHook(tap.Publish)
 
 	flowHandler := router.Build(router.Deps{
 		DB:                 db,
@@ -299,7 +314,7 @@ func NewTestServerWithServiceToken(db *sql.DB, serviceToken string) (*TestServer
 	composite := newCompositeHandler(authHandler, flowHandler)
 	srv := httptest.NewServer(composite)
 	cleanup := func() {
-		eventbus.SetNotifyHook(nil)
+		eventbus.RemoveNotifyHook(hookHandle)
 		srv.Close()
 	}
 	return &TestServer{BaseURL: srv.URL, Server: srv, DB: db, JWT: jwtIssuer}, cleanup, nil

@@ -43,18 +43,34 @@ func TestWorkspaceStream(t *testing.T) {
 	// resync frame (i.e. the subscription is fully registered server-side)
 	// before creating the task, so the append hook is guaranteed to find
 	// at least this subscriber.
+	//
+	// The realtime frame is flushed to the reader during the POST handler
+	// (right after the create commits, before the HTTP response is
+	// written), so the reader can observe task.changed and finish the
+	// test while this POST is still in flight. Report the create's
+	// outcome on a channel and assert it on the main goroutine after the
+	// read loop instead of calling require.* here — a require failure in
+	// a goroutine that outlives the test panics with "Fail in goroutine
+	// after test has completed".
+	type postResult struct {
+		status int
+		body   []byte
+	}
+	writerDone := make(chan postResult, 1)
 	resyncSeen := make(chan struct{})
 	go func() {
 		select {
 		case <-resyncSeen:
 		case <-ctx.Done():
+			writerDone <- postResult{}
 			return
 		}
-		doJSON(t, http.MethodPost, testServerURL+"/tasks", tt.AccessToken, map[string]any{
+		status, body := doJSONStatus(t, http.MethodPost, testServerURL+"/tasks", tt.AccessToken, map[string]any{
 			"projectId": tt.ProjectPublicID,
 			"title":     "stream-triggering task",
 			"priority":  1,
-		}, nil)
+		})
+		writerDone <- postResult{status: status, body: body}
 	}()
 
 	// Reader: parse SSE frames until we see task.changed or time out.
@@ -110,6 +126,13 @@ func TestWorkspaceStream(t *testing.T) {
 
 	require.True(t, sawResync, "expected initial resync frame on connect")
 	require.True(t, sawTask, "expected a task.changed frame after POST /tasks")
+
+	// The create that produced the frame must itself have succeeded: a
+	// realtime event must never be delivered for a task write that did
+	// not commit. Assert the POST outcome here on the main goroutine.
+	res := <-writerDone
+	require.GreaterOrEqualf(t, res.status, 200, "POST /tasks -> %d body=%s", res.status, string(res.body))
+	require.Lessf(t, res.status, 300, "POST /tasks -> %d body=%s", res.status, string(res.body))
 }
 
 // TestWorkspaceStream_RequiresAuth asserts that an unauthenticated
