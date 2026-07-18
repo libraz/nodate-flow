@@ -22,7 +22,7 @@ import PasswordInput from '../features/auth/password-input';
 import { useCapabilities } from '../features/auth/use-capabilities';
 import { useCapsLockHint } from '../features/auth/use-caps-lock-hint';
 import { useRateLimitCountdown } from '../features/auth/use-rate-limit-countdown';
-import { userFromMe, type MeResponse } from '../features/auth/user-from-me';
+import { type MeResponse, userFromMe } from '../features/auth/user-from-me';
 import OAuthButtonRow from '../features/oauth/oauth-button-row';
 import type { ProblemJson } from '../lib/api-error';
 import { type AuthErrorI18nKey, mapAuthError, mapAuthThrown } from '../lib/auth-errors';

@@ -13,7 +13,7 @@
 import { useEffect, useState } from 'react';
 
 import { authStore } from '../features/auth/auth-store';
-import { userFromMe, type MeResponse } from '../features/auth/user-from-me';
+import { type MeResponse, userFromMe } from '../features/auth/user-from-me';
 import { refreshAccessToken, sdk } from '../lib/sdk';
 
 export type AuthBootstrapStatus = 'loading' | 'authenticated' | 'unauthenticated';

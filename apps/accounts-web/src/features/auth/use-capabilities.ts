@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react';
 import type { components } from '@nodate-flow/sdk';
+import { useEffect, useState } from 'react';
 import { sdk } from '../../lib/sdk';
 
 /** Boolean flags describing which auth methods are available. */

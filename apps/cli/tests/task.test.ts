@@ -16,8 +16,8 @@ import {
   executeSearchPaginated,
   executeTaskListPaginated,
   executeUpdate,
-  isValidPriority,
   isStateTransition,
+  isValidPriority,
   type SdkClientLike,
   STATE_TRANSITIONS,
 } from '../src/task-builders.js';

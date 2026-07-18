@@ -15,8 +15,8 @@ import { useTranslation } from 'react-i18next';
 
 import AuthCard from '../components/auth/auth-card';
 import { selectIsAuthenticated, useAuth } from '../features/auth/auth-store';
-import { resolveInviteErrorKey } from '../features/workspaces/invite-errors';
 import { useAcceptInvite, useInviteInfoQuery } from '../features/workspaces/invite-api';
+import { resolveInviteErrorKey } from '../features/workspaces/invite-errors';
 import { formatEpochDateTime } from '../lib/format';
 import { useSubmitGuard } from '../lib/use-submit-guard';
 

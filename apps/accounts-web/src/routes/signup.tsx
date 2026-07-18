@@ -18,7 +18,7 @@ import AuthCard from '../components/auth-card';
 import { type SignupFormValues, signupSchema } from '../features/auth/auth-schemas';
 import { authStore, selectIsAuthenticated, useAuth } from '../features/auth/auth-store';
 import PasswordInput from '../features/auth/password-input';
-import { userFromMe, type MeResponse } from '../features/auth/user-from-me';
+import { type MeResponse, userFromMe } from '../features/auth/user-from-me';
 import OAuthButtonRow from '../features/oauth/oauth-button-row';
 import type { ProblemJson } from '../lib/api-error';
 import { type AuthErrorI18nKey, mapAuthError, mapAuthThrown } from '../lib/auth-errors';

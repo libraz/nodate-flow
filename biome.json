@@ -108,6 +108,9 @@
         "rules": {
           "a11y": {
             "noLabelWithoutControl": "off"
+          },
+          "style": {
+            "useNamingConvention": "off"
           }
         }
       }
@@ -119,7 +122,8 @@
           "a11y": {
             "useSemanticElements": "off",
             "noNoninteractiveElementToInteractiveRole": "off",
-            "useFocusableInteractive": "off"
+            "useFocusableInteractive": "off",
+            "noNoninteractiveTabindex": "off"
           }
         }
       }

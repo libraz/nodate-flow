@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { userFromMe, type MeResponse } from '../user-from-me';
+import { type MeResponse, userFromMe } from '../user-from-me';
 
 function me(overrides: Partial<MeResponse> = {}): MeResponse {
   return {

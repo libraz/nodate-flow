@@ -17,7 +17,7 @@ import { useTranslation } from 'react-i18next';
 import AuthCard from '../components/auth-card';
 import { authStore } from '../features/auth/auth-store';
 import { useCapsLockHint } from '../features/auth/use-caps-lock-hint';
-import { userFromMe, type MeResponse } from '../features/auth/user-from-me';
+import { type MeResponse, userFromMe } from '../features/auth/user-from-me';
 import type { ProblemJson } from '../lib/api-error';
 import { type AuthErrorI18nKey, mapAuthError, mapAuthThrown } from '../lib/auth-errors';
 import { sdk } from '../lib/sdk';
