@@ -15,6 +15,7 @@ import (
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/generated"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/types"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/webhook"
+	"github.com/nodate-flow/nodate-flow/apps/flow-api/tests/helpers"
 )
 
 // TestWebhookRetryAndDeadLetter verifies the webhook delivery state
@@ -219,7 +220,7 @@ func TestWebhookFanoutDedupAndOccurredAt(t *testing.T) {
 	// adding wall-clock delay to the test.
 	eventPubID := types.New()
 	eventOccurredAt := time.Now().UTC().Truncate(time.Second).Add(-2 * time.Second)
-	res, err := testDB.ExecContext(ctx, `
+	res, err := helpers.ExecRetry(ctx, testDB, "test seed: insert event", `
 		INSERT INTO events (public_id, workspace_id, task_id, actor_user_id, type, payload_json, occurred_at)
 		VALUES (?, ?, NULL, ?, 'task.created', JSON_OBJECT(), ?)
 	`, eventPubID, wsInternalID, ownerInternalID, eventOccurredAt)

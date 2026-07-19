@@ -603,7 +603,7 @@ func asNumber(t *testing.T, v any) float64 {
 // payload is intentionally minimal.
 func insertSyntheticTaskEvent(t *testing.T, db *sql.DB, workspaceID, taskID uint32) uint32 {
 	t.Helper()
-	res, err := db.Exec(`
+	res, err := helpers.ExecRetry(context.Background(), db, "test seed: insert event", `
 		INSERT INTO events (public_id, workspace_id, task_id, type, payload_json, occurred_at)
 		VALUES (UUID_TO_BIN(UUID(), 0), ?, ?, 'test.synthetic.source', JSON_OBJECT(), NOW(3))`,
 		workspaceID, taskID,

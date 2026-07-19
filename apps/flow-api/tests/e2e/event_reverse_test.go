@@ -48,7 +48,7 @@ func reverseStatus(t *testing.T, tt *helpers.TestTenant, eventPublicID string) (
 func appendAgentEventForTask(t *testing.T, db *sql.DB, wsID, taskID, agentID uint32, eventType string) (uint64, string) {
 	t.Helper()
 	pub := types.New()
-	res, err := db.Exec(`
+	res, err := helpers.ExecRetry(context.Background(), db, "test seed: insert event", `
 		INSERT INTO events (public_id, workspace_id, task_id, actor_agent_id, type, payload_json, occurred_at)
 		VALUES (?, ?, ?, ?, ?, JSON_OBJECT(), NOW(3))`,
 		pub, wsID, taskID, agentID, eventType,
@@ -65,7 +65,7 @@ func appendAgentEventForTask(t *testing.T, db *sql.DB, wsID, taskID, agentID uin
 func appendUserEventForTask(t *testing.T, db *sql.DB, wsID, taskID, userID uint32, eventType string) string {
 	t.Helper()
 	pub := types.New()
-	_, err := db.Exec(`
+	_, err := helpers.ExecRetry(context.Background(), db, "test seed: insert event", `
 		INSERT INTO events (public_id, workspace_id, task_id, actor_user_id, type, payload_json, occurred_at)
 		VALUES (?, ?, ?, ?, ?, JSON_OBJECT(), NOW(3))`,
 		pub, wsID, taskID, userID, eventType,
@@ -81,7 +81,7 @@ func appendUserEventForTask(t *testing.T, db *sql.DB, wsID, taskID, userID uint3
 func appendSystemEventForTask(t *testing.T, db *sql.DB, wsID, taskID uint32, source, eventType string) string {
 	t.Helper()
 	pub := types.New()
-	_, err := db.Exec(`
+	_, err := helpers.ExecRetry(context.Background(), db, "test seed: insert event", `
 		INSERT INTO events (public_id, workspace_id, task_id, actor_system_source, type, payload_json, occurred_at)
 		VALUES (?, ?, ?, ?, ?, JSON_OBJECT(), NOW(3))`,
 		pub, wsID, taskID, source, eventType,

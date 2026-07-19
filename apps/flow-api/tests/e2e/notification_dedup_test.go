@@ -11,6 +11,7 @@ import (
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/generated"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/types"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/notification"
+	"github.com/nodate-flow/nodate-flow/apps/flow-api/tests/helpers"
 	"github.com/nodate-flow/nodate-flow/packages/go-shared/email"
 )
 
@@ -56,7 +57,7 @@ func TestNotificationFanoutDedup(t *testing.T) {
 	require.NoError(t, err)
 
 	// Insert a single event row and capture its internal id.
-	res, err := testDB.ExecContext(ctx, `
+	res, err := helpers.ExecRetry(ctx, testDB, "test seed: insert event", `
 		INSERT INTO events (public_id, workspace_id, task_id, actor_user_id, type, payload_json, occurred_at)
 		VALUES (?, ?, NULL, ?, 'task.created', JSON_OBJECT(), NOW())
 	`, types.New(), wsInternalID, actorInternalID)

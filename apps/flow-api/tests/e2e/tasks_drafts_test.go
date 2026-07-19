@@ -9,6 +9,7 @@
 package e2e
 
 import (
+	"context"
 	"database/sql"
 	"encoding/json"
 	"net/http"
@@ -16,6 +17,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/dbretry"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/types"
 	"github.com/nodate-flow/nodate-flow/apps/flow-api/tests/helpers"
 )
@@ -47,67 +49,95 @@ func seedRetroDraft(t *testing.T, db *sql.DB, tt *helpers.TestTenant, agentInter
 	wsID := lookupWorkspaceIDForDrafts(t, db, tt.WorkspacePublicID)
 	projectID := lookupProjectIDForDrafts(t, db, wsID, tt.ProjectPublicID)
 
-	tx, err := db.Begin()
-	require.NoError(t, err)
-	defer func() { _ = tx.Rollback() }()
-
-	// Source task (the "completed" task that prompts a retrospective).
+	// Public ids are stable across retries, so generate them once and
+	// reuse them inside the retried transaction body.
 	srcPub := types.New()
-	srcRes, err := tx.Exec(`
-		INSERT INTO tasks (
-			public_id, workspace_id, project_id, task_number,
-			title, description, derived_state, visibility
-		) VALUES (?, ?, ?, ?, ?, ?, 'open', 'public')`,
-		srcPub, wsID, projectID, nextTaskNumber(t, tx, projectID),
-		sourceTitle, sql.NullString{String: "Original task body", Valid: true},
-	)
-	require.NoError(t, err)
-	srcInternalID, err := srcRes.LastInsertId()
-	require.NoError(t, err)
-
-	// Retro draft task (the "from" side of the retro_of edge).
 	retroPub := types.New()
-	retroRes, err := tx.Exec(`
-		INSERT INTO tasks (
-			public_id, workspace_id, project_id, task_number,
-			title, description, derived_state, visibility
-		) VALUES (?, ?, ?, ?, ?, ?, 'open', 'public')`,
-		retroPub, wsID, projectID, nextTaskNumber(t, tx, projectID),
-		retroTitle, sql.NullString{String: "Drafted retrospective body", Valid: true},
-	)
-	require.NoError(t, err)
-	retroInternalID, err := retroRes.LastInsertId()
-	require.NoError(t, err)
-
-	// retro_of edge: from = the new retro task, to = the source task.
 	depPub := types.New()
-	_, err = tx.Exec(`
-		INSERT INTO task_dependencies (
-			public_id, workspace_id, from_task_id, to_task_id, kind, enabled
-		) VALUES (?, ?, ?, ?, 'retro_of', TRUE)`,
-		depPub, wsID, retroInternalID, srcInternalID,
-	)
-	require.NoError(t, err)
-
-	// task.retro.drafted event with actor_agent_id so the handler's
-	// FindRetroDraftAgent lookup resolves the agent attribution.
 	evtPub := types.New()
+
 	payload, err := json.Marshal(map[string]any{
 		"newTaskPublicId":    retroPub.UUID().String(),
 		"sourceTaskPublicId": srcPub.UUID().String(),
 		"draft":              true,
 	})
 	require.NoError(t, err)
-	_, err = tx.Exec(`
-		INSERT INTO events (
-			public_id, workspace_id, task_id, actor_agent_id,
-			type, payload_json, occurred_at
-		) VALUES (?, ?, ?, ?, 'task.retro.drafted', ?, NOW(3))`,
-		evtPub, wsID, retroInternalID, agentInternalID, payload,
-	)
-	require.NoError(t, err)
 
-	require.NoError(t, tx.Commit())
+	// Seed the three rows inside a single retryable transaction. Under
+	// heavy parallel load the events insert contends on FK locks and can
+	// deadlock against concurrent seeds; dbretry.InTx re-runs the whole
+	// begin/insert/commit in a fresh lock order rather than failing the
+	// seed. The closure must be re-entrant, so it returns errors instead
+	// of asserting, and re-reads the per-project task_number on each
+	// attempt.
+	err = dbretry.InTx(context.Background(), db, "test seed: retro draft", nil,
+		func(ctx context.Context, tx *sql.Tx) error {
+			// Source task (the "completed" task that prompts a retrospective).
+			srcNum, err := nextTaskNumberTx(ctx, tx, projectID)
+			if err != nil {
+				return err
+			}
+			srcRes, err := tx.ExecContext(ctx, `
+				INSERT INTO tasks (
+					public_id, workspace_id, project_id, task_number,
+					title, description, derived_state, visibility
+				) VALUES (?, ?, ?, ?, ?, ?, 'open', 'public')`,
+				srcPub, wsID, projectID, srcNum,
+				sourceTitle, sql.NullString{String: "Original task body", Valid: true},
+			)
+			if err != nil {
+				return err
+			}
+			srcInternalID, err := srcRes.LastInsertId()
+			if err != nil {
+				return err
+			}
+
+			// Retro draft task (the "from" side of the retro_of edge).
+			retroNum, err := nextTaskNumberTx(ctx, tx, projectID)
+			if err != nil {
+				return err
+			}
+			retroRes, err := tx.ExecContext(ctx, `
+				INSERT INTO tasks (
+					public_id, workspace_id, project_id, task_number,
+					title, description, derived_state, visibility
+				) VALUES (?, ?, ?, ?, ?, ?, 'open', 'public')`,
+				retroPub, wsID, projectID, retroNum,
+				retroTitle, sql.NullString{String: "Drafted retrospective body", Valid: true},
+			)
+			if err != nil {
+				return err
+			}
+			retroInternalID, err := retroRes.LastInsertId()
+			if err != nil {
+				return err
+			}
+
+			// retro_of edge: from = the new retro task, to = the source task.
+			if _, err := tx.ExecContext(ctx, `
+				INSERT INTO task_dependencies (
+					public_id, workspace_id, from_task_id, to_task_id, kind, enabled
+				) VALUES (?, ?, ?, ?, 'retro_of', TRUE)`,
+				depPub, wsID, retroInternalID, srcInternalID,
+			); err != nil {
+				return err
+			}
+
+			// task.retro.drafted event with actor_agent_id so the handler's
+			// FindRetroDraftAgent lookup resolves the agent attribution.
+			if _, err := tx.ExecContext(ctx, `
+				INSERT INTO events (
+					public_id, workspace_id, task_id, actor_agent_id,
+					type, payload_json, occurred_at
+				) VALUES (?, ?, ?, ?, 'task.retro.drafted', ?, NOW(3))`,
+				evtPub, wsID, retroInternalID, agentInternalID, payload,
+			); err != nil {
+				return err
+			}
+			return nil
+		})
+	require.NoError(t, err)
 
 	return srcPub.UUID().String(), retroPub.UUID().String()
 }
@@ -140,21 +170,23 @@ func lookupProjectIDForDrafts(t *testing.T, db *sql.DB, workspaceID uint32, proj
 	return id
 }
 
-// nextTaskNumber returns the next per-project task_number inside the
+// nextTaskNumberTx returns the next per-project task_number inside the
 // open transaction. Mirrors the AssignTaskNumber sqlc query without
-// importing the generated package.
-func nextTaskNumber(t *testing.T, tx *sql.Tx, projectID uint32) uint32 {
-	t.Helper()
+// importing the generated package. It returns an error rather than
+// asserting so it can run inside a dbretry.InTx closure that must be
+// re-entrant on a transient-error retry.
+func nextTaskNumberTx(ctx context.Context, tx *sql.Tx, projectID uint32) (uint32, error) {
 	var n sql.NullInt32
-	require.NoError(t, tx.QueryRow(
+	if err := tx.QueryRowContext(ctx,
 		`SELECT MAX(task_number) FROM tasks WHERE project_id = ?`,
 		projectID,
-	).Scan(&n))
-	if !n.Valid {
-		return 1
+	).Scan(&n); err != nil {
+		return 0, err
 	}
-	require.GreaterOrEqual(t, n.Int32, int32(0))
-	return uint32(n.Int32) + 1 //#nosec G115 -- bounded by non-negative INT task_number fixture above.
+	if !n.Valid || n.Int32 < 0 {
+		return 1, nil
+	}
+	return uint32(n.Int32) + 1, nil //#nosec G115 -- bounded by the non-negative check above.
 }
 
 // TestListRetroDraftsHappyPath seeds a retro draft and asserts the
