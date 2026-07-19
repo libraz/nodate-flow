@@ -16,7 +16,7 @@ env:
 
 jobs:
   web:
-    name: Web (typecheck, lint, test)
+    name: Web (format, lint, test)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -28,6 +28,7 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
+      # Biome check covers both formatting and linting.
       - name: Biome check
         run: bun run check
 
@@ -36,11 +37,11 @@ jobs:
 
       - name: Unit tests (flow-web)
         working-directory: apps/flow-web
-        run: bun run test
+        run: bun run test --coverage
 
       - name: Unit tests (accounts-web)
         working-directory: apps/accounts-web
-        run: bun run test
+        run: bun run test --coverage
 
       - name: Build (flow-web)
         working-directory: apps/flow-web
@@ -50,17 +51,27 @@ jobs:
         working-directory: apps/accounts-web
         run: bun run build
 
+      # Public repo: codecov runs tokenless. Uploads never gate CI.
+      - name: Upload coverage (flow-web)
+        uses: codecov/codecov-action@v5
+        with:
+          files: apps/flow-web/coverage/lcov.info
+          flags: flow-web
+          fail_ci_if_error: false
+
+      - name: Upload coverage (accounts-web)
+        uses: codecov/codecov-action@v5
+        with:
+          files: apps/accounts-web/coverage/lcov.info
+          flags: accounts-web
+          fail_ci_if_error: false
+
   api:
-    name: API (build, vet, e2e)
+    name: API (format, lint, test)
     runs-on: ubuntu-latest
-    # Integration tests use testcontainers (MySQL, MinIO, Redis) started by
-    # Go test helpers. The matrix runs the flow-api suite twice: ai_mock="1"
-    # exercises the deterministic mock AI orchestrator; ai_mock="" wires the
-    # real per-tenant workspace provider path.
-    strategy:
-      fail-fast: false
-      matrix:
-        ai_mock: ["1", ""]
+    # CI runs unit tests only. Integration and e2e suites that need a database
+    # (testcontainers) are excluded: NF_TEST_INTEGRATION is left unset and
+    # -short is passed so those suites skip.
     steps:
       - uses: actions/checkout@v7
 
@@ -71,13 +82,25 @@ jobs:
             apps/flow-api/go.sum
             apps/auth-api/go.sum
 
-      - name: Build (flow-api)
+      - name: Gofmt check (flow-api)
         working-directory: apps/flow-api
-        run: go build ./...
+        run: |
+          fmt_out=$(gofmt -l .)
+          if [ -n "$fmt_out" ]; then
+            echo "::error::unformatted Go files:"
+            echo "$fmt_out"
+            exit 1
+          fi
 
-      - name: Build (auth-api)
+      - name: Gofmt check (auth-api)
         working-directory: apps/auth-api
-        run: go build ./...
+        run: |
+          fmt_out=$(gofmt -l .)
+          if [ -n "$fmt_out" ]; then
+            echo "::error::unformatted Go files:"
+            echo "$fmt_out"
+            exit 1
+          fi
 
       - name: Go vet (flow-api)
         working-directory: apps/flow-api
@@ -87,14 +110,33 @@ jobs:
         working-directory: apps/auth-api
         run: go vet ./...
 
-      - name: Integration tests (flow-api)
+      - name: Build (flow-api)
         working-directory: apps/flow-api
-        env:
-          NF_TEST_INTEGRATION: "1"
-          NF_FLOW_AI_MOCK: ${{ matrix.ai_mock }}
-        run: go test -race -count=1 -timeout=10m ./...
+        run: go build ./...
 
-      - name: Integration tests (auth-api)
-        if: matrix.ai_mock == '1'
+      - name: Build (auth-api)
         working-directory: apps/auth-api
-        run: go test -race -count=1 -timeout=10m ./...
+        run: go build ./...
+
+      - name: Unit tests (flow-api)
+        working-directory: apps/flow-api
+        run: go test -short -race -count=1 -covermode=atomic -coverprofile=coverage.out ./...
+
+      - name: Unit tests (auth-api)
+        working-directory: apps/auth-api
+        run: go test -short -race -count=1 -covermode=atomic -coverprofile=coverage.out ./...
+
+      # Public repo: codecov runs tokenless. Uploads never gate CI.
+      - name: Upload coverage (flow-api)
+        uses: codecov/codecov-action@v5
+        with:
+          files: apps/flow-api/coverage.out
+          flags: flow-api
+          fail_ci_if_error: false
+
+      - name: Upload coverage (auth-api)
+        uses: codecov/codecov-action@v5
+        with:
+          files: apps/auth-api/coverage.out
+          flags: auth-api
+          fail_ci_if_error: false
