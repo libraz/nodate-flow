@@ -129,7 +129,7 @@ build-accounts-web:
 
 # ---------- test ----------
 
-.PHONY: test test-api test-api-mock test-api-real test-web test-accounts-web test-ui test-sdk test-e2e test-contract test-openapi-diff test-schema-collisions test-schema-diff lighthouse
+.PHONY: test test-api test-api-mock test-api-real test-web test-accounts-web test-ui test-sdk test-e2e test-contract test-openapi-diff test-schema-collisions test-schema-diff test-core-contract lighthouse
 test: test-api test-auth-api test-web test-accounts-web test-ui test-sdk ## Run unit/integration tests (Go + TS)
 
 test-api: test-api-mock test-api-real ## Go tests (flow) — both NF_FLOW_AI_MOCK on and off
@@ -169,6 +169,11 @@ test-schema-collisions: ## Fail if the merged OpenAPI spec has schema name colli
 
 test-schema-diff: ## Fail if sql/schema.sql is out of sync with sql/core/** and sql/flow/**
 	./scripts/schema-diff.sh
+
+test-core-contract: ## Check a database against the core contract (NF_CONFORMANCE_DSN or NF_DB_* vars)
+	bash sql/core/conformance/run.sh \
+	  --dsn "$${NF_CONFORMANCE_DSN:-$(NF_DB_USER):$(NF_DB_PASSWORD)@$(NF_DB_HOST):$(NF_DB_PORT)/$(NF_DB_NAME)}" \
+	  --mode $${NF_CONFORMANCE_MODE:-schema}
 
 lighthouse: build-web ## Run Lighthouse CI (a11y 95+, perf 70+)
 	$(PKG_X) @lhci/cli autorun

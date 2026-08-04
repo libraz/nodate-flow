@@ -66,6 +66,46 @@ jobs:
           flags: accounts-web
           fail_ci_if_error: false
 
+  schema:
+    name: Schema (drift, core contract)
+    runs-on: ubuntu-latest
+    services:
+      mysql:
+        image: mysql:9.6
+        env:
+          MYSQL_ROOT_PASSWORD: conformance
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -uroot -pconformance"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=20
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Schema drift
+        run: bash scripts/schema-diff.sh
+
+      # The contract is checked against both shapes a deployment can take.
+      # Core alone is what an implementor that hosts no task layer applies,
+      # and it is the shape most likely to rot unnoticed, because nothing
+      # in this repository runs on it.
+      - name: Core contract (core layer only)
+        run: |
+          mysql -h 127.0.0.1 -uroot -pconformance -e 'CREATE DATABASE core_only'
+          bash sql/build-schema.sh core \
+            | mysql -h 127.0.0.1 -uroot -pconformance core_only
+          bash sql/core/conformance/run.sh \
+            --dsn 'root:conformance@127.0.0.1:3306/core_only' --mode all
+
+      - name: Core contract (core + flow layers)
+        run: |
+          mysql -h 127.0.0.1 -uroot -pconformance -e 'CREATE DATABASE full_stack'
+          mysql -h 127.0.0.1 -uroot -pconformance full_stack < sql/schema.sql
+          bash sql/core/conformance/run.sh \
+            --dsn 'root:conformance@127.0.0.1:3306/full_stack' --mode all
+
   api:
     name: API (format, lint, test)
     runs-on: ubuntu-latest
