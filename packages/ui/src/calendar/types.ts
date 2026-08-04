@@ -8,9 +8,9 @@
  * these types at the boundary.
  *
  * The enums below track the live MySQL schema (unified calendar + task
- * integration). Calendar sharing is modelled via subscriptions, not via
- * a dedicated `shared` kind, so `CalendarKind` stays at
- * `personal | system`.
+ * integration). Sharing is a `calendar_members` grant, not a calendar
+ * kind, so `CalendarKind` stays at `personal | system` — it says where
+ * the contents come from, not who can see them.
  */
 
 export type CalendarKind = 'personal' | 'system';

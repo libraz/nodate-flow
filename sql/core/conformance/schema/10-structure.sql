@@ -98,6 +98,36 @@ CALL nf_conformance_assert(
      AND column_name = 'calendar_id'),
   'calendar_members must be unique per (calendar_id, user_id)');
 
+-- Sharing is membership, not a calendar kind. An implementation that
+-- added 'shared' to the enum would have two encodings of one fact, and
+-- the redundant one does not carry the behaviour: a calendar labelled
+-- shared but still naming an owner is deleted along with that user.
+CALL nf_conformance_assert(
+  (SELECT column_type = "enum('personal','system')"
+   FROM information_schema.columns
+   WHERE table_schema = DATABASE()
+     AND table_name = 'calendars' AND column_name = 'kind'),
+  'calendars.kind must remain personal and system only; sharing is calendar_members');
+
+-- A calendar a group shares has to be able to belong to no one, or the
+-- owner FK cascade takes everyone else's history when one member goes.
+CALL nf_conformance_assert(
+  (SELECT is_nullable = 'YES'
+   FROM information_schema.columns
+   WHERE table_schema = DATABASE()
+     AND table_name = 'calendars' AND column_name = 'owner_user_id'),
+  'calendars.owner_user_id must be nullable so a shared calendar can outlive any one member');
+
+-- Events, by contrast, always belong to someone: the owner is what
+-- decides whose layer and colour they appear on, so there is no
+-- unowned event for an importer to invent.
+CALL nf_conformance_assert(
+  (SELECT is_nullable = 'NO'
+   FROM information_schema.columns
+   WHERE table_schema = DATABASE()
+     AND table_name = 'calendar_events' AND column_name = 'owner_user_id'),
+  'calendar_events.owner_user_id must be NOT NULL so every event lands on a layer');
+
 -- The guard triggers are part of the contract, not an optional extra: an
 -- implementation that loaded the tables but skipped them would accept
 -- writes this document says are refused.

@@ -51,6 +51,12 @@ the `task_role_key` generated column, and the projection guard triggers. An
 implementation does not need to re-derive these rules; it needs to not work
 around them.
 
+`owner_user_id` is required, and it decides whose layer and colour the
+event appears on. There is no such thing as an event belonging to the
+calendar rather than to a person: a writer importing from somewhere that
+has no notion of an owner files the event under the acting user, which is
+the honest answer — that user is who put it there.
+
 One rule the schema cannot enforce for itself: `show_as` and `flexibility`
 are separate axes and must stay that way. `show_as` is iCalendar `TRANSP` —
 whether the time reads as taken — and is what every external free/busy
@@ -137,6 +143,16 @@ were never given.
 
 Workspace membership is a prerequisite for both, not a substitute: a
 workspace may hold calendars whose audiences do not coincide.
+
+There is no `shared` calendar kind, and an implementation must not add one.
+`calendars.kind` says where the contents come from — written by people, or
+pulled from a provider feed — and how many people can reach a calendar is
+already a count of `calendar_members` rows. Encoding the same fact twice
+gives the two encodings a way to disagree, and the disagreement is not
+cosmetic: `calendars.owner_user_id` cascades on delete, so a calendar
+carrying a `shared` label *and* an owner still vanishes when that one person
+is removed. A calendar a group shares leaves `owner_user_id` NULL; that is
+the whole difference, and it is the difference that has teeth.
 
 Resolve the calendar id and check the grant in the same function. Splitting
 them is how an authorization check goes missing — not because someone
