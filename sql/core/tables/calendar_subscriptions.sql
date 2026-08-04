@@ -1,7 +1,12 @@
 -- ====================================
 -- calendar_subscriptions
--- Per-user display preferences for a calendar (color, visibility).
--- Not an ACL axis — event-level visibility is the only ws-internal ACL.
+-- One user's private display preferences for a calendar: their own colour
+-- override and whether the layer is toggled on in their sidebar.
+--
+-- Not an ACL axis, and deliberately so. Access lives in calendar_members;
+-- a row here grants nothing and its absence denies nothing. The split
+-- keeps a personal preference — which its own user changes freely — from
+-- being a permission write.
 -- ====================================
 CREATE TABLE calendar_subscriptions (
   id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY COMMENT 'Internal PK, never exposed',

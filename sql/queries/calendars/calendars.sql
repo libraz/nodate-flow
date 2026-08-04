@@ -36,7 +36,13 @@ WHERE public_id = ?
 LIMIT 1;
 
 -- name: ListCalendarsForUser :many
--- List all calendars a user subscribes to within a workspace.
+-- List the calendars a user may reach within a workspace.
+--
+-- Driven from calendar_members, because that is what grants access. The
+-- subscription is a LEFT JOIN: display preferences are optional, and a
+-- member who never touched their sidebar still has to see the calendar.
+-- Defaults come from the membership so an absent subscription renders the
+-- same as a default one.
 SELECT
   c.id,
   c.public_id,
@@ -47,18 +53,24 @@ SELECT
   c.cover_url,
   c.owner_user_id,
   c.system_slug,
-  cs.display_color,
-  cs.visible,
-  cs.sort_weight AS subscription_sort_weight,
+  cm.role,
+  cm.member_color,
+  COALESCE(cs.display_color, cm.member_color) AS display_color,
+  COALESCE(cs.visible, TRUE)                  AS visible,
+  COALESCE(cs.sort_weight, cm.sort_weight)    AS subscription_sort_weight,
   c.updated_at,
   c.created_at
-FROM calendar_subscriptions cs
+FROM calendar_members cm
 INNER JOIN calendars c
-  ON c.id = cs.calendar_id AND c.enabled = TRUE
-WHERE cs.user_id = ?
-  AND cs.workspace_id = ?
-  AND cs.enabled = TRUE
-ORDER BY cs.sort_weight ASC, c.created_at ASC;
+  ON c.id = cm.calendar_id AND c.enabled = TRUE
+LEFT JOIN calendar_subscriptions cs
+  ON cs.calendar_id = cm.calendar_id
+ AND cs.user_id = cm.user_id
+ AND cs.enabled = TRUE
+WHERE cm.user_id = ?
+  AND cm.workspace_id = ?
+  AND cm.enabled = TRUE
+ORDER BY COALESCE(cs.sort_weight, cm.sort_weight) ASC, c.created_at ASC;
 
 -- name: PatchCalendar :exec
 -- Patch mutable calendar fields. NULL params leave columns untouched.
@@ -117,7 +129,7 @@ LIMIT 1;
 -- currently subscribed to. Used by the "Add teammate calendar" picker in
 -- the right-rail Calendars panel. Excludes:
 --   - calendars owned by the actor (their own personal calendar)
---   - calendars where an active calendar_subscriptions row already exists
+--   - calendars the actor already holds a calendar_members grant on
 --     for the actor
 --   - non-personal calendars (system/holiday/etc — those have their own UI)
 -- Owners must still be active workspace members so we don't surface
@@ -149,10 +161,10 @@ WHERE c.workspace_id = ?
   AND c.enabled = TRUE
   AND c.owner_user_id <> CAST(sqlc.arg('actor_id') AS UNSIGNED)
   AND NOT EXISTS (
-    SELECT 1 FROM calendar_subscriptions cs
-    WHERE cs.calendar_id = c.id
-      AND cs.user_id = CAST(sqlc.arg('actor_id') AS UNSIGNED)
-      AND cs.enabled = TRUE
+    SELECT 1 FROM calendar_members cm
+    WHERE cm.calendar_id = c.id
+      AND cm.user_id = CAST(sqlc.arg('actor_id') AS UNSIGNED)
+      AND cm.enabled = TRUE
   )
 ORDER BY uo.display_name ASC, c.created_at ASC
 LIMIT 200;

@@ -173,31 +173,31 @@ func CreateCalendar(deps Deps) func(context.Context, *CreateCalendarInput) (*Cre
 			return nil, httpErr(apierrors.CalendarCalendarStoreWriteInterrupted)
 		}
 
-		subPublicID := types.New()
-		_, err = deps.CalendarQueries.CreateCalendarSubscription(ctx, calendar.CreateCalendarSubscriptionParams{
-			PublicID:     subPublicID,
-			WorkspaceID:  wsID,
-			CalendarID:   uint32(calID), //#nosec G115 -- LastInsertId for calendars.id (BIGINT UNSIGNED), fits uint32 within realistic deployments
-			UserID:       actorID,
-			DisplayColor: input.Body.Color,
+		// The creator becomes the calendar's owner member. Without this row
+		// the calendar would exist with nobody able to reach it: access is
+		// calendar_members, and every resolution helper reads it.
+		_, err = deps.CalendarQueries.UpsertCalendarMember(ctx, calendar.UpsertCalendarMemberParams{
+			PublicID:    types.New(),
+			WorkspaceID: wsID,
+			CalendarID:  uint32(calID), //#nosec G115 -- LastInsertId for calendars.id (BIGINT UNSIGNED), fits uint32 within realistic deployments
+			UserID:      actorID,
+			Role:        calendar.CalendarMembersRoleOwner,
+			MemberColor: input.Body.Color,
 		})
 		if err != nil {
-			return nil, httpErr(apierrors.CalendarSubscriptionStoreWriteInterrupted)
+			return nil, httpErr(apierrors.CalendarCalendarStoreWriteInterrupted)
 		}
 
 		out := &CreateCalendarOutput{}
 		out.Body = CalendarResponse{
-			ID:          calPublicID.String(),
-			Kind:        input.Body.Kind,
-			Name:        input.Body.Name,
-			Description: input.Body.Description,
-			Color:       input.Body.Color,
-			CoverURL:    input.Body.CoverURL,
-			SystemSlug:  input.Body.SystemSlug,
-			// calendar_subscriptions.role has been dropped. Creator is
-			// the calendar owner (cal.owner_user_id); DTO surfaces "owner" to
-			// preserve SDK shape.
-			Role:                   "owner",
+			ID:                     calPublicID.String(),
+			Kind:                   input.Body.Kind,
+			Name:                   input.Body.Name,
+			Description:            input.Body.Description,
+			Color:                  input.Body.Color,
+			CoverURL:               input.Body.CoverURL,
+			SystemSlug:             input.Body.SystemSlug,
+			Role:                   string(calendar.CalendarMembersRoleOwner),
 			MemberColor:            input.Body.Color,
 			DisplayColor:           input.Body.Color,
 			Visible:                true,
@@ -222,13 +222,13 @@ func GetCalendar(deps Deps) func(context.Context, *GetCalendarInput) (*GetCalend
 		if err != nil {
 			return nil, err
 		}
-		cal, sub, err := resolveCalendar(ctx, deps.CalendarQueries, wsID, actorID, input.CalID)
+		cal, member, err := resolveCalendar(ctx, deps.CalendarQueries, wsID, actorID, input.CalID)
 		if err != nil {
 			return nil, err
 		}
 
 		out := &GetCalendarOutput{}
-		out.Body = calendarFromRow(cal, sub)
+		out.Body = calendarFromRow(cal, member, findSubscription(ctx, deps.CalendarQueries, cal.ID, actorID))
 		return out, nil
 	}
 }
@@ -241,14 +241,12 @@ func PatchCalendar(deps Deps) func(context.Context, *PatchCalendarInput) (*Patch
 		if err != nil {
 			return nil, err
 		}
-		cal, sub, err := resolveCalendar(ctx, deps.CalendarQueries, wsID, actorID, input.CalID)
+		// Editing the calendar itself — its name, colour, cover — is
+		// administration rather than use, so an editor who may add events
+		// still may not rename the calendar out from under everyone.
+		cal, member, err := resolveCalendarAdmin(ctx, deps.CalendarQueries, wsID, actorID, input.CalID)
 		if err != nil {
 			return nil, err
-		}
-		// Only the calendar owner can modify calendar metadata.
-		// Subscription role has been dropped; owner-only is the new gate.
-		if !cal.OwnerUserID.Valid || cal.OwnerUserID.Int32 != int32(actorID) { //#nosec G115 -- actor user id sourced from session, fits int32 within realistic deployments
-			return nil, httpErr(apierrors.CalendarCalendarOwnerRoleRequired)
 		}
 
 		patchName := sql.NullString{}
@@ -290,7 +288,7 @@ func PatchCalendar(deps Deps) func(context.Context, *PatchCalendarInput) (*Patch
 			return nil, httpErr(apierrors.CalendarCalendarStoreReadInterrupted)
 		}
 		out := &PatchCalendarOutput{}
-		out.Body = calendarFromRow(cal, sub)
+		out.Body = calendarFromRow(cal, member, findSubscription(ctx, deps.CalendarQueries, cal.ID, actorID))
 
 		_ = appendCalendarEvent(ctx, deps.DB, wsID, "calendar.updated", &actorID, map[string]any{
 			"calendarId": input.CalID,
@@ -307,14 +305,14 @@ func DeleteCalendar(deps Deps) func(context.Context, *DeleteCalendarInput) (*Del
 		if err != nil {
 			return nil, err
 		}
-		cal, _, err := resolveCalendar(ctx, deps.CalendarQueries, wsID, actorID, input.CalID)
+		// Deleting the calendar is the one action a manager does not get:
+		// managers curate membership and content, owners decide whether the
+		// calendar exists.
+		cal, _, err := resolveCalendarAtLeast(
+			ctx, deps.CalendarQueries, wsID, actorID, input.CalID, calendar.CalendarMembersRoleOwner,
+		)
 		if err != nil {
 			return nil, err
-		}
-		// Subscription role has been dropped; fall back to calendar
-		// ownership (cal.owner_user_id).
-		if !cal.OwnerUserID.Valid || cal.OwnerUserID.Int32 != int32(actorID) { //#nosec G115 -- actor user id sourced from session, fits int32 within realistic deployments
-			return nil, httpErr(apierrors.CalendarCalendarOwnerRoleRequired)
 		}
 		_ = cal
 
@@ -341,20 +339,13 @@ func DeleteCalendar(deps Deps) func(context.Context, *DeleteCalendarInput) (*Del
 // --- Mapping helpers ---
 
 func calendarFromListRow(r calendar.ListCalendarsForUserRow) CalendarResponse {
-	// Subscription role + member_color have been dropped. Expose a
-	// stable DTO shape: derive "role" from calendar ownership, and fall back
-	// to display_color for member_color so SDK consumers keep rendering.
-	role := "editor"
-	if r.OwnerUserID.Valid {
-		role = "owner"
-	}
 	resp := CalendarResponse{
 		ID:                     r.PublicID.String(),
 		Kind:                   string(r.Kind),
 		Name:                   r.Name,
 		Color:                  r.Color,
-		Role:                   role,
-		MemberColor:            r.DisplayColor,
+		Role:                   string(r.Role),
+		MemberColor:            r.MemberColor,
 		DisplayColor:           r.DisplayColor,
 		Visible:                r.Visible,
 		SubscriptionSortWeight: r.SubscriptionSortWeight,
@@ -367,23 +358,33 @@ func calendarFromListRow(r calendar.ListCalendarsForUserRow) CalendarResponse {
 	return resp
 }
 
-func calendarFromRow(c calendar.FindCalendarByPublicIdRow, s calendar.FindCalendarSubscriptionRow) CalendarResponse {
-	// Subscription role + member_color have been dropped. Derive "role"
-	// from calendar ownership; fall back to display_color for member_color.
-	role := "editor"
-	if c.OwnerUserID.Valid {
-		role = "owner"
+// calendarFromRow renders a calendar for a single member. sub is nil when
+// the member has never set display preferences for it, in which case the
+// membership supplies the defaults — the same values the list query
+// COALESCEs to, so the two endpoints cannot disagree.
+func calendarFromRow(
+	c calendar.FindCalendarByPublicIdRow,
+	m calendar.FindCalendarMemberRow,
+	sub *calendar.FindCalendarSubscriptionRow,
+) CalendarResponse {
+	displayColor := m.MemberColor
+	visible := true
+	var sortWeight int32
+	if sub != nil {
+		displayColor = sub.DisplayColor
+		visible = sub.Visible
+		sortWeight = sub.SortWeight
 	}
 	resp := CalendarResponse{
 		ID:                     c.PublicID.String(),
 		Kind:                   string(c.Kind),
 		Name:                   c.Name,
 		Color:                  c.Color,
-		Role:                   role,
-		MemberColor:            s.DisplayColor,
-		DisplayColor:           s.DisplayColor,
-		Visible:                s.Visible,
-		SubscriptionSortWeight: s.SortWeight,
+		Role:                   string(m.Role),
+		MemberColor:            m.MemberColor,
+		DisplayColor:           displayColor,
+		Visible:                visible,
+		SubscriptionSortWeight: sortWeight,
 		CreatedAt:              c.CreatedAt.Unix(),
 	}
 	resp.Description = dbtype.PtrFromNullString(c.Description)

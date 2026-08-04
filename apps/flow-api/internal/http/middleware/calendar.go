@@ -20,7 +20,7 @@ type calCtxKey int
 const (
 	ctxKeyCalendarID calCtxKey = iota
 	ctxKeyCalendarIDPublic
-	ctxKeySubscription
+	ctxKeyCalendarMember
 )
 
 // CalendarContext is the calendar metadata injected by RequireCalendarMember.
@@ -29,10 +29,14 @@ type CalendarContext struct {
 	PublicID uuid.UUID
 }
 
-// SubscriptionContext holds the caller's subscription (membership) info for the
-// resolved calendar. It is populated by RequireCalendarMember.
-type SubscriptionContext struct {
+// MemberContext holds the caller's grant on the resolved calendar. It is
+// populated by RequireCalendarMember.
+type MemberContext struct {
 	ID uint32
+	// Role is the calendar_members.role value: owner, manager, editor or
+	// viewer. The middleware only proves membership; a handler that needs
+	// more than read access checks this.
+	Role string
 }
 
 // CalendarFromContext extracts the calendar metadata established by
@@ -46,21 +50,28 @@ func CalendarFromContext(ctx context.Context) (CalendarContext, bool) {
 	return CalendarContext{ID: id, PublicID: pub}, true
 }
 
-// SubscriptionFromContext extracts the caller's subscription info established
-// by RequireCalendarMember. Returns false when the middleware has not run or
-// the user has no subscription.
-func SubscriptionFromContext(ctx context.Context) (SubscriptionContext, bool) {
-	v, ok := ctx.Value(ctxKeySubscription).(SubscriptionContext)
+// MemberFromContext extracts the caller's calendar grant established by
+// RequireCalendarMember. Returns false when the middleware has not run.
+func MemberFromContext(ctx context.Context) (MemberContext, bool) {
+	v, ok := ctx.Value(ctxKeyCalendarMember).(MemberContext)
 	return v, ok
 }
 
 // RequireCalendarMember returns a middleware that resolves {calId} from the
-// URL, verifies the actor holds an active subscription to the calendar, and
-// stores both the internal calendar id and the subscription info on the
-// request context.
+// URL, verifies the actor holds an active grant on the calendar, and stores
+// the internal calendar id and the grant on the request context.
+//
+// Membership is calendar_members, not calendar_subscriptions: a
+// subscription is one user's display preference and grants nothing, so
+// reading it here would let anyone who once toggled a sidebar colour reach
+// a calendar they were never given.
+//
+// This gate proves membership only. Role floors live in the handlers,
+// because what counts as enough differs per endpoint and a middleware
+// cannot see which one it is fronting.
 func RequireCalendarMember(db ACLDB) func(http.Handler) http.Handler {
 	const calQuery = `SELECT id FROM calendars WHERE public_id = ? AND enabled = TRUE LIMIT 1`
-	const subQuery = `SELECT id FROM calendar_subscriptions WHERE calendar_id = ? AND user_id = ? AND enabled = TRUE LIMIT 1`
+	const memberQuery = `SELECT id, role FROM calendar_members WHERE calendar_id = ? AND user_id = ? AND enabled = TRUE LIMIT 1`
 
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -87,9 +98,9 @@ func RequireCalendarMember(db ACLDB) func(http.Handler) http.Handler {
 				return
 			}
 
-			// Verify the actor has an active subscription (membership).
-			var subID uint32
-			if err := db.QueryRowContext(r.Context(), subQuery, calID, actorID).Scan(&subID); err != nil {
+			var memberID uint32
+			var role string
+			if err := db.QueryRowContext(r.Context(), memberQuery, calID, actorID).Scan(&memberID, &role); err != nil {
 				if errors.Is(err, sql.ErrNoRows) {
 					writeSpecError(w, apierrors.CalendarCalendarAccessDenied)
 					return
@@ -100,7 +111,7 @@ func RequireCalendarMember(db ACLDB) func(http.Handler) http.Handler {
 
 			ctx := context.WithValue(r.Context(), ctxKeyCalendarID, calID)
 			ctx = context.WithValue(ctx, ctxKeyCalendarIDPublic, pub)
-			ctx = context.WithValue(ctx, ctxKeySubscription, SubscriptionContext{ID: subID})
+			ctx = context.WithValue(ctx, ctxKeyCalendarMember, MemberContext{ID: memberID, Role: role})
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})
 	}

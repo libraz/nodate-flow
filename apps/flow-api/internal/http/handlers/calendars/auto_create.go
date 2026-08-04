@@ -47,13 +47,16 @@ func EnsurePersonalCalendar(ctx context.Context, cq *calendar.Queries, workspace
 		return err
 	}
 
-	subPublicID := types.New()
-	_, err = cq.CreateCalendarSubscription(ctx, calendar.CreateCalendarSubscriptionParams{
-		PublicID:     subPublicID,
-		WorkspaceID:  workspaceID,
-		CalendarID:   uint32(calID), //#nosec G115 -- LastInsertId for calendars.id (BIGINT UNSIGNED), fits uint32 within realistic deployments
-		UserID:       userID,
-		DisplayColor: "#4285F4",
+	// The calendar is this user's own, so they own it. Access lives in
+	// calendar_members; without this row the calendar would be created and
+	// immediately unreachable.
+	_, err = cq.UpsertCalendarMember(ctx, calendar.UpsertCalendarMemberParams{
+		PublicID:    types.New(),
+		WorkspaceID: workspaceID,
+		CalendarID:  uint32(calID), //#nosec G115 -- LastInsertId for calendars.id (BIGINT UNSIGNED), fits uint32 within realistic deployments
+		UserID:      userID,
+		Role:        calendar.CalendarMembersRoleOwner,
+		MemberColor: "#4285F4",
 	})
 	return err
 }
@@ -113,16 +116,17 @@ func SubscribeHolidayCalendar(ctx context.Context, cq *calendar.Queries, workspa
 		return err
 	}
 
-	// Subscribe user (idempotent — duplicate key is tolerated).
-	subPublicID := types.New()
-	_, err = cq.CreateCalendarSubscription(ctx, calendar.CreateCalendarSubscriptionParams{
-		PublicID:     subPublicID,
-		WorkspaceID:  workspaceID,
-		CalendarID:   calID,
-		UserID:       userID,
-		DisplayColor: "#EA4335",
+	// Grant read access to the shared system calendar. Viewer, not owner:
+	// its contents come from the holiday provider, and nobody edits it.
+	// The upsert makes a repeat call a no-op.
+	_, err = cq.UpsertCalendarMember(ctx, calendar.UpsertCalendarMemberParams{
+		PublicID:    types.New(),
+		WorkspaceID: workspaceID,
+		CalendarID:  calID,
+		UserID:      userID,
+		Role:        calendar.CalendarMembersRoleViewer,
+		MemberColor: "#EA4335",
 	})
-	// Duplicate subscription is fine.
 	if err != nil {
 		var mysqlErr interface{ Number() uint16 }
 		if errors.As(err, &mysqlErr) && mysqlErr.Number() == 1062 {

@@ -33,12 +33,20 @@ func TestMCPListTasksUsesVisibilityFilter(t *testing.T) {
 	}
 }
 
-func TestMCPCalendarResolverRequiresSubscription(t *testing.T) {
+// TestMCPCalendarResolverRequiresMembership proves the MCP calendar
+// resolver gates on calendar_members. Reading calendar_subscriptions here
+// would be a hole rather than a rename: a subscription is a display
+// preference, so anyone who ever toggled a sidebar colour would keep
+// access to a calendar they were never granted.
+func TestMCPCalendarResolverRequiresMembership(t *testing.T) {
 	t.Parallel()
 
 	src := readMCPSource(t, "acl.go")
-	if !strings.Contains(src, "FindCalendarSubscription") {
-		t.Fatalf("resolveCalendar must require a calendar subscription")
+	if !strings.Contains(src, "FindCalendarMember") {
+		t.Fatalf("resolveCalendar must require a calendar_members grant")
+	}
+	if strings.Contains(src, "FindCalendarSubscription") {
+		t.Fatalf("resolveCalendar must not gate on calendar_subscriptions, which grants nothing")
 	}
 }
 

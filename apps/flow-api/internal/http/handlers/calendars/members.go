@@ -2,6 +2,7 @@ package calendars
 
 import (
 	"context"
+	"database/sql"
 
 	"github.com/google/uuid"
 
@@ -103,14 +104,9 @@ func AddMember(deps Deps) func(context.Context, *AddMemberInput) (*AddMemberOutp
 		if err != nil {
 			return nil, err
 		}
-		cal, _, err := resolveCalendar(ctx, deps.CalendarQueries, wsID, actorID, input.CalID)
+		cal, _, err := resolveCalendarAdmin(ctx, deps.CalendarQueries, wsID, actorID, input.CalID)
 		if err != nil {
 			return nil, err
-		}
-		// Only the calendar owner can add members.
-		// Subscription role has been dropped; owner-only is the new gate.
-		if !cal.OwnerUserID.Valid || cal.OwnerUserID.Int32 != int32(actorID) { //#nosec G115 -- actor user id sourced from session, fits int32 within realistic deployments
-			return nil, httpErr(apierrors.CalendarCalendarOwnerRoleRequired)
 		}
 
 		user, err := deps.Queries.FindUserByEmail(ctx, input.Body.Email)
@@ -118,8 +114,7 @@ func AddMember(deps Deps) func(context.Context, *AddMemberInput) (*AddMemberOutp
 			return nil, httpErr(apierr.SpecForErrNoRows(err, apierrors.CalendarMemberUserNotFound, apierrors.CalendarMemberStoreReadInterrupted))
 		}
 
-		// Check if already subscribed.
-		_, err = deps.CalendarQueries.FindCalendarSubscription(ctx, calendar.FindCalendarSubscriptionParams{
+		_, err = deps.CalendarQueries.FindCalendarMember(ctx, calendar.FindCalendarMemberParams{
 			CalendarID: cal.ID,
 			UserID:     user.ID,
 		})
@@ -127,23 +122,26 @@ func AddMember(deps Deps) func(context.Context, *AddMemberInput) (*AddMemberOutp
 			return nil, httpErr(apierrors.CalendarMemberAlreadySubscribed)
 		}
 
-		// Determine member color based on current member count.
-		members, err := deps.CalendarQueries.ListCalendarSubscribers(ctx, calendar.ListCalendarSubscribersParams{
+		// Pick the next colour off the palette by member count, so members
+		// added in order are visually distinct until the palette wraps.
+		count, err := deps.CalendarQueries.CountCalendarMembers(ctx, calendar.CountCalendarMembersParams{
 			CalendarID:  cal.ID,
 			WorkspaceID: wsID,
 		})
 		if err != nil {
 			return nil, httpErr(apierrors.CalendarMemberListQueryInterrupted)
 		}
-		color := memberColors[len(members)%len(memberColors)]
+		color := memberColors[int(count)%len(memberColors)]
 
-		subPublicID := types.New()
-		_, err = deps.CalendarQueries.CreateCalendarSubscription(ctx, calendar.CreateCalendarSubscriptionParams{
-			PublicID:     subPublicID,
-			WorkspaceID:  wsID,
-			CalendarID:   cal.ID,
-			UserID:       user.ID,
-			DisplayColor: color,
+		memberPublicID := types.New()
+		_, err = deps.CalendarQueries.UpsertCalendarMember(ctx, calendar.UpsertCalendarMemberParams{
+			PublicID:        memberPublicID,
+			WorkspaceID:     wsID,
+			CalendarID:      cal.ID,
+			UserID:          user.ID,
+			Role:            calendar.CalendarMembersRole(input.Body.Role),
+			MemberColor:     color,
+			InvitedByUserID: sql.NullInt32{Int32: int32(actorID), Valid: true}, //#nosec G115 -- actor user id sourced from session, fits int32 within realistic deployments
 		})
 		if err != nil {
 			return nil, httpErr(apierrors.CalendarMemberStoreWriteInterrupted)
@@ -151,7 +149,7 @@ func AddMember(deps Deps) func(context.Context, *AddMemberInput) (*AddMemberOutp
 
 		out := &AddMemberOutput{}
 		out.Body = MemberResponse{
-			ID:          subPublicID.String(),
+			ID:          memberPublicID.String(),
 			UserID:      user.PublicID.String(),
 			DisplayName: user.DisplayName,
 			MemberColor: color,
@@ -182,7 +180,7 @@ func ListMembers(deps Deps) func(context.Context, *ListMembersInput) (*ListMembe
 			return nil, err
 		}
 
-		rows, err := deps.CalendarQueries.ListCalendarSubscribers(ctx, calendar.ListCalendarSubscribersParams{
+		rows, err := deps.CalendarQueries.ListCalendarMembers(ctx, calendar.ListCalendarMembersParams{
 			CalendarID:  cal.ID,
 			WorkspaceID: wsID,
 		})
@@ -193,15 +191,12 @@ func ListMembers(deps Deps) func(context.Context, *ListMembersInput) (*ListMembe
 		out := &ListMembersOutput{}
 		out.Body.Members = make([]MemberResponse, len(rows))
 		for i, r := range rows {
-			// member_color + role columns have been dropped from
-			// calendar_subscriptions. Surface an empty color and the previous
-			// DEFAULT role so the DTO shape stays stable.
 			resp := MemberResponse{
 				ID:          r.PublicID.String(),
 				UserID:      r.UserPublicID.String(),
 				DisplayName: r.DisplayName,
-				MemberColor: "",
-				Role:        "editor",
+				MemberColor: r.MemberColor,
+				Role:        string(r.Role),
 				CreatedAt:   r.CreatedAt.Unix(),
 			}
 			resp.AvatarURL = dbtype.PtrFromNullString(r.AvatarUrl)
@@ -218,14 +213,9 @@ func UpdateMemberRole(deps Deps) func(context.Context, *UpdateMemberRoleInput) (
 		if err != nil {
 			return nil, err
 		}
-		cal, _, err := resolveCalendar(ctx, deps.CalendarQueries, wsID, actorID, input.CalID)
+		cal, actorMember, err := resolveCalendarAdmin(ctx, deps.CalendarQueries, wsID, actorID, input.CalID)
 		if err != nil {
 			return nil, err
-		}
-		// Subscription role has been dropped; fall back to calendar
-		// ownership.
-		if !cal.OwnerUserID.Valid || cal.OwnerUserID.Int32 != int32(actorID) { //#nosec G115 -- actor user id sourced from session, fits int32 within realistic deployments
-			return nil, httpErr(apierrors.CalendarCalendarOwnerRoleRequired)
 		}
 
 		targetUID, err := uuid.Parse(input.UserID)
@@ -237,10 +227,62 @@ func UpdateMemberRole(deps Deps) func(context.Context, *UpdateMemberRoleInput) (
 			return nil, httpErr(apierrors.CalendarMemberUserNotFound)
 		}
 
-		// Subscription role has been dropped; this endpoint is a no-op
-		// until the itemkit rebuild. Kept so existing clients keep 200 OK.
-		_ = cal
-		_ = targetUserID
+		newRole := calendar.CalendarMembersRole(input.Body.Role)
+
+		// A manager may not mint owners, and may not touch an existing one.
+		// Otherwise the owner-only gate on deleting the calendar is
+		// reachable by anyone who can administer membership.
+		if roleRank(actorMember.Role) < roleRank(calendar.CalendarMembersRoleOwner) {
+			target, terr := deps.CalendarQueries.FindCalendarMember(ctx, calendar.FindCalendarMemberParams{
+				CalendarID: cal.ID,
+				UserID:     targetUserID,
+			})
+			if terr != nil {
+				return nil, httpErr(apierr.SpecForErrNoRows(terr, apierrors.CalendarMemberNotFound, apierrors.CalendarMemberStoreReadInterrupted))
+			}
+			if newRole == calendar.CalendarMembersRoleOwner ||
+				target.Role == calendar.CalendarMembersRoleOwner {
+				return nil, httpErr(apierrors.CalendarCalendarOwnerRoleRequired)
+			}
+		}
+
+		// Demoting the last owner would leave the calendar with nobody able
+		// to delete it or restore an owner.
+		if newRole != calendar.CalendarMembersRoleOwner {
+			owners, oerr := deps.CalendarQueries.CountCalendarOwners(ctx, cal.ID)
+			if oerr != nil {
+				return nil, httpErr(apierrors.CalendarMemberStoreReadInterrupted)
+			}
+			current, cerr := deps.CalendarQueries.FindCalendarMember(ctx, calendar.FindCalendarMemberParams{
+				CalendarID: cal.ID,
+				UserID:     targetUserID,
+			})
+			if cerr != nil {
+				return nil, httpErr(apierr.SpecForErrNoRows(cerr, apierrors.CalendarMemberNotFound, apierrors.CalendarMemberStoreReadInterrupted))
+			}
+			if current.Role == calendar.CalendarMembersRoleOwner && owners <= 1 {
+				return nil, httpErr(apierrors.CalendarMemberLastOwnerRemovalBlocked)
+			}
+		}
+
+		res, err := deps.CalendarQueries.UpdateCalendarMemberRole(ctx, calendar.UpdateCalendarMemberRoleParams{
+			Role:       newRole,
+			CalendarID: cal.ID,
+			UserID:     targetUserID,
+		})
+		if err != nil {
+			return nil, httpErr(apierrors.CalendarMemberStoreWriteInterrupted)
+		}
+		if affected, _ := res.RowsAffected(); affected == 0 {
+			// Either no live membership, or the role already matched. The
+			// former must not report success; distinguish by looking.
+			if _, ferr := deps.CalendarQueries.FindCalendarMember(ctx, calendar.FindCalendarMemberParams{
+				CalendarID: cal.ID,
+				UserID:     targetUserID,
+			}); ferr != nil {
+				return nil, httpErr(apierr.SpecForErrNoRows(ferr, apierrors.CalendarMemberNotFound, apierrors.CalendarMemberStoreReadInterrupted))
+			}
+		}
 
 		out := &UpdateMemberRoleOutput{}
 		out.Body.Updated = true
@@ -263,7 +305,7 @@ func RemoveMember(deps Deps) func(context.Context, *RemoveMemberInput) (*RemoveM
 		if err != nil {
 			return nil, err
 		}
-		cal, _, err := resolveCalendar(ctx, deps.CalendarQueries, wsID, actorID, input.CalID)
+		cal, actorMember, err := resolveCalendar(ctx, deps.CalendarQueries, wsID, actorID, input.CalID)
 		if err != nil {
 			return nil, err
 		}
@@ -277,17 +319,7 @@ func RemoveMember(deps Deps) func(context.Context, *RemoveMemberInput) (*RemoveM
 			return nil, httpErr(apierrors.CalendarMemberUserNotFound)
 		}
 
-		isSelf := targetUserID == actorID
-		// Subscription role has been dropped; fall back to calendar
-		// ownership.
-		isOwner := cal.OwnerUserID.Valid && cal.OwnerUserID.Int32 == int32(actorID) //#nosec G115 -- actor user id sourced from session, fits int32 within realistic deployments
-
-		if !isSelf && !isOwner {
-			return nil, httpErr(apierrors.CalendarCalendarOwnerRoleRequired)
-		}
-
-		// Verify the target is subscribed.
-		_, err = deps.CalendarQueries.FindCalendarSubscription(ctx, calendar.FindCalendarSubscriptionParams{
+		target, err := deps.CalendarQueries.FindCalendarMember(ctx, calendar.FindCalendarMemberParams{
 			CalendarID: cal.ID,
 			UserID:     targetUserID,
 		})
@@ -295,18 +327,35 @@ func RemoveMember(deps Deps) func(context.Context, *RemoveMemberInput) (*RemoveM
 			return nil, httpErr(apierr.SpecForErrNoRows(err, apierrors.CalendarMemberNotFound, apierrors.CalendarMemberStoreReadInterrupted))
 		}
 
-		// Last-owner protection now lives on calendars.owner_user_id
-		// (not subscription role). Prevent removing the single calendar owner
-		// via self-leave.
-		if cal.OwnerUserID.Valid && cal.OwnerUserID.Int32 == int32(targetUserID) { //#nosec G115 -- target user id is users.id (BIGINT UNSIGNED), fits int32 within realistic deployments
-			return nil, httpErr(apierrors.CalendarMemberLastOwnerRemovalBlocked)
+		// Leaving is always allowed; removing someone else needs manager or
+		// owner, and only an owner may remove another owner.
+		isSelf := targetUserID == actorID
+		if !isSelf {
+			if roleRank(actorMember.Role) < roleRank(calendar.CalendarMembersRoleManager) {
+				return nil, httpErr(apierrors.CalendarCalendarOwnerRoleRequired)
+			}
+			if target.Role == calendar.CalendarMembersRoleOwner &&
+				roleRank(actorMember.Role) < roleRank(calendar.CalendarMembersRoleOwner) {
+				return nil, httpErr(apierrors.CalendarCalendarOwnerRoleRequired)
+			}
 		}
 
-		err = deps.CalendarQueries.DisableCalendarSubscription(ctx, calendar.DisableCalendarSubscriptionParams{
+		// The last owner cannot leave or be removed, including by
+		// themselves — a calendar with no owner can never regain one.
+		if target.Role == calendar.CalendarMembersRoleOwner {
+			owners, oerr := deps.CalendarQueries.CountCalendarOwners(ctx, cal.ID)
+			if oerr != nil {
+				return nil, httpErr(apierrors.CalendarMemberStoreReadInterrupted)
+			}
+			if owners <= 1 {
+				return nil, httpErr(apierrors.CalendarMemberLastOwnerRemovalBlocked)
+			}
+		}
+
+		if _, err = deps.CalendarQueries.DisableCalendarMember(ctx, calendar.DisableCalendarMemberParams{
 			CalendarID: cal.ID,
 			UserID:     targetUserID,
-		})
-		if err != nil {
+		}); err != nil {
 			return nil, httpErr(apierrors.CalendarMemberStoreRemoveInterrupted)
 		}
 

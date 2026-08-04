@@ -62,17 +62,17 @@ type eventCommon interface {
 // filled in by the per-row mapper after this baseline is built.
 func baseEventResponse(c eventCommon) EventResponse {
 	return EventResponse{
-		ID:         c.publicIDString(),
-		Kind:       c.kindString(),
-		Visibility: c.visibilityString(),
+		ID:          c.publicIDString(),
+		Kind:        c.kindString(),
+		Visibility:  c.visibilityString(),
 		ShowAs:      c.showAsString(),
 		Flexibility: c.flexibilityString(),
-		Title:      c.title(),
-		AllDay:     c.allDay(),
-		StartAt:    c.startAt(),
-		EndAt:      c.endAt(),
-		Timezone:   c.timezone(),
-		CreatedAt:  c.createdAt(),
+		Title:       c.title(),
+		AllDay:      c.allDay(),
+		StartAt:     c.startAt(),
+		EndAt:       c.endAt(),
+		Timezone:    c.timezone(),
+		CreatedAt:   c.createdAt(),
 
 		CreatorID:          c.creatorID(),
 		CreatorDisplayName: c.creatorDisplayName(),
@@ -100,7 +100,7 @@ func (e rangeEvent) publicIDString() string     { return e.r.PublicID.String() }
 func (e rangeEvent) kindString() string         { return string(e.r.Kind) }
 func (e rangeEvent) visibilityString() string   { return string(e.r.Visibility) }
 func (e rangeEvent) showAsString() string       { return string(e.r.ShowAs) }
-func (e rangeEvent) flexibilityString() string { return string(e.r.Flexibility) }
+func (e rangeEvent) flexibilityString() string  { return string(e.r.Flexibility) }
 func (e rangeEvent) title() string              { return e.r.Title }
 func (e rangeEvent) allDay() bool               { return e.r.AllDay }
 func (e rangeEvent) startAt() *int64            { return nullTimeUnixPtr(e.r.StartAt) }
@@ -116,18 +116,18 @@ type recurringEvent struct {
 	r calendar.ListRecurringCalendarEventsByRangeRow
 }
 
-func (e recurringEvent) publicIDString() string   { return e.r.PublicID.String() }
-func (e recurringEvent) kindString() string       { return string(e.r.Kind) }
-func (e recurringEvent) visibilityString() string { return string(e.r.Visibility) }
-func (e recurringEvent) showAsString() string     { return string(e.r.ShowAs) }
+func (e recurringEvent) publicIDString() string    { return e.r.PublicID.String() }
+func (e recurringEvent) kindString() string        { return string(e.r.Kind) }
+func (e recurringEvent) visibilityString() string  { return string(e.r.Visibility) }
+func (e recurringEvent) showAsString() string      { return string(e.r.ShowAs) }
 func (e recurringEvent) flexibilityString() string { return string(e.r.Flexibility) }
-func (e recurringEvent) title() string            { return e.r.Title }
-func (e recurringEvent) allDay() bool             { return e.r.AllDay }
-func (e recurringEvent) startAt() *int64          { return nullTimeUnixPtr(e.r.StartAt) }
-func (e recurringEvent) endAt() *int64            { return nullTimeUnixPtr(e.r.EndAt) }
-func (e recurringEvent) timezone() string         { return e.r.Timezone }
-func (e recurringEvent) createdAt() int64         { return handlerutil.TimeToUnix(e.r.CreatedAt) }
-func (e recurringEvent) creatorID() string        { return creatorPublicIDString(e.r.CreatorPublicID) }
+func (e recurringEvent) title() string             { return e.r.Title }
+func (e recurringEvent) allDay() bool              { return e.r.AllDay }
+func (e recurringEvent) startAt() *int64           { return nullTimeUnixPtr(e.r.StartAt) }
+func (e recurringEvent) endAt() *int64             { return nullTimeUnixPtr(e.r.EndAt) }
+func (e recurringEvent) timezone() string          { return e.r.Timezone }
+func (e recurringEvent) createdAt() int64          { return handlerutil.TimeToUnix(e.r.CreatedAt) }
+func (e recurringEvent) creatorID() string         { return creatorPublicIDString(e.r.CreatorPublicID) }
 func (e recurringEvent) creatorDisplayName() string {
 	return e.r.CreatorDisplayName.String
 }
@@ -144,7 +144,7 @@ func (e fullEvent) publicIDString() string     { return e.r.PublicID.String() }
 func (e fullEvent) kindString() string         { return string(e.r.Kind) }
 func (e fullEvent) visibilityString() string   { return string(e.r.Visibility) }
 func (e fullEvent) showAsString() string       { return string(e.r.ShowAs) }
-func (e fullEvent) flexibilityString() string { return string(e.r.Flexibility) }
+func (e fullEvent) flexibilityString() string  { return string(e.r.Flexibility) }
 func (e fullEvent) title() string              { return e.r.Title }
 func (e fullEvent) allDay() bool               { return e.r.AllDay }
 func (e fullEvent) startAt() *int64            { return nullTimeUnixPtr(e.r.StartAt) }

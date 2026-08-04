@@ -34,6 +34,17 @@ export type Flexibility = 'fixed' | 'negotiable' | 'conditional';
  */
 export type Availability = 'open' | 'tentative' | 'negotiable' | 'blocked';
 export type Visibility = 'default' | 'public' | 'private' | 'confidential';
+/**
+ * A member's role on one calendar. Matches `calendar_members.role`, and is
+ * an access grant rather than a display preference — the subscription that
+ * carries {@link Calendar.displayColor} and {@link Calendar.visible} grants
+ * nothing.
+ *
+ *  - `owner`   controls membership and can delete the calendar
+ *  - `manager` controls membership, cannot delete the calendar
+ *  - `editor`  writes events
+ *  - `viewer`  reads
+ */
 export type SubscriptionRole = 'owner' | 'manager' | 'editor' | 'viewer';
 export type Rsvp = 'pending' | 'accepted' | 'declined' | 'tentative' | 'needs_action';
 

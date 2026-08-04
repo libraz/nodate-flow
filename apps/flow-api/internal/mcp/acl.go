@@ -259,7 +259,9 @@ func resolveCalendar(ctx context.Context, deps Deps, s *session, publicID string
 		}
 		return 0, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
 	}
-	if _, err := deps.CalendarQueries.FindCalendarSubscription(ctx, calendar.FindCalendarSubscriptionParams{
+	// Access is calendar_members, not the subscription: a subscription is a
+	// display preference and grants nothing.
+	if _, err := deps.CalendarQueries.FindCalendarMember(ctx, calendar.FindCalendarMemberParams{
 		CalendarID: row.ID,
 		UserID:     s.userID,
 	}); err != nil {

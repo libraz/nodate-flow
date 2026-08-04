@@ -151,8 +151,8 @@ func SelfSubscribe(deps Deps) func(context.Context, *SelfSubscribeInput) (*SelfS
 			return nil, httpErr(apierrors.CalendarCalendarStoreReadInterrupted)
 		}
 
-		// Already subscribed? Return idempotent success.
-		if _, err := deps.CalendarQueries.FindCalendarSubscription(ctx, calendar.FindCalendarSubscriptionParams{
+		// Already a member? Return idempotent success.
+		if _, err := deps.CalendarQueries.FindCalendarMember(ctx, calendar.FindCalendarMemberParams{
 			CalendarID: cal.ID,
 			UserID:     actorID,
 		}); err == nil {
@@ -164,24 +164,27 @@ func SelfSubscribe(deps Deps) func(context.Context, *SelfSubscribeInput) (*SelfS
 			return nil, httpErr(apierrors.CalendarMemberStoreReadInterrupted)
 		}
 
-		// Determine display_color via the same color-rotation pattern used
-		// by AddMember so subsequent subscribers fan out predictably.
-		members, err := deps.CalendarQueries.ListCalendarSubscribers(ctx, calendar.ListCalendarSubscribersParams{
+		// Same colour rotation as AddMember, so members fan out
+		// predictably however they joined.
+		count, err := deps.CalendarQueries.CountCalendarMembers(ctx, calendar.CountCalendarMembersParams{
 			CalendarID:  cal.ID,
 			WorkspaceID: wsID,
 		})
 		if err != nil {
 			return nil, httpErr(apierrors.CalendarMemberListQueryInterrupted)
 		}
-		color := memberColors[len(members)%len(memberColors)]
+		color := memberColors[int(count)%len(memberColors)]
 
-		subPublicID := types.New()
-		if _, err := deps.CalendarQueries.CreateCalendarSubscription(ctx, calendar.CreateCalendarSubscriptionParams{
-			PublicID:     subPublicID,
-			WorkspaceID:  wsID,
-			CalendarID:   cal.ID,
-			UserID:       actorID,
-			DisplayColor: color,
+		// Self-service joining grants the least privilege that makes the
+		// calendar useful. Anything more would let a workspace member vote
+		// themselves write access to a calendar nobody invited them to.
+		if _, err := deps.CalendarQueries.UpsertCalendarMember(ctx, calendar.UpsertCalendarMemberParams{
+			PublicID:    types.New(),
+			WorkspaceID: wsID,
+			CalendarID:  cal.ID,
+			UserID:      actorID,
+			Role:        calendar.CalendarMembersRoleViewer,
+			MemberColor: color,
 		}); err != nil {
 			return nil, httpErr(apierrors.CalendarMemberStoreWriteInterrupted)
 		}

@@ -378,7 +378,7 @@ func TestCalendarMemberAddAndRemove(t *testing.T) {
 		"conflict body must carry the canonical error code")
 
 	// 3. Remove the member. The handler soft-deletes the
-	// calendar_subscriptions row.
+	// calendar_members row.
 	var removed struct {
 		Removed bool `json:"removed"`
 	}
@@ -388,20 +388,22 @@ func TestCalendarMemberAddAndRemove(t *testing.T) {
 		host.AccessToken, nil, &removed)
 	assert.True(t, removed.Removed, "remove-member must confirm success")
 
-	// Verify enabled = FALSE on the subscription row, scoped to this
-	// calendar and user. The view layer hides disabled rows so a list
-	// check would silently pass even if the soft-delete failed.
+	// Verify the grant row survives with enabled = FALSE, scoped to this
+	// calendar and user. The row has to stay: a later re-add updates it in
+	// place, and deleting it would lose who granted access and when. The
+	// list endpoint hides disabled rows, so a list check alone would pass
+	// even if the revoke had done nothing.
 	var enabled bool
 	require.NoError(t, testDB.QueryRow(
-		`SELECT cs.enabled
-		 FROM calendar_subscriptions cs
-		 JOIN calendars c ON c.id = cs.calendar_id
-		 JOIN users u ON u.id = cs.user_id
+		`SELECT cm.enabled
+		 FROM calendar_members cm
+		 JOIN calendars c ON c.id = cm.calendar_id
+		 JOIN users u ON u.id = cm.user_id
 		 WHERE c.public_id = UUID_TO_BIN(?, 0)
 		   AND u.public_id = UUID_TO_BIN(?, 0)
 		 LIMIT 1`,
 		calID, member.UserPublicID).Scan(&enabled))
-	assert.False(t, enabled, "remove-member must flip subscriptions.enabled to FALSE")
+	assert.False(t, enabled, "remove-member must flip calendar_members.enabled to FALSE")
 
 	// 4. The member must no longer appear in the active list.
 	var listedAfter struct {

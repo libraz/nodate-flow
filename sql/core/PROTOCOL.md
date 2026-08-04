@@ -120,6 +120,28 @@ Three rules make the opt-in safe:
 - Set it only around a write that genuinely owns the invariant. Using it to
   silence a rejection reintroduces exactly the drift the guard prevents.
 
+## Access
+
+Two tables answer two different questions, and an implementation must not
+collapse them.
+
+`calendar_members` is the access grant: a row says a user may reach a
+calendar, and its `role` says what they may do — `owner` > `manager` >
+`editor` > `viewer`. Every read and every write must resolve through it.
+
+`calendar_subscriptions` is one user's display preference for a calendar
+they can already reach: their own colour override, and whether the layer is
+toggled on. It grants nothing, its absence denies nothing, and treating it
+as an ACL means anyone who once changed a sidebar colour keeps access they
+were never given.
+
+Workspace membership is a prerequisite for both, not a substitute: a
+workspace may hold calendars whose audiences do not coincide.
+
+Resolve the calendar id and check the grant in the same function. Splitting
+them is how an authorization check goes missing — not because someone
+decides to skip it, but because the two steps can be performed apart.
+
 ## Realtime across processes
 
 Two products on one database each have their own in-process fan-out, which

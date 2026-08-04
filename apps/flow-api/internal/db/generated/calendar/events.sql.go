@@ -300,11 +300,19 @@ SELECT
 FROM calendar_events ce
 INNER JOIN calendars c
   ON c.id = ce.calendar_id
-INNER JOIN calendar_subscriptions cs
-  ON cs.calendar_id = ce.calendar_id
-  AND cs.user_id = ?
-  AND cs.visible = TRUE
-  AND cs.enabled = TRUE
+INNER JOIN calendar_members cm
+  ON cm.calendar_id = ce.calendar_id
+  AND cm.user_id = ?
+  AND cm.enabled = TRUE
+  -- Access is the membership. The subscription only says whether the
+  -- member has hidden the layer, so its absence means visible.
+  AND NOT EXISTS (
+    SELECT 1 FROM calendar_subscriptions cs
+    WHERE cs.calendar_id = cm.calendar_id
+      AND cs.user_id = cm.user_id
+      AND cs.enabled = TRUE
+      AND cs.visible = FALSE
+  )
 WHERE ce.workspace_id = ?
   AND ce.recurrence_rule IS NULL
   AND ce.start_at < ?
@@ -552,11 +560,19 @@ INNER JOIN workspace_members wm
   ON wm.workspace_id = ce.workspace_id
   AND wm.user_id = ?
   AND wm.enabled = TRUE
-INNER JOIN calendar_subscriptions cs
-  ON cs.calendar_id = ce.calendar_id
-  AND cs.user_id = wm.user_id
-  AND cs.visible = TRUE
-  AND cs.enabled = TRUE
+INNER JOIN calendar_members cm
+  ON cm.calendar_id = ce.calendar_id
+  AND cm.user_id = wm.user_id
+  AND cm.enabled = TRUE
+  -- Access is the membership. The subscription only says whether the
+  -- member has hidden the layer, so its absence means visible.
+  AND NOT EXISTS (
+    SELECT 1 FROM calendar_subscriptions cs
+    WHERE cs.calendar_id = cm.calendar_id
+      AND cs.user_id = cm.user_id
+      AND cs.enabled = TRUE
+      AND cs.visible = FALSE
+  )
 WHERE ce.recurrence_rule IS NULL
   AND ce.start_at IS NOT NULL
   AND ce.start_at < ?
@@ -707,11 +723,19 @@ INNER JOIN workspace_members wm
   ON wm.workspace_id = ce.workspace_id
   AND wm.user_id = ?
   AND wm.enabled = TRUE
-INNER JOIN calendar_subscriptions cs
-  ON cs.calendar_id = ce.calendar_id
-  AND cs.user_id = wm.user_id
-  AND cs.visible = TRUE
-  AND cs.enabled = TRUE
+INNER JOIN calendar_members cm
+  ON cm.calendar_id = ce.calendar_id
+  AND cm.user_id = wm.user_id
+  AND cm.enabled = TRUE
+  -- Access is the membership. The subscription only says whether the
+  -- member has hidden the layer, so its absence means visible.
+  AND NOT EXISTS (
+    SELECT 1 FROM calendar_subscriptions cs
+    WHERE cs.calendar_id = cm.calendar_id
+      AND cs.user_id = cm.user_id
+      AND cs.enabled = TRUE
+      AND cs.visible = FALSE
+  )
 WHERE ce.recurrence_rule IS NOT NULL
   AND ce.start_at IS NOT NULL
   AND ce.start_at < ?
@@ -843,11 +867,19 @@ SELECT
 FROM calendar_events ce
 INNER JOIN calendars c
   ON c.id = ce.calendar_id
-INNER JOIN calendar_subscriptions cs
-  ON cs.calendar_id = ce.calendar_id
-  AND cs.user_id = ?
-  AND cs.visible = TRUE
-  AND cs.enabled = TRUE
+INNER JOIN calendar_members cm
+  ON cm.calendar_id = ce.calendar_id
+  AND cm.user_id = ?
+  AND cm.enabled = TRUE
+  -- Access is the membership. The subscription only says whether the
+  -- member has hidden the layer, so its absence means visible.
+  AND NOT EXISTS (
+    SELECT 1 FROM calendar_subscriptions cs
+    WHERE cs.calendar_id = cm.calendar_id
+      AND cs.user_id = cm.user_id
+      AND cs.enabled = TRUE
+      AND cs.visible = FALSE
+  )
 WHERE ce.workspace_id = ?
   AND ce.recurrence_rule IS NOT NULL
   AND ce.start_at < ?

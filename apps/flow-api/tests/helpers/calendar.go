@@ -110,17 +110,16 @@ func CreateCalendarTestTenant(t *testing.T, srv *TestServer) *CalendarTestTenant
 }
 
 // CreateExtraCalendarMember creates an additional user, adds them to the
-// given workspace and subscribes them to the given calendar. The
-// calSubRole parameter is preserved for call-site compatibility but
-// ignored: subscription role was dropped during the calendar refactor;
-// event-level visibility is the ACL axis now.
+// given workspace, and grants them the given role on the calendar. An
+// empty role means editor, which is what most tests want: a second person
+// who can add their own events but does not administer the calendar.
 func CreateExtraCalendarMember(
 	t *testing.T,
 	srv *TestServer,
 	wsID uint32,
 	wsPub dbtype.PublicID,
 	calendarID uint32,
-	_ string,
+	calRole string,
 ) *CalendarTestTenant {
 	t.Helper()
 
@@ -154,12 +153,16 @@ func CreateExtraCalendarMember(
 	})
 	require.NoError(t, err)
 
-	_, err = cq.CreateCalendarSubscription(ctx, calgen.CreateCalendarSubscriptionParams{
-		PublicID:     dbtype.New(),
-		WorkspaceID:  wsID,
-		CalendarID:   calendarID,
-		UserID:       userID,
-		DisplayColor: "#FF5722",
+	if calRole == "" {
+		calRole = string(calgen.CalendarMembersRoleEditor)
+	}
+	_, err = cq.UpsertCalendarMember(ctx, calgen.UpsertCalendarMemberParams{
+		PublicID:    dbtype.New(),
+		WorkspaceID: wsID,
+		CalendarID:  calendarID,
+		UserID:      userID,
+		Role:        calgen.CalendarMembersRole(calRole),
+		MemberColor: "#FF5722",
 	})
 	require.NoError(t, err)
 

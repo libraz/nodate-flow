@@ -22,6 +22,12 @@ type Querier interface {
 	// Dedicated setter that clears expires_at (COALESCE-based patch cannot
 	// distinguish "leave unchanged" from "clear" for nullable columns).
 	ClearPublicShareExpiresAt(ctx context.Context, arg ClearPublicShareExpiresAtParams) error
+	// Number of live members, used to pick the next colour from the palette.
+	CountCalendarMembers(ctx context.Context, arg CountCalendarMembersParams) (int64, error)
+	// Live owners of a calendar. Callers check this before demoting or
+	// removing an owner, so a calendar cannot be left with nobody able to
+	// manage its membership.
+	CountCalendarOwners(ctx context.Context, calendarID uint32) (int64, error)
 	// Insert a new calendar. kind determines behavior: personal (user-owned
 	// layer, may own many) or system (holiday feeds).
 	CreateCalendar(ctx context.Context, arg CreateCalendarParams) (int64, error)
@@ -76,6 +82,9 @@ type Querier interface {
 	DisableCalendarEventComment(ctx context.Context, arg DisableCalendarEventCommentParams) error
 	// Soft-disable (revoke) an invite by internal id.
 	DisableCalendarEventInvite(ctx context.Context, id uint32) error
+	// Revoke a membership. The row survives so the grant history stays
+	// readable and so a later re-add updates it in place.
+	DisableCalendarMember(ctx context.Context, arg DisableCalendarMemberParams) (sql.Result, error)
 	// Soft-delete a memo.
 	DisableCalendarMemo(ctx context.Context, arg DisableCalendarMemoParams) error
 	// Remove a user from a calendar (soft-delete).
@@ -114,6 +123,11 @@ type Querier interface {
 	// the replacement will query via calendar_public_shares.
 	// Quick lookup for permission checks: who owns this event?
 	FindCalendarEventOwner(ctx context.Context, arg FindCalendarEventOwnerParams) (FindCalendarEventOwnerRow, error)
+	// Resolve one user's access to a calendar. This is the query every
+	// calendar authorization check runs through; sql.ErrNoRows means no
+	// access, which callers map to a 404 rather than a 403 so the existence
+	// of a calendar is not leaked to someone with no grant on it.
+	FindCalendarMember(ctx context.Context, arg FindCalendarMemberParams) (FindCalendarMemberRow, error)
 	// Resolve a memo by UUID v7.
 	FindCalendarMemoByPublicId(ctx context.Context, arg FindCalendarMemoByPublicIdParams) (FindCalendarMemoByPublicIdRow, error)
 	// Look up a user's subscription to a specific calendar.
@@ -155,17 +169,25 @@ type Querier interface {
 	ListCalendarEventsAcrossCalendars(ctx context.Context, arg ListCalendarEventsAcrossCalendarsParams) ([]ListCalendarEventsAcrossCalendarsRow, error)
 	// List non-recurring events in a calendar within a time range.
 	ListCalendarEventsByRange(ctx context.Context, arg ListCalendarEventsByRangeParams) ([]ListCalendarEventsByRangeRow, error)
+	// List a calendar's members with the role and shared colour each holds.
+	ListCalendarMembers(ctx context.Context, arg ListCalendarMembersParams) ([]ListCalendarMembersRow, error)
 	// List memos for a calendar in display order.
 	ListCalendarMemos(ctx context.Context, arg ListCalendarMemosParams) ([]ListCalendarMemosRow, error)
 	// List all subscribers of a calendar (for member list, color resolution).
 	ListCalendarSubscribers(ctx context.Context, arg ListCalendarSubscribersParams) ([]ListCalendarSubscribersRow, error)
-	// List all calendars a user subscribes to within a workspace.
+	// List the calendars a user may reach within a workspace.
+	//
+	// Driven from calendar_members, because that is what grants access. The
+	// subscription is a LEFT JOIN: display preferences are optional, and a
+	// member who never touched their sidebar still has to see the calendar.
+	// Defaults come from the membership so an absent subscription renders the
+	// same as a default one.
 	ListCalendarsForUser(ctx context.Context, arg ListCalendarsForUserParams) ([]ListCalendarsForUserRow, error)
 	// List teammate personal calendars in a workspace that the actor is not
 	// currently subscribed to. Used by the "Add teammate calendar" picker in
 	// the right-rail Calendars panel. Excludes:
 	//   - calendars owned by the actor (their own personal calendar)
-	//   - calendars where an active calendar_subscriptions row already exists
+	//   - calendars the actor already holds a calendar_members grant on
 	//     for the actor
 	//   - non-personal calendars (system/holiday/etc — those have their own UI)
 	// Owners must still be active workspace members so we don't surface
@@ -233,6 +255,10 @@ type Querier interface {
 	UpdateCalendarChecklistItem(ctx context.Context, arg UpdateCalendarChecklistItemParams) error
 	// Edit a comment's body and stamp edited_at.
 	UpdateCalendarEventComment(ctx context.Context, arg UpdateCalendarEventCommentParams) error
+	// Change a member's role. RowsAffected = 0 means the target holds no live
+	// membership, which the caller maps to a 404 rather than silently
+	// reporting success.
+	UpdateCalendarMemberRole(ctx context.Context, arg UpdateCalendarMemberRoleParams) (sql.Result, error)
 	// Update a memo's title, done, or sort_weight.
 	UpdateCalendarMemo(ctx context.Context, arg UpdateCalendarMemoParams) error
 	// Update the sort_weight of a single share-event link.
@@ -240,6 +266,13 @@ type Querier interface {
 	// public share. Scoped to (share_id, public_id) so a caller cannot
 	// accidentally reorder a link belonging to a different share.
 	UpdateShareEventSortWeight(ctx context.Context, arg UpdateShareEventSortWeightParams) error
+	// Grant (or re-grant) a user access to a calendar at a given role.
+	//
+	// Upsert rather than insert because uniq_calendar_members_calendar_user
+	// covers revoked rows too: re-adding someone who was removed has to
+	// revive their row, and letting a second row accumulate would leave an
+	// older grant behind for an access check to find.
+	UpsertCalendarMember(ctx context.Context, arg UpsertCalendarMemberParams) (int64, error)
 }
 
 var _ Querier = (*Queries)(nil)

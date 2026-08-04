@@ -20,13 +20,21 @@ var (
 	errInviteNotFound       = httpErr(apierrors.CalendarInviteNotFound)
 )
 
-// canEditEvent returns true iff the actor is the event owner or an attendee
-// with can_edit. Workspace membership alone does not grant edit access;
-// event-level owner/attendee relationship is the edit gate.
+// canEditEvent reports whether the actor may change an event.
+//
+// Three ways to qualify: owning the event, being an attendee the owner
+// marked can_edit, or holding manager or owner on the calendar. Workspace
+// membership alone is not one of them — a calendar's audience is narrower
+// than its workspace, and an editor on the calendar may add their own
+// events without gaining the right to rewrite everyone else's.
+//
+// The manager path is the delegation case: on a shared calendar where each
+// person has a layer, whoever coordinates the calendar has to be able to
+// move other people's events without being made owner of each one.
 func canEditEvent(
 	actorUserID uint32,
 	event calendar.FindCalendarEventByPublicIdRow,
-	_ calendar.FindCalendarSubscriptionRow,
+	member calendar.FindCalendarMemberRow,
 	attendee *calendar.FindCalendarEventAttendeeRow,
 ) bool {
 	if event.OwnerUserID == actorUserID {
@@ -35,19 +43,24 @@ func canEditEvent(
 	if attendee != nil && attendee.CanEdit {
 		return true
 	}
-	return false
+	return roleRank(member.Role) >= roleRank(calendar.CalendarMembersRoleManager)
 }
 
-// canSetOwner returns true iff the actor sets themselves as the event owner.
-// Setting another user as owner (manager-style delegation) is not supported
-// in the current post-itemkit model — rebuilt later when manager role is
-// reintroduced.
+// canSetOwner reports whether the actor may file an event under the given
+// owner, which decides whose layer and colour it appears on.
+//
+// Anyone may create their own events. Filing one under somebody else is
+// delegation and needs manager or owner on the calendar: the alternative is
+// that any editor can put commitments on a colleague's layer.
 func canSetOwner(
 	actorUserID uint32,
 	ownerUserID uint32,
-	_ calendar.FindCalendarSubscriptionRow,
+	member calendar.FindCalendarMemberRow,
 ) bool {
-	return actorUserID == ownerUserID
+	if actorUserID == ownerUserID {
+		return true
+	}
+	return roleRank(member.Role) >= roleRank(calendar.CalendarMembersRoleManager)
 }
 
 // validateInvite checks that the invite has not expired and has not exceeded its use limit.

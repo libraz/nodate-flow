@@ -69,6 +69,35 @@ CALL nf_conformance_assert(
   (SELECT flexibility = 'fixed' FROM calendar_events WHERE id = @plain_event),
   'an event inserted without naming flexibility must default to fixed');
 
+-- Access and display preference are separate tables. An implementation
+-- that dropped calendar_members would have to gate on the subscription
+-- instead, which grants nothing — anyone who ever set a sidebar colour
+-- would hold access nobody granted them.
+CALL nf_conformance_assert(
+  (SELECT column_type = "enum('owner','manager','editor','viewer')" AND is_nullable = 'NO'
+   FROM information_schema.columns
+   WHERE table_schema = DATABASE()
+     AND table_name = 'calendar_members' AND column_name = 'role'),
+  'calendar_members.role must be a NOT NULL enum of owner, manager, editor and viewer');
+
+CALL nf_conformance_assert(
+  (SELECT column_default = 'viewer'
+   FROM information_schema.columns
+   WHERE table_schema = DATABASE()
+     AND table_name = 'calendar_members' AND column_name = 'role'),
+  'calendar_members.role must default to the least privilege, so a writer that omits it cannot grant access');
+
+-- One grant per (calendar, user), revoked rows included. Without this a
+-- re-add leaves the older grant behind for an access check to find.
+CALL nf_conformance_assert(
+  (SELECT COUNT(*) = 1 FROM information_schema.statistics
+   WHERE table_schema = DATABASE()
+     AND table_name = 'calendar_members'
+     AND index_name = 'uniq_calendar_members_calendar_user'
+     AND non_unique = 0
+     AND column_name = 'calendar_id'),
+  'calendar_members must be unique per (calendar_id, user_id)');
+
 -- The guard triggers are part of the contract, not an optional extra: an
 -- implementation that loaded the tables but skipped them would accept
 -- writes this document says are refused.

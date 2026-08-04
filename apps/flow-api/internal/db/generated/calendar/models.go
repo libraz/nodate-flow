@@ -578,6 +578,50 @@ func (ns NullCalendarEventsVisibility) Value() (driver.Value, error) {
 	return string(ns.CalendarEventsVisibility), nil
 }
 
+type CalendarMembersRole string
+
+const (
+	CalendarMembersRoleOwner   CalendarMembersRole = "owner"
+	CalendarMembersRoleManager CalendarMembersRole = "manager"
+	CalendarMembersRoleEditor  CalendarMembersRole = "editor"
+	CalendarMembersRoleViewer  CalendarMembersRole = "viewer"
+)
+
+func (e *CalendarMembersRole) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = CalendarMembersRole(s)
+	case string:
+		*e = CalendarMembersRole(s)
+	default:
+		return fmt.Errorf("unsupported scan type for CalendarMembersRole: %T", src)
+	}
+	return nil
+}
+
+type NullCalendarMembersRole struct {
+	CalendarMembersRole CalendarMembersRole `json:"calendarMembersRole"`
+	Valid               bool                `json:"valid"` // Valid is true if CalendarMembersRole is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullCalendarMembersRole) Scan(value interface{}) error {
+	if value == nil {
+		ns.CalendarMembersRole, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.CalendarMembersRole.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullCalendarMembersRole) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.CalendarMembersRole), nil
+}
+
 type CalendarsKind string
 
 const (
@@ -2710,6 +2754,34 @@ type CalendarEventInvite struct {
 	// Admin notes
 	Notes sql.NullString `json:"notes"`
 	// Enabled flag; disabled rows are revoked invites
+	Enabled   bool         `json:"enabled"`
+	UpdatedAt sql.NullTime `json:"updatedAt"`
+	CreatedAt time.Time    `json:"createdAt"`
+}
+
+// Per-calendar access grants: which users may use a calendar and at what role. The ACL axis, unlike calendar_subscriptions, which holds private display preferences and grants nothing.
+type CalendarMember struct {
+	// Internal PK, never exposed
+	ID uint32 `json:"-"`
+	// UUID v7, the only externally visible ID
+	PublicID types.PublicID `json:"publicId"`
+	// Internal FK to workspaces.id
+	WorkspaceID uint32 `json:"-"`
+	// Internal FK to calendars.id
+	CalendarID uint32 `json:"-"`
+	// Internal FK to users.id
+	UserID uint32 `json:"-"`
+	// What this member may do with the calendar. Defaults to the least privilege so a writer that omits it cannot accidentally grant access.
+	Role CalendarMembersRole `json:"role"`
+	// Shared colour identifying this member on the calendar; agreed rather than per-viewer, unlike calendar_subscriptions.display_color
+	MemberColor string `json:"memberColor"`
+	// Internal FK to users.id; who granted this membership. NULL for the owner row created with the calendar.
+	InvitedByUserID sql.NullInt32 `json:"invitedByUserId"`
+	// Display order
+	SortWeight int32 `json:"sortWeight"`
+	// Admin notes
+	Notes sql.NullString `json:"notes"`
+	// Soft-delete flag; FALSE means the membership was revoked. Every access check must filter on enabled = TRUE.
 	Enabled   bool         `json:"enabled"`
 	UpdatedAt sql.NullTime `json:"updatedAt"`
 	CreatedAt time.Time    `json:"createdAt"`
