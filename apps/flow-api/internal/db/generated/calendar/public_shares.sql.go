@@ -343,6 +343,7 @@ SELECT
   ce.kind,
   ce.visibility,
   ce.show_as,
+  ce.flexibility,
   ce.block_label,
   COALESCE(ce.recurrence_rule, CAST('null' AS JSON)) AS recurrence_rule,
   ce.recurrence_end,
@@ -360,23 +361,24 @@ LIMIT 2000
 `
 
 type ListPublicShareEventsByTokenHashRow struct {
-	EventPublicID        types.PublicID           `json:"eventPublicId"`
-	Title                string                   `json:"title"`
-	StartAt              sql.NullTime             `json:"startAt"`
-	EndAt                sql.NullTime             `json:"endAt"`
-	AllDay               bool                     `json:"allDay"`
-	Timezone             string                   `json:"timezone"`
-	Location             sql.NullString           `json:"location"`
-	Memo                 sql.NullString           `json:"memo"`
-	Url                  sql.NullString           `json:"url"`
-	Kind                 CalendarEventsKind       `json:"kind"`
-	Visibility           CalendarEventsVisibility `json:"visibility"`
-	ShowAs               CalendarEventsShowAs     `json:"showAs"`
-	BlockLabel           sql.NullString           `json:"blockLabel"`
-	RecurrenceRule       json.RawMessage          `json:"recurrenceRule"`
-	RecurrenceEnd        sql.NullTime             `json:"recurrenceEnd"`
-	RecurrenceExceptions json.RawMessage          `json:"recurrenceExceptions"`
-	LinkSortWeight       int32                    `json:"linkSortWeight"`
+	EventPublicID        types.PublicID            `json:"eventPublicId"`
+	Title                string                    `json:"title"`
+	StartAt              sql.NullTime              `json:"startAt"`
+	EndAt                sql.NullTime              `json:"endAt"`
+	AllDay               bool                      `json:"allDay"`
+	Timezone             string                    `json:"timezone"`
+	Location             sql.NullString            `json:"location"`
+	Memo                 sql.NullString            `json:"memo"`
+	Url                  sql.NullString            `json:"url"`
+	Kind                 CalendarEventsKind        `json:"kind"`
+	Visibility           CalendarEventsVisibility  `json:"visibility"`
+	ShowAs               CalendarEventsShowAs      `json:"showAs"`
+	Flexibility          CalendarEventsFlexibility `json:"flexibility"`
+	BlockLabel           sql.NullString            `json:"blockLabel"`
+	RecurrenceRule       json.RawMessage           `json:"recurrenceRule"`
+	RecurrenceEnd        sql.NullTime              `json:"recurrenceEnd"`
+	RecurrenceExceptions json.RawMessage           `json:"recurrenceExceptions"`
+	LinkSortWeight       int32                     `json:"linkSortWeight"`
 }
 
 // Unauthenticated public-render query. Final safety gate on event
@@ -404,6 +406,7 @@ func (q *Queries) ListPublicShareEventsByTokenHash(ctx context.Context, tokenHas
 			&i.Kind,
 			&i.Visibility,
 			&i.ShowAs,
+			&i.Flexibility,
 			&i.BlockLabel,
 			&i.RecurrenceRule,
 			&i.RecurrenceEnd,

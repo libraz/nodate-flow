@@ -139,6 +139,7 @@ type MyCalendarEventResponse struct {
 	Kind                 string           `json:"kind"`
 	Visibility           string           `json:"visibility"`
 	ShowAs               string           `json:"showAs"`
+	Flexibility          string           `json:"flexibility"`
 	Title                string           `json:"title"`
 	AllDay               bool             `json:"allDay"`
 	StartAt              *int64           `json:"startAt,omitempty"`
@@ -220,6 +221,7 @@ func ListMyCalendarEvents(deps Deps) func(context.Context, *ListMyCalendarEvents
 				Kind:               string(r.Kind),
 				Visibility:         string(r.Visibility),
 				ShowAs:             string(r.ShowAs),
+				Flexibility:        string(r.Flexibility),
 				Title:              r.Title,
 				AllDay:             r.AllDay,
 				StartAt:            nullTimeUnixPtr(r.StartAt),
@@ -249,6 +251,7 @@ func ListMyCalendarEvents(deps Deps) func(context.Context, *ListMyCalendarEvents
 				Kind:               string(r.Kind),
 				Visibility:         string(r.Visibility),
 				ShowAs:             string(r.ShowAs),
+				Flexibility:        string(r.Flexibility),
 				Title:              r.Title,
 				AllDay:             r.AllDay,
 				StartAt:            nullTimeUnixPtr(r.StartAt),

@@ -50,6 +50,7 @@ type EventResponse struct {
 	Kind                 string           `json:"kind"`
 	Visibility           string           `json:"visibility"`
 	ShowAs               string           `json:"showAs"`
+	Flexibility          string           `json:"flexibility"`
 	Title                string           `json:"title"`
 	AllDay               bool             `json:"allDay"`
 	StartAt              *int64           `json:"startAt,omitempty"`
@@ -85,6 +86,7 @@ type CreateEventInput struct {
 		Kind               string           `json:"kind" enum:"event,block,free,milestone" doc:"Event kind"`
 		Visibility         string           `json:"visibility,omitempty" required:"false" enum:"default,public,private,confidential" doc:"Visibility"`
 		ShowAs             string           `json:"showAs,omitempty" required:"false" enum:"busy,free,tentative,oof" doc:"Show-as status"`
+		Flexibility        string           `json:"flexibility,omitempty" required:"false" enum:"fixed,negotiable,conditional" doc:"Whether the commitment can be moved; independent of showAs, which only says whether the time reads as taken"`
 		Title              string           `json:"title" minLength:"1" maxLength:"500" doc:"Event title"`
 		AllDay             bool             `json:"allDay" required:"false" doc:"All-day event flag"`
 		StartAt            *int64           `json:"startAt,omitempty" required:"false" doc:"Start time as unix seconds (UTC); omit for a planning-stage (undated) event"`
@@ -127,6 +129,7 @@ type PatchEventInput struct {
 		Kind                 *string          `json:"kind,omitempty" required:"false" doc:"Event kind"`
 		Visibility           *string          `json:"visibility,omitempty" required:"false" doc:"Visibility"`
 		ShowAs               *string          `json:"showAs,omitempty" required:"false" doc:"Show-as status"`
+		Flexibility          *string          `json:"flexibility,omitempty" required:"false" enum:"fixed,negotiable,conditional" doc:"Whether the commitment can be moved; independent of showAs, which only says whether the time reads as taken"`
 		Title                *string          `json:"title,omitempty" required:"false" doc:"Event title"`
 		AllDay               *bool            `json:"allDay,omitempty" required:"false" doc:"All-day flag"`
 		StartAt              *int64           `json:"startAt,omitempty" required:"false" doc:"Start time as unix seconds (UTC)"`
@@ -177,6 +180,7 @@ type CrossCalendarEventResponse struct {
 	Kind                 string           `json:"kind"`
 	Visibility           string           `json:"visibility"`
 	ShowAs               string           `json:"showAs"`
+	Flexibility          string           `json:"flexibility"`
 	Title                string           `json:"title"`
 	AllDay               bool             `json:"allDay"`
 	StartAt              *int64           `json:"startAt,omitempty"`
@@ -300,6 +304,13 @@ func CreateEvent(deps Deps) func(context.Context, *CreateEventInput) (*CreateEve
 		if input.Body.ShowAs != "" {
 			showAs = calendar.CalendarEventsShowAs(input.Body.ShowAs)
 		}
+		// Default to 'fixed'. An event created by a client that does not
+		// know about the column must not read as movable, because that
+		// would advertise availability its owner never offered.
+		flexibility := calendar.CalendarEventsFlexibilityFixed
+		if input.Body.Flexibility != "" {
+			flexibility = calendar.CalendarEventsFlexibility(input.Body.Flexibility)
+		}
 
 		// Planning-stage undated events: both start and end may be omitted
 		// (persisted as NULL). Requesting start without end (or vice versa)
@@ -320,6 +331,7 @@ func CreateEvent(deps Deps) func(context.Context, *CreateEventInput) (*CreateEve
 			Kind:            calendar.CalendarEventsKind(input.Body.Kind),
 			Visibility:      visibility,
 			ShowAs:          showAs,
+			Flexibility:     flexibility,
 			Title:           input.Body.Title,
 			AllDay:          input.Body.AllDay,
 			StartAt:         startAtNT,
@@ -556,6 +568,12 @@ func PatchEvent(deps Deps) func(context.Context, *PatchEventInput) (*PatchEventO
 			params.ShowAs = calendar.NullCalendarEventsShowAs{
 				CalendarEventsShowAs: calendar.CalendarEventsShowAs(*input.Body.ShowAs),
 				Valid:                true,
+			}
+		}
+		if input.Body.Flexibility != nil {
+			params.Flexibility = calendar.NullCalendarEventsFlexibility{
+				CalendarEventsFlexibility: calendar.CalendarEventsFlexibility(*input.Body.Flexibility),
+				Valid:                     true,
 			}
 		}
 		if input.Body.Title != nil {

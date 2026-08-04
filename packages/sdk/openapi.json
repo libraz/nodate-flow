@@ -2009,6 +2009,11 @@
             "format": "int64",
             "type": "integer"
           },
+          "flexibility": {
+            "description": "Whether the commitment can be moved; independent of showAs, which only says whether the time reads as taken",
+            "enum": ["fixed", "negotiable", "conditional"],
+            "type": "string"
+          },
           "kind": {
             "description": "Event kind",
             "enum": ["event", "block", "free", "milestone"],
@@ -2858,6 +2863,9 @@
             "format": "int64",
             "type": "integer"
           },
+          "flexibility": {
+            "type": "string"
+          },
           "id": {
             "type": "string"
           },
@@ -2900,6 +2908,7 @@
           "kind",
           "visibility",
           "showAs",
+          "flexibility",
           "title",
           "allDay",
           "timezone",
@@ -3882,6 +3891,9 @@
             "format": "int64",
             "type": "integer"
           },
+          "flexibility": {
+            "type": "string"
+          },
           "id": {
             "type": "string"
           },
@@ -3933,6 +3945,7 @@
           "kind",
           "visibility",
           "showAs",
+          "flexibility",
           "title",
           "allDay",
           "timezone",
@@ -6913,6 +6926,9 @@
             "format": "int64",
             "type": "integer"
           },
+          "flexibility": {
+            "type": "string"
+          },
           "id": {
             "type": "string"
           },
@@ -6972,6 +6988,7 @@
           "kind",
           "visibility",
           "showAs",
+          "flexibility",
           "title",
           "allDay",
           "timezone",
@@ -7508,6 +7525,11 @@
             "description": "End time as unix seconds (UTC)",
             "format": "int64",
             "type": "integer"
+          },
+          "flexibility": {
+            "description": "Whether the commitment can be moved; independent of showAs, which only says whether the time reads as taken",
+            "enum": ["fixed", "negotiable", "conditional"],
+            "type": "string"
           },
           "kind": {
             "description": "Event kind",
@@ -8649,6 +8671,9 @@
             "format": "int64",
             "type": "integer"
           },
+          "flexibility": {
+            "type": "string"
+          },
           "id": {
             "type": "string"
           },
@@ -8688,7 +8713,7 @@
             "type": "string"
           }
         },
-        "required": ["id", "title", "allDay", "timezone", "kind", "showAs"],
+        "required": ["id", "title", "allDay", "timezone", "kind", "showAs", "flexibility"],
         "type": "object"
       },
       "PublicShareRenderPage": {

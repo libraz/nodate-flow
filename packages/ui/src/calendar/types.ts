@@ -16,6 +16,23 @@
 export type CalendarKind = 'personal' | 'system';
 export type EventKind = 'event' | 'block' | 'free' | 'milestone';
 export type ShowAs = 'busy' | 'free' | 'tentative' | 'oof';
+
+/**
+ * Whether a commitment can be moved. Matches `calendar_events.flexibility`,
+ * and is deliberately separate from {@link ShowAs}: `showAs` answers "is
+ * this time taken", `flexibility` answers "could it move". A meeting the
+ * owner would gladly reschedule and one that cannot move are both `busy`.
+ *  - `fixed`       cannot move (the default)
+ *  - `negotiable`  the owner is willing to move it
+ *  - `conditional` movable, but subject to something outside the event
+ */
+export type Flexibility = 'fixed' | 'negotiable' | 'conditional';
+
+/**
+ * The single answer a viewer is shown for a slot, derived from `showAs`
+ * and `flexibility` together. See `getAvailability`.
+ */
+export type Availability = 'open' | 'tentative' | 'negotiable' | 'blocked';
 export type Visibility = 'default' | 'public' | 'private' | 'confidential';
 export type SubscriptionRole = 'owner' | 'manager' | 'editor' | 'viewer';
 export type Rsvp = 'pending' | 'accepted' | 'declined' | 'tentative' | 'needs_action';
@@ -63,6 +80,12 @@ export interface CalendarEvent {
   kind: EventKind;
   visibility: Visibility;
   showAs: ShowAs;
+  /**
+   * Whether the commitment can be moved. Optional so a caller mapping an
+   * older payload does not have to invent a value; treat a missing one as
+   * `fixed`, which is what the column defaults to.
+   */
+  flexibility?: Flexibility;
   title: string;
   allDay: boolean;
   /**

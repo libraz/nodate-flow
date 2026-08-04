@@ -22,6 +22,7 @@ INSERT INTO calendar_events (
   kind,
   visibility,
   show_as,
+  flexibility,
   title,
   all_day,
   start_at,
@@ -38,32 +39,33 @@ INSERT INTO calendar_events (
   recurrence_exceptions,
   notification_offset,
   task_id
-) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 `
 
 type CreateCalendarEventParams struct {
-	PublicID             types.PublicID           `json:"publicId"`
-	WorkspaceID          uint32                   `json:"-"`
-	CalendarID           uint32                   `json:"-"`
-	Kind                 CalendarEventsKind       `json:"kind"`
-	Visibility           CalendarEventsVisibility `json:"visibility"`
-	ShowAs               CalendarEventsShowAs     `json:"showAs"`
-	Title                string                   `json:"title"`
-	AllDay               bool                     `json:"allDay"`
-	StartAt              sql.NullTime             `json:"startAt"`
-	EndAt                sql.NullTime             `json:"endAt"`
-	Timezone             string                   `json:"timezone"`
-	Location             sql.NullString           `json:"location"`
-	Memo                 sql.NullString           `json:"memo"`
-	Url                  sql.NullString           `json:"url"`
-	OwnerUserID          uint32                   `json:"-"`
-	CreatedByUserID      uint32                   `json:"-"`
-	BlockLabel           sql.NullString           `json:"blockLabel"`
-	RecurrenceRule       json.RawMessage          `json:"recurrenceRule"`
-	RecurrenceEnd        sql.NullTime             `json:"recurrenceEnd"`
-	RecurrenceExceptions json.RawMessage          `json:"recurrenceExceptions"`
-	NotificationOffset   sql.NullInt32            `json:"notificationOffset"`
-	TaskID               sql.NullInt32            `json:"-"`
+	PublicID             types.PublicID            `json:"publicId"`
+	WorkspaceID          uint32                    `json:"-"`
+	CalendarID           uint32                    `json:"-"`
+	Kind                 CalendarEventsKind        `json:"kind"`
+	Visibility           CalendarEventsVisibility  `json:"visibility"`
+	ShowAs               CalendarEventsShowAs      `json:"showAs"`
+	Flexibility          CalendarEventsFlexibility `json:"flexibility"`
+	Title                string                    `json:"title"`
+	AllDay               bool                      `json:"allDay"`
+	StartAt              sql.NullTime              `json:"startAt"`
+	EndAt                sql.NullTime              `json:"endAt"`
+	Timezone             string                    `json:"timezone"`
+	Location             sql.NullString            `json:"location"`
+	Memo                 sql.NullString            `json:"memo"`
+	Url                  sql.NullString            `json:"url"`
+	OwnerUserID          uint32                    `json:"-"`
+	CreatedByUserID      uint32                    `json:"-"`
+	BlockLabel           sql.NullString            `json:"blockLabel"`
+	RecurrenceRule       json.RawMessage           `json:"recurrenceRule"`
+	RecurrenceEnd        sql.NullTime              `json:"recurrenceEnd"`
+	RecurrenceExceptions json.RawMessage           `json:"recurrenceExceptions"`
+	NotificationOffset   sql.NullInt32             `json:"notificationOffset"`
+	TaskID               sql.NullInt32             `json:"-"`
 }
 
 // Insert a new calendar event.
@@ -75,6 +77,7 @@ func (q *Queries) CreateCalendarEvent(ctx context.Context, arg CreateCalendarEve
 		arg.Kind,
 		arg.Visibility,
 		arg.ShowAs,
+		arg.Flexibility,
 		arg.Title,
 		arg.AllDay,
 		arg.StartAt,
@@ -130,6 +133,7 @@ SELECT
   ce.kind,
   ce.visibility,
   ce.show_as,
+  ce.flexibility,
   ce.title,
   ce.all_day,
   ce.start_at,
@@ -169,35 +173,36 @@ type FindCalendarEventByPublicIdParams struct {
 }
 
 type FindCalendarEventByPublicIdRow struct {
-	ID                   uint32                   `json:"-"`
-	PublicID             types.PublicID           `json:"publicId"`
-	WorkspaceID          uint32                   `json:"-"`
-	CalendarID           uint32                   `json:"-"`
-	Kind                 CalendarEventsKind       `json:"kind"`
-	Visibility           CalendarEventsVisibility `json:"visibility"`
-	ShowAs               CalendarEventsShowAs     `json:"showAs"`
-	Title                string                   `json:"title"`
-	AllDay               bool                     `json:"allDay"`
-	StartAt              sql.NullTime             `json:"startAt"`
-	EndAt                sql.NullTime             `json:"endAt"`
-	Timezone             string                   `json:"timezone"`
-	Location             sql.NullString           `json:"location"`
-	Memo                 sql.NullString           `json:"memo"`
-	Url                  sql.NullString           `json:"url"`
-	OwnerUserID          uint32                   `json:"-"`
-	CreatedByUserID      uint32                   `json:"-"`
-	CreatorPublicID      types.PublicID           `json:"creatorPublicId"`
-	CreatorDisplayName   sql.NullString           `json:"creatorDisplayName"`
-	CreatorAvatarUrl     sql.NullString           `json:"creatorAvatarUrl"`
-	BlockLabel           sql.NullString           `json:"blockLabel"`
-	RecurrenceRule       json.RawMessage          `json:"recurrenceRule"`
-	RecurrenceEnd        sql.NullTime             `json:"recurrenceEnd"`
-	RecurrenceExceptions json.RawMessage          `json:"recurrenceExceptions"`
-	NotificationOffset   sql.NullInt32            `json:"notificationOffset"`
-	TaskID               sql.NullInt32            `json:"-"`
-	Enabled              bool                     `json:"enabled"`
-	UpdatedAt            sql.NullTime             `json:"updatedAt"`
-	CreatedAt            time.Time                `json:"createdAt"`
+	ID                   uint32                    `json:"-"`
+	PublicID             types.PublicID            `json:"publicId"`
+	WorkspaceID          uint32                    `json:"-"`
+	CalendarID           uint32                    `json:"-"`
+	Kind                 CalendarEventsKind        `json:"kind"`
+	Visibility           CalendarEventsVisibility  `json:"visibility"`
+	ShowAs               CalendarEventsShowAs      `json:"showAs"`
+	Flexibility          CalendarEventsFlexibility `json:"flexibility"`
+	Title                string                    `json:"title"`
+	AllDay               bool                      `json:"allDay"`
+	StartAt              sql.NullTime              `json:"startAt"`
+	EndAt                sql.NullTime              `json:"endAt"`
+	Timezone             string                    `json:"timezone"`
+	Location             sql.NullString            `json:"location"`
+	Memo                 sql.NullString            `json:"memo"`
+	Url                  sql.NullString            `json:"url"`
+	OwnerUserID          uint32                    `json:"-"`
+	CreatedByUserID      uint32                    `json:"-"`
+	CreatorPublicID      types.PublicID            `json:"creatorPublicId"`
+	CreatorDisplayName   sql.NullString            `json:"creatorDisplayName"`
+	CreatorAvatarUrl     sql.NullString            `json:"creatorAvatarUrl"`
+	BlockLabel           sql.NullString            `json:"blockLabel"`
+	RecurrenceRule       json.RawMessage           `json:"recurrenceRule"`
+	RecurrenceEnd        sql.NullTime              `json:"recurrenceEnd"`
+	RecurrenceExceptions json.RawMessage           `json:"recurrenceExceptions"`
+	NotificationOffset   sql.NullInt32             `json:"notificationOffset"`
+	TaskID               sql.NullInt32             `json:"-"`
+	Enabled              bool                      `json:"enabled"`
+	UpdatedAt            sql.NullTime              `json:"updatedAt"`
+	CreatedAt            time.Time                 `json:"createdAt"`
 }
 
 // Resolve a calendar event by UUID v7 within a calendar. The creator
@@ -214,6 +219,7 @@ func (q *Queries) FindCalendarEventByPublicId(ctx context.Context, arg FindCalen
 		&i.Kind,
 		&i.Visibility,
 		&i.ShowAs,
+		&i.Flexibility,
 		&i.Title,
 		&i.AllDay,
 		&i.StartAt,
@@ -279,6 +285,7 @@ SELECT
   ce.kind,
   ce.visibility,
   ce.show_as,
+  ce.flexibility,
   ce.title,
   ce.all_day,
   ce.start_at,
@@ -315,23 +322,24 @@ type ListCalendarEventsAcrossCalendarsParams struct {
 }
 
 type ListCalendarEventsAcrossCalendarsRow struct {
-	PublicID         types.PublicID           `json:"publicId"`
-	CalendarID       uint32                   `json:"-"`
-	CalendarPublicID types.PublicID           `json:"calendarPublicId"`
-	Kind             CalendarEventsKind       `json:"kind"`
-	Visibility       CalendarEventsVisibility `json:"visibility"`
-	ShowAs           CalendarEventsShowAs     `json:"showAs"`
-	Title            string                   `json:"title"`
-	AllDay           bool                     `json:"allDay"`
-	StartAt          sql.NullTime             `json:"startAt"`
-	EndAt            sql.NullTime             `json:"endAt"`
-	Timezone         string                   `json:"timezone"`
-	Location         sql.NullString           `json:"location"`
-	OwnerUserID      uint32                   `json:"-"`
-	BlockLabel       sql.NullString           `json:"blockLabel"`
-	TaskID           sql.NullInt32            `json:"-"`
-	UpdatedAt        sql.NullTime             `json:"updatedAt"`
-	CreatedAt        time.Time                `json:"createdAt"`
+	PublicID         types.PublicID            `json:"publicId"`
+	CalendarID       uint32                    `json:"-"`
+	CalendarPublicID types.PublicID            `json:"calendarPublicId"`
+	Kind             CalendarEventsKind        `json:"kind"`
+	Visibility       CalendarEventsVisibility  `json:"visibility"`
+	ShowAs           CalendarEventsShowAs      `json:"showAs"`
+	Flexibility      CalendarEventsFlexibility `json:"flexibility"`
+	Title            string                    `json:"title"`
+	AllDay           bool                      `json:"allDay"`
+	StartAt          sql.NullTime              `json:"startAt"`
+	EndAt            sql.NullTime              `json:"endAt"`
+	Timezone         string                    `json:"timezone"`
+	Location         sql.NullString            `json:"location"`
+	OwnerUserID      uint32                    `json:"-"`
+	BlockLabel       sql.NullString            `json:"blockLabel"`
+	TaskID           sql.NullInt32             `json:"-"`
+	UpdatedAt        sql.NullTime              `json:"updatedAt"`
+	CreatedAt        time.Time                 `json:"createdAt"`
 }
 
 // Cross-calendar query: list events across multiple calendars for a user
@@ -357,6 +365,7 @@ func (q *Queries) ListCalendarEventsAcrossCalendars(ctx context.Context, arg Lis
 			&i.Kind,
 			&i.Visibility,
 			&i.ShowAs,
+			&i.Flexibility,
 			&i.Title,
 			&i.AllDay,
 			&i.StartAt,
@@ -388,6 +397,7 @@ SELECT
   ce.kind,
   ce.visibility,
   ce.show_as,
+  ce.flexibility,
   ce.title,
   ce.all_day,
   ce.start_at,
@@ -425,28 +435,29 @@ type ListCalendarEventsByRangeParams struct {
 }
 
 type ListCalendarEventsByRangeRow struct {
-	PublicID           types.PublicID           `json:"publicId"`
-	Kind               CalendarEventsKind       `json:"kind"`
-	Visibility         CalendarEventsVisibility `json:"visibility"`
-	ShowAs             CalendarEventsShowAs     `json:"showAs"`
-	Title              string                   `json:"title"`
-	AllDay             bool                     `json:"allDay"`
-	StartAt            sql.NullTime             `json:"startAt"`
-	EndAt              sql.NullTime             `json:"endAt"`
-	Timezone           string                   `json:"timezone"`
-	Location           sql.NullString           `json:"location"`
-	Memo               sql.NullString           `json:"memo"`
-	Url                sql.NullString           `json:"url"`
-	OwnerUserID        uint32                   `json:"-"`
-	CreatedByUserID    uint32                   `json:"-"`
-	CreatorPublicID    types.PublicID           `json:"creatorPublicId"`
-	CreatorDisplayName sql.NullString           `json:"creatorDisplayName"`
-	CreatorAvatarUrl   sql.NullString           `json:"creatorAvatarUrl"`
-	BlockLabel         sql.NullString           `json:"blockLabel"`
-	NotificationOffset sql.NullInt32            `json:"notificationOffset"`
-	TaskID             sql.NullInt32            `json:"-"`
-	UpdatedAt          sql.NullTime             `json:"updatedAt"`
-	CreatedAt          time.Time                `json:"createdAt"`
+	PublicID           types.PublicID            `json:"publicId"`
+	Kind               CalendarEventsKind        `json:"kind"`
+	Visibility         CalendarEventsVisibility  `json:"visibility"`
+	ShowAs             CalendarEventsShowAs      `json:"showAs"`
+	Flexibility        CalendarEventsFlexibility `json:"flexibility"`
+	Title              string                    `json:"title"`
+	AllDay             bool                      `json:"allDay"`
+	StartAt            sql.NullTime              `json:"startAt"`
+	EndAt              sql.NullTime              `json:"endAt"`
+	Timezone           string                    `json:"timezone"`
+	Location           sql.NullString            `json:"location"`
+	Memo               sql.NullString            `json:"memo"`
+	Url                sql.NullString            `json:"url"`
+	OwnerUserID        uint32                    `json:"-"`
+	CreatedByUserID    uint32                    `json:"-"`
+	CreatorPublicID    types.PublicID            `json:"creatorPublicId"`
+	CreatorDisplayName sql.NullString            `json:"creatorDisplayName"`
+	CreatorAvatarUrl   sql.NullString            `json:"creatorAvatarUrl"`
+	BlockLabel         sql.NullString            `json:"blockLabel"`
+	NotificationOffset sql.NullInt32             `json:"notificationOffset"`
+	TaskID             sql.NullInt32             `json:"-"`
+	UpdatedAt          sql.NullTime              `json:"updatedAt"`
+	CreatedAt          time.Time                 `json:"createdAt"`
 }
 
 // List non-recurring events in a calendar within a time range.
@@ -464,6 +475,7 @@ func (q *Queries) ListCalendarEventsByRange(ctx context.Context, arg ListCalenda
 			&i.Kind,
 			&i.Visibility,
 			&i.ShowAs,
+			&i.Flexibility,
 			&i.Title,
 			&i.AllDay,
 			&i.StartAt,
@@ -507,6 +519,7 @@ SELECT
   ce.kind,
   ce.visibility,
   ce.show_as,
+  ce.flexibility,
   ce.title,
   ce.all_day,
   ce.start_at,
@@ -560,32 +573,33 @@ type ListMyCalendarEventsAcrossWorkspacesParams struct {
 }
 
 type ListMyCalendarEventsAcrossWorkspacesRow struct {
-	PublicID           types.PublicID           `json:"publicId"`
-	CalendarID         uint32                   `json:"-"`
-	CalendarPublicID   types.PublicID           `json:"calendarPublicId"`
-	WorkspaceID        uint32                   `json:"-"`
-	WorkspacePublicID  types.PublicID           `json:"workspacePublicId"`
-	WorkspaceName      string                   `json:"workspaceName"`
-	Kind               CalendarEventsKind       `json:"kind"`
-	Visibility         CalendarEventsVisibility `json:"visibility"`
-	ShowAs             CalendarEventsShowAs     `json:"showAs"`
-	Title              string                   `json:"title"`
-	AllDay             bool                     `json:"allDay"`
-	StartAt            sql.NullTime             `json:"startAt"`
-	EndAt              sql.NullTime             `json:"endAt"`
-	Timezone           string                   `json:"timezone"`
-	Location           sql.NullString           `json:"location"`
-	OwnerUserID        uint32                   `json:"-"`
-	OwnerPublicID      types.PublicID           `json:"ownerPublicId"`
-	CreatorPublicID    types.PublicID           `json:"creatorPublicId"`
-	CreatorDisplayName sql.NullString           `json:"creatorDisplayName"`
-	CreatorAvatarUrl   sql.NullString           `json:"creatorAvatarUrl"`
-	AttendeeCount      int64                    `json:"attendeeCount"`
-	ViewerAttending    bool                     `json:"viewerAttending"`
-	BlockLabel         sql.NullString           `json:"blockLabel"`
-	TaskID             sql.NullInt32            `json:"-"`
-	UpdatedAt          sql.NullTime             `json:"updatedAt"`
-	CreatedAt          time.Time                `json:"createdAt"`
+	PublicID           types.PublicID            `json:"publicId"`
+	CalendarID         uint32                    `json:"-"`
+	CalendarPublicID   types.PublicID            `json:"calendarPublicId"`
+	WorkspaceID        uint32                    `json:"-"`
+	WorkspacePublicID  types.PublicID            `json:"workspacePublicId"`
+	WorkspaceName      string                    `json:"workspaceName"`
+	Kind               CalendarEventsKind        `json:"kind"`
+	Visibility         CalendarEventsVisibility  `json:"visibility"`
+	ShowAs             CalendarEventsShowAs      `json:"showAs"`
+	Flexibility        CalendarEventsFlexibility `json:"flexibility"`
+	Title              string                    `json:"title"`
+	AllDay             bool                      `json:"allDay"`
+	StartAt            sql.NullTime              `json:"startAt"`
+	EndAt              sql.NullTime              `json:"endAt"`
+	Timezone           string                    `json:"timezone"`
+	Location           sql.NullString            `json:"location"`
+	OwnerUserID        uint32                    `json:"-"`
+	OwnerPublicID      types.PublicID            `json:"ownerPublicId"`
+	CreatorPublicID    types.PublicID            `json:"creatorPublicId"`
+	CreatorDisplayName sql.NullString            `json:"creatorDisplayName"`
+	CreatorAvatarUrl   sql.NullString            `json:"creatorAvatarUrl"`
+	AttendeeCount      int64                     `json:"attendeeCount"`
+	ViewerAttending    bool                      `json:"viewerAttending"`
+	BlockLabel         sql.NullString            `json:"blockLabel"`
+	TaskID             sql.NullInt32             `json:"-"`
+	UpdatedAt          sql.NullTime              `json:"updatedAt"`
+	CreatedAt          time.Time                 `json:"createdAt"`
 }
 
 // Cross-workspace variant: list non-recurring events on every calendar
@@ -614,6 +628,7 @@ func (q *Queries) ListMyCalendarEventsAcrossWorkspaces(ctx context.Context, arg 
 			&i.Kind,
 			&i.Visibility,
 			&i.ShowAs,
+			&i.Flexibility,
 			&i.Title,
 			&i.AllDay,
 			&i.StartAt,
@@ -656,6 +671,7 @@ SELECT
   ce.kind,
   ce.visibility,
   ce.show_as,
+  ce.flexibility,
   ce.title,
   ce.all_day,
   ce.start_at,
@@ -712,35 +728,36 @@ type ListMyRecurringCalendarEventsAcrossWorkspacesParams struct {
 }
 
 type ListMyRecurringCalendarEventsAcrossWorkspacesRow struct {
-	PublicID             types.PublicID           `json:"publicId"`
-	CalendarID           uint32                   `json:"-"`
-	CalendarPublicID     types.PublicID           `json:"calendarPublicId"`
-	WorkspaceID          uint32                   `json:"-"`
-	WorkspacePublicID    types.PublicID           `json:"workspacePublicId"`
-	WorkspaceName        string                   `json:"workspaceName"`
-	Kind                 CalendarEventsKind       `json:"kind"`
-	Visibility           CalendarEventsVisibility `json:"visibility"`
-	ShowAs               CalendarEventsShowAs     `json:"showAs"`
-	Title                string                   `json:"title"`
-	AllDay               bool                     `json:"allDay"`
-	StartAt              sql.NullTime             `json:"startAt"`
-	EndAt                sql.NullTime             `json:"endAt"`
-	Timezone             string                   `json:"timezone"`
-	Location             sql.NullString           `json:"location"`
-	OwnerUserID          uint32                   `json:"-"`
-	OwnerPublicID        types.PublicID           `json:"ownerPublicId"`
-	CreatorPublicID      types.PublicID           `json:"creatorPublicId"`
-	CreatorDisplayName   sql.NullString           `json:"creatorDisplayName"`
-	CreatorAvatarUrl     sql.NullString           `json:"creatorAvatarUrl"`
-	AttendeeCount        int64                    `json:"attendeeCount"`
-	ViewerAttending      bool                     `json:"viewerAttending"`
-	BlockLabel           sql.NullString           `json:"blockLabel"`
-	RecurrenceRule       json.RawMessage          `json:"recurrenceRule"`
-	RecurrenceEnd        sql.NullTime             `json:"recurrenceEnd"`
-	RecurrenceExceptions json.RawMessage          `json:"recurrenceExceptions"`
-	TaskID               sql.NullInt32            `json:"-"`
-	UpdatedAt            sql.NullTime             `json:"updatedAt"`
-	CreatedAt            time.Time                `json:"createdAt"`
+	PublicID             types.PublicID            `json:"publicId"`
+	CalendarID           uint32                    `json:"-"`
+	CalendarPublicID     types.PublicID            `json:"calendarPublicId"`
+	WorkspaceID          uint32                    `json:"-"`
+	WorkspacePublicID    types.PublicID            `json:"workspacePublicId"`
+	WorkspaceName        string                    `json:"workspaceName"`
+	Kind                 CalendarEventsKind        `json:"kind"`
+	Visibility           CalendarEventsVisibility  `json:"visibility"`
+	ShowAs               CalendarEventsShowAs      `json:"showAs"`
+	Flexibility          CalendarEventsFlexibility `json:"flexibility"`
+	Title                string                    `json:"title"`
+	AllDay               bool                      `json:"allDay"`
+	StartAt              sql.NullTime              `json:"startAt"`
+	EndAt                sql.NullTime              `json:"endAt"`
+	Timezone             string                    `json:"timezone"`
+	Location             sql.NullString            `json:"location"`
+	OwnerUserID          uint32                    `json:"-"`
+	OwnerPublicID        types.PublicID            `json:"ownerPublicId"`
+	CreatorPublicID      types.PublicID            `json:"creatorPublicId"`
+	CreatorDisplayName   sql.NullString            `json:"creatorDisplayName"`
+	CreatorAvatarUrl     sql.NullString            `json:"creatorAvatarUrl"`
+	AttendeeCount        int64                     `json:"attendeeCount"`
+	ViewerAttending      bool                      `json:"viewerAttending"`
+	BlockLabel           sql.NullString            `json:"blockLabel"`
+	RecurrenceRule       json.RawMessage           `json:"recurrenceRule"`
+	RecurrenceEnd        sql.NullTime              `json:"recurrenceEnd"`
+	RecurrenceExceptions json.RawMessage           `json:"recurrenceExceptions"`
+	TaskID               sql.NullInt32             `json:"-"`
+	UpdatedAt            sql.NullTime              `json:"updatedAt"`
+	CreatedAt            time.Time                 `json:"createdAt"`
 }
 
 // Cross-workspace recurring variant. Same membership guard as the
@@ -765,6 +782,7 @@ func (q *Queries) ListMyRecurringCalendarEventsAcrossWorkspaces(ctx context.Cont
 			&i.Kind,
 			&i.Visibility,
 			&i.ShowAs,
+			&i.Flexibility,
 			&i.Title,
 			&i.AllDay,
 			&i.StartAt,
@@ -807,6 +825,7 @@ SELECT
   ce.kind,
   ce.visibility,
   ce.show_as,
+  ce.flexibility,
   ce.title,
   ce.all_day,
   ce.start_at,
@@ -846,26 +865,27 @@ type ListRecurringCalendarEventsAcrossCalendarsParams struct {
 }
 
 type ListRecurringCalendarEventsAcrossCalendarsRow struct {
-	PublicID             types.PublicID           `json:"publicId"`
-	CalendarID           uint32                   `json:"-"`
-	CalendarPublicID     types.PublicID           `json:"calendarPublicId"`
-	Kind                 CalendarEventsKind       `json:"kind"`
-	Visibility           CalendarEventsVisibility `json:"visibility"`
-	ShowAs               CalendarEventsShowAs     `json:"showAs"`
-	Title                string                   `json:"title"`
-	AllDay               bool                     `json:"allDay"`
-	StartAt              sql.NullTime             `json:"startAt"`
-	EndAt                sql.NullTime             `json:"endAt"`
-	Timezone             string                   `json:"timezone"`
-	Location             sql.NullString           `json:"location"`
-	OwnerUserID          uint32                   `json:"-"`
-	BlockLabel           sql.NullString           `json:"blockLabel"`
-	RecurrenceRule       json.RawMessage          `json:"recurrenceRule"`
-	RecurrenceEnd        sql.NullTime             `json:"recurrenceEnd"`
-	RecurrenceExceptions json.RawMessage          `json:"recurrenceExceptions"`
-	TaskID               sql.NullInt32            `json:"-"`
-	UpdatedAt            sql.NullTime             `json:"updatedAt"`
-	CreatedAt            time.Time                `json:"createdAt"`
+	PublicID             types.PublicID            `json:"publicId"`
+	CalendarID           uint32                    `json:"-"`
+	CalendarPublicID     types.PublicID            `json:"calendarPublicId"`
+	Kind                 CalendarEventsKind        `json:"kind"`
+	Visibility           CalendarEventsVisibility  `json:"visibility"`
+	ShowAs               CalendarEventsShowAs      `json:"showAs"`
+	Flexibility          CalendarEventsFlexibility `json:"flexibility"`
+	Title                string                    `json:"title"`
+	AllDay               bool                      `json:"allDay"`
+	StartAt              sql.NullTime              `json:"startAt"`
+	EndAt                sql.NullTime              `json:"endAt"`
+	Timezone             string                    `json:"timezone"`
+	Location             sql.NullString            `json:"location"`
+	OwnerUserID          uint32                    `json:"-"`
+	BlockLabel           sql.NullString            `json:"blockLabel"`
+	RecurrenceRule       json.RawMessage           `json:"recurrenceRule"`
+	RecurrenceEnd        sql.NullTime              `json:"recurrenceEnd"`
+	RecurrenceExceptions json.RawMessage           `json:"recurrenceExceptions"`
+	TaskID               sql.NullInt32             `json:"-"`
+	UpdatedAt            sql.NullTime              `json:"updatedAt"`
+	CreatedAt            time.Time                 `json:"createdAt"`
 }
 
 // Cross-calendar query: list recurring events across multiple calendars
@@ -891,6 +911,7 @@ func (q *Queries) ListRecurringCalendarEventsAcrossCalendars(ctx context.Context
 			&i.Kind,
 			&i.Visibility,
 			&i.ShowAs,
+			&i.Flexibility,
 			&i.Title,
 			&i.AllDay,
 			&i.StartAt,
@@ -925,6 +946,7 @@ SELECT
   ce.kind,
   ce.visibility,
   ce.show_as,
+  ce.flexibility,
   ce.title,
   ce.all_day,
   ce.start_at,
@@ -965,31 +987,32 @@ type ListRecurringCalendarEventsByRangeParams struct {
 }
 
 type ListRecurringCalendarEventsByRangeRow struct {
-	PublicID             types.PublicID           `json:"publicId"`
-	Kind                 CalendarEventsKind       `json:"kind"`
-	Visibility           CalendarEventsVisibility `json:"visibility"`
-	ShowAs               CalendarEventsShowAs     `json:"showAs"`
-	Title                string                   `json:"title"`
-	AllDay               bool                     `json:"allDay"`
-	StartAt              sql.NullTime             `json:"startAt"`
-	EndAt                sql.NullTime             `json:"endAt"`
-	Timezone             string                   `json:"timezone"`
-	Location             sql.NullString           `json:"location"`
-	Memo                 sql.NullString           `json:"memo"`
-	Url                  sql.NullString           `json:"url"`
-	OwnerUserID          uint32                   `json:"-"`
-	CreatedByUserID      uint32                   `json:"-"`
-	CreatorPublicID      types.PublicID           `json:"creatorPublicId"`
-	CreatorDisplayName   sql.NullString           `json:"creatorDisplayName"`
-	CreatorAvatarUrl     sql.NullString           `json:"creatorAvatarUrl"`
-	BlockLabel           sql.NullString           `json:"blockLabel"`
-	RecurrenceRule       json.RawMessage          `json:"recurrenceRule"`
-	RecurrenceEnd        sql.NullTime             `json:"recurrenceEnd"`
-	RecurrenceExceptions json.RawMessage          `json:"recurrenceExceptions"`
-	NotificationOffset   sql.NullInt32            `json:"notificationOffset"`
-	TaskID               sql.NullInt32            `json:"-"`
-	UpdatedAt            sql.NullTime             `json:"updatedAt"`
-	CreatedAt            time.Time                `json:"createdAt"`
+	PublicID             types.PublicID            `json:"publicId"`
+	Kind                 CalendarEventsKind        `json:"kind"`
+	Visibility           CalendarEventsVisibility  `json:"visibility"`
+	ShowAs               CalendarEventsShowAs      `json:"showAs"`
+	Flexibility          CalendarEventsFlexibility `json:"flexibility"`
+	Title                string                    `json:"title"`
+	AllDay               bool                      `json:"allDay"`
+	StartAt              sql.NullTime              `json:"startAt"`
+	EndAt                sql.NullTime              `json:"endAt"`
+	Timezone             string                    `json:"timezone"`
+	Location             sql.NullString            `json:"location"`
+	Memo                 sql.NullString            `json:"memo"`
+	Url                  sql.NullString            `json:"url"`
+	OwnerUserID          uint32                    `json:"-"`
+	CreatedByUserID      uint32                    `json:"-"`
+	CreatorPublicID      types.PublicID            `json:"creatorPublicId"`
+	CreatorDisplayName   sql.NullString            `json:"creatorDisplayName"`
+	CreatorAvatarUrl     sql.NullString            `json:"creatorAvatarUrl"`
+	BlockLabel           sql.NullString            `json:"blockLabel"`
+	RecurrenceRule       json.RawMessage           `json:"recurrenceRule"`
+	RecurrenceEnd        sql.NullTime              `json:"recurrenceEnd"`
+	RecurrenceExceptions json.RawMessage           `json:"recurrenceExceptions"`
+	NotificationOffset   sql.NullInt32             `json:"notificationOffset"`
+	TaskID               sql.NullInt32             `json:"-"`
+	UpdatedAt            sql.NullTime              `json:"updatedAt"`
+	CreatedAt            time.Time                 `json:"createdAt"`
 }
 
 // List recurring events whose recurrence window overlaps the query range.
@@ -1007,6 +1030,7 @@ func (q *Queries) ListRecurringCalendarEventsByRange(ctx context.Context, arg Li
 			&i.Kind,
 			&i.Visibility,
 			&i.ShowAs,
+			&i.Flexibility,
 			&i.Title,
 			&i.AllDay,
 			&i.StartAt,
@@ -1047,6 +1071,7 @@ UPDATE calendar_events
 SET kind                = COALESCE(?, kind),
     visibility          = COALESCE(?, visibility),
     show_as             = COALESCE(?, show_as),
+    flexibility         = COALESCE(?, flexibility),
     title               = COALESCE(?, title),
     all_day             = COALESCE(?, all_day),
     start_at            = COALESCE(?, start_at),
@@ -1069,27 +1094,28 @@ WHERE public_id = ?
 `
 
 type PatchCalendarEventParams struct {
-	Kind                 NullCalendarEventsKind       `json:"kind"`
-	Visibility           NullCalendarEventsVisibility `json:"visibility"`
-	ShowAs               NullCalendarEventsShowAs     `json:"showAs"`
-	Title                sql.NullString               `json:"title"`
-	AllDay               sql.NullBool                 `json:"allDay"`
-	StartAt              sql.NullTime                 `json:"startAt"`
-	EndAt                sql.NullTime                 `json:"endAt"`
-	Timezone             sql.NullString               `json:"timezone"`
-	Location             sql.NullString               `json:"location"`
-	Memo                 sql.NullString               `json:"memo"`
-	Url                  sql.NullString               `json:"url"`
-	OwnerUserID          sql.NullInt32                `json:"-"`
-	BlockLabel           sql.NullString               `json:"blockLabel"`
-	RecurrenceRule       json.RawMessage              `json:"recurrenceRule"`
-	RecurrenceEnd        sql.NullTime                 `json:"recurrenceEnd"`
-	RecurrenceExceptions json.RawMessage              `json:"recurrenceExceptions"`
-	NotificationOffset   sql.NullInt32                `json:"notificationOffset"`
-	TaskID               sql.NullInt32                `json:"-"`
-	PublicID             types.PublicID               `json:"publicId"`
-	CalendarID           uint32                       `json:"-"`
-	WorkspaceID          uint32                       `json:"-"`
+	Kind                 NullCalendarEventsKind        `json:"kind"`
+	Visibility           NullCalendarEventsVisibility  `json:"visibility"`
+	ShowAs               NullCalendarEventsShowAs      `json:"showAs"`
+	Flexibility          NullCalendarEventsFlexibility `json:"flexibility"`
+	Title                sql.NullString                `json:"title"`
+	AllDay               sql.NullBool                  `json:"allDay"`
+	StartAt              sql.NullTime                  `json:"startAt"`
+	EndAt                sql.NullTime                  `json:"endAt"`
+	Timezone             sql.NullString                `json:"timezone"`
+	Location             sql.NullString                `json:"location"`
+	Memo                 sql.NullString                `json:"memo"`
+	Url                  sql.NullString                `json:"url"`
+	OwnerUserID          sql.NullInt32                 `json:"-"`
+	BlockLabel           sql.NullString                `json:"blockLabel"`
+	RecurrenceRule       json.RawMessage               `json:"recurrenceRule"`
+	RecurrenceEnd        sql.NullTime                  `json:"recurrenceEnd"`
+	RecurrenceExceptions json.RawMessage               `json:"recurrenceExceptions"`
+	NotificationOffset   sql.NullInt32                 `json:"notificationOffset"`
+	TaskID               sql.NullInt32                 `json:"-"`
+	PublicID             types.PublicID                `json:"publicId"`
+	CalendarID           uint32                        `json:"-"`
+	WorkspaceID          uint32                        `json:"-"`
 }
 
 // Patch mutable event fields. NULL params leave columns untouched.
@@ -1098,6 +1124,7 @@ func (q *Queries) PatchCalendarEvent(ctx context.Context, arg PatchCalendarEvent
 		arg.Kind,
 		arg.Visibility,
 		arg.ShowAs,
+		arg.Flexibility,
 		arg.Title,
 		arg.AllDay,
 		arg.StartAt,

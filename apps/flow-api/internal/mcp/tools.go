@@ -376,6 +376,7 @@ func registerTools(h *Handler) {
 			"endDate":     stringSchema("End date YYYY-MM-DD (all-day events, inclusive).", Constraints{Pattern: `^\d{4}-\d{2}-\d{2}$`}),
 			"kind":        stringSchema("Event kind: event | block | free (default event)."),
 			"showAs":      stringSchema("Show as: busy | free | tentative | oof (default busy)."),
+			"flexibility": stringSchema("Whether the commitment can be moved: fixed | negotiable | conditional (default fixed). Independent of showAs, which only says whether the time reads as taken."),
 			"visibility":  stringSchema("Visibility: default | public | private | confidential."),
 			"ownerUserId": stringSchema("Owner user public id (UUID v7). Defaults to caller.", Constraints{Pattern: publicIDPattern}),
 			"allDay":      boolSchema("Whether this is an all-day event."),
@@ -390,18 +391,19 @@ func registerTools(h *Handler) {
 		description:   "Update mutable fields of a calendar event. Times are unix seconds since epoch (startAt/endAt); use startDate/endDate (YYYY-MM-DD) for all-day events.",
 		requiredScope: "write:workspace",
 		inputSchema: objectSchema(map[string]any{
-			"eventId":    stringSchema("Event public id (UUID v7).", Constraints{Pattern: publicIDPattern}),
-			"title":      stringSchema("New title.", Constraints{MinLength: intPtr(1), MaxLength: intPtr(500)}),
-			"startAt":    intSchema("New start time, unix seconds since epoch.", Constraints{Min: intPtr(0)}),
-			"endAt":      intSchema("New end time, unix seconds since epoch.", Constraints{Min: intPtr(0)}),
-			"startDate":  stringSchema("New start date YYYY-MM-DD (all-day events).", Constraints{Pattern: `^\d{4}-\d{2}-\d{2}$`}),
-			"endDate":    stringSchema("New end date YYYY-MM-DD (all-day events).", Constraints{Pattern: `^\d{4}-\d{2}-\d{2}$`}),
-			"kind":       stringSchema("New kind: event | block | free."),
-			"showAs":     stringSchema("New show as: busy | free | tentative | oof."),
-			"visibility": stringSchema("New visibility: default | public | private | confidential."),
-			"location":   stringSchema("New location."),
-			"memo":       stringSchema("New memo/notes."),
-			"blockLabel": stringSchema("New block label."),
+			"eventId":     stringSchema("Event public id (UUID v7).", Constraints{Pattern: publicIDPattern}),
+			"title":       stringSchema("New title.", Constraints{MinLength: intPtr(1), MaxLength: intPtr(500)}),
+			"startAt":     intSchema("New start time, unix seconds since epoch.", Constraints{Min: intPtr(0)}),
+			"endAt":       intSchema("New end time, unix seconds since epoch.", Constraints{Min: intPtr(0)}),
+			"startDate":   stringSchema("New start date YYYY-MM-DD (all-day events).", Constraints{Pattern: `^\d{4}-\d{2}-\d{2}$`}),
+			"endDate":     stringSchema("New end date YYYY-MM-DD (all-day events).", Constraints{Pattern: `^\d{4}-\d{2}-\d{2}$`}),
+			"kind":        stringSchema("New kind: event | block | free."),
+			"showAs":      stringSchema("New show as: busy | free | tentative | oof."),
+			"flexibility": stringSchema("New whether the commitment can be moved: fixed | negotiable | conditional (default fixed). Independent of showAs, which only says whether the time reads as taken."),
+			"visibility":  stringSchema("New visibility: default | public | private | confidential."),
+			"location":    stringSchema("New location."),
+			"memo":        stringSchema("New memo/notes."),
+			"blockLabel":  stringSchema("New block label."),
 		}, []string{"eventId"}),
 		run: runUpdateCalendarEvent,
 	})
@@ -2754,12 +2756,13 @@ func runListCalendarEvents(ctx context.Context, deps Deps, s *session, raw json.
 	items := make([]map[string]any, 0, len(rows))
 	for _, r := range rows {
 		item := map[string]any{
-			"id":         r.PublicID.String(),
-			"calendarId": r.CalendarPublicID.String(),
-			"kind":       string(r.Kind),
-			"showAs":     string(r.ShowAs),
-			"title":      r.Title,
-			"allDay":     r.AllDay,
+			"id":          r.PublicID.String(),
+			"calendarId":  r.CalendarPublicID.String(),
+			"kind":        string(r.Kind),
+			"showAs":      string(r.ShowAs),
+			"flexibility": string(r.Flexibility),
+			"title":       r.Title,
+			"allDay":      r.AllDay,
 		}
 		if r.AllDay {
 			if r.StartAt.Valid {
@@ -2791,6 +2794,7 @@ func runCreateCalendarEvent(ctx context.Context, deps Deps, s *session, raw json
 		EndDate     string `json:"endDate"`
 		Kind        string `json:"kind"`
 		ShowAs      string `json:"showAs"`
+		Flexibility string `json:"flexibility"`
 		Visibility  string `json:"visibility"`
 		OwnerUserID string `json:"ownerUserId"`
 		AllDay      *bool  `json:"allDay"`
@@ -2844,6 +2848,13 @@ func runCreateCalendarEvent(ctx context.Context, deps Deps, s *session, raw json
 	if in.ShowAs != "" {
 		showAs = calendar.CalendarEventsShowAs(in.ShowAs)
 	}
+	// Default to 'fixed'. An agent that says nothing about movability has
+	// not been told the event can move, and guessing otherwise would offer
+	// up the owner's time on their behalf.
+	flexibility := calendar.CalendarEventsFlexibilityFixed
+	if in.Flexibility != "" {
+		flexibility = calendar.CalendarEventsFlexibility(in.Flexibility)
+	}
 	visibility := calendar.CalendarEventsVisibilityDefault
 	if in.Visibility != "" {
 		visibility = calendar.CalendarEventsVisibility(in.Visibility)
@@ -2880,6 +2891,7 @@ func runCreateCalendarEvent(ctx context.Context, deps Deps, s *session, raw json
 		Kind:               kind,
 		Visibility:         visibility,
 		ShowAs:             showAs,
+		Flexibility:        flexibility,
 		Title:              in.Title,
 		AllDay:             allDay,
 		StartAt:            sql.NullTime{Time: startAt, Valid: true},
@@ -2900,11 +2912,12 @@ func runCreateCalendarEvent(ctx context.Context, deps Deps, s *session, raw json
 		return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
 	}
 	out := map[string]any{
-		"id":     pub.String(),
-		"title":  in.Title,
-		"kind":   string(kind),
-		"showAs": string(showAs),
-		"allDay": allDay,
+		"id":          pub.String(),
+		"title":       in.Title,
+		"kind":        string(kind),
+		"showAs":      string(showAs),
+		"flexibility": string(flexibility),
+		"allDay":      allDay,
 	}
 	if allDay {
 		out["startDate"] = startAt.UTC().Format("2006-01-02")
@@ -2918,18 +2931,19 @@ func runCreateCalendarEvent(ctx context.Context, deps Deps, s *session, raw json
 
 func runUpdateCalendarEvent(ctx context.Context, deps Deps, s *session, raw json.RawMessage) (any, error) {
 	var in struct {
-		EventID    string  `json:"eventId"`
-		Title      *string `json:"title"`
-		StartAt    *int64  `json:"startAt"`
-		EndAt      *int64  `json:"endAt"`
-		StartDate  *string `json:"startDate"`
-		EndDate    *string `json:"endDate"`
-		Kind       *string `json:"kind"`
-		ShowAs     *string `json:"showAs"`
-		Visibility *string `json:"visibility"`
-		Location   *string `json:"location"`
-		Memo       *string `json:"memo"`
-		BlockLabel *string `json:"blockLabel"`
+		EventID     string  `json:"eventId"`
+		Title       *string `json:"title"`
+		StartAt     *int64  `json:"startAt"`
+		EndAt       *int64  `json:"endAt"`
+		StartDate   *string `json:"startDate"`
+		EndDate     *string `json:"endDate"`
+		Kind        *string `json:"kind"`
+		ShowAs      *string `json:"showAs"`
+		Flexibility *string `json:"flexibility"`
+		Visibility  *string `json:"visibility"`
+		Location    *string `json:"location"`
+		Memo        *string `json:"memo"`
+		BlockLabel  *string `json:"blockLabel"`
 	}
 	if err := parseArgs(raw, &in); err != nil {
 		return nil, err
@@ -3032,6 +3046,12 @@ func runUpdateCalendarEvent(ctx context.Context, deps Deps, s *session, raw json
 		params.ShowAs = calendar.NullCalendarEventsShowAs{
 			CalendarEventsShowAs: calendar.CalendarEventsShowAs(*in.ShowAs),
 			Valid:                true,
+		}
+	}
+	if in.Flexibility != nil {
+		params.Flexibility = calendar.NullCalendarEventsFlexibility{
+			CalendarEventsFlexibility: calendar.CalendarEventsFlexibility(*in.Flexibility),
+			Valid:                     true,
 		}
 	}
 	if in.Visibility != nil {
@@ -3305,6 +3325,7 @@ func runCreateEventFromTask(ctx context.Context, deps Deps, s *session, raw json
 		Kind:               calendar.CalendarEventsKindEvent,
 		Visibility:         calendar.CalendarEventsVisibilityDefault,
 		ShowAs:             calendar.CalendarEventsShowAsBusy,
+		Flexibility:        calendar.CalendarEventsFlexibilityFixed,
 		Title:              task.Title,
 		AllDay:             false,
 		StartAt:            sql.NullTime{Time: startAt, Valid: true},

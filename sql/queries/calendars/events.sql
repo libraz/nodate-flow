@@ -7,6 +7,7 @@ INSERT INTO calendar_events (
   kind,
   visibility,
   show_as,
+  flexibility,
   title,
   all_day,
   start_at,
@@ -23,7 +24,7 @@ INSERT INTO calendar_events (
   recurrence_exceptions,
   notification_offset,
   task_id
-) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
 
 -- name: FindCalendarEventByPublicId :one
 -- Resolve a calendar event by UUID v7 within a calendar. The creator
@@ -37,6 +38,7 @@ SELECT
   ce.kind,
   ce.visibility,
   ce.show_as,
+  ce.flexibility,
   ce.title,
   ce.all_day,
   ce.start_at,
@@ -75,6 +77,7 @@ SELECT
   ce.kind,
   ce.visibility,
   ce.show_as,
+  ce.flexibility,
   ce.title,
   ce.all_day,
   ce.start_at,
@@ -111,6 +114,7 @@ SELECT
   ce.kind,
   ce.visibility,
   ce.show_as,
+  ce.flexibility,
   ce.title,
   ce.all_day,
   ce.start_at,
@@ -153,6 +157,7 @@ SELECT
   ce.kind,
   ce.visibility,
   ce.show_as,
+  ce.flexibility,
   ce.title,
   ce.all_day,
   ce.start_at,
@@ -190,6 +195,7 @@ SELECT
   ce.kind,
   ce.visibility,
   ce.show_as,
+  ce.flexibility,
   ce.title,
   ce.all_day,
   ce.start_at,
@@ -238,6 +244,7 @@ SELECT
   ce.kind,
   ce.visibility,
   ce.show_as,
+  ce.flexibility,
   ce.title,
   ce.all_day,
   ce.start_at,
@@ -297,6 +304,7 @@ SELECT
   ce.kind,
   ce.visibility,
   ce.show_as,
+  ce.flexibility,
   ce.title,
   ce.all_day,
   ce.start_at,
@@ -351,6 +359,7 @@ UPDATE calendar_events
 SET kind                = COALESCE(sqlc.narg('kind'), kind),
     visibility          = COALESCE(sqlc.narg('visibility'), visibility),
     show_as             = COALESCE(sqlc.narg('show_as'), show_as),
+    flexibility         = COALESCE(sqlc.narg('flexibility'), flexibility),
     title               = COALESCE(sqlc.narg('title'), title),
     all_day             = COALESCE(sqlc.narg('all_day'), all_day),
     start_at            = COALESCE(sqlc.narg('start_at'), start_at),

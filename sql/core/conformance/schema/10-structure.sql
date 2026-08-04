@@ -48,6 +48,27 @@ CALL nf_conformance_assert(
      AND is_nullable = 'YES') = 2,
   'events.task_id and events.actor_user_id must be nullable');
 
+-- Availability is two independent columns. An implementation that dropped
+-- flexibility would have nowhere to record that a commitment can move, and
+-- the pressure would be to overload show_as instead — which is the one
+-- thing the contract forbids, because show_as is what every external
+-- free/busy consumer reads.
+CALL nf_conformance_assert(
+  (SELECT column_type = "enum('fixed','negotiable','conditional')"
+      AND is_nullable = 'NO'
+      AND column_default = 'fixed'
+   FROM information_schema.columns
+   WHERE table_schema = DATABASE()
+     AND table_name = 'calendar_events' AND column_name = 'flexibility'),
+  'calendar_events.flexibility must be a NOT NULL enum defaulting to fixed');
+
+-- The default is load-bearing: a writer that predates the column, or one
+-- that simply omits it, must produce a row that reads as immovable rather
+-- than one that advertises availability its owner never offered.
+CALL nf_conformance_assert(
+  (SELECT flexibility = 'fixed' FROM calendar_events WHERE id = @plain_event),
+  'an event inserted without naming flexibility must default to fixed');
+
 -- The guard triggers are part of the contract, not an optional extra: an
 -- implementation that loaded the tables but skipped them would accept
 -- writes this document says are refused.

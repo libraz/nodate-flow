@@ -361,6 +361,49 @@ func (ns NullCalendarEventAttendeesRsvp) Value() (driver.Value, error) {
 	return string(ns.CalendarEventAttendeesRsvp), nil
 }
 
+type CalendarEventsFlexibility string
+
+const (
+	CalendarEventsFlexibilityFixed       CalendarEventsFlexibility = "fixed"
+	CalendarEventsFlexibilityNegotiable  CalendarEventsFlexibility = "negotiable"
+	CalendarEventsFlexibilityConditional CalendarEventsFlexibility = "conditional"
+)
+
+func (e *CalendarEventsFlexibility) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = CalendarEventsFlexibility(s)
+	case string:
+		*e = CalendarEventsFlexibility(s)
+	default:
+		return fmt.Errorf("unsupported scan type for CalendarEventsFlexibility: %T", src)
+	}
+	return nil
+}
+
+type NullCalendarEventsFlexibility struct {
+	CalendarEventsFlexibility CalendarEventsFlexibility `json:"calendarEventsFlexibility"`
+	Valid                     bool                      `json:"valid"` // Valid is true if CalendarEventsFlexibility is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullCalendarEventsFlexibility) Scan(value interface{}) error {
+	if value == nil {
+		ns.CalendarEventsFlexibility, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.CalendarEventsFlexibility.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullCalendarEventsFlexibility) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.CalendarEventsFlexibility), nil
+}
+
 type CalendarEventsKind string
 
 const (
@@ -2478,8 +2521,10 @@ type CalendarEvent struct {
 	Kind CalendarEventsKind `json:"kind"`
 	// Who can see event details: default (calendar setting), public (all), private (time only), confidential (owner only)
 	Visibility CalendarEventsVisibility `json:"visibility"`
-	// Availability display: busy, free, tentative, out-of-office
+	// Availability display: busy, free, tentative, out-of-office. The iCalendar TRANSP axis — whether the time reads as taken — and nothing more.
 	ShowAs CalendarEventsShowAs `json:"showAs"`
+	// Whether the commitment can be moved, independent of whether the time reads as busy. Combined with show_as to derive a displayed availability mark.
+	Flexibility CalendarEventsFlexibility `json:"flexibility"`
 	// Event title
 	Title string `json:"title"`
 	// All-day event flag

@@ -12,15 +12,18 @@
  * settles on a common shape.
  */
 
+export { AVAILABILITY_MARK, combineAvailability, getAvailability } from './availability';
 export { getEventStyle } from './event-styles';
 export { expandAllRecurrences, expandRecurrence } from './recurrence';
 
 export type {
+  Availability,
   Calendar,
   CalendarEvent,
   CalendarKind,
   CalendarMember,
   EventKind,
+  Flexibility,
   RecurrenceRule,
   Rsvp,
   ShowAs,

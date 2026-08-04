@@ -5744,6 +5744,11 @@ export interface components {
              */
             endAt?: number;
             /**
+             * @description Whether the commitment can be moved; independent of showAs, which only says whether the time reads as taken
+             * @enum {string}
+             */
+            flexibility?: "fixed" | "negotiable" | "conditional";
+            /**
              * @description Event kind
              * @enum {string}
              */
@@ -6166,6 +6171,7 @@ export interface components {
             createdAt: number;
             /** Format: int64 */
             endAt?: number;
+            flexibility: string;
             id: string;
             kind: string;
             location?: string;
@@ -6667,6 +6673,7 @@ export interface components {
             creatorId?: string;
             /** Format: int64 */
             endAt?: number;
+            flexibility: string;
             id: string;
             kind: string;
             location?: string;
@@ -8038,6 +8045,7 @@ export interface components {
             creatorId?: string;
             /** Format: int64 */
             endAt?: number;
+            flexibility: string;
             id: string;
             kind: string;
             location?: string;
@@ -8278,6 +8286,11 @@ export interface components {
              * @description End time as unix seconds (UTC)
              */
             endAt?: number;
+            /**
+             * @description Whether the commitment can be moved; independent of showAs, which only says whether the time reads as taken
+             * @enum {string}
+             */
+            flexibility?: "fixed" | "negotiable" | "conditional";
             /** @description Event kind */
             kind?: string;
             /** @description Location */
@@ -8812,6 +8825,7 @@ export interface components {
             blockLabel?: string;
             /** Format: int64 */
             endAt?: number;
+            flexibility: string;
             id: string;
             kind: string;
             location?: string;

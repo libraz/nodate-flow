@@ -51,6 +51,19 @@ the `task_role_key` generated column, and the projection guard triggers. An
 implementation does not need to re-derive these rules; it needs to not work
 around them.
 
+One rule the schema cannot enforce for itself: `show_as` and `flexibility`
+are separate axes and must stay that way. `show_as` is iCalendar `TRANSP` —
+whether the time reads as taken — and is what every external free/busy
+consumer reads. `flexibility` is whether the commitment could move. A
+meeting its owner would gladly reschedule and one that cannot move are both
+`busy`, which is why a second column exists.
+
+Writing `tentative` to mean "negotiable" is the tempting shortcut and the
+one that does real damage: it puts a non-iCalendar meaning into the column
+outside consumers interpret, so a free/busy export starts misreporting to
+people who never agreed to this contract. Display may collapse the two into
+a single mark; storage may not.
+
 ### 2. Append to `events` in the same transaction as the state change
 
 Every state change gets exactly one row in `events`, written in the same

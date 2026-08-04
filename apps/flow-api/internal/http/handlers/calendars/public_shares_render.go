@@ -31,6 +31,7 @@ type PublicShareRenderEvent struct {
 	URL            *string `json:"url,omitempty"`
 	Kind           string  `json:"kind"`
 	ShowAs         string  `json:"showAs"`
+	Flexibility    string  `json:"flexibility"`
 	BlockLabel     *string `json:"blockLabel,omitempty"`
 	RecurrenceRule *string `json:"recurrenceRule,omitempty"`
 	RecurrenceEnd  *int64  `json:"recurrenceEnd,omitempty"`
@@ -117,6 +118,7 @@ func RenderPublicShare(deps Deps) func(context.Context, *RenderPublicShareInput)
 				URL:            nullStringPtr(e.Url),
 				Kind:           string(e.Kind),
 				ShowAs:         string(e.ShowAs),
+				Flexibility:    string(e.Flexibility),
 				BlockLabel:     nullStringPtr(e.BlockLabel),
 				RecurrenceRule: rawMessagePtr(e.RecurrenceRule),
 				RecurrenceEnd:  nullTimeUnixPtr(e.RecurrenceEnd),
@@ -126,9 +128,10 @@ func RenderPublicShare(deps Deps) func(context.Context, *RenderPublicShareInput)
 			}
 			// `private`-visibility events honour a "time only" contract on
 			// the public, unauthenticated page: the time block stays visible
-			// (start/end/show_as/block_label) but all descriptive content is
-			// stripped so title/notes/location/url never leak. `confidential`
-			// events are excluded entirely by the render query.
+			// (start/end, show_as, flexibility, block_label) but all
+			// descriptive content is stripped so title/notes/location/url
+			// never leak. `confidential` events are excluded entirely by the
+			// render query.
 			if e.Visibility == calendar.CalendarEventsVisibilityPrivate {
 				stripPrivateEventDetails(&ev)
 			}
@@ -140,9 +143,14 @@ func RenderPublicShare(deps Deps) func(context.Context, *RenderPublicShareInput)
 
 // stripPrivateEventDetails enforces the "time only" contract for
 // `private`-visibility events on the public render page. The time block
-// stays observable (start/end, all-day, timezone, show_as, block_label,
-// recurrence) while every descriptive field that could leak content to an
-// unauthenticated viewer is cleared: title, location, memo, and url.
+// stays observable (start/end, all-day, timezone, show_as, flexibility,
+// block_label, recurrence) while every descriptive field that could leak
+// content to an unauthenticated viewer is cleared: title, location, memo,
+// and url.
+//
+// flexibility stays because it is an availability property rather than
+// content: someone looking at the share to find a slot needs to know which
+// blocks are movable, which is the whole reason the column exists.
 func stripPrivateEventDetails(ev *PublicShareRenderEvent) {
 	ev.Title = ""
 	ev.Location = nil

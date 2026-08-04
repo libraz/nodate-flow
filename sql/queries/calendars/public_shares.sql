@@ -225,6 +225,7 @@ SELECT
   ce.kind,
   ce.visibility,
   ce.show_as,
+  ce.flexibility,
   ce.block_label,
   COALESCE(ce.recurrence_rule, CAST('null' AS JSON)) AS recurrence_rule,
   ce.recurrence_end,

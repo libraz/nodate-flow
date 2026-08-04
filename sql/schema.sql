@@ -338,7 +338,26 @@ CREATE TABLE calendar_events (
   -- Event classification
   kind ENUM('event','block','free','milestone') NOT NULL DEFAULT 'event' COMMENT 'event=regular, block=declarative time frame (work hours, focus), free=available slot, milestone=umbrella/milestone, has no duration semantics',
   visibility ENUM('default','public','private','confidential') NOT NULL DEFAULT 'default' COMMENT 'Who can see event details: default (calendar setting), public (all), private (time only), confidential (owner only)',
-  show_as ENUM('busy','free','tentative','oof') NOT NULL DEFAULT 'busy' COMMENT 'Availability display: busy, free, tentative, out-of-office',
+  show_as ENUM('busy','free','tentative','oof') NOT NULL DEFAULT 'busy' COMMENT 'Availability display: busy, free, tentative, out-of-office. The iCalendar TRANSP axis — whether the time reads as taken — and nothing more.',
+  /**
+   * flexibility: whether a confirmed commitment could be moved, which
+   * show_as cannot express. A meeting the owner would happily reschedule
+   * and one that cannot move are both show_as='busy'; treating either as
+   * simply unavailable is what makes coordinating across calendars a
+   * conversation rather than a lookup.
+   *
+   * The two axes stay separate on purpose. Overloading show_as with
+   * movability would put non-iCalendar values into the column every
+   * external consumer reads as TRANSP, so a free/busy export would start
+   * lying to anyone outside this database.
+   *
+   *   fixed        cannot move (default; the safe reading of a row
+   *                written by anything that predates this column)
+   *   negotiable   the owner is willing to move it
+   *   conditional  movable, but subject to something outside this row —
+   *                another party's agreement, a cost, a dependency
+   */
+  flexibility ENUM('fixed','negotiable','conditional') NOT NULL DEFAULT 'fixed' COMMENT 'Whether the commitment can be moved, independent of whether the time reads as busy. Combined with show_as to derive a displayed availability mark.',
 
   title VARCHAR(500) NOT NULL COMMENT 'Event title',
   all_day BOOLEAN NOT NULL DEFAULT FALSE COMMENT 'All-day event flag',
