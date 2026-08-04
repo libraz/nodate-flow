@@ -76,7 +76,7 @@ CREATE TABLE calendar_events (
   sort_weight INT NOT NULL DEFAULT 0 COMMENT 'Display order',
   notes TEXT NULL COMMENT 'Admin notes',
   flags JSON NULL COMMENT 'Structured per-event markers (non_working_day, auto_snapped, etc.); unknown keys preserved.',
-  enabled BOOLEAN NOT NULL DEFAULT TRUE COMMENT 'Soft-delete flag; FALSE excludes the row from LIST/GET. The single soft-delete signal for this table — propagate via INNER/LEFT JOIN ... AND ce.enabled = TRUE in every consumer view (matches project-wide enabled propagation in docs/conventions/db.md).',
+  enabled BOOLEAN NOT NULL DEFAULT TRUE COMMENT 'Soft-delete flag; FALSE excludes the row from LIST/GET. The single soft-delete signal for this table — propagate via INNER/LEFT JOIN ... AND ce.enabled = TRUE in every consumer view, so a soft-deleted row cannot reappear through a join.',
   updated_at TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
   created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
 
@@ -95,10 +95,11 @@ CREATE TABLE calendar_events (
   CONSTRAINT fk_calendar_events_owner FOREIGN KEY (owner_user_id) REFERENCES users(id) ON DELETE CASCADE,
   CONSTRAINT fk_calendar_events_creator FOREIGN KEY (created_by_user_id) REFERENCES users(id) ON DELETE CASCADE,
   -- fk_calendar_events_task (task_id -> tasks.id) is NOT declared here.
-  -- task_id is a core column so that a core-only deployment writes rows
-  -- of the same shape, but `tasks` belongs to the flow layer. The
-  -- constraint is added by sql/flow/constraints/ when that layer is
-  -- present. In a core-only deployment task_id is always NULL.
+  -- task_id is a core column so that every deployment writes rows of the
+  -- same shape, but `tasks` belongs to a product layer and a foreign key
+  -- cannot point at a table that may not exist. The layer owning `tasks`
+  -- adds the constraint from its own constraints/ directory; where there
+  -- is no such layer, task_id is always NULL.
 
   -- CHECK constraints that do not reference task_id. MySQL 8.4+
   -- forbids CHECK constraints referencing columns used in FK

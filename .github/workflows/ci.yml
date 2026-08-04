@@ -87,6 +87,11 @@ jobs:
       - name: Schema drift
         run: bash scripts/schema-diff.sh
 
+      # The contract is vendored into other repositories, so a comment
+      # citing a file only this repository has arrives as a dead pointer.
+      - name: Core is self-contained
+        run: bash scripts/core-self-contained.sh
+
       # The contract is checked against both shapes a deployment can take.
       # Core alone is what an implementor that hosts no task layer applies,
       # and it is the shape most likely to rot unnoticed, because nothing
