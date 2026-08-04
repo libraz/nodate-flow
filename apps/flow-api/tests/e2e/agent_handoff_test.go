@@ -435,7 +435,7 @@ func TestManualHandbackEndpoint(t *testing.T) {
 	f := notification.NewFanout(testDB, queries, email.NoopSender{})
 	f.SetTimeout(5 * time.Second)
 	hook := f.Hook()
-	hook(context.Background(), wsID, "agent.task.handoff_to_user", uint32(evs[0].ID)) //#nosec G115 -- events.id fits uint32 within realistic test sizes
+	hook(context.Background(), wsID, "agent.task.handoff_to_user", uint64(evs[0].ID)) //#nosec G115 -- events.id is BIGINT UNSIGNED, non-negative
 	require.NoError(t, f.Shutdown(ctxWithTimeout(t, 10*time.Second)))
 
 	afterCount := notificationCountForUser(context.Background(), t, testDB, userInternalID)
@@ -601,7 +601,7 @@ func asNumber(t *testing.T, v any) float64 {
 // the orchestrator's resolveSourceTask call returns a non-zero task_id.
 // The orchestrator only reads (task_id, public_id) from the row, so the
 // payload is intentionally minimal.
-func insertSyntheticTaskEvent(t *testing.T, db *sql.DB, workspaceID, taskID uint32) uint32 {
+func insertSyntheticTaskEvent(t *testing.T, db *sql.DB, workspaceID, taskID uint32) uint64 {
 	t.Helper()
 	res, err := helpers.ExecRetry(context.Background(), db, "test seed: insert event", `
 		INSERT INTO events (public_id, workspace_id, task_id, type, payload_json, occurred_at)
@@ -611,7 +611,7 @@ func insertSyntheticTaskEvent(t *testing.T, db *sql.DB, workspaceID, taskID uint
 	require.NoError(t, err)
 	id, err := res.LastInsertId()
 	require.NoError(t, err)
-	return uint32(id) //#nosec G115 -- test fixture
+	return uint64(id) //#nosec G115 -- AUTO_INCREMENT LastInsertId is non-negative
 }
 
 // ageTaskUpdatedAt pushes the row's updated_at back so the autoactions

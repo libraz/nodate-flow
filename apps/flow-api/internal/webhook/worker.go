@@ -90,8 +90,8 @@ func NewWorker(db *sql.DB, q *generated.Queries) *Worker {
 // request cancellation while DB inserts still get to finish. A
 // recover() guards the goroutine: a panic inside createDeliveries
 // would otherwise crash the whole flow-api process.
-func (w *Worker) Hook() func(ctx context.Context, workspaceID uint32, eventType string, eventInternalID uint32) {
-	return func(ctx context.Context, workspaceID uint32, eventType string, eventInternalID uint32) {
+func (w *Worker) Hook() func(ctx context.Context, workspaceID uint32, eventType string, eventInternalID uint64) {
+	return func(ctx context.Context, workspaceID uint32, eventType string, eventInternalID uint64) {
 		detached := context.WithoutCancel(ctx)
 		go func() {
 			defer func() {
@@ -116,7 +116,7 @@ func (w *Worker) Hook() func(ctx context.Context, workspaceID uint32, eventType 
 // eventInternalID is resolved once to (event_public_id, occurred_at) so
 // every delivery row in this fan-out shares the same dedupe key and the
 // payload's OccurredAt is the event's logical time, not the dispatch time.
-func (w *Worker) createDeliveries(ctx context.Context, workspaceID uint32, eventType string, eventInternalID uint32) {
+func (w *Worker) createDeliveries(ctx context.Context, workspaceID uint32, eventType string, eventInternalID uint64) {
 	subs, err := w.queries.ListActiveSubscriptionsForEvent(ctx, workspaceID)
 	if err != nil {
 		slog.Warn("webhook: failed to list active subscriptions",
@@ -128,13 +128,13 @@ func (w *Worker) createDeliveries(ctx context.Context, workspaceID uint32, event
 
 	eventRow, err := w.queries.GetEventPublicIDAndOccurredAt(ctx, generated.GetEventPublicIDAndOccurredAtParams{
 		WorkspaceID: workspaceID,
-		ID:          uint64(eventInternalID),
+		ID:          eventInternalID,
 	})
 	if err != nil {
 		slog.Warn("webhook: failed to resolve event public id",
 			slog.Uint64("workspace_id", uint64(workspaceID)),
 			slog.String("event_type", eventType),
-			slog.Uint64("event_internal_id", uint64(eventInternalID)),
+			slog.Uint64("event_internal_id", eventInternalID),
 			slog.String("err", err.Error()))
 		return
 	}

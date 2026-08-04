@@ -201,6 +201,8 @@ func main() {
 	var tap *stream.EventbusTap
 	var streamRemember stream.RememberWorkspaceFunc
 	var aiInvocationPublisher func(context.Context, uint32)
+	streamTailCancel := func() {}
+	defer func() { streamTailCancel() }()
 	if cfg.StreamEnabled {
 		// Prefer a Redis-backed notifier when the env asks for it and
 		// the binary was compiled with -tags redis; otherwise fall
@@ -218,6 +220,22 @@ func main() {
 		eventbus.AddNotifyHook(tap.Publish)
 		streamRemember = tap.RememberWorkspace
 		aiInvocationPublisher = tap.PublishAiInvocation
+
+		// The tap only sees appends made by this binary. When another
+		// product writes to the same database its changes reach this
+		// process's subscribers through the log instead.
+		if cfg.StreamTail {
+			tailer := stream.NewTailer(db, notifier, tap)
+			tailer.SetInterval(cfg.StreamTailInterval)
+			var tailCtx context.Context
+			tailCtx, streamTailCancel = context.WithCancel(context.Background())
+			go func() {
+				if err := tailer.Run(tailCtx); err != nil && !errors.Is(err, context.Canceled) {
+					logger.Warn("event tail stopped", "err", err)
+				}
+			}()
+			logger.Info("event tail started", "interval", cfg.StreamTailInterval)
+		}
 	}
 
 	// Agent runtime wiring. The runner (and optionally the mysql

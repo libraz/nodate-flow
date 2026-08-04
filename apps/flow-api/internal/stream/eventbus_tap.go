@@ -20,6 +20,11 @@ type EventbusTap struct {
 
 	mu    sync.RWMutex
 	cache map[uint32]string // internal workspace id → public id
+
+	// own records the events.id values this tap published, so a
+	// [Tailer] reading the same log can tell them from another
+	// process's appends and not invalidate twice.
+	own selfWrites
 }
 
 // NewEventbusTap returns a tap writing to notifier.
@@ -32,6 +37,14 @@ func NewEventbusTap(notifier Notifier) *EventbusTap {
 		cache:    make(map[uint32]string),
 	}
 }
+
+// trackSelfWrites switches on the self-write ledger. [NewTailer] calls
+// it; nothing else should, because the ledger is only bounded by a
+// tailer draining it.
+func (t *EventbusTap) trackSelfWrites() { t.own.enable() }
+
+// claim implements [selfWriteLedger].
+func (t *EventbusTap) claim(id uint64) bool { return t.own.claim(id) }
 
 // RememberWorkspace caches the internal→public id mapping for a
 // workspace. The SSE handler calls this on every new subscription so
@@ -49,10 +62,14 @@ func (t *EventbusTap) RememberWorkspace(internalID uint32, publicID string) {
 // the frontend will do the right thing on the next subscription
 // because the SSE handler always writes an initial resync marker.
 //
-// eventInternalID is unused here; the SSE tap signals "something
-// happened" without carrying the events.id forward.
-func (t *EventbusTap) Publish(ctx context.Context, workspaceInternalID uint32, eventType string, eventInternalID uint32) {
-	_ = eventInternalID
+// eventInternalID does not reach the wire — the SSE payload is
+// invalidation-only — but it is recorded so a [Tailer] reading the
+// same log can skip what this tap has already delivered. Only ids that
+// were actually published are recorded: an event dropped here for an
+// unknown kind is dropped by the tailer too, and one dropped for an
+// uncached workspace is worth re-publishing if a subscriber has since
+// appeared.
+func (t *EventbusTap) Publish(ctx context.Context, workspaceInternalID uint32, eventType string, eventInternalID uint64) {
 	kind, ok := KindForEventType(eventType)
 	if !ok {
 		return
@@ -63,6 +80,7 @@ func (t *EventbusTap) Publish(ctx context.Context, workspaceInternalID uint32, e
 	if !cached {
 		return
 	}
+	t.own.record(eventInternalID)
 	t.notifier.Publish(ctx, Event{
 		Kind:        kind,
 		WorkspaceID: publicID,

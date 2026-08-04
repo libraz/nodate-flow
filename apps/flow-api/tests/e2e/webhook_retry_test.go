@@ -227,7 +227,7 @@ func TestWebhookFanoutDedupAndOccurredAt(t *testing.T) {
 	require.NoError(t, err)
 	eventLastID, err := res.LastInsertId()
 	require.NoError(t, err)
-	eventInternalID := uint32(eventLastID) //#nosec G115 -- LastInsertId in test seed, fits uint32
+	eventInternalID := uint64(eventLastID) //#nosec G115 -- AUTO_INCREMENT LastInsertId is non-negative
 
 	// Fire the worker's hook twice for the same eventInternalID. The
 	// hook spawns goroutines, so we poll for the first row to land

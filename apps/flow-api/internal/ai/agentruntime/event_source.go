@@ -23,7 +23,7 @@ import (
 // no task scope to bind against.
 type OnEventAgentsQuerier interface {
 	ListOnEventAgentsFor(ctx context.Context, workspaceID uint32, eventKind string) ([]OnEventAgentMatch, error)
-	ListOnEventAgentsForEvent(ctx context.Context, workspaceID uint32, eventInternalID uint32) ([]OnEventAgentMatch, error)
+	ListOnEventAgentsForEvent(ctx context.Context, workspaceID uint32, eventInternalID uint64) ([]OnEventAgentMatch, error)
 }
 
 // OnEventAgentMatch is the narrow row returned from the on-event
@@ -53,8 +53,8 @@ type EventTrigger struct {
 // events.id row that was just appended; the scoped lookup joins
 // through it so schedule_scope='assigned_tasks' agents only wake when
 // the source event is bound to a task they own.
-func (e *EventTrigger) NotifyHook() func(ctx context.Context, workspaceID uint32, eventType string, eventInternalID uint32) {
-	return func(ctx context.Context, workspaceID uint32, eventType string, eventInternalID uint32) {
+func (e *EventTrigger) NotifyHook() func(ctx context.Context, workspaceID uint32, eventType string, eventInternalID uint64) {
+	return func(ctx context.Context, workspaceID uint32, eventType string, eventInternalID uint64) {
 		if e == nil || e.Queries == nil || e.Queue == nil {
 			return
 		}
@@ -62,7 +62,7 @@ func (e *EventTrigger) NotifyHook() func(ctx context.Context, workspaceID uint32
 	}
 }
 
-func (e *EventTrigger) dispatch(ctx context.Context, workspaceID uint32, eventType string, eventInternalID uint32) {
+func (e *EventTrigger) dispatch(ctx context.Context, workspaceID uint32, eventType string, eventInternalID uint64) {
 	if e.Now == nil {
 		e.Now = time.Now
 	}
@@ -177,7 +177,7 @@ WHERE a.enabled = TRUE
     )
   )`
 
-func (q *sqlcOnEventQuerier) ListOnEventAgentsForEvent(ctx context.Context, workspaceID uint32, eventInternalID uint32) ([]OnEventAgentMatch, error) {
+func (q *sqlcOnEventQuerier) ListOnEventAgentsForEvent(ctx context.Context, workspaceID uint32, eventInternalID uint64) ([]OnEventAgentMatch, error) {
 	rows, err := q.db.QueryContext(ctx, onEventAgentsForEventQuery, eventInternalID, workspaceID)
 	if err != nil {
 		return nil, err

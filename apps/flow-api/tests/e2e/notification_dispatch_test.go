@@ -72,7 +72,7 @@ func TestNotificationDispatchOnAssignee(t *testing.T) {
 
 	// Find the task.actor.added event row id this test produced. Anchor
 	// on workspace + actor to avoid collisions with parallel tests.
-	var actorEventID uint32
+	var actorEventID uint64
 	err := testDB.QueryRowContext(ctx, `
 		SELECT id
 		FROM events
@@ -125,7 +125,7 @@ func TestNotificationDispatchOnAssignee(t *testing.T) {
 	require.NoError(t, err, "the dispatched notification row must be readable")
 	require.Equal(t, memberInternalID, gotRecipientID)
 	require.True(t, gotSourceEvent.Valid, "source_event_id must be populated by fan-out")
-	require.Equal(t, int64(actorEventID), gotSourceEvent.Int64)
+	require.Equal(t, actorEventID, uint64(gotSourceEvent.Int64))
 	require.Equal(t, "task.actor.added", gotEventType)
 	require.Equal(t, "in_app", gotChannel)
 	require.Equal(t, "task", gotResourceType)

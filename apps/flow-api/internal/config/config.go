@@ -127,6 +127,17 @@ type Config struct {
 	// StreamBackend selects the SSE fan-out driver: "memory" (default)
 	// or "redis" (requires NF_REDIS_ADDR).
 	StreamBackend string `env:"NF_FLOW_STREAM_BACKEND" envDefault:"memory"`
+	// StreamTail toggles the `events` tailer, which forwards appends
+	// made by another process on the same database to this process's
+	// subscribers. Ignored when StreamEnabled is false.
+	//
+	// Defaults to true: when this API is the only writer the tailer
+	// costs one indexed range scan per interval that returns nothing,
+	// and when it is not, leaving it off means changes made by the
+	// other product never reach a connected client.
+	StreamTail bool `env:"NF_FLOW_STREAM_TAIL" envDefault:"true"`
+	// StreamTailInterval is how often the tailer polls the log.
+	StreamTailInterval time.Duration `env:"NF_FLOW_STREAM_TAIL_INTERVAL" envDefault:"1s"`
 	// OutboundBackend selects the egress rate limiter driver: "memory"
 	// (default) or "redis" (requires NF_REDIS_ADDR).
 	OutboundBackend string `env:"NF_FLOW_OUTBOUND_BACKEND" envDefault:"memory"`

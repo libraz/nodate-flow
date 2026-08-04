@@ -25,7 +25,7 @@ type fanoutFixture struct {
 	actorUserID     uint32
 	recipientUserID uint32
 	taskInternalID  uint32
-	eventInternalID uint32
+	eventInternalID uint64
 }
 
 func seedFanoutFixture(t *testing.T, db *sql.DB) *fanoutFixture {
@@ -98,7 +98,7 @@ func seedFanoutFixture(t *testing.T, db *sql.DB) *fanoutFixture {
 	require.NoError(t, err)
 	eventRaw, err := res.LastInsertId()
 	require.NoError(t, err)
-	eventID := uint32(eventRaw) //#nosec G115 -- LastInsertId in test seed, fits uint32
+	eventID := uint64(eventRaw) //#nosec G115 -- AUTO_INCREMENT LastInsertId is non-negative
 
 	return &fanoutFixture{
 		wsID:            wsID,
@@ -127,7 +127,7 @@ func upsertPreference(t *testing.T, db *sql.DB, wsID, userID uint32, category, c
 // listChannelsForRecipient returns the set of notifications.channel
 // values that exist for the (workspace, recipient, source_event)
 // triple. The tests use it as the post-fan-out assertion vector.
-func listChannelsForRecipient(t *testing.T, db *sql.DB, wsID, recipientID, eventID uint32) []string {
+func listChannelsForRecipient(t *testing.T, db *sql.DB, wsID, recipientID uint32, eventID uint64) []string {
 	t.Helper()
 	rows, err := db.QueryContext(context.Background(),
 		`SELECT channel

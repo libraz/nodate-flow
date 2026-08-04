@@ -140,9 +140,15 @@ type Event struct {
 // notifications.source_event_id, while hooks that only need the
 // signal (SSE tap, on_event triggers) ignore it.
 //
+// It is uint64 rather than the uint32 used for every other internal
+// id because events.id is BIGINT UNSIGNED: the log is append-only and
+// unbounded, so it is the one id expected to outgrow 32 bits. Passing
+// it narrower would silently rewrite source_event_id — the key that
+// makes notification delivery at-least-once rather than at-most-once.
+//
 // Hooks must be non-blocking and must never panic. Leave unset for
 // the no-op behaviour.
-type NotifyHook = func(ctx context.Context, workspaceInternalID uint32, eventType string, eventInternalID uint32)
+type NotifyHook = func(ctx context.Context, workspaceInternalID uint32, eventType string, eventInternalID uint64)
 
 var (
 	notifyMu      sync.RWMutex
@@ -232,7 +238,7 @@ func ActorAgentIDFromContext(ctx context.Context) uint32 {
 	return v
 }
 
-func fireNotifyHooks(ctx context.Context, workspaceInternalID uint32, eventType string, eventInternalID uint32) {
+func fireNotifyHooks(ctx context.Context, workspaceInternalID uint32, eventType string, eventInternalID uint64) {
 	notifyMu.RLock()
 	hooks := make([]NotifyHook, 0, len(notifyHooks))
 	for _, h := range notifyHooks {
@@ -491,9 +497,9 @@ func appendInternalWithMeta(ctx context.Context, db DBTX, evt Event, fromApplier
 		)
 		return ReverseAppendResult{}, err
 	}
-	// LastInsertId is a positive int64 produced by AUTO_INCREMENT; cast to
-	// uint32 for the hook signature (events.id is INT UNSIGNED).
-	eventInternalID := uint32(lastID) //#nosec G115 -- LastInsertId for events.id (BIGINT UNSIGNED), fits uint32 within realistic deployments
+	// LastInsertId is a positive int64 produced by AUTO_INCREMENT, and
+	// events.id is BIGINT UNSIGNED, so uint64 carries it without loss.
+	eventInternalID := uint64(lastID) //#nosec G115 -- AUTO_INCREMENT LastInsertId is non-negative
 	seq := globalSeq.Add(1)
 	seqCtx := WithSeq(ctx, seq)
 	// Fan-out (SSE tap, notification goroutines, on_event triggers) must

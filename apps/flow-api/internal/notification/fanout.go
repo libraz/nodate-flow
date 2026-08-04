@@ -59,7 +59,7 @@ type Fanout struct {
 	// (detached cancel, timeout, shutdown wait) can be exercised
 	// without a live database. Production code leaves this nil and
 	// the hook routes to [Fanout.fanout].
-	run func(ctx context.Context, workspaceID uint32, eventType string, eventInternalID uint32)
+	run func(ctx context.Context, workspaceID uint32, eventType string, eventInternalID uint64)
 
 	// fetchPreferences is the function used to load (recipient,
 	// channel) preferences. Production code leaves this nil and the
@@ -107,8 +107,8 @@ func (f *Fanout) SetTimeout(d time.Duration) {
 // fan-out. It is threaded into notifications.source_event_id so the
 // (recipient, source_event, channel) unique key dedupes goroutine
 // retries and replicated dispatches.
-func (f *Fanout) Hook() func(ctx context.Context, workspaceID uint32, eventType string, eventInternalID uint32) {
-	return func(ctx context.Context, workspaceID uint32, eventType string, eventInternalID uint32) {
+func (f *Fanout) Hook() func(ctx context.Context, workspaceID uint32, eventType string, eventInternalID uint64) {
+	return func(ctx context.Context, workspaceID uint32, eventType string, eventInternalID uint64) {
 		// Refuse to start new work after Shutdown has been called.
 		f.stopMu.RLock()
 		if f.stopping {
@@ -169,7 +169,7 @@ func (f *Fanout) Shutdown(ctx context.Context) error {
 // underlying INSERT IGNORE collides on
 // (recipient_user_id, source_event_id, channel), so re-firing the
 // same hook (e.g. retry, replicated dispatch) yields zero new rows.
-func (f *Fanout) fanout(ctx context.Context, workspaceID uint32, eventType string, eventInternalID uint32) {
+func (f *Fanout) fanout(ctx context.Context, workspaceID uint32, eventType string, eventInternalID uint64) {
 	// Only fan out for event types that warrant user notifications.
 	title, resourceType, severity := classifyEvent(eventType)
 	if title == "" {
@@ -186,7 +186,7 @@ func (f *Fanout) fanout(ctx context.Context, workspaceID uint32, eventType strin
 		slog.ErrorContext(ctx, "notification fanout: failed to fetch event by id",
 			slog.String("event_type", eventType),
 			slog.Uint64("workspace_id", uint64(workspaceID)),
-			slog.Uint64("event_id", uint64(eventInternalID)),
+			slog.Uint64("event_id", eventInternalID),
 			slog.String("err", err.Error()))
 		return
 	}
@@ -220,7 +220,7 @@ func (f *Fanout) fanout(ctx context.Context, workspaceID uint32, eventType strin
 		// level.
 		slog.DebugContext(ctx, "notification fanout: no recipients after filter",
 			slog.Uint64("workspace_id", uint64(workspaceID)),
-			slog.Uint64("event_id", uint64(eventInternalID)),
+			slog.Uint64("event_id", eventInternalID),
 			slog.Int("members_total", len(recipients)),
 			slog.Uint64("actor_user_id", uint64(actorUserID)))
 		return
@@ -310,7 +310,7 @@ func (f *Fanout) fanout(ctx context.Context, workspaceID uint32, eventType strin
 					slog.Uint64("recipient_user_id", uint64(recipientID)),
 					slog.String("event_type", eventType),
 					slog.String("channel", string(channel)),
-					slog.Uint64("event_id", uint64(eventInternalID)),
+					slog.Uint64("event_id", eventInternalID),
 					slog.String("err", err.Error()))
 				continue
 			}
@@ -325,7 +325,7 @@ func (f *Fanout) fanout(ctx context.Context, workspaceID uint32, eventType strin
 				slog.DebugContext(ctx, "notification fanout: deduplicated",
 					slog.Uint64("workspace_id", uint64(workspaceID)),
 					slog.Uint64("recipient_user_id", uint64(recipientID)),
-					slog.Uint64("event_id", uint64(eventInternalID)),
+					slog.Uint64("event_id", eventInternalID),
 					slog.String("event_type", eventType),
 					slog.String("channel", string(channel)))
 				obs.IncNotificationFanoutDedup("unique_collision")
@@ -465,7 +465,7 @@ type eventRow struct {
 // The workspace_id predicate is defence-in-depth — events.id is globally
 // unique already, but anchoring on workspace prevents cross-tenant reads
 // if a caller ever passes a stale id.
-func (f *Fanout) eventByID(ctx context.Context, workspaceID uint32, eventInternalID uint32) (eventRow, error) {
+func (f *Fanout) eventByID(ctx context.Context, workspaceID uint32, eventInternalID uint64) (eventRow, error) {
 	const q = `
 		SELECT e.actor_user_id,
 		       CASE

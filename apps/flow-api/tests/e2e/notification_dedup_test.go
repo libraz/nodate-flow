@@ -64,7 +64,7 @@ func TestNotificationFanoutDedup(t *testing.T) {
 	require.NoError(t, err)
 	eventLastID, err := res.LastInsertId()
 	require.NoError(t, err)
-	eventInternalID := uint32(eventLastID) //#nosec G115 -- LastInsertId in test seed, fits uint32
+	eventInternalID := uint64(eventLastID) //#nosec G115 -- AUTO_INCREMENT LastInsertId is non-negative
 
 	// Snapshot the recipient's notification count before firing.
 	beforeCount := notificationCountForUser(ctx, t, testDB, recipientInternalID)
@@ -87,7 +87,7 @@ func TestNotificationFanoutDedup(t *testing.T) {
 		beforeCount, afterCount)
 
 	// And the existing row points at the right source event.
-	var sourceEventID sql.NullInt32
+	var sourceEventID sql.NullInt64
 	err = testDB.QueryRowContext(ctx, `
 		SELECT source_event_id
 		FROM notifications
@@ -98,7 +98,7 @@ func TestNotificationFanoutDedup(t *testing.T) {
 	`, recipientInternalID).Scan(&sourceEventID)
 	require.NoError(t, err)
 	require.True(t, sourceEventID.Valid, "source_event_id should be populated")
-	require.Equal(t, int32(eventInternalID), sourceEventID.Int32) //#nosec G115 -- event id is events.id (BIGINT UNSIGNED), fits int32 in test seed
+	require.Equal(t, eventInternalID, uint64(sourceEventID.Int64))
 }
 
 // lookupWorkspaceInternalID resolves a workspace's internal id from its

@@ -64,7 +64,7 @@ func TestNotificationMarkReadAndArchive(t *testing.T) {
 	wsInternalID := lookupWorkspaceInternalID(ctx, t, testDB, owner.WorkspacePublicID)
 	ownerInternalID := lookupUserInternalID(ctx, t, testDB, owner.UserPublicID)
 
-	var actorEventID uint32
+	var actorEventID uint64
 	err := testDB.QueryRowContext(ctx, `
 		SELECT id
 		FROM events

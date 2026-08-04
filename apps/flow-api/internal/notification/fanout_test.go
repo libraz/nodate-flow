@@ -29,7 +29,7 @@ func TestHook_DetachesFromParentContext(t *testing.T) {
 
 	done := make(chan struct{})
 	var observedErr atomic.Value // stores error
-	f.run = func(ctx context.Context, _ uint32, _ string, _ uint32) {
+	f.run = func(ctx context.Context, _ uint32, _ string, _ uint64) {
 		defer close(done)
 		// Wait long enough that, if cancellation propagated from the
 		// parent, ctx would be Done immediately.
@@ -74,7 +74,7 @@ func TestHook_TimeoutAborts(t *testing.T) {
 
 	done := make(chan struct{})
 	var observedErr atomic.Value
-	f.run = func(ctx context.Context, _ uint32, _ string, _ uint32) {
+	f.run = func(ctx context.Context, _ uint32, _ string, _ uint64) {
 		defer close(done)
 		// Block until the timeout fires.
 		select {
@@ -121,7 +121,7 @@ func TestShutdown_WaitsForInFlight(t *testing.T) {
 	started := make(chan struct{})
 	var finished atomic.Int32
 	var startedOnce atomic.Bool
-	f.run = func(_ context.Context, _ uint32, _ string, _ uint32) {
+	f.run = func(_ context.Context, _ uint32, _ string, _ uint64) {
 		if startedOnce.CompareAndSwap(false, true) {
 			close(started)
 		}
@@ -189,7 +189,7 @@ func TestShutdown_ContextDeadline(t *testing.T) {
 
 	started := make(chan struct{})
 	var startedOnce atomic.Bool
-	f.run = func(_ context.Context, _ uint32, _ string, _ uint32) {
+	f.run = func(_ context.Context, _ uint32, _ string, _ uint64) {
 		if startedOnce.CompareAndSwap(false, true) {
 			close(started)
 		}

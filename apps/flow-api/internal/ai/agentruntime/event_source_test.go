@@ -12,7 +12,7 @@ type fakeOnEventQuerier struct {
 	mu      sync.Mutex
 	lastWs  uint32
 	lastKnd string
-	lastEid uint32
+	lastEid uint64
 	rows    []OnEventAgentMatch
 }
 
@@ -24,7 +24,7 @@ func (f *fakeOnEventQuerier) ListOnEventAgentsFor(_ context.Context, ws uint32, 
 	return f.rows, nil
 }
 
-func (f *fakeOnEventQuerier) ListOnEventAgentsForEvent(_ context.Context, ws uint32, eid uint32) ([]OnEventAgentMatch, error) {
+func (f *fakeOnEventQuerier) ListOnEventAgentsForEvent(_ context.Context, ws uint32, eid uint64) ([]OnEventAgentMatch, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.lastWs = ws
@@ -86,7 +86,7 @@ func TestEventTriggerScopedDispatch(t *testing.T) {
 	t.Parallel()
 	cases := []struct {
 		name          string
-		eventID       uint32
+		eventID       uint64
 		wantScopedHit bool
 	}{
 		{"scoped path used when event id known", 4242, true},
@@ -108,7 +108,7 @@ func TestEventTriggerScopedDispatch(t *testing.T) {
 				require.Empty(t, q.lastKnd, "legacy event-type path must not be used")
 			} else {
 				require.Equal(t, "task.updated", q.lastKnd, "legacy path should pass event type")
-				require.Equal(t, uint32(0), q.lastEid)
+				require.Equal(t, uint64(0), q.lastEid)
 			}
 		})
 	}
@@ -121,5 +121,5 @@ func TestEventTriggerScopedDispatch(t *testing.T) {
 	et.NotifyHook()(context.Background(), 9, "task.updated", 4242)
 	got, err := queue.Claim(context.Background())
 	require.NoError(t, err)
-	require.Equal(t, uint32(4242), got.Job.SourceEventID)
+	require.Equal(t, uint64(4242), got.Job.SourceEventID)
 }

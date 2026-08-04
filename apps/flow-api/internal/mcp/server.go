@@ -159,7 +159,7 @@ func NewHandler(deps Deps) *Handler {
 // RegisterEventHook returns the eventbus.NotifyHook that broadcasts
 // workspace events to connected SSE clients. The caller should pass
 // this to eventbus.AddNotifyHook.
-func (h *Handler) RegisterEventHook() func(ctx context.Context, workspaceID uint32, eventType string, eventInternalID uint32) {
+func (h *Handler) RegisterEventHook() func(ctx context.Context, workspaceID uint32, eventType string, eventInternalID uint64) {
 	return h.onWorkspaceEvent
 }
 

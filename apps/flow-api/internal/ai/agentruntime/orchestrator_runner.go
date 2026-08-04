@@ -361,7 +361,7 @@ func (r *OrchestratorRunner) resolveSourceTask(ctx context.Context, j Job) (uint
 	row := r.DB.QueryRowContext(ctx, q, j.SourceEventID, j.WsID)
 	if err := row.Scan(&taskID, &pubRaw); err != nil {
 		slog.WarnContext(ctx, "agentruntime: source-task lookup failed",
-			slog.Uint64("event_id", uint64(j.SourceEventID)), slog.Any("err", err))
+			slog.Uint64("event_id", j.SourceEventID), slog.Any("err", err))
 		return 0, ""
 	}
 	if !taskID.Valid {

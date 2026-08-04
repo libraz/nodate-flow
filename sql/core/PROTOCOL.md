@@ -149,6 +149,22 @@ does not reach the other. The `events` table closes that gap: its primary
 key is monotonic, so either side can tail it with `WHERE id > last_seen` and
 feed its own notifier. No broker and no shared code is involved.
 
+One detail decides whether a tailer is correct. `AUTO_INCREMENT` assigns an
+id when the `INSERT` runs, but the row stays invisible until its transaction
+commits — so a row can appear *below* an id that has already been read. A
+cursor that jumps straight to the highest id it has seen steps over that row
+and never delivers it. A tailer must therefore keep re-reading from below
+its high-water mark until a row has had time to commit, and suppress the
+repeats with a set of ids it has already delivered. This bounds the
+guarantee honestly: an append whose transaction stays open longer than that
+window can still be missed, which is why obligation 2 asks for the event
+row to be written in the same transaction as the change rather than in one
+held open around unrelated work.
+
+Delivery is at-least-once. A consumer must treat a repeat as harmless —
+which is why the wire format carries no payload, only "something here
+changed, re-read it".
+
 ## Conformance
 
 `conformance/` holds a suite that checks an implementation against this
