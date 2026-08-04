@@ -213,11 +213,26 @@ func seedTask(ctx context.Context, t *testing.T, wsID, userID uint32, title, due
 
 // seedLinkedEvent inserts a calendar_events row linked to taskID with
 // the given task_role. startAt / endAt are 'YYYY-MM-DD HH:MM:SS'.
+//
+// These tests exist to prove the reconciler heals drift, so they have to
+// manufacture drift that the normal write path cannot produce. That
+// means writing a task-projected row directly, which the projection
+// guard refuses unless the session declares itself the engine. The
+// declaration is scoped to a pinned connection and cleared before the
+// connection returns to the pool, so no later query inherits it.
 func seedLinkedEvent(ctx context.Context, t *testing.T, wsID, calID, userID, taskID uint32,
 	role, startAt, endAt string,
 ) uint32 {
 	t.Helper()
-	res, err := testDB.ExecContext(ctx,
+	conn, err := testDB.Conn(ctx)
+	require.NoError(t, err)
+	defer func() { _ = conn.Close() }()
+
+	_, err = conn.ExecContext(ctx, "SET @nf_item_projection_engine = 1")
+	require.NoError(t, err)
+	defer func() { _, _ = conn.ExecContext(ctx, "SET @nf_item_projection_engine = NULL") }()
+
+	res, err := conn.ExecContext(ctx,
 		`INSERT INTO calendar_events
 		 (public_id, workspace_id, calendar_id, title, start_at, end_at, timezone,
 		  owner_user_id, created_by_user_id, task_id, task_role)

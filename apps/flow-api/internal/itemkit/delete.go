@@ -28,6 +28,12 @@ func UnscheduleTask(ctx context.Context, tx TX, args UnscheduleTaskArgs) error {
 	if !args.Role.IsValid() {
 		return wrapInvariant("role_valid", fmt.Sprintf("unknown role %q", args.Role))
 	}
+	disarm, err := armProjectionGuard(ctx, tx)
+	if err != nil {
+		return err
+	}
+	defer disarm()
+
 	task, err := findTaskByID(ctx, tx, args.WorkspaceID, args.TaskID)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
@@ -89,6 +95,12 @@ func unlinkEventRow(ctx context.Context, tx TX, evt eventRow, actorID uint32, re
 // linked to it. Symmetric to a cascade: the task goes, its
 // projection events go, but unrelated events stay.
 func DeleteTask(ctx context.Context, tx TX, workspaceID, taskID, actorID uint32) error {
+	disarm, err := armProjectionGuard(ctx, tx)
+	if err != nil {
+		return err
+	}
+	defer disarm()
+
 	task, err := findTaskByID(ctx, tx, workspaceID, taskID)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
@@ -113,6 +125,12 @@ func DeleteTask(ctx context.Context, tx TX, workspaceID, taskID, actorID uint32)
 // event is task-linked with RoleDue, the task's due_on column is
 // cleared but the task itself survives.
 func DeleteEvent(ctx context.Context, tx TX, workspaceID, eventID, actorID uint32) error {
+	disarm, err := armProjectionGuard(ctx, tx)
+	if err != nil {
+		return err
+	}
+	defer disarm()
+
 	evt, err := findEventByID(ctx, tx, workspaceID, eventID)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {

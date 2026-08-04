@@ -152,9 +152,9 @@ func waitForPing(ctx context.Context, db *sql.DB, timeout time.Duration) error {
 	return fmt.Errorf("mysql ping never succeeded: %w", lastErr)
 }
 
-// applySchema loads the layered schema — sql/core/tables, sql/flow/tables,
-// sql/flow/constraints, sql/flow/views, sql/flow/triggers — alphabetically
-// with FK checks disabled. This mirrors the behaviour of
+// applySchema loads the layered schema — tables, then cross-layer
+// constraints, then views, then triggers — alphabetically within each
+// directory and with FK checks disabled. This mirrors the behaviour of
 // sql/build-schema.sh but stays in-process so no shell is required.
 //
 // Cross-layer foreign keys live in sql/flow/constraints and must be applied
@@ -169,7 +169,8 @@ func applySchema(ctx context.Context, db *sql.DB) error {
 	flowTablesDir := filepath.Join(root, "sql", "flow", "tables")
 	constraintsDir := filepath.Join(root, "sql", "flow", "constraints")
 	viewsDir := filepath.Join(root, "sql", "flow", "views")
-	triggersDir := filepath.Join(root, "sql", "flow", "triggers")
+	coreTriggersDir := filepath.Join(root, "sql", "core", "triggers")
+	flowTriggersDir := filepath.Join(root, "sql", "flow", "triggers")
 
 	if _, err := db.ExecContext(ctx, "SET FOREIGN_KEY_CHECKS = 0"); err != nil {
 		return err
@@ -187,7 +188,7 @@ func applySchema(ctx context.Context, db *sql.DB) error {
 	if err := execSQLDir(ctx, db, viewsDir); err != nil {
 		return fmt.Errorf("views: %w", err)
 	}
-	if err := execSQLDir(ctx, db, triggersDir); err != nil {
+	if err := execSQLDirs(ctx, db, coreTriggersDir, flowTriggersDir); err != nil {
 		return fmt.Errorf("triggers: %w", err)
 	}
 

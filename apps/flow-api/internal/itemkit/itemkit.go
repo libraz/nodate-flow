@@ -5,9 +5,13 @@
 // change.
 //
 // Design principle: a task with a date is a calendar_event. itemkit
-// enforces that invariant in code because MySQL cross-table triggers
-// are not expressive enough (CHECK constraints cover column-level
-// invariants inside calendar_events only).
+// enforces the cross-table half of that invariant in code, because a
+// MySQL trigger cannot see both tables at once. The half that lives
+// inside calendar_events is enforced by the database: the
+// trg_calendar_events_projection_guard_* triggers reject any write to a
+// task-projected row that does not come from this package, which is what
+// lets a second product share the schema without being able to desync a
+// projection. See armProjectionGuard.
 //
 // Every itemkit function ALSO appends the legacy task.* / calendar.*
 // kind alongside the new item.* kind for one release. Legacy kinds
@@ -147,4 +151,29 @@ func roleNullString(r DateRole) sql.NullString {
 // ITEM.ITEMKIT.INVARIANT_VIOLATION error code.
 func wrapInvariant(name, detail string) error {
 	return fmt.Errorf("itemkit invariant %q: %s", name, detail)
+}
+
+// armProjectionGuard opts the transaction in to writing task-projected
+// calendar_events rows, and returns the function that opts back out.
+//
+// The trg_calendar_events_projection_guard_* triggers reject any write
+// that creates, retargets, or moves a projection unless
+// @nf_item_projection_engine is set, so that a writer which is not this
+// package cannot desync a task from its event. Every itemkit entry
+// point that touches a guarded column arms the guard on entry and
+// disarms it on return.
+//
+// The variable is scoped to the connection, and the caller owns the
+// transaction. Disarming must therefore happen before the caller
+// commits or rolls back — otherwise the connection goes back to the
+// pool with the guard down and an unrelated request inherits it.
+// Deferring the returned function inside an entry point satisfies that,
+// because the entry point always returns first.
+func armProjectionGuard(ctx context.Context, tx TX) (func(), error) {
+	if _, err := tx.ExecContext(ctx, "SET @nf_item_projection_engine = 1"); err != nil {
+		return nil, fmt.Errorf("itemkit: arm projection guard: %w", err)
+	}
+	return func() {
+		_, _ = tx.ExecContext(ctx, "SET @nf_item_projection_engine = NULL")
+	}, nil
 }

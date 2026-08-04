@@ -196,6 +196,12 @@ func ApplyShiftEventAndChildren(ctx context.Context, tx TX, args ApplyShiftEvent
 	if args.NewStartAt.IsZero() {
 		return wrapInvariant("shift_target_required", "newStartAt must be non-zero")
 	}
+	disarm, err := armProjectionGuard(ctx, tx)
+	if err != nil {
+		return err
+	}
+	defer disarm()
+
 	evt, err := findEventByID(ctx, tx, args.WorkspaceID, args.EventID)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {

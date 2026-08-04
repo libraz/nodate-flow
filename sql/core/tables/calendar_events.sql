@@ -83,11 +83,13 @@ CREATE TABLE calendar_events (
 
   -- CHECK constraints that do not reference task_id. MySQL 8.4+
   -- forbids CHECK constraints referencing columns used in FK
-  -- referential actions (task_id has ON DELETE SET NULL), so the
-  -- task_id-related invariants listed below are enforced by itemkit
-  -- and verified by the reconciler instead:
+  -- referential actions (task_id has ON DELETE SET NULL), so these
+  -- two invariants live in trg_calendar_events_projection_guard_ins /
+  -- _upd, which have no such restriction:
   --   (task_id IS NULL) = (task_role IS NULL)
   --   task_id IS NULL OR recurrence_rule IS NULL
+  -- The same triggers reserve task_id, task_role, title, start_at,
+  -- end_at and enabled on a projected row for the projection engine.
   CONSTRAINT chk_calendar_events_start_end_pair CHECK (start_at IS NULL OR end_at IS NOT NULL),
   CONSTRAINT chk_calendar_events_recurrence_requires_start CHECK (start_at IS NOT NULL OR recurrence_rule IS NULL),
   CONSTRAINT chk_calendar_events_notification_requires_start CHECK (start_at IS NOT NULL OR notification_offset IS NULL),

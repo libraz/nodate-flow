@@ -36,6 +36,12 @@ func RenameItem(ctx context.Context, tx TX, args RenameItemArgs) error {
 		return wrapInvariant("rename_origin", "exactly one of TaskID/EventID must be set")
 	}
 
+	disarm, err := armProjectionGuard(ctx, tx)
+	if err != nil {
+		return err
+	}
+	defer disarm()
+
 	if args.TaskID != 0 {
 		return renameFromTask(ctx, tx, args)
 	}

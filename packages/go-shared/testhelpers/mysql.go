@@ -25,6 +25,7 @@ import (
 	"time"
 
 	_ "github.com/go-sql-driver/mysql"
+	"github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/modules/mysql"
 )
 
@@ -135,6 +136,9 @@ func startMySQL(ctx context.Context, cfg MySQLConfig) (*MySQLInstance, error) {
 		mysql.WithDatabase(database),
 		mysql.WithUsername(username),
 		mysql.WithPassword(password),
+		// Required before the schema's triggers will CREATE while the
+		// binary log is on.
+		testcontainers.WithCmdArgs("--log-bin-trust-function-creators=1"),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("start mysql container: %w", err)
@@ -201,13 +205,19 @@ func waitForPing(ctx context.Context, db *sql.DB, timeout time.Duration) error {
 	return fmt.Errorf("mysql ping never succeeded: %w", lastErr)
 }
 
-// ApplyRepoSchema loads the layered schema (sql/core/tables, sql/flow/tables,
-// sql/flow/constraints, sql/flow/views) alphabetically with FK checks
-// disabled. Equivalent to sql/build-schema.sh but in-process.
+// ApplyRepoSchema loads the layered schema — tables, then cross-layer
+// constraints, then views, then triggers — alphabetically within each
+// directory and with FK checks disabled. Equivalent to sql/build-schema.sh
+// but in-process.
 //
 // Cross-layer foreign keys live in sql/flow/constraints and must be applied
 // after every CREATE TABLE of both layers, because they reference tables from
 // each.
+//
+// Triggers are part of the schema, not an optional extra: the
+// calendar_events projection guard rejects writes that would desync a task
+// from its event, so a helper that skipped it would let those tests pass
+// against a database the product never runs on.
 func ApplyRepoSchema(ctx context.Context, db *sql.DB) error {
 	root, err := RepoRoot()
 	if err != nil {
@@ -217,6 +227,8 @@ func ApplyRepoSchema(ctx context.Context, db *sql.DB) error {
 	flowTablesDir := filepath.Join(root, "sql", "flow", "tables")
 	constraintsDir := filepath.Join(root, "sql", "flow", "constraints")
 	viewsDir := filepath.Join(root, "sql", "flow", "views")
+	coreTriggersDir := filepath.Join(root, "sql", "core", "triggers")
+	flowTriggersDir := filepath.Join(root, "sql", "flow", "triggers")
 
 	if _, err := db.ExecContext(ctx, "SET FOREIGN_KEY_CHECKS = 0"); err != nil {
 		return err
@@ -232,6 +244,9 @@ func ApplyRepoSchema(ctx context.Context, db *sql.DB) error {
 	}
 	if err := ExecSQLDir(ctx, db, viewsDir); err != nil {
 		return fmt.Errorf("views: %w", err)
+	}
+	if err := ExecSQLDirs(ctx, db, coreTriggersDir, flowTriggersDir); err != nil {
+		return fmt.Errorf("triggers: %w", err)
 	}
 	if _, err := db.ExecContext(ctx, "SET UNIQUE_CHECKS = 1"); err != nil {
 		return err
@@ -259,9 +274,10 @@ func ExecSQLDirs(ctx context.Context, db *sql.DB, dirs ...string) error {
 	return nil
 }
 
-// ExecSQLDir executes every *.sql file in dir in alphabetical order.
-// The driver must be opened with multiStatements=true for files that
-// contain multiple statements.
+// ExecSQLDir executes every *.sql file in dir in alphabetical order,
+// splitting each file into statements first so trigger bodies — which
+// carry their own DELIMITER directive and internal semicolons — load the
+// same way the mysql client would run them.
 func ExecSQLDir(ctx context.Context, db *sql.DB, dir string) error {
 	entries, err := os.ReadDir(dir)
 	if err != nil {
@@ -276,11 +292,50 @@ func ExecSQLDir(ctx context.Context, db *sql.DB, dir string) error {
 		if err != nil {
 			return err
 		}
-		if _, err := db.ExecContext(ctx, string(raw)); err != nil {
-			return fmt.Errorf("exec %s: %w", e.Name(), err)
+		for _, stmt := range splitSQLStatements(string(raw)) {
+			if strings.TrimSpace(stmt) == "" {
+				continue
+			}
+			if _, err := db.ExecContext(ctx, stmt); err != nil {
+				return fmt.Errorf("exec %s: %w", e.Name(), err)
+			}
 		}
 	}
 	return nil
+}
+
+// splitSQLStatements cuts a .sql file into individually executable
+// statements, honouring the DELIMITER directive. DELIMITER is a mysql
+// client feature rather than SQL, so a trigger body — whose IF / SIGNAL
+// statements end in semicolons of their own — has to be reassembled here
+// before it can be sent over the wire as one statement.
+func splitSQLStatements(raw string) []string {
+	delimiter := ";"
+	var out []string
+	var current strings.Builder
+	for _, line := range strings.Split(raw, "\n") {
+		trimmed := strings.TrimSpace(line)
+		if strings.HasPrefix(strings.ToUpper(trimmed), "DELIMITER ") {
+			if stmt := strings.TrimSpace(current.String()); stmt != "" {
+				out = append(out, stmt)
+				current.Reset()
+			}
+			delimiter = strings.TrimSpace(strings.TrimPrefix(trimmed, "DELIMITER "))
+			continue
+		}
+		current.WriteString(line)
+		current.WriteByte('\n')
+		if strings.HasSuffix(strings.TrimSpace(current.String()), delimiter) {
+			stmt := strings.TrimSpace(current.String())
+			stmt = strings.TrimSuffix(stmt, delimiter)
+			out = append(out, strings.TrimSpace(stmt))
+			current.Reset()
+		}
+	}
+	if stmt := strings.TrimSpace(current.String()); stmt != "" {
+		out = append(out, stmt)
+	}
+	return out
 }
 
 // RepoRoot walks up from this file's location until it finds the

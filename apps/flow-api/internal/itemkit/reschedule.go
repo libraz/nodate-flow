@@ -38,6 +38,12 @@ func RescheduleEvent(ctx context.Context, tx TX, args RescheduleEventArgs) error
 	if !args.StartAt.IsZero() && !args.EndAt.IsZero() && args.EndAt.Before(args.StartAt) {
 		return wrapInvariant("chronology", "end_at before start_at")
 	}
+	disarm, err := armProjectionGuard(ctx, tx)
+	if err != nil {
+		return err
+	}
+	defer disarm()
+
 	evt, err := findEventByID(ctx, tx, args.WorkspaceID, args.EventID)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
@@ -125,6 +131,12 @@ func RescheduleTask(ctx context.Context, tx TX, args RescheduleTaskArgs) error {
 	if !args.SetDueOn {
 		return nil
 	}
+	disarm, err := armProjectionGuard(ctx, tx)
+	if err != nil {
+		return err
+	}
+	defer disarm()
+
 	task, err := findTaskByID(ctx, tx, args.WorkspaceID, args.TaskID)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {

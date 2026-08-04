@@ -152,10 +152,12 @@ func (r *Reconciler) scanDueDateDrift(ctx context.Context) {
 }
 
 // scanOrphanRole finds calendar_events violating the invariant
-// (task_id IS NULL) = (task_role IS NULL). itemkit enforces this on
-// every write; the reconciler only logs because the correct heal
-// direction is ambiguous (which did the writer mean to set?). The
-// counter signals that some writer is bypassing itemkit.
+// (task_id IS NULL) = (task_role IS NULL). The projection guard trigger
+// now rejects such a row outright, so this scan covers rows written
+// before the trigger existed, or by a database the trigger was never
+// applied to. It only logs, because the correct heal direction is
+// ambiguous (which did the writer mean to set?); the counter signals
+// that some writer is bypassing itemkit.
 func (r *Reconciler) scanOrphanRole(ctx context.Context) {
 	const q = `SELECT id, public_id, task_id, task_role
 	           FROM calendar_events
@@ -216,6 +218,32 @@ func (r *Reconciler) scanEnabledMismatch(ctx context.Context) {
 		r.logError("scan enabled iteration failed", err)
 		return
 	}
+	if len(pairs) == 0 {
+		return
+	}
+
+	// Healing here means soft-disabling a task-projected event, which
+	// trg_calendar_events_projection_guard_upd refuses unless the writer
+	// declares itself part of the projection engine. The reconciler is:
+	// it restores the task↔event invariant itemkit failed to hold.
+	//
+	// The opt-in is a session variable, so the heals run on one pinned
+	// connection rather than through the pool — otherwise the UPDATE
+	// could land on a connection that never saw the SET, and worse, the
+	// SET could stay behind on a connection that goes on to serve an
+	// ordinary request with the guard down.
+	conn, err := r.DB.Conn(ctx)
+	if err != nil {
+		r.logError("acquire connection for enabled mismatch heal failed", err)
+		return
+	}
+	defer func() { _ = conn.Close() }()
+	if _, err := conn.ExecContext(ctx, "SET @nf_item_projection_engine = 1"); err != nil {
+		r.logError("arm projection guard failed", err)
+		return
+	}
+	defer func() { _, _ = conn.ExecContext(ctx, "SET @nf_item_projection_engine = NULL") }()
+
 	for _, p := range pairs {
 		if r.Metrics != nil {
 			r.Metrics.IncInconsistency("enabled_mismatch")
@@ -223,7 +251,7 @@ func (r *Reconciler) scanEnabledMismatch(ctx context.Context) {
 		r.Logger.Warn("item consistency drift detected",
 			"kind", "enabled_mismatch", "task_id", p.taskID, "event_id", p.eventID)
 		const upd = `UPDATE calendar_events SET enabled = FALSE WHERE id = ? AND enabled`
-		if _, err := r.DB.ExecContext(ctx, upd, p.eventID); err != nil {
+		if _, err := conn.ExecContext(ctx, upd, p.eventID); err != nil {
 			r.logError("heal enabled mismatch failed", err,
 				"task_id", p.taskID, "event_id", p.eventID)
 			continue

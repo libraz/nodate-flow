@@ -89,13 +89,31 @@ func seed(ctx context.Context, t *testing.T, db *sql.DB) fixtures {
 }
 
 // purge removes every row touched by the test so parallel runs of
-// TestMain-level test suites stay isolated. Runs in a fresh tx with
-// FK checks off so delete order does not matter.
+// TestMain-level test suites stay isolated. FK checks are off so delete
+// order does not matter, and the projection guard is armed because the
+// tests create task-projected calendar_events rows — hard-deleting one is
+// exactly what trg_calendar_events_projection_guard_del refuses. Teardown
+// is a legitimate engine-side write, so it opts in the way itemkit does.
+//
+// Everything runs on one pinned *sql.Conn. Both settings are
+// session-scoped, so issuing them through the pool would let the DELETEs
+// land on a different connection than the SETs and silently leave rows
+// behind.
 func purge(t *testing.T, db *sql.DB, wsID uint32) {
 	t.Helper()
 	ctx := context.Background()
-	if _, err := db.ExecContext(ctx, "SET FOREIGN_KEY_CHECKS = 0"); err != nil {
+	conn, err := db.Conn(ctx)
+	if err != nil {
+		t.Logf("purge: acquire conn: %v", err)
+		return
+	}
+	defer func() { _ = conn.Close() }()
+
+	if _, err := conn.ExecContext(ctx, "SET FOREIGN_KEY_CHECKS = 0"); err != nil {
 		t.Logf("purge: FK off: %v", err)
+	}
+	if _, err := conn.ExecContext(ctx, "SET @nf_item_projection_engine = 1"); err != nil {
+		t.Logf("purge: arm projection guard: %v", err)
 	}
 	for _, q := range []string{
 		`DELETE FROM events WHERE workspace_id = ?`,
@@ -106,11 +124,14 @@ func purge(t *testing.T, db *sql.DB, wsID uint32) {
 		`DELETE FROM workspace_members WHERE workspace_id = ?`,
 		`DELETE FROM workspaces WHERE id = ?`,
 	} {
-		if _, err := db.ExecContext(ctx, q, wsID); err != nil {
+		if _, err := conn.ExecContext(ctx, q, wsID); err != nil {
 			t.Logf("purge %q: %v", q, err)
 		}
 	}
-	if _, err := db.ExecContext(ctx, "SET FOREIGN_KEY_CHECKS = 1"); err != nil {
+	if _, err := conn.ExecContext(ctx, "SET @nf_item_projection_engine = NULL"); err != nil {
+		t.Logf("purge: disarm projection guard: %v", err)
+	}
+	if _, err := conn.ExecContext(ctx, "SET FOREIGN_KEY_CHECKS = 1"); err != nil {
 		t.Logf("purge: FK on: %v", err)
 	}
 }

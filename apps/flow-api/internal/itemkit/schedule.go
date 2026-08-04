@@ -67,12 +67,19 @@ func ScheduleTask(ctx context.Context, tx TX, args ScheduleTaskArgs) (dbtype.Pub
 	if args.ShowAs == "" {
 		args.ShowAs = "busy"
 	}
+
 	if args.StartAt.IsZero() || args.EndAt.IsZero() {
 		return dbtype.PublicID{}, 0, wrapInvariant("start_end_required", "start_at and end_at are required for projection links")
 	}
 	if args.EndAt.Before(args.StartAt) {
 		return dbtype.PublicID{}, 0, wrapInvariant("chronology", "end_at before start_at")
 	}
+
+	disarm, err := armProjectionGuard(ctx, tx)
+	if err != nil {
+		return dbtype.PublicID{}, 0, err
+	}
+	defer disarm()
 
 	snap := applySnap(args.StartAt, args.EndAt, args.Snap)
 	args.StartAt = snap.NewStart
