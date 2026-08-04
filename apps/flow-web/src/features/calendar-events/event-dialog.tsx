@@ -74,6 +74,14 @@ export type CalEventKind = Exclude<ItemKind, 'task'>;
 
 export type ShowAs = 'busy' | 'free' | 'tentative' | 'oof';
 
+/**
+ * Whether the commitment can be moved. Deliberately a separate control
+ * from {@link ShowAs}: `showAs` is what free/busy consumers read, so
+ * saying "tentative" to mean "I would move this" misreports the time as
+ * not really taken to everyone outside this app.
+ */
+export type Flexibility = 'fixed' | 'negotiable' | 'conditional';
+
 /** Block preset chip identifiers. Maps to `blockLabel` + `showAs` on submit. */
 export type BlockPreset = 'working' | 'focus' | 'oof' | 'custom';
 
@@ -301,6 +309,12 @@ const SHOW_AS_KEYS = {
   oof: 'showAs.oof',
 } as const satisfies Record<ShowAs, string>;
 
+const FLEXIBILITY_KEYS = {
+  fixed: 'flexibility.fixed',
+  negotiable: 'flexibility.negotiable',
+  conditional: 'flexibility.conditional',
+} as const satisfies Record<Flexibility, string>;
+
 const BLOCK_PRESET_KEYS = {
   working: 'blockLabel.preset.working',
   focus: 'blockLabel.preset.focus',
@@ -416,6 +430,12 @@ export default function EventDialog({
   // Event-only.
   const [showAs, setShowAs] = useState<ShowAs>(
     mode.kind === 'edit' ? ((mode.event.showAs as ShowAs) ?? 'busy') : 'busy',
+  );
+  // A missing value reads as 'fixed', matching the column default: an
+  // event whose owner never said it could move must not advertise time
+  // they did not offer.
+  const [flexibility, setFlexibility] = useState<Flexibility>(
+    mode.kind === 'edit' ? ((mode.event.flexibility as Flexibility) ?? 'fixed') : 'fixed',
   );
   const [location, setLocation] = useState<string>(
     mode.kind === 'edit' ? (mode.event.location ?? '') : '',
@@ -637,6 +657,7 @@ export default function EventDialog({
     }
     if (calKind === 'event') {
       body.showAs = showAs;
+      body.flexibility = flexibility;
       if (location.trim()) body.location = location.trim();
     }
     if (calKind === 'block') {
@@ -671,6 +692,7 @@ export default function EventDialog({
     }
     if (calKind === 'event') {
       body.showAs = showAs;
+      body.flexibility = flexibility;
       body.location = location.trim();
     }
     if (calKind === 'block') {
@@ -736,6 +758,7 @@ export default function EventDialog({
       projectId,
       priority,
       showAs,
+      flexibility,
       location,
       blockPreset,
       blockCustomLabel,
@@ -758,6 +781,7 @@ export default function EventDialog({
       projectId,
       priority,
       showAs,
+      flexibility,
       location,
       blockPreset,
       blockCustomLabel,
@@ -1034,6 +1058,20 @@ export default function EventDialog({
                       }))}
                       value={showAs}
                       onChange={setShowAs}
+                    />
+                  )}
+                </FormField>
+                <FormField label={t('field.flexibility')} description={t('field.flexibilityHint')}>
+                  {() => (
+                    <SegmentedControl
+                      ariaLabel={t('field.flexibility')}
+                      fullWidth
+                      options={(['fixed', 'negotiable', 'conditional'] as const).map((v) => ({
+                        value: v,
+                        label: t(FLEXIBILITY_KEYS[v]),
+                      }))}
+                      value={flexibility}
+                      onChange={setFlexibility}
                     />
                   )}
                 </FormField>

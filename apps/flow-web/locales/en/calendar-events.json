@@ -41,7 +41,9 @@
     "project": "Project",
     "priority": "Priority",
     "description": "Description",
-    "date": "Date"
+    "date": "Date",
+    "flexibility": "Can it move?",
+    "flexibilityHint": "Separate from \"Show as\", which is what other calendars read."
   },
   "placeholder": {
     "title": {
@@ -58,6 +60,11 @@
     "free": "Free",
     "tentative": "Tentative",
     "oof": "Out of office"
+  },
+  "flexibility": {
+    "fixed": "Fixed",
+    "negotiable": "Negotiable",
+    "conditional": "Depends"
   },
   "blockLabel": {
     "preset": {

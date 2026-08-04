@@ -41,7 +41,9 @@
     "project": "项目",
     "priority": "优先级",
     "description": "描述",
-    "date": "日期"
+    "date": "日期",
+    "flexibility": "能否调整",
+    "flexibilityHint": "与「显示为」是不同的维度，后者是外部日历读取的值。"
   },
   "placeholder": {
     "title": {
@@ -58,6 +60,11 @@
     "free": "空闲",
     "tentative": "暂定",
     "oof": "外出"
+  },
+  "flexibility": {
+    "fixed": "不可调整",
+    "negotiable": "可调整",
+    "conditional": "视情况"
   },
   "blockLabel": {
     "preset": {

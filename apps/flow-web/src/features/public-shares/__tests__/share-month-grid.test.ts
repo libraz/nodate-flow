@@ -25,6 +25,7 @@ function utc(y: number, m: number, d: number, h = 0): number {
 function evt(over: Partial<ShareEvent> & { id: string }): ShareEvent {
   return {
     allDay: false,
+    flexibility: 'fixed',
     kind: 'event',
     showAs: 'busy',
     timezone: 'UTC',

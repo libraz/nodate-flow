@@ -25,6 +25,7 @@ function makeEvent(partial: Partial<CalendarEvent> & { id: string }): CalendarEv
     attendeeCount: 0,
     calendarId: 'cal-1',
     createdAt: 0,
+    flexibility: 'fixed',
     kind: 'event',
     ownerUserId: 'u1',
     showAs: 'busy',

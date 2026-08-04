@@ -41,7 +41,9 @@
     "project": "プロジェクト",
     "priority": "優先度",
     "description": "説明",
-    "date": "日付"
+    "date": "日付",
+    "flexibility": "動かせるか",
+    "flexibilityHint": "「表示」とは別の軸です。「表示」は外部のカレンダーが読む値です。"
   },
   "placeholder": {
     "title": {
@@ -58,6 +60,11 @@
     "free": "空き",
     "tentative": "仮",
     "oof": "不在"
+  },
+  "flexibility": {
+    "fixed": "動かせない",
+    "negotiable": "調整可",
+    "conditional": "条件次第"
   },
   "blockLabel": {
     "preset": {

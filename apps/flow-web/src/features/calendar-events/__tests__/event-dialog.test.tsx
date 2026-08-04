@@ -199,6 +199,48 @@ describe('<EventDialog>', () => {
     expect(onSaved).toHaveBeenCalled();
   });
 
+  it('defaults flexibility to fixed so an unanswered event is not offered up', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(renderDialog());
+
+    await user.type(screen.getByRole('textbox', { name: 'field.title' }), 'Planning call');
+    await user.click(screen.getByRole('button', { name: 'action.submit.create' }));
+
+    const args = mocks.createEvent.mock.calls[0]?.[0] as { body: CreateEventInput };
+    expect(args.body.flexibility).toBe('fixed');
+  });
+
+  it('sends flexibility without disturbing showAs, which free/busy consumers read', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(renderDialog());
+
+    await user.type(screen.getByRole('textbox', { name: 'field.title' }), 'Planning call');
+    await user.click(screen.getByRole('radio', { name: 'flexibility.negotiable' }));
+    await user.click(screen.getByRole('button', { name: 'action.submit.create' }));
+
+    const args = mocks.createEvent.mock.calls[0]?.[0] as { body: CreateEventInput };
+    expect(args.body.flexibility).toBe('negotiable');
+    // The whole point of a second column: marking an event movable must
+    // not quietly downgrade it to 'tentative' for anyone reading the
+    // calendar from outside.
+    expect(args.body.showAs).toBe('busy');
+  });
+
+  it('edit-mode seeds the control from the stored value', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(
+      renderDialog({ mode: editMode({ flexibility: 'conditional' } as Partial<CalEventLike>) }),
+    );
+
+    expect(
+      screen.getByRole('radio', { name: 'flexibility.conditional' }).getAttribute('aria-checked'),
+    ).toBe('true');
+
+    await user.click(screen.getByRole('button', { name: 'action.submit.edit' }));
+    const args = mocks.updateEvent.mock.calls[0]?.[0] as { body: { flexibility?: string } };
+    expect(args.body.flexibility).toBe('conditional');
+  });
+
   it('create-mode submits a task payload when kind is Task', async () => {
     const user = userEvent.setup();
     renderWithProviders(renderDialog());
