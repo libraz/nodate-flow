@@ -51,6 +51,18 @@ the `task_role_key` generated column, and the projection guard triggers. An
 implementation does not need to re-derive these rules; it needs to not work
 around them.
 
+A recurring series is one row carrying the rule, and there are exactly two
+ways to depart from it. Cancelling a single occurrence appends its start to
+`recurrence_exceptions`. Changing one produces a second row naming the
+series in `recurrence_parent_id` and the occurrence it replaces in
+`recurrence_original_start`; that row carries no rule of its own.
+
+Neither substitutes for the other, and an implementation must not add a
+third. A cancellation expressed as a row, or an override that also claims
+to be cancelled, gives a consumer two places to look before it can say
+whether an occurrence happens — and the two answers drift apart the first
+time a writer updates one and not the other.
+
 `owner_user_id` is required, and it decides whose layer and colour the
 event appears on. There is no such thing as an event belonging to the
 calendar rather than to a person: a writer importing from somewhere that
