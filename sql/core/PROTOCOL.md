@@ -100,6 +100,7 @@ Column semantics:
 | `payload_json` | The change. Unknown keys must be preserved by anything that round-trips a row. |
 | `occurred_at` | Logical time, millisecond precision. Ties break by `id`. |
 | `actor_user_id` | Acting user, or NULL for a system action. |
+| `calendar_id` | The calendar the change is about, or NULL. Present so a feed for one calendar reads the log rather than a second history table. |
 
 The table is append-only. Corrections are new rows, never an `UPDATE` or
 `DELETE` of an existing one.
