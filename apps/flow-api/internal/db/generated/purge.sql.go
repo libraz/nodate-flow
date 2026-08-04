@@ -30,6 +30,38 @@ func (q *Queries) AdminFindWorkspaceIdByPublicId(ctx context.Context, publicID t
 	return id, err
 }
 
+const deleteAttachmentsByWorkspace = `-- name: DeleteAttachmentsByWorkspace :exec
+DELETE FROM attachments
+WHERE workspace_id = ?
+`
+
+// Clear the workspace's task attachments ahead of HardDeleteWorkspace.
+//
+// attachments.storage_object_id is ON DELETE RESTRICT, while both
+// attachments.workspace_id and storage_objects.workspace_id are ON DELETE
+// CASCADE. Deleting the workspace therefore only succeeds if InnoDB happens
+// to reach `attachments` before `storage_objects` while walking the cascade
+// chain — an ordering that follows table creation order and is not part of
+// any documented contract. Removing the referrers up front makes the
+// teardown independent of it.
+func (q *Queries) DeleteAttachmentsByWorkspace(ctx context.Context, workspaceID uint32) error {
+	_, err := q.db.ExecContext(ctx, deleteAttachmentsByWorkspace, workspaceID)
+	return err
+}
+
+const deleteCalendarEventAttachmentsByWorkspace = `-- name: DeleteCalendarEventAttachmentsByWorkspace :exec
+DELETE FROM calendar_event_attachments
+WHERE workspace_id = ?
+`
+
+// Calendar-side counterpart of DeleteAttachmentsByWorkspace;
+// calendar_event_attachments.storage_object_id carries the same
+// ON DELETE RESTRICT. See that query for the full rationale.
+func (q *Queries) DeleteCalendarEventAttachmentsByWorkspace(ctx context.Context, workspaceID uint32) error {
+	_, err := q.db.ExecContext(ctx, deleteCalendarEventAttachmentsByWorkspace, workspaceID)
+	return err
+}
+
 const hardDeleteUser = `-- name: HardDeleteUser :execresult
 DELETE FROM users
 WHERE id = ?
@@ -65,9 +97,13 @@ WHERE id = ?
 // should map it to a 404, NOT retry.
 //
 // The ON DELETE CASCADE chain on workspaces.id removes every workspace-
-// scoped row (members, projects, tasks, events, attachments rows, and
-// the storage_objects rows whose blobs the caller already purged from
-// MinIO).
+// scoped row (members, projects, tasks, events, and the storage_objects
+// rows whose blobs the caller already purged from MinIO). Callers MUST
+// have run DeleteAttachmentsByWorkspace and
+// DeleteCalendarEventAttachmentsByWorkspace first, in the same
+// transaction: those two tables reference storage_objects with
+// ON DELETE RESTRICT and would otherwise block this statement depending
+// on the order InnoDB walks the cascade.
 func (q *Queries) HardDeleteWorkspace(ctx context.Context, id uint32) (sql.Result, error) {
 	return q.db.ExecContext(ctx, hardDeleteWorkspace, id)
 }

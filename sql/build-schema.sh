@@ -49,45 +49,44 @@ esac
 # layer may omit any of tables/ views/ triggers/ constraints/.
 # ---------------------------------------------------------------------------
 
-# list_tables_merged prints "path" lines for every table file across the
-# given layer directories, ordered by FILENAME rather than by layer.
+# list_tables prints one path per table file across the given layer
+# directories, layer by layer and alphabetically within each layer. A
+# core-only build therefore emits exactly the leading run of a full build.
 #
-# The merge is load-bearing, not cosmetic. InnoDB evaluates a DELETE's
-# cascade chain in table creation order, and workspace teardown relies on
-# `attachments` rows going away before the `storage_objects` rows they
-# reference via fk_attachments_storage_object (ON DELETE RESTRICT).
-# Emitting layer-by-layer would create storage_objects (core) before
-# attachments (flow) and turn workspace deletion into a 1451 error. Sorting
-# by filename reproduces the single-directory order this schema was built
-# under. Workspace teardown should not depend on InnoDB cascade ordering at
-# all; until it stops doing so, this ordering is a correctness requirement.
-list_tables_merged() {
+# Creation order carries no semantics: FK checks are off for the whole
+# CREATE TABLE run, and no delete path may depend on the order InnoDB walks
+# a cascade chain (which follows creation order and is undocumented). The
+# two ON DELETE RESTRICT edges that could expose such a dependency —
+# attachments and calendar_event_attachments referencing storage_objects —
+# are cleared explicitly by the workspace teardown pipeline before the
+# workspaces row is deleted.
+list_tables() {
   local d f
   for d in "$@"; do
     [[ -d "${d}" ]] || continue
     for f in "${d}"/*.sql; do
       [[ -e "${f}" ]] || continue
-      printf '%s\t%s\n' "$(basename "${f}")" "${f}"
+      printf '%s\n' "${f}"
     done
-  done | sort -k1,1 | cut -f2-
+  done
 }
 
-emit_drop_tables_merged() {
+emit_drop_tables() {
   local f
   while IFS= read -r f; do
     [[ -n "${f}" ]] || continue
     echo "DROP TABLE IF EXISTS \`$(basename "${f}" .sql)\`;"
-  done < <(list_tables_merged "$@")
+  done < <(list_tables "$@")
 }
 
-emit_tables_merged() {
+emit_tables() {
   local f
   while IFS= read -r f; do
     [[ -n "${f}" ]] || continue
     echo "-- >>> $(basename "${f}")"
     cat "${f}"
     echo
-  done < <(list_tables_merged "$@")
+  done < <(list_tables "$@")
 }
 
 emit_files() {
@@ -171,10 +170,10 @@ for layer in "${LAYERS[@]}"; do
   TABLE_DIRS+=("${SCRIPT_DIR}/${layer}/tables")
 done
 
-emit_drop_tables_merged "${TABLE_DIRS[@]}"
+emit_drop_tables "${TABLE_DIRS[@]}"
 echo
 
-emit_tables_merged "${TABLE_DIRS[@]}"
+emit_tables "${TABLE_DIRS[@]}"
 
 # Cross-layer foreign keys reference tables from more than one layer, so they
 # run only after every layer's CREATE TABLE has been emitted.

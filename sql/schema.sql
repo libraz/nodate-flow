@@ -4,15 +4,7 @@ SET NAMES utf8mb4;
 SET FOREIGN_KEY_CHECKS = 0;
 SET UNIQUE_CHECKS = 0;
 
-DROP TABLE IF EXISTS `agent_runs`;
-DROP TABLE IF EXISTS `ai_agents`;
-DROP TABLE IF EXISTS `ai_invocations`;
-DROP TABLE IF EXISTS `ai_models`;
-DROP TABLE IF EXISTS `ai_providers`;
-DROP TABLE IF EXISTS `ai_settings`;
-DROP TABLE IF EXISTS `attachments`;
 DROP TABLE IF EXISTS `audit_logs`;
-DROP TABLE IF EXISTS `auto_action_rules`;
 DROP TABLE IF EXISTS `calendar_event_attachments`;
 DROP TABLE IF EXISTS `calendar_event_attendees`;
 DROP TABLE IF EXISTS `calendar_event_checklist_items`;
@@ -24,34 +16,47 @@ DROP TABLE IF EXISTS `calendar_public_share_events`;
 DROP TABLE IF EXISTS `calendar_public_shares`;
 DROP TABLE IF EXISTS `calendar_subscriptions`;
 DROP TABLE IF EXISTS `calendars`;
-DROP TABLE IF EXISTS `comments`;
-DROP TABLE IF EXISTS `dashboard_widgets`;
 DROP TABLE IF EXISTS `events`;
 DROP TABLE IF EXISTS `identities`;
-DROP TABLE IF EXISTS `import_jobs`;
 DROP TABLE IF EXISTS `instance_admins`;
 DROP TABLE IF EXISTS `instance_audit_logs`;
 DROP TABLE IF EXISTS `instance_settings`;
+DROP TABLE IF EXISTS `magic_link_tokens`;
+DROP TABLE IF EXISTS `oauth_states`;
+DROP TABLE IF EXISTS `personal_access_tokens`;
+DROP TABLE IF EXISTS `sessions`;
+DROP TABLE IF EXISTS `storage_objects`;
+DROP TABLE IF EXISTS `user_recovery_codes`;
+DROP TABLE IF EXISTS `users`;
+DROP TABLE IF EXISTS `workspace_invites`;
+DROP TABLE IF EXISTS `workspace_members`;
+DROP TABLE IF EXISTS `workspaces`;
+DROP TABLE IF EXISTS `agent_runs`;
+DROP TABLE IF EXISTS `ai_agents`;
+DROP TABLE IF EXISTS `ai_invocations`;
+DROP TABLE IF EXISTS `ai_models`;
+DROP TABLE IF EXISTS `ai_providers`;
+DROP TABLE IF EXISTS `ai_settings`;
+DROP TABLE IF EXISTS `attachments`;
+DROP TABLE IF EXISTS `auto_action_rules`;
+DROP TABLE IF EXISTS `comments`;
+DROP TABLE IF EXISTS `dashboard_widgets`;
+DROP TABLE IF EXISTS `import_jobs`;
 DROP TABLE IF EXISTS `intake_items`;
 DROP TABLE IF EXISTS `labels`;
 DROP TABLE IF EXISTS `lenses`;
-DROP TABLE IF EXISTS `magic_link_tokens`;
 DROP TABLE IF EXISTS `mcp_invocations`;
 DROP TABLE IF EXISTS `mcp_tokens`;
 DROP TABLE IF EXISTS `mentions`;
 DROP TABLE IF EXISTS `notification_preferences`;
 DROP TABLE IF EXISTS `notifications`;
-DROP TABLE IF EXISTS `oauth_states`;
 DROP TABLE IF EXISTS `pages`;
-DROP TABLE IF EXISTS `personal_access_tokens`;
 DROP TABLE IF EXISTS `project_members`;
 DROP TABLE IF EXISTS `projects`;
 DROP TABLE IF EXISTS `reactions`;
 DROP TABLE IF EXISTS `relation_suggestions`;
 DROP TABLE IF EXISTS `repo_workspace_mappings`;
-DROP TABLE IF EXISTS `sessions`;
 DROP TABLE IF EXISTS `signals`;
-DROP TABLE IF EXISTS `storage_objects`;
 DROP TABLE IF EXISTS `task_actors`;
 DROP TABLE IF EXISTS `task_constraints`;
 DROP TABLE IF EXISTS `task_dependencies`;
@@ -65,290 +70,9 @@ DROP TABLE IF EXISTS `timeboxes`;
 DROP TABLE IF EXISTS `user_favorites`;
 DROP TABLE IF EXISTS `user_integrations`;
 DROP TABLE IF EXISTS `user_recent_visits`;
-DROP TABLE IF EXISTS `user_recovery_codes`;
 DROP TABLE IF EXISTS `user_view_preferences`;
-DROP TABLE IF EXISTS `users`;
 DROP TABLE IF EXISTS `webhook_deliveries`;
 DROP TABLE IF EXISTS `webhook_subscriptions`;
-DROP TABLE IF EXISTS `workspace_invites`;
-DROP TABLE IF EXISTS `workspace_members`;
-DROP TABLE IF EXISTS `workspaces`;
-
--- >>> agent_runs.sql
--- ====================================
--- agent_runs
--- Queue + history for AI agent executions (scheduler/worker
--- split). The scheduler enqueues one row per due (agent, scheduled_at)
--- pair with a UNIQUE dedupe_key so multiple scheduler replicas cannot
--- double-fire a job. Workers claim rows with SELECT ... FOR UPDATE
--- SKIP LOCKED, run the agent, then update status to succeeded / failed.
--- Completed rows are retained as the audit trail for
--- `ai.agent.run.*` events (ADR 0002 — events in MySQL).
--- ====================================
-CREATE TABLE agent_runs (
-  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY COMMENT 'Internal PK, never exposed',
-  public_id BINARY(16) NOT NULL COMMENT 'UUID v7, the only externally visible ID',
-  workspace_id INT UNSIGNED NOT NULL COMMENT 'Internal FK to workspaces.id',
-  agent_id INT UNSIGNED NOT NULL COMMENT 'Internal FK to ai_agents.id',
-
-  dedupe_key VARCHAR(128) CHARACTER SET latin1 COLLATE latin1_swedish_ci NOT NULL COMMENT 'Unique key shaped as <agent_id>:<unix_minute> to prevent double enqueue across scheduler replicas',
-  status ENUM('pending','claimed','succeeded','failed') NOT NULL DEFAULT 'pending' COMMENT 'Lifecycle state',
-  attempts TINYINT UNSIGNED NOT NULL DEFAULT 0 COMMENT 'Number of claim attempts (for retry budget)',
-  scheduled_at DATETIME(3) NOT NULL COMMENT 'Tick time the scheduler enqueued the run for',
-  claimed_at DATETIME(3) NULL COMMENT 'When a worker claimed the row',
-  finished_at DATETIME(3) NULL COMMENT 'When the worker ack/nacked the row',
-  error_message TEXT NULL COMMENT 'Last failure message for operator visibility',
-
-  sort_weight INT NOT NULL DEFAULT 0 COMMENT 'Display order',
-  notes TEXT NULL COMMENT 'Admin notes',
-  enabled BOOLEAN NOT NULL DEFAULT TRUE COMMENT 'Enabled flag',
-  updated_at TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
-  created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
-
-  UNIQUE KEY uniq_agent_runs_public_id (public_id),
-  UNIQUE KEY uniq_agent_runs_workspace_public_id (workspace_id, public_id),
-  UNIQUE KEY uniq_agent_runs_dedupe_key (dedupe_key),
-  KEY idx_agent_runs_status_scheduled_at (status, scheduled_at),
-  KEY idx_agent_runs_workspace_id_agent_id (workspace_id, agent_id),
-
-  CONSTRAINT fk_agent_runs_workspace FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
-  CONSTRAINT fk_agent_runs_agent FOREIGN KEY (agent_id) REFERENCES ai_agents(id) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Agent execution queue + history';
-
--- >>> ai_agents.sql
--- ====================================
--- ai_agents
--- Reusable LLM agent configuration: a model + system prompt + defaults.
--- Agents are referenced by automations and MCP tools.
--- ====================================
-CREATE TABLE ai_agents (
-  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY COMMENT 'Internal PK, never exposed',
-  public_id BINARY(16) NOT NULL COMMENT 'UUID v7, the only externally visible ID',
-  workspace_id INT UNSIGNED NOT NULL COMMENT 'Internal FK to workspaces.id',
-  model_id INT UNSIGNED NOT NULL COMMENT 'Internal FK to ai_models.id',
-
-  kind ENUM('task_agent','signal_judge') NOT NULL DEFAULT 'task_agent' COMMENT 'Agent dispatch kind. task_agent: operates on tasks (default, all current agents). signal_judge: LLM judge for external signals (see ADR 0008 D3).',
-  name VARCHAR(255) NOT NULL COMMENT 'Human-readable agent name',
-  description TEXT NULL COMMENT 'Free-form description',
-  system_prompt MEDIUMTEXT NOT NULL COMMENT 'System prompt text',
-  temperature SMALLINT UNSIGNED NOT NULL DEFAULT 100 COMMENT 'Sampling temperature x100 (e.g., 100 = 1.00)',
-  max_output_tokens INT UNSIGNED NULL COMMENT 'Per-call output cap (null = model default)',
-  tools_json JSON NULL COMMENT 'Allowed tool list as JSON array',
-  allowed_scopes_json JSON NULL COMMENT 'Allowed MCP scope list as JSON array (null = inherit from token)',
-  monthly_cost_cap_cents INT UNSIGNED NULL COMMENT 'Monthly spend cap in USD cents (null = no cap)',
-  schedule_kind ENUM('disabled','interval','on_event','manual') NOT NULL DEFAULT 'disabled' COMMENT 'Trigger mode: interval = fires every NF_AGENT_TICK_INTERVAL; on_event = fires from eventbus; manual = only via /agents/{id}/trigger',
-  event_trigger_types JSON NULL COMMENT 'JSON array of eventbus Kind strings that fire this agent when schedule_kind=on_event (e.g., ["signal.attached","task.transition.submit"])',
-  schedule_scope ENUM('workspace','assigned_tasks') NOT NULL DEFAULT 'workspace' COMMENT 'When schedule_kind=on_event, controls whether the agent reacts to all workspace events or only events for tasks where it is an enabled actor',
-  paused BOOLEAN NOT NULL DEFAULT FALSE COMMENT 'Manually or automatically paused (e.g., cost cap exceeded)',
-
-  sort_weight INT NOT NULL DEFAULT 0 COMMENT 'Display order',
-  notes TEXT NULL COMMENT 'Admin notes',
-  enabled BOOLEAN NOT NULL DEFAULT TRUE COMMENT 'Enabled flag',
-  updated_at TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
-  created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
-
-  UNIQUE KEY uniq_ai_agents_public_id (public_id),
-  UNIQUE KEY uniq_ai_agents_workspace_public_id (workspace_id, public_id),
-  KEY idx_ai_agents_workspace_id_enabled (workspace_id, enabled),
-  KEY idx_ai_agents_model_id (model_id),
-
-  CONSTRAINT fk_ai_agents_workspace FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
-  CONSTRAINT fk_ai_agents_model FOREIGN KEY (model_id) REFERENCES ai_models(id) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Reusable LLM agent configurations';
-
--- >>> ai_invocations.sql
--- ====================================
--- ai_invocations
--- LLM call audit. Prompts and responses are stored redacted; raw secrets
--- must never appear here.
--- ====================================
-CREATE TABLE ai_invocations (
-  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY COMMENT 'Internal PK, never exposed',
-  public_id BINARY(16) NOT NULL COMMENT 'UUID v7, the only externally visible ID',
-  workspace_id INT UNSIGNED NOT NULL COMMENT 'Internal FK to workspaces.id',
-  provider_id INT UNSIGNED NOT NULL COMMENT 'Internal FK to ai_providers.id',
-  user_id INT UNSIGNED NULL COMMENT 'Internal FK to users.id (if user-initiated)',
-  agent_id INT UNSIGNED NULL COMMENT 'Internal FK to ai_agents.id when the call was made on behalf of an AI agent',
-  task_id INT UNSIGNED NULL COMMENT 'Internal FK to tasks.id if applicable',
-
-  purpose VARCHAR(64) CHARACTER SET latin1 COLLATE latin1_swedish_ci NOT NULL COMMENT 'Logical call purpose (e.g., propose_tasks)',
-  model VARCHAR(128) CHARACTER SET latin1 COLLATE latin1_swedish_ci NOT NULL COMMENT 'Model name actually used',
-  prompt_redacted MEDIUMTEXT NOT NULL COMMENT 'Redacted prompt text',
-  response_redacted MEDIUMTEXT NULL COMMENT 'Redacted response text',
-  tokens_input INT UNSIGNED NULL COMMENT 'Input token count',
-  tokens_output INT UNSIGNED NULL COMMENT 'Output token count',
-  cost_estimate DECIMAL(10,6) NULL COMMENT 'Estimated cost (USD)',
-  status ENUM('ok','error','blocked') NOT NULL COMMENT 'Outcome',
-  error_code VARCHAR(128) CHARACTER SET latin1 COLLATE latin1_swedish_ci NULL COMMENT 'Error code when status != ok',
-  invoked_at DATETIME(3) NOT NULL COMMENT 'Invocation time (millisecond precision)',
-
-  sort_weight INT NOT NULL DEFAULT 0 COMMENT 'Display order',
-  notes TEXT NULL COMMENT 'Admin notes',
-  enabled BOOLEAN NOT NULL DEFAULT TRUE COMMENT 'Enabled flag',
-  updated_at TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
-  created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
-
-  UNIQUE KEY uniq_ai_invocations_public_id (public_id),
-  UNIQUE KEY uniq_ai_invocations_workspace_public_id (workspace_id, public_id),
-  KEY idx_ai_invocations_workspace_id_invoked_at (workspace_id, invoked_at),
-  KEY idx_ai_invocations_workspace_id_provider_id (workspace_id, provider_id),
-  KEY idx_ai_invocations_agent_id_invoked_at (agent_id, invoked_at),
-  KEY idx_ai_invocations_created_at (created_at),
-
-  CONSTRAINT fk_ai_invocations_workspace FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
-  CONSTRAINT fk_ai_invocations_provider FOREIGN KEY (provider_id) REFERENCES ai_providers(id) ON DELETE CASCADE,
-  CONSTRAINT fk_ai_invocations_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL,
-  CONSTRAINT fk_ai_invocations_agent FOREIGN KEY (agent_id) REFERENCES ai_agents(id) ON DELETE SET NULL,
-  CONSTRAINT fk_ai_invocations_task FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE SET NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='LLM invocation audit';
-
--- >>> ai_models.sql
--- ====================================
--- ai_models
--- Concrete model offered by an ai_providers row. Pricing is stored as
--- micro-USD per 1M tokens to keep integer math.
--- ====================================
-CREATE TABLE ai_models (
-  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY COMMENT 'Internal PK, never exposed',
-  public_id BINARY(16) NOT NULL COMMENT 'UUID v7, the only externally visible ID',
-  workspace_id INT UNSIGNED NOT NULL COMMENT 'Internal FK to workspaces.id',
-  provider_id INT UNSIGNED NOT NULL COMMENT 'Internal FK to ai_providers.id',
-
-  name VARCHAR(128) CHARACTER SET latin1 COLLATE latin1_swedish_ci NOT NULL COMMENT 'Provider model identifier (e.g., claude-opus-4)',
-  display_name VARCHAR(255) NOT NULL COMMENT 'Human-readable label',
-  context_window INT UNSIGNED NOT NULL COMMENT 'Max context tokens',
-  max_output_tokens INT UNSIGNED NULL COMMENT 'Max generated tokens (null = same as context)',
-  input_price_micro_usd_per_mtok BIGINT UNSIGNED NOT NULL DEFAULT 0 COMMENT 'Input price in micro-USD per 1M tokens',
-  output_price_micro_usd_per_mtok BIGINT UNSIGNED NOT NULL DEFAULT 0 COMMENT 'Output price in micro-USD per 1M tokens',
-  supports_tools BOOLEAN NOT NULL DEFAULT FALSE COMMENT 'Whether model supports tool use',
-  supports_vision BOOLEAN NOT NULL DEFAULT FALSE COMMENT 'Whether model supports image input',
-
-  sort_weight INT NOT NULL DEFAULT 0 COMMENT 'Display order',
-  notes TEXT NULL COMMENT 'Admin notes',
-  enabled BOOLEAN NOT NULL DEFAULT TRUE COMMENT 'Enabled flag',
-  updated_at TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
-  created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
-
-  UNIQUE KEY uniq_ai_models_public_id (public_id),
-  UNIQUE KEY uniq_ai_models_workspace_public_id (workspace_id, public_id),
-  UNIQUE KEY uniq_ai_models_provider_id_name (provider_id, name),
-  KEY idx_ai_models_workspace_id_enabled (workspace_id, enabled),
-
-  CONSTRAINT fk_ai_models_workspace FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
-  CONSTRAINT fk_ai_models_provider FOREIGN KEY (provider_id) REFERENCES ai_providers(id) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Concrete LLM models per provider';
-
--- >>> ai_providers.sql
--- ====================================
--- ai_providers
--- LLM provider configurations. api_key_ciphertext stores AES-256-GCM
--- output (nonce + tag + ciphertext) and is NEVER read back via the API.
--- ====================================
-CREATE TABLE ai_providers (
-  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY COMMENT 'Internal PK, never exposed',
-  public_id BINARY(16) NOT NULL COMMENT 'UUID v7, the only externally visible ID',
-  workspace_id INT UNSIGNED NOT NULL COMMENT 'Internal FK to workspaces.id',
-
-  kind ENUM('anthropic','openai','google','ollama','openai_compat') NOT NULL COMMENT 'Provider kind',
-  name VARCHAR(255) NOT NULL COMMENT 'Human-readable label',
-  base_url VARCHAR(2048) NULL COMMENT 'API base URL (required for openai_compat/ollama)',
-  api_key_ciphertext VARBINARY(512) NOT NULL COMMENT 'AES-256-GCM nonce+tag+ciphertext',
-  api_key_prefix CHAR(8) CHARACTER SET latin1 COLLATE latin1_swedish_ci NOT NULL COMMENT 'Leading chars for display masking',
-  api_key_suffix CHAR(4) CHARACTER SET latin1 COLLATE latin1_swedish_ci NOT NULL COMMENT 'Trailing chars for display masking',
-  default_model VARCHAR(128) CHARACTER SET latin1 COLLATE latin1_swedish_ci NULL COMMENT 'Default model name',
-
-  sort_weight INT NOT NULL DEFAULT 0 COMMENT 'Display order',
-  notes TEXT NULL COMMENT 'Admin notes',
-  enabled BOOLEAN NOT NULL DEFAULT TRUE COMMENT 'Enabled flag',
-  updated_at TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
-  created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
-
-  UNIQUE KEY uniq_ai_providers_public_id (public_id),
-  UNIQUE KEY uniq_ai_providers_workspace_public_id (workspace_id, public_id),
-  KEY idx_ai_providers_workspace_id_enabled (workspace_id, enabled),
-
-  CONSTRAINT fk_ai_providers_workspace FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='LLM provider credentials';
-
--- >>> ai_settings.sql
--- ====================================
--- ai_settings
--- Per-workspace AI configuration (ADR 0003): embeddings, duplicates,
--- auto-actions, and signal_judge prompt customization.
--- Holds duplicate-detection thresholds, the embed-budget bucket that
--- the CostGuard tracks separately from the LLM chat budget,
--- auto-action executor settings, and free-form operator instructions
--- (judge_instructions) that are spliced into the signal_judge system prompt.
---
--- Settings are not user-facing entities, so no public_id: the row is
--- addressed by its parent workspace.
--- ====================================
-CREATE TABLE ai_settings (
-  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY COMMENT 'Internal PK, never exposed',
-  workspace_id INT UNSIGNED NOT NULL COMMENT 'Internal FK to workspaces.id',
-  modified_by_user_id INT UNSIGNED NULL COMMENT 'Last modifier user.id (audit field; NULL when user is removed or for system writers)',
-
-  embed_model              VARCHAR(64)  NOT NULL DEFAULT 'mock-768' COMMENT 'Embedding model key (resolved by ai/embed registry)',
-  embed_budget_cents_day   INT UNSIGNED NOT NULL DEFAULT 100 COMMENT 'Daily embed cost cap in cents (separate bucket from chat budget)',
-  duplicate_threshold_high DECIMAL(4,3) NOT NULL DEFAULT 0.870 COMMENT 'Cosine sim >= this -> duplicate candidate',
-  duplicate_threshold_low  DECIMAL(4,3) NOT NULL DEFAULT 0.750 COMMENT 'Cosine sim in [low, high) -> related task',
-
-  auto_action_enabled          BOOLEAN      NOT NULL DEFAULT TRUE  COMMENT 'Whether the auto-action executor runs for this workspace',
-  auto_action_interval_minutes INT UNSIGNED NOT NULL DEFAULT 5     COMMENT 'How often the executor evaluates tasks (minutes); 0 disables',
-  auto_action_threshold        DECIMAL(3,2) NOT NULL DEFAULT 0.80  COMMENT 'Minimum confidence score for an action to be applied automatically',
-
-  judge_instructions TEXT NULL
-    COMMENT 'Free-form operator instructions appended to the signal_judge system prompt. NULL or empty string = use the built-in template only. Truncated at prompt-build time if exceeding the configured token budget. See apps/flow-api/internal/ai/signaljudge/prompt.go for inclusion logic.',
-
-  enabled BOOLEAN NOT NULL DEFAULT TRUE COMMENT 'Enabled flag',
-  updated_at TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
-  created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
-
-  UNIQUE KEY uniq_ai_settings_workspace (workspace_id),
-  KEY idx_ai_settings_modified_by_user_id (modified_by_user_id),
-
-  CONSTRAINT fk_ai_settings_workspace FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
-  CONSTRAINT fk_ai_settings_modifier FOREIGN KEY (modified_by_user_id) REFERENCES users(id) ON DELETE SET NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Per-workspace AI configuration (ADR 0003): embeddings, duplicates, auto-actions';
-
--- >>> attachments.sql
--- ====================================
--- attachments
--- Files uploaded against a task. The actual blob and its content metadata
--- (sha256 / byte_size / content_type / storage_key) live in storage_objects;
--- this row is the per-task reference (filename, uploader, sort order). The
--- same blob uploaded twice within a workspace shares one storage_objects
--- row and bumps its ref_count.
--- ====================================
-CREATE TABLE attachments (
-  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY COMMENT 'Internal PK, never exposed',
-  public_id BINARY(16) NOT NULL COMMENT 'UUID v7, the only externally visible ID',
-  workspace_id INT UNSIGNED NOT NULL COMMENT 'Internal FK to workspaces.id',
-  task_id INT UNSIGNED NULL COMMENT 'Internal FK to tasks.id; nullable so audit-trail attachments survive task deletion (FK SET NULL)',
-  uploader_id INT UNSIGNED NOT NULL COMMENT 'Internal FK to users.id (uploader)',
-  storage_object_id INT UNSIGNED NOT NULL COMMENT 'FK to storage_objects.id; holds the actual blob metadata (sha256, byte_size, content_type, storage_key)',
-
-  filename VARCHAR(512) NOT NULL COMMENT 'Original filename as supplied by the uploader; widened to 512 to safely hold multibyte paths',
-
-  sort_weight INT NOT NULL DEFAULT 0 COMMENT 'Display order',
-  notes TEXT NULL COMMENT 'Admin notes',
-  enabled BOOLEAN NOT NULL DEFAULT TRUE COMMENT 'Enabled flag',
-  updated_at TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
-  created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
-
-  UNIQUE KEY uniq_attachments_public_id (public_id),
-  UNIQUE KEY uniq_attachments_workspace_public_id (workspace_id, public_id),
-  KEY idx_attachments_workspace_id_task_id (workspace_id, task_id),
-  KEY idx_attachments_workspace_id_uploader_id (workspace_id, uploader_id),
-  KEY idx_attachments_storage_object (storage_object_id),
-
-  CONSTRAINT fk_attachments_workspace FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
-  CONSTRAINT fk_attachments_task FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE SET NULL,
-  CONSTRAINT fk_attachments_uploader FOREIGN KEY (uploader_id) REFERENCES users(id) ON DELETE CASCADE,
-  -- RESTRICT: attachments must be deleted (and ref_count decremented) before
-  -- the underlying storage_objects row may be removed by the GC sweeper.
-  CONSTRAINT fk_attachments_storage_object FOREIGN KEY (storage_object_id) REFERENCES storage_objects(id) ON DELETE RESTRICT
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Task file attachments metadata';
 
 -- >>> audit_logs.sql
 -- ====================================
@@ -384,48 +108,6 @@ CREATE TABLE audit_logs (
   CONSTRAINT fk_audit_logs_workspace FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
   CONSTRAINT fk_audit_logs_actor FOREIGN KEY (actor_user_id) REFERENCES users(id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Workspace audit log';
-
--- >>> auto_action_rules.sql
--- ====================================
--- auto_action_rules
--- Per-workspace auto-action rule configuration.
--- Each row overrides the default confidence and idle threshold for a
--- specific rule kind (e.g. escalate_overdue, assign_owner) and can be
--- further scoped to a specific signal_kind. A NULL signal_kind acts as
--- the wildcard fallback that matches every signal kind for the rule.
--- Rules may also declare an explicit autonomy_level that overrides the
--- confidence-vs-threshold gate, so the autonomy matrix UI can persist a
--- chosen mode (suggest | draft | auto) directly without encoding it via
--- confidence values.
--- The auto-action executor reads these rules together with ai_settings
--- to decide which actions to propose or apply automatically.
--- ====================================
-CREATE TABLE auto_action_rules (
-  id            INT UNSIGNED AUTO_INCREMENT PRIMARY KEY COMMENT 'Internal PK, never exposed',
-  public_id     BINARY(16)   NOT NULL COMMENT 'UUID v7, used in API responses',
-  workspace_id  INT UNSIGNED NOT NULL COMMENT 'Internal FK to workspaces.id',
-  kind          VARCHAR(64)  NOT NULL COMMENT 'Rule kind: escalate_overdue | assign_owner | nudge_assignee | close_stale_review',
-  signal_kind   VARCHAR(64)  NULL COMMENT 'Signal scope: NULL = wildcard (matches every kind), exact dotted string match (e.g. ''discord.presence''), or wildcard prefix where the stored value matches kinds with that suffix-after-dot. Resolution layer details live in docs/conventions/autonomy.md',
-  enabled       BOOLEAN      NOT NULL DEFAULT TRUE COMMENT 'Whether this rule fires during evaluation',
-  confidence    DECIMAL(3,2) NOT NULL COMMENT 'Confidence score emitted when this rule fires (0.00-1.00)',
-  idle_hours    INT UNSIGNED NOT NULL COMMENT 'Idle threshold in hours. 0 for rules that use due_on (escalate_overdue)',
-  autonomy_level ENUM('suggest','draft','auto') NULL
-    COMMENT 'When set, the autonomy resolver returns this level verbatim and skips confidence comparison. NULL falls back to the existing confidence-vs-threshold derivation. Closed enum mirrors signalkinds.Autonomy.',
-
-  signal_kind_match VARCHAR(64) GENERATED ALWAYS AS (COALESCE(signal_kind, '')) STORED NOT NULL
-    COMMENT 'Internal normalization of signal_kind for the UNIQUE index. Empty string represents the NULL wildcard. Never read from app code -- only the unique-key engine touches this. Constraint order (GENERATED clause before NOT NULL) is required by MySQL 9.x parser.',
-
-  updated_at TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
-  created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
-
-  UNIQUE KEY uniq_auto_action_rules_public_id (public_id),
-  UNIQUE KEY uniq_auto_action_rules_workspace_public_id (workspace_id, public_id),
-  UNIQUE KEY uniq_auto_action_rules_ws_kind_signal (workspace_id, kind, signal_kind_match),
-
-  KEY idx_auto_action_rules_ws_signal (workspace_id, signal_kind, kind),
-
-  CONSTRAINT fk_auto_action_rules_ws FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Per-workspace auto-action rule overrides (kind, signal_kind, confidence, idle threshold)';
 
 -- >>> calendar_event_attachments.sql
 -- ====================================
@@ -915,81 +597,6 @@ CREATE TABLE calendars (
   CONSTRAINT fk_calendars_owner FOREIGN KEY (owner_user_id) REFERENCES users(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Calendar containers (personal layer or system holiday feed). Workspace members share events through event-level visibility (public/private/confidential), not shared-calendar membership.';
 
--- >>> comments.sql
--- ====================================
--- comments
--- Discussion thread attached to a task. Markdown body with edit history
--- captured via edited_at (full revisions out of scope).
--- ====================================
-CREATE TABLE comments (
-  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY COMMENT 'Internal PK, never exposed',
-  public_id BINARY(16) NOT NULL COMMENT 'UUID v7, the only externally visible ID',
-  workspace_id INT UNSIGNED NOT NULL COMMENT 'Internal FK to workspaces.id',
-  task_id INT UNSIGNED NULL COMMENT 'Internal FK to tasks.id; nullable so audit-trail comments survive task deletion (FK SET NULL)',
-  author_id INT UNSIGNED NOT NULL COMMENT 'Internal FK to users.id',
-
-  body MEDIUMTEXT NOT NULL COMMENT 'Markdown body',
-  edited_at DATETIME(3) NULL COMMENT 'Last edit time (null = never edited)',
-
-  sort_weight INT NOT NULL DEFAULT 0 COMMENT 'Display order',
-  notes TEXT NULL COMMENT 'Admin notes',
-  enabled BOOLEAN NOT NULL DEFAULT TRUE COMMENT 'Enabled flag',
-  updated_at TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
-  created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
-
-  UNIQUE KEY uniq_comments_public_id (public_id),
-  UNIQUE KEY uniq_comments_workspace_public_id (workspace_id, public_id),
-  KEY idx_comments_workspace_id_task_id (workspace_id, task_id),
-  KEY idx_comments_workspace_id_author_id (workspace_id, author_id),
-  -- Bare author_id index so ON DELETE CASCADE on users can find dependent
-  -- comment rows without a full table scan (the workspace-leading composite
-  -- above does not satisfy author_id-only lookups).
-  KEY idx_comments_author_id (author_id),
-  -- Supports keyset pagination on (created_at DESC, public_id DESC) for
-  -- ListCommentsForTaskKeyset.
-  KEY idx_comments_task_id_keyset (task_id, created_at, public_id),
-  FULLTEXT KEY ft_comments_body (body),
-
-  CONSTRAINT fk_comments_workspace FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
-  CONSTRAINT fk_comments_task FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE SET NULL,
-  CONSTRAINT fk_comments_author FOREIGN KEY (author_id) REFERENCES users(id) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Task discussion comments';
-
--- >>> dashboard_widgets.sql
--- ====================================
--- dashboard_widgets
--- Configurable widgets that users arrange on their workspace dashboard.
--- Each widget has a type, grid position, and JSON configuration blob.
--- ====================================
-CREATE TABLE dashboard_widgets (
-  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY COMMENT 'Internal PK, never exposed',
-  public_id BINARY(16) NOT NULL COMMENT 'UUID v7, the only externally visible ID',
-  workspace_id INT UNSIGNED NOT NULL COMMENT 'Internal FK to workspaces.id',
-  creator_id INT UNSIGNED NOT NULL COMMENT 'Internal FK to users.id',
-
-  widget_type ENUM('task_summary','burndown','signals_feed','ai_suggestions','overdue_tasks','notification_feed') NOT NULL COMMENT 'Widget variant',
-  title VARCHAR(200) NOT NULL COMMENT 'User-facing widget title',
-  config JSON NULL COMMENT 'Widget-specific configuration (filters, timebox_id, etc.)',
-  position_x SMALLINT UNSIGNED NOT NULL DEFAULT 0 COMMENT 'Grid column offset',
-  position_y SMALLINT UNSIGNED NOT NULL DEFAULT 0 COMMENT 'Grid row offset',
-  width SMALLINT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'Grid column span',
-  height SMALLINT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'Grid row span',
-
-  sort_weight INT NOT NULL DEFAULT 0 COMMENT 'Display order',
-  notes TEXT NULL COMMENT 'Admin notes',
-  enabled BOOLEAN NOT NULL DEFAULT TRUE COMMENT 'Enabled flag',
-  updated_at TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
-  created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
-
-  UNIQUE KEY uniq_dashboard_widgets_public_id (public_id),
-  UNIQUE KEY uniq_dashboard_widgets_workspace_public_id (workspace_id, public_id),
-  KEY idx_dashboard_widgets_workspace_id_enabled_sort_weight (workspace_id, enabled, sort_weight),
-  KEY idx_dashboard_widgets_workspace_id_creator_id (workspace_id, creator_id),
-
-  CONSTRAINT fk_dashboard_widgets_workspace FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
-  CONSTRAINT fk_dashboard_widgets_creator FOREIGN KEY (creator_id) REFERENCES users(id) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Dashboard widgets arranged by users';
-
 -- >>> events.sql
 -- ====================================
 -- events
@@ -1086,45 +693,6 @@ CREATE TABLE identities (
   CONSTRAINT fk_identities_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='User authentication identities';
 
--- >>> import_jobs.sql
--- ====================================
--- import_jobs
--- Bulk import job tracking. Each row represents a single import
--- operation from an external source (GitHub, Jira, Linear, CSV).
--- The worker updates processed_items / failed_items as it progresses.
--- ====================================
-CREATE TABLE import_jobs (
-  id                   INT UNSIGNED AUTO_INCREMENT PRIMARY KEY COMMENT 'Internal PK, never exposed',
-  public_id            BINARY(16) NOT NULL                     COMMENT 'UUID v7, the only externally visible ID',
-  workspace_id         INT UNSIGNED NOT NULL                    COMMENT 'Internal FK to workspaces.id',
-  project_id           INT UNSIGNED NULL                        COMMENT 'Internal FK to projects.id (target project)',
-  initiated_by_user_id INT UNSIGNED NULL                        COMMENT 'Internal FK to users.id (who started the import)',
-
-  source               ENUM('github','jira','linear','csv') NOT NULL COMMENT 'Import source type',
-  status               ENUM('pending','running','completed','failed','cancelled') NOT NULL DEFAULT 'pending' COMMENT 'Lifecycle state',
-  total_items          INT UNSIGNED NOT NULL DEFAULT 0          COMMENT 'Total items to import',
-  processed_items      INT UNSIGNED NOT NULL DEFAULT 0          COMMENT 'Successfully processed items',
-  failed_items         INT UNSIGNED NOT NULL DEFAULT 0          COMMENT 'Items that failed to import',
-  config_json          JSON NOT NULL                            COMMENT 'Source-specific import configuration',
-  error_log            TEXT NULL                                COMMENT 'Aggregated error log',
-  started_at           DATETIME(3) NULL                         COMMENT 'When the worker began processing',
-  completed_at         DATETIME(3) NULL                         COMMENT 'When the import finished (success or failure)',
-
-  sort_weight          INT NOT NULL DEFAULT 0                   COMMENT 'Display order',
-  notes                TEXT NULL                                COMMENT 'Admin notes',
-  enabled              BOOLEAN NOT NULL DEFAULT TRUE            COMMENT 'Enabled flag',
-  updated_at           TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
-  created_at           DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
-
-  UNIQUE KEY uniq_import_jobs_public_id (public_id),
-  UNIQUE KEY uniq_import_jobs_workspace_public_id (workspace_id, public_id),
-  KEY idx_import_jobs_workspace_id_status (workspace_id, status),
-
-  CONSTRAINT fk_import_jobs_workspace FOREIGN KEY (workspace_id)         REFERENCES workspaces(id) ON DELETE CASCADE,
-  CONSTRAINT fk_import_jobs_project   FOREIGN KEY (project_id)           REFERENCES projects(id)   ON DELETE SET NULL,
-  CONSTRAINT fk_import_jobs_initiator FOREIGN KEY (initiated_by_user_id) REFERENCES users(id)      ON DELETE SET NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Bulk import job tracking';
-
 -- >>> instance_admins.sql
 -- ====================================
 -- instance_admins
@@ -1213,6 +781,786 @@ CREATE TABLE instance_settings (
   CONSTRAINT fk_instance_settings_user
     FOREIGN KEY (updated_by_user_id) REFERENCES users(id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Instance-level dynamic settings';
+
+-- >>> magic_link_tokens.sql
+-- ====================================
+-- magic_link_tokens
+-- Passwordless magic-link authentication tokens. Only the SHA-256 hash
+-- of the token is stored; the plaintext URL is sent to the user exactly
+-- once via email.
+-- ====================================
+CREATE TABLE magic_link_tokens (
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY COMMENT 'Internal PK, never exposed',
+  public_id BINARY(16) NOT NULL COMMENT 'UUID v7, the only externally visible ID',
+  user_id INT UNSIGNED NOT NULL COMMENT 'Internal FK to users.id',
+
+  token_hash CHAR(64) CHARACTER SET latin1 COLLATE latin1_swedish_ci NOT NULL COMMENT 'SHA-256 hex of the token',
+  expires_at DATETIME(3) NOT NULL COMMENT 'Token expiry time',
+  used_at DATETIME(3) NULL COMMENT 'Time the token was consumed',
+  ip_address VARBINARY(16) NULL COMMENT 'Packed IPv4/IPv6 address at creation',
+
+  sort_weight INT NOT NULL DEFAULT 0 COMMENT 'Display order',
+  notes TEXT NULL COMMENT 'Admin notes',
+  enabled BOOLEAN NOT NULL DEFAULT TRUE COMMENT 'Enabled flag',
+  updated_at TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+  created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+
+  UNIQUE KEY uniq_magic_link_tokens_public_id (public_id),
+  UNIQUE KEY uniq_magic_link_tokens_token_hash (token_hash),
+  KEY idx_magic_link_tokens_user_id (user_id),
+  KEY idx_magic_link_tokens_expires_at (expires_at),
+
+  CONSTRAINT fk_magic_link_tokens_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Passwordless magic-link tokens';
+
+-- >>> oauth_states.sql
+-- ====================================
+-- oauth_states
+-- Short-lived CSRF-protection state tokens for the personal OAuth
+-- flow (POST /me/integrations/{provider}/connect → GET /oauth/
+-- callback/{provider}). A row is inserted when the user clicks
+-- "Connect", and deleted atomically when the callback handler
+-- consumes the matching state. Rows expire after 15 minutes; the
+-- callback refuses stale rows.
+-- ====================================
+CREATE TABLE oauth_states (
+  state CHAR(64) CHARACTER SET latin1 COLLATE latin1_swedish_ci NOT NULL PRIMARY KEY COMMENT 'Random 32-byte token, hex-encoded',
+
+  user_id INT UNSIGNED NOT NULL COMMENT 'Internal FK to users.id — the user who started the connect flow',
+  provider ENUM('github','slack','google_calendar','discord') NOT NULL COMMENT 'Which provider this state belongs to. ''discord'' is required for the personal Discord presence-binding flow (Phase 8 presence-discord gateway).',
+  redirect_to VARCHAR(512) NULL COMMENT 'Optional client-supplied return URL to send the user to after the callback completes',
+
+  expires_at DATETIME(3) NOT NULL COMMENT 'Hard expiry; callback handler rejects rows past this timestamp',
+  updated_at TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+  created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+
+  KEY idx_oauth_states_expires_at (expires_at),
+
+  CONSTRAINT fk_oauth_states_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Short-lived OAuth CSRF state tokens for personal integrations';
+
+-- >>> personal_access_tokens.sql
+-- ====================================
+-- personal_access_tokens
+-- User-scoped API tokens for the REST API and CLI (`tnk`).
+-- Only the SHA-256 hash of the bearer token is stored; the plaintext is
+-- shown to the user exactly once at creation time.
+-- ====================================
+CREATE TABLE personal_access_tokens (
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY COMMENT 'Internal PK, never exposed',
+  public_id BINARY(16) NOT NULL COMMENT 'UUID v7, the only externally visible ID',
+  workspace_id INT UNSIGNED NOT NULL COMMENT 'Internal FK to workspaces.id',
+  user_id INT UNSIGNED NOT NULL COMMENT 'Internal FK to users.id (token owner)',
+
+  name VARCHAR(255) NOT NULL COMMENT 'Human-readable label',
+  token_hash CHAR(64) CHARACTER SET latin1 COLLATE latin1_swedish_ci NOT NULL COMMENT 'SHA-256 hex of the bearer token',
+  token_prefix CHAR(8) CHARACTER SET latin1 COLLATE latin1_swedish_ci NOT NULL COMMENT 'Leading chars shown as hint',
+  scopes_json JSON NOT NULL COMMENT 'Array of granted API scopes',
+  expires_at DATETIME(3) NULL COMMENT 'Expiry time (null = never)',
+  last_used_at DATETIME(3) NULL COMMENT 'Last successful use',
+  revoked_at DATETIME(3) NULL COMMENT 'Explicit revocation time',
+
+  sort_weight INT NOT NULL DEFAULT 0 COMMENT 'Display order',
+  notes TEXT NULL COMMENT 'Admin notes',
+  enabled BOOLEAN NOT NULL DEFAULT TRUE COMMENT 'Enabled flag',
+  updated_at TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+  created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+
+  UNIQUE KEY uniq_personal_access_tokens_public_id (public_id),
+  UNIQUE KEY uniq_personal_access_tokens_workspace_public_id (workspace_id, public_id),
+  UNIQUE KEY uniq_personal_access_tokens_token_hash (token_hash),
+  KEY idx_personal_access_tokens_workspace_id_user_id (workspace_id, user_id),
+  KEY idx_personal_access_tokens_expires_at (expires_at),
+
+  CONSTRAINT fk_personal_access_tokens_workspace FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
+  CONSTRAINT fk_personal_access_tokens_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='User personal access tokens for REST/CLI';
+
+-- >>> sessions.sql
+-- ====================================
+-- sessions
+-- Refresh-token backed user sessions. Access tokens are stateless JWT;
+-- this table only tracks the refresh token hash and its metadata.
+-- ====================================
+CREATE TABLE sessions (
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY COMMENT 'Internal PK, never exposed',
+  public_id BINARY(16) NOT NULL COMMENT 'UUID v7, the only externally visible ID',
+  user_id INT UNSIGNED NOT NULL COMMENT 'Internal FK to users.id',
+
+  refresh_hash CHAR(64) CHARACTER SET latin1 COLLATE latin1_swedish_ci NOT NULL COMMENT 'SHA-256 hex of refresh token',
+  user_agent VARCHAR(512) NULL COMMENT 'Client user agent at issue time',
+  ip_address VARBINARY(16) NULL COMMENT 'Packed IPv4/IPv6 address at issue time',
+  expires_at DATETIME(3) NOT NULL COMMENT 'Refresh token expiry',
+  revoked_at DATETIME(3) NULL COMMENT 'Explicit revocation time',
+  last_used_at DATETIME(3) NULL COMMENT 'Last refresh time',
+
+  sort_weight INT NOT NULL DEFAULT 0 COMMENT 'Display order',
+  notes TEXT NULL COMMENT 'Admin notes',
+  enabled BOOLEAN NOT NULL DEFAULT TRUE COMMENT 'Enabled flag',
+  updated_at TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+  created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+
+  UNIQUE KEY uniq_sessions_public_id (public_id),
+  UNIQUE KEY uniq_sessions_refresh_hash (refresh_hash),
+  KEY idx_sessions_user_id_expires_at (user_id, expires_at),
+
+  CONSTRAINT fk_sessions_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Refresh-token backed sessions';
+
+-- >>> storage_objects.sql
+-- ====================================
+-- storage_objects
+-- Content-addressed metadata index for blobs that physically live in MinIO
+-- (S3-compatible object storage). One row per unique (scope, sha256) tuple
+-- so that uploading the same file twice within a scope reuses the underlying
+-- object and only bumps ref_count.
+--
+-- Scope is exclusive: a row either belongs to a workspace (task / calendar
+-- event attachments) or to a single user (avatar). The check constraint
+-- enforces exactly one of workspace_id / owner_user_id is non-null.
+--
+-- Lifecycle: creating a referencing row (attachments / users.avatar_*) bumps
+-- ref_count, deleting one decrements it. A background sweeper hard-deletes
+-- the MinIO object and this row when ref_count reaches 0. FKs from referrers
+-- use ON DELETE RESTRICT so we never lose track of a still-referenced blob.
+-- ====================================
+CREATE TABLE storage_objects (
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY COMMENT 'Internal PK, never exposed',
+  public_id BINARY(16) NOT NULL COMMENT 'UUID v7, the only externally visible ID',
+  workspace_id INT UNSIGNED NULL COMMENT 'Internal FK to workspaces.id; non-null for workspace-scoped blobs (task/calendar attachments). Mutually exclusive with owner_user_id.',
+  owner_user_id INT UNSIGNED NULL COMMENT 'Internal FK to users.id; non-null for user-scoped blobs (avatar). Mutually exclusive with workspace_id.',
+
+  sha256 BINARY(32) NOT NULL COMMENT 'SHA-256 of the raw blob; basis for content addressing and dedup within a scope',
+  byte_size BIGINT UNSIGNED NOT NULL COMMENT 'Size in bytes of the underlying blob',
+  content_type VARCHAR(127) CHARACTER SET latin1 COLLATE latin1_swedish_ci NOT NULL COMMENT 'MIME type recorded at upload time',
+  storage_key VARCHAR(255) CHARACTER SET latin1 COLLATE latin1_swedish_ci NOT NULL COMMENT 'Computed object key in MinIO (e.g. workspace/{wsPublicId}/{sha256_hex} or user/{userPublicId}/{sha256_hex})',
+  ref_count INT UNSIGNED NOT NULL DEFAULT 0 COMMENT 'Number of referencing rows (attachments / users.avatar_storage_object_id); GC eligible when 0',
+
+  sort_weight INT NOT NULL DEFAULT 0 COMMENT 'Display order',
+  notes TEXT NULL COMMENT 'Admin notes',
+  enabled BOOLEAN NOT NULL DEFAULT TRUE COMMENT 'Enabled flag',
+  updated_at TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+  created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+
+  UNIQUE KEY uniq_storage_objects_public_id (public_id),
+  -- Per-scope content dedup. NULLs are distinct in MySQL UNIQUE indexes, so
+  -- the workspace-scope and user-scope rows do not interfere with each other.
+  UNIQUE KEY uniq_storage_objects_workspace_sha (workspace_id, sha256),
+  UNIQUE KEY uniq_storage_objects_user_sha (owner_user_id, sha256),
+  UNIQUE KEY uniq_storage_objects_storage_key (storage_key),
+
+  CONSTRAINT fk_storage_objects_workspace FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
+  CONSTRAINT fk_storage_objects_owner_user FOREIGN KEY (owner_user_id) REFERENCES users(id) ON DELETE CASCADE,
+  CONSTRAINT chk_storage_objects_scope_exclusive CHECK (
+    (workspace_id IS NOT NULL AND owner_user_id IS NULL) OR
+    (workspace_id IS NULL     AND owner_user_id IS NOT NULL)
+  )
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Content-addressed object storage references; rows shared across attachments via storage_object_id with ref_count GC.';
+
+-- >>> user_recovery_codes.sql
+-- ====================================
+-- user_recovery_codes
+-- One-time recovery codes used to bypass TOTP at login when the user
+-- loses access to their authenticator app. Codes are stored as
+-- SHA-256 hashes; the plaintext is shown to the user only once at
+-- generation time.
+-- ====================================
+CREATE TABLE user_recovery_codes (
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY COMMENT 'Internal PK, never exposed',
+  user_id INT UNSIGNED NOT NULL COMMENT 'Internal FK to users.id',
+  code_hash BINARY(32) NOT NULL COMMENT 'SHA-256 of the normalized recovery code',
+  used_at DATETIME(3) NULL COMMENT 'Set when the code is consumed at login',
+  updated_at TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+  created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+
+  UNIQUE KEY uniq_user_recovery_codes_user_hash (user_id, code_hash),
+  KEY idx_user_recovery_codes_user_used (user_id, used_at),
+
+  CONSTRAINT fk_user_recovery_codes_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='TOTP recovery codes';
+
+-- >>> users.sql
+-- ====================================
+-- users
+-- Account-level principals. Authenticated via identities (local/oidc).
+-- Not workspace-scoped; users are global and join workspaces via workspace_members.
+-- ====================================
+CREATE TABLE users (
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY COMMENT 'Internal PK, never exposed',
+  public_id BINARY(16) NOT NULL COMMENT 'UUID v7, the only externally visible ID',
+
+  email VARCHAR(255) CHARACTER SET latin1 COLLATE latin1_swedish_ci NOT NULL COMMENT 'Primary email, ASCII only',
+  email_verified_at DATETIME(3) NULL COMMENT 'Email verification timestamp',
+  display_name VARCHAR(255) NOT NULL COMMENT 'Human-readable name',
+  avatar_url VARCHAR(2048) NULL COMMENT 'Avatar image URL; used when the avatar is hosted externally (e.g. OIDC provider)',
+  avatar_storage_object_id INT UNSIGNED NULL COMMENT 'FK to storage_objects.id when the user uploaded their own avatar; NULL when avatar_url (external) is used or no avatar is set',
+  locale VARCHAR(16) NOT NULL DEFAULT 'en' COMMENT 'Preferred locale tag (BCP 47)',
+  timezone VARCHAR(64) CHARACTER SET latin1 COLLATE latin1_swedish_ci NOT NULL DEFAULT 'UTC' COMMENT 'Preferred IANA timezone (independent of locale)',
+  country CHAR(2) CHARACTER SET latin1 COLLATE latin1_swedish_ci NULL COMMENT 'ISO 3166-1 alpha-2 country (independent of locale); drives default holiday subscription',
+  week_start ENUM('mon','sun','sat') NOT NULL DEFAULT 'mon' COMMENT 'Preferred first day of the week for calendar grids',
+  working_days CHAR(7) CHARACTER SET latin1 COLLATE latin1_swedish_ci NULL COMMENT 'User override of workspace working_days; NULL = inherit',
+  working_hours_start TIME NULL COMMENT 'User override of workspace working_hours_start; NULL = inherit',
+  working_hours_end TIME NULL COMMENT 'User override of workspace working_hours_end; NULL = inherit',
+  snap_to_working_day ENUM('off','warn','auto') NOT NULL DEFAULT 'warn' COMMENT 'What happens when a task/event lands on a non-working day: off=accept silently, warn=save with badge, auto=itemkit snaps forward to next working day',
+  treat_holidays_as_non_working BOOLEAN NOT NULL DEFAULT TRUE COMMENT 'If true, subscribed system (holiday) calendar events count as non-working days',
+  theme_preference ENUM('aurora-light','aurora-dark','dotline-light','dotline-dark','glass-light','glass-dark','system') NOT NULL DEFAULT 'system' COMMENT 'UI theme preference',
+  calendar_shift_default ENUM('ask','sync_always','task_only_always') NOT NULL DEFAULT 'ask' COMMENT 'Default behaviour when an event linked to safe tasks is shifted: ask=prompt the user every time (current behaviour), sync_always=also shift every linked safe task by the same delta, task_only_always=shift only the event and leave linked tasks alone',
+  last_login_at DATETIME(3) NULL COMMENT 'Last successful login',
+
+  -- Notification channel toggles (see /settings/notifications).
+  notif_email_digest_enabled     BOOLEAN NOT NULL DEFAULT TRUE  COMMENT 'Weekly digest email',
+  notif_email_mention_enabled    BOOLEAN NOT NULL DEFAULT TRUE  COMMENT 'Email when mentioned in comments',
+  notif_email_assignment_enabled BOOLEAN NOT NULL DEFAULT TRUE  COMMENT 'Email when assigned to a task',
+  notif_email_due_soon_enabled   BOOLEAN NOT NULL DEFAULT TRUE  COMMENT 'Email when owned task is due within 24h',
+  notif_web_push_enabled         BOOLEAN NOT NULL DEFAULT FALSE COMMENT 'Browser push notifications',
+
+  sort_weight INT NOT NULL DEFAULT 0 COMMENT 'Display order',
+  notes TEXT NULL COMMENT 'Admin notes',
+  enabled BOOLEAN NOT NULL DEFAULT TRUE COMMENT 'Enabled flag',
+  updated_at TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+  created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+
+  UNIQUE KEY uniq_users_public_id (public_id),
+  UNIQUE KEY uniq_users_email (email),
+  KEY idx_users_enabled (enabled),
+  KEY idx_users_avatar_storage_object (avatar_storage_object_id),
+
+  -- SET NULL: if the underlying storage_objects row is removed (e.g. after
+  -- ref_count reaches 0 via a sweeper) the user simply loses their avatar
+  -- rather than blocking the deletion.
+  CONSTRAINT fk_users_avatar_storage_object FOREIGN KEY (avatar_storage_object_id) REFERENCES storage_objects(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Global user accounts';
+
+-- >>> workspace_invites.sql
+-- ====================================
+-- workspace_invites
+-- Token-based invite links for joining a workspace with a pre-assigned role.
+-- The plaintext token is never stored; only its SHA-256 hex hash is persisted.
+-- ====================================
+CREATE TABLE workspace_invites (
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY COMMENT 'Internal PK, never exposed',
+  public_id BINARY(16) NOT NULL COMMENT 'UUID v7, the only externally visible ID',
+  workspace_id INT UNSIGNED NOT NULL COMMENT 'Internal FK to workspaces.id',
+  created_by_user_id INT UNSIGNED NULL COMMENT 'Internal FK to users.id who created the invite',
+
+  token_hash CHAR(64) CHARACTER SET latin1 COLLATE latin1_swedish_ci NOT NULL COMMENT 'SHA-256 hex of invite token plaintext',
+  role ENUM('owner','admin','member','guest') NOT NULL DEFAULT 'member' COMMENT 'Role granted on accept',
+  max_uses INT UNSIGNED NULL COMMENT 'NULL = unlimited',
+  use_count INT UNSIGNED NOT NULL DEFAULT 0 COMMENT 'Number of times this invite has been used',
+  expires_at DATETIME(3) NULL COMMENT 'NULL = never expires',
+  label VARCHAR(255) NULL COMMENT 'Optional human label for the invite link',
+
+  sort_weight INT NOT NULL DEFAULT 0 COMMENT 'Display order',
+  notes TEXT NULL COMMENT 'Admin notes',
+  enabled BOOLEAN NOT NULL DEFAULT TRUE COMMENT 'Enabled flag',
+  updated_at TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+  created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+
+  UNIQUE KEY uniq_workspace_invites_public_id (public_id),
+  UNIQUE KEY uniq_workspace_invites_workspace_public_id (workspace_id, public_id),
+  UNIQUE KEY uniq_workspace_invites_token_hash (token_hash),
+  KEY idx_workspace_invites_workspace_id (workspace_id),
+  KEY idx_workspace_invites_expires_at (expires_at),
+
+  CONSTRAINT fk_workspace_invites_workspace FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
+  CONSTRAINT fk_workspace_invites_created_by FOREIGN KEY (created_by_user_id) REFERENCES users(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Token-based workspace invite links';
+
+-- >>> workspace_members.sql
+-- ====================================
+-- workspace_members
+-- M:N between workspaces and users with a workspace-scoped role.
+-- ====================================
+CREATE TABLE workspace_members (
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY COMMENT 'Internal PK, never exposed',
+  public_id BINARY(16) NOT NULL COMMENT 'UUID v7, the only externally visible ID',
+  workspace_id INT UNSIGNED NOT NULL COMMENT 'Internal FK to workspaces.id',
+  user_id INT UNSIGNED NOT NULL COMMENT 'Internal FK to users.id',
+
+  role ENUM('owner','admin','member','guest') NOT NULL DEFAULT 'member' COMMENT 'Workspace-level role',
+  invited_by_user_id INT UNSIGNED NULL COMMENT 'Inviter user.id',
+  invited_at DATETIME(3) NULL COMMENT 'Invitation time',
+  joined_at DATETIME(3) NULL COMMENT 'Acceptance time',
+
+  sort_weight INT NOT NULL DEFAULT 0 COMMENT 'Display order',
+  notes TEXT NULL COMMENT 'Admin notes',
+  enabled BOOLEAN NOT NULL DEFAULT TRUE COMMENT 'Enabled flag',
+  updated_at TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+  created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+
+  UNIQUE KEY uniq_workspace_members_public_id (public_id),
+  UNIQUE KEY uniq_workspace_members_workspace_public_id (workspace_id, public_id),
+  UNIQUE KEY uniq_workspace_members_workspace_id_user_id (workspace_id, user_id),
+  KEY idx_workspace_members_user_id (user_id),
+
+  CONSTRAINT fk_workspace_members_workspace FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
+  CONSTRAINT fk_workspace_members_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+  CONSTRAINT fk_workspace_members_inviter FOREIGN KEY (invited_by_user_id) REFERENCES users(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Workspace membership';
+
+-- >>> workspaces.sql
+-- ====================================
+-- workspaces
+-- Top-level tenant boundary. Every workspace-scoped table carries
+-- workspace_id as its leading composite index column.
+-- ====================================
+CREATE TABLE workspaces (
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY COMMENT 'Internal PK, never exposed',
+  public_id BINARY(16) NOT NULL COMMENT 'UUID v7, the only externally visible ID',
+
+  slug VARCHAR(63) CHARACTER SET latin1 COLLATE latin1_swedish_ci NOT NULL COMMENT 'DNS-label slug (RFC 1035)',
+  name VARCHAR(255) NOT NULL COMMENT 'Display name',
+  description TEXT NULL COMMENT 'Optional description',
+  icon_url VARCHAR(2048) NULL COMMENT 'Icon image URL',
+
+  timezone VARCHAR(64) CHARACTER SET latin1 COLLATE latin1_swedish_ci NOT NULL DEFAULT 'UTC' COMMENT 'Default IANA timezone for the workspace; user tz overrides per-user',
+  country CHAR(2) CHARACTER SET latin1 COLLATE latin1_swedish_ci NULL COMMENT 'ISO 3166-1 alpha-2 country; drives default holiday subscription',
+  working_days CHAR(7) CHARACTER SET latin1 COLLATE latin1_swedish_ci NOT NULL DEFAULT 'MTWTF__' COMMENT 'Per-day flag string Mon..Sun; letter = working, underscore = off. Default MTWTF__ = Mon-Fri.',
+  working_hours_start TIME NOT NULL DEFAULT '09:00:00' COMMENT 'Start of workspace working day (local tz)',
+  working_hours_end TIME NOT NULL DEFAULT '18:00:00' COMMENT 'End of workspace working day (local tz)',
+
+  sort_weight INT NOT NULL DEFAULT 0 COMMENT 'Display order',
+  notes TEXT NULL COMMENT 'Admin notes',
+  enabled BOOLEAN NOT NULL DEFAULT TRUE COMMENT 'Enabled flag',
+  updated_at TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+  created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+
+  UNIQUE KEY uniq_workspaces_public_id (public_id),
+  UNIQUE KEY uniq_workspaces_slug (slug),
+  KEY idx_workspaces_enabled (enabled)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Tenant boundary';
+
+-- >>> agent_runs.sql
+-- ====================================
+-- agent_runs
+-- Queue + history for AI agent executions (scheduler/worker
+-- split). The scheduler enqueues one row per due (agent, scheduled_at)
+-- pair with a UNIQUE dedupe_key so multiple scheduler replicas cannot
+-- double-fire a job. Workers claim rows with SELECT ... FOR UPDATE
+-- SKIP LOCKED, run the agent, then update status to succeeded / failed.
+-- Completed rows are retained as the audit trail for
+-- `ai.agent.run.*` events (ADR 0002 — events in MySQL).
+-- ====================================
+CREATE TABLE agent_runs (
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY COMMENT 'Internal PK, never exposed',
+  public_id BINARY(16) NOT NULL COMMENT 'UUID v7, the only externally visible ID',
+  workspace_id INT UNSIGNED NOT NULL COMMENT 'Internal FK to workspaces.id',
+  agent_id INT UNSIGNED NOT NULL COMMENT 'Internal FK to ai_agents.id',
+
+  dedupe_key VARCHAR(128) CHARACTER SET latin1 COLLATE latin1_swedish_ci NOT NULL COMMENT 'Unique key shaped as <agent_id>:<unix_minute> to prevent double enqueue across scheduler replicas',
+  status ENUM('pending','claimed','succeeded','failed') NOT NULL DEFAULT 'pending' COMMENT 'Lifecycle state',
+  attempts TINYINT UNSIGNED NOT NULL DEFAULT 0 COMMENT 'Number of claim attempts (for retry budget)',
+  scheduled_at DATETIME(3) NOT NULL COMMENT 'Tick time the scheduler enqueued the run for',
+  claimed_at DATETIME(3) NULL COMMENT 'When a worker claimed the row',
+  finished_at DATETIME(3) NULL COMMENT 'When the worker ack/nacked the row',
+  error_message TEXT NULL COMMENT 'Last failure message for operator visibility',
+
+  sort_weight INT NOT NULL DEFAULT 0 COMMENT 'Display order',
+  notes TEXT NULL COMMENT 'Admin notes',
+  enabled BOOLEAN NOT NULL DEFAULT TRUE COMMENT 'Enabled flag',
+  updated_at TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+  created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+
+  UNIQUE KEY uniq_agent_runs_public_id (public_id),
+  UNIQUE KEY uniq_agent_runs_workspace_public_id (workspace_id, public_id),
+  UNIQUE KEY uniq_agent_runs_dedupe_key (dedupe_key),
+  KEY idx_agent_runs_status_scheduled_at (status, scheduled_at),
+  KEY idx_agent_runs_workspace_id_agent_id (workspace_id, agent_id),
+
+  CONSTRAINT fk_agent_runs_workspace FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
+  CONSTRAINT fk_agent_runs_agent FOREIGN KEY (agent_id) REFERENCES ai_agents(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Agent execution queue + history';
+
+-- >>> ai_agents.sql
+-- ====================================
+-- ai_agents
+-- Reusable LLM agent configuration: a model + system prompt + defaults.
+-- Agents are referenced by automations and MCP tools.
+-- ====================================
+CREATE TABLE ai_agents (
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY COMMENT 'Internal PK, never exposed',
+  public_id BINARY(16) NOT NULL COMMENT 'UUID v7, the only externally visible ID',
+  workspace_id INT UNSIGNED NOT NULL COMMENT 'Internal FK to workspaces.id',
+  model_id INT UNSIGNED NOT NULL COMMENT 'Internal FK to ai_models.id',
+
+  kind ENUM('task_agent','signal_judge') NOT NULL DEFAULT 'task_agent' COMMENT 'Agent dispatch kind. task_agent: operates on tasks (default, all current agents). signal_judge: LLM judge for external signals (see ADR 0008 D3).',
+  name VARCHAR(255) NOT NULL COMMENT 'Human-readable agent name',
+  description TEXT NULL COMMENT 'Free-form description',
+  system_prompt MEDIUMTEXT NOT NULL COMMENT 'System prompt text',
+  temperature SMALLINT UNSIGNED NOT NULL DEFAULT 100 COMMENT 'Sampling temperature x100 (e.g., 100 = 1.00)',
+  max_output_tokens INT UNSIGNED NULL COMMENT 'Per-call output cap (null = model default)',
+  tools_json JSON NULL COMMENT 'Allowed tool list as JSON array',
+  allowed_scopes_json JSON NULL COMMENT 'Allowed MCP scope list as JSON array (null = inherit from token)',
+  monthly_cost_cap_cents INT UNSIGNED NULL COMMENT 'Monthly spend cap in USD cents (null = no cap)',
+  schedule_kind ENUM('disabled','interval','on_event','manual') NOT NULL DEFAULT 'disabled' COMMENT 'Trigger mode: interval = fires every NF_AGENT_TICK_INTERVAL; on_event = fires from eventbus; manual = only via /agents/{id}/trigger',
+  event_trigger_types JSON NULL COMMENT 'JSON array of eventbus Kind strings that fire this agent when schedule_kind=on_event (e.g., ["signal.attached","task.transition.submit"])',
+  schedule_scope ENUM('workspace','assigned_tasks') NOT NULL DEFAULT 'workspace' COMMENT 'When schedule_kind=on_event, controls whether the agent reacts to all workspace events or only events for tasks where it is an enabled actor',
+  paused BOOLEAN NOT NULL DEFAULT FALSE COMMENT 'Manually or automatically paused (e.g., cost cap exceeded)',
+
+  sort_weight INT NOT NULL DEFAULT 0 COMMENT 'Display order',
+  notes TEXT NULL COMMENT 'Admin notes',
+  enabled BOOLEAN NOT NULL DEFAULT TRUE COMMENT 'Enabled flag',
+  updated_at TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+  created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+
+  UNIQUE KEY uniq_ai_agents_public_id (public_id),
+  UNIQUE KEY uniq_ai_agents_workspace_public_id (workspace_id, public_id),
+  KEY idx_ai_agents_workspace_id_enabled (workspace_id, enabled),
+  KEY idx_ai_agents_model_id (model_id),
+
+  CONSTRAINT fk_ai_agents_workspace FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
+  CONSTRAINT fk_ai_agents_model FOREIGN KEY (model_id) REFERENCES ai_models(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Reusable LLM agent configurations';
+
+-- >>> ai_invocations.sql
+-- ====================================
+-- ai_invocations
+-- LLM call audit. Prompts and responses are stored redacted; raw secrets
+-- must never appear here.
+-- ====================================
+CREATE TABLE ai_invocations (
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY COMMENT 'Internal PK, never exposed',
+  public_id BINARY(16) NOT NULL COMMENT 'UUID v7, the only externally visible ID',
+  workspace_id INT UNSIGNED NOT NULL COMMENT 'Internal FK to workspaces.id',
+  provider_id INT UNSIGNED NOT NULL COMMENT 'Internal FK to ai_providers.id',
+  user_id INT UNSIGNED NULL COMMENT 'Internal FK to users.id (if user-initiated)',
+  agent_id INT UNSIGNED NULL COMMENT 'Internal FK to ai_agents.id when the call was made on behalf of an AI agent',
+  task_id INT UNSIGNED NULL COMMENT 'Internal FK to tasks.id if applicable',
+
+  purpose VARCHAR(64) CHARACTER SET latin1 COLLATE latin1_swedish_ci NOT NULL COMMENT 'Logical call purpose (e.g., propose_tasks)',
+  model VARCHAR(128) CHARACTER SET latin1 COLLATE latin1_swedish_ci NOT NULL COMMENT 'Model name actually used',
+  prompt_redacted MEDIUMTEXT NOT NULL COMMENT 'Redacted prompt text',
+  response_redacted MEDIUMTEXT NULL COMMENT 'Redacted response text',
+  tokens_input INT UNSIGNED NULL COMMENT 'Input token count',
+  tokens_output INT UNSIGNED NULL COMMENT 'Output token count',
+  cost_estimate DECIMAL(10,6) NULL COMMENT 'Estimated cost (USD)',
+  status ENUM('ok','error','blocked') NOT NULL COMMENT 'Outcome',
+  error_code VARCHAR(128) CHARACTER SET latin1 COLLATE latin1_swedish_ci NULL COMMENT 'Error code when status != ok',
+  invoked_at DATETIME(3) NOT NULL COMMENT 'Invocation time (millisecond precision)',
+
+  sort_weight INT NOT NULL DEFAULT 0 COMMENT 'Display order',
+  notes TEXT NULL COMMENT 'Admin notes',
+  enabled BOOLEAN NOT NULL DEFAULT TRUE COMMENT 'Enabled flag',
+  updated_at TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+  created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+
+  UNIQUE KEY uniq_ai_invocations_public_id (public_id),
+  UNIQUE KEY uniq_ai_invocations_workspace_public_id (workspace_id, public_id),
+  KEY idx_ai_invocations_workspace_id_invoked_at (workspace_id, invoked_at),
+  KEY idx_ai_invocations_workspace_id_provider_id (workspace_id, provider_id),
+  KEY idx_ai_invocations_agent_id_invoked_at (agent_id, invoked_at),
+  KEY idx_ai_invocations_created_at (created_at),
+
+  CONSTRAINT fk_ai_invocations_workspace FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
+  CONSTRAINT fk_ai_invocations_provider FOREIGN KEY (provider_id) REFERENCES ai_providers(id) ON DELETE CASCADE,
+  CONSTRAINT fk_ai_invocations_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL,
+  CONSTRAINT fk_ai_invocations_agent FOREIGN KEY (agent_id) REFERENCES ai_agents(id) ON DELETE SET NULL,
+  CONSTRAINT fk_ai_invocations_task FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='LLM invocation audit';
+
+-- >>> ai_models.sql
+-- ====================================
+-- ai_models
+-- Concrete model offered by an ai_providers row. Pricing is stored as
+-- micro-USD per 1M tokens to keep integer math.
+-- ====================================
+CREATE TABLE ai_models (
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY COMMENT 'Internal PK, never exposed',
+  public_id BINARY(16) NOT NULL COMMENT 'UUID v7, the only externally visible ID',
+  workspace_id INT UNSIGNED NOT NULL COMMENT 'Internal FK to workspaces.id',
+  provider_id INT UNSIGNED NOT NULL COMMENT 'Internal FK to ai_providers.id',
+
+  name VARCHAR(128) CHARACTER SET latin1 COLLATE latin1_swedish_ci NOT NULL COMMENT 'Provider model identifier (e.g., claude-opus-4)',
+  display_name VARCHAR(255) NOT NULL COMMENT 'Human-readable label',
+  context_window INT UNSIGNED NOT NULL COMMENT 'Max context tokens',
+  max_output_tokens INT UNSIGNED NULL COMMENT 'Max generated tokens (null = same as context)',
+  input_price_micro_usd_per_mtok BIGINT UNSIGNED NOT NULL DEFAULT 0 COMMENT 'Input price in micro-USD per 1M tokens',
+  output_price_micro_usd_per_mtok BIGINT UNSIGNED NOT NULL DEFAULT 0 COMMENT 'Output price in micro-USD per 1M tokens',
+  supports_tools BOOLEAN NOT NULL DEFAULT FALSE COMMENT 'Whether model supports tool use',
+  supports_vision BOOLEAN NOT NULL DEFAULT FALSE COMMENT 'Whether model supports image input',
+
+  sort_weight INT NOT NULL DEFAULT 0 COMMENT 'Display order',
+  notes TEXT NULL COMMENT 'Admin notes',
+  enabled BOOLEAN NOT NULL DEFAULT TRUE COMMENT 'Enabled flag',
+  updated_at TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+  created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+
+  UNIQUE KEY uniq_ai_models_public_id (public_id),
+  UNIQUE KEY uniq_ai_models_workspace_public_id (workspace_id, public_id),
+  UNIQUE KEY uniq_ai_models_provider_id_name (provider_id, name),
+  KEY idx_ai_models_workspace_id_enabled (workspace_id, enabled),
+
+  CONSTRAINT fk_ai_models_workspace FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
+  CONSTRAINT fk_ai_models_provider FOREIGN KEY (provider_id) REFERENCES ai_providers(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Concrete LLM models per provider';
+
+-- >>> ai_providers.sql
+-- ====================================
+-- ai_providers
+-- LLM provider configurations. api_key_ciphertext stores AES-256-GCM
+-- output (nonce + tag + ciphertext) and is NEVER read back via the API.
+-- ====================================
+CREATE TABLE ai_providers (
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY COMMENT 'Internal PK, never exposed',
+  public_id BINARY(16) NOT NULL COMMENT 'UUID v7, the only externally visible ID',
+  workspace_id INT UNSIGNED NOT NULL COMMENT 'Internal FK to workspaces.id',
+
+  kind ENUM('anthropic','openai','google','ollama','openai_compat') NOT NULL COMMENT 'Provider kind',
+  name VARCHAR(255) NOT NULL COMMENT 'Human-readable label',
+  base_url VARCHAR(2048) NULL COMMENT 'API base URL (required for openai_compat/ollama)',
+  api_key_ciphertext VARBINARY(512) NOT NULL COMMENT 'AES-256-GCM nonce+tag+ciphertext',
+  api_key_prefix CHAR(8) CHARACTER SET latin1 COLLATE latin1_swedish_ci NOT NULL COMMENT 'Leading chars for display masking',
+  api_key_suffix CHAR(4) CHARACTER SET latin1 COLLATE latin1_swedish_ci NOT NULL COMMENT 'Trailing chars for display masking',
+  default_model VARCHAR(128) CHARACTER SET latin1 COLLATE latin1_swedish_ci NULL COMMENT 'Default model name',
+
+  sort_weight INT NOT NULL DEFAULT 0 COMMENT 'Display order',
+  notes TEXT NULL COMMENT 'Admin notes',
+  enabled BOOLEAN NOT NULL DEFAULT TRUE COMMENT 'Enabled flag',
+  updated_at TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+  created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+
+  UNIQUE KEY uniq_ai_providers_public_id (public_id),
+  UNIQUE KEY uniq_ai_providers_workspace_public_id (workspace_id, public_id),
+  KEY idx_ai_providers_workspace_id_enabled (workspace_id, enabled),
+
+  CONSTRAINT fk_ai_providers_workspace FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='LLM provider credentials';
+
+-- >>> ai_settings.sql
+-- ====================================
+-- ai_settings
+-- Per-workspace AI configuration (ADR 0003): embeddings, duplicates,
+-- auto-actions, and signal_judge prompt customization.
+-- Holds duplicate-detection thresholds, the embed-budget bucket that
+-- the CostGuard tracks separately from the LLM chat budget,
+-- auto-action executor settings, and free-form operator instructions
+-- (judge_instructions) that are spliced into the signal_judge system prompt.
+--
+-- Settings are not user-facing entities, so no public_id: the row is
+-- addressed by its parent workspace.
+-- ====================================
+CREATE TABLE ai_settings (
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY COMMENT 'Internal PK, never exposed',
+  workspace_id INT UNSIGNED NOT NULL COMMENT 'Internal FK to workspaces.id',
+  modified_by_user_id INT UNSIGNED NULL COMMENT 'Last modifier user.id (audit field; NULL when user is removed or for system writers)',
+
+  embed_model              VARCHAR(64)  NOT NULL DEFAULT 'mock-768' COMMENT 'Embedding model key (resolved by ai/embed registry)',
+  embed_budget_cents_day   INT UNSIGNED NOT NULL DEFAULT 100 COMMENT 'Daily embed cost cap in cents (separate bucket from chat budget)',
+  duplicate_threshold_high DECIMAL(4,3) NOT NULL DEFAULT 0.870 COMMENT 'Cosine sim >= this -> duplicate candidate',
+  duplicate_threshold_low  DECIMAL(4,3) NOT NULL DEFAULT 0.750 COMMENT 'Cosine sim in [low, high) -> related task',
+
+  auto_action_enabled          BOOLEAN      NOT NULL DEFAULT TRUE  COMMENT 'Whether the auto-action executor runs for this workspace',
+  auto_action_interval_minutes INT UNSIGNED NOT NULL DEFAULT 5     COMMENT 'How often the executor evaluates tasks (minutes); 0 disables',
+  auto_action_threshold        DECIMAL(3,2) NOT NULL DEFAULT 0.80  COMMENT 'Minimum confidence score for an action to be applied automatically',
+
+  judge_instructions TEXT NULL
+    COMMENT 'Free-form operator instructions appended to the signal_judge system prompt. NULL or empty string = use the built-in template only. Truncated at prompt-build time if exceeding the configured token budget. See apps/flow-api/internal/ai/signaljudge/prompt.go for inclusion logic.',
+
+  enabled BOOLEAN NOT NULL DEFAULT TRUE COMMENT 'Enabled flag',
+  updated_at TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+  created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+
+  UNIQUE KEY uniq_ai_settings_workspace (workspace_id),
+  KEY idx_ai_settings_modified_by_user_id (modified_by_user_id),
+
+  CONSTRAINT fk_ai_settings_workspace FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
+  CONSTRAINT fk_ai_settings_modifier FOREIGN KEY (modified_by_user_id) REFERENCES users(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Per-workspace AI configuration (ADR 0003): embeddings, duplicates, auto-actions';
+
+-- >>> attachments.sql
+-- ====================================
+-- attachments
+-- Files uploaded against a task. The actual blob and its content metadata
+-- (sha256 / byte_size / content_type / storage_key) live in storage_objects;
+-- this row is the per-task reference (filename, uploader, sort order). The
+-- same blob uploaded twice within a workspace shares one storage_objects
+-- row and bumps its ref_count.
+-- ====================================
+CREATE TABLE attachments (
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY COMMENT 'Internal PK, never exposed',
+  public_id BINARY(16) NOT NULL COMMENT 'UUID v7, the only externally visible ID',
+  workspace_id INT UNSIGNED NOT NULL COMMENT 'Internal FK to workspaces.id',
+  task_id INT UNSIGNED NULL COMMENT 'Internal FK to tasks.id; nullable so audit-trail attachments survive task deletion (FK SET NULL)',
+  uploader_id INT UNSIGNED NOT NULL COMMENT 'Internal FK to users.id (uploader)',
+  storage_object_id INT UNSIGNED NOT NULL COMMENT 'FK to storage_objects.id; holds the actual blob metadata (sha256, byte_size, content_type, storage_key)',
+
+  filename VARCHAR(512) NOT NULL COMMENT 'Original filename as supplied by the uploader; widened to 512 to safely hold multibyte paths',
+
+  sort_weight INT NOT NULL DEFAULT 0 COMMENT 'Display order',
+  notes TEXT NULL COMMENT 'Admin notes',
+  enabled BOOLEAN NOT NULL DEFAULT TRUE COMMENT 'Enabled flag',
+  updated_at TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+  created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+
+  UNIQUE KEY uniq_attachments_public_id (public_id),
+  UNIQUE KEY uniq_attachments_workspace_public_id (workspace_id, public_id),
+  KEY idx_attachments_workspace_id_task_id (workspace_id, task_id),
+  KEY idx_attachments_workspace_id_uploader_id (workspace_id, uploader_id),
+  KEY idx_attachments_storage_object (storage_object_id),
+
+  CONSTRAINT fk_attachments_workspace FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
+  CONSTRAINT fk_attachments_task FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE SET NULL,
+  CONSTRAINT fk_attachments_uploader FOREIGN KEY (uploader_id) REFERENCES users(id) ON DELETE CASCADE,
+  -- RESTRICT: attachments must be deleted (and ref_count decremented) before
+  -- the underlying storage_objects row may be removed by the GC sweeper.
+  CONSTRAINT fk_attachments_storage_object FOREIGN KEY (storage_object_id) REFERENCES storage_objects(id) ON DELETE RESTRICT
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Task file attachments metadata';
+
+-- >>> auto_action_rules.sql
+-- ====================================
+-- auto_action_rules
+-- Per-workspace auto-action rule configuration.
+-- Each row overrides the default confidence and idle threshold for a
+-- specific rule kind (e.g. escalate_overdue, assign_owner) and can be
+-- further scoped to a specific signal_kind. A NULL signal_kind acts as
+-- the wildcard fallback that matches every signal kind for the rule.
+-- Rules may also declare an explicit autonomy_level that overrides the
+-- confidence-vs-threshold gate, so the autonomy matrix UI can persist a
+-- chosen mode (suggest | draft | auto) directly without encoding it via
+-- confidence values.
+-- The auto-action executor reads these rules together with ai_settings
+-- to decide which actions to propose or apply automatically.
+-- ====================================
+CREATE TABLE auto_action_rules (
+  id            INT UNSIGNED AUTO_INCREMENT PRIMARY KEY COMMENT 'Internal PK, never exposed',
+  public_id     BINARY(16)   NOT NULL COMMENT 'UUID v7, used in API responses',
+  workspace_id  INT UNSIGNED NOT NULL COMMENT 'Internal FK to workspaces.id',
+  kind          VARCHAR(64)  NOT NULL COMMENT 'Rule kind: escalate_overdue | assign_owner | nudge_assignee | close_stale_review',
+  signal_kind   VARCHAR(64)  NULL COMMENT 'Signal scope: NULL = wildcard (matches every kind), exact dotted string match (e.g. ''discord.presence''), or wildcard prefix where the stored value matches kinds with that suffix-after-dot. Resolution layer details live in docs/conventions/autonomy.md',
+  enabled       BOOLEAN      NOT NULL DEFAULT TRUE COMMENT 'Whether this rule fires during evaluation',
+  confidence    DECIMAL(3,2) NOT NULL COMMENT 'Confidence score emitted when this rule fires (0.00-1.00)',
+  idle_hours    INT UNSIGNED NOT NULL COMMENT 'Idle threshold in hours. 0 for rules that use due_on (escalate_overdue)',
+  autonomy_level ENUM('suggest','draft','auto') NULL
+    COMMENT 'When set, the autonomy resolver returns this level verbatim and skips confidence comparison. NULL falls back to the existing confidence-vs-threshold derivation. Closed enum mirrors signalkinds.Autonomy.',
+
+  signal_kind_match VARCHAR(64) GENERATED ALWAYS AS (COALESCE(signal_kind, '')) STORED NOT NULL
+    COMMENT 'Internal normalization of signal_kind for the UNIQUE index. Empty string represents the NULL wildcard. Never read from app code -- only the unique-key engine touches this. Constraint order (GENERATED clause before NOT NULL) is required by MySQL 9.x parser.',
+
+  updated_at TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+  created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+
+  UNIQUE KEY uniq_auto_action_rules_public_id (public_id),
+  UNIQUE KEY uniq_auto_action_rules_workspace_public_id (workspace_id, public_id),
+  UNIQUE KEY uniq_auto_action_rules_ws_kind_signal (workspace_id, kind, signal_kind_match),
+
+  KEY idx_auto_action_rules_ws_signal (workspace_id, signal_kind, kind),
+
+  CONSTRAINT fk_auto_action_rules_ws FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Per-workspace auto-action rule overrides (kind, signal_kind, confidence, idle threshold)';
+
+-- >>> comments.sql
+-- ====================================
+-- comments
+-- Discussion thread attached to a task. Markdown body with edit history
+-- captured via edited_at (full revisions out of scope).
+-- ====================================
+CREATE TABLE comments (
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY COMMENT 'Internal PK, never exposed',
+  public_id BINARY(16) NOT NULL COMMENT 'UUID v7, the only externally visible ID',
+  workspace_id INT UNSIGNED NOT NULL COMMENT 'Internal FK to workspaces.id',
+  task_id INT UNSIGNED NULL COMMENT 'Internal FK to tasks.id; nullable so audit-trail comments survive task deletion (FK SET NULL)',
+  author_id INT UNSIGNED NOT NULL COMMENT 'Internal FK to users.id',
+
+  body MEDIUMTEXT NOT NULL COMMENT 'Markdown body',
+  edited_at DATETIME(3) NULL COMMENT 'Last edit time (null = never edited)',
+
+  sort_weight INT NOT NULL DEFAULT 0 COMMENT 'Display order',
+  notes TEXT NULL COMMENT 'Admin notes',
+  enabled BOOLEAN NOT NULL DEFAULT TRUE COMMENT 'Enabled flag',
+  updated_at TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+  created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+
+  UNIQUE KEY uniq_comments_public_id (public_id),
+  UNIQUE KEY uniq_comments_workspace_public_id (workspace_id, public_id),
+  KEY idx_comments_workspace_id_task_id (workspace_id, task_id),
+  KEY idx_comments_workspace_id_author_id (workspace_id, author_id),
+  -- Bare author_id index so ON DELETE CASCADE on users can find dependent
+  -- comment rows without a full table scan (the workspace-leading composite
+  -- above does not satisfy author_id-only lookups).
+  KEY idx_comments_author_id (author_id),
+  -- Supports keyset pagination on (created_at DESC, public_id DESC) for
+  -- ListCommentsForTaskKeyset.
+  KEY idx_comments_task_id_keyset (task_id, created_at, public_id),
+  FULLTEXT KEY ft_comments_body (body),
+
+  CONSTRAINT fk_comments_workspace FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
+  CONSTRAINT fk_comments_task FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE SET NULL,
+  CONSTRAINT fk_comments_author FOREIGN KEY (author_id) REFERENCES users(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Task discussion comments';
+
+-- >>> dashboard_widgets.sql
+-- ====================================
+-- dashboard_widgets
+-- Configurable widgets that users arrange on their workspace dashboard.
+-- Each widget has a type, grid position, and JSON configuration blob.
+-- ====================================
+CREATE TABLE dashboard_widgets (
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY COMMENT 'Internal PK, never exposed',
+  public_id BINARY(16) NOT NULL COMMENT 'UUID v7, the only externally visible ID',
+  workspace_id INT UNSIGNED NOT NULL COMMENT 'Internal FK to workspaces.id',
+  creator_id INT UNSIGNED NOT NULL COMMENT 'Internal FK to users.id',
+
+  widget_type ENUM('task_summary','burndown','signals_feed','ai_suggestions','overdue_tasks','notification_feed') NOT NULL COMMENT 'Widget variant',
+  title VARCHAR(200) NOT NULL COMMENT 'User-facing widget title',
+  config JSON NULL COMMENT 'Widget-specific configuration (filters, timebox_id, etc.)',
+  position_x SMALLINT UNSIGNED NOT NULL DEFAULT 0 COMMENT 'Grid column offset',
+  position_y SMALLINT UNSIGNED NOT NULL DEFAULT 0 COMMENT 'Grid row offset',
+  width SMALLINT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'Grid column span',
+  height SMALLINT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'Grid row span',
+
+  sort_weight INT NOT NULL DEFAULT 0 COMMENT 'Display order',
+  notes TEXT NULL COMMENT 'Admin notes',
+  enabled BOOLEAN NOT NULL DEFAULT TRUE COMMENT 'Enabled flag',
+  updated_at TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+  created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+
+  UNIQUE KEY uniq_dashboard_widgets_public_id (public_id),
+  UNIQUE KEY uniq_dashboard_widgets_workspace_public_id (workspace_id, public_id),
+  KEY idx_dashboard_widgets_workspace_id_enabled_sort_weight (workspace_id, enabled, sort_weight),
+  KEY idx_dashboard_widgets_workspace_id_creator_id (workspace_id, creator_id),
+
+  CONSTRAINT fk_dashboard_widgets_workspace FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
+  CONSTRAINT fk_dashboard_widgets_creator FOREIGN KEY (creator_id) REFERENCES users(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Dashboard widgets arranged by users';
+
+-- >>> import_jobs.sql
+-- ====================================
+-- import_jobs
+-- Bulk import job tracking. Each row represents a single import
+-- operation from an external source (GitHub, Jira, Linear, CSV).
+-- The worker updates processed_items / failed_items as it progresses.
+-- ====================================
+CREATE TABLE import_jobs (
+  id                   INT UNSIGNED AUTO_INCREMENT PRIMARY KEY COMMENT 'Internal PK, never exposed',
+  public_id            BINARY(16) NOT NULL                     COMMENT 'UUID v7, the only externally visible ID',
+  workspace_id         INT UNSIGNED NOT NULL                    COMMENT 'Internal FK to workspaces.id',
+  project_id           INT UNSIGNED NULL                        COMMENT 'Internal FK to projects.id (target project)',
+  initiated_by_user_id INT UNSIGNED NULL                        COMMENT 'Internal FK to users.id (who started the import)',
+
+  source               ENUM('github','jira','linear','csv') NOT NULL COMMENT 'Import source type',
+  status               ENUM('pending','running','completed','failed','cancelled') NOT NULL DEFAULT 'pending' COMMENT 'Lifecycle state',
+  total_items          INT UNSIGNED NOT NULL DEFAULT 0          COMMENT 'Total items to import',
+  processed_items      INT UNSIGNED NOT NULL DEFAULT 0          COMMENT 'Successfully processed items',
+  failed_items         INT UNSIGNED NOT NULL DEFAULT 0          COMMENT 'Items that failed to import',
+  config_json          JSON NOT NULL                            COMMENT 'Source-specific import configuration',
+  error_log            TEXT NULL                                COMMENT 'Aggregated error log',
+  started_at           DATETIME(3) NULL                         COMMENT 'When the worker began processing',
+  completed_at         DATETIME(3) NULL                         COMMENT 'When the import finished (success or failure)',
+
+  sort_weight          INT NOT NULL DEFAULT 0                   COMMENT 'Display order',
+  notes                TEXT NULL                                COMMENT 'Admin notes',
+  enabled              BOOLEAN NOT NULL DEFAULT TRUE            COMMENT 'Enabled flag',
+  updated_at           TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+  created_at           DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+
+  UNIQUE KEY uniq_import_jobs_public_id (public_id),
+  UNIQUE KEY uniq_import_jobs_workspace_public_id (workspace_id, public_id),
+  KEY idx_import_jobs_workspace_id_status (workspace_id, status),
+
+  CONSTRAINT fk_import_jobs_workspace FOREIGN KEY (workspace_id)         REFERENCES workspaces(id) ON DELETE CASCADE,
+  CONSTRAINT fk_import_jobs_project   FOREIGN KEY (project_id)           REFERENCES projects(id)   ON DELETE SET NULL,
+  CONSTRAINT fk_import_jobs_initiator FOREIGN KEY (initiated_by_user_id) REFERENCES users(id)      ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Bulk import job tracking';
 
 -- >>> intake_items.sql
 -- ====================================
@@ -1332,37 +1680,6 @@ CREATE TABLE lenses (
   CONSTRAINT fk_lenses_project FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
   CONSTRAINT fk_lenses_creator FOREIGN KEY (creator_id) REFERENCES users(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Saved task query views';
-
--- >>> magic_link_tokens.sql
--- ====================================
--- magic_link_tokens
--- Passwordless magic-link authentication tokens. Only the SHA-256 hash
--- of the token is stored; the plaintext URL is sent to the user exactly
--- once via email.
--- ====================================
-CREATE TABLE magic_link_tokens (
-  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY COMMENT 'Internal PK, never exposed',
-  public_id BINARY(16) NOT NULL COMMENT 'UUID v7, the only externally visible ID',
-  user_id INT UNSIGNED NOT NULL COMMENT 'Internal FK to users.id',
-
-  token_hash CHAR(64) CHARACTER SET latin1 COLLATE latin1_swedish_ci NOT NULL COMMENT 'SHA-256 hex of the token',
-  expires_at DATETIME(3) NOT NULL COMMENT 'Token expiry time',
-  used_at DATETIME(3) NULL COMMENT 'Time the token was consumed',
-  ip_address VARBINARY(16) NULL COMMENT 'Packed IPv4/IPv6 address at creation',
-
-  sort_weight INT NOT NULL DEFAULT 0 COMMENT 'Display order',
-  notes TEXT NULL COMMENT 'Admin notes',
-  enabled BOOLEAN NOT NULL DEFAULT TRUE COMMENT 'Enabled flag',
-  updated_at TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
-  created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
-
-  UNIQUE KEY uniq_magic_link_tokens_public_id (public_id),
-  UNIQUE KEY uniq_magic_link_tokens_token_hash (token_hash),
-  KEY idx_magic_link_tokens_user_id (user_id),
-  KEY idx_magic_link_tokens_expires_at (expires_at),
-
-  CONSTRAINT fk_magic_link_tokens_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Passwordless magic-link tokens';
 
 -- >>> mcp_invocations.sql
 -- ====================================
@@ -1562,32 +1879,6 @@ CREATE TABLE notifications (
   CONSTRAINT fk_notifications_source_event FOREIGN KEY (source_event_id) REFERENCES events(id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Per-user notification entries from eventbus fan-out';
 
--- >>> oauth_states.sql
--- ====================================
--- oauth_states
--- Short-lived CSRF-protection state tokens for the personal OAuth
--- flow (POST /me/integrations/{provider}/connect → GET /oauth/
--- callback/{provider}). A row is inserted when the user clicks
--- "Connect", and deleted atomically when the callback handler
--- consumes the matching state. Rows expire after 15 minutes; the
--- callback refuses stale rows.
--- ====================================
-CREATE TABLE oauth_states (
-  state CHAR(64) CHARACTER SET latin1 COLLATE latin1_swedish_ci NOT NULL PRIMARY KEY COMMENT 'Random 32-byte token, hex-encoded',
-
-  user_id INT UNSIGNED NOT NULL COMMENT 'Internal FK to users.id — the user who started the connect flow',
-  provider ENUM('github','slack','google_calendar','discord') NOT NULL COMMENT 'Which provider this state belongs to. ''discord'' is required for the personal Discord presence-binding flow (Phase 8 presence-discord gateway).',
-  redirect_to VARCHAR(512) NULL COMMENT 'Optional client-supplied return URL to send the user to after the callback completes',
-
-  expires_at DATETIME(3) NOT NULL COMMENT 'Hard expiry; callback handler rejects rows past this timestamp',
-  updated_at TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
-  created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
-
-  KEY idx_oauth_states_expires_at (expires_at),
-
-  CONSTRAINT fk_oauth_states_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Short-lived OAuth CSRF state tokens for personal integrations';
-
 -- >>> pages.sql
 -- ====================================
 -- pages
@@ -1627,43 +1918,6 @@ CREATE TABLE pages (
   CONSTRAINT fk_pages_creator FOREIGN KEY (creator_id) REFERENCES users(id) ON DELETE CASCADE,
   CONSTRAINT fk_pages_parent FOREIGN KEY (parent_page_id) REFERENCES pages(id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Wiki/documentation pages with tree structure';
-
--- >>> personal_access_tokens.sql
--- ====================================
--- personal_access_tokens
--- User-scoped API tokens for the REST API and CLI (`tnk`).
--- Only the SHA-256 hash of the bearer token is stored; the plaintext is
--- shown to the user exactly once at creation time.
--- ====================================
-CREATE TABLE personal_access_tokens (
-  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY COMMENT 'Internal PK, never exposed',
-  public_id BINARY(16) NOT NULL COMMENT 'UUID v7, the only externally visible ID',
-  workspace_id INT UNSIGNED NOT NULL COMMENT 'Internal FK to workspaces.id',
-  user_id INT UNSIGNED NOT NULL COMMENT 'Internal FK to users.id (token owner)',
-
-  name VARCHAR(255) NOT NULL COMMENT 'Human-readable label',
-  token_hash CHAR(64) CHARACTER SET latin1 COLLATE latin1_swedish_ci NOT NULL COMMENT 'SHA-256 hex of the bearer token',
-  token_prefix CHAR(8) CHARACTER SET latin1 COLLATE latin1_swedish_ci NOT NULL COMMENT 'Leading chars shown as hint',
-  scopes_json JSON NOT NULL COMMENT 'Array of granted API scopes',
-  expires_at DATETIME(3) NULL COMMENT 'Expiry time (null = never)',
-  last_used_at DATETIME(3) NULL COMMENT 'Last successful use',
-  revoked_at DATETIME(3) NULL COMMENT 'Explicit revocation time',
-
-  sort_weight INT NOT NULL DEFAULT 0 COMMENT 'Display order',
-  notes TEXT NULL COMMENT 'Admin notes',
-  enabled BOOLEAN NOT NULL DEFAULT TRUE COMMENT 'Enabled flag',
-  updated_at TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
-  created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
-
-  UNIQUE KEY uniq_personal_access_tokens_public_id (public_id),
-  UNIQUE KEY uniq_personal_access_tokens_workspace_public_id (workspace_id, public_id),
-  UNIQUE KEY uniq_personal_access_tokens_token_hash (token_hash),
-  KEY idx_personal_access_tokens_workspace_id_user_id (workspace_id, user_id),
-  KEY idx_personal_access_tokens_expires_at (expires_at),
-
-  CONSTRAINT fk_personal_access_tokens_workspace FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
-  CONSTRAINT fk_personal_access_tokens_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='User personal access tokens for REST/CLI';
 
 -- >>> project_members.sql
 -- ====================================
@@ -1846,37 +2100,6 @@ CREATE TABLE repo_workspace_mappings (
   CONSTRAINT fk_repo_workspace_mappings_project FOREIGN KEY (default_project_id) REFERENCES projects(id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Maps GitHub repositories to workspaces for webhook routing';
 
--- >>> sessions.sql
--- ====================================
--- sessions
--- Refresh-token backed user sessions. Access tokens are stateless JWT;
--- this table only tracks the refresh token hash and its metadata.
--- ====================================
-CREATE TABLE sessions (
-  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY COMMENT 'Internal PK, never exposed',
-  public_id BINARY(16) NOT NULL COMMENT 'UUID v7, the only externally visible ID',
-  user_id INT UNSIGNED NOT NULL COMMENT 'Internal FK to users.id',
-
-  refresh_hash CHAR(64) CHARACTER SET latin1 COLLATE latin1_swedish_ci NOT NULL COMMENT 'SHA-256 hex of refresh token',
-  user_agent VARCHAR(512) NULL COMMENT 'Client user agent at issue time',
-  ip_address VARBINARY(16) NULL COMMENT 'Packed IPv4/IPv6 address at issue time',
-  expires_at DATETIME(3) NOT NULL COMMENT 'Refresh token expiry',
-  revoked_at DATETIME(3) NULL COMMENT 'Explicit revocation time',
-  last_used_at DATETIME(3) NULL COMMENT 'Last refresh time',
-
-  sort_weight INT NOT NULL DEFAULT 0 COMMENT 'Display order',
-  notes TEXT NULL COMMENT 'Admin notes',
-  enabled BOOLEAN NOT NULL DEFAULT TRUE COMMENT 'Enabled flag',
-  updated_at TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
-  created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
-
-  UNIQUE KEY uniq_sessions_public_id (public_id),
-  UNIQUE KEY uniq_sessions_refresh_hash (refresh_hash),
-  KEY idx_sessions_user_id_expires_at (user_id, expires_at),
-
-  CONSTRAINT fk_sessions_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Refresh-token backed sessions';
-
 -- >>> signals.sql
 -- ====================================
 -- signals
@@ -1973,56 +2196,6 @@ CREATE TABLE signals (
   CONSTRAINT fk_signals_task FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE SET NULL,
   CONSTRAINT fk_signals_judge_run FOREIGN KEY (judge_run_id) REFERENCES agent_runs(id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Inbound signals; judged by the signal_judge agent and reified into task events by the Applier (ADR 0008)';
-
--- >>> storage_objects.sql
--- ====================================
--- storage_objects
--- Content-addressed metadata index for blobs that physically live in MinIO
--- (S3-compatible object storage). One row per unique (scope, sha256) tuple
--- so that uploading the same file twice within a scope reuses the underlying
--- object and only bumps ref_count.
---
--- Scope is exclusive: a row either belongs to a workspace (task / calendar
--- event attachments) or to a single user (avatar). The check constraint
--- enforces exactly one of workspace_id / owner_user_id is non-null.
---
--- Lifecycle: creating a referencing row (attachments / users.avatar_*) bumps
--- ref_count, deleting one decrements it. A background sweeper hard-deletes
--- the MinIO object and this row when ref_count reaches 0. FKs from referrers
--- use ON DELETE RESTRICT so we never lose track of a still-referenced blob.
--- ====================================
-CREATE TABLE storage_objects (
-  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY COMMENT 'Internal PK, never exposed',
-  public_id BINARY(16) NOT NULL COMMENT 'UUID v7, the only externally visible ID',
-  workspace_id INT UNSIGNED NULL COMMENT 'Internal FK to workspaces.id; non-null for workspace-scoped blobs (task/calendar attachments). Mutually exclusive with owner_user_id.',
-  owner_user_id INT UNSIGNED NULL COMMENT 'Internal FK to users.id; non-null for user-scoped blobs (avatar). Mutually exclusive with workspace_id.',
-
-  sha256 BINARY(32) NOT NULL COMMENT 'SHA-256 of the raw blob; basis for content addressing and dedup within a scope',
-  byte_size BIGINT UNSIGNED NOT NULL COMMENT 'Size in bytes of the underlying blob',
-  content_type VARCHAR(127) CHARACTER SET latin1 COLLATE latin1_swedish_ci NOT NULL COMMENT 'MIME type recorded at upload time',
-  storage_key VARCHAR(255) CHARACTER SET latin1 COLLATE latin1_swedish_ci NOT NULL COMMENT 'Computed object key in MinIO (e.g. workspace/{wsPublicId}/{sha256_hex} or user/{userPublicId}/{sha256_hex})',
-  ref_count INT UNSIGNED NOT NULL DEFAULT 0 COMMENT 'Number of referencing rows (attachments / users.avatar_storage_object_id); GC eligible when 0',
-
-  sort_weight INT NOT NULL DEFAULT 0 COMMENT 'Display order',
-  notes TEXT NULL COMMENT 'Admin notes',
-  enabled BOOLEAN NOT NULL DEFAULT TRUE COMMENT 'Enabled flag',
-  updated_at TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
-  created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
-
-  UNIQUE KEY uniq_storage_objects_public_id (public_id),
-  -- Per-scope content dedup. NULLs are distinct in MySQL UNIQUE indexes, so
-  -- the workspace-scope and user-scope rows do not interfere with each other.
-  UNIQUE KEY uniq_storage_objects_workspace_sha (workspace_id, sha256),
-  UNIQUE KEY uniq_storage_objects_user_sha (owner_user_id, sha256),
-  UNIQUE KEY uniq_storage_objects_storage_key (storage_key),
-
-  CONSTRAINT fk_storage_objects_workspace FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
-  CONSTRAINT fk_storage_objects_owner_user FOREIGN KEY (owner_user_id) REFERENCES users(id) ON DELETE CASCADE,
-  CONSTRAINT chk_storage_objects_scope_exclusive CHECK (
-    (workspace_id IS NOT NULL AND owner_user_id IS NULL) OR
-    (workspace_id IS NULL     AND owner_user_id IS NOT NULL)
-  )
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Content-addressed object storage references; rows shared across attachments via storage_object_id with ref_count GC.';
 
 -- >>> task_actors.sql
 -- ====================================
@@ -2500,28 +2673,6 @@ CREATE TABLE user_recent_visits (
   CONSTRAINT fk_user_recent_visits_user      FOREIGN KEY (user_id)      REFERENCES users(id)      ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Per-user recently visited entities';
 
--- >>> user_recovery_codes.sql
--- ====================================
--- user_recovery_codes
--- One-time recovery codes used to bypass TOTP at login when the user
--- loses access to their authenticator app. Codes are stored as
--- SHA-256 hashes; the plaintext is shown to the user only once at
--- generation time.
--- ====================================
-CREATE TABLE user_recovery_codes (
-  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY COMMENT 'Internal PK, never exposed',
-  user_id INT UNSIGNED NOT NULL COMMENT 'Internal FK to users.id',
-  code_hash BINARY(32) NOT NULL COMMENT 'SHA-256 of the normalized recovery code',
-  used_at DATETIME(3) NULL COMMENT 'Set when the code is consumed at login',
-  updated_at TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
-  created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
-
-  UNIQUE KEY uniq_user_recovery_codes_user_hash (user_id, code_hash),
-  KEY idx_user_recovery_codes_user_used (user_id, used_at),
-
-  CONSTRAINT fk_user_recovery_codes_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='TOTP recovery codes';
-
 -- >>> user_view_preferences.sql
 -- ====================================
 -- user_view_preferences
@@ -2552,58 +2703,6 @@ CREATE TABLE user_view_preferences (
   CONSTRAINT fk_user_view_prefs_workspace FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
   CONSTRAINT fk_user_view_prefs_user      FOREIGN KEY (user_id)      REFERENCES users(id)      ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Per-user per-scope display preferences';
-
--- >>> users.sql
--- ====================================
--- users
--- Account-level principals. Authenticated via identities (local/oidc).
--- Not workspace-scoped; users are global and join workspaces via workspace_members.
--- ====================================
-CREATE TABLE users (
-  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY COMMENT 'Internal PK, never exposed',
-  public_id BINARY(16) NOT NULL COMMENT 'UUID v7, the only externally visible ID',
-
-  email VARCHAR(255) CHARACTER SET latin1 COLLATE latin1_swedish_ci NOT NULL COMMENT 'Primary email, ASCII only',
-  email_verified_at DATETIME(3) NULL COMMENT 'Email verification timestamp',
-  display_name VARCHAR(255) NOT NULL COMMENT 'Human-readable name',
-  avatar_url VARCHAR(2048) NULL COMMENT 'Avatar image URL; used when the avatar is hosted externally (e.g. OIDC provider)',
-  avatar_storage_object_id INT UNSIGNED NULL COMMENT 'FK to storage_objects.id when the user uploaded their own avatar; NULL when avatar_url (external) is used or no avatar is set',
-  locale VARCHAR(16) NOT NULL DEFAULT 'en' COMMENT 'Preferred locale tag (BCP 47)',
-  timezone VARCHAR(64) CHARACTER SET latin1 COLLATE latin1_swedish_ci NOT NULL DEFAULT 'UTC' COMMENT 'Preferred IANA timezone (independent of locale)',
-  country CHAR(2) CHARACTER SET latin1 COLLATE latin1_swedish_ci NULL COMMENT 'ISO 3166-1 alpha-2 country (independent of locale); drives default holiday subscription',
-  week_start ENUM('mon','sun','sat') NOT NULL DEFAULT 'mon' COMMENT 'Preferred first day of the week for calendar grids',
-  working_days CHAR(7) CHARACTER SET latin1 COLLATE latin1_swedish_ci NULL COMMENT 'User override of workspace working_days; NULL = inherit',
-  working_hours_start TIME NULL COMMENT 'User override of workspace working_hours_start; NULL = inherit',
-  working_hours_end TIME NULL COMMENT 'User override of workspace working_hours_end; NULL = inherit',
-  snap_to_working_day ENUM('off','warn','auto') NOT NULL DEFAULT 'warn' COMMENT 'What happens when a task/event lands on a non-working day: off=accept silently, warn=save with badge, auto=itemkit snaps forward to next working day',
-  treat_holidays_as_non_working BOOLEAN NOT NULL DEFAULT TRUE COMMENT 'If true, subscribed system (holiday) calendar events count as non-working days',
-  theme_preference ENUM('aurora-light','aurora-dark','dotline-light','dotline-dark','glass-light','glass-dark','system') NOT NULL DEFAULT 'system' COMMENT 'UI theme preference',
-  calendar_shift_default ENUM('ask','sync_always','task_only_always') NOT NULL DEFAULT 'ask' COMMENT 'Default behaviour when an event linked to safe tasks is shifted: ask=prompt the user every time (current behaviour), sync_always=also shift every linked safe task by the same delta, task_only_always=shift only the event and leave linked tasks alone',
-  last_login_at DATETIME(3) NULL COMMENT 'Last successful login',
-
-  -- Notification channel toggles (see /settings/notifications).
-  notif_email_digest_enabled     BOOLEAN NOT NULL DEFAULT TRUE  COMMENT 'Weekly digest email',
-  notif_email_mention_enabled    BOOLEAN NOT NULL DEFAULT TRUE  COMMENT 'Email when mentioned in comments',
-  notif_email_assignment_enabled BOOLEAN NOT NULL DEFAULT TRUE  COMMENT 'Email when assigned to a task',
-  notif_email_due_soon_enabled   BOOLEAN NOT NULL DEFAULT TRUE  COMMENT 'Email when owned task is due within 24h',
-  notif_web_push_enabled         BOOLEAN NOT NULL DEFAULT FALSE COMMENT 'Browser push notifications',
-
-  sort_weight INT NOT NULL DEFAULT 0 COMMENT 'Display order',
-  notes TEXT NULL COMMENT 'Admin notes',
-  enabled BOOLEAN NOT NULL DEFAULT TRUE COMMENT 'Enabled flag',
-  updated_at TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
-  created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
-
-  UNIQUE KEY uniq_users_public_id (public_id),
-  UNIQUE KEY uniq_users_email (email),
-  KEY idx_users_enabled (enabled),
-  KEY idx_users_avatar_storage_object (avatar_storage_object_id),
-
-  -- SET NULL: if the underlying storage_objects row is removed (e.g. after
-  -- ref_count reaches 0 via a sweeper) the user simply loses their avatar
-  -- rather than blocking the deletion.
-  CONSTRAINT fk_users_avatar_storage_object FOREIGN KEY (avatar_storage_object_id) REFERENCES storage_objects(id) ON DELETE SET NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Global user accounts';
 
 -- >>> webhook_deliveries.sql
 -- ====================================
@@ -2683,105 +2782,6 @@ CREATE TABLE webhook_subscriptions (
   CONSTRAINT fk_webhook_subscriptions_workspace FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
   CONSTRAINT fk_webhook_subscriptions_creator FOREIGN KEY (creator_id) REFERENCES users(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Workspace-level webhook subscriptions';
-
--- >>> workspace_invites.sql
--- ====================================
--- workspace_invites
--- Token-based invite links for joining a workspace with a pre-assigned role.
--- The plaintext token is never stored; only its SHA-256 hex hash is persisted.
--- ====================================
-CREATE TABLE workspace_invites (
-  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY COMMENT 'Internal PK, never exposed',
-  public_id BINARY(16) NOT NULL COMMENT 'UUID v7, the only externally visible ID',
-  workspace_id INT UNSIGNED NOT NULL COMMENT 'Internal FK to workspaces.id',
-  created_by_user_id INT UNSIGNED NULL COMMENT 'Internal FK to users.id who created the invite',
-
-  token_hash CHAR(64) CHARACTER SET latin1 COLLATE latin1_swedish_ci NOT NULL COMMENT 'SHA-256 hex of invite token plaintext',
-  role ENUM('owner','admin','member','guest') NOT NULL DEFAULT 'member' COMMENT 'Role granted on accept',
-  max_uses INT UNSIGNED NULL COMMENT 'NULL = unlimited',
-  use_count INT UNSIGNED NOT NULL DEFAULT 0 COMMENT 'Number of times this invite has been used',
-  expires_at DATETIME(3) NULL COMMENT 'NULL = never expires',
-  label VARCHAR(255) NULL COMMENT 'Optional human label for the invite link',
-
-  sort_weight INT NOT NULL DEFAULT 0 COMMENT 'Display order',
-  notes TEXT NULL COMMENT 'Admin notes',
-  enabled BOOLEAN NOT NULL DEFAULT TRUE COMMENT 'Enabled flag',
-  updated_at TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
-  created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
-
-  UNIQUE KEY uniq_workspace_invites_public_id (public_id),
-  UNIQUE KEY uniq_workspace_invites_workspace_public_id (workspace_id, public_id),
-  UNIQUE KEY uniq_workspace_invites_token_hash (token_hash),
-  KEY idx_workspace_invites_workspace_id (workspace_id),
-  KEY idx_workspace_invites_expires_at (expires_at),
-
-  CONSTRAINT fk_workspace_invites_workspace FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
-  CONSTRAINT fk_workspace_invites_created_by FOREIGN KEY (created_by_user_id) REFERENCES users(id) ON DELETE SET NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Token-based workspace invite links';
-
--- >>> workspace_members.sql
--- ====================================
--- workspace_members
--- M:N between workspaces and users with a workspace-scoped role.
--- ====================================
-CREATE TABLE workspace_members (
-  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY COMMENT 'Internal PK, never exposed',
-  public_id BINARY(16) NOT NULL COMMENT 'UUID v7, the only externally visible ID',
-  workspace_id INT UNSIGNED NOT NULL COMMENT 'Internal FK to workspaces.id',
-  user_id INT UNSIGNED NOT NULL COMMENT 'Internal FK to users.id',
-
-  role ENUM('owner','admin','member','guest') NOT NULL DEFAULT 'member' COMMENT 'Workspace-level role',
-  invited_by_user_id INT UNSIGNED NULL COMMENT 'Inviter user.id',
-  invited_at DATETIME(3) NULL COMMENT 'Invitation time',
-  joined_at DATETIME(3) NULL COMMENT 'Acceptance time',
-
-  sort_weight INT NOT NULL DEFAULT 0 COMMENT 'Display order',
-  notes TEXT NULL COMMENT 'Admin notes',
-  enabled BOOLEAN NOT NULL DEFAULT TRUE COMMENT 'Enabled flag',
-  updated_at TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
-  created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
-
-  UNIQUE KEY uniq_workspace_members_public_id (public_id),
-  UNIQUE KEY uniq_workspace_members_workspace_public_id (workspace_id, public_id),
-  UNIQUE KEY uniq_workspace_members_workspace_id_user_id (workspace_id, user_id),
-  KEY idx_workspace_members_user_id (user_id),
-
-  CONSTRAINT fk_workspace_members_workspace FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
-  CONSTRAINT fk_workspace_members_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
-  CONSTRAINT fk_workspace_members_inviter FOREIGN KEY (invited_by_user_id) REFERENCES users(id) ON DELETE SET NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Workspace membership';
-
--- >>> workspaces.sql
--- ====================================
--- workspaces
--- Top-level tenant boundary. Every workspace-scoped table carries
--- workspace_id as its leading composite index column.
--- ====================================
-CREATE TABLE workspaces (
-  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY COMMENT 'Internal PK, never exposed',
-  public_id BINARY(16) NOT NULL COMMENT 'UUID v7, the only externally visible ID',
-
-  slug VARCHAR(63) CHARACTER SET latin1 COLLATE latin1_swedish_ci NOT NULL COMMENT 'DNS-label slug (RFC 1035)',
-  name VARCHAR(255) NOT NULL COMMENT 'Display name',
-  description TEXT NULL COMMENT 'Optional description',
-  icon_url VARCHAR(2048) NULL COMMENT 'Icon image URL',
-
-  timezone VARCHAR(64) CHARACTER SET latin1 COLLATE latin1_swedish_ci NOT NULL DEFAULT 'UTC' COMMENT 'Default IANA timezone for the workspace; user tz overrides per-user',
-  country CHAR(2) CHARACTER SET latin1 COLLATE latin1_swedish_ci NULL COMMENT 'ISO 3166-1 alpha-2 country; drives default holiday subscription',
-  working_days CHAR(7) CHARACTER SET latin1 COLLATE latin1_swedish_ci NOT NULL DEFAULT 'MTWTF__' COMMENT 'Per-day flag string Mon..Sun; letter = working, underscore = off. Default MTWTF__ = Mon-Fri.',
-  working_hours_start TIME NOT NULL DEFAULT '09:00:00' COMMENT 'Start of workspace working day (local tz)',
-  working_hours_end TIME NOT NULL DEFAULT '18:00:00' COMMENT 'End of workspace working day (local tz)',
-
-  sort_weight INT NOT NULL DEFAULT 0 COMMENT 'Display order',
-  notes TEXT NULL COMMENT 'Admin notes',
-  enabled BOOLEAN NOT NULL DEFAULT TRUE COMMENT 'Enabled flag',
-  updated_at TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
-  created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
-
-  UNIQUE KEY uniq_workspaces_public_id (public_id),
-  UNIQUE KEY uniq_workspaces_slug (slug),
-  KEY idx_workspaces_enabled (enabled)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Tenant boundary';
 
 -- >>> fk_calendar_events_task.sql
 -- Cross-layer foreign key: calendar_events.task_id -> tasks.id

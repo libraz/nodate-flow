@@ -143,6 +143,20 @@ type Querier interface {
 	DecrementStorageObjectRefCount(ctx context.Context, id uint32) (sql.Result, error)
 	// Delete every recovery code (used or not) for a user.
 	DeleteAllRecoveryCodesForUser(ctx context.Context, userID uint32) error
+	// Clear the workspace's task attachments ahead of HardDeleteWorkspace.
+	//
+	// attachments.storage_object_id is ON DELETE RESTRICT, while both
+	// attachments.workspace_id and storage_objects.workspace_id are ON DELETE
+	// CASCADE. Deleting the workspace therefore only succeeds if InnoDB happens
+	// to reach `attachments` before `storage_objects` while walking the cascade
+	// chain — an ordering that follows table creation order and is not part of
+	// any documented contract. Removing the referrers up front makes the
+	// teardown independent of it.
+	DeleteAttachmentsByWorkspace(ctx context.Context, workspaceID uint32) error
+	// Calendar-side counterpart of DeleteAttachmentsByWorkspace;
+	// calendar_event_attachments.storage_object_id carries the same
+	// ON DELETE RESTRICT. See that query for the full rationale.
+	DeleteCalendarEventAttachmentsByWorkspace(ctx context.Context, workspaceID uint32) error
 	// Hard-delete a storage object row only if no referencing rows remain.
 	// The WHERE ref_count = 0 makes this race-safe against a concurrent
 	// IncrementStorageObjectRefCount: if another transaction grabbed the
@@ -292,9 +306,13 @@ type Querier interface {
 	// should map it to a 404, NOT retry.
 	//
 	// The ON DELETE CASCADE chain on workspaces.id removes every workspace-
-	// scoped row (members, projects, tasks, events, attachments rows, and
-	// the storage_objects rows whose blobs the caller already purged from
-	// MinIO).
+	// scoped row (members, projects, tasks, events, and the storage_objects
+	// rows whose blobs the caller already purged from MinIO). Callers MUST
+	// have run DeleteAttachmentsByWorkspace and
+	// DeleteCalendarEventAttachmentsByWorkspace first, in the same
+	// transaction: those two tables reference storage_objects with
+	// ON DELETE RESTRICT and would otherwise block this statement depending
+	// on the order InnoDB walks the cascade.
 	HardDeleteWorkspace(ctx context.Context, id uint32) (sql.Result, error)
 	// Atomically bump the use counter, but only while the invite still has
 	// capacity. max_uses IS NULL means unlimited. The conditional WHERE makes

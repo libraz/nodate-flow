@@ -50,17 +50,28 @@ type WorkspaceResult struct {
 //     and counted but DO NOT abort the DB delete; the alternative is
 //     leaving the workspace row alive forever whenever object storage
 //     hiccups. Orphaned blobs can be reaped by a separate sweeper.
-//  3. CASCADE-anchored hard DELETE on the workspaces row. RowsAffected==0
-//     means a concurrent caller already deleted it; the result reports
-//     Deleted=false and the caller should treat that as idempotent
+//  3. In one transaction: clear the two attachment tables that reference
+//     storage_objects with ON DELETE RESTRICT, then run the CASCADE-
+//     anchored hard DELETE on the workspaces row. RowsAffected==0 means a
+//     concurrent caller already deleted it; the transaction rolls back so
+//     the attachment deletes do not land on their own, and the result
+//     reports Deleted=false — the caller should treat that as idempotent
 //     success, not 404.
+//
+// Why the attachment tables are cleared explicitly rather than left to the
+// cascade: attachments.workspace_id and calendar_event_attachments.
+// workspace_id are ON DELETE CASCADE, but both tables also reference
+// storage_objects with ON DELETE RESTRICT, and storage_objects.workspace_id
+// is itself ON DELETE CASCADE. Whether the workspace delete succeeds then
+// depends on InnoDB reaching the attachment tables before storage_objects
+// while walking the cascade chain — which follows table creation order and
+// is not a documented guarantee. Deleting the referrers up front makes the
+// outcome independent of it.
 //
 // The function never panics on a nil storage client (Storage is optional
 // when NF_S3_ENDPOINT is unset); the MinIO sweep is simply skipped and
 // the response reports zero counts.
 func Workspace(ctx context.Context, db *sql.DB, q *generated.Queries, store *storage.Client, wsID uint32) (WorkspaceResult, error) {
-	_ = db // reserved for future tx-scoped variants; kept for caller-side parity with [User].
-
 	objs, err := q.ListStorageObjectsByWorkspace(ctx, sql.NullInt32{Int32: int32(wsID), Valid: true}) //#nosec G115 -- workspace internal id is INT UNSIGNED, fits int32 within realistic deployments
 	if err != nil {
 		return WorkspaceResult{}, err
@@ -85,14 +96,41 @@ func Workspace(ctx context.Context, db *sql.DB, q *generated.Queries, store *sto
 		}
 	}
 
-	res, err := q.HardDeleteWorkspace(ctx, wsID)
+	var deleted bool
+	err = func() error {
+		tx, txErr := db.BeginTx(ctx, nil)
+		if txErr != nil {
+			return txErr
+		}
+		defer func() { _ = tx.Rollback() }()
+		qtx := q.WithTx(tx)
+
+		if derr := qtx.DeleteAttachmentsByWorkspace(ctx, wsID); derr != nil {
+			return derr
+		}
+		if derr := qtx.DeleteCalendarEventAttachmentsByWorkspace(ctx, wsID); derr != nil {
+			return derr
+		}
+
+		res, derr := qtx.HardDeleteWorkspace(ctx, wsID)
+		if derr != nil {
+			return derr
+		}
+		rows, _ := res.RowsAffected()
+		if rows == 0 {
+			// Raced with a concurrent delete. Roll back so the attachment
+			// deletes are reverted along with it.
+			return nil
+		}
+		deleted = true
+		return tx.Commit()
+	}()
 	if err != nil {
 		return WorkspaceResult{}, err
 	}
-	rows, _ := res.RowsAffected()
 
 	return WorkspaceResult{
-		Deleted:               rows > 0,
+		Deleted:               deleted,
 		StorageObjectsDeleted: int64(len(keys)),
 		MinioErrors:           minioErrors,
 	}, nil

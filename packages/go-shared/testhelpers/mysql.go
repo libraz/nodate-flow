@@ -20,7 +20,6 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
-	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -225,7 +224,7 @@ func ApplyRepoSchema(ctx context.Context, db *sql.DB) error {
 	if _, err := db.ExecContext(ctx, "SET UNIQUE_CHECKS = 0"); err != nil {
 		return err
 	}
-	if err := ExecSQLDirsMerged(ctx, db, coreTablesDir, flowTablesDir); err != nil {
+	if err := ExecSQLDirs(ctx, db, coreTablesDir, flowTablesDir); err != nil {
 		return fmt.Errorf("tables: %w", err)
 	}
 	if err := ExecSQLDir(ctx, db, constraintsDir); err != nil {
@@ -243,49 +242,26 @@ func ApplyRepoSchema(ctx context.Context, db *sql.DB) error {
 	return nil
 }
 
-// ExecSQLDir executes every *.sql file in dir in alphabetical order.
-// The driver must be opened with multiStatements=true for files that
-// contain multiple statements.
-// ExecSQLDirsMerged executes every .sql file across the given directories
-// ordered by FILENAME rather than by directory.
+// ExecSQLDirs executes every *.sql file across the given directories,
+// directory by directory and alphabetically within each, matching the
+// emission order of sql/build-schema.sh.
 //
-// The merge is load-bearing, not cosmetic. InnoDB evaluates a DELETE's
-// cascade chain in table creation order, and workspace teardown relies on
-// `attachments` rows going away before the `storage_objects` rows they
-// reference via fk_attachments_storage_object (ON DELETE RESTRICT). Loading
-// directory-by-directory would create storage_objects (core) before
-// attachments (flow) and turn workspace deletion into a 1451 error. Sorting
-// by filename reproduces the single-directory order this schema was built
-// under, and matches sql/build-schema.sh.
-func ExecSQLDirsMerged(ctx context.Context, db *sql.DB, dirs ...string) error {
-	type entry struct{ name, path string }
-	var all []entry
+// Creation order carries no semantics here: the caller runs this with FK
+// checks disabled, and no delete path may depend on the order InnoDB walks
+// a cascade chain. See sql/build-schema.sh for the two ON DELETE RESTRICT
+// edges that make that rule worth stating.
+func ExecSQLDirs(ctx context.Context, db *sql.DB, dirs ...string) error {
 	for _, dir := range dirs {
-		items, err := os.ReadDir(dir)
-		if err != nil {
+		if err := ExecSQLDir(ctx, db, dir); err != nil {
 			return err
-		}
-		for _, e := range items {
-			if e.IsDir() || !strings.HasSuffix(e.Name(), ".sql") {
-				continue
-			}
-			all = append(all, entry{e.Name(), filepath.Join(dir, e.Name())})
-		}
-	}
-	sort.Slice(all, func(i, j int) bool { return all[i].name < all[j].name })
-
-	for _, e := range all {
-		raw, err := os.ReadFile(e.path)
-		if err != nil {
-			return err
-		}
-		if _, err := db.ExecContext(ctx, string(raw)); err != nil {
-			return fmt.Errorf("exec %s: %w", e.name, err)
 		}
 	}
 	return nil
 }
 
+// ExecSQLDir executes every *.sql file in dir in alphabetical order.
+// The driver must be opened with multiStatements=true for files that
+// contain multiple statements.
 func ExecSQLDir(ctx context.Context, db *sql.DB, dir string) error {
 	entries, err := os.ReadDir(dir)
 	if err != nil {
