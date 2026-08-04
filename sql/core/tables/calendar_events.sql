@@ -75,7 +75,11 @@ CREATE TABLE calendar_events (
   CONSTRAINT fk_calendar_events_calendar FOREIGN KEY (calendar_id) REFERENCES calendars(id) ON DELETE CASCADE,
   CONSTRAINT fk_calendar_events_owner FOREIGN KEY (owner_user_id) REFERENCES users(id) ON DELETE CASCADE,
   CONSTRAINT fk_calendar_events_creator FOREIGN KEY (created_by_user_id) REFERENCES users(id) ON DELETE CASCADE,
-  CONSTRAINT fk_calendar_events_task FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE SET NULL,
+  -- fk_calendar_events_task (task_id -> tasks.id) is NOT declared here.
+  -- task_id is a core column so that a core-only deployment writes rows
+  -- of the same shape, but `tasks` belongs to the flow layer. The
+  -- constraint is added by sql/flow/constraints/ when that layer is
+  -- present. In a core-only deployment task_id is always NULL.
 
   -- CHECK constraints that do not reference task_id. MySQL 8.4+
   -- forbids CHECK constraints referencing columns used in FK

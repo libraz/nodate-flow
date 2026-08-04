@@ -18,7 +18,7 @@ import { sdk } from '../../lib/sdk';
 
 /**
  * The four trigger modes mirror the ai_agents.schedule_kind ENUM
- * defined in sql/tables/ai_agents.sql. Keep this list in sync with
+ * defined in sql/flow/tables/ai_agents.sql. Keep this list in sync with
  * the backend enum and the OpenAPI UpdateAgentSchedule body schema.
  */
 export const AGENT_SCHEDULE_KINDS = ['disabled', 'interval', 'on_event', 'manual'] as const;

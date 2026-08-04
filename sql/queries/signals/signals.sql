@@ -3,7 +3,7 @@
 -- Dedup is workspace-scoped via UNIQUE (workspace_id, source, external_id)
 -- when external_id is non-NULL. Duplicate deliveries are silently ignored
 -- via INSERT IGNORE; LastInsertId() returns 0 when the row was a duplicate.
--- subject_type is NOT NULL per sql/tables/signals.sql (ADR 0008 D1) so every
+-- subject_type is NOT NULL per sql/flow/tables/signals.sql (ADR 0008 D1) so every
 -- caller must resolve a kind-appropriate subject; subject_id stays NULL for
 -- workspace-scoped signals (workspace_id already identifies the owner).
 -- judge_run_id / judge_output_json / confidence / applied_at stay NULL at

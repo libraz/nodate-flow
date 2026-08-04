@@ -44,7 +44,7 @@ type AppendAgentEventParams struct {
 // AppendEvent but binds actor_agent_id and leaves actor_user_id NULL,
 // preserving the actor_user_id / actor_agent_id mutual exclusion that the
 // events table relies on (enforced by query design rather than a CHECK
-// constraint; see sql/tables/events.sql for the rationale). Used by the
+// constraint; see sql/core/tables/events.sql for the rationale). Used by the
 // orchestrator runner when emitting ai.agent.run.* events and by MCP tool
 // calls dispatched from an agent context.
 //
@@ -112,7 +112,7 @@ type AppendEventParams struct {
 // actor exclusion (actor_user_id / actor_agent_id / actor_system_source)
 // is enforced by handler-side validation (eventbus.validateActors) rather
 // than a CHECK constraint because MySQL 8.4 forbids CHECK constraints on
-// columns used in FK ON DELETE SET NULL actions; see sql/tables/events.sql.
+// columns used in FK ON DELETE SET NULL actions; see sql/core/tables/events.sql.
 //
 // `triggered_by_signal_id` (ADR 0008 D4) is the internal signal id when the
 // event was emitted by the Applier in response to a judged signal. NULL for

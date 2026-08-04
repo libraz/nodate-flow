@@ -76,7 +76,7 @@ export type PresignUploadInput = components['schemas']['PresignUploadBody'];
 export type PresignUploadResult = components['schemas']['PresignUploadOutputBody'];
 export type DownloadAttachmentResult = components['schemas']['DownloadAttachmentOutputBody'];
 
-/** Backend `derived_state` enum (see sql/tables/tasks.sql). */
+/** Backend `derived_state` enum (see sql/flow/tables/tasks.sql). */
 export type TaskDerivedState = 'open' | 'waiting' | 'review' | 'done' | 'cancelled';
 
 /** Ordered list of all task states for column rendering. */

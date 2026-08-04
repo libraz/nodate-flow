@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # schema-diff.sh — verify the committed sql/schema.sql matches what
-# `bash sql/build-schema.sh` produces from sql/tables/ and sql/views/.
+# `bash sql/build-schema.sh` produces from the layered sql/core/ and
+# sql/flow/ trees.
 # Fails with a non-zero exit when the regenerated schema differs from
 # the committed copy.
 #
@@ -56,7 +57,7 @@ if ! diff -u "$SCHEMA_FILE" "$TMP_DIR/schema.regen.sql" >"$TMP_DIR/schema.diff";
 fi
 
 if [[ $exit_code -eq 0 ]]; then
-  echo "sql/schema.sql is in sync with sql/tables/ and sql/views/."
+  echo "sql/schema.sql is in sync with sql/core/ and sql/flow/."
 else
   echo ""
   echo "Schema drift detected. Run 'make db-schema' and commit the updated sql/schema.sql."

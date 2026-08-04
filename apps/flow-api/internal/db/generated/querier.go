@@ -106,7 +106,7 @@ type Querier interface {
 	// AppendEvent but binds actor_agent_id and leaves actor_user_id NULL,
 	// preserving the actor_user_id / actor_agent_id mutual exclusion that the
 	// events table relies on (enforced by query design rather than a CHECK
-	// constraint; see sql/tables/events.sql for the rationale). Used by the
+	// constraint; see sql/core/tables/events.sql for the rationale). Used by the
 	// orchestrator runner when emitting ai.agent.run.* events and by MCP tool
 	// calls dispatched from an agent context.
 	//
@@ -131,7 +131,7 @@ type Querier interface {
 	// actor exclusion (actor_user_id / actor_agent_id / actor_system_source)
 	// is enforced by handler-side validation (eventbus.validateActors) rather
 	// than a CHECK constraint because MySQL 8.4 forbids CHECK constraints on
-	// columns used in FK ON DELETE SET NULL actions; see sql/tables/events.sql.
+	// columns used in FK ON DELETE SET NULL actions; see sql/core/tables/events.sql.
 	//
 	// `triggered_by_signal_id` (ADR 0008 D4) is the internal signal id when the
 	// event was emitted by the Applier in response to a judged signal. NULL for
@@ -795,7 +795,7 @@ type Querier interface {
 	// handler embeds the target agent's public_id, the reason string, and any
 	// delegation chain context. Mutual exclusion of actor_user_id and
 	// actor_agent_id is preserved by this query's column list rather than a
-	// CHECK constraint (see sql/tables/events.sql).
+	// CHECK constraint (see sql/core/tables/events.sql).
 	InsertHandoffToAgentEvent(ctx context.Context, arg InsertHandoffToAgentEventParams) (int64, error)
 	// Append an agent.task.handoff_to_user event. The caller is an AI agent
 	// handing the task back to a human, so actor_agent_id is populated and
@@ -809,7 +809,7 @@ type Querier interface {
 	// Dedup is workspace-scoped via UNIQUE (workspace_id, source, external_id)
 	// when external_id is non-NULL. Duplicate deliveries are silently ignored
 	// via INSERT IGNORE; LastInsertId() returns 0 when the row was a duplicate.
-	// subject_type is NOT NULL per sql/tables/signals.sql (ADR 0008 D1) so every
+	// subject_type is NOT NULL per sql/flow/tables/signals.sql (ADR 0008 D1) so every
 	// caller must resolve a kind-appropriate subject; subject_id stays NULL for
 	// workspace-scoped signals (workspace_id already identifies the owner).
 	// judge_run_id / judge_output_json / confidence / applied_at stay NULL at

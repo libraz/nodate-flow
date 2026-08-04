@@ -19,14 +19,16 @@ import (
 )
 
 // claimTestTables are the only tables the delivery claim path touches,
-// in FK dependency order. The full-schema helpers in tests/helpers are
-// deliberately not imported here: they pull in the HTTP router tree,
-// which would couple this package's test build to the whole application.
+// in FK dependency order, given as paths relative to sql/. They span both
+// schema layers: workspaces and users are core, the webhook tables are
+// flow-only. The full-schema helpers in tests/helpers are deliberately not
+// imported here: they pull in the HTTP router tree, which would couple this
+// package's test build to the whole application.
 var claimTestTables = []string{
-	"workspaces.sql",
-	"users.sql",
-	"webhook_subscriptions.sql",
-	"webhook_deliveries.sql",
+	"core/tables/workspaces.sql",
+	"core/tables/users.sql",
+	"flow/tables/webhook_subscriptions.sql",
+	"flow/tables/webhook_deliveries.sql",
 }
 
 // TestClaimBatchAtomicClaim verifies the multi-replica safety contract
@@ -136,7 +138,7 @@ func startClaimTestDB(t *testing.T) *sql.DB {
 	require.NoError(t, err)
 	root := repoRootDir(t)
 	for _, name := range claimTestTables {
-		ddl, err := os.ReadFile(filepath.Join(root, "sql", "tables", name))
+		ddl, err := os.ReadFile(filepath.Join(root, "sql", filepath.FromSlash(name)))
 		require.NoErrorf(t, err, "read DDL %s", name)
 		_, err = conn.ExecContext(ctx, string(ddl))
 		require.NoErrorf(t, err, "apply DDL %s", name)
@@ -148,8 +150,8 @@ func startClaimTestDB(t *testing.T) *sql.DB {
 }
 
 // repoRootDir resolves the repository root from this file's location so
-// the test can load table DDL from sql/tables regardless of the
-// working directory `go test` runs in.
+// the test can load table DDL from the layered sql/ tree regardless of
+// the working directory `go test` runs in.
 func repoRootDir(t *testing.T) string {
 	t.Helper()
 	_, file, _, ok := runtime.Caller(0)

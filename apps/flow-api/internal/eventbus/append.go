@@ -4,7 +4,7 @@
 // audit trail and the state change live and die together.
 //
 // The events table itself has no UPDATE/DELETE path; only purgeWorkspace
-// removes rows. See sql/tables/events.sql.
+// removes rows. See sql/core/tables/events.sql.
 package eventbus
 
 import (
@@ -24,7 +24,7 @@ import (
 )
 
 // validateActors enforces the three-way actor exclusion rule documented on
-// [Event] and `sql/tables/events.sql`. At most one of ActorUserID,
+// [Event] and `sql/core/tables/events.sql`. At most one of ActorUserID,
 // ActorAgentID, ActorSystemSource may be set per call; zero is allowed and
 // represents the legacy "system actor" path. Returns an APIError carrying
 // INTERNAL.EVENTBUS.ACTOR_MULTIPLE when more than one is set, so the
@@ -80,7 +80,7 @@ type DBTX interface {
 // exclusive actor sources — [Event.ActorUserID], [Event.ActorAgentID],
 // and [Event.ActorSystemSource]. MySQL 8.4 cannot enforce this via
 // CHECK because all three FK referential actions use ON DELETE SET NULL
-// (`sql/tables/events.sql:46-48`), so [Append] validates the three-way
+// (`sql/core/tables/events.sql:46-48`), so [Append] validates the three-way
 // exclusion at the Go layer and rejects rows that set more than one.
 // Setting zero actors is still allowed and represents the legacy
 // "system actor" path used by reconciliation jobs that predate the
@@ -413,7 +413,7 @@ func appendInternalWithMeta(ctx context.Context, db DBTX, evt Event, fromApplier
 	now := time.Now().UTC()
 	pubID := types.New()
 	// Branch on actor kind. The three INSERTs map 1:1 onto the three
-	// actor sources documented on [Event] and `sql/tables/events.sql`:
+	// actor sources documented on [Event] and `sql/core/tables/events.sql`:
 	//   ActorAgentID set -> AppendAgentEvent (binds actor_agent_id,
 	//                       carries triggered_by_signal_id for Applier
 	//                       writes — ADR 0008 D4)

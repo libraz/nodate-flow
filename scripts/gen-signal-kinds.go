@@ -78,7 +78,7 @@ var (
 	// Every registry `source` must be a member or gen-signal-kinds
 	// fails — drift between the registry and the wire/DB enum is caught
 	// at codegen time, not at runtime as a 422. Keep in sync with
-	// signalwire.Sources() and sql/tables/signals.sql.
+	// signalwire.Sources() and sql/flow/tables/signals.sql.
 	validSource = map[string]bool{
 		"manual":   true,
 		"github":   true,
@@ -234,7 +234,7 @@ func validateEntry(path string, e kindEntry) error {
 	}
 	if !validSource[e.Source] {
 		return fmt.Errorf("%s: %s has source %q not in the canonical wire enum "+
-			"(packages/go-shared/signalwire); add it there + sql/tables/signals.sql or fix the YAML", path, e.Kind, e.Source)
+			"(packages/go-shared/signalwire); add it there + sql/flow/tables/signals.sql or fix the YAML", path, e.Kind, e.Source)
 	}
 	if !validRetention[e.Retention] {
 		return fmt.Errorf("%s: %s has invalid retention %q (want stateful|discrete)", path, e.Kind, e.Retention)

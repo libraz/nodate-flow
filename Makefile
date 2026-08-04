@@ -167,7 +167,7 @@ test-openapi-diff: ## Fail if the committed OpenAPI specs drift from the live Go
 test-schema-collisions: ## Fail if the merged OpenAPI spec has schema name collisions
 	./scripts/check-schema-collisions.sh
 
-test-schema-diff: ## Fail if sql/schema.sql is out of sync with sql/tables/** and sql/views/**
+test-schema-diff: ## Fail if sql/schema.sql is out of sync with sql/core/** and sql/flow/**
 	./scripts/schema-diff.sh
 
 lighthouse: build-web ## Run Lighthouse CI (a11y 95+, perf 70+)
@@ -241,7 +241,7 @@ NF_DB_PASSWORD ?= nodatepw
 NF_DB_NAME     ?= nodate_flow
 
 .PHONY: db-schema db-apply db-reset db-shell seed-flow seed-calendar
-db-schema: ## Regenerate sql/schema.sql from sql/tables + sql/views
+db-schema: ## Regenerate sql/schema.sql from sql/core + sql/flow
 	bash sql/build-schema.sh > sql/schema.sql
 
 db-apply: db-schema ## Apply schema.sql to a self-hosted MySQL (uses NF_DB_* vars)

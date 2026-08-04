@@ -25,7 +25,7 @@ import (
 type Source string
 
 // Canonical source values. These mirror the `source ENUM(...)` in
-// sql/tables/signals.sql exactly; the DB enum and this list must agree.
+// sql/flow/tables/signals.sql exactly; the DB enum and this list must agree.
 //
 //   - Manual   — user-emitted from the UI or CLI.
 //   - GitHub   — inbound GitHub webhook.
@@ -48,7 +48,7 @@ const (
 )
 
 // sources is the ordered canonical list. Order is the wire-enum order in
-// sql/tables/signals.sql; SourceEnumTag and the DB ENUM both depend on
+// sql/flow/tables/signals.sql; SourceEnumTag and the DB ENUM both depend on
 // it, so keep new entries appended (do not reorder) to keep generated
 // artefacts stable.
 var sources = []Source{
@@ -139,7 +139,7 @@ func AssertSourcesCovered(candidates []string) error {
 	sort.Strings(unknown)
 	return fmt.Errorf(
 		"signalwire: source(s) %v are not members of the canonical wire enum %v; "+
-			"add them to packages/go-shared/signalwire + sql/tables/signals.sql or remove them from the emitter/registry",
+			"add them to packages/go-shared/signalwire + sql/flow/tables/signals.sql or remove them from the emitter/registry",
 		unknown, SourceStrings())
 }
 

@@ -40,8 +40,10 @@ sql:
       - "queries/webhooks"
       - "queries/workspaces"
     schema:
-      - "tables"
-      - "views"
+      - "core/tables"
+      - "flow/tables"
+      - "flow/constraints"
+      - "flow/views"
     gen:
       go:
         package: "generated"
@@ -308,8 +310,10 @@ sql:
     queries:
       - "queries/calendars"
     schema:
-      - "tables"
-      - "views"
+      - "core/tables"
+      - "flow/tables"
+      - "flow/constraints"
+      - "flow/views"
     gen:
       go:
         package: "calendar"
@@ -431,8 +435,10 @@ sql:
       - "queries/integrations"
       - "queries/storage-objects"
     schema:
-      - "tables"
-      - "views"
+      - "core/tables"
+      - "flow/tables"
+      - "flow/constraints"
+      - "flow/views"
     gen:
       go:
         package: "generated"

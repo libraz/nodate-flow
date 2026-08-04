@@ -52,7 +52,7 @@ func seedActivity(t *testing.T) (uint32, seededActivityIDs) {
 		tt.UserPublicID).Scan(&userID))
 
 	// ai_providers row (FK target for ai_invocations). Column names follow
-	// sql/tables/ai_providers.sql: name (label), api_key_ciphertext
+	// sql/flow/tables/ai_providers.sql: name (label), api_key_ciphertext
 	// (VARBINARY, AES-GCM blob), api_key_prefix/api_key_suffix (NOT NULL
 	// masking chars), default_model.
 	provPub := uuid.Must(uuid.NewV7())

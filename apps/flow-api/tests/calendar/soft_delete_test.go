@@ -16,7 +16,7 @@ import (
 // TestSoftDelete_EventExcludedFromListAndFind verifies that the soft-delete
 // path stamped by DELETE /events/{evtId} (which sets
 // calendar_events.enabled = FALSE) makes the event invisible to LIST and GET.
-// Per sql/tables/calendar_events.sql, `enabled` is the sole soft-delete marker
+// Per sql/core/tables/calendar_events.sql, `enabled` is the sole soft-delete marker
 // (there is no deleted_at column); LIST/GET queries filter on
 // `enabled = TRUE` per sql/queries/calendars/events.sql.
 //
@@ -61,7 +61,7 @@ func TestSoftDelete_EventExcludedFromListAndFind(t *testing.T) {
 
 	// And the row itself must still exist with enabled=FALSE, proving
 	// soft-delete (not hard-delete) and supporting audit trails. Per
-	// sql/tables/calendar_events.sql there is no deleted_at column;
+	// sql/core/tables/calendar_events.sql there is no deleted_at column;
 	// `enabled` is the sole soft-delete signal.
 	dropInternalID := resolveEventInternalID(t, dropID)
 	var enabled bool

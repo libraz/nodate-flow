@@ -38,7 +38,7 @@ func resolveSubjectType(kind string, override string) generated.SignalsSubjectTy
 
 // subjectIDFor returns the sql.NullInt32 to put in signals.subject_id given
 // the resolved subject type and any internal id the caller has already
-// looked up. The bookkeeping rule (mirrors sql/tables/signals.sql) is that
+// looked up. The bookkeeping rule (mirrors sql/flow/tables/signals.sql) is that
 // subject_id stays NULL when subject_type=workspace, because workspace_id
 // on the same row already owns the subject.
 func subjectIDFor(subjectType generated.SignalsSubjectType, internalID int64) sql.NullInt32 {

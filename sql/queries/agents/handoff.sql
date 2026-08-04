@@ -5,7 +5,7 @@
 -- handler embeds the target agent's public_id, the reason string, and any
 -- delegation chain context. Mutual exclusion of actor_user_id and
 -- actor_agent_id is preserved by this query's column list rather than a
--- CHECK constraint (see sql/tables/events.sql).
+-- CHECK constraint (see sql/core/tables/events.sql).
 INSERT INTO events (
   public_id,
   workspace_id,

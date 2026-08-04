@@ -15,6 +15,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"sort"
 	"strings"
 	"sync"
 	"testing"
@@ -92,7 +93,7 @@ func StartIsolated(t *testing.T) *MySQLInstance {
 }
 
 // startMySQL boots a MySQL 9.6 testcontainer, opens a *sql.DB handle,
-// and applies the full schema (sql/tables + sql/views + sql/triggers).
+// and applies the full layered schema (sql/core + sql/flow).
 func startMySQL(ctx context.Context) (*MySQLInstance, error) {
 	startCtx, cancel := context.WithTimeout(ctx, 3*time.Minute)
 	defer cancel()
@@ -152,19 +153,24 @@ func waitForPing(ctx context.Context, db *sql.DB, timeout time.Duration) error {
 	return fmt.Errorf("mysql ping never succeeded: %w", lastErr)
 }
 
-// applySchema loads every file in sql/tables/*.sql, sql/views/*.sql,
-// and sql/triggers/*.sql
-// (alphabetical, with FK checks disabled) into the database. This
-// mirrors the behaviour of sql/build-schema.sh but stays in-process so
-// no shell is required.
+// applySchema loads the layered schema — sql/core/tables, sql/flow/tables,
+// sql/flow/constraints, sql/flow/views, sql/flow/triggers — alphabetically
+// with FK checks disabled. This mirrors the behaviour of
+// sql/build-schema.sh but stays in-process so no shell is required.
+//
+// Cross-layer foreign keys live in sql/flow/constraints and must be applied
+// after every CREATE TABLE of both layers, because they reference tables from
+// each.
 func applySchema(ctx context.Context, db *sql.DB) error {
 	root, err := repoRoot()
 	if err != nil {
 		return err
 	}
-	tablesDir := filepath.Join(root, "sql", "tables")
-	viewsDir := filepath.Join(root, "sql", "views")
-	triggersDir := filepath.Join(root, "sql", "triggers")
+	coreTablesDir := filepath.Join(root, "sql", "core", "tables")
+	flowTablesDir := filepath.Join(root, "sql", "flow", "tables")
+	constraintsDir := filepath.Join(root, "sql", "flow", "constraints")
+	viewsDir := filepath.Join(root, "sql", "flow", "views")
+	triggersDir := filepath.Join(root, "sql", "flow", "triggers")
 
 	if _, err := db.ExecContext(ctx, "SET FOREIGN_KEY_CHECKS = 0"); err != nil {
 		return err
@@ -173,8 +179,11 @@ func applySchema(ctx context.Context, db *sql.DB) error {
 		return err
 	}
 
-	if err := execSQLDir(ctx, db, tablesDir); err != nil {
+	if err := execSQLDirsMerged(ctx, db, coreTablesDir, flowTablesDir); err != nil {
 		return fmt.Errorf("tables: %w", err)
+	}
+	if err := execSQLDir(ctx, db, constraintsDir); err != nil {
+		return fmt.Errorf("constraints: %w", err)
 	}
 	if err := execSQLDir(ctx, db, viewsDir); err != nil {
 		return fmt.Errorf("views: %w", err)
@@ -188,6 +197,51 @@ func applySchema(ctx context.Context, db *sql.DB) error {
 	}
 	if _, err := db.ExecContext(ctx, "SET FOREIGN_KEY_CHECKS = 1"); err != nil {
 		return err
+	}
+	return nil
+}
+
+// execSQLDirsMerged executes every .sql file across the given directories
+// ordered by FILENAME rather than by directory.
+//
+// The merge is load-bearing, not cosmetic. InnoDB evaluates a DELETE's
+// cascade chain in table creation order, and workspace teardown relies on
+// `attachments` rows going away before the `storage_objects` rows they
+// reference via fk_attachments_storage_object (ON DELETE RESTRICT). Loading
+// directory-by-directory would create storage_objects (core) before
+// attachments (flow) and turn workspace deletion into a 1451 error. Sorting
+// by filename reproduces the single-directory order this schema was built
+// under, and matches sql/build-schema.sh.
+func execSQLDirsMerged(ctx context.Context, db *sql.DB, dirs ...string) error {
+	type entry struct{ name, path string }
+	var all []entry
+	for _, dir := range dirs {
+		items, err := os.ReadDir(dir)
+		if err != nil {
+			return err
+		}
+		for _, e := range items {
+			if e.IsDir() || !strings.HasSuffix(e.Name(), ".sql") {
+				continue
+			}
+			all = append(all, entry{e.Name(), filepath.Join(dir, e.Name())})
+		}
+	}
+	sort.Slice(all, func(i, j int) bool { return all[i].name < all[j].name })
+
+	for _, e := range all {
+		raw, err := os.ReadFile(e.path)
+		if err != nil {
+			return err
+		}
+		for _, stmt := range splitSQLStatements(string(raw)) {
+			if strings.TrimSpace(stmt) == "" {
+				continue
+			}
+			if _, err := db.ExecContext(ctx, stmt); err != nil {
+				return fmt.Errorf("exec %s: %w", e.name, err)
+			}
+		}
 	}
 	return nil
 }
@@ -256,7 +310,7 @@ func repoRoot() (string, error) {
 	}
 	dir := filepath.Dir(file)
 	for i := 0; i < 10; i++ {
-		if _, err := os.Stat(filepath.Join(dir, "sql", "tables")); err == nil {
+		if _, err := os.Stat(filepath.Join(dir, "sql", "core", "tables")); err == nil {
 			if _, err := os.Stat(filepath.Join(dir, "apps", "flow-api")); err == nil {
 				return dir, nil
 			}

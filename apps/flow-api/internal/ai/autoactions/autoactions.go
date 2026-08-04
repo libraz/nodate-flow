@@ -22,7 +22,7 @@ import (
 // about. Callers pass the raw derived state string straight through.
 type State string
 
-// Derived state constants (see sql/tables/tasks.sql).
+// Derived state constants (see sql/flow/tables/tasks.sql).
 const (
 	StateOpen      State = "open"
 	StateWaiting   State = "waiting"

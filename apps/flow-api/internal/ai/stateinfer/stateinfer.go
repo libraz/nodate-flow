@@ -18,7 +18,7 @@ import (
 // State mirrors tasks.derived_state.
 type State string
 
-// Derived state constants (see sql/tables/tasks.sql).
+// Derived state constants (see sql/flow/tables/tasks.sql).
 const (
 	StateOpen      State = "open"
 	StateWaiting   State = "waiting"

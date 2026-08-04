@@ -17,7 +17,7 @@ services:
     volumes:
       - mysql_data:/var/lib/mysql
       # Schema is auto-applied on first boot (empty volume). Regenerate
-      # with `make db-schema` whenever sql/tables or sql/views change.
+      # with `make db-schema` whenever sql/core or sql/flow change.
       # To re-apply into an existing volume, use `make db-apply`.
       - ./sql/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
     healthcheck:

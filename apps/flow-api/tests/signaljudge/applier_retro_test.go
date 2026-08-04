@@ -207,7 +207,7 @@ func TestApplierGenerateRetroCreatesDraftTaskAndDependency(t *testing.T) {
 
 	// 3. task_dependencies row: kind='retro_of', from=new task,
 	//    to=source, enabled=true. Confirms the orientation pinned in
-	//    sql/tables/task_dependencies.sql.
+	//    sql/flow/tables/task_dependencies.sql.
 	require.LessOrEqual(t, srcInternalID, int64(^uint32(0)))
 	dep := loadRetroDependency(t, testDB, wsID, newTask.id, uint32(srcInternalID)) //#nosec G115 -- bounded by assertion above.
 	require.Equal(t, "retro_of", dep.kind)

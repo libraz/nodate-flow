@@ -48,10 +48,13 @@ CREATE TABLE events (
   -- reverses_event_id IS NULL are unaffected; only genuine reverses dedupe.
   UNIQUE KEY uniq_events_reverses (workspace_id, reverses_event_id),
 
+  -- fk_events_task, fk_events_actor_agent and fk_events_triggered_by_signal
+  -- are NOT declared here. Their columns are core, so every writer produces
+  -- rows of the same shape, but `tasks`, `ai_agents` and `signals` belong to
+  -- the flow layer. Those three constraints are added by
+  -- sql/flow/constraints/ when that layer is present; in a core-only
+  -- deployment the columns are always NULL.
   CONSTRAINT fk_events_workspace FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
-  CONSTRAINT fk_events_task FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE CASCADE,
   CONSTRAINT fk_events_actor FOREIGN KEY (actor_user_id) REFERENCES users(id) ON DELETE SET NULL,
-  CONSTRAINT fk_events_actor_agent FOREIGN KEY (actor_agent_id) REFERENCES ai_agents(id) ON DELETE SET NULL,
-  CONSTRAINT fk_events_triggered_by_signal FOREIGN KEY (triggered_by_signal_id) REFERENCES signals(id) ON DELETE SET NULL,
   CONSTRAINT fk_events_reverses FOREIGN KEY (reverses_event_id) REFERENCES events(id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Append-only event log';
