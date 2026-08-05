@@ -10,9 +10,9 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/nodate-flow/nodate-flow/apps/auth-api/internal/db/generated"
-	"github.com/nodate-flow/nodate-flow/apps/auth-api/internal/db/types"
-	"github.com/nodate-flow/nodate-flow/packages/go-shared/crypto"
+	"github.com/libraz/nodate-flow/apps/auth-api/internal/db/generated"
+	"github.com/libraz/nodate-flow/apps/auth-api/internal/db/types"
+	"github.com/libraz/nodate-flow/packages/go-shared/crypto"
 )
 
 // testCipherKey is a fixed 32-byte key for test Cipher construction.

@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"time"
 
-	apierrors "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/errors"
+	apierrors "github.com/libraz/nodate-flow/apps/flow-api/internal/errors"
 )
 
 // recurrenceRulePayload is the wire shape of a stored recurrence rule. It

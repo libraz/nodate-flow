@@ -9,7 +9,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/outbound"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/outbound"
 )
 
 // defaultHTTPTimeout is the per-request upstream LLM timeout. Long enough

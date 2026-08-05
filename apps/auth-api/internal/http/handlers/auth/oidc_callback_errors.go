@@ -4,8 +4,8 @@ import (
 	"context"
 	"log/slog"
 
-	apierrors "github.com/nodate-flow/nodate-flow/apps/auth-api/internal/errors"
-	"github.com/nodate-flow/nodate-flow/apps/auth-api/internal/http/handlers/handlerutil"
+	apierrors "github.com/libraz/nodate-flow/apps/auth-api/internal/errors"
+	"github.com/libraz/nodate-flow/apps/auth-api/internal/http/handlers/handlerutil"
 )
 
 // oidcProviderRejection builds the AUTH.OIDC.PROVIDER_REJECTED error

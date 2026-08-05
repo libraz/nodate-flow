@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/ai/providers"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/ai/providers"
 )
 
 // fakeAgentLookup is the in-memory stand-in for AgentLookup. It

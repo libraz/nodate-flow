@@ -7,10 +7,10 @@ import (
 	"context"
 	"database/sql"
 
-	"github.com/nodate-flow/nodate-flow/apps/auth-api/internal/audit"
-	"github.com/nodate-flow/nodate-flow/apps/auth-api/internal/db/generated"
-	integrationspkg "github.com/nodate-flow/nodate-flow/apps/auth-api/internal/integrations"
-	"github.com/nodate-flow/nodate-flow/packages/go-shared/crypto"
+	"github.com/libraz/nodate-flow/apps/auth-api/internal/audit"
+	"github.com/libraz/nodate-flow/apps/auth-api/internal/db/generated"
+	integrationspkg "github.com/libraz/nodate-flow/apps/auth-api/internal/integrations"
+	"github.com/libraz/nodate-flow/packages/go-shared/crypto"
 )
 
 // HandlerQuerier is the narrow subset of [generated.Querier] that the

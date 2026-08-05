@@ -14,9 +14,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/auth"
-	apierrors "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/errors"
-	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/eventbus"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/auth"
+	apierrors "github.com/libraz/nodate-flow/apps/flow-api/internal/errors"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/eventbus"
 )
 
 // sseConn represents a single SSE client connection. Events are

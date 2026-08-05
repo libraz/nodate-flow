@@ -4,13 +4,13 @@ import (
 	"context"
 	"database/sql"
 
-	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/audit"
-	generated "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/generated"
-	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/generated/calendar"
-	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/eventbus"
-	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/handlers/handlerutil"
-	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/storage"
-	"github.com/nodate-flow/nodate-flow/packages/go-shared/email"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/audit"
+	generated "github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated/calendar"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/eventbus"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/handlers/handlerutil"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/storage"
+	"github.com/libraz/nodate-flow/packages/go-shared/email"
 )
 
 // Deps holds the dependencies required by calendar handlers.

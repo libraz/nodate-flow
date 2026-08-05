@@ -4,7 +4,7 @@
 // and apps/flow-api/internal/http/middleware.
 package auth
 
-import "github.com/nodate-flow/nodate-flow/packages/go-shared/authn"
+import "github.com/libraz/nodate-flow/packages/go-shared/authn"
 
 // ErrInvalidPasswordHash is returned when an encoded hash cannot be parsed.
 var ErrInvalidPasswordHash = authn.ErrInvalidPasswordHash

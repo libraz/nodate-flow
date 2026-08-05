@@ -29,9 +29,9 @@ import (
 	"github.com/danielgtaylor/huma/v2"
 	_ "github.com/go-sql-driver/mysql"
 
-	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/auth"
-	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/generated"
-	calendarq "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/generated/calendar"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/auth"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
+	calendarq "github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated/calendar"
 )
 
 // stubDeps returns the minimal Deps the router needs to build with

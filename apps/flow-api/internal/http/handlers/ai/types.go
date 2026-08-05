@@ -15,12 +15,12 @@ package ai
 import (
 	"database/sql"
 
-	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/ai/nlcommand"
-	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/ai/nlquery"
-	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/audit"
-	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/generated"
-	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/handlers/handlerutil"
-	"github.com/nodate-flow/nodate-flow/packages/go-shared/crypto"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/ai/nlcommand"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/ai/nlquery"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/audit"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/handlers/handlerutil"
+	"github.com/libraz/nodate-flow/packages/go-shared/crypto"
 )
 
 // Deps is the dependency bundle for handlers in this package.

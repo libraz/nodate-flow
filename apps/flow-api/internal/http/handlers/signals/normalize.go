@@ -8,8 +8,8 @@ package signals
 import (
 	"database/sql"
 
-	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/generated"
-	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/signalkinds"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/signalkinds"
 )
 
 // resolveSubjectType picks the SignalsSubjectType for an insert.

@@ -13,10 +13,10 @@ import (
 
 	"github.com/danielgtaylor/huma/v2"
 
-	apierrors "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/errors"
-	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/eventbus"
-	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/handlers/resolve"
-	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/middleware"
+	apierrors "github.com/libraz/nodate-flow/apps/flow-api/internal/errors"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/eventbus"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/handlers/resolve"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/middleware"
 )
 
 // AiSuggestionSummary is the public DTO for one pending AI suggestion.

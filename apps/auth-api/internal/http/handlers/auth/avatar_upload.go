@@ -26,14 +26,14 @@ import (
 	// runtime dependencies other than standard library.
 	_ "golang.org/x/image/webp"
 
-	"github.com/nodate-flow/nodate-flow/apps/auth-api/internal/audit"
-	"github.com/nodate-flow/nodate-flow/apps/auth-api/internal/db/generated"
-	"github.com/nodate-flow/nodate-flow/apps/auth-api/internal/db/types"
-	apierrors "github.com/nodate-flow/nodate-flow/apps/auth-api/internal/errors"
-	"github.com/nodate-flow/nodate-flow/apps/auth-api/internal/http/handlers/handlerutil"
-	"github.com/nodate-flow/nodate-flow/apps/auth-api/internal/storage"
-	"github.com/nodate-flow/nodate-flow/packages/go-shared/authn"
-	"github.com/nodate-flow/nodate-flow/packages/go-shared/ctxutil"
+	"github.com/libraz/nodate-flow/apps/auth-api/internal/audit"
+	"github.com/libraz/nodate-flow/apps/auth-api/internal/db/generated"
+	"github.com/libraz/nodate-flow/apps/auth-api/internal/db/types"
+	apierrors "github.com/libraz/nodate-flow/apps/auth-api/internal/errors"
+	"github.com/libraz/nodate-flow/apps/auth-api/internal/http/handlers/handlerutil"
+	"github.com/libraz/nodate-flow/apps/auth-api/internal/storage"
+	"github.com/libraz/nodate-flow/packages/go-shared/authn"
+	"github.com/libraz/nodate-flow/packages/go-shared/ctxutil"
 )
 
 // maxAvatarBytes bounds the accepted payload size. 5 MiB covers every

@@ -10,7 +10,7 @@ import (
 	"runtime/debug"
 	"strings"
 
-	"github.com/nodate-flow/nodate-flow/packages/go-shared/logutil"
+	"github.com/libraz/nodate-flow/packages/go-shared/logutil"
 )
 
 // Config controls logger construction. Zero values select sensible

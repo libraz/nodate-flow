@@ -7,8 +7,8 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/nodate-flow/nodate-flow/packages/go-shared/apierr"
-	"github.com/nodate-flow/nodate-flow/packages/go-shared/dbtype"
+	"github.com/libraz/nodate-flow/packages/go-shared/apierr"
+	"github.com/libraz/nodate-flow/packages/go-shared/dbtype"
 )
 
 // RequireAuth returns an HTTP middleware that extracts the Bearer token

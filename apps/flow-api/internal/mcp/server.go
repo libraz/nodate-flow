@@ -35,14 +35,14 @@ import (
 	"sync"
 	"time"
 
-	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/ai"
-	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/ai/agentguard"
-	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/ai/embed"
-	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/ai/nlquery"
-	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/auth"
-	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/generated"
-	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/generated/calendar"
-	apierrors "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/errors"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/ai"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/ai/agentguard"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/ai/embed"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/ai/nlquery"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/auth"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated/calendar"
+	apierrors "github.com/libraz/nodate-flow/apps/flow-api/internal/errors"
 )
 
 // Deps is the dependency bundle needed to construct an MCP [Handler].

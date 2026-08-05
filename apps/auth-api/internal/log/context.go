@@ -6,7 +6,7 @@
 // those values manually.
 //
 // Redaction stays in the shared logutil package
-// (github.com/nodate-flow/nodate-flow/packages/go-shared/logutil); this
+// (github.com/libraz/nodate-flow/packages/go-shared/logutil); this
 // package intentionally does not re-implement it.
 package log
 

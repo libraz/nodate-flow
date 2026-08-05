@@ -3,7 +3,7 @@ package tasknumber
 import (
 	"context"
 
-	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/generated"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
 )
 
 // Allocate returns the next per-project task number after locking the

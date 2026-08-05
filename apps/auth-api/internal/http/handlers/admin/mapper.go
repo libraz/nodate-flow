@@ -3,9 +3,9 @@ package admin
 import (
 	"encoding/json"
 
-	"github.com/nodate-flow/nodate-flow/apps/auth-api/internal/db/generated"
-	"github.com/nodate-flow/nodate-flow/apps/auth-api/internal/db/types"
-	"github.com/nodate-flow/nodate-flow/packages/go-shared/dbtype"
+	"github.com/libraz/nodate-flow/apps/auth-api/internal/db/generated"
+	"github.com/libraz/nodate-flow/apps/auth-api/internal/db/types"
+	"github.com/libraz/nodate-flow/packages/go-shared/dbtype"
 )
 
 var (

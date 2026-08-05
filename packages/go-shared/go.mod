@@ -1,4 +1,4 @@
-module github.com/nodate-flow/nodate-flow/packages/go-shared
+module github.com/libraz/nodate-flow/packages/go-shared
 
 go 1.26.0
 

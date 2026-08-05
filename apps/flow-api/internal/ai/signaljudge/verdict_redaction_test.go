@@ -7,8 +7,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/eventbus"
-	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/signalkinds"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/eventbus"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/signalkinds"
 )
 
 // secretExcerpt embeds a token whose prefix is in the free-form

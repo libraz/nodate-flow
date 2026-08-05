@@ -9,7 +9,7 @@ import (
 	"io"
 	"net/http"
 
-	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/outbound"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/outbound"
 )
 
 // OutboundClient posts messages back into Slack via the Web API.

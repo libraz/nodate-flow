@@ -3,10 +3,10 @@ package auth
 import (
 	"context"
 
-	"github.com/nodate-flow/nodate-flow/apps/auth-api/internal/audit"
-	internauth "github.com/nodate-flow/nodate-flow/apps/auth-api/internal/auth"
-	"github.com/nodate-flow/nodate-flow/apps/auth-api/internal/db/generated"
-	apierrors "github.com/nodate-flow/nodate-flow/apps/auth-api/internal/errors"
+	"github.com/libraz/nodate-flow/apps/auth-api/internal/audit"
+	internauth "github.com/libraz/nodate-flow/apps/auth-api/internal/auth"
+	"github.com/libraz/nodate-flow/apps/auth-api/internal/db/generated"
+	apierrors "github.com/libraz/nodate-flow/apps/auth-api/internal/errors"
 )
 
 // OIDCMicrosoftCallback handles GET /auth/oidc/microsoft/callback. It

@@ -6,8 +6,8 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/nodate-flow/nodate-flow/packages/go-shared/eventbus"
-	"github.com/nodate-flow/nodate-flow/packages/go-shared/eventlog"
+	"github.com/libraz/nodate-flow/packages/go-shared/eventbus"
+	"github.com/libraz/nodate-flow/packages/go-shared/eventlog"
 )
 
 // roleRank orders workspace roles for privilege comparison. Mirrors the

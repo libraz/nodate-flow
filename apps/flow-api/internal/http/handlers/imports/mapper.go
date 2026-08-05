@@ -1,7 +1,7 @@
 package imports
 
 import (
-	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/generated"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
 )
 
 // mapFindRow converts a FindImportJobByPublicIdRow to the ImportJobBody DTO.

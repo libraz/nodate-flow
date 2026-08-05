@@ -4,8 +4,8 @@ import (
 	"context"
 	"log/slog"
 
-	apierrors "github.com/nodate-flow/nodate-flow/apps/auth-api/internal/errors"
-	"github.com/nodate-flow/nodate-flow/packages/go-shared/authn"
+	apierrors "github.com/libraz/nodate-flow/apps/auth-api/internal/errors"
+	"github.com/libraz/nodate-flow/packages/go-shared/authn"
 )
 
 // OIDCGithubStart handles GET /auth/oidc/github/start. It returns the

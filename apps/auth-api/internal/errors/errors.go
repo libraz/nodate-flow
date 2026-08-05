@@ -2,7 +2,7 @@
 
 package errors
 
-import "github.com/nodate-flow/nodate-flow/packages/go-shared/apierr"
+import "github.com/libraz/nodate-flow/packages/go-shared/apierr"
 
 // Spec describes an error code defined in errors/*.yaml.
 type Spec = apierr.Spec

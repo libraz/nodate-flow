@@ -7,7 +7,7 @@ import (
 
 	"github.com/danielgtaylor/huma/v2"
 
-	apierrors "github.com/nodate-flow/nodate-flow/apps/auth-api/internal/errors"
+	apierrors "github.com/libraz/nodate-flow/apps/auth-api/internal/errors"
 )
 
 func TestHTTPErr_ReturnsStatusError(t *testing.T) {

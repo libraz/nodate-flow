@@ -1,8 +1,8 @@
-module github.com/nodate-flow/nodate-flow/apps/auth-api
+module github.com/libraz/nodate-flow/apps/auth-api
 
 go 1.26.0
 
-replace github.com/nodate-flow/nodate-flow/packages/go-shared => ../../packages/go-shared
+replace github.com/libraz/nodate-flow/packages/go-shared => ../../packages/go-shared
 
 require (
 	github.com/caarlos0/env/v11 v11.4.1
@@ -12,7 +12,7 @@ require (
 	github.com/go-sql-driver/mysql v1.10.0
 	github.com/google/uuid v1.6.0
 	github.com/minio/minio-go/v7 v7.0.100
-	github.com/nodate-flow/nodate-flow/packages/go-shared v0.0.0-00010101000000-000000000000
+	github.com/libraz/nodate-flow/packages/go-shared v0.0.0-00010101000000-000000000000
 	github.com/stretchr/testify v1.11.1
 	golang.org/x/image v0.39.0
 	golang.org/x/oauth2 v0.36.0

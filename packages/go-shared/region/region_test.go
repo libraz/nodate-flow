@@ -3,7 +3,7 @@ package region_test
 import (
 	"testing"
 
-	"github.com/nodate-flow/nodate-flow/packages/go-shared/region"
+	"github.com/libraz/nodate-flow/packages/go-shared/region"
 	"github.com/stretchr/testify/assert"
 )
 

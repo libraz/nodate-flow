@@ -6,8 +6,8 @@ import (
 	"database/sql"
 	"encoding/json"
 
-	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/generated"
-	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/handlers/handlerutil"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/handlers/handlerutil"
 )
 
 // Deps is the dependency bundle for handlers in this package.

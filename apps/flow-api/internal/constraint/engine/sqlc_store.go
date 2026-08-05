@@ -4,9 +4,9 @@ import (
 	"context"
 	"time"
 
-	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/constraint"
-	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/generated"
-	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/types"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/constraint"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
 )
 
 // SqlcStore is the production [Store] implementation backed by sqlc

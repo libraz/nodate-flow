@@ -7,15 +7,15 @@ import (
 	"strings"
 	"time"
 
-	"github.com/nodate-flow/nodate-flow/apps/auth-api/internal/audit"
-	authpkg "github.com/nodate-flow/nodate-flow/apps/auth-api/internal/auth"
-	"github.com/nodate-flow/nodate-flow/apps/auth-api/internal/db/generated"
-	"github.com/nodate-flow/nodate-flow/apps/auth-api/internal/db/types"
-	apierrors "github.com/nodate-flow/nodate-flow/apps/auth-api/internal/errors"
-	"github.com/nodate-flow/nodate-flow/packages/go-shared/apierr"
-	"github.com/nodate-flow/nodate-flow/packages/go-shared/authn"
-	"github.com/nodate-flow/nodate-flow/packages/go-shared/email"
-	sharedtoken "github.com/nodate-flow/nodate-flow/packages/go-shared/token"
+	"github.com/libraz/nodate-flow/apps/auth-api/internal/audit"
+	authpkg "github.com/libraz/nodate-flow/apps/auth-api/internal/auth"
+	"github.com/libraz/nodate-flow/apps/auth-api/internal/db/generated"
+	"github.com/libraz/nodate-flow/apps/auth-api/internal/db/types"
+	apierrors "github.com/libraz/nodate-flow/apps/auth-api/internal/errors"
+	"github.com/libraz/nodate-flow/packages/go-shared/apierr"
+	"github.com/libraz/nodate-flow/packages/go-shared/authn"
+	"github.com/libraz/nodate-flow/packages/go-shared/email"
+	sharedtoken "github.com/libraz/nodate-flow/packages/go-shared/token"
 )
 
 // magicLinkTTL is how long a magic link token stays valid.

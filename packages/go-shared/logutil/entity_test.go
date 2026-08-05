@@ -9,7 +9,7 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/nodate-flow/nodate-flow/packages/go-shared/dbtype"
+	"github.com/libraz/nodate-flow/packages/go-shared/dbtype"
 )
 
 // TestLogEntity_KeyAndValue asserts the helper produces an slog.Attr

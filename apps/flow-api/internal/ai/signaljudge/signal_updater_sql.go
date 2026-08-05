@@ -15,7 +15,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/types"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
 )
 
 // SQLSignalUpdater writes signals.judge_run_id / judge_output_json /

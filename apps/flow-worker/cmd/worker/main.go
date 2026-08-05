@@ -21,10 +21,10 @@ import (
 	"strings"
 	"syscall"
 
-	"github.com/nodate-flow/nodate-flow/apps/flow-worker/internal/config"
-	"github.com/nodate-flow/nodate-flow/apps/flow-worker/internal/jobs"
-	"github.com/nodate-flow/nodate-flow/apps/flow-worker/internal/jobs/calendar_event_day"
-	"github.com/nodate-flow/nodate-flow/apps/flow-worker/internal/lifecycle"
+	"github.com/libraz/nodate-flow/apps/flow-worker/internal/config"
+	"github.com/libraz/nodate-flow/apps/flow-worker/internal/jobs"
+	"github.com/libraz/nodate-flow/apps/flow-worker/internal/jobs/calendar_event_day"
+	"github.com/libraz/nodate-flow/apps/flow-worker/internal/lifecycle"
 )
 
 // registerProductionJobs is invoked by lifecycle.Run with the live

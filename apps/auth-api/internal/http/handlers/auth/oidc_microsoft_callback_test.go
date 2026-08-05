@@ -9,10 +9,10 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/nodate-flow/nodate-flow/apps/auth-api/internal/audit"
-	internauth "github.com/nodate-flow/nodate-flow/apps/auth-api/internal/auth"
-	apierrors "github.com/nodate-flow/nodate-flow/apps/auth-api/internal/errors"
-	"github.com/nodate-flow/nodate-flow/apps/auth-api/internal/http/handlers/handlerutil"
+	"github.com/libraz/nodate-flow/apps/auth-api/internal/audit"
+	internauth "github.com/libraz/nodate-flow/apps/auth-api/internal/auth"
+	apierrors "github.com/libraz/nodate-flow/apps/auth-api/internal/errors"
+	"github.com/libraz/nodate-flow/apps/auth-api/internal/http/handlers/handlerutil"
 )
 
 const testMicrosoftTenantID = "11111111-1111-1111-1111-111111111111"

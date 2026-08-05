@@ -8,7 +8,7 @@
 // YAML edit followed by a regenerate; it is not a code edit.
 package signalkinds
 
-import "github.com/nodate-flow/nodate-flow/packages/go-shared/signalwire"
+import "github.com/libraz/nodate-flow/packages/go-shared/signalwire"
 
 // Kind is the dotted string identifier of a signal kind.
 type Kind string

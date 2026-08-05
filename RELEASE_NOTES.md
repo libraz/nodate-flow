@@ -203,7 +203,7 @@ releases:
 nodate-flow is designed for self-hosted deployment via Docker Compose.
 
 ```sh
-git clone https://github.com/nodate-flow/nodate-flow
+git clone https://github.com/libraz/nodate-flow
 cd nodate-flow
 cp .env.example .env    # edit with your secrets
 docker compose up

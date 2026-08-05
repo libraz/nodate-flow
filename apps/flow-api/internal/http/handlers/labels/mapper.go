@@ -1,8 +1,8 @@
 package labels
 
 import (
-	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/generated"
-	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/handlers/handlerutil"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/handlers/handlerutil"
 )
 
 // nullTimeUnix delegates to handlerutil.NullTimeUnix (returns *int64, nil for NULL).

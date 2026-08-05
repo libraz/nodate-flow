@@ -3,7 +3,7 @@ package tasks
 import (
 	"testing"
 
-	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/generated"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
 	"github.com/stretchr/testify/assert"
 )
 

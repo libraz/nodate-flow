@@ -12,8 +12,8 @@ import (
 	"github.com/minio/minio-go/v7/pkg/credentials"
 	"github.com/stretchr/testify/require"
 
-	"github.com/nodate-flow/nodate-flow/apps/auth-api/testutil"
-	flowstorage "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/storage"
+	"github.com/libraz/nodate-flow/apps/auth-api/testutil"
+	flowstorage "github.com/libraz/nodate-flow/apps/flow-api/internal/storage"
 )
 
 // StorageBundle bundles the per-package storage clients and the raw

@@ -4,8 +4,8 @@ import (
 	"database/sql"
 	"time"
 
-	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/generated/calendar"
-	apierrors "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/errors"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated/calendar"
+	apierrors "github.com/libraz/nodate-flow/apps/flow-api/internal/errors"
 )
 
 // Sentinel errors returned by resolve/permission helpers. These are translated

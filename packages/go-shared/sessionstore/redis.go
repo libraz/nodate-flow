@@ -21,7 +21,7 @@ import (
 
 	"github.com/redis/go-redis/v9"
 
-	"github.com/nodate-flow/nodate-flow/packages/go-shared/dbtype"
+	"github.com/libraz/nodate-flow/packages/go-shared/dbtype"
 )
 
 // RedisStore is the Redis-backed [Store] implementation.

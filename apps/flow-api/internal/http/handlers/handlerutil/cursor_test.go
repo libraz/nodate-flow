@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/types"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
 )
 
 // TestDecodeCursorEmpty verifies the documented "empty string =

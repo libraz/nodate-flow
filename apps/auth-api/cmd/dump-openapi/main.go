@@ -13,9 +13,9 @@ import (
 
 	"github.com/danielgtaylor/huma/v2"
 
-	"github.com/nodate-flow/nodate-flow/apps/auth-api/internal/auth"
-	"github.com/nodate-flow/nodate-flow/apps/auth-api/internal/http/router"
-	"github.com/nodate-flow/nodate-flow/packages/go-shared/openapiutil"
+	"github.com/libraz/nodate-flow/apps/auth-api/internal/auth"
+	"github.com/libraz/nodate-flow/apps/auth-api/internal/http/router"
+	"github.com/libraz/nodate-flow/packages/go-shared/openapiutil"
 )
 
 func main() {

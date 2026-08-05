@@ -4,9 +4,9 @@ import (
 	"context"
 	"testing"
 
-	internauth "github.com/nodate-flow/nodate-flow/apps/auth-api/internal/auth"
-	"github.com/nodate-flow/nodate-flow/packages/go-shared/crypto"
-	"github.com/nodate-flow/nodate-flow/packages/go-shared/email"
+	internauth "github.com/libraz/nodate-flow/apps/auth-api/internal/auth"
+	"github.com/libraz/nodate-flow/packages/go-shared/crypto"
+	"github.com/libraz/nodate-flow/packages/go-shared/email"
 )
 
 func TestCapabilities_AllEnabled(t *testing.T) {

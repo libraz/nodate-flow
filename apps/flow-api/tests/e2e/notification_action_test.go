@@ -8,9 +8,9 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/generated"
-	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/notification"
-	"github.com/nodate-flow/nodate-flow/packages/go-shared/email"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/notification"
+	"github.com/libraz/nodate-flow/packages/go-shared/email"
 )
 
 // TestNotificationMarkReadAndArchive verifies that individual

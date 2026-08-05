@@ -8,8 +8,8 @@ import (
 
 	"github.com/danielgtaylor/huma/v2"
 
-	"github.com/nodate-flow/nodate-flow/apps/auth-api/internal/db/types"
-	apierrors "github.com/nodate-flow/nodate-flow/apps/auth-api/internal/errors"
+	"github.com/libraz/nodate-flow/apps/auth-api/internal/db/types"
+	apierrors "github.com/libraz/nodate-flow/apps/auth-api/internal/errors"
 )
 
 // AvatarProxyInput binds the path param for GET /avatars/{userId}.

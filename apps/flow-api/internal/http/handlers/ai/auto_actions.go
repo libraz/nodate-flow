@@ -5,10 +5,10 @@ import (
 	"sort"
 	"time"
 
-	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/ai/autoactions"
-	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/generated"
-	apierrors "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/errors"
-	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/middleware"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/ai/autoactions"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
+	apierrors "github.com/libraz/nodate-flow/apps/flow-api/internal/errors"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/middleware"
 )
 
 // autoActionsLimit caps how many tasks we evaluate per call. The rule

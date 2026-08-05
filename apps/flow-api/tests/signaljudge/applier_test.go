@@ -26,9 +26,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/ai/signaljudge"
-	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/eventbus"
-	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/signalkinds"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/ai/signaljudge"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/eventbus"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/signalkinds"
 )
 
 // fakeBus records every event passed to AppendJudgeEvent. Exposes

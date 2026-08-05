@@ -25,8 +25,8 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/eventbus"
-	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/signalkinds"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/eventbus"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/signalkinds"
 )
 
 // SignalRef is the minimal projection of a signals row the Applier

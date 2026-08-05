@@ -1,6 +1,6 @@
 package auth
 
-import "github.com/nodate-flow/nodate-flow/packages/go-shared/authn"
+import "github.com/libraz/nodate-flow/packages/go-shared/authn"
 
 // OIDCConfig configures a Google OIDC client.
 type OIDCConfig = authn.OIDCConfig

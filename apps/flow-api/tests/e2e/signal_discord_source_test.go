@@ -7,8 +7,8 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/types"
-	"github.com/nodate-flow/nodate-flow/apps/flow-api/tests/helpers"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
+	"github.com/libraz/nodate-flow/apps/flow-api/tests/helpers"
 )
 
 // TestDiscordSignalSourceRoundTrip is a regression test for B-1: every

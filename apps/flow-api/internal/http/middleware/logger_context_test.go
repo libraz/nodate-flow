@@ -11,7 +11,7 @@ import (
 
 	"github.com/google/uuid"
 
-	nflog "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/log"
+	nflog "github.com/libraz/nodate-flow/apps/flow-api/internal/log"
 )
 
 // TestLoggerContext_AttachesAttrs runs an HTTP request through the

@@ -24,7 +24,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/nodate-flow/nodate-flow/apps/flow-api/tests/helpers"
+	"github.com/libraz/nodate-flow/apps/flow-api/tests/helpers"
 )
 
 // sharedHarness is the (MySQL container, flow-api test server) pair that

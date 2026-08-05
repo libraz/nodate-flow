@@ -6,10 +6,10 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/generated/calendar"
-	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/types"
-	apierrors "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/errors"
-	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/handlers/handlerutil"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated/calendar"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
+	apierrors "github.com/libraz/nodate-flow/apps/flow-api/internal/errors"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/handlers/handlerutil"
 )
 
 // --- Input/Output types ---

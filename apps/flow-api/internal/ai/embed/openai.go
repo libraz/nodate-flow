@@ -13,7 +13,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/ai/providers"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/ai/providers"
 )
 
 // Decryptor is the narrow contract used by OpenAIProvider to unseal the

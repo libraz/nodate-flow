@@ -1,6 +1,6 @@
 package auth
 
-import "github.com/nodate-flow/nodate-flow/packages/go-shared/authn"
+import "github.com/libraz/nodate-flow/packages/go-shared/authn"
 
 // GenerateRecoveryCodes returns 10 fresh recovery codes (plaintext) plus
 // their SHA-256 hashes, in matching order.

@@ -5,9 +5,9 @@ import (
 	"encoding/json"
 	"errors"
 
-	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/ai/nlconstraint"
-	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/constraint"
-	apierrors "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/errors"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/ai/nlconstraint"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/constraint"
+	apierrors "github.com/libraz/nodate-flow/apps/flow-api/internal/errors"
 )
 
 // CompileConstraint handles POST /tasks/{id}/constraints/compile.

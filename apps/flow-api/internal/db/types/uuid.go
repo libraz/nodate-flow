@@ -2,7 +2,7 @@
 // code continues to compile without changes to sqlc.yaml overrides.
 package types
 
-import "github.com/nodate-flow/nodate-flow/packages/go-shared/dbtype"
+import "github.com/libraz/nodate-flow/packages/go-shared/dbtype"
 
 // PublicID is a UUID v7 stored as MySQL BINARY(16).
 type PublicID = dbtype.PublicID

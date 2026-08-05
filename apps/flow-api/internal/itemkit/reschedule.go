@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/nodate-flow/nodate-flow/packages/go-shared/eventbus"
+	"github.com/libraz/nodate-flow/packages/go-shared/eventbus"
 )
 
 // RescheduleEventArgs moves a single calendar_events row in time.

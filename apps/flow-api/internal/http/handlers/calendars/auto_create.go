@@ -7,10 +7,10 @@ import (
 	"log/slog"
 	"strings"
 
-	generated "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/generated"
-	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/generated/calendar"
-	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/types"
-	"github.com/nodate-flow/nodate-flow/packages/go-shared/region"
+	generated "github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated/calendar"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
+	"github.com/libraz/nodate-flow/packages/go-shared/region"
 )
 
 // holidaySlug returns the system_slug used for a country's holiday feed.

@@ -44,9 +44,9 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/testcontainers/testcontainers-go/modules/mysql"
 
-	"github.com/nodate-flow/nodate-flow/apps/flow-worker/internal/config"
-	"github.com/nodate-flow/nodate-flow/apps/flow-worker/internal/jobs"
-	"github.com/nodate-flow/nodate-flow/apps/flow-worker/internal/lifecycle"
+	"github.com/libraz/nodate-flow/apps/flow-worker/internal/config"
+	"github.com/libraz/nodate-flow/apps/flow-worker/internal/jobs"
+	"github.com/libraz/nodate-flow/apps/flow-worker/internal/lifecycle"
 )
 
 const (

@@ -3,9 +3,9 @@ package workspace
 import (
 	"context"
 
-	"github.com/nodate-flow/nodate-flow/apps/auth-api/internal/db/generated"
-	apierrors "github.com/nodate-flow/nodate-flow/apps/auth-api/internal/errors"
-	"github.com/nodate-flow/nodate-flow/packages/go-shared/authn"
+	"github.com/libraz/nodate-flow/apps/auth-api/internal/db/generated"
+	apierrors "github.com/libraz/nodate-flow/apps/auth-api/internal/errors"
+	"github.com/libraz/nodate-flow/packages/go-shared/authn"
 )
 
 // List handles GET /workspaces and returns the workspaces the actor belongs

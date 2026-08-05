@@ -5,10 +5,10 @@ import (
 	"log/slog"
 	"strconv"
 
-	"github.com/nodate-flow/nodate-flow/apps/auth-api/internal/db/generated"
-	apierrors "github.com/nodate-flow/nodate-flow/apps/auth-api/internal/errors"
-	"github.com/nodate-flow/nodate-flow/packages/go-shared/authn"
-	"github.com/nodate-flow/nodate-flow/packages/go-shared/avatarutil"
+	"github.com/libraz/nodate-flow/apps/auth-api/internal/db/generated"
+	apierrors "github.com/libraz/nodate-flow/apps/auth-api/internal/errors"
+	"github.com/libraz/nodate-flow/packages/go-shared/authn"
+	"github.com/libraz/nodate-flow/packages/go-shared/avatarutil"
 )
 
 // strconvUint formats a uint64 in base 10 without bringing in the full

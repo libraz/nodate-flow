@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/nodate-flow/nodate-flow/packages/go-shared/dbtype"
+	"github.com/libraz/nodate-flow/packages/go-shared/dbtype"
 )
 
 // SessionQueries abstracts the sqlc-generated query methods that

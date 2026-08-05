@@ -3,11 +3,11 @@ package workspace
 import (
 	"context"
 
-	"github.com/nodate-flow/nodate-flow/apps/auth-api/internal/audit"
-	apierrors "github.com/nodate-flow/nodate-flow/apps/auth-api/internal/errors"
-	"github.com/nodate-flow/nodate-flow/apps/auth-api/internal/http/middleware"
-	"github.com/nodate-flow/nodate-flow/apps/auth-api/internal/teardown"
-	"github.com/nodate-flow/nodate-flow/packages/go-shared/authn"
+	"github.com/libraz/nodate-flow/apps/auth-api/internal/audit"
+	apierrors "github.com/libraz/nodate-flow/apps/auth-api/internal/errors"
+	"github.com/libraz/nodate-flow/apps/auth-api/internal/http/middleware"
+	"github.com/libraz/nodate-flow/apps/auth-api/internal/teardown"
+	"github.com/libraz/nodate-flow/packages/go-shared/authn"
 )
 
 // Delete handles DELETE /workspaces/{wsId}, the workspace owner's

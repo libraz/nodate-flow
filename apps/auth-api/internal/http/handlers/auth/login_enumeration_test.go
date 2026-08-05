@@ -8,10 +8,10 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	internauth "github.com/nodate-flow/nodate-flow/apps/auth-api/internal/auth"
-	"github.com/nodate-flow/nodate-flow/apps/auth-api/internal/db/generated"
-	"github.com/nodate-flow/nodate-flow/apps/auth-api/internal/db/types"
-	apierrors "github.com/nodate-flow/nodate-flow/apps/auth-api/internal/errors"
+	internauth "github.com/libraz/nodate-flow/apps/auth-api/internal/auth"
+	"github.com/libraz/nodate-flow/apps/auth-api/internal/db/generated"
+	"github.com/libraz/nodate-flow/apps/auth-api/internal/db/types"
+	apierrors "github.com/libraz/nodate-flow/apps/auth-api/internal/errors"
 )
 
 // newPasswordUser inserts a fresh user with a local password identity and

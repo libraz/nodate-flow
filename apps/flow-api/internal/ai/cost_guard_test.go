@@ -7,7 +7,7 @@ import (
 	"sync/atomic"
 	"testing"
 
-	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/ai/providers"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/ai/providers"
 )
 
 // TestCostGuardFiresOnConservativeUnknownModelSpend proves that an unknown

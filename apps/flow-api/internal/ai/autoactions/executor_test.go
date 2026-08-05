@@ -7,8 +7,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/generated"
-	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/types"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
 )
 
 // fakeHandoffQuerier is an in-memory stand-in for the sqlc bundle used

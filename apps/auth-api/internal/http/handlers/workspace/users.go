@@ -3,9 +3,9 @@ package workspace
 import (
 	"context"
 
-	"github.com/nodate-flow/nodate-flow/apps/auth-api/internal/db/generated"
-	apierrors "github.com/nodate-flow/nodate-flow/apps/auth-api/internal/errors"
-	"github.com/nodate-flow/nodate-flow/apps/auth-api/internal/http/middleware"
+	"github.com/libraz/nodate-flow/apps/auth-api/internal/db/generated"
+	apierrors "github.com/libraz/nodate-flow/apps/auth-api/internal/errors"
+	"github.com/libraz/nodate-flow/apps/auth-api/internal/http/middleware"
 )
 
 // ListUsers handles GET /workspaces/{wsId}/users. It returns a minimal

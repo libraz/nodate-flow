@@ -7,11 +7,11 @@ package workspace
 import (
 	"database/sql"
 
-	"github.com/nodate-flow/nodate-flow/apps/auth-api/internal/audit"
-	"github.com/nodate-flow/nodate-flow/apps/auth-api/internal/db/generated"
-	"github.com/nodate-flow/nodate-flow/apps/auth-api/internal/http/handlers/handlerutil"
-	"github.com/nodate-flow/nodate-flow/apps/auth-api/internal/storage"
-	"github.com/nodate-flow/nodate-flow/packages/go-shared/email"
+	"github.com/libraz/nodate-flow/apps/auth-api/internal/audit"
+	"github.com/libraz/nodate-flow/apps/auth-api/internal/db/generated"
+	"github.com/libraz/nodate-flow/apps/auth-api/internal/http/handlers/handlerutil"
+	"github.com/libraz/nodate-flow/apps/auth-api/internal/storage"
+	"github.com/libraz/nodate-flow/packages/go-shared/email"
 )
 
 // Deps is the dependency bundle passed to each handler in this package.

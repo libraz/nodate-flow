@@ -14,12 +14,12 @@ import (
 
 	"time"
 
-	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/ai"
-	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/ai/inboxtriage"
-	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/generated"
-	apierrors "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/errors"
-	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/handlers/resolve"
-	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/middleware"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/ai"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/ai/inboxtriage"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
+	apierrors "github.com/libraz/nodate-flow/apps/flow-api/internal/errors"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/handlers/resolve"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/middleware"
 )
 
 // TriageDeps is the dependency bundle for the triage endpoint. It is a

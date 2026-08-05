@@ -7,8 +7,8 @@ import (
 
 	"github.com/google/uuid"
 
-	nflog "github.com/nodate-flow/nodate-flow/apps/auth-api/internal/log"
-	"github.com/nodate-flow/nodate-flow/packages/go-shared/authn"
+	nflog "github.com/libraz/nodate-flow/apps/auth-api/internal/log"
+	"github.com/libraz/nodate-flow/packages/go-shared/authn"
 )
 
 // LoggerContext returns an HTTP middleware that builds a request-scoped

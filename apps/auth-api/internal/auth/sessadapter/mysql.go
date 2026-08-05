@@ -6,9 +6,9 @@ import (
 	"context"
 	"database/sql"
 
-	"github.com/nodate-flow/nodate-flow/apps/auth-api/internal/db/generated"
-	"github.com/nodate-flow/nodate-flow/packages/go-shared/dbtype"
-	"github.com/nodate-flow/nodate-flow/packages/go-shared/sessionstore"
+	"github.com/libraz/nodate-flow/apps/auth-api/internal/db/generated"
+	"github.com/libraz/nodate-flow/packages/go-shared/dbtype"
+	"github.com/libraz/nodate-flow/packages/go-shared/sessionstore"
 )
 
 // NewMySQLStore returns a shared sessionstore.MySQLStore backed by the

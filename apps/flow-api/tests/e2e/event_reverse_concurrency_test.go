@@ -9,7 +9,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/nodate-flow/nodate-flow/apps/flow-api/tests/helpers"
+	"github.com/libraz/nodate-flow/apps/flow-api/tests/helpers"
 )
 
 // reverseResult carries one goroutine's outcome back to the test

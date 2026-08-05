@@ -3,7 +3,7 @@ package httputil
 import (
 	"net/http"
 
-	"github.com/nodate-flow/nodate-flow/packages/go-shared/authn"
+	"github.com/libraz/nodate-flow/packages/go-shared/authn"
 )
 
 // ClientIPMaxLen caps the stored IP string to avoid unbounded

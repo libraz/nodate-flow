@@ -1,8 +1,8 @@
 package audit
 
 import (
-	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/generated"
-	"github.com/nodate-flow/nodate-flow/packages/go-shared/dbtype"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
+	"github.com/libraz/nodate-flow/packages/go-shared/dbtype"
 )
 
 // mapListRow converts a ListWorkspaceAuditLogsRow to the LogEntryDTO.

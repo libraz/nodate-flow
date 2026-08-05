@@ -12,9 +12,9 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/generated"
-	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/types"
-	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/notification"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/notification"
 )
 
 // reminderEventType is the events.type (and notifications.event_type)

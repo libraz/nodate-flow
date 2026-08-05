@@ -3,7 +3,7 @@ package auth
 import (
 	"time"
 
-	"github.com/nodate-flow/nodate-flow/packages/go-shared/authn"
+	"github.com/libraz/nodate-flow/packages/go-shared/authn"
 )
 
 // GenerateTotpSecret returns a fresh 20-byte random secret suitable

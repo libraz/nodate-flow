@@ -8,7 +8,7 @@ import (
 	"context"
 	"database/sql"
 
-	types "github.com/nodate-flow/nodate-flow/apps/auth-api/internal/db/types"
+	types "github.com/libraz/nodate-flow/apps/auth-api/internal/db/types"
 )
 
 type Querier interface {

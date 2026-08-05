@@ -6,8 +6,8 @@ import (
 	"net"
 	"testing"
 
-	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/generated"
-	"github.com/nodate-flow/nodate-flow/packages/go-shared/authn"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
+	"github.com/libraz/nodate-flow/packages/go-shared/authn"
 )
 
 // captureResult is a no-op sql.Result for the fake DBTX.

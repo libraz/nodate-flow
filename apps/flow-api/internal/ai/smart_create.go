@@ -8,9 +8,9 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/ai/embed"
-	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/ai/providers"
-	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/generated"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/ai/embed"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/ai/providers"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
 )
 
 // --------------------------------------------------------------------

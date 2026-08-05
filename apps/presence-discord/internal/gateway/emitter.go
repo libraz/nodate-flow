@@ -36,8 +36,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/nodate-flow/nodate-flow/apps/presence-discord/internal/obs"
-	"github.com/nodate-flow/nodate-flow/packages/go-shared/signalwire"
+	"github.com/libraz/nodate-flow/apps/presence-discord/internal/obs"
+	"github.com/libraz/nodate-flow/packages/go-shared/signalwire"
 )
 
 // SignalKind is the wire-level signal kind emitted for every

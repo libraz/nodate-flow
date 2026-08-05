@@ -10,7 +10,7 @@ import (
 	"database/sql"
 	"time"
 
-	types "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/types"
+	types "github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
 )
 
 const createCalendarSubscription = `-- name: CreateCalendarSubscription :execlastid

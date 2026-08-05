@@ -16,7 +16,7 @@ import (
 	"errors"
 	"strings"
 
-	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/constraint"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/constraint"
 )
 
 // ErrUnparseable is returned whenever the LLM output cannot be

@@ -11,8 +11,8 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/ai"
-	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/ai/providers"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/ai"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/ai/providers"
 )
 
 // meteringResolver returns a fixed provider on every call.

@@ -18,10 +18,10 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/auth"
-	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/generated"
-	calgen "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/generated/calendar"
-	"github.com/nodate-flow/nodate-flow/packages/go-shared/dbtype"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/auth"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
+	calgen "github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated/calendar"
+	"github.com/libraz/nodate-flow/packages/go-shared/dbtype"
 )
 
 // CalendarTestTenant is the bundle of identifiers calendar e2e tests

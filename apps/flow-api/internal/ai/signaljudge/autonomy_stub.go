@@ -17,7 +17,7 @@ package signaljudge
 import (
 	"context"
 
-	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/signalkinds"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/signalkinds"
 )
 
 // AutonomyLevel names the three branches the Applier supports.

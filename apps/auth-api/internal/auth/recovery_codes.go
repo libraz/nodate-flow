@@ -3,7 +3,7 @@ package auth
 import (
 	"crypto/subtle"
 
-	"github.com/nodate-flow/nodate-flow/packages/go-shared/authn"
+	"github.com/libraz/nodate-flow/packages/go-shared/authn"
 )
 
 // GenerateRecoveryCodes returns 10 fresh recovery codes (plaintext) plus

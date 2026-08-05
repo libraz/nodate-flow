@@ -11,8 +11,8 @@ import (
 	"github.com/go-sql-driver/mysql"
 	"github.com/google/uuid"
 
-	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/types"
-	apierrors "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/errors"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
+	apierrors "github.com/libraz/nodate-flow/apps/flow-api/internal/errors"
 )
 
 func TestIsDuplicateEntryTrue(t *testing.T) {

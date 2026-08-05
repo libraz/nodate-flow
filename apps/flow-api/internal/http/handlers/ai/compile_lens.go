@@ -4,9 +4,9 @@ import (
 	"context"
 	"errors"
 
-	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/ai/nlquery"
-	apierrors "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/errors"
-	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/middleware"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/ai/nlquery"
+	apierrors "github.com/libraz/nodate-flow/apps/flow-api/internal/errors"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/middleware"
 )
 
 // CompileLensInput is the POST /workspaces/{wsId}/ai/compile-lens body.

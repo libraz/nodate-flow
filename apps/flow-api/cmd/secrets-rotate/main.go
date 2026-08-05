@@ -57,7 +57,7 @@ import (
 
 	_ "github.com/go-sql-driver/mysql"
 
-	"github.com/nodate-flow/nodate-flow/packages/go-shared/crypto"
+	"github.com/libraz/nodate-flow/packages/go-shared/crypto"
 )
 
 // envOldKey and envNewKey name the environment variables holding the

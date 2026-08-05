@@ -10,10 +10,10 @@ import (
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 
-	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/generated"
-	apierrors "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/errors"
-	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/mcp"
-	"github.com/nodate-flow/nodate-flow/apps/flow-api/tests/helpers"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
+	apierrors "github.com/libraz/nodate-flow/apps/flow-api/internal/errors"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/mcp"
+	"github.com/libraz/nodate-flow/apps/flow-api/tests/helpers"
 )
 
 // mcpVisibilityFixture is a minimal tenant used to prove MCP tools enforce

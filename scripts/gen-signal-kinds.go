@@ -317,7 +317,7 @@ func genGoFile(all []record) []byte {
 	b.WriteString("// YAML edit followed by a regenerate; it is not a code edit.\n")
 	b.WriteString("package signalkinds\n\n")
 
-	b.WriteString("import \"github.com/nodate-flow/nodate-flow/packages/go-shared/signalwire\"\n\n")
+	b.WriteString("import \"github.com/libraz/nodate-flow/packages/go-shared/signalwire\"\n\n")
 
 	b.WriteString("// Kind is the dotted string identifier of a signal kind.\n")
 	b.WriteString("type Kind string\n\n")

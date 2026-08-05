@@ -4,8 +4,8 @@ import (
 	"crypto/ed25519"
 	"time"
 
-	"github.com/nodate-flow/nodate-flow/packages/go-shared/authn"
-	"github.com/nodate-flow/nodate-flow/packages/go-shared/dbtype"
+	"github.com/libraz/nodate-flow/packages/go-shared/authn"
+	"github.com/libraz/nodate-flow/packages/go-shared/dbtype"
 )
 
 // JWTIssuer signs and verifies short-lived access tokens (EdDSA) and

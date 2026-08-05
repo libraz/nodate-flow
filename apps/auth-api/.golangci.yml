@@ -26,7 +26,7 @@ linters:
             - '!**/tests/**'
             - '!**/testutil/**'
           deny:
-            - pkg: github.com/nodate-flow/nodate-flow/packages/go-shared/crypto
+            - pkg: github.com/libraz/nodate-flow/packages/go-shared/crypto
               desc: crypto package may only be imported from internal/http/handlers/auth, internal/http/handlers/integrations, internal/http/router, internal/integrations, internal/crypto, cmd/api, and tests
     forbidigo:
       forbid:

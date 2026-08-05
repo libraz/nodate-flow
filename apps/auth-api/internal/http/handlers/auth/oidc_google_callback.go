@@ -3,9 +3,9 @@ package auth
 import (
 	"context"
 
-	"github.com/nodate-flow/nodate-flow/apps/auth-api/internal/audit"
-	"github.com/nodate-flow/nodate-flow/apps/auth-api/internal/db/generated"
-	apierrors "github.com/nodate-flow/nodate-flow/apps/auth-api/internal/errors"
+	"github.com/libraz/nodate-flow/apps/auth-api/internal/audit"
+	"github.com/libraz/nodate-flow/apps/auth-api/internal/db/generated"
+	apierrors "github.com/libraz/nodate-flow/apps/auth-api/internal/errors"
 )
 
 // OIDCGoogleCallback handles GET /auth/oidc/google/callback. It exchanges

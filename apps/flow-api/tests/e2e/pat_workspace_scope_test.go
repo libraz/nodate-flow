@@ -6,7 +6,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/nodate-flow/nodate-flow/packages/go-shared/authn"
+	"github.com/libraz/nodate-flow/packages/go-shared/authn"
 )
 
 func mintPatForWorkspace(t *testing.T, tenantAccessToken, userPublicID, workspacePublicID string) string {

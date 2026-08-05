@@ -1,6 +1,6 @@
 package middleware
 
-import "github.com/nodate-flow/nodate-flow/packages/go-shared/httputil"
+import "github.com/libraz/nodate-flow/packages/go-shared/httputil"
 
 // RateLimitConfig is an alias for [httputil.RateLimitConfig].
 type RateLimitConfig = httputil.RateLimitConfig

@@ -13,9 +13,9 @@ import (
 	"github.com/prometheus/client_golang/prometheus/testutil"
 	"github.com/stretchr/testify/require"
 
-	"github.com/nodate-flow/nodate-flow/apps/flow-api/tests/helpers"
-	"github.com/nodate-flow/nodate-flow/apps/flow-worker/internal/jobs/calendar_event_day"
-	"github.com/nodate-flow/nodate-flow/apps/flow-worker/internal/obs"
+	"github.com/libraz/nodate-flow/apps/flow-api/tests/helpers"
+	"github.com/libraz/nodate-flow/apps/flow-worker/internal/jobs/calendar_event_day"
+	"github.com/libraz/nodate-flow/apps/flow-worker/internal/obs"
 )
 
 // silentLogger returns a slog.Logger that drops every record. The

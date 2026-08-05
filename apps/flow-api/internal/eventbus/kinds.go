@@ -1,12 +1,12 @@
 // Package eventbus re-exports event-kind constants defined in the
 // shared package so existing flow-api call sites continue to compile
 // without churn. New code should import
-// github.com/nodate-flow/nodate-flow/packages/go-shared/eventbus
+// github.com/libraz/nodate-flow/packages/go-shared/eventbus
 // directly. These aliases will be removed once the calendar
 // unification cleanup has landed everywhere.
 package eventbus
 
-import sharedbus "github.com/nodate-flow/nodate-flow/packages/go-shared/eventbus"
+import sharedbus "github.com/libraz/nodate-flow/packages/go-shared/eventbus"
 
 // Kind mirrors sharedbus.Kind.
 type Kind = sharedbus.Kind

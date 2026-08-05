@@ -6,7 +6,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/ai/providers"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/ai/providers"
 )
 
 // generatePageSystem instructs the LLM to draft the body of a wiki page.

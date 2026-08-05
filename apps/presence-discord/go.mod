@@ -1,11 +1,11 @@
-module github.com/nodate-flow/nodate-flow/apps/presence-discord
+module github.com/libraz/nodate-flow/apps/presence-discord
 
 go 1.26.0
 
 require (
 	github.com/bwmarrin/discordgo v0.29.0
 	github.com/caarlos0/env/v11 v11.4.1
-	github.com/nodate-flow/nodate-flow/packages/go-shared v0.0.0
+	github.com/libraz/nodate-flow/packages/go-shared v0.0.0
 	github.com/prometheus/client_golang v1.23.2
 	github.com/stretchr/testify v1.11.1
 	go.opentelemetry.io/otel v1.44.0
@@ -45,4 +45,4 @@ require (
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
 
-replace github.com/nodate-flow/nodate-flow/packages/go-shared => ../../packages/go-shared
+replace github.com/libraz/nodate-flow/packages/go-shared => ../../packages/go-shared

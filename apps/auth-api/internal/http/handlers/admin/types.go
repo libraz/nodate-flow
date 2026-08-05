@@ -9,9 +9,9 @@ import (
 	"database/sql"
 	"encoding/json"
 
-	"github.com/nodate-flow/nodate-flow/apps/auth-api/internal/audit"
-	"github.com/nodate-flow/nodate-flow/apps/auth-api/internal/db/generated"
-	"github.com/nodate-flow/nodate-flow/apps/auth-api/internal/storage"
+	"github.com/libraz/nodate-flow/apps/auth-api/internal/audit"
+	"github.com/libraz/nodate-flow/apps/auth-api/internal/db/generated"
+	"github.com/libraz/nodate-flow/apps/auth-api/internal/storage"
 )
 
 // Deps is the dependency bundle for admin handlers.

@@ -61,12 +61,12 @@ sql:
           # public_id is the only externally visible identifier (UUID v7, BINARY(16)).
           - column: "*.public_id"
             go_type:
-              import: "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/types"
+              import: "github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
               package: "types"
               type: "PublicID"
           - column: "*.user_public_id"
             go_type:
-              import: "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/types"
+              import: "github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
               package: "types"
               type: "PublicID"
           # event_public_id is BINARY(16) on webhook_deliveries (the source events.public_id
@@ -80,7 +80,7 @@ sql:
           - column: "*.event_public_id"
             nullable: true
             go_type:
-              import: "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/types"
+              import: "github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
               package: "types"
               type: "PublicID"
               pointer: true
@@ -144,33 +144,33 @@ sql:
             go_struct_tag: 'json:"-"'
           - column: "*.target_public_id"
             go_type:
-              import: "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/types"
+              import: "github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
               package: "types"
               type: "PublicID"
           - column: "*.entity_public_id"
             go_type:
-              import: "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/types"
+              import: "github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
               package: "types"
               type: "PublicID"
           - column: "*.scope_public_id"
             go_type:
-              import: "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/types"
+              import: "github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
               package: "types"
               type: "PublicID"
           - column: "*.mentioned_public_id"
             go_type:
-              import: "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/types"
+              import: "github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
               package: "types"
               type: "PublicID"
           - column: "*.actor_public_id"
             go_type:
-              import: "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/types"
+              import: "github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
               package: "types"
               type: "PublicID"
           - column: "*.actor_user_public_id"
             nullable: true
             go_type:
-              import: "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/types"
+              import: "github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
               package: "types"
               type: "PublicID"
               pointer: true
@@ -181,7 +181,7 @@ sql:
           - column: "*.triggered_by_signal_public_id"
             nullable: true
             go_type:
-              import: "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/types"
+              import: "github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
               package: "types"
               type: "PublicID"
               pointer: true
@@ -198,7 +198,7 @@ sql:
           - column: "*.reverses_event_public_id"
             nullable: true
             go_type:
-              import: "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/types"
+              import: "github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
               package: "types"
               type: "PublicID"
               pointer: true
@@ -240,14 +240,14 @@ sql:
           - column: "*.avatar_storage_object_public_id"
             nullable: true
             go_type:
-              import: "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/types"
+              import: "github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
               package: "types"
               type: "PublicID"
               pointer: true
           - column: "*.author_avatar_storage_object_public_id"
             nullable: true
             go_type:
-              import: "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/types"
+              import: "github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
               package: "types"
               type: "PublicID"
               pointer: true
@@ -255,22 +255,22 @@ sql:
           # queries comes from INNER JOIN storage_objects so it is non-null.
           - column: "*.storage_object_public_id"
             go_type:
-              import: "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/types"
+              import: "github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
               package: "types"
               type: "PublicID"
           - column: "*.calendar_public_id"
             go_type:
-              import: "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/types"
+              import: "github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
               package: "types"
               type: "PublicID"
           - column: "*.resource_public_id"
             go_type:
-              import: "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/types"
+              import: "github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
               package: "types"
               type: "PublicID"
           - column: "*.target_resource_public_id"
             go_type:
-              import: "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/types"
+              import: "github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
               package: "types"
               type: "PublicID"
           - column: "*.signal_id"
@@ -281,12 +281,12 @@ sql:
             go_struct_tag: 'json:"-"'
           - column: "*.triaged_by_public_id"
             go_type:
-              import: "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/types"
+              import: "github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
               package: "types"
               type: "PublicID"
           - column: "*.author_public_id"
             go_type:
-              import: "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/types"
+              import: "github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
               package: "types"
               type: "PublicID"
           - column: "*.initiated_by_user_id"
@@ -330,17 +330,17 @@ sql:
         overrides:
           - column: "*.public_id"
             go_type:
-              import: "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/types"
+              import: "github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
               package: "types"
               type: "PublicID"
           - column: "*.user_public_id"
             go_type:
-              import: "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/types"
+              import: "github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
               package: "types"
               type: "PublicID"
           - column: "*.calendar_public_id"
             go_type:
-              import: "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/types"
+              import: "github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
               package: "types"
               type: "PublicID"
           - column: "*.id"
@@ -408,20 +408,20 @@ sql:
           - column: "*.avatar_storage_object_public_id"
             nullable: true
             go_type:
-              import: "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/types"
+              import: "github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
               package: "types"
               type: "PublicID"
               pointer: true
           - column: "*.author_avatar_storage_object_public_id"
             nullable: true
             go_type:
-              import: "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/types"
+              import: "github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
               package: "types"
               type: "PublicID"
               pointer: true
           - column: "*.storage_object_public_id"
             go_type:
-              import: "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/types"
+              import: "github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
               package: "types"
               type: "PublicID"
           # See note in flow-api block above.
@@ -455,17 +455,17 @@ sql:
         overrides:
           - column: "*.public_id"
             go_type:
-              import: "github.com/nodate-flow/nodate-flow/apps/auth-api/internal/db/types"
+              import: "github.com/libraz/nodate-flow/apps/auth-api/internal/db/types"
               package: "types"
               type: "PublicID"
           - column: "*.user_public_id"
             go_type:
-              import: "github.com/nodate-flow/nodate-flow/apps/auth-api/internal/db/types"
+              import: "github.com/libraz/nodate-flow/apps/auth-api/internal/db/types"
               package: "types"
               type: "PublicID"
           - column: "*.calendar_public_id"
             go_type:
-              import: "github.com/nodate-flow/nodate-flow/apps/auth-api/internal/db/types"
+              import: "github.com/libraz/nodate-flow/apps/auth-api/internal/db/types"
               package: "types"
               type: "PublicID"
           - column: "*.id"
@@ -494,27 +494,27 @@ sql:
             go_struct_tag: 'json:"-"'
           - column: "*.actor_user_public_id"
             go_type:
-              import: "github.com/nodate-flow/nodate-flow/apps/auth-api/internal/db/types"
+              import: "github.com/libraz/nodate-flow/apps/auth-api/internal/db/types"
               package: "types"
               type: "PublicID"
           - column: "*.granted_by_public_id"
             go_type:
-              import: "github.com/nodate-flow/nodate-flow/apps/auth-api/internal/db/types"
+              import: "github.com/libraz/nodate-flow/apps/auth-api/internal/db/types"
               package: "types"
               type: "PublicID"
           - column: "*.target_workspace_public_id"
             go_type:
-              import: "github.com/nodate-flow/nodate-flow/apps/auth-api/internal/db/types"
+              import: "github.com/libraz/nodate-flow/apps/auth-api/internal/db/types"
               package: "types"
               type: "PublicID"
           - column: "*.resource_public_id"
             go_type:
-              import: "github.com/nodate-flow/nodate-flow/apps/auth-api/internal/db/types"
+              import: "github.com/libraz/nodate-flow/apps/auth-api/internal/db/types"
               package: "types"
               type: "PublicID"
           - column: "*.target_resource_public_id"
             go_type:
-              import: "github.com/nodate-flow/nodate-flow/apps/auth-api/internal/db/types"
+              import: "github.com/libraz/nodate-flow/apps/auth-api/internal/db/types"
               package: "types"
               type: "PublicID"
           - column: "*.task_internal_id"
@@ -546,19 +546,19 @@ sql:
           - column: "*.avatar_storage_object_public_id"
             nullable: true
             go_type:
-              import: "github.com/nodate-flow/nodate-flow/apps/auth-api/internal/db/types"
+              import: "github.com/libraz/nodate-flow/apps/auth-api/internal/db/types"
               package: "types"
               type: "PublicID"
               pointer: true
           - column: "*.author_avatar_storage_object_public_id"
             nullable: true
             go_type:
-              import: "github.com/nodate-flow/nodate-flow/apps/auth-api/internal/db/types"
+              import: "github.com/libraz/nodate-flow/apps/auth-api/internal/db/types"
               package: "types"
               type: "PublicID"
               pointer: true
           - column: "*.storage_object_public_id"
             go_type:
-              import: "github.com/nodate-flow/nodate-flow/apps/auth-api/internal/db/types"
+              import: "github.com/libraz/nodate-flow/apps/auth-api/internal/db/types"
               package: "types"
               type: "PublicID"

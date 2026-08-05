@@ -11,7 +11,7 @@ import (
 	"encoding/json"
 	"time"
 
-	types "github.com/nodate-flow/nodate-flow/apps/auth-api/internal/db/types"
+	types "github.com/libraz/nodate-flow/apps/auth-api/internal/db/types"
 )
 
 const createPat = `-- name: CreatePat :execlastid

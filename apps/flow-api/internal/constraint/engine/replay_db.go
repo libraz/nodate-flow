@@ -4,7 +4,7 @@ import (
 	"context"
 	"database/sql"
 
-	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/generated"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
 )
 
 // ReplayLoader is the sqlc-backed loader for Replay. It fetches

@@ -10,9 +10,9 @@ import (
 	"net"
 	"time"
 
-	"github.com/nodate-flow/nodate-flow/apps/auth-api/internal/db/generated"
-	"github.com/nodate-flow/nodate-flow/apps/auth-api/internal/db/types"
-	"github.com/nodate-flow/nodate-flow/packages/go-shared/authn"
+	"github.com/libraz/nodate-flow/apps/auth-api/internal/db/generated"
+	"github.com/libraz/nodate-flow/apps/auth-api/internal/db/types"
+	"github.com/libraz/nodate-flow/packages/go-shared/authn"
 )
 
 // userAgentMaxLen matches the audit_logs.user_agent column width. The

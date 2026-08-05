@@ -5,7 +5,7 @@ package signals
 import (
 	"testing"
 
-	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/generated"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
 )
 
 // TestResolveSubjectType locks in the three-tier precedence rule for

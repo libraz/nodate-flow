@@ -1,6 +1,6 @@
 package reactions
 
-import "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/generated"
+import "github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
 
 // mapTaskReactionRow converts a ListReactionsForTaskRow to the Reaction DTO.
 func mapTaskReactionRow(r generated.ListReactionsForTaskRow) Reaction {

@@ -9,8 +9,8 @@ import (
 	"errors"
 	"testing"
 
-	apierrors "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/errors"
-	"github.com/nodate-flow/nodate-flow/packages/go-shared/apierr"
+	apierrors "github.com/libraz/nodate-flow/apps/flow-api/internal/errors"
+	"github.com/libraz/nodate-flow/packages/go-shared/apierr"
 )
 
 // TestAppendRejectsJudgeKindsFromOutsideApplier locks in that calling

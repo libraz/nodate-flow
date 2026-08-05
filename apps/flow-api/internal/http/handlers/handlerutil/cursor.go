@@ -26,7 +26,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/types"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
 )
 
 // Millis is unix-epoch milliseconds. It exists as a distinct named

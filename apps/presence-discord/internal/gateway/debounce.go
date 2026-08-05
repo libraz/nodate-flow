@@ -34,7 +34,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/nodate-flow/nodate-flow/apps/presence-discord/internal/obs"
+	"github.com/libraz/nodate-flow/apps/presence-discord/internal/obs"
 )
 
 // debounceEmitter is the narrow surface the debouncer needs to push a

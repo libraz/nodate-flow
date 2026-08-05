@@ -5,7 +5,7 @@
 package ai
 
 import (
-	"github.com/nodate-flow/nodate-flow/packages/go-shared/logutil"
+	"github.com/libraz/nodate-flow/packages/go-shared/logutil"
 )
 
 // SecretPrefixes is the fixed list of literal prefixes scanned for in

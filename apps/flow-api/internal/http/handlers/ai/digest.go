@@ -5,11 +5,11 @@ import (
 	"database/sql"
 	"time"
 
-	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/ai/digest"
-	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/generated"
-	apierrors "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/errors"
-	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/handlers/handlerutil"
-	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/middleware"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/ai/digest"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
+	apierrors "github.com/libraz/nodate-flow/apps/flow-api/internal/errors"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/handlers/handlerutil"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/middleware"
 )
 
 // digestLimit caps how many tasks the weekly digest ingests.

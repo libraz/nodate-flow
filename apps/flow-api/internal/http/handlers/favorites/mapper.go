@@ -1,6 +1,6 @@
 package favorites
 
-import "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/generated"
+import "github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
 
 // mapListRow converts a ListFavoritesForUserRow to the Favorite DTO.
 func mapListRow(r generated.ListFavoritesForUserRow) Favorite {

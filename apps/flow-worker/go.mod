@@ -1,12 +1,12 @@
-module github.com/nodate-flow/nodate-flow/apps/flow-worker
+module github.com/libraz/nodate-flow/apps/flow-worker
 
 go 1.26.0
 
 require (
 	github.com/caarlos0/env/v11 v11.4.1
 	github.com/go-sql-driver/mysql v1.10.0
-	github.com/nodate-flow/nodate-flow/apps/flow-api v0.0.0-00010101000000-000000000000
-	github.com/nodate-flow/nodate-flow/packages/go-shared v0.0.0
+	github.com/libraz/nodate-flow/apps/flow-api v0.0.0-00010101000000-000000000000
+	github.com/libraz/nodate-flow/packages/go-shared v0.0.0
 	github.com/prometheus/client_golang v1.23.2
 	github.com/stretchr/testify v1.11.1
 	github.com/testcontainers/testcontainers-go/modules/mysql v0.43.0
@@ -69,7 +69,7 @@ require (
 	github.com/moby/sys/userns v0.1.0 // indirect
 	github.com/moby/term v0.5.2 // indirect
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
-	github.com/nodate-flow/nodate-flow/apps/auth-api v0.0.0-00010101000000-000000000000 // indirect
+	github.com/libraz/nodate-flow/apps/auth-api v0.0.0-00010101000000-000000000000 // indirect
 	github.com/opencontainers/go-digest v1.0.0 // indirect
 	github.com/opencontainers/image-spec v1.1.1 // indirect
 	github.com/philhofer/fwd v1.2.0 // indirect
@@ -110,8 +110,8 @@ require (
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
 
-replace github.com/nodate-flow/nodate-flow/packages/go-shared => ../../packages/go-shared
+replace github.com/libraz/nodate-flow/packages/go-shared => ../../packages/go-shared
 
-replace github.com/nodate-flow/nodate-flow/apps/flow-api => ../flow-api
+replace github.com/libraz/nodate-flow/apps/flow-api => ../flow-api
 
-replace github.com/nodate-flow/nodate-flow/apps/auth-api => ../auth-api
+replace github.com/libraz/nodate-flow/apps/auth-api => ../auth-api

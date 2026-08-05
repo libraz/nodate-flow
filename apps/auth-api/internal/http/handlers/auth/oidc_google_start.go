@@ -3,8 +3,8 @@ package auth
 import (
 	"context"
 
-	apierrors "github.com/nodate-flow/nodate-flow/apps/auth-api/internal/errors"
-	"github.com/nodate-flow/nodate-flow/packages/go-shared/authn"
+	apierrors "github.com/libraz/nodate-flow/apps/auth-api/internal/errors"
+	"github.com/libraz/nodate-flow/packages/go-shared/authn"
 )
 
 // OIDCGoogleStart handles GET /auth/oidc/google/start. It returns the

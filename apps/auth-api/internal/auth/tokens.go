@@ -1,8 +1,8 @@
 package auth
 
 import (
-	"github.com/nodate-flow/nodate-flow/packages/go-shared/authn"
-	sharedtoken "github.com/nodate-flow/nodate-flow/packages/go-shared/token"
+	"github.com/libraz/nodate-flow/packages/go-shared/authn"
+	sharedtoken "github.com/libraz/nodate-flow/packages/go-shared/token"
 )
 
 // PrefixPAT is the user-visible prefix for personal access tokens.

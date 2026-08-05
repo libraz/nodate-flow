@@ -3,7 +3,7 @@ package auth
 import (
 	"context"
 
-	"github.com/nodate-flow/nodate-flow/packages/go-shared/email"
+	"github.com/libraz/nodate-flow/packages/go-shared/email"
 )
 
 // Capabilities handles GET /auth/capabilities. It returns which

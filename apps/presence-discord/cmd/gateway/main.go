@@ -20,8 +20,8 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/nodate-flow/nodate-flow/apps/presence-discord/internal/config"
-	"github.com/nodate-flow/nodate-flow/apps/presence-discord/internal/lifecycle"
+	"github.com/libraz/nodate-flow/apps/presence-discord/internal/config"
+	"github.com/libraz/nodate-flow/apps/presence-discord/internal/lifecycle"
 )
 
 func main() {

@@ -6,7 +6,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/middleware"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/middleware"
 )
 
 // writeJSONError writes a structured JSON error response for the SSE

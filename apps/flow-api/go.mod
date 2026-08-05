@@ -1,4 +1,4 @@
-module github.com/nodate-flow/nodate-flow/apps/flow-api
+module github.com/libraz/nodate-flow/apps/flow-api
 
 go 1.26.0
 
@@ -9,8 +9,8 @@ require (
 	github.com/go-sql-driver/mysql v1.10.0
 	github.com/google/uuid v1.6.0
 	github.com/minio/minio-go/v7 v7.0.100
-	github.com/nodate-flow/nodate-flow/apps/auth-api v0.0.0-00010101000000-000000000000
-	github.com/nodate-flow/nodate-flow/packages/go-shared v0.0.0
+	github.com/libraz/nodate-flow/apps/auth-api v0.0.0-00010101000000-000000000000
+	github.com/libraz/nodate-flow/packages/go-shared v0.0.0
 	github.com/prometheus/client_golang v1.23.2
 	github.com/redis/go-redis/v9 v9.21.0
 	github.com/stretchr/testify v1.11.1
@@ -24,9 +24,9 @@ require (
 	go.opentelemetry.io/otel/trace v1.44.0
 )
 
-replace github.com/nodate-flow/nodate-flow/packages/go-shared => ../../packages/go-shared
+replace github.com/libraz/nodate-flow/packages/go-shared => ../../packages/go-shared
 
-replace github.com/nodate-flow/nodate-flow/apps/auth-api => ../auth-api
+replace github.com/libraz/nodate-flow/apps/auth-api => ../auth-api
 
 require (
 	cloud.google.com/go/compute/metadata v0.9.0 // indirect

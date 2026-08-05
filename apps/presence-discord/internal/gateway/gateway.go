@@ -35,8 +35,8 @@ import (
 
 	"github.com/bwmarrin/discordgo"
 
-	"github.com/nodate-flow/nodate-flow/apps/presence-discord/internal/config"
-	"github.com/nodate-flow/nodate-flow/apps/presence-discord/internal/obs"
+	"github.com/libraz/nodate-flow/apps/presence-discord/internal/config"
+	"github.com/libraz/nodate-flow/apps/presence-discord/internal/obs"
 )
 
 // sessionAdapter is the narrow surface Gateway needs from a

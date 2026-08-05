@@ -6,9 +6,9 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	apierrors "github.com/nodate-flow/nodate-flow/apps/auth-api/internal/errors"
-	"github.com/nodate-flow/nodate-flow/apps/auth-api/internal/http/middleware"
-	"github.com/nodate-flow/nodate-flow/packages/go-shared/memberkit"
+	apierrors "github.com/libraz/nodate-flow/apps/auth-api/internal/errors"
+	"github.com/libraz/nodate-flow/apps/auth-api/internal/http/middleware"
+	"github.com/libraz/nodate-flow/packages/go-shared/memberkit"
 )
 
 // TestRoleEscalationMapsToRoleDenied pins the wire contract shared by the

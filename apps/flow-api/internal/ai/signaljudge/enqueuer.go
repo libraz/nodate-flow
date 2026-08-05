@@ -10,8 +10,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/ai/agentruntime"
-	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/signalkinds"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/ai/agentruntime"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/signalkinds"
 )
 
 // EnqueuerDB is the narrow surface the enqueuer needs from the

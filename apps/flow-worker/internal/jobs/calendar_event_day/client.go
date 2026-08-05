@@ -12,7 +12,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/nodate-flow/nodate-flow/packages/go-shared/signalwire"
+	"github.com/libraz/nodate-flow/packages/go-shared/signalwire"
 )
 
 // SignalsClient is the thin HTTP wrapper the worker uses to POST a

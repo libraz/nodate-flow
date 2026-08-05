@@ -25,8 +25,8 @@ import (
 	"encoding/json"
 	"fmt"
 
-	apierrors "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/errors"
-	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/eventbus"
+	apierrors "github.com/libraz/nodate-flow/apps/flow-api/internal/errors"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/eventbus"
 )
 
 // Verdict is the structured output the signal_judge LLM returns.

@@ -8,9 +8,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/auth"
-	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/router"
-	"github.com/nodate-flow/nodate-flow/packages/go-shared/openapiutil"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/auth"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/router"
+	"github.com/libraz/nodate-flow/packages/go-shared/openapiutil"
 )
 
 func TestDumpOpenAPIMatchesLiveServedSpec(t *testing.T) {

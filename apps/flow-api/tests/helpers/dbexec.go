@@ -4,7 +4,7 @@ import (
 	"context"
 	"database/sql"
 
-	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/dbretry"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/dbretry"
 )
 
 // Execer is the subset of *sql.DB that ExecRetry needs. Keeping it an

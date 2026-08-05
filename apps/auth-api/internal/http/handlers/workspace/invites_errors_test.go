@@ -5,7 +5,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	apierrors "github.com/nodate-flow/nodate-flow/apps/auth-api/internal/errors"
+	apierrors "github.com/libraz/nodate-flow/apps/auth-api/internal/errors"
 )
 
 // TestInviteErrorSpecs_DistinguishExpiredFromExhausted pins the

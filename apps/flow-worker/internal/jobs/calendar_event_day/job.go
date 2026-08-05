@@ -12,8 +12,8 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 
-	"github.com/nodate-flow/nodate-flow/apps/flow-worker/internal/obs"
-	"github.com/nodate-flow/nodate-flow/packages/go-shared/signalwire"
+	"github.com/libraz/nodate-flow/apps/flow-worker/internal/obs"
+	"github.com/libraz/nodate-flow/packages/go-shared/signalwire"
 )
 
 const (

@@ -16,17 +16,17 @@ import (
 	"github.com/go-chi/chi/v5"
 	_ "github.com/go-sql-driver/mysql"
 
-	"github.com/nodate-flow/nodate-flow/apps/auth-api/internal/auth"
-	"github.com/nodate-flow/nodate-flow/apps/auth-api/internal/config"
-	"github.com/nodate-flow/nodate-flow/apps/auth-api/internal/db/generated"
-	"github.com/nodate-flow/nodate-flow/apps/auth-api/internal/http/router"
-	"github.com/nodate-flow/nodate-flow/apps/auth-api/internal/integrations"
-	"github.com/nodate-flow/nodate-flow/apps/auth-api/internal/storage"
-	"github.com/nodate-flow/nodate-flow/packages/go-shared/authn"
-	"github.com/nodate-flow/nodate-flow/packages/go-shared/crypto"
-	"github.com/nodate-flow/nodate-flow/packages/go-shared/email"
-	"github.com/nodate-flow/nodate-flow/packages/go-shared/httputil"
-	"github.com/nodate-flow/nodate-flow/packages/go-shared/logutil"
+	"github.com/libraz/nodate-flow/apps/auth-api/internal/auth"
+	"github.com/libraz/nodate-flow/apps/auth-api/internal/config"
+	"github.com/libraz/nodate-flow/apps/auth-api/internal/db/generated"
+	"github.com/libraz/nodate-flow/apps/auth-api/internal/http/router"
+	"github.com/libraz/nodate-flow/apps/auth-api/internal/integrations"
+	"github.com/libraz/nodate-flow/apps/auth-api/internal/storage"
+	"github.com/libraz/nodate-flow/packages/go-shared/authn"
+	"github.com/libraz/nodate-flow/packages/go-shared/crypto"
+	"github.com/libraz/nodate-flow/packages/go-shared/email"
+	"github.com/libraz/nodate-flow/packages/go-shared/httputil"
+	"github.com/libraz/nodate-flow/packages/go-shared/logutil"
 )
 
 func main() {

@@ -3,7 +3,7 @@ package admin
 import (
 	"context"
 
-	apierrors "github.com/nodate-flow/nodate-flow/apps/auth-api/internal/errors"
+	apierrors "github.com/libraz/nodate-flow/apps/auth-api/internal/errors"
 )
 
 // InstanceStats handles GET /admin/instance-stats. Returns high-level counts

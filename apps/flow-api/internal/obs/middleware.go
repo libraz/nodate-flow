@@ -9,14 +9,14 @@ import (
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
 
-	nflog "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/log"
+	nflog "github.com/libraz/nodate-flow/apps/flow-api/internal/log"
 
 	"github.com/go-chi/chi/v5"
 
-	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/middleware"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/middleware"
 )
 
-const tracerName = "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/obs"
+const tracerName = "github.com/libraz/nodate-flow/apps/flow-api/internal/obs"
 
 // domainForRoute returns the logical sub-domain a route belongs to, for
 // use as an OTel span attribute. After the time-api → flow-api merge the

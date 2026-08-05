@@ -16,8 +16,8 @@ import (
 	"database/sql"
 	"log/slog"
 
-	"github.com/nodate-flow/nodate-flow/apps/auth-api/internal/db/generated"
-	"github.com/nodate-flow/nodate-flow/apps/auth-api/internal/storage"
+	"github.com/libraz/nodate-flow/apps/auth-api/internal/db/generated"
+	"github.com/libraz/nodate-flow/apps/auth-api/internal/storage"
 )
 
 // WorkspaceResult captures the observable side effects of [Workspace] so

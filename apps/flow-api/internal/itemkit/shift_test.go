@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/nodate-flow/nodate-flow/packages/go-shared/dbtype"
+	"github.com/libraz/nodate-flow/packages/go-shared/dbtype"
 )
 
 // seedExtraTask inserts an additional tasks row in the same project

@@ -3,8 +3,8 @@ package calendars
 import (
 	"context"
 
-	apierrors "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/errors"
-	"github.com/nodate-flow/nodate-flow/packages/go-shared/region"
+	apierrors "github.com/libraz/nodate-flow/apps/flow-api/internal/errors"
+	"github.com/libraz/nodate-flow/packages/go-shared/region"
 )
 
 // SubscribeSystemCalendarInput is the body for

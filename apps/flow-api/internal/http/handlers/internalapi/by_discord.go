@@ -5,7 +5,7 @@ import (
 	"database/sql"
 	"errors"
 
-	apierrors "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/errors"
+	apierrors "github.com/libraz/nodate-flow/apps/flow-api/internal/errors"
 )
 
 // ByDiscord handles GET /internal/users/by-discord/{snowflake}. The

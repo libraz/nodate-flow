@@ -4,10 +4,10 @@ import (
 	"context"
 	"errors"
 
-	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/ai/nlcommand"
-	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/audit"
-	apierrors "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/errors"
-	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/http/middleware"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/ai/nlcommand"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/audit"
+	apierrors "github.com/libraz/nodate-flow/apps/flow-api/internal/errors"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/middleware"
 )
 
 // ResolveCommandInput is the POST /workspaces/{wsId}/ai/resolve-command body.

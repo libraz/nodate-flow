@@ -29,8 +29,8 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/nodate-flow/nodate-flow/apps/presence-discord/internal/config"
-	"github.com/nodate-flow/nodate-flow/apps/presence-discord/internal/lifecycle"
+	"github.com/libraz/nodate-flow/apps/presence-discord/internal/config"
+	"github.com/libraz/nodate-flow/apps/presence-discord/internal/lifecycle"
 )
 
 // fakeGateway is a gatewayRunner that blocks Start until ctx is

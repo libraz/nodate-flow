@@ -9,11 +9,11 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/generated"
-	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/db/types"
-	apierrors "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/errors"
-	sl "github.com/nodate-flow/nodate-flow/apps/flow-api/internal/integrations/slack"
-	"github.com/nodate-flow/nodate-flow/apps/flow-api/internal/signalkinds"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
+	apierrors "github.com/libraz/nodate-flow/apps/flow-api/internal/errors"
+	sl "github.com/libraz/nodate-flow/apps/flow-api/internal/integrations/slack"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/signalkinds"
 )
 
 // HandleSlackWebhook is a chi-level handler for POST /webhooks/slack.

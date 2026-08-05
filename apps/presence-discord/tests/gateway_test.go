@@ -48,9 +48,9 @@ import (
 	"github.com/prometheus/client_golang/prometheus/testutil"
 	"github.com/stretchr/testify/require"
 
-	"github.com/nodate-flow/nodate-flow/apps/presence-discord/internal/config"
-	"github.com/nodate-flow/nodate-flow/apps/presence-discord/internal/gateway"
-	"github.com/nodate-flow/nodate-flow/apps/presence-discord/internal/obs"
+	"github.com/libraz/nodate-flow/apps/presence-discord/internal/config"
+	"github.com/libraz/nodate-flow/apps/presence-discord/internal/gateway"
+	"github.com/libraz/nodate-flow/apps/presence-discord/internal/obs"
 )
 
 // signalTokenFixture is the shared bearer presented on both the lookup
