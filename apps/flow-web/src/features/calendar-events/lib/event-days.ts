@@ -30,16 +30,17 @@ export const MAX_EVENT_SPAN_DAYS = 42;
  * A single-day event yields one key, which is what the grid always did.
  * A multi-day event yields one per day, which is what it did not.
  *
- * All-day events are read in UTC and timed events locally, following
- * [eventStartOfDay]: an all-day row is a date and has to name the same
- * square for every viewer.
+ * All-day events are read in UTC and timed events in the effective
+ * timezone, following [eventStartOfDay]: an all-day row is a date and
+ * has to name the same square for every viewer, while a timed one falls
+ * on whichever day the reader's own zone puts it.
  */
-export function eventDayKeys(event: CalendarEvent): string[] {
+export function eventDayKeys(event: CalendarEvent, zone?: string): string[] {
   if (typeof event.startAt !== 'number') return [];
   const allDay = event.allDay === true;
-  const start = eventStartOfDay(event.startAt, allDay);
+  const start = eventStartOfDay(event.startAt, allDay, zone);
   const endSeconds = typeof event.endAt === 'number' ? event.endAt : event.startAt;
-  const end = eventStartOfDay(endSeconds, allDay);
+  const end = eventStartOfDay(endSeconds, allDay, zone);
 
   const keys = [dateKey(start)];
   const cursor = new Date(start);

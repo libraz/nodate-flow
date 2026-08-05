@@ -21,6 +21,7 @@ import {
   type ReactElement,
   useCallback,
   useEffect,
+  useMemo,
   useRef,
   useState,
 } from 'react';
@@ -624,223 +625,256 @@ export default function TaskListView({ projectId }: TaskListViewProps): ReactEle
     setRowSelection({});
   }, []);
 
-  const handleInlineSave = (
-    id: string,
-    patch: { title?: string; priority?: TaskPriority; dueOn?: string | null },
-  ) => {
-    // Backend `*string` treats "" as clear and null as unchanged; map at the wire.
-    const wirePatch: { title?: string; priority?: TaskPriority; dueOn?: string } = {
-      ...(patch.title !== undefined && { title: patch.title }),
-      ...(patch.priority !== undefined && { priority: patch.priority }),
-      ...(patch.dueOn !== undefined && { dueOn: patch.dueOn ?? '' }),
-    };
-    void updateTask.mutateAsync({ id, patch: wirePatch }).catch((err) => {
-      toaster.show({
-        tone: 'danger',
-        message: formatApiError(err, t, 'tasks.inline.save_failed'),
+  const handleInlineSave = useCallback(
+    (id: string, patch: { title?: string; priority?: TaskPriority; dueOn?: string | null }) => {
+      // Backend `*string` treats "" as clear and null as unchanged; map at the wire.
+      const wirePatch: { title?: string; priority?: TaskPriority; dueOn?: string } = {
+        ...(patch.title !== undefined && { title: patch.title }),
+        ...(patch.priority !== undefined && { priority: patch.priority }),
+        ...(patch.dueOn !== undefined && { dueOn: patch.dueOn ?? '' }),
+      };
+      void updateTask.mutateAsync({ id, patch: wirePatch }).catch((err) => {
+        toaster.show({
+          tone: 'danger',
+          message: formatApiError(err, t, 'tasks.inline.save_failed'),
+        });
       });
-    });
-  };
+    },
+    [updateTask, t],
+  );
 
-  const columns: ColumnDef<TaskListItem, unknown>[] = [
-    {
-      id: 'drag',
-      size: 32,
-      enableSorting: false,
-      header: () => null,
-      cell: ({ row }) => (
-        <span
-          draggable
-          role="button"
-          tabIndex={0}
-          aria-label={t('tasks.reorder.drag_handle')}
-          title={t('tasks.reorder.drag_handle')}
-          onDragStart={(e) => handleDragStart(e, row.index)}
-          onDragOver={(e) => handleDragOver(e, row.index)}
-          onDragLeave={handleDragLeave}
-          onDragEnd={handleDragEnd}
-          onDrop={(e) => handleDrop(e, row.index)}
-          onKeyDown={(e) => handleReorderKeyDown(e, row.index)}
-          aria-keyshortcuts="ArrowUp ArrowDown"
-          style={{
-            cursor: 'grab',
-            display: 'inline-flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            width: '100%',
-            userSelect: 'none',
-            opacity: dragIdx === row.index ? 0.4 : 1,
-            color: 'var(--nf-color-fg-muted)',
-            fontSize: 'var(--nf-text-xs)',
-            lineHeight: 1,
-          }}
-        >
-          ⠿
-        </span>
-      ),
-    },
-    {
-      id: 'title',
-      accessorKey: 'title',
-      size: 320,
-      header: () => t('tasks.columns.title'),
-      cell: ({ row }) => (
-        <InlineTitleCell
-          task={row.original}
-          editing={inlineEdit.isEditing(row.original.id, 'title')}
-          onStartEdit={() => inlineEdit.startEdit(row.original.id, 'title')}
-          onStopEdit={inlineEdit.stopEdit}
-          onSave={(title) => handleInlineSave(row.original.id, { title })}
-          onNavigate={() =>
-            void navigate({ to: '/tasks/$taskId', params: { taskId: row.original.id } })
-          }
-        />
-      ),
-    },
-    {
-      id: 'status',
-      accessorKey: 'derivedState',
-      size: 100,
-      header: () => t('tasks.columns.status'),
-      cell: ({ row }) => {
-        const state = row.original.derivedState as TaskDerivedState;
-        const color = STATE_COLOR[state] ?? STATE_COLOR.open;
-        const textColor = STATE_TEXT_COLOR[state] ?? STATE_TEXT_COLOR.open;
-        return (
+  /*
+   * A new array on every render makes TanStack Table rebuild its column
+   * model on every render, for a grid that carries the whole task list.
+   *
+   * Written by hand because there is nothing to write it for us: the
+   * frontend convention bans useMemo on the grounds that React Compiler
+   * memoises automatically, but the compiler is not installed — neither
+   * app's vite config passes it to the react plugin, and neither
+   * babel-plugin-react-compiler nor eslint-plugin-react-compiler is a
+   * dependency. If it is ever adopted, this memo becomes redundant and
+   * can go.
+   *
+   * The dependency list is every value the cells close over. It is long
+   * because the cells are rich, not because the memo is doing something
+   * unusual.
+   */
+  const columns: ColumnDef<TaskListItem, unknown>[] = useMemo(
+    () => [
+      {
+        id: 'drag',
+        size: 32,
+        enableSorting: false,
+        header: () => null,
+        cell: ({ row }) => (
           <span
+            draggable
+            role="button"
+            tabIndex={0}
+            aria-label={t('tasks.reorder.drag_handle')}
+            title={t('tasks.reorder.drag_handle')}
+            onDragStart={(e) => handleDragStart(e, row.index)}
+            onDragOver={(e) => handleDragOver(e, row.index)}
+            onDragLeave={handleDragLeave}
+            onDragEnd={handleDragEnd}
+            onDrop={(e) => handleDrop(e, row.index)}
+            onKeyDown={(e) => handleReorderKeyDown(e, row.index)}
+            aria-keyshortcuts="ArrowUp ArrowDown"
             style={{
+              cursor: 'grab',
               display: 'inline-flex',
               alignItems: 'center',
-              gap: 'var(--nf-space-1)',
-              fontSize: 'var(--nf-text-xs)',
-              fontWeight: 500,
-              padding: 'var(--nf-space-0-5) var(--nf-space-2)',
-              borderRadius: 'var(--nf-radius-pill)',
-              // Appending an alpha suffix to `var(--x)` produces
-              // `var(--x)18`, which is not a colour: the declaration was
-              // dropped and the pill had no wash at all.
-              background: `color-mix(in oklab, ${color} 9%, transparent)`,
-              color: textColor,
-              whiteSpace: 'nowrap',
-            }}
-          >
-            <span
-              aria-hidden
-              style={{
-                // nf-token-override: component dimension, not a spacing step
-                width: '0.375rem',
-                // nf-token-override: component dimension, not a spacing step
-                height: '0.375rem',
-                borderRadius: 'var(--nf-radius-pill)',
-                background: color,
-                flexShrink: 0,
-              }}
-            />
-            {t(STATE_KEY[state] ?? 'tasks.status.open')}
-          </span>
-        );
-      },
-    },
-    {
-      id: 'deps',
-      size: 60,
-      enableSorting: false,
-      header: () => t('tasks.columns.deps'),
-      cell: ({ row }) => {
-        const count = blockedByOpen.get(row.original.id) ?? 0;
-        if (count === 0) return <span style={{ color: 'var(--nf-color-fg-muted)' }}>—</span>;
-        return (
-          <span
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: 'var(--nf-space-1)',
-              color: 'var(--nf-color-danger-fg)',
-              fontVariantNumeric: 'tabular-nums',
-            }}
-            title={t('tasks.card.blockedBy', { count })}
-          >
-            {`\u{1F512} ${count}`}
-          </span>
-        );
-      },
-    },
-    {
-      id: 'assignee',
-      size: 110,
-      enableSorting: false,
-      header: () => t('tasks.columns.assignee'),
-      cell: ({ row }) => {
-        const count = row.original.assigneeCount;
-        if (count === 0) return <span style={{ color: 'var(--nf-color-fg-muted)' }}>—</span>;
-        return (
-          <span
-            style={{
-              display: 'inline-flex',
-              gap: 'var(--nf-space-1-5)',
-              alignItems: 'center',
+              justifyContent: 'center',
+              width: '100%',
+              userSelect: 'none',
+              opacity: dragIdx === row.index ? 0.4 : 1,
               color: 'var(--nf-color-fg-muted)',
+              fontSize: 'var(--nf-text-xs)',
+              lineHeight: 1,
             }}
           >
-            <span
-              aria-hidden
-              style={{
-                // nf-token-override: component dimension, not a spacing step
-                inlineSize: '0.5rem',
-                // nf-token-override: component dimension, not a spacing step
-                blockSize: '0.5rem',
-                borderRadius: 'var(--nf-radius-pill)',
-                background: 'var(--nf-color-accent)',
-              }}
-            />
-            {t('tasks.assignee.count', { count })}
+            ⠿
           </span>
-        );
+        ),
       },
-    },
-    {
-      id: 'due',
-      accessorKey: 'dueOn',
-      size: 100,
-      header: () => t('tasks.columns.due'),
-      cell: ({ row }) => (
-        <InlineDueCell
-          task={row.original}
-          editing={inlineEdit.isEditing(row.original.id, 'due')}
-          onStartEdit={() => inlineEdit.startEdit(row.original.id, 'due')}
-          onStopEdit={inlineEdit.stopEdit}
-          onSave={(dueOn) => handleInlineSave(row.original.id, { dueOn })}
-          locale={locale}
-        />
-      ),
-    },
-    {
-      id: 'priority',
-      accessorKey: 'priority',
-      size: 90,
-      header: () => t('tasks.columns.priority'),
-      cell: ({ row }) => (
-        <InlinePriorityCell
-          task={row.original}
-          editing={inlineEdit.isEditing(row.original.id, 'priority')}
-          onStartEdit={() => inlineEdit.startEdit(row.original.id, 'priority')}
-          onStopEdit={inlineEdit.stopEdit}
-          onSave={(priority) => handleInlineSave(row.original.id, { priority })}
-        />
-      ),
-    },
-    {
-      id: 'updated',
-      accessorKey: 'updatedAt',
-      size: 110,
-      header: () => t('tasks.columns.updated'),
-      cell: ({ row }) => (
-        <span style={{ color: 'var(--nf-color-fg-muted)' }}>
-          {formatEpoch(row.original.updatedAt, locale) ?? '—'}
-        </span>
-      ),
-    },
-  ];
+      {
+        id: 'title',
+        accessorKey: 'title',
+        size: 320,
+        header: () => t('tasks.columns.title'),
+        cell: ({ row }) => (
+          <InlineTitleCell
+            task={row.original}
+            editing={inlineEdit.isEditing(row.original.id, 'title')}
+            onStartEdit={() => inlineEdit.startEdit(row.original.id, 'title')}
+            onStopEdit={inlineEdit.stopEdit}
+            onSave={(title) => handleInlineSave(row.original.id, { title })}
+            onNavigate={() =>
+              void navigate({ to: '/tasks/$taskId', params: { taskId: row.original.id } })
+            }
+          />
+        ),
+      },
+      {
+        id: 'status',
+        accessorKey: 'derivedState',
+        size: 100,
+        header: () => t('tasks.columns.status'),
+        cell: ({ row }) => {
+          const state = row.original.derivedState as TaskDerivedState;
+          const color = STATE_COLOR[state] ?? STATE_COLOR.open;
+          const textColor = STATE_TEXT_COLOR[state] ?? STATE_TEXT_COLOR.open;
+          return (
+            <span
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 'var(--nf-space-1)',
+                fontSize: 'var(--nf-text-xs)',
+                fontWeight: 500,
+                padding: 'var(--nf-space-0-5) var(--nf-space-2)',
+                borderRadius: 'var(--nf-radius-pill)',
+                // Appending an alpha suffix to `var(--x)` produces
+                // `var(--x)18`, which is not a colour: the declaration was
+                // dropped and the pill had no wash at all.
+                background: `color-mix(in oklab, ${color} 9%, transparent)`,
+                color: textColor,
+                whiteSpace: 'nowrap',
+              }}
+            >
+              <span
+                aria-hidden
+                style={{
+                  // nf-token-override: component dimension, not a spacing step
+                  width: '0.375rem',
+                  // nf-token-override: component dimension, not a spacing step
+                  height: '0.375rem',
+                  borderRadius: 'var(--nf-radius-pill)',
+                  background: color,
+                  flexShrink: 0,
+                }}
+              />
+              {t(STATE_KEY[state] ?? 'tasks.status.open')}
+            </span>
+          );
+        },
+      },
+      {
+        id: 'deps',
+        size: 60,
+        enableSorting: false,
+        header: () => t('tasks.columns.deps'),
+        cell: ({ row }) => {
+          const count = blockedByOpen.get(row.original.id) ?? 0;
+          if (count === 0) return <span style={{ color: 'var(--nf-color-fg-muted)' }}>—</span>;
+          return (
+            <span
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 'var(--nf-space-1)',
+                color: 'var(--nf-color-danger-fg)',
+                fontVariantNumeric: 'tabular-nums',
+              }}
+              title={t('tasks.card.blockedBy', { count })}
+            >
+              {`\u{1F512} ${count}`}
+            </span>
+          );
+        },
+      },
+      {
+        id: 'assignee',
+        size: 110,
+        enableSorting: false,
+        header: () => t('tasks.columns.assignee'),
+        cell: ({ row }) => {
+          const count = row.original.assigneeCount;
+          if (count === 0) return <span style={{ color: 'var(--nf-color-fg-muted)' }}>—</span>;
+          return (
+            <span
+              style={{
+                display: 'inline-flex',
+                gap: 'var(--nf-space-1-5)',
+                alignItems: 'center',
+                color: 'var(--nf-color-fg-muted)',
+              }}
+            >
+              <span
+                aria-hidden
+                style={{
+                  // nf-token-override: component dimension, not a spacing step
+                  inlineSize: '0.5rem',
+                  // nf-token-override: component dimension, not a spacing step
+                  blockSize: '0.5rem',
+                  borderRadius: 'var(--nf-radius-pill)',
+                  background: 'var(--nf-color-accent)',
+                }}
+              />
+              {t('tasks.assignee.count', { count })}
+            </span>
+          );
+        },
+      },
+      {
+        id: 'due',
+        accessorKey: 'dueOn',
+        size: 100,
+        header: () => t('tasks.columns.due'),
+        cell: ({ row }) => (
+          <InlineDueCell
+            task={row.original}
+            editing={inlineEdit.isEditing(row.original.id, 'due')}
+            onStartEdit={() => inlineEdit.startEdit(row.original.id, 'due')}
+            onStopEdit={inlineEdit.stopEdit}
+            onSave={(dueOn) => handleInlineSave(row.original.id, { dueOn })}
+            locale={locale}
+          />
+        ),
+      },
+      {
+        id: 'priority',
+        accessorKey: 'priority',
+        size: 90,
+        header: () => t('tasks.columns.priority'),
+        cell: ({ row }) => (
+          <InlinePriorityCell
+            task={row.original}
+            editing={inlineEdit.isEditing(row.original.id, 'priority')}
+            onStartEdit={() => inlineEdit.startEdit(row.original.id, 'priority')}
+            onStopEdit={inlineEdit.stopEdit}
+            onSave={(priority) => handleInlineSave(row.original.id, { priority })}
+          />
+        ),
+      },
+      {
+        id: 'updated',
+        accessorKey: 'updatedAt',
+        size: 110,
+        header: () => t('tasks.columns.updated'),
+        cell: ({ row }) => (
+          <span style={{ color: 'var(--nf-color-fg-muted)' }}>
+            {formatEpoch(row.original.updatedAt, locale) ?? '—'}
+          </span>
+        ),
+      },
+    ],
+    [
+      t,
+      locale,
+      navigate,
+      inlineEdit,
+      blockedByOpen,
+      dragIdx,
+      handleDragEnd,
+      handleDragLeave,
+      handleDragOver,
+      handleDragStart,
+      handleDrop,
+      handleInlineSave,
+      handleReorderKeyDown,
+    ],
+  );
 
   return (
     <>

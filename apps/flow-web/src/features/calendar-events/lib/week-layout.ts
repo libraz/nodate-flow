@@ -63,29 +63,29 @@ function dayDiff(a: Date, b: Date): number {
  * a day for anyone whose offset crosses midnight, which is how the same
  * company holiday showed on different dates for different colleagues.
  */
-export function eventStartDay(evt: CalendarEvent): Date | null {
+export function eventStartDay(evt: CalendarEvent, zone?: string): Date | null {
   if (typeof evt.startAt !== 'number') return null;
-  return eventStartOfDay(evt.startAt, evt.allDay === true);
+  return eventStartOfDay(evt.startAt, evt.allDay === true, zone);
 }
 
 /** Resolve an event's end as a day cell, falling back to its start. */
-export function eventEndDay(evt: CalendarEvent): Date | null {
-  if (typeof evt.endAt === 'number') return eventStartOfDay(evt.endAt, evt.allDay === true);
-  return eventStartDay(evt);
+export function eventEndDay(evt: CalendarEvent, zone?: string): Date | null {
+  if (typeof evt.endAt === 'number') return eventStartOfDay(evt.endAt, evt.allDay === true, zone);
+  return eventStartDay(evt, zone);
 }
 
 /** True when an event spans more than one calendar day in local time. */
-export function isMultiDay(evt: CalendarEvent): boolean {
-  const s = eventStartDay(evt);
-  const e = eventEndDay(evt);
+export function isMultiDay(evt: CalendarEvent, zone?: string): boolean {
+  const s = eventStartDay(evt, zone);
+  const e = eventEndDay(evt, zone);
   if (!s || !e) return false;
   return dayDiff(e, s) > 0;
 }
 
 /** The `YYYY-MM-DD` key for an event's start day, or null. */
-export function eventStartKey(evt: CalendarEvent): string | null {
+export function eventStartKey(evt: CalendarEvent, zone?: string): string | null {
   if (typeof evt.startAt !== 'number') return null;
-  return eventDateKey(evt.startAt, evt.allDay === true);
+  return eventDateKey(evt.startAt, evt.allDay === true, zone);
 }
 
 /**
@@ -97,24 +97,28 @@ export function eventStartKey(evt: CalendarEvent): string | null {
  * @param events All visible events (single- and multi-day); single-day
  *   ones are ignored here and laid out by the caller.
  */
-export function layoutWeek(weekStart: Date, events: CalendarEvent[]): PositionedEvent[] {
+export function layoutWeek(
+  weekStart: Date,
+  events: CalendarEvent[],
+  zone?: string,
+): PositionedEvent[] {
   const ws = startOfDay(weekStart);
   const we = startOfDay(new Date(ws.getTime() + 6 * 86_400_000));
   const tracks: { end: number }[] = [];
   const positioned: PositionedEvent[] = [];
 
-  const multiDay = events.filter((e) => isMultiDay(e));
+  const multiDay = events.filter((e) => isMultiDay(e, zone));
   multiDay.sort((a, b) => {
-    const as = eventStartDay(a);
-    const bs = eventStartDay(b);
+    const as = eventStartDay(a, zone);
+    const bs = eventStartDay(b, zone);
     const am = as ? as.getTime() : 0;
     const bm = bs ? bs.getTime() : 0;
     return am - bm;
   });
 
   for (const evt of multiDay) {
-    const evtStart = eventStartDay(evt);
-    const evtEnd = eventEndDay(evt);
+    const evtStart = eventStartDay(evt, zone);
+    const evtEnd = eventEndDay(evt, zone);
     if (!evtStart || !evtEnd) continue;
     if (evtEnd.getTime() < ws.getTime() || evtStart.getTime() > we.getTime()) continue;
 
