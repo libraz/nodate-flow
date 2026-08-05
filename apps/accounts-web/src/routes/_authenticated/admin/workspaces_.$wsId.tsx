@@ -168,7 +168,8 @@ function DeleteWorkspaceDialog({
 
 function WorkspaceDetailPage(): ReactElement {
   const { wsId } = Route.useParams();
-  const { t } = useTranslation('admin');
+  const { t, i18n } = useTranslation('admin');
+  const locale = i18n.resolvedLanguage ?? 'en';
   const navigate = useNavigate();
   const [workspace, setWorkspace] = useState<WorkspaceDetail | null>(null);
   const [loading, setLoading] = useState(true);
@@ -342,7 +343,9 @@ function WorkspaceDetailPage(): ReactElement {
         </div>
 
         <div style={adminLabelStyle}>{t('workspaces.created_at')}</div>
-        <div style={adminValueStyle}>{formatTimestamp(workspace.createdAt, t('common.never'))}</div>
+        <div style={adminValueStyle}>
+          {formatTimestamp(workspace.createdAt, { locale, fallback: t('common.never') })}
+        </div>
       </div>
 
       <div>

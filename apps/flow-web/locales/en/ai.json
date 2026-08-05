@@ -76,6 +76,7 @@
       "load_failed": "Failed to load AI providers. Please try again.",
       "forbidden": "Only workspace admins can manage AI providers.",
       "retry": "Try again"
-    }
+    },
+    "invalid_base_url": "This kind always uses the official endpoint, so the base URL below is ignored and every request through this provider fails. Delete it and add it again as OpenAI-compatible."
   }
 }

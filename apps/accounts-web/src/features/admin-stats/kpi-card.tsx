@@ -8,6 +8,7 @@
 
 import Card from '@nodate-flow/ui/primitives/card';
 import type { ReactElement } from 'react';
+import { useTranslation } from 'react-i18next';
 
 export interface KpiCardProps {
   /** Short label rendered above the value. */
@@ -31,9 +32,12 @@ function formatValue(value: number | undefined, locale: string): string {
 
 /** Single-tile KPI card. */
 function KpiCard({ title, value, help, loading }: KpiCardProps): ReactElement {
-  // navigator.language is fine here: this is a client-side admin UI and
-  // we want the OS locale's grouping separator.
-  const locale = typeof navigator !== 'undefined' ? navigator.language : 'en';
+  // The grouping separator follows the language the product is set to,
+  // not the one the OS is set to. A reader who chose Japanese and is on
+  // an en-US machine was getting US grouping in the middle of a Japanese
+  // page — the same split that made every admin timestamp US-shaped.
+  const { i18n } = useTranslation();
+  const locale = i18n.resolvedLanguage ?? 'en';
   const display = loading && value === undefined ? '—' : formatValue(value, locale);
 
   return (

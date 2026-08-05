@@ -11,6 +11,8 @@ import Card from '@nodate-flow/ui/primitives/card';
 import type { ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { formatEpochDateTime } from '../../lib/format';
+
 import { type AiInvocation, useAiInvocationsQuery } from './invocations-api';
 
 function toneForStatus(status: string): 'accent' | 'warning' | 'danger' {
@@ -19,12 +21,9 @@ function toneForStatus(status: string): 'accent' | 'warning' | 'danger' {
   return 'danger';
 }
 
-function formatWhen(unix: number): string {
-  return new Date(unix * 1000).toLocaleString();
-}
-
 function InvocationRow({ row }: { row: AiInvocation }): ReactElement {
-  const { t } = useTranslation('settings');
+  const { t, i18n } = useTranslation('settings');
+  const locale = i18n.resolvedLanguage ?? 'en';
   return (
     <li>
       <Card style={{ padding: 'var(--nf-space-3) var(--nf-space-3-5)' }}>
@@ -55,7 +54,7 @@ function InvocationRow({ row }: { row: AiInvocation }): ReactElement {
                 color: 'var(--nf-color-fg-muted)',
               }}
             >
-              {formatWhen(row.invokedAt)}
+              {formatEpochDateTime(row.invokedAt, locale)}
             </span>
           </div>
           <p

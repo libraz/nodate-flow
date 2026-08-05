@@ -19,6 +19,7 @@ import {
   useMarkNotificationRead,
   useNotificationsInfiniteQuery,
 } from './api';
+import { NOTIFICATION_EVENT_KEY } from './event-keys';
 import styles from './notifications.module.css';
 
 /** Relative time string from a unix-seconds timestamp. */
@@ -54,6 +55,20 @@ function resourceHref(resourceType: string, resourceId: string | null): string |
     default:
       return null;
   }
+}
+
+/**
+ * The title to show for a notification.
+ *
+ * `eventType` is the source of truth — it is NOT NULL on every row and
+ * indexed, so rows written before this existed translate too. The stored
+ * `title` is the fallback and only reaches the screen for an event type
+ * added on the server before a key was added here: English, but never
+ * blank, and never a raw key in front of a reader.
+ */
+function notificationTitle(item: NotificationItem, t: (key: string) => string): string {
+  const key = NOTIFICATION_EVENT_KEY[item.eventType];
+  return key === undefined ? item.title : t(key);
 }
 
 function NotificationRow({
@@ -101,7 +116,7 @@ function NotificationRow({
     >
       <span className={isUnread ? styles.unreadDot : styles.readDot} aria-hidden="true" />
       <div className={styles.notifContent}>
-        <p className={styles.notifTitle}>{item.title}</p>
+        <p className={styles.notifTitle}>{notificationTitle(item, t)}</p>
         <div className={styles.notifMeta}>
           {item.actorDisplayName && (
             <span className={styles.notifActor}>{item.actorDisplayName}</span>

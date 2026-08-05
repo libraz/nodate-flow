@@ -28,7 +28,8 @@ type AdminsResponse = components['schemas']['ListAdminsOutputBody'];
 type UserSearchResult = Pick<components['schemas']['User'], 'id' | 'email' | 'displayName'>;
 
 export function AdminsPage(): ReactElement {
-  const { t } = useTranslation('admin');
+  const { t, i18n } = useTranslation('admin');
+  const locale = i18n.resolvedLanguage ?? 'en';
   const invalidateInstanceStats = useInvalidateInstanceStats();
   const [admins, setAdmins] = useState<InstanceAdmin[]>([]);
   const [loading, setLoading] = useState(true);
@@ -176,7 +177,7 @@ export function AdminsPage(): ReactElement {
                 <tr key={admin.id}>
                   <td style={adminTdStyle}>{admin.displayName}</td>
                   <td style={adminTdStyle}>{admin.email}</td>
-                  <td style={adminTdStyle}>{formatTimestamp(admin.grantedAt)}</td>
+                  <td style={adminTdStyle}>{formatTimestamp(admin.grantedAt, { locale })}</td>
                   <td style={adminTdStyle}>{admin.grantedByDisplayName ?? ''}</td>
                   <td style={adminTdStyle}>
                     <Button

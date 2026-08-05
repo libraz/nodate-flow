@@ -181,6 +181,39 @@ export default function ProviderList({ workspaceId }: ProviderListProps): ReactE
                       {kindLabel(p.kind)}
                       {p.defaultModel ? ` · ${p.defaultModel}` : ''}
                     </span>
+                    {/*
+                      The endpoint a provider talks to is part of what the
+                      provider is, and it was the one configured field the
+                      list never showed. An admin looking at this page
+                      could not tell an openai_compat row pointed at their
+                      gateway from one pointed anywhere else — nor spot a
+                      kind=openai row carrying a base URL, which the server
+                      now refuses to build and which used to take the whole
+                      workspace's AI down with it.
+                    */}
+                    {p.baseUrl ? (
+                      <span
+                        style={{
+                          color: 'var(--nf-color-fg-muted)',
+                          fontSize: 'var(--nf-text-micro)',
+                          fontFamily: 'var(--nf-font-mono)',
+                          wordBreak: 'break-all',
+                        }}
+                      >
+                        {p.baseUrl}
+                      </span>
+                    ) : null}
+                    {p.kind === 'openai' && p.baseUrl ? (
+                      <span
+                        role="status"
+                        style={{
+                          color: 'var(--nf-color-danger-fg)',
+                          fontSize: 'var(--nf-text-supporting)',
+                        }}
+                      >
+                        {t('providers.invalid_base_url')}
+                      </span>
+                    ) : null}
                     <MaskedKey value={p.apiKeyMasked} />
                   </div>
                   <div style={{ display: 'flex', gap: 'var(--nf-space-2)' }}>

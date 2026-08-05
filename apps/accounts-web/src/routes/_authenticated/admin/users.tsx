@@ -29,7 +29,8 @@ const STATUS_TO_ENABLED: Record<StatusFilter, 'true' | 'false' | '' | undefined>
 };
 
 function UsersPage(): ReactElement {
-  const { t } = useTranslation('admin');
+  const { t, i18n } = useTranslation('admin');
+  const locale = i18n.resolvedLanguage ?? 'en';
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
@@ -157,8 +158,12 @@ function UsersPage(): ReactElement {
                   </td>
                   <td className="aw-td">{u.isInstanceAdmin ? t('common.yes') : t('common.no')}</td>
                   <td className="aw-td">{u.workspaceCount}</td>
-                  <td className="aw-td">{formatTimestamp(u.lastLoginAt, t('common.never'))}</td>
-                  <td className="aw-td">{formatTimestamp(u.createdAt, t('common.never'))}</td>
+                  <td className="aw-td">
+                    {formatTimestamp(u.lastLoginAt, { locale, fallback: t('common.never') })}
+                  </td>
+                  <td className="aw-td">
+                    {formatTimestamp(u.createdAt, { locale, fallback: t('common.never') })}
+                  </td>
                 </tr>
               ))}
             </tbody>

@@ -219,7 +219,7 @@ function AuditLogsPage(): ReactElement {
             <tbody>
               {entries.map((entry) => (
                 <tr key={entry.id}>
-                  <td style={adminTdStyle}>{formatTimestamp(entry.occurredAt)}</td>
+                  <td style={adminTdStyle}>{formatTimestamp(entry.occurredAt, { locale })}</td>
                   <td style={adminTdStyle}>{entry.action}</td>
                   <td style={adminTdStyle}>{entry.actorDisplayName ?? ''}</td>
                   <td style={adminTdStyle}>

@@ -8,7 +8,6 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"net/http"
 	"time"
 
@@ -376,19 +375,30 @@ func RawBytesToUUIDPtr(v interface{}) *string {
 	return &out
 }
 
-// FormatUnix formats a unix-seconds value as a decimal string. Used by CSV
-// exporters where the wire shape is text rather than a JSON number.
-func FormatUnix(u int64) string {
-	return fmt.Sprintf("%d", u)
+// FormatUnixISO formats a unix-seconds value as an RFC 3339 timestamp in
+// UTC, for CSV exporters.
+//
+// The API boundary keeps `*_at` as int64 unixtime (see
+// docs/conventions/api-types.md) and that does not change. A CSV is a
+// different kind of artifact: someone opens it. These columns used to
+// carry the raw integer, so a spreadsheet showed ten-digit numbers under
+// "Completed At", "Created At" and "Updated At" while "Due Date" and
+// "Start Date" — same file, same row — were readable dates.
+//
+// UTC rather than a viewer's zone because the file has no viewer at the
+// time it is written, and a trailing Z says which zone it is rather than
+// leaving the reader to guess.
+func FormatUnixISO(u int64) string {
+	return time.Unix(u, 0).UTC().Format(time.RFC3339)
 }
 
-// FormatOptionalUnix formats an optional unix-seconds value, returning
-// the empty string when nil.
-func FormatOptionalUnix(u *int64) string {
+// FormatOptionalUnixISO formats an optional unix-seconds value as
+// [FormatUnixISO] does, returning the empty string when nil.
+func FormatOptionalUnixISO(u *int64) string {
 	if u == nil {
 		return ""
 	}
-	return fmt.Sprintf("%d", *u)
+	return FormatUnixISO(*u)
 }
 
 // DerefStr returns the string value or empty string when the pointer is nil.

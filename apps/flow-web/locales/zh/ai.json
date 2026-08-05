@@ -76,6 +76,7 @@
       "load_failed": "加载 AI 提供商失败，请重试。",
       "forbidden": "仅工作区管理员可管理 AI 提供商。",
       "retry": "重试"
-    }
+    },
+    "invalid_base_url": "此类型始终连接官方端点，因此下方的 Base URL 会被忽略，经由此服务提供商的所有请求都会失败。请删除后以 OpenAI 兼容重新添加。"
   }
 }

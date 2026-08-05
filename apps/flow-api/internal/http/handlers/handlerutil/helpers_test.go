@@ -227,24 +227,39 @@ func TestRawBytesToUUIDPtr(t *testing.T) {
 	}
 }
 
-func TestFormatUnix(t *testing.T) {
+// A CSV column a person opens has to read as a time. These used to
+// render the raw integer, so a spreadsheet showed ten digits under
+// "Created At" beside a readable "Due Date" in the same row.
+func TestFormatUnixISO(t *testing.T) {
 	t.Parallel()
-	if got := FormatUnix(0); got != "0" {
+	if got := FormatUnixISO(0); got != "1970-01-01T00:00:00Z" {
 		t.Errorf("zero: got %q", got)
 	}
-	if got := FormatUnix(1700000000); got != "1700000000" {
+	if got := FormatUnixISO(1700000000); got != "2023-11-14T22:13:20Z" {
 		t.Errorf("got %q", got)
 	}
 }
 
-func TestFormatOptionalUnix(t *testing.T) {
+func TestFormatOptionalUnixISO(t *testing.T) {
 	t.Parallel()
-	if got := FormatOptionalUnix(nil); got != "" {
+	if got := FormatOptionalUnixISO(nil); got != "" {
 		t.Errorf("nil: got %q want empty", got)
 	}
 	v := int64(1700000000)
-	if got := FormatOptionalUnix(&v); got != "1700000000" {
+	if got := FormatOptionalUnixISO(&v); got != "2023-11-14T22:13:20Z" {
 		t.Errorf("got %q", got)
+	}
+}
+
+// The zone is stated rather than implied. A timestamp written without
+// one is read in whatever zone the reader's spreadsheet assumes, which
+// is a silent several-hour error in a file people reconcile against.
+func TestFormatUnixISOStatesItsZone(t *testing.T) {
+	t.Parallel()
+	for _, ts := range []int64{0, 1, 1700000000, 2147483647} {
+		if got := FormatUnixISO(ts); got[len(got)-1] != 'Z' {
+			t.Errorf("FormatUnixISO(%d) = %q, want a trailing Z", ts, got)
+		}
 	}
 }
 

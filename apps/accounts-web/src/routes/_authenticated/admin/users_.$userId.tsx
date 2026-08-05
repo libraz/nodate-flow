@@ -173,7 +173,8 @@ function DeleteUserDialog({
  */
 export function UserDetailPage(): ReactElement {
   const { userId } = Route.useParams();
-  const { t } = useTranslation('admin');
+  const { t, i18n } = useTranslation('admin');
+  const locale = i18n.resolvedLanguage ?? 'en';
   const navigate = useNavigate();
   const invalidateInstanceStats = useInvalidateInstanceStats();
   const currentUser = useAuth(selectUser);
@@ -422,10 +423,14 @@ export function UserDetailPage(): ReactElement {
         <div style={adminValueStyle}>{user.workspaceCount}</div>
 
         <div style={adminLabelStyle}>{t('users.last_login')}</div>
-        <div style={adminValueStyle}>{formatTimestamp(user.lastLoginAt, t('common.never'))}</div>
+        <div style={adminValueStyle}>
+          {formatTimestamp(user.lastLoginAt, { locale, fallback: t('common.never') })}
+        </div>
 
         <div style={adminLabelStyle}>{t('users.created_at')}</div>
-        <div style={adminValueStyle}>{formatTimestamp(user.createdAt, t('common.never'))}</div>
+        <div style={adminValueStyle}>
+          {formatTimestamp(user.createdAt, { locale, fallback: t('common.never') })}
+        </div>
       </div>
 
       <div style={{ display: 'flex', gap: 'var(--nf-space-3)' }}>
@@ -482,7 +487,9 @@ export function UserDetailPage(): ReactElement {
                 <tr key={s.id}>
                   <td style={adminTdStyle}>{s.userAgent}</td>
                   <td style={adminTdStyle}>{s.ipAddress}</td>
-                  <td style={adminTdStyle}>{formatTimestamp(s.createdAt, t('common.never'))}</td>
+                  <td style={adminTdStyle}>
+                    {formatTimestamp(s.createdAt, { locale, fallback: t('common.never') })}
+                  </td>
                   <td style={adminTdStyle}>
                     {s.active ? (
                       <Button

