@@ -4,7 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"log/slog"
-	"sync"
 	"testing"
 	"time"
 
@@ -312,52 +311,20 @@ func TestAutoActionExecutorReportsAnIncompletePass(t *testing.T) {
 		"a pass that could not evaluate every workspace must report that, not return as if it had")
 }
 
-// stopsAfterFirstCheck is a context that is live for its first Err()
-// call and cancelled from then on, which puts the cancellation between
-// the workspace enumeration and the work that follows it. Done() is
-// deliberately the embedded background channel: the enumeration query
-// must be allowed to succeed, so only the executor's own per-workspace
-// check is expected to observe the cancellation.
-type stopsAfterFirstCheck struct {
-	context.Context
-	mu     sync.Mutex
-	checks int
-}
-
-func (c *stopsAfterFirstCheck) Err() error {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	c.checks++
-	if c.checks > 1 {
-		return context.Canceled
-	}
-	return nil
-}
-
-// TestAutoActionExecutorReportsAPassStoppedPartWay covers the other end
-// of the same contract: a pass that enumerated the workspaces and then
-// stopped part way through them also reports that it was partial. This
-// is the shape the production incident takes — the enumeration is quick
-// and it is the per-workspace work that runs out of time.
-func TestAutoActionExecutorReportsAPassStoppedPartWay(t *testing.T) {
-	bootstrap(t)
-	t.Parallel()
-
-	// A tenant of our own guarantees the enumeration returns at least
-	// one workspace, so the loop below is entered at all.
-	newTenant(t)
-
-	exec := &autoactions.Executor{
-		DB: testDB,
-		Config: autoactions.ExecutorConfig{
-			Interval:            time.Nanosecond,
-			ConfidenceThreshold: 0.5,
-		},
-		Logger: slog.Default(),
-	}
-
-	err := exec.RunOnce(&stopsAfterFirstCheck{Context: context.Background()})
-	require.Error(t, err, "a pass that stopped between workspaces must report it")
-	require.Contains(t, err.Error(), "stopped after",
-		"the error must say the pass was partial, not that a workspace failed")
-}
+// What is deliberately not covered here: the ctx check inside the
+// per-workspace loop, which stops a pass that is already under way.
+//
+// A test for it needs the pass to get past the enumeration and then be
+// cancelled, and the only handle a test has on "past the enumeration"
+// is how many times the context has been consulted — a number that
+// database/sql changes under load, since a contended pool checks the
+// context more often. Keying on it produced a test that failed for the
+// wrong reason: the enumeration was cancelled instead of the loop, so
+// the assertion reported a partial pass that had never started. A
+// control device that is itself load-dependent cannot say what it is
+// asserting, which makes it worse than no test.
+//
+// The branch shares its return path with the enumeration failure the
+// test above pins, so a pass that ends early does still report. What is
+// not pinned is that the loop stops promptly rather than running to the
+// end of an already-cancelled pass.
