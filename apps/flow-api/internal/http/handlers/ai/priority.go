@@ -90,8 +90,13 @@ func ListPrioritySuggestions(deps Deps) func(context.Context, *ListPrioritySugge
 				Title:           r.Title,
 				State:           state,
 				CurrentPriority: r.Priority,
-				HasAssignee:     func() bool { b, ok := r.PrimaryAssigneePublicID.([]byte); return ok && len(b) > 0 }(),
-				Now:             now,
+				// Same reasoning as the auto-action list: the count is
+				// the typed answer, while the primary-assignee column is
+				// an untyped aggregate whose Go representation is the
+				// driver's choice. A false here suppresses the
+				// deprioritise rule for tasks that do have an owner.
+				HasAssignee: r.AssigneeCount > 0,
+				Now:         now,
 			}
 			if r.UpdatedAt.Valid {
 				sig.UpdatedAt = r.UpdatedAt.Time

@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"sync"
 	"time"
 )
 
@@ -45,12 +46,54 @@ type EventTrigger struct {
 	Queue   Queue
 	Logger  *slog.Logger
 	Now     func() time.Time
+
+	// DispatchTimeout caps one detached dispatch. Zero means
+	// [defaultDispatchTimeout].
+	DispatchTimeout time.Duration
+	// DispatchConcurrency caps how many dispatches touch the database
+	// at once. Zero means [defaultDispatchConcurrency].
+	DispatchConcurrency int
+
+	semOnce  sync.Once
+	sem      chan struct{}
+	wg       sync.WaitGroup
+	stopMu   sync.RWMutex
+	stopping bool
 }
 
+// Defaults for the detached dispatch.
+const (
+	// defaultDispatchTimeout bounds a dispatch that outlives its
+	// request. One lookup plus a handful of enqueues is a sub-second
+	// operation; the budget only exists so a stuck query cannot leak a
+	// goroutine forever.
+	defaultDispatchTimeout = 30 * time.Second
+	// defaultDispatchConcurrency caps how many dispatches hold a
+	// database connection at once.
+	//
+	// Goroutines are cheap and connections are not, so the limit is on
+	// the scarce resource: a burst of events parks goroutines rather
+	// than draining the pool that the request handlers share. Blocking
+	// the caller instead would reintroduce the very coupling this
+	// removes, and dropping the dispatch would silently fail to wake an
+	// agent — so excess work waits.
+	defaultDispatchConcurrency = 8
+)
+
 // NotifyHook returns a closure compatible with eventbus.AddNotifyHook.
-// The closure fires agent lookups off the request goroutine — it is
-// best-effort and never blocks the caller. The eventInternalID is the
-// events.id row that was just appended; the scoped lookup joins
+//
+// The lookup and the enqueues run on their own goroutine. They used to
+// run inline: every event append paid for one query plus an INSERT per
+// matching agent before the request that caused it could return, so a
+// workspace with several on_event agents made every write in that
+// workspace slower, and a slow query there stalled unrelated request
+// handlers. Nothing about waking an agent is worth blocking the write
+// that woke it.
+//
+// The detached context keeps the request's values (trace span, logger)
+// but not its cancellation, since the work must outlive the response;
+// [defaultDispatchTimeout] bounds it instead. The eventInternalID is
+// the events.id row that was just appended; the scoped lookup joins
 // through it so schedule_scope='assigned_tasks' agents only wake when
 // the source event is bound to a task they own.
 func (e *EventTrigger) NotifyHook() func(ctx context.Context, workspaceID uint32, eventType string, eventInternalID uint64) {
@@ -58,17 +101,99 @@ func (e *EventTrigger) NotifyHook() func(ctx context.Context, workspaceID uint32
 		if e == nil || e.Queries == nil || e.Queue == nil {
 			return
 		}
-		e.dispatch(ctx, workspaceID, eventType, eventInternalID)
+		e.stopMu.RLock()
+		if e.stopping {
+			e.stopMu.RUnlock()
+			return
+		}
+		e.wg.Add(1)
+		e.stopMu.RUnlock()
+
+		detached := context.WithoutCancel(ctx)
+		go func() {
+			defer e.wg.Done()
+			defer func() {
+				// A panic here would otherwise end the process: this
+				// goroutine has no caller left to recover it.
+				if r := recover(); r != nil {
+					e.logger().Error("on_event dispatch panic",
+						"recover", r, "ws", workspaceID, "event", eventType)
+				}
+			}()
+			sem := e.semaphore()
+			select {
+			case sem <- struct{}{}:
+			case <-detached.Done():
+				return
+			}
+			defer func() { <-sem }()
+
+			runCtx, cancel := context.WithTimeout(detached, e.dispatchTimeout())
+			defer cancel()
+			e.dispatch(runCtx, workspaceID, eventType, eventInternalID)
+		}()
 	}
 }
 
+// Shutdown stops accepting new dispatches and waits for the in-flight
+// ones, or until ctx is cancelled. Mirrors the notification fan-out so
+// process exit drains both the same way.
+func (e *EventTrigger) Shutdown(ctx context.Context) error {
+	e.stopMu.Lock()
+	e.stopping = true
+	e.stopMu.Unlock()
+
+	done := make(chan struct{})
+	go func() {
+		e.wg.Wait()
+		close(done)
+	}()
+	select {
+	case <-done:
+		return nil
+	case <-ctx.Done():
+		return ctx.Err()
+	}
+}
+
+func (e *EventTrigger) semaphore() chan struct{} {
+	e.semOnce.Do(func() {
+		n := e.DispatchConcurrency
+		if n <= 0 {
+			n = defaultDispatchConcurrency
+		}
+		e.sem = make(chan struct{}, n)
+	})
+	return e.sem
+}
+
+func (e *EventTrigger) dispatchTimeout() time.Duration {
+	if e.DispatchTimeout > 0 {
+		return e.DispatchTimeout
+	}
+	return defaultDispatchTimeout
+}
+
+func (e *EventTrigger) now() time.Time {
+	if e.Now != nil {
+		return e.Now()
+	}
+	return time.Now()
+}
+
+func (e *EventTrigger) logger() *slog.Logger {
+	if e.Logger != nil {
+		return e.Logger
+	}
+	return slog.Default()
+}
+
 func (e *EventTrigger) dispatch(ctx context.Context, workspaceID uint32, eventType string, eventInternalID uint64) {
-	if e.Now == nil {
-		e.Now = time.Now
-	}
-	if e.Logger == nil {
-		e.Logger = slog.Default()
-	}
+	// The defaults are read, never written. Filling the fields lazily
+	// was safe while this ran on the caller's goroutine one at a time;
+	// now that several dispatches run at once it would be two
+	// goroutines writing the same field.
+	log := e.logger()
 	// Prefer the event-scoped query when the eventInternalID is known
 	// (every real eventbus.Append delivers one). Falls back to the
 	// legacy workspace-wide lookup for callers that pass 0 — tests
@@ -83,10 +208,10 @@ func (e *EventTrigger) dispatch(ctx context.Context, workspaceID uint32, eventTy
 		rows, err = e.Queries.ListOnEventAgentsFor(ctx, workspaceID, eventType)
 	}
 	if err != nil {
-		e.Logger.Warn("on_event agent lookup failed", "err", err, "ws", workspaceID, "event", eventType)
+		log.Warn("on_event agent lookup failed", "err", err, "ws", workspaceID, "event", eventType)
 		return
 	}
-	now := e.Now().UTC()
+	now := e.now().UTC()
 	for _, r := range rows {
 		key := fmt.Sprintf("%d:event:%s:%d", r.ID, eventType, now.UnixNano())
 		run := Run{
@@ -95,7 +220,7 @@ func (e *EventTrigger) dispatch(ctx context.Context, workspaceID uint32, eventTy
 			ScheduledAt: now,
 		}
 		if err := e.Queue.Enqueue(ctx, run); err != nil && !errors.Is(err, ErrDuplicate) {
-			e.Logger.Warn("on_event enqueue failed", "err", err, "agent", r.ID)
+			log.Warn("on_event enqueue failed", "err", err, "agent", r.ID)
 		}
 	}
 }

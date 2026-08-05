@@ -42,6 +42,7 @@ import (
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/webhook"
 	"github.com/libraz/nodate-flow/packages/go-shared/authn"
 	"github.com/libraz/nodate-flow/packages/go-shared/crypto"
+	"github.com/libraz/nodate-flow/packages/go-shared/dbtz"
 	"github.com/libraz/nodate-flow/packages/go-shared/email"
 	"github.com/libraz/nodate-flow/packages/go-shared/httputil"
 )
@@ -87,7 +88,10 @@ func main() {
 		logger.Error("NF_DB_DSN is not set")
 		os.Exit(1)
 	}
-	db, err := sql.Open("mysql", cfg.DbDsn)
+	// Pin the session timezone before opening: every stored DATETIME is a
+	// UTC wall clock, and a session that answers NOW() in the host's zone
+	// makes every comparison against them wrong by the offset, silently.
+	db, err := sql.Open("mysql", dbtz.NormalizeDSN(cfg.DbDsn))
 	if err != nil {
 		logger.Error("db open failed", "err", err)
 		os.Exit(1)
@@ -97,6 +101,13 @@ func main() {
 	db.SetConnMaxLifetime(cfg.DbConnMaxLifetime)
 	if err := db.Ping(); err != nil {
 		logger.Error("db ping failed", "err", err)
+		os.Exit(1)
+	}
+	// Refuse to start against a session that is not UTC. The DSN pins
+	// it; this proves the pin took, because a proxy or an externally
+	// assembled DSN can undo it and every symptom of that is silent.
+	if err := dbtz.AssertUTCSession(context.Background(), db); err != nil {
+		logger.Error("db session timezone check failed", "err", err)
 		os.Exit(1)
 	}
 	defer db.Close()
@@ -693,6 +704,11 @@ func main() {
 	// drain above; if it expires we log and move on.
 	if err := notifFanout.Shutdown(shutdownCtx); err != nil {
 		logger.Warn("notification fanout shutdown timed out", "err", err)
+	}
+	// Same for the on_event agent dispatches, which detach from the
+	// request that triggered them for the same reason.
+	if err := eventTrigger.Shutdown(shutdownCtx); err != nil {
+		logger.Warn("on_event dispatch shutdown timed out", "err", err)
 	}
 	logger.Info("shutdown complete")
 }

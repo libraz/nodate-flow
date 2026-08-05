@@ -356,7 +356,17 @@ func (e *Executor) processWorkspaceWithThreshold(ctx context.Context, wsID uint3
 	dynamicTaskQuery := fmt.Sprintf(`
 SELECT t.id, t.public_id, t.workspace_id, t.title, t.derived_state,
        t.priority, t.due_on, t.updated_at, t.created_at,
-       EXISTS(SELECT 1 FROM task_actors ta WHERE ta.task_id = t.id AND ta.kind = 'assignee') AS has_assignee,
+       -- role, not kind. task_actors.kind is the actor type
+       -- ('user' | 'agent') and role is the relationship
+       -- ('assignee' | 'reviewer' | ...), so kind = 'assignee' matches
+       -- nothing the enum can hold: has_assignee was false for every
+       -- task, and the executor kept proposing an owner for tasks that
+       -- already had one while never nudging the assignees that did
+       -- exist. Both rules read this one column.
+       EXISTS(
+         SELECT 1 FROM task_actors ta
+         WHERE ta.task_id = t.id AND ta.role = 'assignee' AND ta.enabled = TRUE
+       ) AS has_assignee,
        ag.id   AS agent_id,
        ag.public_id AS agent_public_id,
        t.agent_memo

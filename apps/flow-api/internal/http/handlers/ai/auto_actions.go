@@ -95,8 +95,18 @@ func ListAutoActions(deps Deps) func(context.Context, *ListAutoActionsInput) (*L
 			sig := autoactions.Signals{
 				State:         autoactions.State(r.DerivedState),
 				AssigneeCount: r.AssigneeCount,
-				HasAssignee:   func() bool { b, ok := r.PrimaryAssigneePublicID.([]byte); return ok && len(b) > 0 }(),
-				Now:           now,
+				// Read from the count, not from a type assertion on the
+				// primary assignee's public id. That column is an
+				// aggregate the view builds with MIN(...), so sqlc types
+				// it interface{} and the driver is free to hand it back
+				// as something other than []byte — in which case the
+				// assertion silently yields false and every task looks
+				// unassigned. The rules that key off this then propose
+				// an owner for tasks that already have one, which is
+				// what a user sees. AssigneeCount is the same fact,
+				// typed, in the same row.
+				HasAssignee: r.AssigneeCount > 0,
+				Now:         now,
 			}
 			if r.UpdatedAt.Valid {
 				sig.UpdatedAt = r.UpdatedAt.Time
