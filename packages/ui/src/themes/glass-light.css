@@ -27,6 +27,7 @@
   --nf-color-accent-hover: oklch(47% 0.13 260);
   --nf-color-accent-active: oklch(42% 0.14 260);
   --nf-color-accent-subtle: oklch(96% 0.015 260);
+  --nf-color-accent-fg: oklch(52% 0.12 260);
 
   --nf-color-success: oklch(62% 0.14 155);
   --nf-color-success-subtle: oklch(94% 0.03 155);
@@ -95,14 +96,19 @@
    */
   --nf-cal-task-color: oklch(52% 0.13 175);
   --nf-cal-task-subtle: oklch(94% 0.03 175);
+  --nf-cal-task-fg: oklch(42% 0.0975 175);
   --nf-cal-event-color: oklch(52% 0.14 250);
   --nf-cal-event-subtle: oklch(94% 0.03 250);
+  --nf-cal-event-fg: oklch(52% 0.14 250);
   --nf-cal-block-color: oklch(54% 0.11 60);
   --nf-cal-block-subtle: oklch(94% 0.03 60);
+  --nf-cal-block-fg: oklch(42% 0.0825 60);
   --nf-cal-free-color: oklch(54% 0.11 150);
   --nf-cal-free-subtle: oklch(94% 0.03 150);
+  --nf-cal-free-fg: oklch(42% 0.0825 150);
   --nf-cal-milestone-color: oklch(50% 0.14 285);
   --nf-cal-milestone-subtle: oklch(94% 0.03 285);
+  --nf-cal-milestone-fg: oklch(50% 0.14 285);
 
   /*
    * Calendar palette — muted, slightly desaturated hues consistent with

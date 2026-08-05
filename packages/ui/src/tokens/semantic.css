@@ -34,6 +34,7 @@
   --nf-color-accent-hover: oklch(66% 0.14 175);
   --nf-color-accent-active: oklch(60% 0.15 175);
   --nf-color-accent-subtle: oklch(92% 0.05 175);
+  --nf-color-accent-fg: oklch(42% 0.0975 175);
 
   /*
    * status
@@ -133,14 +134,19 @@
    */
   --nf-cal-task-color: oklch(64% 0.18 175);
   --nf-cal-task-subtle: oklch(94% 0.04 175);
+  --nf-cal-task-fg: oklch(42% 0.135 175);
   --nf-cal-event-color: oklch(62% 0.17 240);
   --nf-cal-event-subtle: oklch(94% 0.04 240);
+  --nf-cal-event-fg: oklch(42% 0.1275 240);
   --nf-cal-block-color: oklch(60% 0.14 60);
   --nf-cal-block-subtle: oklch(94% 0.04 60);
+  --nf-cal-block-fg: oklch(42% 0.105 60);
   --nf-cal-free-color: oklch(70% 0.12 145);
   --nf-cal-free-subtle: oklch(94% 0.04 145);
+  --nf-cal-free-fg: oklch(42% 0.09 145);
   --nf-cal-milestone-color: oklch(60% 0.18 290);
   --nf-cal-milestone-subtle: oklch(94% 0.04 290);
+  --nf-cal-milestone-fg: oklch(42% 0.135 290);
 
   /*
    * Calendar palette — fixed 10-swatch picker for the per-calendar color
@@ -148,6 +154,12 @@
    * (blue, cyan, green, amber, orange, red, pink, purple, slate, ink) so a
    * given calendar's chosen index renders the "same" color identity in
    * every theme, while lightness/chroma adapt for contrast on each canvas.
+   *
+   * These have no `-fg` counterpart, unlike the five kind colours above,
+   * and they do not need one: every consumer paints a swatch, a chip fill
+   * or a dot with them. Nothing sets text in a palette colour, so there is
+   * no pairing to hold to a contrast ratio. Adding ten more tokens for a
+   * use that does not exist would only invite someone to find one.
    */
   --nf-cal-color-1: oklch(54% 0.18 250);
   --nf-cal-color-2: oklch(58% 0.13 210);

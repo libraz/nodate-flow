@@ -105,7 +105,7 @@ function WorkspacesPage(): ReactElement {
                     borderRadius: 'var(--nf-radius-pill)',
                     fontSize: 'var(--nf-text-xs)',
                     background: 'var(--nf-color-accent-subtle)',
-                    color: 'var(--nf-color-accent)',
+                    color: 'var(--nf-color-accent-fg)',
                   }}
                 >
                   {ws.role}

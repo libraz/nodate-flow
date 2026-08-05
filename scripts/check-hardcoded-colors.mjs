@@ -81,15 +81,15 @@ function walk(dir, out) {
 }
 
 /**
- * A status colour used to paint text.
+ * A fill colour used to paint text.
  *
- * `--nf-color-danger` and its three siblings are fills: bright enough to
- * read as the status at a glance, which is the opposite of what text
- * needs. Measured against each theme's background they land between
- * 1.87:1 and 6.01:1 — fifteen of the sixteen theme-and-status pairs miss
- * AA, and `warning` at 1.87 misses even the 3:1 floor for large text. The
- * `-fg` counterparts exist for exactly this and sit at 7.3:1 or better
- * everywhere.
+ * `--nf-color-danger` and the nine tokens beside it are fills: bright
+ * enough to read as the thing they mean at a glance, which is the
+ * opposite of what text needs. Measured against the surface each one is
+ * actually paired with, the status colours land between 1.87:1 and
+ * 6.01:1, the accent reaches 2.14:1 in the aurora light theme, and the
+ * five calendar tones sit between 2.17:1 and 3.50:1 there. The `-fg`
+ * counterparts exist for exactly this and clear 4.5:1 everywhere.
  *
  * It went unnoticed because it is not a bug you can see in one theme: the
  * author picks the colour that means "error", and it does mean error. It
@@ -102,8 +102,21 @@ function walk(dir, out) {
  * different rules, and only the assignment says which colour it is. Four
  * segmented-control tones were painting their inactive label that way.
  */
-const STATUS_AS_TEXT = /(?<![-\w])color:\s*['"]?var\(--nf-color-(danger|warning|success|info)\)/;
-const STATUS_AS_FG_ALIAS = /--[\w-]*-fg:\s*var\(--nf-color-(danger|warning|success|info)\)/;
+const FILL_TOKENS = [
+  '--nf-color-danger',
+  '--nf-color-warning',
+  '--nf-color-success',
+  '--nf-color-info',
+  '--nf-color-accent',
+  '--nf-cal-task-color',
+  '--nf-cal-event-color',
+  '--nf-cal-block-color',
+  '--nf-cal-free-color',
+  '--nf-cal-milestone-color',
+];
+const FILLS = FILL_TOKENS.map((t) => t.replace('--', '')).join('|');
+const STATUS_AS_TEXT = new RegExp(String.raw`(?<![-\w])color:\s*['"]?var\(--(${FILLS})\)`);
+const STATUS_AS_FG_ALIAS = new RegExp(String.raw`--[\w-]*-fg:\s*var\(--(${FILLS})\)`);
 
 const findings = [];
 const textFindings = [];
@@ -151,17 +164,15 @@ if (findings.length > 0) {
 }
 
 if (textFindings.length > 0) {
-  console.error(
-    `\ncheck-hardcoded-colors: ${textFindings.length} status colour(s) painting text:\n`,
-  );
+  console.error(`\ncheck-hardcoded-colors: ${textFindings.length} fill colour(s) painting text:\n`);
   for (const f of textFindings) console.error(`  ${f.where}\n    ${f.text}`);
   console.error(
-    '\nThe base status colours are fills. Against the page background they run from 1.87:1',
+    '\nThese tokens are fills. Against the surface each is paired with they run from 1.87:1',
   );
+  console.error('to 6.01:1, so text painted with one is between hard and impossible to read.');
   console.error(
-    '(warning) to 6.01:1, so text painted with one is between hard and impossible to read.',
+    'Use the `-fg` counterpart: --nf-color-danger-fg, --nf-color-accent-fg, --nf-cal-task-fg, and so on.',
   );
-  console.error('Use the `-fg` counterpart: var(--nf-color-danger-fg) and its siblings.');
 }
 
 if (findings.length > 0 || textFindings.length > 0) process.exit(1);

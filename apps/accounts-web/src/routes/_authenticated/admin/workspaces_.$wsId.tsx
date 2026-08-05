@@ -267,7 +267,7 @@ function WorkspaceDetailPage(): ReactElement {
   if (error || !workspace) {
     return (
       <div>
-        <Link to="/admin/workspaces" style={{ color: 'var(--nf-color-accent)' }}>
+        <Link to="/admin/workspaces" style={{ color: 'var(--nf-color-accent-fg)' }}>
           {t('common.back_to_workspaces')}
         </Link>
         <p
@@ -289,7 +289,7 @@ function WorkspaceDetailPage(): ReactElement {
         <Link
           to="/admin/workspaces"
           style={{
-            color: 'var(--nf-color-accent)',
+            color: 'var(--nf-color-accent-fg)',
             fontSize: 'var(--nf-text-sm)',
           }}
         >

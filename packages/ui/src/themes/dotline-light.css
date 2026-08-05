@@ -27,6 +27,7 @@
   --nf-color-accent-hover: oklch(0% 0 0);
   --nf-color-accent-active: oklch(0% 0 0);
   --nf-color-accent-subtle: oklch(94% 0 0);
+  --nf-color-accent-fg: oklch(15% 0 0);
 
   --nf-color-success: oklch(50% 0.16 150);
   --nf-color-success-subtle: oklch(94% 0.03 150);
@@ -96,14 +97,19 @@
    */
   --nf-cal-task-color: oklch(46% 0.18 175);
   --nf-cal-task-subtle: oklch(94% 0.03 175);
+  --nf-cal-task-fg: oklch(46% 0.18 175);
   --nf-cal-event-color: oklch(48% 0.2 240);
   --nf-cal-event-subtle: oklch(94% 0.03 240);
+  --nf-cal-event-fg: oklch(48% 0.2 240);
   --nf-cal-block-color: oklch(52% 0.16 60);
   --nf-cal-block-subtle: oklch(94% 0.03 60);
+  --nf-cal-block-fg: oklch(52% 0.16 60);
   --nf-cal-free-color: oklch(50% 0.15 145);
   --nf-cal-free-subtle: oklch(94% 0.03 145);
+  --nf-cal-free-fg: oklch(50% 0.15 145);
   --nf-cal-milestone-color: oklch(46% 0.2 290);
   --nf-cal-milestone-subtle: oklch(94% 0.03 290);
+  --nf-cal-milestone-fg: oklch(46% 0.2 290);
 
   /*
    * Calendar palette — darker, fully saturated hues for high contrast

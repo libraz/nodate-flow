@@ -27,6 +27,7 @@
   --nf-color-accent-hover: oklch(73% 0.13 260);
   --nf-color-accent-active: oklch(78% 0.14 260);
   --nf-color-accent-subtle: oklch(25% 0.04 260);
+  --nf-color-accent-fg: oklch(68% 0.12 260);
 
   --nf-color-success: oklch(72% 0.14 155);
   --nf-color-success-subtle: oklch(25% 0.04 155);
@@ -95,14 +96,19 @@
    */
   --nf-cal-task-color: oklch(72% 0.12 175);
   --nf-cal-task-subtle: oklch(25% 0.04 175);
+  --nf-cal-task-fg: oklch(72% 0.12 175);
   --nf-cal-event-color: oklch(72% 0.12 250);
   --nf-cal-event-subtle: oklch(25% 0.04 250);
+  --nf-cal-event-fg: oklch(72% 0.12 250);
   --nf-cal-block-color: oklch(72% 0.1 60);
   --nf-cal-block-subtle: oklch(25% 0.04 60);
+  --nf-cal-block-fg: oklch(72% 0.1 60);
   --nf-cal-free-color: oklch(72% 0.1 150);
   --nf-cal-free-subtle: oklch(25% 0.04 150);
+  --nf-cal-free-fg: oklch(72% 0.1 150);
   --nf-cal-milestone-color: oklch(70% 0.13 285);
   --nf-cal-milestone-subtle: oklch(25% 0.04 285);
+  --nf-cal-milestone-fg: oklch(70% 0.13 285);
 
   /*
    * Calendar palette — muted lifted hues echoing glass-dark's restrained

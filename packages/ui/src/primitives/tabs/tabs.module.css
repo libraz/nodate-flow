@@ -38,7 +38,7 @@
 }
 
 .tabActive {
-  color: var(--nf-color-accent);
+  color: var(--nf-color-accent-fg);
   border-block-end-color: var(--nf-color-accent);
 }
 

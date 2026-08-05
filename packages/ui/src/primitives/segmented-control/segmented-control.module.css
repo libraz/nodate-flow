@@ -31,7 +31,7 @@
 
   /* Defaults consumed by `.segment` — overridden per-tone for colourful mode. */
   --sc-active-bg: var(--nf-color-accent-subtle);
-  --sc-active-fg: var(--nf-color-accent);
+  --sc-active-fg: var(--nf-color-accent-fg);
   --sc-inactive-bg: transparent;
   --sc-inactive-fg: var(--nf-color-fg-muted);
 }
@@ -152,13 +152,13 @@
   --sc-inactive-bg: transparent;
   --sc-inactive-fg: var(--nf-color-fg-muted);
   --sc-active-bg: var(--nf-color-accent-subtle);
-  --sc-active-fg: var(--nf-color-accent);
+  --sc-active-fg: var(--nf-color-accent-fg);
 }
 
 .toneNeutral.segmentActive {
   /* Neutral active keeps the accent foreground (not fg-on-accent) because the
      fill is the subtle tint, not the saturated accent. */
-  color: var(--nf-color-accent);
+  color: var(--nf-color-accent-fg);
 }
 
 .toneInfo {
@@ -198,35 +198,35 @@
  */
 .toneTask {
   --sc-inactive-bg: var(--nf-cal-task-subtle);
-  --sc-inactive-fg: var(--nf-cal-task-color);
+  --sc-inactive-fg: var(--nf-cal-task-fg);
   --sc-active-bg: var(--nf-cal-task-color);
   --sc-active-fg: var(--nf-color-fg-on-accent);
 }
 
 .toneEvent {
   --sc-inactive-bg: var(--nf-cal-event-subtle);
-  --sc-inactive-fg: var(--nf-cal-event-color);
+  --sc-inactive-fg: var(--nf-cal-event-fg);
   --sc-active-bg: var(--nf-cal-event-color);
   --sc-active-fg: var(--nf-color-fg-on-accent);
 }
 
 .toneBlock {
   --sc-inactive-bg: var(--nf-cal-block-subtle);
-  --sc-inactive-fg: var(--nf-cal-block-color);
+  --sc-inactive-fg: var(--nf-cal-block-fg);
   --sc-active-bg: var(--nf-cal-block-color);
   --sc-active-fg: var(--nf-color-fg-on-accent);
 }
 
 .toneFree {
   --sc-inactive-bg: var(--nf-cal-free-subtle);
-  --sc-inactive-fg: var(--nf-cal-free-color);
+  --sc-inactive-fg: var(--nf-cal-free-fg);
   --sc-active-bg: var(--nf-cal-free-color);
   --sc-active-fg: var(--nf-color-fg-on-accent);
 }
 
 .toneMilestone {
   --sc-inactive-bg: var(--nf-cal-milestone-subtle);
-  --sc-inactive-fg: var(--nf-cal-milestone-color);
+  --sc-inactive-fg: var(--nf-cal-milestone-fg);
   --sc-active-bg: var(--nf-cal-milestone-color);
   --sc-active-fg: var(--nf-color-fg-on-accent);
 }

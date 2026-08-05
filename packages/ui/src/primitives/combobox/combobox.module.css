@@ -54,7 +54,7 @@
 }
 
 .optionSelected {
-  color: var(--nf-color-accent);
+  color: var(--nf-color-accent-fg);
   font-weight: var(--nf-weight-medium);
 }
 

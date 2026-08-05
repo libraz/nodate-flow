@@ -79,7 +79,7 @@
 }
 
 .themeCard[data-selected="true"] .themeName {
-  color: var(--nf-color-accent);
+  color: var(--nf-color-accent-fg);
 }
 
 /* ---- Color mode buttons ---- */
@@ -124,7 +124,7 @@
 }
 
 .modeButton[data-selected="true"] .modeIcon {
-  color: var(--nf-color-accent);
+  color: var(--nf-color-accent-fg);
 }
 
 .modeName {
@@ -134,5 +134,5 @@
 }
 
 .modeButton[data-selected="true"] .modeName {
-  color: var(--nf-color-accent);
+  color: var(--nf-color-accent-fg);
 }

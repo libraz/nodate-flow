@@ -171,7 +171,7 @@ function WorkspacesPage(): ReactElement {
                     <Link
                       to="/admin/workspaces/$wsId"
                       params={{ wsId: ws.id }}
-                      style={{ color: 'var(--nf-color-accent)' }}
+                      style={{ color: 'var(--nf-color-accent-fg)' }}
                     >
                       {ws.name}
                     </Link>

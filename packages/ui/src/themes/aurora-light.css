@@ -26,6 +26,7 @@
   --nf-color-accent-hover: oklch(66% 0.14 175);
   --nf-color-accent-active: oklch(60% 0.15 175);
   --nf-color-accent-subtle: oklch(92% 0.05 175);
+  --nf-color-accent-fg: oklch(42% 0.0975 175);
 
   --nf-color-success: oklch(68% 0.16 150);
   --nf-color-success-subtle: oklch(94% 0.03 150);
@@ -94,14 +95,19 @@
    */
   --nf-cal-task-color: oklch(64% 0.18 175);
   --nf-cal-task-subtle: oklch(94% 0.04 175);
+  --nf-cal-task-fg: oklch(42% 0.135 175);
   --nf-cal-event-color: oklch(62% 0.17 240);
   --nf-cal-event-subtle: oklch(94% 0.04 240);
+  --nf-cal-event-fg: oklch(42% 0.1275 240);
   --nf-cal-block-color: oklch(60% 0.14 60);
   --nf-cal-block-subtle: oklch(94% 0.04 60);
+  --nf-cal-block-fg: oklch(42% 0.105 60);
   --nf-cal-free-color: oklch(70% 0.12 145);
   --nf-cal-free-subtle: oklch(94% 0.04 145);
+  --nf-cal-free-fg: oklch(42% 0.09 145);
   --nf-cal-milestone-color: oklch(60% 0.18 290);
   --nf-cal-milestone-subtle: oklch(94% 0.04 290);
+  --nf-cal-milestone-fg: oklch(42% 0.135 290);
 
   /*
    * Calendar palette — fixed 10-swatch picker. Mid-tone saturated hues sit

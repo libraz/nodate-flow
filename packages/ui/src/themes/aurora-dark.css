@@ -26,6 +26,7 @@
   --nf-color-accent-hover: oklch(82% 0.15 175);
   --nf-color-accent-active: oklch(86% 0.16 175);
   --nf-color-accent-subtle: oklch(32% 0.06 175);
+  --nf-color-accent-fg: oklch(78% 0.14 175);
 
   --nf-color-success: oklch(74% 0.16 150);
   --nf-color-success-subtle: oklch(25% 0.04 150);
@@ -95,14 +96,19 @@
    */
   --nf-cal-task-color: oklch(76% 0.16 175);
   --nf-cal-task-subtle: oklch(28% 0.05 175);
+  --nf-cal-task-fg: oklch(76% 0.16 175);
   --nf-cal-event-color: oklch(74% 0.15 240);
   --nf-cal-event-subtle: oklch(28% 0.05 240);
+  --nf-cal-event-fg: oklch(74% 0.15 240);
   --nf-cal-block-color: oklch(72% 0.13 60);
   --nf-cal-block-subtle: oklch(28% 0.05 60);
+  --nf-cal-block-fg: oklch(72% 0.13 60);
   --nf-cal-free-color: oklch(78% 0.13 145);
   --nf-cal-free-subtle: oklch(28% 0.05 145);
+  --nf-cal-free-fg: oklch(78% 0.13 145);
   --nf-cal-milestone-color: oklch(72% 0.16 290);
   --nf-cal-milestone-subtle: oklch(28% 0.05 290);
+  --nf-cal-milestone-fg: oklch(72% 0.16 290);
 
   /*
    * Calendar palette — lightened chromatic tones for legibility against

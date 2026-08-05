@@ -50,7 +50,7 @@
 }
 
 .md a {
-  color: var(--nf-color-accent);
+  color: var(--nf-color-accent-fg);
   text-decoration: underline;
   text-underline-offset: 2px;
 }
