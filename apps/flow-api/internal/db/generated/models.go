@@ -622,6 +622,48 @@ func (ns NullCalendarMembersRole) Value() (driver.Value, error) {
 	return string(ns.CalendarMembersRole), nil
 }
 
+type CalendarsDefaultEventVisibility string
+
+const (
+	CalendarsDefaultEventVisibilityPublic  CalendarsDefaultEventVisibility = "public"
+	CalendarsDefaultEventVisibilityPrivate CalendarsDefaultEventVisibility = "private"
+)
+
+func (e *CalendarsDefaultEventVisibility) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = CalendarsDefaultEventVisibility(s)
+	case string:
+		*e = CalendarsDefaultEventVisibility(s)
+	default:
+		return fmt.Errorf("unsupported scan type for CalendarsDefaultEventVisibility: %T", src)
+	}
+	return nil
+}
+
+type NullCalendarsDefaultEventVisibility struct {
+	CalendarsDefaultEventVisibility CalendarsDefaultEventVisibility `json:"calendarsDefaultEventVisibility"`
+	Valid                           bool                            `json:"valid"` // Valid is true if CalendarsDefaultEventVisibility is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullCalendarsDefaultEventVisibility) Scan(value interface{}) error {
+	if value == nil {
+		ns.CalendarsDefaultEventVisibility, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.CalendarsDefaultEventVisibility.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullCalendarsDefaultEventVisibility) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.CalendarsDefaultEventVisibility), nil
+}
+
 type CalendarsKind string
 
 const (
@@ -2541,6 +2583,8 @@ type Calendar struct {
 	OwnerUserID sql.NullInt32 `json:"-"`
 	// For system calendars: provider identifier (e.g., holidays.jp)
 	SystemSlug sql.NullString `json:"systemSlug"`
+	// What calendar_events.visibility = 'default' means here. public: details are for every member. private: the time is visible, the details are for the owner and the invited. Never confidential — hiding the row is a per-event decision.
+	DefaultEventVisibility CalendarsDefaultEventVisibility `json:"defaultEventVisibility"`
 	// Display order
 	SortWeight int32 `json:"sortWeight"`
 	// Admin notes
@@ -3708,6 +3752,8 @@ type Session struct {
 	ExpiresAt time.Time `json:"expiresAt"`
 	// Explicit revocation time
 	RevokedAt sql.NullTime `json:"revokedAt"`
+	// SHA-256 hex of the refresh token this session last replaced. Rotation overwrites refresh_hash, so without this the superseded token leaves no trace and a replay of it is indistinguishable from a token that was never issued. Presenting a token that matches this column is the signal that a rotated token was replayed.
+	RotatedFromHash sql.NullString `json:"rotatedFromHash"`
 	// Last refresh time
 	LastUsedAt sql.NullTime `json:"lastUsedAt"`
 	// Display order

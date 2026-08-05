@@ -562,6 +562,41 @@ func (q *Queries) MarkDeliveryFailed(ctx context.Context, arg MarkDeliveryFailed
 	return err
 }
 
+const requeueStrandedDeliveries = `-- name: RequeueStrandedDeliveries :execrows
+UPDATE webhook_deliveries
+SET status = 'failed',
+    next_retry_at = NOW(3)
+WHERE status = 'delivering'
+  AND updated_at < ?
+  AND enabled = TRUE
+`
+
+// Return deliveries stranded in 'delivering' to the retry queue.
+//
+// The claim flips a row to 'delivering' and COMMITs before the HTTP POST,
+// so a worker that dies mid-batch — a deploy, an OOM kill, a panic —
+// leaves rows in a status no query ever selects again. Nothing retries
+// them and nothing reports them: the subscriber simply never receives
+// those events.
+//
+// They go back to 'failed' with next_retry_at = NOW() rather than being
+// abandoned, because delivery is at-least-once by contract (receivers
+// dedupe on the X-Nodate-Delivery header) and a redelivery is cheap
+// compared to a silently dropped event. attempts is not touched here:
+// the attempt never completed, and the existing attempts < max_attempts
+// filter still bounds how many times a row that keeps stranding is
+// picked up.
+//
+// The cutoff is supplied by the caller so the threshold stays
+// configurable and can be kept comfortably above the delivery timeout.
+func (q *Queries) RequeueStrandedDeliveries(ctx context.Context, updatedAt sql.NullTime) (int64, error) {
+	result, err := q.db.ExecContext(ctx, requeueStrandedDeliveries, updatedAt)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
+}
+
 const toggleWebhookSubscription = `-- name: ToggleWebhookSubscription :exec
 UPDATE webhook_subscriptions SET is_active = ?
 WHERE workspace_id = ? AND public_id = ? AND enabled = TRUE

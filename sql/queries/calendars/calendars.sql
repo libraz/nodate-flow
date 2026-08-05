@@ -20,6 +20,7 @@ SELECT
   public_id,
   workspace_id,
   kind,
+  default_event_visibility,
   name,
   description,
   color,

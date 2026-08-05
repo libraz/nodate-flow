@@ -83,6 +83,7 @@ SELECT
   public_id,
   workspace_id,
   kind,
+  default_event_visibility,
   name,
   description,
   color,
@@ -105,19 +106,20 @@ type FindCalendarByPublicIdParams struct {
 }
 
 type FindCalendarByPublicIdRow struct {
-	ID          uint32         `json:"-"`
-	PublicID    types.PublicID `json:"publicId"`
-	WorkspaceID uint32         `json:"-"`
-	Kind        CalendarsKind  `json:"kind"`
-	Name        string         `json:"name"`
-	Description sql.NullString `json:"description"`
-	Color       string         `json:"color"`
-	CoverUrl    sql.NullString `json:"coverUrl"`
-	OwnerUserID sql.NullInt32  `json:"-"`
-	SystemSlug  sql.NullString `json:"systemSlug"`
-	Enabled     bool           `json:"enabled"`
-	UpdatedAt   sql.NullTime   `json:"updatedAt"`
-	CreatedAt   time.Time      `json:"createdAt"`
+	ID                     uint32                          `json:"-"`
+	PublicID               types.PublicID                  `json:"publicId"`
+	WorkspaceID            uint32                          `json:"-"`
+	Kind                   CalendarsKind                   `json:"kind"`
+	DefaultEventVisibility CalendarsDefaultEventVisibility `json:"defaultEventVisibility"`
+	Name                   string                          `json:"name"`
+	Description            sql.NullString                  `json:"description"`
+	Color                  string                          `json:"color"`
+	CoverUrl               sql.NullString                  `json:"coverUrl"`
+	OwnerUserID            sql.NullInt32                   `json:"-"`
+	SystemSlug             sql.NullString                  `json:"systemSlug"`
+	Enabled                bool                            `json:"enabled"`
+	UpdatedAt              sql.NullTime                    `json:"updatedAt"`
+	CreatedAt              time.Time                       `json:"createdAt"`
 }
 
 // Resolve a calendar by UUID v7 within a workspace.
@@ -129,6 +131,7 @@ func (q *Queries) FindCalendarByPublicId(ctx context.Context, arg FindCalendarBy
 		&i.PublicID,
 		&i.WorkspaceID,
 		&i.Kind,
+		&i.DefaultEventVisibility,
 		&i.Name,
 		&i.Description,
 		&i.Color,

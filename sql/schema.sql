@@ -734,6 +734,22 @@ CREATE TABLE calendars (
   owner_user_id INT UNSIGNED NULL COMMENT 'The user this calendar belongs to, or NULL when it belongs to no one in particular: a system feed, or a calendar shared by a group that outlives any single member. NULL is not cosmetic — the FK cascades, so naming an owner means deleting that user deletes the calendar and every event in it. A group calendar must leave this NULL or one departure takes everyone else''s history with it.',
   system_slug VARCHAR(100) CHARACTER SET latin1 COLLATE latin1_swedish_ci NULL COMMENT 'For system calendars: provider identifier (e.g., holidays.jp)',
 
+  /**
+   * default_event_visibility: what calendar_events.visibility = 'default'
+   * resolves to on this calendar. The event column has always documented
+   * 'default' as "the calendar setting" and there was no such setting, so
+   * 'default' — which is also the column's own default, and therefore what
+   * most rows carry — resolved to nothing and was read as fully public.
+   *
+   * Deliberately narrower than the event enum: a calendar may default to
+   * public or private, never to confidential. Confidential hides the row
+   * itself, and that is a decision about one specific meeting rather than
+   * a standing property of a calendar. Keeping it out also keeps the
+   * row-level list filter free of a join on this table, which several of
+   * the event list queries do not have.
+   */
+  default_event_visibility ENUM('public','private') NOT NULL DEFAULT 'public' COMMENT 'What calendar_events.visibility = ''default'' means here. public: details are for every member. private: the time is visible, the details are for the owner and the invited. Never confidential — hiding the row is a per-event decision.',
+
   sort_weight INT NOT NULL DEFAULT 0 COMMENT 'Display order',
   notes TEXT NULL COMMENT 'Admin notes',
   enabled BOOLEAN NOT NULL DEFAULT TRUE COMMENT 'Enabled flag',
@@ -1056,6 +1072,7 @@ CREATE TABLE sessions (
   ip_address VARBINARY(16) NULL COMMENT 'Packed IPv4/IPv6 address at issue time',
   expires_at DATETIME(3) NOT NULL COMMENT 'Refresh token expiry',
   revoked_at DATETIME(3) NULL COMMENT 'Explicit revocation time',
+  rotated_from_hash CHAR(64) CHARACTER SET latin1 COLLATE latin1_swedish_ci NULL COMMENT 'SHA-256 hex of the refresh token this session last replaced. Rotation overwrites refresh_hash, so without this the superseded token leaves no trace and a replay of it is indistinguishable from a token that was never issued. Presenting a token that matches this column is the signal that a rotated token was replayed.',
   last_used_at DATETIME(3) NULL COMMENT 'Last refresh time',
 
   sort_weight INT NOT NULL DEFAULT 0 COMMENT 'Display order',
@@ -1066,6 +1083,7 @@ CREATE TABLE sessions (
 
   UNIQUE KEY uniq_sessions_public_id (public_id),
   UNIQUE KEY uniq_sessions_refresh_hash (refresh_hash),
+  KEY idx_sessions_rotated_from_hash (rotated_from_hash),
   KEY idx_sessions_user_id_expires_at (user_id, expires_at),
 
   CONSTRAINT fk_sessions_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE

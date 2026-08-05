@@ -201,12 +201,50 @@ UPDATE identities
 SET password_hash = ?
 WHERE id = ?;
 
--- name: UpdateIdentityFailedAttempts :exec
--- Bump failed login counter and optionally apply a lockout deadline.
+-- name: BumpIdentityFailedAttempts :exec
+-- Count one failed authentication against an identity, locking the
+-- account once the count reaches the caller's threshold.
+--
+-- The increment is computed here rather than by the caller because a
+-- caller cannot hold the count still between reading and writing it:
+-- guesses arriving at the same time all read the same value and all
+-- write that value plus one, so the counter never passes 1 and the
+-- lockout never fires. Doing both in one statement advances the count
+-- once per attempt however many run concurrently.
+--
+-- The lock is a fixed window, not a rolling one, and the difference
+-- decides who the mechanism protects. Refreshing the deadline on every
+-- further failure would let anyone who can send a failed login keep an
+-- account shut indefinitely: the counter only clears on a successful
+-- authentication, which a locked-out owner can never perform, so an
+-- attacker firing one guess per window owns the account's availability
+-- without ever knowing the password. A lockout that can be held down
+-- from outside is no longer a defence against guessing, it is a way to
+-- take the account away from the person it belongs to.
+--
+-- So: while a deadline is in force it is left exactly as it is, and a
+-- failure arriving after one has expired starts a fresh window at one.
+-- Carrying the old count across the expiry would be the same trap in
+-- slower motion — the first failure after the window would re-cross the
+-- threshold and lock again, so the owner would still never get the
+-- attempts the threshold promises them.
+--
+-- Assignment order matters and cannot be avoided here: the two columns
+-- each depend on the other. A later assignment in the same SET list
+-- sees what the earlier ones wrote, so the counter is written first
+-- (reading the deadline as it was) and the deadline second (reading the
+-- count as it now is). Swapping them silently changes both branches.
 UPDATE identities
-SET failed_attempts = ?,
-    locked_until_at = ?
-WHERE id = ?;
+SET failed_attempts = CASE
+      WHEN locked_until_at IS NOT NULL AND locked_until_at <= NOW(3) THEN 1
+      ELSE failed_attempts + 1
+    END,
+    locked_until_at = CASE
+      WHEN locked_until_at IS NOT NULL AND locked_until_at > NOW(3) THEN locked_until_at
+      WHEN failed_attempts >= sqlc.arg(threshold) THEN sqlc.arg(locked_until)
+      ELSE NULL
+    END
+WHERE id = sqlc.arg(id);
 
 -- name: ResetIdentityFailedAttempts :exec
 -- Clear failed login counter and lockout after a successful authentication.

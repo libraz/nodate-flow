@@ -292,6 +292,61 @@ func (q *Queries) FindSessionByRefreshHash(ctx context.Context, refreshHash stri
 	return i, err
 }
 
+const findSessionByRotatedFromHash = `-- name: FindSessionByRotatedFromHash :one
+SELECT
+  id,
+  public_id,
+  user_id,
+  refresh_hash,
+  expires_at,
+  revoked_at,
+  last_used_at,
+  enabled,
+  created_at
+FROM sessions
+WHERE rotated_from_hash = ?
+LIMIT 1
+`
+
+type FindSessionByRotatedFromHashRow struct {
+	ID          uint32         `json:"-"`
+	PublicID    types.PublicID `json:"publicId"`
+	UserID      uint32         `json:"-"`
+	RefreshHash string         `json:"refreshHash"`
+	ExpiresAt   time.Time      `json:"expiresAt"`
+	RevokedAt   sql.NullTime   `json:"revokedAt"`
+	LastUsedAt  sql.NullTime   `json:"lastUsedAt"`
+	Enabled     bool           `json:"enabled"`
+	CreatedAt   time.Time      `json:"createdAt"`
+}
+
+// Resolve the session that superseded the given refresh token.
+//
+// This is the reuse signal. Rotation overwrites refresh_hash in place,
+// so a token that has been rotated away matches no session's current
+// hash and is indistinguishable from one that was never issued —
+// which is why looking for it among revoked rows found nothing, and
+// found the wrong thing when a session had merely been signed out. A
+// hash recorded here, by contrast, can only have got there by being
+// replaced during a rotation of this very session, so presenting it
+// means someone still holds a token the legitimate client gave up.
+func (q *Queries) FindSessionByRotatedFromHash(ctx context.Context, rotatedFromHash sql.NullString) (FindSessionByRotatedFromHashRow, error) {
+	row := q.db.QueryRowContext(ctx, findSessionByRotatedFromHash, rotatedFromHash)
+	var i FindSessionByRotatedFromHashRow
+	err := row.Scan(
+		&i.ID,
+		&i.PublicID,
+		&i.UserID,
+		&i.RefreshHash,
+		&i.ExpiresAt,
+		&i.RevokedAt,
+		&i.LastUsedAt,
+		&i.Enabled,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
 const listSessionsForUser = `-- name: ListSessionsForUser :many
 SELECT
   public_id,

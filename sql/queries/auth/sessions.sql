@@ -51,6 +51,31 @@ FROM sessions
 WHERE refresh_hash = ?
 LIMIT 1;
 
+-- name: FindSessionByRotatedFromHash :one
+-- Resolve the session that superseded the given refresh token.
+--
+-- This is the reuse signal. Rotation overwrites refresh_hash in place,
+-- so a token that has been rotated away matches no session's current
+-- hash and is indistinguishable from one that was never issued —
+-- which is why looking for it among revoked rows found nothing, and
+-- found the wrong thing when a session had merely been signed out. A
+-- hash recorded here, by contrast, can only have got there by being
+-- replaced during a rotation of this very session, so presenting it
+-- means someone still holds a token the legitimate client gave up.
+SELECT
+  id,
+  public_id,
+  user_id,
+  refresh_hash,
+  expires_at,
+  revoked_at,
+  last_used_at,
+  enabled,
+  created_at
+FROM sessions
+WHERE rotated_from_hash = ?
+LIMIT 1;
+
 -- name: RevokeSession :exec
 -- Mark a session as revoked. Workspace scoping does not apply (user-scoped).
 UPDATE sessions

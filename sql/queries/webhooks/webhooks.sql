@@ -138,3 +138,29 @@ UPDATE webhook_deliveries
 SET status = 'dead', http_status = ?, response_body = ?,
     attempts = attempts + 1, failed_at = NOW(), next_retry_at = NULL
 WHERE id = ?;
+
+-- name: RequeueStrandedDeliveries :execrows
+-- Return deliveries stranded in 'delivering' to the retry queue.
+--
+-- The claim flips a row to 'delivering' and COMMITs before the HTTP POST,
+-- so a worker that dies mid-batch — a deploy, an OOM kill, a panic —
+-- leaves rows in a status no query ever selects again. Nothing retries
+-- them and nothing reports them: the subscriber simply never receives
+-- those events.
+--
+-- They go back to 'failed' with next_retry_at = NOW() rather than being
+-- abandoned, because delivery is at-least-once by contract (receivers
+-- dedupe on the X-Nodate-Delivery header) and a redelivery is cheap
+-- compared to a silently dropped event. attempts is not touched here:
+-- the attempt never completed, and the existing attempts < max_attempts
+-- filter still bounds how many times a row that keeps stranding is
+-- picked up.
+--
+-- The cutoff is supplied by the caller so the threshold stays
+-- configurable and can be kept comfortably above the delivery timeout.
+UPDATE webhook_deliveries
+SET status = 'failed',
+    next_retry_at = NOW(3)
+WHERE status = 'delivering'
+  AND updated_at < ?
+  AND enabled = TRUE;

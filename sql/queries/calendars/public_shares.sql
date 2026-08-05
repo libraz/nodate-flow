@@ -261,6 +261,7 @@ SELECT
   ce.url,
   ce.kind,
   ce.visibility,
+  c.default_event_visibility AS calendar_default_visibility,
   ce.show_as,
   ce.flexibility,
   ce.block_label,

@@ -101,8 +101,10 @@ SELECT
     WHERE a.event_id = ce.id
       AND a.user_id = sqlc.arg(viewer_user_id)
       AND a.enabled = TRUE
-  ) AS is_attendee
+  ) AS is_attendee,
+  cvis.default_event_visibility AS calendar_default_visibility
 FROM calendar_events ce
+INNER JOIN calendars cvis ON cvis.id = ce.calendar_id
 LEFT JOIN users uc
   ON uc.id = ce.created_by_user_id
 WHERE ce.calendar_id = ?
@@ -148,8 +150,10 @@ SELECT
     WHERE a.event_id = ce.id
       AND a.user_id = sqlc.arg(viewer_user_id)
       AND a.enabled = TRUE
-  ) AS is_attendee
+  ) AS is_attendee,
+  cvis.default_event_visibility AS calendar_default_visibility
 FROM calendar_events ce
+INNER JOIN calendars cvis ON cvis.id = ce.calendar_id
 LEFT JOIN users uc
   ON uc.id = ce.created_by_user_id
 WHERE ce.calendar_id = ?
@@ -188,8 +192,10 @@ SELECT
     WHERE a.event_id = ce.id
       AND a.user_id = sqlc.arg(viewer_user_id)
       AND a.enabled = TRUE
-  ) AS is_attendee
+  ) AS is_attendee,
+  cvis.default_event_visibility AS calendar_default_visibility
 FROM calendar_events ce
+INNER JOIN calendars cvis ON cvis.id = ce.calendar_id
 INNER JOIN calendars c
   ON c.id = ce.calendar_id
 INNER JOIN calendar_members cm
@@ -244,8 +250,10 @@ SELECT
     WHERE a.event_id = ce.id
       AND a.user_id = sqlc.arg(viewer_user_id)
       AND a.enabled = TRUE
-  ) AS is_attendee
+  ) AS is_attendee,
+  cvis.default_event_visibility AS calendar_default_visibility
 FROM calendar_events ce
+INNER JOIN calendars cvis ON cvis.id = ce.calendar_id
 INNER JOIN calendars c
   ON c.id = ce.calendar_id
 INNER JOIN calendar_members cm
@@ -313,8 +321,10 @@ SELECT
     WHERE a.event_id = ce.id
       AND a.user_id = sqlc.arg(viewer_user_id)
       AND a.enabled = TRUE
-  ) AS is_attendee
+  ) AS is_attendee,
+  cvis.default_event_visibility AS calendar_default_visibility
 FROM calendar_events ce
+INNER JOIN calendars cvis ON cvis.id = ce.calendar_id
 INNER JOIN calendars c
   ON c.id = ce.calendar_id AND c.enabled = TRUE
 INNER JOIN workspaces w
@@ -391,8 +401,10 @@ SELECT
     WHERE a.event_id = ce.id
       AND a.user_id = sqlc.arg(viewer_user_id)
       AND a.enabled = TRUE
-  ) AS is_attendee
+  ) AS is_attendee,
+  cvis.default_event_visibility AS calendar_default_visibility
 FROM calendar_events ce
+INNER JOIN calendars cvis ON cvis.id = ce.calendar_id
 INNER JOIN calendars c
   ON c.id = ce.calendar_id AND c.enabled = TRUE
 INNER JOIN workspaces w

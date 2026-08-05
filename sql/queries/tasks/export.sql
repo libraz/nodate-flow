@@ -18,10 +18,29 @@ SELECT
   t.created_at
 FROM tasks t
 INNER JOIN projects p ON p.id = t.project_id AND p.enabled = TRUE
-LEFT JOIN task_actors ta ON ta.task_id = t.id
-  AND ta.role = 'assignee'
-  AND ta.kind = 'user'
-  AND ta.enabled = TRUE
+-- One row per task, whatever the number of assignees. Joining
+-- task_actors on task_id alone multiplies the task across its
+-- assignees, and an export is both counted and capped by row: a task
+-- with three assignees appears three times, inflates the total, and
+-- pushes three real tasks past the limit, where they are dropped
+-- without a word. Matching a single actor row keeps one task one row.
+--
+-- The primary assignee is picked by the same order the task list uses
+-- (_v_task_list_all), so the two surfaces name the same person. That
+-- view ranks with ROW_NUMBER() because it also counts assignees; here
+-- the equivalent single-row match is written as a subquery so a_user
+-- stays a plain column reference and the generated types keep the
+-- nullability a LEFT JOIN implies.
+LEFT JOIN task_actors ta ON ta.id = (
+  SELECT ta_pick.id
+  FROM task_actors ta_pick
+  WHERE ta_pick.task_id = t.id
+    AND ta_pick.role = 'assignee'
+    AND ta_pick.kind = 'user'
+    AND ta_pick.enabled = TRUE
+  ORDER BY ta_pick.sort_weight ASC, ta_pick.id ASC
+  LIMIT 1
+)
 LEFT JOIN users a_user ON a_user.id = ta.user_id AND a_user.enabled = TRUE
 WHERE t.workspace_id = sqlc.arg('workspace_id')
   AND t.enabled = TRUE
@@ -76,10 +95,29 @@ SELECT
   t.created_at
 FROM tasks t
 INNER JOIN projects p ON p.id = t.project_id AND p.enabled = TRUE
-LEFT JOIN task_actors ta ON ta.task_id = t.id
-  AND ta.role = 'assignee'
-  AND ta.kind = 'user'
-  AND ta.enabled = TRUE
+-- One row per task, whatever the number of assignees. Joining
+-- task_actors on task_id alone multiplies the task across its
+-- assignees, and an export is both counted and capped by row: a task
+-- with three assignees appears three times, inflates the total, and
+-- pushes three real tasks past the limit, where they are dropped
+-- without a word. Matching a single actor row keeps one task one row.
+--
+-- The primary assignee is picked by the same order the task list uses
+-- (_v_task_list_all), so the two surfaces name the same person. That
+-- view ranks with ROW_NUMBER() because it also counts assignees; here
+-- the equivalent single-row match is written as a subquery so a_user
+-- stays a plain column reference and the generated types keep the
+-- nullability a LEFT JOIN implies.
+LEFT JOIN task_actors ta ON ta.id = (
+  SELECT ta_pick.id
+  FROM task_actors ta_pick
+  WHERE ta_pick.task_id = t.id
+    AND ta_pick.role = 'assignee'
+    AND ta_pick.kind = 'user'
+    AND ta_pick.enabled = TRUE
+  ORDER BY ta_pick.sort_weight ASC, ta_pick.id ASC
+  LIMIT 1
+)
 LEFT JOIN users a_user ON a_user.id = ta.user_id AND a_user.enabled = TRUE
 WHERE t.workspace_id = sqlc.arg('workspace_id')
   AND t.project_id = sqlc.arg('project_id')

@@ -112,6 +112,35 @@ func (q *Queries) EnqueueAgentRun(ctx context.Context, arg EnqueueAgentRunParams
 	return result.LastInsertId()
 }
 
+const failExhaustedAgentRuns = `-- name: FailExhaustedAgentRuns :execrows
+UPDATE agent_runs
+SET status = 'failed',
+    finished_at = NOW(3),
+    error_message = ?
+WHERE status = 'claimed'
+  AND claimed_at IS NOT NULL
+  AND claimed_at < ?
+  AND attempts >= ?
+  AND enabled = TRUE
+`
+
+type FailExhaustedAgentRunsParams struct {
+	ErrorMessage sql.NullString `json:"errorMessage"`
+	ClaimedAt    sql.NullTime   `json:"claimedAt"`
+	Attempts     uint8          `json:"attempts"`
+}
+
+// Fail agent runs that stranded once too often. Without this the rows
+// requeued above would cycle between pending and claimed forever,
+// spending a model call each time.
+func (q *Queries) FailExhaustedAgentRuns(ctx context.Context, arg FailExhaustedAgentRunsParams) (int64, error) {
+	result, err := q.db.ExecContext(ctx, failExhaustedAgentRuns, arg.ErrorMessage, arg.ClaimedAt, arg.Attempts)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
+}
+
 const getLastSuccessfulAgentRun = `-- name: GetLastSuccessfulAgentRun :one
 SELECT scheduled_at
 FROM agent_runs
@@ -305,4 +334,39 @@ WHERE status IN ('succeeded', 'failed')
 func (q *Queries) PurgeFinishedAgentRuns(ctx context.Context, finishedAt sql.NullTime) error {
 	_, err := q.db.ExecContext(ctx, purgeFinishedAgentRuns, finishedAt)
 	return err
+}
+
+const requeueStrandedAgentRuns = `-- name: RequeueStrandedAgentRuns :execrows
+UPDATE agent_runs
+SET status = 'pending',
+    claimed_at = NULL
+WHERE status = 'claimed'
+  AND claimed_at IS NOT NULL
+  AND claimed_at < ?
+  AND attempts < ?
+  AND enabled = TRUE
+`
+
+type RequeueStrandedAgentRunsParams struct {
+	ClaimedAt sql.NullTime `json:"claimedAt"`
+	Attempts  uint8        `json:"attempts"`
+}
+
+// Return agent runs stranded in 'claimed' to the pending queue.
+//
+// A worker that dies between claiming a run and finishing it leaves the
+// row claimed forever; the scheduler's dedupe key is still held, so that
+// agent never runs again either.
+//
+// Runs go back to 'pending' while they still have retry budget. The
+// budget matters more here than for webhooks: every attempt costs a
+// model call, so a run that keeps killing its worker must not be
+// retried forever. Rows past the cap are failed by
+// FailExhaustedAgentRuns instead.
+func (q *Queries) RequeueStrandedAgentRuns(ctx context.Context, arg RequeueStrandedAgentRunsParams) (int64, error) {
+	result, err := q.db.ExecContext(ctx, requeueStrandedAgentRuns, arg.ClaimedAt, arg.Attempts)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
 }
