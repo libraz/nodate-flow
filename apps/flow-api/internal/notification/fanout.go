@@ -191,11 +191,22 @@ func (f *Fanout) fanout(ctx context.Context, workspaceID uint32, eventType strin
 		return
 	}
 
-	// Determine recipients: all active workspace members except the actor.
-	recipients, err := f.workspaceMemberUserIDs(ctx, workspaceID)
+	// Determine recipients. For an event that names a task, "everyone in
+	// the workspace" is the wrong set: a notification carries the task's
+	// title, so closing the list endpoints while leaving this open moves
+	// the same leak to the notification bell. Recipients are therefore
+	// the members who may read that task, by the same Layer 4 rule the
+	// lists apply.
+	var recipients []uint32
+	if row.taskID.Valid {
+		recipients, err = f.taskVisibleMemberUserIDs(ctx, workspaceID, uint32(row.taskID.Int64)) //#nosec G115 -- events.task_id references tasks.id, which fits uint32 within realistic deployments
+	} else {
+		recipients, err = f.workspaceMemberUserIDs(ctx, workspaceID)
+	}
 	if err != nil {
-		slog.ErrorContext(ctx, "notification fanout: failed to list workspace members",
+		slog.ErrorContext(ctx, "notification fanout: failed to list recipients",
 			slog.Uint64("workspace_id", uint64(workspaceID)),
+			slog.Bool("task_scoped", row.taskID.Valid),
 			slog.String("err", err.Error()))
 		return
 	}
@@ -459,6 +470,10 @@ func (f *Fanout) loadPreferencesWithRetry(
 type eventRow struct {
 	actorUserID      sql.NullInt32
 	resourcePublicID types.PublicID
+	// taskID is the internal id of the task the event names, when it
+	// names one. It decides the recipient set: an event about a task
+	// may only notify people who may read that task.
+	taskID sql.NullInt64
 }
 
 // eventByID fetches the row identified by (workspaceID, eventInternalID).
@@ -471,7 +486,8 @@ func (f *Fanout) eventByID(ctx context.Context, workspaceID uint32, eventInterna
 		       CASE
 		         WHEN e.task_id IS NOT NULL THEN (SELECT t.public_id FROM tasks t WHERE t.id = e.task_id)
 		         ELSE NULL
-		       END AS resource_public_id
+		       END AS resource_public_id,
+		       e.task_id
 		FROM events e
 		WHERE e.id = ?
 		  AND e.workspace_id = ?
@@ -481,11 +497,74 @@ func (f *Fanout) eventByID(ctx context.Context, workspaceID uint32, eventInterna
 	err := f.db.QueryRowContext(ctx, q, eventInternalID, workspaceID).Scan(
 		&r.actorUserID,
 		&r.resourcePublicID,
+		&r.taskID,
 	)
 	if err != nil {
 		return r, fmt.Errorf("eventByID: %w", err)
 	}
 	return r, nil
+}
+
+// taskVisibleMemberUserIDs returns the workspace members who may read
+// the given task, which is the recipient set for any notification whose
+// text is derived from it.
+//
+// The predicate is the Layer 4 task visibility rule turned around: the
+// list queries ask "which tasks may this reader see", and this asks
+// "which readers may see this task". Same four branches, same meaning —
+// workspace admins and owners are elevated, public tasks are for
+// everyone, a project task is for its project members, and a private
+// task is for its creator and the people assigned to it.
+//
+// A task that has since been disabled yields no recipients, so a
+// notification queued against a deleted task quietly reaches nobody
+// rather than fanning out on stale rows.
+func (f *Fanout) taskVisibleMemberUserIDs(ctx context.Context, workspaceID, taskID uint32) ([]uint32, error) {
+	const q = `
+		SELECT wm.user_id
+		FROM workspace_members wm
+		INNER JOIN tasks t
+		  ON t.id = ?
+		 AND t.workspace_id = wm.workspace_id
+		 AND t.enabled = TRUE
+		WHERE wm.workspace_id = ?
+		  AND wm.enabled = TRUE
+		  AND (
+		    wm.role IN ('admin', 'owner')
+		    OR t.visibility = 'public'
+		    OR (t.visibility = 'project' AND EXISTS (
+		      SELECT 1 FROM project_members pm
+		      WHERE pm.project_id = t.project_id
+		        AND pm.user_id = wm.user_id
+		        AND pm.enabled = TRUE
+		    ))
+		    OR (t.visibility = 'private' AND (
+		      t.created_by_user_id = wm.user_id
+		      OR EXISTS (
+		        SELECT 1 FROM task_actors ta
+		        WHERE ta.task_id = t.id
+		          AND ta.kind = 'user'
+		          AND ta.user_id = wm.user_id
+		          AND ta.enabled = TRUE
+		      )
+		    ))
+		  )
+	`
+	rows, err := f.db.QueryContext(ctx, q, taskID, workspaceID)
+	if err != nil {
+		return nil, fmt.Errorf("taskVisibleMemberUserIDs: %w", err)
+	}
+	defer rows.Close()
+
+	var ids []uint32
+	for rows.Next() {
+		var id uint32
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		ids = append(ids, id)
+	}
+	return ids, rows.Err()
 }
 
 // workspaceMemberUserIDs returns the internal user IDs of all active

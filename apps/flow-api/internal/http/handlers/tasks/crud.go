@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/acl"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/audit"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/dbretry"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
@@ -644,10 +645,16 @@ func List(deps Deps) func(context.Context, *ListTasksInput) (*ListTasksOutput, e
 			}
 			return out, nil
 		}
+
+		vis := acl.ListVisibilityArgs(actorID, acl.WorkspaceRole(wsRole2))
 		rows, err := deps.Queries.ListTasksForWorkspace(ctx, generated.ListTasksForWorkspaceParams{
-			WorkspaceID: wsInternal,
-			Limit:       limit,
-			Offset:      in.Offset,
+			WorkspaceID:   wsInternal,
+			IsElevated:    vis.IsElevated,
+			ActorUserID:   vis.ActorUserID,
+			ActorUserID_2: vis.ActorUserID,
+			ActorUserID_3: vis.ActorUserID,
+			Limit:         limit,
+			Offset:        in.Offset,
 		})
 		if err != nil {
 			return nil, httpErr(apierrors.InternalUnexpected)

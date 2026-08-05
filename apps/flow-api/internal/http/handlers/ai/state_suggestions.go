@@ -4,6 +4,7 @@ import (
 	"context"
 	"time"
 
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/acl"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/ai/stateinfer"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
 	apierrors "github.com/libraz/nodate-flow/apps/flow-api/internal/errors"
@@ -53,10 +54,25 @@ func ListStateSuggestions(deps Deps) func(context.Context, *ListStateSuggestions
 		if !ok {
 			return nil, httpErr(apierrors.WsWorkspaceNotFound)
 		}
+		actorID, ok := middleware.ActorFromContext(ctx)
+		if !ok {
+			return nil, httpErr(apierrors.WsWorkspaceAccessDenied)
+		}
+		// These endpoints read the workspace task list to derive a
+		// suggestion, and every suggestion carries the task's title. So
+		// the read takes the same visibility filter a plain task list
+		// does: an AI feature is a reader like any other, and deriving
+		// a recommendation from a task does not grant sight of it.
+
+		vis := acl.ListVisibilityArgs(actorID, acl.WorkspaceRole(ws.Role))
 		rows, err := deps.Queries.ListTasksForWorkspace(ctx, generated.ListTasksForWorkspaceParams{
-			WorkspaceID: ws.ID,
-			Limit:       stateSuggestionsLimit,
-			Offset:      0,
+			WorkspaceID:   ws.ID,
+			IsElevated:    vis.IsElevated,
+			ActorUserID:   vis.ActorUserID,
+			ActorUserID_2: vis.ActorUserID,
+			ActorUserID_3: vis.ActorUserID,
+			Limit:         stateSuggestionsLimit,
+			Offset:        0,
 		})
 		if err != nil {
 			return nil, httpErr(apierrors.InternalUnexpected)

@@ -3,6 +3,7 @@ package inbox
 import (
 	"context"
 
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/acl"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
 	apierrors "github.com/libraz/nodate-flow/apps/flow-api/internal/errors"
@@ -33,20 +34,37 @@ func List(deps Deps) func(context.Context, *ListInboxInput) (*ListInboxOutput, e
 			if err != nil {
 				return nil, err
 			}
+			// An inbox item names the task a signal was linked to, and
+			// that link is not automatically the reader's to follow.
+			// The task columns are blanked for anyone the task's own
+			// visibility excludes; the signal itself still lists.
+			wsRole, err := acl.CheckWorkspaceMember(ctx, deps.DB, wsID, actorID, nil)
+			if err != nil {
+				return nil, err
+			}
+			vis := acl.ListVisibilityArgs(actorID, wsRole)
 			rows, err := deps.Queries.ListInbox(ctx, generated.ListInboxParams{
-				WorkspaceID: wsID,
-				Limit:       limit,
-				Offset:      in.Offset,
+				WorkspaceID:   wsID,
+				IsElevated:    vis.IsElevated,
+				ActorUserID:   vis.ActorUserID,
+				ActorUserID_2: vis.ActorUserID,
+				ActorUserID_3: vis.ActorUserID,
+				Limit:         limit,
+				Offset:        in.Offset,
 			})
 			if err != nil {
 				return nil, httpErr(apierrors.InternalUnexpected)
 			}
 			for _, r := range rows {
+				taskID, taskTitle := nullBytesToUUIDString(r.TaskPublicID), nullStr(r.TaskTitle)
+				if !r.TaskVisible.Valid || !r.TaskVisible.Bool {
+					taskID, taskTitle = "", ""
+				}
 				out.Body.Items = append(out.Body.Items, Item{
 					ID:          r.PublicID.String(),
 					WorkspaceID: bytesToUUIDString(r.WorkspacePublicID),
-					TaskID:      nullBytesToUUIDString(r.TaskPublicID),
-					TaskTitle:   nullStr(r.TaskTitle),
+					TaskID:      taskID,
+					TaskTitle:   taskTitle,
 					Source:      string(r.Source),
 					Kind:        r.Kind,
 					ExternalID:  nullStr(r.ExternalID),
@@ -61,20 +79,35 @@ func List(deps Deps) func(context.Context, *ListInboxInput) (*ListInboxOutput, e
 			return out, nil
 		}
 
+		// The cross-workspace feed spans workspaces whose roles differ,
+		// so there is no single elevated flag to compute. The actor is
+		// treated as unelevated throughout and sees task titles only
+		// where the task's own visibility admits them; an admin loses
+		// nothing they can still reach through that workspace's own
+		// inbox, which does compute the flag.
+		userVis := acl.ListVisibilityArgs(actorID, acl.WorkspaceRoleMember)
 		rows, err := deps.Queries.ListInboxForUser(ctx, generated.ListInboxForUserParams{
-			UserID: actorID,
-			Limit:  limit,
-			Offset: in.Offset,
+			UserID:        actorID,
+			IsElevated:    userVis.IsElevated,
+			ActorUserID:   userVis.ActorUserID,
+			ActorUserID_2: userVis.ActorUserID,
+			ActorUserID_3: userVis.ActorUserID,
+			Limit:         limit,
+			Offset:        in.Offset,
 		})
 		if err != nil {
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
 		for _, r := range rows {
+			taskID, taskTitle := nullBytesToUUIDString(r.TaskPublicID), nullStr(r.TaskTitle)
+			if !r.TaskVisible.Valid || !r.TaskVisible.Bool {
+				taskID, taskTitle = "", ""
+			}
 			out.Body.Items = append(out.Body.Items, Item{
 				ID:          r.PublicID.String(),
 				WorkspaceID: bytesToUUIDString(r.WorkspacePublicID),
-				TaskID:      nullBytesToUUIDString(r.TaskPublicID),
-				TaskTitle:   nullStr(r.TaskTitle),
+				TaskID:      taskID,
+				TaskTitle:   taskTitle,
 				Source:      string(r.Source),
 				Kind:        r.Kind,
 				ExternalID:  nullStr(r.ExternalID),

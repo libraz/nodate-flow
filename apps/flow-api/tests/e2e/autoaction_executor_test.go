@@ -65,7 +65,7 @@ func TestAutoActionExecutorClosesStaleReviewViaCanonicalPath(t *testing.T) {
 		},
 		Logger: slog.Default(),
 	}
-	requireCompletePass(t, ctx, exec)
+	requireCompletePass(ctx, t, exec)
 
 	// Assert: derived_state moved to done.
 	derived := readDerivedState(ctx, t, taskID)
@@ -130,7 +130,7 @@ func TestAutoActionExecutorAutoClosesStaleViaCanonicalPath(t *testing.T) {
 		},
 		Logger: slog.Default(),
 	}
-	requireCompletePass(t, ctx, exec)
+	requireCompletePass(ctx, t, exec)
 
 	derived := readDerivedState(ctx, t, taskID)
 	require.Equal(t, "cancelled", derived,
@@ -274,7 +274,7 @@ func requireNoProposalEvent(ctx context.Context, t *testing.T, taskID uint32) {
 // rather than at the pass that ended. Checking the pass first keeps the
 // assertion about behaviour instead of about how many workspaces the
 // suite happened to leave lying around.
-func requireCompletePass(t *testing.T, ctx context.Context, exec *autoactions.Executor) {
+func requireCompletePass(ctx context.Context, t *testing.T, exec *autoactions.Executor) {
 	t.Helper()
 	require.NoError(t, exec.RunOnce(ctx),
 		"the auto-action pass did not reach every workspace, so this workspace may never have been evaluated")
