@@ -132,6 +132,22 @@ function unixToHHMM(sec: number): string {
   return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
 }
 
+/**
+ * Unix seconds for midnight UTC on a `YYYY-MM-DD` date.
+ *
+ * All-day events are dates, and a date is the same square on the
+ * calendar wherever you are. Sending local midnight made it an instant
+ * that lands on a different date for anyone whose offset crosses it: a
+ * Tokyo user's company holiday arrived as 15:00Z the day before and read
+ * as the 4th in Europe, and an agent reported it as the 4th as well. The
+ * API normalises to midnight UTC on the way in, so sending anything else
+ * only means the value echoed back is not the one that was sent.
+ */
+function toUnixUTCDate(dateStr: string): number {
+  const [y, m, day] = dateStr.split('-').map(Number);
+  return Math.floor(Date.UTC(y ?? 1970, (m ?? 1) - 1, day ?? 1, 0, 0, 0, 0) / 1000);
+}
+
 /** Combine a `YYYY-MM-DD` date and a `HH:MM` time into unix seconds (local tz). */
 function toUnix(dateStr: string, timeStr: string): number {
   const [y, m, day] = dateStr.split('-').map(Number);
@@ -778,11 +794,11 @@ export default function EventDialog({
     };
     if (calKind === 'milestone') {
       // Backend enforces (StartAt == nil) != (EndAt == nil); set both.
-      body.startAt = toUnix(startDate, '00:00');
+      body.startAt = toUnixUTCDate(startDate);
       body.endAt = body.startAt;
     } else if (allDay) {
-      body.startAt = toUnix(startDate, '00:00');
-      body.endAt = toUnix(endDate, '23:59');
+      body.startAt = toUnixUTCDate(startDate);
+      body.endAt = toUnixUTCDate(endDate);
     } else {
       body.startAt = toUnix(startDate, startTime);
       body.endAt = toUnix(endDate, endTime);
@@ -825,11 +841,11 @@ export default function EventDialog({
       body.allDay = calKind === 'milestone' ? true : allDay;
       if (calKind === 'milestone') {
         // Backend enforces (StartAt == nil) != (EndAt == nil); set both.
-        body.startAt = toUnix(startDate, '00:00');
+        body.startAt = toUnixUTCDate(startDate);
         body.endAt = body.startAt;
       } else if (allDay) {
-        body.startAt = toUnix(startDate, '00:00');
-        body.endAt = toUnix(endDate, '23:59');
+        body.startAt = toUnixUTCDate(startDate);
+        body.endAt = toUnixUTCDate(endDate);
       } else {
         body.startAt = toUnix(startDate, startTime);
         body.endAt = toUnix(endDate, endTime);

@@ -40,7 +40,7 @@ function InviteErrorComponent({ error }: { error: unknown }): ReactElement {
           textAlign: 'center',
         }}
       >
-        <AlertCircle size={44} aria-hidden="true" style={{ color: 'var(--nf-color-danger)' }} />
+        <AlertCircle size={44} aria-hidden="true" style={{ color: 'var(--nf-color-danger-fg)' }} />
         <h1
           style={{
             margin: 0,

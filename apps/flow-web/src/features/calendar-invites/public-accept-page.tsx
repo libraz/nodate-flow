@@ -144,7 +144,7 @@ function AcceptInviteForm({ token }: AcceptInviteFormProps): ReactElement {
                 padding: 'var(--nf-space-2) var(--nf-space-3)',
                 borderRadius: 'var(--nf-radius-sm)',
                 backgroundColor: 'var(--nf-color-danger-subtle)',
-                color: 'var(--nf-color-danger)',
+                color: 'var(--nf-color-danger-fg)',
                 fontSize: 'var(--nf-text-sm)',
               }}
               role="alert"

@@ -184,7 +184,7 @@ function TodayRoute(): ReactElement {
                 fontSize: 'var(--nf-text-supporting)',
                 textTransform: 'uppercase',
                 letterSpacing: '0.05em',
-                color: isOverdue ? 'var(--nf-color-danger)' : 'var(--nf-color-fg-muted)',
+                color: isOverdue ? 'var(--nf-color-danger-fg)' : 'var(--nf-color-fg-muted)',
               }}
             >
               {t(`today.sections.${key}`)} ({items.length})

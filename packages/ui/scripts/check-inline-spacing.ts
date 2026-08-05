@@ -175,9 +175,17 @@ const PX_THRESHOLD = 4;
  * comment that mentions `nf-token-override` while explaining the
  * mechanism is discussing it, not invoking it, and a substring match
  * could not tell those apart — two files were exempt on that basis alone.
+ *
+ * `REASON` is a copy of the string in scripts/lib/token-override.mjs,
+ * which the colour scan builds its own marker from. This package compiles
+ * with `rootDir: "."`, so importing it would break the build; a test
+ * asserts the two copies stay identical instead. The marker name is
+ * deliberately not shared — an exemption written about a padding value
+ * has no business silencing a colour on the same line.
  */
-const OVERRIDE_LINE = /nf-token-override:[^\S\n]*(?![*/]\s*$)[A-Za-z][^\n]*[A-Za-z]/;
-const OVERRIDE_FILE = /nf-token-override-file:[^\S\n]*(?![*/]\s*$)[A-Za-z][^\n]*[A-Za-z]/;
+const REASON = String.raw`[^\S\n]*(?![*/]\s*$)[A-Za-z][^\n]*[A-Za-z]`;
+const OVERRIDE_LINE = new RegExp(`nf-token-override:${REASON}`);
+const OVERRIDE_FILE = new RegExp(`nf-token-override-file:${REASON}`);
 
 /**
  * Lines exempted by an annotation.

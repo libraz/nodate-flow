@@ -163,7 +163,7 @@
 }
 
 .menuItem--danger {
-  color: var(--nf-color-danger);
+  color: var(--nf-color-danger-fg);
 }
 
 .addButton {
@@ -329,7 +329,7 @@
 
 .discoverError {
   margin: 0;
-  color: var(--nf-color-danger);
+  color: var(--nf-color-danger-fg);
   font-size: var(--nf-text-sm);
 }
 

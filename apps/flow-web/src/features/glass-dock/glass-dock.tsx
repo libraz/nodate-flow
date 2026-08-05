@@ -254,7 +254,7 @@ function NlQueryPanel({ workspaceId }: { workspaceId: string | undefined }): Rea
       {errorMsg ? (
         <p
           role="alert"
-          style={{ margin: 0, fontSize: 'var(--nf-text-xs)', color: 'var(--nf-color-danger)' }}
+          style={{ margin: 0, fontSize: 'var(--nf-text-xs)', color: 'var(--nf-color-danger-fg)' }}
         >
           {errorMsg}
         </p>

@@ -71,9 +71,13 @@ export interface ThemePickerProps {
 // Defaults
 // ---------------------------------------------------------------------------
 
-/** Default preview styles for the built-in theme families.
- * nf-token-override: miniature previews intentionally hardcode theme sample
- * colors so they can show each family before that family is active.
+/**
+ * Default preview styles for the built-in theme families.
+ *
+ * nf-color-override-file: a preview has to paint a family that is not the
+ * active one, so it cannot read that family's tokens — the swatches are
+ * samples of each theme, which is the one place a literal is the whole
+ * point rather than an oversight.
  */
 export const DEFAULT_THEME_PREVIEWS: Record<ThemeFamily, ThemePreviewStyle> = {
   glass: {

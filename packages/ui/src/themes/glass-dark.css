@@ -17,7 +17,7 @@
   --nf-color-fg-muted: oklch(70% 0.006 260);
   --nf-color-fg-subtle: oklch(55% 0.005 260);
   --nf-color-fg-on-accent: oklch(100% 0 0);
-  --nf-color-fg-on-danger: oklch(100% 0 0);
+  --nf-color-fg-on-danger: oklch(15% 0.02 260);
 
   --nf-color-border: oklch(27% 0.01 260);
   --nf-color-border-strong: oklch(38% 0.012 260);

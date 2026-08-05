@@ -33,7 +33,7 @@
   --nf-color-warning: oklch(78% 0.15 75);
   --nf-color-warning-subtle: oklch(94% 0.03 75);
   --nf-color-warning-fg: oklch(42% 0.112 75);
-  --nf-color-danger: oklch(60% 0.21 25);
+  --nf-color-danger: oklch(58.5% 0.21 25);
   --nf-color-danger-subtle: oklch(94% 0.03 25);
   --nf-color-danger-fg: oklch(42% 0.158 25);
   --nf-color-info: oklch(70% 0.13 240);

@@ -163,28 +163,28 @@
 
 .toneInfo {
   --sc-inactive-bg: var(--nf-color-info-subtle);
-  --sc-inactive-fg: var(--nf-color-info);
+  --sc-inactive-fg: var(--nf-color-info-fg);
   --sc-active-bg: var(--nf-color-info);
   --sc-active-fg: var(--nf-color-fg-on-accent);
 }
 
 .toneSuccess {
   --sc-inactive-bg: var(--nf-color-success-subtle);
-  --sc-inactive-fg: var(--nf-color-success);
+  --sc-inactive-fg: var(--nf-color-success-fg);
   --sc-active-bg: var(--nf-color-success);
   --sc-active-fg: var(--nf-color-fg-on-accent);
 }
 
 .toneWarning {
   --sc-inactive-bg: var(--nf-color-warning-subtle);
-  --sc-inactive-fg: var(--nf-color-warning);
+  --sc-inactive-fg: var(--nf-color-warning-fg);
   --sc-active-bg: var(--nf-color-warning);
   --sc-active-fg: var(--nf-color-fg-on-accent);
 }
 
 .toneDanger {
   --sc-inactive-bg: var(--nf-color-danger-subtle);
-  --sc-inactive-fg: var(--nf-color-danger);
+  --sc-inactive-fg: var(--nf-color-danger-fg);
   --sc-active-bg: var(--nf-color-danger);
   --sc-active-fg: var(--nf-color-fg-on-accent);
 }

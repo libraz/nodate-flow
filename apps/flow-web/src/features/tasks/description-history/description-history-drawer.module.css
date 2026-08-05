@@ -128,7 +128,7 @@
 
 .diffLineRemoved {
   display: block;
-  color: var(--nf-color-danger);
+  color: var(--nf-color-danger-fg);
   background: transparent;
   text-decoration: line-through;
 }
@@ -143,6 +143,6 @@
 
 .error {
   margin: 0;
-  color: var(--nf-color-danger);
+  color: var(--nf-color-danger-fg);
   font-size: var(--nf-text-sm);
 }

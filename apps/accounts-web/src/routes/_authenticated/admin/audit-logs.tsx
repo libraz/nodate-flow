@@ -192,7 +192,7 @@ function AuditLogsPage(): ReactElement {
           role="alert"
           style={{
             margin: 0,
-            color: 'var(--nf-color-danger)',
+            color: 'var(--nf-color-danger-fg)',
             fontSize: 'var(--nf-text-sm)',
           }}
         >

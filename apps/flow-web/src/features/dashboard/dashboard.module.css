@@ -128,7 +128,7 @@
   border: none;
   border-radius: var(--nf-radius-sm);
   background: transparent;
-  color: var(--nf-color-danger);
+  color: var(--nf-color-danger-fg);
   cursor: pointer;
   flex-shrink: 0;
   transition: background var(--nf-duration-fast) var(--nf-ease-standard);

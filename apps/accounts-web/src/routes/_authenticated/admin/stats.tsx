@@ -131,7 +131,7 @@ function StatsPage(): ReactElement {
             borderRadius: 'var(--nf-radius-md)',
             border: '1px solid var(--nf-color-border)',
             background: 'color-mix(in srgb, var(--nf-color-danger) 10%, transparent)',
-            color: 'var(--nf-color-danger)',
+            color: 'var(--nf-color-danger-fg)',
             fontSize: 'var(--nf-text-sm)',
           }}
         >

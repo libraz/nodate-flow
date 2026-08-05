@@ -272,7 +272,7 @@
 
 .unlinkBtn:hover {
   background: color-mix(in oklab, var(--nf-color-danger) 12%, transparent);
-  color: var(--nf-color-danger);
+  color: var(--nf-color-danger-fg);
 }
 
 .unlinkBtn:focus-visible {
@@ -402,7 +402,7 @@
   margin: 0;
   padding: var(--nf-space-2) var(--nf-space-4);
   font-size: var(--nf-text-xs);
-  color: var(--nf-color-danger);
+  color: var(--nf-color-danger-fg);
   background: color-mix(in oklab, var(--nf-color-danger) 6%, transparent);
 }
 

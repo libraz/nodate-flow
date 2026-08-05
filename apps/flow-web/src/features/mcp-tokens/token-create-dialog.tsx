@@ -153,7 +153,7 @@ export default function TokenCreateDialog({
           <p
             style={{
               margin: 0,
-              color: 'var(--nf-color-warning)',
+              color: 'var(--nf-color-warning-fg)',
               fontSize: 'var(--nf-text-sm)',
             }}
           >

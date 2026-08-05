@@ -51,6 +51,7 @@ import EventDialog, {
   type EventDialogMode,
   type ItemKind,
 } from '../features/calendar-events/event-dialog';
+import { shiftEventDays } from '../features/calendar-events/lib/shift-event';
 import MonthScroll from '../features/calendar-events/month-scroll';
 import PendingInvitesPanel from '../features/calendar-invites/pending-invites-panel';
 import calendarLayoutStyles from '../features/calendar-invites/pending-invites-panel.module.css';
@@ -61,7 +62,7 @@ import type { TaskDerivedState } from '../features/tasks/api';
 import { STATE_COLOR } from '../features/tasks/constants';
 import { useWorkspacesQuery } from '../features/workspaces/api';
 import { type ApiError, toApiError } from '../lib/api-error';
-import { dateKey } from '../lib/date-utils';
+import { dateKey, eventStartOfDay } from '../lib/date-utils';
 import { sdk } from '../lib/sdk';
 import { useActiveWorkspaceId } from '../lib/use-current-workspace';
 import styles from './_authenticated.calendar.module.css';
@@ -175,9 +176,42 @@ function buildMonthGrid(year: number, monthIndex: number, weekStart: WeekStart):
 }
 
 /** Unix seconds → YYYY-MM-DD in the local tz. */
-function dateKeyFromUnix(unixSeconds: number): string {
-  return dateKey(new Date(unixSeconds * 1000));
+/**
+ * Every `YYYY-MM-DD` cell a calendar event occupies, from its first day
+ * through its last.
+ *
+ * A single-day event yields one key, which is what the grid always did.
+ * A multi-day event yields one per day, which is what it did not: the
+ * month grid filed events by start day alone, so anything spanning a
+ * boundary vanished from every cell after the first.
+ *
+ * The span is capped so a malformed row — an end far in the future, or
+ * an event whose end precedes its start — cannot make the loop run away
+ * while building a map for one month's grid.
+ */
+function eventDayKeys(event: CalendarEvent): string[] {
+  if (typeof event.startAt !== 'number') return [];
+  const allDay = event.allDay === true;
+  const start = eventStartOfDay(event.startAt, allDay);
+  const endSeconds = typeof event.endAt === 'number' ? event.endAt : event.startAt;
+  const end = eventStartOfDay(endSeconds, allDay);
+
+  const keys = [dateKey(start)];
+  const cursor = new Date(start);
+  for (let i = 0; i < MAX_EVENT_SPAN_DAYS && cursor < end; i++) {
+    cursor.setDate(cursor.getDate() + 1);
+    if (cursor > end) break;
+    keys.push(dateKey(cursor));
+  }
+  return keys;
 }
+
+/**
+ * Upper bound on the number of cells one event may occupy. A month grid
+ * shows at most six weeks, so anything past that is a data problem
+ * rather than a long holiday, and the cap keeps it from becoming a hang.
+ */
+const MAX_EVENT_SPAN_DAYS = 42;
 
 /**
  * Differentiate calendar-event pills by kind. Returns inline style
@@ -200,8 +234,11 @@ function pillStyleForKind(kind: string): {
     case 'block':
       return {
         background: 'var(--nf-cal-block-subtle)',
+        // The hatch has to darken a light canvas and lighten a dark one,
+        // so it is mixed from the theme's foreground rather than written
+        // as black: a flat 4% black is invisible on the dark themes.
         backgroundImage:
-          'repeating-linear-gradient(135deg, transparent 0 6px, rgba(0,0,0,0.04) 6px 8px)',
+          'repeating-linear-gradient(135deg, transparent 0 6px, color-mix(in oklch, var(--nf-color-fg) 4%, transparent) 6px 8px)',
         markerColor: 'var(--nf-cal-block-color)',
       };
     case 'free':
@@ -299,23 +336,6 @@ function expandCalendarEvents(
       ? { endAt: isoToSeconds(instance.endAt) ?? instance.event.endAt }
       : {}),
   }));
-}
-
-/**
- * Shift an event's start/end by `dayDelta` whole days while preserving
- * its duration. The month grid is day-resolution, so only the date part
- * moves; the time-of-day component carried in the unix timestamps is
- * left intact. Returns the new `{ startAt, endAt }` in unix seconds.
- */
-function shiftEventDays(
-  event: CalendarEvent,
-  dayDelta: number,
-): { startAt: number; endAt: number } | null {
-  if (typeof event.startAt !== 'number') return null;
-  const deltaSeconds = dayDelta * 86_400;
-  const startAt = event.startAt + deltaSeconds;
-  const endAt = (typeof event.endAt === 'number' ? event.endAt : event.startAt) + deltaSeconds;
-  return { startAt, endAt };
 }
 
 /** Whole-day difference between two local `YYYY-MM-DD` keys (`to - from`). */
@@ -654,7 +674,16 @@ function CalendarRoute(): ReactElement {
     return map;
   }, [tasks, layers.tasksDue]);
 
-  /** dateKey → calendar events (after layer filtering by kind). */
+  /**
+   * dateKey → calendar events (after layer filtering by kind).
+   *
+   * An event is filed under every day it covers, not just the day it
+   * starts. Filing it once put a five-day "Out of office" on the grid as
+   * a single Monday entry and left Tuesday to Friday looking free — on
+   * desktop only, because the mobile month-scroll lays the same data out
+   * with {@link layoutWeek} and draws the whole bar. One account, two
+   * answers to "am I away that week".
+   */
   const eventsByDate = useMemo(() => {
     const map = new Map<string, CalendarEvent[]>();
     for (const ev of expandedEvents) {
@@ -666,10 +695,11 @@ function CalendarRoute(): ReactElement {
       if (k === 'free' && !layers.free) continue;
       if (k === 'milestone' && !layers.milestone) continue;
       if (k !== 'block' && k !== 'free' && k !== 'milestone' && !layers.events) continue;
-      const key = dateKeyFromUnix(ev.startAt);
-      const arr = map.get(key);
-      if (arr) arr.push(ev);
-      else map.set(key, [ev]);
+      for (const key of eventDayKeys(ev)) {
+        const arr = map.get(key);
+        if (arr) arr.push(ev);
+        else map.set(key, [ev]);
+      }
     }
     for (const arr of map.values()) {
       arr.sort((a, b) => (a.startAt ?? 0) - (b.startAt ?? 0));

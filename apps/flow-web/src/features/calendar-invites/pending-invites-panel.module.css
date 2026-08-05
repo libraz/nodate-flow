@@ -122,7 +122,7 @@
 
 .errorMessage {
   margin: 0;
-  color: var(--nf-color-danger);
+  color: var(--nf-color-danger-fg);
 }
 
 .emptyMessage {

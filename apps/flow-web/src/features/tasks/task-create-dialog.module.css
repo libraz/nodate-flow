@@ -50,7 +50,7 @@
 }
 
 .smartError {
-  color: var(--nf-color-danger);
+  color: var(--nf-color-danger-fg);
   margin: 0;
   font-size: var(--nf-text-sm);
 }

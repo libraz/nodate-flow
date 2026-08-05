@@ -78,11 +78,11 @@
 }
 
 .weekday--sun {
-  color: var(--nf-color-danger);
+  color: var(--nf-color-danger-fg);
 }
 
 .weekday--sat {
-  color: var(--nf-color-info);
+  color: var(--nf-color-info-fg);
 }
 
 .grid {
@@ -152,15 +152,15 @@
 }
 
 .dateNumber--sun {
-  color: var(--nf-color-danger);
+  color: var(--nf-color-danger-fg);
 }
 
 .dateNumber--sat {
-  color: var(--nf-color-info);
+  color: var(--nf-color-info-fg);
 }
 
 .dateNumber--holiday {
-  color: var(--nf-color-danger);
+  color: var(--nf-color-danger-fg);
 }
 
 .todayPill {
@@ -173,7 +173,7 @@
 
 .holidayLabel {
   font-size: var(--nf-text-xs);
-  color: var(--nf-color-danger);
+  color: var(--nf-color-danger-fg);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;

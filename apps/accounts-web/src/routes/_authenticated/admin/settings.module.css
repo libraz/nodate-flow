@@ -50,12 +50,12 @@
 
 .error {
   margin: 0;
-  color: var(--nf-color-danger);
+  color: var(--nf-color-danger-fg);
   font-size: var(--nf-text-sm);
 }
 
 .success {
   margin: 0;
-  color: var(--nf-color-success);
+  color: var(--nf-color-success-fg);
   font-size: var(--nf-text-sm);
 }

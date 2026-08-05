@@ -336,7 +336,7 @@ function TitleEditor({
         <p
           id={errorId}
           role="alert"
-          style={{ margin: 0, color: 'var(--nf-color-danger)', fontSize: 'var(--nf-text-sm)' }}
+          style={{ margin: 0, color: 'var(--nf-color-danger-fg)', fontSize: 'var(--nf-text-sm)' }}
         >
           {t('tasks.validation.title_required')}
         </p>

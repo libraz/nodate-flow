@@ -157,7 +157,7 @@ function CommandModeBody({
           className={css.emptyText}
           style={{
             padding: 'var(--nf-space-2) var(--nf-space-3)',
-            color: 'var(--nf-color-danger)',
+            color: 'var(--nf-color-danger-fg)',
           }}
           aria-live="assertive"
         >

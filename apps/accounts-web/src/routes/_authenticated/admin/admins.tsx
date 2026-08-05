@@ -147,7 +147,7 @@ export function AdminsPage(): ReactElement {
           role="alert"
           style={{
             margin: 0,
-            color: 'var(--nf-color-danger)',
+            color: 'var(--nf-color-danger-fg)',
             fontSize: 'var(--nf-text-sm)',
           }}
         >
@@ -282,7 +282,7 @@ export function AdminsPage(): ReactElement {
             role="alert"
             style={{
               margin: 'var(--nf-space-2) 0 0 0',
-              color: 'var(--nf-color-danger)',
+              color: 'var(--nf-color-danger-fg)',
               fontSize: 'var(--nf-text-sm)',
             }}
           >

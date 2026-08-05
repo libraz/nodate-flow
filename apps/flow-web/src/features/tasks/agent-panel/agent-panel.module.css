@@ -80,13 +80,13 @@
 
 .statusPill[data-tone="success"] {
   background: color-mix(in oklab, var(--nf-color-success) 12%, transparent);
-  color: var(--nf-color-success);
+  color: var(--nf-color-success-fg);
   border-color: color-mix(in oklab, var(--nf-color-success) 24%, transparent);
 }
 
 .statusPill[data-tone="warning"] {
   background: color-mix(in oklab, var(--nf-color-warning) 14%, transparent);
-  color: var(--nf-color-warning);
+  color: var(--nf-color-warning-fg);
   border-color: color-mix(in oklab, var(--nf-color-warning) 28%, transparent);
 }
 
@@ -151,7 +151,7 @@
   padding: 0 var(--nf-space-2);
   border-radius: var(--nf-radius-sm);
   background: color-mix(in oklab, var(--nf-color-warning) 12%, transparent);
-  color: var(--nf-color-warning);
+  color: var(--nf-color-warning-fg);
   font-size: var(--nf-text-xs);
   line-height: 1.5rem;
 }

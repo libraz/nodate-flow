@@ -138,12 +138,12 @@
 
 .confidenceHigh {
   background: var(--nf-color-success-subtle);
-  color: var(--nf-color-success);
+  color: var(--nf-color-success-fg);
 }
 
 .confidenceLow {
   background: var(--nf-color-warning-subtle);
-  color: var(--nf-color-warning);
+  color: var(--nf-color-warning-fg);
 }
 
 /* nf-token-override: breakpoint, and custom properties do not work in at-rule conditions */

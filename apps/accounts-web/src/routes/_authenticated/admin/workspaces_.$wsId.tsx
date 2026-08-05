@@ -273,7 +273,7 @@ function WorkspaceDetailPage(): ReactElement {
         <p
           role="alert"
           style={{
-            color: 'var(--nf-color-danger)',
+            color: 'var(--nf-color-danger-fg)',
             fontSize: 'var(--nf-text-sm)',
           }}
         >
@@ -334,7 +334,7 @@ function WorkspaceDetailPage(): ReactElement {
               background: workspace.enabled
                 ? 'color-mix(in srgb, var(--nf-color-success) 15%, transparent)'
                 : 'color-mix(in srgb, var(--nf-color-danger) 15%, transparent)',
-              color: workspace.enabled ? 'var(--nf-color-success)' : 'var(--nf-color-danger)',
+              color: workspace.enabled ? 'var(--nf-color-success-fg)' : 'var(--nf-color-danger-fg)',
             }}
           >
             {workspace.enabled ? t('workspaces.enabled') : t('workspaces.disabled')}
@@ -375,7 +375,7 @@ function WorkspaceDetailPage(): ReactElement {
               margin: 0,
               fontFamily: 'var(--nf-font-sans)',
               fontSize: 'var(--nf-text-lg)',
-              color: 'var(--nf-color-danger)',
+              color: 'var(--nf-color-danger-fg)',
             }}
           >
             {t('workspaces.danger.title')}

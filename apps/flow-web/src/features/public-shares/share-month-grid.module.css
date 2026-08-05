@@ -126,11 +126,11 @@
 }
 
 .weekday--sun {
-  color: var(--nf-color-danger);
+  color: var(--nf-color-danger-fg);
 }
 
 .weekday--sat {
-  color: var(--nf-color-info);
+  color: var(--nf-color-info-fg);
 }
 
 /* ───── week row ───── */
@@ -199,11 +199,11 @@
 }
 
 .dayNumber--sat {
-  color: var(--nf-color-info);
+  color: var(--nf-color-info-fg);
 }
 
 .dayNumber--sun {
-  color: var(--nf-color-danger);
+  color: var(--nf-color-danger-fg);
 }
 
 .dayNumber--today {

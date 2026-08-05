@@ -16,7 +16,7 @@
 
 import type { components } from '@nodate-flow/sdk';
 
-import { dateKey } from '../../../lib/date-utils';
+import { eventDateKey, eventStartOfDay } from '../../../lib/date-utils';
 
 type CalendarEvent = components['schemas']['MyCalendarEventResponse'];
 
@@ -41,13 +41,6 @@ export interface PositionedEvent {
   continuesRight: boolean;
 }
 
-/** Midnight (local) `Date` for the day containing `unixSeconds`. */
-function startOfDayFromUnix(unixSeconds: number): Date {
-  const d = new Date(unixSeconds * 1000);
-  d.setHours(0, 0, 0, 0);
-  return d;
-}
-
 /** Midnight (local) `Date` for `d`. */
 export function startOfDay(d: Date): Date {
   const out = new Date(d);
@@ -61,15 +54,23 @@ function dayDiff(a: Date, b: Date): number {
   return Math.round(ms / 86_400_000);
 }
 
-/** Resolve an event's start as a local-midnight `Date`, or null if absent. */
+/**
+ * Resolve an event's start as the day cell it belongs in, or null if
+ * absent.
+ *
+ * All-day events are read in UTC and timed events locally — see
+ * [eventStartOfDay]. Reading an all-day row with local getters moves it
+ * a day for anyone whose offset crosses midnight, which is how the same
+ * company holiday showed on different dates for different colleagues.
+ */
 export function eventStartDay(evt: CalendarEvent): Date | null {
   if (typeof evt.startAt !== 'number') return null;
-  return startOfDayFromUnix(evt.startAt);
+  return eventStartOfDay(evt.startAt, evt.allDay === true);
 }
 
-/** Resolve an event's end as a local-midnight `Date`, falling back to start. */
+/** Resolve an event's end as a day cell, falling back to its start. */
 export function eventEndDay(evt: CalendarEvent): Date | null {
-  if (typeof evt.endAt === 'number') return startOfDayFromUnix(evt.endAt);
+  if (typeof evt.endAt === 'number') return eventStartOfDay(evt.endAt, evt.allDay === true);
   return eventStartDay(evt);
 }
 
@@ -81,10 +82,10 @@ export function isMultiDay(evt: CalendarEvent): boolean {
   return dayDiff(e, s) > 0;
 }
 
-/** The local `YYYY-MM-DD` key for an event's start day, or null. */
+/** The `YYYY-MM-DD` key for an event's start day, or null. */
 export function eventStartKey(evt: CalendarEvent): string | null {
-  const s = eventStartDay(evt);
-  return s ? dateKey(s) : null;
+  if (typeof evt.startAt !== 'number') return null;
+  return eventDateKey(evt.startAt, evt.allDay === true);
 }
 
 /**

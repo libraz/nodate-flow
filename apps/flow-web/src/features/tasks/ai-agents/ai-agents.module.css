@@ -215,7 +215,7 @@
   appearance: none;
   background: transparent;
   border: 0;
-  color: var(--nf-color-danger);
+  color: var(--nf-color-danger-fg);
   font: inherit;
   font-size: var(--nf-text-xs);
   cursor: pointer;
@@ -296,19 +296,19 @@
 
 .kindBadge[data-tone="success"] {
   background: color-mix(in oklab, var(--nf-color-success) 12%, transparent);
-  color: var(--nf-color-success);
+  color: var(--nf-color-success-fg);
   border-color: color-mix(in oklab, var(--nf-color-success) 24%, transparent);
 }
 
 .kindBadge[data-tone="warning"] {
   background: color-mix(in oklab, var(--nf-color-warning) 14%, transparent);
-  color: var(--nf-color-warning);
+  color: var(--nf-color-warning-fg);
   border-color: color-mix(in oklab, var(--nf-color-warning) 28%, transparent);
 }
 
 .kindBadge[data-tone="info"] {
   background: color-mix(in oklab, var(--nf-color-info) 12%, transparent);
-  color: var(--nf-color-info);
+  color: var(--nf-color-info-fg);
   border-color: color-mix(in oklab, var(--nf-color-info) 24%, transparent);
 }
 

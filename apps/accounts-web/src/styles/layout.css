@@ -82,7 +82,7 @@
 
 .aw-error {
   margin: 0;
-  color: var(--nf-color-danger);
+  color: var(--nf-color-danger-fg);
   font-size: var(--nf-text-sm);
 }
 
@@ -133,12 +133,12 @@
 
 .aw-badge-success {
   background: color-mix(in srgb, var(--nf-color-success) 15%, transparent);
-  color: var(--nf-color-success);
+  color: var(--nf-color-success-fg);
 }
 
 .aw-badge-danger {
   background: color-mix(in srgb, var(--nf-color-danger) 15%, transparent);
-  color: var(--nf-color-danger);
+  color: var(--nf-color-danger-fg);
 }
 
 /* ── native <select> wrapper ──────────────────────────────────────────── */
@@ -208,13 +208,13 @@
 
 .aw-success {
   margin: 0;
-  color: var(--nf-color-success);
+  color: var(--nf-color-success-fg);
   font-size: var(--nf-text-sm);
 }
 
 .aw-warning {
   margin: 0;
-  color: var(--nf-color-warning);
+  color: var(--nf-color-warning-fg);
   font-size: var(--nf-text-sm);
   font-weight: var(--nf-weight-semibold);
 }

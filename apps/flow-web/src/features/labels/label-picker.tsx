@@ -76,7 +76,7 @@ export default function LabelPicker({
                           xmlns="http://www.w3.org/2000/svg"
                           viewBox="0 0 16 16"
                           fill="currentColor"
-                          className="h-4 w-4 text-[var(--nf-color-success)]"
+                          className="h-4 w-4 text-[var(--nf-color-success-fg)]"
                           aria-hidden="true"
                         >
                           <path

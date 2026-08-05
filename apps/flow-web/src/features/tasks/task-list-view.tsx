@@ -39,7 +39,13 @@ import {
   useTasksInfiniteQuery,
   useUpdateTask,
 } from './api';
-import { PRIORITY_COLOR, PRIORITY_KEY, STATE_COLOR, STATE_KEY } from './constants';
+import {
+  PRIORITY_COLOR,
+  PRIORITY_KEY,
+  STATE_COLOR,
+  STATE_KEY,
+  STATE_TEXT_COLOR,
+} from './constants';
 import { useInlineEdit } from './use-inline-edit';
 import { useTaskFilters } from './use-task-filters';
 
@@ -459,7 +465,7 @@ function InlineDueCell({
         }
       }}
       style={{
-        color: overdue ? 'var(--nf-color-danger)' : undefined,
+        color: overdue ? 'var(--nf-color-danger-fg)' : undefined,
         fontWeight: overdue ? 600 : undefined,
         cursor: 'pointer',
       }}
@@ -699,6 +705,7 @@ export default function TaskListView({ projectId }: TaskListViewProps): ReactEle
       cell: ({ row }) => {
         const state = row.original.derivedState as TaskDerivedState;
         const color = STATE_COLOR[state] ?? STATE_COLOR.open;
+        const textColor = STATE_TEXT_COLOR[state] ?? STATE_TEXT_COLOR.open;
         return (
           <span
             style={{
@@ -709,8 +716,11 @@ export default function TaskListView({ projectId }: TaskListViewProps): ReactEle
               fontWeight: 500,
               padding: 'var(--nf-space-0-5) var(--nf-space-2)',
               borderRadius: 'var(--nf-radius-pill)',
-              background: `${color}18`,
-              color: color,
+              // Appending an alpha suffix to `var(--x)` produces
+              // `var(--x)18`, which is not a colour: the declaration was
+              // dropped and the pill had no wash at all.
+              background: `color-mix(in oklab, ${color} 9%, transparent)`,
+              color: textColor,
               whiteSpace: 'nowrap',
             }}
           >
@@ -745,7 +755,7 @@ export default function TaskListView({ projectId }: TaskListViewProps): ReactEle
               display: 'inline-flex',
               alignItems: 'center',
               gap: 'var(--nf-space-1)',
-              color: 'var(--nf-color-danger)',
+              color: 'var(--nf-color-danger-fg)',
               fontVariantNumeric: 'tabular-nums',
             }}
             title={t('tasks.card.blockedBy', { count })}

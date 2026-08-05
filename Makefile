@@ -226,8 +226,8 @@ lighthouse: build-web ## Run Lighthouse CI (a11y 95+, perf 70+)
 
 # ---------- lint / format / typecheck ----------
 
-.PHONY: check lint format typecheck vet check-dtos check-css-var-parens check-public-router check-tokens check-breakpoints
-check: lint typecheck vet i18n-check check-dtos check-css-var-parens check-public-router check-tokens check-breakpoints ## Lint + typecheck + go vet + i18n locale guard + DTO drift guard + CSS var() paren guard + public-surface guard + design-token guard + breakpoint guard
+.PHONY: check lint format typecheck vet check-dtos check-css-var-parens check-public-router check-tokens check-breakpoints check-themes check-colors check-spacing
+check: lint typecheck vet i18n-check check-dtos check-css-var-parens check-public-router check-tokens check-themes check-colors check-spacing check-breakpoints ## Lint + typecheck + go vet + i18n locale guard + DTO drift guard + CSS var() paren guard + public-surface guard + design-token guards (references, theme parity, colours, spacing) + breakpoint guard
 
 check-dtos: ## Fail when web routes/features hand-roll response DTOs instead of using SDK schemas
 	bash scripts/check-handrolled-dtos.sh
@@ -237,6 +237,15 @@ check-public-router: ## Fail when the auth-free router registers a route that is
 
 check-tokens: ## Fail when a var(--nf-*) reference names a token nothing defines
 	node scripts/check-undefined-tokens.mjs
+
+check-themes: ## Fail when a semantic token is missing from a theme, or defined only in themes
+	cd packages/ui && $(PKG_RUN) check-themes
+
+check-colors: ## Fail when a colour is written as a literal instead of a token
+	node scripts/check-hardcoded-colors.mjs
+
+check-spacing: ## Fail when spacing / sizing / type is written as a literal instead of a token
+	cd packages/ui && $(PKG_RUN) lint:design-tokens
 
 check-breakpoints: ## Fail when a media query does not match the declared breakpoint scale
 	node scripts/check-breakpoints.mjs

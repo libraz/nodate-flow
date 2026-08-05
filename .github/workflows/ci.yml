@@ -56,6 +56,25 @@ jobs:
       - name: Design token references
         run: make check-tokens
 
+      # semantic.css is the contract every theme has to satisfy, and it
+      # is also the only value an unthemed document gets. A token added
+      # to the six themes but not to the contract compiles, renders in
+      # the app, and has no value anywhere else — which is how five of
+      # them shipped.
+      - name: Theme parity
+        run: make check-themes
+
+      # A literal colour does not follow the theme: it is right in
+      # whichever theme the author had open and wrong in the other five,
+      # and it looks like an ordinary value forever after.
+      - name: Hardcoded colours
+        run: make check-colors
+
+      # Same argument for spacing and type. Both of these scans existed
+      # for a long time without anything running them.
+      - name: Hardcoded spacing and type
+        run: make check-spacing
+
       # CSS cannot read the breakpoint scale — every media query restates
       # it by hand, and the restatements had drifted a pixel away from
       # what the JS uses, putting the two on opposite sides of the

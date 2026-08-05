@@ -7,9 +7,9 @@
  * synthetic snippets so we do not depend on the actual repo state.
  */
 
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
@@ -122,6 +122,32 @@ describe('scanSource', () => {
     );
     const props = offenses.map((o) => o.property).sort();
     expect(props).toEqual(['font-size', 'min-inline-size']);
+  });
+});
+
+/**
+ * The annotation rule is normatively `scripts/lib/token-override.mjs`,
+ * which the colour scan imports. This scanner cannot import it: it
+ * compiles under `packages/ui` with `rootDir: "."`, so a path outside the
+ * package would break the build. It therefore keeps a copy, and a copy is
+ * only safe while something notices it drifting — the two checks reading
+ * the same marker by two different rules is what put 146 files outside
+ * the colour scan without anyone writing a colour exemption.
+ */
+describe('annotation rule', () => {
+  it('matches the shared implementation byte for byte', () => {
+    const shared = readFileSync(
+      resolve(import.meta.dirname, '../../../scripts/lib/token-override.mjs'),
+      'utf8',
+    );
+    const own = readFileSync(
+      resolve(import.meta.dirname, '../scripts/check-inline-spacing.ts'),
+      'utf8',
+    );
+    const reason = (src: string): string | undefined =>
+      src.match(/REASON = String\.raw`([^`]+)`/)?.[1];
+    expect(reason(own)).toBeDefined();
+    expect(reason(own)).toBe(reason(shared));
   });
 });
 

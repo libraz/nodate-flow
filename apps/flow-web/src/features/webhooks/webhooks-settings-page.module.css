@@ -137,7 +137,7 @@
 }
 
 .menuItemDanger {
-  color: var(--nf-color-danger);
+  color: var(--nf-color-danger-fg);
 }
 
 .menuTrigger {
@@ -186,7 +186,7 @@
 .secretWarning {
   margin: 0;
   font-size: var(--nf-text-sm);
-  color: var(--nf-color-warning);
+  color: var(--nf-color-warning-fg);
 }
 
 .secretValue {

@@ -389,7 +389,7 @@ export default function WorkspaceSettingsForm({
               style={{
                 margin: 0,
                 fontSize: 'var(--nf-text-xl)',
-                color: 'var(--nf-color-danger)',
+                color: 'var(--nf-color-danger-fg)',
               }}
             >
               {t('workspace.general.danger.title')}

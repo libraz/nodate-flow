@@ -35,6 +35,18 @@
 // required — an exemption whose justification nobody wrote down is
 // indistinguishable from an oversight.
 //
+// Write it on its own line directly above the at-rule. Trailing it after
+// the opening `{` reads well but does not survive: the formatter moves a
+// comment written there onto the next line, which puts the at-rule
+// outside the annotation's window and silently retires the exemption.
+// (Measured against biome: the at-rule-trailing position is the only one
+// it relocates. Above the at-rule, and trailing a declaration, both stay
+// put.) The window is deliberately not widened backwards to absorb the
+// move — an annotation written for the first declaration inside a block
+// would then start exempting the block's own prelude as well — so the
+// check names the cause instead, and reports any annotation that ends up
+// exempting nothing.
+//
 // Usage:
 //   node scripts/check-breakpoints.mjs
 
@@ -102,86 +114,140 @@ const CONDITION = /@(?:media|container)[^{;]*?\((max|min)-width:\s*([^)]+?)\s*\)
 const OVERRIDE = /nf-breakpoint-override:[^\S\n]*(?![*/]\s*$)[A-Za-z][^\n]*[A-Za-z]/;
 const findings = [];
 
-/** Lines an annotation exempts: its own, and the one after it. */
-function exemptLines(lines) {
-  const out = new Set();
+/** 1-based lines carrying an annotation. */
+function annotationLines(lines) {
+  const out = [];
   for (let i = 0; i < lines.length; i++) {
-    if (OVERRIDE.test(lines[i] ?? '')) {
-      out.add(i + 1);
-      out.add(i + 2);
+    if (OVERRIDE.test(lines[i] ?? '')) out.push(i + 1);
+  }
+  return out;
+}
+
+/** Every query on one line that does not match the scale. Exemption-blind. */
+function violationsOn(line, where) {
+  const out = [];
+  for (const m of line.matchAll(CONDITION)) {
+    const kind = m[1];
+    const raw = m[2] ?? '';
+    const px = /^(\d+(?:\.\d+)?)px$/.test(raw)
+      ? Number(raw.replace('px', ''))
+      : /^(\d+(?:\.\d+)?)rem$/.test(raw)
+        ? Number(raw.replace('rem', '')) * 16
+        : null;
+    if (px === null) {
+      out.push({ where, raw, kind, why: 'not a plain px/rem length' });
+      continue;
+    }
+    if (!raw.endsWith('px')) {
+      out.push({
+        where,
+        raw,
+        kind,
+        why: `write it in px (${px}px); the declaration and the runtime queries are px, and a rem query moves with the reader's font size while they do not`,
+      });
+      continue;
+    }
+    const table = kind === 'max' ? byMaxWidth : byMinWidth;
+    if (!table.has(px)) {
+      const expected = [...table.keys()].sort((a, b) => a - b).join(' / ');
+      out.push({
+        where,
+        raw,
+        kind,
+        why:
+          kind === 'max'
+            ? `not one below a declared breakpoint (expected ${expected})`
+            : `not a declared breakpoint (expected ${expected})`,
+      });
     }
   }
   return out;
 }
+
+const dangling = [];
 
 for (const root of SOURCE_ROOTS) {
   for (const file of walk(join(repo, root), [])) {
     const text = readFileSync(file, 'utf8');
     if (!text.includes('-width:')) continue;
     const lines = text.split('\n');
-    const exempt = exemptLines(lines);
+    const annotations = annotationLines(lines);
+    // An annotation exempts its own line and the one after it, so it can
+    // trail a query or sit above it.
+    const exempt = new Set(annotations.flatMap((n) => [n, n + 1]));
+    // An annotation counts as used only when it suppressed a real
+    // violation. Sitting next to a query that already matches the scale
+    // does not count: that annotation is claiming something untrue.
+    const used = new Set();
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i] ?? '';
       // Skip prose that quotes a query rather than writing one.
       if (/^\s*(\*|\/\/)/.test(line)) continue;
-      if (exempt.has(i + 1)) continue;
-      for (const m of line.matchAll(CONDITION)) {
-        const kind = m[1];
-        const raw = m[2] ?? '';
-        const where = `${relative(repo, file)}:${i + 1}`;
-        const px = /^(\d+(?:\.\d+)?)px$/.test(raw)
-          ? Number(raw.replace('px', ''))
-          : /^(\d+(?:\.\d+)?)rem$/.test(raw)
-            ? Number(raw.replace('rem', '')) * 16
-            : null;
-        if (px === null) {
-          findings.push({ where, raw, kind, why: 'not a plain px/rem length' });
-          continue;
-        }
-        if (!raw.endsWith('px')) {
-          findings.push({
-            where,
-            raw,
-            kind,
-            why: `write it in px (${px}px); the declaration and the runtime queries are px, and a rem query moves with the reader's font size while they do not`,
-          });
-          continue;
-        }
-        const table = kind === 'max' ? byMaxWidth : byMinWidth;
-        if (!table.has(px)) {
-          const expected = [...table.keys()].sort((a, b) => a - b).join(' / ');
-          findings.push({
-            where,
-            raw,
-            kind,
-            why:
-              kind === 'max'
-                ? `not one below a declared breakpoint (expected ${expected})`
-                : `not a declared breakpoint (expected ${expected})`,
-          });
-        }
+      const violations = violationsOn(line, `${relative(repo, file)}:${i + 1}`);
+      if (violations.length === 0) continue;
+      if (exempt.has(i + 1)) {
+        if (annotations.includes(i + 1)) used.add(i + 1);
+        if (annotations.includes(i)) used.add(i);
+        continue;
       }
+      // An offending at-rule with an annotation on the line below it is
+      // almost always one the formatter relocated out of range.
+      const moved = line.trimStart().startsWith('@') && OVERRIDE.test(lines[i + 1] ?? '');
+      for (const v of violations) {
+        findings.push(
+          moved
+            ? {
+                ...v,
+                hint: `an nf-breakpoint-override sits on line ${i + 2}, inside the block, where it no longer covers this line. The formatter moves a comment written after \`{\` onto the next line; put it on its own line directly above the at-rule instead.`,
+              }
+            : v,
+        );
+      }
+    }
+    for (const n of annotations) {
+      if (used.has(n)) continue;
+      dangling.push({
+        where: `${relative(repo, file)}:${n}`,
+        context: (lines[n - 1] ?? '').trim(),
+      });
     }
   }
 }
 
+const scale = [...bp].map(([n, v]) => `${n} ${v}`).join(', ');
+
 if (findings.length > 0) {
   console.error(
-    `check-breakpoints: ${findings.length} media query/queries do not match the declared scale (${[
-      ...bp,
-    ]
-      .map(([n, v]) => `${n} ${v}`)
-      .join(', ')}):\n`,
+    `check-breakpoints: ${findings.length} media query/queries do not match the declared scale (${scale}):\n`,
   );
   for (const f of findings) {
     console.error(`  ${f.where}\n    (${f.kind}-width: ${f.raw}) — ${f.why}`);
+    if (f.hint !== undefined) console.error(`    ${f.hint}`);
   }
   console.error(
     `\nThe scale is declared in ${DECLARATION}. Extend it there if a new breakpoint is genuinely needed.`,
   );
-  process.exit(1);
 }
 
-console.info(
-  `check-breakpoints: every media query matches the declared scale (${[...bp].map(([n, v]) => `${n} ${v}`).join(', ')})`,
-);
+if (dangling.length > 0) {
+  console.error(
+    `\ncheck-breakpoints: ${dangling.length} nf-breakpoint-override annotation(s) exempt nothing:\n`,
+  );
+  for (const d of dangling) {
+    console.error(`  ${d.where}\n    ${d.context}`);
+  }
+  console.error(
+    '\nAn annotation covers its own line and the next one, and only counts as used when it',
+  );
+  console.error(
+    'suppressed a query that would otherwise fail. One that suppresses nothing is either debris',
+  );
+  console.error(
+    'left by a later fix or an annotation the formatter moved off the at-rule it was written for.',
+  );
+  console.error('Delete it, or put it on its own line directly above the at-rule it belongs to.');
+}
+
+if (findings.length > 0 || dangling.length > 0) process.exit(1);
+
+console.info(`check-breakpoints: every media query matches the declared scale (${scale})`);

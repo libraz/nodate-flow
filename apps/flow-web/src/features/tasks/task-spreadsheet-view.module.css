@@ -214,7 +214,7 @@
 }
 
 .overdueText {
-  color: var(--nf-color-danger);
+  color: var(--nf-color-danger-fg);
   font-weight: var(--nf-weight-semibold);
 }
 
@@ -258,7 +258,7 @@
 
 .bulkBtnDanger {
   composes: bulkBtn;
-  color: var(--nf-color-danger);
+  color: var(--nf-color-danger-fg);
 }
 
 .bulkBtnClear {

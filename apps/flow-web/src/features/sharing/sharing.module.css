@@ -24,7 +24,7 @@
 
 .statusPublic {
   background: var(--nf-color-success-subtle);
-  color: var(--nf-color-success);
+  color: var(--nf-color-success-fg);
 }
 
 .statusPrivate {
@@ -72,7 +72,7 @@
 
 .warningText {
   font-size: var(--nf-text-sm);
-  color: var(--nf-color-warning);
+  color: var(--nf-color-warning-fg);
   margin: 0;
 }
 
@@ -166,5 +166,5 @@
 }
 
 .publicError {
-  color: var(--nf-color-danger);
+  color: var(--nf-color-danger-fg);
 }

@@ -28,7 +28,7 @@
 }
 
 .menuItemDanger {
-  color: var(--nf-color-danger);
+  color: var(--nf-color-danger-fg);
 }
 
 .trigger {

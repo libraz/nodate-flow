@@ -50,12 +50,33 @@ export const STATE_KEY: Record<TaskDerivedState, string> = {
   cancelled: 'tasks.status.cancelled',
 };
 
-/** CSS color string for each derived state (with CSS variable fallbacks). */
+/**
+ * Fill colour for each derived state — the dot beside the label, and the
+ * wash behind it. Bright enough to read as the state at a glance, which
+ * is the opposite of what text needs.
+ */
 export const STATE_COLOR: Record<TaskDerivedState, string> = {
   open: 'var(--nf-color-info)',
   waiting: 'var(--nf-color-warning)',
   review: 'var(--nf-color-accent)',
   done: 'var(--nf-color-success)',
+  cancelled: 'var(--nf-color-fg-muted)',
+};
+
+/**
+ * Text colour for each derived state. The fills above sit between 1.9:1
+ * and 4.0:1 against the page background, so a label painted with one is
+ * somewhere between hard and impossible to read; the `-fg` counterparts
+ * are 7.3:1 or better in every theme.
+ *
+ * `review` is the exception: there is no `--nf-color-accent-fg`, so it
+ * keeps the accent and stays at the accent's own contrast.
+ */
+export const STATE_TEXT_COLOR: Record<TaskDerivedState, string> = {
+  open: 'var(--nf-color-info-fg)',
+  waiting: 'var(--nf-color-warning-fg)',
+  review: 'var(--nf-color-accent)',
+  done: 'var(--nf-color-success-fg)',
   cancelled: 'var(--nf-color-fg-muted)',
 };
 

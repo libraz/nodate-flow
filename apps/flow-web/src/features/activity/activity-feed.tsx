@@ -139,7 +139,7 @@ function FeedWithActors({
         style={{
           padding: 'var(--nf-space-8) var(--nf-space-4)',
           textAlign: 'center',
-          color: 'var(--nf-color-danger)',
+          color: 'var(--nf-color-danger-fg)',
           border: '1px solid var(--nf-color-danger)',
           borderRadius: 'var(--nf-radius-lg)',
           display: 'flex',

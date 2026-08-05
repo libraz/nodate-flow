@@ -13,9 +13,11 @@
  *      etc.). The brands ship a fixed hex and we are not allowed to
  *      retint them per active theme.
  *
- * Each export below is annotated with `nf-token-override` so the
- * design-token CI lint allows the literal hex values while still
- * blocking ad-hoc colors in feature code.
+ * nf-color-override-file: every literal in this module is one of the two
+ * cases above. The whole-file form is deliberate — the line-scoped marker
+ * would have to be repeated on each of the nineteen entries, and a
+ * per-entry exemption would imply the entries were individually
+ * considered when what is exempt is the module's whole reason to exist.
  */
 
 /**
@@ -27,7 +29,6 @@
  * canonical cross-theme identity. Custom hex pickers are out of scope
  * for v1.
  */
-/* nf-token-override: persisted by API or external brand identity */
 export const CALENDAR_EVENT_PALETTE: ReadonlyArray<{
   hex: string;
   token: string;
@@ -92,7 +93,6 @@ export const CALENDAR_EVENT_PALETTE: ReadonlyArray<{
  * hexes so GitHub / Slack / Google nodes stay recognisable across all
  * themes.
  */
-/* nf-token-override: persisted by API or external brand identity */
 export const CONSTRAINT_STATE_COLORS = {
   github: '#6e5494',
   slack: '#4a154b',
@@ -105,7 +105,6 @@ export const CONSTRAINT_STATE_COLORS = {
  * ai / task) use a short curated palette so each lane in the timeline
  * stays distinguishable at a glance.
  */
-/* nf-token-override: persisted by API or external brand identity */
 export const INTEGRATION_SOURCE_COLORS = {
   github: '#6e5494',
   slack: '#4a154b',

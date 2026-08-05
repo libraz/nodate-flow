@@ -75,7 +75,7 @@ function InvocationRow({ row }: { row: AiInvocation }): ReactElement {
             {row.promptRedacted}
           </p>
           {row.errorCode ? (
-            <span style={{ fontSize: 'var(--nf-text-xs)', color: 'var(--nf-color-danger)' }}>
+            <span style={{ fontSize: 'var(--nf-text-xs)', color: 'var(--nf-color-danger-fg)' }}>
               {t('ai_activity.error_code', { code: row.errorCode })}
             </span>
           ) : null}

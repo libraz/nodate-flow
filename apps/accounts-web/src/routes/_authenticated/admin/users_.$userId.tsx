@@ -359,7 +359,7 @@ export function UserDetailPage(): ReactElement {
         <p
           role="alert"
           style={{
-            color: 'var(--nf-color-danger)',
+            color: 'var(--nf-color-danger-fg)',
             fontSize: 'var(--nf-text-sm)',
           }}
         >
@@ -408,7 +408,7 @@ export function UserDetailPage(): ReactElement {
               background: user.enabled
                 ? 'color-mix(in srgb, var(--nf-color-success) 15%, transparent)'
                 : 'color-mix(in srgb, var(--nf-color-danger) 15%, transparent)',
-              color: user.enabled ? 'var(--nf-color-success)' : 'var(--nf-color-danger)',
+              color: user.enabled ? 'var(--nf-color-success-fg)' : 'var(--nf-color-danger-fg)',
             }}
           >
             {user.enabled ? t('users.enabled') : t('users.disabled')}
@@ -522,7 +522,7 @@ export function UserDetailPage(): ReactElement {
                 margin: 0,
                 fontFamily: 'var(--nf-font-sans)',
                 fontSize: 'var(--nf-text-lg)',
-                color: 'var(--nf-color-danger)',
+                color: 'var(--nf-color-danger-fg)',
               }}
             >
               {t('users.danger.title')}

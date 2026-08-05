@@ -176,7 +176,7 @@
 
 .errorLog summary {
   cursor: pointer;
-  color: var(--nf-color-danger);
+  color: var(--nf-color-danger-fg);
 }
 
 .errorLogBody {

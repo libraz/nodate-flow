@@ -39,11 +39,11 @@
 }
 
 .weekday--sun {
-  color: var(--nf-color-danger);
+  color: var(--nf-color-danger-fg);
 }
 
 .weekday--sat {
-  color: var(--nf-color-info);
+  color: var(--nf-color-info-fg);
 }
 
 .scrollBody {
@@ -132,11 +132,11 @@
 }
 
 .dayNumber--sat {
-  color: var(--nf-color-info);
+  color: var(--nf-color-info-fg);
 }
 
 .dayNumber--holiday {
-  color: var(--nf-color-danger);
+  color: var(--nf-color-danger-fg);
 }
 
 .dayNumber--today {
@@ -146,7 +146,7 @@
 
 .holidayLabel {
   font-size: var(--nf-cal-text-cell);
-  color: var(--nf-color-danger);
+  color: var(--nf-color-danger-fg);
   line-height: var(--nf-leading-tight);
   overflow: hidden;
   text-overflow: ellipsis;

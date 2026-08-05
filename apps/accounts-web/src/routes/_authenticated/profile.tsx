@@ -512,7 +512,7 @@ export function ProfilePage(): ReactElement {
           <output
             style={{
               margin: 0,
-              color: 'var(--nf-color-success)',
+              color: 'var(--nf-color-success-fg)',
               fontSize: 'var(--nf-text-sm)',
             }}
           >

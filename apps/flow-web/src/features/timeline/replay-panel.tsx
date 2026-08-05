@@ -116,7 +116,7 @@ export default function ReplayPanel({ taskId }: ReplayPanelProps): ReactElement 
         <p style={{ margin: 0, color: 'var(--nf-color-fg-muted)' }}>{t('replay.loading')}</p>
       ) : null}
       {q.error ? (
-        <p role="alert" style={{ margin: 0, color: 'var(--nf-color-danger)' }}>
+        <p role="alert" style={{ margin: 0, color: 'var(--nf-color-danger-fg)' }}>
           {t('replay.error')}
         </p>
       ) : null}
