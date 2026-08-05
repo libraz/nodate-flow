@@ -21,6 +21,7 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"sync"
 	"time"
 
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/bgloop"
@@ -42,6 +43,22 @@ var retryDelays = []time.Duration{
 // pollInterval is the ticker period for the delivery loop.
 const pollInterval = 5 * time.Second
 
+// deliveryConcurrency is how many subscriptions are delivered to at
+// once. It bounds sockets and memory while leaving enough slots that a
+// handful of slow endpoints cannot stall the rest; the per-subscription
+// grouping in deliverBatch is what actually provides the isolation.
+const deliveryConcurrency = 8
+
+// defaultStrandedAfter is how long a delivery may stay in 'delivering'
+// before the reaper assumes the worker holding it is gone.
+//
+// It has to sit well above the client timeout below, because a row
+// legitimately in flight must never be requeued underneath the worker
+// delivering it: that would produce a duplicate POST for a request that
+// was about to succeed. Ten seconds of timeout against five minutes of
+// grace leaves a wide margin even when a machine is badly overloaded.
+const defaultStrandedAfter = 5 * time.Minute
+
 // batchSize is the maximum number of pending deliveries fetched per tick.
 const batchSize = 50
 
@@ -59,11 +76,21 @@ type Worker struct {
 	// by Stop.
 	cancel context.CancelFunc
 
+	// StrandedAfter overrides [defaultStrandedAfter]. Tests set it low
+	// so the reaper is observable; production leaves it zero.
+	StrandedAfter time.Duration
+
 	// run is the function executed inside each Hook goroutine. Tests
 	// override it to exercise the goroutine plumbing (detached cancel,
 	// panic recovery) without a live database. Production code leaves
 	// this nil and the hook routes to [Worker.createDeliveries].
 	run func(ctx context.Context, workspaceID uint32, eventType string)
+
+	// deliverFn is the per-row delivery step. Tests override it to
+	// exercise the batching — which rows may run at once, which must
+	// wait — without live endpoints or a database. Production leaves it
+	// nil and the batch routes to [Worker.deliver].
+	deliverFn func(ctx context.Context, row generated.ClaimPendingDeliveriesRow)
 }
 
 // NewWorker creates a Worker backed by the given database.
@@ -359,16 +386,109 @@ func (w *Worker) claimForSubscription(ctx context.Context, subscriptionID uint32
 // and POSTs them. The claim commits before any network I/O, so with N
 // worker replicas each due row is delivered by exactly one replica.
 func (w *Worker) processBatch(ctx context.Context) {
+	w.requeueStranded(ctx)
+
 	rows, err := w.claimBatch(ctx)
 	if err != nil {
 		slog.Warn("webhook: failed to claim pending deliveries",
 			slog.String("err", err.Error()))
 		return
 	}
+	w.deliverBatch(ctx, rows)
+}
 
-	for _, row := range rows {
-		w.deliver(ctx, row)
+// deliverBatch delivers a claimed batch, one goroutine per subscription
+// and at most [deliveryConcurrency] subscriptions at a time.
+//
+// The endpoints belong to other people and their latency is theirs, not
+// ours: a subscriber whose server takes the full client timeout to
+// answer used to hold the entire queue for as long as it liked, because
+// the batch was delivered one row after another regardless of who they
+// belonged to. Fifty rows against one dead endpoint blocked every other
+// tenant for the timeout times fifty, and nothing said so — the queue
+// simply drained slower than it filled.
+//
+// Grouping by subscription is what bounds the damage: a slow endpoint
+// occupies exactly one slot no matter how many rows it has queued.
+// Within a subscription the rows stay sequential, both to keep the
+// order the receiver sees and to avoid answering a struggling server
+// with more concurrency.
+func (w *Worker) deliverBatch(ctx context.Context, rows []generated.ClaimPendingDeliveriesRow) {
+	if len(rows) == 0 {
+		return
 	}
+	deliver := w.deliverFn
+	if deliver == nil {
+		deliver = w.deliver
+	}
+	bySubscription := make(map[uint32][]generated.ClaimPendingDeliveriesRow, len(rows))
+	order := make([]uint32, 0, len(rows))
+	for _, row := range rows {
+		if _, seen := bySubscription[row.SubscriptionID]; !seen {
+			order = append(order, row.SubscriptionID)
+		}
+		bySubscription[row.SubscriptionID] = append(bySubscription[row.SubscriptionID], row)
+	}
+
+	sem := make(chan struct{}, deliveryConcurrency)
+	var wg sync.WaitGroup
+	for _, subID := range order {
+		queued := bySubscription[subID]
+		wg.Add(1)
+		go func(queued []generated.ClaimPendingDeliveriesRow) {
+			defer wg.Done()
+			select {
+			case sem <- struct{}{}:
+			case <-ctx.Done():
+				return
+			}
+			defer func() { <-sem }()
+			for _, row := range queued {
+				if ctx.Err() != nil {
+					// Shutdown: leave the rest in 'delivering' for the
+					// reaper rather than firing requests on the way out.
+					return
+				}
+				deliver(ctx, row)
+			}
+		}(queued)
+	}
+	wg.Wait()
+}
+
+// RequeueStrandedForTest runs one pass of the stranded-delivery reaper.
+// Exported for e2e tests that need to observe the recovery without
+// waiting for the background tick; production callers get it from
+// processBatch.
+func (w *Worker) RequeueStrandedForTest(ctx context.Context) {
+	w.requeueStranded(ctx)
+}
+
+// requeueStranded returns rows abandoned in 'delivering' to the retry
+// queue. See RequeueStrandedDeliveries for why they are retried rather
+// than failed.
+func (w *Worker) requeueStranded(ctx context.Context) {
+	cutoff := time.Now().UTC().Add(-w.strandedAfter())
+	n, err := w.queries.RequeueStrandedDeliveries(ctx, sql.NullTime{Time: cutoff, Valid: true})
+	if err != nil {
+		slog.Warn("webhook: failed to requeue stranded deliveries",
+			slog.String("err", err.Error()))
+		return
+	}
+	if n > 0 {
+		slog.Warn("webhook: requeued deliveries abandoned by a previous run",
+			slog.Int64("count", n),
+			slog.Time("delivering_since_before", cutoff))
+	}
+}
+
+// strandedAfter is how long a row may sit in 'delivering' before it is
+// treated as abandoned.
+func (w *Worker) strandedAfter() time.Duration {
+	if w.StrandedAfter > 0 {
+		return w.StrandedAfter
+	}
+	return defaultStrandedAfter
 }
 
 // claimBatch selects up to batchSize due deliveries with

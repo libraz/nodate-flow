@@ -8,12 +8,24 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
+
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
 )
 
 type fakePurger struct {
 	mu      sync.Mutex
 	calls   int
 	lastCut time.Time
+
+	// Recorded arguments and canned results for the stranded-run
+	// reaper.
+	requeueCut      time.Time
+	requeueAttempts uint8
+	requeued        int64
+	failCut         time.Time
+	failAttempts    uint8
+	failReason      string
+	failedRows      int64
 }
 
 func (f *fakePurger) PurgeFinishedAgentRuns(_ context.Context, cut sql.NullTime) error {
@@ -24,6 +36,27 @@ func (f *fakePurger) PurgeFinishedAgentRuns(_ context.Context, cut sql.NullTime)
 		f.lastCut = cut.Time
 	}
 	return nil
+}
+
+func (f *fakePurger) RequeueStrandedAgentRuns(_ context.Context, arg generated.RequeueStrandedAgentRunsParams) (int64, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if arg.ClaimedAt.Valid {
+		f.requeueCut = arg.ClaimedAt.Time
+	}
+	f.requeueAttempts = arg.Attempts
+	return f.requeued, nil
+}
+
+func (f *fakePurger) FailExhaustedAgentRuns(_ context.Context, arg generated.FailExhaustedAgentRunsParams) (int64, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if arg.ClaimedAt.Valid {
+		f.failCut = arg.ClaimedAt.Time
+	}
+	f.failAttempts = arg.Attempts
+	f.failReason = arg.ErrorMessage.String
+	return f.failedRows, nil
 }
 
 func (f *fakePurger) snapshot() (int, time.Time) {
@@ -66,4 +99,56 @@ func TestPurgerLoopTicks(t *testing.T) {
 	p.Stop()
 	calls, _ := q.snapshot()
 	require.GreaterOrEqual(t, calls, 2, "expected the purger loop to fire at least twice")
+}
+
+// TestPurgerReapsStrandedRuns pins the recovery of runs abandoned in
+// 'claimed'.
+//
+// A worker that dies mid-run leaves the row claimed forever. Nothing
+// scans that status, and the scheduler's dedupe key is still held by the
+// row, so the agent is never enqueued again either: one killed worker
+// silently retires the agents it happened to be holding.
+//
+// The cutoff and the retry budget are both asserted because they are the
+// two judgement calls. The budget matters more here than for webhook
+// deliveries — every attempt is a model call — so a run that keeps
+// stranding is failed rather than retried forever.
+func TestPurgerReapsStrandedRuns(t *testing.T) {
+	t.Parallel()
+	q := &fakePurger{requeued: 2, failedRows: 1}
+	fixed := time.Date(2026, 4, 9, 12, 0, 0, 0, time.UTC)
+	p := &Purger{
+		Queries:       q,
+		Retention:     72 * time.Hour,
+		StrandedAfter: 20 * time.Minute,
+		MaxAttempts:   4,
+		Now:           func() time.Time { return fixed },
+	}
+
+	p.tick(context.Background())
+
+	q.mu.Lock()
+	defer q.mu.Unlock()
+	want := fixed.Add(-20 * time.Minute)
+	require.Equal(t, want, q.requeueCut, "requeue cutoff must be now - StrandedAfter")
+	require.Equal(t, want, q.failCut, "fail cutoff must use the same threshold")
+	require.Equal(t, uint8(4), q.requeueAttempts, "the retry budget must reach the requeue query")
+	require.Equal(t, uint8(4), q.failAttempts, "the same budget decides which runs are failed")
+	require.NotEmpty(t, q.failReason, "a failed run must record why, or it is another silent stop")
+}
+
+// TestPurgerReapDefaults pins the defaults, which are the values that
+// actually run in production.
+func TestPurgerReapDefaults(t *testing.T) {
+	t.Parallel()
+	q := &fakePurger{}
+	fixed := time.Date(2026, 4, 9, 12, 0, 0, 0, time.UTC)
+	p := &Purger{Queries: q, Retention: time.Hour, Now: func() time.Time { return fixed }}
+
+	p.tick(context.Background())
+
+	q.mu.Lock()
+	defer q.mu.Unlock()
+	require.Equal(t, fixed.Add(-DefaultStrandedAfter), q.requeueCut)
+	require.Equal(t, uint8(DefaultMaxAttempts), q.requeueAttempts)
 }

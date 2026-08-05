@@ -8,6 +8,7 @@ import (
 	"database/sql"
 	"fmt"
 	"log/slog"
+	"strings"
 	"sync"
 	"time"
 
@@ -278,6 +279,16 @@ func (f *Fanout) fanout(ctx context.Context, workspaceID uint32, eventType strin
 		actorID = row.actorUserID
 	}
 
+	// Collect every (recipient, channel) row this event produces, then
+	// write them in as few statements as possible.
+	//
+	// One INSERT per pair meant one network round trip per pair: a
+	// hundred-member workspace with two channels each spent two hundred
+	// sequential round trips inside a goroutine holding a connection,
+	// for one task comment. Under a burst of events the fan-out
+	// goroutines pile up and the pool they share is what runs out — the
+	// symptom appears in unrelated request handlers, not here.
+	rows := make([]notificationRow, 0, len(filtered))
 	for _, recipientID := range filtered {
 		channels, ok := channelsByUser[recipientID]
 		if !ok {
@@ -286,63 +297,27 @@ func (f *Fanout) fanout(ctx context.Context, workspaceID uint32, eventType strin
 			// only.
 			channels = []generated.NotificationsChannel{generated.NotificationsChannelInApp}
 		}
-
 		for _, channel := range channels {
-			pubID := types.New()
-			// Retry on transient deadlocks. The fan-out goroutine runs
-			// in auto-commit (no enclosing tx), so re-issuing the
-			// INSERT IGNORE is safe and the unique key still dedupes
-			// across retries.
-			var affected int64
-			err := dbretry.Do(ctx, "notification.CreateNotification", func(ctx context.Context) error {
-				n, e := f.queries.CreateNotification(ctx, generated.CreateNotificationParams{
-					PublicID:         pubID,
-					WorkspaceID:      workspaceID,
-					RecipientUserID:  recipientID,
-					ActorUserID:      actorID,
-					SourceEventID:    sourceEventID,
-					EventType:        eventType,
-					ResourceType:     resourceType,
-					ResourcePublicID: row.resourcePublicID,
-					Title:            title,
-					Body:             sql.NullString{},
-					Severity:         severity,
-					Channel:          channel,
-				})
-				if e != nil {
-					return e
-				}
-				affected = n
-				return nil
+			rows = append(rows, notificationRow{
+				publicID:    types.New(),
+				recipientID: recipientID,
+				channel:     channel,
 			})
-			if err != nil {
-				slog.ErrorContext(ctx, "notification fanout: failed to create notification",
-					slog.Uint64("workspace_id", uint64(workspaceID)),
-					slog.Uint64("recipient_user_id", uint64(recipientID)),
-					slog.String("event_type", eventType),
-					slog.String("channel", string(channel)),
-					slog.Uint64("event_id", eventInternalID),
-					slog.String("err", err.Error()))
-				continue
-			}
-			if affected == 0 {
-				// INSERT IGNORE collided with the (recipient, source_event,
-				// channel) unique key — the notification already exists.
-				// This is the at-least-once happy path; record it as
-				// debug, not an error, and bump the dedup counter so
-				// dashboards can confirm the rate is steady (a sudden
-				// spike usually points to a hook fan-firing more than
-				// expected).
-				slog.DebugContext(ctx, "notification fanout: deduplicated",
-					slog.Uint64("workspace_id", uint64(workspaceID)),
-					slog.Uint64("recipient_user_id", uint64(recipientID)),
-					slog.Uint64("event_id", eventInternalID),
-					slog.String("event_type", eventType),
-					slog.String("channel", string(channel)))
-				obs.IncNotificationFanoutDedup("unique_collision")
-			}
 		}
 	}
+
+	f.insertNotifications(ctx, notificationBatch{
+		rows:             rows,
+		workspaceID:      workspaceID,
+		actorID:          actorID,
+		sourceEventID:    sourceEventID,
+		eventType:        eventType,
+		resourceType:     resourceType,
+		resourcePublicID: row.resourcePublicID,
+		title:            title,
+		severity:         severity,
+		eventInternalID:  eventInternalID,
+	})
 }
 
 // DeliverCalendarReminder creates one in-app notification per recipient
@@ -700,5 +675,115 @@ func categoryForEventType(eventType string) string {
 		return "ai"
 	default:
 		return "task.lifecycle"
+	}
+}
+
+// notificationRow is one (recipient, channel) pair to be written.
+type notificationRow struct {
+	publicID    types.PublicID
+	recipientID uint32
+	channel     generated.NotificationsChannel
+}
+
+// notificationBatch carries the per-event fields every row in a fan-out
+// shares, alongside the rows themselves.
+type notificationBatch struct {
+	rows             []notificationRow
+	workspaceID      uint32
+	actorID          sql.NullInt32
+	sourceEventID    sql.NullInt64
+	eventType        string
+	resourceType     string
+	resourcePublicID types.PublicID
+	title            string
+	severity         generated.NotificationsSeverity
+	eventInternalID  uint64
+}
+
+// insertChunkSize caps how many rows go into one statement. Large
+// enough that ordinary workspaces are a single round trip, small enough
+// that a big one does not build a multi-megabyte statement or hold row
+// locks on hundreds of rows at once.
+const insertChunkSize = 100
+
+// insertNotifications writes the batch with one multi-row INSERT IGNORE
+// per chunk.
+//
+// INSERT IGNORE keeps the at-least-once contract intact: the
+// (recipient_user_id, source_event_id, channel) unique key still
+// collapses a re-fired hook, and the affected-row count still tells new
+// rows from deduplicated ones — per chunk now rather than per row,
+// which is all the dedup metric ever used it for.
+func (f *Fanout) insertNotifications(ctx context.Context, b notificationBatch) {
+	if len(b.rows) == 0 {
+		return
+	}
+	const columns = 12
+	for start := 0; start < len(b.rows); start += insertChunkSize {
+		end := start + insertChunkSize
+		if end > len(b.rows) {
+			end = len(b.rows)
+		}
+		chunk := b.rows[start:end]
+
+		var sb strings.Builder
+		sb.WriteString(`INSERT IGNORE INTO notifications (
+			public_id, workspace_id, recipient_user_id, actor_user_id,
+			source_event_id, event_type, resource_type, resource_public_id,
+			title, body, severity, channel
+		) VALUES `)
+		args := make([]any, 0, len(chunk)*columns)
+		for i, r := range chunk {
+			if i > 0 {
+				sb.WriteString(", ")
+			}
+			sb.WriteString("(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
+			args = append(args,
+				r.publicID, b.workspaceID, r.recipientID, b.actorID,
+				b.sourceEventID, b.eventType, b.resourceType, b.resourcePublicID,
+				b.title, sql.NullString{}, b.severity, r.channel,
+			)
+		}
+
+		// Retry on transient deadlocks. The fan-out goroutine runs in
+		// auto-commit, so re-issuing the whole INSERT IGNORE is safe and
+		// the unique key still dedupes across retries.
+		var affected int64
+		stmt := sb.String()
+		err := dbretry.Do(ctx, "notification.CreateNotifications", func(ctx context.Context) error {
+			res, e := f.db.ExecContext(ctx, stmt, args...)
+			if e != nil {
+				return e
+			}
+			n, e := res.RowsAffected()
+			if e != nil {
+				return e
+			}
+			affected = n
+			return nil
+		})
+		if err != nil {
+			slog.ErrorContext(ctx, "notification fanout: failed to create notifications",
+				slog.Uint64("workspace_id", uint64(b.workspaceID)),
+				slog.String("event_type", b.eventType),
+				slog.Int("rows", len(chunk)),
+				slog.Uint64("event_id", b.eventInternalID),
+				slog.String("err", err.Error()))
+			continue
+		}
+		if deduped := int64(len(chunk)) - affected; deduped > 0 {
+			// The unique key collapsed rows that already existed. This
+			// is the at-least-once happy path, so it stays at debug —
+			// but the counter is what lets a dashboard notice a hook
+			// that suddenly fires far more often than it should.
+			slog.DebugContext(ctx, "notification fanout: deduplicated",
+				slog.Uint64("workspace_id", uint64(b.workspaceID)),
+				slog.Uint64("event_id", b.eventInternalID),
+				slog.String("event_type", b.eventType),
+				slog.Int64("deduplicated", deduped))
+			for i := int64(0); i < deduped; i++ {
+				obs.IncNotificationFanoutDedup("unique_collision")
+			}
+		}
 	}
 }
