@@ -214,7 +214,8 @@ vet: ## go vet
 .PHONY: gen gen-sqlc gen-errors gen-signal-kinds gen-sdk gen-openapi i18n-check
 gen: gen-sqlc gen-errors gen-signal-kinds gen-sdk ## Run all codegen (sqlc + errors + signal-kinds + sdk)
 
-gen-sqlc: ## sqlc generate (requires sqlc installed)
+gen-sqlc: ## sqlc generate (requires the pinned sqlc version)
+	@bash scripts/check-codegen-drift.sh --check-tool
 	sqlc generate -f sql/sqlc.yaml
 
 gen-errors: ## Regenerate Go/TS error modules + locale stubs + docs from errors/*.yaml

@@ -93,3 +93,8 @@ docs/
 backup/
 
 apps/flow-api/seed-dev
+
+# Scratch config written by scripts/check-codegen-drift.sh; it lives beside
+# sqlc.yaml because sqlc resolves paths relative to the config, and a killed
+# run would otherwise leave it behind as an untracked file.
+sql/.sqlc-drift-*.yaml
