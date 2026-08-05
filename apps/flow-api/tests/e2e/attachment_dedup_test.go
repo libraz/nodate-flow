@@ -15,7 +15,9 @@ import (
 	"net/url"
 	"strings"
 	"testing"
+	"time"
 
+	"github.com/minio/minio-go/v7"
 	"github.com/stretchr/testify/require"
 )
 
@@ -363,4 +365,92 @@ func TestJapaneseFilename(t *testing.T) {
 		require.True(t, strings.Contains(disp, "filename*=UTF-8''"+expectedRFC5987),
 			"Content-Disposition response header must round-trip the RFC 5987 form: got %q", disp)
 	})
+}
+
+// TestPresignAbandonedUploadDoesNotPoisonDedup is the regression for a
+// dedup row that outlives the upload it was created for.
+//
+// The storage_objects row is written and committed when the presign is
+// issued — before the client has sent a single byte. A client that asks
+// for a URL and then goes away (closed tab, dropped connection, a PUT
+// that never completes) leaves a row asserting that this content is
+// stored under a key holding nothing. Every later upload of the same
+// file then matched that row, was told it need not upload, and produced
+// an attachment pointing at an object that would never exist. Nothing
+// removed the row, so the first abandoned upload of a given file made
+// that file permanently unattachable for the whole workspace.
+func TestPresignAbandonedUploadDoesNotPoisonDedup(t *testing.T) {
+	bootstrap(t)
+	requireStorage(t)
+	t.Parallel()
+
+	tt := newTenant(t)
+	taskID := createTaskForAttachment(t, tt.AccessToken, tt.ProjectPublicID, "Abandoned upload")
+	payload := makePNG(t, 8, 8, color.RGBA{R: 9, G: 8, B: 7, A: 255})
+
+	// Ask for a URL and never use it. This is the whole "interruption":
+	// the row is committed, the object is not.
+	abandoned := presignAttachment(t, tt.AccessToken, taskID, "ghost.png", "image/png", payload)
+	require.False(t, abandoned.Deduplicated)
+	require.NotEmpty(t, abandoned.UploadURL)
+	testStorage.MustNotExist(t, abandoned.StorageKey)
+
+	// Someone uploads the same file later. They must be given a way to
+	// actually store it.
+	second := presignAttachment(t, tt.AccessToken, taskID, "real.png", "image/png", payload)
+	require.False(t, second.Deduplicated,
+		"a row whose object was never uploaded must not be treated as a dedup hit")
+	require.NotEmpty(t, second.UploadURL,
+		"without an upload URL the content can never be stored, and the file stays unattachable forever")
+	require.Equal(t, abandoned.StorageKey, second.StorageKey,
+		"the repair must fill the key the existing row already points at, not allocate a second one")
+
+	uploadViaPresignedURL(t, second.UploadURL, "image/png", payload, second.RequiredHeaders)
+	testStorage.MustExist(t, second.StorageKey)
+
+	// And once the bytes are really there, dedup works as intended.
+	third := presignAttachment(t, tt.AccessToken, taskID, "copy.png", "image/png", payload)
+	require.True(t, third.Deduplicated,
+		"with the object in place the next upload of the same content must dedup")
+	require.Empty(t, third.UploadURL)
+}
+
+// TestPresignRepairsAnAlreadyPoisonedRow covers the rows that exist
+// before this check does.
+//
+// Deployments have been minting these since the first abandoned upload,
+// and there is no marker distinguishing them from healthy rows — the
+// row is identical either way. Removing the object from under a healthy
+// row reproduces exactly that state, and the next presign has to hand
+// back a way to refill it rather than a promise that it is already
+// there.
+func TestPresignRepairsAnAlreadyPoisonedRow(t *testing.T) {
+	bootstrap(t)
+	requireStorage(t)
+	t.Parallel()
+
+	tt := newTenant(t)
+	taskID := createTaskForAttachment(t, tt.AccessToken, tt.ProjectPublicID, "Poisoned row")
+	payload := makePNG(t, 8, 8, color.RGBA{R: 4, G: 5, B: 6, A: 255})
+
+	first := presignAttachment(t, tt.AccessToken, taskID, "orig.png", "image/png", payload)
+	uploadViaPresignedURL(t, first.UploadURL, "image/png", payload, first.RequiredHeaders)
+	testStorage.MustExist(t, first.StorageKey)
+
+	// The object goes away while the row stays: a blob lost to a bucket
+	// lifecycle rule, a partially restored backup, or the abandoned
+	// upload of the test above written before the check existed.
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	require.NoError(t, testStorage.Raw.RemoveObject(ctx, testStorage.Bucket, first.StorageKey, minio.RemoveObjectOptions{}))
+	testStorage.MustNotExist(t, first.StorageKey)
+
+	repaired := presignAttachment(t, tt.AccessToken, taskID, "again.png", "image/png", payload)
+	require.False(t, repaired.Deduplicated,
+		"a row that no longer has an object behind it must stop claiming the content is stored")
+	require.NotEmpty(t, repaired.UploadURL)
+	require.Equal(t, first.StorageKey, repaired.StorageKey)
+
+	uploadViaPresignedURL(t, repaired.UploadURL, "image/png", payload, repaired.RequiredHeaders)
+	testStorage.MustExist(t, repaired.StorageKey)
 }

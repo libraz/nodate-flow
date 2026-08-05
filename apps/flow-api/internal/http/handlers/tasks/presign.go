@@ -204,6 +204,34 @@ func PresignUpload(deps Deps) func(context.Context, *PresignUploadInput) (*Presi
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
 
+		// A dedup hit promises the bytes are already stored, and until
+		// now nothing checked whether they were. The storage_objects
+		// row is committed at presign time, before the client has
+		// uploaded anything, so an upload the client starts and never
+		// finishes leaves a row claiming that content exists at a key
+		// holding nothing. Every later upload of the same content then
+		// dedups onto that row, is told it need not upload, and ends up
+		// attached to an object that will never exist — the first
+		// abandoned upload of a given file poisons that file for the
+		// whole workspace, permanently.
+		//
+		// Asking the store settles it. A claim with no object behind it
+		// is treated as a miss: the caller gets an upload URL for the
+		// very same key, so the row it already points at is filled in
+		// rather than duplicated. That repairs rows poisoned before
+		// this check existed, on the next attempt to use them, without
+		// a migration.
+		//
+		// The check is deliberately outside the transaction: it is a
+		// network round trip to the object store, and holding a
+		// database transaction open across one is how lock contention
+		// becomes an outage.
+		if deduplicated {
+			if _, statErr := deps.Storage.StatObject(ctx, storageKey); statErr != nil {
+				deduplicated = false
+			}
+		}
+
 		// Generate the presigned PUT URL only on the miss branch.
 		// PresignPutWithSha256 binds x-amz-content-sha256 into the
 		// SigV4 signed-headers list so the bucket rejects the upload

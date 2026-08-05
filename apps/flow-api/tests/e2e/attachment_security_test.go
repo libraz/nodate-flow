@@ -491,23 +491,31 @@ func TestPresignConcurrentRace(t *testing.T) {
 			"decode racer %d body=%s", i, string(r.raw))
 	}
 
-	// Second assertion: exactly one miss + (racers-1) dedups.
-	var winners, dedups int
+	// Second assertion: telling a racer the content is already stored
+	// has to be true when it is said.
+	//
+	// This used to require exactly one miss and the rest dedups. That
+	// is no longer the contract, and requiring it would reinstate the
+	// bug: at the moment these racers run, nobody has uploaded
+	// anything, so answering "already stored" to the losers is a claim
+	// about bytes that do not exist. If the winner then abandons its
+	// upload, every loser holds an attachment that can never resolve.
+	// A racer that is not handed an upload URL must therefore be one
+	// whose content really is retrievable — and racers that are all
+	// told to upload are not a failure, they are several clients
+	// storing identical bytes under the same content-addressed key.
 	var winnerKey string
 	for _, r := range results {
 		require.NotEmpty(t, r.res.StorageKey, "every racer must return a key")
 		require.NotEmpty(t, r.res.AttachmentID, "every racer must return an attachment id")
-		if !r.res.Deduplicated {
-			winners++
-			winnerKey = r.res.StorageKey
-			require.NotEmpty(t, r.res.UploadURL, "miss branch must return an upload URL")
-		} else {
-			dedups++
+		if r.res.Deduplicated {
 			require.Empty(t, r.res.UploadURL, "dedup branch must NOT return an upload URL")
+			testStorage.MustExist(t, r.res.StorageKey)
+		} else {
+			require.NotEmpty(t, r.res.UploadURL, "miss branch must return an upload URL")
 		}
+		winnerKey = r.res.StorageKey
 	}
-	require.Equalf(t, 1, winners, "exactly one racer must take the miss path; got %d miss / %d dedup", winners, dedups)
-	require.Equalf(t, racers-1, dedups, "all other racers must dedup; got %d miss / %d dedup", winners, dedups)
 
 	// Third assertion: convergence. Every racer ended up pointing at
 	// the SAME storage_objects row (same storage_key).
