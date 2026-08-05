@@ -224,8 +224,9 @@ function OverviewPanel({ id, workspaceId }: { id: string; workspaceId: string })
         }}
       >
         <div>
+          {/* nf-token-override: a counter read as a figure, not as prose — it pairs with the supporting caption below it and is sized against that pairing */}
           <div style={{ fontSize: '2rem', fontWeight: 600, lineHeight: 1 }}>{active}</div>
-          <div style={{ fontSize: '0.8125rem', color: 'var(--nf-color-fg-muted)' }}>
+          <div style={{ fontSize: 'var(--nf-text-supporting)', color: 'var(--nf-color-fg-muted)' }}>
             {t('projects.detail.active_tasks')}
           </div>
         </div>
@@ -281,7 +282,7 @@ function OverviewPanel({ id, workspaceId }: { id: string; workspaceId: string })
               background: 'var(--nf-color-surface)',
               display: 'flex',
               flexDirection: 'column',
-              gap: '0.125rem',
+              gap: 'var(--nf-space-0-5)',
             }}
           >
             <span style={{ fontSize: 'var(--nf-text-xs)', color: 'var(--nf-color-fg-muted)' }}>
@@ -355,7 +356,7 @@ export default function ProjectDetail({ id, tab, onTabChange }: ProjectDetailPro
         display: 'flex',
         flexDirection: 'column',
         gap: 'var(--nf-space-6)',
-        padding: 'clamp(var(--nf-space-6), 4vw, var(--nf-space-10))',
+        padding: 'var(--nf-space-page)',
       }}
     >
       <Tabs

@@ -16,7 +16,7 @@ import TotpPanel from '../features/settings/totp-panel';
 const sectionStyle = {
   display: 'flex',
   flexDirection: 'column',
-  gap: '0.875rem',
+  gap: 'var(--nf-space-3-5)',
   padding: 'var(--nf-space-5) var(--nf-space-6)',
   borderRadius: 'var(--nf-radius-lg)',
   border: '1px solid var(--nf-color-border)',

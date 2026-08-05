@@ -139,9 +139,9 @@ export default function ActivityRow({ entry, actorName }: ActivityRowProps): Rea
       style={{
         display: 'grid',
         gridTemplateColumns: 'auto 1fr',
-        columnGap: '0.875rem',
+        columnGap: 'var(--nf-space-3-5)',
         alignItems: 'start',
-        padding: '0.625rem var(--nf-space-3)',
+        padding: 'var(--nf-space-2-5) var(--nf-space-3)',
         borderInlineStart: `3px solid ${accent}`,
         borderBlockEnd: '1px solid var(--nf-color-border)',
       }}
@@ -168,11 +168,11 @@ export default function ActivityRow({ entry, actorName }: ActivityRowProps): Rea
           <span style={{ color: 'var(--nf-color-fg)', wordBreak: 'break-word' }}>{action}</span>
           <span
             style={{
-              padding: '0 0.375rem',
+              padding: '0 var(--nf-space-1-5)',
               borderRadius: 'var(--nf-radius-xs)',
               border: `1px solid ${sourceTone}`,
               color: sourceTone,
-              fontSize: '0.625rem',
+              fontSize: 'var(--nf-text-micro)',
               textTransform: 'uppercase',
               letterSpacing: '0.05em',
             }}

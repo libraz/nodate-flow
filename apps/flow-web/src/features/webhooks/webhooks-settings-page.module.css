@@ -27,7 +27,7 @@
 .title {
   margin: 0;
   font-family: var(--nf-font-display, inherit);
-  font-size: clamp(var(--nf-text-xl), 2vw, var(--nf-text-2xl));
+  font-size: var(--nf-text-subsection-title);
   color: var(--nf-color-fg);
 }
 

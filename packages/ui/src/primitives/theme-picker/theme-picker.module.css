@@ -62,8 +62,9 @@
 .previewBars {
   display: flex;
   width: 100%;
+  /* nf-token-override: the seam between the swatches in a theme preview; it reads as a hairline separator, and at the smallest spacing step the previews stop looking like one control */
   gap: 0.1875rem;
-  padding: 0.375rem;
+  padding: var(--nf-space-1-5);
 }
 
 .previewBar {

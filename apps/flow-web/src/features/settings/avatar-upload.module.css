@@ -88,6 +88,7 @@
   inline-size: 100%;
   block-size: 100%;
   font-family: var(--nf-font-sans);
+  /* nf-token-override: initials standing in for a missing avatar; sized to fill the preview box, so it moves with the box and not with the type scale */
   font-size: 2.5rem;
   font-weight: var(--nf-weight-semibold);
   color: var(--nf-color-fg);

@@ -196,7 +196,7 @@ function TitleEditor({
   const headingStyle = {
     margin: 0,
     fontFamily: 'var(--nf-font-display)',
-    fontSize: 'clamp(1.75rem, 3vw, var(--nf-text-4xl))',
+    fontSize: 'var(--nf-text-page-title)',
   } as const;
 
   /**
@@ -278,7 +278,12 @@ function TitleEditor({
 
   return (
     <div
-      style={{ display: 'flex', flexDirection: 'column', gap: '0.375rem', position: 'relative' }}
+      style={{
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 'var(--nf-space-1-5)',
+        position: 'relative',
+      }}
     >
       {/* Preserve the page-level heading landmark while editing. */}
       <h1 style={headingHiddenStyle}>{initial}</h1>
@@ -672,7 +677,7 @@ function AssigneesSection({
             margin: 0,
             display: 'flex',
             flexDirection: 'column',
-            gap: '0.375rem',
+            gap: 'var(--nf-space-1-5)',
           }}
         >
           {assignees.map((a) => (
@@ -824,7 +829,7 @@ function Sidebar({
         flexDirection: 'column',
         gap: 'var(--nf-space-4)',
         position: 'sticky',
-        top: '1rem',
+        top: 'var(--nf-space-4)',
         alignSelf: 'start',
         // nf-token-override: component dimension, not a spacing step
         maxBlockSize: 'calc(100vh - 5rem)',
@@ -857,7 +862,7 @@ function Sidebar({
             style={{
               display: 'inline-flex',
               alignItems: 'center',
-              gap: '0.375rem',
+              gap: 'var(--nf-space-1-5)',
               fontSize: 'var(--nf-text-sm)',
               fontWeight: 'var(--nf-weight-medium)',
               color: 'var(--nf-color-fg)',
@@ -872,6 +877,7 @@ function Sidebar({
                 width: '0.5rem',
                 // nf-token-override: component dimension, not a spacing step
                 height: '0.5rem',
+                // nf-token-override: the corner of an 8px priority dot. At --nf-radius-xs the glass themes would round it into a circle and aurora would leave it square, and the shape is what distinguishes it from the status dots beside it
                 borderRadius: '0.125rem',
                 background: PRIORITY_COLOR[priority],
               }}
@@ -1252,7 +1258,7 @@ function InferStateSection({ taskId }: { taskId: string }): ReactElement {
   const transitionKey = TRANSITION_KEY[transition as TransitionName];
   const transitionLabel = transitionKey ? t(transitionKey) : transition;
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.375rem' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--nf-space-1-5)' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--nf-space-2)' }}>
         <Badge tone="accent">{transitionLabel}</Badge>
         <span
@@ -1268,10 +1274,10 @@ function InferStateSection({ taskId }: { taskId: string }): ReactElement {
       <p
         style={{
           margin: 0,
-          fontSize: '0.8125rem',
+          fontSize: 'var(--nf-text-supporting)',
           color: 'var(--nf-color-fg)',
           display: 'flex',
-          gap: '0.375rem',
+          gap: 'var(--nf-space-1-5)',
           flexWrap: 'wrap',
         }}
       >
@@ -1355,7 +1361,7 @@ function TaskDetailPanel({ id }: TaskDetailPanelProps): ReactElement {
   return (
     <section
       style={{
-        padding: 'clamp(var(--nf-space-6), 4vw, var(--nf-space-10))',
+        padding: 'var(--nf-space-page)',
         display: 'grid',
         gridTemplateColumns: isNarrow ? '1fr' : 'minmax(0, 1fr) minmax(16rem, 22rem)',
         gap: 'var(--nf-space-6)',

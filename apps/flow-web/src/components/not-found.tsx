@@ -32,7 +32,7 @@ export default function NotFound(): ReactElement {
         aria-hidden
         style={{
           fontFamily: 'var(--nf-font-display)',
-          fontSize: 'clamp(5rem, 14vw, 9rem)',
+          fontSize: 'var(--nf-text-status-glyph)',
           lineHeight: 1,
           fontWeight: 700,
           backgroundImage: 'var(--nf-gradient-wordmark)',

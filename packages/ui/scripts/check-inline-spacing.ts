@@ -191,8 +191,14 @@ const OVERRIDE_FILE = /nf-token-override-file:[^\S\n]*(?![*/]\s*$)[A-Za-z][^\n]*
  * `nf-token-override-file:` is the deliberate whole-file form, for the
  * rare component whose every literal is exempt for one stated reason.
  */
-function overrideState(src: string): { wholeFile: boolean; lines: Set<number> } {
+function overrideState(src: string): {
+  wholeFile: boolean;
+  lines: Set<number>;
+  /** 1-based line of every line-scoped annotation, for dangling reporting. */
+  annotations: number[];
+} {
   const lines = new Set<number>();
+  const annotations: number[] = [];
   let wholeFile = false;
   const rows = src.split('\n');
   for (let i = 0; i < rows.length; i++) {
@@ -204,11 +210,12 @@ function overrideState(src: string): { wholeFile: boolean; lines: Set<number> } 
     if (OVERRIDE_LINE.test(row)) {
       // 1-based, and the following line so the annotation can precede
       // what it exempts.
+      annotations.push(i + 1);
       lines.add(i + 1);
       lines.add(i + 2);
     }
   }
-  return { wholeFile, lines };
+  return { wholeFile, lines, annotations };
 }
 
 /**
@@ -499,17 +506,50 @@ function collectFiles(dir: string, exclude: ReadonlyArray<string>, acc: string[]
   }
 }
 
+/** An annotation that exempts nothing. */
+export interface DanglingOverride {
+  file: string;
+  /** 1-based line the annotation sits on. */
+  line: number;
+  /** The annotation's own source line, for context. */
+  context: string;
+}
+
+/** Everything one scan of the tree produced. */
+export interface ScanResult {
+  offenses: SpacingOffense[];
+  /**
+   * Annotations whose two-line window contained no spacing offense.
+   * Usually debris — a literal that was later tokenised, or an
+   * annotation the formatter relocated away from what it was written
+   * for.
+   *
+   * Advisory rather than fatal, because `nf-token-override` is not this
+   * check's alone: check-hardcoded-colors.sh reads the same marker and
+   * reads it file-wide, so a color exemption legitimately sits next to
+   * nothing this scanner can see. Until the two checks stop sharing one
+   * marker, "exempts no spacing literal" cannot be read as "wrong".
+   */
+  dangling: DanglingOverride[];
+}
+
 /**
- * Run the scanner across `options.scanDirs` and return all offenses.
- * Exposed for tests so we can feed synthetic inputs without touching the
- * real file system.
+ * Run the scanner across `options.scanDirs`.
+ *
+ * Annotations are reported when they suppress nothing. An exemption is a
+ * claim about a specific line, and a claim that turns out to be about no
+ * line is either debris left behind by a migration or — the case this
+ * was added for — an annotation the formatter moved off its target. The
+ * check has no way to tell those apart, and neither has a reader, which
+ * is why both are worth surfacing rather than either being ignored.
  */
-export function scanFiles(options: ScanOptions): SpacingOffense[] {
+export function scanFiles(options: ScanOptions): ScanResult {
   const files: string[] = [];
   for (const rel of options.scanDirs) {
     collectFiles(resolve(options.root, rel), options.excludeFragments, files);
   }
-  const out: SpacingOffense[] = [];
+  const offenses: SpacingOffense[] = [];
+  const dangling: DanglingOverride[] = [];
   for (const file of files) {
     let src: string;
     try {
@@ -519,12 +559,46 @@ export function scanFiles(options: ScanOptions): SpacingOffense[] {
     }
     const override = overrideState(src);
     if (override.wholeFile) continue;
+    const used = new Set<number>();
     for (const offense of scanText(file, src)) {
-      if (override.lines.has(offense.line)) continue;
-      out.push(offense);
+      if (override.lines.has(offense.line)) {
+        // Credit whichever annotation(s) cover this line.
+        if (override.annotations.includes(offense.line)) used.add(offense.line);
+        if (override.annotations.includes(offense.line - 1)) used.add(offense.line - 1);
+        continue;
+      }
+      offenses.push(offense);
+    }
+    const rows = src.split('\n');
+    for (const line of override.annotations) {
+      if (used.has(line)) continue;
+      dangling.push({ file, line, context: (rows[line - 1] ?? '').trim() });
     }
   }
-  return out;
+  return { offenses, dangling };
+}
+
+/**
+ * Explain an offense that sits on an at-rule prelude while an annotation
+ * sits on the line below it, inside the block.
+ *
+ * The formatter relocates a comment written after `{` onto the next line
+ * (verified against biome: a comment trailing a declaration or sitting
+ * above an at-rule is left alone; only the at-rule-trailing position
+ * moves). The annotation window covers its own line and the next, so
+ * once moved it no longer reaches the prelude it was written for and the
+ * exemption silently stops applying. Widening the window backwards would
+ * fix this case and open another: an annotation written for the first
+ * declaration inside a block would start exempting the block's own
+ * prelude too. Naming the cause is the cheaper half of the trade.
+ */
+export function formatterHint(src: string, line: number): string | undefined {
+  const rows = src.split('\n');
+  const own = rows[line - 1] ?? '';
+  const next = rows[line] ?? '';
+  if (!own.trimStart().startsWith('@')) return undefined;
+  if (!OVERRIDE_LINE.test(next)) return undefined;
+  return `an nf-token-override sits on line ${line + 1}, inside the block, where it no longer covers this line — the formatter moves a comment written after \`{\` onto the next line. Put it on its own line directly above the at-rule.`;
 }
 
 /**
@@ -582,41 +656,69 @@ function parseFlags(argv: ReadonlyArray<string>): CliFlags {
 
 function main(): void {
   const flags = parseFlags(process.argv.slice(2));
-  const offenses = scanFiles({
+  const { offenses, dangling } = scanFiles({
     root: flags.root,
     scanDirs: DEFAULT_SCAN_DIRS,
     excludeFragments: DEFAULT_EXCLUDE_FRAGMENTS,
   });
 
   if (flags.json) {
-    process.stdout.write(JSON.stringify(offenses, null, 2));
+    process.stdout.write(JSON.stringify({ offenses, dangling }, null, 2));
     process.stdout.write('\n');
-  } else if (offenses.length === 0) {
+  } else if (offenses.length === 0 && dangling.length === 0) {
     console.info('check-inline-spacing: OK (no hardcoded spacing literals)');
   } else {
-    console.error(`check-inline-spacing: found ${offenses.length} offense(s)`);
-    // Group offenses by file for readable output.
-    const byFile = new Map<string, SpacingOffense[]>();
-    for (const o of offenses) {
-      const list = byFile.get(o.file) ?? [];
-      list.push(o);
-      byFile.set(o.file, list);
-    }
-    const files = Array.from(byFile.keys()).sort();
-    for (const file of files) {
-      const list = byFile.get(file) ?? [];
-      console.error(`\n  ${relative(flags.root, file)} (${list.length})`);
-      for (const o of list) {
-        console.error(`    ${o.line}:${o.column}  ${o.property}: ${o.value}`);
+    if (offenses.length > 0) {
+      console.error(`check-inline-spacing: found ${offenses.length} offense(s)`);
+      // Group offenses by file for readable output.
+      const byFile = new Map<string, SpacingOffense[]>();
+      for (const o of offenses) {
+        const list = byFile.get(o.file) ?? [];
+        list.push(o);
+        byFile.set(o.file, list);
       }
+      const files = Array.from(byFile.keys()).sort();
+      for (const file of files) {
+        const list = byFile.get(file) ?? [];
+        let src = '';
+        try {
+          src = readFileSync(file, 'utf8');
+        } catch {
+          src = '';
+        }
+        console.error(`\n  ${relative(flags.root, file)} (${list.length})`);
+        for (const o of list) {
+          console.error(`    ${o.line}:${o.column}  ${o.property}: ${o.value}`);
+          const hint = formatterHint(src, o.line);
+          if (hint !== undefined) console.error(`      ${hint}`);
+        }
+      }
+      console.error(
+        '\n  Replace literals with var(--nf-space-*), var(--nf-radius-*), or var(--nf-text-*).',
+      );
+      console.error(
+        '  Files that legitimately need a literal (e.g. external integration constants) may add an',
+      );
+      console.error('  `nf-token-override: <reason>` annotation to opt out.');
     }
-    console.error(
-      '\n  Replace literals with var(--nf-space-*), var(--nf-radius-*), or var(--nf-text-*).',
-    );
-    console.error(
-      '  Files that legitimately need a literal (e.g. external integration constants) may add an',
-    );
-    console.error('  `nf-token-override: <reason>` annotation to opt out.');
+    if (dangling.length > 0) {
+      console.error(
+        `\ncheck-inline-spacing: ${dangling.length} annotation(s) exempt no spacing literal (advisory)`,
+      );
+      for (const d of dangling) {
+        console.error(`  ${relative(flags.root, d.file)}:${d.line}\n    ${d.context}`);
+      }
+      console.error(
+        '\n  An annotation covers its own line and the next one. One that covers no offense is',
+      );
+      console.error(
+        '  either debris from a migration or an annotation the formatter moved off its target.',
+      );
+      console.error(
+        '  Not fatal: check-hardcoded-colors.sh reads the same marker file-wide, so a color',
+      );
+      console.error('  exemption legitimately has no spacing literal beside it.');
+    }
   }
 
   if (flags.ci && offenses.length > 0) {

@@ -22,7 +22,7 @@
 .title {
   margin: 0;
   font-family: var(--nf-font-display);
-  font-size: clamp(var(--nf-text-2xl), 2.5vw, 2rem);
+  font-size: var(--nf-text-section-title);
   color: var(--nf-color-fg);
 }
 
@@ -75,7 +75,7 @@
 
 .kpiValue {
   font-family: var(--nf-font-display);
-  font-size: clamp(1.75rem, 3vw, var(--nf-text-4xl));
+  font-size: var(--nf-text-page-title);
   line-height: 1.1;
   color: var(--nf-color-fg);
   font-variant-numeric: tabular-nums;
@@ -102,7 +102,7 @@
 
 .acceptanceValue {
   font-family: var(--nf-font-display);
-  font-size: clamp(var(--nf-text-2xl), 2.5vw, 2rem);
+  font-size: var(--nf-text-section-title);
   line-height: 1.1;
   color: var(--nf-color-fg);
   font-variant-numeric: tabular-nums;

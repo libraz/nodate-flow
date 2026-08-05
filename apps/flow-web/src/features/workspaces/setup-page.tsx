@@ -125,7 +125,7 @@ export default function SetupPage(): ReactElement {
               margin: 0,
               fontFamily: 'var(--nf-font-display)',
               fontWeight: 500,
-              fontSize: 'clamp(var(--nf-text-2xl), 3vw, 2rem)',
+              fontSize: 'var(--nf-text-section-title)',
               lineHeight: 1.15,
               letterSpacing: '-0.01em',
               color: 'var(--nf-color-fg)',

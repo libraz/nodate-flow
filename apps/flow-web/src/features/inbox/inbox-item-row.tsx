@@ -74,12 +74,12 @@ export default function InboxItemRow({
   const sourceLabel = isKnownSource(item.source) ? t(SOURCE_LABEL_KEY[item.source]) : item.source;
 
   return (
-    <Card style={{ padding: '0.875rem var(--nf-space-4)' }}>
+    <Card style={{ padding: 'var(--nf-space-3-5) var(--nf-space-4)' }}>
       <div
         style={{
           display: 'flex',
           alignItems: 'center',
-          gap: '0.875rem',
+          gap: 'var(--nf-space-3-5)',
         }}
       >
         <div
@@ -120,7 +120,7 @@ export default function InboxItemRow({
             <span
               style={{
                 fontFamily: 'var(--nf-font-mono)',
-                fontSize: '0.8125rem',
+                fontSize: 'var(--nf-text-supporting)',
                 color: 'var(--nf-color-fg-muted)',
               }}
             >
@@ -146,7 +146,7 @@ export default function InboxItemRow({
           <span
             style={{
               color: 'var(--nf-color-fg-muted)',
-              fontSize: '0.8125rem',
+              fontSize: 'var(--nf-text-supporting)',
               fontVariantNumeric: 'tabular-nums',
             }}
           >

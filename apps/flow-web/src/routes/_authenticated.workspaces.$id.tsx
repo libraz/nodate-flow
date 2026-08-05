@@ -156,14 +156,14 @@ function WorkspaceDetailRoute(): ReactElement {
         display: 'flex',
         flexDirection: 'column',
         gap: 'var(--nf-space-6)',
-        padding: 'clamp(var(--nf-space-6), 4vw, var(--nf-space-10))',
+        padding: 'var(--nf-space-page)',
       }}
     >
       {hasChildRoute ? (
         <p
           style={{
             fontFamily: 'var(--nf-font-display)',
-            fontSize: 'clamp(var(--nf-text-2xl), 2.5vw, 2rem)',
+            fontSize: 'var(--nf-text-section-title)',
             margin: 0,
             color: 'var(--nf-color-fg)',
           }}
@@ -197,7 +197,7 @@ function WorkspaceDetailRoute(): ReactElement {
             }}
             style={{
               display: 'inline-block',
-              padding: 'var(--nf-space-2) 0.875rem',
+              padding: 'var(--nf-space-2) var(--nf-space-3-5)',
               borderRadius: 'var(--nf-radius-md)',
               color: 'var(--nf-color-fg)',
               textDecoration: 'none',
@@ -263,7 +263,7 @@ function WorkspaceNotFound(): ReactElement {
         aria-hidden
         style={{
           fontFamily: 'var(--nf-font-display)',
-          fontSize: 'clamp(5rem, 14vw, 9rem)',
+          fontSize: 'var(--nf-text-status-glyph)',
           lineHeight: 1,
           fontWeight: 700,
           backgroundImage: 'var(--nf-gradient-wordmark)',

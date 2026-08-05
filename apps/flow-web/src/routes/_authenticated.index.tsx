@@ -83,7 +83,7 @@ function StatCard({
           style={{
             fontSize: 'var(--nf-text-xs)',
             color: 'var(--nf-color-fg-muted)',
-            marginTop: '0.125rem',
+            marginTop: 'var(--nf-space-0-5)',
           }}
         >
           {label}
@@ -169,7 +169,7 @@ function TaskSummary(): ReactElement {
           <h2
             style={{
               margin: '0 0 var(--nf-space-3)',
-              fontSize: '0.85rem',
+              fontSize: 'var(--nf-text-supporting)',
               textTransform: 'uppercase',
               letterSpacing: '0.05em',
               color: 'var(--nf-color-fg-muted)',
@@ -194,7 +194,7 @@ function TaskSummary(): ReactElement {
                   display: 'flex',
                   alignItems: 'center',
                   gap: 'var(--nf-space-3)',
-                  padding: '0.6rem var(--nf-space-3)',
+                  padding: 'var(--nf-space-2-5) var(--nf-space-3)',
                   borderRadius: 'var(--nf-radius-md)',
                   background: 'var(--nf-color-surface)',
                 }}
@@ -230,7 +230,7 @@ function TaskSummary(): ReactElement {
             <Link
               to="/today"
               style={{
-                fontSize: '0.8125rem',
+                fontSize: 'var(--nf-text-supporting)',
                 color: 'var(--nf-color-accent)',
                 textDecoration: 'none',
               }}
@@ -269,7 +269,7 @@ function WorkspaceLinks(): ReactElement {
             display: 'inline-flex',
             alignItems: 'center',
             gap: 'var(--nf-space-2)',
-            padding: 'var(--nf-space-2) 0.875rem',
+            padding: 'var(--nf-space-2) var(--nf-space-3-5)',
             borderRadius: 'var(--nf-radius-md)',
             background: 'var(--nf-color-accent)',
             color: 'var(--nf-color-fg-on-accent)',
@@ -339,6 +339,7 @@ function HomePage(): ReactElement {
         flexDirection: 'column',
         gap: 'var(--nf-space-8)',
         paddingBlock: 'var(--nf-space-8)',
+        // nf-token-override: upper bound of a fluid range; the gutter stops widening here so the dashboard columns keep their measure
         paddingInline: 'clamp(var(--nf-space-6), 6vw, 3.5rem)',
         // nf-token-override: component dimension, not a spacing step
         maxInlineSize: '72rem',
@@ -353,6 +354,7 @@ function HomePage(): ReactElement {
             fontFamily: 'var(--nf-font-display)',
             fontOpticalSizing: 'auto',
             fontWeight: 400,
+            // nf-token-override: the dashboard greeting is the one heading set in the display face over the wordmark gradient, and it is sized against that gradient rather than against the page-title step
             fontSize: 'clamp(1.75rem, 4vw, 2.5rem)',
             lineHeight: 1.1,
             letterSpacing: '-0.02em',
@@ -371,7 +373,7 @@ function HomePage(): ReactElement {
         <p
           style={{
             fontFamily: 'var(--nf-font-mono)',
-            fontSize: '0.6875rem',
+            fontSize: 'var(--nf-text-micro)',
             letterSpacing: '0.18em',
             color: 'var(--nf-color-fg-muted)',
             margin: 0,
@@ -467,7 +469,7 @@ function HomePage(): ReactElement {
         <h2
           style={{
             margin: '0 0 var(--nf-space-3)',
-            fontSize: '0.85rem',
+            fontSize: 'var(--nf-text-supporting)',
             textTransform: 'uppercase',
             letterSpacing: '0.05em',
             color: 'var(--nf-color-fg-muted)',

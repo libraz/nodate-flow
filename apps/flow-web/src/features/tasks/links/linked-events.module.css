@@ -180,7 +180,7 @@
 .glyphCell[data-today="true"]::before {
   content: "";
   position: absolute;
-  inset-inline-start: -0.5rem;
+  inset-inline-start: calc(var(--nf-space-2) * -1);
   inset-block-start: 50%;
   /* nf-token-override: component dimension, not a spacing step */
   inline-size: 0.25rem;

@@ -36,7 +36,7 @@ function InboxRoute(): ReactElement {
   return (
     <section
       style={{
-        padding: 'clamp(var(--nf-space-6), 4vw, var(--nf-space-10))',
+        padding: 'var(--nf-space-page)',
         display: 'flex',
         flexDirection: 'column',
         gap: 'var(--nf-space-6)',
@@ -51,7 +51,7 @@ function InboxRoute(): ReactElement {
           style={{
             margin: 0,
             fontFamily: 'var(--nf-font-display)',
-            fontSize: 'clamp(1.75rem, 3vw, var(--nf-text-4xl))',
+            fontSize: 'var(--nf-text-page-title)',
           }}
         >
           {t('view.title')}

@@ -186,7 +186,7 @@ export default function InboxList(): ReactElement {
           style={{
             display: 'flex',
             flexDirection: 'column',
-            gap: '0.375rem',
+            gap: 'var(--nf-space-1-5)',
             fontSize: 'var(--nf-text-sm)',
             color: 'var(--nf-color-fg-muted)',
           }}
@@ -201,7 +201,7 @@ export default function InboxList(): ReactElement {
               border: '1px solid var(--nf-color-border)',
               background: 'var(--nf-color-surface)',
               color: 'var(--nf-color-fg)',
-              fontSize: '0.9375rem',
+              fontSize: 'var(--nf-text-base)',
               // nf-token-override: component dimension, not a spacing step
               maxInlineSize: '20rem',
             }}

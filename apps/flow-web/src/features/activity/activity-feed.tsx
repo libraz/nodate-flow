@@ -46,7 +46,7 @@ function SourceFilter({
     <div
       role="group"
       aria-label={t('filter.source_label')}
-      style={{ display: 'flex', flexWrap: 'wrap', gap: '0.375rem' }}
+      style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--nf-space-1-5)' }}
     >
       {FILTER_VALUES.map((v) => {
         const active = v === value;
@@ -63,7 +63,7 @@ function SourceFilter({
               border: `1px solid ${active ? 'var(--nf-color-accent)' : 'var(--nf-color-border)'}`,
               background: active ? 'var(--nf-color-accent-subtle)' : 'var(--nf-color-surface)',
               color: active ? 'var(--nf-color-accent)' : 'var(--nf-color-fg)',
-              fontSize: '0.8125rem',
+              fontSize: 'var(--nf-text-supporting)',
               cursor: 'pointer',
               transition:
                 'border-color var(--nf-duration-fast) ease, background-color var(--nf-duration-fast) ease',

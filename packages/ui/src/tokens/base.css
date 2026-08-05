@@ -5,12 +5,29 @@
  */
 
 :where(:root) {
-  /* spacing — 4px base, rem-only */
+  /*
+   * spacing — 4px base, rem-only.
+   *
+   * The half steps (`-0-5` through `-3-5`) fill the 2px positions the
+   * 4px grid skips. They are for dense UI — chips, badges, table rows,
+   * icon-to-label gaps — where 4px is visibly loose and 8px breaks the
+   * row height. They are not for layout: page, section and card padding
+   * stay on the whole steps, because a layout built on 2px increments
+   * stops reading as a grid at all.
+   *
+   * The scale ends at whole steps deliberately. Nothing above `-3-5`
+   * needs a half step; if a fourth-of-a-step ever looks necessary, the
+   * component is fighting the scale rather than missing a value in it.
+   */
   --nf-space-0: 0;
   --nf-space-px: 0.0625rem;
+  --nf-space-0-5: 0.125rem;
   --nf-space-1: 0.25rem;
+  --nf-space-1-5: 0.375rem;
   --nf-space-2: 0.5rem;
+  --nf-space-2-5: 0.625rem;
   --nf-space-3: 0.75rem;
+  --nf-space-3-5: 0.875rem;
   --nf-space-4: 1rem;
   --nf-space-5: 1.25rem;
   --nf-space-6: 1.5rem;
@@ -43,6 +60,59 @@
   --nf-text-2xl: 1.5rem;
   --nf-text-3xl: 1.875rem;
   --nf-text-4xl: 2.25rem;
+
+  /*
+   * Two sizes named for what they carry rather than where they sit on
+   * the ladder above, because that is how they were being chosen. Both
+   * were written out by hand dozens of times before they existed here.
+   *
+   * - supporting (13px): the text beside the text. Table cells, the
+   *   caption under a figure, muted helper copy, filter chips, inline
+   *   ids. It reads as secondary next to `base`, which is the whole
+   *   point, and it is almost always paired with `--nf-color-fg-muted`.
+   * - micro (11px): a label small enough that it is read as a marking
+   *   rather than as prose — keyboard hints, group headings in the
+   *   command palette, count badges, tag pills.
+   *
+   * Nothing smaller belongs on this scale. Text that has to be smaller
+   * than `micro` is being asked to fit a box, which is a layout problem
+   * with a layout-scoped answer; see --nf-cal-text-cell below.
+   */
+  --nf-text-supporting: 0.8125rem;
+  --nf-text-micro: 0.6875rem;
+
+  /*
+   * Calendar cell text. A `--nf-cal-*` name in the theme-agnostic file:
+   * the rest of that family is colour and lives in semantic.css because
+   * it changes per theme, but this size does not — it is set by how much
+   * room a day cell has, and it moves when the grid moves, not when the
+   * type scale moves. Keeping it out of --nf-text-* is the point: a
+   * cramped month view is fixed here without touching a word of prose
+   * anywhere else in the product.
+   */
+  --nf-cal-text-cell: 0.625rem;
+
+  /*
+   * Fluid sizes.
+   *
+   * These are viewport-interpolated ranges, not steps of the scales
+   * above: the value moves continuously between the two bounds instead
+   * of snapping at a breakpoint. They exist because every page needed
+   * the same four ranges and wrote them out by hand — the page gutter
+   * alone was copied into 19 files — which meant a change to any of them
+   * was a 19-file edit nobody would make, and the two that carried a
+   * literal bound were the only ones any check could see.
+   *
+   * Named for the role, not the range. A page title stays a page title
+   * when the numbers are retuned; "28-to-36" would not.
+   */
+  --nf-space-page: clamp(var(--nf-space-6), 4vw, var(--nf-space-10));
+  --nf-text-page-title: clamp(1.75rem, 3vw, var(--nf-text-4xl));
+  --nf-text-section-title: clamp(var(--nf-text-2xl), 2.5vw, 2rem);
+  --nf-text-subsection-title: clamp(var(--nf-text-xl), 2vw, var(--nf-text-2xl));
+  /* The oversized decorative glyph on a status screen (404 / 403 / no
+     workspace): display face, gradient fill, aria-hidden. */
+  --nf-text-status-glyph: clamp(5rem, 14vw, 9rem);
 
   /* line heights */
   --nf-leading-tight: 1.2;
@@ -85,7 +155,7 @@
 
   /* breakpoints (reference only — CSS custom properties cannot be used in @media)
    * Use the JS constants from @nodate-flow/ui/tokens/breakpoints instead.
-   * sm: 640px, md: 768px, lg: 1024px, xl: 1280px */
+   * xs: 480px, sm: 640px, md: 768px, lg: 1024px, xl: 1280px */
 
   /* motion durations */
   --nf-duration-instant: 80ms;

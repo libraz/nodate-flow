@@ -160,7 +160,7 @@ function AuthenticatedLayout(): ReactElement | null {
                   display: 'inline-flex',
                   alignItems: 'center',
                   paddingInline: 'var(--nf-space-3)',
-                  paddingBlock: '0.375rem',
+                  paddingBlock: 'var(--nf-space-1-5)',
                   borderRadius: 'var(--nf-radius-md)',
                   background: 'var(--nf-color-accent)',
                   color: 'var(--nf-color-fg-on-accent)',

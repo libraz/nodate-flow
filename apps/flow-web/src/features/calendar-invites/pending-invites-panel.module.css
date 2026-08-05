@@ -31,7 +31,6 @@
 
 /* nf-token-override: breakpoint, and custom properties do not work in at-rule conditions */
 @media (max-width: 1023px) {
-  /* nf-breakpoint-override: ultra-wide threshold for the three-column layout; xl (1280px) catches laptops, which lack the room */
   .layout {
     grid-template-columns: minmax(0, 1fr);
   }

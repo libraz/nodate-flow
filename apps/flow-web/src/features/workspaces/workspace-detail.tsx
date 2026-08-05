@@ -60,7 +60,7 @@ function OverviewPanel({ workspaceId }: { workspaceId: string }): ReactElement {
       <h2
         style={{
           margin: 0,
-          fontSize: '0.8125rem',
+          fontSize: 'var(--nf-text-supporting)',
           textTransform: 'uppercase',
           letterSpacing: '0.05em',
           color: 'var(--nf-color-fg-muted)',
@@ -75,7 +75,7 @@ function OverviewPanel({ workspaceId }: { workspaceId: string }): ReactElement {
           padding: 0,
           display: 'flex',
           flexDirection: 'column',
-          gap: '0.375rem',
+          gap: 'var(--nf-space-1-5)',
         }}
       >
         {active.slice(0, 8).map((p) => (
@@ -87,7 +87,7 @@ function OverviewPanel({ workspaceId }: { workspaceId: string }): ReactElement {
                 display: 'flex',
                 alignItems: 'center',
                 gap: 'var(--nf-space-3)',
-                padding: '0.6rem var(--nf-space-3)',
+                padding: 'var(--nf-space-2-5) var(--nf-space-3)',
                 borderRadius: 'var(--nf-radius-md)',
                 background: 'var(--nf-color-surface)',
                 color: 'inherit',
@@ -111,7 +111,7 @@ function OverviewPanel({ workspaceId }: { workspaceId: string }): ReactElement {
                 <span
                   style={{
                     color: 'var(--nf-color-fg-muted)',
-                    fontSize: '0.8125rem',
+                    fontSize: 'var(--nf-text-supporting)',
                     overflow: 'hidden',
                     textOverflow: 'ellipsis',
                     whiteSpace: 'nowrap',
@@ -172,7 +172,7 @@ export default function WorkspaceDetail({
         display: 'flex',
         flexDirection: 'column',
         gap: 'var(--nf-space-6)',
-        padding: 'clamp(var(--nf-space-6), 4vw, var(--nf-space-10))',
+        padding: 'var(--nf-space-page)',
       }}
     >
       <header style={{ display: 'flex', flexDirection: 'column', gap: 'var(--nf-space-2)' }}>
@@ -180,7 +180,7 @@ export default function WorkspaceDetail({
           id={headingId}
           style={{
             fontFamily: 'var(--nf-font-display)',
-            fontSize: 'clamp(1.75rem, 3vw, var(--nf-text-4xl))',
+            fontSize: 'var(--nf-text-page-title)',
             margin: 0,
           }}
         >

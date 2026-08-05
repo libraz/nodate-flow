@@ -45,7 +45,7 @@ export default function ShortcutsHelpDialog({
             >
               {t(sectionKey)}
             </h3>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.375rem' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--nf-space-1-5)' }}>
               {bindings.map((b) => (
                 <div
                   key={b.keys}
@@ -69,7 +69,7 @@ export default function ShortcutsHelpDialog({
                           minWidth: '1.5rem',
                           // nf-token-override: component dimension, not a spacing step
                           height: '1.5rem',
-                          padding: '0 0.375rem',
+                          padding: '0 var(--nf-space-1-5)',
                           borderRadius: 'var(--nf-radius-xs)',
                           border: '1px solid var(--nf-color-border)',
                           backgroundColor: 'var(--nf-color-bg-elevated)',

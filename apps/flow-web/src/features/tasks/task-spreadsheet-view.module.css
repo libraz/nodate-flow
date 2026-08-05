@@ -91,7 +91,7 @@
 .cell {
   display: flex;
   align-items: center;
-  padding-block: var(--nf-space-2);
+  padding-block: var(--nf-space-1-5);
   padding-inline: var(--nf-space-3);
   font-size: var(--nf-text-sm);
   color: var(--nf-color-fg);
@@ -179,7 +179,7 @@
 
 .cellDateTrigger {
   inline-size: 100%;
-  padding-block: var(--nf-space-1);
+  padding-block: var(--nf-space-0-5);
   padding-inline: var(--nf-space-2);
   background: transparent;
   color: var(--nf-color-fg);

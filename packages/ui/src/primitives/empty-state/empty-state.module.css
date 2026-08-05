@@ -10,6 +10,7 @@
 
 .icon {
   color: var(--nf-color-fg-subtle);
+  /* nf-token-override: a glyph used as an illustration; sized to the empty panel it centres in, not to the type scale */
   font-size: 2.5rem;
   line-height: 1;
 }

@@ -104,7 +104,7 @@ function InviteAcceptPage(): ReactElement {
           search={{ returnTo: `/invite/${token}` }}
           style={{
             display: 'inline-block',
-            padding: '0.625rem var(--nf-space-5)',
+            padding: 'var(--nf-space-2-5) var(--nf-space-5)',
             borderRadius: 'var(--nf-radius-md)',
             background: 'var(--nf-color-accent)',
             color: 'var(--nf-color-fg-on-accent)',
@@ -185,7 +185,7 @@ function InviteAcceptPage(): ReactElement {
           style={{
             display: 'inline-flex',
             alignItems: 'center',
-            padding: '0.625rem var(--nf-space-5)',
+            padding: 'var(--nf-space-2-5) var(--nf-space-5)',
             borderRadius: 'var(--nf-radius-md)',
             border: '1px solid var(--nf-color-border)',
             background: 'transparent',

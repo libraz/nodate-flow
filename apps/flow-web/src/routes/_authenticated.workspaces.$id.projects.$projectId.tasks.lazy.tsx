@@ -48,7 +48,7 @@ function TasksSectionLayout(): ReactElement {
         display: 'flex',
         flexDirection: 'column',
         gap: 'var(--nf-space-5)',
-        padding: 'clamp(var(--nf-space-6), 4vw, var(--nf-space-10))',
+        padding: 'var(--nf-space-page)',
         blockSize: '100%',
       }}
     >
@@ -64,7 +64,7 @@ function TasksSectionLayout(): ReactElement {
         <h2
           style={{
             fontFamily: 'var(--nf-font-display)',
-            fontSize: 'clamp(1.75rem, 3vw, var(--nf-text-4xl))',
+            fontSize: 'var(--nf-text-page-title)',
             margin: 0,
           }}
         >

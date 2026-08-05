@@ -213,7 +213,7 @@ export default function ProjectStateGraph({ projectId }: ProjectStateGraphProps)
           <span
             style={{
               fontWeight: 400,
-              fontSize: '0.8125rem',
+              fontSize: 'var(--nf-text-supporting)',
               color: 'var(--nf-color-fg-muted)',
               marginInlineStart: 'var(--nf-space-3)',
             }}

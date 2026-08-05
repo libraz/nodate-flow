@@ -236,7 +236,7 @@
   padding-inline: var(--nf-space-1);
   border-inline-start: 2px solid transparent;
   border-radius: var(--nf-radius-sm);
-  font-size: 0.625rem;
+  font-size: var(--nf-cal-text-cell);
   color: var(--nf-color-fg);
   cursor: pointer;
   overflow: hidden;
@@ -260,7 +260,7 @@
 .barOverlay {
   position: absolute;
   inset-inline: 0;
-  /* Sits below the date numbers (1.5rem head + small gap). */
+  /* nf-token-override: sits below the date numbers — 1.5rem head plus a small gap, so it tracks the header's height, not the spacing scale */
   inset-block-start: 1.875rem;
   z-index: 1;
   pointer-events: none;
@@ -277,7 +277,7 @@
   padding-inline: var(--nf-space-1);
   border-inline-start: 2px solid transparent;
   border-radius: var(--nf-radius-sm);
-  font-size: 0.625rem;
+  font-size: var(--nf-cal-text-cell);
   font-weight: var(--nf-weight-medium);
   color: var(--nf-color-fg);
   cursor: pointer;
@@ -308,7 +308,7 @@
 }
 
 .more {
-  font-size: 0.625rem;
+  font-size: var(--nf-cal-text-cell);
   color: var(--nf-color-fg-muted);
   padding-inline: var(--nf-space-1);
 }

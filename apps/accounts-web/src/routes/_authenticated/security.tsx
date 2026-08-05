@@ -30,6 +30,7 @@ import {
 } from '../../lib/auth-errors';
 import { logError } from '../../lib/log';
 import { sdk } from '../../lib/sdk';
+import { requestFailed } from '../../lib/sdk-result';
 
 import recoveryStyles from './recovery-codes.module.css';
 
@@ -184,23 +185,14 @@ export function SecurityPage(): ReactElement {
     setPasswordError(null);
     setPasswordSuccess(false);
     try {
-      // IMPORTANT: backend registers POST /me/password. Using PUT returns 405
-      // and openapi-fetch does not populate `error` for unmapped status codes,
-      // which previously caused the UI to display a false-success toast even
-      // though the password was not rotated. Always guard on response.ok as
-      // defense-in-depth for any non-2xx that escapes typed-error mapping.
-      const { error, response } = await sdk.POST('/me/password', {
+      const result = await sdk.POST('/me/password', {
         body: {
           currentPassword: values.currentPassword,
           newPassword: values.newPassword,
         },
       });
-      if (error) {
-        setPasswordError(mapAuthError(error as ProblemJson | undefined));
-        return;
-      }
-      if (!response.ok) {
-        setPasswordError(mapAuthError(undefined));
+      if (requestFailed(result)) {
+        setPasswordError(mapAuthError(result.error as ProblemJson | undefined));
         return;
       }
       setPasswordSuccess(true);
@@ -240,10 +232,10 @@ export function SecurityPage(): ReactElement {
   const handleRevokeSession = async (sessionId: string): Promise<void> => {
     setRevokingId(sessionId);
     try {
-      const { error } = await sdk.DELETE('/me/sessions/{sessionId}', {
+      const result = await sdk.DELETE('/me/sessions/{sessionId}', {
         params: { path: { sessionId } },
       });
-      if (error) {
+      if (requestFailed(result)) {
         toaster.show({ message: t('security.session_revoke_failed'), tone: 'danger' });
         return;
       }
@@ -438,8 +430,9 @@ function TotpSection(): ReactElement {
     setErrorKey(null);
     setBusy(true);
     try {
-      const { data, error } = await sdk.POST('/me/totp/enroll', { body: { password } });
-      if (error) {
+      const result = await sdk.POST('/me/totp/enroll', { body: { password } });
+      const { data, error } = result;
+      if (requestFailed(result)) {
         const errCode = extractErrorCode(error as ProblemJson | undefined);
         setErrorKey(
           errCode === 'AUTH.PASSWORD.CURRENT_MISMATCH'
@@ -472,8 +465,9 @@ function TotpSection(): ReactElement {
     }
     setBusy(true);
     try {
-      const { error, response } = await sdk.DELETE('/me/totp', { body: { password } });
-      if (error || !response.ok) {
+      const result = await sdk.DELETE('/me/totp', { body: { password } });
+      const { error } = result;
+      if (requestFailed(result)) {
         const errCode = extractErrorCode(error as ProblemJson | undefined);
         setErrorKey(
           errCode === 'AUTH.PASSWORD.CURRENT_MISMATCH'
@@ -498,8 +492,9 @@ function TotpSection(): ReactElement {
     setErrorKey(null);
     setBusy(true);
     try {
-      const { data, error } = await sdk.POST('/me/totp/confirm', { body: { code, password } });
-      if (error) {
+      const result = await sdk.POST('/me/totp/confirm', { body: { code, password } });
+      const { data, error } = result;
+      if (requestFailed(result)) {
         const errCode = extractErrorCode(error as ProblemJson | undefined);
         if (errCode === 'AUTH.TOTP.CODE_MISMATCH') {
           setErrorKey('security.totp.errors.code_mismatch');
@@ -946,8 +941,9 @@ function EnabledPanel({
     setErrorKey(null);
     setBusy(true);
     try {
-      const { error } = await sdk.DELETE('/me/totp', { body: { password } });
-      if (error) {
+      const result = await sdk.DELETE('/me/totp', { body: { password } });
+      const { error } = result;
+      if (requestFailed(result)) {
         const errCode = extractErrorCode(error as ProblemJson | undefined);
         if (errCode === 'AUTH.PASSWORD.CURRENT_MISMATCH') {
           setErrorKey('security.totp.errors.password_mismatch');
@@ -970,8 +966,9 @@ function EnabledPanel({
     setErrorKey(null);
     setBusy(true);
     try {
-      const { data, error } = await sdk.POST('/me/totp/recovery-codes', { body: { password } });
-      if (error) {
+      const result = await sdk.POST('/me/totp/recovery-codes', { body: { password } });
+      const { data, error } = result;
+      if (requestFailed(result)) {
         const errCode = extractErrorCode(error as ProblemJson | undefined);
         if (errCode === 'AUTH.PASSWORD.CURRENT_MISMATCH') {
           setErrorKey('security.totp.errors.password_mismatch');

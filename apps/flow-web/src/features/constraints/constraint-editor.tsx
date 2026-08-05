@@ -143,8 +143,8 @@ export default function ConstraintEditor({ taskId }: ConstraintEditorProps): Rea
             style={{
               cursor: 'pointer',
               color: 'var(--nf-color-fg-muted)',
-              fontSize: '0.8125rem',
-              marginBlockEnd: '0.375rem',
+              fontSize: 'var(--nf-text-supporting)',
+              marginBlockEnd: 'var(--nf-space-1-5)',
             }}
           >
             {t('editor.advanced')}

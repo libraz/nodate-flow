@@ -16,7 +16,7 @@ function PagesLayout(): ReactElement {
       fallback={
         <div
           style={{
-            padding: 'clamp(var(--nf-space-6), 4vw, var(--nf-space-10))',
+            padding: 'var(--nf-space-page)',
             display: 'flex',
             flexDirection: 'column',
             gap: 'var(--nf-space-4)',

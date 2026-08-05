@@ -69,7 +69,7 @@ const valueStyle: CSSProperties = {
   margin: 0,
   display: 'flex',
   alignItems: 'center',
-  gap: '0.375rem',
+  gap: 'var(--nf-space-1-5)',
 };
 
 export default function ReplayPanel({ taskId }: ReplayPanelProps): ReactElement {
@@ -85,7 +85,7 @@ export default function ReplayPanel({ taskId }: ReplayPanelProps): ReactElement 
         display: 'flex',
         flexDirection: 'column',
         gap: 'var(--nf-space-3)',
-        padding: '0.875rem var(--nf-space-4)',
+        padding: 'var(--nf-space-3-5) var(--nf-space-4)',
         borderRadius: 'var(--nf-radius-md)',
         border: '1px solid var(--nf-color-border)',
         background: 'var(--nf-color-surface)',
@@ -99,7 +99,9 @@ export default function ReplayPanel({ taskId }: ReplayPanelProps): ReactElement 
           gap: 'var(--nf-space-3)',
         }}
       >
-        <h3 style={{ margin: 0, fontSize: '0.9375rem', fontWeight: 600 }}>{t('replay.title')}</h3>
+        <h3 style={{ margin: 0, fontSize: 'var(--nf-text-base)', fontWeight: 600 }}>
+          {t('replay.title')}
+        </h3>
         <Button
           type="button"
           variant="ghost"

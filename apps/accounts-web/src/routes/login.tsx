@@ -141,11 +141,12 @@ const DEV_PANEL_STYLES = `
 .dql-tag {
   display: inline-flex;
   align-items: center;
-  padding: 2px 6px;
+  padding: var(--nf-space-0-5) var(--nf-space-1-5);
   border-radius: 3px;
   background: var(--nf-color-warning);
   color: var(--nf-color-fg-on-accent);
   font-family: var(--nf-font-mono);
+  /* nf-token-override: a monospace tag set below the micro step on purpose — it is a marking on the demo panel, not text anyone reads as a word */
   font-size: 9px;
   font-weight: 700;
   letter-spacing: 0.12em;
@@ -168,6 +169,7 @@ const DEV_PANEL_STYLES = `
   align-items: center;
   gap: var(--nf-space-2);
   font-family: var(--nf-font-mono);
+  /* nf-token-override: a wide-tracked uppercase tier label; the letter-spacing carries the legibility that the size gives up, so it does not follow the type scale */
   font-size: 10px;
   font-weight: var(--nf-weight-semibold);
   color: var(--nf-color-fg-subtle);
@@ -284,8 +286,8 @@ const DEV_PANEL_STYLES = `
   text-align: center;
   letter-spacing: 0.02em;
 }
-/* nf-token-override: component dimension, not a spacing step */
-@media (max-width: 360px) { /* nf-breakpoint-override: the width at which the email stops fitting on the narrowest phones; a one-off, not a step of the scale */
+/* nf-token-override: component dimension, not a spacing step. nf-breakpoint-override: the width at which the email stops fitting on the narrowest phones; a one-off, not a step of the scale */
+@media (max-width: 360px) {
   .dql-email { display: none; }
 }
 `;

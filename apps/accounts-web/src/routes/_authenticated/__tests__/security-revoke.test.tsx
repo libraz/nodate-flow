@@ -154,4 +154,55 @@ describe('SecurityPage — revoke session error path', () => {
     expect(call?.tone).toBe('danger');
     expect(call?.message).toBe(enAuth.security.session_revoke_failed);
   });
+
+  it('reports a refusal that arrived without an error body', async () => {
+    sdkMocks.get.mockImplementation((path: string) => {
+      if (path === '/me/sessions') {
+        return Promise.resolve({
+          data: {
+            items: [
+              {
+                id: 'sess-2',
+                userAgent: 'Mozilla/5.0',
+                ipAddress: '10.0.0.2',
+                current: false,
+                createdAt: 1_700_000_000,
+                lastUsedAt: 1_700_000_100,
+              },
+            ],
+          },
+          error: null,
+        });
+      }
+      return Promise.resolve({ data: { status: 'disabled' }, error: null });
+    });
+
+    // A 403 with no body: openapi-fetch has nothing to parse, so it
+    // leaves `error` undefined. The handler used to read that as
+    // success and drop the session from the list while the server kept
+    // it alive — the user is told a suspicious session is gone when it
+    // is still able to act on their account.
+    sdkMocks.delete.mockResolvedValue({
+      data: undefined,
+      error: undefined,
+      response: new Response(null, { status: 403 }),
+    });
+
+    mountSecurity();
+
+    const revokeBtn = await screen.findByRole('button', {
+      name: enAuth.security.session_revoke,
+    });
+    fireEvent.click(revokeBtn);
+
+    await waitFor(() => {
+      expect(toasterMock.show).toHaveBeenCalled();
+    });
+    const call = toasterMock.show.mock.calls[0]?.[0];
+    expect(call?.tone).toBe('danger');
+    expect(call?.message).toBe(enAuth.security.session_revoke_failed);
+
+    // And the row must still be there: the session was not revoked.
+    expect(screen.getByRole('button', { name: enAuth.security.session_revoke })).toBeTruthy();
+  });
 });

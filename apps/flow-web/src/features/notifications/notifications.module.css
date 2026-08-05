@@ -4,8 +4,8 @@
 
 .badge {
   position: absolute;
-  inset-block-start: -0.25rem;
-  inset-inline-end: -0.25rem;
+  inset-block-start: calc(var(--nf-space-1) * -1);
+  inset-inline-end: calc(var(--nf-space-1) * -1);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -18,7 +18,7 @@
   background: var(--nf-color-danger);
   color: var(--nf-color-fg-on-danger);
   font-family: var(--nf-font-mono);
-  font-size: 0.625rem;
+  font-size: var(--nf-text-micro);
   font-weight: var(--nf-weight-semibold);
   line-height: 1;
   pointer-events: none;
@@ -113,7 +113,7 @@
   inline-size: 0.5rem;
   /* nf-token-override: component dimension, not a spacing step */
   block-size: 0.5rem;
-  margin-block-start: 0.375rem;
+  margin-block-start: var(--nf-space-1-5);
   border-radius: var(--nf-radius-pill);
   background: var(--nf-color-accent);
 }
@@ -124,7 +124,7 @@
   inline-size: 0.5rem;
   /* nf-token-override: component dimension, not a spacing step */
   block-size: 0.5rem;
-  margin-block-start: 0.375rem;
+  margin-block-start: var(--nf-space-1-5);
   border-radius: var(--nf-radius-pill);
   background: transparent;
 }

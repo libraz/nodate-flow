@@ -35,7 +35,7 @@ function CountsRow({ counts }: { counts: WeeklyDigestCounts }): ReactElement {
     >
       {items.map((item) => (
         <li key={item.key}>
-          <Card style={{ padding: '0.625rem var(--nf-space-3)' }}>
+          <Card style={{ padding: 'var(--nf-space-2-5) var(--nf-space-3)' }}>
             <div style={{ fontSize: 'var(--nf-text-xs)', color: 'var(--nf-color-fg-muted)' }}>
               {item.label}
             </div>
@@ -56,7 +56,13 @@ function TaskList({
 }): ReactElement {
   if (tasks.length === 0) {
     return (
-      <p style={{ margin: 0, color: 'var(--nf-color-fg-muted)', fontSize: '0.8125rem' }}>
+      <p
+        style={{
+          margin: 0,
+          color: 'var(--nf-color-fg-muted)',
+          fontSize: 'var(--nf-text-supporting)',
+        }}
+      >
         {emptyLabel}
       </p>
     );
@@ -78,7 +84,7 @@ function TaskList({
             display: 'flex',
             justifyContent: 'space-between',
             gap: 'var(--nf-space-4)',
-            fontSize: '0.8125rem',
+            fontSize: 'var(--nf-text-supporting)',
           }}
         >
           <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
@@ -102,7 +108,13 @@ export default function DigestView({ workspaceId }: { workspaceId: string }): Re
     <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--nf-space-5)' }}>
       <header style={{ display: 'flex', flexDirection: 'column', gap: 'var(--nf-space-1)' }}>
         <h1 style={{ margin: 0, fontSize: 'var(--nf-text-2xl)' }}>{t('weekly_digest.title')}</h1>
-        <p style={{ margin: 0, color: 'var(--nf-color-fg-muted)', fontSize: '0.8125rem' }}>
+        <p
+          style={{
+            margin: 0,
+            color: 'var(--nf-color-fg-muted)',
+            fontSize: 'var(--nf-text-supporting)',
+          }}
+        >
           {t('weekly_digest.description')}
         </p>
       </header>
@@ -110,20 +122,24 @@ export default function DigestView({ workspaceId }: { workspaceId: string }): Re
       <CountsRow counts={data.counts} />
 
       <section style={{ display: 'flex', flexDirection: 'column', gap: 'var(--nf-space-2)' }}>
-        <h2 style={{ margin: 0, fontSize: '0.9375rem' }}>
+        <h2 style={{ margin: 0, fontSize: 'var(--nf-text-base)' }}>
           {t('weekly_digest.completed_this_week')}
         </h2>
         <TaskList tasks={completed} emptyLabel={t('weekly_digest.empty_completed')} />
       </section>
 
       <section style={{ display: 'flex', flexDirection: 'column', gap: 'var(--nf-space-2)' }}>
-        <h2 style={{ margin: 0, fontSize: '0.9375rem' }}>{t('weekly_digest.overdue_open')}</h2>
+        <h2 style={{ margin: 0, fontSize: 'var(--nf-text-base)' }}>
+          {t('weekly_digest.overdue_open')}
+        </h2>
         <TaskList tasks={overdue} emptyLabel={t('weekly_digest.empty_overdue')} />
       </section>
 
       <section style={{ display: 'flex', flexDirection: 'column', gap: 'var(--nf-space-2)' }}>
-        <h2 style={{ margin: 0, fontSize: '0.9375rem' }}>{t('weekly_digest.markdown')}</h2>
-        <Card style={{ padding: '0.875rem var(--nf-space-4)' }}>
+        <h2 style={{ margin: 0, fontSize: 'var(--nf-text-base)' }}>
+          {t('weekly_digest.markdown')}
+        </h2>
+        <Card style={{ padding: 'var(--nf-space-3-5) var(--nf-space-4)' }}>
           <pre
             style={{
               margin: 0,

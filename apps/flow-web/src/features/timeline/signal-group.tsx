@@ -303,7 +303,7 @@ export default function SignalGroup({
             background: 'var(--nf-color-surface)',
             border: '1px solid var(--nf-color-hairline)',
             borderRadius: 'var(--nf-radius-sm)',
-            padding: 'var(--nf-space-2) 0.625rem',
+            padding: 'var(--nf-space-2) var(--nf-space-2-5)',
           }}
         >
           <summary

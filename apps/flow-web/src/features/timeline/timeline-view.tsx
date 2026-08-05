@@ -202,7 +202,7 @@ function TimelineInner({
                   insetBlockStart: 0,
                   zIndex: 2,
                   margin: 0,
-                  padding: '0.375rem var(--nf-space-3)',
+                  padding: 'var(--nf-space-1-5) var(--nf-space-3)',
                   fontSize: 'var(--nf-text-xs)',
                   textTransform: 'uppercase',
                   letterSpacing: '0.05em',
@@ -225,7 +225,7 @@ function TimelineInner({
                   aria-hidden
                   style={{
                     position: 'absolute',
-                    insetInlineStart: 'calc(var(--nf-space-2) + 0.875rem - 1px)',
+                    insetInlineStart: 'calc(var(--nf-space-2) + var(--nf-space-3-5) - 1px)',
                     insetBlockStart: 0,
                     insetBlockEnd: 0,
                     inlineSize: '2px',

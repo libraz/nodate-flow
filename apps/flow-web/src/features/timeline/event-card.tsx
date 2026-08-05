@@ -197,7 +197,7 @@ function renderRawPayload(payload: unknown): ReactNode {
         padding: 'var(--nf-space-2)',
         background: 'var(--nf-color-surface)',
         borderRadius: 'var(--nf-radius-xs)',
-        fontSize: '0.7rem',
+        fontSize: 'var(--nf-text-micro)',
         overflowX: 'auto',
       }}
     >
@@ -279,7 +279,7 @@ function humanizePayload(type: string, payload: unknown, t: TFunction, locale: s
         fontSize: 'var(--nf-text-xs)',
         display: 'flex',
         flexDirection: 'column',
-        gap: '0.125rem',
+        gap: 'var(--nf-space-0-5)',
       }}
     >
       <div style={{ color: 'var(--nf-color-fg)' }}>
@@ -347,9 +347,9 @@ export default function EventCard({ event }: EventCardProps): ReactElement {
         position: 'relative',
         display: 'grid',
         gridTemplateColumns: 'auto 1fr',
-        columnGap: '0.875rem',
+        columnGap: 'var(--nf-space-3-5)',
         paddingInlineStart: 'var(--nf-space-1)',
-        paddingBlock: '0.625rem',
+        paddingBlock: 'var(--nf-space-2-5)',
       }}
     >
       {/* rail dot */}
@@ -432,11 +432,11 @@ export default function EventCard({ event }: EventCardProps): ReactElement {
           </span>
           <span
             style={{
-              padding: '0 0.375rem',
+              padding: '0 var(--nf-space-1-5)',
               borderRadius: 'var(--nf-radius-xs)',
               border: `1px solid ${tag.color}`,
               color: tag.color,
-              fontSize: '0.625rem',
+              fontSize: 'var(--nf-text-micro)',
               textTransform: 'uppercase',
               letterSpacing: '0.05em',
             }}

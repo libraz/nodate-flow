@@ -18,7 +18,7 @@
 }
 
 .groupLabel {
-  font-size: 0.6875rem;
+  font-size: var(--nf-text-micro);
   text-transform: uppercase;
   letter-spacing: 0.04em;
   color: var(--nf-color-fg-subtle);
@@ -64,14 +64,14 @@
   gap: var(--nf-space-3);
   padding-block-start: var(--nf-space-2);
   border-block-start: 1px solid var(--nf-color-border);
-  font-size: 0.6875rem;
+  font-size: var(--nf-text-micro);
   color: var(--nf-color-fg-subtle);
 }
 
 .hintGroup {
   display: inline-flex;
   align-items: center;
-  gap: 0.375rem;
+  gap: var(--nf-space-1-5);
 }
 
 .hintGroupEnd {
@@ -81,8 +81,8 @@
 
 .kbd {
   font-family: var(--nf-font-mono);
-  font-size: 0.6875rem;
-  padding: var(--nf-space-px) 0.375rem;
+  font-size: var(--nf-text-micro);
+  padding: var(--nf-space-px) var(--nf-space-1-5);
   border-radius: var(--nf-radius-sm);
   border: 1px solid var(--nf-color-border);
   background: var(--nf-color-surface);
@@ -131,8 +131,8 @@
 }
 
 .confidenceBadge {
-  font-size: 0.6875rem;
-  padding: 0.125rem 0.375rem;
+  font-size: var(--nf-text-micro);
+  padding: var(--nf-space-0-5) var(--nf-space-1-5);
   border-radius: var(--nf-radius-sm);
 }
 

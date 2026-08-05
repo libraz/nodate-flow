@@ -167,7 +167,7 @@ export default function AutoActionSettingsPage({
         description={t('workspace.auto_actions.threshold.description')}
       >
         {(control) => (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.375rem' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--nf-space-1-5)' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--nf-space-3)' }}>
               <input
                 {...control}
@@ -196,7 +196,7 @@ export default function AutoActionSettingsPage({
             </div>
             <span
               style={{
-                fontSize: '0.8125rem',
+                fontSize: 'var(--nf-text-supporting)',
                 color: 'var(--nf-color-fg-muted)',
                 fontWeight: 500,
               }}
@@ -361,7 +361,7 @@ function AutoActionRulesSection({
   const thStyle: React.CSSProperties = {
     textAlign: 'start',
     padding: 'var(--nf-space-2) var(--nf-space-3)',
-    fontSize: '0.8125rem',
+    fontSize: 'var(--nf-text-supporting)',
     fontWeight: 600,
     color: 'var(--nf-color-fg-muted)',
     whiteSpace: 'nowrap',
@@ -424,7 +424,13 @@ function AutoActionRulesSection({
                 >
                   {/* Rule name + description */}
                   <td style={tdStyle}>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.125rem' }}>
+                    <div
+                      style={{
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: 'var(--nf-space-0-5)',
+                      }}
+                    >
                       <span style={{ fontWeight: 500 }}>
                         {t(`workspace.auto_actions.rules.${kind}.label`)}
                       </span>
@@ -485,7 +491,7 @@ function AutoActionRulesSection({
                     {idleDisabled ? (
                       <span
                         style={{
-                          fontSize: '0.8125rem',
+                          fontSize: 'var(--nf-text-supporting)',
                           color: 'var(--nf-color-fg-muted)',
                           fontStyle: 'italic',
                         }}

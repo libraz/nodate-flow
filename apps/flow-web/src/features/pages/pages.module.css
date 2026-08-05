@@ -30,7 +30,7 @@
   flex: 1;
   min-inline-size: 0;
   overflow-y: auto;
-  padding: clamp(var(--nf-space-6), 4vw, var(--nf-space-10));
+  padding: var(--nf-space-page);
 }
 
 /* ---------------------------------------------------------------------------
@@ -61,14 +61,14 @@
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: var(--nf-space-1);
+  gap: var(--nf-space-0-5);
 }
 
 .treeItem {
   display: flex;
   align-items: center;
   gap: var(--nf-space-1);
-  padding-block: var(--nf-space-2);
+  padding-block: var(--nf-space-1-5);
   padding-inline: var(--nf-space-2);
   border-radius: var(--nf-radius-sm);
   font-size: var(--nf-text-sm);
@@ -132,7 +132,7 @@
   padding-inline-start: var(--nf-space-4);
   display: flex;
   flex-direction: column;
-  gap: var(--nf-space-1);
+  gap: var(--nf-space-0-5);
 }
 
 /* ---------------------------------------------------------------------------
@@ -155,7 +155,7 @@
 
 .detailTitle {
   font-family: var(--nf-font-display);
-  font-size: clamp(var(--nf-text-2xl), 2.5vw, 2rem);
+  font-size: var(--nf-text-section-title);
   font-weight: var(--nf-weight-bold);
   margin: 0;
   color: var(--nf-color-fg);
@@ -224,7 +224,7 @@
 .aiBadge {
   display: inline-flex;
   align-items: center;
-  padding-block: var(--nf-space-1);
+  padding-block: var(--nf-space-0-5);
   padding-inline: var(--nf-space-2);
   border-radius: var(--nf-radius-pill);
   font-size: var(--nf-text-xs);
@@ -255,7 +255,7 @@
 .formField {
   display: flex;
   flex-direction: column;
-  gap: var(--nf-space-2);
+  gap: var(--nf-space-1-5);
 }
 
 .formLabel {
@@ -290,7 +290,7 @@
   display: flex;
   flex-direction: column;
   gap: var(--nf-space-1);
-  padding-block: var(--nf-space-3);
+  padding-block: var(--nf-space-2-5);
   padding-inline: var(--nf-space-3);
   background: var(--nf-color-surface);
   border: var(--nf-space-px) solid var(--nf-color-border);
@@ -377,7 +377,7 @@
 
 .title {
   font-family: var(--nf-font-display);
-  font-size: clamp(1.75rem, 3vw, var(--nf-text-4xl));
+  font-size: var(--nf-text-page-title);
   margin: 0;
   color: var(--nf-color-fg);
 }

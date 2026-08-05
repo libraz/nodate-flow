@@ -7,9 +7,13 @@
  * synthetic snippets so we do not depend on the actual repo state.
  */
 
-import { describe, expect, it } from 'vitest';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 
-import { scanSource } from '../scripts/check-inline-spacing';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+
+import { formatterHint, scanFiles, scanSource } from '../scripts/check-inline-spacing';
 
 describe('scanSource', () => {
   it('flags inline rem on a tokened property', () => {
@@ -118,5 +122,94 @@ describe('scanSource', () => {
     );
     const props = offenses.map((o) => o.property).sort();
     expect(props).toEqual(['font-size', 'min-inline-size']);
+  });
+});
+
+/**
+ * An annotation is scoped to two lines, so where it sits is part of what
+ * it means — and the formatter is free to move comments. It relocates a
+ * comment written after an at-rule's `{` onto the next line, which puts
+ * the at-rule outside the window and retires the exemption without
+ * changing a character of the annotation itself.
+ */
+describe('formatterHint', () => {
+  it('names the formatter when an annotation sits inside the block it was written for', () => {
+    const src = [
+      '@media (min-width: 100rem) {',
+      '  /* nf-token-override: at-rule condition, not a spacing step */',
+      '  .layout { color: red; }',
+      '}',
+    ].join('\n');
+    expect(formatterHint(src, 1)).toContain('line 2');
+    expect(formatterHint(src, 1)).toContain('directly above the at-rule');
+  });
+
+  it('stays silent for an annotation correctly placed above the at-rule', () => {
+    const src = [
+      '/* nf-token-override: at-rule condition, not a spacing step */',
+      '@media (min-width: 100rem) {',
+      '  .layout { color: red; }',
+      '}',
+    ].join('\n');
+    expect(formatterHint(src, 2)).toBeUndefined();
+  });
+
+  it('stays silent for a plain declaration followed by an annotation', () => {
+    const src = ['.a {', '  padding: 5px;', '  /* nf-token-override: unrelated */', '}'].join('\n');
+    expect(formatterHint(src, 2)).toBeUndefined();
+  });
+});
+
+describe('scanFiles dangling annotations', () => {
+  let dir: string;
+
+  beforeEach(() => {
+    dir = mkdtempSync(join(tmpdir(), 'nf-spacing-'));
+  });
+  afterEach(() => {
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  const scan = () =>
+    scanFiles({ root: dir, scanDirs: ['.'], excludeFragments: ['/node_modules/'] });
+
+  it('reports an annotation whose window holds no literal', () => {
+    writeFileSync(
+      join(dir, 'a.css'),
+      '.a {\n  /* nf-token-override: stale reason */\n  color: red;\n}\n',
+    );
+    const { offenses, dangling } = scan();
+    expect(offenses).toEqual([]);
+    expect(dangling.map((d) => d.line)).toEqual([2]);
+  });
+
+  it('does not report an annotation that suppressed a literal on the next line', () => {
+    writeFileSync(
+      join(dir, 'b.css'),
+      '.b {\n  /* nf-token-override: live reason */\n  padding: 5px;\n}\n',
+    );
+    const { offenses, dangling } = scan();
+    expect(offenses).toEqual([]);
+    expect(dangling).toEqual([]);
+  });
+
+  it('does not report an annotation trailing the literal it suppressed', () => {
+    writeFileSync(
+      join(dir, 'c.css'),
+      '.c {\n  padding: 5px; /* nf-token-override: live reason */\n}\n',
+    );
+    const { offenses, dangling } = scan();
+    expect(offenses).toEqual([]);
+    expect(dangling).toEqual([]);
+  });
+
+  it('reports the annotation and the offense when the annotation moved off its target', () => {
+    writeFileSync(
+      join(dir, 'd.css'),
+      '@media (min-width: 100rem) {\n  /* nf-token-override: at-rule condition */\n  .d {\n    color: red;\n  }\n}\n',
+    );
+    const { offenses, dangling } = scan();
+    expect(offenses.map((o) => o.line)).toEqual([1]);
+    expect(dangling.map((d) => d.line)).toEqual([2]);
   });
 });

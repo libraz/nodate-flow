@@ -108,7 +108,7 @@ function FatalFallback({
             borderRadius: 'var(--nf-radius-md)',
             background: 'var(--nf-color-surface)',
             color: 'var(--nf-color-fg-muted)',
-            fontSize: '0.8125rem',
+            fontSize: 'var(--nf-text-supporting)',
             maxInlineSize: 'var(--nf-measure-content)',
             whiteSpace: 'pre-wrap',
             textAlign: 'start',

@@ -101,7 +101,7 @@ function TodayRoute(): ReactElement {
   return (
     <section
       style={{
-        padding: 'clamp(var(--nf-space-6), 4vw, var(--nf-space-10))',
+        padding: 'var(--nf-space-page)',
         display: 'flex',
         flexDirection: 'column',
         gap: 'var(--nf-space-6)',
@@ -116,7 +116,7 @@ function TodayRoute(): ReactElement {
           style={{
             margin: 0,
             fontFamily: 'var(--nf-font-display)',
-            fontSize: 'clamp(1.75rem, 3vw, var(--nf-text-4xl))',
+            fontSize: 'var(--nf-text-page-title)',
           }}
         >
           {t('today.title')}
@@ -181,7 +181,7 @@ function TodayRoute(): ReactElement {
             <h2
               style={{
                 margin: 0,
-                fontSize: '0.85rem',
+                fontSize: 'var(--nf-text-supporting)',
                 textTransform: 'uppercase',
                 letterSpacing: '0.05em',
                 color: isOverdue ? 'var(--nf-color-danger)' : 'var(--nf-color-fg-muted)',
@@ -208,7 +208,7 @@ function TodayRoute(): ReactElement {
                       display: 'flex',
                       alignItems: 'center',
                       gap: 'var(--nf-space-3)',
-                      padding: '0.6rem var(--nf-space-3)',
+                      padding: 'var(--nf-space-2-5) var(--nf-space-3)',
                       borderRadius: 'var(--nf-radius-md)',
                       background: isOverdue
                         ? 'var(--nf-color-danger-subtle)'
@@ -250,9 +250,9 @@ function TodayRoute(): ReactElement {
                     {pri > 0 ? (
                       <span
                         style={{
-                          fontSize: '0.6875rem',
+                          fontSize: 'var(--nf-text-micro)',
                           fontWeight: 600,
-                          padding: '0.125rem 0.375rem',
+                          padding: 'var(--nf-space-0-5) var(--nf-space-1-5)',
                           borderRadius: 'var(--nf-radius-xs)',
                           background: PRIORITY_COLOR[pri],
                           color: 'white',

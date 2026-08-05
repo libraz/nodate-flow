@@ -179,7 +179,7 @@ function AuditRow({ entry }: { entry: AuditLogEntry }): ReactElement {
       <td
         style={{
           padding: 'var(--nf-space-2) var(--nf-space-3)',
-          fontSize: '0.8125rem',
+          fontSize: 'var(--nf-text-supporting)',
           whiteSpace: 'nowrap',
           color: 'var(--nf-color-fg-muted)',
         }}
@@ -192,7 +192,7 @@ function AuditRow({ entry }: { entry: AuditLogEntry }): ReactElement {
       <td
         style={{
           padding: 'var(--nf-space-2) var(--nf-space-3)',
-          fontSize: '0.8125rem',
+          fontSize: 'var(--nf-text-supporting)',
         }}
       >
         {entry.actorDisplayName ?? t('audit_log.unknown_actor')}
@@ -200,7 +200,7 @@ function AuditRow({ entry }: { entry: AuditLogEntry }): ReactElement {
       <td
         style={{
           padding: 'var(--nf-space-2) var(--nf-space-3)',
-          fontSize: '0.8125rem',
+          fontSize: 'var(--nf-text-supporting)',
         }}
       >
         {entry.resourceType}
@@ -602,7 +602,9 @@ export default function AuditLogView({ workspaceId }: { workspaceId: string }): 
           <Button variant="ghost" size="sm" disabled={currentPage === 0} onClick={handlePrevPage}>
             {t('audit_log.pagination.prev')}
           </Button>
-          <span style={{ fontSize: '0.8125rem', color: 'var(--nf-color-fg-muted)' }}>
+          <span
+            style={{ fontSize: 'var(--nf-text-supporting)', color: 'var(--nf-color-fg-muted)' }}
+          >
             {t('audit_log.pagination.page_of', {
               current: currentPage + 1,
               total: totalPages,

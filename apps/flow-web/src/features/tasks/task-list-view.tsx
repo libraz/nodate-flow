@@ -255,8 +255,8 @@ function InlineTitleCell({
           width: '100%',
           fontSize: 'inherit',
           fontWeight: 500,
-          padding: '0.125rem var(--nf-space-1)',
-          margin: '-0.125rem -0.25rem',
+          padding: 'var(--nf-space-0-5) var(--nf-space-1)',
+          margin: 'calc(var(--nf-space-0-5) * -1) calc(var(--nf-space-1) * -1)',
         }}
       />
     );
@@ -336,9 +336,9 @@ function InlinePriorityCell({
         onBlur={() => onStopEdit()}
         style={{
           width: '100%',
-          fontSize: '0.8125rem',
-          padding: '0.125rem var(--nf-space-1)',
-          margin: '-0.125rem -0.25rem',
+          fontSize: 'var(--nf-text-supporting)',
+          padding: 'var(--nf-space-0-5) var(--nf-space-1)',
+          margin: 'calc(var(--nf-space-0-5) * -1) calc(var(--nf-space-1) * -1)',
         }}
       >
         <option value="0">{t('tasks.priority.none')}</option>
@@ -367,8 +367,8 @@ function InlinePriorityCell({
       style={{
         display: 'inline-flex',
         alignItems: 'center',
-        gap: '0.375rem',
-        fontSize: '0.8125rem',
+        gap: 'var(--nf-space-1-5)',
+        fontSize: 'var(--nf-text-supporting)',
         cursor: 'pointer',
       }}
     >
@@ -379,6 +379,7 @@ function InlinePriorityCell({
           width: '0.375rem',
           // nf-token-override: component dimension, not a spacing step
           height: '0.75rem',
+          // nf-token-override: the corner of a 6x12px colour swatch. --nf-radius-xs spans 0 to 6px across the themes, which on a swatch this small is the difference between a square and a lozenge; a data legend has to read the same in every theme
           borderRadius: '0.125rem',
           background: color,
           flexShrink: 0,
@@ -706,7 +707,7 @@ export default function TaskListView({ projectId }: TaskListViewProps): ReactEle
               gap: 'var(--nf-space-1)',
               fontSize: 'var(--nf-text-xs)',
               fontWeight: 500,
-              padding: '0.125rem var(--nf-space-2)',
+              padding: 'var(--nf-space-0-5) var(--nf-space-2)',
               borderRadius: 'var(--nf-radius-pill)',
               background: `${color}18`,
               color: color,
@@ -766,7 +767,7 @@ export default function TaskListView({ projectId }: TaskListViewProps): ReactEle
           <span
             style={{
               display: 'inline-flex',
-              gap: '0.375rem',
+              gap: 'var(--nf-space-1-5)',
               alignItems: 'center',
               color: 'var(--nf-color-fg-muted)',
             }}

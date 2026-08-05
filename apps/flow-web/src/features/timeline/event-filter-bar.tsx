@@ -136,12 +136,12 @@ export default function EventFilterBar({
           toggleKind(kind);
         }}
         style={{
-          padding: 'var(--nf-space-1) 0.625rem',
+          padding: 'var(--nf-space-1) var(--nf-space-2-5)',
           borderRadius: 'var(--nf-radius-pill)',
           border: `1px solid ${active ? 'var(--nf-color-accent)' : 'var(--nf-color-border)'}`,
           background: active ? 'var(--nf-color-accent-subtle)' : 'var(--nf-color-surface)',
           color: active ? 'var(--nf-color-accent)' : 'var(--nf-color-fg)',
-          fontSize: '0.8125rem',
+          fontSize: 'var(--nf-text-supporting)',
           cursor: 'pointer',
         }}
       >
@@ -162,7 +162,7 @@ export default function EventFilterBar({
       <summary
         style={{
           cursor: 'pointer',
-          fontSize: '0.8125rem',
+          fontSize: 'var(--nf-text-supporting)',
           color: 'var(--nf-color-fg-muted)',
           display: 'flex',
           alignItems: 'center',
@@ -177,7 +177,7 @@ export default function EventFilterBar({
               borderRadius: 'var(--nf-radius-pill)',
               background: 'var(--nf-color-accent-subtle)',
               color: 'var(--nf-color-accent)',
-              fontSize: '0.6875rem',
+              fontSize: 'var(--nf-text-micro)',
             }}
           >
             {selectedKinds.size + (filters.actor?.length ?? 0)}
@@ -189,7 +189,7 @@ export default function EventFilterBar({
         style={{
           display: 'flex',
           flexDirection: 'column',
-          gap: '0.625rem',
+          gap: 'var(--nf-space-2-5)',
           paddingBlockStart: 'var(--nf-space-3)',
         }}
       >
@@ -208,7 +208,7 @@ export default function EventFilterBar({
           >
             <span
               style={{
-                fontSize: '0.6875rem',
+                fontSize: 'var(--nf-text-micro)',
                 textTransform: 'uppercase',
                 letterSpacing: '0.05em',
                 color: 'var(--nf-color-fg-muted)',
@@ -216,7 +216,7 @@ export default function EventFilterBar({
             >
               {t(`filter.kind_group.${group.key}`, { defaultValue: group.key })}
             </span>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.375rem' }}>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--nf-space-1-5)' }}>
               {group.kinds.map((k) => renderChip(k))}
             </div>
           </div>
@@ -231,13 +231,13 @@ export default function EventFilterBar({
             alignItems: 'center',
             columnGap: 'var(--nf-space-3)',
             marginBlockStart: 'var(--nf-space-1)',
-            paddingBlockStart: '0.625rem',
+            paddingBlockStart: 'var(--nf-space-2-5)',
             borderBlockStart: '1px solid var(--nf-color-border)',
           }}
         >
           <span
             style={{
-              fontSize: '0.6875rem',
+              fontSize: 'var(--nf-text-micro)',
               textTransform: 'uppercase',
               letterSpacing: '0.05em',
               color: 'var(--nf-color-fg-muted)',

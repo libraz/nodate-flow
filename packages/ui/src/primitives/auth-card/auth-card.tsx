@@ -37,6 +37,7 @@ export default function AuthCard({ children, width = 'narrow' }: AuthCardProps):
           margin: 0,
           fontFamily: 'var(--nf-font-display)',
           fontWeight: 400,
+          // nf-token-override: the product wordmark on the auth surfaces; the only text on the page, sized to the card rather than to a heading level
           fontSize: 'clamp(2rem, 5vw, 3rem)',
           lineHeight: 1,
           letterSpacing: '-0.02em',

@@ -27,8 +27,8 @@ function InvocationRow({ row }: { row: AiInvocation }): ReactElement {
   const { t } = useTranslation('settings');
   return (
     <li>
-      <Card style={{ padding: 'var(--nf-space-3) 0.875rem' }}>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.375rem' }}>
+      <Card style={{ padding: 'var(--nf-space-3) var(--nf-space-3-5)' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--nf-space-1-5)' }}>
           <div
             style={{
               display: 'flex',
@@ -38,7 +38,7 @@ function InvocationRow({ row }: { row: AiInvocation }): ReactElement {
             }}
           >
             <Badge tone={toneForStatus(row.status)}>{row.status}</Badge>
-            <strong style={{ fontSize: '0.8125rem' }}>{row.purpose}</strong>
+            <strong style={{ fontSize: 'var(--nf-text-supporting)' }}>{row.purpose}</strong>
             <span
               style={{
                 fontFamily: 'var(--nf-font-mono)',

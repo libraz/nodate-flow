@@ -123,7 +123,7 @@ function WorkspaceSettingsLayout(): ReactElement {
         display: 'grid',
         gridTemplateColumns: '16rem 1fr',
         gap: 'var(--nf-space-8)',
-        padding: 'clamp(var(--nf-space-6), 4vw, var(--nf-space-10))',
+        padding: 'var(--nf-space-page)',
         // nf-token-override: component dimension, not a spacing step
         maxInlineSize: '72rem',
         marginInline: 'auto',

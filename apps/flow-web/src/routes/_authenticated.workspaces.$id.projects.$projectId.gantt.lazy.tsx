@@ -447,7 +447,7 @@ function GanttView(): ReactElement {
           <div
             style={{
               display: 'flex',
-              gap: '0.125rem',
+              gap: 'var(--nf-space-0-5)',
               alignItems: 'center',
               borderInlineStart: '1px solid var(--nf-color-border)',
               paddingInlineStart: 'var(--nf-space-2)',
@@ -565,7 +565,7 @@ function GanttView(): ReactElement {
                   gap: 'var(--nf-space-2)',
                   inlineSize: '100%',
                   blockSize: ROW_HEIGHT + ROW_GAP,
-                  paddingInline: '0.625rem',
+                  paddingInline: 'var(--nf-space-2-5)',
                   textAlign: 'start',
                   color: 'inherit',
                   textDecoration: 'none',
@@ -591,7 +591,7 @@ function GanttView(): ReactElement {
                     overflow: 'hidden',
                     textOverflow: 'ellipsis',
                     whiteSpace: 'nowrap',
-                    fontSize: '0.8125rem',
+                    fontSize: 'var(--nf-text-supporting)',
                   }}
                 >
                   {task.title}
@@ -812,7 +812,7 @@ function GanttView(): ReactElement {
           <summary
             style={{
               cursor: 'pointer',
-              fontSize: '0.8125rem',
+              fontSize: 'var(--nf-text-supporting)',
               color: 'var(--nf-color-fg-muted)',
               display: 'flex',
               alignItems: 'center',
@@ -826,7 +826,7 @@ function GanttView(): ReactElement {
               listStyle: 'none',
               margin: 0,
               padding: 0,
-              paddingBlockStart: '0.625rem',
+              paddingBlockStart: 'var(--nf-space-2-5)',
               display: 'flex',
               flexDirection: 'column',
               gap: 'var(--nf-space-1)',
@@ -842,10 +842,10 @@ function GanttView(): ReactElement {
                     display: 'flex',
                     alignItems: 'center',
                     gap: 'var(--nf-space-2)',
-                    padding: '0.375rem var(--nf-space-2)',
+                    padding: 'var(--nf-space-1-5) var(--nf-space-2)',
                     borderRadius: 'var(--nf-radius-sm)',
                     color: 'var(--nf-color-fg)',
-                    fontSize: '0.8125rem',
+                    fontSize: 'var(--nf-text-supporting)',
                     textDecoration: 'none',
                   }}
                 >

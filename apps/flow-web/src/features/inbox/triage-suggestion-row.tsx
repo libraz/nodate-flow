@@ -35,13 +35,13 @@ export default function TriageSuggestionRow({
   const { t } = useTranslation('ai-suggestions');
   const tone = scoreTone(suggestion.score);
   return (
-    <Card style={{ padding: '0.875rem var(--nf-space-4)' }}>
-      <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.875rem' }}>
+    <Card style={{ padding: 'var(--nf-space-3-5) var(--nf-space-4)' }}>
+      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 'var(--nf-space-3-5)' }}>
         <div
           style={{
             display: 'flex',
             flexDirection: 'column',
-            gap: '0.375rem',
+            gap: 'var(--nf-space-1-5)',
             minInlineSize: 0,
             flex: 1,
           }}
@@ -60,7 +60,7 @@ export default function TriageSuggestionRow({
             <span
               style={{
                 fontFamily: 'var(--nf-font-mono)',
-                fontSize: '0.8125rem',
+                fontSize: 'var(--nf-text-supporting)',
                 color: 'var(--nf-color-fg-muted)',
               }}
             >

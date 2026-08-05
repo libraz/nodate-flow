@@ -67,7 +67,7 @@ function AttachmentRow({
         display: 'flex',
         alignItems: 'center',
         gap: 'var(--nf-space-3)',
-        paddingBlock: '0.375rem',
+        paddingBlock: 'var(--nf-space-1-5)',
       }}
     >
       <div style={{ flex: 1, minInlineSize: 0, display: 'flex', flexDirection: 'column' }}>
@@ -83,7 +83,7 @@ function AttachmentRow({
         </span>
         <span
           style={{
-            fontSize: '0.8125rem',
+            fontSize: 'var(--nf-text-supporting)',
             color: 'var(--nf-color-fg-muted)',
             display: 'flex',
             gap: 'var(--nf-space-2)',
