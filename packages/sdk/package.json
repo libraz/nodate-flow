@@ -37,14 +37,14 @@
     }
   },
   "devDependencies": {
-    "@tanstack/react-query": "5.101.1",
+    "@tanstack/react-query": "5.101.4",
     "@types/react": "19.2.17",
-    "i18next": "26.3.2",
+    "i18next": "26.3.6",
     "openapi-typescript": "7.13.0",
-    "react": "19.2.7",
-    "react-i18next": "17.0.8",
-    "typescript": "6.0.3",
-    "vitest": "^4.1.9",
+    "react": "19.2.8",
+    "react-i18next": "17.0.11",
+    "typescript": "7.0.2",
+    "vitest": "^4.1.10",
     "zustand": "5.0.14"
   }
 }

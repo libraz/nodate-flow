@@ -9,74 +9,73 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root';
-import { Route as SignupRouteImport } from './routes/signup';
-import { Route as LoginRouteImport } from './routes/login';
 import { Route as AuthenticatedRouteImport } from './routes/_authenticated';
+import { Route as LoginRouteImport } from './routes/login';
+import { Route as SignupRouteImport } from './routes/signup';
 import { Route as AuthenticatedIndexRouteImport } from './routes/_authenticated.index';
-import { Route as InvitesAcceptRouteImport } from './routes/invites.accept';
-import { Route as InviteTokenRouteImport } from './routes/invite.$token';
-import { Route as AuthenticatedWorkspacesRouteImport } from './routes/_authenticated.workspaces';
-import { Route as AuthenticatedTodayRouteImport } from './routes/_authenticated.today';
-import { Route as AuthenticatedSetupRouteImport } from './routes/_authenticated.setup';
-import { Route as AuthenticatedSettingsRouteImport } from './routes/_authenticated.settings';
-import { Route as AuthenticatedPagesRouteImport } from './routes/_authenticated.pages';
-import { Route as AuthenticatedInboxRouteImport } from './routes/_authenticated.inbox';
 import { Route as AuthenticatedCalendarRouteImport } from './routes/_authenticated.calendar';
-import { Route as AuthenticatedWorkspacesIndexRouteImport } from './routes/_authenticated.workspaces.index';
+import { Route as AuthenticatedInboxRouteImport } from './routes/_authenticated.inbox';
+import { Route as AuthenticatedPagesRouteImport } from './routes/_authenticated.pages';
+import { Route as AuthenticatedSettingsRouteImport } from './routes/_authenticated.settings';
+import { Route as AuthenticatedSetupRouteImport } from './routes/_authenticated.setup';
+import { Route as AuthenticatedTodayRouteImport } from './routes/_authenticated.today';
+import { Route as AuthenticatedWorkspacesRouteImport } from './routes/_authenticated.workspaces';
+import { Route as InviteTokenRouteImport } from './routes/invite.$token';
+import { Route as InvitesAcceptRouteImport } from './routes/invites.accept';
 import { Route as AuthenticatedPagesIndexRouteImport } from './routes/_authenticated.pages.index';
-import { Route as ShareCalTokenRouteImport } from './routes/share.cal.$token';
-import { Route as PublicLensesTokenRouteImport } from './routes/public.lenses.$token';
-import { Route as EmbedCalTokenRouteImport } from './routes/embed.cal.$token';
-import { Route as AuthenticatedWorkspacesIdRouteImport } from './routes/_authenticated.workspaces.$id';
-import { Route as AuthenticatedTasksTaskIdRouteImport } from './routes/_authenticated.tasks.$taskId';
-import { Route as AuthenticatedSettingsSecurityRouteImport } from './routes/_authenticated.settings.security';
-import { Route as AuthenticatedSettingsProfileRouteImport } from './routes/_authenticated.settings.profile';
-import { Route as AuthenticatedSettingsNotificationsRouteImport } from './routes/_authenticated.settings.notifications';
-import { Route as AuthenticatedSettingsIntegrationsRouteImport } from './routes/_authenticated.settings.integrations';
-import { Route as AuthenticatedProjectsProjectIdRouteImport } from './routes/_authenticated.projects.$projectId';
 import { Route as AuthenticatedPagesPageIdRouteImport } from './routes/_authenticated.pages.$pageId';
+import { Route as AuthenticatedProjectsProjectIdRouteImport } from './routes/_authenticated.projects.$projectId';
+import { Route as AuthenticatedSettingsIntegrationsRouteImport } from './routes/_authenticated.settings.integrations';
+import { Route as AuthenticatedSettingsNotificationsRouteImport } from './routes/_authenticated.settings.notifications';
+import { Route as AuthenticatedSettingsProfileRouteImport } from './routes/_authenticated.settings.profile';
+import { Route as AuthenticatedSettingsSecurityRouteImport } from './routes/_authenticated.settings.security';
+import { Route as AuthenticatedTasksTaskIdRouteImport } from './routes/_authenticated.tasks.$taskId';
+import { Route as AuthenticatedWorkspacesIndexRouteImport } from './routes/_authenticated.workspaces.index';
+import { Route as AuthenticatedWorkspacesIdRouteImport } from './routes/_authenticated.workspaces.$id';
+import { Route as EmbedCalTokenRouteImport } from './routes/embed.cal.$token';
+import { Route as PublicLensesTokenRouteImport } from './routes/public.lenses.$token';
+import { Route as ShareCalTokenRouteImport } from './routes/share.cal.$token';
 import { Route as AuthenticatedProjectsProjectIdIndexRouteImport } from './routes/_authenticated.projects.$projectId.index';
-import { Route as AuthenticatedWorkspacesIdTimelineRouteImport } from './routes/_authenticated.workspaces.$id.timeline';
-import { Route as AuthenticatedWorkspacesIdTimeboxesRouteImport } from './routes/_authenticated.workspaces.$id.timeboxes';
-import { Route as AuthenticatedWorkspacesIdSettingsRouteImport } from './routes/_authenticated.workspaces.$id.settings';
-import { Route as AuthenticatedWorkspacesIdRemindersRouteImport } from './routes/_authenticated.workspaces.$id.reminders';
-import { Route as AuthenticatedWorkspacesIdProjectsRouteImport } from './routes/_authenticated.workspaces.$id.projects';
-import { Route as AuthenticatedWorkspacesIdActivityRouteImport } from './routes/_authenticated.workspaces.$id.activity';
-import { Route as AuthenticatedProjectsProjectIdTimelineRouteImport } from './routes/_authenticated.projects.$projectId.timeline';
-import { Route as AuthenticatedProjectsProjectIdTasksRouteImport } from './routes/_authenticated.projects.$projectId.tasks';
 import { Route as AuthenticatedProjectsProjectIdGanttRouteImport } from './routes/_authenticated.projects.$projectId.gantt';
-import { Route as AuthenticatedWorkspacesIdSettingsIndexRouteImport } from './routes/_authenticated.workspaces.$id.settings.index';
-import { Route as AuthenticatedWorkspacesIdProjectsIndexRouteImport } from './routes/_authenticated.workspaces.$id.projects.index';
+import { Route as AuthenticatedProjectsProjectIdTasksRouteImport } from './routes/_authenticated.projects.$projectId.tasks';
+import { Route as AuthenticatedProjectsProjectIdTimelineRouteImport } from './routes/_authenticated.projects.$projectId.timeline';
+import { Route as AuthenticatedWorkspacesIdActivityRouteImport } from './routes/_authenticated.workspaces.$id.activity';
+import { Route as AuthenticatedWorkspacesIdProjectsRouteImport } from './routes/_authenticated.workspaces.$id.projects';
+import { Route as AuthenticatedWorkspacesIdRemindersRouteImport } from './routes/_authenticated.workspaces.$id.reminders';
+import { Route as AuthenticatedWorkspacesIdSettingsRouteImport } from './routes/_authenticated.workspaces.$id.settings';
+import { Route as AuthenticatedWorkspacesIdTimeboxesRouteImport } from './routes/_authenticated.workspaces.$id.timeboxes';
+import { Route as AuthenticatedWorkspacesIdTimelineRouteImport } from './routes/_authenticated.workspaces.$id.timeline';
 import { Route as AuthenticatedProjectsProjectIdTasksIndexRouteImport } from './routes/_authenticated.projects.$projectId.tasks.index';
-import { Route as AuthenticatedWorkspacesIdTasksDraftsRouteImport } from './routes/_authenticated.workspaces.$id.tasks.drafts';
-import { Route as AuthenticatedWorkspacesIdTasksArchivedRouteImport } from './routes/_authenticated.workspaces.$id.tasks.archived';
-import { Route as AuthenticatedWorkspacesIdSettingsWeeklyDigestRouteImport } from './routes/_authenticated.workspaces.$id.settings.weekly-digest';
-import { Route as AuthenticatedWorkspacesIdSettingsWebhooksRouteImport } from './routes/_authenticated.workspaces.$id.settings.webhooks';
-import { Route as AuthenticatedWorkspacesIdSettingsPublicSharesRouteImport } from './routes/_authenticated.workspaces.$id.settings.public-shares';
-import { Route as AuthenticatedWorkspacesIdSettingsMcpTokensRouteImport } from './routes/_authenticated.workspaces.$id.settings.mcp-tokens';
-import { Route as AuthenticatedWorkspacesIdSettingsGeneralRouteImport } from './routes/_authenticated.workspaces.$id.settings.general';
-import { Route as AuthenticatedWorkspacesIdSettingsDataRouteImport } from './routes/_authenticated.workspaces.$id.settings.data';
-import { Route as AuthenticatedWorkspacesIdSettingsAutoActionsRouteImport } from './routes/_authenticated.workspaces.$id.settings.auto-actions';
-import { Route as AuthenticatedWorkspacesIdSettingsAuditLogRouteImport } from './routes/_authenticated.workspaces.$id.settings.audit-log';
-import { Route as AuthenticatedWorkspacesIdSettingsAiProvidersRouteImport } from './routes/_authenticated.workspaces.$id.settings.ai-providers';
-import { Route as AuthenticatedWorkspacesIdSettingsAiAgentsRouteImport } from './routes/_authenticated.workspaces.$id.settings.ai-agents';
-import { Route as AuthenticatedWorkspacesIdSettingsAiActivityRouteImport } from './routes/_authenticated.workspaces.$id.settings.ai-activity';
-import { Route as AuthenticatedWorkspacesIdProjectsProjectIdRouteImport } from './routes/_authenticated.workspaces.$id.projects.$projectId';
 import { Route as AuthenticatedWorkspacesIdInsightsPriorityRouteImport } from './routes/_authenticated.workspaces.$id.insights.priority';
-import { Route as AuthenticatedWorkspacesIdSettingsPublicSharesIndexRouteImport } from './routes/_authenticated.workspaces.$id.settings.public-shares.index';
+import { Route as AuthenticatedWorkspacesIdProjectsIndexRouteImport } from './routes/_authenticated.workspaces.$id.projects.index';
+import { Route as AuthenticatedWorkspacesIdProjectsProjectIdRouteImport } from './routes/_authenticated.workspaces.$id.projects.$projectId';
+import { Route as AuthenticatedWorkspacesIdSettingsIndexRouteImport } from './routes/_authenticated.workspaces.$id.settings.index';
+import { Route as AuthenticatedWorkspacesIdSettingsAiActivityRouteImport } from './routes/_authenticated.workspaces.$id.settings.ai-activity';
+import { Route as AuthenticatedWorkspacesIdSettingsAiAgentsRouteImport } from './routes/_authenticated.workspaces.$id.settings.ai-agents';
+import { Route as AuthenticatedWorkspacesIdSettingsAiProvidersRouteImport } from './routes/_authenticated.workspaces.$id.settings.ai-providers';
+import { Route as AuthenticatedWorkspacesIdSettingsAuditLogRouteImport } from './routes/_authenticated.workspaces.$id.settings.audit-log';
+import { Route as AuthenticatedWorkspacesIdSettingsAutoActionsRouteImport } from './routes/_authenticated.workspaces.$id.settings.auto-actions';
+import { Route as AuthenticatedWorkspacesIdSettingsDataRouteImport } from './routes/_authenticated.workspaces.$id.settings.data';
+import { Route as AuthenticatedWorkspacesIdSettingsGeneralRouteImport } from './routes/_authenticated.workspaces.$id.settings.general';
+import { Route as AuthenticatedWorkspacesIdSettingsMcpTokensRouteImport } from './routes/_authenticated.workspaces.$id.settings.mcp-tokens';
+import { Route as AuthenticatedWorkspacesIdSettingsPublicSharesRouteImport } from './routes/_authenticated.workspaces.$id.settings.public-shares';
+import { Route as AuthenticatedWorkspacesIdSettingsWebhooksRouteImport } from './routes/_authenticated.workspaces.$id.settings.webhooks';
+import { Route as AuthenticatedWorkspacesIdSettingsWeeklyDigestRouteImport } from './routes/_authenticated.workspaces.$id.settings.weekly-digest';
+import { Route as AuthenticatedWorkspacesIdTasksArchivedRouteImport } from './routes/_authenticated.workspaces.$id.tasks.archived';
+import { Route as AuthenticatedWorkspacesIdTasksDraftsRouteImport } from './routes/_authenticated.workspaces.$id.tasks.drafts';
 import { Route as AuthenticatedWorkspacesIdProjectsProjectIdIndexRouteImport } from './routes/_authenticated.workspaces.$id.projects.$projectId.index';
-import { Route as AuthenticatedWorkspacesIdSettingsPublicSharesShareIdRouteImport } from './routes/_authenticated.workspaces.$id.settings.public-shares.$shareId';
-import { Route as AuthenticatedWorkspacesIdSettingsAiMetricsRouteImport } from './routes/_authenticated.workspaces.$id.settings.ai.metrics';
-import { Route as AuthenticatedWorkspacesIdProjectsProjectIdTimelineRouteImport } from './routes/_authenticated.workspaces.$id.projects.$projectId.timeline';
-import { Route as AuthenticatedWorkspacesIdProjectsProjectIdTasksRouteImport } from './routes/_authenticated.workspaces.$id.projects.$projectId.tasks';
-import { Route as AuthenticatedWorkspacesIdProjectsProjectIdMembersRouteImport } from './routes/_authenticated.workspaces.$id.projects.$projectId.members';
 import { Route as AuthenticatedWorkspacesIdProjectsProjectIdGanttRouteImport } from './routes/_authenticated.workspaces.$id.projects.$projectId.gantt';
-import { Route as AuthenticatedWorkspacesIdProjectsProjectIdTasksIndexRouteImport } from './routes/_authenticated.workspaces.$id.projects.$projectId.tasks.index';
+import { Route as AuthenticatedWorkspacesIdProjectsProjectIdMembersRouteImport } from './routes/_authenticated.workspaces.$id.projects.$projectId.members';
+import { Route as AuthenticatedWorkspacesIdProjectsProjectIdTasksRouteImport } from './routes/_authenticated.workspaces.$id.projects.$projectId.tasks';
+import { Route as AuthenticatedWorkspacesIdProjectsProjectIdTimelineRouteImport } from './routes/_authenticated.workspaces.$id.projects.$projectId.timeline';
+import { Route as AuthenticatedWorkspacesIdSettingsAiMetricsRouteImport } from './routes/_authenticated.workspaces.$id.settings.ai.metrics';
+import { Route as AuthenticatedWorkspacesIdSettingsPublicSharesIndexRouteImport } from './routes/_authenticated.workspaces.$id.settings.public-shares.index';
+import { Route as AuthenticatedWorkspacesIdSettingsPublicSharesShareIdRouteImport } from './routes/_authenticated.workspaces.$id.settings.public-shares.$shareId';
 import { Route as AuthenticatedWorkspacesIdCalendarsCalIdEventsEvtIdRouteImport } from './routes/_authenticated.workspaces.$id.calendars.$calId.events.$evtId';
+import { Route as AuthenticatedWorkspacesIdProjectsProjectIdTasksIndexRouteImport } from './routes/_authenticated.workspaces.$id.projects.$projectId.tasks.index';
 
-const SignupRoute = SignupRouteImport.update({
-  id: '/signup',
-  path: '/signup',
+const AuthenticatedRoute = AuthenticatedRouteImport.update({
+  id: '/_authenticated',
   getParentRoute: () => rootRouteImport,
 } as any);
 const LoginRoute = LoginRouteImport.update({
@@ -84,8 +83,9 @@ const LoginRoute = LoginRouteImport.update({
   path: '/login',
   getParentRoute: () => rootRouteImport,
 } as any);
-const AuthenticatedRoute = AuthenticatedRouteImport.update({
-  id: '/_authenticated',
+const SignupRoute = SignupRouteImport.update({
+  id: '/signup',
+  path: '/signup',
   getParentRoute: () => rootRouteImport,
 } as any);
 const AuthenticatedIndexRoute = AuthenticatedIndexRouteImport.update({
@@ -93,43 +93,9 @@ const AuthenticatedIndexRoute = AuthenticatedIndexRouteImport.update({
   path: '/',
   getParentRoute: () => AuthenticatedRoute,
 } as any);
-const InvitesAcceptRoute = InvitesAcceptRouteImport.update({
-  id: '/invites/accept',
-  path: '/invites/accept',
-  getParentRoute: () => rootRouteImport,
-} as any);
-const InviteTokenRoute = InviteTokenRouteImport.update({
-  id: '/invite/$token',
-  path: '/invite/$token',
-  getParentRoute: () => rootRouteImport,
-} as any).lazy(() =>
-  import('./routes/invite.$token.lazy').then((d) => d.Route),
-);
-const AuthenticatedWorkspacesRoute = AuthenticatedWorkspacesRouteImport.update({
-  id: '/workspaces',
-  path: '/workspaces',
-  getParentRoute: () => AuthenticatedRoute,
-} as any);
-const AuthenticatedTodayRoute = AuthenticatedTodayRouteImport.update({
-  id: '/today',
-  path: '/today',
-  getParentRoute: () => AuthenticatedRoute,
-} as any);
-const AuthenticatedSetupRoute = AuthenticatedSetupRouteImport.update({
-  id: '/setup',
-  path: '/setup',
-  getParentRoute: () => AuthenticatedRoute,
-} as any);
-const AuthenticatedSettingsRoute = AuthenticatedSettingsRouteImport.update({
-  id: '/settings',
-  path: '/settings',
-  getParentRoute: () => AuthenticatedRoute,
-} as any).lazy(() =>
-  import('./routes/_authenticated.settings.lazy').then((d) => d.Route),
-);
-const AuthenticatedPagesRoute = AuthenticatedPagesRouteImport.update({
-  id: '/pages',
-  path: '/pages',
+const AuthenticatedCalendarRoute = AuthenticatedCalendarRouteImport.update({
+  id: '/calendar',
+  path: '/calendar',
   getParentRoute: () => AuthenticatedRoute,
 } as any);
 const AuthenticatedInboxRoute = AuthenticatedInboxRouteImport.update({
@@ -139,68 +105,69 @@ const AuthenticatedInboxRoute = AuthenticatedInboxRouteImport.update({
 } as any).lazy(() =>
   import('./routes/_authenticated.inbox.lazy').then((d) => d.Route),
 );
-const AuthenticatedCalendarRoute = AuthenticatedCalendarRouteImport.update({
-  id: '/calendar',
-  path: '/calendar',
+const AuthenticatedPagesRoute = AuthenticatedPagesRouteImport.update({
+  id: '/pages',
+  path: '/pages',
   getParentRoute: () => AuthenticatedRoute,
 } as any);
-const AuthenticatedWorkspacesIndexRoute =
-  AuthenticatedWorkspacesIndexRouteImport.update({
-    id: '/',
-    path: '/',
-    getParentRoute: () => AuthenticatedWorkspacesRoute,
-  } as any);
+const AuthenticatedSettingsRoute = AuthenticatedSettingsRouteImport.update({
+  id: '/settings',
+  path: '/settings',
+  getParentRoute: () => AuthenticatedRoute,
+} as any).lazy(() =>
+  import('./routes/_authenticated.settings.lazy').then((d) => d.Route),
+);
+const AuthenticatedSetupRoute = AuthenticatedSetupRouteImport.update({
+  id: '/setup',
+  path: '/setup',
+  getParentRoute: () => AuthenticatedRoute,
+} as any);
+const AuthenticatedTodayRoute = AuthenticatedTodayRouteImport.update({
+  id: '/today',
+  path: '/today',
+  getParentRoute: () => AuthenticatedRoute,
+} as any);
+const AuthenticatedWorkspacesRoute = AuthenticatedWorkspacesRouteImport.update({
+  id: '/workspaces',
+  path: '/workspaces',
+  getParentRoute: () => AuthenticatedRoute,
+} as any);
+const InviteTokenRoute = InviteTokenRouteImport.update({
+  id: '/invite/$token',
+  path: '/invite/$token',
+  getParentRoute: () => rootRouteImport,
+} as any).lazy(() =>
+  import('./routes/invite.$token.lazy').then((d) => d.Route),
+);
+const InvitesAcceptRoute = InvitesAcceptRouteImport.update({
+  id: '/invites/accept',
+  path: '/invites/accept',
+  getParentRoute: () => rootRouteImport,
+} as any);
 const AuthenticatedPagesIndexRoute = AuthenticatedPagesIndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => AuthenticatedPagesRoute,
 } as any);
-const ShareCalTokenRoute = ShareCalTokenRouteImport.update({
-  id: '/share/cal/$token',
-  path: '/share/cal/$token',
-  getParentRoute: () => rootRouteImport,
-} as any);
-const PublicLensesTokenRoute = PublicLensesTokenRouteImport.update({
-  id: '/public/lenses/$token',
-  path: '/public/lenses/$token',
-  getParentRoute: () => rootRouteImport,
-} as any);
-const EmbedCalTokenRoute = EmbedCalTokenRouteImport.update({
-  id: '/embed/cal/$token',
-  path: '/embed/cal/$token',
-  getParentRoute: () => rootRouteImport,
-} as any);
-const AuthenticatedWorkspacesIdRoute =
-  AuthenticatedWorkspacesIdRouteImport.update({
-    id: '/$id',
-    path: '/$id',
-    getParentRoute: () => AuthenticatedWorkspacesRoute,
+const AuthenticatedPagesPageIdRoute =
+  AuthenticatedPagesPageIdRouteImport.update({
+    id: '/$pageId',
+    path: '/$pageId',
+    getParentRoute: () => AuthenticatedPagesRoute,
   } as any);
-const AuthenticatedTasksTaskIdRoute =
-  AuthenticatedTasksTaskIdRouteImport.update({
-    id: '/tasks/$taskId',
-    path: '/tasks/$taskId',
+const AuthenticatedProjectsProjectIdRoute =
+  AuthenticatedProjectsProjectIdRouteImport.update({
+    id: '/projects/$projectId',
+    path: '/projects/$projectId',
     getParentRoute: () => AuthenticatedRoute,
-  } as any).lazy(() =>
-    import('./routes/_authenticated.tasks.$taskId.lazy').then((d) => d.Route),
-  );
-const AuthenticatedSettingsSecurityRoute =
-  AuthenticatedSettingsSecurityRouteImport.update({
-    id: '/security',
-    path: '/security',
+  } as any);
+const AuthenticatedSettingsIntegrationsRoute =
+  AuthenticatedSettingsIntegrationsRouteImport.update({
+    id: '/integrations',
+    path: '/integrations',
     getParentRoute: () => AuthenticatedSettingsRoute,
   } as any).lazy(() =>
-    import('./routes/_authenticated.settings.security.lazy').then(
-      (d) => d.Route,
-    ),
-  );
-const AuthenticatedSettingsProfileRoute =
-  AuthenticatedSettingsProfileRouteImport.update({
-    id: '/profile',
-    path: '/profile',
-    getParentRoute: () => AuthenticatedSettingsRoute,
-  } as any).lazy(() =>
-    import('./routes/_authenticated.settings.profile.lazy').then(
+    import('./routes/_authenticated.settings.integrations.lazy').then(
       (d) => d.Route,
     ),
   );
@@ -214,51 +181,108 @@ const AuthenticatedSettingsNotificationsRoute =
       (d) => d.Route,
     ),
   );
-const AuthenticatedSettingsIntegrationsRoute =
-  AuthenticatedSettingsIntegrationsRouteImport.update({
-    id: '/integrations',
-    path: '/integrations',
+const AuthenticatedSettingsProfileRoute =
+  AuthenticatedSettingsProfileRouteImport.update({
+    id: '/profile',
+    path: '/profile',
     getParentRoute: () => AuthenticatedSettingsRoute,
   } as any).lazy(() =>
-    import('./routes/_authenticated.settings.integrations.lazy').then(
+    import('./routes/_authenticated.settings.profile.lazy').then(
       (d) => d.Route,
     ),
   );
-const AuthenticatedProjectsProjectIdRoute =
-  AuthenticatedProjectsProjectIdRouteImport.update({
-    id: '/projects/$projectId',
-    path: '/projects/$projectId',
+const AuthenticatedSettingsSecurityRoute =
+  AuthenticatedSettingsSecurityRouteImport.update({
+    id: '/security',
+    path: '/security',
+    getParentRoute: () => AuthenticatedSettingsRoute,
+  } as any).lazy(() =>
+    import('./routes/_authenticated.settings.security.lazy').then(
+      (d) => d.Route,
+    ),
+  );
+const AuthenticatedTasksTaskIdRoute =
+  AuthenticatedTasksTaskIdRouteImport.update({
+    id: '/tasks/$taskId',
+    path: '/tasks/$taskId',
     getParentRoute: () => AuthenticatedRoute,
+  } as any).lazy(() =>
+    import('./routes/_authenticated.tasks.$taskId.lazy').then((d) => d.Route),
+  );
+const AuthenticatedWorkspacesIndexRoute =
+  AuthenticatedWorkspacesIndexRouteImport.update({
+    id: '/',
+    path: '/',
+    getParentRoute: () => AuthenticatedWorkspacesRoute,
   } as any);
-const AuthenticatedPagesPageIdRoute =
-  AuthenticatedPagesPageIdRouteImport.update({
-    id: '/$pageId',
-    path: '/$pageId',
-    getParentRoute: () => AuthenticatedPagesRoute,
+const AuthenticatedWorkspacesIdRoute =
+  AuthenticatedWorkspacesIdRouteImport.update({
+    id: '/$id',
+    path: '/$id',
+    getParentRoute: () => AuthenticatedWorkspacesRoute,
   } as any);
+const EmbedCalTokenRoute = EmbedCalTokenRouteImport.update({
+  id: '/embed/cal/$token',
+  path: '/embed/cal/$token',
+  getParentRoute: () => rootRouteImport,
+} as any);
+const PublicLensesTokenRoute = PublicLensesTokenRouteImport.update({
+  id: '/public/lenses/$token',
+  path: '/public/lenses/$token',
+  getParentRoute: () => rootRouteImport,
+} as any);
+const ShareCalTokenRoute = ShareCalTokenRouteImport.update({
+  id: '/share/cal/$token',
+  path: '/share/cal/$token',
+  getParentRoute: () => rootRouteImport,
+} as any);
 const AuthenticatedProjectsProjectIdIndexRoute =
   AuthenticatedProjectsProjectIdIndexRouteImport.update({
     id: '/',
     path: '/',
     getParentRoute: () => AuthenticatedProjectsProjectIdRoute,
   } as any);
-const AuthenticatedWorkspacesIdTimelineRoute =
-  AuthenticatedWorkspacesIdTimelineRouteImport.update({
+const AuthenticatedProjectsProjectIdGanttRoute =
+  AuthenticatedProjectsProjectIdGanttRouteImport.update({
+    id: '/gantt',
+    path: '/gantt',
+    getParentRoute: () => AuthenticatedProjectsProjectIdRoute,
+  } as any);
+const AuthenticatedProjectsProjectIdTasksRoute =
+  AuthenticatedProjectsProjectIdTasksRouteImport.update({
+    id: '/tasks',
+    path: '/tasks',
+    getParentRoute: () => AuthenticatedProjectsProjectIdRoute,
+  } as any);
+const AuthenticatedProjectsProjectIdTimelineRoute =
+  AuthenticatedProjectsProjectIdTimelineRouteImport.update({
     id: '/timeline',
     path: '/timeline',
+    getParentRoute: () => AuthenticatedProjectsProjectIdRoute,
+  } as any);
+const AuthenticatedWorkspacesIdActivityRoute =
+  AuthenticatedWorkspacesIdActivityRouteImport.update({
+    id: '/activity',
+    path: '/activity',
     getParentRoute: () => AuthenticatedWorkspacesIdRoute,
   } as any).lazy(() =>
-    import('./routes/_authenticated.workspaces.$id.timeline.lazy').then(
+    import('./routes/_authenticated.workspaces.$id.activity.lazy').then(
       (d) => d.Route,
     ),
   );
-const AuthenticatedWorkspacesIdTimeboxesRoute =
-  AuthenticatedWorkspacesIdTimeboxesRouteImport.update({
-    id: '/timeboxes',
-    path: '/timeboxes',
+const AuthenticatedWorkspacesIdProjectsRoute =
+  AuthenticatedWorkspacesIdProjectsRouteImport.update({
+    id: '/projects',
+    path: '/projects',
+    getParentRoute: () => AuthenticatedWorkspacesIdRoute,
+  } as any);
+const AuthenticatedWorkspacesIdRemindersRoute =
+  AuthenticatedWorkspacesIdRemindersRouteImport.update({
+    id: '/reminders',
+    path: '/reminders',
     getParentRoute: () => AuthenticatedWorkspacesIdRoute,
   } as any).lazy(() =>
-    import('./routes/_authenticated.workspaces.$id.timeboxes.lazy').then(
+    import('./routes/_authenticated.workspaces.$id.reminders.lazy').then(
       (d) => d.Route,
     ),
   );
@@ -272,49 +296,53 @@ const AuthenticatedWorkspacesIdSettingsRoute =
       (d) => d.Route,
     ),
   );
-const AuthenticatedWorkspacesIdRemindersRoute =
-  AuthenticatedWorkspacesIdRemindersRouteImport.update({
-    id: '/reminders',
-    path: '/reminders',
+const AuthenticatedWorkspacesIdTimeboxesRoute =
+  AuthenticatedWorkspacesIdTimeboxesRouteImport.update({
+    id: '/timeboxes',
+    path: '/timeboxes',
     getParentRoute: () => AuthenticatedWorkspacesIdRoute,
   } as any).lazy(() =>
-    import('./routes/_authenticated.workspaces.$id.reminders.lazy').then(
+    import('./routes/_authenticated.workspaces.$id.timeboxes.lazy').then(
       (d) => d.Route,
     ),
   );
-const AuthenticatedWorkspacesIdProjectsRoute =
-  AuthenticatedWorkspacesIdProjectsRouteImport.update({
-    id: '/projects',
-    path: '/projects',
-    getParentRoute: () => AuthenticatedWorkspacesIdRoute,
-  } as any);
-const AuthenticatedWorkspacesIdActivityRoute =
-  AuthenticatedWorkspacesIdActivityRouteImport.update({
-    id: '/activity',
-    path: '/activity',
-    getParentRoute: () => AuthenticatedWorkspacesIdRoute,
-  } as any).lazy(() =>
-    import('./routes/_authenticated.workspaces.$id.activity.lazy').then(
-      (d) => d.Route,
-    ),
-  );
-const AuthenticatedProjectsProjectIdTimelineRoute =
-  AuthenticatedProjectsProjectIdTimelineRouteImport.update({
+const AuthenticatedWorkspacesIdTimelineRoute =
+  AuthenticatedWorkspacesIdTimelineRouteImport.update({
     id: '/timeline',
     path: '/timeline',
-    getParentRoute: () => AuthenticatedProjectsProjectIdRoute,
+    getParentRoute: () => AuthenticatedWorkspacesIdRoute,
+  } as any).lazy(() =>
+    import('./routes/_authenticated.workspaces.$id.timeline.lazy').then(
+      (d) => d.Route,
+    ),
+  );
+const AuthenticatedProjectsProjectIdTasksIndexRoute =
+  AuthenticatedProjectsProjectIdTasksIndexRouteImport.update({
+    id: '/',
+    path: '/',
+    getParentRoute: () => AuthenticatedProjectsProjectIdTasksRoute,
   } as any);
-const AuthenticatedProjectsProjectIdTasksRoute =
-  AuthenticatedProjectsProjectIdTasksRouteImport.update({
-    id: '/tasks',
-    path: '/tasks',
-    getParentRoute: () => AuthenticatedProjectsProjectIdRoute,
+const AuthenticatedWorkspacesIdInsightsPriorityRoute =
+  AuthenticatedWorkspacesIdInsightsPriorityRouteImport.update({
+    id: '/insights/priority',
+    path: '/insights/priority',
+    getParentRoute: () => AuthenticatedWorkspacesIdRoute,
+  } as any).lazy(() =>
+    import('./routes/_authenticated.workspaces.$id.insights.priority.lazy').then(
+      (d) => d.Route,
+    ),
+  );
+const AuthenticatedWorkspacesIdProjectsIndexRoute =
+  AuthenticatedWorkspacesIdProjectsIndexRouteImport.update({
+    id: '/',
+    path: '/',
+    getParentRoute: () => AuthenticatedWorkspacesIdProjectsRoute,
   } as any);
-const AuthenticatedProjectsProjectIdGanttRoute =
-  AuthenticatedProjectsProjectIdGanttRouteImport.update({
-    id: '/gantt',
-    path: '/gantt',
-    getParentRoute: () => AuthenticatedProjectsProjectIdRoute,
+const AuthenticatedWorkspacesIdProjectsProjectIdRoute =
+  AuthenticatedWorkspacesIdProjectsProjectIdRouteImport.update({
+    id: '/$projectId',
+    path: '/$projectId',
+    getParentRoute: () => AuthenticatedWorkspacesIdProjectsRoute,
   } as any);
 const AuthenticatedWorkspacesIdSettingsIndexRoute =
   AuthenticatedWorkspacesIdSettingsIndexRouteImport.update({
@@ -322,125 +350,13 @@ const AuthenticatedWorkspacesIdSettingsIndexRoute =
     path: '/',
     getParentRoute: () => AuthenticatedWorkspacesIdSettingsRoute,
   } as any);
-const AuthenticatedWorkspacesIdProjectsIndexRoute =
-  AuthenticatedWorkspacesIdProjectsIndexRouteImport.update({
-    id: '/',
-    path: '/',
-    getParentRoute: () => AuthenticatedWorkspacesIdProjectsRoute,
-  } as any);
-const AuthenticatedProjectsProjectIdTasksIndexRoute =
-  AuthenticatedProjectsProjectIdTasksIndexRouteImport.update({
-    id: '/',
-    path: '/',
-    getParentRoute: () => AuthenticatedProjectsProjectIdTasksRoute,
-  } as any);
-const AuthenticatedWorkspacesIdTasksDraftsRoute =
-  AuthenticatedWorkspacesIdTasksDraftsRouteImport.update({
-    id: '/tasks/drafts',
-    path: '/tasks/drafts',
-    getParentRoute: () => AuthenticatedWorkspacesIdRoute,
-  } as any).lazy(() =>
-    import('./routes/_authenticated.workspaces.$id.tasks.drafts.lazy').then(
-      (d) => d.Route,
-    ),
-  );
-const AuthenticatedWorkspacesIdTasksArchivedRoute =
-  AuthenticatedWorkspacesIdTasksArchivedRouteImport.update({
-    id: '/tasks/archived',
-    path: '/tasks/archived',
-    getParentRoute: () => AuthenticatedWorkspacesIdRoute,
-  } as any).lazy(() =>
-    import('./routes/_authenticated.workspaces.$id.tasks.archived.lazy').then(
-      (d) => d.Route,
-    ),
-  );
-const AuthenticatedWorkspacesIdSettingsWeeklyDigestRoute =
-  AuthenticatedWorkspacesIdSettingsWeeklyDigestRouteImport.update({
-    id: '/weekly-digest',
-    path: '/weekly-digest',
+const AuthenticatedWorkspacesIdSettingsAiActivityRoute =
+  AuthenticatedWorkspacesIdSettingsAiActivityRouteImport.update({
+    id: '/ai-activity',
+    path: '/ai-activity',
     getParentRoute: () => AuthenticatedWorkspacesIdSettingsRoute,
   } as any).lazy(() =>
-    import('./routes/_authenticated.workspaces.$id.settings.weekly-digest.lazy').then(
-      (d) => d.Route,
-    ),
-  );
-const AuthenticatedWorkspacesIdSettingsWebhooksRoute =
-  AuthenticatedWorkspacesIdSettingsWebhooksRouteImport.update({
-    id: '/webhooks',
-    path: '/webhooks',
-    getParentRoute: () => AuthenticatedWorkspacesIdSettingsRoute,
-  } as any).lazy(() =>
-    import('./routes/_authenticated.workspaces.$id.settings.webhooks.lazy').then(
-      (d) => d.Route,
-    ),
-  );
-const AuthenticatedWorkspacesIdSettingsPublicSharesRoute =
-  AuthenticatedWorkspacesIdSettingsPublicSharesRouteImport.update({
-    id: '/public-shares',
-    path: '/public-shares',
-    getParentRoute: () => AuthenticatedWorkspacesIdSettingsRoute,
-  } as any).lazy(() =>
-    import('./routes/_authenticated.workspaces.$id.settings.public-shares.lazy').then(
-      (d) => d.Route,
-    ),
-  );
-const AuthenticatedWorkspacesIdSettingsMcpTokensRoute =
-  AuthenticatedWorkspacesIdSettingsMcpTokensRouteImport.update({
-    id: '/mcp-tokens',
-    path: '/mcp-tokens',
-    getParentRoute: () => AuthenticatedWorkspacesIdSettingsRoute,
-  } as any).lazy(() =>
-    import('./routes/_authenticated.workspaces.$id.settings.mcp-tokens.lazy').then(
-      (d) => d.Route,
-    ),
-  );
-const AuthenticatedWorkspacesIdSettingsGeneralRoute =
-  AuthenticatedWorkspacesIdSettingsGeneralRouteImport.update({
-    id: '/general',
-    path: '/general',
-    getParentRoute: () => AuthenticatedWorkspacesIdSettingsRoute,
-  } as any).lazy(() =>
-    import('./routes/_authenticated.workspaces.$id.settings.general.lazy').then(
-      (d) => d.Route,
-    ),
-  );
-const AuthenticatedWorkspacesIdSettingsDataRoute =
-  AuthenticatedWorkspacesIdSettingsDataRouteImport.update({
-    id: '/data',
-    path: '/data',
-    getParentRoute: () => AuthenticatedWorkspacesIdSettingsRoute,
-  } as any).lazy(() =>
-    import('./routes/_authenticated.workspaces.$id.settings.data.lazy').then(
-      (d) => d.Route,
-    ),
-  );
-const AuthenticatedWorkspacesIdSettingsAutoActionsRoute =
-  AuthenticatedWorkspacesIdSettingsAutoActionsRouteImport.update({
-    id: '/auto-actions',
-    path: '/auto-actions',
-    getParentRoute: () => AuthenticatedWorkspacesIdSettingsRoute,
-  } as any).lazy(() =>
-    import('./routes/_authenticated.workspaces.$id.settings.auto-actions.lazy').then(
-      (d) => d.Route,
-    ),
-  );
-const AuthenticatedWorkspacesIdSettingsAuditLogRoute =
-  AuthenticatedWorkspacesIdSettingsAuditLogRouteImport.update({
-    id: '/audit-log',
-    path: '/audit-log',
-    getParentRoute: () => AuthenticatedWorkspacesIdSettingsRoute,
-  } as any).lazy(() =>
-    import('./routes/_authenticated.workspaces.$id.settings.audit-log.lazy').then(
-      (d) => d.Route,
-    ),
-  );
-const AuthenticatedWorkspacesIdSettingsAiProvidersRoute =
-  AuthenticatedWorkspacesIdSettingsAiProvidersRouteImport.update({
-    id: '/ai-providers',
-    path: '/ai-providers',
-    getParentRoute: () => AuthenticatedWorkspacesIdSettingsRoute,
-  } as any).lazy(() =>
-    import('./routes/_authenticated.workspaces.$id.settings.ai-providers.lazy').then(
+    import('./routes/_authenticated.workspaces.$id.settings.ai-activity.lazy').then(
       (d) => d.Route,
     ),
   );
@@ -454,39 +370,113 @@ const AuthenticatedWorkspacesIdSettingsAiAgentsRoute =
       (d) => d.Route,
     ),
   );
-const AuthenticatedWorkspacesIdSettingsAiActivityRoute =
-  AuthenticatedWorkspacesIdSettingsAiActivityRouteImport.update({
-    id: '/ai-activity',
-    path: '/ai-activity',
+const AuthenticatedWorkspacesIdSettingsAiProvidersRoute =
+  AuthenticatedWorkspacesIdSettingsAiProvidersRouteImport.update({
+    id: '/ai-providers',
+    path: '/ai-providers',
     getParentRoute: () => AuthenticatedWorkspacesIdSettingsRoute,
   } as any).lazy(() =>
-    import('./routes/_authenticated.workspaces.$id.settings.ai-activity.lazy').then(
+    import('./routes/_authenticated.workspaces.$id.settings.ai-providers.lazy').then(
       (d) => d.Route,
     ),
   );
-const AuthenticatedWorkspacesIdProjectsProjectIdRoute =
-  AuthenticatedWorkspacesIdProjectsProjectIdRouteImport.update({
-    id: '/$projectId',
-    path: '/$projectId',
-    getParentRoute: () => AuthenticatedWorkspacesIdProjectsRoute,
-  } as any);
-const AuthenticatedWorkspacesIdInsightsPriorityRoute =
-  AuthenticatedWorkspacesIdInsightsPriorityRouteImport.update({
-    id: '/insights/priority',
-    path: '/insights/priority',
+const AuthenticatedWorkspacesIdSettingsAuditLogRoute =
+  AuthenticatedWorkspacesIdSettingsAuditLogRouteImport.update({
+    id: '/audit-log',
+    path: '/audit-log',
+    getParentRoute: () => AuthenticatedWorkspacesIdSettingsRoute,
+  } as any).lazy(() =>
+    import('./routes/_authenticated.workspaces.$id.settings.audit-log.lazy').then(
+      (d) => d.Route,
+    ),
+  );
+const AuthenticatedWorkspacesIdSettingsAutoActionsRoute =
+  AuthenticatedWorkspacesIdSettingsAutoActionsRouteImport.update({
+    id: '/auto-actions',
+    path: '/auto-actions',
+    getParentRoute: () => AuthenticatedWorkspacesIdSettingsRoute,
+  } as any).lazy(() =>
+    import('./routes/_authenticated.workspaces.$id.settings.auto-actions.lazy').then(
+      (d) => d.Route,
+    ),
+  );
+const AuthenticatedWorkspacesIdSettingsDataRoute =
+  AuthenticatedWorkspacesIdSettingsDataRouteImport.update({
+    id: '/data',
+    path: '/data',
+    getParentRoute: () => AuthenticatedWorkspacesIdSettingsRoute,
+  } as any).lazy(() =>
+    import('./routes/_authenticated.workspaces.$id.settings.data.lazy').then(
+      (d) => d.Route,
+    ),
+  );
+const AuthenticatedWorkspacesIdSettingsGeneralRoute =
+  AuthenticatedWorkspacesIdSettingsGeneralRouteImport.update({
+    id: '/general',
+    path: '/general',
+    getParentRoute: () => AuthenticatedWorkspacesIdSettingsRoute,
+  } as any).lazy(() =>
+    import('./routes/_authenticated.workspaces.$id.settings.general.lazy').then(
+      (d) => d.Route,
+    ),
+  );
+const AuthenticatedWorkspacesIdSettingsMcpTokensRoute =
+  AuthenticatedWorkspacesIdSettingsMcpTokensRouteImport.update({
+    id: '/mcp-tokens',
+    path: '/mcp-tokens',
+    getParentRoute: () => AuthenticatedWorkspacesIdSettingsRoute,
+  } as any).lazy(() =>
+    import('./routes/_authenticated.workspaces.$id.settings.mcp-tokens.lazy').then(
+      (d) => d.Route,
+    ),
+  );
+const AuthenticatedWorkspacesIdSettingsPublicSharesRoute =
+  AuthenticatedWorkspacesIdSettingsPublicSharesRouteImport.update({
+    id: '/public-shares',
+    path: '/public-shares',
+    getParentRoute: () => AuthenticatedWorkspacesIdSettingsRoute,
+  } as any).lazy(() =>
+    import('./routes/_authenticated.workspaces.$id.settings.public-shares.lazy').then(
+      (d) => d.Route,
+    ),
+  );
+const AuthenticatedWorkspacesIdSettingsWebhooksRoute =
+  AuthenticatedWorkspacesIdSettingsWebhooksRouteImport.update({
+    id: '/webhooks',
+    path: '/webhooks',
+    getParentRoute: () => AuthenticatedWorkspacesIdSettingsRoute,
+  } as any).lazy(() =>
+    import('./routes/_authenticated.workspaces.$id.settings.webhooks.lazy').then(
+      (d) => d.Route,
+    ),
+  );
+const AuthenticatedWorkspacesIdSettingsWeeklyDigestRoute =
+  AuthenticatedWorkspacesIdSettingsWeeklyDigestRouteImport.update({
+    id: '/weekly-digest',
+    path: '/weekly-digest',
+    getParentRoute: () => AuthenticatedWorkspacesIdSettingsRoute,
+  } as any).lazy(() =>
+    import('./routes/_authenticated.workspaces.$id.settings.weekly-digest.lazy').then(
+      (d) => d.Route,
+    ),
+  );
+const AuthenticatedWorkspacesIdTasksArchivedRoute =
+  AuthenticatedWorkspacesIdTasksArchivedRouteImport.update({
+    id: '/tasks/archived',
+    path: '/tasks/archived',
     getParentRoute: () => AuthenticatedWorkspacesIdRoute,
   } as any).lazy(() =>
-    import('./routes/_authenticated.workspaces.$id.insights.priority.lazy').then(
+    import('./routes/_authenticated.workspaces.$id.tasks.archived.lazy').then(
       (d) => d.Route,
     ),
   );
-const AuthenticatedWorkspacesIdSettingsPublicSharesIndexRoute =
-  AuthenticatedWorkspacesIdSettingsPublicSharesIndexRouteImport.update({
-    id: '/',
-    path: '/',
-    getParentRoute: () => AuthenticatedWorkspacesIdSettingsPublicSharesRoute,
+const AuthenticatedWorkspacesIdTasksDraftsRoute =
+  AuthenticatedWorkspacesIdTasksDraftsRouteImport.update({
+    id: '/tasks/drafts',
+    path: '/tasks/drafts',
+    getParentRoute: () => AuthenticatedWorkspacesIdRoute,
   } as any).lazy(() =>
-    import('./routes/_authenticated.workspaces.$id.settings.public-shares.index.lazy').then(
+    import('./routes/_authenticated.workspaces.$id.tasks.drafts.lazy').then(
       (d) => d.Route,
     ),
   );
@@ -496,23 +486,29 @@ const AuthenticatedWorkspacesIdProjectsProjectIdIndexRoute =
     path: '/',
     getParentRoute: () => AuthenticatedWorkspacesIdProjectsProjectIdRoute,
   } as any);
-const AuthenticatedWorkspacesIdSettingsPublicSharesShareIdRoute =
-  AuthenticatedWorkspacesIdSettingsPublicSharesShareIdRouteImport.update({
-    id: '/$shareId',
-    path: '/$shareId',
-    getParentRoute: () => AuthenticatedWorkspacesIdSettingsPublicSharesRoute,
+const AuthenticatedWorkspacesIdProjectsProjectIdGanttRoute =
+  AuthenticatedWorkspacesIdProjectsProjectIdGanttRouteImport.update({
+    id: '/gantt',
+    path: '/gantt',
+    getParentRoute: () => AuthenticatedWorkspacesIdProjectsProjectIdRoute,
   } as any).lazy(() =>
-    import('./routes/_authenticated.workspaces.$id.settings.public-shares.$shareId.lazy').then(
+    import('./routes/_authenticated.workspaces.$id.projects.$projectId.gantt.lazy').then(
       (d) => d.Route,
     ),
   );
-const AuthenticatedWorkspacesIdSettingsAiMetricsRoute =
-  AuthenticatedWorkspacesIdSettingsAiMetricsRouteImport.update({
-    id: '/ai/metrics',
-    path: '/ai/metrics',
-    getParentRoute: () => AuthenticatedWorkspacesIdSettingsRoute,
+const AuthenticatedWorkspacesIdProjectsProjectIdMembersRoute =
+  AuthenticatedWorkspacesIdProjectsProjectIdMembersRouteImport.update({
+    id: '/members',
+    path: '/members',
+    getParentRoute: () => AuthenticatedWorkspacesIdProjectsProjectIdRoute,
+  } as any);
+const AuthenticatedWorkspacesIdProjectsProjectIdTasksRoute =
+  AuthenticatedWorkspacesIdProjectsProjectIdTasksRouteImport.update({
+    id: '/tasks',
+    path: '/tasks',
+    getParentRoute: () => AuthenticatedWorkspacesIdProjectsProjectIdRoute,
   } as any).lazy(() =>
-    import('./routes/_authenticated.workspaces.$id.settings.ai.metrics.lazy').then(
+    import('./routes/_authenticated.workspaces.$id.projects.$projectId.tasks.lazy').then(
       (d) => d.Route,
     ),
   );
@@ -526,39 +522,33 @@ const AuthenticatedWorkspacesIdProjectsProjectIdTimelineRoute =
       (d) => d.Route,
     ),
   );
-const AuthenticatedWorkspacesIdProjectsProjectIdTasksRoute =
-  AuthenticatedWorkspacesIdProjectsProjectIdTasksRouteImport.update({
-    id: '/tasks',
-    path: '/tasks',
-    getParentRoute: () => AuthenticatedWorkspacesIdProjectsProjectIdRoute,
+const AuthenticatedWorkspacesIdSettingsAiMetricsRoute =
+  AuthenticatedWorkspacesIdSettingsAiMetricsRouteImport.update({
+    id: '/ai/metrics',
+    path: '/ai/metrics',
+    getParentRoute: () => AuthenticatedWorkspacesIdSettingsRoute,
   } as any).lazy(() =>
-    import('./routes/_authenticated.workspaces.$id.projects.$projectId.tasks.lazy').then(
+    import('./routes/_authenticated.workspaces.$id.settings.ai.metrics.lazy').then(
       (d) => d.Route,
     ),
   );
-const AuthenticatedWorkspacesIdProjectsProjectIdMembersRoute =
-  AuthenticatedWorkspacesIdProjectsProjectIdMembersRouteImport.update({
-    id: '/members',
-    path: '/members',
-    getParentRoute: () => AuthenticatedWorkspacesIdProjectsProjectIdRoute,
-  } as any);
-const AuthenticatedWorkspacesIdProjectsProjectIdGanttRoute =
-  AuthenticatedWorkspacesIdProjectsProjectIdGanttRouteImport.update({
-    id: '/gantt',
-    path: '/gantt',
-    getParentRoute: () => AuthenticatedWorkspacesIdProjectsProjectIdRoute,
-  } as any).lazy(() =>
-    import('./routes/_authenticated.workspaces.$id.projects.$projectId.gantt.lazy').then(
-      (d) => d.Route,
-    ),
-  );
-const AuthenticatedWorkspacesIdProjectsProjectIdTasksIndexRoute =
-  AuthenticatedWorkspacesIdProjectsProjectIdTasksIndexRouteImport.update({
+const AuthenticatedWorkspacesIdSettingsPublicSharesIndexRoute =
+  AuthenticatedWorkspacesIdSettingsPublicSharesIndexRouteImport.update({
     id: '/',
     path: '/',
-    getParentRoute: () => AuthenticatedWorkspacesIdProjectsProjectIdTasksRoute,
+    getParentRoute: () => AuthenticatedWorkspacesIdSettingsPublicSharesRoute,
   } as any).lazy(() =>
-    import('./routes/_authenticated.workspaces.$id.projects.$projectId.tasks.index.lazy').then(
+    import('./routes/_authenticated.workspaces.$id.settings.public-shares.index.lazy').then(
+      (d) => d.Route,
+    ),
+  );
+const AuthenticatedWorkspacesIdSettingsPublicSharesShareIdRoute =
+  AuthenticatedWorkspacesIdSettingsPublicSharesShareIdRouteImport.update({
+    id: '/$shareId',
+    path: '/$shareId',
+    getParentRoute: () => AuthenticatedWorkspacesIdSettingsPublicSharesRoute,
+  } as any).lazy(() =>
+    import('./routes/_authenticated.workspaces.$id.settings.public-shares.$shareId.lazy').then(
       (d) => d.Route,
     ),
   );
@@ -569,6 +559,16 @@ const AuthenticatedWorkspacesIdCalendarsCalIdEventsEvtIdRoute =
     getParentRoute: () => AuthenticatedWorkspacesIdRoute,
   } as any).lazy(() =>
     import('./routes/_authenticated.workspaces.$id.calendars.$calId.events.$evtId.lazy').then(
+      (d) => d.Route,
+    ),
+  );
+const AuthenticatedWorkspacesIdProjectsProjectIdTasksIndexRoute =
+  AuthenticatedWorkspacesIdProjectsProjectIdTasksIndexRouteImport.update({
+    id: '/',
+    path: '/',
+    getParentRoute: () => AuthenticatedWorkspacesIdProjectsProjectIdTasksRoute,
+  } as any).lazy(() =>
+    import('./routes/_authenticated.workspaces.$id.projects.$projectId.tasks.index.lazy').then(
       (d) => d.Route,
     ),
   );
@@ -964,11 +964,11 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/signup': {
-      id: '/signup';
-      path: '/signup';
-      fullPath: '/signup';
-      preLoaderRoute: typeof SignupRouteImport;
+    '/_authenticated': {
+      id: '/_authenticated';
+      path: '';
+      fullPath: '/';
+      preLoaderRoute: typeof AuthenticatedRouteImport;
       parentRoute: typeof rootRouteImport;
     };
     '/login': {
@@ -978,11 +978,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LoginRouteImport;
       parentRoute: typeof rootRouteImport;
     };
-    '/_authenticated': {
-      id: '/_authenticated';
-      path: '';
-      fullPath: '/';
-      preLoaderRoute: typeof AuthenticatedRouteImport;
+    '/signup': {
+      id: '/signup';
+      path: '/signup';
+      fullPath: '/signup';
+      preLoaderRoute: typeof SignupRouteImport;
       parentRoute: typeof rootRouteImport;
     };
     '/_authenticated/': {
@@ -992,53 +992,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedIndexRouteImport;
       parentRoute: typeof AuthenticatedRoute;
     };
-    '/invites/accept': {
-      id: '/invites/accept';
-      path: '/invites/accept';
-      fullPath: '/invites/accept';
-      preLoaderRoute: typeof InvitesAcceptRouteImport;
-      parentRoute: typeof rootRouteImport;
-    };
-    '/invite/$token': {
-      id: '/invite/$token';
-      path: '/invite/$token';
-      fullPath: '/invite/$token';
-      preLoaderRoute: typeof InviteTokenRouteImport;
-      parentRoute: typeof rootRouteImport;
-    };
-    '/_authenticated/workspaces': {
-      id: '/_authenticated/workspaces';
-      path: '/workspaces';
-      fullPath: '/workspaces';
-      preLoaderRoute: typeof AuthenticatedWorkspacesRouteImport;
-      parentRoute: typeof AuthenticatedRoute;
-    };
-    '/_authenticated/today': {
-      id: '/_authenticated/today';
-      path: '/today';
-      fullPath: '/today';
-      preLoaderRoute: typeof AuthenticatedTodayRouteImport;
-      parentRoute: typeof AuthenticatedRoute;
-    };
-    '/_authenticated/setup': {
-      id: '/_authenticated/setup';
-      path: '/setup';
-      fullPath: '/setup';
-      preLoaderRoute: typeof AuthenticatedSetupRouteImport;
-      parentRoute: typeof AuthenticatedRoute;
-    };
-    '/_authenticated/settings': {
-      id: '/_authenticated/settings';
-      path: '/settings';
-      fullPath: '/settings';
-      preLoaderRoute: typeof AuthenticatedSettingsRouteImport;
-      parentRoute: typeof AuthenticatedRoute;
-    };
-    '/_authenticated/pages': {
-      id: '/_authenticated/pages';
-      path: '/pages';
-      fullPath: '/pages';
-      preLoaderRoute: typeof AuthenticatedPagesRouteImport;
+    '/_authenticated/calendar': {
+      id: '/_authenticated/calendar';
+      path: '/calendar';
+      fullPath: '/calendar';
+      preLoaderRoute: typeof AuthenticatedCalendarRouteImport;
       parentRoute: typeof AuthenticatedRoute;
     };
     '/_authenticated/inbox': {
@@ -1048,19 +1006,54 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedInboxRouteImport;
       parentRoute: typeof AuthenticatedRoute;
     };
-    '/_authenticated/calendar': {
-      id: '/_authenticated/calendar';
-      path: '/calendar';
-      fullPath: '/calendar';
-      preLoaderRoute: typeof AuthenticatedCalendarRouteImport;
+    '/_authenticated/pages': {
+      id: '/_authenticated/pages';
+      path: '/pages';
+      fullPath: '/pages';
+      preLoaderRoute: typeof AuthenticatedPagesRouteImport;
       parentRoute: typeof AuthenticatedRoute;
     };
-    '/_authenticated/workspaces/': {
-      id: '/_authenticated/workspaces/';
-      path: '/';
-      fullPath: '/workspaces/';
-      preLoaderRoute: typeof AuthenticatedWorkspacesIndexRouteImport;
-      parentRoute: typeof AuthenticatedWorkspacesRoute;
+    '/_authenticated/settings': {
+      id: '/_authenticated/settings';
+      path: '/settings';
+      fullPath: '/settings';
+      preLoaderRoute: typeof AuthenticatedSettingsRouteImport;
+      parentRoute: typeof AuthenticatedRoute;
+    };
+    '/_authenticated/setup': {
+      id: '/_authenticated/setup';
+      path: '/setup';
+      fullPath: '/setup';
+      preLoaderRoute: typeof AuthenticatedSetupRouteImport;
+      parentRoute: typeof AuthenticatedRoute;
+    };
+    '/_authenticated/today': {
+      id: '/_authenticated/today';
+      path: '/today';
+      fullPath: '/today';
+      preLoaderRoute: typeof AuthenticatedTodayRouteImport;
+      parentRoute: typeof AuthenticatedRoute;
+    };
+    '/_authenticated/workspaces': {
+      id: '/_authenticated/workspaces';
+      path: '/workspaces';
+      fullPath: '/workspaces';
+      preLoaderRoute: typeof AuthenticatedWorkspacesRouteImport;
+      parentRoute: typeof AuthenticatedRoute;
+    };
+    '/invite/$token': {
+      id: '/invite/$token';
+      path: '/invite/$token';
+      fullPath: '/invite/$token';
+      preLoaderRoute: typeof InviteTokenRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
+    '/invites/accept': {
+      id: '/invites/accept';
+      path: '/invites/accept';
+      fullPath: '/invites/accept';
+      preLoaderRoute: typeof InvitesAcceptRouteImport;
+      parentRoute: typeof rootRouteImport;
     };
     '/_authenticated/pages/': {
       id: '/_authenticated/pages/';
@@ -1069,53 +1062,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedPagesIndexRouteImport;
       parentRoute: typeof AuthenticatedPagesRoute;
     };
-    '/share/cal/$token': {
-      id: '/share/cal/$token';
-      path: '/share/cal/$token';
-      fullPath: '/share/cal/$token';
-      preLoaderRoute: typeof ShareCalTokenRouteImport;
-      parentRoute: typeof rootRouteImport;
+    '/_authenticated/pages/$pageId': {
+      id: '/_authenticated/pages/$pageId';
+      path: '/$pageId';
+      fullPath: '/pages/$pageId';
+      preLoaderRoute: typeof AuthenticatedPagesPageIdRouteImport;
+      parentRoute: typeof AuthenticatedPagesRoute;
     };
-    '/public/lenses/$token': {
-      id: '/public/lenses/$token';
-      path: '/public/lenses/$token';
-      fullPath: '/public/lenses/$token';
-      preLoaderRoute: typeof PublicLensesTokenRouteImport;
-      parentRoute: typeof rootRouteImport;
-    };
-    '/embed/cal/$token': {
-      id: '/embed/cal/$token';
-      path: '/embed/cal/$token';
-      fullPath: '/embed/cal/$token';
-      preLoaderRoute: typeof EmbedCalTokenRouteImport;
-      parentRoute: typeof rootRouteImport;
-    };
-    '/_authenticated/workspaces/$id': {
-      id: '/_authenticated/workspaces/$id';
-      path: '/$id';
-      fullPath: '/workspaces/$id';
-      preLoaderRoute: typeof AuthenticatedWorkspacesIdRouteImport;
-      parentRoute: typeof AuthenticatedWorkspacesRoute;
-    };
-    '/_authenticated/tasks/$taskId': {
-      id: '/_authenticated/tasks/$taskId';
-      path: '/tasks/$taskId';
-      fullPath: '/tasks/$taskId';
-      preLoaderRoute: typeof AuthenticatedTasksTaskIdRouteImport;
+    '/_authenticated/projects/$projectId': {
+      id: '/_authenticated/projects/$projectId';
+      path: '/projects/$projectId';
+      fullPath: '/projects/$projectId';
+      preLoaderRoute: typeof AuthenticatedProjectsProjectIdRouteImport;
       parentRoute: typeof AuthenticatedRoute;
     };
-    '/_authenticated/settings/security': {
-      id: '/_authenticated/settings/security';
-      path: '/security';
-      fullPath: '/settings/security';
-      preLoaderRoute: typeof AuthenticatedSettingsSecurityRouteImport;
-      parentRoute: typeof AuthenticatedSettingsRoute;
-    };
-    '/_authenticated/settings/profile': {
-      id: '/_authenticated/settings/profile';
-      path: '/profile';
-      fullPath: '/settings/profile';
-      preLoaderRoute: typeof AuthenticatedSettingsProfileRouteImport;
+    '/_authenticated/settings/integrations': {
+      id: '/_authenticated/settings/integrations';
+      path: '/integrations';
+      fullPath: '/settings/integrations';
+      preLoaderRoute: typeof AuthenticatedSettingsIntegrationsRouteImport;
       parentRoute: typeof AuthenticatedSettingsRoute;
     };
     '/_authenticated/settings/notifications': {
@@ -1125,88 +1090,67 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedSettingsNotificationsRouteImport;
       parentRoute: typeof AuthenticatedSettingsRoute;
     };
-    '/_authenticated/settings/integrations': {
-      id: '/_authenticated/settings/integrations';
-      path: '/integrations';
-      fullPath: '/settings/integrations';
-      preLoaderRoute: typeof AuthenticatedSettingsIntegrationsRouteImport;
+    '/_authenticated/settings/profile': {
+      id: '/_authenticated/settings/profile';
+      path: '/profile';
+      fullPath: '/settings/profile';
+      preLoaderRoute: typeof AuthenticatedSettingsProfileRouteImport;
       parentRoute: typeof AuthenticatedSettingsRoute;
     };
-    '/_authenticated/projects/$projectId': {
-      id: '/_authenticated/projects/$projectId';
-      path: '/projects/$projectId';
-      fullPath: '/projects/$projectId';
-      preLoaderRoute: typeof AuthenticatedProjectsProjectIdRouteImport;
+    '/_authenticated/settings/security': {
+      id: '/_authenticated/settings/security';
+      path: '/security';
+      fullPath: '/settings/security';
+      preLoaderRoute: typeof AuthenticatedSettingsSecurityRouteImport;
+      parentRoute: typeof AuthenticatedSettingsRoute;
+    };
+    '/_authenticated/tasks/$taskId': {
+      id: '/_authenticated/tasks/$taskId';
+      path: '/tasks/$taskId';
+      fullPath: '/tasks/$taskId';
+      preLoaderRoute: typeof AuthenticatedTasksTaskIdRouteImport;
       parentRoute: typeof AuthenticatedRoute;
     };
-    '/_authenticated/pages/$pageId': {
-      id: '/_authenticated/pages/$pageId';
-      path: '/$pageId';
-      fullPath: '/pages/$pageId';
-      preLoaderRoute: typeof AuthenticatedPagesPageIdRouteImport;
-      parentRoute: typeof AuthenticatedPagesRoute;
+    '/_authenticated/workspaces/': {
+      id: '/_authenticated/workspaces/';
+      path: '/';
+      fullPath: '/workspaces/';
+      preLoaderRoute: typeof AuthenticatedWorkspacesIndexRouteImport;
+      parentRoute: typeof AuthenticatedWorkspacesRoute;
+    };
+    '/_authenticated/workspaces/$id': {
+      id: '/_authenticated/workspaces/$id';
+      path: '/$id';
+      fullPath: '/workspaces/$id';
+      preLoaderRoute: typeof AuthenticatedWorkspacesIdRouteImport;
+      parentRoute: typeof AuthenticatedWorkspacesRoute;
+    };
+    '/embed/cal/$token': {
+      id: '/embed/cal/$token';
+      path: '/embed/cal/$token';
+      fullPath: '/embed/cal/$token';
+      preLoaderRoute: typeof EmbedCalTokenRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
+    '/public/lenses/$token': {
+      id: '/public/lenses/$token';
+      path: '/public/lenses/$token';
+      fullPath: '/public/lenses/$token';
+      preLoaderRoute: typeof PublicLensesTokenRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
+    '/share/cal/$token': {
+      id: '/share/cal/$token';
+      path: '/share/cal/$token';
+      fullPath: '/share/cal/$token';
+      preLoaderRoute: typeof ShareCalTokenRouteImport;
+      parentRoute: typeof rootRouteImport;
     };
     '/_authenticated/projects/$projectId/': {
       id: '/_authenticated/projects/$projectId/';
       path: '/';
       fullPath: '/projects/$projectId/';
       preLoaderRoute: typeof AuthenticatedProjectsProjectIdIndexRouteImport;
-      parentRoute: typeof AuthenticatedProjectsProjectIdRoute;
-    };
-    '/_authenticated/workspaces/$id/timeline': {
-      id: '/_authenticated/workspaces/$id/timeline';
-      path: '/timeline';
-      fullPath: '/workspaces/$id/timeline';
-      preLoaderRoute: typeof AuthenticatedWorkspacesIdTimelineRouteImport;
-      parentRoute: typeof AuthenticatedWorkspacesIdRoute;
-    };
-    '/_authenticated/workspaces/$id/timeboxes': {
-      id: '/_authenticated/workspaces/$id/timeboxes';
-      path: '/timeboxes';
-      fullPath: '/workspaces/$id/timeboxes';
-      preLoaderRoute: typeof AuthenticatedWorkspacesIdTimeboxesRouteImport;
-      parentRoute: typeof AuthenticatedWorkspacesIdRoute;
-    };
-    '/_authenticated/workspaces/$id/settings': {
-      id: '/_authenticated/workspaces/$id/settings';
-      path: '/settings';
-      fullPath: '/workspaces/$id/settings';
-      preLoaderRoute: typeof AuthenticatedWorkspacesIdSettingsRouteImport;
-      parentRoute: typeof AuthenticatedWorkspacesIdRoute;
-    };
-    '/_authenticated/workspaces/$id/reminders': {
-      id: '/_authenticated/workspaces/$id/reminders';
-      path: '/reminders';
-      fullPath: '/workspaces/$id/reminders';
-      preLoaderRoute: typeof AuthenticatedWorkspacesIdRemindersRouteImport;
-      parentRoute: typeof AuthenticatedWorkspacesIdRoute;
-    };
-    '/_authenticated/workspaces/$id/projects': {
-      id: '/_authenticated/workspaces/$id/projects';
-      path: '/projects';
-      fullPath: '/workspaces/$id/projects';
-      preLoaderRoute: typeof AuthenticatedWorkspacesIdProjectsRouteImport;
-      parentRoute: typeof AuthenticatedWorkspacesIdRoute;
-    };
-    '/_authenticated/workspaces/$id/activity': {
-      id: '/_authenticated/workspaces/$id/activity';
-      path: '/activity';
-      fullPath: '/workspaces/$id/activity';
-      preLoaderRoute: typeof AuthenticatedWorkspacesIdActivityRouteImport;
-      parentRoute: typeof AuthenticatedWorkspacesIdRoute;
-    };
-    '/_authenticated/projects/$projectId/timeline': {
-      id: '/_authenticated/projects/$projectId/timeline';
-      path: '/timeline';
-      fullPath: '/projects/$projectId/timeline';
-      preLoaderRoute: typeof AuthenticatedProjectsProjectIdTimelineRouteImport;
-      parentRoute: typeof AuthenticatedProjectsProjectIdRoute;
-    };
-    '/_authenticated/projects/$projectId/tasks': {
-      id: '/_authenticated/projects/$projectId/tasks';
-      path: '/tasks';
-      fullPath: '/projects/$projectId/tasks';
-      preLoaderRoute: typeof AuthenticatedProjectsProjectIdTasksRouteImport;
       parentRoute: typeof AuthenticatedProjectsProjectIdRoute;
     };
     '/_authenticated/projects/$projectId/gantt': {
@@ -1216,19 +1160,61 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedProjectsProjectIdGanttRouteImport;
       parentRoute: typeof AuthenticatedProjectsProjectIdRoute;
     };
-    '/_authenticated/workspaces/$id/settings/': {
-      id: '/_authenticated/workspaces/$id/settings/';
-      path: '/';
-      fullPath: '/workspaces/$id/settings/';
-      preLoaderRoute: typeof AuthenticatedWorkspacesIdSettingsIndexRouteImport;
-      parentRoute: typeof AuthenticatedWorkspacesIdSettingsRoute;
+    '/_authenticated/projects/$projectId/tasks': {
+      id: '/_authenticated/projects/$projectId/tasks';
+      path: '/tasks';
+      fullPath: '/projects/$projectId/tasks';
+      preLoaderRoute: typeof AuthenticatedProjectsProjectIdTasksRouteImport;
+      parentRoute: typeof AuthenticatedProjectsProjectIdRoute;
     };
-    '/_authenticated/workspaces/$id/projects/': {
-      id: '/_authenticated/workspaces/$id/projects/';
-      path: '/';
-      fullPath: '/workspaces/$id/projects/';
-      preLoaderRoute: typeof AuthenticatedWorkspacesIdProjectsIndexRouteImport;
-      parentRoute: typeof AuthenticatedWorkspacesIdProjectsRoute;
+    '/_authenticated/projects/$projectId/timeline': {
+      id: '/_authenticated/projects/$projectId/timeline';
+      path: '/timeline';
+      fullPath: '/projects/$projectId/timeline';
+      preLoaderRoute: typeof AuthenticatedProjectsProjectIdTimelineRouteImport;
+      parentRoute: typeof AuthenticatedProjectsProjectIdRoute;
+    };
+    '/_authenticated/workspaces/$id/activity': {
+      id: '/_authenticated/workspaces/$id/activity';
+      path: '/activity';
+      fullPath: '/workspaces/$id/activity';
+      preLoaderRoute: typeof AuthenticatedWorkspacesIdActivityRouteImport;
+      parentRoute: typeof AuthenticatedWorkspacesIdRoute;
+    };
+    '/_authenticated/workspaces/$id/projects': {
+      id: '/_authenticated/workspaces/$id/projects';
+      path: '/projects';
+      fullPath: '/workspaces/$id/projects';
+      preLoaderRoute: typeof AuthenticatedWorkspacesIdProjectsRouteImport;
+      parentRoute: typeof AuthenticatedWorkspacesIdRoute;
+    };
+    '/_authenticated/workspaces/$id/reminders': {
+      id: '/_authenticated/workspaces/$id/reminders';
+      path: '/reminders';
+      fullPath: '/workspaces/$id/reminders';
+      preLoaderRoute: typeof AuthenticatedWorkspacesIdRemindersRouteImport;
+      parentRoute: typeof AuthenticatedWorkspacesIdRoute;
+    };
+    '/_authenticated/workspaces/$id/settings': {
+      id: '/_authenticated/workspaces/$id/settings';
+      path: '/settings';
+      fullPath: '/workspaces/$id/settings';
+      preLoaderRoute: typeof AuthenticatedWorkspacesIdSettingsRouteImport;
+      parentRoute: typeof AuthenticatedWorkspacesIdRoute;
+    };
+    '/_authenticated/workspaces/$id/timeboxes': {
+      id: '/_authenticated/workspaces/$id/timeboxes';
+      path: '/timeboxes';
+      fullPath: '/workspaces/$id/timeboxes';
+      preLoaderRoute: typeof AuthenticatedWorkspacesIdTimeboxesRouteImport;
+      parentRoute: typeof AuthenticatedWorkspacesIdRoute;
+    };
+    '/_authenticated/workspaces/$id/timeline': {
+      id: '/_authenticated/workspaces/$id/timeline';
+      path: '/timeline';
+      fullPath: '/workspaces/$id/timeline';
+      preLoaderRoute: typeof AuthenticatedWorkspacesIdTimelineRouteImport;
+      parentRoute: typeof AuthenticatedWorkspacesIdRoute;
     };
     '/_authenticated/projects/$projectId/tasks/': {
       id: '/_authenticated/projects/$projectId/tasks/';
@@ -1237,88 +1223,32 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedProjectsProjectIdTasksIndexRouteImport;
       parentRoute: typeof AuthenticatedProjectsProjectIdTasksRoute;
     };
-    '/_authenticated/workspaces/$id/tasks/drafts': {
-      id: '/_authenticated/workspaces/$id/tasks/drafts';
-      path: '/tasks/drafts';
-      fullPath: '/workspaces/$id/tasks/drafts';
-      preLoaderRoute: typeof AuthenticatedWorkspacesIdTasksDraftsRouteImport;
+    '/_authenticated/workspaces/$id/insights/priority': {
+      id: '/_authenticated/workspaces/$id/insights/priority';
+      path: '/insights/priority';
+      fullPath: '/workspaces/$id/insights/priority';
+      preLoaderRoute: typeof AuthenticatedWorkspacesIdInsightsPriorityRouteImport;
       parentRoute: typeof AuthenticatedWorkspacesIdRoute;
     };
-    '/_authenticated/workspaces/$id/tasks/archived': {
-      id: '/_authenticated/workspaces/$id/tasks/archived';
-      path: '/tasks/archived';
-      fullPath: '/workspaces/$id/tasks/archived';
-      preLoaderRoute: typeof AuthenticatedWorkspacesIdTasksArchivedRouteImport;
-      parentRoute: typeof AuthenticatedWorkspacesIdRoute;
+    '/_authenticated/workspaces/$id/projects/': {
+      id: '/_authenticated/workspaces/$id/projects/';
+      path: '/';
+      fullPath: '/workspaces/$id/projects/';
+      preLoaderRoute: typeof AuthenticatedWorkspacesIdProjectsIndexRouteImport;
+      parentRoute: typeof AuthenticatedWorkspacesIdProjectsRoute;
     };
-    '/_authenticated/workspaces/$id/settings/weekly-digest': {
-      id: '/_authenticated/workspaces/$id/settings/weekly-digest';
-      path: '/weekly-digest';
-      fullPath: '/workspaces/$id/settings/weekly-digest';
-      preLoaderRoute: typeof AuthenticatedWorkspacesIdSettingsWeeklyDigestRouteImport;
-      parentRoute: typeof AuthenticatedWorkspacesIdSettingsRoute;
+    '/_authenticated/workspaces/$id/projects/$projectId': {
+      id: '/_authenticated/workspaces/$id/projects/$projectId';
+      path: '/$projectId';
+      fullPath: '/workspaces/$id/projects/$projectId';
+      preLoaderRoute: typeof AuthenticatedWorkspacesIdProjectsProjectIdRouteImport;
+      parentRoute: typeof AuthenticatedWorkspacesIdProjectsRoute;
     };
-    '/_authenticated/workspaces/$id/settings/webhooks': {
-      id: '/_authenticated/workspaces/$id/settings/webhooks';
-      path: '/webhooks';
-      fullPath: '/workspaces/$id/settings/webhooks';
-      preLoaderRoute: typeof AuthenticatedWorkspacesIdSettingsWebhooksRouteImport;
-      parentRoute: typeof AuthenticatedWorkspacesIdSettingsRoute;
-    };
-    '/_authenticated/workspaces/$id/settings/public-shares': {
-      id: '/_authenticated/workspaces/$id/settings/public-shares';
-      path: '/public-shares';
-      fullPath: '/workspaces/$id/settings/public-shares';
-      preLoaderRoute: typeof AuthenticatedWorkspacesIdSettingsPublicSharesRouteImport;
-      parentRoute: typeof AuthenticatedWorkspacesIdSettingsRoute;
-    };
-    '/_authenticated/workspaces/$id/settings/mcp-tokens': {
-      id: '/_authenticated/workspaces/$id/settings/mcp-tokens';
-      path: '/mcp-tokens';
-      fullPath: '/workspaces/$id/settings/mcp-tokens';
-      preLoaderRoute: typeof AuthenticatedWorkspacesIdSettingsMcpTokensRouteImport;
-      parentRoute: typeof AuthenticatedWorkspacesIdSettingsRoute;
-    };
-    '/_authenticated/workspaces/$id/settings/general': {
-      id: '/_authenticated/workspaces/$id/settings/general';
-      path: '/general';
-      fullPath: '/workspaces/$id/settings/general';
-      preLoaderRoute: typeof AuthenticatedWorkspacesIdSettingsGeneralRouteImport;
-      parentRoute: typeof AuthenticatedWorkspacesIdSettingsRoute;
-    };
-    '/_authenticated/workspaces/$id/settings/data': {
-      id: '/_authenticated/workspaces/$id/settings/data';
-      path: '/data';
-      fullPath: '/workspaces/$id/settings/data';
-      preLoaderRoute: typeof AuthenticatedWorkspacesIdSettingsDataRouteImport;
-      parentRoute: typeof AuthenticatedWorkspacesIdSettingsRoute;
-    };
-    '/_authenticated/workspaces/$id/settings/auto-actions': {
-      id: '/_authenticated/workspaces/$id/settings/auto-actions';
-      path: '/auto-actions';
-      fullPath: '/workspaces/$id/settings/auto-actions';
-      preLoaderRoute: typeof AuthenticatedWorkspacesIdSettingsAutoActionsRouteImport;
-      parentRoute: typeof AuthenticatedWorkspacesIdSettingsRoute;
-    };
-    '/_authenticated/workspaces/$id/settings/audit-log': {
-      id: '/_authenticated/workspaces/$id/settings/audit-log';
-      path: '/audit-log';
-      fullPath: '/workspaces/$id/settings/audit-log';
-      preLoaderRoute: typeof AuthenticatedWorkspacesIdSettingsAuditLogRouteImport;
-      parentRoute: typeof AuthenticatedWorkspacesIdSettingsRoute;
-    };
-    '/_authenticated/workspaces/$id/settings/ai-providers': {
-      id: '/_authenticated/workspaces/$id/settings/ai-providers';
-      path: '/ai-providers';
-      fullPath: '/workspaces/$id/settings/ai-providers';
-      preLoaderRoute: typeof AuthenticatedWorkspacesIdSettingsAiProvidersRouteImport;
-      parentRoute: typeof AuthenticatedWorkspacesIdSettingsRoute;
-    };
-    '/_authenticated/workspaces/$id/settings/ai-agents': {
-      id: '/_authenticated/workspaces/$id/settings/ai-agents';
-      path: '/ai-agents';
-      fullPath: '/workspaces/$id/settings/ai-agents';
-      preLoaderRoute: typeof AuthenticatedWorkspacesIdSettingsAiAgentsRouteImport;
+    '/_authenticated/workspaces/$id/settings/': {
+      id: '/_authenticated/workspaces/$id/settings/';
+      path: '/';
+      fullPath: '/workspaces/$id/settings/';
+      preLoaderRoute: typeof AuthenticatedWorkspacesIdSettingsIndexRouteImport;
       parentRoute: typeof AuthenticatedWorkspacesIdSettingsRoute;
     };
     '/_authenticated/workspaces/$id/settings/ai-activity': {
@@ -1328,67 +1258,95 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedWorkspacesIdSettingsAiActivityRouteImport;
       parentRoute: typeof AuthenticatedWorkspacesIdSettingsRoute;
     };
-    '/_authenticated/workspaces/$id/projects/$projectId': {
-      id: '/_authenticated/workspaces/$id/projects/$projectId';
-      path: '/$projectId';
-      fullPath: '/workspaces/$id/projects/$projectId';
-      preLoaderRoute: typeof AuthenticatedWorkspacesIdProjectsProjectIdRouteImport;
-      parentRoute: typeof AuthenticatedWorkspacesIdProjectsRoute;
+    '/_authenticated/workspaces/$id/settings/ai-agents': {
+      id: '/_authenticated/workspaces/$id/settings/ai-agents';
+      path: '/ai-agents';
+      fullPath: '/workspaces/$id/settings/ai-agents';
+      preLoaderRoute: typeof AuthenticatedWorkspacesIdSettingsAiAgentsRouteImport;
+      parentRoute: typeof AuthenticatedWorkspacesIdSettingsRoute;
     };
-    '/_authenticated/workspaces/$id/insights/priority': {
-      id: '/_authenticated/workspaces/$id/insights/priority';
-      path: '/insights/priority';
-      fullPath: '/workspaces/$id/insights/priority';
-      preLoaderRoute: typeof AuthenticatedWorkspacesIdInsightsPriorityRouteImport;
+    '/_authenticated/workspaces/$id/settings/ai-providers': {
+      id: '/_authenticated/workspaces/$id/settings/ai-providers';
+      path: '/ai-providers';
+      fullPath: '/workspaces/$id/settings/ai-providers';
+      preLoaderRoute: typeof AuthenticatedWorkspacesIdSettingsAiProvidersRouteImport;
+      parentRoute: typeof AuthenticatedWorkspacesIdSettingsRoute;
+    };
+    '/_authenticated/workspaces/$id/settings/audit-log': {
+      id: '/_authenticated/workspaces/$id/settings/audit-log';
+      path: '/audit-log';
+      fullPath: '/workspaces/$id/settings/audit-log';
+      preLoaderRoute: typeof AuthenticatedWorkspacesIdSettingsAuditLogRouteImport;
+      parentRoute: typeof AuthenticatedWorkspacesIdSettingsRoute;
+    };
+    '/_authenticated/workspaces/$id/settings/auto-actions': {
+      id: '/_authenticated/workspaces/$id/settings/auto-actions';
+      path: '/auto-actions';
+      fullPath: '/workspaces/$id/settings/auto-actions';
+      preLoaderRoute: typeof AuthenticatedWorkspacesIdSettingsAutoActionsRouteImport;
+      parentRoute: typeof AuthenticatedWorkspacesIdSettingsRoute;
+    };
+    '/_authenticated/workspaces/$id/settings/data': {
+      id: '/_authenticated/workspaces/$id/settings/data';
+      path: '/data';
+      fullPath: '/workspaces/$id/settings/data';
+      preLoaderRoute: typeof AuthenticatedWorkspacesIdSettingsDataRouteImport;
+      parentRoute: typeof AuthenticatedWorkspacesIdSettingsRoute;
+    };
+    '/_authenticated/workspaces/$id/settings/general': {
+      id: '/_authenticated/workspaces/$id/settings/general';
+      path: '/general';
+      fullPath: '/workspaces/$id/settings/general';
+      preLoaderRoute: typeof AuthenticatedWorkspacesIdSettingsGeneralRouteImport;
+      parentRoute: typeof AuthenticatedWorkspacesIdSettingsRoute;
+    };
+    '/_authenticated/workspaces/$id/settings/mcp-tokens': {
+      id: '/_authenticated/workspaces/$id/settings/mcp-tokens';
+      path: '/mcp-tokens';
+      fullPath: '/workspaces/$id/settings/mcp-tokens';
+      preLoaderRoute: typeof AuthenticatedWorkspacesIdSettingsMcpTokensRouteImport;
+      parentRoute: typeof AuthenticatedWorkspacesIdSettingsRoute;
+    };
+    '/_authenticated/workspaces/$id/settings/public-shares': {
+      id: '/_authenticated/workspaces/$id/settings/public-shares';
+      path: '/public-shares';
+      fullPath: '/workspaces/$id/settings/public-shares';
+      preLoaderRoute: typeof AuthenticatedWorkspacesIdSettingsPublicSharesRouteImport;
+      parentRoute: typeof AuthenticatedWorkspacesIdSettingsRoute;
+    };
+    '/_authenticated/workspaces/$id/settings/webhooks': {
+      id: '/_authenticated/workspaces/$id/settings/webhooks';
+      path: '/webhooks';
+      fullPath: '/workspaces/$id/settings/webhooks';
+      preLoaderRoute: typeof AuthenticatedWorkspacesIdSettingsWebhooksRouteImport;
+      parentRoute: typeof AuthenticatedWorkspacesIdSettingsRoute;
+    };
+    '/_authenticated/workspaces/$id/settings/weekly-digest': {
+      id: '/_authenticated/workspaces/$id/settings/weekly-digest';
+      path: '/weekly-digest';
+      fullPath: '/workspaces/$id/settings/weekly-digest';
+      preLoaderRoute: typeof AuthenticatedWorkspacesIdSettingsWeeklyDigestRouteImport;
+      parentRoute: typeof AuthenticatedWorkspacesIdSettingsRoute;
+    };
+    '/_authenticated/workspaces/$id/tasks/archived': {
+      id: '/_authenticated/workspaces/$id/tasks/archived';
+      path: '/tasks/archived';
+      fullPath: '/workspaces/$id/tasks/archived';
+      preLoaderRoute: typeof AuthenticatedWorkspacesIdTasksArchivedRouteImport;
       parentRoute: typeof AuthenticatedWorkspacesIdRoute;
     };
-    '/_authenticated/workspaces/$id/settings/public-shares/': {
-      id: '/_authenticated/workspaces/$id/settings/public-shares/';
-      path: '/';
-      fullPath: '/workspaces/$id/settings/public-shares/';
-      preLoaderRoute: typeof AuthenticatedWorkspacesIdSettingsPublicSharesIndexRouteImport;
-      parentRoute: typeof AuthenticatedWorkspacesIdSettingsPublicSharesRoute;
+    '/_authenticated/workspaces/$id/tasks/drafts': {
+      id: '/_authenticated/workspaces/$id/tasks/drafts';
+      path: '/tasks/drafts';
+      fullPath: '/workspaces/$id/tasks/drafts';
+      preLoaderRoute: typeof AuthenticatedWorkspacesIdTasksDraftsRouteImport;
+      parentRoute: typeof AuthenticatedWorkspacesIdRoute;
     };
     '/_authenticated/workspaces/$id/projects/$projectId/': {
       id: '/_authenticated/workspaces/$id/projects/$projectId/';
       path: '/';
       fullPath: '/workspaces/$id/projects/$projectId/';
       preLoaderRoute: typeof AuthenticatedWorkspacesIdProjectsProjectIdIndexRouteImport;
-      parentRoute: typeof AuthenticatedWorkspacesIdProjectsProjectIdRoute;
-    };
-    '/_authenticated/workspaces/$id/settings/public-shares/$shareId': {
-      id: '/_authenticated/workspaces/$id/settings/public-shares/$shareId';
-      path: '/$shareId';
-      fullPath: '/workspaces/$id/settings/public-shares/$shareId';
-      preLoaderRoute: typeof AuthenticatedWorkspacesIdSettingsPublicSharesShareIdRouteImport;
-      parentRoute: typeof AuthenticatedWorkspacesIdSettingsPublicSharesRoute;
-    };
-    '/_authenticated/workspaces/$id/settings/ai/metrics': {
-      id: '/_authenticated/workspaces/$id/settings/ai/metrics';
-      path: '/ai/metrics';
-      fullPath: '/workspaces/$id/settings/ai/metrics';
-      preLoaderRoute: typeof AuthenticatedWorkspacesIdSettingsAiMetricsRouteImport;
-      parentRoute: typeof AuthenticatedWorkspacesIdSettingsRoute;
-    };
-    '/_authenticated/workspaces/$id/projects/$projectId/timeline': {
-      id: '/_authenticated/workspaces/$id/projects/$projectId/timeline';
-      path: '/timeline';
-      fullPath: '/workspaces/$id/projects/$projectId/timeline';
-      preLoaderRoute: typeof AuthenticatedWorkspacesIdProjectsProjectIdTimelineRouteImport;
-      parentRoute: typeof AuthenticatedWorkspacesIdProjectsProjectIdRoute;
-    };
-    '/_authenticated/workspaces/$id/projects/$projectId/tasks': {
-      id: '/_authenticated/workspaces/$id/projects/$projectId/tasks';
-      path: '/tasks';
-      fullPath: '/workspaces/$id/projects/$projectId/tasks';
-      preLoaderRoute: typeof AuthenticatedWorkspacesIdProjectsProjectIdTasksRouteImport;
-      parentRoute: typeof AuthenticatedWorkspacesIdProjectsProjectIdRoute;
-    };
-    '/_authenticated/workspaces/$id/projects/$projectId/members': {
-      id: '/_authenticated/workspaces/$id/projects/$projectId/members';
-      path: '/members';
-      fullPath: '/workspaces/$id/projects/$projectId/members';
-      preLoaderRoute: typeof AuthenticatedWorkspacesIdProjectsProjectIdMembersRouteImport;
       parentRoute: typeof AuthenticatedWorkspacesIdProjectsProjectIdRoute;
     };
     '/_authenticated/workspaces/$id/projects/$projectId/gantt': {
@@ -1398,12 +1356,47 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedWorkspacesIdProjectsProjectIdGanttRouteImport;
       parentRoute: typeof AuthenticatedWorkspacesIdProjectsProjectIdRoute;
     };
-    '/_authenticated/workspaces/$id/projects/$projectId/tasks/': {
-      id: '/_authenticated/workspaces/$id/projects/$projectId/tasks/';
+    '/_authenticated/workspaces/$id/projects/$projectId/members': {
+      id: '/_authenticated/workspaces/$id/projects/$projectId/members';
+      path: '/members';
+      fullPath: '/workspaces/$id/projects/$projectId/members';
+      preLoaderRoute: typeof AuthenticatedWorkspacesIdProjectsProjectIdMembersRouteImport;
+      parentRoute: typeof AuthenticatedWorkspacesIdProjectsProjectIdRoute;
+    };
+    '/_authenticated/workspaces/$id/projects/$projectId/tasks': {
+      id: '/_authenticated/workspaces/$id/projects/$projectId/tasks';
+      path: '/tasks';
+      fullPath: '/workspaces/$id/projects/$projectId/tasks';
+      preLoaderRoute: typeof AuthenticatedWorkspacesIdProjectsProjectIdTasksRouteImport;
+      parentRoute: typeof AuthenticatedWorkspacesIdProjectsProjectIdRoute;
+    };
+    '/_authenticated/workspaces/$id/projects/$projectId/timeline': {
+      id: '/_authenticated/workspaces/$id/projects/$projectId/timeline';
+      path: '/timeline';
+      fullPath: '/workspaces/$id/projects/$projectId/timeline';
+      preLoaderRoute: typeof AuthenticatedWorkspacesIdProjectsProjectIdTimelineRouteImport;
+      parentRoute: typeof AuthenticatedWorkspacesIdProjectsProjectIdRoute;
+    };
+    '/_authenticated/workspaces/$id/settings/ai/metrics': {
+      id: '/_authenticated/workspaces/$id/settings/ai/metrics';
+      path: '/ai/metrics';
+      fullPath: '/workspaces/$id/settings/ai/metrics';
+      preLoaderRoute: typeof AuthenticatedWorkspacesIdSettingsAiMetricsRouteImport;
+      parentRoute: typeof AuthenticatedWorkspacesIdSettingsRoute;
+    };
+    '/_authenticated/workspaces/$id/settings/public-shares/': {
+      id: '/_authenticated/workspaces/$id/settings/public-shares/';
       path: '/';
-      fullPath: '/workspaces/$id/projects/$projectId/tasks/';
-      preLoaderRoute: typeof AuthenticatedWorkspacesIdProjectsProjectIdTasksIndexRouteImport;
-      parentRoute: typeof AuthenticatedWorkspacesIdProjectsProjectIdTasksRoute;
+      fullPath: '/workspaces/$id/settings/public-shares/';
+      preLoaderRoute: typeof AuthenticatedWorkspacesIdSettingsPublicSharesIndexRouteImport;
+      parentRoute: typeof AuthenticatedWorkspacesIdSettingsPublicSharesRoute;
+    };
+    '/_authenticated/workspaces/$id/settings/public-shares/$shareId': {
+      id: '/_authenticated/workspaces/$id/settings/public-shares/$shareId';
+      path: '/$shareId';
+      fullPath: '/workspaces/$id/settings/public-shares/$shareId';
+      preLoaderRoute: typeof AuthenticatedWorkspacesIdSettingsPublicSharesShareIdRouteImport;
+      parentRoute: typeof AuthenticatedWorkspacesIdSettingsPublicSharesRoute;
     };
     '/_authenticated/workspaces/$id/calendars/$calId/events/$evtId': {
       id: '/_authenticated/workspaces/$id/calendars/$calId/events/$evtId';
@@ -1411,6 +1404,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/workspaces/$id/calendars/$calId/events/$evtId';
       preLoaderRoute: typeof AuthenticatedWorkspacesIdCalendarsCalIdEventsEvtIdRouteImport;
       parentRoute: typeof AuthenticatedWorkspacesIdRoute;
+    };
+    '/_authenticated/workspaces/$id/projects/$projectId/tasks/': {
+      id: '/_authenticated/workspaces/$id/projects/$projectId/tasks/';
+      path: '/';
+      fullPath: '/workspaces/$id/projects/$projectId/tasks/';
+      preLoaderRoute: typeof AuthenticatedWorkspacesIdProjectsProjectIdTasksIndexRouteImport;
+      parentRoute: typeof AuthenticatedWorkspacesIdProjectsProjectIdTasksRoute;
     };
   }
 }
