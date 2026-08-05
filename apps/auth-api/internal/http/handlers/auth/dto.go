@@ -14,6 +14,7 @@ import (
 	"github.com/libraz/nodate-flow/apps/auth-api/internal/auth"
 	"github.com/libraz/nodate-flow/apps/auth-api/internal/db/generated"
 	"github.com/libraz/nodate-flow/apps/auth-api/internal/storage"
+	"github.com/libraz/nodate-flow/packages/go-shared/authn"
 	"github.com/libraz/nodate-flow/packages/go-shared/crypto"
 	"github.com/libraz/nodate-flow/packages/go-shared/email"
 	"github.com/libraz/nodate-flow/packages/go-shared/sessionstore"
@@ -51,6 +52,10 @@ type Deps struct {
 	// the NF_AUTH_MICROSOFT_OIDC_CLIENT_ID env is unset. Declared as an
 	// interface so unit tests can substitute a fake exchanger.
 	OIDCMicrosoft MicrosoftExchanger
+	// SingleUse records redeemed one-time token identifiers so a state
+	// parameter cannot be replayed while its signature is still valid.
+	// Router.Build installs the in-process default when this is nil.
+	SingleUse authn.SingleUseStore
 	// MicrosoftAllowedTenantIDs is the tenant allowlist configured by
 	// NF_AUTH_MICROSOFT_OIDC_ALLOWED_TENANTS. The real exchanger
 	// validates it after id_token verification; handlers also enforce it
@@ -274,7 +279,12 @@ type LogoutOutput struct {
 // The nonce is embedded inside the signed state JWT and is not returned
 // separately to avoid leaking it to the client.
 type OIDCStartOutput struct {
-	Body struct {
+	// SetCookie carries the verifier that binds the state parameter to
+	// this browser. The callback refuses a state whose verifier is
+	// absent or does not match, which is what stops an attacker-minted
+	// state from being redeemed in someone else's browser.
+	SetCookie http.Cookie `header:"Set-Cookie"`
+	Body      struct {
 		AuthorizationURL string `json:"authorizationUrl"`
 		State            string `json:"state"`
 	}
@@ -293,6 +303,10 @@ type OIDCCallbackInput struct {
 	UserAgent string `header:"User-Agent"`
 	Code      string `query:"code"`
 	State     string `query:"state"`
+	// StateCookie is the verifier written by the matching /start call.
+	// Absent when the callback was reached without starting the flow in
+	// this browser, which the handlers reject.
+	StateCookie http.Cookie `cookie:"nd_oidc"`
 	// Error is the OAuth2 / OIDC error slug supplied by the IdP when it
 	// declines the sign-in (e.g. "access_denied", "invalid_scope"). Empty
 	// on the happy path.
@@ -308,9 +322,12 @@ type OIDCCallbackInput struct {
 // the IdP callback. Body is still populated for direct handler tests and
 // generated schema compatibility; browsers follow Location.
 type OIDCCallbackOutput struct {
-	Status    int
-	Location  string      `header:"Location"`
-	SetCookie http.Cookie `header:"Set-Cookie"`
+	Status   int
+	Location string `header:"Location"`
+	// SetCookie is a list because the callback always evicts the state
+	// verifier and, on the completing path, also installs the refresh
+	// cookie. Huma emits one Set-Cookie header per element.
+	SetCookie []http.Cookie `header:"Set-Cookie"`
 	Body      LoginBody
 }
 

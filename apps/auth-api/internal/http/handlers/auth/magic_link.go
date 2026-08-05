@@ -14,6 +14,7 @@ import (
 	apierrors "github.com/libraz/nodate-flow/apps/auth-api/internal/errors"
 	"github.com/libraz/nodate-flow/packages/go-shared/apierr"
 	"github.com/libraz/nodate-flow/packages/go-shared/authn"
+	"github.com/libraz/nodate-flow/packages/go-shared/dbtype"
 	"github.com/libraz/nodate-flow/packages/go-shared/email"
 	sharedtoken "github.com/libraz/nodate-flow/packages/go-shared/token"
 )
@@ -50,11 +51,10 @@ func MagicLinkRequest(deps Deps) func(context.Context, *MagicLinkRequestInput) (
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
 		pubID := types.New()
-		ip := authn.ClientIPFromContext(ctx)
-		var ipAddr sql.NullString
-		if ip != "" {
-			ipAddr = sql.NullString{String: ip, Valid: true}
-		}
+		// magic_link_tokens.ip_address is VARBINARY(16), so the address
+		// is packed rather than stored as text: an IPv6 caller would
+		// otherwise overflow the column and fail the request outright.
+		ipAddr := dbtype.NullStringFromIP(authn.ClientIPFromContext(ctx))
 		if _, err := deps.Queries.CreateMagicLinkToken(ctx, generated.CreateMagicLinkTokenParams{
 			PublicID:  pubID,
 			UserID:    user.ID,

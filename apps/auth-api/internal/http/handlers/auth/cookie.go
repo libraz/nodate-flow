@@ -54,6 +54,51 @@ func newRefreshCookie(token string, secure bool) http.Cookie {
 	}
 }
 
+// oidcStateCookieName carries the verifier that binds an OIDC state
+// parameter to the browser that started the flow.
+const oidcStateCookieName = "nd_oidc"
+
+// oidcStateCookiePath scopes the state cookie to the OIDC endpoints, so
+// it never rides along with any other request.
+const oidcStateCookiePath = "/auth/oidc"
+
+// newOIDCStateCookie builds the Set-Cookie carrying the state verifier.
+// Secure / SameSite mirror the refresh cookie: the cookie is written by
+// a cross-site fetch from accounts-web and read back on the top-level
+// redirect the identity provider performs, and SameSite=Lax permits that
+// navigation while still keeping the cookie off cross-site subresource
+// requests.
+func newOIDCStateCookie(verifier string, expiresAt time.Time, secure bool) http.Cookie {
+	maxAge := int(time.Until(expiresAt).Seconds())
+	if maxAge < 1 {
+		maxAge = 1
+	}
+	return http.Cookie{ //#nosec G124 -- HttpOnly always set; Secure/SameSite intentionally derived from cfg (http dev vs https prod)
+		Name:     oidcStateCookieName,
+		Value:    verifier,
+		Path:     oidcStateCookiePath,
+		HttpOnly: true,
+		Secure:   secure,
+		SameSite: refreshCookieSameSite(secure),
+		MaxAge:   maxAge,
+	}
+}
+
+// clearedOIDCStateCookie evicts the state cookie once the flow ends.
+// Attributes must mirror newOIDCStateCookie or the browser treats this
+// as a different cookie and keeps the original.
+func clearedOIDCStateCookie(secure bool) http.Cookie {
+	return http.Cookie{ //#nosec G124 -- HttpOnly always set; Secure/SameSite intentionally derived from cfg (http dev vs https prod)
+		Name:     oidcStateCookieName,
+		Value:    "",
+		Path:     oidcStateCookiePath,
+		HttpOnly: true,
+		Secure:   secure,
+		SameSite: refreshCookieSameSite(secure),
+		MaxAge:   -1,
+	}
+}
+
 // clearedRefreshCookie builds a Set-Cookie value that deletes the
 // refresh cookie on the client (MaxAge=-1 emits Max-Age=0). The
 // SameSite/Secure attributes must mirror newRefreshCookie or browsers

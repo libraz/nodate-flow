@@ -32,15 +32,23 @@ var inviteRaceDB = testhelpers.NewSharedMySQL(testhelpers.MySQLConfig{Database: 
 // otherwise returns the shared *sql.DB.
 func requireInviteRaceDB(t *testing.T) *sql.DB {
 	t.Helper()
+	return requireWorkspaceTxDB(t).DB
+}
+
+// requireWorkspaceTxDB is the same gate for tests that also need the
+// DSN — opening a second pool with its own session settings is how the
+// lock-contention tests keep their waits short.
+func requireWorkspaceTxDB(t *testing.T) *testhelpers.MySQLInstance {
+	t.Helper()
 	if testing.Short() {
-		t.Skip("skipping invite race integration test in -short mode")
+		t.Skip("skipping workspace transaction integration test in -short mode")
 	}
 	if os.Getenv("NF_TEST_INTEGRATION") == "" {
-		t.Skip("set NF_TEST_INTEGRATION=1 to run invite race integration tests")
+		t.Skip("set NF_TEST_INTEGRATION=1 to run workspace transaction integration tests")
 	}
 	inst, err := inviteRaceDB.Start(context.Background())
 	require.NoError(t, err, "start mysql testcontainer")
-	return inst.DB
+	return inst
 }
 
 // raceNewUser inserts a fresh user + local identity and returns the

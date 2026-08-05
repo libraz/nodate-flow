@@ -27,12 +27,11 @@ func OIDCMicrosoftCallback(deps Deps) func(context.Context, *OIDCCallbackInput) 
 		if deps.OIDCMicrosoft == nil {
 			return nil, httpErr(apierrors.AuthOidcMicrosoftNotConfigured)
 		}
-		// Validate the state JWT for CSRF protection. The signed state
-		// embeds the nonce + the provider it was minted for; the
-		// provider claim defends against cross-provider state replay.
-		nonce, err := deps.JWT.VerifyOIDCStateForProvider(in.State, "microsoft")
+		// Verify and consume the state before touching the code. See
+		// consumeOIDCState for what the gate covers.
+		nonce, err := deps.consumeOIDCState(ctx, in, "microsoft")
 		if err != nil {
-			return nil, httpErr(apierrors.AuthOidcStateMismatch)
+			return nil, err
 		}
 		claims, err := deps.OIDCMicrosoft.Exchange(ctx, in.Code, nonce)
 		if err != nil {

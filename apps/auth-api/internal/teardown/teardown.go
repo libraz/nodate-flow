@@ -14,11 +14,84 @@ package teardown
 import (
 	"context"
 	"database/sql"
+	stderrors "errors"
 	"log/slog"
 
 	"github.com/libraz/nodate-flow/apps/auth-api/internal/db/generated"
 	"github.com/libraz/nodate-flow/apps/auth-api/internal/storage"
+	"github.com/libraz/nodate-flow/packages/go-shared/dbretry"
 )
+
+// errConcurrentDelete rolls a teardown transaction back when the target
+// row turned out to be gone already: the pipeline's preparatory writes
+// (attachment deletes, ref_count decrements) must not land on their own.
+// It is an internal signal, never returned to a caller, and is not
+// transient so the retry loop leaves it alone.
+var errConcurrentDelete = stderrors.New("teardown: row already deleted")
+
+// BlobSweeper is the subset of [storage.Client] the teardown pipelines
+// need. Both pipelines take the interface rather than the concrete
+// client so tests can observe what a failed delete did — or did not —
+// remove from object storage.
+type BlobSweeper interface {
+	// RemoveObjects deletes the given keys in bulk, best effort. It
+	// returns the first per-key failure after attempting the rest.
+	RemoveObjects(ctx context.Context, keys []string) error
+}
+
+// sweepBlobs removes keys from object storage and reports 1 when the
+// sweep had at least one failure, 0 otherwise (see
+// [WorkspaceResult.MinioErrors] for why a bare flag).
+//
+// Both pipelines route every deletion through here so the ordering
+// rule holds in one place: the sweep runs only after the owning
+// database transaction has committed. Deleting blobs first means a
+// transaction that later fails — a deadlock, a lock wait timeout, a
+// cancelled request — leaves every row alive while the bytes are gone
+// for good, which reads as "attachment present, download 404s" in the
+// UI and cannot be undone.
+//
+// Committing first inverts the failure into an orphaned blob, which is
+// recoverable — but only if the keys are written down: the rows that
+// named them are already deleted, so this log is their last record.
+// Each key is therefore logged individually rather than as a count.
+//
+// store is optional: it is nil when NF_S3_ENDPOINT is unset. A nil
+// *storage.Client wrapped in an interface is not itself nil, so the
+// guard has to unwrap the concrete type.
+func sweepBlobs(ctx context.Context, store BlobSweeper, keys []string, owner slog.Attr) int64 {
+	switch s := store.(type) {
+	case nil:
+		return 0
+	case *storage.Client:
+		if s == nil {
+			return 0
+		}
+	}
+	if len(keys) == 0 {
+		return 0
+	}
+	err := store.RemoveObjects(ctx, keys)
+	if err == nil {
+		return 0
+	}
+	slog.WarnContext(ctx, "teardown: object storage sweep had errors",
+		owner,
+		slog.Int("key_count", len(keys)),
+		slog.String("err", err.Error()),
+	)
+	// RemoveObjects collapses per-key failures into the first error, so
+	// we cannot tell which keys survived. List them all: over-reporting
+	// costs an operator one HEAD request per key, under-reporting costs
+	// an unreclaimable blob.
+	for _, k := range keys {
+		slog.WarnContext(ctx, "teardown: blob may be orphaned",
+			owner,
+			slog.String("storage_key", k),
+		)
+	}
+	return 1
+}
 
 // WorkspaceResult captures the observable side effects of [Workspace] so
 // callers can populate the response body (Deleted, StorageObjectsDeleted,
@@ -43,20 +116,21 @@ type WorkspaceResult struct {
 // Workspace runs the destructive workspace-delete pipeline against the
 // supplied internal workspace id.
 //
-//  1. Enumerate every storage_objects row owned by the workspace so the
-//     MinIO sweep can run before the CASCADE-anchored hard DELETE removes
-//     the rows we would otherwise need to drive the blob cleanup.
-//  2. Best-effort bulk-delete those keys from MinIO. Failures are logged
-//     and counted but DO NOT abort the DB delete; the alternative is
-//     leaving the workspace row alive forever whenever object storage
-//     hiccups. Orphaned blobs can be reaped by a separate sweeper.
-//  3. In one transaction: clear the two attachment tables that reference
-//     storage_objects with ON DELETE RESTRICT, then run the CASCADE-
-//     anchored hard DELETE on the workspaces row. RowsAffected==0 means a
+//  1. In one transaction: enumerate every storage_objects row owned by
+//     the workspace (the CASCADE-anchored DELETE is about to remove the
+//     rows that name the blobs, so the keys have to be read first, and
+//     reading them inside the transaction keeps the list consistent with
+//     what the DELETE actually removes), clear the two attachment tables
+//     that reference storage_objects with ON DELETE RESTRICT, then run
+//     the hard DELETE on the workspaces row. RowsAffected==0 means a
 //     concurrent caller already deleted it; the transaction rolls back so
 //     the attachment deletes do not land on their own, and the result
 //     reports Deleted=false — the caller should treat that as idempotent
 //     success, not 404.
+//  2. Only once that transaction has committed, best-effort bulk-delete
+//     the collected keys from MinIO. Failures are logged per key and
+//     counted but DO NOT resurrect the workspace row. See [sweepBlobs]
+//     for why the sweep must not run first.
 //
 // Why the attachment tables are cleared explicitly rather than left to the
 // cascade: attachments.workspace_id and calendar_event_attachments.
@@ -71,39 +145,30 @@ type WorkspaceResult struct {
 // The function never panics on a nil storage client (Storage is optional
 // when NF_S3_ENDPOINT is unset); the MinIO sweep is simply skipped and
 // the response reports zero counts.
-func Workspace(ctx context.Context, db *sql.DB, q *generated.Queries, store *storage.Client, wsID uint32) (WorkspaceResult, error) {
-	objs, err := q.ListStorageObjectsByWorkspace(ctx, sql.NullInt32{Int32: int32(wsID), Valid: true}) //#nosec G115 -- workspace internal id is INT UNSIGNED, fits int32 within realistic deployments
-	if err != nil {
-		return WorkspaceResult{}, err
-	}
-
-	keys := make([]string, 0, len(objs))
-	for _, o := range objs {
-		if o.StorageKey != "" {
-			keys = append(keys, o.StorageKey)
-		}
-	}
-
-	var minioErrors int64
-	if store != nil && len(keys) > 0 {
-		if rerr := store.RemoveObjects(ctx, keys); rerr != nil {
-			slog.WarnContext(ctx, "teardown: workspace delete MinIO sweep had errors",
-				slog.Uint64("workspace_internal_id", uint64(wsID)),
-				slog.Int("key_count", len(keys)),
-				slog.String("err", rerr.Error()),
-			)
-			minioErrors = 1
-		}
-	}
-
-	var deleted bool
-	err = func() error {
-		tx, txErr := db.BeginTx(ctx, nil)
-		if txErr != nil {
-			return txErr
-		}
-		defer func() { _ = tx.Rollback() }()
+func Workspace(ctx context.Context, db *sql.DB, q *generated.Queries, store BlobSweeper, wsID uint32) (WorkspaceResult, error) {
+	var (
+		keys    []string
+		deleted bool
+	)
+	// Retried as a whole on a deadlock: the DELETE walks a wide cascade
+	// and readily loses a lock race, and every attempt re-reads the keys
+	// from scratch so a retry cannot carry state from the attempt that
+	// rolled back.
+	err := dbretry.InTx(ctx, db, "teardown.Workspace", nil, func(ctx context.Context, tx *sql.Tx) error {
+		keys = nil
+		deleted = false
 		qtx := q.WithTx(tx)
+
+		objs, lerr := qtx.ListStorageObjectsByWorkspace(ctx, sql.NullInt32{Int32: int32(wsID), Valid: true}) //#nosec G115 -- workspace internal id is INT UNSIGNED, fits int32 within realistic deployments
+		if lerr != nil {
+			return lerr
+		}
+		keys = make([]string, 0, len(objs))
+		for _, o := range objs {
+			if o.StorageKey != "" {
+				keys = append(keys, o.StorageKey)
+			}
+		}
 
 		if derr := qtx.DeleteAttachmentsByWorkspace(ctx, wsID); derr != nil {
 			return derr
@@ -120,17 +185,26 @@ func Workspace(ctx context.Context, db *sql.DB, q *generated.Queries, store *sto
 		if rows == 0 {
 			// Raced with a concurrent delete. Roll back so the attachment
 			// deletes are reverted along with it.
-			return nil
+			return errConcurrentDelete
 		}
 		deleted = true
-		return tx.Commit()
-	}()
-	if err != nil {
+		return nil
+	})
+	if err != nil && !stderrors.Is(err, errConcurrentDelete) {
 		return WorkspaceResult{}, err
 	}
+	if !deleted {
+		// Either the transaction rolled back or another caller won the
+		// race. Every row still points at its blob, so object storage
+		// must be left alone.
+		return WorkspaceResult{}, nil
+	}
+
+	minioErrors := sweepBlobs(ctx, store, keys,
+		slog.Uint64("workspace_internal_id", uint64(wsID)))
 
 	return WorkspaceResult{
-		Deleted:               deleted,
+		Deleted:               true,
 		StorageObjectsDeleted: int64(len(keys)),
 		MinioErrors:           minioErrors,
 	}, nil
@@ -157,12 +231,12 @@ type UserResult struct {
 // User runs the destructive user-delete pipeline against the supplied
 // internal user id.
 //
-// Why a transaction-then-sweep flow (instead of the workspace pattern's
-// "MinIO first, DB second"): attachments.uploader_id is ON DELETE CASCADE,
-// so HardDeleteUser silently removes the user's attachment rows. A naive
-// MinIO-first sweep would have to guess which underlying storage_objects
-// rows are about to lose their last referrer, and a concurrent dedup-hit
-// upload from a sibling member could bump ref_count between the guess and
+// Why the ref_count dance rather than a straight enumerate-and-sweep:
+// attachments.uploader_id is ON DELETE CASCADE, so HardDeleteUser
+// silently removes the user's attachment rows. Sweeping from a list read
+// up front would have to guess which underlying storage_objects rows are
+// about to lose their last referrer, and a concurrent dedup-hit upload
+// from a sibling member could bump ref_count between the guess and
 // the cascade — yanking the blob out from under the new uploader. Instead
 // we DecrementStorageObjectRefCount for every uploader-owned attachment
 // row, run HardDeleteUser inside the same transaction (CASCADE drops the
@@ -189,7 +263,7 @@ type UserResult struct {
 //
 // The function never panics on a nil storage client; the MinIO sweep is
 // simply skipped and the response reports zero counts.
-func User(ctx context.Context, db *sql.DB, q *generated.Queries, store *storage.Client, userID uint32) (UserResult, error) {
+func User(ctx context.Context, db *sql.DB, q *generated.Queries, store BlobSweeper, userID uint32) (UserResult, error) {
 	taskAtts, err := q.ListAttachmentsForUploaderPurge(ctx, userID)
 	if err != nil {
 		return UserResult{}, err
@@ -224,12 +298,12 @@ func User(ctx context.Context, db *sql.DB, q *generated.Queries, store *storage.
 		freedSharedKeys []string
 		deleted         bool
 	)
-	err = func() error {
-		tx, txErr := db.BeginTx(ctx, nil)
-		if txErr != nil {
-			return txErr
-		}
-		defer func() { _ = tx.Rollback() }()
+	// Retried as a whole on a deadlock, same as the workspace pipeline.
+	// freedSharedKeys is rebuilt per attempt: an attempt that rolls back
+	// must not leave keys behind for the sweep that follows.
+	err = dbretry.InTx(ctx, db, "teardown.User", nil, func(ctx context.Context, tx *sql.Tx) error {
+		freedSharedKeys = nil
+		deleted = false
 		qtx := q.WithTx(tx)
 
 		for _, a := range taskAtts {
@@ -265,7 +339,7 @@ func User(ctx context.Context, db *sql.DB, q *generated.Queries, store *storage.
 		if rows == 0 {
 			// Raced with a concurrent delete. Roll back so the
 			// ref_count decrements are reverted.
-			return nil
+			return errConcurrentDelete
 		}
 		deleted = true
 
@@ -284,9 +358,9 @@ func User(ctx context.Context, db *sql.DB, q *generated.Queries, store *storage.
 			}
 		}
 
-		return tx.Commit()
-	}()
-	if err != nil {
+		return nil
+	})
+	if err != nil && !stderrors.Is(err, errConcurrentDelete) {
 		return UserResult{}, err
 	}
 
@@ -311,15 +385,9 @@ func User(ctx context.Context, db *sql.DB, q *generated.Queries, store *storage.
 	}
 
 	var minioErrors int64
-	if deleted && store != nil && len(keys) > 0 {
-		if rerr := store.RemoveObjects(ctx, keys); rerr != nil {
-			slog.WarnContext(ctx, "teardown: user delete MinIO sweep had errors",
-				slog.Uint64("user_internal_id", uint64(userID)),
-				slog.Int("key_count", len(keys)),
-				slog.String("err", rerr.Error()),
-			)
-			minioErrors = 1
-		}
+	if deleted {
+		minioErrors = sweepBlobs(ctx, store, keys,
+			slog.Uint64("user_internal_id", uint64(userID)))
 	}
 
 	return UserResult{

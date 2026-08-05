@@ -112,7 +112,7 @@ func rowToAdminSession(r generated.AdminListUserSessionsRow) Session {
 	return Session{
 		ID:         r.PublicID.String(),
 		UserAgent:  r.UserAgent.String,
-		IPAddress:  r.IpAddress.String,
+		IPAddress:  dbtype.IPStringFromNullString(r.IpAddress),
 		ExpiresAt:  r.ExpiresAt.Unix(),
 		LastUsedAt: nullTimeUnix(r.LastUsedAt),
 		Active:     r.Enabled && !r.RevokedAt.Valid,
@@ -147,7 +147,7 @@ func rowToAuditEntry(r generated.AdminListInstanceAuditLogsRow) AuditEntry {
 		TargetWorkspaceName:    nullStr(r.TargetWorkspaceName),
 		TargetResourceType:     nullStr(r.TargetResourceType),
 		TargetResourcePublicID: nullPubID(r.TargetResourcePublicID),
-		IPAddress:              nullStr(r.IpAddress),
+		IPAddress:              dbtype.IPPtrFromNullString(r.IpAddress),
 		UserAgent:              nullStr(r.UserAgent),
 		Payload:                payload,
 		OccurredAt:             r.OccurredAt.Unix(),

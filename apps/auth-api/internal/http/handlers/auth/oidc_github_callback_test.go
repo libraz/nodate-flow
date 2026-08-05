@@ -48,9 +48,6 @@ func TestOIDCGithubCallback_PassesNonceFromState(t *testing.T) {
 	require.NoError(t, err)
 
 	const wantNonce = "01961234-5678-7000-8000-deadbeefcafe"
-	state, err := jwt.SignOIDCStateForProvider(wantNonce, "github")
-	require.NoError(t, err)
-
 	gh := &fakeGithubExchanger{
 		err: errors.New("stop after capturing nonce"),
 	}
@@ -59,8 +56,13 @@ func TestOIDCGithubCallback_PassesNonceFromState(t *testing.T) {
 		OIDCGithub: gh,
 		Audit:      audit.NoopSink{},
 	}
+	state, stateCookie := boundOIDCState(t, &deps, "github", wantNonce)
 	handler := OIDCGithubCallback(deps)
-	_, err = handler(context.Background(), &OIDCCallbackInput{Code: "auth-code", State: state})
+	_, err = handler(context.Background(), &OIDCCallbackInput{
+		Code:        "auth-code",
+		State:       state,
+		StateCookie: stateCookie,
+	})
 	require.Error(t, err, "Exchange returned an error so handler must propagate")
 
 	assert.Equal(t, "auth-code", gh.gotCode, "code must be forwarded verbatim")
@@ -77,17 +79,19 @@ func TestOIDCGithubCallback_RejectsUnverifiedEmail(t *testing.T) {
 	t.Parallel()
 	jwt, err := internauth.NewJWTIssuer(nil, "iss", "aud", time.Minute)
 	require.NoError(t, err)
-	state, err := jwt.SignOIDCStateForProvider("nonce-value", "github")
-	require.NoError(t, err)
-
 	gh := &fakeGithubExchanger{err: internauth.ErrGithubEmailNotVerified}
 	deps := Deps{
 		JWT:        jwt,
 		OIDCGithub: gh,
 		Audit:      audit.NoopSink{},
 	}
+	state, stateCookie := signedGithubState(t, &deps)
 	handler := OIDCGithubCallback(deps)
-	_, err = handler(context.Background(), &OIDCCallbackInput{Code: "auth-code", State: state})
+	_, err = handler(context.Background(), &OIDCCallbackInput{
+		Code:        "auth-code",
+		State:       state,
+		StateCookie: stateCookie,
+	})
 	require.Error(t, err)
 
 	var problem *handlerutil.ProblemDetails
@@ -111,8 +115,13 @@ func TestOIDCGithubCallback_RejectsBadState(t *testing.T) {
 		OIDCGithub: gh,
 		Audit:      audit.NoopSink{},
 	}
+	_, stateCookie := signedGithubState(t, &deps)
 	handler := OIDCGithubCallback(deps)
-	_, err = handler(context.Background(), &OIDCCallbackInput{Code: "c", State: "garbage"})
+	_, err = handler(context.Background(), &OIDCCallbackInput{
+		Code:        "c",
+		State:       "garbage",
+		StateCookie: stateCookie,
+	})
 	require.Error(t, err)
 	assert.Empty(t, gh.gotCode, "Exchange must not run when state verification fails")
 }
@@ -128,18 +137,17 @@ func TestOIDCGithubCallback_SurfacesProviderRejection(t *testing.T) {
 	t.Parallel()
 	jwt, err := internauth.NewJWTIssuer(nil, "iss", "aud", time.Minute)
 	require.NoError(t, err)
-	state, err := jwt.SignOIDCStateForProvider("nonce-value", "github")
-	require.NoError(t, err)
-
 	gh := &fakeGithubExchanger{}
 	deps := Deps{
 		JWT:        jwt,
 		OIDCGithub: gh,
 		Audit:      audit.NoopSink{},
 	}
+	state, stateCookie := signedGithubState(t, &deps)
 	handler := OIDCGithubCallback(deps)
 	_, err = handler(context.Background(), &OIDCCallbackInput{
 		State:            state,
+		StateCookie:      stateCookie,
 		Error:            "access_denied",
 		ErrorDescription: "user denied",
 	})

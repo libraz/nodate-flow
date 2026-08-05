@@ -25,13 +25,11 @@ func OIDCGoogleCallback(deps Deps) func(context.Context, *OIDCCallbackInput) (*O
 		if deps.OIDC == nil {
 			return nil, httpErr(apierrors.AuthOidcProviderUnreachable)
 		}
-		// Validate the state JWT to prevent CSRF. The signed state
-		// embeds the nonce and the provider it was minted for; the
-		// provider check stops a state issued for one redirect URI
-		// from being redeemed at another.
-		nonce, err := deps.JWT.VerifyOIDCStateForProvider(in.State, "google")
+		// Verify and consume the state before touching the code. See
+		// consumeOIDCState for what the gate covers.
+		nonce, err := deps.consumeOIDCState(ctx, in, "google")
 		if err != nil {
-			return nil, httpErr(apierrors.AuthOidcStateMismatch)
+			return nil, err
 		}
 		idTok, err := deps.OIDC.Exchange(ctx, in.Code, nonce)
 		if err != nil {

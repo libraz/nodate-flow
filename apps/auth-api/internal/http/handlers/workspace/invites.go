@@ -3,6 +3,7 @@ package workspace
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"time"
 
 	"github.com/libraz/nodate-flow/apps/auth-api/internal/auth"
@@ -12,6 +13,7 @@ import (
 	"github.com/libraz/nodate-flow/apps/auth-api/internal/http/middleware"
 	"github.com/libraz/nodate-flow/packages/go-shared/apierr"
 	"github.com/libraz/nodate-flow/packages/go-shared/authn"
+	"github.com/libraz/nodate-flow/packages/go-shared/dbretry"
 	"github.com/libraz/nodate-flow/packages/go-shared/email"
 	"github.com/libraz/nodate-flow/packages/go-shared/memberkit"
 	sharedtoken "github.com/libraz/nodate-flow/packages/go-shared/token"
@@ -22,6 +24,12 @@ import (
 // so callers in this package keep their existing import surface while
 // the constant lives in a single source of truth.
 const PrefixInvite = sharedtoken.PrefixInvite
+
+// errInviteExhausted rolls the accept transaction back when the invite
+// has no use slots left. It never reaches the client — the handler
+// answers with WORKSPACE_INVITE.EXHAUSTED — and it is deliberately not
+// a transient error so the retry loop leaves it alone.
+var errInviteExhausted = errors.New("workspace: invite exhausted")
 
 // uint32FromNullInt32 extracts a uint32 from a sql.NullInt32; returns
 // 0 when the null flag is unset.
@@ -219,43 +227,51 @@ func AcceptInvite(deps InviteDeps) func(context.Context, *AcceptInviteInput) (*A
 		// Create the member + materialise personal calendar + use-count
 		// bump in a single tx so a mid-flight failure never leaves the
 		// user half-joined.
-		tx, err := deps.DB.BeginTx(ctx, nil)
-		if err != nil {
-			return nil, httpErr(apierrors.InternalUnexpected)
-		}
-		defer func() { _ = tx.Rollback() }()
-
-		txQueries := deps.Queries.WithTx(tx)
 		now := time.Now()
+		// Concurrent redemptions of the same invite contend on the invite
+		// row and on the workspace's member rows, so this is a natural
+		// deadlock site; retry the whole transaction rather than telling
+		// the invitee their link is broken.
+		exhausted := false
+		txErr := dbretry.InTx(ctx, deps.DB, "workspace.AcceptInvite", nil, func(ctx context.Context, tx *sql.Tx) error {
+			exhausted = false
+			txQueries := deps.Queries.WithTx(tx)
 
-		// Atomically claim a use slot first. The conditional UPDATE only
-		// affects a row while use_count < max_uses, so concurrent accepts
-		// racing on the same invite can never collectively exceed the cap:
-		// exactly max_uses redemptions see affected == 1; the rest see 0
-		// and bail out as exhausted. Running this inside the tx (before the
-		// member add) means a loser's transaction rolls back cleanly without
-		// having created a half-joined member.
-		affected, err := txQueries.IncrementInviteUseCount(ctx, invite.ID)
-		if err != nil {
-			return nil, httpErr(apierrors.InternalUnexpected)
-		}
-		if affected == 0 {
+			// Atomically claim a use slot first. The conditional UPDATE only
+			// affects a row while use_count < max_uses, so concurrent accepts
+			// racing on the same invite can never collectively exceed the cap:
+			// exactly max_uses redemptions see affected == 1; the rest see 0
+			// and bail out as exhausted. Running this inside the tx (before the
+			// member add) means a loser's transaction rolls back cleanly without
+			// having created a half-joined member.
+			affected, err := txQueries.IncrementInviteUseCount(ctx, invite.ID)
+			if err != nil {
+				return err
+			}
+			if affected == 0 {
+				// Not a failure of the transaction: the cap is simply
+				// full. Flag it and roll back with a sentinel so the
+				// retry loop does not treat it as work to repeat.
+				exhausted = true
+				return errInviteExhausted
+			}
+
+			_, err = memberkit.AddWorkspaceMember(ctx, tx, memberkit.AddWorkspaceMemberArgs{
+				WorkspaceID:              invite.WorkspaceID,
+				UserID:                   actorID,
+				Role:                     memberkit.Role(invite.Role),
+				InvitedByUserID:          uint32FromNullInt32(invite.CreatedByUserID),
+				InvitedAt:                invite.CreatedAt,
+				JoinedAt:                 now,
+				EnsurePersonalCalendar:   true,
+				SubscribeHolidayCalendar: true,
+			})
+			return err
+		})
+		if exhausted {
 			return nil, httpErr(apierrors.WsWorkspaceInviteExhausted)
 		}
-
-		if _, err := memberkit.AddWorkspaceMember(ctx, tx, memberkit.AddWorkspaceMemberArgs{
-			WorkspaceID:              invite.WorkspaceID,
-			UserID:                   actorID,
-			Role:                     memberkit.Role(invite.Role),
-			InvitedByUserID:          uint32FromNullInt32(invite.CreatedByUserID),
-			InvitedAt:                invite.CreatedAt,
-			JoinedAt:                 now,
-			EnsurePersonalCalendar:   true,
-			SubscribeHolidayCalendar: true,
-		}); err != nil {
-			return nil, httpErr(apierrors.InternalUnexpected)
-		}
-		if err := tx.Commit(); err != nil {
+		if txErr != nil {
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
 

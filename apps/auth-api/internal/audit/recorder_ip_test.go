@@ -8,6 +8,7 @@ import (
 
 	"github.com/libraz/nodate-flow/apps/auth-api/internal/db/generated"
 	"github.com/libraz/nodate-flow/packages/go-shared/authn"
+	"github.com/libraz/nodate-flow/packages/go-shared/dbtype"
 )
 
 // captureResult is a no-op sql.Result for the fake DBTX.
@@ -108,18 +109,27 @@ func TestRecord_WorkspaceScopedCarriesIPAndUserAgent(t *testing.T) {
 	}
 }
 
-// TestPackIP covers the IP normalization edge cases.
-func TestPackIP(t *testing.T) {
-	if got := packIP(""); got.Valid {
-		t.Error("empty IP should yield NULL")
-	}
-	if got := packIP("bogus"); got.Valid {
-		t.Error("unparseable IP should yield NULL")
-	}
-	if got := packIP("2001:db8::1"); !got.Valid || len(got.String) != net.IPv6len {
-		t.Errorf("IPv6 should pack to 16 bytes, got valid=%v len=%d", got.Valid, len(got.String))
-	}
-	if got := packIP("10.0.0.1"); !got.Valid || len(got.String) != net.IPv6len {
-		t.Errorf("IPv4 should pack to 16 bytes, got valid=%v len=%d", got.Valid, len(got.String))
+// TestRecord_PacksClientIPForColumnWidth asserts the recorder stores the
+// shared packed form for every client, IPv6 included: the text form of a
+// global IPv6 address is far wider than VARBINARY(16) and MySQL rejects
+// the insert outright in STRICT mode. Encoding rules themselves are
+// covered by the dbtype package.
+func TestRecord_PacksClientIPForColumnWidth(t *testing.T) {
+	for _, ip := range []string{"2001:db8:85a3:8d3:1319:8a2e:370:7348", "10.0.0.1"} {
+		t.Run(ip, func(t *testing.T) {
+			fake := &captureDBTX{}
+			rec := New(generated.New(fake))
+
+			rec.Record(authn.WithClientIP(context.Background(), ip), Entry{Action: "auth.login"})
+
+			got := argNullString(t, fake.lastArgs, 6)
+			want := dbtype.NullStringFromIP(ip)
+			if got != want {
+				t.Fatalf("ip_address = %q, want the shared packed form %q", got.String, want.String)
+			}
+			if len(got.String) != net.IPv6len {
+				t.Fatalf("ip_address is %d bytes, want %d", len(got.String), net.IPv6len)
+			}
+		})
 	}
 }

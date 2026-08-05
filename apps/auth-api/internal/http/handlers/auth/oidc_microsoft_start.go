@@ -15,17 +15,16 @@ func OIDCMicrosoftStart(deps Deps) func(context.Context, *struct{}) (*OIDCStartO
 			return nil, httpErr(apierrors.AuthOidcMicrosoftNotConfigured)
 		}
 		nonce := authn.RandomHex(16)
-		state, err := deps.JWT.SignOIDCStateForProvider(nonce, "microsoft")
+		out := &OIDCStartOutput{}
+		state, err := deps.startOIDCState(ctx, out, nonce, "microsoft")
 		if err != nil {
-			return nil, httpErr(apierrors.InternalUnexpected)
+			return nil, err
 		}
 		url, err := deps.OIDCMicrosoft.AuthCodeURL(ctx, state, nonce)
 		if err != nil {
 			return nil, httpErr(apierrors.AuthOidcProviderUnreachable)
 		}
-		out := &OIDCStartOutput{}
 		out.Body.AuthorizationURL = url
-		out.Body.State = state
 		return out, nil
 	}
 }

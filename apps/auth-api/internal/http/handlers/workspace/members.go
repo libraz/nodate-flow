@@ -13,6 +13,7 @@ import (
 	"github.com/libraz/nodate-flow/apps/auth-api/internal/http/middleware"
 	"github.com/libraz/nodate-flow/packages/go-shared/apierr"
 	"github.com/libraz/nodate-flow/packages/go-shared/authn"
+	"github.com/libraz/nodate-flow/packages/go-shared/dbretry"
 	"github.com/libraz/nodate-flow/packages/go-shared/memberkit"
 )
 
@@ -109,25 +110,23 @@ func InviteMember(deps Deps) func(context.Context, *AddMemberInput) (*AddMemberO
 		// calendar layer and (if applicable) holiday subscription
 		// materialise in the same transaction as the member row.
 		now := time.Now()
-		tx, err := deps.DB.BeginTx(ctx, nil)
-		if err != nil {
-			return nil, httpErr(apierrors.InternalUnexpected)
-		}
-		defer func() { _ = tx.Rollback() }()
-
-		mkRes, err := memberkit.AddWorkspaceMember(ctx, tx, memberkit.AddWorkspaceMemberArgs{
-			WorkspaceID:              ws.ID,
-			UserID:                   userID,
-			Role:                     memberkit.Role(role),
-			InvitedByUserID:          actorID,
-			InvitedAt:                now,
-			EnsurePersonalCalendar:   true,
-			SubscribeHolidayCalendar: true,
-		})
-		if err != nil {
-			return nil, httpErr(apierrors.InternalUnexpected)
-		}
-		if err := tx.Commit(); err != nil {
+		var mkRes memberkit.AddWorkspaceMemberResult
+		if err := dbretry.InTx(ctx, deps.DB, "workspace.AddMember", nil, func(ctx context.Context, tx *sql.Tx) error {
+			res, err := memberkit.AddWorkspaceMember(ctx, tx, memberkit.AddWorkspaceMemberArgs{
+				WorkspaceID:              ws.ID,
+				UserID:                   userID,
+				Role:                     memberkit.Role(role),
+				InvitedByUserID:          actorID,
+				InvitedAt:                now,
+				EnsurePersonalCalendar:   true,
+				SubscribeHolidayCalendar: true,
+			})
+			if err != nil {
+				return err
+			}
+			mkRes = res
+			return nil
+		}); err != nil {
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
 
@@ -179,27 +178,29 @@ func UpdateMemberRole(deps Deps) func(context.Context, *UpdateMemberRoleInput) (
 			return nil, httpErr(apierr.SpecForErrNoRows(err, apierrors.WsMemberNotFound, apierrors.InternalUnexpected))
 		}
 
-		tx, err := deps.DB.BeginTx(ctx, nil)
-		if err != nil {
-			return nil, httpErr(apierrors.InternalUnexpected)
-		}
-		defer func() { _ = tx.Rollback() }()
-		if err := memberkit.UpdateMemberRole(ctx, tx, memberkit.UpdateMemberRoleArgs{
-			WorkspaceID: ws.ID,
-			UserID:      uid,
-			NewRole:     memberkit.Role(in.Body.Role),
-			ActorUserID: actorID,
+		// The closure returns memberkit's error unchanged so the mapping
+		// below stays a pure function of the error value; nothing in it
+		// depends on which attempt produced it.
+		if err := dbretry.InTx(ctx, deps.DB, "workspace.UpdateMemberRole", nil, func(ctx context.Context, tx *sql.Tx) error {
+			return memberkit.UpdateMemberRole(ctx, tx, memberkit.UpdateMemberRoleArgs{
+				WorkspaceID: ws.ID,
+				UserID:      uid,
+				NewRole:     memberkit.Role(in.Body.Role),
+				ActorUserID: actorID,
+			})
 		}); err != nil {
 			switch {
 			case errors.Is(err, memberkit.ErrSelfModify):
 				return nil, httpErr(apierrors.WsMemberSelfModify)
 			case errors.Is(err, memberkit.ErrLastOwner):
 				return nil, httpErr(apierrors.WsMemberLastOwner)
+			case errors.Is(err, memberkit.ErrRoleEscalation):
+				// The actor does not outrank the member they are acting
+				// on (an admin reaching for an owner). Same refusal the
+				// grant side already returns.
+				return nil, httpErr(apierrors.WsMemberRoleDenied)
 			}
 			return nil, httpErr(apierr.SpecForErrNoRows(err, apierrors.WsMemberNotFound, apierrors.InternalUnexpected))
-		}
-		if err := tx.Commit(); err != nil {
-			return nil, httpErr(apierrors.InternalUnexpected)
 		}
 
 		mem, err := deps.Queries.FindWorkspaceMemberByUserId(ctx, generated.FindWorkspaceMemberByUserIdParams{
@@ -237,26 +238,26 @@ func RemoveMember(deps Deps) func(context.Context, *RemoveMemberInput) (*RemoveM
 			return nil, httpErr(apierr.SpecForErrNoRows(err, apierrors.WsMemberNotFound, apierrors.InternalUnexpected))
 		}
 
-		tx, err := deps.DB.BeginTx(ctx, nil)
-		if err != nil {
-			return nil, httpErr(apierrors.InternalUnexpected)
-		}
-		defer func() { _ = tx.Rollback() }()
-		if _, err := memberkit.RemoveWorkspaceMember(ctx, tx, memberkit.RemoveWorkspaceMemberArgs{
-			WorkspaceID: ws.ID,
-			UserID:      uid,
-			ActorUserID: actorID,
+		if err := dbretry.InTx(ctx, deps.DB, "workspace.RemoveMember", nil, func(ctx context.Context, tx *sql.Tx) error {
+			_, err := memberkit.RemoveWorkspaceMember(ctx, tx, memberkit.RemoveWorkspaceMemberArgs{
+				WorkspaceID: ws.ID,
+				UserID:      uid,
+				ActorUserID: actorID,
+			})
+			return err
 		}); err != nil {
 			switch {
 			case errors.Is(err, memberkit.ErrSelfModify):
 				return nil, httpErr(apierrors.WsMemberSelfModify)
 			case errors.Is(err, memberkit.ErrLastOwner):
 				return nil, httpErr(apierrors.WsMemberLastOwner)
+			case errors.Is(err, memberkit.ErrRoleEscalation):
+				// The actor does not outrank the member they are acting
+				// on (an admin reaching for an owner). Same refusal the
+				// grant side already returns.
+				return nil, httpErr(apierrors.WsMemberRoleDenied)
 			}
 			return nil, httpErr(apierr.SpecForErrNoRows(err, apierrors.WsMemberNotFound, apierrors.InternalUnexpected))
-		}
-		if err := tx.Commit(); err != nil {
-			return nil, httpErr(apierrors.InternalUnexpected)
 		}
 
 		out := &RemoveMemberOutput{}

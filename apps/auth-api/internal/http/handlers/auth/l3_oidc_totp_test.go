@@ -40,9 +40,11 @@ func TestOIDCCallback_2FAAccountReturnsChallenge(t *testing.T) {
 		},
 	}
 
+	state, stateCookie := signedGithubState(t, &deps)
 	out, err := OIDCGithubCallback(deps)(ctx, &OIDCCallbackInput{
-		Code:  "auth-code",
-		State: signedGithubState(t, deps),
+		Code:        "auth-code",
+		State:       state,
+		StateCookie: stateCookie,
 	})
 	require.NoError(t, err, "OIDC sign-in on a 2FA account must be challenged, not 500")
 	require.NotNil(t, out)
@@ -50,7 +52,7 @@ func TestOIDCCallback_2FAAccountReturnsChallenge(t *testing.T) {
 	assert.Equal(t, "totp_required", out.Body.Step, "2FA account must be challenged")
 	assert.NotEmpty(t, out.Body.ChallengeToken, "a challenge token must be returned")
 	assert.Empty(t, out.Body.AccessToken, "no access token before the second factor")
-	assert.Empty(t, out.SetCookie.Value, "no refresh cookie before the second factor")
+	assert.Empty(t, refreshCookieFrom(out.SetCookie).Value, "no refresh cookie before the second factor")
 	assert.Equal(t, 302, out.Status, "OIDC browser callback must redirect to accounts-web")
 	assert.Contains(t, out.Location, "/oidc/complete#")
 	assert.Contains(t, out.Location, "step=totp_required")
@@ -91,9 +93,11 @@ func TestOIDCCallback_NoMFACompletesDirectly(t *testing.T) {
 		},
 	}
 
+	state, stateCookie := signedGithubState(t, &deps)
 	out, err := OIDCGithubCallback(deps)(ctx, &OIDCCallbackInput{
-		Code:  "auth-code",
-		State: signedGithubState(t, deps),
+		Code:        "auth-code",
+		State:       state,
+		StateCookie: stateCookie,
 	})
 	require.NoError(t, err)
 	require.NotNil(t, out)
@@ -101,7 +105,7 @@ func TestOIDCCallback_NoMFACompletesDirectly(t *testing.T) {
 	assert.Equal(t, "complete", out.Body.Step, "non-2FA account must complete directly")
 	assert.NotEmpty(t, out.Body.AccessToken, "tokens must be issued without a second factor")
 	assert.NotEmpty(t, out.Body.UserID)
-	assert.NotEmpty(t, out.SetCookie.Value, "refresh cookie set on completion")
+	assert.NotEmpty(t, refreshCookieFrom(out.SetCookie).Value, "refresh cookie set on completion")
 	assert.Empty(t, out.Body.ChallengeToken, "no challenge for a non-2FA account")
 	assert.Equal(t, 302, out.Status, "OIDC browser callback must redirect to accounts-web")
 	assert.Contains(t, out.Location, "/oidc/complete#step=complete")

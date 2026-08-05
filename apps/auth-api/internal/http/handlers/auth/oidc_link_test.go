@@ -3,6 +3,7 @@ package auth
 import (
 	"context"
 	"database/sql"
+	"net/http"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -10,6 +11,7 @@ import (
 
 	internauth "github.com/libraz/nodate-flow/apps/auth-api/internal/auth"
 	"github.com/libraz/nodate-flow/apps/auth-api/internal/db/types"
+	"github.com/libraz/nodate-flow/packages/go-shared/authn"
 )
 
 // countUsersByEmail returns how many users rows hold the given email,
@@ -39,21 +41,48 @@ func findIdentityUserID(t *testing.T, db *sql.DB, provider, subject string) (uin
 	return uid, true
 }
 
-// signedGithubState mints a valid signed OIDC state JWT for the GitHub
-// provider so the callback's CSRF guard passes in tests.
-func signedGithubState(t *testing.T, deps Deps) string {
+// boundOIDCState puts deps in the state a real /start call would leave
+// behind and returns what the browser carries back: the state parameter
+// in the URL plus the verifier cookie. Both halves are required at the
+// callback, so tests that skip either one exercise the rejection path.
+func boundOIDCState(t *testing.T, deps *Deps, provider, nonce string) (string, http.Cookie) {
 	t.Helper()
-	state, err := deps.JWT.SignOIDCStateForProvider("nonce-value", "github")
+	if deps.SingleUse == nil {
+		deps.SingleUse = authn.NewMemorySingleUseStore()
+	}
+	binding, err := deps.JWT.NewOIDCStateBinding(nonce, provider)
 	require.NoError(t, err)
-	return state
+	return binding.State, oidcVerifierCookie(binding.CookieValue)
 }
 
-// signedMicrosoftState mints a valid signed OIDC state JWT for Microsoft.
-func signedMicrosoftState(t *testing.T, deps Deps) string {
+// oidcVerifierCookie wraps a verifier the way Huma hands a request
+// cookie to the handler.
+func oidcVerifierCookie(value string) http.Cookie {
+	return http.Cookie{Name: oidcStateCookieName, Value: value}
+}
+
+// refreshCookieFrom picks the refresh cookie out of a callback's
+// Set-Cookie list. The list also carries the eviction of the state
+// verifier, so tests must not assume a single entry.
+func refreshCookieFrom(cookies []http.Cookie) http.Cookie {
+	for _, c := range cookies {
+		if c.Name == refreshCookieName {
+			return c
+		}
+	}
+	return http.Cookie{}
+}
+
+// signedGithubState mints a bound state + cookie pair for GitHub.
+func signedGithubState(t *testing.T, deps *Deps) (string, http.Cookie) {
 	t.Helper()
-	state, err := deps.JWT.SignOIDCStateForProvider("nonce-value", "microsoft")
-	require.NoError(t, err)
-	return state
+	return boundOIDCState(t, deps, "github", "nonce-value")
+}
+
+// signedMicrosoftState mints a bound state + cookie pair for Microsoft.
+func signedMicrosoftState(t *testing.T, deps *Deps) (string, http.Cookie) {
+	t.Helper()
+	return boundOIDCState(t, deps, "microsoft", "nonce-value")
 }
 
 // TestOIDCGithubCallback_LinksExistingPasswordAccount proves the fix for
@@ -80,14 +109,16 @@ func TestOIDCGithubCallback_LinksExistingPasswordAccount(t *testing.T) {
 		},
 	}
 
+	state, stateCookie := signedGithubState(t, &deps)
 	out, err := OIDCGithubCallback(deps)(context.Background(), &OIDCCallbackInput{
-		Code:  "auth-code",
-		State: signedGithubState(t, deps),
+		Code:        "auth-code",
+		State:       state,
+		StateCookie: stateCookie,
 	})
 	require.NoError(t, err, "same-email GitHub sign-in must link, not 500")
 	require.NotNil(t, out)
 	assert.NotEmpty(t, out.Body.AccessToken, "linked sign-in must issue an access token")
-	assert.NotEmpty(t, out.SetCookie.Value, "linked sign-in must set a refresh cookie")
+	assert.NotEmpty(t, refreshCookieFrom(out.SetCookie).Value, "linked sign-in must set a refresh cookie")
 
 	// The GitHub identity must now point at the SAME pre-existing user.
 	linkedUID, ok := findIdentityUserID(t, db, "github", ghSub)
@@ -131,9 +162,11 @@ func TestOIDCMicrosoftCallback_DoesNotAutoLinkExistingPasswordAccount(t *testing
 		},
 	}
 
+	state, stateCookie := signedMicrosoftState(t, &deps)
 	out, err := OIDCMicrosoftCallback(deps)(context.Background(), &OIDCCallbackInput{
-		Code:  "auth-code",
-		State: signedMicrosoftState(t, deps),
+		Code:        "auth-code",
+		State:       state,
+		StateCookie: stateCookie,
 	})
 	require.Error(t, err, "same-email Microsoft sign-in must not auto-link")
 	assert.Nil(t, out)
@@ -166,9 +199,11 @@ func TestOIDCLink_LinkingNotGatedByRegistrationOpen(t *testing.T) {
 		},
 	}
 
+	state, stateCookie := signedGithubState(t, &deps)
 	out, err := OIDCGithubCallback(deps)(context.Background(), &OIDCCallbackInput{
-		Code:  "auth-code",
-		State: signedGithubState(t, deps),
+		Code:        "auth-code",
+		State:       state,
+		StateCookie: stateCookie,
 	})
 	require.NoError(t, err, "linking onto an existing account is login, not registration")
 	assert.NotEmpty(t, out.Body.AccessToken)
@@ -202,9 +237,11 @@ func TestOIDCGithubCallback_BrandNewEmailStillRegisters(t *testing.T) {
 		},
 	}
 
+	state, stateCookie := signedGithubState(t, &deps)
 	out, err := OIDCGithubCallback(deps)(context.Background(), &OIDCCallbackInput{
-		Code:  "auth-code",
-		State: signedGithubState(t, deps),
+		Code:        "auth-code",
+		State:       state,
+		StateCookie: stateCookie,
 	})
 	require.NoError(t, err, "brand-new email must register")
 	assert.NotEmpty(t, out.Body.AccessToken)

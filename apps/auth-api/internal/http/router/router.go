@@ -39,12 +39,15 @@ type Deps struct {
 	OIDCMicrosoft             *auth.MicrosoftOIDCClient
 	MicrosoftAllowedTenantIDs []string
 	Sessions                  sessionstore.Store
-	Cipher                    *crypto.Cipher
-	CookieSecure              bool
-	RegistrationOpen          bool
-	MinPasswordLength         int
-	DisableRateLimit          bool
-	TrustedProxyHops          int
+	// SingleUse records redeemed one-time token identifiers. Nil selects
+	// the in-process default, which is correct for a single replica.
+	SingleUse         authn.SingleUseStore
+	Cipher            *crypto.Cipher
+	CookieSecure      bool
+	RegistrationOpen  bool
+	MinPasswordLength int
+	DisableRateLimit  bool
+	TrustedProxyHops  int
 
 	// OAuthAllowedDomains / OAuthAllowedEmails carry the opt-in OAuth/OIDC
 	// sign-in allowlist (normalized in config.Load). Empty (both) means
@@ -143,8 +146,18 @@ func BuildResult(deps Deps) Result {
 	if sessionStore == nil {
 		sessionStore = sessadapter.NewMySQLStore(deps.DB, deps.Queries)
 	}
+	// One-time token identifiers (today the OIDC state jti) are recorded
+	// here so a token cannot be redeemed twice inside its lifetime. The
+	// in-process default is atomic within a replica; a deployment that
+	// runs several auth-api replicas needs a shared implementation of
+	// authn.SingleUseStore injected through Deps.
+	singleUse := deps.SingleUse
+	if singleUse == nil {
+		singleUse = authn.NewMemorySingleUseStore()
+	}
 	auditRec := audit.New(deps.Queries)
 	authDeps := authhandlers.Deps{
+		SingleUse:                 singleUse,
 		DB:                        deps.DB,
 		Queries:                   deps.Queries,
 		Sessions:                  sessionStore,

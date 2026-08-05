@@ -21,17 +21,13 @@ func OIDCGithubStart(deps Deps) func(context.Context, *struct{}) (*OIDCStartOutp
 		if deps.OIDCGithub == nil {
 			return nil, httpErr(apierrors.AuthOidcGithubNotConfigured)
 		}
-		state, err := deps.JWT.SignOIDCStateForProvider(authn.RandomHex(16), "github")
-		if err != nil {
-			slog.ErrorContext(ctx, "oidc github start: failed to sign state",
-				slog.String("err", err.Error()))
-			return nil, httpErr(apierrors.InternalUnexpected)
-		}
-		url := deps.OIDCGithub.AuthCodeURL(state)
-		slog.DebugContext(ctx, "oidc github start: authorization url issued")
 		out := &OIDCStartOutput{}
-		out.Body.AuthorizationURL = url
-		out.Body.State = state
+		state, err := deps.startOIDCState(ctx, out, authn.RandomHex(16), "github")
+		if err != nil {
+			return nil, err
+		}
+		out.Body.AuthorizationURL = deps.OIDCGithub.AuthCodeURL(state)
+		slog.DebugContext(ctx, "oidc github start: authorization url issued")
 		return out, nil
 	}
 }

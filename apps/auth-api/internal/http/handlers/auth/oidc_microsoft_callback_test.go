@@ -50,9 +50,6 @@ func TestOIDCMicrosoftCallback_AcceptsXmsEdovWithoutEmailVerified(t *testing.T) 
 	jwt, err := internauth.NewJWTIssuer(nil, "iss", "aud", time.Minute)
 	require.NoError(t, err)
 
-	state, err := jwt.SignOIDCStateForProvider("nonce-value", "microsoft")
-	require.NoError(t, err)
-
 	ms := &fakeMicrosoftExchanger{
 		claims: &internauth.MicrosoftClaims{
 			Sub:                      "ms-subject-id",
@@ -69,13 +66,18 @@ func TestOIDCMicrosoftCallback_AcceptsXmsEdovWithoutEmailVerified(t *testing.T) 
 		MicrosoftAllowedTenantIDs: []string{testMicrosoftTenantID},
 		Audit:                     audit.NoopSink{},
 	}
+	state, stateCookie := signedMicrosoftState(t, &deps)
 	handler := OIDCMicrosoftCallback(deps)
 	defer func() {
 		if r := recover(); r == nil {
 			t.Fatal("expected nil-Queries to panic after Microsoft claim validation")
 		}
 	}()
-	_, _ = handler(context.Background(), &OIDCCallbackInput{Code: "auth-code", State: state})
+	_, _ = handler(context.Background(), &OIDCCallbackInput{
+		Code:        "auth-code",
+		State:       state,
+		StateCookie: stateCookie,
+	})
 }
 
 // TestOIDCMicrosoftCallback_AcceptsVerifiedEmailWithoutDB stops short
@@ -86,9 +88,6 @@ func TestOIDCMicrosoftCallback_AcceptsVerifiedEmailWithoutDB(t *testing.T) {
 	t.Parallel()
 	jwt, err := internauth.NewJWTIssuer(nil, "iss", "aud", time.Minute)
 	require.NoError(t, err)
-	state, err := jwt.SignOIDCStateForProvider("nonce-value", "microsoft")
-	require.NoError(t, err)
-
 	ms := &fakeMicrosoftExchanger{
 		claims: &internauth.MicrosoftClaims{
 			Sub:                      "ms-subject-id",
@@ -108,13 +107,18 @@ func TestOIDCMicrosoftCallback_AcceptsVerifiedEmailWithoutDB(t *testing.T) {
 		// FindIdentityByProviderSubject call. That's the assertion: we
 		// got past Microsoft claim validation without being short-circuited.
 	}
+	state, stateCookie := signedMicrosoftState(t, &deps)
 	handler := OIDCMicrosoftCallback(deps)
 	defer func() {
 		if r := recover(); r == nil {
 			t.Fatal("expected nil-Queries to panic past the email_verified gate")
 		}
 	}()
-	_, _ = handler(context.Background(), &OIDCCallbackInput{Code: "auth-code", State: state})
+	_, _ = handler(context.Background(), &OIDCCallbackInput{
+		Code:        "auth-code",
+		State:       state,
+		StateCookie: stateCookie,
+	})
 }
 
 // TestOIDCMicrosoftCallback_RejectsBadState asserts state validation
@@ -132,8 +136,13 @@ func TestOIDCMicrosoftCallback_RejectsBadState(t *testing.T) {
 		OIDCMicrosoft: ms,
 		Audit:         audit.NoopSink{},
 	}
+	_, stateCookie := signedMicrosoftState(t, &deps)
 	handler := OIDCMicrosoftCallback(deps)
-	_, err = handler(context.Background(), &OIDCCallbackInput{Code: "c", State: "garbage"})
+	_, err = handler(context.Background(), &OIDCCallbackInput{
+		Code:        "c",
+		State:       "garbage",
+		StateCookie: stateCookie,
+	})
 	require.Error(t, err)
 	assert.Empty(t, ms.gotCode, "Exchange must not run when state verification fails")
 }
@@ -149,9 +158,6 @@ func TestOIDCMicrosoftCallback_SurfacesProviderRejection(t *testing.T) {
 	t.Parallel()
 	jwt, err := internauth.NewJWTIssuer(nil, "iss", "aud", time.Minute)
 	require.NoError(t, err)
-	state, err := jwt.SignOIDCStateForProvider("nonce-value", "microsoft")
-	require.NoError(t, err)
-
 	ms := &fakeMicrosoftExchanger{}
 	deps := Deps{
 		JWT:                       jwt,
@@ -159,9 +165,11 @@ func TestOIDCMicrosoftCallback_SurfacesProviderRejection(t *testing.T) {
 		MicrosoftAllowedTenantIDs: []string{testMicrosoftTenantID},
 		Audit:                     audit.NoopSink{},
 	}
+	state, stateCookie := signedMicrosoftState(t, &deps)
 	handler := OIDCMicrosoftCallback(deps)
 	_, err = handler(context.Background(), &OIDCCallbackInput{
 		State:            state,
+		StateCookie:      stateCookie,
 		Error:            "invalid_scope",
 		ErrorDescription: "scope rejected",
 	})
@@ -186,9 +194,6 @@ func TestOIDCMicrosoftCallback_PreferredUsernameFallback(t *testing.T) {
 	t.Parallel()
 	jwt, err := internauth.NewJWTIssuer(nil, "iss", "aud", time.Minute)
 	require.NoError(t, err)
-	state, err := jwt.SignOIDCStateForProvider("nonce-value", "microsoft")
-	require.NoError(t, err)
-
 	ms := &fakeMicrosoftExchanger{
 		claims: &internauth.MicrosoftClaims{
 			Sub:                      "ms-subject-id",
@@ -206,6 +211,7 @@ func TestOIDCMicrosoftCallback_PreferredUsernameFallback(t *testing.T) {
 		MicrosoftAllowedTenantIDs: []string{testMicrosoftTenantID},
 		Audit:                     audit.NoopSink{},
 	}
+	state, stateCookie := signedMicrosoftState(t, &deps)
 	handler := OIDCMicrosoftCallback(deps)
 	defer func() {
 		// Past the email-derivation step the handler dereferences
@@ -214,16 +220,17 @@ func TestOIDCMicrosoftCallback_PreferredUsernameFallback(t *testing.T) {
 		// email substituted in.
 		_ = recover()
 	}()
-	_, _ = handler(context.Background(), &OIDCCallbackInput{Code: "c", State: state})
+	_, _ = handler(context.Background(), &OIDCCallbackInput{
+		Code:        "c",
+		State:       state,
+		StateCookie: stateCookie,
+	})
 }
 
 func TestOIDCMicrosoftCallback_RejectsUnlistedTenant(t *testing.T) {
 	t.Parallel()
 	jwt, err := internauth.NewJWTIssuer(nil, "iss", "aud", time.Minute)
 	require.NoError(t, err)
-	state, err := jwt.SignOIDCStateForProvider("nonce-value", "microsoft")
-	require.NoError(t, err)
-
 	ms := &fakeMicrosoftExchanger{
 		claims: &internauth.MicrosoftClaims{
 			Sub:                      "ms-subject-id",
@@ -240,8 +247,13 @@ func TestOIDCMicrosoftCallback_RejectsUnlistedTenant(t *testing.T) {
 		MicrosoftAllowedTenantIDs: []string{testMicrosoftTenantID},
 		Audit:                     audit.NoopSink{},
 	}
+	state, stateCookie := signedMicrosoftState(t, &deps)
 	handler := OIDCMicrosoftCallback(deps)
-	_, err = handler(context.Background(), &OIDCCallbackInput{Code: "auth-code", State: state})
+	_, err = handler(context.Background(), &OIDCCallbackInput{
+		Code:        "auth-code",
+		State:       state,
+		StateCookie: stateCookie,
+	})
 	require.Error(t, err)
 
 	var problem *handlerutil.ProblemDetails
@@ -253,9 +265,6 @@ func TestOIDCMicrosoftCallback_RejectsMissingXmsEdov(t *testing.T) {
 	t.Parallel()
 	jwt, err := internauth.NewJWTIssuer(nil, "iss", "aud", time.Minute)
 	require.NoError(t, err)
-	state, err := jwt.SignOIDCStateForProvider("nonce-value", "microsoft")
-	require.NoError(t, err)
-
 	ms := &fakeMicrosoftExchanger{
 		claims: &internauth.MicrosoftClaims{
 			Sub:           "ms-subject-id",
@@ -271,8 +280,13 @@ func TestOIDCMicrosoftCallback_RejectsMissingXmsEdov(t *testing.T) {
 		MicrosoftAllowedTenantIDs: []string{testMicrosoftTenantID},
 		Audit:                     audit.NoopSink{},
 	}
+	state, stateCookie := signedMicrosoftState(t, &deps)
 	handler := OIDCMicrosoftCallback(deps)
-	_, err = handler(context.Background(), &OIDCCallbackInput{Code: "auth-code", State: state})
+	_, err = handler(context.Background(), &OIDCCallbackInput{
+		Code:        "auth-code",
+		State:       state,
+		StateCookie: stateCookie,
+	})
 	require.Error(t, err)
 
 	var problem *handlerutil.ProblemDetails

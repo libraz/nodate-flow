@@ -12,6 +12,7 @@ import (
 	"github.com/libraz/nodate-flow/apps/auth-api/internal/db/types"
 	apierrors "github.com/libraz/nodate-flow/apps/auth-api/internal/errors"
 	"github.com/libraz/nodate-flow/packages/go-shared/authn"
+	"github.com/libraz/nodate-flow/packages/go-shared/dbretry"
 	"github.com/libraz/nodate-flow/packages/go-shared/memberkit"
 	"github.com/libraz/nodate-flow/packages/go-shared/region"
 )
@@ -50,38 +51,41 @@ func Create(deps Deps) func(context.Context, *CreateWorkspaceInput) (*CreateWork
 		desc := sql.NullString{String: in.Body.Description, Valid: in.Body.Description != ""}
 		icon := sql.NullString{String: in.Body.IconURL, Valid: in.Body.IconURL != ""}
 
-		tx, err := deps.DB.BeginTx(ctx, nil)
-		if err != nil {
-			return nil, httpErr(apierrors.InternalUnexpected)
-		}
-		defer func() { _ = tx.Rollback() }()
-		txQueries := deps.Queries.WithTx(tx)
-
-		wsID, err := txQueries.CreateWorkspace(ctx, generated.CreateWorkspaceParams{
-			PublicID:    pub,
-			Slug:        slug,
-			Name:        in.Body.Name,
-			Description: desc,
-			IconUrl:     icon,
-			Timezone:    tz,
-			Country:     sql.NullString{String: country, Valid: country != ""},
+		// Retry the whole transaction on a deadlock. Creating a
+		// workspace inserts the row, its owner membership, a personal
+		// calendar layer and the holiday subscription in one go, so it
+		// touches enough shared parents to lose a lock race under load —
+		// and this is the first thing a new user does. A transient 1213
+		// must not surface as a permanent 500 on the onboarding step.
+		var wsID int64
+		txErr := dbretry.InTx(ctx, deps.DB, "workspace.Create", nil, func(ctx context.Context, tx *sql.Tx) error {
+			id, err := deps.Queries.WithTx(tx).CreateWorkspace(ctx, generated.CreateWorkspaceParams{
+				PublicID:    pub,
+				Slug:        slug,
+				Name:        in.Body.Name,
+				Description: desc,
+				IconUrl:     icon,
+				Timezone:    tz,
+				Country:     sql.NullString{String: country, Valid: country != ""},
+			})
+			if err != nil {
+				return err
+			}
+			wsID = id
+			// Add the creator as owner through memberkit so their
+			// personal calendar layer materialises in the same tx.
+			if _, err := memberkit.AddWorkspaceMember(ctx, tx, memberkit.AddWorkspaceMemberArgs{
+				WorkspaceID:              uint32(id), //#nosec G115 -- LastInsertId for workspaces.id (BIGINT UNSIGNED), fits uint32 within realistic deployments
+				UserID:                   uid,
+				Role:                     memberkit.RoleOwner,
+				EnsurePersonalCalendar:   true,
+				SubscribeHolidayCalendar: country != "",
+			}); err != nil {
+				return err
+			}
+			return nil
 		})
-		if err != nil {
-			return nil, httpErr(apierrors.InternalUnexpected)
-		}
-
-		// Add the creator as owner through memberkit so their
-		// personal calendar layer materialises in the same tx.
-		if _, err := memberkit.AddWorkspaceMember(ctx, tx, memberkit.AddWorkspaceMemberArgs{
-			WorkspaceID:              uint32(wsID), //#nosec G115 -- LastInsertId for workspaces.id (BIGINT UNSIGNED), fits uint32 within realistic deployments
-			UserID:                   uid,
-			Role:                     memberkit.RoleOwner,
-			EnsurePersonalCalendar:   true,
-			SubscribeHolidayCalendar: country != "",
-		}); err != nil {
-			return nil, httpErr(apierrors.InternalUnexpected)
-		}
-		if err := tx.Commit(); err != nil {
+		if txErr != nil {
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
 

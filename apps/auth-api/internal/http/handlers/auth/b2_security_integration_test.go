@@ -18,6 +18,7 @@ import (
 	"github.com/libraz/nodate-flow/apps/auth-api/internal/db/types"
 	apierrors "github.com/libraz/nodate-flow/apps/auth-api/internal/errors"
 	"github.com/libraz/nodate-flow/apps/auth-api/internal/http/handlers/handlerutil"
+	"github.com/libraz/nodate-flow/packages/go-shared/authn"
 	"github.com/libraz/nodate-flow/packages/go-shared/crypto"
 	"github.com/libraz/nodate-flow/packages/go-shared/testhelpers"
 )
@@ -66,12 +67,13 @@ func b2Deps(t *testing.T, db *sql.DB) (Deps, *captureSink) {
 	require.NoError(t, err)
 	sink := &captureSink{}
 	return Deps{
-		DB:       db,
-		Queries:  q,
-		Sessions: sessadapter.NewMySQLStore(db, q),
-		JWT:      jwt,
-		Cipher:   b2TestCipher(t),
-		Audit:    sink,
+		DB:        db,
+		Queries:   q,
+		Sessions:  sessadapter.NewMySQLStore(db, q),
+		JWT:       jwt,
+		Cipher:    b2TestCipher(t),
+		Audit:     sink,
+		SingleUse: authn.NewMemorySingleUseStore(),
 	}, sink
 }
 
