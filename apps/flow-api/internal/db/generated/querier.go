@@ -167,6 +167,11 @@ type Querier interface {
 	// Verify that a user is an enabled member of a workspace. Returns 1 if
 	// the membership exists, sql.ErrNoRows otherwise.
 	CheckWorkspaceMemberExists(ctx context.Context, arg CheckWorkspaceMemberExistsParams) (int32, error)
+	// Take ownership of one pending job. The status column is the claim: the
+	// update matches only while the row is still pending, so exactly one
+	// replica can move it to running. Callers MUST treat a zero row count as
+	// "someone else got it" and move on.
+	ClaimImportJob(ctx context.Context, id uint32) (int64, error)
 	// Pick the oldest pending run and mark it claimed in the same tx.
 	// Callers wrap this in BEGIN / COMMIT; SELECT ... FOR UPDATE SKIP LOCKED
 	// lets multiple workers race for rows without contention.
@@ -250,6 +255,9 @@ type Querier interface {
 	CountAiSuggestionOutcomesForWorkspace(ctx context.Context, arg CountAiSuggestionOutcomesForWorkspaceParams) (CountAiSuggestionOutcomesForWorkspaceRow, error)
 	// Count enabled child pages for a given parent. Used to check before deletion.
 	CountChildPages(ctx context.Context, arg CountChildPagesParams) (int64, error)
+	// Progress counters as the worker last published them, for callers that
+	// need the finished totals without re-reading the whole row.
+	CountImportedTasksForJob(ctx context.Context, id uint32) (CountImportedTasksForJobRow, error)
 	// Count total and completed tasks in a timebox for progress tracking.
 	CountTasksForTimebox(ctx context.Context, arg CountTasksForTimeboxParams) (CountTasksForTimeboxRow, error)
 	// Count unread notifications for a user across all workspaces.
@@ -463,6 +471,11 @@ type Querier interface {
 	// Mark a constraint as currently failing. Clears satisfied_at so the
 	// transition is visible in v_task_constraint_satisfaction.
 	FailConstraint(ctx context.Context, arg FailConstraintParams) error
+	// Reap jobs left running by a worker that died mid-import. Without this
+	// the row keeps its running status forever, which is the same "never
+	// finishes" the queue exists to avoid. The cutoff is supplied by the
+	// caller so the timeout stays configurable.
+	FailStuckImportJobs(ctx context.Context, arg FailStuckImportJobsParams) (int64, error)
 	// Lookup the single active (task, event, relation) tuple. Used by
 	// itemkit to detect duplicates before attempting to insert.
 	FindActiveLink(ctx context.Context, arg FindActiveLinkParams) (FindActiveLinkRow, error)
@@ -510,6 +523,9 @@ type Querier interface {
 	FindIdentityByProviderSubject(ctx context.Context, arg FindIdentityByProviderSubjectParams) (FindIdentityByProviderSubjectRow, error)
 	// Find a single import job by public id.
 	FindImportJobByPublicId(ctx context.Context, arg FindImportJobByPublicIdParams) (FindImportJobByPublicIdRow, error)
+	// Read the current status of a claimed job. The worker calls this while
+	// it works so a cancellation issued through the API stops the run.
+	FindImportJobStatusByID(ctx context.Context, id uint32) (ImportJobsStatus, error)
 	// Find a single intake item by public id.
 	FindIntakeItemByPublicId(ctx context.Context, arg FindIntakeItemByPublicIdParams) (FindIntakeItemByPublicIdRow, error)
 	// Resolve a label by its UUID v7 within a workspace.
@@ -668,6 +684,10 @@ type Querier interface {
 	// Fetch just the timezone and country columns by internal id. Used by the
 	// calendar layer when resolving the effective timezone for a request.
 	FindWorkspaceTimezoneCountryById(ctx context.Context, id uint32) (FindWorkspaceTimezoneCountryByIdRow, error)
+	// Move a claimed job to a terminal state and stamp the final counters.
+	// Restricted to 'running' so a job cancelled mid-flight keeps the
+	// cancelled status the API gave it.
+	FinishImportJob(ctx context.Context, arg FinishImportJobParams) error
 	// Fetch the minimal fields an agent runner needs to invoke an LLM.
 	GetAgentForExec(ctx context.Context, arg GetAgentForExecParams) (GetAgentForExecRow, error)
 	// Fetch the minimal fields the agent guard needs to make an allow/deny
@@ -1053,6 +1073,13 @@ type Querier interface {
 	// List import jobs for a workspace with total count.
 	ListImportJobsForWorkspace(ctx context.Context, arg ListImportJobsForWorkspaceParams) ([]ListImportJobsForWorkspaceRow, error)
 	// List a workspace's inbox via v_inbox.
+	//
+	// The signal is the row; the task it points at is a separate thing the
+	// reader may or may not be allowed to see. So the item stays and the
+	// task columns are blanked rather than the row being dropped: a signal
+	// arriving is not the task's secret, its title is. Dropping the row
+	// would also make the inbox silently lose items whose linkage the
+	// reader cannot follow, which reads as data loss rather than privacy.
 	ListInbox(ctx context.Context, arg ListInboxParams) ([]ListInboxRow, error)
 	// List inbox items across every workspace the actor is an active member of.
 	ListInboxForUser(ctx context.Context, arg ListInboxForUserParams) ([]ListInboxForUserRow, error)
@@ -1192,6 +1219,10 @@ type Querier interface {
 	// ai.suggestion.applied / ai.suggestion.dismissed event for the same
 	// inbox_item_id (compared via JSON_EXTRACT on payload_json).
 	ListPendingAiSuggestions(ctx context.Context, workspaceID uint32) ([]ListPendingAiSuggestionsRow, error)
+	// The worker's claim candidates, oldest first. Claiming is a separate
+	// conditional UPDATE, so this read takes no locks: a row listed here may
+	// already have been taken by another replica by the time it is claimed.
+	ListPendingImportJobs(ctx context.Context, limit int32) ([]ListPendingImportJobsRow, error)
 	// List pending suggestions where a task is either the source or target.
 	// Joins tasks for human-readable titles and public IDs.
 	ListPendingSuggestionsForTask(ctx context.Context, arg ListPendingSuggestionsForTaskParams) ([]ListPendingSuggestionsForTaskRow, error)
@@ -1463,6 +1494,8 @@ type Querier interface {
 	// Housekeeping: drop succeeded / failed rows older than the cutoff so
 	// the table does not grow unbounded. Run from a cron or a startup task.
 	PurgeFinishedAgentRuns(ctx context.Context, finishedAt sql.NullTime) error
+	// Publish the running counters so the polling UI can show movement.
+	RecordImportJobProgress(ctx context.Context, arg RecordImportJobProgressParams) error
 	// Insert a new global user account. The caller supplies a UUID v7 public_id.
 	RegisterUser(ctx context.Context, arg RegisterUserParams) (int64, error)
 	// Soft-remove an actor from a task.

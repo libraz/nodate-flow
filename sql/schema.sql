@@ -3218,6 +3218,15 @@ SELECT
   s.public_id,
   t.public_id AS task_public_id,
   t.title AS task_title,
+  -- The task's own ACL columns ride along so a consumer can apply the
+  -- Layer 4 visibility rule. The view cannot apply it itself: it takes
+  -- no parameters, and the answer depends on who is reading. Exposing
+  -- the inputs here is what lets every consumer reach the same verdict
+  -- instead of each inventing one.
+  t.visibility AS task_visibility,
+  t.project_id AS task_project_id,
+  t.created_by_user_id AS task_created_by_user_id,
+  t.id AS task_internal_id,
   s.source,
   s.kind,
   s.external_id,

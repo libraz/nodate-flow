@@ -1823,14 +1823,38 @@ SELECT
   COUNT(*) OVER() AS total
 FROM v_task_list v
 WHERE v.workspace_id = ?
+  AND (
+    CAST(? AS SIGNED) = 1
+    OR v.visibility = 'public'
+    OR (v.visibility = 'project' AND EXISTS (
+      SELECT 1 FROM project_members pm_vis
+      WHERE pm_vis.project_id = v.project_id
+        AND pm_vis.user_id = CAST(? AS UNSIGNED)
+        AND pm_vis.enabled = TRUE
+    ))
+    OR (v.visibility = 'private' AND (
+      v.created_by_user_id = CAST(? AS UNSIGNED)
+      OR EXISTS (
+        SELECT 1 FROM task_actors ta_vis
+        INNER JOIN tasks tv ON tv.id = ta_vis.task_id AND tv.public_id = v.public_id
+        WHERE ta_vis.kind = 'user'
+          AND ta_vis.user_id = CAST(? AS UNSIGNED)
+          AND ta_vis.enabled = TRUE
+      )
+    ))
+  )
 ORDER BY v.sort_weight ASC, v.priority DESC, v.due_on ASC, v.created_at DESC, v.public_id DESC
 LIMIT ? OFFSET ?
 `
 
 type ListTasksForWorkspaceParams struct {
-	WorkspaceID uint32 `json:"-"`
-	Limit       int32  `json:"limit"`
-	Offset      int32  `json:"offset"`
+	WorkspaceID   uint32 `json:"-"`
+	IsElevated    int64  `json:"isElevated"`
+	ActorUserID   int64  `json:"actorUserId"`
+	ActorUserID_2 int64  `json:"actorUserId2"`
+	ActorUserID_3 int64  `json:"actorUserId3"`
+	Limit         int32  `json:"limit"`
+	Offset        int32  `json:"offset"`
 }
 
 type ListTasksForWorkspaceRow struct {
@@ -1859,7 +1883,15 @@ type ListTasksForWorkspaceRow struct {
 
 // List tasks across an entire workspace via v_task_list.
 func (q *Queries) ListTasksForWorkspace(ctx context.Context, arg ListTasksForWorkspaceParams) ([]ListTasksForWorkspaceRow, error) {
-	rows, err := q.db.QueryContext(ctx, listTasksForWorkspace, arg.WorkspaceID, arg.Limit, arg.Offset)
+	rows, err := q.db.QueryContext(ctx, listTasksForWorkspace,
+		arg.WorkspaceID,
+		arg.IsElevated,
+		arg.ActorUserID,
+		arg.ActorUserID_2,
+		arg.ActorUserID_3,
+		arg.Limit,
+		arg.Offset,
+	)
 	if err != nil {
 		return nil, err
 	}

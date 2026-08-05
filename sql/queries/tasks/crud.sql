@@ -155,7 +155,27 @@ SELECT
   v.assignee_count,
   COUNT(*) OVER() AS total
 FROM v_task_list v
-WHERE v.workspace_id = ?
+WHERE v.workspace_id = sqlc.arg('workspace_id')
+  AND (
+    CAST(sqlc.arg('is_elevated') AS SIGNED) = 1
+    OR v.visibility = 'public'
+    OR (v.visibility = 'project' AND EXISTS (
+      SELECT 1 FROM project_members pm_vis
+      WHERE pm_vis.project_id = v.project_id
+        AND pm_vis.user_id = CAST(sqlc.arg('actor_user_id') AS UNSIGNED)
+        AND pm_vis.enabled = TRUE
+    ))
+    OR (v.visibility = 'private' AND (
+      v.created_by_user_id = CAST(sqlc.arg('actor_user_id') AS UNSIGNED)
+      OR EXISTS (
+        SELECT 1 FROM task_actors ta_vis
+        INNER JOIN tasks tv ON tv.id = ta_vis.task_id AND tv.public_id = v.public_id
+        WHERE ta_vis.kind = 'user'
+          AND ta_vis.user_id = CAST(sqlc.arg('actor_user_id') AS UNSIGNED)
+          AND ta_vis.enabled = TRUE
+      )
+    ))
+  )
 ORDER BY v.sort_weight ASC, v.priority DESC, v.due_on ASC, v.created_at DESC, v.public_id DESC
 LIMIT ? OFFSET ?;
 

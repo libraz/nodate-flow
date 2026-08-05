@@ -34,6 +34,49 @@ func (q *Queries) CancelImportJob(ctx context.Context, arg CancelImportJobParams
 	return err
 }
 
+const claimImportJob = `-- name: ClaimImportJob :execrows
+UPDATE import_jobs
+SET status     = 'running',
+    started_at = NOW(3)
+WHERE id = ?
+  AND status = 'pending'
+  AND enabled = TRUE
+`
+
+// Take ownership of one pending job. The status column is the claim: the
+// update matches only while the row is still pending, so exactly one
+// replica can move it to running. Callers MUST treat a zero row count as
+// "someone else got it" and move on.
+func (q *Queries) ClaimImportJob(ctx context.Context, id uint32) (int64, error) {
+	result, err := q.db.ExecContext(ctx, claimImportJob, id)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
+}
+
+const countImportedTasksForJob = `-- name: CountImportedTasksForJob :one
+SELECT ij.total_items, ij.processed_items, ij.failed_items
+FROM import_jobs ij
+WHERE ij.id = ?
+  AND ij.enabled = TRUE
+`
+
+type CountImportedTasksForJobRow struct {
+	TotalItems     uint32 `json:"totalItems"`
+	ProcessedItems uint32 `json:"processedItems"`
+	FailedItems    uint32 `json:"failedItems"`
+}
+
+// Progress counters as the worker last published them, for callers that
+// need the finished totals without re-reading the whole row.
+func (q *Queries) CountImportedTasksForJob(ctx context.Context, id uint32) (CountImportedTasksForJobRow, error) {
+	row := q.db.QueryRowContext(ctx, countImportedTasksForJob, id)
+	var i CountImportedTasksForJobRow
+	err := row.Scan(&i.TotalItems, &i.ProcessedItems, &i.FailedItems)
+	return i, err
+}
+
 const createImportJob = `-- name: CreateImportJob :execlastid
 INSERT INTO import_jobs (
   public_id, workspace_id, project_id, initiated_by_user_id, source, config_json
@@ -63,6 +106,34 @@ func (q *Queries) CreateImportJob(ctx context.Context, arg CreateImportJobParams
 		return 0, err
 	}
 	return result.LastInsertId()
+}
+
+const failStuckImportJobs = `-- name: FailStuckImportJobs :execrows
+UPDATE import_jobs
+SET status       = 'failed',
+    error_log    = ?,
+    completed_at = NOW(3)
+WHERE status = 'running'
+  AND started_at IS NOT NULL
+  AND started_at < ?
+  AND enabled = TRUE
+`
+
+type FailStuckImportJobsParams struct {
+	ErrorLog  sql.NullString `json:"errorLog"`
+	StartedAt sql.NullTime   `json:"startedAt"`
+}
+
+// Reap jobs left running by a worker that died mid-import. Without this
+// the row keeps its running status forever, which is the same "never
+// finishes" the queue exists to avoid. The cutoff is supplied by the
+// caller so the timeout stays configurable.
+func (q *Queries) FailStuckImportJobs(ctx context.Context, arg FailStuckImportJobsParams) (int64, error) {
+	result, err := q.db.ExecContext(ctx, failStuckImportJobs, arg.ErrorLog, arg.StartedAt)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
 }
 
 const findImportJobByPublicId = `-- name: FindImportJobByPublicId :one
@@ -138,6 +209,22 @@ func (q *Queries) FindImportJobByPublicId(ctx context.Context, arg FindImportJob
 	return i, err
 }
 
+const findImportJobStatusByID = `-- name: FindImportJobStatusByID :one
+SELECT ij.status
+FROM import_jobs ij
+WHERE ij.id = ?
+  AND ij.enabled = TRUE
+`
+
+// Read the current status of a claimed job. The worker calls this while
+// it works so a cancellation issued through the API stops the run.
+func (q *Queries) FindImportJobStatusByID(ctx context.Context, id uint32) (ImportJobsStatus, error) {
+	row := q.db.QueryRowContext(ctx, findImportJobStatusByID, id)
+	var status ImportJobsStatus
+	err := row.Scan(&status)
+	return status, err
+}
+
 const findRunningImportForProject = `-- name: FindRunningImportForProject :one
 SELECT
   ij.id,
@@ -179,6 +266,43 @@ func (q *Queries) FindRunningImportForProject(ctx context.Context, arg FindRunni
 		&i.CreatedAt,
 	)
 	return i, err
+}
+
+const finishImportJob = `-- name: FinishImportJob :exec
+UPDATE import_jobs
+SET status          = ?,
+    total_items     = ?,
+    processed_items = ?,
+    failed_items    = ?,
+    error_log       = ?,
+    completed_at    = NOW(3)
+WHERE id = ?
+  AND status = 'running'
+  AND enabled = TRUE
+`
+
+type FinishImportJobParams struct {
+	Status         ImportJobsStatus `json:"status"`
+	TotalItems     uint32           `json:"totalItems"`
+	ProcessedItems uint32           `json:"processedItems"`
+	FailedItems    uint32           `json:"failedItems"`
+	ErrorLog       sql.NullString   `json:"errorLog"`
+	ID             uint32           `json:"-"`
+}
+
+// Move a claimed job to a terminal state and stamp the final counters.
+// Restricted to 'running' so a job cancelled mid-flight keeps the
+// cancelled status the API gave it.
+func (q *Queries) FinishImportJob(ctx context.Context, arg FinishImportJobParams) error {
+	_, err := q.db.ExecContext(ctx, finishImportJob,
+		arg.Status,
+		arg.TotalItems,
+		arg.ProcessedItems,
+		arg.FailedItems,
+		arg.ErrorLog,
+		arg.ID,
+	)
+	return err
 }
 
 const listImportJobsForWorkspace = `-- name: ListImportJobsForWorkspace :many
@@ -255,6 +379,90 @@ func (q *Queries) ListImportJobsForWorkspace(ctx context.Context, arg ListImport
 		return nil, err
 	}
 	return items, nil
+}
+
+const listPendingImportJobs = `-- name: ListPendingImportJobs :many
+SELECT
+  ij.id,
+  ij.public_id,
+  ij.workspace_id,
+  ij.project_id,
+  ij.source,
+  ij.config_json
+FROM import_jobs ij
+WHERE ij.status = 'pending'
+  AND ij.enabled = TRUE
+ORDER BY ij.created_at ASC, ij.id ASC
+LIMIT ?
+`
+
+type ListPendingImportJobsRow struct {
+	ID          uint32           `json:"-"`
+	PublicID    types.PublicID   `json:"publicId"`
+	WorkspaceID uint32           `json:"-"`
+	ProjectID   sql.NullInt32    `json:"-"`
+	Source      ImportJobsSource `json:"source"`
+	ConfigJson  json.RawMessage  `json:"configJson"`
+}
+
+// The worker's claim candidates, oldest first. Claiming is a separate
+// conditional UPDATE, so this read takes no locks: a row listed here may
+// already have been taken by another replica by the time it is claimed.
+func (q *Queries) ListPendingImportJobs(ctx context.Context, limit int32) ([]ListPendingImportJobsRow, error) {
+	rows, err := q.db.QueryContext(ctx, listPendingImportJobs, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListPendingImportJobsRow{}
+	for rows.Next() {
+		var i ListPendingImportJobsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.PublicID,
+			&i.WorkspaceID,
+			&i.ProjectID,
+			&i.Source,
+			&i.ConfigJson,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const recordImportJobProgress = `-- name: RecordImportJobProgress :exec
+UPDATE import_jobs
+SET total_items     = ?,
+    processed_items = ?,
+    failed_items    = ?
+WHERE id = ?
+  AND enabled = TRUE
+`
+
+type RecordImportJobProgressParams struct {
+	TotalItems     uint32 `json:"totalItems"`
+	ProcessedItems uint32 `json:"processedItems"`
+	FailedItems    uint32 `json:"failedItems"`
+	ID             uint32 `json:"-"`
+}
+
+// Publish the running counters so the polling UI can show movement.
+func (q *Queries) RecordImportJobProgress(ctx context.Context, arg RecordImportJobProgressParams) error {
+	_, err := q.db.ExecContext(ctx, recordImportJobProgress,
+		arg.TotalItems,
+		arg.ProcessedItems,
+		arg.FailedItems,
+		arg.ID,
+	)
+	return err
 }
 
 const updateImportJobProgress = `-- name: UpdateImportJobProgress :exec

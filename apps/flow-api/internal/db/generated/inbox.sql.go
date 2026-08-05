@@ -39,6 +39,33 @@ SELECT
   v.public_id,
   v.task_public_id,
   v.task_title,
+  -- Whether the reader may follow the link to the task. Computed here
+  -- rather than blanking the columns in place, because the columns are
+  -- nullable for a different reason — a signal need not name a task at
+  -- all — and collapsing the two would leave the mapper unable to tell
+  -- "no task" from "not yours". The mapper applies the flag; see
+  -- eventacl.AttendeeExistsSQL for the same shape on calendar events.
+  (
+    CAST(? AS SIGNED) = 1
+    OR v.task_internal_id IS NULL
+    OR v.task_visibility = 'public'
+    OR (v.task_visibility = 'project' AND EXISTS (
+      SELECT 1 FROM project_members pm_vis
+      WHERE pm_vis.project_id = v.task_project_id
+        AND pm_vis.user_id = CAST(? AS UNSIGNED)
+        AND pm_vis.enabled = TRUE
+    ))
+    OR (v.task_visibility = 'private' AND (
+      v.task_created_by_user_id = CAST(? AS UNSIGNED)
+      OR EXISTS (
+        SELECT 1 FROM task_actors ta_vis
+        WHERE ta_vis.task_id = v.task_internal_id
+          AND ta_vis.kind = 'user'
+          AND ta_vis.user_id = CAST(? AS UNSIGNED)
+          AND ta_vis.enabled = TRUE
+      )
+    ))
+  ) AS task_visible,
   v.source,
   v.kind,
   v.external_id,
@@ -54,9 +81,13 @@ LIMIT ? OFFSET ?
 `
 
 type ListInboxParams struct {
-	WorkspaceID uint32 `json:"-"`
-	Limit       int32  `json:"limit"`
-	Offset      int32  `json:"offset"`
+	IsElevated    int64  `json:"isElevated"`
+	ActorUserID   int64  `json:"actorUserId"`
+	ActorUserID_2 int64  `json:"actorUserId2"`
+	ActorUserID_3 int64  `json:"actorUserId3"`
+	WorkspaceID   uint32 `json:"-"`
+	Limit         int32  `json:"limit"`
+	Offset        int32  `json:"offset"`
 }
 
 type ListInboxRow struct {
@@ -65,6 +96,7 @@ type ListInboxRow struct {
 	PublicID          types.PublicID  `json:"publicId"`
 	TaskPublicID      sql.NullString  `json:"taskPublicId"`
 	TaskTitle         sql.NullString  `json:"taskTitle"`
+	TaskVisible       sql.NullBool    `json:"taskVisible"`
 	Source            SignalsSource   `json:"source"`
 	Kind              string          `json:"kind"`
 	ExternalID        sql.NullString  `json:"externalId"`
@@ -76,8 +108,23 @@ type ListInboxRow struct {
 }
 
 // List a workspace's inbox via v_inbox.
+//
+// The signal is the row; the task it points at is a separate thing the
+// reader may or may not be allowed to see. So the item stays and the
+// task columns are blanked rather than the row being dropped: a signal
+// arriving is not the task's secret, its title is. Dropping the row
+// would also make the inbox silently lose items whose linkage the
+// reader cannot follow, which reads as data loss rather than privacy.
 func (q *Queries) ListInbox(ctx context.Context, arg ListInboxParams) ([]ListInboxRow, error) {
-	rows, err := q.db.QueryContext(ctx, listInbox, arg.WorkspaceID, arg.Limit, arg.Offset)
+	rows, err := q.db.QueryContext(ctx, listInbox,
+		arg.IsElevated,
+		arg.ActorUserID,
+		arg.ActorUserID_2,
+		arg.ActorUserID_3,
+		arg.WorkspaceID,
+		arg.Limit,
+		arg.Offset,
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -91,6 +138,7 @@ func (q *Queries) ListInbox(ctx context.Context, arg ListInboxParams) ([]ListInb
 			&i.PublicID,
 			&i.TaskPublicID,
 			&i.TaskTitle,
+			&i.TaskVisible,
 			&i.Source,
 			&i.Kind,
 			&i.ExternalID,
@@ -120,6 +168,33 @@ SELECT
   v.public_id,
   v.task_public_id,
   v.task_title,
+  -- Whether the reader may follow the link to the task. Computed here
+  -- rather than blanking the columns in place, because the columns are
+  -- nullable for a different reason — a signal need not name a task at
+  -- all — and collapsing the two would leave the mapper unable to tell
+  -- "no task" from "not yours". The mapper applies the flag; see
+  -- eventacl.AttendeeExistsSQL for the same shape on calendar events.
+  (
+    CAST(? AS SIGNED) = 1
+    OR v.task_internal_id IS NULL
+    OR v.task_visibility = 'public'
+    OR (v.task_visibility = 'project' AND EXISTS (
+      SELECT 1 FROM project_members pm_vis
+      WHERE pm_vis.project_id = v.task_project_id
+        AND pm_vis.user_id = CAST(? AS UNSIGNED)
+        AND pm_vis.enabled = TRUE
+    ))
+    OR (v.task_visibility = 'private' AND (
+      v.task_created_by_user_id = CAST(? AS UNSIGNED)
+      OR EXISTS (
+        SELECT 1 FROM task_actors ta_vis
+        WHERE ta_vis.task_id = v.task_internal_id
+          AND ta_vis.kind = 'user'
+          AND ta_vis.user_id = CAST(? AS UNSIGNED)
+          AND ta_vis.enabled = TRUE
+      )
+    ))
+  ) AS task_visible,
   v.source,
   v.kind,
   v.external_id,
@@ -138,9 +213,13 @@ LIMIT ? OFFSET ?
 `
 
 type ListInboxForUserParams struct {
-	UserID uint32 `json:"-"`
-	Limit  int32  `json:"limit"`
-	Offset int32  `json:"offset"`
+	IsElevated    int64  `json:"isElevated"`
+	ActorUserID   int64  `json:"actorUserId"`
+	ActorUserID_2 int64  `json:"actorUserId2"`
+	ActorUserID_3 int64  `json:"actorUserId3"`
+	UserID        uint32 `json:"-"`
+	Limit         int32  `json:"limit"`
+	Offset        int32  `json:"offset"`
 }
 
 type ListInboxForUserRow struct {
@@ -149,6 +228,7 @@ type ListInboxForUserRow struct {
 	PublicID          types.PublicID  `json:"publicId"`
 	TaskPublicID      sql.NullString  `json:"taskPublicId"`
 	TaskTitle         sql.NullString  `json:"taskTitle"`
+	TaskVisible       sql.NullBool    `json:"taskVisible"`
 	Source            SignalsSource   `json:"source"`
 	Kind              string          `json:"kind"`
 	ExternalID        sql.NullString  `json:"externalId"`
@@ -161,7 +241,15 @@ type ListInboxForUserRow struct {
 
 // List inbox items across every workspace the actor is an active member of.
 func (q *Queries) ListInboxForUser(ctx context.Context, arg ListInboxForUserParams) ([]ListInboxForUserRow, error) {
-	rows, err := q.db.QueryContext(ctx, listInboxForUser, arg.UserID, arg.Limit, arg.Offset)
+	rows, err := q.db.QueryContext(ctx, listInboxForUser,
+		arg.IsElevated,
+		arg.ActorUserID,
+		arg.ActorUserID_2,
+		arg.ActorUserID_3,
+		arg.UserID,
+		arg.Limit,
+		arg.Offset,
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -175,6 +263,7 @@ func (q *Queries) ListInboxForUser(ctx context.Context, arg ListInboxForUserPara
 			&i.PublicID,
 			&i.TaskPublicID,
 			&i.TaskTitle,
+			&i.TaskVisible,
 			&i.Source,
 			&i.Kind,
 			&i.ExternalID,

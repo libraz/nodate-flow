@@ -4314,18 +4314,22 @@ type VCommentForTask struct {
 }
 
 type VInbox struct {
-	WorkspaceID       uint32          `json:"-"`
-	WorkspacePublicID []byte          `json:"workspacePublicId"`
-	PublicID          types.PublicID  `json:"publicId"`
-	TaskPublicID      sql.NullString  `json:"taskPublicId"`
-	TaskTitle         sql.NullString  `json:"taskTitle"`
-	Source            SignalsSource   `json:"source"`
-	Kind              string          `json:"kind"`
-	ExternalID        sql.NullString  `json:"externalId"`
-	PayloadJson       json.RawMessage `json:"payloadJson"`
-	ReceivedAt        time.Time       `json:"receivedAt"`
-	UpdatedAt         sql.NullTime    `json:"updatedAt"`
-	CreatedAt         time.Time       `json:"createdAt"`
+	WorkspaceID         uint32              `json:"-"`
+	WorkspacePublicID   []byte              `json:"workspacePublicId"`
+	PublicID            types.PublicID      `json:"publicId"`
+	TaskPublicID        sql.NullString      `json:"taskPublicId"`
+	TaskTitle           sql.NullString      `json:"taskTitle"`
+	TaskVisibility      NullTasksVisibility `json:"taskVisibility"`
+	TaskProjectID       sql.NullInt32       `json:"taskProjectId"`
+	TaskCreatedByUserID sql.NullInt32       `json:"taskCreatedByUserId"`
+	TaskInternalID      sql.NullInt32       `json:"-"`
+	Source              SignalsSource       `json:"source"`
+	Kind                string              `json:"kind"`
+	ExternalID          sql.NullString      `json:"externalId"`
+	PayloadJson         json.RawMessage     `json:"payloadJson"`
+	ReceivedAt          time.Time           `json:"receivedAt"`
+	UpdatedAt           sql.NullTime        `json:"updatedAt"`
+	CreatedAt           time.Time           `json:"createdAt"`
 }
 
 type VInstanceAuditLog struct {
