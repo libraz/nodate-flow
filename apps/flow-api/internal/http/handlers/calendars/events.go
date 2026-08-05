@@ -144,7 +144,65 @@ type PatchEventInput struct {
 		RecurrenceEnd        *int64           `json:"recurrenceEnd,omitempty" required:"false" doc:"Recurrence end as unix seconds (UTC)"`
 		RecurrenceExceptions *json.RawMessage `json:"recurrenceExceptions,omitempty" required:"false" doc:"Array of ISO 8601 dates/times to exclude from recurrence"`
 		NotificationOffset   *int32           `json:"notificationOffset,omitempty" required:"false" doc:"Notification offset"`
+		// Clear names the nullable fields to set back to nothing.
+		//
+		// A PATCH that carries only values cannot express removal: the
+		// field the caller left out and the field they want emptied
+		// arrive identically. So every nullable column was write-once
+		// through this route — the dialog's "no repeat" saved
+		// successfully and the meeting kept recurring, and a location
+		// typed by mistake stayed for good.
+		//
+		// Clearing recurrenceRule clears recurrenceEnd and
+		// recurrenceExceptions with it: they describe a series, and
+		// leaving them on a row that no longer has one keeps state
+		// nothing reads and the next writer has to reason about.
+		Clear []string `json:"clear,omitempty" required:"false" enum:"location,memo,url,blockLabel,recurrenceRule,recurrenceEnd,recurrenceExceptions,notificationOffset" doc:"Nullable fields to clear. Takes precedence over a value sent for the same field in this request."`
 	}
+}
+
+// clearableEventFields maps the API names accepted in PatchEventInput's
+// Clear list to the flags the patch query takes.
+type clearableEventFields struct {
+	location             int64
+	memo                 int64
+	url                  int64
+	blockLabel           int64
+	recurrenceRule       int64
+	recurrenceEnd        int64
+	recurrenceExceptions int64
+	notificationOffset   int64
+}
+
+// parseClearFields reads the Clear list. An unknown name is rejected
+// rather than ignored: a caller who misspells a field would otherwise
+// get a success response for a removal that did not happen, which is the
+// failure this whole mechanism exists to remove.
+func parseClearFields(names []string) (clearableEventFields, error) {
+	var out clearableEventFields
+	for _, name := range names {
+		switch name {
+		case "location":
+			out.location = 1
+		case "memo":
+			out.memo = 1
+		case "url":
+			out.url = 1
+		case "blockLabel":
+			out.blockLabel = 1
+		case "recurrenceRule":
+			out.recurrenceRule = 1
+		case "recurrenceEnd":
+			out.recurrenceEnd = 1
+		case "recurrenceExceptions":
+			out.recurrenceExceptions = 1
+		case "notificationOffset":
+			out.notificationOffset = 1
+		default:
+			return clearableEventFields{}, httpErr(apierrors.ValidationBodyFieldInvalid)
+		}
+	}
+	return out, nil
 }
 
 // PatchEventOutput is the response for the patch event endpoint.
@@ -262,6 +320,46 @@ func ListEvents(deps Deps) func(context.Context, *ListEventsInput) (*ListEventsO
 	}
 }
 
+// normalizeAllDayBounds pins an all-day event's stored instants to UTC
+// midnight.
+//
+// "All day on 5 August" is a date, not an interval on the world clock:
+// it means the same square on the calendar for everyone. The column pair
+// is DATETIME, so the date has to be encoded as an instant, and which
+// instant it is has to be one thing — otherwise the same row reads as a
+// different day depending on who wrote it and who is looking.
+//
+// It was two things. The browser dialog sent local midnight and the MCP
+// tools sent UTC midnight, so a Tokyo user's company holiday arrived as
+// 2026-08-04T15:00Z and every reader bucketing by local date showed it
+// on 4 August in Europe, while an agent reported startDate 2026-08-04
+// for a day the creator had called the 5th.
+//
+// Normalising on the way in makes the row canonical whichever client
+// wrote it, so a reader that takes the UTC date parts gets the date the
+// author meant. Clients still have to read it that way — a reader
+// bucketing all-day rows by local date undoes this — but the stored
+// value is no longer the thing that disagrees.
+func normalizeAllDayBounds(allDay bool, start, end sql.NullTime) (sql.NullTime, sql.NullTime) {
+	if !allDay {
+		return start, end
+	}
+	if start.Valid {
+		start.Time = truncateToUTCDay(start.Time)
+	}
+	if end.Valid {
+		end.Time = truncateToUTCDay(end.Time)
+	}
+	return start, end
+}
+
+// truncateToUTCDay returns midnight UTC on the calendar day t falls on
+// in UTC.
+func truncateToUTCDay(t time.Time) time.Time {
+	u := t.UTC()
+	return time.Date(u.Year(), u.Month(), u.Day(), 0, 0, 0, 0, time.UTC)
+}
+
 // CreateEvent creates a new event in a calendar.
 func CreateEvent(deps Deps) func(context.Context, *CreateEventInput) (*CreateEventOutput, error) {
 	return func(ctx context.Context, input *CreateEventInput) (*CreateEventOutput, error) {
@@ -327,6 +425,7 @@ func CreateEvent(deps Deps) func(context.Context, *CreateEventInput) (*CreateEve
 			startAtNT = sql.NullTime{Time: handlerutil.UnixToTime(*input.Body.StartAt), Valid: true}
 			endAtNT = sql.NullTime{Time: handlerutil.UnixToTime(*input.Body.EndAt), Valid: true}
 		}
+		startAtNT, endAtNT = normalizeAllDayBounds(input.Body.AllDay, startAtNT, endAtNT)
 		params := calendar.CreateCalendarEventParams{
 			PublicID:        eventPublicID,
 			WorkspaceID:     wsID,
@@ -578,10 +677,29 @@ func PatchEvent(deps Deps) func(context.Context, *PatchEventInput) (*PatchEventO
 			input.Body.EndAt = nil
 		}
 
+		cleared, cerr := parseClearFields(input.Body.Clear)
+		if cerr != nil {
+			return nil, cerr
+		}
 		params := calendar.PatchCalendarEventParams{
 			PublicID:    types.FromUUID(evtUID),
 			CalendarID:  cal.ID,
 			WorkspaceID: wsID,
+
+			ClearLocation:             cleared.location,
+			ClearMemo:                 cleared.memo,
+			ClearUrl:                  cleared.url,
+			ClearBlockLabel:           cleared.blockLabel,
+			ClearRecurrenceRule:       cleared.recurrenceRule,
+			ClearRecurrenceEnd:        cleared.recurrenceEnd,
+			ClearRecurrenceExceptions: cleared.recurrenceExceptions,
+			ClearNotificationOffset:   cleared.notificationOffset,
+			// sqlc emits one field per textual occurrence of a named
+			// argument; clear_recurrence_rule appears in three SET
+			// expressions because clearing the rule clears the two
+			// columns that only describe a series.
+			ClearRecurrenceRule_2: cleared.recurrenceRule,
+			ClearRecurrenceRule_3: cleared.recurrenceRule,
 		}
 		if input.Body.Kind != nil {
 			params.Kind = calendar.NullCalendarEventsKind{
@@ -654,6 +772,26 @@ func PatchEvent(deps Deps) func(context.Context, *PatchEventInput) (*PatchEventO
 		}
 		if input.Body.NotificationOffset != nil {
 			params.NotificationOffset = sql.NullInt32{Int32: *input.Body.NotificationOffset, Valid: true}
+		}
+
+		// The all-day flag and the times can move in separate requests,
+		// so the normalisation reads whichever value the row will end up
+		// with: the one being set now, or the one already stored. A
+		// patch that only flips allDay to true still has to pin the
+		// existing instants, or the row keeps the wall-clock times it
+		// had and reads as a different day for half the workspace.
+		effectiveAllDay := evt.AllDay
+		if input.Body.AllDay != nil {
+			effectiveAllDay = *input.Body.AllDay
+		}
+		if effectiveAllDay {
+			if !params.StartAt.Valid && evt.StartAt.Valid {
+				params.StartAt = evt.StartAt
+			}
+			if !params.EndAt.Valid && evt.EndAt.Valid {
+				params.EndAt = evt.EndAt
+			}
+			params.StartAt, params.EndAt = normalizeAllDayBounds(true, params.StartAt, params.EndAt)
 		}
 
 		if err := cqtx.PatchCalendarEvent(ctx, params); err != nil {

@@ -72,6 +72,16 @@ type Event struct {
 	// full timestamps naming one occurrence, or bare YYYY-MM-DD dates
 	// naming a local day.
 	Exceptions []string
+	// RecurrenceEnd is the calendar_events.recurrence_end column: an
+	// inclusive last instant for the series, stored alongside the rule
+	// rather than inside it.
+	//
+	// It is a second upper bound, not a replacement for the rule's own
+	// UNTIL, and whichever comes first wins. Ignoring it — which is what
+	// the browser expander does — means a series the API was told to
+	// stop keeps being drawn forever, on the authenticated calendar and
+	// on the public share page alike.
+	RecurrenceEnd *time.Time
 }
 
 // Occurrence is one concrete instance of a series.
@@ -148,9 +158,16 @@ func Expand(evt Event, rangeStart, rangeEnd time.Time) []Occurrence {
 	if evt.Rule.Count != nil && *evt.Rule.Count >= 0 {
 		maxCount = *evt.Rule.Count
 	}
+	// Two independent upper bounds, and the earlier one ends the series.
 	var until *time.Time
 	if u := parseUntil(evt.Rule.Until, loc); u != nil {
 		until = u
+	}
+	if evt.RecurrenceEnd != nil {
+		end := evt.RecurrenceEnd.In(loc)
+		if until == nil || end.Before(*until) {
+			until = &end
+		}
 	}
 
 	byDay := normalizeByDay(evt.Rule.ByDay)

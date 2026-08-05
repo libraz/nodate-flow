@@ -158,7 +158,7 @@ export default function PublicPageLayout({
           >
             <CalendarIcon
               size={20}
-              style={{ color: 'var(--nf-color-accent)' }}
+              style={{ color: 'var(--nf-color-accent-fg)' }}
               aria-hidden="true"
             />
             {t('share.brand')}

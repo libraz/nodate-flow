@@ -105,7 +105,7 @@ export default function PublicShareCalPage({ token }: PublicShareCalPageProps): 
             }}
             aria-hidden="true"
           >
-            <CalendarIcon size={20} style={{ color: 'var(--nf-color-accent)' }} />
+            <CalendarIcon size={20} style={{ color: 'var(--nf-color-accent-fg)' }} />
           </div>
         )}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--nf-space-0-5)' }}>

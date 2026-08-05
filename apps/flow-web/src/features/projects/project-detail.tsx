@@ -306,7 +306,7 @@ function OverviewPanel({ id, workspaceId }: { id: string; workspaceId: string })
         style={{
           alignSelf: 'flex-start',
           fontSize: 'var(--nf-text-sm)',
-          color: 'var(--nf-color-accent)',
+          color: 'var(--nf-color-accent-fg)',
           textDecoration: 'none',
         }}
       >

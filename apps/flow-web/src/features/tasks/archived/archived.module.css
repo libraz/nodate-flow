@@ -268,7 +268,7 @@
 
 .rowTitle:hover,
 .rowTitle:focus-visible {
-  color: var(--nf-color-accent);
+  color: var(--nf-color-accent-fg);
 }
 
 .rowMeta {

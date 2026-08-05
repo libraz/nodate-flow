@@ -271,7 +271,26 @@ type Querier interface {
 	MarkCalendarEventInviteSent(ctx context.Context, id uint32) error
 	// Patch mutable calendar fields. NULL params leave columns untouched.
 	PatchCalendar(ctx context.Context, arg PatchCalendarParams) error
-	// Patch mutable event fields. NULL params leave columns untouched.
+	// Patch mutable event fields. An omitted parameter leaves its column
+	// untouched; a clear_* flag sets its column to NULL.
+	//
+	// COALESCE alone cannot express "set this to nothing", because the
+	// absent parameter and the requested NULL arrive as the same value. That
+	// made every nullable column write-once from the API: a recurring
+	// meeting could not be made non-recurring, and a location entered by
+	// mistake could not be removed. The dialog offering "no repeat" and then
+	// reporting success while the series continued is that gap seen from the
+	// outside.
+	//
+	// The flag is read first so `clear` wins over a value sent in the same
+	// request. Sending both is contradictory, and taking the destructive
+	// reading of a contradiction is the one that cannot silently leave a
+	// value the caller asked to be rid of.
+	//
+	// start_at / end_at are deliberately not clearable here. They are
+	// nullable for planning-stage events, but a task-projected row's dates
+	// mirror the task and only the item projection engine may move them, so
+	// clearing them belongs to that path rather than to a generic patch.
 	PatchCalendarEvent(ctx context.Context, arg PatchCalendarEventParams) error
 	// Update a subscriber's display preferences.
 	PatchCalendarSubscription(ctx context.Context, arg PatchCalendarSubscriptionParams) error

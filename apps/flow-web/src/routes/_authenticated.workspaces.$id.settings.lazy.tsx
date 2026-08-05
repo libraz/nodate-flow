@@ -144,7 +144,7 @@ function WorkspaceSettingsLayout(): ReactElement {
               'aria-current': 'page',
               style: {
                 background: 'var(--nf-color-accent-subtle)',
-                color: 'var(--nf-color-accent)',
+                color: 'var(--nf-color-accent-fg)',
                 fontWeight: 500,
               },
             }}

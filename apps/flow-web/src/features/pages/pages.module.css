@@ -87,7 +87,7 @@
 
 .treeItemActive {
   background: var(--nf-color-accent-subtle);
-  color: var(--nf-color-accent);
+  color: var(--nf-color-accent-fg);
   font-weight: var(--nf-weight-medium);
 }
 
@@ -230,7 +230,7 @@
   font-size: var(--nf-text-xs);
   font-weight: var(--nf-weight-medium);
   background: var(--nf-color-accent-subtle);
-  color: var(--nf-color-accent);
+  color: var(--nf-color-accent-fg);
   white-space: nowrap;
 }
 

@@ -61,7 +61,7 @@
   padding-inline: var(--nf-space-2);
   font-family: var(--nf-font-sans);
   font-size: var(--nf-text-xs);
-  color: var(--nf-color-accent);
+  color: var(--nf-color-accent-fg);
   background: transparent;
   border: none;
   border-radius: var(--nf-radius-sm);
@@ -226,7 +226,7 @@
   padding-inline: var(--nf-space-3);
   font-family: var(--nf-font-sans);
   font-size: var(--nf-text-xs);
-  color: var(--nf-color-accent);
+  color: var(--nf-color-accent-fg);
   background: transparent;
   border: var(--nf-space-px) solid var(--nf-color-border);
   border-radius: var(--nf-radius-sm);

@@ -62,7 +62,7 @@ function SourceFilter({
               borderRadius: 'var(--nf-radius-pill)',
               border: `1px solid ${active ? 'var(--nf-color-accent)' : 'var(--nf-color-border)'}`,
               background: active ? 'var(--nf-color-accent-subtle)' : 'var(--nf-color-surface)',
-              color: active ? 'var(--nf-color-accent)' : 'var(--nf-color-fg)',
+              color: active ? 'var(--nf-color-accent-fg)' : 'var(--nf-color-fg)',
               fontSize: 'var(--nf-text-supporting)',
               cursor: 'pointer',
               transition:

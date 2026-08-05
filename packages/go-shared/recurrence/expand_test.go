@@ -333,3 +333,62 @@ func TestParseRuleReadsGrammar(t *testing.T) {
 		t.Fatalf("ParseRule = %+v", r)
 	}
 }
+
+// TestExpandHonoursRecurrenceEnd covers the second upper bound. It lives
+// in its own column rather than inside the rule, and an expander that
+// only reads the rule keeps drawing a series the API was told to stop.
+func TestExpandHonoursRecurrenceEnd(t *testing.T) {
+	t.Parallel()
+	loc := time.UTC
+	start := time.Date(2027, 3, 1, 9, 0, 0, 0, loc)
+	end := time.Date(2027, 3, 3, 23, 59, 59, 0, loc)
+	occ := Expand(Event{
+		StartAt:       start,
+		EndAt:         start.Add(time.Hour),
+		Rule:          &Rule{Freq: FreqDaily},
+		RecurrenceEnd: &end,
+	}, start, time.Date(2027, 4, 1, 0, 0, 0, 0, loc))
+
+	requireStarts(t, occ, loc, []string{
+		"2027-03-01T09:00:00Z",
+		"2027-03-02T09:00:00Z",
+		"2027-03-03T09:00:00Z",
+	})
+}
+
+// TestExpandTakesTheEarlierUpperBound states how the two bounds combine:
+// UNTIL and recurrence_end are independent, and whichever comes first
+// ends the series. Taking the later one would extend a series past the
+// date one of the two says it stops.
+func TestExpandTakesTheEarlierUpperBound(t *testing.T) {
+	t.Parallel()
+	loc := time.UTC
+	start := time.Date(2027, 3, 1, 9, 0, 0, 0, loc)
+	rangeEnd := time.Date(2027, 4, 1, 0, 0, 0, 0, loc)
+
+	// recurrence_end earlier than UNTIL.
+	early := time.Date(2027, 3, 2, 23, 59, 59, 0, loc)
+	occ := Expand(Event{
+		StartAt:       start,
+		EndAt:         start.Add(time.Hour),
+		Rule:          &Rule{Freq: FreqDaily, Until: "2027-03-10"},
+		RecurrenceEnd: &early,
+	}, start, rangeEnd)
+	requireStarts(t, occ, loc, []string{
+		"2027-03-01T09:00:00Z",
+		"2027-03-02T09:00:00Z",
+	})
+
+	// UNTIL earlier than recurrence_end.
+	late := time.Date(2027, 3, 20, 23, 59, 59, 0, loc)
+	occ = Expand(Event{
+		StartAt:       start,
+		EndAt:         start.Add(time.Hour),
+		Rule:          &Rule{Freq: FreqDaily, Until: "2027-03-02"},
+		RecurrenceEnd: &late,
+	}, start, rangeEnd)
+	requireStarts(t, occ, loc, []string{
+		"2027-03-01T09:00:00Z",
+		"2027-03-02T09:00:00Z",
+	})
+}

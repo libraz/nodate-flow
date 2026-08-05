@@ -48,7 +48,7 @@
 .toggleChipActive {
   border-color: var(--nf-color-accent);
   background: var(--nf-color-accent-subtle);
-  color: var(--nf-color-accent);
+  color: var(--nf-color-accent-fg);
   font-weight: var(--nf-weight-semibold);
 }
 

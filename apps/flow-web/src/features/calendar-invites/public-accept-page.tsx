@@ -104,7 +104,7 @@ function AcceptInviteForm({ token }: AcceptInviteFormProps): ReactElement {
             <CalendarCheck
               size={48}
               aria-hidden="true"
-              style={{ color: 'var(--nf-color-accent)' }}
+              style={{ color: 'var(--nf-color-accent-fg)' }}
             />
             <h1 style={headingStyle}>{t('invites.accept.success_title')}</h1>
             <p style={{ margin: 0, color: 'var(--nf-color-fg-muted)' }}>{successMessage}</p>

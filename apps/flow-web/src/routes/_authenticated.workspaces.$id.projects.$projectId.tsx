@@ -161,7 +161,7 @@ function ProjectLayout(): ReactElement {
               'data-active': 'true',
               style: {
                 background: 'var(--nf-color-accent-subtle)',
-                color: 'var(--nf-color-accent)',
+                color: 'var(--nf-color-accent-fg)',
                 fontWeight: 500,
               },
             }}

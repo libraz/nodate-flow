@@ -1221,15 +1221,25 @@ SET kind                = COALESCE(?, kind),
     start_at            = COALESCE(?, start_at),
     end_at              = COALESCE(?, end_at),
     timezone            = COALESCE(?, timezone),
-    location            = COALESCE(?, location),
-    memo                = COALESCE(?, memo),
-    url                 = COALESCE(?, url),
+    location            = IF(CAST(? AS SIGNED) = 1,
+                             NULL, COALESCE(?, location)),
+    memo                = IF(CAST(? AS SIGNED) = 1,
+                             NULL, COALESCE(?, memo)),
+    url                 = IF(CAST(? AS SIGNED) = 1,
+                             NULL, COALESCE(?, url)),
     owner_user_id       = COALESCE(?, owner_user_id),
-    block_label         = COALESCE(?, block_label),
-    recurrence_rule       = COALESCE(?, recurrence_rule),
-    recurrence_end        = COALESCE(?, recurrence_end),
-    recurrence_exceptions = COALESCE(?, recurrence_exceptions),
-    notification_offset   = COALESCE(?, notification_offset),
+    block_label         = IF(CAST(? AS SIGNED) = 1,
+                             NULL, COALESCE(?, block_label)),
+    recurrence_rule       = IF(CAST(? AS SIGNED) = 1,
+                               NULL, COALESCE(?, recurrence_rule)),
+    recurrence_end        = IF(CAST(? AS SIGNED) = 1
+                                 OR CAST(? AS SIGNED) = 1,
+                               NULL, COALESCE(?, recurrence_end)),
+    recurrence_exceptions = IF(CAST(? AS SIGNED) = 1
+                                 OR CAST(? AS SIGNED) = 1,
+                               NULL, COALESCE(?, recurrence_exceptions)),
+    notification_offset   = IF(CAST(? AS SIGNED) = 1,
+                               NULL, COALESCE(?, notification_offset)),
     task_id             = COALESCE(?, task_id)
 WHERE public_id = ?
   AND calendar_id = ?
@@ -1238,31 +1248,60 @@ WHERE public_id = ?
 `
 
 type PatchCalendarEventParams struct {
-	Kind                 NullCalendarEventsKind        `json:"kind"`
-	Visibility           NullCalendarEventsVisibility  `json:"visibility"`
-	ShowAs               NullCalendarEventsShowAs      `json:"showAs"`
-	Flexibility          NullCalendarEventsFlexibility `json:"flexibility"`
-	Title                sql.NullString                `json:"title"`
-	AllDay               sql.NullBool                  `json:"allDay"`
-	StartAt              sql.NullTime                  `json:"startAt"`
-	EndAt                sql.NullTime                  `json:"endAt"`
-	Timezone             sql.NullString                `json:"timezone"`
-	Location             sql.NullString                `json:"location"`
-	Memo                 sql.NullString                `json:"memo"`
-	Url                  sql.NullString                `json:"url"`
-	OwnerUserID          sql.NullInt32                 `json:"-"`
-	BlockLabel           sql.NullString                `json:"blockLabel"`
-	RecurrenceRule       json.RawMessage               `json:"recurrenceRule"`
-	RecurrenceEnd        sql.NullTime                  `json:"recurrenceEnd"`
-	RecurrenceExceptions json.RawMessage               `json:"recurrenceExceptions"`
-	NotificationOffset   sql.NullInt32                 `json:"notificationOffset"`
-	TaskID               sql.NullInt32                 `json:"-"`
-	PublicID             types.PublicID                `json:"publicId"`
-	CalendarID           uint32                        `json:"-"`
-	WorkspaceID          uint32                        `json:"-"`
+	Kind                      NullCalendarEventsKind        `json:"kind"`
+	Visibility                NullCalendarEventsVisibility  `json:"visibility"`
+	ShowAs                    NullCalendarEventsShowAs      `json:"showAs"`
+	Flexibility               NullCalendarEventsFlexibility `json:"flexibility"`
+	Title                     sql.NullString                `json:"title"`
+	AllDay                    sql.NullBool                  `json:"allDay"`
+	StartAt                   sql.NullTime                  `json:"startAt"`
+	EndAt                     sql.NullTime                  `json:"endAt"`
+	Timezone                  sql.NullString                `json:"timezone"`
+	ClearLocation             int64                         `json:"clearLocation"`
+	Location                  interface{}                   `json:"location"`
+	ClearMemo                 int64                         `json:"clearMemo"`
+	Memo                      interface{}                   `json:"memo"`
+	ClearUrl                  int64                         `json:"clearUrl"`
+	Url                       interface{}                   `json:"url"`
+	OwnerUserID               sql.NullInt32                 `json:"-"`
+	ClearBlockLabel           int64                         `json:"clearBlockLabel"`
+	BlockLabel                interface{}                   `json:"blockLabel"`
+	ClearRecurrenceRule       int64                         `json:"clearRecurrenceRule"`
+	RecurrenceRule            interface{}                   `json:"recurrenceRule"`
+	ClearRecurrenceEnd        int64                         `json:"clearRecurrenceEnd"`
+	ClearRecurrenceRule_2     int64                         `json:"clearRecurrenceRule2"`
+	RecurrenceEnd             interface{}                   `json:"recurrenceEnd"`
+	ClearRecurrenceExceptions int64                         `json:"clearRecurrenceExceptions"`
+	ClearRecurrenceRule_3     int64                         `json:"clearRecurrenceRule3"`
+	RecurrenceExceptions      interface{}                   `json:"recurrenceExceptions"`
+	ClearNotificationOffset   int64                         `json:"clearNotificationOffset"`
+	NotificationOffset        interface{}                   `json:"notificationOffset"`
+	TaskID                    sql.NullInt32                 `json:"-"`
+	PublicID                  types.PublicID                `json:"publicId"`
+	CalendarID                uint32                        `json:"-"`
+	WorkspaceID               uint32                        `json:"-"`
 }
 
-// Patch mutable event fields. NULL params leave columns untouched.
+// Patch mutable event fields. An omitted parameter leaves its column
+// untouched; a clear_* flag sets its column to NULL.
+//
+// COALESCE alone cannot express "set this to nothing", because the
+// absent parameter and the requested NULL arrive as the same value. That
+// made every nullable column write-once from the API: a recurring
+// meeting could not be made non-recurring, and a location entered by
+// mistake could not be removed. The dialog offering "no repeat" and then
+// reporting success while the series continued is that gap seen from the
+// outside.
+//
+// The flag is read first so `clear` wins over a value sent in the same
+// request. Sending both is contradictory, and taking the destructive
+// reading of a contradiction is the one that cannot silently leave a
+// value the caller asked to be rid of.
+//
+// start_at / end_at are deliberately not clearable here. They are
+// nullable for planning-stage events, but a task-projected row's dates
+// mirror the task and only the item projection engine may move them, so
+// clearing them belongs to that path rather than to a generic patch.
 func (q *Queries) PatchCalendarEvent(ctx context.Context, arg PatchCalendarEventParams) error {
 	_, err := q.db.ExecContext(ctx, patchCalendarEvent,
 		arg.Kind,
@@ -1274,14 +1313,24 @@ func (q *Queries) PatchCalendarEvent(ctx context.Context, arg PatchCalendarEvent
 		arg.StartAt,
 		arg.EndAt,
 		arg.Timezone,
+		arg.ClearLocation,
 		arg.Location,
+		arg.ClearMemo,
 		arg.Memo,
+		arg.ClearUrl,
 		arg.Url,
 		arg.OwnerUserID,
+		arg.ClearBlockLabel,
 		arg.BlockLabel,
+		arg.ClearRecurrenceRule,
 		arg.RecurrenceRule,
+		arg.ClearRecurrenceEnd,
+		arg.ClearRecurrenceRule_2,
 		arg.RecurrenceEnd,
+		arg.ClearRecurrenceExceptions,
+		arg.ClearRecurrenceRule_3,
 		arg.RecurrenceExceptions,
+		arg.ClearNotificationOffset,
 		arg.NotificationOffset,
 		arg.TaskID,
 		arg.PublicID,

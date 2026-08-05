@@ -391,7 +391,7 @@ export default function EventCard({ event }: EventCardProps): ReactElement {
                 blockSize: '1.25rem',
                 borderRadius: 'var(--nf-radius-pill)',
                 background: 'color-mix(in oklab, var(--nf-color-accent) 14%, transparent)',
-                color: 'var(--nf-color-accent)',
+                color: 'var(--nf-color-accent-fg)',
                 display: 'inline-flex',
                 alignItems: 'center',
                 justifyContent: 'center',

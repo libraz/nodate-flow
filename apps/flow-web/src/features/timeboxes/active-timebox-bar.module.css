@@ -21,7 +21,7 @@
 .label {
   font-size: var(--nf-text-xs);
   font-weight: var(--nf-weight-semibold);
-  color: var(--nf-color-accent);
+  color: var(--nf-color-accent-fg);
   text-transform: uppercase;
   letter-spacing: 0.05em;
   white-space: nowrap;

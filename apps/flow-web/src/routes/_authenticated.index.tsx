@@ -231,7 +231,7 @@ function TaskSummary(): ReactElement {
               to="/today"
               style={{
                 fontSize: 'var(--nf-text-supporting)',
-                color: 'var(--nf-color-accent)',
+                color: 'var(--nf-color-accent-fg)',
                 textDecoration: 'none',
               }}
             >

@@ -1604,13 +1604,19 @@ type Querier interface {
 	// them and nothing reports them: the subscriber simply never receives
 	// those events.
 	//
-	// They go back to 'failed' with next_retry_at = NOW() rather than being
-	// abandoned, because delivery is at-least-once by contract (receivers
-	// dedupe on the X-Nodate-Delivery header) and a redelivery is cheap
-	// compared to a silently dropped event. attempts is not touched here:
-	// the attempt never completed, and the existing attempts < max_attempts
-	// filter still bounds how many times a row that keeps stranding is
-	// picked up.
+	// They are retried rather than abandoned because nobody knows whether
+	// the POST reached the endpoint. Delivery is at-least-once by contract:
+	// the payload is HMAC-signed and carries event_public_id, so a receiver
+	// can recognise a repeat, and a duplicate the receiver can drop is a
+	// smaller harm than an event that silently never arrives.
+	//
+	// attempts IS charged for the strand. The attempt genuinely did not
+	// complete, so charging it is not strictly fair — but a row whose
+	// payload kills the worker would otherwise be requeued forever, because
+	// the attempts < max_attempts filter that bounds every other retry path
+	// never advances. Spending one of six attempts per strand puts that loop
+	// under the same budget as an ordinary failure, and a rolling deploy
+	// that strands a row once or twice still leaves most of the budget.
 	//
 	// The cutoff is supplied by the caller so the threshold stays
 	// configurable and can be kept comfortably above the delivery timeout.

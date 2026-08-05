@@ -62,7 +62,7 @@
   padding: var(--nf-space-px) var(--nf-space-2);
   border-radius: var(--nf-radius-xs);
   background: var(--nf-color-accent-hover);
-  color: var(--nf-color-accent);
+  color: var(--nf-color-accent-fg);
 }
 
 .metaPrimary {

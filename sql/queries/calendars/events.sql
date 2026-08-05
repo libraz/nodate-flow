@@ -440,7 +440,26 @@ ORDER BY ce.start_at ASC, ce.public_id ASC
 LIMIT 2000;
 
 -- name: PatchCalendarEvent :exec
--- Patch mutable event fields. NULL params leave columns untouched.
+-- Patch mutable event fields. An omitted parameter leaves its column
+-- untouched; a clear_* flag sets its column to NULL.
+--
+-- COALESCE alone cannot express "set this to nothing", because the
+-- absent parameter and the requested NULL arrive as the same value. That
+-- made every nullable column write-once from the API: a recurring
+-- meeting could not be made non-recurring, and a location entered by
+-- mistake could not be removed. The dialog offering "no repeat" and then
+-- reporting success while the series continued is that gap seen from the
+-- outside.
+--
+-- The flag is read first so `clear` wins over a value sent in the same
+-- request. Sending both is contradictory, and taking the destructive
+-- reading of a contradiction is the one that cannot silently leave a
+-- value the caller asked to be rid of.
+--
+-- start_at / end_at are deliberately not clearable here. They are
+-- nullable for planning-stage events, but a task-projected row's dates
+-- mirror the task and only the item projection engine may move them, so
+-- clearing them belongs to that path rather than to a generic patch.
 UPDATE calendar_events
 SET kind                = COALESCE(sqlc.narg('kind'), kind),
     visibility          = COALESCE(sqlc.narg('visibility'), visibility),
@@ -451,15 +470,25 @@ SET kind                = COALESCE(sqlc.narg('kind'), kind),
     start_at            = COALESCE(sqlc.narg('start_at'), start_at),
     end_at              = COALESCE(sqlc.narg('end_at'), end_at),
     timezone            = COALESCE(sqlc.narg('timezone'), timezone),
-    location            = COALESCE(sqlc.narg('location'), location),
-    memo                = COALESCE(sqlc.narg('memo'), memo),
-    url                 = COALESCE(sqlc.narg('url'), url),
+    location            = IF(CAST(sqlc.arg('clear_location') AS SIGNED) = 1,
+                             NULL, COALESCE(sqlc.narg('location'), location)),
+    memo                = IF(CAST(sqlc.arg('clear_memo') AS SIGNED) = 1,
+                             NULL, COALESCE(sqlc.narg('memo'), memo)),
+    url                 = IF(CAST(sqlc.arg('clear_url') AS SIGNED) = 1,
+                             NULL, COALESCE(sqlc.narg('url'), url)),
     owner_user_id       = COALESCE(sqlc.narg('owner_user_id'), owner_user_id),
-    block_label         = COALESCE(sqlc.narg('block_label'), block_label),
-    recurrence_rule       = COALESCE(sqlc.narg('recurrence_rule'), recurrence_rule),
-    recurrence_end        = COALESCE(sqlc.narg('recurrence_end'), recurrence_end),
-    recurrence_exceptions = COALESCE(sqlc.narg('recurrence_exceptions'), recurrence_exceptions),
-    notification_offset   = COALESCE(sqlc.narg('notification_offset'), notification_offset),
+    block_label         = IF(CAST(sqlc.arg('clear_block_label') AS SIGNED) = 1,
+                             NULL, COALESCE(sqlc.narg('block_label'), block_label)),
+    recurrence_rule       = IF(CAST(sqlc.arg('clear_recurrence_rule') AS SIGNED) = 1,
+                               NULL, COALESCE(sqlc.narg('recurrence_rule'), recurrence_rule)),
+    recurrence_end        = IF(CAST(sqlc.arg('clear_recurrence_end') AS SIGNED) = 1
+                                 OR CAST(sqlc.arg('clear_recurrence_rule') AS SIGNED) = 1,
+                               NULL, COALESCE(sqlc.narg('recurrence_end'), recurrence_end)),
+    recurrence_exceptions = IF(CAST(sqlc.arg('clear_recurrence_exceptions') AS SIGNED) = 1
+                                 OR CAST(sqlc.arg('clear_recurrence_rule') AS SIGNED) = 1,
+                               NULL, COALESCE(sqlc.narg('recurrence_exceptions'), recurrence_exceptions)),
+    notification_offset   = IF(CAST(sqlc.arg('clear_notification_offset') AS SIGNED) = 1,
+                               NULL, COALESCE(sqlc.narg('notification_offset'), notification_offset)),
     task_id             = COALESCE(sqlc.narg('task_id'), task_id)
 WHERE public_id = ?
   AND calendar_id = ?

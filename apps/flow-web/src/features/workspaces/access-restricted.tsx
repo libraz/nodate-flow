@@ -56,7 +56,7 @@ export default function AccessRestricted({ sectionTitleKey }: AccessRestrictedPr
         <Link
           to="/workspaces/$id/settings/general"
           params={{ id }}
-          style={{ color: 'var(--nf-color-accent)', textDecoration: 'none' }}
+          style={{ color: 'var(--nf-color-accent-fg)', textDecoration: 'none' }}
         >
           {t('access_restricted.cta')}
         </Link>

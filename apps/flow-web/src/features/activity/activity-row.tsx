@@ -66,7 +66,7 @@ function ActorGlyph({
           blockSize: '1.75rem',
           borderRadius: 'var(--nf-radius-pill)',
           background: 'color-mix(in oklab, var(--nf-color-accent) 14%, transparent)',
-          color: 'var(--nf-color-accent)',
+          color: 'var(--nf-color-accent-fg)',
           display: 'inline-flex',
           alignItems: 'center',
           justifyContent: 'center',

@@ -75,7 +75,7 @@
 .rowTitle:hover,
 .rowTitle:focus-visible {
   text-decoration: underline;
-  color: var(--nf-color-accent);
+  color: var(--nf-color-accent-fg);
 }
 
 .rowLinkedTo {
@@ -96,7 +96,7 @@
 .rowLinkedTo:hover,
 .rowLinkedTo:focus-visible {
   text-decoration: underline;
-  color: var(--nf-color-accent);
+  color: var(--nf-color-accent-fg);
 }
 
 .rowLinkedToArrow {

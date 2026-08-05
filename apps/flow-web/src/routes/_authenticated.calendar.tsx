@@ -51,6 +51,7 @@ import EventDialog, {
   type EventDialogMode,
   type ItemKind,
 } from '../features/calendar-events/event-dialog';
+import { eventDayKeys } from '../features/calendar-events/lib/event-days';
 import { shiftEventDays } from '../features/calendar-events/lib/shift-event';
 import MonthScroll from '../features/calendar-events/month-scroll';
 import PendingInvitesPanel from '../features/calendar-invites/pending-invites-panel';
@@ -62,7 +63,7 @@ import type { TaskDerivedState } from '../features/tasks/api';
 import { STATE_COLOR } from '../features/tasks/constants';
 import { useWorkspacesQuery } from '../features/workspaces/api';
 import { type ApiError, toApiError } from '../lib/api-error';
-import { dateKey, eventStartOfDay } from '../lib/date-utils';
+import { dateKey } from '../lib/date-utils';
 import { sdk } from '../lib/sdk';
 import { useActiveWorkspaceId } from '../lib/use-current-workspace';
 import styles from './_authenticated.calendar.module.css';
@@ -176,43 +177,6 @@ function buildMonthGrid(year: number, monthIndex: number, weekStart: WeekStart):
 }
 
 /** Unix seconds → YYYY-MM-DD in the local tz. */
-/**
- * Every `YYYY-MM-DD` cell a calendar event occupies, from its first day
- * through its last.
- *
- * A single-day event yields one key, which is what the grid always did.
- * A multi-day event yields one per day, which is what it did not: the
- * month grid filed events by start day alone, so anything spanning a
- * boundary vanished from every cell after the first.
- *
- * The span is capped so a malformed row — an end far in the future, or
- * an event whose end precedes its start — cannot make the loop run away
- * while building a map for one month's grid.
- */
-function eventDayKeys(event: CalendarEvent): string[] {
-  if (typeof event.startAt !== 'number') return [];
-  const allDay = event.allDay === true;
-  const start = eventStartOfDay(event.startAt, allDay);
-  const endSeconds = typeof event.endAt === 'number' ? event.endAt : event.startAt;
-  const end = eventStartOfDay(endSeconds, allDay);
-
-  const keys = [dateKey(start)];
-  const cursor = new Date(start);
-  for (let i = 0; i < MAX_EVENT_SPAN_DAYS && cursor < end; i++) {
-    cursor.setDate(cursor.getDate() + 1);
-    if (cursor > end) break;
-    keys.push(dateKey(cursor));
-  }
-  return keys;
-}
-
-/**
- * Upper bound on the number of cells one event may occupy. A month grid
- * shows at most six weeks, so anything past that is a data problem
- * rather than a long holiday, and the cap keeps it from becoming a hang.
- */
-const MAX_EVENT_SPAN_DAYS = 42;
-
 /**
  * Differentiate calendar-event pills by kind. Returns inline style
  * fragments merged into the pill button, plus the 45-degree marker

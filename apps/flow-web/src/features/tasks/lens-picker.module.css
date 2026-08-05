@@ -59,7 +59,7 @@
 
 .optionSelected {
   background: var(--nf-color-accent-subtle);
-  color: var(--nf-color-accent);
+  color: var(--nf-color-accent-fg);
 }
 
 .optionApply {
@@ -91,7 +91,7 @@
   padding-inline: var(--nf-space-2);
   border-radius: var(--nf-radius-pill);
   background: var(--nf-color-accent-subtle);
-  color: var(--nf-color-accent);
+  color: var(--nf-color-accent-fg);
 }
 
 .saveRow {

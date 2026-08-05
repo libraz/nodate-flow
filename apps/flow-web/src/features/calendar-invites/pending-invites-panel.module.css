@@ -105,7 +105,7 @@
   block-size: 1.25rem;
   border-radius: var(--nf-radius-pill);
   background: var(--nf-color-accent-subtle);
-  color: var(--nf-color-accent);
+  color: var(--nf-color-accent-fg);
   font-size: var(--nf-text-xs);
   font-weight: var(--nf-weight-semibold);
   font-variant-numeric: tabular-nums;

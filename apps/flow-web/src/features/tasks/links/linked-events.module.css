@@ -212,7 +212,7 @@
 
 .rowTitle:hover,
 .rowTitle:focus-visible {
-  color: var(--nf-color-accent);
+  color: var(--nf-color-accent-fg);
   text-decoration: underline;
   text-underline-offset: 0.2em;
 }
@@ -232,7 +232,7 @@
 }
 
 .time[data-tone="today"] {
-  color: var(--nf-color-accent);
+  color: var(--nf-color-accent-fg);
   font-weight: 600;
 }
 

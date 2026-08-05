@@ -290,7 +290,7 @@
 
 .kindBadge[data-tone="accent"] {
   background: color-mix(in oklab, var(--nf-color-accent) 12%, transparent);
-  color: var(--nf-color-accent);
+  color: var(--nf-color-accent-fg);
   border-color: color-mix(in oklab, var(--nf-color-accent) 24%, transparent);
 }
 

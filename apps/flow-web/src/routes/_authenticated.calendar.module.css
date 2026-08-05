@@ -165,7 +165,7 @@
 
 .todayPill {
   background: var(--nf-color-accent-subtle);
-  color: var(--nf-color-accent);
+  color: var(--nf-color-accent-fg);
   border-radius: var(--nf-radius-pill);
   padding-inline: var(--nf-space-2);
   font-weight: var(--nf-weight-semibold);
@@ -283,7 +283,7 @@
 }
 
 .eventPill--viewerAttending .eventPill__attendees {
-  color: var(--nf-color-accent);
+  color: var(--nf-color-accent-fg);
   opacity: 1;
 }
 
