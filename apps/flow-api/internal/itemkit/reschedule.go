@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/libraz/nodate-flow/packages/go-shared/eventbus"
+	"github.com/libraz/nodate-flow/packages/go-shared/region"
 )
 
 // RescheduleEventArgs moves a single calendar_events row in time.
@@ -83,7 +84,7 @@ func RescheduleEvent(ctx context.Context, tx TX, args RescheduleEventArgs) error
 		role := DateRole(evt.taskRole.String)
 		if role == RoleDue {
 			if !args.StartAt.IsZero() {
-				if err := propagateTaskDateFromRole(ctx, tx, uint32(evt.taskID.Int32), role, args.StartAt); err != nil { //#nosec G115 -- task_id is tasks.id (BIGINT UNSIGNED), fits uint32 within realistic deployments
+				if err := propagateTaskDateFromRole(ctx, tx, uint32(evt.taskID.Int32), role, args.StartAt, evt.timezone); err != nil { //#nosec G115 -- task_id is tasks.id (BIGINT UNSIGNED), fits uint32 within realistic deployments
 					return err
 				}
 			}
@@ -210,10 +211,22 @@ func propagateEventFromTaskDate(ctx context.Context, tx TX, task taskRow, role D
 		return wrapInvariant("event_undated_but_projection",
 			"linked projection event has null start/end; reconciler must heal")
 	}
+	// Rebuild the instant in the event's own zone. Composing it from the
+	// stored UTC clock instead keeps the wrong time-of-day: a Tokyo 08:00
+	// meeting reads as 23:00 in UTC, so moving its task to the 8th put
+	// the event at 23:00 on the 8th — 08:00 on the 9th in Tokyo, a day
+	// past the deadline that asked for it. The two then disagree
+	// permanently, and the drift reconciler resolves that disagreement in
+	// the event's favour, silently undoing the date the user typed.
+	loc, err := region.LoadLocation(region.EffectiveTimezone(existing.timezone))
+	if err != nil {
+		return wrapInvariant("event_timezone_valid",
+			fmt.Sprintf("event timezone %q is not a known IANA zone", existing.timezone))
+	}
 	dur := existing.endAt.Time.Sub(existing.startAt.Time)
+	localStart := existing.startAt.Time.In(loc)
 	newStart := time.Date(newDate.Year(), newDate.Month(), newDate.Day(),
-		existing.startAt.Time.Hour(), existing.startAt.Time.Minute(), existing.startAt.Time.Second(), 0,
-		existing.startAt.Time.Location())
+		localStart.Hour(), localStart.Minute(), localStart.Second(), 0, loc)
 	newEnd := newStart.Add(dur)
 
 	// Task date has already been snapped upstream; re-run snap here only

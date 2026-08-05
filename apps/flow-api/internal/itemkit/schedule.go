@@ -137,7 +137,7 @@ func ScheduleTask(ctx context.Context, tx TX, args ScheduleTaskArgs) (dbtype.Pub
 		return dbtype.PublicID{}, 0, err
 	}
 
-	if err := propagateTaskDateFromRole(ctx, tx, task.id, args.Role, args.StartAt); err != nil {
+	if err := propagateTaskDateFromRole(ctx, tx, task.id, args.Role, args.StartAt, args.Timezone); err != nil {
 		return dbtype.PublicID{}, 0, err
 	}
 
@@ -184,7 +184,7 @@ func reschedulePutExisting(ctx context.Context, tx TX, task taskRow, existing ev
 		return dbtype.PublicID{}, 0, err
 	}
 
-	if err := propagateTaskDateFromRole(ctx, tx, task.id, args.Role, args.StartAt); err != nil {
+	if err := propagateTaskDateFromRole(ctx, tx, task.id, args.Role, args.StartAt, args.Timezone); err != nil {
 		return dbtype.PublicID{}, 0, err
 	}
 
@@ -201,11 +201,21 @@ func reschedulePutExisting(ctx context.Context, tx TX, task taskRow, existing ev
 
 // propagateTaskDateFromRole writes tasks.due_on from the scheduled
 // event's start date. Has no effect for RoleScheduled.
-func propagateTaskDateFromRole(ctx context.Context, tx TX, taskID uint32, role DateRole, startAt time.Time) error {
+//
+// tz is the event's timezone, and it decides the answer: an 08:00
+// meeting in Asia/Tokyo is on the 11th for everyone who attends it, even
+// though the instant stored in UTC falls on the 10th. Deriving the date
+// from the UTC instant moved the deadline a day earlier than the meeting
+// that set it, and every downstream reader — task list, Gantt, public
+// lens, `time.due_before` evaluation — inherited the shift.
+func propagateTaskDateFromRole(ctx context.Context, tx TX, taskID uint32, role DateRole, startAt time.Time, tz string) error {
 	if startAt.IsZero() || role != RoleDue {
 		return nil
 	}
-	date := dateOnly(startAt)
+	date, err := eventDate(startAt, tz)
+	if err != nil {
+		return err
+	}
 	if _, err := tx.ExecContext(ctx, "UPDATE tasks SET due_on = ? WHERE id = ?", date, taskID); err != nil {
 		return fmt.Errorf("itemkit: propagate task due_on: %w", err)
 	}

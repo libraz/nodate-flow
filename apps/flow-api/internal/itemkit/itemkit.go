@@ -29,6 +29,7 @@ import (
 	"time"
 
 	"github.com/libraz/nodate-flow/packages/go-shared/dbtype"
+	"github.com/libraz/nodate-flow/packages/go-shared/region"
 )
 
 // DateRole encodes how a calendar event relates to its linked task.
@@ -134,10 +135,31 @@ func findLinkedEvent(ctx context.Context, tx TX, taskID uint32, role DateRole) (
 	return e, err
 }
 
-// dateOnly returns t truncated to local midnight in its own Location.
-// Used when projecting event.start_at onto task.due_on.
+// dateOnly returns t truncated to midnight in its own Location.
+//
+// Only safe for a value that is already a date — an `*_on` column read
+// back from MySQL, or one parsed from `YYYY-MM-DD`, both of which arrive
+// as midnight UTC. To take the date of an *instant* use [eventDate],
+// which asks the question in the event's timezone; doing it here would
+// answer in UTC and put a Tokyo morning meeting on the previous day.
 func dateOnly(t time.Time) time.Time {
 	return time.Date(t.Year(), t.Month(), t.Day(), 0, 0, 0, 0, t.Location())
+}
+
+// eventDate returns the calendar date an event instant falls on, read in
+// the event's own timezone and carried as midnight UTC (the shape a DATE
+// column round-trips without a shift).
+//
+// An unresolvable timezone is an error rather than a fallback to UTC:
+// the fallback is precisely the bug, and it is silent — the task simply
+// gets a date one day off and no one is told.
+func eventDate(t time.Time, tz string) (time.Time, error) {
+	d, err := region.LocalDate(t, region.EffectiveTimezone(tz))
+	if err != nil {
+		return time.Time{}, wrapInvariant("event_timezone_valid",
+			fmt.Sprintf("event timezone %q is not a known IANA zone", tz))
+	}
+	return d, nil
 }
 
 // roleNullString wraps a DateRole as sql.NullString for nullable

@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/libraz/nodate-flow/packages/go-shared/dbtype"
+	"github.com/libraz/nodate-flow/packages/go-shared/region"
 )
 
 // OtherEventLink describes a contributes_to event OTHER than the
@@ -232,8 +233,15 @@ func ApplyShiftEventAndChildren(ctx context.Context, tx TX, args ApplyShiftEvent
 		return nil
 	}
 
-	dayDelta := dateOnly(args.NewStartAt).Sub(dateOnly(oldStart)).Hours() / 24
-	dayDeltaInt := int(dayDelta)
+	// How many days a move covers is a question about calendar dates, and
+	// dates belong to the event's timezone. Measured in UTC, moving a
+	// Tokyo meeting from 08:00 to 20:00 on the same day crosses a UTC
+	// midnight and drags every linked task forward a day.
+	dayDeltaInt, err := region.LocalDayDelta(oldStart, args.NewStartAt, region.EffectiveTimezone(evt.timezone))
+	if err != nil {
+		return wrapInvariant("event_timezone_valid",
+			fmt.Sprintf("event timezone %q is not a known IANA zone", evt.timezone))
+	}
 	if dayDeltaInt == 0 {
 		// Time-of-day only: tasks have DATE precision and do not move.
 		return nil

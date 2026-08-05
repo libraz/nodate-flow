@@ -15,15 +15,24 @@ import (
 	"database/sql"
 	"errors"
 	"log/slog"
+	"sync/atomic"
 	"time"
 
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/dbretry"
+	"github.com/libraz/nodate-flow/packages/go-shared/region"
 )
 
 // DefaultInterval is the gap between reconciler runs when Start is
 // called without an explicit interval override. Five minutes keeps the
 // steady-state load trivial while bounding drift visibility.
 const DefaultInterval = 5 * time.Minute
+
+// maxDriftRowsPerPass caps how many linked events one due-date scan
+// inspects. The scan resumes from its cursor on the next pass, so the
+// cap trades a longer time-to-detect on a large table for a bounded
+// query — the alternative, an unpaged scan, grows without limit under
+// exactly the deployments that can least afford it.
+const maxDriftRowsPerPass = 5000
 
 // MetricsSink is the minimal counter surface the reconciler needs. The
 // flow-api wires this to the Prometheus counters in internal/obs;
@@ -42,6 +51,11 @@ type Reconciler struct {
 	Logger   *slog.Logger
 	Metrics  MetricsSink
 	Interval time.Duration
+
+	// dueDriftCursor is the last calendar_events.id the due-date scan
+	// inspected. Atomic because RunOnce is exported for tests and
+	// nothing stops a caller from driving a pass off another goroutine.
+	dueDriftCursor atomic.Uint32
 }
 
 // Start runs the reconciler loop until ctx is cancelled. It blocks
@@ -87,21 +101,39 @@ func (r *Reconciler) runOnce(ctx context.Context) {
 }
 
 // scanDueDateDrift finds linked calendar_events (task_role = 'due')
-// whose DATE(start_at) disagrees with tasks.due_on, then heals by
-// copying from the event (richer source — it carries the time-of-day
-// too).
+// whose start date disagrees with tasks.due_on, then heals by copying
+// from the event (richer source — it carries the time-of-day too).
+//
+// The comparison happens in Go rather than as `DATE(ce.start_at) <>
+// t.due_on`, because the SQL form asks the question in UTC. A Tokyo
+// 08:00 meeting is stored as 23:00 UTC the previous day, so the SQL date
+// is a day early — which made this loop re-assert the wrong deadline
+// every five minutes, silently undoing both itemkit's correct write and
+// any manual correction. A reconciler that heals toward a wrong value is
+// worse than no reconciler: it makes the bug survive being fixed.
+//
+// Doing it in Go means the scan can no longer be narrowed by a WHERE
+// clause — the local date has to be computed before it is known whether
+// a row drifted. So the scan is paged instead: each pass reads at most
+// maxDriftRowsPerPass rows and resumes from where it stopped, which
+// bounds the work per pass while still covering the whole table over
+// successive passes. Drift healing was always eventual; this makes the
+// cost of that eventuality explicit.
 func (r *Reconciler) scanDueDateDrift(ctx context.Context) {
 	const role = "due"
-	// The JOIN uses the (task_id, task_role, enabled) index. DATE() is
-	// a row-level filter applied after the join.
-	const q = `SELECT t.id, ce.id, t.due_on, DATE(ce.start_at)
+	// The JOIN uses the (task_id, task_role, enabled) index; the keyset
+	// on ce.id keeps each page a bounded forward scan.
+	const q = `SELECT t.id, ce.id, t.due_on, ce.start_at, ce.timezone
 	      FROM tasks t
 	      JOIN calendar_events ce ON ce.task_id = t.id AND ce.enabled
 	      WHERE t.enabled
 	        AND ce.task_role = ?
 	        AND ce.start_at IS NOT NULL
-	        AND (t.due_on IS NULL OR DATE(ce.start_at) <> t.due_on)`
-	rows, err := r.DB.QueryContext(ctx, q, role)
+	        AND ce.id > ?
+	      ORDER BY ce.id
+	      LIMIT ?`
+	cursor := r.dueDriftCursor.Load()
+	rows, err := r.DB.QueryContext(ctx, q, role, cursor, maxDriftRowsPerPass)
 	if err != nil {
 		r.logError("scan drift failed", err, "role", role)
 		return
@@ -116,17 +148,50 @@ func (r *Reconciler) scanDueDateDrift(ctx context.Context) {
 		eventDate sql.NullTime
 	}
 	var drifts []drift
+	var scanned int
+	var lastID uint32
 	for rows.Next() {
 		var d drift
-		if err := rows.Scan(&d.taskID, &d.eventID, &d.taskDate, &d.eventDate); err != nil {
+		var startAt sql.NullTime
+		var tz string
+		if err := rows.Scan(&d.taskID, &d.eventID, &d.taskDate, &startAt, &tz); err != nil {
 			r.logError("scan row failed", err, "role", role)
 			continue
 		}
+		scanned++
+		lastID = d.eventID
+		if !startAt.Valid {
+			continue
+		}
+		local, err := region.LocalDate(startAt.Time, region.EffectiveTimezone(tz))
+		if err != nil {
+			// The row names a zone that does not exist, so there is no
+			// date to heal toward. Report it rather than falling back to
+			// UTC, which would write a plausible-looking wrong date.
+			if r.Metrics != nil {
+				r.Metrics.IncInconsistency("event_timezone_invalid")
+			}
+			r.Logger.Warn("item consistency drift detected",
+				"kind", "event_timezone_invalid", "task_id", d.taskID,
+				"event_id", d.eventID, "timezone", tz)
+			continue
+		}
+		if d.taskDate.Valid && sameDate(d.taskDate.Time, local) {
+			continue
+		}
+		d.eventDate = sql.NullTime{Time: local, Valid: true}
 		drifts = append(drifts, d)
 	}
 	if err := rows.Err(); err != nil {
 		r.logError("scan iteration failed", err, "role", role)
 		return
+	}
+	// A short page means the end of the table; start the next pass from
+	// the beginning so rows before the cursor are revisited.
+	if scanned < maxDriftRowsPerPass {
+		r.dueDriftCursor.Store(0)
+	} else {
+		r.dueDriftCursor.Store(lastID)
 	}
 
 	for _, d := range drifts {
@@ -279,6 +344,16 @@ func (r *Reconciler) logError(msg string, err error, args ...any) {
 	}
 	args = append([]any{"err", err}, args...)
 	r.Logger.Error(msg, args...)
+}
+
+// sameDate reports whether two date-carrying times name the same
+// calendar day. Both sides are midnight-carried values (a DATE column
+// read back, and region.LocalDate's output), so comparing the Y/M/D
+// triple avoids depending on either one's location.
+func sameDate(a, b time.Time) bool {
+	ay, am, ad := a.Date()
+	by, bm, bd := b.Date()
+	return ay == by && am == bm && ad == bd
 }
 
 func nullTimeString(t sql.NullTime) string {
