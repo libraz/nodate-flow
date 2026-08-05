@@ -129,7 +129,7 @@ func ParseCSV(text string) ([]Row, []RowError, error) {
 			continue
 		}
 
-		row := Row{Line: lineNo, Title: strings.TrimSpace(field(record, titleCol))}
+		row := Row{Line: lineNo, Title: unescapeFormula(strings.TrimSpace(field(record, titleCol)))}
 		if row.Title == "" {
 			rowErrs = append(rowErrs, RowError{Line: lineNo, Column: colTitle, Reason: "required"})
 			continue
@@ -148,7 +148,7 @@ func ParseCSV(text string) ([]Row, []RowError, error) {
 // column wins: reporting one reason per line keeps the error log
 // readable when a whole file is malformed the same way.
 func fillOptional(row *Row, record []string, index map[string]int) *RowError {
-	if raw := strings.TrimSpace(field(record, index[colDescription])); raw != "" {
+	if raw := unescapeFormula(strings.TrimSpace(field(record, index[colDescription]))); raw != "" {
 		row.Description = sql.NullString{String: raw, Valid: true}
 	}
 	if raw := strings.TrimSpace(field(record, index[colPriority])); raw != "" {
@@ -199,6 +199,28 @@ func indexHeader(header []string) (map[string]int, error) {
 		return nil, fmt.Errorf("importer: csv header has no %q column", colTitle)
 	}
 	return index, nil
+}
+
+// formulaLeaders mirrors the characters the export escapes when they
+// start a cell.
+const formulaLeaders = "=+-@\t\r"
+
+// unescapeFormula removes the apostrophe the export adds in front of a
+// cell a spreadsheet would otherwise execute.
+//
+// Without this, exporting a workspace and importing it back renames
+// every task whose title starts with one of those characters, gaining
+// an apostrophe each round trip. The prefix is only stripped when what
+// follows it is one of those characters, so a title that genuinely
+// begins with an apostrophe survives untouched.
+func unescapeFormula(cell string) string {
+	if len(cell) < 2 || cell[0] != '\'' {
+		return cell
+	}
+	if !strings.ContainsRune(formulaLeaders, rune(cell[1])) {
+		return cell
+	}
+	return cell[1:]
 }
 
 func field(record []string, i int) string {

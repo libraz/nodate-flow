@@ -190,6 +190,124 @@ func TestReconcilerCleanStateLeavesTaskAlone(t *testing.T) {
 	// assertion at all.
 }
 
+// TestReconcilerHealsDueOnDriftInTheEventTimezone seeds a Tokyo morning
+// meeting whose deadline carries the UTC date — the exact state the
+// old derivation produced — and asserts the reconciler heals it to the
+// Tokyo date.
+//
+// Nothing about this pair looks wrong in UTC: DATE(start_at) and due_on
+// agree, which is why the SQL-side comparison walked past it.
+func TestReconcilerHealsDueOnDriftInTheEventTimezone(t *testing.T) {
+	bootstrap(t)
+	t.Parallel()
+
+	tenant := newTenant(t)
+	t.Cleanup(func() { helpers.PurgeWorkspace(t, testDB, tenant.WorkspacePublicID) })
+
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+
+	wsID, userID := lookupWorkspaceAndOwner(ctx, t, tenant.WorkspacePublicID)
+	calID := seedPersonalCalendar(ctx, t, wsID, userID, "drift-tokyo")
+
+	// 2026-06-08 08:00 Asia/Tokyo.
+	taskID := seedTask(ctx, t, wsID, userID, "tokyo standup task", "2026-06-07")
+	seedLinkedEventInZone(ctx, t, wsID, calID, userID, taskID, "due",
+		"2026-06-07 23:00:00", "2026-06-08 00:00:00", "Asia/Tokyo")
+
+	sink := newRecordingMetrics()
+	rec := &reconciler.Reconciler{DB: testDB, Logger: slog.Default(), Metrics: sink}
+	rec.RunOnce(ctx)
+
+	var dueOn sql.NullString
+	require.NoError(t, testDB.QueryRowContext(ctx,
+		`SELECT DATE_FORMAT(due_on, '%Y-%m-%d') FROM tasks WHERE id = ?`, taskID).
+		Scan(&dueOn))
+	require.True(t, dueOn.Valid)
+	require.Equal(t, "2026-06-08", dueOn.String,
+		"the deadline belongs to the Tokyo day the meeting is on")
+
+	requireEveryDriftHealed(t, sink, "date_drift_due")
+}
+
+// TestReconcilerLeavesACorrectZonedDueDateAlone is the one that matters
+// most: a correctly-dated pair must survive the loop.
+//
+// Judged in UTC this pair looks drifted, so the reconciler used to
+// "heal" it backwards every five minutes — overwriting both itemkit's
+// correct write and any manual correction, with no error anywhere. A
+// background loop that reverts the fix makes the bug unfixable from the
+// outside.
+func TestReconcilerLeavesACorrectZonedDueDateAlone(t *testing.T) {
+	bootstrap(t)
+	t.Parallel()
+
+	tenant := newTenant(t)
+	t.Cleanup(func() { helpers.PurgeWorkspace(t, testDB, tenant.WorkspacePublicID) })
+
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+
+	wsID, userID := lookupWorkspaceAndOwner(ctx, t, tenant.WorkspacePublicID)
+	calID := seedPersonalCalendar(ctx, t, wsID, userID, "clean-tokyo")
+
+	taskID := seedTask(ctx, t, wsID, userID, "correctly dated task", "2026-06-08")
+	seedLinkedEventInZone(ctx, t, wsID, calID, userID, taskID, "due",
+		"2026-06-07 23:00:00", "2026-06-08 00:00:00", "Asia/Tokyo")
+
+	sink := newRecordingMetrics()
+	rec := &reconciler.Reconciler{DB: testDB, Logger: slog.Default(), Metrics: sink}
+	// Two passes, because the failure this guards against is a loop that
+	// re-asserts itself on every tick. One pass cannot tell a loop that
+	// leaves the row alone from one that has not come round yet.
+	rec.RunOnce(ctx)
+	rec.RunOnce(ctx)
+
+	var dueOn sql.NullString
+	require.NoError(t, testDB.QueryRowContext(ctx,
+		`SELECT DATE_FORMAT(due_on, '%Y-%m-%d') FROM tasks WHERE id = ?`, taskID).
+		Scan(&dueOn))
+	require.True(t, dueOn.Valid)
+	require.Equal(t, "2026-06-08", dueOn.String,
+		"the reconciler must not drag a correct deadline back to its UTC date")
+}
+
+// TestReconcilerReportsAnUnresolvableTimezone asserts a row naming a
+// zone that does not exist is surfaced rather than healed toward a
+// UTC-derived date, which would look plausible and be wrong.
+func TestReconcilerReportsAnUnresolvableTimezone(t *testing.T) {
+	bootstrap(t)
+	t.Parallel()
+
+	tenant := newTenant(t)
+	t.Cleanup(func() { helpers.PurgeWorkspace(t, testDB, tenant.WorkspacePublicID) })
+
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+
+	wsID, userID := lookupWorkspaceAndOwner(ctx, t, tenant.WorkspacePublicID)
+	calID := seedPersonalCalendar(ctx, t, wsID, userID, "bad-zone")
+
+	taskID := seedTask(ctx, t, wsID, userID, "unresolvable zone task", "2026-06-07")
+	seedLinkedEventInZone(ctx, t, wsID, calID, userID, taskID, "due",
+		"2026-06-07 23:00:00", "2026-06-08 00:00:00", "Mars/Olympus")
+
+	sink := newRecordingMetrics()
+	rec := &reconciler.Reconciler{DB: testDB, Logger: slog.Default(), Metrics: sink}
+	rec.RunOnce(ctx)
+
+	require.GreaterOrEqual(t, sink.inconsistency["event_timezone_invalid"], 1,
+		"an unresolvable zone must be reported")
+
+	var dueOn sql.NullString
+	require.NoError(t, testDB.QueryRowContext(ctx,
+		`SELECT DATE_FORMAT(due_on, '%Y-%m-%d') FROM tasks WHERE id = ?`, taskID).
+		Scan(&dueOn))
+	require.True(t, dueOn.Valid)
+	require.Equal(t, "2026-06-07", dueOn.String,
+		"a row with no resolvable zone has no date to heal toward")
+}
+
 // ---- seed helpers (local to this test file) --------------------------------
 
 func lookupWorkspaceAndOwner(ctx context.Context, t *testing.T, wsPublicID string) (uint32, uint32) {
@@ -255,6 +373,17 @@ func seedLinkedEvent(ctx context.Context, t *testing.T, wsID, calID, userID, tas
 	role, startAt, endAt string,
 ) uint32 {
 	t.Helper()
+	return seedLinkedEventInZone(ctx, t, wsID, calID, userID, taskID, role, startAt, endAt, "UTC")
+}
+
+// seedLinkedEventInZone is seedLinkedEvent with the event's timezone
+// spelled out. startAt / endAt stay UTC instants — the zone is what the
+// event claims its wall clock is read in, which is what decides the
+// calendar date the deadline should carry.
+func seedLinkedEventInZone(ctx context.Context, t *testing.T, wsID, calID, userID, taskID uint32,
+	role, startAt, endAt, tz string,
+) uint32 {
+	t.Helper()
 	conn, err := testDB.Conn(ctx)
 	require.NoError(t, err)
 	defer func() { _ = conn.Close() }()
@@ -267,9 +396,9 @@ func seedLinkedEvent(ctx context.Context, t *testing.T, wsID, calID, userID, tas
 		`INSERT INTO calendar_events
 		 (public_id, workspace_id, calendar_id, title, start_at, end_at, timezone,
 		  owner_user_id, created_by_user_id, task_id, task_role)
-		 VALUES (UUID_TO_BIN(UUID(), 0), ?, ?, 'linked', ?, ?, 'UTC',
+		 VALUES (UUID_TO_BIN(UUID(), 0), ?, ?, 'linked', ?, ?, ?,
 		         ?, ?, ?, ?)`,
-		wsID, calID, startAt, endAt, userID, userID, taskID, role)
+		wsID, calID, startAt, endAt, tz, userID, userID, taskID, role)
 	require.NoError(t, err)
 	id, err := res.LastInsertId()
 	require.NoError(t, err)
