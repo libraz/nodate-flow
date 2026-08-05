@@ -6,78 +6,56 @@ import (
 	"encoding/json"
 	"errors"
 	"log/slog"
-	"net/http/httptest"
 	"strings"
 	"testing"
 
-	"github.com/danielgtaylor/huma/v2"
+	apierrors "github.com/libraz/nodate-flow/apps/flow-api/internal/errors"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/handlers/handlerutil"
 )
 
-// TestWriteFetchError_LogsUnknownError covers Task #11 item A:
-// when writeFetchError falls back to INTERNAL.UNEXPECTED because the
-// upstream error is not a known shape, the original error must be
-// logged with the source context BEFORE the response is written.
-// Without this guarantee, a transport-layer regression silently
-// collapses to a generic 500 with nothing on disk for ops to triage.
-func TestWriteFetchError_LogsUnknownError(t *testing.T) {
+// TestDatasetQueryFailed_LogsTheDriverError covers what the caller is
+// deliberately not told.
+//
+// The error handed back names nothing about the database, because an
+// export failure must not describe the store to whoever asked for the
+// file. That makes the log the only remaining record: without it a
+// transport-level regression collapses into a generic 500 with nothing
+// for anyone to triage from.
+//
+// This used to live in the CSV route's own error writer. Both routes
+// now return their errors for Huma to render, so the logging moved to
+// the fetch path they share — which also means the JSON route logs it
+// for the first time.
+func TestDatasetQueryFailed_LogsTheDriverError(t *testing.T) {
 	var buf bytes.Buffer
 	prev := slog.Default()
 	slog.SetDefault(slog.New(slog.NewJSONHandler(&buf, &slog.HandlerOptions{Level: slog.LevelDebug})))
 	t.Cleanup(func() { slog.SetDefault(prev) })
 
-	rec := httptest.NewRecorder()
-	upstream := errors.New("synthetic upstream failure")
-	writeFetchError(context.Background(), rec, "lens", upstream)
+	err := datasetQueryFailed(context.Background(), "lens", errors.New("synthetic upstream failure"))
 
-	if rec.Code != 500 {
-		t.Fatalf("status = %d; want 500", rec.Code)
+	var problem *handlerutil.ProblemDetails
+	if !errors.As(err, &problem) {
+		t.Fatalf("error = %T; want *handlerutil.ProblemDetails", err)
+	}
+	if problem.Type != apierrors.ExportTaskDatasetQueryFailed.Code {
+		t.Fatalf("type = %q; want %q", problem.Type, apierrors.ExportTaskDatasetQueryFailed.Code)
+	}
+	if strings.Contains(problem.Detail, "synthetic upstream failure") {
+		t.Fatalf("the caller must not be told what the store said, got detail %q", problem.Detail)
 	}
 
 	if buf.Len() == 0 {
-		t.Fatal("writeFetchError did not log the upstream error")
+		t.Fatal("the driver error was neither returned nor logged, so it is simply gone")
 	}
-
 	var entry map[string]any
-	if err := json.Unmarshal(buf.Bytes(), &entry); err != nil {
-		t.Fatalf("log output is not JSON: %v\n%s", err, buf.String())
-	}
-
-	if got, _ := entry["msg"].(string); !strings.Contains(got, "fetch error") {
-		t.Fatalf("log msg = %q; want containing 'fetch error'", got)
+	if uerr := json.Unmarshal(buf.Bytes(), &entry); uerr != nil {
+		t.Fatalf("log output is not JSON: %v\n%s", uerr, buf.String())
 	}
 	if got, _ := entry["source"].(string); got != "lens" {
 		t.Fatalf("log source = %q; want %q", got, "lens")
 	}
 	if got, _ := entry["error"].(string); !strings.Contains(got, "synthetic upstream failure") {
 		t.Fatalf("log error attr = %q; want containing %q", got, "synthetic upstream failure")
-	}
-}
-
-// TestWriteFetchError_KnownShapeDoesNotLog asserts the happy fallback:
-// when the error is already an apierror-shaped value the response
-// pipeline forwards code + status without the noise of an extra log
-// line. Otherwise every domain 4xx would generate phantom error logs.
-func TestWriteFetchError_KnownShapeDoesNotLog(t *testing.T) {
-	var buf bytes.Buffer
-	prev := slog.Default()
-	slog.SetDefault(slog.New(slog.NewJSONHandler(&buf, &slog.HandlerOptions{Level: slog.LevelDebug})))
-	t.Cleanup(func() { slog.SetDefault(prev) })
-
-	// A wrapped huma.ErrorModel is the "known shape" — writeFetchError
-	// projects it onto the wire envelope without an additional log.
-	specErr := &huma.ErrorModel{
-		Type:   "WS.TASK.NOT_FOUND",
-		Title:  "Not Found",
-		Status: 404,
-		Detail: "task not found",
-	}
-	rec := httptest.NewRecorder()
-	writeFetchError(context.Background(), rec, "workspace", specErr)
-
-	if rec.Code != 404 {
-		t.Fatalf("status = %d; want 404", rec.Code)
-	}
-	if buf.Len() != 0 {
-		t.Fatalf("known-shape error should not log; got: %s", buf.String())
 	}
 }

@@ -4,10 +4,11 @@ import (
 	"context"
 	"database/sql"
 	"encoding/csv"
-	"encoding/json"
 	"fmt"
+	"io"
 	"log/slog"
 	"net/http"
+	"strconv"
 
 	"github.com/danielgtaylor/huma/v2"
 	"github.com/google/uuid"
@@ -105,82 +106,48 @@ func Export(deps Deps) func(ctx context.Context, in *Input) (*Output, error) {
 	}
 }
 
-// CSV returns a raw http.HandlerFunc that streams a CSV file.
-// It is registered on the chi router directly (not via Huma) because
-// the response is a file download with custom content-type headers.
+// CSVOperation streams the workspace's tasks as a CSV download.
 //
-// Errors are emitted as a JSON problem+json envelope via
-// [handlerutil.WriteSpecError] so clients see the same `type` /
-// `status` shape as Huma-mediated routes.
-func CSV(deps Deps) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		ctx := r.Context()
+// It is a Huma operation rather than a raw chi handler so the route
+// reaches the OpenAPI document and, through it, the generated SDK. As a
+// bare chi registration it served the file correctly to anyone who
+// already knew the path and was invisible to everyone who did not,
+// which is why the JSON route grew a `format` parameter that looked
+// like the way to ask for a CSV and was not.
+//
+// The body is streamed because the payload is a file: Huma marshals a
+// declared response body as JSON, so a CSV has to be written directly.
+// Errors are returned rather than written, which is what lets Huma emit
+// the same problem+json envelope as every other route instead of this
+// package hand-rolling one.
+func CSVOperation(deps Deps) func(context.Context, *CSVInput) (*huma.StreamResponse, error) {
+	return func(ctx context.Context, in *CSVInput) (*huma.StreamResponse, error) {
 		ws, ok := middleware.WorkspaceFromContext(ctx)
 		if !ok {
-			handlerutil.WriteSpecError(w, apierrors.WsWorkspaceNotFound)
-			return
+			return nil, httpErr(apierrors.WsWorkspaceNotFound)
 		}
 		actorID, _ := middleware.ActorFromContext(ctx)
 
-		q := r.URL.Query()
-		lensID := q.Get("lensId")
-		limit := parseLimit(q.Get("limit"), 5000)
+		limit := in.Limit
+		if limit <= 0 {
+			limit = 5000
+		}
+		if limit > maxExportRows {
+			limit = maxExportRows
+		}
 
 		var rows []exportRow
 		var err error
-
-		source := "workspace"
-		if lensID != "" {
-			source = "lens"
-			rows, err = fetchForLens(ctx, deps, ws, actorID, lensID, limit)
+		if in.LensID != "" {
+			rows, err = fetchForLens(ctx, deps, ws, actorID, in.LensID, limit)
 		} else {
 			rows, err = fetchForWorkspace(ctx, deps, ws, actorID, limit)
 		}
 		if err != nil {
-			writeFetchError(ctx, w, source, err)
-			return
+			return nil, err
 		}
-
 		tasks := mapRows(rows)
 
-		// Headers for file download.
-		w.Header().Set("Content-Type", "text/csv; charset=utf-8")
-		w.Header().Set("Content-Disposition", `attachment; filename="tasks-export.csv"`)
-		w.WriteHeader(http.StatusOK)
-
-		// UTF-8 BOM for Excel compatibility.
-		_, _ = w.Write([]byte{0xEF, 0xBB, 0xBF})
-
-		cw := csv.NewWriter(w)
-		// Header row.
-		_ = cw.Write([]string{
-			"ID", "Title", "Description", "Status", "Priority",
-			"Due Date", "Start Date", "Completed At",
-			"Project ID", "Project", "Assignee ID", "Assignee",
-			"Updated At", "Created At",
-		})
-
-		for _, t := range tasks {
-			_ = cw.Write([]string{
-				t.ID,
-				t.Title,
-				handlerutil.DerefStr(t.Description),
-				t.Status,
-				fmt.Sprintf("%d", t.Priority),
-				handlerutil.DerefStr(t.DueOn),
-				handlerutil.DerefStr(t.StartedOn),
-				handlerutil.FormatOptionalUnix(t.CompletedAt),
-				t.ProjectID,
-				t.ProjectName,
-				handlerutil.DerefStr(t.AssigneeID),
-				handlerutil.DerefStr(t.AssigneeDisplayName),
-				handlerutil.FormatOptionalUnix(t.UpdatedAt),
-				handlerutil.FormatUnix(t.CreatedAt),
-			})
-		}
-		cw.Flush()
-
-		// Audit log.
 		deps.Audit.Record(ctx, audit.Entry{
 			Action:       "export.create",
 			ActorID:      actorID,
@@ -192,7 +159,6 @@ func CSV(deps Deps) http.HandlerFunc {
 			},
 		})
 
-		// Append event.
 		actorInt64 := int64(actorID)
 		if err := eventbus.Append(ctx, deps.DB, eventbus.Event{
 			Type:        eventbus.ExportRequested,
@@ -205,18 +171,90 @@ func CSV(deps Deps) http.HandlerFunc {
 		}); err != nil {
 			slog.ErrorContext(ctx, "eventbus.Append failed",
 				slog.Any("err", err),
-				slog.String("handler", "export.CSV"),
+				slog.String("handler", "export.CSVOperation"),
 				slog.String("event_type", string(eventbus.ExportRequested)),
 				logutil.LogEntity("workspace", ws.PublicID),
 				slog.String("format", "csv"),
 			)
 		}
+
+		return &huma.StreamResponse{
+			Body: func(hctx huma.Context) {
+				hctx.SetHeader("Content-Type", "text/csv; charset=utf-8")
+				hctx.SetHeader("Content-Disposition", `attachment; filename="tasks-export.csv"`)
+				// The row count travels in a header because the body is a
+				// file. A caller that wants to know whether the export
+				// filled the ceiling it asked for — and is therefore
+				// missing rows — cannot get that from the CSV text
+				// without parsing it, and counting lines is wrong the
+				// moment a description contains a newline. The server
+				// already knows the number exactly.
+				hctx.SetHeader(RowCountHeader, strconv.Itoa(len(tasks)))
+				hctx.SetStatus(http.StatusOK)
+				writeCSV(hctx.BodyWriter(), tasks)
+			},
+		}, nil
 	}
+}
+
+// writeCSV emits the export as CSV.
+//
+// The leading byte order mark is for spreadsheet software that reads a
+// CSV as the local code page unless told otherwise; without it a file
+// of non-ASCII task titles opens as mojibake. This is the only place
+// that adds one — a second BOM written by a client assembling its own
+// file would appear as stray characters in the first header cell.
+func writeCSV(w io.Writer, tasks []ExportedTask) {
+	_, _ = w.Write([]byte{0xEF, 0xBB, 0xBF})
+
+	cw := csv.NewWriter(w)
+	_ = cw.Write([]string{
+		"ID", "Title", "Description", "Status", "Priority",
+		"Due Date", "Start Date", "Completed At",
+		"Project ID", "Project", "Assignee ID", "Assignee",
+		"Updated At", "Created At",
+	})
+	for _, t := range tasks {
+		_ = cw.Write([]string{
+			t.ID,
+			t.Title,
+			handlerutil.DerefStr(t.Description),
+			t.Status,
+			fmt.Sprintf("%d", t.Priority),
+			handlerutil.DerefStr(t.DueOn),
+			handlerutil.DerefStr(t.StartedOn),
+			handlerutil.FormatOptionalUnix(t.CompletedAt),
+			t.ProjectID,
+			t.ProjectName,
+			handlerutil.DerefStr(t.AssigneeID),
+			handlerutil.DerefStr(t.AssigneeDisplayName),
+			handlerutil.FormatOptionalUnix(t.UpdatedAt),
+			handlerutil.FormatUnix(t.CreatedAt),
+		})
+	}
+	cw.Flush()
 }
 
 // ----------------------------------------------------------------
 // Internal helpers
 // ----------------------------------------------------------------
+
+// datasetQueryFailed converts a failed export query into the caller's
+// error, logging the driver error on the way out.
+//
+// The typed error deliberately says nothing about what went wrong —
+// an export failure must not describe the database to whoever asked
+// for the file — so the detail has to be recorded somewhere, or a
+// transport-level regression becomes a generic 500 with nothing to
+// triage from. The CSV route used to log this and the JSON route did
+// not; now both go through here, so both do.
+func datasetQueryFailed(ctx context.Context, source string, err error) error {
+	slog.ErrorContext(ctx, "export: dataset fetch error",
+		slog.String("source", source),
+		slog.String("error", err.Error()),
+	)
+	return httpErr(apierrors.ExportTaskDatasetQueryFailed)
+}
 
 // exportRow is an internal union type so both query row types can
 // be handled through a single mapper pipeline.
@@ -251,7 +289,7 @@ func fetchForWorkspace(
 		Limit:         limit,
 	})
 	if err != nil {
-		return nil, httpErr(apierrors.ExportTaskDatasetQueryFailed)
+		return nil, datasetQueryFailed(ctx, "workspace", err)
 	}
 	out := make([]exportRow, len(dbRows))
 	for i, r := range dbRows {
@@ -305,7 +343,7 @@ func fetchForLens(
 			Limit:         limit,
 		})
 		if err != nil {
-			return nil, httpErr(apierrors.ExportTaskDatasetQueryFailed)
+			return nil, datasetQueryFailed(ctx, "lens", err)
 		}
 		out := make([]exportRow, len(dbRows))
 		for i, r := range dbRows {
@@ -383,65 +421,4 @@ func mapRows(rows []exportRow) []ExportedTask {
 		tasks = append(tasks, t)
 	}
 	return tasks
-}
-
-// parseLimit parses a limit string, returning the default on failure.
-func parseLimit(s string, def int32) int32 {
-	if s == "" {
-		return def
-	}
-	var v int32
-	_, err := fmt.Sscanf(s, "%d", &v)
-	if err != nil || v <= 0 {
-		return def
-	}
-	if v > maxExportRows {
-		return maxExportRows
-	}
-	return v
-}
-
-// writeFetchError emits a JSON problem+json envelope for the CSV path.
-// fetch helpers return errors built by [handlerutil.HTTPErr], which are
-// *huma.ErrorModel values; we forward the embedded code + status into a
-// matching problem+json envelope so the wire shape stays identical to
-// the Huma-mediated JSON route. Unknown shapes collapse to
-// INTERNAL.UNEXPECTED so a transport-layer regression does not leak a
-// raw error string — but the original error is logged first so the
-// fallback never silently swallows an unfamiliar failure mode.
-func writeFetchError(ctx context.Context, w http.ResponseWriter, source string, err error) {
-	var hm *huma.ErrorModel
-	switch e := err.(type) {
-	case *handlerutil.ProblemDetails:
-		if e != nil {
-			hm = &e.ErrorModel
-		}
-	case *huma.ErrorModel:
-		hm = e
-	}
-	if hm != nil {
-		w.Header().Set("Content-Type", "application/problem+json; charset=utf-8")
-		status := hm.Status
-		if status == 0 {
-			status = http.StatusInternalServerError
-		}
-		w.WriteHeader(status)
-		_ = json.NewEncoder(w).Encode(struct {
-			Type   string `json:"type"`
-			Title  string `json:"title"`
-			Status int    `json:"status"`
-			Detail string `json:"detail"`
-		}{
-			Type:   hm.Type,
-			Title:  hm.Title,
-			Status: status,
-			Detail: hm.Detail,
-		})
-		return
-	}
-	slog.ErrorContext(ctx, "export: fetch error",
-		slog.Any("error", err),
-		slog.String("source", source),
-	)
-	handlerutil.WriteSpecError(w, apierrors.InternalUnexpected)
 }

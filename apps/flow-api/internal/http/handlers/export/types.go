@@ -28,8 +28,29 @@ var httpErr = handlerutil.HTTPErr
 // workspace in a single download. Cost is bounded by the DB query
 // timeout and the streaming CSV encoder.
 type Input struct {
+	WsID string `path:"wsId"`
+	// This operation answers in JSON and only in JSON. The parameter
+	// used to accept csv as well — and defaulted to it — while the
+	// handler ignored it and returned JSON regardless, echoing back the
+	// format it had not produced. A caller asking for csv therefore got
+	// a JSON body that said "csv" and no indication that the file they
+	// wanted lives at a different path. Declaring the one value the
+	// route can actually serve turns that into a rejection naming the
+	// CSV route instead of a wrong answer wearing the right label.
+	Format string `query:"format" enum:"json" default:"json" doc:"Export format. This route serves JSON; the CSV download is GET /workspaces/{wsId}/export/tasks.csv"`
+	LensID string `query:"lensId,omitempty" doc:"Optional lens public id to scope the export"`
+	Limit  int32  `query:"limit" minimum:"1" maximum:"10000" default:"5000" doc:"Maximum number of rows to export"`
+}
+
+// RowCountHeader carries the number of task rows the CSV download
+// contains. It is how a caller tells a complete export from one that
+// stopped at the row ceiling, which the file itself cannot say.
+const RowCountHeader = "X-Export-Row-Count"
+
+// CSVInput is the request surface of the CSV download. It carries no
+// format parameter: the route is the format.
+type CSVInput struct {
 	WsID   string `path:"wsId"`
-	Format string `query:"format" enum:"csv,json" default:"csv" doc:"Export format (csv or json)"`
 	LensID string `query:"lensId,omitempty" doc:"Optional lens public id to scope the export"`
 	Limit  int32  `query:"limit" minimum:"1" maximum:"10000" default:"5000" doc:"Maximum number of rows to export"`
 }

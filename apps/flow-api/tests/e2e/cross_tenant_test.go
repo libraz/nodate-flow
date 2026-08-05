@@ -185,3 +185,45 @@ func TestCrossTenantExportIsolation(t *testing.T) {
 		outsider.AccessToken, nil)
 	require.GreaterOrEqual(t, status, 403, "outsider must not export tasks")
 }
+
+// TestCrossTenantCSVExportIsolation is the authorization baseline for
+// the CSV download, taken before the route moves from a raw chi
+// registration to a Huma operation.
+//
+// The route hands back every task in a workspace, so what matters when
+// it moves is not that it still works but that it still refuses. The
+// test is written against the route as it stands so the same assertions
+// can be run after the move: a check written afterwards cannot tell
+// "the move preserved this" from "this was never enforced".
+func TestCrossTenantCSVExportIsolation(t *testing.T) {
+	bootstrap(t)
+	t.Parallel()
+
+	owner := newTenant(t)
+	outsider := newTenant(t)
+
+	// The owner has something worth stealing.
+	doJSON(t, http.MethodPost, testServerURL+"/tasks", owner.AccessToken,
+		map[string]any{"projectId": owner.ProjectPublicID, "title": "CONFIDENTIAL-CSV-" + randomHex(8)}, nil)
+
+	csvURL := testServerURL + "/workspaces/" + owner.WorkspacePublicID + "/export/tasks.csv"
+
+	status, body := doJSONStatus(t, http.MethodGet, csvURL, outsider.AccessToken, nil)
+	require.GreaterOrEqual(t, status, 403,
+		"a member of another workspace must not download this workspace's CSV")
+	require.NotContains(t, string(body), "CONFIDENTIAL-CSV-",
+		"a refusal must not carry any of the rows it refused")
+
+	// Unauthenticated is refused too, and for the same reason.
+	status, body = doJSONStatus(t, http.MethodGet, csvURL, "", nil)
+	require.GreaterOrEqual(t, status, 401,
+		"the CSV download must require authentication")
+	require.NotContains(t, string(body), "CONFIDENTIAL-CSV-")
+
+	// And the owner can still get it, so the assertions above are about
+	// authorization rather than a route that answers nobody.
+	status, body = doJSONStatus(t, http.MethodGet, csvURL, owner.AccessToken, nil)
+	require.Equal(t, http.StatusOK, status, "the owner must be able to download the CSV")
+	require.Contains(t, string(body), "CONFIDENTIAL-CSV-",
+		"the owner's download must contain the owner's tasks")
+}

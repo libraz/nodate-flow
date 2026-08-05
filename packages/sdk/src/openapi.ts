@@ -3730,6 +3730,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/workspaces/{wsId}/export/tasks.csv": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Export tasks as CSV
+         * @description Download workspace tasks as a CSV file, optionally scoped by a saved lens.
+         */
+        get: operations["export-tasks-csv"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/workspaces/{wsId}/imports": {
         parameters: {
             query?: never;
@@ -8281,6 +8301,8 @@ export interface components {
             allDay?: boolean;
             /** @description Block label */
             blockLabel?: string;
+            /** @description Nullable fields to clear. Takes precedence over a value sent for the same field in this request. */
+            clear?: ("location" | "memo" | "url" | "blockLabel" | "recurrenceRule" | "recurrenceEnd" | "recurrenceExceptions" | "notificationOffset")[] | null;
             /**
              * Format: int64
              * @description End time as unix seconds (UTC)
@@ -18327,8 +18349,8 @@ export interface operations {
     "export-tasks": {
         parameters: {
             query?: {
-                /** @description Export format (csv or json) */
-                format?: "csv" | "json";
+                /** @description Export format. This route serves JSON; the CSV download is GET /workspaces/{wsId}/export/tasks.csv */
+                format?: "json";
                 /** @description Optional lens public id to scope the export */
                 lensId?: string;
                 /** @description Maximum number of rows to export */
@@ -18349,6 +18371,44 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Body"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "export-tasks-csv": {
+        parameters: {
+            query?: {
+                /** @description Optional lens public id to scope the export */
+                lensId?: string;
+                /** @description Maximum number of rows to export */
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                wsId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description CSV file download */
+            200: {
+                headers: {
+                    /** @description Number of task rows in the file. Equal to the requested limit means the export stopped at the ceiling and the workspace holds more. */
+                    "X-Export-Row-Count"?: number;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/csv": unknown;
                 };
             };
             /** @description Error */

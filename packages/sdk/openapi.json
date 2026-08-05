@@ -7521,6 +7521,23 @@
             "description": "Block label",
             "type": "string"
           },
+          "clear": {
+            "description": "Nullable fields to clear. Takes precedence over a value sent for the same field in this request.",
+            "items": {
+              "enum": [
+                "location",
+                "memo",
+                "url",
+                "blockLabel",
+                "recurrenceRule",
+                "recurrenceEnd",
+                "recurrenceExceptions",
+                "notificationOffset"
+              ],
+              "type": "string"
+            },
+            "type": ["array", "null"]
+          },
           "endAt": {
             "description": "End time as unix seconds (UTC)",
             "format": "int64",
@@ -24597,14 +24614,14 @@
             }
           },
           {
-            "description": "Export format (csv or json)",
+            "description": "Export format. This route serves JSON; the CSV download is GET /workspaces/{wsId}/export/tasks.csv",
             "explode": false,
             "in": "query",
             "name": "format",
             "schema": {
-              "default": "csv",
-              "description": "Export format (csv or json)",
-              "enum": ["csv", "json"],
+              "default": "json",
+              "description": "Export format. This route serves JSON; the CSV download is GET /workspaces/{wsId}/export/tasks.csv",
+              "enum": ["json"],
               "type": "string"
             }
           },
@@ -24656,6 +24673,74 @@
           }
         },
         "summary": "Export tasks as JSON",
+        "tags": ["Admin"]
+      }
+    },
+    "/workspaces/{wsId}/export/tasks.csv": {
+      "get": {
+        "description": "Download workspace tasks as a CSV file, optionally scoped by a saved lens.",
+        "operationId": "export-tasks-csv",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "wsId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Optional lens public id to scope the export",
+            "explode": false,
+            "in": "query",
+            "name": "lensId",
+            "schema": {
+              "description": "Optional lens public id to scope the export",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Maximum number of rows to export",
+            "explode": false,
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "default": 5000,
+              "description": "Maximum number of rows to export",
+              "format": "int32",
+              "maximum": 10000,
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "text/csv": {}
+            },
+            "description": "CSV file download",
+            "headers": {
+              "X-Export-Row-Count": {
+                "description": "Number of task rows in the file. Equal to the requested limit means the export stopped at the ceiling and the workspace holds more.",
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            }
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Export tasks as CSV",
         "tags": ["Admin"]
       }
     },

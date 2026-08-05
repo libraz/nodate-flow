@@ -780,7 +780,7 @@ func buildAuthenticatedAPI(r chi.Router, deps Deps, shared *sharedDeps, authMW f
 		lensDeps := lenses.Deps{DB: deps.DB, Queries: deps.Queries, Audit: shared.auditRec}
 		lenses.RegisterWorkspaceScoped(subAPI, lensDeps)
 		exportDeps := exporthandlers.Deps{DB: deps.DB, Queries: deps.Queries, Audit: shared.auditRec}
-		exporthandlers.RegisterWorkspaceScoped(subAPI, sub, exportDeps)
+		exporthandlers.RegisterWorkspaceScoped(subAPI, exportDeps)
 		tbDeps := timeboxes.Deps{DB: deps.DB, Queries: deps.Queries, Audit: shared.auditRec}
 		timeboxes.RegisterWorkspaceScoped(subAPI, tbDeps)
 		dashDeps := dashboard.Deps{DB: deps.DB, Queries: deps.Queries, Audit: shared.auditRec}
