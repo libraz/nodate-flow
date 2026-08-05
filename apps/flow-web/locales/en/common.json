@@ -40,6 +40,8 @@
     "timeboxes": "Timeboxes",
     "activity": "Activity",
     "insightsPriority": "Priority suggestions",
+    "retroDrafts": "Retrospective drafts",
+    "archive": "Archive",
     "collapse": "Collapse sidebar",
     "expand": "Expand sidebar"
   },
@@ -413,7 +415,9 @@
       "remove": "Remove",
       "remove_confirm": "Remove {name} from this workspace?",
       "removed": "Member removed",
-      "role_updated": "Role updated"
+      "remove_failed": "Failed to remove the member",
+      "role_updated": "Role updated",
+      "role_update_failed": "Failed to change the role"
     },
     "invites": {
       "create": "Create invite link",
@@ -570,7 +574,10 @@
       "user_id": "User ID",
       "role": "Role",
       "added_at": "Added",
-      "empty": "No members yet."
+      "empty": "No members yet.",
+      "remove": "Remove",
+      "removed": "Member removed",
+      "remove_failed": "Failed to remove the member"
     },
     "roles": {
       "lead": "Lead",
@@ -1033,6 +1040,11 @@
       "email_invalid": "Enter a valid email address.",
       "password_min": "Password must be at least 8 characters.",
       "name_required": "Display name is required."
+    },
+    "offline": {
+      "title": "Cannot reach the server",
+      "description": "Your session could not be checked because the connection failed. You are still signed in — try again once you are back online.",
+      "retry": "Try again"
     }
   },
   "realtime": {

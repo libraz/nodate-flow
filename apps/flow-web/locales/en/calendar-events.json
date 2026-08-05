@@ -161,7 +161,11 @@
       "send_invite": "Send invite link",
       "title": "Attendees",
       "you": "you",
-      "your_response": "Your response"
+      "your_response": "Your response",
+      "errors": {
+        "add_failed": "Could not add the attendee",
+        "invite_failed": "Could not create the invite link"
+      }
     },
     "creator": {
       "label": "Created by",

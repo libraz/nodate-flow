@@ -246,6 +246,7 @@
       "disable_confirm": "禁用两步验证？账户将仅由密码保护。",
       "copy": "复制",
       "secret_copied": "已复制密钥",
+      "secret_copy_failed": "无法复制密钥",
       "open_in_app": "在身份验证器中打开",
       "enabled_toast": "已启用两步验证。",
       "disabled_toast": "已禁用两步验证。",
@@ -268,6 +269,7 @@
         "download": "下载为 .txt",
         "saved": "我已保存",
         "copied": "已复制恢复代码",
+        "copy_failed": "无法复制恢复代码",
         "regenerated_toast": "已生成新的恢复代码。",
         "errors": {
           "regenerate_failed": "无法重新生成恢复代码，请重试。"
@@ -551,6 +553,7 @@
         },
         "submit": "导出",
         "success": "已导出 {count} 个任务",
+        "truncated": "仅导出了前 {count, number} 个任务。此工作区的任务数超过单次导出的上限，因此该文件不是完整备份。",
         "error": "导出任务失败"
       },
       "imports": {

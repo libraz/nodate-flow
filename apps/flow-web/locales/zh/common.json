@@ -40,6 +40,8 @@
     "timeboxes": "时间盒",
     "activity": "动态",
     "insightsPriority": "优先级建议",
+    "retroDrafts": "回顾草稿",
+    "archive": "归档",
     "collapse": "收起侧边栏",
     "expand": "展开侧边栏"
   },
@@ -413,7 +415,9 @@
       "remove": "移除",
       "remove_confirm": "将 {name} 从此工作区移除？",
       "removed": "已移除成员",
-      "role_updated": "已更新角色"
+      "remove_failed": "移除成员失败",
+      "role_updated": "已更新角色",
+      "role_update_failed": "修改角色失败"
     },
     "invites": {
       "create": "创建邀请链接",
@@ -570,7 +574,10 @@
       "user_id": "用户 ID",
       "role": "角色",
       "added_at": "添加时间",
-      "empty": "暂无成员。"
+      "empty": "暂无成员。",
+      "remove": "移除",
+      "removed": "已移除成员",
+      "remove_failed": "移除成员失败"
     },
     "roles": {
       "lead": "负责人",
@@ -1033,6 +1040,11 @@
       "email_invalid": "请输入有效的邮箱地址。",
       "password_min": "密码至少 8 位。",
       "name_required": "请填写显示名称。"
+    },
+    "offline": {
+      "title": "无法连接服务器",
+      "description": "由于连接失败，无法验证您的会话。您仍处于登录状态，请在网络恢复后重试。",
+      "retry": "重试"
     }
   },
   "realtime": {

@@ -40,6 +40,8 @@
     "timeboxes": "タイムボックス",
     "activity": "アクティビティ",
     "insightsPriority": "優先度の提案",
+    "retroDrafts": "振り返りドラフト",
+    "archive": "アーカイブ",
     "collapse": "サイドバーを折りたたむ",
     "expand": "サイドバーを展開する"
   },
@@ -413,7 +415,9 @@
       "remove": "削除",
       "remove_confirm": "{name} をこのワークスペースから削除しますか？",
       "removed": "メンバーを削除しました",
-      "role_updated": "ロールを更新しました"
+      "remove_failed": "メンバーの削除に失敗しました",
+      "role_updated": "ロールを更新しました",
+      "role_update_failed": "ロールの変更に失敗しました"
     },
     "invites": {
       "create": "招待リンクを作成",
@@ -570,7 +574,10 @@
       "user_id": "ユーザー ID",
       "role": "ロール",
       "added_at": "追加日",
-      "empty": "メンバーはまだいません。"
+      "empty": "メンバーはまだいません。",
+      "remove": "削除",
+      "removed": "メンバーを削除しました",
+      "remove_failed": "メンバーの削除に失敗しました"
     },
     "roles": {
       "lead": "リード",
@@ -1033,6 +1040,11 @@
       "email_invalid": "有効なメールアドレスを入力してください。",
       "password_min": "パスワードは 8 文字以上で入力してください。",
       "name_required": "表示名を入力してください。"
+    },
+    "offline": {
+      "title": "サーバーに接続できません",
+      "description": "接続に失敗したため、セッションを確認できませんでした。サインインしたままなので、接続が回復してから再試行してください。",
+      "retry": "再試行"
     }
   },
   "realtime": {

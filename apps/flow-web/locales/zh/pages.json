@@ -16,6 +16,17 @@
   "confirm_delete": "删除此页面？",
   "ai_generate": "用 AI 生成",
   "ai_generating": "生成中...",
+  "generate": {
+    "dialog_title": "用 AI 生成页面",
+    "context_label": "页面标题",
+    "prompt_label": "指令",
+    "prompt_placeholder": "请描述这个页面要涵盖的内容、目标读者、主要章节、语气，以及其他希望 AI 知道的信息。",
+    "prompt_help": "AI 会将上方的页面标题作为上下文，并按照你输入的指令生成内容。",
+    "submit": "生成",
+    "submitting": "生成中...",
+    "cancel": "取消",
+    "error": "生成页面失败，请重试。"
+  },
   "children": "子页面",
   "breadcrumb_label": "面包屑导航",
   "search_placeholder": "搜索页面...",

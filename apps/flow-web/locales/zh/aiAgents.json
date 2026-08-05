@@ -58,7 +58,17 @@
       "attempts": "尝试: {current}/{max}",
       "cost_today": "今日成本: ${amount}",
       "hand_back": "交还给我",
-      "run_history": "运行历史"
+      "run_history": "运行历史",
+      "assign": {
+        "title": "AI 代理",
+        "empty": "尚未分配代理",
+        "add": "分配代理",
+        "none_available": "此工作区没有代理",
+        "paused_option": "{name}（已暂停）",
+        "remove": "取消分配 {name}",
+        "failed": "分配代理失败",
+        "remove_failed": "取消分配代理失败"
+      }
     }
   },
   "handoff_reason": {

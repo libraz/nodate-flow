@@ -58,7 +58,17 @@
       "attempts": "tries: {current}/{max}",
       "cost_today": "cost today: ${amount}",
       "hand_back": "Hand back to me",
-      "run_history": "Open run history"
+      "run_history": "Open run history",
+      "assign": {
+        "title": "AI agents",
+        "empty": "No agent assigned",
+        "add": "Assign an agent",
+        "none_available": "No agents in this workspace",
+        "paused_option": "{name} (paused)",
+        "remove": "Unassign {name}",
+        "failed": "Failed to assign the agent",
+        "remove_failed": "Failed to unassign the agent"
+      }
     }
   },
   "handoff_reason": {

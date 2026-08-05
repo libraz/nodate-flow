@@ -161,7 +161,11 @@
       "send_invite": "发送邀请链接",
       "title": "参与者",
       "you": "你",
-      "your_response": "你的回应"
+      "your_response": "你的回应",
+      "errors": {
+        "add_failed": "无法添加参与者",
+        "invite_failed": "无法生成邀请链接"
+      }
     },
     "creator": {
       "label": "创建者",

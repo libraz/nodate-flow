@@ -161,7 +161,11 @@
       "send_invite": "招待リンクを送信",
       "title": "参加者",
       "you": "あなた",
-      "your_response": "あなたの返事"
+      "your_response": "あなたの返事",
+      "errors": {
+        "add_failed": "参加者を追加できませんでした",
+        "invite_failed": "招待リンクを発行できませんでした"
+      }
     },
     "creator": {
       "label": "作成者",

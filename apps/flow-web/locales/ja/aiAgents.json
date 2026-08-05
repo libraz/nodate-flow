@@ -58,7 +58,17 @@
       "attempts": "試行: {current}/{max}",
       "cost_today": "本日のコスト: ${amount}",
       "hand_back": "手元に戻す",
-      "run_history": "実行履歴"
+      "run_history": "実行履歴",
+      "assign": {
+        "title": "AI エージェント",
+        "empty": "エージェントは割り当てられていません",
+        "add": "エージェントを割り当てる",
+        "none_available": "このワークスペースにはエージェントがありません",
+        "paused_option": "{name}（一時停止中）",
+        "remove": "{name} の割り当てを解除",
+        "failed": "エージェントの割り当てに失敗しました",
+        "remove_failed": "エージェントの割り当て解除に失敗しました"
+      }
     }
   },
   "handoff_reason": {

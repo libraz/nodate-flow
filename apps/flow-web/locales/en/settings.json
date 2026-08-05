@@ -77,7 +77,7 @@
       "action": "Action",
       "resource_type": "Resource type",
       "actor_search": "Actor",
-      "actor_search_placeholder": "Search by name\u2026",
+      "actor_search_placeholder": "Search by name…",
       "date_from": "From",
       "date_to": "To",
       "all_actions": "All actions",
@@ -246,6 +246,7 @@
       "disable_confirm": "Disable two-factor authentication? Your account will be protected by a password only.",
       "copy": "Copy",
       "secret_copied": "Secret copied",
+      "secret_copy_failed": "Could not copy the secret",
       "open_in_app": "Open in authenticator app",
       "enabled_toast": "Two-factor authentication is now enabled.",
       "disabled_toast": "Two-factor authentication disabled.",
@@ -268,6 +269,7 @@
         "download": "Download as .txt",
         "saved": "I've saved them",
         "copied": "Recovery codes copied",
+        "copy_failed": "Could not copy the recovery codes",
         "regenerated_toast": "New recovery codes generated.",
         "errors": {
           "regenerate_failed": "Could not regenerate recovery codes. Please try again."
@@ -551,6 +553,7 @@
         },
         "submit": "Export",
         "success": "Exported {count} tasks",
+        "truncated": "Exported the first {count, number} tasks. This workspace has more than a single export can return, so the file is not a complete backup.",
         "error": "Failed to export tasks"
       },
       "imports": {
