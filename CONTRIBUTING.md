@@ -33,6 +33,7 @@ make dev                       # runs Go API + React frontend in parallel
 | `make gen-errors` | Regenerate Go + TS error code files from `errors/*.yaml` |
 | `make gen-sqlc` | Regenerate sqlc Go types from `sql/` |
 | `make gen-sdk` | Regenerate TypeScript SDK from OpenAPI spec |
+| `make verify-codegen` | Fail when the schema and its generated code disagree |
 
 ## Design order
 
@@ -150,6 +151,37 @@ Several directories contain generated code. These are marked with
 - `apps/flow-api/internal/db/generated/` -- sqlc output
 - `apps/flow-api/internal/errors/` -- error code codegen output
 - `packages/sdk/` -- OpenAPI TypeScript SDK
+
+### A schema change is not finished until the generated code follows
+
+`sql/schema.sql` and the sqlc output are both derived from the layered
+sources under `sql/core/` and `sql/flow/`. Neither is regenerated
+automatically, and leaving one behind is quiet: a column that exists in
+the schema but not in the generated struct is not a compile error, so
+the build succeeds and the tests pass while the column is unreachable.
+
+Column comments count too -- sqlc copies them into the generated Go doc
+comments, so a comment-only edit still leaves the generated files stale.
+
+A change under `sql/` therefore runs both generators before it is done:
+
+```sh
+make db-schema   # layered sources -> sql/schema.sql
+make gen-sqlc    # schema + queries -> apps/*/internal/db/generated/
+```
+
+`make verify-codegen` checks the pairing without writing anything, and
+is what the pre-commit hook and CI both run. The generator version is
+pinned in `scripts/check-codegen-drift.sh`, because two sqlc versions
+emit different code from identical input.
+
+### Hooks
+
+The pre-commit hook is `.githooks/pre-commit`, tracked in this
+repository and reached through the global hooks directory. When
+`core.hooksPath` is configured, git ignores `.git/hooks` entirely, so
+anything a package manager installs there never runs; `git rev-parse
+--git-path hooks` shows which directory git actually reads.
 
 ## License
 
