@@ -16,6 +16,8 @@ import (
 	"errors"
 	"log/slog"
 	"time"
+
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/dbretry"
 )
 
 // DefaultInterval is the gap between reconciler runs when Start is
@@ -140,7 +142,10 @@ func (r *Reconciler) scanDueDateDrift(ctx context.Context) {
 		// the direction itemkit uses for linked writes — the event
 		// is the richer source.
 		const upd = `UPDATE tasks SET due_on = ? WHERE id = ? AND enabled`
-		if _, err := r.DB.ExecContext(ctx, upd, d.eventDate, d.taskID); err != nil {
+		if err := r.heal(ctx, "reconciler.dateDrift", func(ctx context.Context) error {
+			_, err := r.DB.ExecContext(ctx, upd, d.eventDate, d.taskID)
+			return err
+		}); err != nil {
 			r.logError("heal drift failed", err,
 				"kind", kind, "task_id", d.taskID, "event_id", d.eventID)
 			continue
@@ -251,7 +256,10 @@ func (r *Reconciler) scanEnabledMismatch(ctx context.Context) {
 		r.Logger.Warn("item consistency drift detected",
 			"kind", "enabled_mismatch", "task_id", p.taskID, "event_id", p.eventID)
 		const upd = `UPDATE calendar_events SET enabled = FALSE WHERE id = ? AND enabled`
-		if _, err := conn.ExecContext(ctx, upd, p.eventID); err != nil {
+		if err := r.heal(ctx, "reconciler.enabledMismatch", func(ctx context.Context) error {
+			_, err := conn.ExecContext(ctx, upd, p.eventID)
+			return err
+		}); err != nil {
 			r.logError("heal enabled mismatch failed", err,
 				"task_id", p.taskID, "event_id", p.eventID)
 			continue
@@ -278,4 +286,22 @@ func nullTimeString(t sql.NullTime) string {
 		return ""
 	}
 	return t.Time.Format("2006-01-02")
+}
+
+// heal runs one healing statement, retrying the transient MySQL errors
+// (deadlock, lock-wait timeout) that a contended table hands back.
+//
+// Without the retry a heal that lost a lock race is logged and dropped,
+// and the pair stays broken until some later run happens to catch it.
+// The background loop does eventually come round again, but that makes
+// the recovery a property of the schedule rather than of the reconciler
+// — and the one-shot callers, RunOnce and anything driving a single
+// pass, never get a second round at all. Contention is exactly what a
+// safety net that sweeps live tables should expect to meet.
+//
+// Each statement stands alone, so retrying the statement is enough;
+// there is no transaction whose earlier work a retry would have to
+// redo.
+func (r *Reconciler) heal(ctx context.Context, label string, exec func(context.Context) error) error {
+	return dbretry.Do(ctx, label, exec)
 }
