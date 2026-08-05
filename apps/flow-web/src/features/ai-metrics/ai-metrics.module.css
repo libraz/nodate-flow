@@ -51,7 +51,7 @@
 }
 
 /* nf-token-override: breakpoint, and custom properties do not work in at-rule conditions */
-@media (max-width: 48rem) {
+@media (max-width: 767px) {
   .kpiGrid {
     grid-template-columns: 1fr;
   }

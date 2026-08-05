@@ -169,7 +169,7 @@
 }
 
 /* nf-token-override: breakpoint, and custom properties do not work in at-rule conditions */
-@media (max-width: 640px) {
+@media (max-width: 639px) {
   .inviteRow {
     flex-wrap: wrap;
   }
@@ -376,7 +376,7 @@
 }
 
 /* nf-token-override: breakpoint, and custom properties do not work in at-rule conditions */
-@media (max-width: 640px) {
+@media (max-width: 639px) {
   .attachmentRow,
   .checklistRow {
     flex-wrap: wrap;

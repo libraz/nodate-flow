@@ -56,6 +56,13 @@ jobs:
       - name: Design token references
         run: make check-tokens
 
+      # CSS cannot read the breakpoint scale — every media query restates
+      # it by hand, and the restatements had drifted a pixel away from
+      # what the JS uses, putting the two on opposite sides of the
+      # boundary.
+      - name: Breakpoint scale
+        run: make check-breakpoints
+
       - name: Unit tests (flow-web)
         working-directory: apps/flow-web
         run: bun run test --coverage

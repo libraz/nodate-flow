@@ -328,7 +328,7 @@
 
 /* Tighter section padding on phones so the month-scroll gets more width. */
 /* nf-token-override: breakpoint, and custom properties do not work in at-rule conditions */
-@media (max-width: 47.9375rem) {
+@media (max-width: 767px) {
   .section {
     padding: var(--nf-space-4);
     gap: var(--nf-space-4);

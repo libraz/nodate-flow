@@ -176,8 +176,8 @@ const PX_THRESHOLD = 4;
  * mechanism is discussing it, not invoking it, and a substring match
  * could not tell those apart — two files were exempt on that basis alone.
  */
-const OVERRIDE_LINE = /nf-token-override:\s*\S/;
-const OVERRIDE_FILE = /nf-token-override-file:\s*\S/;
+const OVERRIDE_LINE = /nf-token-override:[^\S\n]*(?![*/]\s*$)[A-Za-z][^\n]*[A-Za-z]/;
+const OVERRIDE_FILE = /nf-token-override-file:[^\S\n]*(?![*/]\s*$)[A-Za-z][^\n]*[A-Za-z]/;
 
 /**
  * Lines exempted by an annotation.
