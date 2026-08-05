@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"log/slog"
+	"sync"
 	"testing"
 	"time"
 
@@ -64,7 +65,7 @@ func TestAutoActionExecutorClosesStaleReviewViaCanonicalPath(t *testing.T) {
 		},
 		Logger: slog.Default(),
 	}
-	exec.RunOnce(ctx)
+	requireCompletePass(t, ctx, exec)
 
 	// Assert: derived_state moved to done.
 	derived := readDerivedState(ctx, t, taskID)
@@ -129,7 +130,7 @@ func TestAutoActionExecutorAutoClosesStaleViaCanonicalPath(t *testing.T) {
 		},
 		Logger: slog.Default(),
 	}
-	exec.RunOnce(ctx)
+	requireCompletePass(t, ctx, exec)
 
 	derived := readDerivedState(ctx, t, taskID)
 	require.Equal(t, "cancelled", derived,
@@ -259,4 +260,104 @@ func requireNoProposalEvent(ctx context.Context, t *testing.T, taskID uint32) {
 		taskID).Scan(&n)
 	require.NoError(t, err)
 	require.Zero(t, n, "executor must not also emit ai.auto_action.proposed when it applies the action")
+}
+
+// requireCompletePass drives one evaluation pass and fails unless it
+// reached every workspace.
+//
+// The executor scans the whole instance, which is what it does in
+// production, so a pass raised by this test also walks the workspaces
+// every other test in the suite is holding. If that walk stops early
+// this test's workspace may simply never have been looked at, and
+// asserting on the outcome would report a transition the executor was
+// never asked to make — with the failure pointing at the state machine
+// rather than at the pass that ended. Checking the pass first keeps the
+// assertion about behaviour instead of about how many workspaces the
+// suite happened to leave lying around.
+func requireCompletePass(t *testing.T, ctx context.Context, exec *autoactions.Executor) {
+	t.Helper()
+	require.NoError(t, exec.RunOnce(ctx),
+		"the auto-action pass did not reach every workspace, so this workspace may never have been evaluated")
+}
+
+// TestAutoActionExecutorReportsAnIncompletePass locks in the half of the
+// contract that was missing: a pass that did not reach every workspace
+// says so, instead of returning as though the whole instance had been
+// evaluated.
+//
+// Silence was the damaging part. Workspaces are walked in id order, so
+// the tenants a truncated pass skips are always the same ones, and
+// nothing in the logs or the return value distinguished "evaluated and
+// nothing to do" from "never looked at". A cancelled context is the
+// deterministic stand-in here for the condition that produced it in
+// practice: the pass pinning a pooled connection for its whole run
+// while the per-workspace work asked the same pool for more.
+func TestAutoActionExecutorReportsAnIncompletePass(t *testing.T) {
+	bootstrap(t)
+	t.Parallel()
+
+	stopped, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	exec := &autoactions.Executor{
+		DB: testDB,
+		Config: autoactions.ExecutorConfig{
+			Interval:            time.Nanosecond,
+			ConfidenceThreshold: 0.5,
+		},
+		Logger: slog.Default(),
+	}
+
+	require.Error(t, exec.RunOnce(stopped),
+		"a pass that could not evaluate every workspace must report that, not return as if it had")
+}
+
+// stopsAfterFirstCheck is a context that is live for its first Err()
+// call and cancelled from then on, which puts the cancellation between
+// the workspace enumeration and the work that follows it. Done() is
+// deliberately the embedded background channel: the enumeration query
+// must be allowed to succeed, so only the executor's own per-workspace
+// check is expected to observe the cancellation.
+type stopsAfterFirstCheck struct {
+	context.Context
+	mu     sync.Mutex
+	checks int
+}
+
+func (c *stopsAfterFirstCheck) Err() error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.checks++
+	if c.checks > 1 {
+		return context.Canceled
+	}
+	return nil
+}
+
+// TestAutoActionExecutorReportsAPassStoppedPartWay covers the other end
+// of the same contract: a pass that enumerated the workspaces and then
+// stopped part way through them also reports that it was partial. This
+// is the shape the production incident takes — the enumeration is quick
+// and it is the per-workspace work that runs out of time.
+func TestAutoActionExecutorReportsAPassStoppedPartWay(t *testing.T) {
+	bootstrap(t)
+	t.Parallel()
+
+	// A tenant of our own guarantees the enumeration returns at least
+	// one workspace, so the loop below is entered at all.
+	newTenant(t)
+
+	exec := &autoactions.Executor{
+		DB: testDB,
+		Config: autoactions.ExecutorConfig{
+			Interval:            time.Nanosecond,
+			ConfidenceThreshold: 0.5,
+		},
+		Logger: slog.Default(),
+	}
+
+	err := exec.RunOnce(&stopsAfterFirstCheck{Context: context.Background()})
+	require.Error(t, err, "a pass that stopped between workspaces must report it")
+	require.Contains(t, err.Error(), "stopped after",
+		"the error must say the pass was partial, not that a workspace failed")
 }

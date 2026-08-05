@@ -569,7 +569,7 @@ func TestAutoActionsHandoffToUser(t *testing.T) {
 			ConfidenceThreshold: 0.5,
 		},
 	}
-	exec.RunOnce(context.Background())
+	requireCompletePass(t, context.Background(), exec)
 
 	handoffs := selectEventsForTask(t, testDB, wsID, taskInternalID, "agent.task.handoff_to_user")
 	require.Len(t, handoffs, 1, "autoactions executor must emit exactly one handoff")

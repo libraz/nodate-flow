@@ -119,7 +119,9 @@ func (e *Executor) Start(ctx context.Context) {
 		case <-e.stopCh:
 			return
 		case <-ticker.C:
-			e.tick(ctx)
+			if err := e.tick(ctx); err != nil {
+				e.Logger.Error("auto-action executor: pass incomplete", "err", err)
+			}
 		}
 	}
 }
@@ -138,8 +140,13 @@ func (e *Executor) Stop() {
 // integration tests that need deterministic execution without waiting
 // on the interval, and for one-shot CLI invocations. Production code
 // uses [Start] / [Stop].
-func (e *Executor) RunOnce(ctx context.Context) {
-	e.tick(ctx)
+//
+// The error reports that the pass did not reach every workspace, not
+// that a particular workspace failed: per-workspace problems are logged
+// and skipped so one bad tenant cannot starve the rest. A caller that
+// needs to know its own workspace was evaluated must check this.
+func (e *Executor) RunOnce(ctx context.Context) error {
+	return e.tick(ctx)
 }
 
 // taskRow holds the fields needed for evaluation and mutation.
@@ -175,13 +182,63 @@ LEFT JOIN ai_settings a ON a.workspace_id = w.id
 WHERE w.enabled = TRUE
 `
 
-func (e *Executor) tick(ctx context.Context) {
-	rows, err := e.DB.QueryContext(ctx, wsAutoActionQuery)
+// workspaceTarget is one workspace the pass has to evaluate, with the
+// confidence threshold already resolved against the global default.
+type workspaceTarget struct {
+	id        uint32
+	threshold float32
+}
+
+// tick evaluates every enabled workspace once and reports whether the
+// pass covered all of them.
+//
+// The enumeration is read to completion and its cursor closed before
+// any workspace is processed, rather than processing inside the scan.
+// Streaming a result set pins the connection it came from for as long
+// as the loop runs, so the old shape held one pooled connection for the
+// entire pass while the per-workspace work below asked that same pool
+// for more: with enough passes in flight the pool is fully held by
+// readers waiting on writers that can never be served. Reading the ids
+// first bounds the pin to the length of the read.
+//
+// A pass that ends early returns an error. It used to end silently, and
+// silence here is the worst possible outcome: workspaces are scanned in
+// id order, so the tenants that never got evaluated are always the same
+// ones, and nothing anywhere said the run was partial.
+func (e *Executor) tick(ctx context.Context) error {
+	targets, err := e.listWorkspaceTargets(ctx)
 	if err != nil {
 		e.Logger.Error("auto-action executor: list workspaces", "err", err)
-		return
+		return err
 	}
-	defer rows.Close()
+
+	for i, target := range targets {
+		if err := ctx.Err(); err != nil {
+			e.Logger.Error("auto-action executor: pass stopped early",
+				"err", err,
+				"evaluated", i,
+				"workspaces", len(targets),
+			)
+			return fmt.Errorf("autoactions: pass stopped after %d of %d workspaces: %w", i, len(targets), err)
+		}
+		e.processWorkspaceWithThreshold(ctx, target.id, target.threshold)
+	}
+	return nil
+}
+
+// listWorkspaceTargets reads every enabled workspace and its resolved
+// threshold. A scan error drops the affected row and is logged; an
+// error that ended the iteration itself fails the whole pass, because
+// the rows that were never delivered are indistinguishable from rows
+// that do not exist.
+func (e *Executor) listWorkspaceTargets(ctx context.Context) ([]workspaceTarget, error) {
+	rows, err := e.DB.QueryContext(ctx, wsAutoActionQuery)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = rows.Close() }()
+
+	var targets []workspaceTarget
 	for rows.Next() {
 		var wsID uint32
 		var wsCfg wsAutoActionConfig
@@ -197,8 +254,12 @@ func (e *Executor) tick(ctx context.Context) {
 		if wsCfg.threshold > 0 {
 			threshold = wsCfg.threshold
 		}
-		e.processWorkspaceWithThreshold(ctx, wsID, threshold)
+		targets = append(targets, workspaceTarget{id: wsID, threshold: threshold})
 	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("autoactions: workspace scan ended early after %d rows: %w", len(targets), err)
+	}
+	return targets, nil
 }
 
 // taskQuery is now built dynamically in processWorkspaceWithThreshold
