@@ -238,6 +238,32 @@ function isIdentChar(c: string): boolean {
  * numeric literal (with optional surrounding quotes) before the next
  * comma / semicolon / closing brace.
  */
+/**
+ * Blank out `var(...)` spans, keeping the string length so column
+ * numbers stay meaningful. Handles fallbacks that nest parentheses.
+ */
+function maskTokenRefs(value: string): string {
+  let out = value;
+  let idx = out.indexOf('var(');
+  while (idx !== -1) {
+    let depth = 0;
+    let j = idx + 3;
+    for (; j < out.length; j++) {
+      if (out[j] === '(') depth += 1;
+      else if (out[j] === ')') {
+        depth -= 1;
+        if (depth === 0) {
+          j += 1;
+          break;
+        }
+      }
+    }
+    out = out.slice(0, idx) + ' '.repeat(j - idx) + out.slice(j);
+    idx = out.indexOf('var(', j);
+  }
+  return out;
+}
+
 function scanText(file: string, text: string): SpacingOffense[] {
   const out: SpacingOffense[] = [];
   const len = text.length;
@@ -346,13 +372,13 @@ function scanText(file: string, text: string): SpacingOffense[] {
     }
     const valueChunk = text.slice(k, valEnd);
 
-    // Skip values that already use a token reference. `var(--nf-...)` is
-    // the canonical form; we also accept `calc()` expressions whose
-    // operands are token references.
-    if (valueChunk.includes('var(--nf-')) {
-      i = valEnd;
-      continue;
-    }
+    // Token references are blanked out rather than causing the whole
+    // value to be skipped. A shorthand is often part token and part
+    // literal — `padding: 0.125rem var(--nf-space-1)` — and skipping the
+    // value wholesale meant that migrating one half of a declaration
+    // silently retired the check on the other half. The mask preserves
+    // offsets so reported columns still point at the literal.
+    const scannable = maskTokenRefs(valueChunk);
     // Skip CSS keywords / sentinel values.
     const trimmed = valueChunk.trim().replace(/^['"]/, '').replace(/['"]$/, '');
     if (
@@ -379,24 +405,24 @@ function scanText(file: string, text: string): SpacingOffense[] {
     // Literals that are part of `var(...)` expressions are already
     // skipped above.
     let p = 0;
-    const vlen = valueChunk.length;
+    const vlen = scannable.length;
     while (p < vlen) {
-      const cp = valueChunk[p];
+      const cp = scannable[p];
       if (cp === undefined) break;
       if (cp >= '0' && cp <= '9') {
         // Read number.
         let q = p;
         while (q < vlen) {
-          const cq = valueChunk[q];
+          const cq = scannable[q];
           if (cq === undefined) break;
           if (!((cq >= '0' && cq <= '9') || cq === '.')) break;
           q += 1;
         }
-        const numText = valueChunk.slice(p, q);
+        const numText = scannable.slice(p, q);
         // Read unit (rem | px | em | other identifier).
         let r = q;
         while (r < vlen) {
-          const cr = valueChunk[r];
+          const cr = scannable[r];
           if (cr === undefined) break;
           if (!((cr >= 'a' && cr <= 'z') || (cr >= 'A' && cr <= 'Z'))) break;
           r += 1;
