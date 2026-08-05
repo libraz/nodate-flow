@@ -38,6 +38,8 @@ const allCommands: ReadonlyArray<readonly string[]> = [
   ['auth', 'login'],
   ['auth', 'logout'],
   ['auth', 'status'],
+  ['workspace', 'list'],
+  ['project', 'list'],
   ['task', 'list'],
   ['task', 'create'],
   ['task', 'update'],

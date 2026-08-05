@@ -6,7 +6,12 @@ import { pathToFileURL } from 'node:url';
 import { c, createCLI, prompt, table } from '@libraz/node-cli';
 import type { components } from '@nodate-flow/sdk';
 
-import { createAuthClient, createFlowClient, extractRefreshTokenFromSetCookie } from './api.js';
+import {
+  createAuthClient,
+  createFlowClient,
+  createIdentityClient,
+  extractRefreshTokenFromSetCookie,
+} from './api.js';
 import { authErrorMessage, completeLogin } from './auth-login.js';
 import {
   clearCredentials,
@@ -15,7 +20,11 @@ import {
   loadCredentials,
   saveCredentials,
 } from './config.js';
-import { buildListQuery, executeProjectList, executeWorkspaceList } from './resource-builders.js';
+import {
+  buildListQuery,
+  executeProjectListPaginated,
+  executeWorkspaceListPaginated,
+} from './resource-builders.js';
 import {
   buildSearchQuery,
   buildUpdatePlan,
@@ -34,6 +43,7 @@ import { assertYmd, DateValidationError } from './util/date.js';
 import { EXIT_AUTH, EXIT_RUNTIME, EXIT_VALIDATION, isAuthRequiredError } from './util/exit.js';
 import { optionalYmd, resolveDeprecatedFlag } from './util/flags.js';
 import { attachExamples, type ExamplesByPath } from './util/help.js';
+import { DEFAULT_LIST_LIMIT } from './util/paging.js';
 import { getPackageVersion } from './version.js';
 
 const cli = createCLI({
@@ -185,7 +195,7 @@ workspace
   .option('-l, --limit <limit>', {
     description: 'Maximum number of workspaces to return',
     type: 'number',
-    default: 100,
+    default: DEFAULT_LIST_LIMIT,
   })
   .option('--offset <offset>', {
     description: 'Result offset',
@@ -193,9 +203,10 @@ workspace
     default: 0,
   })
   .action(async ({ options, stdout, stderr }) => {
-    let client: ReturnType<typeof createFlowClient>;
+    // Workspaces live on the auth API, not the flow API.
+    let client: ReturnType<typeof createIdentityClient>;
     try {
-      client = createFlowClient();
+      client = createIdentityClient();
     } catch (err) {
       if (isAuthRequiredError(err)) {
         stderr.write(c`{red Error}: ${(err as Error).message}\n`);
@@ -205,7 +216,7 @@ workspace
       throw err;
     }
 
-    const { data, error } = await executeWorkspaceList(
+    const { data, error } = await executeWorkspaceListPaginated(
       client,
       buildListQuery(options.limit as number | undefined, options.offset as number | undefined),
     );
@@ -216,7 +227,7 @@ workspace
       return;
     }
 
-    const workspaces = asCliWorkspaceRows(data?.workspaces ?? undefined);
+    const workspaces = asCliWorkspaceRows(data?.items);
     if (workspaces.length === 0) {
       stdout.write('No workspaces found.\n');
       return;
@@ -256,7 +267,7 @@ project
   .option('-l, --limit <limit>', {
     description: 'Maximum number of projects to return',
     type: 'number',
-    default: 100,
+    default: DEFAULT_LIST_LIMIT,
   })
   .option('--offset <offset>', {
     description: 'Result offset',
@@ -283,7 +294,7 @@ project
       throw err;
     }
 
-    const { data, error } = await executeProjectList(
+    const { data, error } = await executeProjectListPaginated(
       client,
       workspaceId,
       buildListQuery(options.limit as number | undefined, options.offset as number | undefined),
@@ -295,7 +306,7 @@ project
       return;
     }
 
-    const projects = asCliProjectRows(data?.projects ?? undefined);
+    const projects = asCliProjectRows(data?.items);
     if (projects.length === 0) {
       stdout.write('No projects found.\n');
       return;
@@ -403,8 +414,11 @@ task
       return;
     }
 
+    // The full public id is printed on purpose: every task path resolves
+    // its {id} by parsing a UUID, so an abbreviated id copied out of this
+    // table would only ever come back as "Task not found".
     const rows = tasks.map((t) => ({
-      id: t.id.slice(0, 8),
+      id: t.id,
       title: t.title.length > 50 ? `${t.title.slice(0, 47)}...` : t.title,
       state: t.derivedState,
       priority: String(t.priority),
@@ -779,8 +793,9 @@ task
       return;
     }
 
+    // Full public ids, for the same reason as `task list`.
     const rows = tasks.map((t) => ({
-      id: t.id.slice(0, 8),
+      id: t.id,
       title: t.title.length > 50 ? `${t.title.slice(0, 47)}...` : t.title,
       state: t.derivedState,
       priority: String(t.priority),
@@ -853,7 +868,7 @@ const examples: ExamplesByPath = {
   'auth login': ['tnk auth login'],
   'auth logout': ['tnk auth logout'],
   'auth status': ['tnk auth status'],
-  'workspace list': ['tnk workspace list', 'tnk workspace list --limit 50'],
+  'workspace list': ['tnk workspace list', 'tnk workspace list --limit 200'],
   'project list': ['tnk project list --workspace-id 0190f3a6-4e6c-7d2a-94c9-aa86b1f72c11'],
   'task list': [
     'tnk task list',
@@ -866,16 +881,16 @@ const examples: ExamplesByPath = {
     'tnk task create -t "Internal note" -p 9c2ad1d8-1f2c-7e1c-9a8a-44c0c9f0c1ab --visibility private',
   ],
   'task update': [
-    'tnk task update 9c2ad1d8 --title "Updated title"',
-    'tnk task update 9c2ad1d8 --state start',
-    'tnk task update 9c2ad1d8 --due 2026-06-15 --priority 3',
-    'tnk task update 9c2ad1d8 --due ""',
+    'tnk task update 4f7a1c02-5e3b-7a19-b8d4-2c61f0e9a377 --title "Updated title"',
+    'tnk task update 4f7a1c02-5e3b-7a19-b8d4-2c61f0e9a377 --state start',
+    'tnk task update 4f7a1c02-5e3b-7a19-b8d4-2c61f0e9a377 --due 2026-06-15 --priority 3',
+    'tnk task update 4f7a1c02-5e3b-7a19-b8d4-2c61f0e9a377 --due ""',
   ],
   'task search': [
     'tnk task search "release" --workspace-id 0190f3a6-4e6c-7d2a-94c9-aa86b1f72c11',
     'tnk task search "report" --project-id 9c2ad1d8-1f2c-7e1c-9a8a-44c0c9f0c1ab --limit 10',
   ],
-  'task view': ['tnk task view 9c2ad1d8-1f2c-7e1c-9a8a-44c0c9f0c1ab'],
+  'task view': ['tnk task view 4f7a1c02-5e3b-7a19-b8d4-2c61f0e9a377'],
 };
 attachExamples(cli, examples);
 

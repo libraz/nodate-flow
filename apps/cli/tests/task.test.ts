@@ -317,4 +317,66 @@ describe('executeTaskListPaginated', () => {
     expect(result.error).toEqual({ detail: 'boom' });
     expect(sdk.GET).toHaveBeenCalledTimes(1);
   });
+
+  /*
+   * GET /tasks declares `maximum:"200"` on `limit` and answers a larger
+   * value with a 422 instead of clamping, so a request for more than one
+   * page has to be split by the CLI.
+   */
+  it('splits a limit above the page maximum across several requests', async () => {
+    const page = (offset: number) => ({
+      data: {
+        tasks: Array.from({ length: 200 }, (_, i) => ({ id: `task-${offset + i}` })),
+        total: 600,
+      },
+    });
+    const sdk: SdkClientLike = {
+      GET: vi
+        .fn()
+        .mockResolvedValueOnce(page(0))
+        .mockResolvedValueOnce(page(200))
+        .mockResolvedValueOnce(page(400)),
+      POST: vi.fn(),
+      PATCH: vi.fn(),
+    };
+
+    const result = await executeTaskListPaginated(sdk, { limit: 500, workspaceId: 'ws' });
+
+    expect(result.data?.tasks).toHaveLength(500);
+    expect(result.data?.total).toBe(600);
+    expect(sdk.GET).toHaveBeenCalledTimes(3);
+    expect(sdk.GET).toHaveBeenNthCalledWith(1, '/tasks', {
+      params: { query: { limit: 200, workspaceId: 'ws', offset: 0 } },
+    });
+    expect(sdk.GET).toHaveBeenNthCalledWith(2, '/tasks', {
+      params: { query: { limit: 200, workspaceId: 'ws', offset: 200 } },
+    });
+    expect(sdk.GET).toHaveBeenNthCalledWith(3, '/tasks', {
+      params: { query: { limit: 200, workspaceId: 'ws', offset: 400 } },
+    });
+  });
+
+  it('never forwards a limit the endpoint would reject', async () => {
+    const sdk = createSdkMock({ data: { tasks: [{ id: 'a' }], total: 1 } });
+
+    await executeTaskListPaginated(sdk, { limit: 500, workspaceId: 'ws' });
+
+    const limits = (sdk.GET as ReturnType<typeof vi.fn>).mock.calls.map(
+      ([, options]) => (options as { params: { query: { limit: number } } }).params.query.limit,
+    );
+    expect(limits.length).toBeGreaterThan(0);
+    for (const limit of limits) {
+      expect(limit).toBeLessThanOrEqual(200);
+    }
+  });
+
+  it('clamps a search limit above the page maximum too', async () => {
+    const sdk = createSdkMock({ data: { tasks: [{ id: 'a' }], total: 1 } });
+
+    await executeSearchPaginated(sdk, { q: 'ship', limit: 1000, workspaceId: 'ws' });
+
+    expect(sdk.GET).toHaveBeenNthCalledWith(1, '/tasks', {
+      params: { query: { q: 'ship', limit: 200, workspaceId: 'ws', offset: 0 } },
+    });
+  });
 });

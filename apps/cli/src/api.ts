@@ -1,9 +1,16 @@
 // API client factory for the tnk CLI.
 // Uses @nodate-flow/sdk with stored credentials.
+//
+// Runtime values come from the SDK's narrow subpath entry points rather
+// than its barrel: the barrel re-exports the React/i18next/zustand
+// providers, which are optional peer dependencies the CLI does not
+// declare. Type-only imports still use the barrel because they are
+// erased before Node ever resolves them.
 
-import { createClient, type NodateFlowClient } from '@nodate-flow/sdk';
+import { createClient, type NodateFlowClient } from '@nodate-flow/sdk/client';
 
 import {
+  type Credentials,
   getAuthApiUrl,
   getFlowApiUrl,
   loadCredentials,
@@ -115,16 +122,19 @@ export function createAuthenticatedFetch(options: AuthenticatedFetchOptions): ty
 }
 
 /**
- * Creates a typed SDK client for the flow API, authenticated with
- * the stored access token. Throws when no credentials are found.
+ * Creates a typed SDK client for the service `selectBaseUrl` picks out of
+ * the stored credentials, authenticated with the stored access token and
+ * able to rotate it on a 401. Throws when no credentials are found.
  */
-export function createFlowClient(): NodateFlowClient {
+function createAuthenticatedClient(
+  selectBaseUrl: (creds: Credentials) => string,
+): NodateFlowClient {
   let creds = loadCredentials();
   if (!creds) {
     throw new AuthRequiredError();
   }
   return createClient({
-    baseUrl: getFlowApiUrl(),
+    baseUrl: selectBaseUrl(creds),
     tokenProvider: () => creds?.accessToken,
     fetchOptions: {
       fetch: createAuthenticatedFetch({
@@ -143,6 +153,24 @@ export function createFlowClient(): NodateFlowClient {
       }),
     },
   });
+}
+
+/**
+ * Creates a typed SDK client for the flow API (tasks, projects,
+ * calendar), authenticated with the stored access token.
+ */
+export function createFlowClient(): NodateFlowClient {
+  return createAuthenticatedClient(() => getFlowApiUrl());
+}
+
+/**
+ * Creates a typed SDK client for the auth API, authenticated with the
+ * stored access token. The auth API owns identity and workspace
+ * resources (`GET /workspaces` and friends), which the flow API does not
+ * serve, so callers of those paths must use this client.
+ */
+export function createIdentityClient(): NodateFlowClient {
+  return createAuthenticatedClient(resolveAuthApiUrl);
 }
 
 /**

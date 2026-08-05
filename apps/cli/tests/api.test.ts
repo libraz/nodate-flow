@@ -1,6 +1,23 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { createAuthenticatedFetch, extractRefreshTokenFromSetCookie } from '../src/api.js';
+import {
+  createAuthenticatedFetch,
+  createFlowClient,
+  createIdentityClient,
+  extractRefreshTokenFromSetCookie,
+} from '../src/api.js';
+import { loadCredentials } from '../src/config.js';
+
+// Only the credential file access is faked; the URL resolution helpers
+// stay real so the tests exercise the actual env/credential precedence.
+vi.mock('../src/config.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../src/config.js')>();
+  return {
+    ...actual,
+    loadCredentials: vi.fn(),
+    saveCredentials: vi.fn(),
+  };
+});
 
 describe('extractRefreshTokenFromSetCookie', () => {
   it('extracts nd_rt from a Set-Cookie header', () => {
@@ -96,5 +113,69 @@ describe('createAuthenticatedFetch', () => {
     expect(response.status).toBe(401);
     expect(fetchImpl).toHaveBeenCalledTimes(1);
     expect(setTokens).not.toHaveBeenCalled();
+  });
+});
+
+describe('client factories', () => {
+  let requestedUrls: string[];
+
+  beforeEach(() => {
+    requestedUrls = [];
+    vi.mocked(loadCredentials).mockReturnValue({
+      accessToken: 'access-token',
+      refreshToken: 'refresh-token',
+      apiBaseUrl: 'http://stored-flow.test',
+      authApiBaseUrl: 'http://stored-auth.test',
+    });
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: RequestInfo | URL) => {
+        requestedUrls.push(input instanceof Request ? input.url : String(input));
+        return new Response(JSON.stringify({ workspaces: [], total: 0 }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        });
+      }),
+    );
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.unstubAllEnvs();
+    vi.mocked(loadCredentials).mockReset();
+  });
+
+  it('sends identity-client requests to the auth API', async () => {
+    vi.stubEnv('NF_AUTH_API_URL', 'http://auth.test');
+    vi.stubEnv('NF_FLOW_API_URL', 'http://flow.test');
+
+    await createIdentityClient().GET('/workspaces', { params: { query: { limit: 100 } } });
+
+    expect(requestedUrls).toEqual(['http://auth.test/workspaces?limit=100']);
+  });
+
+  it('sends flow-client requests to the flow API', async () => {
+    vi.stubEnv('NF_AUTH_API_URL', 'http://auth.test');
+    vi.stubEnv('NF_FLOW_API_URL', 'http://flow.test');
+
+    await createFlowClient().GET('/tasks', { params: { query: { limit: 25 } } });
+
+    expect(requestedUrls).toEqual(['http://flow.test/tasks?limit=25']);
+  });
+
+  it('falls back to the auth API URL stored at login', async () => {
+    vi.stubEnv('NF_AUTH_API_URL', undefined);
+    vi.stubEnv('NF_FLOW_API_URL', undefined);
+
+    await createIdentityClient().GET('/workspaces', { params: { query: { limit: 100 } } });
+
+    expect(requestedUrls).toEqual(['http://stored-auth.test/workspaces?limit=100']);
+  });
+
+  it('rejects both factories when no credentials are stored', () => {
+    vi.mocked(loadCredentials).mockReturnValue(undefined);
+
+    expect(() => createIdentityClient()).toThrow();
+    expect(() => createFlowClient()).toThrow();
   });
 });

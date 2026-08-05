@@ -1,7 +1,7 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
 exports[`tnk help output > matches snapshot for \`auth login\` 1`] = `
-"Usage: auth login
+"Usage: auth login [options]
 
 Log in with email and password
 
@@ -13,7 +13,7 @@ Examples:
 `;
 
 exports[`tnk help output > matches snapshot for \`auth logout\` 1`] = `
-"Usage: auth logout
+"Usage: auth logout [options]
 
 Clear stored credentials
 
@@ -25,7 +25,7 @@ Examples:
 `;
 
 exports[`tnk help output > matches snapshot for \`auth status\` 1`] = `
-"Usage: auth status
+"Usage: auth status [options]
 
 Show current authentication status
 
@@ -34,6 +34,21 @@ Options:
 
 Examples:
   tnk auth status"
+`;
+
+exports[`tnk help output > matches snapshot for \`project list\` 1`] = `
+"Usage: project list [options]
+
+List projects in a workspace
+
+Options:
+  -w, --workspace-id <workspace-id>    Workspace public id (required)
+  -l, --limit <limit>                  Maximum number of projects to return (default: 50)
+      --offset <offset>                Result offset (default: 0)
+  -h, --help                           Show help for this command
+
+Examples:
+  tnk project list --workspace-id 0190f3a6-4e6c-7d2a-94c9-aa86b1f72c11"
 `;
 
 exports[`tnk help output > matches snapshot for \`task create\` 1`] = `
@@ -118,14 +133,14 @@ Options:
   -h, --help                         Show help for this command
 
 Examples:
-  tnk task update 9c2ad1d8 --title "Updated title"
-  tnk task update 9c2ad1d8 --state start
-  tnk task update 9c2ad1d8 --due 2026-06-15 --priority 3
-  tnk task update 9c2ad1d8 --due """
+  tnk task update 4f7a1c02-5e3b-7a19-b8d4-2c61f0e9a377 --title "Updated title"
+  tnk task update 4f7a1c02-5e3b-7a19-b8d4-2c61f0e9a377 --state start
+  tnk task update 4f7a1c02-5e3b-7a19-b8d4-2c61f0e9a377 --due 2026-06-15 --priority 3
+  tnk task update 4f7a1c02-5e3b-7a19-b8d4-2c61f0e9a377 --due """
 `;
 
 exports[`tnk help output > matches snapshot for \`task view\` 1`] = `
-"Usage: task view <id>
+"Usage: task view <id> [options]
 
 View task details
 
@@ -136,5 +151,20 @@ Options:
   -h, --help    Show help for this command
 
 Examples:
-  tnk task view 9c2ad1d8-1f2c-7e1c-9a8a-44c0c9f0c1ab"
+  tnk task view 4f7a1c02-5e3b-7a19-b8d4-2c61f0e9a377"
+`;
+
+exports[`tnk help output > matches snapshot for \`workspace list\` 1`] = `
+"Usage: workspace list [options]
+
+List workspaces
+
+Options:
+  -l, --limit <limit>      Maximum number of workspaces to return (default: 50)
+      --offset <offset>    Result offset (default: 0)
+  -h, --help               Show help for this command
+
+Examples:
+  tnk workspace list
+  tnk workspace list --limit 200"
 `;

@@ -9,6 +9,8 @@
 
 import type { components, NodateFlowClient } from '@nodate-flow/sdk';
 
+import { clampPageLimit, MAX_PAGES, requestedCount } from './util/paging.js';
+
 /* ── State transition helpers ──────────────────────────────────── */
 
 /**
@@ -176,18 +178,30 @@ async function executeTaskListPage(
  * Fetch every page for list/search commands. The backend can return a
  * `nextCursor` on unfiltered first pages; filtered paths may only expose
  * `total`, so this falls back to offset paging when no cursor is present.
+ *
+ * `query.limit` is how many tasks the caller wants in total, which may
+ * exceed what `GET /tasks` serves in one page. The per-page limit is
+ * clamped to `MAX_PAGE_LIMIT` — the endpoint answers a larger value with
+ * a 422 rather than clamping it itself — and pages accumulate until the
+ * requested count is reached.
  */
 export async function executeTaskListPaginated(
   client: SdkClientLike,
   query: TaskListQuery,
 ): Promise<{ data?: TaskListResult; error?: unknown }> {
   const tasks: unknown[] = [];
-  const requestedLimit = query.limit;
+  const requestedLimit = requestedCount(query.limit);
+  if (requestedLimit === 0) return { data: { tasks: [], total: 0 } };
+
   let total: number | undefined;
-  let nextQuery: TaskListQuery = { ...query, offset: query.offset ?? 0 };
+  let nextQuery: TaskListQuery = {
+    ...query,
+    limit: clampPageLimit(requestedLimit),
+    offset: query.offset ?? 0,
+  };
   let lastCursor: string | undefined;
 
-  for (let page = 0; page < 1000; page += 1) {
+  for (let page = 0; page < MAX_PAGES; page += 1) {
     const result = await executeTaskListPage(client, nextQuery);
     if (result.error) return { error: result.error };
 
