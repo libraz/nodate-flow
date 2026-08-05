@@ -97,6 +97,14 @@ func RemoveWorkspaceMember(ctx context.Context, tx TX, args RemoveWorkspaceMembe
 		}
 	}
 
+	// Rank guard: the actor must outrank the member they are removing, so
+	// an admin cannot remove an owner even when a second owner makes the
+	// last-owner guard above indifferent. Ordered after it so the more
+	// specific answer still wins when both apply.
+	if err := ensureActorMayActOn(ctx, tx, args.WorkspaceID, args.ActorUserID, Role(targetRole)); err != nil {
+		return res, err
+	}
+
 	// Step 1: soft-disable subscriptions. Leaf rows, safe first.
 	if n, err := execCount(ctx, tx,
 		`UPDATE calendar_subscriptions SET enabled = FALSE

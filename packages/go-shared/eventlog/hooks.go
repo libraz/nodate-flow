@@ -52,7 +52,7 @@ func SeqFromContext(ctx context.Context) int64 {
 	return v
 }
 
-func fireHooks(ctx context.Context, workspaceID uint32, eventType string) {
+func fireHooks(ctx context.Context, workspaceID uint32, eventType string, eventInternalID uint64) {
 	hooksMu.RLock()
 	snapshot := hooks
 	hooksMu.RUnlock()
@@ -62,6 +62,6 @@ func fireHooks(ctx context.Context, workspaceID uint32, eventType string) {
 	seq := globalSeq.Add(1)
 	ctx = WithSeq(ctx, seq)
 	for _, h := range snapshot {
-		h(ctx, workspaceID, eventType)
+		h(ctx, workspaceID, eventType, eventInternalID)
 	}
 }

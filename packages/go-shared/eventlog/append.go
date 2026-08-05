@@ -16,6 +16,7 @@ import (
 	"log/slog"
 	"time"
 
+	"github.com/libraz/nodate-flow/packages/go-shared/dbretry"
 	"github.com/libraz/nodate-flow/packages/go-shared/dbtype"
 )
 
@@ -45,15 +46,40 @@ type Event struct {
 	OccurredAt time.Time
 }
 
-// NotifyHook fires AFTER a successful append. Hooks are synchronous
-// but must be cheap; long-running work belongs on a worker. The
-// caller registers hooks via RegisterHook / ClearHooks at process
-// startup (flow-api wires this to the SSE notifier + agent runtime).
-type NotifyHook = func(ctx context.Context, workspaceID uint32, eventType string)
+// NotifyHook fires after a successful append, and after the enclosing
+// transaction commits when there is one. Hooks are synchronous but must
+// be cheap; long-running work belongs on a worker. The caller registers
+// hooks via RegisterHook / ClearHooks at process startup.
+//
+// eventInternalID is the events.id row that was just written.
+// Subscribers need it to resolve the event they were told about —
+// webhook deliveries dedupe on its public id, notifications anchor on
+// source_event_id — so a hook that only knows the workspace and the
+// type cannot deliver anything. The signature matches flow-api's
+// eventbus.NotifyHook exactly so one bridge can forward appends from
+// either log to the same set of subscribers.
+type NotifyHook = func(ctx context.Context, workspaceID uint32, eventType string, eventInternalID uint64)
 
 // Append inserts a single event row using the provided DBTX. When db
 // is a *sql.Tx the event is part of that transaction. Returns the
 // inserted public_id on success.
+//
+// Retries mirror [eventbus.Append] in flow-api, and so does the split
+// between the two cases:
+//
+//   - On a *sql.DB (auto-commit) the INSERT is wrapped in a deadlock
+//     retry. Parallel writers contend on FK record locks for shared
+//     parents — workspaces, tasks, users — and InnoDB resolves the
+//     contention by rolling one side back with ER_LOCK_DEADLOCK.
+//     Re-issuing the statement clears it.
+//   - On a *sql.Tx the caller owns the retry boundary and Append must
+//     not retry: a deadlock invalidates the entire transaction, so
+//     re-running this one statement would issue it against a
+//     transaction the server has already rolled back. The unit that has
+//     to be retried is the caller's transaction, which is what
+//     [dbretry.InTx] wraps. Callers that open a transaction by hand get
+//     no retry at all, and a deadlock surfaces to the user as a 500 for
+//     work that would have succeeded on a second attempt.
 func Append(ctx context.Context, db DBTX, evt Event) (dbtype.PublicID, error) {
 	var raw json.RawMessage
 	if evt.Payload == nil {
@@ -81,13 +107,55 @@ func Append(ctx context.Context, db DBTX, evt Event) (dbtype.PublicID, error) {
 
 	const q = `INSERT INTO events (public_id, workspace_id, task_id, actor_user_id, type, payload_json, occurred_at)
 	           VALUES (?, ?, ?, ?, ?, ?, ?)`
-	if _, err := db.ExecContext(ctx, q, pubID, evt.WorkspaceID, taskArg, actorArg, evt.Type, raw, occurred); err != nil {
+	var lastID int64
+	insert := func(ctx context.Context) error {
+		res, err := db.ExecContext(ctx, q, pubID, evt.WorkspaceID, taskArg, actorArg, evt.Type, raw, occurred)
+		if err != nil {
+			return err
+		}
+		id, err := res.LastInsertId()
+		if err != nil {
+			return err
+		}
+		lastID = id
+		return nil
+	}
+	_, isTx := db.(*sql.Tx)
+	var err error
+	if isTx {
+		err = insert(ctx)
+	} else {
+		err = dbretry.Do(ctx, "eventlog.Append", insert)
+	}
+	if err != nil {
 		slog.ErrorContext(ctx, "eventlog: append failed",
 			slog.String("type", evt.Type),
 			slog.Uint64("workspace_id", uint64(evt.WorkspaceID)),
 			slog.String("error", err.Error()))
 		return dbtype.PublicID{}, err
 	}
-	fireHooks(ctx, evt.WorkspaceID, evt.Type)
+
+	// LastInsertId is a positive int64 from AUTO_INCREMENT and events.id
+	// is BIGINT UNSIGNED, so uint64 carries it without loss.
+	eventInternalID := uint64(lastID) //#nosec G115 -- AUTO_INCREMENT LastInsertId is non-negative
+	// Subscribers read the event row on their own connection, so they
+	// must not be woken before it is visible there. With a collector on
+	// the context (dbretry.InTx) the fan-out waits for the commit; on the
+	// auto-commit path the row is already durable and it fires now.
+	//
+	// A transaction the caller opened by hand has neither property: the
+	// hooks would be handed an id nothing else can resolve yet, and every
+	// subscriber would quietly deliver nothing. Refuse instead, and name
+	// the caller — the same rule flow-api's eventbus applies.
+	if isTx && !dbretry.HasCommitHooks(ctx) {
+		slog.ErrorContext(ctx, "eventlog: fan-out skipped; append ran in a hand-rolled transaction without a commit boundary (use dbretry.InTx)",
+			slog.String("type", evt.Type),
+			slog.Uint64("workspace_id", uint64(evt.WorkspaceID)),
+			slog.Uint64("event_id", eventInternalID))
+		return pubID, nil
+	}
+	dbretry.AddCommitHook(ctx, func() {
+		fireHooks(ctx, evt.WorkspaceID, evt.Type, eventInternalID)
+	})
 	return pubID, nil
 }

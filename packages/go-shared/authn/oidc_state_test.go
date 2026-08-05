@@ -2,6 +2,7 @@ package authn
 
 import (
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -112,4 +113,60 @@ func TestVerifyOIDCStateForProvider_RejectsLegacyUnboundState(t *testing.T) {
 
 	_, err = j.VerifyOIDCStateForProvider(token, "google")
 	assert.Error(t, err, "legacy state without provider claim must not satisfy provider-bound verification")
+}
+
+// TestOIDCStateBinding_RoundTrip proves a state minted for a browser is
+// accepted only when that browser presents its own verifier.
+func TestOIDCStateBinding_RoundTrip(t *testing.T) {
+	t.Parallel()
+	j := newTestIssuer(t)
+
+	binding, err := j.NewOIDCStateBinding("nonce-bound", "google")
+	require.NoError(t, err)
+	require.NotEmpty(t, binding.State)
+	require.NotEmpty(t, binding.CookieValue)
+	assert.NotContains(t, binding.State, binding.CookieValue,
+		"the verifier must never travel inside the URL parameter")
+	assert.True(t, binding.ExpiresAt.After(time.Now()))
+
+	verified, err := j.VerifyOIDCStateBinding(binding.State, binding.CookieValue, "google")
+	require.NoError(t, err)
+	assert.Equal(t, "nonce-bound", verified.Nonce)
+	assert.NotEmpty(t, verified.ID, "the jti is what makes the state single-use")
+	assert.WithinDuration(t, binding.ExpiresAt, verified.ExpiresAt, time.Second)
+}
+
+// TestOIDCStateBinding_RejectsWrongOrMissingCookie is the login-CSRF
+// regression at the token layer: a state is worthless without the
+// verifier held by the browser that started the flow.
+func TestOIDCStateBinding_RejectsWrongOrMissingCookie(t *testing.T) {
+	t.Parallel()
+	j := newTestIssuer(t)
+
+	binding, err := j.NewOIDCStateBinding("nonce-bound", "google")
+	require.NoError(t, err)
+	other, err := j.NewOIDCStateBinding("nonce-other", "google")
+	require.NoError(t, err)
+
+	_, err = j.VerifyOIDCStateBinding(binding.State, "", "google")
+	assert.Error(t, err, "a browser with no verifier must be refused")
+
+	_, err = j.VerifyOIDCStateBinding(binding.State, other.CookieValue, "google")
+	assert.Error(t, err, "a verifier from another flow must be refused")
+
+	_, err = j.VerifyOIDCStateBinding(binding.State, binding.CookieValue, "github")
+	assert.Error(t, err, "a state minted for another provider must be refused")
+}
+
+// TestOIDCStateBinding_RejectsUnboundState keeps the legacy constructor
+// from being a way around the binding.
+func TestOIDCStateBinding_RejectsUnboundState(t *testing.T) {
+	t.Parallel()
+	j := newTestIssuer(t)
+
+	unbound, err := j.SignOIDCStateForProvider("nonce-legacy", "google")
+	require.NoError(t, err)
+
+	_, err = j.VerifyOIDCStateBinding(unbound, "any-verifier", "google")
+	assert.Error(t, err, "a state carrying no cookie hash cannot identify a browser")
 }

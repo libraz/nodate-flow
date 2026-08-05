@@ -116,8 +116,11 @@ func (s *MySQLStore) Create(ctx context.Context, p CreateParams) (uint32, error)
 		UserID:      p.UserID,
 		RefreshHash: p.RefreshHash,
 		UserAgent:   sql.NullString{String: p.UserAgent, Valid: p.UserAgent != ""},
-		IpAddress:   sql.NullString{String: p.IPAddress, Valid: p.IPAddress != ""},
-		ExpiresAt:   p.ExpiresAt,
+		// sessions.ip_address is VARBINARY(16): the text form of a real
+		// IPv6 address does not fit and MySQL rejects the whole insert
+		// in STRICT mode, which would fail the login that issued it.
+		IpAddress: dbtype.NullStringFromIP(p.IPAddress),
+		ExpiresAt: p.ExpiresAt,
 	})
 	if err != nil {
 		return 0, fmt.Errorf("sessionstore/mysql: create: %w", err)
@@ -140,7 +143,7 @@ func (s *MySQLStore) FindByRefreshHash(ctx context.Context, hash string) (*Sessi
 		UserID:      row.UserID,
 		RefreshHash: row.RefreshHash,
 		UserAgent:   row.UserAgent.String,
-		IPAddress:   row.IpAddress.String,
+		IPAddress:   dbtype.IPStringFromNullString(row.IpAddress),
 		ExpiresAt:   row.ExpiresAt,
 		RevokedAt:   nullTimePtr(row.RevokedAt),
 		LastUsedAt:  nullTimePtr(row.LastUsedAt),
@@ -220,7 +223,7 @@ func (s *MySQLStore) ListActive(ctx context.Context, userID uint32) ([]Session, 
 			PublicID:   r.PublicID,
 			UserID:     userID,
 			UserAgent:  r.UserAgent.String,
-			IPAddress:  r.IpAddress.String,
+			IPAddress:  dbtype.IPStringFromNullString(r.IpAddress),
 			ExpiresAt:  r.ExpiresAt,
 			LastUsedAt: nullTimePtr(r.LastUsedAt),
 			CreatedAt:  r.CreatedAt,

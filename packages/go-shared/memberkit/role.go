@@ -25,21 +25,81 @@ var roleRank = map[Role]int{
 // hierarchy (owner > admin > member > guest), so an admin can never mint
 // an owner — only an owner may grant the owner role.
 //
-// This is the single guard that prevents privilege escalation across the
-// add-member, update-role, and create-invite paths. Returns
-// ErrRoleEscalation when targetRole outranks actorRole, or a descriptive
-// error when either role is not a recognised value.
+// This is the grant half of the escalation guard; [EnsureActorOutranksTarget]
+// is the other half. Returns ErrRoleEscalation when targetRole outranks
+// actorRole, or a descriptive error when either role is not a recognised
+// value.
 func EnsureRoleWithinActor(actorRole, targetRole Role) error {
+	return ensureRankWithin(actorRole, targetRole)
+}
+
+// EnsureActorOutranksTarget reports whether an actor holding actorRole
+// may modify a member who currently holds targetRole.
+//
+// Guarding only the role being granted leaves the mirror image open: an
+// admin who cannot mint an owner can still demote one to member and then
+// remove them, which costs the workspace an owner and hands the
+// owner-only delete gate to whoever is left. The current role of the
+// person being acted on therefore gates the action just as the new role
+// does, and both directions have to hold — closing one and leaving the
+// other is how this came back after the grant side was fixed.
+//
+// Equal ranks pass: one owner may act on another, mirroring the calendar
+// member rules where only an owner may touch an owner.
+func EnsureActorOutranksTarget(actorRole, targetRole Role) error {
+	return ensureRankWithin(actorRole, targetRole)
+}
+
+// ensureRankWithin is the single comparison behind both guards: the
+// other role may not outrank the actor's.
+func ensureRankWithin(actorRole, otherRole Role) error {
 	if !actorRole.IsValid() {
 		return fmt.Errorf("memberkit: invalid actor role %q", actorRole)
 	}
-	if !targetRole.IsValid() {
-		return fmt.Errorf("memberkit: invalid target role %q", targetRole)
+	if !otherRole.IsValid() {
+		return fmt.Errorf("memberkit: invalid target role %q", otherRole)
 	}
-	if roleRank[targetRole] > roleRank[actorRole] {
+	if roleRank[otherRole] > roleRank[actorRole] {
 		return ErrRoleEscalation
 	}
 	return nil
+}
+
+// loadMemberRole reads a member's current workspace role. Returns
+// sql.ErrNoRows when the user is not a member.
+func loadMemberRole(ctx context.Context, tx TX, workspaceID, userID uint32) (Role, error) {
+	var role string
+	if err := tx.QueryRowContext(ctx,
+		`SELECT role FROM workspace_members
+		 WHERE workspace_id = ? AND user_id = ? AND enabled = TRUE
+		 LIMIT 1`,
+		workspaceID, userID).Scan(&role); err != nil {
+		return "", err
+	}
+	return Role(role), nil
+}
+
+// ensureActorMayActOn loads the actor's own role and checks it against
+// the target's current role.
+//
+// The lookup happens here rather than in the caller so no write path can
+// reach the member tables without the check: the handlers used to be the
+// only place this was enforced, and the one that forgot is exactly the
+// hole this closes. A zero actor is a system path with no privilege to
+// escalate and is left alone; an actor with no membership row cannot
+// outrank anybody, so it is refused rather than skipped.
+func ensureActorMayActOn(ctx context.Context, tx TX, workspaceID, actorUserID uint32, targetRole Role) error {
+	if actorUserID == 0 {
+		return nil
+	}
+	actorRole, err := loadMemberRole(ctx, tx, workspaceID, actorUserID)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return ErrRoleEscalation
+		}
+		return fmt.Errorf("memberkit: load actor role: %w", err)
+	}
+	return EnsureActorOutranksTarget(actorRole, targetRole)
 }
 
 // UpdateMemberRoleArgs carries the arguments for UpdateMemberRole.
@@ -103,6 +163,15 @@ func UpdateMemberRole(ctx context.Context, tx TX, args UpdateMemberRoleArgs) err
 		if owners <= 1 {
 			return ErrLastOwner
 		}
+	}
+
+	// The actor must outrank the member as they stand today, not just the
+	// role they are being moved to: without this an admin can demote an
+	// owner and then remove them. Ordered after the last-owner guard so
+	// the more specific "the workspace would lose its only owner" answer
+	// still wins when both apply.
+	if err := ensureActorMayActOn(ctx, tx, args.WorkspaceID, args.ActorUserID, Role(oldRole)); err != nil {
+		return err
 	}
 
 	if _, err := tx.ExecContext(ctx,
