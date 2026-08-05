@@ -365,7 +365,7 @@ function WorkspaceDetailPage(): ReactElement {
           padding: 'var(--nf-space-4)',
           border: '1px solid var(--nf-color-danger)',
           borderRadius: 'var(--nf-radius-md)',
-          background: 'color-mix(in srgb, var(--nf-color-danger) 4%, var(--nf-color-bg-default))',
+          background: 'color-mix(in srgb, var(--nf-color-danger) 4%, var(--nf-color-bg))',
         }}
       >
         <header style={{ display: 'flex', flexDirection: 'column', gap: 'var(--nf-space-1)' }}>

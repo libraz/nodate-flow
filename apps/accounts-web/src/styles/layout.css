@@ -263,7 +263,7 @@
 }
 
 .aw-mono {
-  font-family: var(--font-mono);
+  font-family: var(--nf-font-mono);
   word-break: break-all;
   user-select: all;
 }

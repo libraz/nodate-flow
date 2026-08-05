@@ -27,6 +27,7 @@ import { useTranslation } from 'react-i18next';
 import AuthCard from '../../components/auth-card';
 import { type ProfileFormValues, profileSchema } from '../../features/auth/auth-schemas';
 import { type AuthUser, authStore, selectUser, useAuth } from '../../features/auth/auth-store';
+import { userFromMe } from '../../features/auth/user-from-me';
 import { type SupportedLanguage, setLanguage } from '../../i18n';
 import type { ProblemJson } from '../../lib/api-error';
 import { mapAuthError } from '../../lib/auth-errors';
@@ -45,22 +46,14 @@ const LANGUAGE_DEFAULT_COUNTRY: Record<SupportedLanguage, string> = {
 };
 
 /**
- * Local view of the auth-api `/me` response. Typed against the SDK `MeBody`
- * for the fields we actually consume so the `weekStart` enum stays aligned
- * with the OpenAPI source.
+ * The auth-api `/me` response, whole.
+ *
+ * It used to be narrowed to the fields this form reads, which made it
+ * easy to rebuild the session from a subset and lose the rest. The
+ * session is rebuilt through `userFromMe`, so the full shape is what
+ * belongs here.
  */
-type MeResponse = Pick<
-  components['schemas']['MeBody'],
-  | 'id'
-  | 'email'
-  | 'displayName'
-  | 'locale'
-  | 'timezone'
-  | 'country'
-  | 'themePreference'
-  | 'isInstanceAdmin'
-  | 'weekStart'
->;
+type MeResponse = components['schemas']['MeBody'];
 
 /** Allowed `weekStart` values, mirrored from the SDK `MeBody` enum. */
 type WeekStart = components['schemas']['MeBody']['weekStart'];
@@ -222,11 +215,12 @@ export function ProfilePage(): ReactElement {
     { value: 'sat', label: t('profile.week_start.sat') },
   ];
 
-  // The shared `AuthUser` slice does not currently track `weekStart`, but the
-  // server-side `/me` response does. We read it via a narrowed cast so the
-  // form picks up the persisted value when it is present and falls back to
-  // a locale-appropriate default otherwise.
-  const persistedWeekStart = (user as Partial<MeResponse> | null)?.weekStart;
+  // The session carries `weekStart`, so the form starts from what the
+  // server actually holds. The locale default below only applies when the
+  // account has never had one — reaching for it while a stored value
+  // exists is what let "Saturday" turn back into "Sunday" on reload and
+  // then overwrite the real setting on the next save.
+  const persistedWeekStart = user?.weekStart as WeekStart | undefined;
   const userLocale = (user?.locale ?? 'en') as SupportedLanguage | string;
   const fallbackWeekStart: WeekStart = userLocale === 'ja' || userLocale === 'zh' ? 'mon' : 'sun';
 
@@ -326,17 +320,12 @@ export function ProfilePage(): ReactElement {
         return;
       }
       const me = data as MeResponse;
-      const updatedUser: AuthUser = {
-        id: me.id,
-        email: me.email,
-        displayName: me.displayName,
-        locale: me.locale,
-        timezone: me.timezone,
-        country: me.country,
-        themePreference: me.themePreference,
-        isInstanceAdmin: authStore.getState().user?.isInstanceAdmin ?? false,
-      };
-      authStore.getState().setSession(authStore.getState().accessToken ?? '', updatedUser);
+      // Rebuild through the shared mapper rather than copying fields by
+      // hand. The hand-written version silently dropped every field it
+      // did not list — `weekStart` and `avatarUrl` among them — so saving
+      // any part of the profile erased them from the session, and the
+      // next save wrote the erased value back to the server.
+      authStore.getState().setSession(authStore.getState().accessToken ?? '', userFromMe(me));
       setPreference(values.themePreference as ThemePreference);
       setLanguage(values.locale as SupportedLanguage);
       setSuccess(true);

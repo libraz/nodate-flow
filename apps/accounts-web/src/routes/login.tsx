@@ -7,7 +7,7 @@
  * step triggered by the server, not a user-filled form.
  */
 
-import { type components, isSafeRedirect } from '@nodate-flow/sdk';
+import { type components, isSafeRedirect, parseAllowedOrigins } from '@nodate-flow/sdk';
 import { useZodForm } from '@nodate-flow/ui/hooks/use-zod-form';
 import Button from '@nodate-flow/ui/primitives/button';
 import FormField from '@nodate-flow/ui/primitives/form-field';
@@ -38,6 +38,26 @@ import { useSubmitGuard } from '../lib/use-submit-guard';
  */
 const RECOVERY_MIN_LEN = 8;
 const RECOVERY_MAX_LEN = 20;
+
+/**
+ * Origins other than this app's own that `?redirect=` may point at.
+ * Sign-in hands the user back to the product frontend, which runs on a
+ * different origin in every deployment (and on a different port in local
+ * dev), so the set has to come from configuration:
+ * `VITE_NF_ALLOWED_REDIRECT_ORIGINS` (comma-separated) plus the product
+ * frontend origin the profile page already links to. Anything else is
+ * refused and the user lands on /profile instead.
+ */
+const ALLOWED_ORIGINS = parseAllowedOrigins(
+  [
+    import.meta.env.VITE_NF_ALLOWED_REDIRECT_ORIGINS ?? '',
+    import.meta.env.VITE_FLOW_WEB_URL ?? '',
+    // Local dev serves the two apps on different ports of localhost, so
+    // the hand-off is cross-origin there too. Dev-only: a production
+    // build must name its product origin in the config above.
+    import.meta.env.DEV ? 'http://localhost:5173' : '',
+  ].join(','),
+);
 
 // Module-scope constant so Vite tree-shakes the dev-only panel out of
 // production bundles when used as a JSX guard. A render-scope check would
@@ -334,7 +354,7 @@ function LoginPage(): ReactElement {
   const alertRef = useRef<HTMLParagraphElement>(null);
 
   const redirectAfterLogin = useCallback((): void => {
-    if (redirectTarget && isSafeRedirect(redirectTarget)) {
+    if (redirectTarget && isSafeRedirect(redirectTarget, window.location.origin, ALLOWED_ORIGINS)) {
       window.location.href = redirectTarget;
     } else {
       void navigate({ to: '/profile', replace: true });

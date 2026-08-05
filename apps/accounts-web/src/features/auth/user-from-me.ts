@@ -11,6 +11,7 @@ export function userFromMe(me: MeResponse): AuthUser {
     timezone: me.timezone,
     country: me.country,
     themePreference: me.themePreference,
+    weekStart: me.weekStart,
     isInstanceAdmin: me.isInstanceAdmin,
     avatarUrl: me.avatarUrl ?? null,
   };
