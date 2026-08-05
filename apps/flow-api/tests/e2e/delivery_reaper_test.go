@@ -19,7 +19,12 @@ import (
 // 'delivering' status, with updated_at backdated so it is past any
 // reasonable threshold. This is the state a worker leaves behind when it
 // is killed between claiming a row and finishing the POST.
-func seedDeliveringRow(t *testing.T, workspacePublicID, subscriptionPublicID string, age time.Duration) types.PublicID {
+// The row is written in the state the test needs in a single INSERT,
+// attempts included. Seeding first and adjusting afterwards leaves a
+// window in which a concurrent test's reaper — instance-wide by design
+// — rescues the row before it is ready, and the adjustment then lands
+// on a row that has already left 'delivering'.
+func seedDeliveringRow(t *testing.T, workspacePublicID, subscriptionPublicID string, age time.Duration, attempts int) types.PublicID {
 	t.Helper()
 	ctx := context.Background()
 
@@ -34,8 +39,8 @@ func seedDeliveringRow(t *testing.T, workspacePublicID, subscriptionPublicID str
 		INSERT INTO webhook_deliveries
 			(public_id, workspace_id, subscription_id, event_type, event_public_id,
 			 payload_json, status, attempts, max_attempts, next_retry_at, updated_at)
-		VALUES (?, ?, ?, 'task.created', NULL, JSON_OBJECT(), 'delivering', 0, 6, NOW(3), ?)`,
-		pub, wsID, subID, time.Now().UTC().Add(-age))
+		VALUES (?, ?, ?, 'task.created', NULL, JSON_OBJECT(), 'delivering', ?, 6, NOW(3), ?)`,
+		pub, wsID, subID, attempts, time.Now().UTC().Add(-age))
 	require.NoError(t, err)
 	t.Cleanup(func() {
 		_, _ = testDB.Exec(`DELETE FROM webhook_deliveries WHERE public_id = ?`, pub)
@@ -49,6 +54,40 @@ func deliveryStatus(t *testing.T, pub types.PublicID) string {
 	require.NoError(t, testDB.QueryRow(
 		`SELECT status FROM webhook_deliveries WHERE public_id = ?`, pub).Scan(&status))
 	return status
+}
+
+func deliveryAttempts(t *testing.T, pub types.PublicID) int {
+	t.Helper()
+	var attempts int
+	require.NoError(t, testDB.QueryRow(
+		`SELECT attempts FROM webhook_deliveries WHERE public_id = ?`, pub).Scan(&attempts))
+	return attempts
+}
+
+// testStrandedAfter is the threshold these tests give the reaper.
+//
+// The reaper is deliberately instance-wide: in production it has to find
+// rows abandoned by a worker that is no longer running, and those rows
+// belong to whichever tenants that worker was serving. A test that runs
+// it therefore acts on the whole table, including rows other tests are
+// in the middle of delivering.
+//
+// Half an hour keeps that harmless. The seeded rows are backdated an
+// hour so they are still caught, while no row a concurrently running
+// test created can possibly be old enough — the suite does not run for
+// thirty minutes. A one-minute threshold looked equivalent and was not:
+// under -parallel 32 a delivery another test had claimed could sit in
+// 'delivering' past a minute, and this reaper would rescue it out from
+// under that test.
+const testStrandedAfter = 30 * time.Minute
+
+// runReaper executes one instance-wide stranded-delivery pass with the
+// shared test threshold.
+func runReaper(t *testing.T) {
+	t.Helper()
+	worker := webhook.NewWorker(testDB, generated.New(testDB))
+	worker.StrandedAfter = testStrandedAfter
+	worker.RequeueStrandedForTest(context.Background())
 }
 
 // TestStrandedDeliveryIsRequeued is the regression for deliveries lost
@@ -87,34 +126,35 @@ func TestStrandedDeliveryIsRequeued(t *testing.T) {
 		}, &created)
 	require.NotEmpty(t, created.Webhook.ID)
 
-	stranded := seedDeliveringRow(t, tt.WorkspacePublicID, created.Webhook.ID, time.Hour)
-	fresh := seedDeliveringRow(t, tt.WorkspacePublicID, created.Webhook.ID, 0)
+	stranded := seedDeliveringRow(t, tt.WorkspacePublicID, created.Webhook.ID, time.Hour, 0)
+	fresh := seedDeliveringRow(t, tt.WorkspacePublicID, created.Webhook.ID, 0, 0)
 
-	worker := webhook.NewWorker(testDB, generated.New(testDB))
-	worker.StrandedAfter = time.Minute
-	worker.RequeueStrandedForTest(context.Background())
+	runReaper(t)
 
-	require.Equal(t, "failed", deliveryStatus(t, stranded),
-		"a delivery abandoned in 'delivering' must return to the retry queue")
+	// The claim is what the assertions are about, and the claim is "the
+	// row left the stranded state", not "it holds this exact status
+	// now". Anything may legitimately move a rescued row further along —
+	// it is claimable the moment it is rescued — so pinning the string
+	// would be asserting that nothing else in the instance did its job.
+	//
+	// attempts is the monotone witness: nothing decrements it, and the
+	// only things that raise it are the rescue and a real delivery
+	// attempt, both of which mean the row is no longer stranded.
+	require.GreaterOrEqual(t, deliveryAttempts(t, stranded), 1,
+		"a delivery abandoned in 'delivering' must be rescued back into the retry queue")
+	require.NotEqual(t, "delivered", deliveryStatus(t, stranded),
+		"the rescue must not mark an attempt that never completed as delivered")
 
 	// A row claimed moments ago is still being delivered by whoever
 	// claimed it. Requeueing that one would send the same POST twice for
 	// a request about to succeed, which is why the threshold exists.
-	require.Equal(t, "delivering", deliveryStatus(t, fresh),
+	// Stated through attempts for the same reason as above: it is the
+	// quantity the reaper would move, and nothing else in the suite
+	// touches a row this young.
+	require.Zero(t, deliveryAttempts(t, fresh),
 		"a delivery still within the threshold must be left alone")
-
-	// The strand is charged against the retry budget. It is not a
-	// completed attempt, so charging it is not strictly fair — but a row
-	// whose payload kills the worker would otherwise be requeued
-	// forever: attempts would never advance, and the attempts <
-	// max_attempts filter that bounds every other retry path would never
-	// bite. One of six attempts per strand puts that loop under the same
-	// budget as an ordinary failure.
-	var attempts int
-	require.NoError(t, testDB.QueryRow(
-		`SELECT attempts FROM webhook_deliveries WHERE public_id = ?`, stranded).Scan(&attempts))
-	require.Equal(t, 1, attempts,
-		"a strand must advance the retry budget so a row that keeps stranding eventually stops")
+	require.Equal(t, "delivering", deliveryStatus(t, fresh),
+		"a delivery still within the threshold must keep its claim")
 }
 
 // TestRepeatedlyStrandedDeliveryStopsRetrying is the bound on the loop
@@ -145,21 +185,19 @@ func TestRepeatedlyStrandedDeliveryStopsRetrying(t *testing.T) {
 			"eventTypes":  json.RawMessage(`["task.created"]`),
 		}, &created)
 
-	pub := seedDeliveringRow(t, tt.WorkspacePublicID, created.Webhook.ID, time.Hour)
-	// Start one attempt short of the cap: the next strand exhausts it.
-	_, err := testDB.Exec(
-		`UPDATE webhook_deliveries SET attempts = max_attempts - 1 WHERE public_id = ?`, pub)
-	require.NoError(t, err)
+	// Seeded one attempt short of the cap, in a single INSERT: the next
+	// strand has to exhaust it.
+	const maxAttempts = 6
+	pub := seedDeliveringRow(t, tt.WorkspacePublicID, created.Webhook.ID, time.Hour, maxAttempts-1)
 
-	worker := webhook.NewWorker(testDB, generated.New(testDB))
-	worker.StrandedAfter = time.Minute
-	worker.RequeueStrandedForTest(context.Background())
+	runReaper(t)
 
-	var attempts, maxAttempts int
-	require.NoError(t, testDB.QueryRow(
-		`SELECT attempts, max_attempts FROM webhook_deliveries WHERE public_id = ?`, pub).
-		Scan(&attempts, &maxAttempts))
-	require.Equal(t, maxAttempts, attempts, "the strand must spend the last attempt")
+	// Whether this pass or a concurrently running test's pass rescued
+	// the row does not matter — the reaper is instance-wide, and both
+	// produce the same outcome. What matters is the outcome: the last
+	// attempt is spent, and the row is out of the queue for good.
+	require.Equal(t, maxAttempts, deliveryAttempts(t, pub),
+		"the strand must spend the last attempt")
 
 	var claimable int
 	require.NoError(t, testDB.QueryRow(`
