@@ -35,6 +35,27 @@ jobs:
       - name: Typecheck
         run: bun run typecheck
 
+      # Compares every apps/*/locales/<lang> against its English reference
+      # and rejects empty values and i18next-native '{{var}}' placeholders.
+      # Nothing else in CI reads the locale files, so without this step a
+      # namespace can go missing in one language and ship green.
+      - name: i18n locales
+        run: make i18n-check
+
+      # The auth-free router is a security boundary, and the only thing
+      # standing between it and an accidentally public route is this
+      # allowlist. It reads the committed spec plus the router source, so
+      # it needs no Go toolchain and belongs with the other fast gates.
+      - name: Public router surface
+        run: make check-public-router
+
+      # A var() naming a token nothing defines takes its whole
+      # declaration down with it, so the style is simply absent — no
+      # error, no fallback, and nothing else in the pipeline reads CSS
+      # closely enough to notice.
+      - name: Design token references
+        run: make check-tokens
+
       - name: Unit tests (flow-web)
         working-directory: apps/flow-web
         run: bun run test --coverage
@@ -42,6 +63,21 @@ jobs:
       - name: Unit tests (accounts-web)
         working-directory: apps/accounts-web
         run: bun run test --coverage
+
+      # The remaining TypeScript workspaces. A suite that no pipeline
+      # invokes reports nothing, which reads exactly like a suite that
+      # passes.
+      - name: Unit tests (cli)
+        working-directory: apps/cli
+        run: bun run test
+
+      - name: Unit tests (ui)
+        working-directory: packages/ui
+        run: bun run test
+
+      - name: Unit tests (sdk)
+        working-directory: packages/sdk
+        run: bun run test
 
       - name: Build (flow-web)
         working-directory: apps/flow-web
@@ -65,6 +101,36 @@ jobs:
           files: apps/accounts-web/coverage/lcov.info
           flags: accounts-web
           fail_ci_if_error: false
+
+  openapi:
+    name: OpenAPI (spec + SDK drift)
+    # The committed spec and the generated TS SDK are what every frontend
+    # type-checks against, and both are produced from the Go handlers.
+    # Nothing else in the pipeline regenerates them, so a handler change
+    # that was never dumped — or a spec that was dumped but never run
+    # through openapi-typescript — reaches main with the whole build green.
+    # Needs both toolchains: Go to dump the two services, bun/node to
+    # regenerate the types.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-go@v6
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache-dependency-path: |
+            apps/flow-api/go.sum
+            apps/auth-api/go.sum
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: ${{ env.BUN_VERSION }}
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Spec and SDK match the Go sources
+        run: make test-openapi-diff
 
   schema:
     name: Schema (drift, core contract)
@@ -133,10 +199,20 @@ jobs:
 
   api:
     name: API (format, lint, test)
+    # GitHub-hosted Linux runners ship a running Docker daemon, which is what
+    # testcontainers needs to boot the MySQL and MinIO instances the
+    # integration and e2e suites run against. Moving this job to a runner
+    # without Docker turns those suites off again.
     runs-on: ubuntu-latest
-    # CI runs unit tests only. Integration and e2e suites that need a database
-    # (testcontainers) are excluded: NF_TEST_INTEGRATION is left unset and
-    # -short is passed so those suites skip.
+    # Container startup can hang instead of erroring; cap it well above a
+    # normal run so a stuck daemon is reported rather than billed.
+    timeout-minutes: 45
+    env:
+      # The suites that cover cross-tenant access, IDOR, and secret leakage
+      # only run when this is set, and they are skipped rather than failed
+      # when it is not — so leaving it unset means CI reports green on a run
+      # that exercised none of them.
+      NF_TEST_INTEGRATION: "1"
     steps:
       - uses: actions/checkout@v7
 
@@ -146,50 +222,61 @@ jobs:
           cache-dependency-path: |
             apps/flow-api/go.sum
             apps/auth-api/go.sum
+            apps/flow-worker/go.sum
+            apps/presence-discord/go.sum
+            packages/go-shared/go.sum
 
-      - name: Gofmt check (flow-api)
-        working-directory: apps/flow-api
+      # Every module in go.work, not just the two services. The worker,
+      # the presence gateway and the shared kit all ship code and all
+      # have tests; leaving them out of the pipeline made those tests
+      # invisible rather than optional.
+      - name: Gofmt check
         run: |
-          fmt_out=$(gofmt -l .)
+          fmt_out=$(gofmt -l apps/flow-api apps/auth-api apps/flow-worker apps/presence-discord packages/go-shared)
           if [ -n "$fmt_out" ]; then
             echo "::error::unformatted Go files:"
             echo "$fmt_out"
             exit 1
           fi
 
-      - name: Gofmt check (auth-api)
-        working-directory: apps/auth-api
+      - name: Go vet
         run: |
-          fmt_out=$(gofmt -l .)
-          if [ -n "$fmt_out" ]; then
-            echo "::error::unformatted Go files:"
-            echo "$fmt_out"
-            exit 1
-          fi
+          for mod in apps/flow-api apps/auth-api apps/flow-worker apps/presence-discord packages/go-shared; do
+            echo "::group::go vet $mod"
+            (cd "$mod" && go vet ./...) || exit 1
+            echo "::endgroup::"
+          done
 
-      - name: Go vet (flow-api)
+      - name: Build
+        run: |
+          for mod in apps/flow-api apps/auth-api apps/flow-worker apps/presence-discord packages/go-shared; do
+            echo "::group::go build $mod"
+            (cd "$mod" && go build ./...) || exit 1
+            echo "::endgroup::"
+          done
+
+      # -short is deliberately absent: the integration guards skip on it as
+      # well as on NF_TEST_INTEGRATION, so passing it would silence the
+      # suites this job just opted into.
+      - name: Tests (flow-api)
         working-directory: apps/flow-api
-        run: go vet ./...
+        run: go test -race -count=1 -covermode=atomic -coverprofile=coverage.out ./...
 
-      - name: Go vet (auth-api)
+      - name: Tests (auth-api)
         working-directory: apps/auth-api
-        run: go vet ./...
+        run: go test -race -count=1 -covermode=atomic -coverprofile=coverage.out ./...
 
-      - name: Build (flow-api)
-        working-directory: apps/flow-api
-        run: go build ./...
+      - name: Tests (flow-worker)
+        working-directory: apps/flow-worker
+        run: go test -race -count=1 ./...
 
-      - name: Build (auth-api)
-        working-directory: apps/auth-api
-        run: go build ./...
+      - name: Tests (presence-discord)
+        working-directory: apps/presence-discord
+        run: go test -race -count=1 ./...
 
-      - name: Unit tests (flow-api)
-        working-directory: apps/flow-api
-        run: go test -short -race -count=1 -covermode=atomic -coverprofile=coverage.out ./...
-
-      - name: Unit tests (auth-api)
-        working-directory: apps/auth-api
-        run: go test -short -race -count=1 -covermode=atomic -coverprofile=coverage.out ./...
+      - name: Tests (go-shared)
+        working-directory: packages/go-shared
+        run: go test -race -count=1 ./...
 
       # Public repo: codecov runs tokenless. Uploads never gate CI.
       - name: Upload coverage (flow-api)

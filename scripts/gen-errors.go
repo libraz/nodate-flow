@@ -237,20 +237,88 @@ func run() error {
 		}
 	}
 
-	// Docs.
+	// Docs. Generated pages are also pruned: a code removed from the
+	// YAML used to leave its page behind, and a stale page reads exactly
+	// like a live one — same shape, same path, no hint that the code it
+	// documents no longer exists anywhere in the product.
 	docsRoot := filepath.Join(root, "docs", "errors")
 	for _, name := range fileNames {
 		dir := filepath.Join(docsRoot, name)
 		if err := os.MkdirAll(dir, 0o755); err != nil {
 			return err
 		}
+		current := make(map[string]bool, len(byFile[name]))
 		for _, r := range byFile[name] {
+			current[r.Code+".md"] = true
 			if err := writeFile(filepath.Join(dir, r.Code+".md"), genDoc(r)); err != nil {
+				return err
+			}
+		}
+		if err := pruneDocs(dir, current); err != nil {
+			return err
+		}
+	}
+
+	// A domain whose YAML file is gone leaves a whole directory of pages
+	// that nothing generates any more.
+	live := make(map[string]bool, len(fileNames))
+	for _, name := range fileNames {
+		live[name] = true
+	}
+	domains, err := os.ReadDir(docsRoot)
+	if err != nil && !os.IsNotExist(err) {
+		return err
+	}
+	for _, d := range domains {
+		if !d.IsDir() || live[d.Name()] {
+			continue
+		}
+		dir := filepath.Join(docsRoot, d.Name())
+		if err := pruneDocs(dir, nil); err != nil {
+			return err
+		}
+		// Only removes the directory when the prune emptied it, so a
+		// hand-written file keeps its folder alive.
+		if entries, err := os.ReadDir(dir); err == nil && len(entries) == 0 {
+			if err := os.Remove(dir); err != nil {
 				return err
 			}
 		}
 	}
 
+	return nil
+}
+
+// pruneDocs deletes generated error pages in dir that are not in keep.
+//
+// Only files whose stem is a valid error code are touched, so anything
+// hand-written alongside them (a README, an index) is left alone: this
+// generator owns the `<CODE>.md` namespace and nothing else.
+func pruneDocs(dir string, keep map[string]bool) error {
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil
+		}
+		return err
+	}
+	for _, e := range entries {
+		if e.IsDir() {
+			continue
+		}
+		fileName := e.Name()
+		if keep[fileName] {
+			continue
+		}
+		stem, ok := strings.CutSuffix(fileName, ".md")
+		if !ok || !codeRe.MatchString(stem) {
+			continue
+		}
+		if err := os.Remove(filepath.Join(dir, fileName)); err != nil {
+			return err
+		}
+		fmt.Printf("gen-errors: removed stale doc %s\n", filepath.Join(dir, fileName))
+	}
 	return nil
 }
 

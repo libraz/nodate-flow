@@ -1,11 +1,18 @@
 #!/usr/bin/env node
-// 2.AI-10 i18n translator bot — deterministic scaffold.
+// i18n translator bot — deterministic scaffold.
 //
-// Walks apps/flow-web/locales/en/*.json, finds keys that are missing in the
-// matching ja file, and either reports them (--check, CI gate) or fills
-// them in with a `[TODO:ja] <english>` placeholder (--write, used by the
-// GitHub Actions translator job). A future LLM path can replace the
-// placeholder generator without changing the CLI contract.
+// Walks every `apps/*/locales/en/*.json`, finds keys that are missing in
+// each sibling language, and either reports them (--check, CI gate) or
+// fills them in with a `[TODO:<lang>] <english>` placeholder (--write,
+// used by the GitHub Actions translator job). A future LLM path can
+// replace the placeholder generator without changing the CLI contract.
+//
+// English is the reference in every locale root. Languages are whatever
+// directories sit next to `en`, so adding a language or an app is enough
+// to put it under the gate — nothing here names a language. That
+// generality is the point: the check previously compared en against ja
+// alone, in flow-web alone, which is why nine `generate.*` keys could go
+// missing from zh/pages.json and stay missing through a full CI run.
 //
 // The --check mode also scans every apps/*/locales/*/*.json (and
 // apps/*/src/locales/*/*.json for apps that co-locate locales with the
@@ -15,8 +22,8 @@
 // instead of silently surfacing English copy inside the JA UI.
 //
 // Usage:
-//   node scripts/i18n-translate.mjs --check   # exit 1 if ja is missing keys or any value is empty
-//   node scripts/i18n-translate.mjs --write   # patch ja files in place
+//   node scripts/i18n-translate.mjs --check   # exit 1 on key drift or empty values
+//   node scripts/i18n-translate.mjs --write   # patch non-English files in place
 
 import { readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
@@ -24,8 +31,9 @@ import { fileURLToPath } from 'node:url';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const repo = join(here, '..');
-const enDir = join(repo, 'apps/flow-web/locales/en');
-const jaDir = join(repo, 'apps/flow-web/locales/ja');
+
+/** The language every other one is compared against. */
+const REFERENCE_LANG = 'en';
 
 const mode = process.argv.includes('--write') ? 'write' : 'check';
 
@@ -48,43 +56,111 @@ function setPath(obj, path, value) {
   cur[parts.at(-1)] = value;
 }
 
-const files = readdirSync(enDir).filter((f) => f.endsWith('.json'));
+function isDirectory(path) {
+  try {
+    return statSync(path).isDirectory();
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Every `apps/<app>/locales` directory that carries a reference language,
+ * paired with the sibling languages to hold against it. Discovered from
+ * the filesystem rather than listed, so a new app or a new language is
+ * covered the moment its directory exists.
+ */
+function collectLocaleRoots() {
+  const roots = [];
+  const appsDir = join(repo, 'apps');
+  let apps = [];
+  try {
+    apps = readdirSync(appsDir);
+  } catch {
+    return roots;
+  }
+  for (const app of apps.sort()) {
+    for (const rel of ['locales', join('src', 'locales')]) {
+      const root = join(appsDir, app, rel);
+      if (!isDirectory(join(root, REFERENCE_LANG))) continue;
+      const langs = readdirSync(root)
+        .filter((lang) => lang !== REFERENCE_LANG && isDirectory(join(root, lang)))
+        .sort();
+      roots.push({ app, root, langs });
+    }
+  }
+  return roots;
+}
+
+function readJson(path) {
+  try {
+    return JSON.parse(readFileSync(path, 'utf8'));
+  } catch {
+    // Absent or unreadable: treat as an empty catalog so every reference
+    // key is reported missing, which is what a dropped file should look
+    // like. Malformed JSON is separately surfaced by the scans below.
+    return {};
+  }
+}
+
 let missingTotal = 0;
+let staleTotal = 0;
 const report = [];
 
-for (const file of files) {
-  const en = JSON.parse(readFileSync(join(enDir, file), 'utf8'));
-  let ja = {};
-  try {
-    ja = JSON.parse(readFileSync(join(jaDir, file), 'utf8'));
-  } catch {
-    // ja file does not exist yet; treat as empty.
-  }
-  const enFlat = new Map();
-  const jaFlat = new Map();
-  walk(en, '', enFlat);
-  walk(ja, '', jaFlat);
+for (const { root, langs } of collectLocaleRoots()) {
+  const refDir = join(root, REFERENCE_LANG);
+  const files = readdirSync(refDir).filter((f) => f.endsWith('.json'));
 
-  const missing = [];
-  for (const [path, value] of enFlat) {
-    if (!jaFlat.has(path)) missing.push({ path, value });
-  }
-  if (missing.length === 0) continue;
-  missingTotal += missing.length;
-  report.push({ file, missing });
+  for (const lang of langs) {
+    for (const file of files) {
+      const reference = readJson(join(refDir, file));
+      const targetPath = join(root, lang, file);
+      const target = readJson(targetPath);
 
-  if (mode === 'write') {
-    for (const { path, value } of missing) {
-      setPath(ja, path, typeof value === 'string' ? `[TODO:ja] ${value}` : value);
+      const refFlat = new Map();
+      const targetFlat = new Map();
+      walk(reference, '', refFlat);
+      walk(target, '', targetFlat);
+
+      const missing = [];
+      for (const [path, value] of refFlat) {
+        if (!targetFlat.has(path)) missing.push({ path, value });
+      }
+      // A key the reference no longer has is dead weight that reads as a
+      // real translation to anyone editing the file.
+      const stale = [];
+      for (const path of targetFlat.keys()) {
+        if (!refFlat.has(path)) stale.push(path);
+      }
+
+      if (missing.length === 0 && stale.length === 0) continue;
+      missingTotal += missing.length;
+      staleTotal += stale.length;
+      const rel = targetPath.startsWith(`${repo}/`)
+        ? targetPath.slice(repo.length + 1)
+        : targetPath;
+      report.push({ rel, missing, stale });
+
+      if (mode === 'write' && missing.length > 0) {
+        for (const { path, value } of missing) {
+          setPath(target, path, typeof value === 'string' ? `[TODO:${lang}] ${value}` : value);
+        }
+        writeFileSync(targetPath, `${JSON.stringify(target, null, 2)}\n`);
+      }
     }
-    writeFileSync(join(jaDir, file), `${JSON.stringify(ja, null, 2)}\n`);
   }
 }
 
 if (report.length > 0) {
-  for (const { file, missing } of report) {
-    console.info(`${file}: ${missing.length} missing key(s)`);
-    for (const { path } of missing) console.info(`  - ${path}`);
+  for (const { rel, missing, stale } of report) {
+    if (missing.length > 0) {
+      console.info(`${rel}: ${missing.length} missing key(s)`);
+      for (const { path } of missing) console.info(`  - ${path}`);
+    }
+    if (stale.length > 0) {
+      console.info(`${rel}: ${stale.length} key(s) not present in ${REFERENCE_LANG}`);
+      for (const path of stale) console.info(`  + ${path}`);
+    }
   }
 }
 
@@ -265,11 +341,16 @@ if (doubleBraceFindings.length > 0) {
 
 if (
   mode === 'check' &&
-  (missingTotal > 0 || emptyFindings.length > 0 || doubleBraceFindings.length > 0)
+  (missingTotal > 0 || staleTotal > 0 || emptyFindings.length > 0 || doubleBraceFindings.length > 0)
 ) {
   if (missingTotal > 0) {
     console.error(
-      `\n${missingTotal} key(s) missing in ja locales. Run \`node scripts/i18n-translate.mjs --write\` to scaffold placeholders.`,
+      `\n${missingTotal} key(s) missing from non-${REFERENCE_LANG} locales. Run \`node scripts/i18n-translate.mjs --write\` to scaffold placeholders.`,
+    );
+  }
+  if (staleTotal > 0) {
+    console.error(
+      `\n${staleTotal} key(s) present in a translation but not in ${REFERENCE_LANG}. Remove them, or add them to ${REFERENCE_LANG} if they are real.`,
     );
   }
   if (emptyFindings.length > 0) {
@@ -285,5 +366,5 @@ if (
   process.exit(1);
 }
 console.info(
-  mode === 'write' ? `wrote placeholders for ${missingTotal} key(s)` : 'ja locales up to date',
+  mode === 'write' ? `wrote placeholders for ${missingTotal} key(s)` : 'locales up to date',
 );

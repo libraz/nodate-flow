@@ -129,19 +129,52 @@ build-accounts-web:
 
 # ---------- test ----------
 
-.PHONY: test test-api test-api-mock test-api-real test-web test-accounts-web test-ui test-sdk test-e2e test-contract test-openapi-diff test-schema-collisions test-schema-diff verify-codegen test-core-contract lighthouse
-test: test-api test-auth-api test-web test-accounts-web test-ui test-sdk ## Run unit/integration tests (Go + TS)
+# The Go integration and e2e suites — cross-tenant isolation, IDOR, secret
+# leakage — only run when NF_TEST_INTEGRATION is non-empty, and they boot
+# their own MySQL/MinIO containers via testcontainers, so a working Docker
+# daemon is required. They are on by default: a regression suite that has to
+# be opted into is a regression suite nobody runs. On a machine without
+# Docker, run `make test NF_TEST_INTEGRATION=` to fall back to unit tests.
+#
+# The value is deliberately taken away from .env: that file is generated from
+# .env.example on first run and carries an empty NF_TEST_INTEGRATION, so
+# honouring it would leave the suites off on every checkout while looking
+# configured. A command-line assignment outranks this and still wins.
+ifeq ($(origin NF_TEST_INTEGRATION),file)
+override NF_TEST_INTEGRATION := 1
+endif
+NF_TEST_INTEGRATION ?= 1
+
+.PHONY: test test-api test-api-mock test-api-real test-auth-api test-worker test-presence test-go-shared test-cli test-web test-accounts-web test-ui test-sdk test-e2e test-contract test-openapi-diff test-schema-collisions test-schema-diff verify-codegen test-core-contract lighthouse
+
+# Every module that ships code has a target here and every target is
+# reachable from `test`. A suite nothing invokes is indistinguishable
+# from a suite that does not exist.
+test: test-api test-auth-api test-worker test-presence test-go-shared \
+      test-cli test-web test-accounts-web test-ui test-sdk ## Run unit/integration tests (Go + TS; Go integration suites need Docker)
 
 test-api: test-api-mock test-api-real ## Go tests (flow) — both NF_FLOW_AI_MOCK on and off
 
-test-api-mock: ## Go tests (flow) with NF_FLOW_AI_MOCK=1 (mock AI orchestrator path)
-	cd apps/flow-api && NF_FLOW_AI_MOCK=1 go test ./...
+test-api-mock: ## Go tests (flow) with NF_FLOW_AI_MOCK=1 (mock AI orchestrator path; needs Docker)
+	cd apps/flow-api && NF_TEST_INTEGRATION="$(NF_TEST_INTEGRATION)" NF_FLOW_AI_MOCK=1 go test ./...
 
-test-api-real: ## Go tests (flow) with NF_FLOW_AI_MOCK unset (real per-tenant provider path)
-	cd apps/flow-api && env -u NF_FLOW_AI_MOCK go test ./...
+test-api-real: ## Go tests (flow) with NF_FLOW_AI_MOCK unset (real per-tenant provider path; needs Docker)
+	cd apps/flow-api && NF_TEST_INTEGRATION="$(NF_TEST_INTEGRATION)" env -u NF_FLOW_AI_MOCK go test ./...
 
-test-auth-api: ## Go tests (auth)
-	cd apps/auth-api && go test ./...
+test-auth-api: ## Go tests (auth; integration suites need Docker)
+	cd apps/auth-api && NF_TEST_INTEGRATION="$(NF_TEST_INTEGRATION)" go test ./...
+
+test-worker: ## Go tests (flow-worker; integration suites need Docker)
+	cd apps/flow-worker && NF_TEST_INTEGRATION="$(NF_TEST_INTEGRATION)" go test ./...
+
+test-presence: ## Go tests (presence-discord)
+	cd apps/presence-discord && NF_TEST_INTEGRATION="$(NF_TEST_INTEGRATION)" go test ./...
+
+test-go-shared: ## Go tests (packages/go-shared; integration suites need Docker)
+	cd packages/go-shared && NF_TEST_INTEGRATION="$(NF_TEST_INTEGRATION)" go test ./...
+
+test-cli: ## Vitest (apps/cli)
+	cd apps/cli && $(PKG_RUN) test
 
 test-web: ## Vitest (flow-web)
 	cd apps/flow-web && $(PKG_RUN) test
@@ -183,11 +216,17 @@ lighthouse: build-web ## Run Lighthouse CI (a11y 95+, perf 70+)
 
 # ---------- lint / format / typecheck ----------
 
-.PHONY: check lint format typecheck vet check-dtos check-css-var-parens
-check: lint typecheck vet i18n-check check-dtos check-css-var-parens ## Lint + typecheck + go vet + i18n locale guard + DTO drift guard + CSS var() paren guard
+.PHONY: check lint format typecheck vet check-dtos check-css-var-parens check-public-router check-tokens
+check: lint typecheck vet i18n-check check-dtos check-css-var-parens check-public-router check-tokens ## Lint + typecheck + go vet + i18n locale guard + DTO drift guard + CSS var() paren guard + public-surface guard + design-token guard
 
 check-dtos: ## Fail when web routes/features hand-roll response DTOs instead of using SDK schemas
 	bash scripts/check-handrolled-dtos.sh
+
+check-public-router: ## Fail when the auth-free router registers a route that is not allowlisted
+	$(PKG_RUN) scripts/check-public-router.ts
+
+check-tokens: ## Fail when a var(--nf-*) reference names a token nothing defines
+	node scripts/check-undefined-tokens.mjs
 
 check-css-var-parens: ## Fail when a var(--nf-...) token reference has a stray extra closing paren
 	bash scripts/check-css-var-parens.sh --ci
@@ -211,7 +250,7 @@ vet: ## go vet
 
 # ---------- codegen ----------
 
-.PHONY: gen gen-sqlc gen-errors gen-signal-kinds gen-sdk gen-openapi i18n-check
+.PHONY: gen gen-sqlc gen-errors gen-signal-kinds gen-sdk gen-sdk-types gen-openapi i18n-check
 gen: gen-sqlc gen-errors gen-signal-kinds gen-sdk ## Run all codegen (sqlc + errors + signal-kinds + sdk)
 
 gen-sqlc: ## sqlc generate (requires the pinned sqlc version)
@@ -224,7 +263,7 @@ gen-errors: ## Regenerate Go/TS error modules + locale stubs + docs from errors/
 gen-signal-kinds: ## Regenerate Go/TS signal-kind modules + locale stubs + docs from signal_kinds/*.yaml
 	go -C scripts run gen-signal-kinds.go
 
-i18n-check: ## Fail on missing ja keys, empty string values, or i18next-native '{{var}}' placeholders under the ICU backend
+i18n-check: ## Fail on locale key drift against en, empty string values, or i18next-native '{{var}}' placeholders under the ICU backend
 	node scripts/i18n-translate.mjs --check
 
 gen-openapi: ## Dump merged OpenAPI 3.1 (flow-api + auth-api) to packages/sdk/openapi.json
@@ -234,8 +273,15 @@ gen-openapi: ## Dump merged OpenAPI 3.1 (flow-api + auth-api) to packages/sdk/op
 	$(PKG_X) biome format --write packages/sdk/openapi.json
 	@rm -f packages/sdk/openapi-flow.json packages/sdk/openapi-auth.json
 
-gen-sdk: gen-openapi ## Generate TS SDK from OpenAPI
-	cd packages/sdk && $(PKG_X) openapi-typescript openapi.json -o src/openapi.ts
+# openapi-typescript emits its output through the TypeScript compiler's
+# AST factory, which only the 5.x JavaScript implementation ships. The
+# workspaces pin TypeScript 7, so the generator runs behind a resolver
+# shim that points the bare `typescript` specifier at the 5.x copy
+# packages/sdk pins. See scripts/openapi-typescript-runtime.mjs.
+gen-sdk-types: ## Regenerate packages/sdk/src/openapi.ts from the committed spec
+	cd packages/sdk && node --import ../../scripts/openapi-typescript-runtime.mjs ../../node_modules/openapi-typescript/bin/cli.js openapi.json -o src/openapi.ts
+
+gen-sdk: gen-openapi gen-sdk-types ## Dump the OpenAPI spec and regenerate the TS SDK types
 
 # ---------- database ----------
 

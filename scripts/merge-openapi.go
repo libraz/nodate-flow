@@ -1,6 +1,14 @@
 // Command merge-openapi merges multiple OpenAPI 3.1 JSON files into one.
-// It combines paths and component schemas, with earlier files taking
-// precedence on collisions.
+// It combines paths and every components sub-map, with earlier files
+// taking precedence on collisions.
+//
+// What it refuses to do is drop things. An earlier version merged only
+// `paths` and `components.schemas` and discarded everything else in the
+// second and later specs without a word — so the day a service starts
+// emitting `components.securitySchemes`, or tags, or servers, that part
+// of its contract would vanish from the merged spec and from every
+// client generated off it, with the build green throughout. Sections
+// this program does not know how to combine now stop the merge instead.
 //
 // Usage:
 //
@@ -12,7 +20,22 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"sort"
 )
+
+// Top-level keys taken from the first spec and expected to be identical
+// (or absent) in the rest. A later spec that disagrees is reported
+// rather than silently losing.
+var singletonKeys = []string{"openapi", "info"}
+
+// Top-level keys this program knows how to combine.
+var mergeableKeys = map[string]bool{
+	"paths":      true,
+	"components": true,
+	"tags":       true,
+	"security":   true,
+	"servers":    true,
+}
 
 func main() {
 	out := flag.String("o", "openapi.json", "output path")
@@ -39,8 +62,10 @@ func main() {
 			root = spec
 			continue
 		}
-		mergePaths(root, spec)
-		mergeSchemas(root, spec)
+		if err := merge(root, spec, f); err != nil {
+			fmt.Fprintf(os.Stderr, "merge-openapi: %v\n", err)
+			os.Exit(1)
+		}
 	}
 
 	buf, err := json.MarshalIndent(root, "", "  ")
@@ -88,7 +113,72 @@ func mergePaths(dst, src map[string]any) {
 	}
 }
 
-func mergeSchemas(dst, src map[string]any) {
+// merge folds src into dst, refusing anything it cannot account for.
+func merge(dst, src map[string]any, srcName string) error {
+	for _, key := range singletonKeys {
+		sv, present := src[key]
+		if !present {
+			continue
+		}
+		dv, exists := dst[key]
+		if !exists {
+			dst[key] = sv
+			continue
+		}
+		if key == "openapi" && !equalJSON(dv, sv) {
+			return fmt.Errorf("%s: openapi version %v disagrees with %v", srcName, sv, dv)
+		}
+	}
+
+	mergePaths(dst, src)
+	mergeComponents(dst, src)
+	mergeTagList(dst, src)
+
+	// `security` and `servers` are document-wide and cannot be combined
+	// meaningfully when two specs disagree: whichever won would apply to
+	// the other service's paths as well.
+	for _, key := range []string{"security", "servers"} {
+		sv, present := src[key]
+		if !present {
+			continue
+		}
+		dv, exists := dst[key]
+		if !exists {
+			dst[key] = sv
+			continue
+		}
+		if !equalJSON(dv, sv) {
+			return fmt.Errorf(
+				"%s: %q differs between specs and cannot be merged; the merged document would apply one service's setting to the other's paths",
+				srcName, key)
+		}
+	}
+
+	// Anything left is a section this program cannot vouch for. Dropping
+	// it silently is the bug this check exists to prevent.
+	unknown := make([]string, 0)
+	for key := range src {
+		if mergeableKeys[key] {
+			continue
+		}
+		if contains(singletonKeys, key) {
+			continue
+		}
+		unknown = append(unknown, key)
+	}
+	if len(unknown) > 0 {
+		sort.Strings(unknown)
+		return fmt.Errorf(
+			"%s: unhandled top-level section(s) %v — teach merge-openapi how to combine them rather than shipping a spec that omits them",
+			srcName, unknown)
+	}
+	return nil
+}
+
+// mergeComponents merges every components sub-map, not just schemas.
+// securitySchemes, responses, parameters and the rest are as much a part
+// of the contract as the schemas are.
+func mergeComponents(dst, src map[string]any) {
 	srcComp, ok := src["components"].(map[string]any)
 	if !ok {
 		return
@@ -98,18 +188,69 @@ func mergeSchemas(dst, src map[string]any) {
 		dstComp = map[string]any{}
 		dst["components"] = dstComp
 	}
-	srcSchemas, ok := srcComp["schemas"].(map[string]any)
+	for section, entries := range srcComp {
+		srcEntries, ok := entries.(map[string]any)
+		if !ok {
+			// Not a name→object map; keep the first spec's value.
+			if _, exists := dstComp[section]; !exists {
+				dstComp[section] = entries
+			}
+			continue
+		}
+		dstEntries, ok := dstComp[section].(map[string]any)
+		if !ok {
+			dstEntries = map[string]any{}
+			dstComp[section] = dstEntries
+		}
+		for name, entry := range srcEntries {
+			if _, exists := dstEntries[name]; !exists {
+				dstEntries[name] = entry
+			}
+		}
+	}
+}
+
+// mergeTagList unions the document tag lists by tag name.
+func mergeTagList(dst, src map[string]any) {
+	srcTags, ok := src["tags"].([]any)
 	if !ok {
 		return
 	}
-	dstSchemas, ok := dstComp["schemas"].(map[string]any)
-	if !ok {
-		dstSchemas = map[string]any{}
-		dstComp["schemas"] = dstSchemas
-	}
-	for name, schema := range srcSchemas {
-		if _, exists := dstSchemas[name]; !exists {
-			dstSchemas[name] = schema
+	dstTags, _ := dst["tags"].([]any)
+	seen := map[string]bool{}
+	for _, t := range dstTags {
+		if m, ok := t.(map[string]any); ok {
+			if name, ok := m["name"].(string); ok {
+				seen[name] = true
+			}
 		}
 	}
+	for _, t := range srcTags {
+		m, ok := t.(map[string]any)
+		if !ok {
+			continue
+		}
+		name, _ := m["name"].(string)
+		if seen[name] {
+			continue
+		}
+		seen[name] = true
+		dstTags = append(dstTags, t)
+	}
+	dst["tags"] = dstTags
+}
+
+func equalJSON(a, b any) bool {
+	ab, err1 := json.Marshal(a)
+	bb, err2 := json.Marshal(b)
+	return err1 == nil && err2 == nil && string(ab) == string(bb)
+}
+
+func contains(list []string, want string) bool {
+	for _, s := range list {
+		if s == want {
+			return true
+		}
+	}
+	return false
 }
