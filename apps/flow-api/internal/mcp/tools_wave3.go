@@ -8,11 +8,13 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/acl"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/dbretry"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
 	apierrors "github.com/libraz/nodate-flow/apps/flow-api/internal/errors"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/eventbus"
-	"github.com/libraz/nodate-flow/apps/flow-api/internal/tasknumber"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/taskcreate"
 )
 
 func runListIntakeItems(ctx context.Context, deps Deps, s *session, raw json.RawMessage) (any, error) {
@@ -135,12 +137,16 @@ func runTriageIntakeItem(ctx context.Context, deps Deps, s *session, raw json.Ra
 		evtKind = eventbus.IntakeItemDuplicate
 	}
 	actor := int64(s.userID)
-	_ = eventbus.Append(ctx, deps.DB, eventbus.Event{
+	// The triage status is committed, and the pending-status guard above
+	// makes a retry fail with ALREADY_TRIAGED without re-appending. The
+	// caller has no way to repair the log, so propagating would only
+	// report a failure for work that succeeded.
+	eventbus.AppendBestEffort(ctx, deps.DB, eventbus.Event{
 		Type:        evtKind,
 		WorkspaceID: s.workspaceID,
 		ActorUserID: &actor,
 		Payload:     map[string]any{"intakeItemId": in.IntakeItemID, "status": in.Status, "via": "mcp"},
-	})
+	}, "mcp.triage_intake_item")
 
 	return map[string]any{"ok": true, "status": in.Status}, nil
 }
@@ -179,85 +185,60 @@ func runConvertIntakeToTask(ctx context.Context, deps Deps, s *session, raw json
 		return nil, apierrors.New(apierrors.WsIntakeAlreadyConverted)
 	}
 
-	prjPub, err := types.Parse(in.ProjectID)
+	// Converting writes a task into the target project, so the actor must be
+	// a project editor (or workspace-elevated), matching intake.Convert.
+	prjID, err := resolveProjectForWrite(ctx, deps, s, in.ProjectID, acl.ProjectRoleEditor)
 	if err != nil {
-		return nil, apierrors.New(apierrors.McpToolArgumentsInvalid)
+		return nil, err
 	}
-	prj, err := deps.Queries.FindProjectByPublicId(ctx, generated.FindProjectByPublicIdParams{
-		WorkspaceID: s.workspaceID,
-		PublicID:    prjPub,
-	})
-	if err != nil {
-		if stderrors.Is(err, sql.ErrNoRows) {
-			return nil, apierrors.New(apierrors.WsProjectNotFound)
+
+	var (
+		taskPub types.PublicID
+		taskID  int64
+	)
+	if txErr := dbretry.InTx(ctx, deps.DB, "mcp.convert_intake_to_task", nil, func(ctx context.Context, tx *sql.Tx) error {
+		// An intake item is a workspace-level inbox entry with no audience of
+		// its own, so the converted task takes the workspace default, exactly
+		// as REST intake.Convert does.
+		created, err := taskcreate.New(ctx, tx, taskcreate.Args{
+			WorkspaceID: s.workspaceID,
+			ProjectID:   prjID,
+			ActorUserID: sql.NullInt32{Int32: int32(s.userID), Valid: true}, //#nosec G115 -- session user id is users.id (BIGINT UNSIGNED), fits int32 within realistic deployments
+			Title:       item.Title,
+			Description: item.Body,
+		})
+		if err != nil {
+			return err
 		}
-		return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
-	}
+		taskPub = created.PublicID
+		taskID = created.ID
 
-	taskPub := newPublicID()
-	desc := sql.NullString{}
-	if item.Body.Valid {
-		desc = item.Body
-	}
-
-	tx, err := deps.DB.BeginTx(ctx, nil)
-	if err != nil {
-		return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
-	}
-	defer tx.Rollback() //nolint:errcheck
-	qtx := deps.Queries.WithTx(tx)
-
-	nextNum, err := tasknumber.Allocate(ctx, qtx, prj.WorkspaceID, prj.ID)
-	if err != nil {
-		return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
-	}
-
-	taskID, err := qtx.CreateTask(ctx, generated.CreateTaskParams{
-		PublicID:        taskPub,
-		WorkspaceID:     s.workspaceID,
-		ProjectID:       prj.ID,
-		TaskNumber:      uint32(nextNum), //#nosec G115 -- task_number is per-project sequence, fits uint32
-		ParentTaskID:    sql.NullInt32{},
-		CreatedByUserID: sql.NullInt32{Int32: int32(s.userID), Valid: true}, //#nosec G115 -- session user id is users.id (BIGINT UNSIGNED), fits int32 within realistic deployments
-		UpdatedByUserID: sql.NullInt32{Int32: int32(s.userID), Valid: true}, //#nosec G115 -- session user id is users.id (BIGINT UNSIGNED), fits int32 within realistic deployments
-		Title:           item.Title,
-		Description:     desc,
-		Priority:        0,
-		DueOn:           sql.NullTime{},
-		StartedOn:       sql.NullTime{},
-		Visibility:      generated.TasksVisibilityPublic,
-	})
-	if err != nil {
-		return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
-	}
-
-	if err := qtx.SetIntakeItemTask(ctx, generated.SetIntakeItemTaskParams{
-		TaskID:      sql.NullInt32{Int32: int32(taskID), Valid: true}, //#nosec G115 -- task_id is tasks.id (BIGINT UNSIGNED), fits int32 within realistic deployments
-		WorkspaceID: s.workspaceID,
-		PublicID:    pub,
-	}); err != nil {
-		return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
-	}
-
-	if err := tx.Commit(); err != nil {
-		return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
+		return deps.Queries.WithTx(tx).SetIntakeItemTask(ctx, generated.SetIntakeItemTaskParams{
+			TaskID:      sql.NullInt32{Int32: int32(created.ID), Valid: true}, //#nosec G115 -- task_id is tasks.id (BIGINT UNSIGNED), fits int32 within realistic deployments
+			WorkspaceID: s.workspaceID,
+			PublicID:    pub,
+		})
+	}); txErr != nil {
+		return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, txErr)
 	}
 
 	actor := int64(s.userID)
-	_ = eventbus.Append(ctx, deps.DB, eventbus.Event{
+	// The conversion committed a new task and linked the intake item; a
+	// retry would create a second task.
+	eventbus.AppendBestEffort(ctx, deps.DB, eventbus.Event{
 		Type:        eventbus.IntakeItemAccepted,
 		WorkspaceID: s.workspaceID,
 		ActorUserID: &actor,
 		TaskID:      &taskID,
 		Payload:     map[string]any{"intakeItemId": in.IntakeItemID, "taskId": taskPub.String(), "via": "mcp"},
-	})
-	_ = eventbus.Append(ctx, deps.DB, eventbus.Event{
+	}, "mcp.convert_intake_to_task")
+	eventbus.AppendBestEffort(ctx, deps.DB, eventbus.Event{
 		Type:        eventbus.TaskCreated,
 		WorkspaceID: s.workspaceID,
 		ActorUserID: &actor,
 		TaskID:      &taskID,
 		Payload:     map[string]any{"taskId": taskPub.String(), "title": item.Title, "source": "intake_convert_mcp"},
-	})
+	}, "mcp.convert_intake_to_task")
 
 	return map[string]any{"ok": true, "taskId": taskPub.String()}, nil
 }
@@ -326,7 +307,7 @@ func runRestoreDescriptionVersion(ctx context.Context, deps Deps, s *session, ra
 		return nil, apierrors.New(apierrors.McpToolArgumentsInvalid)
 	}
 
-	taskInternal, taskPub, err := resolveTask(ctx, deps, s, in.TaskID)
+	taskInternal, taskPub, err := resolveTaskForWrite(ctx, deps, s, in.TaskID, acl.ProjectRoleEditor)
 	if err != nil {
 		return nil, err
 	}
@@ -402,13 +383,15 @@ func runRestoreDescriptionVersion(ctx context.Context, deps Deps, s *session, ra
 
 	actor := int64(s.userID)
 	taskIDInt64 := int64(taskInternal)
-	_ = eventbus.Append(ctx, deps.DB, eventbus.Event{
+	// The restore committed a new description version row; a retry would
+	// add another one on top of it.
+	eventbus.AppendBestEffort(ctx, deps.DB, eventbus.Event{
 		Type:        eventbus.DescriptionVersionRestored,
 		WorkspaceID: s.workspaceID,
 		ActorUserID: &actor,
 		TaskID:      &taskIDInt64,
 		Payload:     map[string]any{"taskId": in.TaskID, "restoredFrom": in.VersionID, "newVersionId": newPub.String(), "via": "mcp"},
-	})
+	}, "mcp.restore_description_version")
 
 	return map[string]any{"ok": true, "newVersionId": newPub.String()}, nil
 }

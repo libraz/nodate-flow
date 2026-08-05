@@ -187,15 +187,17 @@ func ListMyCalendarEvents(deps Deps) func(context.Context, *ListMyCalendarEvents
 		}
 
 		rows, err := deps.CalendarQueries.ListMyCalendarEventsAcrossWorkspaces(ctx, calendar.ListMyCalendarEventsAcrossWorkspacesParams{
-			UserID:  actorID,
-			StartAt: sql.NullTime{Time: endTime, Valid: true},
-			EndAt:   sql.NullTime{Time: startTime, Valid: true},
+			ViewerUserID: actorID,
+			UserID:       actorID,
+			StartAt:      sql.NullTime{Time: endTime, Valid: true},
+			EndAt:        sql.NullTime{Time: startTime, Valid: true},
 		})
 		if err != nil {
 			return nil, httpErr(apierrors.CalendarEventListQueryInterrupted)
 		}
 
 		recurringRows, err := deps.CalendarQueries.ListMyRecurringCalendarEventsAcrossWorkspaces(ctx, calendar.ListMyRecurringCalendarEventsAcrossWorkspacesParams{
+			ViewerUserID:  actorID,
 			UserID:        actorID,
 			StartAt:       sql.NullTime{Time: endTime, Valid: true},
 			RecurrenceEnd: sql.NullTime{Time: startTime, Valid: true},
@@ -233,7 +235,7 @@ func ListMyCalendarEvents(deps Deps) func(context.Context, *ListMyCalendarEvents
 			resp.BlockLabel = dbtype.PtrFromNullString(r.BlockLabel)
 			resp.CreatorAvatarURL = dbtype.PtrFromNullString(r.CreatorAvatarUrl)
 			resp.UpdatedAt = dbtype.UnixSecondsFromNullTime(r.UpdatedAt)
-			scrubPrivateEvent(string(r.Visibility), r.OwnerUserID, actorID, &resp.Location, nil, nil)
+			scrubEventDetails(string(r.Visibility), r.OwnerUserID, actorID, r.IsAttendee, &resp.Location, nil, nil)
 			out.Body.Events = append(out.Body.Events, resp)
 		}
 
@@ -272,7 +274,7 @@ func ListMyCalendarEvents(deps Deps) func(context.Context, *ListMyCalendarEvents
 				resp.RecurrenceExceptions = &raw
 			}
 			resp.UpdatedAt = dbtype.UnixSecondsFromNullTime(r.UpdatedAt)
-			scrubPrivateEvent(string(r.Visibility), r.OwnerUserID, actorID, &resp.Location, nil, nil)
+			scrubEventDetails(string(r.Visibility), r.OwnerUserID, actorID, r.IsAttendee, &resp.Location, nil, nil)
 			out.Body.Events = append(out.Body.Events, resp)
 		}
 

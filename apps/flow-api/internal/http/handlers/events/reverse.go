@@ -6,11 +6,11 @@ import (
 	stderrors "errors"
 	"log/slog"
 
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/dbretry"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
 	apierrors "github.com/libraz/nodate-flow/apps/flow-api/internal/errors"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/eventbus"
-	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/handlers/handlerutil"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/middleware"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/taskstate"
 )
@@ -33,6 +33,12 @@ import (
 var reverseStateRollback = map[string]string{
 	eventbus.TaskAutoCompleted: taskstate.TransitionReopen,
 }
+
+// errReverseAnswered rolls the reversal transaction back when the
+// handler has already decided what to answer (a 409 for a lost race, a
+// rejected rollback). It never reaches the client and is not transient,
+// so the retry loop leaves it alone.
+var errReverseAnswered = stderrors.New("events: reverse answered")
 
 // Reverse handles POST /workspaces/{wsId}/events/{eventPublicId}/reverse.
 // Behaviour is documented on the package; in short:
@@ -131,62 +137,72 @@ func Reverse(deps Deps) func(context.Context, *ReverseInput) (*ReverseOutput, er
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
 
-		// Open a single transaction so the compensating event INSERT
-		// and the optional state-rollback transition land together.
-		// Both writers use the same *sql.Tx so eventbus.Append's
-		// retry-loop branch is short-circuited (the tx owns the retry
-		// boundary) and the trigger-guard session variable set by
-		// ApplyTransitionTx is scoped to this connection only.
-		tx, err := deps.DB.BeginTx(ctx, nil)
-		if err != nil {
-			return nil, httpErr(apierrors.InternalUnexpected)
-		}
-		defer func() { _ = tx.Rollback() }()
+		// One transaction so the compensating event INSERT and the
+		// optional state-rollback transition land together. It is opened
+		// through dbretry.InTx for two reasons beyond deadlock retries:
+		// the eventbus needs a commit boundary to defer the realtime and
+		// notification fan-out to, and the trigger-guard session variable
+		// set by ApplyTransitionTx stays scoped to this connection.
+		var (
+			result eventbus.ReverseAppendResult
+			// answered holds a response-shaped error decided inside the
+			// transaction (a rejected rollback, a lost reverse race).
+			// Returning it through the closure would make it look like a
+			// transaction failure, so it travels alongside the sentinel.
+			answered error
+		)
+		txErr := dbretry.InTx(ctx, deps.DB, "events.Reverse", nil, func(ctx context.Context, tx *sql.Tx) error {
+			answered = nil
 
-		// Optional state rollback. Runs BEFORE the compensating event
-		// append so a failed rollback cannot leave a half-applied
-		// reversal on the timeline (the tx rolls back atomically).
-		if transition, needsRollback := reverseStateRollback[target.Type]; needsRollback {
-			if err := applyStateRollback(ctx, tx, ws.ID, eventPub, transition, actorInternal); err != nil {
-				return nil, err
+			// Optional state rollback. Runs BEFORE the compensating event
+			// append so a failed rollback cannot leave a half-applied
+			// reversal on the timeline (the tx rolls back atomically).
+			if transition, needsRollback := reverseStateRollback[target.Type]; needsRollback {
+				if err := applyStateRollback(ctx, tx, ws.ID, eventPub, transition, actorInternal); err != nil {
+					answered = err
+					return errReverseAnswered
+				}
 			}
-		}
 
-		// Append the compensating event. Type is preserved (the
-		// projection / UI cancels matching reversed_event_id pairs out
-		// symmetrically), the reverser is the user, and the payload
-		// carries enough lineage for the timeline renderer.
-		actor := int64(actorInternal)    //#nosec G115 -- actor user id from session, fits int64
-		origInternal := int64(target.ID) //#nosec G115 -- event ids are auto-increment DB ids and fit int64.
-		result, err := eventbus.AppendReverseEvent(ctx, tx, eventbus.Event{
-			Type:            target.Type,
-			WorkspaceID:     ws.ID,
-			ActorUserID:     &actor,
-			ReversesEventID: &origInternal,
-			Payload: map[string]any{
-				"reversed_event_public_id":   eventPub.String(),
-				"reversed_by_user_public_id": reverserPub.String(),
-			},
+			// Append the compensating event. Type is preserved (the
+			// projection / UI cancels matching reversed_event_id pairs out
+			// symmetrically), the reverser is the user, and the payload
+			// carries enough lineage for the timeline renderer.
+			actor := int64(actorInternal)    //#nosec G115 -- actor user id from session, fits int64
+			origInternal := int64(target.ID) //#nosec G115 -- event ids are auto-increment DB ids and fit int64.
+			var aerr error
+			result, aerr = eventbus.AppendReverseEvent(ctx, tx, eventbus.Event{
+				Type:            target.Type,
+				WorkspaceID:     ws.ID,
+				ActorUserID:     &actor,
+				ReversesEventID: &origInternal,
+				Payload: map[string]any{
+					"reversed_event_public_id":   eventPub.String(),
+					"reversed_by_user_public_id": reverserPub.String(),
+				},
+			})
+			if aerr != nil {
+				if stderrors.Is(aerr, eventbus.ErrAlreadyReversed) {
+					// A concurrent reverse of the same target committed its
+					// compensating row between our FindEventForReverse read
+					// and this INSERT; the UNIQUE (workspace_id,
+					// reverses_event_id) index rejected ours. The event is
+					// already reversed, so surface the same canonical 409 as
+					// the WasReversed pre-check instead of a 500. This
+					// attempt (including any state rollback) rolls back —
+					// the winner's rollback transition is the one that
+					// stands.
+					answered = httpErr(apierrors.AiReverseAlreadyReversed)
+					return errReverseAnswered
+				}
+				return aerr
+			}
+			return nil
 		})
-		if err != nil {
-			if handlerutil.IsDuplicateEntry(err) {
-				// A concurrent reverse of the same target committed its
-				// compensating row between our FindEventForReverse read
-				// and this INSERT; the UNIQUE (workspace_id,
-				// reverses_event_id) index rejected ours. The event is
-				// already reversed, so surface the same canonical 409 as
-				// the WasReversed pre-check instead of a 500. The tx
-				// (including any state rollback we attempted) is rolled
-				// back by the deferred Rollback — the winner's rollback
-				// transition is the one that stands. public_id is UUID
-				// v7, so realistically the only unique key this INSERT
-				// can violate is the reverses index.
-				return nil, httpErr(apierrors.AiReverseAlreadyReversed)
-			}
-			return nil, httpErr(apierrors.InternalUnexpected)
+		if answered != nil {
+			return nil, answered
 		}
-
-		if err := tx.Commit(); err != nil {
+		if txErr != nil {
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
 

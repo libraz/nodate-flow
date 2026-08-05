@@ -152,6 +152,10 @@ func requireWorkspaceMember(ctx context.Context, deps Deps, s *session) (acl.Wor
 // verifies it belongs to the session workspace. Returns the internal
 // project id.
 //
+// This is the *read* gate: it proves tenancy but says nothing about the
+// caller's project role. Anything that writes inside the project must use
+// [resolveProjectForWrite] instead.
+//
 // Delegates to [acl.ResolveProjectByPublicID] for the lookup and
 // applies the workspace-binding check that is specific to MCP tokens.
 func resolveProject(ctx context.Context, deps Deps, s *session, publicID string) (uint32, error) {
@@ -169,23 +173,97 @@ func resolveProject(ctx context.Context, deps Deps, s *session, publicID string)
 	return prj.ID, nil
 }
 
-// resolveTask resolves a task public id, verifies it belongs to the session
-// workspace, and enforces the same project-membership / task-visibility
-// decision used by REST RequireTaskAccess.
-func resolveTask(ctx context.Context, deps Deps, s *session, publicID string) (uint32, types.PublicID, error) {
+// checkProjectRoleFloor applies the Layer-3 project-role floor to an already
+// resolved role. It is the MCP mirror of REST RequireProjectRole
+// (apps/flow-api/internal/http/middleware/acl.go): workspace owners / admins
+// arrive as [acl.ProjectRoleElevated] and pass unconditionally, everyone else
+// must meet minRole, and denial is WS.PROJECT.ACCESS_DENIED — the same code
+// the HTTP middleware writes.
+func checkProjectRoleFloor(role, minRole acl.ProjectRole) error {
+	if role == acl.ProjectRoleElevated || role.AtLeast(minRole) {
+		return nil
+	}
+	return apierrors.New(apierrors.WsProjectAccessDenied)
+}
+
+// resolveProjectForWrite resolves a project public id for a tool that writes
+// inside that project. On top of [resolveProject]'s tenancy check it enforces
+// the Layer-3 project-role floor, so a workspace member with no
+// project_members row cannot create rows in a project they were never added
+// to.
+//
+// The decision is the same chain REST runs for the project-scoped writes that
+// have no path parameter to hang RequireProjectRole on
+// (tasks.requireProjectEditor / intake.requireProjectEditor):
+// acl.CheckWorkspaceMember → acl.LookupProjectMembership → role floor.
+func resolveProjectForWrite(ctx context.Context, deps Deps, s *session, publicID string, minRole acl.ProjectRole) (uint32, error) {
+	prjID, err := resolveProject(ctx, deps, s, publicID)
+	if err != nil {
+		return 0, err
+	}
+	wsRole, err := acl.CheckWorkspaceMember(ctx, deps.DB, s.workspaceID, s.userID, apierrors.WsProjectAccessDenied)
+	if err != nil {
+		return 0, err
+	}
+	role, _, err := acl.LookupProjectMembership(ctx, deps.DB, s.workspaceID, prjID, s.userID, wsRole)
+	if err != nil {
+		return 0, err
+	}
+	if err := checkProjectRoleFloor(role, minRole); err != nil {
+		return 0, err
+	}
+	return prjID, nil
+}
+
+// authorizeTask runs the shared Layer-3/4 task ACL and the MCP-specific
+// workspace binding, returning the full access result so callers can apply a
+// role floor on top. Every MCP task resolver funnels through here.
+func authorizeTask(ctx context.Context, deps Deps, s *session, publicID string) (acl.TaskAccess, types.PublicID, error) {
 	pub, err := types.Parse(publicID)
 	if err != nil {
-		return 0, types.PublicID{}, apierrors.New(apierrors.WsTaskNotFound)
+		return acl.TaskAccess{}, types.PublicID{}, apierrors.New(apierrors.WsTaskNotFound)
 	}
 	access, err := acl.AuthorizeTaskAccess(ctx, deps.DB, pub.UUID(), s.userID)
 	if err != nil {
+		return acl.TaskAccess{}, types.PublicID{}, err
+	}
+	if access.Task.WorkspaceID != s.workspaceID {
+		return acl.TaskAccess{}, types.PublicID{}, apierrors.New(apierrors.McpTokenWorkspaceMismatch)
+	}
+	return access, pub, nil
+}
+
+// resolveTask resolves a task public id, verifies it belongs to the session
+// workspace, and enforces the same project-membership / task-visibility
+// decision used by REST RequireTaskAccess.
+//
+// This is the *read* gate. Being able to see a task is not permission to
+// change it, so mutating tools must use [resolveTaskForWrite] /
+// [resolveTaskRowForWrite], which additionally apply the project-role floor
+// REST attaches with RequireProjectRole.
+func resolveTask(ctx context.Context, deps Deps, s *session, publicID string) (uint32, types.PublicID, error) {
+	access, pub, err := authorizeTask(ctx, deps, s, publicID)
+	if err != nil {
 		return 0, types.PublicID{}, err
 	}
-	rec := access.Task
-	if rec.WorkspaceID != s.workspaceID {
-		return 0, types.PublicID{}, apierrors.New(apierrors.McpTokenWorkspaceMismatch)
+	return access.Task.ID, pub, nil
+}
+
+// resolveTaskForWrite is [resolveTask] plus the Layer-3 project-role floor.
+// It is the MCP equivalent of the REST chain RequireTaskAccess +
+// RequireProjectRole(minRole), reusing the very same role that
+// acl.AuthorizeTaskAccess hands the HTTP middleware, so a project viewer (or
+// a workspace member with no project_members row at all) who can read a task
+// cannot mutate it.
+func resolveTaskForWrite(ctx context.Context, deps Deps, s *session, publicID string, minRole acl.ProjectRole) (uint32, types.PublicID, error) {
+	access, pub, err := authorizeTask(ctx, deps, s, publicID)
+	if err != nil {
+		return 0, types.PublicID{}, err
 	}
-	return rec.ID, pub, nil
+	if err := checkProjectRoleFloor(access.ProjectRole, minRole); err != nil {
+		return 0, types.PublicID{}, err
+	}
+	return access.Task.ID, pub, nil
 }
 
 // loadTaskRow is the single MCP entry point to the tasks public-id lookup.
@@ -212,6 +290,23 @@ func resolveTaskRow(ctx context.Context, deps Deps, s *session, publicID string)
 	if err != nil {
 		return 0, generated.FindTaskByPublicIdRow{}, err
 	}
+	return fetchTaskRow(ctx, deps, s, internalID, pub)
+}
+
+// resolveTaskRowForWrite is [resolveTaskRow] with the Layer-3 project-role
+// floor applied, for mutating tools that also need the current task fields.
+func resolveTaskRowForWrite(ctx context.Context, deps Deps, s *session, publicID string, minRole acl.ProjectRole) (uint32, generated.FindTaskByPublicIdRow, error) {
+	internalID, pub, err := resolveTaskForWrite(ctx, deps, s, publicID, minRole)
+	if err != nil {
+		return 0, generated.FindTaskByPublicIdRow{}, err
+	}
+	return fetchTaskRow(ctx, deps, s, internalID, pub)
+}
+
+// fetchTaskRow loads a task row that the caller has already been authorized
+// for. Missing rows surface as WS.TASK.NOT_FOUND so a row that vanished
+// between the ACL decision and the load is not an execution failure.
+func fetchTaskRow(ctx context.Context, deps Deps, s *session, internalID uint32, pub types.PublicID) (uint32, generated.FindTaskByPublicIdRow, error) {
 	row, err := loadTaskRow(ctx, deps.Queries, s.workspaceID, pub)
 	if err != nil {
 		if stderrors.Is(err, sql.ErrNoRows) {

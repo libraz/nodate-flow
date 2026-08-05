@@ -2,11 +2,13 @@ package calendars
 
 import (
 	"context"
+	"database/sql"
 	"strings"
 	"time"
 
 	"github.com/google/uuid"
 
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/dbretry"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated/calendar"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
 	apierrors "github.com/libraz/nodate-flow/apps/flow-api/internal/errors"
@@ -42,7 +44,7 @@ func CreateEventFromTask(deps Deps) func(context.Context, *CreateEventFromTaskIn
 		if err != nil {
 			return nil, err
 		}
-		cal, _, err := resolveCalendar(ctx, deps.CalendarQueries, wsID, actorID, input.CalID)
+		cal, _, err := resolveCalendarWrite(ctx, deps.CalendarQueries, wsID, actorID, input.CalID)
 		if err != nil {
 			return nil, err
 		}
@@ -92,30 +94,33 @@ func CreateEventFromTask(deps Deps) func(context.Context, *CreateEventFromTaskIn
 		startAt := time.Date(baseDate.Year(), baseDate.Month(), baseDate.Day(), 9, 0, 0, 0, loc)
 		endAt := startAt.Add(time.Hour)
 
-		tx, err := deps.DB.BeginTx(ctx, nil)
-		if err != nil {
-			return nil, httpErr(apierrors.CalendarTaskSyncStoreWriteInterrupted)
-		}
-		defer func() { _ = tx.Rollback() }()
-
-		eventPublicID, _, err := itemkit.ScheduleTask(ctx, tx, itemkit.ScheduleTaskArgs{
-			WorkspaceID: wsID,
-			TaskID:      taskID,
-			CalendarID:  cal.ID,
-			ActorUserID: actorID,
-			Role:        role,
-			Title:       title,
-			StartAt:     startAt,
-			EndAt:       endAt,
-			Timezone:    tzName,
+		// itemkit writes an event row through eventlog inside this
+		// transaction, and a deadlock there rolls the whole transaction
+		// back, so the retry has to restart the transaction rather than
+		// a statement inside it.
+		var eventPublicID types.PublicID
+		txErr := dbretry.InTx(ctx, deps.DB, "calendars.CreateEventFromTask", nil, func(ctx context.Context, tx *sql.Tx) error {
+			id, _, err := itemkit.ScheduleTask(ctx, tx, itemkit.ScheduleTaskArgs{
+				WorkspaceID: wsID,
+				TaskID:      taskID,
+				CalendarID:  cal.ID,
+				ActorUserID: actorID,
+				Role:        role,
+				Title:       title,
+				StartAt:     startAt,
+				EndAt:       endAt,
+				Timezone:    tzName,
+			})
+			if err != nil {
+				return err
+			}
+			eventPublicID = id
+			return nil
 		})
-		if err != nil {
-			if strings.Contains(err.Error(), "itemkit invariant") {
+		if txErr != nil {
+			if strings.Contains(txErr.Error(), "itemkit invariant") {
 				return nil, httpErr(apierrors.ItemItemkitInvariantViolation)
 			}
-			return nil, httpErr(apierrors.CalendarTaskSyncStoreWriteInterrupted)
-		}
-		if err := tx.Commit(); err != nil {
 			return nil, httpErr(apierrors.CalendarTaskSyncStoreWriteInterrupted)
 		}
 

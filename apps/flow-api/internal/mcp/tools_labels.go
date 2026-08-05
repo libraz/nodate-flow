@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/acl"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
 	apierrors "github.com/libraz/nodate-flow/apps/flow-api/internal/errors"
@@ -87,12 +88,13 @@ func runCreateLabel(ctx context.Context, deps Deps, s *session, raw json.RawMess
 		return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
 	}
 	actor := int64(s.userID)
-	_ = eventbus.Append(ctx, deps.DB, eventbus.Event{
+	// The label row is committed; a retry would create a second one.
+	eventbus.AppendBestEffort(ctx, deps.DB, eventbus.Event{
 		Type:        eventbus.LabelCreated,
 		WorkspaceID: s.workspaceID,
 		ActorUserID: &actor,
 		Payload:     map[string]any{"labelId": pub.String(), "via": "mcp"},
-	})
+	}, "mcp.create_label")
 	return map[string]any{"id": pub.String(), "name": in.Name, "color": in.Color}, nil
 }
 
@@ -107,7 +109,7 @@ func runAddTaskLabel(ctx context.Context, deps Deps, s *session, raw json.RawMes
 	if err := parseArgs(raw, &in); err != nil {
 		return nil, err
 	}
-	taskInternal, _, err := resolveTask(ctx, deps, s, in.TaskID)
+	taskInternal, _, err := resolveTaskForWrite(ctx, deps, s, in.TaskID, acl.ProjectRoleEditor)
 	if err != nil {
 		return nil, err
 	}
@@ -136,13 +138,15 @@ func runAddTaskLabel(ctx context.Context, deps Deps, s *session, raw json.RawMes
 	}
 	taskID64 := int64(taskInternal)
 	actor := int64(s.userID)
-	_ = eventbus.Append(ctx, deps.DB, eventbus.Event{
+	// The junction row is committed and uniquely keyed, so a retry is
+	// rejected before it could re-append the event.
+	eventbus.AppendBestEffort(ctx, deps.DB, eventbus.Event{
 		Type:        eventbus.TaskLabelAdded,
 		WorkspaceID: s.workspaceID,
 		ActorUserID: &actor,
 		TaskID:      &taskID64,
 		Payload:     map[string]any{"taskId": in.TaskID, "labelId": in.LabelID, "via": "mcp"},
-	})
+	}, "mcp.add_task_label")
 	return map[string]any{"ok": true}, nil
 }
 
@@ -157,7 +161,7 @@ func runRemoveTaskLabel(ctx context.Context, deps Deps, s *session, raw json.Raw
 	if err := parseArgs(raw, &in); err != nil {
 		return nil, err
 	}
-	taskInternal, _, err := resolveTask(ctx, deps, s, in.TaskID)
+	taskInternal, _, err := resolveTaskForWrite(ctx, deps, s, in.TaskID, acl.ProjectRoleEditor)
 	if err != nil {
 		return nil, err
 	}
@@ -184,13 +188,17 @@ func runRemoveTaskLabel(ctx context.Context, deps Deps, s *session, raw json.Raw
 	}
 	taskID64 := int64(taskInternal)
 	actor := int64(s.userID)
-	_ = eventbus.Append(ctx, deps.DB, eventbus.Event{
+	// Propagated: disabling an already-disabled junction is a no-op, so
+	// a retry re-appends the event without changing anything else.
+	if err := eventbus.Append(ctx, deps.DB, eventbus.Event{
 		Type:        eventbus.TaskLabelRemoved,
 		WorkspaceID: s.workspaceID,
 		ActorUserID: &actor,
 		TaskID:      &taskID64,
 		Payload:     map[string]any{"taskId": in.TaskID, "labelId": in.LabelID, "via": "mcp"},
-	})
+	}); err != nil {
+		return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
+	}
 	return map[string]any{"ok": true}, nil
 }
 
@@ -248,7 +256,7 @@ func runArchiveTask(ctx context.Context, deps Deps, s *session, raw json.RawMess
 	if err := parseArgs(raw, &in); err != nil {
 		return nil, err
 	}
-	_, taskPub, err := resolveTask(ctx, deps, s, in.TaskID)
+	_, taskPub, err := resolveTaskForWrite(ctx, deps, s, in.TaskID, acl.ProjectRoleEditor)
 	if err != nil {
 		return nil, err
 	}
@@ -260,12 +268,16 @@ func runArchiveTask(ctx context.Context, deps Deps, s *session, raw json.RawMess
 		return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
 	}
 	actor := int64(s.userID)
-	_ = eventbus.Append(ctx, deps.DB, eventbus.Event{
+	// Propagated: ArchiveTask only matches a not-yet-archived row, so a
+	// retry is a no-op UPDATE that still re-appends the event.
+	if err := eventbus.Append(ctx, deps.DB, eventbus.Event{
 		Type:        eventbus.TaskArchived,
 		WorkspaceID: s.workspaceID,
 		ActorUserID: &actor,
 		Payload:     map[string]any{"taskId": in.TaskID, "via": "mcp"},
-	})
+	}); err != nil {
+		return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
+	}
 	return map[string]any{"ok": true}, nil
 }
 
@@ -279,7 +291,7 @@ func runUnarchiveTask(ctx context.Context, deps Deps, s *session, raw json.RawMe
 	if err := parseArgs(raw, &in); err != nil {
 		return nil, err
 	}
-	_, taskPub, err := resolveTask(ctx, deps, s, in.TaskID)
+	_, taskPub, err := resolveTaskForWrite(ctx, deps, s, in.TaskID, acl.ProjectRoleEditor)
 	if err != nil {
 		return nil, err
 	}
@@ -291,11 +303,14 @@ func runUnarchiveTask(ctx context.Context, deps Deps, s *session, raw json.RawMe
 		return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
 	}
 	actor := int64(s.userID)
-	_ = eventbus.Append(ctx, deps.DB, eventbus.Event{
+	// Propagated for the same reason as archive: the retry converges.
+	if err := eventbus.Append(ctx, deps.DB, eventbus.Event{
 		Type:        eventbus.TaskUnarchived,
 		WorkspaceID: s.workspaceID,
 		ActorUserID: &actor,
 		Payload:     map[string]any{"taskId": in.TaskID, "via": "mcp"},
-	})
+	}); err != nil {
+		return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
+	}
 	return map[string]any{"ok": true}, nil
 }

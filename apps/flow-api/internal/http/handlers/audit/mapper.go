@@ -19,7 +19,7 @@ func mapListRow(r generated.ListWorkspaceAuditLogsRow) LogEntryDTO {
 		PublicID:     r.PublicID.String(),
 		Action:       r.Action,
 		ResourceType: r.ResourceType,
-		IPAddress:    nullStrPtr(r.IpAddress),
+		IPAddress:    dbtype.IPPtrFromNullString(r.IpAddress),
 		UserAgent:    nullStrPtr(r.UserAgent),
 		MetadataJSON: r.MetadataJson,
 		OccurredAt:   r.OccurredAt.Unix(),

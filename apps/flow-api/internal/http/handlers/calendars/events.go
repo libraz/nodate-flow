@@ -17,6 +17,7 @@ import (
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/handlers/handlerutil"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/itemkit"
 	"github.com/libraz/nodate-flow/packages/go-shared/dbtype"
+	"github.com/libraz/nodate-flow/packages/go-shared/eventacl"
 )
 
 // --- Input/Output types ---
@@ -228,9 +229,10 @@ func ListEvents(deps Deps) func(context.Context, *ListEventsInput) (*ListEventsO
 
 		// Non-recurring events: start_at < end, end_at > start (overlap check).
 		nonRecurring, err := deps.CalendarQueries.ListCalendarEventsByRange(ctx, calendar.ListCalendarEventsByRangeParams{
-			CalendarID: cal.ID,
-			StartAt:    sql.NullTime{Time: endTime, Valid: true},
-			EndAt:      sql.NullTime{Time: startTime, Valid: true},
+			ViewerUserID: actorID,
+			CalendarID:   cal.ID,
+			StartAt:      sql.NullTime{Time: endTime, Valid: true},
+			EndAt:        sql.NullTime{Time: startTime, Valid: true},
 		})
 		if err != nil {
 			return nil, httpErr(apierrors.CalendarEventListQueryInterrupted)
@@ -238,6 +240,7 @@ func ListEvents(deps Deps) func(context.Context, *ListEventsInput) (*ListEventsO
 
 		// Recurring events whose recurrence window overlaps the query range.
 		recurring, err := deps.CalendarQueries.ListRecurringCalendarEventsByRange(ctx, calendar.ListRecurringCalendarEventsByRangeParams{
+			ViewerUserID:  actorID,
 			CalendarID:    cal.ID,
 			StartAt:       sql.NullTime{Time: endTime, Valid: true},
 			RecurrenceEnd: sql.NullTime{Time: startTime, Valid: true},
@@ -266,7 +269,7 @@ func CreateEvent(deps Deps) func(context.Context, *CreateEventInput) (*CreateEve
 		if err != nil {
 			return nil, err
 		}
-		cal, sub, err := resolveCalendar(ctx, deps.CalendarQueries, wsID, actorID, input.CalID)
+		cal, sub, err := resolveCalendarWrite(ctx, deps.CalendarQueries, wsID, actorID, input.CalID)
 		if err != nil {
 			return nil, err
 		}
@@ -442,12 +445,38 @@ func GetEvent(deps Deps) func(context.Context, *GetEventInput) (*GetEventOutput,
 			return nil, httpErr(apierrors.CalendarEventStoreReadInterrupted)
 		}
 
-		// Visibility filtering: private events scrub memo/location/url for
-		// ws members other than the owner. Event-level visibility is the
-		// real ACL; ws membership is the edit gate. Routed through the
-		// shared scrub helper so every read path applies the same rule.
+		// Attendance decides whether a private event's room and link are
+		// this viewer's to read, so it is resolved before either check.
+		// One lookup is affordable here; the list paths get the same
+		// answer from the is_attendee column instead of a query per row.
+		isAttendee := false
+		if _, aerr := deps.CalendarQueries.FindCalendarEventAttendee(ctx, calendar.FindCalendarEventAttendeeParams{
+			EventID: handlerutil.NullInt32From(evt.ID),
+			UserID:  actorID,
+		}); aerr == nil {
+			isAttendee = true
+		} else if !errors.Is(aerr, sql.ErrNoRows) {
+			return nil, httpErr(apierrors.CalendarEventStoreReadInterrupted)
+		}
+
+		aclEvent := eventacl.Event{
+			Visibility:  eventacl.Visibility(evt.Visibility),
+			OwnerUserID: evt.OwnerUserID,
+		}
+		aclActor := eventacl.Actor{UserID: actorID, IsAttendee: isAttendee}
+
+		// A confidential event is not this viewer's to know about, so it
+		// answers as an unknown id rather than as a refusal — a 403 here
+		// would confirm that the executive has something at that hour,
+		// which is the fact the setting exists to hide. The list queries
+		// drop the same rows via eventacl.RowVisibilitySQL.
+		if !eventacl.CanSee(aclEvent, aclActor) {
+			return nil, errEventNotFound
+		}
+
 		resp := eventFromFullRow(evt)
-		scrubPrivateEvent(string(evt.Visibility), evt.OwnerUserID, actorID, &resp.Location, &resp.Memo, &resp.URL)
+		scrubEventDetails(string(evt.Visibility), evt.OwnerUserID, actorID, isAttendee,
+			&resp.Location, &resp.Memo, &resp.URL)
 
 		out := &GetEventOutput{}
 		out.Body = resp
@@ -467,7 +496,7 @@ func PatchEvent(deps Deps) func(context.Context, *PatchEventInput) (*PatchEventO
 		if err != nil {
 			return nil, err
 		}
-		cal, sub, err := resolveCalendar(ctx, deps.CalendarQueries, wsID, actorID, input.CalID)
+		cal, sub, err := resolveCalendarWrite(ctx, deps.CalendarQueries, wsID, actorID, input.CalID)
 		if err != nil {
 			return nil, err
 		}
@@ -704,7 +733,7 @@ func DeleteEvent(deps Deps) func(context.Context, *DeleteEventInput) (*DeleteEve
 		if err != nil {
 			return nil, err
 		}
-		cal, sub, err := resolveCalendar(ctx, deps.CalendarQueries, wsID, actorID, input.CalID)
+		cal, sub, err := resolveCalendarWrite(ctx, deps.CalendarQueries, wsID, actorID, input.CalID)
 		if err != nil {
 			return nil, err
 		}
@@ -797,10 +826,11 @@ func ListCalendarEvents(deps Deps) func(context.Context, *ListCalendarEventsInpu
 
 		// Non-recurring events
 		rows, err := deps.CalendarQueries.ListCalendarEventsAcrossCalendars(ctx, calendar.ListCalendarEventsAcrossCalendarsParams{
-			UserID:      actorID,
-			WorkspaceID: wsID,
-			StartAt:     sql.NullTime{Time: endTime, Valid: true},
-			EndAt:       sql.NullTime{Time: startTime, Valid: true},
+			ViewerUserID: actorID,
+			UserID:       actorID,
+			WorkspaceID:  wsID,
+			StartAt:      sql.NullTime{Time: endTime, Valid: true},
+			EndAt:        sql.NullTime{Time: startTime, Valid: true},
 		})
 		if err != nil {
 			return nil, httpErr(apierrors.CalendarEventListQueryInterrupted)
@@ -808,6 +838,7 @@ func ListCalendarEvents(deps Deps) func(context.Context, *ListCalendarEventsInpu
 
 		// Recurring events whose recurrence window overlaps the query range
 		recurringRows, err := deps.CalendarQueries.ListRecurringCalendarEventsAcrossCalendars(ctx, calendar.ListRecurringCalendarEventsAcrossCalendarsParams{
+			ViewerUserID:  actorID,
 			UserID:        actorID,
 			WorkspaceID:   wsID,
 			StartAt:       sql.NullTime{Time: endTime, Valid: true},
@@ -837,7 +868,7 @@ func ListCalendarEvents(deps Deps) func(context.Context, *ListCalendarEventsInpu
 			resp.Location = dbtype.PtrFromNullString(r.Location)
 			resp.BlockLabel = dbtype.PtrFromNullString(r.BlockLabel)
 			resp.UpdatedAt = dbtype.UnixSecondsFromNullTime(r.UpdatedAt)
-			scrubPrivateEvent(string(r.Visibility), r.OwnerUserID, actorID, &resp.Location, nil, nil)
+			scrubEventDetails(string(r.Visibility), r.OwnerUserID, actorID, r.IsAttendee, &resp.Location, nil, nil)
 			out.Body.Events = append(out.Body.Events, resp)
 		}
 
@@ -867,7 +898,7 @@ func ListCalendarEvents(deps Deps) func(context.Context, *ListCalendarEventsInpu
 				resp.RecurrenceExceptions = &raw
 			}
 			resp.UpdatedAt = dbtype.UnixSecondsFromNullTime(r.UpdatedAt)
-			scrubPrivateEvent(string(r.Visibility), r.OwnerUserID, actorID, &resp.Location, nil, nil)
+			scrubEventDetails(string(r.Visibility), r.OwnerUserID, actorID, r.IsAttendee, &resp.Location, nil, nil)
 			out.Body.Events = append(out.Body.Events, resp)
 		}
 

@@ -16,6 +16,7 @@ import (
 	"encoding/json"
 	stderrors "errors"
 	"net/http"
+	"strings"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
@@ -405,6 +406,39 @@ func RequireWorkspaceRole(minRole WorkspaceRole) func(http.Handler) http.Handler
 	}
 }
 
+// RequireWorkspaceRoleForWrites returns a middleware that applies a
+// workspace role floor to mutating requests only. Safe methods pass through
+// with whatever role [RequireWorkspaceMember] resolved, so the lowest role
+// (guest) keeps full read access while every POST / PUT / PATCH / DELETE on
+// the group needs at least minRole.
+//
+// This is the workspace-level counterpart of the read / commenter / editor
+// split used for task-scoped routes: rather than moving dozens of
+// operations between chi groups, the floor is expressed once per group and
+// automatically covers any operation later registered on it.
+//
+// It must be chained after [RequireWorkspaceMember]. A mutating request that
+// arrives without a resolved workspace is denied rather than allowed, so
+// mounting this on a group that never resolves a workspace fails closed.
+//
+// Responds 403 WS.MEMBER.ROLE_DENIED on failure.
+func RequireWorkspaceRoleForWrites(minRole WorkspaceRole) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if isSafeMethod(r.Method) {
+				next.ServeHTTP(w, r)
+				return
+			}
+			ws, ok := WorkspaceFromContext(r.Context())
+			if !ok || !ws.Role.AtLeast(minRole) {
+				writeSpecError(w, apierrors.WsMemberRoleDenied)
+				return
+			}
+			next.ServeHTTP(w, r)
+		})
+	}
+}
+
 // ----------------------------------------------------------------------------
 // Project-level
 // ----------------------------------------------------------------------------
@@ -604,18 +638,142 @@ func TaskVisibilityFilter(userID uint32, wsRole WorkspaceRole) (fragment string,
 	return acl.TaskVisibilityFilter(userID, wsRole)
 }
 
+// enforceBearerTokenWorkspace rejects a request whose bearer token is bound
+// to a workspace other than the one just resolved. The decision itself lives
+// in [acl.EnforceTokenWorkspace] so the middleware, the handler-level
+// membership helpers, and [RequireTokenWorkspaceBinding] cannot drift apart.
 func enforceBearerTokenWorkspace(w http.ResponseWriter, r *http.Request, workspaceID uint32) bool {
-	boundWorkspaceID, ok := authn.TokenWorkspaceIDFromContext(r.Context())
-	if !ok || boundWorkspaceID == workspaceID {
-		return true
-	}
-	kind, _ := authn.TokenKindFromContext(r.Context())
-	if kind == authn.TokenKindMCP {
-		writeSpecError(w, apierrors.McpTokenWorkspaceMismatch)
+	if err := acl.EnforceTokenWorkspace(r.Context(), workspaceID); err != nil {
+		writeAPIError(w, err)
 		return false
 	}
-	writeSpecError(w, apierrors.WsWorkspaceAccessDenied)
-	return false
+	return true
+}
+
+// TokenWorkspaceScope classifies how a route pattern lets the workspace
+// binding carried by a PAT / MCP bearer token be enforced.
+type TokenWorkspaceScope int
+
+const (
+	// TokenWorkspaceScopeAnchored means the workspace is named directly in
+	// the URL via {wsId}, so the binding can be checked before the handler
+	// runs.
+	TokenWorkspaceScopeAnchored TokenWorkspaceScope = iota
+	// TokenWorkspaceScopeDerived means the workspace is derived from
+	// another identifier (task, project, request body) and the binding is
+	// enforced by [acl.CheckWorkspaceMember] once that resolution happens.
+	TokenWorkspaceScopeDerived
+	// TokenWorkspaceScopeCrossWorkspace means the route deliberately spans
+	// every workspace the caller belongs to (the /me/* surface, the inbox,
+	// notifications). A token that promises a single workspace cannot be
+	// honoured there, so such routes reject workspace-bound tokens.
+	TokenWorkspaceScopeCrossWorkspace
+)
+
+// tokenWorkspaceDerivedRoutes lists the route prefixes whose workspace is
+// resolved from a non-{wsId} identifier and therefore reaches
+// [acl.CheckWorkspaceMember] (directly or through the handler-level
+// membership helpers) before any data is touched.
+//
+// This is the only exemption list: anything not matched here and not
+// carrying {wsId} is treated as cross-workspace and refuses bound tokens, so
+// a newly added route fails closed rather than inheriting an unchecked path.
+var tokenWorkspaceDerivedRoutes = []string{
+	// Task collection + every task-scoped route: RequireTaskAccess, or the
+	// project-editor check inside the collection handlers, resolves the
+	// owning workspace.
+	"/tasks",
+	// Project-scoped routes: RequireProjectMemberByGlobalID resolves the
+	// owning workspace.
+	"/projects/{prjId}",
+	// Signal injection: the handler resolves the workspace named in the
+	// body through resolve.WorkspaceMember.
+	"/signals",
+}
+
+// TokenWorkspaceScopeFor classifies a chi/Huma route pattern. Exported so
+// the router's static check tests can assert the classification of every
+// registered operation instead of re-deriving the rule.
+func TokenWorkspaceScopeFor(pattern string) TokenWorkspaceScope {
+	if strings.Contains(pattern, "{wsId}") {
+		return TokenWorkspaceScopeAnchored
+	}
+	for _, prefix := range tokenWorkspaceDerivedRoutes {
+		if pattern == prefix || strings.HasPrefix(pattern, prefix+"/") {
+			return TokenWorkspaceScopeDerived
+		}
+	}
+	return TokenWorkspaceScopeCrossWorkspace
+}
+
+// RequireTokenWorkspaceBinding returns a middleware that enforces the
+// workspace binding of PAT / MCP bearer tokens on every authenticated route.
+//
+// It is mounted as part of the shared auth chain rather than next to the
+// three ACL middlewares that happen to resolve a workspace, because those
+// three cover only a fraction of the route table: a token advertised to its
+// owner as "workspace W1 only" was otherwise honoured as a full-account
+// credential on any route that resolves its workspace some other way, or
+// none at all.
+//
+// Requests authenticated by a session JWT or the internal service token
+// carry no binding and pass through untouched.
+func RequireTokenWorkspaceBinding(db ACLDB) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			bound, ok := authn.TokenWorkspaceIDFromContext(r.Context())
+			if !ok {
+				next.ServeHTTP(w, r)
+				return
+			}
+			switch TokenWorkspaceScopeFor(routePattern(r)) {
+			case TokenWorkspaceScopeDerived:
+				// Enforced downstream once the workspace is known.
+			case TokenWorkspaceScopeAnchored:
+				pub, err := uuid.Parse(chi.URLParam(r, "wsId"))
+				if err != nil {
+					break
+				}
+				wsID, err := acl.ResolveWorkspaceByPublicID(r.Context(), db, pub)
+				if err != nil {
+					// An unresolvable workspace is the downstream layer's
+					// 404 to emit; answering here would turn a not-found
+					// into a differently-shaped error.
+					break
+				}
+				if wsID != bound {
+					writeAPIError(w, acl.TokenWorkspaceMismatch(r.Context()))
+					return
+				}
+			case TokenWorkspaceScopeCrossWorkspace:
+				writeAPIError(w, acl.TokenWorkspaceMismatch(r.Context()))
+				return
+			}
+			next.ServeHTTP(w, r)
+		})
+	}
+}
+
+// routePattern returns the chi route template matched for the request, or
+// the empty string when the request never went through chi's router. An
+// empty pattern classifies as cross-workspace, so an unrouted request with a
+// bound token fails closed.
+func routePattern(r *http.Request) string {
+	rctx := chi.RouteContext(r.Context())
+	if rctx == nil {
+		return ""
+	}
+	return rctx.RoutePattern()
+}
+
+// isSafeMethod reports whether the HTTP method is read-only.
+func isSafeMethod(method string) bool {
+	switch method {
+	case http.MethodGet, http.MethodHead, http.MethodOptions:
+		return true
+	default:
+		return false
+	}
 }
 
 // RequireProjectRole returns a middleware that asserts the actor's project

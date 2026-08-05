@@ -183,7 +183,15 @@ func resolveCalendarAtLeast(
 }
 
 // resolveCalendarWrite resolves the calendar for a handler that changes its
-// contents: events, attendees, comments, attachments, memos.
+// contents: events, attendees, comments, attachments, memos, checklists,
+// invites.
+//
+// Two refusals rather than one. A viewer is refused because writing is what
+// separates an editor from a viewer, and a calendar's contents are visible to
+// every one of its members — a read-only member who can post is a read-only
+// member who can address the whole audience. A system calendar is refused at
+// any role because its contents come from a provider feed: a row a user adds
+// there has no source to be reconciled against and survives no refresh.
 func resolveCalendarWrite(
 	ctx context.Context,
 	cq *calendar.Queries,
@@ -191,7 +199,14 @@ func resolveCalendarWrite(
 	actorID uint32,
 	calIDStr string,
 ) (calendar.FindCalendarByPublicIdRow, calendar.FindCalendarMemberRow, error) {
-	return resolveCalendarAtLeast(ctx, cq, wsID, actorID, calIDStr, calendar.CalendarMembersRoleEditor)
+	cal, member, err := resolveCalendarAtLeast(ctx, cq, wsID, actorID, calIDStr, calendar.CalendarMembersRoleEditor)
+	if err != nil {
+		return cal, member, err
+	}
+	if cal.Kind == calendar.CalendarsKindSystem {
+		return calendar.FindCalendarByPublicIdRow{}, calendar.FindCalendarMemberRow{}, errCalendarReadOnly
+	}
+	return cal, member, nil
 }
 
 // resolveCalendarAdmin resolves the calendar for a handler that changes the

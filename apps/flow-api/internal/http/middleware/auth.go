@@ -71,12 +71,10 @@ func RequireBearerTokenScope(next http.Handler) http.Handler {
 }
 
 func requiredScopeForMethod(method string) string {
-	switch method {
-	case http.MethodGet, http.MethodHead, http.MethodOptions:
+	if isSafeMethod(method) {
 		return "read:workspace"
-	default:
-		return "write:workspace"
 	}
+	return "write:workspace"
 }
 
 func tokenHasScope(scopes []string, required string) bool {

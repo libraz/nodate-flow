@@ -32,7 +32,19 @@ import (
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/auth"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
 	calendarq "github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated/calendar"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/middleware"
 )
+
+// isSafeMethod reports whether the HTTP method is read-only. Role floors and
+// the scope checks only apply to the mutating half.
+func isSafeMethod(method string) bool {
+	switch method {
+	case http.MethodGet, http.MethodHead, http.MethodOptions:
+		return true
+	default:
+		return false
+	}
+}
 
 // stubDeps returns the minimal Deps the router needs to build with
 // every sub-API registered. The DB is a real *sql.DB pointing at an
@@ -339,6 +351,227 @@ func TestEveryOperationHasTags(t *testing.T) {
 		t.Errorf("%d operations are missing huma.Operation.Tags:", len(bad))
 		for _, m := range bad {
 			t.Errorf("  %-6s %s (%s) — summary: %q", m.method, m.path, m.operationID, m.summary)
+		}
+	}
+}
+
+// roleFloorExemptOps lists every mutating operation on the authenticated
+// surface that deliberately runs without a group-level workspace/project role
+// floor, together with the reason it is safe.
+//
+// The map is the whole exemption budget: TestEveryMutatingOpHasARoleFloor
+// fails both when an unlisted mutation has no floor (a new route slipped in
+// without a role decision) and when a listed one turns out to have one or to
+// no longer exist (a stale entry). Grant an exemption only when the operation
+// enforces its authorization somewhere the router cannot see, and say where.
+//
+// Deciding whether an operation needs a workspace role floor: ask what rows
+// the request writes. The workspace role floor exists to protect state the
+// workspace shares — labels, timeboxes, lenses, pages, dashboards, imports,
+// the intake queue — where one member's edit changes what every other member
+// sees. It is NOT a general "guests may not POST" rule: an operation whose
+// every write is bound to the caller (user_id = actor: their notifications,
+// their favorites, their inbox rows, their own tokens) has no shared state to
+// protect, and putting a floor on it only removes the caller's control over
+// their own account.
+// #nosec G101 -- operation ids mapped to prose reasons; no credentials here
+var roleFloorExemptOps = map[string]string{
+	// Resolved through RequireProjectMemberByGlobalID; the handlers apply
+	// the project-role rules themselves because the required role differs
+	// per operation (lead for membership changes, editor for metadata).
+	"projects-patch":          "project role checked in handler",
+	"projects-disable":        "project role checked in handler",
+	"projects-members-add":    "project role checked in handler",
+	"projects-members-remove": "project role checked in handler",
+
+	// No workspace path parameter to hang a floor on: the project comes
+	// from the request body and the handlers gate on project editor via
+	// tasks.requireProjectEditor.
+	"tasks-create":  "project editor checked in handler",
+	"tasks-reorder": "project editor checked in handler",
+
+	// Accepts either the internal service token or a workspace member
+	// bearer; membership is resolved from the body through
+	// resolve.WorkspaceMember.
+	"signals-create": "workspace membership checked in handler",
+
+	// Caller-scoped rows. Ownership, not workspace role, is the access rule:
+	// every statement is bound by user_id = actor, so the request cannot
+	// change what any other member sees.
+	"inbox-archive":                "caller-scoped row",
+	"inbox-snooze":                 "caller-scoped row",
+	"notifications-mark-read":      "caller-scoped row",
+	"notifications-archive":        "caller-scoped row",
+	"notifications-mark-all-read":  "caller-scoped row",
+	"favorites-create":             "caller-scoped row",
+	"favorites-delete":             "caller-scoped row",
+	"mcp-tokens-create":            "caller-scoped row",
+	"mcp-tokens-delete":            "caller-scoped row",
+	"relation-suggestions-resolve": "workspace membership checked in handler",
+
+	// Calendar surface. The write floor is enforced in the handlers rather
+	// than by a router-level floor: resolveCalendarWrite requires calendar
+	// editor or above (and refuses writes to system calendars), with
+	// resolveWorkspaceNonGuest / resolveWorkspaceAdmin covering the
+	// public-share admin routes.
+	"calendars-create":                  "calendar ACL in handler",
+	"calendars-subscribe-system":        "calendar ACL in handler",
+	"calendars-self-subscribe":          "calendar ACL in handler",
+	"calendars-patch":                   "calendar ACL in handler",
+	"calendars-delete":                  "calendar ACL in handler",
+	"calendars-self-subscription-patch": "calendar ACL in handler",
+	"public-shares-create":              "calendar ACL in handler",
+	"public-shares-patch":               "calendar ACL in handler",
+	"public-shares-rotate":              "calendar ACL in handler",
+	"public-shares-delete":              "calendar ACL in handler",
+	"public-shares-events-attach":       "calendar ACL in handler",
+	"public-shares-events-detach":       "calendar ACL in handler",
+	"public-shares-events-reorder":      "calendar ACL in handler",
+	"events-create":                     "calendar ACL in handler",
+	"events-patch":                      "calendar ACL in handler",
+	"events-delete":                     "calendar ACL in handler",
+	"events-smart-create":               "calendar ACL in handler",
+	"events-from-task":                  "calendar ACL in handler",
+	"members-add":                       "calendar ACL in handler",
+	"members-update-role":               "calendar ACL in handler",
+	"members-remove":                    "calendar ACL in handler",
+	"attendees-add":                     "calendar ACL in handler",
+	"attendees-remove":                  "calendar ACL in handler",
+	"attendees-rsvp":                    "calendar ACL in handler",
+	"attendees-can-edit":                "calendar ACL in handler",
+	"event-invites-create":              "calendar ACL in handler",
+	"event-invites-revoke":              "calendar ACL in handler",
+	"comments-create":                   "calendar ACL in handler",
+	"comments-edit":                     "calendar ACL in handler",
+	"comments-delete":                   "calendar ACL in handler",
+	"checklist-create":                  "calendar ACL in handler",
+	"checklist-update":                  "calendar ACL in handler",
+	"checklist-delete":                  "calendar ACL in handler",
+	"memos-create":                      "calendar ACL in handler",
+	"memos-update":                      "calendar ACL in handler",
+	"memos-delete":                      "calendar ACL in handler",
+	"attachments-presign":               "calendar ACL in handler",
+	"attachments-confirm":               "calendar ACL in handler",
+	"attachments-delete":                "calendar ACL in handler",
+}
+
+// TestEveryMutatingOpHasARoleFloor asserts that every mutating operation on
+// the authenticated surface either sits behind a chi group that mounts a role
+// floor, or is named in roleFloorExemptOps.
+//
+// The floor recorded on each operation comes from mountGroup, which mounts
+// the middleware and records the label in the same call, so this cannot pass
+// on a group that merely claims a floor.
+//
+// Without such a check, "guest" — documented as the read-only workspace role
+// — was a full write role across labels, lenses, pages, timeboxes, imports
+// and the AI surface: a group can gain a mutating route long after its
+// middleware stack was decided, and nothing said so.
+func TestEveryMutatingOpHasARoleFloor(t *testing.T) {
+	t.Parallel()
+	res := BuildResult(stubDeps(t))
+
+	used := map[string]bool{}
+	var offenders []OperationRef
+	for _, op := range res.AuthenticatedOps {
+		if isSafeMethod(op.Method) {
+			continue
+		}
+		if op.WriteFloor != floorNone.label {
+			if _, exempt := roleFloorExemptOps[op.OperationID]; exempt {
+				t.Errorf("%s is listed in roleFloorExemptOps but its group now mounts the %q floor — drop the exemption",
+					op.OperationID, op.WriteFloor)
+				used[op.OperationID] = true
+			}
+			continue
+		}
+		if _, exempt := roleFloorExemptOps[op.OperationID]; exempt {
+			used[op.OperationID] = true
+			continue
+		}
+		offenders = append(offenders, op)
+	}
+
+	sort.Slice(offenders, func(i, j int) bool {
+		if offenders[i].Path != offenders[j].Path {
+			return offenders[i].Path < offenders[j].Path
+		}
+		return offenders[i].Method < offenders[j].Method
+	})
+	for _, op := range offenders {
+		t.Errorf("mutating op %-6s %s (%s) has no workspace/project role floor — mount one via mountGroup, or add it to roleFloorExemptOps with the reason it is safe",
+			op.Method, op.Path, op.OperationID)
+	}
+
+	for id := range roleFloorExemptOps {
+		if !used[id] {
+			t.Errorf("roleFloorExemptOps lists %q, which is no longer a floorless mutating operation — remove the stale entry", id)
+		}
+	}
+}
+
+// tokenBindingCrossWorkspaceOps lists the authenticated operations that
+// deliberately span every workspace the caller belongs to and therefore
+// refuse a workspace-bound PAT / MCP token outright.
+//
+// Everything else must be reachable for a bound token only after the binding
+// has been compared against a concrete workspace — either from the {wsId}
+// path parameter (RequireTokenWorkspaceBinding) or from the workspace the
+// handler resolves (acl.CheckWorkspaceMember).
+var tokenBindingCrossWorkspaceOps = map[string]struct{}{
+	"me-tasks-list":                {},
+	"me-tasks-with-dates-list":     {},
+	"me-calendar-events-list":      {},
+	"me-invites-list":              {},
+	"notifications-list":           {},
+	"notifications-unread-count":   {},
+	"notifications-mark-read":      {},
+	"notifications-archive":        {},
+	"favorites-list":               {},
+	"favorites-create":             {},
+	"favorites-delete":             {},
+	"inbox-list":                   {},
+	"inbox-archive":                {},
+	"inbox-snooze":                 {},
+	"relation-suggestions-resolve": {},
+}
+
+// TestBearerTokenWorkspaceBindingCoversEveryOp asserts that every operation on
+// the authenticated surface is classified for the PAT / MCP workspace binding,
+// and that the set of routes which reject bound tokens outright is exactly the
+// declared cross-workspace set.
+//
+// Coverage of the check itself is inherited rather than re-derived here:
+// RequireTokenWorkspaceBinding is part of the authMW chain, and
+// TestAuthenticatedSubRouterAlwaysAuthenticated already proves that chain runs
+// on every operation this builder registers. What this test pins down is the
+// classification — which is where a new route can quietly acquire an
+// unchecked path.
+func TestBearerTokenWorkspaceBindingCoversEveryOp(t *testing.T) {
+	t.Parallel()
+	res := BuildResult(stubDeps(t))
+
+	used := map[string]struct{}{}
+	for _, op := range res.AuthenticatedOps {
+		scope := middleware.TokenWorkspaceScopeFor(op.Path)
+		_, declared := tokenBindingCrossWorkspaceOps[op.OperationID]
+		if scope == middleware.TokenWorkspaceScopeCrossWorkspace {
+			if !declared {
+				t.Errorf("op %-6s %s (%s) refuses workspace-bound tokens but is not declared cross-workspace — give the route a {wsId}, add its prefix to middleware.tokenWorkspaceDerivedRoutes once the handler resolves a workspace, or declare it in tokenBindingCrossWorkspaceOps",
+					op.Method, op.Path, op.OperationID)
+				continue
+			}
+			used[op.OperationID] = struct{}{}
+			continue
+		}
+		if declared {
+			t.Errorf("op %s is declared cross-workspace but its path now resolves a workspace — remove the stale entry", op.OperationID)
+		}
+	}
+
+	for id := range tokenBindingCrossWorkspaceOps {
+		if _, seen := used[id]; !seen {
+			t.Errorf("tokenBindingCrossWorkspaceOps lists %q, which is not a registered cross-workspace operation — remove the stale entry", id)
 		}
 	}
 }

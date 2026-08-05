@@ -16,6 +16,7 @@ import (
 	"github.com/go-sql-driver/mysql"
 	"github.com/google/uuid"
 
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/acl"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
 	apierrors "github.com/libraz/nodate-flow/apps/flow-api/internal/errors"
@@ -404,7 +405,15 @@ func DerefStr(s *string) string {
 // the workspace. Returns nil on success, sql.ErrNoRows when the user is not
 // a member. This is the single canonical existence check — callers no longer
 // need to inline the query.
+//
+// A bearer token bound to a different workspace is reported as ErrNoRows
+// too: callers already map that onto their own access-denied spec, so a
+// replayed token lands on the 403/404 path instead of the generic 500
+// branch reserved for transport failures.
 func CheckWorkspaceMember(ctx context.Context, db *sql.DB, workspaceID uint32, userID uint32) error {
+	if err := acl.EnforceTokenWorkspace(ctx, workspaceID); err != nil {
+		return sql.ErrNoRows
+	}
 	q := generated.New(db)
 	_, err := q.CheckWorkspaceMemberExists(ctx, generated.CheckWorkspaceMemberExistsParams{
 		WorkspaceID: workspaceID,
@@ -415,8 +424,12 @@ func CheckWorkspaceMember(ctx context.Context, db *sql.DB, workspaceID uint32, u
 
 // WorkspaceMemberRole returns the role string ("owner", "admin", "member",
 // "guest") for the given user in the workspace. Returns sql.ErrNoRows when
-// the user is not an enabled member.
+// the user is not an enabled member, or when the request's bearer token is
+// bound to a different workspace (see [CheckWorkspaceMember]).
 func WorkspaceMemberRole(ctx context.Context, db *sql.DB, workspaceID uint32, userID uint32) (string, error) {
+	if err := acl.EnforceTokenWorkspace(ctx, workspaceID); err != nil {
+		return "", sql.ErrNoRows
+	}
 	q := generated.New(db)
 	role, err := q.GetWorkspaceMemberRole(ctx, generated.GetWorkspaceMemberRoleParams{
 		WorkspaceID: workspaceID,

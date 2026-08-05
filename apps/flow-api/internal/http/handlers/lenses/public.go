@@ -2,9 +2,7 @@ package lenses
 
 import (
 	"context"
-	"crypto/rand"
 	"database/sql"
-	"encoding/hex"
 	"log/slog"
 
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/audit"
@@ -14,11 +12,22 @@ import (
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/eventbus"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/middleware"
 	"github.com/libraz/nodate-flow/packages/go-shared/apierr"
+	sharedtoken "github.com/libraz/nodate-flow/packages/go-shared/token"
 )
 
 // Publish handles POST /workspaces/{wsId}/lenses/{lensId}/publish.
-// It generates a random 32-char hex share token and marks the lens
-// as publicly accessible. Returns 409 if the lens is already public.
+// It mints a capability token, stores only its SHA-256, and marks the
+// lens as publicly accessible. Returns 409 if the lens is already
+// public.
+//
+// The plaintext token is returned to the publisher exactly once and is
+// not written anywhere else — not to the event payload, not to the
+// audit log, not back out of the lens read endpoints. Those records
+// outlive the share: the event log is append-only, so a token recorded
+// at publish time stays readable to every workspace member after the
+// lens is unpublished and after the recorder has left. lensId is the
+// identifier those records need; the token is a credential and belongs
+// only in the URL its holder was given.
 func Publish(deps Deps) func(context.Context, *PublishLensInput) (*PublishLensOutput, error) {
 	return func(ctx context.Context, in *PublishLensInput) (*PublishLensOutput, error) {
 		ws, ok := middleware.WorkspaceFromContext(ctx)
@@ -43,19 +52,23 @@ func Publish(deps Deps) func(context.Context, *PublishLensInput) (*PublishLensOu
 		if err != nil {
 			return nil, httpErr(apierr.SpecForErrNoRows(err, apierrors.WsLensNotFound, apierrors.InternalUnexpected))
 		}
+		if err := requireLensShareOwner(ctx, deps, ws, actorID, lensRow.CreatorPublicID); err != nil {
+			return nil, err
+		}
 
-		// Generate a cryptographically random 32-char hex token.
-		tokenBytes := make([]byte, 16)
-		if _, err := rand.Read(tokenBytes); err != nil {
+		// Mint through the shared token package so lens shares stay in
+		// lockstep with calendar shares and invite magic links: one
+		// alphabet, one entropy budget, one hash encoding.
+		token, tokenHash, err := sharedtoken.MintToken()
+		if err != nil {
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
-		token := hex.EncodeToString(tokenBytes)
 
 		// SetLensPublic is a no-op when is_public = TRUE (WHERE guard).
 		if err := deps.Queries.SetLensPublic(ctx, generated.SetLensPublicParams{
-			PublicToken: sql.NullString{String: token, Valid: true},
-			WorkspaceID: ws.ID,
-			PublicID:    lid,
+			PublicTokenHash: sql.NullString{String: tokenHash, Valid: true},
+			WorkspaceID:     ws.ID,
+			PublicID:        lid,
 		}); err != nil {
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
@@ -72,8 +85,7 @@ func Publish(deps Deps) func(context.Context, *PublishLensInput) (*PublishLensOu
 			WorkspaceID: ws.ID,
 			ActorUserID: actorInt64Ptr(actorID),
 			Payload: map[string]any{
-				"lensId":      lensRow.PublicID.String(),
-				"publicToken": token,
+				"lensId": lensRow.PublicID.String(),
 			},
 		}); err != nil {
 			slog.ErrorContext(ctx, "eventbus.Append failed",
@@ -92,7 +104,6 @@ func Publish(deps Deps) func(context.Context, *PublishLensInput) (*PublishLensOu
 			WorkspaceID:  ws.ID,
 			ResourceType: "lens",
 			ResourceID:   lensRow.PublicID.String(),
-			Metadata:     map[string]any{"publicToken": token},
 		})
 
 		return &PublishLensOutput{Body: PublishLensBody{
@@ -127,6 +138,9 @@ func Unpublish(deps Deps) func(context.Context, *UnpublishLensInput) (*Unpublish
 		})
 		if err != nil {
 			return nil, httpErr(apierr.SpecForErrNoRows(err, apierrors.WsLensNotFound, apierrors.InternalUnexpected))
+		}
+		if err := requireLensShareOwner(ctx, deps, ws, actorID, lensRow.CreatorPublicID); err != nil {
+			return nil, err
 		}
 
 		// SetLensPrivate is a no-op when is_public = FALSE (WHERE guard).
@@ -175,16 +189,53 @@ func Unpublish(deps Deps) func(context.Context, *UnpublishLensInput) (*Unpublish
 	}
 }
 
+// requireLensShareOwner gates publishing and unpublishing a lens to its
+// creator and to workspace admins / owners.
+//
+// Publishing puts a projection of the workspace's tasks on an
+// unauthenticated URL, so "any workspace member who can see the lens" is
+// too wide a gate: the workspace role floor already keeps guests out, and
+// this narrows the remaining members to the people who own the view or
+// administer the workspace. It mirrors the calendar public-share rule
+// (resolveWorkspaceNonGuest / resolveWorkspaceAdmin).
+func requireLensShareOwner(
+	ctx context.Context,
+	deps Deps,
+	ws middleware.WorkspaceContext,
+	actorID uint32,
+	creatorPublicID types.PublicID,
+) error {
+	if ws.Role.AtLeast(middleware.WorkspaceRoleAdmin) {
+		return nil
+	}
+	profile, err := deps.Queries.FindUserProfileById(ctx, actorID)
+	if err != nil {
+		return httpErr(apierr.SpecForErrNoRows(err, apierrors.WsMemberRoleDenied, apierrors.InternalUnexpected))
+	}
+	if profile.PublicID != creatorPublicID {
+		return httpErr(apierrors.WsMemberRoleDenied)
+	}
+	return nil
+}
+
 // GetPublic handles GET /public/lenses/{token}. This is an
 // unauthenticated endpoint that returns a read-only view of a publicly
 // shared lens together with the resolved task list. Rate-limited by
 // per-IP middleware at the router level. The task list is hard-capped
 // at publicLensTaskCap rows; public shares are not paginated because
 // they are intentionally a small projection, not a free data dump.
+//
+// The token's shape is not prescribed here: the SHA-256 is computed
+// over the raw path parameter, so anything that is not a live token —
+// including the empty string — lands in the token-invalid path rather
+// than in a validation error that would confirm the format.
 func GetPublic(deps Deps) func(context.Context, *GetPublicLensInput) (*GetPublicLensOutput, error) {
 	return func(ctx context.Context, in *GetPublicLensInput) (*GetPublicLensOutput, error) {
-		row, err := deps.Queries.FindLensByPublicToken(ctx, sql.NullString{
-			String: in.Token,
+		if in.Token == "" {
+			return nil, httpErr(apierrors.WsLensPublicTokenInvalid)
+		}
+		row, err := deps.Queries.FindLensByPublicTokenHash(ctx, sql.NullString{
+			String: sharedtoken.HashToken(in.Token),
 			Valid:  true,
 		})
 		if err != nil {

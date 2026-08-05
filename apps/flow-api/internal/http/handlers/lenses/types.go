@@ -22,6 +22,12 @@ type Deps struct {
 var httpErr = handlerutil.HTTPErr
 
 // SavedLens is the public DTO for a saved lens row.
+//
+// There is deliberately no share-token field. Only the SHA-256 of a
+// share token is stored, so the plaintext exists once, in the publish
+// response, and cannot be re-read afterwards — by this endpoint or by
+// anyone who reaches the row. IsPublic answers whether a share URL is
+// live; recovering a lost URL means unpublishing and publishing again.
 type SavedLens struct {
 	ID                 string          `json:"id" doc:"Lens public id (UUID v7)"`
 	CreatorID          string          `json:"creatorId"`
@@ -33,7 +39,6 @@ type SavedLens struct {
 	GroupBy            *string         `json:"groupBy"`
 	IsDefault          bool            `json:"isDefault"`
 	IsPublic           bool            `json:"isPublic"`
-	PublicToken        *string         `json:"publicToken,omitempty" doc:"Share token; only returned to workspace members"`
 	SharedAt           *int64          `json:"sharedAt,omitempty" doc:"Unix seconds when first shared publicly"`
 	SafetyCheckedAt    *int64          `json:"safetyCheckedAt,omitempty" doc:"Unix seconds of last AI safety check"`
 	SortWeight         int32           `json:"sortWeight"`
@@ -81,9 +86,11 @@ type PublishLensOutput struct {
 	Body PublishLensBody
 }
 
-// PublishLensBody is the response body for publishing a lens.
+// PublishLensBody is the response body for publishing a lens. This is
+// the only place the plaintext share token is ever returned; the row
+// keeps only its hash.
 type PublishLensBody struct {
-	PublicToken string `json:"publicToken" doc:"32-char hex token for the public share URL"`
+	PublicToken string `json:"publicToken" doc:"Opaque token for the public share URL, returned exactly once"`
 }
 
 // UnpublishLensInput is the input for POST /workspaces/{wsId}/lenses/{lensId}/unpublish.
@@ -103,8 +110,13 @@ type UnpublishLensBody struct {
 }
 
 // GetPublicLensInput is the input for GET /public/lenses/{token}.
+//
+// The token is not length-constrained: the handler hashes whatever it
+// receives and looks that up, so a wrong-shaped token gets the same
+// answer as a wrong token instead of a validation error that would
+// leak the expected format.
 type GetPublicLensInput struct {
-	Token string `path:"token" minLength:"32" maxLength:"32" doc:"32-char hex share token"`
+	Token string `path:"token" doc:"Opaque share token from the public URL"`
 }
 
 // GetPublicLensOutput is the response for GET /public/lenses/{token}.

@@ -250,7 +250,6 @@ func Update(deps Deps) func(context.Context, *UpdateLensInput) (*UpdateLensOutpu
 			GroupBy:            groupBy,
 			IsDefault:          isDefault,
 			IsPublic:           existing.IsPublic,
-			PublicToken:        nullString(existing.PublicToken),
 			SharedAt:           nullTimeUnix(existing.SharedAt),
 			SafetyCheckedAt:    nullTimeUnix(existing.SafetyCheckedAt),
 			SortWeight:         existing.SortWeight,

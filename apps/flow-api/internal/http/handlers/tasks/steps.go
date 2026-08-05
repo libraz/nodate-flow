@@ -11,11 +11,13 @@ import (
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/ai"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/ai/embed"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/audit"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/dbretry"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
 	apierrors "github.com/libraz/nodate-flow/apps/flow-api/internal/errors"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/eventbus"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/middleware"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/taskcreate"
 	"github.com/libraz/nodate-flow/packages/go-shared/logutil"
 )
 
@@ -203,41 +205,35 @@ func ApplySteps(deps StepsDeps) func(context.Context, *ApplyStepsInput) (*ApplyS
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
 
-		// Begin transaction.
-		tx, err := deps.DB.BeginTx(ctx, nil)
-		if err != nil {
-			return nil, httpErr(apierrors.InternalUnexpected)
-		}
-		defer tx.Rollback() //nolint:errcheck
-
-		qtx := deps.Queries.WithTx(tx)
-
+		// Every step is created in one transaction so a failure halfway
+		// through the list leaves no orphan children behind. Task-number
+		// allocation reads MAX(task_number) inside the transaction, so each
+		// step sees the rows its predecessors inserted and the children get
+		// distinct numbers.
 		created := make([]string, 0, len(in.Body.Steps))
 		childIDs := make([]int64, 0, len(in.Body.Steps))
-		for _, st := range in.Body.Steps {
-			pub := types.New()
-			desc := sql.NullString{String: st.Description, Valid: st.Description != ""}
-			childID, err := qtx.CreateTask(ctx, generated.CreateTaskParams{
-				PublicID:        pub,
-				WorkspaceID:     ws.ID,
-				ProjectID:       parentProjectID,
-				ParentTaskID:    sql.NullInt32{Int32: int32(task.ID), Valid: true}, //#nosec G115 -- parent task id is tasks.id (BIGINT UNSIGNED), fits int32 within realistic deployments
-				CreatedByUserID: sql.NullInt32{Int32: int32(actorID), Valid: true}, //#nosec G115 -- actor user id sourced from session, fits int32 within realistic deployments
-				UpdatedByUserID: sql.NullInt32{Int32: int32(actorID), Valid: true}, //#nosec G115 -- actor user id sourced from session, fits int32 within realistic deployments
-				Title:           st.Title,
-				Description:     desc,
-				Priority:        st.Priority,
-				Visibility:      generated.TasksVisibilityPublic,
-			})
-			if err != nil {
-				return nil, httpErr(apierrors.InternalUnexpected)
+		txErr := dbretry.InTx(ctx, deps.DB, "tasks.ApplySteps", nil, func(ctx context.Context, tx *sql.Tx) error {
+			created = created[:0]
+			childIDs = childIDs[:0]
+			for _, st := range in.Body.Steps {
+				child, err := taskcreate.New(ctx, tx, taskcreate.Args{
+					WorkspaceID:  ws.ID,
+					ProjectID:    parentProjectID,
+					ParentTaskID: sql.NullInt32{Int32: int32(task.ID), Valid: true}, //#nosec G115 -- parent task id is tasks.id (BIGINT UNSIGNED), fits int32 within realistic deployments
+					ActorUserID:  sql.NullInt32{Int32: int32(actorID), Valid: true}, //#nosec G115 -- actor user id sourced from session, fits int32 within realistic deployments
+					Title:        st.Title,
+					Description:  sql.NullString{String: st.Description, Valid: st.Description != ""},
+					Priority:     st.Priority,
+				})
+				if err != nil {
+					return err
+				}
+				created = append(created, child.PublicID.String())
+				childIDs = append(childIDs, child.ID)
 			}
-			created = append(created, pub.String())
-			childIDs = append(childIDs, childID)
-		}
-
-		// Commit transaction.
-		if err := tx.Commit(); err != nil {
+			return nil
+		})
+		if txErr != nil {
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
 

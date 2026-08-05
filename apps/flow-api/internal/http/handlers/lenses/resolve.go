@@ -225,12 +225,12 @@ func parseDateString(v any) (time.Time, bool) {
 // hard-capped at publicLensTaskCap rows.
 //
 // Errors propagate to the caller as opaque internals; the
-// FindLensByPublicToken call already validated the token, so a failure
+// FindLensByPublicTokenHash call already validated the token, so a failure
 // here means the database is unhappy.
 func resolvePublicLensTasks(
 	ctx context.Context,
 	q *generated.Queries,
-	lens generated.FindLensByPublicTokenRow,
+	lens generated.FindLensByPublicTokenHashRow,
 ) ([]PublicLensTask, error) {
 	filter, _, _ := parseLensJSON(lens.LensJson)
 	parsed := parsePublicLensFilter(filter)

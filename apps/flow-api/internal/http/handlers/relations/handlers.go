@@ -3,16 +3,20 @@ package relations
 import (
 	"context"
 	"database/sql"
+	stderrors "errors"
 	"log/slog"
 	"strconv"
 
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/acl"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/audit"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/dbretry"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
 	apierrors "github.com/libraz/nodate-flow/apps/flow-api/internal/errors"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/eventbus"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/handlers/handlerutil"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/middleware"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/taskdeps"
 	"github.com/libraz/nodate-flow/packages/go-shared/apierr"
 )
 
@@ -24,16 +28,34 @@ func ListForWorkspace(deps Deps) func(context.Context, *ListForWorkspaceInput) (
 		if !ok {
 			return nil, httpErr(apierrors.WsWorkspaceNotFound)
 		}
+		actorID, ok := middleware.ActorFromContext(ctx)
+		if !ok {
+			return nil, httpErr(apierrors.WsWorkspaceAccessDenied)
+		}
 
 		limit := in.Limit
 		if limit <= 0 {
 			limit = 50
 		}
 
+		// Both task titles ride on every suggestion row, so the list has
+		// to be filtered to suggestions whose two ends the actor may
+		// both see. COUNT(*) OVER() sits inside the same statement, so
+		// total counts the filtered set — a total taken before the
+		// filter would report rows the caller is told nothing about,
+		// which is its own disclosure.
+		vis := acl.ListVisibilityArgs(actorID, acl.WorkspaceRole(ws.Role))
 		rows, err := deps.Queries.ListPendingSuggestionsForWorkspace(ctx, generated.ListPendingSuggestionsForWorkspaceParams{
-			WorkspaceID: ws.ID,
-			Limit:       limit,
-			Offset:      in.Offset,
+			WorkspaceID:   ws.ID,
+			IsElevated:    vis.IsElevated,
+			ActorUserID:   vis.ActorUserID,
+			ActorUserID_2: vis.ActorUserID,
+			ActorUserID_3: vis.ActorUserID,
+			ActorUserID_4: vis.ActorUserID,
+			ActorUserID_5: vis.ActorUserID,
+			ActorUserID_6: vis.ActorUserID,
+			Limit:         limit,
+			Offset:        in.Offset,
 		})
 		if err != nil {
 			return nil, httpErr(apierrors.InternalUnexpected)
@@ -65,17 +87,32 @@ func ListForTask(deps Deps) func(context.Context, *ListForTaskInput) (*ListForTa
 		if !ok {
 			return nil, httpErr(apierrors.WsWorkspaceNotFound)
 		}
+		actorID, ok := middleware.ActorFromContext(ctx)
+		if !ok {
+			return nil, httpErr(apierrors.WsWorkspaceAccessDenied)
+		}
 
 		limit := in.Limit
 		if limit <= 0 {
 			limit = 50
 		}
 
+		// Reaching this route means the actor may see the task named in
+		// the path; the other end of each suggestion is a different task
+		// and is not covered by that. Same filter as the workspace list.
+		vis := acl.ListVisibilityArgs(actorID, acl.WorkspaceRole(ws.Role))
 		rows, err := deps.Queries.ListPendingSuggestionsForTask(ctx, generated.ListPendingSuggestionsForTaskParams{
-			WorkspaceID:  ws.ID,
-			SourceTaskID: tc.ID,
-			TargetTaskID: tc.ID,
-			Limit:        limit,
+			WorkspaceID:   ws.ID,
+			SourceTaskID:  tc.ID,
+			TargetTaskID:  tc.ID,
+			IsElevated:    vis.IsElevated,
+			ActorUserID:   vis.ActorUserID,
+			ActorUserID_2: vis.ActorUserID,
+			ActorUserID_3: vis.ActorUserID,
+			ActorUserID_4: vis.ActorUserID,
+			ActorUserID_5: vis.ActorUserID,
+			ActorUserID_6: vis.ActorUserID,
+			Limit:         limit,
 		})
 		if err != nil {
 			return nil, httpErr(apierrors.InternalUnexpected)
@@ -147,6 +184,16 @@ LIMIT 1`
 
 // resolveAccept creates a task_dependencies row and marks the suggestion
 // as accepted.
+//
+// Accepting a suggestion writes a real dependency edge, so it is held to
+// exactly what POST /tasks/{id}/dependencies is held to: the caller must
+// be able to reach both endpoint tasks and be at least an editor in both
+// their projects, and the edge goes in through [taskdeps.Add] so it gets
+// the project locks and the cycle rejection. Workspace membership alone
+// is not enough — it would let a guest draw edges between tasks in
+// projects they were never added to — and skipping the cycle check
+// breaks the DAG the `dependency.all_done` walk depends on, silently and
+// permanently.
 func resolveAccept(
 	ctx context.Context,
 	deps Deps,
@@ -160,33 +207,54 @@ func resolveAccept(
 		return nil, httpErr(apierrors.InternalUnexpected)
 	}
 
-	// Create the dependency edge.
-	depPub := types.New()
-	if _, err := deps.Queries.AddDependency(ctx, generated.AddDependencyParams{
-		PublicID:    depPub,
-		WorkspaceID: wsID,
-		FromTaskID:  suggestion.SourceTaskID,
-		ToTaskID:    suggestion.TargetTaskID,
-		Kind:        depKind,
-	}); err != nil {
-		// Duplicate edge is acceptable; the dependency already exists.
-		if !isDuplicateEntry(err) {
-			return nil, httpErr(apierrors.InternalUnexpected)
-		}
+	source, err := authorizeEndpoint(ctx, deps, suggestion.SourceTaskPublicID, actorID)
+	if err != nil {
+		return nil, err
+	}
+	target, err := authorizeEndpoint(ctx, deps, suggestion.TargetTaskPublicID, actorID)
+	if err != nil {
+		return nil, err
 	}
 
-	// Mark the suggestion as accepted.
-	if err := deps.Queries.ResolveSuggestion(ctx, generated.ResolveSuggestionParams{
-		Status:      generated.RelationSuggestionsStatusAccepted,
-		ResolvedBy:  sql.NullInt32{Int32: int32(actorID), Valid: true}, //#nosec G115 -- actor user id sourced from session, fits int32 within realistic deployments
-		WorkspaceID: wsID,
-		PublicID:    suggestion.PublicID,
-	}); err != nil {
+	actor := int64(actorID)
+	txErr := dbretry.InTx(ctx, deps.DB, "relations.Accept", nil, func(ctx context.Context, tx *sql.Tx) error {
+		if _, e := taskdeps.Add(ctx, tx, taskdeps.Args{
+			WorkspaceID:      wsID,
+			FromTaskID:       suggestion.SourceTaskID,
+			FromProjectID:    source.Task.ProjectID,
+			ToTaskID:         suggestion.TargetTaskID,
+			ToProjectID:      target.Task.ProjectID,
+			Kind:             depKind,
+			ActorUserID:      &actor,
+			FromTaskPublicID: suggestion.SourceTaskPublicID.String(),
+			ToTaskPublicID:   suggestion.TargetTaskPublicID.String(),
+			Via:              "relation.accept",
+		}); e != nil {
+			// An edge somebody already drew is not a reason to refuse
+			// the suggestion: the state the caller asked for holds.
+			if !stderrors.Is(e, taskdeps.ErrDuplicate) {
+				return e
+			}
+		}
+
+		// Mark the suggestion as accepted in the same transaction as the
+		// edge, so a failure cannot leave a suggestion claiming an edge
+		// that was never written.
+		return deps.Queries.WithTx(tx).ResolveSuggestion(ctx, generated.ResolveSuggestionParams{
+			Status:      generated.RelationSuggestionsStatusAccepted,
+			ResolvedBy:  sql.NullInt32{Int32: int32(actorID), Valid: true}, //#nosec G115 -- actor user id sourced from session, fits int32 within realistic deployments
+			WorkspaceID: wsID,
+			PublicID:    suggestion.PublicID,
+		})
+	})
+	if txErr != nil {
+		if stderrors.Is(txErr, taskdeps.ErrCycle) {
+			return nil, httpErr(apierrors.WsTaskDependencyCycle)
+		}
 		return nil, httpErr(apierrors.InternalUnexpected)
 	}
 
 	// Emit event.
-	actor := int64(actorID)
 	srcTaskID := int64(suggestion.SourceTaskID)
 	if err := eventbus.Append(ctx, deps.DB, eventbus.Event{
 		Type:        eventbus.RelationAccepted,
@@ -278,6 +346,26 @@ func resolveDismiss(
 	return out, nil
 }
 
+// authorizeEndpoint resolves one endpoint task of a suggestion and
+// applies the same floor POST /tasks/{id}/dependencies applies: the
+// caller must be able to see the task at all (workspace membership plus
+// task visibility) and be at least an editor in the project that owns
+// it. Elevated project roles pass regardless, matching the MCP and REST
+// resolvers.
+//
+// Errors from the ACL layer already carry the canonical spec, so they
+// travel back unchanged rather than being flattened into a 500.
+func authorizeEndpoint(ctx context.Context, deps Deps, taskPub types.PublicID, actorID uint32) (acl.TaskAccess, error) {
+	access, err := acl.AuthorizeTaskAccess(ctx, deps.DB, taskPub.UUID(), actorID)
+	if err != nil {
+		return acl.TaskAccess{}, err
+	}
+	if access.ProjectRole != acl.ProjectRoleElevated && !access.ProjectRole.AtLeast(acl.ProjectRoleEditor) {
+		return acl.TaskAccess{}, httpErr(apierrors.WsProjectAccessDenied)
+	}
+	return access, nil
+}
+
 // mapSuggestionKindToDependencyKind converts a relation_suggestions
 // suggested_kind enum value to the corresponding task_dependencies
 // kind enum value.
@@ -335,6 +423,3 @@ func parseConfidence(s string) float64 {
 
 // totalAsInt64 delegates to handlerutil.TotalAsInt64.
 var totalAsInt64 = handlerutil.TotalAsInt64
-
-// isDuplicateEntry delegates to handlerutil.IsDuplicateEntry.
-var isDuplicateEntry = handlerutil.IsDuplicateEntry

@@ -19,7 +19,7 @@ import (
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/middleware"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/itemkit"
 	nflog "github.com/libraz/nodate-flow/apps/flow-api/internal/log"
-	"github.com/libraz/nodate-flow/apps/flow-api/internal/tasknumber"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/taskcreate"
 	"github.com/libraz/nodate-flow/packages/go-shared/apierr"
 	"github.com/libraz/nodate-flow/packages/go-shared/logutil"
 	"github.com/libraz/nodate-flow/packages/go-shared/stringutil"
@@ -315,12 +315,8 @@ func Create(deps Deps) func(context.Context, *CreateTaskInput) (*CreateTaskOutpu
 			return nil, httpErr(apierrors.ValidationBodyDueBeforeStart)
 		}
 
-		pub := types.New()
+		var pub types.PublicID
 		desc := sql.NullString{String: in.Body.Description, Valid: in.Body.Description != ""}
-		vis := generated.TasksVisibilityPublic
-		if in.Body.Visibility != "" {
-			vis = generated.TasksVisibility(in.Body.Visibility)
-		}
 
 		// Run the create transaction inside a deadlock-aware retry
 		// wrapper. The tx body acquires FK record locks against
@@ -336,29 +332,31 @@ func Create(deps Deps) func(context.Context, *CreateTaskInput) (*CreateTaskOutpu
 		txErr := dbretry.InTx(ctx, deps.DB, "tasks.Create", nil, func(ctx context.Context, tx *sql.Tx) error {
 			validationFn = nil
 			qtx := deps.Queries.WithTx(tx)
-			nextNum, err := tasknumber.Allocate(ctx, qtx, prj.WorkspaceID, prj.ID)
-			if err != nil {
-				return err
-			}
 
-			tID, err := qtx.CreateTask(ctx, generated.CreateTaskParams{
-				PublicID:        pub,
-				WorkspaceID:     prj.WorkspaceID,
-				ProjectID:       prj.ID,
-				TaskNumber:      uint32(nextNum), //#nosec G115 -- task_number is per-project sequence, fits uint32
-				ParentTaskID:    sql.NullInt32{},
-				CreatedByUserID: sql.NullInt32{Int32: int32(actorID), Valid: true}, //#nosec G115 -- actor user id sourced from session, fits int32 within realistic deployments
-				UpdatedByUserID: sql.NullInt32{Int32: int32(actorID), Valid: true}, //#nosec G115 -- actor user id sourced from session, fits int32 within realistic deployments
-				Title:           title,
-				Description:     desc,
-				Priority:        in.Body.Priority,
-				DueOn:           due,
-				StartedOn:       start,
-				Visibility:      vis,
+			created, err := taskcreate.New(ctx, tx, taskcreate.Args{
+				WorkspaceID: prj.WorkspaceID,
+				ProjectID:   prj.ID,
+				ActorUserID: sql.NullInt32{Int32: int32(actorID), Valid: true}, //#nosec G115 -- actor user id sourced from session, fits int32 within realistic deployments
+				Title:       title,
+				Description: desc,
+				Priority:    in.Body.Priority,
+				DueOn:       due,
+				StartedOn:   start,
+				// Empty body visibility means "workspace default"; taskcreate
+				// substitutes it so the default lives in one place.
+				Visibility: generated.TasksVisibility(in.Body.Visibility),
 			})
 			if err != nil {
+				if errors.Is(err, taskcreate.ErrVisibilityInvalid) {
+					validationFn = func() error { return httpErr(apierrors.ValidationBodyFieldInvalid) }
+					return errCreateValidation
+				}
 				return err
 			}
+			tID := created.ID
+			// The public id is minted per attempt, so a retried transaction
+			// never commits an id a previous attempt already published.
+			pub = created.PublicID
 			taskID = tID
 
 			// Attach actors. When the caller passed no explicit actor
@@ -823,52 +821,57 @@ func Patch(deps Deps) func(context.Context, *PatchTaskInput) (*PatchTaskOutput, 
 				)
 			}
 		} else {
-			tx, err := deps.DB.BeginTx(ctx, nil)
-			if err != nil {
-				return nil, httpErr(apierrors.InternalUnexpected)
-			}
-			defer tx.Rollback() //nolint:errcheck
-			qtx := deps.Queries.WithTx(tx)
-			if err := qtx.UpdateTask(ctx, updateParams); err != nil {
-				return nil, httpErr(apierrors.InternalUnexpected)
-			}
-			if titleChanged {
-				if err := itemkit.RenameItem(ctx, tx, itemkit.RenameItemArgs{
-					WorkspaceID: ws.ID,
-					ActorUserID: actorID,
-					TaskID:      task.ID,
-					NewTitle:    newTitle,
-				}); err != nil {
-					return nil, translateItemkitTaskError(err)
+			// dbretry.InTx rather than a hand-rolled transaction: the
+			// lifecycle event is appended inside it, and the eventbus
+			// only has a commit boundary to defer its fan-out to when
+			// the transaction came from here.
+			var answered error
+			txErr := dbretry.InTx(ctx, deps.DB, "tasks.Patch", nil, func(ctx context.Context, tx *sql.Tx) error {
+				answered = nil
+				qtx := deps.Queries.WithTx(tx)
+				if err := qtx.UpdateTask(ctx, updateParams); err != nil {
+					return err
 				}
-			}
-			if dueOnChanged {
-				snap, err := itemkit.ResolveSnapConfig(ctx, tx, ws.ID, actorID)
-				if err != nil {
-					return nil, httpErr(apierrors.InternalUnexpected)
+				if titleChanged {
+					if err := itemkit.RenameItem(ctx, tx, itemkit.RenameItemArgs{
+						WorkspaceID: ws.ID,
+						ActorUserID: actorID,
+						TaskID:      task.ID,
+						NewTitle:    newTitle,
+					}); err != nil {
+						answered = translateItemkitTaskError(err)
+						return err
+					}
 				}
-				var t time.Time
-				if newDue.Valid {
-					t = newDue.Time
+				if dueOnChanged {
+					snap, err := itemkit.ResolveSnapConfig(ctx, tx, ws.ID, actorID)
+					if err != nil {
+						return err
+					}
+					var t time.Time
+					if newDue.Valid {
+						t = newDue.Time
+					}
+					if err := itemkit.RescheduleTask(ctx, tx, itemkit.RescheduleTaskArgs{
+						WorkspaceID: ws.ID,
+						TaskID:      task.ID,
+						ActorUserID: actorID,
+						SetDueOn:    true,
+						DueOn:       t,
+						Snap:        snap,
+					}); err != nil {
+						answered = translateItemkitTaskError(err)
+						return err
+					}
 				}
-				if err := itemkit.RescheduleTask(ctx, tx, itemkit.RescheduleTaskArgs{
-					WorkspaceID: ws.ID,
-					TaskID:      task.ID,
-					ActorUserID: actorID,
-					SetDueOn:    true,
-					DueOn:       t,
-					Snap:        snap,
-				}); err != nil {
-					return nil, translateItemkitTaskError(err)
-				}
+				// Append the lifecycle event inside the tx so a crash between
+				// commit and a post-commit append cannot lose the timeline row.
+				return eventbus.Append(ctx, tx, updateEvent)
+			})
+			if answered != nil {
+				return nil, answered
 			}
-			// Append the lifecycle event inside the tx so a crash between
-			// commit and a post-commit append cannot lose the timeline row
-			// (L-14).
-			if err := eventbus.Append(ctx, tx, updateEvent); err != nil {
-				return nil, httpErr(apierrors.InternalUnexpected)
-			}
-			if err := tx.Commit(); err != nil {
+			if txErr != nil {
 				return nil, httpErr(apierrors.InternalUnexpected)
 			}
 		}

@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	stderrors "errors"
 
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/acl"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
 	apierrors "github.com/libraz/nodate-flow/apps/flow-api/internal/errors"
@@ -119,12 +120,15 @@ func runAddFavorite(ctx context.Context, deps Deps, s *session, raw json.RawMess
 		return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
 	}
 	actor := int64(s.userID)
-	_ = eventbus.Append(ctx, deps.DB, eventbus.Event{
+	// The favorite row is committed, and the tool short-circuits on an
+	// existing favorite, so a retry returns early without reaching this
+	// append: propagating would report a failure nothing can repair.
+	eventbus.AppendBestEffort(ctx, deps.DB, eventbus.Event{
 		Type:        eventbus.FavoriteAdded,
 		WorkspaceID: s.workspaceID,
 		ActorUserID: &actor,
 		Payload:     map[string]any{"targetType": in.TargetType, "targetId": in.TargetID, "via": "mcp"},
-	})
+	}, "mcp.add_favorite")
 	return map[string]any{"ok": true, "id": pub.String()}, nil
 }
 
@@ -170,7 +174,7 @@ func runAddReaction(ctx context.Context, deps Deps, s *session, raw json.RawMess
 	if in.Emoji == "" {
 		return nil, apierrors.New(apierrors.McpToolArgumentsInvalid)
 	}
-	taskInternal, _, err := resolveTask(ctx, deps, s, in.TaskID)
+	taskInternal, _, err := resolveTaskForWrite(ctx, deps, s, in.TaskID, acl.ProjectRoleCommenter)
 	if err != nil {
 		return nil, err
 	}
@@ -200,13 +204,15 @@ func runAddReaction(ctx context.Context, deps Deps, s *session, raw json.RawMess
 	}
 	taskID64 := int64(taskInternal)
 	actor := int64(s.userID)
-	_ = eventbus.Append(ctx, deps.DB, eventbus.Event{
+	// Same shape as add_favorite: committed row, and a retry returns on
+	// the existing-reaction check before it could re-append.
+	eventbus.AppendBestEffort(ctx, deps.DB, eventbus.Event{
 		Type:        eventbus.ReactionAdded,
 		WorkspaceID: s.workspaceID,
 		ActorUserID: &actor,
 		TaskID:      &taskID64,
 		Payload:     map[string]any{"taskId": in.TaskID, "emoji": in.Emoji, "via": "mcp"},
-	})
+	}, "mcp.add_reaction")
 	return map[string]any{"ok": true, "id": pub.String()}, nil
 }
 

@@ -159,7 +159,7 @@ func CreateEventInvite(deps Deps) func(context.Context, *CreateEventInviteInput)
 		if err != nil {
 			return nil, err
 		}
-		cal, _, err := resolveCalendar(ctx, deps.CalendarQueries, wsID, actorID, input.CalID)
+		cal, _, err := resolveCalendarWrite(ctx, deps.CalendarQueries, wsID, actorID, input.CalID)
 		if err != nil {
 			return nil, err
 		}
@@ -237,7 +237,7 @@ func CreateEventInvite(deps Deps) func(context.Context, *CreateEventInviteInput)
 			return nil, httpErr(apierrors.CalendarInviteStoreLookupInterrupted)
 		}
 
-		existing, err := deps.CalendarQueries.FindActiveCalendarEventInvite(ctx, calendar.FindActiveCalendarEventInviteParams{
+		existing, err := deps.CalendarQueries.FindCalendarEventInviteForAttendee(ctx, calendar.FindCalendarEventInviteForAttendeeParams{
 			EventID:    handlerutil.NullInt32From(evt.ID),
 			AttendeeID: handlerutil.NullInt32From(attRow.ID),
 		})
@@ -246,9 +246,15 @@ func CreateEventInvite(deps Deps) func(context.Context, *CreateEventInviteInput)
 		var inviteInternalID uint32
 		switch {
 		case err == nil:
-			// Rotate in place. The handler-facing API still returns
-			// the new plaintext token.
-			if rerr := deps.CalendarQueries.RotateCalendarEventInviteToken(ctx, calendar.RotateCalendarEventInviteTokenParams{
+			// A row already exists for this (event, attendee), live or
+			// revoked, and UNIQUE(event_id, attendee_id) says there is
+			// only ever the one. Revive it with a fresh token rather
+			// than inserting beside it: the previous behaviour looked
+			// only at live rows, so re-inviting someone after a revoke
+			// went to the insert below, collided with the revoked row
+			// and failed for good. The response still carries the new
+			// plaintext token exactly once either way.
+			if rerr := deps.CalendarQueries.ReviveCalendarEventInvite(ctx, calendar.ReviveCalendarEventInviteParams{
 				TokenHash: tokenHash,
 				ExpiresAt: expiresAt,
 				ID:        existing.ID,
@@ -272,12 +278,12 @@ func CreateEventInvite(deps Deps) func(context.Context, *CreateEventInviteInput)
 			})
 			if cerr != nil {
 				if handlerutil.IsDuplicateEntry(cerr) {
-					existing, rerr := deps.CalendarQueries.FindActiveCalendarEventInvite(ctx, calendar.FindActiveCalendarEventInviteParams{
+					existing, rerr := deps.CalendarQueries.FindCalendarEventInviteForAttendee(ctx, calendar.FindCalendarEventInviteForAttendeeParams{
 						EventID:    handlerutil.NullInt32From(evt.ID),
 						AttendeeID: handlerutil.NullInt32From(attRow.ID),
 					})
 					if rerr == nil {
-						if rerr = deps.CalendarQueries.RotateCalendarEventInviteToken(ctx, calendar.RotateCalendarEventInviteTokenParams{
+						if rerr = deps.CalendarQueries.ReviveCalendarEventInvite(ctx, calendar.ReviveCalendarEventInviteParams{
 							TokenHash: tokenHash,
 							ExpiresAt: expiresAt,
 							ID:        existing.ID,
@@ -573,7 +579,7 @@ func RevokeEventInvite(deps Deps) func(context.Context, *RevokeEventInviteInput)
 		if err != nil {
 			return nil, err
 		}
-		cal, _, err := resolveCalendar(ctx, deps.CalendarQueries, wsID, actorID, input.CalID)
+		cal, _, err := resolveCalendarWrite(ctx, deps.CalendarQueries, wsID, actorID, input.CalID)
 		if err != nil {
 			return nil, err
 		}

@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"time"
 
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/acl"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/audit"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
@@ -491,6 +492,10 @@ func AddTask(deps Deps) func(context.Context, *AddTaskInput) (*AddTaskOutput, er
 		if !ok {
 			return nil, httpErr(apierrors.WsWorkspaceNotFound)
 		}
+		actorID, ok := middleware.ActorFromContext(ctx)
+		if !ok {
+			return nil, httpErr(apierrors.WsMemberRoleDenied)
+		}
 
 		// Resolve timebox public_id -> internal id.
 		tbPub, err := types.Parse(in.TimeboxID)
@@ -516,6 +521,14 @@ func AddTask(deps Deps) func(context.Context, *AddTaskInput) (*AddTaskOutput, er
 		}
 		taskID, err := resolveTaskInternal(ctx, deps.DB, ws.ID, taskPub)
 		if err != nil {
+			return nil, err
+		}
+
+		// Adding a task to a timebox puts its title on the timebox list,
+		// so it takes the same right as reading it. Without this a task
+		// the actor cannot see could be pulled into a timebox they can,
+		// which is a read of someone else's task through a write.
+		if _, err := acl.AuthorizeTaskAccess(ctx, deps.DB, taskPub.UUID(), actorID); err != nil {
 			return nil, err
 		}
 
@@ -649,6 +662,10 @@ func ListTasks(deps Deps) func(context.Context, *ListTimeboxTasksInput) (*ListTi
 		if !ok {
 			return nil, httpErr(apierrors.WsWorkspaceNotFound)
 		}
+		actorID, ok := middleware.ActorFromContext(ctx)
+		if !ok {
+			return nil, httpErr(apierrors.WsMemberRoleDenied)
+		}
 
 		// Resolve timebox.
 		tbPub, err := types.Parse(in.TimeboxID)
@@ -668,17 +685,33 @@ func ListTasks(deps Deps) func(context.Context, *ListTimeboxTasksInput) (*ListTi
 			limit = 50
 		}
 
+		// Belonging to a timebox says nothing about who may read the
+		// task, so the list and the progress counts both run through the
+		// visibility predicate. Counting the unfiltered set would answer
+		// "how many are hidden from you", which is the same disclosure
+		// by arithmetic.
+		vis := acl.ListVisibilityArgs(actorID, acl.WorkspaceRole(ws.Role))
 		rows, err := deps.Queries.ListTasksForTimebox(ctx, generated.ListTasksForTimeboxParams{
-			TimeboxID: tb.ID,
-			Limit:     limit,
-			Offset:    in.Offset,
+			TimeboxID:     tb.ID,
+			IsElevated:    vis.IsElevated,
+			ActorUserID:   vis.ActorUserID,
+			ActorUserID_2: vis.ActorUserID,
+			ActorUserID_3: vis.ActorUserID,
+			Limit:         limit,
+			Offset:        in.Offset,
 		})
 		if err != nil {
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
 
 		// Fetch progress counts.
-		progress, err := deps.Queries.CountTasksForTimebox(ctx, tb.ID)
+		progress, err := deps.Queries.CountTasksForTimebox(ctx, generated.CountTasksForTimeboxParams{
+			TimeboxID:     tb.ID,
+			IsElevated:    vis.IsElevated,
+			ActorUserID:   vis.ActorUserID,
+			ActorUserID_2: vis.ActorUserID,
+			ActorUserID_3: vis.ActorUserID,
+		})
 		if err != nil {
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}

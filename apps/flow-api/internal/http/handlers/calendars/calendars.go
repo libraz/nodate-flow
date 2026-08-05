@@ -317,11 +317,33 @@ func DeleteCalendar(deps Deps) func(context.Context, *DeleteCalendarInput) (*Del
 		_ = cal
 
 		calUID, _ := uuid.Parse(input.CalID)
-		err = deps.CalendarQueries.DisableCalendar(ctx, calendar.DisableCalendarParams{
+
+		// Deleting the calendar has to withdraw its events from every
+		// public share in the same breath. A share page is served to
+		// anyone holding the URL and is edited through a view that
+		// filters on the calendar, so leaving the links behind produced
+		// the one state with no way out: still published, no longer
+		// listed anywhere that could unpublish it.
+		tx, err := deps.DB.BeginTx(ctx, nil)
+		if err != nil {
+			return nil, httpErr(apierrors.CalendarCalendarStoreDeleteInterrupted)
+		}
+		defer func() { _ = tx.Rollback() }()
+		cqtx := deps.CalendarQueries.WithTx(tx)
+
+		if err := cqtx.DisableCalendar(ctx, calendar.DisableCalendarParams{
 			PublicID:    types.FromUUID(calUID),
 			WorkspaceID: wsID,
-		})
-		if err != nil {
+		}); err != nil {
+			return nil, httpErr(apierrors.CalendarCalendarStoreDeleteInterrupted)
+		}
+		if err := cqtx.DetachCalendarEventsFromAllShares(ctx, calendar.DetachCalendarEventsFromAllSharesParams{
+			PublicID:    types.FromUUID(calUID),
+			WorkspaceID: wsID,
+		}); err != nil {
+			return nil, httpErr(apierrors.CalendarCalendarStoreDeleteInterrupted)
+		}
+		if err := tx.Commit(); err != nil {
 			return nil, httpErr(apierrors.CalendarCalendarStoreDeleteInterrupted)
 		}
 

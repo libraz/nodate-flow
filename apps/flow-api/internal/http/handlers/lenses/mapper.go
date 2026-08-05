@@ -69,7 +69,6 @@ func rowToLensFromList(r generated.ListLensesForProjectRow) SavedLens {
 		GroupBy:            groupBy,
 		IsDefault:          r.IsDefault,
 		IsPublic:           r.IsPublic,
-		PublicToken:        nullString(r.PublicToken),
 		SharedAt:           nullTimeUnix(r.SharedAt),
 		SafetyCheckedAt:    nullTimeUnix(r.SafetyCheckedAt),
 		SortWeight:         r.SortWeight,
@@ -92,7 +91,6 @@ func rowToLensFromGet(r generated.GetLensByPublicIDRow) SavedLens {
 		GroupBy:            groupBy,
 		IsDefault:          r.IsDefault,
 		IsPublic:           r.IsPublic,
-		PublicToken:        nullString(r.PublicToken),
 		SharedAt:           nullTimeUnix(r.SharedAt),
 		SafetyCheckedAt:    nullTimeUnix(r.SafetyCheckedAt),
 		SortWeight:         r.SortWeight,
@@ -101,12 +99,12 @@ func rowToLensFromGet(r generated.GetLensByPublicIDRow) SavedLens {
 	}
 }
 
-// rowToPublicLens maps a FindLensByPublicTokenRow to the PublicLens DTO.
+// rowToPublicLens maps a FindLensByPublicTokenHashRow to the PublicLens DTO.
 // Only exposes the lens definition; all workspace/creator metadata is
 // omitted. The Tasks slice is initialised to a non-nil empty slice so the
 // JSON encoder emits `[]` rather than `null`; the caller fills it in by
 // running the resolver.
-func rowToPublicLens(r generated.FindLensByPublicTokenRow) PublicLens {
+func rowToPublicLens(r generated.FindLensByPublicTokenHashRow) PublicLens {
 	filter, sort, groupBy := parseLensJSON(r.LensJson)
 	return PublicLens{
 		ID:          r.PublicID.String(),

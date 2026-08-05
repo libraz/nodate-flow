@@ -14,6 +14,7 @@ import (
 	apierrors "github.com/libraz/nodate-flow/apps/flow-api/internal/errors"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/mcp"
 	"github.com/libraz/nodate-flow/apps/flow-api/tests/helpers"
+	"github.com/libraz/nodate-flow/packages/go-shared/testhelpers"
 )
 
 // mcpVisibilityFixture is a minimal tenant used to prove MCP tools enforce
@@ -199,13 +200,11 @@ func TestMCPToolsEnforceTaskVisibility(t *testing.T) {
 	})
 }
 
-// requireMCPIntegration skips DB-backed MCP tests in -short mode. In normal
-// runs the test boots the shared MySQL testcontainer used elsewhere in the
-// suite; if Docker is unreachable, helpers.StartShared fails with a clear
-// error.
+// requireMCPIntegration gates the DB-backed MCP tests. Once integration
+// mode is on the test boots the shared MySQL testcontainer used
+// elsewhere in the suite; if Docker is unreachable, helpers.StartShared
+// fails the test rather than skipping it.
 func requireMCPIntegration(t *testing.T) {
 	t.Helper()
-	if testing.Short() {
-		t.Skip("skipping MCP DB-backed test in -short mode")
-	}
+	testhelpers.SkipUnlessIntegration(t)
 }

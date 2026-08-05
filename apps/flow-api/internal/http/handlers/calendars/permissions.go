@@ -18,6 +18,13 @@ var (
 	errEventNotFound        = httpErr(apierrors.CalendarEventNotFound)
 	errForbidden            = httpErr(apierrors.CalendarCalendarOwnerRoleRequired)
 	errInviteNotFound       = httpErr(apierrors.CalendarInviteNotFound)
+
+	// errCalendarReadOnly refuses a write to a system calendar, whose rows
+	// are owned by a provider feed rather than by anyone in the workspace.
+	// It reuses the calendar access code because the refusal is the same
+	// shape — this calendar is not yours to write to — and no member, at
+	// any role, is the exception.
+	errCalendarReadOnly = httpErr(apierrors.CalendarCalendarAccessDenied)
 )
 
 // canEditEvent reports whether the actor may change an event.

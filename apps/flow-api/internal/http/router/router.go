@@ -238,15 +238,91 @@ type OperationRef struct {
 	Method      string
 	Path        string
 	OperationID string
+	// WriteFloor is the ACL floor the operation's chi group applies to
+	// mutating methods (one of the floor* constants). It is recorded by
+	// the same call that mounts the middleware, so a group cannot claim a
+	// floor it does not enforce.
+	WriteFloor string
 }
 
-// snapshotOps reads each huma.API's OpenAPI document and emits one
-// OperationRef per registered (verb, path) pair. It MUST be called
-// before mergeAPIs, because that function mutates apis[0]'s OpenAPI
-// document in place to host every other sub-API's paths.
-func snapshotOps(apis []huma.API) []OperationRef {
-	var ops []OperationRef
+// aclFloor pairs the label a group records on its operations with the
+// middleware that enforces it. Carrying both in one value means a caller
+// picks the enforcement and the bookkeeping together instead of naming a
+// floor and separately remembering to mount it.
+//
+// This narrows the mistake; it does not make it impossible. Deleting the
+// Use call in mountGroup, or handing it an aclFloor literal with a label
+// and no middleware, still produces a group that reports a floor and
+// enforces nothing. The check that catches that is the chain test in
+// acl_floor_chain_test.go, which drives requests through the middleware a
+// group actually ended up with.
+type aclFloor struct {
+	// label identifies the floor in the operation inventory the static
+	// checks walk. Empty for groups that enforce their ACL elsewhere.
+	label string
+	// mw enforces the floor. Nil only for floorNone.
+	mw func(http.Handler) http.Handler
+}
+
+// Group ACL floors. A floor is the minimum role a mutating request must
+// carry to reach any operation registered on the group.
+var (
+	// floorNone marks a group that mounts no role floor of its own. Every
+	// such group is listed in the router's static check tests together
+	// with the reason its operations are safe without one.
+	floorNone = aclFloor{}
+	// floorWorkspaceMember keeps guests (the read-only workspace role)
+	// out of every mutating operation on the group.
+	floorWorkspaceMember = aclFloor{
+		label: "workspace:member",
+		mw:    middleware.RequireWorkspaceRoleForWrites(middleware.WorkspaceRoleMember),
+	}
+	// floorWorkspaceAdmin restricts the whole group to workspace
+	// admins / owners, reads included.
+	floorWorkspaceAdmin = aclFloor{
+		label: "workspace:admin",
+		mw:    middleware.RequireWorkspaceRole(middleware.WorkspaceRoleAdmin),
+	}
+	// floorProjectCommenter / floorProjectEditor restrict the group to the
+	// matching project role; they apply to reads as well because the
+	// groups carrying them register only mutations.
+	floorProjectCommenter = aclFloor{
+		label: "project:commenter",
+		mw:    middleware.RequireProjectRole(middleware.ProjectRoleCommenter),
+	}
+	floorProjectEditor = aclFloor{
+		label: "project:editor",
+		mw:    middleware.RequireProjectRole(middleware.ProjectRoleEditor),
+	}
+)
+
+// groupAPI pairs a sub-API with the ACL floor of the chi group it was
+// registered on.
+type groupAPI struct {
+	api   huma.API
+	floor string
+}
+
+// plainGroups adapts a builder that returns bare huma.API values (the
+// public and auth surfaces, which have no workspace role concept) into the
+// groupAPI shape the snapshot uses.
+func plainGroups(apis []huma.API) []groupAPI {
+	out := make([]groupAPI, 0, len(apis))
 	for _, a := range apis {
+		out = append(out, groupAPI{api: a, floor: floorNone.label})
+	}
+	return out
+}
+
+// snapshotOps reads each sub-API's OpenAPI document and emits one
+// OperationRef per registered (verb, path) pair, tagged with its group's
+// ACL floor. It MUST be called before mergeAPIs, because that function
+// mutates apis[0]'s OpenAPI document in place to host every other
+// sub-API's paths.
+func snapshotOps(groups []groupAPI) []OperationRef {
+	var ops []OperationRef
+	for _, g := range groups {
+		a := g.api
 		spec := a.OpenAPI()
 		if spec == nil || spec.Paths == nil {
 			continue
@@ -272,6 +348,7 @@ func snapshotOps(apis []huma.API) []OperationRef {
 					Method:      method,
 					Path:        path,
 					OperationID: op.OperationID,
+					WriteFloor:  g.floor,
 				})
 			}
 		}
@@ -325,30 +402,43 @@ func BuildResult(deps Deps) Result {
 	// the project / task ACL helpers) once the workspace is resolved,
 	// so each builder gets a fully-tagged logger without having to thread
 	// a "log-after-acl" wrapper through every group.
+	//
+	// The PAT / MCP workspace binding is enforced in the same chain rather
+	// than next to the individual ACL middlewares, so a token minted for one
+	// workspace cannot be replayed on any route in the table — including the
+	// ones that resolve their workspace elsewhere, or not at all. See
+	// middleware.RequireTokenWorkspaceBinding.
 	loggerCtx := middleware.LoggerContext()
+	tokenWorkspaceMW := middleware.RequireTokenWorkspaceBinding(shared.aclDB)
 	authMW := func(next http.Handler) http.Handler {
-		return rawAuthMW(middleware.RequireBearerTokenScope(loggerCtx(next)))
+		return rawAuthMW(middleware.RequireBearerTokenScope(tokenWorkspaceMW(loggerCtx(next))))
 	}
 
-	authedAPIs := buildAuthenticatedAPI(r, deps, shared, authMW)
-	publicAPIs := buildPublicShareAPI(r, deps, shared)
-	authAPIs := buildAuthAPI(r, deps, shared)
+	authedGroups := buildAuthenticatedAPI(r, deps, shared, authMW)
+	publicGroups := plainGroups(buildPublicShareAPI(r, deps, shared))
+	authGroups := plainGroups(buildAuthAPI(r, deps, shared))
 
 	// Snapshot the per-builder operation set before mergeAPIs mutates
 	// apis[0]'s OpenAPI document. The static check tests rely on these
 	// pristine slices to walk only the routes that belong to their
 	// builder; once merged, every path appears under apis[0].
-	authedOps := snapshotOps(authedAPIs)
-	publicOps := snapshotOps(publicAPIs)
-	authOps := snapshotOps(authAPIs)
+	authedOps := snapshotOps(authedGroups)
+	publicOps := snapshotOps(publicGroups)
+	authOps := snapshotOps(authGroups)
 
 	// Aggregate every sub-API for OpenAPI merging. The order matters
 	// for /openapi.json: authenticated paths come first so the rendered
 	// document keeps the historical layout.
-	apis := make([]huma.API, 0, len(authedAPIs)+len(publicAPIs)+len(authAPIs))
-	apis = append(apis, authedAPIs...)
-	apis = append(apis, publicAPIs...)
-	apis = append(apis, authAPIs...)
+	apis := make([]huma.API, 0, len(authedGroups)+len(publicGroups)+len(authGroups))
+	for _, g := range authedGroups {
+		apis = append(apis, g.api)
+	}
+	for _, g := range publicGroups {
+		apis = append(apis, g.api)
+	}
+	for _, g := range authGroups {
+		apis = append(apis, g.api)
+	}
 
 	// OpenAPI spec and Scalar API reference UI — public, no auth.
 	specJSON := buildOpenAPIJSON(apis)
@@ -638,6 +728,26 @@ func newSubAPI(sub chi.Router) huma.API {
 	return humachi.New(sub, huma.DefaultConfig("nodate-flow", "0.0.0"))
 }
 
+// mountGroup mounts the group's ACL floor middleware, creates its
+// huma.API, and records the floor label alongside it in apis. Call it
+// after the group's other Use() calls (auth, workspace / project
+// resolution) and before registering any operation.
+//
+// The label recorded here is what the operation inventory reports, and an
+// inventory is a ledger: it says which floor was chosen, not that the
+// choice is enforced. Removing the Use call below would leave every
+// operation still reporting its floor. What rules that out is
+// TestMountGroupMountsTheFloorItRecords, which drives requests through
+// the middleware this function leaves on the group.
+func mountGroup(sub chi.Router, floor aclFloor, apis *[]groupAPI) huma.API {
+	if floor.mw != nil {
+		sub.Use(floor.mw)
+	}
+	api := newSubAPI(sub)
+	*apis = append(*apis, groupAPI{api: api, floor: floor.label})
+	return api
+}
+
 // buildAuthenticatedAPI registers every route that requires a valid
 // bearer token. The supplied authMW is attached to each chi group so
 // every handler runs through the auth resolver before reaching the
@@ -645,15 +755,17 @@ func newSubAPI(sub chi.Router) huma.API {
 // group, each carrying the OpenAPI document that the static check
 // tests (TestAuthenticatedSubRouterAlwaysAuthenticated) walk to assert
 // 401 on every (method, path) when called without credentials.
-func buildAuthenticatedAPI(r chi.Router, deps Deps, shared *sharedDeps, authMW func(http.Handler) http.Handler) []huma.API {
-	apis := make([]huma.API, 0, 8)
+func buildAuthenticatedAPI(r chi.Router, deps Deps, shared *sharedDeps, authMW func(http.Handler) http.Handler) []groupAPI {
+	apis := make([]groupAPI, 0, 8)
 
-	// /workspaces/{wsId} member-level reads: project list, lenses, AI, etc.
+	// /workspaces/{wsId} member-level surface: project list, labels,
+	// lenses, timeboxes, pages, AI, etc. Reads are open to every workspace
+	// member; the member floor keeps guests — the read-only workspace role
+	// — out of every mutation registered on this group.
 	r.Group(func(sub chi.Router) {
 		sub.Use(authMW)
 		sub.Use(middleware.RequireWorkspaceMember(shared.aclDB))
-		subAPI := newSubAPI(sub)
-		apis = append(apis, subAPI)
+		subAPI := mountGroup(sub, floorWorkspaceMember, &apis)
 
 		huma.Register(subAPI, huma.Operation{
 			OperationID: "projects-list",
@@ -828,7 +940,6 @@ func buildAuthenticatedAPI(r chi.Router, deps Deps, shared *sharedDeps, authMW f
 			notifier = stream.NopNotifier{}
 		}
 		sub.Get("/workspaces/{wsId}/stream", stream.SSEHandler(notifier, deps.StreamRemember))
-		notifications.RegisterWorkspaceScoped(subAPI, shared.notifDeps)
 		relationDeps := relations.Deps{DB: deps.DB, Queries: deps.Queries, Audit: shared.auditRec}
 		relations.RegisterWorkspaceScoped(subAPI, relationDeps)
 		intakeDeps := intakehandlers.Deps{DB: deps.DB, Queries: deps.Queries, Audit: shared.auditRec}
@@ -837,22 +948,25 @@ func buildAuthenticatedAPI(r chi.Router, deps Deps, shared *sharedDeps, authMW f
 		importhandlers.Register(subAPI, importDeps)
 	})
 
-	// Per-user MCP tokens (workspace member, not admin).
+	// Workspace-scoped routes whose mutations only ever touch rows owned by
+	// the caller: their own MCP tokens, their own notifications. Every
+	// statement here is bound by user_id = actor, so there is no shared
+	// state for a workspace role floor to protect — and applying one would
+	// only stop a guest from managing their own notification bell or
+	// minting a token that is, in turn, limited to their own role.
 	r.Group(func(sub chi.Router) {
 		sub.Use(authMW)
 		sub.Use(middleware.RequireWorkspaceMember(shared.aclDB))
-		subAPI := newSubAPI(sub)
-		apis = append(apis, subAPI)
+		subAPI := mountGroup(sub, floorNone, &apis)
 		aihandlers.RegisterMcpTokens(subAPI, shared.aiDeps)
+		notifications.RegisterWorkspaceScoped(subAPI, shared.notifDeps)
 	})
 
 	// Workspace admin routes: AI providers, project create, webhooks.
 	r.Group(func(sub chi.Router) {
 		sub.Use(authMW)
 		sub.Use(middleware.RequireWorkspaceMember(shared.aclDB))
-		sub.Use(middleware.RequireWorkspaceRole(middleware.WorkspaceRoleAdmin))
-		subAPI := newSubAPI(sub)
-		apis = append(apis, subAPI)
+		subAPI := mountGroup(sub, floorWorkspaceAdmin, &apis)
 		huma.Register(subAPI, huma.Operation{
 			OperationID: "projects-create",
 			Method:      http.MethodPost,
@@ -874,8 +988,7 @@ func buildAuthenticatedAPI(r chi.Router, deps Deps, shared *sharedDeps, authMW f
 	r.Group(func(sub chi.Router) {
 		sub.Use(authMW)
 		sub.Use(middleware.RequireProjectMemberByGlobalID(shared.aclDB))
-		subAPI := newSubAPI(sub)
-		apis = append(apis, subAPI)
+		subAPI := mountGroup(sub, floorNone, &apis)
 		projects.RegisterGlobal(subAPI, shared.prjDeps)
 		timeline.RegisterProjectScoped(subAPI, shared.tlDeps)
 	})
@@ -883,8 +996,7 @@ func buildAuthenticatedAPI(r chi.Router, deps Deps, shared *sharedDeps, authMW f
 	// Task collection routes.
 	r.Group(func(sub chi.Router) {
 		sub.Use(authMW)
-		subAPI := newSubAPI(sub)
-		apis = append(apis, subAPI)
+		subAPI := mountGroup(sub, floorNone, &apis)
 		tasks.RegisterCollection(subAPI, shared.taskDeps)
 	})
 
@@ -915,8 +1027,7 @@ func buildAuthenticatedAPI(r chi.Router, deps Deps, shared *sharedDeps, authMW f
 	r.Group(func(sub chi.Router) {
 		sub.Use(authMW)
 		sub.Use(middleware.RequireTaskAccess(shared.aclDB))
-		subAPI := newSubAPI(sub)
-		apis = append(apis, subAPI)
+		subAPI := mountGroup(sub, floorNone, &apis)
 		tasks.RegisterTaskScopedReads(subAPI, shared.taskDeps)
 		labels.RegisterTaskScopedReads(subAPI, labelTaskDeps)
 		timeline.RegisterTaskScoped(subAPI, shared.tlDeps)
@@ -928,9 +1039,7 @@ func buildAuthenticatedAPI(r chi.Router, deps Deps, shared *sharedDeps, authMW f
 	r.Group(func(sub chi.Router) {
 		sub.Use(authMW)
 		sub.Use(middleware.RequireTaskAccess(shared.aclDB))
-		sub.Use(middleware.RequireProjectRole(middleware.ProjectRoleCommenter))
-		subAPI := newSubAPI(sub)
-		apis = append(apis, subAPI)
+		subAPI := mountGroup(sub, floorProjectCommenter, &apis)
 		tasks.RegisterTaskScopedCommenterWrites(subAPI, shared.taskDeps)
 		reactions.RegisterTaskScopedWrites(subAPI, reactionDeps)
 	})
@@ -939,9 +1048,7 @@ func buildAuthenticatedAPI(r chi.Router, deps Deps, shared *sharedDeps, authMW f
 	r.Group(func(sub chi.Router) {
 		sub.Use(authMW)
 		sub.Use(middleware.RequireTaskAccess(shared.aclDB))
-		sub.Use(middleware.RequireProjectRole(middleware.ProjectRoleEditor))
-		subAPI := newSubAPI(sub)
-		apis = append(apis, subAPI)
+		subAPI := mountGroup(sub, floorProjectEditor, &apis)
 		tasks.RegisterTaskScopedEditorWrites(subAPI, shared.taskDeps)
 		labels.RegisterTaskScopedWrites(subAPI, labelTaskDeps)
 		tasks.RegisterSteps(subAPI, stepsDeps)
@@ -954,8 +1061,7 @@ func buildAuthenticatedAPI(r chi.Router, deps Deps, shared *sharedDeps, authMW f
 	r.Group(func(sub chi.Router) {
 		sub.Use(authMW)
 		sub.Use(middleware.RequireWorkspaceMember(shared.aclDB))
-		subAPI := newSubAPI(sub)
-		apis = append(apis, subAPI)
+		subAPI := mountGroup(sub, floorWorkspaceMember, &apis)
 		timeline.RegisterWorkspaceScoped(subAPI, shared.tlDeps)
 		eventsDeps := events.Deps{DB: deps.DB, Queries: deps.Queries}
 		events.RegisterWorkspaceScoped(subAPI, eventsDeps)
@@ -972,8 +1078,7 @@ func buildAuthenticatedAPI(r chi.Router, deps Deps, shared *sharedDeps, authMW f
 	// TestAuthenticatedSubRouterAlwaysAuthenticated).
 	r.Group(func(sub chi.Router) {
 		sub.Use(middleware.RequireSignalsAuth(authMW, deps.FlowAPISignalToken))
-		subAPI := newSubAPI(sub)
-		apis = append(apis, subAPI)
+		subAPI := mountGroup(sub, floorNone, &apis)
 		signals.RegisterCollection(subAPI, shared.signalDeps)
 	})
 
@@ -986,8 +1091,7 @@ func buildAuthenticatedAPI(r chi.Router, deps Deps, shared *sharedDeps, authMW f
 	// snowflake → flow user lookup.
 	r.Group(func(sub chi.Router) {
 		sub.Use(middleware.RequireServiceTokenOnly(deps.FlowAPISignalToken))
-		subAPI := newSubAPI(sub)
-		apis = append(apis, subAPI)
+		subAPI := mountGroup(sub, floorNone, &apis)
 		internalapi.Register(subAPI, internalapi.Deps{DB: deps.DB, Queries: deps.Queries})
 	})
 
@@ -995,8 +1099,7 @@ func buildAuthenticatedAPI(r chi.Router, deps Deps, shared *sharedDeps, authMW f
 	// handlers resolve ws membership themselves).
 	r.Group(func(sub chi.Router) {
 		sub.Use(authMW)
-		subAPI := newSubAPI(sub)
-		apis = append(apis, subAPI)
+		subAPI := mountGroup(sub, floorNone, &apis)
 		inbox.Register(subAPI, shared.inboxDeps)
 		notifications.Register(subAPI, shared.notifDeps)
 		favDeps := favorites.Deps{DB: deps.DB, Queries: deps.Queries, Audit: shared.auditRec}
@@ -1027,8 +1130,7 @@ func buildAuthenticatedAPI(r chi.Router, deps Deps, shared *sharedDeps, authMW f
 	r.Group(func(sub chi.Router) {
 		sub.Use(authMW)
 		sub.Use(middleware.RequireWorkspaceMember(shared.aclDB))
-		subAPI := newSubAPI(sub)
-		apis = append(apis, subAPI)
+		subAPI := mountGroup(sub, floorWorkspaceMember, &apis)
 		triageDeps := inbox.TriageDeps{Deps: shared.inboxDeps, AI: shared.aiOrch}
 		inbox.RegisterTriage(subAPI, triageDeps)
 		inbox.RegisterAiSuggestions(subAPI, triageDeps)
@@ -1047,8 +1149,7 @@ func buildAuthenticatedAPI(r chi.Router, deps Deps, shared *sharedDeps, authMW f
 	// scopes by user_id) or at the handler level (resolveWorkspace).
 	r.Group(func(sub chi.Router) {
 		sub.Use(authMW)
-		subAPI := newSubAPI(sub)
-		apis = append(apis, subAPI)
+		subAPI := mountGroup(sub, floorNone, &apis)
 
 		huma.Register(subAPI, huma.Operation{
 			OperationID: "calendars-list",
@@ -1196,8 +1297,7 @@ func buildAuthenticatedAPI(r chi.Router, deps Deps, shared *sharedDeps, authMW f
 	r.Group(func(sub chi.Router) {
 		sub.Use(authMW)
 		sub.Use(calMW)
-		subAPI := newSubAPI(sub)
-		apis = append(apis, subAPI)
+		subAPI := mountGroup(sub, floorNone, &apis)
 
 		// Single calendar CRUD.
 		huma.Register(subAPI, huma.Operation{

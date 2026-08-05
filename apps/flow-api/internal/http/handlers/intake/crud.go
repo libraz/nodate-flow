@@ -14,7 +14,7 @@ import (
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/eventbus"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/handlers/handlerutil"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/middleware"
-	"github.com/libraz/nodate-flow/apps/flow-api/internal/tasknumber"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/taskcreate"
 	"github.com/libraz/nodate-flow/packages/go-shared/apierr"
 	"github.com/libraz/nodate-flow/packages/go-shared/logutil"
 )
@@ -359,9 +359,6 @@ func Convert(deps Deps) func(context.Context, *ConvertIntakeItemInput) (*Convert
 			return nil, httpErr(spec)
 		}
 
-		taskPub := types.New()
-		desc := sql.NullString{String: nullStr(item.Body), Valid: item.Body.Valid}
-
 		// Create the task inside a transaction for task-number safety.
 		tx, err := deps.DB.BeginTx(ctx, nil)
 		if err != nil {
@@ -370,29 +367,20 @@ func Convert(deps Deps) func(context.Context, *ConvertIntakeItemInput) (*Convert
 		defer tx.Rollback() //nolint:errcheck
 		qtx := deps.Queries.WithTx(tx)
 
-		nextNum, err := tasknumber.Allocate(ctx, qtx, prj.WorkspaceID, prj.ID)
-		if err != nil {
-			return nil, httpErr(apierrors.InternalUnexpected)
-		}
-
-		taskID, err := qtx.CreateTask(ctx, generated.CreateTaskParams{
-			PublicID:        taskPub,
-			WorkspaceID:     ws.ID,
-			ProjectID:       prj.ID,
-			TaskNumber:      uint32(nextNum), //#nosec G115 -- task_number is per-project sequence, fits uint32
-			ParentTaskID:    sql.NullInt32{},
-			CreatedByUserID: sql.NullInt32{Int32: int32(actorID), Valid: true}, //#nosec G115 -- actor user id sourced from session, fits int32 within realistic deployments
-			UpdatedByUserID: sql.NullInt32{Int32: int32(actorID), Valid: true}, //#nosec G115 -- actor user id sourced from session, fits int32 within realistic deployments
-			Title:           item.Title,
-			Description:     desc,
-			Priority:        0,
-			DueOn:           sql.NullTime{},
-			StartedOn:       sql.NullTime{},
-			Visibility:      generated.TasksVisibilityPublic,
+		// An intake item is a workspace-level inbox entry with no audience of
+		// its own, so the converted task takes the workspace default.
+		created, err := taskcreate.New(ctx, tx, taskcreate.Args{
+			WorkspaceID: ws.ID,
+			ProjectID:   prj.ID,
+			ActorUserID: sql.NullInt32{Int32: int32(actorID), Valid: true}, //#nosec G115 -- actor user id sourced from session, fits int32 within realistic deployments
+			Title:       item.Title,
+			Description: sql.NullString{String: nullStr(item.Body), Valid: item.Body.Valid},
 		})
 		if err != nil {
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
+		taskID := created.ID
+		taskPub := created.PublicID
 
 		// Link intake item to the created task.
 		if err := qtx.SetIntakeItemTask(ctx, generated.SetIntakeItemTaskParams{

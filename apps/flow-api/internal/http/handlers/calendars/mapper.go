@@ -7,18 +7,32 @@ import (
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/handlers/handlerutil"
 	"github.com/libraz/nodate-flow/packages/go-shared/dbtype"
+	"github.com/libraz/nodate-flow/packages/go-shared/eventacl"
 )
 
-// scrubPrivateEvent redacts the free-text fields of a private event from
-// every viewer except its owner. Calendar event visibility is the real
-// access control: workspace membership only gates who may edit, so a
-// private event's location, memo, and URL must never leak to co-members
-// on any read path (single GET, per-calendar list, cross-calendar list,
-// cross-workspace feed). This helper is the single source of truth for
-// that rule; each read path routes the fields it projects through it and
-// passes nil for the fields its DTO does not carry.
-func scrubPrivateEvent(visibility string, ownerUserID, viewerUserID uint32, location, memo, url **string) {
-	if visibility != string(calendar.CalendarEventsVisibilityPrivate) || ownerUserID == viewerUserID {
+// scrubEventDetails redacts an event's free-text fields from a viewer
+// who may see that the time is taken but not what fills it.
+//
+// The decision itself is eventacl.CanSeeDetails, so REST and MCP answer
+// it the same way; this function only applies the answer to whichever
+// of the three fields the calling DTO carries, passing nil for the rest.
+//
+// isAttendee comes from the is_attendee column the list queries project
+// (eventacl.AttendeeExistsSQL) or from a direct lookup on the detail
+// path. It is the field that makes `private` usable: whoever was invited
+// to the meeting needs the room and the call link, and a rule that
+// excepted only the owner withheld exactly those from the people the
+// event was for.
+//
+// Rows the viewer may not see at all never reach here — that is a
+// row-level decision and it belongs in the query, because dropping rows
+// afterwards would leave any total counting events the viewer is not
+// supposed to know about.
+func scrubEventDetails(visibility string, ownerUserID, viewerUserID uint32, isAttendee bool, location, memo, url **string) {
+	if eventacl.CanSeeDetails(
+		eventacl.Event{Visibility: eventacl.Visibility(visibility), OwnerUserID: ownerUserID},
+		eventacl.Actor{UserID: viewerUserID, IsAttendee: isAttendee},
+	) {
 		return
 	}
 	if location != nil {
@@ -165,7 +179,7 @@ func eventFromRangeRow(r calendar.ListCalendarEventsByRangeRow, viewerUserID uin
 	resp.BlockLabel = dbtype.PtrFromNullString(r.BlockLabel)
 	resp.NotificationOffset = dbtype.PtrFromNullInt32(r.NotificationOffset)
 	resp.UpdatedAt = dbtype.UnixSecondsFromNullTime(r.UpdatedAt)
-	scrubPrivateEvent(string(r.Visibility), r.OwnerUserID, viewerUserID, &resp.Location, &resp.Memo, &resp.URL)
+	scrubEventDetails(string(r.Visibility), r.OwnerUserID, viewerUserID, r.IsAttendee, &resp.Location, &resp.Memo, &resp.URL)
 	return resp
 }
 
@@ -178,7 +192,7 @@ func eventFromRecurringRow(r calendar.ListRecurringCalendarEventsByRangeRow, vie
 	resp.Memo = dbtype.PtrFromNullString(r.Memo)
 	resp.URL = dbtype.PtrFromNullString(r.Url)
 	resp.BlockLabel = dbtype.PtrFromNullString(r.BlockLabel)
-	scrubPrivateEvent(string(r.Visibility), r.OwnerUserID, viewerUserID, &resp.Location, &resp.Memo, &resp.URL)
+	scrubEventDetails(string(r.Visibility), r.OwnerUserID, viewerUserID, r.IsAttendee, &resp.Location, &resp.Memo, &resp.URL)
 	if r.RecurrenceRule != nil {
 		raw := json.RawMessage(r.RecurrenceRule)
 		resp.RecurrenceRule = &raw

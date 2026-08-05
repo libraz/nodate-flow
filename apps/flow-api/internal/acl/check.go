@@ -9,6 +9,7 @@ import (
 
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
 	apierrors "github.com/libraz/nodate-flow/apps/flow-api/internal/errors"
+	"github.com/libraz/nodate-flow/packages/go-shared/authn"
 )
 
 // DB is the minimal subset of *sql.DB that the ACL check functions
@@ -40,6 +41,42 @@ WHERE user_id = ? AND enabled = TRUE AND revoked_at IS NULL LIMIT 1`
 		return err
 	}
 	return nil
+}
+
+// ----------------------------------------------------------------------------
+// Bearer token workspace binding
+// ----------------------------------------------------------------------------
+
+// TokenWorkspaceMismatch returns the error a workspace-bound bearer token
+// gets when it is replayed against a workspace it was not minted for. MCP
+// tokens get their own code so an MCP client can tell a binding failure
+// apart from a plain membership failure.
+func TokenWorkspaceMismatch(ctx context.Context) error {
+	if kind, _ := authn.TokenKindFromContext(ctx); kind == authn.TokenKindMCP {
+		return apierrors.New(apierrors.McpTokenWorkspaceMismatch)
+	}
+	return apierrors.New(apierrors.WsWorkspaceAccessDenied)
+}
+
+// EnforceTokenWorkspace verifies that the bearer token authenticating the
+// request is allowed to act on workspaceID.
+//
+// PAT and MCP tokens are minted against exactly one workspace
+// (personal_access_tokens.workspace_id / mcp_tokens.workspace_id is NOT
+// NULL), so a token replayed against any other workspace must be rejected
+// even when its owner is a member of both. The check lives here — inside
+// the shared workspace membership gate — rather than at each call site so a
+// route that resolves a workspace by a route parameter, a request body, or
+// a task/project id cannot silently opt out of the binding.
+//
+// Requests carrying no workspace-bound token (browser JWT sessions, the
+// internal service token) pass through untouched.
+func EnforceTokenWorkspace(ctx context.Context, workspaceID uint32) error {
+	bound, ok := authn.TokenWorkspaceIDFromContext(ctx)
+	if !ok || bound == workspaceID {
+		return nil
+	}
+	return TokenWorkspaceMismatch(ctx)
 }
 
 // ----------------------------------------------------------------------------
@@ -99,6 +136,11 @@ WHERE id = ? AND enabled = TRUE LIMIT 1`
 // corrupt enum is a server-side invariant violation, not a caller
 // permissions failure.
 func CheckWorkspaceMember(ctx context.Context, db DB, wsID, userID uint32, deniedSpec *apierrors.Spec) (WorkspaceRole, error) {
+	// A workspace-bound bearer token never gets past its own workspace,
+	// whatever membership the token owner holds elsewhere.
+	if err := EnforceTokenWorkspace(ctx, wsID); err != nil {
+		return "", err
+	}
 	const q = `SELECT role FROM workspace_members
 WHERE workspace_id = ? AND user_id = ? AND enabled = TRUE LIMIT 1`
 	var role string
@@ -445,6 +487,22 @@ func AuthorizeTaskAccess(ctx context.Context, db DB, pub uuid.UUID, userID uint3
 // List filters
 // ----------------------------------------------------------------------------
 
+// Layer 4 task visibility has to be expressed in two places, because
+// the two kinds of query in this repository cannot share one string:
+//
+//   - hand-written queries splice in [TaskVisibilityFilter], a fragment
+//     plus binds;
+//   - sqlc queries carry the predicate in their own .sql file, because
+//     sqlc parses the statement and a runtime-spliced fragment would be
+//     invisible to it. Those take their binds from [ListVisibilityArgs].
+//
+// The rule is the same either way and neither form may be skipped. A
+// list endpoint that projects a task title and applies neither is the
+// recurring defect here: the shared helper existed, and its call sites
+// were three, while the endpoints returning task titles were many.
+// TestTaskListEndpointsHideInvisibleTitles drives the reachable ones as
+// a guest and fails on any body carrying a title it should not.
+
 // TaskVisibilityFilter returns a SQL WHERE fragment and associated bind
 // arguments that enforce Layer 4 task visibility in list queries. The
 // fragment references v_task_list columns and should be ANDed into an
@@ -477,4 +535,39 @@ func TaskVisibilityFilter(userID uint32, wsRole WorkspaceRole) (fragment string,
     ))
   )`
 	return frag, []any{userID, userID, userID}
+}
+
+// VisibilityArgs carries the bind values for the .sql-file form of the
+// Layer 4 task visibility rule: the two named arguments those queries
+// declare, `is_elevated` and `actor_user_id`.
+//
+// sqlc emits one field per textual occurrence of a named argument
+// rather than deduplicating them, so a query repeating actor_user_id
+// six times has six fields to fill. Callers copy ActorUserID into every
+// one of them; that repetition is sqlc's, not the rule's.
+type VisibilityArgs struct {
+	// IsElevated is 1 for workspace admins and owners, who bypass the
+	// predicate, and 0 for everyone else. An int rather than a bool
+	// because MySQL has no boolean parameter type and the queries
+	// CAST it to SIGNED.
+	IsElevated int64
+	// ActorUserID is the internal id of the user the list is being
+	// rendered for — never the owner of the resource being listed.
+	ActorUserID int64
+}
+
+// ListVisibilityArgs derives the binds for a sqlc list query that
+// carries the visibility predicate.
+//
+// It exists so the elevated-role decision is made in one place. Written
+// out at each call site it becomes a role comparison a reader has to
+// verify against the others, and the failure mode is silent: an
+// endpoint that computes IsElevated too generously shows every task to
+// everyone, and nothing about the query looks wrong.
+func ListVisibilityArgs(actorID uint32, wsRole WorkspaceRole) VisibilityArgs {
+	var elevated int64
+	if wsRole.AtLeast(WorkspaceRoleAdmin) {
+		elevated = 1
+	}
+	return VisibilityArgs{IsElevated: elevated, ActorUserID: int64(actorID)}
 }

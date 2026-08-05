@@ -12,6 +12,7 @@ import (
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/acl"
 	apierrors "github.com/libraz/nodate-flow/apps/flow-api/internal/errors"
 	"github.com/libraz/nodate-flow/apps/flow-api/tests/helpers"
+	"github.com/libraz/nodate-flow/packages/go-shared/testhelpers"
 )
 
 // -----------------------------------------------------------------------------
@@ -324,15 +325,13 @@ func requireSpec(t *testing.T, err error, spec *apierrors.Spec) {
 	require.Equalf(t, spec.Code, ae.Spec.Code, "wrong error code: got %s want %s", ae.Spec.Code, spec.Code)
 }
 
-// requireIntegration skips DB-backed tests in -short mode. In normal
-// runs the test boots the shared MySQL testcontainer used elsewhere in
-// the package; if Docker is unreachable, helpers.StartShared will fail
-// with a clear error.
+// requireIntegration gates the DB-backed tests in this package. Once
+// integration mode is on the test boots the shared MySQL testcontainer;
+// if Docker is unreachable, helpers.StartShared fails the test rather
+// than skipping it.
 func requireIntegration(t *testing.T) {
 	t.Helper()
-	if testing.Short() {
-		t.Skip("skipping ACL DB-backed test in -short mode")
-	}
+	testhelpers.SkipUnlessIntegration(t)
 }
 
 // TestACLLayered exercises every (layer × outcome) combination.

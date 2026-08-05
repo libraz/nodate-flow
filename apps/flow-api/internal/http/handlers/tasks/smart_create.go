@@ -19,6 +19,7 @@ import (
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/eventbus"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/middleware"
 	nflog "github.com/libraz/nodate-flow/apps/flow-api/internal/log"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/taskcreate"
 	"github.com/libraz/nodate-flow/packages/go-shared/apierr"
 	"github.com/libraz/nodate-flow/packages/go-shared/logutil"
 )
@@ -141,6 +142,12 @@ func ApplySmart(deps SmartCreateDeps) func(context.Context, *ApplySmartInput) (*
 		if err != nil {
 			return nil, httpErr(apierr.SpecForErrNoRows(err, apierrors.WsProjectNotFound, apierrors.InternalUnexpected))
 		}
+		// Same project-editor gate as POST /tasks: the project comes from the
+		// request body, so workspace membership alone does not say whether the
+		// caller may create tasks in it.
+		if spec := requireProjectEditor(ctx, deps.DB, ws.ID, prj.ID, actorID); spec != nil {
+			return nil, httpErr(spec)
+		}
 
 		// Begin transaction.
 		tx, err := deps.DB.BeginTx(ctx, nil)
@@ -152,23 +159,19 @@ func ApplySmart(deps SmartCreateDeps) func(context.Context, *ApplySmartInput) (*
 		qtx := deps.Queries.WithTx(tx)
 
 		// Create parent task.
-		parentPub := types.New()
-		desc := sql.NullString{String: in.Body.Description, Valid: in.Body.Description != ""}
-		parentID, err := qtx.CreateTask(ctx, generated.CreateTaskParams{
-			PublicID:        parentPub,
-			WorkspaceID:     ws.ID,
-			ProjectID:       prj.ID,
-			ParentTaskID:    sql.NullInt32{},
-			CreatedByUserID: sql.NullInt32{Int32: int32(actorID), Valid: true}, //#nosec G115 -- actor user id sourced from session, fits int32 within realistic deployments
-			UpdatedByUserID: sql.NullInt32{Int32: int32(actorID), Valid: true}, //#nosec G115 -- actor user id sourced from session, fits int32 within realistic deployments
-			Title:           in.Body.Title,
-			Description:     desc,
-			Priority:        in.Body.Priority,
-			Visibility:      generated.TasksVisibilityPublic,
+		parent, err := taskcreate.New(ctx, tx, taskcreate.Args{
+			WorkspaceID: ws.ID,
+			ProjectID:   prj.ID,
+			ActorUserID: sql.NullInt32{Int32: int32(actorID), Valid: true}, //#nosec G115 -- actor user id sourced from session, fits int32 within realistic deployments
+			Title:       in.Body.Title,
+			Description: sql.NullString{String: in.Body.Description, Valid: in.Body.Description != ""},
+			Priority:    in.Body.Priority,
 		})
 		if err != nil {
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
+		parentID := parent.ID
+		parentPub := parent.PublicID
 
 		// Attach assignees to parent task.
 		for _, uid := range in.Body.AssigneeUserIDs {
@@ -180,19 +183,14 @@ func ApplySmart(deps SmartCreateDeps) func(context.Context, *ApplySmartInput) (*
 		// Create subtasks.
 		subtaskIDs := make([]string, 0, len(in.Body.Subtasks))
 		for _, sub := range in.Body.Subtasks {
-			subPub := types.New()
-			subDesc := sql.NullString{String: sub.Description, Valid: sub.Description != ""}
-			subID, err := qtx.CreateTask(ctx, generated.CreateTaskParams{
-				PublicID:        subPub,
-				WorkspaceID:     ws.ID,
-				ProjectID:       prj.ID,
-				ParentTaskID:    sql.NullInt32{Int32: int32(parentID), Valid: true}, //#nosec G115 -- parent_task_id is tasks.id (BIGINT UNSIGNED), fits int32 within realistic deployments
-				CreatedByUserID: sql.NullInt32{Int32: int32(actorID), Valid: true},  //#nosec G115 -- actor user id sourced from session, fits int32 within realistic deployments
-				UpdatedByUserID: sql.NullInt32{Int32: int32(actorID), Valid: true},  //#nosec G115 -- actor user id sourced from session, fits int32 within realistic deployments
-				Title:           sub.Title,
-				Description:     subDesc,
-				Priority:        sub.Priority,
-				Visibility:      generated.TasksVisibilityPublic,
+			child, err := taskcreate.New(ctx, tx, taskcreate.Args{
+				WorkspaceID:  ws.ID,
+				ProjectID:    prj.ID,
+				ParentTaskID: sql.NullInt32{Int32: int32(parentID), Valid: true}, //#nosec G115 -- parent_task_id is tasks.id (BIGINT UNSIGNED), fits int32 within realistic deployments
+				ActorUserID:  sql.NullInt32{Int32: int32(actorID), Valid: true},  //#nosec G115 -- actor user id sourced from session, fits int32 within realistic deployments
+				Title:        sub.Title,
+				Description:  sql.NullString{String: sub.Description, Valid: sub.Description != ""},
+				Priority:     sub.Priority,
 			})
 			if err != nil {
 				return nil, httpErr(apierrors.InternalUnexpected)
@@ -200,11 +198,11 @@ func ApplySmart(deps SmartCreateDeps) func(context.Context, *ApplySmartInput) (*
 
 			// Attach subtask assignee if provided.
 			if sub.AssigneeUserID != "" {
-				if err := addActorByPublicID(ctx, qtx, ws.ID, uint32(subID), sub.AssigneeUserID); err != nil { //#nosec G115 -- LastInsertId for tasks.id (BIGINT UNSIGNED), fits uint32 within realistic deployments
+				if err := addActorByPublicID(ctx, qtx, ws.ID, uint32(child.ID), sub.AssigneeUserID); err != nil { //#nosec G115 -- LastInsertId for tasks.id (BIGINT UNSIGNED), fits uint32 within realistic deployments
 					return nil, err
 				}
 			}
-			subtaskIDs = append(subtaskIDs, subPub.String())
+			subtaskIDs = append(subtaskIDs, child.PublicID.String())
 		}
 
 		// Commit transaction.

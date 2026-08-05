@@ -530,9 +530,19 @@ func DeletePublicShare(deps Deps) func(context.Context, *DeletePublicShareInput)
 	}
 }
 
-// AttachEventsToShare bulk-publishes events on a share. Events marked
-// confidential are rejected with SHARE.SHARE_EVENT.EVENT_NOT_VISIBLE for
-// that specific event, but the rest of the batch still applies.
+// AttachEventsToShare bulk-publishes events on a share.
+//
+// Publishing is per-event rather than per-share, so the authorization is
+// per-event too: the actor must hold editor or better on the calendar each
+// event lives in. Workspace membership is not enough and never was — a
+// workspace holds calendars whose audiences do not coincide, and this
+// endpoint's output is a URL anyone on the internet can open, so "may not
+// read it" has to imply "may not publish it". Confidential events are
+// refused outright, at any role.
+//
+// An event the actor cannot publish is counted as skipped rather than
+// failing the batch, matching how the confidential case has always
+// behaved: the request is a list of candidates, not a transaction.
 func AttachEventsToShare(deps Deps) func(context.Context, *AttachEventsToShareInput) (*AttachEventsToShareOutput, error) {
 	return func(ctx context.Context, input *AttachEventsToShareInput) (*AttachEventsToShareOutput, error) {
 		wsID, actorID, err := resolveWorkspaceNonGuest(ctx, deps.Queries, input.WsID)
@@ -552,6 +562,30 @@ func AttachEventsToShare(deps Deps) func(context.Context, *AttachEventsToShareIn
 				return nil, errShareNotFound
 			}
 			return nil, httpErr(apierrors.CalendarCalendarStoreReadInterrupted)
+		}
+
+		// One membership lookup per distinct calendar, not per event: a
+		// 500-event batch is usually drawn from a handful of calendars,
+		// and the answer cannot change inside one request.
+		publishable := make(map[uint32]bool)
+		mayPublishFrom := func(calID uint32) (bool, error) {
+			if ok, seen := publishable[calID]; seen {
+				return ok, nil
+			}
+			member, err := deps.CalendarQueries.FindCalendarMember(ctx, calendar.FindCalendarMemberParams{
+				CalendarID: calID,
+				UserID:     actorID,
+			})
+			if err != nil {
+				if errors.Is(err, sql.ErrNoRows) {
+					publishable[calID] = false
+					return false, nil
+				}
+				return false, err
+			}
+			ok := roleRank(member.Role) >= roleRank(calendar.CalendarMembersRoleEditor)
+			publishable[calID] = ok
+			return ok, nil
 		}
 
 		attached := 0
@@ -574,6 +608,14 @@ func AttachEventsToShare(deps Deps) func(context.Context, *AttachEventsToShareIn
 				skipped++
 				continue
 			}
+			allowed, err := mayPublishFrom(evt.CalendarID)
+			if err != nil {
+				return nil, httpErr(apierrors.CalendarCalendarStoreReadInterrupted)
+			}
+			if !allowed {
+				skipped++
+				continue
+			}
 			if _, err := deps.CalendarQueries.AttachEventToShare(ctx, calendar.AttachEventToShareParams{
 				PublicID:    types.New(),
 				WorkspaceID: wsID,
@@ -581,6 +623,16 @@ func AttachEventsToShare(deps Deps) func(context.Context, *AttachEventsToShareIn
 				EventID:     evt.ID,
 				SortWeight:  0,
 			}); err != nil {
+				// A duplicate here means a live link already exists, so
+				// the state the caller asked for holds and the honest
+				// count is attached. Reporting it as skipped told the
+				// caller the event was not published while it was —
+				// the worst of the two ways to be wrong about a page
+				// anyone on the internet can open.
+				if handlerutil.IsDuplicateEntry(err) {
+					attached++
+					continue
+				}
 				skipped++
 				continue
 			}

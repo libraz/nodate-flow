@@ -17,13 +17,14 @@ import (
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/ai"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/ai/embed"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/ai/nlquery"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/dbretry"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated/calendar"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
 	apierrors "github.com/libraz/nodate-flow/apps/flow-api/internal/errors"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/eventbus"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/itemkit"
-	"github.com/libraz/nodate-flow/apps/flow-api/internal/tasknumber"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/taskcreate"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/taskstate"
 )
 
@@ -679,6 +680,12 @@ func intPtr(v int) *int { return &v }
 // MCP arguments that reference resources by public id.
 const publicIDPattern = `^[0-9a-f]{32}$`
 
+// errTransitionRejected rolls a transition transaction back when the
+// state machine refuses the move. The caller answers from the returned
+// spec instead; the sentinel never reaches the client and is not a
+// transient error, so the retry loop leaves it alone.
+var errTransitionRejected = stderrors.New("mcp: transition rejected")
+
 func objectSchema(props map[string]any, required []string) map[string]any {
 	if props == nil {
 		props = map[string]any{}
@@ -944,7 +951,7 @@ func runCreateTask(ctx context.Context, deps Deps, s *session, raw json.RawMessa
 	if _, err := requireWorkspaceMember(ctx, deps, s); err != nil {
 		return nil, err
 	}
-	prjID, err := resolveProject(ctx, deps, s, in.ProjectID)
+	prjID, err := resolveProjectForWrite(ctx, deps, s, in.ProjectID, acl.ProjectRoleEditor)
 	if err != nil {
 		return nil, err
 	}
@@ -956,41 +963,34 @@ func runCreateTask(ctx context.Context, deps Deps, s *session, raw json.RawMessa
 	if err != nil {
 		return nil, apierrors.New(apierrors.McpToolArgumentsInvalid)
 	}
-	pub := newPublicID()
-	desc := sql.NullString{String: in.Description, Valid: in.Description != ""}
-	tx, err := deps.DB.BeginTx(ctx, nil)
-	if err != nil {
-		return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
-	}
-	defer tx.Rollback() //nolint:errcheck
-	qtx := deps.Queries.WithTx(tx)
-
-	nextNum, err := tasknumber.Allocate(ctx, qtx, s.workspaceID, prjID)
-	if err != nil {
-		return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
-	}
-	taskID, err := qtx.CreateTask(ctx, generated.CreateTaskParams{
-		PublicID:        pub,
-		WorkspaceID:     s.workspaceID,
-		ProjectID:       prjID,
-		ParentTaskID:    sql.NullInt32{},
-		CreatedByUserID: sql.NullInt32{Int32: int32(s.userID), Valid: true}, //#nosec G115 -- session user id is users.id (BIGINT UNSIGNED), fits int32 within realistic deployments
-		UpdatedByUserID: sql.NullInt32{Int32: int32(s.userID), Valid: true}, //#nosec G115 -- session user id is users.id (BIGINT UNSIGNED), fits int32 within realistic deployments
-		TaskNumber:      uint32(nextNum),                                    //#nosec G115 -- per-project sequence, fits uint32
-		Title:           in.Title,
-		Description:     desc,
-		Priority:        in.Priority,
-		DueOn:           due,
-		StartedOn:       start,
-	})
-	if err != nil {
-		return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
-	}
-	if err := tx.Commit(); err != nil {
-		return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
+	var (
+		pub    types.PublicID
+		taskID int64
+	)
+	if txErr := dbretry.InTx(ctx, deps.DB, "mcp.create_task", nil, func(ctx context.Context, tx *sql.Tx) error {
+		created, err := taskcreate.New(ctx, tx, taskcreate.Args{
+			WorkspaceID: s.workspaceID,
+			ProjectID:   prjID,
+			ActorUserID: sql.NullInt32{Int32: int32(s.userID), Valid: true}, //#nosec G115 -- session user id is users.id (BIGINT UNSIGNED), fits int32 within realistic deployments
+			Title:       in.Title,
+			Description: sql.NullString{String: in.Description, Valid: in.Description != ""},
+			Priority:    in.Priority,
+			DueOn:       due,
+			StartedOn:   start,
+		})
+		if err != nil {
+			return err
+		}
+		pub = created.PublicID
+		taskID = created.ID
+		return nil
+	}); txErr != nil {
+		return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, txErr)
 	}
 	actor := int64(s.userID)
-	_ = eventbus.Append(ctx, deps.DB, eventbus.Event{
+	// The task row is committed. Reporting a failure here would tell the
+	// caller nothing was created and invite a duplicate on retry.
+	eventbus.AppendBestEffort(ctx, deps.DB, eventbus.Event{
 		Type:        eventbus.TaskCreated,
 		WorkspaceID: s.workspaceID,
 		ActorUserID: &actor,
@@ -1000,7 +1000,7 @@ func runCreateTask(ctx context.Context, deps Deps, s *session, raw json.RawMessa
 			"title":  in.Title,
 			"via":    "mcp",
 		},
-	})
+	}, "mcp.create_task")
 	return map[string]any{"id": pub.String()}, nil
 }
 
@@ -1019,7 +1019,7 @@ func runUpdateTask(ctx context.Context, deps Deps, s *session, raw json.RawMessa
 	if _, err := requireWorkspaceMember(ctx, deps, s); err != nil {
 		return nil, err
 	}
-	taskInternal, current, err := resolveTaskRow(ctx, deps, s, in.TaskID)
+	taskInternal, current, err := resolveTaskRowForWrite(ctx, deps, s, in.TaskID, acl.ProjectRoleEditor)
 	if err != nil {
 		return nil, err
 	}
@@ -1082,54 +1082,69 @@ func runUpdateTask(ctx context.Context, deps Deps, s *session, raw json.RawMessa
 			return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
 		}
 	} else {
-		tx, err := deps.DB.BeginTx(ctx, nil)
-		if err != nil {
-			return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
-		}
-		defer tx.Rollback() //nolint:errcheck
-		qtx := deps.Queries.WithTx(tx)
-		if err := qtx.UpdateTask(ctx, updateParams); err != nil {
-			return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
-		}
-		if titleChanged {
-			if err := itemkit.RenameItem(ctx, tx, itemkit.RenameItemArgs{
-				WorkspaceID: s.workspaceID,
-				ActorUserID: s.userID,
-				TaskID:      taskInternal,
-				NewTitle:    title,
-			}); err != nil {
-				return nil, translateItemkitMCPError(err)
+		// itemkit writes an event row through eventlog inside this
+		// transaction, and a deadlock there rolls the whole transaction
+		// back — re-running one statement inside a dead transaction
+		// would achieve nothing. dbretry.InTx retries the unit that
+		// actually failed.
+		var answered error
+		txErr := dbretry.InTx(ctx, deps.DB, "mcp.update_task", nil, func(ctx context.Context, tx *sql.Tx) error {
+			answered = nil
+			qtx := deps.Queries.WithTx(tx)
+			if err := qtx.UpdateTask(ctx, updateParams); err != nil {
+				return err
 			}
-		}
-		if dueOnChanged {
-			var t time.Time
-			if due.Valid {
-				t = due.Time
+			if titleChanged {
+				if err := itemkit.RenameItem(ctx, tx, itemkit.RenameItemArgs{
+					WorkspaceID: s.workspaceID,
+					ActorUserID: s.userID,
+					TaskID:      taskInternal,
+					NewTitle:    title,
+				}); err != nil {
+					answered = translateItemkitMCPError(err)
+					return err
+				}
 			}
-			if err := itemkit.RescheduleTask(ctx, tx, itemkit.RescheduleTaskArgs{
-				WorkspaceID: s.workspaceID,
-				TaskID:      taskInternal,
-				ActorUserID: s.userID,
-				SetDueOn:    true,
-				DueOn:       t,
-			}); err != nil {
-				return nil, translateItemkitMCPError(err)
+			if dueOnChanged {
+				var t time.Time
+				if due.Valid {
+					t = due.Time
+				}
+				if err := itemkit.RescheduleTask(ctx, tx, itemkit.RescheduleTaskArgs{
+					WorkspaceID: s.workspaceID,
+					TaskID:      taskInternal,
+					ActorUserID: s.userID,
+					SetDueOn:    true,
+					DueOn:       t,
+				}); err != nil {
+					answered = translateItemkitMCPError(err)
+					return err
+				}
 			}
+			return nil
+		})
+		if answered != nil {
+			return nil, answered
 		}
-		if err := tx.Commit(); err != nil {
-			return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
+		if txErr != nil {
+			return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, txErr)
 		}
 	}
 
 	taskID64 := int64(taskInternal)
 	actor := int64(s.userID)
-	_ = eventbus.Append(ctx, deps.DB, eventbus.Event{
+	// Propagated rather than absorbed: re-running this tool with the same
+	// arguments re-applies the same field values and re-appends the
+	// event, so the caller's retry is what repairs the log.
+	if err := eventbus.Append(ctx, deps.DB, eventbus.Event{
 		Type:        eventbus.TaskUpdated,
 		WorkspaceID: s.workspaceID,
 		ActorUserID: &actor,
 		TaskID:      &taskID64,
 		Payload:     map[string]any{"taskId": current.PublicID.String(), "via": "mcp"},
-	})
+	}); err != nil {
+		return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
+	}
 	return map[string]any{"id": current.PublicID.String()}, nil
 }
 
@@ -1161,41 +1176,53 @@ func runTransitionTask(ctx context.Context, deps Deps, s *session, raw json.RawM
 	if _, err := requireWorkspaceMember(ctx, deps, s); err != nil {
 		return nil, err
 	}
-	taskInternal, pub, err := resolveTask(ctx, deps, s, in.TaskID)
+	taskInternal, pub, err := resolveTaskForWrite(ctx, deps, s, in.TaskID, acl.ProjectRoleEditor)
 	if err != nil {
 		return nil, err
 	}
-
-	tx, err := deps.DB.BeginTx(ctx, nil)
-	if err != nil {
-		return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
-	}
-	defer func() { _ = tx.Rollback() }()
 
 	actor := int64(s.userID)
 	reason := ""
 	if in.Reason != nil {
 		reason = *in.Reason
 	}
-	result, spec, applyErr := taskstate.ApplyTransitionTx(ctx, tx, taskstate.ApplyParams{
-		WorkspaceID:  s.workspaceID,
-		TaskID:       taskInternal,
-		PublicID:     pub,
-		Transition:   in.Transition,
-		ActorUserID:  &actor,
-		Reason:       reason,
-		Via:          "mcp",
-		ExtraPayload: nil,
+	// dbretry.InTx, not a hand-rolled transaction: the transition event
+	// is appended inside it, and only InTx gives the eventbus a commit
+	// boundary to hang the fan-out on. Opening the tx directly here is
+	// what stopped webhook deliveries and notifications from being
+	// created for agent-driven transitions while the same transition
+	// over REST delivered normally.
+	var (
+		result taskstate.ApplyResult
+		spec   *apierrors.Spec
+	)
+	txErr := dbretry.InTx(ctx, deps.DB, "mcp.transition_task", nil, func(ctx context.Context, tx *sql.Tx) error {
+		var applyErr error
+		result, spec, applyErr = taskstate.ApplyTransitionTx(ctx, tx, taskstate.ApplyParams{
+			WorkspaceID:  s.workspaceID,
+			TaskID:       taskInternal,
+			PublicID:     pub,
+			Transition:   in.Transition,
+			ActorUserID:  &actor,
+			Reason:       reason,
+			Via:          "mcp",
+			ExtraPayload: nil,
+		})
+		if applyErr != nil {
+			return applyErr
+		}
+		if spec != nil {
+			// A rejected transition is a decision, not a failure: roll
+			// the attempt back and let the caller answer with the spec.
+			return errTransitionRejected
+		}
+		return nil
 	})
-	if applyErr != nil {
-		return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, applyErr)
-	}
 	if spec != nil {
 		return nil, apierrors.New(spec)
 	}
-
-	if err := tx.Commit(); err != nil {
-		return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
+	if txErr != nil {
+		return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, txErr)
 	}
 	return map[string]any{
 		"id":         pub.String(),
@@ -1219,7 +1246,7 @@ func runAddComment(ctx context.Context, deps Deps, s *session, raw json.RawMessa
 	if _, err := requireWorkspaceMember(ctx, deps, s); err != nil {
 		return nil, err
 	}
-	taskInternal, pub, err := resolveTask(ctx, deps, s, in.TaskID)
+	taskInternal, pub, err := resolveTaskForWrite(ctx, deps, s, in.TaskID, acl.ProjectRoleCommenter)
 	if err != nil {
 		return nil, err
 	}
@@ -1235,7 +1262,8 @@ func runAddComment(ctx context.Context, deps Deps, s *session, raw json.RawMessa
 	}
 	taskID64 := int64(taskInternal)
 	actor := int64(s.userID)
-	_ = eventbus.Append(ctx, deps.DB, eventbus.Event{
+	// The comment row is committed; a retry would post it twice.
+	eventbus.AppendBestEffort(ctx, deps.DB, eventbus.Event{
 		Type:        eventbus.CommentAddedLegacy,
 		WorkspaceID: s.workspaceID,
 		ActorUserID: &actor,
@@ -1245,7 +1273,7 @@ func runAddComment(ctx context.Context, deps Deps, s *session, raw json.RawMessa
 			"commentId": cpub.String(),
 			"via":       "mcp",
 		},
-	})
+	}, "mcp.add_comment")
 	return map[string]any{"id": cpub.String()}, nil
 }
 
@@ -1582,7 +1610,7 @@ func runApplySteps(ctx context.Context, deps Deps, s *session, raw json.RawMessa
 	if _, err := requireWorkspaceMember(ctx, deps, s); err != nil {
 		return nil, err
 	}
-	parentInternal, parentPub, err := resolveTask(ctx, deps, s, in.ParentTaskID)
+	parentInternal, parentPub, err := resolveTaskForWrite(ctx, deps, s, in.ParentTaskID, acl.ProjectRoleEditor)
 	if err != nil {
 		return nil, err
 	}
@@ -1593,41 +1621,61 @@ func runApplySteps(ctx context.Context, deps Deps, s *session, raw json.RawMessa
 	).Scan(&parentProjectID); err != nil {
 		return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
 	}
-	created := make([]string, 0, len(in.Steps))
 	for _, st := range in.Steps {
 		if st.Title == "" {
 			return nil, apierrors.New(apierrors.McpToolArgumentsInvalid)
 		}
-		pub := newPublicID()
-		desc := sql.NullString{String: st.Description, Valid: st.Description != ""}
-		childID, err := deps.Queries.CreateTask(ctx, generated.CreateTaskParams{
-			PublicID:        pub,
-			WorkspaceID:     s.workspaceID,
-			ProjectID:       parentProjectID,
-			ParentTaskID:    sql.NullInt32{Int32: int32(parentInternal), Valid: true}, //#nosec G115 -- parent task id is tasks.id (BIGINT UNSIGNED), fits int32 within realistic deployments
-			CreatedByUserID: sql.NullInt32{Int32: int32(s.userID), Valid: true},       //#nosec G115 -- session user id is users.id (BIGINT UNSIGNED), fits int32 within realistic deployments
-			UpdatedByUserID: sql.NullInt32{Int32: int32(s.userID), Valid: true},       //#nosec G115 -- session user id is users.id (BIGINT UNSIGNED), fits int32 within realistic deployments
-			Title:           st.Title,
-			Description:     desc,
-			Priority:        st.Priority,
-		})
-		if err != nil {
-			return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
+	}
+
+	// All children are created in one transaction. Task-number allocation
+	// locks the project row, and it reads MAX(task_number) within the
+	// transaction so each step sees its predecessors and the children get
+	// distinct numbers. A failure partway through now rolls the whole batch
+	// back instead of leaving orphan children behind.
+	created := make([]string, 0, len(in.Steps))
+	childIDs := make([]int64, 0, len(in.Steps))
+	if txErr := dbretry.InTx(ctx, deps.DB, "mcp.apply_steps", nil, func(ctx context.Context, tx *sql.Tx) error {
+		created = created[:0]
+		childIDs = childIDs[:0]
+		for _, st := range in.Steps {
+			child, err := taskcreate.New(ctx, tx, taskcreate.Args{
+				WorkspaceID:  s.workspaceID,
+				ProjectID:    parentProjectID,
+				ParentTaskID: sql.NullInt32{Int32: int32(parentInternal), Valid: true}, //#nosec G115 -- parent task id is tasks.id (BIGINT UNSIGNED), fits int32 within realistic deployments
+				ActorUserID:  sql.NullInt32{Int32: int32(s.userID), Valid: true},       //#nosec G115 -- session user id is users.id (BIGINT UNSIGNED), fits int32 within realistic deployments
+				Title:        st.Title,
+				Description:  sql.NullString{String: st.Description, Valid: st.Description != ""},
+				Priority:     st.Priority,
+			})
+			if err != nil {
+				return err
+			}
+			created = append(created, child.PublicID.String())
+			childIDs = append(childIDs, child.ID)
 		}
-		actor := int64(s.userID)
-		_ = eventbus.Append(ctx, deps.DB, eventbus.Event{
+		return nil
+	}); txErr != nil {
+		return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, txErr)
+	}
+
+	// Events are appended after commit so they reference committed rows and
+	// a retried transaction cannot publish a child that was rolled back.
+	actor := int64(s.userID)
+	for i, st := range in.Steps {
+		childID := childIDs[i]
+		// The children are committed; a retry would create them again.
+		eventbus.AppendBestEffort(ctx, deps.DB, eventbus.Event{
 			Type:        eventbus.TaskCreated,
 			WorkspaceID: s.workspaceID,
 			ActorUserID: &actor,
 			TaskID:      &childID,
 			Payload: map[string]any{
-				"taskId":       pub.String(),
+				"taskId":       created[i],
 				"title":        st.Title,
 				"parentTaskId": parentPub.String(),
 				"via":          "mcp:apply_steps",
 			},
-		})
-		created = append(created, pub.String())
+		}, "mcp.apply_steps")
 	}
 	return map[string]any{"created": created}, nil
 }
@@ -1756,7 +1804,8 @@ func runCreateTimebox(ctx context.Context, deps Deps, s *session, raw json.RawMe
 		return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
 	}
 	actor := int64(s.userID)
-	_ = eventbus.Append(ctx, deps.DB, eventbus.Event{
+	// The timebox row is committed; a retry would create a second one.
+	eventbus.AppendBestEffort(ctx, deps.DB, eventbus.Event{
 		Type:        eventbus.TimeboxCreated,
 		WorkspaceID: s.workspaceID,
 		ActorUserID: &actor,
@@ -1765,7 +1814,7 @@ func runCreateTimebox(ctx context.Context, deps Deps, s *session, raw json.RawMe
 			"name":      in.Name,
 			"via":       "mcp",
 		},
-	})
+	}, "mcp.create_timebox")
 	_ = timeboxID // internal id not exposed
 	return map[string]any{"id": pub.String()}, nil
 }
@@ -1817,7 +1866,9 @@ func runAddTaskToTimebox(ctx context.Context, deps Deps, s *session, raw json.Ra
 	}
 	taskID64 := int64(taskInternal)
 	actor := int64(s.userID)
-	_ = eventbus.Append(ctx, deps.DB, eventbus.Event{
+	// The link row is committed and carries a unique key, so a retry
+	// would be rejected before it could re-append the event.
+	eventbus.AppendBestEffort(ctx, deps.DB, eventbus.Event{
 		Type:        eventbus.TimeboxTaskAdded,
 		WorkspaceID: s.workspaceID,
 		ActorUserID: &actor,
@@ -1827,7 +1878,7 @@ func runAddTaskToTimebox(ctx context.Context, deps Deps, s *session, raw json.Ra
 			"taskId":    taskPub.String(),
 			"via":       "mcp",
 		},
-	})
+	}, "mcp.add_task_to_timebox")
 	return map[string]any{"ok": true}, nil
 }
 
@@ -2302,7 +2353,8 @@ func runCreatePage(ctx context.Context, deps Deps, s *session, raw json.RawMessa
 	}
 
 	actor := int64(s.userID)
-	_ = eventbus.Append(ctx, deps.DB, eventbus.Event{
+	// The page row is committed; a retry would create a second one.
+	eventbus.AppendBestEffort(ctx, deps.DB, eventbus.Event{
 		Type:        eventbus.PageCreated,
 		WorkspaceID: s.workspaceID,
 		ActorUserID: &actor,
@@ -2311,7 +2363,7 @@ func runCreatePage(ctx context.Context, deps Deps, s *session, raw json.RawMessa
 			"title":  in.Title,
 			"via":    "mcp",
 		},
-	})
+	}, "mcp.create_page")
 	_ = pageID // internal id not exposed
 	return map[string]any{"id": pub.String()}, nil
 }
@@ -2365,7 +2417,9 @@ func runUpdatePage(ctx context.Context, deps Deps, s *session, raw json.RawMessa
 
 	pageID64 := int64(pageInternal)
 	actor := int64(s.userID)
-	_ = eventbus.Append(ctx, deps.DB, eventbus.Event{
+	// Propagated: the update is idempotent, so a retry re-applies the
+	// same values and re-appends the event.
+	if err := eventbus.Append(ctx, deps.DB, eventbus.Event{
 		Type:        eventbus.PageUpdated,
 		WorkspaceID: s.workspaceID,
 		ActorUserID: &actor,
@@ -2373,7 +2427,9 @@ func runUpdatePage(ctx context.Context, deps Deps, s *session, raw json.RawMessa
 			"pageId": pub.String(),
 			"via":    "mcp",
 		},
-	})
+	}); err != nil {
+		return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
+	}
 	_ = pageID64 // used only for the event; no page-specific event field yet
 	return map[string]any{"id": pub.String()}, nil
 }
@@ -2465,7 +2521,9 @@ func runGeneratePage(ctx context.Context, deps Deps, s *session, raw json.RawMes
 	}
 
 	actor := int64(s.userID)
-	_ = eventbus.Append(ctx, deps.DB, eventbus.Event{
+	// The page row is committed, and a retry would repeat the model call
+	// that produced its body as well as duplicating the page.
+	eventbus.AppendBestEffort(ctx, deps.DB, eventbus.Event{
 		Type:        eventbus.PageCreated,
 		WorkspaceID: s.workspaceID,
 		ActorUserID: &actor,
@@ -2475,7 +2533,7 @@ func runGeneratePage(ctx context.Context, deps Deps, s *session, raw json.RawMes
 			"isAiGenerated": isAI,
 			"via":           "mcp:generate_page",
 		},
-	})
+	}, "mcp.generate_page")
 	_ = pageID // internal id not exposed
 	return map[string]any{
 		"id":            pub.String(),
@@ -2504,7 +2562,7 @@ func runSmartCreateTask(ctx context.Context, deps Deps, s *session, raw json.Raw
 	if _, err := requireWorkspaceMember(ctx, deps, s); err != nil {
 		return nil, err
 	}
-	prjID, err := resolveProject(ctx, deps, s, in.ProjectID)
+	prjID, err := resolveProjectForWrite(ctx, deps, s, in.ProjectID, acl.ProjectRoleEditor)
 	if err != nil {
 		return nil, err
 	}
@@ -2526,25 +2584,62 @@ func runSmartCreateTask(ctx context.Context, deps Deps, s *session, raw json.Raw
 		return nil, mapAiError(err)
 	}
 
-	// Create the parent task.
-	parentPub := newPublicID()
-	desc := sql.NullString{String: in.Description, Valid: in.Description != ""}
-	parentID, err := deps.Queries.CreateTask(ctx, generated.CreateTaskParams{
-		PublicID:        parentPub,
-		WorkspaceID:     s.workspaceID,
-		ProjectID:       prjID,
-		ParentTaskID:    sql.NullInt32{},
-		CreatedByUserID: sql.NullInt32{Int32: int32(s.userID), Valid: true}, //#nosec G115 -- session user id is users.id (BIGINT UNSIGNED), fits int32 within realistic deployments
-		UpdatedByUserID: sql.NullInt32{Int32: int32(s.userID), Valid: true}, //#nosec G115 -- session user id is users.id (BIGINT UNSIGNED), fits int32 within realistic deployments
-		Title:           in.Title,
-		Description:     desc,
-		Priority:        0,
-	})
-	if err != nil {
-		return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
+	// Create the parent and every proposed subtask in one transaction, so a
+	// failure partway through the batch does not leave a parent with a
+	// truncated set of children.
+	type createdChild struct {
+		id    int64
+		pub   string
+		title string
 	}
+	var (
+		parentPub types.PublicID
+		parentID  int64
+		children  []createdChild
+	)
+	if txErr := dbretry.InTx(ctx, deps.DB, "mcp.smart_create_task", nil, func(ctx context.Context, tx *sql.Tx) error {
+		children = children[:0]
+		parent, err := taskcreate.New(ctx, tx, taskcreate.Args{
+			WorkspaceID: s.workspaceID,
+			ProjectID:   prjID,
+			ActorUserID: sql.NullInt32{Int32: int32(s.userID), Valid: true}, //#nosec G115 -- session user id is users.id (BIGINT UNSIGNED), fits int32 within realistic deployments
+			Title:       in.Title,
+			Description: sql.NullString{String: in.Description, Valid: in.Description != ""},
+		})
+		if err != nil {
+			return err
+		}
+		parentPub = parent.PublicID
+		parentID = parent.ID
+
+		for _, st := range proposal.Subtasks {
+			if st.Title == "" {
+				continue
+			}
+			child, cerr := taskcreate.New(ctx, tx, taskcreate.Args{
+				WorkspaceID:  s.workspaceID,
+				ProjectID:    prjID,
+				ParentTaskID: sql.NullInt32{Int32: int32(parent.ID), Valid: true}, //#nosec G115 -- parent_task_id is tasks.id (BIGINT UNSIGNED), fits int32 within realistic deployments
+				ActorUserID:  sql.NullInt32{Int32: int32(s.userID), Valid: true},  //#nosec G115 -- session user id is users.id (BIGINT UNSIGNED), fits int32 within realistic deployments
+				Title:        st.Title,
+				Description:  sql.NullString{String: st.Description, Valid: st.Description != ""},
+				Priority:     smartCreatePriorityToInt(st.Priority),
+			})
+			if cerr != nil {
+				return cerr
+			}
+			children = append(children, createdChild{id: child.ID, pub: child.PublicID.String(), title: st.Title})
+		}
+		return nil
+	}); txErr != nil {
+		return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, txErr)
+	}
+
+	// Events are appended after commit so they reference committed rows.
+	// The whole tree is durable by now, so a failure here is absorbed:
+	// a retry would build a second copy of it.
 	actor := int64(s.userID)
-	_ = eventbus.Append(ctx, deps.DB, eventbus.Event{
+	eventbus.AppendBestEffort(ctx, deps.DB, eventbus.Event{
 		Type:        eventbus.TaskCreated,
 		WorkspaceID: s.workspaceID,
 		ActorUserID: &actor,
@@ -2554,43 +2649,23 @@ func runSmartCreateTask(ctx context.Context, deps Deps, s *session, raw json.Raw
 			"title":  in.Title,
 			"via":    "mcp:smart_create_task",
 		},
-	})
-
-	// Build the response.
-	subtaskIDs := make([]string, 0, len(proposal.Subtasks))
-	for _, st := range proposal.Subtasks {
-		if st.Title == "" {
-			continue
-		}
-		childPub := newPublicID()
-		childDesc := sql.NullString{String: st.Description, Valid: st.Description != ""}
-		childID, cerr := deps.Queries.CreateTask(ctx, generated.CreateTaskParams{
-			PublicID:        childPub,
-			WorkspaceID:     s.workspaceID,
-			ProjectID:       prjID,
-			ParentTaskID:    sql.NullInt32{Int32: int32(parentID), Valid: true}, //#nosec G115 -- parent_task_id is tasks.id (BIGINT UNSIGNED), fits int32 within realistic deployments
-			CreatedByUserID: sql.NullInt32{Int32: int32(s.userID), Valid: true}, //#nosec G115 -- session user id is users.id (BIGINT UNSIGNED), fits int32 within realistic deployments
-			UpdatedByUserID: sql.NullInt32{Int32: int32(s.userID), Valid: true}, //#nosec G115 -- session user id is users.id (BIGINT UNSIGNED), fits int32 within realistic deployments
-			Title:           st.Title,
-			Description:     childDesc,
-			Priority:        smartCreatePriorityToInt(st.Priority),
-		})
-		if cerr != nil {
-			return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, cerr)
-		}
-		_ = eventbus.Append(ctx, deps.DB, eventbus.Event{
+	}, "mcp.smart_create_task")
+	subtaskIDs := make([]string, 0, len(children))
+	for i := range children {
+		childID := children[i].id
+		eventbus.AppendBestEffort(ctx, deps.DB, eventbus.Event{
 			Type:        eventbus.TaskCreated,
 			WorkspaceID: s.workspaceID,
 			ActorUserID: &actor,
 			TaskID:      &childID,
 			Payload: map[string]any{
-				"taskId":       childPub.String(),
-				"title":        st.Title,
+				"taskId":       children[i].pub,
+				"title":        children[i].title,
 				"parentTaskId": parentPub.String(),
 				"via":          "mcp:smart_create_task",
 			},
-		})
-		subtaskIDs = append(subtaskIDs, childPub.String())
+		}, "mcp.smart_create_task")
+		subtaskIDs = append(subtaskIDs, children[i].pub)
 	}
 
 	// Build assignee suggestions for the response (we do not auto-assign
@@ -2745,10 +2820,11 @@ func runListCalendarEvents(ctx context.Context, deps Deps, s *session, raw json.
 	// The SQL query uses start_at < ? AND end_at > ? (overlap check),
 	// so we pass endTime as StartAt and startTime as EndAt.
 	rows, err := deps.CalendarQueries.ListCalendarEventsAcrossCalendars(ctx, calendar.ListCalendarEventsAcrossCalendarsParams{
-		UserID:      s.userID,
-		WorkspaceID: s.workspaceID,
-		StartAt:     sql.NullTime{Time: endTime, Valid: true},
-		EndAt:       sql.NullTime{Time: startTime, Valid: true},
+		ViewerUserID: s.userID,
+		UserID:       s.userID,
+		WorkspaceID:  s.workspaceID,
+		StartAt:      sql.NullTime{Time: endTime, Valid: true},
+		EndAt:        sql.NullTime{Time: startTime, Valid: true},
 	})
 	if err != nil {
 		return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
@@ -3217,11 +3293,19 @@ func runListFreeSlots(ctx context.Context, deps Deps, s *session, raw json.RawMe
 	workStart := time.Date(date.Year(), date.Month(), date.Day(), 9, 0, 0, 0, time.UTC)
 	workEnd := time.Date(date.Year(), date.Month(), date.Day(), 18, 0, 0, 0, time.UTC)
 
+	// The viewer here is the target, not the caller. This tool returns
+	// free windows and never any event data, so the question it has to
+	// answer is which of the target's own commitments occupy the day —
+	// filtering by the caller's rights would drop the target's
+	// confidential events and report an occupied slot as free. What the
+	// caller learns is availability, which is what show_as governs: an
+	// owner who does not want a block to read as taken marks it free.
 	rows, err := deps.CalendarQueries.ListCalendarEventsAcrossCalendars(ctx, calendar.ListCalendarEventsAcrossCalendarsParams{
-		UserID:      targetUserID,
-		WorkspaceID: s.workspaceID,
-		StartAt:     sql.NullTime{Time: workEnd, Valid: true},
-		EndAt:       sql.NullTime{Time: workStart, Valid: true},
+		ViewerUserID: targetUserID,
+		UserID:       targetUserID,
+		WorkspaceID:  s.workspaceID,
+		StartAt:      sql.NullTime{Time: workEnd, Valid: true},
+		EndAt:        sql.NullTime{Time: workStart, Valid: true},
 	})
 	if err != nil {
 		return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
@@ -3306,7 +3390,11 @@ func runCreateEventFromTask(ctx context.Context, deps Deps, s *session, raw json
 		return nil, err
 	}
 
-	taskInternal, task, err := resolveTaskRow(ctx, deps, s, in.TaskID)
+	// The created event carries calendar_events.task_id, i.e. it links itself
+	// to the task. REST reaches the same end state with two calls, the second
+	// of which (tasks-event-links-create) is project-editor gated, so the
+	// editor floor applies here too on top of the calendar_members grant.
+	taskInternal, task, err := resolveTaskRowForWrite(ctx, deps, s, in.TaskID, acl.ProjectRoleEditor)
 	if err != nil {
 		return nil, err
 	}

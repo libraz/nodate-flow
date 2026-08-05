@@ -25,4 +25,10 @@ var (
 	RunProposeSteps    = runProposeSteps
 	RunGeneratePage    = runGeneratePage
 	RunResolveTaskRef  = runResolveTaskRef
+	RunGetTask         = runGetTask
+	RunUpdateTask      = runUpdateTask
+	RunTransitionTask  = runTransitionTask
+	RunAddComment      = runAddComment
+	RunAddTaskLabel    = runAddTaskLabel
+	RunCreateTask      = runCreateTask
 )
