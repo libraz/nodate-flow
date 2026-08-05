@@ -170,17 +170,45 @@ const PROPERTY_LOOKUP: ReadonlyMap<string, string> = (() => {
 const PX_THRESHOLD = 4;
 
 /**
- * Returns true when `path` (or one of its ancestors up to `root`) carries
- * the `nf-token-override` annotation. The annotation may appear anywhere
- * in the file body and applies to the whole file.
+ * An annotation must carry a reason. Requiring the colon and some text
+ * after it is also what keeps prose from disabling the check: a doc
+ * comment that mentions `nf-token-override` while explaining the
+ * mechanism is discussing it, not invoking it, and a substring match
+ * could not tell those apart — two files were exempt on that basis alone.
  */
-function hasOverride(path: string): boolean {
-  try {
-    const src = readFileSync(path, 'utf8');
-    return src.includes('nf-token-override');
-  } catch {
-    return false;
+const OVERRIDE_LINE = /nf-token-override:\s*\S/;
+const OVERRIDE_FILE = /nf-token-override-file:\s*\S/;
+
+/**
+ * Lines exempted by an annotation.
+ *
+ * An annotation covers the line it sits on and the line after it, so it
+ * can be written trailing the declaration or immediately above it. It
+ * does not cover the rest of the file: one legitimate literal used to
+ * take every other literal in the same file out of the check with it,
+ * which is how 23 offenses in a single file stayed invisible.
+ *
+ * `nf-token-override-file:` is the deliberate whole-file form, for the
+ * rare component whose every literal is exempt for one stated reason.
+ */
+function overrideState(src: string): { wholeFile: boolean; lines: Set<number> } {
+  const lines = new Set<number>();
+  let wholeFile = false;
+  const rows = src.split('\n');
+  for (let i = 0; i < rows.length; i++) {
+    const row = rows[i] ?? '';
+    if (OVERRIDE_FILE.test(row)) {
+      wholeFile = true;
+      continue;
+    }
+    if (OVERRIDE_LINE.test(row)) {
+      // 1-based, and the following line so the annotation can precede
+      // what it exempts.
+      lines.add(i + 1);
+      lines.add(i + 2);
+    }
   }
+  return { wholeFile, lines };
 }
 
 /**
@@ -457,14 +485,18 @@ export function scanFiles(options: ScanOptions): SpacingOffense[] {
   }
   const out: SpacingOffense[] = [];
   for (const file of files) {
-    if (hasOverride(file)) continue;
     let src: string;
     try {
       src = readFileSync(file, 'utf8');
     } catch {
       continue;
     }
-    out.push(...scanText(file, src));
+    const override = overrideState(src);
+    if (override.wholeFile) continue;
+    for (const offense of scanText(file, src)) {
+      if (override.lines.has(offense.line)) continue;
+      out.push(offense);
+    }
   }
   return out;
 }
