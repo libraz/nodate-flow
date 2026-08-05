@@ -38,10 +38,12 @@ export interface DatePickerProps {
   nextLabel: string;
   /**
    * First day of the week shown in the weekday row and grid layout.
-   * Defaults to `'monday'` to match the main `/calendar` view and the
-   * Japanese / most-of-Europe convention.
+   * Defaults to `'monday'` to match the Japanese / most-of-Europe
+   * convention. Saturday is included because the product offers it as a
+   * user preference, and a picker that cannot express the setting the
+   * user saved just renders somebody else's week.
    */
-  weekStart?: 'sunday' | 'monday';
+  weekStart?: WeekStartDay;
   /** Custom trigger label. Defaults to the value. */
   triggerLabel?: string;
   /** Additional class on the trigger button. */
@@ -62,8 +64,19 @@ export interface DatePickerProps {
   clearLabel?: string;
 }
 
-const DEFAULT_WEEKDAYS_MONDAY = ['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su'];
-const DEFAULT_WEEKDAYS_SUNDAY = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'];
+/** First day of the week the grid is laid out from. */
+export type WeekStartDay = 'sunday' | 'monday' | 'saturday';
+
+/** `Date.getDay()` value (Sun=0..Sat=6) each anchor corresponds to. */
+const WEEK_START_DOW: Record<WeekStartDay, number> = { sunday: 0, monday: 1, saturday: 6 };
+
+const CANONICAL_WEEKDAYS = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'];
+
+/** Default short labels rotated so index 0 is the requested start day. */
+function defaultWeekdays(weekStart: WeekStartDay): string[] {
+  const offset = WEEK_START_DOW[weekStart];
+  return Array.from({ length: 7 }, (_, i) => CANONICAL_WEEKDAYS[(i + offset) % 7] as string);
+}
 
 const MONTH_NAMES = [
   'January',
@@ -142,8 +155,7 @@ export default function DatePicker({
   onClear,
   clearLabel,
 }: DatePickerProps): ReactElement {
-  const resolvedWeekdayLabels =
-    weekdayLabels ?? (weekStart === 'monday' ? DEFAULT_WEEKDAYS_MONDAY : DEFAULT_WEEKDAYS_SUNDAY);
+  const resolvedWeekdayLabels = weekdayLabels ?? defaultWeekdays(weekStart);
   const [open, setOpen] = useState(false);
   // Fall back to today (not a hardcoded year) when value is empty or malformed
   // so the picker always opens on a sensible month/year. See parseIso() docs.
@@ -168,9 +180,9 @@ export default function DatePicker({
 
   const days = useMemo(() => daysInMonth(viewYear, viewMonth), [viewYear, viewMonth]);
   const rawStartDay = useMemo(() => startDayOfWeek(viewYear, viewMonth), [viewYear, viewMonth]);
-  // Shift the Sun=0..Sat=6 day-of-week into the number of leading empty cells
-  // according to weekStart. Monday-first: Sun=6, Mon=0, ..., Sat=5.
-  const leadingEmpty = weekStart === 'monday' ? (rawStartDay + 6) % 7 : rawStartDay;
+  // Shift the Sun=0..Sat=6 day-of-week into the number of leading empty
+  // cells, counting from whichever day the week starts on.
+  const leadingEmpty = (rawStartDay - WEEK_START_DOW[weekStart] + 7) % 7;
   const today = useMemo(todayIso, []);
 
   const goPrev = useCallback(() => {
@@ -255,7 +267,7 @@ export default function DatePicker({
             {resolvedWeekdayLabels.map((wd, i) => {
               // Canonical Sunday-based day-of-week (0=Sun..6=Sat) for a stable key
               // independent of label content or week-start offset.
-              const dow = weekStart === 'monday' ? (i + 1) % 7 : i;
+              const dow = (i + WEEK_START_DOW[weekStart]) % 7;
               return (
                 <div key={`dow-${dow}`} className={styles.weekday}>
                   {wd}

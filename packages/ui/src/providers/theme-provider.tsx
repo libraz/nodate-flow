@@ -68,14 +68,18 @@ function isPreference(value: unknown): value is ThemePreference {
   return value === 'system' || isThemeId(value);
 }
 
-function resolveSystem(defaultFamily: ThemeFamily): ThemeId {
-  if (typeof window === 'undefined') return `${defaultFamily}-dark` as ThemeId;
+function resolveSystem(family: ThemeFamily): ThemeId {
+  if (typeof window === 'undefined') return `${family}-dark` as ThemeId;
   const dark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-  return `${defaultFamily}-${dark ? 'dark' : 'light'}` as ThemeId;
+  return `${family}-${dark ? 'dark' : 'light'}` as ThemeId;
 }
 
-function resolvePreference(pref: ThemePreference, defaultFamily: ThemeFamily): ThemeId {
-  return pref === 'system' ? resolveSystem(defaultFamily) : pref;
+function resolvePreference(pref: ThemePreference, family: ThemeFamily): ThemeId {
+  return pref === 'system' ? resolveSystem(family) : pref;
+}
+
+function isFamily(value: unknown): value is ThemeFamily {
+  return typeof value === 'string' && (THEME_FAMILIES as readonly string[]).includes(value);
 }
 
 // ---------------------------------------------------------------------------
@@ -100,6 +104,13 @@ export interface ThemeContextValue {
 }
 
 const ThemeContext = createContext<ThemeContextValue | null>(null);
+
+/**
+ * Delays before each server-hydration retry. The session lands shortly
+ * after mount, so the useful attempts are the early ones; the tail exists
+ * so a slow cold start still gets the stored theme rather than none.
+ */
+const SERVER_HYDRATION_DELAYS_MS = [0, 100, 250, 500, 1000, 2000, 4000] as const;
 
 // ---------------------------------------------------------------------------
 // Provider props
@@ -166,35 +177,81 @@ export function ThemeProvider({
     return 'system';
   });
 
-  const [resolved, setResolved] = useState<ThemeId>(() =>
-    resolvePreference(preference, defaultFamily),
-  );
+  /**
+   * The family to use while the colour mode is `system`.
+   *
+   * The stored preference is a single value that is either a concrete
+   * theme or the string `system`, so it has nowhere to record "follow the
+   * OS, in this family". Keeping the family beside it is what lets the
+   * two controls stay independent: picking a family must not silently
+   * pin the colour mode, and picking `system` must not forget the family.
+   */
+  const [family, setFamilyRaw] = useState<ThemeFamily>(() => {
+    try {
+      const stored = window.localStorage.getItem(`${storageKey}.family`);
+      if (isFamily(stored)) return stored;
+    } catch {
+      /* ignore */
+    }
+    return isThemeId(preference) ? splitThemeId(preference).family : defaultFamily;
+  });
+
+  const [resolved, setResolved] = useState<ThemeId>(() => resolvePreference(preference, family));
   const hydratedRef = useRef(false);
 
-  // ---- Server hydration (one-shot) ----
+  // ---- Server hydration ----
+  //
+  // Runs until the server actually answers. `fetchServerTheme` reads the
+  // session, which this provider mounts above and therefore before — so
+  // the first call reliably comes back empty, and latching on that first
+  // attempt meant the stored preference was never applied at all. The
+  // account would render the default theme while the profile page,
+  // reading the same server value directly, displayed the saved one.
+  //
+  // Attempts are bounded and the callback is a local read (store + query
+  // cache), not a request.
   useEffect(() => {
     if (hydratedRef.current || !fetchServerTheme) return;
-    hydratedRef.current = true;
-    void fetchServerTheme().then((serverPref) => {
-      if (serverPref && isPreference(serverPref)) {
-        setPreferenceRaw(serverPref);
-      }
-    });
+    let cancelled = false;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    let attempt = 0;
+
+    const poll = (): void => {
+      void fetchServerTheme().then((serverPref) => {
+        if (cancelled || hydratedRef.current) return;
+        if (serverPref && isPreference(serverPref)) {
+          hydratedRef.current = true;
+          setPreferenceRaw(serverPref);
+          if (isThemeId(serverPref)) setFamilyRaw(splitThemeId(serverPref).family);
+          return;
+        }
+        attempt += 1;
+        if (attempt >= SERVER_HYDRATION_DELAYS_MS.length) return;
+        timer = setTimeout(poll, SERVER_HYDRATION_DELAYS_MS[attempt]);
+      });
+    };
+    poll();
+
+    return () => {
+      cancelled = true;
+      if (timer) clearTimeout(timer);
+    };
   }, [fetchServerTheme]);
 
   // ---- Apply preference to DOM + localStorage ----
   useEffect(() => {
-    const next = resolvePreference(preference, defaultFamily);
+    const next = resolvePreference(preference, family);
     setResolved(next);
     if (typeof document !== 'undefined') {
       document.documentElement.setAttribute('data-theme', next);
     }
     try {
       window.localStorage.setItem(storageKey, preference);
+      window.localStorage.setItem(`${storageKey}.family`, family);
     } catch {
       /* ignore */
     }
-  }, [preference, defaultFamily, storageKey]);
+  }, [preference, family, storageKey]);
 
   // ---- Server sync (fire-and-forget, skip initial hydration) ----
   const isFirstRender = useRef(true);
@@ -215,7 +272,7 @@ export function ThemeProvider({
     if (preference !== 'system' || typeof window === 'undefined') return;
     const mq = window.matchMedia('(prefers-color-scheme: dark)');
     const onChange = (): void => {
-      const next = resolveSystem(defaultFamily);
+      const next = resolveSystem(family);
       setResolved(next);
       if (typeof document !== 'undefined') {
         document.documentElement.setAttribute('data-theme', next);
@@ -225,43 +282,51 @@ export function ThemeProvider({
     return () => {
       mq.removeEventListener('change', onChange);
     };
-  }, [preference, defaultFamily]);
+  }, [preference, family]);
 
   // ---- Derived values ----
-  const { family, mode } = splitThemeId(resolved);
-  const colorMode: ColorMode = preference === 'system' ? 'system' : mode;
+  //
+  // Read from the preference, not from `resolved`. `resolved` is state
+  // written by an effect, so it trails the preference by a commit — long
+  // enough for the colour-mode control to show the previous value right
+  // after a change, which is the same "control disagrees with the screen"
+  // problem in miniature.
+  const colorMode: ColorMode = preference === 'system' ? 'system' : splitThemeId(preference).mode;
 
   // ---- Setters ----
   const setPreference = useCallback((p: ThemePreference) => {
     setPreferenceRaw(p);
+    // A concrete preference names a family; keep the two from drifting so
+    // a later switch back to `system` resumes in the family on screen.
+    if (isThemeId(p)) setFamilyRaw(splitThemeId(p).family);
   }, []);
 
-  const setFamily = useCallback(
-    (f: ThemeFamily) => {
-      if (preference === 'system') {
-        // Keep system mode — just remember the family for next explicit switch.
-        // We resolve system to current concrete, then swap the family portion.
-        const currentMode = splitThemeId(resolved).mode;
-        const next = joinThemeId(f, currentMode);
-        if (next) setPreferenceRaw(next);
-      } else {
-        const currentMode = splitThemeId(preference as ThemeId).mode;
-        const next = joinThemeId(f, currentMode);
-        if (next) setPreferenceRaw(next);
-      }
-    },
-    [preference, resolved],
-  );
+  /**
+   * Change the visual family, leaving the colour mode exactly as it was.
+   *
+   * When the mode is `system` it stays `system`: the previous version
+   * wrote a concrete theme here, which froze the account at whatever
+   * light/dark state happened to be showing, stopped it following sunset,
+   * flipped the untouched colour-mode control from "System" to "Light",
+   * and persisted that to the server.
+   */
+  const setFamily = useCallback((f: ThemeFamily) => {
+    setFamilyRaw(f);
+    setPreferenceRaw((prev) => {
+      if (prev === 'system') return prev;
+      const next = joinThemeId(f, splitThemeId(prev).mode);
+      return next ?? prev;
+    });
+  }, []);
 
   const setColorMode = useCallback(
     (m: ColorMode) => {
       if (m === 'system') {
         setPreferenceRaw('system');
-      } else {
-        const currentFamily = family;
-        const next = joinThemeId(currentFamily, m);
-        if (next) setPreferenceRaw(next);
+        return;
       }
+      const next = joinThemeId(family, m);
+      if (next) setPreferenceRaw(next);
     },
     [family],
   );

@@ -35,7 +35,7 @@ export default function AuthCard({ children, width = 'narrow' }: AuthCardProps):
         aria-hidden
         style={{
           margin: 0,
-          fontFamily: 'var(--font-display)',
+          fontFamily: 'var(--nf-font-display)',
           fontWeight: 400,
           fontSize: 'clamp(2rem, 5vw, 3rem)',
           lineHeight: 1,

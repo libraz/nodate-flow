@@ -21,9 +21,18 @@
   --nf-space-20: 5rem;
   --nf-space-24: 6rem;
 
-  /* font families */
-  --nf-font-sans: "Inter Variable", "Noto Sans JP", system-ui, sans-serif;
+  /*
+   * Font families.
+   *
+   * These name the faces both apps actually load — see the Google Fonts
+   * link in each `index.html`, which fetches Fraunces, Instrument Sans
+   * and JetBrains Mono. Naming anything else here does not fall back
+   * gracefully; it means the download is paid for on every cold load and
+   * the text renders in a system face regardless.
+   */
+  --nf-font-sans: "Instrument Sans", "Noto Sans JP", system-ui, sans-serif;
   --nf-font-mono: "JetBrains Mono", ui-monospace, monospace;
+  --nf-font-display: "Fraunces", Georgia, "Times New Roman", serif;
 
   /* font sizes */
   --nf-text-xs: 0.75rem;
@@ -37,6 +46,9 @@
 
   /* line heights */
   --nf-leading-tight: 1.2;
+  /* The gap between tight and normal is wide, and 1.2 is cramped for the
+     Japanese and Chinese copy this product renders. */
+  --nf-leading-snug: 1.35;
   --nf-leading-normal: 1.5;
   --nf-leading-relaxed: 1.7;
 

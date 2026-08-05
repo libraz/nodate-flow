@@ -16,6 +16,7 @@
   --nf-color-fg-muted: oklch(45% 0.018 260);
   --nf-color-fg-subtle: oklch(60% 0.014 260);
   --nf-color-fg-on-accent: oklch(99% 0.005 80);
+  --nf-color-fg-on-danger: oklch(99% 0.005 80);
 
   --nf-color-border: oklch(88% 0.012 80);
   --nf-color-border-strong: oklch(76% 0.014 80);
@@ -28,12 +29,16 @@
 
   --nf-color-success: oklch(68% 0.16 150);
   --nf-color-success-subtle: oklch(94% 0.03 150);
+  --nf-color-success-fg: oklch(42% 0.12 150);
   --nf-color-warning: oklch(78% 0.15 75);
   --nf-color-warning-subtle: oklch(94% 0.03 75);
+  --nf-color-warning-fg: oklch(42% 0.112 75);
   --nf-color-danger: oklch(60% 0.21 25);
   --nf-color-danger-subtle: oklch(94% 0.03 25);
+  --nf-color-danger-fg: oklch(42% 0.158 25);
   --nf-color-info: oklch(70% 0.13 240);
   --nf-color-info-subtle: oklch(94% 0.03 240);
+  --nf-color-info-fg: oklch(42% 0.098 240);
 
   --nf-color-focus-ring: oklch(66% 0.18 240);
   --nf-focus-ring-width: 2px;
