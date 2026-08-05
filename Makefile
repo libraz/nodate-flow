@@ -150,28 +150,38 @@ NF_TEST_INTEGRATION ?= 1
 # Every module that ships code has a target here and every target is
 # reachable from `test`. A suite nothing invokes is indistinguishable
 # from a suite that does not exist.
+#
+# GO_TEST_P caps how many packages `go test` builds and runs at once.
+# Each integration package starts its own MySQL container, and the
+# default (one per core) asks Docker for more instances than it can make
+# ready inside the wait timeout. The suite then reports "wait until
+# ready ... context deadline exceeded" on tests that are fine, which is
+# a red run that teaches people to ignore red. Raise it only on a
+# machine that can actually start that many databases at once.
+GO_TEST_P ?= 4
+
 test: test-api test-auth-api test-worker test-presence test-go-shared \
       test-cli test-web test-accounts-web test-ui test-sdk ## Run unit/integration tests (Go + TS; Go integration suites need Docker)
 
 test-api: test-api-mock test-api-real ## Go tests (flow) — both NF_FLOW_AI_MOCK on and off
 
 test-api-mock: ## Go tests (flow) with NF_FLOW_AI_MOCK=1 (mock AI orchestrator path; needs Docker)
-	cd apps/flow-api && NF_TEST_INTEGRATION="$(NF_TEST_INTEGRATION)" NF_FLOW_AI_MOCK=1 go test ./...
+	cd apps/flow-api && NF_TEST_INTEGRATION="$(NF_TEST_INTEGRATION)" NF_FLOW_AI_MOCK=1 go test -p $(GO_TEST_P) ./...
 
 test-api-real: ## Go tests (flow) with NF_FLOW_AI_MOCK unset (real per-tenant provider path; needs Docker)
-	cd apps/flow-api && NF_TEST_INTEGRATION="$(NF_TEST_INTEGRATION)" env -u NF_FLOW_AI_MOCK go test ./...
+	cd apps/flow-api && NF_TEST_INTEGRATION="$(NF_TEST_INTEGRATION)" env -u NF_FLOW_AI_MOCK go test -p $(GO_TEST_P) ./...
 
 test-auth-api: ## Go tests (auth; integration suites need Docker)
-	cd apps/auth-api && NF_TEST_INTEGRATION="$(NF_TEST_INTEGRATION)" go test ./...
+	cd apps/auth-api && NF_TEST_INTEGRATION="$(NF_TEST_INTEGRATION)" go test -p $(GO_TEST_P) ./...
 
 test-worker: ## Go tests (flow-worker; integration suites need Docker)
-	cd apps/flow-worker && NF_TEST_INTEGRATION="$(NF_TEST_INTEGRATION)" go test ./...
+	cd apps/flow-worker && NF_TEST_INTEGRATION="$(NF_TEST_INTEGRATION)" go test -p $(GO_TEST_P) ./...
 
 test-presence: ## Go tests (presence-discord)
-	cd apps/presence-discord && NF_TEST_INTEGRATION="$(NF_TEST_INTEGRATION)" go test ./...
+	cd apps/presence-discord && NF_TEST_INTEGRATION="$(NF_TEST_INTEGRATION)" go test -p $(GO_TEST_P) ./...
 
 test-go-shared: ## Go tests (packages/go-shared; integration suites need Docker)
-	cd packages/go-shared && NF_TEST_INTEGRATION="$(NF_TEST_INTEGRATION)" go test ./...
+	cd packages/go-shared && NF_TEST_INTEGRATION="$(NF_TEST_INTEGRATION)" go test -p $(GO_TEST_P) ./...
 
 test-cli: ## Vitest (apps/cli)
 	cd apps/cli && $(PKG_RUN) test
