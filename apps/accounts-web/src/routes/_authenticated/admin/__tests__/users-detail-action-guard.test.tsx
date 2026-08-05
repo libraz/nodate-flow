@@ -39,13 +39,9 @@ const confirmMock = vi.hoisted(() => ({
 
 vi.mock('../../../../lib/sdk', () => ({
   sdk: {
-    // biome-ignore lint/style/useNamingConvention: openapi-fetch HTTP method key
     GET: sdkMocks.get,
-    // biome-ignore lint/style/useNamingConvention: openapi-fetch HTTP method key
     POST: sdkMocks.post,
-    // biome-ignore lint/style/useNamingConvention: openapi-fetch HTTP method key
     PATCH: sdkMocks.patch,
-    // biome-ignore lint/style/useNamingConvention: openapi-fetch HTTP method key
     DELETE: sdkMocks.delete,
   },
 }));
@@ -64,7 +60,6 @@ vi.mock('@tanstack/react-router', () => {
       options: {},
       useParams: () => ({ userId: 'u-1' }),
     }),
-    // biome-ignore lint/style/useNamingConvention: tanstack router exports `Link` in PascalCase
     Link: ({ children, ...rest }: { children: ReactNode } & Record<string, unknown>) => (
       <a {...(rest as Record<string, unknown>)}>{children}</a>
     ),

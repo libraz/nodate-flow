@@ -18,11 +18,9 @@ import jaAdmin from '../../../locales/ja/admin.json';
 const navigateMock = vi.hoisted(() => vi.fn());
 vi.mock('@tanstack/react-router', () => ({
   useNavigate: () => navigateMock,
-  // biome-ignore lint/style/useNamingConvention: matches @tanstack/react-router export name
   Link: ({ children, to }: { children: ReactNode; to?: string }) => (
     <a href={to ?? '#'}>{children}</a>
   ),
-  // biome-ignore lint/style/useNamingConvention: matches @tanstack/react-router export name
   Outlet: () => null,
   createFileRoute: () => () => ({ options: {} }),
 }));

@@ -25,9 +25,7 @@ import enAdmin from '../../../../locales/en/admin.json';
 const navigateMock = vi.hoisted(() => vi.fn());
 vi.mock('@tanstack/react-router', () => ({
   useNavigate: () => navigateMock,
-  // biome-ignore lint/style/useNamingConvention: matches @tanstack/react-router export name
   Link: ({ children }: { children: ReactNode }) => <span>{children}</span>,
-  // biome-ignore lint/style/useNamingConvention: matches @tanstack/react-router export name
   Outlet: () => null,
   createFileRoute: () => () => ({ options: {} }),
 }));

@@ -143,7 +143,6 @@ function ArchivedRowImpl({
       data-selected={selected ? 'true' : 'false'}
       data-removing={removing ? 'true' : undefined}
       data-focused={focused ? 'true' : undefined}
-      // biome-ignore lint/a11y/noNoninteractiveTabindex: rows are the primary j/k navigation target
       tabIndex={0}
       onClick={handleRowClick}
       onKeyDown={handleKeyDown}

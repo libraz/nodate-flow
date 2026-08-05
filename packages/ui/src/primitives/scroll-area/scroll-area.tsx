@@ -32,7 +32,6 @@ function ScrollAreaImpl(
       ref={ref}
       className={cx(styles.root, className)}
       style={mergedStyle}
-      // biome-ignore lint/a11y/noNoninteractiveTabindex: keyboard-scrollable region needs focus
       tabIndex={0}
       role="region"
       {...rest}

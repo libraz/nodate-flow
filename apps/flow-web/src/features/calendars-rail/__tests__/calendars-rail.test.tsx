@@ -47,7 +47,6 @@ const sdkMocks = vi.hoisted(() => ({
 
 vi.mock('../../../lib/sdk', () => ({
   sdk: {
-    // biome-ignore lint/style/useNamingConvention: openapi-fetch HTTP method key
     GET: vi.fn(async (path: string) => {
       if (path === '/workspaces/{wsId}/calendars') {
         sdkMocks.fetchCount += 1;
@@ -55,11 +54,8 @@ vi.mock('../../../lib/sdk', () => ({
       }
       return { data: null, error: { status: 404 } };
     }),
-    // biome-ignore lint/style/useNamingConvention: openapi-fetch HTTP method key
     PATCH: vi.fn(async () => ({ data: null, error: null })),
-    // biome-ignore lint/style/useNamingConvention: openapi-fetch HTTP method key
     DELETE: vi.fn(async () => ({ data: null, error: null })),
-    // biome-ignore lint/style/useNamingConvention: openapi-fetch HTTP method key
     POST: vi.fn(async () => ({ data: null, error: null })),
   },
 }));

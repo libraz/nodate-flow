@@ -28,7 +28,6 @@ const postMock = vi.fn();
 
 vi.mock('../../../lib/sdk', () => ({
   sdk: {
-    // biome-ignore lint/style/useNamingConvention: openapi-fetch exposes HTTP verbs uppercased.
     POST: (...args: unknown[]) => postMock(...args),
   },
 }));

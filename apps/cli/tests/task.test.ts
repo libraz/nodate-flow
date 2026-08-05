@@ -33,11 +33,8 @@ function createSdkMock(
   response: { data?: unknown; error?: unknown } = { data: { ok: true } },
 ): SdkClientLike {
   return {
-    // biome-ignore lint/style/useNamingConvention: SDK method name
     GET: vi.fn().mockResolvedValue(response),
-    // biome-ignore lint/style/useNamingConvention: SDK method name
     POST: vi.fn().mockResolvedValue(response),
-    // biome-ignore lint/style/useNamingConvention: SDK method name
     PATCH: vi.fn().mockResolvedValue(response),
   };
 }
@@ -164,11 +161,8 @@ describe('executeUpdate', () => {
 
   it('short-circuits and forwards the error from a failing PATCH', async () => {
     const sdk: SdkClientLike = {
-      // biome-ignore lint/style/useNamingConvention: SDK method name
       GET: vi.fn(),
-      // biome-ignore lint/style/useNamingConvention: SDK method name
       POST: vi.fn(),
-      // biome-ignore lint/style/useNamingConvention: SDK method name
       PATCH: vi.fn().mockResolvedValue({ error: { detail: 'nope' } }),
     };
     const result = await executeUpdate(sdk, 'tsk-1', {
@@ -217,11 +211,8 @@ describe('executeSearch', () => {
 
   it('forwards SDK errors back to the caller', async () => {
     const sdk: SdkClientLike = {
-      // biome-ignore lint/style/useNamingConvention: SDK method name
       GET: vi.fn().mockResolvedValue({ error: { detail: 'boom' } }),
-      // biome-ignore lint/style/useNamingConvention: SDK method name
       POST: vi.fn(),
-      // biome-ignore lint/style/useNamingConvention: SDK method name
       PATCH: vi.fn(),
     };
     const result = await executeSearch(sdk, { q: 'x', limit: 1, projectId: 'p' });
@@ -234,7 +225,6 @@ describe('executeSearch', () => {
 describe('executeTaskListPaginated', () => {
   it('follows nextCursor until the terminal page', async () => {
     const sdk: SdkClientLike = {
-      // biome-ignore lint/style/useNamingConvention: SDK method name
       GET: vi
         .fn()
         .mockResolvedValueOnce({
@@ -243,9 +233,7 @@ describe('executeTaskListPaginated', () => {
         .mockResolvedValueOnce({
           data: { tasks: [{ id: 'b' }, { id: 'c' }], nextCursor: null },
         }),
-      // biome-ignore lint/style/useNamingConvention: SDK method name
       POST: vi.fn(),
-      // biome-ignore lint/style/useNamingConvention: SDK method name
       PATCH: vi.fn(),
     };
 
@@ -262,13 +250,10 @@ describe('executeTaskListPaginated', () => {
 
   it('stops once the requested limit is reached', async () => {
     const sdk: SdkClientLike = {
-      // biome-ignore lint/style/useNamingConvention: SDK method name
       GET: vi.fn().mockResolvedValue({
         data: { tasks: [{ id: 'a' }, { id: 'b' }], total: 5, nextCursor: 'cursor-2' },
       }),
-      // biome-ignore lint/style/useNamingConvention: SDK method name
       POST: vi.fn(),
-      // biome-ignore lint/style/useNamingConvention: SDK method name
       PATCH: vi.fn(),
     };
 
@@ -280,14 +265,11 @@ describe('executeTaskListPaginated', () => {
 
   it('falls back to offset paging when a filtered response has no cursor', async () => {
     const sdk: SdkClientLike = {
-      // biome-ignore lint/style/useNamingConvention: SDK method name
       GET: vi
         .fn()
         .mockResolvedValueOnce({ data: { tasks: [{ id: 'a' }], total: 2 } })
         .mockResolvedValueOnce({ data: { tasks: [{ id: 'b' }], total: 2 } }),
-      // biome-ignore lint/style/useNamingConvention: SDK method name
       POST: vi.fn(),
-      // biome-ignore lint/style/useNamingConvention: SDK method name
       PATCH: vi.fn(),
     };
 
@@ -304,11 +286,8 @@ describe('executeTaskListPaginated', () => {
 
   it('forwards page errors without issuing later requests', async () => {
     const sdk: SdkClientLike = {
-      // biome-ignore lint/style/useNamingConvention: SDK method name
       GET: vi.fn().mockResolvedValue({ error: { detail: 'boom' } }),
-      // biome-ignore lint/style/useNamingConvention: SDK method name
       POST: vi.fn(),
-      // biome-ignore lint/style/useNamingConvention: SDK method name
       PATCH: vi.fn(),
     };
 

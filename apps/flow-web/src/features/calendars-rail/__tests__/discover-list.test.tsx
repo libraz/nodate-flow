@@ -39,7 +39,6 @@ import { ApiError, formatApiError } from '../../../lib/api-error';
  * suppress at every call site.
  */
 type LocaleDiscoverShape = {
-  // biome-ignore lint/style/useNamingConvention: matches JSON locale key path
   calendars_rail: { discover: Record<string, string> };
 };
 

@@ -37,11 +37,8 @@ const toasterMock = vi.hoisted(() => ({
 
 vi.mock('../../../lib/sdk', () => ({
   sdk: {
-    // biome-ignore lint/style/useNamingConvention: openapi-fetch HTTP method key
     GET: sdkMocks.get,
-    // biome-ignore lint/style/useNamingConvention: openapi-fetch HTTP method key
     DELETE: sdkMocks.delete,
-    // biome-ignore lint/style/useNamingConvention: openapi-fetch HTTP method key
     POST: sdkMocks.post,
   },
 }));
@@ -49,7 +46,6 @@ vi.mock('../../../lib/sdk', () => ({
 vi.mock('@nodate-flow/ui/primitives/toast', () => ({
   toaster: toasterMock,
   default: () => null,
-  // biome-ignore lint/style/useNamingConvention: matches @nodate-flow/ui export name
   ToastProvider: () => null,
 }));
 

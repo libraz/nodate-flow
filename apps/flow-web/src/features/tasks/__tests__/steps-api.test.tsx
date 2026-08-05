@@ -20,7 +20,6 @@ import { useProposeSteps } from '../steps-api';
 
 vi.mock('../../../lib/sdk', () => ({
   sdk: {
-    // biome-ignore lint/style/useNamingConvention: openapi-fetch exposes HTTP verbs uppercased.
     POST: vi.fn(async () => ({
       data: {
         parentTaskId: 'task-001',

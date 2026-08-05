@@ -13,7 +13,6 @@ import { tasksKeys, useCreateTask } from '../api';
 
 vi.mock('../../../lib/sdk', () => ({
   sdk: {
-    // biome-ignore lint/style/useNamingConvention: openapi-fetch exposes HTTP verbs uppercased.
     POST: vi.fn(async () => ({
       // Minimal payload — the create hook only reads it to resolve the mutation,
       // not to populate downstream caches, so a structural cast is safe here.

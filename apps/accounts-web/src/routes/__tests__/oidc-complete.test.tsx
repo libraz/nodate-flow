@@ -27,9 +27,7 @@ const sdkMocks = vi.hoisted(() => ({
 vi.mock('../../lib/sdk', () => ({
   refreshAccessToken: sdkMocks.refresh,
   sdk: {
-    // biome-ignore lint/style/useNamingConvention: openapi-fetch HTTP method key
     GET: sdkMocks.get,
-    // biome-ignore lint/style/useNamingConvention: openapi-fetch HTTP method key
     POST: sdkMocks.post,
   },
 }));
