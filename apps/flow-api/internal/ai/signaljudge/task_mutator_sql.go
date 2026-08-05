@@ -62,7 +62,7 @@ import (
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
 	apierrors "github.com/libraz/nodate-flow/apps/flow-api/internal/errors"
-	"github.com/libraz/nodate-flow/apps/flow-api/internal/tasknumber"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/taskcreate"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/taskstate"
 )
 
@@ -415,8 +415,10 @@ func (m *SQLTaskMutator) DraftRetroTask(
 	now := m.now().UTC()
 	description := fmt.Sprintf(retroDescriptionTemplate, src.Title, now.Format("2006-01-02"))
 
-	newPub := types.New()
-	var newTaskID int64
+	var (
+		newPub    types.PublicID
+		newTaskID int64
+	)
 
 	// Single transaction for both inserts (and the optional actor
 	// row). dbretry.InTx retries on transient deadlocks; the inner
@@ -426,32 +428,20 @@ func (m *SQLTaskMutator) DraftRetroTask(
 	txErr := dbretry.InTx(ctx, m.DB, "signaljudge.SQLTaskMutator.DraftRetroTask", nil, func(ctx context.Context, tx *sql.Tx) error {
 		qtx := m.Queries.WithTx(tx)
 
-		// Allocate the next per-project task_number. CreateTask
-		// requires this — without it the row would collide on the
-		// uniq_tasks_project_id_task_number index.
-		nextNum, err := tasknumber.Allocate(ctx, qtx, workspaceID, src.ProjectID)
-		if err != nil {
-			return fmt.Errorf("AssignTaskNumber: %w", err)
-		}
-
-		taskID, err := qtx.CreateTask(ctx, generated.CreateTaskParams{
-			PublicID:        newPub,
-			WorkspaceID:     workspaceID,
-			ProjectID:       src.ProjectID,
-			ParentTaskID:    sql.NullInt32{},
-			CreatedByUserID: sql.NullInt32{}, // attribution lives on events.actor_agent_id
-			UpdatedByUserID: sql.NullInt32{},
-			TaskNumber:      uint32(nextNum), //#nosec G115 -- per-project sequence, fits uint32
-			Title:           newTitle,
-			Description:     sql.NullString{String: description, Valid: true},
-			Priority:        0,
-			DueOn:           sql.NullTime{},
-			StartedOn:       sql.NullTime{},
-			Visibility:      generated.TasksVisibilityPublic,
+		created, err := taskcreate.New(ctx, tx, taskcreate.Args{
+			WorkspaceID: workspaceID,
+			ProjectID:   src.ProjectID,
+			// ActorUserID stays invalid: attribution for an agent-drafted
+			// retro lives on events.actor_agent_id, not on the task row.
+			ActorUserID: sql.NullInt32{},
+			Title:       newTitle,
+			Description: sql.NullString{String: description, Valid: true},
 		})
 		if err != nil {
-			return fmt.Errorf("CreateTask: %w", err)
+			return fmt.Errorf("taskcreate.New: %w", err)
 		}
+		taskID := created.ID
+		newPub = created.PublicID
 		newTaskID = taskID
 
 		// Best-effort assignee inheritance. When the source had a

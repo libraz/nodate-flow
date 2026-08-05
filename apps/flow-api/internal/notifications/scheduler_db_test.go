@@ -16,6 +16,7 @@ import (
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
 	"github.com/libraz/nodate-flow/apps/flow-api/tests/helpers"
+	"github.com/libraz/nodate-flow/packages/go-shared/testhelpers"
 )
 
 // claimFixture is the minimum scaffolding a claim test needs: one
@@ -87,9 +88,7 @@ func seedClaimFixture(t *testing.T, db *sql.DB) *claimFixture {
 // subsequent attempt reports zero, and releasing the claim (the
 // dispatch-failure retry path) makes the reminder claimable again.
 func TestClaimReminderForDelivery_SingleWinner(t *testing.T) {
-	if testing.Short() {
-		t.Skip("skipping reminder claim DB test in -short mode")
-	}
+	testhelpers.SkipUnlessIntegration(t)
 	inst := helpers.StartShared(t)
 	db := inst.DB
 	fx := seedClaimFixture(t, db)

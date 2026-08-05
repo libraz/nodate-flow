@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 )
 
@@ -41,9 +42,9 @@ func (m *MockProvider) Name() string { return "mock" }
 func (m *MockProvider) Kind() Kind { return MockKind }
 
 // Complete implements Provider. The mock ignores req.Prompt and returns
-// the fixture associated with req.System (or, when System is empty, the
-// default inbox_triage fixture). The returned Response carries zero
-// tokens / zero cost so the cost guard never trips in tests.
+// the fixture [fixtureNameForSystem] selects for req.System, falling back
+// to inbox_triage for any purpose that has no entry. The returned Response
+// carries zero tokens / zero cost so the cost guard never trips in tests.
 func (m *MockProvider) Complete(_ context.Context, req Request) (*Response, error) {
 	name := fixtureNameForSystem(req.System)
 	text, err := m.load(name)
@@ -82,11 +83,32 @@ func (m *MockProvider) load(name string) (string, error) {
 	return string(b), nil
 }
 
+// smartCreateMarker identifies the smart-create system prompt. It is the
+// response key that prompt asks the model to emit, which makes it a
+// property of the smart-create contract rather than of its prose: the
+// wording can be rewritten without breaking the routing, and dropping the
+// key would be a contract change that should break it.
+//
+// Matching a substring rather than comparing against the prompt constant
+// keeps this package free of an import cycle — internal/ai imports
+// providers, not the other way round. [TestMockFixtureRoutingForSmartCreate]
+// in internal/ai asserts the two stay in agreement.
+const smartCreateMarker = "suggestedAssignees"
+
 // fixtureNameForSystem maps an orchestrator system prompt to a fixture
-// file name. The mapping is intentionally tiny: currently only
-// inbox_triage is needed, and additional purposes can be added later as
-// new orchestrator methods are introduced.
-func fixtureNameForSystem(_ string) string {
+// file name.
+//
+// The mapping is deliberately incomplete. Only purposes whose fixture is
+// actually asserted on get an entry; everything else falls through to
+// inbox_triage, which is the historical default. That fallback is a known
+// sharp edge — an unrouted purpose silently receives triage JSON and
+// produces a confidently wrong proposal rather than an error — so adding a
+// purpose here should come with a test that would fail if the routing
+// regressed to the fallback.
+func fixtureNameForSystem(system string) string {
+	if strings.Contains(system, smartCreateMarker) {
+		return "smart_create"
+	}
 	return "inbox_triage"
 }
 

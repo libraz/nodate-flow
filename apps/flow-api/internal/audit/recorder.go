@@ -7,37 +7,18 @@ import (
 	"database/sql"
 	"encoding/json"
 	"log/slog"
-	"net"
 	"time"
 
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
 	"github.com/libraz/nodate-flow/packages/go-shared/authn"
+	"github.com/libraz/nodate-flow/packages/go-shared/dbtype"
 )
 
 // userAgentMaxLen matches the audit_logs.user_agent column width. The
 // value is clipped before storage so an oversized header cannot be used
 // as a write-amplification vector.
 const userAgentMaxLen = 512
-
-// packIP normalizes a client IP string into the 16-byte packed form the
-// audit_logs.ip_address VARBINARY(16) column expects. Both IPv4 and IPv6
-// map to a fixed 16-byte representation via [net.IP.To16], so the value
-// never overflows the column. Empty or unparseable input yields SQL NULL.
-func packIP(ip string) sql.NullString {
-	if ip == "" {
-		return sql.NullString{}
-	}
-	parsed := net.ParseIP(ip)
-	if parsed == nil {
-		return sql.NullString{}
-	}
-	packed := parsed.To16()
-	if packed == nil {
-		return sql.NullString{}
-	}
-	return sql.NullString{String: string(packed), Valid: true}
-}
 
 // truncateUserAgent clips an oversized User-Agent to the column width.
 func truncateUserAgent(ua string) string {
@@ -122,7 +103,7 @@ func (r *Recorder) Record(ctx context.Context, e Entry) {
 	if clientIP == "" {
 		clientIP = authn.ClientIPFromContext(ctx)
 	}
-	ipAddress := packIP(clientIP)
+	ipAddress := dbtype.NullStringFromIP(clientIP)
 
 	userAgent := e.UserAgent
 	if userAgent == "" {

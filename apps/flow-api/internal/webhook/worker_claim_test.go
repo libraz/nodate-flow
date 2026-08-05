@@ -16,6 +16,7 @@ import (
 
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
+	"github.com/libraz/nodate-flow/packages/go-shared/testhelpers"
 )
 
 // claimTestTables are the only tables the delivery claim path touches,
@@ -46,12 +47,7 @@ var claimTestTables = []string{
 // a FOR UPDATE lock on the row, which is exactly the state a real
 // replica is in between its claim SELECT and COMMIT.
 func TestClaimBatchAtomicClaim(t *testing.T) {
-	if testing.Short() {
-		t.Skip("skipping integration test in -short mode")
-	}
-	if os.Getenv("NF_TEST_INTEGRATION") == "" {
-		t.Skip("set NF_TEST_INTEGRATION=1 to run webhook claim tests")
-	}
+	testhelpers.SkipUnlessIntegration(t)
 
 	ctx := context.Background()
 	db := startClaimTestDB(t)

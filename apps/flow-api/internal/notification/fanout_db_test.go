@@ -15,6 +15,7 @@ import (
 
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
 	"github.com/libraz/nodate-flow/apps/flow-api/tests/helpers"
+	"github.com/libraz/nodate-flow/packages/go-shared/testhelpers"
 )
 
 // fanoutFixture is the minimum tenant scaffolding the fan-out path
@@ -165,9 +166,7 @@ func runFanout(t *testing.T, db *sql.DB, fx *fanoutFixture, eventType string) *F
 // exactly one email notification and zero in_app notifications,
 // proving the historical "always in_app" hardcode is gone.
 func TestFanout_RespectsExplicitChannelPreference(t *testing.T) {
-	if testing.Short() {
-		t.Skip("skipping fanout DB test in -short mode")
-	}
+	testhelpers.SkipUnlessIntegration(t)
 	inst := helpers.StartShared(t)
 	db := inst.DB
 	fx := seedFanoutFixture(t, db)
@@ -187,9 +186,7 @@ func TestFanout_RespectsExplicitChannelPreference(t *testing.T) {
 // in_app notification — the historical default that downstream
 // surfaces (badge counts, bell list) depend on.
 func TestFanout_DefaultsToInAppWhenUnconfigured(t *testing.T) {
-	if testing.Short() {
-		t.Skip("skipping fanout DB test in -short mode")
-	}
+	testhelpers.SkipUnlessIntegration(t)
 	inst := helpers.StartShared(t)
 	db := inst.DB
 	fx := seedFanoutFixture(t, db)
@@ -204,9 +201,7 @@ func TestFanout_DefaultsToInAppWhenUnconfigured(t *testing.T) {
 // that opting into both in_app and email yields two distinct rows
 // (one per channel) for the same source event.
 func TestFanout_MultipleEnabledChannelsProducePerChannelRows(t *testing.T) {
-	if testing.Short() {
-		t.Skip("skipping fanout DB test in -short mode")
-	}
+	testhelpers.SkipUnlessIntegration(t)
 	inst := helpers.StartShared(t)
 	db := inst.DB
 	fx := seedFanoutFixture(t, db)
@@ -225,9 +220,7 @@ func TestFanout_MultipleEnabledChannelsProducePerChannelRows(t *testing.T) {
 // (recipient, source_event, channel) UNIQUE key collides for every
 // channel that was already produced on the first run.
 func TestFanout_RefireIsNoopPerChannel(t *testing.T) {
-	if testing.Short() {
-		t.Skip("skipping fanout DB test in -short mode")
-	}
+	testhelpers.SkipUnlessIntegration(t)
 	inst := helpers.StartShared(t)
 	db := inst.DB
 	fx := seedFanoutFixture(t, db)
@@ -250,9 +243,7 @@ func TestFanout_RefireIsNoopPerChannel(t *testing.T) {
 // that channel — the muted channel must not produce a notification,
 // even if the unmuted alternative is also enabled.
 func TestFanout_MutedPreferenceSuppressesChannel(t *testing.T) {
-	if testing.Short() {
-		t.Skip("skipping fanout DB test in -short mode")
-	}
+	testhelpers.SkipUnlessIntegration(t)
 	inst := helpers.StartShared(t)
 	db := inst.DB
 	fx := seedFanoutFixture(t, db)

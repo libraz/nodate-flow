@@ -15,6 +15,7 @@ import (
 	"strconv"
 
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/ai/embed"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/dbretry"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/eventbus"
@@ -201,33 +202,52 @@ func (p *Pipeline) processTask(ctx context.Context, workspaceID uint32, taskID u
 	for _, m := range matches {
 		pub := types.New()
 		conf := fmt.Sprintf("%.4f", m.score)
-		if _, err := p.Queries.CreateRelationSuggestion(ctx, generated.CreateRelationSuggestionParams{
-			PublicID:      pub,
-			WorkspaceID:   workspaceID,
-			SourceTaskID:  taskID,
-			TargetTaskID:  m.taskID,
-			SuggestedKind: m.kind,
-			Confidence:    conf,
+		srcID := int64(taskID)
+		// The suggestion row and the event announcing it go in together.
+		// This pass runs detached from the request that triggered it (a
+		// notify hook spawns it with WithoutCancel), so the task it
+		// describes can be deleted while it works. Appending afterwards
+		// on its own connection then failed the events.task_id foreign
+		// key and left a suggestion no event ever announced. Inserting
+		// the suggestion first inside the transaction takes a shared lock
+		// on the parent task rows, so by the time the event insert runs
+		// the task cannot have gone away: either both rows land or
+		// neither does.
+		if err := dbretry.InTx(ctx, p.DB, "relations.suggest", nil, func(ctx context.Context, tx *sql.Tx) error {
+			if _, err := p.Queries.WithTx(tx).CreateRelationSuggestion(ctx, generated.CreateRelationSuggestionParams{
+				PublicID:      pub,
+				WorkspaceID:   workspaceID,
+				SourceTaskID:  taskID,
+				TargetTaskID:  m.taskID,
+				SuggestedKind: m.kind,
+				Confidence:    conf,
+			}); err != nil {
+				return err
+			}
+			return eventbus.Append(ctx, tx, eventbus.Event{
+				Type:        eventbus.RelationSuggested,
+				WorkspaceID: workspaceID,
+				TaskID:      &srcID,
+				Payload: map[string]any{
+					"suggestionId": pub.String(),
+					"sourceTaskId": taskID,
+					"targetTaskId": m.taskID,
+					"kind":         string(m.kind),
+					"confidence":   m.score,
+				},
+			})
 		}); err != nil {
-			// Skip duplicates silently.
-			slog.Debug("relations pipeline: create suggestion skipped", "err", err)
+			// An already-suggested pair (the pair is uniquely keyed) and a
+			// task deleted since the candidates were read are both normal
+			// outcomes for a background pass over data it does not own.
+			slog.DebugContext(ctx, "relations pipeline: suggestion skipped",
+				"workspace_id", workspaceID,
+				"source_task_id", taskID,
+				"target_task_id", m.taskID,
+				"err", err,
+			)
 			continue
 		}
-
-		// Emit event.
-		srcID := int64(taskID)
-		_ = eventbus.Append(ctx, p.DB, eventbus.Event{
-			Type:        eventbus.RelationSuggested,
-			WorkspaceID: workspaceID,
-			TaskID:      &srcID,
-			Payload: map[string]any{
-				"suggestionId": pub.String(),
-				"sourceTaskId": taskID,
-				"targetTaskId": m.taskID,
-				"kind":         string(m.kind),
-				"confidence":   m.score,
-			},
-		})
 	}
 }
 

@@ -51,9 +51,18 @@ const subscriberInboxSize = 64
 type subscriber struct {
 	workspaceID string
 	ch          chan Event
-	// resyncQueued is 1 when we have already dropped an event for
-	// this subscriber and queued a resync marker; it prevents us
-	// from flooding the resync queue under sustained pressure.
+	// done is closed exactly once when the subscription is torn down.
+	// Unsubscription is signalled this way rather than by closing ch:
+	// Publish sends outside the registry lock, so a concurrent
+	// close(ch) would panic the whole process with "send on closed
+	// channel". Closing done instead makes every send path a select
+	// that simply stops delivering.
+	done chan struct{}
+	// resyncQueued is true while a resync marker is sitting unread in
+	// ch. It keeps sustained pressure from filling the inbox with
+	// nothing but markers, and it is cleared again once the
+	// subscriber has drained the marker so the next overflow raises a
+	// fresh one.
 	resyncQueued atomic.Bool
 }
 
@@ -120,15 +129,36 @@ func (n *InProcessNotifier) Publish(_ context.Context, evt Event) {
 	n.mu.RUnlock()
 
 	for _, s := range list {
-		// If a resync is already queued for this subscriber, skip
-		// both the normal event and further resync markers: the
-		// client is going to resync on reconnect anyway.
-		if s.resyncQueued.Load() {
+		// The snapshot above can outlive a subscriber: its context may
+		// have been cancelled while we were iterating. Skip it rather
+		// than filling an inbox nobody will ever drain.
+		select {
+		case <-s.done:
 			continue
+		default:
+		}
+		// A pending resync marker supersedes every normal event: the
+		// client re-invalidates all of its workspace queries when it
+		// reads the marker, so queueing more work behind it is wasted.
+		//
+		// The marker is always the last thing in the inbox (nothing is
+		// queued while the flag is set), so an empty inbox means the
+		// subscriber has read it and caught up. Re-arm there: without
+		// this reset one burst past subscriberInboxSize would mute the
+		// subscriber for the rest of its session, and because the SSE
+		// connection stays healthy on heartbeats the client never
+		// notices it stopped receiving updates.
+		if s.resyncQueued.Load() {
+			if len(s.ch) > 0 {
+				continue
+			}
+			s.resyncQueued.Store(false)
 		}
 		select {
 		case s.ch <- evt:
 			n.eventsPublished.Add(1)
+		case <-s.done:
+			// Unsubscribed underneath us; nothing to deliver.
 		default:
 			n.eventsDropped.Add(1)
 			// Inbox full. Try to queue a resync marker exactly once.
@@ -140,16 +170,24 @@ func (n *InProcessNotifier) Publish(_ context.Context, evt Event) {
 				case <-s.ch:
 				default:
 				}
+				queued := false
 				select {
 				case s.ch <- Event{
 					Kind:        KindResync,
 					WorkspaceID: evt.WorkspaceID,
 					At:          evt.At,
 				}:
+					queued = true
+				case <-s.done:
 				default:
-					// Still full (racing drain failed). Give up
-					// silently; the subscriber's context will expire
-					// soon and the SSE handler will reconnect.
+					// Still full (racing drain failed).
+				}
+				if !queued {
+					// The marker never made it into the inbox, so the
+					// subscriber would be muted by a flag it can never
+					// clear by reading. Release it and let the next
+					// overflow try again.
+					s.resyncQueued.Store(false)
 				}
 			}
 		}
@@ -157,12 +195,17 @@ func (n *InProcessNotifier) Publish(_ context.Context, evt Event) {
 }
 
 // Subscribe registers a new subscriber for workspacePublicID and
-// returns its receive channel. The subscriber is removed and its
-// channel closed when ctx is cancelled.
+// returns its receive channel. The subscriber is removed from the
+// registry when ctx is cancelled.
+//
+// The returned channel is never closed: readers unwind on their own
+// ctx.Done() instead. Closing it would race with the lock-free sends
+// in Publish and panic the process.
 func (n *InProcessNotifier) Subscribe(ctx context.Context, workspacePublicID string) <-chan Event {
 	s := &subscriber{
 		workspaceID: workspacePublicID,
 		ch:          make(chan Event, subscriberInboxSize),
+		done:        make(chan struct{}),
 	}
 
 	n.mu.Lock()
@@ -184,7 +227,7 @@ func (n *InProcessNotifier) Subscribe(ctx context.Context, workspacePublicID str
 			}
 		}
 		n.mu.Unlock()
-		close(s.ch)
+		close(s.done)
 	}()
 
 	return s.ch

@@ -24,9 +24,7 @@ func TestMain(m *testing.M) {
 
 func tailDB(t *testing.T) *sql.DB {
 	t.Helper()
-	if testing.Short() {
-		t.Skip("tailer tests require MySQL; skipping in -short mode")
-	}
+	testhelpers.SkipUnlessIntegration(t)
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Minute)
 	defer cancel()
 	inst, err := tailShared.Start(ctx)

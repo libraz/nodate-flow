@@ -10,16 +10,25 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	stderrors "errors"
 	"fmt"
 	"log/slog"
 	"strconv"
 	"sync"
 	"time"
 
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/dbretry"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
+	apierrors "github.com/libraz/nodate-flow/apps/flow-api/internal/errors"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/taskstate"
 )
+
+// errTransitionRejected rolls an auto-action transition back when the
+// state machine refuses the move — the task drifted between the query
+// and the apply. Internal only, and not transient, so the retry loop
+// leaves it alone.
+var errTransitionRejected = stderrors.New("autoactions: transition rejected")
 
 // ExecutorConfig controls the background auto-action loop. These values
 // are used as global fallback defaults; per-workspace overrides are read
@@ -751,41 +760,50 @@ func (e *Executor) autoClose(ctx context.Context, r taskRow, act *Action) {
 // auto_action / confidence keys on the event payload mark the event
 // origin so audit consumers can distinguish it from human transitions.
 func (e *Executor) applyStateTransition(ctx context.Context, r taskRow, act *Action, transition string) {
-	tx, err := e.DB.BeginTx(ctx, nil)
-	if err != nil {
-		e.Logger.Error("auto-action executor: begin tx", "err", err)
-		return
-	}
-	defer func() { _ = tx.Rollback() }()
-
-	result, spec, cause := taskstate.ApplyTransitionTx(ctx, tx, taskstate.ApplyParams{
-		WorkspaceID: r.workspaceID,
-		TaskID:      r.id,
-		PublicID:    r.publicID,
-		Transition:  transition,
-		ActorUserID: nil, // system / auto-action, not a real user
-		Reason:      act.Reason,
-		Via:         "auto_action",
-		ExtraPayload: map[string]any{
-			"auto_action": string(act.Kind),
-			"confidence":  act.Confidence,
-		},
+	// dbretry.InTx owns the transaction so the transition event's
+	// fan-out (realtime, notifications, webhooks) fires after the
+	// commit. Applying the same transition by hand would append the
+	// event but never deliver anything derived from it.
+	var (
+		result   taskstate.ApplyResult
+		spec     *apierrors.Spec
+		rejected error
+	)
+	txErr := dbretry.InTx(ctx, e.DB, "autoactions.applyStateTransition", nil, func(ctx context.Context, tx *sql.Tx) error {
+		var cause error
+		result, spec, cause = taskstate.ApplyTransitionTx(ctx, tx, taskstate.ApplyParams{
+			WorkspaceID: r.workspaceID,
+			TaskID:      r.id,
+			PublicID:    r.publicID,
+			Transition:  transition,
+			ActorUserID: nil, // system / auto-action, not a real user
+			Reason:      act.Reason,
+			Via:         "auto_action",
+			ExtraPayload: map[string]any{
+				"auto_action": string(act.Kind),
+				"confidence":  act.Confidence,
+			},
+		})
+		if spec != nil {
+			// Validation rejection (TRANSITION_REJECTED / NOT_FOUND) means
+			// the task drifted out of the matching state between query and
+			// apply; this is benign — roll back, log and skip.
+			e.Logger.Warn("auto-action executor: transition rejected",
+				"task", r.publicID.String(),
+				"transition", transition,
+				"code", spec.Code,
+				"cause", cause,
+			)
+			rejected = errTransitionRejected
+			return rejected
+		}
+		return cause
 	})
-	if spec != nil {
-		// Validation rejection (TRANSITION_REJECTED / NOT_FOUND) means
-		// the task drifted out of the matching state between query and
-		// apply; this is benign — log and skip.
-		e.Logger.Warn("auto-action executor: transition rejected",
-			"task", r.publicID.String(),
-			"transition", transition,
-			"code", spec.Code,
-			"cause", cause,
-		)
+	if rejected != nil {
 		return
 	}
-
-	if err := tx.Commit(); err != nil {
-		e.Logger.Error("auto-action executor: commit", "task", r.publicID.String(), "err", err)
+	if txErr != nil {
+		e.Logger.Error("auto-action executor: transition failed", "task", r.publicID.String(), "err", txErr)
 		return
 	}
 	e.Logger.Info("auto-action applied: state transition",

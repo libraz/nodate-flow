@@ -101,10 +101,10 @@ func (o *Orchestrator) ProposeInboxTriage(ctx context.Context, workspaceID uint3
 		return nil, parseErr
 	}
 
-	// Append one ai.suggestion.proposed event per suggestion. We swallow
-	// individual append errors so a transient failure on event N does
-	// not lose the user-visible suggestions; the orchestrator log line
-	// surfaces the underlying error for ops to investigate.
+	// Append one ai.suggestion.proposed event per suggestion. A failure
+	// on event N must not cost the caller the suggestions themselves —
+	// they are the product of a paid, non-repeatable model call — so the
+	// loss is recorded and the run continues.
 	if o.DB != nil {
 		for _, s := range suggestions {
 			payload := map[string]any{
@@ -113,11 +113,11 @@ func (o *Orchestrator) ProposeInboxTriage(ctx context.Context, workspaceID uint3
 				"action":        s.RecommendedAction,
 				"reasoning":     s.Reasoning,
 			}
-			_ = eventbus.Append(ctx, o.DB, eventbus.Event{
+			eventbus.AppendBestEffort(ctx, o.DB, eventbus.Event{
 				Type:        eventbus.AiSuggestionProposed,
 				WorkspaceID: workspaceID,
 				Payload:     payload,
-			})
+			}, "ai.propose_inbox_triage")
 		}
 	}
 	o.ProposalCache.Put(cacheKey, suggestions)

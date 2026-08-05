@@ -12,9 +12,8 @@ import (
 	"github.com/libraz/nodate-flow/packages/go-shared/testhelpers"
 )
 
-// itemkit tests use a shared MySQL testcontainer. Guard behind
-// testing.Short() so `go test -short` stays fast on machines without
-// Docker.
+// itemkit tests use a shared MySQL testcontainer, so every entry point
+// goes through testhelpers.SkipUnlessIntegration.
 var shared = testhelpers.NewSharedMySQL(testhelpers.MySQLConfig{
 	Database: "itemkit_test",
 })
@@ -138,9 +137,7 @@ func purge(t *testing.T, db *sql.DB, wsID uint32) {
 
 func startDB(t *testing.T) *sql.DB {
 	t.Helper()
-	if testing.Short() {
-		t.Skip("itemkit tests require MySQL; skipping in -short mode")
-	}
+	testhelpers.SkipUnlessIntegration(t)
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Minute)
 	defer cancel()
 	inst, err := shared.Start(ctx)

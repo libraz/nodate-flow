@@ -11,17 +11,34 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
 	"sync"
 	"sync/atomic"
 	"time"
 
+	"github.com/go-sql-driver/mysql"
+
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/dbretry"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
 	apierrors "github.com/libraz/nodate-flow/apps/flow-api/internal/errors"
 )
+
+// mysqlDuplicateEntry is ER_DUP_ENTRY (1062).
+const mysqlDuplicateEntry uint16 = 1062
+
+// ErrAlreadyReversed is returned by [AppendReverseEvent] when a
+// concurrent request already recorded a compensating event for the same
+// target. The UNIQUE (workspace_id, reverses_event_id) index on `events`
+// is the authority: the pre-check in the reversal handler can be passed
+// by two requests at once, and exactly one INSERT survives.
+//
+// This is a resolved race, not a lost write — the log ends up holding
+// the one compensating row it is supposed to — so callers should map it
+// onto their "already reversed" answer rather than an internal error.
+var ErrAlreadyReversed = errors.New("eventbus: event already reversed")
 
 // validateActors enforces the three-way actor exclusion rule documented on
 // [Event] and `sql/core/tables/events.sql`. At most one of ActorUserID,
@@ -53,6 +70,13 @@ func validateActors(evt Event) error {
 			WithDetail("actor_system_source_set", evt.ActorSystemSource != "")
 	}
 	return nil
+}
+
+// isDuplicateEntry reports whether err is MySQL's ER_DUP_ENTRY. Kept
+// local so the eventbus does not depend on the HTTP handler helpers.
+func isDuplicateEntry(err error) bool {
+	var me *mysql.MySQLError
+	return errors.As(err, &me) && me.Number == mysqlDuplicateEntry
 }
 
 // globalSeq is a monotonically increasing counter that assigns a
@@ -300,6 +324,49 @@ func Append(ctx context.Context, db DBTX, evt Event) error {
 	return appendInternal(ctx, db, evt, false)
 }
 
+// AppendBestEffort appends evt and, when the INSERT fails, records what
+// was lost instead of failing the caller's operation.
+//
+// It exists so that "this call site accepts a dropped event" is written
+// down and greppable. Assigning the error to the blank identifier is the
+// same behaviour with none of the information: no reason, no call site,
+// and no payload, which leaves nothing to replay from. Choosing between
+// the two forms is a real decision, so a static test rejects the
+// discarded one (see no_swallowed_append_test.go).
+//
+// Use this form only where the state change the event describes is
+// already committed and the client cannot safely retry — creating a
+// task, adding a comment, converting an intake item. Returning an error
+// there would report "nothing happened" for work that did happen, and a
+// retry would duplicate it. Where the mutation is idempotent (setting a
+// status, updating fields, archiving) call [Append] and propagate: the
+// retry that follows is what repairs the log.
+//
+// callSite names the operation, e.g. "mcp.create_task". The payload is
+// logged alongside it because the row does not exist: this line is the
+// only remaining description of the change, and any state derived from
+// the log stays wrong until someone replays it.
+func AppendBestEffort(ctx context.Context, db DBTX, evt Event, callSite string) {
+	if err := appendInternal(ctx, db, evt, false); err != nil {
+		// Append already logged the driver error; this line adds what it
+		// could not know — who dropped it and what the row would have
+		// said.
+		attrs := []any{
+			slog.String("call_site", callSite),
+			slog.String("type", evt.Type),
+			slog.Uint64("workspace_id", uint64(evt.WorkspaceID)),
+			slog.Any("error", err),
+		}
+		if evt.TaskID != nil {
+			attrs = append(attrs, slog.Int64("task_id", *evt.TaskID))
+		}
+		if payload, merr := json.Marshal(evt.Payload); merr == nil {
+			attrs = append(attrs, slog.String("payload", string(payload)))
+		}
+		slog.ErrorContext(ctx, "eventbus: event dropped; state derived from the log is incomplete until it is replayed", attrs...)
+	}
+}
+
 // AppendJudgeEvent is the signaljudge Applier's entry point into the
 // shared INSERT path. Behaves identically to [Append] for non-judge
 // kinds but additionally permits the kinds listed in [judgeEventKinds]
@@ -490,6 +557,23 @@ func appendInternalWithMeta(ctx context.Context, db DBTX, evt Event, fromApplier
 		err = dbretry.Do(ctx, "eventbus.Append", insert)
 	}
 	if err != nil {
+		if evt.ReversesEventID != nil && isDuplicateEntry(err) {
+			// Two requests reversed the same event at once and the
+			// UNIQUE (workspace_id, reverses_event_id) index rejected
+			// the second INSERT. Nothing was lost: the compensating row
+			// the loser wanted is already in the log, written by the
+			// winner. Report it as its own condition so the handler can
+			// answer idempotently, and log it at info — an operator
+			// paged by "append failed" would find a log that is exactly
+			// as it should be. Both the sentinel and the driver error
+			// stay reachable via errors.Is / errors.As.
+			slog.InfoContext(ctx, "eventbus: reverse already recorded by a concurrent request",
+				"type", evt.Type,
+				"workspace_id", evt.WorkspaceID,
+				"reverses_event_id", *evt.ReversesEventID,
+			)
+			return ReverseAppendResult{}, fmt.Errorf("%w (%w)", ErrAlreadyReversed, err)
+		}
 		slog.ErrorContext(ctx, "eventbus: append failed",
 			"type", evt.Type,
 			"workspace_id", evt.WorkspaceID,
@@ -510,8 +594,26 @@ func appendInternalWithMeta(ctx context.Context, db DBTX, evt Event, fromApplier
 	// locks, a self-inflicted deadlock that InnoDB resolves by rolling
 	// one side back. AddCommitHook defers the fan-out until the
 	// transaction commits when the caller ran us via dbretry.InTx; on
-	// the auto-commit path (and for callers managing their own
-	// transaction) it fires immediately, preserving prior behavior.
+	// the auto-commit path the row is already durable, so it fires
+	// immediately.
+	//
+	// The third case — a transaction the caller opened by hand — has
+	// neither property: there is no collector to defer to, so the hooks
+	// would fire against a row no other connection can see yet. That is
+	// how webhook deliveries and in-app notifications went missing for
+	// MCP-driven transitions while the identical REST transition
+	// delivered fine. Refuse the dispatch rather than fire it early: a
+	// hook that runs too soon looks like it worked and silently drops
+	// the delivery, while a refusal is one loud line naming the caller
+	// that needs dbretry.InTx.
+	if _, isTx := db.(*sql.Tx); isTx && !dbretry.HasCommitHooks(seqCtx) {
+		slog.ErrorContext(ctx, "eventbus: fan-out skipped; append ran in a hand-rolled transaction without a commit boundary (use dbretry.InTx)",
+			"type", evt.Type,
+			"workspace_id", evt.WorkspaceID,
+			"event_id", eventInternalID,
+		)
+		return ReverseAppendResult{PublicID: pubID, OccurredAt: now}, nil
+	}
 	dbretry.AddCommitHook(seqCtx, func() {
 		fireNotifyHooks(seqCtx, evt.WorkspaceID, evt.Type, eventInternalID)
 	})
