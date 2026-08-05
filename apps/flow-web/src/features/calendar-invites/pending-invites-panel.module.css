@@ -22,9 +22,8 @@
  * narrowest desktop where 1fr keeps day cells around 100px each so the
  * task pill text can render without being clipped to a 0-width title.
  */
-/* nf-token-override: breakpoint, and custom properties do not work in at-rule conditions */
+/* nf-token-override: breakpoint, and custom properties do not work in at-rule conditions. nf-breakpoint-override: ultra-wide threshold for the three-column layout; xl (1280px) catches laptops, which lack the room */
 @media (min-width: 100rem) {
-  /* nf-breakpoint-override: ultra-wide threshold for the three-column layout; xl (1280px) catches laptops, which lack the room */
   .layout {
     grid-template-columns: minmax(0, 16rem) minmax(0, 1fr) minmax(0, 18rem);
   }
