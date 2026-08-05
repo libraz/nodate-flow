@@ -75,7 +75,7 @@ function ActorPicker({ workspaceId, selected, onSelect, label }: ActorPickerProp
         minInlineSize: '14rem',
         minBlockSize: '6rem',
         padding: 'var(--nf-space-1)',
-        borderRadius: '0.25rem',
+        borderRadius: 'var(--nf-radius-xs)',
         border: '1px solid var(--nf-color-border)',
         background: 'var(--nf-color-bg)',
         color: 'var(--nf-color-fg)',
@@ -135,7 +135,7 @@ export default function EventFilterBar({
         }}
         style={{
           padding: 'var(--nf-space-1) 0.625rem',
-          borderRadius: '999px',
+          borderRadius: 'var(--nf-radius-pill)',
           border: `1px solid ${active ? 'var(--nf-color-accent)' : 'var(--nf-color-border)'}`,
           background: active ? 'var(--nf-color-accent-subtle)' : 'var(--nf-color-surface)',
           color: active ? 'var(--nf-color-accent)' : 'var(--nf-color-fg)',
@@ -152,7 +152,7 @@ export default function EventFilterBar({
     <details
       style={{
         border: '1px solid var(--nf-color-border)',
-        borderRadius: '0.5rem',
+        borderRadius: 'var(--nf-radius-md)',
         padding: 'var(--nf-space-2) var(--nf-space-3)',
         background: 'var(--nf-color-surface)',
       }}
@@ -172,7 +172,7 @@ export default function EventFilterBar({
           <span
             style={{
               padding: '0 var(--nf-space-2)',
-              borderRadius: '999px',
+              borderRadius: 'var(--nf-radius-pill)',
               background: 'var(--nf-color-accent-subtle)',
               color: 'var(--nf-color-accent)',
               fontSize: '0.6875rem',

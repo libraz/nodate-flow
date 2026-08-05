@@ -40,7 +40,7 @@ const NL_UNPARSEABLE = 'AI.NL_QUERY.UNPARSEABLE';
 const BADGE_STYLE: React.CSSProperties = {
   display: 'inline-block',
   padding: '0.125rem var(--nf-space-2)',
-  borderRadius: '999px',
+  borderRadius: 'var(--nf-radius-pill)',
   background: 'var(--nf-color-accent-subtle)',
   color: 'var(--nf-color-fg)',
   fontSize: '0.6875rem',
@@ -228,7 +228,7 @@ function NlQueryPanel({ workspaceId }: { workspaceId: string | undefined }): Rea
         maxLength={500}
         style={{
           padding: 'var(--nf-space-2) 0.625rem',
-          borderRadius: '0.375rem',
+          borderRadius: 'var(--nf-radius-sm)',
           border: '1px solid var(--nf-color-border)',
           background: 'var(--nf-color-bg)',
           color: 'var(--nf-color-fg)',
@@ -240,7 +240,7 @@ function NlQueryPanel({ workspaceId }: { workspaceId: string | undefined }): Rea
         disabled={disabled}
         style={{
           padding: '0.4rem var(--nf-space-3)',
-          borderRadius: '0.375rem',
+          borderRadius: 'var(--nf-radius-sm)',
           border: '1px solid var(--nf-color-border)',
           background: 'var(--nf-color-surface)',
           color: 'var(--nf-color-fg)',
@@ -614,7 +614,7 @@ function GlassDockImpl(): ReactElement {
           alignItems: 'center',
           gap: 'var(--nf-space-2)',
           padding: '0.625rem 0.875rem',
-          borderRadius: '999px',
+          borderRadius: 'var(--nf-radius-pill)',
           background: 'var(--nf-color-surface)',
           border: '1px solid var(--nf-color-border)',
           color: 'var(--nf-color-fg)',
@@ -645,7 +645,7 @@ function GlassDockImpl(): ReactElement {
         flexDirection: 'column',
         background: 'var(--nf-color-bg-elevated)',
         border: '1px solid var(--nf-color-border)',
-        borderRadius: '0.75rem',
+        borderRadius: 'var(--nf-radius-lg)',
         boxShadow: 'var(--nf-shadow-lg)',
         zIndex: 50,
       }}
@@ -675,7 +675,7 @@ function GlassDockImpl(): ReactElement {
             justifyContent: 'center',
             inlineSize: '1.75rem',
             blockSize: '1.75rem',
-            borderRadius: '0.375rem',
+            borderRadius: 'var(--nf-radius-sm)',
             border: 'none',
             background: 'transparent',
             color: 'var(--nf-color-fg)',

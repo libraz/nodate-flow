@@ -59,7 +59,7 @@ function SourceFilter({
             onClick={() => onChange(v)}
             style={{
               padding: 'var(--nf-space-1) var(--nf-space-3)',
-              borderRadius: '999px',
+              borderRadius: 'var(--nf-radius-pill)',
               border: `1px solid ${active ? 'var(--nf-color-accent)' : 'var(--nf-color-border)'}`,
               background: active ? 'var(--nf-color-accent-subtle)' : 'var(--nf-color-surface)',
               color: active ? 'var(--nf-color-accent)' : 'var(--nf-color-fg)',
@@ -141,7 +141,7 @@ function FeedWithActors({
           textAlign: 'center',
           color: 'var(--nf-color-danger)',
           border: '1px solid var(--nf-color-danger)',
-          borderRadius: '0.75rem',
+          borderRadius: 'var(--nf-radius-lg)',
           display: 'flex',
           flexDirection: 'column',
           gap: 'var(--nf-space-3)',
@@ -171,7 +171,7 @@ function FeedWithActors({
           textAlign: 'center',
           color: 'var(--nf-color-fg-muted)',
           border: '1px dashed var(--nf-color-border)',
-          borderRadius: '0.75rem',
+          borderRadius: 'var(--nf-radius-lg)',
           background: 'var(--nf-color-bg-sunken)',
           fontSize: 'var(--nf-text-sm)',
         }}
@@ -192,7 +192,7 @@ function FeedWithActors({
           maxBlockSize: '40rem',
           overflowY: 'auto',
           border: '1px solid var(--nf-color-border)',
-          borderRadius: '0.75rem',
+          borderRadius: 'var(--nf-radius-lg)',
           background: 'var(--nf-color-surface)',
         }}
       >

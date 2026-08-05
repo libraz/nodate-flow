@@ -59,7 +59,7 @@ function InviteErrorComponent({ error }: { error: unknown }): ReactElement {
             display: 'inline-flex',
             alignItems: 'center',
             padding: '0.625rem var(--nf-space-5)',
-            borderRadius: '0.5rem',
+            borderRadius: 'var(--nf-radius-md)',
             border: '1px solid var(--nf-color-border)',
             color: 'var(--nf-color-fg)',
             textDecoration: 'none',

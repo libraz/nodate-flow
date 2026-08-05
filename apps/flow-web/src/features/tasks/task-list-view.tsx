@@ -705,7 +705,7 @@ export default function TaskListView({ projectId }: TaskListViewProps): ReactEle
               fontSize: 'var(--nf-text-xs)',
               fontWeight: 500,
               padding: '0.125rem var(--nf-space-2)',
-              borderRadius: '999px',
+              borderRadius: 'var(--nf-radius-pill)',
               background: `${color}18`,
               color: color,
               whiteSpace: 'nowrap',
@@ -716,7 +716,7 @@ export default function TaskListView({ projectId }: TaskListViewProps): ReactEle
               style={{
                 width: '0.375rem',
                 height: '0.375rem',
-                borderRadius: '999px',
+                borderRadius: 'var(--nf-radius-pill)',
                 background: color,
                 flexShrink: 0,
               }}
@@ -772,7 +772,7 @@ export default function TaskListView({ projectId }: TaskListViewProps): ReactEle
               style={{
                 inlineSize: '0.5rem',
                 blockSize: '0.5rem',
-                borderRadius: '999px',
+                borderRadius: 'var(--nf-radius-pill)',
                 background: 'var(--nf-color-accent)',
               }}
             />

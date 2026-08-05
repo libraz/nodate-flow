@@ -197,7 +197,7 @@ export default function InboxList(): ReactElement {
             onChange={handleWorkspaceChange}
             style={{
               padding: 'var(--nf-space-2) var(--nf-space-3)',
-              borderRadius: '0.5rem',
+              borderRadius: 'var(--nf-radius-md)',
               border: '1px solid var(--nf-color-border)',
               background: 'var(--nf-color-surface)',
               color: 'var(--nf-color-fg)',
@@ -283,7 +283,7 @@ export default function InboxList(): ReactElement {
             textAlign: 'center',
             color: 'var(--nf-color-fg-muted)',
             border: '1px dashed var(--nf-color-border)',
-            borderRadius: '0.75rem',
+            borderRadius: 'var(--nf-radius-lg)',
             background: 'var(--nf-color-bg-sunken)',
           }}
         >

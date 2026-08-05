@@ -67,7 +67,7 @@ export default function Forbidden(): ReactElement {
           display: 'inline-flex',
           alignItems: 'center',
           padding: 'var(--nf-space-2) var(--nf-space-5)',
-          borderRadius: '0.5rem',
+          borderRadius: 'var(--nf-radius-md)',
           background: 'var(--nf-color-accent)',
           color: 'var(--nf-color-fg-on-accent)',
           textDecoration: 'none',

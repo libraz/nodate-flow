@@ -181,7 +181,7 @@ function OverviewPanel({ id, workspaceId }: { id: string; workspaceId: string })
             textAlign: 'center',
             color: 'var(--nf-color-fg-muted)',
             border: '1px dashed var(--nf-color-border)',
-            borderRadius: '0.5rem',
+            borderRadius: 'var(--nf-radius-md)',
             background: 'var(--nf-color-bg-sunken)',
           }}
         >
@@ -243,7 +243,7 @@ function OverviewPanel({ id, workspaceId }: { id: string; workspaceId: string })
         style={{
           display: 'flex',
           blockSize: '0.5rem',
-          borderRadius: '999px',
+          borderRadius: 'var(--nf-radius-pill)',
           overflow: 'hidden',
           background: 'var(--nf-color-surface)',
         }}
@@ -276,7 +276,7 @@ function OverviewPanel({ id, workspaceId }: { id: string; workspaceId: string })
             key={s}
             style={{
               padding: 'var(--nf-space-2) var(--nf-space-3)',
-              borderRadius: '0.5rem',
+              borderRadius: 'var(--nf-radius-md)',
               background: 'var(--nf-color-surface)',
               display: 'flex',
               flexDirection: 'column',

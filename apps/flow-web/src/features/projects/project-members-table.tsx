@@ -148,7 +148,7 @@ export default function ProjectMembersTable({ projectId }: ProjectMembersTablePr
               textAlign: 'center',
               color: 'var(--nf-color-fg-muted)',
               border: '1px dashed var(--nf-color-border)',
-              borderRadius: '0.5rem',
+              borderRadius: 'var(--nf-radius-md)',
               background: 'var(--nf-color-bg-sunken)',
             }}
           >

@@ -86,7 +86,7 @@ export default function ReplayPanel({ taskId }: ReplayPanelProps): ReactElement 
         flexDirection: 'column',
         gap: 'var(--nf-space-3)',
         padding: '0.875rem var(--nf-space-4)',
-        borderRadius: '0.5rem',
+        borderRadius: 'var(--nf-radius-md)',
         border: '1px solid var(--nf-color-border)',
         background: 'var(--nf-color-surface)',
       }}

@@ -245,7 +245,7 @@ export default function SignalGroup({
         padding: 'var(--nf-space-3)',
         background: 'var(--nf-color-bg-sunken)',
         border: '1px solid var(--nf-color-border)',
-        borderRadius: '0.5rem',
+        borderRadius: 'var(--nf-radius-md)',
         display: 'flex',
         flexDirection: 'column',
         gap: 'var(--nf-space-2)',
@@ -302,7 +302,7 @@ export default function SignalGroup({
           style={{
             background: 'var(--nf-color-surface)',
             border: '1px solid var(--nf-color-hairline)',
-            borderRadius: '0.375rem',
+            borderRadius: 'var(--nf-radius-sm)',
             padding: 'var(--nf-space-2) 0.625rem',
           }}
         >

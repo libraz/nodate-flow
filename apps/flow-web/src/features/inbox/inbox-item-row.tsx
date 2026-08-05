@@ -89,7 +89,7 @@ export default function InboxItemRow({
             justifyContent: 'center',
             inlineSize: '2rem',
             blockSize: '2rem',
-            borderRadius: '0.5rem',
+            borderRadius: 'var(--nf-radius-md)',
             background: 'var(--nf-color-surface)',
             color: 'var(--nf-color-fg)',
             flexShrink: 0,

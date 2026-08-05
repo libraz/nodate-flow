@@ -176,7 +176,7 @@ function TimelineInner({
             textAlign: 'center',
             color: 'var(--nf-color-fg-muted)',
             border: '1px dashed var(--nf-color-border)',
-            borderRadius: '0.75rem',
+            borderRadius: 'var(--nf-radius-lg)',
             background: 'var(--nf-color-bg-sunken)',
           }}
         >

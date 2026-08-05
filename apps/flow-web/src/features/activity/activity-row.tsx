@@ -62,7 +62,7 @@ function ActorGlyph({
         style={{
           inlineSize: '1.75rem',
           blockSize: '1.75rem',
-          borderRadius: '999px',
+          borderRadius: 'var(--nf-radius-pill)',
           background: 'color-mix(in oklab, var(--nf-color-accent) 14%, transparent)',
           color: 'var(--nf-color-accent)',
           display: 'inline-flex',
@@ -82,7 +82,7 @@ function ActorGlyph({
         style={{
           inlineSize: '1.75rem',
           blockSize: '1.75rem',
-          borderRadius: '999px',
+          borderRadius: 'var(--nf-radius-pill)',
           background: 'var(--nf-color-bg-sunken)',
           color: 'var(--nf-color-fg-muted)',
           display: 'inline-flex',
@@ -165,7 +165,7 @@ export default function ActivityRow({ entry, actorName }: ActivityRowProps): Rea
           <span
             style={{
               padding: '0 0.375rem',
-              borderRadius: '0.25rem',
+              borderRadius: 'var(--nf-radius-xs)',
               border: `1px solid ${sourceTone}`,
               color: sourceTone,
               fontSize: '0.625rem',

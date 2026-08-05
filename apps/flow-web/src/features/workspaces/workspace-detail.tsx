@@ -38,7 +38,7 @@ function OverviewPanel({ workspaceId }: { workspaceId: string }): ReactElement {
             textAlign: 'center',
             color: 'var(--nf-color-fg-muted)',
             border: '1px dashed var(--nf-color-border)',
-            borderRadius: '0.5rem',
+            borderRadius: 'var(--nf-radius-md)',
             background: 'var(--nf-color-bg-sunken)',
           }}
         >
@@ -88,7 +88,7 @@ function OverviewPanel({ workspaceId }: { workspaceId: string }): ReactElement {
                 alignItems: 'center',
                 gap: 'var(--nf-space-3)',
                 padding: '0.6rem var(--nf-space-3)',
-                borderRadius: '0.5rem',
+                borderRadius: 'var(--nf-radius-md)',
                 background: 'var(--nf-color-surface)',
                 color: 'inherit',
                 textDecoration: 'none',
@@ -99,7 +99,7 @@ function OverviewPanel({ workspaceId }: { workspaceId: string }): ReactElement {
                 style={{
                   inlineSize: '0.6rem',
                   blockSize: '0.6rem',
-                  borderRadius: '999px',
+                  borderRadius: 'var(--nf-radius-pill)',
                   background: p.color ?? 'var(--nf-color-fg-muted)',
                   flexShrink: 0,
                 }}

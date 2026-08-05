@@ -150,7 +150,7 @@ function WorkspaceSettingsLayout(): ReactElement {
             style={{
               display: 'block',
               padding: 'var(--nf-space-2) var(--nf-space-3)',
-              borderRadius: '0.5rem',
+              borderRadius: 'var(--nf-radius-md)',
               color: 'var(--nf-color-fg)',
               textDecoration: 'none',
             }}

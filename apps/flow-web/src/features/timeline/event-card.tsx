@@ -196,7 +196,7 @@ function renderRawPayload(payload: unknown): ReactNode {
         marginBlockStart: 'var(--nf-space-1)',
         padding: 'var(--nf-space-2)',
         background: 'var(--nf-color-surface)',
-        borderRadius: '0.25rem',
+        borderRadius: 'var(--nf-radius-xs)',
         fontSize: '0.7rem',
         overflowX: 'auto',
       }}
@@ -275,7 +275,7 @@ function humanizePayload(type: string, payload: unknown, t: TFunction, locale: s
         marginBlockStart: 'var(--nf-space-1)',
         padding: 'var(--nf-space-2)',
         background: 'var(--nf-color-surface)',
-        borderRadius: '0.25rem',
+        borderRadius: 'var(--nf-radius-xs)',
         fontSize: 'var(--nf-text-xs)',
         display: 'flex',
         flexDirection: 'column',
@@ -368,7 +368,7 @@ export default function EventCard({ event }: EventCardProps): ReactElement {
           style={{
             inlineSize: '1.75rem',
             blockSize: '1.75rem',
-            borderRadius: '999px',
+            borderRadius: 'var(--nf-radius-pill)',
             background: 'var(--nf-color-bg)',
             border: `2px solid ${tag.color}`,
             display: 'flex',
@@ -384,7 +384,7 @@ export default function EventCard({ event }: EventCardProps): ReactElement {
               style={{
                 inlineSize: '1.25rem',
                 blockSize: '1.25rem',
-                borderRadius: '999px',
+                borderRadius: 'var(--nf-radius-pill)',
                 background: 'color-mix(in oklab, var(--nf-color-accent) 14%, transparent)',
                 color: 'var(--nf-color-accent)',
                 display: 'inline-flex',
@@ -428,7 +428,7 @@ export default function EventCard({ event }: EventCardProps): ReactElement {
           <span
             style={{
               padding: '0 0.375rem',
-              borderRadius: '0.25rem',
+              borderRadius: 'var(--nf-radius-xs)',
               border: `1px solid ${tag.color}`,
               color: tag.color,
               fontSize: '0.625rem',

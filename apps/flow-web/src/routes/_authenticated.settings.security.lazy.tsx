@@ -18,7 +18,7 @@ const sectionStyle = {
   flexDirection: 'column',
   gap: '0.875rem',
   padding: 'var(--nf-space-5) var(--nf-space-6)',
-  borderRadius: '0.75rem',
+  borderRadius: 'var(--nf-radius-lg)',
   border: '1px solid var(--nf-color-border)',
   background: 'var(--nf-color-surface)',
 } as const;

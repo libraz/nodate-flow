@@ -376,7 +376,7 @@ function DescriptionEditor({ id, initial }: { id: string; initial: string }): Re
             ...(isEmpty
               ? {
                   border: '1px dashed var(--nf-color-border)',
-                  borderRadius: '0.5rem',
+                  borderRadius: 'var(--nf-radius-md)',
                   padding: 'var(--nf-space-4)',
                   cursor: 'pointer',
                   textAlign: 'center' as const,

@@ -134,7 +134,7 @@ function TodayRoute(): ReactElement {
             gap: 'var(--nf-space-4)',
             color: 'var(--nf-color-fg-muted)',
             border: '1px dashed var(--nf-color-border)',
-            borderRadius: '0.75rem',
+            borderRadius: 'var(--nf-radius-lg)',
             background: 'var(--nf-color-bg-sunken)',
           }}
         >
@@ -153,7 +153,7 @@ function TodayRoute(): ReactElement {
               display: 'inline-flex',
               alignItems: 'center',
               padding: 'var(--nf-space-2) var(--nf-space-4)',
-              borderRadius: '0.5rem',
+              borderRadius: 'var(--nf-radius-md)',
               background: 'var(--nf-color-accent)',
               color: 'white',
               border: 'none',
@@ -208,7 +208,7 @@ function TodayRoute(): ReactElement {
                       alignItems: 'center',
                       gap: 'var(--nf-space-3)',
                       padding: '0.6rem var(--nf-space-3)',
-                      borderRadius: '0.5rem',
+                      borderRadius: 'var(--nf-radius-md)',
                       background: isOverdue
                         ? 'var(--nf-color-danger-subtle)'
                         : 'var(--nf-color-surface)',
@@ -222,7 +222,7 @@ function TodayRoute(): ReactElement {
                       style={{
                         inlineSize: '0.5rem',
                         blockSize: '0.5rem',
-                        borderRadius: '999px',
+                        borderRadius: 'var(--nf-radius-pill)',
                         background:
                           STATE_COLOR[task.derivedState as TaskDerivedState] ??
                           'var(--nf-color-fg-muted)',
@@ -250,7 +250,7 @@ function TodayRoute(): ReactElement {
                           fontSize: '0.6875rem',
                           fontWeight: 600,
                           padding: '0.125rem 0.375rem',
-                          borderRadius: '0.25rem',
+                          borderRadius: 'var(--nf-radius-xs)',
                           background: PRIORITY_COLOR[pri],
                           color: 'white',
                           whiteSpace: 'nowrap',

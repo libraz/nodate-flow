@@ -104,7 +104,7 @@ function FatalFallback({
           style={{
             margin: 0,
             padding: 'var(--nf-space-3) var(--nf-space-4)',
-            borderRadius: '0.5rem',
+            borderRadius: 'var(--nf-radius-md)',
             background: 'var(--nf-color-surface)',
             color: 'var(--nf-color-fg-muted)',
             fontSize: '0.8125rem',
@@ -122,7 +122,7 @@ function FatalFallback({
           onClick={resetErrorBoundary}
           style={{
             padding: 'var(--nf-space-2) var(--nf-space-4)',
-            borderRadius: '0.5rem',
+            borderRadius: 'var(--nf-radius-md)',
             border: '1px solid var(--nf-color-border)',
             background: 'var(--nf-color-surface)',
             color: 'var(--nf-color-fg)',
@@ -135,7 +135,7 @@ function FatalFallback({
           to="/"
           style={{
             padding: 'var(--nf-space-2) var(--nf-space-4)',
-            borderRadius: '0.5rem',
+            borderRadius: 'var(--nf-radius-md)',
             background: 'var(--nf-color-accent)',
             color: 'var(--nf-color-fg-on-accent)',
             textDecoration: 'none',

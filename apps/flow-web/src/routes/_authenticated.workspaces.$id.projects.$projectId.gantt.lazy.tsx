@@ -522,7 +522,7 @@ function GanttView(): ReactElement {
             textAlign: 'center',
             color: 'var(--nf-color-fg-muted)',
             border: '1px dashed var(--nf-color-border)',
-            borderRadius: '0.75rem',
+            borderRadius: 'var(--nf-radius-lg)',
             background: 'var(--nf-color-bg-sunken)',
           }}
         >
@@ -534,7 +534,7 @@ function GanttView(): ReactElement {
             display: 'grid',
             gridTemplateColumns: `${LABEL_WIDTH}px minmax(0, 1fr)`,
             border: '1px solid var(--nf-color-border)',
-            borderRadius: '0.5rem',
+            borderRadius: 'var(--nf-radius-md)',
             overflow: 'hidden',
             background: 'var(--nf-color-surface)',
           }}
@@ -576,7 +576,7 @@ function GanttView(): ReactElement {
                   style={{
                     inlineSize: '0.5rem',
                     blockSize: '0.5rem',
-                    borderRadius: '999px',
+                    borderRadius: 'var(--nf-radius-pill)',
                     background:
                       STATE_COLOR[task.derivedState as TaskDerivedState] ??
                       'var(--nf-color-fg-muted)',
@@ -801,7 +801,7 @@ function GanttView(): ReactElement {
           style={{
             alignSelf: 'stretch',
             border: '1px solid var(--nf-color-border)',
-            borderRadius: '0.5rem',
+            borderRadius: 'var(--nf-radius-md)',
             background: 'var(--nf-color-bg-sunken)',
             padding: 'var(--nf-space-2) var(--nf-space-3)',
           }}
@@ -840,7 +840,7 @@ function GanttView(): ReactElement {
                     alignItems: 'center',
                     gap: 'var(--nf-space-2)',
                     padding: '0.375rem var(--nf-space-2)',
-                    borderRadius: '0.375rem',
+                    borderRadius: 'var(--nf-radius-sm)',
                     color: 'var(--nf-color-fg)',
                     fontSize: '0.8125rem',
                     textDecoration: 'none',
@@ -851,7 +851,7 @@ function GanttView(): ReactElement {
                     style={{
                       inlineSize: '0.5rem',
                       blockSize: '0.5rem',
-                      borderRadius: '999px',
+                      borderRadius: 'var(--nf-radius-pill)',
                       background:
                         STATE_COLOR[task.derivedState as TaskDerivedState] ??
                         'var(--nf-color-fg-muted)',
