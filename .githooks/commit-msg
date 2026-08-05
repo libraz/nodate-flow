@@ -1,0 +1,20 @@
+#!/bin/sh
+# Repository commit-message hook.
+#
+# Tracked, and reached either through the global hooks directory (which
+# dispatches to it) or through simple-git-hooks, which points .git/hooks at
+# this same file. Both routes run identical checks, so a machine with
+# core.hooksPath set and one without behave the same.
+#
+# The shared message shape is checked before this runs; what is left is the
+# part only this repository knows, which is its scope vocabulary. See
+# commitlint.config.js.
+#
+# Bypass (rare, intentional): git commit --no-verify
+
+set -e
+
+toplevel=$(git rev-parse --show-toplevel 2>/dev/null) || exit 0
+
+cd "$toplevel"
+exec bunx --bun commitlint --edit "$1"

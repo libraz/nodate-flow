@@ -14,6 +14,17 @@ set -e
 
 toplevel=$(git rev-parse --show-toplevel 2>/dev/null) || exit 0
 
+# Format and lint only what is staged. Everything here is deliberately
+# sub-second: a hook that runs a test suite is a hook people learn to pass
+# --no-verify to, and then it protects nothing. Whole-repository checks
+# belong in CI, which is where they run.
+if ! (cd "$toplevel" && bunx --bun lint-staged); then
+  echo "" >&2
+  echo "✖ pre-commit hook: staged files failed lint or formatting (see above)." >&2
+  echo "  Bypass only when you know why: git commit --no-verify" >&2
+  exit 1
+fi
+
 # --staged makes the checker return immediately when nothing it cares about
 # is staged. Which paths those are is the checker's business, not the hook's,
 # so the decision lives in one place; paying for a generator run on every
