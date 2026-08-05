@@ -96,6 +96,8 @@ function DialogImpl(
   ref: Ref<HTMLDivElement>,
 ): ReactElement | null {
   const containerRef = useRef<HTMLDivElement | null>(null);
+  /** Whether the pointer went down on the overlay itself. See the handlers below. */
+  const pressedOnOverlayRef = useRef(false);
   const titleId = useId();
 
   useFocusTrap(containerRef, open);
@@ -131,7 +133,31 @@ function DialogImpl(
     // biome-ignore lint/a11y/useKeyWithClickEvents: overlay dismissal; keyboard handled by document keydown Escape
     <div
       className={cx(styles.overlay, fullScreenOnMobile && styles.overlayMobile)}
-      onClick={dismissOnOverlayClick ? onClose : undefined}
+      /*
+       * Dismiss only when the gesture both started and ended on the
+       * overlay. A `click` fires on the nearest common ancestor of
+       * pointerdown and pointerup, so dragging a text selection out of a
+       * field and releasing past the dialog's edge counted as an overlay
+       * click — the dialog closed and everything typed into it went with
+       * it. Selecting text is the ordinary way to edit, so this was
+       * reachable without doing anything unusual.
+       */
+      onPointerDown={
+        dismissOnOverlayClick
+          ? (event) => {
+              pressedOnOverlayRef.current = event.target === event.currentTarget;
+            }
+          : undefined
+      }
+      onClick={
+        dismissOnOverlayClick
+          ? (event) => {
+              const startedHere = pressedOnOverlayRef.current;
+              pressedOnOverlayRef.current = false;
+              if (startedHere && event.target === event.currentTarget) onClose();
+            }
+          : undefined
+      }
     >
       {/* biome-ignore lint/a11y/useKeyWithClickEvents: onClick only stops overlay-dismiss propagation; dialog keyboard handled at document level */}
       <div

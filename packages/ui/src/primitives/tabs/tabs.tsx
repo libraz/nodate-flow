@@ -97,6 +97,7 @@ const Tabs = forwardRef<HTMLDivElement, TabsProps>(
       value,
       defaultValue: defaultValue ?? fallback,
       onChange: handleChange,
+      name: 'Tabs',
     });
     const current = active ?? fallback;
     const baseId = useId();

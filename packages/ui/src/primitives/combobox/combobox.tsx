@@ -46,6 +46,7 @@ import {
   useCallback,
   useEffect,
   useId,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -132,6 +133,7 @@ function ComboboxImpl(
     value,
     defaultValue,
     onChange,
+    name: 'Combobox',
   });
 
   const initialLabel = useMemo(
@@ -230,7 +232,29 @@ function ComboboxImpl(
     whileElementsMounted: autoUpdate,
   });
 
+  /**
+   * The rendered option elements, indexed to match `filtered`.
+   *
+   * Populated on every option and, until now, read by nothing: arrow keys
+   * moved `activeIndex` past the bottom of the popup and the highlight
+   * went with it, off screen. The list is scrollable and the active
+   * option is styled, so from the keyboard the control looked like it had
+   * simply stopped responding.
+   */
   const listRef = useRef<Array<HTMLElement | null>>([]);
+
+  /**
+   * Keep the active option in view.
+   *
+   * `block: 'nearest'` scrolls only when the option is actually outside
+   * the viewport of its scroll container, so moving between two visible
+   * options does not jerk the list. Layout effect rather than effect:
+   * the scroll happens in the same frame as the highlight moving.
+   */
+  useLayoutEffect(() => {
+    if (!open || activeIndex === null) return;
+    listRef.current[activeIndex]?.scrollIntoView({ block: 'nearest' });
+  }, [open, activeIndex]);
 
   const click = useClick(context, { event: 'mousedown', keyboardHandlers: false });
   const focus = useFocus(context);

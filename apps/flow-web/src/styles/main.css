@@ -11,7 +11,22 @@
 
 @import "@nodate-flow/ui/styles/focus-ring.css";
 
-:root {
+/*
+ * The scheme to use before a theme is applied — the first paint, and any
+ * document that never sets `data-theme`.
+ *
+ * `:where()` is load-bearing. Every theme declares its own
+ * `color-scheme` under `[data-theme="…"]`, and an attribute selector and
+ * `:root` have the same specificity, so the winner is decided by source
+ * order alone: this rule sits after the theme imports and was quietly
+ * beating all six of them. `light dark` means "either, follow the OS",
+ * which is precisely what choosing a theme is supposed to override — so
+ * a reader on a dark OS who picked aurora-light got dark scrollbars,
+ * dark date pickers and dark autofill on a light page. Wrapping the
+ * selector drops it to zero specificity, so every theme wins over it and
+ * the outcome no longer depends on the order of the imports above.
+ */
+:where(:root) {
   color-scheme: light dark;
 }
 

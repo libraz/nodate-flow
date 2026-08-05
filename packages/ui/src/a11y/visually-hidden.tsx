@@ -2,14 +2,20 @@
  * VisuallyHidden — content remains accessible to assistive technology
  * but is removed from the visual layout. Implements the standard "sr-only"
  * clip pattern.
+ *
+ * There is no `focusable` escape hatch. It existed as a prop, documented
+ * as "becomes visible on keyboard focus (useful for skip links)", and
+ * set a `data-nf-focusable` attribute that nothing read — a skip link
+ * built on it stayed invisible on focus, which is the one thing a skip
+ * link has to do. SkipLink in this same directory does that properly, so
+ * the prop was promising a second and worse way to reach a solved
+ * problem. Reach for SkipLink.
  */
 
 import type { CSSProperties, JSX, ReactNode } from 'react';
 
 export interface VisuallyHiddenProps {
   children: ReactNode;
-  /** When true, becomes visible on keyboard focus (useful for skip links). */
-  focusable?: boolean;
 }
 
 const HIDDEN: CSSProperties = {
@@ -24,10 +30,6 @@ const HIDDEN: CSSProperties = {
   borderWidth: 0,
 };
 
-export default function VisuallyHidden({ children, focusable }: VisuallyHiddenProps): JSX.Element {
-  return (
-    <span style={HIDDEN} data-nf-focusable={focusable ? '' : undefined}>
-      {children}
-    </span>
-  );
+export default function VisuallyHidden({ children }: VisuallyHiddenProps): JSX.Element {
+  return <span style={HIDDEN}>{children}</span>;
 }

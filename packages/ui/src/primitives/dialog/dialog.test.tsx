@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { type ReactElement, useState } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -404,5 +404,42 @@ describe('Dialog overlay lock + background inert', () => {
     // B closed; focus must return to the opener inside A — NOT to body.
     expect(getOverlayOpenCountForTests()).toBe(1);
     expect(document.activeElement).toBe(openB);
+  });
+  /**
+   * A `click` fires on the nearest common ancestor of pointerdown and
+   * pointerup, so dragging a text selection out of a field and releasing
+   * past the dialog's edge produced a click on the overlay. The dialog
+   * dismissed and everything typed into it went with it. Selecting text
+   * is how people edit, so this needed no unusual gesture at all.
+   */
+  it('does not dismiss when the gesture started inside the dialog', () => {
+    const onClose = vi.fn();
+    render(
+      <Dialog open onClose={onClose} title="t">
+        <input aria-label="field" defaultValue="typed" />
+      </Dialog>,
+    );
+    const field = screen.getByLabelText('field');
+    const overlay = field.closest('[class*="overlay"]');
+    if (!overlay) throw new Error('overlay not found');
+
+    fireEvent.pointerDown(field);
+    fireEvent.click(overlay);
+    expect(onClose).not.toHaveBeenCalled();
+  });
+
+  it('dismisses when the gesture both starts and ends on the overlay', () => {
+    const onClose = vi.fn();
+    render(
+      <Dialog open onClose={onClose} title="t">
+        <input aria-label="field" />
+      </Dialog>,
+    );
+    const overlay = screen.getByLabelText('field').closest('[class*="overlay"]');
+    if (!overlay) throw new Error('overlay not found');
+
+    fireEvent.pointerDown(overlay);
+    fireEvent.click(overlay);
+    expect(onClose).toHaveBeenCalledTimes(1);
   });
 });

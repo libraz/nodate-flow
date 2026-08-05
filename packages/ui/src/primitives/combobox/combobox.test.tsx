@@ -284,4 +284,36 @@ describe.each(THEMES)('Combobox [%s]', (theme) => {
     render(<Combobox options={OPTIONS} aria-label="rtl" dir="rtl" />);
     expect(screen.getByRole('combobox').getAttribute('dir')).toBe('rtl');
   });
+
+  /**
+   * The listbox scrolls, so an option below the fold has to be brought
+   * into view when the arrow keys reach it. The element refs were being
+   * collected and never read: the highlight moved off screen and, from
+   * the keyboard, the control looked like it had stopped responding.
+   */
+  it('scrolls the active option into view as the arrow keys move it', async () => {
+    const scrollIntoView = vi.fn();
+    const original = Element.prototype.scrollIntoView;
+    Element.prototype.scrollIntoView = scrollIntoView;
+    try {
+      const many: ComboboxOption[] = Array.from({ length: 30 }, (_, i) => ({
+        value: `v${i}`,
+        label: `Option ${i}`,
+      }));
+      const user = userEvent.setup();
+      render(<Combobox options={many} aria-label="long" />);
+      const input = screen.getByRole('combobox') as HTMLInputElement;
+      input.focus();
+      await user.keyboard('{ArrowDown}');
+      await waitFor(() => expect(screen.getByRole('listbox')).toBeDefined());
+
+      scrollIntoView.mockClear();
+      await user.keyboard('{ArrowDown}{ArrowDown}{ArrowDown}');
+
+      expect(scrollIntoView).toHaveBeenCalled();
+      expect(scrollIntoView.mock.calls.at(-1)?.[0]).toEqual({ block: 'nearest' });
+    } finally {
+      Element.prototype.scrollIntoView = original;
+    }
+  });
 });

@@ -11,7 +11,14 @@
 
 @import "./layout.css";
 
-:root {
+/*
+ * The scheme to use before a theme is applied. `:where()` is
+ * load-bearing — see the same rule in flow-web's main.css: `:root` and
+ * `[data-theme="…"]` have equal specificity, so this rule was winning
+ * over all six themes on source order and pinning the UA widgets to the
+ * OS preference regardless of which theme the reader chose.
+ */
+:where(:root) {
   color-scheme: light dark;
 }
 

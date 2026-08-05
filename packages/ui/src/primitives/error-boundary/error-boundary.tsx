@@ -8,7 +8,17 @@
 import { Component, type ErrorInfo, type ReactElement, type ReactNode } from 'react';
 import styles from './error-boundary.module.css';
 
-export interface ErrorFallbackProps {
+/**
+ * What ErrorBoundary hands to a custom `fallback`.
+ *
+ * Named for the boundary rather than for the fallback because the
+ * ErrorFallback primitive next door exports its own, different
+ * `ErrorFallbackProps` — the props of that component. Two public types
+ * with one name is only a problem once both reach the package barrel,
+ * which is how this stayed invisible while ErrorBoundary was missing
+ * from it.
+ */
+export interface ErrorBoundaryFallbackProps {
   /** The caught error. */
   error: Error;
   /** Call to reset the boundary (re-renders children). */
@@ -19,7 +29,7 @@ export interface ErrorBoundaryProps {
   /** Content to render when no error. */
   children: ReactNode;
   /** Custom fallback component. If omitted, uses the built-in default. */
-  fallback?: (props: ErrorFallbackProps) => ReactElement;
+  fallback?: (props: ErrorBoundaryFallbackProps) => ReactElement;
   /** Called when an error is caught (for logging / reporting). */
   onError?: (error: Error, info: ErrorInfo) => void;
   /** Title shown in the default fallback UI. Defaults to "Something went wrong". */
@@ -38,7 +48,7 @@ function DefaultFallback({
   resetErrorBoundary,
   title = 'Something went wrong',
   action = 'Try again',
-}: ErrorFallbackProps & { title?: string; action?: string }): ReactElement {
+}: ErrorBoundaryFallbackProps & { title?: string; action?: string }): ReactElement {
   return (
     <div className={styles.root} role="alert">
       <p className={styles.title}>{title}</p>

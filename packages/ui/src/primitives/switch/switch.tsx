@@ -29,6 +29,7 @@ const Switch = forwardRef<HTMLButtonElement, SwitchProps>(
       value: checked,
       defaultValue: defaultChecked ?? false,
       onChange: onCheckedChange,
+      name: 'Switch',
     });
 
     return (

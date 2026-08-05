@@ -168,9 +168,20 @@ export default function DatePicker({
   const [viewYear, setViewYear] = useState(initial.year);
   const [viewMonth, setViewMonth] = useState(initial.month);
 
-  // Sync view when value changes externally
-  const prevValue = useMemo(() => value, [value]);
+  /*
+   * Move the visible month when `value` changes from outside.
+   *
+   * The previous value has to be held in state. It was held in a
+   * `useMemo(() => value, [value])`, which returns the new value the
+   * moment `value` changes — so the comparison below was `value !==
+   * value` and the whole block was unreachable. A date set from anywhere
+   * other than this calendar (a form reset, a "today" shortcut, a value
+   * arriving with the record) left the picker showing whatever month it
+   * happened to be on, with the selected day off screen.
+   */
+  const [prevValue, setPrevValue] = useState(value);
   if (prevValue !== value) {
+    setPrevValue(value);
     const p = parseIso(value);
     if (p && (p.year !== viewYear || p.month !== viewMonth)) {
       setViewYear(p.year);
