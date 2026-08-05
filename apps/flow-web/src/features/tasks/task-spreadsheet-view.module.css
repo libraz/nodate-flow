@@ -74,7 +74,7 @@
 }
 
 .bodyRow:nth-child(even) {
-  background: var(--nf-color-surface-muted);
+  background: var(--nf-color-bg-sunken);
 }
 
 .bodyRow:hover {
@@ -90,7 +90,7 @@
 .cell {
   display: flex;
   align-items: center;
-  padding-block: var(--nf-space-1-5);
+  padding-block: var(--nf-space-2);
   padding-inline: var(--nf-space-3);
   font-size: var(--nf-text-sm);
   color: var(--nf-color-fg);
@@ -118,7 +118,7 @@
 }
 
 .cellEditable:hover {
-  background: var(--nf-color-surface-muted);
+  background: var(--nf-color-bg-sunken);
 }
 
 .cellActive {
@@ -177,7 +177,7 @@
 
 .cellDateTrigger {
   inline-size: 100%;
-  padding-block: var(--nf-space-0-5);
+  padding-block: var(--nf-space-1);
   padding-inline: var(--nf-space-2);
   background: transparent;
   color: var(--nf-color-fg);
@@ -222,7 +222,7 @@
   padding-inline: var(--nf-space-4);
   border-radius: var(--nf-radius-md);
   background: var(--nf-color-accent);
-  color: var(--nf-color-accent-fg);
+  color: var(--nf-color-fg-on-accent);
   font-size: var(--nf-text-sm);
 }
 

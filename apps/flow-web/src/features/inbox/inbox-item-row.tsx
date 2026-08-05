@@ -110,7 +110,7 @@ export default function InboxItemRow({
             <Badge tone="neutral">{sourceLabel}</Badge>
             <span
               style={{
-                fontFamily: 'var(--font-mono)',
+                fontFamily: 'var(--nf-font-mono)',
                 fontSize: '0.8125rem',
                 color: 'var(--nf-color-fg-muted)',
               }}

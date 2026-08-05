@@ -36,7 +36,7 @@ export default function LabelBadge({ name, color, onRemove }: LabelBadgeProps): 
             e.stopPropagation();
             onRemove();
           }}
-          className="ms-0.5 rounded-full p-0.5 hover:bg-[var(--nf-color-bg-hover)] focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[var(--nf-color-focus-ring)]"
+          className="ms-0.5 rounded-full p-0.5 hover:bg-[var(--nf-color-surface-hover)] focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[var(--nf-color-focus-ring)]"
           aria-label={t('badge.remove', { name })}
         >
           <svg

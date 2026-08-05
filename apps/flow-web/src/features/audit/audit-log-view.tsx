@@ -16,7 +16,7 @@ import { type ChangeEvent, type ReactElement, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { formatDate } from '../../lib/format';
-
+import { useWeekStart } from '../../lib/use-week-start';
 import { type AuditLogEntry, type AuditLogFilters, useAuditLogsQuery } from './api';
 
 const PAGE_SIZE = 50;
@@ -209,7 +209,7 @@ function AuditRow({ entry }: { entry: AuditLogEntry }): ReactElement {
         style={{
           padding: '0.5rem 0.75rem',
           fontSize: '0.75rem',
-          fontFamily: 'var(--font-mono)',
+          fontFamily: 'var(--nf-font-mono)',
           color: 'var(--nf-color-fg-muted)',
         }}
       >
@@ -234,6 +234,7 @@ function AuditRow({ entry }: { entry: AuditLogEntry }): ReactElement {
 
 export default function AuditLogView({ workspaceId }: { workspaceId: string }): ReactElement {
   const { t } = useTranslation('settings');
+  const weekStart = useWeekStart();
   const { t: tCommon, i18n } = useTranslation('common');
   const locale = i18n.resolvedLanguage ?? 'en';
   const weekdayLabels = tCommon('common.date.weekdays', { returnObjects: true }) as string[];
@@ -425,6 +426,7 @@ export default function AuditLogView({ workspaceId }: { workspaceId: string }): 
               value={filters.dateFrom ?? ''}
               onChange={handleDateFromChange}
               weekdayLabels={weekdayLabels}
+              weekStart={weekStart}
               formatMonthYear={formatMonthYear}
               prevLabel={tCommon('calendar.prev')}
               nextLabel={tCommon('calendar.next')}
@@ -444,6 +446,7 @@ export default function AuditLogView({ workspaceId }: { workspaceId: string }): 
               value={filters.dateTo ?? ''}
               onChange={handleDateToChange}
               weekdayLabels={weekdayLabels}
+              weekStart={weekStart}
               formatMonthYear={formatMonthYear}
               prevLabel={tCommon('calendar.prev')}
               nextLabel={tCommon('calendar.next')}

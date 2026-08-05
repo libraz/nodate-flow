@@ -23,13 +23,7 @@ import ThemePicker, {
   type ThemeFamilyEntry,
 } from '@nodate-flow/ui/primitives/theme-picker';
 import { toaster } from '@nodate-flow/ui/primitives/toast';
-import {
-  type ColorMode,
-  joinThemeId,
-  splitThemeId,
-  type ThemeFamily,
-  type ThemeId,
-} from '@nodate-flow/ui/providers/theme-provider';
+import type { ColorMode, ThemeFamily } from '@nodate-flow/ui/providers/theme-provider';
 import { type ReactElement, useMemo } from 'react';
 import { Controller } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
@@ -100,7 +94,7 @@ export default function ProfileForm(): ReactElement {
   const { t, i18n } = useTranslation('settings');
   const { data: me } = useMeQuery();
   const update = useUpdateMe();
-  const { preference, resolved, setPreference } = useTheme();
+  const { family, colorMode, setFamily, setColorMode } = useTheme();
 
   // Flatten the IANA-region-grouped timezone list into Combobox options so
   // users can search by region (`Asia`), city (`Tokyo`), or full id
@@ -217,10 +211,9 @@ export default function ProfileForm(): ReactElement {
     }
   };
 
-  // Derive family and colorMode from the live theme preference.
-  const family: ThemeFamily = splitThemeId(resolved).family;
-  const colorMode: ColorMode =
-    preference === 'system' ? 'system' : splitThemeId(preference as ThemeId).mode;
+  // Both come from the provider, which is the only place that knows how
+  // `system` maps onto a family. Re-deriving them here is what let the
+  // two controls disagree with what was actually rendered.
 
   const themeEntries: ThemeFamilyEntry[] = [
     { id: 'glass', label: t('profile.theme_glass'), preview: DEFAULT_THEME_PREVIEWS.glass },
@@ -238,19 +231,17 @@ export default function ProfileForm(): ReactElement {
     { mode: 'system' as const, label: t('profile.color_mode_system') },
   ];
 
+  // Both controls delegate to the provider rather than reimplementing the
+  // family/mode arithmetic. The local copy resolved `system` to whichever
+  // concrete theme was showing and wrote that back, so changing the family
+  // silently turned the untouched colour-mode control from "System" to
+  // "Light" and stopped the account following the OS.
   const handleFamilyChange = (f: ThemeFamily): void => {
-    const currentMode = splitThemeId(resolved).mode;
-    const next = joinThemeId(f, currentMode);
-    if (next) setPreference(next);
+    setFamily(f);
   };
 
   const handleColorModeChange = (m: ColorMode): void => {
-    if (m === 'system') {
-      setPreference('system');
-    } else {
-      const next = joinThemeId(family, m);
-      if (next) setPreference(next);
-    }
+    setColorMode(m);
   };
 
   const onSubmit = async (values: ProfileFormValues): Promise<void> => {

@@ -16,7 +16,9 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import EventDialog, { type EventDialogMode, presetToRRule } from '../event-dialog';
 
 type CreateEventInput = components['schemas']['CreateEventInputBody'];
+type PatchEventInput = components['schemas']['PatchEventInputBody'];
 type CalEventLike = components['schemas']['MyCalendarEventResponse'];
+type EventDetail = components['schemas']['EventResponse'];
 
 /* ── mocks ────────────────────────────────────────────────────── */
 
@@ -29,6 +31,7 @@ const mocks = vi.hoisted(() => ({
   createTask: vi.fn(),
   rememberCalendarChoice: vi.fn(),
   toastShow: vi.fn(),
+  eventDetail: vi.fn(),
 }));
 
 vi.mock('../api', () => ({
@@ -45,6 +48,7 @@ vi.mock('../api', () => ({
   useUpdateEvent: () => ({ mutateAsync: mocks.updateEvent, isPending: false }),
   useDeleteEvent: () => ({ mutateAsync: mocks.deleteEvent, isPending: false }),
   useCreateCalendarTask: () => ({ mutateAsync: mocks.createTask, isPending: false }),
+  useEventDetailQuery: () => mocks.eventDetail(),
 }));
 
 // The toast implementation isn't under test — silence it.
@@ -101,6 +105,34 @@ function editMode(event: Partial<CalEventLike> = {}): EventDialogMode {
   };
 }
 
+/**
+ * The full event row the dialog hydrates from. Distinct from the grid
+ * aggregate {@link CalEventLike} in that it carries `memo`, which is the
+ * whole reason the dialog re-reads the event instead of trusting the
+ * aggregate it was opened with.
+ */
+function eventDetail(overrides: Partial<EventDetail> = {}): EventDetail {
+  return {
+    id: 'evt-1',
+    title: 'Existing event',
+    kind: 'event',
+    timezone: 'UTC',
+    allDay: false,
+    showAs: 'busy',
+    flexibility: 'fixed',
+    visibility: 'default',
+    createdAt: 1_700_000_000,
+    startAt: Math.floor(new Date('2030-06-15T09:00:00').getTime() / 1000),
+    endAt: Math.floor(new Date('2030-06-15T10:00:00').getTime() / 1000),
+    ...overrides,
+  } as EventDetail;
+}
+
+/** Resolve the detail query with the given row on the next render. */
+function withDetail(overrides: Partial<EventDetail> = {}): void {
+  mocks.eventDetail.mockReturnValue({ data: eventDetail(overrides), isLoading: false });
+}
+
 function renderDialog(overrides: Partial<Parameters<typeof EventDialog>[0]> = {}): ReactElement {
   return (
     <EventDialog
@@ -122,6 +154,8 @@ beforeEach(() => {
   mocks.createTask.mockReset().mockResolvedValue({ id: 'task-new' });
   mocks.rememberCalendarChoice.mockReset();
   mocks.toastShow.mockReset();
+  // Create mode never fetches; edit-mode tests opt in via `withDetail`.
+  mocks.eventDetail.mockReset().mockReturnValue({ data: undefined, isLoading: false });
 });
 
 /* ── tests ────────────────────────────────────────────────────── */
@@ -236,9 +270,12 @@ describe('<EventDialog>', () => {
       screen.getByRole('radio', { name: 'flexibility.conditional' }).getAttribute('aria-checked'),
     ).toBe('true');
 
+    // Only a control the user moved reaches the payload, so drive the
+    // one under test before submitting.
+    await user.click(screen.getByRole('radio', { name: 'flexibility.negotiable' }));
     await user.click(screen.getByRole('button', { name: 'action.submit.edit' }));
     const args = mocks.updateEvent.mock.calls[0]?.[0] as { body: { flexibility?: string } };
-    expect(args.body.flexibility).toBe('conditional');
+    expect(args.body.flexibility).toBe('negotiable');
   });
 
   it('create-mode submits a task payload when kind is Task', async () => {
@@ -293,6 +330,73 @@ describe('<EventDialog>', () => {
     renderWithProviders(renderDialog({ mode: editMode() }));
     const taskRadio = screen.getByRole('radio', { name: 'kind.task' });
     expect(taskRadio.hasAttribute('disabled')).toBe(true);
+  });
+
+  it('edit-mode shows the stored memo, which the grid aggregate never carries', async () => {
+    withDetail({ memo: 'Vendor quote: 3 weeks lead time, contact Rin' });
+    renderWithProviders(renderDialog({ mode: editMode() }));
+
+    const memoBox = await screen.findByRole('textbox', { name: 'field.memo' });
+    expect((memoBox as HTMLTextAreaElement).value).toBe(
+      'Vendor quote: 3 weeks lead time, contact Rin',
+    );
+  });
+
+  it('leaves the memo out of the patch body when only the title changed', async () => {
+    const user = userEvent.setup();
+    withDetail({ memo: 'Vendor quote: 3 weeks lead time, contact Rin' });
+    renderWithProviders(renderDialog({ mode: editMode() }));
+
+    const titleInput = screen.getByRole('textbox', { name: 'field.title' });
+    await user.clear(titleInput);
+    await user.type(titleInput, 'Renamed event');
+    await user.click(screen.getByRole('button', { name: 'action.submit.edit' }));
+
+    expect(mocks.updateEvent).toHaveBeenCalledTimes(1);
+    const args = mocks.updateEvent.mock.calls[0]?.[0] as { body: PatchEventInput };
+    expect(args.body.title).toBe('Renamed event');
+    // An absent field means "leave it alone"; sending the memo here is
+    // what used to overwrite a long note with whatever the dialog held.
+    expect('memo' in args.body).toBe(false);
+  });
+
+  it('sends the memo once the user actually edits it', async () => {
+    const user = userEvent.setup();
+    withDetail({ memo: 'Vendor quote' });
+    renderWithProviders(renderDialog({ mode: editMode() }));
+
+    const memoBox = await screen.findByRole('textbox', { name: 'field.memo' });
+    await user.type(memoBox, ' — revised');
+    await user.click(screen.getByRole('button', { name: 'action.submit.edit' }));
+
+    const args = mocks.updateEvent.mock.calls[0]?.[0] as { body: PatchEventInput };
+    expect(args.body.memo).toBe('Vendor quote — revised');
+    // Untouched controls stay out of the payload.
+    expect('title' in args.body).toBe(false);
+    expect('startAt' in args.body).toBe(false);
+  });
+
+  it('skips the request entirely when nothing was edited', async () => {
+    const user = userEvent.setup();
+    const onSaved = vi.fn();
+    withDetail({ memo: 'Vendor quote' });
+    renderWithProviders(renderDialog({ mode: editMode(), onSaved }));
+
+    await user.click(screen.getByRole('button', { name: 'action.submit.edit' }));
+
+    expect(mocks.updateEvent).not.toHaveBeenCalled();
+    expect(onSaved).toHaveBeenCalled();
+  });
+
+  it('keeps the memo box inert until the stored value arrives', async () => {
+    const user = userEvent.setup();
+    mocks.eventDetail.mockReturnValue({ data: undefined, isLoading: true });
+    renderWithProviders(renderDialog({ mode: editMode() }));
+
+    await user.click(screen.getByRole('button', { name: 'action.moreOptions' }));
+    const memoBox = screen.getByRole('textbox', { name: 'field.memo' });
+    expect((memoBox as HTMLTextAreaElement).disabled).toBe(true);
+    expect(memoBox.getAttribute('aria-busy')).toBe('true');
   });
 
   it('preserves backend error detail in mutation failure toasts', async () => {

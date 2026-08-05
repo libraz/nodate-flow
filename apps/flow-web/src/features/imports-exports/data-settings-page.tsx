@@ -19,7 +19,9 @@
  * `?format=` query value — it does not stream `text/csv`. The export
  * mutation in `./api.ts` consequently fetches the JSON body and
  * synthesises a CSV/JSON Blob client-side before triggering the
- * download.
+ * download. That endpoint has a row ceiling and no way to page past it,
+ * so an export that fills the ceiling reports itself as truncated and
+ * this page surfaces it as a warning rather than a success.
  *
  * Hooks consumed (all in `./api.ts`):
  *   - {@link useImportsQuery}              — list (poll-friendly useQuery)
@@ -41,7 +43,7 @@ import { getRouteApi } from '@tanstack/react-router';
 import { type ChangeEvent, type FormEvent, type ReactElement, Suspense, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { ApiError } from '../../lib/api-error';
+import { formatApiError } from '../../lib/api-error';
 import { confirmAction } from '../../lib/confirm-action';
 import { type Project, useProjectsQuery } from '../projects/api';
 import {
@@ -298,11 +300,10 @@ function ImportCreateForm({ workspaceId }: ImportCreateFormProps): ReactElement 
           setConfigError(null);
         },
         onError: (err) => {
-          const message =
-            err instanceof ApiError && err.message
-              ? err.message
-              : t('settings.data.imports.create.error');
-          toaster.show({ tone: 'danger', message });
+          toaster.show({
+            tone: 'danger',
+            message: formatApiError(err, t, 'settings.data.imports.create.error'),
+          });
         },
       },
     );
@@ -395,10 +396,10 @@ function ImportsCard({ workspaceId }: ImportsCardProps): ReactElement {
               message: t('settings.data.imports.cancel_success'),
             });
           },
-          onError: () => {
+          onError: (err) => {
             toaster.show({
               tone: 'danger',
-              message: t('settings.data.imports.cancel_error'),
+              message: formatApiError(err, t, 'settings.data.imports.cancel_error'),
             });
           },
         },
@@ -479,6 +480,12 @@ interface ExportsCardProps {
   workspaceId: string;
 }
 
+/**
+ * The truncation warning carries a consequence ("this is not a complete
+ * backup"), which takes longer to read and act on than a confirmation.
+ */
+const TRUNCATED_TOAST_DURATION_MS = 12_000;
+
 function ExportsCard({ workspaceId }: ExportsCardProps): ReactElement {
   const { t } = useTranslation('settings');
   const exportTasks = useExportTasksMutation();
@@ -489,16 +496,27 @@ function ExportsCard({ workspaceId }: ExportsCardProps): ReactElement {
     exportTasks.mutate(
       { wsId: workspaceId, format },
       {
-        onSuccess: ({ count }) => {
+        onSuccess: ({ count, truncated }) => {
+          // A file that stops at the row ceiling is not the backup the
+          // button offered, so it does not get to look like one.
+          if (truncated) {
+            toaster.show({
+              tone: 'warning',
+              message: t('settings.data.export.truncated', { count }),
+              duration: TRUNCATED_TOAST_DURATION_MS,
+            });
+            return;
+          }
           toaster.show({
             tone: 'success',
             message: t('settings.data.export.success', { count }),
           });
         },
         onError: (err) => {
-          const message =
-            err instanceof ApiError && err.message ? err.message : t('settings.data.export.error');
-          toaster.show({ tone: 'danger', message });
+          toaster.show({
+            tone: 'danger',
+            message: formatApiError(err, t, 'settings.data.export.error'),
+          });
         },
       },
     );

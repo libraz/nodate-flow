@@ -26,7 +26,7 @@ import { useKeyboardShortcuts } from '../lib/use-keyboard-shortcuts';
 
 function AuthenticatedLayout(): ReactElement | null {
   const { t } = useTranslation('common');
-  const { status } = useAuthBootstrap();
+  const { status, retry } = useAuthBootstrap();
   const isAuthenticated = useAuth(selectIsAuthenticated);
 
   // Resolve the default project for FAB-triggered task creation. This
@@ -94,13 +94,20 @@ function AuthenticatedLayout(): ReactElement | null {
       const accountsUrl =
         (import.meta.env.VITE_ACCOUNTS_WEB_URL as string | undefined) ?? 'http://localhost:5175';
       const target = `${accountsUrl}/login?redirect=${encodeURIComponent(window.location.href)}`;
-      if (isSafeRedirect(target)) {
+      // accountsUrl comes from build-time config, so it is the allowlist
+      // here; the check still stops a malformed value from turning into
+      // a navigation to an unexpected origin or scheme.
+      if (isSafeRedirect(target, window.location.origin, [accountsUrl])) {
         window.location.href = target;
       }
     }
   }, [status, isAuthenticated]);
 
   if (status === 'loading') return null;
+  // We could not reach the auth service, which says nothing about whether
+  // the session is still valid. Offer the retry instead of bouncing the
+  // user to a login screen they may not even need.
+  if (status === 'offline') return <SessionUnreachable onRetry={retry} />;
   if (!isAuthenticated) return null;
 
   return (
@@ -167,6 +174,40 @@ function AuthenticatedLayout(): ReactElement | null {
         </div>
       </Dialog>
     </AppShell>
+  );
+}
+
+/**
+ * Shown when the session probe could not reach the auth service on load.
+ * Deliberately not a redirect: the session may well still be valid, and
+ * a redirect would throw away whatever the user had on screen.
+ */
+function SessionUnreachable({ onRetry }: { onRetry: () => void }): ReactElement {
+  const { t } = useTranslation('common');
+  return (
+    <main
+      aria-label={t('auth.offline.title')}
+      style={{
+        minBlockSize: '100vh',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 'var(--nf-space-4)',
+        padding: 'var(--nf-space-6)',
+        textAlign: 'center',
+        background: 'var(--nf-color-bg)',
+        color: 'var(--nf-color-fg)',
+      }}
+    >
+      <h1 style={{ margin: 0, fontFamily: 'var(--nf-font-display)' }}>{t('auth.offline.title')}</h1>
+      <p style={{ margin: 0, color: 'var(--nf-color-fg-muted)', maxInlineSize: '32rem' }}>
+        {t('auth.offline.description')}
+      </p>
+      <Button type="button" variant="primary" onClick={onRetry}>
+        {t('auth.offline.retry')}
+      </Button>
+    </main>
   );
 }
 

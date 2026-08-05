@@ -117,7 +117,7 @@ function ProjectLayout(): ReactElement {
       <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
         <h1
           style={{
-            fontFamily: 'var(--font-display)',
+            fontFamily: 'var(--nf-font-display)',
             fontSize: 'clamp(1.5rem, 2.5vw, 2rem)',
             margin: 0,
             flex: 1,
@@ -197,7 +197,7 @@ function ProjectNotFound({ workspaceId }: { workspaceId: string }): ReactElement
       <div
         aria-hidden
         style={{
-          fontFamily: 'var(--font-display)',
+          fontFamily: 'var(--nf-font-display)',
           fontSize: 'clamp(5rem, 14vw, 9rem)',
           lineHeight: 1,
           fontWeight: 700,
@@ -214,7 +214,7 @@ function ProjectNotFound({ workspaceId }: { workspaceId: string }): ReactElement
       </div>
       <h1
         style={{
-          fontFamily: 'var(--font-display)',
+          fontFamily: 'var(--nf-font-display)',
           margin: 0,
           fontSize: 'var(--nf-text-2xl)',
           color: 'var(--nf-color-fg)',

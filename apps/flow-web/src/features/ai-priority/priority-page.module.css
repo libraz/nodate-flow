@@ -17,7 +17,7 @@
 
 .title {
   margin: 0;
-  font-family: var(--font-display, inherit);
+  font-family: var(--nf-font-display, inherit);
   font-size: clamp(1.25rem, 2vw, 1.5rem);
   color: var(--nf-color-fg);
 }
@@ -42,7 +42,7 @@
 }
 
 .kpiValue {
-  font-family: var(--font-display, inherit);
+  font-family: var(--nf-font-display, inherit);
   font-size: var(--nf-text-lg);
   font-weight: var(--nf-weight-semibold);
   color: var(--nf-color-fg);

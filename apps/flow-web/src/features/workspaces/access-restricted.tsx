@@ -44,7 +44,7 @@ export default function AccessRestricted({ sectionTitleKey }: AccessRestrictedPr
     >
       <h1
         style={{
-          fontFamily: 'var(--font-display)',
+          fontFamily: 'var(--nf-font-display)',
           fontSize: 'clamp(1.5rem, 2.5vw, 2rem)',
           margin: 0,
         }}

@@ -142,7 +142,7 @@
 
 .modelCell {
   color: var(--nf-color-fg);
-  font-family: var(--font-mono);
+  font-family: var(--nf-font-mono);
   font-size: var(--nf-text-xs);
   white-space: nowrap;
   overflow: hidden;
@@ -237,7 +237,7 @@
   border-radius: var(--nf-radius-sm);
   background: color-mix(in oklab, var(--nf-color-danger) 6%, transparent);
   color: var(--nf-color-fg);
-  font-family: var(--font-mono);
+  font-family: var(--nf-font-mono);
   font-size: var(--nf-text-xs);
   white-space: pre-wrap;
   word-break: break-word;

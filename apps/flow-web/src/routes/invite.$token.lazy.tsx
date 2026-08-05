@@ -3,18 +3,27 @@
  *
  * Flow:
  * 1. Fetch invite info (public, no auth needed) via useSuspenseQuery
- * 2. If user is not authenticated, redirect to login with returnTo
- * 3. If authenticated, show confirmation card with "Join" button
- * 4. On accept, navigate to the joined workspace
+ * 2. Wait for the session probe — this route sits outside
+ *    `_authenticated`, so an already-signed-in visitor arrives with a
+ *    refresh cookie but an empty in-memory store. Invite links are
+ *    followed from mail and chat, which is exactly the case where that
+ *    happens, so deciding "signed out" before the probe settles would
+ *    turn the product's main onboarding path into a dead end.
+ * 3. If the visitor really is signed out, point them at login with
+ *    returnTo
+ * 4. If authenticated, show confirmation card with "Join" button
+ * 5. On accept, navigate to the joined workspace
  */
 
 import Button from '@nodate-flow/ui/primitives/button';
+import Spinner from '@nodate-flow/ui/primitives/spinner';
 import { createLazyFileRoute, getRouteApi, Link, useNavigate } from '@tanstack/react-router';
 import { type ReactElement, type ReactNode, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import AuthCard from '../components/auth/auth-card';
 import { selectIsAuthenticated, useAuth } from '../features/auth/auth-store';
+import { useAuthBootstrap } from '../features/auth/use-auth-bootstrap';
 import { useAcceptInvite, useInviteInfoQuery } from '../features/workspaces/invite-api';
 import { resolveInviteErrorKey } from '../features/workspaces/invite-errors';
 import { formatEpochDateTime } from '../lib/format';
@@ -62,11 +71,23 @@ function InviteAcceptPage(): ReactElement {
   const navigate = useNavigate();
   const { token } = routeApi.useParams();
   const isAuthenticated = useAuth(selectIsAuthenticated);
+  const { status: authStatus } = useAuthBootstrap();
   const acceptInvite = useAcceptInvite();
   const submitGuard = useSubmitGuard();
   const [error, setError] = useState<string | null>(null);
 
   const { data: info } = useInviteInfoQuery(token);
+
+  // Session state unknown so far: wait rather than guess. Skipped when
+  // the store already holds a session (in-app navigation), so the extra
+  // frame only costs the cold-open case it exists for.
+  if (!isAuthenticated && authStatus === 'loading') {
+    return (
+      <InviteAuthCardBody workspaceName={info.workspaceName}>
+        <Spinner label={t('common.loading')} />
+      </InviteAuthCardBody>
+    );
+  }
 
   // If not logged in, prompt the user to sign in first
   if (!isAuthenticated) {

@@ -133,7 +133,7 @@ function AgentsList({ workspaceId }: { workspaceId: string }): ReactElement {
                   style={{
                     fontSize: 'var(--nf-text-xs)',
                     color: 'var(--nf-color-fg-muted)',
-                    fontFamily: 'var(--font-mono)',
+                    fontFamily: 'var(--nf-font-mono)',
                   }}
                 >
                   {agent.modelName}

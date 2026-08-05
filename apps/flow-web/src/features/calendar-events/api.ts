@@ -36,6 +36,7 @@ import {
 
 import { type ApiError, toApiError } from '../../lib/api-error';
 import { sdk } from '../../lib/sdk';
+import { eventDetailKeys } from '../events/api';
 
 export type Calendar = components['schemas']['CalendarResponse'];
 export type CalendarEventResponse = components['schemas']['EventResponse'];
@@ -131,6 +132,40 @@ export function rememberCalendarChoice(workspaceId: string, calendarId: string):
     // Storage unavailable (private mode, quota, SSR): memory is a
     // nice-to-have, not a correctness requirement.
   }
+}
+
+/**
+ * useEventDetailQuery — GET one event with its full body.
+ *
+ * The grid feeds the edit dialog a `MyCalendarEventResponse`, which is an
+ * aggregate projection: it carries no `memo`, so a dialog seeded from it
+ * alone cannot tell "this event has no memo" from "the memo was never
+ * loaded". Editing anything else would then round-trip an empty memo back
+ * over a stored one. This hook reads the authoritative row so the dialog
+ * hydrates from complete values.
+ *
+ * Shares {@link eventDetailKeys} with the detail route so both surfaces
+ * read one cache entry and both are invalidated by the same mutations.
+ * Not a Suspense query — the dialog opens over an already-rendered route
+ * and hydrates in place rather than blocking its own first paint.
+ */
+export function useEventDetailQuery(
+  workspaceId: string,
+  calendarId: string,
+  eventId: string,
+  enabled: boolean,
+): UseQueryResult<CalendarEventResponse, ApiError> {
+  return useQuery<CalendarEventResponse, ApiError>({
+    queryKey: eventDetailKeys.detail(workspaceId, calendarId, eventId),
+    enabled: enabled && workspaceId !== '' && calendarId !== '' && eventId !== '',
+    queryFn: async (): Promise<CalendarEventResponse> => {
+      const { data, error } = await sdk.GET('/workspaces/{wsId}/calendars/{calId}/events/{evtId}', {
+        params: { path: { wsId: workspaceId, calId: calendarId, evtId: eventId } },
+      });
+      if (error || !data) throw toApiError(error, 'Failed to load event');
+      return data;
+    },
+  });
 }
 
 /** Invalidate the two aggregate calendar query roots after any event write. */

@@ -48,9 +48,11 @@ if (!container) {
   throw new Error('root container missing');
 }
 
-// F3: auth bootstrap runs inside the `_authenticated` layout route via
-// useAuthBootstrap; no top-level AuthProvider is required because the
-// auth slice is a vanilla zustand store accessible to non-React modules.
+// Auth bootstrap runs from the root route (for public pages that branch
+// on auth state) and from the `_authenticated` layout, both via
+// useAuthBootstrap, which shares one in-flight refresh between them. No
+// top-level AuthProvider is required because the auth slice is a vanilla
+// zustand store accessible to non-React modules.
 createRoot(container).render(
   <StrictMode>
     <ErrorBoundary fallback={<FatalError />}>

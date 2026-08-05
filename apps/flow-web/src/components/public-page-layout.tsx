@@ -126,7 +126,7 @@ export default function PublicPageLayout({
             backgroundImage: `url(${encodeURI(coverImageUrl)})`,
             backgroundSize: 'cover',
             backgroundPosition: 'center',
-            backgroundColor: 'var(--nf-color-bg-subtle)',
+            backgroundColor: 'var(--nf-color-bg-sunken)',
           }}
           aria-hidden="true"
         />

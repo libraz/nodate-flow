@@ -24,7 +24,7 @@ import { z } from 'zod';
 import { formatApiError } from '../../lib/api-error';
 import { formatDate } from '../../lib/format';
 import { useSubmitGuard } from '../../lib/use-submit-guard';
-
+import { useWeekStart } from '../../lib/use-week-start';
 import { TASK_PRIORITIES, type TaskPriority, useCreateTask } from './api';
 import { PRIORITY_KEY } from './constants';
 import {
@@ -77,6 +77,7 @@ export default function TaskCreateDialog({
   onClose,
 }: TaskCreateDialogProps): ReactElement {
   const { t, i18n } = useTranslation('common');
+  const weekStart = useWeekStart();
   const locale = i18n.resolvedLanguage ?? 'en';
   const weekdayLabels = t('common.date.weekdays', { returnObjects: true }) as string[];
   const formatMonthYear = (year: number, month: number): string =>
@@ -331,6 +332,7 @@ export default function TaskCreateDialog({
                   }
                 }}
                 weekdayLabels={weekdayLabels}
+                weekStart={weekStart}
                 formatMonthYear={formatMonthYear}
                 prevLabel={t('calendar.prev')}
                 nextLabel={t('calendar.next')}

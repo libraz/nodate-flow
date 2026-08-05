@@ -34,7 +34,7 @@ function InvocationRow({ row }: { row: AiInvocation }): ReactElement {
             <strong style={{ fontSize: '0.8125rem' }}>{row.purpose}</strong>
             <span
               style={{
-                fontFamily: 'var(--font-mono)',
+                fontFamily: 'var(--nf-font-mono)',
                 fontSize: 'var(--nf-text-xs)',
                 color: 'var(--nf-color-fg-muted)',
               }}

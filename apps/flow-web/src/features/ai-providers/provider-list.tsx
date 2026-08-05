@@ -84,7 +84,11 @@ export default function ProviderList({ workspaceId }: ProviderListProps): ReactE
         }}
       >
         <h1
-          style={{ margin: 0, fontFamily: 'var(--font-display)', fontSize: 'var(--nf-text-2xl)' }}
+          style={{
+            margin: 0,
+            fontFamily: 'var(--nf-font-display)',
+            fontSize: 'var(--nf-text-2xl)',
+          }}
         >
           {t('providers.title')}
         </h1>

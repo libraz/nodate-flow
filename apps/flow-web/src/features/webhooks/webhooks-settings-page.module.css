@@ -26,7 +26,7 @@
 
 .title {
   margin: 0;
-  font-family: var(--font-display, inherit);
+  font-family: var(--nf-font-display, inherit);
   font-size: clamp(1.25rem, 2vw, 1.5rem);
   color: var(--nf-color-fg);
 }
@@ -78,7 +78,7 @@
 }
 
 .urlCell {
-  font-family: var(--font-mono, monospace);
+  font-family: var(--nf-font-mono, monospace);
   font-size: var(--nf-text-xs);
   max-inline-size: 18rem;
   overflow: hidden;
@@ -129,7 +129,7 @@
 
 .menuItem:hover,
 .menuItem:focus-visible {
-  background: var(--nf-color-bg-hover);
+  background: var(--nf-color-surface-hover);
 }
 
 .menuItemDanger {
@@ -152,7 +152,7 @@
 
 .menuTrigger:hover,
 .menuTrigger:focus-visible {
-  background: var(--nf-color-bg-hover);
+  background: var(--nf-color-surface-hover);
 }
 
 .dialogForm {
@@ -184,7 +184,7 @@
 }
 
 .secretValue {
-  font-family: var(--font-mono, monospace);
+  font-family: var(--nf-font-mono, monospace);
   font-size: var(--nf-text-sm);
 }
 
@@ -229,7 +229,7 @@
 }
 
 .deliveryEvent {
-  font-family: var(--font-mono, monospace);
+  font-family: var(--nf-font-mono, monospace);
   font-size: var(--nf-text-xs);
   color: var(--nf-color-fg);
 }
@@ -264,7 +264,7 @@
 }
 
 .eventTypesList {
-  font-family: var(--font-mono, monospace);
+  font-family: var(--nf-font-mono, monospace);
   font-size: var(--nf-text-xs);
   color: var(--nf-color-fg-muted);
 }

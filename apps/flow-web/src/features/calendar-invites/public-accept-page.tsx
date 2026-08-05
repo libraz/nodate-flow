@@ -237,7 +237,7 @@ function ErrorState({ icon, message }: ErrorStateProps): ReactElement {
 
 const headingStyle: React.CSSProperties = {
   margin: 0,
-  fontFamily: 'var(--font-display)',
+  fontFamily: 'var(--nf-font-display)',
   fontSize: 'var(--nf-text-2xl)',
   fontWeight: 'var(--nf-weight-bold)',
   color: 'var(--nf-color-fg)',

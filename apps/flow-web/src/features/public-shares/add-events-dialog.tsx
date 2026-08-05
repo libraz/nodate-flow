@@ -18,7 +18,7 @@ import { type ReactElement, Suspense, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { formatDate } from '../../lib/format';
-
+import { useWeekStart } from '../../lib/use-week-start';
 import styles from './add-events-dialog.module.css';
 import {
   type CrossCalendarEvent,
@@ -66,6 +66,7 @@ export default function AddEventsDialog({
   onClose,
 }: AddEventsDialogProps): ReactElement {
   const { t } = useTranslation('settings');
+  const weekStart = useWeekStart();
   const { t: tCommon, i18n } = useTranslation('common');
   const locale = i18n.resolvedLanguage ?? 'en';
   const weekdayLabels = tCommon('common.date.weekdays', { returnObjects: true }) as string[];
@@ -88,6 +89,7 @@ export default function AddEventsDialog({
                 value={from}
                 onChange={setFrom}
                 weekdayLabels={weekdayLabels}
+                weekStart={weekStart}
                 formatMonthYear={formatMonthYear}
                 prevLabel={tCommon('calendar.prev')}
                 nextLabel={tCommon('calendar.next')}
@@ -104,6 +106,7 @@ export default function AddEventsDialog({
                 value={to}
                 onChange={setTo}
                 weekdayLabels={weekdayLabels}
+                weekStart={weekStart}
                 formatMonthYear={formatMonthYear}
                 prevLabel={tCommon('calendar.prev')}
                 nextLabel={tCommon('calendar.next')}

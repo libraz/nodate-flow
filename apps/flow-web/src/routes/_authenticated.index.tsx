@@ -346,7 +346,7 @@ function HomePage(): ReactElement {
       <header style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
         <h1
           style={{
-            fontFamily: 'var(--font-display)',
+            fontFamily: 'var(--nf-font-display)',
             fontOpticalSizing: 'auto',
             fontWeight: 400,
             fontSize: 'clamp(1.75rem, 4vw, 2.5rem)',
@@ -366,7 +366,7 @@ function HomePage(): ReactElement {
         </h1>
         <p
           style={{
-            fontFamily: 'var(--font-mono)',
+            fontFamily: 'var(--nf-font-mono)',
             fontSize: '0.6875rem',
             letterSpacing: '0.18em',
             color: 'var(--nf-color-fg-muted)',

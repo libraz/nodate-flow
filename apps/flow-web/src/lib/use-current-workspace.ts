@@ -18,7 +18,12 @@
  *
  * Whenever a non-null id is resolved from the URL we persist it to
  * `localStorage['nf.activeWsId']` so the next non-scoped route can
- * hydrate immediately without a round-trip.
+ * hydrate immediately without a round-trip. On routes that are not
+ * workspace-scoped the URL cannot express a switch at all, so
+ * {@link setActiveWorkspaceId} is the write path — the stored id is
+ * exposed as a subscribable store precisely so that such a write
+ * re-renders every reader instead of being invisible until the next
+ * navigation.
  *
  * The `useActiveWorkspaceId` export is an alias that makes the intent
  * explicit at call sites; both hooks return the same value. Callers
@@ -28,12 +33,34 @@
 
 import { useQuery } from '@tanstack/react-query';
 import { useRouterState } from '@tanstack/react-router';
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useSyncExternalStore } from 'react';
 
 import { authSdk, sdk } from './sdk';
 
 /** localStorage key used to persist the last-visited workspace id. */
 const STORAGE_KEY = 'nf.activeWsId';
+
+/* ── stored-id store ──────────────────────────────────────────── */
+
+/**
+ * localStorage on its own is not reactive, so a write made outside a
+ * URL change (the workspace switcher on a cross-workspace page) would
+ * update the tab's storage without re-rendering anything that reads it —
+ * the control would snap back to the old value and no query would move.
+ * The subscriber set below turns the stored id into an external store
+ * that {@link useCurrentWorkspaceId} can subscribe to.
+ */
+type StoredIdListener = () => void;
+
+const storedIdListeners = new Set<StoredIdListener>();
+
+/**
+ * Cached snapshot. `useSyncExternalStore` compares snapshots by
+ * identity on every render, so this must not re-read localStorage each
+ * call — a fresh read is fine for strings, but caching also keeps the
+ * hot path off the synchronous storage API.
+ */
+let storedIdSnapshot: string | null | undefined;
 
 function readStoredWsId(): string | null {
   if (typeof window === 'undefined') return null;
@@ -45,6 +72,25 @@ function readStoredWsId(): string | null {
   }
 }
 
+function getStoredWsIdSnapshot(): string | null {
+  if (storedIdSnapshot === undefined) storedIdSnapshot = readStoredWsId();
+  return storedIdSnapshot;
+}
+
+function subscribeStoredWsId(listener: StoredIdListener): () => void {
+  storedIdListeners.add(listener);
+  return () => {
+    storedIdListeners.delete(listener);
+  };
+}
+
+/** Publish a new stored id, notifying subscribers only on a real change. */
+function publishStoredWsId(next: string | null): void {
+  if (getStoredWsIdSnapshot() === next) return;
+  storedIdSnapshot = next;
+  for (const listener of storedIdListeners) listener();
+}
+
 function writeStoredWsId(id: string): void {
   if (typeof window === 'undefined') return;
   try {
@@ -52,6 +98,21 @@ function writeStoredWsId(id: string): void {
   } catch {
     /* quota / disabled storage — ignore */
   }
+  publishStoredWsId(id);
+}
+
+/**
+ * Set the active workspace explicitly, outside of any URL change.
+ *
+ * Cross-workspace routes (`/calendar`, `/today`, `/inbox`, `/settings`,
+ * `/pages`) carry no workspace id in the path, so the only way to move
+ * the active workspace while staying on one is to write it here.
+ * Subscribers re-render with the new id and their workspace-keyed
+ * queries follow.
+ */
+export function setActiveWorkspaceId(id: string): void {
+  if (!id) return;
+  writeStoredWsId(id);
 }
 
 /**
@@ -60,12 +121,14 @@ function writeStoredWsId(id: string): void {
  * sidebar shortcut.
  */
 export function clearActiveWorkspaceId(): void {
-  if (typeof window === 'undefined') return;
-  try {
-    window.localStorage.removeItem(STORAGE_KEY);
-  } catch {
-    /* ignore */
+  if (typeof window !== 'undefined') {
+    try {
+      window.localStorage.removeItem(STORAGE_KEY);
+    } catch {
+      /* ignore */
+    }
   }
+  publishStoredWsId(null);
 }
 
 export function useCurrentWorkspaceId(): string | null {
@@ -158,7 +221,11 @@ export function useCurrentWorkspaceId(): string | null {
   // creation flows resolve a default project without requiring the user
   // to navigate to a workspace manually first.
   const visibleList = workspacesQuery.data;
-  const stored = readStoredWsId();
+  const stored = useSyncExternalStore(
+    subscribeStoredWsId,
+    getStoredWsIdSnapshot,
+    getStoredWsIdSnapshot,
+  );
   let fallbackWsId: string | null = null;
   let storedInvalid = false;
   let autoSelected: string | null = null;

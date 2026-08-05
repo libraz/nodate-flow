@@ -3,6 +3,7 @@
  * Kept as a route so existing links / bookmarks still work.
  */
 
+import { isSafeRedirect } from '@nodate-flow/sdk';
 import { createFileRoute } from '@tanstack/react-router';
 import { type ReactElement, useEffect } from 'react';
 
@@ -25,7 +26,10 @@ function LoginRedirect(): ReactElement | null {
 export const Route = createFileRoute('/login')({
   validateSearch: (search: Record<string, unknown>): LoginSearch => {
     const raw = search.returnTo;
-    if (typeof raw === 'string' && raw.startsWith('/') && !raw.startsWith('//')) {
+    // returnTo is echoed back to us after sign-in, so it must resolve
+    // inside this app. No allowlist: a cross-origin return target is
+    // never legitimate here.
+    if (typeof raw === 'string' && isSafeRedirect(raw, window.location.origin)) {
       return { returnTo: raw };
     }
     return {};

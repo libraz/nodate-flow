@@ -16,6 +16,7 @@ import Dialog from '@nodate-flow/ui/primitives/dialog';
 import { useQueries } from '@tanstack/react-query';
 import { useNavigate } from '@tanstack/react-router';
 import {
+  Archive,
   Building2,
   CalendarDays,
   CalendarRange,
@@ -24,6 +25,7 @@ import {
   Home,
   Inbox,
   type LucideIcon,
+  NotebookPen,
   Plus,
   Settings,
   SquareCheckBig,
@@ -377,6 +379,27 @@ function PaletteBody({ onSelect, initialCommandMode }: InnerProps): ReactElement
         icon: Settings,
       },
     ];
+    // Workspace-scoped destinations, which only resolve once a workspace
+    // is in context. The archive and the retro-draft queue have no fixed
+    // path, so the palette is the one place they can be reached by name.
+    const workspaceNav: CommandItem[] = wsId
+      ? [
+          {
+            id: 'nav:retro-drafts',
+            label: t('nav.retroDrafts'),
+            group: navGroup,
+            href: `/workspaces/${wsId}/tasks/drafts`,
+            icon: NotebookPen,
+          },
+          {
+            id: 'nav:archive',
+            label: t('nav.archive'),
+            group: navGroup,
+            href: `/workspaces/${wsId}/tasks/archived`,
+            icon: Archive,
+          },
+        ]
+      : [];
     const ws: CommandItem[] = workspaces.map((w) => ({
       id: `ws:${w.id}`,
       label: w.name,
@@ -398,8 +421,8 @@ function PaletteBody({ onSelect, initialCommandMode }: InnerProps): ReactElement
       href: `/workspaces/${p.workspaceId}/projects/${p.id}`,
       icon: FolderKanban,
     }));
-    return [...actions, ...tasks, ...projects, ...nav, ...ws];
-  }, [t, workspaces, taskResults, projectResults]);
+    return [...actions, ...tasks, ...projects, ...nav, ...workspaceNav, ...ws];
+  }, [t, wsId, workspaces, taskResults, projectResults]);
 
   const filtered = useMemo<CommandItem[]>(() => {
     if (mode === 'command') return [];

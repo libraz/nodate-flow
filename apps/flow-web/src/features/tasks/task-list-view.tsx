@@ -28,8 +28,8 @@ import { useTranslation } from 'react-i18next';
 
 import { formatApiError } from '../../lib/api-error';
 import { formatDate, formatEpoch, isOverdue } from '../../lib/format';
+import { useWeekStart } from '../../lib/use-week-start';
 import { computeBlockedByOpen, useProjectDependenciesQuery } from '../projects/api';
-
 import {
   type TaskDerivedState,
   type TaskListItem,
@@ -403,6 +403,7 @@ function InlineDueCell({
   locale: string;
 }): ReactElement {
   const { t } = useTranslation('common');
+  const weekStart = useWeekStart();
   const weekdayLabels = t('common.date.weekdays', { returnObjects: true }) as string[];
   const formatMonthYear = (year: number, month: number): string =>
     t('common.date.monthYear', { year, month });
@@ -421,6 +422,7 @@ function InlineDueCell({
           onStopEdit();
         }}
         weekdayLabels={weekdayLabels}
+        weekStart={weekStart}
         formatMonthYear={formatMonthYear}
         prevLabel={t('calendar.prev')}
         nextLabel={t('calendar.next')}

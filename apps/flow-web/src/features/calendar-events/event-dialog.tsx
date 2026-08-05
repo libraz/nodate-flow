@@ -45,6 +45,7 @@ import { formatApiError } from '../../lib/api-error';
 import { confirmAction } from '../../lib/confirm-action';
 import { dateKey } from '../../lib/date-utils';
 import { formatDate } from '../../lib/format';
+import { useWeekStart } from '../../lib/use-week-start';
 import { selectUser, useAuth } from '../auth/auth-store';
 import { TASK_PRIORITIES, type TaskPriority } from '../tasks/api';
 import { PRIORITY_KEY } from '../tasks/constants';
@@ -57,6 +58,7 @@ import {
   useCreateEvent,
   useDefaultCalendarId,
   useDeleteEvent,
+  useEventDetailQuery,
   useUpdateEvent,
 } from './api';
 import AttendeesSection from './attendees-section';
@@ -343,6 +345,50 @@ const NOTIFICATION_PRESET_KEYS = {
   '1day': 'notification.preset.1day',
 } as const satisfies Record<NotificationPreset, string>;
 
+/* ── dirty tracking ─────────────────────────────────────────────── */
+
+/**
+ * Every form control the dialog tracks individually.
+ *
+ * PATCH treats a present field as "set this value", so an edit payload
+ * built from the whole form writes back fields the user never opened —
+ * silently replacing stored content with whatever the dialog happened to
+ * be seeded with. Recording which controls the user actually moved lets
+ * {@link EventDialog} send exactly those.
+ */
+type TrackedField =
+  | 'kind'
+  | 'title'
+  | 'startDate'
+  | 'endDate'
+  | 'startTime'
+  | 'endTime'
+  | 'allDay'
+  | 'calendarId'
+  | 'projectId'
+  | 'priority'
+  | 'showAs'
+  | 'flexibility'
+  | 'location'
+  | 'blockPreset'
+  | 'blockCustomLabel'
+  | 'recurrence'
+  | 'notification'
+  | 'memo';
+
+/**
+ * Time controls are patched as one unit: the API rejects a start without
+ * a matching end, and flipping all-day changes what the pair means. Any
+ * one of them moving re-sends the whole range.
+ */
+const TIME_FIELDS: readonly TrackedField[] = [
+  'startDate',
+  'endDate',
+  'startTime',
+  'endTime',
+  'allDay',
+];
+
 /* ── component ──────────────────────────────────────────────────── */
 
 const KIND_OPTIONS: ItemKind[] = ['task', 'event', 'block', 'free', 'milestone'];
@@ -356,6 +402,7 @@ export default function EventDialog({
   onSaved,
 }: EventDialogProps): ReactElement | null {
   const { t, i18n } = useTranslation('calendar-events');
+  const weekStart = useWeekStart();
   const { t: tCommon } = useTranslation('common');
   const locale = i18n.resolvedLanguage ?? 'en';
   // `returnObjects` falls back to the raw key string when no resource
@@ -382,6 +429,29 @@ export default function EventDialog({
     mode.kind === 'create' ? (mode.initialItemKind ?? 'event') : mode.initialKind;
 
   const initialDate = mode.kind === 'create' ? mode.date : inferEditDate(mode.event);
+
+  /* ── dirty tracking ─── */
+
+  // A ref, not state: nothing renders from it, and a control marking
+  // itself dirty must not cost a render pass on every keystroke.
+  const dirtyFieldsRef = useRef<Set<TrackedField>>(new Set());
+
+  function markDirty(field: TrackedField): void {
+    dirtyFieldsRef.current.add(field);
+  }
+
+  /** Whether the user moved any of the given controls. */
+  function anyDirty(...fields: TrackedField[]): boolean {
+    return fields.some((f) => dirtyFieldsRef.current.has(f));
+  }
+
+  /** Wrap a state setter so moving its control records the field as edited. */
+  function editing<T>(field: TrackedField, apply: (value: T) => void): (value: T) => void {
+    return (value: T) => {
+      markDirty(field);
+      apply(value);
+    };
+  }
 
   /* ── form state ─── */
 
@@ -458,17 +528,73 @@ export default function EventDialog({
   const [recurrence, setRecurrence] = useState<RecurrencePreset>('none');
   const [notification, setNotification] = useState<NotificationPreset>('none');
   // MyCalendarEventResponse (the `/me/calendar-events` aggregate shape used by
-  // the calendar grid) omits `memo`. Starting empty keeps the round-trip
-  // idempotent when a full event details endpoint hydrates it later.
+  // the calendar grid) omits `memo`; it arrives with the event detail below.
   const [memo, setMemo] = useState<string>('');
 
-  // Hydrate notification / recurrence presets on edit.
+  /* ── hydrate the edit form from the authoritative event row ─── */
+
+  const detailQuery = useEventDetailQuery(
+    workspaceId,
+    mode.kind === 'edit' ? mode.calendarId : '',
+    mode.kind === 'edit' ? mode.eventId : '',
+    open && mode.kind === 'edit',
+  );
+  const detail = detailQuery.data;
+  // True only while the dialog has an event whose full body is still in
+  // flight — create mode never fetches, so its query stays pending forever.
+  const detailLoading = isEdit && detailQuery.isLoading;
+
+  // One-shot: the response is the starting point, not a live binding.
+  // Controls the user already moved keep their value so a slow response
+  // never overwrites typing.
+  const hydratedRef = useRef<boolean>(false);
+
+  // Reopening the dialog starts a fresh edit session: drop the recorded
+  // edits and hydrate again. Declared before the hydration effect so the
+  // reset lands first on the render that reopens. Comparing against a
+  // value snapshot would not do — hydration legitimately changes field
+  // values without the user having touched anything, and that must not
+  // read as an unsaved edit.
   useEffect(() => {
-    if (mode.kind !== 'edit') return;
-    // We don't pull notificationOffset from MyCalendarEventResponse (not
-    // returned there). Keep default 'none'; server round-trip fetches
-    // full event details if needed. Left as a follow-up.
-  }, [mode]);
+    if (!open) return;
+    dirtyFieldsRef.current = new Set();
+    hydratedRef.current = false;
+  }, [open]);
+
+  useEffect(() => {
+    if (!open || !detail || hydratedRef.current) return;
+    hydratedRef.current = true;
+    const dirty = dirtyFieldsRef.current;
+
+    if (!dirty.has('title')) setTitle(detail.title);
+    if (!dirty.has('memo')) setMemo(detail.memo ?? '');
+    if (!dirty.has('location')) setLocation(detail.location ?? '');
+    if (!dirty.has('showAs')) setShowAs((detail.showAs as ShowAs) || 'busy');
+    if (!dirty.has('flexibility')) setFlexibility((detail.flexibility as Flexibility) || 'fixed');
+    if (!dirty.has('blockPreset')) setBlockPreset(blockPresetFromLabel(detail.blockLabel));
+    if (!dirty.has('blockCustomLabel')) setBlockCustomLabel(detail.blockLabel ?? '');
+    if (!TIME_FIELDS.some((f) => dirty.has(f))) {
+      setAllDay(detail.allDay);
+      if (detail.startAt != null) {
+        setStartDate(unixToDateKey(detail.startAt));
+        setStartTime(unixToHHMM(detail.startAt));
+      }
+      if (detail.endAt != null) {
+        setEndDate(unixToDateKey(detail.endAt));
+        setEndTime(unixToHHMM(detail.endAt));
+      }
+    }
+    // A memo sits behind the "more options" disclosure, so an event that
+    // has one opens with the panel already down — otherwise the only
+    // long-form content on the event is invisible while the user edits.
+    if ((detail.memo ?? '') !== '') setExpanded(true);
+
+    // `recurrenceRule` / `notificationOffset` are deliberately not mapped
+    // back onto their preset controls: the presets are lossy (an arbitrary
+    // rule has no matching preset), so seeding them needs a rule → preset
+    // matcher. Until that exists the dirty gate in `buildPatchBody` keeps
+    // an untouched control from writing over the stored rule.
+  }, [detail, open]);
 
   // Validation state.
   const [titleError, setTitleError] = useState<string | null>(null);
@@ -510,6 +636,7 @@ export default function EventDialog({
   /* ── all-day toggle preserves last-used time ─── */
 
   const handleAllDayChange = (next: boolean): void => {
+    markDirty('allDay');
     if (next) {
       lastTimeRef.current = { start: startTime, end: endTime };
     } else {
@@ -617,13 +744,18 @@ export default function EventDialog({
         toaster.show({ tone: 'success', message: t(TOAST_CREATED_KEYS[kind]) });
       } else if (isEdit) {
         const body = buildPatchBody();
-        await updateEvent.mutateAsync({
-          workspaceId,
-          calendarId,
-          eventId: mode.eventId,
-          body,
-        });
-        rememberCalendarChoice(workspaceId, calendarId);
+        // Nothing was touched: skip the round-trip rather than replay the
+        // stored values back at the server, which would append an update
+        // event and an audit row for a no-op.
+        if (Object.keys(body).length > 0) {
+          await updateEvent.mutateAsync({
+            workspaceId,
+            calendarId,
+            eventId: mode.eventId,
+            body,
+          });
+          rememberCalendarChoice(workspaceId, calendarId);
+        }
         toaster.show({ tone: 'success', message: t(TOAST_UPDATED_KEYS[kind]) });
       }
       onSaved();
@@ -673,38 +805,57 @@ export default function EventDialog({
     return body;
   }
 
+  /**
+   * Build the PATCH payload from the controls the user actually moved.
+   *
+   * A field present in the body means "set it to this"; a field absent
+   * means "leave it alone". Sending the whole form would therefore write
+   * back every value the dialog was seeded with, including ones it never
+   * had — that is how a title fix used to wipe a long memo. Switching
+   * kind counts as touching the kind-specific fields, since those only
+   * become meaningful once the new kind is selected.
+   */
   function buildPatchBody(): PatchEventInput {
     const calKind = kind as CalEventKind;
-    const body: PatchEventInput = {
-      title: title.trim(),
-      allDay: calKind === 'milestone' ? true : allDay,
-    };
-    if (calKind === 'milestone') {
-      // Backend enforces (StartAt == nil) != (EndAt == nil); set both.
-      body.startAt = toUnix(startDate, '00:00');
-      body.endAt = body.startAt;
-    } else if (allDay) {
-      body.startAt = toUnix(startDate, '00:00');
-      body.endAt = toUnix(endDate, '23:59');
-    } else {
-      body.startAt = toUnix(startDate, startTime);
-      body.endAt = toUnix(endDate, endTime);
+    const body: PatchEventInput = {};
+
+    if (anyDirty('title')) body.title = title.trim();
+
+    if (anyDirty(...TIME_FIELDS, 'kind')) {
+      body.allDay = calKind === 'milestone' ? true : allDay;
+      if (calKind === 'milestone') {
+        // Backend enforces (StartAt == nil) != (EndAt == nil); set both.
+        body.startAt = toUnix(startDate, '00:00');
+        body.endAt = body.startAt;
+      } else if (allDay) {
+        body.startAt = toUnix(startDate, '00:00');
+        body.endAt = toUnix(endDate, '23:59');
+      } else {
+        body.startAt = toUnix(startDate, startTime);
+        body.endAt = toUnix(endDate, endTime);
+      }
     }
     if (calKind === 'event') {
-      body.showAs = showAs;
-      body.flexibility = flexibility;
-      body.location = location.trim();
+      if (anyDirty('showAs', 'kind')) body.showAs = showAs;
+      if (anyDirty('flexibility', 'kind')) body.flexibility = flexibility;
+      if (anyDirty('location', 'kind')) body.location = location.trim();
     }
-    if (calKind === 'block') {
-      const label = blockPreset === 'custom' ? blockCustomLabel.trim() : blockPreset;
-      body.blockLabel = label;
+    if (calKind === 'block' && anyDirty('blockPreset', 'blockCustomLabel', 'kind')) {
+      body.blockLabel = blockPreset === 'custom' ? blockCustomLabel.trim() : blockPreset;
       body.showAs = blockPreset === 'oof' ? 'oof' : 'busy';
     }
-    const rrule = presetToRRule(recurrence, startDate);
-    if (rrule !== null) body.recurrenceRule = rrule;
-    const minutes = presetToMinutes(notification);
-    if (minutes !== null) body.notificationOffset = minutes;
-    body.memo = memo.trim();
+    // The presets cannot express "clear the stored rule" yet, so an
+    // untouched control stays out of the payload entirely rather than
+    // asserting 'none' over whatever the event actually has.
+    if (anyDirty('recurrence')) {
+      const rrule = presetToRRule(recurrence, startDate);
+      if (rrule !== null) body.recurrenceRule = rrule;
+    }
+    if (anyDirty('notification')) {
+      const minutes = presetToMinutes(notification);
+      if (minutes !== null) body.notificationOffset = minutes;
+    }
+    if (anyDirty('memo')) body.memo = memo.trim();
     return body;
   }
 
@@ -738,58 +889,9 @@ export default function EventDialog({
     }
   }
 
-  // Snapshot the initial user-visible field values so a dirty check can
-  // detect any unsaved edit before the dialog dismisses. Re-snapshots
-  // when `open` flips to true so reopening the dialog after a save
-  // resets the baseline.
-  const initialSnapshotRef = useRef<string>('');
-  // biome-ignore lint/correctness/useExhaustiveDependencies: snapshot baseline must only refresh when dialog opens
-  useEffect(() => {
-    if (!open) return;
-    initialSnapshotRef.current = JSON.stringify({
-      kind,
-      title,
-      startDate,
-      endDate,
-      startTime,
-      endTime,
-      allDay,
-      calendarId,
-      projectId,
-      priority,
-      showAs,
-      flexibility,
-      location,
-      blockPreset,
-      blockCustomLabel,
-      recurrence,
-      notification,
-      memo,
-    });
-  }, [open]);
-
+  /** Any control moved since the dialog opened — gates discard-confirm. */
   function isDirty(): boolean {
-    const current = JSON.stringify({
-      kind,
-      title,
-      startDate,
-      endDate,
-      startTime,
-      endTime,
-      allDay,
-      calendarId,
-      projectId,
-      priority,
-      showAs,
-      flexibility,
-      location,
-      blockPreset,
-      blockCustomLabel,
-      recurrence,
-      notification,
-      memo,
-    });
-    return current !== initialSnapshotRef.current;
+    return dirtyFieldsRef.current.size > 0;
   }
 
   async function handleClose(): Promise<void> {
@@ -832,7 +934,7 @@ export default function EventDialog({
             size="sm"
             options={kindOptions}
             value={kind}
-            onChange={(next) => setKind(next)}
+            onChange={editing('kind', setKind)}
           />
 
           {mode.kind === 'edit' ? (
@@ -847,7 +949,10 @@ export default function EventDialog({
               <Input
                 {...control}
                 value={title}
-                onChange={(e) => setTitle(e.currentTarget.value)}
+                onChange={(e) => {
+                  markDirty('title');
+                  setTitle(e.currentTarget.value);
+                }}
                 placeholder={t(PLACEHOLDER_TITLE_KEYS[kind])}
                 autoFocus={isCreate}
               />
@@ -860,7 +965,7 @@ export default function EventDialog({
                 <Combobox
                   options={calendarOptions}
                   value={calendarId}
-                  onChange={setCalendarId}
+                  onChange={editing('calendarId', setCalendarId)}
                   aria-label={t('field.calendar')}
                 />
               )}
@@ -875,8 +980,9 @@ export default function EventDialog({
                   {() => (
                     <DatePicker
                       value={startDate}
-                      onChange={setStartDate}
+                      onChange={editing('startDate', setStartDate)}
                       weekdayLabels={weekdayLabels}
+                      weekStart={weekStart}
                       formatMonthYear={formatMonthYear}
                       prevLabel={tCommon('calendar.prev')}
                       nextLabel={tCommon('calendar.next')}
@@ -895,8 +1001,9 @@ export default function EventDialog({
                   {() => (
                     <DatePicker
                       value={endDate}
-                      onChange={setEndDate}
+                      onChange={editing('endDate', setEndDate)}
                       weekdayLabels={weekdayLabels}
+                      weekStart={weekStart}
                       formatMonthYear={formatMonthYear}
                       prevLabel={tCommon('calendar.prev')}
                       nextLabel={tCommon('calendar.next')}
@@ -914,10 +1021,13 @@ export default function EventDialog({
                   <DatePicker
                     value={startDate}
                     onChange={(v) => {
+                      markDirty('startDate');
+                      markDirty('endDate');
                       setStartDate(v);
                       setEndDate(v);
                     }}
                     weekdayLabels={weekdayLabels}
+                    weekStart={weekStart}
                     formatMonthYear={formatMonthYear}
                     prevLabel={tCommon('calendar.prev')}
                     nextLabel={tCommon('calendar.next')}
@@ -935,8 +1045,9 @@ export default function EventDialog({
                       <div className={styles.inlineGrow}>
                         <DatePicker
                           value={startDate}
-                          onChange={setStartDate}
+                          onChange={editing('startDate', setStartDate)}
                           weekdayLabels={weekdayLabels}
+                          weekStart={weekStart}
                           formatMonthYear={formatMonthYear}
                           prevLabel={tCommon('calendar.prev')}
                           nextLabel={tCommon('calendar.next')}
@@ -948,7 +1059,11 @@ export default function EventDialog({
                         />
                       </div>
                       {allDay ? null : (
-                        <TimePicker value={startTime} onChange={setStartTime} step={15} />
+                        <TimePicker
+                          value={startTime}
+                          onChange={editing('startTime', setStartTime)}
+                          step={15}
+                        />
                       )}
                     </div>
                   )}
@@ -962,8 +1077,9 @@ export default function EventDialog({
                       <div className={styles.inlineGrow}>
                         <DatePicker
                           value={endDate}
-                          onChange={setEndDate}
+                          onChange={editing('endDate', setEndDate)}
                           weekdayLabels={weekdayLabels}
+                          weekStart={weekStart}
                           formatMonthYear={formatMonthYear}
                           prevLabel={tCommon('calendar.prev')}
                           nextLabel={tCommon('calendar.next')}
@@ -976,7 +1092,11 @@ export default function EventDialog({
                         />
                       </div>
                       {allDay ? null : (
-                        <TimePicker value={endTime} onChange={setEndTime} step={15} />
+                        <TimePicker
+                          value={endTime}
+                          onChange={editing('endTime', setEndTime)}
+                          step={15}
+                        />
                       )}
                     </div>
                   )}
@@ -1017,7 +1137,10 @@ export default function EventDialog({
                         <Select
                           {...control}
                           value={projectId}
-                          onChange={(e) => setProjectId(e.currentTarget.value)}
+                          onChange={(e) => {
+                            markDirty('projectId');
+                            setProjectId(e.currentTarget.value);
+                          }}
                         >
                           {projects.map((p) => (
                             <option key={p.id} value={p.id}>
@@ -1037,7 +1160,10 @@ export default function EventDialog({
                           label: tCommon(PRIORITY_KEY[p]),
                         }))}
                         value={String(priority) as `${TaskPriority}`}
-                        onChange={(v) => setPriority(Number(v) as TaskPriority)}
+                        onChange={(v) => {
+                          markDirty('priority');
+                          setPriority(Number(v) as TaskPriority);
+                        }}
                       />
                     )}
                   </FormField>
@@ -1057,7 +1183,7 @@ export default function EventDialog({
                         label: t(SHOW_AS_KEYS[v]),
                       }))}
                       value={showAs}
-                      onChange={setShowAs}
+                      onChange={editing('showAs', setShowAs)}
                     />
                   )}
                 </FormField>
@@ -1071,7 +1197,7 @@ export default function EventDialog({
                         label: t(FLEXIBILITY_KEYS[v]),
                       }))}
                       value={flexibility}
-                      onChange={setFlexibility}
+                      onChange={editing('flexibility', setFlexibility)}
                     />
                   )}
                 </FormField>
@@ -1080,7 +1206,10 @@ export default function EventDialog({
                     <Input
                       {...control}
                       value={location}
-                      onChange={(e) => setLocation(e.currentTarget.value)}
+                      onChange={(e) => {
+                        markDirty('location');
+                        setLocation(e.currentTarget.value);
+                      }}
                     />
                   )}
                 </FormField>
@@ -1098,7 +1227,9 @@ export default function EventDialog({
                             key={preset}
                             pressed={blockPreset === preset}
                             onPressedChange={(v) => {
-                              if (v) setBlockPreset(preset);
+                              if (!v) return;
+                              markDirty('blockPreset');
+                              setBlockPreset(preset);
                             }}
                           >
                             {t(BLOCK_PRESET_KEYS[preset])}
@@ -1108,7 +1239,10 @@ export default function EventDialog({
                       {blockPreset === 'custom' ? (
                         <Input
                           value={blockCustomLabel}
-                          onChange={(e) => setBlockCustomLabel(e.currentTarget.value)}
+                          onChange={(e) => {
+                            markDirty('blockCustomLabel');
+                            setBlockCustomLabel(e.currentTarget.value);
+                          }}
                           style={{ marginBlockStart: 'var(--nf-space-2)' }}
                         />
                       ) : null}
@@ -1137,7 +1271,10 @@ export default function EventDialog({
                   <Select
                     {...control}
                     value={recurrence}
-                    onChange={(e) => setRecurrence(e.currentTarget.value as RecurrencePreset)}
+                    onChange={(e) => {
+                      markDirty('recurrence');
+                      setRecurrence(e.currentTarget.value as RecurrencePreset);
+                    }}
                   >
                     {(['none', 'daily', 'weekdays', 'weekly', 'monthly', 'yearly'] as const).map(
                       (v) => (
@@ -1154,7 +1291,10 @@ export default function EventDialog({
                   <Select
                     {...control}
                     value={notification}
-                    onChange={(e) => setNotification(e.currentTarget.value as NotificationPreset)}
+                    onChange={(e) => {
+                      markDirty('notification');
+                      setNotification(e.currentTarget.value as NotificationPreset);
+                    }}
                   >
                     {(
                       [
@@ -1180,8 +1320,17 @@ export default function EventDialog({
                   <Textarea
                     {...control}
                     value={memo}
-                    onChange={(e) => setMemo(e.currentTarget.value)}
+                    onChange={(e) => {
+                      markDirty('memo');
+                      setMemo(e.currentTarget.value);
+                    }}
                     rows={3}
+                    // Typing into an empty box before the stored memo
+                    // lands would mark the field edited and send that
+                    // fragment over the real one, so the control stays
+                    // inert until it holds the actual value.
+                    disabled={detailLoading}
+                    aria-busy={detailLoading || undefined}
                   />
                 )}
               </FormField>

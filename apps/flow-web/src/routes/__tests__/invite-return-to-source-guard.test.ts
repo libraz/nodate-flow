@@ -10,8 +10,10 @@ describe('/invite/$token login returnTo preservation', () => {
 
     expect(invite).toContain('search={{ returnTo: `/invite/$' + '{token}` }}');
     expect(login).toContain('validateSearch');
-    expect(login).toContain("raw.startsWith('/')");
-    expect(login).toContain("!raw.startsWith('//')");
+    // returnTo is validated by resolving it against this app's origin
+    // (see the SDK's isSafeRedirect), not by prefix-matching the raw
+    // string, which backslash-escaped paths slip past.
+    expect(login).toContain('isSafeRedirect(raw, window.location.origin)');
     expect(login).toContain('new URL(returnTo ??');
     expect(login).toContain('redirect=');
   });

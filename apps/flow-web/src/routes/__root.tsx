@@ -5,7 +5,25 @@ import { lazy, type ReactElement, Suspense, useEffect, useRef } from 'react';
 import { ErrorBoundary } from 'react-error-boundary';
 import { useTranslation } from 'react-i18next';
 import NotFoundContent from '../components/not-found';
+import { useAuthBootstrap } from '../features/auth/use-auth-bootstrap';
+import { shouldProbeSession } from '../lib/session-probe';
 import type { RouterContext } from '../router/router';
+
+/**
+ * SessionProbe — re-establishes the session from the refresh cookie for
+ * routes outside `_authenticated` that change what they render based on
+ * auth state (`/invite/$token` above all: invite links are opened from
+ * mail and chat, i.e. in a browser context that has the cookie but no
+ * in-memory session yet).
+ *
+ * Renders nothing. The bootstrap helper memoizes its in-flight promise
+ * module-side, so mounting this alongside the `_authenticated` layout's
+ * own call still results in exactly one refresh round-trip.
+ */
+function SessionProbe(): null {
+  useAuthBootstrap();
+  return null;
+}
 
 function NotFound(): ReactElement {
   return (
@@ -15,7 +33,7 @@ function NotFound(): ReactElement {
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        fontFamily: 'var(--font-body)',
+        fontFamily: 'var(--nf-font-sans)',
         background: 'var(--nf-color-bg)',
       }}
     >
@@ -71,13 +89,13 @@ function FatalFallback({
         justifyContent: 'center',
         gap: '1rem',
         padding: '2rem',
-        fontFamily: 'var(--font-body)',
+        fontFamily: 'var(--nf-font-sans)',
         background: 'var(--nf-color-bg)',
         color: 'var(--nf-color-fg)',
         textAlign: 'center',
       }}
     >
-      <h1 style={{ fontFamily: 'var(--font-display)', margin: 0 }}>{t('fatal.title')}</h1>
+      <h1 style={{ fontFamily: 'var(--nf-font-display)', margin: 0 }}>{t('fatal.title')}</h1>
       <p style={{ margin: 0, color: 'var(--nf-color-fg-muted)', maxInlineSize: '36rem' }}>
         {t('fatal.description')}
       </p>
@@ -131,12 +149,14 @@ function FatalFallback({
 }
 
 function RootLayout(): ReactElement {
+  const pathname = useRouterState({ select: (s) => s.location.pathname });
   // The root ErrorBoundary resets when the user navigates. The reset is
   // driven from inside `FatalFallback` via `useRouterState` — the
   // subtree under the boundary is frozen while the fallback is active,
   // so `resetKeys` on this element never propagates the new pathname.
   return (
     <>
+      {shouldProbeSession(pathname) ? <SessionProbe /> : null}
       <ErrorBoundary FallbackComponent={FatalFallback}>
         <Suspense fallback={<PageSkeleton sidebar />}>
           <Outlet />

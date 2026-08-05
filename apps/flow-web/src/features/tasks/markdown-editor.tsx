@@ -192,7 +192,7 @@ export default function MarkdownEditor({
           onClick={handleCode}
           aria-label={t('tasks.markdown_editor.code')}
           disabled={previewing}
-          style={{ ...toolbarButtonStyle, fontFamily: 'var(--font-mono)' }}
+          style={{ ...toolbarButtonStyle, fontFamily: 'var(--nf-font-mono)' }}
         >
           {'</>'}
         </Button>

@@ -17,7 +17,7 @@ function PagesIndex(): ReactElement {
           margin: 0,
           paddingBlockStart: 'clamp(1.5rem, 4vw, 2.5rem)',
           paddingInline: 'clamp(1.5rem, 4vw, 2.5rem)',
-          fontFamily: 'var(--font-display)',
+          fontFamily: 'var(--nf-font-display)',
           fontSize: 'clamp(1.75rem, 3vw, 2.25rem)',
         }}
       >

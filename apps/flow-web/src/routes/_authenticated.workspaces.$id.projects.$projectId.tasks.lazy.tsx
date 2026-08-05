@@ -63,7 +63,7 @@ function TasksSectionLayout(): ReactElement {
       >
         <h2
           style={{
-            fontFamily: 'var(--font-display)',
+            fontFamily: 'var(--nf-font-display)',
             fontSize: 'clamp(1.75rem, 3vw, 2.25rem)',
             margin: 0,
           }}

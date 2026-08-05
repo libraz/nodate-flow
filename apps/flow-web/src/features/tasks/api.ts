@@ -65,6 +65,8 @@ export type TaskListItem = components['schemas']['TaskListItem'];
 export type MyTaskListItem = components['schemas']['MyTaskListItem'];
 export type TaskComment = components['schemas']['TaskComment'];
 export type TaskActor = components['schemas']['TaskActor'];
+export type TaskAgentActor = components['schemas']['TaskAgentActor'];
+export type AddAgentActorInput = components['schemas']['AddTaskAgentActorBody'];
 export type TaskAttachment = components['schemas']['TaskAttachment'];
 export type CreateTaskInput = components['schemas']['CreateTaskBody'];
 export type PatchTaskInput = components['schemas']['PatchTaskBody'];
@@ -127,6 +129,7 @@ export const tasksKeys = {
   detail: (id: string) => [...tasksKeys.all, 'detail', id] as const,
   comments: (id: string) => [...tasksKeys.all, 'detail', id, 'comments'] as const,
   actors: (id: string) => [...tasksKeys.all, 'detail', id, 'actors'] as const,
+  agentActors: (id: string) => [...tasksKeys.all, 'detail', id, 'agent-actors'] as const,
   duplicates: (id: string) => [...tasksKeys.all, 'detail', id, 'duplicates'] as const,
   inferState: (id: string) => [...tasksKeys.all, 'detail', id, 'infer-state'] as const,
   aiInvocations: (id: string) => [...tasksKeys.all, 'detail', id, 'ai-invocations'] as const,
@@ -513,6 +516,62 @@ export function useAddTaskActor(): UseMutationResult<TaskActor, ApiError, AddAct
       return data;
     },
     onSuccess: (_data, vars) => {
+      void qc.invalidateQueries({ queryKey: tasksKeys.actors(vars.taskId) });
+      void qc.invalidateQueries({ queryKey: tasksKeys.detail(vars.taskId) });
+      void qc.invalidateQueries({ queryKey: [...timelineKeys.all, 'task', vars.taskId] });
+    },
+  });
+}
+
+/**
+ * GET /tasks/{id}/agents — the AI agents attached to a task.
+ *
+ * Kept separate from {@link useTaskActorsQuery} because the backend
+ * models agent actors on their own endpoint: they carry an `agentId`
+ * rather than a `userId` and the UI renders them differently.
+ */
+export function useTaskAgentActorsQuery(taskId: string): UseSuspenseQueryResult<TaskAgentActor[]> {
+  return useSuspenseQuery({
+    queryKey: tasksKeys.agentActors(taskId),
+    queryFn: async (): Promise<TaskAgentActor[]> => {
+      const { data, error } = await sdk.GET('/tasks/{id}/agents', {
+        params: { path: { id: taskId } },
+      });
+      if (error || !data) throw toApiError(error, 'Failed to load task agents');
+      return data.agents ?? [];
+    },
+  });
+}
+
+export interface AddAgentActorArgs {
+  taskId: string;
+  input: AddAgentActorInput;
+}
+
+/**
+ * POST /tasks/{id}/agents — attach an AI agent to a task.
+ *
+ * Idempotent per (task, agent) on the backend. Invalidates the same keys
+ * as the human-actor mutations plus the agent list, so the agent panel,
+ * the actor list and the task timeline all reflect the new assignment.
+ */
+export function useAddTaskAgentActor(): UseMutationResult<
+  TaskAgentActor,
+  ApiError,
+  AddAgentActorArgs
+> {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ taskId, input }: AddAgentActorArgs): Promise<TaskAgentActor> => {
+      const { data, error } = await sdk.POST('/tasks/{id}/agents', {
+        params: { path: { id: taskId } },
+        body: input,
+      });
+      if (error || !data) throw toApiError(error, 'Failed to assign agent to task');
+      return data;
+    },
+    onSuccess: (_data, vars) => {
+      void qc.invalidateQueries({ queryKey: tasksKeys.agentActors(vars.taskId) });
       void qc.invalidateQueries({ queryKey: tasksKeys.actors(vars.taskId) });
       void qc.invalidateQueries({ queryKey: tasksKeys.detail(vars.taskId) });
       void qc.invalidateQueries({ queryKey: [...timelineKeys.all, 'task', vars.taskId] });

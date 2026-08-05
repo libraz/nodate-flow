@@ -253,3 +253,33 @@ export function useAddProjectMember(): UseMutationResult<
     },
   });
 }
+
+export interface RemoveProjectMemberArgs {
+  id: string;
+  userId: string;
+}
+
+/**
+ * DELETE /projects/{prjId}/members/{userId}.
+ *
+ * Workspace membership is unaffected — this only detaches the user from
+ * the project. Invalidates the same member list the add mutation does.
+ */
+export function useRemoveProjectMember(): UseMutationResult<
+  void,
+  ApiError,
+  RemoveProjectMemberArgs
+> {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, userId }: RemoveProjectMemberArgs): Promise<void> => {
+      const { error } = await sdk.DELETE('/projects/{prjId}/members/{userId}', {
+        params: { path: { prjId: id, userId } },
+      });
+      if (error) throw toError(error, 'Failed to remove project member');
+    },
+    onSuccess: (_data, vars) => {
+      void qc.invalidateQueries({ queryKey: projectsKeys.members(vars.id) });
+    },
+  });
+}

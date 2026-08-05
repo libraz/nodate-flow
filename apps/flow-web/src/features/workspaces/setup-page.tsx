@@ -122,7 +122,7 @@ export default function SetupPage(): ReactElement {
           <h1
             style={{
               margin: 0,
-              fontFamily: 'var(--font-display)',
+              fontFamily: 'var(--nf-font-display)',
               fontWeight: 500,
               fontSize: 'clamp(1.5rem, 3vw, 2rem)',
               lineHeight: 1.15,

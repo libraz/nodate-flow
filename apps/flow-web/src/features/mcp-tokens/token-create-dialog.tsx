@@ -169,7 +169,7 @@ export default function TokenCreateDialog({
                 onFocus={(e) => {
                   e.currentTarget.select();
                 }}
-                style={{ fontFamily: 'var(--font-mono, monospace)' }}
+                style={{ fontFamily: 'var(--nf-font-mono, monospace)' }}
               />
             )}
           </FormField>

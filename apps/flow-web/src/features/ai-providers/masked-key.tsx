@@ -20,7 +20,7 @@ export default function MaskedKey({ value }: MaskedKeyProps): ReactElement {
         display: 'inline-flex',
         alignItems: 'center',
         gap: '0.375rem',
-        fontFamily: 'var(--font-mono, ui-monospace, monospace)',
+        fontFamily: 'var(--nf-font-mono, ui-monospace, monospace)',
         fontSize: 'var(--nf-text-sm)',
         color: 'var(--nf-color-fg-muted)',
       }}

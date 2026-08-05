@@ -31,7 +31,7 @@
 }
 
 .title {
-  font-family: var(--font-display);
+  font-family: var(--nf-font-display);
   font-size: clamp(1.75rem, 3vw, 2.25rem);
   margin: 0;
   color: var(--nf-color-fg);
@@ -410,7 +410,7 @@
 
 .emptyTitle {
   margin: 0;
-  font-family: var(--font-display);
+  font-family: var(--nf-font-display);
   font-size: var(--nf-text-xl);
   color: var(--nf-color-fg);
 }

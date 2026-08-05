@@ -117,7 +117,7 @@ export default function TokenList({ workspaceId }: TokenListProps): ReactElement
               {tokens.map((token) => (
                 <tr key={token.id} style={{ borderBlockStart: '1px solid var(--nf-color-border)' }}>
                   <td style={{ padding: '0.75rem' }}>{token.name}</td>
-                  <td style={{ padding: '0.75rem', fontFamily: 'var(--font-mono, monospace)' }}>
+                  <td style={{ padding: '0.75rem', fontFamily: 'var(--nf-font-mono, monospace)' }}>
                     {token.tokenPrefix}
                   </td>
                   <td style={{ padding: '0.75rem' }}>{(token.scopes ?? []).join(' ') || '—'}</td>

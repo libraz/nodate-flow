@@ -90,7 +90,7 @@ export default function ProjectList({ workspaceId }: ProjectListProps): ReactEle
       >
         <h1
           style={{
-            fontFamily: 'var(--font-display)',
+            fontFamily: 'var(--nf-font-display)',
             fontSize: 'clamp(1.75rem, 3vw, 2.25rem)',
             margin: 0,
           }}

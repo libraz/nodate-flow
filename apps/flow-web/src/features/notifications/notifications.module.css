@@ -14,7 +14,7 @@
   padding-inline: 0.25rem;
   border-radius: var(--nf-radius-pill);
   background: var(--nf-color-danger);
-  color: var(--nf-color-on-danger);
+  color: var(--nf-color-fg-on-danger);
   font-family: var(--nf-font-mono);
   font-size: 0.625rem;
   font-weight: var(--nf-weight-semibold);

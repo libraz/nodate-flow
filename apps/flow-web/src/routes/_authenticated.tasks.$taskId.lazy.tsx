@@ -38,6 +38,7 @@ import FavoriteButton from '../features/favorites/favorite-button';
 import { useProjectQuery } from '../features/projects/api';
 import { useTaskReactionsQuery } from '../features/reactions/api';
 import ReactionBar from '../features/reactions/reaction-bar';
+import AgentAssignSection from '../features/tasks/agent-panel/agent-assign-section';
 import AgentPanel from '../features/tasks/agent-panel/agent-panel';
 import AIAgentsSection from '../features/tasks/ai-agents/section';
 import AIAgentsSkeleton from '../features/tasks/ai-agents/skeleton';
@@ -74,6 +75,7 @@ import { useWorkspaceMembersQuery, useWorkspaceQuery } from '../features/workspa
 import { formatApiError } from '../lib/api-error';
 import { formatDate } from '../lib/format';
 import { formatDueDate } from '../lib/format-date';
+import { useWeekStart } from '../lib/use-week-start';
 
 const routeApi = getRouteApi('/_authenticated/tasks/$taskId');
 
@@ -193,7 +195,7 @@ function TitleEditor({
 
   const headingStyle = {
     margin: 0,
-    fontFamily: 'var(--font-display)',
+    fontFamily: 'var(--nf-font-display)',
     fontSize: 'clamp(1.75rem, 3vw, 2.25rem)',
   } as const;
 
@@ -730,6 +732,8 @@ function Sidebar({
   dueOn,
 }: SidebarProps): ReactElement {
   const { t, i18n } = useTranslation('common');
+  const weekStart = useWeekStart();
+  const { t: tAgents } = useTranslation('aiAgents');
   const locale = i18n.resolvedLanguage ?? 'en';
   const weekdayLabels = t('common.date.weekdays', { returnObjects: true }) as string[];
   const formatMonthYear = (year: number, month: number): string =>
@@ -874,6 +878,7 @@ function Sidebar({
                 void handleStartChange(next);
               }}
               weekdayLabels={weekdayLabels}
+              weekStart={weekStart}
               formatMonthYear={formatMonthYear}
               prevLabel={t('calendar.prev')}
               nextLabel={t('calendar.next')}
@@ -889,6 +894,7 @@ function Sidebar({
                 void handleDueChange(next);
               }}
               weekdayLabels={weekdayLabels}
+              weekStart={weekStart}
               formatMonthYear={formatMonthYear}
               prevLabel={t('calendar.prev')}
               nextLabel={t('calendar.next')}
@@ -932,6 +938,21 @@ function Sidebar({
           }
         >
           <AssigneesSection taskId={id} workspaceId={workspaceId} />
+        </Suspense>
+      </Card>
+
+      <Card style={{ padding: '1rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+        <h2 style={{ margin: 0, fontSize: 'var(--nf-text-base)' }}>
+          {tAgents('task_detail.agent.assign.title')}
+        </h2>
+        <Suspense
+          fallback={
+            <div style={{ display: 'flex', justifyContent: 'center', padding: '0.5rem' }}>
+              <Spinner label={t('common.loading')} />
+            </div>
+          }
+        >
+          <AgentAssignSection taskId={id} workspaceId={workspaceId} />
         </Suspense>
       </Card>
 
@@ -1072,7 +1093,7 @@ function RelatedTasksSection({ taskId }: { taskId: string }): ReactElement {
               </span>
               <span
                 style={{
-                  fontFamily: 'var(--font-mono)',
+                  fontFamily: 'var(--nf-font-mono)',
                   fontSize: 'var(--nf-text-xs)',
                   color: 'var(--nf-color-fg-muted)',
                 }}
@@ -1132,7 +1153,7 @@ function InferStateSection({ taskId }: { taskId: string }): ReactElement {
         <Badge tone="accent">{transitionLabel}</Badge>
         <span
           style={{
-            fontFamily: 'var(--font-mono)',
+            fontFamily: 'var(--nf-font-mono)',
             fontSize: 'var(--nf-text-xs)',
             color: 'var(--nf-color-fg-muted)',
           }}

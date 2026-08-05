@@ -5,6 +5,7 @@ import { BP } from '@nodate-flow/ui/tokens/breakpoints';
 import { Link, useRouterState } from '@tanstack/react-router';
 import {
   Activity,
+  Archive,
   Briefcase,
   CalendarDays,
   CalendarRange,
@@ -18,6 +19,7 @@ import {
   ListOrdered,
   type LucideIcon,
   Menu,
+  NotebookPen,
   Settings,
   Timer,
   X,
@@ -165,6 +167,53 @@ function WorkspaceInsightsPriorityLink({ workspaceId }: { workspaceId: string })
     >
       <Icon icon={ListOrdered} decorative />
       <span className={styles.label}>{t('nav.insightsPriority')}</span>
+    </Link>
+  );
+}
+
+/**
+ * WorkspaceArchiveLink — single sidebar entry that points at
+ * `/workspaces/{id}/tasks/archived`. Archiving a task is reversible
+ * only if the archive is reachable; without an entry point the room is
+ * addressable but not findable, which makes archiving a one-way door in
+ * practice. Static label, no data fetch.
+ */
+function WorkspaceArchiveLink({ workspaceId }: { workspaceId: string }): ReactElement {
+  const { t } = useTranslation('common');
+  return (
+    <Link
+      to="/workspaces/$id/tasks/archived"
+      params={{ id: workspaceId }}
+      className={cx(styles.item, styles.subItem, 'nf-focus-ring')}
+      activeProps={{
+        className: cx(styles.item, styles.subItem, styles.itemActive, 'nf-focus-ring'),
+      }}
+    >
+      <Icon icon={Archive} decorative />
+      <span className={styles.label}>{t('nav.archive')}</span>
+    </Link>
+  );
+}
+
+/**
+ * WorkspaceRetroDraftsLink — single sidebar entry that points at
+ * `/workspaces/{id}/tasks/drafts`. The queue fills itself from AI
+ * activity, so with no entry point the drafts accumulate unseen and
+ * every one of them expires unread. Static label, no data fetch.
+ */
+function WorkspaceRetroDraftsLink({ workspaceId }: { workspaceId: string }): ReactElement {
+  const { t } = useTranslation('common');
+  return (
+    <Link
+      to="/workspaces/$id/tasks/drafts"
+      params={{ id: workspaceId }}
+      className={cx(styles.item, styles.subItem, 'nf-focus-ring')}
+      activeProps={{
+        className: cx(styles.item, styles.subItem, styles.itemActive, 'nf-focus-ring'),
+      }}
+    >
+      <Icon icon={NotebookPen} decorative />
+      <span className={styles.label}>{t('nav.retroDrafts')}</span>
     </Link>
   );
 }
@@ -403,6 +452,8 @@ export default function Sidebar(): ReactElement {
                   <WorkspaceActivityLink workspaceId={currentWorkspaceId} />
                   <WorkspaceTimeboxesLink workspaceId={currentWorkspaceId} />
                   <WorkspaceInsightsPriorityLink workspaceId={currentWorkspaceId} />
+                  <WorkspaceRetroDraftsLink workspaceId={currentWorkspaceId} />
+                  <WorkspaceArchiveLink workspaceId={currentWorkspaceId} />
                   <Suspense fallback={null}>
                     <WorkspaceProjectsSection workspaceId={currentWorkspaceId} />
                   </Suspense>

@@ -76,7 +76,7 @@ function TaskList({
           <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
             {task.title}
           </span>
-          <span style={{ color: 'var(--nf-color-fg-muted)', fontFamily: 'var(--font-mono)' }}>
+          <span style={{ color: 'var(--nf-color-fg-muted)', fontFamily: 'var(--nf-font-mono)' }}>
             {task.date}
           </span>
         </li>
@@ -119,7 +119,7 @@ export default function DigestView({ workspaceId }: { workspaceId: string }): Re
           <pre
             style={{
               margin: 0,
-              fontFamily: 'var(--font-mono)',
+              fontFamily: 'var(--nf-font-mono)',
               fontSize: 'var(--nf-text-xs)',
               whiteSpace: 'pre-wrap',
               wordBreak: 'break-word',

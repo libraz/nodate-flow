@@ -46,7 +46,7 @@ function InboxRoute(): ReactElement {
         <h1
           style={{
             margin: 0,
-            fontFamily: 'var(--font-display)',
+            fontFamily: 'var(--nf-font-display)',
             fontSize: 'clamp(1.75rem, 3vw, 2.25rem)',
           }}
         >

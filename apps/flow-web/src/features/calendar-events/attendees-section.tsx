@@ -27,6 +27,7 @@ import { toaster } from '@nodate-flow/ui/primitives/toast';
 import { type ReactElement, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { formatApiError } from '../../lib/api-error';
 import { getPublicBaseUrl } from '../../lib/public-base-url';
 import { useWorkspaceMembersQuery } from '../workspaces/api';
 import {
@@ -127,8 +128,11 @@ export default function AttendeesSection({
     addAttendees.mutate(
       { ...scope, userIds: [userId] },
       {
-        onError: () => {
-          toaster.show({ tone: 'danger', message: t('event.attendees.add') });
+        onError: (err) => {
+          toaster.show({
+            tone: 'danger',
+            message: formatApiError(err, t, 'event.attendees.errors.add_failed'),
+          });
         },
       },
     );
@@ -162,8 +166,11 @@ export default function AttendeesSection({
         // contexts; the toast still confirms the invite was issued.
       }
       toaster.show({ tone: 'success', message: t('event.attendees.invite_sent') });
-    } catch {
-      toaster.show({ tone: 'danger', message: t('event.attendees.send_invite') });
+    } catch (err) {
+      toaster.show({
+        tone: 'danger',
+        message: formatApiError(err, t, 'event.attendees.errors.invite_failed'),
+      });
     }
   };
 

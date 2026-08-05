@@ -23,7 +23,7 @@
 
 .menuItem:hover,
 .menuItem:focus-visible {
-  background: var(--nf-color-bg-hover);
+  background: var(--nf-color-surface-hover);
 }
 
 .menuItemDanger {
@@ -46,7 +46,7 @@
 
 .trigger:hover,
 .trigger:focus-visible {
-  background: var(--nf-color-bg-hover);
+  background: var(--nf-color-surface-hover);
 }
 
 /* ── card body layout ─────────────────────────────────────────────────── */

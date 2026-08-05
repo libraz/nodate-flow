@@ -57,7 +57,7 @@
 }
 
 .navButton:hover {
-  background: var(--nf-color-bg-subtle);
+  background: var(--nf-color-bg-sunken);
   color: var(--nf-color-fg);
 }
 
@@ -81,7 +81,7 @@
 }
 
 .todayButton:hover {
-  background: var(--nf-color-bg-subtle);
+  background: var(--nf-color-bg-sunken);
 }
 
 .todayButton:focus-visible {
@@ -350,7 +350,7 @@
 }
 
 .popoverClose:hover {
-  background: var(--nf-color-bg-subtle);
+  background: var(--nf-color-bg-sunken);
   color: var(--nf-color-fg);
 }
 

@@ -85,7 +85,7 @@ export default function ShareErrorView({
             paddingBlock: 'var(--nf-space-2)',
             borderRadius: 'var(--nf-radius-md)',
             backgroundColor: 'var(--nf-color-accent)',
-            color: 'var(--nf-color-accent-fg)',
+            color: 'var(--nf-color-fg-on-accent)',
             textDecoration: 'none',
             fontWeight: 'var(--nf-weight-medium)',
             fontSize: 'var(--nf-text-sm)',

@@ -88,7 +88,7 @@ export default function ReactionBar({
           className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs transition-colors ${
             g.myReactionId
               ? 'border-[var(--nf-color-accent)] bg-[var(--nf-color-accent-subtle)]'
-              : 'border-[var(--nf-color-border)] hover:bg-[var(--nf-color-bg-hover)]'
+              : 'border-[var(--nf-color-border)] hover:bg-[var(--nf-color-surface-hover)]'
           }`}
           title={g.userNames.join(', ')}
           aria-label={`${g.emoji} ${g.count}`}
@@ -105,7 +105,7 @@ export default function ReactionBar({
                 key={emoji}
                 type="button"
                 onClick={() => handleToggle(emoji)}
-                className="rounded p-1.5 text-lg hover:bg-[var(--nf-color-bg-hover)]"
+                className="rounded p-1.5 text-lg hover:bg-[var(--nf-color-surface-hover)]"
               >
                 {emoji}
               </button>

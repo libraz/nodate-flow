@@ -380,7 +380,7 @@ export default function WorkspaceSettingsForm({
             padding: '1.25rem',
             border: '1px solid var(--nf-color-danger)',
             borderRadius: 'var(--nf-radius-md)',
-            background: 'color-mix(in srgb, var(--nf-color-danger) 4%, var(--nf-color-bg-default))',
+            background: 'color-mix(in srgb, var(--nf-color-danger) 4%, var(--nf-color-bg))',
           }}
         >
           <header style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>

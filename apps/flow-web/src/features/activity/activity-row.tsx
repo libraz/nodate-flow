@@ -187,7 +187,7 @@ export default function ActivityRow({ entry, actorName }: ActivityRowProps): Rea
         >
           <span
             style={{
-              fontFamily: 'var(--font-mono)',
+              fontFamily: 'var(--nf-font-mono)',
               overflow: 'hidden',
               textOverflow: 'ellipsis',
               maxInlineSize: '24rem',

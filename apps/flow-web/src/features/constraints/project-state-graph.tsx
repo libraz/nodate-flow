@@ -200,7 +200,7 @@ export default function ProjectStateGraph({ projectId }: ProjectStateGraphProps)
     >
       <figcaption
         style={{
-          fontFamily: 'var(--font-display)',
+          fontFamily: 'var(--nf-font-display)',
           fontSize: 'var(--nf-text-base)',
           fontWeight: 600,
           marginBlockEnd: '0.75rem',

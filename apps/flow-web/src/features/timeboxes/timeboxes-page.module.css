@@ -180,7 +180,7 @@
 .progressBar {
   flex: 1 1 auto;
   block-size: 0.375rem;
-  background: var(--nf-color-surface-muted);
+  background: var(--nf-color-bg-sunken);
   border-radius: var(--nf-radius-pill);
   overflow: hidden;
   min-inline-size: 0;

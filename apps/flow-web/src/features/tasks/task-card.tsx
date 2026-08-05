@@ -62,7 +62,7 @@ export default function TaskCard({
     >
       <div className="flex items-start gap-1">
         {ext.projectIdentifier && ext.taskNumber ? (
-          <span className="shrink-0 rounded bg-[var(--nf-color-bg-muted)] px-1.5 py-0.5 text-xs font-mono text-[var(--nf-color-fg-muted)]">
+          <span className="shrink-0 rounded bg-[var(--nf-color-bg-sunken)] px-1.5 py-0.5 text-xs font-mono text-[var(--nf-color-fg-muted)]">
             {ext.projectIdentifier}-{ext.taskNumber}
           </span>
         ) : null}

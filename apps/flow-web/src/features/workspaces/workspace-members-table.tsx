@@ -158,7 +158,7 @@ export default function WorkspaceMembersTable({
       <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <h2
           style={{
-            fontFamily: 'var(--font-display)',
+            fontFamily: 'var(--nf-font-display)',
             fontSize: 'var(--nf-text-xl)',
             margin: 0,
           }}

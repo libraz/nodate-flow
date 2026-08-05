@@ -62,7 +62,7 @@ export default function LabelPicker({
                     <button
                       type="button"
                       onClick={() => onToggle(label.id, !active)}
-                      className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-[var(--nf-color-bg-hover)]"
+                      className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-[var(--nf-color-surface-hover)]"
                     >
                       <span
                         className="inline-block h-3 w-3 rounded-full flex-shrink-0"

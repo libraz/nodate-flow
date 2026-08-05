@@ -18,7 +18,7 @@
 
 .title {
   margin: 0;
-  font-family: var(--font-display, inherit);
+  font-family: var(--nf-font-display, inherit);
   font-size: clamp(1.25rem, 2vw, 1.5rem);
   color: var(--nf-color-fg);
 }
@@ -183,7 +183,7 @@
   background: var(--nf-color-bg);
   border-radius: var(--nf-radius-sm);
   border: var(--nf-space-px) solid var(--nf-color-border);
-  font-family: var(--font-mono, monospace);
+  font-family: var(--nf-font-mono, monospace);
   font-size: var(--nf-text-xs);
   color: var(--nf-color-fg);
   white-space: pre-wrap;
@@ -220,7 +220,7 @@
 }
 
 .configTextarea {
-  font-family: var(--font-mono, monospace);
+  font-family: var(--nf-font-mono, monospace);
   font-size: var(--nf-text-sm);
   min-block-size: 6rem;
 }

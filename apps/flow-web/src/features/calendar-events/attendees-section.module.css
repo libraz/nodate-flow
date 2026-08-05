@@ -116,7 +116,7 @@
 .removeButton {
   /* Square ghost icon button — re-use Button "ghost" + size sm and pin
      the inline size so the X stays centered without leading whitespace. */
-  inline-size: var(--nf-space-7);
+  inline-size: var(--nf-space-6);
   padding-inline: 0;
 }
 

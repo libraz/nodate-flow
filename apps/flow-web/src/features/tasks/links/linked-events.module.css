@@ -494,7 +494,7 @@
 
 .escHint {
   margin-inline-start: auto;
-  font-family: var(--font-mono);
+  font-family: var(--nf-font-mono);
   font-size: var(--nf-text-xs);
   color: var(--nf-color-fg-subtle);
   padding: 0 var(--nf-space-2);
