@@ -1,0 +1,20 @@
+{
+  "suggestedAssignees": [],
+  "subtasks": [
+    {
+      "title": "Fixture subtask one",
+      "description": "First step of the deterministic smart-create breakdown.",
+      "priority": "high"
+    },
+    {
+      "title": "Fixture subtask two",
+      "description": "Second step, present so tests exercise more than a single child insert.",
+      "priority": "medium"
+    },
+    {
+      "title": "Fixture subtask three",
+      "description": "Third step, kept distinct so per-child assertions can tell them apart.",
+      "priority": "low"
+    }
+  ]
+}
