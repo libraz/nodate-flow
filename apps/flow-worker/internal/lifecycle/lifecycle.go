@@ -29,6 +29,7 @@ import (
 	"github.com/libraz/nodate-flow/apps/flow-worker/internal/config"
 	"github.com/libraz/nodate-flow/apps/flow-worker/internal/jobs"
 	"github.com/libraz/nodate-flow/apps/flow-worker/internal/obs"
+	"github.com/libraz/nodate-flow/packages/go-shared/dbtz"
 	"github.com/libraz/nodate-flow/packages/go-shared/logutil"
 )
 
@@ -222,7 +223,10 @@ func Run(ctx context.Context, cfg *config.Config, logger *slog.Logger, opts *Run
 // Run can surface it to cmd/worker (which exits non-zero) without
 // losing the underlying driver message.
 func openAndPingDB(cfg *config.Config, logger *slog.Logger) (*sql.DB, error) {
-	db, err := sql.Open("mysql", cfg.DBDSN)
+	// Pin the session timezone before opening: every stored DATETIME is a
+	// UTC wall clock, and a session that answers NOW() in the host's zone
+	// makes every comparison against them wrong by the offset, silently.
+	db, err := sql.Open("mysql", dbtz.NormalizeDSN(cfg.DBDSN))
 	if err != nil {
 		logger.Error("db open failed", "err", err)
 		return nil, fmt.Errorf("db open: %w", err)

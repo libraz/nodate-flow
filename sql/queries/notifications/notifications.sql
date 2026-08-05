@@ -252,24 +252,31 @@ WHERE workspace_id = ?
   AND is_muted = FALSE
   AND enabled = TRUE;
 
--- name: ClaimReminderForDelivery :execrows
--- Atomically claim a calendar event's reminder for delivery. The
--- conditional predicate notified_at IS NULL is what makes the claim
--- safe: a single UPDATE lets exactly one caller flip the row from
--- NULL to NOW(), so the affected-rows count (RowsAffected) is 1 for
--- the winner and 0 for every racing loser. Callers MUST claim first
--- and dispatch the reminder only when the count is 1, replacing the
--- read-then-blind-UPDATE pattern that could double-send when more
--- than one scheduler tick or process observes the same due event.
+-- name: ClaimReminderOccurrence :execrows
+-- Claim one occurrence of a calendar event's reminder for delivery.
 --
--- On a dispatch failure the caller should reset notified_at back to
--- NULL so the next tick can re-claim and retry the send.
+-- The claim is an INSERT, and the unique key on (event_id,
+-- occurrence_start) decides the winner: exactly one caller inserts the
+-- row and every racing tick or replica gets zero affected rows from the
+-- IGNORE. Callers MUST claim first and dispatch only on a count of 1.
 --
--- The WHERE targets the primary key directly; unlike the notifications
--- reads in this file it does not lead with workspace_id because the
--- claim is a single-row primary-key mutation, not a tenant-scoped
--- scan — the id already uniquely identifies the workspace's event.
-UPDATE calendar_events
-SET notified_at = NOW()
-WHERE id = ?
-  AND notified_at IS NULL;
+-- Per occurrence rather than per event, because a recurring series has
+-- one reminder per week and a column on the event row can only remember
+-- one of them. Claiming on calendar_events.notified_at rang the first
+-- Monday and nothing after it.
+--
+-- On a dispatch failure the caller releases the claim with
+-- ReleaseReminderOccurrence so the next tick can retake it.
+INSERT IGNORE INTO calendar_event_reminders (workspace_id, event_id, occurrence_start)
+VALUES (?, ?, ?);
+
+-- name: ReleaseReminderOccurrence :exec
+-- Give back a claim whose dispatch failed, so the next tick retries.
+--
+-- A real DELETE rather than a flag: the unique key is what stops a
+-- second send, so a released claim has to stop occupying it. A
+-- tombstone would make the retry impossible in exactly the situation
+-- the release exists for.
+DELETE FROM calendar_event_reminders
+WHERE event_id = ?
+  AND occurrence_start = ?;

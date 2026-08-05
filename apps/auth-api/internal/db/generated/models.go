@@ -2645,10 +2645,8 @@ type CalendarEvent struct {
 	RecurrenceParentID sql.NullInt32 `json:"recurrenceParentId"`
 	// Set on an override row: the start the occurrence would have had under the parent rule. Identifies which occurrence is replaced, so moving the override does not lose track of what it overrides.
 	RecurrenceOriginalStart sql.NullTime `json:"recurrenceOriginalStart"`
-	// Minutes before event to send notification; NULL = no notification
+	// Minutes before an occurrence to send its reminder; NULL = no reminder. Applies to every occurrence of a recurring event; what has already been sent is recorded in calendar_event_reminders.
 	NotificationOffset sql.NullInt32 `json:"notificationOffset"`
-	// Timestamp when notification was sent; NULL = not yet notified
-	NotifiedAt sql.NullTime `json:"notifiedAt"`
 	// Linked task (optional, for task-calendar sync)
 	TaskID sql.NullInt32 `json:"taskId"`
 	// When task_id IS NOT NULL: which task field this event represents. due=task.due_on, scheduled=time-blocked (multi-link allowed).
@@ -2805,6 +2803,20 @@ type CalendarEventInvite struct {
 	Enabled   bool         `json:"enabled"`
 	UpdatedAt sql.NullTime `json:"updatedAt"`
 	CreatedAt time.Time    `json:"createdAt"`
+}
+
+// Sent-reminder claims, one per (event, occurrence). Replaces the single calendar_events.notified_at claim, which could only ever fire once per row.
+type CalendarEventReminder struct {
+	// Internal PK, never exposed
+	ID uint32 `json:"-"`
+	// Internal FK to workspaces.id; carried so a workspace teardown reaches these rows directly
+	WorkspaceID uint32 `json:"-"`
+	// Internal FK to calendar_events.id
+	EventID uint32 `json:"eventId"`
+	// UTC start of the occurrence this reminder covered; equals calendar_events.start_at for non-recurring events
+	OccurrenceStart time.Time `json:"occurrenceStart"`
+	// When the claim was taken, which is also when the reminder was sent
+	CreatedAt time.Time `json:"createdAt"`
 }
 
 // Per-calendar access grants: which users may use a calendar and at what role. The ACL axis, unlike calendar_subscriptions, which holds private display preferences and grants nothing.

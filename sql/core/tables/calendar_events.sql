@@ -73,8 +73,15 @@ CREATE TABLE calendar_events (
   recurrence_parent_id INT UNSIGNED NULL COMMENT 'Set on an override row: the recurring event whose single occurrence this row replaces. NULL on ordinary and master rows.',
   recurrence_original_start DATETIME(3) NULL COMMENT 'Set on an override row: the start the occurrence would have had under the parent rule. Identifies which occurrence is replaced, so moving the override does not lose track of what it overrides.',
 
-  notification_offset INT NULL COMMENT 'Minutes before event to send notification; NULL = no notification',
-  notified_at DATETIME(3) NULL DEFAULT NULL COMMENT 'Timestamp when notification was sent; NULL = not yet notified',
+  /**
+   * notification_offset: how long before an occurrence its reminder is
+   * due. Applies to every occurrence of a recurring event, not only the
+   * first — which is why the record of what has already been sent lives
+   * in calendar_event_reminders, keyed by occurrence, rather than in a
+   * single column here. A column can only remember one answer, and a
+   * series needs one per week.
+   */
+  notification_offset INT NULL COMMENT 'Minutes before an occurrence to send its reminder; NULL = no reminder. Applies to every occurrence of a recurring event; what has already been sent is recorded in calendar_event_reminders.',
 
   -- Cross-module link to nodate-flow tasks
   task_id INT UNSIGNED NULL COMMENT 'Linked task (optional, for task-calendar sync)',

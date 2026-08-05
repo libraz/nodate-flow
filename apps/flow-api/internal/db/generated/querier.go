@@ -232,23 +232,21 @@ type Querier interface {
 	// MarkDeliveryDelivered/Failed/Dead (WHERE id = ?).
 	// ORDER BY carries d.id as a stable tie-breaker.
 	ClaimPendingDeliveries(ctx context.Context, limit int32) ([]ClaimPendingDeliveriesRow, error)
-	// Atomically claim a calendar event's reminder for delivery. The
-	// conditional predicate notified_at IS NULL is what makes the claim
-	// safe: a single UPDATE lets exactly one caller flip the row from
-	// NULL to NOW(), so the affected-rows count (RowsAffected) is 1 for
-	// the winner and 0 for every racing loser. Callers MUST claim first
-	// and dispatch the reminder only when the count is 1, replacing the
-	// read-then-blind-UPDATE pattern that could double-send when more
-	// than one scheduler tick or process observes the same due event.
+	// Claim one occurrence of a calendar event's reminder for delivery.
 	//
-	// On a dispatch failure the caller should reset notified_at back to
-	// NULL so the next tick can re-claim and retry the send.
+	// The claim is an INSERT, and the unique key on (event_id,
+	// occurrence_start) decides the winner: exactly one caller inserts the
+	// row and every racing tick or replica gets zero affected rows from the
+	// IGNORE. Callers MUST claim first and dispatch only on a count of 1.
 	//
-	// The WHERE targets the primary key directly; unlike the notifications
-	// reads in this file it does not lead with workspace_id because the
-	// claim is a single-row primary-key mutation, not a tenant-scoped
-	// scan — the id already uniquely identifies the workspace's event.
-	ClaimReminderForDelivery(ctx context.Context, id uint32) (int64, error)
+	// Per occurrence rather than per event, because a recurring series has
+	// one reminder per week and a column on the event row can only remember
+	// one of them. Claiming on calendar_events.notified_at rang the first
+	// Monday and nothing after it.
+	//
+	// On a dispatch failure the caller releases the claim with
+	// ReleaseReminderOccurrence so the next tick can retake it.
+	ClaimReminderOccurrence(ctx context.Context, arg ClaimReminderOccurrenceParams) (int64, error)
 	// Delete tokens that are either expired-and-used or expired-and-unused, for periodic cleanup.
 	CleanupExpiredMagicLinks(ctx context.Context) error
 	// Disable TOTP on a local identity.
@@ -1572,6 +1570,13 @@ type Querier interface {
 	RecordImportJobProgress(ctx context.Context, arg RecordImportJobProgressParams) error
 	// Insert a new global user account. The caller supplies a UUID v7 public_id.
 	RegisterUser(ctx context.Context, arg RegisterUserParams) (int64, error)
+	// Give back a claim whose dispatch failed, so the next tick retries.
+	//
+	// A real DELETE rather than a flag: the unique key is what stops a
+	// second send, so a released claim has to stop occupying it. A
+	// tombstone would make the retry impossible in exactly the situation
+	// the release exists for.
+	ReleaseReminderOccurrence(ctx context.Context, arg ReleaseReminderOccurrenceParams) error
 	// Soft-remove an actor from a task.
 	RemoveActor(ctx context.Context, arg RemoveActorParams) error
 	// Soft-remove a project member.

@@ -84,6 +84,24 @@ func (a *queriesAdapter) ListSessionsForUser(ctx context.Context, userID uint32,
 	return out, nil
 }
 
+func (a *queriesAdapter) FindSessionByRotatedFromHash(ctx context.Context, rotatedFromHash string) (sessionstore.FindAnySessionByRefreshHashRow, error) {
+	row, err := a.q.FindSessionByRotatedFromHash(ctx, sql.NullString{String: rotatedFromHash, Valid: true})
+	if err != nil {
+		return sessionstore.FindAnySessionByRefreshHashRow{}, err
+	}
+	return sessionstore.FindAnySessionByRefreshHashRow{
+		ID:          row.ID,
+		PublicID:    row.PublicID,
+		UserID:      row.UserID,
+		RefreshHash: row.RefreshHash,
+		ExpiresAt:   row.ExpiresAt,
+		RevokedAt:   row.RevokedAt,
+		LastUsedAt:  row.LastUsedAt,
+		Enabled:     row.Enabled,
+		CreatedAt:   row.CreatedAt,
+	}, nil
+}
+
 func (a *queriesAdapter) RevokeAllSessionsForUserExcept(ctx context.Context, userID uint32, publicID dbtype.PublicID) error {
 	return a.q.RevokeAllSessionsForUserExcept(ctx, generated.RevokeAllSessionsForUserExceptParams{
 		UserID:   userID,

@@ -2,7 +2,6 @@ package e2e
 
 import (
 	"context"
-	"database/sql"
 	"testing"
 	"time"
 
@@ -99,8 +98,8 @@ func TestCalendarReminderDispatch(t *testing.T) {
 	f.SetTimeout(5 * time.Second)
 	calnotifs.CheckAndNotify(ctx, testDB, f)
 
-	// Each recipient gets exactly one new row, and notified_at is set so
-	// future ticks do not re-fire.
+	// Each recipient gets exactly one new row, and the occurrence is
+	// claimed so future ticks do not re-fire it.
 	require.Equalf(t, int64(1),
 		notificationCountForUser(ctx, t, testDB, attendeeID)-beforeAttendee,
 		"attendee should receive exactly one reminder notification")
@@ -108,12 +107,12 @@ func TestCalendarReminderDispatch(t *testing.T) {
 		notificationCountForUser(ctx, t, testDB, ownerID)-beforeOwner,
 		"owner should receive exactly one reminder notification")
 
-	var notifiedAt sql.NullTime
+	var claims int
 	err = testDB.QueryRowContext(ctx,
-		`SELECT notified_at FROM calendar_events WHERE id = ?`, eventID,
-	).Scan(&notifiedAt)
+		`SELECT COUNT(*) FROM calendar_event_reminders WHERE event_id = ?`, eventID,
+	).Scan(&claims)
 	require.NoError(t, err)
-	require.True(t, notifiedAt.Valid, "notified_at should be set after dispatch")
+	require.Equal(t, 1, claims, "the dispatched occurrence should be claimed")
 
 	// Inspect a delivered row to confirm the channel + resource link
 	// match the scheduler contract.
@@ -139,7 +138,7 @@ func TestCalendarReminderDispatch(t *testing.T) {
 	require.Equal(t, "in_app", channel)
 	require.Equal(t, "Reminder me", title)
 
-	// A second tick should be a no-op now that notified_at is set.
+	// A second tick should be a no-op now that the occurrence is claimed.
 	calnotifs.CheckAndNotify(ctx, testDB, f)
 	require.Equalf(t, int64(1),
 		notificationCountForUser(ctx, t, testDB, attendeeID)-beforeAttendee,
@@ -147,4 +146,100 @@ func TestCalendarReminderDispatch(t *testing.T) {
 	require.Equalf(t, int64(1),
 		notificationCountForUser(ctx, t, testDB, ownerID)-beforeOwner,
 		"second tick must not duplicate the owner's reminder")
+}
+
+// TestRecurringCalendarReminderFiresEveryOccurrence is H-20.
+//
+// A reminder used to be claimed on one column of the event row, so a
+// series rang once for its lifetime: "every Monday, 15 minutes before"
+// notified the first Monday and was silent for the remaining
+// fifty-one. Adding a rule to an event that had already fired meant it
+// never rang again at all.
+//
+// The test drives the same tick twice for two different occurrences,
+// because a single occurrence firing is exactly what the old code did.
+func TestRecurringCalendarReminderFiresEveryOccurrence(t *testing.T) {
+	bootstrap(t)
+	t.Parallel()
+
+	owner := newTenant(t)
+	ctx := context.Background()
+	queries := generated.New(testDB)
+
+	wsID := lookupWorkspaceInternalID(ctx, t, testDB, owner.WorkspacePublicID)
+	ownerID := lookupUserInternalID(ctx, t, testDB, owner.UserPublicID)
+
+	calRes, err := testDB.ExecContext(ctx, `
+		INSERT INTO calendars (public_id, workspace_id, kind, name, owner_user_id)
+		VALUES (?, ?, 'personal', 'recurring reminder cal', ?)
+	`, types.New(), wsID, ownerID)
+	require.NoError(t, err)
+	calLastID, err := calRes.LastInsertId()
+	require.NoError(t, err)
+	calID := uint32(calLastID) //#nosec G115 -- LastInsertId in test seed, fits uint32
+
+	// A daily series anchored thirty days in the past, at a time of day
+	// five minutes ahead of now. The occurrence the tick should find is
+	// today's — which exists only as an expansion of the rule, because
+	// the master row's own start is a month old and long past due. That
+	// is the arrangement the old claim could not serve.
+	anchor := time.Now().UTC().Add(5*time.Minute).Truncate(time.Minute).AddDate(0, 0, -30)
+	eventPub := types.New()
+	evRes, err := testDB.ExecContext(ctx, `
+		INSERT INTO calendar_events (
+			public_id, workspace_id, calendar_id,
+			title, start_at, end_at, timezone,
+			owner_user_id, created_by_user_id,
+			notification_offset, recurrence_rule
+		) VALUES (?, ?, ?, ?, ?, ?, 'UTC', ?, ?, 30, ?)
+	`, eventPub, wsID, calID,
+		"Daily standup reminder", anchor, anchor.Add(time.Hour),
+		ownerID, ownerID, `{"freq":"daily","interval":1}`)
+	require.NoError(t, err)
+	evLastID, err := evRes.LastInsertId()
+	require.NoError(t, err)
+	eventID := uint32(evLastID) //#nosec G115 -- LastInsertId in test seed, fits uint32
+
+	f := notification.NewFanout(testDB, queries, email.NoopSender{})
+	f.SetTimeout(5 * time.Second)
+
+	before := notificationCountForUser(ctx, t, testDB, ownerID)
+	calnotifs.CheckAndNotify(ctx, testDB, f)
+	require.NoError(t, f.Shutdown(ctxWithTimeout(t, 10*time.Second)))
+
+	afterFirst := notificationCountForUser(ctx, t, testDB, ownerID)
+	require.Equalf(t, int64(1), afterFirst-before,
+		"the occurrence whose reminder window is open must fire (before=%d after=%d)",
+		before, afterFirst)
+
+	// A second tick must not re-fire the same occurrence.
+	calnotifs.CheckAndNotify(ctx, testDB, f)
+	require.Equal(t, afterFirst, notificationCountForUser(ctx, t, testDB, ownerID),
+		"a second tick must not duplicate the same occurrence")
+
+	// Exactly one claim exists, and it names an occurrence rather than
+	// the series anchor — the anchor is a month old and was never due.
+	var claims int
+	var claimed time.Time
+	require.NoError(t, testDB.QueryRowContext(ctx,
+		`SELECT COUNT(*) FROM calendar_event_reminders WHERE event_id = ?`, eventID).Scan(&claims))
+	require.Equal(t, 1, claims)
+	require.NoError(t, testDB.QueryRowContext(ctx,
+		`SELECT occurrence_start FROM calendar_event_reminders WHERE event_id = ?`, eventID).Scan(&claimed))
+	require.Truef(t, claimed.After(anchor.Add(24*time.Hour)),
+		"the claim must name an expanded occurrence (%s), not the series anchor (%s)",
+		claimed.Format(time.RFC3339), anchor.Format(time.RFC3339))
+
+	// Releasing that claim is what the dispatch-failure path does; the
+	// next tick must retake it rather than treat the series as done.
+	_, err = testDB.ExecContext(ctx,
+		`DELETE FROM calendar_event_reminders WHERE event_id = ?`, eventID)
+	require.NoError(t, err)
+
+	beforeRetry := notificationCountForUser(ctx, t, testDB, ownerID)
+	calnotifs.CheckAndNotify(ctx, testDB, f)
+	require.NoError(t, f.Shutdown(ctxWithTimeout(t, 10*time.Second)))
+	require.Equalf(t, int64(1),
+		notificationCountForUser(ctx, t, testDB, ownerID)-beforeRetry,
+		"a released occurrence must be retried, not skipped as already sent")
 }

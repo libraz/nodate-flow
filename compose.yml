@@ -12,6 +12,14 @@ services:
       - --character-set-server=utf8mb4
       - --collation-server=utf8mb4_0900_ai_ci
       - --max-connections=256
+      # Every stored DATETIME is a UTC wall clock, and queries compare
+      # them against NOW(). Left to the host's zone the two disagree by
+      # its offset with no error anywhere: OAuth states expire early,
+      # webhook backoff windows read as already past, invites vanish
+      # ahead of time. The services pin the session zone in their DSN as
+      # well; this makes the default right for anything that connects
+      # without one, such as a mysql shell.
+      - --default-time-zone=+00:00
     ports:
       - "${NF_DB_PORT:-3306}:3306"
     volumes:
@@ -150,7 +158,7 @@ services:
     environment:
       NF_FLOW_PORT: "8080"
       NF_FLOW_LOG_LEVEL: ${NF_FLOW_LOG_LEVEL:-info}
-      NF_DB_DSN: ${NF_DB_DSN:-nodate:nodatepw@tcp(mysql:3306)/nodate_flow?parseTime=true&charset=utf8mb4&collation=utf8mb4_0900_ai_ci}
+      NF_DB_DSN: ${NF_DB_DSN:-nodate:nodatepw@tcp(mysql:3306)/nodate_flow?parseTime=true&charset=utf8mb4&collation=utf8mb4_0900_ai_ci&time_zone=%27%2B00%3A00%27}
       NF_COOKIE_SECURE: "false"
       NF_REDIS_ADDR: ${NF_REDIS_ADDR:-redis:6379}
       NF_FLOW_SESSION_STORE: ${NF_FLOW_SESSION_STORE:-mysql}
@@ -208,7 +216,7 @@ services:
     environment:
       NF_AUTH_PORT: "8082"
       NF_AUTH_LOG_LEVEL: ${NF_AUTH_LOG_LEVEL:-info}
-      NF_DB_DSN: ${NF_DB_DSN:-nodate:nodatepw@tcp(mysql:3306)/nodate_flow?parseTime=true&charset=utf8mb4&collation=utf8mb4_0900_ai_ci}
+      NF_DB_DSN: ${NF_DB_DSN:-nodate:nodatepw@tcp(mysql:3306)/nodate_flow?parseTime=true&charset=utf8mb4&collation=utf8mb4_0900_ai_ci&time_zone=%27%2B00%3A00%27}
       NF_COOKIE_SECURE: "false"
       NF_REGISTRATION_OPEN: ${NF_REGISTRATION_OPEN:-true}
       NF_AUTH_CORS: ${NF_AUTH_CORS:-http://localhost:5173,http://localhost:5175,http://127.0.0.1:5173,http://127.0.0.1:5175}
@@ -265,7 +273,7 @@ services:
     environment:
       NF_FLOW_WORKER_PORT: "9091"
       NF_FLOW_WORKER_LOG_LEVEL: ${NF_FLOW_WORKER_LOG_LEVEL:-info}
-      NF_DB_DSN: ${NF_DB_DSN:-nodate:nodatepw@tcp(mysql:3306)/nodate_flow?parseTime=true&charset=utf8mb4&collation=utf8mb4_0900_ai_ci}
+      NF_DB_DSN: ${NF_DB_DSN:-nodate:nodatepw@tcp(mysql:3306)/nodate_flow?parseTime=true&charset=utf8mb4&collation=utf8mb4_0900_ai_ci&time_zone=%27%2B00%3A00%27}
       # flow-api service is named "api" inside this compose network.
       NF_FLOW_API_BASE_URL: ${NF_FLOW_API_BASE_URL:-http://api:8080}
       # Shared secret used by the worker to authenticate against

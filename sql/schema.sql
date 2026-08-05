@@ -10,6 +10,7 @@ DROP TABLE IF EXISTS `calendar_event_attendees`;
 DROP TABLE IF EXISTS `calendar_event_checklist_items`;
 DROP TABLE IF EXISTS `calendar_event_comments`;
 DROP TABLE IF EXISTS `calendar_event_invites`;
+DROP TABLE IF EXISTS `calendar_event_reminders`;
 DROP TABLE IF EXISTS `calendar_events`;
 DROP TABLE IF EXISTS `calendar_members`;
 DROP TABLE IF EXISTS `calendar_memos`;
@@ -334,6 +335,59 @@ CREATE TABLE calendar_event_invites (
   CONSTRAINT fk_calendar_event_invites_attendee FOREIGN KEY (attendee_id) REFERENCES calendar_event_attendees(id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Magic-link invite rows for calendar event attendees';
 
+-- >>> calendar_event_reminders.sql
+-- ====================================
+-- calendar_event_reminders
+-- One row per reminder that has been sent, keyed by the occurrence it
+-- was sent for.
+--
+-- Reminders used to be claimed on calendar_events.notified_at: one
+-- column, one claim, one reminder for the lifetime of the row. That is
+-- the right shape for an event that happens once and the wrong shape for
+-- a series — "every Monday, 15 minutes before" rang on the first Monday
+-- and was silent for the remaining fifty-one, because the column was
+-- already set. Adding a recurrence rule to an existing event that had
+-- already fired meant it never rang again at all.
+--
+-- The claim is an INSERT rather than an UPDATE because insertion is
+-- naturally once-only: the unique key below decides the winner, and the
+-- loser gets a duplicate-key error instead of a zero-rows-affected count
+-- it has to remember to check. Releasing a claim after a failed dispatch
+-- is a DELETE, which is why there is no soft-delete flag here — a
+-- released claim must genuinely stop existing so the next tick can take
+-- it, and a tombstone that still occupied the unique key would make the
+-- retry impossible.
+--
+-- Deliberately without public_id, sort_weight or notes: nothing outside
+-- the scheduler ever addresses one of these rows, and the columns the
+-- table template carries are for entities the API exposes.
+-- ====================================
+CREATE TABLE calendar_event_reminders (
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY COMMENT 'Internal PK, never exposed',
+  workspace_id INT UNSIGNED NOT NULL COMMENT 'Internal FK to workspaces.id; carried so a workspace teardown reaches these rows directly',
+  event_id INT UNSIGNED NOT NULL COMMENT 'Internal FK to calendar_events.id',
+
+  /**
+   * occurrence_start: the start instant of the specific occurrence this
+   * reminder was for, in UTC.
+   *
+   * For a non-recurring event it equals calendar_events.start_at. For a
+   * series it is one expansion of the rule, which is what makes the
+   * claim per-occurrence rather than per-row. Stored to millisecond
+   * precision so it matches the column it is derived from exactly; a
+   * truncated copy would fail to match and re-send.
+   */
+  occurrence_start DATETIME(3) NOT NULL COMMENT 'UTC start of the occurrence this reminder covered; equals calendar_events.start_at for non-recurring events',
+
+  created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) COMMENT 'When the claim was taken, which is also when the reminder was sent',
+
+  UNIQUE KEY uniq_calendar_event_reminders_occurrence (event_id, occurrence_start),
+  KEY idx_calendar_event_reminders_workspace (workspace_id),
+
+  CONSTRAINT fk_calendar_event_reminders_workspace FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
+  CONSTRAINT fk_calendar_event_reminders_event FOREIGN KEY (event_id) REFERENCES calendar_events(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Sent-reminder claims, one per (event, occurrence). Replaces the single calendar_events.notified_at claim, which could only ever fire once per row.';
+
 -- >>> calendar_events.sql
 -- ====================================
 -- calendar_events
@@ -410,8 +464,15 @@ CREATE TABLE calendar_events (
   recurrence_parent_id INT UNSIGNED NULL COMMENT 'Set on an override row: the recurring event whose single occurrence this row replaces. NULL on ordinary and master rows.',
   recurrence_original_start DATETIME(3) NULL COMMENT 'Set on an override row: the start the occurrence would have had under the parent rule. Identifies which occurrence is replaced, so moving the override does not lose track of what it overrides.',
 
-  notification_offset INT NULL COMMENT 'Minutes before event to send notification; NULL = no notification',
-  notified_at DATETIME(3) NULL DEFAULT NULL COMMENT 'Timestamp when notification was sent; NULL = not yet notified',
+  /**
+   * notification_offset: how long before an occurrence its reminder is
+   * due. Applies to every occurrence of a recurring event, not only the
+   * first — which is why the record of what has already been sent lives
+   * in calendar_event_reminders, keyed by occurrence, rather than in a
+   * single column here. A column can only remember one answer, and a
+   * series needs one per week.
+   */
+  notification_offset INT NULL COMMENT 'Minutes before an occurrence to send its reminder; NULL = no reminder. Applies to every occurrence of a recurring event; what has already been sent is recorded in calendar_event_reminders.',
 
   -- Cross-module link to nodate-flow tasks
   task_id INT UNSIGNED NULL COMMENT 'Linked task (optional, for task-calendar sync)',

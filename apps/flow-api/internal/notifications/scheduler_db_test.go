@@ -23,6 +23,7 @@ import (
 // calendar event (with its owning workspace / calendar / user) whose
 // reminder window is open and notified_at is still NULL.
 type claimFixture struct {
+	workspaceID   uint32
 	eventID       uint32
 	eventPublicID types.PublicID
 }
@@ -77,17 +78,18 @@ func seedClaimFixture(t *testing.T, db *sql.DB) *claimFixture {
 	require.NoError(t, err)
 
 	return &claimFixture{
+		workspaceID:   wsID,
 		eventID:       uint32(evRaw), //#nosec G115 -- LastInsertId in test seed, fits uint32
 		eventPublicID: eventPub,
 	}
 }
 
-// TestClaimReminderForDelivery_SingleWinner verifies the claim contract
-// the scheduler relies on: the first conditional UPDATE flips
-// notified_at from NULL to NOW() and reports one affected row, every
-// subsequent attempt reports zero, and releasing the claim (the
-// dispatch-failure retry path) makes the reminder claimable again.
-func TestClaimReminderForDelivery_SingleWinner(t *testing.T) {
+// TestClaimReminderOccurrence_SingleWinner verifies the claim contract
+// the scheduler relies on: the first INSERT creates the (event,
+// occurrence) row and reports one affected row, every subsequent attempt
+// reports zero, and releasing the claim (the dispatch-failure retry
+// path) makes that occurrence claimable again.
+func TestClaimReminderOccurrence_SingleWinner(t *testing.T) {
 	testhelpers.SkipUnlessIntegration(t)
 	inst := helpers.StartShared(t)
 	db := inst.DB
@@ -95,27 +97,42 @@ func TestClaimReminderForDelivery_SingleWinner(t *testing.T) {
 
 	ctx := context.Background()
 	queries := generated.New(db)
+	occurrence := time.Date(2030, 6, 3, 9, 0, 0, 0, time.UTC)
 
-	affected, err := queries.ClaimReminderForDelivery(ctx, fx.eventID)
+	claim := func() (int64, error) {
+		return queries.ClaimReminderOccurrence(ctx, generated.ClaimReminderOccurrenceParams{
+			WorkspaceID:     fx.workspaceID,
+			EventID:         fx.eventID,
+			OccurrenceStart: occurrence,
+		})
+	}
+
+	affected, err := claim()
 	require.NoError(t, err)
 	require.Equal(t, int64(1), affected, "first claim must win exactly one row")
 
-	affected, err = queries.ClaimReminderForDelivery(ctx, fx.eventID)
+	affected, err = claim()
 	require.NoError(t, err)
-	require.Equal(t, int64(0), affected, "re-claim must lose while notified_at is set")
+	require.Equal(t, int64(0), affected, "re-claim must lose while the row exists")
 
-	var notifiedAt sql.NullTime
-	require.NoError(t, db.QueryRowContext(ctx,
-		`SELECT notified_at FROM calendar_events WHERE id = ?`, fx.eventID,
-	).Scan(&notifiedAt))
-	require.True(t, notifiedAt.Valid, "winning claim must set notified_at")
-
-	// Releasing the claim re-arms the reminder for the next tick.
-	releaseReminderClaim(ctx, db, pendingNotification{
-		ID:       fx.eventID,
-		PublicID: fx.eventPublicID,
+	// A different occurrence of the same event is a separate claim. This
+	// is the whole point of the table: one reminder per occurrence, not
+	// one for the lifetime of the row.
+	affected, err = queries.ClaimReminderOccurrence(ctx, generated.ClaimReminderOccurrenceParams{
+		WorkspaceID:     fx.workspaceID,
+		EventID:         fx.eventID,
+		OccurrenceStart: occurrence.AddDate(0, 0, 7),
 	})
-	affected, err = queries.ClaimReminderForDelivery(ctx, fx.eventID)
 	require.NoError(t, err)
-	require.Equal(t, int64(1), affected, "released reminder must be claimable again")
+	require.Equal(t, int64(1), affected, "the next week's occurrence must be claimable")
+
+	// Releasing re-arms that occurrence for the next tick.
+	releaseReminderClaim(ctx, db, pendingNotification{
+		ID:              fx.eventID,
+		PublicID:        fx.eventPublicID,
+		OccurrenceStart: occurrence,
+	})
+	affected, err = claim()
+	require.NoError(t, err)
+	require.Equal(t, int64(1), affected, "a released occurrence must be claimable again")
 }

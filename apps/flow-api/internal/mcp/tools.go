@@ -2850,12 +2850,17 @@ func listCalendarOccurrences(
 		if perr != nil || rule == nil {
 			continue
 		}
+		var seriesEnd *time.Time
+		if r.RecurrenceEnd.Valid {
+			seriesEnd = &r.RecurrenceEnd.Time
+		}
 		for _, inst := range recurrence.Expand(recurrence.Event{
-			StartAt:    r.StartAt.Time,
-			EndAt:      r.EndAt.Time,
-			Timezone:   r.Timezone,
-			Rule:       rule,
-			Exceptions: recurrence.ParseExceptions(r.RecurrenceExceptions),
+			StartAt:       r.StartAt.Time,
+			EndAt:         r.EndAt.Time,
+			Timezone:      r.Timezone,
+			Rule:          rule,
+			Exceptions:    recurrence.ParseExceptions(r.RecurrenceExceptions),
+			RecurrenceEnd: seriesEnd,
 		}, startTime, endTime) {
 			out = append(out, mcpCalendarOccurrence{
 				row:     recurringRowAsPlain(r),
@@ -3306,10 +3311,13 @@ func runUpdateCalendarEvent(ctx context.Context, deps Deps, s *session, raw json
 		params.StartAt = sql.NullTime{}
 		params.EndAt = sql.NullTime{}
 	}
-	// Only run the remaining-fields patch if anything is still set.
+	// Only run the remaining-fields patch if anything is still set. The
+	// clearable columns arrive as a bare any rather than a typed Null*,
+	// because their SET expression wraps the COALESCE in an IF that
+	// reads the matching clear flag; nil is the absent case.
 	if params.Title.Valid || params.Kind.Valid || params.ShowAs.Valid ||
-		params.Visibility.Valid || params.Location.Valid || params.Memo.Valid ||
-		params.BlockLabel.Valid || params.StartAt.Valid || params.EndAt.Valid {
+		params.Visibility.Valid || params.Location != nil || params.Memo != nil ||
+		params.BlockLabel != nil || params.StartAt.Valid || params.EndAt.Valid {
 		if err := qtxCal.PatchCalendarEvent(ctx, params); err != nil {
 			return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
 		}
