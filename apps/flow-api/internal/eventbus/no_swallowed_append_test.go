@@ -1,26 +1,22 @@
 package eventbus
 
 import (
+	"fmt"
+	"go/ast"
+	"go/parser"
+	"go/token"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 )
 
-// swallowedForms are the ways a caller can throw away an append error.
-// The blank identifier is the whole problem: it compiles, it reads like
-// a decision, and it leaves no reason, no call site and no payload, so
-// a dropped row cannot even be reconstructed from the logs afterwards.
-//
-// Both the qualified spelling (callers outside this package) and the
-// bare one (callers inside it) are listed.
-var swallowedForms = []string{
-	"_ = eventbus.Append(",
-	"_ = eventbus.AppendJudgeEvent(",
-	"_, _ = eventbus.AppendReverseEvent(",
-	"_ = Append(",
-	"_ = AppendJudgeEvent(",
-	"_, _ = AppendReverseEvent(",
+// appendFuncs are the entry points that put a row in the events log.
+// Discarding what any of them returns is what this guard rejects.
+var appendFuncs = map[string]bool{
+	"Append":             true,
+	"AppendJudgeEvent":   true,
+	"AppendReverseEvent": true,
 }
 
 // TestNoSwallowedAppends proves every event append in the module either
@@ -29,14 +25,21 @@ var swallowedForms = []string{
 // The guard is a whole-module walk rather than a package-local check
 // because the writers are spread across internal/mcp, internal/ai,
 // internal/http/handlers and the workers, and the defect was never one
-// call site: the same `_ =` appeared independently in two dozen places
-// while fifty-odd neighbours checked the error, so a review-time rule
-// had already failed to hold. Dropping a row is not cosmetic — task
-// state is derived from the event log (CLAUDE.md rule 8), so a missing
-// row is a wrong state that nothing later corrects.
+// call site: the same discarded error appeared independently in two
+// dozen places while fifty-odd neighbours checked it, so a review-time
+// rule had already failed to hold. Dropping a row is not cosmetic —
+// task state is derived from the event log (CLAUDE.md rule 8), so a
+// missing row is a wrong state that nothing later corrects.
 //
-// Choosing between the two forms is a real decision; see
-// [AppendBestEffort] for the criterion.
+// The check parses each file and looks for an assignment of an append
+// call to the blank identifier. Matching source text instead would be
+// wrong in both directions: a commented-out example would fail the build
+// for nothing, and reformatting the call across two lines, or inserting
+// a second space, would walk straight past it. The AST knows which
+// spellings are the same statement.
+//
+// Choosing between propagation and [AppendBestEffort] is a real
+// decision; see that function for the criterion.
 func TestNoSwallowedAppends(t *testing.T) {
 	t.Parallel()
 
@@ -54,22 +57,37 @@ func TestNoSwallowedAppends(t *testing.T) {
 		if !strings.HasSuffix(name, ".go") || strings.HasSuffix(name, "_test.go") {
 			return nil
 		}
-		// The walk root is this repository's own source tree, supplied by
-		// the test, not by anything a caller controls.
-		b, readErr := os.ReadFile(path) //#nosec G122 -- walk root is the repo source tree, fixed by the test
-		if readErr != nil {
-			return readErr
+		fset := token.NewFileSet()
+		file, perr := parser.ParseFile(fset, path, nil, 0)
+		if perr != nil {
+			// A file that does not parse cannot compile either, so the
+			// build already rejects it and this guard has nothing to add.
+			// Failing here instead would turn any half-written file in
+			// the tree into a confusing failure of an unrelated check.
+			return nil
 		}
 		rel, relErr := filepath.Rel(root, path)
 		if relErr != nil {
 			return relErr
 		}
-		src := string(b)
-		for _, form := range swallowedForms {
-			if strings.Contains(src, form) {
-				offenders = append(offenders, filepath.ToSlash(rel)+" contains "+form)
+		rel = filepath.ToSlash(rel)
+		inEventbus := file.Name.Name == "eventbus"
+
+		ast.Inspect(file, func(n ast.Node) bool {
+			assign, ok := n.(*ast.AssignStmt)
+			if !ok || !allBlank(assign.Lhs) || len(assign.Rhs) != 1 {
+				return true
 			}
-		}
+			call, ok := assign.Rhs[0].(*ast.CallExpr)
+			if !ok {
+				return true
+			}
+			if fn, ok := appendCallName(call, inEventbus); ok {
+				offenders = append(offenders, fmt.Sprintf("%s:%d discards the result of %s",
+					rel, fset.Position(assign.Pos()).Line, fn))
+			}
+			return true
+		})
 		return nil
 	})
 	if err != nil {
@@ -83,42 +101,87 @@ func TestNoSwallowedAppends(t *testing.T) {
 	}
 }
 
+// allBlank reports whether every expression on the left of an
+// assignment is the blank identifier, i.e. the whole result is thrown
+// away.
+func allBlank(lhs []ast.Expr) bool {
+	if len(lhs) == 0 {
+		return false
+	}
+	for _, e := range lhs {
+		id, ok := e.(*ast.Ident)
+		if !ok || id.Name != "_" {
+			return false
+		}
+	}
+	return true
+}
+
+// appendCallName reports whether call targets one of the append entry
+// points, and under what name. A qualified call must name this package
+// so an unrelated Append method on some other type is not mistaken for
+// one of ours; inside the package itself the call is unqualified.
+func appendCallName(call *ast.CallExpr, inEventbus bool) (string, bool) {
+	switch fn := call.Fun.(type) {
+	case *ast.SelectorExpr:
+		pkg, ok := fn.X.(*ast.Ident)
+		if !ok || pkg.Name != "eventbus" || !appendFuncs[fn.Sel.Name] {
+			return "", false
+		}
+		return "eventbus." + fn.Sel.Name, true
+	case *ast.Ident:
+		if !inEventbus || !appendFuncs[fn.Name] {
+			return "", false
+		}
+		return fn.Name, true
+	}
+	return "", false
+}
+
 // TestAppendBestEffortStaysAccountable pins the two things that make
 // [AppendBestEffort] an acceptable alternative to propagation. Reducing
 // it to a silent swallow would leave the guard above green while
 // restoring exactly the behaviour it exists to prevent.
+//
+// The keys are looked for as string literals in the parsed function
+// body, not in its source text: a doc comment mentioning them reads the
+// same to a text search and proves nothing.
 func TestAppendBestEffortStaysAccountable(t *testing.T) {
 	t.Parallel()
 
-	src, err := os.ReadFile("append.go")
+	fset := token.NewFileSet()
+	file, err := parser.ParseFile(fset, "append.go", nil, 0)
 	if err != nil {
-		t.Fatalf("read append.go: %v", err)
+		t.Fatalf("parse append.go: %v", err)
 	}
-	body, ok := sliceBetween(string(src), "func AppendBestEffort(", "\n}\n")
-	if !ok {
+
+	var body *ast.BlockStmt
+	for _, decl := range file.Decls {
+		if fn, ok := decl.(*ast.FuncDecl); ok && fn.Name.Name == "AppendBestEffort" {
+			body = fn.Body
+			break
+		}
+	}
+	if body == nil {
 		t.Fatal("could not locate AppendBestEffort")
 	}
+
+	literals := map[string]bool{}
+	ast.Inspect(body, func(n ast.Node) bool {
+		if lit, ok := n.(*ast.BasicLit); ok && lit.Kind == token.STRING {
+			literals[strings.Trim(lit.Value, `"`)] = true
+		}
+		return true
+	})
+
 	for _, want := range []string{
 		"call_site", // who dropped it
 		"payload",   // and what the row would have said
 	} {
-		if !strings.Contains(body, want) {
+		if !literals[want] {
 			t.Errorf("AppendBestEffort must log %s: without it a dropped event cannot be replayed", want)
 		}
 	}
-}
-
-func sliceBetween(src, openTok, closeTok string) (string, bool) {
-	start := strings.Index(src, openTok)
-	if start < 0 {
-		return "", false
-	}
-	rest := src[start+len(openTok):]
-	end := strings.Index(rest, closeTok)
-	if end < 0 {
-		return "", false
-	}
-	return rest[:end], true
 }
 
 // flowAPIModuleRoot returns the apps/flow-api directory. Tests run in

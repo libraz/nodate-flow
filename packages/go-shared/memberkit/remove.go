@@ -169,12 +169,16 @@ func RemoveWorkspaceMember(ctx context.Context, tx TX, args RemoveWorkspaceMembe
 	if actor == 0 {
 		actor = args.UserID
 	}
+	userPub, err := userPublicID(ctx, tx, args.UserID)
+	if err != nil {
+		return res, err
+	}
 	if _, err := eventlog.Append(ctx, tx, eventlog.Event{
 		Type:        string(eventbus.WorkspaceMemberRemoved),
 		WorkspaceID: args.WorkspaceID,
 		ActorUserID: &actor,
 		Payload: map[string]any{
-			"userId":                 args.UserID,
+			"userId":                 userPub.String(),
 			"subscriptionsDisabled":  res.SubscriptionsDisabled,
 			"personalCalsDisabled":   res.PersonalCalsDisabled,
 			"taskActorsDisabled":     res.TaskActorsDisabled,

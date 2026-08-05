@@ -205,12 +205,16 @@ func AddWorkspaceMember(ctx context.Context, tx TX, args AddWorkspaceMemberArgs)
 	if actor == 0 {
 		actor = args.UserID
 	}
+	userPub, err := userPublicID(ctx, tx, args.UserID)
+	if err != nil {
+		return res, err
+	}
 	if _, err := eventlog.Append(ctx, tx, eventlog.Event{
 		Type:        string(eventbus.WorkspaceMemberAdded),
 		WorkspaceID: args.WorkspaceID,
 		ActorUserID: &actor,
 		Payload: map[string]any{
-			"userId":          args.UserID,
+			"userId":          userPub.String(),
 			"role":            string(args.Role),
 			"reenabled":       res.ReenabledMember,
 			"createdCalendar": res.CreatedCalendar,

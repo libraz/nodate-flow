@@ -198,6 +198,22 @@ func (p *Pipeline) processTask(ctx context.Context, workspaceID uint32, taskID u
 		matches = matches[:MaxSuggestions]
 	}
 
+	if len(matches) == 0 {
+		return
+	}
+
+	// The suggestion event names both tasks so a client can open them.
+	// Only the public id can do that: the internal key identifies nothing
+	// the client can look up, and every other event spells taskId as a
+	// UUID string, so a number here would also split the field's type in
+	// the generated SDK.
+	var srcPub types.PublicID
+	const srcPubQuery = `SELECT public_id FROM tasks WHERE id = ? AND workspace_id = ? LIMIT 1`
+	if err := p.DB.QueryRowContext(ctx, srcPubQuery, taskID, workspaceID).Scan(&srcPub); err != nil {
+		slog.Error("relations pipeline: resolve source task public id", "err", err)
+		return
+	}
+
 	// Create suggestion rows.
 	for _, m := range matches {
 		pub := types.New()
@@ -230,8 +246,8 @@ func (p *Pipeline) processTask(ctx context.Context, workspaceID uint32, taskID u
 				TaskID:      &srcID,
 				Payload: map[string]any{
 					"suggestionId": pub.String(),
-					"sourceTaskId": taskID,
-					"targetTaskId": m.taskID,
+					"sourceTaskId": srcPub.String(),
+					"targetTaskId": m.publicID.String(),
 					"kind":         string(m.kind),
 					"confidence":   m.score,
 				},

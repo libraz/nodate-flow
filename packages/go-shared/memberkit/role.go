@@ -185,12 +185,16 @@ func UpdateMemberRole(ctx context.Context, tx TX, args UpdateMemberRoleArgs) err
 	if actor == 0 {
 		actor = args.UserID
 	}
+	userPub, err := userPublicID(ctx, tx, args.UserID)
+	if err != nil {
+		return err
+	}
 	if _, err := eventlog.Append(ctx, tx, eventlog.Event{
 		Type:        string(eventbus.WorkspaceMemberRoleChanged),
 		WorkspaceID: args.WorkspaceID,
 		ActorUserID: &actor,
 		Payload: map[string]any{
-			"userId":  args.UserID,
+			"userId":  userPub.String(),
 			"oldRole": oldRole,
 			"newRole": string(args.NewRole),
 		},

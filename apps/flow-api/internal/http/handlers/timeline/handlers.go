@@ -14,6 +14,7 @@ import (
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
 	apierrors "github.com/libraz/nodate-flow/apps/flow-api/internal/errors"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/middleware"
+	"github.com/libraz/nodate-flow/packages/go-shared/eventlog"
 )
 
 // timelineRow is the in-handler scan target. It mirrors the columns
@@ -223,8 +224,12 @@ func toDTO(r timelineRow) Event {
 		TriggeredBySignalID: triggeredBySignal,
 		ReversesEventID:     reversesEvent,
 		WasReversed:         r.wasReversed,
-		Payload:             r.payload,
-		OccurredAt:          r.occurredAt.Unix(),
+		// The events table is append-only, so rows written before the
+		// append-path rail existed still name tasks and users by their
+		// internal keys. Redacting here keeps those out of the response
+		// every workspace member reads.
+		Payload:    eventlog.RedactPayloadIDs(r.payload),
+		OccurredAt: r.occurredAt.Unix(),
 	}
 }
 

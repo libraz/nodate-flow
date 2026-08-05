@@ -24,6 +24,7 @@ import (
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
 	apierrors "github.com/libraz/nodate-flow/apps/flow-api/internal/errors"
+	"github.com/libraz/nodate-flow/packages/go-shared/eventlog"
 )
 
 // mysqlDuplicateEntry is ER_DUP_ENTRY (1062).
@@ -454,6 +455,18 @@ func appendInternalWithMeta(ctx context.Context, db DBTX, evt Event, fromApplier
 	// worker append path) shares the same rail.
 	if err := validateActors(evt); err != nil {
 		slog.ErrorContext(ctx, "eventbus: actor exclusion violated",
+			"type", evt.Type,
+			"workspace_id", evt.WorkspaceID,
+			"error", err,
+		)
+		return ReverseAppendResult{}, err
+	}
+	// Internal ids must not reach the payload. The rail lives on the
+	// append path, shared with eventlog.Append, because a payload map is
+	// assembled at runtime and only the finished value says what will be
+	// stored. See eventlog.ValidatePayloadIDs.
+	if err := eventlog.ValidatePayloadIDs(evt.Payload); err != nil {
+		slog.ErrorContext(ctx, "eventbus: payload carries internal identifiers",
 			"type", evt.Type,
 			"workspace_id", evt.WorkspaceID,
 			"error", err,

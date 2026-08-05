@@ -52,6 +52,16 @@ func SeqFromContext(ctx context.Context) int64 {
 	return v
 }
 
+// hasHooks reports whether any subscriber is registered. auth-api
+// registers none — it writes member events but nothing in that process
+// consumes them — so callers use this to stay quiet about a fan-out
+// that has nowhere to go.
+func hasHooks() bool {
+	hooksMu.RLock()
+	defer hooksMu.RUnlock()
+	return len(hooks) > 0
+}
+
 func fireHooks(ctx context.Context, workspaceID uint32, eventType string, eventInternalID uint64) {
 	hooksMu.RLock()
 	snapshot := hooks

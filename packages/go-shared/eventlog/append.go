@@ -81,6 +81,12 @@ type NotifyHook = func(ctx context.Context, workspaceID uint32, eventType string
 //     no retry at all, and a deadlock surfaces to the user as a 500 for
 //     work that would have succeeded on a second attempt.
 func Append(ctx context.Context, db DBTX, evt Event) (dbtype.PublicID, error) {
+	// Internal ids must not reach the payload; see ValidatePayloadIDs.
+	// The check is here rather than at each builder because this is the
+	// only place every payload passes through.
+	if err := ValidatePayloadIDs(evt.Payload); err != nil {
+		return dbtype.PublicID{}, fmt.Errorf("eventlog: append %s: %w", evt.Type, err)
+	}
 	var raw json.RawMessage
 	if evt.Payload == nil {
 		raw = json.RawMessage(`{}`)
@@ -147,7 +153,7 @@ func Append(ctx context.Context, db DBTX, evt Event) (dbtype.PublicID, error) {
 	// hooks would be handed an id nothing else can resolve yet, and every
 	// subscriber would quietly deliver nothing. Refuse instead, and name
 	// the caller — the same rule flow-api's eventbus applies.
-	if isTx && !dbretry.HasCommitHooks(ctx) {
+	if isTx && !dbretry.HasCommitHooks(ctx) && hasHooks() {
 		slog.ErrorContext(ctx, "eventlog: fan-out skipped; append ran in a hand-rolled transaction without a commit boundary (use dbretry.InTx)",
 			slog.String("type", evt.Type),
 			slog.Uint64("workspace_id", uint64(evt.WorkspaceID)),

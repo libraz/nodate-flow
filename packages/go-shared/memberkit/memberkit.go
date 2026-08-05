@@ -247,3 +247,19 @@ func createSubscription(ctx context.Context, tx TX, wsID, calendarID, userID uin
 	}
 	return nil
 }
+
+// userPublicID resolves a user's internal id to the UUID v7 that may be
+// shown outside the database.
+//
+// Membership events are read back through the workspace timeline by
+// every member, so the actor and subject they name have to be public
+// identifiers: an internal key identifies nobody the client can resolve
+// and doubles as a count of the users on the instance.
+func userPublicID(ctx context.Context, tx TX, userID uint32) (dbtype.PublicID, error) {
+	var pub dbtype.PublicID
+	if err := tx.QueryRowContext(ctx,
+		`SELECT public_id FROM users WHERE id = ?`, userID).Scan(&pub); err != nil {
+		return dbtype.PublicID{}, fmt.Errorf("memberkit: resolve user public id: %w", err)
+	}
+	return pub, nil
+}

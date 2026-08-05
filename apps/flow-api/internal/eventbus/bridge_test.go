@@ -3,9 +3,10 @@ package eventbus
 import (
 	"context"
 	"database/sql"
-	"os"
+	"go/ast"
+	"go/parser"
+	"go/token"
 	"path/filepath"
-	"strings"
 	"testing"
 
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/dbretry"
@@ -124,17 +125,55 @@ func TestBridgeRefusedInHandRolledTx(t *testing.T) {
 // subscriber it feeds was implemented, tested and configurable. A test
 // that only exercises BridgeEventlog would stay green with nothing in
 // the binary calling it, so this asserts the process wiring itself.
+//
+// It parses main.go and looks for a live call expression rather than
+// searching the text for the identifier. Searching text cannot tell a
+// call from a mention: `// eventbus.BridgeEventlog()` satisfies a
+// substring check exactly as well as the real thing, and commenting a
+// line out during debugging and forgetting to restore it is a more
+// likely way to lose the wiring than deleting it. Comments never reach
+// the AST, so parsing removes that whole class.
 func TestEventlogBridgeIsWired(t *testing.T) {
 	t.Parallel()
 
-	src, err := os.ReadFile(filepath.Join(flowAPIModuleRoot(t), "cmd", "api", "main.go"))
+	mainPath := filepath.Join(flowAPIModuleRoot(t), "cmd", "api", "main.go")
+	fset := token.NewFileSet()
+	file, err := parser.ParseFile(fset, mainPath, nil, 0)
 	if err != nil {
-		t.Fatalf("read main.go: %v", err)
+		t.Fatalf("parse main.go: %v", err)
 	}
-	if !strings.Contains(string(src), "eventbus.BridgeEventlog()") {
-		t.Fatal("cmd/api/main.go must call eventbus.BridgeEventlog(): without it every append made " +
-			"through the shared eventlog (itemkit, memberkit) fans out to nobody — no realtime " +
-			"refresh, no notification row, no webhook delivery — and nothing reports an error")
+
+	found := false
+	for _, decl := range file.Decls {
+		fn, ok := decl.(*ast.FuncDecl)
+		if !ok || fn.Body == nil {
+			continue
+		}
+		ast.Inspect(fn.Body, func(n ast.Node) bool {
+			call, ok := n.(*ast.CallExpr)
+			if !ok {
+				return true
+			}
+			sel, ok := call.Fun.(*ast.SelectorExpr)
+			if !ok || sel.Sel.Name != "BridgeEventlog" {
+				return true
+			}
+			pkg, ok := sel.X.(*ast.Ident)
+			if ok && pkg.Name == "eventbus" {
+				found = true
+				return false
+			}
+			return true
+		})
+		if found {
+			break
+		}
+	}
+
+	if !found {
+		t.Fatal("cmd/api/main.go must call eventbus.BridgeEventlog() from a function body: without it " +
+			"every append made through the shared eventlog (itemkit, memberkit) fans out to nobody — " +
+			"no realtime refresh, no notification row, no webhook delivery — and nothing reports an error")
 	}
 }
 

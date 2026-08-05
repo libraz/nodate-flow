@@ -177,9 +177,12 @@ func (m *SQLTaskMutator) CompleteTask(ctx context.Context, workspaceID uint32, t
 			ActorUserID: nil, // judged by an agent, not a real user
 			Reason:      "auto-completed by signal judge",
 			Via:         "signal_judge",
-			ExtraPayload: map[string]any{
-				"agentInternalId": agentID,
-			},
+			// The judging agent is recorded on the row itself, in
+			// events.actor_agent_id, which the timeline resolves to the
+			// agent's public id. Repeating the internal key in the
+			// payload added nothing a reader could use and published a
+			// database key to every workspace member.
+			ExtraPayload: nil,
 		})
 		if spec != nil {
 			if spec == apierrors.WsTaskTransitionRejected && m.taskIsDone(ctx, tx, workspaceID, taskInternalID) {
