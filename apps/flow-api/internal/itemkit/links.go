@@ -63,13 +63,17 @@ func LinkTaskToEvent(ctx context.Context, tx TX, args LinkTaskToEventArgs) (dbty
 	}
 
 	// Both sides must exist, be enabled, and live in the same workspace.
-	if _, err := findTaskByID(ctx, tx, args.WorkspaceID, args.TaskID); err != nil {
+	// Their public ids come back from the same reads the existence check
+	// needs, so the event payload below never has to name an internal key.
+	task, err := findTaskByID(ctx, tx, args.WorkspaceID, args.TaskID)
+	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return dbtype.PublicID{}, 0, fmt.Errorf("itemkit: task %d not found in ws %d", args.TaskID, args.WorkspaceID)
 		}
 		return dbtype.PublicID{}, 0, fmt.Errorf("itemkit: read task: %w", err)
 	}
-	if _, err := findEventByID(ctx, tx, args.WorkspaceID, args.EventID); err != nil {
+	evt, err := findEventByID(ctx, tx, args.WorkspaceID, args.EventID)
+	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return dbtype.PublicID{}, 0, fmt.Errorf("itemkit: event %d not found in ws %d", args.EventID, args.WorkspaceID)
 		}
@@ -79,7 +83,7 @@ func LinkTaskToEvent(ctx context.Context, tx TX, args LinkTaskToEventArgs) (dbty
 	// Idempotency: if an enabled (task, event, relation) row already
 	// exists, return it without appending a duplicate event.
 	existingID, existingPub, err := findActiveLink(ctx, tx, args)
-	if err != nil && !errors.Is(err, sql.ErrNoRows) {
+	if err != nil && !errors.Is(err, sql.ErrNoRows) { //nolint:staticcheck // err is reassigned below
 		return dbtype.PublicID{}, 0, fmt.Errorf("itemkit: find active link: %w", err)
 	}
 	if err == nil {
@@ -105,8 +109,8 @@ func LinkTaskToEvent(ctx context.Context, tx TX, args LinkTaskToEventArgs) (dbty
 
 	payload := map[string]any{
 		"linkPublicId": pub.String(),
-		"taskId":       args.TaskID,
-		"eventId":      args.EventID,
+		"taskId":       task.publicID.String(),
+		"eventId":      evt.publicID.String(),
 		"relation":     string(args.Relation),
 	}
 	actor := args.ActorUserID
@@ -132,18 +136,24 @@ func UnlinkTaskFromEvent(ctx context.Context, tx TX, args UnlinkTaskFromEventArg
 		return wrapInvariant("link_workspace_required", "workspaceID must be non-zero")
 	}
 
-	// Load the row first so we can emit a useful audit event.
+	// Load the row first so we can emit a useful audit event. The join
+	// picks up both public ids in the same read: the audit event names
+	// the task and the calendar event to a reader outside the database,
+	// and the internal keys stay local to the UPDATE below.
 	var (
-		taskID, eventID uint32
-		relation        string
+		taskID, eventID   uint32
+		taskPub, eventPub dbtype.PublicID
+		relation          string
 	)
 	err := tx.QueryRowContext(ctx,
-		`SELECT task_id, event_id, relation
-		 FROM task_event_links
-		 WHERE workspace_id = ? AND public_id = ? AND enabled = TRUE
+		`SELECT l.task_id, l.event_id, t.public_id, e.public_id, l.relation
+		 FROM task_event_links l
+		 JOIN tasks t ON t.id = l.task_id
+		 JOIN calendar_events e ON e.id = l.event_id
+		 WHERE l.workspace_id = ? AND l.public_id = ? AND l.enabled = TRUE
 		 LIMIT 1`,
 		args.WorkspaceID, args.LinkID,
-	).Scan(&taskID, &eventID, &relation)
+	).Scan(&taskID, &eventID, &taskPub, &eventPub, &relation)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return err
@@ -160,8 +170,8 @@ func UnlinkTaskFromEvent(ctx context.Context, tx TX, args UnlinkTaskFromEventArg
 
 	payload := map[string]any{
 		"linkPublicId": args.LinkID.String(),
-		"taskId":       taskID,
-		"eventId":      eventID,
+		"taskId":       taskPub.String(),
+		"eventId":      eventPub.String(),
 		"relation":     relation,
 	}
 	actor := args.ActorUserID

@@ -13,6 +13,8 @@ import (
 	"fmt"
 	"sync"
 	"time"
+
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/bgloop"
 )
 
 // Job is the minimal description of an agent the scheduler needs to
@@ -100,7 +102,9 @@ func (s *Scheduler) Start(ctx context.Context) error {
 	s.running = true
 	s.mu.Unlock()
 
-	go s.loop(runCtx)
+	// Supervised so a panic in a tick does not take the process down
+	// and a loop that returns is restarted rather than silently gone.
+	go bgloop.Run(runCtx, "agent.scheduler", nil, s.loop)
 	return nil
 }
 

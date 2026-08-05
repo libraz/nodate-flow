@@ -1,10 +1,13 @@
 package obs
 
 import (
+	"context"
 	"database/sql"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
+
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/bgloop"
 )
 
 // dbQueryDuration observes query latency in seconds partitioned by operation
@@ -72,12 +75,17 @@ func RecordDBQuery(query string, duration time.Duration, err error) {
 // nf_db_connections_idle gauges. The goroutine exits when the provided done
 // channel is closed.
 func StartDBStatsCollector(db *sql.DB, done <-chan struct{}) {
+	ctx, cancel := context.WithCancel(context.Background())
 	go func() {
+		<-done
+		cancel()
+	}()
+	go bgloop.Run(ctx, "obs.db_stats", nil, func(ctx context.Context) {
 		ticker := time.NewTicker(15 * time.Second)
 		defer ticker.Stop()
 		for {
 			select {
-			case <-done:
+			case <-ctx.Done():
 				return
 			case <-ticker.C:
 				stats := db.Stats()
@@ -85,5 +93,5 @@ func StartDBStatsCollector(db *sql.DB, done <-chan struct{}) {
 				dbConnectionsIdle.Set(float64(stats.Idle))
 			}
 		}
-	}()
+	})
 }

@@ -23,6 +23,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/bgloop"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
 )
@@ -54,6 +55,9 @@ type Worker struct {
 	queries *generated.Queries
 	client  *http.Client
 	done    chan struct{}
+	// cancel stops the supervised delivery loop. Set by Start, called
+	// by Stop.
+	cancel context.CancelFunc
 
 	// run is the function executed inside each Hook goroutine. Tests
 	// override it to exercise the goroutine plumbing (detached cancel,
@@ -220,15 +224,29 @@ func (w *Worker) buildPayload(ctx context.Context, workspaceID uint32, eventType
 	return b
 }
 
-// Start launches the periodic delivery processing loop in a background
-// goroutine. Call [Worker.Stop] to terminate it.
+// Start launches the periodic delivery processing loop in a supervised
+// background goroutine. Call [Worker.Stop] to terminate it.
+//
+// The loop runs under bgloop so a panic while building a delivery
+// payload — bad JSON from one workspace's event, say — cannot take the
+// whole process down with it.
 func (w *Worker) Start(ctx context.Context) {
-	go w.loop(ctx)
+	runCtx, cancel := context.WithCancel(ctx)
+	w.cancel = cancel
+	go bgloop.Run(runCtx, "webhook.worker", nil, w.loop)
 	slog.Info("webhook worker started", slog.Duration("interval", pollInterval))
 }
 
 // Stop signals the delivery loop to exit.
+//
+// Cancelling the loop's context is what makes the stop clean: the
+// supervisor restarts a loop that returns on its own, so signalling
+// through w.done alone would look like a loop dying and be restarted
+// forever after shutdown.
 func (w *Worker) Stop() {
+	if w.cancel != nil {
+		w.cancel()
+	}
 	close(w.done)
 	slog.Info("webhook worker stopped")
 }

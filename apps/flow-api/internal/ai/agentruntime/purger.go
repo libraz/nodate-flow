@@ -7,6 +7,8 @@ import (
 	"log/slog"
 	"sync"
 	"time"
+
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/bgloop"
 )
 
 // PurgeQuerier is the narrow contract [Purger] needs from the sqlc
@@ -61,7 +63,7 @@ func (p *Purger) Start(ctx context.Context) error {
 	p.running = true
 	p.mu.Unlock()
 
-	go p.loop(runCtx)
+	go bgloop.Run(runCtx, "agent_runs.purger", p.Logger, p.loop)
 	return nil
 }
 

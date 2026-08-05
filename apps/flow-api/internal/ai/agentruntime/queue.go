@@ -3,6 +3,7 @@ package agentruntime
 import (
 	"context"
 	"errors"
+	"log/slog"
 	"sync"
 	"time"
 )
@@ -123,19 +124,78 @@ type Worker struct {
 	Queue  Queue
 	Runner Runner
 	Now    func() time.Time
+	// Name identifies this worker in logs. Defaults to "agent.worker".
+	Name string
+	// Logger receives claim failures. Defaults to slog.Default().
+	Logger *slog.Logger
+	// ClaimBackoff is the pause after a failed claim. Defaults to
+	// [defaultClaimBackoff].
+	ClaimBackoff time.Duration
 }
 
+// defaultClaimBackoff is how long a worker waits after a failed claim
+// before trying again. Long enough that a database outage does not turn
+// into a spin, short enough that agents resume promptly once it clears.
+const defaultClaimBackoff = time.Second
+
 // Loop claims runs until ctx is cancelled. It Ack/Nacks based on the
-// Runner's return value so the queue state stays consistent even
-// when the LLM call fails.
+// Runner's return value so the queue state stays consistent even when
+// the LLM call fails.
+//
+// A failed claim is retried, not fatal. The queue reads the database on
+// every claim, so one deadlock, one lock-wait timeout or one dropped
+// connection used to end the goroutine — and with every worker on the
+// same database they tended to end together. The process stayed up and
+// healthy to every probe with no agent ever running again, and the only
+// trace was the absence of work. Each failure is logged with the
+// consecutive count so a persistent outage is distinguishable from a
+// blip.
 func (w *Worker) Loop(ctx context.Context) {
 	if w.Now == nil {
 		w.Now = time.Now
 	}
+	log := w.Logger
+	if log == nil {
+		log = slog.Default()
+	}
+	name := w.Name
+	if name == "" {
+		name = "agent.worker"
+	}
+	backoff := w.ClaimBackoff
+	if backoff <= 0 {
+		backoff = defaultClaimBackoff
+	}
+
+	consecutiveFailures := 0
 	for {
 		r, err := w.Queue.Claim(ctx)
 		if err != nil {
-			return
+			// Cancellation is the one clean exit; anything else is a
+			// database fault the worker has to outlive.
+			if ctx.Err() != nil {
+				log.InfoContext(ctx, "agent worker stopped", "worker", name)
+				return
+			}
+			consecutiveFailures++
+			log.ErrorContext(ctx, "agent worker: claim failed; retrying",
+				"worker", name,
+				"consecutive_failures", consecutiveFailures,
+				"backoff", backoff,
+				"err", err)
+			select {
+			case <-ctx.Done():
+				log.InfoContext(ctx, "agent worker stopped", "worker", name)
+				return
+			case <-time.After(backoff):
+			}
+			continue
+		}
+		if consecutiveFailures > 0 {
+			log.InfoContext(ctx, "agent worker: claims recovered",
+				"worker", name,
+				"after_failures", consecutiveFailures)
+			consecutiveFailures = 0
 		}
 		if runErr := w.Runner.Run(ctx, r.Job, w.Now()); runErr != nil {
 			_ = w.Queue.Nack(ctx, r.DedupeKey, runErr)

@@ -93,13 +93,18 @@ func RescheduleEvent(ctx context.Context, tx TX, args RescheduleEventArgs) error
 	payload := map[string]any{
 		"eventPublicId": evt.publicID.String(),
 	}
-	if evt.taskID.Valid {
-		payload["taskId"] = uint32(evt.taskID.Int32) //#nosec G115 -- task_id is tasks.id (BIGINT UNSIGNED), fits uint32 within realistic deployments
-	}
 	var taskPtr *uint32
 	if evt.taskID.Valid {
 		v := uint32(evt.taskID.Int32) //#nosec G115 -- task_id is tasks.id (BIGINT UNSIGNED), fits uint32 within realistic deployments
 		taskPtr = &v
+		// The events row carries the internal task id in its own column;
+		// the payload is read by clients, so it names the task by the id
+		// they can resolve.
+		task, err := findTaskByID(ctx, tx, args.WorkspaceID, v)
+		if err != nil {
+			return fmt.Errorf("itemkit: resolve task public id: %w", err)
+		}
+		payload["taskId"] = task.publicID.String()
 	}
 	return appendItemEvents(ctx, tx, eventbus.ItemRescheduled, args.WorkspaceID, &args.ActorUserID, taskPtr, payload)
 }
