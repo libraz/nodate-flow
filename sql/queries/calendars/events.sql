@@ -95,7 +95,13 @@ SELECT
   ce.notification_offset,
   ce.task_id,
   ce.updated_at,
-  ce.created_at
+  ce.created_at,
+  EXISTS (
+    SELECT 1 FROM calendar_event_attendees a
+    WHERE a.event_id = ce.id
+      AND a.user_id = sqlc.arg(viewer_user_id)
+      AND a.enabled = TRUE
+  ) AS is_attendee
 FROM calendar_events ce
 LEFT JOIN users uc
   ON uc.id = ce.created_by_user_id
@@ -104,6 +110,7 @@ WHERE ce.calendar_id = ?
   AND ce.start_at < ?
   AND ce.end_at > ?
   AND ce.enabled = TRUE
+  AND (ce.visibility <> 'confidential' OR ce.owner_user_id = sqlc.arg(viewer_user_id))
 ORDER BY ce.start_at ASC, ce.public_id ASC
 LIMIT 1000;
 
@@ -135,7 +142,13 @@ SELECT
   ce.notification_offset,
   ce.task_id,
   ce.updated_at,
-  ce.created_at
+  ce.created_at,
+  EXISTS (
+    SELECT 1 FROM calendar_event_attendees a
+    WHERE a.event_id = ce.id
+      AND a.user_id = sqlc.arg(viewer_user_id)
+      AND a.enabled = TRUE
+  ) AS is_attendee
 FROM calendar_events ce
 LEFT JOIN users uc
   ON uc.id = ce.created_by_user_id
@@ -144,6 +157,7 @@ WHERE ce.calendar_id = ?
   AND ce.start_at < ?
   AND (ce.recurrence_end IS NULL OR ce.recurrence_end > ?)
   AND ce.enabled = TRUE
+  AND (ce.visibility <> 'confidential' OR ce.owner_user_id = sqlc.arg(viewer_user_id))
 ORDER BY ce.start_at ASC
 LIMIT 1000;
 
@@ -168,7 +182,13 @@ SELECT
   ce.block_label,
   ce.task_id,
   ce.updated_at,
-  ce.created_at
+  ce.created_at,
+  EXISTS (
+    SELECT 1 FROM calendar_event_attendees a
+    WHERE a.event_id = ce.id
+      AND a.user_id = sqlc.arg(viewer_user_id)
+      AND a.enabled = TRUE
+  ) AS is_attendee
 FROM calendar_events ce
 INNER JOIN calendars c
   ON c.id = ce.calendar_id
@@ -190,6 +210,7 @@ WHERE ce.workspace_id = ?
   AND ce.start_at < ?
   AND ce.end_at > ?
   AND ce.enabled = TRUE
+  AND (ce.visibility <> 'confidential' OR ce.owner_user_id = sqlc.arg(viewer_user_id))
 ORDER BY ce.start_at ASC, ce.public_id ASC
 LIMIT 1000;
 
@@ -217,7 +238,13 @@ SELECT
   COALESCE(ce.recurrence_exceptions, CAST('null' AS JSON)) AS recurrence_exceptions,
   ce.task_id,
   ce.updated_at,
-  ce.created_at
+  ce.created_at,
+  EXISTS (
+    SELECT 1 FROM calendar_event_attendees a
+    WHERE a.event_id = ce.id
+      AND a.user_id = sqlc.arg(viewer_user_id)
+      AND a.enabled = TRUE
+  ) AS is_attendee
 FROM calendar_events ce
 INNER JOIN calendars c
   ON c.id = ce.calendar_id
@@ -239,6 +266,7 @@ WHERE ce.workspace_id = ?
   AND ce.start_at < ?
   AND (ce.recurrence_end IS NULL OR ce.recurrence_end > ?)
   AND ce.enabled = TRUE
+  AND (ce.visibility <> 'confidential' OR ce.owner_user_id = sqlc.arg(viewer_user_id))
 ORDER BY ce.start_at ASC
 LIMIT 1000;
 
@@ -279,7 +307,13 @@ SELECT
   ce.block_label,
   ce.task_id,
   ce.updated_at,
-  ce.created_at
+  ce.created_at,
+  EXISTS (
+    SELECT 1 FROM calendar_event_attendees a
+    WHERE a.event_id = ce.id
+      AND a.user_id = sqlc.arg(viewer_user_id)
+      AND a.enabled = TRUE
+  ) AS is_attendee
 FROM calendar_events ce
 INNER JOIN calendars c
   ON c.id = ce.calendar_id AND c.enabled = TRUE
@@ -311,6 +345,7 @@ WHERE ce.recurrence_rule IS NULL
   AND ce.start_at < ?
   AND ce.end_at > ?
   AND ce.enabled = TRUE
+  AND (ce.visibility <> 'confidential' OR ce.owner_user_id = sqlc.arg(viewer_user_id))
 ORDER BY ce.start_at ASC, ce.public_id ASC
 LIMIT 2000;
 
@@ -350,7 +385,13 @@ SELECT
   COALESCE(ce.recurrence_exceptions, CAST('null' AS JSON)) AS recurrence_exceptions,
   ce.task_id,
   ce.updated_at,
-  ce.created_at
+  ce.created_at,
+  EXISTS (
+    SELECT 1 FROM calendar_event_attendees a
+    WHERE a.event_id = ce.id
+      AND a.user_id = sqlc.arg(viewer_user_id)
+      AND a.enabled = TRUE
+  ) AS is_attendee
 FROM calendar_events ce
 INNER JOIN calendars c
   ON c.id = ce.calendar_id AND c.enabled = TRUE
@@ -382,6 +423,7 @@ WHERE ce.recurrence_rule IS NOT NULL
   AND ce.start_at < ?
   AND (ce.recurrence_end IS NULL OR ce.recurrence_end > ?)
   AND ce.enabled = TRUE
+  AND (ce.visibility <> 'confidential' OR ce.owner_user_id = sqlc.arg(viewer_user_id))
 ORDER BY ce.start_at ASC, ce.public_id ASC
 LIMIT 2000;
 

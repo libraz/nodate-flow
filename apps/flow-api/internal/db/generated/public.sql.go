@@ -14,7 +14,7 @@ import (
 	types "github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
 )
 
-const findLensByPublicToken = `-- name: FindLensByPublicToken :one
+const findLensByPublicTokenHash = `-- name: FindLensByPublicTokenHash :one
 SELECT
   l.id,
   l.public_id,
@@ -29,13 +29,13 @@ SELECT
   l.created_at
 FROM lenses l
 INNER JOIN workspaces w ON w.id = l.workspace_id AND w.enabled = TRUE
-WHERE l.public_token = ?
+WHERE l.public_token_hash = ?
   AND l.is_public = TRUE
   AND l.enabled = TRUE
 LIMIT 1
 `
 
-type FindLensByPublicTokenRow struct {
+type FindLensByPublicTokenHashRow struct {
 	ID                uint32          `json:"-"`
 	PublicID          types.PublicID  `json:"publicId"`
 	WorkspaceID       uint32          `json:"-"`
@@ -49,11 +49,13 @@ type FindLensByPublicTokenRow struct {
 	CreatedAt         time.Time       `json:"createdAt"`
 }
 
-// Look up a publicly shared lens by its token. Used by unauthenticated
-// public share endpoints. Only returns enabled + public lenses.
-func (q *Queries) FindLensByPublicToken(ctx context.Context, publicToken sql.NullString) (FindLensByPublicTokenRow, error) {
-	row := q.db.QueryRowContext(ctx, findLensByPublicToken, publicToken)
-	var i FindLensByPublicTokenRow
+// Look up a publicly shared lens by the SHA-256 hex of its URL token.
+// Used by unauthenticated public share endpoints; the caller hashes the
+// token from the path before calling, so the plaintext never reaches a
+// query log. Only returns enabled + public lenses.
+func (q *Queries) FindLensByPublicTokenHash(ctx context.Context, publicTokenHash sql.NullString) (FindLensByPublicTokenHashRow, error) {
+	row := q.db.QueryRowContext(ctx, findLensByPublicTokenHash, publicTokenHash)
+	var i FindLensByPublicTokenHashRow
 	err := row.Scan(
 		&i.ID,
 		&i.PublicID,
@@ -182,7 +184,7 @@ func (q *Queries) ListPublicLensTasks(ctx context.Context, arg ListPublicLensTas
 const setLensPrivate = `-- name: SetLensPrivate :exec
 UPDATE lenses
 SET is_public = FALSE,
-    public_token = NULL
+    public_token_hash = NULL
 WHERE workspace_id = ?
   AND public_id = ?
   AND is_public = TRUE
@@ -194,7 +196,8 @@ type SetLensPrivateParams struct {
 	PublicID    types.PublicID `json:"publicId"`
 }
 
-// Revoke public sharing on a lens. Clears the token.
+// Revoke public sharing on a lens. Clears the token hash so the URL
+// stops resolving and re-publishing has to mint a fresh token.
 // No-op if the lens is already private (WHERE is_public = TRUE guard).
 func (q *Queries) SetLensPrivate(ctx context.Context, arg SetLensPrivateParams) error {
 	_, err := q.db.ExecContext(ctx, setLensPrivate, arg.WorkspaceID, arg.PublicID)
@@ -204,7 +207,7 @@ func (q *Queries) SetLensPrivate(ctx context.Context, arg SetLensPrivateParams) 
 const setLensPublic = `-- name: SetLensPublic :exec
 UPDATE lenses
 SET is_public = TRUE,
-    public_token = ?,
+    public_token_hash = ?,
     shared_at = NOW(3)
 WHERE workspace_id = ?
   AND public_id = ?
@@ -213,15 +216,17 @@ WHERE workspace_id = ?
 `
 
 type SetLensPublicParams struct {
-	PublicToken sql.NullString `json:"publicToken"`
-	WorkspaceID uint32         `json:"-"`
-	PublicID    types.PublicID `json:"publicId"`
+	PublicTokenHash sql.NullString `json:"publicTokenHash"`
+	WorkspaceID     uint32         `json:"-"`
+	PublicID        types.PublicID `json:"publicId"`
 }
 
-// Enable public sharing on a lens. Generates a share URL token.
+// Enable public sharing on a lens. Stores the SHA-256 hex of the share
+// URL token minted by the caller; the plaintext is returned to the
+// publisher once and is not recoverable afterwards.
 // No-op if the lens is already public (WHERE is_public = FALSE guard).
 func (q *Queries) SetLensPublic(ctx context.Context, arg SetLensPublicParams) error {
-	_, err := q.db.ExecContext(ctx, setLensPublic, arg.PublicToken, arg.WorkspaceID, arg.PublicID)
+	_, err := q.db.ExecContext(ctx, setLensPublic, arg.PublicTokenHash, arg.WorkspaceID, arg.PublicID)
 	return err
 }
 

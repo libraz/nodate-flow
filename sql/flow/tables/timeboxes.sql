@@ -21,12 +21,17 @@ CREATE TABLE timeboxes (
   sort_weight INT NOT NULL DEFAULT 0 COMMENT 'Display order',
   notes TEXT NULL COMMENT 'Admin notes',
   enabled BOOLEAN NOT NULL DEFAULT TRUE COMMENT 'Enabled flag',
+  -- Liveness marker scoping the unique key below to live rows: 1 while
+  -- enabled, NULL once soft-deleted, so tombstones leave the index
+  -- rather than colliding with each other. See the soft-delete rule in
+  -- sql/core/conformance/schema/40-soft-delete-uniqueness.sql.
+  active TINYINT UNSIGNED GENERATED ALWAYS AS (IF(enabled, 1, NULL)) VIRTUAL COMMENT 'NULL once soft-deleted; exists only to scope the unique key below to live rows',
   updated_at TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
   created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
 
   UNIQUE KEY uniq_timeboxes_public_id (public_id),
   UNIQUE KEY uniq_timeboxes_workspace_public_id (workspace_id, public_id),
-  UNIQUE KEY uniq_timeboxes_workspace_id_name_enabled (workspace_id, name, enabled),
+  UNIQUE KEY uniq_timeboxes_workspace_id_name_active (workspace_id, name, active),
   KEY idx_timeboxes_workspace_id_archived_at (workspace_id, archived_at),
   KEY idx_timeboxes_workspace_id_status_enabled (workspace_id, status, enabled),
   KEY idx_timeboxes_workspace_id_project_id_enabled (workspace_id, project_id, enabled),

@@ -37,10 +37,17 @@ WHERE public_id = ?
   AND enabled = TRUE
 LIMIT 1;
 
--- name: FindActiveCalendarEventInvite :one
--- Find the currently active invite for a given (event_id, attendee_id)
--- pair. Used before create to decide "insert new vs rotate existing",
--- since the UNIQUE(event_id, attendee_id) constraint forces upsert.
+-- name: FindCalendarEventInviteForAttendee :one
+-- Find the invite row for an (event_id, attendee_id) pair whatever its
+-- state. UNIQUE(event_id, attendee_id) says there is at most one, ever:
+-- an invite is a single standing grant rather than a series, so a
+-- revoked one is the same row waiting to be revived, not a tombstone
+-- beside which a second may be inserted.
+--
+-- Deliberately not filtered on enabled. Looking only at live rows made
+-- the create path miss the revoked row, insert, collide with it, and
+-- fail — which meant a participant could never be invited again after
+-- one revocation.
 SELECT
   id, public_id, workspace_id, calendar_id, event_id, attendee_id,
   email, token_hash, expires_at, accepted_at, sent_at,
@@ -48,18 +55,24 @@ SELECT
 FROM calendar_event_invites
 WHERE event_id = ?
   AND attendee_id = ?
-  AND enabled = TRUE
 LIMIT 1;
 
--- name: RotateCalendarEventInviteToken :exec
--- Rotate the token on an existing invite row (resend flow): install a
--- fresh token_hash + expires_at and clear sent_at / accepted_at so the
--- UI reflects a fresh, undelivered invite.
+-- name: ReviveCalendarEventInvite :exec
+-- Bring an invite row back into service with a fresh capability:
+-- install a new token_hash + expires_at, clear the delivery state, and
+-- re-enable the row.
+--
+-- The token has to be new. Restoring the previous one would make a
+-- revocation reversible by whoever still held the old link, so the
+-- revive and the rotation are one statement rather than two a caller
+-- could get half-right. Rotating a live invite (the resend flow) runs
+-- the same statement; enabled = TRUE is simply already true.
 UPDATE calendar_event_invites
 SET token_hash = ?,
     expires_at = ?,
     sent_at = NULL,
-    accepted_at = NULL
+    accepted_at = NULL,
+    enabled = TRUE
 WHERE id = ?;
 
 -- name: MarkCalendarEventInviteSent :exec

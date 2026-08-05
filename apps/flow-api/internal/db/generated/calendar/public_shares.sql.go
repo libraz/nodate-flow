@@ -124,6 +124,41 @@ func (q *Queries) CreatePublicShare(ctx context.Context, arg CreatePublicSharePa
 	return result.LastInsertId()
 }
 
+const detachCalendarEventsFromAllShares = `-- name: DetachCalendarEventsFromAllShares :exec
+UPDATE calendar_public_share_events cpse
+INNER JOIN calendar_events ce ON ce.id = cpse.event_id
+INNER JOIN calendars c ON c.id = ce.calendar_id
+SET cpse.enabled = FALSE
+WHERE c.public_id = ?
+  AND c.workspace_id = ?
+  AND cpse.enabled = TRUE
+`
+
+type DetachCalendarEventsFromAllSharesParams struct {
+	PublicID    types.PublicID `json:"publicId"`
+	WorkspaceID uint32         `json:"-"`
+}
+
+// Withdraw every publication of a calendar's events, across every share
+// in the workspace. Run when the calendar itself is deleted.
+//
+// The render query's join on calendars already stops these rows being
+// served, so this is not what closes the leak; it is what stops the
+// leak being recreated. Without it the link rows survive, and a share
+// that later regains a calendar id — or a reader of the table taking
+// cpse.enabled at face value — sees publications nobody can account
+// for. The editor cannot clear them either, since it lists through the
+// same calendars join.
+//
+// Deliberately does not touch calendar_events. Soft-deleting those
+// would hit the projection guard for any task-linked row, which only
+// the item projection engine may disable, and the calendar's own
+// enabled flag is already what every read path filters on.
+func (q *Queries) DetachCalendarEventsFromAllShares(ctx context.Context, arg DetachCalendarEventsFromAllSharesParams) error {
+	_, err := q.db.ExecContext(ctx, detachCalendarEventsFromAllShares, arg.PublicID, arg.WorkspaceID)
+	return err
+}
+
 const detachEventFromShare = `-- name: DetachEventFromShare :exec
 UPDATE calendar_public_share_events
 SET enabled = FALSE
@@ -165,7 +200,7 @@ func (q *Queries) DisablePublicShare(ctx context.Context, arg DisablePublicShare
 }
 
 const findEventIDAndVisibility = `-- name: FindEventIDAndVisibility :one
-SELECT id, visibility
+SELECT id, visibility, calendar_id
 FROM calendar_events
 WHERE workspace_id = ?
   AND public_id = ?
@@ -181,15 +216,22 @@ type FindEventIDAndVisibilityParams struct {
 type FindEventIDAndVisibilityRow struct {
 	ID         uint32                   `json:"-"`
 	Visibility CalendarEventsVisibility `json:"visibility"`
+	CalendarID uint32                   `json:"-"`
 }
 
-// Lightweight resolver used by the public-share attach path to translate
-// an event public_id into its internal id + visibility within a workspace.
-// Enforces workspace isolation so a share cannot publish another ws's events.
+// Lightweight resolver used by the public-share attach/detach paths to
+// translate an event public_id into its internal id + visibility within a
+// workspace. Enforces workspace isolation so a share cannot publish another
+// ws's events.
+//
+// calendar_id is returned because workspace isolation is not the access
+// check on the attach path: an event's audience is its calendar's members,
+// so the caller has to look up its own grant on that calendar before
+// publishing the event to an unauthenticated URL.
 func (q *Queries) FindEventIDAndVisibility(ctx context.Context, arg FindEventIDAndVisibilityParams) (FindEventIDAndVisibilityRow, error) {
 	row := q.db.QueryRowContext(ctx, findEventIDAndVisibility, arg.WorkspaceID, arg.PublicID)
 	var i FindEventIDAndVisibilityRow
-	err := row.Scan(&i.ID, &i.Visibility)
+	err := row.Scan(&i.ID, &i.Visibility, &i.CalendarID)
 	return i, err
 }
 
@@ -352,6 +394,7 @@ SELECT
 FROM calendar_public_shares cps
 INNER JOIN calendar_public_share_events cpse ON cpse.share_id = cps.id AND cpse.enabled = TRUE
 INNER JOIN calendar_events ce ON ce.id = cpse.event_id AND ce.enabled = TRUE
+INNER JOIN calendars c ON c.id = ce.calendar_id AND c.enabled = TRUE
 WHERE cps.token_hash = ?
   AND cps.enabled = TRUE
   AND ce.visibility <> 'confidential'
@@ -384,6 +427,13 @@ type ListPublicShareEventsByTokenHashRow struct {
 // Unauthenticated public-render query. Final safety gate on event
 // visibility and start_at IS NOT NULL. expires_at is checked in the
 // handler (not here) so 410 can be differentiated from 404.
+//
+// Joins calendars for the same reason ListPublicShareEventsForEditor
+// does: an event whose calendar was deleted must stop rendering. When
+// only the editor query filtered on it, deleting a calendar left its
+// events on the world-readable page while removing them from the editor
+// that would have been used to take them down — the one state with no
+// way out short of deleting the whole share.
 func (q *Queries) ListPublicShareEventsByTokenHash(ctx context.Context, tokenHash string) ([]ListPublicShareEventsByTokenHashRow, error) {
 	rows, err := q.db.QueryContext(ctx, listPublicShareEventsByTokenHash, tokenHash)
 	if err != nil {

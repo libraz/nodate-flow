@@ -2609,8 +2609,8 @@ type CalendarEvent struct {
 	TaskID sql.NullInt32 `json:"-"`
 	// When task_id IS NOT NULL: which task field this event represents. due=task.due_on, scheduled=time-blocked (multi-link allowed).
 	TaskRole NullCalendarEventsTaskRole `json:"taskRole"`
-	// De-NULLed surrogate for task_role; empty string when task_role IS NULL. Exists solely to power uniq_calendar_events_task_role_key over (task_id, task_role_key).
-	TaskRoleKey string `json:"-"`
+	// The task_role when it is a role a task may hold at most once and the row is live; NULL otherwise. Exists only to scope uniq_calendar_events_task_singleton_role to live singleton projections.
+	TaskSingletonRole sql.NullString `json:"taskSingletonRole"`
 	// Display order
 	SortWeight int32 `json:"sortWeight"`
 	// Admin notes
@@ -2872,9 +2872,11 @@ type CalendarPublicShareEvent struct {
 	// Admin notes
 	Notes sql.NullString `json:"notes"`
 	// Enabled flag (soft-disable)
-	Enabled   bool         `json:"enabled"`
-	UpdatedAt sql.NullTime `json:"updatedAt"`
-	CreatedAt time.Time    `json:"createdAt"`
+	Enabled bool `json:"enabled"`
+	// NULL once soft-deleted; exists only to scope the unique key below to live rows
+	Active    sql.NullInt16 `json:"active"`
+	UpdatedAt sql.NullTime  `json:"updatedAt"`
+	CreatedAt time.Time     `json:"createdAt"`
 }
 
 // Per-user display preferences for a calendar (color, visibility). Not an ACL axis — event-level visibility is the only ws-internal ACL.
@@ -3220,9 +3222,11 @@ type Label struct {
 	// Admin notes
 	Notes sql.NullString `json:"notes"`
 	// Enabled flag
-	Enabled   bool         `json:"enabled"`
-	UpdatedAt sql.NullTime `json:"updatedAt"`
-	CreatedAt time.Time    `json:"createdAt"`
+	Enabled bool `json:"enabled"`
+	// NULL once soft-deleted; exists only to scope the unique key below to live rows
+	Active    sql.NullInt16 `json:"active"`
+	UpdatedAt sql.NullTime  `json:"updatedAt"`
+	CreatedAt time.Time     `json:"createdAt"`
 }
 
 // Saved task query views
@@ -3247,8 +3251,8 @@ type Lense struct {
 	IsDefault bool `json:"isDefault"`
 	// Whether the lens is publicly shared
 	IsPublic bool `json:"isPublic"`
-	// Random hex token for public share URL
-	PublicToken sql.NullString `json:"publicToken"`
+	// SHA-256 hex of the public share URL token; the plaintext is handed to the publisher once and never stored, so a leak of this table does not yield working share URLs. NULL while the lens is not published. Same shape as calendar_public_shares.token_hash — capability tokens are hashed at rest everywhere.
+	PublicTokenHash sql.NullString `json:"publicTokenHash"`
 	// Timestamp when first shared publicly
 	SharedAt sql.NullTime `json:"sharedAt"`
 	// Timestamp of last AI safety check
@@ -3260,9 +3264,11 @@ type Lense struct {
 	// Admin notes
 	Notes sql.NullString `json:"notes"`
 	// Enabled flag
-	Enabled   bool         `json:"enabled"`
-	UpdatedAt sql.NullTime `json:"updatedAt"`
-	CreatedAt time.Time    `json:"createdAt"`
+	Enabled bool `json:"enabled"`
+	// NULL once soft-deleted; exists only to scope the unique key below to live rows
+	Active    sql.NullInt16 `json:"active"`
+	UpdatedAt sql.NullTime  `json:"updatedAt"`
+	CreatedAt time.Time     `json:"createdAt"`
 }
 
 // Passwordless magic-link tokens
@@ -3571,9 +3577,11 @@ type Project struct {
 	// Admin notes
 	Notes sql.NullString `json:"notes"`
 	// Enabled flag
-	Enabled   bool         `json:"enabled"`
-	UpdatedAt sql.NullTime `json:"updatedAt"`
-	CreatedAt time.Time    `json:"createdAt"`
+	Enabled bool `json:"enabled"`
+	// NULL once soft-deleted; exists only to scope the unique key below to live rows
+	Active    sql.NullInt16 `json:"active"`
+	UpdatedAt sql.NullTime  `json:"updatedAt"`
+	CreatedAt time.Time     `json:"createdAt"`
 }
 
 // Project membership
@@ -3619,9 +3627,11 @@ type Reaction struct {
 	// Admin notes
 	Notes sql.NullString `json:"notes"`
 	// Enabled flag
-	Enabled   bool         `json:"enabled"`
-	UpdatedAt sql.NullTime `json:"updatedAt"`
-	CreatedAt time.Time    `json:"createdAt"`
+	Enabled bool `json:"enabled"`
+	// NULL once soft-deleted; exists only to scope the unique key below to live rows
+	Active    sql.NullInt16 `json:"active"`
+	UpdatedAt sql.NullTime  `json:"updatedAt"`
+	CreatedAt time.Time     `json:"createdAt"`
 }
 
 // AI-suggested task relation candidates
@@ -3907,9 +3917,11 @@ type TaskDependency struct {
 	// Admin notes
 	Notes sql.NullString `json:"notes"`
 	// Enabled flag
-	Enabled   bool         `json:"enabled"`
-	UpdatedAt sql.NullTime `json:"updatedAt"`
-	CreatedAt time.Time    `json:"createdAt"`
+	Enabled bool `json:"enabled"`
+	// NULL once soft-deleted; exists only to scope the unique key below to live rows
+	Active    sql.NullInt16 `json:"active"`
+	UpdatedAt sql.NullTime  `json:"updatedAt"`
+	CreatedAt time.Time     `json:"createdAt"`
 }
 
 // Task description version history (full snapshots)
@@ -3978,9 +3990,11 @@ type TaskEventLink struct {
 	// Admin notes
 	Notes sql.NullString `json:"notes"`
 	// Enabled flag (soft-disable)
-	Enabled   bool         `json:"enabled"`
-	UpdatedAt sql.NullTime `json:"updatedAt"`
-	CreatedAt time.Time    `json:"createdAt"`
+	Enabled bool `json:"enabled"`
+	// NULL once soft-deleted; exists only to scope the unique key below to live rows
+	Active    sql.NullInt16 `json:"active"`
+	UpdatedAt sql.NullTime  `json:"updatedAt"`
+	CreatedAt time.Time     `json:"createdAt"`
 }
 
 // Task-label junction
@@ -4000,9 +4014,11 @@ type TaskLabel struct {
 	// Admin notes
 	Notes sql.NullString `json:"notes"`
 	// Enabled flag
-	Enabled   bool         `json:"enabled"`
-	UpdatedAt sql.NullTime `json:"updatedAt"`
-	CreatedAt time.Time    `json:"createdAt"`
+	Enabled bool `json:"enabled"`
+	// NULL once soft-deleted; exists only to scope the unique key below to live rows
+	Active    sql.NullInt16 `json:"active"`
+	UpdatedAt sql.NullTime  `json:"updatedAt"`
+	CreatedAt time.Time     `json:"createdAt"`
 }
 
 // Time-bounded work containers
@@ -4034,9 +4050,11 @@ type Timebox struct {
 	// Admin notes
 	Notes sql.NullString `json:"notes"`
 	// Enabled flag
-	Enabled   bool         `json:"enabled"`
-	UpdatedAt sql.NullTime `json:"updatedAt"`
-	CreatedAt time.Time    `json:"createdAt"`
+	Enabled bool `json:"enabled"`
+	// NULL once soft-deleted; exists only to scope the unique key below to live rows
+	Active    sql.NullInt16 `json:"active"`
+	UpdatedAt sql.NullTime  `json:"updatedAt"`
+	CreatedAt time.Time     `json:"createdAt"`
 }
 
 // Timebox-task associations
@@ -4056,9 +4074,11 @@ type TimeboxTask struct {
 	// Admin notes
 	Notes sql.NullString `json:"notes"`
 	// Enabled flag
-	Enabled   bool         `json:"enabled"`
-	UpdatedAt sql.NullTime `json:"updatedAt"`
-	CreatedAt time.Time    `json:"createdAt"`
+	Enabled bool `json:"enabled"`
+	// NULL once soft-deleted; exists only to scope the unique key below to live rows
+	Active    sql.NullInt16 `json:"active"`
+	UpdatedAt sql.NullTime  `json:"updatedAt"`
+	CreatedAt time.Time     `json:"createdAt"`
 }
 
 // Global user accounts
@@ -4139,9 +4159,11 @@ type UserFavorite struct {
 	// Admin notes
 	Notes sql.NullString `json:"notes"`
 	// Enabled flag
-	Enabled   bool         `json:"enabled"`
-	UpdatedAt sql.NullTime `json:"updatedAt"`
-	CreatedAt time.Time    `json:"createdAt"`
+	Enabled bool `json:"enabled"`
+	// NULL once soft-deleted; exists only to scope the unique key below to live rows
+	Active    sql.NullInt16 `json:"active"`
+	UpdatedAt sql.NullTime  `json:"updatedAt"`
+	CreatedAt time.Time     `json:"createdAt"`
 }
 
 // Personal OAuth integrations owned by an individual user

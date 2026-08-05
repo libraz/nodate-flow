@@ -1,6 +1,8 @@
--- name: FindLensByPublicToken :one
--- Look up a publicly shared lens by its token. Used by unauthenticated
--- public share endpoints. Only returns enabled + public lenses.
+-- name: FindLensByPublicTokenHash :one
+-- Look up a publicly shared lens by the SHA-256 hex of its URL token.
+-- Used by unauthenticated public share endpoints; the caller hashes the
+-- token from the path before calling, so the plaintext never reaches a
+-- query log. Only returns enabled + public lenses.
 SELECT
   l.id,
   l.public_id,
@@ -15,7 +17,7 @@ SELECT
   l.created_at
 FROM lenses l
 INNER JOIN workspaces w ON w.id = l.workspace_id AND w.enabled = TRUE
-WHERE l.public_token = ?
+WHERE l.public_token_hash = ?
   AND l.is_public = TRUE
   AND l.enabled = TRUE
 LIMIT 1;
@@ -63,11 +65,13 @@ ORDER BY v.priority DESC, v.due_on ASC, v.created_at DESC, v.public_id DESC
 LIMIT ?;
 
 -- name: SetLensPublic :exec
--- Enable public sharing on a lens. Generates a share URL token.
+-- Enable public sharing on a lens. Stores the SHA-256 hex of the share
+-- URL token minted by the caller; the plaintext is returned to the
+-- publisher once and is not recoverable afterwards.
 -- No-op if the lens is already public (WHERE is_public = FALSE guard).
 UPDATE lenses
 SET is_public = TRUE,
-    public_token = ?,
+    public_token_hash = ?,
     shared_at = NOW(3)
 WHERE workspace_id = ?
   AND public_id = ?
@@ -75,11 +79,12 @@ WHERE workspace_id = ?
   AND enabled = TRUE;
 
 -- name: SetLensPrivate :exec
--- Revoke public sharing on a lens. Clears the token.
+-- Revoke public sharing on a lens. Clears the token hash so the URL
+-- stops resolving and re-publishing has to mint a fresh token.
 -- No-op if the lens is already private (WHERE is_public = TRUE guard).
 UPDATE lenses
 SET is_public = FALSE,
-    public_token = NULL
+    public_token_hash = NULL
 WHERE workspace_id = ?
   AND public_id = ?
   AND is_public = TRUE

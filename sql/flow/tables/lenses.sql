@@ -15,7 +15,7 @@ CREATE TABLE lenses (
   lens_json JSON NOT NULL COMMENT 'Serialized Lens object (filter, sort, groupBy)',
   is_default BOOLEAN NOT NULL DEFAULT FALSE COMMENT 'Default lens for the scope',
   is_public BOOLEAN NOT NULL DEFAULT FALSE COMMENT 'Whether the lens is publicly shared',
-  public_token CHAR(32) CHARACTER SET latin1 NULL COMMENT 'Random hex token for public share URL',
+  public_token_hash CHAR(64) CHARACTER SET latin1 COLLATE latin1_swedish_ci NULL COMMENT 'SHA-256 hex of the public share URL token; the plaintext is handed to the publisher once and never stored, so a leak of this table does not yield working share URLs. NULL while the lens is not published. Same shape as calendar_public_shares.token_hash — capability tokens are hashed at rest everywhere.',
   shared_at DATETIME(3) NULL COMMENT 'Timestamp when first shared publicly',
   safety_checked_at DATETIME(3) NULL COMMENT 'Timestamp of last AI safety check',
   archived_at DATETIME(3) NULL COMMENT 'Set when lens is archived (distinct from enabled)',
@@ -23,13 +23,18 @@ CREATE TABLE lenses (
   sort_weight INT NOT NULL DEFAULT 0 COMMENT 'Display order',
   notes TEXT NULL COMMENT 'Admin notes',
   enabled BOOLEAN NOT NULL DEFAULT TRUE COMMENT 'Enabled flag',
+  -- Liveness marker scoping the unique key below to live rows: 1 while
+  -- enabled, NULL once soft-deleted, so tombstones leave the index
+  -- rather than colliding with each other. See the soft-delete rule in
+  -- sql/core/conformance/schema/40-soft-delete-uniqueness.sql.
+  active TINYINT UNSIGNED GENERATED ALWAYS AS (IF(enabled, 1, NULL)) VIRTUAL COMMENT 'NULL once soft-deleted; exists only to scope the unique key below to live rows',
   updated_at TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
   created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
 
   UNIQUE KEY uniq_lenses_public_id (public_id),
   UNIQUE KEY uniq_lenses_workspace_public_id (workspace_id, public_id),
-  UNIQUE KEY uniq_lenses_workspace_id_project_id_name_enabled (workspace_id, project_id, name, enabled),
-  UNIQUE KEY uniq_lenses_public_token (public_token),
+  UNIQUE KEY uniq_lenses_workspace_id_project_id_name_active (workspace_id, project_id, name, active),
+  UNIQUE KEY uniq_lenses_public_token_hash (public_token_hash),
   KEY idx_lenses_workspace_id_archived_at (workspace_id, archived_at),
   KEY idx_lenses_workspace_id_project_id_enabled (workspace_id, project_id, enabled),
   KEY idx_lenses_workspace_id_creator_id (workspace_id, creator_id),

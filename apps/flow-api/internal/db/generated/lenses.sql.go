@@ -88,7 +88,6 @@ SELECT
   l.lens_json,
   l.is_default,
   l.is_public,
-  l.public_token,
   l.shared_at,
   l.safety_checked_at,
   l.sort_weight,
@@ -116,7 +115,6 @@ type GetLensByPublicIDRow struct {
 	LensJson           json.RawMessage `json:"lensJson"`
 	IsDefault          bool            `json:"isDefault"`
 	IsPublic           bool            `json:"isPublic"`
-	PublicToken        sql.NullString  `json:"publicToken"`
 	SharedAt           sql.NullTime    `json:"sharedAt"`
 	SafetyCheckedAt    sql.NullTime    `json:"safetyCheckedAt"`
 	SortWeight         int32           `json:"sortWeight"`
@@ -138,7 +136,6 @@ func (q *Queries) GetLensByPublicID(ctx context.Context, arg GetLensByPublicIDPa
 		&i.LensJson,
 		&i.IsDefault,
 		&i.IsPublic,
-		&i.PublicToken,
 		&i.SharedAt,
 		&i.SafetyCheckedAt,
 		&i.SortWeight,
@@ -158,7 +155,6 @@ SELECT
   l.lens_json,
   l.is_default,
   l.is_public,
-  l.public_token,
   l.shared_at,
   l.safety_checked_at,
   l.sort_weight,
@@ -190,7 +186,6 @@ type ListLensesForProjectRow struct {
 	LensJson           json.RawMessage `json:"lensJson"`
 	IsDefault          bool            `json:"isDefault"`
 	IsPublic           bool            `json:"isPublic"`
-	PublicToken        sql.NullString  `json:"publicToken"`
 	SharedAt           sql.NullTime    `json:"sharedAt"`
 	SafetyCheckedAt    sql.NullTime    `json:"safetyCheckedAt"`
 	SortWeight         int32           `json:"sortWeight"`
@@ -223,7 +218,6 @@ func (q *Queries) ListLensesForProject(ctx context.Context, arg ListLensesForPro
 			&i.LensJson,
 			&i.IsDefault,
 			&i.IsPublic,
-			&i.PublicToken,
 			&i.SharedAt,
 			&i.SafetyCheckedAt,
 			&i.SortWeight,

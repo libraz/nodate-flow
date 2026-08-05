@@ -23,11 +23,57 @@ SELECT
   tt.title AS target_task_title,
   rs.created_at
 FROM relation_suggestions rs
-INNER JOIN tasks st ON st.id = rs.source_task_id
-INNER JOIN tasks tt ON tt.id = rs.target_task_id
-WHERE rs.workspace_id = ?
-  AND (rs.source_task_id = ? OR rs.target_task_id = ?)
+INNER JOIN tasks st ON st.id = rs.source_task_id AND st.enabled = TRUE
+INNER JOIN tasks tt ON tt.id = rs.target_task_id AND tt.enabled = TRUE
+WHERE rs.workspace_id = sqlc.arg('workspace_id')
+  AND (rs.source_task_id = sqlc.arg('source_task_id') OR rs.target_task_id = sqlc.arg('target_task_id'))
   AND rs.status = 'pending'
+  -- Both titles are on the wire, so a suggestion is listable only when
+  -- the actor may see both ends. Elevated roles skip the check.
+  AND (
+    CAST(sqlc.arg('is_elevated') AS SIGNED) = 1
+    OR (
+      (
+        st.visibility = 'public'
+        OR (st.visibility = 'project' AND EXISTS (
+          SELECT 1 FROM project_members pm_st
+          WHERE pm_st.project_id = st.project_id
+            AND pm_st.user_id = CAST(sqlc.arg('actor_user_id') AS UNSIGNED)
+            AND pm_st.enabled = TRUE
+        ))
+        OR (st.visibility = 'private' AND (
+          st.created_by_user_id = CAST(sqlc.arg('actor_user_id') AS UNSIGNED)
+          OR EXISTS (
+            SELECT 1 FROM task_actors ta_st
+            WHERE ta_st.task_id = st.id
+              AND ta_st.kind = 'user'
+              AND ta_st.user_id = CAST(sqlc.arg('actor_user_id') AS UNSIGNED)
+              AND ta_st.enabled = TRUE
+          )
+        ))
+      )
+      AND
+      (
+        tt.visibility = 'public'
+        OR (tt.visibility = 'project' AND EXISTS (
+          SELECT 1 FROM project_members pm_tt
+          WHERE pm_tt.project_id = tt.project_id
+            AND pm_tt.user_id = CAST(sqlc.arg('actor_user_id') AS UNSIGNED)
+            AND pm_tt.enabled = TRUE
+        ))
+        OR (tt.visibility = 'private' AND (
+          tt.created_by_user_id = CAST(sqlc.arg('actor_user_id') AS UNSIGNED)
+          OR EXISTS (
+            SELECT 1 FROM task_actors ta_tt
+            WHERE ta_tt.task_id = tt.id
+              AND ta_tt.kind = 'user'
+              AND ta_tt.user_id = CAST(sqlc.arg('actor_user_id') AS UNSIGNED)
+              AND ta_tt.enabled = TRUE
+          )
+        ))
+      )
+    )
+  )
 ORDER BY rs.confidence DESC, rs.id DESC
 LIMIT ?;
 
@@ -45,10 +91,56 @@ SELECT
   rs.created_at,
   COUNT(*) OVER() AS total
 FROM relation_suggestions rs
-INNER JOIN tasks st ON st.id = rs.source_task_id
-INNER JOIN tasks tt ON tt.id = rs.target_task_id
-WHERE rs.workspace_id = ?
+INNER JOIN tasks st ON st.id = rs.source_task_id AND st.enabled = TRUE
+INNER JOIN tasks tt ON tt.id = rs.target_task_id AND tt.enabled = TRUE
+WHERE rs.workspace_id = sqlc.arg('workspace_id')
   AND rs.status = 'pending'
+  -- Both titles are on the wire, so a suggestion is listable only when
+  -- the actor may see both ends. Elevated roles skip the check.
+  AND (
+    CAST(sqlc.arg('is_elevated') AS SIGNED) = 1
+    OR (
+      (
+        st.visibility = 'public'
+        OR (st.visibility = 'project' AND EXISTS (
+          SELECT 1 FROM project_members pm_st
+          WHERE pm_st.project_id = st.project_id
+            AND pm_st.user_id = CAST(sqlc.arg('actor_user_id') AS UNSIGNED)
+            AND pm_st.enabled = TRUE
+        ))
+        OR (st.visibility = 'private' AND (
+          st.created_by_user_id = CAST(sqlc.arg('actor_user_id') AS UNSIGNED)
+          OR EXISTS (
+            SELECT 1 FROM task_actors ta_st
+            WHERE ta_st.task_id = st.id
+              AND ta_st.kind = 'user'
+              AND ta_st.user_id = CAST(sqlc.arg('actor_user_id') AS UNSIGNED)
+              AND ta_st.enabled = TRUE
+          )
+        ))
+      )
+      AND
+      (
+        tt.visibility = 'public'
+        OR (tt.visibility = 'project' AND EXISTS (
+          SELECT 1 FROM project_members pm_tt
+          WHERE pm_tt.project_id = tt.project_id
+            AND pm_tt.user_id = CAST(sqlc.arg('actor_user_id') AS UNSIGNED)
+            AND pm_tt.enabled = TRUE
+        ))
+        OR (tt.visibility = 'private' AND (
+          tt.created_by_user_id = CAST(sqlc.arg('actor_user_id') AS UNSIGNED)
+          OR EXISTS (
+            SELECT 1 FROM task_actors ta_tt
+            WHERE ta_tt.task_id = tt.id
+              AND ta_tt.kind = 'user'
+              AND ta_tt.user_id = CAST(sqlc.arg('actor_user_id') AS UNSIGNED)
+              AND ta_tt.enabled = TRUE
+          )
+        ))
+      )
+    )
+  )
 ORDER BY rs.created_at DESC, rs.id DESC
 LIMIT ? OFFSET ?;
 

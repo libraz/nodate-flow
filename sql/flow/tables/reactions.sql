@@ -16,13 +16,18 @@ CREATE TABLE reactions (
   sort_weight  INT NOT NULL DEFAULT 0 COMMENT 'Display order',
   notes        TEXT NULL COMMENT 'Admin notes',
   enabled      BOOLEAN NOT NULL DEFAULT TRUE COMMENT 'Enabled flag',
+  -- Liveness marker scoping the unique key below to live rows: 1 while
+  -- enabled, NULL once soft-deleted, so tombstones leave the index
+  -- rather than colliding with each other. See the soft-delete rule in
+  -- sql/core/conformance/schema/40-soft-delete-uniqueness.sql.
+  active TINYINT UNSIGNED GENERATED ALWAYS AS (IF(enabled, 1, NULL)) VIRTUAL COMMENT 'NULL once soft-deleted; exists only to scope the unique key below to live rows',
   updated_at   TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
   created_at   DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
 
   UNIQUE KEY uniq_reactions_public_id (public_id),
   UNIQUE KEY uniq_reactions_workspace_public_id (workspace_id, public_id),
-  UNIQUE KEY uniq_reactions_user_task_emoji (user_id, task_id, emoji, enabled),
-  UNIQUE KEY uniq_reactions_user_comment_emoji (user_id, comment_id, emoji, enabled),
+  UNIQUE KEY uniq_reactions_user_task_emoji (user_id, task_id, emoji, active),
+  UNIQUE KEY uniq_reactions_user_comment_emoji (user_id, comment_id, emoji, active),
   KEY idx_reactions_task_id_emoji (task_id, emoji),
   KEY idx_reactions_comment_id_emoji (comment_id, emoji),
 

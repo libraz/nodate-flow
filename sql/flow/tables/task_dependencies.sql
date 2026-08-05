@@ -23,12 +23,17 @@ CREATE TABLE task_dependencies (
   sort_weight INT NOT NULL DEFAULT 0 COMMENT 'Display order',
   notes TEXT NULL COMMENT 'Admin notes',
   enabled BOOLEAN NOT NULL DEFAULT TRUE COMMENT 'Enabled flag',
+  -- Liveness marker scoping the unique key below to live rows: 1 while
+  -- enabled, NULL once soft-deleted, so tombstones leave the index
+  -- rather than colliding with each other. See the soft-delete rule in
+  -- sql/core/conformance/schema/40-soft-delete-uniqueness.sql.
+  active TINYINT UNSIGNED GENERATED ALWAYS AS (IF(enabled, 1, NULL)) VIRTUAL COMMENT 'NULL once soft-deleted; exists only to scope the unique key below to live rows',
   updated_at TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
   created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
 
   UNIQUE KEY uniq_task_dependencies_public_id (public_id),
   UNIQUE KEY uniq_task_dependencies_workspace_public_id (workspace_id, public_id),
-  UNIQUE KEY uniq_task_dependencies_edge (from_task_id, to_task_id, kind, enabled),
+  UNIQUE KEY uniq_task_dependencies_edge (from_task_id, to_task_id, kind, active),
   KEY idx_task_dependencies_workspace_from (workspace_id, from_task_id),
   KEY idx_task_dependencies_workspace_to (workspace_id, to_task_id),
   -- Bare to_task_id index for ON DELETE CASCADE on tasks. The workspace-leading

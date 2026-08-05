@@ -296,7 +296,13 @@ SELECT
   ce.block_label,
   ce.task_id,
   ce.updated_at,
-  ce.created_at
+  ce.created_at,
+  EXISTS (
+    SELECT 1 FROM calendar_event_attendees a
+    WHERE a.event_id = ce.id
+      AND a.user_id = ?
+      AND a.enabled = TRUE
+  ) AS is_attendee
 FROM calendar_events ce
 INNER JOIN calendars c
   ON c.id = ce.calendar_id
@@ -318,15 +324,17 @@ WHERE ce.workspace_id = ?
   AND ce.start_at < ?
   AND ce.end_at > ?
   AND ce.enabled = TRUE
+  AND (ce.visibility <> 'confidential' OR ce.owner_user_id = ?)
 ORDER BY ce.start_at ASC, ce.public_id ASC
 LIMIT 1000
 `
 
 type ListCalendarEventsAcrossCalendarsParams struct {
-	UserID      uint32       `json:"-"`
-	WorkspaceID uint32       `json:"-"`
-	StartAt     sql.NullTime `json:"startAt"`
-	EndAt       sql.NullTime `json:"endAt"`
+	ViewerUserID uint32       `json:"-"`
+	UserID       uint32       `json:"-"`
+	WorkspaceID  uint32       `json:"-"`
+	StartAt      sql.NullTime `json:"startAt"`
+	EndAt        sql.NullTime `json:"endAt"`
 }
 
 type ListCalendarEventsAcrossCalendarsRow struct {
@@ -348,16 +356,19 @@ type ListCalendarEventsAcrossCalendarsRow struct {
 	TaskID           sql.NullInt32             `json:"-"`
 	UpdatedAt        sql.NullTime              `json:"updatedAt"`
 	CreatedAt        time.Time                 `json:"createdAt"`
+	IsAttendee       bool                      `json:"isAttendee"`
 }
 
 // Cross-calendar query: list events across multiple calendars for a user
 // within a workspace and time range. Used by the unified calendar view.
 func (q *Queries) ListCalendarEventsAcrossCalendars(ctx context.Context, arg ListCalendarEventsAcrossCalendarsParams) ([]ListCalendarEventsAcrossCalendarsRow, error) {
 	rows, err := q.db.QueryContext(ctx, listCalendarEventsAcrossCalendars,
+		arg.ViewerUserID,
 		arg.UserID,
 		arg.WorkspaceID,
 		arg.StartAt,
 		arg.EndAt,
+		arg.ViewerUserID,
 	)
 	if err != nil {
 		return nil, err
@@ -385,6 +396,7 @@ func (q *Queries) ListCalendarEventsAcrossCalendars(ctx context.Context, arg Lis
 			&i.TaskID,
 			&i.UpdatedAt,
 			&i.CreatedAt,
+			&i.IsAttendee,
 		); err != nil {
 			return nil, err
 		}
@@ -423,7 +435,13 @@ SELECT
   ce.notification_offset,
   ce.task_id,
   ce.updated_at,
-  ce.created_at
+  ce.created_at,
+  EXISTS (
+    SELECT 1 FROM calendar_event_attendees a
+    WHERE a.event_id = ce.id
+      AND a.user_id = ?
+      AND a.enabled = TRUE
+  ) AS is_attendee
 FROM calendar_events ce
 LEFT JOIN users uc
   ON uc.id = ce.created_by_user_id
@@ -432,14 +450,16 @@ WHERE ce.calendar_id = ?
   AND ce.start_at < ?
   AND ce.end_at > ?
   AND ce.enabled = TRUE
+  AND (ce.visibility <> 'confidential' OR ce.owner_user_id = ?)
 ORDER BY ce.start_at ASC, ce.public_id ASC
 LIMIT 1000
 `
 
 type ListCalendarEventsByRangeParams struct {
-	CalendarID uint32       `json:"-"`
-	StartAt    sql.NullTime `json:"startAt"`
-	EndAt      sql.NullTime `json:"endAt"`
+	ViewerUserID uint32       `json:"-"`
+	CalendarID   uint32       `json:"-"`
+	StartAt      sql.NullTime `json:"startAt"`
+	EndAt        sql.NullTime `json:"endAt"`
 }
 
 type ListCalendarEventsByRangeRow struct {
@@ -466,11 +486,18 @@ type ListCalendarEventsByRangeRow struct {
 	TaskID             sql.NullInt32             `json:"-"`
 	UpdatedAt          sql.NullTime              `json:"updatedAt"`
 	CreatedAt          time.Time                 `json:"createdAt"`
+	IsAttendee         bool                      `json:"isAttendee"`
 }
 
 // List non-recurring events in a calendar within a time range.
 func (q *Queries) ListCalendarEventsByRange(ctx context.Context, arg ListCalendarEventsByRangeParams) ([]ListCalendarEventsByRangeRow, error) {
-	rows, err := q.db.QueryContext(ctx, listCalendarEventsByRange, arg.CalendarID, arg.StartAt, arg.EndAt)
+	rows, err := q.db.QueryContext(ctx, listCalendarEventsByRange,
+		arg.ViewerUserID,
+		arg.CalendarID,
+		arg.StartAt,
+		arg.EndAt,
+		arg.ViewerUserID,
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -502,6 +529,7 @@ func (q *Queries) ListCalendarEventsByRange(ctx context.Context, arg ListCalenda
 			&i.TaskID,
 			&i.UpdatedAt,
 			&i.CreatedAt,
+			&i.IsAttendee,
 		); err != nil {
 			return nil, err
 		}
@@ -546,7 +574,13 @@ SELECT
   ce.block_label,
   ce.task_id,
   ce.updated_at,
-  ce.created_at
+  ce.created_at,
+  EXISTS (
+    SELECT 1 FROM calendar_event_attendees a
+    WHERE a.event_id = ce.id
+      AND a.user_id = ?
+      AND a.enabled = TRUE
+  ) AS is_attendee
 FROM calendar_events ce
 INNER JOIN calendars c
   ON c.id = ce.calendar_id AND c.enabled = TRUE
@@ -578,14 +612,16 @@ WHERE ce.recurrence_rule IS NULL
   AND ce.start_at < ?
   AND ce.end_at > ?
   AND ce.enabled = TRUE
+  AND (ce.visibility <> 'confidential' OR ce.owner_user_id = ?)
 ORDER BY ce.start_at ASC, ce.public_id ASC
 LIMIT 2000
 `
 
 type ListMyCalendarEventsAcrossWorkspacesParams struct {
-	UserID  uint32       `json:"-"`
-	StartAt sql.NullTime `json:"startAt"`
-	EndAt   sql.NullTime `json:"endAt"`
+	ViewerUserID uint32       `json:"-"`
+	UserID       uint32       `json:"-"`
+	StartAt      sql.NullTime `json:"startAt"`
+	EndAt        sql.NullTime `json:"endAt"`
 }
 
 type ListMyCalendarEventsAcrossWorkspacesRow struct {
@@ -616,6 +652,7 @@ type ListMyCalendarEventsAcrossWorkspacesRow struct {
 	TaskID             sql.NullInt32             `json:"-"`
 	UpdatedAt          sql.NullTime              `json:"updatedAt"`
 	CreatedAt          time.Time                 `json:"createdAt"`
+	IsAttendee         bool                      `json:"isAttendee"`
 }
 
 // Cross-workspace variant: list non-recurring events on every calendar
@@ -626,7 +663,13 @@ type ListMyCalendarEventsAcrossWorkspacesRow struct {
 // /me/calendar-events for the unified flow-web calendar so the client
 // does not fan out one request per workspace.
 func (q *Queries) ListMyCalendarEventsAcrossWorkspaces(ctx context.Context, arg ListMyCalendarEventsAcrossWorkspacesParams) ([]ListMyCalendarEventsAcrossWorkspacesRow, error) {
-	rows, err := q.db.QueryContext(ctx, listMyCalendarEventsAcrossWorkspaces, arg.UserID, arg.StartAt, arg.EndAt)
+	rows, err := q.db.QueryContext(ctx, listMyCalendarEventsAcrossWorkspaces,
+		arg.ViewerUserID,
+		arg.UserID,
+		arg.StartAt,
+		arg.EndAt,
+		arg.ViewerUserID,
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -662,6 +705,7 @@ func (q *Queries) ListMyCalendarEventsAcrossWorkspaces(ctx context.Context, arg 
 			&i.TaskID,
 			&i.UpdatedAt,
 			&i.CreatedAt,
+			&i.IsAttendee,
 		); err != nil {
 			return nil, err
 		}
@@ -709,7 +753,13 @@ SELECT
   COALESCE(ce.recurrence_exceptions, CAST('null' AS JSON)) AS recurrence_exceptions,
   ce.task_id,
   ce.updated_at,
-  ce.created_at
+  ce.created_at,
+  EXISTS (
+    SELECT 1 FROM calendar_event_attendees a
+    WHERE a.event_id = ce.id
+      AND a.user_id = ?
+      AND a.enabled = TRUE
+  ) AS is_attendee
 FROM calendar_events ce
 INNER JOIN calendars c
   ON c.id = ce.calendar_id AND c.enabled = TRUE
@@ -741,11 +791,13 @@ WHERE ce.recurrence_rule IS NOT NULL
   AND ce.start_at < ?
   AND (ce.recurrence_end IS NULL OR ce.recurrence_end > ?)
   AND ce.enabled = TRUE
+  AND (ce.visibility <> 'confidential' OR ce.owner_user_id = ?)
 ORDER BY ce.start_at ASC, ce.public_id ASC
 LIMIT 2000
 `
 
 type ListMyRecurringCalendarEventsAcrossWorkspacesParams struct {
+	ViewerUserID  uint32       `json:"-"`
 	UserID        uint32       `json:"-"`
 	StartAt       sql.NullTime `json:"startAt"`
 	RecurrenceEnd sql.NullTime `json:"recurrenceEnd"`
@@ -782,13 +834,20 @@ type ListMyRecurringCalendarEventsAcrossWorkspacesRow struct {
 	TaskID               sql.NullInt32             `json:"-"`
 	UpdatedAt            sql.NullTime              `json:"updatedAt"`
 	CreatedAt            time.Time                 `json:"createdAt"`
+	IsAttendee           bool                      `json:"isAttendee"`
 }
 
 // Cross-workspace recurring variant. Same membership guard as the
 // non-recurring query. Clients expand RRULE instances client-side via
 // the shared recurrence expander.
 func (q *Queries) ListMyRecurringCalendarEventsAcrossWorkspaces(ctx context.Context, arg ListMyRecurringCalendarEventsAcrossWorkspacesParams) ([]ListMyRecurringCalendarEventsAcrossWorkspacesRow, error) {
-	rows, err := q.db.QueryContext(ctx, listMyRecurringCalendarEventsAcrossWorkspaces, arg.UserID, arg.StartAt, arg.RecurrenceEnd)
+	rows, err := q.db.QueryContext(ctx, listMyRecurringCalendarEventsAcrossWorkspaces,
+		arg.ViewerUserID,
+		arg.UserID,
+		arg.StartAt,
+		arg.RecurrenceEnd,
+		arg.ViewerUserID,
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -827,6 +886,7 @@ func (q *Queries) ListMyRecurringCalendarEventsAcrossWorkspaces(ctx context.Cont
 			&i.TaskID,
 			&i.UpdatedAt,
 			&i.CreatedAt,
+			&i.IsAttendee,
 		); err != nil {
 			return nil, err
 		}
@@ -863,7 +923,13 @@ SELECT
   COALESCE(ce.recurrence_exceptions, CAST('null' AS JSON)) AS recurrence_exceptions,
   ce.task_id,
   ce.updated_at,
-  ce.created_at
+  ce.created_at,
+  EXISTS (
+    SELECT 1 FROM calendar_event_attendees a
+    WHERE a.event_id = ce.id
+      AND a.user_id = ?
+      AND a.enabled = TRUE
+  ) AS is_attendee
 FROM calendar_events ce
 INNER JOIN calendars c
   ON c.id = ce.calendar_id
@@ -885,11 +951,13 @@ WHERE ce.workspace_id = ?
   AND ce.start_at < ?
   AND (ce.recurrence_end IS NULL OR ce.recurrence_end > ?)
   AND ce.enabled = TRUE
+  AND (ce.visibility <> 'confidential' OR ce.owner_user_id = ?)
 ORDER BY ce.start_at ASC
 LIMIT 1000
 `
 
 type ListRecurringCalendarEventsAcrossCalendarsParams struct {
+	ViewerUserID  uint32       `json:"-"`
 	UserID        uint32       `json:"-"`
 	WorkspaceID   uint32       `json:"-"`
 	StartAt       sql.NullTime `json:"startAt"`
@@ -918,16 +986,19 @@ type ListRecurringCalendarEventsAcrossCalendarsRow struct {
 	TaskID               sql.NullInt32             `json:"-"`
 	UpdatedAt            sql.NullTime              `json:"updatedAt"`
 	CreatedAt            time.Time                 `json:"createdAt"`
+	IsAttendee           bool                      `json:"isAttendee"`
 }
 
 // Cross-calendar query: list recurring events across multiple calendars
 // whose recurrence window overlaps the query range.
 func (q *Queries) ListRecurringCalendarEventsAcrossCalendars(ctx context.Context, arg ListRecurringCalendarEventsAcrossCalendarsParams) ([]ListRecurringCalendarEventsAcrossCalendarsRow, error) {
 	rows, err := q.db.QueryContext(ctx, listRecurringCalendarEventsAcrossCalendars,
+		arg.ViewerUserID,
 		arg.UserID,
 		arg.WorkspaceID,
 		arg.StartAt,
 		arg.RecurrenceEnd,
+		arg.ViewerUserID,
 	)
 	if err != nil {
 		return nil, err
@@ -958,6 +1029,7 @@ func (q *Queries) ListRecurringCalendarEventsAcrossCalendars(ctx context.Context
 			&i.TaskID,
 			&i.UpdatedAt,
 			&i.CreatedAt,
+			&i.IsAttendee,
 		); err != nil {
 			return nil, err
 		}
@@ -999,7 +1071,13 @@ SELECT
   ce.notification_offset,
   ce.task_id,
   ce.updated_at,
-  ce.created_at
+  ce.created_at,
+  EXISTS (
+    SELECT 1 FROM calendar_event_attendees a
+    WHERE a.event_id = ce.id
+      AND a.user_id = ?
+      AND a.enabled = TRUE
+  ) AS is_attendee
 FROM calendar_events ce
 LEFT JOIN users uc
   ON uc.id = ce.created_by_user_id
@@ -1008,11 +1086,13 @@ WHERE ce.calendar_id = ?
   AND ce.start_at < ?
   AND (ce.recurrence_end IS NULL OR ce.recurrence_end > ?)
   AND ce.enabled = TRUE
+  AND (ce.visibility <> 'confidential' OR ce.owner_user_id = ?)
 ORDER BY ce.start_at ASC
 LIMIT 1000
 `
 
 type ListRecurringCalendarEventsByRangeParams struct {
+	ViewerUserID  uint32       `json:"-"`
 	CalendarID    uint32       `json:"-"`
 	StartAt       sql.NullTime `json:"startAt"`
 	RecurrenceEnd sql.NullTime `json:"recurrenceEnd"`
@@ -1045,11 +1125,18 @@ type ListRecurringCalendarEventsByRangeRow struct {
 	TaskID               sql.NullInt32             `json:"-"`
 	UpdatedAt            sql.NullTime              `json:"updatedAt"`
 	CreatedAt            time.Time                 `json:"createdAt"`
+	IsAttendee           bool                      `json:"isAttendee"`
 }
 
 // List recurring events whose recurrence window overlaps the query range.
 func (q *Queries) ListRecurringCalendarEventsByRange(ctx context.Context, arg ListRecurringCalendarEventsByRangeParams) ([]ListRecurringCalendarEventsByRangeRow, error) {
-	rows, err := q.db.QueryContext(ctx, listRecurringCalendarEventsByRange, arg.CalendarID, arg.StartAt, arg.RecurrenceEnd)
+	rows, err := q.db.QueryContext(ctx, listRecurringCalendarEventsByRange,
+		arg.ViewerUserID,
+		arg.CalendarID,
+		arg.StartAt,
+		arg.RecurrenceEnd,
+		arg.ViewerUserID,
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -1084,6 +1171,7 @@ func (q *Queries) ListRecurringCalendarEventsByRange(ctx context.Context, arg Li
 			&i.TaskID,
 			&i.UpdatedAt,
 			&i.CreatedAt,
+			&i.IsAttendee,
 		); err != nil {
 			return nil, err
 		}

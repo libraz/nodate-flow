@@ -113,8 +113,35 @@ SELECT
   COUNT(*) OVER() AS total
 FROM timebox_tasks tt
 INNER JOIN tasks t ON t.id = tt.task_id AND t.enabled = TRUE
-WHERE tt.timebox_id = ?
+WHERE tt.timebox_id = sqlc.arg('timebox_id')
   AND tt.enabled = TRUE
+  -- A timebox may hold tasks the reader is not allowed to see; the
+  -- membership row grants nothing about the task's own visibility.
+  -- The same predicate gates the progress counts, so the two numbers
+  -- describe the same set the caller is shown.
+  AND (
+    CAST(sqlc.arg('is_elevated') AS SIGNED) = 1
+    OR
+    (
+      t.visibility = 'public'
+      OR (t.visibility = 'project' AND EXISTS (
+        SELECT 1 FROM project_members pm_vis
+        WHERE pm_vis.project_id = t.project_id
+          AND pm_vis.user_id = CAST(sqlc.arg('actor_user_id') AS UNSIGNED)
+          AND pm_vis.enabled = TRUE
+      ))
+      OR (t.visibility = 'private' AND (
+        t.created_by_user_id = CAST(sqlc.arg('actor_user_id') AS UNSIGNED)
+        OR EXISTS (
+          SELECT 1 FROM task_actors ta_vis
+          WHERE ta_vis.task_id = t.id
+            AND ta_vis.kind = 'user'
+            AND ta_vis.user_id = CAST(sqlc.arg('actor_user_id') AS UNSIGNED)
+            AND ta_vis.enabled = TRUE
+        )
+      ))
+    )
+  )
 ORDER BY t.priority DESC, t.created_at ASC, t.id ASC
 LIMIT ? OFFSET ?;
 
@@ -125,5 +152,32 @@ SELECT
   SUM(CASE WHEN t.derived_state IN ('done', 'cancelled') THEN 1 ELSE 0 END) AS completed_tasks
 FROM timebox_tasks tt
 INNER JOIN tasks t ON t.id = tt.task_id AND t.enabled = TRUE
-WHERE tt.timebox_id = ?
-  AND tt.enabled = TRUE;
+WHERE tt.timebox_id = sqlc.arg('timebox_id')
+  AND tt.enabled = TRUE
+  -- A timebox may hold tasks the reader is not allowed to see; the
+  -- membership row grants nothing about the task's own visibility.
+  -- The same predicate gates the progress counts, so the two numbers
+  -- describe the same set the caller is shown.
+  AND (
+    CAST(sqlc.arg('is_elevated') AS SIGNED) = 1
+    OR
+    (
+      t.visibility = 'public'
+      OR (t.visibility = 'project' AND EXISTS (
+        SELECT 1 FROM project_members pm_vis
+        WHERE pm_vis.project_id = t.project_id
+          AND pm_vis.user_id = CAST(sqlc.arg('actor_user_id') AS UNSIGNED)
+          AND pm_vis.enabled = TRUE
+      ))
+      OR (t.visibility = 'private' AND (
+        t.created_by_user_id = CAST(sqlc.arg('actor_user_id') AS UNSIGNED)
+        OR EXISTS (
+          SELECT 1 FROM task_actors ta_vis
+          WHERE ta_vis.task_id = t.id
+            AND ta_vis.kind = 'user'
+            AND ta_vis.user_id = CAST(sqlc.arg('actor_user_id') AS UNSIGNED)
+            AND ta_vis.enabled = TRUE
+        )
+      ))
+    )
+  );

@@ -78,49 +78,6 @@ func (q *Queries) DisableCalendarEventInvite(ctx context.Context, id uint32) err
 	return err
 }
 
-const findActiveCalendarEventInvite = `-- name: FindActiveCalendarEventInvite :one
-SELECT
-  id, public_id, workspace_id, calendar_id, event_id, attendee_id,
-  email, token_hash, expires_at, accepted_at, sent_at,
-  notes, enabled, updated_at, created_at
-FROM calendar_event_invites
-WHERE event_id = ?
-  AND attendee_id = ?
-  AND enabled = TRUE
-LIMIT 1
-`
-
-type FindActiveCalendarEventInviteParams struct {
-	EventID    sql.NullInt32 `json:"-"`
-	AttendeeID sql.NullInt32 `json:"-"`
-}
-
-// Find the currently active invite for a given (event_id, attendee_id)
-// pair. Used before create to decide "insert new vs rotate existing",
-// since the UNIQUE(event_id, attendee_id) constraint forces upsert.
-func (q *Queries) FindActiveCalendarEventInvite(ctx context.Context, arg FindActiveCalendarEventInviteParams) (CalendarEventInvite, error) {
-	row := q.db.QueryRowContext(ctx, findActiveCalendarEventInvite, arg.EventID, arg.AttendeeID)
-	var i CalendarEventInvite
-	err := row.Scan(
-		&i.ID,
-		&i.PublicID,
-		&i.WorkspaceID,
-		&i.CalendarID,
-		&i.EventID,
-		&i.AttendeeID,
-		&i.Email,
-		&i.TokenHash,
-		&i.ExpiresAt,
-		&i.AcceptedAt,
-		&i.SentAt,
-		&i.Notes,
-		&i.Enabled,
-		&i.UpdatedAt,
-		&i.CreatedAt,
-	)
-	return i, err
-}
-
 const findCalendarEventInviteByPublicId = `-- name: FindCalendarEventInviteByPublicId :one
 SELECT
   id, public_id, workspace_id, calendar_id, event_id, attendee_id,
@@ -172,6 +129,55 @@ LIMIT 1
 // distinguish "expired" from "not found" and return clearer errors.
 func (q *Queries) FindCalendarEventInviteByTokenHash(ctx context.Context, tokenHash []byte) (CalendarEventInvite, error) {
 	row := q.db.QueryRowContext(ctx, findCalendarEventInviteByTokenHash, tokenHash)
+	var i CalendarEventInvite
+	err := row.Scan(
+		&i.ID,
+		&i.PublicID,
+		&i.WorkspaceID,
+		&i.CalendarID,
+		&i.EventID,
+		&i.AttendeeID,
+		&i.Email,
+		&i.TokenHash,
+		&i.ExpiresAt,
+		&i.AcceptedAt,
+		&i.SentAt,
+		&i.Notes,
+		&i.Enabled,
+		&i.UpdatedAt,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
+const findCalendarEventInviteForAttendee = `-- name: FindCalendarEventInviteForAttendee :one
+SELECT
+  id, public_id, workspace_id, calendar_id, event_id, attendee_id,
+  email, token_hash, expires_at, accepted_at, sent_at,
+  notes, enabled, updated_at, created_at
+FROM calendar_event_invites
+WHERE event_id = ?
+  AND attendee_id = ?
+LIMIT 1
+`
+
+type FindCalendarEventInviteForAttendeeParams struct {
+	EventID    sql.NullInt32 `json:"-"`
+	AttendeeID sql.NullInt32 `json:"-"`
+}
+
+// Find the invite row for an (event_id, attendee_id) pair whatever its
+// state. UNIQUE(event_id, attendee_id) says there is at most one, ever:
+// an invite is a single standing grant rather than a series, so a
+// revoked one is the same row waiting to be revived, not a tombstone
+// beside which a second may be inserted.
+//
+// Deliberately not filtered on enabled. Looking only at live rows made
+// the create path miss the revoked row, insert, collide with it, and
+// fail — which meant a participant could never be invited again after
+// one revocation.
+func (q *Queries) FindCalendarEventInviteForAttendee(ctx context.Context, arg FindCalendarEventInviteForAttendeeParams) (CalendarEventInvite, error) {
+	row := q.db.QueryRowContext(ctx, findCalendarEventInviteForAttendee, arg.EventID, arg.AttendeeID)
 	var i CalendarEventInvite
 	err := row.Scan(
 		&i.ID,
@@ -410,25 +416,32 @@ func (q *Queries) MarkCalendarEventInviteSent(ctx context.Context, id uint32) er
 	return err
 }
 
-const rotateCalendarEventInviteToken = `-- name: RotateCalendarEventInviteToken :exec
+const reviveCalendarEventInvite = `-- name: ReviveCalendarEventInvite :exec
 UPDATE calendar_event_invites
 SET token_hash = ?,
     expires_at = ?,
     sent_at = NULL,
-    accepted_at = NULL
+    accepted_at = NULL,
+    enabled = TRUE
 WHERE id = ?
 `
 
-type RotateCalendarEventInviteTokenParams struct {
+type ReviveCalendarEventInviteParams struct {
 	TokenHash []byte    `json:"tokenHash"`
 	ExpiresAt time.Time `json:"expiresAt"`
 	ID        uint32    `json:"-"`
 }
 
-// Rotate the token on an existing invite row (resend flow): install a
-// fresh token_hash + expires_at and clear sent_at / accepted_at so the
-// UI reflects a fresh, undelivered invite.
-func (q *Queries) RotateCalendarEventInviteToken(ctx context.Context, arg RotateCalendarEventInviteTokenParams) error {
-	_, err := q.db.ExecContext(ctx, rotateCalendarEventInviteToken, arg.TokenHash, arg.ExpiresAt, arg.ID)
+// Bring an invite row back into service with a fresh capability:
+// install a new token_hash + expires_at, clear the delivery state, and
+// re-enable the row.
+//
+// The token has to be new. Restoring the previous one would make a
+// revocation reversible by whoever still held the old link, so the
+// revive and the rotation are one statement rather than two a caller
+// could get half-right. Rotating a live invite (the resend flow) runs
+// the same statement; enabled = TRUE is simply already true.
+func (q *Queries) ReviveCalendarEventInvite(ctx context.Context, arg ReviveCalendarEventInviteParams) error {
+	_, err := q.db.ExecContext(ctx, reviveCalendarEventInvite, arg.TokenHash, arg.ExpiresAt, arg.ID)
 	return err
 }

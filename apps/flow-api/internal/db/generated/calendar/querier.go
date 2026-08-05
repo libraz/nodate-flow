@@ -65,6 +65,22 @@ type Querier interface {
 	// DeleteStorageObjectIfUnreferenced can free the storage object (FK is
 	// ON DELETE RESTRICT). Audit trail survives via events.
 	DeleteCalendarEventAttachment(ctx context.Context, arg DeleteCalendarEventAttachmentParams) error
+	// Withdraw every publication of a calendar's events, across every share
+	// in the workspace. Run when the calendar itself is deleted.
+	//
+	// The render query's join on calendars already stops these rows being
+	// served, so this is not what closes the leak; it is what stops the
+	// leak being recreated. Without it the link rows survive, and a share
+	// that later regains a calendar id — or a reader of the table taking
+	// cpse.enabled at face value — sees publications nobody can account
+	// for. The editor cannot clear them either, since it lists through the
+	// same calendars join.
+	//
+	// Deliberately does not touch calendar_events. Soft-deleting those
+	// would hit the projection guard for any task-linked row, which only
+	// the item projection engine may disable, and the calendar's own
+	// enabled flag is already what every read path filters on.
+	DetachCalendarEventsFromAllShares(ctx context.Context, arg DetachCalendarEventsFromAllSharesParams) error
 	// Remove one event from a share (soft). Looks up the link by share +
 	// event internal ids (caller resolves both via their public ids first).
 	DetachEventFromShare(ctx context.Context, arg DetachEventFromShareParams) error
@@ -93,10 +109,6 @@ type Querier interface {
 	// are left as-is (soft-disabled at the share level is sufficient; the
 	// render query joins through cps.enabled).
 	DisablePublicShare(ctx context.Context, arg DisablePublicShareParams) error
-	// Find the currently active invite for a given (event_id, attendee_id)
-	// pair. Used before create to decide "insert new vs rotate existing",
-	// since the UNIQUE(event_id, attendee_id) constraint forces upsert.
-	FindActiveCalendarEventInvite(ctx context.Context, arg FindActiveCalendarEventInviteParams) (CalendarEventInvite, error)
 	// Resolve a calendar by UUID v7 within a workspace.
 	FindCalendarByPublicId(ctx context.Context, arg FindCalendarByPublicIdParams) (FindCalendarByPublicIdRow, error)
 	// Resolve a checklist item by UUID v7.
@@ -119,6 +131,17 @@ type Querier interface {
 	// Expiry is intentionally NOT filtered here so the handler can
 	// distinguish "expired" from "not found" and return clearer errors.
 	FindCalendarEventInviteByTokenHash(ctx context.Context, tokenHash []byte) (CalendarEventInvite, error)
+	// Find the invite row for an (event_id, attendee_id) pair whatever its
+	// state. UNIQUE(event_id, attendee_id) says there is at most one, ever:
+	// an invite is a single standing grant rather than a series, so a
+	// revoked one is the same row waiting to be revived, not a tombstone
+	// beside which a second may be inserted.
+	//
+	// Deliberately not filtered on enabled. Looking only at live rows made
+	// the create path miss the revoked row, insert, collide with it, and
+	// fail — which meant a participant could never be invited again after
+	// one revocation.
+	FindCalendarEventInviteForAttendee(ctx context.Context, arg FindCalendarEventInviteForAttendeeParams) (CalendarEventInvite, error)
 	// ListAllCalendarEvents was consumed only by the deleted ICS export path;
 	// the replacement will query via calendar_public_shares.
 	// Quick lookup for permission checks: who owns this event?
@@ -132,9 +155,15 @@ type Querier interface {
 	FindCalendarMemoByPublicId(ctx context.Context, arg FindCalendarMemoByPublicIdParams) (FindCalendarMemoByPublicIdRow, error)
 	// Look up a user's subscription to a specific calendar.
 	FindCalendarSubscription(ctx context.Context, arg FindCalendarSubscriptionParams) (FindCalendarSubscriptionRow, error)
-	// Lightweight resolver used by the public-share attach path to translate
-	// an event public_id into its internal id + visibility within a workspace.
-	// Enforces workspace isolation so a share cannot publish another ws's events.
+	// Lightweight resolver used by the public-share attach/detach paths to
+	// translate an event public_id into its internal id + visibility within a
+	// workspace. Enforces workspace isolation so a share cannot publish another
+	// ws's events.
+	//
+	// calendar_id is returned because workspace isolation is not the access
+	// check on the attach path: an event's audience is its calendar's members,
+	// so the caller has to look up its own grant on that calendar before
+	// publishing the event to an unauthenticated URL.
 	FindEventIDAndVisibility(ctx context.Context, arg FindEventIDAndVisibilityParams) (FindEventIDAndVisibilityRow, error)
 	// Find the personal calendar for a user in a workspace.
 	FindPersonalCalendar(ctx context.Context, arg FindPersonalCalendarParams) (FindPersonalCalendarRow, error)
@@ -213,6 +242,13 @@ type Querier interface {
 	// Unauthenticated public-render query. Final safety gate on event
 	// visibility and start_at IS NOT NULL. expires_at is checked in the
 	// handler (not here) so 410 can be differentiated from 404.
+	//
+	// Joins calendars for the same reason ListPublicShareEventsForEditor
+	// does: an event whose calendar was deleted must stop rendering. When
+	// only the editor query filtered on it, deleting a calendar left its
+	// events on the world-readable page while removing them from the editor
+	// that would have been used to take them down — the one state with no
+	// way out short of deleting the whole share.
 	ListPublicShareEventsByTokenHash(ctx context.Context, tokenHash string) ([]ListPublicShareEventsByTokenHashRow, error)
 	// List events published on a share for the workspace-authenticated
 	// editor UI. Returns full event metadata so the editor can show what is
@@ -241,10 +277,16 @@ type Querier interface {
 	PatchCalendarSubscription(ctx context.Context, arg PatchCalendarSubscriptionParams) error
 	// Update mutable share fields. NULL arguments leave columns untouched.
 	PatchPublicShare(ctx context.Context, arg PatchPublicShareParams) error
-	// Rotate the token on an existing invite row (resend flow): install a
-	// fresh token_hash + expires_at and clear sent_at / accepted_at so the
-	// UI reflects a fresh, undelivered invite.
-	RotateCalendarEventInviteToken(ctx context.Context, arg RotateCalendarEventInviteTokenParams) error
+	// Bring an invite row back into service with a fresh capability:
+	// install a new token_hash + expires_at, clear the delivery state, and
+	// re-enable the row.
+	//
+	// The token has to be new. Restoring the previous one would make a
+	// revocation reversible by whoever still held the old link, so the
+	// revive and the rotation are one statement rather than two a caller
+	// could get half-right. Rotating a live invite (the resend flow) runs
+	// the same statement; enabled = TRUE is simply already true.
+	ReviveCalendarEventInvite(ctx context.Context, arg ReviveCalendarEventInviteParams) error
 	// Regenerate the token hash; invalidates any previously issued URL.
 	RotatePublicShareToken(ctx context.Context, arg RotatePublicShareTokenParams) error
 	// Grant or revoke edit permission on an attendee (by event owner).

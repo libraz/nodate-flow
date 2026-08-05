@@ -311,6 +311,17 @@ CREATE TABLE calendar_event_invites (
   UNIQUE KEY uniq_calendar_event_invites_public_id (public_id),
   UNIQUE KEY uniq_calendar_event_invites_workspace_public_id (workspace_id, public_id),
   UNIQUE KEY uniq_calendar_event_invites_token_hash (token_hash),
+  -- One row per (event, attendee), whatever its state. An invite is a
+  -- single standing grant rather than a series, so a revoked one is the
+  -- same row waiting to be revived, not a tombstone beside which a
+  -- second may be inserted. Deliberately not scoped to live rows with a
+  -- generated marker, unlike the tables that key a repeatable tuple.
+  --
+  -- The writer owes the other half: re-inviting the same attendee must
+  -- revive this row with a freshly minted token. Inserting instead
+  -- collides here, which is how a participant became permanently
+  -- un-invitable after one revocation; restoring the old token instead
+  -- would make the revocation reversible by whoever still held the link.
   UNIQUE KEY uniq_calendar_event_invites_event_attendee (event_id, attendee_id),
   KEY idx_calendar_event_invites_workspace_expires (workspace_id, expires_at),
   KEY idx_calendar_event_invites_workspace_email (workspace_id, email),
@@ -406,15 +417,27 @@ CREATE TABLE calendar_events (
   task_id INT UNSIGNED NULL COMMENT 'Linked task (optional, for task-calendar sync)',
   task_role ENUM('due','scheduled') NULL COMMENT 'When task_id IS NOT NULL: which task field this event represents. due=task.due_on, scheduled=time-blocked (multi-link allowed).',
   /**
-   * task_role_key: de-NULLed projection of task_role used to build a UNIQUE
-   * key over (task_id, task_role). MySQL UNIQUE indexes treat NULLs as
-   * distinct, which would let two NULL task_role rows coexist for the same
-   * task_id and silently weaken the (task_id, task_role) invariant. By
-   * coalescing NULL to the empty string in a STORED generated column we get
-   * a NOT NULL surrogate that participates in the UNIQUE without losing the
-   * "absent role" sentinel.
+   * task_singleton_role: names the role only when the projection is one
+   * a task may hold at most once, and only while the row is live. NULL
+   * for everything else, so those rows leave the unique key below
+   * entirely — MySQL never treats an index entry containing NULL as a
+   * duplicate.
+   *
+   * The two roles are not the same kind of link and the schema has to
+   * say so. `due` mirrors a single task field, so a second live one
+   * would mean the task has two due dates. `scheduled` is a time block,
+   * and the column comment above has always said a task may hold
+   * several — a key that forbade the second one contradicted the
+   * documented model and made adding a second block fail.
+   *
+   * Excluding soft-deleted rows is the other half. A disabled
+   * projection keeps its task_id and task_role on purpose: that is the
+   * record of what the row projected, and the projection guard forbids
+   * clearing it outside the engine. Left in the key, that tombstone
+   * collided with the next projection and made the task permanently
+   * unschedulable.
    */
-  task_role_key VARCHAR(32) GENERATED ALWAYS AS (COALESCE(task_role, '')) STORED NOT NULL COMMENT 'De-NULLed surrogate for task_role; empty string when task_role IS NULL. Exists solely to power uniq_calendar_events_task_role_key over (task_id, task_role_key).',
+  task_singleton_role VARCHAR(16) GENERATED ALWAYS AS (IF(enabled AND task_role = 'due', task_role, NULL)) VIRTUAL COMMENT 'The task_role when it is a role a task may hold at most once and the row is live; NULL otherwise. Exists only to scope uniq_calendar_events_task_singleton_role to live singleton projections.',
 
   sort_weight INT NOT NULL DEFAULT 0 COMMENT 'Display order',
   notes TEXT NULL COMMENT 'Admin notes',
@@ -430,7 +453,7 @@ CREATE TABLE calendar_events (
   KEY idx_calendar_events_calendar_recurrence (calendar_id, recurrence_end),
   KEY idx_calendar_events_workspace_range (workspace_id, start_at, end_at),
   KEY idx_calendar_events_task_role (task_id, task_role, enabled),
-  UNIQUE KEY uniq_calendar_events_task_role_key (task_id, task_role_key),
+  UNIQUE KEY uniq_calendar_events_task_singleton_role (task_id, task_singleton_role),
   -- One override per occurrence. Without this, two concurrent edits of
   -- the same occurrence both insert, and the expander has to pick.
   UNIQUE KEY uniq_calendar_events_recurrence_override (recurrence_parent_id, recurrence_original_start),
@@ -587,12 +610,17 @@ CREATE TABLE calendar_public_share_events (
   sort_weight INT NOT NULL DEFAULT 0 COMMENT 'Override display order on the share page',
   notes TEXT NULL COMMENT 'Admin notes',
   enabled BOOLEAN NOT NULL DEFAULT TRUE COMMENT 'Enabled flag (soft-disable)',
+  -- Liveness marker scoping the unique key below to live rows: 1 while
+  -- enabled, NULL once soft-deleted, so tombstones leave the index
+  -- rather than colliding with each other. See the soft-delete rule in
+  -- sql/core/conformance/schema/40-soft-delete-uniqueness.sql.
+  active TINYINT UNSIGNED GENERATED ALWAYS AS (IF(enabled, 1, NULL)) VIRTUAL COMMENT 'NULL once soft-deleted; exists only to scope the unique key below to live rows',
   updated_at TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
   created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
 
   UNIQUE KEY uniq_calendar_public_share_events_public_id (public_id),
   UNIQUE KEY uniq_calendar_public_share_events_workspace_public_id (workspace_id, public_id),
-  UNIQUE KEY uniq_calendar_public_share_events_share_event (share_id, event_id, enabled) COMMENT 'At most one enabled publication per (share, event)',
+  UNIQUE KEY uniq_calendar_public_share_events_share_event (share_id, event_id, active) COMMENT 'At most one live publication per (share, event); detached ones drop out via active',
   KEY idx_calendar_public_share_events_workspace_event (workspace_id, event_id, enabled),
 
   CONSTRAINT fk_calendar_public_share_events_workspace FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
@@ -1759,12 +1787,17 @@ CREATE TABLE labels (
   sort_weight     INT NOT NULL DEFAULT 0 COMMENT 'Display order',
   notes           TEXT NULL COMMENT 'Admin notes',
   enabled         BOOLEAN NOT NULL DEFAULT TRUE COMMENT 'Enabled flag',
+  -- Liveness marker scoping the unique key below to live rows: 1 while
+  -- enabled, NULL once soft-deleted, so tombstones leave the index
+  -- rather than colliding with each other. See the soft-delete rule in
+  -- sql/core/conformance/schema/40-soft-delete-uniqueness.sql.
+  active TINYINT UNSIGNED GENERATED ALWAYS AS (IF(enabled, 1, NULL)) VIRTUAL COMMENT 'NULL once soft-deleted; exists only to scope the unique key below to live rows',
   updated_at      TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
   created_at      DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
 
   UNIQUE KEY uniq_labels_public_id (public_id),
   UNIQUE KEY uniq_labels_workspace_public_id (workspace_id, public_id),
-  UNIQUE KEY uniq_labels_workspace_id_project_id_name_enabled (workspace_id, project_id, name, enabled),
+  UNIQUE KEY uniq_labels_workspace_id_project_id_name_active (workspace_id, project_id, name, active),
   KEY idx_labels_workspace_id_project_id_enabled (workspace_id, project_id, enabled),
   KEY idx_labels_parent_label_id (parent_label_id),
   KEY idx_labels_created_by_user_id (created_by_user_id),
@@ -1793,7 +1826,7 @@ CREATE TABLE lenses (
   lens_json JSON NOT NULL COMMENT 'Serialized Lens object (filter, sort, groupBy)',
   is_default BOOLEAN NOT NULL DEFAULT FALSE COMMENT 'Default lens for the scope',
   is_public BOOLEAN NOT NULL DEFAULT FALSE COMMENT 'Whether the lens is publicly shared',
-  public_token CHAR(32) CHARACTER SET latin1 NULL COMMENT 'Random hex token for public share URL',
+  public_token_hash CHAR(64) CHARACTER SET latin1 COLLATE latin1_swedish_ci NULL COMMENT 'SHA-256 hex of the public share URL token; the plaintext is handed to the publisher once and never stored, so a leak of this table does not yield working share URLs. NULL while the lens is not published. Same shape as calendar_public_shares.token_hash — capability tokens are hashed at rest everywhere.',
   shared_at DATETIME(3) NULL COMMENT 'Timestamp when first shared publicly',
   safety_checked_at DATETIME(3) NULL COMMENT 'Timestamp of last AI safety check',
   archived_at DATETIME(3) NULL COMMENT 'Set when lens is archived (distinct from enabled)',
@@ -1801,13 +1834,18 @@ CREATE TABLE lenses (
   sort_weight INT NOT NULL DEFAULT 0 COMMENT 'Display order',
   notes TEXT NULL COMMENT 'Admin notes',
   enabled BOOLEAN NOT NULL DEFAULT TRUE COMMENT 'Enabled flag',
+  -- Liveness marker scoping the unique key below to live rows: 1 while
+  -- enabled, NULL once soft-deleted, so tombstones leave the index
+  -- rather than colliding with each other. See the soft-delete rule in
+  -- sql/core/conformance/schema/40-soft-delete-uniqueness.sql.
+  active TINYINT UNSIGNED GENERATED ALWAYS AS (IF(enabled, 1, NULL)) VIRTUAL COMMENT 'NULL once soft-deleted; exists only to scope the unique key below to live rows',
   updated_at TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
   created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
 
   UNIQUE KEY uniq_lenses_public_id (public_id),
   UNIQUE KEY uniq_lenses_workspace_public_id (workspace_id, public_id),
-  UNIQUE KEY uniq_lenses_workspace_id_project_id_name_enabled (workspace_id, project_id, name, enabled),
-  UNIQUE KEY uniq_lenses_public_token (public_token),
+  UNIQUE KEY uniq_lenses_workspace_id_project_id_name_active (workspace_id, project_id, name, active),
+  UNIQUE KEY uniq_lenses_public_token_hash (public_token_hash),
   KEY idx_lenses_workspace_id_archived_at (workspace_id, archived_at),
   KEY idx_lenses_workspace_id_project_id_enabled (workspace_id, project_id, enabled),
   KEY idx_lenses_workspace_id_creator_id (workspace_id, creator_id),
@@ -2112,14 +2150,19 @@ CREATE TABLE projects (
   sort_weight INT NOT NULL DEFAULT 0 COMMENT 'Display order',
   notes TEXT NULL COMMENT 'Admin notes',
   enabled BOOLEAN NOT NULL DEFAULT TRUE COMMENT 'Enabled flag',
+  -- Liveness marker scoping the unique key below to live rows: 1 while
+  -- enabled, NULL once soft-deleted, so tombstones leave the index
+  -- rather than colliding with each other. See the soft-delete rule in
+  -- sql/core/conformance/schema/40-soft-delete-uniqueness.sql.
+  active TINYINT UNSIGNED GENERATED ALWAYS AS (IF(enabled, 1, NULL)) VIRTUAL COMMENT 'NULL once soft-deleted; exists only to scope the unique key below to live rows',
   updated_at TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
   created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
 
   UNIQUE KEY uniq_projects_public_id (public_id),
   UNIQUE KEY uniq_projects_workspace_public_id (workspace_id, public_id),
-  UNIQUE KEY uniq_projects_workspace_id_slug_enabled (workspace_id, slug, enabled),
+  UNIQUE KEY uniq_projects_workspace_id_slug_active (workspace_id, slug, active),
   KEY idx_projects_workspace_id_enabled (workspace_id, enabled),
-  UNIQUE KEY uniq_projects_workspace_id_identifier_enabled (workspace_id, identifier, enabled),
+  UNIQUE KEY uniq_projects_workspace_id_identifier_active (workspace_id, identifier, active),
 
   CONSTRAINT fk_projects_workspace FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Task container';
@@ -2143,13 +2186,18 @@ CREATE TABLE reactions (
   sort_weight  INT NOT NULL DEFAULT 0 COMMENT 'Display order',
   notes        TEXT NULL COMMENT 'Admin notes',
   enabled      BOOLEAN NOT NULL DEFAULT TRUE COMMENT 'Enabled flag',
+  -- Liveness marker scoping the unique key below to live rows: 1 while
+  -- enabled, NULL once soft-deleted, so tombstones leave the index
+  -- rather than colliding with each other. See the soft-delete rule in
+  -- sql/core/conformance/schema/40-soft-delete-uniqueness.sql.
+  active TINYINT UNSIGNED GENERATED ALWAYS AS (IF(enabled, 1, NULL)) VIRTUAL COMMENT 'NULL once soft-deleted; exists only to scope the unique key below to live rows',
   updated_at   TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
   created_at   DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
 
   UNIQUE KEY uniq_reactions_public_id (public_id),
   UNIQUE KEY uniq_reactions_workspace_public_id (workspace_id, public_id),
-  UNIQUE KEY uniq_reactions_user_task_emoji (user_id, task_id, emoji, enabled),
-  UNIQUE KEY uniq_reactions_user_comment_emoji (user_id, comment_id, emoji, enabled),
+  UNIQUE KEY uniq_reactions_user_task_emoji (user_id, task_id, emoji, active),
+  UNIQUE KEY uniq_reactions_user_comment_emoji (user_id, comment_id, emoji, active),
   KEY idx_reactions_task_id_emoji (task_id, emoji),
   KEY idx_reactions_comment_id_emoji (comment_id, emoji),
 
@@ -2435,12 +2483,17 @@ CREATE TABLE task_dependencies (
   sort_weight INT NOT NULL DEFAULT 0 COMMENT 'Display order',
   notes TEXT NULL COMMENT 'Admin notes',
   enabled BOOLEAN NOT NULL DEFAULT TRUE COMMENT 'Enabled flag',
+  -- Liveness marker scoping the unique key below to live rows: 1 while
+  -- enabled, NULL once soft-deleted, so tombstones leave the index
+  -- rather than colliding with each other. See the soft-delete rule in
+  -- sql/core/conformance/schema/40-soft-delete-uniqueness.sql.
+  active TINYINT UNSIGNED GENERATED ALWAYS AS (IF(enabled, 1, NULL)) VIRTUAL COMMENT 'NULL once soft-deleted; exists only to scope the unique key below to live rows',
   updated_at TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
   created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
 
   UNIQUE KEY uniq_task_dependencies_public_id (public_id),
   UNIQUE KEY uniq_task_dependencies_workspace_public_id (workspace_id, public_id),
-  UNIQUE KEY uniq_task_dependencies_edge (from_task_id, to_task_id, kind, enabled),
+  UNIQUE KEY uniq_task_dependencies_edge (from_task_id, to_task_id, kind, active),
   KEY idx_task_dependencies_workspace_from (workspace_id, from_task_id),
   KEY idx_task_dependencies_workspace_to (workspace_id, to_task_id),
   -- Bare to_task_id index for ON DELETE CASCADE on tasks. The workspace-leading
@@ -2543,12 +2596,17 @@ CREATE TABLE task_event_links (
   sort_weight INT NOT NULL DEFAULT 0 COMMENT 'Display order within an event''s linked-task list',
   notes TEXT NULL COMMENT 'Admin notes',
   enabled BOOLEAN NOT NULL DEFAULT TRUE COMMENT 'Enabled flag (soft-disable)',
+  -- Liveness marker scoping the unique key below to live rows: 1 while
+  -- enabled, NULL once soft-deleted, so tombstones leave the index
+  -- rather than colliding with each other. See the soft-delete rule in
+  -- sql/core/conformance/schema/40-soft-delete-uniqueness.sql.
+  active TINYINT UNSIGNED GENERATED ALWAYS AS (IF(enabled, 1, NULL)) VIRTUAL COMMENT 'NULL once soft-deleted; exists only to scope the unique key below to live rows',
   updated_at TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
   created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
 
   UNIQUE KEY uniq_task_event_links_public_id (public_id),
   UNIQUE KEY uniq_task_event_links_workspace_public_id (workspace_id, public_id),
-  UNIQUE KEY uniq_task_event_links_task_event_relation (task_id, event_id, relation, enabled) COMMENT 'At most one enabled link per (task, event, relation)',
+  UNIQUE KEY uniq_task_event_links_task_event_relation (task_id, event_id, relation, active) COMMENT 'At most one live link per (task, event, relation); revoked ones drop out via active',
   KEY idx_task_event_links_workspace_event (workspace_id, event_id, enabled),
   KEY idx_task_event_links_workspace_task (workspace_id, task_id, enabled),
 
@@ -2572,12 +2630,17 @@ CREATE TABLE task_labels (
   sort_weight  INT NOT NULL DEFAULT 0 COMMENT 'Display order',
   notes        TEXT NULL COMMENT 'Admin notes',
   enabled      BOOLEAN NOT NULL DEFAULT TRUE COMMENT 'Enabled flag',
+  -- Liveness marker scoping the unique key below to live rows: 1 while
+  -- enabled, NULL once soft-deleted, so tombstones leave the index
+  -- rather than colliding with each other. See the soft-delete rule in
+  -- sql/core/conformance/schema/40-soft-delete-uniqueness.sql.
+  active TINYINT UNSIGNED GENERATED ALWAYS AS (IF(enabled, 1, NULL)) VIRTUAL COMMENT 'NULL once soft-deleted; exists only to scope the unique key below to live rows',
   updated_at   TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
   created_at   DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
 
   UNIQUE KEY uniq_task_labels_public_id (public_id),
   UNIQUE KEY uniq_task_labels_workspace_public_id (workspace_id, public_id),
-  UNIQUE KEY uniq_task_labels_task_id_label_id_enabled (task_id, label_id, enabled),
+  UNIQUE KEY uniq_task_labels_task_id_label_id_active (task_id, label_id, active),
   KEY idx_task_labels_workspace_id_label_id (workspace_id, label_id),
 
   CONSTRAINT fk_task_labels_workspace FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
@@ -2655,12 +2718,17 @@ CREATE TABLE timebox_tasks (
   sort_weight INT NOT NULL DEFAULT 0 COMMENT 'Display order',
   notes TEXT NULL COMMENT 'Admin notes',
   enabled BOOLEAN NOT NULL DEFAULT TRUE COMMENT 'Enabled flag',
+  -- Liveness marker scoping the unique key below to live rows: 1 while
+  -- enabled, NULL once soft-deleted, so tombstones leave the index
+  -- rather than colliding with each other. See the soft-delete rule in
+  -- sql/core/conformance/schema/40-soft-delete-uniqueness.sql.
+  active TINYINT UNSIGNED GENERATED ALWAYS AS (IF(enabled, 1, NULL)) VIRTUAL COMMENT 'NULL once soft-deleted; exists only to scope the unique key below to live rows',
   updated_at TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
   created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
 
   UNIQUE KEY uniq_timebox_tasks_public_id (public_id),
   UNIQUE KEY uniq_timebox_tasks_workspace_public_id (workspace_id, public_id),
-  UNIQUE KEY uniq_timebox_tasks_timebox_id_task_id_enabled (timebox_id, task_id, enabled),
+  UNIQUE KEY uniq_timebox_tasks_timebox_id_task_id_active (timebox_id, task_id, active),
   KEY idx_timebox_tasks_workspace_id_timebox_id (workspace_id, timebox_id),
   KEY idx_timebox_tasks_task_id (task_id),
 
@@ -2693,12 +2761,17 @@ CREATE TABLE timeboxes (
   sort_weight INT NOT NULL DEFAULT 0 COMMENT 'Display order',
   notes TEXT NULL COMMENT 'Admin notes',
   enabled BOOLEAN NOT NULL DEFAULT TRUE COMMENT 'Enabled flag',
+  -- Liveness marker scoping the unique key below to live rows: 1 while
+  -- enabled, NULL once soft-deleted, so tombstones leave the index
+  -- rather than colliding with each other. See the soft-delete rule in
+  -- sql/core/conformance/schema/40-soft-delete-uniqueness.sql.
+  active TINYINT UNSIGNED GENERATED ALWAYS AS (IF(enabled, 1, NULL)) VIRTUAL COMMENT 'NULL once soft-deleted; exists only to scope the unique key below to live rows',
   updated_at TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
   created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
 
   UNIQUE KEY uniq_timeboxes_public_id (public_id),
   UNIQUE KEY uniq_timeboxes_workspace_public_id (workspace_id, public_id),
-  UNIQUE KEY uniq_timeboxes_workspace_id_name_enabled (workspace_id, name, enabled),
+  UNIQUE KEY uniq_timeboxes_workspace_id_name_active (workspace_id, name, active),
   KEY idx_timeboxes_workspace_id_archived_at (workspace_id, archived_at),
   KEY idx_timeboxes_workspace_id_status_enabled (workspace_id, status, enabled),
   KEY idx_timeboxes_workspace_id_project_id_enabled (workspace_id, project_id, enabled),
@@ -2726,12 +2799,17 @@ CREATE TABLE user_favorites (
   sort_weight      INT NOT NULL DEFAULT 0 COMMENT 'Display order',
   notes            TEXT NULL COMMENT 'Admin notes',
   enabled          BOOLEAN NOT NULL DEFAULT TRUE COMMENT 'Enabled flag',
+  -- Liveness marker scoping the unique key below to live rows: 1 while
+  -- enabled, NULL once soft-deleted, so tombstones leave the index
+  -- rather than colliding with each other. See the soft-delete rule in
+  -- sql/core/conformance/schema/40-soft-delete-uniqueness.sql.
+  active TINYINT UNSIGNED GENERATED ALWAYS AS (IF(enabled, 1, NULL)) VIRTUAL COMMENT 'NULL once soft-deleted; exists only to scope the unique key below to live rows',
   updated_at       TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
   created_at       DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
 
   UNIQUE KEY uniq_user_favorites_public_id (public_id),
   UNIQUE KEY uniq_user_favorites_workspace_public_id (workspace_id, public_id),
-  UNIQUE KEY uniq_user_favorites_user_target (user_id, target_type, target_public_id, enabled),
+  UNIQUE KEY uniq_user_favorites_user_target (user_id, target_type, target_public_id, active),
   KEY idx_user_favorites_workspace_user (workspace_id, user_id),
 
   CONSTRAINT fk_user_favorites_workspace FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
@@ -3244,6 +3322,15 @@ WHERE p.enabled = TRUE;
 -- Each correlated subquery propagates `enabled = TRUE` through the chain
 -- of parent rows it touches, so a disabled user/agent/label/target task
 -- never inflates the count exposed on the detail page.
+--
+-- Archived tasks are included on purpose. Archiving is a listing
+-- decision, not a deletion: the archive room lists archived rows and
+-- links to them, and every task-detail route (detail, infer-state,
+-- transitions, duplicates, steps, handoff, replay) resolves through
+-- this view. Filtering here made all of those 404 for exactly the rows
+-- the archive room advertises. Which tasks a list shows is settled by
+-- picking v_task_list or v_task_list_archived, one level up.
+-- t.enabled = FALSE is soft-deletion and does stay excluded.
 CREATE OR REPLACE VIEW v_task_detail AS
 SELECT
   t.workspace_id,
@@ -3307,8 +3394,7 @@ LEFT JOIN tasks pt
   ON pt.id = t.parent_task_id AND pt.enabled = TRUE
 LEFT JOIN users creator
   ON creator.id = t.created_by_user_id AND creator.enabled = TRUE
-WHERE t.enabled = TRUE
-  AND t.archived_at IS NULL;
+WHERE t.enabled = TRUE;
 
 -- >>> v_task_list.sql
 -- v_task_list

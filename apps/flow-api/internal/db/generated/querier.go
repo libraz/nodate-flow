@@ -251,7 +251,7 @@ type Querier interface {
 	// Count enabled child pages for a given parent. Used to check before deletion.
 	CountChildPages(ctx context.Context, arg CountChildPagesParams) (int64, error)
 	// Count total and completed tasks in a timebox for progress tracking.
-	CountTasksForTimebox(ctx context.Context, timeboxID uint32) (CountTasksForTimeboxRow, error)
+	CountTasksForTimebox(ctx context.Context, arg CountTasksForTimeboxParams) (CountTasksForTimeboxRow, error)
 	// Count unread notifications for a user across all workspaces.
 	// Used by the global notification badge when no workspace is selected.
 	CountUnreadNotifications(ctx context.Context, recipientUserID uint32) (int64, error)
@@ -516,9 +516,11 @@ type Querier interface {
 	FindLabelByPublicId(ctx context.Context, arg FindLabelByPublicIdParams) (FindLabelByPublicIdRow, error)
 	// Find a label by name within a workspace (for MCP resolve).
 	FindLabelByWorkspaceAndName(ctx context.Context, arg FindLabelByWorkspaceAndNameParams) (FindLabelByWorkspaceAndNameRow, error)
-	// Look up a publicly shared lens by its token. Used by unauthenticated
-	// public share endpoints. Only returns enabled + public lenses.
-	FindLensByPublicToken(ctx context.Context, publicToken sql.NullString) (FindLensByPublicTokenRow, error)
+	// Look up a publicly shared lens by the SHA-256 hex of its URL token.
+	// Used by unauthenticated public share endpoints; the caller hashes the
+	// token from the path before calling, so the plaintext never reaches a
+	// query log. Only returns enabled + public lenses.
+	FindLensByPublicTokenHash(ctx context.Context, publicTokenHash sql.NullString) (FindLensByPublicTokenHashRow, error)
 	// Resolve a local-password identity by user email for the login pipeline.
 	// Joins identities with users on email and provider='local'. Also
 	// returns the TOTP columns so the login handler can decide whether
@@ -1515,10 +1517,13 @@ type Querier interface {
 	SetIntakeItemAIScore(ctx context.Context, arg SetIntakeItemAIScoreParams) error
 	// Link an intake item to a converted task.
 	SetIntakeItemTask(ctx context.Context, arg SetIntakeItemTaskParams) error
-	// Revoke public sharing on a lens. Clears the token.
+	// Revoke public sharing on a lens. Clears the token hash so the URL
+	// stops resolving and re-publishing has to mint a fresh token.
 	// No-op if the lens is already private (WHERE is_public = TRUE guard).
 	SetLensPrivate(ctx context.Context, arg SetLensPrivateParams) error
-	// Enable public sharing on a lens. Generates a share URL token.
+	// Enable public sharing on a lens. Stores the SHA-256 hex of the share
+	// URL token minted by the caller; the plaintext is returned to the
+	// publisher once and is not recoverable afterwards.
 	// No-op if the lens is already public (WHERE is_public = FALSE guard).
 	SetLensPublic(ctx context.Context, arg SetLensPublicParams) error
 	// Bind the authenticated user's avatar to a freshly inserted (or dedup-hit)

@@ -44,7 +44,42 @@ FROM timebox_tasks tt
 INNER JOIN tasks t ON t.id = tt.task_id AND t.enabled = TRUE
 WHERE tt.timebox_id = ?
   AND tt.enabled = TRUE
+  -- A timebox may hold tasks the reader is not allowed to see; the
+  -- membership row grants nothing about the task's own visibility.
+  -- The same predicate gates the progress counts, so the two numbers
+  -- describe the same set the caller is shown.
+  AND (
+    CAST(? AS SIGNED) = 1
+    OR
+    (
+      t.visibility = 'public'
+      OR (t.visibility = 'project' AND EXISTS (
+        SELECT 1 FROM project_members pm_vis
+        WHERE pm_vis.project_id = t.project_id
+          AND pm_vis.user_id = CAST(? AS UNSIGNED)
+          AND pm_vis.enabled = TRUE
+      ))
+      OR (t.visibility = 'private' AND (
+        t.created_by_user_id = CAST(? AS UNSIGNED)
+        OR EXISTS (
+          SELECT 1 FROM task_actors ta_vis
+          WHERE ta_vis.task_id = t.id
+            AND ta_vis.kind = 'user'
+            AND ta_vis.user_id = CAST(? AS UNSIGNED)
+            AND ta_vis.enabled = TRUE
+        )
+      ))
+    )
+  )
 `
+
+type CountTasksForTimeboxParams struct {
+	TimeboxID     uint32 `json:"-"`
+	IsElevated    int64  `json:"isElevated"`
+	ActorUserID   int64  `json:"actorUserId"`
+	ActorUserID_2 int64  `json:"actorUserId2"`
+	ActorUserID_3 int64  `json:"actorUserId3"`
+}
 
 type CountTasksForTimeboxRow struct {
 	TotalTasks     int64       `json:"totalTasks"`
@@ -52,8 +87,14 @@ type CountTasksForTimeboxRow struct {
 }
 
 // Count total and completed tasks in a timebox for progress tracking.
-func (q *Queries) CountTasksForTimebox(ctx context.Context, timeboxID uint32) (CountTasksForTimeboxRow, error) {
-	row := q.db.QueryRowContext(ctx, countTasksForTimebox, timeboxID)
+func (q *Queries) CountTasksForTimebox(ctx context.Context, arg CountTasksForTimeboxParams) (CountTasksForTimeboxRow, error) {
+	row := q.db.QueryRowContext(ctx, countTasksForTimebox,
+		arg.TimeboxID,
+		arg.IsElevated,
+		arg.ActorUserID,
+		arg.ActorUserID_2,
+		arg.ActorUserID_3,
+	)
 	var i CountTasksForTimeboxRow
 	err := row.Scan(&i.TotalTasks, &i.CompletedTasks)
 	return i, err
@@ -205,14 +246,45 @@ FROM timebox_tasks tt
 INNER JOIN tasks t ON t.id = tt.task_id AND t.enabled = TRUE
 WHERE tt.timebox_id = ?
   AND tt.enabled = TRUE
+  -- A timebox may hold tasks the reader is not allowed to see; the
+  -- membership row grants nothing about the task's own visibility.
+  -- The same predicate gates the progress counts, so the two numbers
+  -- describe the same set the caller is shown.
+  AND (
+    CAST(? AS SIGNED) = 1
+    OR
+    (
+      t.visibility = 'public'
+      OR (t.visibility = 'project' AND EXISTS (
+        SELECT 1 FROM project_members pm_vis
+        WHERE pm_vis.project_id = t.project_id
+          AND pm_vis.user_id = CAST(? AS UNSIGNED)
+          AND pm_vis.enabled = TRUE
+      ))
+      OR (t.visibility = 'private' AND (
+        t.created_by_user_id = CAST(? AS UNSIGNED)
+        OR EXISTS (
+          SELECT 1 FROM task_actors ta_vis
+          WHERE ta_vis.task_id = t.id
+            AND ta_vis.kind = 'user'
+            AND ta_vis.user_id = CAST(? AS UNSIGNED)
+            AND ta_vis.enabled = TRUE
+        )
+      ))
+    )
+  )
 ORDER BY t.priority DESC, t.created_at ASC, t.id ASC
 LIMIT ? OFFSET ?
 `
 
 type ListTasksForTimeboxParams struct {
-	TimeboxID uint32 `json:"-"`
-	Limit     int32  `json:"limit"`
-	Offset    int32  `json:"offset"`
+	TimeboxID     uint32 `json:"-"`
+	IsElevated    int64  `json:"isElevated"`
+	ActorUserID   int64  `json:"actorUserId"`
+	ActorUserID_2 int64  `json:"actorUserId2"`
+	ActorUserID_3 int64  `json:"actorUserId3"`
+	Limit         int32  `json:"limit"`
+	Offset        int32  `json:"offset"`
 }
 
 type ListTasksForTimeboxRow struct {
@@ -230,7 +302,15 @@ type ListTasksForTimeboxRow struct {
 
 // List tasks belonging to a timebox with pagination.
 func (q *Queries) ListTasksForTimebox(ctx context.Context, arg ListTasksForTimeboxParams) ([]ListTasksForTimeboxRow, error) {
-	rows, err := q.db.QueryContext(ctx, listTasksForTimebox, arg.TimeboxID, arg.Limit, arg.Offset)
+	rows, err := q.db.QueryContext(ctx, listTasksForTimebox,
+		arg.TimeboxID,
+		arg.IsElevated,
+		arg.ActorUserID,
+		arg.ActorUserID_2,
+		arg.ActorUserID_3,
+		arg.Limit,
+		arg.Offset,
+	)
 	if err != nil {
 		return nil, err
 	}

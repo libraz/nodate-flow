@@ -4,6 +4,15 @@
 -- Each correlated subquery propagates `enabled = TRUE` through the chain
 -- of parent rows it touches, so a disabled user/agent/label/target task
 -- never inflates the count exposed on the detail page.
+--
+-- Archived tasks are included on purpose. Archiving is a listing
+-- decision, not a deletion: the archive room lists archived rows and
+-- links to them, and every task-detail route (detail, infer-state,
+-- transitions, duplicates, steps, handoff, replay) resolves through
+-- this view. Filtering here made all of those 404 for exactly the rows
+-- the archive room advertises. Which tasks a list shows is settled by
+-- picking v_task_list or v_task_list_archived, one level up.
+-- t.enabled = FALSE is soft-deletion and does stay excluded.
 CREATE OR REPLACE VIEW v_task_detail AS
 SELECT
   t.workspace_id,
@@ -67,5 +76,4 @@ LEFT JOIN tasks pt
   ON pt.id = t.parent_task_id AND pt.enabled = TRUE
 LEFT JOIN users creator
   ON creator.id = t.created_by_user_id AND creator.enabled = TRUE
-WHERE t.enabled = TRUE
-  AND t.archived_at IS NULL;
+WHERE t.enabled = TRUE;

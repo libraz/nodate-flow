@@ -161,20 +161,73 @@ SELECT
   tt.title AS target_task_title,
   rs.created_at
 FROM relation_suggestions rs
-INNER JOIN tasks st ON st.id = rs.source_task_id
-INNER JOIN tasks tt ON tt.id = rs.target_task_id
+INNER JOIN tasks st ON st.id = rs.source_task_id AND st.enabled = TRUE
+INNER JOIN tasks tt ON tt.id = rs.target_task_id AND tt.enabled = TRUE
 WHERE rs.workspace_id = ?
   AND (rs.source_task_id = ? OR rs.target_task_id = ?)
   AND rs.status = 'pending'
+  -- Both titles are on the wire, so a suggestion is listable only when
+  -- the actor may see both ends. Elevated roles skip the check.
+  AND (
+    CAST(? AS SIGNED) = 1
+    OR (
+      (
+        st.visibility = 'public'
+        OR (st.visibility = 'project' AND EXISTS (
+          SELECT 1 FROM project_members pm_st
+          WHERE pm_st.project_id = st.project_id
+            AND pm_st.user_id = CAST(? AS UNSIGNED)
+            AND pm_st.enabled = TRUE
+        ))
+        OR (st.visibility = 'private' AND (
+          st.created_by_user_id = CAST(? AS UNSIGNED)
+          OR EXISTS (
+            SELECT 1 FROM task_actors ta_st
+            WHERE ta_st.task_id = st.id
+              AND ta_st.kind = 'user'
+              AND ta_st.user_id = CAST(? AS UNSIGNED)
+              AND ta_st.enabled = TRUE
+          )
+        ))
+      )
+      AND
+      (
+        tt.visibility = 'public'
+        OR (tt.visibility = 'project' AND EXISTS (
+          SELECT 1 FROM project_members pm_tt
+          WHERE pm_tt.project_id = tt.project_id
+            AND pm_tt.user_id = CAST(? AS UNSIGNED)
+            AND pm_tt.enabled = TRUE
+        ))
+        OR (tt.visibility = 'private' AND (
+          tt.created_by_user_id = CAST(? AS UNSIGNED)
+          OR EXISTS (
+            SELECT 1 FROM task_actors ta_tt
+            WHERE ta_tt.task_id = tt.id
+              AND ta_tt.kind = 'user'
+              AND ta_tt.user_id = CAST(? AS UNSIGNED)
+              AND ta_tt.enabled = TRUE
+          )
+        ))
+      )
+    )
+  )
 ORDER BY rs.confidence DESC, rs.id DESC
 LIMIT ?
 `
 
 type ListPendingSuggestionsForTaskParams struct {
-	WorkspaceID  uint32 `json:"-"`
-	SourceTaskID uint32 `json:"-"`
-	TargetTaskID uint32 `json:"-"`
-	Limit        int32  `json:"limit"`
+	WorkspaceID   uint32 `json:"-"`
+	SourceTaskID  uint32 `json:"-"`
+	TargetTaskID  uint32 `json:"-"`
+	IsElevated    int64  `json:"isElevated"`
+	ActorUserID   int64  `json:"actorUserId"`
+	ActorUserID_2 int64  `json:"actorUserId2"`
+	ActorUserID_3 int64  `json:"actorUserId3"`
+	ActorUserID_4 int64  `json:"actorUserId4"`
+	ActorUserID_5 int64  `json:"actorUserId5"`
+	ActorUserID_6 int64  `json:"actorUserId6"`
+	Limit         int32  `json:"limit"`
 }
 
 type ListPendingSuggestionsForTaskRow struct {
@@ -196,6 +249,13 @@ func (q *Queries) ListPendingSuggestionsForTask(ctx context.Context, arg ListPen
 		arg.WorkspaceID,
 		arg.SourceTaskID,
 		arg.TargetTaskID,
+		arg.IsElevated,
+		arg.ActorUserID,
+		arg.ActorUserID_2,
+		arg.ActorUserID_3,
+		arg.ActorUserID_4,
+		arg.ActorUserID_5,
+		arg.ActorUserID_6,
 		arg.Limit,
 	)
 	if err != nil {
@@ -242,18 +302,71 @@ SELECT
   rs.created_at,
   COUNT(*) OVER() AS total
 FROM relation_suggestions rs
-INNER JOIN tasks st ON st.id = rs.source_task_id
-INNER JOIN tasks tt ON tt.id = rs.target_task_id
+INNER JOIN tasks st ON st.id = rs.source_task_id AND st.enabled = TRUE
+INNER JOIN tasks tt ON tt.id = rs.target_task_id AND tt.enabled = TRUE
 WHERE rs.workspace_id = ?
   AND rs.status = 'pending'
+  -- Both titles are on the wire, so a suggestion is listable only when
+  -- the actor may see both ends. Elevated roles skip the check.
+  AND (
+    CAST(? AS SIGNED) = 1
+    OR (
+      (
+        st.visibility = 'public'
+        OR (st.visibility = 'project' AND EXISTS (
+          SELECT 1 FROM project_members pm_st
+          WHERE pm_st.project_id = st.project_id
+            AND pm_st.user_id = CAST(? AS UNSIGNED)
+            AND pm_st.enabled = TRUE
+        ))
+        OR (st.visibility = 'private' AND (
+          st.created_by_user_id = CAST(? AS UNSIGNED)
+          OR EXISTS (
+            SELECT 1 FROM task_actors ta_st
+            WHERE ta_st.task_id = st.id
+              AND ta_st.kind = 'user'
+              AND ta_st.user_id = CAST(? AS UNSIGNED)
+              AND ta_st.enabled = TRUE
+          )
+        ))
+      )
+      AND
+      (
+        tt.visibility = 'public'
+        OR (tt.visibility = 'project' AND EXISTS (
+          SELECT 1 FROM project_members pm_tt
+          WHERE pm_tt.project_id = tt.project_id
+            AND pm_tt.user_id = CAST(? AS UNSIGNED)
+            AND pm_tt.enabled = TRUE
+        ))
+        OR (tt.visibility = 'private' AND (
+          tt.created_by_user_id = CAST(? AS UNSIGNED)
+          OR EXISTS (
+            SELECT 1 FROM task_actors ta_tt
+            WHERE ta_tt.task_id = tt.id
+              AND ta_tt.kind = 'user'
+              AND ta_tt.user_id = CAST(? AS UNSIGNED)
+              AND ta_tt.enabled = TRUE
+          )
+        ))
+      )
+    )
+  )
 ORDER BY rs.created_at DESC, rs.id DESC
 LIMIT ? OFFSET ?
 `
 
 type ListPendingSuggestionsForWorkspaceParams struct {
-	WorkspaceID uint32 `json:"-"`
-	Limit       int32  `json:"limit"`
-	Offset      int32  `json:"offset"`
+	WorkspaceID   uint32 `json:"-"`
+	IsElevated    int64  `json:"isElevated"`
+	ActorUserID   int64  `json:"actorUserId"`
+	ActorUserID_2 int64  `json:"actorUserId2"`
+	ActorUserID_3 int64  `json:"actorUserId3"`
+	ActorUserID_4 int64  `json:"actorUserId4"`
+	ActorUserID_5 int64  `json:"actorUserId5"`
+	ActorUserID_6 int64  `json:"actorUserId6"`
+	Limit         int32  `json:"limit"`
+	Offset        int32  `json:"offset"`
 }
 
 type ListPendingSuggestionsForWorkspaceRow struct {
@@ -271,7 +384,18 @@ type ListPendingSuggestionsForWorkspaceRow struct {
 
 // List pending suggestions for a workspace with pagination.
 func (q *Queries) ListPendingSuggestionsForWorkspace(ctx context.Context, arg ListPendingSuggestionsForWorkspaceParams) ([]ListPendingSuggestionsForWorkspaceRow, error) {
-	rows, err := q.db.QueryContext(ctx, listPendingSuggestionsForWorkspace, arg.WorkspaceID, arg.Limit, arg.Offset)
+	rows, err := q.db.QueryContext(ctx, listPendingSuggestionsForWorkspace,
+		arg.WorkspaceID,
+		arg.IsElevated,
+		arg.ActorUserID,
+		arg.ActorUserID_2,
+		arg.ActorUserID_3,
+		arg.ActorUserID_4,
+		arg.ActorUserID_5,
+		arg.ActorUserID_6,
+		arg.Limit,
+		arg.Offset,
+	)
 	if err != nil {
 		return nil, err
 	}
