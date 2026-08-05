@@ -600,6 +600,34 @@ func lastColon(s string) int {
 	return -1
 }
 
+// signalsForOccurrenceDay narrows the rows to the occurrence day the
+// caller is asserting about.
+//
+// The job scans every workspace, which is what it does in production, so
+// a tick raised by a test running in parallel expands this event's
+// recurrence too — over that test's own window, which can reach
+// occurrence days the present test never asked about. Counting every row
+// the event ever produced therefore counts other tests' ticks, and the
+// total drifts with how many of them ran first.
+//
+// Scoping the question to one day is safe because the occurrence day is
+// part of external_id and (workspace_id, source, external_id) is unique:
+// no matter how many ticks expand it, a given day can land at most once.
+// Tests that assert on a single non-recurring event need none of this,
+// since such an event has only the one occurrence day to begin with.
+func signalsForOccurrenceDay(rows []signalRow, day string) []signalRow {
+	out := make([]signalRow, 0, len(rows))
+	for _, r := range rows {
+		if !r.ExternalID.Valid {
+			continue
+		}
+		if i := lastColon(r.ExternalID.String); i >= 0 && r.ExternalID.String[i+1:] == day {
+			out = append(out, r)
+		}
+	}
+	return out
+}
+
 // TestRecurringEventFiresOnNonBaseDay is the core P2-8 fix: a daily recurring
 // event must emit event_day_arrived on a day after its base start day. The
 // base sits two days before the tick window; the worker must expand the rule
@@ -628,10 +656,10 @@ func TestRecurringEventFiresOnNonBaseDay(t *testing.T) {
 	tick := time.Date(2026, time.August, 4, 0, 0, 30, 0, time.UTC)
 	require.NoError(t, job.Tick(context.Background(), tick), "tick should succeed")
 
-	signals := loadSignalsForEvent(t, h.db, tt.WorkspaceID, eventInternalID)
-	require.Lenf(t, signals, 1, "the 08-04 occurrence must fire exactly once, got %d", len(signals))
-	require.Equal(t, []string{"2026-08-04"}, externalIDDaySuffixes(signals),
-		"the recurring event must fire on the non-base day 2026-08-04")
+	signals := signalsForOccurrenceDay(
+		loadSignalsForEvent(t, h.db, tt.WorkspaceID, eventInternalID), "2026-08-04")
+	require.Lenf(t, signals, 1,
+		"the non-base day 2026-08-04 must fire exactly once, got %d", len(signals))
 
 	// Payload start instant must be the occurrence start (08-04 09:00Z), not
 	// the base (08-01 09:00Z) — downstream judges key off the live instant.
@@ -667,7 +695,8 @@ func TestRecurringExceptionDoesNotFire(t *testing.T) {
 	tick := time.Date(2026, time.August, 4, 0, 0, 30, 0, time.UTC)
 	require.NoError(t, job.Tick(context.Background(), tick), "tick should succeed")
 
-	signals := loadSignalsForEvent(t, h.db, tt.WorkspaceID, eventInternalID)
+	signals := signalsForOccurrenceDay(
+		loadSignalsForEvent(t, h.db, tt.WorkspaceID, eventInternalID), "2026-08-04")
 	require.Emptyf(t, signals,
 		"an occurrence excluded by recurrence_exceptions must not fire, got %d", len(signals))
 }
@@ -696,7 +725,8 @@ func TestRecurringPastRecurrenceEndDoesNotFire(t *testing.T) {
 	tick := time.Date(2026, time.August, 4, 0, 0, 30, 0, time.UTC)
 	require.NoError(t, job.Tick(context.Background(), tick), "tick should succeed")
 
-	signals := loadSignalsForEvent(t, h.db, tt.WorkspaceID, eventInternalID)
+	signals := signalsForOccurrenceDay(
+		loadSignalsForEvent(t, h.db, tt.WorkspaceID, eventInternalID), "2026-08-04")
 	require.Emptyf(t, signals,
 		"an occurrence past recurrence_end must not fire, got %d", len(signals))
 }
