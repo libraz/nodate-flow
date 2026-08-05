@@ -2,7 +2,6 @@ package helpers
 
 import (
 	"bytes"
-	"context"
 	"crypto/rand"
 	"database/sql"
 	"encoding/hex"
@@ -12,7 +11,6 @@ import (
 	"net/http"
 	"sync"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/require"
 )
@@ -165,94 +163,6 @@ func CleanupTenant(t *testing.T, tt *TestTenant) {
 	}
 	_, _ = io.Copy(io.Discard, resp.Body)
 	_ = resp.Body.Close()
-}
-
-// PurgeWorkspace removes every row that belongs to the supplied
-// workspace public id, in foreign-key order, using direct SQL.
-//
-// IMPORTANT: this is the ONLY direct-SQL exception in the test suite.
-// It exists because the workspace API does not yet expose a delete
-// operation. Once the workspace delete API lands, callers should switch to that route
-// and PurgeWorkspace should be deleted.
-//
-// The implementation toggles FOREIGN_KEY_CHECKS off so deletion order
-// does not need to follow the dependency graph by hand. The list of
-// tables intentionally enumerates every workspace-scoped table; tables
-// that are workspace-scoped indirectly (e.g. comments via tasks) are
-// pruned by the parent CASCADE.
-func PurgeWorkspace(t *testing.T, db *sql.DB, workspacePublicID string) {
-	t.Helper()
-	if workspacePublicID == "" {
-		return
-	}
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-
-	tx, err := db.BeginTx(ctx, nil)
-	require.NoError(t, err)
-	defer func() { _ = tx.Rollback() }()
-
-	if _, err := tx.ExecContext(ctx, "SET FOREIGN_KEY_CHECKS = 0"); err != nil {
-		require.NoError(t, err)
-	}
-
-	// Lookup the internal id once.
-	var wsID uint32
-	err = tx.QueryRowContext(ctx,
-		`SELECT id FROM workspaces WHERE public_id = UUID_TO_BIN(?, 0) LIMIT 1`,
-		workspacePublicID).Scan(&wsID)
-	if err == sql.ErrNoRows {
-		// Nothing to purge; restore checks and return.
-		_, _ = tx.ExecContext(ctx, "SET FOREIGN_KEY_CHECKS = 1")
-		require.NoError(t, tx.Commit())
-		return
-	}
-	require.NoError(t, err)
-
-	// FK order: leaf rows first, parents last. Tables not directly
-	// keyed on workspace_id are deleted via their parent (tasks,
-	// projects) explicitly to avoid leaving orphans.
-	stmts := []string{
-		`DELETE FROM signals          WHERE workspace_id = ?`,
-		`DELETE FROM events           WHERE workspace_id = ?`,
-		`DELETE FROM ai_invocations   WHERE workspace_id = ?`,
-		`DELETE FROM mcp_invocations  WHERE workspace_id = ?`,
-		`DELETE FROM mcp_tokens       WHERE workspace_id = ?`,
-		`DELETE FROM ai_agents        WHERE workspace_id = ?`,
-		`DELETE FROM ai_models        WHERE workspace_id = ?`,
-		`DELETE FROM ai_providers     WHERE workspace_id = ?`,
-		`DELETE FROM ai_settings      WHERE workspace_id = ?`,
-		`DELETE FROM attachments      WHERE workspace_id = ?`,
-		// storage_objects rows scoped to this workspace must be wiped
-		// AFTER attachments because of fk_attachments_storage_object.
-		// User-scoped (avatar) rows are owned via owner_user_id and
-		// fall under fk_storage_objects_owner_user CASCADE when the
-		// user is deleted by workspace_members CASCADE downstream.
-		`DELETE FROM storage_objects  WHERE workspace_id = ?`,
-		`DELETE FROM comments         WHERE workspace_id = ?`,
-		`DELETE FROM task_event_links  WHERE workspace_id = ?`,
-		`DELETE FROM task_constraints WHERE workspace_id = ?`,
-		`DELETE FROM task_dependencies WHERE workspace_id = ?`,
-		`DELETE FROM task_actors      WHERE workspace_id = ?`,
-		`DELETE FROM tasks            WHERE workspace_id = ?`,
-		`DELETE FROM project_members  WHERE workspace_id = ?`,
-		`DELETE FROM projects         WHERE workspace_id = ?`,
-		`DELETE FROM calendar_public_share_events WHERE workspace_id = ?`,
-		`DELETE FROM calendar_public_shares       WHERE workspace_id = ?`,
-		`DELETE FROM audit_logs       WHERE workspace_id = ?`,
-		`DELETE FROM workspace_members WHERE workspace_id = ?`,
-		`DELETE FROM workspaces       WHERE id = ?`,
-	}
-	for _, q := range stmts {
-		if _, err := tx.ExecContext(ctx, q, wsID); err != nil {
-			t.Logf("PurgeWorkspace: %q: %v", q, err)
-		}
-	}
-
-	if _, err := tx.ExecContext(ctx, "SET FOREIGN_KEY_CHECKS = 1"); err != nil {
-		require.NoError(t, err)
-	}
-	require.NoError(t, tx.Commit())
 }
 
 // doJSON sends a JSON request and decodes the JSON response body into

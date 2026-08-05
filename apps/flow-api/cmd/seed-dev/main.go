@@ -63,7 +63,7 @@ import (
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated/calendar"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
-	"github.com/libraz/nodate-flow/apps/flow-api/internal/tasknumber"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/taskcreate"
 )
 
 //go:embed locales/*.json
@@ -488,7 +488,11 @@ func ensureProject(ctx context.Context, db *sql.DB, q *generated.Queries, wsID u
 
 // ensureTasks returns the internal id of the lowest-numbered seed task,
 // which the caller uses as the link anchor for task_event_links.
-func ensureTasks(ctx context.Context, db *sql.DB, q *generated.Queries, wsID, projID, userID uint32, l seedLocale, logger *slog.Logger) (uint32, error) {
+//
+// The sqlc Queries handle is no longer needed here: taskcreate.New takes
+// the transaction directly. The parameter stays so the seed helpers keep a
+// uniform signature.
+func ensureTasks(ctx context.Context, db *sql.DB, _ *generated.Queries, wsID, projID, userID uint32, l seedLocale, logger *slog.Logger) (uint32, error) {
 	var count int
 	if err := db.QueryRowContext(ctx,
 		"SELECT COUNT(*) FROM tasks WHERE workspace_id = ? AND project_id = ? AND enabled = TRUE",
@@ -502,26 +506,17 @@ func ensureTasks(ctx context.Context, db *sql.DB, q *generated.Queries, wsID, pr
 			return 0, err
 		}
 		defer tx.Rollback() //nolint:errcheck
-		qtx := q.WithTx(tx)
 
 		createdBy := sql.NullInt32{Int32: int32(userID), Valid: true} //#nosec G115 -- user id sourced from seed flow, fits int32
 		for _, s := range l.Tasks {
-			nextNum, err := tasknumber.Allocate(ctx, qtx, wsID, projID)
-			if err != nil {
-				return 0, fmt.Errorf("assign task number: %w", err)
-			}
-			if _, err := qtx.CreateTask(ctx, generated.CreateTaskParams{
-				PublicID:        types.New(),
-				WorkspaceID:     wsID,
-				ProjectID:       projID,
-				CreatedByUserID: createdBy,
-				UpdatedByUserID: createdBy,
-				TaskNumber:      uint32(nextNum), //#nosec G115 -- task_number is per-project sequence, fits uint32
-				Title:           s.Title,
-				Priority:        s.Priority,
-				Visibility:      generated.TasksVisibilityPublic,
+			if _, err := taskcreate.New(ctx, tx, taskcreate.Args{
+				WorkspaceID: wsID,
+				ProjectID:   projID,
+				ActorUserID: createdBy,
+				Title:       s.Title,
+				Priority:    s.Priority,
 			}); err != nil {
-				return 0, err
+				return 0, fmt.Errorf("create seed task: %w", err)
 			}
 		}
 		if err := tx.Commit(); err != nil {

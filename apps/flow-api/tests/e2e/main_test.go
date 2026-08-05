@@ -19,6 +19,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/libraz/nodate-flow/apps/flow-api/tests/helpers"
+	"github.com/libraz/nodate-flow/packages/go-shared/testhelpers"
 )
 
 var (
@@ -27,16 +28,15 @@ var (
 	testStorage   *helpers.StorageBundle
 )
 
-// TestMain bootstraps the shared MySQL testcontainer and HTTP server
-// once for the whole package so parallel tests all talk to the same
-// harness. When NF_TEST_INTEGRATION is unset, it simply runs m.Run()
-// and every test skips via skipIfNoIntegration.
+// TestMain bootstraps the shared MySQL testcontainer, MinIO, and the
+// HTTP server once for the whole package so parallel tests all talk to
+// the same harness. When NF_TEST_INTEGRATION is unset, it simply runs
+// m.Run() and every test skips via skipIfNoIntegration.
 //
-// MinIO is started lazily and bound into the test server so the
-// attachment / avatar dedup tests can exercise the real S3 path. If
-// MinIO startup fails (no Docker, image pull error) the suite still
-// runs; tests that require storage skip themselves via
-// requireStorage(t).
+// Once integration mode is on, a missing prerequisite is a failure and
+// not a skip: the suite was asked to run, so reporting success after
+// quietly running nothing would hide exactly the regressions (cross
+// tenant access, IDOR, secret leakage) it exists to catch.
 func TestMain(m *testing.M) {
 	if os.Getenv("NF_TEST_INTEGRATION") == "" {
 		os.Exit(m.Run())
@@ -47,17 +47,17 @@ func TestMain(m *testing.M) {
 		os.Exit(1)
 	}
 
-	// Best-effort MinIO bootstrap; storage-dependent tests gate on
-	// testStorage being non-nil so a missing MinIO does not break the
-	// rest of the suite.
-	if minioInst, mErr := helpers.EnsureSharedMinIO(); mErr == nil {
-		if bundle, bErr := helpers.NewStorageBundle(minioInst); bErr == nil {
-			testStorage = bundle
-		} else {
-			fmt.Fprintln(os.Stderr, "e2e: build storage bundle:", bErr)
-		}
-	} else {
-		fmt.Fprintln(os.Stderr, "e2e: minio unavailable, storage tests will skip:", mErr)
+	// MinIO backs the attachment / avatar dedup tests against the real
+	// S3 path; without it those tests have nothing to assert on.
+	minioInst, err := helpers.EnsureSharedMinIO()
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "e2e: start shared minio:", err)
+		os.Exit(1)
+	}
+	testStorage, err = helpers.NewStorageBundle(minioInst)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "e2e: build storage bundle:", err)
+		os.Exit(1)
 	}
 
 	srv, cleanup, err := helpers.NewTestServerWithStorage(inst.DB, testStorage)
@@ -73,15 +73,13 @@ func TestMain(m *testing.M) {
 	os.Exit(code)
 }
 
-// requireStorage skips the test when the shared MinIO container failed
-// to start. Tests that exercise attachment / avatar uploads call this
-// at the top so the rest of the suite stays runnable on machines
-// without Docker volume support for MinIO.
+// requireStorage asserts the shared MinIO bundle is wired. Tests that
+// exercise attachment / avatar uploads call this at the top; TestMain
+// has already aborted the run if the bundle could not be built, so this
+// only fires when a test reaches storage outside the bootstrapped path.
 func requireStorage(t *testing.T) {
 	t.Helper()
-	if testStorage == nil {
-		t.Skip("storage tests require MinIO; bundle not initialised")
-	}
+	require.NotNil(t, testStorage, "storage bundle not initialised")
 }
 
 func mustStartHarness(t *testing.T) {
@@ -94,11 +92,21 @@ func mustStartHarness(t *testing.T) {
 // runs stay green without Docker.
 func skipIfNoIntegration(t *testing.T) {
 	t.Helper()
-	if testing.Short() {
-		t.Skip("skipping integration test in -short mode")
-	}
-	if os.Getenv("NF_TEST_INTEGRATION") == "" {
-		t.Skip("set NF_TEST_INTEGRATION=1 to run e2e tests")
+	testhelpers.SkipUnlessIntegration(t)
+}
+
+// requireAIMock skips a test whose assertions only hold when the mock
+// orchestrator answers for the LLM. The suite runs twice, once with
+// NF_FLOW_AI_MOCK set and once without, and in the second pass a
+// workspace with no provider configured correctly refuses the call —
+// so a test that needs a deterministic completion has nothing to assert
+// on. This is the mirror of the guard the provider-failure tests use to
+// exclude themselves from the mock pass.
+func requireAIMock(t *testing.T) {
+	t.Helper()
+	switch os.Getenv("NF_FLOW_AI_MOCK") {
+	case "", "0", "false":
+		t.Skip("NF_FLOW_AI_MOCK is unset; without the mock orchestrator no provider answers this call")
 	}
 }
 

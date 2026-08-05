@@ -18,6 +18,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/libraz/nodate-flow/apps/flow-api/tests/helpers"
+	"github.com/libraz/nodate-flow/packages/go-shared/testhelpers"
 )
 
 var (
@@ -49,12 +50,7 @@ func TestMain(m *testing.M) {
 
 func skipIfNoIntegration(t *testing.T) {
 	t.Helper()
-	if testing.Short() {
-		t.Skip("skipping integration test in -short mode")
-	}
-	if os.Getenv("NF_TEST_INTEGRATION") == "" {
-		t.Skip("set NF_TEST_INTEGRATION=1 to run sql view tests")
-	}
+	testhelpers.SkipUnlessIntegration(t)
 }
 
 // fixture bundles the IDs the test needs to assert on the views.

@@ -43,8 +43,7 @@ type SeededAgent struct {
 // The handler-level POST /workspaces/{wsId}/ai/providers endpoint
 // requires a real encryption Cipher and an encrypted api key, neither
 // of which is wired through the test harness. Instead this helper
-// inserts the rows directly under FOREIGN_KEY_CHECKS so the seed stays
-// fully self-contained.
+// inserts the rows directly so the seed stays fully self-contained.
 //
 // Each call uses random suffixes for the provider / model / agent names
 // so parallel-running tests inside the same workspace never collide.
@@ -74,11 +73,12 @@ func SeedAgent(t *testing.T, db *sql.DB, workspacePublicID string, opts SeedAgen
 	require.NoError(t, err)
 	defer func() { _ = tx.Rollback() }()
 
-	// FOREIGN_KEY_CHECKS off keeps the helper resilient if a later
-	// schema change adds new FKs without exposing matching seed rows.
-	if _, err := tx.ExecContext(ctx, "SET FOREIGN_KEY_CHECKS = 0"); err != nil {
-		require.NoError(t, err)
-	}
+	// The three inserts below run in dependency order, each referencing
+	// the id the previous one returned, so foreign key enforcement stays
+	// on. Switching it off would make a broken seed look like a working
+	// one, and because the session variable outlives a rollback it would
+	// hand the connection back to the pool with enforcement disabled for
+	// whatever test picks it up next.
 
 	// ai_providers — api_key_ciphertext stays a meaningless byte blob
 	// because the orchestrator path under test (handoff) never calls
@@ -150,9 +150,6 @@ func SeedAgent(t *testing.T, db *sql.DB, workspacePublicID string, opts SeedAgen
 	require.NoError(t, err, "insert ai_agents")
 	agentInternalID := lastInsertID(t, res)
 
-	if _, err := tx.ExecContext(ctx, "SET FOREIGN_KEY_CHECKS = 1"); err != nil {
-		require.NoError(t, err)
-	}
 	require.NoError(t, tx.Commit())
 
 	return &SeededAgent{

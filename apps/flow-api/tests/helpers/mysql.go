@@ -160,11 +160,30 @@ func waitForPing(ctx context.Context, db *sql.DB, timeout time.Duration) error {
 // Cross-layer foreign keys live in sql/flow/constraints and must be applied
 // after every CREATE TABLE of both layers, because they reference tables from
 // each.
+//
+// Everything runs on one pinned connection. FOREIGN_KEY_CHECKS and
+// UNIQUE_CHECKS are session state, so issuing them against the pool
+// only happens to work while the pool holds a single connection: the
+// statements they are meant to cover could otherwise be dealt a
+// different session, and the relaxed session could be handed to a test
+// later on. Pinning makes both properties hold by construction.
 func applySchema(ctx context.Context, db *sql.DB) error {
 	root, err := repoRoot()
 	if err != nil {
 		return err
 	}
+
+	conn, err := db.Conn(ctx)
+	if err != nil {
+		return err
+	}
+	defer func() {
+		// Restore before the connection returns to the pool, whatever
+		// happened above.
+		_, _ = conn.ExecContext(ctx, "SET UNIQUE_CHECKS = 1")
+		_, _ = conn.ExecContext(ctx, "SET FOREIGN_KEY_CHECKS = 1")
+		_ = conn.Close()
+	}()
 	coreTablesDir := filepath.Join(root, "sql", "core", "tables")
 	flowTablesDir := filepath.Join(root, "sql", "flow", "tables")
 	constraintsDir := filepath.Join(root, "sql", "flow", "constraints")
@@ -172,31 +191,24 @@ func applySchema(ctx context.Context, db *sql.DB) error {
 	coreTriggersDir := filepath.Join(root, "sql", "core", "triggers")
 	flowTriggersDir := filepath.Join(root, "sql", "flow", "triggers")
 
-	if _, err := db.ExecContext(ctx, "SET FOREIGN_KEY_CHECKS = 0"); err != nil {
+	if _, err := conn.ExecContext(ctx, "SET FOREIGN_KEY_CHECKS = 0"); err != nil {
 		return err
 	}
-	if _, err := db.ExecContext(ctx, "SET UNIQUE_CHECKS = 0"); err != nil {
+	if _, err := conn.ExecContext(ctx, "SET UNIQUE_CHECKS = 0"); err != nil {
 		return err
 	}
 
-	if err := execSQLDirs(ctx, db, coreTablesDir, flowTablesDir); err != nil {
+	if err := execSQLDirs(ctx, conn, coreTablesDir, flowTablesDir); err != nil {
 		return fmt.Errorf("tables: %w", err)
 	}
-	if err := execSQLDir(ctx, db, constraintsDir); err != nil {
+	if err := execSQLDir(ctx, conn, constraintsDir); err != nil {
 		return fmt.Errorf("constraints: %w", err)
 	}
-	if err := execSQLDir(ctx, db, viewsDir); err != nil {
+	if err := execSQLDir(ctx, conn, viewsDir); err != nil {
 		return fmt.Errorf("views: %w", err)
 	}
-	if err := execSQLDirs(ctx, db, coreTriggersDir, flowTriggersDir); err != nil {
+	if err := execSQLDirs(ctx, conn, coreTriggersDir, flowTriggersDir); err != nil {
 		return fmt.Errorf("triggers: %w", err)
-	}
-
-	if _, err := db.ExecContext(ctx, "SET UNIQUE_CHECKS = 1"); err != nil {
-		return err
-	}
-	if _, err := db.ExecContext(ctx, "SET FOREIGN_KEY_CHECKS = 1"); err != nil {
-		return err
 	}
 	return nil
 }
@@ -209,16 +221,16 @@ func applySchema(ctx context.Context, db *sql.DB) error {
 // checks disabled, and no delete path may depend on the order InnoDB walks
 // a cascade chain. See sql/build-schema.sh for the two ON DELETE RESTRICT
 // edges that make that rule worth stating.
-func execSQLDirs(ctx context.Context, db *sql.DB, dirs ...string) error {
+func execSQLDirs(ctx context.Context, conn *sql.Conn, dirs ...string) error {
 	for _, dir := range dirs {
-		if err := execSQLDir(ctx, db, dir); err != nil {
+		if err := execSQLDir(ctx, conn, dir); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func execSQLDir(ctx context.Context, db *sql.DB, dir string) error {
+func execSQLDir(ctx context.Context, conn *sql.Conn, dir string) error {
 	entries, err := os.ReadDir(dir)
 	if err != nil {
 		return err
@@ -236,7 +248,7 @@ func execSQLDir(ctx context.Context, db *sql.DB, dir string) error {
 			if strings.TrimSpace(stmt) == "" {
 				continue
 			}
-			if _, err := db.ExecContext(ctx, stmt); err != nil {
+			if _, err := conn.ExecContext(ctx, stmt); err != nil {
 				return fmt.Errorf("exec %s: %w", e.Name(), err)
 			}
 		}

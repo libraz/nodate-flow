@@ -22,6 +22,7 @@ import (
 	"testing"
 
 	"github.com/libraz/nodate-flow/apps/flow-api/tests/helpers"
+	"github.com/libraz/nodate-flow/packages/go-shared/testhelpers"
 )
 
 var (
@@ -58,16 +59,12 @@ func TestMain(m *testing.M) {
 
 // bootstrap is the integration-only setup gate. Tests that talk to the
 // real DB must call it at the top of the function body so they skip
-// cleanly when Docker / NF_TEST_INTEGRATION are unavailable.
+// cleanly when integration mode is off. Once it is on, a harness that
+// never came up fails the test rather than skipping it.
 func bootstrap(t *testing.T) {
 	t.Helper()
-	if testing.Short() {
-		t.Skip("skipping integration test in -short mode")
-	}
-	if os.Getenv("NF_TEST_INTEGRATION") == "" {
-		t.Skip("set NF_TEST_INTEGRATION=1 to run signaljudge integration tests")
-	}
+	testhelpers.SkipUnlessIntegration(t)
 	if testSrv == nil || testDB == nil {
-		t.Skip("shared test server failed to start")
+		t.Fatal("integration mode is on but the shared test server was never bootstrapped")
 	}
 }

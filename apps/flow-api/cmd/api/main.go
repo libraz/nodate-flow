@@ -427,6 +427,13 @@ func main() {
 	webhookWorker := webhook.NewWorker(db, queries)
 	eventbus.AddNotifyHook(webhookWorker.Hook())
 
+	// Appends made through the cross-service eventlog (itemkit,
+	// memberkit) reach every subscriber registered above. Without this
+	// the item and member half of the event log fans out to nobody.
+	// Registered after the subscribers so a reader sees what it covers,
+	// though the bridge forwards to whatever is registered at fire time.
+	eventbus.BridgeEventlog()
+
 	// JudgeEnqueuer wakes any matching signal_judge agents the moment
 	// a fresh signal lands (ADR 0008 D3). The orchestrator dispatch
 	// branch in OrchestratorRunner.Run picks the queued row up via
