@@ -247,63 +247,46 @@ func TestLoginTotp_ReplayedCodeRejected(t *testing.T) {
 	assert.Equal(t, now.Unix()/30, ident.MfaLastStep.Int64)
 }
 
-// TestRefresh_ReusedTokenRevokesFamilyAndAudits proves B-2(c): replaying
-// a rotated (revoked) refresh token tears down every session for the
-// user and writes an auth.refresh_reuse_detected audit entry.
-func TestRefresh_ReusedTokenRevokesFamilyAndAudits(t *testing.T) {
+// TestRefresh_ReplayedRotatedTokenRevokesFamilyAndAudits drives a real
+// rotation and then replays the token it superseded.
+//
+// The previous version of this test built the state by hand: it revoked
+// a session while leaving its refresh hash in place, and asserted the
+// detector fired. Rotation never produces that row — it overwrites the
+// hash — so the test passed against a detector that could not fire on
+// anything real, and the only state that did reach it was the benign
+// one (a signed-out session), where firing was wrong. Rotating through
+// the handler is what makes the assertion mean something.
+func TestRefresh_ReplayedRotatedTokenRevokesFamilyAndAudits(t *testing.T) {
 	t.Parallel()
 	db := requireB2DB(t)
 	deps, sink := b2Deps(t, db)
 	ctx := context.Background()
 
 	uid, _, _ := b2NewUser(t, deps.Queries)
+	stolenPlain, stolenHash := b2NewSession(t, deps, uid)
 
-	// Create a session, then rotate it past the benign grace window so
-	// the original refresh hash now points at a revoked row. We simulate
-	// rotation by inserting the original session already revoked.
-	origPlain, origHash, err := internauth.GenerateRefresh()
-	require.NoError(t, err)
-	_, err = deps.Queries.CreateSession(ctx, generated.CreateSessionParams{
-		PublicID:    types.New(),
-		UserID:      uid,
-		RefreshHash: origHash,
-		ExpiresAt:   time.Now().Add(30 * 24 * time.Hour),
+	// A second device the user is still signed in on.
+	_, _ = b2NewSession(t, deps, uid)
+
+	// The legitimate client refreshes: the stolen token is now the one
+	// this session rotated away.
+	_, err := Refresh(deps)(ctx, &RefreshInput{
+		RefreshCookie: http.Cookie{Name: "nd_rt", Value: stolenPlain}, //#nosec G124 -- test cookie
 	})
-	require.NoError(t, err)
+	require.NoError(t, err, "the legitimate refresh must succeed")
+	b2AgeRotation(t, db, stolenHash, time.Hour)
 
-	// A second, still-active session in the same family.
-	_, activeHash, err := internauth.GenerateRefresh()
-	require.NoError(t, err)
-	activePub := types.New()
-	_, err = deps.Queries.CreateSession(ctx, generated.CreateSessionParams{
-		PublicID:    activePub,
-		UserID:      uid,
-		RefreshHash: activeHash,
-		ExpiresAt:   time.Now().Add(30 * 24 * time.Hour),
-	})
-	require.NoError(t, err)
-
-	// Revoke the original session well outside the grace window.
-	_, err = db.ExecContext(ctx,
-		"UPDATE sessions SET revoked_at = ?, enabled = FALSE WHERE refresh_hash = ?",
-		time.Now().Add(-time.Hour), origHash)
-	require.NoError(t, err)
-
-	// Replay the (now revoked) original refresh token.
+	// The attacker replays the token the client gave up.
 	_, err = Refresh(deps)(ctx, &RefreshInput{
-		RefreshCookie: http.Cookie{Name: "nd_rt", Value: origPlain}, //#nosec G124 -- test cookie
+		RefreshCookie: http.Cookie{Name: "nd_rt", Value: stolenPlain}, //#nosec G124 -- test cookie
 	})
 	problem := problemFor(t, err)
 	assert.Equal(t, apierrors.AuthTokenRefreshInvalid.Code, problem.Type)
 
-	// The whole family must now be revoked, including the active session.
-	var activeCount int
-	require.NoError(t, db.QueryRowContext(ctx,
-		"SELECT COUNT(*) FROM sessions WHERE user_id = ? AND enabled = TRUE AND revoked_at IS NULL", uid,
-	).Scan(&activeCount))
-	assert.Equal(t, 0, activeCount, "reuse must revoke the entire session family")
+	assert.Equal(t, 0, b2ActiveSessions(t, db, uid),
+		"replaying a superseded token must tear down the whole family")
 
-	// An audit entry must record the reuse.
 	found := false
 	for _, e := range sink.snapshot() {
 		if e.Action == "auth.refresh_reuse_detected" {
@@ -315,8 +298,9 @@ func TestRefresh_ReusedTokenRevokesFamilyAndAudits(t *testing.T) {
 }
 
 // TestRefresh_GraceWindowDoesNotRevokeFamily confirms a benign
-// double-submit (the rotated token replayed within the grace window) is
-// rejected but does NOT tear down the session family.
+// double-submit — the same token sent twice, the second arriving just
+// after the first rotated it — is rejected without tearing the family
+// down.
 func TestRefresh_GraceWindowDoesNotRevokeFamily(t *testing.T) {
 	t.Parallel()
 	db := requireB2DB(t)
@@ -324,48 +308,105 @@ func TestRefresh_GraceWindowDoesNotRevokeFamily(t *testing.T) {
 	ctx := context.Background()
 
 	uid, _, _ := b2NewUser(t, deps.Queries)
+	plain, _ := b2NewSession(t, deps, uid)
 
-	origPlain, origHash, err := internauth.GenerateRefresh()
-	require.NoError(t, err)
-	_, err = deps.Queries.CreateSession(ctx, generated.CreateSessionParams{
-		PublicID:    types.New(),
-		UserID:      uid,
-		RefreshHash: origHash,
-		ExpiresAt:   time.Now().Add(30 * 24 * time.Hour),
+	_, err := Refresh(deps)(ctx, &RefreshInput{
+		RefreshCookie: http.Cookie{Name: "nd_rt", Value: plain}, //#nosec G124 -- test cookie
 	})
 	require.NoError(t, err)
 
-	_, activeHash, err := internauth.GenerateRefresh()
-	require.NoError(t, err)
-	_, err = deps.Queries.CreateSession(ctx, generated.CreateSessionParams{
-		PublicID:    types.New(),
-		UserID:      uid,
-		RefreshHash: activeHash,
-		ExpiresAt:   time.Now().Add(30 * 24 * time.Hour),
-	})
-	require.NoError(t, err)
-
-	// Revoke the original "just now" — inside the grace window.
-	_, err = db.ExecContext(ctx,
-		"UPDATE sessions SET revoked_at = ?, enabled = FALSE WHERE refresh_hash = ?",
-		time.Now(), origHash)
-	require.NoError(t, err)
-
+	// Immediately again with the same cookie, still inside the grace
+	// window.
 	_, err = Refresh(deps)(ctx, &RefreshInput{
-		RefreshCookie: http.Cookie{Name: "nd_rt", Value: origPlain}, //#nosec G124 -- test cookie
+		RefreshCookie: http.Cookie{Name: "nd_rt", Value: plain}, //#nosec G124 -- test cookie
 	})
 	problem := problemFor(t, err)
 	assert.Equal(t, apierrors.AuthTokenRefreshInvalid.Code, problem.Type)
 
-	// The active session must survive a benign double-submit.
-	var activeCount int
-	require.NoError(t, db.QueryRowContext(ctx,
-		"SELECT COUNT(*) FROM sessions WHERE user_id = ? AND enabled = TRUE AND revoked_at IS NULL", uid,
-	).Scan(&activeCount))
-	assert.Equal(t, 1, activeCount, "benign double-submit must not revoke the family")
-
+	assert.Equal(t, 1, b2ActiveSessions(t, db, uid),
+		"a duplicated request must not revoke the family")
 	for _, e := range sink.snapshot() {
 		assert.NotEqual(t, "auth.refresh_reuse_detected", e.Action,
 			"grace-window replay must not raise the reuse alarm")
 	}
+}
+
+// TestRefresh_SignedOutSessionDoesNotRevokeFamily is the other half of
+// the fix, and the one that was actively harmful.
+//
+// Signing out a device revokes its row and leaves the refresh hash
+// where it is. A client that retries with the cookie it still holds —
+// a background tab, a queued request — therefore presented a hash that
+// resolved to a revoked session, which the detector read as theft: it
+// revoked every other session the user had deliberately kept and filed
+// a high-severity finding. Signing out one device must cost the user
+// nothing but that device.
+func TestRefresh_SignedOutSessionDoesNotRevokeFamily(t *testing.T) {
+	t.Parallel()
+	db := requireB2DB(t)
+	deps, sink := b2Deps(t, db)
+	ctx := context.Background()
+
+	uid, _, _ := b2NewUser(t, deps.Queries)
+	goneP1ain, goneHash := b2NewSession(t, deps, uid)
+	_, _ = b2NewSession(t, deps, uid)
+
+	// Sign that device out, long enough ago to be outside any grace.
+	_, err := db.ExecContext(ctx,
+		"UPDATE sessions SET revoked_at = ?, enabled = FALSE WHERE refresh_hash = ?",
+		time.Now().Add(-time.Hour), goneHash)
+	require.NoError(t, err)
+
+	_, err = Refresh(deps)(ctx, &RefreshInput{
+		RefreshCookie: http.Cookie{Name: "nd_rt", Value: goneP1ain}, //#nosec G124 -- test cookie
+	})
+	problem := problemFor(t, err)
+	assert.Equal(t, apierrors.AuthTokenRefreshInvalid.Code, problem.Type)
+
+	assert.Equal(t, 1, b2ActiveSessions(t, db, uid),
+		"signing out one device must leave the user's other sessions alone")
+	for _, e := range sink.snapshot() {
+		assert.NotEqual(t, "auth.refresh_reuse_detected", e.Action,
+			"a signed-out session is not evidence of a stolen token")
+	}
+}
+
+// b2NewSession creates one active session and returns its plaintext
+// refresh token and hash.
+func b2NewSession(t *testing.T, deps Deps, uid uint32) (string, string) {
+	t.Helper()
+	plain, hash, err := internauth.GenerateRefresh()
+	require.NoError(t, err)
+	_, err = deps.Queries.CreateSession(context.Background(), generated.CreateSessionParams{
+		PublicID:    types.New(),
+		UserID:      uid,
+		RefreshHash: hash,
+		ExpiresAt:   time.Now().Add(30 * 24 * time.Hour),
+	})
+	require.NoError(t, err)
+	return plain, hash
+}
+
+// b2AgeRotation backdates the rotation that replaced oldHash so the
+// replay lands outside the benign double-submit window.
+func b2AgeRotation(t *testing.T, db *sql.DB, oldHash string, age time.Duration) {
+	t.Helper()
+	res, err := db.ExecContext(context.Background(),
+		"UPDATE sessions SET last_used_at = ? WHERE rotated_from_hash = ?",
+		time.Now().Add(-age), oldHash)
+	require.NoError(t, err)
+	n, err := res.RowsAffected()
+	require.NoError(t, err)
+	require.EqualValues(t, 1, n,
+		"the rotation must have recorded the hash it replaced, or there is nothing for the detector to find")
+}
+
+// b2ActiveSessions counts the user's live sessions.
+func b2ActiveSessions(t *testing.T, db *sql.DB, uid uint32) int {
+	t.Helper()
+	var n int
+	require.NoError(t, db.QueryRowContext(context.Background(),
+		"SELECT COUNT(*) FROM sessions WHERE user_id = ? AND enabled = TRUE AND revoked_at IS NULL", uid,
+	).Scan(&n))
+	return n
 }

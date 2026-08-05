@@ -6,6 +6,7 @@ import (
 
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated/calendar"
 	apierrors "github.com/libraz/nodate-flow/apps/flow-api/internal/errors"
+	"github.com/libraz/nodate-flow/packages/go-shared/eventacl"
 )
 
 // Sentinel errors returned by resolve/permission helpers. These are translated
@@ -27,47 +28,34 @@ var (
 	errCalendarReadOnly = httpErr(apierrors.CalendarCalendarAccessDenied)
 )
 
-// canEditEvent reports whether the actor may change an event.
-//
-// Three ways to qualify: owning the event, being an attendee the owner
-// marked can_edit, or holding manager or owner on the calendar. Workspace
-// membership alone is not one of them — a calendar's audience is narrower
-// than its workspace, and an editor on the calendar may add their own
-// events without gaining the right to rewrite everyone else's.
-//
-// The manager path is the delegation case: on a shared calendar where each
-// person has a layer, whoever coordinates the calendar has to be able to
-// move other people's events without being made owner of each one.
+// canEditEvent and canSetOwner adapt this package's sqlc row types to
+// the shared rule in eventacl. The rule itself lives there because MCP
+// answers the same question about the same rows and used to answer it
+// differently — keyed on calendars.owner_user_id, which is NULL on every
+// shared calendar, so a manager could move an event in the web app and
+// never through an agent.
 func canEditEvent(
 	actorUserID uint32,
 	event calendar.FindCalendarEventByPublicIdRow,
 	member calendar.FindCalendarMemberRow,
 	attendee *calendar.FindCalendarEventAttendeeRow,
 ) bool {
-	if event.OwnerUserID == actorUserID {
-		return true
-	}
-	if attendee != nil && attendee.CanEdit {
-		return true
-	}
-	return roleRank(member.Role) >= roleRank(calendar.CalendarMembersRoleManager)
+	return eventacl.CanEdit(event.OwnerUserID, eventacl.Editor{
+		UserID:          actorUserID,
+		CalendarRole:    eventacl.Role(member.Role),
+		AttendeeCanEdit: attendee != nil && attendee.CanEdit,
+	})
 }
 
-// canSetOwner reports whether the actor may file an event under the given
-// owner, which decides whose layer and colour it appears on.
-//
-// Anyone may create their own events. Filing one under somebody else is
-// delegation and needs manager or owner on the calendar: the alternative is
-// that any editor can put commitments on a colleague's layer.
 func canSetOwner(
 	actorUserID uint32,
 	ownerUserID uint32,
 	member calendar.FindCalendarMemberRow,
 ) bool {
-	if actorUserID == ownerUserID {
-		return true
-	}
-	return roleRank(member.Role) >= roleRank(calendar.CalendarMembersRoleManager)
+	return eventacl.CanSetOwner(ownerUserID, eventacl.Editor{
+		UserID:       actorUserID,
+		CalendarRole: eventacl.Role(member.Role),
+	})
 }
 
 // validateInvite checks that the invite has not expired and has not exceeded its use limit.

@@ -67,6 +67,10 @@ func (f *fakeSessions) FindAnyByRefreshHash(_ context.Context, _ string) (*sessi
 	panic("not implemented")
 }
 
+func (f *fakeSessions) FindSupersededBy(_ context.Context, _ string) (*sessionstore.Session, error) {
+	panic("not implemented")
+}
+
 func (f *fakeSessions) RevokeAllForUser(_ context.Context, _ uint32) error {
 	panic("not implemented")
 }

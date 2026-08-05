@@ -190,7 +190,7 @@ func LoginTotp(deps Deps) func(context.Context, *LoginTotpInput) (*LoginTotpOutp
 			// wrong code and cannot reuse it inside the skew window.
 			replayed := okCode && ident.MfaLastStep.Valid && step <= ident.MfaLastStep.Int64
 			if !okCode || replayed {
-				bumpFailedByID(ctx, deps, ident.ID, ident.FailedAttempts)
+				bumpFailedByID(ctx, deps, ident.ID)
 				deps.Audit.Record(ctx, audit.Entry{
 					Action:       "auth.login_totp_failed",
 					ActorID:      uint32(uid),
@@ -206,7 +206,7 @@ func LoginTotp(deps Deps) func(context.Context, *LoginTotpInput) (*LoginTotpOutp
 			hash := auth.HashRecoveryCode(in.Body.RecoveryCode)
 			rcID, lerr := deps.Queries.FindUnusedRecoveryCode(ctx, generated.FindUnusedRecoveryCodeParams{UserID: uid, CodeHash: hash})
 			recordRecoveryFailure := func() error {
-				bumpFailedByIDWithThreshold(ctx, deps, ident.ID, ident.FailedAttempts, maxRecoveryFailedBeforeLock)
+				bumpFailedByIDWithThreshold(ctx, deps, ident.ID, maxRecoveryFailedBeforeLock)
 				deps.Audit.Record(ctx, audit.Entry{
 					Action:       "auth.login_totp_failed",
 					ActorID:      uint32(uid),
@@ -295,44 +295,46 @@ func LoginTotp(deps Deps) func(context.Context, *LoginTotpInput) (*LoginTotpOutp
 	}
 }
 
-// bumpFailedByID increments the failed-attempts counter on an identity
-// identified by its internal ID, locking the account for 15 minutes if
-// the count reaches [maxFailedBeforeLock]. Used by the TOTP login path
-// where we already have the identity row from FindLocalIdentityByUserId.
-func bumpFailedByID(ctx context.Context, deps Deps, identityID uint32, currentAttempts uint32) {
-	bumpFailedByIDWithThreshold(ctx, deps, identityID, currentAttempts, maxFailedBeforeLock)
+// lockoutWindow is how long an account stays locked once the failed
+// attempts reach a threshold.
+const lockoutWindow = 15 * time.Minute
+
+// bumpFailedByID counts one failed authentication against an identity
+// identified by its internal ID, locking the account for
+// [lockoutWindow] once the count reaches [maxFailedBeforeLock]. Used by
+// the TOTP login path, which already holds the identity row.
+func bumpFailedByID(ctx context.Context, deps Deps, identityID uint32) {
+	bumpFailedByIDWithThreshold(ctx, deps, identityID, maxFailedBeforeLock)
 }
 
 // bumpFailedByIDWithThreshold is the threshold-parameterised variant of
 // [bumpFailedByID]. The recovery-code branch passes the lower
 // [maxRecoveryFailedBeforeLock] so an attacker probing recovery codes
-// trips the 15-minute lockout faster than an attacker brute-forcing
-// 6-digit TOTP codes.
-func bumpFailedByIDWithThreshold(ctx context.Context, deps Deps, identityID uint32, currentAttempts, threshold uint32) {
-	next := currentAttempts + 1
-	var lock sql.NullTime
-	if next >= threshold {
-		lock = sql.NullTime{Time: time.Now().Add(15 * time.Minute), Valid: true}
-	}
-	if err := deps.Queries.UpdateIdentityFailedAttempts(ctx, generated.UpdateIdentityFailedAttemptsParams{
-		FailedAttempts: next,
-		LockedUntilAt:  lock,
-		ID:             identityID,
+// trips the lockout faster than an attacker brute-forcing 6-digit TOTP
+// codes.
+//
+// Neither the count nor the comparison against the threshold is done
+// here. The whole point of a lockout is to bound guesses that arrive
+// together, and a caller that reads the counter, adds one and writes it
+// back gives every simultaneous guess the same starting value — the
+// stored count goes to 1 and stays there. The statement does the read,
+// the increment and the threshold test in one place so it cannot be
+// interleaved.
+func bumpFailedByIDWithThreshold(ctx context.Context, deps Deps, identityID, threshold uint32) {
+	if err := deps.Queries.BumpIdentityFailedAttempts(ctx, generated.BumpIdentityFailedAttemptsParams{
+		Threshold:   threshold,
+		LockedUntil: sql.NullTime{Time: time.Now().Add(lockoutWindow), Valid: true},
+		ID:          identityID,
 	}); err != nil {
 		slog.ErrorContext(ctx, "login_totp: failed to bump failed attempts counter", slog.Any("err", err))
 	}
 }
 
 func bumpFailed(ctx context.Context, deps Deps, row generated.FindLocalIdentityByEmailRow) {
-	next := row.FailedAttempts + 1
-	var lock sql.NullTime
-	if next >= maxFailedBeforeLock {
-		lock = sql.NullTime{Time: time.Now().Add(15 * time.Minute), Valid: true}
-	}
-	if err := deps.Queries.UpdateIdentityFailedAttempts(ctx, generated.UpdateIdentityFailedAttemptsParams{
-		FailedAttempts: next,
-		LockedUntilAt:  lock,
-		ID:             row.ID,
+	if err := deps.Queries.BumpIdentityFailedAttempts(ctx, generated.BumpIdentityFailedAttemptsParams{
+		Threshold:   maxFailedBeforeLock,
+		LockedUntil: sql.NullTime{Time: time.Now().Add(lockoutWindow), Valid: true},
+		ID:          row.ID,
 	}); err != nil {
 		slog.ErrorContext(ctx, "login: failed to bump failed attempts counter", slog.Any("err", err), slog.String("user_public_id", row.UserPublicID.String()))
 	}

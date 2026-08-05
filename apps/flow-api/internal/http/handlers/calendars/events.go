@@ -460,8 +460,9 @@ func GetEvent(deps Deps) func(context.Context, *GetEventInput) (*GetEventOutput,
 		}
 
 		aclEvent := eventacl.Event{
-			Visibility:  eventacl.Visibility(evt.Visibility),
-			OwnerUserID: evt.OwnerUserID,
+			Visibility:      eventacl.Visibility(evt.Visibility),
+			OwnerUserID:     evt.OwnerUserID,
+			CalendarDefault: eventacl.Visibility(cal.DefaultEventVisibility),
 		}
 		aclActor := eventacl.Actor{UserID: actorID, IsAttendee: isAttendee}
 
@@ -475,7 +476,8 @@ func GetEvent(deps Deps) func(context.Context, *GetEventInput) (*GetEventOutput,
 		}
 
 		resp := eventFromFullRow(evt)
-		scrubEventDetails(string(evt.Visibility), evt.OwnerUserID, actorID, isAttendee,
+		scrubEventDetails(string(evt.Visibility), string(cal.DefaultEventVisibility),
+			evt.OwnerUserID, actorID, isAttendee,
 			&resp.Location, &resp.Memo, &resp.URL)
 
 		out := &GetEventOutput{}
@@ -868,7 +870,7 @@ func ListCalendarEvents(deps Deps) func(context.Context, *ListCalendarEventsInpu
 			resp.Location = dbtype.PtrFromNullString(r.Location)
 			resp.BlockLabel = dbtype.PtrFromNullString(r.BlockLabel)
 			resp.UpdatedAt = dbtype.UnixSecondsFromNullTime(r.UpdatedAt)
-			scrubEventDetails(string(r.Visibility), r.OwnerUserID, actorID, r.IsAttendee, &resp.Location, nil, nil)
+			scrubEventDetails(string(r.Visibility), string(r.CalendarDefaultVisibility), r.OwnerUserID, actorID, r.IsAttendee, &resp.Location, nil, nil)
 			out.Body.Events = append(out.Body.Events, resp)
 		}
 
@@ -898,7 +900,7 @@ func ListCalendarEvents(deps Deps) func(context.Context, *ListCalendarEventsInpu
 				resp.RecurrenceExceptions = &raw
 			}
 			resp.UpdatedAt = dbtype.UnixSecondsFromNullTime(r.UpdatedAt)
-			scrubEventDetails(string(r.Visibility), r.OwnerUserID, actorID, r.IsAttendee, &resp.Location, nil, nil)
+			scrubEventDetails(string(r.Visibility), string(r.CalendarDefaultVisibility), r.OwnerUserID, actorID, r.IsAttendee, &resp.Location, nil, nil)
 			out.Body.Events = append(out.Body.Events, resp)
 		}
 

@@ -12,9 +12,12 @@ import (
 	"github.com/libraz/nodate-flow/apps/auth-api/internal/db/generated"
 )
 
-// bumpFailedByID is tested via a fake DBTX that captures the exec args
-// rather than hitting a real database. This validates the lockout
-// threshold logic without a full handler roundtrip.
+// The fake DBTX below captures exec args so the handler-side wiring
+// (which threshold, which identity) can be checked without a database.
+// What the statement itself does with those args is covered against a
+// real MySQL in lockout_concurrency_test.go, because the property that
+// matters — the count advancing once per attempt when attempts overlap
+// — cannot be observed through a fake.
 
 // fakeDBTX implements generated.DBTX and records exec calls.
 type fakeDBTX struct {
@@ -48,58 +51,49 @@ type fakeResult struct{}
 func (fakeResult) LastInsertId() (int64, error) { return 0, nil }
 func (fakeResult) RowsAffected() (int64, error) { return 1, nil }
 
-func TestBumpFailedByID_IncrementsCounter(t *testing.T) {
+// TestBumpFailedByID_PassesTheTotpThreshold checks the wiring the
+// handler is still responsible for: which threshold and which identity
+// the statement is asked to apply. The count itself is no longer the
+// caller's to compute — it is incremented inside the statement so
+// simultaneous attempts cannot share a starting value — so there is
+// nothing here to assert about it, and the behaviour that replaced it
+// is covered against a real database in lockout_concurrency_test.go.
+func TestBumpFailedByID_PassesTheTotpThreshold(t *testing.T) {
 	t.Parallel()
 	db := &fakeDBTX{}
-	q := generated.New(db)
-	deps := Deps{Queries: q}
+	deps := Deps{Queries: generated.New(db)}
 
-	bumpFailedByID(context.Background(), deps, 42, 0)
+	bumpFailedByID(context.Background(), deps, 42)
 
-	require.Len(t, db.execCalls, 1, "must call UpdateIdentityFailedAttempts")
+	require.Len(t, db.execCalls, 1, "must call BumpIdentityFailedAttempts")
 	args := db.execCalls[0].args
-	// args: failed_attempts, locked_until_at, id
+	// args: threshold, locked_until, id
 	require.Len(t, args, 3)
-	assert.Equal(t, uint32(1), args[0], "failed_attempts must be incremented to 1")
-	lock, ok := args[1].(sql.NullTime)
-	require.True(t, ok)
-	assert.False(t, lock.Valid, "must NOT set lockout for first failure")
-	assert.Equal(t, uint32(42), args[2], "must target correct identity ID")
-}
-
-func TestBumpFailedByID_LocksAtThreshold(t *testing.T) {
-	t.Parallel()
-	db := &fakeDBTX{}
-	q := generated.New(db)
-	deps := Deps{Queries: q}
-
-	// Simulate 4 prior failures; next bump (the 5th) should trigger lockout.
-	bumpFailedByID(context.Background(), deps, 42, maxFailedBeforeLock-1)
-
-	require.Len(t, db.execCalls, 1)
-	args := db.execCalls[0].args
 	assert.Equal(t, uint32(maxFailedBeforeLock), args[0],
-		"failed_attempts must be set to the threshold")
+		"the TOTP path must apply the TOTP threshold")
 	lock, ok := args[1].(sql.NullTime)
 	require.True(t, ok)
-	assert.True(t, lock.Valid, "must set lockout when threshold reached")
-	assert.True(t, lock.Time.After(time.Now().Add(14*time.Minute)),
-		"lockout must be at least 14 minutes in the future")
+	assert.True(t, lock.Valid,
+		"a deadline is always supplied; the statement decides whether the count has reached the threshold")
+	assert.True(t, lock.Time.After(time.Now().Add(lockoutWindow-time.Minute)),
+		"the deadline must be a full lockout window away")
+	assert.Equal(t, uint32(42), args[2], "must target the right identity")
 }
 
-func TestBumpFailedByID_AboveThresholdStillLocks(t *testing.T) {
+// TestBumpFailedByIDWithThreshold_PassesTheRecoveryThreshold is the
+// wire-up test for the tighter recovery budget: without it the recovery
+// branch would inherit the laxer TOTP threshold and hand an attacker
+// five times the attempts per lockout period.
+func TestBumpFailedByIDWithThreshold_PassesTheRecoveryThreshold(t *testing.T) {
 	t.Parallel()
 	db := &fakeDBTX{}
-	q := generated.New(db)
-	deps := Deps{Queries: q}
+	deps := Deps{Queries: generated.New(db)}
 
-	bumpFailedByID(context.Background(), deps, 42, maxFailedBeforeLock+5)
+	bumpFailedByIDWithThreshold(context.Background(), deps, 42, maxRecoveryFailedBeforeLock)
 
 	require.Len(t, db.execCalls, 1)
-	args := db.execCalls[0].args
-	lock, ok := args[1].(sql.NullTime)
-	require.True(t, ok)
-	assert.True(t, lock.Valid, "must set lockout even when already above threshold")
+	assert.Equal(t, uint32(maxRecoveryFailedBeforeLock), db.execCalls[0].args[0],
+		"the recovery branch must apply its own threshold")
 }
 
 func TestMaxFailedBeforeLock_IsReasonable(t *testing.T) {
@@ -118,51 +112,4 @@ func TestRecoveryCodeThreshold_IsTighter(t *testing.T) {
 		"recovery-code lockout threshold must be 3")
 	assert.Less(t, uint32(maxRecoveryFailedBeforeLock), uint32(maxFailedBeforeLock),
 		"recovery threshold must be strictly tighter than TOTP threshold")
-}
-
-// TestBumpFailedByIDWithThreshold_LocksAtRecoveryThreshold validates the
-// recovery-code branch trips the lockout at three failures even though
-// the TOTP threshold is five. This is the wire-up test for the L1 fix:
-// without it, recovery codes would inherit the laxer TOTP threshold and
-// give an attacker five times the attempt budget per period.
-func TestBumpFailedByIDWithThreshold_LocksAtRecoveryThreshold(t *testing.T) {
-	t.Parallel()
-	db := &fakeDBTX{}
-	q := generated.New(db)
-	deps := Deps{Queries: q}
-
-	// Two prior failures; the third (this call) should trigger lockout
-	// when the recovery threshold is in effect.
-	bumpFailedByIDWithThreshold(context.Background(), deps, 42, maxRecoveryFailedBeforeLock-1, maxRecoveryFailedBeforeLock)
-
-	require.Len(t, db.execCalls, 1)
-	args := db.execCalls[0].args
-	assert.Equal(t, uint32(maxRecoveryFailedBeforeLock), args[0],
-		"failed_attempts must reach the recovery threshold")
-	lock, ok := args[1].(sql.NullTime)
-	require.True(t, ok)
-	assert.True(t, lock.Valid,
-		"recovery threshold must lock at 3 even though TOTP threshold is 5")
-}
-
-// TestBumpFailedByIDWithThreshold_DoesNotLockBelowTotpThreshold confirms
-// the legacy TOTP path (called via [bumpFailedByID]) does NOT lock at 3
-// failures — the threshold parameter is what gates the lockout, not a
-// global rule.
-func TestBumpFailedByIDWithThreshold_DoesNotLockBelowTotpThreshold(t *testing.T) {
-	t.Parallel()
-	db := &fakeDBTX{}
-	q := generated.New(db)
-	deps := Deps{Queries: q}
-
-	// Three prior failures with TOTP threshold (5) — should NOT lock.
-	bumpFailedByID(context.Background(), deps, 42, 2)
-
-	require.Len(t, db.execCalls, 1)
-	args := db.execCalls[0].args
-	assert.Equal(t, uint32(3), args[0])
-	lock, ok := args[1].(sql.NullTime)
-	require.True(t, ok)
-	assert.False(t, lock.Valid,
-		"TOTP path must not lock at 3 failures — that is the recovery-only threshold")
 }

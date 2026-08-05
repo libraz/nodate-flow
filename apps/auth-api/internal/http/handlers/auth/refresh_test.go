@@ -23,10 +23,11 @@ import (
 type stubRefreshSessions struct {
 	session *sessionstore.Session
 	err     error
-	// anySession is returned by FindAnyByRefreshHash for reuse-detection
-	// tests. anyErr overrides it when non-nil.
-	anySession *sessionstore.Session
-	anyErr     error
+	// supersededSession is returned by FindSupersededBy for
+	// reuse-detection tests: it stands for the session that rotated the
+	// presented token away. supersededErr overrides it when non-nil.
+	supersededSession *sessionstore.Session
+	supersededErr     error
 	// revokeAllCalls records the userIDs passed to RevokeAllForUser so
 	// reuse-detection tests can assert the session family was torn down.
 	revokeAllCalls []uint32
@@ -59,14 +60,21 @@ func (s *stubRefreshSessions) RevokeAllExcept(_ context.Context, _ uint32, _ dbt
 	panic("not implemented")
 }
 
+// FindAnyByRefreshHash is no longer part of reuse detection: matching a
+// revoked session's current token means the session was signed out, not
+// that a rotated token came back.
 func (s *stubRefreshSessions) FindAnyByRefreshHash(_ context.Context, _ string) (*sessionstore.Session, error) {
-	if s.anyErr != nil {
-		return nil, s.anyErr
+	panic("not implemented")
+}
+
+func (s *stubRefreshSessions) FindSupersededBy(_ context.Context, _ string) (*sessionstore.Session, error) {
+	if s.supersededErr != nil {
+		return nil, s.supersededErr
 	}
-	if s.anySession == nil {
+	if s.supersededSession == nil {
 		return nil, sessionstore.ErrNotFound
 	}
-	return s.anySession, nil
+	return s.supersededSession, nil
 }
 
 func (s *stubRefreshSessions) RevokeAllForUser(_ context.Context, userID uint32) error {

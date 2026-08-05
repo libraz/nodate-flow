@@ -123,6 +123,15 @@ func (s *RedisStore) FindAnyByRefreshHash(ctx context.Context, hash string) (*Se
 	return s.FindByRefreshHash(ctx, hash)
 }
 
+// FindSupersededBy implements [Store]. The Redis driver rekeys on
+// rotation and keeps no record of the key it replaced, so there is
+// nothing here to match: reuse detection across a rotation is a
+// property of the MySQL driver only. Returning not-found rather than
+// guessing keeps the detector silent instead of wrong.
+func (s *RedisStore) FindSupersededBy(_ context.Context, _ string) (*Session, error) {
+	return nil, ErrNotFound
+}
+
 // RevokeAllForUser implements [Store]. It revokes every active session
 // for the user by draining the user's session set.
 func (s *RedisStore) RevokeAllForUser(ctx context.Context, userID uint32) error {

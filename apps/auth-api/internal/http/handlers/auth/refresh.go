@@ -44,11 +44,11 @@ func Refresh(deps Deps) func(context.Context, *RefreshInput) (*RefreshOutput, er
 		if err != nil {
 			if errors.Is(err, sessionstore.ErrNotFound) {
 				// The hash matched no active session. Before rejecting,
-				// check whether it matches an already-rotated / revoked
-				// row: that means a previously-invalidated refresh token
-				// was replayed (token theft or a leaked cookie), so the
-				// whole session family is torn down and the event is
-				// audited. A very recent revocation is treated as a benign
+				// check whether some session rotated this token away:
+				// that means a superseded refresh token was replayed
+				// (token theft or a leaked cookie), so the whole session
+				// family is torn down and the event is audited. A
+				// rotation that just happened is treated as a benign
 				// double-submit and only rejected.
 				detectRefreshReuse(ctx, deps, hash)
 				return nil, httpErr(apierrors.AuthTokenRefreshInvalid)
@@ -97,54 +97,66 @@ func Refresh(deps Deps) func(context.Context, *RefreshInput) (*RefreshOutput, er
 }
 
 // detectRefreshReuse inspects a refresh hash that matched no active
-// session. When the hash resolves to an already-revoked row that was
-// revoked outside the [refreshReuseGrace] window, it concludes a rotated
-// refresh token was replayed: every active session for that user is
-// revoked (session-family teardown) and an "auth.refresh_reuse_detected"
-// audit entry is written. Failures are swallowed — this runs on a path
-// that already returns AUTH.TOKEN.REFRESH_INVALID, and a detection
-// hiccup must never change the user-visible outcome.
+// session. When the hash is one a session rotated away, a superseded
+// token is being replayed: every active session for that user is
+// revoked (session-family teardown) and an
+// "auth.refresh_reuse_detected" audit entry is written. Failures are
+// swallowed — this runs on a path that already returns
+// AUTH.TOKEN.REFRESH_INVALID, and a detection hiccup must never change
+// the user-visible outcome.
+//
+// The signal is the rotation record, not the revocation state, and the
+// difference is the whole point. Asking whether the hash matches some
+// revoked session's current token answers a different question: it
+// says the session was signed out, which is what happens when a user
+// signs out one device or changes their password. A client that then
+// retries with its stale cookie is not an attacker, and treating it as
+// one revoked every other session that user had deliberately kept and
+// filed a high-severity finding about it. Meanwhile the case the check
+// was written for could never match, because rotation overwrites the
+// hash in place and leaves the superseded token resolving to nothing.
 func detectRefreshReuse(ctx context.Context, deps Deps, hash string) {
 	if deps.Sessions == nil {
 		return
 	}
-	prior, err := deps.Sessions.FindAnyByRefreshHash(ctx, hash)
-	if err != nil || prior == nil {
-		// Genuinely unknown hash (never issued): nothing to detect.
+	superseded, err := deps.Sessions.FindSupersededBy(ctx, hash)
+	if err != nil || superseded == nil {
+		// The hash was never issued, or belongs to a session that was
+		// signed out rather than rotated. Either way the caller has
+		// already rejected it, and neither is evidence of theft.
 		return
 	}
-	if prior.RevokedAt == nil {
-		// Active row that FindByRefreshHash did not return — should not
-		// happen; do not tear down a live family on an ambiguous signal.
-		return
+	// Benign double-submit grace: a client that fires two refreshes at
+	// once presents the same token twice, and the second arrives just
+	// after the first rotated it away. Reject it — the caller does —
+	// but do not tear the family down over a duplicated request.
+	rotatedAt := superseded.CreatedAt
+	if superseded.LastUsedAt != nil {
+		rotatedAt = *superseded.LastUsedAt
 	}
-	// Benign double-submit grace: a token presented within a few seconds
-	// of its own rotation is almost certainly a duplicated request, not a
-	// theft. Reject it (already handled by the caller) but do not nuke the
-	// family.
-	if time.Since(*prior.RevokedAt) <= refreshReuseGrace {
+	if time.Since(rotatedAt) <= refreshReuseGrace {
 		return
 	}
 
-	if rerr := deps.Sessions.RevokeAllForUser(ctx, prior.UserID); rerr != nil {
+	if rerr := deps.Sessions.RevokeAllForUser(ctx, superseded.UserID); rerr != nil {
 		// Best-effort: still record the detection below.
 		_ = rerr
 	}
 	if deps.Audit != nil {
 		resourceID := ""
-		if pub, perr := deps.Queries.FindUserPublicIdById(ctx, prior.UserID); perr == nil {
+		if pub, perr := deps.Queries.FindUserPublicIdById(ctx, superseded.UserID); perr == nil {
 			resourceID = pub.String()
 		}
 		deps.Audit.Record(ctx, audit.Entry{
 			Action:       "auth.refresh_reuse_detected",
-			ActorID:      prior.UserID,
+			ActorID:      superseded.UserID,
 			ResourceType: "user",
 			ResourceID:   resourceID,
 			Metadata: map[string]any{
-				"severity":          "high",
-				"revoked_session":   prior.PublicID.String(),
-				"sessions_revoked":  "all",
-				"revoked_token_age": time.Since(*prior.RevokedAt).String(),
+				"severity":           "high",
+				"replayed_session":   superseded.PublicID.String(),
+				"sessions_revoked":   "all",
+				"replayed_token_age": time.Since(rotatedAt).String(),
 			},
 		})
 	}

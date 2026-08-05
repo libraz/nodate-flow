@@ -27,6 +27,11 @@ type SessionQueries interface {
 	// sql.ErrNoRows when no row matches.
 	FindAnySessionByRefreshHash(ctx context.Context, refreshHash string) (FindAnySessionByRefreshHashRow, error)
 
+	// FindSessionByRotatedFromHash looks up the session whose last
+	// rotation replaced the given hash. Returns sql.ErrNoRows when no
+	// session superseded it.
+	FindSessionByRotatedFromHash(ctx context.Context, rotatedFromHash string) (FindAnySessionByRefreshHashRow, error)
+
 	// RevokeSession marks a session as revoked by (userID, publicID).
 	RevokeSession(ctx context.Context, userID uint32, publicID dbtype.PublicID) error
 
@@ -172,6 +177,28 @@ func (s *MySQLStore) FindAnyByRefreshHash(ctx context.Context, hash string) (*Se
 	}, nil
 }
 
+// FindSupersededBy implements [Store] by resolving the session whose
+// last rotation replaced this hash.
+func (s *MySQLStore) FindSupersededBy(ctx context.Context, hash string) (*Session, error) {
+	row, err := s.q.FindSessionByRotatedFromHash(ctx, hash)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, ErrNotFound
+		}
+		return nil, fmt.Errorf("sessionstore/mysql: find-superseded: %w", err)
+	}
+	return &Session{
+		InternalID:  row.ID,
+		PublicID:    row.PublicID,
+		UserID:      row.UserID,
+		RefreshHash: row.RefreshHash,
+		ExpiresAt:   row.ExpiresAt,
+		RevokedAt:   nullTimePtr(row.RevokedAt),
+		LastUsedAt:  nullTimePtr(row.LastUsedAt),
+		CreatedAt:   row.CreatedAt,
+	}, nil
+}
+
 // RotateRefreshHash implements [Store]. The rotation is wrapped in a
 // transaction with SELECT ... FOR UPDATE to prevent TOCTOU races when
 // concurrent refresh requests arrive for the same session.
@@ -192,8 +219,18 @@ func (s *MySQLStore) RotateRefreshHash(ctx context.Context, oldHash, newHash str
 		return fmt.Errorf("sessionstore/mysql: rotate lock: %w", err)
 	}
 
-	const updateQ = `UPDATE sessions SET refresh_hash = ?, expires_at = ?, last_used_at = CURRENT_TIMESTAMP WHERE id = ?`
-	if _, err := tx.ExecContext(ctx, updateQ, newHash, expiresAt, id); err != nil {
+	// rotated_from_hash is what makes the replaced token traceable. The
+	// row keeps its identity across rotations, so overwriting
+	// refresh_hash on its own leaves the superseded token matching
+	// nothing at all — a replay of it then looks exactly like a token
+	// that was never issued, and the reuse detector has nothing to find.
+	const updateQ = `UPDATE sessions
+	                    SET refresh_hash = ?,
+	                        rotated_from_hash = ?,
+	                        expires_at = ?,
+	                        last_used_at = CURRENT_TIMESTAMP
+	                  WHERE id = ?`
+	if _, err := tx.ExecContext(ctx, updateQ, newHash, oldHash, expiresAt, id); err != nil {
 		return fmt.Errorf("sessionstore/mysql: rotate update: %w", err)
 	}
 

@@ -19,6 +19,7 @@ import (
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated/calendar"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
 	apierrors "github.com/libraz/nodate-flow/apps/flow-api/internal/errors"
+	"github.com/libraz/nodate-flow/packages/go-shared/eventacl"
 )
 
 // session is the per-request MCP caller context. It carries the
@@ -400,40 +401,59 @@ LIMIT 1`
 	return userID, nil
 }
 
-// canEditCalendarEvent checks if the acting user can edit a calendar
-// event. Returns true if the user is the event owner, a can_edit
-// attendee, or the personal-calendar owner.
+// requireCalendarMembership refuses a caller who holds no
+// calendar_members row on the given calendar.
 //
-// calendar_subscriptions.role has been dropped, so there is no
-// per-subscription manager/owner tier anymore. The calendar-level
-// "owner" is whoever holds calendars.owner_user_id (personal layer).
-// System calendars (kind=system) are read-only and have no editable
-// owner. Attendee can_edit is still honored via FindCalendarEventAttendee.
-func canEditCalendarEvent(ctx context.Context, deps Deps, s *session, eventOwnerUserID uint32, eventID uint32, calendarID uint32) (bool, error) {
-	if s.userID == eventOwnerUserID {
-		return true, nil
+// The REST handlers reach every event through resolveCalendar, so
+// membership is checked before the edit rule is ever consulted. The MCP
+// event tools resolve the event by its own public id and went straight
+// to the edit rule, which let somebody removed from a calendar keep
+// editing the events on it that they happen to own. Membership is the
+// outer gate on both transports now.
+func requireCalendarMembership(ctx context.Context, deps Deps, s *session, calendarID uint32) error {
+	if _, err := deps.CalendarQueries.FindCalendarMember(ctx, calendar.FindCalendarMemberParams{
+		CalendarID: calendarID,
+		UserID:     s.userID,
+	}); err != nil {
+		if stderrors.Is(err, sql.ErrNoRows) {
+			return apierrors.New(apierrors.CalendarCalendarAccessDenied)
+		}
+		return apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
 	}
-	att, err := deps.CalendarQueries.FindCalendarEventAttendee(ctx, calendar.FindCalendarEventAttendeeParams{
+	return nil
+}
+
+// canEditCalendarEvent answers the same question the REST handlers ask,
+// through the same rule: eventacl.CanEdit.
+//
+// It used to have its own: event owner, can_edit attendee, or the holder
+// of calendars.owner_user_id. That third clause is why an agent refused
+// edits the web app allowed. A shared calendar leaves owner_user_id NULL
+// by design, so on exactly the calendars that have managers, no manager
+// qualified — and on a personal calendar the clause was redundant, since
+// its owner also holds the owner row in calendar_members.
+func canEditCalendarEvent(ctx context.Context, deps Deps, s *session, eventOwnerUserID uint32, eventID uint32, calendarID uint32) (bool, error) {
+	actor := eventacl.Editor{UserID: s.userID}
+
+	if att, err := deps.CalendarQueries.FindCalendarEventAttendee(ctx, calendar.FindCalendarEventAttendeeParams{
 		EventID: sql.NullInt32{Int32: int32(eventID), Valid: true}, //#nosec G115 -- internal row id, bounded by realistic deployments
 		UserID:  s.userID,
-	})
-	if err == nil && att.CanEdit {
-		return true, nil
+	}); err == nil {
+		actor.AttendeeCanEdit = att.CanEdit
+	} else if !stderrors.Is(err, sql.ErrNoRows) {
+		return false, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
 	}
-	// Look up the personal-calendar owner via raw SQL. The sqlc
-	// FindCalendarByPublicId query needs the public id, which we do
-	// not have here; a lightweight single-column lookup by internal
-	// id is appropriate and matches the pattern used elsewhere in
-	// this package.
-	const q = `SELECT owner_user_id FROM calendars WHERE id = ? AND enabled = TRUE LIMIT 1`
-	var ownerID sql.NullInt32
-	if err := deps.DB.QueryRowContext(ctx, q, calendarID).Scan(&ownerID); err != nil {
-		return false, nil
+
+	if member, err := deps.CalendarQueries.FindCalendarMember(ctx, calendar.FindCalendarMemberParams{
+		CalendarID: calendarID,
+		UserID:     s.userID,
+	}); err == nil {
+		actor.CalendarRole = eventacl.Role(member.Role)
+	} else if !stderrors.Is(err, sql.ErrNoRows) {
+		return false, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
 	}
-	if ownerID.Valid && uint32(ownerID.Int32) == s.userID { //#nosec G115 -- owner_user_id is users.id (BIGINT UNSIGNED), fits uint32 within realistic deployments
-		return true, nil
-	}
-	return false, nil
+
+	return eventacl.CanEdit(eventOwnerUserID, actor), nil
 }
 
 func newPublicID() types.PublicID { return types.New() }

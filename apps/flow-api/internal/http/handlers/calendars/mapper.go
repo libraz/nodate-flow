@@ -28,9 +28,13 @@ import (
 // row-level decision and it belongs in the query, because dropping rows
 // afterwards would leave any total counting events the viewer is not
 // supposed to know about.
-func scrubEventDetails(visibility string, ownerUserID, viewerUserID uint32, isAttendee bool, location, memo, url **string) {
+func scrubEventDetails(visibility string, calendarDefault string, ownerUserID, viewerUserID uint32, isAttendee bool, location, memo, url **string) {
 	if eventacl.CanSeeDetails(
-		eventacl.Event{Visibility: eventacl.Visibility(visibility), OwnerUserID: ownerUserID},
+		eventacl.Event{
+			Visibility:      eventacl.Visibility(visibility),
+			OwnerUserID:     ownerUserID,
+			CalendarDefault: eventacl.Visibility(calendarDefault),
+		},
 		eventacl.Actor{UserID: viewerUserID, IsAttendee: isAttendee},
 	) {
 		return
@@ -179,7 +183,7 @@ func eventFromRangeRow(r calendar.ListCalendarEventsByRangeRow, viewerUserID uin
 	resp.BlockLabel = dbtype.PtrFromNullString(r.BlockLabel)
 	resp.NotificationOffset = dbtype.PtrFromNullInt32(r.NotificationOffset)
 	resp.UpdatedAt = dbtype.UnixSecondsFromNullTime(r.UpdatedAt)
-	scrubEventDetails(string(r.Visibility), r.OwnerUserID, viewerUserID, r.IsAttendee, &resp.Location, &resp.Memo, &resp.URL)
+	scrubEventDetails(string(r.Visibility), string(r.CalendarDefaultVisibility), r.OwnerUserID, viewerUserID, r.IsAttendee, &resp.Location, &resp.Memo, &resp.URL)
 	return resp
 }
 
@@ -192,7 +196,7 @@ func eventFromRecurringRow(r calendar.ListRecurringCalendarEventsByRangeRow, vie
 	resp.Memo = dbtype.PtrFromNullString(r.Memo)
 	resp.URL = dbtype.PtrFromNullString(r.Url)
 	resp.BlockLabel = dbtype.PtrFromNullString(r.BlockLabel)
-	scrubEventDetails(string(r.Visibility), r.OwnerUserID, viewerUserID, r.IsAttendee, &resp.Location, &resp.Memo, &resp.URL)
+	scrubEventDetails(string(r.Visibility), string(r.CalendarDefaultVisibility), r.OwnerUserID, viewerUserID, r.IsAttendee, &resp.Location, &resp.Memo, &resp.URL)
 	if r.RecurrenceRule != nil {
 		raw := json.RawMessage(r.RecurrenceRule)
 		resp.RecurrenceRule = &raw

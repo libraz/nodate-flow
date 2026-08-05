@@ -26,6 +26,8 @@ import (
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/itemkit"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/taskcreate"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/taskstate"
+	"github.com/libraz/nodate-flow/packages/go-shared/recurrence"
+	"github.com/libraz/nodate-flow/packages/go-shared/region"
 )
 
 // countLinkedEvents returns how many enabled calendar_events are
@@ -2779,6 +2781,132 @@ func parseDayBoundary(s string) (time.Time, error) {
 	return time.Parse("2006-01-02", s)
 }
 
+// mcpCalendarOccurrence is one thing on the calendar during a window:
+// either a plain event or one occurrence of a series, flattened so the
+// tools downstream do not have to care which.
+type mcpCalendarOccurrence struct {
+	row     calendar.ListCalendarEventsAcrossCalendarsRow
+	startAt time.Time
+	endAt   time.Time
+	dated   bool
+}
+
+// listCalendarOccurrences returns everything on the caller's calendars
+// between startTime and endTime, with recurring series expanded into
+// their concrete occurrences.
+//
+// Both calendar tools go through here. Reading only the non-recurring
+// query — which is what they did — meant the standing meetings were
+// absent from every answer: an agent asked for Tuesday's schedule got a
+// day with the weekly one-to-ones missing, and the free-slot search
+// built its busy map from the same truncated set and offered those hours
+// as available.
+func listCalendarOccurrences(
+	ctx context.Context,
+	deps Deps,
+	membershipUserID uint32,
+	viewerUserID uint32,
+	workspaceID uint32,
+	startTime, endTime time.Time,
+) ([]mcpCalendarOccurrence, error) {
+	// The overlap predicate is start_at < :end AND end_at > :start, and
+	// the generated params name them the other way round; passing them
+	// swapped is the query's convention, not a mistake.
+	plain, err := deps.CalendarQueries.ListCalendarEventsAcrossCalendars(ctx, calendar.ListCalendarEventsAcrossCalendarsParams{
+		ViewerUserID: viewerUserID,
+		UserID:       membershipUserID,
+		WorkspaceID:  workspaceID,
+		StartAt:      sql.NullTime{Time: endTime, Valid: true},
+		EndAt:        sql.NullTime{Time: startTime, Valid: true},
+	})
+	if err != nil {
+		return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
+	}
+
+	out := make([]mcpCalendarOccurrence, 0, len(plain))
+	for _, r := range plain {
+		occ := mcpCalendarOccurrence{row: r}
+		if r.StartAt.Valid && r.EndAt.Valid {
+			occ.startAt, occ.endAt, occ.dated = r.StartAt.Time, r.EndAt.Time, true
+		}
+		out = append(out, occ)
+	}
+
+	series, err := deps.CalendarQueries.ListRecurringCalendarEventsAcrossCalendars(ctx, calendar.ListRecurringCalendarEventsAcrossCalendarsParams{
+		ViewerUserID:  viewerUserID,
+		UserID:        membershipUserID,
+		WorkspaceID:   workspaceID,
+		StartAt:       sql.NullTime{Time: endTime, Valid: true},
+		RecurrenceEnd: sql.NullTime{Time: startTime, Valid: true},
+	})
+	if err != nil {
+		return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
+	}
+	for _, r := range series {
+		if !r.StartAt.Valid || !r.EndAt.Valid {
+			continue
+		}
+		rule, perr := recurrence.ParseRule(r.RecurrenceRule)
+		if perr != nil || rule == nil {
+			continue
+		}
+		for _, inst := range recurrence.Expand(recurrence.Event{
+			StartAt:    r.StartAt.Time,
+			EndAt:      r.EndAt.Time,
+			Timezone:   r.Timezone,
+			Rule:       rule,
+			Exceptions: recurrence.ParseExceptions(r.RecurrenceExceptions),
+		}, startTime, endTime) {
+			out = append(out, mcpCalendarOccurrence{
+				row:     recurringRowAsPlain(r),
+				startAt: inst.StartAt,
+				endAt:   inst.EndAt,
+				dated:   true,
+			})
+		}
+	}
+
+	sort.Slice(out, func(i, j int) bool {
+		switch {
+		case out[i].dated && out[j].dated && !out[i].startAt.Equal(out[j].startAt):
+			return out[i].startAt.Before(out[j].startAt)
+		case out[i].dated != out[j].dated:
+			return out[i].dated
+		default:
+			return out[i].row.PublicID.String() < out[j].row.PublicID.String()
+		}
+	})
+	return out, nil
+}
+
+// recurringRowAsPlain narrows a recurring row to the shape the callers
+// project. The two queries select the same columns; sqlc names the row
+// types separately, so the copy is mechanical.
+func recurringRowAsPlain(r calendar.ListRecurringCalendarEventsAcrossCalendarsRow) calendar.ListCalendarEventsAcrossCalendarsRow {
+	return calendar.ListCalendarEventsAcrossCalendarsRow{
+		PublicID:                  r.PublicID,
+		CalendarID:                r.CalendarID,
+		CalendarPublicID:          r.CalendarPublicID,
+		Kind:                      r.Kind,
+		Visibility:                r.Visibility,
+		ShowAs:                    r.ShowAs,
+		Flexibility:               r.Flexibility,
+		Title:                     r.Title,
+		AllDay:                    r.AllDay,
+		StartAt:                   r.StartAt,
+		EndAt:                     r.EndAt,
+		Timezone:                  r.Timezone,
+		Location:                  r.Location,
+		OwnerUserID:               r.OwnerUserID,
+		BlockLabel:                r.BlockLabel,
+		TaskID:                    r.TaskID,
+		UpdatedAt:                 r.UpdatedAt,
+		CreatedAt:                 r.CreatedAt,
+		IsAttendee:                r.IsAttendee,
+		CalendarDefaultVisibility: r.CalendarDefaultVisibility,
+	}
+}
+
 func runListCalendarEvents(ctx context.Context, deps Deps, s *session, raw json.RawMessage) (any, error) {
 	var in struct {
 		StartDate string `json:"startDate"`
@@ -2817,20 +2945,13 @@ func runListCalendarEvents(ctx context.Context, deps Deps, s *session, raw json.
 	default:
 		return nil, apierrors.New(apierrors.McpToolArgumentsInvalid)
 	}
-	// The SQL query uses start_at < ? AND end_at > ? (overlap check),
-	// so we pass endTime as StartAt and startTime as EndAt.
-	rows, err := deps.CalendarQueries.ListCalendarEventsAcrossCalendars(ctx, calendar.ListCalendarEventsAcrossCalendarsParams{
-		ViewerUserID: s.userID,
-		UserID:       s.userID,
-		WorkspaceID:  s.workspaceID,
-		StartAt:      sql.NullTime{Time: endTime, Valid: true},
-		EndAt:        sql.NullTime{Time: startTime, Valid: true},
-	})
+	occurrences, err := listCalendarOccurrences(ctx, deps, s.userID, s.userID, s.workspaceID, startTime, endTime)
 	if err != nil {
-		return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
+		return nil, err
 	}
-	items := make([]map[string]any, 0, len(rows))
-	for _, r := range rows {
+	items := make([]map[string]any, 0, len(occurrences))
+	for _, occ := range occurrences {
+		r := occ.row
 		item := map[string]any{
 			"id":          r.PublicID.String(),
 			"calendarId":  r.CalendarPublicID.String(),
@@ -2840,19 +2961,17 @@ func runListCalendarEvents(ctx context.Context, deps Deps, s *session, raw json.
 			"title":       r.Title,
 			"allDay":      r.AllDay,
 		}
-		if r.AllDay {
-			if r.StartAt.Valid {
-				item["startDate"] = r.StartAt.Time.UTC().Format("2006-01-02")
-			}
-			if r.EndAt.Valid {
-				item["endDate"] = r.EndAt.Time.UTC().Format("2006-01-02")
-			}
-		} else {
-			if r.StartAt.Valid {
-				item["startAt"] = r.StartAt.Time.Unix()
-			}
-			if r.EndAt.Valid {
-				item["endAt"] = r.EndAt.Time.Unix()
+		// Each occurrence carries its own times. A series is reported as
+		// the meetings it produces in the window rather than as one row
+		// plus a rule the caller would have to expand, because the
+		// caller here is a model answering "what is on Tuesday".
+		if occ.dated {
+			if r.AllDay {
+				item["startDate"] = occ.startAt.UTC().Format("2006-01-02")
+				item["endDate"] = occ.endAt.UTC().Format("2006-01-02")
+			} else {
+				item["startAt"] = occ.startAt.Unix()
+				item["endAt"] = occ.endAt.Unix()
 			}
 		}
 		items = append(items, item)
@@ -3055,6 +3174,9 @@ func runUpdateCalendarEvent(ctx context.Context, deps Deps, s *session, raw json
 	if err != nil {
 		return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
 	}
+	if err := requireCalendarMembership(ctx, deps, s, owner.CalendarID); err != nil {
+		return nil, err
+	}
 	ok, err := canEditCalendarEvent(ctx, deps, s, owner.OwnerUserID, evt.ID, owner.CalendarID)
 	if err != nil || !ok {
 		return nil, apierrors.Newf(apierrors.McpToolExecutionFailed, "permission denied: cannot edit event")
@@ -3235,6 +3357,9 @@ func runDeleteCalendarEvent(ctx context.Context, deps Deps, s *session, raw json
 	if err != nil {
 		return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
 	}
+	if err := requireCalendarMembership(ctx, deps, s, owner.CalendarID); err != nil {
+		return nil, err
+	}
 	ok, err := canEditCalendarEvent(ctx, deps, s, owner.OwnerUserID, evt.ID, owner.CalendarID)
 	if err != nil || !ok {
 		return nil, apierrors.Newf(apierrors.McpToolExecutionFailed, "permission denied: cannot delete event")
@@ -3252,6 +3377,34 @@ func runDeleteCalendarEvent(ctx context.Context, deps Deps, s *session, raw json
 		return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
 	}
 	return map[string]any{"success": true}, nil
+}
+
+// workDayStartHour and workDayEndHour bound the window list_free_slots
+// searches. They are a stand-in for a real per-user working-hours
+// setting, which does not exist yet; naming them makes the assumption
+// visible rather than leaving two literals in the middle of a function.
+const (
+	workDayStartHour = 9
+	workDayEndHour   = 18
+)
+
+// resolveUserTimezone returns the IANA timezone to interpret a user's
+// day in: their own preference, else the workspace default, else UTC.
+//
+// Same chain as the REST handlers' resolveEffectiveTimezone, minus the
+// explicit-request tier, because no MCP tool takes a timezone argument.
+// Lookup failures fall through rather than erroring: a missing profile
+// row should degrade to the workspace's timezone, not fail the tool.
+func resolveUserTimezone(ctx context.Context, deps Deps, workspaceID, userID uint32) string {
+	var userTz string
+	if profile, err := deps.Queries.FindUserProfileById(ctx, userID); err == nil {
+		userTz = profile.Timezone
+	}
+	var wsTz string
+	if row, err := deps.Queries.FindWorkspaceTimezoneCountryById(ctx, workspaceID); err == nil {
+		wsTz = row.Timezone
+	}
+	return region.EffectiveTimezone(userTz, wsTz)
 }
 
 func runListFreeSlots(ctx context.Context, deps Deps, s *session, raw json.RawMessage) (any, error) {
@@ -3290,8 +3443,19 @@ func runListFreeSlots(ctx context.Context, deps Deps, s *session, raw json.RawMe
 		in.DurationMinutes = 60
 	}
 
-	workStart := time.Date(date.Year(), date.Month(), date.Day(), 9, 0, 0, 0, time.UTC)
-	workEnd := time.Date(date.Year(), date.Month(), date.Day(), 18, 0, 0, 0, time.UTC)
+	// The working day belongs to the person whose day it is, so the
+	// window is built in their timezone rather than in UTC. Fixed at UTC
+	// it named 18:00–03:00 for a Tokyo user: the real working day fell
+	// outside the query window, so every meeting in it was invisible,
+	// the day was reported wholly free, and the agent booked the middle
+	// of the night.
+	tzName := resolveUserTimezone(ctx, deps, s.workspaceID, targetUserID)
+	loc, lerr := time.LoadLocation(tzName)
+	if lerr != nil {
+		loc = time.UTC
+	}
+	workStart := time.Date(date.Year(), date.Month(), date.Day(), workDayStartHour, 0, 0, 0, loc)
+	workEnd := time.Date(date.Year(), date.Month(), date.Day(), workDayEndHour, 0, 0, 0, loc)
 
 	// The viewer here is the target, not the caller. This tool returns
 	// free windows and never any event data, so the question it has to
@@ -3300,35 +3464,29 @@ func runListFreeSlots(ctx context.Context, deps Deps, s *session, raw json.RawMe
 	// confidential events and report an occupied slot as free. What the
 	// caller learns is availability, which is what show_as governs: an
 	// owner who does not want a block to read as taken marks it free.
-	rows, err := deps.CalendarQueries.ListCalendarEventsAcrossCalendars(ctx, calendar.ListCalendarEventsAcrossCalendarsParams{
-		ViewerUserID: targetUserID,
-		UserID:       targetUserID,
-		WorkspaceID:  s.workspaceID,
-		StartAt:      sql.NullTime{Time: workEnd, Valid: true},
-		EndAt:        sql.NullTime{Time: workStart, Valid: true},
-	})
+	occurrences, err := listCalendarOccurrences(ctx, deps, targetUserID, targetUserID, s.workspaceID, workStart, workEnd)
 	if err != nil {
-		return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
+		return nil, err
 	}
 
 	// Collect busy intervals, clamped to working hours.
 	type interval struct{ start, end time.Time }
-	busy := make([]interval, 0, len(rows))
-	for _, r := range rows {
+	busy := make([]interval, 0, len(occurrences))
+	for _, occ := range occurrences {
+		r := occ.row
 		if r.AllDay {
 			continue
 		}
 		if string(r.ShowAs) == "free" {
 			continue
 		}
-		// start_at / end_at are nullable. Undated events
-		// (planning-stage placeholders) don't contribute to busy
-		// intervals, so skip them.
-		if !r.StartAt.Valid || !r.EndAt.Valid {
+		// Undated events (planning-stage placeholders) occupy no time,
+		// so they contribute nothing to the busy map.
+		if !occ.dated {
 			continue
 		}
-		s := r.StartAt.Time
-		e := r.EndAt.Time
+		s := occ.startAt
+		e := occ.endAt
 		if s.Before(workStart) {
 			s = workStart
 		}

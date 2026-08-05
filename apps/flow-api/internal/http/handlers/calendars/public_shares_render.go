@@ -6,10 +6,10 @@ import (
 	"encoding/hex"
 	"time"
 
-	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated/calendar"
 	apierrors "github.com/libraz/nodate-flow/apps/flow-api/internal/errors"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/handlers/handlerutil"
 	"github.com/libraz/nodate-flow/packages/go-shared/apierr"
+	"github.com/libraz/nodate-flow/packages/go-shared/eventacl"
 )
 
 // --- Public render (unauthenticated) ---
@@ -132,7 +132,20 @@ func RenderPublicShare(deps Deps) func(context.Context, *RenderPublicShareInput)
 			// descriptive content is stripped so title/notes/location/url
 			// never leak. `confidential` events are excluded entirely by the
 			// render query.
-			if e.Visibility == calendar.CalendarEventsVisibilityPrivate {
+			//
+			// `default` resolves against the calendar's setting rather than
+			// falling through as public. It is the column's own default, so
+			// most events carry it, and reading it as public put the full
+			// text of ordinary events on an unauthenticated URL — the one
+			// place where guessing wrong is irreversible.
+			if !eventacl.CanSeeDetails(
+				eventacl.Event{
+					Visibility:      eventacl.Visibility(e.Visibility),
+					OwnerUserID:     0,
+					CalendarDefault: eventacl.Visibility(e.CalendarDefaultVisibility),
+				},
+				eventacl.Actor{},
+			) {
 				stripPrivateEventDetails(&ev)
 			}
 			out.Body.Events[i] = ev

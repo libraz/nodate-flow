@@ -7,7 +7,8 @@
 // hiding what is written on it:
 //
 //	public        every calendar member sees the event and its details
-//	default       treated as public (see the note below)
+//	default       whatever the calendar's default_event_visibility says,
+//	              which is public or private and never confidential
 //	private       every calendar member sees that the time is taken;
 //	              the location, memo and URL are for the owner and the
 //	              people actually invited
@@ -39,9 +40,11 @@
 // keeps the SQL fragment free of a join on `calendars` that several of
 // the list queries do not have.
 //
-// `default` is treated as public because nothing resolves it against a
-// calendar-level setting yet — there is no such setting. That is a
-// separate gap; this package does not paper over it by guessing.
+// `default` resolves against calendars.default_event_visibility, which
+// is the setting the event column's own comment always referred to.
+// Callers supply it as Event.CalendarDefault; the zero value reads as
+// public, which is the column default and the behaviour that predates
+// the setting.
 package eventacl
 
 // Visibility mirrors the calendar_events.visibility ENUM string.
@@ -59,6 +62,28 @@ const (
 type Event struct {
 	Visibility  Visibility
 	OwnerUserID uint32
+	// CalendarDefault is the calendars.default_event_visibility of the
+	// calendar the event sits on, and is what Visibility resolves to when
+	// it is 'default'. Leaving it zero means public, which is both the
+	// column's own default and the behaviour that predates it.
+	CalendarDefault Visibility
+}
+
+// effective resolves 'default' against the calendar's setting.
+//
+// The setting cannot name confidential, so 'default' never hides a row —
+// which is what lets the SQL row filter stay free of a join on calendars.
+// An unrecognised or absent setting reads as public, matching the column
+// default rather than inventing a stricter answer the operator did not
+// choose.
+func (e Event) effective() Visibility {
+	if e.Visibility != VisibilityDefault && e.Visibility != "" {
+		return e.Visibility
+	}
+	if e.CalendarDefault == VisibilityPrivate {
+		return VisibilityPrivate
+	}
+	return VisibilityPublic
 }
 
 // Actor is the requesting user's context. IsAttendee is true when the
@@ -83,7 +108,7 @@ type Actor struct {
 // express, and treating attendance as consent here would let the owner
 // leak the event by adding someone to it.
 func CanSee(evt Event, actor Actor) bool {
-	if evt.Visibility != VisibilityConfidential {
+	if evt.effective() != VisibilityConfidential {
 		return true
 	}
 	return actor.UserID != 0 && evt.OwnerUserID == actor.UserID
@@ -99,7 +124,7 @@ func CanSeeDetails(evt Event, actor Actor) bool {
 	if !CanSee(evt, actor) {
 		return false
 	}
-	if evt.Visibility != VisibilityPrivate {
+	if evt.effective() != VisibilityPrivate {
 		return true
 	}
 	if actor.UserID != 0 && evt.OwnerUserID == actor.UserID {
@@ -130,3 +155,85 @@ const AttendeeExistsSQL = `EXISTS (
       AND a.user_id = sqlc.arg(viewer_user_id)
       AND a.enabled = TRUE
   )`
+
+// ----------------------------------------------------------------------------
+// Write rule
+// ----------------------------------------------------------------------------
+
+// Role mirrors the calendar_members.role ENUM.
+type Role string
+
+const (
+	RoleOwner   Role = "owner"
+	RoleManager Role = "manager"
+	RoleEditor  Role = "editor"
+	RoleViewer  Role = "viewer"
+	// RoleNone is the zero value: the actor holds no membership row.
+	RoleNone Role = ""
+)
+
+// roleRank orders the roles so a check reads as "at least this much".
+// An unrecognised value ranks below viewer: a role added to the enum but
+// not here must fail closed rather than outrank everyone.
+func roleRank(r Role) int {
+	switch r {
+	case RoleOwner:
+		return 4
+	case RoleManager:
+		return 3
+	case RoleEditor:
+		return 2
+	case RoleViewer:
+		return 1
+	}
+	return 0
+}
+
+// Editor is the actor's standing on a calendar, as far as changing what
+// is on it is concerned.
+type Editor struct {
+	UserID uint32
+	// CalendarRole is the actor's calendar_members.role, or RoleNone
+	// when they hold no membership.
+	CalendarRole Role
+	// AttendeeCanEdit is true when the actor is an attendee of the event
+	// whose can_edit flag the owner set.
+	AttendeeCanEdit bool
+}
+
+// CanEdit reports whether the actor may change an existing event.
+//
+// Three ways to qualify: owning the event, being an attendee the owner
+// marked can_edit, or holding manager or owner on the calendar.
+// Workspace membership alone is not one of them — a calendar's audience
+// is narrower than its workspace, and an editor may add their own events
+// without gaining the right to rewrite everyone else's.
+//
+// The manager path is the delegation case, and it is why this rule reads
+// calendar_members rather than calendars.owner_user_id. A shared
+// calendar leaves owner_user_id NULL on purpose (naming an owner makes
+// the FK cascade delete everyone's history with that user), so an
+// implementation keyed on it refuses every manager on exactly the
+// calendars managers exist for.
+func CanEdit(eventOwnerUserID uint32, actor Editor) bool {
+	if actor.UserID != 0 && eventOwnerUserID == actor.UserID {
+		return true
+	}
+	if actor.AttendeeCanEdit {
+		return true
+	}
+	return roleRank(actor.CalendarRole) >= roleRank(RoleManager)
+}
+
+// CanSetOwner reports whether the actor may file an event under the
+// given owner, which decides whose layer and colour it appears on.
+//
+// Anyone may create their own events. Filing one under somebody else is
+// delegation and takes manager or owner on the calendar; the alternative
+// is that any editor can put commitments on a colleague's layer.
+func CanSetOwner(ownerUserID uint32, actor Editor) bool {
+	if actor.UserID != 0 && actor.UserID == ownerUserID {
+		return true
+	}
+	return roleRank(actor.CalendarRole) >= roleRank(RoleManager)
+}

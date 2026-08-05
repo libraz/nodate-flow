@@ -77,9 +77,25 @@ type Store interface {
 	// replayed. Returns [ErrNotFound] when no row at all matches.
 	FindAnyByRefreshHash(ctx context.Context, hash string) (*Session, error)
 
+	// FindSupersededBy looks up the session that rotated the given
+	// refresh hash away, whatever state that session is now in.
+	//
+	// A match means the token being presented was replaced during a
+	// rotation of that session, so someone is still holding a token the
+	// legitimate client already gave up. That is the reuse signal, and
+	// it is deliberately distinct from FindAnyByRefreshHash: a hash
+	// that matches a revoked session's *current* token is an ordinary
+	// invalid token — the session was signed out — and tearing down the
+	// user's other sessions over it destroys ones they chose to keep.
+	//
+	// Returns [ErrNotFound] when no session superseded the hash.
+	FindSupersededBy(ctx context.Context, hash string) (*Session, error)
+
 	// RotateRefreshHash replaces the refresh hash and expiry on the
 	// session identified by [Session.InternalID] (MySQL) or
-	// [Session.RefreshHash] (Redis; the implementation may rekey).
+	// [Session.RefreshHash] (Redis; the implementation may rekey). The
+	// hash being replaced is recorded so a later replay of it can be
+	// recognised; see FindSupersededBy.
 	RotateRefreshHash(ctx context.Context, oldHash, newHash string, expiresAt time.Time) error
 
 	// Revoke marks a session as revoked by (userID, publicID). A
