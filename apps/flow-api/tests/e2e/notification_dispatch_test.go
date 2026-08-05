@@ -125,7 +125,7 @@ func TestNotificationDispatchOnAssignee(t *testing.T) {
 	require.NoError(t, err, "the dispatched notification row must be readable")
 	require.Equal(t, memberInternalID, gotRecipientID)
 	require.True(t, gotSourceEvent.Valid, "source_event_id must be populated by fan-out")
-	require.Equal(t, actorEventID, uint64(gotSourceEvent.Int64))
+	require.Equal(t, actorEventID, uint64(gotSourceEvent.Int64)) //#nosec G115 -- source_event_id is BIGINT UNSIGNED read back through NullInt64; the id was written by this test
 	require.Equal(t, "task.actor.added", gotEventType)
 	require.Equal(t, "in_app", gotChannel)
 	require.Equal(t, "task", gotResourceType)

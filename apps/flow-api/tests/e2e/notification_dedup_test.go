@@ -98,7 +98,7 @@ func TestNotificationFanoutDedup(t *testing.T) {
 	`, recipientInternalID).Scan(&sourceEventID)
 	require.NoError(t, err)
 	require.True(t, sourceEventID.Valid, "source_event_id should be populated")
-	require.Equal(t, eventInternalID, uint64(sourceEventID.Int64))
+	require.Equal(t, eventInternalID, uint64(sourceEventID.Int64)) //#nosec G115 -- source_event_id is BIGINT UNSIGNED read back through NullInt64; the id was written by this test
 }
 
 // lookupWorkspaceInternalID resolves a workspace's internal id from its

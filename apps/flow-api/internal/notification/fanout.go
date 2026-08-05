@@ -259,7 +259,7 @@ func (f *Fanout) fanout(ctx context.Context, workspaceID uint32, eventType strin
 
 	sourceEventID := sql.NullInt64{}
 	if eventInternalID != 0 {
-		sourceEventID = sql.NullInt64{Int64: int64(eventInternalID), Valid: true}
+		sourceEventID = sql.NullInt64{Int64: int64(eventInternalID), Valid: true} //#nosec G115 -- events.id is BIGINT UNSIGNED, but database/sql carries the nullable column as NullInt64; auto-increment ids stay far below int64 max
 	}
 
 	actorID := sql.NullInt32{}
