@@ -8,7 +8,9 @@
   font-family: var(--nf-font-sans);
   font-size: var(--nf-text-sm);
   z-index: var(--nf-z-popover);
+  /* nf-token-override: component dimension, not a spacing step */
   min-inline-size: 12rem;
+  /* nf-token-override: component dimension, not a spacing step */
   max-inline-size: 24rem;
 }
 
@@ -18,8 +20,10 @@
 }
 
 /* Touch-friendly sizing on mobile */
+/* nf-token-override: breakpoint, and custom properties do not work in at-rule conditions */
 @media (max-width: 767px) {
   .popover {
+    /* nf-token-override: component dimension, not a spacing step */
     min-inline-size: 16rem;
     max-inline-size: calc(100vw - var(--nf-space-4) * 2);
     font-size: var(--nf-text-base);

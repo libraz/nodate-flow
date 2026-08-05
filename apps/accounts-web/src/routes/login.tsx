@@ -234,13 +234,17 @@ const DEV_PANEL_STYLES = `
 }
 .dql-dot {
   flex-shrink: 0;
+  // nf-token-override: component dimension, not a spacing step
   width: 6px;
+  // nf-token-override: component dimension, not a spacing step
   height: 6px;
   border-radius: 50%;
   background: var(--nf-color-fg-subtle);
 }
 .dql-dot--hero {
+  // nf-token-override: component dimension, not a spacing step
   width: 8px;
+  // nf-token-override: component dimension, not a spacing step
   height: 8px;
   background: var(--nf-color-warning);
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--nf-color-warning) 25%, transparent);
@@ -280,6 +284,7 @@ const DEV_PANEL_STYLES = `
   text-align: center;
   letter-spacing: 0.02em;
 }
+// nf-token-override: component dimension, not a spacing step
 @media (max-width: 360px) {
   .dql-email { display: none; }
 }

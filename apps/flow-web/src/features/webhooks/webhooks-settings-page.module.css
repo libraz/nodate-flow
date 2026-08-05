@@ -80,6 +80,7 @@
 .urlCell {
   font-family: var(--nf-font-mono, monospace);
   font-size: var(--nf-text-xs);
+  /* nf-token-override: component dimension, not a spacing step */
   max-inline-size: 18rem;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -87,6 +88,7 @@
 }
 
 .descriptionCell {
+  /* nf-token-override: component dimension, not a spacing step */
   max-inline-size: 14rem;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -97,6 +99,7 @@
   display: flex;
   flex-wrap: wrap;
   gap: var(--nf-space-1);
+  /* nf-token-override: component dimension, not a spacing step */
   max-inline-size: 16rem;
 }
 
@@ -111,6 +114,7 @@
   gap: var(--nf-space-px);
   margin: calc(-1 * var(--nf-space-4));
   padding: var(--nf-space-2);
+  /* nf-token-override: component dimension, not a spacing step */
   min-inline-size: 12rem;
 }
 
@@ -141,7 +145,9 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  /* nf-token-override: component dimension, not a spacing step */
   inline-size: 1.75rem;
+  /* nf-token-override: component dimension, not a spacing step */
   block-size: 1.75rem;
   border-radius: var(--nf-radius-sm);
   color: var(--nf-color-fg-muted);

@@ -52,6 +52,7 @@
 .preview {
   display: flex;
   width: 100%;
+  /* nf-token-override: component dimension, not a spacing step */
   height: 2.75rem;
   align-items: flex-end;
   overflow: hidden;
@@ -66,6 +67,7 @@
 }
 
 .previewBar {
+  /* nf-token-override: component dimension, not a spacing step */
   height: 0.375rem;
 }
 

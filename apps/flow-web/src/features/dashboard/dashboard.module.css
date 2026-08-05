@@ -37,6 +37,7 @@
   align-content: start;
 }
 
+/* nf-token-override: breakpoint, and custom properties do not work in at-rule conditions */
 @media (max-width: 640px) {
   .grid {
     grid-template-columns: 1fr;
@@ -52,6 +53,7 @@
   border-radius: var(--nf-radius-md);
   box-shadow: var(--nf-shadow-sm);
   overflow: hidden;
+  /* nf-token-override: component dimension, not a spacing step */
   min-block-size: 10rem;
   transition:
     box-shadow var(--nf-duration-fast) var(--nf-ease-standard),
@@ -95,7 +97,9 @@
   display: flex;
   align-items: center;
   justify-content: center;
+  /* nf-token-override: component dimension, not a spacing step */
   inline-size: 1.5rem;
+  /* nf-token-override: component dimension, not a spacing step */
   block-size: 1.5rem;
   color: var(--nf-color-accent);
   flex-shrink: 0;
@@ -116,7 +120,9 @@
   display: flex;
   align-items: center;
   justify-content: center;
+  /* nf-token-override: component dimension, not a spacing step */
   inline-size: 1.75rem;
+  /* nf-token-override: component dimension, not a spacing step */
   block-size: 1.75rem;
   padding: 0;
   border: none;
@@ -158,7 +164,9 @@
   position: absolute;
   inset-block-end: 0;
   inset-inline-end: 0;
+  /* nf-token-override: component dimension, not a spacing step */
   inline-size: 1rem;
+  /* nf-token-override: component dimension, not a spacing step */
   block-size: 1rem;
   cursor: nwse-resize;
   opacity: 0.4;

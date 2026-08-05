@@ -16,6 +16,7 @@
   gap: var(--nf-space-6);
   padding-block: var(--nf-space-6);
   padding-inline: var(--nf-space-6);
+  /* nf-token-override: component dimension, not a spacing step */
   max-inline-size: 56rem;
   margin-inline: auto;
   inline-size: 100%;

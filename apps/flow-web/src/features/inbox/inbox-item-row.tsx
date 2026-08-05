@@ -87,7 +87,9 @@ export default function InboxItemRow({
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
+            // nf-token-override: component dimension, not a spacing step
             inlineSize: '2rem',
+            // nf-token-override: component dimension, not a spacing step
             blockSize: '2rem',
             borderRadius: 'var(--nf-radius-md)',
             background: 'var(--nf-color-surface)',

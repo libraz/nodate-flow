@@ -18,7 +18,9 @@ export default function LinkedEventsSkeleton(): ReactElement {
     <div className={styles.skeleton} aria-hidden="true">
       {ROW_TITLE_WIDTHS.map((titleWidth, idx) => {
         const titleStyle: CSSProperties = { inlineSize: titleWidth };
+        // nf-token-override: placeholder sized to the content it stands in for, not a spacing step
         const glyphStyle: CSSProperties = { inlineSize: '0.875rem' };
+        // nf-token-override: placeholder sized to the content it stands in for, not a spacing step
         const timeStyle: CSSProperties = { inlineSize: '4rem' };
         return (
           // biome-ignore lint/suspicious/noArrayIndexKey: static-length skeleton, no reorder

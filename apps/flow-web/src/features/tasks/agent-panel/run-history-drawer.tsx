@@ -147,6 +147,7 @@ export default function AgentRunHistoryDrawer({
       title={t('task_detail.agent.run_history')}
       side="inline-end"
     >
+      {/* nf-token-override: placeholder sized to the content it stands in for, not a spacing step */}
       <Suspense fallback={<Skeleton style={{ blockSize: '4rem', inlineSize: '100%' }} />}>
         <RunHistoryBody taskId={taskId} locale={locale} />
       </Suspense>

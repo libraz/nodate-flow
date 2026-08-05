@@ -50,6 +50,7 @@
   gap: var(--nf-space-4);
 }
 
+/* nf-token-override: breakpoint, and custom properties do not work in at-rule conditions */
 @media (max-width: 48rem) {
   .kpiGrid {
     grid-template-columns: 1fr;
@@ -61,6 +62,7 @@
   flex-direction: column;
   gap: var(--nf-space-2);
   padding: var(--nf-space-4) var(--nf-space-5);
+  /* nf-token-override: component dimension, not a spacing step */
   min-block-size: 6.5rem;
 }
 
@@ -107,6 +109,7 @@
 }
 
 .acceptanceTrack {
+  /* nf-token-override: component dimension, not a spacing step */
   block-size: 0.5rem;
   inline-size: 100%;
   border-radius: var(--nf-radius-pill);

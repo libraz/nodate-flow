@@ -72,7 +72,9 @@ function ActorPicker({ workspaceId, selected, onSelect, label }: ActorPickerProp
       onChange={handleChange}
       aria-label={label}
       style={{
+        // nf-token-override: component dimension, not a spacing step
         minInlineSize: '14rem',
+        // nf-token-override: component dimension, not a spacing step
         minBlockSize: '6rem',
         padding: 'var(--nf-space-1)',
         borderRadius: 'var(--nf-radius-xs)',

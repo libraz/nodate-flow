@@ -43,6 +43,7 @@
   padding-inline: var(--nf-space-4);
   background: var(--nf-color-bg-elevated);
   border-block-end: var(--nf-space-px) solid var(--nf-color-border);
+  /* nf-token-override: component dimension, not a spacing step */
   min-block-size: 3.5rem;
   inline-size: 100%;
   min-inline-size: 0;
@@ -57,6 +58,7 @@
 
 .workspaceSelect {
   min-inline-size: 0;
+  /* nf-token-override: component dimension, not a spacing step */
   max-inline-size: 14rem;
   padding-block: var(--nf-space-1);
   padding-inline: var(--nf-space-2);
@@ -110,6 +112,7 @@
  */
 .breadcrumbProject {
   display: inline-block;
+  /* nf-token-override: component dimension, not a spacing step */
   max-inline-size: 18rem;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -119,6 +122,7 @@
 
 .search {
   inline-size: 100%;
+  /* nf-token-override: component dimension, not a spacing step */
   max-inline-size: 20rem;
   flex: 0 1 20rem;
 }
@@ -191,7 +195,9 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  /* nf-token-override: component dimension, not a spacing step */
   inline-size: 2.25rem;
+  /* nf-token-override: component dimension, not a spacing step */
   block-size: 2.25rem;
   background: transparent;
   border: var(--nf-space-px) solid var(--nf-color-border);
@@ -214,7 +220,9 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  /* nf-token-override: component dimension, not a spacing step */
   inline-size: 2.25rem;
+  /* nf-token-override: component dimension, not a spacing step */
   block-size: 2.25rem;
   padding: 0;
   border-radius: var(--nf-radius-pill);
@@ -254,6 +262,7 @@
   flex-direction: column;
   gap: var(--nf-space-1);
   padding: 0;
+  /* nf-token-override: component dimension, not a spacing step */
   min-inline-size: 14rem;
 }
 
@@ -347,6 +356,7 @@
  * still reachable via the workspace-switcher in the left column, so
  * hiding it in the breadcrumb at this width is not a loss of affordance.
  */
+/* nf-token-override: breakpoint, and custom properties do not work in at-rule conditions */
 @container header (max-width: 767px) {
   /*
    * Hide the topbar left slot (workspace switcher) at mobile widths.
@@ -373,9 +383,13 @@
    * a 44px constant, so exact rem values are used here.
    */
   .searchButton {
+    /* nf-token-override: component dimension, not a spacing step */
     inline-size: 2.75rem;
+    /* nf-token-override: component dimension, not a spacing step */
     block-size: 2.75rem;
+    /* nf-token-override: component dimension, not a spacing step */
     min-inline-size: 2.75rem;
+    /* nf-token-override: component dimension, not a spacing step */
     min-block-size: 2.75rem;
     padding: 0;
     justify-content: center;
@@ -384,12 +398,16 @@
 
   .iconButton,
   .avatarTrigger {
+    /* nf-token-override: component dimension, not a spacing step */
     min-inline-size: 2.75rem;
+    /* nf-token-override: component dimension, not a spacing step */
     min-block-size: 2.75rem;
   }
 
   .inlineNotificationBell button {
+    /* nf-token-override: component dimension, not a spacing step */
     min-inline-size: 2.75rem;
+    /* nf-token-override: component dimension, not a spacing step */
     min-block-size: 2.75rem;
   }
 
@@ -410,6 +428,7 @@
   }
 
   .breadcrumbProject {
+    /* nf-token-override: component dimension, not a spacing step */
     max-inline-size: 10rem;
   }
 
@@ -419,6 +438,7 @@
    * and squeeze the action cluster in the right grid track.
    */
   .workspaceSelect {
+    /* nf-token-override: component dimension, not a spacing step */
     max-inline-size: 10rem;
   }
 }
@@ -427,6 +447,7 @@
  * Ultra (<480px): additionally hide the inline notification bell; it is
  * still accessible from the avatar dropdown.
  */
+/* nf-token-override: breakpoint, and custom properties do not work in at-rule conditions */
 @container header (max-width: 479px) {
   .inlineNotificationBell {
     display: none;
@@ -451,6 +472,7 @@
    * element is narrower than the label.
    */
   .workspaceSelect {
+    /* nf-token-override: component dimension, not a spacing step */
     max-inline-size: 7rem;
   }
 }
@@ -474,6 +496,7 @@
  * Gating this rule on the viewport media query keeps the padding in
  * lockstep with the hamburger's actual visibility.
  */
+/* nf-token-override: breakpoint, and custom properties do not work in at-rule conditions */
 @media (max-width: 767px) {
   .topBar {
     padding-inline-start: var(--nf-space-16);

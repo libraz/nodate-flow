@@ -107,6 +107,7 @@ export default function SetupPage(): ReactElement {
     >
       <div
         style={{
+          // nf-token-override: component dimension, not a spacing step
           inlineSize: 'min(28rem, 100%)',
           display: 'flex',
           flexDirection: 'column',

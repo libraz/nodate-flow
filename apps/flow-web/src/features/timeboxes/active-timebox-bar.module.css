@@ -74,12 +74,14 @@
  * and the two actions visible so the user can stop the timebox from
  * any device width.
  */
+/* nf-token-override: breakpoint, and custom properties do not work in at-rule conditions */
 @media (max-width: 767px) {
   .workspace {
     display: none;
   }
 }
 
+/* nf-token-override: breakpoint, and custom properties do not work in at-rule conditions */
 @media (max-width: 479px) {
   .progress {
     display: none;

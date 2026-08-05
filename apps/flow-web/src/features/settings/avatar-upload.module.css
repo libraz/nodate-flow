@@ -44,7 +44,9 @@
 
 .preview {
   position: relative;
+  /* nf-token-override: component dimension, not a spacing step */
   inline-size: 7.5rem;
+  /* nf-token-override: component dimension, not a spacing step */
   block-size: 7.5rem;
   padding: 0;
   margin: 0;
@@ -118,7 +120,9 @@
 }
 
 .overlayIcon {
+  /* nf-token-override: component dimension, not a spacing step */
   inline-size: 1.5rem;
+  /* nf-token-override: component dimension, not a spacing step */
   block-size: 1.5rem;
   stroke-width: 1.5;
 }

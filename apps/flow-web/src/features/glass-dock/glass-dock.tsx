@@ -639,6 +639,7 @@ function GlassDockImpl(): ReactElement {
         position: 'fixed',
         insetBlockEnd: 'var(--nf-space-4)',
         insetInlineEnd: 'var(--nf-space-4)',
+        // nf-token-override: component dimension, not a spacing step
         inlineSize: '360px',
         maxBlockSize: '70vh',
         display: 'flex',
@@ -673,7 +674,9 @@ function GlassDockImpl(): ReactElement {
             display: 'inline-flex',
             alignItems: 'center',
             justifyContent: 'center',
+            // nf-token-override: component dimension, not a spacing step
             inlineSize: '1.75rem',
+            // nf-token-override: component dimension, not a spacing step
             blockSize: '1.75rem',
             borderRadius: 'var(--nf-radius-sm)',
             border: 'none',

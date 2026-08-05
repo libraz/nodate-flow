@@ -25,6 +25,7 @@
 .table {
   display: grid;
   inline-size: 100%;
+  /* nf-token-override: component dimension, not a spacing step */
   min-inline-size: 56rem;
 }
 
@@ -96,6 +97,7 @@
   color: var(--nf-color-fg);
   border-inline-end: 1px solid var(--nf-color-border);
   cursor: default;
+  /* nf-token-override: component dimension, not a spacing step */
   min-block-size: 2.25rem;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -188,7 +190,9 @@
 /* ── Status / Priority indicators ───────────────────────────── */
 
 .statusDot {
+  /* nf-token-override: component dimension, not a spacing step */
   inline-size: 0.5rem;
+  /* nf-token-override: component dimension, not a spacing step */
   block-size: 0.5rem;
   border-radius: var(--nf-radius-pill);
   flex-shrink: 0;
@@ -196,7 +200,9 @@
 }
 
 .priorityBar {
+  /* nf-token-override: component dimension, not a spacing step */
   inline-size: 0.25rem;
+  /* nf-token-override: component dimension, not a spacing step */
   block-size: 0.75rem;
   border-radius: 1px;
   flex-shrink: 0;
@@ -286,6 +292,7 @@
   /* default: visible */
 }
 
+/* nf-token-override: breakpoint, and custom properties do not work in at-rule conditions */
 @media (max-width: 767px) {
   .headerRow,
   .bodyRow {

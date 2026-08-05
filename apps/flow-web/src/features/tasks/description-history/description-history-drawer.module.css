@@ -12,6 +12,7 @@
   min-block-size: 0;
 }
 
+/* nf-token-override: breakpoint, and custom properties do not work in at-rule conditions */
 @media (max-width: 768px) {
   .body {
     grid-template-columns: 1fr;
@@ -110,6 +111,7 @@
   line-height: var(--nf-leading-snug);
   white-space: pre-wrap;
   overflow-x: auto;
+  /* nf-token-override: component dimension, not a spacing step */
   min-block-size: 8rem;
 }
 

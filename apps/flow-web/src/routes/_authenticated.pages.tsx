@@ -22,7 +22,9 @@ function PagesLayout(): ReactElement {
             gap: 'var(--nf-space-4)',
           }}
         >
+          {/* nf-token-override: placeholder sized to the content it stands in for, not a spacing step */}
           <Skeleton style={{ blockSize: '2rem', inlineSize: '12rem' }} />
+          {/* nf-token-override: placeholder sized to the content it stands in for, not a spacing step */}
           <Skeleton style={{ blockSize: '24rem', inlineSize: '100%' }} />
         </div>
       }

@@ -112,6 +112,7 @@ export default function ProjectList({ workspaceId }: ProjectListProps): ReactEle
         columns={columns}
         data={projects}
         emptyContent={t('projects.empty')}
+        // nf-token-override: component dimension, not a spacing step
         style={{ minBlockSize: '20rem' }}
       />
 

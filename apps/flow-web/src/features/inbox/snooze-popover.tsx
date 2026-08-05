@@ -44,6 +44,7 @@ export default function SnoozePopover({ children, onSnooze }: SnoozePopoverProps
         flexDirection: 'column',
         gap: 'var(--nf-space-1)',
         padding: '0.375rem',
+        // nf-token-override: component dimension, not a spacing step
         minInlineSize: '10rem',
       }}
     >

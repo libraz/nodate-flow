@@ -20,7 +20,9 @@
   padding-block: var(--nf-space-3);
   font-family: var(--nf-font-sans);
   font-size: var(--nf-text-sm);
+  /* nf-token-override: component dimension, not a spacing step */
   min-inline-size: 16rem;
+  /* nf-token-override: component dimension, not a spacing step */
   max-inline-size: 24rem;
 }
 

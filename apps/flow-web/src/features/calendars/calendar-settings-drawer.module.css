@@ -36,7 +36,9 @@
 }
 
 .swatch {
+  /* nf-token-override: component dimension, not a spacing step */
   inline-size: 1.75rem;
+  /* nf-token-override: component dimension, not a spacing step */
   block-size: 1.75rem;
   border-radius: var(--nf-radius-pill);
   border: 2px solid var(--nf-color-border);
@@ -114,16 +116,19 @@
 }
 
 .fallbackHead {
+  /* nf-token-override: component dimension, not a spacing step */
   block-size: 2rem;
   inline-size: 60%;
 }
 
 .fallbackField {
+  /* nf-token-override: component dimension, not a spacing step */
   block-size: 2.5rem;
   inline-size: 100%;
 }
 
 .fallbackBody {
+  /* nf-token-override: component dimension, not a spacing step */
   block-size: 4rem;
   inline-size: 100%;
 }

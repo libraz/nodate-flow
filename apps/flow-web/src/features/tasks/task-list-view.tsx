@@ -375,7 +375,9 @@ function InlinePriorityCell({
       <span
         aria-hidden
         style={{
+          // nf-token-override: component dimension, not a spacing step
           width: '0.375rem',
+          // nf-token-override: component dimension, not a spacing step
           height: '0.75rem',
           borderRadius: '0.125rem',
           background: color,
@@ -714,7 +716,9 @@ export default function TaskListView({ projectId }: TaskListViewProps): ReactEle
             <span
               aria-hidden
               style={{
+                // nf-token-override: component dimension, not a spacing step
                 width: '0.375rem',
+                // nf-token-override: component dimension, not a spacing step
                 height: '0.375rem',
                 borderRadius: 'var(--nf-radius-pill)',
                 background: color,
@@ -770,7 +774,9 @@ export default function TaskListView({ projectId }: TaskListViewProps): ReactEle
             <span
               aria-hidden
               style={{
+                // nf-token-override: component dimension, not a spacing step
                 inlineSize: '0.5rem',
+                // nf-token-override: component dimension, not a spacing step
                 blockSize: '0.5rem',
                 borderRadius: 'var(--nf-radius-pill)',
                 background: 'var(--nf-color-accent)',
@@ -842,6 +848,7 @@ export default function TaskListView({ projectId }: TaskListViewProps): ReactEle
         onRowSelectionChange={setRowSelection}
         selectAllRowsLabel={t('tasks.list.select_all')}
         selectRowLabel={(index) => t('tasks.list.select_row', { index })}
+        // nf-token-override: component dimension, not a spacing step
         style={{ minBlockSize: '20rem' }}
       />
       {/*

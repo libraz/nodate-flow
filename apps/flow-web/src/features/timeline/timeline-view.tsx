@@ -185,6 +185,7 @@ function TimelineInner({
       ) : (
         <div
           style={{
+            // nf-token-override: component dimension, not a spacing step
             maxBlockSize: '40rem',
             overflowY: 'auto',
             display: 'flex',

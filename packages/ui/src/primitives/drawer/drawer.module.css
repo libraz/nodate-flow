@@ -25,6 +25,7 @@
 .inlineEnd {
   inset-block: 0;
   inset-inline-end: 0;
+  /* nf-token-override: component dimension, not a spacing step */
   inline-size: 24rem;
   max-inline-size: 100%;
   border-start-start-radius: var(--nf-radius-lg);
@@ -34,6 +35,7 @@
 .inlineStart {
   inset-block: 0;
   inset-inline-start: 0;
+  /* nf-token-override: component dimension, not a spacing step */
   inline-size: 24rem;
   max-inline-size: 100%;
   border-start-end-radius: var(--nf-radius-lg);
@@ -43,6 +45,7 @@
 .blockStart {
   inset-inline: 0;
   inset-block-start: 0;
+  /* nf-token-override: component dimension, not a spacing step */
   block-size: 18rem;
   max-block-size: 100%;
   border-end-start-radius: var(--nf-radius-lg);
@@ -52,6 +55,7 @@
 .blockEnd {
   inset-inline: 0;
   inset-block-end: 0;
+  /* nf-token-override: component dimension, not a spacing step */
   block-size: 18rem;
   max-block-size: 100%;
   border-start-start-radius: var(--nf-radius-lg);
@@ -73,6 +77,7 @@
 }
 
 /* Mobile: side drawers expand to near full-width, block drawers expand */
+/* nf-token-override: breakpoint, and custom properties do not work in at-rule conditions */
 @media (max-width: 767px) {
   .inlineEnd,
   .inlineStart {

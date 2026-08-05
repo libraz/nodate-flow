@@ -140,6 +140,7 @@ function AuthenticatedLayout(): ReactElement | null {
             display: 'flex',
             flexDirection: 'column',
             gap: 'var(--nf-space-4)',
+            // nf-token-override: component dimension, not a spacing step
             minInlineSize: '20rem',
           }}
         >

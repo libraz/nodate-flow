@@ -45,6 +45,7 @@ function SecurityRoute(): ReactElement {
 
       <section style={sectionStyle}>
         <h2 style={sectionHeadingStyle}>{t('security.totp.title')}</h2>
+        {/* nf-token-override: placeholder sized to the content it stands in for, not a spacing step */}
         <Suspense fallback={<Skeleton style={{ blockSize: '4rem', inlineSize: '100%' }} />}>
           <TotpPanel />
         </Suspense>
@@ -55,7 +56,9 @@ function SecurityRoute(): ReactElement {
         <Suspense
           fallback={
             <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--nf-space-2)' }}>
+              {/* nf-token-override: placeholder sized to the content it stands in for, not a spacing step */}
               <Skeleton style={{ blockSize: '4rem', inlineSize: '100%' }} />
+              {/* nf-token-override: placeholder sized to the content it stands in for, not a spacing step */}
               <Skeleton style={{ blockSize: '4rem', inlineSize: '100%' }} />
             </div>
           }

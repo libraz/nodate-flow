@@ -155,6 +155,7 @@ export default function ProjectMembersTable({ projectId }: ProjectMembersTablePr
             {t('projects.members.empty')}
           </span>
         }
+        // nf-token-override: component dimension, not a spacing step
         style={{ minBlockSize: '16rem' }}
       />
 

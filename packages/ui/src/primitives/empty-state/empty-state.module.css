@@ -25,6 +25,7 @@
   margin: 0;
   font-size: var(--nf-text-sm);
   color: var(--nf-color-fg-subtle);
+  /* nf-token-override: component dimension, not a spacing step */
   max-inline-size: 28rem;
 }
 

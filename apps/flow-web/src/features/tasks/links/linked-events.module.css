@@ -57,7 +57,9 @@
 }
 
 .caret {
+  /* nf-token-override: component dimension, not a spacing step */
   inline-size: 0.75rem;
+  /* nf-token-override: component dimension, not a spacing step */
   block-size: 0.75rem;
   transition: transform var(--nf-duration-fast) var(--nf-ease-standard);
   color: var(--nf-color-fg-subtle);
@@ -167,7 +169,9 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  /* nf-token-override: component dimension, not a spacing step */
   inline-size: 1.25rem;
+  /* nf-token-override: component dimension, not a spacing step */
   block-size: 1.25rem;
   color: var(--nf-color-fg-muted);
   position: relative;
@@ -178,7 +182,9 @@
   position: absolute;
   inset-inline-start: -0.5rem;
   inset-block-start: 50%;
+  /* nf-token-override: component dimension, not a spacing step */
   inline-size: 0.25rem;
+  /* nf-token-override: component dimension, not a spacing step */
   block-size: 0.25rem;
   border-radius: 50%;
   background: var(--nf-color-accent);
@@ -186,7 +192,9 @@
 }
 
 .glyph {
+  /* nf-token-override: component dimension, not a spacing step */
   inline-size: 1rem;
+  /* nf-token-override: component dimension, not a spacing step */
   block-size: 1rem;
   color: currentColor;
 }
@@ -241,7 +249,9 @@
   background: transparent;
   border: 0;
   color: var(--nf-color-fg-subtle);
+  /* nf-token-override: component dimension, not a spacing step */
   inline-size: 1.5rem;
+  /* nf-token-override: component dimension, not a spacing step */
   block-size: 1.5rem;
   display: inline-flex;
   align-items: center;
@@ -300,6 +310,7 @@
 }
 
 .skeletonChip {
+  /* nf-token-override: placeholder sized to the content it stands in for, not a spacing step */
   block-size: 0.75rem;
   border-radius: var(--nf-radius-sm);
   background: color-mix(in oklab, var(--nf-color-bg-elevated) 80%, transparent);
@@ -316,7 +327,9 @@
   position: absolute;
   inset-block-start: calc(100% + var(--nf-space-2));
   inset-inline-end: 0;
+  /* nf-token-override: component dimension, not a spacing step */
   inline-size: clamp(20rem, var(--nf-measure-narrow), 90vw);
+  /* nf-token-override: component dimension, not a spacing step */
   max-block-size: clamp(20rem, 80vh, var(--nf-measure-narrow));
   display: flex;
   flex-direction: column;
@@ -358,7 +371,9 @@
 }
 
 .popoverInputIcon {
+  /* nf-token-override: component dimension, not a spacing step */
   inline-size: 1rem;
+  /* nf-token-override: component dimension, not a spacing step */
   block-size: 1rem;
   color: var(--nf-color-fg-subtle);
   flex-shrink: 0;
@@ -397,7 +412,9 @@
   padding: var(--nf-space-1) 0;
   overflow-y: auto;
   flex: 1;
+  /* nf-token-override: component dimension, not a spacing step */
   min-block-size: 4rem;
+  /* nf-token-override: component dimension, not a spacing step */
   max-block-size: 18rem;
 }
 
@@ -547,6 +564,8 @@
 }
 
 .kindGlyph {
+  /* nf-token-override: component dimension, not a spacing step */
   inline-size: 0.875rem;
+  /* nf-token-override: component dimension, not a spacing step */
   block-size: 0.875rem;
 }

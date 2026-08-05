@@ -189,6 +189,7 @@ function FeedWithActors({
           listStyle: 'none',
           margin: 0,
           padding: 0,
+          // nf-token-override: component dimension, not a spacing step
           maxBlockSize: '40rem',
           overflowY: 'auto',
           border: '1px solid var(--nf-color-border)',

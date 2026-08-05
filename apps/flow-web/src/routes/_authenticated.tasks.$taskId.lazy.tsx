@@ -371,6 +371,7 @@ function DescriptionEditor({ id, initial }: { id: string; initial: string }): Re
           }
           style={{
             color: isEmpty ? 'var(--nf-color-fg-muted)' : 'var(--nf-color-fg)',
+            // nf-token-override: component dimension, not a spacing step
             minBlockSize: '3rem',
             inlineSize: '100%',
             ...(isEmpty
@@ -825,6 +826,7 @@ function Sidebar({
         position: 'sticky',
         top: '1rem',
         alignSelf: 'start',
+        // nf-token-override: component dimension, not a spacing step
         maxBlockSize: 'calc(100vh - 5rem)',
         overflowY: 'auto',
       }}
@@ -866,7 +868,9 @@ function Sidebar({
               aria-hidden
               style={{
                 display: 'inline-block',
+                // nf-token-override: component dimension, not a spacing step
                 width: '0.5rem',
+                // nf-token-override: component dimension, not a spacing step
                 height: '0.5rem',
                 borderRadius: '0.125rem',
                 background: PRIORITY_COLOR[priority],
@@ -1373,14 +1377,17 @@ function TaskDetailPanel({ id }: TaskDetailPanelProps): ReactElement {
           <AgentPanel taskId={id} agentContext={task.agentContext} locale={locale} />
         ) : null}
         <DescriptionSection id={id} initial={task.description ?? ''} />
+        {/* nf-token-override: placeholder sized to the content it stands in for, not a spacing step */}
         <Suspense fallback={<Skeleton style={{ blockSize: '2rem', inlineSize: '12rem' }} />}>
           <ReactionsSection taskId={id} />
         </Suspense>
         <Separator />
+        {/* nf-token-override: placeholder sized to the content it stands in for, not a spacing step */}
         <Suspense fallback={<Skeleton style={{ blockSize: '4rem', inlineSize: '100%' }} />}>
           <DependenciesSection taskId={id} workspaceId={task.workspaceId} />
         </Suspense>
         <Separator />
+        {/* nf-token-override: placeholder sized to the content it stands in for, not a spacing step */}
         <Suspense fallback={<Skeleton style={{ blockSize: '4rem', inlineSize: '100%' }} />}>
           <LinkedEventsSection taskId={id} workspaceId={task.workspaceId} locale={locale} />
         </Suspense>
@@ -1389,10 +1396,12 @@ function TaskDetailPanel({ id }: TaskDetailPanelProps): ReactElement {
           <AIAgentsSection taskId={id} locale={locale} />
         </Suspense>
         <Separator />
+        {/* nf-token-override: placeholder sized to the content it stands in for, not a spacing step */}
         <Suspense fallback={<Skeleton style={{ blockSize: '4rem', inlineSize: '100%' }} />}>
           <TaskAttachments taskId={id} />
         </Suspense>
         <Separator />
+        {/* nf-token-override: placeholder sized to the content it stands in for, not a spacing step */}
         <Suspense fallback={<Skeleton style={{ blockSize: '8rem', inlineSize: '100%' }} />}>
           <CommentsFeed taskId={id} />
         </Suspense>
@@ -1423,7 +1432,9 @@ function TaskDetailRoute(): ReactElement {
             gap: 'var(--nf-space-4)',
           }}
         >
+          {/* nf-token-override: placeholder sized to the content it stands in for, not a spacing step */}
           <Skeleton style={{ blockSize: '2rem', inlineSize: '16rem' }} />
+          {/* nf-token-override: placeholder sized to the content it stands in for, not a spacing step */}
           <Skeleton style={{ blockSize: '12rem', inlineSize: '100%' }} />
         </div>
       }

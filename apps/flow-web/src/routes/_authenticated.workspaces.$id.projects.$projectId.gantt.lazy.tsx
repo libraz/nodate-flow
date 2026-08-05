@@ -194,6 +194,7 @@ function zoomPresetFromIndex(idx: number): ZoomPreset | undefined {
 
 function GanttRoute(): ReactElement {
   return (
+    // nf-token-override: placeholder sized to the content it stands in for, not a spacing step
     <Suspense fallback={<Skeleton style={{ blockSize: '20rem', inlineSize: '100%' }} />}>
       <GanttView />
     </Suspense>
@@ -574,7 +575,9 @@ function GanttView(): ReactElement {
                 <span
                   aria-hidden
                   style={{
+                    // nf-token-override: component dimension, not a spacing step
                     inlineSize: '0.5rem',
+                    // nf-token-override: component dimension, not a spacing step
                     blockSize: '0.5rem',
                     borderRadius: 'var(--nf-radius-pill)',
                     background:
@@ -849,7 +852,9 @@ function GanttView(): ReactElement {
                   <span
                     aria-hidden
                     style={{
+                      // nf-token-override: component dimension, not a spacing step
                       inlineSize: '0.5rem',
+                      // nf-token-override: component dimension, not a spacing step
                       blockSize: '0.5rem',
                       borderRadius: 'var(--nf-radius-pill)',
                       background:

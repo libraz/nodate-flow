@@ -32,7 +32,9 @@ export default function PublicShareCalPage({ token }: PublicShareCalPageProps): 
   if (isLoading) {
     return (
       <PublicPageLayout busy>
+        {/* nf-token-override: placeholder sized to the content it stands in for, not a spacing step */}
         <Skeleton style={{ height: '3rem' }} />
+        {/* nf-token-override: placeholder sized to the content it stands in for, not a spacing step */}
         <Skeleton style={{ height: '24rem' }} />
       </PublicPageLayout>
     );
@@ -80,7 +82,9 @@ export default function PublicShareCalPage({ token }: PublicShareCalPageProps): 
             src={page.iconUrl}
             alt=""
             style={{
+              // nf-token-override: component dimension, not a spacing step
               width: '2.5rem',
+              // nf-token-override: component dimension, not a spacing step
               height: '2.5rem',
               borderRadius: 'var(--nf-radius-md)',
               objectFit: 'cover',
@@ -89,7 +93,9 @@ export default function PublicShareCalPage({ token }: PublicShareCalPageProps): 
         ) : (
           <div
             style={{
+              // nf-token-override: component dimension, not a spacing step
               width: '2.5rem',
+              // nf-token-override: component dimension, not a spacing step
               height: '2.5rem',
               borderRadius: 'var(--nf-radius-md)',
               backgroundColor: 'var(--nf-color-accent-subtle)',

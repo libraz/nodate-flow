@@ -13,6 +13,7 @@
   min-block-size: 0;
   /* Fill the viewport minus the route chrome above so the inner body
      can scroll independently. */
+  /* nf-token-override: component dimension, not a spacing step */
   block-size: min(70vh, 40rem);
   border: var(--nf-space-px) solid var(--nf-color-border);
   border-radius: var(--nf-radius-md);
@@ -61,6 +62,7 @@
   align-items: center;
   padding-inline: var(--nf-space-3);
   padding-block: var(--nf-space-1);
+  /* nf-token-override: component dimension, not a spacing step */
   min-block-size: 2rem;
   font-size: var(--nf-text-sm);
   font-weight: var(--nf-weight-semibold);
@@ -86,6 +88,7 @@
   display: flex;
   flex-direction: column;
   align-items: stretch;
+  /* nf-token-override: component dimension, not a spacing step */
   min-block-size: 5.5rem;
   min-inline-size: 0;
   padding: var(--nf-space-px);
@@ -103,7 +106,9 @@
   align-items: center;
   justify-content: center;
   align-self: flex-start;
+  /* nf-token-override: component dimension, not a spacing step */
   min-inline-size: 1.5rem;
+  /* nf-token-override: component dimension, not a spacing step */
   block-size: 1.5rem;
   border-radius: var(--nf-radius-pill);
   cursor: pointer;
@@ -157,6 +162,7 @@
 }
 
 .trackSpacer {
+  /* nf-token-override: component dimension, not a spacing step */
   block-size: 1.25rem;
 }
 
@@ -166,6 +172,7 @@
   display: flex;
   align-items: center;
   gap: var(--nf-space-px);
+  /* nf-token-override: component dimension, not a spacing step */
   block-size: 1.125rem;
   margin-block: var(--nf-space-px);
   padding-inline: var(--nf-space-1);
@@ -200,7 +207,9 @@
 }
 
 .chipAttendeesIcon {
+  /* nf-token-override: component dimension, not a spacing step */
   inline-size: 0.625rem;
+  /* nf-token-override: component dimension, not a spacing step */
   block-size: 0.625rem;
 }
 
@@ -219,6 +228,7 @@
   all: unset;
   position: absolute;
   box-sizing: border-box;
+  /* nf-token-override: component dimension, not a spacing step */
   block-size: 1.125rem;
   display: flex;
   align-items: center;
@@ -289,7 +299,9 @@
 
 .taskDot {
   flex-shrink: 0;
+  /* nf-token-override: component dimension, not a spacing step */
   inline-size: 0.375rem;
+  /* nf-token-override: component dimension, not a spacing step */
   block-size: 0.375rem;
   border-radius: var(--nf-radius-pill);
 }

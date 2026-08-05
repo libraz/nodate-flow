@@ -17,11 +17,16 @@ export default function MetricsSkeleton(): ReactElement {
       style={{ display: 'flex', flexDirection: 'column', gap: 'var(--nf-space-6)' }}
     >
       <div className={styles.kpiGrid}>
+        {/* nf-token-override: placeholder sized to the content it stands in for, not a spacing step */}
         <Skeleton style={{ blockSize: '6.5rem', inlineSize: '100%' }} />
+        {/* nf-token-override: placeholder sized to the content it stands in for, not a spacing step */}
         <Skeleton style={{ blockSize: '6.5rem', inlineSize: '100%' }} />
+        {/* nf-token-override: placeholder sized to the content it stands in for, not a spacing step */}
         <Skeleton style={{ blockSize: '6.5rem', inlineSize: '100%' }} />
       </div>
+      {/* nf-token-override: placeholder sized to the content it stands in for, not a spacing step */}
       <Skeleton style={{ blockSize: '6.5rem', inlineSize: '100%' }} />
+      {/* nf-token-override: placeholder sized to the content it stands in for, not a spacing step */}
       <Skeleton style={{ blockSize: '12rem', inlineSize: '100%' }} />
     </div>
   );

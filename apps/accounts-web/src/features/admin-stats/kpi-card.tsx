@@ -44,6 +44,7 @@ function KpiCard({ title, value, help, loading }: KpiCardProps): ReactElement {
         flexDirection: 'column',
         gap: 'var(--nf-space-2)',
         padding: 'var(--nf-space-6)',
+        // nf-token-override: component dimension, not a spacing step
         minBlockSize: '160px',
       }}
     >

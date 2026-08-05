@@ -117,6 +117,7 @@ export default function AutoActionSettingsPage({
             onChange={(e) => {
               setEnabled(e.target.checked);
             }}
+            // nf-token-override: component dimension, not a spacing step
             style={{ inlineSize: '1.25rem', blockSize: '1.25rem' }}
           />
         )}
@@ -143,6 +144,7 @@ export default function AutoActionSettingsPage({
                   setIntervalMinutes(Math.max(0, Math.min(1440, v)));
                 }
               }}
+              // nf-token-override: component dimension, not a spacing step
               style={{ inlineSize: '6rem' }}
             />
             <span
@@ -184,6 +186,7 @@ export default function AutoActionSettingsPage({
                 style={{
                   fontSize: 'var(--nf-text-sm)',
                   fontVariantNumeric: 'tabular-nums',
+                  // nf-token-override: component dimension, not a spacing step
                   minInlineSize: '3rem',
                   textAlign: 'end',
                 }}
@@ -448,6 +451,7 @@ function AutoActionRulesSection({
                         updateDraft(kind, { enabled: e.target.checked });
                       }}
                       aria-label={t(`workspace.auto_actions.rules.${kind}.label`)}
+                      // nf-token-override: component dimension, not a spacing step
                       style={{ inlineSize: '1.125rem', blockSize: '1.125rem' }}
                     />
                   </td>
@@ -469,6 +473,7 @@ function AutoActionRulesSection({
                       }}
                       aria-label={t('workspace.auto_actions.rules.column.confidence')}
                       style={{
+                        // nf-token-override: component dimension, not a spacing step
                         inlineSize: '5rem',
                         fontVariantNumeric: 'tabular-nums',
                       }}
@@ -502,6 +507,7 @@ function AutoActionRulesSection({
                         }}
                         aria-label={t('workspace.auto_actions.rules.column.idle_hours')}
                         style={{
+                          // nf-token-override: component dimension, not a spacing step
                           inlineSize: '5rem',
                           fontVariantNumeric: 'tabular-nums',
                         }}

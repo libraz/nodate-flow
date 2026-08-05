@@ -106,6 +106,7 @@ export default function WorkspaceMembersTable({
               void handleRoleChange(member.userId, e.target.value as MemberRole);
             }}
             aria-label={t('workspaces.members.change_role')}
+            // nf-token-override: component dimension, not a spacing step
             style={{ minInlineSize: '7rem' }}
           >
             {ROLES.map((r) => (
@@ -194,6 +195,7 @@ export default function WorkspaceMembersTable({
         aria-label={t('workspaces.members.title')}
         columns={columns}
         data={members}
+        // nf-token-override: component dimension, not a spacing step
         style={{ minBlockSize: '16rem' }}
       />
 

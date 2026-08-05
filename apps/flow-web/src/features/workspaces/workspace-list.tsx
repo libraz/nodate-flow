@@ -106,6 +106,7 @@ export default function WorkspaceList(): ReactElement {
         columns={columns}
         data={workspaces}
         emptyContent={t('workspaces.empty')}
+        // nf-token-override: component dimension, not a spacing step
         style={{ minBlockSize: '20rem' }}
       />
 

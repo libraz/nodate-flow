@@ -114,6 +114,7 @@ export default function WorkspaceInvitesList({
         aria-label={t('workspaces.invites.list_title')}
         columns={columns}
         data={invites}
+        // nf-token-override: component dimension, not a spacing step
         style={{ minBlockSize: '8rem' }}
       />
     </section>

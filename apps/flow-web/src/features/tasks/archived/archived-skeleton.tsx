@@ -26,9 +26,13 @@ export default function ArchivedSkeleton(): ReactElement {
           <Skeleton className={styles.skeletonHeader} />
           {ROW_PLACEHOLDERS.map((rowId) => (
             <div key={`row-${chapterId}-${rowId}`} className={styles.skeletonRow}>
+              {/* nf-token-override: placeholder sized to the content it stands in for, not a spacing step */}
               <Skeleton style={{ blockSize: '1rem', inlineSize: '1rem' }} />
+              {/* nf-token-override: placeholder sized to the content it stands in for, not a spacing step */}
               <Skeleton style={{ blockSize: '1rem', inlineSize: '70%' }} />
+              {/* nf-token-override: placeholder sized to the content it stands in for, not a spacing step */}
               <Skeleton style={{ blockSize: '1rem', inlineSize: '4rem' }} />
+              {/* nf-token-override: placeholder sized to the content it stands in for, not a spacing step */}
               <Skeleton style={{ blockSize: '1rem', inlineSize: '4rem' }} />
             </div>
           ))}

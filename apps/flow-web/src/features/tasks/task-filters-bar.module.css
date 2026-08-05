@@ -17,10 +17,12 @@
 }
 
 .searchInput {
+  /* nf-token-override: component dimension, not a spacing step */
   inline-size: 18rem;
 }
 
 .assigneePicker {
+  /* nf-token-override: component dimension, not a spacing step */
   inline-size: 12rem;
 }
 
@@ -53,6 +55,7 @@
 .divider {
   display: block;
   inline-size: 1px;
+  /* nf-token-override: component dimension, not a spacing step */
   block-size: 1.25rem;
   background: var(--nf-color-border);
   flex-shrink: 0;

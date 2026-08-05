@@ -96,6 +96,7 @@ function FatalFallback({
       }}
     >
       <h1 style={{ fontFamily: 'var(--nf-font-display)', margin: 0 }}>{t('fatal.title')}</h1>
+      {/* nf-token-override: component dimension, not a spacing step */}
       <p style={{ margin: 0, color: 'var(--nf-color-fg-muted)', maxInlineSize: '36rem' }}>
         {t('fatal.description')}
       </p>

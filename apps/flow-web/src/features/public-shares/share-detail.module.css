@@ -77,6 +77,7 @@
 }
 
 .handleHeaderCell {
+  /* nf-token-override: component dimension, not a spacing step */
   inline-size: 2rem;
   padding: var(--nf-space-2) var(--nf-space-1);
 }
@@ -124,7 +125,9 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  /* nf-token-override: component dimension, not a spacing step */
   inline-size: 1.5rem;
+  /* nf-token-override: component dimension, not a spacing step */
   block-size: 1.5rem;
   padding: 0;
   background: transparent;

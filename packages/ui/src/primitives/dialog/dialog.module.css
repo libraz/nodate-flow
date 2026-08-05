@@ -23,6 +23,7 @@
 }
 
 .sizeSm {
+  /* nf-token-override: component dimension, not a spacing step */
   max-inline-size: 24rem;
 }
 
@@ -31,14 +32,17 @@
 }
 
 .sizeLg {
+  /* nf-token-override: component dimension, not a spacing step */
   max-inline-size: 36rem;
 }
 
 .sizeXl {
+  /* nf-token-override: component dimension, not a spacing step */
   max-inline-size: 40rem;
 }
 
 /* Mobile bottom-sheet variant (< 768px) */
+/* nf-token-override: breakpoint, and custom properties do not work in at-rule conditions */
 @media (max-width: 767px) {
   .dialogMobile {
     position: fixed;

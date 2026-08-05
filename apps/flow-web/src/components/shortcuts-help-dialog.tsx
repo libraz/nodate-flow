@@ -65,7 +65,9 @@ export default function ShortcutsHelpDialog({
                           display: 'inline-flex',
                           alignItems: 'center',
                           justifyContent: 'center',
+                          // nf-token-override: component dimension, not a spacing step
                           minWidth: '1.5rem',
+                          // nf-token-override: component dimension, not a spacing step
                           height: '1.5rem',
                           padding: '0 0.375rem',
                           borderRadius: 'var(--nf-radius-xs)',

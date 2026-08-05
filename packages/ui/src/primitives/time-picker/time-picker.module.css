@@ -23,6 +23,7 @@
 .list {
   display: flex;
   flex-direction: column;
+  /* nf-token-override: component dimension, not a spacing step */
   max-block-size: 15rem;
   overflow-y: auto;
   margin: calc(-1 * var(--nf-space-4));

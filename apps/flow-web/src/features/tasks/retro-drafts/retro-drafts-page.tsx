@@ -142,6 +142,7 @@ export default function RetroDraftsPage({ workspaceId }: RetroDraftsPageProps): 
             strokeWidth={1.5}
             strokeLinecap="round"
             strokeLinejoin="round"
+            // nf-token-override: component dimension, not a spacing step
             style={{ inlineSize: '5rem', blockSize: '5rem' }}
           >
             <rect x="14" y="14" width="68" height="68" rx="6" />

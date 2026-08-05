@@ -34,6 +34,7 @@ function SearchResults({
   const { data: results, isLoading } = useSearchPages(workspaceId, query);
 
   if (query.length < 2) return null;
+  // nf-token-override: placeholder sized to the content it stands in for, not a spacing step
   if (isLoading) return <Skeleton style={{ blockSize: '2rem', inlineSize: '100%' }} />;
   if (!results || results.length === 0) return null;
 
@@ -128,6 +129,7 @@ export default function PageList({ activePageId }: PageListProps): ReactElement 
             <Suspense
               fallback={
                 <div style={{ padding: 'var(--nf-space-4)' }}>
+                  {/* nf-token-override: placeholder sized to the content it stands in for, not a spacing step */}
                   <Skeleton style={{ blockSize: '1.5rem', inlineSize: '80%' }} />
                 </div>
               }
@@ -143,7 +145,7 @@ export default function PageList({ activePageId }: PageListProps): ReactElement 
 
         {/* Right content area */}
         <div className={styles.contentArea}>
-          {mode === 'create' && (
+          {mode === 'create' && ( // nf-token-override: placeholder sized to the content it stands in for, not a spacing step
             <Suspense fallback={<Skeleton style={{ blockSize: '20rem', inlineSize: '100%' }} />}>
               <PageEditor
                 workspaceId={workspaceId}
@@ -152,20 +154,22 @@ export default function PageList({ activePageId }: PageListProps): ReactElement 
               />
             </Suspense>
           )}
-          {mode === 'edit' && activePageId && (
-            <Suspense fallback={<Skeleton style={{ blockSize: '20rem', inlineSize: '100%' }} />}>
-              <PageEditorWithData
-                workspaceId={workspaceId}
-                pageId={activePageId}
-                onDone={handleEditorDone}
-              />
-            </Suspense>
-          )}
-          {mode === 'view' && activePageId && (
-            <Suspense fallback={<Skeleton style={{ blockSize: '20rem', inlineSize: '100%' }} />}>
-              <PageDetail workspaceId={workspaceId} pageId={activePageId} onEdit={handleEdit} />
-            </Suspense>
-          )}
+          {mode === 'edit' &&
+            activePageId && ( // nf-token-override: placeholder sized to the content it stands in for, not a spacing step
+              <Suspense fallback={<Skeleton style={{ blockSize: '20rem', inlineSize: '100%' }} />}>
+                <PageEditorWithData
+                  workspaceId={workspaceId}
+                  pageId={activePageId}
+                  onDone={handleEditorDone}
+                />
+              </Suspense>
+            )}
+          {mode === 'view' &&
+            activePageId && ( // nf-token-override: placeholder sized to the content it stands in for, not a spacing step
+              <Suspense fallback={<Skeleton style={{ blockSize: '20rem', inlineSize: '100%' }} />}>
+                <PageDetail workspaceId={workspaceId} pageId={activePageId} onEdit={handleEdit} />
+              </Suspense>
+            )}
           {mode === 'view' && !activePageId && (
             <div className={styles.empty}>
               <p className={styles.emptyTitle}>{t('no_selection')}</p>

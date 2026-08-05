@@ -13,6 +13,7 @@
 }
 
 .aside {
+  /* nf-token-override: component dimension, not a spacing step */
   inline-size: 220px;
   border-inline-end: 1px solid var(--nf-color-border);
   padding: var(--nf-space-4);
@@ -65,9 +66,11 @@
   flex: 1;
   min-inline-size: 0;
   padding: var(--nf-space-8);
+  /* nf-token-override: component dimension, not a spacing step */
   max-inline-size: 1200px;
 }
 
+/* nf-token-override: breakpoint, and custom properties do not work in at-rule conditions */
 @media (max-width: 767px) {
   .shell {
     flex-direction: column;

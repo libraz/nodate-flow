@@ -202,6 +202,7 @@ export default function InboxList(): ReactElement {
               background: 'var(--nf-color-surface)',
               color: 'var(--nf-color-fg)',
               fontSize: '0.9375rem',
+              // nf-token-override: component dimension, not a spacing step
               maxInlineSize: '20rem',
             }}
           >

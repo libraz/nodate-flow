@@ -36,6 +36,7 @@
   border-radius: var(--nf-radius-md);
   box-shadow: var(--nf-shadow-lg);
   z-index: var(--nf-z-dropdown);
+  /* nf-token-override: component dimension, not a spacing step */
   max-block-size: 16rem;
   overflow: auto;
 }

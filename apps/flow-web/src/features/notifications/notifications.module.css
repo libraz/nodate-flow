@@ -9,7 +9,9 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  /* nf-token-override: component dimension, not a spacing step */
   min-inline-size: 1.125rem;
+  /* nf-token-override: component dimension, not a spacing step */
   block-size: 1.125rem;
   padding-inline: var(--nf-space-1);
   border-radius: var(--nf-radius-pill);
@@ -26,7 +28,9 @@
   position: absolute;
   inset-block-start: calc(100% + var(--nf-space-2));
   inset-inline-end: 0;
+  /* nf-token-override: component dimension, not a spacing step */
   inline-size: 22rem;
+  /* nf-token-override: component dimension, not a spacing step */
   max-block-size: 28rem;
   overflow-y: auto;
   background: var(--nf-color-bg-elevated);
@@ -105,7 +109,9 @@
 
 .unreadDot {
   flex-shrink: 0;
+  /* nf-token-override: component dimension, not a spacing step */
   inline-size: 0.5rem;
+  /* nf-token-override: component dimension, not a spacing step */
   block-size: 0.5rem;
   margin-block-start: 0.375rem;
   border-radius: var(--nf-radius-pill);
@@ -114,7 +120,9 @@
 
 .readDot {
   flex-shrink: 0;
+  /* nf-token-override: component dimension, not a spacing step */
   inline-size: 0.5rem;
+  /* nf-token-override: component dimension, not a spacing step */
   block-size: 0.5rem;
   margin-block-start: 0.375rem;
   border-radius: var(--nf-radius-pill);
@@ -168,7 +176,9 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  /* nf-token-override: component dimension, not a spacing step */
   inline-size: 1.75rem;
+  /* nf-token-override: component dimension, not a spacing step */
   block-size: 1.75rem;
   background: transparent;
   border: var(--nf-space-px) solid var(--nf-color-border);

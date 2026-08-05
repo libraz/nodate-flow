@@ -109,6 +109,7 @@
   position: absolute;
   inset-block: 0;
   inset-inline-end: 0;
+  /* nf-token-override: component dimension, not a spacing step */
   inline-size: 4px;
   cursor: col-resize;
   user-select: none;

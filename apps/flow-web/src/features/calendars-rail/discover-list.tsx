@@ -135,8 +135,11 @@ export default function DiscoverList({ workspaceId, onClose }: DiscoverListProps
 
       {isLoading ? (
         <div className={styles.discoverSkeletons} aria-busy="true">
+          {/* nf-token-override: placeholder sized to the content it stands in for, not a spacing step */}
           <Skeleton style={{ blockSize: '3rem' }} />
+          {/* nf-token-override: placeholder sized to the content it stands in for, not a spacing step */}
           <Skeleton style={{ blockSize: '3rem' }} />
+          {/* nf-token-override: placeholder sized to the content it stands in for, not a spacing step */}
           <Skeleton style={{ blockSize: '3rem' }} />
         </div>
       ) : error ? (

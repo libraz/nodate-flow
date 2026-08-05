@@ -233,6 +233,7 @@ function ProjectNotFound({ workspaceId }: { workspaceId: string }): ReactElement
       <p
         style={{
           margin: 0,
+          // nf-token-override: component dimension, not a spacing step
           maxInlineSize: '28rem',
           color: 'var(--nf-color-fg-muted)',
         }}

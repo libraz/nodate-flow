@@ -2,6 +2,7 @@
   display: flex;
   flex-direction: column;
   block-size: 100%;
+  /* nf-token-override: component dimension, not a spacing step */
   inline-size: 16rem;
   background: var(--nf-color-bg-elevated);
   border-inline-end: var(--nf-space-px) solid var(--nf-color-border);
@@ -10,16 +11,19 @@
 }
 
 .collapsed {
+  /* nf-token-override: component dimension, not a spacing step */
   inline-size: 4rem;
 }
 
 /* Mobile: sidebar becomes an overlay drawer */
+/* nf-token-override: breakpoint, and custom properties do not work in at-rule conditions */
 @media (max-width: 767px) {
   .sidebar {
     position: fixed;
     inset-block: 0;
     inset-inline-start: 0;
     z-index: var(--nf-z-overlay);
+    /* nf-token-override: component dimension, not a spacing step */
     inline-size: 16rem;
     transform: translateX(-100%);
     transition: transform var(--nf-duration-base) var(--nf-ease-standard);
@@ -31,6 +35,7 @@
   }
 
   .collapsed {
+    /* nf-token-override: component dimension, not a spacing step */
     inline-size: 16rem;
     transform: translateX(-100%);
   }
@@ -193,6 +198,7 @@
   display: none;
 }
 
+/* nf-token-override: breakpoint, and custom properties do not work in at-rule conditions */
 @media (max-width: 767px) {
   .backdrop {
     display: block;

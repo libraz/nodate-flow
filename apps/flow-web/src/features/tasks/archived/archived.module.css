@@ -42,6 +42,7 @@
   margin: 0;
   color: var(--nf-color-fg-muted);
   font-size: var(--nf-text-sm);
+  /* nf-token-override: component dimension, not a spacing step */
   max-inline-size: 42rem;
 }
 
@@ -71,6 +72,7 @@
 
 .filterSearch {
   flex: 1 1 16rem;
+  /* nf-token-override: component dimension, not a spacing step */
   min-inline-size: 12rem;
 }
 
@@ -355,6 +357,7 @@
 
 .bulkBarSep {
   inline-size: 1px;
+  /* nf-token-override: component dimension, not a spacing step */
   block-size: 1.25rem;
   background: color-mix(in oklab, var(--nf-color-fg-on-accent) 25%, transparent);
 }
@@ -403,7 +406,9 @@
 }
 
 .emptyIllustration {
+  /* nf-token-override: component dimension, not a spacing step */
   inline-size: 5.5rem;
+  /* nf-token-override: component dimension, not a spacing step */
   block-size: 5.5rem;
   color: var(--nf-color-fg-subtle);
 }
@@ -426,6 +431,7 @@
 
 .virtualScroll {
   position: relative;
+  /* nf-token-override: component dimension, not a spacing step */
   block-size: clamp(20rem, 70vh, 56rem);
   overflow-y: auto;
   overflow-x: hidden;
@@ -488,7 +494,9 @@
 }
 
 .skeletonHeader {
+  /* nf-token-override: placeholder sized to the content it stands in for, not a spacing step */
   block-size: 1rem;
+  /* nf-token-override: placeholder sized to the content it stands in for, not a spacing step */
   inline-size: 8rem;
 }
 

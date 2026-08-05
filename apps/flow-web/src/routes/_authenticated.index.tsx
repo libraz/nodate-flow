@@ -54,6 +54,7 @@ function StatCard({
         background: 'var(--nf-color-surface)',
         border: '1px solid var(--nf-color-border)',
         flex: '1 1 0',
+        // nf-token-override: component dimension, not a spacing step
         minWidth: '10rem',
       }}
     >
@@ -62,7 +63,9 @@ function StatCard({
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
+          // nf-token-override: component dimension, not a spacing step
           width: '2.5rem',
+          // nf-token-override: component dimension, not a spacing step
           height: '2.5rem',
           borderRadius: 'var(--nf-radius-md)',
           background: accent ?? 'var(--nf-color-accent)',
@@ -337,6 +340,7 @@ function HomePage(): ReactElement {
         gap: 'var(--nf-space-8)',
         paddingBlock: 'var(--nf-space-8)',
         paddingInline: 'clamp(var(--nf-space-6), 6vw, 3.5rem)',
+        // nf-token-override: component dimension, not a spacing step
         maxInlineSize: '72rem',
         marginInline: 'auto',
         inlineSize: '100%',

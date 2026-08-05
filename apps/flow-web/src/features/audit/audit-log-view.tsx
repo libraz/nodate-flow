@@ -220,6 +220,7 @@ function AuditRow({ entry }: { entry: AuditLogEntry }): ReactElement {
           padding: 'var(--nf-space-2) var(--nf-space-3)',
           fontSize: 'var(--nf-text-xs)',
           color: 'var(--nf-color-fg-muted)',
+          // nf-token-override: component dimension, not a spacing step
           maxInlineSize: '16rem',
           overflow: 'hidden',
           textOverflow: 'ellipsis',
@@ -368,6 +369,7 @@ export default function AuditLogView({ workspaceId }: { workspaceId: string }): 
               id="audit-action-filter"
               value={filters.action ?? ''}
               onChange={handleActionChange}
+              // nf-token-override: component dimension, not a spacing step
               style={{ minInlineSize: '12rem' }}
             >
               <option value="">{t('audit_log.filter.all_actions')}</option>
@@ -390,6 +392,7 @@ export default function AuditLogView({ workspaceId }: { workspaceId: string }): 
               id="audit-resource-type-filter"
               value={filters.resourceType ?? ''}
               onChange={handleResourceTypeChange}
+              // nf-token-override: component dimension, not a spacing step
               style={{ minInlineSize: '10rem' }}
             >
               <option value="">{t('audit_log.filter.all_types')}</option>
@@ -414,6 +417,7 @@ export default function AuditLogView({ workspaceId }: { workspaceId: string }): 
               placeholder={t('audit_log.filter.actor_search_placeholder')}
               value={filters.actorSearch ?? ''}
               onChange={handleActorSearchChange}
+              // nf-token-override: component dimension, not a spacing step
               style={{ minInlineSize: '12rem' }}
             />
           </div>

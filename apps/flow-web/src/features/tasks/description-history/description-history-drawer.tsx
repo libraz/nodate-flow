@@ -50,8 +50,11 @@ export default function DescriptionHistoryDrawer({
       <Suspense
         fallback={
           <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--nf-space-2)' }}>
+            {/* nf-token-override: placeholder sized to the content it stands in for, not a spacing step */}
             <Skeleton style={{ blockSize: '2rem', inlineSize: '100%' }} />
+            {/* nf-token-override: placeholder sized to the content it stands in for, not a spacing step */}
             <Skeleton style={{ blockSize: '2rem', inlineSize: '100%' }} />
+            {/* nf-token-override: placeholder sized to the content it stands in for, not a spacing step */}
             <Skeleton style={{ blockSize: '2rem', inlineSize: '100%' }} />
           </div>
         }
@@ -115,7 +118,9 @@ function HistoryBody({ taskId, currentBody, onAfterRestore }: HistoryBodyProps):
           <Suspense
             fallback={
               <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--nf-space-2)' }}>
+                {/* nf-token-override: placeholder sized to the content it stands in for, not a spacing step */}
                 <Skeleton style={{ blockSize: '1.5rem', inlineSize: '50%' }} />
+                {/* nf-token-override: placeholder sized to the content it stands in for, not a spacing step */}
                 <Skeleton style={{ blockSize: '8rem', inlineSize: '100%' }} />
               </div>
             }

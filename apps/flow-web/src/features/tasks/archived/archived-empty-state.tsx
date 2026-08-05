@@ -34,6 +34,7 @@ export default function ArchivedEmptyState({ workspaceId }: ArchivedEmptyStatePr
           strokeWidth={1.5}
           strokeLinecap="round"
           strokeLinejoin="round"
+          // nf-token-override: component dimension, not a spacing step
           style={{ inlineSize: '6rem', blockSize: '6rem' }}
         >
           <rect x="8" y="20" width="80" height="56" rx="3" />

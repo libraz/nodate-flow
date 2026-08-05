@@ -10,6 +10,7 @@
   grid-template-columns: 16rem 1fr;
   gap: var(--nf-space-8);
   padding: clamp(var(--nf-space-6), 4vw, var(--nf-space-10));
+  /* nf-token-override: component dimension, not a spacing step */
   max-inline-size: 72rem;
   margin-inline: auto;
   inline-size: 100%;
@@ -37,6 +38,7 @@
   font-weight: var(--nf-weight-medium);
 }
 
+/* nf-token-override: breakpoint, and custom properties do not work in at-rule conditions */
 @media (max-width: 767px) {
   .layout {
     grid-template-columns: 1fr;

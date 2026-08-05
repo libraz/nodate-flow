@@ -122,6 +122,7 @@ export default function PublicPageLayout({
       {coverImageUrl ? (
         <div
           style={{
+            // nf-token-override: component dimension, not a spacing step
             blockSize: '12rem',
             backgroundImage: `url(${encodeURI(coverImageUrl)})`,
             backgroundSize: 'cover',

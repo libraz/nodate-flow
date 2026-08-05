@@ -97,7 +97,9 @@ function OverviewPanel({ workspaceId }: { workspaceId: string }): ReactElement {
               <span
                 aria-hidden
                 style={{
+                  // nf-token-override: component dimension, not a spacing step
                   inlineSize: '0.6rem',
+                  // nf-token-override: component dimension, not a spacing step
                   blockSize: '0.6rem',
                   borderRadius: 'var(--nf-radius-pill)',
                   background: p.color ?? 'var(--nf-color-fg-muted)',

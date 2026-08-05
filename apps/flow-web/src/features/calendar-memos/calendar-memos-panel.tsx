@@ -137,8 +137,11 @@ export default function CalendarMemosPanel({
     return (
       <div className={styles.body}>
         <div className={styles.skeleton}>
+          {/* nf-token-override: placeholder sized to the content it stands in for, not a spacing step */}
           <Skeleton style={{ blockSize: '2.5rem', inlineSize: '100%' }} />
+          {/* nf-token-override: placeholder sized to the content it stands in for, not a spacing step */}
           <Skeleton style={{ blockSize: '2.5rem', inlineSize: '100%' }} />
+          {/* nf-token-override: placeholder sized to the content it stands in for, not a spacing step */}
           <Skeleton style={{ blockSize: '2.5rem', inlineSize: '100%' }} />
         </div>
       </div>

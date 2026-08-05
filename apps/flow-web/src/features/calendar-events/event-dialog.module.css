@@ -11,7 +11,9 @@
 .body {
   display: flex;
   flex-direction: column;
+  /* nf-token-override: component dimension, not a spacing step */
   min-inline-size: 28rem;
+  /* nf-token-override: component dimension, not a spacing step */
   block-size: min(36rem, 75vh);
 }
 
@@ -43,6 +45,7 @@
  * not get clipped.
  */
 .kindMorphZone {
+  /* nf-token-override: component dimension, not a spacing step */
   min-block-size: 8rem;
 }
 
@@ -133,6 +136,7 @@
   gap: var(--nf-space-3);
 }
 
+/* nf-token-override: breakpoint, and custom properties do not work in at-rule conditions */
 @media (max-width: 640px) {
   .body {
     /* Let the Dialog primitive's mobile sheet (or overlay padding) size

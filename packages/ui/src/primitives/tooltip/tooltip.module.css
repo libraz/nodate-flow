@@ -9,6 +9,7 @@
   border-radius: var(--nf-radius-sm);
   box-shadow: var(--nf-shadow-md);
   z-index: var(--nf-z-tooltip);
+  /* nf-token-override: component dimension, not a spacing step */
   max-inline-size: 16rem;
   pointer-events: none;
 }

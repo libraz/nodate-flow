@@ -4,6 +4,7 @@
   display: flex;
   flex-direction: column;
   gap: var(--nf-space-3);
+  /* nf-token-override: component dimension, not a spacing step */
   min-inline-size: 22rem;
 }
 
@@ -145,6 +146,7 @@
   color: var(--nf-color-warning);
 }
 
+/* nf-token-override: breakpoint, and custom properties do not work in at-rule conditions */
 @media (max-width: 767px) {
   .body {
     min-inline-size: 0;

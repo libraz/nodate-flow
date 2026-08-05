@@ -9,6 +9,7 @@
   flex-direction: column;
   gap: var(--nf-space-4);
   padding: clamp(var(--nf-space-4), 4vw, var(--nf-space-6));
+  /* nf-token-override: component dimension, not a spacing step */
   max-inline-size: 64rem;
   margin-inline: auto;
   inline-size: 100%;
@@ -167,6 +168,7 @@
   padding: var(--nf-space-4);
 }
 
+/* nf-token-override: breakpoint, and custom properties do not work in at-rule conditions */
 @media (max-width: 640px) {
   .inviteRow {
     flex-wrap: wrap;
@@ -373,6 +375,7 @@
   color: var(--nf-color-fg);
 }
 
+/* nf-token-override: breakpoint, and custom properties do not work in at-rule conditions */
 @media (max-width: 640px) {
   .attachmentRow,
   .checklistRow {

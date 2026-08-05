@@ -133,6 +133,7 @@ function AuditLogsPage(): ReactElement {
           flexWrap: 'wrap',
         }}
       >
+        {/* nf-token-override: component dimension, not a spacing step */}
         <div style={{ flex: 1, minWidth: '200px' }}>
           <Input
             type="text"

@@ -35,7 +35,9 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  /* nf-token-override: component dimension, not a spacing step */
   width: 1.5rem;
+  /* nf-token-override: component dimension, not a spacing step */
   height: 1.5rem;
   border-radius: var(--nf-radius-sm);
   color: var(--nf-color-fg-muted);

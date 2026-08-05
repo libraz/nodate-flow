@@ -23,6 +23,7 @@
   align-items: center;
   justify-content: center;
   gap: var(--nf-space-2);
+  /* nf-token-override: component dimension, not a spacing step */
   block-size: 2rem;
   padding-inline: var(--nf-space-3);
   padding-block: 0;
@@ -72,7 +73,9 @@
 }
 
 .dot {
+  /* nf-token-override: component dimension, not a spacing step */
   inline-size: 0.5rem;
+  /* nf-token-override: component dimension, not a spacing step */
   block-size: 0.5rem;
   border-radius: var(--nf-radius-pill);
   background: var(--chip-color, var(--nf-color-fg-muted));

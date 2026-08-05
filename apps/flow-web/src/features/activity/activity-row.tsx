@@ -60,7 +60,9 @@ function ActorGlyph({
         role="img"
         aria-label={actorLabel}
         style={{
+          // nf-token-override: component dimension, not a spacing step
           inlineSize: '1.75rem',
+          // nf-token-override: component dimension, not a spacing step
           blockSize: '1.75rem',
           borderRadius: 'var(--nf-radius-pill)',
           background: 'color-mix(in oklab, var(--nf-color-accent) 14%, transparent)',
@@ -80,7 +82,9 @@ function ActorGlyph({
         role="img"
         aria-label={actorLabel}
         style={{
+          // nf-token-override: component dimension, not a spacing step
           inlineSize: '1.75rem',
+          // nf-token-override: component dimension, not a spacing step
           blockSize: '1.75rem',
           borderRadius: 'var(--nf-radius-pill)',
           background: 'var(--nf-color-bg-sunken)',
@@ -204,6 +208,7 @@ export default function ActivityRow({ entry, actorName }: ActivityRowProps): Rea
               fontFamily: 'var(--nf-font-mono)',
               overflow: 'hidden',
               textOverflow: 'ellipsis',
+              // nf-token-override: component dimension, not a spacing step
               maxInlineSize: '24rem',
               whiteSpace: 'nowrap',
             }}

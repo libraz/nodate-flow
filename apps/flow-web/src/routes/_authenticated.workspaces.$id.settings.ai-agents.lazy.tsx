@@ -282,6 +282,7 @@ function EventTriggersEditor({
         onChange={(e) => {
           setValue(e.target.value);
         }}
+        // nf-token-override: component dimension, not a spacing step
         style={{ flex: 1, minInlineSize: '16rem' }}
       />
       <Button
@@ -497,7 +498,7 @@ function AiAgentsRoute(): ReactElement {
           </Button>
         )}
       </header>
-      {creating ? (
+      {creating ? ( // nf-token-override: placeholder sized to the content it stands in for, not a spacing step
         <Suspense fallback={<Skeleton style={{ blockSize: '12rem', inlineSize: '100%' }} />}>
           <CreateAgentForm
             workspaceId={id}
@@ -510,7 +511,9 @@ function AiAgentsRoute(): ReactElement {
       <Suspense
         fallback={
           <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--nf-space-3)' }}>
+            {/* nf-token-override: placeholder sized to the content it stands in for, not a spacing step */}
             <Skeleton style={{ blockSize: '6rem', inlineSize: '100%' }} />
+            {/* nf-token-override: placeholder sized to the content it stands in for, not a spacing step */}
             <Skeleton style={{ blockSize: '6rem', inlineSize: '100%' }} />
           </div>
         }

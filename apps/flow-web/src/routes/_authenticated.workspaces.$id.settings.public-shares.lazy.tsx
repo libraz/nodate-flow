@@ -16,7 +16,9 @@ function WorkspacePublicSharesLayout(): ReactElement {
     <Suspense
       fallback={
         <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--nf-space-3)' }}>
+          {/* nf-token-override: placeholder sized to the content it stands in for, not a spacing step */}
           <Skeleton style={{ blockSize: '2rem', inlineSize: '16rem' }} />
+          {/* nf-token-override: placeholder sized to the content it stands in for, not a spacing step */}
           <Skeleton style={{ blockSize: '8rem', inlineSize: '100%' }} />
         </div>
       }

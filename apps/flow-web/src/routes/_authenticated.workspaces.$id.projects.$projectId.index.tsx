@@ -36,7 +36,9 @@ function ProjectDetailRoute(): ReactElement {
             gap: 'var(--nf-space-4)',
           }}
         >
+          {/* nf-token-override: placeholder sized to the content it stands in for, not a spacing step */}
           <Skeleton style={{ blockSize: '2rem', inlineSize: '16rem' }} />
+          {/* nf-token-override: placeholder sized to the content it stands in for, not a spacing step */}
           <Skeleton style={{ blockSize: '12rem', inlineSize: '100%' }} />
         </div>
       }

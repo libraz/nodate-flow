@@ -510,6 +510,7 @@ const styles = {
     color: 'var(--nf-color-fg-muted)',
     textTransform: 'uppercase',
     letterSpacing: '0.04em',
+    // nf-token-override: component dimension, not a spacing step
     minInlineSize: '220px',
     borderBlockEnd: 'var(--nf-space-px) solid var(--nf-color-border)',
   } satisfies CSSProperties,
@@ -522,6 +523,7 @@ const styles = {
     color: 'var(--nf-color-fg-muted)',
     textTransform: 'uppercase',
     letterSpacing: '0.04em',
+    // nf-token-override: component dimension, not a spacing step
     inlineSize: '360px',
     borderBlockEnd: 'var(--nf-space-px) solid var(--nf-color-border)',
   } satisfies CSSProperties,
@@ -536,6 +538,7 @@ const styles = {
     paddingBlock: 'var(--nf-space-3)',
     paddingInline: 'var(--nf-space-3)',
     verticalAlign: 'middle',
+    // nf-token-override: component dimension, not a spacing step
     inlineSize: '360px',
   } satisfies CSSProperties,
   kindCell: {

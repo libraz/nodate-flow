@@ -68,7 +68,9 @@ export default function IntakeList(): ReactElement {
       <Suspense
         fallback={
           <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--nf-space-2)' }}>
+            {/* nf-token-override: placeholder sized to the content it stands in for, not a spacing step */}
             <Skeleton style={{ blockSize: '4rem', inlineSize: '100%' }} />
+            {/* nf-token-override: placeholder sized to the content it stands in for, not a spacing step */}
             <Skeleton style={{ blockSize: '4rem', inlineSize: '100%' }} />
           </div>
         }

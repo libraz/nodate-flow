@@ -121,7 +121,9 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  /* nf-token-override: component dimension, not a spacing step */
   inline-size: 1.75rem;
+  /* nf-token-override: component dimension, not a spacing step */
   block-size: 1.75rem;
   background: transparent;
   border: var(--nf-space-px) solid var(--nf-color-border);

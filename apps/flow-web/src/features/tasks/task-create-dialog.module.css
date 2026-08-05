@@ -19,6 +19,7 @@
    when the error row mounts (morphic UI rule). The min-height
    accommodates the rendered <FormField> error line. */
 .fieldWithError {
+  /* nf-token-override: component dimension, not a spacing step */
   min-block-size: 5.5rem;
   display: flex;
   flex-direction: column;
@@ -42,7 +43,9 @@
 }
 
 .smartSpinner {
+  /* nf-token-override: component dimension, not a spacing step */
   inline-size: 1rem;
+  /* nf-token-override: component dimension, not a spacing step */
   block-size: 1rem;
 }
 

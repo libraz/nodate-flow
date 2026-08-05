@@ -36,6 +36,7 @@ export default function LinkedEventsEmpty({
           strokeLinejoin="round"
           aria-hidden="true"
           focusable="false"
+          // nf-token-override: component dimension, not a spacing step
           style={{ inlineSize: '4rem', blockSize: '2rem' }}
         >
           {/* a sparse calendar grid on the inline-start */}

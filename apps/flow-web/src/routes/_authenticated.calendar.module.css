@@ -12,6 +12,7 @@
   display: flex;
   flex-direction: column;
   gap: var(--nf-space-6);
+  /* nf-token-override: component dimension, not a spacing step */
   max-inline-size: min(120rem, 100%);
   margin-inline: auto;
   inline-size: 100%;
@@ -51,6 +52,7 @@
 .monthLabel {
   margin: 0;
   font-size: var(--nf-text-lg);
+  /* nf-token-override: component dimension, not a spacing step */
   min-inline-size: 10rem;
 }
 
@@ -90,6 +92,7 @@
 }
 
 .cell {
+  /* nf-token-override: component dimension, not a spacing step */
   min-block-size: clamp(7rem, 14vh, 11rem);
   padding: var(--nf-space-2);
   border-radius: var(--nf-radius-md);
@@ -137,6 +140,7 @@
   font-size: var(--nf-text-xs);
   font-variant-numeric: tabular-nums;
   color: var(--nf-color-fg-muted);
+  /* nf-token-override: component dimension, not a spacing step */
   min-block-size: 1.25rem;
 }
 
@@ -208,7 +212,9 @@
 }
 
 .taskPill__dot {
+  /* nf-token-override: component dimension, not a spacing step */
   inline-size: 0.5rem;
+  /* nf-token-override: component dimension, not a spacing step */
   block-size: 0.5rem;
   border-radius: var(--nf-radius-pill);
   flex-shrink: 0;
@@ -237,7 +243,9 @@
 }
 
 .eventPill__marker {
+  /* nf-token-override: component dimension, not a spacing step */
   inline-size: 0.5rem;
+  /* nf-token-override: component dimension, not a spacing step */
   block-size: 0.5rem;
   transform: rotate(45deg);
   flex-shrink: 0;
@@ -264,7 +272,9 @@
 }
 
 .eventPill__attendeesIcon {
+  /* nf-token-override: component dimension, not a spacing step */
   inline-size: 0.75rem;
+  /* nf-token-override: component dimension, not a spacing step */
   block-size: 0.75rem;
 }
 
@@ -317,6 +327,7 @@
 }
 
 /* Tighter section padding on phones so the month-scroll gets more width. */
+/* nf-token-override: breakpoint, and custom properties do not work in at-rule conditions */
 @media (max-width: 47.9375rem) {
   .section {
     padding: var(--nf-space-4);

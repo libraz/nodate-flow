@@ -242,6 +242,7 @@ function OverviewPanel({ id, workspaceId }: { id: string; workspaceId: string })
       <div
         style={{
           display: 'flex',
+          // nf-token-override: component dimension, not a spacing step
           blockSize: '0.5rem',
           borderRadius: 'var(--nf-radius-pill)',
           overflow: 'hidden',

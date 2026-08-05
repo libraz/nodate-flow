@@ -38,6 +38,7 @@ export default function PublicShareEmbedPage({ token }: PublicShareEmbedPageProp
   if (isLoading) {
     return (
       <div style={embedRootStyle} aria-busy="true">
+        {/* nf-token-override: placeholder sized to the content it stands in for, not a spacing step */}
         <Skeleton style={{ height: '24rem' }} />
       </div>
     );

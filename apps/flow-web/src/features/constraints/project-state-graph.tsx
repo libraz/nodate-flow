@@ -170,6 +170,7 @@ export default function ProjectStateGraph({ projectId }: ProjectStateGraphProps)
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
+          // nf-token-override: component dimension, not a spacing step
           minBlockSize: '300px',
           color: 'var(--nf-color-fg-muted)',
         }}
@@ -196,6 +197,7 @@ export default function ProjectStateGraph({ projectId }: ProjectStateGraphProps)
   return (
     <figure
       aria-label={t('constraints:stateGraph.projectTitle')}
+      // nf-token-override: component dimension, not a spacing step
       style={{ margin: 0, overflow: 'auto', minBlockSize: '300px' }}
     >
       <figcaption

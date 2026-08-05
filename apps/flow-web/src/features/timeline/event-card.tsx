@@ -359,6 +359,7 @@ export default function EventCard({ event }: EventCardProps): ReactElement {
           gridColumn: '1 / 2',
           gridRow: '1 / span 2',
           position: 'relative',
+          // nf-token-override: component dimension, not a spacing step
           inlineSize: '1.75rem',
           display: 'flex',
           justifyContent: 'center',
@@ -366,7 +367,9 @@ export default function EventCard({ event }: EventCardProps): ReactElement {
       >
         <div
           style={{
+            // nf-token-override: component dimension, not a spacing step
             inlineSize: '1.75rem',
+            // nf-token-override: component dimension, not a spacing step
             blockSize: '1.75rem',
             borderRadius: 'var(--nf-radius-pill)',
             background: 'var(--nf-color-bg)',
@@ -382,7 +385,9 @@ export default function EventCard({ event }: EventCardProps): ReactElement {
               role="img"
               aria-label={actorLabel}
               style={{
+                // nf-token-override: component dimension, not a spacing step
                 inlineSize: '1.25rem',
+                // nf-token-override: component dimension, not a spacing step
                 blockSize: '1.25rem',
                 borderRadius: 'var(--nf-radius-pill)',
                 background: 'color-mix(in oklab, var(--nf-color-accent) 14%, transparent)',

@@ -27,8 +27,11 @@ export default function PublicLensPage({ token }: PublicLensPageProps): ReactEle
   if (isLoading) {
     return (
       <PublicPageLayout busy mainLabel={t('public_page.loading')}>
+        {/* nf-token-override: placeholder sized to the content it stands in for, not a spacing step */}
         <Skeleton style={{ height: '3rem' }} />
+        {/* nf-token-override: placeholder sized to the content it stands in for, not a spacing step */}
         <Skeleton style={{ height: '4rem' }} />
+        {/* nf-token-override: placeholder sized to the content it stands in for, not a spacing step */}
         <Skeleton style={{ height: '4rem' }} />
       </PublicPageLayout>
     );

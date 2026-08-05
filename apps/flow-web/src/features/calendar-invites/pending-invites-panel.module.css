@@ -22,12 +22,14 @@
  * narrowest desktop where 1fr keeps day cells around 100px each so the
  * task pill text can render without being clipped to a 0-width title.
  */
+/* nf-token-override: breakpoint, and custom properties do not work in at-rule conditions */
 @media (min-width: 100rem) {
   .layout {
     grid-template-columns: minmax(0, 16rem) minmax(0, 1fr) minmax(0, 18rem);
   }
 }
 
+/* nf-token-override: breakpoint, and custom properties do not work in at-rule conditions */
 @media (max-width: 64rem) {
   .layout {
     grid-template-columns: minmax(0, 1fr);
@@ -96,8 +98,10 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  /* nf-token-override: component dimension, not a spacing step */
   min-inline-size: 1.25rem;
   padding-inline: var(--nf-space-1);
+  /* nf-token-override: component dimension, not a spacing step */
   block-size: 1.25rem;
   border-radius: var(--nf-radius-pill);
   background: var(--nf-color-accent-subtle);
@@ -145,5 +149,6 @@
 }
 
 .loadingSkeleton {
+  /* nf-token-override: placeholder sized to the content it stands in for, not a spacing step */
   block-size: 4rem;
 }

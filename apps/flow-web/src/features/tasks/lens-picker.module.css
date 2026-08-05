@@ -20,7 +20,9 @@
 }
 
 .panel {
+  /* nf-token-override: component dimension, not a spacing step */
   min-inline-size: 14rem;
+  /* nf-token-override: component dimension, not a spacing step */
   max-inline-size: 20rem;
   padding: var(--nf-space-2);
   display: flex;

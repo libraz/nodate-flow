@@ -59,7 +59,9 @@
 }
 
 .caret {
+  /* nf-token-override: component dimension, not a spacing step */
   inline-size: 0.75rem;
+  /* nf-token-override: component dimension, not a spacing step */
   block-size: 0.75rem;
   transition: transform var(--nf-duration-fast) var(--nf-ease-standard);
   color: var(--nf-color-fg-subtle);
@@ -173,7 +175,9 @@
 }
 
 .statusGlyph {
+  /* nf-token-override: component dimension, not a spacing step */
   inline-size: 0.5rem;
+  /* nf-token-override: component dimension, not a spacing step */
   block-size: 0.5rem;
   border-radius: 50%;
   display: inline-block;
@@ -264,6 +268,7 @@
 }
 
 .skeletonChip {
+  /* nf-token-override: placeholder sized to the content it stands in for, not a spacing step */
   block-size: 0.75rem;
   border-radius: var(--nf-radius-sm);
   background: color-mix(in oklab, var(--nf-color-bg-elevated) 80%, transparent);

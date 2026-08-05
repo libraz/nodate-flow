@@ -25,7 +25,9 @@ export default function PageSkeleton({
     <div aria-busy="true" className={cx(styles.root, className)} {...rest}>
       {/* Header */}
       <div className={styles.header}>
+        {/* nf-token-override: placeholder sized to the content it stands in for, not a spacing step */}
         <Skeleton style={{ inlineSize: '8rem', blockSize: 'var(--nf-space-5)' }} />
+        {/* nf-token-override: placeholder sized to the content it stands in for, not a spacing step */}
         <Skeleton style={{ inlineSize: '6rem', blockSize: 'var(--nf-space-5)' }} />
       </div>
 

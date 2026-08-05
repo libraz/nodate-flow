@@ -138,7 +138,9 @@ function WorkspaceDetailRoute(): ReactElement {
               padding: 'var(--nf-space-6)',
             }}
           >
+            {/* nf-token-override: placeholder sized to the content it stands in for, not a spacing step */}
             <Skeleton style={{ blockSize: '2rem', inlineSize: '16rem' }} />
+            {/* nf-token-override: placeholder sized to the content it stands in for, not a spacing step */}
             <Skeleton style={{ blockSize: '12rem', inlineSize: '100%' }} />
           </div>
         }
@@ -209,7 +211,9 @@ function WorkspaceDetailRoute(): ReactElement {
       <Suspense
         fallback={
           <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--nf-space-4)' }}>
+            {/* nf-token-override: placeholder sized to the content it stands in for, not a spacing step */}
             <Skeleton style={{ blockSize: '2rem', inlineSize: '16rem' }} />
+            {/* nf-token-override: placeholder sized to the content it stands in for, not a spacing step */}
             <Skeleton style={{ blockSize: '12rem', inlineSize: '100%' }} />
           </div>
         }
@@ -286,6 +290,7 @@ function WorkspaceNotFound(): ReactElement {
       <p
         style={{
           margin: 0,
+          // nf-token-override: component dimension, not a spacing step
           maxInlineSize: '28rem',
           color: 'var(--nf-color-fg-muted)',
         }}

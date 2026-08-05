@@ -105,6 +105,7 @@ function TodayRoute(): ReactElement {
         display: 'flex',
         flexDirection: 'column',
         gap: 'var(--nf-space-6)',
+        // nf-token-override: component dimension, not a spacing step
         maxInlineSize: '60rem',
         marginInline: 'auto',
         inlineSize: '100%',
@@ -220,7 +221,9 @@ function TodayRoute(): ReactElement {
                     <span
                       aria-hidden
                       style={{
+                        // nf-token-override: component dimension, not a spacing step
                         inlineSize: '0.5rem',
+                        // nf-token-override: component dimension, not a spacing step
                         blockSize: '0.5rem',
                         borderRadius: 'var(--nf-radius-pill)',
                         background:
@@ -276,6 +279,7 @@ function TodayRoute(): ReactElement {
                         fontSize: 'var(--nf-text-xs)',
                         color: 'var(--nf-color-fg-muted)',
                         whiteSpace: 'nowrap',
+                        // nf-token-override: component dimension, not a spacing step
                         minWidth: '5.5rem',
                         textAlign: 'right',
                       }}
