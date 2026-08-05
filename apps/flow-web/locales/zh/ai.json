@@ -44,7 +44,8 @@
       "api_key": "API 密钥",
       "api_key_placeholder": "sk-...",
       "base_url": "基础 URL（可选）",
-      "default_model": "默认模型（可选）"
+      "default_model": "默认模型（可选）",
+      "base_url_description": "仅用于连接自定义端点的类型。openai 始终连接官方 OpenAI 端点；如需使用 Azure、代理或网关，请选择 OpenAI 兼容。"
     },
     "kind": {
       "anthropic": "Anthropic",

@@ -120,7 +120,11 @@ export default function ProviderAddDialog({
               {...control}
               value={kind}
               onChange={(e) => {
-                setKind(e.target.value as AiProviderKind);
+                const next = e.target.value as AiProviderKind;
+                setKind(next);
+                // The field is hidden for openai, so a value typed under
+                // another kind would otherwise be submitted invisibly.
+                if (next === 'openai') setBaseUrl('');
               }}
             >
               {KINDS.map((k) => (
@@ -160,17 +164,31 @@ export default function ProviderAddDialog({
           )}
         </FormField>
 
-        <FormField label={t('providers.field.base_url')}>
-          {(control) => (
-            <Input
-              {...control}
-              value={baseUrl}
-              onChange={(e) => {
-                setBaseUrl(e.target.value);
-              }}
-            />
-          )}
-        </FormField>
+        {/*
+          The openai kind is the official endpoint only; a custom base URL
+          belongs to openai_compat. Offering the field here invited a
+          configuration the server refuses to build — and, until that
+          refusal moved to submit time, one that was stored and then broke
+          every AI call in the workspace. Hiding it is the half that stops
+          the mistake being made; the server check is the half that stops
+          it being made another way.
+        */}
+        {kind !== 'openai' && (
+          <FormField
+            label={t('providers.field.base_url')}
+            description={t('providers.field.base_url_description')}
+          >
+            {(control) => (
+              <Input
+                {...control}
+                value={baseUrl}
+                onChange={(e) => {
+                  setBaseUrl(e.target.value);
+                }}
+              />
+            )}
+          </FormField>
+        )}
 
         <FormField label={t('providers.field.default_model')}>
           {(control) => (

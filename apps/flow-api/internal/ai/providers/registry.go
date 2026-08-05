@@ -27,25 +27,15 @@ var ErrBaseURLNotAllowed = errors.New("ai/providers: base url is not allowed for
 // call. dec is the only object that holds the master key; it MUST be the
 // process-wide *crypto.Cipher built from NF_SECRET_KEY.
 func New(cfg Config, dec Decryptor) (Provider, error) {
-	if cfg.Kind != KindOllama && len(cfg.EncryptedKey) == 0 {
-		return nil, ErrMissingKey
+	if err := Validate(cfg); err != nil {
+		return nil, err
 	}
 	switch cfg.Kind {
 	case KindAnthropic:
 		return &anthropicProvider{cfg: cfg, dec: dec, endpoint: cfg.BaseURL}, nil
 	case KindOpenAI:
-		// The openai kind is the official endpoint only. Reject a configured
-		// base URL rather than silently ignoring it, so an admin who meant to
-		// reach a custom endpoint is told to use kind=openai_compat instead of
-		// having their traffic and key routed to api.openai.com.
-		if cfg.BaseURL != "" {
-			return nil, ErrBaseURLNotAllowed
-		}
 		return &openAIProvider{cfg: cfg, dec: dec, baseURL: defaultOpenAIBaseURL}, nil
 	case KindGoogle:
-		if err := validateBaseURL(cfg.BaseURL); err != nil {
-			return nil, err
-		}
 		return &googleProvider{cfg: cfg, dec: dec, baseURL: cfg.BaseURL}, nil
 	case KindOllama:
 		return &ollamaProvider{cfg: cfg}, nil
@@ -53,6 +43,38 @@ func New(cfg Config, dec Decryptor) (Provider, error) {
 		return &openAIProvider{cfg: cfg, dec: dec, baseURL: chooseBaseURL(cfg.BaseURL, defaultOpenAIBaseURL)}, nil
 	}
 	return nil, fmt.Errorf("%w: %q", ErrUnknownKind, cfg.Kind)
+}
+
+// Validate reports whether cfg describes a provider that can be built.
+// [New] calls it first, so anything that passes here is something New
+// will accept — the two cannot disagree about what a valid provider is.
+//
+// It exists separately so the create and update handlers can reject a
+// bad configuration at the point the admin submits it. They could not
+// call New: it wants a Decryptor, and at submit time there is nothing to
+// decrypt. Without this, a kind=openai row carrying a base URL was
+// written happily and only failed later, at the first completion, in a
+// place with no way to say which field was wrong.
+func Validate(cfg Config) error {
+	if cfg.Kind != KindOllama && len(cfg.EncryptedKey) == 0 {
+		return ErrMissingKey
+	}
+	switch cfg.Kind {
+	case KindAnthropic, KindOllama, KindOpenAICompat:
+		return nil
+	case KindOpenAI:
+		// The openai kind is the official endpoint only. Reject a configured
+		// base URL rather than silently ignoring it, so an admin who meant to
+		// reach a custom endpoint is told to use kind=openai_compat instead of
+		// having their traffic and key routed to api.openai.com.
+		if cfg.BaseURL != "" {
+			return ErrBaseURLNotAllowed
+		}
+		return nil
+	case KindGoogle:
+		return validateBaseURL(cfg.BaseURL)
+	}
+	return fmt.Errorf("%w: %q", ErrUnknownKind, cfg.Kind)
 }
 
 // chooseBaseURL returns override if non-empty, otherwise fallback. Centralised

@@ -37,6 +37,17 @@ func mapProviderError(err error) error {
 		return httpErr(apierrors.AiResponseSchemaMismatch)
 	case errors.Is(err, providers.ErrUpstreamUnreachable):
 		return httpErr(apierrors.AiProviderUpstreamUnreachable)
+	// The provider row cannot be turned into a client at all: a base URL
+	// on a kind that does not take one, a kind nothing implements, a
+	// missing key. Nothing was sent upstream, so reporting "could not
+	// reach the provider" points the reader at the network and at the
+	// vendor's status page — the two places the answer is not. The
+	// configuration is what has to change, which is what 412 says.
+	case errors.Is(err, providers.ErrBaseURLNotAllowed),
+		errors.Is(err, providers.ErrInvalidBaseURL),
+		errors.Is(err, providers.ErrUnknownKind),
+		errors.Is(err, providers.ErrMissingKey):
+		return httpErr(apierrors.AiProviderNotConfigured)
 	default:
 		return httpErr(apierrors.AiProviderUpstreamUnreachable)
 	}

@@ -44,7 +44,8 @@
       "api_key": "API キー",
       "api_key_placeholder": "sk-...",
       "base_url": "ベース URL（任意）",
-      "default_model": "デフォルトモデル（任意）"
+      "default_model": "デフォルトモデル（任意）",
+      "base_url_description": "独自のエンドポイントに接続する種類でのみ使います。openai は常に公式の OpenAI エンドポイントに接続します。Azure・プロキシ・ゲートウェイを使う場合は OpenAI 互換を選んでください。"
     },
     "kind": {
       "anthropic": "Anthropic",

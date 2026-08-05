@@ -44,7 +44,8 @@
       "api_key": "API key",
       "api_key_placeholder": "sk-...",
       "base_url": "Base URL (optional)",
-      "default_model": "Default model (optional)"
+      "default_model": "Default model (optional)",
+      "base_url_description": "Only for kinds that target a custom endpoint. The openai kind always uses the official OpenAI endpoint; for Azure, a proxy or a gateway, choose OpenAI-compatible."
     },
     "kind": {
       "anthropic": "Anthropic",

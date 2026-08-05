@@ -4,6 +4,7 @@ import (
 	"context"
 	"log/slog"
 
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/ai/providers"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/audit"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
@@ -56,6 +57,36 @@ func CreateProvider(deps Deps) func(context.Context, *CreateProviderInput) (*Cre
 		}
 		if deps.Cipher == nil {
 			return nil, httpErr(apierrors.AiProviderNotConfigured)
+		}
+
+		// Refuse a configuration that cannot become a provider, before it
+		// reaches the table.
+		//
+		// The check already existed, inside providers.New, but nothing ran
+		// it until the first completion — long after the row was written.
+		// By then the error surfaced as "could not reach the provider" on
+		// an unrelated request, and the row could not be repaired: PATCH
+		// takes only the API key. Worse, the default provider is the most
+		// recently created enabled row, so one bad row silently shadowed a
+		// working one and the whole workspace's AI stopped, with nothing
+		// pointing at the row that had just been added.
+		//
+		// EncryptedKey is a stand-in: the real sealed blob does not exist
+		// yet at this point and Validate only checks that a key is present
+		// for the kinds that require one.
+		if err := providers.Validate(providers.Config{
+			Kind:         providers.Kind(in.Body.Kind),
+			Name:         in.Body.Name,
+			BaseURL:      in.Body.BaseURL,
+			DefaultModel: in.Body.DefaultModel,
+			EncryptedKey: []byte(in.Body.APIKey),
+		}); err != nil {
+			slog.InfoContext(ctx, "ai provider create rejected",
+				slog.String("workspaceId", ws.PublicID.String()),
+				slog.String("kind", in.Body.Kind),
+				slog.Bool("hasBaseUrl", in.Body.BaseURL != ""),
+				slog.String("err", err.Error()))
+			return nil, httpErr(apierrors.ValidationBodyFieldInvalid)
 		}
 
 		// Sealed key is built without ever stashing the plaintext anywhere

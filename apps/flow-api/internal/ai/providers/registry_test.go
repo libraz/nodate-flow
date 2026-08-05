@@ -74,3 +74,41 @@ func TestOpenAICompatAcceptsBaseURL(t *testing.T) {
 		t.Fatalf("provider kind = %q, want %q", got, KindOpenAICompat)
 	}
 }
+
+// TestValidateAgreesWithNew pins the contract the create handler relies
+// on: anything Validate accepts, New accepts, and anything Validate
+// rejects, New rejects with the same sentinel. The handler cannot call
+// New — there is no sealed key to hand it at submit time — so the two
+// have to be the same rule rather than two rules that look alike.
+func TestValidateAgreesWithNew(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name string
+		cfg  Config
+	}{
+		{"openai with a base url", Config{Kind: KindOpenAI, BaseURL: "https://proxy/v1", EncryptedKey: []byte("k")}},
+		{"openai without one", Config{Kind: KindOpenAI, EncryptedKey: []byte("k")}},
+		{"openai_compat with a base url", Config{Kind: KindOpenAICompat, BaseURL: "https://proxy/v1", EncryptedKey: []byte("k")}},
+		{"anthropic", Config{Kind: KindAnthropic, EncryptedKey: []byte("k")}},
+		{"google with a malformed base url", Config{Kind: KindGoogle, BaseURL: "ftp://nope", EncryptedKey: []byte("k")}},
+		{"google with a good base url", Config{Kind: KindGoogle, BaseURL: "https://gen.example/v1", EncryptedKey: []byte("k")}},
+		{"ollama without a key", Config{Kind: KindOllama}},
+		{"a kind nothing implements", Config{Kind: Kind("nope"), EncryptedKey: []byte("k")}},
+		{"a key-requiring kind with no key", Config{Kind: KindAnthropic}},
+	}
+	for _, tc := range cases {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			vErr := Validate(tc.cfg)
+			_, nErr := New(tc.cfg, fakeDecryptor{})
+			if (vErr == nil) != (nErr == nil) {
+				t.Fatalf("Validate err = %v but New err = %v", vErr, nErr)
+			}
+			if vErr != nil && nErr != nil && vErr.Error() != nErr.Error() {
+				t.Fatalf("Validate err = %v, New err = %v; want the same", vErr, nErr)
+			}
+		})
+	}
+}
