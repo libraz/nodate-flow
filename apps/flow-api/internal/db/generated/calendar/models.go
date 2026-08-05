@@ -2519,7 +2519,7 @@ type AutoActionRule struct {
 	CreatedAt       time.Time    `json:"createdAt"`
 }
 
-// Calendar containers (personal layer or system holiday feed). Workspace members share events through event-level visibility (public/private/confidential), not shared-calendar membership.
+// Calendar containers. Access is calendar_members; kind is the source of the contents, not the audience. owner_user_id NULL means the calendar outlives any single member.
 type Calendar struct {
 	// Internal PK, never exposed
 	ID uint32 `json:"-"`
@@ -2527,7 +2527,7 @@ type Calendar struct {
 	PublicID types.PublicID `json:"publicId"`
 	// Internal FK to workspaces.id
 	WorkspaceID uint32 `json:"-"`
-	// Calendar kind: personal (user-owned layer, may own many), system (holiday feeds).
+	// Where the contents come from: personal (written by people through the API) or system (populated from a provider feed identified by system_slug, and read-only to users). Not an audience: see the table comment.
 	Kind CalendarsKind `json:"kind"`
 	// Display name
 	Name string `json:"name"`
@@ -2537,7 +2537,7 @@ type Calendar struct {
 	Color string `json:"color"`
 	// Cover image URL
 	CoverUrl sql.NullString `json:"coverUrl"`
-	// For personal calendars: the owning user. NULL for system
+	// The user this calendar belongs to, or NULL when it belongs to no one in particular: a system feed, or a calendar shared by a group that outlives any single member. NULL is not cosmetic — the FK cascades, so naming an owner means deleting that user deletes the calendar and every event in it. A group calendar must leave this NULL or one departure takes everyone else's history with it.
 	OwnerUserID sql.NullInt32 `json:"-"`
 	// For system calendars: provider identifier (e.g., holidays.jp)
 	SystemSlug sql.NullString `json:"systemSlug"`
@@ -2595,8 +2595,12 @@ type CalendarEvent struct {
 	RecurrenceRule json.RawMessage `json:"recurrenceRule"`
 	// Computed end date for recurrence expansion queries
 	RecurrenceEnd sql.NullTime `json:"recurrenceEnd"`
-	// Array of ISO 8601 dates/times to exclude from recurrence
+	// Array of ISO 8601 occurrence starts to skip when expanding this rule. Cancelling one occurrence is an entry here, never a row.
 	RecurrenceExceptions json.RawMessage `json:"recurrenceExceptions"`
+	// Set on an override row: the recurring event whose single occurrence this row replaces. NULL on ordinary and master rows.
+	RecurrenceParentID sql.NullInt32 `json:"recurrenceParentId"`
+	// Set on an override row: the start the occurrence would have had under the parent rule. Identifies which occurrence is replaced, so moving the override does not lose track of what it overrides.
+	RecurrenceOriginalStart sql.NullTime `json:"recurrenceOriginalStart"`
 	// Minutes before event to send notification; NULL = no notification
 	NotificationOffset sql.NullInt32 `json:"notificationOffset"`
 	// Timestamp when notification was sent; NULL = not yet notified
@@ -2613,7 +2617,7 @@ type CalendarEvent struct {
 	Notes sql.NullString `json:"notes"`
 	// Structured per-event markers (non_working_day, auto_snapped, etc.); unknown keys preserved.
 	Flags json.RawMessage `json:"flags"`
-	// Soft-delete flag; FALSE excludes the row from LIST/GET. The single soft-delete signal for this table — propagate via INNER/LEFT JOIN ... AND ce.enabled = TRUE in every consumer view (matches project-wide enabled propagation in docs/conventions/db.md).
+	// Soft-delete flag; FALSE excludes the row from LIST/GET. The single soft-delete signal for this table — propagate via INNER/LEFT JOIN ... AND ce.enabled = TRUE in every consumer view, so a soft-deleted row cannot reappear through a join.
 	Enabled   bool         `json:"enabled"`
 	UpdatedAt sql.NullTime `json:"updatedAt"`
 	CreatedAt time.Time    `json:"createdAt"`
@@ -2969,15 +2973,17 @@ type Event struct {
 	WorkspaceID uint32 `json:"-"`
 	// Internal FK to tasks.id when the event targets a task
 	TaskID sql.NullInt32 `json:"-"`
-	// Internal FK to signals.id; set when this event was emitted by the Applier in response to a judged signal. Provides full traceability from external input to task event (ADR 0008 D4).
+	// Internal FK to calendars.id when the event targets a calendar or something inside one. The symmetric counterpart of task_id, and the reason a per-calendar activity feed can read the log directly instead of keeping a second history table that would drift from it.
+	CalendarID sql.NullInt32 `json:"-"`
+	// Internal FK to signals.id; set when this event was emitted by the Applier in response to a judged signal. Provides full traceability from external input to task event. Belongs to a product layer: NULL in a deployment without one.
 	TriggeredBySignalID sql.NullInt32 `json:"triggeredBySignalId"`
-	// Acting user.id (null for system/bot actions). Mutually exclusive with actor_agent_id and actor_system_source: exactly one of the three actor sources is set per row (both NULL is also legal for legacy "system actor"). The mutual-exclusion rule is enforced by query design and handler validation, not a CHECK constraint, because all three FK referential actions use ON DELETE SET NULL and MySQL 8.4 forbids CHECK constraints referencing columns used in FK referential actions. Each INSERT binds exactly one of the three columns: AppendEvent (events.sql) sets actor_user_id only; AppendAgentEvent (events.sql) and InsertHandoffToUserEvent (agents/handoff.sql) set actor_agent_id only; InsertHandoffToAgentEvent (agents/handoff.sql) sets actor_user_id only; worker-tick append paths set actor_system_source only.
+	// Acting user.id (null for system/bot actions). Mutually exclusive with actor_agent_id and actor_system_source: exactly one of the three actor sources is set per row (both NULL is also legal for legacy "system actor"). The mutual-exclusion rule is enforced by query design and handler validation, not a CHECK constraint, because all three FK referential actions use ON DELETE SET NULL and MySQL 8.4 forbids CHECK constraints referencing columns used in FK referential actions. Every INSERT must therefore bind exactly one of the three, chosen by who is acting: a person, an agent, or a background process.
 	ActorUserID sql.NullInt32 `json:"actorUserId"`
 	// Acting ai_agents.id when the event was produced by an AI agent (judge / task agent). See actor_user_id comment for the three-way exclusion rule.
 	ActorAgentID sql.NullInt32 `json:"actorAgentId"`
-	// Third actor source for system-driven events emitted by the worker binary (apps/flow-worker; ADR 0008 D8). Examples: `worker:scheduler`, `worker:retention`, `worker:calendar`. Not an FK because the worker is not represented in the database. See actor_user_id comment for the three-way exclusion rule.
+	// Third actor source, for events emitted by a background process rather than a person or an agent. Free-form and namespaced by the writer, e.g. `worker:scheduler` or `worker:retention`. Not an FK because such a process has no row in the database. See actor_user_id comment for the three-way exclusion rule.
 	ActorSystemSource sql.NullString `json:"actorSystemSource"`
-	// Internal FK to events.id. Non-NULL means this event is a compensating reverse of another event (e.g., user undoing an auto-completion). The derived_state projection cancels both events out. See ADR 0008 D4 — events are immutable; reversals never UPDATE/DELETE.
+	// Internal FK to events.id. Non-NULL means this event is a compensating reverse of another event (e.g., user undoing an auto-completion). A projection reading the log cancels both events out. The log is immutable: a reversal is a new row, never an UPDATE or DELETE of the original.
 	ReversesEventID sql.NullInt64 `json:"reversesEventId"`
 	// Event type (e.g., task.created, signal.attached, signal.judged)
 	Type string `json:"type"`
@@ -3654,7 +3660,7 @@ type RepoWorkspaceMapping struct {
 	WorkspaceID uint32 `json:"-"`
 	// Internal FK to user_integrations.id (the GitHub OAuth connection)
 	IntegrationID uint32 `json:"integrationId"`
-	// GitHub owner/repo (e.g. nodate-flow/nodate-flow)
+	// GitHub owner/repo (e.g. libraz/nodate-flow)
 	RepoFullName string `json:"repoFullName"`
 	// GitHub numeric repository ID for webhook lookup
 	RepoID uint64 `json:"repoId"`

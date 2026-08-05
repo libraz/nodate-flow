@@ -10,7 +10,7 @@ CREATE TABLE repo_workspace_mappings (
   workspace_id INT UNSIGNED NOT NULL COMMENT 'Internal FK to workspaces.id',
   integration_id INT UNSIGNED NOT NULL COMMENT 'Internal FK to user_integrations.id (the GitHub OAuth connection)',
 
-  repo_full_name VARCHAR(255) CHARACTER SET latin1 COLLATE latin1_swedish_ci NOT NULL COMMENT 'GitHub owner/repo (e.g. nodate-flow/nodate-flow)',
+  repo_full_name VARCHAR(255) CHARACTER SET latin1 COLLATE latin1_swedish_ci NOT NULL COMMENT 'GitHub owner/repo (e.g. libraz/nodate-flow)',
   repo_id BIGINT UNSIGNED NOT NULL COMMENT 'GitHub numeric repository ID for webhook lookup',
   default_project_id INT UNSIGNED NULL COMMENT 'Optional FK to projects.id for routing issues/PRs',
   is_sync_issues BOOLEAN NOT NULL DEFAULT FALSE COMMENT 'Sync GitHub issues as tasks',
