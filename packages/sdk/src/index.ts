@@ -41,7 +41,7 @@ export {
 } from './query-client.js';
 export { QueryProvider } from './query-provider.js';
 // Redirect safety utilities
-export { isSafeRedirect } from './redirect.js';
+export { isSafeRedirect, parseAllowedOrigins } from './redirect.js';
 export {
   type AuthRequestMiddlewareOptions,
   createAuthRequestMiddleware,

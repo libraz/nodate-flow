@@ -8887,7 +8887,7 @@
             "type": "string"
           },
           "publicToken": {
-            "description": "32-char hex token for the public share URL",
+            "description": "Opaque token for the public share URL, returned exactly once",
             "type": "string"
           }
         },
@@ -9555,10 +9555,6 @@
             "type": "boolean"
           },
           "name": {
-            "type": "string"
-          },
-          "publicToken": {
-            "description": "Share token; only returned to workspace members",
             "type": "string"
           },
           "safetyCheckedAt": {
@@ -13718,6 +13714,13 @@
             }
           },
           {
+            "in": "cookie",
+            "name": "nd_oidc",
+            "schema": {
+              "$ref": "#/components/schemas/Cookie"
+            }
+          },
+          {
             "explode": false,
             "in": "query",
             "name": "error",
@@ -13784,7 +13787,14 @@
                 }
               }
             },
-            "description": "OK"
+            "description": "OK",
+            "headers": {
+              "Set-Cookie": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
           },
           "default": {
             "content": {
@@ -13826,6 +13836,13 @@
             "name": "state",
             "schema": {
               "type": "string"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "nd_oidc",
+            "schema": {
+              "$ref": "#/components/schemas/Cookie"
             }
           },
           {
@@ -13895,7 +13912,14 @@
                 }
               }
             },
-            "description": "OK"
+            "description": "OK",
+            "headers": {
+              "Set-Cookie": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
           },
           "default": {
             "content": {
@@ -13937,6 +13961,13 @@
             "name": "state",
             "schema": {
               "type": "string"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "nd_oidc",
+            "schema": {
+              "$ref": "#/components/schemas/Cookie"
             }
           },
           {
@@ -14006,7 +14037,14 @@
                 }
               }
             },
-            "description": "OK"
+            "description": "OK",
+            "headers": {
+              "Set-Cookie": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
           },
           "default": {
             "content": {
@@ -16227,14 +16265,12 @@
         "operationId": "lenses-get-public",
         "parameters": [
           {
-            "description": "32-char hex share token",
+            "description": "Opaque share token from the public URL",
             "in": "path",
             "name": "token",
             "required": true,
             "schema": {
-              "description": "32-char hex share token",
-              "maxLength": 32,
-              "minLength": 32,
+              "description": "Opaque share token from the public URL",
               "type": "string"
             }
           }

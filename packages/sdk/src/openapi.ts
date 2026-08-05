@@ -8915,7 +8915,7 @@ export interface components {
              * @example https://example.com/schemas/PublishLensBody.json
              */
             readonly $schema?: string;
-            /** @description 32-char hex token for the public share URL */
+            /** @description Opaque token for the public share URL, returned exactly once */
             publicToken: string;
         };
         Reaction: {
@@ -9251,8 +9251,6 @@ export interface components {
             isDefault: boolean;
             isPublic: boolean;
             name: string;
-            /** @description Share token; only returned to workspace members */
-            publicToken?: string;
             /**
              * Format: int64
              * @description Unix seconds of last AI safety check
@@ -11373,7 +11371,9 @@ export interface operations {
                 "User-Agent"?: string;
             };
             path?: never;
-            cookie?: never;
+            cookie?: {
+                nd_oidc?: components["schemas"]["Cookie"];
+            };
         };
         requestBody?: never;
         responses: {
@@ -11411,6 +11411,7 @@ export interface operations {
             /** @description OK */
             200: {
                 headers: {
+                    "Set-Cookie"?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -11440,7 +11441,9 @@ export interface operations {
                 "User-Agent"?: string;
             };
             path?: never;
-            cookie?: never;
+            cookie?: {
+                nd_oidc?: components["schemas"]["Cookie"];
+            };
         };
         requestBody?: never;
         responses: {
@@ -11478,6 +11481,7 @@ export interface operations {
             /** @description OK */
             200: {
                 headers: {
+                    "Set-Cookie"?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -11507,7 +11511,9 @@ export interface operations {
                 "User-Agent"?: string;
             };
             path?: never;
-            cookie?: never;
+            cookie?: {
+                nd_oidc?: components["schemas"]["Cookie"];
+            };
         };
         requestBody?: never;
         responses: {
@@ -11545,6 +11551,7 @@ export interface operations {
             /** @description OK */
             200: {
                 headers: {
+                    "Set-Cookie"?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -13112,7 +13119,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                /** @description 32-char hex share token */
+                /** @description Opaque share token from the public URL */
                 token: string;
             };
             cookie?: never;

@@ -17,6 +17,15 @@ export interface AuthUser {
   timezone: string;
   country: string;
   themePreference: string;
+  /**
+   * First day of the week (`mon` / `sun` / `sat`).
+   *
+   * Optional because a session restored by an older client may predate
+   * the field. Readers must fall back on their own rather than assume a
+   * default here — a wrong default written back on the next save is how
+   * the stored preference gets destroyed.
+   */
+  weekStart?: string;
   isInstanceAdmin: boolean;
   /**
    * Public avatar URL served by the auth-api proxy

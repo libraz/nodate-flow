@@ -122,6 +122,35 @@ export function decodeTokenExp(token: string): number | null {
   }
 }
 
+/**
+ * Why the most recent refresh returned no token.
+ *
+ * `network` means the request never reached the server, so nothing is
+ * known about the session; `rejected` means the server answered and
+ * declined. Only the second is grounds for ending the session.
+ */
+export type RefreshFailureKind = 'none' | 'network' | 'rejected';
+
+/**
+ * Whether a caught value represents a transport-layer failure rather
+ * than a response.
+ *
+ * Deliberately decided from the thrown value alone. `fetch` rejects with
+ * a `TypeError` when the request never reached a server (DNS, TCP, CORS,
+ * offline) and with a `DOMException` named `AbortError` on cancellation;
+ * anything else means we did get an answer. Inferring "network" from a
+ * missing HTTP status would be wrong here, because a status is also
+ * missing whenever an error envelope fails to parse — that would classify
+ * a genuine rejection as a blip and keep a dead session alive.
+ */
+function isTransportFailure(err: unknown): boolean {
+  if (err instanceof TypeError) return true;
+  if (typeof DOMException !== 'undefined' && err instanceof DOMException) {
+    return err.name === 'AbortError';
+  }
+  return false;
+}
+
 /** Token refresher handle with helpers for expiry-aware request gating. */
 export interface TokenRefresher {
   /** Trigger a refresh (deduped within the grace window). */
@@ -136,6 +165,12 @@ export interface TokenRefresher {
    * token observed by this refresher, or null if unknown.
    */
   currentExp: () => number | null;
+  /**
+   * Why the most recent refresh produced no token. Callers use this to
+   * tell "the server says you are signed out" from "we could not ask",
+   * which decide opposite things: sign the user out, or offer a retry.
+   */
+  lastFailure: () => RefreshFailureKind;
 }
 
 /**
@@ -148,8 +183,14 @@ export interface TokenRefresher {
  *   pre-rotation token reuse the same new token.
  * - On success: decodes the new token's `exp` claim for later expiry
  *   checks, calls `setAccessToken`, and returns the new token.
- * - On failure: calls `clearSession`, then `onSessionExpired` (if
- *   provided), and returns `null`.
+ * - On rejection by the server: calls `clearSession`, then
+ *   `onSessionExpired` (if provided), and returns `null`.
+ * - On a transport failure (the request never reached the server):
+ *   returns `null` with the session **left intact**. A connection that
+ *   dropped for a moment says nothing about whether the refresh cookie
+ *   is still good, and signing someone out over it discards unsaved work
+ *   with no way back but a manual reload. Callers distinguish the two
+ *   through {@link TokenRefresher.lastFailure}.
  *
  * The returned function carries two helper methods (`isExpiringSoon`,
  * `currentExp`) so request-middleware callers can decide whether to
@@ -163,6 +204,16 @@ export function createTokenRefresher(options: RefreshMiddlewareOptions): TokenRe
   // prior tab) still participates in proactive refresh.
   let cachedExp: number | null = null;
   let cachedForToken: string | undefined;
+  let lastFailureKind: RefreshFailureKind = 'none';
+
+  /** Server said no: drop the session and notify. */
+  function endSession(): void {
+    lastFailureKind = 'rejected';
+    options.clearSession();
+    cachedExp = null;
+    cachedForToken = undefined;
+    options.onSessionExpired?.();
+  }
 
   function syncCachedExpFromStore(): void {
     const current = options.getAccessToken();
@@ -182,30 +233,28 @@ export function createTokenRefresher(options: RefreshMiddlewareOptions): TokenRe
           credentials: 'include',
         });
         if (!res.ok) {
-          options.clearSession();
-          cachedExp = null;
-          cachedForToken = undefined;
-          options.onSessionExpired?.();
+          endSession();
           return null;
         }
         const body = (await res.json()) as { accessToken?: string };
         const token = body.accessToken;
         if (!token) {
-          options.clearSession();
-          cachedExp = null;
-          cachedForToken = undefined;
-          options.onSessionExpired?.();
+          endSession();
           return null;
         }
         options.setAccessToken(token);
         cachedExp = decodeTokenExp(token);
         cachedForToken = token;
+        lastFailureKind = 'none';
         return token;
-      } catch {
-        options.clearSession();
-        cachedExp = null;
-        cachedForToken = undefined;
-        options.onSessionExpired?.();
+      } catch (err) {
+        if (isTransportFailure(err)) {
+          // We never reached the server, so the session is unproven, not
+          // invalid. Leave it alone and report why there is no token.
+          lastFailureKind = 'network';
+          return null;
+        }
+        endSession();
         return null;
       }
     })();
@@ -237,6 +286,8 @@ export function createTokenRefresher(options: RefreshMiddlewareOptions): TokenRe
     syncCachedExpFromStore();
     return cachedExp;
   };
+
+  refreshAccessToken.lastFailure = (): RefreshFailureKind => lastFailureKind;
 
   return refreshAccessToken;
 }

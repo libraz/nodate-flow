@@ -73,15 +73,68 @@ describe('createTokenRefresher', () => {
     expect(opts.setAccessToken).not.toHaveBeenCalled();
   });
 
-  it('calls clearSession and returns null on network error', async () => {
-    const opts = makeOptions();
+  it('keeps the session when the request never reached the server', async () => {
+    const onSessionExpired = vi.fn();
+    const opts = makeOptions({ onSessionExpired });
+    // What `fetch` throws when the network is down: no response, so
+    // nothing was learned about whether the refresh cookie is still good.
     vi.mocked(globalThis.fetch).mockRejectedValueOnce(new TypeError('Failed to fetch'));
 
     const refresh = createTokenRefresher(opts);
     const result = await refresh();
 
     expect(result).toBeNull();
+    expect(opts.clearSession).not.toHaveBeenCalled();
+    expect(onSessionExpired).not.toHaveBeenCalled();
+    expect(refresh.lastFailure()).toBe('network');
+  });
+
+  it('keeps the session when the request was aborted', async () => {
+    const opts = makeOptions();
+    vi.mocked(globalThis.fetch).mockRejectedValueOnce(
+      new DOMException('The operation was aborted.', 'AbortError'),
+    );
+
+    const refresh = createTokenRefresher(opts);
+
+    expect(await refresh()).toBeNull();
+    expect(opts.clearSession).not.toHaveBeenCalled();
+    expect(refresh.lastFailure()).toBe('network');
+  });
+
+  it('ends the session when the server declines, and says so', async () => {
+    const opts = makeOptions();
+    vi.mocked(globalThis.fetch).mockResolvedValueOnce(jsonResponse({ error: 'expired' }, 401));
+
+    const refresh = createTokenRefresher(opts);
+
+    expect(await refresh()).toBeNull();
     expect(opts.clearSession).toHaveBeenCalledOnce();
+    // The distinction is the whole point: a refused refresh is an answer,
+    // a dropped connection is not.
+    expect(refresh.lastFailure()).toBe('rejected');
+  });
+
+  it('ends the session on a non-transport throw, which is not a connectivity problem', async () => {
+    const opts = makeOptions();
+    // e.g. the response body failed to parse as JSON.
+    vi.mocked(globalThis.fetch).mockRejectedValueOnce(new SyntaxError('Unexpected token'));
+
+    const refresh = createTokenRefresher(opts);
+
+    expect(await refresh()).toBeNull();
+    expect(opts.clearSession).toHaveBeenCalledOnce();
+    expect(refresh.lastFailure()).toBe('rejected');
+  });
+
+  it('reports no failure after a successful refresh', async () => {
+    const opts = makeOptions();
+    vi.mocked(globalThis.fetch).mockResolvedValueOnce(jsonResponse({ accessToken: 'ok-token' }));
+
+    const refresh = createTokenRefresher(opts);
+
+    expect(await refresh()).toBe('ok-token');
+    expect(refresh.lastFailure()).toBe('none');
   });
 
   it('calls clearSession and returns null when accessToken is missing from body', async () => {

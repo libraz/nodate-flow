@@ -5,7 +5,31 @@
   "type": "module",
   "main": "./src/index.ts",
   "types": "./src/index.ts",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "bun": "./src/index.ts",
+      "module": "./src/index.ts",
+      "node": "./dist/index.js",
+      "default": "./src/index.ts"
+    },
+    "./client": {
+      "types": "./src/client.ts",
+      "bun": "./src/client.ts",
+      "module": "./src/client.ts",
+      "node": "./dist/client.js",
+      "default": "./src/client.ts"
+    },
+    "./api-error": {
+      "types": "./src/api-error.ts",
+      "bun": "./src/api-error.ts",
+      "module": "./src/api-error.ts",
+      "node": "./dist/api-error.js",
+      "default": "./src/api-error.ts"
+    }
+  },
   "scripts": {
+    "build": "tsc -b",
     "typecheck": "tsc -b",
     "test": "vitest run"
   },
@@ -43,7 +67,7 @@
     "openapi-typescript": "7.13.0",
     "react": "19.2.8",
     "react-i18next": "17.0.11",
-    "typescript": "7.0.2",
+    "typescript": "5.9.3",
     "vitest": "^4.1.10",
     "zustand": "5.0.14"
   }
