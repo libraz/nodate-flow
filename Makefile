@@ -129,7 +129,7 @@ build-accounts-web:
 
 # ---------- test ----------
 
-.PHONY: test test-api test-api-mock test-api-real test-web test-accounts-web test-ui test-sdk test-e2e test-contract test-openapi-diff test-schema-collisions test-schema-diff test-core-contract lighthouse
+.PHONY: test test-api test-api-mock test-api-real test-web test-accounts-web test-ui test-sdk test-e2e test-contract test-openapi-diff test-schema-collisions test-schema-diff verify-codegen test-core-contract lighthouse
 test: test-api test-auth-api test-web test-accounts-web test-ui test-sdk ## Run unit/integration tests (Go + TS)
 
 test-api: test-api-mock test-api-real ## Go tests (flow) — both NF_FLOW_AI_MOCK on and off
@@ -169,6 +169,9 @@ test-schema-collisions: ## Fail if the merged OpenAPI spec has schema name colli
 
 test-schema-diff: ## Fail if sql/schema.sql is out of sync with sql/core/** and sql/flow/**
 	./scripts/schema-diff.sh
+
+verify-codegen: ## Fail if sql/schema.sql or the sqlc output is out of sync with the schema
+	bash scripts/check-codegen-drift.sh
 
 test-core-contract: ## Check a database against the core contract (NF_CONFORMANCE_DSN or NF_DB_* vars)
 	bash sql/core/conformance/run.sh \
