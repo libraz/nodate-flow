@@ -178,7 +178,7 @@ function AuditRow({ entry }: { entry: AuditLogEntry }): ReactElement {
     <tr>
       <td
         style={{
-          padding: '0.5rem 0.75rem',
+          padding: 'var(--nf-space-2) var(--nf-space-3)',
           fontSize: '0.8125rem',
           whiteSpace: 'nowrap',
           color: 'var(--nf-color-fg-muted)',
@@ -186,12 +186,12 @@ function AuditRow({ entry }: { entry: AuditLogEntry }): ReactElement {
       >
         {formatTimestamp(entry.occurredAt)}
       </td>
-      <td style={{ padding: '0.5rem 0.75rem' }}>
+      <td style={{ padding: 'var(--nf-space-2) var(--nf-space-3)' }}>
         <Badge tone={toneForAction(entry.action)}>{entry.action}</Badge>
       </td>
       <td
         style={{
-          padding: '0.5rem 0.75rem',
+          padding: 'var(--nf-space-2) var(--nf-space-3)',
           fontSize: '0.8125rem',
         }}
       >
@@ -199,7 +199,7 @@ function AuditRow({ entry }: { entry: AuditLogEntry }): ReactElement {
       </td>
       <td
         style={{
-          padding: '0.5rem 0.75rem',
+          padding: 'var(--nf-space-2) var(--nf-space-3)',
           fontSize: '0.8125rem',
         }}
       >
@@ -207,8 +207,8 @@ function AuditRow({ entry }: { entry: AuditLogEntry }): ReactElement {
       </td>
       <td
         style={{
-          padding: '0.5rem 0.75rem',
-          fontSize: '0.75rem',
+          padding: 'var(--nf-space-2) var(--nf-space-3)',
+          fontSize: 'var(--nf-text-xs)',
           fontFamily: 'var(--nf-font-mono)',
           color: 'var(--nf-color-fg-muted)',
         }}
@@ -217,8 +217,8 @@ function AuditRow({ entry }: { entry: AuditLogEntry }): ReactElement {
       </td>
       <td
         style={{
-          padding: '0.5rem 0.75rem',
-          fontSize: '0.75rem',
+          padding: 'var(--nf-space-2) var(--nf-space-3)',
+          fontSize: 'var(--nf-text-xs)',
           color: 'var(--nf-color-fg-muted)',
           maxInlineSize: '16rem',
           overflow: 'hidden',
@@ -334,33 +334,33 @@ export default function AuditLogView({ workspaceId }: { workspaceId: string }): 
   };
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-      <header style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--nf-space-4)' }}>
+      <header style={{ display: 'flex', flexDirection: 'column', gap: 'var(--nf-space-1)' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <h1 style={{ margin: 0, fontSize: '1.5rem' }}>{t('audit_log.title')}</h1>
+          <h1 style={{ margin: 0, fontSize: 'var(--nf-text-2xl)' }}>{t('audit_log.title')}</h1>
           <Button variant="default" size="sm" onClick={handleExport}>
             {t('audit_log.export_csv')}
           </Button>
         </div>
-        <p style={{ margin: 0, color: 'var(--nf-color-fg-muted)', fontSize: '0.875rem' }}>
+        <p style={{ margin: 0, color: 'var(--nf-color-fg-muted)', fontSize: 'var(--nf-text-sm)' }}>
           {t('audit_log.description')}
         </p>
       </header>
 
       {/* Filters */}
-      <Card style={{ padding: '0.75rem' }}>
+      <Card style={{ padding: 'var(--nf-space-3)' }}>
         <div
           style={{
             display: 'flex',
             flexWrap: 'wrap',
-            gap: '0.75rem',
+            gap: 'var(--nf-space-3)',
             alignItems: 'flex-end',
           }}
         >
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--nf-space-1)' }}>
             <label
               htmlFor="audit-action-filter"
-              style={{ fontSize: '0.75rem', color: 'var(--nf-color-fg-muted)' }}
+              style={{ fontSize: 'var(--nf-text-xs)', color: 'var(--nf-color-fg-muted)' }}
             >
               {t('audit_log.filter.action')}
             </label>
@@ -379,10 +379,10 @@ export default function AuditLogView({ workspaceId }: { workspaceId: string }): 
             </Select>
           </div>
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--nf-space-1)' }}>
             <label
               htmlFor="audit-resource-type-filter"
-              style={{ fontSize: '0.75rem', color: 'var(--nf-color-fg-muted)' }}
+              style={{ fontSize: 'var(--nf-text-xs)', color: 'var(--nf-color-fg-muted)' }}
             >
               {t('audit_log.filter.resource_type')}
             </label>
@@ -401,10 +401,10 @@ export default function AuditLogView({ workspaceId }: { workspaceId: string }): 
             </Select>
           </div>
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--nf-space-1)' }}>
             <label
               htmlFor="audit-actor-search"
-              style={{ fontSize: '0.75rem', color: 'var(--nf-color-fg-muted)' }}
+              style={{ fontSize: 'var(--nf-text-xs)', color: 'var(--nf-color-fg-muted)' }}
             >
               {t('audit_log.filter.actor_search')}
             </label>
@@ -418,8 +418,8 @@ export default function AuditLogView({ workspaceId }: { workspaceId: string }): 
             />
           </div>
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-            <span style={{ fontSize: '0.75rem', color: 'var(--nf-color-fg-muted)' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--nf-space-1)' }}>
+            <span style={{ fontSize: 'var(--nf-text-xs)', color: 'var(--nf-color-fg-muted)' }}>
               {t('audit_log.filter.date_from')}
             </span>
             <DatePicker
@@ -438,8 +438,8 @@ export default function AuditLogView({ workspaceId }: { workspaceId: string }): 
             />
           </div>
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-            <span style={{ fontSize: '0.75rem', color: 'var(--nf-color-fg-muted)' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--nf-space-1)' }}>
+            <span style={{ fontSize: 'var(--nf-text-xs)', color: 'var(--nf-color-fg-muted)' }}>
               {t('audit_log.filter.date_to')}
             </span>
             <DatePicker
@@ -469,13 +469,13 @@ export default function AuditLogView({ workspaceId }: { workspaceId: string }): 
       {data.entries.length === 0 ? (
         <div
           style={{
-            padding: '3rem 1rem',
+            padding: 'var(--nf-space-12) var(--nf-space-4)',
             textAlign: 'center',
             color: 'var(--nf-color-fg-muted)',
             border: '1px dashed var(--nf-color-border)',
             borderRadius: '0.75rem',
             background: 'var(--nf-color-bg-sunken)',
-            fontSize: '0.875rem',
+            fontSize: 'var(--nf-text-sm)',
           }}
         >
           {t(hasActiveFilter ? 'audit_log.empty_filtered' : 'audit_log.empty')}
@@ -486,7 +486,7 @@ export default function AuditLogView({ workspaceId }: { workspaceId: string }): 
             style={{
               inlineSize: '100%',
               borderCollapse: 'collapse',
-              fontSize: '0.875rem',
+              fontSize: 'var(--nf-text-sm)',
             }}
           >
             <thead>
@@ -497,9 +497,9 @@ export default function AuditLogView({ workspaceId }: { workspaceId: string }): 
               >
                 <th
                   style={{
-                    padding: '0.5rem 0.75rem',
+                    padding: 'var(--nf-space-2) var(--nf-space-3)',
                     textAlign: 'start',
-                    fontSize: '0.75rem',
+                    fontSize: 'var(--nf-text-xs)',
                     fontWeight: 500,
                     color: 'var(--nf-color-fg-muted)',
                     textTransform: 'uppercase',
@@ -510,9 +510,9 @@ export default function AuditLogView({ workspaceId }: { workspaceId: string }): 
                 </th>
                 <th
                   style={{
-                    padding: '0.5rem 0.75rem',
+                    padding: 'var(--nf-space-2) var(--nf-space-3)',
                     textAlign: 'start',
-                    fontSize: '0.75rem',
+                    fontSize: 'var(--nf-text-xs)',
                     fontWeight: 500,
                     color: 'var(--nf-color-fg-muted)',
                     textTransform: 'uppercase',
@@ -523,9 +523,9 @@ export default function AuditLogView({ workspaceId }: { workspaceId: string }): 
                 </th>
                 <th
                   style={{
-                    padding: '0.5rem 0.75rem',
+                    padding: 'var(--nf-space-2) var(--nf-space-3)',
                     textAlign: 'start',
-                    fontSize: '0.75rem',
+                    fontSize: 'var(--nf-text-xs)',
                     fontWeight: 500,
                     color: 'var(--nf-color-fg-muted)',
                     textTransform: 'uppercase',
@@ -536,9 +536,9 @@ export default function AuditLogView({ workspaceId }: { workspaceId: string }): 
                 </th>
                 <th
                   style={{
-                    padding: '0.5rem 0.75rem',
+                    padding: 'var(--nf-space-2) var(--nf-space-3)',
                     textAlign: 'start',
-                    fontSize: '0.75rem',
+                    fontSize: 'var(--nf-text-xs)',
                     fontWeight: 500,
                     color: 'var(--nf-color-fg-muted)',
                     textTransform: 'uppercase',
@@ -549,9 +549,9 @@ export default function AuditLogView({ workspaceId }: { workspaceId: string }): 
                 </th>
                 <th
                   style={{
-                    padding: '0.5rem 0.75rem',
+                    padding: 'var(--nf-space-2) var(--nf-space-3)',
                     textAlign: 'start',
-                    fontSize: '0.75rem',
+                    fontSize: 'var(--nf-text-xs)',
                     fontWeight: 500,
                     color: 'var(--nf-color-fg-muted)',
                     textTransform: 'uppercase',
@@ -562,9 +562,9 @@ export default function AuditLogView({ workspaceId }: { workspaceId: string }): 
                 </th>
                 <th
                   style={{
-                    padding: '0.5rem 0.75rem',
+                    padding: 'var(--nf-space-2) var(--nf-space-3)',
                     textAlign: 'start',
-                    fontSize: '0.75rem',
+                    fontSize: 'var(--nf-text-xs)',
                     fontWeight: 500,
                     color: 'var(--nf-color-fg-muted)',
                     textTransform: 'uppercase',
@@ -592,7 +592,7 @@ export default function AuditLogView({ workspaceId }: { workspaceId: string }): 
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            gap: '1rem',
+            gap: 'var(--nf-space-4)',
           }}
         >
           <Button variant="ghost" size="sm" disabled={currentPage === 0} onClick={handlePrevPage}>

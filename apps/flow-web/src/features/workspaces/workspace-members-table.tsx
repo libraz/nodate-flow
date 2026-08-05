@@ -154,7 +154,7 @@ export default function WorkspaceMembersTable({
   ];
 
   return (
-    <section style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+    <section style={{ display: 'flex', flexDirection: 'column', gap: 'var(--nf-space-6)' }}>
       <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <h2
           style={{
@@ -166,7 +166,7 @@ export default function WorkspaceMembersTable({
           {t('workspaces.members.title')}
         </h2>
         {isAdmin ? (
-          <div style={{ display: 'flex', gap: '0.5rem' }}>
+          <div style={{ display: 'flex', gap: 'var(--nf-space-2)' }}>
             <Button
               variant="ghost"
               size="sm"

@@ -66,7 +66,7 @@ function AttachmentRow({
       style={{
         display: 'flex',
         alignItems: 'center',
-        gap: '0.75rem',
+        gap: 'var(--nf-space-3)',
         paddingBlock: '0.375rem',
       }}
     >
@@ -86,7 +86,7 @@ function AttachmentRow({
             fontSize: '0.8125rem',
             color: 'var(--nf-color-fg-muted)',
             display: 'flex',
-            gap: '0.5rem',
+            gap: 'var(--nf-space-2)',
             flexWrap: 'wrap',
           }}
         >
@@ -152,7 +152,7 @@ export default function TaskAttachments({ taskId }: TaskAttachmentsProps): React
   };
 
   return (
-    <section style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+    <section style={{ display: 'flex', flexDirection: 'column', gap: 'var(--nf-space-3)' }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <h2 style={{ margin: 0, fontSize: 'var(--nf-text-lg)' }}>{t('tasks.attachments.title')}</h2>
         <div>
@@ -189,7 +189,7 @@ export default function TaskAttachments({ taskId }: TaskAttachmentsProps): React
             margin: 0,
             display: 'flex',
             flexDirection: 'column',
-            gap: '0.25rem',
+            gap: 'var(--nf-space-1)',
           }}
         >
           {attachments.map((a) => (

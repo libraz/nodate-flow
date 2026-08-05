@@ -21,12 +21,12 @@ function WorkspaceActivityRoute(): ReactElement {
   const [source, setSource] = useState<ActivitySourceFilter>('all');
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-      <header style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--nf-space-4)' }}>
+      <header style={{ display: 'flex', flexDirection: 'column', gap: 'var(--nf-space-1)' }}>
         <h1 style={{ margin: 0, fontSize: 'var(--nf-text-xl)', color: 'var(--nf-color-fg)' }}>
           {t('view.title')}
         </h1>
-        <p style={{ margin: 0, color: 'var(--nf-color-fg-muted)', fontSize: '0.875rem' }}>
+        <p style={{ margin: 0, color: 'var(--nf-color-fg-muted)', fontSize: 'var(--nf-text-sm)' }}>
           {t('view.description')}
         </p>
       </header>

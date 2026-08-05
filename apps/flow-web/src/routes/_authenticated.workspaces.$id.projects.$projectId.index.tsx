@@ -28,7 +28,14 @@ function ProjectDetailRoute(): ReactElement {
   return (
     <Suspense
       fallback={
-        <div style={{ padding: '2rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+        <div
+          style={{
+            padding: 'var(--nf-space-8)',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 'var(--nf-space-4)',
+          }}
+        >
           <Skeleton style={{ blockSize: '2rem', inlineSize: '16rem' }} />
           <Skeleton style={{ blockSize: '12rem', inlineSize: '100%' }} />
         </div>

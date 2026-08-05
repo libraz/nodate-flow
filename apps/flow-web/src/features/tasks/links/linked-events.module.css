@@ -316,8 +316,8 @@
   position: absolute;
   inset-block-start: calc(100% + var(--nf-space-2));
   inset-inline-end: 0;
-  inline-size: clamp(20rem, 32rem, 90vw);
-  max-block-size: clamp(20rem, 80vh, 32rem);
+  inline-size: clamp(20rem, var(--nf-measure-narrow), 90vw);
+  max-block-size: clamp(20rem, 80vh, var(--nf-measure-narrow));
   display: flex;
   flex-direction: column;
   background: var(--nf-color-bg-elevated);

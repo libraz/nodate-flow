@@ -47,8 +47,8 @@ function TasksSectionLayout(): ReactElement {
       style={{
         display: 'flex',
         flexDirection: 'column',
-        gap: '1.25rem',
-        padding: 'clamp(1.5rem, 4vw, 2.5rem)',
+        gap: 'var(--nf-space-5)',
+        padding: 'clamp(var(--nf-space-6), 4vw, var(--nf-space-10))',
         blockSize: '100%',
       }}
     >
@@ -57,20 +57,20 @@ function TasksSectionLayout(): ReactElement {
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center',
-          gap: '1rem',
+          gap: 'var(--nf-space-4)',
           flexWrap: 'wrap',
         }}
       >
         <h2
           style={{
             fontFamily: 'var(--nf-font-display)',
-            fontSize: 'clamp(1.75rem, 3vw, 2.25rem)',
+            fontSize: 'clamp(1.75rem, 3vw, var(--nf-text-4xl))',
             margin: 0,
           }}
         >
           {t('tasks.title')}
         </h2>
-        <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
+        <div style={{ display: 'flex', gap: 'var(--nf-space-3)', alignItems: 'center' }}>
           <TaskViewSwitcher />
           <Button
             variant="primary"
@@ -87,7 +87,7 @@ function TasksSectionLayout(): ReactElement {
 
       <Suspense
         fallback={
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--nf-space-3)' }}>
             <Skeleton style={{ blockSize: '2rem', inlineSize: '100%' }} />
             <Skeleton style={{ blockSize: '12rem', inlineSize: '100%' }} />
           </div>

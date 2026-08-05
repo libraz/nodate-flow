@@ -120,7 +120,7 @@ function WorkspacesPage(): ReactElement {
           onChange={handleFilterChange}
           aria-label={t('workspaces.status')}
           style={{
-            padding: '0.5rem 0.75rem',
+            padding: 'var(--nf-space-2) var(--nf-space-3)',
             borderRadius: 'var(--nf-radius-md)',
             border: 'var(--nf-space-px) solid var(--nf-color-border)',
             background: 'var(--nf-color-bg)',

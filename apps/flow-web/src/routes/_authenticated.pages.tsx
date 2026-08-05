@@ -16,10 +16,10 @@ function PagesLayout(): ReactElement {
       fallback={
         <div
           style={{
-            padding: 'clamp(1.5rem, 4vw, 2.5rem)',
+            padding: 'clamp(var(--nf-space-6), 4vw, var(--nf-space-10))',
             display: 'flex',
             flexDirection: 'column',
-            gap: '1rem',
+            gap: 'var(--nf-space-4)',
           }}
         >
           <Skeleton style={{ blockSize: '2rem', inlineSize: '12rem' }} />

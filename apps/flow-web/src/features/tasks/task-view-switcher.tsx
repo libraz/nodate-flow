@@ -17,7 +17,7 @@ export default function TaskViewSwitcher(): ReactElement {
     <div
       role="tablist"
       aria-label={t('tasks.title')}
-      style={{ display: 'inline-flex', gap: '0.25rem' }}
+      style={{ display: 'inline-flex', gap: 'var(--nf-space-1)' }}
     >
       <Button
         type="button"

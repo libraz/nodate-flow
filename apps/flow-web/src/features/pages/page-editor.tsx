@@ -154,7 +154,7 @@ export default function PageEditor({
               value={parentPageId}
               onChange={handleParentChange}
               style={{
-                padding: '0.5rem 0.75rem',
+                padding: 'var(--nf-space-2) var(--nf-space-3)',
                 borderRadius: 'var(--nf-radius-md)',
                 border: 'var(--nf-space-px) solid var(--nf-color-border)',
                 background: 'var(--nf-color-surface)',
@@ -180,7 +180,7 @@ export default function PageEditor({
               onChange={handleProjectChange}
               disabled={isEditing}
               style={{
-                padding: '0.5rem 0.75rem',
+                padding: 'var(--nf-space-2) var(--nf-space-3)',
                 borderRadius: 'var(--nf-radius-md)',
                 border: 'var(--nf-space-px) solid var(--nf-color-border)',
                 background: 'var(--nf-color-surface)',

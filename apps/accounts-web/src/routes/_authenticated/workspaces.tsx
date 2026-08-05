@@ -101,7 +101,7 @@ function WorkspacesPage(): ReactElement {
                 </div>
                 <span
                   style={{
-                    padding: '0.125rem 0.5rem',
+                    padding: '0.125rem var(--nf-space-2)',
                     borderRadius: 'var(--nf-radius-pill)',
                     fontSize: 'var(--nf-text-xs)',
                     background: 'var(--nf-color-accent-subtle)',

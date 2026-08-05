@@ -19,8 +19,8 @@ export default function Forbidden(): ReactElement {
         flexDirection: 'column',
         alignItems: 'center',
         justifyContent: 'center',
-        gap: '1.25rem',
-        padding: '3rem 2rem',
+        gap: 'var(--nf-space-5)',
+        padding: 'var(--nf-space-12) var(--nf-space-8)',
         textAlign: 'center',
       }}
     >
@@ -66,7 +66,7 @@ export default function Forbidden(): ReactElement {
         style={{
           display: 'inline-flex',
           alignItems: 'center',
-          padding: '0.5rem 1.25rem',
+          padding: 'var(--nf-space-2) var(--nf-space-5)',
           borderRadius: '0.5rem',
           background: 'var(--nf-color-accent)',
           color: 'var(--nf-color-fg-on-accent)',

@@ -19,14 +19,20 @@ export default function TaskMiniTimeline({ taskId }: TaskMiniTimelineProps): Rea
 
   if (data.events.length === 0) {
     return (
-      <div style={{ padding: '1rem', textAlign: 'center', color: 'var(--nf-color-fg-muted)' }}>
+      <div
+        style={{
+          padding: 'var(--nf-space-4)',
+          textAlign: 'center',
+          color: 'var(--nf-color-fg-muted)',
+        }}
+      >
         {t('view.empty')}
       </div>
     );
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--nf-space-2)' }}>
       {data.events.map((ev) => (
         <EventCard key={ev.id} event={ev} />
       ))}

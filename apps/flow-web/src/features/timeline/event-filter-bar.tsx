@@ -74,7 +74,7 @@ function ActorPicker({ workspaceId, selected, onSelect, label }: ActorPickerProp
       style={{
         minInlineSize: '14rem',
         minBlockSize: '6rem',
-        padding: '0.25rem',
+        padding: 'var(--nf-space-1)',
         borderRadius: '0.25rem',
         border: '1px solid var(--nf-color-border)',
         background: 'var(--nf-color-bg)',
@@ -134,7 +134,7 @@ export default function EventFilterBar({
           toggleKind(kind);
         }}
         style={{
-          padding: '0.25rem 0.625rem',
+          padding: 'var(--nf-space-1) 0.625rem',
           borderRadius: '999px',
           border: `1px solid ${active ? 'var(--nf-color-accent)' : 'var(--nf-color-border)'}`,
           background: active ? 'var(--nf-color-accent-subtle)' : 'var(--nf-color-surface)',
@@ -153,7 +153,7 @@ export default function EventFilterBar({
       style={{
         border: '1px solid var(--nf-color-border)',
         borderRadius: '0.5rem',
-        padding: '0.5rem 0.75rem',
+        padding: 'var(--nf-space-2) var(--nf-space-3)',
         background: 'var(--nf-color-surface)',
       }}
     >
@@ -164,14 +164,14 @@ export default function EventFilterBar({
           color: 'var(--nf-color-fg-muted)',
           display: 'flex',
           alignItems: 'center',
-          gap: '0.5rem',
+          gap: 'var(--nf-space-2)',
         }}
       >
         {t('filter.kind_label')}
         {selectedKinds.size > 0 || (filters.actor?.length ?? 0) > 0 ? (
           <span
             style={{
-              padding: '0 0.5rem',
+              padding: '0 var(--nf-space-2)',
               borderRadius: '999px',
               background: 'var(--nf-color-accent-subtle)',
               color: 'var(--nf-color-accent)',
@@ -188,7 +188,7 @@ export default function EventFilterBar({
           display: 'flex',
           flexDirection: 'column',
           gap: '0.625rem',
-          paddingBlockStart: '0.75rem',
+          paddingBlockStart: 'var(--nf-space-3)',
         }}
       >
         {KIND_GROUPS.map((group) => (
@@ -200,8 +200,8 @@ export default function EventFilterBar({
               display: 'grid',
               gridTemplateColumns: '7rem 1fr',
               alignItems: 'center',
-              columnGap: '0.75rem',
-              rowGap: '0.25rem',
+              columnGap: 'var(--nf-space-3)',
+              rowGap: 'var(--nf-space-1)',
             }}
           >
             <span
@@ -227,8 +227,8 @@ export default function EventFilterBar({
             display: 'grid',
             gridTemplateColumns: '7rem 1fr',
             alignItems: 'center',
-            columnGap: '0.75rem',
-            marginBlockStart: '0.25rem',
+            columnGap: 'var(--nf-space-3)',
+            marginBlockStart: 'var(--nf-space-1)',
             paddingBlockStart: '0.625rem',
             borderBlockStart: '1px solid var(--nf-color-border)',
           }}

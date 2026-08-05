@@ -194,7 +194,7 @@ export default function DashboardView({ workspaceId }: DashboardViewProps): Reac
         fallback={
           <div
             style={{
-              padding: '2rem',
+              padding: 'var(--nf-space-8)',
               textAlign: 'center',
               color: 'var(--nf-color-fg-muted)',
             }}

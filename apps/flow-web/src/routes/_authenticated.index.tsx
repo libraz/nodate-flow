@@ -48,8 +48,8 @@ function StatCard({
       style={{
         display: 'flex',
         alignItems: 'center',
-        gap: '0.75rem',
-        padding: '1rem 1.25rem',
+        gap: 'var(--nf-space-3)',
+        padding: 'var(--nf-space-4) var(--nf-space-5)',
         borderRadius: '0.75rem',
         background: 'var(--nf-color-surface)',
         border: '1px solid var(--nf-color-border)',
@@ -134,7 +134,7 @@ function TaskSummary(): ReactElement {
 
   return (
     <>
-      <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
+      <div style={{ display: 'flex', gap: 'var(--nf-space-3)', flexWrap: 'wrap' }}>
         <StatCard
           icon={FolderKanban}
           label={t('home.stat_open')}
@@ -165,7 +165,7 @@ function TaskSummary(): ReactElement {
         <section>
           <h2
             style={{
-              margin: '0 0 0.75rem',
+              margin: '0 0 var(--nf-space-3)',
               fontSize: '0.85rem',
               textTransform: 'uppercase',
               letterSpacing: '0.05em',
@@ -181,7 +181,7 @@ function TaskSummary(): ReactElement {
               padding: 0,
               display: 'flex',
               flexDirection: 'column',
-              gap: '0.25rem',
+              gap: 'var(--nf-space-1)',
             }}
           >
             {recentTasks.map((task) => (
@@ -190,8 +190,8 @@ function TaskSummary(): ReactElement {
                 style={{
                   display: 'flex',
                   alignItems: 'center',
-                  gap: '0.75rem',
-                  padding: '0.6rem 0.75rem',
+                  gap: 'var(--nf-space-3)',
+                  padding: '0.6rem var(--nf-space-3)',
                   borderRadius: '0.5rem',
                   background: 'var(--nf-color-surface)',
                 }}
@@ -223,7 +223,7 @@ function TaskSummary(): ReactElement {
               </li>
             ))}
           </ul>
-          <div style={{ marginTop: '0.5rem' }}>
+          <div style={{ marginTop: 'var(--nf-space-2)' }}>
             <Link
               to="/today"
               style={{
@@ -254,7 +254,7 @@ function WorkspaceLinks(): ReactElement {
           display: 'flex',
           flexDirection: 'column',
           alignItems: 'flex-start',
-          gap: '0.75rem',
+          gap: 'var(--nf-space-3)',
         }}
       >
         <p style={{ margin: 0, color: 'var(--nf-color-fg-muted)', fontSize: 'var(--nf-text-sm)' }}>
@@ -265,8 +265,8 @@ function WorkspaceLinks(): ReactElement {
           style={{
             display: 'inline-flex',
             alignItems: 'center',
-            gap: '0.5rem',
-            padding: '0.5rem 0.875rem',
+            gap: 'var(--nf-space-2)',
+            padding: 'var(--nf-space-2) 0.875rem',
             borderRadius: '0.5rem',
             background: 'var(--nf-color-accent)',
             color: 'var(--nf-color-fg-on-accent)',
@@ -283,7 +283,7 @@ function WorkspaceLinks(): ReactElement {
   }
 
   return (
-    <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+    <div style={{ display: 'flex', gap: 'var(--nf-space-2)', flexWrap: 'wrap' }}>
       {workspaces.map((ws) => (
         <Link
           key={ws.id}
@@ -292,8 +292,8 @@ function WorkspaceLinks(): ReactElement {
           style={{
             display: 'inline-flex',
             alignItems: 'center',
-            gap: '0.5rem',
-            padding: '0.5rem 1rem',
+            gap: 'var(--nf-space-2)',
+            padding: 'var(--nf-space-2) var(--nf-space-4)',
             borderRadius: '0.5rem',
             background: 'var(--nf-color-surface)',
             border: '1px solid var(--nf-color-border)',
@@ -334,16 +334,16 @@ function HomePage(): ReactElement {
         minBlockSize: '100%',
         display: 'flex',
         flexDirection: 'column',
-        gap: '2rem',
-        paddingBlock: '2rem',
-        paddingInline: 'clamp(1.5rem, 6vw, 3.5rem)',
+        gap: 'var(--nf-space-8)',
+        paddingBlock: 'var(--nf-space-8)',
+        paddingInline: 'clamp(var(--nf-space-6), 6vw, 3.5rem)',
         maxInlineSize: '72rem',
         marginInline: 'auto',
         inlineSize: '100%',
       }}
     >
       {/* Header */}
-      <header style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+      <header style={{ display: 'flex', flexDirection: 'column', gap: 'var(--nf-space-2)' }}>
         <h1
           style={{
             fontFamily: 'var(--nf-font-display)',
@@ -378,15 +378,15 @@ function HomePage(): ReactElement {
       </header>
 
       {/* Quick actions */}
-      <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+      <div style={{ display: 'flex', gap: 'var(--nf-space-2)', flexWrap: 'wrap' }}>
         <button
           type="button"
           onClick={() => window.dispatchEvent(new Event(OPEN_COMMAND_PALETTE_EVENT))}
           style={{
             display: 'inline-flex',
             alignItems: 'center',
-            gap: '0.5rem',
-            padding: '0.5rem 1rem',
+            gap: 'var(--nf-space-2)',
+            padding: 'var(--nf-space-2) var(--nf-space-4)',
             borderRadius: '0.5rem',
             background: 'var(--nf-color-accent)',
             color: 'white',
@@ -408,8 +408,8 @@ function HomePage(): ReactElement {
           style={{
             display: 'inline-flex',
             alignItems: 'center',
-            gap: '0.5rem',
-            padding: '0.5rem 1rem',
+            gap: 'var(--nf-space-2)',
+            padding: 'var(--nf-space-2) var(--nf-space-4)',
             borderRadius: '0.5rem',
             background: 'transparent',
             color: 'var(--nf-color-fg)',
@@ -426,8 +426,8 @@ function HomePage(): ReactElement {
           style={{
             display: 'inline-flex',
             alignItems: 'center',
-            gap: '0.5rem',
-            padding: '0.5rem 1rem',
+            gap: 'var(--nf-space-2)',
+            padding: 'var(--nf-space-2) var(--nf-space-4)',
             borderRadius: '0.5rem',
             background: 'transparent',
             color: 'var(--nf-color-fg)',
@@ -444,7 +444,13 @@ function HomePage(): ReactElement {
       {/* Task summary */}
       <Suspense
         fallback={
-          <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--nf-color-fg-muted)' }}>
+          <div
+            style={{
+              padding: 'var(--nf-space-8)',
+              textAlign: 'center',
+              color: 'var(--nf-color-fg-muted)',
+            }}
+          >
             {t('common.loading')}
           </div>
         }
@@ -456,7 +462,7 @@ function HomePage(): ReactElement {
       <section>
         <h2
           style={{
-            margin: '0 0 0.75rem',
+            margin: '0 0 var(--nf-space-3)',
             fontSize: '0.85rem',
             textTransform: 'uppercase',
             letterSpacing: '0.05em',

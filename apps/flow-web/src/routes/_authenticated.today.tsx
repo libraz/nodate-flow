@@ -101,21 +101,21 @@ function TodayRoute(): ReactElement {
   return (
     <section
       style={{
-        padding: 'clamp(1.5rem, 4vw, 2.5rem)',
+        padding: 'clamp(var(--nf-space-6), 4vw, var(--nf-space-10))',
         display: 'flex',
         flexDirection: 'column',
-        gap: '1.5rem',
+        gap: 'var(--nf-space-6)',
         maxInlineSize: '60rem',
         marginInline: 'auto',
         inlineSize: '100%',
       }}
     >
-      <header style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+      <header style={{ display: 'flex', flexDirection: 'column', gap: 'var(--nf-space-2)' }}>
         <h1
           style={{
             margin: 0,
             fontFamily: 'var(--nf-font-display)',
-            fontSize: 'clamp(1.75rem, 3vw, 2.25rem)',
+            fontSize: 'clamp(1.75rem, 3vw, var(--nf-text-4xl))',
           }}
         >
           {t('today.title')}
@@ -126,12 +126,12 @@ function TodayRoute(): ReactElement {
       {totalCount === 0 ? (
         <div
           style={{
-            padding: '3rem 1rem',
+            padding: 'var(--nf-space-12) var(--nf-space-4)',
             textAlign: 'center',
             display: 'flex',
             flexDirection: 'column',
             alignItems: 'center',
-            gap: '1rem',
+            gap: 'var(--nf-space-4)',
             color: 'var(--nf-color-fg-muted)',
             border: '1px dashed var(--nf-color-border)',
             borderRadius: '0.75rem',
@@ -152,7 +152,7 @@ function TodayRoute(): ReactElement {
             style={{
               display: 'inline-flex',
               alignItems: 'center',
-              padding: '0.5rem 1rem',
+              padding: 'var(--nf-space-2) var(--nf-space-4)',
               borderRadius: '0.5rem',
               background: 'var(--nf-color-accent)',
               color: 'white',
@@ -175,7 +175,7 @@ function TodayRoute(): ReactElement {
           <section
             key={key}
             aria-label={t(`today.sections.${key}`)}
-            style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}
+            style={{ display: 'flex', flexDirection: 'column', gap: 'var(--nf-space-2)' }}
           >
             <h2
               style={{
@@ -195,7 +195,7 @@ function TodayRoute(): ReactElement {
                 padding: 0,
                 display: 'flex',
                 flexDirection: 'column',
-                gap: '0.25rem',
+                gap: 'var(--nf-space-1)',
               }}
             >
               {items.map((task) => {
@@ -206,8 +206,8 @@ function TodayRoute(): ReactElement {
                     style={{
                       display: 'flex',
                       alignItems: 'center',
-                      gap: '0.75rem',
-                      padding: '0.6rem 0.75rem',
+                      gap: 'var(--nf-space-3)',
+                      padding: '0.6rem var(--nf-space-3)',
                       borderRadius: '0.5rem',
                       background: isOverdue
                         ? 'var(--nf-color-danger-subtle)'

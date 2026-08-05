@@ -107,7 +107,7 @@ export default function TokenCreateDialog({
           onSubmit={(e) => {
             void handleSubmit(e);
           }}
-          style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}
+          style={{ display: 'flex', flexDirection: 'column', gap: 'var(--nf-space-4)' }}
         >
           <FormField label={t('workspace.mcp_tokens.dialog.field.name')} required>
             {(control) => (
@@ -139,7 +139,7 @@ export default function TokenCreateDialog({
             )}
           </FormField>
 
-          <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
+          <div style={{ display: 'flex', gap: 'var(--nf-space-2)', justifyContent: 'flex-end' }}>
             <Button type="button" variant="ghost" onClick={handleClose}>
               {t('workspace.mcp_tokens.dialog.cancel')}
             </Button>
@@ -149,7 +149,7 @@ export default function TokenCreateDialog({
           </div>
         </form>
       ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--nf-space-4)' }}>
           <p
             style={{
               margin: 0,
@@ -173,7 +173,7 @@ export default function TokenCreateDialog({
               />
             )}
           </FormField>
-          <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
+          <div style={{ display: 'flex', gap: 'var(--nf-space-2)', justifyContent: 'flex-end' }}>
             <Button
               type="button"
               variant="ghost"

@@ -30,12 +30,12 @@ function CountsRow({ counts }: { counts: WeeklyDigestCounts }): ReactElement {
         padding: 0,
         display: 'grid',
         gridTemplateColumns: 'repeat(auto-fit, minmax(7rem, 1fr))',
-        gap: '0.5rem',
+        gap: 'var(--nf-space-2)',
       }}
     >
       {items.map((item) => (
         <li key={item.key}>
-          <Card style={{ padding: '0.625rem 0.75rem' }}>
+          <Card style={{ padding: '0.625rem var(--nf-space-3)' }}>
             <div style={{ fontSize: 'var(--nf-text-xs)', color: 'var(--nf-color-fg-muted)' }}>
               {item.label}
             </div>
@@ -62,14 +62,22 @@ function TaskList({
     );
   }
   return (
-    <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'grid', gap: '0.25rem' }}>
+    <ul
+      style={{
+        listStyle: 'none',
+        margin: 0,
+        padding: 0,
+        display: 'grid',
+        gap: 'var(--nf-space-1)',
+      }}
+    >
       {tasks.map((task) => (
         <li
           key={task.taskId}
           style={{
             display: 'flex',
             justifyContent: 'space-between',
-            gap: '1rem',
+            gap: 'var(--nf-space-4)',
             fontSize: '0.8125rem',
           }}
         >
@@ -91,8 +99,8 @@ export default function DigestView({ workspaceId }: { workspaceId: string }): Re
   const completed = data.completedThisWeek ?? [];
   const overdue = data.overdueOpen ?? [];
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-      <header style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--nf-space-5)' }}>
+      <header style={{ display: 'flex', flexDirection: 'column', gap: 'var(--nf-space-1)' }}>
         <h1 style={{ margin: 0, fontSize: 'var(--nf-text-2xl)' }}>{t('weekly_digest.title')}</h1>
         <p style={{ margin: 0, color: 'var(--nf-color-fg-muted)', fontSize: '0.8125rem' }}>
           {t('weekly_digest.description')}
@@ -101,21 +109,21 @@ export default function DigestView({ workspaceId }: { workspaceId: string }): Re
 
       <CountsRow counts={data.counts} />
 
-      <section style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+      <section style={{ display: 'flex', flexDirection: 'column', gap: 'var(--nf-space-2)' }}>
         <h2 style={{ margin: 0, fontSize: '0.9375rem' }}>
           {t('weekly_digest.completed_this_week')}
         </h2>
         <TaskList tasks={completed} emptyLabel={t('weekly_digest.empty_completed')} />
       </section>
 
-      <section style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+      <section style={{ display: 'flex', flexDirection: 'column', gap: 'var(--nf-space-2)' }}>
         <h2 style={{ margin: 0, fontSize: '0.9375rem' }}>{t('weekly_digest.overdue_open')}</h2>
         <TaskList tasks={overdue} emptyLabel={t('weekly_digest.empty_overdue')} />
       </section>
 
-      <section style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+      <section style={{ display: 'flex', flexDirection: 'column', gap: 'var(--nf-space-2)' }}>
         <h2 style={{ margin: 0, fontSize: '0.9375rem' }}>{t('weekly_digest.markdown')}</h2>
-        <Card style={{ padding: '0.875rem 1rem' }}>
+        <Card style={{ padding: '0.875rem var(--nf-space-4)' }}>
           <pre
             style={{
               margin: 0,

@@ -69,8 +69,8 @@ export default function WorkspaceList(): ReactElement {
       style={{
         display: 'flex',
         flexDirection: 'column',
-        gap: '1.5rem',
-        padding: 'clamp(1.5rem, 4vw, 2.5rem)',
+        gap: 'var(--nf-space-6)',
+        padding: 'clamp(var(--nf-space-6), 4vw, var(--nf-space-10))',
         blockSize: '100%',
       }}
     >
@@ -79,13 +79,13 @@ export default function WorkspaceList(): ReactElement {
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center',
-          gap: '1rem',
+          gap: 'var(--nf-space-4)',
         }}
       >
         <h1
           style={{
             fontFamily: 'var(--nf-font-display)',
-            fontSize: 'clamp(1.75rem, 3vw, 2.25rem)',
+            fontSize: 'clamp(1.75rem, 3vw, var(--nf-text-4xl))',
             margin: 0,
           }}
         >

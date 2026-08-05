@@ -37,7 +37,7 @@ try {
  */
 function FatalError(): ReactElement {
   return (
-    <main style={{ padding: '2rem' }}>
+    <main style={{ padding: 'var(--nf-space-8)' }}>
       <p>Failed to initialize the application.</p>
     </main>
   );

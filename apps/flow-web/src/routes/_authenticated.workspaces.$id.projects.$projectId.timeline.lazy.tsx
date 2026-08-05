@@ -26,7 +26,7 @@ function ProjectTimelineRoute(): ReactElement {
   return (
     <Suspense
       fallback={
-        <div style={{ padding: '2rem', display: 'flex', justifyContent: 'center' }}>
+        <div style={{ padding: 'var(--nf-space-8)', display: 'flex', justifyContent: 'center' }}>
           <Spinner label={t('common.loading')} />
         </div>
       }

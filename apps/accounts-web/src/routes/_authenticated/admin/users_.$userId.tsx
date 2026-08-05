@@ -114,7 +114,7 @@ function DeleteUserDialog({
           <ul
             style={{
               margin: 0,
-              paddingInlineStart: '1.25rem',
+              paddingInlineStart: 'var(--nf-space-5)',
               fontSize: 'var(--nf-text-sm)',
               color: 'var(--nf-color-fg-muted)',
               display: 'flex',

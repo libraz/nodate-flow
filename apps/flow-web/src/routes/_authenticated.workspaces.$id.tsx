@@ -130,7 +130,14 @@ function WorkspaceDetailRoute(): ReactElement {
     return (
       <Suspense
         fallback={
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', padding: '1.5rem' }}>
+          <div
+            style={{
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 'var(--nf-space-4)',
+              padding: 'var(--nf-space-6)',
+            }}
+          >
             <Skeleton style={{ blockSize: '2rem', inlineSize: '16rem' }} />
             <Skeleton style={{ blockSize: '12rem', inlineSize: '100%' }} />
           </div>
@@ -146,15 +153,15 @@ function WorkspaceDetailRoute(): ReactElement {
       style={{
         display: 'flex',
         flexDirection: 'column',
-        gap: '1.5rem',
-        padding: 'clamp(1.5rem, 4vw, 2.5rem)',
+        gap: 'var(--nf-space-6)',
+        padding: 'clamp(var(--nf-space-6), 4vw, var(--nf-space-10))',
       }}
     >
       {hasChildRoute ? (
         <p
           style={{
             fontFamily: 'var(--nf-font-display)',
-            fontSize: 'clamp(1.5rem, 2.5vw, 2rem)',
+            fontSize: 'clamp(var(--nf-text-2xl), 2.5vw, 2rem)',
             margin: 0,
             color: 'var(--nf-color-fg)',
           }}
@@ -166,9 +173,9 @@ function WorkspaceDetailRoute(): ReactElement {
         aria-label={t('workspaces.nav.label')}
         style={{
           display: 'flex',
-          gap: '0.25rem',
+          gap: 'var(--nf-space-1)',
           borderBlockEnd: '1px solid var(--nf-color-border)',
-          paddingBlockEnd: '0.5rem',
+          paddingBlockEnd: 'var(--nf-space-2)',
         }}
       >
         {SUB_NAV.map((item) => (
@@ -188,7 +195,7 @@ function WorkspaceDetailRoute(): ReactElement {
             }}
             style={{
               display: 'inline-block',
-              padding: '0.5rem 0.875rem',
+              padding: 'var(--nf-space-2) 0.875rem',
               borderRadius: '0.5rem',
               color: 'var(--nf-color-fg)',
               textDecoration: 'none',
@@ -201,7 +208,7 @@ function WorkspaceDetailRoute(): ReactElement {
 
       <Suspense
         fallback={
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--nf-space-4)' }}>
             <Skeleton style={{ blockSize: '2rem', inlineSize: '16rem' }} />
             <Skeleton style={{ blockSize: '12rem', inlineSize: '100%' }} />
           </div>
@@ -243,8 +250,8 @@ function WorkspaceNotFound(): ReactElement {
         flexDirection: 'column',
         alignItems: 'center',
         justifyContent: 'center',
-        gap: '1.25rem',
-        padding: '3rem 2rem',
+        gap: 'var(--nf-space-5)',
+        padding: 'var(--nf-space-12) var(--nf-space-8)',
         textAlign: 'center',
       }}
     >
@@ -290,7 +297,7 @@ function WorkspaceNotFound(): ReactElement {
         style={{
           display: 'inline-flex',
           alignItems: 'center',
-          padding: '0.5rem 1.25rem',
+          padding: 'var(--nf-space-2) var(--nf-space-5)',
           borderRadius: '0.5rem',
           background: 'var(--nf-color-accent)',
           color: 'var(--nf-color-fg-on-accent)',

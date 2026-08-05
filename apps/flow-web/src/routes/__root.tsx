@@ -87,8 +87,8 @@ function FatalFallback({
         flexDirection: 'column',
         alignItems: 'center',
         justifyContent: 'center',
-        gap: '1rem',
-        padding: '2rem',
+        gap: 'var(--nf-space-4)',
+        padding: 'var(--nf-space-8)',
         fontFamily: 'var(--nf-font-sans)',
         background: 'var(--nf-color-bg)',
         color: 'var(--nf-color-fg)',
@@ -103,12 +103,12 @@ function FatalFallback({
         <pre
           style={{
             margin: 0,
-            padding: '0.75rem 1rem',
+            padding: 'var(--nf-space-3) var(--nf-space-4)',
             borderRadius: '0.5rem',
             background: 'var(--nf-color-surface)',
             color: 'var(--nf-color-fg-muted)',
             fontSize: '0.8125rem',
-            maxInlineSize: '48rem',
+            maxInlineSize: 'var(--nf-measure-content)',
             whiteSpace: 'pre-wrap',
             textAlign: 'start',
           }}
@@ -116,12 +116,12 @@ function FatalFallback({
           {message}
         </pre>
       ) : null}
-      <div style={{ display: 'flex', gap: '0.75rem' }}>
+      <div style={{ display: 'flex', gap: 'var(--nf-space-3)' }}>
         <button
           type="button"
           onClick={resetErrorBoundary}
           style={{
-            padding: '0.5rem 1rem',
+            padding: 'var(--nf-space-2) var(--nf-space-4)',
             borderRadius: '0.5rem',
             border: '1px solid var(--nf-color-border)',
             background: 'var(--nf-color-surface)',
@@ -134,7 +134,7 @@ function FatalFallback({
         <Link
           to="/"
           style={{
-            padding: '0.5rem 1rem',
+            padding: 'var(--nf-space-2) var(--nf-space-4)',
             borderRadius: '0.5rem',
             background: 'var(--nf-color-accent)',
             color: 'var(--nf-color-fg-on-accent)',

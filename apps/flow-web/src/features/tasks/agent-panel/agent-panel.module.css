@@ -39,7 +39,7 @@
   background: color-mix(in oklab, var(--nf-color-accent) 14%, transparent);
   color: var(--nf-color-accent);
   flex-shrink: 0;
-  font-size: 1.25rem;
+  font-size: var(--nf-text-xl);
 }
 
 .identity {

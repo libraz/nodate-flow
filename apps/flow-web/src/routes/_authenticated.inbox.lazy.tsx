@@ -23,7 +23,7 @@ function InboxRoute(): ReactElement {
   const { t } = useTranslation('inbox');
 
   const fallback = (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--nf-space-3)' }}>
       <Skeleton style={{ blockSize: '4rem', inlineSize: '100%' }} />
       <Skeleton style={{ blockSize: '4rem', inlineSize: '100%' }} />
       <Skeleton style={{ blockSize: '4rem', inlineSize: '100%' }} />
@@ -33,21 +33,21 @@ function InboxRoute(): ReactElement {
   return (
     <section
       style={{
-        padding: 'clamp(1.5rem, 4vw, 2.5rem)',
+        padding: 'clamp(var(--nf-space-6), 4vw, var(--nf-space-10))',
         display: 'flex',
         flexDirection: 'column',
-        gap: '1.5rem',
+        gap: 'var(--nf-space-6)',
         maxInlineSize: '60rem',
         marginInline: 'auto',
         inlineSize: '100%',
       }}
     >
-      <header style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+      <header style={{ display: 'flex', flexDirection: 'column', gap: 'var(--nf-space-2)' }}>
         <h1
           style={{
             margin: 0,
             fontFamily: 'var(--nf-font-display)',
-            fontSize: 'clamp(1.75rem, 3vw, 2.25rem)',
+            fontSize: 'clamp(1.75rem, 3vw, var(--nf-text-4xl))',
           }}
         >
           {t('view.title')}

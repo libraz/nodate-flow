@@ -241,14 +241,14 @@ export default function SignalGroup({
       data-reversed={isFullyReversed || undefined}
       style={{
         containerType: 'inline-size',
-        margin: '0.5rem 0',
-        padding: '0.75rem',
+        margin: 'var(--nf-space-2) 0',
+        padding: 'var(--nf-space-3)',
         background: 'var(--nf-color-bg-sunken)',
         border: '1px solid var(--nf-color-border)',
         borderRadius: '0.5rem',
         display: 'flex',
         flexDirection: 'column',
-        gap: '0.5rem',
+        gap: 'var(--nf-space-2)',
         opacity: isFullyReversed ? 0.7 : 1,
       }}
     >
@@ -256,7 +256,7 @@ export default function SignalGroup({
         style={{
           display: 'flex',
           alignItems: 'center',
-          gap: '0.5rem',
+          gap: 'var(--nf-space-2)',
           flexWrap: 'wrap',
         }}
       >
@@ -303,7 +303,7 @@ export default function SignalGroup({
             background: 'var(--nf-color-surface)',
             border: '1px solid var(--nf-color-hairline)',
             borderRadius: '0.375rem',
-            padding: '0.5rem 0.625rem',
+            padding: 'var(--nf-space-2) 0.625rem',
           }}
         >
           <summary
@@ -311,7 +311,7 @@ export default function SignalGroup({
               cursor: 'pointer',
               display: 'flex',
               alignItems: 'center',
-              gap: '0.5rem',
+              gap: 'var(--nf-space-2)',
               color: 'var(--nf-color-fg-muted)',
               fontSize: 'var(--nf-text-sm)',
               listStyle: 'revert',
@@ -328,7 +328,7 @@ export default function SignalGroup({
           </summary>
           <p
             style={{
-              marginBlockStart: '0.5rem',
+              marginBlockStart: 'var(--nf-space-2)',
               marginBlockEnd: 0,
               color: 'var(--nf-color-fg-muted)',
               fontSize: 'var(--nf-text-sm)',
@@ -350,7 +350,7 @@ export default function SignalGroup({
           padding: 0,
           display: 'flex',
           flexDirection: 'column',
-          gap: '0.25rem',
+          gap: 'var(--nf-space-1)',
         }}
       >
         {events.map((ev) => (

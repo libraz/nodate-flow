@@ -50,7 +50,10 @@ function InviteAuthCardBody({
   const title = t('workspaces.invites.join_title', { workspace: workspaceName });
   return (
     <AuthCard>
-      <main aria-label={title} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+      <main
+        aria-label={title}
+        style={{ display: 'flex', flexDirection: 'column', gap: 'var(--nf-space-5)' }}
+      >
         <h1
           style={{
             fontFamily: 'var(--nf-font-sans)',
@@ -101,7 +104,7 @@ function InviteAcceptPage(): ReactElement {
           search={{ returnTo: `/invite/${token}` }}
           style={{
             display: 'inline-block',
-            padding: '0.625rem 1.25rem',
+            padding: '0.625rem var(--nf-space-5)',
             borderRadius: '0.5rem',
             background: 'var(--nf-color-accent)',
             color: 'var(--nf-color-fg-on-accent)',
@@ -176,13 +179,13 @@ function InviteAcceptPage(): ReactElement {
           {error}
         </p>
       ) : null}
-      <div style={{ display: 'flex', gap: '0.75rem' }}>
+      <div style={{ display: 'flex', gap: 'var(--nf-space-3)' }}>
         <Link
           to="/"
           style={{
             display: 'inline-flex',
             alignItems: 'center',
-            padding: '0.625rem 1.25rem',
+            padding: '0.625rem var(--nf-space-5)',
             borderRadius: '0.5rem',
             border: '1px solid var(--nf-color-border)',
             background: 'transparent',

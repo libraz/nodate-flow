@@ -46,11 +46,11 @@ function IntegrationsRoute(): ReactElement {
   }, [router, t]);
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--nf-space-6)' }}>
       <h1 style={{ margin: 0, fontSize: 'var(--nf-text-2xl)' }}>{t('integrations.title')}</h1>
       <Suspense
         fallback={
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--nf-space-3)' }}>
             <Skeleton style={{ blockSize: '5rem', inlineSize: '100%' }} />
             <Skeleton style={{ blockSize: '5rem', inlineSize: '100%' }} />
             <Skeleton style={{ blockSize: '5rem', inlineSize: '100%' }} />

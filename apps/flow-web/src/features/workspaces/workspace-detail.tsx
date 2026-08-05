@@ -30,11 +30,11 @@ function OverviewPanel({ workspaceId }: { workspaceId: string }): ReactElement {
 
   if (active.length === 0) {
     return (
-      <Card style={{ padding: '1.5rem' }}>
+      <Card style={{ padding: 'var(--nf-space-6)' }}>
         <p
           style={{
             margin: 0,
-            padding: '2rem 1rem',
+            padding: 'var(--nf-space-8) var(--nf-space-4)',
             textAlign: 'center',
             color: 'var(--nf-color-fg-muted)',
             border: '1px dashed var(--nf-color-border)',
@@ -49,7 +49,14 @@ function OverviewPanel({ workspaceId }: { workspaceId: string }): ReactElement {
   }
 
   return (
-    <Card style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+    <Card
+      style={{
+        padding: 'var(--nf-space-6)',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 'var(--nf-space-4)',
+      }}
+    >
       <h2
         style={{
           margin: 0,
@@ -79,8 +86,8 @@ function OverviewPanel({ workspaceId }: { workspaceId: string }): ReactElement {
               style={{
                 display: 'flex',
                 alignItems: 'center',
-                gap: '0.75rem',
-                padding: '0.6rem 0.75rem',
+                gap: 'var(--nf-space-3)',
+                padding: '0.6rem var(--nf-space-3)',
                 borderRadius: '0.5rem',
                 background: 'var(--nf-color-surface)',
                 color: 'inherit',
@@ -162,16 +169,16 @@ export default function WorkspaceDetail({
       style={{
         display: 'flex',
         flexDirection: 'column',
-        gap: '1.5rem',
-        padding: 'clamp(1.5rem, 4vw, 2.5rem)',
+        gap: 'var(--nf-space-6)',
+        padding: 'clamp(var(--nf-space-6), 4vw, var(--nf-space-10))',
       }}
     >
-      <header style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+      <header style={{ display: 'flex', flexDirection: 'column', gap: 'var(--nf-space-2)' }}>
         <h1
           id={headingId}
           style={{
             fontFamily: 'var(--nf-font-display)',
-            fontSize: 'clamp(1.75rem, 3vw, 2.25rem)',
+            fontSize: 'clamp(1.75rem, 3vw, var(--nf-text-4xl))',
             margin: 0,
           }}
         >

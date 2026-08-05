@@ -50,7 +50,7 @@ function AgentsList({ workspaceId }: { workspaceId: string }): ReactElement {
     return (
       <div
         style={{
-          padding: '3rem 1rem',
+          padding: 'var(--nf-space-12) var(--nf-space-4)',
           textAlign: 'center',
           color: 'var(--nf-color-fg-muted)',
           border: '1px dashed var(--nf-color-border)',
@@ -71,7 +71,7 @@ function AgentsList({ workspaceId }: { workspaceId: string }): ReactElement {
         margin: 0,
         display: 'flex',
         flexDirection: 'column',
-        gap: '0.75rem',
+        gap: 'var(--nf-space-3)',
       }}
     >
       {data.agents.map((agent) => {
@@ -109,10 +109,10 @@ function AgentsList({ workspaceId }: { workspaceId: string }): ReactElement {
           <li key={agent.id}>
             <Card
               style={{
-                padding: '1rem',
+                padding: 'var(--nf-space-4)',
                 display: 'flex',
                 flexDirection: 'column',
-                gap: '0.75rem',
+                gap: 'var(--nf-space-3)',
               }}
             >
               <header
@@ -120,10 +120,10 @@ function AgentsList({ workspaceId }: { workspaceId: string }): ReactElement {
                   display: 'flex',
                   justifyContent: 'space-between',
                   alignItems: 'center',
-                  gap: '0.5rem',
+                  gap: 'var(--nf-space-2)',
                 }}
               >
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--nf-space-2)' }}>
                   <strong>{agent.name}</strong>
                   <Badge tone={agent.paused ? 'warning' : 'success'}>
                     {agent.paused ? t('agents.status.paused') : t('agents.status.active')}
@@ -153,7 +153,7 @@ function AgentsList({ workspaceId }: { workspaceId: string }): ReactElement {
               <div
                 style={{
                   display: 'flex',
-                  gap: '0.75rem',
+                  gap: 'var(--nf-space-3)',
                   alignItems: 'center',
                   flexWrap: 'wrap',
                 }}
@@ -161,7 +161,7 @@ function AgentsList({ workspaceId }: { workspaceId: string }): ReactElement {
                 <div
                   style={{
                     display: 'flex',
-                    gap: '0.5rem',
+                    gap: 'var(--nf-space-2)',
                     alignItems: 'center',
                     fontSize: 'var(--nf-text-sm)',
                   }}
@@ -267,7 +267,7 @@ function EventTriggersEditor({
     <div
       style={{
         display: 'flex',
-        gap: '0.5rem',
+        gap: 'var(--nf-space-2)',
         alignItems: 'center',
         fontSize: 'var(--nf-text-sm)',
       }}
@@ -328,7 +328,7 @@ function CreateAgentForm({
 
   if (models.models.length === 0) {
     return (
-      <Card style={{ padding: '1rem' }}>
+      <Card style={{ padding: 'var(--nf-space-4)' }}>
         <p style={{ margin: 0, color: 'var(--nf-color-fg-muted)' }}>
           {t('agents.create.noModels')}
         </p>
@@ -364,10 +364,10 @@ function CreateAgentForm({
   return (
     <Card
       style={{
-        padding: '1rem',
+        padding: 'var(--nf-space-4)',
         display: 'flex',
         flexDirection: 'column',
-        gap: '0.75rem',
+        gap: 'var(--nf-space-3)',
       }}
     >
       <h2 style={{ margin: 0, fontSize: 'var(--nf-text-base)' }}>{t('agents.create.title')}</h2>
@@ -443,7 +443,7 @@ function CreateAgentForm({
           )}
         </FormField>
       ) : null}
-      <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
+      <div style={{ display: 'flex', gap: 'var(--nf-space-2)', justifyContent: 'flex-end' }}>
         <Button type="button" variant="ghost" onClick={onDone}>
           {t('agents.create.cancel')}
         </Button>
@@ -467,14 +467,19 @@ function AiAgentsRoute(): ReactElement {
   const [creating, setCreating] = useState(false);
   return (
     <section
-      style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', inlineSize: '100%' }}
+      style={{
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 'var(--nf-space-6)',
+        inlineSize: '100%',
+      }}
     >
       <header
         style={{
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          gap: '0.5rem',
+          gap: 'var(--nf-space-2)',
         }}
       >
         <div>
@@ -504,7 +509,7 @@ function AiAgentsRoute(): ReactElement {
       ) : null}
       <Suspense
         fallback={
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--nf-space-3)' }}>
             <Skeleton style={{ blockSize: '6rem', inlineSize: '100%' }} />
             <Skeleton style={{ blockSize: '6rem', inlineSize: '100%' }} />
           </div>

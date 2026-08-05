@@ -15,10 +15,10 @@ function PagesIndex(): ReactElement {
       <h1
         style={{
           margin: 0,
-          paddingBlockStart: 'clamp(1.5rem, 4vw, 2.5rem)',
-          paddingInline: 'clamp(1.5rem, 4vw, 2.5rem)',
+          paddingBlockStart: 'clamp(var(--nf-space-6), 4vw, var(--nf-space-10))',
+          paddingInline: 'clamp(var(--nf-space-6), 4vw, var(--nf-space-10))',
           fontFamily: 'var(--nf-font-display)',
-          fontSize: 'clamp(1.75rem, 3vw, 2.25rem)',
+          fontSize: 'clamp(1.75rem, 3vw, var(--nf-text-4xl))',
         }}
       >
         {t('title')}

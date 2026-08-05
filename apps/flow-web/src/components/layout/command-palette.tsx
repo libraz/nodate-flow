@@ -503,7 +503,7 @@ function PaletteBody({ onSelect, initialCommandMode }: InnerProps): ReactElement
       ) : filtered.length === 0 ? (
         <p className={css.emptyText}>{t('dock.command_palette.empty')}</p>
       ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--nf-space-2)' }}>
           {grouped.map(([group, its]) => (
             <div key={group}>
               <div className={css.groupLabel}>{group}</div>

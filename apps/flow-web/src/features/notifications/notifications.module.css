@@ -11,7 +11,7 @@
   justify-content: center;
   min-inline-size: 1.125rem;
   block-size: 1.125rem;
-  padding-inline: 0.25rem;
+  padding-inline: var(--nf-space-1);
   border-radius: var(--nf-radius-pill);
   background: var(--nf-color-danger);
   color: var(--nf-color-fg-on-danger);

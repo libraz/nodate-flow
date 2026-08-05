@@ -49,7 +49,7 @@ export default function DescriptionHistoryDrawer({
     <Drawer open={open} onClose={onClose} title={t('tasks.history.title')} side="inline-end">
       <Suspense
         fallback={
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--nf-space-2)' }}>
             <Skeleton style={{ blockSize: '2rem', inlineSize: '100%' }} />
             <Skeleton style={{ blockSize: '2rem', inlineSize: '100%' }} />
             <Skeleton style={{ blockSize: '2rem', inlineSize: '100%' }} />
@@ -114,7 +114,7 @@ function HistoryBody({ taskId, currentBody, onAfterRestore }: HistoryBodyProps):
         {selectedId ? (
           <Suspense
             fallback={
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--nf-space-2)' }}>
                 <Skeleton style={{ blockSize: '1.5rem', inlineSize: '50%' }} />
                 <Skeleton style={{ blockSize: '8rem', inlineSize: '100%' }} />
               </div>

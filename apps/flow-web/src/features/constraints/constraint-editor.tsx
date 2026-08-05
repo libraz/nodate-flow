@@ -138,7 +138,7 @@ export default function ConstraintEditor({ taskId }: ConstraintEditorProps): Rea
       </div>
 
       <form onSubmit={onSubmit}>
-        <details style={{ marginBlockEnd: '0.5rem' }} open={expression.length > 0}>
+        <details style={{ marginBlockEnd: 'var(--nf-space-2)' }} open={expression.length > 0}>
           <summary
             style={{
               cursor: 'pointer',

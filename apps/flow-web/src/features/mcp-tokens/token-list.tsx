@@ -48,16 +48,16 @@ export default function TokenList({ workspaceId }: TokenListProps): ReactElement
   };
 
   return (
-    <section style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+    <section style={{ display: 'flex', flexDirection: 'column', gap: 'var(--nf-space-5)' }}>
       <header
         style={{
           display: 'flex',
           alignItems: 'flex-start',
           justifyContent: 'space-between',
-          gap: '1rem',
+          gap: 'var(--nf-space-4)',
         }}
       >
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--nf-space-1)' }}>
           <h1 style={{ margin: 0, fontSize: 'var(--nf-text-2xl)' }}>
             {t('workspace.mcp_tokens.title')}
           </h1>
@@ -93,22 +93,22 @@ export default function TokenList({ workspaceId }: TokenListProps): ReactElement
           >
             <thead>
               <tr style={{ textAlign: 'start', color: 'var(--nf-color-fg-muted)' }}>
-                <th style={{ padding: '0.5rem 0.75rem', textAlign: 'start' }}>
+                <th style={{ padding: 'var(--nf-space-2) var(--nf-space-3)', textAlign: 'start' }}>
                   {t('workspace.mcp_tokens.table.name')}
                 </th>
-                <th style={{ padding: '0.5rem 0.75rem', textAlign: 'start' }}>
+                <th style={{ padding: 'var(--nf-space-2) var(--nf-space-3)', textAlign: 'start' }}>
                   {t('workspace.mcp_tokens.table.prefix')}
                 </th>
-                <th style={{ padding: '0.5rem 0.75rem', textAlign: 'start' }}>
+                <th style={{ padding: 'var(--nf-space-2) var(--nf-space-3)', textAlign: 'start' }}>
                   {t('workspace.mcp_tokens.table.scopes')}
                 </th>
-                <th style={{ padding: '0.5rem 0.75rem', textAlign: 'start' }}>
+                <th style={{ padding: 'var(--nf-space-2) var(--nf-space-3)', textAlign: 'start' }}>
                   {t('workspace.mcp_tokens.table.created_at')}
                 </th>
-                <th style={{ padding: '0.5rem 0.75rem', textAlign: 'start' }}>
+                <th style={{ padding: 'var(--nf-space-2) var(--nf-space-3)', textAlign: 'start' }}>
                   {t('workspace.mcp_tokens.table.last_used_at')}
                 </th>
-                <th style={{ padding: '0.5rem 0.75rem', textAlign: 'end' }}>
+                <th style={{ padding: 'var(--nf-space-2) var(--nf-space-3)', textAlign: 'end' }}>
                   {t('workspace.mcp_tokens.table.actions')}
                 </th>
               </tr>
@@ -116,22 +116,29 @@ export default function TokenList({ workspaceId }: TokenListProps): ReactElement
             <tbody>
               {tokens.map((token) => (
                 <tr key={token.id} style={{ borderBlockStart: '1px solid var(--nf-color-border)' }}>
-                  <td style={{ padding: '0.75rem' }}>{token.name}</td>
-                  <td style={{ padding: '0.75rem', fontFamily: 'var(--nf-font-mono, monospace)' }}>
+                  <td style={{ padding: 'var(--nf-space-3)' }}>{token.name}</td>
+                  <td
+                    style={{
+                      padding: 'var(--nf-space-3)',
+                      fontFamily: 'var(--nf-font-mono, monospace)',
+                    }}
+                  >
                     {token.tokenPrefix}
                   </td>
-                  <td style={{ padding: '0.75rem' }}>{(token.scopes ?? []).join(' ') || '—'}</td>
-                  <td style={{ padding: '0.75rem' }}>
+                  <td style={{ padding: 'var(--nf-space-3)' }}>
+                    {(token.scopes ?? []).join(' ') || '—'}
+                  </td>
+                  <td style={{ padding: 'var(--nf-space-3)' }}>
                     {formatUnixDateTime(token.createdAt, locale, '—')}
                   </td>
-                  <td style={{ padding: '0.75rem' }}>
+                  <td style={{ padding: 'var(--nf-space-3)' }}>
                     {formatUnixDateTime(
                       token.lastUsedAt,
                       locale,
                       t('workspace.mcp_tokens.never_used'),
                     )}
                   </td>
-                  <td style={{ padding: '0.75rem', textAlign: 'end' }}>
+                  <td style={{ padding: 'var(--nf-space-3)', textAlign: 'end' }}>
                     <Button
                       type="button"
                       variant="ghost"

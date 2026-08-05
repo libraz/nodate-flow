@@ -26,7 +26,7 @@ export default function AuthCard({ children, width = 'narrow' }: AuthCardProps):
         flexDirection: 'column',
         alignItems: 'center',
         justifyContent: 'center',
-        gap: '1.5rem',
+        gap: 'var(--nf-space-6)',
         padding: 'var(--nf-space-6, 2rem)',
         background: 'var(--nf-color-bg, var(--color-bg))',
       }}

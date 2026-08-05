@@ -196,7 +196,7 @@ function TitleEditor({
   const headingStyle = {
     margin: 0,
     fontFamily: 'var(--nf-font-display)',
-    fontSize: 'clamp(1.75rem, 3vw, 2.25rem)',
+    fontSize: 'clamp(1.75rem, 3vw, var(--nf-text-4xl))',
   } as const;
 
   /**
@@ -224,7 +224,14 @@ function TitleEditor({
       setEditing(true);
     };
     return (
-      <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
+      <div
+        style={{
+          display: 'flex',
+          gap: 'var(--nf-space-2)',
+          alignItems: 'center',
+          flexWrap: 'wrap',
+        }}
+      >
         <h1 style={{ ...headingStyle, flex: 1, minInlineSize: 0 }}>{initial}</h1>
         <Suspense fallback={null}>
           <TaskFavoriteStar taskId={id} workspaceId={workspaceId} />
@@ -275,7 +282,7 @@ function TitleEditor({
     >
       {/* Preserve the page-level heading landmark while editing. */}
       <h1 style={headingHiddenStyle}>{initial}</h1>
-      <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+      <div style={{ display: 'flex', gap: 'var(--nf-space-2)', alignItems: 'center' }}>
         <Input
           value={value}
           onChange={(e) => {
@@ -346,7 +353,7 @@ function DescriptionEditor({ id, initial }: { id: string; initial: string }): Re
     };
     const isEmpty = initial.length === 0;
     return (
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--nf-space-2)' }}>
         {/* biome-ignore lint/a11y/noStaticElementInteractions: interactive only in the empty state, where it carries role="button" + tabIndex + a keyboard handler; otherwise an inert description renderer. */}
         <div
           role={isEmpty ? 'button' : undefined}
@@ -370,7 +377,7 @@ function DescriptionEditor({ id, initial }: { id: string; initial: string }): Re
               ? {
                   border: '1px dashed var(--nf-color-border)',
                   borderRadius: '0.5rem',
-                  padding: '1rem',
+                  padding: 'var(--nf-space-4)',
                   cursor: 'pointer',
                   textAlign: 'center' as const,
                 }
@@ -403,7 +410,7 @@ function DescriptionEditor({ id, initial }: { id: string; initial: string }): Re
   };
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--nf-space-2)' }}>
       <MarkdownEditor
         value={value}
         onChange={setValue}
@@ -411,7 +418,7 @@ function DescriptionEditor({ id, initial }: { id: string; initial: string }): Re
         autoFocus
         aria-label={t('tasks.detail.description_edit')}
       />
-      <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
+      <div style={{ display: 'flex', gap: 'var(--nf-space-2)', justifyContent: 'flex-end' }}>
         <Button
           type="button"
           variant="ghost"
@@ -445,14 +452,14 @@ function DescriptionSection({ id, initial }: { id: string; initial: string }): R
   const { t } = useTranslation('common');
   const [historyOpen, setHistoryOpen] = useState(false);
   return (
-    <Card style={{ padding: '1rem' }}>
+    <Card style={{ padding: 'var(--nf-space-4)' }}>
       <div
         style={{
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'flex-end',
-          gap: '0.5rem',
-          marginBlockEnd: '0.5rem',
+          gap: 'var(--nf-space-2)',
+          marginBlockEnd: 'var(--nf-space-2)',
         }}
       >
         <Button
@@ -502,9 +509,16 @@ function TaskActionsCard({
   const { t } = useTranslation('common');
   const [eventDialogOpen, setEventDialogOpen] = useState(false);
   return (
-    <Card style={{ padding: '1rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+    <Card
+      style={{
+        padding: 'var(--nf-space-4)',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 'var(--nf-space-2)',
+      }}
+    >
       <h2 style={{ margin: 0, fontSize: 'var(--nf-text-base)' }}>{t('tasks.actions.title')}</h2>
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--nf-space-2)' }}>
         <Button type="button" variant="default" onClick={() => setEventDialogOpen(true)}>
           {t('tasks.actions.create_event.trigger')}
         </Button>
@@ -545,7 +559,7 @@ function CommentsFeed({ taskId }: { taskId: string }): ReactElement {
   };
 
   return (
-    <section style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+    <section style={{ display: 'flex', flexDirection: 'column', gap: 'var(--nf-space-4)' }}>
       <h2 style={{ margin: 0, fontSize: 'var(--nf-text-lg)' }}>{t('tasks.comments.title')}</h2>
       {comments.length === 0 ? (
         <p style={{ color: 'var(--nf-color-fg-muted)', margin: 0 }}>{t('tasks.comments.empty')}</p>
@@ -557,7 +571,7 @@ function CommentsFeed({ taskId }: { taskId: string }): ReactElement {
             margin: 0,
             display: 'flex',
             flexDirection: 'column',
-            gap: '0.75rem',
+            gap: 'var(--nf-space-3)',
           }}
         >
           {comments.map((c) => (
@@ -576,7 +590,7 @@ function CommentsFeed({ taskId }: { taskId: string }): ReactElement {
         onSubmit={(e) => {
           void handleSubmit(e);
         }}
-        style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}
+        style={{ display: 'flex', flexDirection: 'column', gap: 'var(--nf-space-2)' }}
       >
         <FormField label={t('tasks.comments.title')}>
           {(control) => (
@@ -807,7 +821,7 @@ function Sidebar({
       style={{
         display: 'flex',
         flexDirection: 'column',
-        gap: '1rem',
+        gap: 'var(--nf-space-4)',
         position: 'sticky',
         top: '1rem',
         alignSelf: 'start',
@@ -815,7 +829,14 @@ function Sidebar({
         overflowY: 'auto',
       }}
     >
-      <Card style={{ padding: '1rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+      <Card
+        style={{
+          padding: 'var(--nf-space-4)',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 'var(--nf-space-3)',
+        }}
+      >
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <span style={{ color: 'var(--nf-color-fg-muted)' }}>{t('tasks.detail.state_label')}</span>
           <Badge tone={STATE_TONE[state]}>{t(STATE_KEY[state])}</Badge>
@@ -904,11 +925,18 @@ function Sidebar({
         </FormField>
       </Card>
 
-      <Card style={{ padding: '1rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+      <Card
+        style={{
+          padding: 'var(--nf-space-4)',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 'var(--nf-space-2)',
+        }}
+      >
         <h2 style={{ margin: 0, fontSize: 'var(--nf-text-base)' }}>
           {t('tasks.detail.transitions.title')}
         </h2>
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--nf-space-2)' }}>
           {legal.map((name) => (
             <Button
               key={name}
@@ -926,13 +954,22 @@ function Sidebar({
 
       <TaskActionsCard taskId={id} workspaceId={workspaceId} />
 
-      <Card style={{ padding: '1rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+      <Card
+        style={{
+          padding: 'var(--nf-space-4)',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 'var(--nf-space-2)',
+        }}
+      >
         <h2 style={{ margin: 0, fontSize: 'var(--nf-text-base)' }}>
           {t('tasks.detail.assignees.title')}
         </h2>
         <Suspense
           fallback={
-            <div style={{ display: 'flex', justifyContent: 'center', padding: '0.5rem' }}>
+            <div
+              style={{ display: 'flex', justifyContent: 'center', padding: 'var(--nf-space-2)' }}
+            >
               <Spinner label={t('common.loading')} />
             </div>
           }
@@ -941,13 +978,22 @@ function Sidebar({
         </Suspense>
       </Card>
 
-      <Card style={{ padding: '1rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+      <Card
+        style={{
+          padding: 'var(--nf-space-4)',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 'var(--nf-space-2)',
+        }}
+      >
         <h2 style={{ margin: 0, fontSize: 'var(--nf-text-base)' }}>
           {tAgents('task_detail.agent.assign.title')}
         </h2>
         <Suspense
           fallback={
-            <div style={{ display: 'flex', justifyContent: 'center', padding: '0.5rem' }}>
+            <div
+              style={{ display: 'flex', justifyContent: 'center', padding: 'var(--nf-space-2)' }}
+            >
               <Spinner label={t('common.loading')} />
             </div>
           }
@@ -956,10 +1002,19 @@ function Sidebar({
         </Suspense>
       </Card>
 
-      <Card style={{ padding: '1rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+      <Card
+        style={{
+          padding: 'var(--nf-space-4)',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 'var(--nf-space-2)',
+        }}
+      >
         <Suspense
           fallback={
-            <div style={{ display: 'flex', justifyContent: 'center', padding: '0.5rem' }}>
+            <div
+              style={{ display: 'flex', justifyContent: 'center', padding: 'var(--nf-space-2)' }}
+            >
               <Spinner label={t('common.loading')} />
             </div>
           }
@@ -968,10 +1023,19 @@ function Sidebar({
         </Suspense>
       </Card>
 
-      <Card style={{ padding: '1rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+      <Card
+        style={{
+          padding: 'var(--nf-space-4)',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 'var(--nf-space-2)',
+        }}
+      >
         <Suspense
           fallback={
-            <div style={{ display: 'flex', justifyContent: 'center', padding: '0.5rem' }}>
+            <div
+              style={{ display: 'flex', justifyContent: 'center', padding: 'var(--nf-space-2)' }}
+            >
               <Spinner label={t('common.loading')} />
             </div>
           }
@@ -980,10 +1044,19 @@ function Sidebar({
         </Suspense>
       </Card>
 
-      <Card style={{ padding: '1rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+      <Card
+        style={{
+          padding: 'var(--nf-space-4)',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 'var(--nf-space-2)',
+        }}
+      >
         <Suspense
           fallback={
-            <div style={{ display: 'flex', justifyContent: 'center', padding: '0.5rem' }}>
+            <div
+              style={{ display: 'flex', justifyContent: 'center', padding: 'var(--nf-space-2)' }}
+            >
               <Spinner label={t('common.loading')} />
             </div>
           }
@@ -992,13 +1065,22 @@ function Sidebar({
         </Suspense>
       </Card>
 
-      <Card style={{ padding: '1rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+      <Card
+        style={{
+          padding: 'var(--nf-space-4)',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 'var(--nf-space-2)',
+        }}
+      >
         <h2 style={{ margin: 0, fontSize: 'var(--nf-text-base)' }}>
           {t('tasks.detail.infer_state.title')}
         </h2>
         <Suspense
           fallback={
-            <div style={{ display: 'flex', justifyContent: 'center', padding: '0.5rem' }}>
+            <div
+              style={{ display: 'flex', justifyContent: 'center', padding: 'var(--nf-space-2)' }}
+            >
               <Spinner label={t('common.loading')} />
             </div>
           }
@@ -1009,7 +1091,7 @@ function Sidebar({
 
       <Suspense
         fallback={
-          <div style={{ display: 'flex', justifyContent: 'center', padding: '0.5rem' }}>
+          <div style={{ display: 'flex', justifyContent: 'center', padding: 'var(--nf-space-2)' }}>
             <Spinner label={t('common.loading')} />
           </div>
         }
@@ -1017,13 +1099,22 @@ function Sidebar({
         <TaskStepsPanel taskId={id} workspaceId={workspaceId} />
       </Suspense>
 
-      <Card style={{ padding: '1rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+      <Card
+        style={{
+          padding: 'var(--nf-space-4)',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 'var(--nf-space-2)',
+        }}
+      >
         <h2 style={{ margin: 0, fontSize: 'var(--nf-text-base)' }}>
           {t('tasks.detail.duplicates.title')}
         </h2>
         <Suspense
           fallback={
-            <div style={{ display: 'flex', justifyContent: 'center', padding: '0.5rem' }}>
+            <div
+              style={{ display: 'flex', justifyContent: 'center', padding: 'var(--nf-space-2)' }}
+            >
               <Spinner label={t('common.loading')} />
             </div>
           }
@@ -1032,13 +1123,22 @@ function Sidebar({
         </Suspense>
       </Card>
 
-      <Card style={{ padding: '1rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+      <Card
+        style={{
+          padding: 'var(--nf-space-4)',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 'var(--nf-space-2)',
+        }}
+      >
         <h2 style={{ margin: 0, fontSize: 'var(--nf-text-base)' }}>
           {t('tasks.detail.activity.title')}
         </h2>
         <Suspense
           fallback={
-            <div style={{ display: 'flex', justifyContent: 'center', padding: '0.5rem' }}>
+            <div
+              style={{ display: 'flex', justifyContent: 'center', padding: 'var(--nf-space-2)' }}
+            >
               <Spinner label={t('common.loading')} />
             </div>
           }
@@ -1068,7 +1168,7 @@ function RelatedTasksSection({ taskId }: { taskId: string }): ReactElement {
         margin: 0,
         display: 'flex',
         flexDirection: 'column',
-        gap: '0.5rem',
+        gap: 'var(--nf-space-2)',
       }}
     >
       {data.candidates.map((c) => {
@@ -1080,7 +1180,7 @@ function RelatedTasksSection({ taskId }: { taskId: string }): ReactElement {
               style={{
                 display: 'flex',
                 alignItems: 'center',
-                gap: '0.5rem',
+                gap: 'var(--nf-space-2)',
                 color: 'var(--nf-color-fg)',
                 textDecoration: 'none',
               }}
@@ -1149,7 +1249,7 @@ function InferStateSection({ taskId }: { taskId: string }): ReactElement {
   const transitionLabel = transitionKey ? t(transitionKey) : transition;
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.375rem' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--nf-space-2)' }}>
         <Badge tone="accent">{transitionLabel}</Badge>
         <span
           style={{
@@ -1251,13 +1351,20 @@ function TaskDetailPanel({ id }: TaskDetailPanelProps): ReactElement {
   return (
     <section
       style={{
-        padding: 'clamp(1.5rem, 4vw, 2.5rem)',
+        padding: 'clamp(var(--nf-space-6), 4vw, var(--nf-space-10))',
         display: 'grid',
         gridTemplateColumns: isNarrow ? '1fr' : 'minmax(0, 1fr) minmax(16rem, 22rem)',
-        gap: '1.5rem',
+        gap: 'var(--nf-space-6)',
       }}
     >
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', minInlineSize: 0 }}>
+      <div
+        style={{
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 'var(--nf-space-6)',
+          minInlineSize: 0,
+        }}
+      >
         <Suspense fallback={null}>
           <TaskBreadcrumb workspaceId={task.workspaceId} projectId={task.projectId} />
         </Suspense>
@@ -1308,7 +1415,14 @@ function TaskDetailRoute(): ReactElement {
   return (
     <Suspense
       fallback={
-        <div style={{ padding: '2rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+        <div
+          style={{
+            padding: 'var(--nf-space-8)',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 'var(--nf-space-4)',
+          }}
+        >
           <Skeleton style={{ blockSize: '2rem', inlineSize: '16rem' }} />
           <Skeleton style={{ blockSize: '12rem', inlineSize: '100%' }} />
         </div>

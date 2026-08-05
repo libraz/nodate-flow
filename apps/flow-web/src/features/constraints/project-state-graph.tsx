@@ -203,7 +203,7 @@ export default function ProjectStateGraph({ projectId }: ProjectStateGraphProps)
           fontFamily: 'var(--nf-font-display)',
           fontSize: 'var(--nf-text-base)',
           fontWeight: 600,
-          marginBlockEnd: '0.75rem',
+          marginBlockEnd: 'var(--nf-space-3)',
         }}
       >
         {t('constraints:stateGraph.projectTitle')}
@@ -213,7 +213,7 @@ export default function ProjectStateGraph({ projectId }: ProjectStateGraphProps)
               fontWeight: 400,
               fontSize: '0.8125rem',
               color: 'var(--nf-color-fg-muted)',
-              marginInlineStart: '0.75rem',
+              marginInlineStart: 'var(--nf-space-3)',
             }}
           >
             {t('constraints:stateGraph.noDependencies')}

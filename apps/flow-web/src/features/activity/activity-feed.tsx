@@ -58,7 +58,7 @@ function SourceFilter({
             aria-pressed={active}
             onClick={() => onChange(v)}
             style={{
-              padding: '0.25rem 0.75rem',
+              padding: 'var(--nf-space-1) var(--nf-space-3)',
               borderRadius: '999px',
               border: `1px solid ${active ? 'var(--nf-color-accent)' : 'var(--nf-color-border)'}`,
               background: active ? 'var(--nf-color-accent-subtle)' : 'var(--nf-color-surface)',
@@ -126,7 +126,7 @@ function FeedWithActors({
 
   if (isLoading) {
     return (
-      <div style={{ padding: '2rem', display: 'flex', justifyContent: 'center' }}>
+      <div style={{ padding: 'var(--nf-space-8)', display: 'flex', justifyContent: 'center' }}>
         <Spinner label={t('view.loading')} />
       </div>
     );
@@ -137,14 +137,14 @@ function FeedWithActors({
       <div
         role="alert"
         style={{
-          padding: '2rem 1rem',
+          padding: 'var(--nf-space-8) var(--nf-space-4)',
           textAlign: 'center',
           color: 'var(--nf-color-danger)',
           border: '1px solid var(--nf-color-danger)',
           borderRadius: '0.75rem',
           display: 'flex',
           flexDirection: 'column',
-          gap: '0.75rem',
+          gap: 'var(--nf-space-3)',
           alignItems: 'center',
         }}
       >
@@ -167,13 +167,13 @@ function FeedWithActors({
     return (
       <div
         style={{
-          padding: '3rem 1rem',
+          padding: 'var(--nf-space-12) var(--nf-space-4)',
           textAlign: 'center',
           color: 'var(--nf-color-fg-muted)',
           border: '1px dashed var(--nf-color-border)',
           borderRadius: '0.75rem',
           background: 'var(--nf-color-bg-sunken)',
-          fontSize: '0.875rem',
+          fontSize: 'var(--nf-text-sm)',
         }}
       >
         {source === 'all' ? t('view.empty') : t('view.empty_filtered')}
@@ -229,11 +229,18 @@ export default function ActivityFeed({
 }: ActivityFeedProps): ReactElement {
   const { t } = useTranslation('activity');
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', minBlockSize: 0 }}>
+    <div
+      style={{
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 'var(--nf-space-3)',
+        minBlockSize: 0,
+      }}
+    >
       <SourceFilter value={source} onChange={onSourceChange} />
       <Suspense
         fallback={
-          <div style={{ padding: '2rem', display: 'flex', justifyContent: 'center' }}>
+          <div style={{ padding: 'var(--nf-space-8)', display: 'flex', justifyContent: 'center' }}>
             <Spinner label={t('view.loading')} />
           </div>
         }

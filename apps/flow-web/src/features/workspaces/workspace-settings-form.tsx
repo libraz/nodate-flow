@@ -108,7 +108,7 @@ function DeleteWorkspaceDialog({
     >
       <form
         onSubmit={handleSubmit}
-        style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}
+        style={{ display: 'flex', flexDirection: 'column', gap: 'var(--nf-space-5)' }}
       >
         <p
           style={{
@@ -125,8 +125,8 @@ function DeleteWorkspaceDialog({
           style={{
             display: 'flex',
             flexDirection: 'column',
-            gap: '0.5rem',
-            padding: '0.75rem',
+            gap: 'var(--nf-space-2)',
+            padding: 'var(--nf-space-3)',
             border: '1px solid var(--nf-color-border)',
             borderRadius: 'var(--nf-radius-md)',
             background: 'var(--nf-color-bg-sunken)',
@@ -138,12 +138,12 @@ function DeleteWorkspaceDialog({
           <ul
             style={{
               margin: 0,
-              paddingInlineStart: '1.25rem',
+              paddingInlineStart: 'var(--nf-space-5)',
               fontSize: 'var(--nf-text-sm)',
               color: 'var(--nf-color-fg-muted)',
               display: 'flex',
               flexDirection: 'column',
-              gap: '0.25rem',
+              gap: 'var(--nf-space-1)',
             }}
           >
             <li>{t('workspace.general.danger.confirm.loses_projects_and_tasks')}</li>
@@ -173,7 +173,7 @@ function DeleteWorkspaceDialog({
           )}
         </FormField>
 
-        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem' }}>
+        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 'var(--nf-space-3)' }}>
           <Button type="button" variant="ghost" disabled={pending} onClick={onCancel}>
             {t('workspace.general.danger.confirm.cancel')}
           </Button>
@@ -283,9 +283,9 @@ export default function WorkspaceSettingsForm({
         onSubmit={(e) => {
           void handleSubmit(e);
         }}
-        style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}
+        style={{ display: 'flex', flexDirection: 'column', gap: 'var(--nf-space-5)' }}
       >
-        <header style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+        <header style={{ display: 'flex', flexDirection: 'column', gap: 'var(--nf-space-1)' }}>
           <h1 style={{ margin: 0, fontSize: 'var(--nf-text-2xl)' }}>
             {t('workspace.general.title')}
           </h1>
@@ -375,15 +375,15 @@ export default function WorkspaceSettingsForm({
           style={{
             display: 'flex',
             flexDirection: 'column',
-            gap: '1rem',
-            marginBlockStart: '2rem',
-            padding: '1.25rem',
+            gap: 'var(--nf-space-4)',
+            marginBlockStart: 'var(--nf-space-8)',
+            padding: 'var(--nf-space-5)',
             border: '1px solid var(--nf-color-danger)',
             borderRadius: 'var(--nf-radius-md)',
             background: 'color-mix(in srgb, var(--nf-color-danger) 4%, var(--nf-color-bg))',
           }}
         >
-          <header style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+          <header style={{ display: 'flex', flexDirection: 'column', gap: 'var(--nf-space-1)' }}>
             <h2
               id="workspace-danger-zone-heading"
               style={{

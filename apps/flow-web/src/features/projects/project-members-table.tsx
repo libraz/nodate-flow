@@ -114,7 +114,7 @@ export default function ProjectMembersTable({ projectId }: ProjectMembersTablePr
   ];
 
   return (
-    <section style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+    <section style={{ display: 'flex', flexDirection: 'column', gap: 'var(--nf-space-4)' }}>
       <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <h2
           style={{
@@ -144,7 +144,7 @@ export default function ProjectMembersTable({ projectId }: ProjectMembersTablePr
           <span
             style={{
               display: 'block',
-              padding: '2rem 1rem',
+              padding: 'var(--nf-space-8) var(--nf-space-4)',
               textAlign: 'center',
               color: 'var(--nf-color-fg-muted)',
               border: '1px dashed var(--nf-color-border)',

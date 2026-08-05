@@ -17,7 +17,7 @@ const sectionStyle = {
   display: 'flex',
   flexDirection: 'column',
   gap: '0.875rem',
-  padding: '1.25rem 1.5rem',
+  padding: 'var(--nf-space-5) var(--nf-space-6)',
   borderRadius: '0.75rem',
   border: '1px solid var(--nf-color-border)',
   background: 'var(--nf-color-surface)',
@@ -28,14 +28,14 @@ const sectionHeadingStyle = {
   fontSize: 'var(--nf-text-base)',
   fontWeight: 600,
   color: 'var(--nf-color-fg)',
-  paddingBlockEnd: '0.75rem',
+  paddingBlockEnd: 'var(--nf-space-3)',
   borderBlockEnd: '1px solid var(--nf-color-border)',
 } as const;
 
 function SecurityRoute(): ReactElement {
   const { t } = useTranslation('settings');
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--nf-space-5)' }}>
       <h1 style={{ margin: 0, fontSize: 'var(--nf-text-2xl)' }}>{t('security.title')}</h1>
 
       <section style={sectionStyle}>
@@ -54,7 +54,7 @@ function SecurityRoute(): ReactElement {
         <h2 style={sectionHeadingStyle}>{t('security.sessions.title')}</h2>
         <Suspense
           fallback={
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--nf-space-2)' }}>
               <Skeleton style={{ blockSize: '4rem', inlineSize: '100%' }} />
               <Skeleton style={{ blockSize: '4rem', inlineSize: '100%' }} />
             </div>

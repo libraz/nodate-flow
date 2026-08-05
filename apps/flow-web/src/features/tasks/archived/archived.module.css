@@ -16,8 +16,8 @@
   display: flex;
   flex-direction: column;
   gap: var(--nf-space-6);
-  padding: clamp(1.5rem, 4vw, 2.5rem);
-  padding-block-end: clamp(6rem, 12vh, 9rem);
+  padding: clamp(var(--nf-space-6), 4vw, var(--nf-space-10));
+  padding-block-end: clamp(var(--nf-space-24), 12vh, 9rem);
   background: var(--nf-color-bg);
   min-block-size: 100%;
 }
@@ -32,7 +32,7 @@
 
 .title {
   font-family: var(--nf-font-display);
-  font-size: clamp(1.75rem, 3vw, 2.25rem);
+  font-size: clamp(1.75rem, 3vw, var(--nf-text-4xl));
   margin: 0;
   color: var(--nf-color-fg);
   letter-spacing: -0.01em;
@@ -152,7 +152,7 @@
   justify-content: space-between;
   gap: var(--nf-space-3);
   position: sticky;
-  inset-block-start: 4rem;
+  inset-block-start: var(--nf-space-16);
   background: color-mix(in oklab, var(--nf-color-bg) 92%, transparent);
   backdrop-filter: blur(var(--nf-surface-blur));
   padding-block: var(--nf-space-2);
@@ -417,7 +417,7 @@
 
 .emptyBody {
   margin: 0;
-  max-inline-size: 32rem;
+  max-inline-size: var(--nf-measure-narrow);
   color: var(--nf-color-fg-muted);
   font-size: var(--nf-text-sm);
 }

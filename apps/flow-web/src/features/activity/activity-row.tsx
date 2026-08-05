@@ -137,15 +137,29 @@ export default function ActivityRow({ entry, actorName }: ActivityRowProps): Rea
         gridTemplateColumns: 'auto 1fr',
         columnGap: '0.875rem',
         alignItems: 'start',
-        padding: '0.625rem 0.75rem',
+        padding: '0.625rem var(--nf-space-3)',
         borderInlineStart: `3px solid ${accent}`,
         borderBlockEnd: '1px solid var(--nf-color-border)',
       }}
     >
       <ActorGlyph entry={entry} actorName={actorName} actorLabel={actorLabel} />
 
-      <div style={{ minInlineSize: 0, display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-        <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.5rem', flexWrap: 'wrap' }}>
+      <div
+        style={{
+          minInlineSize: 0,
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 'var(--nf-space-1)',
+        }}
+      >
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'baseline',
+            gap: 'var(--nf-space-2)',
+            flexWrap: 'wrap',
+          }}
+        >
           <span style={{ color: 'var(--nf-color-fg)', fontWeight: 500 }}>{actorLabel}</span>
           <span style={{ color: 'var(--nf-color-fg)', wordBreak: 'break-word' }}>{action}</span>
           <span
@@ -179,7 +193,7 @@ export default function ActivityRow({ entry, actorName }: ActivityRowProps): Rea
           style={{
             display: 'flex',
             alignItems: 'center',
-            gap: '0.5rem',
+            gap: 'var(--nf-space-2)',
             flexWrap: 'wrap',
             fontSize: 'var(--nf-text-xs)',
             color: 'var(--nf-color-fg-muted)',

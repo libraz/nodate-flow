@@ -51,8 +51,8 @@ const rowStyle: CSSProperties = {
   display: 'grid',
   gridTemplateColumns: 'minmax(5rem, max-content) 1fr',
   alignItems: 'center',
-  gap: '0.75rem',
-  paddingBlock: '0.5rem',
+  gap: 'var(--nf-space-3)',
+  paddingBlock: 'var(--nf-space-2)',
   borderBlockStart: '1px solid var(--nf-color-border)',
 };
 
@@ -84,8 +84,8 @@ export default function ReplayPanel({ taskId }: ReplayPanelProps): ReactElement 
       style={{
         display: 'flex',
         flexDirection: 'column',
-        gap: '0.75rem',
-        padding: '0.875rem 1rem',
+        gap: 'var(--nf-space-3)',
+        padding: '0.875rem var(--nf-space-4)',
         borderRadius: '0.5rem',
         border: '1px solid var(--nf-color-border)',
         background: 'var(--nf-color-surface)',
@@ -96,7 +96,7 @@ export default function ReplayPanel({ taskId }: ReplayPanelProps): ReactElement 
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          gap: '0.75rem',
+          gap: 'var(--nf-space-3)',
         }}
       >
         <h3 style={{ margin: 0, fontSize: '0.9375rem', fontWeight: 600 }}>{t('replay.title')}</h3>

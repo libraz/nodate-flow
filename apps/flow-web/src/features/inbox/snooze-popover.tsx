@@ -42,7 +42,7 @@ export default function SnoozePopover({ children, onSnooze }: SnoozePopoverProps
       style={{
         display: 'flex',
         flexDirection: 'column',
-        gap: '0.25rem',
+        gap: 'var(--nf-space-1)',
         padding: '0.375rem',
         minInlineSize: '10rem',
       }}

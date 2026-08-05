@@ -111,7 +111,7 @@ export default function EventFromTaskDialog({
     <Dialog open={open} onClose={onClose} title={t('tasks.actions.create_event.title')}>
       <form
         onSubmit={handleSubmit}
-        style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}
+        style={{ display: 'flex', flexDirection: 'column', gap: 'var(--nf-space-4)' }}
       >
         <FormField label={t('tasks.actions.create_event.workspace_label')}>
           {(control) => (
@@ -154,7 +154,7 @@ export default function EventFromTaskDialog({
         <p style={{ margin: 0, color: 'var(--nf-color-fg-muted)', fontSize: 'var(--nf-text-xs)' }}>
           {t('tasks.actions.create_event.hint')}
         </p>
-        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem' }}>
+        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 'var(--nf-space-2)' }}>
           <Button type="button" variant="ghost" size="sm" onClick={onClose}>
             {t('tasks.actions.create_event.cancel')}
           </Button>

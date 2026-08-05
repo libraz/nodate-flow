@@ -173,12 +173,12 @@ export default function InboxList(): ReactElement {
     : workspaceFiltered;
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--nf-space-4)' }}>
       <div
         style={{
           display: 'flex',
           alignItems: 'flex-end',
-          gap: '0.75rem',
+          gap: 'var(--nf-space-3)',
           flexWrap: 'wrap',
         }}
       >
@@ -196,7 +196,7 @@ export default function InboxList(): ReactElement {
             value={selectedWorkspaceId}
             onChange={handleWorkspaceChange}
             style={{
-              padding: '0.5rem 0.75rem',
+              padding: 'var(--nf-space-2) var(--nf-space-3)',
               borderRadius: '0.5rem',
               border: '1px solid var(--nf-color-border)',
               background: 'var(--nf-color-surface)',
@@ -238,7 +238,7 @@ export default function InboxList(): ReactElement {
       {suggestions.length > 0 ? (
         <section
           aria-label={tAi('triage.result_title')}
-          style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}
+          style={{ display: 'flex', flexDirection: 'column', gap: 'var(--nf-space-2)' }}
         >
           <h2
             style={{
@@ -259,7 +259,7 @@ export default function InboxList(): ReactElement {
               margin: 0,
               display: 'flex',
               flexDirection: 'column',
-              gap: '0.5rem',
+              gap: 'var(--nf-space-2)',
             }}
           >
             {suggestions.map((suggestion) => (
@@ -279,7 +279,7 @@ export default function InboxList(): ReactElement {
       {filteredItems.length === 0 ? (
         <div
           style={{
-            padding: '3rem 1rem',
+            padding: 'var(--nf-space-12) var(--nf-space-4)',
             textAlign: 'center',
             color: 'var(--nf-color-fg-muted)',
             border: '1px dashed var(--nf-color-border)',
@@ -292,7 +292,7 @@ export default function InboxList(): ReactElement {
               display: 'flex',
               flexDirection: 'column',
               alignItems: 'center',
-              gap: '0.75rem',
+              gap: 'var(--nf-space-3)',
             }}
           >
             <InboxIcon
@@ -311,7 +311,7 @@ export default function InboxList(): ReactElement {
             margin: 0,
             display: 'flex',
             flexDirection: 'column',
-            gap: '0.75rem',
+            gap: 'var(--nf-space-3)',
           }}
         >
           {filteredItems.map((item) => (

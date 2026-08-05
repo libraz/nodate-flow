@@ -122,8 +122,8 @@ function WorkspaceSettingsLayout(): ReactElement {
       style={{
         display: 'grid',
         gridTemplateColumns: '16rem 1fr',
-        gap: '2rem',
-        padding: 'clamp(1.5rem, 4vw, 2.5rem)',
+        gap: 'var(--nf-space-8)',
+        padding: 'clamp(var(--nf-space-6), 4vw, var(--nf-space-10))',
         maxInlineSize: '72rem',
         marginInline: 'auto',
         inlineSize: '100%',
@@ -131,7 +131,7 @@ function WorkspaceSettingsLayout(): ReactElement {
     >
       <nav
         aria-label={t('sections_label')}
-        style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}
+        style={{ display: 'flex', flexDirection: 'column', gap: 'var(--nf-space-1)' }}
       >
         {SUB_NAV.map((item) => (
           <Link
@@ -149,7 +149,7 @@ function WorkspaceSettingsLayout(): ReactElement {
             }}
             style={{
               display: 'block',
-              padding: '0.5rem 0.75rem',
+              padding: 'var(--nf-space-2) var(--nf-space-3)',
               borderRadius: '0.5rem',
               color: 'var(--nf-color-fg)',
               textDecoration: 'none',

@@ -30,7 +30,7 @@ export default function ShortcutsHelpDialog({
 
   return (
     <Dialog open={open} onClose={onClose} title={t('shortcuts.title')}>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--nf-space-6)' }}>
         {[...sections.entries()].map(([sectionKey, bindings]) => (
           <div key={sectionKey}>
             <h3
@@ -40,7 +40,7 @@ export default function ShortcutsHelpDialog({
                 textTransform: 'uppercase',
                 letterSpacing: '0.05em',
                 opacity: 0.6,
-                marginBottom: '0.5rem',
+                marginBottom: 'var(--nf-space-2)',
               }}
             >
               {t(sectionKey)}
@@ -53,11 +53,11 @@ export default function ShortcutsHelpDialog({
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'space-between',
-                    padding: '0.25rem 0',
+                    padding: 'var(--nf-space-1) 0',
                   }}
                 >
                   <span style={{ fontSize: 'var(--nf-text-sm)' }}>{t(b.labelKey)}</span>
-                  <span style={{ display: 'flex', gap: '0.25rem' }}>
+                  <span style={{ display: 'flex', gap: 'var(--nf-space-1)' }}>
                     {b.keys.split(' ').map((k) => (
                       <kbd
                         key={k}

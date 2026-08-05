@@ -139,14 +139,14 @@ function AuthenticatedLayout(): ReactElement | null {
           style={{
             display: 'flex',
             flexDirection: 'column',
-            gap: '1rem',
+            gap: 'var(--nf-space-4)',
             minInlineSize: '20rem',
           }}
         >
           <p style={{ margin: 0, color: 'var(--nf-color-fg-muted)' }}>
             {t('tasks.quick_create.no_projects.title')}
           </p>
-          <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
+          <div style={{ display: 'flex', gap: 'var(--nf-space-2)', justifyContent: 'flex-end' }}>
             <Button type="button" variant="ghost" onClick={() => setNoProjectHintOpen(false)}>
               {t('tasks.form.cancel')}
             </Button>
@@ -158,7 +158,7 @@ function AuthenticatedLayout(): ReactElement | null {
                 style={{
                   display: 'inline-flex',
                   alignItems: 'center',
-                  paddingInline: '0.75rem',
+                  paddingInline: 'var(--nf-space-3)',
                   paddingBlock: '0.375rem',
                   borderRadius: 'var(--nf-radius-md)',
                   background: 'var(--nf-color-accent)',
@@ -201,7 +201,13 @@ function SessionUnreachable({ onRetry }: { onRetry: () => void }): ReactElement 
       }}
     >
       <h1 style={{ margin: 0, fontFamily: 'var(--nf-font-display)' }}>{t('auth.offline.title')}</h1>
-      <p style={{ margin: 0, color: 'var(--nf-color-fg-muted)', maxInlineSize: '32rem' }}>
+      <p
+        style={{
+          margin: 0,
+          color: 'var(--nf-color-fg-muted)',
+          maxInlineSize: 'var(--nf-measure-narrow)',
+        }}
+      >
         {t('auth.offline.description')}
       </p>
       <Button type="button" variant="primary" onClick={onRetry}>

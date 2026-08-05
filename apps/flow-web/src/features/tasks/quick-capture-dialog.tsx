@@ -90,7 +90,7 @@ export default function QuickCaptureDialog({
           void handleSubmit(e);
         }}
         noValidate
-        style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}
+        style={{ display: 'flex', flexDirection: 'column', gap: 'var(--nf-space-4)' }}
       >
         <FormField
           label={t('tasks.form.title')}
@@ -123,7 +123,7 @@ export default function QuickCaptureDialog({
           )}
         </FormField>
 
-        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem' }}>
+        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 'var(--nf-space-3)' }}>
           <Button type="button" variant="ghost" onClick={handleClose} disabled={submitting}>
             {t('tasks.form.cancel')}
           </Button>

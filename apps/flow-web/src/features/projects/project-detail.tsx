@@ -89,13 +89,13 @@ function SettingsPanel({ id }: { id: string }): ReactElement {
   const featureFlags = project as unknown as Record<FeatureFlag, boolean | undefined>;
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-      <Card style={{ padding: '1.25rem' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--nf-space-6)' }}>
+      <Card style={{ padding: 'var(--nf-space-5)' }}>
         <form
           onSubmit={(e) => {
             void handleRename(e);
           }}
-          style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}
+          style={{ display: 'flex', flexDirection: 'column', gap: 'var(--nf-space-4)' }}
         >
           <FormField label={t('projects.form.name')} required>
             {(control) => (
@@ -116,7 +116,7 @@ function SettingsPanel({ id }: { id: string }): ReactElement {
         </form>
       </Card>
 
-      <Card style={{ padding: '1.25rem' }}>
+      <Card style={{ padding: 'var(--nf-space-5)' }}>
         <section>
           <div className="flex items-baseline gap-2 flex-wrap">
             <h3 className="text-base font-semibold text-[var(--nf-color-fg)]">
@@ -151,7 +151,7 @@ function SettingsPanel({ id }: { id: string }): ReactElement {
         </section>
       </Card>
 
-      <Card style={{ padding: '1.25rem' }}>
+      <Card style={{ padding: 'var(--nf-space-5)' }}>
         <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
           <Button
             variant="danger"
@@ -173,11 +173,11 @@ function OverviewPanel({ id, workspaceId }: { id: string; workspaceId: string })
 
   if (tasks.length === 0) {
     return (
-      <Card style={{ padding: '1.5rem' }}>
+      <Card style={{ padding: 'var(--nf-space-6)' }}>
         <p
           style={{
             margin: 0,
-            padding: '2rem 1rem',
+            padding: 'var(--nf-space-8) var(--nf-space-4)',
             textAlign: 'center',
             color: 'var(--nf-color-fg-muted)',
             border: '1px dashed var(--nf-color-border)',
@@ -207,8 +207,22 @@ function OverviewPanel({ id, workspaceId }: { id: string; workspaceId: string })
   const pct = total > 0 ? Math.round((counts.done / total) * 100) : 0;
 
   return (
-    <Card style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-      <div style={{ display: 'flex', alignItems: 'baseline', gap: '1rem', flexWrap: 'wrap' }}>
+    <Card
+      style={{
+        padding: 'var(--nf-space-6)',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 'var(--nf-space-5)',
+      }}
+    >
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'baseline',
+          gap: 'var(--nf-space-4)',
+          flexWrap: 'wrap',
+        }}
+      >
         <div>
           <div style={{ fontSize: '2rem', fontWeight: 600, lineHeight: 1 }}>{active}</div>
           <div style={{ fontSize: '0.8125rem', color: 'var(--nf-color-fg-muted)' }}>
@@ -254,14 +268,14 @@ function OverviewPanel({ id, workspaceId }: { id: string; workspaceId: string })
           padding: 0,
           display: 'grid',
           gridTemplateColumns: 'repeat(auto-fit, minmax(8rem, 1fr))',
-          gap: '0.5rem',
+          gap: 'var(--nf-space-2)',
         }}
       >
         {STATE_ORDER.map((s) => (
           <li
             key={s}
             style={{
-              padding: '0.5rem 0.75rem',
+              padding: 'var(--nf-space-2) var(--nf-space-3)',
               borderRadius: '0.5rem',
               background: 'var(--nf-color-surface)',
               display: 'flex',
@@ -339,8 +353,8 @@ export default function ProjectDetail({ id, tab, onTabChange }: ProjectDetailPro
       style={{
         display: 'flex',
         flexDirection: 'column',
-        gap: '1.5rem',
-        padding: 'clamp(1.5rem, 4vw, 2.5rem)',
+        gap: 'var(--nf-space-6)',
+        padding: 'clamp(var(--nf-space-6), 4vw, var(--nf-space-10))',
       }}
     >
       <Tabs

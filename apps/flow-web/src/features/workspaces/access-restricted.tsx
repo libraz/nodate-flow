@@ -38,14 +38,14 @@ export default function AccessRestricted({ sectionTitleKey }: AccessRestrictedPr
       style={{
         display: 'flex',
         flexDirection: 'column',
-        gap: '0.75rem',
+        gap: 'var(--nf-space-3)',
         inlineSize: '100%',
       }}
     >
       <h1
         style={{
           fontFamily: 'var(--nf-font-display)',
-          fontSize: 'clamp(1.5rem, 2.5vw, 2rem)',
+          fontSize: 'clamp(var(--nf-text-2xl), 2.5vw, 2rem)',
           margin: 0,
         }}
       >

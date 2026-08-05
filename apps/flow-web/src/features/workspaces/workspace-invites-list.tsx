@@ -100,7 +100,7 @@ export default function WorkspaceInvitesList({
   ];
 
   return (
-    <section style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+    <section style={{ display: 'flex', flexDirection: 'column', gap: 'var(--nf-space-4)' }}>
       <h3
         style={{
           fontFamily: 'var(--nf-font-display)',

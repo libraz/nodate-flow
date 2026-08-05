@@ -155,7 +155,14 @@ function TimelineInner({
   };
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', minBlockSize: 0 }}>
+    <div
+      style={{
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 'var(--nf-space-3)',
+        minBlockSize: 0,
+      }}
+    >
       <EventFilterBar
         filters={filters}
         onChange={onChange}
@@ -165,7 +172,7 @@ function TimelineInner({
       {allEvents.length === 0 ? (
         <div
           style={{
-            padding: '3rem 1rem',
+            padding: 'var(--nf-space-12) var(--nf-space-4)',
             textAlign: 'center',
             color: 'var(--nf-color-fg-muted)',
             border: '1px dashed var(--nf-color-border)',
@@ -182,8 +189,8 @@ function TimelineInner({
             overflowY: 'auto',
             display: 'flex',
             flexDirection: 'column',
-            gap: '1.25rem',
-            paddingInlineEnd: '0.5rem',
+            gap: 'var(--nf-space-5)',
+            paddingInlineEnd: 'var(--nf-space-2)',
           }}
         >
           {groups.map((g) => (
@@ -194,7 +201,7 @@ function TimelineInner({
                   insetBlockStart: 0,
                   zIndex: 2,
                   margin: 0,
-                  padding: '0.375rem 0.75rem',
+                  padding: '0.375rem var(--nf-space-3)',
                   fontSize: 'var(--nf-text-xs)',
                   textTransform: 'uppercase',
                   letterSpacing: '0.05em',
@@ -208,8 +215,8 @@ function TimelineInner({
               <div
                 style={{
                   position: 'relative',
-                  paddingInlineStart: '0.5rem',
-                  paddingBlockStart: '0.25rem',
+                  paddingInlineStart: 'var(--nf-space-2)',
+                  paddingBlockStart: 'var(--nf-space-1)',
                 }}
               >
                 {/* vertical rail */}
@@ -217,7 +224,7 @@ function TimelineInner({
                   aria-hidden
                   style={{
                     position: 'absolute',
-                    insetInlineStart: 'calc(0.5rem + 0.875rem - 1px)',
+                    insetInlineStart: 'calc(var(--nf-space-2) + 0.875rem - 1px)',
                     insetBlockStart: 0,
                     insetBlockEnd: 0,
                     inlineSize: '2px',

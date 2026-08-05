@@ -129,14 +129,14 @@ export default function WorkspaceInviteDialog({
   if (generatedUrl) {
     return (
       <Dialog open={open} onClose={handleClose} title={t('workspaces.invites.link_ready_title')}>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--nf-space-5)' }}>
           <p style={{ margin: 0, color: 'var(--nf-color-fg-muted)' }}>
             {t('workspaces.invites.link_ready_description')}
           </p>
           <div
             style={{
               display: 'flex',
-              gap: '0.5rem',
+              gap: 'var(--nf-space-2)',
               alignItems: 'center',
             }}
           >
@@ -176,7 +176,7 @@ export default function WorkspaceInviteDialog({
           void handleSubmit(e);
         }}
         noValidate
-        style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}
+        style={{ display: 'flex', flexDirection: 'column', gap: 'var(--nf-space-5)' }}
       >
         <FormField label={t('workspaces.members.role')}>
           {(control) => (
@@ -245,7 +245,7 @@ export default function WorkspaceInviteDialog({
           )}
         </FormField>
 
-        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem' }}>
+        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 'var(--nf-space-3)' }}>
           <Button type="button" variant="ghost" onClick={handleClose} disabled={submitting}>
             {t('workspaces.form.cancel')}
           </Button>

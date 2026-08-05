@@ -9,7 +9,7 @@
   display: grid;
   grid-template-columns: 16rem 1fr;
   gap: var(--nf-space-8);
-  padding: clamp(1.5rem, 4vw, 2.5rem);
+  padding: clamp(var(--nf-space-6), 4vw, var(--nf-space-10));
   max-inline-size: 72rem;
   margin-inline: auto;
   inline-size: 100%;

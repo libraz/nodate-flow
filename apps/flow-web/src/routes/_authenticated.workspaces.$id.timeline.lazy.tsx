@@ -16,7 +16,7 @@ function WorkspaceTimelineRoute(): ReactElement {
   const { t } = useTranslation('common');
   const { t: tTimeline } = useTranslation('timeline');
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--nf-space-4)' }}>
       <header>
         <h1 style={{ margin: 0, fontSize: 'var(--nf-text-xl)', color: 'var(--nf-color-fg)' }}>
           {tTimeline('view.title')}
@@ -24,7 +24,7 @@ function WorkspaceTimelineRoute(): ReactElement {
       </header>
       <Suspense
         fallback={
-          <div style={{ padding: '2rem', display: 'flex', justifyContent: 'center' }}>
+          <div style={{ padding: 'var(--nf-space-8)', display: 'flex', justifyContent: 'center' }}>
             <Spinner label={t('common.loading')} />
           </div>
         }

@@ -39,7 +39,7 @@ const NL_UNPARSEABLE = 'AI.NL_QUERY.UNPARSEABLE';
 
 const BADGE_STYLE: React.CSSProperties = {
   display: 'inline-block',
-  padding: '0.125rem 0.5rem',
+  padding: '0.125rem var(--nf-space-2)',
   borderRadius: '999px',
   background: 'var(--nf-color-accent-subtle)',
   color: 'var(--nf-color-fg)',
@@ -207,8 +207,8 @@ function NlQueryPanel({ workspaceId }: { workspaceId: string | undefined }): Rea
       style={{
         display: 'flex',
         flexDirection: 'column',
-        gap: '0.5rem',
-        padding: '0.75rem',
+        gap: 'var(--nf-space-2)',
+        padding: 'var(--nf-space-3)',
         borderBlockEnd: '1px solid var(--nf-color-border)',
       }}
     >
@@ -227,7 +227,7 @@ function NlQueryPanel({ workspaceId }: { workspaceId: string | undefined }): Rea
         placeholder={t('nl_query.placeholder')}
         maxLength={500}
         style={{
-          padding: '0.5rem 0.625rem',
+          padding: 'var(--nf-space-2) 0.625rem',
           borderRadius: '0.375rem',
           border: '1px solid var(--nf-color-border)',
           background: 'var(--nf-color-bg)',
@@ -239,7 +239,7 @@ function NlQueryPanel({ workspaceId }: { workspaceId: string | undefined }): Rea
         type="submit"
         disabled={disabled}
         style={{
-          padding: '0.4rem 0.75rem',
+          padding: '0.4rem var(--nf-space-3)',
           borderRadius: '0.375rem',
           border: '1px solid var(--nf-color-border)',
           background: 'var(--nf-color-surface)',
@@ -264,7 +264,7 @@ function NlQueryPanel({ workspaceId }: { workspaceId: string | undefined }): Rea
           style={{
             display: 'flex',
             flexDirection: 'column',
-            gap: '0.5rem',
+            gap: 'var(--nf-space-2)',
           }}
         >
           <div
@@ -306,9 +306,9 @@ function GlassDockSuggestionRow({
     onDismiss(suggestion.inboxItemId);
   };
   return (
-    <Card style={{ padding: '0.625rem 0.75rem' }}>
+    <Card style={{ padding: '0.625rem var(--nf-space-3)' }}>
       <div style={{ display: 'flex', flexDirection: 'column', gap: '0.375rem' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--nf-space-2)' }}>
           <Badge
             tone={
               suggestion.score >= 0.8 ? 'danger' : suggestion.score >= 0.5 ? 'warning' : 'neutral'
@@ -367,7 +367,7 @@ function StateSuggestionsPanel({
         display: 'flex',
         flexDirection: 'column',
         gap: '0.375rem',
-        padding: '0.75rem',
+        padding: 'var(--nf-space-3)',
         borderBlockEnd: '1px solid var(--nf-color-border)',
       }}
     >
@@ -391,7 +391,7 @@ function StateSuggestionsPanel({
               style={{
                 display: 'flex',
                 alignItems: 'center',
-                gap: '0.5rem',
+                gap: 'var(--nf-space-2)',
                 color: 'var(--nf-color-fg)',
                 textDecoration: 'none',
                 fontSize: 'var(--nf-text-xs)',
@@ -427,7 +427,7 @@ function RemindersPanel({ workspaceId }: { workspaceId: string | undefined }): R
         display: 'flex',
         flexDirection: 'column',
         gap: '0.375rem',
-        padding: '0.75rem',
+        padding: 'var(--nf-space-3)',
         borderBlockEnd: '1px solid var(--nf-color-border)',
       }}
     >
@@ -454,7 +454,7 @@ function RemindersPanel({ workspaceId }: { workspaceId: string | undefined }): R
                 style={{
                   display: 'flex',
                   alignItems: 'center',
-                  gap: '0.5rem',
+                  gap: 'var(--nf-space-2)',
                   color: 'var(--nf-color-fg)',
                   textDecoration: 'none',
                   fontSize: 'var(--nf-text-xs)',
@@ -483,7 +483,7 @@ function RemindersPanel({ workspaceId }: { workspaceId: string | undefined }): R
           params={{ id: workspaceId }}
           style={{
             alignSelf: 'flex-end',
-            padding: '0.25rem 0.5rem',
+            padding: 'var(--nf-space-1) var(--nf-space-2)',
             borderRadius: 'var(--nf-radius-sm)',
             color: 'var(--nf-color-fg-muted)',
             textDecoration: 'none',
@@ -513,7 +513,7 @@ function AutoActionsPanel({
         display: 'flex',
         flexDirection: 'column',
         gap: '0.375rem',
-        padding: '0.75rem',
+        padding: 'var(--nf-space-3)',
         borderBlockEnd: '1px solid var(--nf-color-border)',
       }}
     >
@@ -544,7 +544,7 @@ function AutoActionsPanel({
                 style={{
                   display: 'flex',
                   alignItems: 'center',
-                  gap: '0.5rem',
+                  gap: 'var(--nf-space-2)',
                   color: 'var(--nf-color-fg)',
                   textDecoration: 'none',
                   fontSize: 'var(--nf-text-xs)',
@@ -608,11 +608,11 @@ function GlassDockImpl(): ReactElement {
         aria-label={t('glass_dock.expand')}
         style={{
           position: 'fixed',
-          insetBlockEnd: '1rem',
-          insetInlineEnd: '1rem',
+          insetBlockEnd: 'var(--nf-space-4)',
+          insetInlineEnd: 'var(--nf-space-4)',
           display: 'flex',
           alignItems: 'center',
-          gap: '0.5rem',
+          gap: 'var(--nf-space-2)',
           padding: '0.625rem 0.875rem',
           borderRadius: '999px',
           background: 'var(--nf-color-surface)',
@@ -637,8 +637,8 @@ function GlassDockImpl(): ReactElement {
       aria-label={t('glass_dock.title')}
       style={{
         position: 'fixed',
-        insetBlockEnd: '1rem',
-        insetInlineEnd: '1rem',
+        insetBlockEnd: 'var(--nf-space-4)',
+        insetInlineEnd: 'var(--nf-space-4)',
         inlineSize: '360px',
         maxBlockSize: '70vh',
         display: 'flex',
@@ -655,11 +655,11 @@ function GlassDockImpl(): ReactElement {
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          padding: '0.75rem 0.875rem',
+          padding: 'var(--nf-space-3) 0.875rem',
           borderBlockEnd: '1px solid var(--nf-color-border)',
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--nf-space-2)' }}>
           <Icon icon={Sparkles} decorative />
           <strong style={{ fontSize: 'var(--nf-text-sm)' }}>{t('glass_dock.title')}</strong>
           {suggestions.length > 0 ? <Badge tone="accent">{suggestions.length}</Badge> : null}
@@ -692,10 +692,10 @@ function GlassDockImpl(): ReactElement {
       <div
         style={{
           overflow: 'auto',
-          padding: '0.75rem',
+          padding: 'var(--nf-space-3)',
           display: 'flex',
           flexDirection: 'column',
-          gap: '0.5rem',
+          gap: 'var(--nf-space-2)',
         }}
       >
         {suggestionsFailed ? (
@@ -706,7 +706,7 @@ function GlassDockImpl(): ReactElement {
               color: 'var(--nf-color-fg-muted)',
               fontSize: '0.8125rem',
               textAlign: 'center',
-              padding: '1rem',
+              padding: 'var(--nf-space-4)',
             }}
           >
             {tCommon('glass_dock.unavailable')}
@@ -718,7 +718,7 @@ function GlassDockImpl(): ReactElement {
               color: 'var(--nf-color-fg-muted)',
               fontSize: '0.8125rem',
               textAlign: 'center',
-              padding: '1rem',
+              padding: 'var(--nf-space-4)',
             }}
           >
             {t('glass_dock.empty')}

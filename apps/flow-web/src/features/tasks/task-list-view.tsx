@@ -255,7 +255,7 @@ function InlineTitleCell({
           width: '100%',
           fontSize: 'inherit',
           fontWeight: 500,
-          padding: '0.125rem 0.25rem',
+          padding: '0.125rem var(--nf-space-1)',
           margin: '-0.125rem -0.25rem',
         }}
       />
@@ -337,7 +337,7 @@ function InlinePriorityCell({
         style={{
           width: '100%',
           fontSize: '0.8125rem',
-          padding: '0.125rem 0.25rem',
+          padding: '0.125rem var(--nf-space-1)',
           margin: '-0.125rem -0.25rem',
         }}
       >
@@ -701,10 +701,10 @@ export default function TaskListView({ projectId }: TaskListViewProps): ReactEle
             style={{
               display: 'inline-flex',
               alignItems: 'center',
-              gap: '0.25rem',
+              gap: 'var(--nf-space-1)',
               fontSize: 'var(--nf-text-xs)',
               fontWeight: 500,
-              padding: '0.125rem 0.5rem',
+              padding: '0.125rem var(--nf-space-2)',
               borderRadius: '999px',
               background: `${color}18`,
               color: color,
@@ -739,7 +739,7 @@ export default function TaskListView({ projectId }: TaskListViewProps): ReactEle
             style={{
               display: 'inline-flex',
               alignItems: 'center',
-              gap: '0.25rem',
+              gap: 'var(--nf-space-1)',
               color: 'var(--nf-color-danger)',
               fontVariantNumeric: 'tabular-nums',
             }}

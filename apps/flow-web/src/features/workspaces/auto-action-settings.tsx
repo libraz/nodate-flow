@@ -91,9 +91,9 @@ export default function AutoActionSettingsPage({
       onSubmit={(e) => {
         void handleSubmit(e);
       }}
-      style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}
+      style={{ display: 'flex', flexDirection: 'column', gap: 'var(--nf-space-5)' }}
     >
-      <header style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+      <header style={{ display: 'flex', flexDirection: 'column', gap: 'var(--nf-space-1)' }}>
         <h1 style={{ margin: 0, fontSize: 'var(--nf-text-2xl)' }}>
           {t('workspace.auto_actions.title')}
         </h1>
@@ -128,7 +128,7 @@ export default function AutoActionSettingsPage({
         description={t('workspace.auto_actions.interval.description')}
       >
         {(control) => (
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--nf-space-2)' }}>
             <Input
               {...control}
               type="number"
@@ -166,7 +166,7 @@ export default function AutoActionSettingsPage({
       >
         {(control) => (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.375rem' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--nf-space-3)' }}>
               <input
                 {...control}
                 type="range"
@@ -357,7 +357,7 @@ function AutoActionRulesSection({
 
   const thStyle: React.CSSProperties = {
     textAlign: 'start',
-    padding: '0.5rem 0.75rem',
+    padding: 'var(--nf-space-2) var(--nf-space-3)',
     fontSize: '0.8125rem',
     fontWeight: 600,
     color: 'var(--nf-color-fg-muted)',
@@ -365,7 +365,7 @@ function AutoActionRulesSection({
   };
 
   const tdStyle: React.CSSProperties = {
-    padding: '0.5rem 0.75rem',
+    padding: 'var(--nf-space-2) var(--nf-space-3)',
     verticalAlign: 'middle',
   };
 
@@ -375,8 +375,8 @@ function AutoActionRulesSection({
     // submit handler to the wrapping div via a button with form attribute
     // pointing at a hidden inner form — but since the section is already
     // inside the outer <form>, we rely on the button's onClick instead.
-    <section style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-      <header style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+    <section style={{ display: 'flex', flexDirection: 'column', gap: 'var(--nf-space-3)' }}>
+      <header style={{ display: 'flex', flexDirection: 'column', gap: 'var(--nf-space-1)' }}>
         <h2 style={{ margin: 0, fontSize: 'var(--nf-text-lg)' }}>
           {t('workspace.auto_actions.rules.title')}
         </h2>

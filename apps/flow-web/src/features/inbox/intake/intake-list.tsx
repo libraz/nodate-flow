@@ -67,7 +67,7 @@ export default function IntakeList(): ReactElement {
       </div>
       <Suspense
         fallback={
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--nf-space-2)' }}>
             <Skeleton style={{ blockSize: '4rem', inlineSize: '100%' }} />
             <Skeleton style={{ blockSize: '4rem', inlineSize: '100%' }} />
           </div>

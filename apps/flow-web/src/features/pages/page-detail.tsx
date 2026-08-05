@@ -140,7 +140,7 @@ export default function PageDetail({ workspaceId, pageId, onEdit }: PageDetailPr
           <span>{updatedLabel}</span>
           {page.isAiGenerated && (
             <span className={styles.aiBadge}>
-              <Sparkles size={12} aria-hidden style={{ marginInlineEnd: '0.25rem' }} />
+              <Sparkles size={12} aria-hidden style={{ marginInlineEnd: 'var(--nf-space-1)' }} />
               AI
             </span>
           )}

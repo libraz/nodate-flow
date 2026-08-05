@@ -27,9 +27,16 @@ function InvocationRow({ row }: { row: AiInvocation }): ReactElement {
   const { t } = useTranslation('settings');
   return (
     <li>
-      <Card style={{ padding: '0.75rem 0.875rem' }}>
+      <Card style={{ padding: 'var(--nf-space-3) 0.875rem' }}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.375rem' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 'var(--nf-space-2)',
+              flexWrap: 'wrap',
+            }}
+          >
             <Badge tone={toneForStatus(row.status)}>{row.status}</Badge>
             <strong style={{ fontSize: '0.8125rem' }}>{row.purpose}</strong>
             <span
@@ -82,8 +89,8 @@ export default function InvocationsList({ workspaceId }: { workspaceId: string }
   const { t } = useTranslation('settings');
   const { data } = useAiInvocationsQuery(workspaceId);
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-      <header style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--nf-space-4)' }}>
+      <header style={{ display: 'flex', flexDirection: 'column', gap: 'var(--nf-space-1)' }}>
         <h1 style={{ margin: 0, fontSize: 'var(--nf-text-2xl)' }}>{t('ai_activity.title')}</h1>
         <p style={{ margin: 0, color: 'var(--nf-color-fg-muted)', fontSize: 'var(--nf-text-sm)' }}>
           {t('ai_activity.description')}
@@ -92,7 +99,7 @@ export default function InvocationsList({ workspaceId }: { workspaceId: string }
       {data.length === 0 ? (
         <div
           style={{
-            padding: '3rem 1rem',
+            padding: 'var(--nf-space-12) var(--nf-space-4)',
             textAlign: 'center',
             color: 'var(--nf-color-fg-muted)',
             border: '1px dashed var(--nf-color-border)',
@@ -111,7 +118,7 @@ export default function InvocationsList({ workspaceId }: { workspaceId: string }
             margin: 0,
             display: 'flex',
             flexDirection: 'column',
-            gap: '0.5rem',
+            gap: 'var(--nf-space-2)',
           }}
         >
           {data.map((row) => (

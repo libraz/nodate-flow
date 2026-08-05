@@ -392,7 +392,7 @@ function GanttView(): ReactElement {
   };
 
   return (
-    <section style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+    <section style={{ display: 'flex', flexDirection: 'column', gap: 'var(--nf-space-4)' }}>
       <style>{`
         .gantt-label-row:hover { background: var(--nf-color-bg-sunken); }
         .gantt-label-row:focus-visible { outline: 2px solid var(--nf-color-accent); outline-offset: -2px; }
@@ -402,16 +402,23 @@ function GanttView(): ReactElement {
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          gap: '0.75rem',
+          gap: 'var(--nf-space-3)',
           flexWrap: 'wrap',
         }}
       >
         <h2 style={{ margin: 0, fontSize: 'var(--nf-text-2xl)', fontWeight: 600 }}>
           {t('gantt.title')}
         </h2>
-        <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
+        <div
+          style={{
+            display: 'flex',
+            gap: 'var(--nf-space-2)',
+            alignItems: 'center',
+            flexWrap: 'wrap',
+          }}
+        >
           {/* Navigation */}
-          <div style={{ display: 'flex', gap: '0.25rem', alignItems: 'center' }}>
+          <div style={{ display: 'flex', gap: 'var(--nf-space-1)', alignItems: 'center' }}>
             <Button
               type="button"
               variant="ghost"
@@ -442,7 +449,7 @@ function GanttView(): ReactElement {
               gap: '0.125rem',
               alignItems: 'center',
               borderInlineStart: '1px solid var(--nf-color-border)',
-              paddingInlineStart: '0.5rem',
+              paddingInlineStart: 'var(--nf-space-2)',
             }}
           >
             <Button
@@ -494,7 +501,7 @@ function GanttView(): ReactElement {
               display: 'flex',
               alignItems: 'center',
               borderInlineStart: '1px solid var(--nf-color-border)',
-              paddingInlineStart: '0.5rem',
+              paddingInlineStart: 'var(--nf-space-2)',
             }}
           >
             <ToggleChip
@@ -511,7 +518,7 @@ function GanttView(): ReactElement {
       {scheduled.length === 0 ? (
         <div
           style={{
-            padding: '3rem 1rem',
+            padding: 'var(--nf-space-12) var(--nf-space-4)',
             textAlign: 'center',
             color: 'var(--nf-color-fg-muted)',
             border: '1px dashed var(--nf-color-border)',
@@ -554,7 +561,7 @@ function GanttView(): ReactElement {
                 style={{
                   display: 'flex',
                   alignItems: 'center',
-                  gap: '0.5rem',
+                  gap: 'var(--nf-space-2)',
                   inlineSize: '100%',
                   blockSize: ROW_HEIGHT + ROW_GAP,
                   paddingInline: '0.625rem',
@@ -796,7 +803,7 @@ function GanttView(): ReactElement {
             border: '1px solid var(--nf-color-border)',
             borderRadius: '0.5rem',
             background: 'var(--nf-color-bg-sunken)',
-            padding: '0.5rem 0.75rem',
+            padding: 'var(--nf-space-2) var(--nf-space-3)',
           }}
         >
           <summary
@@ -806,7 +813,7 @@ function GanttView(): ReactElement {
               color: 'var(--nf-color-fg-muted)',
               display: 'flex',
               alignItems: 'center',
-              gap: '0.5rem',
+              gap: 'var(--nf-space-2)',
             }}
           >
             {t('gantt.unscheduled', { count: unscheduled })}
@@ -819,7 +826,7 @@ function GanttView(): ReactElement {
               paddingBlockStart: '0.625rem',
               display: 'flex',
               flexDirection: 'column',
-              gap: '0.25rem',
+              gap: 'var(--nf-space-1)',
             }}
           >
             {unscheduledTasks.map((task) => (
@@ -831,8 +838,8 @@ function GanttView(): ReactElement {
                     inlineSize: '100%',
                     display: 'flex',
                     alignItems: 'center',
-                    gap: '0.5rem',
-                    padding: '0.375rem 0.5rem',
+                    gap: 'var(--nf-space-2)',
+                    padding: '0.375rem var(--nf-space-2)',
                     borderRadius: '0.375rem',
                     color: 'var(--nf-color-fg)',
                     fontSize: '0.8125rem',

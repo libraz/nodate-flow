@@ -94,7 +94,7 @@ export default function IntakeConvertDialog({
     <Dialog open={open} onClose={onClose} title={t('intake.convert.title')}>
       <form
         onSubmit={handleSubmit}
-        style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}
+        style={{ display: 'flex', flexDirection: 'column', gap: 'var(--nf-space-4)' }}
       >
         <p style={{ margin: 0, color: 'var(--nf-color-fg-muted)', fontSize: 'var(--nf-text-sm)' }}>
           {item ? item.title : ''}
@@ -114,7 +114,7 @@ export default function IntakeConvertDialog({
             />
           )}
         </FormField>
-        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem' }}>
+        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 'var(--nf-space-2)' }}>
           <Button type="button" variant="ghost" size="sm" onClick={onClose}>
             {t('intake.convert.cancel')}
           </Button>

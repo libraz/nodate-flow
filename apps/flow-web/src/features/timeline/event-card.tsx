@@ -193,8 +193,8 @@ function renderRawPayload(payload: unknown): ReactNode {
   return (
     <pre
       style={{
-        marginBlockStart: '0.25rem',
-        padding: '0.5rem',
+        marginBlockStart: 'var(--nf-space-1)',
+        padding: 'var(--nf-space-2)',
         background: 'var(--nf-color-surface)',
         borderRadius: '0.25rem',
         fontSize: '0.7rem',
@@ -272,8 +272,8 @@ function humanizePayload(type: string, payload: unknown, t: TFunction, locale: s
   return (
     <div
       style={{
-        marginBlockStart: '0.25rem',
-        padding: '0.5rem',
+        marginBlockStart: 'var(--nf-space-1)',
+        padding: 'var(--nf-space-2)',
         background: 'var(--nf-color-surface)',
         borderRadius: '0.25rem',
         fontSize: 'var(--nf-text-xs)',
@@ -348,7 +348,7 @@ export default function EventCard({ event }: EventCardProps): ReactElement {
         display: 'grid',
         gridTemplateColumns: 'auto 1fr',
         columnGap: '0.875rem',
-        paddingInlineStart: '0.25rem',
+        paddingInlineStart: 'var(--nf-space-1)',
         paddingBlock: '0.625rem',
       }}
     >
@@ -411,14 +411,14 @@ export default function EventCard({ event }: EventCardProps): ReactElement {
           minInlineSize: 0,
           display: 'flex',
           flexDirection: 'column',
-          gap: '0.25rem',
+          gap: 'var(--nf-space-1)',
         }}
       >
         <div
           style={{
             display: 'flex',
             alignItems: 'baseline',
-            gap: '0.5rem',
+            gap: 'var(--nf-space-2)',
             flexWrap: 'wrap',
           }}
         >

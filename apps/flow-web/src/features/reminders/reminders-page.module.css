@@ -19,7 +19,7 @@
 .title {
   margin: 0;
   font-family: var(--nf-font-display, inherit);
-  font-size: clamp(1.25rem, 2vw, 1.5rem);
+  font-size: clamp(var(--nf-text-xl), 2vw, var(--nf-text-2xl));
   color: var(--nf-color-fg);
 }
 

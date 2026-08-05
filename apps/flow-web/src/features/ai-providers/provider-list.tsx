@@ -74,13 +74,13 @@ export default function ProviderList({ workspaceId }: ProviderListProps): ReactE
   };
 
   return (
-    <section style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+    <section style={{ display: 'flex', flexDirection: 'column', gap: 'var(--nf-space-4)' }}>
       <header
         style={{
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          gap: '1rem',
+          gap: 'var(--nf-space-4)',
         }}
       >
         <h1
@@ -111,11 +111,11 @@ export default function ProviderList({ workspaceId }: ProviderListProps): ReactE
         <Card
           role="alert"
           style={{
-            padding: '1.5rem',
+            padding: 'var(--nf-space-6)',
             display: 'flex',
             flexDirection: 'column',
             alignItems: 'center',
-            gap: '0.75rem',
+            gap: 'var(--nf-space-3)',
             textAlign: 'center',
           }}
         >
@@ -132,12 +132,18 @@ export default function ProviderList({ workspaceId }: ProviderListProps): ReactE
           ) : null}
         </Card>
       ) : isLoading || !providers ? (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--nf-space-3)' }}>
           <Skeleton style={{ blockSize: '4rem', inlineSize: '100%' }} />
           <Skeleton style={{ blockSize: '4rem', inlineSize: '100%' }} />
         </div>
       ) : providers.length === 0 ? (
-        <Card style={{ padding: '2rem', textAlign: 'center', color: 'var(--nf-color-fg-muted)' }}>
+        <Card
+          style={{
+            padding: 'var(--nf-space-8)',
+            textAlign: 'center',
+            color: 'var(--nf-color-fg-muted)',
+          }}
+        >
           {t('providers.empty')}
         </Card>
       ) : (
@@ -148,22 +154,24 @@ export default function ProviderList({ workspaceId }: ProviderListProps): ReactE
             margin: 0,
             display: 'flex',
             flexDirection: 'column',
-            gap: '0.75rem',
+            gap: 'var(--nf-space-3)',
           }}
         >
           {providers.map((p) => (
             <li key={p.id}>
-              <Card style={{ padding: '1rem' }}>
+              <Card style={{ padding: 'var(--nf-space-4)' }}>
                 <div
                   style={{
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'space-between',
-                    gap: '1rem',
+                    gap: 'var(--nf-space-4)',
                     flexWrap: 'wrap',
                   }}
                 >
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                  <div
+                    style={{ display: 'flex', flexDirection: 'column', gap: 'var(--nf-space-1)' }}
+                  >
                     <strong>{p.name}</strong>
                     <span
                       style={{ color: 'var(--nf-color-fg-muted)', fontSize: 'var(--nf-text-sm)' }}
@@ -173,7 +181,7 @@ export default function ProviderList({ workspaceId }: ProviderListProps): ReactE
                     </span>
                     <MaskedKey value={p.apiKeyMasked} />
                   </div>
-                  <div style={{ display: 'flex', gap: '0.5rem' }}>
+                  <div style={{ display: 'flex', gap: 'var(--nf-space-2)' }}>
                     <Button
                       variant="ghost"
                       onClick={() => {

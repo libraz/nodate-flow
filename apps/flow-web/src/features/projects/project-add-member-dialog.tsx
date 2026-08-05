@@ -143,7 +143,7 @@ function ProjectAddMemberDialogBody({
         void handleSubmit(e);
       }}
       noValidate
-      style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}
+      style={{ display: 'flex', flexDirection: 'column', gap: 'var(--nf-space-5)' }}
     >
       <FormField
         label={t('projects.members.user_id')}
@@ -182,7 +182,7 @@ function ProjectAddMemberDialogBody({
         )}
       </FormField>
 
-      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem' }}>
+      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 'var(--nf-space-3)' }}>
         <Button type="button" variant="ghost" onClick={handleClose} disabled={submitting}>
           {t('projects.form.cancel')}
         </Button>

@@ -74,7 +74,7 @@ export default function InboxItemRow({
   const sourceLabel = isKnownSource(item.source) ? t(SOURCE_LABEL_KEY[item.source]) : item.source;
 
   return (
-    <Card style={{ padding: '0.875rem 1rem' }}>
+    <Card style={{ padding: '0.875rem var(--nf-space-4)' }}>
       <div
         style={{
           display: 'flex',
@@ -101,12 +101,19 @@ export default function InboxItemRow({
           style={{
             display: 'flex',
             flexDirection: 'column',
-            gap: '0.25rem',
+            gap: 'var(--nf-space-1)',
             minInlineSize: 0,
             flex: 1,
           }}
         >
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 'var(--nf-space-2)',
+              flexWrap: 'wrap',
+            }}
+          >
             <Badge tone="neutral">{sourceLabel}</Badge>
             <span
               style={{
@@ -144,7 +151,7 @@ export default function InboxItemRow({
             {formatRelative(item.receivedAt, locale)}
           </span>
         </div>
-        <div style={{ display: 'flex', gap: '0.5rem', flexShrink: 0 }}>
+        <div style={{ display: 'flex', gap: 'var(--nf-space-2)', flexShrink: 0 }}>
           <SnoozePopover
             onSnooze={(snoozeUntil) => {
               onSnooze(item.id, snoozeUntil);

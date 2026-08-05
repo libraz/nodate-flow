@@ -35,7 +35,7 @@ export default function TriageSuggestionRow({
   const { t } = useTranslation('ai-suggestions');
   const tone = scoreTone(suggestion.score);
   return (
-    <Card style={{ padding: '0.875rem 1rem' }}>
+    <Card style={{ padding: '0.875rem var(--nf-space-4)' }}>
       <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.875rem' }}>
         <div
           style={{
@@ -46,7 +46,14 @@ export default function TriageSuggestionRow({
             flex: 1,
           }}
         >
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 'var(--nf-space-2)',
+              flexWrap: 'wrap',
+            }}
+          >
             <Badge tone={tone}>
               {t('triage.score')}: {suggestion.score.toFixed(2)}
             </Badge>

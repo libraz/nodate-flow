@@ -63,7 +63,7 @@ export default function ProviderRotateDialog({
         onSubmit={(e) => {
           void handleSubmit(e);
         }}
-        style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}
+        style={{ display: 'flex', flexDirection: 'column', gap: 'var(--nf-space-4)' }}
       >
         <p style={{ margin: 0, color: 'var(--nf-color-fg-muted)', fontSize: 'var(--nf-text-sm)' }}>
           {t('providers.rotate_dialog.description')}
@@ -83,7 +83,7 @@ export default function ProviderRotateDialog({
             />
           )}
         </FormField>
-        <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
+        <div style={{ display: 'flex', gap: 'var(--nf-space-2)', justifyContent: 'flex-end' }}>
           <Button type="button" variant="ghost" onClick={handleClose}>
             {t('providers.action.cancel')}
           </Button>

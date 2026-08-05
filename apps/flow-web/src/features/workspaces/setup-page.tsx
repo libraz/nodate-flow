@@ -101,8 +101,8 @@ export default function SetupPage(): ReactElement {
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        paddingBlock: 'clamp(2rem, 8vh, 6rem)',
-        paddingInline: 'clamp(1rem, 4vw, 2rem)',
+        paddingBlock: 'clamp(var(--nf-space-8), 8vh, var(--nf-space-24))',
+        paddingInline: 'clamp(var(--nf-space-4), 4vw, var(--nf-space-8))',
       }}
     >
       <div
@@ -118,13 +118,13 @@ export default function SetupPage(): ReactElement {
           boxShadow: 'var(--nf-shadow-md)',
         }}
       >
-        <header style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+        <header style={{ display: 'flex', flexDirection: 'column', gap: 'var(--nf-space-2)' }}>
           <h1
             style={{
               margin: 0,
               fontFamily: 'var(--nf-font-display)',
               fontWeight: 500,
-              fontSize: 'clamp(1.5rem, 3vw, 2rem)',
+              fontSize: 'clamp(var(--nf-text-2xl), 3vw, 2rem)',
               lineHeight: 1.15,
               letterSpacing: '-0.01em',
               color: 'var(--nf-color-fg)',

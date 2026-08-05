@@ -103,9 +103,9 @@ export function ConfirmProvider(): ReactElement {
 
   return (
     <Dialog open={open} onClose={handleCancel} title={state?.title ?? ''}>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--nf-space-5)' }}>
         <div style={{ whiteSpace: 'pre-wrap' }}>{state?.message}</div>
-        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem' }}>
+        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 'var(--nf-space-3)' }}>
           <Button
             type="button"
             variant="ghost"
