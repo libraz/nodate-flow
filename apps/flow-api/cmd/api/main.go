@@ -5,6 +5,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"os"
@@ -23,11 +24,13 @@ import (
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/ai/providers"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/ai/signaljudge"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/auth"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/bgloop"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/config"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated/calendar"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/eventbus"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/router"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/importer"
 	nflog "github.com/libraz/nodate-flow/apps/flow-api/internal/log"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/notification"
 	calendarnotifs "github.com/libraz/nodate-flow/apps/flow-api/internal/notifications"
@@ -229,11 +232,11 @@ func main() {
 			tailer.SetInterval(cfg.StreamTailInterval)
 			var tailCtx context.Context
 			tailCtx, streamTailCancel = context.WithCancel(context.Background())
-			go func() {
-				if err := tailer.Run(tailCtx); err != nil && !errors.Is(err, context.Canceled) {
+			go bgloop.Run(tailCtx, "stream.tailer", logger, func(ctx context.Context) {
+				if err := tailer.Run(ctx); err != nil && !errors.Is(err, context.Canceled) {
 					logger.Warn("event tail stopped", "err", err)
 				}
-			}()
+			})
 			logger.Info("event tail started", "interval", cfg.StreamTailInterval)
 		}
 	}
@@ -533,9 +536,13 @@ func main() {
 		var wctx context.Context
 		wctx, workerCancel = context.WithCancel(context.Background())
 		for i := 0; i < workerCount; i++ {
-			w := &agentruntime.Worker{Queue: agentQueue, Runner: runner}
+			name := fmt.Sprintf("agent.worker.%d", i)
+			w := &agentruntime.Worker{Queue: agentQueue, Runner: runner, Name: name, Logger: logger}
 			agentWorkers = append(agentWorkers, w)
-			go w.Loop(wctx)
+			// Supervised: the loop already survives claim failures, and
+			// bgloop covers what it cannot — a panic inside an agent run
+			// would otherwise take the whole process down with it.
+			go bgloop.Run(wctx, name, logger, w.Loop)
 		}
 		logger.Info("agent workers started", "count", workerCount, "backend", cfg.AgentQueueBackend)
 	}
@@ -563,6 +570,13 @@ func main() {
 
 	webhookWorker.Start(context.Background())
 
+	// Import worker: drains the import_jobs queue that
+	// POST /workspaces/{wsId}/imports fills. Without it a created job
+	// stays pending forever, and the UI reads a pending job as one that
+	// is still working.
+	importWorker := importer.NewWorker(db, queries, logger)
+	importWorker.Start(context.Background())
+
 	// Autonomous auto-action executor: periodically evaluates tasks and
 	// applies deterministic actions (escalate overdue, close stale
 	// reviews) without human intervention. Controlled by
@@ -579,7 +593,15 @@ func main() {
 	}
 	autoActionCtx, autoActionCancel := context.WithCancel(context.Background())
 	defer autoActionCancel()
-	go autoActionExec.Start(autoActionCtx)
+	if cfg.AutoActionInterval > 0 {
+		// Only supervised when it is actually enabled: Start returns at
+		// once when the interval is zero, and the supervisor would read
+		// that as a loop dying and restart it forever. A disabled
+		// feature must not look like a broken one.
+		go bgloop.Run(autoActionCtx, "autoactions.executor", logger, autoActionExec.Start)
+	} else {
+		autoActionExec.Start(autoActionCtx)
+	}
 
 	// Item-consistency reconciler: scans tasks and calendar_events for
 	// drift (date mismatch, orphan role, enabled-flag mismatch) and
@@ -594,7 +616,7 @@ func main() {
 		}
 		var rctx context.Context
 		rctx, reconcilerCancel = context.WithCancel(context.Background())
-		go rec.Start(rctx)
+		go bgloop.Run(rctx, "item.reconciler", logger, rec.Start)
 		logger.Info("item reconciler started", "interval", cfg.ItemReconcilerInterval)
 	}
 
@@ -617,7 +639,9 @@ func main() {
 	// attendee receives an in-app notification row, and marks
 	// notified_at to prevent duplicates. Exits when stopCtx is
 	// cancelled by the shutdown signal handler.
-	go calendarnotifs.StartNotificationScheduler(stopCtx, db, notifFanout, time.Minute)
+	go bgloop.Run(stopCtx, "calendar.reminder_scheduler", logger, func(ctx context.Context) {
+		calendarnotifs.StartNotificationScheduler(ctx, db, notifFanout, time.Minute)
+	})
 
 	serverErr := make(chan error, 1)
 	go func() {
@@ -641,6 +665,7 @@ func main() {
 	scheduler.Stop()
 	autoActionExec.Stop()
 	webhookWorker.Stop()
+	importWorker.Stop()
 	schedulerCancel()
 	if reconcilerCancel != nil {
 		reconcilerCancel()

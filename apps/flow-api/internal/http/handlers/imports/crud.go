@@ -13,6 +13,7 @@ import (
 	apierrors "github.com/libraz/nodate-flow/apps/flow-api/internal/errors"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/eventbus"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/middleware"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/importer"
 	"github.com/libraz/nodate-flow/packages/go-shared/apierr"
 	"github.com/libraz/nodate-flow/packages/go-shared/logutil"
 )
@@ -60,6 +61,9 @@ func Create(deps Deps) func(context.Context, *CreateImportInput) (*CreateImportO
 		configJSON, err := json.Marshal(in.Body.ConfigJSON)
 		if err != nil {
 			return nil, httpErr(apierrors.InternalUnexpected)
+		}
+		if err := checkCSVPayloadSize(in.Body); err != nil {
+			return nil, err
 		}
 
 		pub := types.New()
@@ -234,4 +238,27 @@ func Cancel(deps Deps) func(context.Context, *CancelImportInput) (*CancelImportO
 		out.Body.Ok = true
 		return out, nil
 	}
+}
+
+// checkCSVPayloadSize rejects a csv job whose payload is over the
+// importer's ceiling, before the row is written.
+//
+// The check belongs here rather than in the worker because the payload
+// travels in config_json: accepting the request stores the whole body in
+// the queue row, and telling the user it was too big only after that
+// costs a round trip and leaves a megabyte of rejected data in the
+// table. The worker enforces the row-count ceiling, which needs a parse
+// and cannot be answered from the request alone.
+func checkCSVPayloadSize(body CreateImportBody) error {
+	if body.Source != string(generated.ImportJobsSourceCsv) || body.ConfigJSON == nil {
+		return nil
+	}
+	payload, ok := body.ConfigJSON["csv"].(string)
+	if !ok {
+		return nil
+	}
+	if len(payload) > importer.MaxCSVBytes {
+		return httpErr(apierrors.ValidationFileTooLarge)
+	}
+	return nil
 }
