@@ -51,12 +51,26 @@ const jaKeys = flattenKeys(ja as Record<string, unknown>);
 const zhKeys = flattenKeys(zh as Record<string, unknown>);
 
 describe('mapAuthError', () => {
-  it('uses curated i18n keys from the generated SDK catalog', () => {
+  it('uses a curated i18n key when the catalog carries one', () => {
     expect(mapAuthError({ type: AuthErrors.AUTH_OIDC_PROVIDER_REJECTED.code })).toBe(
       'auth:errors.oidc_provider_rejected',
     );
+  });
+
+  /**
+   * A curated key is an override, and an override that resolves to
+   * nothing is worse than none: the reader gets the key string itself in
+   * a toast while a translated message for the same code sits in the
+   * generated bundle. Six codes were in that state, including this one —
+   * `auth.errors.session_unauthorized` exists in no locale of either app.
+   *
+   * This case used to assert the curated key, which is to say it pinned
+   * the broken behaviour: the assertion passed precisely because the
+   * lookup short-circuited before reaching the message that works.
+   */
+  it('falls through to the generated code entry when no curated key is set', () => {
     expect(mapAuthError({ type: AuthErrors.AUTH_SESSION_UNAUTHORIZED.code })).toBe(
-      'auth:errors.session_unauthorized',
+      'errors:AUTH.SESSION.UNAUTHORIZED',
     );
   });
 

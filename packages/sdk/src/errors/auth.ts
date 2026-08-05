@@ -146,7 +146,6 @@ export const AuthErrors = {
     code: "AUTH.PERMISSION.INSTANCE_ADMIN_REQUIRED",
     status: 403,
     message: "Instance administrator privileges are required",
-    i18nKey: "auth.errors.permission_instance_admin_required",
   },
   AUTH_REGISTER_EMAIL_ALREADY_TAKEN: {
     code: "AUTH.REGISTER.EMAIL_ALREADY_TAKEN",
@@ -177,7 +176,6 @@ export const AuthErrors = {
     code: "AUTH.SESSION.UNAUTHORIZED",
     status: 401,
     message: "You must be signed in to access this resource",
-    i18nKey: "auth.errors.session_unauthorized",
   },
   AUTH_TOKEN_MISSING_OR_MALFORMED: {
     code: "AUTH.TOKEN.MISSING_OR_MALFORMED",

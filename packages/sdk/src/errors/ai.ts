@@ -100,19 +100,16 @@ export const AiErrors = {
     code: "AI.REVERSE.ALREADY_REVERSED",
     status: 409,
     message: "Event already has a compensating reverse.",
-    i18nKey: "errors.ai.reverse.alreadyReversed",
   },
   AI_REVERSE_NOT_LLM_ORIGIN: {
     code: "AI.REVERSE.NOT_LLM_ORIGIN",
     status: 403,
     message: "Cannot reverse an event that did not originate from an LLM agent.",
-    i18nKey: "errors.ai.reverse.notLlmOrigin",
   },
   AI_REVERSE_TARGET_NOT_FOUND: {
     code: "AI.REVERSE.TARGET_NOT_FOUND",
     status: 404,
     message: "Event not found in this workspace.",
-    i18nKey: "errors.ai.reverse.targetNotFound",
   },
   AI_SAFETY_BLOCKED: {
     code: "AI.SAFETY.BLOCKED",

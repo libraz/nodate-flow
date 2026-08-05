@@ -193,7 +193,6 @@ resources:
         message_zh: "任务参与者角色必须为 assignee、reviewer、watcher 或 approver 之一"
         description: "Returned when a task create or update payload includes an `actors[].role` value outside the allowed enum. The persisted column is `task_actors.role ENUM('assignee','reviewer','watcher','approver')`, so any other string is rejected at the validation boundary before the SQL layer."
         userAction: "Set each actor's role to one of: assignee, reviewer, watcher, approver."
-        i18nKey: "workspace.errors.task_actor_role_invalid"
 
       dependency_cycle:
         code: WS.TASK.DEPENDENCY_CYCLE

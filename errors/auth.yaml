@@ -187,7 +187,6 @@ resources:
         message_zh: "访问此资源需要先登录"
         description: "Returned when a request reaches a protected route with no authenticated session present on the context. Distinct from AUTH.SESSION.EXPIRED (had a valid session, now expired) and AUTH.SESSION.REVOKED (session was explicitly invalidated server-side)."
         userAction: "Sign in and retry the request."
-        i18nKey: "auth.errors.session_unauthorized"
 
   permission:
     breadcrumb: "Auth > Permission"
@@ -200,7 +199,6 @@ resources:
         message_zh: "此操作需要实例管理员权限"
         description: "Returned when an endpoint that requires the instance-admin role is called by a non-admin user."
         userAction: "Ask an instance administrator to perform this operation."
-        i18nKey: "auth.errors.permission_instance_admin_required"
 
   token:
     breadcrumb: "Auth > Token"

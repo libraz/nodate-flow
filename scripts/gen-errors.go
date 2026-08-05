@@ -10,6 +10,7 @@ package main
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -235,6 +236,22 @@ func run() error {
 		if err := writeFile(filepath.Join(zhDir, "errors.json"), genLocale(all, "zh")); err != nil {
 			return err
 		}
+	}
+
+	// An i18nKey has to resolve, or it reaches a reader as itself.
+	//
+	// The field is an override: when set, the frontend uses it instead of
+	// the generated `errors:<CODE>` entry, which the loop above writes for
+	// every code in all three locales of both apps. That makes a dead
+	// override strictly worse than no override — the reader gets the raw
+	// key string in a toast while a translated message for the same code
+	// sits in the same bundle. Six of seven were in that state.
+	//
+	// Checked here rather than in a separate script because this is the
+	// step that writes the catalog the override displaces: a reference
+	// that resolves to nothing should not be able to reach a build.
+	if err := checkI18nKeys(root, all, localeApps); err != nil {
+		return err
 	}
 
 	// Docs. Generated pages are also pruned: a code removed from the
@@ -542,4 +559,75 @@ func genDoc(r record) []byte {
 		fmt.Fprintf(&b, "## User action\n\n%s\n", r.UserAction)
 	}
 	return b.Bytes()
+}
+
+// checkI18nKeys fails when a record's optional i18nKey does not resolve
+// to a string in every locale of at least one app.
+//
+// "At least one app" rather than "every app" because the namespaces are
+// not shared: accounts-web ships auth.json and flow-web does not, so a
+// key under `auth.` can only ever resolve on one side. Requiring all
+// three locales of the app that does have it is what stops a key that
+// exists in English and nowhere else.
+func checkI18nKeys(root string, all []record, localeApps []string) error {
+	var bad []string
+	for _, r := range all {
+		if r.I18nKey == "" {
+			continue
+		}
+		ns, path, ok := strings.Cut(r.I18nKey, ".")
+		if !ok {
+			bad = append(bad, fmt.Sprintf("%s: i18nKey %q has no namespace", r.Code, r.I18nKey))
+			continue
+		}
+		resolved := false
+		for _, app := range localeApps {
+			inAllLangs := true
+			for _, lang := range []string{"en", "ja", "zh"} {
+				if !localeKeyExists(filepath.Join(root, app, "locales", lang, ns+".json"), path) {
+					inAllLangs = false
+					break
+				}
+			}
+			if inAllLangs {
+				resolved = true
+				break
+			}
+		}
+		if !resolved {
+			bad = append(bad, fmt.Sprintf("%s: i18nKey %q resolves in no app's en+ja+zh", r.Code, r.I18nKey))
+		}
+	}
+	if len(bad) == 0 {
+		return nil
+	}
+	sort.Strings(bad)
+	return fmt.Errorf("gen-errors: %d unresolvable i18nKey reference(s):\n  %s\n\nEither add the key to that namespace in all three locales, or drop i18nKey and let the generated errors:<CODE> entry carry the message",
+		len(bad), strings.Join(bad, "\n  "))
+}
+
+// localeKeyExists reports whether a dotted path resolves to a string in
+// the given locale JSON file.
+func localeKeyExists(file, dotted string) bool {
+	raw, err := os.ReadFile(file)
+	if err != nil {
+		return false
+	}
+	var doc any
+	if err := json.Unmarshal(raw, &doc); err != nil {
+		return false
+	}
+	cur := doc
+	for _, seg := range strings.Split(dotted, ".") {
+		m, ok := cur.(map[string]any)
+		if !ok {
+			return false
+		}
+		cur, ok = m[seg]
+		if !ok {
+			return false
+		}
+	}
+	str, ok := cur.(string)
+	return ok && strings.TrimSpace(str) != ""
 }
