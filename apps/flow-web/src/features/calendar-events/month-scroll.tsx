@@ -141,6 +141,13 @@ export interface MonthScrollProps {
   locale: string;
   /** User's start-of-week preference. */
   weekStart: WeekStart;
+  /**
+   * Effective timezone (profile, else workspace, else browser). Decides
+   * which calendar day a timed event falls on, so the mobile view files
+   * events under the same days the desktop grid and the server-side
+   * reminders do.
+   */
+  timezone: string;
   /** State colour lookup for task dots, keyed by `derivedState`. */
   stateColor: (derivedState: string) => string;
   /** Bumped by the toolbar "Today" button to request a re-scroll. */
@@ -158,6 +165,8 @@ const TRACK_REM = 1.25;
 
 interface WeekRowProps {
   weekStart: Date;
+  /** Effective timezone; see MonthScrollProps.timezone. */
+  timezone: string;
   events: CalendarEvent[];
   tasksByDate: Map<string, CalendarTask[]>;
   holidaysByDate: Map<string, HolidayEntry[]>;
@@ -170,6 +179,7 @@ interface WeekRowProps {
 
 function WeekRow({
   weekStart,
+  timezone,
   events,
   tasksByDate,
   holidaysByDate,
@@ -188,22 +198,26 @@ function WeekRow({
     [weekStart],
   );
 
-  const positioned = useMemo(() => layoutWeek(weekStart, events), [weekStart, events]);
+  const positioned = useMemo(
+    () => layoutWeek(weekStart, events, timezone),
+    [weekStart, events, timezone],
+  );
 
-  // Single-day events grouped by local date key within this week.
+  // Single-day events grouped by date key within this week, read in the
+  // effective timezone.
   const singleDayMap = useMemo(() => {
     const map = new Map<string, CalendarEvent[]>();
     const weekKeys = new Set(week.map((d) => dateKey(d)));
     for (const evt of events) {
-      if (isMultiDay(evt)) continue;
-      const key = eventStartKey(evt);
+      if (isMultiDay(evt, timezone)) continue;
+      const key = eventStartKey(evt, timezone);
       if (!key || !weekKeys.has(key)) continue;
       const arr = map.get(key);
       if (arr) arr.push(evt);
       else map.set(key, [evt]);
     }
     return map;
-  }, [events, week]);
+  }, [events, week, timezone]);
 
   // Tracks reserved by multi-day bars for each day column.
   const reservedByCol = useMemo(() => {
@@ -419,6 +433,7 @@ export default function MonthScroll({
   holidaysByDate,
   locale,
   weekStart,
+  timezone,
   stateColor,
   scrollToTodaySignal,
   onDayCreate,
@@ -508,6 +523,7 @@ export default function MonthScroll({
             <WeekRow
               key={item.key}
               weekStart={item.weekStart}
+              timezone={timezone}
               events={events}
               tasksByDate={tasksByDate}
               holidaysByDate={holidaysByDate}

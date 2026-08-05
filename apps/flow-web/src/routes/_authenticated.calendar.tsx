@@ -63,9 +63,10 @@ import type { TaskDerivedState } from '../features/tasks/api';
 import { STATE_COLOR } from '../features/tasks/constants';
 import { useWorkspacesQuery } from '../features/workspaces/api';
 import { type ApiError, toApiError } from '../lib/api-error';
-import { dateKey } from '../lib/date-utils';
+import { dateKey, todayKey } from '../lib/date-utils';
 import { sdk } from '../lib/sdk';
 import { useActiveWorkspaceId } from '../lib/use-current-workspace';
+import { resolveEffectiveTimezone } from '../lib/use-effective-timezone';
 import styles from './_authenticated.calendar.module.css';
 
 /**
@@ -84,6 +85,7 @@ type RecurrenceExpansionInput<T> = {
   timezone: string;
   recurrenceRule: RecurrenceRule | null;
   recurrenceExceptions?: string[];
+  recurrenceEnd?: string;
 };
 type WeekStart = 'mon' | 'sun' | 'sat';
 type Weekday = 'mon' | 'tue' | 'wed' | 'thu' | 'fri' | 'sat' | 'sun';
@@ -284,6 +286,11 @@ function expandCalendarEvents(
       recurrenceRule: rule,
     };
     if (exceptions) input.recurrenceExceptions = exceptions;
+    // recurrence_end is the second upper bound on a series; without it a
+    // series the API was told to stop keeps being drawn.
+    if (typeof event.recurrenceEnd === 'number') {
+      input.recurrenceEnd = secondsToIso(event.recurrenceEnd);
+    }
     return input;
   });
 
@@ -404,6 +411,12 @@ function CalendarRoute(): ReactElement {
   const { data: me } = useMeQuery();
   const country = me.country;
   const selfUserId = me.id;
+  // Which zone this surface reads and writes times in. The profile
+  // setting existed, was validated, and was consulted by nothing here:
+  // the grid, the pills and the dialog all used the browser's zone, so
+  // someone from Tokyo working in Berlin saw Berlin days while the
+  // server's reminders about the same events used Tokyo.
+  const timezone = resolveEffectiveTimezone(me.timezone, workspaces, activeWsId);
   // Narrow workspace shape for the rail — id, name, and the optional
   // country code (so the holidays-mode picker can pre-select the
   // workspace's own configured country) — without coupling the rail to
@@ -659,7 +672,7 @@ function CalendarRoute(): ReactElement {
       if (k === 'free' && !layers.free) continue;
       if (k === 'milestone' && !layers.milestone) continue;
       if (k !== 'block' && k !== 'free' && k !== 'milestone' && !layers.events) continue;
-      for (const key of eventDayKeys(ev)) {
+      for (const key of eventDayKeys(ev, timezone)) {
         const arr = map.get(key);
         if (arr) arr.push(ev);
         else map.set(key, [ev]);
@@ -669,7 +682,11 @@ function CalendarRoute(): ReactElement {
       arr.sort((a, b) => (a.startAt ?? 0) - (b.startAt ?? 0));
     }
     return map;
-  }, [expandedEvents, layers.events, layers.blocks, layers.free, layers.milestone]);
+    // `timezone` decides which day each event is filed under, so a
+    // profile change has to rebuild the map. It is a plain string from
+    // `resolveEffectiveTimezone`, so listing it does not invalidate the
+    // memo on every render the way an object identity would.
+  }, [expandedEvents, layers.events, layers.blocks, layers.free, layers.milestone, timezone]);
 
   /**
    * Flat layer-filtered event list for the mobile month-scroll. Mirrors
@@ -704,7 +721,9 @@ function CalendarRoute(): ReactElement {
     return map;
   }, [holidayProvider, rangeStart, rangeEnd, i18n.language, layers.holidays]);
 
-  const todayKey = dateKey(today);
+  // "Today" has to be the reader's today, or the highlight lands on
+  // a different cell from the one the events are filed under.
+  const todayKeyValue = todayKey(timezone, today);
   const monthLabel = useMemo(
     () =>
       new Intl.DateTimeFormat(locale, { year: 'numeric', month: 'long' }).format(
@@ -856,6 +875,7 @@ function CalendarRoute(): ReactElement {
               holidaysByDate={holidaysByDate}
               locale={locale}
               weekStart={weekStart}
+              timezone={timezone}
               stateColor={stateColor}
               scrollToTodaySignal={scrollToTodaySignal}
               onDayCreate={(key) => handleCellClick(key, false)}
@@ -880,7 +900,7 @@ function CalendarRoute(): ReactElement {
                   const dayEvents = eventsByDate.get(cell.key) ?? [];
                   const dayHolidays = holidaysByDate.get(cell.key) ?? [];
                   const totalCount = dayTasks.length + dayEvents.length;
-                  const isToday = cell.key === todayKey;
+                  const isToday = cell.key === todayKeyValue;
                   const isDragOver = dragOverKey === cell.key;
                   // Render only the first holiday label on the cell (rare
                   // multi-holiday days append "+N" — full list lives in the
@@ -1090,6 +1110,7 @@ function CalendarRoute(): ReactElement {
       {editTarget !== null ? (
         <EventDialog
           open
+          timezone={timezone}
           workspaceId={
             editTarget.mode === 'edit' ? editTarget.event.workspaceId : (activeWsId ?? '')
           }

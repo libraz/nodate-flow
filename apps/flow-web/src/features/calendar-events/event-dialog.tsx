@@ -88,7 +88,26 @@ export type Flexibility = 'fixed' | 'negotiable' | 'conditional';
 export type BlockPreset = 'working' | 'focus' | 'oof' | 'custom';
 
 /** Recurrence preset identifiers stored in component state. */
-export type RecurrencePreset = 'none' | 'daily' | 'weekdays' | 'weekly' | 'monthly' | 'yearly';
+/**
+ * The repeat choices the dialog offers, plus `custom` — which is not
+ * offered, only shown.
+ *
+ * The presets are lossy: a stored rule can say things none of them can
+ * (an interval, a set of weekdays that is not the working week). Before,
+ * that was handled by not showing the stored rule at all, so every event
+ * opened reading "Does not repeat" whether or not it repeated, and the
+ * only way to stop a daily standup was to delete the series. `custom`
+ * lets the control tell the truth about a rule it cannot offer to
+ * recreate, while still allowing the user to replace it or clear it.
+ */
+export type RecurrencePreset =
+  | 'none'
+  | 'daily'
+  | 'weekdays'
+  | 'weekly'
+  | 'monthly'
+  | 'yearly'
+  | 'custom';
 
 /** Notification preset identifiers. `none` omits the field on submit. */
 export type NotificationPreset =
@@ -114,6 +133,16 @@ export type EventDialogMode =
 export interface EventDialogProps {
   open: boolean;
   workspaceId: string;
+  /**
+   * Effective timezone (profile, else workspace, else browser). Stamped
+   * on events this dialog creates.
+   *
+   * It used to be the browser's, which meant the profile setting had no
+   * effect on the events it produced: a Tokyo user working in Berlin
+   * created meetings labelled Europe/Berlin, and the reminders — which
+   * already honoured the profile — disagreed about what time they were.
+   */
+  timezone: string;
   /** Projects available to the Task kind picker. */
   projects: FlowProject[];
   mode: EventDialogMode;
@@ -212,6 +241,11 @@ export function presetToRRule(preset: RecurrencePreset, _startDate: string): Rec
   switch (preset) {
     case 'none':
       return null;
+    // `custom` describes a rule this control did not author and cannot
+    // reproduce, so selecting it changes nothing: null here means the
+    // caller leaves the stored rule alone.
+    case 'custom':
+      return null;
     case 'daily':
       return { freq: 'daily' };
     case 'weekdays':
@@ -222,6 +256,43 @@ export function presetToRRule(preset: RecurrencePreset, _startDate: string): Rec
       return { freq: 'monthly' };
     case 'yearly':
       return { freq: 'yearly' };
+  }
+}
+
+/**
+ * Map a stored rule back onto the control, or `custom` when no preset
+ * reproduces it.
+ *
+ * Deliberately strict: a rule with an interval, a count, an until or a
+ * byMonthDay is not "weekly" even if its freq says so, because choosing
+ * `weekly` in the control would silently drop the rest of it. Reporting
+ * `custom` and leaving the rule untouched is the honest answer.
+ */
+export function rruleToPreset(rule: RecurrenceRule | null | undefined): RecurrencePreset {
+  if (!rule) return 'none';
+  const plain =
+    (rule.interval === undefined || rule.interval === 1) &&
+    rule.count === undefined &&
+    rule.until === undefined &&
+    (rule.byMonthDay === undefined || rule.byMonthDay.length === 0);
+  if (!plain) return 'custom';
+
+  const byDay = rule.byDay ?? [];
+  switch (rule.freq) {
+    case 'daily':
+      return byDay.length === 0 ? 'daily' : 'custom';
+    case 'weekly': {
+      if (byDay.length === 0) return 'weekly';
+      const weekdays = ['mo', 'tu', 'we', 'th', 'fr'];
+      const normalized = [...byDay].map((d) => d.toLowerCase()).sort();
+      return normalized.join(',') === [...weekdays].sort().join(',') ? 'weekdays' : 'custom';
+    }
+    case 'monthly':
+      return byDay.length === 0 ? 'monthly' : 'custom';
+    case 'yearly':
+      return byDay.length === 0 ? 'yearly' : 'custom';
+    default:
+      return 'custom';
   }
 }
 
@@ -347,6 +418,7 @@ const RECURRENCE_PRESET_KEYS = {
   weekly: 'recurrence.preset.weekly',
   monthly: 'recurrence.preset.monthly',
   yearly: 'recurrence.preset.yearly',
+  custom: 'recurrence.preset.custom',
 } as const satisfies Record<RecurrencePreset, string>;
 
 const NOTIFICATION_PRESET_KEYS = {
@@ -412,6 +484,7 @@ const KIND_OPTIONS: ItemKind[] = ['task', 'event', 'block', 'free', 'milestone']
 export default function EventDialog({
   open,
   workspaceId,
+  timezone,
   projects,
   mode,
   onClose,
@@ -605,11 +678,13 @@ export default function EventDialog({
     // long-form content on the event is invisible while the user edits.
     if ((detail.memo ?? '') !== '') setExpanded(true);
 
-    // `recurrenceRule` / `notificationOffset` are deliberately not mapped
-    // back onto their preset controls: the presets are lossy (an arbitrary
-    // rule has no matching preset), so seeding them needs a rule → preset
-    // matcher. Until that exists the dirty gate in `buildPatchBody` keeps
-    // an untouched control from writing over the stored rule.
+    // Seed the repeat control from the stored rule. Leaving it at
+    // 'none' meant a recurring event opened claiming it did not repeat,
+    // and the only way to stop one was to delete the whole series. A
+    // rule no preset reproduces shows as 'custom', which still leaves it
+    // untouched unless the user picks something else.
+    setRecurrence(rruleToPreset(detail.recurrenceRule as RecurrenceRule | null | undefined));
+    if (detail.recurrenceRule) setExpanded(true);
   }, [detail, open]);
 
   // Validation state.
@@ -785,7 +860,7 @@ export default function EventDialog({
 
   function buildCreateBody(): CreateEventInput {
     const calKind = kind as CalEventKind;
-    const tz = browserTimezone();
+    const tz = timezone || browserTimezone();
     const body: CreateEventInput = {
       title: title.trim(),
       kind: calKind,
@@ -860,12 +935,19 @@ export default function EventDialog({
       body.blockLabel = blockPreset === 'custom' ? blockCustomLabel.trim() : blockPreset;
       body.showAs = blockPreset === 'oof' ? 'oof' : 'busy';
     }
-    // The presets cannot express "clear the stored rule" yet, so an
-    // untouched control stays out of the payload entirely rather than
-    // asserting 'none' over whatever the event actually has.
+    // A touched control is an instruction. Picking a preset writes that
+    // rule; picking "Does not repeat" clears the stored one, which the
+    // API expresses as an explicit clear because an omitted field and a
+    // field being emptied look identical in a PATCH. `custom` is the one
+    // value that means "leave it": it names a rule this control did not
+    // author.
     if (anyDirty('recurrence')) {
       const rrule = presetToRRule(recurrence, startDate);
-      if (rrule !== null) body.recurrenceRule = rrule;
+      if (rrule !== null) {
+        body.recurrenceRule = rrule;
+      } else if (recurrence === 'none') {
+        body.clear = [...(body.clear ?? []), 'recurrenceRule'];
+      }
     }
     if (anyDirty('notification')) {
       const minutes = presetToMinutes(notification);
@@ -1292,13 +1374,28 @@ export default function EventDialog({
                       setRecurrence(e.currentTarget.value as RecurrencePreset);
                     }}
                   >
-                    {(['none', 'daily', 'weekdays', 'weekly', 'monthly', 'yearly'] as const).map(
-                      (v) => (
-                        <option key={v} value={v}>
-                          {t(RECURRENCE_PRESET_KEYS[v])}
-                        </option>
-                      ),
-                    )}
+                    {/*
+                      `custom` is listed only while it is the current
+                      value: it describes a stored rule rather than a
+                      choice, so offering it on an event that has no
+                      such rule would be an option that does nothing.
+                    */}
+                    {(recurrence === 'custom'
+                      ? ([
+                          'custom',
+                          'none',
+                          'daily',
+                          'weekdays',
+                          'weekly',
+                          'monthly',
+                          'yearly',
+                        ] as const)
+                      : (['none', 'daily', 'weekdays', 'weekly', 'monthly', 'yearly'] as const)
+                    ).map((v) => (
+                      <option key={v} value={v}>
+                        {t(RECURRENCE_PRESET_KEYS[v])}
+                      </option>
+                    ))}
                   </Select>
                 )}
               </FormField>

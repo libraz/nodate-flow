@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { dateKey, eventDateKey, eventStartOfDay } from '../date-utils';
+import { dateKey, eventDateKey, eventStartOfDay, todayKey } from '../date-utils';
 
 describe('dateKey', () => {
   it('formats a normal date as YYYY-MM-DD', () => {
@@ -75,5 +75,32 @@ describe('eventStartOfDay', () => {
     const timed = new Date(2027, 7, 5, 23, 45, 0, 0).getTime() / 1000;
     const d = eventStartOfDay(timed, false);
     expect(dateKey(d)).toBe(eventDateKey(timed, false));
+  });
+});
+
+describe('eventDateKey with an effective timezone', () => {
+  // 2027-08-05T22:00Z is already the 6th in Tokyo and still the 5th in
+  // New York. Which day the event belongs to is exactly the question the
+  // profile timezone answers, and reading it in the browser's zone is
+  // what made the setting a no-op.
+  const timed = Date.UTC(2027, 7, 5, 22, 0, 0, 0) / 1000;
+
+  it('files a timed event by the day it falls on in that zone', () => {
+    expect(eventDateKey(timed, false, 'Asia/Tokyo')).toBe('2027-08-06');
+    expect(eventDateKey(timed, false, 'America/New_York')).toBe('2027-08-05');
+  });
+
+  it('leaves all-day events in UTC whatever zone is supplied', () => {
+    const allDay = Date.UTC(2027, 7, 5, 0, 0, 0, 0) / 1000;
+    expect(eventDateKey(allDay, true, 'Asia/Tokyo')).toBe('2027-08-05');
+    expect(eventDateKey(allDay, true, 'America/New_York')).toBe('2027-08-05');
+  });
+});
+
+describe('todayKey', () => {
+  it('reads today in the supplied zone', () => {
+    const noonUTC = new Date(Date.UTC(2027, 7, 5, 22, 0, 0, 0));
+    expect(todayKey('Asia/Tokyo', noonUTC)).toBe('2027-08-06');
+    expect(todayKey('America/New_York', noonUTC)).toBe('2027-08-05');
   });
 });

@@ -13,7 +13,7 @@ import userEvent from '@testing-library/user-event';
 import { renderWithProviders } from '@tests/helpers/render';
 import type { ReactElement } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import EventDialog, { type EventDialogMode, presetToRRule } from '../event-dialog';
+import EventDialog, { type EventDialogMode, presetToRRule, rruleToPreset } from '../event-dialog';
 
 type CreateEventInput = components['schemas']['CreateEventInputBody'];
 type PatchEventInput = components['schemas']['PatchEventInputBody'];
@@ -137,6 +137,7 @@ function renderDialog(overrides: Partial<Parameters<typeof EventDialog>[0]> = {}
   return (
     <EventDialog
       open
+      timezone="UTC"
       workspaceId="ws-1"
       projects={[{ id: 'proj-1', name: 'Alpha' }] as Parameters<typeof EventDialog>[0]['projects']}
       mode={overrides.mode ?? createMode()}
@@ -399,6 +400,66 @@ describe('<EventDialog>', () => {
     expect(memoBox.getAttribute('aria-busy')).toBe('true');
   });
 
+  it('shows the stored repeat rule instead of claiming the event never repeats', async () => {
+    withDetail({ recurrenceRule: { freq: 'weekly' } } as Partial<EventDetail>);
+    renderWithProviders(renderDialog({ mode: editMode() }));
+
+    // The rule lives behind the disclosure, which opens itself when there
+    // is one — a repeat the user cannot see is a repeat they cannot stop.
+    const select = (await screen.findByRole('combobox', {
+      name: 'field.recurrence',
+    })) as HTMLSelectElement;
+    expect(select.value).toBe('weekly');
+  });
+
+  it('labels a rule no preset reproduces as custom rather than as no repeat', async () => {
+    withDetail({ recurrenceRule: { freq: 'weekly', interval: 2 } } as Partial<EventDetail>);
+    renderWithProviders(renderDialog({ mode: editMode() }));
+
+    const select = (await screen.findByRole('combobox', {
+      name: 'field.recurrence',
+    })) as HTMLSelectElement;
+    expect(select.value).toBe('custom');
+  });
+
+  it('clears the stored rule when the user picks "does not repeat"', async () => {
+    const user = userEvent.setup();
+    withDetail({ recurrenceRule: { freq: 'daily' } } as Partial<EventDetail>);
+    renderWithProviders(renderDialog({ mode: editMode() }));
+
+    const select = await screen.findByRole('combobox', { name: 'field.recurrence' });
+    await user.selectOptions(select, 'none');
+    await user.click(screen.getByRole('button', { name: 'action.submit.edit' }));
+
+    const args = mocks.updateEvent.mock.calls[0]?.[0] as { body: PatchEventInput };
+    // Omitting the field means "leave it alone" in a PATCH, so stopping a
+    // daily standup needs the explicit clear — without it the only way out
+    // was deleting the series.
+    expect(args.body.clear).toContain('recurrenceRule');
+    expect('recurrenceRule' in args.body).toBe(false);
+  });
+
+  it('leaves an untouched rule out of the patch body now that it is seeded', async () => {
+    const user = userEvent.setup();
+    withDetail({
+      recurrenceRule: { freq: 'weekly', interval: 2 },
+      memo: 'Vendor quote',
+    } as Partial<EventDetail>);
+    renderWithProviders(renderDialog({ mode: editMode() }));
+
+    const memoBox = await screen.findByRole('textbox', { name: 'field.memo' });
+    await user.type(memoBox, ' — revised');
+    await user.click(screen.getByRole('button', { name: 'action.submit.edit' }));
+
+    const args = mocks.updateEvent.mock.calls[0]?.[0] as { body: PatchEventInput };
+    expect(args.body.memo).toBe('Vendor quote — revised');
+    // Seeding the control must not turn every save into a rewrite of the
+    // rule — and the every-other-week rule the presets cannot express must
+    // survive a save that had nothing to do with it.
+    expect('recurrenceRule' in args.body).toBe(false);
+    expect(args.body.clear ?? []).not.toContain('recurrenceRule');
+  });
+
   it('preserves backend error detail in mutation failure toasts', async () => {
     const user = userEvent.setup();
     mocks.createEvent.mockRejectedValueOnce(new Error('Calendar slug already exists'));
@@ -440,5 +501,42 @@ describe('presetToRRule', () => {
       const freq = (rule as { freq: string }).freq;
       expect(freq).toBe(freq.toLowerCase());
     }
+  });
+});
+
+describe('rruleToPreset', () => {
+  it('reports no repeat only when there is genuinely no rule', () => {
+    expect(rruleToPreset(null)).toBe('none');
+    expect(rruleToPreset(undefined)).toBe('none');
+  });
+
+  it('round-trips every preset the control can author', () => {
+    for (const preset of ['daily', 'weekdays', 'weekly', 'monthly', 'yearly'] as const) {
+      const rule = presetToRRule(preset, '2030-06-15');
+      expect(rruleToPreset(rule)).toBe(preset);
+    }
+  });
+
+  it('accepts uppercase weekday tokens, which RFC 5545 rules carry', () => {
+    expect(rruleToPreset({ freq: 'weekly', byDay: ['MO', 'TU', 'WE', 'TH', 'FR'] })).toBe(
+      'weekdays',
+    );
+  });
+
+  it('refuses to flatten a rule a preset would silently truncate', () => {
+    // Each of these says something no preset can, so answering with one
+    // would drop that part of the rule the moment the user saved.
+    expect(rruleToPreset({ freq: 'weekly', interval: 2 })).toBe('custom');
+    expect(rruleToPreset({ freq: 'daily', count: 10 })).toBe('custom');
+    expect(rruleToPreset({ freq: 'daily', until: '2030-12-31' })).toBe('custom');
+    expect(rruleToPreset({ freq: 'monthly', byMonthDay: [1, 15] })).toBe('custom');
+    expect(rruleToPreset({ freq: 'weekly', byDay: ['mo', 'we'] })).toBe('custom');
+    expect(rruleToPreset({ freq: 'daily', byDay: ['mo'] })).toBe('custom');
+  });
+
+  it('never authors a rule for the value it uses to describe one', () => {
+    // Selecting 'custom' has to be a no-op: it names a rule this control
+    // did not write and cannot rebuild.
+    expect(presetToRRule('custom', '2030-06-15')).toBeNull();
   });
 });
