@@ -188,72 +188,6 @@ export interface ExportTasksResult {
   truncated: boolean;
 }
 
-/** Columns emitted in the synthesised CSV, in order. */
-const CSV_COLUMNS = [
-  'id',
-  'title',
-  'description',
-  'projectId',
-  'projectName',
-  'assigneeId',
-  'assigneeDisplayName',
-  'status',
-  'priority',
-  'dueOn',
-  'startedOn',
-  'completedAt',
-  'createdAt',
-] as const;
-
-type CsvColumn = (typeof CSV_COLUMNS)[number];
-
-/**
- * Format a single task field as a CSV cell value. Numeric fields stringify
- * as decimals; missing optionals render as empty strings.
- */
-function csvValueOf(task: ExportedTask, key: CsvColumn): string {
-  const value: unknown = task[key as keyof ExportedTask];
-  if (value === undefined || value === null) return '';
-  if (typeof value === 'number') return String(value);
-  if (typeof value === 'string') return value;
-  return String(value);
-}
-
-/**
- * Escape a CSV cell per RFC 4180: quote when the value contains a delimiter,
- * a double quote, or a line break, and double up internal quotes.
- */
-function escapeCsvCell(value: string): string {
-  if (value.includes(',') || value.includes('"') || value.includes('\n') || value.includes('\r')) {
-    return `"${value.replace(/"/g, '""')}"`;
-  }
-  return value;
-}
-
-/** Serialise the exported tasks into an RFC 4180 CSV string. */
-function buildCsv(tasks: readonly ExportedTask[]): string {
-  const header = CSV_COLUMNS.join(',');
-  const rows = tasks.map((task) =>
-    CSV_COLUMNS.map((col) => escapeCsvCell(csvValueOf(task, col))).join(','),
-  );
-  return `${header}\n${rows.join('\n')}\n`;
-}
-
-/**
- * UTF-8 byte order mark. Excel reads a BOM-less CSV as the machine's
- * legacy code page, which turns every Japanese and Chinese title into
- * mojibake. Spelled out as bytes because a U+FEFF string literal is
- * invisible in an editor and easy to lose in a later edit; this way the
- * blob provably carries the same three octets the server's CSV route
- * writes ahead of its own output.
- */
-const UTF8_BOM = Uint8Array.from([0xef, 0xbb, 0xbf]);
-
-/** Wrap a CSV string in a BOM-prefixed, Excel-readable Blob. */
-function csvBlob(csv: string): Blob {
-  return new Blob([UTF8_BOM, csv], { type: 'text/csv;charset=utf-8' });
-}
-
 /** Build a stable `YYYYMMDDHHmm` timestamp for download filenames. */
 function buildTimestamp(): string {
   const now = new Date();
@@ -263,6 +197,19 @@ function buildTimestamp(): string {
   const hh = String(now.getHours()).padStart(2, '0');
   const mi = String(now.getMinutes()).padStart(2, '0');
   return `${yyyy}${mm}${dd}${hh}${mi}`;
+}
+
+/**
+ * Header carrying the number of task rows in a CSV download. The file
+ * cannot say how many rows it holds — a description with a newline in it
+ * makes a line tally wrong — so the server sends the number it knows.
+ */
+const EXPORT_ROW_COUNT_HEADER = 'X-Export-Row-Count';
+
+/** Filename stem, marking a partial export in the name itself. */
+function downloadStem(truncated: boolean): string {
+  const timestamp = buildTimestamp();
+  return truncated ? `tasks-export-partial-${timestamp}` : `tasks-export-${timestamp}`;
 }
 
 /**
@@ -285,15 +232,27 @@ function triggerDownload(blob: Blob, filename: string): void {
 }
 
 /**
- * GET /workspaces/{wsId}/export/tasks — fetch the workspace's tasks,
- * synthesise a CSV or JSON file client-side, and trigger a browser
- * download. Resolves with the row count, format, filename, and whether
- * the response hit the row ceiling so callers can surface a toast.
+ * Download the workspace's tasks as a file.
+ *
+ * CSV comes from `GET /workspaces/{wsId}/export/tasks.csv`, byte for
+ * byte. This client used to assemble its own CSV from the JSON export,
+ * which produced a second, incompatible file: different columns in a
+ * different order, `camelCase` field names where the server writes
+ * human-readable labels. "Export as CSV" therefore meant two different
+ * things depending on whether you clicked the button or called the API,
+ * and anything reading by column position could not consume both. The
+ * server's file is the canonical one — it is the version that leaves an
+ * audit entry and an event behind, which is what an export of everyone's
+ * work should do.
+ *
+ * JSON is still assembled here: the JSON route returns a envelope
+ * (`{count, format, tasks}`) and the file people expect is the task
+ * array.
  *
  * `limit` is always sent explicitly. Leaving it off falls back to the
  * server's 5000-row default, which silently halves the ceiling the
- * endpoint can actually serve — the difference between a partial file and
- * a complete one for most workspaces that hit it at all.
+ * endpoint can actually serve — the difference between a partial file
+ * and a complete one for most workspaces that hit it at all.
  *
  * A truncated export is named `tasks-export-partial-…` so the file keeps
  * saying it is incomplete long after the toast is gone.
@@ -306,34 +265,44 @@ export function useExportTasksMutation(): UseMutationResult<
   return useMutation<ExportTasksResult, ApiError, ExportTasksArgs>({
     mutationFn: async ({ wsId, format, lensId, limit }): Promise<ExportTasksResult> => {
       const rowLimit = limit ?? EXPORT_MAX_ROWS;
+      const query = {
+        ...(lensId != null ? { lensId } : {}),
+        limit: rowLimit,
+      };
+
+      if (format === 'csv') {
+        const { data, error, response } = await sdk.GET('/workspaces/{wsId}/export/tasks.csv', {
+          params: { path: { wsId }, query },
+          parseAs: 'blob',
+        });
+        if (error || !response.ok || !(data instanceof Blob)) {
+          throw toApiError(error, 'Failed to export tasks');
+        }
+
+        // The row count rides in a header because the body is a file:
+        // counting lines in the CSV would be wrong for any task whose
+        // description contains a newline, and over-counting there would
+        // warn about truncation that never happened.
+        const count = Number.parseInt(response.headers.get(EXPORT_ROW_COUNT_HEADER) ?? '', 10);
+        const rows = Number.isNaN(count) ? 0 : count;
+        const truncated = rows >= rowLimit;
+        const filename = `${downloadStem(truncated)}.csv`;
+        triggerDownload(data, filename);
+        return { count: rows, format: 'csv', filename, truncated };
+      }
+
       const { data, error } = await sdk.GET('/workspaces/{wsId}/export/tasks', {
-        params: {
-          path: { wsId },
-          query: {
-            format,
-            ...(lensId != null ? { lensId } : {}),
-            limit: rowLimit,
-          },
-        },
+        params: { path: { wsId }, query: { format: 'json', ...query } },
       });
       if (error || !data) throw toApiError(error, 'Failed to export tasks');
 
       const tasks: ExportedTask[] = data.tasks ?? [];
       const truncated = tasks.length >= rowLimit;
-      const timestamp = buildTimestamp();
-      const stem = truncated ? `tasks-export-partial-${timestamp}` : `tasks-export-${timestamp}`;
-
-      if (format === 'csv') {
-        const filename = `${stem}.csv`;
-        triggerDownload(csvBlob(buildCsv(tasks)), filename);
-        return { count: tasks.length, format: 'csv', filename, truncated };
-      }
-
+      const filename = `${downloadStem(truncated)}.json`;
       // No BOM on the JSON branch: a leading U+FEFF is not valid JSON
       // text and trips strict parsers, and the mojibake problem it solves
       // is specific to Excel opening CSV.
       const json = JSON.stringify(tasks, null, 2);
-      const filename = `${stem}.json`;
       triggerDownload(new Blob([json], { type: 'application/json;charset=utf-8' }), filename);
       return { count: tasks.length, format: 'json', filename, truncated };
     },

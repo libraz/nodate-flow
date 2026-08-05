@@ -2,11 +2,10 @@
  * Export feature — mutation hook that fetches task exports in CSV or JSON
  * format and triggers a browser download via an invisible anchor element.
  *
- * Goes through the typed `@nodate-flow/sdk`. The SDK types the response
- * as JSON (the OpenAPI spec only documents the JSON envelope) but we
- * pass `parseAs: 'stream'` and read the raw `Response` so the CSV branch
- * can pull the body as text. The JSON branch decodes through
- * `Response.json()` for the same reason.
+ * Goes through the typed `@nodate-flow/sdk`. Each format has its own
+ * route: the CSV download is a documented operation returning
+ * `text/csv`, and the JSON export returns its envelope. Neither branch
+ * has to reach past the SDK for the raw response body any more.
  */
 
 import { type UseMutationResult, useMutation } from '@tanstack/react-query';
@@ -47,6 +46,13 @@ function triggerDownload(blob: Blob, filename: string): void {
   }, 100);
 }
 
+/**
+ * Header carrying the number of task rows in a CSV download. The file
+ * cannot report its own row count: a description containing a newline
+ * makes a line tally wrong.
+ */
+const EXPORT_ROW_COUNT_HEADER = 'X-Export-Row-Count';
+
 function buildTimestamp(): string {
   const now = new Date();
   const y = String(now.getFullYear());
@@ -56,52 +62,57 @@ function buildTimestamp(): string {
 }
 
 /**
- * useExportTasks — mutation that fetches the export endpoint and triggers
- * a browser download. Returns the number of exported tasks on success.
+ * useExportTasks — mutation that downloads a task export and reports how
+ * many tasks it contained.
+ *
+ * The CSV branch calls the CSV route. It used to call the JSON route
+ * with `format=csv`, read the body as text and save it as a `.csv` —
+ * which meant the downloaded "CSV" was a JSON document wearing a CSV
+ * extension, because that route only ever returned JSON no matter what
+ * `format` said. The row count was then derived by splitting on
+ * newlines, which is wrong for any task whose description contains one.
+ * The server sends both the file and its row count now.
  */
 export function useExportTasks(): UseMutationResult<number, ApiError, ExportTasksArgs> {
   return useMutation<number, ApiError, ExportTasksArgs>({
     mutationFn: async ({ workspaceId, format, lensId }): Promise<number> => {
-      // `parseAs: 'stream'` short-circuits the SDK's default JSON decode
-      // so we can pull the raw response body — required for the CSV
-      // branch and also useful for the JSON branch (we want the parsed
-      // envelope, not the typed-but-wrong `Body` schema generated from
-      // the OpenAPI spec).
-      const { error, response } = await sdk.GET('/workspaces/{wsId}/export/tasks', {
-        params: {
-          path: { wsId: workspaceId },
-          query: {
-            format,
-            limit: 5000,
-            ...(lensId !== undefined ? { lensId } : {}),
-          },
-        },
-        parseAs: 'stream',
-      });
-
-      if (error) {
-        throw toApiError(error, 'Export failed');
-      }
-      if (!response.ok) {
-        throw new ApiError(undefined, `Export failed with status ${String(response.status)}`);
-      }
-
+      const query = {
+        limit: 5000,
+        ...(lensId !== undefined ? { lensId } : {}),
+      };
       const timestamp = buildTimestamp();
 
       if (format === 'csv') {
-        const text = await response.text();
-        const blob = new Blob([text], { type: 'text/csv;charset=utf-8' });
-        triggerDownload(blob, `tasks-${timestamp}.csv`);
-        // Count rows (subtract header row).
-        const lines = text.split('\n').filter((line) => line.trim().length > 0);
-        return Math.max(0, lines.length - 1);
+        const { data, error, response } = await sdk.GET('/workspaces/{wsId}/export/tasks.csv', {
+          params: { path: { wsId: workspaceId }, query },
+          parseAs: 'blob',
+        });
+        if (error) {
+          throw toApiError(error, 'Export failed');
+        }
+        if (!response.ok || !(data instanceof Blob)) {
+          throw new ApiError(undefined, `Export failed with status ${String(response.status)}`);
+        }
+        triggerDownload(data, `tasks-${timestamp}.csv`);
+        const count = Number.parseInt(response.headers.get(EXPORT_ROW_COUNT_HEADER) ?? '', 10);
+        return Number.isNaN(count) ? 0 : count;
       }
 
-      // JSON format.
-      const data = (await response.json()) as { count?: number; tasks?: unknown[] };
+      const { data, error, response } = await sdk.GET('/workspaces/{wsId}/export/tasks', {
+        params: { path: { wsId: workspaceId }, query: { format: 'json', ...query } },
+      });
+      if (error) {
+        throw toApiError(error, 'Export failed');
+      }
+      if (!response.ok || !data) {
+        throw new ApiError(undefined, `Export failed with status ${String(response.status)}`);
+      }
+
       const jsonStr = JSON.stringify(data, null, 2);
-      const blob = new Blob([jsonStr], { type: 'application/json;charset=utf-8' });
-      triggerDownload(blob, `tasks-${timestamp}.json`);
+      triggerDownload(
+        new Blob([jsonStr], { type: 'application/json;charset=utf-8' }),
+        `tasks-${timestamp}.json`,
+      );
       return data.count ?? data.tasks?.length ?? 0;
     },
   });

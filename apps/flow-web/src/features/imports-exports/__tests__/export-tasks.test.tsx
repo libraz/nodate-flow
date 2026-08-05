@@ -70,21 +70,50 @@ function exportedTasks(count: number): ExportedTask[] {
  * Stand in for the export handler: serve at most `limit` rows out of a
  * workspace holding `datasetSize`, defaulting and clamping exactly as
  * the server does.
+ *
+ * The two formats now come from two routes. The CSV route answers with
+ * the file the server built — including its byte order mark — and puts
+ * the row count in a header, because the file itself cannot report it:
+ * a description containing a newline makes a line tally wrong. The stub
+ * mirrors that so the tests exercise the contract the client actually
+ * depends on.
  */
 function serveDataset(datasetSize: number): void {
   mocks.get.mockImplementation(
     async (
-      _path: string,
+      path: string,
       init: { params?: { query?: { limit?: number; format?: string } } },
     ): Promise<unknown> => {
       const query = init.params?.query ?? {};
       const requested = typeof query.limit === 'number' ? query.limit : SERVER_DEFAULT_LIMIT;
       const limit = Math.min(requested, EXPORT_MAX_ROWS);
       const tasks = exportedTasks(Math.min(datasetSize, limit));
-      return { data: { count: tasks.length, format: query.format, tasks }, error: null };
+
+      if (path.endsWith('/export/tasks.csv')) {
+        const body = `${SERVER_CSV_BOM}ID,Title,Description,Status\n${tasks
+          .map((t) => `${t.id},${t.title},,open`)
+          .join('\n')}\n`;
+        return {
+          data: new Blob([body], { type: 'text/csv;charset=utf-8' }),
+          error: undefined,
+          response: new Response(null, {
+            status: 200,
+            headers: { 'X-Export-Row-Count': String(tasks.length) },
+          }),
+        };
+      }
+
+      return {
+        data: { count: tasks.length, format: query.format, tasks },
+        error: null,
+        response: new Response(null, { status: 200 }),
+      };
     },
   );
 }
+
+/** The BOM the server writes ahead of its CSV output. */
+const SERVER_CSV_BOM = '\uFEFF';
 
 /* ── download capture ─────────────────────────────────────────── */
 
@@ -231,7 +260,7 @@ describe('useExportTasksMutation — row ceiling', () => {
 });
 
 describe('useExportTasksMutation — file encoding', () => {
-  it('prefixes the CSV with a UTF-8 BOM so Excel does not mangle CJK titles', async () => {
+  it('saves the server CSV unchanged, adding no second byte order mark', async () => {
     serveDataset(2);
     const { result } = renderHook(() => useExportTasksMutation(), {
       wrapper: hookWrapper(buildClient()),
@@ -242,13 +271,17 @@ describe('useExportTasksMutation — file encoding', () => {
     const blob = downloads[0]?.blob;
     expect(blob).toBeDefined();
     const bytes = new Uint8Array(await (blob as Blob).arrayBuffer());
-    expect(Array.from(bytes.slice(0, 3))).toEqual([0xef, 0xbb, 0xbf]);
 
-    // The BOM is a prefix, not a replacement: the header row still leads
-    // the payload.
+    // Exactly one BOM. This client used to build its own CSV and prefix
+    // its own mark; wrapping the server's file the same way would put
+    // two in a row, which Excel renders as stray characters in the first
+    // header cell.
+    expect(Array.from(bytes.slice(0, 3))).toEqual([0xef, 0xbb, 0xbf]);
+    expect(Array.from(bytes.slice(3, 6))).not.toEqual([0xef, 0xbb, 0xbf]);
+
+    // And the columns are the server's, not a set assembled here.
     const text = await (blob as Blob).text();
-    expect(text.codePointAt(0)).toBe(0xfeff);
-    expect(text.slice(1).startsWith('id,title,description')).toBe(true);
+    expect(text.slice(1).startsWith('ID,Title,Description')).toBe(true);
   });
 
   it('leaves JSON exports BOM-free, since a leading U+FEFF is not valid JSON', async () => {
