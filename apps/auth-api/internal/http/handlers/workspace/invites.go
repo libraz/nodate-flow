@@ -257,14 +257,13 @@ func AcceptInvite(deps InviteDeps) func(context.Context, *AcceptInviteInput) (*A
 			}
 
 			_, err = memberkit.AddWorkspaceMember(ctx, tx, memberkit.AddWorkspaceMemberArgs{
-				WorkspaceID:              invite.WorkspaceID,
-				UserID:                   actorID,
-				Role:                     memberkit.Role(invite.Role),
-				InvitedByUserID:          uint32FromNullInt32(invite.CreatedByUserID),
-				InvitedAt:                invite.CreatedAt,
-				JoinedAt:                 now,
-				EnsurePersonalCalendar:   true,
-				SubscribeHolidayCalendar: true,
+				WorkspaceID:            invite.WorkspaceID,
+				UserID:                 actorID,
+				Role:                   memberkit.Role(invite.Role),
+				InvitedByUserID:        uint32FromNullInt32(invite.CreatedByUserID),
+				InvitedAt:              invite.CreatedAt,
+				JoinedAt:               now,
+				EnsurePersonalCalendar: true,
 			})
 			return err
 		})

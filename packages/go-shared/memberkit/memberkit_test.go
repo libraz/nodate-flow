@@ -143,12 +143,11 @@ func TestAddWorkspaceMember_NewMemberCreatesCalendar(t *testing.T) {
 	var res AddWorkspaceMemberResult
 	withTx(t, db, func(tx *sql.Tx) {
 		r, err := AddWorkspaceMember(ctx, tx, AddWorkspaceMemberArgs{
-			WorkspaceID:              ws.wsID,
-			UserID:                   userID,
-			Role:                     RoleMember,
-			InvitedByUserID:          ws.actorID,
-			EnsurePersonalCalendar:   true,
-			SubscribeHolidayCalendar: true, // no country set → no-op
+			WorkspaceID:            ws.wsID,
+			UserID:                 userID,
+			Role:                   RoleMember,
+			InvitedByUserID:        ws.actorID,
+			EnsurePersonalCalendar: true,
 		})
 		if err != nil {
 			t.Fatalf("AddWorkspaceMember: %v", err)
@@ -161,9 +160,6 @@ func TestAddWorkspaceMember_NewMemberCreatesCalendar(t *testing.T) {
 	}
 	if !res.CreatedCalendar {
 		t.Errorf("expected CreatedCalendar=true")
-	}
-	if res.SubscribedHoliday {
-		t.Errorf("expected SubscribedHoliday=false (no country set)")
 	}
 
 	// Verify member row exists and is enabled.
@@ -211,61 +207,6 @@ func TestAddWorkspaceMember_NewMemberCreatesCalendar(t *testing.T) {
 	}
 	if eventCount != 1 {
 		t.Errorf("expected 1 workspace.member.added event, got %d", eventCount)
-	}
-}
-
-// TestAddWorkspaceMember_SubscribesHolidayWhenCountrySet verifies
-// that a workspace with a country gets a system holiday calendar
-// auto-created on first add, and subsequent adds reuse it.
-func TestAddWorkspaceMember_SubscribesHolidayWhenCountrySet(t *testing.T) {
-	db := startDB(t)
-	ctx := context.Background()
-	ws := seedWorkspace(t, ctx, db, "JP")
-	t.Cleanup(func() { purgeWorkspace(t, db, ws.wsID) })
-
-	// First invitee — creates the holiday calendar.
-	user1 := seedUser(t, ctx, db)
-	var res1 AddWorkspaceMemberResult
-	withTx(t, db, func(tx *sql.Tx) {
-		r, err := AddWorkspaceMember(ctx, tx, AddWorkspaceMemberArgs{
-			WorkspaceID: ws.wsID, UserID: user1, Role: RoleMember,
-			InvitedByUserID:          ws.actorID,
-			EnsurePersonalCalendar:   true,
-			SubscribeHolidayCalendar: true,
-		})
-		if err != nil {
-			t.Fatalf("add user1: %v", err)
-		}
-		res1 = r
-	})
-	if !res1.CreatedHolidayCal || !res1.SubscribedHoliday {
-		t.Errorf("user1 should have created+subscribed holiday: %+v", res1)
-	}
-
-	// Second invitee — reuses the same calendar.
-	user2 := seedUser(t, ctx, db)
-	var res2 AddWorkspaceMemberResult
-	withTx(t, db, func(tx *sql.Tx) {
-		r, err := AddWorkspaceMember(ctx, tx, AddWorkspaceMemberArgs{
-			WorkspaceID: ws.wsID, UserID: user2, Role: RoleMember,
-			InvitedByUserID:          ws.actorID,
-			EnsurePersonalCalendar:   true,
-			SubscribeHolidayCalendar: true,
-		})
-		if err != nil {
-			t.Fatalf("add user2: %v", err)
-		}
-		res2 = r
-	})
-	if res2.CreatedHolidayCal {
-		t.Error("user2 should NOT have created another holiday calendar")
-	}
-	if !res2.SubscribedHoliday {
-		t.Error("user2 should have subscribed to the existing holiday calendar")
-	}
-	if res1.HolidayCalendarID != res2.HolidayCalendarID {
-		t.Errorf("holiday calendar IDs should match: user1=%d user2=%d",
-			res1.HolidayCalendarID, res2.HolidayCalendarID)
 	}
 }
 

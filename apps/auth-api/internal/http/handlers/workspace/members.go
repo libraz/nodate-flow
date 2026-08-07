@@ -113,13 +113,12 @@ func InviteMember(deps Deps) func(context.Context, *AddMemberInput) (*AddMemberO
 		var mkRes memberkit.AddWorkspaceMemberResult
 		if err := dbretry.InTx(ctx, deps.DB, "workspace.AddMember", nil, func(ctx context.Context, tx *sql.Tx) error {
 			res, err := memberkit.AddWorkspaceMember(ctx, tx, memberkit.AddWorkspaceMemberArgs{
-				WorkspaceID:              ws.ID,
-				UserID:                   userID,
-				Role:                     memberkit.Role(role),
-				InvitedByUserID:          actorID,
-				InvitedAt:                now,
-				EnsurePersonalCalendar:   true,
-				SubscribeHolidayCalendar: true,
+				WorkspaceID:            ws.ID,
+				UserID:                 userID,
+				Role:                   memberkit.Role(role),
+				InvitedByUserID:        actorID,
+				InvitedAt:              now,
+				EnsurePersonalCalendar: true,
 			})
 			if err != nil {
 				return err

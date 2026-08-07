@@ -39,11 +39,6 @@ type AddWorkspaceMemberArgs struct {
 	// false only for specialised flows (e.g. re-enabling an existing
 	// member who already had a calendar).
 	EnsurePersonalCalendar bool
-	// SubscribeHolidayCalendar controls whether memberkit also
-	// subscribes the member to the workspace's system (holiday)
-	// calendar, creating it on demand if workspace.country is set.
-	// Has no effect when workspace.country is NULL.
-	SubscribeHolidayCalendar bool
 }
 
 // AddWorkspaceMemberResult reports which side effects memberkit
@@ -56,9 +51,6 @@ type AddWorkspaceMemberResult struct {
 	CreatedMember      bool
 	ReenabledMember    bool
 	CreatedCalendar    bool
-	CreatedHolidayCal  bool
-	SubscribedHoliday  bool
-	HolidayCalendarID  uint32
 	PersonalCalendarID uint32
 }
 
@@ -68,10 +60,10 @@ type AddWorkspaceMemberResult struct {
 // returns their existing row without touching the calendar side; a
 // previously-removed (soft-disabled) member is re-enabled.
 //
-// Invariant: the four possible side effects (member row, personal
-// calendar, personal subscription, holiday subscription) all happen
-// inside the caller's transaction. If any step fails, the caller
-// rolls back and none of the rows stick.
+// Invariant: the three possible side effects (member row, personal
+// calendar, personal subscription) all happen inside the caller's
+// transaction. If any step fails, the caller rolls back and none of
+// the rows stick.
 func AddWorkspaceMember(ctx context.Context, tx TX, args AddWorkspaceMemberArgs) (AddWorkspaceMemberResult, error) {
 	if !args.Role.IsValid() {
 		return AddWorkspaceMemberResult{}, fmt.Errorf("memberkit: invalid role %q", args.Role)
@@ -167,37 +159,6 @@ func AddWorkspaceMember(ctx context.Context, tx TX, args AddWorkspaceMemberArgs)
 		}
 	}
 
-	// Step 3: subscribe to the holiday calendar when the workspace
-	// has a country set.
-	if args.SubscribeHolidayCalendar {
-		ws, werr := findWorkspaceByID(ctx, tx, args.WorkspaceID)
-		if werr != nil && !errors.Is(werr, sql.ErrNoRows) {
-			return res, fmt.Errorf("memberkit: load workspace: %w", werr)
-		}
-		if werr == nil && ws.country.Valid && ws.country.String != "" {
-			country := ws.country.String
-			calID, herr := findSystemHolidayCalendar(ctx, tx, args.WorkspaceID, country)
-			switch {
-			case herr == nil:
-				res.HolidayCalendarID = calID
-			case errors.Is(herr, sql.ErrNoRows):
-				// Create the system calendar on first subscription.
-				name := country + " Holidays"
-				calID, err := createCalendar(ctx, tx, args.WorkspaceID, "system", name, "#EA4335", 0, holidaySlug(country))
-				if err != nil {
-					return res, err
-				}
-				res.HolidayCalendarID = calID
-				res.CreatedHolidayCal = true
-			default:
-				return res, fmt.Errorf("memberkit: find holiday calendar: %w", herr)
-			}
-			if err := createSubscription(ctx, tx, args.WorkspaceID, res.HolidayCalendarID, args.UserID, "#EA4335"); err != nil {
-				return res, err
-			}
-			res.SubscribedHoliday = true
-		}
-	}
 
 	// Step 4: emit the audit event. Inviter (if any) is the actor,
 	// otherwise the user themselves (self-registration).
@@ -218,7 +179,6 @@ func AddWorkspaceMember(ctx context.Context, tx TX, args AddWorkspaceMemberArgs)
 			"role":            string(args.Role),
 			"reenabled":       res.ReenabledMember,
 			"createdCalendar": res.CreatedCalendar,
-			"subscribedHol":   res.SubscribedHoliday,
 		},
 	}); err != nil {
 		return res, fmt.Errorf("memberkit: append event: %w", err)

@@ -104,24 +104,6 @@ type TX interface {
 	QueryContext(ctx context.Context, q string, a ...any) (*sql.Rows, error)
 }
 
-// workspaceRow is memberkit's minimal projection of a workspaces row —
-// just the fields needed to decide whether to auto-subscribe to a
-// system (holiday) calendar.
-type workspaceRow struct {
-	id      uint32
-	country sql.NullString
-}
-
-// findWorkspaceByID reads the workspace's country for holiday
-// subscription. Returns sql.ErrNoRows when the workspace is missing
-// or disabled.
-func findWorkspaceByID(ctx context.Context, tx TX, wsID uint32) (workspaceRow, error) {
-	const q = `SELECT id, country FROM workspaces WHERE id = ? AND enabled = TRUE`
-	var w workspaceRow
-	err := tx.QueryRowContext(ctx, q, wsID).Scan(&w.id, &w.country)
-	return w, err
-}
-
 // findExistingMember returns (memberID, enabled, nil) when the row
 // exists, (0, false, sql.ErrNoRows) when it does not.
 func findExistingMember(ctx context.Context, tx TX, wsID, userID uint32) (uint32, bool, error) {
@@ -164,40 +146,6 @@ func findPersonalCalendar(ctx context.Context, tx TX, wsID, userID uint32) (uint
 	var id uint32
 	err := tx.QueryRowContext(ctx, q, wsID, userID).Scan(&id)
 	return id, err
-}
-
-// findSystemHolidayCalendar returns the ID of the workspace's system
-// holiday calendar for the given country, or sql.ErrNoRows when none
-// exists yet.
-func findSystemHolidayCalendar(ctx context.Context, tx TX, wsID uint32, country string) (uint32, error) {
-	const q = `SELECT id FROM calendars
-	           WHERE workspace_id = ?
-	             AND kind = 'system'
-	             AND system_slug = ?
-	           LIMIT 1`
-	var id uint32
-	err := tx.QueryRowContext(ctx, q, wsID, holidaySlug(country)).Scan(&id)
-	return id, err
-}
-
-// holidaySlug builds the canonical system_slug for a country's
-// holiday feed. Mirrors flow-api calendars/auto_create.holidaySlug.
-func holidaySlug(country string) string {
-	return "holidays." + lowercase(country)
-}
-
-// lowercase is a tiny helper so memberkit does not pull in strings
-// just for ToLower.
-func lowercase(s string) string {
-	b := make([]byte, len(s))
-	for i := 0; i < len(s); i++ {
-		c := s[i]
-		if c >= 'A' && c <= 'Z' {
-			c += 'a' - 'A'
-		}
-		b[i] = c
-	}
-	return string(b)
 }
 
 // createCalendar inserts a calendars row and returns its internal id.

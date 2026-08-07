@@ -75,11 +75,10 @@ func Create(deps Deps) func(context.Context, *CreateWorkspaceInput) (*CreateWork
 			// Add the creator as owner through memberkit so their
 			// personal calendar layer materialises in the same tx.
 			if _, err := memberkit.AddWorkspaceMember(ctx, tx, memberkit.AddWorkspaceMemberArgs{
-				WorkspaceID:              uint32(id), //#nosec G115 -- LastInsertId for workspaces.id (BIGINT UNSIGNED), fits uint32 within realistic deployments
-				UserID:                   uid,
-				Role:                     memberkit.RoleOwner,
-				EnsurePersonalCalendar:   true,
-				SubscribeHolidayCalendar: country != "",
+				WorkspaceID:            uint32(id), //#nosec G115 -- LastInsertId for workspaces.id (BIGINT UNSIGNED), fits uint32 within realistic deployments
+				UserID:                 uid,
+				Role:                   memberkit.RoleOwner,
+				EnsurePersonalCalendar: true,
 			}); err != nil {
 				return err
 			}
