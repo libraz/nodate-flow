@@ -18,6 +18,7 @@ import jaAdmin from '../../../locales/ja/admin.json';
 const navigateMock = vi.hoisted(() => vi.fn());
 vi.mock('@tanstack/react-router', () => ({
   useNavigate: () => navigateMock,
+  useLocation: () => ({ href: '/profile' }),
   Link: ({ children, to }: { children: ReactNode; to?: string }) => (
     <a href={to ?? '#'}>{children}</a>
   ),
