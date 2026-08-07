@@ -85,6 +85,17 @@ func ConfirmUpload(deps Deps) func(context.Context, *ConfirmTaskAttachmentInput)
 		size := uint64(actual) //#nosec G115 -- StatObject returns a non-negative object size
 
 		if !storage.ExceedsUploadLimit(size, handlerutil.MaxUploadSize) {
+			// The size is now a measurement rather than a claim, so the
+			// row stops being a reservation: it becomes a dedup
+			// candidate and the sweeper leaves it alone. The measured
+			// size replaces the declared one, which until this point
+			// was whatever the client felt like sending.
+			if err := deps.Queries.MarkStorageObjectUploaded(ctx, generated.MarkStorageObjectUploadedParams{
+				ByteSize: size,
+				ID:       row.StorageObjectID,
+			}); err != nil {
+				return nil, httpErr(apierrors.InternalUnexpected)
+			}
 			out := &ConfirmTaskAttachmentOutput{}
 			out.Body.Ok = true
 			out.Body.ByteSize = size

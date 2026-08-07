@@ -3842,6 +3842,8 @@ type StorageObject struct {
 	StorageKey string `json:"storageKey"`
 	// Number of referencing rows (attachments / users.avatar_storage_object_id); GC eligible when 0
 	RefCount uint32 `json:"refCount"`
+	// When the upload behind this row was confirmed present in object storage. NULL means the row was created to hand out an upload URL and the bytes have not been seen since: the size the client declared is unverified, so the row is not a dedup candidate and the sweeper reclaims it once the URL it was minted for has expired.
+	UploadedAt sql.NullTime `json:"uploadedAt"`
 	// Display order
 	SortWeight int32 `json:"sortWeight"`
 	// Admin notes

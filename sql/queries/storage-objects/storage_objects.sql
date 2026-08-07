@@ -12,6 +12,7 @@ SELECT
   content_type,
   storage_key,
   ref_count,
+  uploaded_at,
   enabled,
   updated_at,
   created_at
@@ -35,6 +36,7 @@ SELECT
   content_type,
   storage_key,
   ref_count,
+  uploaded_at,
   enabled,
   updated_at,
   created_at
@@ -58,6 +60,7 @@ SELECT
   content_type,
   storage_key,
   ref_count,
+  uploaded_at,
   enabled,
   updated_at,
   created_at
@@ -109,4 +112,78 @@ WHERE id = ?
 -- sweeper leaves the underlying MinIO blob alone.
 DELETE FROM storage_objects
 WHERE id = ?
+  AND ref_count = 0;
+
+-- name: MarkStorageObjectUploaded :exec
+-- Record that the bytes behind this row have been seen in object
+-- storage and their real size checked. Until this runs the row is a
+-- reservation, not a stored object: the only size anyone has is the one
+-- the client declared, which is exactly the number an attacker lies
+-- about. The stamp is what promotes it to a dedup candidate and takes
+-- it out of the sweeper's reach.
+UPDATE storage_objects
+SET uploaded_at = NOW(3),
+    byte_size   = sqlc.arg(byte_size)
+WHERE id = sqlc.arg(id)
+  AND enabled = TRUE;
+
+-- name: ListUnconfirmedStorageObjects :many
+-- Reservations whose upload never arrived. The cutoff is supplied by
+-- the caller and must be past the lifetime of the presigned URL the row
+-- was created for: while that URL is valid an upload can still land, so
+-- reclaiming earlier would delete a row out from under a transfer in
+-- progress.
+SELECT
+  id,
+  public_id,
+  workspace_id,
+  storage_key,
+  ref_count,
+  created_at
+FROM storage_objects
+WHERE uploaded_at IS NULL
+  AND created_at < sqlc.arg(cutoff)
+  AND enabled = TRUE
+ORDER BY created_at ASC
+LIMIT ?;
+
+-- name: ListUnreferencedStorageObjects :many
+-- Rows nothing points at any more. The delete paths drop these inline,
+-- so anything showing up here is the residue of a delete that got part
+-- way — an object-store call that failed, a workspace teardown that
+-- died — and would otherwise sit in the bucket forever.
+SELECT
+  id,
+  public_id,
+  workspace_id,
+  storage_key,
+  ref_count,
+  created_at
+FROM storage_objects
+WHERE ref_count = 0
+  AND enabled = TRUE
+ORDER BY created_at ASC
+LIMIT ?;
+
+-- name: DeleteAttachmentsForStorageObject :execrows
+-- Drop the attachment rows that point at a reservation being reclaimed.
+-- They exist because the presign created both in one transaction, and
+-- fk_attachments_storage_object is RESTRICT, so the storage object
+-- cannot go while they remain. An attachment whose bytes never arrived
+-- has nothing to show anyway.
+DELETE FROM attachments
+WHERE storage_object_id = ?;
+
+-- name: DeleteCalendarEventAttachmentsForStorageObject :execrows
+-- The calendar-side mirror of DeleteAttachmentsForStorageObject; the
+-- same RESTRICT edge exists from calendar_event_attachments.
+DELETE FROM calendar_event_attachments
+WHERE storage_object_id = ?;
+
+-- name: DeleteStorageObjectByID :execrows
+-- Remove a reclaimed row. Restricted to rows nothing references so a
+-- concurrent upload that adopted the row between listing and deleting
+-- is left alone.
+DELETE FROM storage_objects
+WHERE id = sqlc.arg(id)
   AND ref_count = 0;

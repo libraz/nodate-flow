@@ -7,6 +7,7 @@ import (
 
 	"github.com/google/uuid"
 
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated/calendar"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
 	apierrors "github.com/libraz/nodate-flow/apps/flow-api/internal/errors"
@@ -82,6 +83,15 @@ func ConfirmAttachment(deps Deps) func(context.Context, *ConfirmAttachmentInput)
 		size := uint64(actual) //#nosec G115 -- StatObject returns a non-negative object size
 
 		if !storage.ExceedsUploadLimit(size, handlerutil.MaxUploadSize) {
+			// The size is now a measurement rather than a claim, so the
+			// row stops being a reservation: it becomes a dedup
+			// candidate and the sweeper leaves it alone.
+			if err := deps.Queries.MarkStorageObjectUploaded(ctx, generated.MarkStorageObjectUploadedParams{
+				ByteSize: size,
+				ID:       att.StorageObjectID,
+			}); err != nil {
+				return nil, httpErr(apierrors.InternalUnexpected)
+			}
 			out := &ConfirmAttachmentOutput{}
 			out.Body.Ok = true
 			out.Body.ByteSize = size

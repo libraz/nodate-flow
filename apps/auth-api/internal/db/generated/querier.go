@@ -186,10 +186,23 @@ type Querier interface {
 	// any documented contract. Removing the referrers up front makes the
 	// teardown independent of it.
 	DeleteAttachmentsByWorkspace(ctx context.Context, workspaceID uint32) error
+	// Drop the attachment rows that point at a reservation being reclaimed.
+	// They exist because the presign created both in one transaction, and
+	// fk_attachments_storage_object is RESTRICT, so the storage object
+	// cannot go while they remain. An attachment whose bytes never arrived
+	// has nothing to show anyway.
+	DeleteAttachmentsForStorageObject(ctx context.Context, storageObjectID uint32) (int64, error)
 	// Calendar-side counterpart of DeleteAttachmentsByWorkspace;
 	// calendar_event_attachments.storage_object_id carries the same
 	// ON DELETE RESTRICT. See that query for the full rationale.
 	DeleteCalendarEventAttachmentsByWorkspace(ctx context.Context, workspaceID uint32) error
+	// The calendar-side mirror of DeleteAttachmentsForStorageObject; the
+	// same RESTRICT edge exists from calendar_event_attachments.
+	DeleteCalendarEventAttachmentsForStorageObject(ctx context.Context, storageObjectID uint32) (int64, error)
+	// Remove a reclaimed row. Restricted to rows nothing references so a
+	// concurrent upload that adopted the row between listing and deleting
+	// is left alone.
+	DeleteStorageObjectByID(ctx context.Context, id uint32) (int64, error)
 	// Hard-delete a storage object row only if no referencing rows remain.
 	// The WHERE ref_count = 0 makes this race-safe against a concurrent
 	// IncrementStorageObjectRefCount: if another transaction grabbed the
@@ -420,6 +433,17 @@ type Querier interface {
 	// here because purge IS the admin tooling that operates across the
 	// workspace boundary by design.
 	ListStorageObjectsByWorkspace(ctx context.Context, workspaceID sql.NullInt32) ([]ListStorageObjectsByWorkspaceRow, error)
+	// Reservations whose upload never arrived. The cutoff is supplied by
+	// the caller and must be past the lifetime of the presigned URL the row
+	// was created for: while that URL is valid an upload can still land, so
+	// reclaiming earlier would delete a row out from under a transfer in
+	// progress.
+	ListUnconfirmedStorageObjects(ctx context.Context, arg ListUnconfirmedStorageObjectsParams) ([]ListUnconfirmedStorageObjectsRow, error)
+	// Rows nothing points at any more. The delete paths drop these inline,
+	// so anything showing up here is the residue of a delete that got part
+	// way — an object-store call that failed, a workspace teardown that
+	// died — and would otherwise sit in the bucket forever.
+	ListUnreferencedStorageObjects(ctx context.Context, limit int32) ([]ListUnreferencedStorageObjectsRow, error)
 	// List every active integration owned by a user. Tokens are NOT
 	// selected; only metadata used by the /me/integrations list view.
 	ListUserIntegrations(ctx context.Context, userID uint32) ([]ListUserIntegrationsRow, error)
@@ -463,6 +487,13 @@ type Querier interface {
 	// and the loser sees zero affected rows. Callers MUST inspect
 	// RowsAffected and treat 0 as "already consumed" (reject the attempt).
 	MarkRecoveryCodeUsed(ctx context.Context, id uint32) (int64, error)
+	// Record that the bytes behind this row have been seen in object
+	// storage and their real size checked. Until this runs the row is a
+	// reservation, not a stored object: the only size anyone has is the one
+	// the client declared, which is exactly the number an attacker lies
+	// about. The stamp is what promotes it to a dedup candidate and takes
+	// it out of the sweeper's reach.
+	MarkStorageObjectUploaded(ctx context.Context, arg MarkStorageObjectUploadedParams) error
 	// Patch the authenticated user's profile. NULL params leave the column untouched.
 	PatchMe(ctx context.Context, arg PatchMeParams) error
 	// Patch a workspace via COALESCE; NULL params leave existing columns untouched.

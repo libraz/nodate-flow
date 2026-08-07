@@ -240,11 +240,12 @@ func PresignAttachment(deps Deps) func(context.Context, *PresignAttachmentInput)
 		baseStorageKey := storage.KeyForWorkspace(wsHex, shaHex)
 
 		var (
-			storageObjectID uint32
-			deduplicated    bool
-			storageKey      string
-			attPub          = types.New()
-			committed       bool
+			storageObjectID    uint32
+			deduplicated       bool
+			existingUploadedAt sql.NullTime
+			storageKey         string
+			attPub             = types.New()
+			committed          bool
 		)
 
 	attempts:
@@ -278,6 +279,7 @@ func PresignAttachment(deps Deps) func(context.Context, *PresignAttachmentInput)
 				}
 				storageObjectID = existing.ID
 				storageKey = existing.StorageKey
+				existingUploadedAt = existing.UploadedAt
 				deduplicated = true
 			case stderrors.Is(findErr, sql.ErrNoRows):
 				// Miss: allocate a new storage_objects row with ref_count=1.
@@ -366,7 +368,23 @@ func PresignAttachment(deps Deps) func(context.Context, *PresignAttachmentInput)
 		// database transaction open across one is how lock contention
 		// becomes an outage.
 		if deduplicated {
-			if _, statErr := deps.Storage.StatObject(ctx, storageKey); statErr != nil {
+			// Two different ways the promise can be false, and neither
+			// implies the other.
+			//
+			// A row with no uploaded_at is a reservation: it was
+			// created to hand out an upload URL, and the only size
+			// anyone has for it is the one the client declared. That is
+			// exactly the number an attacker lies about — declare one
+			// byte, send ten gigabytes, never confirm — so treating it
+			// as stored content would let the lie be inherited by
+			// everyone who uploads the same file afterwards.
+			//
+			// A row that was confirmed can still have lost its object
+			// afterwards, to a bucket lifecycle rule or a partial
+			// restore, and no column records that. Only the store knows.
+			if !existingUploadedAt.Valid {
+				deduplicated = false
+			} else if _, statErr := deps.Storage.StatObject(ctx, storageKey); statErr != nil {
 				deduplicated = false
 			}
 		}

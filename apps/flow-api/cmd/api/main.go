@@ -38,6 +38,7 @@ import (
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/outbound"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/reconciler"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/storage"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/storagegc"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/stream"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/webhook"
 	"github.com/libraz/nodate-flow/packages/go-shared/authn"
@@ -588,6 +589,17 @@ func main() {
 	importWorker := importer.NewWorker(db, queries, logger)
 	importWorker.Start(context.Background())
 
+	// Storage sweeper: reclaims upload reservations whose bytes never
+	// arrived, and rows an interrupted delete left unreferenced. Six
+	// places in the codebase were written assuming this existed.
+	var storageSweeper *storagegc.Sweeper
+	if storageClient != nil {
+		storageSweeper = storagegc.New(db, queries, storageClient, logger)
+		storageSweeper.Start(context.Background())
+	} else {
+		logger.Warn("storage sweeper disabled: no object store configured")
+	}
+
 	// Autonomous auto-action executor: periodically evaluates tasks and
 	// applies deterministic actions (escalate overdue, close stale
 	// reviews) without human intervention. Controlled by
@@ -677,6 +689,9 @@ func main() {
 	autoActionExec.Stop()
 	webhookWorker.Stop()
 	importWorker.Stop()
+	if storageSweeper != nil {
+		storageSweeper.Stop()
+	}
 	schedulerCancel()
 	if reconcilerCancel != nil {
 		reconcilerCancel()

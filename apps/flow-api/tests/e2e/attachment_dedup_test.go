@@ -156,6 +156,21 @@ func countAttachmentsForStorageKey(t *testing.T, db *sql.DB, storageKey string) 
 	return n
 }
 
+// confirmAttachment completes an upload the way a real client does.
+//
+// The presign only reserves a row; the confirm is what measures the
+// object and records that its size is a fact rather than the number the
+// client typed. A test that uploads without confirming is modelling a
+// client that walked away, which is a different scenario from a
+// finished upload — and since an unmeasured row is deliberately not a
+// dedup candidate, leaving it out changes what the test is about.
+func confirmAttachment(t *testing.T, token, taskID, attachmentID string) {
+	t.Helper()
+	doJSON(t, http.MethodPost,
+		fmt.Sprintf("%s/tasks/%s/attachments/%s/confirm", testServerURL, taskID, attachmentID),
+		token, nil, nil)
+}
+
 // TestPresignDedupHit verifies that re-uploading the same payload in
 // the same workspace produces a single storage_objects row whose
 // ref_count tracks the number of attachments pointing at it.
@@ -181,6 +196,7 @@ func TestPresignDedupHit(t *testing.T) {
 			first.RequiredHeaders["x-amz-content-sha256"],
 			"requiredHeaders must pin the body hash for SigV4 verification")
 		uploadViaPresignedURL(t, first.UploadURL, "image/png", payload, first.RequiredHeaders)
+		confirmAttachment(t, tt.AccessToken, taskID, first.AttachmentID)
 		testStorage.MustExist(t, first.StorageKey)
 
 		rc, ok := storageObjectRefCount(t, testDB, first.StorageKey)
@@ -406,6 +422,7 @@ func TestPresignAbandonedUploadDoesNotPoisonDedup(t *testing.T) {
 		"the repair must fill the key the existing row already points at, not allocate a second one")
 
 	uploadViaPresignedURL(t, second.UploadURL, "image/png", payload, second.RequiredHeaders)
+	confirmAttachment(t, tt.AccessToken, taskID, second.AttachmentID)
 	testStorage.MustExist(t, second.StorageKey)
 
 	// And once the bytes are really there, dedup works as intended.
@@ -453,4 +470,58 @@ func TestPresignRepairsAnAlreadyPoisonedRow(t *testing.T) {
 
 	uploadViaPresignedURL(t, repaired.UploadURL, "image/png", payload, repaired.RequiredHeaders)
 	testStorage.MustExist(t, repaired.StorageKey)
+}
+
+// TestUnconfirmedUploadIsNotADedupCandidate is the first half of the
+// size-limit fix.
+//
+// The ceiling is enforced on a number the client supplies at presign
+// time, and the presigned PUT binds only the body's hash, not its
+// length. A member can therefore declare one byte, send whatever they
+// like, and never call confirm — nothing measures the result. The row
+// that upload created must not then be handed to the next person as
+// proof the content is stored, because the size on it is still the
+// number the first client made up.
+func TestUnconfirmedUploadIsNotADedupCandidate(t *testing.T) {
+	bootstrap(t)
+	requireStorage(t)
+	t.Parallel()
+
+	tt := newTenant(t)
+	taskID := createTaskForAttachment(t, tt.AccessToken, tt.ProjectPublicID, "Unconfirmed")
+	payload := makePNG(t, 8, 8, color.RGBA{R: 21, G: 22, B: 23, A: 255})
+
+	// Upload, but never confirm: the bytes are in the bucket and the
+	// row still carries only the declared size.
+	first := presignAttachment(t, tt.AccessToken, taskID, "unconfirmed.png", "image/png", payload)
+	uploadViaPresignedURL(t, first.UploadURL, "image/png", payload, first.RequiredHeaders)
+	testStorage.MustExist(t, first.StorageKey)
+
+	second := presignAttachment(t, tt.AccessToken, taskID, "next.png", "image/png", payload)
+	require.False(t, second.Deduplicated,
+		"a row whose size was never measured must not be presented as stored content")
+	require.NotEmpty(t, second.UploadURL)
+	require.Equal(t, first.StorageKey, second.StorageKey)
+}
+
+// TestConfirmedUploadBecomesADedupCandidate is the other half: once the
+// size has been measured rather than claimed, the row is trustworthy and
+// dedup does its job.
+func TestConfirmedUploadBecomesADedupCandidate(t *testing.T) {
+	bootstrap(t)
+	requireStorage(t)
+	t.Parallel()
+
+	tt := newTenant(t)
+	taskID := createTaskForAttachment(t, tt.AccessToken, tt.ProjectPublicID, "Confirmed")
+	payload := makePNG(t, 8, 8, color.RGBA{R: 31, G: 32, B: 33, A: 255})
+
+	first := presignAttachment(t, tt.AccessToken, taskID, "confirmed.png", "image/png", payload)
+	uploadViaPresignedURL(t, first.UploadURL, "image/png", payload, first.RequiredHeaders)
+	confirmAttachment(t, tt.AccessToken, taskID, first.AttachmentID)
+
+	second := presignAttachment(t, tt.AccessToken, taskID, "copy.png", "image/png", payload)
+	require.True(t, second.Deduplicated,
+		"a measured upload is what dedup is for")
+	require.Empty(t, second.UploadURL)
 }

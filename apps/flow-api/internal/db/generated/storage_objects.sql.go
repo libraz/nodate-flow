@@ -28,6 +28,56 @@ func (q *Queries) DecrementStorageObjectRefCount(ctx context.Context, id uint32)
 	return q.db.ExecContext(ctx, decrementStorageObjectRefCount, id)
 }
 
+const deleteAttachmentsForStorageObject = `-- name: DeleteAttachmentsForStorageObject :execrows
+DELETE FROM attachments
+WHERE storage_object_id = ?
+`
+
+// Drop the attachment rows that point at a reservation being reclaimed.
+// They exist because the presign created both in one transaction, and
+// fk_attachments_storage_object is RESTRICT, so the storage object
+// cannot go while they remain. An attachment whose bytes never arrived
+// has nothing to show anyway.
+func (q *Queries) DeleteAttachmentsForStorageObject(ctx context.Context, storageObjectID uint32) (int64, error) {
+	result, err := q.db.ExecContext(ctx, deleteAttachmentsForStorageObject, storageObjectID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
+}
+
+const deleteCalendarEventAttachmentsForStorageObject = `-- name: DeleteCalendarEventAttachmentsForStorageObject :execrows
+DELETE FROM calendar_event_attachments
+WHERE storage_object_id = ?
+`
+
+// The calendar-side mirror of DeleteAttachmentsForStorageObject; the
+// same RESTRICT edge exists from calendar_event_attachments.
+func (q *Queries) DeleteCalendarEventAttachmentsForStorageObject(ctx context.Context, storageObjectID uint32) (int64, error) {
+	result, err := q.db.ExecContext(ctx, deleteCalendarEventAttachmentsForStorageObject, storageObjectID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
+}
+
+const deleteStorageObjectByID = `-- name: DeleteStorageObjectByID :execrows
+DELETE FROM storage_objects
+WHERE id = ?
+  AND ref_count = 0
+`
+
+// Remove a reclaimed row. Restricted to rows nothing references so a
+// concurrent upload that adopted the row between listing and deleting
+// is left alone.
+func (q *Queries) DeleteStorageObjectByID(ctx context.Context, id uint32) (int64, error) {
+	result, err := q.db.ExecContext(ctx, deleteStorageObjectByID, id)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
+}
+
 const deleteStorageObjectIfUnreferenced = `-- name: DeleteStorageObjectIfUnreferenced :execresult
 DELETE FROM storage_objects
 WHERE id = ?
@@ -54,6 +104,7 @@ SELECT
   content_type,
   storage_key,
   ref_count,
+  uploaded_at,
   enabled,
   updated_at,
   created_at
@@ -73,6 +124,7 @@ type FindStorageObjectByIDRow struct {
 	ContentType string         `json:"contentType"`
 	StorageKey  string         `json:"storageKey"`
 	RefCount    uint32         `json:"refCount"`
+	UploadedAt  sql.NullTime   `json:"uploadedAt"`
 	Enabled     bool           `json:"enabled"`
 	UpdatedAt   sql.NullTime   `json:"updatedAt"`
 	CreatedAt   time.Time      `json:"createdAt"`
@@ -94,6 +146,7 @@ func (q *Queries) FindStorageObjectByID(ctx context.Context, id uint32) (FindSto
 		&i.ContentType,
 		&i.StorageKey,
 		&i.RefCount,
+		&i.UploadedAt,
 		&i.Enabled,
 		&i.UpdatedAt,
 		&i.CreatedAt,
@@ -112,6 +165,7 @@ SELECT
   content_type,
   storage_key,
   ref_count,
+  uploaded_at,
   enabled,
   updated_at,
   created_at
@@ -137,6 +191,7 @@ type FindStorageObjectByOwnerUserShaRow struct {
 	ContentType string         `json:"contentType"`
 	StorageKey  string         `json:"storageKey"`
 	RefCount    uint32         `json:"refCount"`
+	UploadedAt  sql.NullTime   `json:"uploadedAt"`
 	Enabled     bool           `json:"enabled"`
 	UpdatedAt   sql.NullTime   `json:"updatedAt"`
 	CreatedAt   time.Time      `json:"createdAt"`
@@ -158,6 +213,7 @@ func (q *Queries) FindStorageObjectByOwnerUserSha(ctx context.Context, arg FindS
 		&i.ContentType,
 		&i.StorageKey,
 		&i.RefCount,
+		&i.UploadedAt,
 		&i.Enabled,
 		&i.UpdatedAt,
 		&i.CreatedAt,
@@ -176,6 +232,7 @@ SELECT
   content_type,
   storage_key,
   ref_count,
+  uploaded_at,
   enabled,
   updated_at,
   created_at
@@ -201,6 +258,7 @@ type FindStorageObjectByWorkspaceShaRow struct {
 	ContentType string         `json:"contentType"`
 	StorageKey  string         `json:"storageKey"`
 	RefCount    uint32         `json:"refCount"`
+	UploadedAt  sql.NullTime   `json:"uploadedAt"`
 	Enabled     bool           `json:"enabled"`
 	UpdatedAt   sql.NullTime   `json:"updatedAt"`
 	CreatedAt   time.Time      `json:"createdAt"`
@@ -222,6 +280,7 @@ func (q *Queries) FindStorageObjectByWorkspaceSha(ctx context.Context, arg FindS
 		&i.ContentType,
 		&i.StorageKey,
 		&i.RefCount,
+		&i.UploadedAt,
 		&i.Enabled,
 		&i.UpdatedAt,
 		&i.CreatedAt,
@@ -281,4 +340,151 @@ func (q *Queries) InsertStorageObject(ctx context.Context, arg InsertStorageObje
 		arg.ContentType,
 		arg.StorageKey,
 	)
+}
+
+const listUnconfirmedStorageObjects = `-- name: ListUnconfirmedStorageObjects :many
+SELECT
+  id,
+  public_id,
+  workspace_id,
+  storage_key,
+  ref_count,
+  created_at
+FROM storage_objects
+WHERE uploaded_at IS NULL
+  AND created_at < ?
+  AND enabled = TRUE
+ORDER BY created_at ASC
+LIMIT ?
+`
+
+type ListUnconfirmedStorageObjectsParams struct {
+	Cutoff time.Time `json:"cutoff"`
+	Limit  int32     `json:"limit"`
+}
+
+type ListUnconfirmedStorageObjectsRow struct {
+	ID          uint32         `json:"-"`
+	PublicID    types.PublicID `json:"publicId"`
+	WorkspaceID sql.NullInt32  `json:"-"`
+	StorageKey  string         `json:"storageKey"`
+	RefCount    uint32         `json:"refCount"`
+	CreatedAt   time.Time      `json:"createdAt"`
+}
+
+// Reservations whose upload never arrived. The cutoff is supplied by
+// the caller and must be past the lifetime of the presigned URL the row
+// was created for: while that URL is valid an upload can still land, so
+// reclaiming earlier would delete a row out from under a transfer in
+// progress.
+func (q *Queries) ListUnconfirmedStorageObjects(ctx context.Context, arg ListUnconfirmedStorageObjectsParams) ([]ListUnconfirmedStorageObjectsRow, error) {
+	rows, err := q.db.QueryContext(ctx, listUnconfirmedStorageObjects, arg.Cutoff, arg.Limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListUnconfirmedStorageObjectsRow{}
+	for rows.Next() {
+		var i ListUnconfirmedStorageObjectsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.PublicID,
+			&i.WorkspaceID,
+			&i.StorageKey,
+			&i.RefCount,
+			&i.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listUnreferencedStorageObjects = `-- name: ListUnreferencedStorageObjects :many
+SELECT
+  id,
+  public_id,
+  workspace_id,
+  storage_key,
+  ref_count,
+  created_at
+FROM storage_objects
+WHERE ref_count = 0
+  AND enabled = TRUE
+ORDER BY created_at ASC
+LIMIT ?
+`
+
+type ListUnreferencedStorageObjectsRow struct {
+	ID          uint32         `json:"-"`
+	PublicID    types.PublicID `json:"publicId"`
+	WorkspaceID sql.NullInt32  `json:"-"`
+	StorageKey  string         `json:"storageKey"`
+	RefCount    uint32         `json:"refCount"`
+	CreatedAt   time.Time      `json:"createdAt"`
+}
+
+// Rows nothing points at any more. The delete paths drop these inline,
+// so anything showing up here is the residue of a delete that got part
+// way — an object-store call that failed, a workspace teardown that
+// died — and would otherwise sit in the bucket forever.
+func (q *Queries) ListUnreferencedStorageObjects(ctx context.Context, limit int32) ([]ListUnreferencedStorageObjectsRow, error) {
+	rows, err := q.db.QueryContext(ctx, listUnreferencedStorageObjects, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListUnreferencedStorageObjectsRow{}
+	for rows.Next() {
+		var i ListUnreferencedStorageObjectsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.PublicID,
+			&i.WorkspaceID,
+			&i.StorageKey,
+			&i.RefCount,
+			&i.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const markStorageObjectUploaded = `-- name: MarkStorageObjectUploaded :exec
+UPDATE storage_objects
+SET uploaded_at = NOW(3),
+    byte_size   = ?
+WHERE id = ?
+  AND enabled = TRUE
+`
+
+type MarkStorageObjectUploadedParams struct {
+	ByteSize uint64 `json:"byteSize"`
+	ID       uint32 `json:"-"`
+}
+
+// Record that the bytes behind this row have been seen in object
+// storage and their real size checked. Until this runs the row is a
+// reservation, not a stored object: the only size anyone has is the one
+// the client declared, which is exactly the number an attacker lies
+// about. The stamp is what promotes it to a dedup candidate and takes
+// it out of the sweeper's reach.
+func (q *Queries) MarkStorageObjectUploaded(ctx context.Context, arg MarkStorageObjectUploadedParams) error {
+	_, err := q.db.ExecContext(ctx, markStorageObjectUploaded, arg.ByteSize, arg.ID)
+	return err
 }
