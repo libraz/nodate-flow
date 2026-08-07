@@ -110,6 +110,19 @@ func presignCalendarAttachment(
 	return out
 }
 
+// confirmCalendarAttachment completes a calendar upload the way a real
+// client does, mirroring confirmAttachment on the task surface: the
+// presign only reserves a row, and the confirm is what measures the
+// object and turns the declared size into a checked one. Skipping it
+// leaves a reservation, which is deliberately not a dedup candidate.
+func confirmCalendarAttachment(t *testing.T, tt persona, calID, evtID, attID string) {
+	t.Helper()
+	doJSON(t, http.MethodPost,
+		fmt.Sprintf("%s/workspaces/%s/calendars/%s/events/%s/attachments/%s/confirm",
+			testServerURL, tt.workspaceID(), calID, evtID, attID),
+		tt.token(), nil, nil)
+}
+
 // persona is the smallest interface attachment helpers need: a token
 // and a workspace public id. Both *helpers.TestTenant and any future
 // personas can satisfy it via the methods below.
@@ -155,6 +168,7 @@ func TestCalendarPresignDedupHit(t *testing.T) {
 	require.NotEmpty(t, first.RequiredHeaders["x-amz-content-sha256"],
 		"miss branch must return signed-header binding")
 	uploadViaPresignedURL(t, first.UploadURL, "image/png", payload, first.RequiredHeaders)
+	confirmCalendarAttachment(t, tt, calID, evtID, first.AttachmentID)
 	testStorage.MustExist(t, first.StorageKey)
 
 	rc, ok := storageObjectRefCount(t, testDB, first.StorageKey)
@@ -194,6 +208,7 @@ func TestCalendarDeleteRefCountGc(t *testing.T) {
 	first := presignCalendarAttachment(t, tt, calID, evtID, "first.png", "image/png", payload)
 	require.False(t, first.Deduplicated)
 	uploadViaPresignedURL(t, first.UploadURL, "image/png", payload, first.RequiredHeaders)
+	confirmCalendarAttachment(t, tt, calID, evtID, first.AttachmentID)
 
 	second := presignCalendarAttachment(t, tt, calID, evtID, "second.png", "image/png", payload)
 	require.True(t, second.Deduplicated)

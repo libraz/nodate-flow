@@ -157,14 +157,21 @@ func grantInstanceAdmin(t *testing.T, db *sql.DB, userPublicID string) {
 }
 
 // uploadAttachmentForTask creates a task in the supplied tenant's default
-// project, presigns + PUTs an attachment, and returns the attachment id
-// + storage key for downstream assertions.
+// project, presigns + PUTs + confirms an attachment, and returns the
+// attachment id + storage key for downstream assertions.
+//
+// The confirm is part of the upload, not an extra: a real client always
+// sends it, and it is what turns the reservation the presign created
+// into stored content — measured size, dedup candidate, out of the
+// sweeper's reach. Stopping after the PUT would model a client that
+// walked away, which is a different scenario from a finished upload.
 func uploadAttachmentForTask(t *testing.T, tt *helpers.TestTenant, label string, payload []byte) (taskID, storageKey string) {
 	t.Helper()
 	taskID = createTaskForAttachment(t, tt.AccessToken, tt.ProjectPublicID, label)
 	res := presignAttachment(t, tt.AccessToken, taskID, label+".png", "image/png", payload)
 	require.False(t, res.Deduplicated, "fresh upload must not be deduplicated")
 	uploadViaPresignedURL(t, res.UploadURL, "image/png", payload, res.RequiredHeaders)
+	confirmAttachment(t, tt.AccessToken, taskID, res.AttachmentID)
 	return taskID, res.StorageKey
 }
 
@@ -615,6 +622,7 @@ func TestAdminDeleteUserSharedAttachment(t *testing.T) {
 	first := presignAttachment(t, owner.AccessToken, taskID, "shared-a.png", "image/png", payload)
 	require.False(t, first.Deduplicated, "first upload must miss")
 	uploadViaPresignedURL(t, first.UploadURL, "image/png", payload, first.RequiredHeaders)
+	confirmAttachment(t, owner.AccessToken, taskID, first.AttachmentID)
 
 	second := presignAttachment(t, owner.AccessToken, taskID, "shared-b.png", "image/png", payload)
 	require.True(t, second.Deduplicated, "identical sha256 must hit the dedup path")

@@ -274,6 +274,7 @@ func TestDeleteRefCountGc(t *testing.T) {
 	first := presignAttachment(t, tt.AccessToken, taskID, "first.png", "image/png", payload)
 	require.False(t, first.Deduplicated)
 	uploadViaPresignedURL(t, first.UploadURL, "image/png", payload, first.RequiredHeaders)
+	confirmAttachment(t, tt.AccessToken, taskID, first.AttachmentID)
 
 	second := presignAttachment(t, tt.AccessToken, taskID, "second.png", "image/png", payload)
 	require.True(t, second.Deduplicated, "second presign must dedup")

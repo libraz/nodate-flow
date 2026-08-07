@@ -462,6 +462,18 @@ type Querier interface {
 	DeleteTaskEventLink(ctx context.Context, arg DeleteTaskEventLinkParams) error
 	// Remove a label from a task (hard delete from junction).
 	DeleteTaskLabel(ctx context.Context, arg DeleteTaskLabelParams) error
+	// Remove a reservation whose upload never arrived, guarded on the same
+	// predicate that selected it.
+	//
+	// Not ref_count: a reservation is born at ref_count = 1 for the
+	// attachment the presign created alongside it, and removing that
+	// attachment is not what decrements the count, so a ref_count = 0 guard
+	// here matches nothing and no reservation is ever reclaimed. Nor is
+	// ref_count the right question — an unconfirmed row is not offered to
+	// dedup, so nobody new can be pointing at it. The only thing that can
+	// still rescue the row is a confirm landing in this instant, and that
+	// is exactly what uploaded_at IS NULL loses to.
+	DeleteUnconfirmedStorageObjectByID(ctx context.Context, id uint32) (int64, error)
 	// Hard-delete a single integration row (user-scoped).
 	DeleteUserIntegration(ctx context.Context, arg DeleteUserIntegrationParams) error
 	DeleteWebhookSubscription(ctx context.Context, arg DeleteWebhookSubscriptionParams) error

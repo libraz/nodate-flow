@@ -187,3 +187,19 @@ WHERE storage_object_id = ?;
 DELETE FROM storage_objects
 WHERE id = sqlc.arg(id)
   AND ref_count = 0;
+
+-- name: DeleteUnconfirmedStorageObjectByID :execrows
+-- Remove a reservation whose upload never arrived, guarded on the same
+-- predicate that selected it.
+--
+-- Not ref_count: a reservation is born at ref_count = 1 for the
+-- attachment the presign created alongside it, and removing that
+-- attachment is not what decrements the count, so a ref_count = 0 guard
+-- here matches nothing and no reservation is ever reclaimed. Nor is
+-- ref_count the right question — an unconfirmed row is not offered to
+-- dedup, so nobody new can be pointing at it. The only thing that can
+-- still rescue the row is a confirm landing in this instant, and that
+-- is exactly what uploaded_at IS NULL loses to.
+DELETE FROM storage_objects
+WHERE id = sqlc.arg(id)
+  AND uploaded_at IS NULL;

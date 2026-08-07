@@ -25,6 +25,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/bgloop"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
 )
 
@@ -73,6 +74,7 @@ type Sweeper struct {
 	BatchSize      int32
 
 	stopOnce sync.Once
+	doneOnce sync.Once
 	stopCh   chan struct{}
 	done     chan struct{}
 }
@@ -89,9 +91,16 @@ func New(db *sql.DB, q *generated.Queries, store ObjectRemover, logger *slog.Log
 	}
 }
 
-// Start runs the sweep loop in its own goroutine and returns.
+// Start runs the sweep loop in its own supervised goroutine and
+// returns.
+//
+// Supervised because the loop is the only thing bounding what one
+// account can store. A pass that panics on one malformed row and is
+// never restarted leaves the ceiling off for every tenant, and the
+// only symptom is a bucket that keeps growing — the same silence the
+// missing sweeper produced in the first place.
 func (s *Sweeper) Start(ctx context.Context) {
-	go s.loop(ctx)
+	go bgloop.Run(ctx, "storage.sweeper", s.Logger, s.loop)
 	s.Logger.Info("storage sweeper started",
 		slog.Duration("interval", s.interval()),
 		slog.Duration("reservation_ttl", s.reservationTTL()),
@@ -109,7 +118,10 @@ func (s *Sweeper) Stop() {
 }
 
 func (s *Sweeper) loop(ctx context.Context) {
-	defer close(s.done)
+	// Once, not on every return: the supervisor restarts the loop after
+	// a panic, and a second close would take the process down by the
+	// route the supervisor exists to prevent.
+	defer s.doneOnce.Do(func() { close(s.done) })
 	ticker := time.NewTicker(s.interval())
 	defer ticker.Stop()
 	for {
@@ -132,6 +144,25 @@ type Result struct {
 	Unreferenced int
 }
 
+// reclaimKind picks the predicate the row delete is made conditional
+// on. The two kinds of residue are racing with different things, so one
+// guard cannot serve both.
+type reclaimKind int
+
+const (
+	// reservationKind is a row whose upload never arrived. Nobody new
+	// can be pointing at it — an unconfirmed row is deliberately not a
+	// dedup candidate — so the only way it stops being collectable is a
+	// confirm landing while this pass runs. Guard on the predicate that
+	// selected it and let the confirm win.
+	reservationKind reclaimKind = iota
+
+	// unreferencedKind is a row every referrer has already left. Here a
+	// concurrent upload really can adopt it, and adoption shows up as
+	// ref_count climbing back above zero.
+	unreferencedKind
+)
+
 // RunOnce reclaims one batch of each kind and reports the counts.
 //
 // The two kinds are swept in the same pass because they are the same
@@ -153,7 +184,7 @@ func (s *Sweeper) RunOnce(ctx context.Context) (Result, error) {
 		if err := ctx.Err(); err != nil {
 			return out, err
 		}
-		if s.reclaim(ctx, row.ID, row.StorageKey, "unconfirmed reservation") {
+		if s.reclaim(ctx, row.ID, row.StorageKey, reservationKind, "unconfirmed reservation") {
 			out.Reservations++
 		}
 	}
@@ -166,7 +197,7 @@ func (s *Sweeper) RunOnce(ctx context.Context) (Result, error) {
 		if err := ctx.Err(); err != nil {
 			return out, err
 		}
-		if s.reclaim(ctx, row.ID, row.StorageKey, "unreferenced object") {
+		if s.reclaim(ctx, row.ID, row.StorageKey, unreferencedKind, "unreferenced object") {
 			out.Unreferenced++
 		}
 	}
@@ -189,7 +220,7 @@ func (s *Sweeper) RunOnce(ctx context.Context) (Result, error) {
 // object-store call must not undo a committed delete — a blob left
 // behind is found again on the next pass, whereas a row rolled back
 // after its referrers were removed is a row nothing can reach.
-func (s *Sweeper) reclaim(ctx context.Context, id uint32, key, reason string) bool {
+func (s *Sweeper) reclaim(ctx context.Context, id uint32, key string, kind reclaimKind, reason string) bool {
 	log := s.Logger.With(
 		slog.Uint64("storage_object_id", uint64(id)),
 		slog.String("reason", reason),
@@ -212,14 +243,25 @@ func (s *Sweeper) reclaim(ctx context.Context, id uint32, key, reason string) bo
 		return false
 	}
 
-	affected, err := qtx.DeleteStorageObjectByID(ctx, id)
-	if err != nil {
-		log.Error("storage sweeper: delete row", slog.String("err", err.Error()))
+	var (
+		affected int64
+		delErr   error
+	)
+	switch kind {
+	case reservationKind:
+		affected, delErr = qtx.DeleteUnconfirmedStorageObjectByID(ctx, id)
+	case unreferencedKind:
+		affected, delErr = qtx.DeleteStorageObjectByID(ctx, id)
+	}
+	if delErr != nil {
+		log.Error("storage sweeper: delete row", slog.String("err", delErr.Error()))
 		return false
 	}
 	if affected == 0 {
-		// Someone adopted the row between the listing and now — a fresh
-		// upload of the same content deduped onto it. Leave it.
+		// The row stopped being collectable between the listing and
+		// now: a confirm landed on the reservation, or a fresh upload of
+		// the same content deduped onto the unreferenced row. Either way
+		// the guard held and the rollback puts the referrers back.
 		return false
 	}
 	if err := tx.Commit(); err != nil {

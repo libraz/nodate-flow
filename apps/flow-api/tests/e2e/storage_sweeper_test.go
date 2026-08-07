@@ -19,7 +19,7 @@ import (
 // MinIO, driven with RunOnce so a pass is one observable step.
 func newSweeper(t *testing.T) *storagegc.Sweeper {
 	t.Helper()
-	return storagegc.New(testDB, generated.New(testDB), testStorage.Client, slog.Default())
+	return storagegc.New(testDB, generated.New(testDB), testStorage.Flow, slog.Default())
 }
 
 // storageObjectExists reports whether the row is still in the database.
@@ -63,11 +63,17 @@ func TestSweeperReclaimsAnAbandonedReservation(t *testing.T) {
 		time.Now().UTC().Add(-2*time.Hour), res.StorageKey)
 	require.NoError(t, err)
 
+	// A pass sweeps the whole instance, so the TTL is what keeps this
+	// test off other tests' rows: an hour is far longer than a suite
+	// runs, so the only row on the wrong side of the cutoff is the one
+	// back-dated above. The counts in Result are for the same reason not
+	// worth asserting on — they include whatever the rest of the suite
+	// happened to leave behind, and a parallel test's own pass can
+	// reclaim this row first. What this test is about is the row.
 	sweeper := newSweeper(t)
 	sweeper.ReservationTTL = time.Hour
-	out, err := sweeper.RunOnce(ctx)
+	_, err = sweeper.RunOnce(ctx)
 	require.NoError(t, err)
-	require.GreaterOrEqual(t, out.Reservations, 1)
 
 	require.False(t, storageObjectExists(ctx, t, res.StorageKey),
 		"an upload nobody ever confirmed must not hold a row forever")
@@ -141,9 +147,12 @@ func TestSweeperReclaimsAnUnreferencedRow(t *testing.T) {
 		`UPDATE storage_objects SET ref_count = 0 WHERE storage_key = ?`, res.StorageKey)
 	require.NoError(t, err)
 
-	out, err := newSweeper(t).RunOnce(ctx)
+	// No count assertion here either: the unreferenced sweep has no age
+	// cutoff to fence it in, so any pass this suite runs in parallel can
+	// be the one that takes this row. That the row is gone afterwards is
+	// the claim; who removed it is not.
+	_, err = newSweeper(t).RunOnce(ctx)
 	require.NoError(t, err)
-	require.GreaterOrEqual(t, out.Unreferenced, 1)
 
 	require.False(t, storageObjectExists(ctx, t, res.StorageKey),
 		"a row nothing references must not keep its blob alive")

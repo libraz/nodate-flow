@@ -93,6 +93,31 @@ func (q *Queries) DeleteStorageObjectIfUnreferenced(ctx context.Context, id uint
 	return q.db.ExecContext(ctx, deleteStorageObjectIfUnreferenced, id)
 }
 
+const deleteUnconfirmedStorageObjectByID = `-- name: DeleteUnconfirmedStorageObjectByID :execrows
+DELETE FROM storage_objects
+WHERE id = ?
+  AND uploaded_at IS NULL
+`
+
+// Remove a reservation whose upload never arrived, guarded on the same
+// predicate that selected it.
+//
+// Not ref_count: a reservation is born at ref_count = 1 for the
+// attachment the presign created alongside it, and removing that
+// attachment is not what decrements the count, so a ref_count = 0 guard
+// here matches nothing and no reservation is ever reclaimed. Nor is
+// ref_count the right question — an unconfirmed row is not offered to
+// dedup, so nobody new can be pointing at it. The only thing that can
+// still rescue the row is a confirm landing in this instant, and that
+// is exactly what uploaded_at IS NULL loses to.
+func (q *Queries) DeleteUnconfirmedStorageObjectByID(ctx context.Context, id uint32) (int64, error) {
+	result, err := q.db.ExecContext(ctx, deleteUnconfirmedStorageObjectByID, id)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
+}
+
 const findStorageObjectByID = `-- name: FindStorageObjectByID :one
 SELECT
   id,
