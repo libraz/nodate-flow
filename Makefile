@@ -213,8 +213,9 @@ test-schema-collisions: ## Fail if the merged OpenAPI spec has schema name colli
 test-schema-diff: ## Fail if sql/schema.sql is out of sync with sql/core/** and sql/flow/**
 	./scripts/schema-diff.sh
 
-verify-codegen: ## Fail if sql/schema.sql or the sqlc output is out of sync with the schema
+verify-codegen: ## Fail if generated code is out of sync with the schema or the error YAML
 	bash scripts/check-codegen-drift.sh
+	go -C scripts run gen-errors.go --check-stamp
 
 test-core-contract: ## Check a database against the core contract (NF_CONFORMANCE_DSN or NF_DB_* vars)
 	bash sql/core/conformance/run.sh \

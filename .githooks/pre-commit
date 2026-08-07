@@ -36,3 +36,20 @@ if ! bash "$toplevel/scripts/check-codegen-drift.sh" --staged; then
   echo "  Bypass only when you know why: git commit --no-verify" >&2
   exit 1
 fi
+
+# The error catalog is generated from errors/*.yaml the way the data layer
+# is generated from the schema, and it drifted the same way: a YAML edit
+# without a regeneration left the Go constants, the TS catalog and the docs
+# describing something their source no longer said. The check compares a
+# hash recorded in the generated barrel against one recomputed from the
+# YAML, so it writes nothing and costs two file reads. Gated on the sources
+# being staged, for the same reason the schema check is.
+if git diff --cached --name-only --diff-filter=ACMR | grep -qE '^errors/.*\.yaml$'; then
+  if ! (cd "$toplevel" && go -C scripts run gen-errors.go --check-stamp); then
+    echo "" >&2
+    echo "✖ pre-commit hook: errors/*.yaml changed without regenerating (see above)." >&2
+    echo "  Run 'make gen-errors' and stage the result." >&2
+    echo "  Bypass only when you know why: git commit --no-verify" >&2
+    exit 1
+  fi
+fi

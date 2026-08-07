@@ -201,7 +201,7 @@ jobs:
           go install "github.com/sqlc-dev/sqlc/cmd/sqlc@$version"
           echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
 
-      - name: Generated data layer matches the schema
+      - name: Generated code matches the schema and the error catalog
         run: make verify-codegen
 
       # The contract is checked against both shapes a deployment can take.
