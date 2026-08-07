@@ -3,12 +3,12 @@
 package handlerutil
 
 import (
-	"encoding/json"
 	"net/http"
 
 	"github.com/danielgtaylor/huma/v2"
 
 	apierrors "github.com/libraz/nodate-flow/apps/auth-api/internal/errors"
+	"github.com/libraz/nodate-flow/packages/go-shared/problem"
 )
 
 // ProblemDetails extends huma.ErrorModel with the developer-facing
@@ -102,34 +102,9 @@ func HTTPErrWithDetails(spec *apierrors.Spec, details map[string]any) error {
 
 // WriteSpecError writes a JSON error envelope for raw chi handlers and
 // chi-level middlewares (auth, ACL, rate limit) that cannot return
-// errors through the Huma pipeline. The envelope mirrors the shape
-// produced by [HTTPErr] so clients can branch on the same `type`
-// field regardless of which layer emitted the error.
-//
-// The wire shape is RFC 9457-compliant problem+json:
-//
-//   - type:        machine-readable error code (e.g. "AUTH.SESSION.UNAUTHORIZED")
-//   - title:       HTTP status text (e.g. "Unauthorized")
-//   - status:      HTTP status code
-//   - detail:      human-readable message from the Spec
-//   - description: developer-facing explanation (omitted when empty)
-//   - userAction:  end-user recovery hint (omitted when empty)
+// errors through the Huma pipeline. It forwards to [problem.Write], the
+// single writer both services share, so a client sees one envelope
+// shape regardless of which layer emitted the error.
 func WriteSpecError(w http.ResponseWriter, spec *apierrors.Spec) {
-	w.Header().Set("Content-Type", "application/problem+json; charset=utf-8")
-	w.WriteHeader(spec.Status)
-	_ = json.NewEncoder(w).Encode(struct {
-		Type        string `json:"type"`
-		Title       string `json:"title"`
-		Status      int    `json:"status"`
-		Detail      string `json:"detail"`
-		Description string `json:"description,omitempty"`
-		UserAction  string `json:"userAction,omitempty"`
-	}{
-		Type:        spec.Code,
-		Title:       http.StatusText(spec.Status),
-		Status:      spec.Status,
-		Detail:      spec.Message,
-		Description: spec.Description,
-		UserAction:  spec.UserAction,
-	})
+	problem.Write(w, spec)
 }

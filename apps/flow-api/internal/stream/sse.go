@@ -7,19 +7,14 @@ import (
 	"time"
 
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/middleware"
+	"github.com/libraz/nodate-flow/packages/go-shared/problem"
 )
 
-// writeJSONError writes a structured JSON error response for the SSE
-// handler. It matches the standard apierrors envelope shape so clients
-// receive a consistent error format even on upgrade-time failures.
+// writeJSONError writes a structured error response for the SSE
+// handler. An upgrade that fails before the stream opens is an ordinary
+// HTTP error, so it carries the same envelope as every other one.
 func writeJSONError(w http.ResponseWriter, status int, code, message string) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(status)
-	_ = json.NewEncoder(w).Encode(map[string]any{
-		"status":  status,
-		"code":    code,
-		"message": message,
-	})
+	problem.WriteCode(w, status, code, message)
 }
 
 // heartbeatInterval is the idle cadence at which the SSE writer

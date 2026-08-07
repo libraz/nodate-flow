@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/libraz/nodate-flow/packages/go-shared/authn"
+	"github.com/libraz/nodate-flow/packages/go-shared/problem"
 )
 
 func TestRequireBearerTokenScope_PATReadCannotWrite(t *testing.T) {
@@ -16,7 +17,7 @@ func TestRequireBearerTokenScope_PATReadCannotWrite(t *testing.T) {
 	if rec.Code != http.StatusForbidden {
 		t.Fatalf("PATCH with read-only PAT status = %d, want %d", rec.Code, http.StatusForbidden)
 	}
-	var body problemBody
+	var body problem.Details
 	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
 		t.Fatalf("decode body: %v", err)
 	}
@@ -52,7 +53,7 @@ func TestRequireBearerTokenScope_MCPUsesMCPScopeError(t *testing.T) {
 	if rec.Code != http.StatusForbidden {
 		t.Fatalf("POST with read-only MCP token status = %d, want %d", rec.Code, http.StatusForbidden)
 	}
-	var body problemBody
+	var body problem.Details
 	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
 		t.Fatalf("decode body: %v", err)
 	}

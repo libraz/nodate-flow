@@ -5,6 +5,8 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+
+	"github.com/libraz/nodate-flow/packages/go-shared/problem"
 )
 
 func TestSSEHandler_MissingWorkspaceContext_ReturnsJSONError(t *testing.T) {
@@ -25,44 +27,7 @@ func TestSSEHandler_MissingWorkspaceContext_ReturnsJSONError(t *testing.T) {
 		t.Errorf("status: got %d, want %d", rec.Code, http.StatusForbidden)
 	}
 
-	// Verify Content-Type is JSON.
-	ct := rec.Header().Get("Content-Type")
-	if ct != "application/json" {
-		t.Errorf("Content-Type: got %q, want %q", ct, "application/json")
-	}
-
-	// Parse and verify JSON envelope structure.
-	var body map[string]any
-	if err := json.NewDecoder(rec.Body).Decode(&body); err != nil {
-		t.Fatalf("failed to decode JSON body: %v", err)
-	}
-
-	// Check status field.
-	status, ok := body["status"]
-	if !ok {
-		t.Fatal("JSON body missing 'status' field")
-	}
-	if statusFloat, ok := status.(float64); !ok || int(statusFloat) != http.StatusForbidden {
-		t.Errorf("status field: got %v, want %d", status, http.StatusForbidden)
-	}
-
-	// Check code field.
-	code, ok := body["code"]
-	if !ok {
-		t.Fatal("JSON body missing 'code' field")
-	}
-	if code != "WS.WORKSPACE.NOT_FOUND" {
-		t.Errorf("code field: got %v, want %q", code, "WS.WORKSPACE.NOT_FOUND")
-	}
-
-	// Check message field.
-	message, ok := body["message"]
-	if !ok {
-		t.Fatal("JSON body missing 'message' field")
-	}
-	if message != "workspace context missing" {
-		t.Errorf("message field: got %v, want %q", message, "workspace context missing")
-	}
+	requireProblemEnvelope(t, rec, "WS.WORKSPACE.NOT_FOUND", "workspace context missing")
 }
 
 func TestWriteJSONError_EnvelopeStructure(t *testing.T) {
@@ -74,10 +39,22 @@ func TestWriteJSONError_EnvelopeStructure(t *testing.T) {
 	if rec.Code != http.StatusBadRequest {
 		t.Errorf("status: got %d, want %d", rec.Code, http.StatusBadRequest)
 	}
+	requireProblemEnvelope(t, rec, "TEST.CODE", "test message")
+}
 
-	ct := rec.Header().Get("Content-Type")
-	if ct != "application/json" {
-		t.Errorf("Content-Type: got %q, want %q", ct, "application/json")
+// requireProblemEnvelope asserts a recorded response carries the
+// canonical problem+json envelope.
+//
+// A stream that fails before it opens answers as an ordinary HTTP
+// error, and the client reading it is the same SDK: it takes the code
+// from `type` and the message from `detail`. This handler used to send
+// {status, code, message}, none of which the SDK reads, so a rejected
+// subscription arrived with neither a code to branch on nor a status.
+func requireProblemEnvelope(t *testing.T, rec *httptest.ResponseRecorder, code, detail string) {
+	t.Helper()
+
+	if ct := rec.Header().Get("Content-Type"); ct != problem.ContentType {
+		t.Errorf("Content-Type: got %q, want %q", ct, problem.ContentType)
 	}
 
 	var body map[string]any
@@ -85,18 +62,21 @@ func TestWriteJSONError_EnvelopeStructure(t *testing.T) {
 		t.Fatalf("failed to decode JSON body: %v", err)
 	}
 
-	// Verify exactly 3 fields.
-	if len(body) != 3 {
-		t.Errorf("expected 3 fields in JSON envelope, got %d: %v", len(body), body)
+	if body["type"] != code {
+		t.Errorf("type: got %v, want %q", body["type"], code)
 	}
-
-	if statusFloat, ok := body["status"].(float64); !ok || int(statusFloat) != http.StatusBadRequest {
-		t.Errorf("status: got %v, want %d", body["status"], http.StatusBadRequest)
+	if body["detail"] != detail {
+		t.Errorf("detail: got %v, want %q", body["detail"], detail)
 	}
-	if body["code"] != "TEST.CODE" {
-		t.Errorf("code: got %v, want %q", body["code"], "TEST.CODE")
+	if statusFloat, ok := body["status"].(float64); !ok || int(statusFloat) != rec.Code {
+		t.Errorf("status: got %v, want %d", body["status"], rec.Code)
 	}
-	if body["message"] != "test message" {
-		t.Errorf("message: got %v, want %q", body["message"], "test message")
+	if body["title"] != http.StatusText(rec.Code) {
+		t.Errorf("title: got %v, want %q", body["title"], http.StatusText(rec.Code))
+	}
+	for _, gone := range []string{"code", "message"} {
+		if _, present := body[gone]; present {
+			t.Errorf("%q must be gone from the envelope, not merely unread: %v", gone, body)
+		}
 	}
 }

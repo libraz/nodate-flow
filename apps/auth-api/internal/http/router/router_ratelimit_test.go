@@ -15,6 +15,7 @@ import (
 	"github.com/libraz/nodate-flow/apps/auth-api/internal/auth"
 	"github.com/libraz/nodate-flow/apps/auth-api/internal/db/generated"
 	"github.com/libraz/nodate-flow/packages/go-shared/apierr"
+	"github.com/libraz/nodate-flow/packages/go-shared/problem"
 )
 
 // rateLimitDeps mirrors stubDeps but with rate-limiting enabled and a
@@ -88,11 +89,13 @@ func TestMagicLinkVerify_RateLimitedReturns429(t *testing.T) {
 	lastRec := httptest.NewRecorder()
 	h.ServeHTTP(lastRec, lastReq)
 	require.Equal(t, http.StatusTooManyRequests, lastRec.Code)
-	var body struct {
-		Code string `json:"code"`
-	}
+	// The code travels under `type`: the rate limiter answers in the
+	// same problem+json envelope every other layer uses, which is what
+	// lets a client read it at all.
+	var body problem.Details
 	require.NoError(t, json.NewDecoder(lastRec.Body).Decode(&body))
-	assert.Equal(t, apierr.CodeRateLimitExceeded, body.Code)
+	assert.Equal(t, apierr.CodeRateLimitExceeded, body.Type)
+	assert.Equal(t, http.StatusTooManyRequests, body.Status)
 }
 
 // TestMagicLinkVerify_IsBehindAuthRateLimitGroup is a structural check:

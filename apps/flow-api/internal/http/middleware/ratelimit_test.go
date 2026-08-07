@@ -11,6 +11,7 @@ import (
 	"github.com/libraz/nodate-flow/packages/go-shared/apierr"
 	"github.com/libraz/nodate-flow/packages/go-shared/authn"
 	"github.com/libraz/nodate-flow/packages/go-shared/httputil"
+	"github.com/libraz/nodate-flow/packages/go-shared/problem"
 	"github.com/stretchr/testify/require"
 )
 
@@ -287,16 +288,7 @@ func TestIPRateLimiter_Middleware_BlockedResponseIsJSON(t *testing.T) {
 	handler.ServeHTTP(rec2, req2)
 
 	require.Equal(t, http.StatusTooManyRequests, rec2.Code)
-	require.Equal(t, "application/json", rec2.Header().Get("Content-Type"))
-
-	var body map[string]any
-	err := json.NewDecoder(rec2.Body).Decode(&body)
-	require.NoError(t, err, "response body must be valid JSON")
-
-	// Verify the envelope fields.
-	require.Equal(t, float64(http.StatusTooManyRequests), body["status"], "status field must be 429")
-	require.Equal(t, apierr.CodeRateLimitExceeded, body["code"], "code field must match")
-	require.Equal(t, "429 Too Many Requests", body["message"], "message field must match")
+	requireProblemEnvelope(t, rec2, apierr.CodeRateLimitExceeded, "429 Too Many Requests")
 }
 
 func TestAPIRateLimiter_Middleware_BlockedResponseIsJSON(t *testing.T) {
@@ -331,15 +323,7 @@ func TestAPIRateLimiter_Middleware_BlockedResponseIsJSON(t *testing.T) {
 	handler.ServeHTTP(rec2, req2)
 
 	require.Equal(t, http.StatusTooManyRequests, rec2.Code)
-	require.Equal(t, "application/json", rec2.Header().Get("Content-Type"))
-
-	var body map[string]any
-	err := json.NewDecoder(rec2.Body).Decode(&body)
-	require.NoError(t, err, "response body must be valid JSON")
-
-	require.Equal(t, float64(http.StatusTooManyRequests), body["status"])
-	require.Equal(t, apierr.CodeRateLimitExceeded, body["code"])
-	require.Equal(t, "429 Too Many Requests", body["message"])
+	requireProblemEnvelope(t, rec2, apierr.CodeRateLimitExceeded, "429 Too Many Requests")
 }
 
 func TestRateLimitCodeMatchesGeneratedCatalog(t *testing.T) {
@@ -355,14 +339,29 @@ func TestWriteJSONError_EnvelopeStructure(t *testing.T) {
 	httputil.WriteJSONError(rec, http.StatusForbidden, "WS.WORKSPACE.NOT_FOUND", "workspace context missing")
 
 	require.Equal(t, http.StatusForbidden, rec.Code)
-	require.Equal(t, "application/json", rec.Header().Get("Content-Type"))
+	requireProblemEnvelope(t, rec, "WS.WORKSPACE.NOT_FOUND", "workspace context missing")
+}
+
+// requireProblemEnvelope asserts a recorded response carries the
+// canonical problem+json envelope: the code under `type`, the message
+// under `detail`, and the HTTP status repeated in the body.
+//
+// The rate limiter runs in front of every route, so its 429 is the one
+// error the SDK is guaranteed to meet. It used to answer with
+// {status, code, message}, which the SDK reads none of — the resulting
+// ApiError had no code to branch on and no status, so a throttled
+// client saw a bare fallback message.
+func requireProblemEnvelope(t *testing.T, rec *httptest.ResponseRecorder, code, detail string) {
+	t.Helper()
+	require.Equal(t, problem.ContentType, rec.Header().Get("Content-Type"))
 
 	var body map[string]any
-	err := json.NewDecoder(rec.Body).Decode(&body)
-	require.NoError(t, err, "response body must be valid JSON")
+	require.NoError(t, json.NewDecoder(rec.Body).Decode(&body), "response body must be valid JSON")
 
-	require.Len(t, body, 3, "JSON envelope should have exactly 3 fields")
-	require.Equal(t, float64(http.StatusForbidden), body["status"])
-	require.Equal(t, "WS.WORKSPACE.NOT_FOUND", body["code"])
-	require.Equal(t, "workspace context missing", body["message"])
+	require.Equal(t, code, body["type"])
+	require.Equal(t, detail, body["detail"])
+	require.Equal(t, float64(rec.Code), body["status"])
+	require.Equal(t, http.StatusText(rec.Code), body["title"])
+	require.NotContains(t, body, "code", "the pre-unification member must be gone, not merely unread")
+	require.NotContains(t, body, "message", "the pre-unification member must be gone, not merely unread")
 }

@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/libraz/nodate-flow/packages/go-shared/authn"
+	"github.com/libraz/nodate-flow/packages/go-shared/problem"
 )
 
 // AuthMode re-exports [authn.AuthMode] so handlers and tests inside
@@ -179,18 +180,12 @@ func writeServiceTokenInvalid(w http.ResponseWriter) {
 	writeAuth401(w, "AUTH.TOKEN.SIGNATURE_INVALID", "Token signature is invalid")
 }
 
-// writeAuth401 encodes a minimal {code, message} JSON envelope at HTTP
-// 401. The shape matches [authn.RequireAuth]'s 401 response so the
-// /internal/* group is indistinguishable from a standard auth-guarded
-// route on the wire.
+// writeAuth401 writes the canonical problem+json envelope at HTTP 401,
+// through the same writer [authn.RequireAuth] uses, so the /internal/*
+// group is indistinguishable from a standard auth-guarded route on the
+// wire.
 func writeAuth401(w http.ResponseWriter, code, message string) {
-	w.Header().Set("Content-Type", "application/json; charset=utf-8")
-	w.WriteHeader(http.StatusUnauthorized)
-	// Hand-rolled JSON keeps this middleware free of an encoding/json
-	// dependency and avoids the per-request allocation of a struct.
-	// The two values are constants drawn from the error catalog so no
-	// escaping is needed.
-	_, _ = w.Write([]byte(`{"code":"` + code + `","message":"` + message + `"}`))
+	problem.WriteCode(w, http.StatusUnauthorized, code, message)
 }
 
 // bearerFromAuthHeader parses an HTTP Authorization header value and

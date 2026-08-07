@@ -13,7 +13,6 @@ package middleware
 import (
 	"context"
 	"database/sql"
-	"encoding/json"
 	stderrors "errors"
 	"net/http"
 	"strings"
@@ -27,6 +26,7 @@ import (
 	apierrors "github.com/libraz/nodate-flow/apps/flow-api/internal/errors"
 	sharedacl "github.com/libraz/nodate-flow/packages/go-shared/acl"
 	"github.com/libraz/nodate-flow/packages/go-shared/authn"
+	"github.com/libraz/nodate-flow/packages/go-shared/problem"
 )
 
 // ----------------------------------------------------------------------------
@@ -205,39 +205,18 @@ func ProjectFromContext(ctx context.Context) (ProjectContext, bool) {
 // Error response
 // ----------------------------------------------------------------------------
 
-// problemBody is the RFC 9457 problem+json wire shape emitted by the
-// chi-level middlewares (ACL, calendar). The struct is duplicated here
-// rather than re-using [handlerutil.WriteSpecError] because that
-// package depends on this `middleware` package for [ActorFromContext]
-// — importing it back from middleware would create a cycle. The
-// fields mirror handlerutil's struct verbatim so the wire payload is
-// byte-identical regardless of which layer emitted the error.
-type problemBody struct {
-	Type        string `json:"type"`
-	Title       string `json:"title"`
-	Status      int    `json:"status"`
-	Detail      string `json:"detail"`
-	Description string `json:"description,omitempty"`
-	UserAction  string `json:"userAction,omitempty"`
-}
-
-// writeSpecError writes the canonical RFC 9457 problem+json error
-// envelope for the chi-level middlewares (ACL, calendar). They sit
-// above Huma's pipeline so they cannot return a `huma.StatusError`;
-// the body shape mirrors handlerutil.WriteSpecError so clients can
-// branch on the same `type` field regardless of which layer emitted
-// the error.
+// writeSpecError writes the canonical problem+json error envelope for
+// the chi-level middlewares (ACL, calendar). They sit above Huma's
+// pipeline so they cannot return a `huma.StatusError`.
+//
+// It forwards to [problem.Write] rather than to
+// handlerutil.WriteSpecError because handlerutil depends on this
+// `middleware` package for [ActorFromContext]; importing it back from
+// here would close an import cycle. The shared writer has no such
+// dependency, so the body no longer has to be re-declared to dodge the
+// cycle — which is how the two copies drifted apart in the first place.
 func writeSpecError(w http.ResponseWriter, spec *apierrors.Spec) {
-	w.Header().Set("Content-Type", "application/problem+json; charset=utf-8")
-	w.WriteHeader(spec.Status)
-	_ = json.NewEncoder(w).Encode(problemBody{
-		Type:        spec.Code,
-		Title:       http.StatusText(spec.Status),
-		Status:      spec.Status,
-		Detail:      spec.Message,
-		Description: spec.Description,
-		UserAction:  spec.UserAction,
-	})
+	problem.Write(w, spec)
 }
 
 // writeAPIError converts an *apierrors.APIError into a JSON error

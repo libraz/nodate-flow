@@ -6,7 +6,6 @@ package handlerutil
 import (
 	"context"
 	"database/sql"
-	"encoding/json"
 	"errors"
 	"net/http"
 	"time"
@@ -22,6 +21,7 @@ import (
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/middleware"
 	"github.com/libraz/nodate-flow/packages/go-shared/apierr"
 	"github.com/libraz/nodate-flow/packages/go-shared/dbtype"
+	"github.com/libraz/nodate-flow/packages/go-shared/problem"
 )
 
 // ProblemDetails extends huma.ErrorModel with the developer-facing
@@ -85,17 +85,12 @@ func HTTPErr(spec *apierrors.Spec) error {
 	}
 }
 
-// specExtensions returns the RFC 9457 extension map for a spec, or
-// nil when the spec has no opt-in metadata. Today this only populates
-// `x-i18n-key`; new extension members would be added here so every
-// code path (HTTPErr, HTTPErrWithRetryAfter, WriteSpecError) stays in
-// sync. Returning nil lets the JSON `omitempty` tag drop the field
-// from the wire payload entirely.
+// specExtensions returns the RFC 9457 extension map for a spec. The
+// definition lives in [problem] so the Huma-side envelopes built here
+// and the raw-writer envelopes emitted by the shared middleware pick up
+// a new extension member at the same time.
 func specExtensions(spec *apierrors.Spec) map[string]any {
-	if spec == nil || spec.I18nKey == "" {
-		return nil
-	}
-	return map[string]any{"x-i18n-key": spec.I18nKey}
+	return problem.Extensions(spec)
 }
 
 // HTTPErrFromAPIError converts an *apierr.APIError into the canonical
@@ -178,28 +173,12 @@ func (p *headersProblemDetails) GetHeaders() http.Header {
 
 // WriteSpecError writes a JSON error envelope for raw chi handlers that
 // cannot return errors through the Huma pipeline (file downloads,
-// streaming responses, etc.). The envelope mirrors the shape produced
-// by [HTTPErr] so clients can branch on the same `type` field.
+// streaming responses, etc.). It forwards to [problem.Write], which is
+// the same writer the shared authentication and rate-limit middleware
+// use, so a client sees one envelope shape no matter which layer
+// rejected the request.
 func WriteSpecError(w http.ResponseWriter, spec *apierrors.Spec) {
-	w.Header().Set("Content-Type", "application/problem+json; charset=utf-8")
-	w.WriteHeader(spec.Status)
-	_ = json.NewEncoder(w).Encode(struct {
-		Type        string         `json:"type"`
-		Title       string         `json:"title"`
-		Status      int            `json:"status"`
-		Detail      string         `json:"detail"`
-		Description string         `json:"description,omitempty"`
-		UserAction  string         `json:"userAction,omitempty"`
-		Extensions  map[string]any `json:"extensions,omitempty"`
-	}{
-		Type:        spec.Code,
-		Title:       http.StatusText(spec.Status),
-		Status:      spec.Status,
-		Detail:      spec.Message,
-		Description: spec.Description,
-		UserAction:  spec.UserAction,
-		Extensions:  specExtensions(spec),
-	})
+	problem.Write(w, spec)
 }
 
 // mysqlErrDuplicateEntry is the MySQL error number for a unique-constraint

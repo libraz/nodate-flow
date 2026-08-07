@@ -2,13 +2,13 @@ package authn
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"net/http"
 	"strings"
 
 	"github.com/libraz/nodate-flow/packages/go-shared/apierr"
 	"github.com/libraz/nodate-flow/packages/go-shared/dbtype"
+	"github.com/libraz/nodate-flow/packages/go-shared/problem"
 )
 
 // RequireAuth returns an HTTP middleware that extracts the Bearer token
@@ -101,46 +101,39 @@ func bearerFromHeader(h string) (string, bool) {
 	return tok, true
 }
 
-type errorBody struct {
-	Code    string `json:"code"`
-	Message string `json:"message"`
-}
+// The 401s below are the most-travelled error path in the product:
+// this middleware guards nearly every authenticated route, so an
+// envelope it gets wrong is the one clients see when a session dies.
+// They go through [problem] like every other emitter — see that
+// package for why the shape has to match.
 
 func writeJSON401Missing(w http.ResponseWriter) {
-	w.Header().Set("Content-Type", "application/json; charset=utf-8")
-	w.WriteHeader(http.StatusUnauthorized)
-	_ = json.NewEncoder(w).Encode(errorBody{
-		Code:    "AUTH.TOKEN.MISSING_OR_MALFORMED",
-		Message: "Missing or invalid authentication token",
-	})
+	problem.WriteCode(w, http.StatusUnauthorized,
+		"AUTH.TOKEN.MISSING_OR_MALFORMED", "Missing or invalid authentication token")
 }
 
 func writeJSON401SignatureInvalid(w http.ResponseWriter) {
-	writeJSONError(w, http.StatusUnauthorized, "AUTH.TOKEN.SIGNATURE_INVALID", "Token signature is invalid")
+	problem.WriteCode(w, http.StatusUnauthorized,
+		"AUTH.TOKEN.SIGNATURE_INVALID", "Token signature is invalid")
 }
 
 func writeJSONResolveError(w http.ResponseWriter, err error) {
 	var ae *apierr.APIError
 	if errors.As(err, &ae) && ae.Spec != nil {
-		writeJSONError(w, ae.Spec.Status, ae.Spec.Code, ae.Spec.Message)
+		// The spec came from a service catalog, so this path can carry
+		// description, userAction and the curated i18n key too.
+		problem.Write(w, ae.Spec)
 		return
 	}
 	if errors.Is(err, ErrUserDisabled) {
-		writeJSONError(w, http.StatusUnauthorized, "AUTH.SESSION.UNAUTHORIZED", "You must be signed in to access this resource")
+		problem.WriteCode(w, http.StatusUnauthorized,
+			"AUTH.SESSION.UNAUTHORIZED", "You must be signed in to access this resource")
 		return
 	}
 	if errors.Is(err, ErrTokenInvalid) {
 		writeJSON401SignatureInvalid(w)
 		return
 	}
-	writeJSONError(w, http.StatusInternalServerError, "INTERNAL.UNEXPECTED", "Unexpected server error")
-}
-
-func writeJSONError(w http.ResponseWriter, status int, code, message string) {
-	w.Header().Set("Content-Type", "application/json; charset=utf-8")
-	w.WriteHeader(status)
-	_ = json.NewEncoder(w).Encode(errorBody{
-		Code:    code,
-		Message: message,
-	})
+	problem.WriteCode(w, http.StatusInternalServerError,
+		apierr.CodeInternalUnexpected, "Unexpected server error")
 }

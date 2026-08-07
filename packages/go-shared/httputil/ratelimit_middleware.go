@@ -1,7 +1,6 @@
 package httputil
 
 import (
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -9,6 +8,7 @@ import (
 
 	"github.com/libraz/nodate-flow/packages/go-shared/apierr"
 	"github.com/libraz/nodate-flow/packages/go-shared/authn"
+	"github.com/libraz/nodate-flow/packages/go-shared/problem"
 	"github.com/libraz/nodate-flow/packages/go-shared/ratelimit"
 )
 
@@ -172,15 +172,11 @@ func SetRateLimitHeaders(w http.ResponseWriter, res ratelimit.Result) {
 	h.Set("X-RateLimit-Reset", strconv.FormatInt(res.ResetUnix, 10))
 }
 
-// WriteJSONError writes a structured JSON error response matching the
-// standard apierrors envelope. It is used by middleware that runs
-// before Huma and therefore cannot return a huma.StatusError.
+// WriteJSONError writes the canonical problem+json error envelope. It
+// exists for middleware that runs before Huma and therefore cannot
+// return a huma.StatusError; it is a thin forward to [problem.WriteCode]
+// so the rate limiter's 429 is indistinguishable in shape from a
+// handler's 404.
 func WriteJSONError(w http.ResponseWriter, status int, code, message string) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(status)
-	_ = json.NewEncoder(w).Encode(map[string]any{
-		"status":  status,
-		"code":    code,
-		"message": message,
-	})
+	problem.WriteCode(w, status, code, message)
 }

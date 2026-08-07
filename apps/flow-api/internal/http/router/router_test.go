@@ -398,16 +398,17 @@ var roleFloorExemptOps = map[string]string{
 	// Caller-scoped rows. Ownership, not workspace role, is the access rule:
 	// every statement is bound by user_id = actor, so the request cannot
 	// change what any other member sees.
-	"inbox-archive":                "caller-scoped row",
-	"inbox-snooze":                 "caller-scoped row",
-	"notifications-mark-read":      "caller-scoped row",
-	"notifications-archive":        "caller-scoped row",
-	"notifications-mark-all-read":  "caller-scoped row",
-	"favorites-create":             "caller-scoped row",
-	"favorites-delete":             "caller-scoped row",
-	"mcp-tokens-create":            "caller-scoped row",
-	"mcp-tokens-delete":            "caller-scoped row",
-	"relation-suggestions-resolve": "workspace membership checked in handler",
+	"inbox-archive":                   "caller-scoped row",
+	"inbox-snooze":                    "caller-scoped row",
+	"notifications-mark-read":         "caller-scoped row",
+	"notifications-archive":           "caller-scoped row",
+	"notifications-mark-all-read":     "caller-scoped row",
+	"notification-preferences-update": "caller-scoped row",
+	"favorites-create":                "caller-scoped row",
+	"favorites-delete":                "caller-scoped row",
+	"mcp-tokens-create":               "caller-scoped row",
+	"mcp-tokens-delete":               "caller-scoped row",
+	"relation-suggestions-resolve":    "workspace membership checked in handler",
 
 	// Calendar surface. The write floor is enforced in the handlers rather
 	// than by a router-level floor: resolveCalendarWrite requires calendar

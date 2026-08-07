@@ -39,10 +39,20 @@ export class ApiError extends Error {
 
 /**
  * Converts an SDK error response into an ApiError.
- * Extracts `detail`, `title`, and `type` fields from Huma error envelopes.
- * Pass `httpStatus` when available (e.g. from `Response.status` or the
- * problem+json `status` field) so the resulting error can drive
- * status-based routing such as global 401 handling.
+ * Extracts `detail`, `title`, and `type` fields from problem+json error
+ * envelopes. Pass `httpStatus` when available (e.g. from
+ * `Response.status` or the problem+json `status` field) so the resulting
+ * error can drive status-based routing such as global 401 handling.
+ *
+ * `code` and `message` are accepted as fallbacks for `type` and
+ * `detail`. Every server emitter writes problem+json — that is asserted
+ * on the server side, where it can actually be enforced — so this is
+ * insurance for a body that reaches the SDK from somewhere else: a
+ * reverse proxy, an old build behind a stale cache, a gateway of its
+ * own. Losing the code costs the caller its branch; losing the status
+ * costs more, because the terminal-401 handling and the "never retry a
+ * 4xx" rule both read it, and an error with no status is treated as a
+ * network blip that gets retried against a session that is already dead.
  */
 export function toApiError(err: unknown, fallback: string, httpStatus?: number): ApiError {
   if (err && typeof err === 'object') {
@@ -51,14 +61,18 @@ export function toApiError(err: unknown, fallback: string, httpStatus?: number):
       title?: unknown;
       type?: unknown;
       status?: unknown;
+      code?: unknown;
+      message?: unknown;
       userAction?: unknown;
       extensions?: unknown;
     };
     const message =
       (typeof obj.detail === 'string' && obj.detail) ||
       (typeof obj.title === 'string' && obj.title) ||
+      (typeof obj.message === 'string' && obj.message) ||
       fallback;
-    const code = typeof obj.type === 'string' ? obj.type : undefined;
+    const code =
+      typeof obj.type === 'string' ? obj.type : typeof obj.code === 'string' ? obj.code : undefined;
     const resolvedStatus = httpStatus ?? (typeof obj.status === 'number' ? obj.status : undefined);
     const userAction = typeof obj.userAction === 'string' ? obj.userAction : undefined;
     const extensions =
