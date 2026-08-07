@@ -16,8 +16,13 @@ import (
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/signalkinds"
 )
 
+// slackURLVerification is the envelope `type` Slack POSTs once when a
+// Request URL is saved in an app's Event Subscriptions settings.
+const slackURLVerification = "url_verification"
+
 // HandleSlackWebhook is a chi-level handler for POST /webhooks/slack.
-// It verifies the v0 Slack signing-secret scheme and inserts a signals row.
+// It verifies the v0 Slack signing-secret scheme, answers the Events API
+// URL verification handshake, and inserts a signals row.
 func HandleSlackWebhook(deps Deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		body, err := io.ReadAll(http.MaxBytesReader(w, r.Body, 1<<20))
@@ -37,6 +42,44 @@ func HandleSlackWebhook(deps Deps) http.HandlerFunc {
 				slog.String("source", "slack"),
 			)
 			writeError(w, slackVerifyErrorSpec(verr))
+			return
+		}
+
+		// The envelope is parsed before anything is resolved or written
+		// because the URL verification handshake below has to be answered
+		// on an instance that has no workspace configured yet.
+		var envelope struct {
+			Type      string `json:"type"`
+			Challenge string `json:"challenge"`
+			EventID   string `json:"event_id"`
+			Event     struct {
+				Type string `json:"type"`
+			} `json:"event"`
+		}
+		bodyIsJSON := json.Valid(body)
+		if bodyIsJSON {
+			if uerr := json.Unmarshal(body, &envelope); uerr != nil {
+				slog.WarnContext(r.Context(), "webhook: slack envelope unmarshal", "error", uerr)
+			}
+		}
+
+		// Events API URL verification: saving a Request URL makes Slack
+		// POST {"type":"url_verification","challenge":"..."} and accept the
+		// URL only if the response echoes `challenge` back with 200.
+		// Without this the app's event subscription can never be enabled,
+		// so no other branch below is reachable in a real deployment.
+		//
+		// The handshake is signed like every other delivery, so it is
+		// handled after VerifySignature — an unsigned prober must not be
+		// able to discover that this path exists — but before workspace
+		// resolution and the insert, since no event has occurred yet and
+		// there is nothing to persist.
+		if envelope.Type == slackURLVerification {
+			if envelope.Challenge == "" {
+				writeError(w, apierrors.IntegrationSlackWebhookPayloadUnparseable)
+				return
+			}
+			writeJSON(w, http.StatusOK, map[string]any{"challenge": envelope.Challenge})
 			return
 		}
 
@@ -72,16 +115,7 @@ func HandleSlackWebhook(deps Deps) http.HandlerFunc {
 		// Pull the inner event type from { "event": { "type": "..." } }
 		// if present; otherwise fall back to the top-level type.
 		kind := "unknown"
-		var envelope struct {
-			Type  string `json:"type"`
-			Event struct {
-				Type string `json:"type"`
-			} `json:"event"`
-		}
-		if json.Valid(body) {
-			if uerr := json.Unmarshal(body, &envelope); uerr != nil {
-				slog.WarnContext(r.Context(), "webhook: slack envelope unmarshal", "error", uerr)
-			}
+		if bodyIsJSON {
 			kind = sl.NormalizeEventKind(envelope.Type, envelope.Event.Type)
 		}
 		// When NormalizeEventKind produces "slack.presence" the row already
@@ -92,9 +126,17 @@ func HandleSlackWebhook(deps Deps) http.HandlerFunc {
 		// signal_kinds/slack.yaml entries (TODO: registry expansion when
 		// the judge prompt needs them).
 		payload := body
-		if !json.Valid(body) {
+		if !bodyIsJSON {
 			payload = json.RawMessage(`{}`)
 		}
+
+		// `event_id` is the top-level identifier Slack assigns to an event
+		// callback; it is carried unchanged on every retry of the same
+		// event, which is exactly the dedupe semantics
+		// (workspace_id, source, external_id) needs. Envelope types that
+		// carry no event_id (interactivity payloads, future shapes) stay
+		// NULL and are simply not deduped.
+		ext := dedupeKey(envelope.EventID)
 
 		// Slack does not (yet) resolve the per-user subject from this
 		// webhook entrypoint — the mention/user normalisation is a follow-up
@@ -111,6 +153,7 @@ func HandleSlackWebhook(deps Deps) http.HandlerFunc {
 			WorkspaceID: wsID,
 			Source:      generated.SignalsSourceSlack,
 			Kind:        kind,
+			ExternalID:  ext,
 			PayloadJson: payload,
 			ReceivedAt:  now,
 			SubjectType: subjectType,
@@ -118,6 +161,9 @@ func HandleSlackWebhook(deps Deps) http.HandlerFunc {
 		})
 		if err != nil {
 			writeError(w, apierrors.InternalUnexpected)
+			return
+		}
+		if respondIfDuplicate(ctx, w, deps, wsID, generated.SignalsSourceSlack, ext, signalInternalID, "signals.HandleSlackWebhook") {
 			return
 		}
 

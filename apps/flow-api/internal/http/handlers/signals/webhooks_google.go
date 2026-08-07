@@ -16,6 +16,35 @@ import (
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/signalkinds"
 )
 
+// headerGoogleMessageNumber is the per-delivery counter Google attaches to
+// every push notification. It is 1 for the initial sync message and
+// increases (not necessarily by one) for each subsequent notification on
+// the channel, and a redelivery of the same notification repeats the same
+// number.
+const headerGoogleMessageNumber = "X-Goog-Message-Number"
+
+// googleDeliveryKey builds the signals.external_id dedupe key for a Google
+// push notification.
+//
+// The channel id alone identifies the subscription, not the delivery: it
+// is fixed for the whole lifetime of the watch, so using it as external_id
+// makes the (workspace_id, source, external_id) unique key collapse every
+// notification on that channel onto the first one — the channel records
+// one signal and then goes permanently silent. Pairing it with the message
+// number makes the key unique per notification while still repeating
+// across Google's retries of that notification, which is what dedupe
+// needs.
+//
+// A delivery that carries no message number cannot be identified, so it
+// gets a NULL external_id (stored, not deduped) rather than falling back
+// to the channel id, which would resurrect the silent-channel failure.
+func googleDeliveryKey(channelID, messageNumber string) sql.NullString {
+	if channelID == "" || messageNumber == "" {
+		return sql.NullString{}
+	}
+	return dedupeKey(channelID + ":" + messageNumber)
+}
+
 // HandleGoogleWebhook is a chi-level handler for POST /webhooks/google.
 // Google Drive push notifications do not sign payloads; instead each
 // channel is registered with a unique X-Goog-Channel-Token that we
@@ -88,7 +117,7 @@ func HandleGoogleWebhook(deps Deps) http.HandlerFunc {
 		// the signal_kinds/calendar.yaml registry and a per-channel
 		// calendar_event resolver is in place, switch to
 		// SignalsSubjectTypeCalendarEvent with the resolved internal id.
-		ext := sql.NullString{String: r.Header.Get(goog.HeaderChannelID), Valid: r.Header.Get(goog.HeaderChannelID) != ""}
+		ext := googleDeliveryKey(r.Header.Get(goog.HeaderChannelID), r.Header.Get(headerGoogleMessageNumber))
 		subjectType := resolveSubjectType(kind, "")
 		subjectID := subjectIDFor(subjectType, 0)
 		pub := types.New()
@@ -105,6 +134,9 @@ func HandleGoogleWebhook(deps Deps) http.HandlerFunc {
 		})
 		if err != nil {
 			writeError(w, apierrors.InternalUnexpected)
+			return
+		}
+		if respondIfDuplicate(ctx, w, deps, wsID, generated.SignalsSourceGoogle, ext, signalInternalID, "signals.HandleGoogleWebhook") {
 			return
 		}
 
