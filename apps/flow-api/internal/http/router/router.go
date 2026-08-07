@@ -1792,10 +1792,16 @@ func newDBInvocationLogger(q *generated.Queries, publish func(context.Context, u
 		}
 		model := rec.Model
 		var cost sql.NullString
+		// The cost recorded is the cost the provider reported. It is not
+		// re-derived from the model name here: every provider prices its
+		// own call, applying the deliberately conservative rate to models
+		// missing from the price table, and a provider that charges
+		// nothing reports zero on purpose. Guessing again at this layer
+		// could only overwrite that zero, and did — local model names are
+		// absent from the price table, so free inference was logged, and
+		// billed against the workspace's daily budget, at the table's
+		// highest rate.
 		costMicros := rec.CostMicros
-		if costMicros == 0 {
-			costMicros = providers.EstimateCostMicrosUSD(model, rec.TokensInput, rec.TokensOutput)
-		}
 		if costMicros == 0 && rec.CostCents > 0 {
 			costMicros = rec.CostCents * 10_000
 		}

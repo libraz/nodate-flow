@@ -59,9 +59,35 @@ type googleProvider struct {
 
 func (p *googleProvider) Name() string { return p.cfg.Name }
 func (p *googleProvider) Kind() Kind   { return KindGoogle }
+func (p *googleProvider) Model() string {
+	return chooseBaseURL(p.cfg.DefaultModel, googleDefaultModel)
+}
 
 type googleReq struct {
 	Contents []googleContent `json:"contents"`
+	// GenerationConfig carries the sampling knobs. Gemini spells them
+	// differently from the other providers (nested, and maxOutputTokens
+	// rather than max_tokens), which is how they came to be dropped here
+	// while every sibling provider forwarded them.
+	GenerationConfig *googleGenerationConfig `json:"generationConfig,omitempty"`
+}
+
+type googleGenerationConfig struct {
+	MaxOutputTokens int      `json:"maxOutputTokens,omitempty"`
+	Temperature     *float64 `json:"temperature,omitempty"`
+}
+
+// generationConfig returns the sampling block for req, or nil when the
+// caller chose neither knob so the field can be omitted entirely.
+func generationConfig(req Request) *googleGenerationConfig {
+	if req.MaxTokens <= 0 && req.Temperature == nil {
+		return nil
+	}
+	cfg := &googleGenerationConfig{Temperature: req.Temperature}
+	if req.MaxTokens > 0 {
+		cfg.MaxOutputTokens = req.MaxTokens
+	}
+	return cfg
 }
 
 type googleContent struct {
@@ -90,14 +116,15 @@ type googleResp struct {
 func (p *googleProvider) Complete(ctx context.Context, req Request) (*Response, error) {
 	model := req.Model
 	if model == "" {
-		model = chooseBaseURL(p.cfg.DefaultModel, googleDefaultModel)
+		model = p.Model()
 	}
 	prompt := req.Prompt
 	if req.System != "" {
 		prompt = req.System + "\n\n" + prompt
 	}
 	body, err := json.Marshal(googleReq{
-		Contents: []googleContent{{Role: "user", Parts: []googlePart{{Text: prompt}}}},
+		Contents:         []googleContent{{Role: "user", Parts: []googlePart{{Text: prompt}}}},
+		GenerationConfig: generationConfig(req),
 	})
 	if err != nil {
 		return nil, fmt.Errorf("google: marshal: %w", err)

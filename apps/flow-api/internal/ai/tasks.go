@@ -10,6 +10,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/ai/airequest"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/ai/embed"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/ai/providers"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
@@ -186,10 +187,10 @@ func (o *Orchestrator) ProposeTasksFrom(ctx context.Context, workspaceID uint32,
 
 	// Truncate user input to limit prompt-injection surface and prevent
 	// prompt-size abuse. See maxDescLen for the rationale.
-	req := providers.Request{
+	req := airequest.New(prov, airequest.Args{
 		System: proposeTasksSystem,
 		Prompt: sanitizeDesc(signal),
-	}
+	})
 	wsIDStr := strconv.FormatUint(uint64(workspaceID), 10)
 	resp, err := prov.Complete(ctx, req)
 	if err != nil {
@@ -224,10 +225,10 @@ func (o *Orchestrator) ProposePriority(ctx context.Context, workspaceID uint32, 
 		return "", ErrNoProvider
 	}
 	ctx = providers.WithWorkspaceID(ctx, workspaceID)
-	req := providers.Request{
+	req := airequest.New(prov, airequest.Args{
 		System: proposePrioritySystem,
 		Prompt: sanitizeDesc(taskSummary),
-	}
+	})
 	wsIDStr := strconv.FormatUint(uint64(workspaceID), 10)
 	resp, err := prov.Complete(ctx, req)
 	if err != nil {
@@ -378,10 +379,10 @@ func (o *Orchestrator) ProposeSteps(
 	userPrompt := buildStepsPrompt(sanitizeTitle(title), sanitizeDesc(description), existingChildren, ranked)
 
 	// ---- call LLM ----
-	req := providers.Request{
+	req := airequest.New(prov, airequest.Args{
 		System: proposeStepsSystemPrompt(granularity),
 		Prompt: userPrompt,
-	}
+	})
 	wsIDStr := strconv.FormatUint(uint64(workspaceID), 10)
 	resp, err := prov.Complete(ctx, req)
 	if err != nil {

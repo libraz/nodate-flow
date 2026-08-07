@@ -17,7 +17,6 @@ import (
 // Default thresholds mirror ADR 0003 §4. Used when ai_settings has no
 // row for the workspace yet.
 const (
-	defaultEmbedModel       = "mock-768"
 	defaultDuplicateHigh    = 0.870
 	defaultDuplicateLow     = 0.750
 	duplicateCandidateLimit = 200
@@ -60,7 +59,10 @@ func ListDuplicates(deps Deps) func(context.Context, *ListDuplicatesInput) (*Lis
 			return nil, httpErr(apierrors.WsTaskNotFound)
 		}
 
-		model, high, low := resolveThresholds(ctx, deps.Queries, ws.ID)
+		// The lookup key is the embedder's own model, which is what
+		// wrote every row: see [embed.Client.Model].
+		model := deps.Embedder.Model()
+		high, low := resolveThresholds(ctx, deps.Queries, ws.ID)
 
 		// Fetch the source embedding; if missing, try a write-time
 		// upsert using the current task text so the first call after a
@@ -143,10 +145,10 @@ func emptyDuplicates(model string) *ListDuplicatesOutput {
 	return out
 }
 
-func resolveThresholds(ctx context.Context, q *generated.Queries, wsID uint32) (string, float64, float64) {
+func resolveThresholds(ctx context.Context, q *generated.Queries, wsID uint32) (float64, float64) {
 	s, err := q.GetAiSettings(ctx, wsID)
 	if err != nil {
-		return defaultEmbedModel, defaultDuplicateHigh, defaultDuplicateLow
+		return defaultDuplicateHigh, defaultDuplicateLow
 	}
 	high, lerr := strconv.ParseFloat(s.DuplicateThresholdHigh, 64)
 	if lerr != nil {
@@ -156,11 +158,7 @@ func resolveThresholds(ctx context.Context, q *generated.Queries, wsID uint32) (
 	if lerr != nil {
 		low = defaultDuplicateLow
 	}
-	model := s.EmbedModel
-	if model == "" {
-		model = defaultEmbedModel
-	}
-	return model, high, low
+	return high, low
 }
 
 // vectorBytes coerces an interface{} VECTOR column to []byte. sqlc

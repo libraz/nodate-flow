@@ -17,6 +17,12 @@ import (
 // and audit records can distinguish it from real upstream providers.
 const MockKind Kind = "mock"
 
+// MockModel is the model name the mock reports. It is a real name rather
+// than an empty string so the mock exercises the same "every invocation
+// carries a model" invariant production does; a blank one here would let
+// a missing model label pass every test that runs under NF_AI_MOCK.
+const MockModel = "mock"
+
 // MockProvider is a deterministic Provider that ignores Request.Prompt
 // and returns canned text loaded from a fixture file. It is intended for
 // the NF_AI_MOCK=1 development / test path only.
@@ -41,6 +47,9 @@ func (m *MockProvider) Name() string { return "mock" }
 // Kind implements Provider.
 func (m *MockProvider) Kind() Kind { return MockKind }
 
+// Model implements Provider.
+func (m *MockProvider) Model() string { return MockModel }
+
 // Complete implements Provider. The mock ignores req.Prompt and returns
 // the fixture [fixtureNameForSystem] selects for req.System, falling back
 // to inbox_triage for any purpose that has no entry. The returned Response
@@ -51,7 +60,11 @@ func (m *MockProvider) Complete(_ context.Context, req Request) (*Response, erro
 	if err != nil {
 		return nil, err
 	}
-	return &Response{Text: text}, nil
+	model := req.Model
+	if model == "" {
+		model = MockModel
+	}
+	return &Response{Model: model, Text: text}, nil
 }
 
 // LoadFixture returns the raw text of a named fixture (without the .json

@@ -22,6 +22,16 @@ var ErrMissingKey = errors.New("ai/providers: missing encrypted api key")
 // intent.
 var ErrBaseURLNotAllowed = errors.New("ai/providers: base url is not allowed for kind=openai; use kind=openai_compat")
 
+// AllKinds returns every provider kind [New] can build, in a stable
+// order. It exists so tests can assert the completion contract holds for
+// the whole set rather than for whichever kinds someone remembered to
+// list: adding a kind to [New] without adding it here leaves the switch
+// below unable to build it, and adding it here without covering it in
+// the contract test fails that test.
+func AllKinds() []Kind {
+	return []Kind{KindAnthropic, KindOpenAI, KindGoogle, KindOllama, KindOpenAICompat}
+}
+
 // New constructs a Provider for cfg, decrypting nothing yet. The actual
 // decryption happens inside Complete, scoped to a single upstream HTTP
 // call. dec is the only object that holds the master key; it MUST be the

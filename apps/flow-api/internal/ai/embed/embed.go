@@ -86,6 +86,25 @@ type Client struct {
 	Redact       Redactor
 }
 
+// Model returns the key every task_embeddings row this client writes is
+// stored under, and therefore the only key a reader may look them up by.
+//
+// Readers must call this rather than resolving a model name of their
+// own. They used to read ai_settings.embed_model, a column with no write
+// path and a default of "mock-768", while writes went in under the
+// provider's real model name — so duplicate detection matched nothing at
+// all on any deployment with a real embedding provider, and matched
+// everything on the mock the tests ran against.
+//
+// Nil-safe: a workspace with no embedder has no embeddings, and the
+// empty key it returns matches none.
+func (c *Client) Model() string {
+	if c == nil || c.Provider == nil {
+		return ""
+	}
+	return c.Provider.Model()
+}
+
 // New constructs a Client. Panics if provider or queries is nil so
 // wiring mistakes fail loudly at boot.
 func New(provider Provider, q Store) *Client {
@@ -120,7 +139,7 @@ func (c *Client) EmbedTask(ctx context.Context, workspaceID, taskID uint32, titl
 		return nil
 	}
 	hash := hashText(text)
-	model := c.Provider.Model()
+	model := c.Model()
 
 	existing, err := c.Queries.GetTaskEmbedding(ctx, generated.GetTaskEmbeddingParams{
 		TaskID: taskID,
@@ -169,7 +188,7 @@ func (c *Client) recordMetrics(workspaceID uint32, costMicros int64) {
 	if c.OnInvocation == nil {
 		return
 	}
-	c.OnInvocation(providerName(c.Provider), c.Provider.Model(), strconv.FormatUint(uint64(workspaceID), 10), costMicros)
+	c.OnInvocation(providerName(c.Provider), c.Model(), strconv.FormatUint(uint64(workspaceID), 10), costMicros)
 }
 
 func (c *Client) logSuccess(ctx context.Context, workspaceID uint32, text string, costMicros int64) {
@@ -179,7 +198,7 @@ func (c *Client) logSuccess(ctx context.Context, workspaceID uint32, text string
 	c.LogInvoke(ctx, InvocationRecord{
 		WorkspaceID:      workspaceID,
 		Purpose:          "embed_task",
-		Model:            c.Provider.Model(),
+		Model:            c.Model(),
 		PromptRedacted:   c.redact(text),
 		ResponseRedacted: "embedding vector omitted",
 		TokensInput:      estimateTokens(text),
@@ -196,7 +215,7 @@ func (c *Client) logFailure(ctx context.Context, workspaceID uint32, text string
 	c.LogInvoke(ctx, InvocationRecord{
 		WorkspaceID:    workspaceID,
 		Purpose:        "embed_task",
-		Model:          c.Provider.Model(),
+		Model:          c.Model(),
 		PromptRedacted: c.redact(text),
 		Status:         "error",
 		ErrorCode:      c.redact(err.Error()),

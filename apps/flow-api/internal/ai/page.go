@@ -6,6 +6,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/ai/airequest"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/ai/providers"
 )
 
@@ -72,11 +73,11 @@ func (o *Orchestrator) GeneratePageBody(
 
 	userPrompt := buildPagePrompt(sanitizeTitle(title), truncatePrompt(prompt))
 
-	req := providers.Request{
+	req := airequest.New(prov, airequest.Args{
 		System:    generatePageSystem,
 		Prompt:    userPrompt,
 		MaxTokens: pageGenerationMaxTokens,
-	}
+	})
 	wsIDStr := strconv.FormatUint(uint64(workspaceID), 10)
 	resp, err := prov.Complete(ctx, req)
 	if err != nil {

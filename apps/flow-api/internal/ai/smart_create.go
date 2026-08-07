@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/ai/airequest"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/ai/embed"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/ai/providers"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
@@ -230,10 +231,10 @@ func (o *Orchestrator) ProposeSmartCreate(
 	userPrompt := buildSmartCreatePrompt(title, description, ranked, taskRows, members)
 
 	// ---- call LLM ----
-	req := providers.Request{
+	req := airequest.New(prov, airequest.Args{
 		System: smartCreateSystemPrompt,
 		Prompt: userPrompt,
-	}
+	})
 	wsIDStr := strconv.FormatUint(uint64(workspaceID), 10)
 	resp, err := prov.Complete(ctx, req)
 	if err != nil {

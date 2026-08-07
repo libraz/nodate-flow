@@ -36,6 +36,7 @@ type recordingProvider struct {
 
 func (p *recordingProvider) Name() string         { return "recording" }
 func (p *recordingProvider) Kind() providers.Kind { return p.kind }
+func (p *recordingProvider) Model() string        { return "recording-model" }
 
 func (p *recordingProvider) Complete(_ context.Context, _ providers.Request) (*providers.Response, error) {
 	p.called = true

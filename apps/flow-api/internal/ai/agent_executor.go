@@ -7,6 +7,7 @@ import (
 	"strconv"
 
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/ai/agentruntime"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/ai/airequest"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/ai/providers"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
 	"github.com/libraz/nodate-flow/packages/go-shared/logutil"
@@ -26,9 +27,11 @@ var ErrAgentPaused = errors.New("ai: agent is paused")
 //
 // Execute loads the agent row via [generated.Queries.GetAgentForExec],
 // enforces the cost guard, resolves the workspace's default provider,
-// and calls Complete with the agent's system prompt. The redacted
-// prompt + response are persisted via [InvocationLogger] alongside
-// every other LLM call site.
+// and calls Complete with the agent's system prompt, model, output cap,
+// and temperature — all of which come from that row via
+// [airequest.ForAgent], not from the provider's own defaults. The
+// redacted prompt + response are persisted via [InvocationLogger]
+// alongside every other LLM call site.
 type AgentExecutor struct {
 	Queries      *generated.Queries
 	Resolver     ProviderResolver
@@ -86,14 +89,14 @@ func (e *AgentExecutor) ExecuteAgent(ctx context.Context, workspaceID, agentID u
 		return result, ErrNoProvider
 	}
 	ctx = providers.WithWorkspaceID(ctx, workspaceID)
-	req := providers.Request{
+	req := airequest.ForAgent(prov, airequest.FromExecRow(row), airequest.Args{
 		System: row.SystemPrompt,
 		// The tick prompt is intentionally empty — interval agents
 		// are self-directed; the system prompt defines the task and
 		// the model replies without additional user input. Event /
 		// manual triggers will populate Prompt in a later pass.
 		Prompt: "",
-	}
+	})
 	wsIDStr := strconv.FormatUint(uint64(workspaceID), 10)
 	resp, err := prov.Complete(ctx, req)
 	if err != nil {

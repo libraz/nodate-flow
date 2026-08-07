@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/ai"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/ai/airequest"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/ai/providers"
 	"github.com/libraz/nodate-flow/packages/go-shared/logutil"
 )
@@ -215,11 +216,11 @@ func (w *WorkspaceProvider) CompileLens(ctx context.Context, prompt string) ([]b
 	}
 	ctx = providers.WithWorkspaceID(ctx, wsID)
 
-	req := providers.Request{
+	req := airequest.New(prov, airequest.Args{
 		System:    compileLensSystem,
 		Prompt:    prompt,
 		MaxTokens: 1024,
-	}
+	})
 	wsIDStr := strconv.FormatUint(uint64(wsID), 10)
 	promptRedacted := logutil.Redact(strings.TrimSpace(req.System + "\n" + req.Prompt))
 	resp, err := prov.Complete(ctx, req)

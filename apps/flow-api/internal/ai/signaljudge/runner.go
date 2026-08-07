@@ -10,7 +10,9 @@ import (
 	"strings"
 
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/ai/agentruntime"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/ai/airequest"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/ai/providers"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
 	"github.com/libraz/nodate-flow/packages/go-shared/logutil"
 )
 
@@ -83,7 +85,11 @@ type AgentSnapshot struct {
 	AgentID      uint32
 	Paused       bool
 	SystemPrompt string
-	ModelName    string
+	// Settings carries the model, output cap, and temperature the agent
+	// is configured with. It reaches the provider through
+	// [airequest.ForAgent]; a zero value means the lookup did not consult
+	// an agent row and the provider's own defaults apply.
+	Settings airequest.AgentSettings
 }
 
 // SignalLookup is the narrow surface the runner needs to load the
@@ -238,10 +244,10 @@ func (r *Runner) ExecuteJudge(ctx context.Context, workspaceID, agentID uint32, 
 	}
 
 	ctx = providers.WithWorkspaceID(ctx, workspaceID)
-	req := providers.Request{
+	req := airequest.ForAgent(prov, agent.Settings, airequest.Args{
 		System: systemPrompt,
 		Prompt: userPrompt,
-	}
+	})
 	wsIDStr := strconv.FormatUint(uint64(workspaceID), 10)
 	// Pre-compose the combined prompt for redaction so both branches
 	// (success / failure) below see the same shape and any registered
@@ -300,11 +306,11 @@ func (r *Runner) ExecuteJudge(ctx context.Context, workspaceID, agentID uint32, 
 	// non-JSON-capable model) — additional retries just burn budget.
 	verdictText := resp.Text
 	if r.shouldRetry(verdictText) {
-		retryReq := providers.Request{
-			System: systemPrompt,
-			Prompt: userPrompt + "\n\n" + retryReminder,
-			Model:  req.Model,
-		}
+		// Re-ask the same question rather than rebuilding the request:
+		// the retry has to run on the agent's model, cap, and
+		// temperature exactly as the first attempt did, or the second
+		// answer is not comparable to the first.
+		retryReq := airequest.WithPrompt(req, userPrompt+"\n\n"+retryReminder)
 		retryResp, retryErr := prov.Complete(ctx, retryReq)
 		if retryErr == nil && retryResp != nil {
 			if r.OnInvocation != nil {
@@ -497,27 +503,34 @@ func composeJudgePrompt(s SignalSnapshot) (string, error) {
 
 // SQLAgentLookup is the default production AgentLookup. It runs one
 // SELECT against ai_agents for each ExecuteJudge call, which matches
-// the cost profile of the task-agent path (which also does one
-// lookup per tick via GetAgentForExec). Keeping the lookups separate
-// avoids extending the sqlc query surface for Phase 2; the optimised
-// shared lookup is a Phase 6 follow-up.
+// the cost profile of the task-agent path.
+//
+// It uses the same GetAgentForExec query that path uses, rather than a
+// judge-local SELECT of its own. Two hand-written projections of the
+// same row are how the judge came to run without the agent's configured
+// output cap and temperature while the task agent (eventually) had them:
+// widening one query left the other behind, silently. Sharing the query
+// makes a new per-agent knob arrive on both paths or neither.
 type SQLAgentLookup struct {
 	DB *sql.DB
 }
 
 // Load implements AgentLookup against the live ai_agents table.
 func (l *SQLAgentLookup) Load(ctx context.Context, workspaceID, agentID uint32) (AgentSnapshot, error) {
-	const q = `SELECT a.id, a.workspace_id, a.paused, a.system_prompt, m.name
-		FROM ai_agents a
-		INNER JOIN ai_models m ON m.id = a.model_id AND m.enabled = TRUE
-		WHERE a.workspace_id = ? AND a.id = ? AND a.enabled = TRUE
-		LIMIT 1`
-	var snap AgentSnapshot
-	row := l.DB.QueryRowContext(ctx, q, workspaceID, agentID)
-	if err := row.Scan(&snap.AgentID, &snap.WorkspaceID, &snap.Paused, &snap.SystemPrompt, &snap.ModelName); err != nil {
+	row, err := generated.New(l.DB).GetAgentForExec(ctx, generated.GetAgentForExecParams{
+		WorkspaceID: workspaceID,
+		ID:          agentID,
+	})
+	if err != nil {
 		return AgentSnapshot{}, err
 	}
-	return snap, nil
+	return AgentSnapshot{
+		WorkspaceID:  row.WorkspaceID,
+		AgentID:      row.ID,
+		Paused:       row.Paused,
+		SystemPrompt: row.SystemPrompt,
+		Settings:     airequest.FromExecRow(row),
+	}, nil
 }
 
 // SQLSignalLookup is the default production SignalLookup. One SELECT

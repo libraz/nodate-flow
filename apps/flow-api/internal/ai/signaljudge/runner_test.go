@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/ai/airequest"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/ai/providers"
 )
 
@@ -44,17 +45,29 @@ func (f *fakeResolver) Default(_ context.Context, _ uint32) (providers.Provider,
 // recordingProvider captures the most recent request and returns a
 // canned response or error. Implements [providers.Provider].
 type recordingProvider struct {
-	kind providers.Kind
-	resp *providers.Response
-	err  error
+	kind  providers.Kind
+	model string
+	resp  *providers.Response
+	err   error
+	// req is the most recent request; reqs is every one, which the
+	// parse-retry path needs so the second attempt can be inspected as
+	// well as the first.
 	req  providers.Request
+	reqs []providers.Request
 }
 
 func (p *recordingProvider) Name() string         { return "recording" }
 func (p *recordingProvider) Kind() providers.Kind { return p.kind }
+func (p *recordingProvider) Model() string {
+	if p.model == "" {
+		return "provider-default-model"
+	}
+	return p.model
+}
 
 func (p *recordingProvider) Complete(_ context.Context, req providers.Request) (*providers.Response, error) {
 	p.req = req
+	p.reqs = append(p.reqs, req)
 	if p.err != nil {
 		return nil, p.err
 	}
@@ -85,7 +98,7 @@ func TestExecuteJudgeHappyPath(t *testing.T) {
 			AgentID:      7,
 			WorkspaceID:  3,
 			SystemPrompt: "", // empty falls back to skeleton
-			ModelName:    "fake-model",
+			Settings:     airequest.AgentSettings{ModelName: "fake-model"},
 		}},
 		Signals: &fakeSignalLookup{snap: SignalSnapshot{
 			SignalID:    99,
@@ -221,6 +234,112 @@ func TestExecuteJudgeOverrideSystemPrompt(t *testing.T) {
 	}
 	if prov.req.System != custom {
 		t.Fatalf("system prompt = %q, want %q", prov.req.System, custom)
+	}
+}
+
+// TestExecuteJudgeSendsTheAgentsConfiguredSettings is the end-to-end
+// assertion for the request-plumbing defect, on the one agent path whose
+// agent lookup is an interface and can therefore be driven without a
+// database.
+//
+// The runner used to hand the provider nothing but two prompts. The
+// agent's model, output cap, and temperature were all read out of
+// ai_agents and then dropped, so a judge configured to run on a small
+// model ran on whatever the workspace's default provider was set to —
+// at that model's price, and with the Anthropic provider's own 1024-token
+// floor silently truncating anything longer.
+//
+// The expected values are read back from the settings the test supplied,
+// not from the provider's defaults, so this cannot pass by coincidence:
+// the provider deliberately reports a different model.
+func TestExecuteJudgeSendsTheAgentsConfiguredSettings(t *testing.T) {
+	t.Parallel()
+
+	prov := &recordingProvider{
+		kind:  providers.Kind("mock"),
+		model: "workspace-default-model",
+		resp:  &providers.Response{Text: `{"action":"noop","confidence":0.1,"reasoning_excerpt":"nothing actionable"}`},
+	}
+	temp := uint16(15)
+	settings := airequest.AgentSettings{
+		ModelName:       "agent-configured-model",
+		MaxOutputTokens: 8192,
+		TemperatureX100: &temp,
+	}
+	var logged []InvocationRecord
+	var metricModels []string
+	r := &Runner{
+		Agents:       &fakeAgentLookup{snap: AgentSnapshot{AgentID: 4, WorkspaceID: 6, Settings: settings}},
+		Signals:      &fakeSignalLookup{snap: SignalSnapshot{SignalID: 2, WorkspaceID: 6, Kind: "manual"}},
+		Resolver:     &fakeResolver{provider: prov},
+		Log:          func(_ context.Context, rec InvocationRecord) { logged = append(logged, rec) },
+		OnInvocation: func(_, model, _ string, _ int64) { metricModels = append(metricModels, model) },
+	}
+
+	if _, err := r.ExecuteJudge(context.Background(), 6, 4, 2); err != nil {
+		t.Fatalf("ExecuteJudge: %v", err)
+	}
+
+	if prov.req.Model != settings.ModelName {
+		t.Errorf("provider was called with model %q, want the agent's %q", prov.req.Model, settings.ModelName)
+	}
+	if prov.req.Model == prov.Model() {
+		t.Errorf("the agent's model was replaced by the provider default %q", prov.Model())
+	}
+	if prov.req.MaxTokens != settings.MaxOutputTokens {
+		t.Errorf("MaxTokens = %d, want the agent's %d", prov.req.MaxTokens, settings.MaxOutputTokens)
+	}
+	if prov.req.Temperature == nil || *prov.req.Temperature != 0.15 {
+		t.Errorf("Temperature = %v, want 0.15 (stored as 15)", prov.req.Temperature)
+	}
+	if len(logged) != 1 || logged[0].Model != settings.ModelName {
+		t.Errorf("ai_invocations must record the model the call ran on; got %+v", logged)
+	}
+	if len(metricModels) != 1 || metricModels[0] != settings.ModelName {
+		t.Errorf("metrics model label = %v, want [%q]", metricModels, settings.ModelName)
+	}
+}
+
+// TestExecuteJudgeRetryKeepsTheAgentsSettings covers the second attempt.
+// The retry is a re-ask of the same question, so answering it on a
+// different model — or without the agent's cap and temperature — would
+// make the two answers incomparable, and would let the retry bill a
+// model the operator never chose.
+func TestExecuteJudgeRetryKeepsTheAgentsSettings(t *testing.T) {
+	t.Parallel()
+
+	prov := &recordingProvider{
+		kind:  providers.Kind("mock"),
+		model: "workspace-default-model",
+		// Not a valid verdict, so the runner's single retry fires.
+		resp: &providers.Response{Text: "sorry, I cannot comply"},
+	}
+	temp := uint16(15)
+	r := &Runner{
+		Agents: &fakeAgentLookup{snap: AgentSnapshot{AgentID: 4, WorkspaceID: 6, Settings: airequest.AgentSettings{
+			ModelName:       "agent-configured-model",
+			MaxOutputTokens: 8192,
+			TemperatureX100: &temp,
+		}}},
+		Signals:  &fakeSignalLookup{snap: SignalSnapshot{SignalID: 2, WorkspaceID: 6, Kind: "manual"}},
+		Resolver: &fakeResolver{provider: prov},
+	}
+
+	if _, err := r.ExecuteJudge(context.Background(), 6, 4, 2); err != nil {
+		t.Fatalf("ExecuteJudge: %v", err)
+	}
+	if len(prov.reqs) != 2 {
+		t.Fatalf("expected the parse-retry to make a second call, got %d", len(prov.reqs))
+	}
+	first, retry := prov.reqs[0], prov.reqs[1]
+	if retry.Model != first.Model || retry.MaxTokens != first.MaxTokens || retry.System != first.System {
+		t.Errorf("retry ran under different settings:\n first=%+v\n retry=%+v", first, retry)
+	}
+	if retry.Temperature == nil || first.Temperature == nil || *retry.Temperature != *first.Temperature {
+		t.Errorf("retry lost the agent's temperature: %v", retry.Temperature)
+	}
+	if !strings.Contains(retry.Prompt, retryReminder) {
+		t.Errorf("the retry must append the reminder; got %q", retry.Prompt)
 	}
 }
 

@@ -1455,15 +1455,13 @@ func runProposeDuplicates(ctx context.Context, deps Deps, s *session, raw json.R
 		return nil, err
 	}
 
-	// Resolve model + thresholds from ai_settings (ADR 0003 defaults on
-	// miss).
-	model := "mock-768"
+	// The lookup key is the embedder's own model, which is what wrote
+	// every row: see [embed.Client.Model]. Thresholds come from
+	// ai_settings, with the ADR 0003 defaults on miss.
+	model := deps.Embedder.Model()
 	high := 0.870
 	low := 0.750
 	if settings, serr := deps.Queries.GetAiSettings(ctx, s.workspaceID); serr == nil {
-		if settings.EmbedModel != "" {
-			model = settings.EmbedModel
-		}
 		if v, perr := strconv.ParseFloat(settings.DuplicateThresholdHigh, 64); perr == nil {
 			high = v
 		}
@@ -2032,14 +2030,13 @@ func runProposeRelations(ctx context.Context, deps Deps, s *session, raw json.Ra
 		return nil, err
 	}
 
-	// Resolve model + thresholds from ai_settings (ADR 0003 defaults).
-	model := "mock-768"
+	// The lookup key is the embedder's own model, which is what wrote
+	// every row: see [embed.Client.Model]. Thresholds come from
+	// ai_settings, with the ADR 0003 defaults on miss.
+	model := deps.Embedder.Model()
 	high := 0.870
 	low := 0.750
 	if settings, serr := deps.Queries.GetAiSettings(ctx, s.workspaceID); serr == nil {
-		if settings.EmbedModel != "" {
-			model = settings.EmbedModel
-		}
 		if v, perr := strconv.ParseFloat(settings.DuplicateThresholdHigh, 64); perr == nil {
 			high = v
 		}

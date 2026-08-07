@@ -36,11 +36,23 @@ type Config struct {
 }
 
 // Request is a minimal LLM call payload.
+//
+// Nothing outside apps/flow-api/internal/ai/airequest may build one: the
+// per-agent model, output cap, and temperature reach the upstream call
+// only if every field is filled from the same place, and hand-built
+// literals lost them silently. See that package for the rationale and
+// for the guard test that enforces it.
 type Request struct {
 	Model     string
 	System    string
 	Prompt    string
 	MaxTokens int
+	// Temperature is the sampling temperature to send upstream. Nil means
+	// "do not send one" — the upstream model's own default applies. A
+	// pointer rather than a float so that a deliberate 0 (fully
+	// deterministic sampling) stays distinguishable from "unset"; a plain
+	// float64 would make the zero value silently request greedy decoding.
+	Temperature *float64
 }
 
 // Response is a minimal LLM call result.
@@ -49,8 +61,12 @@ type Response struct {
 	Text         string
 	InputTokens  int
 	OutputTokens int
-	// CostMicros is the provider's best-effort cost estimate in millionths
-	// of a US dollar, or zero if pricing is unknown.
+	// CostMicros is what the call cost, in millionths of a US dollar, as
+	// computed by the provider that made it. It is authoritative: a
+	// provider that charges nothing reports zero, and downstream code
+	// records that zero rather than re-deriving a price from the model
+	// name. Estimating downstream is how free local inference came to be
+	// logged at the most expensive rate in the price table.
 	CostMicros int64
 	// CostCents is a legacy whole-cent estimate kept for older call sites
 	// and tests. New code should use [Response.EstimatedCostMicros] and
@@ -94,6 +110,14 @@ type Provider interface {
 
 	// Kind returns the provider kind enum value.
 	Kind() Kind
+
+	// Model returns the model this provider calls when Request.Model is
+	// empty: the configured ai_providers.default_model, or the kind's
+	// built-in fallback. Callers need it before the call is made, because
+	// a failed call still has to be logged and metered against a model
+	// name, and reading it off the (absent) response leaves the label
+	// blank.
+	Model() string
 
 	// Complete performs a single completion call against the upstream LLM.
 	Complete(ctx context.Context, req Request) (*Response, error)

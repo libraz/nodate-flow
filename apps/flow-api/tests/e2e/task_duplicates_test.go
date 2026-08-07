@@ -5,6 +5,7 @@ import (
 	"os"
 	"testing"
 
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/ai/embed"
 	"github.com/stretchr/testify/require"
 )
 
@@ -58,7 +59,13 @@ func TestTaskDuplicatesProposal(t *testing.T) {
 		tt.AccessToken, nil, &out)
 
 	require.Equal(t, sourceID, out.Source)
-	require.Equal(t, "mock-768", out.Model)
+	// Ask the embedder the server is running what it files rows under,
+	// rather than asserting its current name. The endpoint used to derive
+	// its lookup key from ai_settings.embed_model, which happens to
+	// default to the mock's name — so a literal here agreed with the
+	// broken key and this test passed while duplicate detection returned
+	// nothing on every deployment with a real embedding provider.
+	require.Equal(t, embed.NewMockProvider().Model(), out.Model)
 	require.NotEmpty(t, out.Candidates, "at least the identical twin must rank")
 	top := out.Candidates[0]
 	require.Equal(t, twinID, top.TaskID, "identical-text twin must rank first")

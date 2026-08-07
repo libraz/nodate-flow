@@ -25,12 +25,18 @@ type anthropicProvider struct {
 
 func (p *anthropicProvider) Name() string { return p.cfg.Name }
 func (p *anthropicProvider) Kind() Kind   { return KindAnthropic }
+func (p *anthropicProvider) Model() string {
+	return chooseBaseURL(p.cfg.DefaultModel, anthropicDefaultMdl)
+}
 
 type anthropicReq struct {
 	Model     string             `json:"model"`
 	MaxTokens int                `json:"max_tokens"`
 	System    string             `json:"system,omitempty"`
 	Messages  []anthropicMessage `json:"messages"`
+	// Temperature is omitted when the caller did not choose one, leaving
+	// the model's own default in force.
+	Temperature *float64 `json:"temperature,omitempty"`
 }
 
 type anthropicMessage struct {
@@ -56,17 +62,23 @@ type anthropicResp struct {
 func (p *anthropicProvider) Complete(ctx context.Context, req Request) (*Response, error) {
 	model := req.Model
 	if model == "" {
-		model = chooseBaseURL(p.cfg.DefaultModel, anthropicDefaultMdl)
+		model = p.Model()
 	}
+	// max_tokens is required by the Messages API, so an absent cap has to
+	// become some number here. It is the one place in the provider set
+	// where a missing value silently truncates a long answer instead of
+	// failing, which is why the agent's configured cap must reach this
+	// call rather than being re-defaulted.
 	maxTok := req.MaxTokens
 	if maxTok <= 0 {
 		maxTok = anthropicMaxTokensFb
 	}
 	body, err := json.Marshal(anthropicReq{
-		Model:     model,
-		MaxTokens: maxTok,
-		System:    req.System,
-		Messages:  []anthropicMessage{{Role: "user", Content: req.Prompt}},
+		Model:       model,
+		MaxTokens:   maxTok,
+		System:      req.System,
+		Messages:    []anthropicMessage{{Role: "user", Content: req.Prompt}},
+		Temperature: req.Temperature,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("anthropic: marshal: %w", err)

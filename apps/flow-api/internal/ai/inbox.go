@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"strconv"
 
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/ai/airequest"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/ai/providers"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/eventbus"
@@ -82,10 +83,10 @@ func (o *Orchestrator) ProposeInboxTriage(ctx context.Context, workspaceID uint3
 		}
 	}
 
-	req := providers.Request{
+	req := airequest.New(prov, airequest.Args{
 		System: proposeInboxTriageSystem,
 		Prompt: prompt,
-	}
+	})
 	wsIDStr := strconv.FormatUint(uint64(workspaceID), 10)
 	resp, err := prov.Complete(ctx, req)
 	if err != nil {

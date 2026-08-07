@@ -25,6 +25,9 @@ type openAIProvider struct {
 
 func (p *openAIProvider) Name() string { return p.cfg.Name }
 func (p *openAIProvider) Kind() Kind   { return p.cfg.Kind }
+func (p *openAIProvider) Model() string {
+	return chooseBaseURL(p.cfg.DefaultModel, openAIDefaultModel)
+}
 
 type openAIMessage struct {
 	Role    string `json:"role"`
@@ -35,6 +38,9 @@ type openAIReq struct {
 	Model     string          `json:"model"`
 	Messages  []openAIMessage `json:"messages"`
 	MaxTokens int             `json:"max_tokens,omitempty"`
+	// Temperature is omitted when the caller did not choose one, leaving
+	// the model's own default in force.
+	Temperature *float64 `json:"temperature,omitempty"`
 }
 
 type openAIResp struct {
@@ -54,7 +60,7 @@ type openAIResp struct {
 func (p *openAIProvider) Complete(ctx context.Context, req Request) (*Response, error) {
 	model := req.Model
 	if model == "" {
-		model = chooseBaseURL(p.cfg.DefaultModel, openAIDefaultModel)
+		model = p.Model()
 	}
 	msgs := make([]openAIMessage, 0, 2)
 	if req.System != "" {
@@ -63,9 +69,10 @@ func (p *openAIProvider) Complete(ctx context.Context, req Request) (*Response, 
 	msgs = append(msgs, openAIMessage{Role: "user", Content: req.Prompt})
 
 	body, err := json.Marshal(openAIReq{
-		Model:     model,
-		Messages:  msgs,
-		MaxTokens: req.MaxTokens,
+		Model:       model,
+		Messages:    msgs,
+		MaxTokens:   req.MaxTokens,
+		Temperature: req.Temperature,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("openai: marshal: %w", err)

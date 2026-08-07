@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/ai/embed"
 	"github.com/stretchr/testify/require"
 )
 
@@ -75,7 +76,9 @@ func TestMCPProposeDuplicates(t *testing.T) {
 	}
 	require.NoError(t, json.Unmarshal([]byte(frame.Result.Content[0].Text), &payload),
 		"inner=%s", frame.Result.Content[0].Text)
-	require.Equal(t, "mock-768", payload.Model)
+	// See the note in task_duplicates_test.go: the expected key comes
+	// from the embedder that wrote the rows, not from its current name.
+	require.Equal(t, embed.NewMockProvider().Model(), payload.Model)
 	require.NotEmpty(t, payload.Candidates)
 	require.Equal(t, twinID, payload.Candidates[0].TaskID)
 	require.Equal(t, "duplicate", payload.Candidates[0].Classification)
