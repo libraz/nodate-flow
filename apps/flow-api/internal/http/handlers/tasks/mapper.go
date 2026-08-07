@@ -23,6 +23,7 @@ import (
 	"database/sql"
 	"encoding/hex"
 	"encoding/json"
+	"strings"
 	"time"
 
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
@@ -175,6 +176,39 @@ type taskListRow struct {
 	AssigneeCount           int64
 }
 
+// splitLabelIDs turns the v_task_list label_ids column into the DTO's
+// string slice. The column is a comma-separated list of UUID text (the
+// view calls BIN_TO_UUID before aggregating, so nothing binary reaches
+// this point) and NULL for a task carrying no labels.
+//
+// Passing the column through as a single string is the shape this
+// replaced: a caller cannot split a concatenation of raw BINARY(16)
+// public ids, because 0x2C is a legal payload byte, and JSON encoding
+// destroys the bytes before the caller sees them anyway. Splitting here
+// keeps the wire format a plain array of ids.
+//
+// Entries that do not parse as UUIDs are dropped rather than forwarded.
+// The view's aggregate cap makes a clipped entry unreachable, so this is
+// belt-and-braces: if the cap is ever raised past group_concat_max_len,
+// the response loses a label instead of publishing a malformed id.
+func splitLabelIDs(v sql.NullString) []string {
+	if !v.Valid || v.String == "" {
+		return nil
+	}
+	parts := strings.Split(v.String, ",")
+	ids := make([]string, 0, len(parts))
+	for _, p := range parts {
+		if _, err := types.Parse(p); err != nil {
+			continue
+		}
+		ids = append(ids, p)
+	}
+	if len(ids) == 0 {
+		return nil
+	}
+	return ids
+}
+
 // taskListRowToDTO converts the unified projection into TaskListItem.
 // This is the single function responsible for shaping list-row JSON;
 // every caller must route through here so OFFSET and keyset variants
@@ -195,7 +229,7 @@ func taskListRowToDTO(r taskListRow) TaskListItem {
 		StartedOn:         nullDate(r.StartedOn),
 		CompletedAt:       nullTimeUnix(r.CompletedAt),
 		ArchivedAt:        nullTimeUnix(r.ArchivedAt),
-		LabelIDs:          nullStr(r.LabelIDs),
+		LabelIDs:          splitLabelIDs(r.LabelIDs),
 		SortWeight:        r.SortWeight,
 		PrimaryAssigneeID: rawBytesToUUIDPtr(r.PrimaryAssigneePublicID),
 		AssigneeCount:     r.AssigneeCount,

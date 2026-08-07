@@ -146,6 +146,7 @@ INSERT INTO notification_preferences (
 ) VALUES (?, ?, ?, ?, ?, ?)
 ON DUPLICATE KEY UPDATE
   is_muted   = VALUES(is_muted),
+  enabled    = TRUE,
   updated_at = NOW()
 `
 
@@ -159,6 +160,12 @@ type UpsertNotificationPreferenceParams struct {
 }
 
 // Create or update a notification preference for a user.
+//
+// enabled is reset to TRUE on update because a soft-disabled row still
+// occupies the (user, workspace, category, channel) unique key: without
+// the reset the INSERT collides, the UPDATE leaves enabled = FALSE, and
+// every reader keeps skipping the row while the API reports the value
+// the caller just wrote.
 func (q *Queries) UpsertNotificationPreference(ctx context.Context, arg UpsertNotificationPreferenceParams) error {
 	_, err := q.db.ExecContext(ctx, upsertNotificationPreference,
 		arg.PublicID,

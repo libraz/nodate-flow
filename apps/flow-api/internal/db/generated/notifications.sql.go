@@ -165,40 +165,42 @@ func (q *Queries) CreateNotification(ctx context.Context, arg CreateNotification
 	return result.RowsAffected()
 }
 
-const getEnabledChannelsForRecipients = `-- name: GetEnabledChannelsForRecipients :many
+const getNotificationPreferencesForRecipients = `-- name: GetNotificationPreferencesForRecipients :many
 SELECT
   user_id,
-  channel
+  channel,
+  is_muted
 FROM notification_preferences
 WHERE workspace_id = ?
   AND event_category = ?
   AND user_id IN (/*SLICE:user_ids*/?)
-  AND is_muted = FALSE
   AND enabled = TRUE
 `
 
-type GetEnabledChannelsForRecipientsParams struct {
+type GetNotificationPreferencesForRecipientsParams struct {
 	WorkspaceID   uint32   `json:"-"`
 	EventCategory string   `json:"eventCategory"`
 	UserIds       []uint32 `json:"-"`
 }
 
-type GetEnabledChannelsForRecipientsRow struct {
+type GetNotificationPreferencesForRecipientsRow struct {
 	UserID  uint32                         `json:"-"`
 	Channel NotificationPreferencesChannel `json:"channel"`
+	IsMuted bool                           `json:"isMuted"`
 }
 
-// Resolve, for a set of recipients in one workspace, which delivery
-// channels are enabled for a given event_category. A recipient with
-// no row for the (workspace, category, channel) tuple returns no
-// entry; the caller is expected to apply the default (in_app) when a
-// recipient is absent from the result set.
+// Load, for a set of recipients in one workspace, every stored
+// preference row for a given event_category — muted ones included.
 //
-// Only rows with enabled = TRUE AND is_muted = FALSE are returned —
-// a muted preference behaves identically to a disabled one for the
-// purposes of fan-out, and neither should produce a notifications row.
-func (q *Queries) GetEnabledChannelsForRecipients(ctx context.Context, arg GetEnabledChannelsForRecipientsParams) ([]GetEnabledChannelsForRecipientsRow, error) {
-	query := getEnabledChannelsForRecipients
+// is_muted has to come back with the row. Filtering muted rows out here
+// makes "the user muted this channel" indistinguishable from "the user
+// never touched this category", and the caller has to treat an absent
+// recipient as the default. Under that shape a mute on the default
+// channel is silently discarded and the user keeps receiving what they
+// turned off. The caller resolves defaults against the returned rows
+// instead; see the notification package's channel resolution.
+func (q *Queries) GetNotificationPreferencesForRecipients(ctx context.Context, arg GetNotificationPreferencesForRecipientsParams) ([]GetNotificationPreferencesForRecipientsRow, error) {
+	query := getNotificationPreferencesForRecipients
 	var queryParams []interface{}
 	queryParams = append(queryParams, arg.WorkspaceID)
 	queryParams = append(queryParams, arg.EventCategory)
@@ -215,10 +217,10 @@ func (q *Queries) GetEnabledChannelsForRecipients(ctx context.Context, arg GetEn
 		return nil, err
 	}
 	defer rows.Close()
-	items := []GetEnabledChannelsForRecipientsRow{}
+	items := []GetNotificationPreferencesForRecipientsRow{}
 	for rows.Next() {
-		var i GetEnabledChannelsForRecipientsRow
-		if err := rows.Scan(&i.UserID, &i.Channel); err != nil {
+		var i GetNotificationPreferencesForRecipientsRow
+		if err := rows.Scan(&i.UserID, &i.Channel, &i.IsMuted); err != nil {
 			return nil, err
 		}
 		items = append(items, i)

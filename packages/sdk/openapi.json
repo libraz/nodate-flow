@@ -7177,6 +7177,26 @@
         ],
         "type": "object"
       },
+      "NotificationPreferenceDTO": {
+        "additionalProperties": false,
+        "properties": {
+          "channel": {
+            "description": "Delivery channel",
+            "enum": ["in_app", "email", "push"],
+            "type": "string"
+          },
+          "eventCategory": {
+            "description": "Event category the setting applies to",
+            "type": "string"
+          },
+          "muted": {
+            "description": "True when delivery of this category on this channel is suppressed",
+            "type": "boolean"
+          }
+        },
+        "required": ["eventCategory", "channel", "muted"],
+        "type": "object"
+      },
       "OIDCStartOutputBody": {
         "additionalProperties": false,
         "properties": {
@@ -8032,6 +8052,26 @@
           }
         },
         "required": ["ok"],
+        "type": "object"
+      },
+      "PreferencesOutputBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/PreferencesOutputBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "preferences": {
+            "items": {
+              "$ref": "#/components/schemas/NotificationPreferenceDTO"
+            },
+            "type": ["array", "null"]
+          }
+        },
+        "required": ["preferences"],
         "type": "object"
       },
       "PresignAttachmentInputBody": {
@@ -10790,7 +10830,11 @@
             "type": "string"
           },
           "labelIds": {
-            "type": "string"
+            "description": "Label public ids in display order, capped at the first 20",
+            "items": {
+              "type": "string"
+            },
+            "type": ["array", "null"]
           },
           "parentTaskId": {
             "type": "string"
@@ -11742,6 +11786,29 @@
             "type": "string"
           }
         },
+        "type": "object"
+      },
+      "UpdatePreferencesInputBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/UpdatePreferencesInputBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "preferences": {
+            "description": "Cells to write; each is addressed by (eventCategory, channel)",
+            "items": {
+              "$ref": "#/components/schemas/NotificationPreferenceDTO"
+            },
+            "maxItems": 64,
+            "minItems": 1,
+            "type": ["array", "null"]
+          }
+        },
+        "required": ["preferences"],
         "type": "object"
       },
       "UpdateRsvpInputBody": {
@@ -26456,6 +26523,98 @@
           }
         },
         "summary": "Update a member's role"
+      }
+    },
+    "/workspaces/{wsId}/notification-preferences": {
+      "get": {
+        "description": "Returns the caller's complete event-category by delivery-channel matrix for the workspace, with the value fan-out actually applies to each cell. Cells the caller has never changed are reported at their default: the in-app channel delivers, email and push do not.",
+        "operationId": "notification-preferences-list",
+        "parameters": [
+          {
+            "description": "Workspace public id (UUID v7)",
+            "in": "path",
+            "name": "wsId",
+            "required": true,
+            "schema": {
+              "description": "Workspace public id (UUID v7)",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PreferencesOutputBody"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "List the caller's notification preferences",
+        "tags": ["Tasks"]
+      },
+      "put": {
+        "description": "Writes the listed (event category, delivery channel) cells for the caller and returns the resulting complete matrix. Cells the body omits are left as they were. Muting a category on the in-app channel stops notification rows being created for it.",
+        "operationId": "notification-preferences-update",
+        "parameters": [
+          {
+            "description": "Workspace public id (UUID v7)",
+            "in": "path",
+            "name": "wsId",
+            "required": true,
+            "schema": {
+              "description": "Workspace public id (UUID v7)",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdatePreferencesInputBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PreferencesOutputBody"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Update the caller's notification preferences",
+        "tags": ["Tasks"]
       }
     },
     "/workspaces/{wsId}/notifications/read-all": {

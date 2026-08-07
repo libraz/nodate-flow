@@ -816,16 +816,6 @@ type Querier interface {
 	// caller already cleared, so a delete cannot target an attachment on a
 	// different (or unauthorized) task; a mismatch returns no row.
 	GetAttachmentStorageObjectIDForDelete(ctx context.Context, arg GetAttachmentStorageObjectIDForDeleteParams) (GetAttachmentStorageObjectIDForDeleteRow, error)
-	// Resolve, for a set of recipients in one workspace, which delivery
-	// channels are enabled for a given event_category. A recipient with
-	// no row for the (workspace, category, channel) tuple returns no
-	// entry; the caller is expected to apply the default (in_app) when a
-	// recipient is absent from the result set.
-	//
-	// Only rows with enabled = TRUE AND is_muted = FALSE are returned —
-	// a muted preference behaves identically to a disabled one for the
-	// purposes of fan-out, and neither should produce a notifications row.
-	GetEnabledChannelsForRecipients(ctx context.Context, arg GetEnabledChannelsForRecipientsParams) ([]GetEnabledChannelsForRecipientsRow, error)
 	// Resolve an event's public id and logical occurrence time given its
 	// internal id, scoped by workspace as a defence-in-depth check.
 	// Used by the webhook fanout chain (H1): the worker needs the event's
@@ -842,6 +832,17 @@ type Querier interface {
 	GetLastSuccessfulAgentRun(ctx context.Context, arg GetLastSuccessfulAgentRunParams) (time.Time, error)
 	// Fetch a single lens by its public_id.
 	GetLensByPublicID(ctx context.Context, arg GetLensByPublicIDParams) (GetLensByPublicIDRow, error)
+	// Load, for a set of recipients in one workspace, every stored
+	// preference row for a given event_category — muted ones included.
+	//
+	// is_muted has to come back with the row. Filtering muted rows out here
+	// makes "the user muted this channel" indistinguishable from "the user
+	// never touched this category", and the caller has to treat an absent
+	// recipient as the default. Under that shape a mute on the default
+	// channel is silently discarded and the user keeps receiving what they
+	// turned off. The caller resolves defaults against the returned rows
+	// instead; see the notification package's channel resolution.
+	GetNotificationPreferencesForRecipients(ctx context.Context, arg GetNotificationPreferencesForRecipientsParams) ([]GetNotificationPreferencesForRecipientsRow, error)
 	// Fetch a single page by workspace_id + public_id, including parent page info.
 	// pg.id is required: used by MCP resolvePage and page handlers for
 	// parent_page_id resolution and circular-reference checks.
@@ -1862,6 +1863,12 @@ type Querier interface {
 	// signal_kind is intentionally excluded from the UPDATE branch.
 	UpsertAutoActionRule(ctx context.Context, arg UpsertAutoActionRuleParams) error
 	// Create or update a notification preference for a user.
+	//
+	// enabled is reset to TRUE on update because a soft-disabled row still
+	// occupies the (user, workspace, category, channel) unique key: without
+	// the reset the INSERT collides, the UPDATE leaves enabled = FALSE, and
+	// every reader keeps skipping the row while the API reports the value
+	// the caller just wrote.
 	UpsertNotificationPreference(ctx context.Context, arg UpsertNotificationPreferenceParams) error
 	// Record or refresh a recent visit. If the user already visited this entity,
 	// update the timestamp and title snapshot.

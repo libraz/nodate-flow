@@ -58,13 +58,37 @@ LEFT JOIN (
   GROUP BY ta.task_id
 ) assignees ON assignees.task_id = t.id
 LEFT JOIN (
+  -- label_ids is a comma-separated list of UUID *text*, not of raw
+  -- BINARY(16). Concatenating the binary form is unrecoverable in both
+  -- directions: 0x2C occurs inside legitimate UUIDv7 bytes so the reader
+  -- cannot tell a separator from payload, and the bytes are not valid
+  -- UTF-8 so JSON encoding replaces them with U+FFFD before the reader
+  -- ever sees them. BIN_TO_UUID uses swap_flag 0 to match the
+  -- UUID_TO_BIN(?, 0) form every writer uses.
+  --
+  -- The rn cap is what keeps GROUP_CONCAT honest. Its result is clipped
+  -- at group_concat_max_len (1024 bytes by default) with no error and no
+  -- marker, which at 37 bytes per entry would cut the 28th UUID in half
+  -- and hand the reader a malformed id. Capping the aggregate below that
+  -- point makes the clip unreachable, so the column is either the whole
+  -- list or its first 20 entries in display order -- never a
+  -- half-written one. The list-row badge strip is the only consumer.
+  -- Callers needing every label of a task read the task's label
+  -- collection directly.
   SELECT
-    tl.task_id,
-    GROUP_CONCAT(l.public_id ORDER BY tl.sort_weight ASC, tl.id ASC SEPARATOR ',') AS label_ids
-  FROM task_labels tl
-  INNER JOIN tasks tlt ON tlt.id = tl.task_id AND tlt.enabled = TRUE
-  INNER JOIN labels l ON l.id = tl.label_id AND l.enabled = TRUE
-  WHERE tl.enabled = TRUE
-  GROUP BY tl.task_id
+    ranked.task_id,
+    GROUP_CONCAT(BIN_TO_UUID(ranked.public_id, 0) ORDER BY ranked.rn ASC SEPARATOR ',') AS label_ids
+  FROM (
+    SELECT
+      tl.task_id,
+      l.public_id,
+      ROW_NUMBER() OVER (PARTITION BY tl.task_id ORDER BY tl.sort_weight ASC, tl.id ASC) AS rn
+    FROM task_labels tl
+    INNER JOIN tasks tlt ON tlt.id = tl.task_id AND tlt.enabled = TRUE
+    INNER JOIN labels l ON l.id = tl.label_id AND l.enabled = TRUE
+    WHERE tl.enabled = TRUE
+  ) ranked
+  WHERE ranked.rn <= 20
+  GROUP BY ranked.task_id
 ) labels ON labels.task_id = t.id
 WHERE t.enabled = TRUE;

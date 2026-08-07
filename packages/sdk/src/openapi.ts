@@ -4182,6 +4182,30 @@ export interface paths {
         patch: operations["workspaces-members-update-role"];
         trace?: never;
     };
+    "/workspaces/{wsId}/notification-preferences": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List the caller's notification preferences
+         * @description Returns the caller's complete event-category by delivery-channel matrix for the workspace, with the value fan-out actually applies to each cell. Cells the caller has never changed are reported at their default: the in-app channel delivers, email and push do not.
+         */
+        get: operations["notification-preferences-list"];
+        /**
+         * Update the caller's notification preferences
+         * @description Writes the listed (event category, delivery channel) cells for the caller and returns the resulting complete matrix. Cells the body omits are left as they were. Muting a category on the in-app channel stops notification rows being created for it.
+         */
+        put: operations["notification-preferences-update"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/workspaces/{wsId}/notifications/read-all": {
         parameters: {
             query?: never;
@@ -8142,6 +8166,17 @@ export interface components {
             title: string;
             workspaceId: string;
         };
+        NotificationPreferenceDTO: {
+            /**
+             * @description Delivery channel
+             * @enum {string}
+             */
+            channel: "in_app" | "email" | "push";
+            /** @description Event category the setting applies to */
+            eventCategory: string;
+            /** @description True when delivery of this category on this channel is suppressed */
+            muted: boolean;
+        };
         OIDCStartOutputBody: {
             /**
              * Format: uri
@@ -8557,6 +8592,15 @@ export interface components {
              */
             readonly $schema?: string;
             ok: boolean;
+        };
+        PreferencesOutputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/PreferencesOutputBody.json
+             */
+            readonly $schema?: string;
+            preferences: components["schemas"]["NotificationPreferenceDTO"][] | null;
         };
         PresignAttachmentInputBody: {
             /**
@@ -9782,7 +9826,8 @@ export interface components {
             derivedState: string;
             dueOn?: string;
             id: string;
-            labelIds?: string;
+            /** @description Label public ids in display order, capped at the first 20 */
+            labelIds?: string[] | null;
             parentTaskId?: string;
             primaryAssigneeId: string | null;
             /** Format: int32 */
@@ -10244,6 +10289,16 @@ export interface components {
             /** @description Project public id; null to unset */
             projectId?: string;
             title?: string;
+        };
+        UpdatePreferencesInputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/UpdatePreferencesInputBody.json
+             */
+            readonly $schema?: string;
+            /** @description Cells to write; each is addressed by (eventCategory, channel) */
+            preferences: components["schemas"]["NotificationPreferenceDTO"][] | null;
         };
         UpdateRsvpInputBody: {
             /**
@@ -19499,6 +19554,74 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["WorkspaceMember"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "notification-preferences-list": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Workspace public id (UUID v7) */
+                wsId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PreferencesOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "notification-preferences-update": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Workspace public id (UUID v7) */
+                wsId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdatePreferencesInputBody"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PreferencesOutputBody"];
                 };
             };
             /** @description Error */
