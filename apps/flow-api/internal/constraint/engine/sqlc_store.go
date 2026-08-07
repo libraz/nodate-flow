@@ -2,6 +2,8 @@ package engine
 
 import (
 	"context"
+	"database/sql"
+	stderrors "errors"
 	"time"
 
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/constraint"
@@ -30,12 +32,32 @@ type SqlcStore struct {
 func (s *SqlcStore) LoadTask(ctx context.Context, taskID uint32) (constraint.Facts, []Row, error) {
 	f := constraint.Facts{Now: time.Now()}
 
-	if due, err := s.Queries.GetTaskDueOnForEngine(ctx, generated.GetTaskDueOnForEngineParams{
+	// A failed read is not the same fact as "this task has no due date",
+	// and the difference is not visible downstream: constraint.Facts
+	// encodes an absent due_on as a nil pointer, and every time.due_*
+	// builtin answers false for a nil DueOn. Swallowing the error would
+	// therefore turn a database outage into a definitive "the deadline
+	// constraint is not met" — or, under `not(time.due_before(...))`,
+	// into a definitive "it is met". Both are answers the engine has no
+	// grounds to give, so the load fails instead and the caller decides
+	// what to do with a task it could not evaluate.
+	//
+	// sql.ErrNoRows is the one exception: no row means the task is not
+	// in this workspace, so there are no constraints to evaluate against
+	// it either and the load stays empty rather than failing. That is
+	// the tenant-scope contract the engine reads are built on.
+	due, err := s.Queries.GetTaskDueOnForEngine(ctx, generated.GetTaskDueOnForEngineParams{
 		ID:          taskID,
 		WorkspaceID: s.WorkspaceID,
-	}); err == nil && due.Valid {
-		d := due.Time
-		f.DueOn = &d
+	})
+	switch {
+	case err == nil:
+		if due.Valid {
+			d := due.Time
+			f.DueOn = &d
+		}
+	case !stderrors.Is(err, sql.ErrNoRows):
+		return f, nil, err
 	}
 
 	deps, err := s.Queries.ListDependencyStatesForEngine(ctx, generated.ListDependencyStatesForEngineParams{

@@ -6,6 +6,7 @@ import (
 	stderrors "errors"
 	"log/slog"
 
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/acl"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/dbretry"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
@@ -13,6 +14,7 @@ import (
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/eventbus"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/middleware"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/taskstate"
+	"github.com/libraz/nodate-flow/packages/go-shared/apierr"
 )
 
 // reverseStateRollback maps the original event's type onto the state
@@ -108,6 +110,23 @@ func Reverse(deps Deps) func(context.Context, *ReverseInput) (*ReverseOutput, er
 				return nil, httpErr(apierrors.AiReverseTargetNotFound)
 			}
 			return nil, httpErr(apierrors.InternalUnexpected)
+		}
+
+		// Layer 4 visibility. Workspace membership is not enough: an
+		// event carries a task_id, and reversing it rewrites that task's
+		// derived_state. Without this check any member could undo agent
+		// activity on a private or project-scoped task they are not
+		// allowed to read — and the 403 / 409 answers below would
+		// confirm the event exists while doing it, so the check runs
+		// before them and answers the same 404 as a miss.
+		//
+		// The decision goes through acl.AuthorizeTaskAccess, the same
+		// single-resource path RequireTaskAccess uses for every
+		// /tasks/{id} route. The admin bypass lives inside it; deciding
+		// "is this actor elevated" here would be a second copy of a rule
+		// that only has to be written too generously once.
+		if err := checkReverseTargetVisible(ctx, deps.DB, ws.ID, eventPub, actorInternal); err != nil {
+			return nil, err
 		}
 
 		// Eligibility check. actor_agent_id MUST be set, and neither of
@@ -214,6 +233,52 @@ func Reverse(deps Deps) func(context.Context, *ReverseInput) (*ReverseOutput, er
 			},
 		}, nil
 	}
+}
+
+// checkReverseTargetVisible enforces Layer 4 task visibility on the
+// task an event belongs to. Events not bound to a task (workspace-level
+// activity) carry nothing task-scoped to hide, so workspace membership
+// — already enforced by the middleware — is the whole rule for them.
+//
+// Denial is reported as AI.REVERSE.TARGET_NOT_FOUND, matching what a
+// caller gets for an event in another workspace: a member probing for
+// agent activity on a colleague's private task learns the same thing
+// either way.
+func checkReverseTargetVisible(ctx context.Context, db *sql.DB, wsID uint32, eventPublicID types.PublicID, actorInternal uint32) error {
+	// The event projection used above does not carry task_id, so the
+	// pointer is read here. Scoped by workspace for the same reason
+	// every other read is: the id came off a public_id the caller chose.
+	const q = `SELECT t.public_id
+		FROM events e
+		INNER JOIN tasks t ON t.id = e.task_id AND t.enabled = TRUE
+		WHERE e.workspace_id = ? AND e.public_id = ? AND e.enabled = TRUE LIMIT 1`
+	var taskPub types.PublicID
+	if err := db.QueryRowContext(ctx, q, wsID, eventPublicID).Scan(&taskPub); err != nil {
+		if stderrors.Is(err, sql.ErrNoRows) {
+			// Either the event has no task or its task row is gone. In
+			// both cases there is no task-scoped secret to protect and
+			// the reversal proceeds on workspace membership alone.
+			return nil
+		}
+		slog.ErrorContext(ctx, "events.Reverse: task lookup for visibility failed",
+			slog.Any("err", err),
+			slog.Uint64("workspace_internal", uint64(wsID)),
+		)
+		return httpErr(apierrors.InternalUnexpected)
+	}
+
+	if _, err := acl.AuthorizeTaskAccess(ctx, db, taskPub.UUID(), actorInternal); err != nil {
+		var apiErr *apierr.APIError
+		if stderrors.As(err, &apiErr) {
+			return httpErr(apierrors.AiReverseTargetNotFound)
+		}
+		slog.ErrorContext(ctx, "events.Reverse: task authorization failed",
+			slog.Any("err", err),
+			slog.Uint64("workspace_internal", uint64(wsID)),
+		)
+		return httpErr(apierrors.InternalUnexpected)
+	}
+	return nil
 }
 
 // applyStateRollback walks the task referenced by the target event

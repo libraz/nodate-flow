@@ -244,7 +244,7 @@ func GetPublic(deps Deps) func(context.Context, *GetPublicLensInput) (*GetPublic
 
 		body := rowToPublicLens(row)
 
-		tasks, err := resolvePublicLensTasks(ctx, deps.Queries, row)
+		tasks, err := resolvePublicLensTasks(ctx, deps.DB, row)
 		if err != nil {
 			slog.ErrorContext(ctx, "resolvePublicLensTasks failed",
 				slog.Any("err", err),
