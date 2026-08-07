@@ -14,7 +14,6 @@ import {
   type ReactNode,
   type Ref,
   useCallback,
-  useEffect,
   useId,
   useRef,
 } from 'react';
@@ -67,7 +66,10 @@ function DrawerImpl(
   const titleId = useId();
 
   useFocusTrap(containerRef, open);
-  useOverlayLock(containerRef, open);
+  // Escape is routed by the shared overlay stack, which hands the key to
+  // the top-most overlay only — a dialog opened from inside this drawer
+  // closes by itself and leaves the drawer's form intact.
+  useOverlayLock(containerRef, open, onClose);
 
   const handleRef = useCallback(
     (node: HTMLDivElement | null) => {
@@ -77,18 +79,6 @@ function DrawerImpl(
     },
     [ref],
   );
-
-  useEffect(() => {
-    if (!open) return;
-    const onKeyDown = (event: KeyboardEvent): void => {
-      if (event.key === 'Escape') {
-        event.stopPropagation();
-        onClose();
-      }
-    };
-    document.addEventListener('keydown', onKeyDown);
-    return () => document.removeEventListener('keydown', onKeyDown);
-  }, [open, onClose]);
 
   if (!open) return null;
   const root = getPortalRoot();
