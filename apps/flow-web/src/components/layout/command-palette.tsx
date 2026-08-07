@@ -44,6 +44,8 @@ import { useTranslation } from 'react-i18next';
 
 import type { ResolveCommandResult } from '../../features/nl-command/api';
 import { useResolveCommand } from '../../features/nl-command/api';
+import type { DispatchOutcome } from '../../features/nl-command/dispatch';
+import { dispatchToolCall, isDispatchableTool } from '../../features/nl-command/dispatch';
 import type { Project } from '../../features/projects/api';
 import type { TaskListItem } from '../../features/tasks/api';
 import { useWorkspacesQuery } from '../../features/workspaces/api';
@@ -84,6 +86,8 @@ interface CommandModeBodyProps {
   prompt: string;
   wsId: string | null;
   onSelect: InnerProps['onSelect'];
+  /** Switches the palette back to search mode with the given query. */
+  onSearch: (query: string) => void;
   /**
    * Receives the Enter-key handler so the parent input can invoke the
    * command-mode submit/execute flow. Keydown events don't bubble from the
@@ -92,15 +96,44 @@ interface CommandModeBodyProps {
   submitHandlerRef: MutableRefObject<(() => void) | null>;
 }
 
+/**
+ * Renders the outcome of a dispatch. Only the two navigating outcomes
+ * leave the palette; every refusal stays on screen and says what stopped
+ * it, so a command that did nothing never looks like one that worked.
+ */
+function outcomeMessage(
+  outcome: DispatchOutcome,
+  t: ReturnType<typeof useTranslation<'common'>>['t'],
+): string {
+  switch (outcome.kind) {
+    case 'unsupported':
+      return t('dock.command_palette.unsupported', { tool: outcome.tool });
+    case 'unresolved':
+      switch (outcome.reason) {
+        case 'missing':
+          return t('dock.command_palette.unresolved_missing', { argument: outcome.argument });
+        case 'not_found':
+          return t('dock.command_palette.unresolved_not_found', { term: outcome.term });
+        default:
+          return t('dock.command_palette.unresolved_ambiguous', { term: outcome.term });
+      }
+    default:
+      return t('dock.command_palette.execute_failed');
+  }
+}
+
 function CommandModeBody({
   prompt,
   wsId,
   onSelect,
+  onSearch,
   submitHandlerRef,
 }: CommandModeBodyProps): ReactElement {
   const { t } = useTranslation('common');
   const resolveCommand = useResolveCommand(wsId);
   const [result, setResult] = useState<ResolveCommandResult | null>(null);
+  const [outcome, setOutcome] = useState<DispatchOutcome | null>(null);
+  const [executing, setExecuting] = useState(false);
 
   // Track the last submitted prompt to avoid re-submitting on every render
   const lastSubmittedRef = useRef<string>('');
@@ -110,18 +143,28 @@ function CommandModeBody({
     if (lastSubmittedRef.current === prompt && result) return;
     lastSubmittedRef.current = prompt;
     setResult(null);
+    setOutcome(null);
     resolveCommand.mutate(prompt, {
       onSuccess: (data) => setResult(data),
     });
   };
 
   const handleExecute = (): void => {
-    if (!result) return;
-    // Map resolved tool to a navigation action
-    const href = toolToHref(result, wsId);
-    if (href) {
-      onSelect(href);
-    }
+    if (!result || !wsId || executing) return;
+    setOutcome(null);
+    setExecuting(true);
+    void dispatchToolCall(result, { workspaceId: wsId }).then((next) => {
+      setExecuting(false);
+      if (next.kind === 'executed' || next.kind === 'navigated') {
+        onSelect(next.navigateTo);
+        return;
+      }
+      if (next.kind === 'search') {
+        onSearch(next.query);
+        return;
+      }
+      setOutcome(next);
+    });
   };
 
   // Expose Enter handling to the parent input. Sync on every render so the
@@ -191,44 +234,39 @@ function CommandModeBody({
 
           <pre className={css.commandArgs}>{JSON.stringify(result.args, null, 2)}</pre>
 
-          <p className={css.emptyText} style={{ color: 'var(--nf-color-fg)' }} aria-live="polite">
-            {result.confidence >= 0.8
-              ? t('dock.command_palette.confirm_execute')
-              : t('dock.command_palette.confirm_low', { tool: result.tool })}
-          </p>
+          {/* A tool with no handler says so before Enter is pressed, so
+              the palette never offers to run something it cannot run. */}
+          {!isDispatchableTool(result.tool) ? (
+            <p
+              className={css.emptyText}
+              style={{ color: 'var(--nf-color-danger-fg)' }}
+              aria-live="assertive"
+            >
+              {t('dock.command_palette.unsupported', { tool: result.tool })}
+            </p>
+          ) : executing ? (
+            <p className={css.emptyText} style={{ color: 'var(--nf-color-fg)' }} aria-live="polite">
+              {t('dock.command_palette.executing')}
+            </p>
+          ) : outcome ? (
+            <p
+              className={css.emptyText}
+              style={{ color: 'var(--nf-color-danger-fg)' }}
+              aria-live="assertive"
+            >
+              {outcomeMessage(outcome, t)}
+            </p>
+          ) : (
+            <p className={css.emptyText} style={{ color: 'var(--nf-color-fg)' }} aria-live="polite">
+              {result.confidence >= 0.8
+                ? t('dock.command_palette.confirm_execute')
+                : t('dock.command_palette.confirm_low', { tool: result.tool })}
+            </p>
+          )}
         </div>
       )}
     </div>
   );
-}
-
-// ---------------------------------------------------------------------------
-// Tool -> navigation mapping
-// ---------------------------------------------------------------------------
-
-function toolToHref(
-  result: ResolveCommandResult,
-  wsId: string | null,
-): Pick<CommandItem, 'href' | 'search'> | null {
-  const args = result.args;
-  switch (result.tool) {
-    case 'create_task': {
-      const projectId = typeof args.projectId === 'string' ? args.projectId : null;
-      if (projectId && wsId) {
-        return {
-          href: `/workspaces/${wsId}/projects/${projectId}/tasks`,
-          search: { new: true, ...(typeof args.title === 'string' ? { title: args.title } : {}) },
-        };
-      }
-      return { href: '/today', search: { new: true } };
-    }
-    case 'navigate': {
-      const target = typeof args.path === 'string' ? args.path : '/';
-      return { href: target };
-    }
-    default:
-      return { href: '/' };
-  }
 }
 
 // ---------------------------------------------------------------------------
@@ -494,6 +532,10 @@ function PaletteBody({ onSelect, initialCommandMode }: InnerProps): ReactElement
           prompt={commandPrompt}
           wsId={wsId}
           onSelect={onSelect}
+          onSearch={(q) => {
+            setQuery(q);
+            setActive(0);
+          }}
           submitHandlerRef={commandSubmitRef}
         />
       ) : isSearching && filtered.length === 0 ? (
@@ -557,7 +599,6 @@ function PaletteBody({ onSelect, initialCommandMode }: InnerProps): ReactElement
           </span>
         )}
       </div>
-      ;
     </div>
   );
 }

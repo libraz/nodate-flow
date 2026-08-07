@@ -10,6 +10,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"sort"
 	"strings"
 )
 
@@ -31,6 +32,21 @@ var allowedTools = map[string]struct{}{
 	"list_projects":     {},
 	"smart_create_task": {},
 	"transition_task":   {},
+}
+
+// AllowedToolNames returns the allowed tool names in a stable order.
+// The caller pairs it with the MCP registry (mcp.DescribeTools) to build
+// the prompt catalogue, so this list decides *which* tools NL commands
+// may reach while the registry decides what each one is called upon to
+// do. Keeping the two apart is what stops a second, drifting copy of the
+// tool definitions from existing.
+func AllowedToolNames() []string {
+	out := make([]string, 0, len(allowedTools))
+	for name := range allowedTools {
+		out = append(out, name)
+	}
+	sort.Strings(out)
+	return out
 }
 
 // ToolCall is the validated result of resolving a natural language

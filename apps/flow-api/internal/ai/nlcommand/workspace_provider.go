@@ -78,6 +78,12 @@ Rules:
 - "confidence" is your estimate of how well the command matches the tool (0.0-1.0).
 - If the command is ambiguous, pick the best match but lower the confidence.
 - If no tool matches at all, return {"tool":"","args":{},"confidence":0.0}.
+- You are not given any public ids. When a schema asks for one (taskId,
+  projectId, ...) and the user named the thing by its title instead, put
+  that title text in the id field verbatim; the caller looks it up. Never
+  invent a UUID.
+- Moving a task between states is "transition_task", not a title or field
+  update.
 
 Available tools:
 %s`

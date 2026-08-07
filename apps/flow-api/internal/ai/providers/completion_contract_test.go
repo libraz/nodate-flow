@@ -102,6 +102,32 @@ func TestWireCasesCoverEveryKind(t *testing.T) {
 	}
 }
 
+// TestAllKindsListsEveryKind pins the list the contract tests iterate.
+//
+// Four tests in this file are loops over [AllKinds] or over the wireCases
+// keyed off it, and a loop over an empty list passes without asserting
+// anything. That would leave the whole contract — request settings on the
+// wire, per-provider cost reporting, a non-empty model name — quietly
+// covering nothing while still reporting green, which is the same failure
+// the contract itself exists to prevent.
+func TestAllKindsListsEveryKind(t *testing.T) {
+	t.Parallel()
+
+	got := AllKinds()
+	for _, want := range []Kind{KindAnthropic, KindOpenAI, KindGoogle, KindOllama, KindOpenAICompat} {
+		found := false
+		for _, k := range got {
+			if k == want {
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.Errorf("AllKinds() omits %q, so every contract test that loops over it silently skips that provider", want)
+		}
+	}
+}
+
 // bodyCapturingServer answers every request with body and records the
 // decoded request body and URL path.
 func bodyCapturingServer(t *testing.T, body string, got *map[string]any, path *string) *httptest.Server {

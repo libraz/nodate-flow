@@ -616,14 +616,21 @@ func buildSharedDeps(deps Deps) *sharedDeps {
 			nlConstraintCompiler = nlconstraint.New(prov)
 		}
 		if nlCommandResolver == nil {
-			tools := []nlcommand.ToolSpec{
-				{Name: "create_task", Description: "Create a new task", InputSchema: map[string]any{"type": "object", "properties": map[string]any{"title": map[string]any{"type": "string"}, "priority": map[string]any{"type": "integer", "minimum": 1, "maximum": 3}}}},
-				{Name: "update_task", Description: "Update an existing task", InputSchema: map[string]any{"type": "object", "properties": map[string]any{"taskId": map[string]any{"type": "string"}, "title": map[string]any{"type": "string"}, "status": map[string]any{"type": "string"}}}},
-				{Name: "search_tasks", Description: "Search tasks by query", InputSchema: map[string]any{"type": "object", "properties": map[string]any{"query": map[string]any{"type": "string"}}}},
-				{Name: "propose_lens", Description: "Propose a filter lens from natural language", InputSchema: map[string]any{"type": "object", "properties": map[string]any{"prompt": map[string]any{"type": "string"}}}},
-				{Name: "add_comment", Description: "Add a comment to a task", InputSchema: map[string]any{"type": "object", "properties": map[string]any{"taskId": map[string]any{"type": "string"}, "body": map[string]any{"type": "string"}}}},
-				{Name: "list_tasks", Description: "List tasks in a project", InputSchema: map[string]any{"type": "object", "properties": map[string]any{"projectId": map[string]any{"type": "string"}}}},
-				{Name: "list_projects", Description: "List projects in a workspace", InputSchema: map[string]any{"type": "object", "properties": map[string]any{}}},
+			// The prompt catalogue is read off the MCP tool registry
+			// rather than written out here. A second hand-maintained copy
+			// drifts without failing: the model shapes arguments from the
+			// copy while the executor validates against the registry, so a
+			// command resolves "successfully" into arguments nothing can
+			// use. nlcommand owns which tools are reachable; mcp owns what
+			// each one takes.
+			descs := mcp.DescribeTools(nlcommand.AllowedToolNames())
+			tools := make([]nlcommand.ToolSpec, 0, len(descs))
+			for _, d := range descs {
+				tools = append(tools, nlcommand.ToolSpec{
+					Name:        d.Name,
+					Description: d.Description,
+					InputSchema: d.InputSchema,
+				})
 			}
 			cmdProv := nlcommand.NewWorkspaceProvider(wsResolver, extractWS).
 				WithMetering(nlGuard, func(ctx context.Context, rec nlcommand.InvocationRecord) {
