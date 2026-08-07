@@ -185,6 +185,24 @@ func (q *Queries) AdminSuspendWorkspace(ctx context.Context, publicID types.Publ
 	return err
 }
 
+const countEnabledWorkspaces = `-- name: CountEnabledWorkspaces :one
+SELECT COUNT(*) AS total
+FROM workspaces
+WHERE enabled = TRUE
+`
+
+// Number of live tenants on this instance. Used by the inbound webhook
+// receivers to decide whether NF_FLOW_DEFAULT_WORKSPACE_ID may act as a
+// fallback for an unmapped sender: that fallback is only meaningful on a
+// single-tenant deployment, and the moment a second workspace exists it
+// would start delivering one tenant's events to another.
+func (q *Queries) CountEnabledWorkspaces(ctx context.Context) (int64, error) {
+	row := q.db.QueryRowContext(ctx, countEnabledWorkspaces)
+	var total int64
+	err := row.Scan(&total)
+	return total, err
+}
+
 const createWorkspace = `-- name: CreateWorkspace :execlastid
 INSERT INTO workspaces (
   public_id,

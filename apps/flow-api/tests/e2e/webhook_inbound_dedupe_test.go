@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strconv"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -52,9 +53,9 @@ type webhookResponse struct {
 }
 
 // callWebhook drives a chi-level webhook handler directly. The inbound
-// webhook routes are unauthenticated and read their workspace from
-// Deps.DefaultWorkspaceID, so each test points a private Deps at its own
-// tenant instead of perturbing the shared server's configuration.
+// webhook routes are unauthenticated and resolve their workspace from the
+// sender identity on the delivery, so each test maps its own sender to
+// its own tenant instead of perturbing the shared server's configuration.
 func callWebhook(t *testing.T, h http.HandlerFunc, req *http.Request) (int, webhookResponse) {
 	t.Helper()
 	rec := httptest.NewRecorder()
@@ -84,6 +85,22 @@ func countSignals(t *testing.T, workspacePublicID, source, externalID string) in
 	return n
 }
 
+// mapWebhookSource claims an external webhook sender for the tenant's
+// workspace by writing the routing row directly, so a test that drives a
+// chi handler in-process does not have to stand up an admin session
+// first. TestWebhookDeliveriesRouteToTheMappedWorkspace covers the REST
+// surface that operators actually use.
+func mapWebhookSource(t *testing.T, workspacePublicID, provider, externalKey string) {
+	t.Helper()
+	_, err := testDB.Exec(
+		`INSERT INTO integration_source_mappings (public_id, workspace_id, provider, external_key, label)
+		 VALUES (UUID_TO_BIN(UUID(), 0),
+		         (SELECT id FROM workspaces WHERE public_id = UUID_TO_BIN(?, 0)),
+		         ?, ?, ?)`,
+		workspacePublicID, provider, externalKey, "test "+provider+" source")
+	require.NoError(t, err)
+}
+
 // TestSlackWebhookDedupesByEventID verifies that a Slack event redelivery
 // (identical top-level `event_id`) lands as one signals row, returns the
 // existing row's public id, and does not wake the judge a second time.
@@ -103,15 +120,17 @@ func TestSlackWebhookDedupesByEventID(t *testing.T) {
 		DB:                 testDB,
 		Queries:            generated.New(testDB),
 		SlackSigningSecret: secret,
-		DefaultWorkspaceID: tt.WorkspacePublicID,
 		JudgeEnqueuer:      enq,
 	})
+
+	teamID := "T" + strings.ToUpper(randomHex(4))
+	mapWebhookSource(t, tt.WorkspacePublicID, "slack", teamID)
 
 	eventID := "Ev" + randomHex(8)
 	body, err := json.Marshal(map[string]any{
 		"type":     "event_callback",
 		"event_id": eventID,
-		"team_id":  "T" + randomHex(4),
+		"team_id":  teamID,
 		"event": map[string]any{
 			"type": "app_mention",
 			"text": "hello",
@@ -165,11 +184,11 @@ func TestGoogleWebhookRecordsEveryDeliveryOnAChannel(t *testing.T) {
 		DB:                 testDB,
 		Queries:            generated.New(testDB),
 		GoogleChannelToken: channelToken,
-		DefaultWorkspaceID: tt.WorkspacePublicID,
 		JudgeEnqueuer:      enq,
 	})
 
 	channelID := "chan-" + randomHex(8)
+	mapWebhookSource(t, tt.WorkspacePublicID, "google", channelID)
 	push := func(messageNumber, resourceState string) *http.Request {
 		req := httptest.NewRequest(http.MethodPost, "/webhooks/google",
 			bytes.NewReader([]byte(`{"kind":"drive#change"}`)))

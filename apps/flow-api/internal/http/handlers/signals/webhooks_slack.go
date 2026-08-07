@@ -1,7 +1,6 @@
 package signals
 
 import (
-	"database/sql"
 	"encoding/json"
 	"errors"
 	"io"
@@ -52,6 +51,7 @@ func HandleSlackWebhook(deps Deps) http.HandlerFunc {
 			Type      string `json:"type"`
 			Challenge string `json:"challenge"`
 			EventID   string `json:"event_id"`
+			TeamID    string `json:"team_id"`
 			Event     struct {
 				Type string `json:"type"`
 			} `json:"event"`
@@ -83,32 +83,18 @@ func HandleSlackWebhook(deps Deps) http.HandlerFunc {
 			return
 		}
 
-		if deps.DefaultWorkspaceID == "" {
-			writeError(w, apierrors.InternalUnexpected)
-			return
-		}
-		wsPub, err := types.Parse(deps.DefaultWorkspaceID)
-		if err != nil {
-			slog.ErrorContext(r.Context(), "webhook: slack default workspace id parse failed",
-				slog.Any("error", err),
-				slog.String("source", "slack"),
-			)
-			writeError(w, apierrors.InternalUnexpected)
-			return
-		}
+		// `team_id` is the Slack workspace the event happened in and is
+		// present on every event callback. It is the routing key: one
+		// Slack workspace maps to one flow workspace, and the envelope
+		// it comes from has already passed signature verification.
 		ctx := r.Context()
-		const wsLookup = `SELECT id FROM workspaces WHERE public_id = ? AND enabled = TRUE LIMIT 1`
-		var wsID uint32
-		if err := deps.DB.QueryRowContext(ctx, wsLookup, wsPub).Scan(&wsID); err != nil {
-			if errors.Is(err, sql.ErrNoRows) {
-				writeError(w, apierrors.WsWorkspaceNotFound)
-				return
-			}
-			slog.ErrorContext(ctx, "webhook: slack workspace lookup failed",
-				slog.Any("error", err),
-				slog.String("source", "slack"),
-			)
-			writeError(w, apierrors.InternalUnexpected)
+		wsID, spec := resolveWebhookWorkspace(ctx, deps, webhookSender{
+			Provider: generated.IntegrationSourceMappingsProviderSlack,
+			Key:      envelope.TeamID,
+			Source:   "slack",
+		})
+		if spec != nil {
+			writeError(w, spec)
 			return
 		}
 

@@ -46,9 +46,16 @@ type Config struct {
 	// true only for local development and CI where webhook secrets are
 	// not available.
 	WebhooksInsecure bool `env:"NF_FLOW_WEBHOOKS_INSECURE" envDefault:"false"`
-	// DefaultWorkspaceID is the workspace public id (UUID v7) that
-	// inbound webhook signals are routed to as a fallback when the
-	// repo_workspace_mappings table has no entry for the repository.
+	// DefaultWorkspaceID is the workspace public id (UUID v7) inbound
+	// webhook deliveries fall back to when the sender has no
+	// integration_source_mappings row.
+	//
+	// Single-tenant deployments only. The fallback is applied only while
+	// the instance has exactly one enabled workspace; once a second one
+	// exists, honouring it would file one tenant's GitHub / Slack /
+	// Google events under another, so unmapped deliveries are rejected
+	// with INTEGRATION.MAPPING.WORKSPACE_UNRESOLVED instead. The api logs
+	// the unusable setting at startup.
 	DefaultWorkspaceID string `env:"NF_FLOW_DEFAULT_WORKSPACE_ID" envDefault:""`
 
 	// FlowAPISignalToken is the bearer token internal-only callers

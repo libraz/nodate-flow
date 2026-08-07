@@ -29,6 +29,7 @@ import (
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated/calendar"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/eventbus"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/handlers/signals"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/router"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/importer"
 	nflog "github.com/libraz/nodate-flow/apps/flow-api/internal/log"
@@ -120,6 +121,18 @@ func main() {
 
 	queries := generated.New(db)
 	calendarQueries := calendar.New(db)
+
+	// NF_FLOW_DEFAULT_WORKSPACE_ID routes inbound webhook deliveries whose
+	// sender has no integration_source_mappings row. That is only sound
+	// while the instance hosts a single tenant; past that it would file
+	// one workspace's GitHub / Slack / Google events under another. The
+	// receivers enforce the rule per delivery, so this check does not stop
+	// the boot — it is here so the operator learns why deliveries started
+	// being rejected instead of discovering it from the webhook provider's
+	// retry log.
+	if err := signals.CheckDefaultWorkspaceFallback(context.Background(), queries, cfg.DefaultWorkspaceID); err != nil {
+		logger.Error("default workspace webhook fallback is not usable", "err", err)
+	}
 
 	// Cipher is optional at scaffold time: if NF_SECRET_KEY is unset the
 	// AI provider endpoints will return AI.PROVIDER.NOT_CONFIGURED for

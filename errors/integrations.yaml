@@ -118,3 +118,42 @@ resources:
         message_zh: "未找到与该 Discord 账号绑定的用户"
         description: "Returned by the internal /internal/users/by-discord/{snowflake} lookup when no enabled user_integrations row with provider='discord' and a matching metadata_json.external_user_id exists. The presence-discord gateway treats this outcome as drop_no_user (expected and noisy)."
         userAction: "Ask the user to bind their Discord account via the personal integrations settings page."
+
+  mapping:
+    breadcrumb: "Integration > Source mapping"
+    errors:
+      not_found:
+        code: INTEGRATION.MAPPING.NOT_FOUND
+        status: 404
+        message: "Integration source mapping not found"
+        message_ja: "連携ソースのマッピングが見つかりません"
+        message_zh: "未找到集成来源映射"
+        description: "Returned when the integration_source_mappings public id does not exist in the caller's workspace. A mapping owned by another workspace is reported the same way so cross-tenant existence stays hidden."
+        userAction: "Refresh the integration mappings list."
+
+      source_already_mapped:
+        code: INTEGRATION.MAPPING.SOURCE_ALREADY_MAPPED
+        status: 409
+        message: "That external source is already mapped"
+        message_ja: "その外部ソースは既に別のマッピングで使われています"
+        message_zh: "该外部来源已被映射"
+        description: "Returned when the (provider, external key) pair is already claimed. The claim is instance-wide because an inbound delivery can only belong to one workspace; the existing claim may be held by another workspace, which is not disclosed."
+        userAction: "Delete the existing mapping for that source, or ask the instance administrator which workspace holds it."
+
+      external_key_invalid:
+        code: INTEGRATION.MAPPING.EXTERNAL_KEY_INVALID
+        status: 400
+        message: "External key does not match the provider's identifier format"
+        message_ja: "外部キーがプロバイダの識別子形式と一致しません"
+        message_zh: "外部键与该服务提供商的标识符格式不匹配"
+        description: "Returned when the external key is empty or malformed for the chosen provider: github expects the numeric repository id as decimal digits, slack expects a team id, google expects the push channel id."
+        userAction: "Copy the identifier from the provider's webhook or channel settings."
+
+      workspace_unresolved:
+        code: INTEGRATION.MAPPING.WORKSPACE_UNRESOLVED
+        status: 404
+        message: "No workspace is mapped to this webhook source"
+        message_ja: "この Webhook 送信元に対応するワークスペースがありません"
+        message_zh: "没有工作区映射到该 Webhook 来源"
+        description: "Returned by the /webhooks/* receivers when the delivery's sender (GitHub repository id, Slack team id, Google channel id) has no enabled integration_source_mappings row, and the single-tenant NF_FLOW_DEFAULT_WORKSPACE_ID fallback does not apply. The delivery is not stored: routing it to an arbitrary tenant would leak one workspace's events into another."
+        userAction: "Add an integration source mapping for that repository, Slack team, or push channel in the workspace that owns it."

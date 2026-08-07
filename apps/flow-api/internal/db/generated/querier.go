@@ -284,13 +284,30 @@ type Querier interface {
 	// within the given time window. Used by the AI metrics endpoint
 	// to compute acceptance rate.
 	CountAiSuggestionOutcomesForWorkspace(ctx context.Context, arg CountAiSuggestionOutcomesForWorkspaceParams) (CountAiSuggestionOutcomesForWorkspaceRow, error)
+	// Row count behind ListArchivedTasksForWorkspace.
+	CountArchivedTasksForWorkspace(ctx context.Context, workspaceID uint32) (int64, error)
 	// Count enabled child pages for a given parent. Used to check before deletion.
 	CountChildPages(ctx context.Context, arg CountChildPagesParams) (int64, error)
+	// Number of live tenants on this instance. Used by the inbound webhook
+	// receivers to decide whether NF_FLOW_DEFAULT_WORKSPACE_ID may act as a
+	// fallback for an unmapped sender: that fallback is only meaningful on a
+	// single-tenant deployment, and the moment a second workspace exists it
+	// would start delivering one tenant's events to another.
+	CountEnabledWorkspaces(ctx context.Context) (int64, error)
 	// Progress counters as the worker last published them, for callers that
 	// need the finished totals without re-reading the whole row.
 	CountImportedTasksForJob(ctx context.Context, id uint32) (CountImportedTasksForJobRow, error)
+	// Row count behind ListTasksForProject. Filters must stay identical to
+	// that query's WHERE clause or the pager reports a total the list can
+	// never reach.
+	CountTasksForProject(ctx context.Context, arg CountTasksForProjectParams) (int64, error)
 	// Count total and completed tasks in a timebox for progress tracking.
 	CountTasksForTimebox(ctx context.Context, arg CountTasksForTimeboxParams) (CountTasksForTimeboxRow, error)
+	// Row count behind ListTasksForWorkspace, carrying the same Layer-4
+	// visibility predicate. Dropping any branch of it here would leak the
+	// existence of tasks the caller cannot see, as a total larger than the
+	// rows they can page through.
+	CountTasksForWorkspace(ctx context.Context, arg CountTasksForWorkspaceParams) (int64, error)
 	// Count unread notifications for a user across all workspaces.
 	// Used by the global notification badge when no workspace is selected.
 	CountUnreadNotifications(ctx context.Context, recipientUserID uint32) (int64, error)
@@ -311,6 +328,11 @@ type Querier interface {
 	CreateImportJob(ctx context.Context, arg CreateImportJobParams) (int64, error)
 	// Insert a new intake item into the triage queue.
 	CreateIntakeItem(ctx context.Context, arg CreateIntakeItemParams) (int64, error)
+	// Claim an external source for a workspace. The (provider, external_key)
+	// UNIQUE key is instance-wide, so a second workspace claiming the same
+	// source fails with a duplicate-entry error the handler turns into
+	// INTEGRATION.MAPPING.SOURCE_ALREADY_MAPPED.
+	CreateIntegrationSourceMapping(ctx context.Context, arg CreateIntegrationSourceMappingParams) (int64, error)
 	// Insert a new label in a workspace.
 	CreateLabel(ctx context.Context, arg CreateLabelParams) (int64, error)
 	// Insert a new saved lens (view).
@@ -348,8 +370,6 @@ type Querier interface {
 	CreateReaction(ctx context.Context, arg CreateReactionParams) (int64, error)
 	// Insert an AI-generated relation suggestion between two tasks.
 	CreateRelationSuggestion(ctx context.Context, arg CreateRelationSuggestionParams) (int64, error)
-	// Insert a new repository-to-workspace mapping.
-	CreateRepoMapping(ctx context.Context, arg CreateRepoMappingParams) (int64, error)
 	// Insert a new refresh-token session for a user.
 	CreateSession(ctx context.Context, arg CreateSessionParams) (int64, error)
 	// Insert a stub user for invitations: no identity row, display_name defaults to email.
@@ -431,6 +451,13 @@ type Querier interface {
 	// sibling task's edge cannot be deleted through another task's path; the
 	// affected-row count lets the handler return NOT_FOUND on a no-op.
 	DeleteDependency(ctx context.Context, arg DeleteDependencyParams) (int64, error)
+	// Release the claim on an external source. This is a hard delete, not
+	// the usual enabled = FALSE soft delete: the (provider, external_key)
+	// UNIQUE key is instance-wide, so a tombstone row would permanently
+	// block the source from being mapped again by anyone, including its
+	// rightful owner. Use enabled = FALSE to pause routing while keeping
+	// the claim.
+	DeleteIntegrationSourceMapping(ctx context.Context, arg DeleteIntegrationSourceMappingParams) (int64, error)
 	// Soft-delete a lens.
 	DeleteLens(ctx context.Context, arg DeleteLensParams) error
 	// Remove all mentions for a specific comment (before re-extracting).
@@ -441,9 +468,6 @@ type Querier interface {
 	// not-found / wrong-workspace target (0 rows) instead of reporting a false
 	// success.
 	DeleteProvider(ctx context.Context, arg DeleteProviderParams) (int64, error)
-	// Soft-delete a mapping by setting enabled = FALSE. Scoped to the
-	// workspace and identified by public_id.
-	DeleteRepoMapping(ctx context.Context, arg DeleteRepoMappingParams) error
 	// Remove a reclaimed row. Restricted to rows nothing references so a
 	// concurrent upload that adopted the row between listing and deleting
 	// is left alone.
@@ -614,6 +638,16 @@ type Querier interface {
 	FindImportJobStatusByID(ctx context.Context, id uint32) (ImportJobsStatus, error)
 	// Find a single intake item by public id.
 	FindIntakeItemByPublicId(ctx context.Context, arg FindIntakeItemByPublicIdParams) (FindIntakeItemByPublicIdRow, error)
+	// Resolve the workspace an inbound webhook delivery belongs to from the
+	// sender identity the provider put on the wire. Every /webhooks/*
+	// receiver calls this before it writes anything; a miss means the
+	// delivery has no tenant and must be rejected, never routed to a
+	// default. Joined against workspaces so a mapping pointing at a
+	// disabled tenant resolves to nothing.
+	FindIntegrationSourceMapping(ctx context.Context, arg FindIntegrationSourceMappingParams) (FindIntegrationSourceMappingRow, error)
+	// Load one mapping, workspace-scoped so a public id from another tenant
+	// resolves to nothing.
+	FindIntegrationSourceMappingByPublicId(ctx context.Context, arg FindIntegrationSourceMappingByPublicIdParams) (FindIntegrationSourceMappingByPublicIdRow, error)
 	// Resolve a label by its UUID v7 within a workspace.
 	FindLabelByPublicId(ctx context.Context, arg FindLabelByPublicIdParams) (FindLabelByPublicIdRow, error)
 	// Find a label by name within a workspace (for MCP resolve).
@@ -853,10 +887,6 @@ type Querier interface {
 	// Compute nesting depth of a page by walking up to the root via recursive CTE.
 	// Returns 0 for root pages, 1 for direct children of root, etc.
 	GetPageDepth(ctx context.Context, id uint32) (interface{}, error)
-	// Look up the workspace mapping for a GitHub repository by its numeric
-	// repo ID. Used by the webhook handler to route incoming events to the
-	// correct workspace. Only returns enabled rows.
-	GetRepoMappingByRepoID(ctx context.Context, repoID uint64) (GetRepoMappingByRepoIDRow, error)
 	// Fetch a single suggestion by public_id with source/target task info.
 	GetSuggestionByPublicId(ctx context.Context, arg GetSuggestionByPublicIdParams) (GetSuggestionByPublicIdRow, error)
 	// Read the raw agent_memo JSON for a task. Returns NULL when unset; callers
@@ -1012,7 +1042,8 @@ type Querier interface {
 	// by the AI activity panel. All columns here are already redacted at
 	// write time by the orchestrator; safe to surface at the API boundary.
 	ListAiInvocationsForWorkspace(ctx context.Context, arg ListAiInvocationsForWorkspaceParams) ([]ListAiInvocationsForWorkspaceRow, error)
-	// List archived tasks via v_task_list_archived.
+	// List archived tasks via v_task_list_archived. See ListTasksForProject
+	// for why the total is a separate query.
 	ListArchivedTasksForWorkspace(ctx context.Context, arg ListArchivedTasksForWorkspaceParams) ([]ListArchivedTasksForWorkspaceRow, error)
 	// Keyset-paginated variant of ListArchivedTasksForWorkspace.
 	//
@@ -1192,6 +1223,10 @@ type Querier interface {
 	ListIntakeItemsForWorkspace(ctx context.Context, arg ListIntakeItemsForWorkspaceParams) ([]ListIntakeItemsForWorkspaceRow, error)
 	// Cursor-paginated intake items for a workspace, filtered by status.
 	ListIntakeItemsForWorkspaceKeyset(ctx context.Context, arg ListIntakeItemsForWorkspaceKeysetParams) ([]ListIntakeItemsForWorkspaceKeysetRow, error)
+	// List every mapping owned by a workspace, newest provider group first.
+	// Disabled rows are included: they still hold the claim on the source,
+	// so hiding them would make "already mapped" errors inexplicable.
+	ListIntegrationSourceMappings(ctx context.Context, workspaceID uint32) ([]ListIntegrationSourceMappingsRow, error)
 	// List labels scoped to a specific project (includes workspace-wide labels).
 	ListLabelsForProject(ctx context.Context, arg ListLabelsForProjectParams) ([]ListLabelsForProjectRow, error)
 	// List all labels in a workspace, optionally filtered by project.
@@ -1377,9 +1412,6 @@ type Querier interface {
 	ListRecentAudit(ctx context.Context, arg ListRecentAuditParams) ([]ListRecentAuditRow, error)
 	// List the most recent visits for a user in a workspace, newest first.
 	ListRecentVisitsForUser(ctx context.Context, arg ListRecentVisitsForUserParams) ([]ListRecentVisitsForUserRow, error)
-	// List all active repository mappings for a workspace. Returns metadata
-	// only (no internal IDs leak through the view layer).
-	ListRepoMappingsForWorkspace(ctx context.Context, workspaceID uint32) ([]ListRepoMappingsForWorkspaceRow, error)
 	// List draft retrospective tasks: tasks linked back to a source task
 	// via a task_dependencies row with kind='retro_of'. Backs the Phase 6 / L2
 	// retro draft queue endpoint (GET /workspaces/{wsId}/tasks/drafts?reason=retro).
@@ -1423,7 +1455,15 @@ type Querier interface {
 	ListTaskConstraintsForEngine(ctx context.Context, arg ListTaskConstraintsForEngineParams) ([]ListTaskConstraintsForEngineRow, error)
 	// List labels attached to a task.
 	ListTaskLabels(ctx context.Context, arg ListTaskLabelsParams) ([]ListTaskLabelsRow, error)
-	// List tasks in a project via v_task_list with window-function pagination.
+	// List tasks in a project via v_task_list.
+	//
+	// The page total is NOT computed here. COUNT(*) OVER() would make the
+	// window function consume every row the filter matches, and each of
+	// those rows drags v_task_list's per-row label / assignee subqueries
+	// with it -- so asking for a 50-row page of an 8000-task project
+	// evaluated them 8000 times instead of 50. CountTasksForProject answers
+	// the same question over the bare task rows, and the handler only asks
+	// when the page came back full (a short page already pins the total).
 	ListTasksForProject(ctx context.Context, arg ListTasksForProjectParams) ([]ListTasksForProjectRow, error)
 	// Keyset-paginated variant of ListTasksForProject.
 	//
@@ -1440,7 +1480,8 @@ type Querier interface {
 	ListTasksForProjectKeyset(ctx context.Context, arg ListTasksForProjectKeysetParams) ([]ListTasksForProjectKeysetRow, error)
 	// List tasks belonging to a timebox with pagination.
 	ListTasksForTimebox(ctx context.Context, arg ListTasksForTimeboxParams) ([]ListTasksForTimeboxRow, error)
-	// List tasks across an entire workspace via v_task_list.
+	// List tasks across an entire workspace via v_task_list. See
+	// ListTasksForProject for why the total is a separate query.
 	ListTasksForWorkspace(ctx context.Context, arg ListTasksForWorkspaceParams) ([]ListTasksForWorkspaceRow, error)
 	// Keyset-paginated variant of ListTasksForWorkspace.
 	//
@@ -1801,6 +1842,10 @@ type Querier interface {
 	UpdateImportJobStatus(ctx context.Context, arg UpdateImportJobStatusParams) error
 	// Update the triage status of an intake item.
 	UpdateIntakeItemTriage(ctx context.Context, arg UpdateIntakeItemTriageParams) error
+	// Patch the mutable fields of a mapping. NULL leaves a field unchanged.
+	// provider and external_key are immutable: changing them would move the
+	// claim to a different source, which is a create plus a delete.
+	UpdateIntegrationSourceMapping(ctx context.Context, arg UpdateIntegrationSourceMappingParams) error
 	// Update mutable label fields.
 	UpdateLabel(ctx context.Context, arg UpdateLabelParams) error
 	// Update a lens name, description and/or JSON body.

@@ -3,7 +3,6 @@ package signals
 import (
 	"database/sql"
 	"encoding/json"
-	"errors"
 	"io"
 	"log/slog"
 	"net/http"
@@ -71,32 +70,20 @@ func HandleGoogleWebhook(deps Deps) http.HandlerFunc {
 		}
 		kind := goog.NormalizeEventKind(r.Header.Get(goog.HeaderResourceState))
 
-		if deps.DefaultWorkspaceID == "" {
-			writeError(w, apierrors.InternalUnexpected)
-			return
-		}
-		wsPub, err := types.Parse(deps.DefaultWorkspaceID)
-		if err != nil {
-			slog.ErrorContext(r.Context(), "webhook: google default workspace id parse failed",
-				slog.Any("error", err),
-				slog.String("source", "google"),
-			)
-			writeError(w, apierrors.InternalUnexpected)
-			return
-		}
+		// The channel id is chosen by us when the watch is registered
+		// and repeats on every notification for that watch, so it is
+		// the routing key. The channel token verified above proves the
+		// delivery is one of ours; it says nothing about which tenant
+		// the watched resource belongs to.
+		channelID := r.Header.Get(goog.HeaderChannelID)
 		ctx := r.Context()
-		const wsLookup = `SELECT id FROM workspaces WHERE public_id = ? AND enabled = TRUE LIMIT 1`
-		var wsID uint32
-		if err := deps.DB.QueryRowContext(ctx, wsLookup, wsPub).Scan(&wsID); err != nil {
-			if errors.Is(err, sql.ErrNoRows) {
-				writeError(w, apierrors.WsWorkspaceNotFound)
-				return
-			}
-			slog.ErrorContext(ctx, "webhook: google workspace lookup failed",
-				slog.Any("error", err),
-				slog.String("source", "google"),
-			)
-			writeError(w, apierrors.InternalUnexpected)
+		wsID, spec := resolveWebhookWorkspace(ctx, deps, webhookSender{
+			Provider: generated.IntegrationSourceMappingsProviderGoogle,
+			Key:      channelID,
+			Source:   "google",
+		})
+		if spec != nil {
+			writeError(w, spec)
 			return
 		}
 
@@ -117,7 +104,7 @@ func HandleGoogleWebhook(deps Deps) http.HandlerFunc {
 		// the signal_kinds/calendar.yaml registry and a per-channel
 		// calendar_event resolver is in place, switch to
 		// SignalsSubjectTypeCalendarEvent with the resolved internal id.
-		ext := googleDeliveryKey(r.Header.Get(goog.HeaderChannelID), r.Header.Get(headerGoogleMessageNumber))
+		ext := googleDeliveryKey(channelID, r.Header.Get(headerGoogleMessageNumber))
 		subjectType := resolveSubjectType(kind, "")
 		subjectID := subjectIDFor(subjectType, 0)
 		pub := types.New()

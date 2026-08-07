@@ -173,8 +173,6 @@ type Querier interface {
 	// public render path. Returns only enabled rows; caller applies the
 	// expires_at gate so the 410 code path can be distinguished from 404.
 	FindPublicShareByTokenHash(ctx context.Context, tokenHash string) (FindPublicShareByTokenHashRow, error)
-	// Find a system calendar by its slug within a workspace.
-	FindSystemCalendarBySlug(ctx context.Context, arg FindSystemCalendarBySlugParams) (FindSystemCalendarBySlugRow, error)
 	// List checklist items for an event in display order. Paginated
 	// (LIMIT/OFFSET) so the result set is always bounded; total carries the
 	// pre-page count.

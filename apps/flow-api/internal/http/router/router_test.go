@@ -416,7 +416,6 @@ var roleFloorExemptOps = map[string]string{
 	// resolveWorkspaceNonGuest / resolveWorkspaceAdmin covering the
 	// public-share admin routes.
 	"calendars-create":                  "calendar ACL in handler",
-	"calendars-subscribe-system":        "calendar ACL in handler",
 	"calendars-self-subscribe":          "calendar ACL in handler",
 	"calendars-patch":                   "calendar ACL in handler",
 	"calendars-delete":                  "calendar ACL in handler",

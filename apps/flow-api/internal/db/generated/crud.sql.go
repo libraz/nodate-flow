@@ -61,6 +61,93 @@ func (q *Queries) AssignTaskNumber(ctx context.Context, arg AssignTaskNumberPara
 	return next_number, err
 }
 
+const countArchivedTasksForWorkspace = `-- name: CountArchivedTasksForWorkspace :one
+SELECT COUNT(*)
+FROM v_task_list_archived v
+WHERE v.workspace_id = ?
+`
+
+// Row count behind ListArchivedTasksForWorkspace.
+func (q *Queries) CountArchivedTasksForWorkspace(ctx context.Context, workspaceID uint32) (int64, error) {
+	row := q.db.QueryRowContext(ctx, countArchivedTasksForWorkspace, workspaceID)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
+const countTasksForProject = `-- name: CountTasksForProject :one
+SELECT COUNT(*)
+FROM v_task_list v
+WHERE v.workspace_id = ?
+  AND v.project_public_id = ?
+`
+
+type CountTasksForProjectParams struct {
+	WorkspaceID     uint32 `json:"-"`
+	ProjectPublicID []byte `json:"projectPublicId"`
+}
+
+// Row count behind ListTasksForProject. Filters must stay identical to
+// that query's WHERE clause or the pager reports a total the list can
+// never reach.
+func (q *Queries) CountTasksForProject(ctx context.Context, arg CountTasksForProjectParams) (int64, error) {
+	row := q.db.QueryRowContext(ctx, countTasksForProject, arg.WorkspaceID, arg.ProjectPublicID)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
+const countTasksForWorkspace = `-- name: CountTasksForWorkspace :one
+SELECT COUNT(*)
+FROM v_task_list v
+WHERE v.workspace_id = ?
+  AND (
+    CAST(? AS SIGNED) = 1
+    OR v.visibility = 'public'
+    OR (v.visibility = 'project' AND EXISTS (
+      SELECT 1 FROM project_members pm_vis
+      WHERE pm_vis.project_id = v.project_id
+        AND pm_vis.user_id = CAST(? AS UNSIGNED)
+        AND pm_vis.enabled = TRUE
+    ))
+    OR (v.visibility = 'private' AND (
+      v.created_by_user_id = CAST(? AS UNSIGNED)
+      OR EXISTS (
+        SELECT 1 FROM task_actors ta_vis
+        INNER JOIN tasks tv ON tv.id = ta_vis.task_id AND tv.public_id = v.public_id
+        WHERE ta_vis.kind = 'user'
+          AND ta_vis.user_id = CAST(? AS UNSIGNED)
+          AND ta_vis.enabled = TRUE
+      )
+    ))
+  )
+`
+
+type CountTasksForWorkspaceParams struct {
+	WorkspaceID   uint32 `json:"-"`
+	IsElevated    int64  `json:"isElevated"`
+	ActorUserID   int64  `json:"actorUserId"`
+	ActorUserID_2 int64  `json:"actorUserId2"`
+	ActorUserID_3 int64  `json:"actorUserId3"`
+}
+
+// Row count behind ListTasksForWorkspace, carrying the same Layer-4
+// visibility predicate. Dropping any branch of it here would leak the
+// existence of tasks the caller cannot see, as a total larger than the
+// rows they can page through.
+func (q *Queries) CountTasksForWorkspace(ctx context.Context, arg CountTasksForWorkspaceParams) (int64, error) {
+	row := q.db.QueryRowContext(ctx, countTasksForWorkspace,
+		arg.WorkspaceID,
+		arg.IsElevated,
+		arg.ActorUserID,
+		arg.ActorUserID_2,
+		arg.ActorUserID_3,
+	)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
 const createTask = `-- name: CreateTask :execlastid
 INSERT INTO tasks (
   public_id,
@@ -445,8 +532,7 @@ SELECT
   v.created_at,
   v.primary_assignee_public_id,
   v.assignee_count,
-  v.label_ids,
-  COUNT(*) OVER() AS total
+  v.label_ids
 FROM v_task_list_archived v
 WHERE v.workspace_id = ?
 ORDER BY v.archived_at DESC, v.public_id DESC
@@ -477,13 +563,13 @@ type ListArchivedTasksForWorkspaceRow struct {
 	SortWeight              int32             `json:"sortWeight"`
 	UpdatedAt               sql.NullTime      `json:"updatedAt"`
 	CreatedAt               time.Time         `json:"createdAt"`
-	PrimaryAssigneePublicID interface{}       `json:"primaryAssigneePublicId"`
+	PrimaryAssigneePublicID sql.NullString    `json:"primaryAssigneePublicId"`
 	AssigneeCount           int64             `json:"assigneeCount"`
-	LabelIds                sql.NullString    `json:"labelIds"`
-	Total                   interface{}       `json:"total"`
+	LabelIds                string            `json:"labelIds"`
 }
 
-// List archived tasks via v_task_list_archived.
+// List archived tasks via v_task_list_archived. See ListTasksForProject
+// for why the total is a separate query.
 func (q *Queries) ListArchivedTasksForWorkspace(ctx context.Context, arg ListArchivedTasksForWorkspaceParams) ([]ListArchivedTasksForWorkspaceRow, error) {
 	rows, err := q.db.QueryContext(ctx, listArchivedTasksForWorkspace, arg.WorkspaceID, arg.Limit, arg.Offset)
 	if err != nil {
@@ -514,7 +600,6 @@ func (q *Queries) ListArchivedTasksForWorkspace(ctx context.Context, arg ListArc
 			&i.PrimaryAssigneePublicID,
 			&i.AssigneeCount,
 			&i.LabelIds,
-			&i.Total,
 		); err != nil {
 			return nil, err
 		}
@@ -586,9 +671,9 @@ type ListArchivedTasksForWorkspaceKeysetRow struct {
 	SortWeight              int32             `json:"sortWeight"`
 	UpdatedAt               sql.NullTime      `json:"updatedAt"`
 	CreatedAt               time.Time         `json:"createdAt"`
-	PrimaryAssigneePublicID interface{}       `json:"primaryAssigneePublicId"`
+	PrimaryAssigneePublicID sql.NullString    `json:"primaryAssigneePublicId"`
 	AssigneeCount           int64             `json:"assigneeCount"`
-	LabelIds                sql.NullString    `json:"labelIds"`
+	LabelIds                string            `json:"labelIds"`
 }
 
 // Keyset-paginated variant of ListArchivedTasksForWorkspace.
@@ -1579,8 +1664,7 @@ SELECT
   v.updated_at,
   v.created_at,
   v.primary_assignee_public_id,
-  v.assignee_count,
-  COUNT(*) OVER() AS total
+  v.assignee_count
 FROM v_task_list v
 WHERE v.workspace_id = ?
   AND v.project_public_id = ?
@@ -1610,16 +1694,23 @@ type ListTasksForProjectRow struct {
 	ProjectIdentifier       sql.NullString    `json:"projectIdentifier"`
 	TaskNumber              uint32            `json:"taskNumber"`
 	ArchivedAt              sql.NullTime      `json:"archivedAt"`
-	LabelIds                sql.NullString    `json:"labelIds"`
+	LabelIds                string            `json:"labelIds"`
 	SortWeight              int32             `json:"sortWeight"`
 	UpdatedAt               sql.NullTime      `json:"updatedAt"`
 	CreatedAt               time.Time         `json:"createdAt"`
-	PrimaryAssigneePublicID interface{}       `json:"primaryAssigneePublicId"`
+	PrimaryAssigneePublicID sql.NullString    `json:"primaryAssigneePublicId"`
 	AssigneeCount           int64             `json:"assigneeCount"`
-	Total                   interface{}       `json:"total"`
 }
 
-// List tasks in a project via v_task_list with window-function pagination.
+// List tasks in a project via v_task_list.
+//
+// The page total is NOT computed here. COUNT(*) OVER() would make the
+// window function consume every row the filter matches, and each of
+// those rows drags v_task_list's per-row label / assignee subqueries
+// with it -- so asking for a 50-row page of an 8000-task project
+// evaluated them 8000 times instead of 50. CountTasksForProject answers
+// the same question over the bare task rows, and the handler only asks
+// when the page came back full (a short page already pins the total).
 func (q *Queries) ListTasksForProject(ctx context.Context, arg ListTasksForProjectParams) ([]ListTasksForProjectRow, error) {
 	rows, err := q.db.QueryContext(ctx, listTasksForProject,
 		arg.WorkspaceID,
@@ -1655,7 +1746,6 @@ func (q *Queries) ListTasksForProject(ctx context.Context, arg ListTasksForProje
 			&i.CreatedAt,
 			&i.PrimaryAssigneePublicID,
 			&i.AssigneeCount,
-			&i.Total,
 		); err != nil {
 			return nil, err
 		}
@@ -1726,11 +1816,11 @@ type ListTasksForProjectKeysetRow struct {
 	ProjectIdentifier       sql.NullString    `json:"projectIdentifier"`
 	TaskNumber              uint32            `json:"taskNumber"`
 	ArchivedAt              sql.NullTime      `json:"archivedAt"`
-	LabelIds                sql.NullString    `json:"labelIds"`
+	LabelIds                string            `json:"labelIds"`
 	SortWeight              int32             `json:"sortWeight"`
 	UpdatedAt               sql.NullTime      `json:"updatedAt"`
 	CreatedAt               time.Time         `json:"createdAt"`
-	PrimaryAssigneePublicID interface{}       `json:"primaryAssigneePublicId"`
+	PrimaryAssigneePublicID sql.NullString    `json:"primaryAssigneePublicId"`
 	AssigneeCount           int64             `json:"assigneeCount"`
 }
 
@@ -1819,8 +1909,7 @@ SELECT
   v.updated_at,
   v.created_at,
   v.primary_assignee_public_id,
-  v.assignee_count,
-  COUNT(*) OVER() AS total
+  v.assignee_count
 FROM v_task_list v
 WHERE v.workspace_id = ?
   AND (
@@ -1872,16 +1961,16 @@ type ListTasksForWorkspaceRow struct {
 	ProjectIdentifier       sql.NullString    `json:"projectIdentifier"`
 	TaskNumber              uint32            `json:"taskNumber"`
 	ArchivedAt              sql.NullTime      `json:"archivedAt"`
-	LabelIds                sql.NullString    `json:"labelIds"`
+	LabelIds                string            `json:"labelIds"`
 	SortWeight              int32             `json:"sortWeight"`
 	UpdatedAt               sql.NullTime      `json:"updatedAt"`
 	CreatedAt               time.Time         `json:"createdAt"`
-	PrimaryAssigneePublicID interface{}       `json:"primaryAssigneePublicId"`
+	PrimaryAssigneePublicID sql.NullString    `json:"primaryAssigneePublicId"`
 	AssigneeCount           int64             `json:"assigneeCount"`
-	Total                   interface{}       `json:"total"`
 }
 
-// List tasks across an entire workspace via v_task_list.
+// List tasks across an entire workspace via v_task_list. See
+// ListTasksForProject for why the total is a separate query.
 func (q *Queries) ListTasksForWorkspace(ctx context.Context, arg ListTasksForWorkspaceParams) ([]ListTasksForWorkspaceRow, error) {
 	rows, err := q.db.QueryContext(ctx, listTasksForWorkspace,
 		arg.WorkspaceID,
@@ -1920,7 +2009,6 @@ func (q *Queries) ListTasksForWorkspace(ctx context.Context, arg ListTasksForWor
 			&i.CreatedAt,
 			&i.PrimaryAssigneePublicID,
 			&i.AssigneeCount,
-			&i.Total,
 		); err != nil {
 			return nil, err
 		}
@@ -1991,11 +2079,11 @@ type ListTasksForWorkspaceKeysetRow struct {
 	ProjectIdentifier       sql.NullString    `json:"projectIdentifier"`
 	TaskNumber              uint32            `json:"taskNumber"`
 	ArchivedAt              sql.NullTime      `json:"archivedAt"`
-	LabelIds                sql.NullString    `json:"labelIds"`
+	LabelIds                string            `json:"labelIds"`
 	SortWeight              int32             `json:"sortWeight"`
 	UpdatedAt               sql.NullTime      `json:"updatedAt"`
 	CreatedAt               time.Time         `json:"createdAt"`
-	PrimaryAssigneePublicID interface{}       `json:"primaryAssigneePublicId"`
+	PrimaryAssigneePublicID sql.NullString    `json:"primaryAssigneePublicId"`
 	AssigneeCount           int64             `json:"assigneeCount"`
 }
 

@@ -11,6 +11,26 @@ export const IntegrationsErrors = {
     status: 404,
     message: "No flow user is bound to that Discord account",
   },
+  INTEGRATION_MAPPING_EXTERNAL_KEY_INVALID: {
+    code: "INTEGRATION.MAPPING.EXTERNAL_KEY_INVALID",
+    status: 400,
+    message: "External key does not match the provider's identifier format",
+  },
+  INTEGRATION_MAPPING_NOT_FOUND: {
+    code: "INTEGRATION.MAPPING.NOT_FOUND",
+    status: 404,
+    message: "Integration source mapping not found",
+  },
+  INTEGRATION_MAPPING_SOURCE_ALREADY_MAPPED: {
+    code: "INTEGRATION.MAPPING.SOURCE_ALREADY_MAPPED",
+    status: 409,
+    message: "That external source is already mapped",
+  },
+  INTEGRATION_MAPPING_WORKSPACE_UNRESOLVED: {
+    code: "INTEGRATION.MAPPING.WORKSPACE_UNRESOLVED",
+    status: 404,
+    message: "No workspace is mapped to this webhook source",
+  },
   INTEGRATION_OAUTH_AUTHORIZATION_CODE_INVALID: {
     code: "INTEGRATION.OAUTH.AUTHORIZATION_CODE_INVALID",
     status: 400,

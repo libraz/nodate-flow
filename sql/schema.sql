@@ -45,6 +45,7 @@ DROP TABLE IF EXISTS `comments`;
 DROP TABLE IF EXISTS `dashboard_widgets`;
 DROP TABLE IF EXISTS `import_jobs`;
 DROP TABLE IF EXISTS `intake_items`;
+DROP TABLE IF EXISTS `integration_source_mappings`;
 DROP TABLE IF EXISTS `labels`;
 DROP TABLE IF EXISTS `lenses`;
 DROP TABLE IF EXISTS `mcp_invocations`;
@@ -57,7 +58,6 @@ DROP TABLE IF EXISTS `project_members`;
 DROP TABLE IF EXISTS `projects`;
 DROP TABLE IF EXISTS `reactions`;
 DROP TABLE IF EXISTS `relation_suggestions`;
-DROP TABLE IF EXISTS `repo_workspace_mappings`;
 DROP TABLE IF EXISTS `signals`;
 DROP TABLE IF EXISTS `task_actors`;
 DROP TABLE IF EXISTS `task_constraints`;
@@ -1846,6 +1846,44 @@ CREATE TABLE intake_items (
   CONSTRAINT fk_intake_items_triaged_by FOREIGN KEY (triaged_by_user_id) REFERENCES users(id)      ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Intake triage queue';
 
+-- >>> integration_source_mappings.sql
+-- ====================================
+-- integration_source_mappings
+-- Routes an inbound webhook delivery to the workspace that owns the
+-- external source it came from. Every /webhooks/* receiver identifies
+-- its sender (GitHub repository, Slack team, Google push channel) and
+-- looks the sender up here; without a row the delivery has no tenant
+-- and is rejected rather than routed to an arbitrary workspace.
+--
+-- (provider, external_key) is UNIQUE across the whole instance, not per
+-- workspace: one external source belongs to exactly one tenant, so the
+-- routing decision can never be ambiguous. `enabled = FALSE` pauses
+-- routing while keeping the claim; releasing the source for another
+-- workspace requires deleting the row.
+-- ====================================
+CREATE TABLE integration_source_mappings (
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY COMMENT 'Internal PK, never exposed',
+  public_id BINARY(16) NOT NULL COMMENT 'UUID v7, the only externally visible ID',
+  workspace_id INT UNSIGNED NOT NULL COMMENT 'Internal FK to workspaces.id — the tenant inbound deliveries from this source are routed to',
+
+  provider ENUM('github','slack','google') NOT NULL COMMENT 'Which /webhooks/* receiver this mapping routes',
+  external_key VARCHAR(255) CHARACTER SET latin1 COLLATE latin1_bin NOT NULL COMMENT 'Provider-side sender identity, matched byte-for-byte against the delivery: github = repository.id as decimal digits, slack = team_id, google = X-Goog-Channel-ID',
+  label VARCHAR(255) NOT NULL COMMENT 'Display-only name for the source (e.g. GitHub owner/repo, Slack workspace name, watched Drive folder)',
+
+  sort_weight INT NOT NULL DEFAULT 0 COMMENT 'Display order',
+  notes TEXT NULL COMMENT 'Admin notes',
+  enabled BOOLEAN NOT NULL DEFAULT TRUE COMMENT 'Enabled flag — FALSE pauses routing without releasing the (provider, external_key) claim',
+  updated_at TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+  created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+
+  UNIQUE KEY uniq_integration_source_mappings_public_id (public_id),
+  UNIQUE KEY uniq_integration_source_mappings_workspace_public_id (workspace_id, public_id),
+  UNIQUE KEY uniq_integration_source_mappings_provider_key (provider, external_key),
+  KEY idx_integration_source_mappings_workspace_provider (workspace_id, provider, enabled),
+
+  CONSTRAINT fk_integration_source_mappings_workspace FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Maps an external webhook sender to the workspace that owns it';
+
 -- >>> labels.sql
 -- ====================================
 -- labels
@@ -2326,43 +2364,6 @@ CREATE TABLE relation_suggestions (
   CONSTRAINT fk_relation_suggestions_resolved_by FOREIGN KEY (resolved_by) REFERENCES users(id) ON DELETE SET NULL,
   CONSTRAINT chk_relation_suggestions_no_self CHECK (source_task_id != target_task_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='AI-suggested task relation candidates';
-
--- >>> repo_workspace_mappings.sql
--- ====================================
--- repo_workspace_mappings
--- Maps a GitHub repository to a workspace so incoming webhooks can
--- be routed to the correct tenant. Optionally pins a default project
--- and controls which event types are synchronised as tasks.
--- ====================================
-CREATE TABLE repo_workspace_mappings (
-  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY COMMENT 'Internal PK, never exposed',
-  public_id BINARY(16) NOT NULL COMMENT 'UUID v7, the only externally visible ID',
-  workspace_id INT UNSIGNED NOT NULL COMMENT 'Internal FK to workspaces.id',
-  integration_id INT UNSIGNED NOT NULL COMMENT 'Internal FK to user_integrations.id (the GitHub OAuth connection)',
-
-  repo_full_name VARCHAR(255) CHARACTER SET latin1 COLLATE latin1_swedish_ci NOT NULL COMMENT 'GitHub owner/repo (e.g. libraz/nodate-flow)',
-  repo_id BIGINT UNSIGNED NOT NULL COMMENT 'GitHub numeric repository ID for webhook lookup',
-  default_project_id INT UNSIGNED NULL COMMENT 'Optional FK to projects.id for routing issues/PRs',
-  is_sync_issues BOOLEAN NOT NULL DEFAULT FALSE COMMENT 'Sync GitHub issues as tasks',
-  is_sync_pull_requests BOOLEAN NOT NULL DEFAULT FALSE COMMENT 'Sync GitHub pull requests as tasks',
-
-  sort_weight INT NOT NULL DEFAULT 0 COMMENT 'Display order',
-  notes TEXT NULL COMMENT 'Admin notes',
-  enabled BOOLEAN NOT NULL DEFAULT TRUE COMMENT 'Enabled flag',
-  updated_at TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
-  created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
-
-  UNIQUE KEY uniq_repo_workspace_mappings_public_id (public_id),
-  UNIQUE KEY uniq_repo_workspace_mappings_workspace_public_id (workspace_id, public_id),
-  UNIQUE KEY uniq_repo_workspace_mappings_workspace_repo (workspace_id, repo_full_name),
-  KEY idx_repo_workspace_mappings_repo_id (repo_id),
-  KEY idx_repo_workspace_mappings_integration_id (integration_id),
-  KEY idx_repo_workspace_mappings_workspace_id_enabled (workspace_id, enabled),
-
-  CONSTRAINT fk_repo_workspace_mappings_workspace FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
-  CONSTRAINT fk_repo_workspace_mappings_integration FOREIGN KEY (integration_id) REFERENCES user_integrations(id) ON DELETE CASCADE,
-  CONSTRAINT fk_repo_workspace_mappings_project FOREIGN KEY (default_project_id) REFERENCES projects(id) ON DELETE SET NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Maps GitHub repositories to workspaces for webhook routing';
 
 -- >>> signals.sql
 -- ====================================
@@ -3140,11 +3141,22 @@ DROP VIEW IF EXISTS `_v_task_list_all`;
 -- (archived) which filter this base view by archived_at. MySQL 8.4 expands
 -- single-level views via the MERGE optimizer, so there is no runtime cost.
 --
--- Defense-in-depth: every aggregate subquery over a task_* child table
--- INNER JOINs the parent tasks row with `enabled = TRUE` even though the
--- outer SELECT already filters disabled tasks. This prevents accidental
--- leakage of child rows belonging to soft-disabled tasks if these
--- subqueries are ever lifted into a different consumer.
+-- The three child-table columns are correlated scalar subqueries rather
+-- than joined derived tables, and that is a tenancy property, not a
+-- micro-optimisation. A derived table cannot see the outer workspace
+-- predicate, so MySQL has to materialise it over every row in the
+-- instance before the join can filter: reading one 200-task project meant
+-- aggregating every task_actors and task_labels row of every tenant
+-- first, and one large tenant slowed the list down for all the others.
+-- Correlating on t.id instead evaluates each subquery per emitted row
+-- against the child tables' task_id indexes, so the work scales with the
+-- page, not with the instance. Adding a fourth child column belongs in
+-- the same shape; a LEFT JOIN over a GROUP BY reintroduces the problem.
+--
+-- Correlating on t.id also carries the enabled check that the previous
+-- shape spelled out: the subqueries only ever see the outer row, which
+-- the final WHERE already restricts to enabled tasks, so a child row of
+-- a soft-disabled task cannot surface here.
 CREATE OR REPLACE ALGORITHM=MERGE VIEW v_task_list_all AS
 SELECT
   t.workspace_id,
@@ -3167,32 +3179,29 @@ SELECT
   t.sort_weight,
   t.updated_at,
   t.created_at,
-  assignees.primary_assignee_public_id,
-  COALESCE(assignees.assignee_count, 0) AS assignee_count,
-  labels.label_ids
-FROM tasks t
-INNER JOIN projects p
-  ON p.id = t.project_id AND p.enabled = TRUE
-INNER JOIN workspaces w
-  ON w.id = t.workspace_id AND w.enabled = TRUE
-LEFT JOIN tasks pt
-  ON pt.id = t.parent_task_id AND pt.enabled = TRUE
-LEFT JOIN (
-  SELECT
-    ta.task_id,
-    MIN(CASE WHEN rn = 1 THEN u.public_id END) AS primary_assignee_public_id,
-    COUNT(*) AS assignee_count
-  FROM (
-    SELECT ta2.task_id, ta2.user_id,
-           ROW_NUMBER() OVER (PARTITION BY ta2.task_id ORDER BY ta2.sort_weight ASC, ta2.id ASC) AS rn
-    FROM task_actors ta2
-    INNER JOIN tasks ta2t ON ta2t.id = ta2.task_id AND ta2t.enabled = TRUE
-    WHERE ta2.enabled = TRUE AND ta2.role = 'assignee'
-  ) ta
-  INNER JOIN users u ON u.id = ta.user_id AND u.enabled = TRUE
-  GROUP BY ta.task_id
-) assignees ON assignees.task_id = t.id
-LEFT JOIN (
+  -- The first assignee in display order, and NULL when that actor is an
+  -- AI agent or a disabled user -- the ORDER BY picks the row, the LEFT
+  -- JOIN decides whether it has a name to show. Resolving to the *next*
+  -- assignee instead would silently promote someone the workspace did
+  -- not put first.
+  (SELECT u.public_id
+     FROM task_actors ta
+     LEFT JOIN users u
+       ON u.id = ta.user_id AND u.enabled = TRUE
+    WHERE ta.task_id = t.id
+      AND ta.enabled = TRUE
+      AND ta.role = 'assignee'
+    ORDER BY ta.sort_weight ASC, ta.id ASC
+    LIMIT 1) AS primary_assignee_public_id,
+  -- Counts human assignees only; the INNER JOIN drops agent actors
+  -- (user_id IS NULL) and actors whose user has been disabled.
+  (SELECT COUNT(*)
+     FROM task_actors ta
+     INNER JOIN users u
+       ON u.id = ta.user_id AND u.enabled = TRUE
+    WHERE ta.task_id = t.id
+      AND ta.enabled = TRUE
+      AND ta.role = 'assignee') AS assignee_count,
   -- label_ids is a comma-separated list of UUID *text*, not of raw
   -- BINARY(16). Concatenating the binary form is unrecoverable in both
   -- directions: 0x2C occurs inside legitimate UUIDv7 bytes so the reader
@@ -3201,31 +3210,37 @@ LEFT JOIN (
   -- ever sees them. BIN_TO_UUID uses swap_flag 0 to match the
   -- UUID_TO_BIN(?, 0) form every writer uses.
   --
-  -- The rn cap is what keeps GROUP_CONCAT honest. Its result is clipped
-  -- at group_concat_max_len (1024 bytes by default) with no error and no
-  -- marker, which at 37 bytes per entry would cut the 28th UUID in half
-  -- and hand the reader a malformed id. Capping the aggregate below that
-  -- point makes the clip unreachable, so the column is either the whole
-  -- list or its first 20 entries in display order -- never a
+  -- The SUBSTRING_INDEX cap is what keeps GROUP_CONCAT honest. Its
+  -- result is clipped at group_concat_max_len (1024 bytes by default)
+  -- with no error and no marker, which at 37 bytes per entry would cut
+  -- the 28th UUID in half and hand the reader a malformed id. Cutting at
+  -- the 20th entry lands on byte 739, so the clip can only ever damage
+  -- text this expression has already discarded: the column is either the
+  -- whole list or its first 20 entries in display order -- never a
   -- half-written one. The list-row badge strip is the only consumer.
   -- Callers needing every label of a task read the task's label
   -- collection directly.
-  SELECT
-    ranked.task_id,
-    GROUP_CONCAT(BIN_TO_UUID(ranked.public_id, 0) ORDER BY ranked.rn ASC SEPARATOR ',') AS label_ids
-  FROM (
-    SELECT
-      tl.task_id,
-      l.public_id,
-      ROW_NUMBER() OVER (PARTITION BY tl.task_id ORDER BY tl.sort_weight ASC, tl.id ASC) AS rn
-    FROM task_labels tl
-    INNER JOIN tasks tlt ON tlt.id = tl.task_id AND tlt.enabled = TRUE
-    INNER JOIN labels l ON l.id = tl.label_id AND l.enabled = TRUE
-    WHERE tl.enabled = TRUE
-  ) ranked
-  WHERE ranked.rn <= 20
-  GROUP BY ranked.task_id
-) labels ON labels.task_id = t.id
+  -- The COALESCE sits inside SUBSTRING_INDEX, not around the subquery:
+  -- a task with no labels aggregates to NULL, and the empty string is
+  -- what "no labels" already meant to every consumer. Wrapping the
+  -- subquery from the outside instead leaves the generated reader with
+  -- no column type to work from and it falls back to interface{}.
+  (SELECT SUBSTRING_INDEX(
+            COALESCE(GROUP_CONCAT(BIN_TO_UUID(l.public_id, 0)
+              ORDER BY tl.sort_weight ASC, tl.id ASC SEPARATOR ','), ''),
+            ',', 20)
+     FROM task_labels tl
+     INNER JOIN labels l
+       ON l.id = tl.label_id AND l.enabled = TRUE
+    WHERE tl.task_id = t.id
+      AND tl.enabled = TRUE) AS label_ids
+FROM tasks t
+INNER JOIN projects p
+  ON p.id = t.project_id AND p.enabled = TRUE
+INNER JOIN workspaces w
+  ON w.id = t.workspace_id AND w.enabled = TRUE
+LEFT JOIN tasks pt
+  ON pt.id = t.parent_task_id AND pt.enabled = TRUE
 WHERE t.enabled = TRUE;
 
 -- >>> v_admin_users.sql

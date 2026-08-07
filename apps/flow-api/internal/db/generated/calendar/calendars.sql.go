@@ -196,53 +196,6 @@ func (q *Queries) FindPersonalCalendar(ctx context.Context, arg FindPersonalCale
 	return i, err
 }
 
-const findSystemCalendarBySlug = `-- name: FindSystemCalendarBySlug :one
-SELECT
-  id,
-  public_id,
-  kind,
-  name,
-  system_slug,
-  enabled,
-  created_at
-FROM calendars
-WHERE workspace_id = ?
-  AND system_slug = ?
-  AND enabled = TRUE
-LIMIT 1
-`
-
-type FindSystemCalendarBySlugParams struct {
-	WorkspaceID uint32         `json:"-"`
-	SystemSlug  sql.NullString `json:"systemSlug"`
-}
-
-type FindSystemCalendarBySlugRow struct {
-	ID         uint32         `json:"-"`
-	PublicID   types.PublicID `json:"publicId"`
-	Kind       CalendarsKind  `json:"kind"`
-	Name       string         `json:"name"`
-	SystemSlug sql.NullString `json:"systemSlug"`
-	Enabled    bool           `json:"enabled"`
-	CreatedAt  time.Time      `json:"createdAt"`
-}
-
-// Find a system calendar by its slug within a workspace.
-func (q *Queries) FindSystemCalendarBySlug(ctx context.Context, arg FindSystemCalendarBySlugParams) (FindSystemCalendarBySlugRow, error) {
-	row := q.db.QueryRowContext(ctx, findSystemCalendarBySlug, arg.WorkspaceID, arg.SystemSlug)
-	var i FindSystemCalendarBySlugRow
-	err := row.Scan(
-		&i.ID,
-		&i.PublicID,
-		&i.Kind,
-		&i.Name,
-		&i.SystemSlug,
-		&i.Enabled,
-		&i.CreatedAt,
-	)
-	return i, err
-}
-
 const listCalendarsForUser = `-- name: ListCalendarsForUser :many
 SELECT
   c.id,

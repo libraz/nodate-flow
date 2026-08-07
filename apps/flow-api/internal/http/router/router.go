@@ -69,6 +69,7 @@ import (
 	importhandlers "github.com/libraz/nodate-flow/apps/flow-api/internal/http/handlers/imports"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/handlers/inbox"
 	intakehandlers "github.com/libraz/nodate-flow/apps/flow-api/internal/http/handlers/intake"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/handlers/integrationmappings"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/handlers/internalapi"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/handlers/labels"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/handlers/lenses"
@@ -122,8 +123,11 @@ type Deps struct {
 	SlackSigningSecret string
 	// GoogleChannelToken authenticates inbound Google Drive push notifications.
 	GoogleChannelToken string
-	// DefaultWorkspaceID is the workspace public id (UUID v7) that
-	// webhook-origin signals are routed to. Empty in tests.
+	// DefaultWorkspaceID is the single-tenant fallback workspace public
+	// id (UUID v7) for webhook-origin signals whose sender has no
+	// integration_source_mappings row. Empty in tests, where the suite
+	// runs many workspaces on one instance and the fallback is therefore
+	// inapplicable by construction.
 	DefaultWorkspaceID string
 	// DisableRateLimit disables all per-IP rate limiters. Used by
 	// integration tests where many parallel tenants register from
@@ -987,6 +991,8 @@ func buildAuthenticatedAPI(r chi.Router, deps Deps, shared *sharedDeps, authMW f
 		aihandlers.RegisterAutoActionRules(subAPI, shared.aiDeps)
 		webhookDeps := webhooks.Deps{DB: deps.DB, Queries: deps.Queries, Audit: shared.auditRec}
 		webhooks.Register(subAPI, webhookDeps)
+		mappingDeps := integrationmappings.Deps{DB: deps.DB, Queries: deps.Queries, Audit: shared.auditRec}
+		integrationmappings.Register(subAPI, mappingDeps)
 		auditHandlerDeps := audithandlers.Deps{DB: deps.DB, Queries: deps.Queries}
 		audithandlers.Register(subAPI, auditHandlerDeps)
 	})
@@ -1174,14 +1180,6 @@ func buildAuthenticatedAPI(r chi.Router, deps Deps, shared *sharedDeps, authMW f
 			Description: "Creates a new calendar in the workspace owned by the caller. Personal calendars default to discoverable=false; team calendars default to true.",
 			Tags:        []string{"Calendar"},
 		}, calendars.CreateCalendar(shared.calDeps))
-		huma.Register(subAPI, huma.Operation{
-			OperationID: "calendars-subscribe-system",
-			Method:      http.MethodPost,
-			Path:        "/workspaces/{wsId}/calendars/subscribe-system",
-			Summary:     "Subscribe the caller to the holiday feed for a country",
-			Description: "Subscribes the caller to a system-managed read-only holiday calendar for the supplied ISO country code. Idempotent.",
-			Tags:        []string{"Calendar"},
-		}, calendars.SubscribeSystemCalendar(shared.calDeps))
 		huma.Register(subAPI, huma.Operation{
 			OperationID: "discoverable-calendars-list",
 			Method:      http.MethodGet,

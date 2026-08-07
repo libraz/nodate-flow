@@ -931,6 +931,49 @@ func (ns NullIntakeItemsTriageStatus) Value() (driver.Value, error) {
 	return string(ns.IntakeItemsTriageStatus), nil
 }
 
+type IntegrationSourceMappingsProvider string
+
+const (
+	IntegrationSourceMappingsProviderGithub IntegrationSourceMappingsProvider = "github"
+	IntegrationSourceMappingsProviderSlack  IntegrationSourceMappingsProvider = "slack"
+	IntegrationSourceMappingsProviderGoogle IntegrationSourceMappingsProvider = "google"
+)
+
+func (e *IntegrationSourceMappingsProvider) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = IntegrationSourceMappingsProvider(s)
+	case string:
+		*e = IntegrationSourceMappingsProvider(s)
+	default:
+		return fmt.Errorf("unsupported scan type for IntegrationSourceMappingsProvider: %T", src)
+	}
+	return nil
+}
+
+type NullIntegrationSourceMappingsProvider struct {
+	IntegrationSourceMappingsProvider IntegrationSourceMappingsProvider `json:"integrationSourceMappingsProvider"`
+	Valid                             bool                              `json:"valid"` // Valid is true if IntegrationSourceMappingsProvider is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullIntegrationSourceMappingsProvider) Scan(value interface{}) error {
+	if value == nil {
+		ns.IntegrationSourceMappingsProvider, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.IntegrationSourceMappingsProvider.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullIntegrationSourceMappingsProvider) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.IntegrationSourceMappingsProvider), nil
+}
+
 type McpInvocationsStatus string
 
 const (
@@ -3253,6 +3296,30 @@ type IntakeItem struct {
 	CreatedAt time.Time    `json:"createdAt"`
 }
 
+// Maps an external webhook sender to the workspace that owns it
+type IntegrationSourceMapping struct {
+	// Internal PK, never exposed
+	ID uint32 `json:"-"`
+	// UUID v7, the only externally visible ID
+	PublicID types.PublicID `json:"publicId"`
+	// Internal FK to workspaces.id — the tenant inbound deliveries from this source are routed to
+	WorkspaceID uint32 `json:"-"`
+	// Which /webhooks/* receiver this mapping routes
+	Provider IntegrationSourceMappingsProvider `json:"provider"`
+	// Provider-side sender identity, matched byte-for-byte against the delivery: github = repository.id as decimal digits, slack = team_id, google = X-Goog-Channel-ID
+	ExternalKey string `json:"externalKey"`
+	// Display-only name for the source (e.g. GitHub owner/repo, Slack workspace name, watched Drive folder)
+	Label string `json:"label"`
+	// Display order
+	SortWeight int32 `json:"sortWeight"`
+	// Admin notes
+	Notes sql.NullString `json:"notes"`
+	// Enabled flag — FALSE pauses routing without releasing the (provider, external_key) claim
+	Enabled   bool         `json:"enabled"`
+	UpdatedAt sql.NullTime `json:"updatedAt"`
+	CreatedAt time.Time    `json:"createdAt"`
+}
+
 // Hierarchical colored labels
 type Label struct {
 	// Internal PK, never exposed
@@ -3714,36 +3781,6 @@ type RelationSuggestion struct {
 	ResolvedAt sql.NullTime `json:"resolvedAt"`
 	UpdatedAt  sql.NullTime `json:"updatedAt"`
 	CreatedAt  time.Time    `json:"createdAt"`
-}
-
-// Maps GitHub repositories to workspaces for webhook routing
-type RepoWorkspaceMapping struct {
-	// Internal PK, never exposed
-	ID uint32 `json:"-"`
-	// UUID v7, the only externally visible ID
-	PublicID types.PublicID `json:"publicId"`
-	// Internal FK to workspaces.id
-	WorkspaceID uint32 `json:"-"`
-	// Internal FK to user_integrations.id (the GitHub OAuth connection)
-	IntegrationID uint32 `json:"integrationId"`
-	// GitHub owner/repo (e.g. libraz/nodate-flow)
-	RepoFullName string `json:"repoFullName"`
-	// GitHub numeric repository ID for webhook lookup
-	RepoID uint64 `json:"repoId"`
-	// Optional FK to projects.id for routing issues/PRs
-	DefaultProjectID sql.NullInt32 `json:"defaultProjectId"`
-	// Sync GitHub issues as tasks
-	IsSyncIssues bool `json:"isSyncIssues"`
-	// Sync GitHub pull requests as tasks
-	IsSyncPullRequests bool `json:"isSyncPullRequests"`
-	// Display order
-	SortWeight int32 `json:"sortWeight"`
-	// Admin notes
-	Notes sql.NullString `json:"notes"`
-	// Enabled flag
-	Enabled   bool         `json:"enabled"`
-	UpdatedAt sql.NullTime `json:"updatedAt"`
-	CreatedAt time.Time    `json:"createdAt"`
 }
 
 // Refresh-token backed sessions
@@ -4496,9 +4533,9 @@ type VTaskList struct {
 	SortWeight              int32             `json:"sortWeight"`
 	UpdatedAt               sql.NullTime      `json:"updatedAt"`
 	CreatedAt               time.Time         `json:"createdAt"`
-	PrimaryAssigneePublicID interface{}       `json:"primaryAssigneePublicId"`
+	PrimaryAssigneePublicID sql.NullString    `json:"primaryAssigneePublicId"`
 	AssigneeCount           int64             `json:"assigneeCount"`
-	LabelIds                sql.NullString    `json:"labelIds"`
+	LabelIds                string            `json:"labelIds"`
 }
 
 type VTaskListAll struct {
@@ -4522,9 +4559,9 @@ type VTaskListAll struct {
 	SortWeight              int32             `json:"sortWeight"`
 	UpdatedAt               sql.NullTime      `json:"updatedAt"`
 	CreatedAt               time.Time         `json:"createdAt"`
-	PrimaryAssigneePublicID interface{}       `json:"primaryAssigneePublicId"`
+	PrimaryAssigneePublicID sql.NullString    `json:"primaryAssigneePublicId"`
 	AssigneeCount           int64             `json:"assigneeCount"`
-	LabelIds                sql.NullString    `json:"labelIds"`
+	LabelIds                string            `json:"labelIds"`
 }
 
 type VTaskListArchived struct {
@@ -4548,9 +4585,9 @@ type VTaskListArchived struct {
 	SortWeight              int32             `json:"sortWeight"`
 	UpdatedAt               sql.NullTime      `json:"updatedAt"`
 	CreatedAt               time.Time         `json:"createdAt"`
-	PrimaryAssigneePublicID interface{}       `json:"primaryAssigneePublicId"`
+	PrimaryAssigneePublicID sql.NullString    `json:"primaryAssigneePublicId"`
 	AssigneeCount           int64             `json:"assigneeCount"`
-	LabelIds                sql.NullString    `json:"labelIds"`
+	LabelIds                string            `json:"labelIds"`
 }
 
 type VTaskTimeline struct {

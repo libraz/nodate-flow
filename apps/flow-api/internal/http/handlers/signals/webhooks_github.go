@@ -3,7 +3,6 @@ package signals
 import (
 	"database/sql"
 	"encoding/json"
-	"errors"
 	"io"
 	"log/slog"
 	"net/http"
@@ -46,10 +45,8 @@ func extractTaskMarker(body []byte) (string, bool) {
 }
 
 // HandleGithubWebhook is a chi-level handler for POST /webhooks/github.
-// It verifies the X-Hub-Signature-256 header and inserts a signals row.
-//
-// Currently routes every inbound delivery to deps.DefaultWorkspaceID;
-// a real per-repo workspace mapping table is deferred.
+// It verifies the X-Hub-Signature-256 header, routes the delivery to the
+// workspace that owns the sending repository, and inserts a signals row.
 func HandleGithubWebhook(deps Deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		body, err := io.ReadAll(http.MaxBytesReader(w, r.Body, 1<<20))
@@ -77,48 +74,41 @@ func HandleGithubWebhook(deps Deps) http.HandlerFunc {
 		}
 		// Normalize event + action into a stable kind so the
 		// constraint engine and timeline filters can rely on a single
-		// shape across every github source.
-		var actionEnv struct {
-			Action string `json:"action"`
+		// shape across every github source. The same pass reads
+		// repository.id, which is the routing key: it is the stable
+		// numeric identity of the sending repository (a rename changes
+		// full_name but not the id), and the body it comes from has
+		// already passed HMAC verification above.
+		var routeEnv struct {
+			Action     string `json:"action"`
+			Repository struct {
+				ID int64 `json:"id"`
+			} `json:"repository"`
 		}
 		if json.Valid(body) {
-			if uerr := json.Unmarshal(body, &actionEnv); uerr != nil {
+			if uerr := json.Unmarshal(body, &routeEnv); uerr != nil {
 				slog.WarnContext(r.Context(), "webhook: github action unmarshal", "error", uerr)
 			}
 		}
-		event = gh.NormalizeEventKind(event, actionEnv.Action)
+		event = gh.NormalizeEventKind(event, routeEnv.Action)
 
-		// Resolve workspace from the configured default.
-		if deps.DefaultWorkspaceID == "" {
-			writeError(w, apierrors.InternalUnexpected)
-			return
-		}
-		wsPub, err := types.Parse(deps.DefaultWorkspaceID)
-		if err != nil {
-			slog.ErrorContext(r.Context(), "webhook: github default workspace id parse failed",
-				slog.Any("error", err),
-				slog.String("source", "github"),
-			)
-			writeError(w, apierrors.InternalUnexpected)
-			return
-		}
 		ctx := r.Context()
-		const wsLookup = `SELECT id FROM workspaces WHERE public_id = ? AND enabled = TRUE LIMIT 1`
-		var wsID uint32
-		if err := deps.DB.QueryRowContext(ctx, wsLookup, wsPub).Scan(&wsID); err != nil {
-			if errors.Is(err, sql.ErrNoRows) {
-				writeError(w, apierrors.WsWorkspaceNotFound)
-				return
-			}
-			slog.ErrorContext(ctx, "webhook: github workspace lookup failed",
-				slog.Any("error", err),
-				slog.String("source", "github"),
-			)
-			writeError(w, apierrors.InternalUnexpected)
+		wsID, spec := resolveWebhookWorkspace(ctx, deps, webhookSender{
+			Provider: generated.IntegrationSourceMappingsProviderGithub,
+			Key:      githubSenderKey(routeEnv.Repository.ID),
+			Source:   "github",
+		})
+		if spec != nil {
+			writeError(w, spec)
 			return
 		}
 
-		// Best-effort task linkage from a body marker.
+		// Best-effort task linkage from a body marker. The lookup is
+		// scoped to wsID — the workspace the repository is mapped to —
+		// so a `tnk:<uuid>` written into an issue body can only ever
+		// name a task in that repository's own workspace. A marker
+		// pointing at another tenant's task simply does not resolve and
+		// the signal stays workspace-scoped.
 		var taskFK sql.NullInt32
 		var taskInternal int64
 		var taskLinked bool
