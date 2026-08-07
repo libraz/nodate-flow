@@ -12,6 +12,10 @@
  * difference is therefore purely a copy concern -- we do not branch on
  * `mode` for the network call itself, since the auth-api end-point is
  * symmetric.
+ *
+ * Leaving for the provider discards the whole page, `?redirect=`
+ * included, so the caller's target is handed to {@link
+ * rememberOidcRedirect} first and picked up again on /oidc/complete.
  */
 
 import Button from '@nodate-flow/ui/primitives/button';
@@ -22,8 +26,8 @@ import type { ProblemJson } from '../../lib/api-error';
 import { type AuthErrorI18nKey, mapAuthError, mapAuthThrown } from '../../lib/auth-errors';
 import { sdk } from '../../lib/sdk';
 import { useCapabilities } from '../auth/use-capabilities';
-
 import styles from './oauth-button-row.module.css';
+import { rememberOidcRedirect } from './oidc-redirect';
 
 /**
  * Operating mode of the row.
@@ -52,6 +56,13 @@ export interface OAuthButtonRowProps {
   /** Discriminator -- which page this row is rendered on. */
   mode: OAuthMode;
   /**
+   * Where to land once the provider round trip finishes -- normally the
+   * page's own `?redirect=`. Validated on the way out and again on the
+   * way back; anything unsafe is dropped and /oidc/complete falls back
+   * to /profile.
+   */
+  redirect?: string;
+  /**
    * Optional callback so the parent can surface the auth-api error in
    * its own banner. The component does not render its own error UI.
    */
@@ -64,7 +75,7 @@ export interface OAuthButtonRowProps {
  * Returns `null` when capabilities have not loaded yet or when no OIDC
  * provider is enabled, so the caller can drop it in unconditionally.
  */
-function OAuthButtonRow({ mode, onError }: OAuthButtonRowProps): ReactElement | null {
+function OAuthButtonRow({ mode, redirect, onError }: OAuthButtonRowProps): ReactElement | null {
   const { t } = useTranslation('auth');
   const caps = useCapabilities();
   // Tracks the in-flight provider so we can disable every button while a
@@ -91,6 +102,10 @@ function OAuthButtonRow({ mode, onError }: OAuthButtonRowProps): ReactElement | 
     if (pendingProvider !== null) return;
     setPendingProvider(provider);
     setBusyProvider(provider);
+    // Stash before the first navigation: from here on the page can be
+    // replaced at any moment. An absent or unsafe target clears the slot,
+    // so a previous attempt cannot leak into this one.
+    rememberOidcRedirect(redirect);
     try {
       const { data, error } = await sdk.GET(oidcStartPath[provider]);
       if (error || !data) {

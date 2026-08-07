@@ -32,7 +32,38 @@ vi.mock('../../lib/sdk', () => ({
   },
 }));
 
+import { rememberOidcRedirect, takeOidcRedirect } from '../../features/oauth/oidc-redirect';
 import { Route as OIDCCompleteRoute } from '../oidc.complete';
+
+/**
+ * Replace the `href` setter so a completed sign-in reports where it would
+ * navigate instead of actually leaving the page. `origin` is restated
+ * explicitly: it lives on the prototype, so spreading `location` drops it
+ * and the redirect check would have nothing to resolve against.
+ */
+function stubLocationHref(): { setHref: ReturnType<typeof vi.fn>; restore: () => void } {
+  const original = window.location;
+  const setHref = vi.fn();
+  Object.defineProperty(window, 'location', {
+    configurable: true,
+    value: {
+      ...original,
+      origin: original.origin,
+      get href() {
+        return original.href;
+      },
+      set href(value: string) {
+        setHref(value);
+      },
+    },
+  });
+  return {
+    setHref,
+    restore: () => {
+      Object.defineProperty(window, 'location', { configurable: true, value: original });
+    },
+  };
+}
 
 function buildI18n(): ReturnType<typeof i18n.createInstance> {
   const instance = i18n.createInstance();
@@ -115,6 +146,7 @@ beforeEach(() => {
   sdkMocks.post.mockReset();
   sdkMocks.refresh.mockReset();
   authStore.getState().clearSession();
+  window.sessionStorage.clear();
 });
 
 describe('oidc complete route', () => {
@@ -124,11 +156,63 @@ describe('oidc complete route', () => {
 
     const router = mountOIDCComplete('/oidc/complete#step=complete');
 
-    expect(await screen.findByText(enAuth.login.magic_link_verifying)).toBeDefined();
+    expect(await screen.findByText(enAuth.login.oidc_verifying)).toBeDefined();
     await waitFor(() => expect(router.state.location.pathname).toBe('/profile'));
     expect(sdkMocks.refresh).toHaveBeenCalledTimes(1);
     expect(authStore.getState().accessToken).toBe('access-oidc-1');
     expect(authStore.getState().user?.email).toBe('oidc@example.test');
+  });
+
+  it('lands on the page the sign-in started from', async () => {
+    // A deep link into the product frontend: a different origin from this
+    // app, allowed because it is on the configured redirect allowlist.
+    const target = 'http://localhost:5173/workspaces/w1/tasks/t1';
+    sdkMocks.refresh.mockResolvedValueOnce('access-oidc-3');
+    mockMe('oidc-redirect@example.test');
+    const location = stubLocationHref();
+    try {
+      rememberOidcRedirect(target);
+      const router = mountOIDCComplete('/oidc/complete#step=complete');
+
+      await waitFor(() => expect(location.setHref).toHaveBeenCalledWith(target));
+      // The default landing page was not used.
+      expect(router.state.location.pathname).toBe('/oidc/complete');
+      // The target is consumed, so a later sign-in in the same tab starts clean.
+      expect(takeOidcRedirect()).toBeNull();
+    } finally {
+      location.restore();
+    }
+  });
+
+  it('refuses a redirect to an outside origin and falls back to profile', async () => {
+    sdkMocks.refresh.mockResolvedValueOnce('access-oidc-4');
+    mockMe('oidc-evil@example.test');
+    const location = stubLocationHref();
+    try {
+      // Planted directly in storage: the entry is same-origin
+      // script-writable, so the check on the way back has to be the one
+      // that decides. `rememberOidcRedirect` would have refused this too.
+      window.sessionStorage.setItem(
+        'nf.oidc.redirect',
+        JSON.stringify({ target: 'https://evil.example/steal', expiresAt: Date.now() + 60_000 }),
+      );
+      const router = mountOIDCComplete('/oidc/complete#step=complete');
+
+      await waitFor(() => expect(router.state.location.pathname).toBe('/profile'));
+      expect(location.setHref).not.toHaveBeenCalled();
+    } finally {
+      location.restore();
+    }
+  });
+
+  it('names the provider flow rather than reusing the magic-link copy', async () => {
+    sdkMocks.refresh.mockImplementation(() => new Promise(() => {}));
+
+    mountOIDCComplete('/oidc/complete#step=complete');
+
+    expect(await screen.findByText(enAuth.login.oidc_verifying)).toBeDefined();
+    expect(screen.queryByText(enAuth.login.magic_link_verifying)).toBeNull();
+    expect(screen.queryByText(enAuth.login.magic_link_title)).toBeNull();
   });
 
   it('finishes a TOTP-required OIDC callback through /auth/login/totp', async () => {

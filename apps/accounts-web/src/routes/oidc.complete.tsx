@@ -5,6 +5,11 @@
  * OIDC has already set the httpOnly refresh cookie, so this page refreshes
  * an access token and loads /me. TOTP-required OIDC carries only a short-lived
  * challenge token in the URL fragment and finishes through /auth/login/totp.
+ *
+ * The page the user actually asked for is picked up from
+ * {@link takeOidcRedirect}, which re-validates it: a deep link into the
+ * product frontend must survive the provider hand-off the same way it
+ * survives a password sign-in.
  */
 
 import type { components } from '@nodate-flow/sdk';
@@ -19,6 +24,7 @@ import AuthCard from '../components/auth-card';
 import { authStore } from '../features/auth/auth-store';
 import { useCapsLockHint } from '../features/auth/use-caps-lock-hint';
 import { type MeResponse, userFromMe } from '../features/auth/user-from-me';
+import { takeOidcRedirect } from '../features/oauth/oidc-redirect';
 import type { ProblemJson } from '../lib/api-error';
 import { type AuthErrorI18nKey, mapAuthError, mapAuthThrown } from '../lib/auth-errors';
 import { refreshAccessToken, sdk } from '../lib/sdk';
@@ -62,6 +68,14 @@ export function OIDCCompletePage(): ReactElement {
         return;
       }
       authStore.getState().setSession(accessToken, userFromMe(data as MeResponse));
+      // Consume the target the sign-in started from. It is re-validated
+      // inside takeOidcRedirect, so an unsafe or expired value lands the
+      // user on /profile exactly as if none had been given.
+      const target = takeOidcRedirect();
+      if (target) {
+        window.location.href = target;
+        return;
+      }
       void navigate({ to: '/profile', replace: true });
     },
     [navigate],
@@ -240,9 +254,9 @@ export function OIDCCompletePage(): ReactElement {
   return (
     <AuthCard>
       <div className="aw-stack aw-stack-5" role={status === 'error' ? 'alert' : undefined}>
-        <h1 className="aw-page-title">{t('login.magic_link_title')}</h1>
+        <h1 className="aw-page-title">{t('login.oidc_title')}</h1>
         {status === 'verifying' ? (
-          <p className="aw-flush aw-muted">{t('login.magic_link_verifying')}</p>
+          <p className="aw-flush aw-muted">{t('login.oidc_verifying')}</p>
         ) : (
           <>
             <p className="aw-flush aw-error">{error ? t(error) : t('errors.generic')}</p>

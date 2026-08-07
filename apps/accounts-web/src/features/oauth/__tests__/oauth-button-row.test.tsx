@@ -46,6 +46,7 @@ vi.mock('../../auth/use-capabilities', () => ({
 }));
 
 import OAuthButtonRow from '../oauth-button-row';
+import { takeOidcRedirect } from '../oidc-redirect';
 
 function buildI18n(): ReturnType<typeof i18n.createInstance> {
   const instance = i18n.createInstance();
@@ -71,7 +72,51 @@ function Wrapper({ children }: { children: ReactNode }): ReactElement {
 beforeEach(() => {
   sdkMocks.get.mockReset();
   capsMocks.current = null;
+  window.sessionStorage.clear();
 });
+
+/** Caps with Google enabled — the shape most of these cases need. */
+function googleOnlyCaps(): NonNullable<typeof capsMocks.current> {
+  return {
+    passwordLogin: true,
+    oidcGoogle: true,
+    oidcGithub: false,
+    oidcMicrosoft: false,
+    magicLink: false,
+    totp: false,
+    registrationOpen: true,
+  };
+}
+
+/**
+ * Replace the `href` setter so the provider hand-off is observable
+ * without leaving the page. `origin` is restated explicitly: it lives on
+ * the prototype, so spreading `location` drops it and the redirect check
+ * would have nothing to resolve against.
+ */
+function stubLocationHref(): { setHref: ReturnType<typeof vi.fn>; restore: () => void } {
+  const original = window.location;
+  const setHref = vi.fn();
+  Object.defineProperty(window, 'location', {
+    configurable: true,
+    value: {
+      ...original,
+      origin: original.origin,
+      get href() {
+        return original.href;
+      },
+      set href(value: string) {
+        setHref(value);
+      },
+    },
+  });
+  return {
+    setHref,
+    restore: () => {
+      Object.defineProperty(window, 'location', { configurable: true, value: original });
+    },
+  };
+}
 
 afterEach(() => {
   capsMocks.current = null;
@@ -173,6 +218,46 @@ describe('<OAuthButtonRow>', () => {
         configurable: true,
         value: originalLocation,
       });
+    }
+  });
+
+  it('carries the caller redirect across the provider hand-off', async () => {
+    // The page is discarded the moment we navigate to the provider, so
+    // the target has to be stashed before that happens.
+    const target = 'http://localhost:5173/workspaces/w1/tasks/t1';
+    capsMocks.current = googleOnlyCaps();
+    sdkMocks.get.mockResolvedValue({
+      data: { authorizationUrl: 'https://oidc.example/start' },
+      error: null,
+    });
+    const location = stubLocationHref();
+    try {
+      render(<OAuthButtonRow mode="login" redirect={target} />, { wrapper: Wrapper });
+      await userEvent.click(screen.getByRole('button', { name: enAuth.login.sso_google }));
+      expect(location.setHref).toHaveBeenCalledWith('https://oidc.example/start');
+      expect(takeOidcRedirect()).toBe(target);
+    } finally {
+      location.restore();
+    }
+  });
+
+  it('does not carry a redirect to an outside origin', async () => {
+    capsMocks.current = googleOnlyCaps();
+    sdkMocks.get.mockResolvedValue({
+      data: { authorizationUrl: 'https://oidc.example/start' },
+      error: null,
+    });
+    const location = stubLocationHref();
+    try {
+      render(<OAuthButtonRow mode="login" redirect="https://evil.example/steal" />, {
+        wrapper: Wrapper,
+      });
+      await userEvent.click(screen.getByRole('button', { name: enAuth.login.sso_google }));
+      // The sign-in still starts; only the unusable target is dropped.
+      expect(location.setHref).toHaveBeenCalledWith('https://oidc.example/start');
+      expect(takeOidcRedirect()).toBeNull();
+    } finally {
+      location.restore();
     }
   });
 
