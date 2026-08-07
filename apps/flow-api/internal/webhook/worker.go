@@ -1,11 +1,12 @@
 // Package webhook implements the background webhook delivery worker. It
 // subscribes to eventbus events via [Worker.Hook], creates pending
 // delivery rows for matching subscriptions, and periodically processes
-// those deliveries with HMAC-SHA256 signed POST requests. Each batch is
-// first claimed atomically (FOR UPDATE SKIP LOCKED + status flip to
-// 'delivering') so multiple worker replicas partition the queue instead
-// of each delivering every row. Failed deliveries are retried with
-// exponential backoff up to six attempts.
+// those deliveries with POST requests signed over timestamp and body
+// (see [sign] for the scheme, [webhookPayload] for what the body says).
+// Each batch is first claimed atomically (FOR UPDATE SKIP LOCKED +
+// status flip to 'delivering') so multiple worker replicas partition the
+// queue instead of each delivering every row. Failed deliveries are
+// retried with exponential backoff up to six attempts.
 package webhook
 
 import (
@@ -17,10 +18,12 @@ import (
 	"database/sql"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
 	"net/http"
+	"strconv"
 	"sync"
 	"time"
 
@@ -172,7 +175,7 @@ func (w *Worker) createDeliveries(ctx context.Context, workspaceID uint32, event
 	eventPubID := eventRow.PublicID
 	occurredAt := eventRow.OccurredAt
 
-	payload := w.buildPayload(ctx, workspaceID, eventType, occurredAt)
+	ectx := w.resolveEventContext(ctx, workspaceID, eventInternalID)
 
 	for _, sub := range subs {
 		if !matchesEventType(sub.EventTypes, eventType) {
@@ -181,6 +184,7 @@ func (w *Worker) createDeliveries(ctx context.Context, workspaceID uint32, event
 
 		pubID := types.New()
 		now := time.Now().UTC()
+		payload := buildPayload(pubID, eventPubID, eventType, occurredAt, ectx)
 		if _, err := w.queries.CreateWebhookDelivery(ctx, generated.CreateWebhookDeliveryParams{
 			PublicID:       pubID,
 			WorkspaceID:    workspaceID,
@@ -217,32 +221,111 @@ func matchesEventType(raw json.RawMessage, eventType string) bool {
 	return false
 }
 
+// webhookResource names one resource an event targets. Receivers use it
+// to fetch the current state over the REST API; a delivery without one
+// says only that something changed somewhere, which no integration can
+// act on.
+//
+// ID is always a public_id (UUID v7). The events row stores internal
+// sequential FKs, and those must never leave the process.
+type webhookResource struct {
+	Type string `json:"type"`
+	ID   string `json:"id"`
+}
+
+// webhookPayload is the JSON body POSTed to a subscriber.
+//
+// It carries identifiers only, and deliberately not the source event's
+// own payload_json. That column is written by every producer in the
+// codebase and has carried a share token in plaintext before; a webhook
+// target is an arbitrary third-party URL chosen by a workspace member,
+// so forwarding the column wholesale would turn any future producer
+// mistake into an external disclosure. A receiver that holds a token
+// can read whatever detail it is entitled to from the API using the
+// ids below.
+type webhookPayload struct {
+	EventID     string            `json:"eventId"`
+	EventType   string            `json:"eventType"`
+	DeliveryID  string            `json:"deliveryId"`
+	WorkspaceID string            `json:"workspaceId,omitempty"`
+	OccurredAt  int64             `json:"occurredAt"`
+	Resources   []webhookResource `json:"resources,omitempty"`
+}
+
+// eventContext holds the public ids behind an events row's internal FKs.
+type eventContext struct {
+	workspacePublicID types.PublicID
+	taskPublicID      types.PublicID
+	calendarPublicID  types.PublicID
+}
+
+// resolveEventContext translates the internal FKs on an events row into
+// the public ids of the rows they point at.
+//
+// Both target columns are nullable and an event may set either, both
+// (a scheduled item exists as a task inside a calendar) or neither, so
+// the joins are outer and a zero PublicID means "this event targets no
+// row of that kind". A failed lookup degrades to an empty context: the
+// delivery still goes out carrying the event id, which is worth more to
+// the receiver than nothing at all.
+func (w *Worker) resolveEventContext(ctx context.Context, workspaceID uint32, eventInternalID uint64) eventContext {
+	const q = `
+		SELECT w.public_id, t.public_id, c.public_id
+		FROM events e
+		INNER JOIN workspaces w ON w.id = e.workspace_id
+		LEFT JOIN tasks t ON t.id = e.task_id
+		LEFT JOIN calendars c ON c.id = e.calendar_id
+		WHERE e.workspace_id = ? AND e.id = ?
+		LIMIT 1
+	`
+	var ectx eventContext
+	if err := w.db.QueryRowContext(ctx, q, workspaceID, eventInternalID).Scan(
+		&ectx.workspacePublicID, &ectx.taskPublicID, &ectx.calendarPublicID,
+	); err != nil {
+		slog.WarnContext(ctx, "webhook: failed to resolve event resources",
+			slog.Uint64("workspace_id", uint64(workspaceID)),
+			slog.Uint64("event_internal_id", eventInternalID),
+			slog.String("err", err.Error()))
+		return eventContext{}
+	}
+	return ectx
+}
+
+// resources lists the public ids the event targets, task first so a
+// receiver that only understands one kind reads the more specific one.
+func (e eventContext) resources() []webhookResource {
+	var out []webhookResource
+	var zero types.PublicID
+	if e.taskPublicID != zero {
+		out = append(out, webhookResource{Type: "task", ID: e.taskPublicID.String()})
+	}
+	if e.calendarPublicID != zero {
+		out = append(out, webhookResource{Type: "calendar", ID: e.calendarPublicID.String()})
+	}
+	return out
+}
+
 // buildPayload constructs the JSON payload sent to the webhook target.
+//
 // occurredAt comes from the source events row so the payload reflects
 // when the event happened, not when the worker happened to dispatch it.
-func (w *Worker) buildPayload(ctx context.Context, workspaceID uint32, eventType string, occurredAt time.Time) json.RawMessage {
-	type webhookPayload struct {
-		EventType   string `json:"eventType"`
-		WorkspaceID string `json:"workspaceId,omitempty"`
-		OccurredAt  int64  `json:"occurredAt"`
-	}
-	// Look up the workspace public id for the payload.
+// deliveryID is the webhook_deliveries.public_id of the row this body is
+// stored on, so the payload and the X-Nodate-Delivery header agree across
+// every retry of that row.
+func buildPayload(deliveryID, eventPublicID types.PublicID, eventType string, occurredAt time.Time, ectx eventContext) json.RawMessage {
 	var wsPublicID string
-	const q = `SELECT HEX(public_id) FROM workspaces WHERE id = ? LIMIT 1`
-	var hexStr string
-	if err := w.db.QueryRowContext(ctx, q, workspaceID).Scan(&hexStr); err == nil {
-		// Convert hex to UUID format.
-		if parsed, perr := types.Parse(
-			hexStr[:8] + "-" + hexStr[8:12] + "-" + hexStr[12:16] + "-" + hexStr[16:20] + "-" + hexStr[20:],
-		); perr == nil {
-			wsPublicID = parsed.String()
-		}
+	var zero types.PublicID
+	if ectx.workspacePublicID != zero {
+		wsPublicID = ectx.workspacePublicID.String()
 	}
 
 	p := webhookPayload{
+		EventID:     eventPublicID.String(),
 		EventType:   eventType,
+		DeliveryID:  deliveryID.String(),
 		WorkspaceID: wsPublicID,
 		OccurredAt:  occurredAt.Unix(),
+		Resources:   ectx.resources(),
 	}
 	b, err := json.Marshal(p)
 	if err != nil {
@@ -536,6 +619,20 @@ func (w *Worker) deliver(ctx context.Context, row generated.ClaimPendingDeliveri
 		payload = json.RawMessage(`{}`)
 	}
 
+	// Re-read the subscription immediately before the POST. Rows are
+	// claimed in batches and a batch can take minutes to drain, so a
+	// subscription paused or deleted after its rows were queued would
+	// otherwise keep receiving them — the one thing a subscriber has no
+	// way to stop from their side. It runs ahead of the URL check so a
+	// retired delivery records why it was retired rather than whatever
+	// its stale destination now resolves to.
+	if reason, live := w.subscriptionLive(ctx, row); !live {
+		if reason != "" {
+			w.markCancelled(ctx, row, reason)
+		}
+		return
+	}
+
 	// Re-check the stored URL before every attempt: subscriptions created
 	// before the SSRF policy existed (or whose DNS now points at a
 	// non-public address) must not be delivered. The safe client's dialer
@@ -547,7 +644,8 @@ func (w *Worker) deliver(ctx context.Context, row generated.ClaimPendingDeliveri
 		return
 	}
 
-	signature := sign(row.Secret, payload)
+	timestamp := strconv.FormatInt(time.Now().UTC().Unix(), 10)
+	signature := sign(row.Secret, timestamp, payload)
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, row.Url, bytes.NewReader(payload))
 	if err != nil {
@@ -555,7 +653,8 @@ func (w *Worker) deliver(ctx context.Context, row generated.ClaimPendingDeliveri
 		return
 	}
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("X-Nodate-Signature-256", signature)
+	req.Header.Set(SignatureHeader, signature)
+	req.Header.Set(TimestampHeader, timestamp)
 	req.Header.Set("X-Nodate-Event", row.EventType)
 	req.Header.Set("X-Nodate-Delivery", row.PublicID.String())
 
@@ -583,6 +682,63 @@ func (w *Worker) deliver(ctx context.Context, row generated.ClaimPendingDeliveri
 	}
 
 	w.markFailed(ctx, row, resp.StatusCode, bodyStr)
+}
+
+// subscriptionLive reports whether the subscription behind a claimed
+// delivery still wants it. The second return value is false when the
+// POST must not happen; the first is the reason to record, empty when
+// the row should simply be left for the next tick.
+//
+// A read error is not treated as a cancellation: a database hiccup must
+// not silently discard a delivery, so the row keeps its 'delivering'
+// status and the stranded reaper requeues it.
+func (w *Worker) subscriptionLive(ctx context.Context, row generated.ClaimPendingDeliveriesRow) (string, bool) {
+	const q = `SELECT is_active, enabled FROM webhook_subscriptions WHERE id = ? LIMIT 1`
+	var isActive, enabled bool
+	switch err := w.db.QueryRowContext(ctx, q, row.SubscriptionID).Scan(&isActive, &enabled); {
+	case err == nil:
+	case errors.Is(err, sql.ErrNoRows):
+		return "subscription no longer exists", false
+	default:
+		slog.WarnContext(ctx, "webhook: failed to re-check subscription before delivery",
+			slog.String("delivery", row.PublicID.String()),
+			slog.String("err", err.Error()))
+		return "", false
+	}
+
+	switch {
+	case !enabled:
+		return "subscription deleted", false
+	case !isActive:
+		return "subscription paused", false
+	}
+	return "", true
+}
+
+// markCancelled retires a delivery that must not be sent because its
+// subscription is gone or paused.
+//
+// The row is retired rather than returned to the queue. A requeued row
+// stays due, so it would be re-claimed on every tick for as long as the
+// pause lasts, and a workspace with a paused subscription and a large
+// backlog would spend its whole batch budget re-claiming rows it is
+// never allowed to send. Retiring also matches what pausing means to
+// the person who pressed it: events from the pause window are not
+// replayed when the subscription resumes.
+//
+// 'dead' is the status used because the delivery status enum has no
+// dedicated cancelled state; the reason is recorded in response_body so
+// the delivery list distinguishes this from an exhausted retry budget.
+func (w *Worker) markCancelled(ctx context.Context, row generated.ClaimPendingDeliveriesRow, reason string) {
+	if err := w.queries.MarkDeliveryDead(ctx, generated.MarkDeliveryDeadParams{
+		ResponseBody: sql.NullString{String: "not delivered: " + reason, Valid: true},
+		ID:           row.ID,
+	}); err != nil {
+		slog.WarnContext(ctx, "webhook: failed to retire a delivery for an inactive subscription",
+			slog.String("delivery", row.PublicID.String()),
+			slog.String("reason", reason),
+			slog.String("err", err.Error()))
+	}
 }
 
 // markFailed marks a delivery attempt as failed. If max retries are
@@ -625,11 +781,34 @@ func (w *Worker) markFailed(ctx context.Context, row generated.ClaimPendingDeliv
 	}
 }
 
-// sign computes the HMAC-SHA256 signature for a webhook payload.
-func sign(secret string, payload []byte) string {
+// SignatureHeader carries the v0 HMAC of a delivery.
+const SignatureHeader = "X-Nodate-Signature"
+
+// TimestampHeader carries the instant the delivery was signed, in Unix
+// seconds. It is covered by the signature, so a receiver that also
+// checks it against its own clock cannot be fed a captured delivery:
+// keeping the original timestamp fails the clock check, and changing it
+// fails the signature.
+const TimestampHeader = "X-Nodate-Timestamp"
+
+// sign computes the signature for a webhook delivery over
+//
+//	base = "v0:" + timestamp + ":" + body
+//	sig  = "v0=" + hex(HMAC_SHA256(secret, base))
+//
+// which is the same scheme this service already requires of the inbound
+// webhooks it verifies. Signing the body alone made a captured delivery
+// replayable forever, because nothing in the signed material said when
+// it was produced.
+//
+// Receivers verify by recomputing the HMAC over the same base string
+// and rejecting a timestamp outside their tolerated clock skew (five
+// minutes is the usual figure).
+func sign(secret, timestamp string, payload []byte) string {
 	mac := hmac.New(sha256.New, []byte(secret))
+	mac.Write([]byte("v0:" + timestamp + ":"))
 	mac.Write(payload)
-	return "sha256=" + hex.EncodeToString(mac.Sum(nil))
+	return "v0=" + hex.EncodeToString(mac.Sum(nil))
 }
 
 // GenerateSecret produces a cryptographically random 32-byte hex secret

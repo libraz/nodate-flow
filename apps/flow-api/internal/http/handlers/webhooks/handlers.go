@@ -321,14 +321,19 @@ func TestDelivery(deps Deps) func(context.Context, *TestDeliveryInput) (*TestDel
 			return nil, httpErr(apierrors.WebhookSubscriptionUrlInvalid)
 		}
 
-		// Build a test ping payload.
-		payload, _ := json.Marshal(map[string]any{
-			"eventType":  "webhook.test",
-			"occurredAt": handlerutil.NowUnix(),
-		})
-
 		deliveryPub := types.New()
 		now := time.Now().UTC()
+
+		// Build a test ping payload. It carries the same identifier
+		// fields a real delivery does, minus the ones a ping has no
+		// answer for, so an operator verifying their receiver against
+		// this ping is verifying it against the real shape.
+		payload, _ := json.Marshal(map[string]any{
+			"eventType":   "webhook.test",
+			"deliveryId":  deliveryPub.String(),
+			"workspaceId": wsCtx.PublicID.String(),
+			"occurredAt":  handlerutil.NowUnix(),
+		})
 
 		// Resolve subscription internal id for the delivery.
 		const subIDQuery = `SELECT id FROM webhook_subscriptions WHERE workspace_id = ? AND public_id = ? AND enabled = TRUE LIMIT 1`
