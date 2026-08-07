@@ -148,6 +148,12 @@ type Querier interface {
 	CountActiveUsers(ctx context.Context) (int64, error)
 	// Count all active (non-disabled) workspaces.
 	CountActiveWorkspaces(ctx context.Context) (int64, error)
+	// Number of live tenants on this instance. Used by the inbound webhook
+	// receivers to decide whether NF_FLOW_DEFAULT_WORKSPACE_ID may act as a
+	// fallback for an unmapped sender: that fallback is only meaningful on a
+	// single-tenant deployment, and the moment a second workspace exists it
+	// would start delivering one tenant's events to another.
+	CountEnabledWorkspaces(ctx context.Context) (int64, error)
 	// Count of v_workspace_activity rows matching the same filters as
 	// ListWorkspaceActivity (no cursor).
 	CountWorkspaceActivity(ctx context.Context, arg CountWorkspaceActivityParams) (int64, error)

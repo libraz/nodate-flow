@@ -48,6 +48,16 @@ WHERE public_id = ?
   AND enabled = TRUE
 LIMIT 1;
 
+-- name: CountEnabledWorkspaces :one
+-- Number of live tenants on this instance. Used by the inbound webhook
+-- receivers to decide whether NF_FLOW_DEFAULT_WORKSPACE_ID may act as a
+-- fallback for an unmapped sender: that fallback is only meaningful on a
+-- single-tenant deployment, and the moment a second workspace exists it
+-- would start delivering one tenant's events to another.
+SELECT COUNT(*) AS total
+FROM workspaces
+WHERE enabled = TRUE;
+
 -- name: FindWorkspaceBySlug :one
 -- Resolve a workspace by slug. Returns internal id for ACL.
 SELECT
