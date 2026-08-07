@@ -339,16 +339,6 @@
       "subscribed_toast": "Subscribed to {name}",
       "load_error": "Could not load teammate calendars. Please try again.",
       "subscribe_error": "Could not subscribe. Please try again."
-    },
-    "holidays": {
-      "trigger": "Subscribe holiday calendar...",
-      "title": "Subscribe holiday calendar",
-      "country_label": "Country",
-      "country_placeholder": "Pick a country...",
-      "default_hint": "{flag} {code} is your workspace default.",
-      "subscribe": "Subscribe",
-      "subscribed_toast": "Subscribed to {name} holidays.",
-      "error": "Could not subscribe. Please try again."
     }
   },
   "not_found": {

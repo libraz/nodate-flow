@@ -109,22 +109,6 @@ WHERE workspace_id = ?
   AND enabled = TRUE
 LIMIT 1;
 
--- name: FindSystemCalendarBySlug :one
--- Find a system calendar by its slug within a workspace.
-SELECT
-  id,
-  public_id,
-  kind,
-  name,
-  system_slug,
-  enabled,
-  created_at
-FROM calendars
-WHERE workspace_id = ?
-  AND system_slug = ?
-  AND enabled = TRUE
-LIMIT 1;
-
 -- name: ListDiscoverableCalendarsInWorkspace :many
 -- List teammate personal calendars in a workspace that the actor is not
 -- currently subscribed to. Used by the "Add teammate calendar" picker in

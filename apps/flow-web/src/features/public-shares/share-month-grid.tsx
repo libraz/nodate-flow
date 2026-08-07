@@ -15,6 +15,7 @@
  * a11y-safe.
  */
 
+import { getOrCreateProvider } from '@nodate-flow/holidays';
 import type { components } from '@nodate-flow/sdk';
 import { cx } from '@nodate-flow/ui/lib/cx';
 import { ChevronLeft, ChevronRight, MapPin, X } from 'lucide-react';
@@ -66,10 +67,56 @@ function initialMonthAnchor(events: ShareEvent[], zone: string): string {
   return `${monthKeyOf(base)}-01`;
 }
 
+/**
+ * holidayNamesFor resolves the share's holiday overlay: date key
+ * (`YYYY-MM-DD`) to the localized holiday name.
+ *
+ * The share page's `showHolidaysCountry` setting used to be echoed back
+ * as a text chip and nothing else, so a share advertising "Holidays:
+ * Japan" drew an ordinary grid. The overlay is resolved in the browser
+ * from the same provider the authenticated calendar uses, which is why
+ * the API carries only the country code and no holiday rows.
+ */
+function holidayNamesFor(
+  country: string | null | undefined,
+  weeks: ReturnType<typeof buildMonthGrid>['weeks'],
+  locale: string,
+): Map<string, string> {
+  const map = new Map<string, string>();
+  if (!country) return map;
+  let provider: ReturnType<typeof getOrCreateProvider>;
+  try {
+    provider = getOrCreateProvider(country);
+  } catch {
+    // An unrecognised country code leaves the grid unannotated rather
+    // than failing the whole public page.
+    return map;
+  }
+  const keys = weeks.flatMap((w) => w.cells.map((c) => c.key));
+  if (keys.length === 0) return map;
+  const sorted = [...keys].sort();
+  const first = sorted[0];
+  const last = sorted[sorted.length - 1];
+  if (!first || !last) return map;
+  const start = new Date(`${first}T00:00:00`);
+  const end = new Date(`${last}T00:00:00`);
+  end.setDate(end.getDate() + 1);
+  for (const entry of provider.holidaysBetween(start, end, locale)) {
+    if (!map.has(entry.date)) map.set(entry.date, entry.name);
+  }
+  return map;
+}
+
 export interface ShareMonthGridProps {
   events: ShareEvent[];
   /** Share publishing timezone (IANA). Day boundaries resolve here. */
   timezone: string;
+  /**
+   * ISO 3166-1 alpha-2 country whose public holidays are overlaid on the
+   * grid, from the share's `showHolidaysCountry` setting. Omitted or
+   * empty leaves the grid unannotated.
+   */
+  holidaysCountry?: string | null;
   /** Start-of-week anchor; public shares default to Sunday. */
   weekStart?: WeekStart;
   /** Chromeless mode for iframe embedding (transparent, compact). */
@@ -84,6 +131,7 @@ export interface ShareMonthGridProps {
 export default function ShareMonthGrid({
   events,
   timezone,
+  holidaysCountry,
   weekStart = 'sun',
   embed = false,
 }: ShareMonthGridProps): ReactElement {
@@ -101,6 +149,8 @@ export default function ShareMonthGrid({
     month: 'long',
     timeZone: 'UTC',
   }).format(grid.monthAnchor);
+
+  const holidayNames = holidayNamesFor(holidaysCountry, grid.weeks, locale);
 
   const weekdayFmt = new Intl.DateTimeFormat(locale, { weekday: 'short', timeZone: 'UTC' });
   const weekdayLabels = grid.weekdayOrder.map((dow) => {
@@ -163,6 +213,7 @@ export default function ShareMonthGrid({
               week={week}
               events={visibleEvents}
               timezone={timezone}
+              holidayNames={holidayNames}
               onEventOpen={setSelected}
             />
           ))}
@@ -185,10 +236,18 @@ interface ShareWeekRowProps {
   week: ReturnType<typeof buildMonthGrid>['weeks'][number];
   events: ShareEvent[];
   timezone: string;
+  /** Date key (`YYYY-MM-DD`) to localized public-holiday name. */
+  holidayNames: Map<string, string>;
   onEventOpen: (event: ShareEvent) => void;
 }
 
-function ShareWeekRow({ week, events, timezone, onEventOpen }: ShareWeekRowProps): ReactElement {
+function ShareWeekRow({
+  week,
+  events,
+  timezone,
+  holidayNames,
+  onEventOpen,
+}: ShareWeekRowProps): ReactElement {
   const { t } = useTranslation();
   const positioned = week.bars;
 
@@ -295,12 +354,18 @@ function ShareWeekRow({ week, events, timezone, onEventOpen }: ShareWeekRowProps
                     styles.dayNumber,
                     cell.dow === 0 && styles['dayNumber--sun'],
                     cell.dow === 6 && styles['dayNumber--sat'],
+                    holidayNames.has(cell.key) && styles['dayNumber--holiday'],
                     cell.isToday && styles['dayNumber--today'],
                   )}
                 >
                   {cell.dayNumber}
                 </span>
               </span>
+              {holidayNames.has(cell.key) ? (
+                <span className={styles.holidayLabel} title={holidayNames.get(cell.key)}>
+                  {holidayNames.get(cell.key)}
+                </span>
+              ) : null}
 
               <div
                 className={styles.trackArea}

@@ -682,12 +682,3 @@ resources:
         message_zh: "无法创建日历订阅"
         description: "Returned when inserting a calendar subscription row encounters an unexpected database error."
         userAction: "Retry the request. If the problem persists, contact support."
-
-      country_invalid:
-        code: CALENDAR.SUBSCRIPTION.COUNTRY_INVALID
-        status: 400
-        message: "Country code is invalid or not supported"
-        message_ja: "国コードが無効か未対応です"
-        message_zh: "国家代码无效或不受支持"
-        description: "Returned when the ISO 3166-1 alpha-2 country code supplied to the subscribe-system endpoint is not recognised or has no holiday feed available."
-        userAction: "Pick a supported country code (e.g. JP, US, GB) from the selector."

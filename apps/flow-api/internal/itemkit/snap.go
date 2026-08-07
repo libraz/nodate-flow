@@ -29,9 +29,10 @@ type SnapConfig struct {
 	// deciding which weekday it falls on. Nil means UTC.
 	Location *time.Location
 
-	// Holidays is the set of ISO-date (YYYY-MM-DD) strings the actor's
-	// subscribed holiday calendars cover in the candidate range. Empty
-	// means no holidays are considered even when TreatHolidays is true.
+	// Holidays is the set of ISO-date (YYYY-MM-DD) strings that count as
+	// public holidays for the actor. ResolveSnapConfig fills it from the
+	// actor's effective country; empty means no holidays are considered
+	// even when TreatHolidays is true.
 	Holidays map[string]struct{}
 
 	// TreatHolidays reflects users.treat_holidays_as_non_working. When

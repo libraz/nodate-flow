@@ -93,9 +93,6 @@ vi.mock('../../calendar-memos/calendar-memos-panel', () => ({
 vi.mock('../discover-list', () => ({
   default: () => null,
 }));
-vi.mock('../holidays-list', () => ({
-  default: () => null,
-}));
 
 /* ── Imports under test ───────────────────────────────────────── */
 

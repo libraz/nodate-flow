@@ -273,8 +273,8 @@ vet: ## go vet
 
 # ---------- codegen ----------
 
-.PHONY: gen gen-sqlc gen-errors gen-signal-kinds gen-sdk gen-sdk-types gen-openapi i18n-check
-gen: gen-sqlc gen-errors gen-signal-kinds gen-sdk ## Run all codegen (sqlc + errors + signal-kinds + sdk)
+.PHONY: gen gen-sqlc gen-errors gen-signal-kinds gen-holidays gen-sdk gen-sdk-types gen-openapi i18n-check
+gen: gen-sqlc gen-errors gen-signal-kinds gen-holidays gen-sdk ## Run all codegen (sqlc + errors + signal-kinds + holidays + sdk)
 
 gen-sqlc: ## sqlc generate (requires the pinned sqlc version)
 	@bash scripts/check-codegen-drift.sh --check-tool
@@ -285,6 +285,9 @@ gen-errors: ## Regenerate Go/TS error modules + locale stubs + docs from errors/
 
 gen-signal-kinds: ## Regenerate Go/TS signal-kind modules + locale stubs + docs from signal_kinds/*.yaml
 	go -C scripts run gen-signal-kinds.go
+
+gen-holidays: ## Regenerate the embedded Go holiday dataset from @nodate-flow/holidays
+	$(PKG_RUN) scripts/gen-holidays.ts
 
 i18n-check: ## Fail on locale key drift against en, empty string values, or i18next-native '{{var}}' placeholders under the ICU backend
 	node scripts/i18n-translate.mjs --check

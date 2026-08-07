@@ -183,7 +183,11 @@ export default function PublicShareCalPage({ token }: PublicShareCalPageProps): 
           {t('share.no_upcoming_events')}
         </p>
       ) : (
-        <ShareMonthGrid events={events} timezone={pageTimezone} />
+        <ShareMonthGrid
+          events={events}
+          timezone={pageTimezone}
+          holidaysCountry={page.showHolidaysCountry ?? null}
+        />
       )}
     </PublicPageLayout>
   );

@@ -68,7 +68,12 @@ export default function PublicShareEmbedPage({ token }: PublicShareEmbedPageProp
           {t('share.no_upcoming_events')}
         </p>
       ) : (
-        <ShareMonthGrid events={events} timezone={pageTimezone} embed />
+        <ShareMonthGrid
+          events={events}
+          timezone={pageTimezone}
+          holidaysCountry={page.showHolidaysCountry ?? null}
+          embed
+        />
       )}
     </main>
   );

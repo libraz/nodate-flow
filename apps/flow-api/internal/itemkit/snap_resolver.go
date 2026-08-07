@@ -7,13 +7,14 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/libraz/nodate-flow/packages/go-shared/holidays"
 	"github.com/libraz/nodate-flow/packages/go-shared/region"
 )
 
 // ResolveSnapConfig reads the user and workspace rows to assemble a
 // SnapConfig suitable for passing into ScheduleTask / RescheduleEvent /
-// RescheduleTask. It does NOT populate Holidays — callers that want
-// holiday-aware snap supply the set separately (see LoadHolidayDates).
+// RescheduleTask, including the holiday set implied by the actor's
+// effective country when users.treat_holidays_as_non_working is on.
 //
 // When the actor has no row (system actions, bootstrap), the returned
 // config defaults to SnapOff so no badges are applied.
@@ -24,10 +25,10 @@ func ResolveSnapConfig(ctx context.Context, tx TX, workspaceID, userID uint32) (
 	}
 
 	var wsDays string
-	var wsTZ sql.NullString
+	var wsTZ, wsCountry sql.NullString
 	err := tx.QueryRowContext(ctx,
-		`SELECT working_days, timezone FROM workspaces WHERE id = ? AND enabled = TRUE`,
-		workspaceID).Scan(&wsDays, &wsTZ)
+		`SELECT working_days, timezone, country FROM workspaces WHERE id = ? AND enabled = TRUE`,
+		workspaceID).Scan(&wsDays, &wsTZ, &wsCountry)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return cfg, nil
@@ -40,11 +41,12 @@ func ResolveSnapConfig(ctx context.Context, tx TX, workspaceID, userID uint32) (
 		snapMode      sql.NullString
 		treatHolidays sql.NullBool
 		userTZ        sql.NullString
+		userCountry   sql.NullString
 	)
 	err = tx.QueryRowContext(ctx,
-		`SELECT working_days, snap_to_working_day, treat_holidays_as_non_working, timezone
+		`SELECT working_days, snap_to_working_day, treat_holidays_as_non_working, timezone, country
 		 FROM users WHERE id = ? AND enabled = TRUE`,
-		userID).Scan(&userDays, &snapMode, &treatHolidays, &userTZ)
+		userID).Scan(&userDays, &snapMode, &treatHolidays, &userTZ, &userCountry)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return cfg, nil
@@ -60,6 +62,13 @@ func ResolveSnapConfig(ctx context.Context, tx TX, workspaceID, userID uint32) (
 		valueOrEmpty(userDays), wsDays,
 	)
 	cfg.TreatHolidays = treatHolidays.Valid && treatHolidays.Bool
+	// The holiday set is loaded only when the actor asked for it. Country
+	// falls back to the workspace's the same way timezone does, so a user
+	// who never set a personal country still gets their organisation's
+	// calendar rather than none at all.
+	if cfg.TreatHolidays {
+		cfg.Holidays = holidays.Set(effectiveCountry(userCountry, wsCountry))
+	}
 
 	loc := time.UTC
 	if userTZ.Valid && userTZ.String != "" {
@@ -75,38 +84,16 @@ func ResolveSnapConfig(ctx context.Context, tx TX, workspaceID, userID uint32) (
 	return cfg, nil
 }
 
-// LoadHolidayDates returns the set of ISO-date strings (YYYY-MM-DD)
-// covered by events on system (holiday) calendars the user is
-// subscribed to, within the inclusive [from, to] range. Empty when the
-// user has no holiday subscription. Used by handlers that want snap to
-// treat subscribed holidays as non-working days.
-func LoadHolidayDates(ctx context.Context, tx TX, userID, workspaceID uint32, from, to time.Time) (map[string]struct{}, error) {
-	out := map[string]struct{}{}
-	if userID == 0 || workspaceID == 0 {
-		return out, nil
+// effectiveCountry picks the ISO 3166-1 alpha-2 code whose holidays
+// apply to the actor: their own if set, otherwise the workspace's.
+func effectiveCountry(userCountry, wsCountry sql.NullString) string {
+	if userCountry.Valid && userCountry.String != "" {
+		return userCountry.String
 	}
-	const q = `
-		SELECT DATE(ce.start_at) AS d
-		FROM calendar_events ce
-		JOIN calendars c ON c.id = ce.calendar_id AND c.enabled = TRUE AND c.kind = 'system'
-		JOIN calendar_subscriptions cs
-		  ON cs.calendar_id = c.id AND cs.user_id = ? AND cs.enabled = TRUE
-		WHERE ce.enabled = TRUE
-		  AND ce.start_at IS NOT NULL
-		  AND ce.start_at >= ? AND ce.start_at < ?`
-	rows, err := tx.QueryContext(ctx, q, userID, from, to.Add(24*time.Hour))
-	if err != nil {
-		return out, fmt.Errorf("itemkit: load holiday dates: %w", err)
+	if wsCountry.Valid && wsCountry.String != "" {
+		return wsCountry.String
 	}
-	defer rows.Close()
-	for rows.Next() {
-		var d time.Time
-		if err := rows.Scan(&d); err != nil {
-			return out, fmt.Errorf("itemkit: scan holiday date: %w", err)
-		}
-		out[d.Format("2006-01-02")] = struct{}{}
-	}
-	return out, rows.Err()
+	return ""
 }
 
 func valueOrEmpty(v sql.NullString) string {

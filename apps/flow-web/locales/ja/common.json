@@ -339,16 +339,6 @@
       "subscribed_toast": "{name} を購読しました",
       "load_error": "メンバーのカレンダーを読み込めませんでした。もう一度お試しください。",
       "subscribe_error": "購読できませんでした。もう一度お試しください。"
-    },
-    "holidays": {
-      "trigger": "祝日カレンダーを購読...",
-      "title": "祝日カレンダーを購読",
-      "country_label": "国",
-      "country_placeholder": "国を選択...",
-      "default_hint": "{flag} {code} はワークスペースのデフォルトです。",
-      "subscribe": "購読",
-      "subscribed_toast": "{name} の祝日を購読しました。",
-      "error": "購読できませんでした。もう一度お試しください。"
     }
   },
   "not_found": {

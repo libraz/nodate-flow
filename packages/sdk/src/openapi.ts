@@ -2982,26 +2982,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/workspaces/{wsId}/calendars/subscribe-system": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Subscribe the caller to the holiday feed for a country
-         * @description Subscribes the caller to a system-managed read-only holiday calendar for the supplied ISO country code. Idempotent.
-         */
-        post: operations["calendars-subscribe-system"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/workspaces/{wsId}/calendars/{calId}": {
         parameters: {
             query?: never;
@@ -3900,6 +3880,54 @@ export interface paths {
         options?: never;
         head?: never;
         patch?: never;
+        trace?: never;
+    };
+    "/workspaces/{wsId}/integration-mappings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List inbound webhook source mappings
+         * @description Returns every external source (GitHub repository, Slack team, Google push channel) whose inbound webhook deliveries are routed to this workspace, including paused ones.
+         */
+        get: operations["integration-mappings-list"];
+        put?: never;
+        /**
+         * Route an external webhook source to this workspace
+         * @description Claims an external source so its inbound webhook deliveries are filed in this workspace. A source belongs to exactly one workspace instance-wide; claiming one that is already mapped fails with INTEGRATION.MAPPING.SOURCE_ALREADY_MAPPED.
+         */
+        post: operations["integration-mappings-create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/workspaces/{wsId}/integration-mappings/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Release a webhook source mapping
+         * @description Removes the mapping and releases the claim on the external source so another workspace may map it. Deliveries from that source stop being accepted immediately.
+         */
+        delete: operations["integration-mappings-delete"];
+        options?: never;
+        head?: never;
+        /**
+         * Rename or pause a webhook source mapping
+         * @description Updates the display label, or sets enabled=false to stop routing deliveries from the source while keeping the claim on it. The provider and external key are immutable.
+         */
+        patch: operations["integration-mappings-patch"];
         trace?: never;
     };
     "/workspaces/{wsId}/invites": {
@@ -5711,6 +5739,20 @@ export interface components {
              */
             temperature?: number;
         };
+        CreateBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/CreateBody.json
+             */
+            readonly $schema?: string;
+            /** @description github = numeric repository id (decimal digits, from the repository.id field of any webhook delivery), slack = team id (Txxxxxxxx), google = the channel id used when the watch was registered. */
+            externalKey: string;
+            /** @description Display-only name, e.g. the owner/repo or the Slack workspace name. */
+            label: string;
+            /** @enum {string} */
+            provider: "github" | "slack" | "google";
+        };
         CreateCalendarInputBody: {
             /**
              * Format: uri
@@ -6976,6 +7018,31 @@ export interface components {
             /** Format: int64 */
             totalWorkspaces: number;
         };
+        IntegrationMapping: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/IntegrationMapping.json
+             */
+            readonly $schema?: string;
+            /** Format: int64 */
+            createdAt: number;
+            /** @description False pauses routing without releasing the claim on the source. */
+            enabled: boolean;
+            /** @description Provider-side sender identity: github = numeric repository id, slack = team id, google = push channel id. */
+            externalKey: string;
+            /** @description Mapping public id (UUID v7) */
+            id: string;
+            /** @description Display-only name for the source. */
+            label: string;
+            /**
+             * @description Which /webhooks/* receiver this mapping routes.
+             * @enum {string}
+             */
+            provider: "github" | "slack" | "google";
+            /** Format: int64 */
+            updatedAt?: number;
+        };
         InviteInfoOutputBody: {
             /**
              * Format: uri
@@ -7168,6 +7235,17 @@ export interface components {
              */
             readonly $schema?: string;
             actions: components["schemas"]["TaskAutoAction"][] | null;
+            /** Format: int64 */
+            total: number;
+        };
+        ListBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/ListBody.json
+             */
+            readonly $schema?: string;
+            mappings: components["schemas"]["IntegrationMapping"][] | null;
             /** Format: int64 */
             total: number;
         };
@@ -8308,6 +8386,16 @@ export interface components {
             intervalMinutes?: number;
             /** Format: double */
             threshold?: number;
+        };
+        PatchBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/PatchBody.json
+             */
+            readonly $schema?: string;
+            enabled?: boolean;
+            label?: string;
         };
         PatchCalendarInputBody: {
             /**
@@ -9549,24 +9637,6 @@ export interface components {
             taskId: string;
             title: string;
             transition: string;
-        };
-        SubscribeSystemCalendarInputBody: {
-            /**
-             * Format: uri
-             * @description A URL to the JSON Schema for this object.
-             * @example https://example.com/schemas/SubscribeSystemCalendarInputBody.json
-             */
-            readonly $schema?: string;
-            country: string;
-        };
-        SubscribeSystemCalendarOutputBody: {
-            /**
-             * Format: uri
-             * @description A URL to the JSON Schema for this object.
-             * @example https://example.com/schemas/SubscribeSystemCalendarOutputBody.json
-             */
-            readonly $schema?: string;
-            ok: boolean;
         };
         SubtaskProposal: {
             assignee?: components["schemas"]["AssigneeSuggestion"];
@@ -13337,6 +13407,8 @@ export interface operations {
                 state?: string[] | null;
                 /** @description Filter to tasks with this user as an assignee (user public id UUID v7) */
                 assignee?: string;
+                /** @description Filter by priority level; comma-separate to OR multiple values (priority=4,2) */
+                priority?: number[] | null;
                 /** @description Opaque cursor returned by previous page; pass to fetch next page. Empty when at end. */
                 cursor?: string;
                 limit?: number;
@@ -16533,42 +16605,6 @@ export interface operations {
             };
         };
     };
-    "calendars-subscribe-system": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /** @description Workspace public ID */
-                wsId: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["SubscribeSystemCalendarInputBody"];
-            };
-        };
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["SubscribeSystemCalendarOutputBody"];
-                };
-            };
-            /** @description Error */
-            default: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["ErrorModel"];
-                };
-            };
-        };
-    };
     "calendars-get": {
         parameters: {
             query?: never;
@@ -18809,6 +18845,146 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ConvertIntakeItemOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "integration-mappings-list": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Workspace public ID */
+                wsId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "integration-mappings-create": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Workspace public ID */
+                wsId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateBody"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntegrationMapping"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "integration-mappings-delete": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Workspace public ID */
+                wsId: string;
+                /** @description Mapping public ID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeleteOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "integration-mappings-patch": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Workspace public ID */
+                wsId: string;
+                /** @description Mapping public ID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PatchBody"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntegrationMapping"];
                 };
             };
             /** @description Error */

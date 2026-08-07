@@ -1876,6 +1876,36 @@
         "required": ["modelId", "name", "systemPrompt"],
         "type": "object"
       },
+      "CreateBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/CreateBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "externalKey": {
+            "description": "github = numeric repository id (decimal digits, from the repository.id field of any webhook delivery), slack = team id (Txxxxxxxx), google = the channel id used when the watch was registered.",
+            "maxLength": 255,
+            "minLength": 1,
+            "type": "string"
+          },
+          "label": {
+            "description": "Display-only name, e.g. the owner/repo or the Slack workspace name.",
+            "maxLength": 255,
+            "minLength": 1,
+            "type": "string"
+          },
+          "provider": {
+            "enum": ["github", "slack", "google"],
+            "type": "string"
+          }
+        },
+        "required": ["provider", "externalKey", "label"],
+        "type": "object"
+      },
       "CreateCalendarInputBody": {
         "additionalProperties": false,
         "properties": {
@@ -4440,6 +4470,49 @@
         "required": ["totalUsers", "totalWorkspaces"],
         "type": "object"
       },
+      "IntegrationMapping": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/IntegrationMapping.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "createdAt": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "enabled": {
+            "description": "False pauses routing without releasing the claim on the source.",
+            "type": "boolean"
+          },
+          "externalKey": {
+            "description": "Provider-side sender identity: github = numeric repository id, slack = team id, google = push channel id.",
+            "type": "string"
+          },
+          "id": {
+            "description": "Mapping public id (UUID v7)",
+            "type": "string"
+          },
+          "label": {
+            "description": "Display-only name for the source.",
+            "type": "string"
+          },
+          "provider": {
+            "description": "Which /webhooks/* receiver this mapping routes.",
+            "enum": ["github", "slack", "google"],
+            "type": "string"
+          },
+          "updatedAt": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "required": ["id", "provider", "externalKey", "label", "enabled", "createdAt"],
+        "type": "object"
+      },
       "InviteInfoOutputBody": {
         "additionalProperties": false,
         "properties": {
@@ -4882,6 +4955,30 @@
           }
         },
         "required": ["total", "actions"],
+        "type": "object"
+      },
+      "ListBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/ListBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "mappings": {
+            "items": {
+              "$ref": "#/components/schemas/IntegrationMapping"
+            },
+            "type": ["array", "null"]
+          },
+          "total": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "required": ["total", "mappings"],
         "type": "object"
       },
       "ListCalendarEventsOutputBody": {
@@ -7490,6 +7587,27 @@
             "maximum": 1,
             "minimum": 0,
             "type": "number"
+          }
+        },
+        "type": "object"
+      },
+      "PatchBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/PatchBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "label": {
+            "maxLength": 255,
+            "minLength": 1,
+            "type": "string"
           }
         },
         "type": "object"
@@ -10113,43 +10231,6 @@
           }
         },
         "required": ["taskId", "title", "state", "transition", "confidence", "reason"],
-        "type": "object"
-      },
-      "SubscribeSystemCalendarInputBody": {
-        "additionalProperties": false,
-        "properties": {
-          "$schema": {
-            "description": "A URL to the JSON Schema for this object.",
-            "examples": ["https://example.com/schemas/SubscribeSystemCalendarInputBody.json"],
-            "format": "uri",
-            "readOnly": true,
-            "type": "string"
-          },
-          "country": {
-            "maxLength": 2,
-            "minLength": 2,
-            "pattern": "^[A-Z]{2}$",
-            "type": "string"
-          }
-        },
-        "required": ["country"],
-        "type": "object"
-      },
-      "SubscribeSystemCalendarOutputBody": {
-        "additionalProperties": false,
-        "properties": {
-          "$schema": {
-            "description": "A URL to the JSON Schema for this object.",
-            "examples": ["https://example.com/schemas/SubscribeSystemCalendarOutputBody.json"],
-            "format": "uri",
-            "readOnly": true,
-            "type": "string"
-          },
-          "ok": {
-            "type": "boolean"
-          }
-        },
-        "required": ["ok"],
         "type": "object"
       },
       "SubtaskProposal": {
@@ -16578,6 +16659,22 @@
             }
           },
           {
+            "description": "Filter by priority level; comma-separate to OR multiple values (priority=4,2)",
+            "explode": false,
+            "in": "query",
+            "name": "priority",
+            "schema": {
+              "description": "Filter by priority level; comma-separate to OR multiple values (priority=4,2)",
+              "items": {
+                "format": "int32",
+                "maximum": 4,
+                "minimum": 0,
+                "type": "integer"
+              },
+              "type": ["array", "null"]
+            }
+          },
+          {
             "description": "Opaque cursor returned by previous page; pass to fetch next page. Empty when at end.",
             "explode": false,
             "in": "query",
@@ -21427,58 +21524,6 @@
         "tags": ["Calendar"]
       }
     },
-    "/workspaces/{wsId}/calendars/subscribe-system": {
-      "post": {
-        "description": "Subscribes the caller to a system-managed read-only holiday calendar for the supplied ISO country code. Idempotent.",
-        "operationId": "calendars-subscribe-system",
-        "parameters": [
-          {
-            "description": "Workspace public ID",
-            "in": "path",
-            "name": "wsId",
-            "required": true,
-            "schema": {
-              "description": "Workspace public ID",
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/SubscribeSystemCalendarInputBody"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/SubscribeSystemCalendarOutputBody"
-                }
-              }
-            },
-            "description": "OK"
-          },
-          "default": {
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorModel"
-                }
-              }
-            },
-            "description": "Error"
-          }
-        },
-        "summary": "Subscribe the caller to the holiday feed for a country",
-        "tags": ["Calendar"]
-      }
-    },
     "/workspaces/{wsId}/calendars/{calId}": {
       "delete": {
         "description": "Soft-deletes the calendar. Subscriptions are revoked; event history stays queryable for audit. Requires calendar owner role.",
@@ -25359,6 +25404,210 @@
         },
         "summary": "Convert an intake item into a task",
         "tags": ["Tasks"]
+      }
+    },
+    "/workspaces/{wsId}/integration-mappings": {
+      "get": {
+        "description": "Returns every external source (GitHub repository, Slack team, Google push channel) whose inbound webhook deliveries are routed to this workspace, including paused ones.",
+        "operationId": "integration-mappings-list",
+        "parameters": [
+          {
+            "description": "Workspace public ID",
+            "in": "path",
+            "name": "wsId",
+            "required": true,
+            "schema": {
+              "description": "Workspace public ID",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListBody"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "List inbound webhook source mappings",
+        "tags": ["Integration"]
+      },
+      "post": {
+        "description": "Claims an external source so its inbound webhook deliveries are filed in this workspace. A source belongs to exactly one workspace instance-wide; claiming one that is already mapped fails with INTEGRATION.MAPPING.SOURCE_ALREADY_MAPPED.",
+        "operationId": "integration-mappings-create",
+        "parameters": [
+          {
+            "description": "Workspace public ID",
+            "in": "path",
+            "name": "wsId",
+            "required": true,
+            "schema": {
+              "description": "Workspace public ID",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IntegrationMapping"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Route an external webhook source to this workspace",
+        "tags": ["Integration"]
+      }
+    },
+    "/workspaces/{wsId}/integration-mappings/{id}": {
+      "delete": {
+        "description": "Removes the mapping and releases the claim on the external source so another workspace may map it. Deliveries from that source stop being accepted immediately.",
+        "operationId": "integration-mappings-delete",
+        "parameters": [
+          {
+            "description": "Workspace public ID",
+            "in": "path",
+            "name": "wsId",
+            "required": true,
+            "schema": {
+              "description": "Workspace public ID",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Mapping public ID",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "description": "Mapping public ID",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeleteOutputBody"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Release a webhook source mapping",
+        "tags": ["Integration"]
+      },
+      "patch": {
+        "description": "Updates the display label, or sets enabled=false to stop routing deliveries from the source while keeping the claim on it. The provider and external key are immutable.",
+        "operationId": "integration-mappings-patch",
+        "parameters": [
+          {
+            "description": "Workspace public ID",
+            "in": "path",
+            "name": "wsId",
+            "required": true,
+            "schema": {
+              "description": "Workspace public ID",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Mapping public ID",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "description": "Mapping public ID",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PatchBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IntegrationMapping"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Rename or pause a webhook source mapping",
+        "tags": ["Integration"]
       }
     },
     "/workspaces/{wsId}/invites": {

@@ -163,38 +163,31 @@ func TestSystemCalendarRejectsContentWrites(t *testing.T) {
 
 	owner := newTenant(t)
 
-	// Subscribing to a country's holiday feed creates the workspace's
-	// system calendar on first call and grants the caller viewer.
-	doJSON(t, http.MethodPost,
-		testServerURL+"/workspaces/"+owner.WorkspacePublicID+"/calendars/subscribe-system",
-		owner.AccessToken, map[string]any{"country": "JP"}, &struct {
-			Ok bool `json:"ok"`
-		}{})
-
-	var listed struct {
-		Calendars []struct {
-			ID   string `json:"id"`
-			Kind string `json:"kind"`
-		} `json:"calendars"`
-	}
-	doJSON(t, http.MethodGet,
-		testServerURL+"/workspaces/"+owner.WorkspacePublicID+"/calendars",
-		owner.AccessToken, nil, &listed)
-
-	sysCalID := ""
-	for _, c := range listed.Calendars {
-		if c.Kind == "system" {
-			sysCalID = c.ID
-			break
-		}
-	}
-	require.NotEmpty(t, sysCalID, "subscribing to a holiday feed must surface a system calendar")
+	// A system calendar is created by the platform, not by an API call,
+	// so the fixture writes the row directly. What the test is about is
+	// the guard on writes to it, which is independent of how it got there.
+	var sysCalID string
+	require.NoError(t, testDB.QueryRow(`SELECT UUID()`).Scan(&sysCalID))
+	_, err := testDB.Exec(
+		`INSERT INTO calendars (public_id, workspace_id, kind, name, color, system_slug)
+		 VALUES (UUID_TO_BIN(?, 0),
+		         (SELECT id FROM workspaces WHERE public_id = UUID_TO_BIN(?, 0)),
+		         'system', 'Fixture Holidays', '#EA4335', ?)`,
+		sysCalID, owner.WorkspacePublicID, "fixture."+randomHex(6))
+	require.NoError(t, err)
+	_, err = testDB.Exec(
+		`INSERT INTO calendar_members (public_id, workspace_id, calendar_id, user_id, role, member_color)
+		 VALUES (UUID_TO_BIN(UUID(), 0),
+		         (SELECT id FROM workspaces WHERE public_id = UUID_TO_BIN(?, 0)),
+		         (SELECT id FROM calendars WHERE public_id = UUID_TO_BIN(?, 0)),
+		         (SELECT id FROM users WHERE public_id = UUID_TO_BIN(?, 0)),
+		         'viewer', '#EA4335')`,
+		owner.WorkspacePublicID, sysCalID, owner.UserPublicID)
+	require.NoError(t, err)
 
 	// Give the caller the highest role the enum has, so the refusal that
-	// follows can only come from the calendar's kind. There is no API
-	// for this by design — the subscribe path grants viewer and the
-	// role-change endpoint needs manager, which the subscriber is not.
-	_, err := testDB.Exec(
+	// follows can only come from the calendar's kind.
+	_, err = testDB.Exec(
 		`UPDATE calendar_members cm
 		   JOIN calendars c ON c.id = cm.calendar_id
 		   JOIN users u ON u.id = cm.user_id
