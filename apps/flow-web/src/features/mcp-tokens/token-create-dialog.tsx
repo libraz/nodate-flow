@@ -13,6 +13,7 @@
  */
 
 import Button from '@nodate-flow/ui/primitives/button';
+import Checkbox from '@nodate-flow/ui/primitives/checkbox';
 import Dialog from '@nodate-flow/ui/primitives/dialog';
 import FormField from '@nodate-flow/ui/primitives/form-field';
 import Input from '@nodate-flow/ui/primitives/input';
@@ -20,7 +21,9 @@ import { toaster } from '@nodate-flow/ui/primitives/toast';
 import { type FormEvent, type ReactElement, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { ApiError } from '../../lib/api-error';
 import { useCreateMcpToken } from './api';
+import { DEFAULT_MCP_TOKEN_SCOPES, MCP_TOKEN_SCOPE_OPTIONS, type McpTokenScope } from './scopes';
 
 export interface TokenCreateDialogProps {
   workspaceId: string;
@@ -40,7 +43,8 @@ export default function TokenCreateDialog({
 
   const [stage, setStage] = useState<Stage>('form');
   const [name, setName] = useState('');
-  const [scopesText, setScopesText] = useState('');
+  const [scopes, setScopes] = useState<readonly McpTokenScope[]>(DEFAULT_MCP_TOKEN_SCOPES);
+  const [scopesError, setScopesError] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [plaintext, setPlaintext] = useState('');
   const [copied, setCopied] = useState(false);
@@ -48,9 +52,17 @@ export default function TokenCreateDialog({
   const reset = (): void => {
     setStage('form');
     setName('');
-    setScopesText('');
+    setScopes(DEFAULT_MCP_TOKEN_SCOPES);
+    setScopesError('');
     setSubmitting(false);
     setCopied(false);
+  };
+
+  const toggleScope = (scope: McpTokenScope, on: boolean): void => {
+    setScopesError('');
+    setScopes((prev) =>
+      on ? (prev.includes(scope) ? prev : [...prev, scope]) : prev.filter((s) => s !== scope),
+    );
   };
 
   const handleClose = (): void => {
@@ -63,23 +75,32 @@ export default function TokenCreateDialog({
   const handleSubmit = async (e: FormEvent<HTMLFormElement>): Promise<void> => {
     e.preventDefault();
     if (name.trim() === '') return;
+    // A token with no scopes passes authentication and lists every tool,
+    // then refuses every call. Refuse to issue one instead.
+    if (scopes.length === 0) {
+      setScopesError(t('workspace.mcp_tokens.validation.scopes_required'));
+      return;
+    }
     setSubmitting(true);
-    const scopes = scopesText
-      .split(/\s+/)
-      .map((s) => s.trim())
-      .filter((s) => s.length > 0);
     try {
       const result = await create.mutateAsync({
         name: name.trim(),
-        scopes: scopes.length > 0 ? scopes : null,
+        scopes: [...scopes],
       });
       setPlaintext(result.token);
       setStage('reveal');
-    } catch {
-      toaster.show({
-        tone: 'danger',
-        message: t('workspace.mcp_tokens.errors.create_failed'),
-      });
+    } catch (err) {
+      // The server rejects an unsupported scope with a body-field code;
+      // that belongs on the field, not in a generic toast that leaves the
+      // user with no idea which value was refused.
+      if (err instanceof ApiError && err.code === 'VALIDATION.BODY.FIELD_INVALID') {
+        setScopesError(t('workspace.mcp_tokens.validation.scopes_rejected'));
+      } else {
+        toaster.show({
+          tone: 'danger',
+          message: t('workspace.mcp_tokens.errors.create_failed'),
+        });
+      }
     } finally {
       setSubmitting(false);
     }
@@ -125,17 +146,54 @@ export default function TokenCreateDialog({
           <FormField
             label={t('workspace.mcp_tokens.dialog.field.scopes')}
             description={t('workspace.mcp_tokens.dialog.field.scopes_help')}
+            {...(scopesError !== '' ? { error: scopesError } : {})}
           >
             {(control) => (
-              <Input
-                {...control}
-                value={scopesText}
-                autoComplete="off"
-                spellCheck={false}
-                onChange={(e) => {
-                  setScopesText(e.target.value);
+              <fieldset
+                id={control.id}
+                aria-describedby={control['aria-describedby']}
+                style={{
+                  border: 'none',
+                  margin: 0,
+                  padding: 0,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: 'var(--nf-space-2)',
                 }}
-              />
+              >
+                {MCP_TOKEN_SCOPE_OPTIONS.map((option) => {
+                  const boxId = `${control.id}-${option.scope}`;
+                  return (
+                    <div
+                      key={option.scope}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'flex-start',
+                        gap: 'var(--nf-space-2)',
+                      }}
+                    >
+                      <Checkbox
+                        id={boxId}
+                        checked={scopes.includes(option.scope)}
+                        onChange={(e) => {
+                          toggleScope(option.scope, e.target.checked);
+                        }}
+                      />
+                      <label htmlFor={boxId} style={{ display: 'flex', flexDirection: 'column' }}>
+                        <span>{t(option.labelKey)}</span>
+                        <span
+                          style={{
+                            color: 'var(--nf-color-fg-muted)',
+                            fontSize: 'var(--nf-text-sm)',
+                          }}
+                        >
+                          {t(option.helpKey)}
+                        </span>
+                      </label>
+                    </div>
+                  );
+                })}
+              </fieldset>
             )}
           </FormField>
 
