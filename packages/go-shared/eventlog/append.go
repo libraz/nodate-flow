@@ -49,7 +49,8 @@ type Event struct {
 // NotifyHook fires after a successful append, and after the enclosing
 // transaction commits when there is one. Hooks are synchronous but must
 // be cheap; long-running work belongs on a worker. The caller registers
-// hooks via RegisterHook / ClearHooks at process startup.
+// hooks via [RegisterHook] at process startup and can drop one again
+// with [RemoveHook].
 //
 // eventInternalID is the events.id row that was just written.
 // Subscribers need it to resolve the event they were told about —
