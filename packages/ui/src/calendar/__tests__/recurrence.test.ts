@@ -322,3 +322,80 @@ describe('expandRecurrence — empty filters', () => {
     ]);
   });
 });
+
+describe('expandRecurrence — recurrenceEnd', () => {
+  // recurrence_end lives in its own column beside the rule, not inside
+  // it. An expander that reads only the rule keeps drawing a series the
+  // API was told to stop — on the calendar and on the public share page
+  // — with no way to end it from the UI.
+  it('stops the series at recurrenceEnd', () => {
+    const event = {
+      startAt: '2027-03-01T09:00:00Z',
+      endAt: '2027-03-01T10:00:00Z',
+      timezone: 'UTC',
+      recurrenceRule: { freq: 'daily' as const, interval: 1 },
+      recurrenceEnd: '2027-03-03T23:59:59Z',
+    };
+    const instances = expandRecurrence(
+      event,
+      DateTime.fromISO('2027-03-01T00:00:00Z'),
+      DateTime.fromISO('2027-04-01T00:00:00Z'),
+    );
+    expect(instances.map((i) => i.startAt.toUTC().toFormat('yyyy-MM-dd'))).toEqual([
+      '2027-03-01',
+      '2027-03-02',
+      '2027-03-03',
+    ]);
+  });
+
+  // Two independent upper bounds; the earlier one ends the series.
+  // Taking the later would run a series past a date one of them says it
+  // stops, which is the same silent overrun in the other direction.
+  it('takes the earlier of recurrenceEnd and the rule UNTIL', () => {
+    const base = {
+      startAt: '2027-03-01T09:00:00Z',
+      endAt: '2027-03-01T10:00:00Z',
+      timezone: 'UTC',
+    };
+    const range = [
+      DateTime.fromISO('2027-03-01T00:00:00Z'),
+      DateTime.fromISO('2027-04-01T00:00:00Z'),
+    ] as const;
+
+    const endEarlier = expandRecurrence(
+      {
+        ...base,
+        recurrenceRule: { freq: 'daily' as const, interval: 1, until: '2027-03-10' },
+        recurrenceEnd: '2027-03-02T23:59:59Z',
+      },
+      range[0],
+      range[1],
+    );
+    expect(endEarlier).toHaveLength(2);
+
+    const untilEarlier = expandRecurrence(
+      {
+        ...base,
+        recurrenceRule: { freq: 'daily' as const, interval: 1, until: '2027-03-02' },
+        recurrenceEnd: '2027-03-20T23:59:59Z',
+      },
+      range[0],
+      range[1],
+    );
+    expect(untilEarlier).toHaveLength(2);
+  });
+
+  it('leaves a series without recurrenceEnd unbounded by it', () => {
+    const instances = expandRecurrence(
+      {
+        startAt: '2027-03-01T09:00:00Z',
+        endAt: '2027-03-01T10:00:00Z',
+        timezone: 'UTC',
+        recurrenceRule: { freq: 'daily' as const, interval: 1, count: 5 },
+      },
+      DateTime.fromISO('2027-03-01T00:00:00Z'),
+      DateTime.fromISO('2027-04-01T00:00:00Z'),
+    );
+    expect(instances).toHaveLength(5);
+  });
+});

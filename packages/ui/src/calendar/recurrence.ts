@@ -8,6 +8,22 @@ interface RecurrenceEvent {
   timezone?: string | undefined;
   recurrenceRule: RecurrenceRule | null;
   recurrenceExceptions?: string[] | undefined;
+  /**
+   * The `recurrence_end` column: an inclusive last instant for the
+   * series, stored beside the rule rather than inside it.
+   *
+   * A second upper bound, not a replacement for the rule's own UNTIL,
+   * and whichever comes first ends the series. Ignoring it — which this
+   * expander did — meant a series the API had been told to stop kept
+   * being drawn, on the authenticated calendar and on the public share
+   * page alike, with no way to end it from the UI.
+   *
+   * The Go expander (packages/go-shared/recurrence) reads the same
+   * column the same way; the two implementations serve the same stored
+   * rules and a divergence between them is a bug in whichever one
+   * differs.
+   */
+  recurrenceEnd?: string | undefined;
 }
 
 interface ExpandedInstance {
@@ -140,7 +156,15 @@ export function expandRecurrence(
   const eventEnd = parseInZone(event.endAt, zone);
   const duration = eventEnd.diff(eventStart);
   const interval = rule.interval ?? 1;
-  const until = rule.until ? parseUntil(rule.until, zone) : null;
+  // Two independent upper bounds, and the earlier one ends the series.
+  const ruleUntil = rule.until ? parseUntil(rule.until, zone) : null;
+  const seriesEnd = event.recurrenceEnd ? parseInZone(event.recurrenceEnd, zone) : null;
+  const until =
+    ruleUntil && seriesEnd
+      ? ruleUntil < seriesEnd
+        ? ruleUntil
+        : seriesEnd
+      : (ruleUntil ?? (seriesEnd?.isValid ? seriesEnd : null));
   const maxCount = rule.count ?? Number.POSITIVE_INFINITY;
   const exceptions = buildRecurrenceExceptionSets(event.recurrenceExceptions, zone);
 
@@ -200,6 +224,7 @@ export function expandAllRecurrences<
     timezone?: string;
     recurrenceRule?: RecurrenceRule | null;
     recurrenceExceptions?: string[];
+    recurrenceEnd?: string;
   },
 >(events: T[], rangeStart: DateTime, rangeEnd: DateTime): T[] {
   const result: T[] = [];
@@ -217,6 +242,7 @@ export function expandAllRecurrences<
         timezone: event.timezone,
         recurrenceRule: event.recurrenceRule,
         recurrenceExceptions: event.recurrenceExceptions,
+        recurrenceEnd: event.recurrenceEnd,
       },
       rangeStart,
       rangeEnd,
