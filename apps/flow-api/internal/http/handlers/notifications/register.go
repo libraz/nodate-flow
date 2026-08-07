@@ -54,4 +54,20 @@ func RegisterWorkspaceScoped(api huma.API, deps Deps) {
 		Description: "Bulk-marks every unread notification for the caller within the workspace as read. Useful for the 'mark all read' affordance in the notifications panel.",
 		Tags:        []string{"Tasks"},
 	}, MarkAllRead(deps))
+	huma.Register(api, huma.Operation{
+		OperationID: "notification-preferences-list",
+		Method:      http.MethodGet,
+		Path:        "/workspaces/{wsId}/notification-preferences",
+		Summary:     "List the caller's notification preferences",
+		Description: "Returns the caller's complete event-category by delivery-channel matrix for the workspace, with the value fan-out actually applies to each cell. Cells the caller has never changed are reported at their default: the in-app channel delivers, email and push do not.",
+		Tags:        []string{"Tasks"},
+	}, ListPreferences(deps))
+	huma.Register(api, huma.Operation{
+		OperationID: "notification-preferences-update",
+		Method:      http.MethodPut,
+		Path:        "/workspaces/{wsId}/notification-preferences",
+		Summary:     "Update the caller's notification preferences",
+		Description: "Writes the listed (event category, delivery channel) cells for the caller and returns the resulting complete matrix. Cells the body omits are left as they were. Muting a category on the in-app channel stops notification rows being created for it.",
+		Tags:        []string{"Tasks"},
+	}, UpdatePreferences(deps))
 }

@@ -127,6 +127,60 @@ type MarkAllReadOutput struct {
 	Body MarkAllReadOutputBody
 }
 
+// --- Preferences ---
+
+// NotificationPreferenceDTO is one (event category, channel) cell of
+// the caller's preference matrix.
+//
+// There is deliberately no public id on this DTO. The stored row is an
+// implementation detail of "the caller muted this cell": a cell the
+// caller has never touched has no row at all, and one they set back to
+// the default still does. Addressing the cell by (eventCategory,
+// channel) keeps the write idempotent and spares the client from
+// tracking which cells happen to be materialised.
+type NotificationPreferenceDTO struct {
+	EventCategory string `json:"eventCategory" doc:"Event category the setting applies to"`
+	Channel       string `json:"channel" enum:"in_app,email,push" doc:"Delivery channel"`
+	Muted         bool   `json:"muted" doc:"True when delivery of this category on this channel is suppressed"`
+}
+
+// ListPreferencesInput is the path for
+// GET /workspaces/{wsId}/notification-preferences.
+type ListPreferencesInput struct {
+	WsID string `path:"wsId" doc:"Workspace public id (UUID v7)"`
+}
+
+// PreferencesOutputBody is the response body shared by the list and
+// update preference operations.
+//
+// The matrix is always complete: every category × channel pair is
+// returned with its effective value, whether or not a row backs it.
+// Returning only the stored rows would push the default rules into
+// every client, and a client that guessed them differently from the
+// fan-out would show people settings the server does not honour.
+type PreferencesOutputBody struct {
+	Preferences []NotificationPreferenceDTO `json:"preferences"`
+}
+
+// PreferencesOutput is the response for the preference operations.
+type PreferencesOutput struct {
+	Body PreferencesOutputBody
+}
+
+// UpdatePreferencesInput is the request for
+// PUT /workspaces/{wsId}/notification-preferences.
+//
+// The body carries only the cells being changed; unlisted cells keep
+// whatever they had. It is a PUT rather than a PATCH because each
+// listed cell is written whole — there is no partial update of a
+// boolean — and repeating the request is a no-op.
+type UpdatePreferencesInput struct {
+	WsID string `path:"wsId" doc:"Workspace public id (UUID v7)"`
+	Body struct {
+		Preferences []NotificationPreferenceDTO `json:"preferences" minItems:"1" maxItems:"64" doc:"Cells to write; each is addressed by (eventCategory, channel)"`
+	}
+}
+
 // --- Archive ---
 
 // ArchiveInput is the path for POST /notifications/{notifId}/archive.

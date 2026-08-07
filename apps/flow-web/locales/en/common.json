@@ -98,7 +98,13 @@
       "command_hint": "Type > for AI commands",
       "no_workspace": "Select a workspace first to use AI commands.",
       "error": "Could not resolve the command. Please try again.",
-      "initial_command": "> "
+      "initial_command": "> ",
+      "executing": "Running the command…",
+      "unsupported": "{tool} can't be run from the palette yet. Nothing was changed.",
+      "unresolved_missing": "The command is missing {argument}. Nothing was changed.",
+      "unresolved_not_found": "Nothing here matches “{term}”. Nothing was changed.",
+      "unresolved_ambiguous": "“{term}” matches more than one item. Be more specific.",
+      "execute_failed": "The command could not be completed. Nothing was changed."
     }
   },
   "glass_dock": {

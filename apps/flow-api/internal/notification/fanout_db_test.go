@@ -161,24 +161,73 @@ func runFanout(t *testing.T, db *sql.DB, fx *fanoutFixture, eventType string) *F
 	return f
 }
 
-// TestFanout_RespectsExplicitChannelPreference verifies that an
-// explicit (email enabled, in_app absent) preference results in
-// exactly one email notification and zero in_app notifications,
-// proving the historical "always in_app" hardcode is gone.
+// TestFanout_RespectsExplicitChannelPreference verifies that a
+// recipient who has muted in_app and opted into email receives exactly
+// one email notification and zero in_app ones, proving the historical
+// "always in_app" hardcode is gone.
+//
+// The in_app row is explicit. Fan-out reads the absence of a row as the
+// channel default, so leaving it out states nothing about in_app — and
+// the default for in_app is to deliver.
 func TestFanout_RespectsExplicitChannelPreference(t *testing.T) {
 	testhelpers.SkipUnlessIntegration(t)
 	inst := helpers.StartShared(t)
 	db := inst.DB
 	fx := seedFanoutFixture(t, db)
 
-	// Opt the recipient into email only for the lifecycle category
-	// that "task.created" maps to.
+	// Route the recipient's lifecycle notifications (the category
+	// "task.created" maps to) to email instead of the bell.
+	upsertPreference(t, db, fx.wsID, fx.recipientUserID, "task.lifecycle", "in_app", true)
 	upsertPreference(t, db, fx.wsID, fx.recipientUserID, "task.lifecycle", "email", false)
 
 	runFanout(t, db, fx, "task.created")
 
 	got := listChannelsForRecipient(t, db, fx.wsID, fx.recipientUserID, fx.eventInternalID)
 	require.Equal(t, []string{"email"}, got)
+}
+
+// TestFanout_EmailOptInKeepsInApp pins the per-channel nature of the
+// defaults: adding a channel is not the same as replacing the set.
+//
+// A recipient who asks for email and says nothing about in_app keeps
+// the bell, because a row for one channel says nothing about another.
+// Reading "has any row" as "has configured every channel" is what made
+// a mute on the default channel unrepresentable, so this is the pairing
+// assertion to TestFanout_MutedCategoryProducesNoRows.
+func TestFanout_EmailOptInKeepsInApp(t *testing.T) {
+	testhelpers.SkipUnlessIntegration(t)
+	inst := helpers.StartShared(t)
+	db := inst.DB
+	fx := seedFanoutFixture(t, db)
+
+	upsertPreference(t, db, fx.wsID, fx.recipientUserID, "task.lifecycle", "email", false)
+
+	runFanout(t, db, fx, "task.created")
+
+	got := listChannelsForRecipient(t, db, fx.wsID, fx.recipientUserID, fx.eventInternalID)
+	require.ElementsMatch(t, []string{"email", "in_app"}, got)
+}
+
+// TestFanout_MutedCategoryProducesNoRows is the setting doing its job:
+// a recipient who has muted every channel of a category gets nothing at
+// all for it.
+//
+// Producing zero rows is a legitimate outcome of fan-out, not an error
+// path — the earlier shape treated an empty resolved channel set as
+// "unconfigured" and fell back to in_app, which is precisely how a mute
+// was thrown away.
+func TestFanout_MutedCategoryProducesNoRows(t *testing.T) {
+	testhelpers.SkipUnlessIntegration(t)
+	inst := helpers.StartShared(t)
+	db := inst.DB
+	fx := seedFanoutFixture(t, db)
+
+	upsertPreference(t, db, fx.wsID, fx.recipientUserID, "task.lifecycle", "in_app", true)
+
+	runFanout(t, db, fx, "task.created")
+
+	got := listChannelsForRecipient(t, db, fx.wsID, fx.recipientUserID, fx.eventInternalID)
+	require.Empty(t, got)
 }
 
 // TestFanout_DefaultsToInAppWhenUnconfigured verifies that recipients

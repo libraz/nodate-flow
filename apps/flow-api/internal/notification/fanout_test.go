@@ -223,18 +223,18 @@ func TestLoadPreferencesWithRetry_TransientErrorRecovers(t *testing.T) {
 	f := NewFanout(nil, nil, nil)
 
 	var calls atomic.Int32
-	wantRow := generated.GetEnabledChannelsForRecipientsRow{
+	wantRow := generated.GetNotificationPreferencesForRecipientsRow{
 		UserID:  42,
 		Channel: generated.NotificationPreferencesChannelEmail,
 	}
-	f.fetchPreferences = func(_ context.Context, _ generated.GetEnabledChannelsForRecipientsParams) ([]generated.GetEnabledChannelsForRecipientsRow, error) {
+	f.fetchPreferences = func(_ context.Context, _ generated.GetNotificationPreferencesForRecipientsParams) ([]generated.GetNotificationPreferencesForRecipientsRow, error) {
 		if calls.Add(1) == 1 {
 			return nil, errors.New("transient: connection reset by peer")
 		}
-		return []generated.GetEnabledChannelsForRecipientsRow{wantRow}, nil
+		return []generated.GetNotificationPreferencesForRecipientsRow{wantRow}, nil
 	}
 
-	rows, err := f.loadPreferencesWithRetry(context.Background(), generated.GetEnabledChannelsForRecipientsParams{
+	rows, err := f.loadPreferencesWithRetry(context.Background(), generated.GetNotificationPreferencesForRecipientsParams{
 		WorkspaceID:   1,
 		EventCategory: "task.lifecycle",
 		UserIds:       []uint32{42},
@@ -261,12 +261,12 @@ func TestLoadPreferencesWithRetry_PersistentErrorPropagates(t *testing.T) {
 
 	var calls atomic.Int32
 	dbErr := errors.New("driver: bad connection")
-	f.fetchPreferences = func(_ context.Context, _ generated.GetEnabledChannelsForRecipientsParams) ([]generated.GetEnabledChannelsForRecipientsRow, error) {
+	f.fetchPreferences = func(_ context.Context, _ generated.GetNotificationPreferencesForRecipientsParams) ([]generated.GetNotificationPreferencesForRecipientsRow, error) {
 		calls.Add(1)
 		return nil, dbErr
 	}
 
-	_, err := f.loadPreferencesWithRetry(context.Background(), generated.GetEnabledChannelsForRecipientsParams{
+	_, err := f.loadPreferencesWithRetry(context.Background(), generated.GetNotificationPreferencesForRecipientsParams{
 		WorkspaceID:   1,
 		EventCategory: "task.lifecycle",
 		UserIds:       []uint32{42},
@@ -289,7 +289,7 @@ func TestLoadPreferencesWithRetry_ContextCancelDuringBackoff(t *testing.T) {
 	f := NewFanout(nil, nil, nil)
 
 	var calls atomic.Int32
-	f.fetchPreferences = func(_ context.Context, _ generated.GetEnabledChannelsForRecipientsParams) ([]generated.GetEnabledChannelsForRecipientsRow, error) {
+	f.fetchPreferences = func(_ context.Context, _ generated.GetNotificationPreferencesForRecipientsParams) ([]generated.GetNotificationPreferencesForRecipientsRow, error) {
 		calls.Add(1)
 		return nil, errors.New("transient")
 	}
@@ -298,7 +298,7 @@ func TestLoadPreferencesWithRetry_ContextCancelDuringBackoff(t *testing.T) {
 	defer cancel()
 
 	start := time.Now()
-	_, err := f.loadPreferencesWithRetry(ctx, generated.GetEnabledChannelsForRecipientsParams{
+	_, err := f.loadPreferencesWithRetry(ctx, generated.GetNotificationPreferencesForRecipientsParams{
 		WorkspaceID:   1,
 		EventCategory: "task.lifecycle",
 		UserIds:       []uint32{42},

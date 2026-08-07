@@ -182,25 +182,34 @@
     "save": "保存",
     "saving": "保存中…",
     "saved": "已更新通知设置",
-    "email_digest": {
-      "label": "每周摘要邮件",
-      "description": "每周接收一份工作区活动摘要。"
-    },
-    "email_mention": {
-      "label": "提及",
-      "description": "当有人在评论中 @ 我时发送邮件。"
-    },
-    "email_assignment": {
-      "label": "任务指派",
-      "description": "当有任务被指派给我时发送邮件。"
-    },
-    "email_due_soon": {
-      "label": "即将到期",
-      "description": "当我负责的任务在 24 小时内到期时发送邮件。"
-    },
-    "web_push": {
-      "label": "浏览器推送通知",
-      "description": "在此浏览器中显示桌面通知。需要授权。"
+    "workspace_label": "工作区",
+    "no_workspaces": "加入工作区后即可设置通知。",
+    "channel_note": "以下设置作用于应用内的通知铃铛。邮件与推送投递尚未开放。",
+    "categories": {
+      "task_lifecycle": {
+        "label": "任务动态",
+        "description": "任务的创建、更新、开始、完成、阻塞与删除。"
+      },
+      "task_comment": {
+        "label": "评论",
+        "description": "在你可见的任务上新增、编辑或删除评论。"
+      },
+      "task_mention": {
+        "label": "指派与提及",
+        "description": "你被加入某个任务或条目，或被移出。"
+      },
+      "relation": {
+        "label": "关联",
+        "description": "条目被关联到里程碑，或解除关联。"
+      },
+      "timebox": {
+        "label": "排期",
+        "description": "条目被放上日历、被移动或被移出日历。"
+      },
+      "ai": {
+        "label": "智能体",
+        "description": "智能体接手任务、交还任务，或被关联到任务。"
+      }
     },
     "errors": {
       "update_failed": "更新通知设置失败，请重试。"
@@ -458,7 +467,7 @@
           "name": "名称",
           "name_placeholder": "例如：本地开发笔记本",
           "scopes": "作用域",
-          "scopes_help": "用空格分隔的作用域列表，留空则使用默认作用域。"
+          "scopes_help": "MCP 工具调用至少需要一个作用域。没有作用域的令牌可以连接并列出工具，但所有调用都会被拒绝。"
         },
         "reveal_warning": "请立即复制此令牌，之后将无法再次查看。",
         "token_label": "令牌",
@@ -466,10 +475,18 @@
         "copied": "已复制",
         "done": "完成",
         "cancel": "取消",
-        "submit": "创建"
+        "submit": "创建",
+        "scope": {
+          "read": "读取",
+          "read_help": "列出并获取本工作区的项目、任务、页面和日历。",
+          "write": "写入",
+          "write_help": "还可创建、更新和推进状态。包含读取权限。"
+        }
       },
       "validation": {
-        "name_required": "请填写名称。"
+        "name_required": "请填写名称。",
+        "scopes_required": "请至少选择一个作用域。",
+        "scopes_rejected": "服务器拒绝了其中一个作用域。请刷新页面后重试。"
       },
       "errors": {
         "create_failed": "创建令牌失败，请重试。",

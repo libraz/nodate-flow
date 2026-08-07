@@ -98,7 +98,13 @@
       "command_hint": "输入 > 进入 AI 命令",
       "no_workspace": "请先选择工作区以使用 AI 命令。",
       "error": "无法解析该命令，请重试。",
-      "initial_command": "> "
+      "initial_command": "> ",
+      "executing": "正在执行命令…",
+      "unsupported": "{tool} 尚不能从命令面板执行。未做任何更改。",
+      "unresolved_missing": "命令缺少 {argument}。未做任何更改。",
+      "unresolved_not_found": "没有与“{term}”匹配的项。未做任何更改。",
+      "unresolved_ambiguous": "“{term}”匹配到多个项，请描述得更具体一些。",
+      "execute_failed": "命令执行失败。未做任何更改。"
     }
   },
   "glass_dock": {

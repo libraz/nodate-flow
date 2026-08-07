@@ -2,6 +2,28 @@
  * Notification preference toggles for /settings/notifications.
  */
 
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-4);
+  /* nf-token-override: component dimension, not a spacing step */
+  max-inline-size: 40rem;
+}
+
+.workspacePicker {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-1-5);
+  /* nf-token-override: component dimension, not a spacing step */
+  max-inline-size: 20rem;
+}
+
+.channelNote {
+  margin: 0;
+  font-size: var(--nf-text-sm);
+  color: var(--nf-color-fg-muted);
+}
+
 .form {
   display: flex;
   flex-direction: column;

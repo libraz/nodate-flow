@@ -15,6 +15,7 @@ import (
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/dbretry"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/notification/prefs"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/obs"
 	"github.com/libraz/nodate-flow/packages/go-shared/email"
 )
@@ -62,13 +63,14 @@ type Fanout struct {
 	// the hook routes to [Fanout.fanout].
 	run func(ctx context.Context, workspaceID uint32, eventType string, eventInternalID uint64)
 
-	// fetchPreferences is the function used to load (recipient,
-	// channel) preferences. Production code leaves this nil and the
-	// fan-out path falls through to [Fanout.queries.GetEnabledChannelsForRecipients].
+	// fetchPreferences is the function used to load the stored
+	// (recipient, channel, muted) preference rows. Production code
+	// leaves this nil and the fan-out path falls through to
+	// [Fanout.queries.GetNotificationPreferencesForRecipients].
 	// Tests override it to simulate transient and persistent DB errors
 	// so the retry-once-then-fall-back contract can be exercised
 	// without a live database.
-	fetchPreferences func(ctx context.Context, params generated.GetEnabledChannelsForRecipientsParams) ([]generated.GetEnabledChannelsForRecipientsRow, error)
+	fetchPreferences func(ctx context.Context, params generated.GetNotificationPreferencesForRecipientsParams) ([]generated.GetNotificationPreferencesForRecipientsRow, error)
 }
 
 // NewFanout creates a Fanout backed by the given database and email
@@ -238,15 +240,15 @@ func (f *Fanout) fanout(ctx context.Context, workspaceID uint32, eventType strin
 		return
 	}
 
-	// Resolve enabled (recipient, channel) pairs in a single round
-	// trip. Recipients with no row for this category fall through to
-	// the default in_app channel below. The first failure triggers
-	// one retry with a small back-off; if it still fails we increment
-	// the preference-fetch error counter and fall back to the safe
-	// default (in_app only for every recipient) rather than silently
-	// dropping notifications.
+	// Load the stored preference rows for this category in a single
+	// round trip; muted rows come back too, because it is the presence
+	// of a mute that has to override the default. The first failure
+	// triggers one retry with a small back-off; if it still fails we
+	// increment the preference-fetch error counter and fall back to the
+	// defaults for every recipient rather than silently dropping
+	// notifications.
 	eventCategory := categoryForEventType(eventType)
-	prefs, err := f.loadPreferencesWithRetry(ctx, generated.GetEnabledChannelsForRecipientsParams{
+	prefRows, err := f.loadPreferencesWithRetry(ctx, generated.GetNotificationPreferencesForRecipientsParams{
 		WorkspaceID:   workspaceID,
 		EventCategory: eventCategory,
 		UserIds:       filtered,
@@ -258,15 +260,18 @@ func (f *Fanout) fanout(ctx context.Context, workspaceID uint32, eventType strin
 			slog.String("event_type", eventType),
 			slog.String("err", err.Error()))
 		obs.IncNotificationFanoutPreferenceFetchError(err)
-		prefs = nil
+		prefRows = nil
 	}
 
-	// channelsByUser[recipientID] is the set of (already-deduped)
-	// channels to write for that recipient. A recipient absent from
-	// the map gets the default in_app channel.
-	channelsByUser := make(map[uint32][]generated.NotificationsChannel, len(filtered))
-	for _, p := range prefs {
-		channelsByUser[p.UserID] = append(channelsByUser[p.UserID], generated.NotificationsChannel(p.Channel))
+	// prefsByUser[recipientID] is that recipient's stored rows for this
+	// category. Recipients with no rows are absent from the map and
+	// [prefs.ResolveChannels] hands them the bare defaults.
+	prefsByUser := make(map[uint32][]prefs.Pref, len(filtered))
+	for _, p := range prefRows {
+		prefsByUser[p.UserID] = append(prefsByUser[p.UserID], prefs.Pref{
+			Channel: generated.NotificationsChannel(p.Channel),
+			Muted:   p.IsMuted,
+		})
 	}
 
 	sourceEventID := sql.NullInt64{}
@@ -290,14 +295,10 @@ func (f *Fanout) fanout(ctx context.Context, workspaceID uint32, eventType strin
 	// symptom appears in unrelated request handlers, not here.
 	rows := make([]notificationRow, 0, len(filtered))
 	for _, recipientID := range filtered {
-		channels, ok := channelsByUser[recipientID]
-		if !ok {
-			// No preference rows for this user+category: preserve the
-			// historical behaviour and deliver to the in_app channel
-			// only.
-			channels = []generated.NotificationsChannel{generated.NotificationsChannelInApp}
-		}
-		for _, channel := range channels {
+		// A recipient who muted every channel of this category
+		// resolves to no channels and therefore to no rows — that is
+		// the whole point of the setting, so it is not an error case.
+		for _, channel := range prefs.ResolveChannels(prefsByUser[recipientID]) {
 			rows = append(rows, notificationRow{
 				publicID:    types.New(),
 				recipientID: recipientID,
@@ -396,22 +397,22 @@ func (f *Fanout) DeliverCalendarReminder(
 	return firstErr
 }
 
-// loadPreferencesWithRetry fetches the (recipient, channel)
-// preference rows for the given workspace+category+recipient set.
-// It performs at most one retry with a small delay before the
-// caller falls back to the in_app-only default. The intent is
-// to ride out single-packet drops or short connection-pool stalls
-// without giving up correctness on the first hiccup.
+// loadPreferencesWithRetry fetches the stored preference rows for the
+// given workspace+category+recipient set. It performs at most one retry
+// with a small delay before the caller falls back to the channel
+// defaults. The intent is to ride out single-packet drops or short
+// connection-pool stalls without giving up correctness on the first
+// hiccup.
 //
 // Tests inject a synthetic [Fanout.fetchPreferences] hook to
 // simulate transient and persistent failures without a live DB.
 func (f *Fanout) loadPreferencesWithRetry(
 	ctx context.Context,
-	params generated.GetEnabledChannelsForRecipientsParams,
-) ([]generated.GetEnabledChannelsForRecipientsRow, error) {
+	params generated.GetNotificationPreferencesForRecipientsParams,
+) ([]generated.GetNotificationPreferencesForRecipientsRow, error) {
 	fetch := f.fetchPreferences
 	if fetch == nil {
-		fetch = f.queries.GetEnabledChannelsForRecipients
+		fetch = f.queries.GetNotificationPreferencesForRecipients
 	}
 
 	rows, err := fetch(ctx, params)
@@ -656,25 +657,27 @@ func classifyEvent(eventType string) (title string, resourceType string, severit
 // preferences UI.
 //
 // The schema groups dozens of event types into a handful of stable
-// categories (see notification_preferences.sql for the canonical list).
-// New event types fall back to the broadest "task.lifecycle" bucket so
-// fan-out keeps working before a more specific bucket is added.
+// categories ([prefs.Categories] is the canonical list). New event types fall
+// back to the broadest task.lifecycle bucket so fan-out keeps working
+// before a more specific bucket is added — which also means every
+// category this returns must appear in [prefs.Categories], or the events
+// routed to it would be unmutable.
 func categoryForEventType(eventType string) string {
 	switch eventType {
 	case "task.comment.added", "task.comment.edited", "task.comment.removed":
-		return "task.comment"
+		return prefs.CategoryTaskComment
 	case "task.actor.added", "task.actor.removed",
 		"item.actor.added", "item.actor.removed":
-		return "task.mention"
+		return prefs.CategoryTaskMention
 	case "item.scheduled", "item.unscheduled", "item.rescheduled":
-		return "timebox"
+		return prefs.CategoryTimebox
 	case "item.milestone.link.added", "item.milestone.link.removed":
-		return "relation"
+		return prefs.CategoryRelation
 	case "agent.task.handoff_to_user", "agent.task.handoff_to_agent",
 		"agent.task.attached", "agent.task.detached", "agent.task.thought":
-		return "ai"
+		return prefs.CategoryAI
 	default:
-		return "task.lifecycle"
+		return prefs.CategoryTaskLifecycle
 	}
 }
 

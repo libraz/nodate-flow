@@ -182,25 +182,34 @@
     "save": "Save",
     "saving": "Saving...",
     "saved": "Notification preferences updated",
-    "email_digest": {
-      "label": "Weekly digest email",
-      "description": "Receive a summary of your workspace activity every week."
-    },
-    "email_mention": {
-      "label": "Mentions",
-      "description": "Email me when someone @-mentions me in a comment."
-    },
-    "email_assignment": {
-      "label": "Task assignments",
-      "description": "Email me when a task is assigned to me."
-    },
-    "email_due_soon": {
-      "label": "Due soon",
-      "description": "Email me when a task I own is due within the next 24 hours."
-    },
-    "web_push": {
-      "label": "Browser push notifications",
-      "description": "Show desktop notifications in this browser. Requires permission."
+    "workspace_label": "Workspace",
+    "no_workspaces": "Join a workspace to set up notifications.",
+    "channel_note": "These control the in-app notification bell. Email and push delivery are not available yet.",
+    "categories": {
+      "task_lifecycle": {
+        "label": "Task activity",
+        "description": "Tasks created, updated, started, completed, blocked or deleted."
+      },
+      "task_comment": {
+        "label": "Comments",
+        "description": "Comments added, edited or removed on a task you can see."
+      },
+      "task_mention": {
+        "label": "Assignments and mentions",
+        "description": "You are added to or removed from a task or an item."
+      },
+      "relation": {
+        "label": "Links",
+        "description": "An item is linked to or unlinked from a milestone."
+      },
+      "timebox": {
+        "label": "Scheduling",
+        "description": "An item is placed on a calendar, moved, or taken off it."
+      },
+      "ai": {
+        "label": "Agents",
+        "description": "An agent picks up a task, hands it back, or is attached to one."
+      }
     },
     "errors": {
       "update_failed": "Could not update your notification preferences. Please try again."
@@ -458,7 +467,7 @@
           "name": "Name",
           "name_placeholder": "e.g. Local dev laptop",
           "scopes": "Scopes",
-          "scopes_help": "Space-separated list of scopes. Leave empty for default scopes."
+          "scopes_help": "Every MCP tool call requires at least one scope. A token with none can connect and list tools, but every call is refused."
         },
         "reveal_warning": "Copy this token now. You will not be able to see it again.",
         "token_label": "Token",
@@ -466,10 +475,18 @@
         "copied": "Copied",
         "done": "Done",
         "cancel": "Cancel",
-        "submit": "Create"
+        "submit": "Create",
+        "scope": {
+          "read": "Read",
+          "read_help": "List and fetch projects, tasks, pages, and calendars in this workspace.",
+          "write": "Write",
+          "write_help": "Also create, update, and transition them. Includes read."
+        }
       },
       "validation": {
-        "name_required": "Name is required."
+        "name_required": "Name is required.",
+        "scopes_required": "Select at least one scope.",
+        "scopes_rejected": "The server refused one of these scopes. Reload the page and try again."
       },
       "errors": {
         "create_failed": "Could not create the token. Please try again.",

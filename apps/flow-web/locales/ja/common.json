@@ -98,7 +98,13 @@
       "command_hint": "> で AI コマンドモード",
       "no_workspace": "AI コマンドを使用するにはワークスペースを選択してください。",
       "error": "コマンドを解析できませんでした。もう一度お試しください。",
-      "initial_command": "> "
+      "initial_command": "> ",
+      "executing": "コマンドを実行しています…",
+      "unsupported": "{tool} はまだパレットから実行できません。変更はありません。",
+      "unresolved_missing": "{argument} が指定されていません。変更はありません。",
+      "unresolved_not_found": "「{term}」に一致するものが見つかりません。変更はありません。",
+      "unresolved_ambiguous": "「{term}」に一致するものが複数あります。もう少し具体的に指定してください。",
+      "execute_failed": "コマンドを実行できませんでした。変更はありません。"
     }
   },
   "glass_dock": {
