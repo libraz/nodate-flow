@@ -266,6 +266,19 @@ export function transitionForDrop(
   }
 }
 
+/**
+ * Query serialization for `GET /tasks`.
+ *
+ * The list's array filters are declared `explode: false`, and the
+ * server reads only the first occurrence of a repeated parameter --
+ * `state=open&state=done` filters by `open` alone, silently. The HTTP
+ * client's default is the repeated form, so every request carrying
+ * `state` or `priority` has to ask for the comma form explicitly.
+ */
+const TASK_LIST_QUERY_SERIALIZER = {
+  array: { style: 'form', explode: false },
+} as const;
+
 export const TASKS_QUERY_LIMIT = 200;
 
 export function useTasksQuery(
@@ -286,6 +299,7 @@ export function useTasksQuery(
         q?: string;
         state?: string[];
         assignee?: string;
+        priority?: number[];
       } = {
         projectId,
         limit: TASKS_QUERY_LIMIT,
@@ -294,15 +308,13 @@ export function useTasksQuery(
       if (search.length > 0) query.q = search;
       if (states.length > 0) query.state = [...states];
       if (assignee.length > 0) query.assignee = assignee;
-      const { data, error } = await sdk.GET('/tasks', { params: { query } });
+      if (priorities.length > 0) query.priority = [...priorities];
+      const { data, error } = await sdk.GET('/tasks', {
+        params: { query },
+        querySerializer: TASK_LIST_QUERY_SERIALIZER,
+      });
       if (error || !data) throw toApiError(error, 'Failed to load tasks');
-      const tasks = data.tasks ?? [];
-      // Client-side priority filter (API does not support priority param yet)
-      if (priorities.length > 0) {
-        const allowed = new Set<number>(priorities);
-        return tasks.filter((t) => allowed.has(t.priority));
-      }
-      return tasks;
+      return data.tasks ?? [];
     },
   });
 }
@@ -327,9 +339,17 @@ export interface TasksPage {
  * `(created_at, public_id)` for cursor monotonicity, so this hook deliberately
  * uses OFFSET pagination and threads the offset through `pageParam`.
  *
- * Mirrors `useTasksQuery` in shape (same project + filter args, same
- * client-side priority filter) but exposes the standard infinite-query
- * surface so virtualizers can call `fetchNextPage()` near the scroll end.
+ * Mirrors `useTasksQuery` in shape (same project + filter args) but
+ * exposes the standard infinite-query surface so virtualizers can call
+ * `fetchNextPage()` near the scroll end.
+ *
+ * Every filter, priority included, is a query parameter the server
+ * applies. It used to loop here, refetching page after page until a
+ * client-side priority filter yielded a row, which turned selecting a
+ * rare priority in a large project into a long chain of blocking
+ * requests whose totals said the list was still full. One page in, one
+ * page out: an empty page now means the filter matched nothing on that
+ * page, not that the hook should go looking for another.
  *
  * Lives under the `[...tasksKeys.all, 'list']` invalidation prefix so the
  * existing W5 mutation policy (create / update / delete / transition all
@@ -347,46 +367,39 @@ export function useTasksInfiniteQuery(
       const states = filters?.states ?? [];
       const assignee = filters?.assigneeId?.trim() ?? '';
       const priorities = filters?.priority ?? [];
-      const allowed = priorities.length > 0 ? new Set<number>(priorities) : null;
-      let offset = pageParam;
-      let total = 0;
+      const offset = pageParam;
 
-      for (;;) {
-        const query: {
-          projectId: string;
-          limit: number;
-          offset: number;
-          q?: string;
-          state?: string[];
-          assignee?: string;
-        } = {
-          projectId,
-          limit: TASKS_PAGE_SIZE,
-          offset,
-        };
-        if (search.length > 0) query.q = search;
-        if (states.length > 0) query.state = [...states];
-        if (assignee.length > 0) query.assignee = assignee;
-        const { data, error } = await sdk.GET('/tasks', { params: { query } });
-        if (error || !data) throw toApiError(error, 'Failed to load tasks');
+      const query: {
+        projectId: string;
+        limit: number;
+        offset: number;
+        q?: string;
+        state?: string[];
+        assignee?: string;
+        priority?: number[];
+      } = {
+        projectId,
+        limit: TASKS_PAGE_SIZE,
+        offset,
+      };
+      if (search.length > 0) query.q = search;
+      if (states.length > 0) query.state = [...states];
+      if (assignee.length > 0) query.assignee = assignee;
+      if (priorities.length > 0) query.priority = [...priorities];
+      const { data, error } = await sdk.GET('/tasks', {
+        params: { query },
+        querySerializer: TASK_LIST_QUERY_SERIALIZER,
+      });
+      if (error || !data) throw toApiError(error, 'Failed to load tasks');
 
-        const rawTasks = data.tasks ?? [];
-        total = data.total ?? rawTasks.length;
-        const nextOffset = offset + TASKS_PAGE_SIZE;
-        const tasks = allowed ? rawTasks.filter((t) => allowed.has(t.priority)) : rawTasks;
-
-        if (!allowed || tasks.length > 0 || nextOffset >= total) {
-          return {
-            tasks,
-            nextCursor: data.nextCursor ?? null,
-            total,
-            offset: pageParam,
-            nextOffset,
-          };
-        }
-
-        offset = nextOffset;
-      }
+      const tasks = data.tasks ?? [];
+      return {
+        tasks,
+        nextCursor: data.nextCursor ?? null,
+        total: data.total ?? tasks.length,
+        offset,
+        nextOffset: offset + TASKS_PAGE_SIZE,
+      };
     },
     getNextPageParam: (lastPage) => {
       return lastPage.nextOffset < lastPage.total ? lastPage.nextOffset : undefined;

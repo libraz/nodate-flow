@@ -6,6 +6,8 @@
  *      3 pages, with OFFSET advancing each time, and the offset is
  *      threaded through `pageParam` (NOT into the query
  *      key).
+ *   1b. every filter, priority included, travels as a query parameter
+ *      and one page fetch costs exactly one request.
  *   2. `tasksKeys.infinite` lives under the shared `[...all, 'list']`
  *      prefix so the W5 mutation invalidation policy refreshes it.
  *
@@ -152,23 +154,51 @@ describe('useTasksInfiniteQuery', () => {
     expect(result.current.hasNextPage).toBe(false);
   });
 
-  it('skips empty backend pages when applying the priority filter client-side', async () => {
-    const pageOne = {
-      tasks: Array.from({ length: 100 }, (_, i) => aTask(`low-${i}`, 1)),
-      total: 250,
+  it('sends the priority filter to the server and issues one request per page', async () => {
+    // The hook used to fetch page after page inside a single queryFn
+    // until a client-side priority filter produced a row. Selecting a
+    // rare priority in a large project therefore cost one blocking
+    // request per empty page. Priority is a server parameter now, so a
+    // page fetch is exactly one request whatever the filter matches.
+    const page = {
+      tasks: [aTask('urgent-1', 4), aTask('urgent-2', 4)],
+      total: 2,
     };
-    const pageTwo = {
-      tasks: [aTask('urgent-1', 4), ...Array.from({ length: 99 }, (_, i) => aTask(`mid-${i}`, 2))],
-      total: 250,
-    };
-    const pageThree = {
-      tasks: Array.from({ length: 50 }, (_, i) => aTask(`tail-${i}`, 1)),
-      total: 250,
-    };
-    sdkMocks.get
-      .mockResolvedValueOnce({ data: pageOne, error: null })
-      .mockResolvedValueOnce({ data: pageTwo, error: null })
-      .mockResolvedValueOnce({ data: pageThree, error: null });
+    sdkMocks.get.mockResolvedValue({ data: page, error: null });
+
+    const client = buildClient();
+    const { result } = renderHook(() => useTasksInfiniteQuery('prj-1', { priority: [4, 3] }), {
+      wrapper: makeWrapper(client),
+    });
+
+    await waitFor(() => {
+      expect(result.current.data).toBeDefined();
+    });
+
+    expect(sdkMocks.get).toHaveBeenCalledTimes(1);
+    const query = sdkMocks.get.mock.calls[0]?.[1]?.params?.query as
+      | Record<string, unknown>
+      | undefined;
+    expect(query?.priority).toEqual([4, 3]);
+    expect(query?.offset).toBe(0);
+
+    // The array filters are explode:false on the wire. Left to the
+    // client's default the request would repeat the parameter and the
+    // server would honour only the first value, so the request has to
+    // carry the comma-form serializer.
+    const opts = sdkMocks.get.mock.calls[0]?.[1] as Record<string, unknown> | undefined;
+    expect(opts?.querySerializer).toEqual({ array: { style: 'form', explode: false } });
+    expect(result.current.data.pages[0]?.tasks.map((task) => task.id)).toEqual([
+      'urgent-1',
+      'urgent-2',
+    ]);
+  });
+
+  it('does not chase further pages when the server returns an empty page', async () => {
+    // An empty page is the server's answer for this offset, not a cue
+    // to keep asking. The old loop read it as "keep going" and walked
+    // the whole project one request at a time.
+    sdkMocks.get.mockResolvedValue({ data: { tasks: [], total: 5000 }, error: null });
 
     const client = buildClient();
     const { result } = renderHook(() => useTasksInfiniteQuery('prj-1', { priority: [4] }), {
@@ -179,30 +209,25 @@ describe('useTasksInfiniteQuery', () => {
       expect(result.current.data).toBeDefined();
     });
 
-    expect(result.current.data.pages).toHaveLength(1);
-    expect(result.current.data.pages[0]?.tasks.map((task) => task.id)).toEqual(['urgent-1']);
-    expect(result.current.hasNextPage).toBe(true);
+    expect(sdkMocks.get).toHaveBeenCalledTimes(1);
+    expect(result.current.data.pages[0]?.tasks).toEqual([]);
+  });
 
-    const firstQuery = sdkMocks.get.mock.calls[0]?.[1]?.params?.query as
-      | Record<string, unknown>
-      | undefined;
-    const secondQuery = sdkMocks.get.mock.calls[1]?.[1]?.params?.query as
-      | Record<string, unknown>
-      | undefined;
-    expect(firstQuery?.offset).toBe(0);
-    expect(secondQuery?.offset).toBe(100);
+  it('omits the priority parameter when no priority filter is active', async () => {
+    sdkMocks.get.mockResolvedValue({ data: { tasks: [aTask('t-0')], total: 1 }, error: null });
 
-    await result.current.fetchNextPage();
-    await waitFor(() => {
-      expect(result.current.data.pages).toHaveLength(2);
+    const client = buildClient();
+    const { result } = renderHook(() => useTasksInfiniteQuery('prj-1', { priority: [] }), {
+      wrapper: makeWrapper(client),
     });
 
-    const thirdQuery = sdkMocks.get.mock.calls[2]?.[1]?.params?.query as
+    await waitFor(() => {
+      expect(result.current.data).toBeDefined();
+    });
+    const query = sdkMocks.get.mock.calls[0]?.[1]?.params?.query as
       | Record<string, unknown>
       | undefined;
-    expect(thirdQuery?.offset).toBe(200);
-    expect(result.current.data.pages[1]?.tasks).toHaveLength(0);
-    expect(result.current.hasNextPage).toBe(false);
+    expect(query).not.toHaveProperty('priority');
   });
 
   it('keeps pagination state out of the queryKey', () => {

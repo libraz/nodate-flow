@@ -168,7 +168,7 @@ type taskListRow struct {
 	ProjectIdentifier       sql.NullString
 	TaskNumber              uint32
 	ArchivedAt              sql.NullTime
-	LabelIDs                sql.NullString
+	LabelIDs                string
 	SortWeight              int32
 	UpdatedAt               sql.NullTime
 	CreatedAt               time.Time
@@ -191,11 +191,11 @@ type taskListRow struct {
 // The view's aggregate cap makes a clipped entry unreachable, so this is
 // belt-and-braces: if the cap is ever raised past group_concat_max_len,
 // the response loses a label instead of publishing a malformed id.
-func splitLabelIDs(v sql.NullString) []string {
-	if !v.Valid || v.String == "" {
+func splitLabelIDs(v string) []string {
+	if v == "" {
 		return nil
 	}
-	parts := strings.Split(v.String, ",")
+	parts := strings.Split(v, ",")
 	ids := make([]string, 0, len(parts))
 	for _, p := range parts {
 		if _, err := types.Parse(p); err != nil {

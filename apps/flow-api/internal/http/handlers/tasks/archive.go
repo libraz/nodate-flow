@@ -187,7 +187,13 @@ func ListArchived(deps Deps) func(context.Context, *ListArchivedTasksInput) (*Li
 			out.Body.Tasks = append(out.Body.Tasks, mapArchivedTaskListItem(r))
 		}
 		if len(rows) > 0 {
-			out.Body.Total = totalAsInt64(rows[0].Total)
+			total, terr := listTotal(in.Offset, in.Limit, len(rows), func() (int64, error) {
+				return deps.Queries.CountArchivedTasksForWorkspace(ctx, ws.ID)
+			})
+			if terr != nil {
+				return nil, httpErr(apierrors.InternalUnexpected)
+			}
+			out.Body.Total = total
 			if int64(in.Offset+in.Limit) < out.Body.Total {
 				last := rows[len(rows)-1]
 				// Archived list keys on archived_at, not created_at.

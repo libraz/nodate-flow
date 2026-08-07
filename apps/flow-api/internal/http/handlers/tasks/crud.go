@@ -36,6 +36,12 @@ var allowedDerivedStates = map[string]struct{}{
 	"cancelled": {},
 }
 
+// maxTaskPriority is the inclusive ceiling of tasks.priority as the
+// OpenAPI schema declares it on both the create body and the list
+// filter. Values outside the range cannot match a stored row, so the
+// list filter drops them instead of binding them into the IN list.
+const maxTaskPriority = 4
+
 // errCreateValidation is the sentinel returned from the dbretry.InTx
 // callback inside Create when a validation failure (unparseable id,
 // unknown member, invalid role) is encountered. It is non-transient so
@@ -86,7 +92,7 @@ func parseActorRole(s string) (generated.TaskActorsRole, error) {
 // query input; it is used to choose between the sqlc fast path and the
 // dynamic SQL path.
 func hasListFilters(in *ListTasksInput) bool {
-	return in.Q != "" || len(in.State) > 0 || in.Assignee != ""
+	return in.Q != "" || len(in.State) > 0 || in.Assignee != "" || len(in.Priority) > 0
 }
 
 // needsDynamicQuery reports whether GET /tasks must go through the
@@ -111,11 +117,31 @@ func needsDynamicQuery(in *ListTasksInput, wsRole middleware.WorkspaceRole) bool
 	return !wsRole.AtLeast(middleware.WorkspaceRoleAdmin)
 }
 
+// listTotal resolves the total row count behind an OFFSET page without
+// making every page pay for it. A page shorter than the limit is the
+// last one, so offset+len is already the exact total and count() runs
+// only when the page came back full. The callback issues the matching
+// Count* query; it is never invoked on the short-page path.
+func listTotal(offset, limit int32, pageLen int, count func() (int64, error)) (int64, error) {
+	if int32(pageLen) < limit { //#nosec G115 -- page length is capped by the LIMIT bind, which the schema caps at 200
+		return int64(offset) + int64(pageLen), nil
+	}
+	return count()
+}
+
 // listTasksFiltered runs a dynamic SELECT against v_task_list applying the
-// optional q / state / assignee filters. It bypasses sqlc because sqlc
-// cannot express dynamic WHERE fragments. The shape of the returned rows
-// matches the sqlc ListTasksForWorkspace projection so the existing
-// mapper can reuse them.
+// optional q / state / assignee / priority filters. It bypasses sqlc
+// because sqlc cannot express dynamic WHERE fragments. The shape of the
+// returned rows matches the sqlc ListTasksForWorkspace projection so the
+// existing mapper can reuse them.
+//
+// The total comes from a second statement rather than COUNT(*) OVER(),
+// and only when the page came back full. The window function had to
+// consume every matching row, and each of those rows pulls
+// v_task_list's per-row label and assignee subqueries along with it, so
+// a 50-row page of a large project paid for them thousands of times
+// over. A short page needs no statement at all: it is the last one, so
+// the offset plus what came back is the exact total.
 func listTasksFiltered(
 	ctx context.Context,
 	db *sql.DB,
@@ -142,6 +168,13 @@ func listTasksFiltered(
 		where = append(where, "v.project_public_id = ?")
 		args = append(args, projectPublicID)
 	}
+	// Substring match, deliberately, and not the FULLTEXT index the
+	// tasks table declares. MySQL's default parser leaves Japanese
+	// unusable -- searching the opening word of a title matches nothing
+	// -- and the ngram parser trades that for the opposite failure,
+	// returning rows that do not contain the term at all. Neither
+	// answers the question this box asks, so the leading-wildcard scan
+	// stays until a search backend that tokenises CJK is in play.
 	if in.Q != "" {
 		where = append(where, "LOWER(v.title) LIKE ?")
 		args = append(args, "%"+stringutil.EscapeLike(strings.ToLower(in.Q))+"%")
@@ -157,6 +190,24 @@ func listTasksFiltered(
 		}
 		if len(placeholders) > 0 {
 			where = append(where, "v.derived_state IN ("+strings.Join(placeholders, ",")+")")
+		}
+	}
+	if len(in.Priority) > 0 {
+		placeholders := make([]string, 0, len(in.Priority))
+		for _, p := range in.Priority {
+			if p < 0 || p > maxTaskPriority {
+				continue
+			}
+			placeholders = append(placeholders, "?")
+			args = append(args, p)
+		}
+		// Every value was out of range: match nothing rather than
+		// dropping the clause, which would widen the result to the
+		// unfiltered list.
+		if len(placeholders) == 0 {
+			where = append(where, "1 = 0")
+		} else {
+			where = append(where, "v.priority IN ("+strings.Join(placeholders, ",")+")")
 		}
 	}
 	if in.Assignee != "" {
@@ -198,15 +249,14 @@ func listTasksFiltered(
   v.updated_at,
   v.created_at,
   v.primary_assignee_public_id,
-  v.assignee_count,
-  COUNT(*) OVER() AS total
+  v.assignee_count
 FROM v_task_list v
 WHERE %s
 ORDER BY v.sort_weight ASC, v.priority DESC, v.due_on ASC, v.created_at DESC, v.public_id DESC
 LIMIT ? OFFSET ?`, strings.Join(where, " AND "))
 
-	args = append(args, in.Limit, in.Offset)
-	rows, err := db.QueryContext(ctx, query, args...)
+	pageArgs := append(append([]any{}, args...), in.Limit, in.Offset)
+	rows, err := db.QueryContext(ctx, query, pageArgs...)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -239,7 +289,6 @@ LIMIT ? OFFSET ?`, strings.Join(where, " AND "))
 			&r.CreatedAt,
 			&r.PrimaryAssigneePublicID,
 			&r.AssigneeCount,
-			&r.Total,
 		); err != nil {
 			return nil, 0, err
 		}
@@ -248,8 +297,13 @@ LIMIT ? OFFSET ?`, strings.Join(where, " AND "))
 	if err := rows.Err(); err != nil {
 		return nil, 0, err
 	}
-	if len(out) > 0 {
-		total = totalAsInt64(out[0].Total)
+	if int32(len(out)) < in.Limit { //#nosec G115 -- page length is capped by the LIMIT bind, which the schema caps at 200
+		return out, int64(in.Offset) + int64(len(out)), nil
+	}
+	//#nosec G201 -- same WHERE fragments as the page query above; user values stay bound.
+	countQuery := fmt.Sprintf("SELECT COUNT(*) FROM v_task_list v WHERE %s", strings.Join(where, " AND "))
+	if err := db.QueryRowContext(ctx, countQuery, args...).Scan(&total); err != nil {
+		return nil, 0, err
 	}
 	return out, total, nil
 }
@@ -567,7 +621,16 @@ func List(deps Deps) func(context.Context, *ListTasksInput) (*ListTasksOutput, e
 				out.Body.Tasks = append(out.Body.Tasks, rowToTaskListItemFromProject(r))
 			}
 			if len(rows) > 0 {
-				out.Body.Total = totalAsInt64(rows[0].Total)
+				total, terr := listTotal(in.Offset, limit, len(rows), func() (int64, error) {
+					return deps.Queries.CountTasksForProject(ctx, generated.CountTasksForProjectParams{
+						WorkspaceID:     prj.WorkspaceID,
+						ProjectPublicID: pubBytes[:],
+					})
+				})
+				if terr != nil {
+					return nil, httpErr(apierrors.InternalUnexpected)
+				}
+				out.Body.Total = total
 				// Bridge for first-page callers: the OFFSET path also
 				// emits a nextCursor when more rows exist so callers
 				// can switch to the keyset path on the second request
@@ -663,7 +726,19 @@ func List(deps Deps) func(context.Context, *ListTasksInput) (*ListTasksOutput, e
 			out.Body.Tasks = append(out.Body.Tasks, rowToTaskListItemFromWorkspace(r))
 		}
 		if len(rows) > 0 {
-			out.Body.Total = totalAsInt64(rows[0].Total)
+			total, terr := listTotal(in.Offset, limit, len(rows), func() (int64, error) {
+				return deps.Queries.CountTasksForWorkspace(ctx, generated.CountTasksForWorkspaceParams{
+					WorkspaceID:   wsInternal,
+					IsElevated:    vis.IsElevated,
+					ActorUserID:   vis.ActorUserID,
+					ActorUserID_2: vis.ActorUserID,
+					ActorUserID_3: vis.ActorUserID,
+				})
+			})
+			if terr != nil {
+				return nil, httpErr(apierrors.InternalUnexpected)
+			}
+			out.Body.Total = total
 			if int64(in.Offset+limit) < out.Body.Total {
 				last := rows[len(rows)-1]
 				nc := handlerutil.EncodeCursor(last.CreatedAt, last.PublicID)

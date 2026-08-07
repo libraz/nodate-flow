@@ -260,6 +260,7 @@ type ListTasksInput struct {
 	Q           string   `query:"q" doc:"Case-insensitive substring match on title"`
 	State       []string `query:"state" doc:"Filter by derived_state; repeat to OR multiple values"`
 	Assignee    string   `query:"assignee" doc:"Filter to tasks with this user as an assignee (user public id UUID v7)"`
+	Priority    []int32  `query:"priority" minimum:"0" maximum:"4" doc:"Filter by priority level; comma-separate to OR multiple values (priority=4,2)"`
 	Cursor      string   `query:"cursor" doc:"Opaque cursor returned by previous page; pass to fetch next page. Empty when at end."`
 	Limit       int32    `query:"limit" minimum:"1" maximum:"200" default:"50"`
 	Offset      int32    `query:"offset" minimum:"0" default:"0"`

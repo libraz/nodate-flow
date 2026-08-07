@@ -57,7 +57,15 @@ WHERE v.workspace_id = ?
 LIMIT 1;
 
 -- name: ListTasksForProject :many
--- List tasks in a project via v_task_list with window-function pagination.
+-- List tasks in a project via v_task_list.
+--
+-- The page total is NOT computed here. COUNT(*) OVER() would make the
+-- window function consume every row the filter matches, and each of
+-- those rows drags v_task_list's per-row label / assignee subqueries
+-- with it -- so asking for a 50-row page of an 8000-task project
+-- evaluated them 8000 times instead of 50. CountTasksForProject answers
+-- the same question over the bare task rows, and the handler only asks
+-- when the page came back full (a short page already pins the total).
 SELECT
   v.public_id,
   v.project_public_id,
@@ -78,13 +86,21 @@ SELECT
   v.updated_at,
   v.created_at,
   v.primary_assignee_public_id,
-  v.assignee_count,
-  COUNT(*) OVER() AS total
+  v.assignee_count
 FROM v_task_list v
 WHERE v.workspace_id = ?
   AND v.project_public_id = ?
 ORDER BY v.sort_weight ASC, v.priority DESC, v.due_on ASC, v.created_at DESC, v.public_id DESC
 LIMIT ? OFFSET ?;
+
+-- name: CountTasksForProject :one
+-- Row count behind ListTasksForProject. Filters must stay identical to
+-- that query's WHERE clause or the pager reports a total the list can
+-- never reach.
+SELECT COUNT(*)
+FROM v_task_list v
+WHERE v.workspace_id = ?
+  AND v.project_public_id = ?;
 
 -- name: ListTasksForProjectKeyset :many
 -- Keyset-paginated variant of ListTasksForProject.
@@ -131,7 +147,8 @@ ORDER BY v.created_at DESC, v.public_id DESC
 LIMIT ?;
 
 -- name: ListTasksForWorkspace :many
--- List tasks across an entire workspace via v_task_list.
+-- List tasks across an entire workspace via v_task_list. See
+-- ListTasksForProject for why the total is a separate query.
 SELECT
   v.public_id,
   v.project_public_id,
@@ -152,8 +169,7 @@ SELECT
   v.updated_at,
   v.created_at,
   v.primary_assignee_public_id,
-  v.assignee_count,
-  COUNT(*) OVER() AS total
+  v.assignee_count
 FROM v_task_list v
 WHERE v.workspace_id = sqlc.arg('workspace_id')
   AND (
@@ -178,6 +194,35 @@ WHERE v.workspace_id = sqlc.arg('workspace_id')
   )
 ORDER BY v.sort_weight ASC, v.priority DESC, v.due_on ASC, v.created_at DESC, v.public_id DESC
 LIMIT ? OFFSET ?;
+
+-- name: CountTasksForWorkspace :one
+-- Row count behind ListTasksForWorkspace, carrying the same Layer-4
+-- visibility predicate. Dropping any branch of it here would leak the
+-- existence of tasks the caller cannot see, as a total larger than the
+-- rows they can page through.
+SELECT COUNT(*)
+FROM v_task_list v
+WHERE v.workspace_id = sqlc.arg('workspace_id')
+  AND (
+    CAST(sqlc.arg('is_elevated') AS SIGNED) = 1
+    OR v.visibility = 'public'
+    OR (v.visibility = 'project' AND EXISTS (
+      SELECT 1 FROM project_members pm_vis
+      WHERE pm_vis.project_id = v.project_id
+        AND pm_vis.user_id = CAST(sqlc.arg('actor_user_id') AS UNSIGNED)
+        AND pm_vis.enabled = TRUE
+    ))
+    OR (v.visibility = 'private' AND (
+      v.created_by_user_id = CAST(sqlc.arg('actor_user_id') AS UNSIGNED)
+      OR EXISTS (
+        SELECT 1 FROM task_actors ta_vis
+        INNER JOIN tasks tv ON tv.id = ta_vis.task_id AND tv.public_id = v.public_id
+        WHERE ta_vis.kind = 'user'
+          AND ta_vis.user_id = CAST(sqlc.arg('actor_user_id') AS UNSIGNED)
+          AND ta_vis.enabled = TRUE
+      )
+    ))
+  );
 
 -- name: ListTasksForWorkspaceKeyset :many
 -- Keyset-paginated variant of ListTasksForWorkspace.
@@ -527,7 +572,8 @@ WHERE workspace_id = ?
   AND archived_at IS NOT NULL;
 
 -- name: ListArchivedTasksForWorkspace :many
--- List archived tasks via v_task_list_archived.
+-- List archived tasks via v_task_list_archived. See ListTasksForProject
+-- for why the total is a separate query.
 SELECT
   v.public_id,
   v.project_public_id,
@@ -548,12 +594,17 @@ SELECT
   v.created_at,
   v.primary_assignee_public_id,
   v.assignee_count,
-  v.label_ids,
-  COUNT(*) OVER() AS total
+  v.label_ids
 FROM v_task_list_archived v
 WHERE v.workspace_id = ?
 ORDER BY v.archived_at DESC, v.public_id DESC
 LIMIT ? OFFSET ?;
+
+-- name: CountArchivedTasksForWorkspace :one
+-- Row count behind ListArchivedTasksForWorkspace.
+SELECT COUNT(*)
+FROM v_task_list_archived v
+WHERE v.workspace_id = ?;
 
 -- name: ListArchivedTasksForWorkspaceKeyset :many
 -- Keyset-paginated variant of ListArchivedTasksForWorkspace.
