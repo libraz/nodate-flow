@@ -182,12 +182,21 @@ type Querier interface {
 	// List active attachments for an event with uploader display fields and the
 	// storage_objects metadata flattened in via JOIN. Order is stable by
 	// created_at then public_id.
+	// The uploader is LEFT JOINed: the file belongs to the event, so suspending
+	// the account that uploaded it must not take it off the event for the other
+	// attendees. `enabled = TRUE` stays in the ON clause so a suspended
+	// uploader's identity is withheld rather than the row disappearing.
 	ListCalendarEventAttachments(ctx context.Context, arg ListCalendarEventAttachmentsParams) ([]ListCalendarEventAttachmentsRow, error)
 	// List all attendees for an event with user profile info.
 	ListCalendarEventAttendees(ctx context.Context, arg ListCalendarEventAttendeesParams) ([]ListCalendarEventAttendeesRow, error)
 	// List comments on an event in chronological order. Paginated
 	// (LIMIT/OFFSET) so the result set is always bounded; total carries the
 	// pre-page count.
+	// The author is LEFT JOINed: a comment is part of the event's discussion,
+	// so suspending the account that wrote it must not erase what was said for
+	// the rest of the attendees. `enabled = TRUE` stays in the ON clause so a
+	// suspended author's identity is withheld rather than the comment
+	// disappearing.
 	ListCalendarEventComments(ctx context.Context, arg ListCalendarEventCommentsParams) ([]ListCalendarEventCommentsRow, error)
 	// List active invites for a single event, newest first. Paginated
 	// (LIMIT/OFFSET) so the result set is always bounded; total carries the
@@ -201,6 +210,11 @@ type Querier interface {
 	// List a calendar's members with the role and shared colour each holds.
 	ListCalendarMembers(ctx context.Context, arg ListCalendarMembersParams) ([]ListCalendarMembersRow, error)
 	// List memos for a calendar in display order.
+	// The creator is LEFT JOINed: a memo belongs to the shared calendar, so
+	// suspending the account that wrote it must not remove it from the calendar
+	// everyone else is reading. `enabled = TRUE` stays in the ON clause so a
+	// suspended creator's identity is withheld rather than the memo
+	// disappearing.
 	ListCalendarMemos(ctx context.Context, arg ListCalendarMemosParams) ([]ListCalendarMemosRow, error)
 	// List all subscribers of a calendar (for member list, color resolution).
 	ListCalendarSubscribers(ctx context.Context, arg ListCalendarSubscribersParams) ([]ListCalendarSubscribersRow, error)
@@ -234,10 +248,17 @@ type Querier interface {
 	// (belt-and-braces beyond the soft-disable cascade). Backs GET
 	// /me/calendar-events for the unified flow-web calendar so the client
 	// does not fan out one request per workspace.
+	// The owner is LEFT JOINed for the same reason the creator already is: the
+	// event exists for everyone on the calendar, so suspending its owner must
+	// not make it vanish from the agendas of the members still using it. Access
+	// is decided by workspace_members + calendar_members below, and
+	// scrubEventDetails compares the raw ce.owner_user_id, so nothing about
+	// visibility rests on this join.
 	ListMyCalendarEventsAcrossWorkspaces(ctx context.Context, arg ListMyCalendarEventsAcrossWorkspacesParams) ([]ListMyCalendarEventsAcrossWorkspacesRow, error)
 	// Cross-workspace recurring variant. Same membership guard as the
 	// non-recurring query. Clients expand RRULE instances client-side via
-	// the shared recurrence expander.
+	// the shared recurrence expander. The owner is LEFT JOINed for the same
+	// reason as in the non-recurring query.
 	ListMyRecurringCalendarEventsAcrossWorkspaces(ctx context.Context, arg ListMyRecurringCalendarEventsAcrossWorkspacesParams) ([]ListMyRecurringCalendarEventsAcrossWorkspacesRow, error)
 	// Unauthenticated public-render query. Final safety gate on event
 	// visibility and start_at IS NOT NULL. expires_at is checked in the

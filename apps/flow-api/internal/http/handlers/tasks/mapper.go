@@ -41,6 +41,15 @@ var (
 	rawBytesToUUIDPtr     = handlerutil.RawBytesToUUIDPtr
 )
 
+// bylineDisplayName / publicIDOrEmpty render the user a comment or an
+// attachment is attributed to. Both go empty together when that account has
+// been suspended; the comment and the file stay on the task, because they
+// belong to the task rather than to the account that produced them.
+var (
+	bylineDisplayName = handlerutil.BylineDisplayName
+	publicIDOrEmpty   = handlerutil.PublicIDOrEmpty
+)
+
 func rowToTaskFromFind(r generated.FindTaskByPublicIdRow) Task {
 	return Task{
 		ID:                       r.PublicID.String(),
@@ -374,8 +383,8 @@ func rowToActor(r generated.ListActorsForTaskRow) TaskActor {
 func rowToComment(r generated.ListCommentsForTaskRow) TaskComment {
 	return TaskComment{
 		ID:                r.PublicID.String(),
-		AuthorID:          r.AuthorPublicID.String(),
-		AuthorDisplayName: r.AuthorDisplayName,
+		AuthorID:          publicIDOrEmpty(r.AuthorPublicID),
+		AuthorDisplayName: bylineDisplayName(r.AuthorDisplayName),
 		AuthorAvatarURL:   nullStr(r.AuthorAvatarUrl),
 		Body:              r.Body,
 		EditedAt:          nullTimeUnix(r.EditedAt),
@@ -394,8 +403,8 @@ func rowToAttachment(r generated.ListAttachmentsForTaskRow) TaskAttachment {
 	return TaskAttachment{
 		ID:                  r.PublicID.String(),
 		StorageObjectID:     r.StorageObjectPublicID.String(),
-		UploaderID:          r.UploaderPublicID.String(),
-		UploaderDisplayName: r.UploaderDisplayName,
+		UploaderID:          publicIDOrEmpty(r.UploaderPublicID),
+		UploaderDisplayName: bylineDisplayName(r.UploaderDisplayName),
 		Filename:            r.Filename,
 		ContentType:         r.ContentType,
 		ByteSize:            r.ByteSize,

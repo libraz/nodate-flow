@@ -16,6 +16,10 @@ INSERT INTO calendar_event_attachments (
 -- List active attachments for an event with uploader display fields and the
 -- storage_objects metadata flattened in via JOIN. Order is stable by
 -- created_at then public_id.
+-- The uploader is LEFT JOINed: the file belongs to the event, so suspending
+-- the account that uploaded it must not take it off the event for the other
+-- attendees. `enabled = TRUE` stays in the ON clause so a suspended
+-- uploader's identity is withheld rather than the row disappearing.
 SELECT
   a.public_id,
   a.filename,
@@ -29,7 +33,7 @@ SELECT
   u.display_name,
   a.created_at
 FROM calendar_event_attachments a
-INNER JOIN users u ON u.id = a.uploader_id AND u.enabled = TRUE
+LEFT JOIN users u ON u.id = a.uploader_id AND u.enabled = TRUE
 INNER JOIN storage_objects so ON so.id = a.storage_object_id AND so.enabled = TRUE
 WHERE a.workspace_id = ?
   AND a.event_id = ?

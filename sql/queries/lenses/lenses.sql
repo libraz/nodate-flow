@@ -14,6 +14,10 @@ INSERT INTO lenses (
 
 -- name: ListLensesForProject :many
 -- List enabled lenses scoped to a workspace + project (or workspace-wide when project_id IS NULL).
+-- The creator is LEFT JOINed: a lens is a shared saved view, so suspending
+-- the account that saved it must not remove it from everyone else's lens
+-- list. `enabled = TRUE` stays in the ON clause so a suspended creator's
+-- identity is withheld rather than the lens disappearing.
 SELECT
   l.public_id,
   u.public_id AS creator_public_id,
@@ -30,7 +34,7 @@ SELECT
   l.created_at,
   COUNT(*) OVER() AS total
 FROM lenses l
-INNER JOIN users u ON u.id = l.creator_id AND u.enabled = TRUE
+LEFT JOIN users u ON u.id = l.creator_id AND u.enabled = TRUE
 WHERE l.workspace_id = ?
   AND (l.project_id = ? OR l.project_id IS NULL)
   AND l.enabled = TRUE
@@ -55,7 +59,7 @@ SELECT
   l.updated_at,
   l.created_at
 FROM lenses l
-INNER JOIN users u ON u.id = l.creator_id AND u.enabled = TRUE
+LEFT JOIN users u ON u.id = l.creator_id AND u.enabled = TRUE
 WHERE l.workspace_id = ?
   AND l.public_id = ?
   AND l.enabled = TRUE;

@@ -96,7 +96,7 @@ SELECT
   dw.updated_at,
   dw.created_at
 FROM dashboard_widgets dw
-INNER JOIN users u ON u.id = dw.creator_id AND u.enabled = TRUE
+LEFT JOIN users u ON u.id = dw.creator_id AND u.enabled = TRUE
 WHERE dw.workspace_id = ?
   AND dw.public_id = ?
   AND dw.enabled = TRUE
@@ -111,7 +111,7 @@ type GetWidgetByPublicIDParams struct {
 type GetWidgetByPublicIDRow struct {
 	PublicID           types.PublicID             `json:"publicId"`
 	CreatorPublicID    types.PublicID             `json:"creatorPublicId"`
-	CreatorDisplayName string                     `json:"creatorDisplayName"`
+	CreatorDisplayName sql.NullString             `json:"creatorDisplayName"`
 	WidgetType         DashboardWidgetsWidgetType `json:"widgetType"`
 	Title              string                     `json:"title"`
 	Config             json.RawMessage            `json:"config"`
@@ -163,7 +163,7 @@ SELECT
   dw.created_at,
   COUNT(*) OVER() AS total
 FROM dashboard_widgets dw
-INNER JOIN users u ON u.id = dw.creator_id AND u.enabled = TRUE
+LEFT JOIN users u ON u.id = dw.creator_id AND u.enabled = TRUE
 WHERE dw.workspace_id = ?
   AND dw.enabled = TRUE
 ORDER BY dw.sort_weight ASC, dw.created_at ASC, dw.id ASC
@@ -179,7 +179,7 @@ type ListWidgetsForWorkspaceParams struct {
 type ListWidgetsForWorkspaceRow struct {
 	PublicID           types.PublicID             `json:"publicId"`
 	CreatorPublicID    types.PublicID             `json:"creatorPublicId"`
-	CreatorDisplayName string                     `json:"creatorDisplayName"`
+	CreatorDisplayName sql.NullString             `json:"creatorDisplayName"`
 	WidgetType         DashboardWidgetsWidgetType `json:"widgetType"`
 	Title              string                     `json:"title"`
 	Config             json.RawMessage            `json:"config"`
@@ -194,6 +194,11 @@ type ListWidgetsForWorkspaceRow struct {
 }
 
 // List enabled widgets for a workspace with creator info, ordered by sort_weight.
+// The creator is LEFT JOINed: a widget belongs to the workspace dashboard
+// everyone shares, so suspending the account that placed it must not blank
+// out the dashboard for the rest of the team. `enabled = TRUE` stays in the
+// ON clause so a suspended creator's identity is withheld rather than the
+// widget disappearing.
 func (q *Queries) ListWidgetsForWorkspace(ctx context.Context, arg ListWidgetsForWorkspaceParams) ([]ListWidgetsForWorkspaceRow, error) {
 	rows, err := q.db.QueryContext(ctx, listWidgetsForWorkspace, arg.WorkspaceID, arg.Limit, arg.Offset)
 	if err != nil {

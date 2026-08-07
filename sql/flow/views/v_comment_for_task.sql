@@ -3,6 +3,16 @@
 -- ListCommentsForTaskKeyset (keyset variant). Encapsulates the comments
 -- + tasks + users JOINs so both query variants stay aligned on
 -- visibility (`enabled = TRUE` propagation) and column shape.
+--
+-- The author is LEFT JOINed. A comment is part of the task's history and
+-- belongs to the task, not to the account that typed it, so suspending
+-- that account must not delete the discussion for everyone else on the
+-- team. `enabled = TRUE` stays in the ON clause, so a suspended author's
+-- identity columns come back NULL and the comment renders as written by an
+-- unknown user. The rule this follows: `enabled = TRUE` may gate a row only
+-- when the user is what the row is about (membership, credentials, actor
+-- lists); when the user is merely the byline on someone else's content, it
+-- gates the byline.
 CREATE OR REPLACE ALGORITHM=MERGE VIEW v_comment_for_task AS
 SELECT
   c.workspace_id,
@@ -21,7 +31,7 @@ SELECT
 FROM comments c
 INNER JOIN workspaces w ON w.id = c.workspace_id AND w.enabled = TRUE
 INNER JOIN tasks t ON t.id = c.task_id AND t.enabled = TRUE
-INNER JOIN users u ON u.id = c.author_id AND u.enabled = TRUE
+LEFT JOIN users u ON u.id = c.author_id AND u.enabled = TRUE
 LEFT JOIN storage_objects so_author_avatar
   ON so_author_avatar.id = u.avatar_storage_object_id AND so_author_avatar.enabled = TRUE
 WHERE c.enabled = TRUE;

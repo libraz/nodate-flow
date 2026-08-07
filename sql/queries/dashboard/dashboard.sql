@@ -15,6 +15,11 @@ INSERT INTO dashboard_widgets (
 
 -- name: ListWidgetsForWorkspace :many
 -- List enabled widgets for a workspace with creator info, ordered by sort_weight.
+-- The creator is LEFT JOINed: a widget belongs to the workspace dashboard
+-- everyone shares, so suspending the account that placed it must not blank
+-- out the dashboard for the rest of the team. `enabled = TRUE` stays in the
+-- ON clause so a suspended creator's identity is withheld rather than the
+-- widget disappearing.
 SELECT
   dw.public_id,
   u.public_id AS creator_public_id,
@@ -31,7 +36,7 @@ SELECT
   dw.created_at,
   COUNT(*) OVER() AS total
 FROM dashboard_widgets dw
-INNER JOIN users u ON u.id = dw.creator_id AND u.enabled = TRUE
+LEFT JOIN users u ON u.id = dw.creator_id AND u.enabled = TRUE
 WHERE dw.workspace_id = ?
   AND dw.enabled = TRUE
 ORDER BY dw.sort_weight ASC, dw.created_at ASC, dw.id ASC
@@ -54,7 +59,7 @@ SELECT
   dw.updated_at,
   dw.created_at
 FROM dashboard_widgets dw
-INNER JOIN users u ON u.id = dw.creator_id AND u.enabled = TRUE
+LEFT JOIN users u ON u.id = dw.creator_id AND u.enabled = TRUE
 WHERE dw.workspace_id = ?
   AND dw.public_id = ?
   AND dw.enabled = TRUE

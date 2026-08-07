@@ -126,8 +126,8 @@ func ListComments(deps Deps) func(context.Context, *ListCommentsInput) (*ListCom
 		for i, r := range rows {
 			resp := CommentResponse{
 				ID:          r.PublicID.String(),
-				UserID:      r.UserPublicID.String(),
-				DisplayName: r.DisplayName,
+				UserID:      handlerutil.PublicIDOrEmpty(r.UserPublicID),
+				DisplayName: handlerutil.BylineDisplayName(r.DisplayName),
 				Body:        r.Body,
 				CreatedAt:   r.CreatedAt.Unix(),
 			}

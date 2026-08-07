@@ -124,8 +124,8 @@ func ListMemos(deps Deps) func(context.Context, *ListMemosInput) (*ListMemosOutp
 				Body:            dbtype.PtrFromNullString(r.Body),
 				Done:            r.Done,
 				SortWeight:      r.SortWeight,
-				UserPublicID:    r.UserPublicID.String(),
-				UserDisplayName: r.DisplayName,
+				UserPublicID:    handlerutil.PublicIDOrEmpty(r.UserPublicID),
+				UserDisplayName: handlerutil.BylineDisplayName(r.DisplayName),
 				CreatedAt:       r.CreatedAt.Unix(),
 			}
 			resp.UpdatedAt = dbtype.UnixSecondsFromNullTime(r.UpdatedAt)

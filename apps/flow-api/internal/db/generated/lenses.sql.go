@@ -94,7 +94,7 @@ SELECT
   l.updated_at,
   l.created_at
 FROM lenses l
-INNER JOIN users u ON u.id = l.creator_id AND u.enabled = TRUE
+LEFT JOIN users u ON u.id = l.creator_id AND u.enabled = TRUE
 WHERE l.workspace_id = ?
   AND l.public_id = ?
   AND l.enabled = TRUE
@@ -109,7 +109,7 @@ type GetLensByPublicIDRow struct {
 	PublicID           types.PublicID  `json:"publicId"`
 	WorkspaceID        uint32          `json:"-"`
 	CreatorPublicID    types.PublicID  `json:"creatorPublicId"`
-	CreatorDisplayName string          `json:"creatorDisplayName"`
+	CreatorDisplayName sql.NullString  `json:"creatorDisplayName"`
 	Name               string          `json:"name"`
 	Description        sql.NullString  `json:"description"`
 	LensJson           json.RawMessage `json:"lensJson"`
@@ -162,7 +162,7 @@ SELECT
   l.created_at,
   COUNT(*) OVER() AS total
 FROM lenses l
-INNER JOIN users u ON u.id = l.creator_id AND u.enabled = TRUE
+LEFT JOIN users u ON u.id = l.creator_id AND u.enabled = TRUE
 WHERE l.workspace_id = ?
   AND (l.project_id = ? OR l.project_id IS NULL)
   AND l.enabled = TRUE
@@ -180,7 +180,7 @@ type ListLensesForProjectParams struct {
 type ListLensesForProjectRow struct {
 	PublicID           types.PublicID  `json:"publicId"`
 	CreatorPublicID    types.PublicID  `json:"creatorPublicId"`
-	CreatorDisplayName string          `json:"creatorDisplayName"`
+	CreatorDisplayName sql.NullString  `json:"creatorDisplayName"`
 	Name               string          `json:"name"`
 	Description        sql.NullString  `json:"description"`
 	LensJson           json.RawMessage `json:"lensJson"`
@@ -195,6 +195,10 @@ type ListLensesForProjectRow struct {
 }
 
 // List enabled lenses scoped to a workspace + project (or workspace-wide when project_id IS NULL).
+// The creator is LEFT JOINed: a lens is a shared saved view, so suspending
+// the account that saved it must not remove it from everyone else's lens
+// list. `enabled = TRUE` stays in the ON clause so a suspended creator's
+// identity is withheld rather than the lens disappearing.
 func (q *Queries) ListLensesForProject(ctx context.Context, arg ListLensesForProjectParams) ([]ListLensesForProjectRow, error) {
 	rows, err := q.db.QueryContext(ctx, listLensesForProject,
 		arg.WorkspaceID,

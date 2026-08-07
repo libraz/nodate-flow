@@ -120,7 +120,7 @@ type ListCommentsForTaskParams struct {
 type ListCommentsForTaskRow struct {
 	PublicID          types.PublicID `json:"publicId"`
 	AuthorPublicID    types.PublicID `json:"authorPublicId"`
-	AuthorDisplayName string         `json:"authorDisplayName"`
+	AuthorDisplayName sql.NullString `json:"authorDisplayName"`
 	AuthorAvatarUrl   sql.NullString `json:"authorAvatarUrl"`
 	Body              string         `json:"body"`
 	EditedAt          sql.NullTime   `json:"editedAt"`
@@ -202,7 +202,7 @@ type ListCommentsForTaskKeysetParams struct {
 type ListCommentsForTaskKeysetRow struct {
 	PublicID          types.PublicID `json:"publicId"`
 	AuthorPublicID    types.PublicID `json:"authorPublicId"`
-	AuthorDisplayName string         `json:"authorDisplayName"`
+	AuthorDisplayName sql.NullString `json:"authorDisplayName"`
 	AuthorAvatarUrl   sql.NullString `json:"authorAvatarUrl"`
 	Body              string         `json:"body"`
 	EditedAt          sql.NullTime   `json:"editedAt"`

@@ -130,7 +130,7 @@ function AttachmentRow({
         <span className={styles.attachmentMeta}>
           <span>{formatBytes(attachment.byteSize, locale, t)}</span>
           <span>{attachment.contentType}</span>
-          <span>{attachment.uploaderName}</span>
+          <span>{attachment.uploaderName || t('common:common.deactivated_user')}</span>
           {created ? <span>{created}</span> : null}
         </span>
       </div>

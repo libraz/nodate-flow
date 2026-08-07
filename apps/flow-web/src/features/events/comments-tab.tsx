@@ -139,7 +139,9 @@ function EventCommentRow({
   return (
     <li className={styles.commentCard}>
       <header className={styles.commentHeader}>
-        <span className={styles.commentAuthor}>{comment.displayName}</span>
+        <span className={styles.commentAuthor}>
+          {comment.displayName || t('common:common.deactivated_user')}
+        </span>
         <span>
           <span className={styles.commentTimestamp}>{timestamp}</span>
           {edited ? <span className={styles.commentEdited}>·</span> : null}

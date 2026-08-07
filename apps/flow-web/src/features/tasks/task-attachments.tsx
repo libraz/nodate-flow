@@ -93,7 +93,9 @@ function AttachmentRow({
           <span>{formatBytes(attachment.byteSize, locale, t)}</span>
           <span>{attachment.contentType}</span>
           <span>
-            {t('tasks.attachments.uploaded_by', { name: attachment.uploaderDisplayName })}
+            {t('tasks.attachments.uploaded_by', {
+              name: attachment.uploaderDisplayName || t('common.deactivated_user'),
+            })}
           </span>
         </span>
       </div>

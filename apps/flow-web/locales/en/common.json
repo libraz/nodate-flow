@@ -2,6 +2,7 @@
   "common": {
     "breadcrumb": "Breadcrumb",
     "unknown_role": "Unknown role",
+    "deactivated_user": "Deactivated user",
     "network_error": "Network error. Check your connection and try again.",
     "date": {
       "placeholder": "Select a date"

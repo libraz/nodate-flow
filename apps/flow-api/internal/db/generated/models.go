@@ -4363,7 +4363,7 @@ type VCommentForTask struct {
 	TaskPublicID                      []byte          `json:"taskPublicId"`
 	PublicID                          types.PublicID  `json:"publicId"`
 	AuthorPublicID                    types.PublicID  `json:"authorPublicId"`
-	AuthorDisplayName                 string          `json:"authorDisplayName"`
+	AuthorDisplayName                 sql.NullString  `json:"authorDisplayName"`
 	AuthorAvatarUrl                   sql.NullString  `json:"authorAvatarUrl"`
 	AuthorAvatarStorageObjectID       sql.NullInt32   `json:"-"`
 	AuthorAvatarStorageObjectPublicID *types.PublicID `json:"authorAvatarStorageObjectPublicId"`

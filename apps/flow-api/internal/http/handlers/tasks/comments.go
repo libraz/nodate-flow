@@ -177,8 +177,8 @@ func ListComments(deps Deps) func(context.Context, *ListTaskCommentsInput) (*Lis
 func rowToCommentKeyset(r generated.ListCommentsForTaskKeysetRow) TaskComment {
 	return TaskComment{
 		ID:                r.PublicID.String(),
-		AuthorID:          r.AuthorPublicID.String(),
-		AuthorDisplayName: r.AuthorDisplayName,
+		AuthorID:          publicIDOrEmpty(r.AuthorPublicID),
+		AuthorDisplayName: bylineDisplayName(r.AuthorDisplayName),
 		AuthorAvatarURL:   nullStr(r.AuthorAvatarUrl),
 		Body:              r.Body,
 		EditedAt:          nullTimeUnix(r.EditedAt),

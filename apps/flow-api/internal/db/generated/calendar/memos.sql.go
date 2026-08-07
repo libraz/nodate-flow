@@ -146,7 +146,7 @@ SELECT
   m.updated_at,
   m.created_at
 FROM calendar_memos m
-INNER JOIN users u ON u.id = m.created_by_user_id AND u.enabled = TRUE
+LEFT JOIN users u ON u.id = m.created_by_user_id AND u.enabled = TRUE
 WHERE m.calendar_id = ?
   AND m.workspace_id = ?
   AND m.enabled = TRUE
@@ -166,12 +166,17 @@ type ListCalendarMemosRow struct {
 	SortWeight      int32          `json:"sortWeight"`
 	CreatedByUserID uint32         `json:"-"`
 	UserPublicID    types.PublicID `json:"userPublicId"`
-	DisplayName     string         `json:"displayName"`
+	DisplayName     sql.NullString `json:"displayName"`
 	UpdatedAt       sql.NullTime   `json:"updatedAt"`
 	CreatedAt       time.Time      `json:"createdAt"`
 }
 
 // List memos for a calendar in display order.
+// The creator is LEFT JOINed: a memo belongs to the shared calendar, so
+// suspending the account that wrote it must not remove it from the calendar
+// everyone else is reading. `enabled = TRUE` stays in the ON clause so a
+// suspended creator's identity is withheld rather than the memo
+// disappearing.
 func (q *Queries) ListCalendarMemos(ctx context.Context, arg ListCalendarMemosParams) ([]ListCalendarMemosRow, error) {
 	rows, err := q.db.QueryContext(ctx, listCalendarMemos, arg.CalendarID, arg.WorkspaceID)
 	if err != nil {

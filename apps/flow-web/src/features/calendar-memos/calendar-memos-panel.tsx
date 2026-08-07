@@ -380,7 +380,12 @@ function MemoRow({ memo, onUpdate, onDelete }: MemoRowProps): ReactElement {
     onUpdate({ done: !memo.done });
   };
 
-  const attribution = memo.userDisplayName.trim();
+  // An optimistic row has no author until the server answers, so it shows no
+  // attribution at all. A saved row with an empty name is one whose author has
+  // since been deactivated: the memo stays on the calendar and only the byline
+  // falls back to a placeholder.
+  const authorName = memo.userDisplayName.trim();
+  const attribution = isOptimistic ? '' : authorName || t('common.deactivated_user');
 
   return (
     <li className={styles.row}>

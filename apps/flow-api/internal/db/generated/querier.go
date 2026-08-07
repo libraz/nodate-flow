@@ -1025,6 +1025,11 @@ type Querier interface {
 	// List attachments on a task with uploader display fields and the
 	// storage_objects metadata flattened in via JOIN. Returns total via a
 	// window function for paginated UI.
+	// The uploader is LEFT JOINed: the attachment belongs to the task, not to
+	// the account that uploaded it, so suspending that account must not take
+	// the file off everyone else's task. `enabled = TRUE` stays in the ON
+	// clause so a suspended uploader's identity is withheld (NULL columns,
+	// rendered as an unknown user) instead of the row disappearing.
 	ListAttachmentsForTask(ctx context.Context, arg ListAttachmentsForTaskParams) ([]ListAttachmentsForTaskRow, error)
 	// Enumerate task attachments uploaded by a user across every workspace
 	// they belong to, joined with the underlying storage_objects so the
@@ -1191,6 +1196,10 @@ type Querier interface {
 	// List all labels in a workspace, optionally filtered by project.
 	ListLabelsForWorkspace(ctx context.Context, arg ListLabelsForWorkspaceParams) ([]ListLabelsForWorkspaceRow, error)
 	// List enabled lenses scoped to a workspace + project (or workspace-wide when project_id IS NULL).
+	// The creator is LEFT JOINed: a lens is a shared saved view, so suspending
+	// the account that saved it must not remove it from everyone else's lens
+	// list. `enabled = TRUE` stays in the ON clause so a suspended creator's
+	// identity is withheld rather than the lens disappearing.
 	ListLensesForProject(ctx context.Context, arg ListLensesForProjectParams) ([]ListLensesForProjectRow, error)
 	// List the events a task is linked to (optionally filtered by relation).
 	// @relation may be an empty string to include all relations.
@@ -1482,6 +1491,11 @@ type Querier interface {
 	// List webhook subscriptions for a workspace with pagination.
 	ListWebhookSubscriptions(ctx context.Context, arg ListWebhookSubscriptionsParams) ([]ListWebhookSubscriptionsRow, error)
 	// List enabled widgets for a workspace with creator info, ordered by sort_weight.
+	// The creator is LEFT JOINed: a widget belongs to the workspace dashboard
+	// everyone shares, so suspending the account that placed it must not blank
+	// out the dashboard for the rest of the team. `enabled = TRUE` stays in the
+	// ON clause so a suspended creator's identity is withheld rather than the
+	// widget disappearing.
 	ListWidgetsForWorkspace(ctx context.Context, arg ListWidgetsForWorkspaceParams) ([]ListWidgetsForWorkspaceRow, error)
 	// Cursor-paginated workspace activity timeline drawn from
 	// v_workspace_activity (audit_logs UNION ALL ai_invocations UNION ALL

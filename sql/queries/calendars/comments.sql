@@ -12,6 +12,11 @@ INSERT INTO calendar_event_comments (
 -- List comments on an event in chronological order. Paginated
 -- (LIMIT/OFFSET) so the result set is always bounded; total carries the
 -- pre-page count.
+-- The author is LEFT JOINed: a comment is part of the event's discussion,
+-- so suspending the account that wrote it must not erase what was said for
+-- the rest of the attendees. `enabled = TRUE` stays in the ON clause so a
+-- suspended author's identity is withheld rather than the comment
+-- disappearing.
 SELECT
   c.public_id,
   c.author_id,
@@ -23,7 +28,7 @@ SELECT
   c.created_at,
   COUNT(*) OVER() AS total
 FROM calendar_event_comments c
-INNER JOIN users u ON u.id = c.author_id AND u.enabled = TRUE
+LEFT JOIN users u ON u.id = c.author_id AND u.enabled = TRUE
 WHERE c.event_id = ?
   AND c.workspace_id = ?
   AND c.enabled = TRUE

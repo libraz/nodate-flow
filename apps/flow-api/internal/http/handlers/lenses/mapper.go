@@ -60,8 +60,8 @@ func rowToLensFromList(r generated.ListLensesForProjectRow) SavedLens {
 	filter, sort, groupBy := parseLensJSON(r.LensJson)
 	return SavedLens{
 		ID:                 r.PublicID.String(),
-		CreatorID:          r.CreatorPublicID.String(),
-		CreatorDisplayName: r.CreatorDisplayName,
+		CreatorID:          publicIDOrEmpty(r.CreatorPublicID),
+		CreatorDisplayName: bylineDisplayName(r.CreatorDisplayName),
 		Name:               r.Name,
 		Description:        nullString(r.Description),
 		Filter:             filter,
@@ -82,8 +82,8 @@ func rowToLensFromGet(r generated.GetLensByPublicIDRow) SavedLens {
 	filter, sort, groupBy := parseLensJSON(r.LensJson)
 	return SavedLens{
 		ID:                 r.PublicID.String(),
-		CreatorID:          r.CreatorPublicID.String(),
-		CreatorDisplayName: r.CreatorDisplayName,
+		CreatorID:          publicIDOrEmpty(r.CreatorPublicID),
+		CreatorDisplayName: bylineDisplayName(r.CreatorDisplayName),
 		Name:               r.Name,
 		Description:        nullString(r.Description),
 		Filter:             filter,
@@ -133,6 +133,14 @@ func rowToPublicLensTask(r generated.ListPublicLensTasksRow) PublicLensTask {
 
 // nullTimeUnix delegates to handlerutil.NullTimeUnix (returns *int64, nil for NULL).
 var nullTimeUnix = handlerutil.NullTimeUnix
+
+// bylineDisplayName and publicIDOrEmpty delegate to handlerutil. A lens is a
+// shared saved view, so a suspended creator empties the byline rather than
+// dropping the lens out of everyone else's list.
+var (
+	bylineDisplayName = handlerutil.BylineDisplayName
+	publicIDOrEmpty   = handlerutil.PublicIDOrEmpty
+)
 
 // nullString delegates to handlerutil.NullStrPtr.
 var nullString = handlerutil.NullStrPtr

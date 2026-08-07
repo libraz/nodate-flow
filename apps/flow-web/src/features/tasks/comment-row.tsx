@@ -116,7 +116,7 @@ export default function CommentRow({
   return (
     <Card className={styles.card}>
       <header className={styles.header}>
-        <strong>{comment.authorDisplayName}</strong>
+        <strong>{comment.authorDisplayName || t('common.deactivated_user')}</strong>
         <div className={styles.headerRight}>
           <span className={styles.timestamp}>{formatEpochDateTime(comment.createdAt, locale)}</span>
           {edited ? <span className={styles.editedHint}>{t('tasks.comments.edited')}</span> : null}

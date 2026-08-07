@@ -286,6 +286,12 @@ LIMIT 1000;
 -- (belt-and-braces beyond the soft-disable cascade). Backs GET
 -- /me/calendar-events for the unified flow-web calendar so the client
 -- does not fan out one request per workspace.
+-- The owner is LEFT JOINed for the same reason the creator already is: the
+-- event exists for everyone on the calendar, so suspending its owner must
+-- not make it vanish from the agendas of the members still using it. Access
+-- is decided by workspace_members + calendar_members below, and
+-- scrubEventDetails compares the raw ce.owner_user_id, so nothing about
+-- visibility rests on this join.
 SELECT
   ce.public_id,
   ce.calendar_id,
@@ -329,7 +335,7 @@ INNER JOIN calendars c
   ON c.id = ce.calendar_id AND c.enabled = TRUE
 INNER JOIN workspaces w
   ON w.id = ce.workspace_id AND w.enabled = TRUE
-INNER JOIN users uo
+LEFT JOIN users uo
   ON uo.id = ce.owner_user_id AND uo.enabled = TRUE
 LEFT JOIN users uc
   ON uc.id = ce.created_by_user_id
@@ -362,7 +368,8 @@ LIMIT 2000;
 -- name: ListMyRecurringCalendarEventsAcrossWorkspaces :many
 -- Cross-workspace recurring variant. Same membership guard as the
 -- non-recurring query. Clients expand RRULE instances client-side via
--- the shared recurrence expander.
+-- the shared recurrence expander. The owner is LEFT JOINed for the same
+-- reason as in the non-recurring query.
 SELECT
   ce.public_id,
   ce.calendar_id,
@@ -409,7 +416,7 @@ INNER JOIN calendars c
   ON c.id = ce.calendar_id AND c.enabled = TRUE
 INNER JOIN workspaces w
   ON w.id = ce.workspace_id AND w.enabled = TRUE
-INNER JOIN users uo
+LEFT JOIN users uo
   ON uo.id = ce.owner_user_id AND uo.enabled = TRUE
 LEFT JOIN users uc
   ON uc.id = ce.created_by_user_id

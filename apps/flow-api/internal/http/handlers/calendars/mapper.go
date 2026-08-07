@@ -98,10 +98,12 @@ func baseEventResponse(c eventCommon) EventResponse {
 	}
 }
 
-// creatorPublicIDString renders a creator public_id to its UUID string,
-// returning "" for the zero value. The creator JOIN is a LEFT JOIN, so a
-// hard-deleted creator (CASCADE normally prevents this) scans as the zero
-// PublicID; we suppress that rather than emit a zero UUID.
+// creatorPublicIDString renders a creator or owner public_id to its UUID
+// string, returning "" for the zero value. Both joins are LEFT JOINs, so a
+// hard-deleted user (CASCADE normally prevents this) and a suspended one
+// scan as the zero PublicID; we suppress that rather than emit a zero UUID.
+// The event stays in the response either way — an event belongs to the
+// calendar its members share, not to the account that owns the row.
 func creatorPublicIDString(id types.PublicID) string {
 	if id == (types.PublicID{}) {
 		return ""

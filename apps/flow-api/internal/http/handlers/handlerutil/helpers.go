@@ -237,6 +237,25 @@ func PublicIDOrEmpty(p types.PublicID) string {
 	return p.String()
 }
 
+// BylineDisplayName renders the display name of the user a row is
+// attributed to — the uploader of an attachment, the author of a comment,
+// the creator of a lens or widget.
+//
+// Those users are LEFT JOINed with `enabled = TRUE` in the ON clause, so a
+// suspended account yields a NULL name and this returns "". The row stays:
+// the file, comment, lens and widget belong to the workspace, not to the
+// account that produced them, and suspending someone must not delete their
+// contributions out from under the rest of the team. What is withheld is
+// only the byline. Clients render their own placeholder for the empty
+// string; pair this with [PublicIDOrEmpty] for the matching id, which goes
+// empty at the same time.
+//
+// `enabled = TRUE` may still gate the row itself when the user is what the
+// row is about: membership lists, actor and attendee rows, credentials.
+func BylineDisplayName(s sql.NullString) string {
+	return dbtype.StringFromNullString(s)
+}
+
 // NullInt32From wraps a non-null uint32 (typically an internal row ID
 // resolved earlier in the handler) into a sql.NullInt32 suitable for
 // passing to sqlc-generated query params whose underlying column is

@@ -16,6 +16,11 @@ INSERT INTO attachments (
 -- List attachments on a task with uploader display fields and the
 -- storage_objects metadata flattened in via JOIN. Returns total via a
 -- window function for paginated UI.
+-- The uploader is LEFT JOINed: the attachment belongs to the task, not to
+-- the account that uploaded it, so suspending that account must not take
+-- the file off everyone else's task. `enabled = TRUE` stays in the ON
+-- clause so a suspended uploader's identity is withheld (NULL columns,
+-- rendered as an unknown user) instead of the row disappearing.
 SELECT
   a.public_id,
   u.public_id AS uploader_public_id,
@@ -31,7 +36,7 @@ SELECT
   COUNT(*) OVER() AS total
 FROM attachments a
 INNER JOIN tasks t ON t.id = a.task_id AND t.enabled = TRUE
-INNER JOIN users u ON u.id = a.uploader_id AND u.enabled = TRUE
+LEFT JOIN users u ON u.id = a.uploader_id AND u.enabled = TRUE
 INNER JOIN storage_objects so ON so.id = a.storage_object_id AND so.enabled = TRUE
 WHERE a.workspace_id = ?
   AND t.public_id = ?

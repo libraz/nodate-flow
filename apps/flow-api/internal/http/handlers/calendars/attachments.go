@@ -176,8 +176,8 @@ func ListAttachments(deps Deps) func(context.Context, *ListAttachmentsInput) (*L
 				ByteSize:        r.ByteSize,
 				StorageKey:      r.StorageKey,
 				ChecksumSHA256:  hex.EncodeToString(r.Sha256),
-				UploaderID:      r.UserPublicID.String(),
-				UploaderName:    r.DisplayName,
+				UploaderID:      handlerutil.PublicIDOrEmpty(r.UserPublicID),
+				UploaderName:    handlerutil.BylineDisplayName(r.DisplayName),
 				CreatedAt:       r.CreatedAt.Unix(),
 			}
 		}

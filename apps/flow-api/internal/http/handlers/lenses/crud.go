@@ -241,8 +241,8 @@ func Update(deps Deps) func(context.Context, *UpdateLensInput) (*UpdateLensOutpu
 
 		return &UpdateLensOutput{Body: SavedLens{
 			ID:                 existing.PublicID.String(),
-			CreatorID:          existing.CreatorPublicID.String(),
-			CreatorDisplayName: existing.CreatorDisplayName,
+			CreatorID:          publicIDOrEmpty(existing.CreatorPublicID),
+			CreatorDisplayName: bylineDisplayName(existing.CreatorDisplayName),
 			Name:               name,
 			Description:        nullString(description),
 			Filter:             filter,

@@ -12,6 +12,11 @@ INSERT INTO calendar_memos (
 
 -- name: ListCalendarMemos :many
 -- List memos for a calendar in display order.
+-- The creator is LEFT JOINed: a memo belongs to the shared calendar, so
+-- suspending the account that wrote it must not remove it from the calendar
+-- everyone else is reading. `enabled = TRUE` stays in the ON clause so a
+-- suspended creator's identity is withheld rather than the memo
+-- disappearing.
 SELECT
   m.public_id,
   m.title,
@@ -24,7 +29,7 @@ SELECT
   m.updated_at,
   m.created_at
 FROM calendar_memos m
-INNER JOIN users u ON u.id = m.created_by_user_id AND u.enabled = TRUE
+LEFT JOIN users u ON u.id = m.created_by_user_id AND u.enabled = TRUE
 WHERE m.calendar_id = ?
   AND m.workspace_id = ?
   AND m.enabled = TRUE
