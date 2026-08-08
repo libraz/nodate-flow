@@ -222,6 +222,23 @@
   gap: var(--nf-space-2);
 }
 
+/*
+ * Sits under the field's ordinary hint and has to read as a different
+ * kind of sentence — a boundary, not more help text. Warning foreground
+ * rather than danger: nothing has gone wrong yet, and colouring an
+ * always-present note as an error teaches people to look past it.
+ */
+.configCaution {
+  display: block;
+  margin-block-start: var(--nf-space-1);
+  color: var(--nf-color-warning-fg);
+}
+
+.configCautionLink {
+  color: inherit;
+  text-decoration: underline;
+}
+
 .configTextarea {
   font-family: var(--nf-font-mono, monospace);
   font-size: var(--nf-text-sm);

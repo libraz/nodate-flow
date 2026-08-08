@@ -612,7 +612,9 @@
           },
           "config": {
             "label": "Configuration JSON",
-            "hint": "Source-specific configuration. Leave empty if not needed.",
+            "hint": "Source-specific settings for this import, stored and returned exactly as written.",
+            "no_credentials": "Not a place for credentials: no tokens, API keys, or passwords. This field is not encrypted, and the server refuses them.",
+            "credentials_where": "Connect the service in integration settings instead",
             "invalid": "Configuration must be valid JSON."
           },
           "submit": "Start import",

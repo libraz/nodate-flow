@@ -30,6 +30,7 @@
  *   - {@link useExportTasksMutation}       — GET export/tasks + Blob download
  */
 
+import { WsErrors } from '@nodate-flow/sdk';
 import Badge, { type BadgeTone } from '@nodate-flow/ui/primitives/badge';
 import Button from '@nodate-flow/ui/primitives/button';
 import Card from '@nodate-flow/ui/primitives/card';
@@ -39,11 +40,11 @@ import Select from '@nodate-flow/ui/primitives/select';
 import Spinner from '@nodate-flow/ui/primitives/spinner';
 import Textarea from '@nodate-flow/ui/primitives/textarea';
 import { toaster } from '@nodate-flow/ui/primitives/toast';
-import { getRouteApi } from '@tanstack/react-router';
+import { getRouteApi, Link } from '@tanstack/react-router';
 import { type ChangeEvent, type FormEvent, type ReactElement, Suspense, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { formatApiError } from '../../lib/api-error';
+import { ApiError, formatApiError } from '../../lib/api-error';
 import { confirmAction } from '../../lib/confirm-action';
 import { type Project, useProjectsQuery } from '../projects/api';
 import {
@@ -212,6 +213,26 @@ function ImportRow({ job, locale, cancelPending, onCancel }: ImportRowProps): Re
   );
 }
 
+/**
+ * The two ways the server refuses a configuration: a key the source does
+ * not define, and a key whose name says it carries a credential. Both
+ * are about the configuration field specifically, so both belong on it.
+ *
+ * The codes come from the generated error module rather than being
+ * spelled out here, so renaming one in `errors/ws.yaml` moves this with
+ * it instead of quietly turning the branch off.
+ */
+const CONFIG_REJECTION_CODES: readonly string[] = [
+  WsErrors.WS_IMPORT_CONFIG_SECRET_REJECTED.code,
+  WsErrors.WS_IMPORT_CONFIG_KEY_UNKNOWN.code,
+];
+
+function isConfigRejection(err: unknown): boolean {
+  return (
+    err instanceof ApiError && err.code !== undefined && CONFIG_REJECTION_CODES.includes(err.code)
+  );
+}
+
 interface ImportCreateFormProps {
   workspaceId: string;
 }
@@ -300,10 +321,18 @@ function ImportCreateForm({ workspaceId }: ImportCreateFormProps): ReactElement 
           setConfigError(null);
         },
         onError: (err) => {
-          toaster.show({
-            tone: 'danger',
-            message: formatApiError(err, t, 'settings.data.imports.create.error'),
-          });
+          const message = formatApiError(err, t, 'settings.data.imports.create.error');
+          // A rejected configuration is a problem with one field, and
+          // the two rejections ask for different things — drop the key,
+          // or move the credential somewhere it belongs. Both land on
+          // the field the reader has to edit, where the message stays
+          // put while they fix it and the caution above it is still in
+          // view, rather than in a toast that leaves.
+          if (isConfigRejection(err)) {
+            setConfigError(message);
+            return;
+          }
+          toaster.show({ tone: 'danger', message });
         },
       },
     );
@@ -340,7 +369,26 @@ function ImportCreateForm({ workspaceId }: ImportCreateFormProps): ReactElement 
       </div>
       <FormField
         label={t('settings.data.imports.create.config.label')}
-        description={t('settings.data.imports.create.config.hint')}
+        description={
+          <>
+            {t('settings.data.imports.create.config.hint')}
+            {/*
+              The field is a free-form JSON box on a screen about
+              connecting GitHub and Jira, which reads as an invitation to
+              paste a personal access token. It is stored in plaintext,
+              so say what it is for before someone does. The server
+              refuses credentials either way; being told after a failed
+              submit is being told once the token is already on a
+              clipboard and in a form field.
+            */}
+            <span className={styles.configCaution}>
+              {t('settings.data.imports.create.config.no_credentials')}{' '}
+              <Link to="/settings/integrations" className={styles.configCautionLink}>
+                {t('settings.data.imports.create.config.credentials_where')}
+              </Link>
+            </span>
+          </>
+        }
         {...(configError ? { error: configError } : {})}
       >
         {(control) => (
