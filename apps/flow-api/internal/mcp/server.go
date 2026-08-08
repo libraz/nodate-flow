@@ -86,6 +86,15 @@ type mcpRateLimiter struct {
 
 type tokenBucket struct {
 	timestamps []time.Time
+	// throttling records that this bucket has already refused a request
+	// and has not admitted one since. It exists so the audit trail gets
+	// one row per throttling episode instead of one per refused request:
+	// a client that keeps firing after it is capped is precisely the
+	// client that would otherwise turn a cheap in-memory refusal into an
+	// unbounded stream of INSERTs, which is a worse outcome than the
+	// missing record. It clears on the next admitted request, so a token
+	// that trips the limiter again tomorrow is recorded again.
+	throttling bool
 }
 
 func newMCPRateLimiter() mcpRateLimiter {
@@ -98,7 +107,11 @@ func newMCPRateLimiter() mcpRateLimiter {
 
 // allow checks whether the token is within its rate limit. Returns true
 // if allowed, false if the limit is exceeded.
-func (rl *mcpRateLimiter) allow(token string) (bool, time.Duration) {
+//
+// firstRefusal is true only on the refusal that begins a throttling
+// episode — the caller uses it to decide whether the refusal is worth an
+// audit row. See [tokenBucket.throttling].
+func (rl *mcpRateLimiter) allow(token string) (allowed bool, retryAfter time.Duration, firstRefusal bool) {
 	now := time.Now()
 	rl.mu.Lock()
 	defer rl.mu.Unlock()
@@ -131,15 +144,18 @@ func (rl *mcpRateLimiter) allow(token string) (bool, time.Duration) {
 	b.timestamps = b.timestamps[:n]
 
 	if len(b.timestamps) >= rl.maxReqs {
-		retryAfter := b.timestamps[0].Add(rl.window).Sub(now)
-		if retryAfter < time.Second {
-			retryAfter = time.Second
+		wait := b.timestamps[0].Add(rl.window).Sub(now)
+		if wait < time.Second {
+			wait = time.Second
 		}
-		return false, retryAfter
+		first := !b.throttling
+		b.throttling = true
+		return false, wait, first
 	}
 
 	b.timestamps = append(b.timestamps, now)
-	return true, 0
+	b.throttling = false
+	return true, 0, false
 }
 
 // NewHandler constructs the MCP HTTP handler with the default tool
@@ -199,6 +215,10 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		var ae *apierrors.APIError
 		if errors.As(err, &ae) {
+			// session is non-nil exactly when the token resolved to a
+			// workspace but was refused anyway (expiry); that is the
+			// refusal the audit trail has to carry.
+			h.auditTransportRefusal(r.Context(), session, ae.Spec)
 			writeRPCTransportError(w, req.ID, ae.Spec, ae.Spec.Message)
 			return
 		}
@@ -209,7 +229,10 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// Per-token rate limiting. Hash the token so the plaintext is never
 	// stored as a map key in the rate limiter.
 	tokHash := hashToken(tok)
-	if allowed, retryAfter := h.rl.allow(tokHash); !allowed {
+	if allowed, retryAfter, first := h.rl.allow(tokHash); !allowed {
+		if first {
+			h.auditTransportRefusal(r.Context(), session, apierrors.RateLimitExceeded)
+		}
 		w.Header().Set("Retry-After", strconv.Itoa(int(retryAfter.Seconds())))
 		writeRPCTransportError(w, req.ID, apierrors.RateLimitExceeded, "rate limit exceeded")
 		return
@@ -510,7 +533,10 @@ func (h *Handler) loadAgentGuardSnapshot(ctx context.Context, agentID uint32) (a
 	var scopes []string
 	if len(row.AllowedScopesJson) > 0 {
 		if uerr := json.Unmarshal(row.AllowedScopesJson, &scopes); uerr != nil {
-			slog.WarnContext(ctx, "mcp: malformed allowed_scopes_json", slog.Int("agent_id", int(agentID)), slog.String("err", uerr.Error()))
+			// The agent goes unnamed here: GetAgentGuardSnapshot projects
+			// only the guard columns, so the sole identifier in scope is
+			// the internal id, which must not reach a log line.
+			slog.WarnContext(ctx, "mcp: malformed allowed_scopes_json", slog.String("err", uerr.Error()))
 		}
 	}
 	var costCap *int64
@@ -605,6 +631,30 @@ func invocationActor(s *session) (userID, agentID sql.NullInt32) {
 		agentID = sql.NullInt32{Int32: int32(s.agentID), Valid: true} //#nosec G115 -- agent id is ai_agents.id (BIGINT UNSIGNED), fits int32 within realistic deployments
 	}
 	return userID, agentID
+}
+
+// auditTransportRefusal records a refusal that happens before any tool
+// is named — an expired token, or a throttled request.
+//
+// Both are refusals the operator has the most reason to want to see and
+// the least other way to find. A tool call that is denied for scope
+// leaves a row; a token that has been expired for a week and is still
+// being presented every second left nothing at all, and neither did the
+// burst that tripped the limiter. What the timeline showed instead was
+// an agent that simply stopped appearing, which reads as an idle agent
+// rather than one being turned away.
+//
+// tool_name is empty because the refusal happened before the frame was
+// dispatched — the row records that the caller was turned away, not what
+// it wanted. A nil session means the token named no workspace (unknown
+// token), and there is no tenant to write the row under; those refusals
+// stay unrecorded by design rather than landing in someone else's
+// workspace.
+func (h *Handler) auditTransportRefusal(ctx context.Context, s *session, spec *apierrors.Spec) {
+	if s == nil || spec == nil {
+		return
+	}
+	h.audit(ctx, s, "", nil, nil, generated.McpInvocationsStatusDenied, spec.Code, 0)
 }
 
 // audit writes a single mcp_invocations row. It never returns an error

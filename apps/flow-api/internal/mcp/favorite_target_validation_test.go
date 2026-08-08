@@ -12,7 +12,7 @@ func TestRunAddFavoriteValidatesTargetBeforeInsert(t *testing.T) {
 		t.Fatal(err)
 	}
 	body := string(src)
-	targetCheck := "ensureMCPFavoriteTargetExists(ctx, deps.Queries, s.workspaceID, tt, targetPub)"
+	targetCheck := "ensureMCPFavoriteTargetExists(ctx, deps, s, tt, in.TargetID, targetPub)"
 	insert := "deps.Queries.CreateFavorite"
 	if !strings.Contains(body, targetCheck) {
 		t.Fatal("runAddFavorite must validate that the target exists")

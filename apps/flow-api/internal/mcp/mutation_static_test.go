@@ -20,8 +20,14 @@ var mutationLogGates = map[string]bool{
 }
 
 // writeToolsWithoutMutationLog lists the write-scoped tools that record
-// nothing because they change nothing. Both ask a model a question and
-// hand the answer back; neither writes a row.
+// nothing because they change nothing a person could later find missing.
+//
+// write:workspace is not a synonym for "mutates": the scope also covers
+// spending the workspace's AI budget, because a read-only token's holder
+// cannot undo a charge (see the scope vocabulary on session.hasScope).
+// Every entry below is in the scope for that second reason, so the
+// justification each one needs is that it writes no workspace state — not
+// that it is harmless.
 //
 // The map is an allowlist rather than documentation: a newly registered
 // write:workspace tool is absent from it and therefore fails
@@ -31,6 +37,10 @@ var mutationLogGates = map[string]bool{
 var writeToolsWithoutMutationLog = map[string]string{
 	"propose_tasks_from": "asks the model for task candidates and returns them; persists nothing",
 	"propose_priority":   "asks the model for a priority and returns it; persists nothing",
+	"propose_steps":      "asks the model for a task breakdown and returns it; apply_steps is what persists",
+	"propose_lens":       "compiles a query into a lens definition and returns it; persists nothing",
+	"propose_duplicates": "similarity search; the only write is the task's own embedding, a derived cache",
+	"propose_relations":  "similarity search; the only write is the task's own embedding, a derived cache",
 }
 
 // readToolsRequiringMutationLog names the read-scoped tools that must

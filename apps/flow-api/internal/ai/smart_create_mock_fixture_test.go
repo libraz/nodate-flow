@@ -3,6 +3,7 @@ package ai
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"testing"
 
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/ai/providers"
@@ -44,15 +45,15 @@ func TestMockFixtureRoutingForSmartCreate(t *testing.T) {
 	}
 }
 
-// TestMockFixtureFallbackUnchanged pins the historical default. Routing was
-// added for smart create only; every other purpose must keep receiving the
-// inbox-triage fixture so existing tests are unaffected.
-func TestMockFixtureFallbackUnchanged(t *testing.T) {
+// TestMockFixtureRoutingForInboxTriage proves the inbox-triage prompt still
+// reaches its own fixture now that it is routed by marker rather than
+// reached by falling through.
+func TestMockFixtureRoutingForInboxTriage(t *testing.T) {
 	t.Parallel()
 
 	prov := providers.NewMockProvider("")
 	resp, err := prov.Complete(context.Background(), providers.Request{
-		System: "some other orchestrator purpose",
+		System: proposeInboxTriageSystem,
 	})
 	if err != nil {
 		t.Fatalf("mock provider: %v", err)
@@ -61,9 +62,25 @@ func TestMockFixtureFallbackUnchanged(t *testing.T) {
 		InboxItemID string `json:"inboxItemId"`
 	}
 	if err := json.Unmarshal([]byte(resp.Text), &triage); err != nil {
-		t.Fatalf("unrouted purposes must still receive the inbox_triage fixture, got %q: %v", resp.Text, err)
+		t.Fatalf("inbox-triage prompt must resolve to the inbox_triage fixture, got %q: %v", resp.Text, err)
 	}
 	if len(triage) == 0 {
 		t.Fatal("the inbox_triage fixture must stay non-empty")
+	}
+}
+
+// TestMockFixtureUnroutedPurposeFails proves an unrouted purpose is refused
+// rather than answered with somebody else's fixture. Answering it produced a
+// proposal in the wrong shape that still looked deliberate, and the caller
+// had no way to tell.
+func TestMockFixtureUnroutedPurposeFails(t *testing.T) {
+	t.Parallel()
+
+	prov := providers.NewMockProvider("")
+	resp, err := prov.Complete(context.Background(), providers.Request{
+		System: "some other orchestrator purpose",
+	})
+	if !errors.Is(err, providers.ErrMockFixtureUnrouted) {
+		t.Fatalf("unrouted purpose must fail with ErrMockFixtureUnrouted; got resp=%v err=%v", resp, err)
 	}
 }

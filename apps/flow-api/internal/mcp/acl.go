@@ -39,9 +39,18 @@ type session struct {
 //
 // The vocabulary is the closed set in [SupportedScopes]:
 //
-//   - read:workspace  — invoke read-only tools across the workspace.
-//   - write:workspace — additionally invoke every mutating tool; it
-//     widens to read:workspace.
+//   - read:workspace  — invoke tools that neither change workspace state
+//     nor spend the workspace's AI budget.
+//   - write:workspace — additionally invoke every mutating tool and every
+//     tool that bills an upstream model; it widens to read:workspace.
+//
+// Cost sits on the write side of that line, not the mutation boundary
+// alone. A read-only token is handed out as the safe one, and the
+// proposal tools persist nothing — but each call charges the workspace's
+// provider account, and the holder of a read token cannot undo the
+// charge. The tools were split across both scopes on the mutation reading
+// alone: propose_priority required write while propose_steps, which
+// prompts the same model, required read.
 //
 // Matching is therefore a membership test with write-implies-read
 // widening — there is no "read:calendar" or "write:task:complete"
@@ -72,6 +81,16 @@ func (s *session) hasScope(required string) bool {
 // token revocation, expiry, parses scopes_json, and returns the
 // resolved workspace and user ids. Scope enforcement is applied per
 // tool call, not here.
+//
+// On expiry it returns both a non-nil session and a non-nil error. The
+// session is not an authorisation — the caller must still refuse the
+// request — but the token did name a workspace, a user and possibly an
+// agent, and that is exactly what the refusal has to be recorded
+// against. Returning only the error would leave an expired agent token
+// hammering the surface with nothing in mcp_invocations to see it by,
+// which is the case an audit trail exists for. A token that matches no
+// row names nothing, so that refusal still returns a nil session and
+// cannot be recorded.
 func (h *Handler) authenticate(ctx context.Context, tok string) (*session, error) {
 	if h.deps.Queries == nil {
 		return nil, apierrors.New(apierrors.InternalUnexpected)
@@ -83,13 +102,18 @@ func (h *Handler) authenticate(ctx context.Context, tok string) (*session, error
 		}
 		return nil, err
 	}
-	if row.ExpiresAt.Valid && row.ExpiresAt.Time.Before(time.Now()) {
-		return nil, apierrors.New(apierrors.McpTokenExpired)
-	}
 	scopes := parseScopes(row.ScopesJson)
 	var agentID uint32
 	if row.AgentID.Valid {
 		agentID = uint32(row.AgentID.Int32) //#nosec G115 -- agent_id is agents.id (BIGINT UNSIGNED), fits uint32 within realistic deployments
+	}
+	if row.ExpiresAt.Valid && row.ExpiresAt.Time.Before(time.Now()) {
+		return &session{
+			userID:      row.UserID,
+			workspaceID: row.WorkspaceID,
+			agentID:     agentID,
+			scopes:      scopes,
+		}, apierrors.New(apierrors.McpTokenExpired)
 	}
 	// Stamp last_used_at so the token-list UI can surface usage and a
 	// leaked-token signal is not dead. Best-effort only: auth must never

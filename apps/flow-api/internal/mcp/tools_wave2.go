@@ -88,11 +88,8 @@ func runAddFavorite(ctx context.Context, deps Deps, s *session, raw json.RawMess
 	if err != nil {
 		return nil, apierrors.New(apierrors.McpToolArgumentsInvalid)
 	}
-	if err := ensureMCPFavoriteTargetExists(ctx, deps.Queries, s.workspaceID, tt, targetPub); err != nil {
-		if stderrors.Is(err, sql.ErrNoRows) {
-			return nil, apierrors.New(apierrors.McpToolArgumentsInvalid)
-		}
-		return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
+	if err := ensureMCPFavoriteTargetExists(ctx, deps, s, tt, in.TargetID, targetPub); err != nil {
+		return nil, err
 	}
 	// Check for existing favorite to avoid duplicates.
 	_, err = deps.Queries.FindFavoriteByTarget(ctx, generated.FindFavoriteByTargetParams{
@@ -133,32 +130,50 @@ func runAddFavorite(ctx context.Context, deps Deps, s *session, raw json.RawMess
 	return map[string]any{"ok": true, "id": pub.String()}, nil
 }
 
+// ensureMCPFavoriteTargetExists refuses a favorite whose target the caller
+// cannot reach. Tenancy alone is not enough for tasks: task rows carry a
+// Layer-4 visibility of their own, so probing them with a workspace-scoped
+// lookup answers "does this id name a task in your workspace?" for a task
+// the caller is not allowed to see. A favorite is a per-user row that grants
+// nothing, but the accept/reject split still reports existence, and one bit
+// per guess is all an oracle needs.
+//
+// The task branch therefore goes through resolveTask, the same gate every
+// other task-touching tool uses, and returns its WS.TASK.NOT_FOUND verbatim
+// — the invisible and the absent answer identically. The other target types
+// have no per-row visibility, so workspace scope is the whole rule for them.
 func ensureMCPFavoriteTargetExists(
 	ctx context.Context,
-	q *generated.Queries,
-	workspaceID uint32,
+	deps Deps,
+	s *session,
 	targetType generated.UserFavoritesTargetType,
+	targetID string,
 	targetPublicID types.PublicID,
 ) error {
+	q := deps.Queries
+	var err error
 	switch targetType {
 	case generated.UserFavoritesTargetTypeProject:
-		_, err := q.FindProjectByPublicId(ctx, generated.FindProjectByPublicIdParams{WorkspaceID: workspaceID, PublicID: targetPublicID})
-		return err
+		_, err = q.FindProjectByPublicId(ctx, generated.FindProjectByPublicIdParams{WorkspaceID: s.workspaceID, PublicID: targetPublicID})
 	case generated.UserFavoritesTargetTypeTask:
-		_, err := loadTaskRow(ctx, q, workspaceID, targetPublicID)
-		return err
+		_, _, taskErr := resolveTask(ctx, deps, s, targetID)
+		return taskErr
 	case generated.UserFavoritesTargetTypePage:
-		_, err := q.GetPageByPublicId(ctx, generated.GetPageByPublicIdParams{WorkspaceID: workspaceID, PublicID: targetPublicID})
-		return err
+		_, err = q.GetPageByPublicId(ctx, generated.GetPageByPublicIdParams{WorkspaceID: s.workspaceID, PublicID: targetPublicID})
 	case generated.UserFavoritesTargetTypeLens:
-		_, err := q.GetLensByPublicID(ctx, generated.GetLensByPublicIDParams{WorkspaceID: workspaceID, PublicID: targetPublicID})
-		return err
+		_, err = q.GetLensByPublicID(ctx, generated.GetLensByPublicIDParams{WorkspaceID: s.workspaceID, PublicID: targetPublicID})
 	case generated.UserFavoritesTargetTypeTimebox:
-		_, err := q.GetTimeboxByPublicId(ctx, generated.GetTimeboxByPublicIdParams{WorkspaceID: workspaceID, PublicID: targetPublicID})
-		return err
+		_, err = q.GetTimeboxByPublicId(ctx, generated.GetTimeboxByPublicIdParams{WorkspaceID: s.workspaceID, PublicID: targetPublicID})
 	default:
-		return sql.ErrNoRows
+		err = sql.ErrNoRows
 	}
+	if err != nil {
+		if stderrors.Is(err, sql.ErrNoRows) {
+			return apierrors.New(apierrors.McpToolArgumentsInvalid)
+		}
+		return apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
+	}
+	return nil
 }
 
 func runAddReaction(ctx context.Context, deps Deps, s *session, raw json.RawMessage) (any, error) {

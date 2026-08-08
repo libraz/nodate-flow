@@ -221,6 +221,10 @@ func (h *Handler) serveSSE(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		var ae *apierrors.APIError
 		if stderrors.As(err, &ae) {
+			// Same refusal as the POST path, and it has to be recorded on
+			// both: a client shut out of tool calls will keep reopening
+			// the stream, and that is the traffic an operator sees first.
+			h.auditTransportRefusal(r.Context(), sess, ae.Spec)
 			writeRPCTransportError(w, nil, ae.Spec, ae.Spec.Message)
 			return
 		}
@@ -246,7 +250,10 @@ func (h *Handler) serveSSE(w http.ResponseWriter, r *http.Request) {
 	// rate limiter, AND so the GET (SSE) and POST paths share one budget
 	// under the same hashed key — preventing a client from doubling its
 	// rate allowance by splitting requests across the two methods.
-	if allowed, retryAfter := h.rl.allow(hashToken(tok)); !allowed {
+	if allowed, retryAfter, first := h.rl.allow(hashToken(tok)); !allowed {
+		if first {
+			h.auditTransportRefusal(r.Context(), sess, apierrors.RateLimitExceeded)
+		}
 		w.Header().Set("Retry-After", strconv.Itoa(int(retryAfter.Seconds())))
 		writeRPCTransportError(w, nil, apierrors.RateLimitExceeded, "rate limit exceeded")
 		return

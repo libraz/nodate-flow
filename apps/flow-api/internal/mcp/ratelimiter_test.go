@@ -9,7 +9,7 @@ func TestRateLimiterAllowsWithinLimit(t *testing.T) {
 	t.Parallel()
 	rl := newMCPRateLimiter()
 	for i := 0; i < rl.maxReqs; i++ {
-		ok, _ := rl.allow("tok1")
+		ok, _, _ := rl.allow("tok1")
 		if !ok {
 			t.Fatalf("request %d should be allowed", i+1)
 		}
@@ -22,7 +22,7 @@ func TestRateLimiterDeniesOverLimit(t *testing.T) {
 	for i := 0; i < rl.maxReqs; i++ {
 		rl.allow("tok2")
 	}
-	ok, retryAfter := rl.allow("tok2")
+	ok, retryAfter, _ := rl.allow("tok2")
 	if ok {
 		t.Fatal("request over limit should be denied")
 	}
@@ -69,7 +69,7 @@ func TestRateLimiterIsolatesTokens(t *testing.T) {
 		rl.allow("tok-a")
 	}
 	// tok-b should still be allowed.
-	ok, _ := rl.allow("tok-b")
+	ok, _, _ := rl.allow("tok-b")
 	if !ok {
 		t.Fatal("different token should have its own limit")
 	}
@@ -90,7 +90,7 @@ func TestRateLimiterSseAndPostShareHashedBudget(t *testing.T) {
 	// Simulate the POST path consuming the full per-token budget under the
 	// hashed key (server.go: h.rl.allow(hashToken(tok))).
 	for i := 0; i < rl.maxReqs; i++ {
-		ok, _ := rl.allow(key)
+		ok, _, _ := rl.allow(key)
 		if !ok {
 			t.Fatalf("POST request %d should be within budget", i+1)
 		}
@@ -99,7 +99,7 @@ func TestRateLimiterSseAndPostShareHashedBudget(t *testing.T) {
 	// The SSE path now also keys on hashToken(tok) (sse.go), so a GET that
 	// arrives after the budget is spent must be denied — proving the two
 	// paths share one budget rather than each getting maxReqs.
-	if ok, retryAfter := rl.allow(hashToken(tok)); ok {
+	if ok, retryAfter, _ := rl.allow(hashToken(tok)); ok {
 		t.Fatal("SSE request must be denied: it shares the POST budget under the hashed key")
 	} else if retryAfter < time.Second {
 		t.Fatalf("retryAfter should be >= 1s, got %v", retryAfter)

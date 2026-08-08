@@ -11,6 +11,7 @@ import (
 	"github.com/libraz/nodate-flow/apps/auth-api/internal/db/generated"
 	"github.com/libraz/nodate-flow/apps/auth-api/internal/db/types"
 	apierrors "github.com/libraz/nodate-flow/apps/auth-api/internal/errors"
+	"github.com/libraz/nodate-flow/apps/auth-api/internal/http/handlers/handlerutil"
 	"github.com/libraz/nodate-flow/packages/go-shared/authn"
 	"github.com/libraz/nodate-flow/packages/go-shared/region"
 )
@@ -65,6 +66,15 @@ func Register(deps Deps) func(context.Context, *RegisterInput) (*RegisterOutput,
 			ThemePreference: generated.UsersThemePreference("system"),
 		})
 		if err != nil {
+			// The lookup above is advisory only: two sign-ups for the same
+			// address can both pass it and only uniq_users_email decides
+			// which one exists. Reporting the loser as an internal error
+			// tells someone who typed their own address that the service
+			// is broken, and hides the one thing they can act on — that
+			// the account is already there and the next step is signing in.
+			if handlerutil.IsDuplicateEntry(err) {
+				return nil, httpErr(apierrors.AuthRegisterEmailAlreadyTaken)
+			}
 			slog.ErrorContext(ctx, "register: create user failed", "error", err)
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
@@ -77,6 +87,12 @@ func Register(deps Deps) func(context.Context, *RegisterInput) (*RegisterOutput,
 			Subject:      email,
 			PasswordHash: sql.NullString{String: hash, Valid: true},
 		}); err != nil {
+			// uniq_identities_provider_subject is the same race one step
+			// later: the local identity is keyed by the address, so a
+			// concurrent sign-up that reached this insert first owns it.
+			if handlerutil.IsDuplicateEntry(err) {
+				return nil, httpErr(apierrors.AuthRegisterEmailAlreadyTaken)
+			}
 			slog.ErrorContext(ctx, "register: create identity failed", "error", err)
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}

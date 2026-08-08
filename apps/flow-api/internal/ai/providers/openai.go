@@ -87,7 +87,7 @@ func (p *openAIProvider) Complete(ctx context.Context, req Request) (*Response, 
 
 	plain, err := p.dec.Decrypt(p.cfg.EncryptedKey)
 	if err != nil {
-		return nil, fmt.Errorf("openai: decrypt key: %w", err)
+		return nil, fmt.Errorf("openai: decrypt key: %w: %w", ErrKeyDecryptFailed, err)
 	}
 	httpReq.Header.Set("Authorization", "Bearer "+string(plain))
 	zero(plain)

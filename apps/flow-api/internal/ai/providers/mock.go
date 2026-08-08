@@ -6,6 +6,7 @@ package providers
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -51,11 +52,14 @@ func (m *MockProvider) Kind() Kind { return MockKind }
 func (m *MockProvider) Model() string { return MockModel }
 
 // Complete implements Provider. The mock ignores req.Prompt and returns
-// the fixture [fixtureNameForSystem] selects for req.System, falling back
-// to inbox_triage for any purpose that has no entry. The returned Response
-// carries zero tokens / zero cost so the cost guard never trips in tests.
+// the fixture [fixtureNameForSystem] selects for req.System. A purpose with
+// no fixture is an error, not a substitution. The returned Response carries
+// zero tokens / zero cost so the cost guard never trips in tests.
 func (m *MockProvider) Complete(_ context.Context, req Request) (*Response, error) {
-	name := fixtureNameForSystem(req.System)
+	name, ok := fixtureNameForSystem(req.System)
+	if !ok {
+		return nil, ErrMockFixtureUnrouted
+	}
 	text, err := m.load(name)
 	if err != nil {
 		return nil, err
@@ -108,21 +112,37 @@ func (m *MockProvider) load(name string) (string, error) {
 // in internal/ai asserts the two stay in agreement.
 const smartCreateMarker = "suggestedAssignees"
 
-// fixtureNameForSystem maps an orchestrator system prompt to a fixture
-// file name.
+// inboxTriageMarker identifies the inbox-triage system prompt by the
+// response key that prompt asks the model to emit, for the same reason
+// [smartCreateMarker] does.
+const inboxTriageMarker = "recommendedAction"
+
+// ErrMockFixtureUnrouted is returned when a purpose reaches the mock
+// provider with no fixture mapped to it.
 //
-// The mapping is deliberately incomplete. Only purposes whose fixture is
-// actually asserted on get an entry; everything else falls through to
-// inbox_triage, which is the historical default. That fallback is a known
-// sharp edge — an unrouted purpose silently receives triage JSON and
-// produces a confidently wrong proposal rather than an error — so adding a
-// purpose here should come with a test that would fail if the routing
-// regressed to the fallback.
-func fixtureNameForSystem(system string) string {
-	if strings.Contains(system, smartCreateMarker) {
-		return "smart_create"
+// The mock used to answer such a purpose with the inbox_triage fixture.
+// Nothing in the response said so: a caller asking for a priority, a page
+// body, or a task breakdown received a triage array, parsed whatever it
+// could out of it, and produced a proposal that looked deliberate. A
+// missing fixture is a gap in the mock, and a gap should stop the caller
+// rather than answer it in another purpose's vocabulary.
+var ErrMockFixtureUnrouted = errors.New("ai/providers: mock has no fixture for this purpose")
+
+// fixtureNameForSystem maps an orchestrator system prompt to a fixture
+// file name, reporting false when the purpose has no fixture.
+//
+// The mapping is deliberately incomplete: only purposes with a fixture in
+// apps/flow-api/testdata/ai are listed. Adding a purpose here means adding
+// its fixture and a test that would fail if the routing regressed.
+func fixtureNameForSystem(system string) (string, bool) {
+	switch {
+	case strings.Contains(system, smartCreateMarker):
+		return "smart_create", true
+	case strings.Contains(system, inboxTriageMarker):
+		return "inbox_triage", true
+	default:
+		return "", false
 	}
-	return "inbox_triage"
 }
 
 // resolveFixtureDir returns the directory used to load fixture files.

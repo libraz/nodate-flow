@@ -29,17 +29,20 @@ var ErrInvalidBaseURL = errors.New("ai/providers: invalid base url")
 // a webhook, so the threat model applies here as well.
 var ErrBaseURLDestinationNotAllowed = errors.New("ai/providers: base url destination is not allowed")
 
-// allowPrivateEnv is the escape hatch operators set to permit private
+// AllowPrivateEnv is the escape hatch operators set to permit private
 // destinations. Local inference — Ollama on 127.0.0.1:11434, an
 // OpenAI-compatible server on the LAN — is a legitimate deployment, but it
 // is the operator's decision, not a workspace admin's, so it is enabled
 // per deployment rather than per provider row. It must not be set in a
 // deployment where workspace admins are not fully trusted.
-const allowPrivateEnv = "NF_FLOW_AI_ALLOW_PRIVATE"
+//
+// Exported so the sibling packages that send requests through this
+// transport can enable it in their own tests without restating the name.
+const AllowPrivateEnv = "NF_FLOW_AI_ALLOW_PRIVATE"
 
 // allowPrivateDestinations reports whether the escape hatch is enabled.
 func allowPrivateDestinations() bool {
-	v := os.Getenv(allowPrivateEnv)
+	v := os.Getenv(AllowPrivateEnv)
 	return v == "1" || v == "true"
 }
 

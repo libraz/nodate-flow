@@ -114,7 +114,7 @@ func (p *googleProvider) Complete(ctx context.Context, req Request) (*Response, 
 
 	plain, err := p.dec.Decrypt(p.cfg.EncryptedKey)
 	if err != nil {
-		return nil, fmt.Errorf("google: decrypt key: %w", err)
+		return nil, fmt.Errorf("google: decrypt key: %w: %w", ErrKeyDecryptFailed, err)
 	}
 	// string(plain) copies the bytes into the immutable header value, so
 	// zeroing the plaintext slice afterwards drops our only mutable copy;

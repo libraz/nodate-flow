@@ -183,7 +183,7 @@ func registerTools(h *Handler) {
 	h.register(tool{
 		name:          "propose_steps",
 		description:   "Ask the workspace LLM to break an existing task into concrete execution steps.",
-		requiredScope: "read:workspace",
+		requiredScope: "write:workspace",
 		inputSchema: objectSchema(map[string]any{
 			"taskId": stringSchema("Task public id (UUID v7).", Constraints{Pattern: publicIDPattern}),
 		}, []string{"taskId"}),
@@ -210,7 +210,7 @@ func registerTools(h *Handler) {
 	h.register(tool{
 		name:          "propose_duplicates",
 		description:   "Return likely-duplicate tasks for a given task by embedding similarity (ADR 0003).",
-		requiredScope: "read:workspace",
+		requiredScope: "write:workspace",
 		inputSchema: objectSchema(map[string]any{
 			"taskId": stringSchema("Task public id (UUID v7).", Constraints{Pattern: publicIDPattern}),
 		}, []string{"taskId"}),
@@ -219,7 +219,7 @@ func registerTools(h *Handler) {
 	h.register(tool{
 		name:          "propose_lens",
 		description:   "Compile a natural-language query into a validated Lens view JSON.",
-		requiredScope: "read:workspace",
+		requiredScope: "write:workspace",
 		inputSchema: objectSchema(map[string]any{
 			"prompt": stringSchema("Natural-language description of the desired view.", Constraints{MinLength: intPtr(1)}),
 		}, []string{"prompt"}),
@@ -271,7 +271,7 @@ func registerTools(h *Handler) {
 	h.register(tool{
 		name:          "propose_relations",
 		description:   "Given a task, find related or duplicate tasks by embedding similarity. Returns structured suggestions with kind.",
-		requiredScope: "read:workspace",
+		requiredScope: "write:workspace",
 		inputSchema: objectSchema(map[string]any{
 			"taskId": stringSchema("Task public id (UUID v7).", Constraints{Pattern: publicIDPattern}),
 		}, []string{"taskId"}),
@@ -601,7 +601,7 @@ func registerTools(h *Handler) {
 		inputSchema: objectSchema(map[string]any{
 			"intakeItemId": stringSchema("Intake item public id (UUID v7).", Constraints{Pattern: publicIDPattern}),
 			"status":       stringSchema("Triage decision: accepted, rejected, snoozed, or duplicate.", Constraints{Pattern: `^(accepted|rejected|snoozed|duplicate)$`}),
-			"snoozeUntil":  intSchema("Unix seconds timestamp for snooze expiry (required when status is snoozed).", Constraints{Min: intPtr(0)}),
+			"snoozeUntil":  intSchema("Unix seconds timestamp for snooze expiry (required when status is snoozed).", Constraints{Min: intPtr(1)}),
 		}, []string{"intakeItemId", "status"}),
 		run: runTriageIntakeItem,
 	})

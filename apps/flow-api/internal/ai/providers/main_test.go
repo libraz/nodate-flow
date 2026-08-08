@@ -15,7 +15,7 @@ import (
 // every parallel test is still parked, so no parallel test observes the
 // strict setting.
 func TestMain(m *testing.M) {
-	if err := os.Setenv(allowPrivateEnv, "1"); err != nil {
+	if err := os.Setenv(AllowPrivateEnv, "1"); err != nil {
 		panic(err)
 	}
 	os.Exit(m.Run())

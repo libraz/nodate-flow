@@ -125,6 +125,26 @@ func mcpVisJSON(t *testing.T, v any) json.RawMessage {
 	return b
 }
 
+// apiErrorCode extracts the error code an MCP tool answered with, so two
+// rejections can be compared for indistinguishability rather than merely
+// for both being errors.
+func apiErrorCode(t *testing.T, err error) string {
+	t.Helper()
+	var ae *apierrors.APIError
+	require.Truef(t, stderrors.As(err, &ae), "want *apierrors.APIError, got %T: %v", err, err)
+	require.NotNil(t, ae.Spec)
+	return ae.Spec.Code
+}
+
+// mcpVisJSONString renders a tool result back to JSON so a test can assert
+// on what the caller would actually receive.
+func mcpVisJSONString(t *testing.T, v any) string {
+	t.Helper()
+	b, err := json.Marshal(v)
+	require.NoError(t, err)
+	return string(b)
+}
+
 func requireTaskNotFound(t *testing.T, err error) {
 	t.Helper()
 	require.Error(t, err)
@@ -178,6 +198,41 @@ func TestMCPToolsEnforceTaskVisibility(t *testing.T) {
 		})
 		_, err := mcp.RunGeneratePage(ctx, deps, other, arg)
 		requireTaskNotFound(t, err)
+	})
+
+	t.Run("add_favorite/not_visible_matches_missing", func(t *testing.T) {
+		// A favorite grants nothing and nobody else can see it, which is
+		// exactly why the existence check was left at workspace scope. The
+		// leak is not the row: it is that accepting the call tells the
+		// caller the id names a real task. Favoriting an id that is present
+		// but invisible must answer the same as favoriting an id that was
+		// never issued.
+		invisible := mcpVisJSON(t, map[string]any{
+			"targetType": "task",
+			"targetId":   fx.privateTask.String(),
+		})
+		absent := mcpVisJSON(t, map[string]any{
+			"targetType": "task",
+			"targetId":   uuid.Must(uuid.NewV7()).String(),
+		})
+
+		_, invisibleErr := mcp.RunAddFavorite(ctx, deps, other, invisible)
+		require.Error(t, invisibleErr)
+		_, absentErr := mcp.RunAddFavorite(ctx, deps, other, absent)
+		require.Error(t, absentErr)
+		require.Equalf(t, apiErrorCode(t, absentErr), apiErrorCode(t, invisibleErr),
+			"an invisible task and an absent one must be indistinguishable; got %v vs %v",
+			invisibleErr, absentErr)
+
+		// And nothing was written: a favorite row for a task the caller
+		// cannot see would resurface its id in list_favorites.
+		listed, err := mcp.RunListFavorites(ctx, deps, other, mcpVisJSON(t, map[string]any{}))
+		require.NoError(t, err)
+		require.NotContains(t, mcpVisJSONString(t, listed), fx.privateTask.String())
+
+		// Positive control: the creator, who can see the task, may favorite it.
+		_, err = mcp.RunAddFavorite(ctx, deps, creator, invisible)
+		require.NoError(t, err)
 	})
 
 	t.Run("resolve_task_ref/not_visible_matches_missing", func(t *testing.T) {

@@ -180,6 +180,7 @@ func main() {
 		providers.DestOpenAI,
 		providers.DestGoogle,
 		providers.DestOllama,
+		providers.DestOpenAIEmbed,
 	}
 	if cfg.OutboundLlmRps > 0 {
 		burst := cfg.OutboundLlmBurst

@@ -65,6 +65,30 @@ func TestGenuineTransportFailureStaysUnreachable(t *testing.T) {
 	}
 }
 
+// TestUnsealableKeyNamesTheSecretRatherThanTheNetwork covers the failure
+// that used to reach the operator as an unreachable provider.
+//
+// A key that cannot be unsealed is not a reachability problem: nothing
+// was sent, retrying never helps, and every provider row in the
+// deployment is failing identically because the deployment's secret key
+// no longer matches what the ciphertext was sealed with. Reported as a
+// transport fault it sends the reader to the network and the vendor's
+// status page and keeps them there.
+func TestUnsealableKeyNamesTheSecretRatherThanTheNetwork(t *testing.T) {
+	t.Parallel()
+
+	pd := problemOf(t, mapProviderError(fmt.Errorf("anthropic: decrypt key: %w", providers.ErrKeyDecryptFailed)))
+	if pd.Type == apierrors.AiProviderUpstreamUnreachable.Code {
+		t.Fatal("an unsealable key must not be reported as an unreachable upstream")
+	}
+	if pd.Type != apierrors.AiProviderKeyDecryptFailed.Code {
+		t.Fatalf("code = %s, want %s", pd.Type, apierrors.AiProviderKeyDecryptFailed.Code)
+	}
+	if !strings.Contains(pd.UserAction, "NF_SECRET_KEY") {
+		t.Errorf("userAction %q does not name the key the ciphertext was sealed with", pd.UserAction)
+	}
+}
+
 // TestCreateProviderErrorNamesTheEndpointPolicy covers the submit-time
 // path. An admin told only that a body field is invalid has nowhere to go:
 // the address is well-formed and the reason it was refused is a policy

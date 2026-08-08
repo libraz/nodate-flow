@@ -37,6 +37,14 @@ func mapProviderError(err error) error {
 		return httpErr(apierrors.AiResponseSchemaMismatch)
 	case errors.Is(err, providers.ErrUpstreamUnreachable):
 		return httpErr(apierrors.AiProviderUpstreamUnreachable)
+	// The stored key could not be unsealed, so nothing was sent. Reported
+	// as an unreachable provider this is the most misleading answer the
+	// surface can give: the network is fine, every provider in the
+	// deployment is failing the same way, and retrying never helps. The
+	// cause is that NF_SECRET_KEY no longer matches the ciphertext, and
+	// that is what the caller has to be told.
+	case errors.Is(err, providers.ErrKeyDecryptFailed):
+		return httpErr(apierrors.AiProviderKeyDecryptFailed)
 	// The provider row cannot be turned into a client at all: a base URL
 	// on a kind that does not take one, a kind nothing implements, a
 	// missing key. Nothing was sent upstream, so reporting "could not

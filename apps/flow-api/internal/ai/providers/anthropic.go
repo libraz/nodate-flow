@@ -94,7 +94,7 @@ func (p *anthropicProvider) Complete(ctx context.Context, req Request) (*Respons
 
 	plain, err := p.dec.Decrypt(p.cfg.EncryptedKey)
 	if err != nil {
-		return nil, fmt.Errorf("anthropic: decrypt key: %w", err)
+		return nil, fmt.Errorf("anthropic: decrypt key: %w: %w", ErrKeyDecryptFailed, err)
 	}
 	httpReq.Header.Set("x-api-key", string(plain))
 	zero(plain)

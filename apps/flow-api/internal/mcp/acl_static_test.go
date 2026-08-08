@@ -119,6 +119,10 @@ var projectRoleWriteGates = map[string]bool{
 var writeToolsWithoutProjectGate = map[string]string{
 	"propose_tasks_from":    "LLM proposal that persists nothing",
 	"propose_priority":      "read-only proposal behind the Layer-4 visibility ACL",
+	"propose_steps":         "read-only proposal behind the Layer-4 visibility ACL; write-scoped because it bills the model",
+	"propose_duplicates":    "read-only similarity search behind the Layer-4 visibility ACL; write-scoped because it bills the embedder",
+	"propose_relations":     "read-only similarity search behind the Layer-4 visibility ACL; write-scoped because it bills the embedder",
+	"propose_lens":          "compiles a query and persists nothing; write-scoped because it bills the model",
 	"create_label":          "workspace-level row; REST labels are workspace-member gated",
 	"create_page":           "workspace-level row; REST pages are workspace-member gated",
 	"update_page":           "workspace-level row; REST pages are workspace-member gated",

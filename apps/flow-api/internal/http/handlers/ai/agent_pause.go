@@ -9,6 +9,7 @@ import (
 	apierrors "github.com/libraz/nodate-flow/apps/flow-api/internal/errors"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/eventbus"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/middleware"
+	"github.com/libraz/nodate-flow/packages/go-shared/logutil"
 )
 
 // PauseAgentInput is the body for POST /workspaces/{wsId}/ai/agents/{agentId}/pause.
@@ -73,7 +74,7 @@ func PauseAgent(deps Deps) func(context.Context, *PauseAgentInput) (*PauseAgentO
 				slog.Any("err", err),
 				slog.String("handler", "ai.PauseAgent"),
 				slog.String("event_type", string(kind)),
-				slog.Int64("workspace_id", int64(ws.ID)),
+				logutil.LogEntity("workspace", ws.PublicID),
 				slog.String("agent_id", agentPub.String()),
 			)
 		}

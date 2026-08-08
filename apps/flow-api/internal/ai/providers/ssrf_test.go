@@ -18,7 +18,7 @@ import (
 // t.Parallel: t.Setenv is process-global.
 func strictPolicy(t *testing.T) {
 	t.Helper()
-	t.Setenv(allowPrivateEnv, "")
+	t.Setenv(AllowPrivateEnv, "")
 }
 
 // TestBaseURLRejectsInternalDestinations covers the addresses a workspace
@@ -221,7 +221,7 @@ func TestClassifyTransportErrorKeepsTheRefusalReason(t *testing.T) {
 // inference depends on: with it set, a loopback endpoint is configurable
 // and reachable again.
 func TestAllowPrivateEscapeHatch(t *testing.T) {
-	t.Setenv(allowPrivateEnv, "1")
+	t.Setenv(AllowPrivateEnv, "1")
 
 	if err := validateBaseURL("http://127.0.0.1:11434"); err != nil {
 		t.Fatalf("validateBaseURL under the escape hatch = %v, want nil", err)

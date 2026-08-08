@@ -293,6 +293,26 @@ func doLimited(ctx context.Context, destination string, req *http.Request) (*htt
 	return resp, nil
 }
 
+// DestOpenAIEmbed is the limiter key for the embeddings endpoint. It is
+// separate from [DestOpenAI] because the two have their own upstream
+// quotas and a shared bucket would let a backfill of embeddings starve
+// interactive completions.
+const DestOpenAIEmbed = "embed.openai"
+
+// DoLimited runs an already-built upstream request through the shared
+// egress path: the SSRF-guarded dialer and proxy-free transport, the
+// per-workspace and per-destination rate limiters, and the 429 retry.
+//
+// It is exported because the embeddings client lives in a sibling package
+// and calls the same vendors from the same process. Its own bare
+// http.Client was a second door out of the process that none of the caps
+// could see, so a backfill could spend the provider's quota while the
+// limiter reported a workspace well inside its budget, and a 429 came back
+// to the caller as a hard failure instead of a retry.
+func DoLimited(ctx context.Context, destination string, req *http.Request) (*http.Response, error) {
+	return doLimited(ctx, destination, req)
+}
+
 // retryDelay computes the wait duration for a 429 retry. It uses the
 // Retry-After header if present and numeric, otherwise falls back to
 // exponential backoff: 1s, 2s, 4s.

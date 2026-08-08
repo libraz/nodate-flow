@@ -42,6 +42,22 @@ var (
 	// AI.PROVIDER.UPSTREAM_REQUEST_REJECTED (502).
 	ErrUpstreamRequestRejected = errors.New("ai/providers: upstream request rejected")
 
+	// ErrKeyDecryptFailed is returned when the provider's stored API key
+	// could not be unsealed, so nothing was sent upstream. Maps to
+	// AI.PROVIDER.KEY_DECRYPT_FAILED (412).
+	//
+	// This is its own sentinel because the alternative — letting it fall
+	// through to the unclassified default and surface as
+	// AI.PROVIDER.UPSTREAM_UNREACHABLE — describes a network that is
+	// working fine and sends the operator to the vendor's status page. The
+	// real cause is local and singular: the ciphertext in ai_providers was
+	// sealed with a different NF_SECRET_KEY than the process is running
+	// with, which is what a rotation without a re-seal leaves behind. That
+	// failure is total and permanent for every provider row in the
+	// deployment, and it never recovers on retry, so it must not be
+	// reported as a transient reachability problem.
+	ErrKeyDecryptFailed = errors.New("ai/providers: api key decrypt failed")
+
 	// ErrResponseInvalidJSON is returned when the upstream response body
 	// could not be decoded as JSON. Maps to AI.RESPONSE.INVALID_JSON (502).
 	ErrResponseInvalidJSON = errors.New("ai/providers: upstream response is not valid json")

@@ -47,13 +47,17 @@ const (
 // The API key is stored as ciphertext and decrypted per-call via a
 // Decryptor. The plaintext is zeroed immediately after use, matching
 // the pattern used by the LLM providers in internal/ai/providers.
+//
+// Requests go out through [providers.DoLimited] rather than a client of
+// this package's own, so embeddings are subject to the same egress caps,
+// 429 retry, and destination guard as completions. The base URL is
+// workspace-admin input, which is what makes the last of those necessary.
 type OpenAIProvider struct {
 	keyCiphertext []byte
 	dec           Decryptor
 	model         string
 	dim           int
 	url           string
-	client        *http.Client
 }
 
 // OpenAIOption configures an OpenAIProvider.
@@ -92,7 +96,6 @@ func NewOpenAIProvider(keyCiphertext []byte, dec Decryptor, opts ...OpenAIOption
 		model:         defaultOpenAIEmbedModel,
 		dim:           Dim,
 		url:           defaultOpenAIEmbedURL,
-		client:        &http.Client{Timeout: openAIEmbedTimeout},
 	}
 	for _, o := range opts {
 		o(p)
@@ -139,6 +142,11 @@ func (p *OpenAIProvider) Embed(ctx context.Context, text string) ([]float32, err
 		return nil, fmt.Errorf("openai embed: marshal: %w", err)
 	}
 
+	// The embed budget is this provider's own, not the completion
+	// timeout of the shared client the request now travels on.
+	ctx, cancel := context.WithTimeout(ctx, openAIEmbedTimeout)
+	defer cancel()
+
 	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, p.url, bytes.NewReader(body))
 	if err != nil {
 		return nil, fmt.Errorf("openai embed: build request: %w", err)
@@ -152,7 +160,7 @@ func (p *OpenAIProvider) Embed(ctx context.Context, text string) ([]float32, err
 	httpReq.Header.Set("Authorization", "Bearer "+string(plain))
 	zero(plain)
 
-	resp, err := p.client.Do(httpReq)
+	resp, err := providers.DoLimited(ctx, providers.DestOpenAIEmbed, httpReq)
 	if err != nil {
 		return nil, fmt.Errorf("openai embed: do: %w", classifyEmbedTransportError(ctx, err))
 	}

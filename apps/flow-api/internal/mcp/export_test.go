@@ -34,6 +34,9 @@ var (
 	RunAddTaskLabel          = runAddTaskLabel
 	RunCreateTask            = runCreateTask
 	RunExportTasks           = runExportTasks
+	RunAddFavorite           = runAddFavorite
+	RunListFavorites         = runListFavorites
+	RunTriageIntakeItem      = runTriageIntakeItem
 	RunListImportJobs        = runListImportJobs
 	RunCreateImportJob       = runCreateImportJob
 	RunCreateCalendarEvent   = runCreateCalendarEvent

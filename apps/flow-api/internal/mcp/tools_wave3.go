@@ -89,6 +89,21 @@ func runTriageIntakeItem(ctx context.Context, deps Deps, s *session, raw json.Ra
 		return nil, apierrors.New(apierrors.McpToolArgumentsInvalid)
 	}
 
+	// A snooze is a deadline, and nothing resurfaces an item without one:
+	// the queue is filtered by triage_status alone, so an item parked as
+	// snoozed with a NULL snooze_until leaves the pending list and has no
+	// date at which anything brings it back. Accepting that silently was
+	// worse than refusing it, because the tool reported success. The check
+	// belongs with the other argument validation, before the item is read:
+	// a malformed call should not depend on the item existing.
+	var snoozeUntil sql.NullTime
+	if in.Status == "snoozed" {
+		if in.SnoozeUntil == nil || *in.SnoozeUntil <= 0 {
+			return nil, apierrors.New(apierrors.McpToolArgumentsInvalid)
+		}
+		snoozeUntil = sql.NullTime{Time: time.Unix(*in.SnoozeUntil, 0), Valid: true}
+	}
+
 	pub, err := types.Parse(in.IntakeItemID)
 	if err != nil {
 		return nil, apierrors.New(apierrors.McpToolArgumentsInvalid)
@@ -107,11 +122,6 @@ func runTriageIntakeItem(ctx context.Context, deps Deps, s *session, raw json.Ra
 	}
 	if existing.TriageStatus != generated.IntakeItemsTriageStatusPending {
 		return nil, apierrors.New(apierrors.WsIntakeAlreadyTriaged)
-	}
-
-	var snoozeUntil sql.NullTime
-	if in.Status == "snoozed" && in.SnoozeUntil != nil {
-		snoozeUntil = sql.NullTime{Time: time.Unix(*in.SnoozeUntil, 0), Valid: true}
 	}
 
 	// Not an existence check: the item is read into `existing` above,
