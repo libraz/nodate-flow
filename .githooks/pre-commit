@@ -54,6 +54,24 @@ if git diff --cached --name-only --diff-filter=ACMR | grep -qE '^errors/.*\.yaml
   fi
 fi
 
+# A design-token reference that carries a stray closing paren is invalid
+# CSS, so the browser drops the whole declaration without saying anything:
+# no error, no fallback, just a style that is absent. It is also the kind of
+# typo that gets copied — one occurrence became many before anything caught
+# it. The scan is a paren-balance test over the styles and costs about as
+# much as reading them, so it is gated on styling files being staged rather
+# than on nothing at all.
+if git diff --cached --name-only --diff-filter=ACMR |
+  grep -qE '\.(css|tsx?)$'; then
+  if ! bash "$toplevel/scripts/check-css-var-parens.sh" --ci; then
+    echo "" >&2
+    echo "✖ pre-commit hook: a var(--nf-...) reference has a stray closing paren (see above)." >&2
+    echo "  The declaration around it is dropped by the browser." >&2
+    echo "  Bypass only when you know why: git commit --no-verify" >&2
+    exit 1
+  fi
+fi
+
 # The signal-kind registry generates the same three kinds of artefact, plus
 # the flow-web locale bundles. It is checked by comparing the files rather
 # than a hash of the sources, because its failure mode was the generator

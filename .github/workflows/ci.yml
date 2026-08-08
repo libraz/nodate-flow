@@ -42,12 +42,41 @@ jobs:
       - name: i18n locales
         run: make i18n-check
 
+      # A route that re-declares a response shape locally compiles against
+      # its own copy, so the mismatch with the wire format is invisible to
+      # both the typechecker and the build — it surfaces as an empty page
+      # at runtime.
+      - name: Hand-rolled response DTOs
+        run: make check-dtos
+
+      # A token reference carrying a stray closing paren is invalid CSS:
+      # the declaration is dropped whole, silently. It appeared once, then
+      # spread across the styles before anything noticed, which is what
+      # the scan exists to prevent — it can only do that from here.
+      - name: Malformed token references
+        run: make check-css-var-parens
+
       # The auth-free router is a security boundary, and the only thing
       # standing between it and an accidentally public route is this
       # allowlist. It reads the committed spec plus the router source, so
       # it needs no Go toolchain and belongs with the other fast gates.
       - name: Public router surface
         run: make check-public-router
+
+      # The country allowlist is written twice and nothing generates one
+      # side from the other. A code only the form knows fails on save with
+      # an error naming a field nobody touched; a code only the API knows
+      # is simply unreachable. The check parses the Go source as text, so
+      # it needs no Go toolchain either.
+      - name: Region allowlist parity
+        run: make check-region-parity
+
+      # packages/sdk is bundled into both browser apps. A single stray
+      # `/// <reference types="node" />` switches the Node globals back on
+      # for the whole project, so Buffer and process typecheck everywhere
+      # and fail only in a browser.
+      - name: Browser SDK Node types
+        run: make check-sdk-browser-safe
 
       # A var() naming a token nothing defines takes its whole
       # declaration down with it, so the style is simply absent — no
