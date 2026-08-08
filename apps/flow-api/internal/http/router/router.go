@@ -38,6 +38,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/danielgtaylor/huma/v2"
@@ -88,9 +89,13 @@ import (
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/obs"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/storage"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/stream"
+	"github.com/libraz/nodate-flow/packages/go-shared/apierr"
+	"github.com/libraz/nodate-flow/packages/go-shared/authn"
 	"github.com/libraz/nodate-flow/packages/go-shared/crypto"
 	"github.com/libraz/nodate-flow/packages/go-shared/email"
+	"github.com/libraz/nodate-flow/packages/go-shared/httputil"
 	"github.com/libraz/nodate-flow/packages/go-shared/openapiutil"
+	"github.com/libraz/nodate-flow/packages/go-shared/ratelimit"
 )
 
 // Deps is the dependency bundle Build needs in order to wire every
@@ -736,7 +741,56 @@ func buildSharedDeps(deps Deps) *sharedDeps {
 // sub-APIs would point every group at the same registry and panic on
 // duplicate anonymous "ListOutputBody" style schema names.
 func newSubAPI(sub chi.Router) huma.API {
-	return humachi.New(sub, huma.DefaultConfig("nodate-flow", "0.0.0"))
+	return humachi.New(sub, newAPIConfig(true))
+}
+
+// newPublicSubAPI is newSubAPI for a group that carries no auth
+// middleware. Its operations are documented without a security
+// requirement, because a bearer changes nothing about what they return.
+func newPublicSubAPI(sub chi.Router) huma.API {
+	return humachi.New(sub, newAPIConfig(false))
+}
+
+// bearerSchemeName is the OpenAPI key under which the API's JWT bearer
+// is declared. Both services use the same name so the merged document
+// has one scheme rather than two spellings of it.
+const bearerSchemeName = "bearerAuth"
+
+// newAPIConfig returns a fresh huma.Config declaring the API's bearer
+// security scheme and, for a group that sits behind RequireAuth,
+// stamping that requirement onto every operation registered on it.
+//
+// Without this the published document names no authentication mechanism
+// at all: the bundled reference UI can call nothing that needs a token,
+// and an SDK generated from the spec has no way to send one.
+//
+// The requirement rides on each operation rather than on the document
+// because the public and authenticated surfaces share one document. A
+// document-wide requirement would tell readers that the share and invite
+// endpoints want a token they in fact ignore. Attaching it through the
+// group's config instead means the spec follows the middleware: an
+// operation is documented as authenticated exactly when it was
+// registered on a group that authenticates.
+func newAPIConfig(authenticated bool) huma.Config {
+	cfg := huma.DefaultConfig("nodate-flow", "0.0.0")
+	cfg.Components.SecuritySchemes = map[string]*huma.SecurityScheme{
+		bearerSchemeName: {
+			Type:         "http",
+			Scheme:       "bearer",
+			BearerFormat: "JWT",
+			Description:  "Access token issued by auth-api. Obtain one with POST /auth/login and rotate it with POST /auth/refresh.",
+		},
+	}
+	if !authenticated {
+		return cfg
+	}
+	cfg.OnAddOperation = append(cfg.OnAddOperation,
+		func(_ *huma.OpenAPI, op *huma.Operation) {
+			if op.Security == nil {
+				op.Security = []map[string][]string{{bearerSchemeName: {}}}
+			}
+		})
+	return cfg
 }
 
 // mountGroup mounts the group's ACL floor middleware, creates its
@@ -950,7 +1004,13 @@ func buildAuthenticatedAPI(r chi.Router, deps Deps, shared *sharedDeps, authMW f
 		if notifier == nil {
 			notifier = stream.NopNotifier{}
 		}
-		sub.Get("/workspaces/{wsId}/stream", stream.SSEHandler(notifier, deps.StreamRemember))
+		// The stream outlives the request that opened it, so the gate
+		// it passed on connect is re-run on a timer against the same
+		// two middlewares this group is mounted behind. A token that
+		// has been revoked or expired, or an account removed from the
+		// workspace, closes the stream instead of keeping it fed.
+		reauthorize := middleware.StreamReauthorizer(authMW, middleware.RequireWorkspaceMember(shared.aclDB))
+		sub.Get("/workspaces/{wsId}/stream", stream.SSEHandler(notifier, deps.StreamRemember, reauthorize))
 		relationDeps := relations.Deps{DB: deps.DB, Queries: deps.Queries, Audit: shared.auditRec}
 		relations.RegisterWorkspaceScoped(subAPI, relationDeps)
 		intakeDeps := intakehandlers.Deps{DB: deps.DB, Queries: deps.Queries, Audit: shared.auditRec}
@@ -1649,16 +1709,93 @@ func buildAuthenticatedAPI(r chi.Router, deps Deps, shared *sharedDeps, authMW f
 // buildPublicShareAPI registers the unauthenticated public surface.
 // These routes deliberately skip RequireAuth and instead rely on
 // signature verification (webhooks), opaque share tokens (public
-// lenses, future /share/cal/* and /invites/{token}/*), or no
-// authentication at all (/health). The sub-router gets its own per-IP
-// rate limiter so public abuse cannot exhaust the global budget.
+// lenses, /share/cal/*), or no authentication at all (/health).
+//
+// The surface is split by what an operation does, because reading a
+// shared page and redeeming an invite want opposite limits: a shared
+// link is meant to be opened by many people, while an invite is
+// redeemed once. Sharing one budget between them forced the strict
+// choice on both. See publicRenderRateLimiter and the accept group
+// below.
 //
 // The public calendar share and event-invite endpoints
 // (/share/cal/{token}, /invites/{token}/info, /invites/{token}/accept)
 // were relocated here from the retired time-api binary per ADR 0007
 // and are registered inside this builder.
+// Budgets for the unauthenticated surface. Both windows are 15 minutes;
+// what differs is how many requests fit in one and what a bucket counts.
+const (
+	publicRateLimitWindow = 15 * time.Minute
+	// Redeeming an invite: a write, performed once per attendee.
+	publicAcceptMaxRequests = 30
+	// Opening a shared page: a read, per share per caller. Enough for a
+	// page load plus reloads and a few tab restores.
+	publicRenderMaxRequests = 60
+)
+
+// publicRenderRateLimiter limits the read-only public renders, keyed by
+// the share token together with the caller's address.
+//
+// Keying on the address alone is what this replaces, and it did not
+// survive contact with how these links are used. A public share exists
+// to be handed to a group of people, and a group of people is very often
+// one egress address: an office, a school, a mobile carrier's NAT. Under
+// a per-address bucket the first few openings spent everyone's budget
+// and the rest of the building got 429 on a page that was published
+// precisely so they could read it — with no setting an operator could
+// reach to fix it.
+//
+// Adding the token to the key separates them: colleagues opening
+// different shared links no longer draw on one another's budget, and a
+// single share is still bounded per caller. What the bucket cannot do is
+// stand in for guessing protection, and it never could — share tokens
+// are opaque and long, so no achievable request rate meaningfully
+// improves the odds of hitting one. Volume from a single address is
+// bounded by the global per-IP limiter, which stays in front of this.
+//
+// The token is read off the end of the path rather than from
+// chi.URLParam: a group middleware runs before the mux matches a route,
+// so the named parameters do not exist yet. Both routes in this group
+// end in the token, and a request that reaches here with nothing after
+// the prefix simply keys on the empty token, which still bounds it.
+func publicRenderRateLimiter() func(http.Handler) http.Handler {
+	limiter := ratelimit.New(ratelimit.Config{
+		MaxRequests: publicRenderMaxRequests,
+		Window:      publicRateLimitWindow,
+	})
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+			ip := authn.ClientIPFromContext(req.Context())
+			token := pathTail(req.URL.Path)
+			if ip == "" && token == "" {
+				next.ServeHTTP(w, req)
+				return
+			}
+			res := limiter.Allow(token + "@" + ip)
+			httputil.SetRateLimitHeaders(w, res)
+			if !res.Allowed {
+				w.Header().Set("Retry-After", ratelimit.FormatRetryAfter(res.RetryAfter))
+				httputil.WriteJSONError(w, http.StatusTooManyRequests, apierr.CodeRateLimitExceeded, "429 Too Many Requests")
+				return
+			}
+			next.ServeHTTP(w, req)
+		})
+	}
+}
+
+// pathTail returns the last segment of a URL path, ignoring a trailing
+// slash. It is how publicRenderRateLimiter reads the share token before
+// the mux has matched a route.
+func pathTail(p string) string {
+	p = strings.TrimSuffix(p, "/")
+	if i := strings.LastIndexByte(p, '/'); i >= 0 {
+		return p[i+1:]
+	}
+	return p
+}
+
 func buildPublicShareAPI(r chi.Router, deps Deps, shared *sharedDeps) []huma.API {
-	apis := make([]huma.API, 0, 2)
+	apis := make([]huma.API, 0, 3)
 
 	// /health is auth-free but deliberately exempt from the public
 	// per-IP rate limiter: kubelet liveness/readiness probes hit it
@@ -1666,7 +1803,7 @@ func buildPublicShareAPI(r chi.Router, deps Deps, shared *sharedDeps) []huma.API
 	// per-IP limiter still applies; that one is sized for normal
 	// request volume.
 	r.Group(func(sub chi.Router) {
-		subAPI := newSubAPI(sub)
+		subAPI := newPublicSubAPI(sub)
 		apis = append(apis, subAPI)
 
 		huma.Register(subAPI, huma.Operation{
@@ -1683,32 +1820,22 @@ func buildPublicShareAPI(r chi.Router, deps Deps, shared *sharedDeps) []huma.API
 		})
 	})
 
-	// Public share / invite Huma operations live behind a tight
-	// per-IP rate limiter so the unauthenticated surface cannot be
-	// abused to drain the global budget. Step 0-2 (ADR 0007) will
-	// add /share/cal/{token}, /invites/{token}/info,
-	// /invites/{token}/accept under this same group.
+	// Read-only public renders: the shared calendar page and the public
+	// lens. These are the operations a link is handed around for, so
+	// their limiter is keyed per share rather than per address (see
+	// publicRenderRateLimiter).
 	r.Group(func(sub chi.Router) {
-		// Independent per-IP rate limiter for the public surface. The
-		// limit (30 req / 15 min) is intentionally tight so a single
-		// IP cannot grind the share endpoints. The global limiter
-		// still applies on top of this; both have to allow the
-		// request through.
-		publicRL := middleware.NewIPRateLimiter(middleware.RateLimitConfig{
-			MaxRequests: 30,
-			Window:      15 * time.Minute,
-		})
-		sub.Use(publicRL.Middleware())
-		subAPI := newSubAPI(sub)
+		if !deps.DisableRateLimit {
+			sub.Use(publicRenderRateLimiter())
+		}
+		subAPI := newPublicSubAPI(sub)
 		apis = append(apis, subAPI)
 
 		publicLensDeps := lenses.Deps{DB: deps.DB, Queries: deps.Queries, Audit: shared.auditRec}
 		lenses.RegisterPublic(subAPI, publicLensDeps)
 
-		// Calendar public share render and event-invite accept
-		// (relocated from time-api per ADR 0007). Both are
-		// unauthenticated; the opaque token is the capability.
-		calDeps := shared.calDeps
+		// Calendar public share render (relocated from time-api per
+		// ADR 0007). Unauthenticated; the opaque token is the capability.
 		huma.Register(subAPI, huma.Operation{
 			OperationID: "public-shares-render",
 			Method:      http.MethodGet,
@@ -1716,7 +1843,23 @@ func buildPublicShareAPI(r chi.Router, deps Deps, shared *sharedDeps) []huma.API
 			Summary:     "Render a public calendar share by URL token",
 			Description: "Returns the public share page contents (title, description, theme, ordered events) addressed by its opaque URL token. Public, rate-limited; no auth required.",
 			Tags:        []string{"CalendarShare"},
-		}, calendars.RenderPublicShare(calDeps))
+		}, calendars.RenderPublicShare(shared.calDeps))
+	})
+
+	// Redeeming an invite is a write, and one an attendee performs once.
+	// It keeps the tight per-IP budget: a wrong token here has a
+	// consequence, and nothing legitimate needs to try repeatedly.
+	r.Group(func(sub chi.Router) {
+		if !deps.DisableRateLimit {
+			acceptRL := middleware.NewIPRateLimiter(middleware.RateLimitConfig{
+				MaxRequests: publicAcceptMaxRequests,
+				Window:      publicRateLimitWindow,
+			})
+			sub.Use(acceptRL.Middleware())
+		}
+		subAPI := newPublicSubAPI(sub)
+		apis = append(apis, subAPI)
+
 		huma.Register(subAPI, huma.Operation{
 			OperationID: "event-invites-accept",
 			Method:      http.MethodPost,
@@ -1724,7 +1867,7 @@ func buildPublicShareAPI(r chi.Router, deps Deps, shared *sharedDeps) []huma.API
 			Summary:     "Accept a calendar event invite via magic-link token",
 			Description: "Consumes a magic-link invite token: marks the attendee's RSVP as accepted and registers the resulting account context. Public, rate-limited; the opaque token is the only capability.",
 			Tags:        []string{"CalendarInvite"},
-		}, calendars.AcceptEventInvite(calDeps))
+		}, calendars.AcceptEventInvite(shared.calDeps))
 	})
 
 	// Webhook receivers are technically unauthenticated but verify

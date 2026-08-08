@@ -98,6 +98,48 @@ func Build(deps Deps) http.Handler {
 	return BuildResult(deps).Handler
 }
 
+// bearerSchemeName is the OpenAPI key under which the API's JWT bearer
+// is declared. flow-api uses the same name so the merged document has
+// one scheme rather than two spellings of it.
+const bearerSchemeName = "bearerAuth"
+
+// newAPIConfig returns a fresh huma.Config declaring the API's bearer
+// security scheme and, for a group that sits behind RequireAuth,
+// stamping that requirement onto every operation registered on it.
+//
+// Without this the published document names no authentication mechanism
+// at all: the bundled reference UI can call nothing that needs a token,
+// and an SDK generated from the spec has no way to send one.
+//
+// The requirement rides on each operation rather than on the document
+// because the sign-in endpoints and the account endpoints share one
+// document, and the former must not be described as needing the token
+// they exist to hand out. Attaching it through the group's config means
+// the spec follows the middleware: an operation is documented as
+// authenticated exactly when it was registered on a group that
+// authenticates.
+func newAPIConfig(authenticated bool) huma.Config {
+	cfg := huma.DefaultConfig("nodate-auth", "0.0.0")
+	cfg.Components.SecuritySchemes = map[string]*huma.SecurityScheme{
+		bearerSchemeName: {
+			Type:         "http",
+			Scheme:       "bearer",
+			BearerFormat: "JWT",
+			Description:  "Access token issued by auth-api. Obtain one with POST /auth/login and rotate it with POST /auth/refresh.",
+		},
+	}
+	if !authenticated {
+		return cfg
+	}
+	cfg.OnAddOperation = append(cfg.OnAddOperation,
+		func(_ *huma.OpenAPI, op *huma.Operation) {
+			if op.Security == nil {
+				op.Security = []map[string][]string{{bearerSchemeName: {}}}
+			}
+		})
+	return cfg
+}
+
 // BuildResult mounts every auth-api route onto a fresh chi router and
 // returns the handler together with the list of huma.API instances used.
 func BuildResult(deps Deps) Result {
@@ -117,14 +159,19 @@ func BuildResult(deps Deps) Result {
 		r.Use(globalRL.Middleware())
 	}
 
-	newConfig := func() huma.Config {
-		return huma.DefaultConfig("nodate-auth", "0.0.0")
-	}
 	var apis []huma.API
-	api := humachi.New(r, newConfig())
+	// The root API hosts only auth-free operations (health, capabilities,
+	// the avatar proxy, the OAuth callback); everything needing a token
+	// is registered on a group built with newAuthedSubAPI.
+	api := humachi.New(r, newAPIConfig(false))
 	apis = append(apis, api)
 	newSubAPI := func(sub chi.Router) huma.API {
-		a := humachi.New(sub, newConfig())
+		a := humachi.New(sub, newAPIConfig(false))
+		apis = append(apis, a)
+		return a
+	}
+	newAuthedSubAPI := func(sub chi.Router) huma.API {
+		a := humachi.New(sub, newAPIConfig(true))
 		apis = append(apis, a)
 		return a
 	}
@@ -333,7 +380,7 @@ func BuildResult(deps Deps) Result {
 
 	r.Group(func(sub chi.Router) {
 		sub.Use(authMW)
-		subAPI := newSubAPI(sub)
+		subAPI := newAuthedSubAPI(sub)
 
 		// /me profile
 		huma.Register(subAPI, huma.Operation{
@@ -448,7 +495,7 @@ func BuildResult(deps Deps) Result {
 	// Admin setup endpoint (auth-only, no admin check — for bootstrap).
 	r.Group(func(sub chi.Router) {
 		sub.Use(authMW)
-		subAPI := newSubAPI(sub)
+		subAPI := newAuthedSubAPI(sub)
 		adminhandlers.RegisterSetup(subAPI, adminDeps)
 	})
 
@@ -456,7 +503,7 @@ func BuildResult(deps Deps) Result {
 	r.Group(func(sub chi.Router) {
 		sub.Use(authMW)
 		sub.Use(adminACL)
-		subAPI := newSubAPI(sub)
+		subAPI := newAuthedSubAPI(sub)
 		adminhandlers.Register(subAPI, adminDeps)
 	})
 
@@ -477,7 +524,7 @@ func BuildResult(deps Deps) Result {
 	// Workspace auth-only endpoints (create, list, accept invite).
 	r.Group(func(sub chi.Router) {
 		sub.Use(authMW)
-		subAPI := newSubAPI(sub)
+		subAPI := newAuthedSubAPI(sub)
 		huma.Register(subAPI, huma.Operation{
 			OperationID: "workspaces-create",
 			Method:      http.MethodPost,
@@ -505,7 +552,7 @@ func BuildResult(deps Deps) Result {
 	r.Group(func(sub chi.Router) {
 		sub.Use(authMW)
 		sub.Use(wsACL)
-		subAPI := newSubAPI(sub)
+		subAPI := newAuthedSubAPI(sub)
 		huma.Register(subAPI, huma.Operation{
 			OperationID: "workspaces-get",
 			Method:      http.MethodGet,
@@ -534,7 +581,7 @@ func BuildResult(deps Deps) Result {
 		sub.Use(authMW)
 		sub.Use(wsACL)
 		sub.Use(middleware.RequireWorkspaceRole(middleware.WorkspaceRoleAdmin))
-		subAPI := newSubAPI(sub)
+		subAPI := newAuthedSubAPI(sub)
 		huma.Register(subAPI, huma.Operation{
 			OperationID: "workspaces-patch",
 			Method:      http.MethodPatch,
@@ -591,7 +638,7 @@ func BuildResult(deps Deps) Result {
 		sub.Use(authMW)
 		sub.Use(wsACL)
 		sub.Use(middleware.RequireWorkspaceRole(middleware.WorkspaceRoleOwner))
-		subAPI := newSubAPI(sub)
+		subAPI := newAuthedSubAPI(sub)
 		huma.Register(subAPI, huma.Operation{
 			OperationID: "workspaces-delete",
 			Method:      http.MethodDelete,
@@ -643,7 +690,7 @@ func BuildResult(deps Deps) Result {
 	// /me/integrations (auth-protected).
 	r.Group(func(sub chi.Router) {
 		sub.Use(authMW)
-		subAPI := newSubAPI(sub)
+		subAPI := newAuthedSubAPI(sub)
 		huma.Register(subAPI, huma.Operation{
 			OperationID: "me-integrations-list",
 			Method:      http.MethodGet,
