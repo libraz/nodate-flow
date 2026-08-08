@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
 	"log/slog"
 	"net/http"
 	"net/url"
@@ -96,7 +95,10 @@ func (p *DiscordProvider) Exchange(ctx context.Context, code, redirectURI string
 		return nil, nil, wrapExchange(err)
 	}
 	defer resp.Body.Close()
-	body, _ := io.ReadAll(resp.Body)
+	body, err := readProviderBody(resp.Body)
+	if err != nil {
+		return nil, nil, wrapExchange(err)
+	}
 	if resp.StatusCode/100 != 2 {
 		// Never echo the raw body — Discord may include tokens in
 		// some response variants and the slog redaction layer does
@@ -204,7 +206,10 @@ func (p *DiscordProvider) Refresh(ctx context.Context, refreshToken string) (*To
 		return nil, wrapExchange(err)
 	}
 	defer resp.Body.Close()
-	body, _ := io.ReadAll(resp.Body)
+	body, err := readProviderBody(resp.Body)
+	if err != nil {
+		return nil, wrapExchange(err)
+	}
 	if resp.StatusCode/100 != 2 {
 		// See Exchange — strip the raw body so token-shaped error
 		// payloads never reach slog.
@@ -269,7 +274,10 @@ func (p *DiscordProvider) Revoke(ctx context.Context, tokens TokenSet) error {
 		return fmt.Errorf("integrations/discord: revoke: %w", err)
 	}
 	defer resp.Body.Close()
-	body, _ := io.ReadAll(resp.Body)
+	// Revoke is best-effort, so an over-long body is not itself a
+	// failure: the size error is dropped and the truncated bytes fall
+	// through to the parse below, which reports them as unparseable.
+	body, _ := readProviderBody(resp.Body)
 	if resp.StatusCode/100 == 2 {
 		return nil
 	}

@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 	"net/url"
 	"strings"
@@ -89,9 +88,12 @@ func (p *GoogleCalendarProvider) Exchange(ctx context.Context, code, redirectURI
 		return nil, nil, wrapExchange(err)
 	}
 	defer resp.Body.Close()
-	body, _ := io.ReadAll(resp.Body)
+	body, err := readProviderBody(resp.Body)
+	if err != nil {
+		return nil, nil, wrapExchange(err)
+	}
 	if resp.StatusCode/100 != 2 {
-		return nil, nil, wrapExchange(fmt.Errorf("status %d: %s", resp.StatusCode, body))
+		return nil, nil, wrapExchange(fmt.Errorf("status %d: %s", resp.StatusCode, errorPreview(body)))
 	}
 	var tok struct {
 		AccessToken  string `json:"access_token"`
@@ -168,9 +170,12 @@ func (p *GoogleCalendarProvider) Refresh(ctx context.Context, refreshToken strin
 		return nil, wrapExchange(err)
 	}
 	defer resp.Body.Close()
-	body, _ := io.ReadAll(resp.Body)
+	body, err := readProviderBody(resp.Body)
+	if err != nil {
+		return nil, wrapExchange(err)
+	}
 	if resp.StatusCode/100 != 2 {
-		return nil, wrapExchange(fmt.Errorf("status %d: %s", resp.StatusCode, body))
+		return nil, wrapExchange(fmt.Errorf("status %d: %s", resp.StatusCode, errorPreview(body)))
 	}
 	var tok struct {
 		AccessToken  string `json:"access_token"`
@@ -219,7 +224,10 @@ func (p *GoogleCalendarProvider) Revoke(ctx context.Context, tokens TokenSet) er
 		return fmt.Errorf("integrations/google: revoke: %w", err)
 	}
 	defer resp.Body.Close()
-	body, _ := io.ReadAll(resp.Body)
+	// A 200 revoke is a success whatever the body did, so the size
+	// error is dropped here; the truncated bytes only feed the
+	// diagnostic paths below.
+	body, _ := readProviderBody(resp.Body)
 	if resp.StatusCode == http.StatusOK {
 		return nil
 	}
@@ -231,5 +239,5 @@ func (p *GoogleCalendarProvider) Revoke(ctx context.Context, tokens TokenSet) er
 			return nil
 		}
 	}
-	return fmt.Errorf("integrations/google: revoke status %d: %s", resp.StatusCode, body)
+	return fmt.Errorf("integrations/google: revoke status %d: %s", resp.StatusCode, errorPreview(body))
 }

@@ -24,6 +24,13 @@ type OutboundClient struct {
 // ErrOutboundUnauthorized is returned when slack rejects the token.
 var ErrOutboundUnauthorized = errors.New("slack outbound: unauthorized")
 
+// maxResponseBytes bounds how much of a Slack response this client
+// holds in memory. chat.postMessage answers with a small JSON envelope;
+// a failure body is quoted into an error string that reaches the logs.
+// Neither justifies reading a response whose length the other side
+// picks.
+const maxResponseBytes = 64 << 10 // 64 KiB
+
 func (c *OutboundClient) base() string {
 	if c.BaseURL != "" {
 		return c.BaseURL
@@ -59,7 +66,7 @@ func (c *OutboundClient) PostMessage(ctx context.Context, channel, text string) 
 		return "", err
 	}
 	defer resp.Body.Close()
-	raw, _ := io.ReadAll(resp.Body)
+	raw, _ := io.ReadAll(io.LimitReader(resp.Body, maxResponseBytes))
 	if resp.StatusCode == http.StatusUnauthorized {
 		return "", ErrOutboundUnauthorized
 	}

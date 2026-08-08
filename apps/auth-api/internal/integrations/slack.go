@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 	"net/url"
 	"strings"
@@ -78,9 +77,12 @@ func (p *SlackProvider) Exchange(ctx context.Context, code, redirectURI string) 
 		return nil, nil, wrapExchange(err)
 	}
 	defer resp.Body.Close()
-	body, _ := io.ReadAll(resp.Body)
+	body, err := readProviderBody(resp.Body)
+	if err != nil {
+		return nil, nil, wrapExchange(err)
+	}
 	if resp.StatusCode/100 != 2 {
-		return nil, nil, wrapExchange(fmt.Errorf("status %d: %s", resp.StatusCode, body))
+		return nil, nil, wrapExchange(fmt.Errorf("status %d: %s", resp.StatusCode, errorPreview(body)))
 	}
 	var tok struct {
 		OK         bool   `json:"ok"`
@@ -137,9 +139,12 @@ func (p *SlackProvider) Revoke(ctx context.Context, tokens TokenSet) error {
 		return fmt.Errorf("integrations/slack: revoke: %w", err)
 	}
 	defer resp.Body.Close()
-	body, _ := io.ReadAll(resp.Body)
+	body, err := readProviderBody(resp.Body)
+	if err != nil {
+		return fmt.Errorf("integrations/slack: revoke: %w", err)
+	}
 	if resp.StatusCode/100 != 2 {
-		return fmt.Errorf("integrations/slack: revoke status %d: %s", resp.StatusCode, body)
+		return fmt.Errorf("integrations/slack: revoke status %d: %s", resp.StatusCode, errorPreview(body))
 	}
 	var r struct {
 		OK    bool   `json:"ok"`

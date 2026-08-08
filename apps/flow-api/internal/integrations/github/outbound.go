@@ -28,6 +28,13 @@ type OutboundClient struct {
 // configured token.
 var ErrOutboundUnauthorized = errors.New("github outbound: unauthorized")
 
+// maxResponseBytes bounds how much of a GitHub response this client
+// holds in memory. The successful shape is a single JSON object with a
+// comment id; the failure shape ends up quoted inside an error string
+// that reaches the logs. Neither is worth an unbounded read against an
+// endpoint whose response size is chosen by the other side.
+const maxResponseBytes = 64 << 10 // 64 KiB
+
 func (c *OutboundClient) httpClient() *http.Client {
 	if c.HTTP != nil {
 		return c.HTTP
@@ -68,7 +75,7 @@ func (c *OutboundClient) CreateIssueComment(ctx context.Context, owner, repo str
 		return 0, err
 	}
 	defer resp.Body.Close()
-	raw, _ := io.ReadAll(resp.Body)
+	raw, _ := io.ReadAll(io.LimitReader(resp.Body, maxResponseBytes))
 	if resp.StatusCode == http.StatusUnauthorized {
 		return 0, ErrOutboundUnauthorized
 	}

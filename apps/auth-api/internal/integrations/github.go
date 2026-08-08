@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -79,9 +78,12 @@ func (p *GithubProvider) Exchange(ctx context.Context, code, redirectURI string)
 		return nil, nil, wrapExchange(err)
 	}
 	defer resp.Body.Close()
-	body, _ := io.ReadAll(resp.Body)
+	body, err := readProviderBody(resp.Body)
+	if err != nil {
+		return nil, nil, wrapExchange(err)
+	}
 	if resp.StatusCode/100 != 2 {
-		return nil, nil, wrapExchange(fmt.Errorf("status %d: %s", resp.StatusCode, body))
+		return nil, nil, wrapExchange(fmt.Errorf("status %d: %s", resp.StatusCode, errorPreview(body)))
 	}
 	var tok struct {
 		AccessToken string `json:"access_token"`
@@ -163,6 +165,9 @@ func (p *GithubProvider) Revoke(ctx context.Context, tokens TokenSet) error {
 	if resp.StatusCode == http.StatusNoContent || resp.StatusCode == http.StatusNotFound {
 		return nil
 	}
-	body, _ := io.ReadAll(resp.Body)
-	return fmt.Errorf("integrations/github: revoke status %d: %s", resp.StatusCode, body)
+	// The status is already a failure, so a body that ran past the
+	// ceiling changes nothing about the outcome — only how much of it
+	// is quoted back.
+	body, _ := readProviderBody(resp.Body)
+	return fmt.Errorf("integrations/github: revoke status %d: %s", resp.StatusCode, errorPreview(body))
 }

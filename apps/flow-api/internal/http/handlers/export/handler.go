@@ -149,36 +149,6 @@ func CSVOperation(deps Deps) func(context.Context, *CSVInput) (*huma.StreamRespo
 		}
 		tasks := mapRows(rows)
 
-		deps.Audit.Record(ctx, audit.Entry{
-			Action:       "export.create",
-			ActorID:      actorID,
-			WorkspaceID:  ws.ID,
-			ResourceType: "export",
-			Metadata: map[string]any{
-				"format": "csv",
-				"count":  len(tasks),
-			},
-		})
-
-		actorInt64 := int64(actorID)
-		if err := eventbus.Append(ctx, deps.DB, eventbus.Event{
-			Type:        eventbus.ExportRequested,
-			WorkspaceID: ws.ID,
-			ActorUserID: &actorInt64,
-			Payload: map[string]any{
-				"format": "csv",
-				"count":  len(tasks),
-			},
-		}); err != nil {
-			slog.ErrorContext(ctx, "eventbus.Append failed",
-				slog.Any("err", err),
-				slog.String("handler", "export.CSVOperation"),
-				slog.String("event_type", string(eventbus.ExportRequested)),
-				logutil.LogEntity("workspace", ws.PublicID),
-				slog.String("format", "csv"),
-			)
-		}
-
 		return &huma.StreamResponse{
 			Body: func(hctx huma.Context) {
 				hctx.SetHeader("Content-Type", "text/csv; charset=utf-8")
@@ -192,37 +162,161 @@ func CSVOperation(deps Deps) func(context.Context, *CSVInput) (*huma.StreamRespo
 				// already knows the number exactly.
 				hctx.SetHeader(RowCountHeader, strconv.Itoa(len(tasks)))
 				hctx.SetStatus(http.StatusOK)
-				writeCSV(hctx.BodyWriter(), tasks)
+
+				res := writeCSV(hctx.BodyWriter(), tasks)
+				recordExport(ctx, deps, ws, actorID, len(tasks), res)
+				if res.err != nil {
+					// The status line went out before the first row did,
+					// so there is no status code left to say the file is
+					// short. The alternatives are a trailer, which almost
+					// no client reads and none of ours do, or ending the
+					// chunked stream without terminating it — which every
+					// HTTP client reports as a failed transfer and every
+					// browser as a failed download. Take the second: a
+					// truncated export must not arrive looking whole.
+					//
+					// net/http treats ErrAbortHandler as "close the
+					// connection, log nothing"; the diagnostic is the
+					// error record written above.
+					panic(http.ErrAbortHandler)
+				}
 			},
 		}, nil
 	}
 }
 
-// writeCSV emits the export as CSV.
+// recordExport writes the audit entry and the event for a CSV export
+// once the body has been written.
+//
+// Both are recorded after the fact, not before, because before the write
+// the only number available is how many rows the query returned — and
+// that is the number this handler used to record unconditionally, so an
+// export that reached the caller as twelve rows was logged as five
+// thousand. An administrator asking what left the workspace was reading
+// the size of a result set, not of a download.
+//
+// The records are written on a context detached from the request. The
+// realistic cause of a failed write is the caller going away, which
+// cancels the request context — precisely the case where the audit
+// entry matters most, and precisely the case where a request-scoped
+// context would refuse to write it.
+func recordExport(
+	ctx context.Context, deps Deps, ws middleware.WorkspaceContext,
+	actorID uint32, selected int, res csvWriteResult,
+) {
+	meta := exportMetadata(selected, res)
+
+	deps.Audit.Record(context.WithoutCancel(ctx), audit.Entry{
+		Action:       "export.create",
+		ActorID:      actorID,
+		WorkspaceID:  ws.ID,
+		ResourceType: "export",
+		Metadata:     meta,
+	})
+
+	actorInt64 := int64(actorID)
+	if err := eventbus.Append(context.WithoutCancel(ctx), deps.DB, eventbus.Event{
+		Type:        eventbus.ExportRequested,
+		WorkspaceID: ws.ID,
+		ActorUserID: &actorInt64,
+		Payload:     meta,
+	}); err != nil {
+		slog.ErrorContext(ctx, "eventbus.Append failed",
+			slog.Any("err", err),
+			slog.String("handler", "export.CSVOperation"),
+			slog.String("event_type", string(eventbus.ExportRequested)),
+			logutil.LogEntity("workspace", ws.PublicID),
+			slog.String("format", "csv"),
+		)
+	}
+
+	if res.err != nil {
+		slog.ErrorContext(ctx, "export: CSV body write failed",
+			slog.Any("err", res.err),
+			logutil.LogEntity("workspace", ws.PublicID),
+			slog.Int("rows_selected", selected),
+			slog.Int("rows_written", res.written),
+		)
+	}
+}
+
+// csvWriteResult is what writeCSV observed: the number of task rows it
+// handed to the CSV writer, and the error that stopped it.
+//
+// It is a type rather than two return values so the delivered count and
+// the selected count cannot be transposed at the call site. Recording
+// the selected count as though it were the delivered one is the exact
+// defect this pair exists to prevent, and `len(tasks)` is in scope
+// right where the metadata is built.
+type csvWriteResult struct {
+	written int
+	err     error
+}
+
+// exportMetadata describes one export for the audit log and the event
+// stream.
+//
+//   - count    — task rows handed to the CSV writer. When the write
+//     failed this is an upper bound on what was delivered, not a
+//     confirmed count: the writer buffers, so rows counted here can
+//     still have been lost in the failing flush.
+//   - selected — task rows the query returned. Equal to count on a
+//     clean export; larger when the download was cut short.
+//   - complete — whether the whole file reached the transport. It is
+//     what qualifies count, and without it a short export is
+//     indistinguishable from a small workspace.
+func exportMetadata(selected int, res csvWriteResult) map[string]any {
+	return map[string]any{
+		"format":   "csv",
+		"count":    res.written,
+		"selected": selected,
+		"complete": res.err == nil,
+	}
+}
+
+// writeCSV emits the export as CSV and reports how many task rows it
+// got through, along with the first write error that stopped it.
+//
+// Every write is checked. The rows are already in memory by the time
+// this runs, so the writer failing means the transport did — usually
+// the caller hanging up mid-download. Discarding those errors, as this
+// did, produced a short file with a 200 on it and a log entry claiming
+// the whole workspace had been exported.
+//
+// The count is rows handed to the csv.Writer, which buffers: after a
+// failing Flush some of the counted rows never reached the socket. It
+// is an upper bound on delivery, which is why the caller pairs it with
+// the error rather than reporting it alone.
 //
 // The leading byte order mark is for spreadsheet software that reads a
 // CSV as the local code page unless told otherwise; without it a file
 // of non-ASCII task titles opens as mojibake. This is the only place
 // that adds one — a second BOM written by a client assembling its own
 // file would appear as stray characters in the first header cell.
-func writeCSV(w io.Writer, tasks []ExportedTask) {
-	_, _ = w.Write([]byte{0xEF, 0xBB, 0xBF})
+func writeCSV(w io.Writer, tasks []ExportedTask) csvWriteResult {
+	if _, err := w.Write([]byte{0xEF, 0xBB, 0xBF}); err != nil {
+		return csvWriteResult{err: fmt.Errorf("export: write byte order mark: %w", err)}
+	}
 
 	cw := csv.NewWriter(w)
-	write := func(cells []string) {
+	write := func(cells []string) error {
 		for i, cell := range cells {
 			cells[i] = neutraliseFormula(cell)
 		}
-		_ = cw.Write(cells)
+		return cw.Write(cells)
 	}
-	write([]string{
+	if err := write([]string{
 		"ID", "Title", "Description", "Status", "Priority",
 		"Due Date", "Start Date", "Completed At",
 		"Project ID", "Project", "Assignee ID", "Assignee",
 		"Updated At", "Created At",
-	})
+	}); err != nil {
+		return csvWriteResult{err: fmt.Errorf("export: write header row: %w", err)}
+	}
+
+	written := 0
 	for _, t := range tasks {
-		write([]string{
+		if err := write([]string{
 			t.ID,
 			t.Title,
 			handlerutil.DerefStr(t.Description),
@@ -237,9 +331,20 @@ func writeCSV(w io.Writer, tasks []ExportedTask) {
 			handlerutil.DerefStr(t.AssigneeDisplayName),
 			handlerutil.FormatOptionalUnixISO(t.UpdatedAt),
 			handlerutil.FormatUnixISO(t.CreatedAt),
-		})
+		}); err != nil {
+			return csvWriteResult{written: written, err: fmt.Errorf("export: write row %d: %w", written+1, err)}
+		}
+		written++
 	}
+
+	// Flush is where the buffered tail reaches the writer, so it can
+	// fail after every Write above succeeded. cw.Error() is the only
+	// place that failure is reported — Flush itself returns nothing.
 	cw.Flush()
+	if err := cw.Error(); err != nil {
+		return csvWriteResult{written: written, err: fmt.Errorf("export: flush csv: %w", err)}
+	}
+	return csvWriteResult{written: written}
 }
 
 // ----------------------------------------------------------------

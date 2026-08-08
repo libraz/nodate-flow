@@ -75,11 +75,20 @@ type Job struct {
 	// days. Steady-state ticks use only the elapsed time since the last
 	// successful tick so the 26h lookback does not re-scan yesterday on
 	// every minute. Defaults to defaultCatchUpWindow when non-positive.
+	//
+	// It also bounds how much a single tick may scan. A gap wider than
+	// this is not discarded: the tick takes the oldest slice of it and
+	// the cursor advances by exactly that much, so the remainder is
+	// picked up by the ticks that follow. See spanSinceLast.
 	CatchUpWindow time.Duration
 
-	mu                 sync.Mutex
-	lastSuccessfulTick time.Time
-	lastSuccessfulByWS map[uint32]time.Time
+	// Cursors records how far each workspace has been scanned. Optional:
+	// defaults to an in-process store, which is what the job has always
+	// used.
+	Cursors CursorStore
+
+	memoryCursorsOnce sync.Once
+	memoryCursors     CursorStore
 }
 
 // New constructs a Job with its Scanner and Client wired against the
@@ -139,11 +148,27 @@ func (j *Job) Tick(ctx context.Context, now time.Time) error {
 	}
 
 	for _, ws := range workspaces {
-		window := j.dayWindowForWorkspace(ws.ID, now)
-		if err := j.tickForWorkspace(ctx, ws, now, window); err != nil {
+		span := j.spanForWorkspace(ctx, ws.ID, now)
+		if span.upper.Before(now) {
+			// The workspace is behind by more than one tick can scan.
+			// Say so: a workspace that keeps failing walks forward one
+			// slice per tick, and the only other sign of it is the
+			// absence of signals nobody is looking for.
+			j.Logger.InfoContext(ctx, "calendar_event_day: workspace is catching up",
+				slog.String("workspace_public_id", ws.PublicID.String()),
+				slog.Time("scanning_through", span.upper),
+				slog.Duration("behind_by", now.Sub(span.upper)),
+			)
+		}
+		if err := j.tickForWorkspace(ctx, ws, span); err != nil {
 			// One bad workspace must not block the rest. The runner
 			// metric stays "ok" because the loop made progress; per-
 			// workspace failures surface via the slog stream.
+			//
+			// The cursor is deliberately left where it was: the days in
+			// this span have not been materialised, and advancing past
+			// them is what made a workspace with broken data lose them
+			// permanently.
 			j.Logger.WarnContext(ctx, "calendar_event_day: workspace tick failed",
 				slog.Any("err", err),
 				slog.Uint64("workspace_internal_id", uint64(ws.ID)),
@@ -151,21 +176,21 @@ func (j *Job) Tick(ctx context.Context, now time.Time) error {
 			)
 			continue
 		}
-		j.markWorkspaceSuccessfulTick(ws.ID, now)
+		j.markScanned(ctx, ws, span.upper)
 	}
 	obs.CalendarEventDayTicksTotal.WithLabelValues("ok").Inc()
 	return nil
 }
 
 // tickForWorkspace runs the scan + emit cycle for a single workspace.
-// `window` is the fire-once day window (tick interval + catch-up). Only
-// events whose local day arrives inside the window are scanned, so a
-// steady cadence emits each (event, day) once. Returned errors describe
-// the workspace-level failure (event query); per-event POST failures are
+// `span` is the fire-once day window this tick materialises. Only events
+// whose local day arrives inside it are scanned, so a steady cadence
+// emits each (event, day) once. Returned errors describe the
+// workspace-level failure (event query); per-event POST failures are
 // logged inside the loop and do not abort the workspace — partial
 // progress is better than none.
-func (j *Job) tickForWorkspace(ctx context.Context, ws Workspace, now time.Time, window time.Duration) error {
-	events, err := j.Scanner.ListEventsForDays(ctx, ws.ID, ws.Timezone, now, window)
+func (j *Job) tickForWorkspace(ctx context.Context, ws Workspace, span scanSpan) error {
+	events, err := j.Scanner.ListEventsForDays(ctx, ws.ID, ws.Timezone, span.upper, span.width)
 	if err != nil {
 		return fmt.Errorf("list arriving events: %w", err)
 	}
@@ -248,20 +273,60 @@ func dedupeKey(eventPublicID, day string) string {
 	return "calendar_event_day:" + eventPublicID + ":" + day
 }
 
-// dayWindow resolves the fire-once scan window. The first tick gets the
-// configured catch-up allowance because an in-memory job has no durable
-// cursor. After that, steady-state ticks use the elapsed time since the
-// last successful tick, bounded below by TickInterval for minor scheduler
-// jitter and bounded above by TickInterval+CatchUpWindow for outages.
-func (j *Job) dayWindow(now time.Time) time.Duration {
-	return j.windowSinceLast(j.lastTickForWorkspace(0), now)
+// scanSpan is the stretch of time one tick materialises for one
+// workspace: the local days whose midnight falls in
+// `[upper - width, upper)`. `upper` is the instant the cursor moves to
+// when the tick succeeds, which is the tick time in steady state and an
+// earlier instant while a workspace is catching up.
+type scanSpan struct {
+	upper time.Time
+	width time.Duration
 }
 
-func (j *Job) dayWindowForWorkspace(workspaceID uint32, now time.Time) time.Duration {
-	return j.windowSinceLast(j.lastTickForWorkspace(workspaceID), now)
+// spanForWorkspace resolves the span this tick should materialise for a
+// workspace, reading the workspace's cursor.
+//
+// A cursor that cannot be read is treated as absent, which costs a
+// catch-up-width scan and no correctness: the day-scoped external_id
+// collapses anything already emitted.
+func (j *Job) spanForWorkspace(ctx context.Context, workspaceID uint32, now time.Time) scanSpan {
+	last, err := j.cursors().Load(ctx, workspaceID)
+	if err != nil {
+		j.Logger.WarnContext(ctx, "calendar_event_day: cursor load failed, scanning the full catch-up window",
+			slog.Any("err", err),
+			slog.Uint64("workspace_internal_id", uint64(workspaceID)),
+		)
+		last = time.Time{}
+	}
+	return j.spanSinceLast(last, now)
 }
 
-func (j *Job) windowSinceLast(last, now time.Time) time.Duration {
+// spanSinceLast turns a cursor into the span for this tick.
+//
+//   - No cursor: scan the whole catch-up allowance. This is the first
+//     tick after a process start, which with an in-memory store is also
+//     the first tick after every deploy.
+//   - Cursor within one interval: scan one interval. Steady state, and
+//     the lower bound absorbs scheduler jitter.
+//   - Cursor within the catch-up allowance: scan exactly the elapsed
+//     time, so a short outage self-heals in one tick.
+//   - Cursor older than the allowance: scan the OLDEST allowance-wide
+//     slice of the gap, ending at `last + maxWindow` rather than at
+//     `now`.
+//
+// That last case is the one that used to lose days. The window was
+// clamped to the allowance but still measured backwards from `now`, and
+// the cursor still jumped to `now` on success — so everything between
+// the old cursor and `now - maxWindow` was skipped and never looked at
+// again. A workspace that failed for longer than the allowance (broken
+// timezone data, say) lost every day in the middle of the outage even
+// after it recovered, and nothing downstream could tell those days from
+// days on which nothing happened.
+//
+// Walking the gap forward one slice per tick converts a permanent hole
+// into a delay: a workspace 30 days behind is current again after 30
+// ticks, and the day-scoped external_id keeps the backfill idempotent.
+func (j *Job) spanSinceLast(last, now time.Time) scanSpan {
 	interval := j.TickInterval
 	if interval <= 0 {
 		interval = defaultTickInterval
@@ -273,41 +338,42 @@ func (j *Job) windowSinceLast(last, now time.Time) time.Duration {
 	maxWindow := interval + catchUp
 
 	if last.IsZero() {
-		return maxWindow
+		return scanSpan{upper: now, width: maxWindow}
 	}
 
 	elapsed := now.Sub(last)
-	if elapsed <= interval {
-		return interval
+	switch {
+	case elapsed <= interval:
+		return scanSpan{upper: now, width: interval}
+	case elapsed <= maxWindow:
+		return scanSpan{upper: now, width: elapsed}
+	default:
+		return scanSpan{upper: last.Add(maxWindow), width: maxWindow}
 	}
-	if elapsed > maxWindow {
-		return maxWindow
-	}
-	return elapsed
 }
 
-func (j *Job) markSuccessfulTick(now time.Time) {
-	j.markWorkspaceSuccessfulTick(0, now)
+// markScanned advances a workspace's cursor to the upper bound of the
+// span the tick just completed — not to `now`, which would declare the
+// unscanned remainder of a catch-up gap done.
+func (j *Job) markScanned(ctx context.Context, ws Workspace, scannedThrough time.Time) {
+	if err := j.cursors().Save(ctx, ws.ID, scannedThrough); err != nil {
+		// A cursor that fails to persist costs a re-scan, not lost
+		// days: the next tick reads the older value and materialises
+		// the same span again, which the dedupe key collapses.
+		j.Logger.WarnContext(ctx, "calendar_event_day: cursor save failed",
+			slog.Any("err", err),
+			slog.String("workspace_public_id", ws.PublicID.String()),
+			slog.Time("scanned_through", scannedThrough),
+		)
+	}
 }
 
-func (j *Job) markWorkspaceSuccessfulTick(workspaceID uint32, now time.Time) {
-	j.mu.Lock()
-	if workspaceID == 0 {
-		j.lastSuccessfulTick = now
-	} else {
-		if j.lastSuccessfulByWS == nil {
-			j.lastSuccessfulByWS = make(map[uint32]time.Time)
-		}
-		j.lastSuccessfulByWS[workspaceID] = now
+func (j *Job) cursors() CursorStore {
+	if j.Cursors != nil {
+		return j.Cursors
 	}
-	j.mu.Unlock()
-}
-
-func (j *Job) lastTickForWorkspace(workspaceID uint32) time.Time {
-	j.mu.Lock()
-	defer j.mu.Unlock()
-	if workspaceID == 0 {
-		return j.lastSuccessfulTick
-	}
-	return j.lastSuccessfulByWS[workspaceID]
+	j.memoryCursorsOnce.Do(func() {
+		j.memoryCursors = NewMemoryCursorStore()
+	})
+	return j.memoryCursors
 }

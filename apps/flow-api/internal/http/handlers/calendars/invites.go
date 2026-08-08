@@ -225,21 +225,11 @@ func CreateEventInvite(deps Deps) func(context.Context, *CreateEventInviteInput)
 		}
 		expiresAt := time.Now().UTC().Add(time.Duration(hours) * time.Hour)
 
-		// Find the attendee's internal id so we can look up an existing
-		// invite (UNIQUE on (event_id, attendee_id)). The list query
-		// does not surface the internal id, so go through the direct
-		// per-user lookup.
-		attRow, err := deps.CalendarQueries.FindCalendarEventAttendee(ctx, calendar.FindCalendarEventAttendeeParams{
-			EventID: handlerutil.NullInt32From(evt.ID),
-			UserID:  matched.UserID,
-		})
-		if err != nil {
-			return nil, httpErr(apierrors.CalendarInviteStoreLookupInterrupted)
-		}
-
+		// The attendee's internal id comes from the row already matched
+		// above; the invite is UNIQUE on (event_id, attendee_id).
 		existing, err := deps.CalendarQueries.FindCalendarEventInviteForAttendee(ctx, calendar.FindCalendarEventInviteForAttendeeParams{
 			EventID:    handlerutil.NullInt32From(evt.ID),
-			AttendeeID: handlerutil.NullInt32From(attRow.ID),
+			AttendeeID: handlerutil.NullInt32From(matched.ID),
 		})
 		rotated := false
 		var invitePublicID types.PublicID
@@ -271,7 +261,7 @@ func CreateEventInvite(deps Deps) func(context.Context, *CreateEventInviteInput)
 				WorkspaceID: wsID,
 				CalendarID:  cal.ID,
 				EventID:     handlerutil.NullInt32From(evt.ID),
-				AttendeeID:  handlerutil.NullInt32From(attRow.ID),
+				AttendeeID:  handlerutil.NullInt32From(matched.ID),
 				Email:       profile.Email,
 				TokenHash:   tokenHash,
 				ExpiresAt:   expiresAt,
@@ -280,7 +270,7 @@ func CreateEventInvite(deps Deps) func(context.Context, *CreateEventInviteInput)
 				if handlerutil.IsDuplicateEntry(cerr) {
 					existing, rerr := deps.CalendarQueries.FindCalendarEventInviteForAttendee(ctx, calendar.FindCalendarEventInviteForAttendeeParams{
 						EventID:    handlerutil.NullInt32From(evt.ID),
-						AttendeeID: handlerutil.NullInt32From(attRow.ID),
+						AttendeeID: handlerutil.NullInt32From(matched.ID),
 					})
 					if rerr == nil {
 						if rerr = deps.CalendarQueries.ReviveCalendarEventInvite(ctx, calendar.ReviveCalendarEventInviteParams{
@@ -474,10 +464,12 @@ func AcceptEventInvite(deps Deps) func(context.Context, *AcceptEventInviteInput)
 
 		rsvp := calendar.CalendarEventAttendeesRsvp(input.Body.Rsvp)
 
-		// Resolve attendee → user_id so we can target the RSVP update.
-		// ListCalendarEventAttendees is the cheapest available path
-		// since the schema doesn't expose a (attendee_id → user_id)
-		// lookup directly.
+		// Resolve invite.attendee_id (internal) → user_id so we can target
+		// the RSVP update. The attendee list carries its own internal id,
+		// so the match is a scan of one already-fetched result set — the
+		// endpoint is unauthenticated and an all-hands event has hundreds
+		// of attendees, which is exactly the shape that must not cost a
+		// round trip per attendee.
 		attendees, err := deps.CalendarQueries.ListCalendarEventAttendees(ctx, calendar.ListCalendarEventAttendeesParams{
 			EventID:     invite.EventID,
 			WorkspaceID: invite.WorkspaceID,
@@ -487,19 +479,9 @@ func AcceptEventInvite(deps Deps) func(context.Context, *AcceptEventInviteInput)
 		}
 		var targetUserID uint32
 		var attendeeMatched bool
+		wantAttendeeID := handlerutil.Int32ToUint32(invite.AttendeeID)
 		for _, a := range attendees {
-			// AttendeeID is internal; we can't compare directly without
-			// fetching each attendee's internal id. Fall back to a
-			// per-user lookup against the attendee row (event_id,
-			// user_id) and compare the returned internal id.
-			row, lerr := deps.CalendarQueries.FindCalendarEventAttendee(ctx, calendar.FindCalendarEventAttendeeParams{
-				EventID: invite.EventID,
-				UserID:  a.UserID,
-			})
-			if lerr != nil {
-				continue
-			}
-			if row.ID == handlerutil.Int32ToUint32(invite.AttendeeID) {
+			if a.ID == wantAttendeeID {
 				targetUserID = a.UserID
 				attendeeMatched = true
 				break
@@ -670,17 +652,7 @@ func ListEventInvites(deps Deps) func(context.Context, *ListEventInvitesInput) (
 		}
 		internalToPublic := make(map[uint32]types.PublicID, len(attendees))
 		for _, a := range attendees {
-			// Fetch the attendee's internal id via the per-user lookup;
-			// the list query omits it. This is O(attendees) per list
-			// call — acceptable given typical event attendee counts.
-			row, lerr := deps.CalendarQueries.FindCalendarEventAttendee(ctx, calendar.FindCalendarEventAttendeeParams{
-				EventID: handlerutil.NullInt32From(evt.ID),
-				UserID:  a.UserID,
-			})
-			if lerr != nil {
-				continue
-			}
-			internalToPublic[row.ID] = a.PublicID
+			internalToPublic[a.ID] = a.PublicID
 		}
 
 		out := &ListEventInvitesOutput{}
