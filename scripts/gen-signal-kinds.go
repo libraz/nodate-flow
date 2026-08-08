@@ -36,7 +36,15 @@ type kindEntry struct {
 	AutonomyDefault    string `yaml:"autonomy_default"`
 	SubjectTypeDefault string `yaml:"subject_type_default"`
 	Description        string `yaml:"description"`
-	I18nKey            string `yaml:"i18n_key"`
+	DescriptionJA      string `yaml:"description_ja"`
+	DescriptionZH      string `yaml:"description_zh"`
+	// Label is the display name shown in the autonomy matrix. Optional:
+	// when empty it is derived from the kind, which is what every entry
+	// relied on before the field existed.
+	Label   string `yaml:"label"`
+	LabelJA string `yaml:"label_ja"`
+	LabelZH string `yaml:"label_zh"`
+	I18nKey string `yaml:"i18n_key"`
 }
 
 type kindFile struct {
@@ -53,6 +61,11 @@ type record struct {
 	AutonomyDefault    string
 	SubjectTypeDefault string
 	Description        string
+	DescriptionJA      string
+	DescriptionZH      string
+	Label              string
+	LabelJA            string
+	LabelZH            string
 	I18nKey            string
 }
 
@@ -97,14 +110,35 @@ var (
 var kindRe = regexp.MustCompile(`^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)*$`)
 
 func main() {
-	if err := run(); err != nil {
+	// --check answers "is what is committed what this generator would
+	// produce today?" without writing anything, so it is safe to run
+	// from verify-codegen and from a pre-commit hook.
+	//
+	// It compares content rather than hashing the YAML, because the
+	// failure this guards against is not only an un-regenerated source
+	// edit. The generator once ignored the language it was writing for
+	// and published the English copy into ja and zh; a source stamp
+	// would have called that fresh. Comparing the files themselves
+	// catches a change in the generator, a hand-edit of its output, and
+	// a stale regeneration alike.
+	if len(os.Args) > 1 && os.Args[1] == "--check" {
+		if err := run(true); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
+		fmt.Fprintln(os.Stdout, "gen-signal-kinds: generated files match signal_kinds/*.yaml")
+		return
+	}
+	if err := run(false); err != nil {
 		fmt.Fprintln(os.Stderr, "gen-signal-kinds:", err)
 		os.Exit(1)
 	}
 	fmt.Fprintln(os.Stdout, "gen-signal-kinds: ok")
 }
 
-func run() error {
+// run builds every output from the YAML registry. With check set it
+// compares the results against what is committed and writes nothing.
+func run(check bool) error {
 	root, err := repoRoot()
 	if err != nil {
 		return err
@@ -147,6 +181,10 @@ func run() error {
 				return fmt.Errorf("duplicate kind %q in %s and %s", e.Kind, prev, path)
 			}
 			seen[e.Kind] = path
+			label := e.Label
+			if label == "" {
+				label = defaultLabel(e.Kind)
+			}
 			r := record{
 				File:               base,
 				Kind:               e.Kind,
@@ -155,6 +193,11 @@ func run() error {
 				AutonomyDefault:    e.AutonomyDefault,
 				SubjectTypeDefault: e.SubjectTypeDefault,
 				Description:        e.Description,
+				DescriptionJA:      e.DescriptionJA,
+				DescriptionZH:      e.DescriptionZH,
+				Label:              label,
+				LabelJA:            e.LabelJA,
+				LabelZH:            e.LabelZH,
 				I18nKey:            e.I18nKey,
 			}
 			recs = append(recs, r)
@@ -182,19 +225,17 @@ func run() error {
 	}
 	sort.Slice(all, func(i, j int) bool { return all[i].Kind < all[j].Kind })
 
+	// The outputs are assembled first and emitted second so that --check
+	// and a real run answer from the same values.
+	outputs := map[string][]byte{}
+
 	// 1) Go module — typed consts and lookup table.
-	goPath := filepath.Join(root, "apps", "flow-api", "internal", "signalkinds", "signalkinds.go")
-	if err := writeFile(goPath, genGoFile(all)); err != nil {
-		return err
-	}
+	outputs[filepath.Join(root, "apps", "flow-api", "internal", "signalkinds", "signalkinds.go")] = genGoFile(all)
 
 	// 2) TS module — SDK consts + lookup helper.
-	tsPath := filepath.Join(root, "packages", "sdk", "src", "signal-kinds", "index.ts")
-	if err := writeFile(tsPath, genTsFile(all)); err != nil {
-		return err
-	}
+	outputs[filepath.Join(root, "packages", "sdk", "src", "signal-kinds", "index.ts")] = genTsFile(all)
 
-	// 3) i18n stubs — flow-web only (accounts-web is identity-side and
+	// 3) i18n bundles — flow-web only (accounts-web is identity-side and
 	// has no signal surface).
 	localeApp := filepath.Join(root, "apps", "flow-web", "locales")
 	for _, lang := range []string{"en", "ja", "zh"} {
@@ -202,23 +243,65 @@ func run() error {
 		if _, err := os.Stat(dir); os.IsNotExist(err) {
 			continue
 		}
-		if err := writeFile(filepath.Join(dir, "signal-kinds.json"), genLocale(all, lang)); err != nil {
-			return err
-		}
+		outputs[filepath.Join(dir, "signal-kinds.json")] = genLocale(all, lang)
 	}
 
 	// 4) Per-source Markdown docs.
 	docsDir := filepath.Join(root, "docs", "signal-kinds")
+	for _, src := range sourceNames {
+		outputs[filepath.Join(docsDir, src+".md")] = genDoc(src, bySource[src])
+	}
+
+	if check {
+		return compareOutputs(root, outputs)
+	}
 	if err := os.MkdirAll(docsDir, 0o755); err != nil {
 		return err
 	}
-	for _, src := range sourceNames {
-		outPath := filepath.Join(docsDir, src+".md")
-		if err := writeFile(outPath, genDoc(src, bySource[src])); err != nil {
+	paths := make([]string, 0, len(outputs))
+	for path := range outputs {
+		paths = append(paths, path)
+	}
+	sort.Strings(paths)
+	for _, path := range paths {
+		if err := writeFile(path, outputs[path]); err != nil {
 			return err
 		}
 	}
+	return nil
+}
 
+// compareOutputs reports the committed files that differ from what the
+// generator produces now.
+func compareOutputs(root string, outputs map[string][]byte) error {
+	paths := make([]string, 0, len(outputs))
+	for path := range outputs {
+		paths = append(paths, path)
+	}
+	sort.Strings(paths)
+
+	var stale []string
+	for _, path := range paths {
+		committed, err := os.ReadFile(path)
+		rel, relErr := filepath.Rel(root, path)
+		if relErr != nil {
+			rel = path
+		}
+		switch {
+		case os.IsNotExist(err):
+			stale = append(stale, rel+" (not committed)")
+		case err != nil:
+			return fmt.Errorf("gen-signal-kinds: cannot read %s: %w", rel, err)
+		case !bytes.Equal(committed, outputs[path]):
+			stale = append(stale, rel)
+		}
+	}
+	if len(stale) > 0 {
+		return fmt.Errorf("gen-signal-kinds: these files are not what signal_kinds/*.yaml generates:\n  %s\n\n"+
+			"Run 'make gen-signal-kinds' and commit the result. Editing a generated locale by hand does not "+
+			"survive the next run — put the translation in signal_kinds/*.yaml instead",
+			strings.Join(stale, "\n  "))
+	}
 	return nil
 }
 
@@ -250,6 +333,30 @@ func validateEntry(path string, e kindEntry) error {
 	}
 	if e.I18nKey == "" {
 		return fmt.Errorf("%s: %s missing 'i18n_key'", path, e.Kind)
+	}
+	// Translations are required, not optional, because this generator
+	// overwrites the locale files whole. A kind added without them used
+	// to be emitted as English into every locale, and any translation
+	// written by hand afterwards was destroyed by the next `make gen` —
+	// the failure looked like a translator's mistake and had no trace
+	// pointing here. Failing at the source is the only place the
+	// omission is visible.
+	//
+	// The registry is a small closed enumeration (one entry per signal
+	// the product can act on), so requiring both languages up front
+	// costs a sentence per kind. This is deliberately stricter than the
+	// error catalogue, which has hundreds of entries and lets zh land
+	// incrementally.
+	for _, missing := range []struct{ field, value string }{
+		{"label_ja", e.LabelJA},
+		{"label_zh", e.LabelZH},
+		{"description_ja", e.DescriptionJA},
+		{"description_zh", e.DescriptionZH},
+	} {
+		if missing.value == "" {
+			return fmt.Errorf("%s: %s missing %q; every signal kind must ship its ja and zh copy "+
+				"or the generator will publish English into those locales", path, e.Kind, missing.field)
+		}
 	}
 	return nil
 }
@@ -495,21 +602,28 @@ func genTsFile(all []record) []byte {
 // contributes two entries: "<i18n_key>.label" (display label) and
 // "<i18n_key>.description" (longer help text).
 //
-// English values are populated from the YAML. ja and zh are seeded with
-// the English text as a deterministic placeholder so the empty-value
-// lint in scripts/i18n-translate.mjs does not trip. The @i18n agent is
-// expected to overwrite these on a subsequent translation pass.
+// Every language is read from the YAML entry. This function used to
+// ignore its own `lang` argument and write the English text into all
+// three files, which made the three locale bundles byte-identical and
+// the autonomy matrix English for ja and zh readers. Editing the JSON
+// by hand appeared to fix it until the next `make gen` overwrote the
+// file — validateEntry now refuses an entry that has nothing to write
+// here.
 func genLocale(all []record, lang string) []byte {
 	type pair struct{ key, value string }
 	var pairs []pair
 	for _, r := range all {
-		label := defaultLabel(r.Kind)
-		desc := r.Description
+		label, desc := r.Label, r.Description
+		switch lang {
+		case "ja":
+			label, desc = r.LabelJA, r.DescriptionJA
+		case "zh":
+			label, desc = r.LabelZH, r.DescriptionZH
+		}
 		pairs = append(pairs,
 			pair{key: r.I18nKey + ".label", value: label},
 			pair{key: r.I18nKey + ".description", value: desc},
 		)
-		_ = lang // ja/zh currently mirror en; translators overwrite in place.
 	}
 	sort.Slice(pairs, func(i, j int) bool { return pairs[i].key < pairs[j].key })
 

@@ -10,4 +10,9 @@ kinds:
     autonomy_default: auto
     subject_type_default: user
     description: "User-emitted signal from UI or CLI"
+    description_ja: "UI または CLI から利用者自身が発行するシグナル"
+    description_zh: "用户通过 UI 或 CLI 主动发出的信号"
+    label: "Manual"
+    label_ja: "手動"
+    label_zh: "手动"
     i18n_key: signalKinds.manual

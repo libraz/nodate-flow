@@ -11,6 +11,11 @@ kinds:
     autonomy_default: suggest
     subject_type_default: user
     description: "User online status from Discord gateway"
+    description_ja: "Discord ゲートウェイから取得した利用者のオンライン状態"
+    description_zh: "来自 Discord 网关的用户在线状态"
+    label: "Discord presence"
+    label_ja: "Discord のオンライン状態"
+    label_zh: "Discord 在线状态"
     i18n_key: signalKinds.discord.presence
 
   - kind: slack.presence
@@ -19,4 +24,9 @@ kinds:
     autonomy_default: suggest
     subject_type_default: user
     description: "User active/away status from Slack Events API"
+    description_ja: "Slack Events API から取得した利用者の在席・離席状態"
+    description_zh: "来自 Slack Events API 的用户活动/离开状态"
+    label: "Slack presence"
+    label_ja: "Slack の在席状態"
+    label_zh: "Slack 在线状态"
     i18n_key: signalKinds.slack.presence

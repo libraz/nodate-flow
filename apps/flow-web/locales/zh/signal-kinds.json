@@ -1,10 +1,10 @@
 {
-  "signalKinds.calendar.eventDayArrived.description": "Internal scheduler tick when a calendar event's start_date arrives in workspace local time",
-  "signalKinds.calendar.eventDayArrived.label": "Calendar event day arrived",
-  "signalKinds.discord.presence.description": "User online status from Discord gateway",
-  "signalKinds.discord.presence.label": "Discord presence",
-  "signalKinds.manual.description": "User-emitted signal from UI or CLI",
-  "signalKinds.manual.label": "Manual",
-  "signalKinds.slack.presence.description": "User active/away status from Slack Events API",
-  "signalKinds.slack.presence.label": "Slack presence"
+  "signalKinds.calendar.eventDayArrived.description": "当日程的开始日期在工作区本地时间到来时，由内部调度器发出的信号",
+  "signalKinds.calendar.eventDayArrived.label": "日程当日到来",
+  "signalKinds.discord.presence.description": "来自 Discord 网关的用户在线状态",
+  "signalKinds.discord.presence.label": "Discord 在线状态",
+  "signalKinds.manual.description": "用户通过 UI 或 CLI 主动发出的信号",
+  "signalKinds.manual.label": "手动",
+  "signalKinds.slack.presence.description": "来自 Slack Events API 的用户活动/离开状态",
+  "signalKinds.slack.presence.label": "Slack 在线状态"
 }

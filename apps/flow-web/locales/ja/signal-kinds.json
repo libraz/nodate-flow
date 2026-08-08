@@ -1,10 +1,10 @@
 {
-  "signalKinds.calendar.eventDayArrived.description": "Internal scheduler tick when a calendar event's start_date arrives in workspace local time",
-  "signalKinds.calendar.eventDayArrived.label": "Calendar event day arrived",
-  "signalKinds.discord.presence.description": "User online status from Discord gateway",
-  "signalKinds.discord.presence.label": "Discord presence",
-  "signalKinds.manual.description": "User-emitted signal from UI or CLI",
-  "signalKinds.manual.label": "Manual",
-  "signalKinds.slack.presence.description": "User active/away status from Slack Events API",
-  "signalKinds.slack.presence.label": "Slack presence"
+  "signalKinds.calendar.eventDayArrived.description": "予定の開始日がワークスペースのローカル時間で到来したときに内部スケジューラが発火するティック",
+  "signalKinds.calendar.eventDayArrived.label": "予定日の到来",
+  "signalKinds.discord.presence.description": "Discord ゲートウェイから取得した利用者のオンライン状態",
+  "signalKinds.discord.presence.label": "Discord のオンライン状態",
+  "signalKinds.manual.description": "UI または CLI から利用者自身が発行するシグナル",
+  "signalKinds.manual.label": "手動",
+  "signalKinds.slack.presence.description": "Slack Events API から取得した利用者の在席・離席状態",
+  "signalKinds.slack.presence.label": "Slack の在席状態"
 }

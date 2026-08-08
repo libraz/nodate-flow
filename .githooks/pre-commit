@@ -53,3 +53,20 @@ if git diff --cached --name-only --diff-filter=ACMR | grep -qE '^errors/.*\.yaml
     exit 1
   fi
 fi
+
+# The signal-kind registry generates the same three kinds of artefact, plus
+# the flow-web locale bundles. It is checked by comparing the files rather
+# than a hash of the sources, because its failure mode was the generator
+# itself: it wrote the English copy into every locale, which a source hash
+# calls fresh. Gated on either the registry or the generator being staged —
+# a change to either can make the committed output wrong.
+if git diff --cached --name-only --diff-filter=ACMR |
+  grep -qE '^(signal_kinds/.*\.yaml|scripts/gen-signal-kinds\.go)$'; then
+  if ! (cd "$toplevel" && go -C scripts run gen-signal-kinds.go --check); then
+    echo "" >&2
+    echo "✖ pre-commit hook: the signal-kind registry and its generated files disagree (see above)." >&2
+    echo "  Run 'make gen-signal-kinds' and stage the result." >&2
+    echo "  Bypass only when you know why: git commit --no-verify" >&2
+    exit 1
+  fi
+fi

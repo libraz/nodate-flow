@@ -11,4 +11,9 @@ kinds:
     autonomy_default: draft
     subject_type_default: calendar_event
     description: "Internal scheduler tick when a calendar event's start_date arrives in workspace local time"
+    description_ja: "予定の開始日がワークスペースのローカル時間で到来したときに内部スケジューラが発火するティック"
+    description_zh: "当日程的开始日期在工作区本地时间到来时，由内部调度器发出的信号"
+    label: "Calendar event day arrived"
+    label_ja: "予定日の到来"
+    label_zh: "日程当日到来"
     i18n_key: signalKinds.calendar.eventDayArrived
