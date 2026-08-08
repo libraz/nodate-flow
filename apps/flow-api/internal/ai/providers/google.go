@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -20,32 +19,6 @@ const (
 	// transport log, or proxy access log built from the URL.
 	googleAPIKeyHeader = "x-goog-api-key" //#nosec G101 -- HTTP header name, not a credential
 )
-
-// ErrInvalidBaseURL is returned by [New] when a provider's configured
-// base URL is present but not a parseable absolute http(s) URL. Validating
-// at construction turns a malformed ai_providers.base_url into a fast,
-// stable failure instead of an opaque transport error mid-call.
-var ErrInvalidBaseURL = errors.New("ai/providers: invalid base url")
-
-// validateBaseURL parses raw and rejects anything that is not an absolute
-// http or https URL. An empty string is accepted: it means "use the
-// provider default endpoint".
-func validateBaseURL(raw string) error {
-	if raw == "" {
-		return nil
-	}
-	u, err := url.Parse(raw)
-	if err != nil {
-		return fmt.Errorf("%w: %v", ErrInvalidBaseURL, err)
-	}
-	if u.Scheme != "http" && u.Scheme != "https" {
-		return fmt.Errorf("%w: scheme must be http or https", ErrInvalidBaseURL)
-	}
-	if u.Host == "" {
-		return fmt.Errorf("%w: missing host", ErrInvalidBaseURL)
-	}
-	return nil
-}
 
 // googleProvider talks to Gemini's generateContent endpoint. The API key
 // is passed via the x-goog-api-key request header (never the URL query),

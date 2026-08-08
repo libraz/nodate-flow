@@ -43,13 +43,38 @@ func mapProviderError(err error) error {
 	// reach the provider" points the reader at the network and at the
 	// vendor's status page — the two places the answer is not. The
 	// configuration is what has to change, which is what 412 says.
+	// The endpoint itself is the problem: it names an address this
+	// deployment will not contact, or it is not a usable http(s) URL at
+	// all. This has its own code because the alternative — reporting it as
+	// an unreachable provider — sends the reader to the network and the
+	// vendor's status page, and the refusal came from us.
+	case errors.Is(err, providers.ErrBaseURLDestinationNotAllowed),
+		errors.Is(err, providers.ErrInvalidBaseURL):
+		return httpErr(apierrors.AiProviderBaseUrlNotAllowed)
 	case errors.Is(err, providers.ErrBaseURLNotAllowed),
-		errors.Is(err, providers.ErrInvalidBaseURL),
 		errors.Is(err, providers.ErrUnknownKind),
 		errors.Is(err, providers.ErrMissingKey):
 		return httpErr(apierrors.AiProviderNotConfigured)
 	default:
 		return httpErr(apierrors.AiProviderUpstreamUnreachable)
+	}
+}
+
+// createProviderError maps a rejected provider configuration to the code
+// the admin sees on submit.
+//
+// The endpoint cases get their own code rather than the generic invalid-
+// field answer: a refused base URL is the one rejection here whose cause
+// is a deployment policy rather than a typo, and an admin who is told only
+// that a field is invalid has no way to learn that the address was
+// deliberately refused or that there is a setting which permits it.
+func createProviderError(err error) error {
+	switch {
+	case errors.Is(err, providers.ErrBaseURLDestinationNotAllowed),
+		errors.Is(err, providers.ErrInvalidBaseURL):
+		return httpErr(apierrors.AiProviderBaseUrlNotAllowed)
+	default:
+		return httpErr(apierrors.ValidationBodyFieldInvalid)
 	}
 }
 

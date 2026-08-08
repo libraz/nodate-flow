@@ -282,10 +282,7 @@ func main() {
 		if cipher != nil && !cfg.AiMock {
 			resolver := providers.NewWorkspaceResolver(queries, cipher)
 			budget := ai.BudgetReaderFunc(func(ctx context.Context, wsID uint32) (int64, error) {
-				return queries.SumAiCostTodayForWorkspace(ctx, generated.SumAiCostTodayForWorkspaceParams{
-					WorkspaceID: wsID,
-					InvokedAt:   ai.WorkspaceDayStart(ctx, queries, wsID),
-				})
+				return queries.SumAiCostTodayForWorkspace(ctx, ai.DailyCostParams(ctx, queries, wsID))
 			})
 			invocationLogger := router.NewDBInvocationLogger(queries, aiInvocationPublisher)
 			executor = &ai.AgentExecutor{

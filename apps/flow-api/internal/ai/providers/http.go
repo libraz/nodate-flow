@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"strconv"
 	"sync"
@@ -18,9 +19,34 @@ import (
 // goroutine forever.
 const defaultHTTPTimeout = 90 * time.Second
 
+// dialTimeout bounds the TCP connect phase of an upstream call.
+const dialTimeout = 10 * time.Second
+
 // sharedClient is the package-wide *http.Client. We reuse one transport so
 // keep-alives work; per-call timeouts come from the request context.
-var sharedClient = &http.Client{Timeout: defaultHTTPTimeout}
+//
+// The transport is spelled out rather than left to the default because of
+// where the destination comes from: ai_providers.base_url is workspace
+// admin input, so the dialer carries [safeControl] to refuse connects to
+// non-public addresses, and the proxy is disabled — an HTTP_PROXY in the
+// environment would otherwise route every call through a hop that the
+// connect-time check never sees.
+var sharedClient = &http.Client{
+	Timeout: defaultHTTPTimeout,
+	Transport: &http.Transport{
+		Proxy: nil,
+		DialContext: (&net.Dialer{
+			Timeout:   dialTimeout,
+			KeepAlive: 30 * time.Second,
+			Control:   safeControl,
+		}).DialContext,
+		ForceAttemptHTTP2:     true,
+		MaxIdleConns:          10,
+		IdleConnTimeout:       90 * time.Second,
+		TLSHandshakeTimeout:   10 * time.Second,
+		ExpectContinueTimeout: 1 * time.Second,
+	},
+}
 
 // SetHTTPTimeoutForTest overrides the package-wide HTTP client timeout
 // and returns a restore function. Only intended for tests that need to

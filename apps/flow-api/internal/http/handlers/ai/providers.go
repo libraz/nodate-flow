@@ -86,7 +86,19 @@ func CreateProvider(deps Deps) func(context.Context, *CreateProviderInput) (*Cre
 				slog.String("kind", in.Body.Kind),
 				slog.Bool("hasBaseUrl", in.Body.BaseURL != ""),
 				slog.String("err", err.Error()))
-			return nil, httpErr(apierrors.ValidationBodyFieldInvalid)
+			return nil, createProviderError(err)
+		}
+		// Resolve the endpoint as well, so a hostname that points inside the
+		// deployment's own network is refused here rather than at the first
+		// completion. The connect-time guard in internal/ai/providers is what
+		// actually enforces the policy; this is the part that can say which
+		// field was wrong while the admin still has the form open.
+		if err := providers.ValidateBaseURLDestination(ctx, in.Body.BaseURL); err != nil {
+			slog.InfoContext(ctx, "ai provider create rejected",
+				slog.String("workspaceId", ws.PublicID.String()),
+				slog.String("kind", in.Body.Kind),
+				slog.String("err", err.Error()))
+			return nil, createProviderError(err)
 		}
 
 		// Sealed key is built without ever stashing the plaintext anywhere

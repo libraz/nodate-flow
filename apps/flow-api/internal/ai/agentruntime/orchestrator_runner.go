@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"time"
 
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/dbretry"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
 	apierrors "github.com/libraz/nodate-flow/apps/flow-api/internal/errors"
@@ -163,7 +164,20 @@ type OrchestratorRunner struct {
 // fire automated handoff events when the agent looks stuck.
 //
 // Event emissions are best-effort: a failing append is logged and
-// swallowed so a flaky events table cannot wedge the agent loop.
+// swallowed so a flaky events table cannot wedge the agent loop. What
+// "failing" means is narrower than it looks, though. Under parallel load
+// an append can come back with an InnoDB deadlock — the fan-out writes
+// contend on FK locks against the same workspace and task parents — and
+// that is not a flaky events table, it is the outcome MySQL asks the
+// caller to re-issue. Swallowing it drops a run event that would have
+// been written on the next attempt, and since Run returns nil either way
+// the loss is invisible: the timeline keeps a started with no completed,
+// and the UI shows a run that never ends.
+//
+// So every database call below goes through [dbretry.Do], which retries
+// exactly the transient class and returns anything else untouched. Only
+// what survives the retries is swallowed, and that is logged at error
+// level because by then a row really has been lost.
 func (r *OrchestratorRunner) Run(ctx context.Context, j Job, _ time.Time) error {
 	if r.Now == nil {
 		r.Now = time.Now
@@ -315,7 +329,10 @@ func (r *OrchestratorRunner) appendRunEvent(ctx context.Context, args runEventAr
 	if args.agentID != 0 {
 		actorAgentID = sql.NullInt32{Int32: int32(args.agentID), Valid: true} //#nosec G115 -- ai_agents.id is INT UNSIGNED, fits int32 within realistic deployments
 	}
-	if _, err := q.AppendAgentEvent(ctx, generated.AppendAgentEventParams{
+	// The parameters — public id included — are built once, outside the
+	// retry, so a retried attempt re-inserts the same row rather than a
+	// second one with a new identity.
+	params := generated.AppendAgentEventParams{
 		PublicID:     types.New(),
 		WorkspaceID:  args.workspaceID,
 		TaskID:       taskID,
@@ -323,9 +340,14 @@ func (r *OrchestratorRunner) appendRunEvent(ctx context.Context, args runEventAr
 		Type:         args.eventType,
 		PayloadJson:  raw,
 		OccurredAt:   args.occurred,
+	}
+	if err := dbretry.Do(ctx, "agentruntime.AppendAgentEvent", func(ctx context.Context) error {
+		_, err := q.AppendAgentEvent(ctx, params)
+		return err
 	}); err != nil {
-		slog.WarnContext(ctx, "agentruntime: append agent run event failed",
-			"err", err, "type", args.eventType, "workspace_id", args.workspaceID, "agent_id", args.agentID)
+		slog.ErrorContext(ctx, "agentruntime: agent run event lost",
+			"err", err, "type", args.eventType, "workspace_id", args.workspaceID,
+			"agent_id", args.agentID, "agent_public_id", args.agentPubID)
 	}
 }
 
@@ -358,8 +380,11 @@ func (r *OrchestratorRunner) resolveSourceTask(ctx context.Context, j Job) (uint
 		pubRaw []byte
 		pubID  types.PublicID
 	)
-	row := r.DB.QueryRowContext(ctx, q, j.SourceEventID, j.WsID)
-	if err := row.Scan(&taskID, &pubRaw); err != nil {
+	// Losing this lookup detaches every event this run emits from its
+	// task, which is what the timeline is keyed by.
+	if err := dbretry.Do(ctx, "agentruntime.resolveSourceTask", func(ctx context.Context) error {
+		return r.DB.QueryRowContext(ctx, q, j.SourceEventID, j.WsID).Scan(&taskID, &pubRaw)
+	}); err != nil {
 		slog.WarnContext(ctx, "agentruntime: source-task lookup failed",
 			slog.Uint64("event_id", j.SourceEventID), slog.Any("err", err))
 		return 0, ""
@@ -383,7 +408,9 @@ func (r *OrchestratorRunner) resolveAgentPublicID(ctx context.Context, agentID u
 	}
 	const q = `SELECT public_id FROM ai_agents WHERE id = ? LIMIT 1`
 	var pubID types.PublicID
-	if err := r.DB.QueryRowContext(ctx, q, agentID).Scan(&pubID); err != nil {
+	if err := dbretry.Do(ctx, "agentruntime.resolveAgentPublicID", func(ctx context.Context) error {
+		return r.DB.QueryRowContext(ctx, q, agentID).Scan(&pubID)
+	}); err != nil {
 		slog.WarnContext(ctx, "agentruntime: failed to resolve agent public_id",
 			slog.Uint64("agent_id", uint64(agentID)), slog.Any("err", err))
 		return "unknown"
@@ -401,9 +428,17 @@ func (r *OrchestratorRunner) readMemo(ctx context.Context, workspaceID, taskID u
 	if q == nil || taskID == 0 {
 		return snap
 	}
-	raw, err := q.GetTaskAgentMemo(ctx, generated.GetTaskAgentMemoParams{
-		WorkspaceID: workspaceID,
-		ID:          taskID,
+	var raw json.RawMessage
+	// A memo that could not be read reads as zero, which resets the
+	// handoff loop budget and the attempts counter. Retry the transient
+	// case before accepting that.
+	err := dbretry.Do(ctx, "agentruntime.GetTaskAgentMemo", func(ctx context.Context) error {
+		var err error
+		raw, err = q.GetTaskAgentMemo(ctx, generated.GetTaskAgentMemoParams{
+			WorkspaceID: workspaceID,
+			ID:          taskID,
+		})
+		return err
 	})
 	if err != nil || len(raw) == 0 {
 		return snap
@@ -427,12 +462,17 @@ func (r *OrchestratorRunner) mergeMemo(ctx context.Context, workspaceID, taskID 
 		slog.WarnContext(ctx, "agentruntime: agent_memo marshal failed", "err", err)
 		return
 	}
-	if err := q.UpdateTaskAgentMemo(ctx, generated.UpdateTaskAgentMemoParams{
+	params := generated.UpdateTaskAgentMemoParams{
 		Column1:     raw,
 		WorkspaceID: workspaceID,
 		ID:          taskID,
+	}
+	// The patch is a JSON_MERGE_PATCH, so re-applying it after a rolled
+	// back attempt produces the same memo as applying it once.
+	if err := dbretry.Do(ctx, "agentruntime.UpdateTaskAgentMemo", func(ctx context.Context) error {
+		return q.UpdateTaskAgentMemo(ctx, params)
 	}); err != nil {
-		slog.WarnContext(ctx, "agentruntime: agent_memo update failed",
+		slog.ErrorContext(ctx, "agentruntime: agent_memo update lost",
 			slog.Uint64("task_id", uint64(taskID)), slog.Any("err", err))
 	}
 }
@@ -588,15 +628,21 @@ func (r *OrchestratorRunner) appendHandoffEvent(ctx context.Context, j Job, task
 		taskIDNull = sql.NullInt32{Int32: int32(taskID), Valid: true} //#nosec G115 -- task_id fits int32
 	}
 	actorAgent := sql.NullInt32{Int32: int32(j.AgentID), Valid: true} //#nosec G115 -- ai_agents.id fits int32
-	if _, err := q.InsertHandoffToUserEvent(ctx, generated.InsertHandoffToUserEventParams{
+	params := generated.InsertHandoffToUserEventParams{
 		PublicID:     types.New(),
 		WorkspaceID:  j.WsID,
 		TaskID:       taskIDNull,
 		ActorAgentID: actorAgent,
 		PayloadJson:  raw,
 		OccurredAt:   at,
+	}
+	// This row is how a stuck agent reaches a human at all, so a lock
+	// conflict must not be the reason nobody is told.
+	if err := dbretry.Do(ctx, "agentruntime.InsertHandoffToUserEvent", func(ctx context.Context) error {
+		_, err := q.InsertHandoffToUserEvent(ctx, params)
+		return err
 	}); err != nil {
-		slog.WarnContext(ctx, "agentruntime: handoff_to_user insert failed",
+		slog.ErrorContext(ctx, "agentruntime: handoff_to_user event lost",
 			slog.Uint64("agent_id", uint64(j.AgentID)), slog.Any("err", err))
 	}
 }
@@ -610,8 +656,13 @@ func (r *OrchestratorRunner) pauseAgent(ctx context.Context, agentID uint32) {
 		return
 	}
 	const q = `UPDATE ai_agents SET paused = TRUE WHERE id = ?`
-	if _, err := r.DB.ExecContext(ctx, q, agentID); err != nil {
-		slog.WarnContext(ctx, "agentruntime: pause agent failed",
+	// Idempotent by construction, and the agent keeps spending until it
+	// lands, so a lock conflict is worth re-issuing.
+	if err := dbretry.Do(ctx, "agentruntime.pauseAgent", func(ctx context.Context) error {
+		_, err := r.DB.ExecContext(ctx, q, agentID)
+		return err
+	}); err != nil {
+		slog.ErrorContext(ctx, "agentruntime: pause agent failed",
 			slog.Uint64("agent_id", uint64(agentID)), slog.Any("err", err))
 	}
 }

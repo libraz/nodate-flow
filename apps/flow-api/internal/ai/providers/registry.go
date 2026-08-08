@@ -70,8 +70,12 @@ func Validate(cfg Config) error {
 		return ErrMissingKey
 	}
 	switch cfg.Kind {
-	case KindAnthropic, KindOllama, KindOpenAICompat:
-		return nil
+	case KindAnthropic, KindOllama, KindOpenAICompat, KindGoogle:
+		// Every kind that accepts a custom endpoint is judged by the same
+		// rule. Applying it to one kind is the same as not having it: the
+		// kinds whose whole purpose is a custom endpoint are the ones an
+		// admin would actually point somewhere.
+		return validateBaseURL(cfg.BaseURL)
 	case KindOpenAI:
 		// The openai kind is the official endpoint only. Reject a configured
 		// base URL rather than silently ignoring it, so an admin who meant to
@@ -81,8 +85,6 @@ func Validate(cfg Config) error {
 			return ErrBaseURLNotAllowed
 		}
 		return nil
-	case KindGoogle:
-		return validateBaseURL(cfg.BaseURL)
 	}
 	return fmt.Errorf("%w: %q", ErrUnknownKind, cfg.Kind)
 }

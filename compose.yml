@@ -175,6 +175,10 @@ services:
       NF_FLOW_SLACK_SIGNING_SECRET: ${NF_FLOW_SLACK_SIGNING_SECRET:-}
       NF_FLOW_WEBHOOKS_INSECURE: ${NF_FLOW_WEBHOOKS_INSECURE:-true}
       NF_FLOW_AI_DAILY_BUDGET_CENTS: ${NF_FLOW_AI_DAILY_BUDGET_CENTS:-}
+      # Empty by default: an AI provider may only be pointed at a public
+      # address unless the operator opts out. Set to 1 in .env to reach a
+      # local Ollama / LM Studio endpoint. See .env.example.
+      NF_FLOW_AI_ALLOW_PRIVATE: ${NF_FLOW_AI_ALLOW_PRIVATE:-}
       NF_S3_ENDPOINT: ${NF_S3_ENDPOINT:-minio:9000}
       NF_S3_ACCESS_KEY: ${NF_S3_ACCESS_KEY:-minioadmin}
       NF_S3_SECRET_KEY: ${NF_S3_SECRET_KEY:-minioadmin}

@@ -579,10 +579,7 @@ func buildSharedDeps(deps Deps) *sharedDeps {
 		// ai_invocations rows. Without this the NL surfaces bill the
 		// provider unbounded and untracked (audit C-2 / H-8 / M-6).
 		nlBudget := ai.BudgetReaderFunc(func(ctx context.Context, wsID uint32) (int64, error) {
-			return deps.Queries.SumAiCostTodayForWorkspace(ctx, generated.SumAiCostTodayForWorkspaceParams{
-				WorkspaceID: wsID,
-				InvokedAt:   ai.WorkspaceDayStart(ctx, deps.Queries, wsID),
-			})
+			return deps.Queries.SumAiCostTodayForWorkspace(ctx, ai.DailyCostParams(ctx, deps.Queries, wsID))
 		})
 		nlGuard := ai.NewCostGuard(nlBudget, deps.AiDailyBudgetCents)
 		nlLogger := invocationLogger
@@ -682,10 +679,7 @@ func buildSharedDeps(deps Deps) *sharedDeps {
 	case deps.Cipher != nil:
 		resolver := providers.NewWorkspaceResolver(deps.Queries, deps.Cipher)
 		budget := ai.BudgetReaderFunc(func(ctx context.Context, wsID uint32) (int64, error) {
-			return deps.Queries.SumAiCostTodayForWorkspace(ctx, generated.SumAiCostTodayForWorkspaceParams{
-				WorkspaceID: wsID,
-				InvokedAt:   ai.WorkspaceDayStart(ctx, deps.Queries, wsID),
-			})
+			return deps.Queries.SumAiCostTodayForWorkspace(ctx, ai.DailyCostParams(ctx, deps.Queries, wsID))
 		})
 		aiOrch = &ai.Orchestrator{
 			Resolver:      resolver,
@@ -2005,10 +1999,11 @@ func (g *embedBudgetGuard) Check(ctx context.Context, workspaceID uint32) error 
 	} else if err != sql.ErrNoRows {
 		return err
 	}
-	spent, err := g.Queries.SumEmbedCostTodayForWorkspace(ctx, generated.SumEmbedCostTodayForWorkspaceParams{
-		WorkspaceID: workspaceID,
-		InvokedAt:   time.Now().UTC().Truncate(24 * time.Hour),
-	})
+	// The embed budget resets on the same boundary as every other AI budget:
+	// midnight in the workspace's own timezone, which is why the bound comes
+	// from the same place the completion guard's does rather than from a
+	// calculation here.
+	spent, err := g.Queries.SumEmbedCostTodayForWorkspace(ctx, ai.DailyEmbedCostParams(ctx, g.Queries, workspaceID))
 	if err != nil {
 		return err
 	}

@@ -13,6 +13,13 @@ type workspaceTimezoneLoader interface {
 	FindWorkspaceTimezoneCountryById(ctx context.Context, id uint32) (generated.FindWorkspaceTimezoneCountryByIdRow, error)
 }
 
+// nowFunc is the clock the window boundary is computed from. It is a
+// variable so a test can compare two boundaries taken from the same
+// instant; the alternative is comparing two separate reads of the wall
+// clock, which agree except across a midnight and therefore describe a
+// test that is right almost always.
+var nowFunc = time.Now
+
 // DailyBudgetBoundary returns the start of the current day (local midnight) in
 // the given IANA timezone, expressed as a time.Time suitable for the
 // invoked_at lower bound of the daily AI-cost query.
@@ -37,6 +44,19 @@ func DailyBudgetBoundary(now time.Time, tz string) time.Time {
 // local-midnight boundary for its daily AI budget window. A load error is
 // swallowed to a UTC boundary: the meter must not fail the caller's request
 // just because the timezone column could not be read.
+//
+// This is the only definition of "today" for AI spend, and every place that
+// bounds a cost query — the completion guard, the embed guard, the
+// cost-today meter — has to use it. Each of those once computed its own
+// boundary, and they disagreed: the workspace's local midnight, UTC
+// midnight, and whatever timezone the browser reported. A workspace could
+// be refused every AI call for hours after its budget had reset while the
+// meter reported that nothing had been spent, and nobody could reconcile
+// the three answers because none of them was wrong on its own terms.
+//
+// Call sites do not use it directly, though: they take a whole params
+// struct from [DailyCostParams] or [DailyEmbedCostParams], so there is no
+// place left to write a boundary by hand.
 func WorkspaceDayStart(ctx context.Context, loader workspaceTimezoneLoader, workspaceID uint32) time.Time {
 	tz := ""
 	if loader != nil {
@@ -44,5 +64,33 @@ func WorkspaceDayStart(ctx context.Context, loader workspaceTimezoneLoader, work
 			tz = row.Timezone
 		}
 	}
-	return DailyBudgetBoundary(time.Now(), tz)
+	return DailyBudgetBoundary(nowFunc(), tz)
+}
+
+// DailyCostParams builds the bounded query for what a workspace has spent
+// on LLM calls in the current budget window.
+//
+// The whole parameter struct is built here rather than the boundary alone
+// because the defect this replaces was not a wrong calculation — each call
+// site computed a defensible boundary — it was three call sites each
+// computing their own. Handing back the finished struct leaves the caller
+// nothing to decide, and [TestCostQueryParamsAreCentralized] keeps the
+// literal from being written anywhere else.
+func DailyCostParams(ctx context.Context, loader workspaceTimezoneLoader, workspaceID uint32) generated.SumAiCostTodayForWorkspaceParams {
+	return generated.SumAiCostTodayForWorkspaceParams{
+		WorkspaceID: workspaceID,
+		InvokedAt:   WorkspaceDayStart(ctx, loader, workspaceID),
+	}
+}
+
+// DailyEmbedCostParams is [DailyCostParams] for the separate embedding
+// budget. The two totals are metered against different caps but over the
+// same day: an embed budget that resets on its own schedule blocks
+// indexing for hours after the chat budget has reset, with no meter
+// anywhere showing why.
+func DailyEmbedCostParams(ctx context.Context, loader workspaceTimezoneLoader, workspaceID uint32) generated.SumEmbedCostTodayForWorkspaceParams {
+	return generated.SumEmbedCostTodayForWorkspaceParams{
+		WorkspaceID: workspaceID,
+		InvokedAt:   WorkspaceDayStart(ctx, loader, workspaceID),
+	}
 }

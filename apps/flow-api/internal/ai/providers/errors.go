@@ -88,6 +88,16 @@ func classifyTransportError(ctx context.Context, err error) *UpstreamError {
 	if err == nil {
 		return nil
 	}
+	// Our own connect-time refusal arrives here wrapped in the transport's
+	// error chain, and it is not an unreachable upstream — the request was
+	// never sent, on purpose. Collapsing it into ErrUpstreamUnreachable
+	// tells the operator to check the network and the vendor's status page,
+	// which is the one place the answer is not: the base URL points
+	// somewhere this deployment refuses to contact, and there is a setting
+	// that says so.
+	if errors.Is(err, ErrBaseURLDestinationNotAllowed) {
+		return &UpstreamError{Sentinel: ErrBaseURLDestinationNotAllowed}
+	}
 	if errors.Is(err, context.DeadlineExceeded) {
 		return &UpstreamError{Sentinel: ErrUpstreamTimeout}
 	}

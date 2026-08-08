@@ -53,6 +53,14 @@ const (
 	defaultAutoActionEnabled         = true
 	defaultAutoActionIntervalMinutes = 5
 	defaultAutoActionThreshold       = 0.80
+
+	// The remaining ai_settings columns are not exposed by this endpoint,
+	// but the upsert rewrites the whole row, so a workspace with no row yet
+	// needs a value for each. These mirror the column defaults.
+	defaultEmbedModel             = "mock-768"
+	defaultEmbedBudgetCentsDay    = 100
+	defaultDuplicateThresholdHigh = "0.870"
+	defaultDuplicateThresholdLow  = "0.750"
 )
 
 // --- handlers ---
@@ -104,29 +112,9 @@ func PatchAutoActionSettings(deps Deps) func(context.Context, *PatchAutoActionSe
 		}
 
 		// Start from DB values or column defaults.
-		var params generated.UpsertAiSettingsParams
-		if err == sql.ErrNoRows {
-			params = generated.UpsertAiSettingsParams{
-				WorkspaceID:               ws.ID,
-				EmbedModel:                "mock-768",
-				EmbedBudgetCentsDay:       100,
-				DuplicateThresholdHigh:    "0.870",
-				DuplicateThresholdLow:     "0.750",
-				AutoActionEnabled:         defaultAutoActionEnabled,
-				AutoActionIntervalMinutes: uint32(defaultAutoActionIntervalMinutes),
-				AutoActionThreshold:       fmt.Sprintf("%.2f", defaultAutoActionThreshold),
-			}
-		} else {
-			params = generated.UpsertAiSettingsParams{
-				WorkspaceID:               ws.ID,
-				EmbedModel:                row.EmbedModel,
-				EmbedBudgetCentsDay:       row.EmbedBudgetCentsDay,
-				DuplicateThresholdHigh:    row.DuplicateThresholdHigh,
-				DuplicateThresholdLow:     row.DuplicateThresholdLow,
-				AutoActionEnabled:         row.AutoActionEnabled,
-				AutoActionIntervalMinutes: row.AutoActionIntervalMinutes,
-				AutoActionThreshold:       row.AutoActionThreshold,
-			}
+		params := aiSettingsUpsertDefaults(ws.ID)
+		if err == nil {
+			params = aiSettingsUpsertFromRow(ws.ID, row)
 		}
 
 		if uid, ok := middleware.ActorFromContext(ctx); ok {
@@ -183,6 +171,49 @@ func RegisterAutoActionSettings(api huma.API, deps Deps) {
 }
 
 // --- mapper helpers ---
+
+// aiSettingsUpsertFromRow rebuilds the full upsert payload from the row
+// that was just read, so a partial update of one knob rewrites every other
+// column with the value it already had.
+//
+// UpsertAiSettings writes the whole row: every column it takes appears in
+// its ON DUPLICATE KEY UPDATE clause. A field left out of the params here
+// is therefore not "unchanged", it is overwritten with the zero value.
+// That is how a single toggle in the auto-action panel silently erased
+// ai_settings.judge_instructions — free-form operator text with no event,
+// no audit entry, and no way back other than raw SQL. Anything added to
+// the query has to be carried here as well; the accompanying test walks
+// both structs by field name so an omission fails rather than deletes.
+func aiSettingsUpsertFromRow(workspaceID uint32, row generated.GetAiSettingsRow) generated.UpsertAiSettingsParams {
+	return generated.UpsertAiSettingsParams{
+		WorkspaceID:               workspaceID,
+		EmbedModel:                row.EmbedModel,
+		EmbedBudgetCentsDay:       row.EmbedBudgetCentsDay,
+		DuplicateThresholdHigh:    row.DuplicateThresholdHigh,
+		DuplicateThresholdLow:     row.DuplicateThresholdLow,
+		AutoActionEnabled:         row.AutoActionEnabled,
+		AutoActionIntervalMinutes: row.AutoActionIntervalMinutes,
+		AutoActionThreshold:       row.AutoActionThreshold,
+		JudgeInstructions:         row.JudgeInstructions,
+	}
+}
+
+// aiSettingsUpsertDefaults is the payload for a workspace that has never
+// written an ai_settings row. The values mirror the column defaults in
+// sql/flow/tables/ai_settings.sql; judge_instructions has no default and
+// stays NULL.
+func aiSettingsUpsertDefaults(workspaceID uint32) generated.UpsertAiSettingsParams {
+	return generated.UpsertAiSettingsParams{
+		WorkspaceID:               workspaceID,
+		EmbedModel:                defaultEmbedModel,
+		EmbedBudgetCentsDay:       defaultEmbedBudgetCentsDay,
+		DuplicateThresholdHigh:    defaultDuplicateThresholdHigh,
+		DuplicateThresholdLow:     defaultDuplicateThresholdLow,
+		AutoActionEnabled:         defaultAutoActionEnabled,
+		AutoActionIntervalMinutes: uint32(defaultAutoActionIntervalMinutes),
+		AutoActionThreshold:       fmt.Sprintf("%.2f", defaultAutoActionThreshold),
+	}
+}
 
 // autoActionBodyFromRow converts the auto-action columns of a
 // GetAiSettingsRow into the API response body.

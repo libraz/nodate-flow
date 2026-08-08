@@ -19,6 +19,14 @@ import (
 // distinguish "paused" from an LLM failure.
 var ErrAgentPaused = errors.New("ai: agent is paused")
 
+// AgentExecQueries is the slice of the sqlc Querier that ExecuteAgent
+// needs. *generated.Queries satisfies it; it is an interface rather than
+// the concrete handle so the attribution and cost-accounting behaviour of
+// one tick can be exercised without a database.
+type AgentExecQueries interface {
+	GetAgentForExec(ctx context.Context, arg generated.GetAgentForExecParams) (generated.GetAgentForExecRow, error)
+}
+
 // AgentExecutor runs one tick of an AI agent. It is the production
 // adapter behind the [agentruntime.AgentExecutor] interface — the
 // runner stays in the agentruntime package and never imports the ai
@@ -31,9 +39,10 @@ var ErrAgentPaused = errors.New("ai: agent is paused")
 // and temperature — all of which come from that row via
 // [airequest.ForAgent], not from the provider's own defaults. The
 // redacted prompt + response are persisted via [InvocationLogger]
-// alongside every other LLM call site.
+// alongside every other LLM call site, tagged with the agent that caused
+// them so per-agent cost accounting can see them.
 type AgentExecutor struct {
-	Queries      *generated.Queries
+	Queries      AgentExecQueries
 	Resolver     ProviderResolver
 	Guard        *CostGuard
 	Log          InvocationLogger
@@ -54,6 +63,15 @@ func (e *AgentExecutor) ExecuteAgent(ctx context.Context, workspaceID, agentID u
 	if e == nil || e.Queries == nil || e.Resolver == nil {
 		return result, ErrNoProvider
 	}
+	// Attribute everything this tick spends to the agent that caused it.
+	// The per-agent monthly cap is enforced from SumAiCostForAgentSince,
+	// which only counts ai_invocations rows whose agent_id is set, and the
+	// only writer of that column is AgentIDFromContext at the logging call
+	// sites. An MCP tool call gets tagged by the dispatch layer above it; a
+	// scheduled run has no such layer, so without this the cap is enforced
+	// against a spend total that is permanently zero. The judge runner
+	// passes the same id explicitly into its own InvocationRecord.
+	ctx = WithAgentID(ctx, agentID)
 	row, err := e.Queries.GetAgentForExec(ctx, generated.GetAgentForExecParams{
 		WorkspaceID: workspaceID,
 		ID:          agentID,
