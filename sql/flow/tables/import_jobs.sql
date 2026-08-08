@@ -16,7 +16,7 @@ CREATE TABLE import_jobs (
   total_items          INT UNSIGNED NOT NULL DEFAULT 0          COMMENT 'Total items to import',
   processed_items      INT UNSIGNED NOT NULL DEFAULT 0          COMMENT 'Successfully processed items',
   failed_items         INT UNSIGNED NOT NULL DEFAULT 0          COMMENT 'Items that failed to import',
-  config_json          JSON NOT NULL                            COMMENT 'Source-specific import configuration',
+  config_json          JSON NOT NULL                            COMMENT 'Source-specific import configuration. Plaintext and returned by the read endpoints, so it must never hold a credential: the API rejects credential-shaped key names at every nesting level, and checks a per-source allow-list for sources that have declared their keys (see internal/importer). External-service credentials belong in user_integrations / ai_providers, which are encrypted',
   error_log            TEXT NULL                                COMMENT 'Aggregated error log',
   started_at           DATETIME(3) NULL                         COMMENT 'When the worker began processing',
   completed_at         DATETIME(3) NULL                         COMMENT 'When the import finished (success or failure)',

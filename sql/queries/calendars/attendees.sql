@@ -11,7 +11,14 @@ INSERT INTO calendar_event_attendees (
 
 -- name: ListCalendarEventAttendees :many
 -- List all attendees for an event with user profile info.
+--
+-- a.id is selected because callers that join attendees back to invites
+-- (calendar_event_invites.attendee_id is an internal FK) otherwise have
+-- to re-look-up every attendee one at a time, which turns a single
+-- large-event request into one round trip per attendee. sqlc tags it
+-- json:"-" via the *.id override, so it stays off the API boundary.
 SELECT
+  a.id,
   a.public_id,
   a.user_id,
   a.rsvp,

@@ -35,7 +35,7 @@ LIMIT 1
 type GetAiSettingsRow struct {
 	ID                        uint32         `json:"-"`
 	WorkspaceID               uint32         `json:"-"`
-	ModifiedByUserID          sql.NullInt32  `json:"modifiedByUserId"`
+	ModifiedByUserID          sql.NullInt32  `json:"-"`
 	EmbedModel                string         `json:"embedModel"`
 	EmbedBudgetCentsDay       uint32         `json:"embedBudgetCentsDay"`
 	DuplicateThresholdHigh    string         `json:"duplicateThresholdHigh"`
@@ -105,7 +105,7 @@ ON DUPLICATE KEY UPDATE
 
 type UpsertAiSettingsParams struct {
 	WorkspaceID               uint32         `json:"-"`
-	ModifiedByUserID          sql.NullInt32  `json:"modifiedByUserId"`
+	ModifiedByUserID          sql.NullInt32  `json:"-"`
 	EmbedModel                string         `json:"embedModel"`
 	EmbedBudgetCentsDay       uint32         `json:"embedBudgetCentsDay"`
 	DuplicateThresholdHigh    string         `json:"duplicateThresholdHigh"`

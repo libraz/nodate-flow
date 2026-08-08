@@ -186,6 +186,12 @@ type Querier interface {
 	// uploader's identity is withheld rather than the row disappearing.
 	ListCalendarEventAttachments(ctx context.Context, arg ListCalendarEventAttachmentsParams) ([]ListCalendarEventAttachmentsRow, error)
 	// List all attendees for an event with user profile info.
+	//
+	// a.id is selected because callers that join attendees back to invites
+	// (calendar_event_invites.attendee_id is an internal FK) otherwise have
+	// to re-look-up every attendee one at a time, which turns a single
+	// large-event request into one round trip per attendee. sqlc tags it
+	// json:"-" via the *.id override, so it stays off the API boundary.
 	ListCalendarEventAttendees(ctx context.Context, arg ListCalendarEventAttendeesParams) ([]ListCalendarEventAttendeesRow, error)
 	// List comments on an event in chronological order. Paginated
 	// (LIMIT/OFFSET) so the result set is always bounded; total carries the

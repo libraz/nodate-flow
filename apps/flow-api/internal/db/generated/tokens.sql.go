@@ -32,7 +32,7 @@ type CreateMcpTokenParams struct {
 	PublicID    types.PublicID  `json:"publicId"`
 	WorkspaceID uint32          `json:"-"`
 	UserID      uint32          `json:"-"`
-	AgentID     sql.NullInt32   `json:"agentId"`
+	AgentID     sql.NullInt32   `json:"-"`
 	Name        string          `json:"name"`
 	TokenHash   string          `json:"tokenHash"`
 	TokenPrefix string          `json:"tokenPrefix"`

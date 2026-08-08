@@ -86,7 +86,7 @@ type CreateWorkspaceMemberParams struct {
 	WorkspaceID     uint32               `json:"-"`
 	UserID          uint32               `json:"-"`
 	Role            WorkspaceMembersRole `json:"role"`
-	InvitedByUserID sql.NullInt32        `json:"invitedByUserId"`
+	InvitedByUserID sql.NullInt32        `json:"-"`
 	InvitedAt       sql.NullTime         `json:"invitedAt"`
 	JoinedAt        sql.NullTime         `json:"joinedAt"`
 }
@@ -195,7 +195,7 @@ type FindWorkspaceMemberByUserIdRow struct {
 	WorkspaceID     uint32               `json:"-"`
 	UserID          uint32               `json:"-"`
 	Role            WorkspaceMembersRole `json:"role"`
-	InvitedByUserID sql.NullInt32        `json:"invitedByUserId"`
+	InvitedByUserID sql.NullInt32        `json:"-"`
 	InvitedAt       sql.NullTime         `json:"invitedAt"`
 	JoinedAt        sql.NullTime         `json:"joinedAt"`
 	Enabled         bool                 `json:"enabled"`

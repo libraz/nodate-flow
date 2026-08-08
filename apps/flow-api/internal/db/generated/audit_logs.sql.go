@@ -53,7 +53,7 @@ type AdminListInstanceAuditLogsRow struct {
 	ActorUserPublicID       *types.PublicID `json:"actorUserPublicId"`
 	ActorDisplayName        sql.NullString  `json:"actorDisplayName"`
 	Action                  string          `json:"action"`
-	TargetWorkspacePublicID sql.NullString  `json:"targetWorkspacePublicId"`
+	TargetWorkspacePublicID types.PublicID  `json:"targetWorkspacePublicId"`
 	TargetWorkspaceName     sql.NullString  `json:"targetWorkspaceName"`
 	TargetResourceType      sql.NullString  `json:"targetResourceType"`
 	TargetResourcePublicID  types.PublicID  `json:"targetResourcePublicId"`

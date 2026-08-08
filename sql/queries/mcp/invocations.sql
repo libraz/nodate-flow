@@ -5,6 +5,7 @@ INSERT INTO mcp_invocations (
   public_id,
   workspace_id,
   user_id,
+  agent_id,
   task_id,
   tool_name,
   arguments_redacted_json,
@@ -13,4 +14,4 @@ INSERT INTO mcp_invocations (
   error_code,
   duration_ms,
   invoked_at
-) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);

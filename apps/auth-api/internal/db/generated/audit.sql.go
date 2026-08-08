@@ -81,7 +81,7 @@ type AppendInstanceAuditLogParams struct {
 	PublicID               types.PublicID  `json:"publicId"`
 	ActorUserID            sql.NullInt32   `json:"-"`
 	Action                 string          `json:"action"`
-	TargetWorkspaceID      sql.NullInt32   `json:"targetWorkspaceId"`
+	TargetWorkspaceID      sql.NullInt32   `json:"-"`
 	TargetResourceType     sql.NullString  `json:"targetResourceType"`
 	TargetResourcePublicID types.PublicID  `json:"targetResourcePublicId"`
 	IpAddress              sql.NullString  `json:"ipAddress"`

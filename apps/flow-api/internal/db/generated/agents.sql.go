@@ -32,7 +32,7 @@ INSERT INTO ai_agents (
 type CreateAgentParams struct {
 	PublicID        types.PublicID       `json:"publicId"`
 	WorkspaceID     uint32               `json:"-"`
-	ModelID         uint32               `json:"modelId"`
+	ModelID         uint32               `json:"-"`
 	Name            string               `json:"name"`
 	Description     sql.NullString       `json:"description"`
 	SystemPrompt    string               `json:"systemPrompt"`

@@ -34,7 +34,7 @@ type AppendAgentEventParams struct {
 	WorkspaceID         uint32          `json:"-"`
 	TaskID              sql.NullInt32   `json:"-"`
 	CalendarID          sql.NullInt32   `json:"-"`
-	ActorAgentID        sql.NullInt32   `json:"actorAgentId"`
+	ActorAgentID        sql.NullInt32   `json:"-"`
 	TriggeredBySignalID sql.NullInt32   `json:"-"`
 	ReversesEventID     sql.NullInt64   `json:"-"`
 	Type                string          `json:"type"`
@@ -226,7 +226,7 @@ type FindEventForReverseRow struct {
 	WorkspaceID         uint32         `json:"-"`
 	Type                string         `json:"type"`
 	ActorUserID         sql.NullInt32  `json:"-"`
-	ActorAgentID        sql.NullInt32  `json:"actorAgentId"`
+	ActorAgentID        sql.NullInt32  `json:"-"`
 	ActorSystemSource   sql.NullString `json:"actorSystemSource"`
 	TriggeredBySignalID sql.NullInt32  `json:"-"`
 	ReversesEventID     sql.NullInt64  `json:"-"`

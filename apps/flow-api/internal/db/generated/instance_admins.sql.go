@@ -25,7 +25,7 @@ WHERE NOT EXISTS (
 type AdminBootstrapFirstInstanceAdminParams struct {
 	PublicID        types.PublicID `json:"publicId"`
 	UserID          uint32         `json:"-"`
-	GrantedByUserID sql.NullInt32  `json:"grantedByUserId"`
+	GrantedByUserID sql.NullInt32  `json:"-"`
 }
 
 // Atomically promote the calling user to the FIRST instance admin.
@@ -107,7 +107,7 @@ VALUES (?, ?, ?, NOW())
 type AdminGrantInstanceAdminParams struct {
 	PublicID        types.PublicID `json:"publicId"`
 	UserID          uint32         `json:"-"`
-	GrantedByUserID sql.NullInt32  `json:"grantedByUserId"`
+	GrantedByUserID sql.NullInt32  `json:"-"`
 }
 
 // Grant instance admin to a user.

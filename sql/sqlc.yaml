@@ -101,6 +101,32 @@ sql:
             go_struct_tag: 'json:"-"'
           - column: "*.provider_id"
             go_struct_tag: 'json:"-"'
+          # Internal FKs whose target is itself a public_id-bearing table:
+          # ai_agents, ai_models, tasks (both ends of a relation),
+          # public_shares, calendar_events (the recurrence master). Each
+          # of these is an integer surrogate key and none of them has a
+          # public alias in the same row, so leaving the tag off publishes
+          # the sequence directly. TestGeneratedIDFieldsAreNotSerialized
+          # in internal/db is what keeps this list from falling behind the
+          # schema again.
+          - column: "*.agent_id"
+            go_struct_tag: 'json:"-"'
+          - column: "*.actor_agent_id"
+            go_struct_tag: 'json:"-"'
+          - column: "*.model_id"
+            go_struct_tag: 'json:"-"'
+          - column: "*.from_task_id"
+            go_struct_tag: 'json:"-"'
+          - column: "*.to_task_id"
+            go_struct_tag: 'json:"-"'
+          - column: "*.share_id"
+            go_struct_tag: 'json:"-"'
+          - column: "*.recurrence_parent_id"
+            go_struct_tag: 'json:"-"'
+          - column: "*.modified_by_user_id"
+            go_struct_tag: 'json:"-"'
+          - column: "*.target_workspace_id"
+            go_struct_tag: 'json:"-"'
           - column: "*.recipient_user_id"
             go_struct_tag: 'json:"-"'
           - column: "*.actor_user_id"
@@ -142,6 +168,17 @@ sql:
             go_struct_tag: 'json:"-"'
           - column: "*.mentioned_user_id"
             go_struct_tag: 'json:"-"'
+          # v_instance_audit_log LEFT JOINs workspaces, so this is NULL
+          # for instance-level entries. PublicID.Scan maps NULL to the
+          # zero UUID, which the mapper reads back as "no workspace" —
+          # the same treatment auth-api gives the identical column.
+          # Without the override sqlc hands back sql.NullString and the
+          # raw 16 bytes are serialised as if they were text.
+          - column: "*.target_workspace_public_id"
+            go_type:
+              import: "github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
+              package: "types"
+              type: "PublicID"
           - column: "*.target_public_id"
             go_type:
               import: "github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
@@ -300,6 +337,25 @@ sql:
           # and emits as interface{}. Force string here; the underlying
           # ai_agents.name column is VARCHAR(255) NOT NULL and COALESCE
           # provides '' as the no-agent fallback.
+          # The generated models cover the whole schema in every block, so
+          # the exclusion list has to as well: a column tagged in one
+          # block and forgotten in another publishes the same sequence
+          # from whichever app reads it. TestGeneratedIDFieldsAreNotSerialized
+          # in apps/flow-api/internal/db compares the three.
+          - column: "*.granted_by_user_id"
+            go_struct_tag: 'json:"-"'
+          - column: "*.invited_by_user_id"
+            go_struct_tag: 'json:"-"'
+          - column: "*.judge_run_id"
+            go_struct_tag: 'json:"-"'
+          - column: "*.source_event_id"
+            go_struct_tag: 'json:"-"'
+          - column: "*.subject_id"
+            go_struct_tag: 'json:"-"'
+          - column: "*.task_created_by_user_id"
+            go_struct_tag: 'json:"-"'
+          - column: "*.task_project_id"
+            go_struct_tag: 'json:"-"'
           - column: "v_task_detail.agent_assignee_name"
             go_type: "string"
   # --- flow-api calendar subpackage (calendar queries only) ---
@@ -377,7 +433,30 @@ sql:
             go_struct_tag: 'json:"-"'
           - column: "*.actor_id"
             go_struct_tag: 'json:"-"'
+          - column: "*.actor_user_id"
+            go_struct_tag: 'json:"-"'
+          - column: "*.invited_by_user_id"
+            go_struct_tag: 'json:"-"'
           - column: "*.provider_id"
+            go_struct_tag: 'json:"-"'
+          # See the note on the same group in the flow-api block above.
+          - column: "*.agent_id"
+            go_struct_tag: 'json:"-"'
+          - column: "*.actor_agent_id"
+            go_struct_tag: 'json:"-"'
+          - column: "*.model_id"
+            go_struct_tag: 'json:"-"'
+          - column: "*.from_task_id"
+            go_struct_tag: 'json:"-"'
+          - column: "*.to_task_id"
+            go_struct_tag: 'json:"-"'
+          - column: "*.share_id"
+            go_struct_tag: 'json:"-"'
+          - column: "*.recurrence_parent_id"
+            go_struct_tag: 'json:"-"'
+          - column: "*.modified_by_user_id"
+            go_struct_tag: 'json:"-"'
+          - column: "*.target_workspace_id"
             go_struct_tag: 'json:"-"'
           - column: "*.initiated_by_user_id"
             go_struct_tag: 'json:"-"'
@@ -424,6 +503,60 @@ sql:
               import: "github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
               package: "types"
               type: "PublicID"
+          - column: "*.resource_public_id"
+            go_type:
+              import: "github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
+              package: "types"
+              type: "PublicID"
+          # The generated models cover the whole schema in every block, so
+          # the exclusion list has to as well: a column tagged in one
+          # block and forgotten in another publishes the same sequence
+          # from whichever app reads it. TestGeneratedIDFieldsAreNotSerialized
+          # in apps/flow-api/internal/db compares the three.
+          - column: "*.author_user_id"
+            go_struct_tag: 'json:"-"'
+          - column: "*.comment_id"
+            go_struct_tag: 'json:"-"'
+          - column: "*.granted_by_user_id"
+            go_struct_tag: 'json:"-"'
+          - column: "*.judge_run_id"
+            go_struct_tag: 'json:"-"'
+          - column: "*.label_id"
+            go_struct_tag: 'json:"-"'
+          - column: "*.mentioned_user_id"
+            go_struct_tag: 'json:"-"'
+          - column: "*.parent_label_id"
+            go_struct_tag: 'json:"-"'
+          - column: "*.parent_page_id"
+            go_struct_tag: 'json:"-"'
+          - column: "*.parent_task_id"
+            go_struct_tag: 'json:"-"'
+          - column: "*.recipient_user_id"
+            go_struct_tag: 'json:"-"'
+          - column: "*.resolved_by"
+            go_struct_tag: 'json:"-"'
+          - column: "*.reverses_event_id"
+            go_struct_tag: 'json:"-"'
+          - column: "*.signal_id"
+            go_struct_tag: 'json:"-"'
+          - column: "*.source_event_id"
+            go_struct_tag: 'json:"-"'
+          - column: "*.source_task_id"
+            go_struct_tag: 'json:"-"'
+          - column: "*.subject_id"
+            go_struct_tag: 'json:"-"'
+          - column: "*.target_task_id"
+            go_struct_tag: 'json:"-"'
+          - column: "*.task_created_by_user_id"
+            go_struct_tag: 'json:"-"'
+          - column: "*.task_project_id"
+            go_struct_tag: 'json:"-"'
+          - column: "*.timebox_id"
+            go_struct_tag: 'json:"-"'
+          - column: "*.triaged_by_user_id"
+            go_struct_tag: 'json:"-"'
+          - column: "*.triggered_by_signal_id"
+            go_struct_tag: 'json:"-"'
           # See note in flow-api block above.
   # --- auth-api (auth + audit + workspace queries only) ---
   - engine: "mysql"
@@ -489,6 +622,25 @@ sql:
           - column: "*.provider_id"
             go_struct_tag: 'json:"-"'
           - column: "*.project_id"
+            go_struct_tag: 'json:"-"'
+          # See the note on the same group in the flow-api block above.
+          - column: "*.agent_id"
+            go_struct_tag: 'json:"-"'
+          - column: "*.actor_agent_id"
+            go_struct_tag: 'json:"-"'
+          - column: "*.model_id"
+            go_struct_tag: 'json:"-"'
+          - column: "*.from_task_id"
+            go_struct_tag: 'json:"-"'
+          - column: "*.to_task_id"
+            go_struct_tag: 'json:"-"'
+          - column: "*.share_id"
+            go_struct_tag: 'json:"-"'
+          - column: "*.recurrence_parent_id"
+            go_struct_tag: 'json:"-"'
+          - column: "*.modified_by_user_id"
+            go_struct_tag: 'json:"-"'
+          - column: "*.target_workspace_id"
             go_struct_tag: 'json:"-"'
           - column: "*.initiated_by_user_id"
             go_struct_tag: 'json:"-"'
@@ -562,3 +714,68 @@ sql:
               import: "github.com/libraz/nodate-flow/apps/auth-api/internal/db/types"
               package: "types"
               type: "PublicID"
+          # The generated models cover the whole schema in every block, so
+          # the exclusion list has to as well: a column tagged in one
+          # block and forgotten in another publishes the same sequence
+          # from whichever app reads it. TestGeneratedIDFieldsAreNotSerialized
+          # in apps/flow-api/internal/db compares the three.
+          - column: "*.actor_id"
+            go_struct_tag: 'json:"-"'
+          - column: "*.attendee_id"
+            go_struct_tag: 'json:"-"'
+          - column: "*.author_id"
+            go_struct_tag: 'json:"-"'
+          - column: "*.author_user_id"
+            go_struct_tag: 'json:"-"'
+          - column: "*.calendar_id"
+            go_struct_tag: 'json:"-"'
+          - column: "*.comment_id"
+            go_struct_tag: 'json:"-"'
+          - column: "*.creator_id"
+            go_struct_tag: 'json:"-"'
+          - column: "*.event_id"
+            go_struct_tag: 'json:"-"'
+          - column: "*.judge_run_id"
+            go_struct_tag: 'json:"-"'
+          - column: "*.label_id"
+            go_struct_tag: 'json:"-"'
+          - column: "*.mentioned_user_id"
+            go_struct_tag: 'json:"-"'
+          - column: "*.parent_label_id"
+            go_struct_tag: 'json:"-"'
+          - column: "*.parent_page_id"
+            go_struct_tag: 'json:"-"'
+          - column: "*.parent_task_id"
+            go_struct_tag: 'json:"-"'
+          - column: "*.recipient_user_id"
+            go_struct_tag: 'json:"-"'
+          - column: "*.resolved_by"
+            go_struct_tag: 'json:"-"'
+          - column: "*.reverses_event_id"
+            go_struct_tag: 'json:"-"'
+          - column: "*.signal_id"
+            go_struct_tag: 'json:"-"'
+          - column: "*.source_event_id"
+            go_struct_tag: 'json:"-"'
+          - column: "*.source_task_id"
+            go_struct_tag: 'json:"-"'
+          - column: "*.subject_id"
+            go_struct_tag: 'json:"-"'
+          - column: "*.subscription_id"
+            go_struct_tag: 'json:"-"'
+          - column: "*.target_task_id"
+            go_struct_tag: 'json:"-"'
+          - column: "*.task_created_by_user_id"
+            go_struct_tag: 'json:"-"'
+          - column: "*.task_id"
+            go_struct_tag: 'json:"-"'
+          - column: "*.task_project_id"
+            go_struct_tag: 'json:"-"'
+          - column: "*.timebox_id"
+            go_struct_tag: 'json:"-"'
+          - column: "*.triaged_by_user_id"
+            go_struct_tag: 'json:"-"'
+          - column: "*.triggered_by_signal_id"
+            go_struct_tag: 'json:"-"'
+          - column: "*.uploader_id"
+            go_struct_tag: 'json:"-"'

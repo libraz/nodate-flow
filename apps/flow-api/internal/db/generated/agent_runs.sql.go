@@ -53,7 +53,7 @@ type ClaimNextAgentRunRow struct {
 	ID          uint32         `json:"-"`
 	PublicID    types.PublicID `json:"publicId"`
 	WorkspaceID uint32         `json:"-"`
-	AgentID     uint32         `json:"agentId"`
+	AgentID     uint32         `json:"-"`
 	DedupeKey   string         `json:"dedupeKey"`
 	ScheduledAt time.Time      `json:"scheduledAt"`
 	Attempts    uint8          `json:"attempts"`
@@ -90,7 +90,7 @@ INSERT INTO agent_runs (
 type EnqueueAgentRunParams struct {
 	PublicID    types.PublicID `json:"publicId"`
 	WorkspaceID uint32         `json:"-"`
-	AgentID     uint32         `json:"agentId"`
+	AgentID     uint32         `json:"-"`
 	DedupeKey   string         `json:"dedupeKey"`
 	ScheduledAt time.Time      `json:"scheduledAt"`
 }
@@ -151,7 +151,7 @@ LIMIT 1
 
 type GetLastSuccessfulAgentRunParams struct {
 	WorkspaceID uint32 `json:"-"`
-	AgentID     uint32 `json:"agentId"`
+	AgentID     uint32 `json:"-"`
 }
 
 // Return the most recent succeeded run time for a given agent.
@@ -208,7 +208,7 @@ type ListAgentRunsByTaskParams struct {
 type ListAgentRunsByTaskRow struct {
 	PublicID                  types.PublicID  `json:"publicId"`
 	TaskID                    sql.NullInt32   `json:"-"`
-	ActorAgentID              sql.NullInt32   `json:"actorAgentId"`
+	ActorAgentID              sql.NullInt32   `json:"-"`
 	TriggeredBySignalPublicID types.PublicID  `json:"triggeredBySignalPublicId"`
 	ReversesEventPublicID     types.PublicID  `json:"reversesEventPublicId"`
 	WasReversed               bool            `json:"wasReversed"`

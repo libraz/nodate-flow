@@ -27,7 +27,7 @@ INSERT INTO calendar_public_share_events (
 type AttachEventToShareParams struct {
 	PublicID    types.PublicID `json:"publicId"`
 	WorkspaceID uint32         `json:"-"`
-	ShareID     uint32         `json:"shareId"`
+	ShareID     uint32         `json:"-"`
 	EventID     uint32         `json:"-"`
 	SortWeight  int32          `json:"sortWeight"`
 }
@@ -174,7 +174,7 @@ WHERE share_id = ?
 `
 
 type DetachEventFromShareParams struct {
-	ShareID uint32 `json:"shareId"`
+	ShareID uint32 `json:"-"`
 	EventID uint32 `json:"-"`
 }
 
@@ -748,7 +748,7 @@ WHERE share_id = ?
 
 type UpdateShareEventSortWeightParams struct {
 	SortWeight int32          `json:"sortWeight"`
-	ShareID    uint32         `json:"shareId"`
+	ShareID    uint32         `json:"-"`
 	PublicID   types.PublicID `json:"publicId"`
 }
 

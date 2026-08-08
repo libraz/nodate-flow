@@ -239,7 +239,7 @@ type UpsertCalendarMemberParams struct {
 	UserID          uint32              `json:"-"`
 	Role            CalendarMembersRole `json:"role"`
 	MemberColor     string              `json:"memberColor"`
-	InvitedByUserID sql.NullInt32       `json:"invitedByUserId"`
+	InvitedByUserID sql.NullInt32       `json:"-"`
 }
 
 // Grant (or re-grant) a user access to a calendar at a given role.

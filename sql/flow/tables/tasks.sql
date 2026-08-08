@@ -42,6 +42,16 @@ CREATE TABLE tasks (
   -- Supports keyset pagination on (created_at DESC, public_id DESC) for
   -- ListTasksForWorkspaceKeyset / ListTasksForProjectKeyset / ListMyTasksKeyset.
   KEY idx_tasks_workspace_id_keyset (workspace_id, created_at, public_id),
+  -- Serves the item-consistency reconciler's enabled-mismatch scan, the
+  -- one query in the product that reads across tenants: it looks for
+  -- calendar_events still enabled under a soft-disabled task. The
+  -- disabled side is the small side, so leading with enabled makes the
+  -- scan a covering range over just those rows, and the trailing id
+  -- carries the reconciler's resume cursor inside the same index.
+  -- Deliberately not workspace-scoped: a cross-tenant sweep cannot use
+  -- an index that leads with workspace_id, and every tenant-scoped
+  -- reader already has a more selective index above.
+  KEY idx_tasks_enabled_id (enabled, id),
   FULLTEXT KEY ft_tasks_title_description (title, description),
 
   CONSTRAINT fk_tasks_workspace FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,

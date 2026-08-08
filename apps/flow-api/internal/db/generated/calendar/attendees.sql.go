@@ -120,6 +120,7 @@ func (q *Queries) FindCalendarEventAttendee(ctx context.Context, arg FindCalenda
 
 const listCalendarEventAttendees = `-- name: ListCalendarEventAttendees :many
 SELECT
+  a.id,
   a.public_id,
   a.user_id,
   a.rsvp,
@@ -142,6 +143,7 @@ type ListCalendarEventAttendeesParams struct {
 }
 
 type ListCalendarEventAttendeesRow struct {
+	ID           uint32                     `json:"-"`
 	PublicID     types.PublicID             `json:"publicId"`
 	UserID       uint32                     `json:"-"`
 	Rsvp         CalendarEventAttendeesRsvp `json:"rsvp"`
@@ -153,6 +155,12 @@ type ListCalendarEventAttendeesRow struct {
 }
 
 // List all attendees for an event with user profile info.
+//
+// a.id is selected because callers that join attendees back to invites
+// (calendar_event_invites.attendee_id is an internal FK) otherwise have
+// to re-look-up every attendee one at a time, which turns a single
+// large-event request into one round trip per attendee. sqlc tags it
+// json:"-" via the *.id override, so it stays off the API boundary.
 func (q *Queries) ListCalendarEventAttendees(ctx context.Context, arg ListCalendarEventAttendeesParams) ([]ListCalendarEventAttendeesRow, error) {
 	rows, err := q.db.QueryContext(ctx, listCalendarEventAttendees, arg.EventID, arg.WorkspaceID)
 	if err != nil {
@@ -163,6 +171,7 @@ func (q *Queries) ListCalendarEventAttendees(ctx context.Context, arg ListCalend
 	for rows.Next() {
 		var i ListCalendarEventAttendeesRow
 		if err := rows.Scan(
+			&i.ID,
 			&i.PublicID,
 			&i.UserID,
 			&i.Rsvp,

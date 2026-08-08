@@ -2303,7 +2303,7 @@ type AgentRun struct {
 	// Internal FK to workspaces.id
 	WorkspaceID uint32 `json:"-"`
 	// Internal FK to ai_agents.id
-	AgentID uint32 `json:"agentId"`
+	AgentID uint32 `json:"-"`
 	// Unique key shaped as <agent_id>:<unix_minute> to prevent double enqueue across scheduler replicas
 	DedupeKey string `json:"dedupeKey"`
 	// Lifecycle state
@@ -2337,7 +2337,7 @@ type AiAgent struct {
 	// Internal FK to workspaces.id
 	WorkspaceID uint32 `json:"-"`
 	// Internal FK to ai_models.id
-	ModelID uint32 `json:"modelId"`
+	ModelID uint32 `json:"-"`
 	// Agent dispatch kind. task_agent: operates on tasks (default, all current agents). signal_judge: LLM judge for external signals (see ADR 0008 D3).
 	Kind AiAgentsKind `json:"kind"`
 	// Human-readable agent name
@@ -2387,7 +2387,7 @@ type AiInvocation struct {
 	// Internal FK to users.id (if user-initiated)
 	UserID sql.NullInt32 `json:"-"`
 	// Internal FK to ai_agents.id when the call was made on behalf of an AI agent
-	AgentID sql.NullInt32 `json:"agentId"`
+	AgentID sql.NullInt32 `json:"-"`
 	// Internal FK to tasks.id if applicable
 	TaskID sql.NullInt32 `json:"-"`
 	// Logical call purpose (e.g., propose_tasks)
@@ -2495,7 +2495,7 @@ type AiSetting struct {
 	// Internal FK to workspaces.id
 	WorkspaceID uint32 `json:"-"`
 	// Last modifier user.id (audit field; NULL when user is removed or for system writers)
-	ModifiedByUserID sql.NullInt32 `json:"modifiedByUserId"`
+	ModifiedByUserID sql.NullInt32 `json:"-"`
 	// Embedding model key (resolved by ai/embed registry)
 	EmbedModel string `json:"embedModel"`
 	// Daily embed cost cap in cents (separate bucket from chat budget)
@@ -2553,13 +2553,13 @@ type AuditLog struct {
 	// Internal FK to workspaces.id
 	WorkspaceID uint32 `json:"-"`
 	// Actor user.id (null for system)
-	ActorUserID sql.NullInt32 `json:"actorUserId"`
+	ActorUserID sql.NullInt32 `json:"-"`
 	// Action identifier (e.g., ai_provider.create)
 	Action string `json:"action"`
 	// Target resource type
 	ResourceType string `json:"resourceType"`
 	// Target resource public_id when available
-	ResourcePublicID sql.NullString `json:"resourcePublicId"`
+	ResourcePublicID types.PublicID `json:"resourcePublicId"`
 	// Packed IPv4/IPv6 address
 	IpAddress sql.NullString `json:"ipAddress"`
 	// Client user agent
@@ -2685,7 +2685,7 @@ type CalendarEvent struct {
 	// Array of ISO 8601 occurrence starts to skip when expanding this rule. Cancelling one occurrence is an entry here, never a row.
 	RecurrenceExceptions json.RawMessage `json:"recurrenceExceptions"`
 	// Set on an override row: the recurring event whose single occurrence this row replaces. NULL on ordinary and master rows.
-	RecurrenceParentID sql.NullInt32 `json:"recurrenceParentId"`
+	RecurrenceParentID sql.NullInt32 `json:"-"`
 	// Set on an override row: the start the occurrence would have had under the parent rule. Identifies which occurrence is replaced, so moving the override does not lose track of what it overrides.
 	RecurrenceOriginalStart sql.NullTime `json:"recurrenceOriginalStart"`
 	// Minutes before an occurrence to send its reminder; NULL = no reminder. Applies to every occurrence of a recurring event; what has already been sent is recorded in calendar_event_reminders.
@@ -2879,7 +2879,7 @@ type CalendarMember struct {
 	// Shared colour identifying this member on the calendar; agreed rather than per-viewer, unlike calendar_subscriptions.display_color
 	MemberColor string `json:"memberColor"`
 	// Internal FK to users.id; who granted this membership. NULL for the owner row created with the calendar.
-	InvitedByUserID sql.NullInt32 `json:"invitedByUserId"`
+	InvitedByUserID sql.NullInt32 `json:"-"`
 	// Display order
 	SortWeight int32 `json:"sortWeight"`
 	// Admin notes
@@ -2963,7 +2963,7 @@ type CalendarPublicShareEvent struct {
 	// Internal FK to workspaces.id; denormalized from share for tenant isolation
 	WorkspaceID uint32 `json:"-"`
 	// Internal FK to calendar_public_shares.id
-	ShareID uint32 `json:"shareId"`
+	ShareID uint32 `json:"-"`
 	// Internal FK to calendar_events.id
 	EventID uint32 `json:"-"`
 	// Override display order on the share page
@@ -3077,15 +3077,15 @@ type Event struct {
 	// Internal FK to calendars.id when the event targets a calendar or something inside one. The symmetric counterpart of task_id, and the reason a per-calendar activity feed can read the log directly instead of keeping a second history table that would drift from it.
 	CalendarID sql.NullInt32 `json:"-"`
 	// Internal FK to signals.id; set when this event was emitted by the Applier in response to a judged signal. Provides full traceability from external input to task event. Belongs to a product layer: NULL in a deployment without one.
-	TriggeredBySignalID sql.NullInt32 `json:"triggeredBySignalId"`
+	TriggeredBySignalID sql.NullInt32 `json:"-"`
 	// Acting user.id (null for system/bot actions). Mutually exclusive with actor_agent_id and actor_system_source: exactly one of the three actor sources is set per row (both NULL is also legal for legacy "system actor"). The mutual-exclusion rule is enforced by query design and handler validation, not a CHECK constraint, because all three FK referential actions use ON DELETE SET NULL and MySQL 8.4 forbids CHECK constraints referencing columns used in FK referential actions. Every INSERT must therefore bind exactly one of the three, chosen by who is acting: a person, an agent, or a background process.
-	ActorUserID sql.NullInt32 `json:"actorUserId"`
+	ActorUserID sql.NullInt32 `json:"-"`
 	// Acting ai_agents.id when the event was produced by an AI agent (judge / task agent). See actor_user_id comment for the three-way exclusion rule.
-	ActorAgentID sql.NullInt32 `json:"actorAgentId"`
+	ActorAgentID sql.NullInt32 `json:"-"`
 	// Third actor source, for events emitted by a background process rather than a person or an agent. Free-form and namespaced by the writer, e.g. `worker:scheduler` or `worker:retention`. Not an FK because such a process has no row in the database. See actor_user_id comment for the three-way exclusion rule.
 	ActorSystemSource sql.NullString `json:"actorSystemSource"`
 	// Internal FK to events.id. Non-NULL means this event is a compensating reverse of another event (e.g., user undoing an auto-completion). A projection reading the log cancels both events out. The log is immutable: a reversal is a new row, never an UPDATE or DELETE of the original.
-	ReversesEventID sql.NullInt64 `json:"reversesEventId"`
+	ReversesEventID sql.NullInt64 `json:"-"`
 	// Event type (e.g., task.created, signal.attached, signal.judged)
 	Type string `json:"type"`
 	// Event payload
@@ -3160,7 +3160,7 @@ type ImportJob struct {
 	ProcessedItems uint32 `json:"processedItems"`
 	// Items that failed to import
 	FailedItems uint32 `json:"failedItems"`
-	// Source-specific import configuration
+	// Source-specific import configuration. Plaintext and returned by the read endpoints, so it must never hold a credential: the API rejects credential-shaped key names at every nesting level, and checks a per-source allow-list for sources that have declared their keys (see internal/importer). External-service credentials belong in user_integrations / ai_providers, which are encrypted
 	ConfigJson json.RawMessage `json:"configJson"`
 	// Aggregated error log
 	ErrorLog sql.NullString `json:"errorLog"`
@@ -3187,7 +3187,7 @@ type InstanceAdmin struct {
 	// Internal FK to users.id
 	UserID uint32 `json:"-"`
 	// Internal FK to users.id (granter, null for bootstrap)
-	GrantedByUserID sql.NullInt32 `json:"grantedByUserId"`
+	GrantedByUserID sql.NullInt32 `json:"-"`
 	// Time the grant was created
 	GrantedAt time.Time `json:"grantedAt"`
 	// Explicit revocation time
@@ -3209,11 +3209,11 @@ type InstanceAuditLog struct {
 	// UUID v7, the only externally visible ID
 	PublicID types.PublicID `json:"publicId"`
 	// Actor user.id (null for system)
-	ActorUserID sql.NullInt32 `json:"actorUserId"`
+	ActorUserID sql.NullInt32 `json:"-"`
 	// Action identifier (e.g., instance_admin.grant)
 	Action string `json:"action"`
 	// Affected workspace.id when applicable
-	TargetWorkspaceID sql.NullInt32 `json:"targetWorkspaceId"`
+	TargetWorkspaceID sql.NullInt32 `json:"-"`
 	// Target resource type
 	TargetResourceType sql.NullString `json:"targetResourceType"`
 	// Target resource public_id when available
@@ -3267,11 +3267,11 @@ type IntakeItem struct {
 	// Internal FK to workspaces.id
 	WorkspaceID uint32 `json:"-"`
 	// Origin signal (NULL = manual)
-	SignalID sql.NullInt32 `json:"signalId"`
+	SignalID sql.NullInt32 `json:"-"`
 	// Converted task (NULL = not yet converted)
 	TaskID sql.NullInt32 `json:"-"`
 	// User who triaged this item
-	TriagedByUserID sql.NullInt32 `json:"triagedByUserId"`
+	TriagedByUserID sql.NullInt32 `json:"-"`
 	// Item title
 	Title string `json:"title"`
 	// Item body / details
@@ -3331,7 +3331,7 @@ type Label struct {
 	// NULL = workspace-wide label
 	ProjectID sql.NullInt32 `json:"-"`
 	// Self-ref for hierarchy; NULL = root
-	ParentLabelID sql.NullInt32 `json:"parentLabelId"`
+	ParentLabelID sql.NullInt32 `json:"-"`
 	// Creator user.id (audit field; NULL when creator is removed)
 	CreatedByUserID sql.NullInt32 `json:"-"`
 	// Display name
@@ -3430,6 +3430,8 @@ type McpInvocation struct {
 	WorkspaceID uint32 `json:"-"`
 	// Internal FK to users.id (PAT owner)
 	UserID sql.NullInt32 `json:"-"`
+	// Internal FK to ai_agents.id when the invoking token acts on behalf of an AI agent. Copied from mcp_tokens.agent_id at invocation time so the attribution survives the token being revoked. NULL means a human-owned token, which is what makes the user/agent distinction in v_workspace_activity decidable
+	AgentID sql.NullInt32 `json:"-"`
 	// Internal FK to tasks.id when applicable
 	TaskID sql.NullInt32 `json:"-"`
 	// MCP tool name (e.g., create_task)
@@ -3467,7 +3469,7 @@ type McpToken struct {
 	// Internal FK to users.id (token owner)
 	UserID uint32 `json:"-"`
 	// Internal FK to ai_agents.id when the token acts on behalf of an AI agent
-	AgentID sql.NullInt32 `json:"agentId"`
+	AgentID sql.NullInt32 `json:"-"`
 	// Human-readable label
 	Name string `json:"name"`
 	// SHA-256 hex of the bearer token
@@ -3499,10 +3501,10 @@ type Mention struct {
 	// UUID v7, the only externally visible ID
 	PublicID        types.PublicID `json:"publicId"`
 	WorkspaceID     uint32         `json:"-"`
-	MentionedUserID uint32         `json:"mentionedUserId"`
-	ActorUserID     sql.NullInt32  `json:"actorUserId"`
+	MentionedUserID uint32         `json:"-"`
+	ActorUserID     sql.NullInt32  `json:"-"`
 	TaskID          sql.NullInt32  `json:"-"`
-	CommentID       sql.NullInt32  `json:"commentId"`
+	CommentID       sql.NullInt32  `json:"-"`
 	Source          MentionsSource `json:"source"`
 	// Display order
 	SortWeight int32 `json:"sortWeight"`
@@ -3523,17 +3525,17 @@ type Notification struct {
 	// Internal FK to workspaces.id
 	WorkspaceID uint32 `json:"-"`
 	// Internal FK to users.id, the user who receives this notification
-	RecipientUserID uint32 `json:"recipientUserId"`
+	RecipientUserID uint32 `json:"-"`
 	// Internal FK to users.id, who triggered the event (null for system)
-	ActorUserID sql.NullInt32 `json:"actorUserId"`
+	ActorUserID sql.NullInt32 `json:"-"`
 	// Internal FK to events.id (BIGINT UNSIGNED) used for at-least-once dedup; null for non-event-driven paths (scheduler, system)
-	SourceEventID sql.NullInt64 `json:"sourceEventId"`
+	SourceEventID sql.NullInt64 `json:"-"`
 	// Matches eventbus event types (e.g. task.created, task.comment.added)
 	EventType string `json:"eventType"`
 	// Resource kind: task, project, comment, etc.
 	ResourceType string `json:"resourceType"`
 	// public_id of the affected resource (null for workspace-level events)
-	ResourcePublicID sql.NullString `json:"resourcePublicId"`
+	ResourcePublicID types.PublicID `json:"resourcePublicId"`
 	// Human-readable notification title (i18n key or pre-rendered)
 	Title string `json:"title"`
 	// Optional longer description
@@ -3610,7 +3612,7 @@ type Page struct {
 	// Internal FK to users.id
 	CreatorID uint32 `json:"-"`
 	// Internal FK to pages.id (NULL = root page)
-	ParentPageID sql.NullInt32 `json:"parentPageId"`
+	ParentPageID sql.NullInt32 `json:"-"`
 	// Page title
 	Title string `json:"title"`
 	// Page content
@@ -3742,7 +3744,7 @@ type Reaction struct {
 	WorkspaceID uint32         `json:"-"`
 	UserID      uint32         `json:"-"`
 	TaskID      sql.NullInt32  `json:"-"`
-	CommentID   sql.NullInt32  `json:"commentId"`
+	CommentID   sql.NullInt32  `json:"-"`
 	// Unicode emoji
 	Emoji string `json:"emoji"`
 	// Display order
@@ -3766,9 +3768,9 @@ type RelationSuggestion struct {
 	// Internal FK to workspaces.id
 	WorkspaceID uint32 `json:"-"`
 	// Internal FK to tasks.id (trigger task)
-	SourceTaskID uint32 `json:"sourceTaskId"`
+	SourceTaskID uint32 `json:"-"`
 	// Internal FK to tasks.id (suggested relation)
-	TargetTaskID uint32 `json:"targetTaskId"`
+	TargetTaskID uint32 `json:"-"`
 	// Suggested dependency kind
 	SuggestedKind RelationSuggestionsSuggestedKind `json:"suggestedKind"`
 	// Cosine similarity score (0.0000 to 1.0000)
@@ -3776,7 +3778,7 @@ type RelationSuggestion struct {
 	// Resolution status
 	Status RelationSuggestionsStatus `json:"status"`
 	// Internal FK to users.id (who resolved)
-	ResolvedBy sql.NullInt32 `json:"resolvedBy"`
+	ResolvedBy sql.NullInt32 `json:"-"`
 	// When the suggestion was accepted or dismissed
 	ResolvedAt sql.NullTime `json:"resolvedAt"`
 	UpdatedAt  sql.NullTime `json:"updatedAt"`
@@ -3826,7 +3828,7 @@ type Signal struct {
 	// Internal FK to tasks.id, if resolved (legacy fast path; duplicates subject_type=task / subject_id)
 	TaskID sql.NullInt32 `json:"-"`
 	// Internal FK to agent_runs.id; set when a judge run has evaluated this signal. NULL means "not yet judged".
-	JudgeRunID sql.NullInt32 `json:"judgeRunId"`
+	JudgeRunID sql.NullInt32 `json:"-"`
 	// Originating channel. Canonical source list lives in packages/go-shared/signalwire (Sources()); this ENUM, the flow-api Huma enum tag, and the signal_kinds registry all derive from / are asserted against it. 'calendar' is reserved for internal scheduler ticks (flow-worker calendar_event_day job, etc.) — not a user-facing webhook source. 'discord' is the presence-discord gateway.
 	Source SignalsSource `json:"source"`
 	// Source-specific event kind (e.g., pull_request.opened, discord.presence). Closed enumeration defined by signal_kinds/*.yaml; stays VARCHAR so new kinds do not require a schema change.
@@ -3840,7 +3842,7 @@ type Signal struct {
 	// What the signal is about; selects which table subject_id targets.
 	SubjectType SignalsSubjectType `json:"subjectType"`
 	// Internal id of the subject row. NULL when subject_type=workspace (workspace_id already owns the row). Polymorphic, so not declared as an FK; integrity is enforced at ingestion time.
-	SubjectID sql.NullInt32 `json:"subjectId"`
+	SubjectID sql.NullInt32 `json:"-"`
 	// Structured verdict from the judge run (intent, target task, proposed events, reasoning excerpt). NULL until judged.
 	JudgeOutputJson json.RawMessage `json:"judgeOutputJson"`
 	// Judge confidence in [0.00, 1.00]; compared against ai_settings.auto_action_threshold / auto_action_rules.
@@ -3904,7 +3906,7 @@ type Task struct {
 	// Per-project monotonic counter (1-based)
 	TaskNumber uint32 `json:"taskNumber"`
 	// Self-reference for subtasks
-	ParentTaskID sql.NullInt32 `json:"parentTaskId"`
+	ParentTaskID sql.NullInt32 `json:"-"`
 	// Creator user.id
 	CreatedByUserID sql.NullInt32 `json:"-"`
 	// Last modifier user.id (audit field; NULL for system writers)
@@ -3952,7 +3954,7 @@ type TaskActor struct {
 	// Internal FK to users.id (null when this row is an AI agent actor)
 	UserID sql.NullInt32 `json:"-"`
 	// Internal FK to ai_agents.id (null when this row is a human actor)
-	AgentID sql.NullInt32 `json:"agentId"`
+	AgentID sql.NullInt32 `json:"-"`
 	// Actor kind — user or AI agent
 	Kind TaskActorsKind `json:"kind"`
 	// Actor role on the task
@@ -4004,9 +4006,9 @@ type TaskDependency struct {
 	// Internal FK to workspaces.id
 	WorkspaceID uint32 `json:"-"`
 	// Internal FK to tasks.id (source)
-	FromTaskID uint32 `json:"fromTaskId"`
+	FromTaskID uint32 `json:"-"`
 	// Internal FK to tasks.id (target)
-	ToTaskID uint32 `json:"toTaskId"`
+	ToTaskID uint32 `json:"-"`
 	// Dependency kind. blocks: from_task waits on to_task. relates: informational link. duplicates: from_task duplicates to_task. subtask_of: from_task is a subtask of to_task. retro_of: created by the signal_judge Applier when an event-day signal triggers a retrospective draft task; from_task is the new draft, to_task is the original task whose lifecycle finished and prompted the retro.
 	Kind TaskDependenciesKind `json:"kind"`
 	// Display order
@@ -4032,7 +4034,7 @@ type TaskDescriptionVersion struct {
 	// Internal FK to tasks.id
 	TaskID uint32 `json:"-"`
 	// User who authored this version
-	AuthorUserID sql.NullInt32 `json:"authorUserId"`
+	AuthorUserID sql.NullInt32 `json:"-"`
 	// Monotonically increasing per task
 	VersionNumber uint32 `json:"versionNumber"`
 	// Full description snapshot
@@ -4105,7 +4107,7 @@ type TaskLabel struct {
 	// Internal FK to tasks.id
 	TaskID uint32 `json:"-"`
 	// Internal FK to labels.id
-	LabelID uint32 `json:"labelId"`
+	LabelID uint32 `json:"-"`
 	// Display order
 	SortWeight int32 `json:"sortWeight"`
 	// Admin notes
@@ -4163,7 +4165,7 @@ type TimeboxTask struct {
 	// Internal FK to workspaces.id
 	WorkspaceID uint32 `json:"-"`
 	// Internal FK to timeboxes.id
-	TimeboxID uint32 `json:"timeboxId"`
+	TimeboxID uint32 `json:"-"`
 	// Internal FK to tasks.id
 	TaskID uint32 `json:"-"`
 	// Display order
@@ -4387,7 +4389,7 @@ type VAuditRecent struct {
 	ActorDisplayName  sql.NullString  `json:"actorDisplayName"`
 	Action            string          `json:"action"`
 	ResourceType      string          `json:"resourceType"`
-	ResourcePublicID  sql.NullString  `json:"resourcePublicId"`
+	ResourcePublicID  types.PublicID  `json:"resourcePublicId"`
 	IpAddress         sql.NullString  `json:"ipAddress"`
 	UserAgent         sql.NullString  `json:"userAgent"`
 	MetadataJson      json.RawMessage `json:"metadataJson"`
@@ -4417,8 +4419,8 @@ type VInbox struct {
 	TaskPublicID        sql.NullString      `json:"taskPublicId"`
 	TaskTitle           sql.NullString      `json:"taskTitle"`
 	TaskVisibility      NullTasksVisibility `json:"taskVisibility"`
-	TaskProjectID       sql.NullInt32       `json:"taskProjectId"`
-	TaskCreatedByUserID sql.NullInt32       `json:"taskCreatedByUserId"`
+	TaskProjectID       sql.NullInt32       `json:"-"`
+	TaskCreatedByUserID sql.NullInt32       `json:"-"`
 	TaskInternalID      sql.NullInt32       `json:"-"`
 	Source              SignalsSource       `json:"source"`
 	Kind                string              `json:"kind"`
@@ -4639,7 +4641,7 @@ type VWorkspaceActivity struct {
 	ActorKind         interface{}    `json:"actorKind"`
 	Action            string         `json:"action"`
 	ResourceType      string         `json:"resourceType"`
-	ResourcePublicID  sql.NullString `json:"resourcePublicId"`
+	ResourcePublicID  types.PublicID `json:"resourcePublicId"`
 	Severity          interface{}    `json:"severity"`
 }
 
@@ -4810,7 +4812,7 @@ type WorkspaceMember struct {
 	// Workspace-level role
 	Role WorkspaceMembersRole `json:"role"`
 	// Inviter user.id
-	InvitedByUserID sql.NullInt32 `json:"invitedByUserId"`
+	InvitedByUserID sql.NullInt32 `json:"-"`
 	// Invitation time
 	InvitedAt sql.NullTime `json:"invitedAt"`
 	// Acceptance time

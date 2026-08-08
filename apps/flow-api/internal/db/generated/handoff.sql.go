@@ -73,7 +73,7 @@ type InsertHandoffToUserEventParams struct {
 	PublicID     types.PublicID  `json:"publicId"`
 	WorkspaceID  uint32          `json:"-"`
 	TaskID       sql.NullInt32   `json:"-"`
-	ActorAgentID sql.NullInt32   `json:"actorAgentId"`
+	ActorAgentID sql.NullInt32   `json:"-"`
 	PayloadJson  json.RawMessage `json:"payloadJson"`
 	OccurredAt   time.Time       `json:"occurredAt"`
 }

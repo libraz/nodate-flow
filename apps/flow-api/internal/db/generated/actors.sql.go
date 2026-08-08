@@ -69,7 +69,7 @@ type AddAgentActorParams struct {
 	PublicID    types.PublicID `json:"publicId"`
 	WorkspaceID uint32         `json:"-"`
 	TaskID      uint32         `json:"-"`
-	AgentID     sql.NullInt32  `json:"agentId"`
+	AgentID     sql.NullInt32  `json:"-"`
 	Role        TaskActorsRole `json:"role"`
 }
 

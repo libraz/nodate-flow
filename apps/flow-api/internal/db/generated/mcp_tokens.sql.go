@@ -38,7 +38,7 @@ type FindUserForMcpTokenRow struct {
 	TokenPublicID types.PublicID  `json:"tokenPublicId"`
 	WorkspaceID   uint32          `json:"-"`
 	UserID        uint32          `json:"-"`
-	AgentID       sql.NullInt32   `json:"agentId"`
+	AgentID       sql.NullInt32   `json:"-"`
 	ScopesJson    json.RawMessage `json:"scopesJson"`
 	ExpiresAt     sql.NullTime    `json:"expiresAt"`
 	UserPublicID  types.PublicID  `json:"userPublicId"`

@@ -201,7 +201,7 @@ type LogAiInvocationParams struct {
 	WorkspaceID      uint32              `json:"-"`
 	ProviderID       uint32              `json:"-"`
 	UserID           sql.NullInt32       `json:"-"`
-	AgentID          sql.NullInt32       `json:"agentId"`
+	AgentID          sql.NullInt32       `json:"-"`
 	TaskID           sql.NullInt32       `json:"-"`
 	Purpose          string              `json:"purpose"`
 	Model            string              `json:"model"`
@@ -247,6 +247,7 @@ INSERT INTO mcp_invocations (
   public_id,
   workspace_id,
   user_id,
+  agent_id,
   task_id,
   tool_name,
   arguments_redacted_json,
@@ -255,13 +256,14 @@ INSERT INTO mcp_invocations (
   error_code,
   duration_ms,
   invoked_at
-) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 `
 
 type LogMcpInvocationParams struct {
 	PublicID              types.PublicID       `json:"publicId"`
 	WorkspaceID           uint32               `json:"-"`
 	UserID                sql.NullInt32        `json:"-"`
+	AgentID               sql.NullInt32        `json:"-"`
 	TaskID                sql.NullInt32        `json:"-"`
 	ToolName              string               `json:"toolName"`
 	ArgumentsRedactedJson json.RawMessage      `json:"argumentsRedactedJson"`
@@ -279,6 +281,7 @@ func (q *Queries) LogMcpInvocation(ctx context.Context, arg LogMcpInvocationPara
 		arg.PublicID,
 		arg.WorkspaceID,
 		arg.UserID,
+		arg.AgentID,
 		arg.TaskID,
 		arg.ToolName,
 		arg.ArgumentsRedactedJson,
@@ -302,7 +305,7 @@ WHERE agent_id = ?
 `
 
 type SumAiCostForAgentSinceParams struct {
-	AgentID   sql.NullInt32 `json:"agentId"`
+	AgentID   sql.NullInt32 `json:"-"`
 	InvokedAt time.Time     `json:"invokedAt"`
 }
 

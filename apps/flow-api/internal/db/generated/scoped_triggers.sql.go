@@ -140,7 +140,7 @@ type ListEventsForScopedAgentRow struct {
 	WorkspaceID         uint32          `json:"-"`
 	TaskID              sql.NullInt32   `json:"-"`
 	ActorUserID         sql.NullInt32   `json:"-"`
-	ActorAgentID        sql.NullInt32   `json:"actorAgentId"`
+	ActorAgentID        sql.NullInt32   `json:"-"`
 	TriggeredBySignalID sql.NullInt32   `json:"-"`
 	ReversesEventID     sql.NullInt64   `json:"-"`
 	WasReversed         bool            `json:"wasReversed"`

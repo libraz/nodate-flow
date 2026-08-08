@@ -50,7 +50,7 @@ WHERE td.from_task_id = ?
 `
 
 type ListDependencyStatesForEngineParams struct {
-	FromTaskID  uint32 `json:"fromTaskId"`
+	FromTaskID  uint32 `json:"-"`
 	WorkspaceID uint32 `json:"-"`
 }
 

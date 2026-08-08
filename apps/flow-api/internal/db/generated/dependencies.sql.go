@@ -26,8 +26,8 @@ INSERT INTO task_dependencies (
 type AddDependencyParams struct {
 	PublicID    types.PublicID       `json:"publicId"`
 	WorkspaceID uint32               `json:"-"`
-	FromTaskID  uint32               `json:"fromTaskId"`
-	ToTaskID    uint32               `json:"toTaskId"`
+	FromTaskID  uint32               `json:"-"`
+	ToTaskID    uint32               `json:"-"`
 	Kind        TaskDependenciesKind `json:"kind"`
 }
 
@@ -58,7 +58,7 @@ WHERE workspace_id = ?
 type DeleteDependencyParams struct {
 	WorkspaceID uint32         `json:"-"`
 	PublicID    types.PublicID `json:"publicId"`
-	FromTaskID  uint32         `json:"fromTaskId"`
+	FromTaskID  uint32         `json:"-"`
 }
 
 // Soft-delete a dependency edge. Scoped by the owning from_task_id so a
@@ -269,8 +269,8 @@ WHERE td.workspace_id = ?
 `
 
 type ListDependencyEdgesForWorkspaceRow struct {
-	FromTaskID uint32 `json:"fromTaskId"`
-	ToTaskID   uint32 `json:"toTaskId"`
+	FromTaskID uint32 `json:"-"`
+	ToTaskID   uint32 `json:"-"`
 }
 
 // List every enabled dependency edge in the workspace as (from, to) internal
@@ -312,8 +312,8 @@ FOR UPDATE
 `
 
 type ListDependencyEdgesForWorkspaceForUpdateRow struct {
-	FromTaskID uint32 `json:"fromTaskId"`
-	ToTaskID   uint32 `json:"toTaskId"`
+	FromTaskID uint32 `json:"-"`
+	ToTaskID   uint32 `json:"-"`
 }
 
 // The same edge set, read under a lock. This is the serialization point for

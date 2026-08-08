@@ -8,6 +8,7 @@ CREATE TABLE mcp_invocations (
   public_id BINARY(16) NOT NULL COMMENT 'UUID v7, the only externally visible ID',
   workspace_id INT UNSIGNED NOT NULL COMMENT 'Internal FK to workspaces.id',
   user_id INT UNSIGNED NULL COMMENT 'Internal FK to users.id (PAT owner)',
+  agent_id INT UNSIGNED NULL COMMENT 'Internal FK to ai_agents.id when the invoking token acts on behalf of an AI agent. Copied from mcp_tokens.agent_id at invocation time so the attribution survives the token being revoked. NULL means a human-owned token, which is what makes the user/agent distinction in v_workspace_activity decidable',
   task_id INT UNSIGNED NULL COMMENT 'Internal FK to tasks.id when applicable',
 
   tool_name VARCHAR(128) CHARACTER SET latin1 COLLATE latin1_swedish_ci NOT NULL COMMENT 'MCP tool name (e.g., create_task)',
@@ -28,9 +29,11 @@ CREATE TABLE mcp_invocations (
   UNIQUE KEY uniq_mcp_invocations_workspace_public_id (workspace_id, public_id),
   KEY idx_mcp_invocations_workspace_id_invoked_at (workspace_id, invoked_at),
   KEY idx_mcp_invocations_workspace_id_user_id (workspace_id, user_id),
+  KEY idx_mcp_invocations_workspace_id_agent_id (workspace_id, agent_id),
   KEY idx_mcp_invocations_created_at (created_at),
 
   CONSTRAINT fk_mcp_invocations_workspace FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
   CONSTRAINT fk_mcp_invocations_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL,
+  CONSTRAINT fk_mcp_invocations_agent FOREIGN KEY (agent_id) REFERENCES ai_agents(id) ON DELETE SET NULL,
   CONSTRAINT fk_mcp_invocations_task FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='MCP tool invocation audit';

@@ -72,7 +72,7 @@ type InsertSignalParams struct {
 	PayloadJson json.RawMessage    `json:"payloadJson"`
 	ReceivedAt  time.Time          `json:"receivedAt"`
 	SubjectType SignalsSubjectType `json:"subjectType"`
-	SubjectID   sql.NullInt32      `json:"subjectId"`
+	SubjectID   sql.NullInt32      `json:"-"`
 	ExpiresAt   sql.NullTime       `json:"expiresAt"`
 }
 

@@ -12,6 +12,17 @@
 --   occurred_at             -- DATETIME(3); audit.occurred_at / ai.invoked_at / mcp.invoked_at
 --   actor_user_public_id    -- BINARY(16) NULL; resolved via users.id when the source row has an actor
 --   actor_kind              -- 'user' | 'agent' | 'system'
+--
+-- actor_kind is decided by which actor column the source row bound, and
+-- the ai and mcp legs answer it the same way: an agent_id wins over a
+-- user_id, because an agent-owned token still records the human who
+-- minted it and reporting that human as the actor puts a person's face
+-- on work an agent did. The audit leg has no agent column, so its rows
+-- can only be 'user' or 'system'; that is why an MCP call also carrying
+-- an audit_logs row shows up twice with different actor_kind values.
+-- Collapsing the two is not a view-level fix — audit_logs would need an
+-- actor_agent_id of its own — and dropping the mcp leg would drop the
+-- only leg that can say 'agent' about a tool call.
 --   action                  -- audit.action / ai.purpose / mcp.tool_name
 --   resource_type           -- audit.resource_type / 'ai_invocation' / 'mcp_invocation'
 --   resource_public_id      -- audit.resource_public_id / source's own public_id for ai/mcp
@@ -84,7 +95,14 @@ SELECT
   CAST('mcp_invocations' AS CHAR(32) CHARACTER SET utf8mb4) AS source_table,
   mi.invoked_at AS occurred_at,
   actor.public_id AS actor_user_public_id,
-  CAST(IF(mi.user_id IS NULL, 'system', 'user') AS CHAR(8) CHARACTER SET utf8mb4) AS actor_kind,
+  CAST(
+    CASE
+      WHEN mi.agent_id IS NOT NULL THEN 'agent'
+      WHEN mi.user_id IS NOT NULL THEN 'user'
+      ELSE 'system'
+    END
+    AS CHAR(8) CHARACTER SET utf8mb4
+  ) AS actor_kind,
   mi.tool_name AS action,
   CAST('mcp_invocation' AS CHAR(64) CHARACTER SET utf8mb4) AS resource_type,
   mi.public_id AS resource_public_id,
