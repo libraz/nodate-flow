@@ -29,11 +29,35 @@ func TestMemberCannotElevateOwnRole(t *testing.T) {
 		member.AccessToken, nil, nil)
 
 	// Member tries to promote themselves to admin.
-	status, _ := doJSONStatus(t, http.MethodPatch,
+	//
+	// The actor is a member of this workspace, so hiding the route
+	// behind a 404 would tell them nothing they do not already know:
+	// the refusal is 403 WS.MEMBER.ROLE_DENIED, from the role gate.
+	status, body := doJSONStatus(t, http.MethodPatch,
 		testServerURL+"/workspaces/"+owner.WorkspacePublicID+"/members/"+member.UserPublicID,
 		member.AccessToken, map[string]any{"role": "admin"})
-	require.GreaterOrEqual(t, status, 403,
-		"member must not be able to elevate own role")
+	requireDenied(t, status, body, http.StatusForbidden, "WS.MEMBER.ROLE_DENIED",
+		"a member elevating their own role")
+
+	// The role did not move.
+	var members struct {
+		Members []struct {
+			UserID string `json:"userId"`
+			Role   string `json:"role"`
+		} `json:"members"`
+	}
+	doJSON(t, http.MethodGet,
+		testServerURL+"/workspaces/"+owner.WorkspacePublicID+"/members",
+		owner.AccessToken, nil, &members)
+	var found bool
+	for _, m := range members.Members {
+		if m.UserID == member.UserPublicID {
+			found = true
+			require.Equal(t, "member", m.Role,
+				"the refused PATCH must leave the role as invited")
+		}
+	}
+	require.True(t, found, "the invited member must still be listed")
 }
 
 // TestMemberCannotChangeOtherRoles verifies that a regular member
@@ -56,11 +80,11 @@ func TestMemberCannotChangeOtherRoles(t *testing.T) {
 		member.AccessToken, nil, nil)
 
 	// Member tries to demote the owner.
-	status, _ := doJSONStatus(t, http.MethodPatch,
+	status, body := doJSONStatus(t, http.MethodPatch,
 		testServerURL+"/workspaces/"+owner.WorkspacePublicID+"/members/"+owner.UserPublicID,
 		member.AccessToken, map[string]any{"role": "guest"})
-	require.GreaterOrEqual(t, status, 403,
-		"member must not be able to change owner's role")
+	requireDenied(t, status, body, http.StatusForbidden, "WS.MEMBER.ROLE_DENIED",
+		"a member demoting the owner")
 }
 
 // TestMemberCannotRemoveOtherMembers verifies that a regular member
@@ -83,11 +107,11 @@ func TestMemberCannotRemoveOtherMembers(t *testing.T) {
 		member.AccessToken, nil, nil)
 
 	// Member tries to remove the owner.
-	status, _ := doJSONStatus(t, http.MethodDelete,
+	status, body := doJSONStatus(t, http.MethodDelete,
 		testServerURL+"/workspaces/"+owner.WorkspacePublicID+"/members/"+owner.UserPublicID,
 		member.AccessToken, nil)
-	require.GreaterOrEqual(t, status, 403,
-		"member must not be able to remove other members")
+	requireDenied(t, status, body, http.StatusForbidden, "WS.MEMBER.ROLE_DENIED",
+		"a member removing the owner")
 }
 
 // TestMemberCannotCreateInvites verifies that a regular member (not
@@ -110,11 +134,11 @@ func TestMemberCannotCreateInvites(t *testing.T) {
 		member.AccessToken, nil, nil)
 
 	// Member tries to create an invite.
-	status, _ := doJSONStatus(t, http.MethodPost,
+	status, body := doJSONStatus(t, http.MethodPost,
 		testServerURL+"/workspaces/"+owner.WorkspacePublicID+"/invites",
 		member.AccessToken, map[string]any{"role": "member"})
-	require.GreaterOrEqual(t, status, 403,
-		"member must not be able to create invites")
+	requireDenied(t, status, body, http.StatusForbidden, "WS.MEMBER.ROLE_DENIED",
+		"a member creating an invite")
 }
 
 // TestGuestCannotPerformAdminActions verifies that a guest-role member
@@ -165,11 +189,14 @@ func TestGuestCannotPerformAdminActions(t *testing.T) {
 			map[string]any{"confirm": true}},
 	}
 
+	// Each of these is refused by the role gate, which the guest reaches
+	// as a genuine (if minimally privileged) member — hence 403 rather
+	// than a concealing 404, and hence one shared code for all of them.
 	for _, op := range adminOps {
 		t.Run(op.name, func(t *testing.T) {
-			status, _ := doJSONStatus(t, op.method, op.path, guest.AccessToken, op.body)
-			require.GreaterOrEqual(t, status, 403,
-				"guest must not be able to %s", op.name)
+			status, body := doJSONStatus(t, op.method, op.path, guest.AccessToken, op.body)
+			requireDenied(t, status, body, http.StatusForbidden, "WS.MEMBER.ROLE_DENIED",
+				"a guest performing "+op.name)
 		})
 	}
 }
@@ -201,9 +228,15 @@ func TestNonOwnerCannotDeleteWorkspace(t *testing.T) {
 
 	// Admin tries to delete workspace WITH confirm=true so we isolate
 	// the role check from the missing-confirm guard.
-	status, _ := doJSONStatus(t, http.MethodDelete,
+	status, body := doJSONStatus(t, http.MethodDelete,
 		testServerURL+"/workspaces/"+owner.WorkspacePublicID,
 		admin.AccessToken, map[string]any{"confirm": true})
-	require.GreaterOrEqual(t, status, 403,
-		"only owner should be able to delete workspace")
+	requireDenied(t, status, body, http.StatusForbidden, "WS.MEMBER.ROLE_DENIED",
+		"a non-owner admin deleting the workspace")
+
+	// The workspace is still there.
+	status, _ = doJSONStatus(t, http.MethodGet,
+		testServerURL+"/workspaces/"+owner.WorkspacePublicID, owner.AccessToken, nil)
+	require.Equal(t, http.StatusOK, status,
+		"the workspace must survive the refused delete")
 }

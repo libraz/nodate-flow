@@ -15,11 +15,6 @@ import { loadTenants } from './fixtures/load-tenants';
 import { injectAuth } from './fixtures/tenant';
 
 test.describe('admin themed confirm dialog', () => {
-  test.beforeEach(() => {
-    const { adminGranted } = loadTenants();
-    test.skip(!adminGranted, 'Admin grant failed — instance already has an admin from a prior run');
-  });
-
   test('workspace suspend opens themed dialog and cancel dismisses it', async ({ page }) => {
     const { admin } = loadTenants();
     await injectAuth(page.context(), admin);

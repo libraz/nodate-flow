@@ -32,15 +32,17 @@ func TestCrossTenantProjectUpdateIsolation(t *testing.T) {
 		}, &project)
 	require.NotEmpty(t, project.ID, "project create must return an id")
 
-	// Attempt to update ownerA's project using ownerB's workspace path.
-	// The API should reject this because the project does not belong to
-	// workspace B. We expect 403 or 404 (the project simply does not
-	// exist under workspace B from the outsider's perspective).
-	status, _ := doJSONStatus(t, http.MethodPatch,
+	// Attempt to update ownerA's project as ownerB. The project gate
+	// resolves the id and then refuses on membership, so the answer is
+	// 403 WS.PROJECT.ACCESS_DENIED — pinned here so a regression that
+	// turns the resolve step into a 500 cannot pass as a refusal.
+	status, body := doJSONStatus(t, http.MethodPatch,
 		testServerURL+"/projects/"+project.ID,
 		ownerB.AccessToken, map[string]any{"name": "Hacked Name"})
-	require.GreaterOrEqual(t, status, 403,
-		"outsider must not be able to update project belonging to another workspace")
+	requireDenied(t, status, body, http.StatusForbidden, "WS.PROJECT.ACCESS_DENIED",
+		"an outsider updating a project in another workspace")
+	require.NotContains(t, string(body), "Original Name",
+		"a refusal must not carry the project it refused")
 
 	// Verify the project name is unchanged by fetching it as ownerA.
 	var fetched struct {

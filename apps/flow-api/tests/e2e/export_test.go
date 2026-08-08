@@ -472,6 +472,47 @@ func TestExportCSVReportsItsRowCount(t *testing.T) {
 		"an export that stopped at the ceiling must say so through the count")
 }
 
+// TestExportCSVAuditRecordsTheDownloadNotTheQuery pins what the audit
+// trail says an export was.
+//
+// The handler sends 200 before the first row, so the record it leaves
+// is the only lasting account of how much data left the workspace. It
+// used to be written before the body and to carry the size of the
+// result set, which meant an export the caller cut off after a dozen
+// rows was filed as a complete one. The count now comes from the write,
+// and `complete` is what qualifies it.
+func TestExportCSVAuditRecordsTheDownloadNotTheQuery(t *testing.T) {
+	bootstrap(t)
+	t.Parallel()
+
+	tt := newTenant(t)
+	for _, title := range []string{"Audited One", "Audited Two"} {
+		doJSON(t, http.MethodPost, testServerURL+"/tasks", tt.AccessToken,
+			map[string]any{"projectId": tt.ProjectPublicID, "title": title}, nil)
+	}
+
+	resp, err := csvGet(t, testServerURL+"/workspaces/"+tt.WorkspacePublicID+"/export/tasks.csv", tt.AccessToken)
+	require.NoError(t, err)
+	defer func() { _ = resp.Body.Close() }()
+	_, _ = io.Copy(io.Discard, resp.Body)
+	require.Equal(t, http.StatusOK, resp.StatusCode)
+
+	var count, selected int
+	var complete bool
+	require.NoError(t, testDB.QueryRow(
+		`SELECT metadata_json->>'$.count', metadata_json->>'$.selected', metadata_json->>'$.complete'
+		 FROM audit_logs
+		 WHERE workspace_id = (SELECT id FROM workspaces WHERE public_id = UUID_TO_BIN(?, 0))
+		   AND action = 'export.create'
+		 ORDER BY id DESC LIMIT 1`,
+		tt.WorkspacePublicID).Scan(&count, &selected, &complete),
+		"a CSV export must leave an export.create entry carrying what was delivered")
+
+	require.Equal(t, 2, count, "the audited count must be the rows written to the response")
+	require.Equal(t, 2, selected, "a clean export delivers everything the query selected")
+	require.True(t, complete, "an export that finished must be recorded as complete")
+}
+
 // csvGet issues an authenticated GET and returns the raw response so a
 // test can read headers the JSON helpers discard.
 func csvGet(t *testing.T, url, bearer string) (*http.Response, error) {

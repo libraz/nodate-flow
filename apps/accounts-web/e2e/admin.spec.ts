@@ -47,11 +47,6 @@ async function seedTwoCandidates(): Promise<string> {
 }
 
 test.describe('admin pages', () => {
-  test.beforeEach(() => {
-    const { adminGranted } = loadTenants();
-    test.skip(!adminGranted, 'Admin grant failed — instance already has an admin from a prior run');
-  });
-
   test.describe('admin navigation', () => {
     test('admin layout renders sidebar navigation', async ({ page }) => {
       const { admin } = loadTenants();
@@ -344,9 +339,9 @@ test.describe('admin pages', () => {
       await page.waitForLoadState('networkidle');
 
       // The shared admin tenant from globalSetup is granted instance
-      // admin (the `adminGranted` beforeEach gate already skips this
-      // suite when the grant failed), so the admin row must be in the
-      // list and must surface a Revoke button. Asserting unconditionally
+      // admin (globalSetup fails the run outright if it cannot be), so
+      // the admin row must be in the list and must surface a Revoke
+      // button. Asserting unconditionally
       // — without `.catch`-swallowing — so a missing row counts as a
       // real regression instead of a silent pass.
       const revokeButtons = page.getByRole('button', { name: /revoke/i });

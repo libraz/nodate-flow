@@ -24,10 +24,19 @@ func TestIDORTaskCrossWorkspace(t *testing.T) {
 		map[string]any{"projectId": owner.ProjectPublicID, "title": "Confidential"}, &task)
 
 	// Outsider knows the task UUID but is in a different workspace.
-	status, _ := doJSONStatus(t, http.MethodGet,
+	//
+	// The route answers 403 WS.TASK.ACCESS_DENIED rather than 404: the
+	// task-access middleware reserves WS.TASK.NOT_FOUND for the cases
+	// where the id resolves to nothing the actor may know about, and
+	// treats a resolvable task in a foreign workspace as a denial. The
+	// assertion pins that so a change of disclosure posture has to be a
+	// deliberate edit here rather than a silent drift.
+	status, body := doJSONStatus(t, http.MethodGet,
 		testServerURL+"/tasks/"+task.ID, outsider.AccessToken, nil)
-	require.GreaterOrEqual(t, status, 403,
-		"outsider must not access task from another workspace")
+	requireDenied(t, status, body, http.StatusForbidden, "WS.TASK.ACCESS_DENIED",
+		"outsider reading a task from another workspace")
+	require.NotContains(t, string(body), "Confidential",
+		"a refusal must not carry the task it refused")
 }
 
 // TestIDORTaskUpdate verifies that an outsider cannot update a task
@@ -45,12 +54,13 @@ func TestIDORTaskUpdate(t *testing.T) {
 	doJSON(t, http.MethodPost, testServerURL+"/tasks", owner.AccessToken,
 		map[string]any{"projectId": owner.ProjectPublicID, "title": "Secret Task"}, &task)
 
-	// Outsider tries to update the task.
-	status, _ := doJSONStatus(t, http.MethodPatch,
+	// Outsider tries to update the task. Same gate as the read path, so
+	// the same refusal: 403 WS.TASK.ACCESS_DENIED.
+	status, body := doJSONStatus(t, http.MethodPatch,
 		testServerURL+"/tasks/"+task.ID, outsider.AccessToken,
 		map[string]any{"title": "Hacked Title"})
-	require.GreaterOrEqual(t, status, 403,
-		"outsider must not update task from another workspace")
+	requireDenied(t, status, body, http.StatusForbidden, "WS.TASK.ACCESS_DENIED",
+		"outsider updating a task from another workspace")
 
 	// Verify the title was NOT changed.
 	var got struct {
@@ -78,10 +88,10 @@ func TestIDORTaskDelete(t *testing.T) {
 		map[string]any{"projectId": owner.ProjectPublicID, "title": "Protected"}, &task)
 
 	// Outsider tries to delete.
-	status, _ := doJSONStatus(t, http.MethodDelete,
+	status, body := doJSONStatus(t, http.MethodDelete,
 		testServerURL+"/tasks/"+task.ID, outsider.AccessToken, nil)
-	require.GreaterOrEqual(t, status, 403,
-		"outsider must not delete task from another workspace")
+	requireDenied(t, status, body, http.StatusForbidden, "WS.TASK.ACCESS_DENIED",
+		"outsider deleting a task from another workspace")
 
 	// Owner can still access it.
 	status, _ = doJSONStatus(t, http.MethodGet,
@@ -99,11 +109,13 @@ func TestIDORProjectCrossWorkspace(t *testing.T) {
 	owner := newTenant(t)
 	outsider := newTenant(t)
 
-	// Outsider tries to access owner's project.
-	status, _ := doJSONStatus(t, http.MethodGet,
+	// Outsider tries to access owner's project. The project gate mirrors
+	// the task gate: 403 WS.PROJECT.ACCESS_DENIED, with NOT_FOUND kept
+	// for ids that resolve to nothing in the actor's own workspace.
+	status, body := doJSONStatus(t, http.MethodGet,
 		testServerURL+"/projects/"+owner.ProjectPublicID, outsider.AccessToken, nil)
-	require.GreaterOrEqual(t, status, 403,
-		"outsider must not access project from another workspace")
+	requireDenied(t, status, body, http.StatusForbidden, "WS.PROJECT.ACCESS_DENIED",
+		"outsider reading a project from another workspace")
 }
 
 // TestNonexistentUUIDReturns404 verifies that requesting a resource

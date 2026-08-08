@@ -369,11 +369,13 @@ func TestMemberEmailNotVisibleToOutsider(t *testing.T) {
 	owner := newTenant(t)
 	outsider := newTenant(t)
 
-	status, _ := doJSONStatus(t, http.MethodGet,
+	status, body := doJSONStatus(t, http.MethodGet,
 		testServerURL+"/workspaces/"+owner.WorkspacePublicID+"/members",
 		outsider.AccessToken, nil)
-	require.GreaterOrEqual(t, status, 403,
-		"outsider must not access member list (email harvesting)")
+	requireDenied(t, status, body, http.StatusForbidden, "WS.WORKSPACE.ACCESS_DENIED",
+		"an outsider listing workspace members")
+	require.NotContains(t, string(body), owner.Email,
+		"a refusal must not carry the addresses it refused")
 }
 
 // ---------- Export does not leak internal data ----------

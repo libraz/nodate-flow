@@ -61,11 +61,6 @@ function formatValue(n: number): string {
 }
 
 test.describe('admin instance stats dashboard', () => {
-  test.beforeEach(() => {
-    const { adminGranted } = loadTenants();
-    test.skip(!adminGranted, 'Admin grant failed — instance already has an admin from a prior run');
-  });
-
   test('A: page renders title, both KPI cards, refresh button, and placeholder', async ({
     page,
   }) => {
@@ -236,18 +231,6 @@ test.describe('admin instance stats dashboard', () => {
 
   test.describe('mobile viewport', () => {
     test.use({ viewport: { width: 375, height: 812 } });
-
-    test.beforeEach(() => {
-      // Nested describes run their own `beforeEach` chain, but the
-      // outer skip guard still fires first (Playwright walks parent
-      // hooks). Re-asserting here keeps the case self-contained and
-      // matches the "skip when admin grant failed" pattern used above.
-      const { adminGranted } = loadTenants();
-      test.skip(
-        !adminGranted,
-        'Admin grant failed — instance already has an admin from a prior run',
-      );
-    });
 
     /** G: 375x812 viewport still renders both KPI labels without overflow. */
     test('G: mobile renders both KPI labels without overflow', async ({ page }) => {

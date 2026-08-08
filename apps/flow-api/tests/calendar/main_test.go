@@ -41,6 +41,9 @@ func TestMain(m *testing.M) {
 	}
 	testSrv = srv
 	testDB = inst.DB
+	// CreateTestTenant (which CreateCalendarTestTenant now goes through)
+	// only schedules its per-workspace purge when this is set.
+	helpers.RegisterCleanupDB(inst.DB)
 	code := m.Run()
 	cleanup()
 	os.Exit(code)

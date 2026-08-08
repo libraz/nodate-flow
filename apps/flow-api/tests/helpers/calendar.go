@@ -10,27 +10,19 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
-	"fmt"
 	"io"
 	"net/http"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/libraz/nodate-flow/apps/flow-api/internal/auth"
-	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
-	calgen "github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated/calendar"
 	"github.com/libraz/nodate-flow/packages/go-shared/dbtype"
 )
 
 // CalendarTestTenant is the bundle of identifiers calendar e2e tests
-// need. It mirrors the time-api TestTenant shape so the migrated tests
-// keep their call sites unchanged. Unlike the auth-api-driven
-// CreateTestTenant in tenant.go, this tenant is seeded directly into
-// the DB via sqlc and bypasses /auth/register; calendar tests
-// historically used this stub path because time-api had no auth
-// endpoints.
+// need. It carries the internal workspace / user ids alongside the
+// public ones because calendar tests assert against DB rows and probe
+// cross-tenant paths that are keyed on the internal ids.
 type CalendarTestTenant struct {
 	BaseURL           string
 	UserPublicID      dbtype.PublicID
@@ -42,143 +34,83 @@ type CalendarTestTenant struct {
 	AccessToken       string
 }
 
-// CreateCalendarTestTenant inserts a fresh user + workspace + owner
-// membership directly via sqlc and signs a JWT recognized by the merged
-// auth middleware. Suitable for calendar tests that need internal IDs
-// (CalendarID, WorkspaceID) for cross-tenant probes and direct DB
-// assertions.
+// CreateCalendarTestTenant registers a user and creates their workspace
+// through the API, then resolves the internal ids the calendar tests
+// need out of the resulting rows.
+//
+// It used to INSERT the user, the workspace and the owner membership
+// with sqlc and hand-sign a JWT, which is what time-api had to do
+// before the services merged. Carried forward into flow-api, that
+// bypassed POST /workspaces — and POST /workspaces is where a workspace
+// gets its personal calendar (EnsurePersonalCalendar). So the whole
+// register → create workspace → provision personal calendar chain went
+// unexercised by every calendar test in this package, which is exactly
+// the wiring those tests exist to protect. Going through
+// CreateTestTenant puts them back on the production path.
 func CreateCalendarTestTenant(t *testing.T, srv *TestServer) *CalendarTestTenant {
 	t.Helper()
 
-	suffix := randomHex(8)
-	q := generated.New(srv.DB)
-	ctx := context.Background()
+	base := CreateTestTenant(t, srv.BaseURL)
 
-	userPub := dbtype.New()
-	email := fmt.Sprintf("test+%s@example.test", suffix)
-	displayName := "Test User " + suffix
-
-	userID64, err := q.CreateStubUser(ctx, generated.CreateStubUserParams{
-		PublicID:        userPub,
-		Email:           email,
-		DisplayName:     displayName,
-		Locale:          "en",
-		Timezone:        "UTC",
-		Country:         sql.NullString{},
-		ThemePreference: generated.UsersThemePreferenceSystem,
-	})
-	require.NoError(t, err, "create test user")
-	userID := uint32(userID64) //#nosec G115 -- LastInsertId for users.id (BIGINT UNSIGNED), fits uint32 in test seed
-
-	wsPub := dbtype.New()
-	wsSlug := "ws-" + suffix
-	wsID64, err := q.CreateWorkspace(ctx, generated.CreateWorkspaceParams{
-		PublicID: wsPub,
-		Slug:     wsSlug,
-		Name:     "Test Workspace " + suffix,
-		Timezone: "UTC",
-	})
-	require.NoError(t, err, "create test workspace")
-	wsID := uint32(wsID64) //#nosec G115 -- LastInsertId for workspaces.id (BIGINT UNSIGNED), fits uint32 in test seed
-
-	_, err = q.CreateWorkspaceMember(ctx, generated.CreateWorkspaceMemberParams{
-		PublicID:    dbtype.New(),
-		WorkspaceID: wsID,
-		UserID:      userID,
-		Role:        generated.WorkspaceMembersRoleOwner,
-		JoinedAt:    sql.NullTime{Time: time.Now().UTC(), Valid: true},
-	})
-	require.NoError(t, err, "create workspace member")
-
-	token, _, err := srv.JWT.Sign(userPub, dbtype.PublicID{})
-	require.NoError(t, err, "sign test jwt")
-
-	// Auto-register workspace purge so calendar tests get the same
-	// cleanup contract as the REST CreateTestTenant in tenant.go.
-	t.Cleanup(func() { PurgeWorkspace(t, srv.DB, wsPub.String()) })
+	userPub, err := dbtype.Parse(base.UserPublicID)
+	require.NoError(t, err, "parse user public id %q", base.UserPublicID)
+	wsPub, err := dbtype.Parse(base.WorkspacePublicID)
+	require.NoError(t, err, "parse workspace public id %q", base.WorkspacePublicID)
 
 	return &CalendarTestTenant{
 		BaseURL:           srv.BaseURL,
 		UserPublicID:      userPub,
-		UserInternalID:    userID,
-		Email:             email,
-		DisplayName:       displayName,
+		UserInternalID:    ResolveUserInternalID(t, srv.DB, base.UserPublicID),
+		Email:             base.Email,
+		DisplayName:       base.DisplayName,
 		WorkspacePublicID: wsPub,
-		WorkspaceID:       wsID,
-		AccessToken:       token,
+		WorkspaceID:       ResolveWorkspaceInternalID(t, srv.DB, base.WorkspacePublicID),
+		AccessToken:       base.AccessToken,
 	}
 }
 
-// CreateExtraCalendarMember creates an additional user, adds them to the
-// given workspace, and grants them the given role on the calendar. An
-// empty role means editor, which is what most tests want: a second person
-// who can add their own events but does not administer the calendar.
+// CreateExtraCalendarMember registers a second user, brings them into
+// the owner's workspace through the invite flow, and adds them to the
+// calendar at the given role. An empty role means editor, which is what
+// most tests want: a second person who can add their own events but
+// does not administer the calendar.
+//
+// Every step is an API call for the same reason CreateCalendarTestTenant
+// is: the invite → accept → add-to-calendar chain is product behaviour,
+// and seeding the rows directly meant no calendar test ever ran it.
 func CreateExtraCalendarMember(
 	t *testing.T,
 	srv *TestServer,
-	wsID uint32,
-	wsPub dbtype.PublicID,
+	owner *CalendarTestTenant,
 	calendarID uint32,
 	calRole string,
 ) *CalendarTestTenant {
 	t.Helper()
 
-	suffix := randomHex(8)
-	q := generated.New(srv.DB)
-	cq := calgen.New(srv.DB)
-	ctx := context.Background()
+	member := CreateCalendarTestTenant(t, srv)
+	wsURL := srv.BaseURL + "/workspaces/" + owner.WorkspacePublicID.String()
 
-	userPub := dbtype.New()
-	email := fmt.Sprintf("member+%s@example.test", suffix)
-	displayName := "Member " + suffix
-
-	userID64, err := q.CreateStubUser(ctx, generated.CreateStubUserParams{
-		PublicID:        userPub,
-		Email:           email,
-		DisplayName:     displayName,
-		Locale:          "en",
-		Timezone:        "UTC",
-		Country:         sql.NullString{},
-		ThemePreference: generated.UsersThemePreferenceSystem,
-	})
-	require.NoError(t, err)
-	userID := uint32(userID64) //#nosec G115 -- LastInsertId for users.id (BIGINT UNSIGNED), fits uint32 in test seed
-
-	_, err = q.CreateWorkspaceMember(ctx, generated.CreateWorkspaceMemberParams{
-		PublicID:    dbtype.New(),
-		WorkspaceID: wsID,
-		UserID:      userID,
-		Role:        generated.WorkspaceMembersRoleMember,
-		JoinedAt:    sql.NullTime{Time: time.Now().UTC(), Valid: true},
-	})
-	require.NoError(t, err)
+	var invite struct {
+		Token string `json:"token"`
+	}
+	DoJSON(t, http.MethodPost, wsURL+"/invites", owner.AccessToken,
+		map[string]any{"role": "member"}, &invite)
+	require.NotEmpty(t, invite.Token, "workspace invite returned no token")
+	DoJSON(t, http.MethodPost, srv.BaseURL+"/invites/"+invite.Token+"/accept",
+		member.AccessToken, nil, nil)
 
 	if calRole == "" {
-		calRole = string(calgen.CalendarMembersRoleEditor)
+		calRole = "editor"
 	}
-	_, err = cq.UpsertCalendarMember(ctx, calgen.UpsertCalendarMemberParams{
-		PublicID:    dbtype.New(),
-		WorkspaceID: wsID,
-		CalendarID:  calendarID,
-		UserID:      userID,
-		Role:        calgen.CalendarMembersRole(calRole),
-		MemberColor: "#FF5722",
-	})
-	require.NoError(t, err)
+	calPub := ResolveCalendarPublicID(t, srv.DB, calendarID)
+	DoJSON(t, http.MethodPost, wsURL+"/calendars/"+calPub+"/members", owner.AccessToken,
+		map[string]any{"email": member.Email, "role": calRole}, nil)
 
-	token, _, err := srv.JWT.Sign(userPub, dbtype.PublicID{})
-	require.NoError(t, err)
-
-	return &CalendarTestTenant{
-		BaseURL:           srv.BaseURL,
-		UserPublicID:      userPub,
-		UserInternalID:    userID,
-		Email:             email,
-		DisplayName:       displayName,
-		WorkspacePublicID: wsPub,
-		WorkspaceID:       wsID,
-		AccessToken:       token,
-	}
+	// The member now acts inside the owner's workspace, so report that
+	// workspace rather than the one their own registration created.
+	member.WorkspacePublicID = owner.WorkspacePublicID
+	member.WorkspaceID = owner.WorkspaceID
+	return member
 }
 
 // WsPath builds a URL like {BaseURL}/workspaces/{wsId}/{segments...}.
@@ -229,8 +161,9 @@ func DoJSONStatus(t *testing.T, method, url, bearer string, body any) (int, []by
 }
 
 // ResolveCalendarInternalID looks up the internal ID of a calendar by
-// its public UUID string. Used by tests that need to seed extra members
-// or subscriptions directly via DB.
+// its public UUID string. Reading an internal id back out of a row the
+// API already created is the sanctioned direct-SQL use in tests; what
+// is not sanctioned is writing rows the API would have written.
 func ResolveCalendarInternalID(t *testing.T, db *sql.DB, calPublicIDStr string) uint32 {
 	t.Helper()
 	var id uint32
@@ -243,14 +176,45 @@ func ResolveCalendarInternalID(t *testing.T, db *sql.DB, calPublicIDStr string) 
 	return id
 }
 
-// SignToken creates a JWT for the given user public ID using the test
-// JWT issuer. Useful when a test needs to mint an additional token for
-// a stub user without going through the auth-api register flow.
-func SignToken(t *testing.T, jwt *auth.JWTIssuer, userPub dbtype.PublicID) string {
+// ResolveCalendarPublicID is the reverse lookup, for helpers that are
+// handed an internal calendar id but have to address the calendar over
+// the API.
+func ResolveCalendarPublicID(t *testing.T, db *sql.DB, calendarID uint32) string {
 	t.Helper()
-	tok, _, err := jwt.Sign(userPub, dbtype.PublicID{})
-	require.NoError(t, err)
-	return tok
+	var pub string
+	err := db.QueryRowContext(
+		context.Background(),
+		`SELECT BIN_TO_UUID(public_id, 0) FROM calendars WHERE id = ? AND enabled = TRUE LIMIT 1`,
+		calendarID,
+	).Scan(&pub)
+	require.NoError(t, err, "resolve calendar public id for %d", calendarID)
+	return pub
+}
+
+// ResolveUserInternalID looks up users.id by public UUID string.
+func ResolveUserInternalID(t *testing.T, db *sql.DB, userPublicIDStr string) uint32 {
+	t.Helper()
+	var id uint32
+	err := db.QueryRowContext(
+		context.Background(),
+		`SELECT id FROM users WHERE public_id = UUID_TO_BIN(?, 0) LIMIT 1`,
+		userPublicIDStr,
+	).Scan(&id)
+	require.NoError(t, err, "resolve user internal id for %s", userPublicIDStr)
+	return id
+}
+
+// ResolveWorkspaceInternalID looks up workspaces.id by public UUID string.
+func ResolveWorkspaceInternalID(t *testing.T, db *sql.DB, wsPublicIDStr string) uint32 {
+	t.Helper()
+	var id uint32
+	err := db.QueryRowContext(
+		context.Background(),
+		`SELECT id FROM workspaces WHERE public_id = UUID_TO_BIN(?, 0) AND enabled = TRUE LIMIT 1`,
+		wsPublicIDStr,
+	).Scan(&id)
+	require.NoError(t, err, "resolve workspace internal id for %s", wsPublicIDStr)
+	return id
 }
 
 // RandomHex returns a random hex string of 2*n characters. Re-exported

@@ -375,7 +375,7 @@ func TestDeletePublicShare_AdminOnly(t *testing.T) {
 	calID := createCalendar(t, owner)
 
 	calInternalID := helpers.ResolveCalendarInternalID(t, testDB, calID)
-	member := helpers.CreateExtraCalendarMember(t, testSrv, owner.WorkspaceID, owner.WorkspacePublicID, calInternalID, "")
+	member := helpers.CreateExtraCalendarMember(t, testSrv, owner, calInternalID, "")
 
 	var share struct {
 		ID string `json:"id"`

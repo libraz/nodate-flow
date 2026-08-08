@@ -129,10 +129,12 @@ func TestPresignHeaderMissingRejected(t *testing.T) {
 // member cannot list workspace A's attachments, fetch metadata, or
 // mint a download URL even when they hold the public_id verbatim.
 //
-// Failure shape is intentionally accepted as either 403 (auth /
-// membership middleware) or 404 (resolver scoped on workspace_id).
-// Both are non-disclosing; a 200 here would be a hard cross-tenant
-// leak.
+// All three routes hang off the task access gate, so the refusal is
+// 403 WS.TASK.ACCESS_DENIED before the attachment resolver is ever
+// reached. The assertions name that exact pair: an attachment route
+// that starts answering 5xx to outsiders is a crash on the ACL path,
+// not a refusal, and the earlier "4xx, any code" form could not say
+// which of the two it had seen.
 func TestCrossWorkspaceAttachmentDownload(t *testing.T) {
 	bootstrap(t)
 	requireStorage(t)
@@ -153,8 +155,8 @@ func TestCrossWorkspaceAttachmentDownload(t *testing.T) {
 		status, body := doJSONStatus(t, http.MethodGet,
 			fmt.Sprintf("%s/tasks/%s/attachments", testServerURL, taskA),
 			b.AccessToken, nil)
-		require.GreaterOrEqualf(t, status, 400, "outsider must not list; body=%s", string(body))
-		require.Lessf(t, status, 500, "must be 4xx not 5xx; body=%s", string(body))
+		requireDenied(t, status, body, http.StatusForbidden, "WS.TASK.ACCESS_DENIED",
+			"outsider listing another workspace's attachments")
 		require.NotContainsf(t, string(body), res.AttachmentID,
 			"response must not leak the attachment public id; body=%s", string(body))
 		require.NotContainsf(t, string(body), res.StorageKey,
@@ -165,8 +167,8 @@ func TestCrossWorkspaceAttachmentDownload(t *testing.T) {
 		status, body := doJSONStatus(t, http.MethodGet,
 			fmt.Sprintf("%s/tasks/%s/attachments/%s/download", testServerURL, taskA, res.AttachmentID),
 			b.AccessToken, nil)
-		require.GreaterOrEqualf(t, status, 400, "outsider must not get download URL; body=%s", string(body))
-		require.Lessf(t, status, 500, "must be 4xx not 5xx; body=%s", string(body))
+		requireDenied(t, status, body, http.StatusForbidden, "WS.TASK.ACCESS_DENIED",
+			"outsider minting a download URL for another workspace's attachment")
 		require.NotContainsf(t, string(body), res.StorageKey,
 			"response must not leak the storage key; body=%s", string(body))
 	})
@@ -175,8 +177,8 @@ func TestCrossWorkspaceAttachmentDownload(t *testing.T) {
 		status, body := doJSONStatus(t, http.MethodDelete,
 			fmt.Sprintf("%s/tasks/%s/attachments/%s", testServerURL, taskA, res.AttachmentID),
 			b.AccessToken, nil)
-		require.GreaterOrEqualf(t, status, 400, "outsider must not delete; body=%s", string(body))
-		require.Lessf(t, status, 500, "must be 4xx not 5xx; body=%s", string(body))
+		requireDenied(t, status, body, http.StatusForbidden, "WS.TASK.ACCESS_DENIED",
+			"outsider deleting another workspace's attachment")
 	})
 
 	// After the outsider's failed delete attempts, the attachment row

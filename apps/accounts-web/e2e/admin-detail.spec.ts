@@ -2,8 +2,8 @@
  * Admin detail pages e2e tests.
  *
  * Verifies navigation to user detail and workspace detail pages from
- * the admin list views. Requires the `adminGranted` tenant to have
- * instance-admin privileges; skips otherwise.
+ * the admin list views. The shared admin tenant is granted
+ * instance-admin in global setup, which fails the run if it cannot.
  */
 
 import { expect, test } from '@playwright/test';
@@ -13,11 +13,6 @@ import { injectAuth } from './fixtures/tenant';
 import { checkA11y } from './helpers/a11y';
 
 test.describe('admin detail pages', () => {
-  test.beforeEach(() => {
-    const { adminGranted } = loadTenants();
-    test.skip(!adminGranted, 'Admin grant failed — instance already has an admin from a prior run');
-  });
-
   test('user detail page renders from user list', async ({ page }) => {
     const { admin } = loadTenants();
     await injectAuth(page.context(), admin);
@@ -101,12 +96,12 @@ test.describe('admin detail pages', () => {
     await page.goto('/admin/workspaces');
     await page.waitForLoadState('networkidle');
 
-    // Wait for the workspace table to load (may have no rows)
-    const hasRows = await page.waitForSelector('td', { timeout: 10_000 }).then(
-      () => true,
-      () => false,
-    );
-    test.skip(!hasRows, 'No workspaces in the admin list to test detail navigation');
+    // globalSetup seeds a workspace for the admin tenant, so the list
+    // has at least one row by construction. This used to skip when the
+    // table came up empty, which meant an admin list that stopped
+    // rendering rows was reported as "nothing to test" rather than as
+    // the regression it is.
+    await page.waitForSelector('td', { timeout: 10_000 });
 
     // Click the first workspace detail link
     const wsLink = page.locator('a[href*="/admin/workspaces/"]').first();
@@ -137,11 +132,7 @@ test.describe('admin detail pages', () => {
     await page.goto('/admin/workspaces');
     await page.waitForLoadState('networkidle');
 
-    const hasRows = await page.waitForSelector('td', { timeout: 10_000 }).then(
-      () => true,
-      () => false,
-    );
-    test.skip(!hasRows, 'No workspaces in the admin list to test detail navigation');
+    await page.waitForSelector('td', { timeout: 10_000 });
 
     const wsLink = page.locator('a[href*="/admin/workspaces/"]').first();
     await expect(wsLink).toBeVisible({ timeout: 10_000 });
@@ -180,11 +171,7 @@ test.describe('admin detail pages', () => {
     await page.goto('/admin/workspaces');
     await page.waitForLoadState('networkidle');
 
-    const hasRows = await page.waitForSelector('td', { timeout: 10_000 }).then(
-      () => true,
-      () => false,
-    );
-    test.skip(!hasRows, 'No workspaces in the admin list to test detail navigation');
+    await page.waitForSelector('td', { timeout: 10_000 });
 
     const wsLink = page.locator('a[href*="/admin/workspaces/"]').first();
     await expect(wsLink).toBeVisible({ timeout: 10_000 });

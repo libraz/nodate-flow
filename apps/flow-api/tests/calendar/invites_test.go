@@ -175,7 +175,7 @@ func TestCreateInvite_ReturnsTokenOnce(t *testing.T) {
 	owner := newTenant(t)
 	calID := createCalendar(t, owner)
 	calInternalID := helpers.ResolveCalendarInternalID(t, testDB, calID)
-	member := helpers.CreateExtraCalendarMember(t, testSrv, owner.WorkspaceID, owner.WorkspacePublicID, calInternalID, "")
+	member := helpers.CreateExtraCalendarMember(t, testSrv, owner, calInternalID, "")
 	evtID := createEventForTenant(t, owner, calID, "Invite Token Once")
 	attendeeID := addAttendee(t, owner, calID, evtID, member.UserPublicID.String())
 
@@ -200,7 +200,7 @@ func TestCreateInvite_RotatesExistingOnResend(t *testing.T) {
 	owner := newTenant(t)
 	calID := createCalendar(t, owner)
 	calInternalID := helpers.ResolveCalendarInternalID(t, testDB, calID)
-	member := helpers.CreateExtraCalendarMember(t, testSrv, owner.WorkspaceID, owner.WorkspacePublicID, calInternalID, "")
+	member := helpers.CreateExtraCalendarMember(t, testSrv, owner, calInternalID, "")
 	evtID := createEventForTenant(t, owner, calID, "Invite Rotate")
 	attendeeID := addAttendee(t, owner, calID, evtID, member.UserPublicID.String())
 
@@ -227,7 +227,7 @@ func TestCreateInvite_NonOwnerForbidden(t *testing.T) {
 	owner := newTenant(t)
 	calID := createCalendar(t, owner)
 	calInternalID := helpers.ResolveCalendarInternalID(t, testDB, calID)
-	member := helpers.CreateExtraCalendarMember(t, testSrv, owner.WorkspaceID, owner.WorkspacePublicID, calInternalID, "")
+	member := helpers.CreateExtraCalendarMember(t, testSrv, owner, calInternalID, "")
 	evtID := createEventForTenant(t, owner, calID, "Non-Owner Invite")
 	attendeeID := addAttendee(t, owner, calID, evtID, member.UserPublicID.String())
 
@@ -254,7 +254,7 @@ func TestAcceptInvite_HappyPath(t *testing.T) {
 	owner := newTenant(t)
 	calID := createCalendar(t, owner)
 	calInternalID := helpers.ResolveCalendarInternalID(t, testDB, calID)
-	member := helpers.CreateExtraCalendarMember(t, testSrv, owner.WorkspaceID, owner.WorkspacePublicID, calInternalID, "")
+	member := helpers.CreateExtraCalendarMember(t, testSrv, owner, calInternalID, "")
 	evtID := createEventForTenant(t, owner, calID, "Accept Happy Path")
 	attendeeID := addAttendee(t, owner, calID, evtID, member.UserPublicID.String())
 
@@ -279,7 +279,7 @@ func TestAcceptInvite_UpdatesRsvpIdempotent(t *testing.T) {
 	owner := newTenant(t)
 	calID := createCalendar(t, owner)
 	calInternalID := helpers.ResolveCalendarInternalID(t, testDB, calID)
-	member := helpers.CreateExtraCalendarMember(t, testSrv, owner.WorkspaceID, owner.WorkspacePublicID, calInternalID, "")
+	member := helpers.CreateExtraCalendarMember(t, testSrv, owner, calInternalID, "")
 	evtID := createEventForTenant(t, owner, calID, "Accept Idempotent")
 	attendeeID := addAttendee(t, owner, calID, evtID, member.UserPublicID.String())
 
@@ -319,7 +319,7 @@ func TestAcceptInvite_ExpiredToken(t *testing.T) {
 	owner := newTenant(t)
 	calID := createCalendar(t, owner)
 	calInternalID := helpers.ResolveCalendarInternalID(t, testDB, calID)
-	member := helpers.CreateExtraCalendarMember(t, testSrv, owner.WorkspaceID, owner.WorkspacePublicID, calInternalID, "")
+	member := helpers.CreateExtraCalendarMember(t, testSrv, owner, calInternalID, "")
 	evtID := createEventForTenant(t, owner, calID, "Accept Expired")
 	attendeeID := addAttendee(t, owner, calID, evtID, member.UserPublicID.String())
 
@@ -343,7 +343,7 @@ func TestRevokeInvite_RemovesFromList(t *testing.T) {
 	owner := newTenant(t)
 	calID := createCalendar(t, owner)
 	calInternalID := helpers.ResolveCalendarInternalID(t, testDB, calID)
-	member := helpers.CreateExtraCalendarMember(t, testSrv, owner.WorkspaceID, owner.WorkspacePublicID, calInternalID, "")
+	member := helpers.CreateExtraCalendarMember(t, testSrv, owner, calInternalID, "")
 	evtID := createEventForTenant(t, owner, calID, "Revoke")
 	attendeeID := addAttendee(t, owner, calID, evtID, member.UserPublicID.String())
 
@@ -376,8 +376,8 @@ func TestListMyInvites_ScopedToCallerEmail(t *testing.T) {
 	owner := newTenant(t)
 	calID := createCalendar(t, owner)
 	calInternalID := helpers.ResolveCalendarInternalID(t, testDB, calID)
-	memberA := helpers.CreateExtraCalendarMember(t, testSrv, owner.WorkspaceID, owner.WorkspacePublicID, calInternalID, "")
-	memberB := helpers.CreateExtraCalendarMember(t, testSrv, owner.WorkspaceID, owner.WorkspacePublicID, calInternalID, "")
+	memberA := helpers.CreateExtraCalendarMember(t, testSrv, owner, calInternalID, "")
+	memberB := helpers.CreateExtraCalendarMember(t, testSrv, owner, calInternalID, "")
 
 	evtA := createEventForTenant(t, owner, calID, "Invite To A")
 	attendeeAID := addAttendee(t, owner, calID, evtA, memberA.UserPublicID.String())
@@ -408,7 +408,7 @@ func TestListMyInvites_ExcludesAcceptedAndExpired(t *testing.T) {
 	owner := newTenant(t)
 	calID := createCalendar(t, owner)
 	calInternalID := helpers.ResolveCalendarInternalID(t, testDB, calID)
-	member := helpers.CreateExtraCalendarMember(t, testSrv, owner.WorkspaceID, owner.WorkspacePublicID, calInternalID, "")
+	member := helpers.CreateExtraCalendarMember(t, testSrv, owner, calInternalID, "")
 
 	acceptedEvt := createEventForTenant(t, owner, calID, "Inbox Accepted")
 	acceptedAttendee := addAttendee(t, owner, calID, acceptedEvt, member.UserPublicID.String())

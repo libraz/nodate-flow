@@ -162,18 +162,18 @@ func TestApplyStepsCreatesEveryChild(t *testing.T) {
 	}, &parent)
 	require.NotEmpty(t, parent.ID)
 
-	// ApplyStep declares priority without omitempty, so the REST DTO
-	// requires it on every step even though 0 is a valid value. The MCP
-	// tool schema only requires title, which is why the two request bodies
-	// in this file differ.
+	// The request body is the MCP one, field for field. Priority used to
+	// be required here and optional there, so the two transports could
+	// not be sent the same steps — and a client that omitted it got a
+	// 422 for leaving out a field whose column has a default.
 	var applied struct {
 		Created []string `json:"created"`
 	}
 	doJSON(t, http.MethodPost, testServerURL+"/tasks/"+parent.ID+"/apply-steps",
 		tt.AccessToken, map[string]any{
 			"steps": []map[string]any{
-				{"title": "rest step one", "priority": 0},
-				{"title": "rest step two", "description": "with a body", "priority": 0},
+				{"title": "rest step one"},
+				{"title": "rest step two", "description": "with a body"},
 				{"title": "rest step three", "priority": 2},
 			},
 		}, &applied)

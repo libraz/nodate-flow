@@ -127,7 +127,7 @@ func TestPatchCalendar_NonOwnerForbidden(t *testing.T) {
 	}, &created)
 
 	calInternalID := helpers.ResolveCalendarInternalID(t, testDB, created.ID)
-	member := helpers.CreateExtraCalendarMember(t, testSrv, owner.WorkspaceID, owner.WorkspacePublicID, calInternalID, "")
+	member := helpers.CreateExtraCalendarMember(t, testSrv, owner, calInternalID, "")
 
 	status, body := helpers.DoJSONStatus(t, http.MethodPatch, member.WsPath("calendars", created.ID), member.AccessToken, map[string]any{
 		"name": "Renamed By Member",
@@ -150,8 +150,8 @@ func TestAddMember_NonOwnerForbidden(t *testing.T) {
 	}, &created)
 
 	calInternalID := helpers.ResolveCalendarInternalID(t, testDB, created.ID)
-	member := helpers.CreateExtraCalendarMember(t, testSrv, owner.WorkspaceID, owner.WorkspacePublicID, calInternalID, "")
-	third := helpers.CreateExtraCalendarMember(t, testSrv, owner.WorkspaceID, owner.WorkspacePublicID, calInternalID, "")
+	member := helpers.CreateExtraCalendarMember(t, testSrv, owner, calInternalID, "")
+	third := helpers.CreateExtraCalendarMember(t, testSrv, owner, calInternalID, "")
 
 	status, body := helpers.DoJSONStatus(t, http.MethodPost, member.WsPath("calendars", created.ID, "members"), member.AccessToken, map[string]any{
 		"email": third.Email,

@@ -176,11 +176,10 @@ func TestAuditListCrossTenantIsolation(t *testing.T) {
 		fmt.Sprintf("%s/workspaces/%s/audit-logs", testServerURL, tenantB.WorkspacePublicID),
 		tenantA.AccessToken, nil)
 
-	// The workspace middleware responds 403 WS.WORKSPACE.ACCESS_DENIED
-	// when the actor is not a member; do not require a specific body
-	// shape, just assert the non-2xx boundary.
-	require.GreaterOrEqual(t, status, 400,
-		"cross-tenant request must be rejected; got %d body=%s", status, string(raw))
-	require.Less(t, status, 500,
-		"cross-tenant rejection must not be a server error; got %d body=%s", status, string(raw))
+	// The workspace middleware refuses a non-member with 403
+	// WS.WORKSPACE.ACCESS_DENIED. Asserting the exact pair is what
+	// separates "the gate held" from "the audit reader crashed on a
+	// workspace it could not resolve".
+	requireDenied(t, status, raw, http.StatusForbidden, "WS.WORKSPACE.ACCESS_DENIED",
+		"tenant A listing tenant B's audit log")
 }

@@ -27,22 +27,39 @@ func TestCrossTenantPageIsolation(t *testing.T) {
 
 	base := testServerURL + "/workspaces/" + owner.WorkspacePublicID + "/pages"
 
-	// Outsider cannot list pages.
-	status, _ := doJSONStatus(t, http.MethodGet, base, outsider.AccessToken, nil)
-	require.GreaterOrEqual(t, status, 403, "outsider must not list pages")
+	// Every route below is mounted behind the workspace membership gate,
+	// which refuses with 403 WS.WORKSPACE.ACCESS_DENIED. The workspace
+	// id is in the path and already known to the caller, so there is
+	// nothing for a 404 to conceal here — what must not happen is the
+	// gate answering 5xx, which the old ">= 403" assertion accepted.
+	status, body := doJSONStatus(t, http.MethodGet, base, outsider.AccessToken, nil)
+	requireDenied(t, status, body, http.StatusForbidden, "WS.WORKSPACE.ACCESS_DENIED",
+		"outsider listing pages")
+	require.NotContains(t, string(body), "Secret Doc",
+		"a refusal must not carry the page it refused")
 
-	// Outsider cannot get the page.
-	status, _ = doJSONStatus(t, http.MethodGet, base+"/"+page.ID, outsider.AccessToken, nil)
-	require.GreaterOrEqual(t, status, 403, "outsider must not get page")
+	status, body = doJSONStatus(t, http.MethodGet, base+"/"+page.ID, outsider.AccessToken, nil)
+	requireDenied(t, status, body, http.StatusForbidden, "WS.WORKSPACE.ACCESS_DENIED",
+		"outsider reading a page")
+	require.NotContains(t, string(body), "Secret Doc",
+		"a refusal must not carry the page it refused")
 
-	// Outsider cannot update the page.
-	status, _ = doJSONStatus(t, http.MethodPatch, base+"/"+page.ID, outsider.AccessToken,
+	status, body = doJSONStatus(t, http.MethodPatch, base+"/"+page.ID, outsider.AccessToken,
 		map[string]any{"title": "Hacked"})
-	require.GreaterOrEqual(t, status, 403, "outsider must not update page")
+	requireDenied(t, status, body, http.StatusForbidden, "WS.WORKSPACE.ACCESS_DENIED",
+		"outsider updating a page")
 
-	// Outsider cannot delete the page.
-	status, _ = doJSONStatus(t, http.MethodDelete, base+"/"+page.ID, outsider.AccessToken, nil)
-	require.GreaterOrEqual(t, status, 403, "outsider must not delete page")
+	status, body = doJSONStatus(t, http.MethodDelete, base+"/"+page.ID, outsider.AccessToken, nil)
+	requireDenied(t, status, body, http.StatusForbidden, "WS.WORKSPACE.ACCESS_DENIED",
+		"outsider deleting a page")
+
+	// The page survived every attempt above.
+	var after struct {
+		Title string `json:"title"`
+	}
+	doJSON(t, http.MethodGet, base+"/"+page.ID, owner.AccessToken, nil, &after)
+	require.Equal(t, "Secret Doc", after.Title,
+		"the page must be untouched after the refused writes")
 }
 
 // TestCrossTenantDashboardIsolation verifies that a member of workspace A
@@ -66,11 +83,15 @@ func TestCrossTenantDashboardIsolation(t *testing.T) {
 
 	base := testServerURL + "/workspaces/" + owner.WorkspacePublicID + "/dashboard/widgets"
 
-	status, _ := doJSONStatus(t, http.MethodGet, base, outsider.AccessToken, nil)
-	require.GreaterOrEqual(t, status, 403)
+	status, body := doJSONStatus(t, http.MethodGet, base, outsider.AccessToken, nil)
+	requireDenied(t, status, body, http.StatusForbidden, "WS.WORKSPACE.ACCESS_DENIED",
+		"outsider listing dashboard widgets")
 
-	status, _ = doJSONStatus(t, http.MethodGet, base+"/"+widget.ID, outsider.AccessToken, nil)
-	require.GreaterOrEqual(t, status, 403)
+	status, body = doJSONStatus(t, http.MethodGet, base+"/"+widget.ID, outsider.AccessToken, nil)
+	requireDenied(t, status, body, http.StatusForbidden, "WS.WORKSPACE.ACCESS_DENIED",
+		"outsider reading a dashboard widget")
+	require.NotContains(t, string(body), "My Widget",
+		"a refusal must not carry the widget it refused")
 }
 
 // TestCrossTenantLensIsolation verifies that a member of workspace A
@@ -94,14 +115,23 @@ func TestCrossTenantLensIsolation(t *testing.T) {
 
 	base := testServerURL + "/workspaces/" + owner.WorkspacePublicID + "/lenses"
 
-	status, _ := doJSONStatus(t, http.MethodGet, base, outsider.AccessToken, nil)
-	require.GreaterOrEqual(t, status, 403)
+	status, body := doJSONStatus(t, http.MethodGet, base, outsider.AccessToken, nil)
+	requireDenied(t, status, body, http.StatusForbidden, "WS.WORKSPACE.ACCESS_DENIED",
+		"outsider listing lenses")
 
-	status, _ = doJSONStatus(t, http.MethodGet, base+"/"+lens.ID, outsider.AccessToken, nil)
-	require.GreaterOrEqual(t, status, 403)
+	status, body = doJSONStatus(t, http.MethodGet, base+"/"+lens.ID, outsider.AccessToken, nil)
+	requireDenied(t, status, body, http.StatusForbidden, "WS.WORKSPACE.ACCESS_DENIED",
+		"outsider reading a lens")
+	require.NotContains(t, string(body), "Private View",
+		"a refusal must not carry the lens it refused")
 
-	status, _ = doJSONStatus(t, http.MethodDelete, base+"/"+lens.ID, outsider.AccessToken, nil)
-	require.GreaterOrEqual(t, status, 403)
+	status, body = doJSONStatus(t, http.MethodDelete, base+"/"+lens.ID, outsider.AccessToken, nil)
+	requireDenied(t, status, body, http.StatusForbidden, "WS.WORKSPACE.ACCESS_DENIED",
+		"outsider deleting a lens")
+
+	// The lens survived the refused delete.
+	status, _ = doJSONStatus(t, http.MethodGet, base+"/"+lens.ID, owner.AccessToken, nil)
+	require.Equal(t, http.StatusOK, status, "the lens must still exist for its owner")
 }
 
 // TestCrossTenantTimeboxIsolation verifies that a member of workspace A
@@ -124,18 +154,32 @@ func TestCrossTenantTimeboxIsolation(t *testing.T) {
 
 	base := testServerURL + "/workspaces/" + owner.WorkspacePublicID + "/timeboxes"
 
-	status, _ := doJSONStatus(t, http.MethodGet, base, outsider.AccessToken, nil)
-	require.GreaterOrEqual(t, status, 403)
+	status, body := doJSONStatus(t, http.MethodGet, base, outsider.AccessToken, nil)
+	requireDenied(t, status, body, http.StatusForbidden, "WS.WORKSPACE.ACCESS_DENIED",
+		"outsider listing timeboxes")
 
-	status, _ = doJSONStatus(t, http.MethodGet, base+"/"+tb.ID, outsider.AccessToken, nil)
-	require.GreaterOrEqual(t, status, 403)
+	status, body = doJSONStatus(t, http.MethodGet, base+"/"+tb.ID, outsider.AccessToken, nil)
+	requireDenied(t, status, body, http.StatusForbidden, "WS.WORKSPACE.ACCESS_DENIED",
+		"outsider reading a timebox")
+	require.NotContains(t, string(body), "Sprint X",
+		"a refusal must not carry the timebox it refused")
 
-	status, _ = doJSONStatus(t, http.MethodPatch, base+"/"+tb.ID, outsider.AccessToken,
+	status, body = doJSONStatus(t, http.MethodPatch, base+"/"+tb.ID, outsider.AccessToken,
 		map[string]any{"name": "Hacked Sprint"})
-	require.GreaterOrEqual(t, status, 403)
+	requireDenied(t, status, body, http.StatusForbidden, "WS.WORKSPACE.ACCESS_DENIED",
+		"outsider updating a timebox")
 
-	status, _ = doJSONStatus(t, http.MethodDelete, base+"/"+tb.ID, outsider.AccessToken, nil)
-	require.GreaterOrEqual(t, status, 403)
+	status, body = doJSONStatus(t, http.MethodDelete, base+"/"+tb.ID, outsider.AccessToken, nil)
+	requireDenied(t, status, body, http.StatusForbidden, "WS.WORKSPACE.ACCESS_DENIED",
+		"outsider deleting a timebox")
+
+	// The timebox survived every attempt above, name included.
+	var after struct {
+		Name string `json:"name"`
+	}
+	doJSON(t, http.MethodGet, base+"/"+tb.ID, owner.AccessToken, nil, &after)
+	require.Equal(t, "Sprint X", after.Name,
+		"the timebox must be untouched after the refused writes")
 }
 
 // TestCrossTenantWebhookIsolation verifies that a member of workspace A
@@ -161,14 +205,19 @@ func TestCrossTenantWebhookIsolation(t *testing.T) {
 
 	base := testServerURL + "/workspaces/" + owner.WorkspacePublicID + "/webhooks"
 
-	status, _ := doJSONStatus(t, http.MethodGet, base, outsider.AccessToken, nil)
-	require.GreaterOrEqual(t, status, 403)
+	status, body := doJSONStatus(t, http.MethodGet, base, outsider.AccessToken, nil)
+	requireDenied(t, status, body, http.StatusForbidden, "WS.WORKSPACE.ACCESS_DENIED",
+		"outsider listing webhooks")
 
-	status, _ = doJSONStatus(t, http.MethodGet, base+"/"+created.Webhook.ID, outsider.AccessToken, nil)
-	require.GreaterOrEqual(t, status, 403)
+	status, body = doJSONStatus(t, http.MethodGet, base+"/"+created.Webhook.ID, outsider.AccessToken, nil)
+	requireDenied(t, status, body, http.StatusForbidden, "WS.WORKSPACE.ACCESS_DENIED",
+		"outsider reading a webhook")
+	require.NotContains(t, string(body), "example.com/hook",
+		"a refusal must not carry the endpoint it refused")
 
-	status, _ = doJSONStatus(t, http.MethodDelete, base+"/"+created.Webhook.ID, outsider.AccessToken, nil)
-	require.GreaterOrEqual(t, status, 403)
+	status, body = doJSONStatus(t, http.MethodDelete, base+"/"+created.Webhook.ID, outsider.AccessToken, nil)
+	requireDenied(t, status, body, http.StatusForbidden, "WS.WORKSPACE.ACCESS_DENIED",
+		"outsider deleting a webhook")
 }
 
 // TestCrossTenantExportIsolation verifies that a member of workspace A
@@ -180,10 +229,11 @@ func TestCrossTenantExportIsolation(t *testing.T) {
 	owner := newTenant(t)
 	outsider := newTenant(t)
 
-	status, _ := doJSONStatus(t, http.MethodGet,
+	status, body := doJSONStatus(t, http.MethodGet,
 		testServerURL+"/workspaces/"+owner.WorkspacePublicID+"/export/tasks?format=json",
 		outsider.AccessToken, nil)
-	require.GreaterOrEqual(t, status, 403, "outsider must not export tasks")
+	requireDenied(t, status, body, http.StatusForbidden, "WS.WORKSPACE.ACCESS_DENIED",
+		"outsider exporting tasks")
 }
 
 // TestCrossTenantCSVExportIsolation is the authorization baseline for
@@ -209,15 +259,17 @@ func TestCrossTenantCSVExportIsolation(t *testing.T) {
 	csvURL := testServerURL + "/workspaces/" + owner.WorkspacePublicID + "/export/tasks.csv"
 
 	status, body := doJSONStatus(t, http.MethodGet, csvURL, outsider.AccessToken, nil)
-	require.GreaterOrEqual(t, status, 403,
-		"a member of another workspace must not download this workspace's CSV")
+	requireDenied(t, status, body, http.StatusForbidden, "WS.WORKSPACE.ACCESS_DENIED",
+		"a member of another workspace downloading this workspace's CSV")
 	require.NotContains(t, string(body), "CONFIDENTIAL-CSV-",
 		"a refusal must not carry any of the rows it refused")
 
-	// Unauthenticated is refused too, and for the same reason.
+	// Unauthenticated is refused too, and one step earlier: the bearer
+	// token never gets as far as the membership gate, so this is 401
+	// from the authn layer rather than 403 from the ACL.
 	status, body = doJSONStatus(t, http.MethodGet, csvURL, "", nil)
-	require.GreaterOrEqual(t, status, 401,
-		"the CSV download must require authentication")
+	requireDenied(t, status, body, http.StatusUnauthorized, "AUTH.TOKEN.MISSING_OR_MALFORMED",
+		"an unauthenticated CSV download")
 	require.NotContains(t, string(body), "CONFIDENTIAL-CSV-")
 
 	// And the owner can still get it, so the assertions above are about

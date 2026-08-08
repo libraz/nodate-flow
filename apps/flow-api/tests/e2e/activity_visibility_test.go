@@ -58,8 +58,8 @@ func TestActivityFeedHidesUnreadableTasksFromMembers(t *testing.T) {
 	// Sanity: the member genuinely cannot read the private task.
 	status, body := doJSONStatus(t, http.MethodGet,
 		testServerURL+"/tasks/"+privateTaskID, member.AccessToken, nil)
-	require.NotEqual(t, http.StatusOK, status,
-		"fixture: the member must not be able to read the private task; body=%s", string(body))
+	requireDenied(t, status, body, http.StatusNotFound, "WS.TASK.NOT_FOUND",
+		"fixture: the member reading the private task")
 
 	memberFeed := string(activityBody(t, owner.WorkspacePublicID, member))
 	require.NotContains(t, memberFeed, privateTaskID,

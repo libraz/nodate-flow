@@ -93,8 +93,8 @@ func TestReverseRejectsEventOnInvisibleTask(t *testing.T) {
 	// result below is about visibility and not about a mis-seeded fixture.
 	status, body := doJSONStatus(t, http.MethodGet,
 		testServerURL+"/tasks/"+taskID, member.AccessToken, nil)
-	require.NotEqual(t, http.StatusOK, status,
-		"fixture: the member must not be able to read the private task; body=%s", string(body))
+	requireDenied(t, status, body, http.StatusNotFound, "WS.TASK.NOT_FOUND",
+		"fixture: the member reading the private task")
 
 	status, body = reverseStatusAs(t, owner.WorkspacePublicID, member, origPub)
 	require.Equal(t, http.StatusNotFound, status,

@@ -46,10 +46,15 @@ func TestProfileUpdateRejectsOverlongDisplayName(t *testing.T) {
 		longName[i] = 'a'
 	}
 
-	status, _ := doJSONStatus(t, http.MethodPatch, testServerURL+"/me",
+	// Length is a schema constraint, so this is refused by the request
+	// validator with 422 and a per-field error rather than by a handler
+	// with a catalogue code.
+	status, body := doJSONStatus(t, http.MethodPatch, testServerURL+"/me",
 		tt.AccessToken, map[string]any{"displayName": string(longName)})
-	require.GreaterOrEqual(t, status, 400,
-		"display name over 100 chars must be rejected")
+	require.Equalf(t, http.StatusUnprocessableEntity, status,
+		"display name over 100 chars must be refused by validation; body=%s", string(body))
+	require.Containsf(t, string(body), "displayName",
+		"the validation error must name the field it refused; body=%s", string(body))
 }
 
 // TestWorkspaceSlugCollision verifies that creating two workspaces
@@ -65,13 +70,12 @@ func TestWorkspaceSlugCollision(t *testing.T) {
 	doJSON(t, http.MethodPost, testServerURL+"/workspaces", tt.AccessToken,
 		map[string]any{"slug": slug, "name": "First WS"}, nil)
 
-	// Second workspace with same slug must fail.
-	status, _ := doJSONStatus(t, http.MethodPost, testServerURL+"/workspaces",
+	// Second workspace with same slug must fail as a conflict, not as
+	// the raw duplicate-key 500 the database would otherwise produce.
+	status, body := doJSONStatus(t, http.MethodPost, testServerURL+"/workspaces",
 		tt.AccessToken, map[string]any{"slug": slug, "name": "Second WS"})
-	require.GreaterOrEqual(t, status, 400,
-		"duplicate workspace slug must be rejected")
-	require.Less(t, status, 500,
-		"slug collision must return 4xx, not 500")
+	requireDenied(t, status, body, http.StatusConflict, "WS.WORKSPACE.SLUG_ALREADY_TAKEN",
+		"creating a second workspace with a taken slug")
 }
 
 // TestPaginationTotalAccuracy verifies that list endpoints return

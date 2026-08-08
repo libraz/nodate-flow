@@ -145,7 +145,7 @@ async function seedShiftGraph(tenant: TestTenant): Promise<SeedResult> {
 async function setShiftDefault(
   tenant: TestTenant,
   pref: 'ask' | 'sync_always' | 'task_only_always',
-): Promise<boolean> {
+): Promise<void> {
   const res = await fetch(`${AUTH_API_URL}/me`, {
     method: 'PATCH',
     headers: {
@@ -155,13 +155,18 @@ async function setShiftDefault(
     },
     body: JSON.stringify({ calendarShiftDefault: pref }),
   });
-  if (res.status === 422) {
-    return false;
-  }
+  // `calendarShiftDefault` is part of the shipped PATCH /me schema, so a
+  // 422 means the running auth-api is not the one this suite is written
+  // against — an environment fault, not a case to skip past. Three of
+  // the four cases in this file depend on the preference, and skipping
+  // them left the shortcut paths (sync_always / task_only_always) and
+  // the "always use this choice" persistence unexercised behind a green
+  // report.
   if (!res.ok) {
-    throw new Error(`PATCH /me -> ${res.status} ${await res.text()}`);
+    throw new Error(
+      `PATCH /me { calendarShiftDefault: ${pref} } -> ${res.status} ${await res.text()}`,
+    );
   }
-  return true;
 }
 
 /**
@@ -255,11 +260,7 @@ test.describe('event detail — shift dialog', () => {
 
   test('B: sync_always pref jumps straight to confirm with task pre-checked', async ({ page }) => {
     tenant = await createTestTenant();
-    const supported = await setShiftDefault(tenant, 'sync_always');
-    test.skip(
-      !supported,
-      'auth-api binary running in this environment does not accept calendarShiftDefault yet',
-    );
+    await setShiftDefault(tenant, 'sync_always');
     const seed = await seedShiftGraph(tenant);
 
     await injectAuth(page.context(), tenant);
@@ -281,11 +282,7 @@ test.describe('event detail — shift dialog', () => {
 
   test('C: task_only_always pref opens confirm with no task ticked', async ({ page }) => {
     tenant = await createTestTenant();
-    const supported = await setShiftDefault(tenant, 'task_only_always');
-    test.skip(
-      !supported,
-      'auth-api binary running in this environment does not accept calendarShiftDefault yet',
-    );
+    await setShiftDefault(tenant, 'task_only_always');
     const seed = await seedShiftGraph(tenant);
 
     await injectAuth(page.context(), tenant);
@@ -305,15 +302,11 @@ test.describe('event detail — shift dialog', () => {
 
   test('D: "Always" checkbox + apply persists sync_always to /me', async ({ page }) => {
     tenant = await createTestTenant();
-    // Probe the auth-api once before kicking off the UI flow — if the
-    // running binary doesn't accept `calendarShiftDefault`, the dialog's
-    // fire-and-forget PATCH /me will silently fail and the success toast
-    // never appears. Skip rather than chase a phantom regression.
-    const supported = await setShiftDefault(tenant, 'ask');
-    test.skip(
-      !supported,
-      'auth-api binary running in this environment does not accept calendarShiftDefault yet',
-    );
+    // Establish the starting preference explicitly. The dialog's
+    // fire-and-forget PATCH /me at the end of this flow writes the same
+    // field, so if the server rejected it this test would otherwise wait
+    // out a toast that can never arrive.
+    await setShiftDefault(tenant, 'ask');
     const seed = await seedShiftGraph(tenant);
 
     await injectAuth(page.context(), tenant);

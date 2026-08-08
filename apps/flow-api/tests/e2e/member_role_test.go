@@ -92,12 +92,14 @@ func TestAdminCanRemoveMember(t *testing.T) {
 		owner.AccessToken, nil, &result)
 	require.True(t, result.Ok)
 
-	// Removed member can no longer access the workspace.
-	status, _ := doJSONStatus(t, http.MethodGet,
+	// Removed member can no longer access the workspace. They know the
+	// workspace exists (they were in it), so the membership gate refuses
+	// rather than conceals.
+	status, body := doJSONStatus(t, http.MethodGet,
 		testServerURL+"/workspaces/"+owner.WorkspacePublicID,
 		member.AccessToken, nil)
-	require.GreaterOrEqual(t, status, 403,
-		"removed member must not access workspace")
+	requireDenied(t, status, body, http.StatusForbidden, "WS.WORKSPACE.ACCESS_DENIED",
+		"a removed member reading the workspace")
 }
 
 // TestWorkspaceUsersSummary verifies that GET /workspaces/{wsId}/users

@@ -17,8 +17,6 @@ export interface SharedTenants {
   /** Second user tenant for tests that mutate user profile (avoids conflicts). */
   user2: Awaited<ReturnType<typeof createTestTenant>>;
   admin: Awaited<ReturnType<typeof createTestTenant>>;
-  /** Whether the admin tenant actually has instance-admin privileges. */
-  adminGranted: boolean;
   /**
    * Public id of the workspace owned by `user`. Seeded so `/workspaces`
    * member-facing tests always have a row to click.
@@ -49,7 +47,10 @@ async function globalSetup(): Promise<void> {
   await new Promise((r) => setTimeout(r, 2000));
 
   const admin = await createTestTenant();
-  const adminGranted = await grantInstanceAdmin(admin);
+  // Throws if the grant cannot be made. The admin specs have no
+  // meaningful degraded mode, so a failure here has to stop the run
+  // rather than let five spec files skip themselves into a green report.
+  await grantInstanceAdmin(admin);
 
   // Seed one workspace per visible tenant so list pages
   // (`/workspaces`, `/admin/workspaces`) always have at least one row
@@ -61,7 +62,6 @@ async function globalSetup(): Promise<void> {
     user,
     user2,
     admin,
-    adminGranted,
     userWorkspaceId,
     adminWorkspaceId,
   };

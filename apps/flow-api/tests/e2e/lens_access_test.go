@@ -82,9 +82,13 @@ func TestLensCrossTenantNotVisible(t *testing.T) {
 			"isDefault": false,
 		}, &lens)
 
-	// Tenant2 cannot access tenant1's lens.
-	status, _ := doJSONStatus(t, http.MethodGet,
+	// Tenant2 cannot access tenant1's lens. The workspace id is in the
+	// path and tenant2 supplied it, so the refusal is the membership
+	// gate's 403 and nothing about the lens is disclosed either way.
+	status, body := doJSONStatus(t, http.MethodGet,
 		wsURL+"/lenses/"+lens.ID, tenant2.AccessToken, nil)
-	require.GreaterOrEqual(t, status, 403,
-		"outsider must not access another workspace's lens")
+	requireDenied(t, status, body, http.StatusForbidden, "WS.WORKSPACE.ACCESS_DENIED",
+		"outsider reading another workspace's lens")
+	require.NotContains(t, string(body), "T1 Lens",
+		"a refusal must not carry the lens it refused")
 }

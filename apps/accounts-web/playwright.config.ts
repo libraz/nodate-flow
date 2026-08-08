@@ -29,11 +29,9 @@ export default defineConfig({
   retries: isCI ? 2 : 0,
   workers: isCI ? 2 : 3,
   reporter: [['html', { open: 'never' }]],
-  expect: {
-    toHaveScreenshot: {
-      maxDiffPixelRatio: 0.01,
-    },
-  },
+  // No visual-regression setup here on purpose — see the same note in
+  // apps/flow-web/playwright.config.ts. Screenshot baselines need a
+  // pinned rendering environment this suite does not have.
   use: {
     baseURL: WEB_BASE_URL,
     trace: 'on-first-retry',

@@ -31,13 +31,15 @@ export default defineConfig({
   retries: isCI ? 2 : 1,
   ...(isCI ? { workers: 2 } : { workers: 3 }),
   reporter: [['html', { open: 'never' }]],
-  snapshotDir: './e2e/snapshots',
-  snapshotPathTemplate: '{snapshotDir}/{arg}{ext}',
-  expect: {
-    toHaveScreenshot: {
-      maxDiffPixelRatio: 0.01,
-    },
-  },
+  // No visual-regression setup here on purpose. Screenshot baselines
+  // are only meaningful against a pinned rendering environment — same
+  // browser build, same font set, same platform — and this suite has
+  // no CI job at all, so a baseline could only ever be captured on
+  // whichever developer machine ran it first and would go red for
+  // everyone else. Tuning left behind for a layer that has no call
+  // sites reads as coverage that exists; it does not. Standing this
+  // up means a containerised Playwright job with provisioned fonts
+  // first, and the config lines after.
   use: {
     baseURL: WEB_BASE_URL,
     trace: 'on-first-retry',

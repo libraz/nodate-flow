@@ -219,17 +219,17 @@ func TestNotificationPreferencesDenyNonMember(t *testing.T) {
 
 	prefsURL := testServerURL + "/workspaces/" + owner.WorkspacePublicID + "/notification-preferences"
 
-	status, _ := doJSONStatus(t, http.MethodGet, prefsURL, outsider.AccessToken, nil)
-	require.NotEqual(t, http.StatusOK, status,
-		"a non-member must not read another workspace's preferences")
+	status, body := doJSONStatus(t, http.MethodGet, prefsURL, outsider.AccessToken, nil)
+	requireDenied(t, status, body, http.StatusForbidden, "WS.WORKSPACE.ACCESS_DENIED",
+		"a non-member reading another workspace's preferences")
 
-	status, _ = doJSONStatus(t, http.MethodPut, prefsURL, outsider.AccessToken, map[string]any{
+	status, body = doJSONStatus(t, http.MethodPut, prefsURL, outsider.AccessToken, map[string]any{
 		"preferences": []map[string]any{
 			{"eventCategory": "ai", "channel": "in_app", "muted": true},
 		},
 	})
-	require.NotEqual(t, http.StatusOK, status,
-		"a non-member must not write another workspace's preferences")
+	requireDenied(t, status, body, http.StatusForbidden, "WS.WORKSPACE.ACCESS_DENIED",
+		"a non-member writing another workspace's preferences")
 }
 
 // latestEventID returns the newest events.id of the given type for a

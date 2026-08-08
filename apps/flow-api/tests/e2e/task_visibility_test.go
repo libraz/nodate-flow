@@ -45,11 +45,16 @@ func TestPrivateTaskHiddenFromNonActor(t *testing.T) {
 	require.Equal(t, http.StatusOK, status,
 		"owner must see their private task")
 
-	// Member cannot see it — must get 403 or 404 (never 200).
-	status, _ = doJSONStatus(t, http.MethodGet,
+	// Member cannot see it. Unlike the cross-workspace case, a private
+	// task inside a workspace the actor belongs to is concealed rather
+	// than denied: the refusal is 404 WS.TASK.NOT_FOUND so a member
+	// cannot use the status to confirm that the task exists at all.
+	status, body := doJSONStatus(t, http.MethodGet,
 		testServerURL+"/tasks/"+task.ID, member.AccessToken, nil)
-	require.GreaterOrEqual(t, status, 403,
-		"non-actor member must not access private task")
+	requireDenied(t, status, body, http.StatusNotFound, "WS.TASK.NOT_FOUND",
+		"a non-actor member reading a private task")
+	require.NotContains(t, string(body), "Owner's Private Task",
+		"a refusal must not carry the task it concealed")
 }
 
 // TestPrivateTaskNotInMemberListView verifies that a private task does
@@ -140,12 +145,12 @@ func TestPrivateTaskUpdateDeniedForNonActor(t *testing.T) {
 			"visibility": "private",
 		}, &task)
 
-	// Member cannot update it.
-	status, _ := doJSONStatus(t, http.MethodPatch,
+	// Member cannot update it — concealed the same way as the read path.
+	status, body := doJSONStatus(t, http.MethodPatch,
 		testServerURL+"/tasks/"+task.ID, member.AccessToken,
 		map[string]any{"title": "Hacked"})
-	require.GreaterOrEqual(t, status, 400,
-		"non-actor must not update private task")
+	requireDenied(t, status, body, http.StatusNotFound, "WS.TASK.NOT_FOUND",
+		"a non-actor member updating a private task")
 
 	// Verify title unchanged.
 	var got struct {

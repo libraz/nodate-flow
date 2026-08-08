@@ -9,9 +9,9 @@
     "preview": "vite preview",
     "typecheck": "tsc -b",
     "test": "vitest run",
+    "test:coverage": "vitest run --coverage",
     "e2e": "playwright test",
-    "e2e:ui": "playwright test --ui",
-    "e2e:snapshots": "playwright test visual-regression --update-snapshots"
+    "e2e:ui": "playwright test --ui"
   },
   "dependencies": {
     "@dnd-kit/core": "6.3.1",
@@ -55,6 +55,7 @@
     "@vitest/coverage-v8": "^4.1.10",
     "fast-check": "^4.9.0",
     "happy-dom": "^20.11.1",
+    "msw": "^2.15.0",
     "mysql2": "^3.23.2",
     "tailwindcss": "^4.3.3",
     "typescript": "7.0.2",

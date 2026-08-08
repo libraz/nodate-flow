@@ -172,11 +172,6 @@ export async function seedWorkspace(tenant: TestTenant): Promise<string> {
 
 /**
  * Grants instance-admin to the given tenant via REST.
- * Uses the bootstrap endpoint that makes the first user admin if none exist,
- * or grants directly if the tenant is already admin.
- */
-/**
- * Grants instance-admin to the given tenant via REST.
  *
  * Three strategies, in order:
  *   1. POST /admin/setup with the tenant's own token. Works on a
@@ -190,9 +185,15 @@ export async function seedWorkspace(tenant: TestTenant): Promise<string> {
  *   3. Fallback: try the direct grant with the tenant's token (only
  *      succeeds if the tenant is already admin from a prior run).
  *
- * Returns true if any strategy succeeded.
+ * Throws when all three fail, which stops the run in `globalSetup`.
+ * This used to return false and let five admin spec files skip
+ * themselves at runtime: the report stayed green while the entire
+ * admin console — list views, detail pages, suspend/grant mutations,
+ * the confirm dialog, the stats dashboard — went unexercised. A
+ * missing prerequisite is an environment failure, and an environment
+ * failure has to look like one.
  */
-export async function grantInstanceAdmin(tenant: TestTenant): Promise<boolean> {
+export async function grantInstanceAdmin(tenant: TestTenant): Promise<void> {
   const setupRes = await fetch(`${AUTH_API_URL}/admin/setup`, {
     method: 'POST',
     headers: {
@@ -201,7 +202,7 @@ export async function grantInstanceAdmin(tenant: TestTenant): Promise<boolean> {
       accept: 'application/json',
     },
   });
-  if (setupRes.ok) return true;
+  if (setupRes.ok) return;
 
   // Setup 409 → an admin already exists. Bootstrap via the seeded
   // developer admin (created by `make seed-flow`).
@@ -212,6 +213,7 @@ export async function grantInstanceAdmin(tenant: TestTenant): Promise<boolean> {
     headers: { 'Content-Type': 'application/json', accept: 'application/json' },
     body: JSON.stringify({ email: seedEmail, password: seedPassword }),
   });
+  let seedGrantStatus = 'skipped (seed login failed)';
   if (seedLoginRes.ok) {
     const seedAuth = (await seedLoginRes.json()) as { accessToken: string };
     const grantRes = await fetch(`${AUTH_API_URL}/admin/instance-admins`, {
@@ -224,10 +226,8 @@ export async function grantInstanceAdmin(tenant: TestTenant): Promise<boolean> {
       body: JSON.stringify({ userId: tenant.userId }),
     });
     // 409 = tenant is already admin (rerun on a hot DB) → still a success.
-    if (grantRes.ok || grantRes.status === 409) return true;
-    console.warn(
-      `Could not grant admin via seed user: status=${grantRes.status} body=${await grantRes.text()}`,
-    );
+    if (grantRes.ok || grantRes.status === 409) return;
+    seedGrantStatus = `${grantRes.status} ${await grantRes.text()}`;
   }
 
   // Last resort: tenant might already be admin from a previous run on the
@@ -241,10 +241,16 @@ export async function grantInstanceAdmin(tenant: TestTenant): Promise<boolean> {
     },
     body: JSON.stringify({ userId: tenant.userId }),
   });
-  if (selfGrantRes.ok || selfGrantRes.status === 409) return true;
+  if (selfGrantRes.ok || selfGrantRes.status === 409) return;
 
-  console.warn(
-    `Could not grant admin: setup=${setupRes.status} seedLogin=${seedLoginRes.status} selfGrant=${selfGrantRes.status}`,
+  throw new Error(
+    [
+      `Could not grant instance-admin to ${tenant.email}; the admin console specs cannot run.`,
+      `  POST /admin/setup            -> ${setupRes.status}`,
+      `  seed admin login (${seedEmail}) -> ${seedLoginRes.status}`,
+      `  POST /admin/instance-admins (as seed admin) -> ${seedGrantStatus}`,
+      `  POST /admin/instance-admins (as self)       -> ${selfGrantRes.status}`,
+      'Run `make seed-flow` (or set NF_SEED_ADMIN_EMAIL / NF_SEED_ADMIN_PASSWORD) and retry.',
+    ].join('\n'),
   );
-  return false;
 }

@@ -41,6 +41,31 @@ func TestMain(m *testing.M) {
 	if os.Getenv("NF_TEST_INTEGRATION") == "" {
 		os.Exit(m.Run())
 	}
+
+	// Open the AI provider SSRF escape hatch for this binary.
+	//
+	// A workspace admin supplies an AI provider's base_url, so the guard
+	// refuses loopback, private and link-local destinations by default —
+	// otherwise that field points a server-side request at a cloud
+	// metadata endpoint. The provider-failure suite here registers an
+	// httptest server as its provider, which is 127.0.0.1 by
+	// construction, so with the guard on it never reaches the behaviour
+	// it exists to test: malformed JSON, a wrong-shaped response, an
+	// upstream timeout.
+	//
+	// Opening the hatch does not leave the guard unverified. Refusal is
+	// covered where it belongs, next to the code, by
+	// internal/ai/providers/ssrf_test.go — internal destinations, names
+	// that resolve internally, the dial-time check, an end-to-end
+	// attempt to reach a loopback server, and the hatch itself. The
+	// split is deliberate: the unit tests own "what gets refused", and
+	// this suite owns "what happens once a provider answers", which
+	// needs a provider it can actually run.
+	if err := os.Setenv("NF_FLOW_AI_ALLOW_PRIVATE", "1"); err != nil {
+		fmt.Fprintln(os.Stderr, "e2e: enable ai private-destination hatch:", err)
+		os.Exit(1)
+	}
+
 	inst, err := helpers.EnsureShared()
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "e2e: start shared mysql:", err)
@@ -138,6 +163,28 @@ func doJSONStatus(t *testing.T, method, url, bearer string, body any) (int, []by
 	raw, err := io.ReadAll(resp.Body)
 	require.NoError(t, err)
 	return resp.StatusCode, raw
+}
+
+// requireDenied asserts that a refusal landed on exactly the status and
+// catalogue code the route is supposed to answer with.
+//
+// The looser "status >= 403" form this replaces cannot tell a refusal
+// from a crash: a handler that blew up on the cross-tenant path still
+// satisfied it, so an ACL could break wide open — or start answering 500
+// to every outsider, which is a denial-of-service surface of its own —
+// without a single test going red. Pinning the code as well means a
+// route that begins answering a different refusal (a workspace check
+// swallowing a task check, say) surfaces as a diff instead of silence.
+//
+// Whether a given route answers 403 or 404 is a disclosure decision, so
+// each call site states which one it expects rather than accepting both:
+// 404 where the refusal must not confirm that the resource exists, 403
+// where the caller is already known to be inside the boundary.
+func requireDenied(t *testing.T, status int, body []byte, wantStatus int, wantCode, label string) {
+	t.Helper()
+	require.Equalf(t, wantStatus, status, "%s: unexpected status; body=%s", label, string(body))
+	require.Equalf(t, wantCode, decodeErrorCode(t, body),
+		"%s: unexpected error code; body=%s", label, string(body))
 }
 
 // doJSON sends a JSON request, asserts a 2xx status, and decodes the

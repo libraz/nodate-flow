@@ -403,12 +403,12 @@ func TestMCPEventEditRequiresCalendarMembership(t *testing.T) {
 			"/calendars/"+calID+"/members/"+member.UserPublicID,
 		host.AccessToken, nil, nil)
 
-	status, _ := doJSONStatus(t, http.MethodPatch,
+	status, body := doJSONStatus(t, http.MethodPatch,
 		testServerURL+"/workspaces/"+member.WorkspacePublicID+
 			"/calendars/"+calID+"/events/"+evt.ID,
 		member.AccessToken, map[string]any{"title": "Edited after removal"})
-	require.NotEqual(t, http.StatusOK, status,
-		"REST must refuse an edit from someone removed from the calendar")
+	requireDenied(t, status, body, http.StatusForbidden, "CALENDAR.CALENDAR.ACCESS_DENIED",
+		"REST edit from someone removed from the calendar")
 
 	code := mcpToolErrorCode(t, member, "update_calendar_event", map[string]any{
 		"eventId": evt.ID,

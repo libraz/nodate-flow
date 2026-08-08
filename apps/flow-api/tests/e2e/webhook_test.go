@@ -133,12 +133,14 @@ func TestWebhookRequiresAdmin(t *testing.T) {
 
 	base := testServerURL + "/workspaces/" + tt.WorkspacePublicID + "/webhooks"
 
-	// Member cannot create a webhook.
-	status, _ := doJSONStatus(t, http.MethodPost, base, memberTT.AccessToken,
+	// Member cannot create a webhook: they are inside the workspace, so
+	// the role gate refuses rather than conceals.
+	status, body := doJSONStatus(t, http.MethodPost, base, memberTT.AccessToken,
 		map[string]any{
 			"url":         "https://example.com/hook",
 			"description": "Should fail",
 			"eventTypes":  json.RawMessage(`["task.created"]`),
 		})
-	require.GreaterOrEqual(t, status, 403, "non-admin must be rejected")
+	requireDenied(t, status, body, http.StatusForbidden, "WS.MEMBER.ROLE_DENIED",
+		"a non-admin creating a webhook")
 }

@@ -45,7 +45,7 @@ func TestPrivateEventFieldLeak_HiddenFromCoMemberAcrossListEndpoints(t *testing.
 	calID := createCalendar(t, owner)
 
 	calInternalID := helpers.ResolveCalendarInternalID(t, testDB, calID)
-	member := helpers.CreateExtraCalendarMember(t, testSrv, owner.WorkspaceID, owner.WorkspacePublicID, calInternalID, "")
+	member := helpers.CreateExtraCalendarMember(t, testSrv, owner, calInternalID, "")
 
 	eventStart := time.Date(2026, 8, 3, 10, 0, 0, 0, time.UTC)
 	const (

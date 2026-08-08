@@ -202,7 +202,7 @@ func TestEventPermission_NonOwnerCannotEditOthersEvent(t *testing.T) {
 	calID := createCalendar(t, owner)
 
 	calInternalID := helpers.ResolveCalendarInternalID(t, testDB, calID)
-	member := helpers.CreateExtraCalendarMember(t, testSrv, owner.WorkspaceID, owner.WorkspacePublicID, calInternalID, "")
+	member := helpers.CreateExtraCalendarMember(t, testSrv, owner, calInternalID, "")
 
 	var evt struct {
 		ID string `json:"id"`
@@ -230,7 +230,7 @@ func TestEventPermission_NonOwnerCannotSetOtherOwner(t *testing.T) {
 	calID := createCalendar(t, owner)
 
 	calInternalID := helpers.ResolveCalendarInternalID(t, testDB, calID)
-	member := helpers.CreateExtraCalendarMember(t, testSrv, owner.WorkspaceID, owner.WorkspacePublicID, calInternalID, "")
+	member := helpers.CreateExtraCalendarMember(t, testSrv, owner, calInternalID, "")
 
 	status, body := helpers.DoJSONStatus(t, http.MethodPost, member.WsPath("calendars", calID, "events"), member.AccessToken, map[string]any{
 		"kind":        "event",
@@ -252,7 +252,7 @@ func TestEventPermission_NonOwnerCannotDeleteOthersEvent(t *testing.T) {
 	calID := createCalendar(t, owner)
 
 	calInternalID := helpers.ResolveCalendarInternalID(t, testDB, calID)
-	member := helpers.CreateExtraCalendarMember(t, testSrv, owner.WorkspaceID, owner.WorkspacePublicID, calInternalID, "")
+	member := helpers.CreateExtraCalendarMember(t, testSrv, owner, calInternalID, "")
 
 	var evt struct {
 		ID string `json:"id"`
@@ -278,7 +278,7 @@ func TestEventPermission_AttendeeWithCanEditCanEdit(t *testing.T) {
 	calID := createCalendar(t, owner)
 
 	calInternalID := helpers.ResolveCalendarInternalID(t, testDB, calID)
-	member := helpers.CreateExtraCalendarMember(t, testSrv, owner.WorkspaceID, owner.WorkspacePublicID, calInternalID, "")
+	member := helpers.CreateExtraCalendarMember(t, testSrv, owner, calInternalID, "")
 
 	var evt struct {
 		ID string `json:"id"`
@@ -316,7 +316,7 @@ func TestPrivateEventVisibility_ScrubsFieldsForNonOwner(t *testing.T) {
 	calID := createCalendar(t, owner)
 
 	calInternalID := helpers.ResolveCalendarInternalID(t, testDB, calID)
-	member := helpers.CreateExtraCalendarMember(t, testSrv, owner.WorkspaceID, owner.WorkspacePublicID, calInternalID, "")
+	member := helpers.CreateExtraCalendarMember(t, testSrv, owner, calInternalID, "")
 
 	start := time.Date(2027, 1, 15, 9, 0, 0, 0, time.UTC)
 	end := time.Date(2027, 1, 15, 10, 0, 0, 0, time.UTC)

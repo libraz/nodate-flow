@@ -15,9 +15,6 @@
  * user) so the mutations cannot affect the admin tenant's own privileges
  * — and so re-runs land deterministically because the seeded developer
  * admin (admin@example.com) is never a subject of these mutations.
- *
- * Skipped when `adminGranted` is false — the admin can only mutate
- * other users when itself an instance admin.
  */
 
 import { expect, test } from '@playwright/test';
@@ -41,11 +38,6 @@ const copy = {
 } as const;
 
 test.describe('admin user-detail action mutations', () => {
-  test.beforeEach(() => {
-    const { adminGranted } = loadTenants();
-    test.skip(!adminGranted, 'Admin grant failed — instance already has an admin from a prior run');
-  });
-
   test('suspend then re-enable flips the status badge', async ({ page }) => {
     const { admin, user2 } = loadTenants();
     await injectAuth(page.context(), admin);

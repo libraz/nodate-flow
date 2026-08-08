@@ -159,8 +159,8 @@ func TestTaskListEndpointsHideInvisibleTitles(t *testing.T) {
 	// either, or the sweep below proves nothing about the rest.
 	status, body := doJSONStatus(t, http.MethodGet,
 		testServerURL+"/tasks/"+task.ID, guest.AccessToken, nil)
-	require.NotEqual(t, http.StatusOK, status,
-		"a private task must not be readable by a non-actor guest; body=%s", string(body))
+	requireDenied(t, status, body, http.StatusNotFound, "WS.TASK.NOT_FOUND",
+		"a non-actor guest reading a private task")
 
 	routes := collectGETRoutes(t)
 	require.Greater(t, len(routes), 50,
