@@ -130,7 +130,10 @@ func HandleGithubWebhook(deps Deps) http.HandlerFunc {
 
 		pub := types.New()
 		now := time.Now().UTC()
-		ext := sql.NullString{String: r.Header.Get("X-GitHub-Delivery"), Valid: r.Header.Get("X-GitHub-Delivery") != ""}
+		// X-GitHub-Delivery is the delivery's own id and is repeated
+		// verbatim on every redelivery of it, which is what the
+		// (workspace_id, source, external_id) dedupe key needs.
+		ext := dedupeKey(r.Header.Get("X-GitHub-Delivery"))
 		// GitHub webhook kinds (issue / pull_request / commit events) are
 		// NOT yet members of the signal_kinds/*.yaml registry, so the
 		// registry lookup misses and resolveSubjectType falls back to
@@ -163,6 +166,13 @@ func HandleGithubWebhook(deps Deps) http.HandlerFunc {
 		})
 		if err != nil {
 			writeError(w, apierrors.InternalUnexpected)
+			return
+		}
+		// A redelivery of the same X-GitHub-Delivery collides on the
+		// dedupe key and writes nothing, so it must not mint a public id,
+		// append a second signal.attached event, or re-wake the judge for
+		// a signal the first delivery already filed.
+		if respondIfDuplicate(ctx, w, deps, wsID, generated.SignalsSourceGithub, ext, signalInternalID, "signals.HandleGithubWebhook") {
 			return
 		}
 

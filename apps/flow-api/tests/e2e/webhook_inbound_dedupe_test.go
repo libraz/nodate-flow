@@ -16,6 +16,7 @@ import (
 
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/handlers/signals"
+	gh "github.com/libraz/nodate-flow/apps/flow-api/internal/integrations/github"
 	goog "github.com/libraz/nodate-flow/apps/flow-api/internal/integrations/google"
 	sl "github.com/libraz/nodate-flow/apps/flow-api/internal/integrations/slack"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/signalkinds"
@@ -99,6 +100,75 @@ func mapWebhookSource(t *testing.T, workspacePublicID, provider, externalKey str
 		         ?, ?, ?)`,
 		workspacePublicID, provider, externalKey, "test "+provider+" source")
 	require.NoError(t, err)
+}
+
+// TestGithubWebhookDedupesByDeliveryID verifies that a GitHub redelivery
+// (identical X-GitHub-Delivery) lands as one signals row, returns the
+// existing row's public id, and does not wake the judge a second time.
+//
+// GitHub redelivers on any non-2xx and offers a manual redeliver button,
+// so the delivery id has always been on external_id — but the collided
+// INSERT was not detected, and the handler answered with a freshly minted
+// public id that matched no persisted row while still dispatching a judge
+// run for it.
+func TestGithubWebhookDedupesByDeliveryID(t *testing.T) {
+	bootstrap(t)
+	t.Parallel()
+	tt := newTenant(t)
+
+	const secret = "github-webhook-secret-for-dedupe-test" //#nosec G101 -- synthetic test fixture, never a real secret
+	enq := &countingEnqueuer{}
+	handler := signals.HandleGithubWebhook(signals.Deps{
+		DB:              testDB,
+		Queries:         generated.New(testDB),
+		GhWebhookSecret: secret,
+		JudgeEnqueuer:   enq,
+	})
+
+	// GitHub routes on repository.id; a per-test random id keeps the
+	// instance-wide UNIQUE (provider, external_key) claim collision-free
+	// under the parallel suite.
+	repoSuffix, err := strconv.ParseInt(randomHex(6), 16, 64)
+	require.NoError(t, err)
+	repoID := repoSuffix + 1
+	mapWebhookSource(t, tt.WorkspacePublicID, "github", strconv.FormatInt(repoID, 10))
+
+	body, err := json.Marshal(map[string]any{
+		"action": "opened",
+		"repository": map[string]any{
+			"id":        repoID,
+			"full_name": "acme/widgets",
+		},
+	})
+	require.NoError(t, err)
+
+	deliveryID := "gh-delivery-" + randomHex(8)
+	deliver := func() *http.Request {
+		req := httptest.NewRequest(http.MethodPost, "/webhooks/github", bytes.NewReader(body))
+		req.Header.Set(gh.SignatureHeader, gh.Sign(body, secret))
+		req.Header.Set(gh.EventHeader, "issues")
+		req.Header.Set("X-GitHub-Delivery", deliveryID)
+		return req
+	}
+
+	status, first := callWebhook(t, handler, deliver())
+	require.Equal(t, http.StatusAccepted, status)
+	require.NotEmpty(t, first.ID)
+	require.False(t, first.Duplicate, "the first delivery is a genuine insert")
+	require.Equal(t, 1, countSignals(t, tt.WorkspacePublicID, "github", deliveryID))
+	require.Equal(t, 1, enq.count(), "the first delivery must reach the judge")
+
+	// GitHub's redelivery of the same delivery id.
+	status, second := callWebhook(t, handler, deliver())
+	require.Equal(t, http.StatusAccepted, status,
+		"a duplicate must still be acknowledged so GitHub stops retrying")
+	require.True(t, second.Duplicate, "the redelivery must be reported as a duplicate")
+	require.Equal(t, first.ID, second.ID,
+		"the redelivery must return the existing row's public id, not a freshly minted one")
+
+	require.Equal(t, 1, countSignals(t, tt.WorkspacePublicID, "github", deliveryID),
+		"a GitHub redelivery must not create a second signals row")
+	require.Equal(t, 1, enq.count(), "a duplicate delivery must not enqueue a second judge run")
 }
 
 // TestSlackWebhookDedupesByEventID verifies that a Slack event redelivery
