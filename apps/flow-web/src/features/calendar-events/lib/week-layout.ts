@@ -89,6 +89,53 @@ export function eventStartKey(evt: CalendarEvent, zone?: string): string | null 
 }
 
 /**
+ * Group events by the week rows they appear in.
+ *
+ * Each week row needs the events that touch it, and it used to get that
+ * by being handed the whole list and filtering — once per row. With two
+ * years of rows on screen that is the entire event list scanned about a
+ * hundred times over, and every scan re-reads each event's day through
+ * the timezone, which is the expensive part. Grouping first walks the
+ * list once and hands each row only what lands in it.
+ *
+ * A multi-day event is filed under every week it spans, so the bars that
+ * cross a week boundary still reach both rows. Weeks with nothing in
+ * them are absent from the map; callers read a missing key as empty.
+ *
+ * @param weekStarts Local-midnight `Date` for each week row, ascending
+ *   and contiguous — the rows the view renders.
+ * @param key Names a week row; the same function the caller keys rows by.
+ */
+export function groupEventsByWeek(
+  events: CalendarEvent[],
+  weekStarts: Date[],
+  key: (weekStart: Date) => string,
+  zone?: string,
+): Map<string, CalendarEvent[]> {
+  const byWeek = new Map<string, CalendarEvent[]>();
+  const first = weekStarts[0];
+  if (!first) return byWeek;
+  const firstStart = startOfDay(first);
+
+  for (const evt of events) {
+    const start = eventStartDay(evt, zone);
+    const end = eventEndDay(evt, zone) ?? start;
+    if (!start || !end) continue;
+    const firstWeek = Math.floor(dayDiff(start, firstStart) / 7);
+    const lastWeek = Math.floor(dayDiff(end, firstStart) / 7);
+    for (let i = Math.max(0, firstWeek); i <= Math.min(weekStarts.length - 1, lastWeek); i++) {
+      const ws = weekStarts[i];
+      if (!ws) continue;
+      const k = key(ws);
+      const bucket = byWeek.get(k);
+      if (bucket) bucket.push(evt);
+      else byWeek.set(k, [evt]);
+    }
+  }
+  return byWeek;
+}
+
+/**
  * Pack the multi-day events that intersect `[weekStart, weekStart+6]`
  * into non-overlapping horizontal tracks. Each entry reports the column
  * span inside the week plus whether the bar is clipped on either edge.

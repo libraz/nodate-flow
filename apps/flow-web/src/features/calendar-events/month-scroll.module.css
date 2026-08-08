@@ -54,6 +54,15 @@
   -webkit-overflow-scrolling: touch;
 }
 
+/*
+ * Holds the virtualizer's full scroll height. Rows inside are placed by
+ * transform, so this is what gives the scrollbar something to travel.
+ */
+.scrollInner {
+  position: relative;
+  inline-size: 100%;
+}
+
 .monthHeader {
   position: sticky;
   inset-block-start: 0;
@@ -70,6 +79,18 @@
   background: var(--nf-color-bg-elevated);
   border-block-end: var(--nf-space-px) solid var(--nf-color-border);
   backdrop-filter: saturate(1.1);
+}
+
+/*
+ * A row the virtualizer positions. Declared after `.monthHeader` on
+ * purpose: a header that is not the pinned one carries both classes and
+ * has to be placed absolutely like every other row.
+ */
+.virtualItem {
+  position: absolute;
+  inset-block-start: 0;
+  inset-inline-start: 0;
+  inline-size: 100%;
 }
 
 /* ───── week row ───── */

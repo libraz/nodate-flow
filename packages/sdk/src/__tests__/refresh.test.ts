@@ -539,3 +539,128 @@ describe('createAuthRequestMiddleware', () => {
     expect(result.headers.has('Authorization')).toBe(false);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Public operations
+// ---------------------------------------------------------------------------
+
+/** Concrete URLs for each unauthenticated operation the API exposes. */
+const PUBLIC_URLS = [
+  'https://api.example.com/health',
+  'https://api.example.com/share/cal/sharetoken',
+  'https://api.example.com/public/lenses/lenstoken',
+  'https://api.example.com/public/invites/accept',
+  'https://auth.example.com/invites/invitetoken/info',
+  'https://auth.example.com/oauth/callback/google',
+];
+
+describe('public operations', () => {
+  const originalFetch = globalThis.fetch;
+
+  beforeEach(() => {
+    globalThis.fetch = vi.fn();
+  });
+
+  afterEach(() => {
+    globalThis.fetch = originalFetch;
+  });
+
+  it.each(PUBLIC_URLS)('never refreshes before %s for a visitor with no session', async (url) => {
+    // The state anyone following a shared link is in: no token at all,
+    // which is exactly the state that otherwise forces a refresh.
+    const opts = makeOptions({ getAccessToken: () => undefined });
+    const refresher = createTokenRefresher(opts);
+    const mw = createAuthRequestMiddleware({
+      getAccessToken: () => undefined,
+      refresher,
+    });
+
+    const result = await mw.onRequest({ request: new Request(url) });
+
+    expect(globalThis.fetch).not.toHaveBeenCalled();
+    expect(result.headers.has('Authorization')).toBe(false);
+    expect(opts.clearSession).not.toHaveBeenCalled();
+  });
+
+  it.each(PUBLIC_URLS)('sends no bearer to %s even with a valid session', async (url) => {
+    const nowSec = Math.floor(Date.now() / 1000);
+    const freshToken = makeJwt(nowSec + 3600);
+    const opts = makeOptions({ getAccessToken: () => freshToken });
+    const refresher = createTokenRefresher(opts);
+    const mw = createAuthRequestMiddleware({
+      getAccessToken: () => freshToken,
+      refresher,
+    });
+
+    const result = await mw.onRequest({ request: new Request(url) });
+
+    expect(result.headers.has('Authorization')).toBe(false);
+  });
+
+  it('does not chase a 401 from a public path with a refresh', async () => {
+    const refreshFn = vi.fn(async () => 'new-token');
+    const mw = createRefreshMiddleware(refreshFn);
+
+    const request = new Request('https://api.example.com/share/cal/revoked');
+    const response = new Response('gone', { status: 401 });
+    const result = await mw.onResponse({ request, response });
+
+    expect(refreshFn).not.toHaveBeenCalled();
+    expect(result).toBe(response);
+  });
+
+  it('still refreshes for an authenticated call to a private path', async () => {
+    // The counterpart to the cases above: skipping public paths must not
+    // turn into skipping everything.
+    const nowSec = Math.floor(Date.now() / 1000);
+    const nearExpiry = makeJwt(nowSec + 2);
+    const rotated = makeJwt(nowSec + 900);
+    let currentToken: string | undefined = nearExpiry;
+    const opts = makeOptions({
+      getAccessToken: () => currentToken,
+      setAccessToken: (t) => {
+        currentToken = t;
+      },
+    });
+    const refresher = createTokenRefresher(opts);
+    vi.mocked(globalThis.fetch).mockResolvedValueOnce(
+      new Response(JSON.stringify({ accessToken: rotated }), { status: 200 }),
+    );
+
+    const mw = createAuthRequestMiddleware({
+      getAccessToken: () => currentToken,
+      refresher,
+    });
+    const result = await mw.onRequest({
+      request: new Request('https://api.example.com/workspaces/ws-1/intake'),
+    });
+
+    expect(globalThis.fetch).toHaveBeenCalledOnce();
+    expect(result.headers.get('Authorization')).toBe(`Bearer ${rotated}`);
+  });
+
+  it('keeps refreshing for paths that only look public', async () => {
+    // /invites/{token}/accept needs an account, unlike .../info; and a
+    // workspace-scoped path that happens to contain "public" is private.
+    const lookalikes = [
+      'https://auth.example.com/invites/invitetoken/accept',
+      'https://api.example.com/workspaces/ws-1/public-shares',
+    ];
+    for (const url of lookalikes) {
+      vi.mocked(globalThis.fetch).mockReset();
+      const opts = makeOptions({ getAccessToken: () => undefined });
+      const refresher = createTokenRefresher(opts);
+      vi.mocked(globalThis.fetch).mockResolvedValueOnce(
+        new Response('unauthorized', { status: 401 }),
+      );
+      const mw = createAuthRequestMiddleware({
+        getAccessToken: () => undefined,
+        refresher,
+      });
+
+      await mw.onRequest({ request: new Request(url) });
+
+      expect(globalThis.fetch, url).toHaveBeenCalledOnce();
+    }
+  });
+});

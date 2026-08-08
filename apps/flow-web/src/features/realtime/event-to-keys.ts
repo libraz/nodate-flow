@@ -88,7 +88,10 @@ export function keysForEvent(evt: StreamEvent): readonly (readonly unknown[])[] 
     case 'favorite.changed':
       return [['favorites', 'list', ws]];
     case 'intake.changed':
-      return [['intake', 'list', ws]];
+      // The intake list is cached per (workspace, status), so the
+      // workspace prefix is what reaches every status tab. A longer
+      // prefix would match nothing and leave the open tab stale.
+      return [['intake', ws]];
     case 'import.changed':
       return [['imports', 'list', ws]];
     case 'calendar.changed':
@@ -125,7 +128,7 @@ export function keysForEvent(evt: StreamEvent): readonly (readonly unknown[])[] 
         ['labels', 'list', ws],
         ['reactions'],
         ['favorites', 'list', ws],
-        ['intake', 'list', ws],
+        ['intake', ws],
         ['imports', 'list', ws],
         ['calendars', ws],
         ['events', ws],

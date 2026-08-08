@@ -9126,9 +9126,6 @@
             "format": "int64",
             "type": "integer"
           },
-          "taskId": {
-            "type": "string"
-          },
           "title": {
             "type": "string"
           },
@@ -12687,6 +12684,14 @@
         "required": ["total", "workspaces", "nextCursor"],
         "type": "object"
       }
+    },
+    "securitySchemes": {
+      "bearerAuth": {
+        "bearerFormat": "JWT",
+        "description": "Access token issued by auth-api. Obtain one with POST /auth/login and rotate it with POST /auth/refresh.",
+        "scheme": "bearer",
+        "type": "http"
+      }
     }
   },
   "info": {
@@ -12778,6 +12783,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "List instance audit logs",
         "tags": ["Admin"]
       }
@@ -12833,6 +12843,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "List instance administrators",
         "tags": ["Admin"]
       },
@@ -12871,6 +12886,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "Grant instance admin privileges",
         "tags": ["Admin"]
       }
@@ -12913,6 +12933,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "Revoke instance admin privileges",
         "tags": ["Admin"]
       }
@@ -12943,6 +12968,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "Get instance-level statistics",
         "tags": ["Admin"]
       }
@@ -12983,6 +13013,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "Revoke a session",
         "tags": ["Admin"]
       }
@@ -13013,6 +13048,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "List instance settings",
         "tags": ["Admin"]
       },
@@ -13051,6 +13091,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "Update instance settings",
         "tags": ["Admin"]
       }
@@ -13081,6 +13126,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "Bootstrap the first instance admin",
         "tags": ["Admin"]
       }
@@ -13155,6 +13205,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "List all users",
         "tags": ["Admin"]
       }
@@ -13205,6 +13260,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "Delete a user immediately",
         "tags": ["Admin"]
       },
@@ -13243,6 +13303,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "Get user details",
         "tags": ["Admin"]
       },
@@ -13291,6 +13356,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "Update user (suspend/enable)",
         "tags": ["Admin"]
       }
@@ -13354,6 +13424,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "List sessions for a user",
         "tags": ["Admin"]
       }
@@ -13428,6 +13503,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "List all workspaces",
         "tags": ["Admin"]
       }
@@ -13478,6 +13558,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "Delete a workspace immediately",
         "tags": ["Admin"]
       },
@@ -13516,6 +13601,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "Get workspace details",
         "tags": ["Admin"]
       },
@@ -13564,6 +13654,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "Update workspace (suspend/enable)",
         "tags": ["Admin"]
       }
@@ -14458,6 +14553,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "List inbox items for the caller",
         "tags": ["Tasks"]
       }
@@ -14508,6 +14608,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "Archive an inbox item",
         "tags": ["Tasks"]
       }
@@ -14568,6 +14673,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "Snooze an inbox item",
         "tags": ["Tasks"]
       }
@@ -14608,6 +14718,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "Accept a workspace invite"
       }
     },
@@ -14676,6 +14791,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "Return the authenticated user's profile"
       },
       "patch": {
@@ -14713,6 +14833,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "Patch the authenticated user's profile"
       }
     },
@@ -14742,6 +14867,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "Remove the authenticated user's avatar"
       },
       "post": {
@@ -14792,6 +14922,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "Upload a new avatar image for the authenticated user"
       }
     },
@@ -14847,6 +14982,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "List events across every workspace the caller belongs to",
         "tags": ["Calendar"]
       }
@@ -14912,6 +15052,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "List the caller's favorites",
         "tags": ["Tasks"]
       },
@@ -14950,6 +15095,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "Add an item to favorites",
         "tags": ["Tasks"]
       }
@@ -15003,6 +15153,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "Remove an item from favorites",
         "tags": ["Tasks"]
       }
@@ -15033,6 +15188,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "List the authenticated user's personal OAuth integrations"
       }
     },
@@ -15074,6 +15234,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "Disconnect a personal OAuth integration"
       }
     },
@@ -15124,6 +15289,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "Start a personal OAuth connect flow"
       }
     },
@@ -15178,6 +15348,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "List pending event invites addressed to the caller",
         "tags": ["CalendarInvite"]
       }
@@ -15253,6 +15428,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "List notifications for the caller",
         "tags": ["Tasks"]
       }
@@ -15295,6 +15475,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "Count unread notifications for the caller",
         "tags": ["Tasks"]
       }
@@ -15344,6 +15529,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "Change the authenticated user's password"
       }
     },
@@ -15382,6 +15572,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "Revoke every session except the current one"
       },
       "get": {
@@ -15418,6 +15613,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "List the authenticated user's active sessions"
       }
     },
@@ -15459,6 +15659,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "Revoke a single session"
       }
     },
@@ -15523,6 +15728,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "List tasks assigned to the authenticated user across every workspace",
         "tags": ["Tasks"]
       }
@@ -15612,6 +15822,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "List tasks with due_on in range across every workspace",
         "tags": ["Tasks"]
       }
@@ -15652,6 +15867,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "Disable TOTP 2FA"
       },
       "get": {
@@ -15679,6 +15899,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "Return TOTP 2FA status"
       }
     },
@@ -15718,6 +15943,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "Confirm TOTP 2FA enrollment"
       }
     },
@@ -15757,6 +15987,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "Begin TOTP 2FA enrollment"
       }
     },
@@ -15786,6 +16021,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "Return remaining recovery code count"
       },
       "post": {
@@ -15823,6 +16063,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "Regenerate TOTP recovery codes"
       }
     },
@@ -15864,6 +16109,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "Archive a notification",
         "tags": ["Tasks"]
       }
@@ -15906,6 +16156,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "Mark a notification as read",
         "tags": ["Tasks"]
       }
@@ -16010,6 +16265,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "Soft-disable a project",
         "tags": ["Projects"]
       },
@@ -16048,6 +16308,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "Fetch a project",
         "tags": ["Projects"]
       },
@@ -16096,6 +16361,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "Patch a project",
         "tags": ["Projects"]
       }
@@ -16136,6 +16406,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "List every task dependency edge within a project",
         "tags": ["Projects"]
       }
@@ -16199,6 +16474,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "List members of a project",
         "tags": ["Projects"]
       },
@@ -16247,6 +16527,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "Add a member to a project",
         "tags": ["Projects"]
       }
@@ -16295,6 +16580,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "Remove a member from a project",
         "tags": ["Projects"]
       }
@@ -16381,6 +16671,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "List events in a project's timeline",
         "tags": ["Tasks"]
       }
@@ -16515,6 +16810,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "Accept or dismiss a relation suggestion",
         "tags": ["Tasks"]
       }
@@ -16597,6 +16897,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "Manually inject a signal",
         "tags": ["Signal"]
       }
@@ -16731,6 +17036,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "List tasks for a project or workspace",
         "tags": ["Tasks"]
       },
@@ -16769,6 +17079,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "Create a task",
         "tags": ["Tasks"]
       }
@@ -16809,6 +17124,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "Bulk-update sort weights for tasks within a project",
         "tags": ["Tasks"]
       }
@@ -16849,6 +17169,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "Soft-disable a task",
         "tags": ["Tasks"]
       },
@@ -16887,6 +17212,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "Fetch a task",
         "tags": ["Tasks"]
       },
@@ -16935,6 +17265,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "Patch a task",
         "tags": ["Tasks"]
       }
@@ -16998,6 +17333,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "List actors on a task",
         "tags": ["Tasks"]
       },
@@ -17046,6 +17386,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "Attach an actor to a task",
         "tags": ["Tasks"]
       }
@@ -17094,6 +17439,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "Remove an actor from a task",
         "tags": ["Tasks"]
       }
@@ -17146,6 +17496,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "List recent agent run events scoped to a task",
         "tags": ["Tasks"]
       }
@@ -17209,6 +17564,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "List AI agent actors on a task",
         "tags": ["Tasks"]
       },
@@ -17257,6 +17617,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "Attach an AI agent to a task",
         "tags": ["Tasks"]
       }
@@ -17320,6 +17685,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "List recent AI invocations scoped to this task",
         "tags": ["Tasks"]
       }
@@ -17370,6 +17740,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "Apply proposed steps as child tasks under a parent task",
         "tags": ["Tasks"]
       }
@@ -17410,6 +17785,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "Archive a task",
         "tags": ["Tasks"]
       }
@@ -17473,6 +17853,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "List attachments on a task",
         "tags": ["Tasks"]
       }
@@ -17523,6 +17908,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "Reserve an attachment row and (if needed) get a presigned PUT URL",
         "tags": ["Tasks"]
       }
@@ -17571,6 +17961,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "Soft-delete an attachment from a task",
         "tags": ["Tasks"]
       }
@@ -17619,6 +18014,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "Confirm an uploaded attachment and enforce its real size",
         "tags": ["Tasks"]
       }
@@ -17667,6 +18067,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "Get a presigned GET URL for downloading an attachment",
         "tags": ["Tasks"]
       }
@@ -17740,6 +18145,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "List comments on a task",
         "tags": ["Tasks"]
       },
@@ -17788,6 +18198,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "Add a comment to a task",
         "tags": ["Tasks"]
       }
@@ -17836,6 +18251,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "Delete a comment (author or workspace admin)",
         "tags": ["Tasks"]
       },
@@ -17892,6 +18312,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "Edit a comment (author only)",
         "tags": ["Tasks"]
       }
@@ -17942,6 +18367,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "Attach a constraint to a task",
         "tags": ["Tasks"]
       }
@@ -17992,6 +18422,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "Compile a natural-language prompt into a constraint DSL expression",
         "tags": ["Tasks"]
       }
@@ -18032,6 +18467,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "Run the constraint engine for a task and persist satisfied/failed markers",
         "tags": ["Tasks"]
       }
@@ -18082,6 +18522,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "Explain a constraint DSL expression in human-readable form",
         "tags": ["Tasks"]
       }
@@ -18130,6 +18575,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "Remove a constraint from a task",
         "tags": ["Tasks"]
       }
@@ -18170,6 +18620,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "List incoming and outgoing dependency edges for a task",
         "tags": ["Tasks"]
       },
@@ -18218,6 +18673,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "Add a dependency edge from a task",
         "tags": ["Tasks"]
       }
@@ -18266,6 +18726,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "Remove a dependency edge",
         "tags": ["Tasks"]
       }
@@ -18306,6 +18771,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "List description version history for a task",
         "tags": ["Tasks"]
       }
@@ -18354,6 +18824,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "Get a specific description version with full body",
         "tags": ["Tasks"]
       }
@@ -18402,6 +18877,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "Restore a previous description version",
         "tags": ["Tasks"]
       }
@@ -18442,6 +18922,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "List likely-duplicate tasks by embedding similarity",
         "tags": ["Tasks"]
       }
@@ -18492,6 +18977,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "Promote an AI agent to the task's current assignee",
         "tags": ["Tasks"]
       }
@@ -18542,6 +19032,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "Hand a task back to a human user",
         "tags": ["Tasks"]
       }
@@ -18582,6 +19077,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "Propose the next likely state transition for a task",
         "tags": ["Tasks"]
       }
@@ -18622,6 +19122,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "List labels on a task",
         "tags": ["Labels"]
       },
@@ -18670,6 +19175,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "Attach a label to a task",
         "tags": ["Labels"]
       }
@@ -18718,6 +19228,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "Remove a label from a task",
         "tags": ["Labels"]
       }
@@ -18792,6 +19307,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "List calendar events a task is linked to via task_event_links",
         "tags": ["Tasks"]
       }
@@ -18842,6 +19362,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "Link a task to a calendar event (contributes_to / blocks / ...)",
         "tags": ["Tasks"]
       }
@@ -18890,6 +19415,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "Soft-disable a task↔event link",
         "tags": ["Tasks"]
       }
@@ -18940,6 +19470,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "AI-powered step decomposition for a task",
         "tags": ["Tasks"]
       }
@@ -19005,6 +19540,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "List reactions on a task",
         "tags": ["Tasks"]
       },
@@ -19055,6 +19595,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "Add a reaction to a task",
         "tags": ["Tasks"]
       }
@@ -19107,6 +19652,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "Remove a reaction from a task",
         "tags": ["Tasks"]
       }
@@ -19161,6 +19711,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "List pending relation suggestions for a task",
         "tags": ["Tasks"]
       }
@@ -19201,6 +19756,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "Replay transition events and report drift vs stored derived_state",
         "tags": ["Tasks"]
       }
@@ -19287,6 +19847,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "List events in a task's timeline",
         "tags": ["Tasks"]
       }
@@ -19337,6 +19902,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "Apply a state machine transition to a task",
         "tags": ["Tasks"]
       }
@@ -19377,6 +19947,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "Unarchive a task",
         "tags": ["Tasks"]
       }
@@ -19432,6 +20007,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "List workspaces for the authenticated user"
       },
       "post": {
@@ -19469,6 +20049,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "Create a workspace"
       }
     },
@@ -19518,6 +20103,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "Delete a workspace immediately"
       },
       "get": {
@@ -19555,6 +20145,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "Get workspace details"
       },
       "patch": {
@@ -19602,6 +20197,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "Update workspace details"
       }
     },
@@ -19676,6 +20276,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "List the unified activity feed for a workspace",
         "tags": ["Workspace"]
       }
@@ -19739,6 +20344,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "List AI agents for a workspace",
         "tags": ["Public"]
       },
@@ -19787,6 +20397,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "Create a new AI agent",
         "tags": ["Public"]
       }
@@ -19845,6 +20460,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "Replace an AI agent's event_trigger_types list",
         "tags": ["Public"]
       }
@@ -19903,6 +20523,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "Toggle the kill switch on an AI agent",
         "tags": ["Public"]
       }
@@ -19961,6 +20586,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "Update an AI agent's schedule_kind trigger mode",
         "tags": ["Public"]
       }
@@ -20009,6 +20639,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "Manually trigger one run of an AI agent",
         "tags": ["Public"]
       }
@@ -20049,6 +20684,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "List auto-action rules for a workspace",
         "tags": ["AI"]
       },
@@ -20097,6 +20737,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "Patch auto-action rules for a workspace",
         "tags": ["AI"]
       }
@@ -20137,6 +20782,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "Get auto-action executor settings for a workspace",
         "tags": ["AI"]
       },
@@ -20185,6 +20835,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "Patch auto-action executor settings for a workspace",
         "tags": ["AI"]
       }
@@ -20225,6 +20880,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "Workspace-wide deterministic auto-action proposals",
         "tags": ["Public"]
       }
@@ -20275,6 +20935,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "Compile natural-language prose into a validated Lens JSON (ADR 0004)",
         "tags": ["Public"]
       }
@@ -20325,6 +20990,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "Today's accumulated LLM spend (USD) for a workspace",
         "tags": ["Public"]
       }
@@ -20388,6 +21058,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "List redacted LLM call audit rows for the AI reasoning panel",
         "tags": ["Public"]
       }
@@ -20442,6 +21117,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "AI suggestion acceptance metrics over a trailing window",
         "tags": ["Public"]
       }
@@ -20505,6 +21185,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "List workspace AI models across all providers",
         "tags": ["Public"]
       }
@@ -20545,6 +21230,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "Suggest priority adjustments for open tasks in a workspace",
         "tags": ["Public"]
       }
@@ -20608,6 +21298,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "List LLM providers (masked, no ciphertext)",
         "tags": ["AI"]
       },
@@ -20656,6 +21351,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "Register an LLM provider with an encrypted API key",
         "tags": ["AI"]
       }
@@ -20704,6 +21404,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "Soft-delete an LLM provider",
         "tags": ["AI"]
       },
@@ -20760,6 +21465,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "Rotate an LLM provider API key",
         "tags": ["AI"]
       }
@@ -20800,6 +21510,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "Workspace-wide deterministic reminder engine proposals",
         "tags": ["Public"]
       }
@@ -20850,6 +21565,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "Resolve a natural-language command into an MCP tool invocation",
         "tags": ["Public"]
       }
@@ -20890,6 +21610,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "Workspace-wide deterministic state inference proposals",
         "tags": ["Public"]
       }
@@ -20930,6 +21655,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "List pending AI suggestions for a workspace",
         "tags": ["Tasks"]
       }
@@ -20971,6 +21701,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "Mark an AI suggestion as applied",
         "tags": ["Tasks"]
       }
@@ -21012,6 +21747,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "Dismiss an AI suggestion",
         "tags": ["Tasks"]
       }
@@ -21052,6 +21792,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "Deterministic weekly digest markdown for a workspace",
         "tags": ["Public"]
       }
@@ -21167,6 +21912,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "List recent audit log entries for a workspace",
         "tags": ["Admin"]
       }
@@ -21233,6 +21983,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "List events across all calendars in a workspace",
         "tags": ["Public"]
       }
@@ -21291,6 +22046,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "Shift an umbrella event and move confirmed contributes_to-linked tasks by the same day delta",
         "tags": ["Tasks"]
       }
@@ -21371,6 +22131,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "List tasks linked to a calendar event via task_event_links",
         "tags": ["Tasks"]
       }
@@ -21429,6 +22194,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "Propose shifting an umbrella event and partition linked tasks into safe vs conflict",
         "tags": ["Tasks"]
       }
@@ -21471,6 +22241,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "List calendars in a workspace",
         "tags": ["Calendar"]
       },
@@ -21521,6 +22296,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "Create a calendar",
         "tags": ["Calendar"]
       }
@@ -21573,6 +22353,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "Delete a calendar",
         "tags": ["Calendar"]
       },
@@ -21623,6 +22408,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "Get a calendar",
         "tags": ["Calendar"]
       },
@@ -21683,6 +22473,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "Update a calendar",
         "tags": ["Calendar"]
       }
@@ -21759,6 +22554,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "List events in a calendar",
         "tags": ["Calendar"]
       },
@@ -21819,6 +22619,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "Create an event",
         "tags": ["Calendar"]
       }
@@ -21881,6 +22686,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "Create a calendar event from a task",
         "tags": ["Calendar"]
       }
@@ -21943,6 +22753,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "Parse natural language text into an event proposal",
         "tags": ["Calendar"]
       }
@@ -22005,6 +22820,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "Delete an event",
         "tags": ["Calendar"]
       },
@@ -22065,6 +22885,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "Get an event",
         "tags": ["Calendar"]
       },
@@ -22135,6 +22960,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "Update an event",
         "tags": ["Calendar"]
       }
@@ -22197,6 +23027,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "List attachments on an event",
         "tags": ["Calendar"]
       }
@@ -22269,6 +23104,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "Reserve an attachment row and (if needed) get a presigned PUT URL",
         "tags": ["Calendar"]
       }
@@ -22341,6 +23181,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "Delete an attachment from an event",
         "tags": ["Calendar"]
       }
@@ -22413,6 +23258,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "Confirm an uploaded attachment and enforce its real size",
         "tags": ["Calendar"]
       }
@@ -22485,6 +23335,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "Get a presigned GET URL for downloading an attachment",
         "tags": ["Calendar"]
       }
@@ -22547,6 +23402,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "List attendees on an event",
         "tags": ["Calendar"]
       },
@@ -22617,6 +23477,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "Add attendees to an event",
         "tags": ["Calendar"]
       }
@@ -22689,6 +23554,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "Update own RSVP for an event",
         "tags": ["Calendar"]
       }
@@ -22771,6 +23641,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "Create (or rotate) a magic-link invite for an attendee",
         "tags": ["CalendarInvite"]
       }
@@ -22843,6 +23718,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "Remove an attendee from an event",
         "tags": ["Calendar"]
       }
@@ -22925,6 +23805,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "Toggle can_edit for an attendee",
         "tags": ["Calendar"]
       }
@@ -23010,6 +23895,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "List checklist items for an event",
         "tags": ["Calendar"]
       },
@@ -23080,6 +23970,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "Add a checklist item to an event",
         "tags": ["Calendar"]
       }
@@ -23152,6 +24047,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "Delete a checklist item",
         "tags": ["Calendar"]
       },
@@ -23232,6 +24132,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "Update a checklist item",
         "tags": ["Calendar"]
       }
@@ -23317,6 +24222,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "List comments on an event",
         "tags": ["Calendar"]
       },
@@ -23387,6 +24297,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "Add a comment to an event",
         "tags": ["Calendar"]
       }
@@ -23459,6 +24374,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "Delete a comment",
         "tags": ["Calendar"]
       },
@@ -23539,6 +24459,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "Edit a comment",
         "tags": ["Calendar"]
       }
@@ -23624,6 +24549,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "List active magic-link invites for an event",
         "tags": ["CalendarInvite"]
       }
@@ -23696,6 +24626,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "Revoke a magic-link invite",
         "tags": ["CalendarInvite"]
       }
@@ -23748,6 +24683,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "List members of a calendar",
         "tags": ["Calendar"]
       },
@@ -23808,6 +24748,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "Add a member to a calendar",
         "tags": ["Calendar"]
       }
@@ -23870,6 +24815,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "Remove a member from a calendar",
         "tags": ["Calendar"]
       },
@@ -23940,6 +24890,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "Update a member's role",
         "tags": ["Calendar"]
       }
@@ -23992,6 +24947,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "List memos in a calendar",
         "tags": ["Calendar"]
       },
@@ -24052,6 +25012,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "Create a memo",
         "tags": ["Calendar"]
       }
@@ -24114,6 +25079,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "Delete a memo",
         "tags": ["Calendar"]
       },
@@ -24184,6 +25154,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "Update a memo",
         "tags": ["Calendar"]
       }
@@ -24236,6 +25211,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "Subscribe the caller to a calendar visible in the workspace",
         "tags": ["Calendar"]
       }
@@ -24298,6 +25278,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "Update the caller's own subscription preferences for a calendar",
         "tags": ["Calendar"]
       }
@@ -24361,6 +25346,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "List dashboard widgets in a workspace",
         "tags": ["Admin"]
       },
@@ -24409,6 +25399,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "Create a dashboard widget",
         "tags": ["Admin"]
       }
@@ -24457,6 +25452,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "Soft-delete a dashboard widget",
         "tags": ["Admin"]
       },
@@ -24503,6 +25503,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "Fetch a dashboard widget by id",
         "tags": ["Admin"]
       },
@@ -24559,6 +25564,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "Update a dashboard widget",
         "tags": ["Admin"]
       }
@@ -24617,6 +25627,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "Update widget position and size",
         "tags": ["Admin"]
       }
@@ -24659,6 +25674,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "List teammate personal calendars the caller can subscribe to",
         "tags": ["Public"]
       }
@@ -24709,6 +25729,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "Reverse an LLM-origin event with a compensating event",
         "tags": ["Tasks"]
       }
@@ -24785,6 +25810,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "Export tasks as JSON",
         "tags": ["Admin"]
       }
@@ -24853,6 +25883,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "Export tasks as CSV",
         "tags": ["Admin"]
       }
@@ -24916,6 +25951,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "List import jobs for the workspace",
         "tags": ["Admin"]
       },
@@ -24964,6 +26004,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "Create an import job",
         "tags": ["Admin"]
       }
@@ -25012,6 +26057,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "Get a single import job",
         "tags": ["Admin"]
       }
@@ -25060,6 +26110,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "Cancel a pending or running import job",
         "tags": ["Admin"]
       }
@@ -25110,6 +26165,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "Ask the AI orchestrator to score and recommend actions for inbox items",
         "tags": ["Tasks"]
       }
@@ -25193,6 +26253,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "List intake items in the triage queue",
         "tags": ["Tasks"]
       },
@@ -25241,6 +26306,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "Create an intake item",
         "tags": ["Tasks"]
       }
@@ -25289,6 +26359,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "Get a single intake item",
         "tags": ["Tasks"]
       },
@@ -25345,6 +26420,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "Triage an intake item (accept, reject, snooze, or mark duplicate)",
         "tags": ["Tasks"]
       }
@@ -25403,6 +26483,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "Convert an intake item into a task",
         "tags": ["Tasks"]
       }
@@ -25445,6 +26530,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "List inbound webhook source mappings",
         "tags": ["Integration"]
       },
@@ -25495,6 +26585,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "Route an external webhook source to this workspace",
         "tags": ["Integration"]
       }
@@ -25547,6 +26642,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "Release a webhook source mapping",
         "tags": ["Integration"]
       },
@@ -25607,6 +26707,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "Rename or pause a webhook source mapping",
         "tags": ["Integration"]
       }
@@ -25670,6 +26775,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "List invite links"
       },
       "post": {
@@ -25717,6 +26827,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "Create an invite link"
       }
     },
@@ -25764,6 +26879,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "Revoke an invite link"
       }
     },
@@ -25836,6 +26956,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "List labels in a workspace",
         "tags": ["Labels"]
       },
@@ -25884,6 +27009,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "Create a label",
         "tags": ["Labels"]
       }
@@ -25932,6 +27062,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "Soft-disable a label",
         "tags": ["Labels"]
       },
@@ -25978,6 +27113,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "Fetch a label",
         "tags": ["Labels"]
       },
@@ -26034,6 +27174,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "Update a label",
         "tags": ["Labels"]
       }
@@ -26107,6 +27252,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "List saved views for a workspace/project",
         "tags": ["Lens"]
       },
@@ -26155,6 +27305,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "Create a saved view (lens)",
         "tags": ["Lens"]
       }
@@ -26203,6 +27358,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "Delete a saved view",
         "tags": ["Lens"]
       },
@@ -26249,6 +27409,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "Fetch a saved view",
         "tags": ["Lens"]
       },
@@ -26305,6 +27470,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "Update a saved view",
         "tags": ["Lens"]
       }
@@ -26353,6 +27523,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "Publish a lens publicly with a shareable token URL",
         "tags": ["Lens"]
       }
@@ -26401,6 +27576,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "Revoke public access to a lens",
         "tags": ["Lens"]
       }
@@ -26464,6 +27644,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "List the caller's MCP tokens (no plaintext)",
         "tags": ["AI"]
       },
@@ -26512,6 +27697,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "Mint a new MCP bearer token (plaintext returned once)",
         "tags": ["AI"]
       }
@@ -26560,6 +27750,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "Revoke an MCP bearer token",
         "tags": ["AI"]
       }
@@ -26623,6 +27818,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "List workspace members"
       },
       "post": {
@@ -26670,6 +27870,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "Add a member to a workspace"
       }
     },
@@ -26717,6 +27922,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "Remove a member from a workspace"
       },
       "patch": {
@@ -26772,6 +27982,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "Update a member's role"
       }
     },
@@ -26813,6 +28028,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "List the caller's notification preferences",
         "tags": ["Tasks"]
       },
@@ -26863,6 +28083,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "Update the caller's notification preferences",
         "tags": ["Tasks"]
       }
@@ -26905,6 +28130,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "Mark all notifications as read in a workspace",
         "tags": ["Tasks"]
       }
@@ -26968,6 +28198,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "List root pages in a workspace",
         "tags": ["Public"]
       },
@@ -27016,6 +28251,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "Create a page",
         "tags": ["Public"]
       }
@@ -27066,6 +28306,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "Generate a page with AI",
         "tags": ["Public"]
       }
@@ -27141,6 +28386,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "Search pages by title",
         "tags": ["Public"]
       }
@@ -27189,6 +28439,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "Soft-delete a page",
         "tags": ["Public"]
       },
@@ -27235,6 +28490,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "Fetch a page by id",
         "tags": ["Public"]
       },
@@ -27291,6 +28551,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "Update a page",
         "tags": ["Public"]
       }
@@ -27362,6 +28627,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "List child pages",
         "tags": ["Public"]
       }
@@ -27425,6 +28695,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "List projects in a workspace",
         "tags": ["Workspace"]
       },
@@ -27473,6 +28748,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "Create a project in a workspace",
         "tags": ["Workspace"]
       }
@@ -27515,6 +28795,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "List public share pages in a workspace",
         "tags": ["Public"]
       },
@@ -27565,6 +28850,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "Create a public share page (returns plaintext token once)",
         "tags": ["Public"]
       }
@@ -27617,6 +28907,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "Delete a public share page (admin or owner only)",
         "tags": ["Public"]
       },
@@ -27667,6 +28962,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "Get a public share page with its published events",
         "tags": ["Public"]
       },
@@ -27727,6 +29027,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "Update public share page metadata",
         "tags": ["Public"]
       }
@@ -27789,6 +29094,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "Attach events to a public share page",
         "tags": ["Public"]
       }
@@ -27851,6 +29161,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "Batch-reorder the events published on a public share page",
         "tags": ["Public"]
       }
@@ -27913,6 +29228,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "Detach an event from a public share page",
         "tags": ["Public"]
       }
@@ -27965,6 +29285,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "Rotate the URL token for a public share page",
         "tags": ["Public"]
       }
@@ -28030,6 +29355,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "List pending relation suggestions for a workspace",
         "tags": ["Tasks"]
       }
@@ -28080,6 +29410,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "Apply AI proposal — create parent task with subtasks and assignees",
         "tags": ["Tasks"]
       }
@@ -28153,6 +29488,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "List archived tasks in a workspace",
         "tags": ["Tasks"]
       }
@@ -28228,6 +29568,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "List draft tasks in a workspace by reason (currently only retro)",
         "tags": ["Tasks"]
       }
@@ -28278,6 +29623,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "AI-powered subtask decomposition and assignee suggestions",
         "tags": ["Tasks"]
       }
@@ -28341,6 +29691,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "List timeboxes in a workspace",
         "tags": ["Tasks"]
       },
@@ -28389,6 +29744,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "Create a timebox",
         "tags": ["Tasks"]
       }
@@ -28437,6 +29797,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "Soft-delete a timebox",
         "tags": ["Tasks"]
       },
@@ -28483,6 +29848,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "Fetch a timebox by id",
         "tags": ["Tasks"]
       },
@@ -28539,6 +29909,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "Update a timebox",
         "tags": ["Tasks"]
       }
@@ -28597,6 +29972,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "Transition timebox status",
         "tags": ["Tasks"]
       }
@@ -28668,6 +30048,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "List tasks in a timebox with progress",
         "tags": ["Tasks"]
       },
@@ -28724,6 +30109,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "Add a task to a timebox",
         "tags": ["Tasks"]
       }
@@ -28780,6 +30170,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "Remove a task from a timebox",
         "tags": ["Tasks"]
       }
@@ -28866,6 +30261,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "List events in a workspace's timeline",
         "tags": ["Tasks"]
       }
@@ -28906,6 +30306,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "List workspace users (actor picker)"
       }
     },
@@ -28970,6 +30375,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "List webhook subscriptions",
         "tags": ["Webhook"]
       },
@@ -29020,6 +30430,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "Create a webhook subscription",
         "tags": ["Webhook"]
       }
@@ -29072,6 +30487,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "Soft-delete a webhook subscription",
         "tags": ["Webhook"]
       },
@@ -29122,6 +30542,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "Get a webhook subscription (includes secret)",
         "tags": ["Webhook"]
       }
@@ -29197,6 +30622,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "List delivery log for a webhook subscription",
         "tags": ["Webhook"]
       }
@@ -29249,6 +30679,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "Send a test ping delivery",
         "tags": ["Webhook"]
       }
@@ -29311,6 +30746,11 @@
             "description": "Error"
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "Activate or deactivate a webhook subscription",
         "tags": ["Webhook"]
       }

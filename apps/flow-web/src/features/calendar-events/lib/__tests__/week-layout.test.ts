@@ -10,7 +10,13 @@
 import type { components } from '@nodate-flow/sdk';
 import { describe, expect, it } from 'vitest';
 
-import { isMultiDay, layoutWeek } from '../week-layout';
+import {
+  eventStartKey,
+  groupEventsByWeek,
+  isMultiDay,
+  layoutWeek,
+  startOfDay,
+} from '../week-layout';
 
 type CalendarEvent = components['schemas']['MyCalendarEventResponse'];
 
@@ -110,5 +116,78 @@ describe('layoutWeek', () => {
       endAt: unix(2026, 6, 2, 11),
     });
     expect(layoutWeek(weekStart, [single])).toHaveLength(0);
+  });
+});
+
+describe('groupEventsByWeek', () => {
+  /** Two years of Monday-aligned week rows, as the month view renders. */
+  const weekStarts = Array.from({ length: 109 }, (_, i) =>
+    startOfDay(new Date(2026, 0, 5 + i * 7)),
+  );
+  const key = (d: Date): string =>
+    `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+
+  /** A spread of single- and multi-day events across the whole range. */
+  const events: CalendarEvent[] = Array.from({ length: 300 }, (_, i) => {
+    const start = new Date(2026, 0, 5 + ((i * 3) % 730), 9);
+    const spanDays = i % 7 === 0 ? 9 : i % 3 === 0 ? 1 : 0;
+    const end = new Date(start.getTime() + spanDays * 86_400_000 + 3_600_000);
+    return makeEvent({
+      id: `e-${i}`,
+      startAt: Math.floor(start.getTime() / 1000),
+      endAt: Math.floor(end.getTime() / 1000),
+    });
+  });
+
+  it('gives every week exactly the bars it got from the whole list', () => {
+    // What the view did before: hand each row all the events and let it
+    // filter. Grouping first must not change a single row's outcome.
+    const grouped = groupEventsByWeek(events, weekStarts, key);
+    for (const ws of weekStarts) {
+      const fromAll = layoutWeek(ws, events);
+      const fromBucket = layoutWeek(ws, grouped.get(key(ws)) ?? []);
+      expect(fromBucket, key(ws)).toEqual(fromAll);
+    }
+  });
+
+  it('gives every week exactly the single-day events it showed before', () => {
+    const grouped = groupEventsByWeek(events, weekStarts, key);
+    for (const ws of weekStarts) {
+      const weekKeys = new Set(
+        Array.from({ length: 7 }, (_, i) =>
+          key(startOfDay(new Date(ws.getTime() + i * 86_400_000))),
+        ),
+      );
+      const singlesIn = (list: CalendarEvent[]): string[] =>
+        list
+          .filter((e) => !isMultiDay(e))
+          .filter((e) => {
+            const k = eventStartKey(e);
+            return k !== null && weekKeys.has(k);
+          })
+          .map((e) => e.id)
+          .sort();
+      expect(singlesIn(grouped.get(key(ws)) ?? []), key(ws)).toEqual(singlesIn(events));
+    }
+  });
+
+  it('files a multi-day event under every week it crosses', () => {
+    const spanning = makeEvent({
+      id: 'long',
+      startAt: Math.floor(new Date(2026, 0, 7, 9).getTime() / 1000),
+      endAt: Math.floor(new Date(2026, 0, 20, 9).getTime() / 1000),
+    });
+    const grouped = groupEventsByWeek([spanning], weekStarts, key);
+    const weeksHolding = weekStarts.filter((ws) => grouped.get(key(ws))?.length);
+    expect(weeksHolding.map(key)).toEqual(['2026-01-05', '2026-01-12', '2026-01-19']);
+  });
+
+  it('leaves weeks outside the range alone', () => {
+    const before = makeEvent({
+      id: 'before',
+      startAt: Math.floor(new Date(2020, 0, 1, 9).getTime() / 1000),
+      endAt: Math.floor(new Date(2020, 0, 1, 10).getTime() / 1000),
+    });
+    expect(groupEventsByWeek([before], weekStarts, key).size).toBe(0);
   });
 });

@@ -292,20 +292,62 @@ export function createTokenRefresher(options: RefreshMiddlewareOptions): TokenRe
   return refreshAccessToken;
 }
 
-/** Auth paths that must never trigger a refresh (prevents loops). */
-const AUTH_SKIP_SUFFIXES = [
-  '/auth/refresh',
-  '/auth/login',
-  '/auth/register',
-  '/auth/logout',
-] as const;
-
-function isAuthPath(url: string): boolean {
+/** The request's path, falling back to the raw string if it will not parse. */
+function pathOf(url: string): string {
   try {
-    const path = new URL(url).pathname;
-    return AUTH_SKIP_SUFFIXES.some((suffix) => path.endsWith(suffix));
+    return new URL(url).pathname;
   } catch {
-    return AUTH_SKIP_SUFFIXES.some((suffix) => url.endsWith(suffix));
+    return url;
+  }
+}
+
+/**
+ * Whether the request is to one of the API's unauthenticated operations.
+ *
+ * These endpoints carry their own capability — an opaque share or invite
+ * token in the path, a credential in the body, or nothing at all for the
+ * health probe — and a bearer changes nothing about what they return.
+ *
+ * Two things follow from calling one with a refresh in front of it.
+ * Every `/auth/*` call would recurse, since a refresh is itself an
+ * `/auth/*` call. And nobody following a shared link has a session, so
+ * the first paint of a public page would wait on a round trip to
+ * auth-api that is certain to be refused, spending the caller's
+ * `/auth/refresh` budget on the way. Behind a shared egress address that
+ * budget belongs to signed-in colleagues, who get logged out to pay for
+ * it.
+ *
+ * The list lives in the SDK because the paths are the API's, not any one
+ * app's: flow-web, accounts-web and the CLI all call through here and
+ * would otherwise each need their own copy to stay correct. What keeps
+ * it honest is the spec: `public-paths.test.ts` walks every operation in
+ * the committed OpenAPI document and requires this function to agree
+ * with the security requirement each one declares.
+ */
+function skipsRefresh(url: string): boolean {
+  const segments = pathOf(url).split('/').filter(Boolean);
+  const [first, second, third] = segments;
+  // Signing in, signing out, and everything leading up to either. None
+  // of it needs a token and the refresh endpoint lives here too.
+  if (first === 'auth') return true;
+  switch (segments.length) {
+    case 1:
+      return first === 'health';
+    case 2:
+      // Avatars are served to <img src>, which sends no headers.
+      // /public/lenses/{token} is length 3; /public/... covers the rest.
+      return first === 'public' || first === 'avatars';
+    case 3:
+      if (first === 'public') return true;
+      if (first === 'share' && second === 'cal') return true;
+      // The provider redirects the browser back here; there is no
+      // session yet on the leg that completes the connection.
+      if (first === 'oauth' && second === 'callback') return true;
+      // /invites/{token}/info previews an invite before sign-in;
+      // /invites/{token}/accept needs an account and is not public.
+      return first === 'invites' && third === 'info';
+    default:
+      return false;
   }
 }
 
@@ -314,7 +356,9 @@ function isAuthPath(url: string): boolean {
  * responses, attempts a token refresh via the provided `refreshFn`,
  * and replays the original request with the new token.
  *
- * Auth-related paths are excluded to prevent infinite loops.
+ * Auth-related paths are excluded to prevent infinite loops, and the
+ * API's public paths because a 401 from one of those says the token in
+ * the URL is wrong, which no refresh can fix.
  *
  * This middleware is the reactive backstop for unexpected 401s. Pair
  * it with {@link createAuthRequestMiddleware} to avoid the console
@@ -328,7 +372,7 @@ export function createRefreshMiddleware(refreshFn: () => Promise<string | null>)
     async onResponse({ request, response }) {
       if (response.status !== 401) return response;
 
-      if (isAuthPath(request.url)) return response;
+      if (skipsRefresh(request.url)) return response;
 
       const newToken = await refreshFn();
       if (!newToken) return response;
@@ -371,14 +415,18 @@ export interface AuthRequestMiddlewareOptions {
  * succeeds, but the console stays noisy.
  *
  * Auth endpoints (`/auth/refresh`, `/auth/login`, `/auth/register`,
- * `/auth/logout`) are skipped to avoid recursive refresh loops.
+ * `/auth/logout`) are skipped to avoid recursive refresh loops, and the
+ * API's public endpoints are skipped and left without a bearer — see
+ * {@link isPublicPath} for why that matters to people who never sign in.
  */
 export function createAuthRequestMiddleware(options: AuthRequestMiddlewareOptions): {
   onRequest: (ctx: { request: Request }) => Promise<Request>;
 } {
   return {
     async onRequest({ request }) {
-      if (isAuthPath(request.url)) return request;
+      // Public operations need no bearer, and asking for one costs a
+      // refused round trip on every unauthenticated view.
+      if (skipsRefresh(request.url)) return request;
 
       // If the current token is missing or about to expire, block the
       // request on a refresh so the outbound call carries a fresh

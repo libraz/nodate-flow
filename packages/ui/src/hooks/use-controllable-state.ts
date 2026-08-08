@@ -44,6 +44,7 @@ export function useControllableState<T>(
     if (nowControlled !== isControlled) {
       warnedRef.current = true;
       const label = name ?? 'A component';
+      // biome-ignore lint/suspicious/noConsole: dev-only warning; the branch above is stripped in production builds.
       console.error(
         isControlled
           ? `${label} is changing from controlled to uncontrolled. Pass the controlled value for the whole lifetime of the component, using null or an empty value rather than undefined for "no selection".`

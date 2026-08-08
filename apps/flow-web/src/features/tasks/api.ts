@@ -178,6 +178,7 @@ export interface DuplicatesResult {
 
 import { ApiError, toApiError } from '../../lib/api-error';
 import { sha256Hex } from '../../lib/crypto/sha256';
+import { resolveContentType } from '../../lib/file-mime';
 
 export { ApiError as TaskApiError };
 
@@ -1076,7 +1077,7 @@ export function usePresignUpload(): UseMutationResult<
   return useMutation({
     mutationFn: async ({ taskId, file }: PresignUploadArgs): Promise<PresignUploadResult> => {
       const sha256 = await sha256Hex(file);
-      const contentType = file.type || 'application/octet-stream';
+      const contentType = resolveContentType(file);
       const { data, error } = await sdk.POST('/tasks/{id}/attachments/presign', {
         params: { path: { id: taskId } },
         body: {

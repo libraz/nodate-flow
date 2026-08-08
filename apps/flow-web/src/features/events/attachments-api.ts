@@ -32,6 +32,7 @@ import {
 
 import { ApiError, toApiError } from '../../lib/api-error';
 import { sha256Hex } from '../../lib/crypto/sha256';
+import { resolveContentType } from '../../lib/file-mime';
 import { sdk } from '../../lib/sdk';
 
 export type EventAttachment = components['schemas']['AttachmentResponse'];
@@ -97,7 +98,7 @@ export function usePresignEventAttachmentMutation(): UseMutationResult<
   return useMutation<PresignAttachmentResult, ApiError, PresignEventAttachmentArgs>({
     mutationFn: async ({ wsId, calId, evtId, file }): Promise<PresignAttachmentResult> => {
       const sha256 = await sha256Hex(file);
-      const contentType = file.type || 'application/octet-stream';
+      const contentType = resolveContentType(file);
       const { data, error } = await sdk.POST(
         '/workspaces/{wsId}/calendars/{calId}/events/{evtId}/attachments/presign',
         {

@@ -21,6 +21,7 @@
 import type { HolidayEntry } from '@nodate-flow/holidays';
 import type { components } from '@nodate-flow/sdk';
 import { cx } from '@nodate-flow/ui/lib/cx';
+import { defaultRangeExtractor, useVirtualizer } from '@tanstack/react-virtual';
 import { Users } from 'lucide-react';
 import { type ReactElement, useCallback, useEffect, useLayoutEffect, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -28,6 +29,7 @@ import { useTranslation } from 'react-i18next';
 import { dateKey } from '../../lib/date-utils';
 import {
   eventStartKey,
+  groupEventsByWeek,
   isMultiDay,
   layoutWeek,
   MAX_VISIBLE_TRACKS,
@@ -67,14 +69,23 @@ type ScrollItem =
  * `RANGE_MONTHS` before and after today, plus the week key that
  * contains today (so the view can auto-scroll there on mount).
  */
-function buildItems(weekStart: WeekStart): { items: ScrollItem[]; todayWeekKey: string } {
+function buildItems(weekStart: WeekStart): {
+  items: ScrollItem[];
+  todayWeekKey: string;
+  todayIndex: number;
+  headerIndexes: number[];
+  weekStarts: Date[];
+} {
   const today = startOfDay(new Date());
   const rangeStart = new Date(today.getFullYear(), today.getMonth() - RANGE_MONTHS, 1);
   const rangeEnd = new Date(today.getFullYear(), today.getMonth() + RANGE_MONTHS + 1, 0);
 
   const items: ScrollItem[] = [];
+  const headerIndexes: number[] = [];
+  const weekStarts: Date[] = [];
   const seenMonths = new Set<string>();
   let todayWeekKey = '';
+  let todayIndex = 0;
 
   // First week-start on or before the range start.
   let ws = addDays(rangeStart, -dowFromStart(rangeStart, weekStart));
@@ -91,6 +102,7 @@ function buildItems(weekStart: WeekStart): { items: ScrollItem[]; todayWeekKey: 
         const monthKey = `${anchor.getFullYear()}-${String(anchor.getMonth() + 1).padStart(2, '0')}`;
         if (!seenMonths.has(monthKey)) {
           seenMonths.add(monthKey);
+          headerIndexes.push(items.length);
           items.push({ kind: 'header', key: `h-${monthKey}`, monthKey, date: anchor });
         }
       }
@@ -100,12 +112,14 @@ function buildItems(weekStart: WeekStart): { items: ScrollItem[]; todayWeekKey: 
     const weekEndExclusive = addDays(ws, 7);
     if (today.getTime() >= ws.getTime() && today.getTime() < weekEndExclusive.getTime()) {
       todayWeekKey = dateKey(ws);
+      todayIndex = items.length;
     }
+    weekStarts.push(ws);
     items.push({ kind: 'week', key: weekKey, weekStart: ws });
     ws = addDays(ws, 7);
   }
 
-  return { items, todayWeekKey };
+  return { items, todayWeekKey, todayIndex, headerIndexes, weekStarts };
 }
 
 /** Date-number tint for a day cell (Sunday/holiday → danger, Saturday → info). */
@@ -162,6 +176,9 @@ export interface MonthScrollProps {
 
 /** Vertical metrics (rem) that keep single-day chips aligned with multi-day bars. */
 const TRACK_REM = 1.25;
+
+/** Shared empty list so weeks with no events keep a stable prop identity. */
+const EMPTY_EVENTS: CalendarEvent[] = [];
 
 interface WeekRowProps {
   weekStart: Date;
@@ -420,12 +437,29 @@ function WeekRow({
   );
 }
 
+/** Starting height guesses (px) the virtualizer refines by measuring. */
+const ESTIMATED_HEADER_PX = 32;
+const ESTIMATED_WEEK_PX = 112;
+
+/**
+ * How far below the top of the viewport "scroll to today" leaves the
+ * week — enough to clear the pinned month header.
+ */
+const TODAY_SCROLL_INSET_PX = 32;
+
 /**
  * MonthScroll — top-level infinite-scroll month view. Builds the week
  * range once on mount (today never moves within a session) and renders
  * weekday labels, a scrollable body of week rows with sticky month
  * headers, and auto-scrolls to today on mount + whenever the toolbar
  * "Today" signal changes.
+ *
+ * The two years of rows are virtualized: only the rows near the viewport
+ * are in the DOM, instead of a hundred-odd rows and their several
+ * hundred day cells all mounted at once for a phone to lay out. The
+ * month header for the row at the top stays pinned through the
+ * virtualizer's range, since a `position: sticky` element cannot be one
+ * of the absolutely-positioned rows around it.
  */
 export default function MonthScroll({
   events,
@@ -443,8 +477,17 @@ export default function MonthScroll({
   const { t } = useTranslation('common');
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  const { items, todayWeekKey } = useMemo(() => buildItems(weekStart), [weekStart]);
+  const { items, todayIndex, headerIndexes, weekStarts } = useMemo(
+    () => buildItems(weekStart),
+    [weekStart],
+  );
   const todayKey = useMemo(() => dateKey(startOfDay(new Date())), []);
+
+  // One pass over the events instead of one pass per rendered week.
+  const eventsByWeek = useMemo(
+    () => groupEventsByWeek(events, weekStarts, dateKey, timezone),
+    [events, weekStarts, timezone],
+  );
 
   const weekdayLabels = useMemo(() => {
     const fmt = new Intl.DateTimeFormat(locale, { weekday: 'short' });
@@ -461,21 +504,46 @@ export default function MonthScroll({
     [locale],
   );
 
+  // Index of the month header currently pinned at the top. Recomputed
+  // from the virtualizer's own range so it tracks the scroll position
+  // without a second scroll listener.
+  const activeHeaderRef = useRef(headerIndexes[0] ?? 0);
+
+  const virtualizer = useVirtualizer({
+    count: items.length,
+    getScrollElement: () => scrollRef.current,
+    estimateSize: (index) =>
+      items[index]?.kind === 'header' ? ESTIMATED_HEADER_PX : ESTIMATED_WEEK_PX,
+    overscan: 3,
+    rangeExtractor: (range) => {
+      // The header for the month the top row belongs to is always kept
+      // in the range, whether or not it is inside the window: it is the
+      // one rendered as the pinned header.
+      let active = headerIndexes[0] ?? 0;
+      for (const index of headerIndexes) {
+        if (index > range.startIndex) break;
+        active = index;
+      }
+      activeHeaderRef.current = active;
+      const indexes = new Set(defaultRangeExtractor(range));
+      indexes.add(active);
+      return [...indexes].sort((a, b) => a - b);
+    },
+  });
+
   const scrollToToday = useCallback(
     (smooth: boolean) => {
-      const container = scrollRef.current;
-      if (!container || !todayWeekKey) return;
-      const el = container.querySelector<HTMLElement>(`[data-week="${todayWeekKey}"]`);
-      if (!el) return;
-      const cRect = container.getBoundingClientRect();
-      const tRect = el.getBoundingClientRect();
-      const delta = tRect.top - cRect.top;
-      container.scrollTo({
-        top: container.scrollTop + delta - 32,
+      if (!todayIndex) return;
+      virtualizer.scrollToIndex(todayIndex, {
+        align: 'start',
         behavior: smooth ? 'smooth' : 'auto',
       });
+      const container = scrollRef.current;
+      // Back the row off the very top so the pinned header does not
+      // cover it, matching where the view has always opened.
+      if (container) container.scrollTop -= TODAY_SCROLL_INSET_PX;
     },
-    [todayWeekKey],
+    [todayIndex, virtualizer],
   );
 
   // Initial position: align today's week just under the pinned header.
@@ -514,27 +582,53 @@ export default function MonthScroll({
         role="grid"
         aria-label={t('calendar.month_scroll.aria_label')}
       >
-        {items.map((item) =>
-          item.kind === 'header' ? (
-            <div key={item.key} className={styles.monthHeader} data-month={item.monthKey}>
-              {monthFmt.format(item.date)}
-            </div>
-          ) : (
-            <WeekRow
-              key={item.key}
-              weekStart={item.weekStart}
-              timezone={timezone}
-              events={events}
-              tasksByDate={tasksByDate}
-              holidaysByDate={holidaysByDate}
-              todayKey={todayKey}
-              stateColor={stateColor}
-              onDayCreate={onDayCreate}
-              onEventOpen={onEventOpen}
-              onTaskOpen={onTaskOpen}
-            />
-          ),
-        )}
+        <div className={styles.scrollInner} style={{ blockSize: virtualizer.getTotalSize() }}>
+          {virtualizer.getVirtualItems().map((virtualItem) => {
+            const item = items[virtualItem.index];
+            if (!item) return null;
+            const pinned = virtualItem.index === activeHeaderRef.current;
+            // The pinned header is the one element that must not be
+            // translated into place — sticky positioning and a transform
+            // cannot both apply to it.
+            const style = pinned ? undefined : { transform: `translateY(${virtualItem.start}px)` };
+            if (item.kind === 'header') {
+              return (
+                <div
+                  key={item.key}
+                  ref={virtualizer.measureElement}
+                  data-index={virtualItem.index}
+                  className={cx(styles.monthHeader, !pinned && styles.virtualItem)}
+                  data-month={item.monthKey}
+                  style={style}
+                >
+                  {monthFmt.format(item.date)}
+                </div>
+              );
+            }
+            return (
+              <div
+                key={item.key}
+                ref={virtualizer.measureElement}
+                data-index={virtualItem.index}
+                className={styles.virtualItem}
+                style={style}
+              >
+                <WeekRow
+                  weekStart={item.weekStart}
+                  timezone={timezone}
+                  events={eventsByWeek.get(dateKey(item.weekStart)) ?? EMPTY_EVENTS}
+                  tasksByDate={tasksByDate}
+                  holidaysByDate={holidaysByDate}
+                  todayKey={todayKey}
+                  stateColor={stateColor}
+                  onDayCreate={onDayCreate}
+                  onEventOpen={onEventOpen}
+                  onTaskOpen={onTaskOpen}
+                />
+              </div>
+            );
+          })}
+        </div>
       </div>
     </div>
   );
