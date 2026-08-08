@@ -398,6 +398,13 @@ type fakeRefresherQuerier struct {
 	listErr    error
 	listCalled bool
 	updateFn   func(generated.UpdateConnectionTokensParams) error
+	// claimFn overrides the claim outcome. Nil means every claim
+	// succeeds, which is what a single refresher in a single process
+	// sees and what these unit tests are about; the contention the claim
+	// exists for is covered against a real database in
+	// refresher_claim_concurrency_test.go.
+	claimFn     func(generated.ClaimConnectionForRefreshParams) (int64, error)
+	claimParams []generated.ClaimConnectionForRefreshParams
 }
 
 func (f *fakeRefresherQuerier) ListConnectionsExpiringBefore(
@@ -405,6 +412,16 @@ func (f *fakeRefresherQuerier) ListConnectionsExpiringBefore(
 ) ([]generated.ListConnectionsExpiringBeforeRow, error) {
 	f.listCalled = true
 	return f.rows, f.listErr
+}
+
+func (f *fakeRefresherQuerier) ClaimConnectionForRefresh(
+	_ context.Context, arg generated.ClaimConnectionForRefreshParams,
+) (int64, error) {
+	f.claimParams = append(f.claimParams, arg)
+	if f.claimFn != nil {
+		return f.claimFn(arg)
+	}
+	return 1, nil
 }
 
 func (f *fakeRefresherQuerier) UpdateConnectionTokens(

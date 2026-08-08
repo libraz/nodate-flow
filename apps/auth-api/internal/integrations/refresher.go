@@ -16,6 +16,7 @@ import (
 // an in-memory fake without pulling in the full sqlc surface.
 type RefresherQuerier interface {
 	ListConnectionsExpiringBefore(ctx context.Context, cutoff sql.NullTime) ([]generated.ListConnectionsExpiringBeforeRow, error)
+	ClaimConnectionForRefresh(ctx context.Context, arg generated.ClaimConnectionForRefreshParams) (int64, error)
 	UpdateConnectionTokens(ctx context.Context, arg generated.UpdateConnectionTokensParams) error
 }
 
@@ -32,6 +33,14 @@ type RefresherQuerier interface {
 // a non-NULL expires_at in the first place so they never surface
 // in the listing anyway, but the guard keeps the worker correct
 // if a provider later starts issuing expiries.
+//
+// Every API replica runs this loop, so each pass claims a row before
+// touching it (ClaimConnectionForRefresh) and skips any row another
+// replica already took. Without the claim, two replicas exchange the
+// same refresh token within milliseconds of each other; a provider that
+// rotates refresh tokens on use reads the second exchange as replay and
+// revokes the grant outright, breaking the connection permanently with
+// nothing shown in the UI.
 type Refresher struct {
 	Queries  RefresherQuerier
 	Cipher   *crypto.Cipher
@@ -43,11 +52,20 @@ type Refresher struct {
 	// LeadTime is the "refresh a token if it expires within this
 	// window" horizon. Defaults to 15 minutes.
 	LeadTime time.Duration
+	// ClaimLease is how long a claim holds a connection against the
+	// other replicas. It has to outlast one provider round trip and
+	// nothing more: a successful refresh pushes the token's expiry
+	// about an hour out, so the row leaves the listing window and is
+	// not offered again for far longer than this. Defaults to 30s.
+	ClaimLease time.Duration
 }
 
 const (
 	defaultRefresherInterval = 10 * time.Minute
 	defaultRefresherLeadTime = 15 * time.Minute
+	// defaultRefresherClaimLease bounds how long one replica's claim
+	// keeps the others off a connection. See Refresher.ClaimLease.
+	defaultRefresherClaimLease = 30 * time.Second
 )
 
 // Run blocks until ctx is cancelled, running RefreshOnce on every
@@ -100,6 +118,33 @@ func (r *Refresher) RefreshOnce(ctx context.Context) error {
 		if ctx.Err() != nil {
 			return ctx.Err()
 		}
+		// Two guards, because they cover different replicas.
+		//
+		// The lease covers a replica that listed *after* another one
+		// claimed: it reads the fresh last_refreshed_at, so a
+		// compare-and-swap on that value would succeed and it would
+		// refresh the row a second time while the winner is still
+		// talking to the provider. Skipping anything touched within the
+		// lease closes that.
+		//
+		// The compare-and-swap covers replicas that listed at the same
+		// instant and therefore hold the same value: exactly one UPDATE
+		// matches it, and the rest see zero rows.
+		if row.LastRefreshedAt.Valid && time.Since(row.LastRefreshedAt.Time) < r.claimLease() {
+			continue
+		}
+		claimed, err := r.Queries.ClaimConnectionForRefresh(ctx, generated.ClaimConnectionForRefreshParams{
+			ID:              row.ID,
+			LastRefreshedAt: row.LastRefreshedAt,
+		})
+		if err != nil {
+			log.Warn("integrations refresher: claim failed",
+				"provider", row.Provider, "connection_id", row.PublicID.String(), "err", err)
+			continue
+		}
+		if claimed == 0 {
+			continue
+		}
 		r.refreshRow(ctx, row, log)
 	}
 	return nil
@@ -109,7 +154,7 @@ func (r *Refresher) refreshRow(ctx context.Context, row generated.ListConnection
 	provider, err := r.Registry.Get(string(row.Provider))
 	if err != nil {
 		log.Warn("integrations refresher: provider unavailable",
-			"provider", row.Provider, "user_id", row.UserID, "err", err)
+			"provider", row.Provider, "connection_id", row.PublicID.String(), "err", err)
 		return
 	}
 	if !row.RefreshTokenCiphertext.Valid || len(row.RefreshTokenCiphertext.String) == 0 {
@@ -118,7 +163,7 @@ func (r *Refresher) refreshRow(ctx context.Context, row generated.ListConnection
 	refreshPlain, err := r.Cipher.Decrypt([]byte(row.RefreshTokenCiphertext.String))
 	if err != nil {
 		log.Warn("integrations refresher: decrypt refresh token failed",
-			"provider", row.Provider, "user_id", row.UserID, "err", err)
+			"provider", row.Provider, "connection_id", row.PublicID.String(), "err", err)
 		return
 	}
 	tok, err := provider.Refresh(ctx, string(refreshPlain))
@@ -127,18 +172,18 @@ func (r *Refresher) refreshRow(ctx context.Context, row generated.ListConnection
 			return
 		}
 		log.Warn("integrations refresher: provider refresh failed",
-			"provider", row.Provider, "user_id", row.UserID, "err", err)
+			"provider", row.Provider, "connection_id", row.PublicID.String(), "err", err)
 		return
 	}
 	if tok == nil || tok.AccessToken == "" {
 		log.Warn("integrations refresher: empty token set",
-			"provider", row.Provider, "user_id", row.UserID)
+			"provider", row.Provider, "connection_id", row.PublicID.String())
 		return
 	}
 	newAccess, err := r.Cipher.Encrypt([]byte(tok.AccessToken))
 	if err != nil {
 		log.Warn("integrations refresher: encrypt access token failed",
-			"provider", row.Provider, "user_id", row.UserID, "err", err)
+			"provider", row.Provider, "connection_id", row.PublicID.String(), "err", err)
 		return
 	}
 	// Preserve existing refresh token if the provider did not
@@ -148,7 +193,7 @@ func (r *Refresher) refreshRow(ctx context.Context, row generated.ListConnection
 		enc, encErr := r.Cipher.Encrypt([]byte(tok.RefreshToken))
 		if encErr != nil {
 			log.Warn("integrations refresher: encrypt refresh token failed",
-				"provider", row.Provider, "user_id", row.UserID, "err", encErr)
+				"provider", row.Provider, "connection_id", row.PublicID.String(), "err", encErr)
 			return
 		}
 		newRefresh = sql.NullString{String: string(enc), Valid: true}
@@ -164,11 +209,11 @@ func (r *Refresher) refreshRow(ctx context.Context, row generated.ListConnection
 		ID:                     row.ID,
 	}); err != nil {
 		log.Warn("integrations refresher: update row failed",
-			"provider", row.Provider, "user_id", row.UserID, "err", err)
+			"provider", row.Provider, "connection_id", row.PublicID.String(), "err", err)
 		return
 	}
 	log.Info("integrations refresher: token refreshed",
-		"provider", row.Provider, "user_id", row.UserID, "expires_at", tok.ExpiresAt)
+		"provider", row.Provider, "connection_id", row.PublicID.String(), "expires_at", tok.ExpiresAt)
 }
 
 func (r *Refresher) logger() *slog.Logger {
@@ -183,4 +228,11 @@ func (r *Refresher) leadTime() time.Duration {
 		return r.LeadTime
 	}
 	return defaultRefresherLeadTime
+}
+
+func (r *Refresher) claimLease() time.Duration {
+	if r.ClaimLease > 0 {
+		return r.ClaimLease
+	}
+	return defaultRefresherClaimLease
 }
