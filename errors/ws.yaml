@@ -593,6 +593,24 @@ resources:
         description: "Returned when attempting to cancel an import job that has already completed, failed, or been cancelled."
         userAction: "The import job is no longer in a cancellable state."
 
+      config_key_unknown:
+        code: WS.IMPORT.CONFIG_KEY_UNKNOWN
+        status: 400
+        message: "The import configuration contains a key this source does not accept"
+        message_ja: "インポート設定に、このソースが受け付けないキーが含まれています"
+        message_zh: "导入配置中包含此来源不接受的键"
+        description: "Returned when configJson carries a key outside the set the chosen import source defines. Applies to sources that have a connector; a source without one has not declared its keys yet."
+        userAction: "Remove the key, or choose the import source it belongs to."
+
+      config_secret_rejected:
+        code: WS.IMPORT.CONFIG_SECRET_REJECTED
+        status: 400
+        message: "The import configuration must not carry credentials"
+        message_ja: "インポート設定に資格情報を含めることはできません"
+        message_zh: "导入配置中不得包含凭据"
+        description: "Returned when configJson carries a key whose name indicates a credential (token, secret, password, API key). The column is stored in plaintext, so credentials are refused at the boundary instead."
+        userAction: "Remove the credential from the configuration. Connect the external service through its integration settings instead."
+
   signal:
     breadcrumb: "Workspace > Signal"
     errors:

@@ -36,6 +36,16 @@ export const WsErrors = {
     status: 409,
     message: "Only pending or running import jobs can be cancelled",
   },
+  WS_IMPORT_CONFIG_KEY_UNKNOWN: {
+    code: "WS.IMPORT.CONFIG_KEY_UNKNOWN",
+    status: 400,
+    message: "The import configuration contains a key this source does not accept",
+  },
+  WS_IMPORT_CONFIG_SECRET_REJECTED: {
+    code: "WS.IMPORT.CONFIG_SECRET_REJECTED",
+    status: 400,
+    message: "The import configuration must not carry credentials",
+  },
   WS_IMPORT_NOT_FOUND: {
     code: "WS.IMPORT.NOT_FOUND",
     status: 404,

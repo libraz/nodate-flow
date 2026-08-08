@@ -23,6 +23,15 @@ resources:
         description: "Returned when an update or delete targets an ai_providers row that does not exist in the workspace, matching zero rows."
         userAction: "Verify the provider id and that it belongs to this workspace."
 
+      base_url_not_allowed:
+        code: AI.PROVIDER.BASE_URL_NOT_ALLOWED
+        status: 412
+        message: "AI provider endpoint is not an allowed destination"
+        message_ja: "AI プロバイダの接続先が許可されていません"
+        message_zh: "AI 服务提供商的接入点不是允许的目标地址"
+        description: "Returned when an AI provider's base URL points at a destination this deployment refuses to contact: a loopback, private, or link-local address (including cloud metadata endpoints), or a URL that is not an absolute http/https address. Private destinations are refused by default because the base URL is workspace-admin input and the response comes back to the caller."
+        userAction: "Use a public https endpoint. To reach a local model server (Ollama, LM Studio), ask your administrator to set NF_FLOW_AI_ALLOW_PRIVATE=1 on the deployment."
+
       upstream_unreachable:
         code: AI.PROVIDER.UPSTREAM_UNREACHABLE
         status: 502

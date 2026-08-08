@@ -31,6 +31,11 @@ export const AiErrors = {
     status: 422,
     message: "Could not turn that into a filter",
   },
+  AI_PROVIDER_BASE_URL_NOT_ALLOWED: {
+    code: "AI.PROVIDER.BASE_URL_NOT_ALLOWED",
+    status: 412,
+    message: "AI provider endpoint is not an allowed destination",
+  },
   AI_PROVIDER_NOT_CONFIGURED: {
     code: "AI.PROVIDER.NOT_CONFIGURED",
     status: 412,
