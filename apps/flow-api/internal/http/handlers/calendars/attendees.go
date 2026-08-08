@@ -327,6 +327,22 @@ func UpdateRsvp(deps Deps) func(context.Context, *UpdateRsvpInput) (*UpdateRsvpO
 			return nil, err
 		}
 
+		// Nothing above establishes that the actor was invited -- resolveCalendar
+		// and resolveEvent only prove the event is visible to them, and seeing
+		// an event is not being on its attendee list. The UPDATE cannot answer
+		// this either: it reports changed rows, not matched ones, so someone
+		// re-confirming the RSVP they already hold is indistinguishable from a
+		// stranger writing into nothing. Ask the existence question directly.
+		if _, err := deps.CalendarQueries.FindCalendarEventAttendee(ctx, calendar.FindCalendarEventAttendeeParams{
+			EventID: handlerutil.NullInt32From(evt.ID),
+			UserID:  actorID,
+		}); err != nil {
+			if errors.Is(err, sql.ErrNoRows) {
+				return nil, httpErr(apierrors.CalendarAttendeeNotFound)
+			}
+			return nil, httpErr(apierrors.CalendarAttendeeListQueryInterrupted)
+		}
+
 		err = deps.CalendarQueries.UpdateAttendeeRsvp(ctx, calendar.UpdateAttendeeRsvpParams{
 			Rsvp:    calendar.CalendarEventAttendeesRsvp(input.Body.Rsvp),
 			EventID: handlerutil.NullInt32From(evt.ID),
@@ -375,9 +391,27 @@ func ToggleCanEdit(deps Deps) func(context.Context, *ToggleCanEditInput) (*Toggl
 		if err != nil {
 			return nil, httpErr(apierrors.CalendarAttendeeUserIdMalformed)
 		}
+		// Global lookup, kept only to turn the public ID into the internal one.
+		// It says nothing about this event.
 		targetUserID, err := deps.Queries.FindUserInternalIdByPublicId(ctx, types.FromUUID(targetUID))
 		if err != nil {
 			return nil, httpErr(apierrors.CalendarAttendeeUserNotFound)
+		}
+
+		// Attendance is the authority on whether there is anything to grant:
+		// edit rights written against a user who is not on this event's list
+		// are a permission the owner believes they handed out. The UPDATE's
+		// row count cannot stand in for this check, because re-setting can_edit
+		// to the value it already holds changes nothing and would look
+		// identical to a miss.
+		if _, err := deps.CalendarQueries.FindCalendarEventAttendee(ctx, calendar.FindCalendarEventAttendeeParams{
+			EventID: handlerutil.NullInt32From(evt.ID),
+			UserID:  targetUserID,
+		}); err != nil {
+			if errors.Is(err, sql.ErrNoRows) {
+				return nil, httpErr(apierrors.CalendarAttendeeNotFound)
+			}
+			return nil, httpErr(apierrors.CalendarAttendeeListQueryInterrupted)
 		}
 
 		err = deps.CalendarQueries.UpdateAttendeeCanEdit(ctx, calendar.UpdateAttendeeCanEditParams{

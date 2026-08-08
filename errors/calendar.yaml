@@ -404,6 +404,15 @@ resources:
   attendee:
     breadcrumb: "Calendar > Attendee"
     errors:
+      not_found:
+        code: CALENDAR.ATTENDEE.NOT_FOUND
+        status: 404
+        message: "This user is not an attendee of this event"
+        message_ja: "このユーザーはこのイベントの参加者ではありません"
+        message_zh: "该用户不是此事件的参与者"
+        description: "Returned when the target user is not on the specified event's attendee list, so there is no RSVP or edit permission to change."
+        userAction: "Verify the user is on this event's attendee list, and invite them to the event first if they are not."
+
       list_query_interrupted:
         code: CALENDAR.ATTENDEE.LIST_QUERY_INTERRUPTED
         status: 500

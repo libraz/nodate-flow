@@ -41,6 +41,11 @@ export const CalendarErrors = {
     status: 500,
     message: "Could not retrieve attendees",
   },
+  CALENDAR_ATTENDEE_NOT_FOUND: {
+    code: "CALENDAR.ATTENDEE.NOT_FOUND",
+    status: 404,
+    message: "This user is not an attendee of this event",
+  },
   CALENDAR_ATTENDEE_OWNER_REQUIRED_TO_TOGGLE_EDIT: {
     code: "CALENDAR.ATTENDEE.OWNER_REQUIRED_TO_TOGGLE_EDIT",
     status: 403,

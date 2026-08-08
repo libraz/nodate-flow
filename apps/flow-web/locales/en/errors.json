@@ -78,6 +78,7 @@
   "CALENDAR.ATTACHMENT.UPLOADER_OR_OWNER_REQUIRED": "Only the uploader or calendar owner can delete this attachment",
   "CALENDAR.ATTENDEE.CAN_EDIT_UPDATE_INTERRUPTED": "Could not update edit permission",
   "CALENDAR.ATTENDEE.LIST_QUERY_INTERRUPTED": "Could not retrieve attendees",
+  "CALENDAR.ATTENDEE.NOT_FOUND": "This user is not an attendee of this event",
   "CALENDAR.ATTENDEE.OWNER_REQUIRED_TO_TOGGLE_EDIT": "Only the event owner can change edit permissions",
   "CALENDAR.ATTENDEE.RSVP_UPDATE_INTERRUPTED": "Could not update RSVP",
   "CALENDAR.ATTENDEE.STORE_REMOVE_INTERRUPTED": "Could not remove attendee",

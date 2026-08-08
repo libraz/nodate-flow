@@ -209,6 +209,13 @@ type UpdateAttendeeCanEditParams struct {
 }
 
 // Grant or revoke edit permission on an attendee (by event owner).
+//
+// Same scope, same open outcome, but about the target rather than the actor:
+// the user named in the request may hold no live attendee row on this event,
+// and a grant written against nothing is a permission the owner believes they
+// handed out. Confirm the target with FindCalendarEventAttendee, not with an
+// affected-row count -- re-granting an attendee the edit rights they already
+// hold changes no row and so counts the same as a target that is not there.
 func (q *Queries) UpdateAttendeeCanEdit(ctx context.Context, arg UpdateAttendeeCanEditParams) error {
 	_, err := q.db.ExecContext(ctx, updateAttendeeCanEdit, arg.CanEdit, arg.EventID, arg.UserID)
 	return err
@@ -229,6 +236,16 @@ type UpdateAttendeeRsvpParams struct {
 }
 
 // Update an attendee's RSVP response (self-service).
+//
+// The (event_id, user_id) pair is the whole scope, and it can legitimately
+// match nothing: being able to see an event is not being invited to it, so
+// an actor who never appears on the attendee list has no RSVP to change.
+// Callers that need to know establish attendance with FindCalendarEventAttendee
+// first; an affected-row count cannot answer it. The connection does not set
+// CLIENT_FOUND_ROWS, so the count reports changed rows, not matched ones, and
+// re-submitting the RSVP already on file is indistinguishable from a missing
+// row. (:execrows fits the atomic-claim queries elsewhere in the repo for the
+// opposite reason: their WHERE clause lets at most one caller change anything.)
 func (q *Queries) UpdateAttendeeRsvp(ctx context.Context, arg UpdateAttendeeRsvpParams) error {
 	_, err := q.db.ExecContext(ctx, updateAttendeeRsvp, arg.Rsvp, arg.EventID, arg.UserID)
 	return err

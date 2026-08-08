@@ -13,6 +13,12 @@ import (
 	"github.com/libraz/nodate-flow/packages/go-shared/dbtype"
 )
 
+// defaultSubscriptionColor mirrors the calendar_subscriptions.display_color
+// column default. A subscription row created by a patch that only sets, say,
+// visibility has to start somewhere, and it starts where the schema would
+// have put it.
+const defaultSubscriptionColor = "#4285F4"
+
 // --- Input/Output types ---
 
 // ListDiscoverableCalendarsInput is the input for the discoverable calendars
@@ -214,21 +220,41 @@ func PatchOwnSubscription(deps Deps) func(context.Context, *PatchOwnSubscription
 			return nil, err
 		}
 
+		// The write is an upsert: membership lives in calendar_members, so the
+		// first time someone recolours or hides a layer there is no
+		// subscription row yet. The New* values feed the insert path and start
+		// from the column defaults, because a row being created has no earlier
+		// preference to carry over; the nullable params feed the duplicate-key
+		// branch, where NULL leaves an omitted field as stored.
 		params := calendar.PatchCalendarSubscriptionParams{
-			CalendarID: cal.ID,
-			UserID:     actorID,
+			PublicID:        types.New(),
+			WorkspaceID:     wsID,
+			CalendarID:      cal.ID,
+			UserID:          actorID,
+			NewDisplayColor: defaultSubscriptionColor,
+			NewVisible:      true,
+			NewSortWeight:   0,
 		}
 		if input.Body.Visible != nil {
 			params.Visible = sql.NullBool{Bool: *input.Body.Visible, Valid: true}
+			params.NewVisible = *input.Body.Visible
 		}
 		if input.Body.DisplayColor != nil {
 			params.DisplayColor = sql.NullString{String: *input.Body.DisplayColor, Valid: true}
+			params.NewDisplayColor = *input.Body.DisplayColor
 		}
 		if input.Body.SortWeight != nil {
-			params.SortWeight = sql.NullInt32{Int32: int32(*input.Body.SortWeight), Valid: true} //#nosec G115 -- SortWeight request-validated to a 32-bit signed range
+			weight := int32(*input.Body.SortWeight) //#nosec G115 -- SortWeight request-validated to a 32-bit signed range
+			params.SortWeight = sql.NullInt32{Int32: weight, Valid: true}
+			params.NewSortWeight = weight
 		}
 
-		if err := deps.CalendarQueries.PatchCalendarSubscription(ctx, params); err != nil {
+		// The count is deliberately not inspected for a not-found: the upsert
+		// has no predicate that can miss, so 0 rows means the stored
+		// preferences already equalled the requested ones. That is a
+		// successful no-op, and the caller's state matches what they asked for
+		// either way.
+		if _, err := deps.CalendarQueries.PatchCalendarSubscription(ctx, params); err != nil {
 			return nil, httpErr(apierrors.CalendarSubscriptionStoreWriteInterrupted)
 		}
 

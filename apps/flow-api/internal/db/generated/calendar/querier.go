@@ -317,8 +317,44 @@ type Querier interface {
 	// mirror the task and only the item projection engine may move them, so
 	// clearing them belongs to that path rather than to a generic patch.
 	PatchCalendarEvent(ctx context.Context, arg PatchCalendarEventParams) (int64, error)
-	// Update a subscriber's display preferences.
-	PatchCalendarSubscription(ctx context.Context, arg PatchCalendarSubscriptionParams) error
+	// Create or update one user's private display preferences for a calendar.
+	//
+	// An upsert rather than an UPDATE because nothing else writes this table.
+	// Membership lives in calendar_members, so the first time someone picks a
+	// colour or hides a layer there is no row to update yet: as a plain UPDATE
+	// this matched nothing, and the API reported a preference that was never
+	// stored, which the user saw as a colour that reverted on the next read.
+	//
+	// The identity parameters and the new_* values are used on the insert path
+	// only. new_* should carry the caller's requested value where the request
+	// supplies one and the column default otherwise -- a row being created has
+	// no earlier preference to preserve. The nullable display_color / visible /
+	// sort_weight parameters drive the duplicate-key branch, where NULL keeps
+	// the stored value so a field the request omits stays untouched.
+	//
+	// public_id is written on the insert path only. A row that already exists
+	// keeps the identity it has published; recolouring a layer must not rotate
+	// an ID that has been on the wire.
+	//
+	// enabled is reset to TRUE because uniq_calendar_subscriptions_calendar_user
+	// covers disabled rows too: without the reset the INSERT collides, the
+	// update leaves enabled = FALSE, and every reader keeps skipping the row --
+	// FindCalendarSubscription filters on it -- while the API reports the value
+	// the caller just wrote. Reviving grants nothing, since access is
+	// calendar_members alone, so someone who dropped a layer and later
+	// recolours it simply gets their own preferences back.
+	//
+	// The duplicate-key branch is keyed on (calendar_id, user_id) rather than
+	// carrying an explicit workspace predicate: a calendar belongs to exactly
+	// one workspace, and the caller resolves it inside the workspace before
+	// writing.
+	//
+	// updated_at is assigned explicitly so the update branch always counts as a
+	// change. RowsAffected is then 1 for a created row and 2 for an updated one
+	// (MySQL counts a duplicate-key update as two). Callers MUST inspect it,
+	// but 0 here is an identical re-write rather than a missing row -- there is
+	// no predicate that can fail -- and MUST NOT be reported as not-found.
+	PatchCalendarSubscription(ctx context.Context, arg PatchCalendarSubscriptionParams) (int64, error)
 	// Update mutable share fields. NULL arguments leave columns untouched.
 	PatchPublicShare(ctx context.Context, arg PatchPublicShareParams) (int64, error)
 	// Bring an invite row back into service with a fresh capability:
@@ -334,8 +370,25 @@ type Querier interface {
 	// Regenerate the token hash; invalidates any previously issued URL.
 	RotatePublicShareToken(ctx context.Context, arg RotatePublicShareTokenParams) (int64, error)
 	// Grant or revoke edit permission on an attendee (by event owner).
+	//
+	// Same scope, same open outcome, but about the target rather than the actor:
+	// the user named in the request may hold no live attendee row on this event,
+	// and a grant written against nothing is a permission the owner believes they
+	// handed out. Confirm the target with FindCalendarEventAttendee, not with an
+	// affected-row count -- re-granting an attendee the edit rights they already
+	// hold changes no row and so counts the same as a target that is not there.
 	UpdateAttendeeCanEdit(ctx context.Context, arg UpdateAttendeeCanEditParams) error
 	// Update an attendee's RSVP response (self-service).
+	//
+	// The (event_id, user_id) pair is the whole scope, and it can legitimately
+	// match nothing: being able to see an event is not being invited to it, so
+	// an actor who never appears on the attendee list has no RSVP to change.
+	// Callers that need to know establish attendance with FindCalendarEventAttendee
+	// first; an affected-row count cannot answer it. The connection does not set
+	// CLIENT_FOUND_ROWS, so the count reports changed rows, not matched ones, and
+	// re-submitting the RSVP already on file is indistinguishable from a missing
+	// row. (:execrows fits the atomic-claim queries elsewhere in the repo for the
+	// opposite reason: their WHERE clause lets at most one caller change anything.)
 	UpdateAttendeeRsvp(ctx context.Context, arg UpdateAttendeeRsvpParams) error
 	// Update a checklist item's title, done, or sort_weight.
 	UpdateCalendarChecklistItem(ctx context.Context, arg UpdateCalendarChecklistItemParams) (int64, error)
