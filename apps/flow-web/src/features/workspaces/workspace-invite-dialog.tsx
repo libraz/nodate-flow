@@ -17,6 +17,7 @@ import { useTranslation } from 'react-i18next';
 
 import type { CreateInviteInput } from './invite-api';
 import { useCreateInvite } from './invite-api';
+import { workspaceInviteUrl } from './invite-link';
 
 type Role = CreateInviteInput['role'];
 
@@ -94,8 +95,7 @@ export default function WorkspaceInviteDialog({
         ...(label.trim() ? { label: label.trim() } : {}),
       };
       const result = await createInvite.mutateAsync({ wsId: workspaceId, input });
-      const url = `${globalThis.location.origin}/invite/${result.token}`;
-      setGeneratedUrl(url);
+      setGeneratedUrl(workspaceInviteUrl(globalThis.location.origin, result.token));
     } catch {
       toaster.show({ tone: 'danger', message: t('workspaces.invites.create_failed') });
     } finally {

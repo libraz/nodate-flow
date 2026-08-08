@@ -21,7 +21,7 @@ export type WorkspaceMember = components['schemas']['WorkspaceMember'];
 export type WorkspaceUserSummary = components['schemas']['WorkspaceUserSummary'];
 export type CreateWorkspaceInput = components['schemas']['CreateWorkspaceInputBody'];
 export type PatchWorkspaceInput = components['schemas']['WorkspacePatchWorkspaceInputBody'];
-export type InviteMemberInput = components['schemas']['AddWorkspaceMemberInputBody'];
+export type AddMemberInput = components['schemas']['AddWorkspaceMemberInputBody'];
 export type UpdateMemberRoleInput = components['schemas']['UpdateWorkspaceMemberRoleInputBody'];
 /**
  * Result of {@link useDeleteWorkspace}. Mirrors the destructive-delete
@@ -226,7 +226,7 @@ export function useDeleteWorkspace(): UseMutationResult<
 
 export interface AddMemberArgs {
   id: string;
-  input: InviteMemberInput;
+  input: AddMemberInput;
 }
 
 export function useAddMember(): UseMutationResult<WorkspaceMember, ApiError, AddMemberArgs> {

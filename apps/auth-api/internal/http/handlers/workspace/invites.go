@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"strings"
 	"time"
 
 	"github.com/libraz/nodate-flow/apps/auth-api/internal/auth"
@@ -24,6 +25,24 @@ import (
 // so callers in this package keep their existing import surface while
 // the constant lives in a single source of truth.
 const PrefixInvite = sharedtoken.PrefixInvite
+
+// InviteAcceptPathPrefix is flow-web's public workspace-invite route with
+// its token segment removed. The route is singular (`/invite/$token`);
+// the plural `/invites/accept` next to it belongs to calendar event
+// invites, so a link built against the wrong one resolves to nothing and
+// the invitee gets a 404 instead of a workspace.
+//
+// A cross-language guard in invite_link_test.go reads flow-web's
+// generated route tree and fails if this prefix stops matching a route
+// that exists.
+const InviteAcceptPathPrefix = "/invite/"
+
+// InviteAcceptURL builds the link an invitee follows to join a
+// workspace. Every surface that hands out an invite goes through here so
+// the email and the copy-link dialog cannot drift apart.
+func InviteAcceptURL(webURL, token string) string {
+	return strings.TrimRight(webURL, "/") + InviteAcceptPathPrefix + token
+}
 
 // errInviteExhausted rolls the accept transaction back when the invite
 // has no use slots left. It never reaches the client — the handler
@@ -100,7 +119,7 @@ func CreateInvite(deps InviteDeps) func(context.Context, *CreateInviteInput) (*C
 		// Best-effort email delivery when both the sender and target
 		// email are available.
 		if deps.EmailSender != nil && in.Body.Email != "" {
-			link := deps.WebURL + "/invites/" + plaintext
+			link := InviteAcceptURL(deps.WebURL, plaintext)
 			_ = deps.EmailSender.Send(ctx, email.Message{
 				To:      []string{in.Body.Email},
 				Subject: "You've been invited to a workspace",

@@ -547,8 +547,8 @@ func BuildResult(deps Deps) Result {
 			Method:      http.MethodPost,
 			Path:        "/workspaces/{wsId}/members",
 			Summary:     "Add a member to a workspace",
-			Description: "Sends a workspace invite to the supplied email at the requested role. The recipient gets a link they redeem via /invites/{token}/accept. Requires workspace admin role.",
-		}, wshandlers.InviteMember(wsDeps))
+			Description: "Grants workspace membership at the requested role immediately. No email is sent and the recipient is never asked: the address is added as it was typed, and if it has no account yet a placeholder is created that whoever later signs in with that address adopts. Use POST /workspaces/{wsId}/invites instead when the recipient should have to accept. Requires workspace admin role.",
+		}, wshandlers.AddMember(wsDeps))
 		huma.Register(subAPI, huma.Operation{
 			OperationID: "workspaces-members-update-role",
 			Method:      http.MethodPatch,

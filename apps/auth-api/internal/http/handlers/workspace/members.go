@@ -54,9 +54,19 @@ func ListMembers(deps Deps) func(context.Context, *ListMembersInput) (*ListMembe
 	}
 }
 
-// InviteMember handles POST /workspaces/{wsId}/members. If the email is
-// not yet registered, a stub user is created so the invite can land.
-func InviteMember(deps Deps) func(context.Context, *AddMemberInput) (*AddMemberOutput, error) {
+// AddMember handles POST /workspaces/{wsId}/members: an admin grants
+// membership directly, with no token and no acceptance step. When the
+// address has no account yet a placeholder user is created to hang the
+// membership on, which whoever later signs in with that address adopts.
+//
+// That is a deliberate admin capability, not an invitation, and the two
+// are not interchangeable: the address is never asked and never
+// verified, so an address entered here by mistake hands a stranger a
+// working seat. Callers that want the recipient to consent — anything
+// driven by a user-supplied address rather than an admin's own roster —
+// belong on POST /workspaces/{wsId}/invites, which mails a token the
+// recipient has to redeem.
+func AddMember(deps Deps) func(context.Context, *AddMemberInput) (*AddMemberOutput, error) {
 	return func(ctx context.Context, in *AddMemberInput) (*AddMemberOutput, error) {
 		ws, ok := middleware.WorkspaceFromContext(ctx)
 		if !ok {

@@ -1,5 +1,9 @@
 /**
- * WorkspaceAddMemberDialog — invite a user to a workspace by email + role.
+ * WorkspaceAddMemberDialog — grant a workspace seat by email + role.
+ *
+ * This adds the member outright: nothing is mailed and the address is
+ * never asked to accept. Use {@link WorkspaceInviteDialog} for a link
+ * the recipient redeems themselves.
  */
 
 import Button from '@nodate-flow/ui/primitives/button';
@@ -12,9 +16,9 @@ import { type FormEvent, type ReactElement, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { z } from 'zod';
 
-import { type InviteMemberInput, useAddMember } from './api';
+import { type AddMemberInput, useAddMember } from './api';
 
-type Role = InviteMemberInput['role'];
+type Role = AddMemberInput['role'];
 
 const ROLES: readonly Role[] = ['owner', 'admin', 'member', 'guest'];
 

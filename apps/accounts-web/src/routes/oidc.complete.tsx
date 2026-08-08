@@ -44,6 +44,20 @@ function readOIDCFragment(hash: string): { step: string; challengeToken: string 
   };
 }
 
+/**
+ * Rewrites the current history entry without its fragment, using
+ * replaceState so the fragment is not merely hidden behind a new entry
+ * the back button can return to.
+ */
+export function scrubOIDCFragment(): void {
+  if (!window.location.hash) return;
+  window.history.replaceState(
+    window.history.state,
+    '',
+    `${window.location.pathname}${window.location.search}`,
+  );
+}
+
 export function OIDCCompletePage(): ReactElement {
   const { t } = useTranslation('auth');
   const navigate = useNavigate();
@@ -85,6 +99,12 @@ export function OIDCCompletePage(): ReactElement {
     let cancelled = false;
     const hash = location.hash || window.location.hash;
     const fragment = readOIDCFragment(hash);
+    // Take the fragment out of the address bar as soon as it has been
+    // read. It carries the step-up challenge, and a fragment survives in
+    // history, in a restored session, and in anything the user copies
+    // out of the URL bar long after the login it authorised finished.
+    // The challenge is already in component state by the time this runs.
+    scrubOIDCFragment();
 
     async function run(): Promise<void> {
       setStatus('verifying');
