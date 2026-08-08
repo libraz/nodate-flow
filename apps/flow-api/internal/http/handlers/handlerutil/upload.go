@@ -10,6 +10,19 @@ import (
 // event attachments) so the two presign / confirm flows enforce an
 // identical limit. The value bounds both the client-declared byteSize at
 // presign time and the real object size verified after upload.
+//
+// The ceiling is enforced in the handler, NOT as a `maximum` struct tag on
+// the presign bodies, and the difference is not cosmetic: Huma validates
+// declared bounds before the handler runs, so a `maximum` tag answers 422
+// with the raw English string "expected number <= 1.048576e+08" and makes
+// the typed VALIDATION.FILE.TOO_LARGE (413) unreachable. That string
+// cannot be translated — this project routes every user-facing message
+// through errors/*.yaml into i18n — and a presign body carries metadata
+// only, so there are no wasted bytes to save by rejecting one round trip
+// earlier. The tag was present on the calendar surface for a while and
+// its handler check was dead code the whole time; nothing caught it
+// because that surface had no oversize test. Both surfaces now state the
+// limit in `doc:` and enforce it here.
 const MaxUploadSize = 100 * 1024 * 1024
 
 // allowedMIMEPrefixes lists the safe MIME type prefixes accepted for
@@ -55,10 +68,31 @@ func IsAllowedContentType(ct string) bool {
 	return false
 }
 
+// windowsTrailingCutset is the set of characters Windows drops from the
+// end of a filename as it writes the file to disk. A name ending in one
+// of them does not survive the download: "payload.exe " is saved as
+// "payload.exe", and "payload.exe." likewise. Suffix-matching the raw
+// name therefore checks a filename that will never exist, so every
+// extension rule here normalises first.
+const windowsTrailingCutset = " .\t\n\v\f\r"
+
+// NormalizeUploadName returns the filename an extension rule has to judge:
+// the name as the client's filesystem will end up storing it.
+//
+// Only the trailing run is stripped, and only of characters a filesystem
+// itself discards. Nothing else about the name is touched — the extension
+// checks are suffix rules, so a name that is merely unusual (leading dots,
+// inner spaces) still has to match on its real ending.
+func NormalizeUploadName(filename string) string {
+	return strings.TrimRight(filename, windowsTrailingCutset)
+}
+
 // HasBlockedExtension reports whether filename ends in one of the blocked
-// (dangerous) extensions. Matching is case-insensitive.
+// (dangerous) extensions. Matching is case-insensitive and is applied to
+// the normalised name, so trailing spaces or dots cannot carry an
+// executable past the list.
 func HasBlockedExtension(filename string) bool {
-	lower := strings.ToLower(filename)
+	lower := strings.ToLower(NormalizeUploadName(filename))
 	for _, ext := range blockedExtensions {
 		if strings.HasSuffix(lower, ext) {
 			return true
@@ -128,7 +162,7 @@ func ResolveContentType(declared, filename string) string {
 	if ct != "" && ct != GenericBinaryType {
 		return ct
 	}
-	if derived, ok := extensionTypes[strings.ToLower(path.Ext(filename))]; ok {
+	if derived, ok := extensionTypes[strings.ToLower(path.Ext(NormalizeUploadName(filename)))]; ok {
 		return derived
 	}
 	return GenericBinaryType

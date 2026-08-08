@@ -181,28 +181,21 @@ func Create(deps Deps) func(context.Context, *CreateTimeboxInput) (*CreateTimebo
 			Metadata:     map[string]any{"name": in.Body.Name},
 		})
 
-		return &CreateTimeboxOutput{Body: TimeboxDTO{
-			ID:                 pub.String(),
-			ProjectID:          ptrStr(in.Body.ProjectID),
-			CreatorID:          "", // not resolved here; get via Get if needed
-			CreatorDisplayName: "",
-			Name:               in.Body.Name,
-			Description:        in.Body.Description,
-			StartsOn:           in.Body.StartsOn,
-			EndsOn:             in.Body.EndsOn,
-			Status:             string(generated.TimeboxesStatusPlanned),
-			UpdatedAt:          0,
-			CreatedAt:          handlerutil.NowUnix(),
-		}}, nil
-	}
-}
+		// Re-read through the same query Get uses so the created timebox
+		// carries the creator summary and project name. Hand-building the
+		// response from the request body left those three fields blank on
+		// exactly one code path, which a client rendering the new row
+		// straight from the create response reads as "no creator".
+		created, err := deps.Queries.GetTimeboxByPublicId(ctx, generated.GetTimeboxByPublicIdParams{
+			WorkspaceID: ws.ID,
+			PublicID:    pub,
+		})
+		if err != nil {
+			return nil, httpErr(apierr.SpecForErrNoRows(err, apierrors.TimeboxTimeboxNotFound, apierrors.InternalUnexpected))
+		}
 
-// ptrStr safely dereferences a *string, returning "" if nil.
-func ptrStr(s *string) string {
-	if s == nil {
-		return ""
+		return &CreateTimeboxOutput{Body: mapGetRow(created)}, nil
 	}
-	return *s
 }
 
 // List handles GET /workspaces/{wsId}/timeboxes.

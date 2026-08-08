@@ -34,6 +34,19 @@ const preferenceFetchRetryDelay = 50 * time.Millisecond
 // to prevent a misbehaving query from leaking goroutines indefinitely.
 const defaultFanoutTimeout = 30 * time.Second
 
+// Only the in_app channel has a transport behind it. A row for email or
+// push is written and then read by nothing: no worker sends it, and
+// MarkNotificationDelivered has no caller, so delivered_at stays NULL for
+// the lifetime of the row.
+//
+// That is more than an unimplemented feature, because the list queries
+// carry no channel predicate. A recipient who enables email for a category
+// gets two rows per event and the bell renders both, identically. The fix
+// belongs on the read side — a channel filter on
+// ListNotificationsForUser / …Keyset / …ForWorkspace — not here: dropping
+// the row instead would throw away the delivery record the eventual sender
+// is meant to consume, and would make the stored preference silently inert.
+
 // Fanout creates per-user notification rows in response to eventbus
 // events. It subscribes via [eventbus.AddNotifyHook] and, for each
 // event, determines the set of recipients (workspace members minus the

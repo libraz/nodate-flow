@@ -172,25 +172,48 @@ WHERE t.workspace_id = ?
 ORDER BY t.created_at DESC, t.public_id DESC
 LIMIT ? OFFSET ?;
 
--- name: FindRetroDraftAgent :one
--- Resolve the AI agent that produced a retro draft task by looking up the
--- TaskRetroDrafted event (type='task.retro.drafted') joined to ai_agents.
--- Returns the agent's public_id and display name. Used by the retro draft
--- queue handler to enrich rows with createdByAgentId / createdByAgentName
--- without coupling the main list query to ai_agents (the event-derived
--- attribution is the only authoritative source — tasks rows do not carry
--- created_by_agent_id).
+-- name: FindRetroDraftAgents :many
+-- Resolve the AI agent behind each of a page of retro draft tasks, by
+-- looking up the TaskRetroDrafted event (type='task.retro.drafted')
+-- joined to ai_agents. Returns the internal task_id alongside the
+-- agent's public_id and display name so the caller can index the result
+-- by the task_id ListRetroDraftsForWorkspace already handed it.
+--
+-- The event-derived attribution is the only authoritative source —
+-- tasks rows do not carry created_by_agent_id — which is why the main
+-- list query stays uncoupled from ai_agents and this runs beside it.
+--
+-- It takes the whole page at once rather than one task at a time. Per
+-- row this was one statement each, so a full page of fifty drafts cost
+-- fifty-one round trips to render a list that shows a name next to each
+-- title, and the cost grew with the page the operator asked for.
+--
+-- ROW_NUMBER picks the earliest qualifying event per task, which is the
+-- row the per-task query returned under ORDER BY occurred_at, id LIMIT 1.
+-- Doing it in the database rather than by keeping the first row seen in
+-- Go means the statement returns exactly one row per task: a task whose
+-- history holds many drafted events cannot make the result set grow.
 SELECT
-  a.public_id AS agent_public_id,
-  a.name      AS agent_name
-FROM events e
-INNER JOIN ai_agents a
-  ON a.id = e.actor_agent_id
- AND a.enabled = TRUE
-WHERE e.workspace_id = ?
-  AND e.task_id      = ?
-  AND e.type         = 'task.retro.drafted'
-  AND e.enabled      = TRUE
-  AND e.actor_agent_id IS NOT NULL
-ORDER BY e.occurred_at ASC, e.id ASC
-LIMIT 1;
+  ranked.task_id,
+  ranked.agent_public_id,
+  ranked.agent_name
+FROM (
+  SELECT
+    e.task_id             AS task_id,
+    a.public_id           AS agent_public_id,
+    a.name                AS agent_name,
+    ROW_NUMBER() OVER (
+      PARTITION BY e.task_id
+      ORDER BY e.occurred_at ASC, e.id ASC
+    )                     AS rn
+  FROM events e
+  INNER JOIN ai_agents a
+    ON a.id = e.actor_agent_id
+   AND a.enabled = TRUE
+  WHERE e.workspace_id = ?
+    AND e.task_id IN (sqlc.slice('task_ids'))
+    AND e.type         = 'task.retro.drafted'
+    AND e.enabled      = TRUE
+    AND e.actor_agent_id IS NOT NULL
+) ranked
+WHERE ranked.rn = 1;

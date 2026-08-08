@@ -77,10 +77,17 @@ type ListImportsInput struct {
 }
 
 // ListImportsBody is the response payload for GET /workspaces/{wsId}/imports.
+//
+// NextCursor is always null here: the endpoint pages by limit/offset and
+// there is no keyset query behind it, so there is no cursor to hand back
+// and no `cursor` parameter that would accept one. The field is declared
+// for envelope symmetry with the cursor-paged lists. Clients must page
+// this endpoint with `offset`; treating a null nextCursor as "no more
+// rows" stops after the first page while rows remain.
 type ListImportsBody struct {
 	Total      int64           `json:"total"`
 	Items      []ImportJobBody `json:"items"`
-	NextCursor *string         `json:"nextCursor"`
+	NextCursor *string         `json:"nextCursor" doc:"Always null on this endpoint; page with offset. See total."`
 }
 
 // ListImportsOutput is the response for GET /workspaces/{wsId}/imports.

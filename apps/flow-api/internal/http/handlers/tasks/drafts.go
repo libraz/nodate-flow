@@ -15,7 +15,6 @@ package tasks
 import (
 	"context"
 	"database/sql"
-	"errors"
 
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
 	apierrors "github.com/libraz/nodate-flow/apps/flow-api/internal/errors"
@@ -32,10 +31,10 @@ import (
 //
 // The response shape carries `total` (filter-applied count from the SQL
 // window function) plus a `drafts` array. The optional agent fields
-// (`createdByAgentId` / `createdByAgentName`) are best-effort: the
-// handler resolves them per-row via [Queries.FindRetroDraftAgent], which
-// looks up the `task.retro.drafted` event's actor_agent_id. Rows where
-// the event has been retention-swept simply omit the agent fields.
+// (`createdByAgentId` / `createdByAgentName`) are best-effort: they come
+// from the `task.retro.drafted` event's actor_agent_id, resolved for the
+// whole page at once by [Queries.FindRetroDraftAgents]. Rows where the
+// event has been retention-swept simply omit the agent fields.
 //
 // The `signal` enrichment block from the L2 design is deliberately left
 // out of this iteration (see the doc comment on [RetroDraft]).
@@ -45,61 +44,99 @@ func ListRetroDrafts(deps Deps) func(context.Context, *ListRetroDraftsInput) (*L
 		if !ok {
 			return nil, httpErr(apierrors.WsWorkspaceNotFound)
 		}
-
-		rows, err := deps.Queries.ListRetroDraftsForWorkspace(ctx, generated.ListRetroDraftsForWorkspaceParams{
-			WorkspaceID: ws.ID,
-			Limit:       in.Limit,
-			Offset:      in.Offset,
-		})
-		if err != nil {
-			return nil, httpErr(apierrors.InternalUnexpected)
-		}
-
-		out := &ListRetroDraftsOutput{}
-		out.Body.Drafts = make([]RetroDraft, 0, len(rows))
-
-		for _, r := range rows {
-			draft := RetroDraft{
-				TaskPublicID: r.TaskPublicID.String(),
-				Title:        r.Title,
-				Description:  nullStr(r.Description),
-				CreatedAt:    r.CreatedAt.Unix(),
-				SourceTask: RetroDraftSourceTask{
-					PublicID: r.SourceTaskPublicID.String(),
-					Title:    r.SourceTaskTitle,
-				},
-			}
-
-			// Best-effort agent attribution. The Applier emits a
-			// task.retro.drafted event with actor_agent_id set; we
-			// resolve it to the agent's public_id + name here. Rows
-			// where the event is missing (retention-swept or seeded
-			// outside the Applier) leave the agent fields empty —
-			// they are documented as optional in [RetroDraft].
-			agentRow, aerr := deps.Queries.FindRetroDraftAgent(ctx, generated.FindRetroDraftAgentParams{
-				WorkspaceID: ws.ID,
-				TaskID: sql.NullInt32{
-					Int32: int32(r.TaskID), //#nosec G115 -- tasks.id is INT UNSIGNED, fits int32 within realistic deployments
-					Valid: true,
-				},
-			})
-			switch {
-			case aerr == nil:
-				draft.CreatedByAgentID = agentRow.AgentPublicID.String()
-				draft.CreatedByAgentName = agentRow.AgentName
-			case errors.Is(aerr, sql.ErrNoRows):
-				// Optional fields stay empty.
-			default:
-				return nil, httpErr(apierrors.InternalUnexpected)
-			}
-
-			out.Body.Drafts = append(out.Body.Drafts, draft)
-		}
-
-		if len(rows) > 0 {
-			out.Body.Total = totalAsInt64(rows[0].Total)
-		}
-
-		return out, nil
+		return listRetroDrafts(ctx, deps.Queries, ws.ID, in.Limit, in.Offset)
 	}
+}
+
+// listRetroDrafts is the whole of the endpoint below the request: it
+// reads the page and enriches it, and knows nothing about HTTP.
+//
+// It is separate from the operation above so the number of statements a
+// page costs can be asserted directly, without a workspace context the
+// middleware alone can build — see drafts_roundtrips_test.go. The count
+// is the property that matters here and it is not visible from the
+// response.
+func listRetroDrafts(
+	ctx context.Context, q *generated.Queries, workspaceID uint32, limit, offset int32,
+) (*ListRetroDraftsOutput, error) {
+	rows, err := q.ListRetroDraftsForWorkspace(ctx, generated.ListRetroDraftsForWorkspaceParams{
+		WorkspaceID: workspaceID,
+		Limit:       limit,
+		Offset:      offset,
+	})
+	if err != nil {
+		return nil, httpErr(apierrors.InternalUnexpected)
+	}
+
+	agents, err := retroDraftAgents(ctx, q, workspaceID, rows)
+	if err != nil {
+		return nil, err
+	}
+
+	out := &ListRetroDraftsOutput{}
+	out.Body.Drafts = make([]RetroDraft, 0, len(rows))
+	for _, r := range rows {
+		draft := RetroDraft{
+			TaskPublicID: r.TaskPublicID.String(),
+			Title:        r.Title,
+			Description:  nullStr(r.Description),
+			CreatedAt:    r.CreatedAt.Unix(),
+			SourceTask: RetroDraftSourceTask{
+				PublicID: r.SourceTaskPublicID.String(),
+				Title:    r.SourceTaskTitle,
+			},
+		}
+		// A task with no drafted event (retention-swept, or seeded
+		// outside the Applier) leaves the agent fields empty; they are
+		// documented as optional in [RetroDraft].
+		if a, found := agents[r.TaskID]; found {
+			draft.CreatedByAgentID = a.AgentPublicID.String()
+			draft.CreatedByAgentName = a.AgentName
+		}
+		out.Body.Drafts = append(out.Body.Drafts, draft)
+	}
+
+	if len(rows) > 0 {
+		out.Body.Total = totalAsInt64(rows[0].Total)
+	}
+	return out, nil
+}
+
+// retroDraftAgents resolves the agent attribution for a whole page of
+// drafts in one statement, keyed by the internal task id the list query
+// already returned.
+//
+// One statement for the page rather than one per row: the queue caps at
+// fifty, so the per-row form billed a full page at fifty-one round trips
+// and grew with the page size the caller chose — for two optional
+// strings per row. An empty page issues nothing at all.
+func retroDraftAgents(
+	ctx context.Context, q *generated.Queries, workspaceID uint32,
+	rows []generated.ListRetroDraftsForWorkspaceRow,
+) (map[uint32]generated.FindRetroDraftAgentsRow, error) {
+	if len(rows) == 0 {
+		return nil, nil
+	}
+	taskIDs := make([]sql.NullInt32, 0, len(rows))
+	for _, r := range rows {
+		taskIDs = append(taskIDs, sql.NullInt32{
+			Int32: int32(r.TaskID), //#nosec G115 -- tasks.id is INT UNSIGNED, fits int32 within realistic deployments
+			Valid: true,
+		})
+	}
+	agentRows, err := q.FindRetroDraftAgents(ctx, generated.FindRetroDraftAgentsParams{
+		WorkspaceID: workspaceID,
+		TaskIds:     taskIDs,
+	})
+	if err != nil {
+		return nil, httpErr(apierrors.InternalUnexpected)
+	}
+	byTask := make(map[uint32]generated.FindRetroDraftAgentsRow, len(agentRows))
+	for _, a := range agentRows {
+		if !a.TaskID.Valid {
+			continue
+		}
+		byTask[uint32(a.TaskID.Int32)] = a //#nosec G115 -- tasks.id is INT UNSIGNED and was passed in as one
+	}
+	return byTask, nil
 }

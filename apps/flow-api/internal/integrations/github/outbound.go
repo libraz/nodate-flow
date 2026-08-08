@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"time"
 
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/outbound"
 )
@@ -35,11 +36,21 @@ var ErrOutboundUnauthorized = errors.New("github outbound: unauthorized")
 // endpoint whose response size is chosen by the other side.
 const maxResponseBytes = 64 << 10 // 64 KiB
 
+// requestTimeout bounds one call to the GitHub REST API. The fallback
+// used to be http.DefaultClient, which has no deadline at all: an upstream
+// that accepts the connection and then stops talking pins the caller's
+// goroutine for as long as the peer keeps the socket open.
+const requestTimeout = 15 * time.Second
+
+// defaultClient is the shared fallback for callers that did not supply
+// their own. One client, so the transport's connection pool is reused.
+var defaultClient = &http.Client{Timeout: requestTimeout}
+
 func (c *OutboundClient) httpClient() *http.Client {
 	if c.HTTP != nil {
 		return c.HTTP
 	}
-	return http.DefaultClient
+	return defaultClient
 }
 
 func (c *OutboundClient) base() string {

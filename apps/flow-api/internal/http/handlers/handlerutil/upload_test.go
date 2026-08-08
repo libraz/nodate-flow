@@ -143,3 +143,96 @@ func TestMaxUploadSize(t *testing.T) {
 		t.Errorf("MaxUploadSize = %d, want %d", MaxUploadSize, want)
 	}
 }
+
+// TestHasBlockedExtensionIgnoresTrailingWindowsPadding covers the bypass a
+// blocked extension used to have: Windows drops trailing spaces and dots
+// as it writes the file, so "payload.exe " reaches the disk as
+// "payload.exe" while a raw suffix match saw a name ending in a space.
+func TestHasBlockedExtensionIgnoresTrailingWindowsPadding(t *testing.T) {
+	blocked := []string{
+		"payload.exe ",
+		"payload.exe.",
+		"payload.exe ...   ",
+		"payload.exe\t",
+		"payload.exe\r\n",
+		"PAYLOAD.EXE .",
+		"script.ps1 ",
+		"macro.vbs.",
+	}
+	for _, name := range blocked {
+		if !HasBlockedExtension(name) {
+			t.Errorf("HasBlockedExtension(%q) = false; the name lands on disk as an executable", name)
+		}
+	}
+
+	allowed := []string{
+		"notes.txt ",
+		"notes.txt.",
+		"report.exe.txt",
+		"executable-notes.md",
+	}
+	for _, name := range allowed {
+		if HasBlockedExtension(name) {
+			t.Errorf("HasBlockedExtension(%q) = true; the real extension is not blocked", name)
+		}
+	}
+}
+
+// TestIsAllowedUploadRejectsPaddedExecutables is the same rule at the
+// surface the handlers actually call, including the case where the client
+// also mislabels the type.
+func TestIsAllowedUploadRejectsPaddedExecutables(t *testing.T) {
+	cases := []struct {
+		contentType string
+		filename    string
+	}{
+		{"application/octet-stream", "payload.exe "},
+		{"text/plain", "payload.exe."},
+		{"image/png", "payload.dll  "},
+		{"", "payload.bat."},
+	}
+	for _, tc := range cases {
+		if IsAllowedUpload(tc.contentType, tc.filename) {
+			t.Errorf("IsAllowedUpload(%q, %q) = true; want false", tc.contentType, tc.filename)
+		}
+	}
+}
+
+// TestResolveContentTypeIgnoresTrailingWindowsPadding pins the other half:
+// a padded name must still resolve through the extension table, or a
+// rejected archive format becomes "unidentified" and is let through.
+func TestResolveContentTypeIgnoresTrailingWindowsPadding(t *testing.T) {
+	cases := map[string]string{
+		"archive.7z ":  "application/x-7z-compressed",
+		"archive.7z.":  "application/x-7z-compressed",
+		"notes.txt  ":  "text/plain",
+		"picture.png.": "image/png",
+	}
+	for filename, want := range cases {
+		if got := ResolveContentType(GenericBinaryType, filename); got != want {
+			t.Errorf("ResolveContentType(generic, %q) = %q; want %q", filename, got, want)
+		}
+	}
+	if IsAllowedUpload(GenericBinaryType, "archive.7z ") {
+		t.Error("IsAllowedUpload(generic, \"archive.7z \") = true; the allowlist rejects 7z")
+	}
+}
+
+// TestNormalizeUploadNameLeavesTheNameOtherwiseAlone guards against the
+// normaliser growing into a sanitiser: only the trailing run goes.
+func TestNormalizeUploadNameLeavesTheNameOtherwiseAlone(t *testing.T) {
+	cases := map[string]string{
+		"payload.exe ":       "payload.exe",
+		"payload.exe":        "payload.exe",
+		" leading.txt":       " leading.txt",
+		"inner space.txt":    "inner space.txt",
+		".hidden":            ".hidden",
+		"dots.in.name.txt  ": "dots.in.name.txt",
+		"...":                "",
+	}
+	for in, want := range cases {
+		if got := NormalizeUploadName(in); got != want {
+			t.Errorf("NormalizeUploadName(%q) = %q; want %q", in, got, want)
+		}
+	}
+}

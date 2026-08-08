@@ -26,6 +26,11 @@ type Op string
 
 // Supported operations for the initial constraint slice. Any Op not in
 // this set is rejected by Parse.
+//
+// OpActorHasRole is satisfied when the role named in Arg is attached to
+// the task, by anyone — it does not test the role of whoever triggered
+// the evaluation, and the keyword's phrasing invites that misreading.
+// See [Facts.ActorRoles] for why the fact cannot be per-caller.
 const (
 	OpAnd             Op = "and"
 	OpOr              Op = "or"
@@ -53,7 +58,7 @@ type Constraint struct {
 	Term *Constraint `json:"term,omitempty"`
 
 	// Arg is the generic string payload: ISO date for time.due_before,
-	// role name for actor.has_role.
+	// the role that must be attached to the task for actor.has_role.
 	Arg string `json:"arg,omitempty"`
 	// TaskIDs is the id list for dependency.* builtins.
 	TaskIDs []string `json:"taskIds,omitempty"`

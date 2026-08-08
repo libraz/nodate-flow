@@ -13,7 +13,7 @@ func TestCreateValidatesFavoriteTargetBeforeInsert(t *testing.T) {
 	}
 	body := string(src)
 	if !containsInOrder(body,
-		"ensureFavoriteTargetExists(ctx, deps.Queries, wsID, targetType, targetPub)",
+		"ensureFavoriteTargetExists(ctx, deps, wsID, actorID, targetType, targetPub)",
 		"deps.Queries.FindFavoriteByTarget",
 		"deps.Queries.CreateFavorite",
 	) {

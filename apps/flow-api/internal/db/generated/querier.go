@@ -739,14 +739,27 @@ type Querier interface {
 	FindProviderForDecrypt(ctx context.Context, arg FindProviderForDecryptParams) (FindProviderForDecryptRow, error)
 	// Find a single reaction by public id.
 	FindReactionByPublicId(ctx context.Context, publicID types.PublicID) (FindReactionByPublicIdRow, error)
-	// Resolve the AI agent that produced a retro draft task by looking up the
-	// TaskRetroDrafted event (type='task.retro.drafted') joined to ai_agents.
-	// Returns the agent's public_id and display name. Used by the retro draft
-	// queue handler to enrich rows with createdByAgentId / createdByAgentName
-	// without coupling the main list query to ai_agents (the event-derived
-	// attribution is the only authoritative source — tasks rows do not carry
-	// created_by_agent_id).
-	FindRetroDraftAgent(ctx context.Context, arg FindRetroDraftAgentParams) (FindRetroDraftAgentRow, error)
+	// Resolve the AI agent behind each of a page of retro draft tasks, by
+	// looking up the TaskRetroDrafted event (type='task.retro.drafted')
+	// joined to ai_agents. Returns the internal task_id alongside the
+	// agent's public_id and display name so the caller can index the result
+	// by the task_id ListRetroDraftsForWorkspace already handed it.
+	//
+	// The event-derived attribution is the only authoritative source —
+	// tasks rows do not carry created_by_agent_id — which is why the main
+	// list query stays uncoupled from ai_agents and this runs beside it.
+	//
+	// It takes the whole page at once rather than one task at a time. Per
+	// row this was one statement each, so a full page of fifty drafts cost
+	// fifty-one round trips to render a list that shows a name next to each
+	// title, and the cost grew with the page the operator asked for.
+	//
+	// ROW_NUMBER picks the earliest qualifying event per task, which is the
+	// row the per-task query returned under ORDER BY occurred_at, id LIMIT 1.
+	// Doing it in the database rather than by keeping the first row seen in
+	// Go means the statement returns exactly one row per task: a task whose
+	// history holds many drafted events cannot make the result set grow.
+	FindRetroDraftAgents(ctx context.Context, arg FindRetroDraftAgentsParams) ([]FindRetroDraftAgentsRow, error)
 	// Check if a pending or running import already exists for a project.
 	FindRunningImportForProject(ctx context.Context, arg FindRunningImportForProjectParams) (FindRunningImportForProjectRow, error)
 	// Resolve a session by its external public_id (UUID v7).
@@ -959,9 +972,20 @@ type Querier interface {
 	//
 	// The ON DELETE CASCADE chain on users.id removes user-scoped rows
 	// (sessions, recovery codes, instance admin grants, the user-scoped
-	// storage_objects rows whose blobs the caller already purged). FK
-	// ON DELETE SET NULL on attachments.uploader_id / similar audit-trail
-	// back-refs is intentional: the audit history outlives the user.
+	// storage_objects rows whose blobs the caller already purged) AND the
+	// attachments / calendar_event_attachments rows the user uploaded:
+	// both uploader_id FKs are ON DELETE CASCADE, not SET NULL. That is
+	// what makes the caller's ref_count decrement obligatory rather than
+	// tidy-up — those tables reference storage_objects with ON DELETE
+	// RESTRICT, so the counters must already be decremented when the
+	// cascade drops the rows, or the sole-referrer sweep that follows
+	// cannot tell a freed blob from a shared one.
+	//
+	// Audit-trail back-refs are the ones that survive, and they survive
+	// because they are separately declared ON DELETE SET NULL:
+	// events.actor_user_id, mcp_invocations.user_id,
+	// instance_audit_logs.actor_user_id, tasks.created_by_user_id. The
+	// history keeps its shape and loses only the name.
 	HardDeleteUser(ctx context.Context, id uint32) (sql.Result, error)
 	// Final stage of the admin workspace immediate destructive delete. Fires
 	// in the same request as the caller's MinIO sweep; there is no soft-

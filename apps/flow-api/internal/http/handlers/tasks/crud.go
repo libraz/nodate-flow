@@ -5,7 +5,6 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"log/slog"
 	"strings"
 	"time"
 
@@ -19,10 +18,8 @@ import (
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/handlers/handlerutil"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/middleware"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/itemkit"
-	nflog "github.com/libraz/nodate-flow/apps/flow-api/internal/log"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/taskcreate"
 	"github.com/libraz/nodate-flow/packages/go-shared/apierr"
-	"github.com/libraz/nodate-flow/packages/go-shared/logutil"
 	"github.com/libraz/nodate-flow/packages/go-shared/stringutil"
 )
 
@@ -892,18 +889,20 @@ func Patch(deps Deps) func(context.Context, *PatchTaskInput) (*PatchTaskOutput, 
 		// the task's current values changes nothing and MySQL counts zero.
 		// The task was resolved by the task middleware before this runs.
 		if !needsItemkit {
-			if _, err := deps.Queries.UpdateTask(ctx, updateParams); err != nil {
+			// Same transaction boundary as the itemkit branch below. The
+			// UPDATE and the timeline row have to commit together: this
+			// path used to append after the write with no transaction in
+			// scope, so a crash in between left a task whose change had
+			// landed and whose timeline never recorded it — and the
+			// append error was only logged, which made the loss silent.
+			if err := dbretry.InTx(ctx, deps.DB, "tasks.Patch", nil, func(ctx context.Context, tx *sql.Tx) error {
+				qtx := deps.Queries.WithTx(tx)
+				if _, err := qtx.UpdateTask(ctx, updateParams); err != nil {
+					return err
+				}
+				return eventbus.Append(ctx, tx, updateEvent)
+			}); err != nil {
 				return nil, httpErr(apierrors.InternalUnexpected)
-			}
-			// No tx in scope on this path; append best-effort.
-			if err := eventbus.Append(ctx, deps.DB, updateEvent); err != nil {
-				nflog.LoggerFromContext(ctx).ErrorContext(ctx, "eventbus.Append failed",
-					slog.Any("err", err),
-					slog.String("handler", "tasks.Patch"),
-					slog.String("event_type", string(eventbus.TaskUpdated)),
-					logutil.LogEntity("workspace", ws.PublicID),
-					logutil.LogEntity("task", task.PublicID),
-				)
 			}
 		} else {
 			// dbretry.InTx rather than a hand-rolled transaction: the

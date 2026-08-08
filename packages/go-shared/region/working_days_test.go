@@ -1,6 +1,7 @@
 package region
 
 import (
+	"strings"
 	"testing"
 	"time"
 )
@@ -18,11 +19,32 @@ func TestValidateWorkingDays(t *testing.T) {
 		{"ABCDEFG", false},
 		{"MTWTF", true},
 		{"MTWTF___", true},
+		// Seven characters, seventeen bytes. The columns are CHAR(7)
+		// latin1, so a multi-byte label has nowhere to go; the check
+		// exists so the caller is told that rather than being told the
+		// string is the wrong length.
+		{"月火水木金__", true},
+		{"MTWTF_\n", true},
 	} {
 		err := ValidateWorkingDays(c.in)
 		if (err != nil) != c.wantErr {
 			t.Errorf("ValidateWorkingDays(%q): wantErr=%v, got=%v", c.in, c.wantErr, err)
 		}
+	}
+}
+
+// TestValidateWorkingDaysExplainsNonASCII pins the message, because the
+// whole point of the separate check is which failure the caller is told
+// about: reporting a kanji label as a length problem sends them looking
+// for a missing character.
+func TestValidateWorkingDaysExplainsNonASCII(t *testing.T) {
+	t.Parallel()
+	err := ValidateWorkingDays("月火水木金__")
+	if err == nil {
+		t.Fatal("ValidateWorkingDays: want an error for a multi-byte label")
+	}
+	if !strings.Contains(err.Error(), "ASCII") {
+		t.Errorf("ValidateWorkingDays: want the error to name the ASCII restriction, got %q", err)
 	}
 }
 

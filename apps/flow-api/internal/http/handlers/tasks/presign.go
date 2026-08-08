@@ -16,6 +16,7 @@ import (
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/handlers/handlerutil"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/middleware"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/storage"
+	"github.com/libraz/nodate-flow/packages/go-shared/logutil"
 )
 
 const presignExpiry = 15 * time.Minute
@@ -291,9 +292,8 @@ func PresignUpload(deps Deps) func(context.Context, *PresignUploadInput) (*Presi
 				slog.Any("err", err),
 				slog.String("handler", "tasks.PresignUpload"),
 				slog.String("event_type", string(eventbus.TaskAttachmentAdded)),
-				slog.Int64("workspace_id", int64(ws.ID)),
-				slog.Int64("actor_id", int64(actorID)),
-				slog.Int64("task_id", taskInternal),
+				logutil.LogEntity("workspace", ws.PublicID),
+				logutil.LogEntity("task", task.PublicID),
 				slog.String("attachment_id", attachPub.String()),
 			)
 		}

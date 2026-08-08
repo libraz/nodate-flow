@@ -1,12 +1,18 @@
 // Package region — working-day / working-hour resolver.
 //
-// A workspace and each user carry a 7-character working-day string
-// (Mon..Sun) plus working-hour window. The string format is letter =
-// working, underscore = off (e.g. "MTWTF__" = Mon–Fri). This file
-// exposes the plain-function API itemkit, reconciler, and UI helpers
-// use to answer "is date D a working day for user U?" without
-// reaching into sqlc types (the columns are plain string / time.Time,
-// so no generated enum is needed).
+// A workspace and each user carry a 7-byte working-day string (Mon..Sun)
+// plus working-hour window. The string format is ASCII, one byte per day:
+// any byte other than '_' means working (e.g. "MTWTF__" = Mon–Fri). This
+// file exposes the plain-function API itemkit, reconciler, and UI helpers
+// use to answer "is date D a working day for user U?" without reaching
+// into sqlc types (the columns are plain string / time.Time, so no
+// generated enum is needed).
+//
+// The letters are labels, not data — nothing reads them — so the ASCII
+// restriction costs no expressiveness. It is not a free choice either:
+// users.working_days and workspaces.working_days are CHAR(7) CHARACTER SET
+// latin1, so a multi-byte label has nowhere to be stored. Letting one
+// through here would move the failure to the INSERT.
 package region
 
 import (
@@ -19,8 +25,8 @@ import (
 // workspace sets one. Monday through Friday, weekends off.
 const WorkingDaysDefault = "MTWTF__"
 
-// WorkingDaysLength is the fixed length of a working-days string
-// (Mon..Sun). Validation rejects any other length.
+// WorkingDaysLength is the fixed length in bytes of a working-days
+// string (Mon..Sun). Validation rejects any other length.
 const WorkingDaysLength = 7
 
 // WorkingHoursStartDefault and WorkingHoursEndDefault are the fallback
@@ -30,14 +36,26 @@ var (
 	WorkingHoursEndDefault   = mustParseClock("18:00")
 )
 
-// ValidateWorkingDays checks the CHAR(7) format: exactly 7 runes, each
-// either a letter (working) or '_' (off). Letters are not
-// case-validated against their weekday position because users may
-// prefer "MTWTF__" (romaji) or "月火水木金__" (kanji) — any non-'_' rune
-// means "on". Empty string is accepted and resolved to the default.
+// ValidateWorkingDays checks the CHAR(7) format: exactly 7 printable
+// ASCII bytes, each either a label (working) or '_' (off). Labels are not
+// case-validated against their weekday position — any byte other than '_'
+// means "on", so "MTWTF__" and "mtwtf__" are equally valid. Empty string
+// is accepted and resolved to the default.
+//
+// The ASCII check comes first so a multi-byte label gets an answer about
+// what is actually wrong with it. A kanji spelling is seven characters and
+// seventeen bytes; reporting that as a length error reads like an
+// off-by-something rather than the storage constraint it is. The columns
+// are CHAR(7) CHARACTER SET latin1, so widening this would be a schema
+// change, not a validator change.
 func ValidateWorkingDays(s string) error {
 	if s == "" {
 		return nil
+	}
+	for i := 0; i < len(s); i++ {
+		if s[i] < 0x20 || s[i] > 0x7E {
+			return fmt.Errorf("working_days must be printable ASCII; byte %d is not", i)
+		}
 	}
 	if len(s) != WorkingDaysLength {
 		return fmt.Errorf("working_days must be exactly %d chars, got %d", WorkingDaysLength, len(s))

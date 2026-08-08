@@ -857,10 +857,17 @@ type ListTaskAttachmentsInput struct {
 }
 
 // ListTaskAttachmentsBody is the response payload for GET /tasks/{id}/attachments.
+//
+// NextCursor is always null here: the endpoint pages by limit/offset and
+// there is no keyset query behind it, so there is no cursor to hand back
+// and no `cursor` parameter that would accept one. The field is declared
+// for envelope symmetry with the cursor-paged lists. Clients must page
+// this endpoint with `offset`; treating a null nextCursor as "no more
+// rows" stops after the first page while rows remain.
 type ListTaskAttachmentsBody struct {
 	Total       int64            `json:"total"`
 	Attachments []TaskAttachment `json:"attachments"`
-	NextCursor  *string          `json:"nextCursor"`
+	NextCursor  *string          `json:"nextCursor" doc:"Always null on this endpoint; page with offset. See total."`
 }
 
 // ListTaskAttachmentsOutput is the response for GET /tasks/{id}/attachments.
@@ -896,7 +903,7 @@ type DeleteTaskAttachmentOutput struct {
 type PresignUploadBody struct {
 	Filename    string `json:"filename" minLength:"1" maxLength:"512" doc:"Original filename"`
 	ContentType string `json:"contentType" minLength:"1" maxLength:"255" doc:"MIME type"`
-	ByteSize    uint64 `json:"byteSize" minimum:"1" doc:"File size in bytes"`
+	ByteSize    uint64 `json:"byteSize" minimum:"1" doc:"File size in bytes. Max 100 MB; over that the handler answers 413 VALIDATION.FILE.TOO_LARGE."`
 	Sha256      string `json:"sha256" minLength:"64" maxLength:"64" pattern:"^[0-9a-f]{64}$" doc:"Lowercase hex SHA-256 digest of the file body (64 chars). Drives content-addressed dedup."`
 }
 

@@ -26,7 +26,6 @@ func TestValidateRecurrenceRule(t *testing.T) {
 		{"valid daily", rawRule(`{"freq":"daily","interval":1}`), false},
 		{"valid weekly byDay", rawRule(`{"freq":"weekly","interval":1,"byDay":["MO","WE"]}`), false},
 		{"valid monthly byMonthDay", rawRule(`{"freq":"monthly","interval":1,"byMonthDay":[15]}`), false},
-		{"valid monthly bySetPos", rawRule(`{"freq":"monthly","interval":1,"byDay":["MO"],"bySetPos":2}`), false},
 		{"valid yearly", rawRule(`{"freq":"yearly"}`), false},
 		{"valid no interval", rawRule(`{"freq":"daily"}`), false},
 		{"valid until date", rawRule(`{"freq":"daily","until":"2025-12-31"}`), false},
@@ -47,7 +46,12 @@ func TestValidateRecurrenceRule(t *testing.T) {
 		{"lowercase byDay rejected", rawRule(`{"freq":"weekly","byDay":["mo"]}`), true},
 		{"byMonthDay zero rejected", rawRule(`{"freq":"monthly","byMonthDay":[0]}`), true},
 		{"byMonthDay out of range rejected", rawRule(`{"freq":"monthly","byMonthDay":[40]}`), true},
+		// No expander implements bySetPos, so accepting an in-range value
+		// stored a rule that then expanded as if the selector were absent:
+		// "second Monday" came back as every Monday, silently.
+		{"bySetPos rejected", rawRule(`{"freq":"monthly","byDay":["MO"],"bySetPos":2}`), true},
 		{"bySetPos zero rejected", rawRule(`{"freq":"monthly","byDay":["MO"],"bySetPos":0}`), true},
+		{"bySetPos negative rejected", rawRule(`{"freq":"monthly","byDay":["MO"],"bySetPos":-1}`), true},
 		{"bySetPos too large rejected", rawRule(`{"freq":"monthly","byDay":["MO"],"bySetPos":6}`), true},
 		{"unparseable until rejected", rawRule(`{"freq":"daily","until":"not-a-date"}`), true},
 	}
@@ -56,6 +60,46 @@ func TestValidateRecurrenceRule(t *testing.T) {
 			got := validateRecurrenceRule(tt.rule)
 			if (got != nil) != tt.wantErr {
 				t.Fatalf("validateRecurrenceRule(%v) = %v, wantErr = %v", tt.rule, got, tt.wantErr)
+			}
+		})
+	}
+}
+
+// TestValidateRecurrenceExceptions pins the accepted spellings to the ones
+// buildExceptions in packages/go-shared/recurrence resolves. Anything the
+// expander skips has to be refused here, because a skipped exception is an
+// occurrence the client reported as deleted and the calendar kept showing.
+func TestValidateRecurrenceExceptions(t *testing.T) {
+	tests := []struct {
+		name    string
+		value   *json.RawMessage
+		wantErr bool
+	}{
+		{"nil ok", nil, false},
+		{"empty ok", rawRule(``), false},
+		{"null ok", rawRule(`null`), false},
+		{"empty array ok", rawRule(`[]`), false},
+		{"date only", rawRule(`["2026-03-01"]`), false},
+		{"rfc3339", rawRule(`["2026-03-01T09:00:00Z"]`), false},
+		{"rfc3339 with offset", rawRule(`["2026-03-01T09:00:00+09:00"]`), false},
+		{"naive local instant", rawRule(`["2026-03-01T09:00:00"]`), false},
+		{"mixed forms", rawRule(`["2026-03-01","2026-03-08T09:00:00Z"]`), false},
+
+		{"not an array", rawRule(`{"a":1}`), true},
+		{"array of numbers", rawRule(`[1,2]`), true},
+		{"malformed json", rawRule(`[not json`), true},
+		{"empty entry", rawRule(`[""]`), true},
+		{"impossible date", rawRule(`["2026-02-30"]`), true},
+		{"unpadded date the expander would skip", rawRule(`["2026-3-1"]`), true},
+		{"free text", rawRule(`["next tuesday"]`), true},
+		{"date with trailing junk", rawRule(`["2026-03-01 morning"]`), true},
+		{"epoch seconds as a string", rawRule(`["1772000000"]`), true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := validateRecurrenceExceptions(tt.value)
+			if (got != nil) != tt.wantErr {
+				t.Fatalf("validateRecurrenceExceptions(%v) = %v, wantErr = %v", tt.value, got, tt.wantErr)
 			}
 		})
 	}

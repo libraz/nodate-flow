@@ -5,6 +5,7 @@ import (
 	"encoding/csv"
 	"errors"
 	"io"
+	"slices"
 	"strings"
 	"testing"
 
@@ -64,7 +65,7 @@ func TestWriteCSVSurfacesAFailedWrite(t *testing.T) {
 	tasks := exportTasks(200)
 	w := &errAfterNBytes{budget: 512, err: broken}
 
-	res := writeCSV(w, tasks)
+	res := writeCSV(w, slices.Values(tasks))
 
 	require.Error(t, res.err, "a failed body write must be reported, not discarded")
 	assert.ErrorIs(t, res.err, broken)
@@ -85,7 +86,7 @@ func TestWriteCSVSurfacesAFailedFlush(t *testing.T) {
 	tasks := exportTasks(1)
 	w := &errAfterNBytes{budget: 3, err: broken}
 
-	res := writeCSV(w, tasks)
+	res := writeCSV(w, slices.Values(tasks))
 
 	require.Error(t, res.err, "cw.Error() after Flush is the only place a buffered failure shows up")
 	assert.ErrorIs(t, res.err, broken)
@@ -97,7 +98,7 @@ func TestWriteCSVCountsEveryRowItWrote(t *testing.T) {
 	tasks := exportTasks(37)
 	var buf bytes.Buffer
 
-	res := writeCSV(&buf, tasks)
+	res := writeCSV(&buf, slices.Values(tasks))
 
 	require.NoError(t, res.err)
 	assert.Equal(t, len(tasks), res.written)
@@ -114,7 +115,7 @@ func TestWriteCSVReportsAWriterThatRefusesTheByteOrderMark(t *testing.T) {
 	t.Parallel()
 
 	broken := errors.New("closed")
-	res := writeCSV(&errAfterNBytes{budget: 0, err: broken}, exportTasks(3))
+	res := writeCSV(&errAfterNBytes{budget: 0, err: broken}, slices.Values(exportTasks(3)))
 
 	require.ErrorIs(t, res.err, broken)
 	assert.Equal(t, 0, res.written)

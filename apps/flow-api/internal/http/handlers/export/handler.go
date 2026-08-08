@@ -6,6 +6,7 @@ import (
 	"encoding/csv"
 	"fmt"
 	"io"
+	"iter"
 	"log/slog"
 	"net/http"
 	"strconv"
@@ -51,19 +52,19 @@ func Export(deps Deps) func(ctx context.Context, in *Input) (*Output, error) {
 			limit = maxExportRows
 		}
 
-		var rows []exportRow
+		var data exportDataset
 		var err error
 
 		if in.LensID != "" {
-			rows, err = fetchForLens(ctx, deps, ws, actorID, in.LensID, limit)
+			data, err = fetchForLens(ctx, deps, ws, actorID, in.LensID, limit)
 		} else {
-			rows, err = fetchForWorkspace(ctx, deps, ws, actorID, limit)
+			data, err = fetchForWorkspace(ctx, deps, ws, actorID, limit)
 		}
 		if err != nil {
 			return nil, err
 		}
 
-		tasks := mapRows(rows)
+		tasks := collectTasks(data)
 
 		// Audit log.
 		deps.Audit.Record(ctx, audit.Entry{
@@ -137,17 +138,16 @@ func CSVOperation(deps Deps) func(context.Context, *CSVInput) (*huma.StreamRespo
 			limit = maxExportRows
 		}
 
-		var rows []exportRow
+		var data exportDataset
 		var err error
 		if in.LensID != "" {
-			rows, err = fetchForLens(ctx, deps, ws, actorID, in.LensID, limit)
+			data, err = fetchForLens(ctx, deps, ws, actorID, in.LensID, limit)
 		} else {
-			rows, err = fetchForWorkspace(ctx, deps, ws, actorID, limit)
+			data, err = fetchForWorkspace(ctx, deps, ws, actorID, limit)
 		}
 		if err != nil {
 			return nil, err
 		}
-		tasks := mapRows(rows)
 
 		return &huma.StreamResponse{
 			Body: func(hctx huma.Context) {
@@ -160,11 +160,15 @@ func CSVOperation(deps Deps) func(context.Context, *CSVInput) (*huma.StreamRespo
 				// without parsing it, and counting lines is wrong the
 				// moment a description contains a newline. The server
 				// already knows the number exactly.
-				hctx.SetHeader(RowCountHeader, strconv.Itoa(len(tasks)))
+				//
+				// It comes from the dataset's own count rather than from
+				// counting DTOs, because there is no slice of DTOs to
+				// count: the rows are converted as they are written.
+				hctx.SetHeader(RowCountHeader, strconv.Itoa(data.count))
 				hctx.SetStatus(http.StatusOK)
 
-				res := writeCSV(hctx.BodyWriter(), tasks)
-				recordExport(ctx, deps, ws, actorID, len(tasks), res)
+				res := writeCSV(hctx.BodyWriter(), exportedTasks(data.rows))
+				recordExport(ctx, deps, ws, actorID, data.count, res)
 				if res.err != nil {
 					// The status line went out before the first row did,
 					// so there is no status code left to say the file is
@@ -234,8 +238,8 @@ func recordExport(
 		slog.ErrorContext(ctx, "export: CSV body write failed",
 			slog.Any("err", res.err),
 			logutil.LogEntity("workspace", ws.PublicID),
-			slog.Int("rows_selected", selected),
-			slog.Int("rows_written", res.written),
+			logutil.LogNumber("rows_selected", selected),
+			logutil.LogNumber("rows_written", res.written),
 		)
 	}
 }
@@ -277,11 +281,18 @@ func exportMetadata(selected int, res csvWriteResult) map[string]any {
 // writeCSV emits the export as CSV and reports how many task rows it
 // got through, along with the first write error that stopped it.
 //
-// Every write is checked. The rows are already in memory by the time
-// this runs, so the writer failing means the transport did — usually
-// the caller hanging up mid-download. Discarding those errors, as this
-// did, produced a short file with a 200 on it and a log entry claiming
-// the whole workspace had been exported.
+// It takes a sequence rather than a slice, and that is the point: a row
+// becomes a DTO immediately before it is written and is unreachable
+// after, so the export holds one converted row at a time instead of ten
+// thousand. Collecting the sequence here — or handing this a slice —
+// puts the whole ceiling back in memory and delays the first byte until
+// every row has been converted, which is what the caller experiences as
+// the download taking a while to start.
+//
+// Every write is checked. The writer failing means the transport did —
+// usually the caller hanging up mid-download. Discarding those errors,
+// as this did, produced a short file with a 200 on it and a log entry
+// claiming the whole workspace had been exported.
 //
 // The count is rows handed to the csv.Writer, which buffers: after a
 // failing Flush some of the counted rows never reached the socket. It
@@ -293,7 +304,7 @@ func exportMetadata(selected int, res csvWriteResult) map[string]any {
 // of non-ASCII task titles opens as mojibake. This is the only place
 // that adds one — a second BOM written by a client assembling its own
 // file would appear as stray characters in the first header cell.
-func writeCSV(w io.Writer, tasks []ExportedTask) csvWriteResult {
+func writeCSV(w io.Writer, tasks iter.Seq[ExportedTask]) csvWriteResult {
 	if _, err := w.Write([]byte{0xEF, 0xBB, 0xBF}); err != nil {
 		return csvWriteResult{err: fmt.Errorf("export: write byte order mark: %w", err)}
 	}
@@ -315,7 +326,8 @@ func writeCSV(w io.Writer, tasks []ExportedTask) csvWriteResult {
 	}
 
 	written := 0
-	for _, t := range tasks {
+	var rowErr error
+	for t := range tasks {
 		if err := write([]string{
 			t.ID,
 			t.Title,
@@ -332,9 +344,17 @@ func writeCSV(w io.Writer, tasks []ExportedTask) csvWriteResult {
 			handlerutil.FormatOptionalUnixISO(t.UpdatedAt),
 			handlerutil.FormatUnixISO(t.CreatedAt),
 		}); err != nil {
-			return csvWriteResult{written: written, err: fmt.Errorf("export: write row %d: %w", written+1, err)}
+			// Breaking out of a range-over-func stops the producer, so
+			// the rows behind the failure are never fetched or
+			// converted — a caller that hangs up early costs the
+			// server the rows it actually read, not the whole ceiling.
+			rowErr = fmt.Errorf("export: write row %d: %w", written+1, err)
+			break
 		}
 		written++
+	}
+	if rowErr != nil {
+		return csvWriteResult{written: written, err: rowErr}
 	}
 
 	// Flush is where the buffered tail reaches the writer, so it can
@@ -420,10 +440,51 @@ type exportRow struct {
 	CreatedAt           sql.NullTime
 }
 
+// exportDataset is one export's worth of rows: how many there are, and
+// a sequence that yields them.
+//
+// The rows are a sequence rather than a slice because the CSV route
+// writes them out one at a time and never needs two at once. The count
+// travels alongside because a sequence cannot be measured without
+// consuming it, and both the Row-Count header and the audit record need
+// the number before the body is written.
+//
+// The sequence is re-iterable and reads from memory: the query has
+// already returned by the time it exists, so this removes the copies
+// layered on top of that result, not the result itself. Streaming from
+// the driver would mean a hand-written query outside the generated set.
+type exportDataset struct {
+	rows  iter.Seq[exportRow]
+	count int
+}
+
+// collectTasks materialises the whole dataset as DTOs. It is what the
+// JSON route needs — the response body is the slice — and the reason
+// [exportDataset] does not simply hand back one.
+func collectTasks(data exportDataset) []ExportedTask {
+	tasks := make([]ExportedTask, 0, data.count)
+	for r := range data.rows {
+		tasks = append(tasks, mapRow(r))
+	}
+	return tasks
+}
+
+// exportedTasks converts a row sequence to a DTO sequence lazily, one
+// row per pull. It is the CSV route's counterpart to [collectTasks].
+func exportedTasks(rows iter.Seq[exportRow]) iter.Seq[ExportedTask] {
+	return func(yield func(ExportedTask) bool) {
+		for r := range rows {
+			if !yield(mapRow(r)) {
+				return
+			}
+		}
+	}
+}
+
 // fetchForWorkspace fetches export rows across the entire workspace.
 func fetchForWorkspace(
 	ctx context.Context, deps Deps, ws middleware.WorkspaceContext, actorID uint32, limit int32,
-) ([]exportRow, error) {
+) (exportDataset, error) {
 	visibility := exportVisibilityParams(actorID, ws.Role)
 	dbRows, err := deps.Queries.ExportTasksForWorkspace(ctx, generated.ExportTasksForWorkspaceParams{
 		WorkspaceID:   ws.ID,
@@ -434,37 +495,42 @@ func fetchForWorkspace(
 		Limit:         limit,
 	})
 	if err != nil {
-		return nil, datasetQueryFailed(ctx, "workspace", err)
+		return exportDataset{}, datasetQueryFailed(ctx, "workspace", err)
 	}
-	out := make([]exportRow, len(dbRows))
-	for i, r := range dbRows {
-		out[i] = exportRow{
-			PublicID:            r.PublicID,
-			Title:               r.Title,
-			Description:         r.Description,
-			DerivedState:        r.DerivedState,
-			Priority:            r.Priority,
-			DueOn:               r.DueOn,
-			StartedOn:           r.StartedOn,
-			CompletedAt:         r.CompletedAt,
-			ProjectPublicID:     r.ProjectPublicID,
-			ProjectName:         r.ProjectName,
-			AssigneePublicID:    r.AssigneePublicID,
-			AssigneeDisplayName: r.AssigneeDisplayName,
-			UpdatedAt:           r.UpdatedAt,
-			CreatedAt:           sql.NullTime{Time: r.CreatedAt, Valid: true},
-		}
-	}
-	return out, nil
+	return exportDataset{
+		count: len(dbRows),
+		rows: func(yield func(exportRow) bool) {
+			for _, r := range dbRows {
+				if !yield(exportRow{
+					PublicID:            r.PublicID,
+					Title:               r.Title,
+					Description:         r.Description,
+					DerivedState:        r.DerivedState,
+					Priority:            r.Priority,
+					DueOn:               r.DueOn,
+					StartedOn:           r.StartedOn,
+					CompletedAt:         r.CompletedAt,
+					ProjectPublicID:     r.ProjectPublicID,
+					ProjectName:         r.ProjectName,
+					AssigneePublicID:    r.AssigneePublicID,
+					AssigneeDisplayName: r.AssigneeDisplayName,
+					UpdatedAt:           r.UpdatedAt,
+					CreatedAt:           sql.NullTime{Time: r.CreatedAt, Valid: true},
+				}) {
+					return
+				}
+			}
+		},
+	}, nil
 }
 
 // fetchForLens resolves the lens and fetches export rows scoped to its project.
 func fetchForLens(
 	ctx context.Context, deps Deps, ws middleware.WorkspaceContext, actorID uint32, lensID string, limit int32,
-) ([]exportRow, error) {
+) (exportDataset, error) {
 	lid, err := types.Parse(lensID)
 	if err != nil {
-		return nil, httpErr(apierrors.ExportTaskLensNotFound)
+		return exportDataset{}, httpErr(apierrors.ExportTaskLensNotFound)
 	}
 
 	projectID, err := deps.Queries.ResolveLensProjectID(ctx, generated.ResolveLensProjectIDParams{
@@ -472,7 +538,7 @@ func fetchForLens(
 		PublicID:    lid,
 	})
 	if err != nil {
-		return nil, httpErr(apierr.SpecForErrNoRows(err, apierrors.ExportTaskLensNotFound, apierrors.ExportTaskDatasetQueryFailed))
+		return exportDataset{}, httpErr(apierr.SpecForErrNoRows(err, apierrors.ExportTaskLensNotFound, apierrors.ExportTaskDatasetQueryFailed))
 	}
 
 	// If the lens has a project scope, use the project-scoped query.
@@ -488,28 +554,33 @@ func fetchForLens(
 			Limit:         limit,
 		})
 		if err != nil {
-			return nil, datasetQueryFailed(ctx, "lens", err)
+			return exportDataset{}, datasetQueryFailed(ctx, "lens", err)
 		}
-		out := make([]exportRow, len(dbRows))
-		for i, r := range dbRows {
-			out[i] = exportRow{
-				PublicID:            r.PublicID,
-				Title:               r.Title,
-				Description:         r.Description,
-				DerivedState:        r.DerivedState,
-				Priority:            r.Priority,
-				DueOn:               r.DueOn,
-				StartedOn:           r.StartedOn,
-				CompletedAt:         r.CompletedAt,
-				ProjectPublicID:     r.ProjectPublicID,
-				ProjectName:         r.ProjectName,
-				AssigneePublicID:    r.AssigneePublicID,
-				AssigneeDisplayName: r.AssigneeDisplayName,
-				UpdatedAt:           r.UpdatedAt,
-				CreatedAt:           sql.NullTime{Time: r.CreatedAt, Valid: true},
-			}
-		}
-		return out, nil
+		return exportDataset{
+			count: len(dbRows),
+			rows: func(yield func(exportRow) bool) {
+				for _, r := range dbRows {
+					if !yield(exportRow{
+						PublicID:            r.PublicID,
+						Title:               r.Title,
+						Description:         r.Description,
+						DerivedState:        r.DerivedState,
+						Priority:            r.Priority,
+						DueOn:               r.DueOn,
+						StartedOn:           r.StartedOn,
+						CompletedAt:         r.CompletedAt,
+						ProjectPublicID:     r.ProjectPublicID,
+						ProjectName:         r.ProjectName,
+						AssigneePublicID:    r.AssigneePublicID,
+						AssigneeDisplayName: r.AssigneeDisplayName,
+						UpdatedAt:           r.UpdatedAt,
+						CreatedAt:           sql.NullTime{Time: r.CreatedAt, Valid: true},
+					}) {
+						return
+					}
+				}
+			},
+		}, nil
 	}
 
 	// Workspace-wide lens: fall back to the workspace query.
@@ -532,38 +603,34 @@ func exportVisibilityParams(actorID uint32, wsRole middleware.WorkspaceRole) exp
 	}
 }
 
-// mapRows converts internal exportRow slices to the public DTO.
+// mapRow converts one internal exportRow to the public DTO.
 // All time/date conversions happen here and nowhere else.
-func mapRows(rows []exportRow) []ExportedTask {
-	tasks := make([]ExportedTask, 0, len(rows))
-	for _, r := range rows {
-		t := ExportedTask{
-			ID:          r.PublicID.String(),
-			Title:       r.Title,
-			Status:      string(r.DerivedState),
-			Priority:    r.Priority,
-			DueOn:       handlerutil.NullTimeDate(r.DueOn),
-			StartedOn:   handlerutil.NullTimeDate(r.StartedOn),
-			CompletedAt: handlerutil.NullTimeUnix(r.CompletedAt),
-			ProjectID:   r.ProjectPublicID.String(),
-			ProjectName: r.ProjectName,
-			UpdatedAt:   handlerutil.NullTimeUnix(r.UpdatedAt),
-		}
-		if r.CreatedAt.Valid {
-			t.CreatedAt = r.CreatedAt.Time.Unix()
-		}
-		if r.Description.Valid {
-			t.Description = &r.Description.String
-		}
-		// A zero UUID means the LEFT JOIN produced NULL (no assignee).
-		if r.AssigneePublicID != (types.PublicID{}) && r.AssigneePublicID != types.PublicID(uuid.UUID{}) {
-			s := r.AssigneePublicID.String()
-			t.AssigneeID = &s
-		}
-		if r.AssigneeDisplayName.Valid {
-			t.AssigneeDisplayName = &r.AssigneeDisplayName.String
-		}
-		tasks = append(tasks, t)
+func mapRow(r exportRow) ExportedTask {
+	t := ExportedTask{
+		ID:          r.PublicID.String(),
+		Title:       r.Title,
+		Status:      string(r.DerivedState),
+		Priority:    r.Priority,
+		DueOn:       handlerutil.NullTimeDate(r.DueOn),
+		StartedOn:   handlerutil.NullTimeDate(r.StartedOn),
+		CompletedAt: handlerutil.NullTimeUnix(r.CompletedAt),
+		ProjectID:   r.ProjectPublicID.String(),
+		ProjectName: r.ProjectName,
+		UpdatedAt:   handlerutil.NullTimeUnix(r.UpdatedAt),
 	}
-	return tasks
+	if r.CreatedAt.Valid {
+		t.CreatedAt = r.CreatedAt.Time.Unix()
+	}
+	if r.Description.Valid {
+		t.Description = &r.Description.String
+	}
+	// A zero UUID means the LEFT JOIN produced NULL (no assignee).
+	if r.AssigneePublicID != (types.PublicID{}) && r.AssigneePublicID != types.PublicID(uuid.UUID{}) {
+		s := r.AssigneePublicID.String()
+		t.AssigneeID = &s
+	}
+	if r.AssigneeDisplayName.Valid {
+		t.AssigneeDisplayName = &r.AssigneeDisplayName.String
+	}
+	return t
 }

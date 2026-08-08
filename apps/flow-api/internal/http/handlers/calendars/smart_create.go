@@ -162,6 +162,11 @@ var (
 	reRangeJP    = regexp.MustCompile(`(\d{1,2})時(?:(\d{1,2})分)?(?:〜|～|から)(\d{1,2})時(?:(\d{1,2})分)?`)
 	reRangeColon = regexp.MustCompile(`(\d{1,2}):(\d{2})(?:〜|～|から)(\d{1,2}):(\d{2})`)
 
+	// Leftovers after the date/time text is removed: dangling particles
+	// at either end, and runs of ASCII or ideographic space to collapse.
+	reEdgeParticles = regexp.MustCompile(`^[\s　のに]+|[\s　のに]+$`)
+	reInnerSpaces   = regexp.MustCompile(`[\s　]+`)
+
 	// All time/date patterns for title cleanup
 	reAllPatterns = regexp.MustCompile(
 		`来週[月火水木金土日]曜日?|明後日|明日|今日|今週[月火水木金土日]曜日?|[月火水木金土日]曜日?` +
@@ -315,8 +320,8 @@ func extractEndTime(text string) (int, int, bool) {
 func cleanTitle(text string) string {
 	cleaned := reAllPatterns.ReplaceAllString(text, "")
 	// Remove common particles and connectors left dangling
-	cleaned = regexp.MustCompile(`^[\s　のに]+|[\s　のに]+$`).ReplaceAllString(cleaned, "")
-	cleaned = regexp.MustCompile(`[\s　]+`).ReplaceAllString(cleaned, " ")
+	cleaned = reEdgeParticles.ReplaceAllString(cleaned, "")
+	cleaned = reInnerSpaces.ReplaceAllString(cleaned, " ")
 	cleaned = strings.TrimSpace(cleaned)
 	// Ensure we have at least something
 	if utf8.RuneCountInString(cleaned) == 0 {

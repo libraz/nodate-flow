@@ -134,7 +134,7 @@ func DeleteAttachment(deps Deps) func(context.Context, *DeleteTaskAttachmentInpu
 			// Programmer error somewhere upstream; log and continue
 			// so the attachment delete still completes.
 			nflog.LoggerFromContext(ctx).WarnContext(ctx, "storage object ref_count underflow",
-				slog.Uint64("storage_object_id", uint64(soRow.StorageObjectID)),
+				logutil.LogEntityPID("attachment", aid),
 				slog.String("handler", "tasks.DeleteAttachment"),
 			)
 		}

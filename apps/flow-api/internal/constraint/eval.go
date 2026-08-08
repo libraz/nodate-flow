@@ -29,9 +29,24 @@ type Facts struct {
 	// A public_id absent from this map is treated as blocking so that
 	// callers which do not populate kinds keep counting every dep.
 	DependencyKinds map[string]string
-	// ActorRoles is the set of roles the acting user currently holds
-	// on this task. The map is keyed by role name with true values;
-	// absent keys are false.
+	// ActorRoles is the set of roles currently attached to this task via
+	// task_actors — roles somebody holds on the task, not roles held by
+	// whoever triggered the evaluation. The map is keyed by role name
+	// with true values; absent keys are false.
+	//
+	// It is deliberately task-scoped and not per-caller. Evaluate is a
+	// pure function of Facts and its result is cached under a hash of
+	// them (see engine/cache.go), while a constraint decides a task's
+	// derived_state — a property of the task. A fact that changed with
+	// who was asking would make the same task hold two states at once
+	// and would make the cache key wrong. Nothing in the evaluation path
+	// carries an acting user: engine.Store.Load is keyed by task and
+	// workspace alone.
+	//
+	// So "actor.has_role(reviewer)" reads as "this task has a reviewer",
+	// and an approval gate has to be written that way. A rule that must
+	// turn on the caller's own role belongs in the ACL layer, which does
+	// know who is asking.
 	ActorRoles map[string]bool
 	// SignalsReceived is the set of inbound signal kinds that have
 	// fired on this task (e.g. "github.pr.merged").

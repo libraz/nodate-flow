@@ -788,6 +788,9 @@ func PatchEvent(deps Deps) func(context.Context, *PatchEventInput) (*PatchEventO
 			params.RecurrenceEnd = sql.NullTime{Time: handlerutil.UnixToTime(*input.Body.RecurrenceEnd), Valid: true}
 		}
 		if input.Body.RecurrenceExceptions != nil {
+			if spec := validateRecurrenceExceptions(input.Body.RecurrenceExceptions); spec != nil {
+				return nil, httpErr(spec)
+			}
 			params.RecurrenceExceptions = json.RawMessage(*input.Body.RecurrenceExceptions)
 		}
 		if input.Body.NotificationOffset != nil {

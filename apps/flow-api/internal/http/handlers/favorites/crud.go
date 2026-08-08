@@ -6,6 +6,7 @@ import (
 	"errors"
 	"log/slog"
 
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/acl"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/audit"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
@@ -35,7 +36,7 @@ func Create(deps Deps) func(context.Context, *CreateFavoriteInput) (*CreateFavor
 			return nil, httpErr(apierrors.WsFavoriteNotFound)
 		}
 		targetType := generated.UserFavoritesTargetType(in.Body.TargetType)
-		if err := ensureFavoriteTargetExists(ctx, deps.Queries, wsID, targetType, targetPub); err != nil {
+		if err := ensureFavoriteTargetExists(ctx, deps, wsID, actorID, targetType, targetPub); err != nil {
 			return nil, httpErr(apierrors.WsFavoriteNotFound)
 		}
 
@@ -116,20 +117,38 @@ func Create(deps Deps) func(context.Context, *CreateFavoriteInput) (*CreateFavor
 	}
 }
 
+// ensureFavoriteTargetExists refuses a favorite whose target the caller
+// cannot reach. For tasks that means the Layer-4 visibility ACL, not just
+// workspace scope: a workspace-scoped lookup answers "does this id name a
+// task here?" for a task the caller may not see, and the caller learns the
+// answer from whether the favorite was accepted. Every rejection surfaces as
+// WS.FAVORITE.NOT_FOUND at the call site, so invisible and absent are the
+// same response.
+//
+// The other target types carry no per-row visibility, so workspace scope is
+// the entire rule for them.
 func ensureFavoriteTargetExists(
 	ctx context.Context,
-	q *generated.Queries,
+	deps Deps,
 	workspaceID uint32,
+	actorID uint32,
 	targetType generated.UserFavoritesTargetType,
 	targetPublicID types.PublicID,
 ) error {
+	q := deps.Queries
 	switch targetType {
 	case generated.UserFavoritesTargetTypeProject:
 		_, err := q.FindProjectByPublicId(ctx, generated.FindProjectByPublicIdParams{WorkspaceID: workspaceID, PublicID: targetPublicID})
 		return err
 	case generated.UserFavoritesTargetTypeTask:
-		_, err := q.FindTaskByPublicId(ctx, generated.FindTaskByPublicIdParams{WorkspaceID: workspaceID, PublicID: targetPublicID})
-		return err
+		access, err := acl.AuthorizeTaskAccess(ctx, deps.DB, targetPublicID.UUID(), actorID)
+		if err != nil {
+			return err
+		}
+		if access.Task.WorkspaceID != workspaceID {
+			return sql.ErrNoRows
+		}
+		return nil
 	case generated.UserFavoritesTargetTypePage:
 		_, err := q.GetPageByPublicId(ctx, generated.GetPageByPublicIdParams{WorkspaceID: workspaceID, PublicID: targetPublicID})
 		return err

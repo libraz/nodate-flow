@@ -69,6 +69,17 @@ sql:
               import: "github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
               package: "types"
               type: "PublicID"
+          # agent_public_id is always ai_agents.public_id under an alias. sqlc infers
+          # PublicID on its own whenever it can still see the source column, but a
+          # SELECT out of a derived table cannot be traced back that far and the column
+          # silently degrades to []byte — which still compiles, still scans, and hands
+          # the API layer raw bytes where every sibling id is a UUID. Naming it here
+          # makes the mapping independent of how the query is shaped.
+          - column: "*.agent_public_id"
+            go_type:
+              import: "github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
+              package: "types"
+              type: "PublicID"
           # event_public_id is BINARY(16) on webhook_deliveries (the source events.public_id
           # used as the dedupe anchor). Without this override sqlc maps the nullable column
           # to sql.NullString, which writes the canonical 36-char UUID into the BINARY(16)
