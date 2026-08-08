@@ -63,6 +63,10 @@ func (c *ProposalCache) Get(key string) (any, bool) {
 	return e.value, true
 }
 
+// proposalCacheMax is the ceiling on live entries. Reaching it triggers
+// one sweep, which is guaranteed to make room.
+const proposalCacheMax = 500
+
 // Put stores a value under the given key with the configured TTL.
 func (c *ProposalCache) Put(key string, value any) {
 	if c == nil || c.ttl <= 0 || value == nil {
@@ -71,14 +75,7 @@ func (c *ProposalCache) Put(key string, value any) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	c.m[key] = proposalEntry{value: value, expireAt: time.Now().Add(c.ttl)}
-
-	// Lazy eviction: purge expired entries when cache grows large.
-	if len(c.m) > 500 {
-		now := time.Now()
-		for k, e := range c.m {
-			if now.After(e.expireAt) {
-				delete(c.m, k)
-			}
-		}
+	if len(c.m) > proposalCacheMax {
+		EvictOldest(c.m, proposalCacheMax, func(e proposalEntry) time.Time { return e.expireAt })
 	}
 }

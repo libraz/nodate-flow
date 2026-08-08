@@ -116,7 +116,7 @@ func TestTailerPublishesAnotherProcessesAppends(t *testing.T) {
 
 	appendEvent(t, db, wsID, "calendar.event.created")
 
-	if _, err := tl.poll(context.Background()); err != nil {
+	if _, _, err := tl.poll(context.Background(), tl.safeID); err != nil {
 		t.Fatalf("poll: %v", err)
 	}
 
@@ -144,7 +144,7 @@ func TestTailerStartsAtTheEndOfTheLog(t *testing.T) {
 	rec := &recorder{}
 	tl := newTestTailer(t, db, rec, nil)
 
-	if _, err := tl.poll(context.Background()); err != nil {
+	if _, _, err := tl.poll(context.Background(), tl.safeID); err != nil {
 		t.Fatalf("poll: %v", err)
 	}
 	if len(rec.events) != 0 {
@@ -174,7 +174,7 @@ func TestTailerSkipsWhatThisProcessAlreadyPublished(t *testing.T) {
 	// Something else wrote this one.
 	appendEvent(t, db, wsID, "calendar.event.updated")
 
-	if _, err := tl.poll(context.Background()); err != nil {
+	if _, _, err := tl.poll(context.Background(), tl.safeID); err != nil {
 		t.Fatalf("poll: %v", err)
 	}
 
@@ -212,7 +212,7 @@ func TestTailerCatchesARowThatCommitsAfterAHigherID(t *testing.T) {
 	}
 
 	// The tailer reads while the lower id is still uncommitted.
-	if _, err := tl.poll(context.Background()); err != nil {
+	if _, _, err := tl.poll(context.Background(), tl.safeID); err != nil {
 		t.Fatalf("first poll: %v", err)
 	}
 	if len(rec.events) != 1 {
@@ -223,7 +223,7 @@ func TestTailerCatchesARowThatCommitsAfterAHigherID(t *testing.T) {
 	if err := tx.Commit(); err != nil {
 		t.Fatalf("commit: %v", err)
 	}
-	if _, err := tl.poll(context.Background()); err != nil {
+	if _, _, err := tl.poll(context.Background(), tl.safeID); err != nil {
 		t.Fatalf("second poll: %v", err)
 	}
 
@@ -244,7 +244,7 @@ func TestTailerDoesNotRepublishWhileRescanning(t *testing.T) {
 
 	appendEvent(t, db, wsID, "calendar.event.created")
 	for range 3 {
-		if _, err := tl.poll(context.Background()); err != nil {
+		if _, _, err := tl.poll(context.Background(), tl.safeID); err != nil {
 			t.Fatalf("poll: %v", err)
 		}
 	}
@@ -265,7 +265,7 @@ func TestTailerAdvancesPastRowsOlderThanTheGrace(t *testing.T) {
 	tl := newTestTailer(t, db, rec, nil)
 
 	id := appendEvent(t, db, wsID, "calendar.event.created")
-	if _, err := tl.poll(context.Background()); err != nil {
+	if _, _, err := tl.poll(context.Background(), tl.safeID); err != nil {
 		t.Fatalf("poll: %v", err)
 	}
 
@@ -285,6 +285,81 @@ func TestTailerAdvancesPastRowsOlderThanTheGrace(t *testing.T) {
 	}
 }
 
+// A burst wider than one batch must be walked once, not re-read from
+// the same floor until the floor moves. The floor only advances after
+// two grace periods, so the old shape re-issued the identical SELECT at
+// full speed for the whole window — and never got out at all while rows
+// kept arriving faster than one batch per window.
+//
+// The claim is counted, not timed: five rows in batches of two is three
+// SELECTs and nothing more. The deadline is only there so a drain that
+// does not terminate fails instead of hanging the suite.
+func TestTailerDrainsABurstInOnePassPerBatch(t *testing.T) {
+	db := tailDB(t)
+	wsID, _ := seedWorkspace(t, db, "tail-burst")
+
+	rec := &recorder{}
+	tl := newTestTailer(t, db, rec, nil)
+	tl.batch = 2
+
+	const burst = 5
+	for range burst {
+		appendEvent(t, db, wsID, "calendar.event.created")
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	tl.drain(ctx)
+
+	if got := tl.polls.Load(); got != 3 {
+		t.Errorf("polls = %d, want 3 (ceil(%d/%d)): the read cursor did not advance inside the drain",
+			got, burst, tl.batch)
+	}
+	if len(rec.events) != burst {
+		t.Errorf("published %d events, want %d (%v)", len(rec.events), burst, rec.kinds())
+	}
+	if tl.failures.Load() != 0 {
+		t.Errorf("drain reported %d poll failures; it did not finish on its own", tl.failures.Load())
+	}
+}
+
+// The re-scan window is what catches a row that commits below an id
+// already read, so the cursor advancing inside a drain must not stop
+// the next drain from starting at the floor again.
+func TestTailerRestartsEachDrainAtTheFloor(t *testing.T) {
+	db := tailDB(t)
+	wsID, _ := seedWorkspace(t, db, "tail-burst-rescan")
+
+	rec := &recorder{}
+	tl := newTestTailer(t, db, rec, nil)
+	tl.batch = 2
+
+	ctx := context.Background()
+	tx, err := db.Begin()
+	if err != nil {
+		t.Fatalf("begin: %v", err)
+	}
+	lateID := appendEvent(t, tx, wsID, "calendar.event.created")
+	for range 4 {
+		appendEvent(t, db, wsID, "calendar.event.updated")
+	}
+	tl.drain(ctx)
+	if len(rec.events) != 4 {
+		t.Fatalf("want the four committed rows, got %d (%v)", len(rec.events), rec.kinds())
+	}
+
+	// The low id lands after the drain that walked past it.
+	if err := tx.Commit(); err != nil {
+		t.Fatalf("commit: %v", err)
+	}
+	tl.drain(ctx)
+
+	if len(rec.events) != 5 {
+		t.Fatalf("the row that committed below the cursor (id %d) was skipped: %d events (%v)",
+			lateID, len(rec.events), rec.kinds())
+	}
+}
+
 // An event type outside the published families is not something the
 // frontend can act on, so it must not wake every query in a workspace.
 func TestTailerIgnoresUnknownEventTypes(t *testing.T) {
@@ -296,7 +371,7 @@ func TestTailerIgnoresUnknownEventTypes(t *testing.T) {
 
 	appendEvent(t, db, wsID, "internal.housekeeping.ran")
 
-	if _, err := tl.poll(context.Background()); err != nil {
+	if _, _, err := tl.poll(context.Background(), tl.safeID); err != nil {
 		t.Fatalf("poll: %v", err)
 	}
 	if len(rec.events) != 0 {

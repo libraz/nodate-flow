@@ -245,6 +245,11 @@ func main() {
 			notifier = in
 			tap = stream.NewEventbusTap(in)
 		}
+		// A replica that handles a write but holds none of the
+		// subscriptions has never been told the workspace's public id.
+		// Without a resolver the event is dropped there, which is
+		// invisible on one replica and total on several.
+		tap.SetWorkspaceResolver(&stream.DBWorkspaceResolver{DB: db})
 		eventbus.AddNotifyHook(tap.Publish)
 		streamRemember = tap.RememberWorkspace
 		aiInvocationPublisher = tap.PublishAiInvocation

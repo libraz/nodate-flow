@@ -218,6 +218,10 @@ func waitForMetricsReady(t *testing.T, port string, timeout time.Duration) strin
 // TestWorkerBootsAndExposesMetrics covers the happy-path boot: Run dials
 // MySQL, binds /metrics, flips the up gauge, and shuts down cleanly when
 // the parent context is cancelled.
+//
+// A job is registered because "up" now means "initialised and has work
+// to do": a worker whose only job was disabled by unset configuration
+// used to report itself healthy while producing nothing.
 func TestWorkerBootsAndExposesMetrics(t *testing.T) {
 	t.Parallel()
 	dsnStr := dsn(t)
@@ -231,7 +235,12 @@ func TestWorkerBootsAndExposesMetrics(t *testing.T) {
 	ready := make(chan struct{})
 	runErr := make(chan error, 1)
 	go func() {
-		runErr <- lifecycle.Run(ctx, cfg, logger, &lifecycle.RunOptions{MetricsReady: ready})
+		runErr <- lifecycle.Run(ctx, cfg, logger, &lifecycle.RunOptions{
+			MetricsReady: ready,
+			Register: func(r *jobs.Runner, _ *sql.DB) {
+				r.Register(newBlockingJob())
+			},
+		})
 	}()
 
 	select {

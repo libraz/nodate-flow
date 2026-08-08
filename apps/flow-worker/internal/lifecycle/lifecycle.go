@@ -155,18 +155,9 @@ func Run(ctx context.Context, cfg *config.Config, logger *slog.Logger, opts *Run
 		close(metricsErr)
 	}()
 
-	// Up gauge flips on once MySQL is reachable and the metrics endpoint
-	// is bound. Flipped back to 0 during graceful shutdown so dashboards
-	// can distinguish "draining" from "dead".
-	obs.UpGauge.Set(1)
-	if opts.MetricsReady != nil {
-		close(opts.MetricsReady)
-	}
-
-	// Job runner. W1 starts with no jobs registered so it just ticks
-	// quietly at debug level — proving the loop, the signal handler, and
-	// the shutdown drain all work end-to-end. W2 will Register the
-	// calendar_event_day job here before Start.
+	// Job runner. Jobs are registered before the up gauge is decided,
+	// because whether this process is doing anything is part of what
+	// "up" means here.
 	runner := &jobs.Runner{
 		Interval:        cfg.JobTickInterval,
 		Logger:          logger,
@@ -174,6 +165,11 @@ func Run(ctx context.Context, cfg *config.Config, logger *slog.Logger, opts *Run
 	}
 	if opts.Register != nil {
 		opts.Register(runner, db)
+	}
+
+	reportRunnerHealth(logger, runner.Registered())
+	if opts.MetricsReady != nil {
+		close(opts.MetricsReady)
 	}
 
 	runnerCtx, runnerCancel := context.WithCancel(context.Background())
@@ -216,6 +212,28 @@ func Run(ctx context.Context, cfg *config.Config, logger *slog.Logger, opts *Run
 	obs.UpGauge.Set(0)
 	logger.Info("shutdown complete")
 	return runErr
+}
+
+// reportRunnerHealth publishes what the boot produced: how many jobs
+// the runner was given, and whether this process is therefore up.
+//
+// The up gauge flips on once MySQL is reachable, the metrics endpoint is
+// bound, and there is at least one job to run. A worker that registered
+// nothing — which is what an unset NF_FLOW_API_SIGNAL_TOKEN produces —
+// reports 0. It still boots and stays up, so the binary can be rolled
+// out ahead of its configuration, but it does not claim to be working:
+// the failure it used to produce was a permanently silent event feed
+// with a green process standing in front of it, and the only trace was
+// a tick counter that never appeared.
+func reportRunnerHealth(logger *slog.Logger, registered int) {
+	obs.JobsRegisteredGauge.Set(float64(registered))
+	if registered == 0 {
+		obs.UpGauge.Set(0)
+		logger.Error("flow-worker: no jobs registered; the process is running but will do nothing")
+		return
+	}
+	obs.UpGauge.Set(1)
+	logger.Info("flow-worker: jobs registered", "count", registered)
 }
 
 // openAndPingDB opens the MySQL pool described by cfg and verifies the

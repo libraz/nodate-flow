@@ -14,7 +14,7 @@ func TestSSEHandler_MissingWorkspaceContext_ReturnsJSONError(t *testing.T) {
 
 	// Create an SSE handler with a no-op notifier and remember func.
 	notifier := NewInProcessNotifier()
-	handler := SSEHandler(notifier, nil)
+	handler := SSEHandler(notifier, nil, nil)
 
 	// Request without workspace context set.
 	req := httptest.NewRequest(http.MethodGet, "/events", nil)

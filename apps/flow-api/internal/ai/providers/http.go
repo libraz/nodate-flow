@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"strconv"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/outbound"
@@ -73,18 +74,53 @@ func WorkspaceIDFromContext(ctx context.Context) uint32 {
 	return v
 }
 
+// wsLimiterIdleTTL is how long a workspace's egress limiter is kept
+// after its last use. A workspace that has not made an LLM call in this
+// long has a full bucket anyway, so dropping it changes nothing about
+// what the next call is allowed to do.
+//
+// wsLimiterSweepEvery is how many creations pass between sweeps. The
+// sweep walks the map, so tying it to creations rather than to calls
+// keeps the cost proportional to how fast the map can grow.
+const (
+	wsLimiterIdleTTL    = 30 * time.Minute
+	wsLimiterSweepEvery = 256
+)
+
+// wsLimiter is one workspace's egress bucket plus when it was last
+// used, which is what lets an idle one be dropped.
+type wsLimiter struct {
+	limiter  *outbound.Limiter
+	lastUsed atomic.Int64 // unix seconds
+}
+
 // wsLimiterStore holds per-workspace rate limiters keyed by workspace
 // internal ID. Each entry is a token-bucket scoped to half the global
 // per-provider rate, so a single tenant cannot starve other workspaces.
+//
+// Entries are evicted once idle: this map is process-lifetime state
+// keyed by tenant, and an api process serving a long tail of workspaces
+// would otherwise accumulate one bucket per workspace it had ever seen
+// and never give any of them back.
 type wsLimiterStore struct {
-	mu       sync.RWMutex
-	limiters map[uint32]*outbound.Limiter
-	rps      float64
-	burst    int
+	mu        sync.RWMutex
+	limiters  map[uint32]*wsLimiter
+	rps       float64
+	burst     int
+	sinceLast int // creations since the last sweep
+	now       func() time.Time
 }
 
 var wsStore = &wsLimiterStore{
-	limiters: make(map[uint32]*outbound.Limiter),
+	limiters: make(map[uint32]*wsLimiter),
+}
+
+// clock returns the store's time source.
+func (s *wsLimiterStore) clock() time.Time {
+	if s.now != nil {
+		return s.now()
+	}
+	return time.Now()
 }
 
 // ConfigureWorkspaceLimiter sets the per-workspace rate and burst.
@@ -110,25 +146,46 @@ func getOrCreateWSLimiter(wsID uint32) *outbound.Limiter {
 	if wsID == 0 {
 		return nil
 	}
+	now := wsStore.clock()
 	wsStore.mu.RLock()
 	if wsStore.rps <= 0 {
 		wsStore.mu.RUnlock()
 		return nil
 	}
-	l := wsStore.limiters[wsID]
+	entry := wsStore.limiters[wsID]
 	wsStore.mu.RUnlock()
-	if l != nil {
-		return l
+	if entry != nil {
+		entry.lastUsed.Store(now.Unix())
+		return entry.limiter
 	}
 	wsStore.mu.Lock()
 	defer wsStore.mu.Unlock()
 	// Double-check after acquiring write lock.
-	if l = wsStore.limiters[wsID]; l != nil {
-		return l
+	if entry = wsStore.limiters[wsID]; entry != nil {
+		entry.lastUsed.Store(now.Unix())
+		return entry.limiter
 	}
-	l = outbound.NewLimiter(wsStore.rps, wsStore.burst)
-	wsStore.limiters[wsID] = l
-	return l
+	entry = &wsLimiter{limiter: outbound.NewLimiter(wsStore.rps, wsStore.burst)}
+	entry.lastUsed.Store(now.Unix())
+	wsStore.limiters[wsID] = entry
+
+	wsStore.sinceLast++
+	if wsStore.sinceLast >= wsLimiterSweepEvery {
+		wsStore.sinceLast = 0
+		wsStore.evictIdleLocked(now)
+	}
+	return entry.limiter
+}
+
+// evictIdleLocked drops every workspace whose limiter has not been used
+// within [wsLimiterIdleTTL]. Caller holds the write lock.
+func (s *wsLimiterStore) evictIdleLocked(now time.Time) {
+	cutoff := now.Add(-wsLimiterIdleTTL).Unix()
+	for id, entry := range s.limiters {
+		if entry.lastUsed.Load() < cutoff {
+			delete(s.limiters, id)
+		}
+	}
 }
 
 // ConfigureLimiter attaches a token-bucket limiter to the given

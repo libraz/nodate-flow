@@ -371,6 +371,16 @@ func validateEnums(cfg *Config) error {
 		return fmt.Errorf("config: NF_FLOW_AGENT_QUEUE_BACKEND must be \"memory\" or \"mysql\", got %q", cfg.AgentQueueBackend)
 	}
 
+	// A sub-second tick is rejected rather than rounded up: the interval
+	// also names the scheduler's dedupe bucket, so anything shorter than
+	// a second cannot be honoured, and a value silently replaced by a
+	// different one is worse than a boot that says what is wrong. The
+	// agent scheduler is not a sub-second component — it asks the
+	// database which agents are due.
+	if cfg.AgentTickInterval < time.Second {
+		return fmt.Errorf("config: NF_FLOW_AGENT_TICK_INTERVAL must be at least 1s, got %s", cfg.AgentTickInterval)
+	}
+
 	// Webhook signature verification secrets must be non-empty when the
 	// corresponding webhook feature is reachable. Accept empty only when
 	// NF_FLOW_WEBHOOKS_INSECURE=true (local dev / CI).

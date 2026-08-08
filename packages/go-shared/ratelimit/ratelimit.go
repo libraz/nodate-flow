@@ -3,13 +3,14 @@
 // token hash, etc.) and get back an Allow/Deny decision with metadata
 // suitable for populating X-RateLimit-* and Retry-After headers.
 //
-// The implementation is intentionally simple: a per-key slice of
-// timestamps protected by a single mutex. A background goroutine
-// periodically evicts stale entries to bound memory. Call [Limiter.Stop]
-// on shutdown to release it.
+// Each key owns a slice of timestamps; keys are distributed over a
+// fixed number of independently locked shards. A background goroutine
+// periodically evicts stale entries to bound memory, one shard at a
+// time. Call [Limiter.Stop] on shutdown to release it.
 package ratelimit
 
 import (
+	"hash/maphash"
 	"strconv"
 	"sync"
 	"time"
@@ -47,11 +48,35 @@ type entry struct {
 	timestamps []time.Time
 }
 
+// shardCount is how many independently locked maps the keyspace is
+// split across. The sweep walks one shard at a time, so it is also the
+// factor by which a sweep's lock hold is shorter than the whole
+// keyspace — and the number of concurrent Allow calls that can proceed
+// while one shard is being swept.
+//
+// Sixteen is chosen for the shape of the traffic this limiter guards:
+// the unauthenticated login / invite / public-share routes, where the
+// key is a client IP and the interesting moment is a burst across many
+// distinct IPs at once.
+const shardCount = 16
+
+// shard is one independently locked slice of the keyspace.
+type shard struct {
+	mu      sync.Mutex
+	buckets map[string]*entry
+}
+
 // Limiter is a sliding window rate limiter keyed by an opaque string.
 // Safe for concurrent use.
+//
+// Keys are spread over [shardCount] shards, each with its own mutex.
+// A single global mutex would have made the periodic sweep — which
+// touches every bucket — block every request for as long as the walk
+// took, and the walk is longest exactly when the keyspace is widest,
+// which is the middle of a burst.
 type Limiter struct {
-	mu        sync.Mutex
-	buckets   map[string]*entry
+	shards    [shardCount]shard
+	seed      maphash.Seed
 	config    Config
 	done      chan struct{}
 	closeOnce sync.Once
@@ -67,14 +92,24 @@ type Limiter struct {
 // callers must supply a non-zero Window.
 func New(cfg Config) *Limiter {
 	l := &Limiter{
-		buckets: make(map[string]*entry),
-		config:  cfg,
-		done:    make(chan struct{}),
+		seed:   maphash.MakeSeed(),
+		config: cfg,
+		done:   make(chan struct{}),
+	}
+	for i := range l.shards {
+		l.shards[i].buckets = make(map[string]*entry)
 	}
 	if cfg.Window > 0 {
 		go l.cleanup(cfg.Window * 2)
 	}
 	return l
+}
+
+// shardFor returns the shard owning key. The seed is per-Limiter so the
+// distribution cannot be predicted from outside the process and a caller
+// cannot deliberately pile every key onto one shard.
+func (l *Limiter) shardFor(key string) *shard {
+	return &l.shards[maphash.String(l.seed, key)%shardCount]
 }
 
 // Stop releases the background cleanup goroutine. It is safe to call
@@ -87,13 +122,14 @@ func (l *Limiter) Stop() {
 // indicating whether the request is within the rate limit.
 func (l *Limiter) Allow(key string) Result {
 	now := time.Now()
-	l.mu.Lock()
-	defer l.mu.Unlock()
+	sh := l.shardFor(key)
+	sh.mu.Lock()
+	defer sh.mu.Unlock()
 
-	b, ok := l.buckets[key]
+	b, ok := sh.buckets[key]
 	if !ok {
 		b = &entry{}
-		l.buckets[key] = b
+		sh.buckets[key] = b
 	}
 
 	// Evict timestamps outside the window.
@@ -143,28 +179,52 @@ func (l *Limiter) cleanup(interval time.Duration) {
 	for {
 		select {
 		case <-ticker.C:
-			now := time.Now()
-			l.mu.Lock()
-			cutoff := now.Add(-l.config.Window)
-			for k, b := range l.buckets {
-				// Trim expired timestamps.
-				n := 0
-				for _, ts := range b.timestamps {
-					if ts.After(cutoff) {
-						b.timestamps[n] = ts
-						n++
-					}
-				}
-				b.timestamps = b.timestamps[:n]
-				if n == 0 {
-					delete(l.buckets, k)
-				}
-			}
-			l.mu.Unlock()
+			l.sweep(time.Now())
 		case <-l.done:
 			return
 		}
 	}
+}
+
+// sweep drops every bucket that holds nothing inside the window as of
+// now, taking one shard lock at a time and releasing it before moving
+// on. Requests keyed into the other shards are served throughout, so
+// the sweep is never a stop-the-world pause proportional to the number
+// of active keys.
+func (l *Limiter) sweep(now time.Time) {
+	cutoff := now.Add(-l.config.Window)
+	for i := range l.shards {
+		sh := &l.shards[i]
+		sh.mu.Lock()
+		for k, b := range sh.buckets {
+			// Trim expired timestamps.
+			n := 0
+			for _, ts := range b.timestamps {
+				if ts.After(cutoff) {
+					b.timestamps[n] = ts
+					n++
+				}
+			}
+			b.timestamps = b.timestamps[:n]
+			if n == 0 {
+				delete(sh.buckets, k)
+			}
+		}
+		sh.mu.Unlock()
+	}
+}
+
+// size reports how many buckets the limiter is holding. Used by the
+// package's own tests to observe eviction.
+func (l *Limiter) size() int {
+	total := 0
+	for i := range l.shards {
+		sh := &l.shards[i]
+		sh.mu.Lock()
+		total += len(sh.buckets)
+		sh.mu.Unlock()
+	}
+	return total
 }
 
 // FormatRetryAfter formats a [Result.RetryAfter] value as a string

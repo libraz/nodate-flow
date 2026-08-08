@@ -91,8 +91,34 @@ type Executor struct {
 	// NF_AGENT_HANDOFF_LOOP_LIMIT alongside the runtime field.
 	HandoffLoopLimit int
 
+	// Now is time.Now except in tests. The per-workspace interval is
+	// measured against it.
+	Now func() time.Time
+
+	// lastRun is when each workspace was last evaluated by this
+	// executor, so ai_settings.auto_action_interval_minutes can be
+	// honoured on a tick loop that runs at the global interval. It is
+	// rebuilt from the workspace list on every pass, so a workspace
+	// that disappears takes its entry with it.
+	//
+	// This is per process. Two replicas each keep their own clock, so a
+	// workspace can be evaluated once per replica per interval; the
+	// actions themselves are idempotent (each re-checks the row it is
+	// about to change) and the pass before this existed ran on every
+	// tick in every replica regardless.
+	lastRunMu sync.Mutex
+	lastRun   map[uint32]time.Time
+
 	stopOnce sync.Once
 	stopCh   chan struct{}
+}
+
+// now returns the executor's clock.
+func (e *Executor) now() time.Time {
+	if e.Now != nil {
+		return e.Now()
+	}
+	return time.Now()
 }
 
 // Start launches the background loop. It blocks until ctx is
@@ -172,21 +198,31 @@ type taskRow struct {
 	agentMemo        []byte
 }
 
+// wsAutoActionQuery reads the per-workspace auto-action settings.
+//
+// has_settings distinguishes "no ai_settings row, use the column
+// defaults" from "a row exists and this is what it says". Without it a
+// configured threshold of 0 — which the API accepts, and which means
+// "apply every action the rule engine proposes" — was read as unset and
+// silently replaced by the global default.
 const wsAutoActionQuery = `
 SELECT w.id,
-       COALESCE(a.auto_action_enabled, TRUE)          AS aa_enabled,
+       a.workspace_id IS NOT NULL                      AS has_settings,
+       COALESCE(a.auto_action_enabled, TRUE)           AS aa_enabled,
        COALESCE(a.auto_action_interval_minutes, 5)     AS aa_interval,
-       COALESCE(a.auto_action_threshold, 0.80)          AS aa_threshold
+       COALESCE(a.auto_action_threshold, 0.80)         AS aa_threshold
 FROM workspaces w
 LEFT JOIN ai_settings a ON a.workspace_id = w.id
 WHERE w.enabled = TRUE
 `
 
 // workspaceTarget is one workspace the pass has to evaluate, with the
-// confidence threshold already resolved against the global default.
+// confidence threshold already resolved against the global default and
+// the configured evaluation interval.
 type workspaceTarget struct {
 	id        uint32
 	threshold float32
+	interval  time.Duration
 }
 
 // tick evaluates every enabled workspace once and reports whether the
@@ -212,6 +248,10 @@ func (e *Executor) tick(ctx context.Context) error {
 		return err
 	}
 
+	// One instant for the whole pass: it is both the "is this workspace
+	// due?" question and the answer stamped on the ones that run, so a
+	// long pass cannot push the next one past its interval.
+	now := e.now()
 	for i, target := range targets {
 		if err := ctx.Err(); err != nil {
 			e.Logger.Error("auto-action executor: pass stopped early",
@@ -221,9 +261,74 @@ func (e *Executor) tick(ctx context.Context) error {
 			)
 			return fmt.Errorf("autoactions: pass stopped after %d of %d workspaces: %w", i, len(targets), err)
 		}
+		if !e.due(target, now) {
+			continue
+		}
 		e.processWorkspaceWithThreshold(ctx, target.id, target.threshold)
 	}
+	e.forgetWorkspacesOutside(targets)
 	return nil
+}
+
+// due reports whether the workspace's configured interval has elapsed,
+// and records the decision when it has.
+//
+// An interval of zero disables the executor for that workspace, which
+// is what the column has always documented. Every other value was read
+// out of the database and then discarded: a workspace configured to be
+// evaluated hourly was evaluated on every global tick, so the setting
+// the UI displayed and the behaviour the tenant got had nothing to do
+// with each other.
+func (e *Executor) due(target workspaceTarget, now time.Time) bool {
+	if target.interval <= 0 {
+		return false
+	}
+	e.lastRunMu.Lock()
+	defer e.lastRunMu.Unlock()
+	if last, seen := e.lastRun[target.id]; seen && now.Sub(last) < target.interval-dueSlack(target.interval) {
+		return false
+	}
+	if e.lastRun == nil {
+		e.lastRun = make(map[uint32]time.Time)
+	}
+	e.lastRun[target.id] = now
+	return true
+}
+
+// dueSlack is how much early a pass may be and still count.
+//
+// Ticks are not perfectly spaced: one delivered late followed by one
+// delivered on time can be marginally less than a period apart. Without
+// slack the workspace would be skipped and wait a whole further
+// interval, so a tenant configured for five minutes would sometimes get
+// ten. A tenth of the interval, capped, absorbs that without letting
+// the interval mean noticeably less than it says.
+func dueSlack(interval time.Duration) time.Duration {
+	slack := interval / 10
+	if slack > 30*time.Second {
+		slack = 30 * time.Second
+	}
+	return slack
+}
+
+// forgetWorkspacesOutside drops the schedule of every workspace that was
+// not in this pass, so a disabled or deleted tenant does not keep an
+// entry for the life of the process.
+func (e *Executor) forgetWorkspacesOutside(targets []workspaceTarget) {
+	e.lastRunMu.Lock()
+	defer e.lastRunMu.Unlock()
+	if len(e.lastRun) == 0 {
+		return
+	}
+	live := make(map[uint32]struct{}, len(targets))
+	for _, t := range targets {
+		live[t.id] = struct{}{}
+	}
+	for id := range e.lastRun {
+		if _, ok := live[id]; !ok {
+			delete(e.lastRun, id)
+		}
+	}
 }
 
 // listWorkspaceTargets reads every enabled workspace and its resolved
@@ -241,20 +346,28 @@ func (e *Executor) listWorkspaceTargets(ctx context.Context) ([]workspaceTarget,
 	var targets []workspaceTarget
 	for rows.Next() {
 		var wsID uint32
+		var hasSettings bool
 		var wsCfg wsAutoActionConfig
-		if err := rows.Scan(&wsID, &wsCfg.enabled, &wsCfg.intervalMinutes, &wsCfg.threshold); err != nil {
+		if err := rows.Scan(&wsID, &hasSettings, &wsCfg.enabled, &wsCfg.intervalMinutes, &wsCfg.threshold); err != nil {
 			e.Logger.Error("auto-action executor: scan workspace", "err", err)
 			continue
 		}
 		if !wsCfg.enabled {
 			continue
 		}
-		// Use per-workspace threshold if configured, otherwise global.
+		// A workspace that has settings is governed by them, including a
+		// threshold of 0 — the API accepts it and it means "apply
+		// everything the rule engine proposes". Only a workspace with no
+		// row at all falls back to the global default.
 		threshold := e.Config.ConfidenceThreshold
-		if wsCfg.threshold > 0 {
+		if hasSettings {
 			threshold = wsCfg.threshold
 		}
-		targets = append(targets, workspaceTarget{id: wsID, threshold: threshold})
+		targets = append(targets, workspaceTarget{
+			id:        wsID,
+			threshold: threshold,
+			interval:  time.Duration(wsCfg.intervalMinutes) * time.Minute,
+		})
 	}
 	if err := rows.Err(); err != nil {
 		return nil, fmt.Errorf("autoactions: workspace scan ended early after %d rows: %w", len(targets), err)

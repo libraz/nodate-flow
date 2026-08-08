@@ -142,6 +142,25 @@ func (s *Scheduler) loop(ctx context.Context) {
 	}
 }
 
+// dedupeKey names the interval slot now falls in, so every replica
+// scheduling the same agent for the same tick produces the same key and
+// the queue keeps exactly one run.
+//
+// The arithmetic is in [time.Duration] units throughout. Converting the
+// interval to whole seconds first — which is what this did — truncates
+// any sub-second interval to zero and divides by it, so an operator who
+// wrote NF_FLOW_AGENT_TICK_INTERVAL=500ms got a panic on the first tick
+// instead of a fast scheduler. Configuration now refuses sub-second
+// intervals (see config.validateEnums), and this stays safe for any
+// value a caller constructs the scheduler with directly.
+func (s *Scheduler) dedupeKey(agentID uint32, now time.Time) string {
+	interval := s.Interval
+	if interval <= 0 {
+		interval = time.Minute
+	}
+	return fmt.Sprintf("%d:%d", agentID, now.UnixNano()/int64(interval))
+}
+
 func (s *Scheduler) tick(ctx context.Context) {
 	now := s.Now()
 	s.mu.Lock()
@@ -159,7 +178,7 @@ func (s *Scheduler) tick(ctx context.Context) {
 			continue
 		}
 		if s.Queue != nil {
-			key := fmt.Sprintf("%d:%d", j.AgentID, now.Unix()/int64(s.Interval.Seconds()))
+			key := s.dedupeKey(j.AgentID, now)
 			if err := s.Queue.Enqueue(ctx, Run{DedupeKey: key, Job: j, ScheduledAt: now}); err != nil {
 				if errors.Is(err, ErrDuplicate) {
 					continue

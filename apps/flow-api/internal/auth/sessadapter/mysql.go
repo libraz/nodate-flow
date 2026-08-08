@@ -54,11 +54,18 @@ func (a *queriesAdapter) FindSessionByRefreshHash(ctx context.Context, refreshHa
 	}, nil
 }
 
+// RevokeSession discards the affected-row count on purpose. Revoking is
+// idempotent by contract here: logout revokes the session it is already
+// running on, and a password change revokes a list read a moment
+// earlier, so "the row was already revoked" is a normal outcome for both
+// and not something to report. The user-facing DELETE /me/sessions/{id}
+// does its own existence check.
 func (a *queriesAdapter) RevokeSession(ctx context.Context, userID uint32, publicID dbtype.PublicID) error {
-	return a.q.RevokeSession(ctx, generated.RevokeSessionParams{
+	_, err := a.q.RevokeSession(ctx, generated.RevokeSessionParams{
 		UserID:   userID,
 		PublicID: publicID,
 	})
+	return err
 }
 
 func (a *queriesAdapter) ListSessionsForUser(ctx context.Context, userID uint32, limit, offset int32) ([]sessionstore.ListSessionsForUserRow, error) {
@@ -102,11 +109,16 @@ func (a *queriesAdapter) FindSessionByRotatedFromHash(ctx context.Context, rotat
 	}, nil
 }
 
+// RevokeAllSessionsForUserExcept discards the affected-row count on
+// purpose: it revokes a set whose size is not known in advance, and a
+// user whose only session is the one being kept legitimately has none
+// left to revoke.
 func (a *queriesAdapter) RevokeAllSessionsForUserExcept(ctx context.Context, userID uint32, publicID dbtype.PublicID) error {
-	return a.q.RevokeAllSessionsForUserExcept(ctx, generated.RevokeAllSessionsForUserExceptParams{
+	_, err := a.q.RevokeAllSessionsForUserExcept(ctx, generated.RevokeAllSessionsForUserExceptParams{
 		UserID:   userID,
 		PublicID: publicID,
 	})
+	return err
 }
 
 func (a *queriesAdapter) FindAnySessionByRefreshHash(ctx context.Context, refreshHash string) (sessionstore.FindAnySessionByRefreshHashRow, error) {

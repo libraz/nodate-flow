@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/middleware"
+	nflog "github.com/libraz/nodate-flow/apps/flow-api/internal/log"
 	"github.com/libraz/nodate-flow/packages/go-shared/problem"
 )
 
@@ -17,10 +18,22 @@ func writeJSONError(w http.ResponseWriter, status int, code, message string) {
 	problem.WriteCode(w, status, code, message)
 }
 
-// heartbeatInterval is the idle cadence at which the SSE writer
-// emits a comment line (": ping") so intermediaries don't close the
+// heartbeatInterval is the idle cadence at which the SSE writer emits
+// a comment line (": ping") so intermediaries don't close the
 // connection. ADR 0005 fixes this at 20 seconds.
-const heartbeatInterval = 20 * time.Second
+//
+// reauthorizeInterval is how often an open stream is re-checked
+// against the gate it passed on connect. It matches the cadence the
+// MCP stream revalidates at (apps/flow-api/internal/mcp/sse.go), so a
+// revoked credential stops delivering within the same bound on both
+// transports.
+//
+// They are variables so the package's own tests can shorten them; no
+// production code assigns to either.
+var (
+	heartbeatInterval   = 20 * time.Second
+	reauthorizeInterval = 15 * time.Second
+)
 
 // initialRetryMillis is the SSE `retry:` hint the server writes on
 // open. Compliant readers use it as the reconnect floor.
@@ -33,6 +46,17 @@ const initialRetryMillis = 5000
 // hot path.
 type RememberWorkspaceFunc func(internalID uint32, publicID string)
 
+// ReauthorizeFunc re-answers "may this connection still be here?" for
+// an already-open stream. A non-nil error closes it.
+//
+// The stream carries every event in its workspace, so holding it is a
+// standing read of the whole workspace. Authorizing that once, at
+// connect, meant a token revoked or an account removed from the
+// workspace kept receiving until the client chose to disconnect. The
+// router supplies the same gate the route is mounted behind, so this
+// is the connect-time decision re-asked, not a second one.
+type ReauthorizeFunc func(r *http.Request) error
+
 // SSEHandler returns an http.Handler that upgrades the request to
 // an SSE stream scoped to the workspace resolved by
 // [middleware.WorkspaceFromContext]. It expects the upstream router
@@ -42,11 +66,16 @@ type RememberWorkspaceFunc func(internalID uint32, publicID string)
 // workspace's internal and public ids so the eventbus tap can
 // resolve future appends. Pass a no-op when streaming is disabled.
 //
-// The handler runs until the client disconnects or the request
-// context is cancelled. Each published [Event] is written as a
-// single SSE frame; idle periods are punctuated by ": ping" comment
-// lines at [heartbeatInterval].
-func SSEHandler(notifier Notifier, remember RememberWorkspaceFunc) http.HandlerFunc {
+// reauthorize is re-run every [reauthorizeInterval] and closes the
+// stream when it fails. Passing nil leaves the stream authorized only
+// at connect, which is what it was before and is not a safe default
+// for a route mounted behind an auth gate.
+//
+// The handler runs until the client disconnects, the request context
+// is cancelled, or reauthorize refuses. Each published [Event] is
+// written as a single SSE frame; idle periods are punctuated by
+// ": ping" comment lines at [heartbeatInterval].
+func SSEHandler(notifier Notifier, remember RememberWorkspaceFunc, reauthorize ReauthorizeFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ws, ok := middleware.WorkspaceFromContext(r.Context())
 		if !ok {
@@ -101,6 +130,8 @@ func SSEHandler(notifier Notifier, remember RememberWorkspaceFunc) http.HandlerF
 
 		ticker := time.NewTicker(heartbeatInterval)
 		defer ticker.Stop()
+		recheck := time.NewTicker(reauthorizeInterval)
+		defer recheck.Stop()
 
 		for {
 			select {
@@ -112,6 +143,23 @@ func SSEHandler(notifier Notifier, remember RememberWorkspaceFunc) http.HandlerF
 				}
 				writeEvent(w, evt)
 				flush()
+			case <-recheck.C:
+				if reauthorize == nil {
+					continue
+				}
+				if err := reauthorize(r); err != nil {
+					// The headers went out when the stream opened, so
+					// there is no status left to send. Closing is the
+					// signal: the client reconnects and is answered by
+					// the same gate, this time as an ordinary request
+					// that can carry a code.
+					nflog.LoggerFromContext(ctx).InfoContext(ctx,
+						"stream: closing, caller is no longer authorized",
+						"workspace_id", ws.PublicID.String(),
+						"err", err,
+					)
+					return
+				}
 			case <-ticker.C:
 				if _, err := fmt.Fprint(w, ": ping\n\n"); err != nil {
 					return

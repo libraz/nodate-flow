@@ -6,6 +6,7 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestValidateEnumsAcceptsValid(t *testing.T) {
@@ -14,6 +15,7 @@ func TestValidateEnumsAcceptsValid(t *testing.T) {
 		Port:              "8080",
 		AgentRunner:       "log",
 		AgentQueueBackend: "memory",
+		AgentTickInterval: time.Minute,
 		WebhooksInsecure:  true,
 	}
 	if err := validateEnums(cfg); err != nil {
@@ -27,6 +29,7 @@ func TestValidateEnumsAcceptsOrchestratorAndMysqlQueue(t *testing.T) {
 		Port:              "3000",
 		AgentRunner:       "orchestrator",
 		AgentQueueBackend: "mysql",
+		AgentTickInterval: time.Minute,
 		WebhooksInsecure:  true,
 	}
 	if err := validateEnums(cfg); err != nil {
@@ -112,6 +115,41 @@ func TestValidateEnumsRejectsInvalidAgentRunner(t *testing.T) {
 	}
 }
 
+// A sub-second tick cannot be honoured: the interval also names the
+// scheduler's dedupe bucket. It used to be accepted and then divided by
+// as whole seconds, so 500ms meant "divide by zero" on the first tick
+// that had a queue behind it.
+func TestValidateEnumsRejectsSubSecondAgentTickInterval(t *testing.T) {
+	t.Parallel()
+	for _, interval := range []time.Duration{0, time.Millisecond, 500 * time.Millisecond, 999 * time.Millisecond} {
+		cfg := &Config{
+			Port:              "8080",
+			AgentRunner:       "log",
+			AgentQueueBackend: "memory",
+			AgentTickInterval: interval,
+			WebhooksInsecure:  true,
+		}
+		err := validateEnums(cfg)
+		if err == nil {
+			t.Fatalf("NF_FLOW_AGENT_TICK_INTERVAL=%s should be rejected", interval)
+		}
+		if !strings.Contains(err.Error(), "NF_FLOW_AGENT_TICK_INTERVAL") {
+			t.Errorf("error should name the env var, got: %v", err)
+		}
+	}
+
+	cfg := &Config{
+		Port:              "8080",
+		AgentRunner:       "log",
+		AgentQueueBackend: "memory",
+		AgentTickInterval: time.Second,
+		WebhooksInsecure:  true,
+	}
+	if err := validateEnums(cfg); err != nil {
+		t.Fatalf("1s is the floor and must be accepted: %v", err)
+	}
+}
+
 func TestValidateEnumsRejectsInvalidQueueBackend(t *testing.T) {
 	t.Parallel()
 	cfg := &Config{
@@ -131,6 +169,7 @@ func TestValidateEnumsRequiresWebhookSecrets(t *testing.T) {
 		Port:              "8080",
 		AgentRunner:       "log",
 		AgentQueueBackend: "memory",
+		AgentTickInterval: time.Minute,
 		WebhooksInsecure:  false,
 	}
 

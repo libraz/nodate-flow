@@ -7,7 +7,14 @@ package nlcommand
 import (
 	"sync"
 	"time"
+
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/ai"
 )
+
+// cacheMax is the ceiling on live entries. Past it, a Put sweeps: an
+// unbounded cache of prompt results is both memory this process never
+// returns and a per-Put walk that gets slower the longer it runs.
+const cacheMax = 1000
 
 // cacheEntry holds a cached resolution result with its expiry time.
 type cacheEntry struct {
@@ -57,14 +64,7 @@ func (c *Cache) Put(key string, tc *ToolCall) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	c.m[key] = cacheEntry{result: tc, expireAt: time.Now().Add(c.ttl)}
-
-	// Lazy eviction: if cache grows beyond 1000 entries, purge expired.
-	if len(c.m) > 1000 {
-		now := time.Now()
-		for k, e := range c.m {
-			if now.After(e.expireAt) {
-				delete(c.m, k)
-			}
-		}
+	if len(c.m) > cacheMax {
+		ai.EvictOldest(c.m, cacheMax, func(e cacheEntry) time.Time { return e.expireAt })
 	}
 }

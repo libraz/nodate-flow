@@ -64,6 +64,16 @@ func (r *Runner) Register(j Job) {
 	r.jobs = append(r.jobs, j)
 }
 
+// Registered reports how many jobs are registered. A runner with none
+// ticks quietly forever, which is indistinguishable from a healthy one
+// at every other observation point — the boot sequence uses this to say
+// so out loud.
+func (r *Runner) Registered() int {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return len(r.jobs)
+}
+
 // Start launches the tick loop in its own goroutine and returns. The loop
 // exits when ctx is cancelled; callers MUST then call Stop to wait for
 // any in-flight tick to drain.

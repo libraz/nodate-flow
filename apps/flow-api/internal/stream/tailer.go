@@ -95,6 +95,7 @@ type Tailer struct {
 	published atomic.Uint64
 	skipped   atomic.Uint64
 	failures  atomic.Uint64
+	polls     atomic.Uint64
 }
 
 // NewTailer returns a tailer reading db and publishing to notifier.
@@ -149,6 +150,12 @@ type TailerMetrics struct {
 	// value with a flat EventsPublished means the log is not being
 	// read at all.
 	PollFailures uint64
+	// Polls counts SELECTs issued against the log. Compared against
+	// the tick rate it says whether the tailer is polling on its
+	// interval or spinning: a value climbing far faster than
+	// EventsPublished means the same rows are being read over and
+	// over.
+	Polls uint64
 	// Cursor is the highest events.id observed.
 	Cursor uint64
 }
@@ -159,6 +166,7 @@ func (t *Tailer) Metrics() TailerMetrics {
 		EventsPublished: t.published.Load(),
 		EventsSkipped:   t.skipped.Load(),
 		PollFailures:    t.failures.Load(),
+		Polls:           t.polls.Load(),
 		Cursor:          atomic.LoadUint64(&t.highWater),
 	}
 }
@@ -191,13 +199,27 @@ func (t *Tailer) Run(ctx context.Context) error {
 }
 
 // drain polls until the log is caught up or an error stops it.
+//
+// Each poll resumes from where the last one stopped. Without that, a
+// full batch meant the next poll re-issued the identical SELECT from
+// the same floor: the floor only moves after two grace periods, so a
+// burst wider than one batch pinned this loop against the database at
+// full speed for ten seconds, and a sustained arrival rate above one
+// batch per grace window never let it out at all.
 func (t *Tailer) drain(ctx context.Context) {
+	// The cursor belongs to this pass. It starts at the floor, so every
+	// drain re-scans the grace window, and it advances with each batch,
+	// so this loop cannot re-read what it has already read.
+	cursor := t.safeID
 	for {
-		n, err := t.poll(ctx)
+		n, last, err := t.poll(ctx, cursor)
 		if err != nil {
 			t.failures.Add(1)
 			slog.WarnContext(ctx, "stream: event tail poll failed", "err", err)
 			return
+		}
+		if last > cursor {
+			cursor = last
 		}
 		t.promote()
 		if n < t.batch {
@@ -237,16 +259,19 @@ const tailQuery = `
 	 ORDER BY e.id
 	 LIMIT ?`
 
-// poll reads one batch and publishes what it has not published before.
-// It returns the number of rows read.
-func (t *Tailer) poll(ctx context.Context) (int, error) {
-	rows, err := t.db.QueryContext(ctx, tailQuery, t.safeID, t.batch)
+// poll reads one batch starting above from and publishes what it has
+// not published before. It returns the number of rows read and the
+// highest id it saw, which is where the caller's next read resumes.
+func (t *Tailer) poll(ctx context.Context, from uint64) (int, uint64, error) {
+	rows, err := t.db.QueryContext(ctx, tailQuery, from, t.batch)
+	t.polls.Add(1)
 	if err != nil {
-		return 0, err
+		return 0, from, err
 	}
 	defer func() { _ = rows.Close() }()
 
 	count := 0
+	last := from
 	at := t.now().Unix()
 	for rows.Next() {
 		var (
@@ -255,9 +280,12 @@ func (t *Tailer) poll(ctx context.Context) (int, error) {
 			workspaceID string
 		)
 		if err := rows.Scan(&id, &eventType, &workspaceID); err != nil {
-			return count, err
+			return count, last, err
 		}
 		count++
+		if id > last {
+			last = id
+		}
 		if id > atomic.LoadUint64(&t.highWater) {
 			atomic.StoreUint64(&t.highWater, id)
 		}
@@ -278,10 +306,10 @@ func (t *Tailer) poll(ctx context.Context) (int, error) {
 		t.published.Add(1)
 	}
 	if err := rows.Err(); err != nil {
-		return count, err
+		return count, last, err
 	}
 	t.trimSeen()
-	return count, nil
+	return count, last, nil
 }
 
 // promote moves the floor up once a grace period has passed, so rows

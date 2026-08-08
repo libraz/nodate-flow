@@ -10,13 +10,31 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
-// UpGauge reports liveness for the flow-worker process. Set to 1 after
-// MySQL has been dialled successfully and to 0 during graceful shutdown.
+// UpGauge reports liveness for the flow-worker process. Set to 1 once
+// MySQL has been dialled, the metrics endpoint is bound, and the runner
+// has at least one job to run; 0 during graceful shutdown and for a
+// worker that came up with nothing registered.
+//
+// That last case is why this is not simply "the process started". A
+// worker whose only job is disabled by unset configuration ticks
+// forever, answers every probe, and produces nothing — and everything
+// downstream of it goes quiet with no failure anywhere to point at.
+// Reporting 0 puts it in front of the alert that already exists.
 //
 //nolint:gochecknoglobals // process-wide metric, matches flow-api pattern.
 var UpGauge = prometheus.NewGauge(prometheus.GaugeOpts{
 	Name: "nf_flow_worker_up",
-	Help: "1 when the flow-worker is initialised and the job runner is active, 0 otherwise.",
+	Help: "1 when the flow-worker is initialised and has at least one job registered, 0 otherwise.",
+})
+
+// JobsRegisteredGauge reports how many jobs the runner was given. It
+// names what UpGauge is reacting to, so an operator seeing up=0 can
+// tell "no jobs configured" from "shutting down" without reading logs.
+//
+//nolint:gochecknoglobals // process-wide metric, matches flow-api pattern.
+var JobsRegisteredGauge = prometheus.NewGauge(prometheus.GaugeOpts{
+	Name: "nf_flow_worker_jobs_registered",
+	Help: "Number of jobs registered on the flow-worker runner at boot.",
 })
 
 // CalendarEventDayTicksTotal counts how many times the calendar event-day
@@ -63,6 +81,7 @@ var CalendarEventDayTickSeconds = prometheus.NewHistogram(
 //nolint:gochecknoinits // metric registration must happen at package load.
 func init() {
 	prometheus.MustRegister(UpGauge)
+	prometheus.MustRegister(JobsRegisteredGauge)
 	prometheus.MustRegister(CalendarEventDayTicksTotal)
 	prometheus.MustRegister(CalendarEventDayTickSeconds)
 }
