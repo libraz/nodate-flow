@@ -54,9 +54,42 @@ func (j *JWTIssuer) SignTotpChallenge(publicID string) (string, time.Time, error
 	return signed, exp, nil
 }
 
+// VerifiedTotpChallenge is a step-up token that passed signature,
+// issuer, audience and expiry validation. It carries the identifiers a
+// caller needs to retire the token after a single redemption: the jti
+// to record and how much of its lifetime is left, so the record never
+// outlives the credential it guards.
+type VerifiedTotpChallenge struct {
+	// PublicID is the user's UUID v7 string representation.
+	PublicID string
+	// TokenID is the jti claim, the key under which a redemption is
+	// recorded in a [SingleUseStore].
+	TokenID string
+	// ExpiresAt is the token's own exp claim.
+	ExpiresAt time.Time
+}
+
+// RemainingTTL is how much of the challenge's lifetime is left at now.
+// It is the ttl to hand [SingleUseStore.Consume] so the replay record
+// is swept as soon as the token it guards would have expired anyway.
+// Returns 0 once the token is past exp.
+func (c VerifiedTotpChallenge) RemainingTTL(now time.Time) time.Duration {
+	d := c.ExpiresAt.Sub(now)
+	if d < 0 {
+		return 0
+	}
+	return d
+}
+
 // VerifyTotpChallenge parses and validates a TOTP step-up token.
-// Returns the user's public UUID v7 string on success.
-func (j *JWTIssuer) VerifyTotpChallenge(token string) (string, error) {
+//
+// A valid signature is not on its own permission to complete a login:
+// nothing in the token changes when it is presented, so it stays
+// redeemable for its whole lifetime unless the caller records the
+// returned TokenID in a [SingleUseStore] and refuses a second
+// redemption. The OIDC hand-off puts the token in a URL fragment,
+// where it survives in browser history long after the login finished.
+func (j *JWTIssuer) VerifyTotpChallenge(token string) (VerifiedTotpChallenge, error) {
 	parsed, err := jwt.ParseWithClaims(token, &TotpChallengeClaims{}, func(t *jwt.Token) (interface{}, error) {
 		if _, ok := t.Method.(*jwt.SigningMethodEd25519); !ok {
 			return nil, errors.New("authn: unexpected jwt signing method")
@@ -64,11 +97,20 @@ func (j *JWTIssuer) VerifyTotpChallenge(token string) (string, error) {
 		return j.pub, nil
 	}, jwt.WithIssuer(j.issuer), jwt.WithAudience(totpChallengeAudience))
 	if err != nil {
-		return "", err
+		return VerifiedTotpChallenge{}, err
 	}
 	claims, ok := parsed.Claims.(*TotpChallengeClaims)
 	if !ok || !parsed.Valid || claims.PublicID == "" {
-		return "", errors.New("authn: invalid totp challenge claims")
+		return VerifiedTotpChallenge{}, errors.New("authn: invalid totp challenge claims")
 	}
-	return claims.PublicID, nil
+	// A challenge with no jti cannot be retired after redemption, so it
+	// is refused rather than silently accepted as a reusable credential.
+	if claims.ID == "" {
+		return VerifiedTotpChallenge{}, errors.New("authn: totp challenge missing jti")
+	}
+	out := VerifiedTotpChallenge{PublicID: claims.PublicID, TokenID: claims.ID}
+	if claims.ExpiresAt != nil {
+		out.ExpiresAt = claims.ExpiresAt.Time
+	}
+	return out, nil
 }

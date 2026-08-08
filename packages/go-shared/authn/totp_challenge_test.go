@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -46,9 +47,69 @@ func TestSignAndVerifyTotpChallenge(t *testing.T) {
 
 			got, err := j.VerifyTotpChallenge(token)
 			require.NoError(t, err)
-			assert.Equal(t, tc.publicID, got)
+			assert.Equal(t, tc.publicID, got.PublicID)
+			assert.NotEmpty(t, got.TokenID, "a challenge must carry a jti so it can be retired after one use")
+			assert.WithinDuration(t, exp, got.ExpiresAt, time.Second)
 		})
 	}
+}
+
+// TestSignTotpChallenge_TokenIDIsUniquePerChallenge pins the property the
+// single-use claim rests on: two challenges for the same user must not
+// share a jti, or retiring one would retire the other.
+func TestSignTotpChallenge_TokenIDIsUniquePerChallenge(t *testing.T) {
+	t.Parallel()
+	j := newTestIssuer(t)
+	const pid = "019012ab-cdef-7000-8000-000000000001"
+
+	first, _, err := j.SignTotpChallenge(pid)
+	require.NoError(t, err)
+	second, _, err := j.SignTotpChallenge(pid)
+	require.NoError(t, err)
+
+	a, err := j.VerifyTotpChallenge(first)
+	require.NoError(t, err)
+	b, err := j.VerifyTotpChallenge(second)
+	require.NoError(t, err)
+
+	assert.NotEqual(t, a.TokenID, b.TokenID,
+		"each challenge needs its own jti so retiring one does not retire the other")
+}
+
+// TestVerifyTotpChallenge_RejectsMissingTokenID proves a challenge that
+// carries no jti is refused rather than accepted as an unretireable
+// credential.
+func TestVerifyTotpChallenge_RejectsMissingTokenID(t *testing.T) {
+	t.Parallel()
+	j := newTestIssuer(t)
+	now := time.Now().UTC()
+	claims := TotpChallengeClaims{
+		PublicID: "019012ab-cdef-7000-8000-000000000001",
+		RegisteredClaims: jwt.RegisteredClaims{
+			Issuer:    j.issuer,
+			Audience:  jwt.ClaimStrings{totpChallengeAudience},
+			Subject:   "019012ab-cdef-7000-8000-000000000001",
+			IssuedAt:  jwt.NewNumericDate(now),
+			ExpiresAt: jwt.NewNumericDate(now.Add(TotpChallengeTTL)),
+		},
+	}
+	token, err := jwt.NewWithClaims(jwt.SigningMethodEdDSA, claims).SignedString(j.priv)
+	require.NoError(t, err)
+
+	_, err = j.VerifyTotpChallenge(token)
+	assert.Error(t, err, "a challenge with no jti cannot be retired and must be refused")
+}
+
+// TestVerifiedTotpChallenge_RemainingTTL asserts the ttl handed to the
+// single-use store tracks the token's own expiry and never goes negative
+// (a negative ttl is a no-op claim in MemorySingleUseStore, which would
+// silently disable the defence).
+func TestVerifiedTotpChallenge_RemainingTTL(t *testing.T) {
+	t.Parallel()
+	now := time.Now()
+	c := VerifiedTotpChallenge{ExpiresAt: now.Add(2 * time.Minute)}
+	assert.InDelta(t, (2 * time.Minute).Seconds(), c.RemainingTTL(now).Seconds(), 1)
+	assert.Zero(t, c.RemainingTTL(now.Add(5*time.Minute)), "a past expiry must clamp to zero")
 }
 
 func TestVerifyTotpChallenge_ExpiredToken(t *testing.T) {

@@ -13,10 +13,10 @@ import (
 // Stateless JWTs are otherwise reusable until they expire: everything
 // the verifier checks travels inside the token itself. Recording the jti
 // on first redemption is what turns them into one-time credentials. The
-// OIDC state parameter goes through this store today; the TOTP step-up
-// challenge in totp_challenge.go carries the same replayability for the
-// length of its lifetime and can be closed the same way, since the store
-// only needs an identifier and a remaining lifetime.
+// OIDC state parameter and the TOTP step-up challenge in
+// totp_challenge.go both go through this store; the store only needs an
+// identifier and a remaining lifetime, so any further stateless
+// one-time token fits it unchanged.
 //
 // The implementation shipped here is in-process. A deployment that runs
 // several replicas needs a shared one; both obvious options fit this

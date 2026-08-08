@@ -167,9 +167,9 @@ func TestMagicLinkVerify_2FAAccountReturnsChallenge(t *testing.T) {
 	assert.Empty(t, out.SetCookie.Value, "no refresh cookie before second factor")
 
 	// The challenge must be a valid step-up token for this user.
-	pubStr, verr := deps.JWT.VerifyTotpChallenge(out.Body.ChallengeToken)
+	challenge, verr := deps.JWT.VerifyTotpChallenge(out.Body.ChallengeToken)
 	require.NoError(t, verr)
-	assert.NotEmpty(t, pubStr)
+	assert.NotEmpty(t, challenge.PublicID)
 }
 
 // TestMagicLinkVerify_NoMFAStillCompletes guards the single-factor path:

@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"net/http"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -256,4 +257,49 @@ func TestOIDCGithubCallback_BrandNewEmailStillRegisters(t *testing.T) {
 	require.NoError(t, db.QueryRowContext(context.Background(),
 		"SELECT email FROM users WHERE id = ?", provisionedUID).Scan(&emailOfUser))
 	assert.Equal(t, newEmail, emailOfUser)
+}
+
+// TestOIDCGithubCallback_ProvisionsUsableTimezone proves an OIDC-created
+// account is seeded with a real IANA zone. An OIDC callback carries no
+// timezone claim, so the insert has to supply the fallback itself; a
+// params struct that leaves the field unset binds the zero value and
+// stores an empty string over the column default. That empty string then
+// travels out through GET /me and blows up Intl.DateTimeFormat, while
+// the web client papers over it with a locally detected zone — so the
+// zone the server actually schedules with and the one the user sees
+// disagree until they happen to save their profile.
+func TestOIDCGithubCallback_ProvisionsUsableTimezone(t *testing.T) {
+	t.Parallel()
+	db := requireB2DB(t)
+	deps, _ := b2Deps(t, db)
+	deps.RegistrationOpen = true
+
+	newEmail := "oidc-tz-" + types.New().String() + "@example.test"
+	const ghSub = "gh-tz-subject-5005"
+	deps.OIDCGithub = &fakeGithubExchanger{
+		claims: &internauth.GithubClaims{
+			Sub:   ghSub,
+			Login: "dave",
+			Name:  "Dave",
+			Email: newEmail,
+		},
+	}
+
+	state, stateCookie := signedGithubState(t, &deps)
+	_, err := OIDCGithubCallback(deps)(context.Background(), &OIDCCallbackInput{
+		Code:        "auth-code",
+		State:       state,
+		StateCookie: stateCookie,
+	})
+	require.NoError(t, err)
+
+	provisionedUID, ok := findIdentityUserID(t, db, "github", ghSub)
+	require.True(t, ok)
+
+	var tz string
+	require.NoError(t, db.QueryRowContext(context.Background(),
+		"SELECT timezone FROM users WHERE id = ?", provisionedUID).Scan(&tz))
+	assert.NotEmpty(t, tz, "an OIDC-provisioned user must not be stored with an empty timezone")
+	_, lerr := time.LoadLocation(tz)
+	assert.NoError(t, lerr, "the seeded timezone must be a loadable IANA zone, got %q", tz)
 }

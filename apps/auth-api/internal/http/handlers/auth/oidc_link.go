@@ -12,6 +12,7 @@ import (
 	"github.com/libraz/nodate-flow/apps/auth-api/internal/db/types"
 	apierrors "github.com/libraz/nodate-flow/apps/auth-api/internal/errors"
 	"github.com/libraz/nodate-flow/packages/go-shared/authn"
+	"github.com/libraz/nodate-flow/packages/go-shared/region"
 )
 
 // oidcProvisionParams carries the verified claims a single OIDC callback
@@ -114,11 +115,17 @@ func (d Deps) resolveOIDCUser(ctx context.Context, p oidcProvisionParams) (uint3
 	if locale == "" {
 		locale = "en"
 	}
+	// An OIDC callback carries no timezone claim, so the account is
+	// seeded with the same fallback the password-register path uses.
+	// Leaving Timezone unset would bind the zero value and store an
+	// empty string over the column default, which then travels out
+	// through GET /me and blows up Intl.DateTimeFormat.
 	uid, rerr := d.Queries.RegisterUser(ctx, generated.RegisterUserParams{
 		PublicID:        userPub,
 		Email:           p.Email,
 		DisplayName:     p.DisplayName,
 		Locale:          locale,
+		Timezone:        region.DefaultTimezone,
 		ThemePreference: generated.UsersThemePreference("system"),
 	})
 	if rerr != nil {

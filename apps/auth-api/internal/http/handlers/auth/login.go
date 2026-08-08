@@ -140,11 +140,11 @@ func LoginTotp(deps Deps) func(context.Context, *LoginTotpInput) (*LoginTotpOutp
 		if deps.Cipher == nil {
 			return nil, httpErr(apierrors.AuthTotpNotConfigured)
 		}
-		pubStr, err := deps.JWT.VerifyTotpChallenge(in.Body.ChallengeToken)
+		challenge, err := deps.JWT.VerifyTotpChallenge(in.Body.ChallengeToken)
 		if err != nil {
 			return nil, httpErr(apierrors.AuthSessionExpired)
 		}
-		pubID, perr := dbtype.Parse(pubStr)
+		pubID, perr := dbtype.Parse(challenge.PublicID)
 		if perr != nil {
 			return nil, httpErr(apierrors.AuthSessionExpired)
 		}
@@ -256,6 +256,13 @@ func LoginTotp(deps Deps) func(context.Context, *LoginTotpInput) (*LoginTotpOutp
 				ActorID:      uint32(uid),
 				ResourceType: "user",
 			})
+		}
+		// Both factors are now proven, so the challenge that carried the
+		// first one has served its purpose: retire it before anything is
+		// issued, so two requests holding the same challenge can never
+		// both walk away with a session.
+		if err := deps.retireTotpChallenge(ctx, challenge); err != nil {
+			return nil, err
 		}
 		// 2FA succeeded — clear any accumulated failed attempts.
 		if err := deps.Queries.ResetIdentityFailedAttempts(ctx, ident.ID); err != nil {

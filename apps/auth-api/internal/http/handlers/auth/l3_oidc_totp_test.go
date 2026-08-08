@@ -60,9 +60,9 @@ func TestOIDCCallback_2FAAccountReturnsChallenge(t *testing.T) {
 
 	// The challenge must be a valid step-up token; the client presents it
 	// to POST /auth/login/totp to finish login.
-	pubStr, verr := deps.JWT.VerifyTotpChallenge(out.Body.ChallengeToken)
+	challenge, verr := deps.JWT.VerifyTotpChallenge(out.Body.ChallengeToken)
 	require.NoError(t, verr)
-	assert.NotEmpty(t, pubStr)
+	assert.NotEmpty(t, challenge.PublicID)
 
 	// The OIDC identity must still have linked onto the existing user, so
 	// completing the TOTP challenge logs into the right account.
