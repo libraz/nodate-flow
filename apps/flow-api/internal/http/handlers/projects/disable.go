@@ -102,7 +102,7 @@ func Disable(deps Deps) func(context.Context, *DisableProjectInput) (*DisablePro
 		nflog.LoggerFromContext(ctx).InfoContext(ctx, "project disabled with cascade",
 			logutil.LogEntity("workspace", ws.PublicID),
 			logutil.LogEntity("project", prj.PublicID),
-			slog.Int64("child_tasks_disabled", childCount),
+			logutil.LogNumber("child_tasks_disabled", childCount),
 		)
 
 		if actorID, ok := middleware.ActorFromContext(ctx); ok {

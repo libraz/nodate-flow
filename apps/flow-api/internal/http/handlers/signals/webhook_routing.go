@@ -10,6 +10,7 @@ import (
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
 	apierrors "github.com/libraz/nodate-flow/apps/flow-api/internal/errors"
+	"github.com/libraz/nodate-flow/packages/go-shared/logutil"
 )
 
 // webhookSender is the sender identity a /webhooks/* receiver extracted
@@ -91,7 +92,7 @@ func resolveWebhookWorkspace(ctx context.Context, deps Deps, sender webhookSende
 		slog.ErrorContext(ctx, "webhook: default-workspace fallback disabled on a multi-tenant instance",
 			slog.String("source", sender.Source),
 			slog.Bool("sender_identified", sender.Key != ""),
-			slog.Int64("enabled_workspaces", total),
+			logutil.LogNumber("enabled_workspaces", total),
 		)
 		return 0, apierrors.IntegrationMappingWorkspaceUnresolved
 	}

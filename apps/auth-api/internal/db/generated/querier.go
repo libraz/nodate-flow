@@ -394,9 +394,20 @@ type Querier interface {
 	//
 	// The ON DELETE CASCADE chain on users.id removes user-scoped rows
 	// (sessions, recovery codes, instance admin grants, the user-scoped
-	// storage_objects rows whose blobs the caller already purged). FK
-	// ON DELETE SET NULL on attachments.uploader_id / similar audit-trail
-	// back-refs is intentional: the audit history outlives the user.
+	// storage_objects rows whose blobs the caller already purged) AND the
+	// attachments / calendar_event_attachments rows the user uploaded:
+	// both uploader_id FKs are ON DELETE CASCADE, not SET NULL. That is
+	// what makes the caller's ref_count decrement obligatory rather than
+	// tidy-up — those tables reference storage_objects with ON DELETE
+	// RESTRICT, so the counters must already be decremented when the
+	// cascade drops the rows, or the sole-referrer sweep that follows
+	// cannot tell a freed blob from a shared one.
+	//
+	// Audit-trail back-refs are the ones that survive, and they survive
+	// because they are separately declared ON DELETE SET NULL:
+	// events.actor_user_id, mcp_invocations.user_id,
+	// instance_audit_logs.actor_user_id, tasks.created_by_user_id. The
+	// history keeps its shape and loses only the name.
 	HardDeleteUser(ctx context.Context, id uint32) (sql.Result, error)
 	// Final stage of the admin workspace immediate destructive delete. Fires
 	// in the same request as the caller's MinIO sweep; there is no soft-

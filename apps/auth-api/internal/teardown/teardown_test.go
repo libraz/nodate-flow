@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	_ "github.com/go-sql-driver/mysql"
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -88,8 +89,9 @@ func impatientDB(t *testing.T, dsn string) *sql.DB {
 
 // seedWorkspaceWithBlob creates a workspace plus one workspace-scoped
 // storage_objects row and returns the workspace internal id and the
-// blob's storage key.
-func seedWorkspaceWithBlob(t *testing.T, db *sql.DB, slugPrefix string) (uint32, string) {
+// blob's storage key, alongside the workspace public id the teardown
+// pipeline logs under.
+func seedWorkspaceWithBlob(t *testing.T, db *sql.DB, slugPrefix string) (uint32, uuid.UUID, string) {
 	t.Helper()
 	ctx := context.Background()
 	q := generated.New(db)
@@ -114,7 +116,7 @@ func seedWorkspaceWithBlob(t *testing.T, db *sql.DB, slugPrefix string) (uint32,
 		types.New(), wsID, digest[:], 11, "text/plain", key, 0)
 	require.NoError(t, err)
 
-	return wsID, key
+	return wsID, pub.UUID(), key
 }
 
 func workspaceExists(t *testing.T, db *sql.DB, wsID uint32) bool {
@@ -145,7 +147,7 @@ func TestWorkspace_FailedTransactionLeavesBlobsIntact(t *testing.T) {
 	inst := requireTeardownDB(t)
 	ctx := context.Background()
 
-	wsID, key := seedWorkspaceWithBlob(t, inst.DB, "teardown-fail")
+	wsID, wsPub, key := seedWorkspaceWithBlob(t, inst.DB, "teardown-fail")
 
 	// Hold an exclusive lock on the workspaces row from an unrelated
 	// session. The pipeline's DELETE will queue behind it.
@@ -159,7 +161,7 @@ func TestWorkspace_FailedTransactionLeavesBlobsIntact(t *testing.T) {
 	db := impatientDB(t, inst.DSN)
 	sweeper := &recordingSweeper{}
 
-	res, err := Workspace(ctx, db, generated.New(db), sweeper, wsID)
+	res, err := Workspace(ctx, db, generated.New(db), sweeper, wsID, wsPub)
 	require.Error(t, err, "the delete transaction must fail while the row is locked")
 	assert.False(t, res.Deleted)
 
@@ -185,10 +187,10 @@ func TestWorkspace_CommittedDeleteSweepsBlobs(t *testing.T) {
 	inst := requireTeardownDB(t)
 	ctx := context.Background()
 
-	wsID, key := seedWorkspaceWithBlob(t, inst.DB, "teardown-ok")
+	wsID, wsPub, key := seedWorkspaceWithBlob(t, inst.DB, "teardown-ok")
 	sweeper := &recordingSweeper{}
 
-	res, err := Workspace(ctx, inst.DB, generated.New(inst.DB), sweeper, wsID)
+	res, err := Workspace(ctx, inst.DB, generated.New(inst.DB), sweeper, wsID, wsPub)
 	require.NoError(t, err)
 	assert.True(t, res.Deleted)
 	assert.Equal(t, int64(1), res.StorageObjectsDeleted)
@@ -211,10 +213,10 @@ func TestWorkspace_SweepFailureIsReportedNotFatal(t *testing.T) {
 	inst := requireTeardownDB(t)
 	ctx := context.Background()
 
-	wsID, _ := seedWorkspaceWithBlob(t, inst.DB, "teardown-sweep-err")
+	wsID, wsPub, _ := seedWorkspaceWithBlob(t, inst.DB, "teardown-sweep-err")
 	sweeper := &recordingSweeper{err: assert.AnError}
 
-	res, err := Workspace(ctx, inst.DB, generated.New(inst.DB), sweeper, wsID)
+	res, err := Workspace(ctx, inst.DB, generated.New(inst.DB), sweeper, wsID, wsPub)
 	require.NoError(t, err, "a storage failure must not fail the delete after commit")
 	assert.True(t, res.Deleted)
 	assert.Equal(t, int64(1), res.MinioErrors)
@@ -229,18 +231,18 @@ func TestWorkspace_NilStorageClientIsSkipped(t *testing.T) {
 	inst := requireTeardownDB(t)
 	ctx := context.Background()
 
-	wsID, _ := seedWorkspaceWithBlob(t, inst.DB, "teardown-nil-store")
+	wsID, wsPub, _ := seedWorkspaceWithBlob(t, inst.DB, "teardown-nil-store")
 
 	var nilClient *storage.Client
-	res, err := Workspace(ctx, inst.DB, generated.New(inst.DB), nilClient, wsID)
+	res, err := Workspace(ctx, inst.DB, generated.New(inst.DB), nilClient, wsID, wsPub)
 	require.NoError(t, err)
 	assert.True(t, res.Deleted)
 	assert.Equal(t, int64(0), res.MinioErrors)
 	assert.False(t, workspaceExists(t, inst.DB, wsID))
 
 	// And with no sweeper at all.
-	wsID2, _ := seedWorkspaceWithBlob(t, inst.DB, "teardown-no-store")
-	res, err = Workspace(ctx, inst.DB, generated.New(inst.DB), nil, wsID2)
+	wsID2, wsPub2, _ := seedWorkspaceWithBlob(t, inst.DB, "teardown-no-store")
+	res, err = Workspace(ctx, inst.DB, generated.New(inst.DB), nil, wsID2, wsPub2)
 	require.NoError(t, err)
 	assert.True(t, res.Deleted)
 }

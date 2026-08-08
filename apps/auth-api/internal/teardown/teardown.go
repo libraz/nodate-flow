@@ -17,9 +17,12 @@ import (
 	stderrors "errors"
 	"log/slog"
 
+	"github.com/google/uuid"
+
 	"github.com/libraz/nodate-flow/apps/auth-api/internal/db/generated"
 	"github.com/libraz/nodate-flow/apps/auth-api/internal/storage"
 	"github.com/libraz/nodate-flow/packages/go-shared/dbretry"
+	"github.com/libraz/nodate-flow/packages/go-shared/logutil"
 )
 
 // errConcurrentDelete rolls a teardown transaction back when the target
@@ -77,7 +80,7 @@ func sweepBlobs(ctx context.Context, store BlobSweeper, keys []string, owner slo
 	}
 	slog.WarnContext(ctx, "teardown: object storage sweep had errors",
 		owner,
-		slog.Int("key_count", len(keys)),
+		logutil.LogNumber("key_count", len(keys)),
 		slog.String("err", err.Error()),
 	)
 	// RemoveObjects collapses per-key failures into the first error, so
@@ -145,7 +148,10 @@ type WorkspaceResult struct {
 // The function never panics on a nil storage client (Storage is optional
 // when NF_S3_ENDPOINT is unset); the MinIO sweep is simply skipped and
 // the response reports zero counts.
-func Workspace(ctx context.Context, db *sql.DB, q *generated.Queries, store BlobSweeper, wsID uint32) (WorkspaceResult, error) {
+//
+// wsPublicID identifies the workspace in the log lines the sweep emits.
+// The internal wsID drives the queries and never reaches a log line.
+func Workspace(ctx context.Context, db *sql.DB, q *generated.Queries, store BlobSweeper, wsID uint32, wsPublicID uuid.UUID) (WorkspaceResult, error) {
 	var (
 		keys    []string
 		deleted bool
@@ -201,7 +207,7 @@ func Workspace(ctx context.Context, db *sql.DB, q *generated.Queries, store Blob
 	}
 
 	minioErrors := sweepBlobs(ctx, store, keys,
-		slog.Uint64("workspace_internal_id", uint64(wsID)))
+		logutil.LogEntity("workspace", wsPublicID))
 
 	return WorkspaceResult{
 		Deleted:               true,
@@ -263,7 +269,10 @@ type UserResult struct {
 //
 // The function never panics on a nil storage client; the MinIO sweep is
 // simply skipped and the response reports zero counts.
-func User(ctx context.Context, db *sql.DB, q *generated.Queries, store BlobSweeper, userID uint32) (UserResult, error) {
+//
+// userPublicID identifies the user in the log lines the sweep emits. The
+// internal userID drives the queries and never reaches a log line.
+func User(ctx context.Context, db *sql.DB, q *generated.Queries, store BlobSweeper, userID uint32, userPublicID uuid.UUID) (UserResult, error) {
 	taskAtts, err := q.ListAttachmentsForUploaderPurge(ctx, userID)
 	if err != nil {
 		return UserResult{}, err
@@ -313,8 +322,7 @@ func User(ctx context.Context, db *sql.DB, q *generated.Queries, store BlobSweep
 			}
 			if affected, _ := decRes.RowsAffected(); affected != 1 {
 				slog.WarnContext(ctx, "teardown: user delete ref_count underflow on task attachment",
-					slog.Uint64("storage_object_id", uint64(a.StorageObjectID)),
-					slog.Uint64("user_internal_id", uint64(userID)),
+					logutil.LogEntity("user", userPublicID),
 				)
 			}
 		}
@@ -325,8 +333,7 @@ func User(ctx context.Context, db *sql.DB, q *generated.Queries, store BlobSweep
 			}
 			if affected, _ := decRes.RowsAffected(); affected != 1 {
 				slog.WarnContext(ctx, "teardown: user delete ref_count underflow on calendar attachment",
-					slog.Uint64("storage_object_id", uint64(a.StorageObjectID)),
-					slog.Uint64("user_internal_id", uint64(userID)),
+					logutil.LogEntity("user", userPublicID),
 				)
 			}
 		}
@@ -387,7 +394,7 @@ func User(ctx context.Context, db *sql.DB, q *generated.Queries, store BlobSweep
 	var minioErrors int64
 	if deleted {
 		minioErrors = sweepBlobs(ctx, store, keys,
-			slog.Uint64("user_internal_id", uint64(userID)))
+			logutil.LogEntity("user", userPublicID))
 	}
 
 	return UserResult{
