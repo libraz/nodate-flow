@@ -356,6 +356,16 @@ func (h *Handler) handleToolCall(w http.ResponseWriter, r *http.Request, s *sess
 		writeRPCAppError(w, req.ID, apierrors.McpProtocolFrameMalformed, valErr.Error())
 		return
 	}
+	// Enforce the tool's own advertised input schema. The constraints a
+	// tool publishes through tools/list are the ones the server applies,
+	// so a tool cannot advertise a bound it does not have — see
+	// argvalidate.go.
+	if schemaErr := validateArgsAgainstSchema(t.inputSchema, params.Arguments); schemaErr != nil {
+		h.audit(r.Context(), s, params.Name, params.Arguments, nil,
+			generated.McpInvocationsStatusError, apierrors.McpToolArgumentsInvalid.Code, 0)
+		writeRPCAppError(w, req.ID, apierrors.McpToolArgumentsInvalid, schemaErr.Error())
+		return
+	}
 	args := params.Arguments
 	if len(args) == 0 {
 		args = json.RawMessage("{}")
@@ -365,6 +375,11 @@ func (h *Handler) handleToolCall(w http.ResponseWriter, r *http.Request, s *sess
 	if s.agentID != 0 {
 		runCtx = ai.WithAgentID(runCtx, s.agentID)
 	}
+	// Attribute the call to the task it touched. The tool bodies do not
+	// know they are being audited; the resolvers in acl.go stamp the id
+	// on this slot as they authorize, so every task-targeting tool lands
+	// a non-NULL mcp_invocations.task_id without a per-tool change.
+	runCtx = withInvocationTarget(runCtx)
 	result, toolErr := t.run(runCtx, h.deps, s, args)
 	dur := int32(time.Since(start).Milliseconds()) //#nosec G115 -- per-tool execution duration in ms is bounded well within int32 (~24 days)
 	if toolErr != nil {
@@ -373,7 +388,7 @@ func (h *Handler) handleToolCall(w http.ResponseWriter, r *http.Request, s *sess
 		if errors.As(toolErr, &ae) {
 			spec = ae.Spec
 		}
-		h.audit(r.Context(), s, params.Name, args, nil,
+		h.audit(runCtx, s, params.Name, args, nil,
 			generated.McpInvocationsStatusError, spec.Code, dur)
 		// Use the stable spec message rather than the raw error to
 		// avoid leaking internal details (DB errors, paths, etc.).
@@ -388,7 +403,7 @@ func (h *Handler) handleToolCall(w http.ResponseWriter, r *http.Request, s *sess
 	// (centralized invariant), but the call site MUST never hand audit
 	// or the client raw secret-bearing JSON.
 	_, redactedResult := redactAuditPayloads(args, resultJSON)
-	h.audit(r.Context(), s, params.Name, args, redactedResult,
+	h.audit(runCtx, s, params.Name, args, redactedResult,
 		generated.McpInvocationsStatusOk, "", dur)
 	// MCP spec: result content is a list of content parts. We wrap the
 	// tool output as a single JSON text part.
@@ -602,11 +617,20 @@ func (h *Handler) audit(
 	if errCode != "" {
 		ec = sql.NullString{String: errCode, Valid: true}
 	}
+	// The task this call acted on, when the tool resolved one. Answering
+	// "what did the agent do to this task" from the audit trail is the
+	// question an AI-native product has to be able to answer, and it
+	// cannot be answered from a column that is always NULL.
+	var taskID sql.NullInt32
+	if id := invocationTaskID(ctx); id != 0 {
+		taskID = sql.NullInt32{Int32: int32(id), Valid: true} //#nosec G115 -- task id is tasks.id (BIGINT UNSIGNED), fits int32 within realistic deployments
+	}
+
 	_, err := h.deps.Queries.LogMcpInvocation(ctx, generated.LogMcpInvocationParams{
 		PublicID:              newPublicID(),
 		WorkspaceID:           s.workspaceID,
 		UserID:                userID,
-		TaskID:                sql.NullInt32{},
+		TaskID:                taskID,
 		ToolName:              toolName,
 		ArgumentsRedactedJson: argsBlob,
 		ResultRedactedJson:    resBlob,

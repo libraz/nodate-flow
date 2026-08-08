@@ -79,6 +79,19 @@ func CreateMcpToken(deps Deps) func(context.Context, *CreateMcpTokenInput) (*Cre
 
 		pub := types.New()
 		now := time.Now()
+
+		// An expiry in the past would mint a token that is dead on
+		// arrival, and the caller would not find out until the first tool
+		// call failed with MCP.TOKEN.EXPIRED.
+		var expiresAt sql.NullTime
+		if in.Body.ExpiresAt != nil {
+			exp := time.Unix(*in.Body.ExpiresAt, 0).UTC()
+			if !exp.After(now) {
+				return nil, httpErr(apierrors.ValidationBodyFieldInvalid)
+			}
+			expiresAt = sql.NullTime{Time: exp, Valid: true}
+		}
+
 		if _, err := deps.Queries.CreateMcpToken(ctx, generated.CreateMcpTokenParams{
 			PublicID:    pub,
 			WorkspaceID: ws.ID,
@@ -88,6 +101,7 @@ func CreateMcpToken(deps Deps) func(context.Context, *CreateMcpTokenInput) (*Cre
 			TokenHash:   hash,
 			TokenPrefix: displayPrefix,
 			ScopesJson:  scopesJSON,
+			ExpiresAt:   expiresAt,
 		}); err != nil {
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
@@ -101,6 +115,10 @@ func CreateMcpToken(deps Deps) func(context.Context, *CreateMcpTokenInput) (*Cre
 		if in.Body.AgentID != nil && *in.Body.AgentID != "" {
 			v := *in.Body.AgentID
 			out.Body.AgentID = &v
+		}
+		if expiresAt.Valid {
+			v := expiresAt.Time.Unix()
+			out.Body.ExpiresAt = &v
 		}
 		out.Body.CreatedAt = now.Unix()
 		deps.Audit.Record(ctx, audit.Entry{

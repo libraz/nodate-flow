@@ -377,10 +377,10 @@ func registerTools(h *Handler) {
 			"endAt":       intSchema("End time, unix seconds since epoch (timed events).", Constraints{Min: intPtr(0)}),
 			"startDate":   stringSchema("Start date YYYY-MM-DD (all-day events).", Constraints{Pattern: `^\d{4}-\d{2}-\d{2}$`}),
 			"endDate":     stringSchema("End date YYYY-MM-DD (all-day events, inclusive).", Constraints{Pattern: `^\d{4}-\d{2}-\d{2}$`}),
-			"kind":        stringSchema("Event kind: event | block | free (default event)."),
-			"showAs":      stringSchema("Show as: busy | free | tentative | oof (default busy)."),
-			"flexibility": stringSchema("Whether the commitment can be moved: fixed | negotiable | conditional (default fixed). Independent of showAs, which only says whether the time reads as taken."),
-			"visibility":  stringSchema("Visibility: default | public | private | confidential."),
+			"kind":        stringSchema("Event kind (default event).", Constraints{Enum: calendarEventKinds}),
+			"showAs":      stringSchema("How the time reads to others (default busy).", Constraints{Enum: calendarEventShowAs}),
+			"flexibility": stringSchema("Whether the commitment can be moved (default fixed). Independent of showAs, which only says whether the time reads as taken.", Constraints{Enum: calendarEventFlexibility}),
+			"visibility":  stringSchema("Who may see the event's details.", Constraints{Enum: calendarEventVisibility}),
 			"ownerUserId": stringSchema("Owner user public id (UUID v7). Defaults to caller.", Constraints{Pattern: publicIDPattern}),
 			"allDay":      boolSchema("Whether this is an all-day event."),
 			"location":    stringSchema("Event location."),
@@ -400,10 +400,10 @@ func registerTools(h *Handler) {
 			"endAt":       intSchema("New end time, unix seconds since epoch.", Constraints{Min: intPtr(0)}),
 			"startDate":   stringSchema("New start date YYYY-MM-DD (all-day events).", Constraints{Pattern: `^\d{4}-\d{2}-\d{2}$`}),
 			"endDate":     stringSchema("New end date YYYY-MM-DD (all-day events).", Constraints{Pattern: `^\d{4}-\d{2}-\d{2}$`}),
-			"kind":        stringSchema("New kind: event | block | free."),
-			"showAs":      stringSchema("New show as: busy | free | tentative | oof."),
-			"flexibility": stringSchema("New whether the commitment can be moved: fixed | negotiable | conditional (default fixed). Independent of showAs, which only says whether the time reads as taken."),
-			"visibility":  stringSchema("New visibility: default | public | private | confidential."),
+			"kind":        stringSchema("New event kind.", Constraints{Enum: calendarEventKinds}),
+			"showAs":      stringSchema("New reading of the time to others.", Constraints{Enum: calendarEventShowAs}),
+			"flexibility": stringSchema("New answer to whether the commitment can be moved. Independent of showAs, which only says whether the time reads as taken.", Constraints{Enum: calendarEventFlexibility}),
+			"visibility":  stringSchema("New answer to who may see the event's details.", Constraints{Enum: calendarEventVisibility}),
 			"location":    stringSchema("New location."),
 			"memo":        stringSchema("New memo/notes."),
 			"blockLabel":  stringSchema("New block label."),
@@ -673,14 +673,69 @@ type Constraints struct {
 	Pattern   string
 	MinLength *int
 	MaxLength *int
+	// Enum is the closed set of permitted string values. Prefer it over
+	// Pattern for a real enumeration: the client shows the caller what
+	// the choices are instead of a regular expression, and a rejection
+	// names them. Build it from the generated column constants so the
+	// advertised set cannot fall behind the column.
+	Enum []string
 }
 
 func intPtr(v int) *int { return &v }
 
-// publicIDPattern matches the lowercase hex form of UUID v7 public ids
-// emitted by types.PublicID.String(). Used as a JSONSchema pattern on
-// MCP arguments that reference resources by public id.
-const publicIDPattern = `^[0-9a-f]{32}$`
+// The calendar_events enum columns, spelled from the generated
+// constants rather than by hand. An agent that guessed a value used to
+// get an opaque execution failure from the driver's rejected INSERT;
+// now the value is refused against the same set the column accepts, and
+// the client can see the choices before it sends anything.
+var (
+	calendarEventKinds = []string{
+		string(calendar.CalendarEventsKindEvent),
+		string(calendar.CalendarEventsKindBlock),
+		string(calendar.CalendarEventsKindFree),
+		string(calendar.CalendarEventsKindMilestone),
+	}
+	calendarEventShowAs = []string{
+		string(calendar.CalendarEventsShowAsBusy),
+		string(calendar.CalendarEventsShowAsFree),
+		string(calendar.CalendarEventsShowAsTentative),
+		string(calendar.CalendarEventsShowAsOof),
+	}
+	calendarEventFlexibility = []string{
+		string(calendar.CalendarEventsFlexibilityFixed),
+		string(calendar.CalendarEventsFlexibilityNegotiable),
+		string(calendar.CalendarEventsFlexibilityConditional),
+	}
+	calendarEventVisibility = []string{
+		string(calendar.CalendarEventsVisibilityDefault),
+		string(calendar.CalendarEventsVisibilityPublic),
+		string(calendar.CalendarEventsVisibilityPrivate),
+		string(calendar.CalendarEventsVisibilityConfidential),
+	}
+)
+
+// publicIDPattern matches a public id as the API actually deals in one:
+// the canonical hyphenated UUID that types.PublicID.String() emits, or
+// the unhyphenated 32-hex form that types.Parse also accepts.
+//
+// It used to read `^[0-9a-f]{32}$` and nothing else — a form the server
+// never emits. The mistake survived because the pattern was
+// advertisement only: every MCP client was handed a rule that would
+// have rejected every id the API had just given it, and no server-side
+// check ever disagreed with the tools it was guarding. Enforcing the
+// schema is what surfaced it.
+//
+// The alternation is deliberate rather than tidy. Narrowing to the
+// canonical form alone would be a rule the resolvers do not apply —
+// types.Parse takes both — and tightening the contract is not this
+// change's job. Written with explicit case ranges instead of an inline
+// (?i) flag because JSON Schema patterns are ECMA-262, which has no
+// inline flags: a client validating locally must read the same rule the
+// server does.
+//
+// [TestPublicIDPatternMatchesEmittedIDs] ties it to a real generated id
+// so the next edit cannot drift from the type again.
+const publicIDPattern = `^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}|[0-9a-fA-F]{32})$`
 
 // errTransitionRejected rolls a transition transaction back when the
 // state machine refuses the move. The caller answers from the returned
@@ -723,6 +778,9 @@ func boolSchema(desc string) map[string]any {
 }
 
 func applyStringConstraints(out map[string]any, c Constraints) {
+	if len(c.Enum) > 0 {
+		out["enum"] = c.Enum
+	}
 	if c.Pattern != "" {
 		out["pattern"] = c.Pattern
 	}
@@ -989,20 +1047,22 @@ func runCreateTask(ctx context.Context, deps Deps, s *session, raw json.RawMessa
 	}); txErr != nil {
 		return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, txErr)
 	}
-	actor := int64(s.userID)
+	noteInvocationTask(ctx, uint32(taskID)) //#nosec G115 -- task id is tasks.id (BIGINT UNSIGNED), fits uint32 within realistic deployments
 	// The task row is committed. Reporting a failure here would tell the
 	// caller nothing was created and invite a duplicate on retry.
-	eventbus.AppendBestEffort(ctx, deps.DB, eventbus.Event{
-		Type:        eventbus.TaskCreated,
-		WorkspaceID: s.workspaceID,
-		ActorUserID: &actor,
-		TaskID:      &taskID,
+	recordMutation(ctx, deps, s, mutation{
+		EventType:    eventbus.TaskCreated,
+		AuditAction:  "task.create",
+		ResourceType: "task",
+		ResourceID:   pub.String(),
+		TaskID:       &taskID,
 		Payload: map[string]any{
 			"taskId": pub.String(),
 			"title":  in.Title,
 			"via":    "mcp",
 		},
-	}, "mcp.create_task")
+		CallSite: "mcp.create_task",
+	})
 	return map[string]any{"id": pub.String()}, nil
 }
 
@@ -1134,16 +1194,17 @@ func runUpdateTask(ctx context.Context, deps Deps, s *session, raw json.RawMessa
 	}
 
 	taskID64 := int64(taskInternal)
-	actor := int64(s.userID)
 	// Propagated rather than absorbed: re-running this tool with the same
 	// arguments re-applies the same field values and re-appends the
 	// event, so the caller's retry is what repairs the log.
-	if err := eventbus.Append(ctx, deps.DB, eventbus.Event{
-		Type:        eventbus.TaskUpdated,
-		WorkspaceID: s.workspaceID,
-		ActorUserID: &actor,
-		TaskID:      &taskID64,
-		Payload:     map[string]any{"taskId": current.PublicID.String(), "via": "mcp"},
+	if err := recordMutationStrict(ctx, deps, s, mutation{
+		EventType:    eventbus.TaskUpdated,
+		AuditAction:  "task.update",
+		ResourceType: "task",
+		ResourceID:   current.PublicID.String(),
+		TaskID:       &taskID64,
+		Payload:      map[string]any{"taskId": current.PublicID.String(), "via": "mcp"},
+		CallSite:     "mcp.update_task",
 	}); err != nil {
 		return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
 	}
@@ -1226,6 +1287,22 @@ func runTransitionTask(ctx context.Context, deps Deps, s *session, raw json.RawM
 	if txErr != nil {
 		return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, txErr)
 	}
+	// taskstate appended the transition event inside the transaction so
+	// the event and the state change commit together; only the audit row
+	// belongs to the transport.
+	recordTxMutationAudit(ctx, deps, s, mutation{
+		AuditAction:  "task.transition",
+		ResourceType: "task",
+		ResourceID:   pub.String(),
+		Payload: map[string]any{
+			"taskId":     pub.String(),
+			"transition": in.Transition,
+			"fromState":  string(result.FromState),
+			"toState":    string(result.ToState),
+			"via":        "mcp",
+		},
+		CallSite: "mcp.transition_task",
+	})
 	return map[string]any{
 		"id":         pub.String(),
 		"fromState":  string(result.FromState),
@@ -1263,19 +1340,20 @@ func runAddComment(ctx context.Context, deps Deps, s *session, raw json.RawMessa
 		return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
 	}
 	taskID64 := int64(taskInternal)
-	actor := int64(s.userID)
 	// The comment row is committed; a retry would post it twice.
-	eventbus.AppendBestEffort(ctx, deps.DB, eventbus.Event{
-		Type:        eventbus.CommentAddedLegacy,
-		WorkspaceID: s.workspaceID,
-		ActorUserID: &actor,
-		TaskID:      &taskID64,
+	recordMutation(ctx, deps, s, mutation{
+		EventType:    eventbus.CommentAddedLegacy,
+		AuditAction:  "comment.create",
+		ResourceType: "comment",
+		ResourceID:   cpub.String(),
+		TaskID:       &taskID64,
 		Payload: map[string]any{
 			"taskId":    pub.String(),
 			"commentId": cpub.String(),
 			"via":       "mcp",
 		},
-	}, "mcp.add_comment")
+		CallSite: "mcp.add_comment",
+	})
 	return map[string]any{"id": cpub.String()}, nil
 }
 
@@ -1660,22 +1738,23 @@ func runApplySteps(ctx context.Context, deps Deps, s *session, raw json.RawMessa
 
 	// Events are appended after commit so they reference committed rows and
 	// a retried transaction cannot publish a child that was rolled back.
-	actor := int64(s.userID)
 	for i, st := range in.Steps {
 		childID := childIDs[i]
 		// The children are committed; a retry would create them again.
-		eventbus.AppendBestEffort(ctx, deps.DB, eventbus.Event{
-			Type:        eventbus.TaskCreated,
-			WorkspaceID: s.workspaceID,
-			ActorUserID: &actor,
-			TaskID:      &childID,
+		recordMutation(ctx, deps, s, mutation{
+			EventType:    eventbus.TaskCreated,
+			AuditAction:  "task.apply_steps",
+			ResourceType: "task",
+			ResourceID:   created[i],
+			TaskID:       &childID,
 			Payload: map[string]any{
 				"taskId":       created[i],
 				"title":        st.Title,
 				"parentTaskId": parentPub.String(),
 				"via":          "mcp:apply_steps",
 			},
-		}, "mcp.apply_steps")
+			CallSite: "mcp.apply_steps",
+		})
 	}
 	return map[string]any{"created": created}, nil
 }
@@ -1803,18 +1882,19 @@ func runCreateTimebox(ctx context.Context, deps Deps, s *session, raw json.RawMe
 	if err != nil {
 		return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
 	}
-	actor := int64(s.userID)
 	// The timebox row is committed; a retry would create a second one.
-	eventbus.AppendBestEffort(ctx, deps.DB, eventbus.Event{
-		Type:        eventbus.TimeboxCreated,
-		WorkspaceID: s.workspaceID,
-		ActorUserID: &actor,
+	recordMutation(ctx, deps, s, mutation{
+		EventType:    eventbus.TimeboxCreated,
+		AuditAction:  "timebox.create",
+		ResourceType: "timebox",
+		ResourceID:   pub.String(),
 		Payload: map[string]any{
 			"timeboxId": pub.String(),
 			"name":      in.Name,
 			"via":       "mcp",
 		},
-	}, "mcp.create_timebox")
+		CallSite: "mcp.create_timebox",
+	})
 	_ = timeboxID // internal id not exposed
 	return map[string]any{"id": pub.String()}, nil
 }
@@ -1865,20 +1945,21 @@ func runAddTaskToTimebox(ctx context.Context, deps Deps, s *session, raw json.Ra
 		return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
 	}
 	taskID64 := int64(taskInternal)
-	actor := int64(s.userID)
 	// The link row is committed and carries a unique key, so a retry
 	// would be rejected before it could re-append the event.
-	eventbus.AppendBestEffort(ctx, deps.DB, eventbus.Event{
-		Type:        eventbus.TimeboxTaskAdded,
-		WorkspaceID: s.workspaceID,
-		ActorUserID: &actor,
-		TaskID:      &taskID64,
+	recordMutation(ctx, deps, s, mutation{
+		EventType:    eventbus.TimeboxTaskAdded,
+		AuditAction:  "timebox.task.add",
+		ResourceType: "timebox",
+		ResourceID:   tbPub.String(),
+		TaskID:       &taskID64,
 		Payload: map[string]any{
 			"timeboxId": tbPub.String(),
 			"taskId":    taskPub.String(),
 			"via":       "mcp",
 		},
-	}, "mcp.add_task_to_timebox")
+		CallSite: "mcp.add_task_to_timebox",
+	})
 	return map[string]any{"ok": true}, nil
 }
 
@@ -1989,6 +2070,22 @@ func runExportTasks(ctx context.Context, deps Deps, s *session, raw json.RawMess
 		}
 		items = append(items, m)
 	}
+	// An export is a read, but it is also the moment a workspace's task
+	// data leaves it in bulk. REST records both halves for exactly that
+	// reason; leaving MCP out meant an administrator investigating a leak
+	// saw only the exports made by people using a browser, and none of
+	// the ones made by the automated callers that use this surface most.
+	recordMutation(ctx, deps, s, mutation{
+		EventType:    eventbus.ExportRequested,
+		AuditAction:  "export.create",
+		ResourceType: "export",
+		Payload: map[string]any{
+			"format": "json",
+			"count":  len(items),
+			"via":    "mcp",
+		},
+		CallSite: "mcp.export_tasks",
+	})
 	return map[string]any{"tasks": items}, nil
 }
 
@@ -2351,18 +2448,19 @@ func runCreatePage(ctx context.Context, deps Deps, s *session, raw json.RawMessa
 		return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
 	}
 
-	actor := int64(s.userID)
 	// The page row is committed; a retry would create a second one.
-	eventbus.AppendBestEffort(ctx, deps.DB, eventbus.Event{
-		Type:        eventbus.PageCreated,
-		WorkspaceID: s.workspaceID,
-		ActorUserID: &actor,
+	recordMutation(ctx, deps, s, mutation{
+		EventType:    eventbus.PageCreated,
+		AuditAction:  "page.create",
+		ResourceType: "page",
+		ResourceID:   pub.String(),
 		Payload: map[string]any{
 			"pageId": pub.String(),
 			"title":  in.Title,
 			"via":    "mcp",
 		},
-	}, "mcp.create_page")
+		CallSite: "mcp.create_page",
+	})
 	_ = pageID // internal id not exposed
 	return map[string]any{"id": pub.String()}, nil
 }
@@ -2415,17 +2513,18 @@ func runUpdatePage(ctx context.Context, deps Deps, s *session, raw json.RawMessa
 	}
 
 	pageID64 := int64(pageInternal)
-	actor := int64(s.userID)
 	// Propagated: the update is idempotent, so a retry re-applies the
 	// same values and re-appends the event.
-	if err := eventbus.Append(ctx, deps.DB, eventbus.Event{
-		Type:        eventbus.PageUpdated,
-		WorkspaceID: s.workspaceID,
-		ActorUserID: &actor,
+	if err := recordMutationStrict(ctx, deps, s, mutation{
+		EventType:    eventbus.PageUpdated,
+		AuditAction:  "page.update",
+		ResourceType: "page",
+		ResourceID:   pub.String(),
 		Payload: map[string]any{
 			"pageId": pub.String(),
 			"via":    "mcp",
 		},
+		CallSite: "mcp.update_page",
 	}); err != nil {
 		return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
 	}
@@ -2519,20 +2618,21 @@ func runGeneratePage(ctx context.Context, deps Deps, s *session, raw json.RawMes
 		return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
 	}
 
-	actor := int64(s.userID)
 	// The page row is committed, and a retry would repeat the model call
 	// that produced its body as well as duplicating the page.
-	eventbus.AppendBestEffort(ctx, deps.DB, eventbus.Event{
-		Type:        eventbus.PageCreated,
-		WorkspaceID: s.workspaceID,
-		ActorUserID: &actor,
+	recordMutation(ctx, deps, s, mutation{
+		EventType:    eventbus.PageCreated,
+		AuditAction:  "page.generate",
+		ResourceType: "page",
+		ResourceID:   pub.String(),
 		Payload: map[string]any{
 			"pageId":        pub.String(),
 			"title":         title,
 			"isAiGenerated": isAI,
 			"via":           "mcp:generate_page",
 		},
-	}, "mcp.generate_page")
+		CallSite: "mcp.generate_page",
+	})
 	_ = pageID // internal id not exposed
 	return map[string]any{
 		"id":            pub.String(),
@@ -2637,33 +2737,37 @@ func runSmartCreateTask(ctx context.Context, deps Deps, s *session, raw json.Raw
 	// Events are appended after commit so they reference committed rows.
 	// The whole tree is durable by now, so a failure here is absorbed:
 	// a retry would build a second copy of it.
-	actor := int64(s.userID)
-	eventbus.AppendBestEffort(ctx, deps.DB, eventbus.Event{
-		Type:        eventbus.TaskCreated,
-		WorkspaceID: s.workspaceID,
-		ActorUserID: &actor,
-		TaskID:      &parentID,
+	noteInvocationTask(ctx, uint32(parentID)) //#nosec G115 -- task id is tasks.id (BIGINT UNSIGNED), fits uint32 within realistic deployments
+	recordMutation(ctx, deps, s, mutation{
+		EventType:    eventbus.TaskCreated,
+		AuditAction:  "task.smart_create",
+		ResourceType: "task",
+		ResourceID:   parentPub.String(),
+		TaskID:       &parentID,
 		Payload: map[string]any{
 			"taskId": parentPub.String(),
 			"title":  in.Title,
 			"via":    "mcp:smart_create_task",
 		},
-	}, "mcp.smart_create_task")
+		CallSite: "mcp.smart_create_task",
+	})
 	subtaskIDs := make([]string, 0, len(children))
 	for i := range children {
 		childID := children[i].id
-		eventbus.AppendBestEffort(ctx, deps.DB, eventbus.Event{
-			Type:        eventbus.TaskCreated,
-			WorkspaceID: s.workspaceID,
-			ActorUserID: &actor,
-			TaskID:      &childID,
+		recordMutation(ctx, deps, s, mutation{
+			EventType:    eventbus.TaskCreated,
+			AuditAction:  "task.create",
+			ResourceType: "task",
+			ResourceID:   children[i].pub,
+			TaskID:       &childID,
 			Payload: map[string]any{
 				"taskId":       children[i].pub,
 				"title":        children[i].title,
 				"parentTaskId": parentPub.String(),
 				"via":          "mcp:smart_create_task",
 			},
-		}, "mcp.smart_create_task")
+			CallSite: "mcp.smart_create_task",
+		})
 		subtaskIDs = append(subtaskIDs, children[i].pub)
 	}
 
@@ -2806,15 +2910,12 @@ func listCalendarOccurrences(
 	workspaceID uint32,
 	startTime, endTime time.Time,
 ) ([]mcpCalendarOccurrence, error) {
-	// The overlap predicate is start_at < :end AND end_at > :start, and
-	// the generated params name them the other way round; passing them
-	// swapped is the query's convention, not a mistake.
 	plain, err := deps.CalendarQueries.ListCalendarEventsAcrossCalendars(ctx, calendar.ListCalendarEventsAcrossCalendarsParams{
 		ViewerUserID: viewerUserID,
 		UserID:       membershipUserID,
 		WorkspaceID:  workspaceID,
-		StartAt:      sql.NullTime{Time: endTime, Valid: true},
-		EndAt:        sql.NullTime{Time: startTime, Valid: true},
+		RangeEnd:     sql.NullTime{Time: endTime, Valid: true},
+		RangeStart:   sql.NullTime{Time: startTime, Valid: true},
 	})
 	if err != nil {
 		return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
@@ -3108,6 +3209,24 @@ func runCreateCalendarEvent(ctx context.Context, deps Deps, s *session, raw json
 	if err != nil {
 		return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
 	}
+	// The event row is committed; a retry would create a second entry on
+	// somebody's calendar.
+	recordMutation(ctx, deps, s, mutation{
+		EventType:    eventbus.CalEventCreated,
+		AuditAction:  "calendar.event.create",
+		ResourceType: "calendar.event",
+		ResourceID:   pub.String(),
+		Payload: map[string]any{
+			"eventId":    pub.String(),
+			"calendarId": in.CalendarID,
+			"title":      in.Title,
+			"kind":       string(kind),
+			"startAt":    startAt.Unix(),
+			"endAt":      endAt.Unix(),
+			"via":        "mcp",
+		},
+		CallSite: "mcp.create_calendar_event",
+	})
 	out := map[string]any{
 		"id":          pub.String(),
 		"title":       in.Title,
@@ -3274,6 +3393,21 @@ func runUpdateCalendarEvent(ctx context.Context, deps Deps, s *session, raw json
 		if err := deps.CalendarQueries.PatchCalendarEvent(ctx, params); err != nil {
 			return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
 		}
+		// This branch never reaches itemkit, so nothing else appends the
+		// event. That is why an agent editing a standalone event used to
+		// leave no trace at all: the linked-event path borrowed itemkit's
+		// event row and this one had nobody to borrow from.
+		recordMutation(ctx, deps, s, mutation{
+			EventType:    eventbus.CalEventUpdated,
+			AuditAction:  "calendar.event.update",
+			ResourceType: "calendar.event",
+			ResourceID:   eventPub.String(),
+			Payload: map[string]any{
+				"eventId": eventPub.String(),
+				"via":     "mcp",
+			},
+			CallSite: "mcp.update_calendar_event",
+		})
 		return map[string]any{"success": true}, nil
 	}
 
@@ -3322,6 +3456,18 @@ func runUpdateCalendarEvent(ctx context.Context, deps Deps, s *session, raw json
 	if err := tx.Commit(); err != nil {
 		return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
 	}
+	// itemkit appended calendar.event.updated inside the transaction that
+	// just committed, so only the audit half is left to add here.
+	recordTxMutationAudit(ctx, deps, s, mutation{
+		AuditAction:  "calendar.event.update",
+		ResourceType: "calendar.event",
+		ResourceID:   eventPub.String(),
+		Payload: map[string]any{
+			"eventId": eventPub.String(),
+			"via":     "mcp",
+		},
+		CallSite: "mcp.update_calendar_event",
+	})
 	return map[string]any{"success": true}, nil
 }
 
@@ -3381,6 +3527,19 @@ func runDeleteCalendarEvent(ctx context.Context, deps Deps, s *session, raw json
 	if err := tx.Commit(); err != nil {
 		return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
 	}
+	// itemkit appended item.unscheduled and the legacy
+	// calendar.event.deleted inside the committed transaction; the audit
+	// row is the remaining half.
+	recordTxMutationAudit(ctx, deps, s, mutation{
+		AuditAction:  "calendar.event.delete",
+		ResourceType: "calendar.event",
+		ResourceID:   eventPub.String(),
+		Payload: map[string]any{
+			"eventId": eventPub.String(),
+			"via":     "mcp",
+		},
+		CallSite: "mcp.delete_calendar_event",
+	})
 	return map[string]any{"success": true}, nil
 }
 
@@ -3596,6 +3755,24 @@ func runCreateEventFromTask(ctx context.Context, deps Deps, s *session, raw json
 	if err != nil {
 		return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
 	}
+	taskID64 := int64(taskInternal)
+	recordMutation(ctx, deps, s, mutation{
+		EventType:    eventbus.CalEventCreated,
+		AuditAction:  "calendar.event.create",
+		ResourceType: "calendar.event",
+		ResourceID:   pub.String(),
+		TaskID:       &taskID64,
+		Payload: map[string]any{
+			"eventId":    pub.String(),
+			"calendarId": in.CalendarID,
+			"taskId":     task.PublicID.String(),
+			"title":      task.Title,
+			"startAt":    startAt.Unix(),
+			"endAt":      endAt.Unix(),
+			"via":        "mcp:create_event_from_task",
+		},
+		CallSite: "mcp.create_event_from_task",
+	})
 	return map[string]any{
 		"id":      pub.String(),
 		"title":   task.Title,
@@ -3669,6 +3846,24 @@ func runToggleCalendarMemo(ctx context.Context, deps Deps, s *session, raw json.
 		PublicID:    memoPub,
 		CalendarID:  calID,
 		WorkspaceID: s.workspaceID,
+	}); err != nil {
+		return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
+	}
+	// Same kind and action the REST memo patch uses, so a shared memo
+	// ticked off by an agent reads the same on the timeline as one ticked
+	// off in the web app.
+	if err := recordMutationStrict(ctx, deps, s, mutation{
+		EventType:    "calendar.memo.updated",
+		AuditAction:  "calendar.memo.update",
+		ResourceType: "calendar.memo",
+		ResourceID:   in.MemoID,
+		Payload: map[string]any{
+			"memoId":     in.MemoID,
+			"calendarId": in.CalendarID,
+			"done":       *in.Done,
+			"via":        "mcp",
+		},
+		CallSite: "mcp.toggle_calendar_memo",
 	}); err != nil {
 		return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
 	}

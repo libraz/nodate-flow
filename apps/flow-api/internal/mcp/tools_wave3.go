@@ -136,17 +136,18 @@ func runTriageIntakeItem(ctx context.Context, deps Deps, s *session, raw json.Ra
 	case "duplicate":
 		evtKind = eventbus.IntakeItemDuplicate
 	}
-	actor := int64(s.userID)
 	// The triage status is committed, and the pending-status guard above
 	// makes a retry fail with ALREADY_TRIAGED without re-appending. The
 	// caller has no way to repair the log, so propagating would only
 	// report a failure for work that succeeded.
-	eventbus.AppendBestEffort(ctx, deps.DB, eventbus.Event{
-		Type:        evtKind,
-		WorkspaceID: s.workspaceID,
-		ActorUserID: &actor,
-		Payload:     map[string]any{"intakeItemId": in.IntakeItemID, "status": in.Status, "via": "mcp"},
-	}, "mcp.triage_intake_item")
+	recordMutation(ctx, deps, s, mutation{
+		EventType:    evtKind,
+		AuditAction:  "intake.triage",
+		ResourceType: "intake_item",
+		ResourceID:   in.IntakeItemID,
+		Payload:      map[string]any{"intakeItemId": in.IntakeItemID, "status": in.Status, "via": "mcp"},
+		CallSite:     "mcp.triage_intake_item",
+	})
 
 	return map[string]any{"ok": true, "status": in.Status}, nil
 }
@@ -222,23 +223,27 @@ func runConvertIntakeToTask(ctx context.Context, deps Deps, s *session, raw json
 		return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, txErr)
 	}
 
-	actor := int64(s.userID)
+	noteInvocationTask(ctx, uint32(taskID)) //#nosec G115 -- task id is tasks.id (BIGINT UNSIGNED), fits uint32 within realistic deployments
 	// The conversion committed a new task and linked the intake item; a
 	// retry would create a second task.
-	eventbus.AppendBestEffort(ctx, deps.DB, eventbus.Event{
-		Type:        eventbus.IntakeItemAccepted,
-		WorkspaceID: s.workspaceID,
-		ActorUserID: &actor,
-		TaskID:      &taskID,
-		Payload:     map[string]any{"intakeItemId": in.IntakeItemID, "taskId": taskPub.String(), "via": "mcp"},
-	}, "mcp.convert_intake_to_task")
-	eventbus.AppendBestEffort(ctx, deps.DB, eventbus.Event{
-		Type:        eventbus.TaskCreated,
-		WorkspaceID: s.workspaceID,
-		ActorUserID: &actor,
-		TaskID:      &taskID,
-		Payload:     map[string]any{"taskId": taskPub.String(), "title": item.Title, "source": "intake_convert_mcp"},
-	}, "mcp.convert_intake_to_task")
+	recordMutation(ctx, deps, s, mutation{
+		EventType:    eventbus.IntakeItemAccepted,
+		AuditAction:  "intake.convert",
+		ResourceType: "intake_item",
+		ResourceID:   in.IntakeItemID,
+		TaskID:       &taskID,
+		Payload:      map[string]any{"intakeItemId": in.IntakeItemID, "taskId": taskPub.String(), "via": "mcp"},
+		CallSite:     "mcp.convert_intake_to_task",
+	})
+	recordMutation(ctx, deps, s, mutation{
+		EventType:    eventbus.TaskCreated,
+		AuditAction:  "task.create",
+		ResourceType: "task",
+		ResourceID:   taskPub.String(),
+		TaskID:       &taskID,
+		Payload:      map[string]any{"taskId": taskPub.String(), "title": item.Title, "source": "intake_convert_mcp"},
+		CallSite:     "mcp.convert_intake_to_task",
+	})
 
 	return map[string]any{"ok": true, "taskId": taskPub.String()}, nil
 }
@@ -381,17 +386,18 @@ func runRestoreDescriptionVersion(ctx context.Context, deps Deps, s *session, ra
 		return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
 	}
 
-	actor := int64(s.userID)
 	taskIDInt64 := int64(taskInternal)
 	// The restore committed a new description version row; a retry would
 	// add another one on top of it.
-	eventbus.AppendBestEffort(ctx, deps.DB, eventbus.Event{
-		Type:        eventbus.DescriptionVersionRestored,
-		WorkspaceID: s.workspaceID,
-		ActorUserID: &actor,
-		TaskID:      &taskIDInt64,
-		Payload:     map[string]any{"taskId": in.TaskID, "restoredFrom": in.VersionID, "newVersionId": newPub.String(), "via": "mcp"},
-	}, "mcp.restore_description_version")
+	recordMutation(ctx, deps, s, mutation{
+		EventType:    eventbus.DescriptionVersionRestored,
+		AuditAction:  "description_version.restore",
+		ResourceType: "task",
+		ResourceID:   taskPub.String(),
+		TaskID:       &taskIDInt64,
+		Payload:      map[string]any{"taskId": in.TaskID, "restoredFrom": in.VersionID, "newVersionId": newPub.String(), "via": "mcp"},
+		CallSite:     "mcp.restore_description_version",
+	})
 
 	return map[string]any{"ok": true, "newVersionId": newPub.String()}, nil
 }

@@ -119,16 +119,17 @@ func runAddFavorite(ctx context.Context, deps Deps, s *session, raw json.RawMess
 	}); err != nil {
 		return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
 	}
-	actor := int64(s.userID)
 	// The favorite row is committed, and the tool short-circuits on an
 	// existing favorite, so a retry returns early without reaching this
 	// append: propagating would report a failure nothing can repair.
-	eventbus.AppendBestEffort(ctx, deps.DB, eventbus.Event{
-		Type:        eventbus.FavoriteAdded,
-		WorkspaceID: s.workspaceID,
-		ActorUserID: &actor,
-		Payload:     map[string]any{"targetType": in.TargetType, "targetId": in.TargetID, "via": "mcp"},
-	}, "mcp.add_favorite")
+	recordMutation(ctx, deps, s, mutation{
+		EventType:    eventbus.FavoriteAdded,
+		AuditAction:  "favorite.create",
+		ResourceType: "favorite",
+		ResourceID:   pub.String(),
+		Payload:      map[string]any{"targetType": in.TargetType, "targetId": in.TargetID, "via": "mcp"},
+		CallSite:     "mcp.add_favorite",
+	})
 	return map[string]any{"ok": true, "id": pub.String()}, nil
 }
 
@@ -203,16 +204,17 @@ func runAddReaction(ctx context.Context, deps Deps, s *session, raw json.RawMess
 		return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
 	}
 	taskID64 := int64(taskInternal)
-	actor := int64(s.userID)
 	// Same shape as add_favorite: committed row, and a retry returns on
 	// the existing-reaction check before it could re-append.
-	eventbus.AppendBestEffort(ctx, deps.DB, eventbus.Event{
-		Type:        eventbus.ReactionAdded,
-		WorkspaceID: s.workspaceID,
-		ActorUserID: &actor,
-		TaskID:      &taskID64,
-		Payload:     map[string]any{"taskId": in.TaskID, "emoji": in.Emoji, "via": "mcp"},
-	}, "mcp.add_reaction")
+	recordMutation(ctx, deps, s, mutation{
+		EventType:    eventbus.ReactionAdded,
+		AuditAction:  "reaction.create",
+		ResourceType: "reaction",
+		ResourceID:   pub.String(),
+		TaskID:       &taskID64,
+		Payload:      map[string]any{"taskId": in.TaskID, "emoji": in.Emoji, "via": "mcp"},
+		CallSite:     "mcp.add_reaction",
+	})
 	return map[string]any{"ok": true, "id": pub.String()}, nil
 }
 

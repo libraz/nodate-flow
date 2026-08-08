@@ -4,10 +4,32 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	stderrors "errors"
 
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
 	apierrors "github.com/libraz/nodate-flow/apps/flow-api/internal/errors"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/eventbus"
+)
+
+// importJobScanPage is how many rows a status-filtered listing reads per
+// round trip, and importJobScanCap how many it will read in total.
+//
+// The underlying query takes no status parameter, so a filtered listing
+// has to do the selection itself. Doing it after LIMIT/OFFSET — which is
+// what this tool used to do — answers "are there failed imports?" with
+// "no" whenever the failures are older than the first page, which for a
+// failure is exactly when they are. Reading pages until the requested
+// window is filled puts the filter back in front of the pagination.
+//
+// The cap bounds the work: past it the tool reports what it found and
+// says so rather than reading a workspace's entire import history to
+// answer one question. Pushing the predicate into the query is the
+// durable fix and belongs in sql/queries/imports/, next to the status
+// parameter ListIntakeItemsForWorkspace already has.
+const (
+	importJobScanPage = 200
+	importJobScanCap  = 5000
 )
 
 func runListImportJobs(ctx context.Context, deps Deps, s *session, raw json.RawMessage) (any, error) {
@@ -25,14 +47,15 @@ func runListImportJobs(ctx context.Context, deps Deps, s *session, raw json.RawM
 	if in.Limit <= 0 || in.Limit > 200 {
 		in.Limit = 50
 	}
-	rows, err := deps.Queries.ListImportJobsForWorkspace(ctx, generated.ListImportJobsForWorkspaceParams{
-		WorkspaceID: s.workspaceID,
-		Limit:       in.Limit,
-		Offset:      in.Offset,
-	})
-	if err != nil {
-		return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
+	if in.Offset < 0 {
+		in.Offset = 0
 	}
+
+	rows, total, truncated, err := listImportJobRows(ctx, deps, s, in.Status, in.Limit, in.Offset)
+	if err != nil {
+		return nil, err
+	}
+
 	type jobOut struct {
 		ID             string `json:"id"`
 		Source         string `json:"source"`
@@ -46,11 +69,6 @@ func runListImportJobs(ctx context.Context, deps Deps, s *session, raw json.RawM
 	}
 	out := make([]jobOut, 0, len(rows))
 	for _, r := range rows {
-		// Apply optional client-side status filter since the query
-		// does not accept a status parameter.
-		if in.Status != "" && string(r.Status) != in.Status {
-			continue
-		}
 		j := jobOut{
 			ID:             r.PublicID.String(),
 			Source:         string(r.Source),
@@ -70,7 +88,98 @@ func runListImportJobs(ctx context.Context, deps Deps, s *session, raw json.RawM
 		}
 		out = append(out, j)
 	}
-	return map[string]any{"jobs": out}, nil
+	// total travels with the page so a caller can tell "there are none"
+	// from "there are more than you asked for", which an agent otherwise
+	// reports to its user as a fact about the workspace.
+	res := map[string]any{"jobs": out, "total": total}
+	if truncated {
+		res["truncated"] = true
+	}
+	return res, nil
+}
+
+// listImportJobRows returns one page of import jobs, applying the status
+// filter before the offset/limit window rather than after it. The third
+// result reports that the scan cap was reached, so the caller can say the
+// count is a floor instead of presenting it as complete.
+func listImportJobRows(
+	ctx context.Context, deps Deps, s *session, status string, limit, offset int32,
+) ([]generated.ListImportJobsForWorkspaceRow, int64, bool, error) {
+	if status == "" {
+		rows, err := deps.Queries.ListImportJobsForWorkspace(ctx, generated.ListImportJobsForWorkspaceParams{
+			WorkspaceID: s.workspaceID,
+			Limit:       limit,
+			Offset:      offset,
+		})
+		if err != nil {
+			return nil, 0, false, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
+		}
+		var total int64
+		if len(rows) > 0 {
+			total = countValue(rows[0].Total)
+		}
+		return rows, total, false, nil
+	}
+
+	var (
+		matched  []generated.ListImportJobsForWorkspaceRow
+		total    int64
+		scanned  int32
+		scanFrom int32
+	)
+	for scanned < importJobScanCap {
+		page, err := deps.Queries.ListImportJobsForWorkspace(ctx, generated.ListImportJobsForWorkspaceParams{
+			WorkspaceID: s.workspaceID,
+			Limit:       importJobScanPage,
+			Offset:      scanFrom,
+		})
+		if err != nil {
+			return nil, 0, false, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
+		}
+		for _, r := range page {
+			if string(r.Status) != status {
+				continue
+			}
+			total++
+			if total > int64(offset) && int32(len(matched)) < limit { //#nosec G115 -- matched is capped by limit, itself bounded to 200 by the caller
+				matched = append(matched, r)
+			}
+		}
+		read := int32(len(page)) //#nosec G115 -- a page holds at most importJobScanPage rows
+		scanned += read
+		scanFrom += read
+		if len(page) < importJobScanPage {
+			return matched, total, false, nil
+		}
+	}
+	return matched, total, true, nil
+}
+
+// countValue reads a COUNT(*) OVER() column, which the driver hands back
+// as int64 or as the decimal text of one depending on the connection's
+// prepared-statement mode.
+func countValue(v any) int64 {
+	switch x := v.(type) {
+	case int64:
+		return x
+	case int32:
+		return int64(x)
+	case int:
+		return int64(x)
+	case uint64:
+		return int64(x) //#nosec G115 -- COUNT(*) result, bounded by workspace size
+	case []byte:
+		var n int64
+		for _, c := range x {
+			if c < '0' || c > '9' {
+				return n
+			}
+			n = n*10 + int64(c-'0')
+		}
+		return n
+	default:
+		return 0
+	}
 }
 
 func runCreateImportJob(ctx context.Context, deps Deps, s *session, raw json.RawMessage) (any, error) {
@@ -107,12 +216,28 @@ func runCreateImportJob(ctx context.Context, deps Deps, s *session, raw json.Raw
 			PublicID:    prjPub,
 		})
 		if err != nil {
-			if err == sql.ErrNoRows {
+			if stderrors.Is(err, sql.ErrNoRows) {
 				return nil, apierrors.New(apierrors.WsProjectNotFound)
 			}
 			return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
 		}
 		projectID = sql.NullInt32{Int32: int32(prj.ID), Valid: true} //#nosec G115 -- project id is projects.id (BIGINT UNSIGNED), fits int32 within realistic deployments
+
+		// One import at a time per project, the same rule REST enforces.
+		// Two concurrent imports of the same source into the same project
+		// produce duplicate tasks that nobody can tell apart afterwards,
+		// and an agent is far more likely than a person to start the
+		// second one — it does not see the progress bar that stops a human.
+		_, err = deps.Queries.FindRunningImportForProject(ctx, generated.FindRunningImportForProjectParams{
+			WorkspaceID: s.workspaceID,
+			ProjectID:   projectID,
+		})
+		if err == nil {
+			return nil, apierrors.New(apierrors.WsImportAlreadyRunning)
+		}
+		if !stderrors.Is(err, sql.ErrNoRows) {
+			return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
+		}
 	}
 
 	configJSON := json.RawMessage("{}")
@@ -136,6 +261,21 @@ func runCreateImportJob(ctx context.Context, deps Deps, s *session, raw json.Raw
 	if err != nil {
 		return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
 	}
+
+	// The job row is committed and the worker will pick it up; a retry
+	// would queue a second import of the same source.
+	recordMutation(ctx, deps, s, mutation{
+		EventType:    eventbus.ImportJobCreated,
+		AuditAction:  "import.create",
+		ResourceType: "import_job",
+		ResourceID:   pub.String(),
+		Payload: map[string]any{
+			"importJobId": pub.String(),
+			"source":      in.Source,
+			"via":         "mcp",
+		},
+		CallSite: "mcp.create_import_job",
+	})
 
 	return map[string]any{"ok": true, "importJobId": pub.String()}, nil
 }

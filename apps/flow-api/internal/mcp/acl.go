@@ -231,6 +231,10 @@ func authorizeTask(ctx context.Context, deps Deps, s *session, publicID string) 
 	if access.Task.WorkspaceID != s.workspaceID {
 		return acl.TaskAccess{}, types.PublicID{}, apierrors.New(apierrors.McpTokenWorkspaceMismatch)
 	}
+	// Every task-touching tool passes through here, which is what makes
+	// this the one place that can attribute an MCP call to its task
+	// without each tool remembering to.
+	noteInvocationTask(ctx, access.Task.ID)
 	return access, pub, nil
 }
 

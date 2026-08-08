@@ -5,6 +5,7 @@ package mcp
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	stderrors "errors"
 	"fmt"
@@ -100,8 +101,103 @@ func (hub *sseHub) activeCount(workspaceID uint32) int {
 	return len(hub.conns[workspaceID])
 }
 
-// heartbeatInterval is the period between SSE heartbeat comments.
-const heartbeatInterval = 30 * time.Second
+// heartbeatInterval is the period between SSE heartbeat comments, and
+// sseRevalidateInterval the period between re-checks of the credential
+// the stream was opened with.
+//
+// They are variables so the package's own tests can shorten them; no
+// production code assigns to either.
+var (
+	heartbeatInterval     = 30 * time.Second
+	sseRevalidateInterval = 15 * time.Second
+)
+
+// authorizeStream is the gate a caller must pass to hold an event
+// stream, applied when the stream opens and again on every
+// revalidation tick.
+//
+// The stream carries every event in a workspace, which makes it a
+// read of the whole workspace and nothing less. It was open to any
+// valid token: a token holding no scope at all received the same feed
+// as one holding read:workspace, and — because removing somebody from a
+// workspace does not touch their mcp_tokens rows — so did a token
+// belonging to a person who had been removed from the workspace
+// entirely. Both are checked here now, on the same terms the POST path
+// applies per call.
+func (h *Handler) authorizeStream(ctx context.Context, sess *session) error {
+	if !sess.hasScope(ScopeReadWorkspace) {
+		return apierrors.New(apierrors.McpScopeInsufficient)
+	}
+	if _, err := requireWorkspaceMember(ctx, h.deps, sess); err != nil {
+		return err
+	}
+	return nil
+}
+
+// revalidateStream re-answers "may this connection still be here?"
+// against the database rather than against the decision made when it
+// opened. Revoking a token, letting it expire, narrowing its scopes, or
+// removing its owner from the workspace all take effect on the next
+// tick; before this existed, the UI promised revocation stopped access
+// "immediately" while an already-open stream kept delivering every
+// workspace event until the client chose to disconnect.
+//
+// A database error that is not "no such token" leaves the stream up.
+// That is deliberate: a transient outage must not disconnect every
+// connected client at once, and the failure it trades away — a
+// revocation not enforced while the database is unreachable — lasts as
+// long as the outage rather than as long as the connection.
+func (h *Handler) revalidateStream(ctx context.Context, tok string, sess *session) error {
+	if h.deps.Queries == nil {
+		return nil
+	}
+	row, err := h.deps.Queries.FindUserForMcpToken(ctx, auth.HashOpaque(tok))
+	if err != nil {
+		if stderrors.Is(err, sql.ErrNoRows) {
+			// The row is gone, disabled, or carries a revoked_at.
+			return apierrors.New(apierrors.McpTokenRevoked)
+		}
+		return nil
+	}
+	if row.ExpiresAt.Valid && row.ExpiresAt.Time.Before(time.Now()) {
+		return apierrors.New(apierrors.McpTokenExpired)
+	}
+	if row.WorkspaceID != sess.workspaceID {
+		return apierrors.New(apierrors.McpTokenWorkspaceMismatch)
+	}
+	current := &session{
+		userID:      row.UserID,
+		workspaceID: row.WorkspaceID,
+		scopes:      parseScopes(row.ScopesJson),
+	}
+	if aerr := h.authorizeStream(ctx, current); aerr != nil {
+		var ae *apierrors.APIError
+		if stderrors.As(aerr, &ae) {
+			return aerr
+		}
+		// Not a decision, an infrastructure failure — same trade as above.
+		return nil
+	}
+	return nil
+}
+
+// streamClosedEvent is the last frame a closed stream receives. The
+// headers went out when the stream opened, so the HTTP status can no
+// longer say anything; a client that is told the code can distinguish a
+// revoked credential from a dropped connection and stop reconnecting.
+func streamClosedEvent(err error) sseEvent {
+	code := apierrors.InternalUnexpected.Code
+	var ae *apierrors.APIError
+	if stderrors.As(err, &ae) && ae.Spec != nil {
+		code = ae.Spec.Code
+	}
+	payload, _ := json.Marshal(map[string]any{
+		"jsonrpc": "2.0",
+		"method":  "notifications/stream_closed",
+		"params":  map[string]any{"code": code},
+	})
+	return sseEvent{EventType: "stream.closed", Data: string(payload)}
+}
 
 // serveSSE handles GET requests for the SSE stream. It authenticates
 // the caller, sets SSE headers, and pumps events until the client
@@ -129,6 +225,19 @@ func (h *Handler) serveSSE(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		writeRPCTransportError(w, nil, apierrors.InternalUnexpected, "auth failed")
+		return
+	}
+
+	// Scope and membership are checked before the stream is registered,
+	// not only when a tool is called: the stream itself is a read of the
+	// workspace.
+	if aerr := h.authorizeStream(r.Context(), sess); aerr != nil {
+		var ae *apierrors.APIError
+		if stderrors.As(aerr, &ae) {
+			writeRPCTransportError(w, nil, ae.Spec, ae.Spec.Message)
+			return
+		}
+		writeRPCTransportError(w, nil, apierrors.InternalUnexpected, "stream authorization failed")
 		return
 	}
 
@@ -168,6 +277,8 @@ func (h *Handler) serveSSE(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	heartbeat := time.NewTicker(heartbeatInterval)
 	defer heartbeat.Stop()
+	revalidate := time.NewTicker(sseRevalidateInterval)
+	defer revalidate.Stop()
 
 	for {
 		select {
@@ -175,6 +286,11 @@ func (h *Handler) serveSSE(w http.ResponseWriter, r *http.Request) {
 			return
 		case evt := <-conn.send:
 			if err := writeSSEEvent(w, flusher, evt); err != nil {
+				return
+			}
+		case <-revalidate.C:
+			if rerr := h.revalidateStream(ctx, tok, sess); rerr != nil {
+				_ = writeSSEEvent(w, flusher, streamClosedEvent(rerr))
 				return
 			}
 		case <-heartbeat.C:

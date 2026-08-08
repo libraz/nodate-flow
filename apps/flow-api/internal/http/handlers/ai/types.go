@@ -130,8 +130,11 @@ type McpTokenSummary struct {
 	AgentID     *string  `json:"agentId,omitempty"`
 	ExpiresAt   *int64   `json:"expiresAt,omitempty"`
 	LastUsedAt  *int64   `json:"lastUsedAt,omitempty"`
-	RevokedAt   *int64   `json:"revokedAt,omitempty"`
 	CreatedAt   int64    `json:"createdAt"`
+	// There is deliberately no revokedAt. The listing query excludes
+	// revoked rows, so the field could only ever be null; advertising it
+	// told a client there was a revoked state to render and then never
+	// produced one.
 }
 
 // CreateMcpTokenInput is the body for POST /workspaces/{wsId}/me/mcp-tokens.
@@ -141,6 +144,14 @@ type CreateMcpTokenInput struct {
 		Name    string   `json:"name" minLength:"1" maxLength:"255"`
 		Scopes  []string `json:"scopes"`
 		AgentID *string  `json:"agentId,omitempty" doc:"Optional ai_agents public_id to bind this token to; tool calls will be attributed to the agent and subject to its cost cap"`
+		// ExpiresAt is when the token stops working, as unix seconds.
+		// Omitting it mints a token that never expires.
+		//
+		// The expiry check has always been enforced; there was simply no
+		// way to ask for one, so every token ever issued was perpetual and
+		// a leaked bearer stayed valid until somebody noticed and revoked
+		// it by hand.
+		ExpiresAt *int64 `json:"expiresAt,omitempty" doc:"Unix seconds at which the token expires. Omit for a token that never expires."`
 	}
 }
 
@@ -155,6 +166,7 @@ type CreateMcpTokenOutput struct {
 		TokenPrefix string   `json:"tokenPrefix"`
 		Scopes      []string `json:"scopes"`
 		AgentID     *string  `json:"agentId,omitempty"`
+		ExpiresAt   *int64   `json:"expiresAt,omitempty"`
 		CreatedAt   int64    `json:"createdAt"`
 	}
 }
