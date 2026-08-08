@@ -48,10 +48,13 @@ var ErrDuplicate = errors.New("taskdeps: edge already exists")
 type Args struct {
 	WorkspaceID uint32
 
-	FromTaskID    uint32
-	FromProjectID uint32
-	ToTaskID      uint32
-	ToProjectID   uint32
+	// FromTaskID / ToTaskID are the edge's endpoints. The owning
+	// projects are deliberately absent: an earlier version locked them
+	// to serialise the cycle check, and carrying them here would invite
+	// a caller to assume that is still the serialization point. It is
+	// the workspace edge set now; see [Add].
+	FromTaskID uint32
+	ToTaskID   uint32
 
 	Kind generated.TaskDependenciesKind
 
@@ -68,16 +71,18 @@ type Args struct {
 	Via string
 }
 
-// Add locks both endpoint projects, rejects an edge that would close a
-// cycle, inserts it, and appends the timeline event — all on the
-// supplied transaction.
+// Add rejects an edge that would close a cycle, inserts it, and appends
+// the timeline event — all on the supplied transaction.
 //
 // The lock is what makes the check meaningful. Without it two
-// concurrent writers (A→B and B→A) each read an edge set that misses
-// the other's insert, both pass the check and both commit, forming the
-// cycle neither request could see. Locking both endpoint projects in
-// ascending id order serialises check-then-insert without letting two
-// cross-project writers deadlock on each other.
+// concurrent writers each read an edge set that misses the other's
+// insert, both pass the check and both commit, forming the cycle
+// neither request could see. The lock has to cover everything the walk
+// reads, which is the whole workspace: locking only the endpoint
+// projects leaves a cycle drawn across four of them open, since two
+// writers holding disjoint project pairs never meet. See
+// ListDependencyEdgesForWorkspaceForUpdate for why the lock sits on the
+// edge rows rather than on the workspace row.
 //
 // tx must come from dbretry.InTx: the insert can lose a lock race with
 // concurrent transition transactions on the same task rows, and that
@@ -86,33 +91,20 @@ type Args struct {
 func Add(ctx context.Context, tx *sql.Tx, args Args) (types.PublicID, error) {
 	q := generated.New(tx)
 
-	first, second := args.FromProjectID, args.ToProjectID
-	if second < first {
-		first, second = second, first
-	}
-	if _, err := q.LockProjectForDependency(ctx, generated.LockProjectForDependencyParams{
-		WorkspaceID: args.WorkspaceID,
-		ID:          first,
-	}); err != nil {
-		return types.PublicID{}, err
-	}
-	if second != first {
-		if _, err := q.LockProjectForDependency(ctx, generated.LockProjectForDependencyParams{
-			WorkspaceID: args.WorkspaceID,
-			ID:          second,
-		}); err != nil {
-			return types.PublicID{}, err
-		}
-	}
-
-	// Read the edge set only after the locks are granted: under
-	// REPEATABLE READ the consistent snapshot is established at the
-	// first plain SELECT, which here runs after any concurrent
-	// dependency writer on these projects has committed, so the walk
-	// sees that writer's edge.
-	edges, err := q.ListDependencyEdgesForWorkspace(ctx, args.WorkspaceID)
+	// Reading the edge set under the lock is a single step: the locking
+	// read establishes both the serialization point and the snapshot the
+	// walk runs on, so no other writer can add an edge between the two.
+	locked, err := q.ListDependencyEdgesForWorkspaceForUpdate(ctx, args.WorkspaceID)
 	if err != nil {
 		return types.PublicID{}, err
+	}
+	// The locking read produces its own row type. Restating it in the
+	// shape [ClosesCycle] takes keeps one walk for both callers -- this
+	// one and the read-only "would this be rejected" preview -- so the
+	// answer the API previews is the answer the write applies.
+	edges := make([]generated.ListDependencyEdgesForWorkspaceRow, len(locked))
+	for i, e := range locked {
+		edges[i] = generated.ListDependencyEdgesForWorkspaceRow(e)
 	}
 	if ClosesCycle(edges, args.FromTaskID, args.ToTaskID) {
 		return types.PublicID{}, ErrCycle
