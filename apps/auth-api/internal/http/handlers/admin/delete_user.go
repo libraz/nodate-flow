@@ -58,7 +58,7 @@ func DeleteUser(deps Deps) func(context.Context, *DeleteUserInput) (*DeleteUserO
 			return nil, httpErr(apierrors.UserDeleteSelfNotAllowed)
 		}
 
-		res, err := teardown.User(ctx, deps.DB, deps.Queries, deps.Storage, uid)
+		res, err := teardown.User(ctx, deps.DB, deps.Queries, deps.Storage, uid, pid.UUID())
 		if err != nil {
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}

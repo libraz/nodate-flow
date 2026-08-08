@@ -291,6 +291,16 @@ func redactAttr(a slog.Attr) slog.Attr {
 		return slog.String(a.Key, "[REDACTED]")
 	}
 	v := a.Value
+	// Internal row ids are suppressed at the sink rather than only at the
+	// call site. The forbidigo rule that guards the call site can match on
+	// the callee name alone, so it cannot see slog.Any("workspace_id",
+	// ws.ID) nor the loose logger.Warn(msg, "workspace_id", id) form —
+	// both of which reach here as a plain integer value. slog normalises
+	// every integer width to Int64/Uint64 on the way in, so those two
+	// kinds are the whole numeric surface to check.
+	if k := v.Kind(); (k == slog.KindInt64 || k == slog.KindUint64) && IsInternalIDKey(a.Key) {
+		return slog.String(a.Key, InternalIDPlaceholder)
+	}
 	switch v.Kind() {
 	case slog.KindString:
 		return slog.String(a.Key, Redact(v.String()))

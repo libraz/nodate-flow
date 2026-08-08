@@ -97,7 +97,7 @@ func DeleteWorkspace(deps Deps) func(context.Context, *DeleteWorkspaceInput) (*D
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
 
-		res, err := teardown.Workspace(ctx, deps.DB, deps.Queries, deps.Storage, wsID)
+		res, err := teardown.Workspace(ctx, deps.DB, deps.Queries, deps.Storage, wsID, pid.UUID())
 		if err != nil {
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}

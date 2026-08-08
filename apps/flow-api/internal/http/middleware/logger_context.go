@@ -8,31 +8,32 @@ import (
 	"github.com/google/uuid"
 
 	nflog "github.com/libraz/nodate-flow/apps/flow-api/internal/log"
+	"github.com/libraz/nodate-flow/packages/go-shared/authn"
+	"github.com/libraz/nodate-flow/packages/go-shared/logutil"
 )
 
 // LoggerContext returns an HTTP middleware that builds a request-scoped
-// [*slog.Logger] pre-populated with request_id, actor_id, and
-// workspace_id attrs and stores it on the request context via
+// [*slog.Logger] pre-populated with request_id, auth_mode, session and
+// workspace attrs and stores it on the request context via
 // [nflog.WithLogger]. Downstream handlers can fetch it with
 // [nflog.LoggerFromContext] without threading those values manually.
 //
 // Ordering. This middleware MUST be installed AFTER the auth middleware
-// so [ActorFromContext] resolves to the authenticated user. It is
-// idempotent: running it more than once on the same chain just wraps the
-// previous logger with the same attrs (slog.With is additive).
+// so [authn.SessionPublicIDFromContext] resolves to the caller's session.
+// It is idempotent: running it more than once on the same chain just
+// wraps the previous logger with the same attrs (slog.With is additive).
 //
-// Empty values are omitted: when the actor or workspace is not yet on
+// Empty values are omitted: when the session or workspace is not yet on
 // the context the corresponding attr is dropped rather than logged as a
 // zero value, so an unauthenticated request still produces a usable
-// logger without misleading "actor_id":0 noise.
+// logger without misleading zero-valued noise.
 //
-// Numeric ids are emitted via [slog.Any] rather than [slog.Int64] /
-// [slog.Uint64] so the project's forbidigo rule (which guards against
-// surfacing internal numeric ids through the slog.IntXX helpers under
-// the actor_id / workspace_id keys) stays untriggered. Convention 18:
-// internal numeric ids never reach external surfaces; structured
-// in-process logs are an internal channel where the numeric form is
-// useful for joining audit rows.
+// The caller is identified by session public id rather than by the
+// internal user id. Attaching the numeric id here put it on every log
+// line the request produced, which is the widest reach an internal
+// sequence can get; the session public id correlates the same lines
+// without carrying one. Requests admitted by a PAT or MCP token have no
+// session, so they correlate on request_id and auth_mode alone.
 func LoggerContext() func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -46,15 +47,12 @@ func LoggerContext() func(http.Handler) http.Handler {
 			if mode, ok := AuthModeFromContext(ctx); ok {
 				attrs = append(attrs, slog.String("auth_mode", string(mode)))
 			}
-			if uid, ok := ActorFromContext(ctx); ok && uid != 0 {
-				attrs = append(attrs, slog.Any("actor_id", uid))
+			if sid, ok := authn.SessionPublicIDFromContext(ctx); ok {
+				attrs = append(attrs, logutil.LogEntityPID("session", sid))
 			}
 			if ws, ok := WorkspaceFromContext(ctx); ok {
-				if ws.ID != 0 {
-					attrs = append(attrs, slog.Any("workspace_id", ws.ID))
-				}
 				if ws.PublicID != uuid.Nil {
-					attrs = append(attrs, slog.String("workspace_public_id", ws.PublicID.String()))
+					attrs = append(attrs, logutil.LogEntity("workspace", ws.PublicID))
 				}
 			}
 
@@ -68,28 +66,18 @@ func LoggerContext() func(http.Handler) http.Handler {
 }
 
 // enrichLoggerWithWorkspace augments the request-scoped logger with the
-// workspace_id / workspace_public_id attrs and returns a derived context
-// carrying the augmented logger. It is invoked from the workspace ACL
-// middlewares after they confirm membership so downstream handlers see a
-// logger that already knows the workspace, even though the global
-// LoggerContext() middleware ran upstream of those ACL stages.
+// workspace_public_id attr and returns a derived context carrying the
+// augmented logger. It is invoked from the workspace ACL middlewares
+// after they confirm membership so downstream handlers see a logger that
+// already knows the workspace, even though the global LoggerContext()
+// middleware ran upstream of those ACL stages.
 //
-// When wsID is zero or pub is the nil UUID the helper is a no-op so the
-// caller does not have to special-case absent values.
-func enrichLoggerWithWorkspace(ctx context.Context, wsID uint32, pub uuid.UUID) context.Context {
-	if ctx == nil {
+// When pub is the nil UUID the helper is a no-op so the caller does not
+// have to special-case an absent value.
+func enrichLoggerWithWorkspace(ctx context.Context, pub uuid.UUID) context.Context {
+	if ctx == nil || pub == uuid.Nil {
 		return ctx
 	}
 	base := nflog.LoggerFromContext(ctx)
-	attrs := make([]any, 0, 2)
-	if wsID != 0 {
-		attrs = append(attrs, slog.Any("workspace_id", wsID))
-	}
-	if pub != uuid.Nil {
-		attrs = append(attrs, slog.String("workspace_public_id", pub.String()))
-	}
-	if len(attrs) == 0 {
-		return ctx
-	}
-	return nflog.WithLogger(ctx, base.With(attrs...))
+	return nflog.WithLogger(ctx, base.With(logutil.LogEntity("workspace", pub)))
 }

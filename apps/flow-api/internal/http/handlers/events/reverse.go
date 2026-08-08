@@ -15,6 +15,7 @@ import (
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/middleware"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/taskstate"
 	"github.com/libraz/nodate-flow/packages/go-shared/apierr"
+	"github.com/libraz/nodate-flow/packages/go-shared/logutil"
 )
 
 // reverseStateRollback maps the original event's type onto the state
@@ -148,10 +149,13 @@ func Reverse(deps Deps) func(context.Context, *ReverseInput) (*ReverseOutput, er
 			// A missing reverser row would be an invariant violation
 			// (the request authenticated successfully). Log and bail
 			// with INTERNAL.UNEXPECTED rather than leaking detail.
+			// The reverser's public id is exactly what this lookup failed
+			// to produce, so the workspace and the target event are all
+			// the correlation this line can honestly carry.
 			slog.ErrorContext(ctx, "events.Reverse: FindUserPublicIdById failed",
 				slog.Any("err", err),
-				slog.Uint64("workspace_internal", uint64(ws.ID)),
-				slog.Uint64("user_internal", uint64(actorInternal)),
+				logutil.LogEntity("workspace", ws.PublicID),
+				logutil.LogEntityPID("event", eventPub),
 			)
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
@@ -262,7 +266,7 @@ func checkReverseTargetVisible(ctx context.Context, db *sql.DB, wsID uint32, eve
 		}
 		slog.ErrorContext(ctx, "events.Reverse: task lookup for visibility failed",
 			slog.Any("err", err),
-			slog.Uint64("workspace_internal", uint64(wsID)),
+			logutil.LogEntityPID("event", eventPublicID),
 		)
 		return httpErr(apierrors.InternalUnexpected)
 	}
@@ -274,7 +278,7 @@ func checkReverseTargetVisible(ctx context.Context, db *sql.DB, wsID uint32, eve
 		}
 		slog.ErrorContext(ctx, "events.Reverse: task authorization failed",
 			slog.Any("err", err),
-			slog.Uint64("workspace_internal", uint64(wsID)),
+			logutil.LogEntityPID("event", eventPublicID),
 		)
 		return httpErr(apierrors.InternalUnexpected)
 	}
@@ -353,7 +357,7 @@ func applyStateRollback(ctx context.Context, tx *sql.Tx, wsID uint32, eventPubli
 			// reversal, so we accept the no-op.
 			slog.WarnContext(ctx, "events.Reverse: state rollback skipped (transition rejected)",
 				slog.String("transition", transition),
-				slog.Uint64("workspace_internal", uint64(wsID)),
+				logutil.LogEntityPID("event", eventPublicID),
 			)
 			return nil
 		default:

@@ -298,12 +298,32 @@ type CreateInviteInput struct {
 }
 
 // CreateWorkspaceInviteInputBody is the JSON body for POST /workspaces/{wsId}/invites.
+//
+// MaxUses and ExpiresIn are both optional and both mean "unbounded" when
+// omitted: an invite created with neither never expires and can be
+// redeemed any number of times. That is the caller's explicit choice from
+// the web client, which omits the field for its "no expiry" / "unlimited"
+// options — the wire format has no way to distinguish "unspecified" from
+// "unlimited", so an omission cannot be given a safer default without
+// silently overriding a deliberate one. Both fields are bounded above so
+// an unbounded invite is at least a deliberate omission rather than an
+// arithmetic accident.
+//
+// Email addresses the invite for delivery only; it does not bind the
+// invite, so a token forwarded to somebody else is still redeemable by
+// them. Binding needs a column on workspace_invites to check the
+// redeemer's address against.
 type CreateWorkspaceInviteInputBody struct {
-	Role      string `json:"role" enum:"owner,admin,member,guest"`
-	MaxUses   *int32 `json:"maxUses,omitempty" minimum:"1"`
-	ExpiresIn *int64 `json:"expiresIn,omitempty" doc:"Seconds until invite expires" minimum:"1"`
+	Role string `json:"role" enum:"owner,admin,member,guest"`
+	// MaxUses is capped at the seat ceiling a single link could
+	// plausibly fill; omit the field for an unlimited link.
+	MaxUses *int32 `json:"maxUses,omitempty" minimum:"1" maximum:"10000" doc:"Redemption limit. Omit for unlimited."`
+	// ExpiresIn is capped at a year. Longer lifetimes are what "omit the
+	// field" is for, and accepting an arbitrary offset only invited
+	// overflow-shaped values that land far past any intended date.
+	ExpiresIn *int64 `json:"expiresIn,omitempty" doc:"Seconds until invite expires (max 1 year). Omit for no expiry." minimum:"1" maximum:"31536000"`
 	Label     string `json:"label,omitempty" maxLength:"200"`
-	Email     string `json:"email,omitempty" maxLength:"320"`
+	Email     string `json:"email,omitempty" maxLength:"320" doc:"Delivery address. Does not bind the invite to this address."`
 }
 
 // CreateInviteOutput is the response for POST /workspaces/{wsId}/invites.

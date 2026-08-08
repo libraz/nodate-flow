@@ -7,22 +7,26 @@ import (
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/google/uuid"
 
 	nflog "github.com/libraz/nodate-flow/apps/flow-api/internal/log"
+	"github.com/libraz/nodate-flow/packages/go-shared/authn"
+	"github.com/libraz/nodate-flow/packages/go-shared/dbtype"
 )
 
 // TestLoggerContext_AttachesAttrs runs an HTTP request through the
 // middleware with a pre-populated auth context and verifies that the
-// downstream logger emits records carrying request_id, actor_id, and
-// workspace_id / workspace_public_id attrs.
+// downstream logger emits records carrying request_id, the session
+// public id, and workspace_public_id — and no internal numeric id.
 func TestLoggerContext_AttachesAttrs(t *testing.T) {
 	var buf bytes.Buffer
 	base := slog.New(slog.NewJSONHandler(&buf, &slog.HandlerOptions{Level: slog.LevelInfo}))
 
 	wsPub := uuid.New()
+	sessionPub := dbtype.FromUUID(uuid.New())
 	const wsID = uint32(42)
 	const userID = uint32(7)
 	const requestID = "rid-test"
@@ -44,6 +48,7 @@ func TestLoggerContext_AttachesAttrs(t *testing.T) {
 			ctx := nflog.WithLogger(r.Context(), base)
 			ctx = nflog.WithRequestID(ctx, requestID)
 			ctx = WithActor(ctx, userID)
+			ctx = authn.WithSessionPublicID(ctx, sessionPub)
 			ctx = withWorkspaceForTest(ctx, wsID, wsPub)
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})
@@ -69,14 +74,21 @@ func TestLoggerContext_AttachesAttrs(t *testing.T) {
 	if rec1["request_id"] != requestID {
 		t.Fatalf("request_id: got %v want %s", rec1["request_id"], requestID)
 	}
-	if rec1["actor_id"] == nil {
-		t.Fatal("actor_id missing from record")
-	}
-	if rec1["workspace_id"] == nil {
-		t.Fatal("workspace_id missing from record")
+	if rec1["session_public_id"] != sessionPub.String() {
+		t.Fatalf("session_public_id: got %v want %s", rec1["session_public_id"], sessionPub.String())
 	}
 	if rec1["workspace_public_id"] != wsPub.String() {
 		t.Fatalf("workspace_public_id: got %v want %s", rec1["workspace_public_id"], wsPub.String())
+	}
+	// The internal ids that used to ride along on every request-scoped
+	// line must not be there, under any key.
+	for _, key := range []string{"actor_id", "workspace_id", "user_id"} {
+		if _, ok := rec1[key]; ok {
+			t.Fatalf("%s must not be on the request-scoped logger: %v", key, rec1)
+		}
+	}
+	if raw := buf.String(); strings.Contains(raw, "\"42\"") || strings.Contains(raw, ":42") || strings.Contains(raw, ":7") {
+		t.Fatalf("an internal id reached the log line: %s", raw)
 	}
 }
 
@@ -108,11 +120,11 @@ func TestLoggerContext_OmitsEmpty(t *testing.T) {
 	if err := json.Unmarshal(bytes.TrimSpace(buf.Bytes()), &rec1); err != nil {
 		t.Fatalf("decode log line: %v", err)
 	}
-	if _, ok := rec1["actor_id"]; ok {
-		t.Fatalf("actor_id should be absent: %v", rec1)
+	if _, ok := rec1["session_public_id"]; ok {
+		t.Fatalf("session_public_id should be absent: %v", rec1)
 	}
-	if _, ok := rec1["workspace_id"]; ok {
-		t.Fatalf("workspace_id should be absent: %v", rec1)
+	if _, ok := rec1["workspace_public_id"]; ok {
+		t.Fatalf("workspace_public_id should be absent: %v", rec1)
 	}
 	if _, ok := rec1["request_id"]; ok {
 		t.Fatalf("request_id should be absent: %v", rec1)

@@ -42,7 +42,7 @@ func Delete(deps Deps) func(context.Context, *DeleteWorkspaceInput) (*DeleteWork
 		// The workspace context already carries the resolved internal id
 		// from RequireWorkspaceMember, so we skip the
 		// AdminFindWorkspaceIdByPublicId round-trip here.
-		res, err := teardown.Workspace(ctx, deps.DB, deps.Queries, deps.Storage, ws.ID)
+		res, err := teardown.Workspace(ctx, deps.DB, deps.Queries, deps.Storage, ws.ID, ws.PublicID)
 		if err != nil {
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}

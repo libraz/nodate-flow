@@ -5,8 +5,11 @@
 package avatarutil
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"path"
+	"strconv"
 	"strings"
 )
 
@@ -36,8 +39,39 @@ func URLForClient(stored, userPublicID, publicBaseURL string) string {
 	if strings.HasPrefix(lower, "http://") || strings.HasPrefix(lower, "https://") {
 		return stored
 	}
+	return ProxyURL(userPublicID, cacheBustFromKey(stored), publicBaseURL)
+}
+
+// ProxyURL renders the avatar proxy URL for a user with an explicit
+// cache-busting tag: "{publicBaseURL}/avatars/{userPublicID}?v={tag}".
+//
+// It is exported for callers whose cache buster does not come from a
+// storage key — see [OpaqueTag]. Trailing slashes on publicBaseURL are
+// trimmed; an empty publicBaseURL yields a relative URL.
+func ProxyURL(userPublicID, tag, publicBaseURL string) string {
 	base := strings.TrimRight(publicBaseURL, "/")
-	return fmt.Sprintf("%s/avatars/%s?v=%s", base, userPublicID, cacheBustFromKey(stored))
+	return fmt.Sprintf("%s/avatars/%s?v=%s", base, userPublicID, tag)
+}
+
+// OpaqueTag derives a stable, non-ordinal cache-busting token from an
+// internal row id.
+//
+// The tag has to change whenever the underlying blob is replaced, and for
+// a self-hosted avatar the only signal available to the /me projection is
+// the storage_objects FK — an AUTO_INCREMENT sequence. Emitting that
+// sequence published it: "?v=48213" tells every reader of the page
+// roughly how many objects the instance has stored, and ranks users by
+// upload order. Hashing keeps the "changes on replacement" property and
+// discards both the ordering and the magnitude.
+//
+// The tag is not a secret. An 8-hex digest over a small integer is
+// brute-forceable, so it hides the sequence from a reader rather than
+// from someone who sets out to recover it. Closing that gap needs the
+// /me projection to carry storage_objects.public_id, after which the tag
+// can be derived from the public id and this helper retired.
+func OpaqueTag(id uint64) string {
+	sum := sha256.Sum256([]byte("nodate-flow/avatar-cache-bust:" + strconv.FormatUint(id, 10)))
+	return hex.EncodeToString(sum[:4])
 }
 
 // cacheBustFromKey extracts a short, stable cache-busting token from a

@@ -34,6 +34,7 @@ import (
 	"github.com/libraz/nodate-flow/apps/auth-api/internal/storage"
 	"github.com/libraz/nodate-flow/packages/go-shared/authn"
 	"github.com/libraz/nodate-flow/packages/go-shared/ctxutil"
+	"github.com/libraz/nodate-flow/packages/go-shared/logutil"
 )
 
 // maxAvatarBytes bounds the accepted payload size. 5 MiB covers every
@@ -297,7 +298,7 @@ func AvatarUpload(deps Deps) func(context.Context, *AvatarUploadInput) (*AvatarU
 				}
 				if affected, _ := decRes.RowsAffected(); affected != 1 {
 					slog.WarnContext(ctx, "previous avatar storage_object ref_count underflow",
-						slog.Uint64("storage_object_id", uint64(prevID)),
+						logutil.LogEntityPID("user", userPublicID),
 						slog.String("handler", "auth.AvatarUpload"),
 					)
 				}

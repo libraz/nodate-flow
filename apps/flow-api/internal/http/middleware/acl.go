@@ -363,7 +363,7 @@ func RequireWorkspaceMember(db ACLDB) func(http.Handler) http.Handler {
 			ctx := context.WithValue(r.Context(), ctxKeyWorkspaceID, access.ID)
 			ctx = context.WithValue(ctx, ctxKeyWorkspaceIDPublic, pub)
 			ctx = context.WithValue(ctx, ctxKeyWorkspaceRole, access.Role)
-			ctx = enrichLoggerWithWorkspace(ctx, access.ID, pub)
+			ctx = enrichLoggerWithWorkspace(ctx, pub)
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})
 	}
@@ -531,7 +531,7 @@ func RequireProjectMemberByGlobalID(db ACLDB) func(http.Handler) http.Handler {
 			ctx = context.WithValue(ctx, ctxKeyProjectID, prj.ID)
 			ctx = context.WithValue(ctx, ctxKeyProjectIDPublic, pub)
 			ctx = context.WithValue(ctx, ctxKeyProjectRole, role)
-			ctx = enrichLoggerWithWorkspace(ctx, prj.WorkspaceID, wsPubID.UUID())
+			ctx = enrichLoggerWithWorkspace(ctx, wsPubID.UUID())
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})
 	}
@@ -604,7 +604,7 @@ func RequireTaskAccess(db ACLDB) func(http.Handler) http.Handler {
 			ctx = context.WithValue(ctx, ctxKeyProjectRole, access.ProjectRole)
 			ctx = context.WithValue(ctx, ctxKeyTaskID, rec.ID)
 			ctx = context.WithValue(ctx, ctxKeyTaskIDPublic, pub)
-			ctx = enrichLoggerWithWorkspace(ctx, rec.WorkspaceID, wsPubID.UUID())
+			ctx = enrichLoggerWithWorkspace(ctx, wsPubID.UUID())
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})
 	}

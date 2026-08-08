@@ -9,6 +9,8 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
+
+	"github.com/libraz/nodate-flow/packages/go-shared/logutil"
 )
 
 type ctxKey int
@@ -50,8 +52,8 @@ func RequestLogger(logger *slog.Logger) func(http.Handler) http.Handler {
 			reqLogger.LogAttrs(ctx, slog.LevelInfo, "http_request",
 				slog.String("method", r.Method),
 				slog.String("path", sanitizePath(r)),
-				slog.Int("status", rec.status),
-				slog.Int64("duration_ms", dur.Milliseconds()),
+				logutil.LogNumber("status", rec.status),
+				logutil.LogNumber("duration_ms", dur.Milliseconds()),
 				slog.String("remote_addr", r.RemoteAddr),
 			)
 		})

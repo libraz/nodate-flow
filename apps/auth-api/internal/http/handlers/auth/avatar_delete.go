@@ -9,6 +9,7 @@ import (
 	apierrors "github.com/libraz/nodate-flow/apps/auth-api/internal/errors"
 	"github.com/libraz/nodate-flow/packages/go-shared/authn"
 	"github.com/libraz/nodate-flow/packages/go-shared/ctxutil"
+	"github.com/libraz/nodate-flow/packages/go-shared/logutil"
 )
 
 // AvatarDeleteOutput returns the updated /me profile so the client can
@@ -91,7 +92,7 @@ func AvatarDelete(deps Deps) func(context.Context, *struct{}) (*AvatarDeleteOutp
 			}
 			if affected, _ := decRes.RowsAffected(); affected != 1 {
 				slog.WarnContext(ctx, "avatar delete: storage_object ref_count underflow",
-					slog.Uint64("storage_object_id", uint64(soID)),
+					logutil.LogEntityPID("user", prev.PublicID),
 				)
 			}
 

@@ -12,6 +12,7 @@ import (
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/eventbus"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/middleware"
 	"github.com/libraz/nodate-flow/packages/go-shared/apierr"
+	"github.com/libraz/nodate-flow/packages/go-shared/logutil"
 	sharedtoken "github.com/libraz/nodate-flow/packages/go-shared/token"
 )
 
@@ -95,8 +96,7 @@ func Publish(deps Deps) func(context.Context, *PublishLensInput) (*PublishLensOu
 				slog.Any("err", err),
 				slog.String("handler", "lenses.Publish"),
 				slog.String("event_type", string(eventbus.LensShared)),
-				slog.Int64("workspace_id", int64(ws.ID)),
-				slog.Int64("actor_id", int64(actorID)),
+				logutil.LogEntity("workspace", ws.PublicID),
 				slog.String("lens_id", lensRow.PublicID.String()),
 			)
 		}
@@ -174,8 +174,7 @@ func Unpublish(deps Deps) func(context.Context, *UnpublishLensInput) (*Unpublish
 				slog.Any("err", err),
 				slog.String("handler", "lenses.Unpublish"),
 				slog.String("event_type", string(eventbus.LensUnshared)),
-				slog.Int64("workspace_id", int64(ws.ID)),
-				slog.Int64("actor_id", int64(actorID)),
+				logutil.LogEntity("workspace", ws.PublicID),
 				slog.String("lens_id", lensRow.PublicID.String()),
 			)
 		}

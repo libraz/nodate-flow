@@ -213,7 +213,7 @@ WHERE workspace_id = ? AND user_id = ? AND enabled = TRUE LIMIT 1`
 			ctx := context.WithValue(r.Context(), ctxKeyWorkspaceID, wsID)
 			ctx = context.WithValue(ctx, ctxKeyWorkspaceIDPublic, pub)
 			ctx = context.WithValue(ctx, ctxKeyWorkspaceRole, WorkspaceRole(role))
-			ctx = enrichLoggerWithWorkspace(ctx, wsID, pub)
+			ctx = enrichLoggerWithWorkspace(ctx, pub)
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})
 	}
