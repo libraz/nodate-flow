@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
 	"time"
 
 	apierrors "github.com/libraz/nodate-flow/apps/flow-api/internal/errors"
@@ -19,24 +20,32 @@ import (
 // viewer should not see (attendees, owner, memos flagged private, task
 // linkage). Recurrence data is passed through so the client renderer
 // can expand instances.
+//
+// RecurrenceRule and RecurrenceExceptions are the decoded JSON values,
+// the same shape EventResponse and the cross-calendar list return. They
+// used to be strings here — the stored JSON handed through as an opaque
+// blob — so the same event read through the public page and through the
+// authenticated API arrived as two different types, and the client grew
+// two recurrence parsers that had already drifted apart. One wire shape
+// is what lets one parser serve both.
 type PublicShareRenderEvent struct {
-	ID             string  `json:"id"`
-	Title          string  `json:"title"`
-	StartAt        *int64  `json:"startAt,omitempty"`
-	EndAt          *int64  `json:"endAt,omitempty"`
-	AllDay         bool    `json:"allDay"`
-	Timezone       string  `json:"timezone"`
-	Location       *string `json:"location,omitempty"`
-	Memo           *string `json:"memo,omitempty"`
-	URL            *string `json:"url,omitempty"`
-	Kind           string  `json:"kind"`
-	ShowAs         string  `json:"showAs"`
-	Flexibility    string  `json:"flexibility"`
-	BlockLabel     *string `json:"blockLabel,omitempty"`
-	RecurrenceRule *string `json:"recurrenceRule,omitempty"`
-	RecurrenceEnd  *int64  `json:"recurrenceEnd,omitempty"`
-	// JSON array of ISO 8601 dates/times to exclude from recurrence.
-	RecurrenceExceptions *string `json:"recurrenceExceptions,omitempty"`
+	ID             string           `json:"id"`
+	Title          string           `json:"title"`
+	StartAt        *int64           `json:"startAt,omitempty"`
+	EndAt          *int64           `json:"endAt,omitempty"`
+	AllDay         bool             `json:"allDay"`
+	Timezone       string           `json:"timezone"`
+	Location       *string          `json:"location,omitempty"`
+	Memo           *string          `json:"memo,omitempty"`
+	URL            *string          `json:"url,omitempty"`
+	Kind           string           `json:"kind"`
+	ShowAs         string           `json:"showAs"`
+	Flexibility    string           `json:"flexibility"`
+	BlockLabel     *string          `json:"blockLabel,omitempty"`
+	RecurrenceRule *json.RawMessage `json:"recurrenceRule,omitempty"`
+	RecurrenceEnd  *int64           `json:"recurrenceEnd,omitempty"`
+	// Array of ISO 8601 dates/times to exclude from recurrence.
+	RecurrenceExceptions *json.RawMessage `json:"recurrenceExceptions,omitempty"`
 }
 
 // PublicShareRenderPage is the workspace-facing metadata exposed on the
@@ -171,17 +180,18 @@ func stripPrivateEventDetails(ev *PublicShareRenderEvent) {
 	ev.URL = nil
 }
 
-// rawMessagePtr converts the JSON-encoded recurrence rule into a string
-// pointer. The sqlc-generated column is `json.RawMessage`; we pass it
-// through as an opaque string so the client can parse it without schema
-// coupling, and return nil for the literal "null" value COALESCE emits.
-func rawMessagePtr(raw []byte) *string {
-	if len(raw) == 0 {
+// rawMessagePtr hands a stored JSON column through to the response as
+// JSON, so it is rendered as the object or array it is rather than as a
+// string holding its own encoding.
+//
+// An absent column and the literal "null" COALESCE emits both answer
+// nil, which omitempty then drops: a rule that is not there must not
+// arrive as a JSON null the client has to distinguish from a missing
+// field.
+func rawMessagePtr(raw []byte) *json.RawMessage {
+	if len(raw) == 0 || string(raw) == "null" {
 		return nil
 	}
-	s := string(raw)
-	if s == "null" {
-		return nil
-	}
-	return &s
+	msg := json.RawMessage(raw)
+	return &msg
 }

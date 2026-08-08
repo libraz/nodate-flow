@@ -16,11 +16,16 @@ import (
 
 // resolveEffectiveTimezone returns the IANA timezone to use for a request in
 // priority order: explicit request value > user preference > workspace default
-// > region.DefaultTimezone. The returned string is validated; if explicit is
-// provided but invalid, the error is surfaced so the caller can return 422.
+// > region.DefaultTimezone.
+//
+// An explicit value is checked through requireValidTimezone, so the error it
+// returns is already the API error every calendar surface answers for a
+// timezone it cannot resolve — callers propagate it rather than choosing a
+// code of their own. Each caller choosing is how the same rejected input came
+// back as a 400 from one endpoint, a 422 from another and a 500 from a third.
 func resolveEffectiveTimezone(ctx context.Context, q *generated.Queries, wsID, actorID uint32, explicit string) (string, error) {
 	if explicit != "" {
-		if err := region.ValidateTimezone(explicit); err != nil {
+		if err := requireValidTimezone("timezone", explicit); err != nil {
 			return "", err
 		}
 		return explicit, nil

@@ -324,7 +324,16 @@ INNER JOIN calendar_members cm
 WHERE ce.workspace_id = ?
   AND ce.recurrence_rule IS NULL
   AND ce.start_at < ?
-  AND ce.end_at > ?
+  -- A milestone is a zero-length event: end_at equals start_at. A strict
+  -- end_at > range_start drops it when it lands on the first instant of
+  -- the window, which is every month view whose first cell carries one,
+  -- so that month was the one month the milestone did not appear in.
+  -- The strict comparison stays for events that have a duration: one
+  -- ending exactly at range_start belongs to the window before this one.
+  AND (
+    ce.end_at > ?
+    OR (ce.start_at = ce.end_at AND ce.end_at = ?)
+  )
   AND ce.enabled = TRUE
   AND (ce.visibility <> 'confidential' OR ce.owner_user_id = ?)
 ORDER BY ce.start_at ASC, ce.public_id ASC
@@ -335,8 +344,8 @@ type ListCalendarEventsAcrossCalendarsParams struct {
 	ViewerUserID uint32       `json:"-"`
 	UserID       uint32       `json:"-"`
 	WorkspaceID  uint32       `json:"-"`
-	StartAt      sql.NullTime `json:"startAt"`
-	EndAt        sql.NullTime `json:"endAt"`
+	RangeEnd     sql.NullTime `json:"rangeEnd"`
+	RangeStart   sql.NullTime `json:"rangeStart"`
 }
 
 type ListCalendarEventsAcrossCalendarsRow struct {
@@ -369,8 +378,9 @@ func (q *Queries) ListCalendarEventsAcrossCalendars(ctx context.Context, arg Lis
 		arg.ViewerUserID,
 		arg.UserID,
 		arg.WorkspaceID,
-		arg.StartAt,
-		arg.EndAt,
+		arg.RangeEnd,
+		arg.RangeStart,
+		arg.RangeStart,
 		arg.ViewerUserID,
 	)
 	if err != nil {
@@ -454,7 +464,16 @@ LEFT JOIN users uc
 WHERE ce.calendar_id = ?
   AND ce.recurrence_rule IS NULL
   AND ce.start_at < ?
-  AND ce.end_at > ?
+  -- A milestone is a zero-length event: end_at equals start_at. A strict
+  -- end_at > range_start drops it when it lands on the first instant of
+  -- the window, which is every month view whose first cell carries one,
+  -- so that month was the one month the milestone did not appear in.
+  -- The strict comparison stays for events that have a duration: one
+  -- ending exactly at range_start belongs to the window before this one.
+  AND (
+    ce.end_at > ?
+    OR (ce.start_at = ce.end_at AND ce.end_at = ?)
+  )
   AND ce.enabled = TRUE
   AND (ce.visibility <> 'confidential' OR ce.owner_user_id = ?)
 ORDER BY ce.start_at ASC, ce.public_id ASC
@@ -464,8 +483,8 @@ LIMIT 1000
 type ListCalendarEventsByRangeParams struct {
 	ViewerUserID uint32       `json:"-"`
 	CalendarID   uint32       `json:"-"`
-	StartAt      sql.NullTime `json:"startAt"`
-	EndAt        sql.NullTime `json:"endAt"`
+	RangeEnd     sql.NullTime `json:"rangeEnd"`
+	RangeStart   sql.NullTime `json:"rangeStart"`
 }
 
 type ListCalendarEventsByRangeRow struct {
@@ -501,8 +520,9 @@ func (q *Queries) ListCalendarEventsByRange(ctx context.Context, arg ListCalenda
 	rows, err := q.db.QueryContext(ctx, listCalendarEventsByRange,
 		arg.ViewerUserID,
 		arg.CalendarID,
-		arg.StartAt,
-		arg.EndAt,
+		arg.RangeEnd,
+		arg.RangeStart,
+		arg.RangeStart,
 		arg.ViewerUserID,
 	)
 	if err != nil {
@@ -620,7 +640,16 @@ INNER JOIN calendar_members cm
 WHERE ce.recurrence_rule IS NULL
   AND ce.start_at IS NOT NULL
   AND ce.start_at < ?
-  AND ce.end_at > ?
+  -- A milestone is a zero-length event: end_at equals start_at. A strict
+  -- end_at > range_start drops it when it lands on the first instant of
+  -- the window, which is every month view whose first cell carries one,
+  -- so that month was the one month the milestone did not appear in.
+  -- The strict comparison stays for events that have a duration: one
+  -- ending exactly at range_start belongs to the window before this one.
+  AND (
+    ce.end_at > ?
+    OR (ce.start_at = ce.end_at AND ce.end_at = ?)
+  )
   AND ce.enabled = TRUE
   AND (ce.visibility <> 'confidential' OR ce.owner_user_id = ?)
 ORDER BY ce.start_at ASC, ce.public_id ASC
@@ -630,8 +659,8 @@ LIMIT 2000
 type ListMyCalendarEventsAcrossWorkspacesParams struct {
 	ViewerUserID uint32       `json:"-"`
 	UserID       uint32       `json:"-"`
-	StartAt      sql.NullTime `json:"startAt"`
-	EndAt        sql.NullTime `json:"endAt"`
+	RangeEnd     sql.NullTime `json:"rangeEnd"`
+	RangeStart   sql.NullTime `json:"rangeStart"`
 }
 
 type ListMyCalendarEventsAcrossWorkspacesRow struct {
@@ -683,8 +712,9 @@ func (q *Queries) ListMyCalendarEventsAcrossWorkspaces(ctx context.Context, arg 
 	rows, err := q.db.QueryContext(ctx, listMyCalendarEventsAcrossWorkspaces,
 		arg.ViewerUserID,
 		arg.UserID,
-		arg.StartAt,
-		arg.EndAt,
+		arg.RangeEnd,
+		arg.RangeStart,
+		arg.RangeStart,
 		arg.ViewerUserID,
 	)
 	if err != nil {

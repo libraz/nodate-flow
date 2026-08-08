@@ -75,7 +75,7 @@ func CreateEventFromTask(deps Deps) func(context.Context, *CreateEventFromTaskIn
 		// Determine timezone from request or caller/workspace preference.
 		tzName, tzErr := resolveEffectiveTimezone(ctx, deps.Queries, wsID, actorID, input.Body.Timezone)
 		if tzErr != nil {
-			return nil, httpErr(apierrors.CalendarTaskSyncTimezoneUnrecognized)
+			return nil, tzErr
 		}
 		loc, locErr := time.LoadLocation(tzName)
 		if locErr != nil {

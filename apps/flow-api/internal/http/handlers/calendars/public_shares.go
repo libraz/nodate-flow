@@ -255,8 +255,8 @@ func CreatePublicShare(deps Deps) func(context.Context, *CreatePublicShareInput)
 		if tz == "" {
 			tz = region.DefaultTimezone
 		}
-		if err := region.ValidateTimezone(tz); err != nil {
-			return nil, httpErr(apierrors.CalendarCalendarStoreWriteInterrupted)
+		if err := requireValidTimezone("timezone", tz); err != nil {
+			return nil, err
 		}
 
 		publicID := types.New()
@@ -381,8 +381,8 @@ func PatchPublicShare(deps Deps) func(context.Context, *PatchPublicShareInput) (
 		}
 
 		if input.Body.Timezone != nil && *input.Body.Timezone != "" {
-			if err := region.ValidateTimezone(*input.Body.Timezone); err != nil {
-				return nil, httpErr(apierrors.CalendarCalendarStoreWriteInterrupted)
+			if err := requireValidTimezone("timezone", *input.Body.Timezone); err != nil {
+				return nil, err
 			}
 		}
 

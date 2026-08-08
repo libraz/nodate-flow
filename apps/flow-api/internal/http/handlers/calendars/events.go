@@ -289,8 +289,8 @@ func ListEvents(deps Deps) func(context.Context, *ListEventsInput) (*ListEventsO
 		nonRecurring, err := deps.CalendarQueries.ListCalendarEventsByRange(ctx, calendar.ListCalendarEventsByRangeParams{
 			ViewerUserID: actorID,
 			CalendarID:   cal.ID,
-			StartAt:      sql.NullTime{Time: endTime, Valid: true},
-			EndAt:        sql.NullTime{Time: startTime, Valid: true},
+			RangeEnd:     sql.NullTime{Time: endTime, Valid: true},
+			RangeStart:   sql.NullTime{Time: startTime, Valid: true},
 		})
 		if err != nil {
 			return nil, httpErr(apierrors.CalendarEventListQueryInterrupted)
@@ -420,6 +420,18 @@ func CreateEvent(deps Deps) func(context.Context, *CreateEventInput) (*CreateEve
 		if (input.Body.StartAt == nil) != (input.Body.EndAt == nil) {
 			return nil, httpErr(apierrors.CalendarEventStartEndPairRequired)
 		}
+		if err := requireEventChronology(input.Body.StartAt, input.Body.EndAt); err != nil {
+			return nil, err
+		}
+
+		// An explicit timezone has to resolve, or the row is stored with a
+		// zone no grid can place the event in; an omitted one falls back
+		// to the caller's preference and then the workspace's.
+		timezone, tzErr := resolveEffectiveTimezone(ctx, deps.Queries, wsID, actorID, input.Body.Timezone)
+		if tzErr != nil {
+			return nil, tzErr
+		}
+
 		var startAtNT, endAtNT sql.NullTime
 		if input.Body.StartAt != nil {
 			startAtNT = sql.NullTime{Time: handlerutil.UnixToTime(*input.Body.StartAt), Valid: true}
@@ -438,7 +450,7 @@ func CreateEvent(deps Deps) func(context.Context, *CreateEventInput) (*CreateEve
 			AllDay:          input.Body.AllDay,
 			StartAt:         startAtNT,
 			EndAt:           endAtNT,
-			Timezone:        input.Body.Timezone,
+			Timezone:        timezone,
 			OwnerUserID:     ownerUserID,
 			CreatedByUserID: actorID,
 		}
@@ -636,6 +648,14 @@ func PatchEvent(deps Deps) func(context.Context, *PatchEventInput) (*PatchEventO
 		// but they must come through unlink first.
 		if (input.Body.StartAt == nil) != (input.Body.EndAt == nil) {
 			return nil, httpErr(apierrors.CalendarEventStartEndPairRequired)
+		}
+		if err := requireEventChronology(input.Body.StartAt, input.Body.EndAt); err != nil {
+			return nil, err
+		}
+		if input.Body.Timezone != nil {
+			if err := requireValidTimezone("timezone", *input.Body.Timezone); err != nil {
+				return nil, err
+			}
 		}
 
 		tx, err := deps.DB.BeginTx(ctx, nil)
@@ -969,8 +989,8 @@ func ListCalendarEvents(deps Deps) func(context.Context, *ListCalendarEventsInpu
 			ViewerUserID: actorID,
 			UserID:       actorID,
 			WorkspaceID:  wsID,
-			StartAt:      sql.NullTime{Time: endTime, Valid: true},
-			EndAt:        sql.NullTime{Time: startTime, Valid: true},
+			RangeEnd:     sql.NullTime{Time: endTime, Valid: true},
+			RangeStart:   sql.NullTime{Time: startTime, Valid: true},
 		})
 		if err != nil {
 			return nil, httpErr(apierrors.CalendarEventListQueryInterrupted)
@@ -993,17 +1013,18 @@ func ListCalendarEvents(deps Deps) func(context.Context, *ListCalendarEventsInpu
 
 		for _, r := range rows {
 			resp := CrossCalendarEventResponse{
-				ID:         r.PublicID.String(),
-				CalendarID: r.CalendarPublicID.String(),
-				Kind:       string(r.Kind),
-				Visibility: string(r.Visibility),
-				ShowAs:     string(r.ShowAs),
-				Title:      r.Title,
-				AllDay:     r.AllDay,
-				StartAt:    nullTimeUnixPtr(r.StartAt),
-				EndAt:      nullTimeUnixPtr(r.EndAt),
-				Timezone:   r.Timezone,
-				CreatedAt:  r.CreatedAt.Unix(),
+				ID:          r.PublicID.String(),
+				CalendarID:  r.CalendarPublicID.String(),
+				Kind:        string(r.Kind),
+				Visibility:  string(r.Visibility),
+				ShowAs:      string(r.ShowAs),
+				Flexibility: string(r.Flexibility),
+				Title:       r.Title,
+				AllDay:      r.AllDay,
+				StartAt:     nullTimeUnixPtr(r.StartAt),
+				EndAt:       nullTimeUnixPtr(r.EndAt),
+				Timezone:    r.Timezone,
+				CreatedAt:   r.CreatedAt.Unix(),
 			}
 			resp.Location = dbtype.PtrFromNullString(r.Location)
 			resp.BlockLabel = dbtype.PtrFromNullString(r.BlockLabel)
@@ -1014,17 +1035,18 @@ func ListCalendarEvents(deps Deps) func(context.Context, *ListCalendarEventsInpu
 
 		for _, r := range recurringRows {
 			resp := CrossCalendarEventResponse{
-				ID:         r.PublicID.String(),
-				CalendarID: r.CalendarPublicID.String(),
-				Kind:       string(r.Kind),
-				Visibility: string(r.Visibility),
-				ShowAs:     string(r.ShowAs),
-				Title:      r.Title,
-				AllDay:     r.AllDay,
-				StartAt:    nullTimeUnixPtr(r.StartAt),
-				EndAt:      nullTimeUnixPtr(r.EndAt),
-				Timezone:   r.Timezone,
-				CreatedAt:  r.CreatedAt.Unix(),
+				ID:          r.PublicID.String(),
+				CalendarID:  r.CalendarPublicID.String(),
+				Kind:        string(r.Kind),
+				Visibility:  string(r.Visibility),
+				ShowAs:      string(r.ShowAs),
+				Flexibility: string(r.Flexibility),
+				Title:       r.Title,
+				AllDay:      r.AllDay,
+				StartAt:     nullTimeUnixPtr(r.StartAt),
+				EndAt:       nullTimeUnixPtr(r.EndAt),
+				Timezone:    r.Timezone,
+				CreatedAt:   r.CreatedAt.Unix(),
 			}
 			resp.Location = dbtype.PtrFromNullString(r.Location)
 			resp.BlockLabel = dbtype.PtrFromNullString(r.BlockLabel)

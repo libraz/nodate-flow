@@ -4177,7 +4177,7 @@ export interface paths {
         put?: never;
         /**
          * Add a member to a workspace
-         * @description Sends a workspace invite to the supplied email at the requested role. The recipient gets a link they redeem via /invites/{token}/accept. Requires workspace admin role.
+         * @description Grants workspace membership at the requested role immediately. No email is sent and the recipient is never asked: the address is added as it was typed, and if it has no account yet a placeholder is created that whoever later signs in with that address adopts. Use POST /workspaces/{wsId}/invites instead when the recipient should have to accept. Requires workspace admin role.
          */
         post: operations["workspaces-members-add"];
         delete?: never;
@@ -6000,6 +6000,11 @@ export interface components {
             readonly $schema?: string;
             /** @description Optional ai_agents public_id to bind this token to; tool calls will be attributed to the agent and subject to its cost cap */
             agentId?: string;
+            /**
+             * Format: int64
+             * @description Unix seconds at which the token expires. Omit for a token that never expires.
+             */
+            expiresAt?: number;
             name: string;
             scopes: string[] | null;
         };
@@ -6013,6 +6018,8 @@ export interface components {
             agentId?: string;
             /** Format: int64 */
             createdAt: number;
+            /** Format: int64 */
+            expiresAt?: number;
             /** @description McpToken public id (UUID v7) */
             id: string;
             name: string;
@@ -8043,8 +8050,6 @@ export interface components {
             /** Format: int64 */
             lastUsedAt?: number;
             name: string;
-            /** Format: int64 */
-            revokedAt?: number;
             scopes: string[] | null;
             tokenPrefix: string;
         };
@@ -8986,8 +8991,8 @@ export interface components {
             memo?: string;
             /** Format: int64 */
             recurrenceEnd?: number;
-            recurrenceExceptions?: string;
-            recurrenceRule?: string;
+            recurrenceExceptions?: unknown;
+            recurrenceRule?: unknown;
             showAs: string;
             /** Format: int64 */
             startAt?: number;

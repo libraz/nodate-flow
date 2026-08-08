@@ -109,8 +109,17 @@ LEFT JOIN users uc
   ON uc.id = ce.created_by_user_id
 WHERE ce.calendar_id = ?
   AND ce.recurrence_rule IS NULL
-  AND ce.start_at < ?
-  AND ce.end_at > ?
+  AND ce.start_at < sqlc.arg(range_end)
+  -- A milestone is a zero-length event: end_at equals start_at. A strict
+  -- end_at > range_start drops it when it lands on the first instant of
+  -- the window, which is every month view whose first cell carries one,
+  -- so that month was the one month the milestone did not appear in.
+  -- The strict comparison stays for events that have a duration: one
+  -- ending exactly at range_start belongs to the window before this one.
+  AND (
+    ce.end_at > sqlc.arg(range_start)
+    OR (ce.start_at = ce.end_at AND ce.end_at = sqlc.arg(range_start))
+  )
   AND ce.enabled = TRUE
   AND (ce.visibility <> 'confidential' OR ce.owner_user_id = sqlc.arg(viewer_user_id))
 ORDER BY ce.start_at ASC, ce.public_id ASC
@@ -213,8 +222,17 @@ INNER JOIN calendar_members cm
   )
 WHERE ce.workspace_id = ?
   AND ce.recurrence_rule IS NULL
-  AND ce.start_at < ?
-  AND ce.end_at > ?
+  AND ce.start_at < sqlc.arg(range_end)
+  -- A milestone is a zero-length event: end_at equals start_at. A strict
+  -- end_at > range_start drops it when it lands on the first instant of
+  -- the window, which is every month view whose first cell carries one,
+  -- so that month was the one month the milestone did not appear in.
+  -- The strict comparison stays for events that have a duration: one
+  -- ending exactly at range_start belongs to the window before this one.
+  AND (
+    ce.end_at > sqlc.arg(range_start)
+    OR (ce.start_at = ce.end_at AND ce.end_at = sqlc.arg(range_start))
+  )
   AND ce.enabled = TRUE
   AND (ce.visibility <> 'confidential' OR ce.owner_user_id = sqlc.arg(viewer_user_id))
 ORDER BY ce.start_at ASC, ce.public_id ASC
@@ -358,8 +376,17 @@ INNER JOIN calendar_members cm
   )
 WHERE ce.recurrence_rule IS NULL
   AND ce.start_at IS NOT NULL
-  AND ce.start_at < ?
-  AND ce.end_at > ?
+  AND ce.start_at < sqlc.arg(range_end)
+  -- A milestone is a zero-length event: end_at equals start_at. A strict
+  -- end_at > range_start drops it when it lands on the first instant of
+  -- the window, which is every month view whose first cell carries one,
+  -- so that month was the one month the milestone did not appear in.
+  -- The strict comparison stays for events that have a duration: one
+  -- ending exactly at range_start belongs to the window before this one.
+  AND (
+    ce.end_at > sqlc.arg(range_start)
+    OR (ce.start_at = ce.end_at AND ce.end_at = sqlc.arg(range_start))
+  )
   AND ce.enabled = TRUE
   AND (ce.visibility <> 'confidential' OR ce.owner_user_id = sqlc.arg(viewer_user_id))
 ORDER BY ce.start_at ASC, ce.public_id ASC

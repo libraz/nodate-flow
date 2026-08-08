@@ -100,6 +100,7 @@
   "CALENDAR.COMMENT.STORE_WRITE_INTERRUPTED": "コメントを保存できませんでした",
   "CALENDAR.EVENT.DATE_RANGE_UNPARSEABLE": "日付または日時パラメータを解析できませんでした",
   "CALENDAR.EVENT.EDIT_PERMISSION_REQUIRED": "このイベントを編集する権限がありません",
+  "CALENDAR.EVENT.END_BEFORE_START": "endAt は startAt 以降にしてください",
   "CALENDAR.EVENT.LIST_QUERY_INTERRUPTED": "イベントを取得できませんでした",
   "CALENDAR.EVENT.NOT_FOUND": "イベントが見つかりません",
   "CALENDAR.EVENT.OWNER_USER_ID_MALFORMED": "ownerUserId の形式が正しくありません",

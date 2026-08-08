@@ -2339,6 +2339,11 @@
             "description": "Optional ai_agents public_id to bind this token to; tool calls will be attributed to the agent and subject to its cost cap",
             "type": "string"
           },
+          "expiresAt": {
+            "description": "Unix seconds at which the token expires. Omit for a token that never expires.",
+            "format": "int64",
+            "type": "integer"
+          },
           "name": {
             "maxLength": 255,
             "minLength": 1,
@@ -2368,6 +2373,10 @@
             "type": "string"
           },
           "createdAt": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "expiresAt": {
             "format": "int64",
             "type": "integer"
           },
@@ -6706,10 +6715,6 @@
           "name": {
             "type": "string"
           },
-          "revokedAt": {
-            "format": "int64",
-            "type": "integer"
-          },
           "scopes": {
             "items": {
               "type": "string"
@@ -8865,12 +8870,8 @@
             "format": "int64",
             "type": "integer"
           },
-          "recurrenceExceptions": {
-            "type": "string"
-          },
-          "recurrenceRule": {
-            "type": "string"
-          },
+          "recurrenceExceptions": {},
+          "recurrenceRule": {},
           "showAs": {
             "type": "string"
           },
@@ -26625,7 +26626,7 @@
         "summary": "List workspace members"
       },
       "post": {
-        "description": "Sends a workspace invite to the supplied email at the requested role. The recipient gets a link they redeem via /invites/{token}/accept. Requires workspace admin role.",
+        "description": "Grants workspace membership at the requested role immediately. No email is sent and the recipient is never asked: the address is added as it was typed, and if it has no account yet a placeholder is created that whoever later signs in with that address adopts. Use POST /workspaces/{wsId}/invites instead when the recipient should have to accept. Requires workspace admin role.",
         "operationId": "workspaces-members-add",
         "parameters": [
           {

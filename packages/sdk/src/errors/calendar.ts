@@ -161,6 +161,11 @@ export const CalendarErrors = {
     status: 403,
     message: "You do not have permission to edit this event",
   },
+  CALENDAR_EVENT_END_BEFORE_START: {
+    code: "CALENDAR.EVENT.END_BEFORE_START",
+    status: 422,
+    message: "endAt must be at or after startAt",
+  },
   CALENDAR_EVENT_LIST_QUERY_INTERRUPTED: {
     code: "CALENDAR.EVENT.LIST_QUERY_INTERRUPTED",
     status: 500,

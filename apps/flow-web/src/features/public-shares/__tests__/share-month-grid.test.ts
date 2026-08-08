@@ -100,6 +100,26 @@ describe('buildMonthGrid', () => {
       id: 'r1',
       startAt: utc(2024, 3, 5, 9),
       endAt: utc(2024, 3, 5, 10),
+      recurrenceRule: { freq: 'daily', interval: 1, count: 2 },
+    });
+
+    const expanded = expandShareEventsForMonth('2024-03-01', [e], 'UTC', 'sun');
+
+    expect(expanded.map((event) => eventStartKey(event, 'UTC'))).toEqual([
+      '2024-03-05',
+      '2024-03-06',
+    ]);
+  });
+
+  // The share render used to hand the rule over as a string holding its
+  // own JSON, while every authenticated surface sent the object. The
+  // server now sends the object here too; the parser keeps accepting the
+  // string so a page served by an older build still expands.
+  it('still expands a rule that arrives as a JSON string', () => {
+    const e = evt({
+      id: 'r2',
+      startAt: utc(2024, 3, 5, 9),
+      endAt: utc(2024, 3, 5, 10),
       recurrenceRule: JSON.stringify({ freq: 'daily', interval: 1, count: 2 }),
     });
 

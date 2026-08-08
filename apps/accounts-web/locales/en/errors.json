@@ -100,6 +100,7 @@
   "CALENDAR.COMMENT.STORE_WRITE_INTERRUPTED": "Could not save comment",
   "CALENDAR.EVENT.DATE_RANGE_UNPARSEABLE": "Could not parse date or datetime parameter",
   "CALENDAR.EVENT.EDIT_PERMISSION_REQUIRED": "You do not have permission to edit this event",
+  "CALENDAR.EVENT.END_BEFORE_START": "endAt must be at or after startAt",
   "CALENDAR.EVENT.LIST_QUERY_INTERRUPTED": "Could not retrieve events",
   "CALENDAR.EVENT.NOT_FOUND": "Event not found",
   "CALENDAR.EVENT.OWNER_USER_ID_MALFORMED": "Invalid ownerUserId",

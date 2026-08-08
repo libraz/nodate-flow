@@ -2,6 +2,7 @@ package calendars
 
 import (
 	"context"
+	"errors"
 	"regexp"
 	"strings"
 	"time"
@@ -52,9 +53,12 @@ func SmartCreate(deps Deps) func(context.Context, *SmartCreateInput) (*SmartCrea
 			return nil, err
 		}
 
+		// An unresolvable timezone is a bad field, not unparseable text:
+		// reporting it as the latter told the caller to rephrase a
+		// sentence that was fine.
 		tz, tzErr := resolveEffectiveTimezone(ctx, deps.Queries, wsID, actorID, input.Body.Timezone)
 		if tzErr != nil {
-			return nil, httpErr(apierrors.CalendarSmartCreateTextUnparseable)
+			return nil, tzErr
 		}
 		proposal, err := ParseEventFromText(input.Body.Text, time.Now(), tz)
 		if err != nil {
@@ -67,9 +71,29 @@ func SmartCreate(deps Deps) func(context.Context, *SmartCreateInput) (*SmartCrea
 	}
 }
 
+// errUnparseableText is the internal sentinel ParseEventFromText
+// returns when the text carries neither a date nor a time it
+// recognises. SmartCreate translates it to
+// apierrors.CalendarSmartCreateTextUnparseable.
+var errUnparseableText = errors.New("calendar: no date or time found in text")
+
 // ParseEventFromText extracts event parameters from natural language.
 // This is a simple rule-based parser. Can be replaced with LLM later.
 // The timezone parameter is an IANA timezone name (e.g. "America/New_York").
+//
+// The patterns below are Japanese. Text in any other language matches
+// none of them, and the parser used to answer anyway: with no date it
+// took today, with no time it took 09:00, so "lunch with Sam tomorrow
+// 3pm" came back as a proposal for this morning. A wrong time that
+// looks like an answer is worse than no answer, because the caller has
+// no way to tell the two apart — an agent confirms it and the meeting
+// is booked for the wrong hour.
+//
+// So a date or a time has to have been recognised. Either one alone is
+// enough and the other falls back: a recognised date with no time
+// starts at 09:00, a recognised time with no date is today. Both
+// defaults describe a value the text did supply; neither invents the
+// whole appointment.
 func ParseEventFromText(text string, now time.Time, timezone string) (*EventProposal, error) {
 	loc, err := time.LoadLocation(timezone)
 	if err != nil {
@@ -81,10 +105,13 @@ func ParseEventFromText(text string, now time.Time, timezone string) (*EventProp
 
 	// Extract date
 	date := nowJST
-	remaining, date = extractDate(remaining, nowJST)
+	remaining, date, hasDate := extractDate(remaining, nowJST)
 
 	// Extract start time
 	startHour, startMin, hasStart := extractStartTime(remaining)
+	if !hasDate && !hasStart {
+		return nil, errUnparseableText
+	}
 	if hasStart {
 		date = time.Date(date.Year(), date.Month(), date.Day(), startHour, startMin, 0, 0, loc)
 	} else {
@@ -154,32 +181,37 @@ var weekdayMap = map[string]time.Weekday{
 	"日": time.Sunday,
 }
 
-func extractDate(text string, now time.Time) (string, time.Time) {
+// extractDate returns the remaining text, the date it read, and whether
+// it read one. The third result is what separates "the text said today"
+// from "the text said nothing and today is the fallback" — the caller
+// needs that distinction to refuse text it does not understand instead
+// of proposing an appointment nobody described.
+func extractDate(text string, now time.Time) (string, time.Time, bool) {
 	if m := reNextWeekday.FindStringSubmatch(text); m != nil {
 		wd := weekdayMap[m[1]]
 		d := nextWeekdayFrom(now, wd, true)
-		return reNextWeekday.ReplaceAllString(text, ""), d
+		return reNextWeekday.ReplaceAllString(text, ""), d, true
 	}
 	if reDayAfter.MatchString(text) {
-		return reDayAfter.ReplaceAllString(text, ""), now.AddDate(0, 0, 2)
+		return reDayAfter.ReplaceAllString(text, ""), now.AddDate(0, 0, 2), true
 	}
 	if reTomorrow.MatchString(text) {
-		return reTomorrow.ReplaceAllString(text, ""), now.AddDate(0, 0, 1)
+		return reTomorrow.ReplaceAllString(text, ""), now.AddDate(0, 0, 1), true
 	}
 	if reToday.MatchString(text) {
-		return reToday.ReplaceAllString(text, ""), now
+		return reToday.ReplaceAllString(text, ""), now, true
 	}
 	if m := reThisWeekday.FindStringSubmatch(text); m != nil {
 		wd := weekdayMap[m[1]]
 		d := nextWeekdayFrom(now, wd, false)
-		return reThisWeekday.ReplaceAllString(text, ""), d
+		return reThisWeekday.ReplaceAllString(text, ""), d, true
 	}
 	if m := reWeekday.FindStringSubmatch(text); m != nil {
 		wd := weekdayMap[m[1]]
 		d := nextWeekdayFrom(now, wd, false)
-		return reWeekday.ReplaceAllString(text, ""), d
+		return reWeekday.ReplaceAllString(text, ""), d, true
 	}
-	return text, now
+	return text, now, false
 }
 
 func nextWeekdayFrom(from time.Time, wd time.Weekday, nextWeek bool) time.Time {

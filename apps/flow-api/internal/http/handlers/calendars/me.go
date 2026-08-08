@@ -189,8 +189,8 @@ func ListMyCalendarEvents(deps Deps) func(context.Context, *ListMyCalendarEvents
 		rows, err := deps.CalendarQueries.ListMyCalendarEventsAcrossWorkspaces(ctx, calendar.ListMyCalendarEventsAcrossWorkspacesParams{
 			ViewerUserID: actorID,
 			UserID:       actorID,
-			StartAt:      sql.NullTime{Time: endTime, Valid: true},
-			EndAt:        sql.NullTime{Time: startTime, Valid: true},
+			RangeEnd:     sql.NullTime{Time: endTime, Valid: true},
+			RangeStart:   sql.NullTime{Time: startTime, Valid: true},
 		})
 		if err != nil {
 			return nil, httpErr(apierrors.CalendarEventListQueryInterrupted)
