@@ -40,13 +40,19 @@ const (
 	// before it is treated as abandoned.
 	//
 	// The number is not a guess about client behaviour: it is the
-	// lifetime of the presigned URL the row was created for, plus room
-	// for a transfer already in flight when the URL expired. Once that
-	// URL is dead no upload can arrive against the row, so waiting
+	// lifetime of the presigned URL the row is currently serving, plus
+	// room for a transfer already in flight when the URL expired. Once
+	// that URL is dead no upload can arrive against the row, so waiting
 	// longer only delays the reclaim. Setting it shorter is the
 	// dangerous direction — it deletes rows out from under uploads that
 	// are still legitimately running, and the user sees an attachment
 	// vanish mid-transfer.
+	//
+	// "Currently serving", not "was created for": a presign that lands
+	// on an unconfirmed row reuses it and mints a new URL against the
+	// same key rather than allocating a second row. The age the sweep
+	// measures is therefore taken from the row's last update, which is
+	// when the newest URL was issued.
 	DefaultReservationTTL = 45 * time.Minute
 
 	// DefaultBatchSize caps how many rows one pass reclaims, so a
@@ -172,7 +178,11 @@ const (
 func (s *Sweeper) RunOnce(ctx context.Context) (Result, error) {
 	var out Result
 
-	cutoff := time.Now().UTC().Add(-s.reservationTTL())
+	// The cutoff is always present; it arrives as a NullTime only
+	// because it is compared against updated_at, which the schema
+	// declares nullable even though the column defaults on insert and
+	// restamps on update, so no row ever carries a NULL there.
+	cutoff := sql.NullTime{Time: time.Now().UTC().Add(-s.reservationTTL()), Valid: true}
 	stale, err := s.Queries.ListUnconfirmedStorageObjects(ctx, generated.ListUnconfirmedStorageObjectsParams{
 		Cutoff: cutoff,
 		Limit:  s.batchSize(),

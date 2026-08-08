@@ -456,6 +456,19 @@ type Querier interface {
 	// was created for: while that URL is valid an upload can still land, so
 	// reclaiming earlier would delete a row out from under a transfer in
 	// progress.
+	//
+	// Aged by updated_at, not created_at, because a row can be handed out
+	// more than once. A presign that finds an unconfirmed row does not
+	// allocate a second one — it reuses this row and mints a fresh URL for
+	// the same key, which is what repairs a reservation somebody abandoned.
+	// Measured from creation, that second URL is born already past the
+	// cutoff, so the sweep deletes the row and the blob out from under an
+	// upload that started seconds ago and the attachment silently
+	// disappears. The reuse goes through IncrementStorageObjectRefCount, an
+	// UPDATE, and updated_at is ON UPDATE CURRENT_TIMESTAMP(3), so this
+	// column is stamped at exactly the moment a URL is handed out. That is
+	// the clock DefaultReservationTTL is described against: the lifetime of
+	// the presigned URL the row is currently serving.
 	ListUnconfirmedStorageObjects(ctx context.Context, arg ListUnconfirmedStorageObjectsParams) ([]ListUnconfirmedStorageObjectsRow, error)
 	// Rows nothing points at any more. The delete paths drop these inline,
 	// so anything showing up here is the residue of a delete that got part

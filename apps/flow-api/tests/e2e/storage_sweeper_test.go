@@ -58,9 +58,15 @@ func TestSweeperReclaimsAnAbandonedReservation(t *testing.T) {
 
 	// Age the reservation past the presigned URL's lifetime: no upload
 	// can arrive against it any more, so nothing is being interrupted.
+	//
+	// updated_at is the column the sweep ages rows by, because a row
+	// gets handed out again every time a presign lands on it. Writing it
+	// explicitly is also what suppresses ON UPDATE CURRENT_TIMESTAMP,
+	// which would otherwise stamp this very statement as the moment the
+	// row was last touched and leave it younger than the cutoff.
 	_, err := testDB.ExecContext(ctx,
-		`UPDATE storage_objects SET created_at = ? WHERE storage_key = ?`,
-		time.Now().UTC().Add(-2*time.Hour), res.StorageKey)
+		`UPDATE storage_objects SET created_at = ?, updated_at = ? WHERE storage_key = ?`,
+		time.Now().UTC().Add(-2*time.Hour), time.Now().UTC().Add(-2*time.Hour), res.StorageKey)
 	require.NoError(t, err)
 
 	// A pass sweeps the whole instance, so the TTL is what keeps this
@@ -98,9 +104,12 @@ func TestSweeperLeavesAConfirmedUploadAlone(t *testing.T) {
 
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()
+	// Both age columns, so the row is old by whichever one the sweep
+	// measures and the claim below is about the confirmation rather than
+	// about having picked a column the sweep ignores.
 	_, err := testDB.ExecContext(ctx,
-		`UPDATE storage_objects SET created_at = ? WHERE storage_key = ?`,
-		time.Now().UTC().Add(-30*24*time.Hour), res.StorageKey)
+		`UPDATE storage_objects SET created_at = ?, updated_at = ? WHERE storage_key = ?`,
+		time.Now().UTC().Add(-30*24*time.Hour), time.Now().UTC().Add(-30*24*time.Hour), res.StorageKey)
 	require.NoError(t, err)
 
 	sweeper := newSweeper(t)
@@ -111,6 +120,89 @@ func TestSweeperLeavesAConfirmedUploadAlone(t *testing.T) {
 	require.True(t, storageObjectExists(ctx, t, res.StorageKey),
 		"a confirmed upload is content in use, however old the row is")
 	testStorage.MustExist(t, res.StorageKey)
+}
+
+// TestSweeperSparesAReservationJustHandedOutAgain is the other edge of
+// the reclaim, and the one that loses data when it is wrong.
+//
+// A reservation is not used once. When a presign finds a row whose
+// upload never arrived it does not allocate a second row — it reuses
+// that one and mints a fresh URL against the same key, which is how a
+// reservation somebody abandoned gets repaired instead of poisoning the
+// content for the whole workspace. So a row can be hours old and still
+// be serving a URL issued seconds ago.
+//
+// Age the row from its creation and that second upload is born already
+// past the cutoff: the sweep deletes the row, drops every attachment
+// pointing at it and removes the blob, and the person who just uploaded
+// watches their file disappear with nothing logged against them. The
+// reclaim has to be measured from when the row was last handed out.
+func TestSweeperSparesAReservationJustHandedOutAgain(t *testing.T) {
+	bootstrap(t)
+	requireStorage(t)
+	t.Parallel()
+
+	tt := newTenant(t)
+	firstTask := createTaskForAttachment(t, tt.AccessToken, tt.ProjectPublicID, "Abandoned")
+	secondTask := createTaskForAttachment(t, tt.AccessToken, tt.ProjectPublicID, "Repaired")
+	payload := makePNG(t, 8, 8, color.RGBA{R: 81, G: 82, B: 83, A: 255})
+
+	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	defer cancel()
+
+	// Someone asks for a URL and walks away.
+	abandoned := presignAttachment(t, tt.AccessToken, firstTask, "ghost.png", "image/png", payload)
+	require.False(t, abandoned.Deduplicated)
+	testStorage.MustNotExist(t, abandoned.StorageKey)
+
+	// Long enough ago that the row is a reclaim candidate.
+	_, err := testDB.ExecContext(ctx,
+		`UPDATE storage_objects SET created_at = ?, updated_at = ? WHERE storage_key = ?`,
+		time.Now().UTC().Add(-2*time.Hour), time.Now().UTC().Add(-2*time.Hour), abandoned.StorageKey)
+	require.NoError(t, err)
+
+	// Now somebody uploads the same content. The presign repairs the
+	// abandoned row in place rather than allocating a new one, so this
+	// upload is running against a row created two hours ago.
+	repaired := presignAttachment(t, tt.AccessToken, secondTask, "real.png", "image/png", payload)
+	require.False(t, repaired.Deduplicated,
+		"a row whose object was never uploaded must hand back a way to fill it")
+	require.NotEmpty(t, repaired.UploadURL)
+	require.Equal(t, abandoned.StorageKey, repaired.StorageKey,
+		"the repair must reuse the key the existing row already points at")
+	uploadViaPresignedURL(t, repaired.UploadURL, "image/png", payload, repaired.RequiredHeaders)
+
+	sweeper := newSweeper(t)
+	sweeper.ReservationTTL = time.Hour
+	_, err = sweeper.RunOnce(ctx)
+	require.NoError(t, err)
+
+	require.True(t, storageObjectExists(ctx, t, repaired.StorageKey),
+		"a row serving a URL issued seconds ago is not abandoned, whatever its creation time says")
+	testStorage.MustExist(t, repaired.StorageKey)
+
+	// The row surviving is only half of it: reclaim drops every
+	// attachment pointing at the row before the row itself, so this is
+	// what the second uploader would actually have lost.
+	var listed struct {
+		Attachments []struct {
+			ID string `json:"id"`
+		} `json:"attachments"`
+	}
+	doJSON(t, http.MethodGet, testServerURL+"/tasks/"+secondTask+"/attachments",
+		tt.AccessToken, nil, &listed)
+	found := false
+	for _, a := range listed.Attachments {
+		if a.ID == repaired.AttachmentID {
+			found = true
+		}
+	}
+	require.True(t, found,
+		"an upload in progress must not have its attachment swept out from under it")
+
+	// And the upload completes normally, which is the whole point of
+	// having left it alone.
+	confirmAttachment(t, tt.AccessToken, secondTask, repaired.AttachmentID)
 }
 
 // TestSweeperReclaimsAnUnreferencedRow covers the residue the delete
