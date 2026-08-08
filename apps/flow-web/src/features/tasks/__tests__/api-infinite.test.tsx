@@ -182,12 +182,11 @@ describe('useTasksInfiniteQuery', () => {
     expect(query?.priority).toEqual([4, 3]);
     expect(query?.offset).toBe(0);
 
-    // The array filters are explode:false on the wire. Left to the
-    // client's default the request would repeat the parameter and the
-    // server would honour only the first value, so the request has to
-    // carry the comma-form serializer.
+    // How the array reaches the wire (comma form, not a repeated
+    // parameter) is the SDK client's job -- see the serializer test in
+    // packages/sdk. The hook must not override it per request.
     const opts = sdkMocks.get.mock.calls[0]?.[1] as Record<string, unknown> | undefined;
-    expect(opts?.querySerializer).toEqual({ array: { style: 'form', explode: false } });
+    expect(opts).not.toHaveProperty('querySerializer');
     expect(result.current.data.pages[0]?.tasks.map((task) => task.id)).toEqual([
       'urgent-1',
       'urgent-2',

@@ -9,6 +9,22 @@ import createOpenapiFetch, { type Client, type ClientOptions } from 'openapi-fet
 
 import type { paths } from './openapi.js';
 
+/**
+ * Serialization for array query parameters.
+ *
+ * Every array parameter in the schema is declared `explode: false`, i.e.
+ * one comma-joined occurrence (`?priority=4,2`). The API reads only the
+ * first occurrence of a repeated parameter, so the exploded form
+ * `?priority=4&priority=2` filters by `4` alone and returns a short list
+ * with no error and no warning. openapi-fetch defaults to the exploded
+ * form, hence this client-wide default: it belongs here rather than at
+ * the call sites, because a rule spelled out per request is a rule that
+ * only holds for the requests someone remembered.
+ */
+const ARRAY_QUERY_SERIALIZER = {
+  array: { style: 'form', explode: false },
+} as const;
+
 /** Options accepted by createClient. */
 export interface CreateClientOptions {
   /** Base URL of the nodate-flow HTTP API, e.g. https://api.example.com. */
@@ -37,6 +53,7 @@ export function createClient(options: CreateClientOptions): Client<paths> {
   const client = createOpenapiFetch<paths>({
     baseUrl: options.baseUrl,
     credentials: 'include',
+    querySerializer: ARRAY_QUERY_SERIALIZER,
     ...options.fetchOptions,
   });
   client.use({

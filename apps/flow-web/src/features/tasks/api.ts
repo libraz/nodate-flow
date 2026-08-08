@@ -266,19 +266,6 @@ export function transitionForDrop(
   }
 }
 
-/**
- * Query serialization for `GET /tasks`.
- *
- * The list's array filters are declared `explode: false`, and the
- * server reads only the first occurrence of a repeated parameter --
- * `state=open&state=done` filters by `open` alone, silently. The HTTP
- * client's default is the repeated form, so every request carrying
- * `state` or `priority` has to ask for the comma form explicitly.
- */
-const TASK_LIST_QUERY_SERIALIZER = {
-  array: { style: 'form', explode: false },
-} as const;
-
 export const TASKS_QUERY_LIMIT = 200;
 
 export function useTasksQuery(
@@ -309,10 +296,7 @@ export function useTasksQuery(
       if (states.length > 0) query.state = [...states];
       if (assignee.length > 0) query.assignee = assignee;
       if (priorities.length > 0) query.priority = [...priorities];
-      const { data, error } = await sdk.GET('/tasks', {
-        params: { query },
-        querySerializer: TASK_LIST_QUERY_SERIALIZER,
-      });
+      const { data, error } = await sdk.GET('/tasks', { params: { query } });
       if (error || !data) throw toApiError(error, 'Failed to load tasks');
       return data.tasks ?? [];
     },
@@ -386,10 +370,7 @@ export function useTasksInfiniteQuery(
       if (states.length > 0) query.state = [...states];
       if (assignee.length > 0) query.assignee = assignee;
       if (priorities.length > 0) query.priority = [...priorities];
-      const { data, error } = await sdk.GET('/tasks', {
-        params: { query },
-        querySerializer: TASK_LIST_QUERY_SERIALIZER,
-      });
+      const { data, error } = await sdk.GET('/tasks', { params: { query } });
       if (error || !data) throw toApiError(error, 'Failed to load tasks');
 
       const tasks = data.tasks ?? [];
