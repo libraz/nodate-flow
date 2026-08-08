@@ -30,6 +30,7 @@ import (
 func TestAutoActionExecutorClosesStaleReviewViaCanonicalPath(t *testing.T) {
 	bootstrap(t)
 	t.Parallel()
+	lockAutoActionPass(t)
 
 	tenant := newTenant(t)
 	t.Cleanup(func() { helpers.PurgeWorkspace(t, testDB, tenant.WorkspacePublicID) })
@@ -88,6 +89,7 @@ func TestAutoActionExecutorClosesStaleReviewViaCanonicalPath(t *testing.T) {
 func TestAutoActionExecutorAutoClosesStaleViaCanonicalPath(t *testing.T) {
 	bootstrap(t)
 	t.Parallel()
+	lockAutoActionPass(t)
 
 	tenant := newTenant(t)
 	t.Cleanup(func() { helpers.PurgeWorkspace(t, testDB, tenant.WorkspacePublicID) })
@@ -140,6 +142,133 @@ func TestAutoActionExecutorAutoClosesStaleViaCanonicalPath(t *testing.T) {
 	requireNoProposalEvent(ctx, t, taskID)
 }
 
+// A threshold of zero is a value the API accepts and stores, and it
+// means "apply every action the rule engine proposes". The executor read
+// it as "unset" and substituted the global default, so a workspace that
+// had deliberately opened the gate all the way got the deployment-wide
+// setting instead — the one number the tenant had explicitly overridden.
+//
+// The task here matches close_stale_review at confidence 0.70, which is
+// below the global 0.90 this executor is configured with. It can only be
+// applied if the workspace's own 0 is what the pass uses.
+func TestAutoActionExecutorUsesAConfiguredThresholdOfZero(t *testing.T) {
+	bootstrap(t)
+	t.Parallel()
+	lockAutoActionPass(t)
+
+	tenant := newTenant(t)
+	t.Cleanup(func() { helpers.PurgeWorkspace(t, testDB, tenant.WorkspacePublicID) })
+
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	wsID, userID := lookupWorkspaceAndOwner(ctx, t, tenant.WorkspacePublicID)
+	setWorkspaceAutoActionThreshold(ctx, t, wsID, "0.00")
+
+	taskID := seedTask(ctx, t, wsID, userID, "stale review task, threshold 0", "")
+	setTaskStateAndUpdatedAt(ctx, t, taskID, "review", time.Now().Add(-10*24*time.Hour))
+
+	exec := &autoactions.Executor{
+		DB: testDB,
+		Config: autoactions.ExecutorConfig{
+			Interval:            time.Nanosecond,
+			ConfidenceThreshold: 0.90,
+			DryRun:              false,
+		},
+		Logger: slog.Default(),
+	}
+	requireCompletePass(ctx, t, exec)
+
+	require.Equal(t, "done", readDerivedState(ctx, t, taskID),
+		"a configured threshold of 0 must be used as configured, not read as unset")
+}
+
+// The mirror: a configured threshold above the action's confidence
+// keeps the action from being applied, so the setting is doing the
+// work rather than the test's global default.
+func TestAutoActionExecutorRespectsAConfiguredThresholdAboveTheAction(t *testing.T) {
+	bootstrap(t)
+	t.Parallel()
+	lockAutoActionPass(t)
+
+	tenant := newTenant(t)
+	t.Cleanup(func() { helpers.PurgeWorkspace(t, testDB, tenant.WorkspacePublicID) })
+
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	wsID, userID := lookupWorkspaceAndOwner(ctx, t, tenant.WorkspacePublicID)
+	setWorkspaceAutoActionThreshold(ctx, t, wsID, "0.99")
+
+	taskID := seedTask(ctx, t, wsID, userID, "stale review task, threshold 0.99", "")
+	setTaskStateAndUpdatedAt(ctx, t, taskID, "review", time.Now().Add(-10*24*time.Hour))
+
+	exec := &autoactions.Executor{
+		DB: testDB,
+		Config: autoactions.ExecutorConfig{
+			Interval:            time.Nanosecond,
+			ConfidenceThreshold: 0.10,
+			DryRun:              false,
+		},
+		Logger: slog.Default(),
+	}
+	requireCompletePass(ctx, t, exec)
+
+	require.Equal(t, "review", readDerivedState(ctx, t, taskID),
+		"the workspace threshold must gate the action, not the global default")
+}
+
+// A workspace configured for a long interval must not be re-evaluated
+// on every global tick. The pass is driven twice back to back: the
+// second one has to leave the second task alone, because the interval
+// the tenant configured has not elapsed.
+func TestAutoActionExecutorWaitsTheConfiguredInterval(t *testing.T) {
+	bootstrap(t)
+	t.Parallel()
+	lockAutoActionPass(t)
+
+	tenant := newTenant(t)
+	t.Cleanup(func() { helpers.PurgeWorkspace(t, testDB, tenant.WorkspacePublicID) })
+
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	wsID, userID := lookupWorkspaceAndOwner(ctx, t, tenant.WorkspacePublicID)
+	setWorkspaceAutoActionSettings(ctx, t, wsID, "0.50", 60)
+
+	first := seedTask(ctx, t, wsID, userID, "stale review, first pass", "")
+	setTaskStateAndUpdatedAt(ctx, t, first, "review", time.Now().Add(-10*24*time.Hour))
+
+	exec := &autoactions.Executor{
+		DB: testDB,
+		Config: autoactions.ExecutorConfig{
+			Interval:            time.Nanosecond,
+			ConfidenceThreshold: 0.50,
+			DryRun:              false,
+		},
+		Logger: slog.Default(),
+	}
+	requireCompletePass(ctx, t, exec)
+	require.Equal(t, "done", readDerivedState(ctx, t, first),
+		"the first pass evaluates the workspace")
+
+	// A second task, and a second pass a minute later — well short of
+	// the hour this workspace asked for.
+	second := seedNextTask(ctx, t, wsID, userID, "stale review, too soon")
+	setTaskStateAndUpdatedAt(ctx, t, second, "review", time.Now().Add(-10*24*time.Hour))
+	exec.Now = func() time.Time { return time.Now().Add(time.Minute) }
+	requireCompletePass(ctx, t, exec)
+
+	require.Equal(t, "review", readDerivedState(ctx, t, second),
+		"a workspace set to 60 minutes must not be evaluated again a minute later")
+
+	// And once the configured interval has passed, it is evaluated.
+	exec.Now = func() time.Time { return time.Now().Add(61 * time.Minute) }
+	requireCompletePass(ctx, t, exec)
+	require.Equal(t, "done", readDerivedState(ctx, t, second),
+		"the workspace must be evaluated once its interval elapses")
+}
+
 // ---- local seed / assertion helpers ---------------------------------------
 
 // setTaskStateAndUpdatedAt force-writes derived_state and back-dates
@@ -177,6 +306,48 @@ func setWorkspaceAutoActionThreshold(ctx context.Context, t *testing.T, wsID uin
 		 VALUES (?, ?)
 		 ON DUPLICATE KEY UPDATE auto_action_threshold = VALUES(auto_action_threshold)`,
 		wsID, threshold,
+	)
+	require.NoError(t, err)
+}
+
+// seedNextTask inserts a second (third, ...) task into the tenant's
+// default project. seedTask leaves task_number at its column default,
+// which collides on (project_id, task_number) as soon as a test needs
+// more than one; the number is taken from the project's current maximum
+// instead. The project belongs to this test's tenant, so nothing else
+// is allocating in it.
+func seedNextTask(ctx context.Context, t *testing.T, wsID, userID uint32, title string) uint32 {
+	t.Helper()
+	var projID uint32
+	require.NoError(t, testDB.QueryRowContext(ctx,
+		`SELECT id FROM projects WHERE workspace_id = ? ORDER BY id LIMIT 1`, wsID).Scan(&projID))
+
+	var nextNumber uint32
+	require.NoError(t, testDB.QueryRowContext(ctx,
+		`SELECT COALESCE(MAX(task_number), 0) + 1 FROM tasks WHERE project_id = ?`, projID).Scan(&nextNumber))
+
+	res, err := testDB.ExecContext(ctx,
+		`INSERT INTO tasks (public_id, workspace_id, project_id, task_number, title, created_by_user_id)
+		 VALUES (UUID_TO_BIN(UUID(), 0), ?, ?, ?, ?, ?)`,
+		wsID, projID, nextNumber, title, userID)
+	require.NoError(t, err)
+	id, err := res.LastInsertId()
+	require.NoError(t, err)
+	return uint32(id) //#nosec G115 -- LastInsertId in test seed, fits uint32
+}
+
+// setWorkspaceAutoActionSettings upserts an ai_settings row carrying
+// both the threshold and the evaluation interval, for tests about the
+// interval rather than the confidence gate.
+func setWorkspaceAutoActionSettings(ctx context.Context, t *testing.T, wsID uint32, threshold string, intervalMinutes uint32) {
+	t.Helper()
+	_, err := testDB.ExecContext(ctx,
+		`INSERT INTO ai_settings (workspace_id, auto_action_threshold, auto_action_interval_minutes)
+		 VALUES (?, ?, ?)
+		 ON DUPLICATE KEY UPDATE
+		   auto_action_threshold = VALUES(auto_action_threshold),
+		   auto_action_interval_minutes = VALUES(auto_action_interval_minutes)`,
+		wsID, threshold, intervalMinutes,
 	)
 	require.NoError(t, err)
 }
@@ -294,6 +465,11 @@ func requireCompletePass(ctx context.Context, t *testing.T, exec *autoactions.Ex
 func TestAutoActionExecutorReportsAnIncompletePass(t *testing.T) {
 	bootstrap(t)
 	t.Parallel()
+	// This pass is cancelled before it enumerates, so it cannot reach
+	// anyone else's rows; it takes the lock anyway so that every caller
+	// of RunOnce in the package is under it and the next one added does
+	// not have to rediscover why.
+	lockAutoActionPass(t)
 
 	stopped, cancel := context.WithCancel(context.Background())
 	cancel()

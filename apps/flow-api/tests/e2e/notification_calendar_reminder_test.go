@@ -22,6 +22,7 @@ import (
 func TestCalendarReminderDispatch(t *testing.T) {
 	bootstrap(t)
 	t.Parallel()
+	lockCalendarReminderPass(t)
 
 	owner := newTenant(t)
 	attendee := newTenant(t)
@@ -161,6 +162,7 @@ func TestCalendarReminderDispatch(t *testing.T) {
 func TestRecurringCalendarReminderFiresEveryOccurrence(t *testing.T) {
 	bootstrap(t)
 	t.Parallel()
+	lockCalendarReminderPass(t)
 
 	owner := newTenant(t)
 	ctx := context.Background()

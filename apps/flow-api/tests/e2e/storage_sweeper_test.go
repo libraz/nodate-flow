@@ -44,6 +44,7 @@ func TestSweeperReclaimsAnAbandonedReservation(t *testing.T) {
 	bootstrap(t)
 	requireStorage(t)
 	t.Parallel()
+	lockStorageSweepPass(t)
 
 	tt := newTenant(t)
 	taskID := createTaskForAttachment(t, tt.AccessToken, tt.ProjectPublicID, "Reclaimed")
@@ -74,8 +75,7 @@ func TestSweeperReclaimsAnAbandonedReservation(t *testing.T) {
 	// runs, so the only row on the wrong side of the cutoff is the one
 	// back-dated above. The counts in Result are for the same reason not
 	// worth asserting on — they include whatever the rest of the suite
-	// happened to leave behind, and a parallel test's own pass can
-	// reclaim this row first. What this test is about is the row.
+	// happened to leave behind. What this test is about is the row.
 	sweeper := newSweeper(t)
 	sweeper.ReservationTTL = time.Hour
 	_, err = sweeper.RunOnce(ctx)
@@ -93,6 +93,7 @@ func TestSweeperLeavesAConfirmedUploadAlone(t *testing.T) {
 	bootstrap(t)
 	requireStorage(t)
 	t.Parallel()
+	lockStorageSweepPass(t)
 
 	tt := newTenant(t)
 	taskID := createTaskForAttachment(t, tt.AccessToken, tt.ProjectPublicID, "Kept")
@@ -141,6 +142,7 @@ func TestSweeperSparesAReservationJustHandedOutAgain(t *testing.T) {
 	bootstrap(t)
 	requireStorage(t)
 	t.Parallel()
+	lockStorageSweepPass(t)
 
 	tt := newTenant(t)
 	firstTask := createTaskForAttachment(t, tt.AccessToken, tt.ProjectPublicID, "Abandoned")
@@ -216,6 +218,7 @@ func TestSweeperReclaimsAnUnreferencedRow(t *testing.T) {
 	bootstrap(t)
 	requireStorage(t)
 	t.Parallel()
+	lockStorageSweepPass(t)
 
 	tt := newTenant(t)
 	taskID := createTaskForAttachment(t, tt.AccessToken, tt.ProjectPublicID, "Orphan")
@@ -240,9 +243,9 @@ func TestSweeperReclaimsAnUnreferencedRow(t *testing.T) {
 	require.NoError(t, err)
 
 	// No count assertion here either: the unreferenced sweep has no age
-	// cutoff to fence it in, so any pass this suite runs in parallel can
-	// be the one that takes this row. That the row is gone afterwards is
-	// the claim; who removed it is not.
+	// cutoff to fence it in, so a pass takes every orphan the rest of the
+	// suite has left lying around along with this one. That the row is
+	// gone afterwards is the claim; how many went with it is not.
 	_, err = newSweeper(t).RunOnce(ctx)
 	require.NoError(t, err)
 
@@ -258,6 +261,7 @@ func TestSweeperKeepsAReferencedRow(t *testing.T) {
 	bootstrap(t)
 	requireStorage(t)
 	t.Parallel()
+	lockStorageSweepPass(t)
 
 	tt := newTenant(t)
 	taskID := createTaskForAttachment(t, tt.AccessToken, tt.ProjectPublicID, "Referenced")

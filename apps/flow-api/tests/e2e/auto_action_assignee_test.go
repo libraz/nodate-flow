@@ -44,6 +44,7 @@ func backdateTask(t *testing.T, taskPublicID string, age time.Duration) {
 func TestAutoActionExecutorSeesExistingAssignee(t *testing.T) {
 	bootstrap(t)
 	t.Parallel()
+	lockAutoActionPass(t)
 
 	tt := newTenant(t)
 

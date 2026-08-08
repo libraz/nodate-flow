@@ -546,6 +546,7 @@ func TestAgentRunsList(t *testing.T) {
 func TestAutoActionsHandoffToUser(t *testing.T) {
 	bootstrap(t)
 	t.Parallel()
+	lockAutoActionPass(t)
 
 	tt := newTenant(t)
 	taskID := createTaskForAgent(t, tt, "Autoactions stuck")
