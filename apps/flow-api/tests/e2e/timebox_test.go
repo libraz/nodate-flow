@@ -19,21 +19,47 @@ func TestTimeboxLifecycle(t *testing.T) {
 
 	// --- Create a timebox (sprint) ---
 	var created struct {
-		ID       string `json:"id"`
-		Name     string `json:"name"`
-		StartsOn string `json:"startsOn"`
-		EndsOn   string `json:"endsOn"`
-		Status   string `json:"status"`
+		ID                 string `json:"id"`
+		Name               string `json:"name"`
+		StartsOn           string `json:"startsOn"`
+		EndsOn             string `json:"endsOn"`
+		Status             string `json:"status"`
+		ProjectID          string `json:"projectId"`
+		ProjectName        string `json:"projectName"`
+		CreatorID          string `json:"creatorId"`
+		CreatorDisplayName string `json:"creatorDisplayName"`
+		CreatedAt          int64  `json:"createdAt"`
 	}
 	doJSON(t, http.MethodPost, tbBase, tt.AccessToken, map[string]any{
-		"name":     "Sprint 1",
-		"startsOn": "2025-05-01",
-		"endsOn":   "2025-05-14",
+		"name":      "Sprint 1",
+		"startsOn":  "2025-05-01",
+		"endsOn":    "2025-05-14",
+		"projectId": tt.ProjectPublicID,
 	}, &created)
 	require.NotEmpty(t, created.ID)
 	require.Equal(t, "Sprint 1", created.Name)
 	require.Equal(t, "2025-05-01", created.StartsOn)
 	require.Equal(t, "planned", created.Status, "new timebox defaults to planned")
+
+	// The create response is the only one a client has before it can
+	// render the new row, so it has to carry the same fields Get does.
+	// It used to be hand-built from the request body, which left the
+	// creator and the project name blank on that one path.
+	require.NotEmpty(t, created.CreatorID, "create response must identify the creator")
+	require.NotEmpty(t, created.CreatorDisplayName, "create response must name the creator")
+	require.Equal(t, tt.ProjectPublicID, created.ProjectID)
+	require.NotEmpty(t, created.ProjectName, "create response must carry the project name")
+	require.NotZero(t, created.CreatedAt)
+
+	var fetched struct {
+		CreatorID          string `json:"creatorId"`
+		CreatorDisplayName string `json:"creatorDisplayName"`
+		ProjectName        string `json:"projectName"`
+	}
+	doJSON(t, http.MethodGet, tbBase+"/"+created.ID, tt.AccessToken, nil, &fetched)
+	require.Equal(t, fetched.CreatorID, created.CreatorID)
+	require.Equal(t, fetched.CreatorDisplayName, created.CreatorDisplayName)
+	require.Equal(t, fetched.ProjectName, created.ProjectName)
 
 	// --- List includes the timebox ---
 	var list struct {

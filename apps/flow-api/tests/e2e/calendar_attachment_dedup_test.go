@@ -361,3 +361,55 @@ func countCalendarEventAttachmentsForStorageKey(t *testing.T, db *sql.DB, storag
 	require.NoError(t, err)
 	return n
 }
+
+// presignCalendarAttachmentRaw posts an arbitrary presign body and hands
+// back the raw status and payload, so rejection paths can be asserted on
+// the status code and error code rather than on a decoded success shape.
+// The calendar analogue of presignAttachmentRaw.
+func presignCalendarAttachmentRaw(
+	t *testing.T,
+	tt persona,
+	calID, evtID string,
+	body map[string]any,
+) (int, []byte) {
+	t.Helper()
+	return doJSONStatus(t, http.MethodPost,
+		fmt.Sprintf("%s/workspaces/%s/calendars/%s/events/%s/attachments/presign",
+			testServerURL, tt.workspaceID(), calID, evtID),
+		tt.token(), body)
+}
+
+// TestCalendarPresignFileTooLarge is the calendar half of
+// TestPresignFileTooLarge: a declared byteSize over the 100 MiB cap must
+// answer 413 VALIDATION.FILE.TOO_LARGE, the same typed error the task
+// surface returns.
+//
+// The parity matters beyond consistency. This endpoint declared the cap
+// as a `maximum` JSON-schema tag, which Huma enforces before the handler
+// runs, so it answered 422 with the raw English string "expected number
+// <= 1.048576e+08" and the handler's own size check was unreachable.
+// Nothing failed, because this surface had no oversize test. The tag is
+// gone and the check is live; this test is what keeps it that way.
+func TestCalendarPresignFileTooLarge(t *testing.T) {
+	bootstrap(t)
+	requireStorage(t)
+	t.Parallel()
+
+	tt := asPersona(t)
+	calID := createCalendarForAttachments(t, tt)
+	evtID := createCalendarEventForAttachments(t, tt, calID, "Cal Too Large")
+
+	// 200 MiB declared, well over the 100 MiB cap. Nothing is uploaded —
+	// the size check runs from the JSON body alone.
+	huge := uint64(200 * 1024 * 1024)
+	status, body := presignCalendarAttachmentRaw(t, tt, calID, evtID, map[string]any{
+		"filename":    "big.zip",
+		"contentType": "application/zip",
+		"byteSize":    huge,
+		"sha256":      strings.Repeat("a", 64),
+	})
+	require.Equalf(t, http.StatusRequestEntityTooLarge, status,
+		"oversize must be 413 VALIDATION.FILE.TOO_LARGE, not a schema-level 422; body=%s", string(body))
+	require.Containsf(t, string(body), "VALIDATION.FILE.TOO_LARGE",
+		"error code must be VALIDATION.FILE.TOO_LARGE; body=%s", string(body))
+}

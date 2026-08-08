@@ -32,6 +32,15 @@ resources:
         description: "Returned when an AI provider's base URL points at a destination this deployment refuses to contact: a loopback, private, or link-local address (including cloud metadata endpoints), or a URL that is not an absolute http/https address. Private destinations are refused by default because the base URL is workspace-admin input and the response comes back to the caller."
         userAction: "Use a public https endpoint. To reach a local model server (Ollama, LM Studio), ask your administrator to set NF_FLOW_AI_ALLOW_PRIVATE=1 on the deployment."
 
+      key_decrypt_failed:
+        code: AI.PROVIDER.KEY_DECRYPT_FAILED
+        status: 412
+        message: "AI provider API key could not be unsealed"
+        message_ja: "AI プロバイダの API キーを復号できませんでした"
+        message_zh: "无法解密 AI 服务提供商的 API 密钥"
+        description: "Returned when the stored AI provider API key could not be decrypted, so no request was sent upstream. The stored ciphertext was sealed with a different NF_SECRET_KEY than the one this deployment is running with — typically a rotated or mistyped key."
+        userAction: "Re-enter the provider's API key so it is resealed with the current key, or ask your administrator to restore the NF_SECRET_KEY the key was sealed with."
+
       upstream_unreachable:
         code: AI.PROVIDER.UPSTREAM_UNREACHABLE
         status: 502
