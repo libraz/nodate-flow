@@ -15,8 +15,8 @@
  * `authorDisplayName`), so consumers must not assume the task-side
  * shape.
  *
- * Cache invalidation policy (W5)
- * ------------------------------
+ * Cache invalidation policy
+ * -------------------------
  *   - Add / Edit / Delete → invalidate the comments list key only.
  *
  * The event detail DTO does not embed a comment count, so the detail

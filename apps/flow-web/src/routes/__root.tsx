@@ -1,4 +1,3 @@
-import { ApiError } from '@nodate-flow/sdk';
 import PageSkeleton from '@nodate-flow/ui/primitives/page-skeleton';
 import { createRootRouteWithContext, Link, Outlet, useRouterState } from '@tanstack/react-router';
 import { lazy, type ReactElement, Suspense, useEffect, useRef } from 'react';
@@ -6,6 +5,7 @@ import { ErrorBoundary } from 'react-error-boundary';
 import { useTranslation } from 'react-i18next';
 import NotFoundContent from '../components/not-found';
 import { useAuthBootstrap } from '../features/auth/use-auth-bootstrap';
+import { fatalDetailMessage } from '../lib/fatal-message';
 import { shouldProbeSession } from '../lib/session-probe';
 import type { RouterContext } from '../router/router';
 
@@ -58,14 +58,13 @@ function FatalFallback({
   resetErrorBoundary: () => void;
 }): ReactElement {
   const { t } = useTranslation(['common', 'errors']);
-  let message: string;
-  if (error instanceof ApiError && error.code) {
-    message = t(error.code, { ns: 'errors', defaultValue: error.message });
-  } else if (error instanceof Error) {
-    message = error.message;
-  } else {
-    message = String(error);
-  }
+  // Only a catalog-named message reaches a production reader; see
+  // fatalDetailMessage.
+  const message = fatalDetailMessage(
+    error,
+    (code) => t(code, { ns: 'errors', defaultValue: '' }),
+    import.meta.env.DEV,
+  );
   // Subscribe to pathname inside the fallback so the router store forces
   // this component to re-render on navigation. `resetKeys` on the parent
   // ErrorBoundary is unreliable because the parent subtree is frozen

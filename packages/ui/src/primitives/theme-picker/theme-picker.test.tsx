@@ -48,6 +48,65 @@ describe('ThemePicker', () => {
     expect(document.activeElement).toBe(screen.getByRole('radio', { name: 'Dotline' }));
   });
 
+  /*
+   * A selection that names something not on offer used to take both
+   * radiogroups out of the tab order entirely: every entry was
+   * `tabIndex=-1`, so Tab walked straight past a control that looked
+   * perfectly normal on screen. These tests reach the groups by tabbing
+   * rather than by reading the attribute, because the attribute is only
+   * interesting insofar as it makes the control reachable.
+   */
+  describe('when the selection matches nothing on offer', () => {
+    function renderOrphanSelection(onThemeChange = vi.fn()): void {
+      render(
+        <ThemePicker
+          themes={THEMES.slice(0, 2)}
+          // A theme family the host app no longer lists — e.g. restored
+          // from a profile written by an older build.
+          selectedTheme="glass"
+          selectedColorMode={'sepia' as never}
+          onThemeChange={onThemeChange}
+          onColorModeChange={() => {}}
+        />,
+      );
+    }
+
+    it('still lets Tab reach the theme group', async () => {
+      const user = userEvent.setup();
+      renderOrphanSelection();
+
+      await user.tab();
+      expect(document.activeElement).toBe(screen.getByRole('radio', { name: 'Aurora' }));
+    });
+
+    it('still lets Tab reach the color mode group', async () => {
+      const user = userEvent.setup();
+      renderOrphanSelection();
+
+      await user.tab();
+      await user.tab();
+      expect(document.activeElement).toBe(screen.getByRole('radio', { name: 'Light' }));
+    });
+
+    it('still lets the reachable entry be operated', async () => {
+      const user = userEvent.setup();
+      const onThemeChange = vi.fn();
+      renderOrphanSelection(onThemeChange);
+
+      await user.tab();
+      await user.keyboard('{ArrowRight}');
+      expect(onThemeChange).toHaveBeenCalledWith('dotline');
+      expect(document.activeElement).toBe(screen.getByRole('radio', { name: 'Dotline' }));
+    });
+
+    it('checks none of the entries, so the fallback is not a silent selection', () => {
+      renderOrphanSelection();
+      for (const radio of screen.getAllByRole('radio')) {
+        expect(radio.getAttribute('aria-checked')).toBe('false');
+      }
+    });
+  });
+
   it('uses RTL-aware horizontal arrow navigation for color mode', async () => {
     const user = userEvent.setup();
     const onColorModeChange = vi.fn();

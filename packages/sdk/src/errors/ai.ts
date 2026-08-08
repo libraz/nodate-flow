@@ -36,6 +36,11 @@ export const AiErrors = {
     status: 412,
     message: "AI provider endpoint is not an allowed destination",
   },
+  AI_PROVIDER_KEY_DECRYPT_FAILED: {
+    code: "AI.PROVIDER.KEY_DECRYPT_FAILED",
+    status: 412,
+    message: "AI provider API key could not be unsealed",
+  },
   AI_PROVIDER_NOT_CONFIGURED: {
     code: "AI.PROVIDER.NOT_CONFIGURED",
     status: 412,

@@ -137,6 +137,26 @@ export default function ThemePicker({
   const themeRefs = useRef<Array<HTMLButtonElement | null>>([]);
   const colorModeRefs = useRef<Array<HTMLButtonElement | null>>([]);
 
+  /*
+   * Roving tabindex focal points.
+   *
+   * A radiogroup keeps exactly one member in the tab order. Deriving that
+   * solely from "is this the selected one" leaves the whole group at
+   * tabIndex=-1 whenever nothing matches — an unknown persisted theme, a
+   * `themes` list narrowed by the host app, a colour mode the build no
+   * longer offers. The group then renders normally and is simply
+   * unreachable by keyboard, with no visible symptom. Falling back to the
+   * first entry keeps a way in, matching SegmentedControl.
+   */
+  const themeFocalIndex = Math.max(
+    themes.findIndex((entry) => entry.id === selectedTheme),
+    0,
+  );
+  const colorModeFocalIndex = Math.max(
+    colorModes.findIndex((entry) => entry.mode === selectedColorMode),
+    0,
+  );
+
   const handleRadioKeyDown = <T,>(
     event: KeyboardEvent<HTMLButtonElement>,
     entries: readonly T[],
@@ -197,7 +217,7 @@ export default function ThemePicker({
                 type="button"
                 role="radio"
                 aria-checked={selected}
-                tabIndex={selected ? 0 : -1}
+                tabIndex={index === themeFocalIndex ? 0 : -1}
                 data-selected={selected}
                 className={styles.themeCard}
                 onClick={() => onThemeChange(entry.id)}
@@ -253,7 +273,7 @@ export default function ThemePicker({
                 type="button"
                 role="radio"
                 aria-checked={selected}
-                tabIndex={selected ? 0 : -1}
+                tabIndex={index === colorModeFocalIndex ? 0 : -1}
                 data-selected={selected}
                 className={styles.modeButton}
                 onClick={() => onColorModeChange(entry.mode)}

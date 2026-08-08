@@ -9,8 +9,8 @@
  *   - {@link useDeleteCalendarMutation}     DELETE /workspaces/{wsId}/calendars/{calId}
  *   - {@link useCalendarEventCountQuery}    GET    /workspaces/{wsId}/calendars/{calId}/events/count
  *
- * Cache invalidation policy (W5)
- * ------------------------------
+ * Cache invalidation policy
+ * -------------------------
  * Centralised through {@link invalidateCalendarCaches}:
  *
  *   - Update / Delete → invalidate

@@ -15,8 +15,8 @@
  * All hooks normalise errors via the shared {@link ApiError} helper so
  * route-level boundaries can branch on `code`.
  *
- * Cache invalidation policy (W5)
- * ------------------------------
+ * Cache invalidation policy
+ * -------------------------
  *   - Create  → invalidate the per-workspace list key.
  *   - Update / Status transition → invalidate the per-workspace list
  *               key (so the active-bar fan-out picks up the change)

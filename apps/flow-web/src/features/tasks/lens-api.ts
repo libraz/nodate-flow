@@ -4,8 +4,8 @@
  * The SDK's SavedLens type is mapped to the narrower LensDto at the
  * boundary via `toLensDto`. All hooks follow the same patterns as `./api.ts`.
  *
- * Cache invalidation policy (W5)
- * ------------------------------
+ * Cache invalidation policy
+ * -------------------------
  *   - Create  → invalidate the parent list key for the (workspaceId,
  *               projectId) scope. The two args together uniquely
  *               identify the saved-view list the new lens appears in.

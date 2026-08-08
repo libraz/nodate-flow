@@ -7,13 +7,13 @@
  * single-action card and imports is a longer list-plus-form, so leading
  * with the compact card keeps the page scannable on first paint.
  *
- * Deviation from the original W7 plan: the plan called for a CSV preview
- * + column-mapping + retry wizard. The actual SDK surface
- * (`ImportJobBody`) only exposes `{id, source, status, processed/total/
- * failed, errorLog, createdAt, startedAt, completedAt}` — no filename,
- * no preview rows, no mapping, no per-row retry. We ship what the
- * backend can actually drive: a list with progress + cancel, and a
- * minimal create form (source + optional projectId + raw configJson).
+ * There is no CSV preview, column mapping or per-row retry here because
+ * the SDK surface cannot drive one: `ImportJobBody` exposes only
+ * `{id, source, status, processed/total/failed, errorLog, createdAt,
+ * startedAt, completedAt}` — no filename, no preview rows, no mapping.
+ * The page offers what the backend supports: a list with progress +
+ * cancel, and a minimal create form (source + optional projectId + raw
+ * configJson).
  *
  * The Exports endpoint always returns a JSON envelope regardless of the
  * `?format=` query value — it does not stream `text/csv`. The export

@@ -59,6 +59,10 @@
   color: var(--nf-color-fg);
 }
 
+/*
+ * The weekday labels are the grid's `role="row"` of column headers, so they
+ * live inside `.dayGrid` and share its seven-column track.
+ */
 .weekdays {
   display: grid;
   grid-template-columns: repeat(7, 1fr);
@@ -74,8 +78,18 @@
 }
 
 .dayGrid {
+  display: flex;
+  flex-direction: column;
+}
+
+.week {
   display: grid;
   grid-template-columns: repeat(7, 1fr);
+}
+
+.dayCell {
+  display: block;
+  min-inline-size: 0;
 }
 
 .day {
@@ -84,6 +98,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
+  inline-size: 100%;
   /* nf-token-override: component dimension, not a spacing step */
   block-size: 2.25rem;
   border-radius: var(--nf-radius-pill);
@@ -92,11 +107,16 @@
   transition: background var(--nf-duration-fast) var(--nf-ease-standard);
 }
 
-.day:hover:not(:disabled) {
+.day:hover:not([aria-disabled="true"]) {
   background: var(--nf-color-surface-hover);
 }
 
-.day:disabled {
+.day:focus-visible {
+  outline: var(--nf-focus-ring-width) solid var(--nf-color-focus-ring);
+  outline-offset: var(--nf-focus-ring-offset);
+}
+
+.day[aria-disabled="true"] {
   opacity: 0.3;
   cursor: default;
 }

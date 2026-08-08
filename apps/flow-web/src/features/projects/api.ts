@@ -4,8 +4,8 @@
  * All hooks are suspense-ready where applicable and participate in the
  * shared QueryClient (throwOnError, route-level ErrorBoundary).
  *
- * Cache invalidation policy (W5)
- * ------------------------------
+ * Cache invalidation policy
+ * -------------------------
  *   - Create  → invalidate the parent list key for the workspace.
  *   - Update  → invalidate the project's detail key + every list key
  *               (`[...projectsKeys.all, 'list']`) because the project

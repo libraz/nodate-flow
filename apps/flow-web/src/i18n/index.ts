@@ -15,7 +15,6 @@ import enCommon from '../../locales/en/common.json';
 import enConstraints from '../../locales/en/constraints.json';
 import enDashboard from '../../locales/en/dashboard.json';
 import enErrors from '../../locales/en/errors.json';
-import enExport from '../../locales/en/export.json';
 import enInbox from '../../locales/en/inbox.json';
 import enLabels from '../../locales/en/labels.json';
 import enLinkedEvents from '../../locales/en/linkedEvents.json';
@@ -40,7 +39,6 @@ import jaCommon from '../../locales/ja/common.json';
 import jaConstraints from '../../locales/ja/constraints.json';
 import jaDashboard from '../../locales/ja/dashboard.json';
 import jaErrors from '../../locales/ja/errors.json';
-import jaExport from '../../locales/ja/export.json';
 import jaInbox from '../../locales/ja/inbox.json';
 import jaLabels from '../../locales/ja/labels.json';
 import jaLinkedEvents from '../../locales/ja/linkedEvents.json';
@@ -65,7 +63,6 @@ import zhCommon from '../../locales/zh/common.json';
 import zhConstraints from '../../locales/zh/constraints.json';
 import zhDashboard from '../../locales/zh/dashboard.json';
 import zhErrors from '../../locales/zh/errors.json';
-import zhExport from '../../locales/zh/export.json';
 import zhInbox from '../../locales/zh/inbox.json';
 import zhLabels from '../../locales/zh/labels.json';
 import zhLinkedEvents from '../../locales/zh/linkedEvents.json';
@@ -129,7 +126,6 @@ export function initI18n(): typeof i18n {
         'aiPriority',
         'constraints',
         'errors',
-        'export',
         'notifications',
         'relations',
         'dashboard',
@@ -158,7 +154,6 @@ export function initI18n(): typeof i18n {
           aiPriority: enAiPriority,
           constraints: enConstraints,
           errors: enErrors,
-          export: enExport,
           notifications: enNotifications,
           relations: enRelations,
           dashboard: enDashboard,
@@ -185,7 +180,6 @@ export function initI18n(): typeof i18n {
           aiPriority: jaAiPriority,
           constraints: jaConstraints,
           errors: jaErrors,
-          export: jaExport,
           notifications: jaNotifications,
           relations: jaRelations,
           dashboard: jaDashboard,
@@ -212,7 +206,6 @@ export function initI18n(): typeof i18n {
           aiPriority: zhAiPriority,
           constraints: zhConstraints,
           errors: zhErrors,
-          export: zhExport,
           notifications: zhNotifications,
           relations: zhRelations,
           dashboard: zhDashboard,

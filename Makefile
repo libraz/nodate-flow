@@ -228,14 +228,20 @@ lighthouse: build-web ## Run Lighthouse CI (a11y 95+, perf 70+)
 
 # ---------- lint / format / typecheck ----------
 
-.PHONY: check lint format typecheck vet check-dtos check-css-var-parens check-public-router check-tokens check-breakpoints check-themes check-colors check-spacing
-check: lint typecheck vet i18n-check check-dtos check-css-var-parens check-public-router check-tokens check-themes check-colors check-spacing check-breakpoints ## Lint + typecheck + go vet + i18n locale guard + DTO drift guard + CSS var() paren guard + public-surface guard + design-token guards (references, theme parity, colours, spacing) + breakpoint guard
+.PHONY: check lint format typecheck vet check-dtos check-css-var-parens check-public-router check-tokens check-breakpoints check-themes check-colors check-spacing check-region-parity check-sdk-browser-safe
+check: lint typecheck vet i18n-check check-dtos check-css-var-parens check-public-router check-region-parity check-sdk-browser-safe check-tokens check-themes check-colors check-spacing check-breakpoints ## Lint + typecheck + go vet + i18n locale guard + DTO drift guard + CSS var() paren guard + public-surface guard + Go/TS region parity + browser-SDK Node-type guard + design-token guards (references, theme parity, colours, spacing) + breakpoint guard
 
 check-dtos: ## Fail when web routes/features hand-roll response DTOs instead of using SDK schemas
 	bash scripts/check-handrolled-dtos.sh
 
 check-public-router: ## Fail when the auth-free router registers a route that is not allowlisted
 	$(PKG_RUN) scripts/check-public-router.ts
+
+check-region-parity: ## Fail when the Go and TS country allowlists disagree
+	node scripts/check-region-parity.mjs
+
+check-sdk-browser-safe: ## Fail when anything pulls Node types into the browser SDK
+	node scripts/check-sdk-browser-safe.mjs
 
 check-tokens: ## Fail when a var(--nf-*) reference names a token nothing defines
 	node scripts/check-undefined-tokens.mjs

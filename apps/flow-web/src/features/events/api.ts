@@ -8,8 +8,8 @@
  * so changes here invalidate the calendar grid in lockstep with the
  * detail page's own queries.
  *
- * Cache invalidation policy (W5)
- * ------------------------------
+ * Cache invalidation policy
+ * -------------------------
  * Centralised through the local `invalidate()` helper:
  *
  *   - Update / Delete → invalidate

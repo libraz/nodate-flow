@@ -45,6 +45,13 @@ export interface PopoverProps {
   /** Optional className for the popover panel. */
   className?: string;
   /**
+   * Accessible name for the panel. The panel carries `role="dialog"`, and a
+   * dialog without a name is announced as an unlabelled region — the reader
+   * is told something opened but not what. Pass a localized string; callers
+   * that render their own heading inside the panel can leave it unset.
+   */
+  ariaLabel?: string;
+  /**
    * Lock the panel to a fixed minimum block-size. Use for kind/mode-swap
    * popovers whose inner content grows or shrinks: without a floor the panel
    * reflows on every switch, which contradicts the "morphic UI must not
@@ -68,6 +75,7 @@ export default function Popover({
   open: controlledOpen,
   onOpenChange,
   className,
+  ariaLabel,
   minBlockSize,
   minInlineSize,
 }: PopoverProps): ReactElement {
@@ -121,6 +129,11 @@ export default function Popover({
               ref={refs.setFloating}
               style={lockStyle}
               className={cx(styles.popover, className)}
+              // `useRole` sets the same role through getFloatingProps below;
+              // stating it here as well is what lets a static a11y rule see
+              // that `aria-label` is being applied to a dialog.
+              role="dialog"
+              aria-label={ariaLabel}
               {...getFloatingProps()}
             >
               {content}

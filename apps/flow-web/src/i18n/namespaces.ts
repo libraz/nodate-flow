@@ -25,7 +25,6 @@ export const namespaces = [
   'aiAgents',
   'sharing',
   'signal-kinds',
-  'export',
   'system-info',
 ] as const;
 

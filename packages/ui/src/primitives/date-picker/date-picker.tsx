@@ -6,7 +6,15 @@
  * Weekday and month labels are injected via props for i18n.
  */
 
-import { type ReactElement, useCallback, useMemo, useState } from 'react';
+import {
+  type KeyboardEvent,
+  type ReactElement,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import { cx } from '../../lib/cx';
 import Popover from '../popover/popover';
 import styles from './date-picker.module.css';
@@ -140,6 +148,45 @@ function todayIso(): string {
   return toIso(d.getFullYear(), d.getMonth() + 1, d.getDate());
 }
 
+/** One cell of the day grid. `day` is null for the out-of-month padding. */
+interface DayCell {
+  /** Stable key: the ISO date the cell stands on, padding included. */
+  key: string;
+  /** Day-of-month, or null when the cell belongs to a neighbouring month. */
+  day: number | null;
+}
+
+/**
+ * Lay the month out as full seven-cell rows.
+ *
+ * A `role="grid"` has to contain rows of cells — a flat run of buttons is
+ * announced as a list of numbers with no week structure, and it is what left
+ * keyboard users tabbing through up to 31 stops to reach the end of a month.
+ * The leading and trailing padding cells are emitted (rather than collapsed
+ * into one spanning element) so every row really does have seven cells.
+ */
+function buildWeeks(year: number, month: number, weekStart: WeekStartDay): DayCell[][] {
+  const total = daysInMonth(year, month);
+  const leading = (startDayOfWeek(year, month) - WEEK_START_DOW[weekStart] + 7) % 7;
+  const rows = Math.ceil((leading + total) / 7);
+  const weeks: DayCell[][] = [];
+  for (let row = 0; row < rows; row += 1) {
+    const cells: DayCell[] = [];
+    for (let col = 0; col < 7; col += 1) {
+      const day = row * 7 + col - leading + 1;
+      // Date normalises out-of-range days into the neighbouring month, which
+      // is exactly what the padding cells need for a unique, stable key.
+      const spill = new Date(year, month - 1, day);
+      cells.push({
+        key: toIso(spill.getFullYear(), spill.getMonth() + 1, spill.getDate()),
+        day: day >= 1 && day <= total ? day : null,
+      });
+    }
+    weeks.push(cells);
+  }
+  return weeks;
+}
+
 /** DatePicker renders a popover with a calendar grid. */
 export default function DatePicker({
   value,
@@ -180,21 +227,44 @@ export default function DatePicker({
    * happened to be on, with the selected day off screen.
    */
   const [prevValue, setPrevValue] = useState(value);
+  // Day the roving tabindex sits on. The grid contributes exactly one tab
+  // stop; everything else inside it is reached with the arrow keys.
+  const [focusedDay, setFocusedDay] = useState(initial.day);
   if (prevValue !== value) {
     setPrevValue(value);
     const p = parseIso(value);
-    if (p && (p.year !== viewYear || p.month !== viewMonth)) {
-      setViewYear(p.year);
-      setViewMonth(p.month);
+    if (p) {
+      setFocusedDay(p.day);
+      if (p.year !== viewYear || p.month !== viewMonth) {
+        setViewYear(p.year);
+        setViewMonth(p.month);
+      }
     }
   }
 
   const days = useMemo(() => daysInMonth(viewYear, viewMonth), [viewYear, viewMonth]);
-  const rawStartDay = useMemo(() => startDayOfWeek(viewYear, viewMonth), [viewYear, viewMonth]);
+  const weeks = useMemo(
+    () => buildWeeks(viewYear, viewMonth, weekStart),
+    [viewYear, viewMonth, weekStart],
+  );
   // Shift the Sun=0..Sat=6 day-of-week into the number of leading empty
   // cells, counting from whichever day the week starts on.
-  const leadingEmpty = (rawStartDay - WEEK_START_DOW[weekStart] + 7) % 7;
+  const leadingEmpty = (startDayOfWeek(viewYear, viewMonth) - WEEK_START_DOW[weekStart] + 7) % 7;
   const today = useMemo(todayIso, []);
+  // Paging to a shorter month must not leave the tab stop on a day that no
+  // longer exists, which would drop the grid out of the tab order entirely.
+  const rovingDay = Math.min(Math.max(focusedDay, 1), days);
+
+  const dayRefs = useRef(new Map<number, HTMLButtonElement>());
+  // Set when a key press moves focus to a day that is not on screen yet
+  // (month or year boundary), and consumed once the new month has rendered.
+  const pendingFocusRef = useRef<number | null>(null);
+  useEffect(() => {
+    const day = pendingFocusRef.current;
+    if (day === null) return;
+    pendingFocusRef.current = null;
+    dayRefs.current.get(day)?.focus();
+  });
 
   const goPrev = useCallback(() => {
     setViewMonth((m) => {
@@ -226,6 +296,82 @@ export default function DatePicker({
     [viewYear, viewMonth, minDate, onChange],
   );
 
+  /** Move the roving focus to a concrete calendar date, paging if needed. */
+  const focusDate = useCallback(
+    (target: Date) => {
+      const y = target.getFullYear();
+      const m = target.getMonth() + 1;
+      const d = target.getDate();
+      setFocusedDay(d);
+      if (y !== viewYear || m !== viewMonth) {
+        setViewYear(y);
+        setViewMonth(m);
+      }
+      pendingFocusRef.current = d;
+    },
+    [viewYear, viewMonth],
+  );
+
+  /**
+   * Arrow-key navigation over the grid, per the WAI-ARIA date-picker
+   * pattern. Movement crosses month and year boundaries so the whole
+   * calendar is reachable without touching the nav buttons.
+   */
+  const handleGridKeyDown = useCallback(
+    (event: KeyboardEvent<HTMLButtonElement>, day: number) => {
+      if (event.altKey || event.ctrlKey || event.metaKey) return;
+      const column = (leadingEmpty + day - 1) % 7;
+      const rtl =
+        event.currentTarget.closest('[dir="rtl"]') !== null ||
+        (typeof document !== 'undefined' && document.documentElement.dir === 'rtl');
+      let byDays: number | null = null;
+      let byMonths: number | null = null;
+      switch (event.key) {
+        case 'ArrowLeft':
+          byDays = rtl ? 1 : -1;
+          break;
+        case 'ArrowRight':
+          byDays = rtl ? -1 : 1;
+          break;
+        case 'ArrowUp':
+          byDays = -7;
+          break;
+        case 'ArrowDown':
+          byDays = 7;
+          break;
+        case 'Home':
+          byDays = -column;
+          break;
+        case 'End':
+          byDays = 6 - column;
+          break;
+        case 'PageUp':
+          byMonths = event.shiftKey ? -12 : -1;
+          break;
+        case 'PageDown':
+          byMonths = event.shiftKey ? 12 : 1;
+          break;
+        default:
+          return;
+      }
+      event.preventDefault();
+      if (byDays !== null) {
+        focusDate(new Date(viewYear, viewMonth - 1, day + byDays));
+        return;
+      }
+      if (byMonths !== null) {
+        // Clamp so 31 January + 1 month lands on 28/29 February rather than
+        // silently spilling into March.
+        const targetMonth = viewMonth - 1 + byMonths;
+        const targetYear = viewYear + Math.floor(targetMonth / 12);
+        const normalizedMonth = ((targetMonth % 12) + 12) % 12;
+        const clamped = Math.min(day, daysInMonth(targetYear, normalizedMonth + 1));
+        focusDate(new Date(targetYear, normalizedMonth, clamped));
+      }
+    },
+    [focusDate, leadingEmpty, viewMonth, viewYear],
+  );
+
   const handleClear = useCallback(() => {
     onClear?.();
     setOpen(false);
@@ -236,6 +382,7 @@ export default function DatePicker({
       open={open}
       onOpenChange={setOpen}
       placement="bottom-start"
+      ariaLabel={formatMonthYear(viewYear, viewMonth)}
       content={
         <div className={styles.panel}>
           {/* Header: prev / month-year / next */}
@@ -255,7 +402,9 @@ export default function DatePicker({
                 <path d="M15 18l-6-6 6-6" />
               </svg>
             </button>
-            <span className={styles.monthYear}>{formatMonthYear(viewYear, viewMonth)}</span>
+            <span className={styles.monthYear} aria-live="polite">
+              {formatMonthYear(viewYear, viewMonth)}
+            </span>
             <button type="button" className={styles.navBtn} onClick={goNext} aria-label={nextLabel}>
               <svg
                 width="16"
@@ -273,45 +422,73 @@ export default function DatePicker({
             </button>
           </div>
 
-          {/* Weekday labels */}
-          <div className={styles.weekdays}>
-            {resolvedWeekdayLabels.map((wd, i) => {
-              // Canonical Sunday-based day-of-week (0=Sun..6=Sat) for a stable key
-              // independent of label content or week-start offset.
-              const dow = (i + WEEK_START_DOW[weekStart]) % 7;
-              return (
-                <div key={`dow-${dow}`} className={styles.weekday}>
-                  {wd}
-                </div>
-              );
-            })}
-          </div>
-
-          {/* Day grid */}
-          <div className={styles.dayGrid} role="grid">
-            {leadingEmpty > 0 && <div style={{ gridColumn: `span ${leadingEmpty}` }} />}
-            {Array.from({ length: days }, (_, i) => {
-              const day = i + 1;
-              const iso = toIso(viewYear, viewMonth, day);
-              const isSelected = iso === value;
-              const isToday = iso === today;
-              const isDisabled = minDate ? iso < minDate : false;
-              return (
-                <button
-                  key={day}
-                  type="button"
-                  disabled={isDisabled}
-                  className={cx(
-                    styles.day,
-                    isSelected && styles.daySelected,
-                    isToday && !isSelected && styles.dayToday,
-                  )}
-                  onClick={() => handleSelect(day)}
-                >
-                  {day}
-                </button>
-              );
-            })}
+          {/* Day grid: weekday header row + one row per week */}
+          <div
+            className={styles.dayGrid}
+            role="grid"
+            aria-label={formatMonthYear(viewYear, viewMonth)}
+          >
+            <div className={styles.weekdays} role="row">
+              {resolvedWeekdayLabels.map((wd, i) => {
+                // Canonical Sunday-based day-of-week (0=Sun..6=Sat) for a stable key
+                // independent of label content or week-start offset.
+                const dow = (i + WEEK_START_DOW[weekStart]) % 7;
+                return (
+                  <div key={`dow-${dow}`} className={styles.weekday} role="columnheader">
+                    {wd}
+                  </div>
+                );
+              })}
+            </div>
+            {weeks.map((week) => (
+              // Rows are keyed by the date their first cell stands on, which
+              // is unique across months and stable across re-renders.
+              <div key={`week-${week[0]?.key ?? ''}`} className={styles.week} role="row">
+                {week.map((cell) => {
+                  if (cell.day === null) {
+                    return <div key={cell.key} className={styles.dayCell} role="gridcell" />;
+                  }
+                  const day = cell.day;
+                  const iso = toIso(viewYear, viewMonth, day);
+                  const isSelected = iso === value;
+                  const isToday = iso === today;
+                  const isDisabled = minDate ? iso < minDate : false;
+                  return (
+                    <div
+                      key={cell.key}
+                      className={styles.dayCell}
+                      role="gridcell"
+                      aria-selected={isSelected}
+                    >
+                      <button
+                        ref={(node) => {
+                          if (node) dayRefs.current.set(day, node);
+                          else dayRefs.current.delete(day);
+                        }}
+                        type="button"
+                        // `aria-disabled` rather than `disabled`: a disabled
+                        // button cannot take focus, so a roving tabindex that
+                        // landed on one would strand the keyboard user with no
+                        // way back into the grid.
+                        aria-disabled={isDisabled || undefined}
+                        aria-current={isToday ? 'date' : undefined}
+                        tabIndex={day === rovingDay ? 0 : -1}
+                        className={cx(
+                          styles.day,
+                          isSelected && styles.daySelected,
+                          isToday && !isSelected && styles.dayToday,
+                        )}
+                        onClick={() => handleSelect(day)}
+                        onFocus={() => setFocusedDay(day)}
+                        onKeyDown={(event) => handleGridKeyDown(event, day)}
+                      >
+                        {day}
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            ))}
           </div>
 
           {/* Footer: optional clear affordance. Only rendered when the caller

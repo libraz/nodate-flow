@@ -4,8 +4,8 @@
  * All hooks are suspense-ready where applicable and participate in the
  * shared QueryClient (throwOnError, route-level ErrorBoundary).
  *
- * Cache invalidation policy (W5)
- * ------------------------------
+ * Cache invalidation policy
+ * -------------------------
  * Every mutation in this module follows the same matrix so the UI never
  * goes stale after concurrent operations and we never broadcast a
  * `tasksKeys.all` nuke without justification:
@@ -32,8 +32,8 @@
  * Wherever a mutation broadcasts `[...tasksKeys.all, 'list']`
  * (i.e. across all projects) the use site is documented inline.
  *
- * Infinite lists (W7/M-9)
- * ----------------------
+ * Infinite lists
+ * --------------
  * `tasksKeys.infinite(projectId, filters)` and `tasksKeys.myInfinite()`
  * both sit under the `[...tasksKeys.all, 'list']` prefix, so every
  * mutation that broadcasts list invalidation also refreshes the infinite
@@ -106,8 +106,8 @@ export interface TaskFilters {
 /**
  * Query key factory for the tasks feature.
  *
- * Keyset pagination keys (W7)
- * ---------------------------
+ * Keyset pagination keys
+ * ----------------------
  * `infinite` is the task-list infinite key used by `useTasksInfiniteQuery`,
  * threading the OFFSET page via TanStack's `pageParam` (NOT into the key
  * itself). Project task lists need the backend's sort_weight ordering for
@@ -337,7 +337,7 @@ export interface TasksPage {
  * page, not that the hook should go looking for another.
  *
  * Lives under the `[...tasksKeys.all, 'list']` invalidation prefix so the
- * existing W5 mutation policy (create / update / delete / transition all
+ * existing mutation policy (create / update / delete / transition all
  * broadcast list invalidation) refreshes both surfaces atomically.
  */
 export function useTasksInfiniteQuery(

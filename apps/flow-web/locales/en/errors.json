@@ -6,6 +6,7 @@
   "AI.MODEL.NOT_FOUND": "AI model not found",
   "AI.NL_QUERY.UNPARSEABLE": "Could not turn that into a filter",
   "AI.PROVIDER.BASE_URL_NOT_ALLOWED": "AI provider endpoint is not an allowed destination",
+  "AI.PROVIDER.KEY_DECRYPT_FAILED": "AI provider API key could not be unsealed",
   "AI.PROVIDER.NOT_CONFIGURED": "AI provider is not configured",
   "AI.PROVIDER.NOT_FOUND": "AI provider not found",
   "AI.PROVIDER.UPSTREAM_AUTH_REJECTED": "AI provider rejected credentials",

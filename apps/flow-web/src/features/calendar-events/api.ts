@@ -9,8 +9,8 @@
  * to POST / PATCH `/workspaces/{wsId}/calendars/{calId}/events[/{evtId}]`.
  * These hooks isolate that lookup and the "remember last used" policy.
  *
- * Cache invalidation policy (W5)
- * ------------------------------
+ * Cache invalidation policy
+ * -------------------------
  *   - Event Create / Update / Delete → invalidate the two calendar
  *     aggregate roots (`['calendar', 'me-events']` and
  *     `['calendar', 'me-tasks']`) via {@link invalidateCalendarAggregates}.

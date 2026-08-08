@@ -6252,14 +6252,18 @@ export interface components {
              * @example https://example.com/schemas/CreateWorkspaceInviteInputBody.json
              */
             readonly $schema?: string;
+            /** @description Delivery address. Does not bind the invite to this address. */
             email?: string;
             /**
              * Format: int64
-             * @description Seconds until invite expires
+             * @description Seconds until invite expires (max 1 year). Omit for no expiry.
              */
             expiresIn?: number;
             label?: string;
-            /** Format: int32 */
+            /**
+             * Format: int32
+             * @description Redemption limit. Omit for unlimited.
+             */
             maxUses?: number;
             /** @enum {string} */
             role: "owner" | "admin" | "member" | "guest";
@@ -7425,6 +7429,7 @@ export interface components {
              */
             readonly $schema?: string;
             items: components["schemas"]["ImportJobBody"][] | null;
+            /** @description Always null on this endpoint; page with offset. See total. */
             nextCursor: string | null;
             /** Format: int64 */
             total: number;
@@ -7806,6 +7811,7 @@ export interface components {
              */
             readonly $schema?: string;
             attachments: components["schemas"]["TaskAttachment"][] | null;
+            /** @description Always null on this endpoint; page with offset. See total. */
             nextCursor: string | null;
             /** Format: int64 */
             total: number;
@@ -8712,7 +8718,7 @@ export interface components {
             readonly $schema?: string;
             /**
              * Format: int64
-             * @description File size in bytes (max 100 MB)
+             * @description File size in bytes. Max 100 MB; over that the handler answers 413 VALIDATION.FILE.TOO_LARGE.
              */
             byteSize: number;
             /** @description MIME type */
@@ -8751,7 +8757,7 @@ export interface components {
             readonly $schema?: string;
             /**
              * Format: int64
-             * @description File size in bytes
+             * @description File size in bytes. Max 100 MB; over that the handler answers 413 VALIDATION.FILE.TOO_LARGE.
              */
             byteSize: number;
             /** @description MIME type */

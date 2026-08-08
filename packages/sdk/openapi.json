@@ -2862,12 +2862,14 @@
             "type": "string"
           },
           "email": {
+            "description": "Delivery address. Does not bind the invite to this address.",
             "maxLength": 320,
             "type": "string"
           },
           "expiresIn": {
-            "description": "Seconds until invite expires",
+            "description": "Seconds until invite expires (max 1 year). Omit for no expiry.",
             "format": "int64",
+            "maximum": 31536000,
             "minimum": 1,
             "type": "integer"
           },
@@ -2876,7 +2878,9 @@
             "type": "string"
           },
           "maxUses": {
+            "description": "Redemption limit. Omit for unlimited.",
             "format": "int32",
+            "maximum": 10000,
             "minimum": 1,
             "type": "integer"
           },
@@ -5336,6 +5340,7 @@
             "type": ["array", "null"]
           },
           "nextCursor": {
+            "description": "Always null on this endpoint; page with offset. See total.",
             "type": ["string", "null"]
           },
           "total": {
@@ -6168,6 +6173,7 @@
             "type": ["array", "null"]
           },
           "nextCursor": {
+            "description": "Always null on this endpoint; page with offset. See total.",
             "type": ["string", "null"]
           },
           "total": {
@@ -8214,9 +8220,8 @@
             "type": "string"
           },
           "byteSize": {
-            "description": "File size in bytes (max 100 MB)",
+            "description": "File size in bytes. Max 100 MB; over that the handler answers 413 VALIDATION.FILE.TOO_LARGE.",
             "format": "int64",
-            "maximum": 104857600,
             "minimum": 1,
             "type": "integer"
           },
@@ -8291,7 +8296,7 @@
             "type": "string"
           },
           "byteSize": {
-            "description": "File size in bytes",
+            "description": "File size in bytes. Max 100 MB; over that the handler answers 413 VALIDATION.FILE.TOO_LARGE.",
             "format": "int64",
             "minimum": 1,
             "type": "integer"

@@ -5,7 +5,8 @@
  * - Timezone list is sourced from `Intl.supportedValuesOf('timeZone')` when
  *   available, with a curated fallback for older runtimes.
  * - Country list is the same allowlist as the backend; extending the list
- *   requires a corresponding entry on both sides.
+ *   requires a corresponding entry on both sides, which
+ *   `src/__tests__/region.test.ts` enforces against the Go source.
  */
 
 // ISO 3166-1 alpha-2 codes are intrinsically uppercase; build the lookup
@@ -58,7 +59,14 @@ const COUNTRY_ENTRIES: ReadonlyArray<readonly [string, string]> = [
   ['CO', 'Colombia'],
 ];
 
-/** ISO 3166-1 alpha-2 code → English display name. Keep in sync with Go. */
+/**
+ * ISO 3166-1 alpha-2 code → English display name.
+ *
+ * This is the same allowlist as `supportedCountries` in
+ * `packages/go-shared/region/region.go`, which is what the API validates
+ * against. `src/__tests__/region.test.ts` reads that Go literal and fails on
+ * any divergence, so the two lists cannot drift unnoticed.
+ */
 export const SUPPORTED_COUNTRIES: Readonly<Record<string, string>> =
   Object.fromEntries(COUNTRY_ENTRIES);
 

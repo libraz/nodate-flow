@@ -8,8 +8,8 @@
  *   - {@link useUpdateCalendarMemberRoleMutation} PATCH  .../members/{userId}
  *   - {@link useRemoveCalendarMemberMutation}      DELETE .../members/{userId}
  *
- * Cache invalidation policy (W5)
- * ------------------------------
+ * Cache invalidation policy
+ * -------------------------
  * Centralised through the local `invalidate()` helper:
  *
  *   - Add / Update role / Remove → invalidate

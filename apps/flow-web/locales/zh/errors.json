@@ -6,6 +6,7 @@
   "AI.MODEL.NOT_FOUND": "未找到 AI 模型",
   "AI.NL_QUERY.UNPARSEABLE": "无法将其转换为筛选条件",
   "AI.PROVIDER.BASE_URL_NOT_ALLOWED": "AI 服务提供商的接入点不是允许的目标地址",
+  "AI.PROVIDER.KEY_DECRYPT_FAILED": "无法解密 AI 服务提供商的 API 密钥",
   "AI.PROVIDER.NOT_CONFIGURED": "AI 服务提供商未配置",
   "AI.PROVIDER.NOT_FOUND": "未找到 AI 服务提供商",
   "AI.PROVIDER.UPSTREAM_AUTH_REJECTED": "AI 服务提供商拒绝了认证凭据",

@@ -6,6 +6,7 @@
   "AI.MODEL.NOT_FOUND": "AI モデルが見つかりません",
   "AI.NL_QUERY.UNPARSEABLE": "入力をフィルタに変換できませんでした",
   "AI.PROVIDER.BASE_URL_NOT_ALLOWED": "AI プロバイダの接続先が許可されていません",
+  "AI.PROVIDER.KEY_DECRYPT_FAILED": "AI プロバイダの API キーを復号できませんでした",
   "AI.PROVIDER.NOT_CONFIGURED": "AI プロバイダが設定されていません",
   "AI.PROVIDER.NOT_FOUND": "AI プロバイダが見つかりません",
   "AI.PROVIDER.UPSTREAM_AUTH_REJECTED": "AI プロバイダが認証を拒否しました",

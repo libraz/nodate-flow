@@ -3,7 +3,17 @@
   "compilerOptions": {
     "outDir": "dist",
     "rootDir": "src",
-    "composite": true
+    "composite": true,
+    // The SDK ships to browser bundles, so nothing here may reach for a
+    // Node global. Without this, TypeScript pulls in every `@types/*`
+    // package it finds hoisted at the workspace root, and whether
+    // `Buffer` compiles becomes a function of where the package manager
+    // happened to place `@types/node` for some unrelated dependency —
+    // the guarantee disappears without anything turning red. An empty
+    // list turns off ambient inclusion entirely; explicit `import`s
+    // (react, vitest) resolve through module resolution and are
+    // unaffected.
+    "types": []
   },
   "include": ["src"]
 }

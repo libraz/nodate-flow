@@ -12,10 +12,9 @@ import { router } from './router/router';
 import './styles/main.css';
 
 // One-shot cleanup of localStorage keys left over from the retired
-// time-web app (decommissioned in commit 4dbfd58). Runs on every boot;
-// removeItem on a missing key is a no-op so there is no cost after the
-// first load that finds nothing to delete. Leave this in for one or
-// two releases, then retire.
+// time-web app. Runs on every boot; removeItem on a missing key is a
+// no-op so there is no cost after the first load that finds nothing to
+// delete. Leave this in for one or two releases, then retire.
 const LEGACY_LOCALSTORAGE_KEYS = [
   'tt_theme',
   'tt_activeCalendarIds',

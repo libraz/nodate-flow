@@ -14,6 +14,7 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useMemo,
   useRef,
   useState,
 } from 'react';
@@ -331,15 +332,23 @@ export function ThemeProvider({
     [family],
   );
 
-  const value: ThemeContextValue = {
-    preference,
-    resolved,
-    family,
-    colorMode,
-    setPreference,
-    setFamily,
-    setColorMode,
-  };
+  // The provider sits at the root of every app, so a fresh object here
+  // re-renders every `useThemeContext` consumer on any ancestor render, not
+  // just on a theme change. The setters are already stable; memoizing the
+  // envelope makes the context change only when the theme actually does.
+  // (No React Compiler in this build — see the app vite configs.)
+  const value = useMemo<ThemeContextValue>(
+    () => ({
+      preference,
+      resolved,
+      family,
+      colorMode,
+      setPreference,
+      setFamily,
+      setColorMode,
+    }),
+    [preference, resolved, family, colorMode, setPreference, setFamily, setColorMode],
+  );
 
   return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;
 }

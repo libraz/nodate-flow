@@ -15,10 +15,8 @@
  *     verbatim so existing dev workflows behave the same.
  *   - In all other modes, swallow silently.
  *
- * No centralised reporter exists in the codebase yet; the audit
- * recommendation was explicitly "search first; don't add new infra"
- * (see TASK #13 / B12). When one is introduced, this file is the
- * single seam to plug it into.
+ * No centralised reporter exists in the codebase yet. When one is
+ * introduced, this file is the single seam to plug it into.
  *
  * @param message Short human-readable label describing the failure
  *                site. Treated as a stable prefix in dev output.

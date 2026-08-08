@@ -13,6 +13,9 @@ import { useTranslation } from 'react-i18next';
 
 import PublicPageLayout from '../../components/public-page-layout';
 import { isNetworkError } from '../../lib/api-error';
+import { formatDueDate } from '../../lib/format-date';
+import type { TaskDerivedState, TaskPriority } from '../tasks/api';
+import { PRIORITY_KEY, STATE_KEY } from '../tasks/constants';
 import { usePublicLensQuery } from './api';
 import styles from './sharing.module.css';
 
@@ -21,7 +24,11 @@ export interface PublicLensPageProps {
 }
 
 export default function PublicLensPage({ token }: PublicLensPageProps): ReactElement {
-  const { t } = useTranslation('sharing');
+  const { t, i18n } = useTranslation('sharing');
+  // Status and priority labels live in `common`, alongside every other view
+  // of a task. A public reader gets the same words a member does.
+  const { t: tCommon } = useTranslation('common');
+  const locale = i18n.resolvedLanguage ?? 'en';
   const { data, isLoading, error } = usePublicLensQuery(token);
 
   if (isLoading) {
@@ -98,15 +105,23 @@ export default function PublicLensPage({ token }: PublicLensPageProps): ReactEle
               </tr>
             </thead>
             <tbody>
-              {data.tasks.map((task) => (
-                <tr key={task.id}>
-                  <td>{task.title}</td>
-                  <td>{task.status}</td>
-                  <td>{String(task.priority)}</td>
-                  <td>{task.dueOn ?? '—'}</td>
-                  <td>{task.assigneeDisplayName ?? '—'}</td>
-                </tr>
-              ))}
+              {data.tasks.map((task) => {
+                // The API sends the raw derived state and a 0-4 priority.
+                // Rendering those verbatim showed a Japanese reader
+                // "waiting" and "3"; route both through the same label maps
+                // the authenticated views use.
+                const stateKey = STATE_KEY[task.status as TaskDerivedState];
+                const priorityKey = PRIORITY_KEY[task.priority as TaskPriority];
+                return (
+                  <tr key={task.id}>
+                    <td>{task.title}</td>
+                    <td>{stateKey ? tCommon(stateKey) : task.status}</td>
+                    <td>{priorityKey ? tCommon(priorityKey) : String(task.priority)}</td>
+                    <td>{task.dueOn ? formatDueDate(task.dueOn, locale) : '—'}</td>
+                    <td>{task.assigneeDisplayName ?? '—'}</td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         )}

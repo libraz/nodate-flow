@@ -3,13 +3,12 @@
  * admin pane for outbound webhook subscriptions: list + create + delete +
  * toggle + send-test + view delivery history.
  *
- * Deviations from the original W8 plan:
- *   - The plan called for full CRUD + retry on failed deliveries. The
- *     actual flow-api surface has no PUT/PATCH on the subscription body
- *     (only a toggle), no per-delivery retry, and no rotate-secret. We
- *     ship what is shippable: create, delete, toggle, send-test, and a
- *     read-only deliveries drawer. To change url / description /
- *     eventTypes the operator deletes and recreates.
+ * What the page deliberately does not offer, and why:
+ *   - No edit and no per-delivery retry: the flow-api surface has no
+ *     PUT/PATCH on the subscription body (only a toggle), no per-delivery
+ *     retry, and no rotate-secret. The page offers create, delete,
+ *     toggle, send-test, and a read-only deliveries drawer. To change
+ *     url / description / eventTypes the operator deletes and recreates.
  *   - The signing secret is also returned by GET detail, so the create
  *     reveal is informational rather than single-shot. The "Show secret"
  *     menu action uses the same detail endpoint for later retrieval.

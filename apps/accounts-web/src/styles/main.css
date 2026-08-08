@@ -9,6 +9,14 @@
 @import "@nodate-flow/ui/themes/glass-light.css";
 @import "@nodate-flow/ui/themes/glass-dark.css";
 
+/*
+ * The `nf-focus-ring` utility. Imported unconditionally, alongside the same
+ * import in flow-web: the class is applied from JSX and paints nothing at all
+ * without this stylesheet, so the first component that reaches for it would
+ * otherwise ship with no keyboard focus indicator and no build error.
+ */
+@import "@nodate-flow/ui/styles/focus-ring.css";
+
 @import "./layout.css";
 
 /*
