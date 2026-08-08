@@ -94,7 +94,7 @@ WHERE cps.workspace_id = ?
   AND cps.enabled = TRUE
 ORDER BY cps.sort_weight ASC, cps.created_at ASC, cps.public_id ASC;
 
--- name: PatchPublicShare :exec
+-- name: PatchPublicShare :execrows
 -- Update mutable share fields. NULL arguments leave columns untouched.
 UPDATE calendar_public_shares
 SET title                  = COALESCE(sqlc.narg('title'), title),
@@ -109,7 +109,7 @@ WHERE workspace_id = ?
   AND public_id = ?
   AND enabled = TRUE;
 
--- name: ClearPublicShareExpiresAt :exec
+-- name: ClearPublicShareExpiresAt :execrows
 -- Dedicated setter that clears expires_at (COALESCE-based patch cannot
 -- distinguish "leave unchanged" from "clear" for nullable columns).
 UPDATE calendar_public_shares
@@ -118,7 +118,7 @@ WHERE workspace_id = ?
   AND public_id = ?
   AND enabled = TRUE;
 
--- name: RotatePublicShareToken :exec
+-- name: RotatePublicShareToken :execrows
 -- Regenerate the token hash; invalidates any previously issued URL.
 UPDATE calendar_public_shares
 SET token_hash = ?
@@ -126,14 +126,15 @@ WHERE workspace_id = ?
   AND public_id = ?
   AND enabled = TRUE;
 
--- name: DisablePublicShare :exec
+-- name: DisablePublicShare :execrows
 -- Soft-delete a share page. Child rows in calendar_public_share_events
 -- are left as-is (soft-disabled at the share level is sufficient; the
 -- render query joins through cps.enabled).
 UPDATE calendar_public_shares
 SET enabled = FALSE
 WHERE workspace_id = ?
-  AND public_id = ?;
+  AND public_id = ?
+  AND enabled = TRUE;
 
 -- name: FindEventIDAndVisibility :one
 -- Lightweight resolver used by the public-share attach/detach paths to
@@ -165,7 +166,7 @@ INSERT INTO calendar_public_share_events (
   sort_weight
 ) VALUES (?, ?, ?, ?, ?);
 
--- name: DetachCalendarEventsFromAllShares :exec
+-- name: DetachCalendarEventsFromAllShares :execrows
 -- Withdraw every publication of a calendar's events, across every share
 -- in the workspace. Run when the calendar itself is deleted.
 --
@@ -189,7 +190,7 @@ WHERE c.public_id = ?
   AND c.workspace_id = ?
   AND cpse.enabled = TRUE;
 
--- name: DetachEventFromShare :exec
+-- name: DetachEventFromShare :execrows
 -- Remove one event from a share (soft). Looks up the link by share +
 -- event internal ids (caller resolves both via their public ids first).
 UPDATE calendar_public_share_events
@@ -198,7 +199,7 @@ WHERE share_id = ?
   AND event_id = ?
   AND enabled = TRUE;
 
--- name: UpdateShareEventSortWeight :exec
+-- name: UpdateShareEventSortWeight :execrows
 -- Update the sort_weight of a single share-event link.
 -- Called in a loop (inside a tx) when a user reorders the events on a
 -- public share. Scoped to (share_id, public_id) so a caller cannot

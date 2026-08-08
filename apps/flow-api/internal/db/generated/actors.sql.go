@@ -267,11 +267,12 @@ func (q *Queries) ListAgentActorsForTask(ctx context.Context, arg ListAgentActor
 	return items, nil
 }
 
-const removeActor = `-- name: RemoveActor :exec
+const removeActor = `-- name: RemoveActor :execrows
 UPDATE task_actors
 SET enabled = FALSE
 WHERE workspace_id = ?
   AND public_id = ?
+  AND enabled = TRUE
 `
 
 type RemoveActorParams struct {
@@ -280,7 +281,10 @@ type RemoveActorParams struct {
 }
 
 // Soft-remove an actor from a task.
-func (q *Queries) RemoveActor(ctx context.Context, arg RemoveActorParams) error {
-	_, err := q.db.ExecContext(ctx, removeActor, arg.WorkspaceID, arg.PublicID)
-	return err
+func (q *Queries) RemoveActor(ctx context.Context, arg RemoveActorParams) (int64, error) {
+	result, err := q.db.ExecContext(ctx, removeActor, arg.WorkspaceID, arg.PublicID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
 }

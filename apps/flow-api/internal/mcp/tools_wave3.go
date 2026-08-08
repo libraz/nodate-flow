@@ -114,7 +114,9 @@ func runTriageIntakeItem(ctx context.Context, deps Deps, s *session, raw json.Ra
 		snoozeUntil = sql.NullTime{Time: time.Unix(*in.SnoozeUntil, 0), Valid: true}
 	}
 
-	if err := deps.Queries.UpdateIntakeItemTriage(ctx, generated.UpdateIntakeItemTriageParams{
+	// Not an existence check: the item is read into `existing` above,
+	// which is also what rejects one already triaged.
+	if _, err := deps.Queries.UpdateIntakeItemTriage(ctx, generated.UpdateIntakeItemTriageParams{
 		TriageStatus:    generated.IntakeItemsTriageStatus(in.Status),
 		TriagedByUserID: sql.NullInt32{Int32: int32(s.userID), Valid: true}, //#nosec G115 -- session user id is users.id (BIGINT UNSIGNED), fits int32 within realistic deployments
 		SnoozeUntil:     snoozeUntil,
@@ -214,11 +216,15 @@ func runConvertIntakeToTask(ctx context.Context, deps Deps, s *session, raw json
 		taskPub = created.PublicID
 		taskID = created.ID
 
-		return deps.Queries.WithTx(tx).SetIntakeItemTask(ctx, generated.SetIntakeItemTaskParams{
+		// The item was resolved before this transaction and the task it is
+		// being linked to was just inserted, so the count adds nothing the
+		// transaction does not already guarantee.
+		_, linkErr := deps.Queries.WithTx(tx).SetIntakeItemTask(ctx, generated.SetIntakeItemTaskParams{
 			TaskID:      sql.NullInt32{Int32: int32(created.ID), Valid: true}, //#nosec G115 -- task_id is tasks.id (BIGINT UNSIGNED), fits int32 within realistic deployments
 			WorkspaceID: s.workspaceID,
 			PublicID:    pub,
 		})
+		return linkErr
 	}); txErr != nil {
 		return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, txErr)
 	}
@@ -349,7 +355,10 @@ func runRestoreDescriptionVersion(ctx context.Context, deps Deps, s *session, ra
 		return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
 	}
 
-	if err := qtx.UpdateTask(ctx, generated.UpdateTaskParams{
+	// Not an existence check: restoring a version whose body already
+	// matches the task changes nothing and MySQL counts zero. The task is
+	// read into taskRow just above.
+	if _, err := qtx.UpdateTask(ctx, generated.UpdateTaskParams{
 		Title:           taskRow.Title,
 		Description:     sql.NullString{String: version.Body, Valid: version.Body != ""},
 		Priority:        taskRow.Priority,

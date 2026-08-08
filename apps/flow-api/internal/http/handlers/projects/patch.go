@@ -52,7 +52,10 @@ func Patch(deps Deps) func(context.Context, *PatchProjectInput) (*PatchProjectOu
 			})
 		}
 
-		if err := deps.Queries.UpdateProjectFull(ctx, generated.UpdateProjectFullParams{
+		// Not an existence check: a PATCH re-sending the project's current
+		// name and slug changes nothing and MySQL counts zero. The project
+		// was resolved into 'current' above.
+		if _, err := deps.Queries.UpdateProjectFull(ctx, generated.UpdateProjectFullParams{
 			Name:        newName,
 			Slug:        newSlug,
 			Description: newDesc,

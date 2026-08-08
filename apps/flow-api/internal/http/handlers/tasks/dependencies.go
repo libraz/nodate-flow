@@ -96,20 +96,17 @@ func AddDependency(deps Deps) func(context.Context, *AddTaskDependencyInput) (*A
 		if err != nil {
 			return nil, httpErr(apierrors.WsTaskNotFound)
 		}
-		// Resolve target task internal id and owning project within the
-		// same workspace. The project id feeds the row locks below.
-		const q = `SELECT id, project_id FROM tasks WHERE workspace_id = ? AND public_id = ? AND enabled = TRUE LIMIT 1`
-		var toID, toProjectID uint32
-		if err := deps.DB.QueryRowContext(ctx, q, ws.ID, toPub).Scan(&toID, &toProjectID); err != nil {
+		// Resolve the target task's internal id within the same
+		// workspace. This is also the existence check: a public id from
+		// another tenant finds nothing and answers 404.
+		const q = `SELECT id FROM tasks WHERE workspace_id = ? AND public_id = ? AND enabled = TRUE LIMIT 1`
+		var toID uint32
+		if err := deps.DB.QueryRowContext(ctx, q, ws.ID, toPub).Scan(&toID); err != nil {
 			return nil, httpErr(apierr.SpecForErrNoRows(err, apierrors.WsTaskNotFound, apierrors.InternalUnexpected))
-		}
-		prj, ok := middleware.ProjectFromContext(ctx)
-		if !ok {
-			return nil, httpErr(apierrors.InternalUnexpected)
 		}
 		// The lock / cycle-check / insert / append sequence lives in
 		// taskdeps so every writer of an edge gets it; see that package
-		// for why the project lock is what makes the check meaningful.
+		// for why the lock has to cover the whole workspace edge set.
 		// dbretry retries transient FK deadlocks: task_dependencies has
 		// FKs into tasks/workspaces and races with concurrent transition
 		// transactions on the same task rows.
@@ -118,9 +115,7 @@ func AddDependency(deps Deps) func(context.Context, *AddTaskDependencyInput) (*A
 			id, e := taskdeps.Add(ctx, tx, taskdeps.Args{
 				WorkspaceID:      ws.ID,
 				FromTaskID:       task.ID,
-				FromProjectID:    prj.ID,
 				ToTaskID:         toID,
-				ToProjectID:      toProjectID,
 				Kind:             generated.TaskDependenciesKind(in.Body.Kind),
 				ActorUserID:      actorPtr(ctx),
 				FromTaskPublicID: task.PublicID.String(),
@@ -137,7 +132,7 @@ func AddDependency(deps Deps) func(context.Context, *AddTaskDependencyInput) (*A
 			if stderrors.Is(txErr, taskdeps.ErrCycle) {
 				return nil, httpErr(apierrors.WsTaskDependencyCycle)
 			}
-			// ErrNoRows from the project lock means an endpoint project
+			// ErrNoRows from inside the transaction means an endpoint
 			// vanished (disabled) between the resolve and the tx.
 			return nil, httpErr(apierr.SpecForErrNoRows(txErr, apierrors.WsTaskNotFound, apierrors.InternalUnexpected))
 		}

@@ -62,7 +62,7 @@ WHERE v.workspace_id = ?
 ORDER BY v.received_at DESC, v.public_id DESC
 LIMIT ? OFFSET ?;
 
--- name: AttachSignalToTask :exec
+-- name: AttachSignalToTask :execrows
 -- Link an existing signal to a task by public_id.
 UPDATE signals s
 SET s.task_id = (

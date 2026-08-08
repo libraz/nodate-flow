@@ -267,7 +267,7 @@ WHERE v.workspace_id = ?
 ORDER BY v.created_at DESC, v.public_id DESC
 LIMIT ?;
 
--- name: UpdateTask :exec
+-- name: UpdateTask :execrows
 -- Update mutable task fields. derived_state is intentionally NOT writable.
 -- updated_by_user_id is appended to the SET list so callers can attribute
 -- the edit; pass the acting user's internal id (NULL for system writers).
@@ -296,7 +296,7 @@ WHERE id = ?
   AND workspace_id = ?
   AND enabled = TRUE;
 
--- name: TransitionTaskState :exec
+-- name: TransitionTaskState :execrows
 -- Write the new derived_state computed by the transition handler. This is
 -- the only path allowed to mutate derived_state and must be called inside
 -- the same transaction as the events append.
@@ -310,7 +310,7 @@ WHERE workspace_id = ?
   AND public_id = ?
   AND enabled = TRUE;
 
--- name: DisableTask :exec
+-- name: DisableTask :execrows
 -- Soft-disable a task.
 -- updated_by_user_id is appended so the audit field records who disabled
 -- the row (NULL for system writers).
@@ -318,7 +318,8 @@ UPDATE tasks
 SET enabled = FALSE,
     updated_by_user_id = ?
 WHERE workspace_id = ?
-  AND public_id = ?;
+  AND public_id = ?
+  AND enabled = TRUE;
 
 -- name: ListMyTasks :many
 -- Tasks where the given user is attached as an actor, via v_my_tasks.
@@ -547,7 +548,7 @@ WHERE t.workspace_id = ?
 ORDER BY t.created_at DESC, t.public_id DESC
 LIMIT ?;
 
--- name: ArchiveTask :exec
+-- name: ArchiveTask :execrows
 -- Set archived_at on a task.
 -- updated_by_user_id is appended so the audit field records who archived
 -- the row (NULL for system writers).
@@ -559,7 +560,7 @@ WHERE workspace_id = ?
   AND enabled = TRUE
   AND archived_at IS NULL;
 
--- name: UnarchiveTask :exec
+-- name: UnarchiveTask :execrows
 -- Clear archived_at on a task.
 -- updated_by_user_id is appended so the audit field records who unarchived
 -- the row (NULL for system writers).

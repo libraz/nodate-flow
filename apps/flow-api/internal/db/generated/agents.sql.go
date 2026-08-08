@@ -362,7 +362,7 @@ func (q *Queries) ListOnEventAgentsForEvent(ctx context.Context, arg ListOnEvent
 	return items, nil
 }
 
-const updateAgentScheduleKind = `-- name: UpdateAgentScheduleKind :exec
+const updateAgentScheduleKind = `-- name: UpdateAgentScheduleKind :execrows
 UPDATE ai_agents
 SET schedule_kind = ?
 WHERE workspace_id = ? AND public_id = ? AND enabled = TRUE
@@ -375,7 +375,10 @@ type UpdateAgentScheduleKindParams struct {
 }
 
 // Update the schedule_kind on an existing agent.
-func (q *Queries) UpdateAgentScheduleKind(ctx context.Context, arg UpdateAgentScheduleKindParams) error {
-	_, err := q.db.ExecContext(ctx, updateAgentScheduleKind, arg.ScheduleKind, arg.WorkspaceID, arg.PublicID)
-	return err
+func (q *Queries) UpdateAgentScheduleKind(ctx context.Context, arg UpdateAgentScheduleKindParams) (int64, error) {
+	result, err := q.db.ExecContext(ctx, updateAgentScheduleKind, arg.ScheduleKind, arg.WorkspaceID, arg.PublicID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
 }

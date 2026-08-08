@@ -195,13 +195,15 @@ func (q *Queries) ListPatsForUser(ctx context.Context, arg ListPatsForUserParams
 	return items, nil
 }
 
-const revokePat = `-- name: RevokePat :exec
+const revokePat = `-- name: RevokePat :execrows
 UPDATE personal_access_tokens
 SET revoked_at = CURRENT_TIMESTAMP,
     enabled = FALSE
 WHERE workspace_id = ?
   AND user_id = ?
   AND public_id = ?
+  AND enabled = TRUE
+  AND revoked_at IS NULL
 `
 
 type RevokePatParams struct {
@@ -211,7 +213,10 @@ type RevokePatParams struct {
 }
 
 // Revoke a PAT (workspace + user scoped).
-func (q *Queries) RevokePat(ctx context.Context, arg RevokePatParams) error {
-	_, err := q.db.ExecContext(ctx, revokePat, arg.WorkspaceID, arg.UserID, arg.PublicID)
-	return err
+func (q *Queries) RevokePat(ctx context.Context, arg RevokePatParams) (int64, error) {
+	result, err := q.db.ExecContext(ctx, revokePat, arg.WorkspaceID, arg.UserID, arg.PublicID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
 }

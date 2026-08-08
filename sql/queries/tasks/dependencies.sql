@@ -1,20 +1,3 @@
--- name: LockProjectForDependency :one
--- Acquire a row-level lock on the owning project before creating a dependency
--- edge. The AddDependency handler reads the workspace's edge set and walks it
--- to reject an edge that would close a cycle; without serialization two
--- concurrent POSTs (A->B and B->A) both pass the cycle check and commit,
--- forming a cycle / mutual-block. Calling this inside the transaction first
--- makes concurrent dependency writers for the same project serialize, while
--- different projects still proceed independently. Mirrors
--- LockProjectForTaskNumber. Both endpoints of a dependency share a project,
--- so locking that project row is sufficient to serialize the check-then-insert.
-SELECT id
-FROM projects
-WHERE workspace_id = ?
-  AND id = ?
-  AND enabled = TRUE
-FOR UPDATE;
-
 -- name: AddDependency :execlastid
 -- Add a directed dependency between two tasks.
 INSERT INTO task_dependencies (
@@ -91,15 +74,54 @@ LIMIT 5000;
 
 -- name: ListDependencyEdgesForWorkspace :many
 -- List every enabled dependency edge in the workspace as (from, to) internal
--- id pairs. Used by AddDependency to walk the graph and reject an edge that
--- would close a cycle, keeping the dependency graph a DAG. Internal ids are
--- safe here because the result never leaves the handler (json:"-" on *.id).
+-- id pairs. Read-only callers (the "would this be rejected" preview) use this
+-- one. Writers must use ListDependencyEdgesForWorkspaceForUpdate instead.
+-- Internal ids are safe here because the result never leaves the handler
+-- (json:"-" on *.id).
 SELECT
   td.from_task_id,
   td.to_task_id
 FROM task_dependencies td
 WHERE td.workspace_id = ?
   AND td.enabled = TRUE;
+
+-- name: ListDependencyEdgesForWorkspaceForUpdate :many
+-- The same edge set, read under a lock. This is the serialization point for
+-- adding an edge: the writer walks the graph to reject an edge that would
+-- close a cycle, and the walk is only sound if no other writer can add an
+-- edge between the walk and the insert.
+--
+-- The lock is workspace-wide because the read is. An earlier version locked
+-- only the two endpoint projects, which serializes writers that share a
+-- project but not a cycle drawn across four of them: two transactions
+-- holding disjoint project pairs both walked an edge set missing the
+-- other's edge, both passed, and both committed. The result is a cycle no
+-- request could see, and it is silent -- `dependency.all_done` is evaluated
+-- by a cycle-tolerant walk, so the constraint simply never becomes
+-- satisfiable and every screen still looks healthy.
+--
+-- Locking the `workspaces` row instead (the obvious spelling of
+-- "workspace-wide") is not an option: an exclusive lock on that row blocks
+-- every INSERT into every table with a foreign key to workspaces, because
+-- InnoDB takes a shared lock on the parent row for each such insert. That
+-- includes the events log, so it would stall unrelated writes across the
+-- whole workspace for the duration of the transaction. Locking the edge
+-- rows themselves has no such reach: nothing references task_dependencies.
+--
+-- Range scanning (workspace_id, from_task_id) also gap-locks the workspace's
+-- slice of that index, so a concurrent INSERT of a new edge blocks rather
+-- than slipping in behind the walk. Writers scan in the same index order, so
+-- they queue rather than deadlock; the one case that can deadlock is two
+-- writers meeting on an empty range, where the gap locks are mutually
+-- compatible but the insert intentions are not. That resolves to a retry
+-- (dbretry.InTx), and a workspace with no edges has no cycle to close.
+SELECT
+  td.from_task_id,
+  td.to_task_id
+FROM task_dependencies td
+WHERE td.workspace_id = ?
+  AND td.enabled = TRUE
+FOR UPDATE;
 
 -- name: DeleteDependency :execrows
 -- Soft-delete a dependency edge. Scoped by the owning from_task_id so a
@@ -109,7 +131,8 @@ UPDATE task_dependencies
 SET enabled = FALSE
 WHERE workspace_id = ?
   AND public_id = ?
-  AND from_task_id = ?;
+  AND from_task_id = ?
+  AND enabled = TRUE;
 
 -- name: ListRetroDraftsForWorkspace :many
 -- List draft retrospective tasks: tasks linked back to a source task

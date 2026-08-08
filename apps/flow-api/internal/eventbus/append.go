@@ -134,6 +134,12 @@ type Event struct {
 	ActorSystemSource string
 	// TaskID is the internal task id when the event targets a task.
 	TaskID *int64
+	// CalendarID is the internal calendar id when the event happened
+	// inside a calendar -- the symmetric counterpart of TaskID. It is
+	// what makes a per-calendar activity feed readable straight off the
+	// event log instead of from a second history table that would drift
+	// from it. Nil for events with no calendar subject.
+	CalendarID *int64
 	// ProjectID is reserved for future use; events.project_id is not yet
 	// part of the schema, so this field is currently ignored by [Append].
 	ProjectID *int64
@@ -488,6 +494,10 @@ func appendInternalWithMeta(ctx context.Context, db DBTX, evt Event, fromApplier
 	if evt.TaskID != nil {
 		taskID = sql.NullInt32{Int32: int32(*evt.TaskID), Valid: true} //#nosec G115 -- task_id is tasks.id (BIGINT UNSIGNED), fits int32 within realistic deployments
 	}
+	calendarID := sql.NullInt32{}
+	if evt.CalendarID != nil {
+		calendarID = sql.NullInt32{Int32: int32(*evt.CalendarID), Valid: true} //#nosec G115 -- calendars.id is INT UNSIGNED, fits int32 within realistic deployments
+	}
 	signalID := sql.NullInt32{}
 	if evt.TriggeredBySignalID != nil {
 		signalID = sql.NullInt32{Int32: int32(*evt.TriggeredBySignalID), Valid: true} //#nosec G115 -- signals.id is INT UNSIGNED, fits int32 within realistic deployments
@@ -517,6 +527,7 @@ func appendInternalWithMeta(ctx context.Context, db DBTX, evt Event, fromApplier
 			PublicID:            pubID,
 			WorkspaceID:         evt.WorkspaceID,
 			TaskID:              taskID,
+			CalendarID:          calendarID,
 			ActorAgentID:        agentID,
 			TriggeredBySignalID: signalID,
 			ReversesEventID:     reversesID,
@@ -545,6 +556,7 @@ func appendInternalWithMeta(ctx context.Context, db DBTX, evt Event, fromApplier
 			PublicID:            pubID,
 			WorkspaceID:         evt.WorkspaceID,
 			TaskID:              taskID,
+			CalendarID:          calendarID,
 			ActorUserID:         actorID,
 			ActorSystemSource:   sysSource,
 			TriggeredBySignalID: signalID,

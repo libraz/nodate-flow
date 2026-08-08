@@ -14,6 +14,51 @@ import (
 	types "github.com/libraz/nodate-flow/apps/auth-api/internal/db/types"
 )
 
+const claimConnectionForRefresh = `-- name: ClaimConnectionForRefresh :execrows
+UPDATE user_integrations
+SET last_refreshed_at = NOW(3)
+WHERE id = ?
+  AND enabled = TRUE
+  AND last_refreshed_at <=> ?
+`
+
+type ClaimConnectionForRefreshParams struct {
+	ID              uint32       `json:"-"`
+	LastRefreshedAt sql.NullTime `json:"lastRefreshedAt"`
+}
+
+// Elect a single refresher for one integration row, by compare-and-swap
+// on the value of last_refreshed_at that the caller read from
+// ListConnectionsExpiringBefore.
+//
+// The refresher runs inside every API replica, so without this the same
+// row is refreshed concurrently by all of them. That is not a wasted
+// call but a data-loss hazard: with a provider that rotates the refresh
+// token on use (Discord here), the second exchange presents a token the
+// provider has already retired, the provider reads that as replay, and
+// it revokes the whole grant. The connection then breaks permanently
+// and the user has to re-authorise.
+//
+// <=> is MySQL's NULL-safe equality, needed because last_refreshed_at is
+// NULL until the first refresh — plain `=` never matches NULL and the
+// claim would fail forever on exactly the rows that were never
+// refreshed. Callers MUST inspect RowsAffected and skip the row unless
+// it is 1; anything else means another replica got there first.
+//
+// The CAS alone is not the whole guard, and cannot be: it only
+// separates replicas that read the same value. A replica that lists a
+// moment after the winner claimed reads the *new* last_refreshed_at, so
+// its swap would also succeed. The caller therefore skips any row
+// touched within its claim lease before reaching this statement; see
+// Refresher.ClaimLease. The two together cover both orderings.
+func (q *Queries) ClaimConnectionForRefresh(ctx context.Context, arg ClaimConnectionForRefreshParams) (int64, error) {
+	result, err := q.db.ExecContext(ctx, claimConnectionForRefresh, arg.ID, arg.LastRefreshedAt)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
+}
+
 const claimOauthState = `-- name: ClaimOauthState :execrows
 DELETE FROM oauth_states
 WHERE state = ?
@@ -251,11 +296,13 @@ func (q *Queries) FindUserIntegrationByUserProvider(ctx context.Context, arg Fin
 const listConnectionsExpiringBefore = `-- name: ListConnectionsExpiringBefore :many
 SELECT
   id,
+  public_id,
   user_id,
   provider,
   access_token_ciphertext,
   refresh_token_ciphertext,
-  access_token_expires_at
+  access_token_expires_at,
+  last_refreshed_at
 FROM user_integrations
 WHERE enabled = TRUE
   AND access_token_expires_at IS NOT NULL
@@ -268,16 +315,25 @@ LIMIT 200
 
 type ListConnectionsExpiringBeforeRow struct {
 	ID                     uint32                   `json:"-"`
+	PublicID               types.PublicID           `json:"publicId"`
 	UserID                 uint32                   `json:"-"`
 	Provider               UserIntegrationsProvider `json:"provider"`
 	AccessTokenCiphertext  []byte                   `json:"accessTokenCiphertext"`
 	RefreshTokenCiphertext sql.NullString           `json:"refreshTokenCiphertext"`
 	AccessTokenExpiresAt   sql.NullTime             `json:"accessTokenExpiresAt"`
+	LastRefreshedAt        sql.NullTime             `json:"lastRefreshedAt"`
 }
 
 // List enabled integrations whose access token will expire before
 // the given cutoff AND still have a stored refresh token. Used by
 // the background token refresher.
+//
+// This listing carries no claim of its own: every replica of the API
+// process runs the refresher, so the same row comes back to all of
+// them on the same tick. `last_refreshed_at` is selected because it is
+// the compare-and-swap witness ClaimConnectionForRefresh matches on,
+// and `public_id` because the refresher logs the row it worked on and
+// an internal id must not appear in a log line.
 func (q *Queries) ListConnectionsExpiringBefore(ctx context.Context, accessTokenExpiresAt sql.NullTime) ([]ListConnectionsExpiringBeforeRow, error) {
 	rows, err := q.db.QueryContext(ctx, listConnectionsExpiringBefore, accessTokenExpiresAt)
 	if err != nil {
@@ -289,11 +345,13 @@ func (q *Queries) ListConnectionsExpiringBefore(ctx context.Context, accessToken
 		var i ListConnectionsExpiringBeforeRow
 		if err := rows.Scan(
 			&i.ID,
+			&i.PublicID,
 			&i.UserID,
 			&i.Provider,
 			&i.AccessTokenCiphertext,
 			&i.RefreshTokenCiphertext,
 			&i.AccessTokenExpiresAt,
+			&i.LastRefreshedAt,
 		); err != nil {
 			return nil, err
 		}

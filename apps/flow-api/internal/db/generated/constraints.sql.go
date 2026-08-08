@@ -52,6 +52,7 @@ SET enabled = FALSE
 WHERE workspace_id = ?
   AND public_id = ?
   AND task_id = ?
+  AND enabled = TRUE
 `
 
 type DeleteConstraintParams struct {
@@ -71,7 +72,7 @@ func (q *Queries) DeleteConstraint(ctx context.Context, arg DeleteConstraintPara
 	return result.RowsAffected()
 }
 
-const failConstraint = `-- name: FailConstraint :exec
+const failConstraint = `-- name: FailConstraint :execrows
 UPDATE task_constraints
 SET failed_at = CURRENT_TIMESTAMP,
     satisfied_at = NULL
@@ -87,9 +88,12 @@ type FailConstraintParams struct {
 
 // Mark a constraint as currently failing. Clears satisfied_at so the
 // transition is visible in v_task_constraint_satisfaction.
-func (q *Queries) FailConstraint(ctx context.Context, arg FailConstraintParams) error {
-	_, err := q.db.ExecContext(ctx, failConstraint, arg.WorkspaceID, arg.PublicID)
-	return err
+func (q *Queries) FailConstraint(ctx context.Context, arg FailConstraintParams) (int64, error) {
+	result, err := q.db.ExecContext(ctx, failConstraint, arg.WorkspaceID, arg.PublicID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
 }
 
 const listConstraintsForTask = `-- name: ListConstraintsForTask :many
@@ -170,7 +174,7 @@ func (q *Queries) ListConstraintsForTask(ctx context.Context, arg ListConstraint
 	return items, nil
 }
 
-const satisfyConstraint = `-- name: SatisfyConstraint :exec
+const satisfyConstraint = `-- name: SatisfyConstraint :execrows
 UPDATE task_constraints
 SET satisfied_at = CURRENT_TIMESTAMP,
     failed_at = NULL
@@ -185,7 +189,10 @@ type SatisfyConstraintParams struct {
 }
 
 // Mark a constraint as satisfied at the current time.
-func (q *Queries) SatisfyConstraint(ctx context.Context, arg SatisfyConstraintParams) error {
-	_, err := q.db.ExecContext(ctx, satisfyConstraint, arg.WorkspaceID, arg.PublicID)
-	return err
+func (q *Queries) SatisfyConstraint(ctx context.Context, arg SatisfyConstraintParams) (int64, error) {
+	result, err := q.db.ExecContext(ctx, satisfyConstraint, arg.WorkspaceID, arg.PublicID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
 }

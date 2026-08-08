@@ -195,7 +195,7 @@ WHERE workspace_id = ?
   AND archived_at IS NULL
   AND enabled = TRUE;
 
--- name: MarkNotificationRead :exec
+-- name: MarkNotificationRead :execrows
 -- Mark a single notification as read.
 UPDATE notifications
 SET read_at = NOW()
@@ -213,7 +213,7 @@ WHERE workspace_id = ?
   AND archived_at IS NULL
   AND enabled = TRUE;
 
--- name: ArchiveNotification :exec
+-- name: ArchiveNotification :execrows
 -- Archive a single notification.
 UPDATE notifications
 SET archived_at = NOW()
@@ -221,7 +221,7 @@ WHERE public_id = ?
   AND recipient_user_id = ?
   AND archived_at IS NULL;
 
--- name: MarkNotificationDelivered :exec
+-- name: MarkNotificationDelivered :execrows
 -- Mark a notification as delivered (email/push sent). Scoped to the
 -- recipient so a delivery flag can never be flipped on another user's
 -- notification, matching the recipient predicate on the sibling

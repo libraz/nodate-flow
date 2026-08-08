@@ -46,11 +46,12 @@ func (q *Queries) AddComment(ctx context.Context, arg AddCommentParams) (int64, 
 	return result.LastInsertId()
 }
 
-const deleteComment = `-- name: DeleteComment :exec
+const deleteComment = `-- name: DeleteComment :execrows
 UPDATE comments
 SET enabled = FALSE
 WHERE workspace_id = ?
   AND public_id = ?
+  AND enabled = TRUE
 `
 
 type DeleteCommentParams struct {
@@ -59,12 +60,15 @@ type DeleteCommentParams struct {
 }
 
 // Soft-delete a comment.
-func (q *Queries) DeleteComment(ctx context.Context, arg DeleteCommentParams) error {
-	_, err := q.db.ExecContext(ctx, deleteComment, arg.WorkspaceID, arg.PublicID)
-	return err
+func (q *Queries) DeleteComment(ctx context.Context, arg DeleteCommentParams) (int64, error) {
+	result, err := q.db.ExecContext(ctx, deleteComment, arg.WorkspaceID, arg.PublicID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
 }
 
-const editComment = `-- name: EditComment :exec
+const editComment = `-- name: EditComment :execrows
 UPDATE comments
 SET body = ?,
     edited_at = CURRENT_TIMESTAMP
@@ -82,14 +86,17 @@ type EditCommentParams struct {
 }
 
 // Edit a comment body and stamp edited_at.
-func (q *Queries) EditComment(ctx context.Context, arg EditCommentParams) error {
-	_, err := q.db.ExecContext(ctx, editComment,
+func (q *Queries) EditComment(ctx context.Context, arg EditCommentParams) (int64, error) {
+	result, err := q.db.ExecContext(ctx, editComment,
 		arg.Body,
 		arg.WorkspaceID,
 		arg.PublicID,
 		arg.AuthorID,
 	)
-	return err
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
 }
 
 const listCommentsForTask = `-- name: ListCommentsForTask :many

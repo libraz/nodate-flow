@@ -59,11 +59,12 @@ func (q *Queries) CreateCalendar(ctx context.Context, arg CreateCalendarParams) 
 	return result.LastInsertId()
 }
 
-const disableCalendar = `-- name: DisableCalendar :exec
+const disableCalendar = `-- name: DisableCalendar :execrows
 UPDATE calendars
 SET enabled = FALSE
 WHERE public_id = ?
   AND workspace_id = ?
+  AND enabled = TRUE
 `
 
 type DisableCalendarParams struct {
@@ -72,9 +73,12 @@ type DisableCalendarParams struct {
 }
 
 // Soft-delete a calendar.
-func (q *Queries) DisableCalendar(ctx context.Context, arg DisableCalendarParams) error {
-	_, err := q.db.ExecContext(ctx, disableCalendar, arg.PublicID, arg.WorkspaceID)
-	return err
+func (q *Queries) DisableCalendar(ctx context.Context, arg DisableCalendarParams) (int64, error) {
+	result, err := q.db.ExecContext(ctx, disableCalendar, arg.PublicID, arg.WorkspaceID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
 }
 
 const findCalendarByPublicId = `-- name: FindCalendarByPublicId :one
@@ -406,7 +410,7 @@ func (q *Queries) ListDiscoverableCalendarsInWorkspace(ctx context.Context, arg 
 	return items, nil
 }
 
-const patchCalendar = `-- name: PatchCalendar :exec
+const patchCalendar = `-- name: PatchCalendar :execrows
 UPDATE calendars
 SET name        = COALESCE(?, name),
     description = COALESCE(?, description),
@@ -427,8 +431,8 @@ type PatchCalendarParams struct {
 }
 
 // Patch mutable calendar fields. NULL params leave columns untouched.
-func (q *Queries) PatchCalendar(ctx context.Context, arg PatchCalendarParams) error {
-	_, err := q.db.ExecContext(ctx, patchCalendar,
+func (q *Queries) PatchCalendar(ctx context.Context, arg PatchCalendarParams) (int64, error) {
+	result, err := q.db.ExecContext(ctx, patchCalendar,
 		arg.Name,
 		arg.Description,
 		arg.Color,
@@ -436,5 +440,8 @@ func (q *Queries) PatchCalendar(ctx context.Context, arg PatchCalendarParams) er
 		arg.PublicID,
 		arg.WorkspaceID,
 	)
-	return err
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
 }

@@ -65,7 +65,7 @@ WHERE dw.workspace_id = ?
   AND dw.enabled = TRUE
 LIMIT 1;
 
--- name: UpdateWidget :exec
+-- name: UpdateWidget :execrows
 -- Update mutable widget fields. Uses sqlc.narg for optional partial updates.
 UPDATE dashboard_widgets
 SET title      = COALESCE(sqlc.narg('title'), title),
@@ -78,7 +78,7 @@ WHERE workspace_id = ?
   AND public_id = ?
   AND enabled = TRUE;
 
--- name: UpdateWidgetPosition :exec
+-- name: UpdateWidgetPosition :execrows
 -- Reposition a single widget on the grid (called N times for batch reorder).
 UPDATE dashboard_widgets
 SET position_x   = ?,
@@ -90,9 +90,10 @@ WHERE workspace_id = ?
   AND public_id = ?
   AND enabled = TRUE;
 
--- name: DisableWidget :exec
+-- name: DisableWidget :execrows
 -- Soft-delete a widget.
 UPDATE dashboard_widgets
 SET enabled = FALSE
 WHERE workspace_id = ?
-  AND public_id = ?;
+  AND public_id = ?
+  AND enabled = TRUE;

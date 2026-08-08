@@ -194,11 +194,17 @@ func Delete(deps Deps) func(context.Context, *DeleteReactionInput) (*DeleteReact
 			return nil, httpErr(apierrors.WsReactionNotFound)
 		}
 
-		if err := deps.Queries.DisableReaction(ctx, generated.DisableReactionParams{
+		// Scoped to this user's live reactions, so a zero count means there
+		// is no reaction here to remove.
+		rows, err := deps.Queries.DisableReaction(ctx, generated.DisableReactionParams{
 			PublicID: pub,
 			UserID:   actorID,
-		}); err != nil {
+		})
+		if err != nil {
 			return nil, httpErr(apierrors.InternalUnexpected)
+		}
+		if rows == 0 {
+			return nil, httpErr(apierrors.WsReactionNotFound)
 		}
 
 		taskIDInt64 := int64(row.TaskID.Int32)

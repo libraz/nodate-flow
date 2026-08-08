@@ -150,7 +150,10 @@ func RestoreDescriptionVersion(deps Deps) func(context.Context, *RestoreDescript
 		}
 
 		// Update the task description.
-		if err := qtx.UpdateTask(ctx, generated.UpdateTaskParams{
+		// Not an existence check: restoring a version whose body already
+		// matches the task changes nothing and MySQL counts zero. The task
+		// was read into taskRow above.
+		if _, err := qtx.UpdateTask(ctx, generated.UpdateTaskParams{
 			Title:           taskRow.Title,
 			Description:     sql.NullString{String: version.Body, Valid: version.Body != ""},
 			Priority:        taskRow.Priority,

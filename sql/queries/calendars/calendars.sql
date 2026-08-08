@@ -73,7 +73,7 @@ WHERE cm.user_id = ?
   AND cm.enabled = TRUE
 ORDER BY COALESCE(cs.sort_weight, cm.sort_weight) ASC, c.created_at ASC;
 
--- name: PatchCalendar :exec
+-- name: PatchCalendar :execrows
 -- Patch mutable calendar fields. NULL params leave columns untouched.
 UPDATE calendars
 SET name        = COALESCE(sqlc.narg('name'), name),
@@ -84,12 +84,13 @@ WHERE public_id = ?
   AND workspace_id = ?
   AND enabled = TRUE;
 
--- name: DisableCalendar :exec
+-- name: DisableCalendar :execrows
 -- Soft-delete a calendar.
 UPDATE calendars
 SET enabled = FALSE
 WHERE public_id = ?
-  AND workspace_id = ?;
+  AND workspace_id = ?
+  AND enabled = TRUE;
 
 -- name: FindPersonalCalendar :one
 -- Find the personal calendar for a user in a workspace.

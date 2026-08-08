@@ -65,7 +65,12 @@ func Patch(deps Deps) func(context.Context, *PatchWorkspaceInput) (*PatchWorkspa
 			params.Country = sql.NullString{String: *in.Body.Country, Valid: *in.Body.Country != ""}
 		}
 
-		if err := deps.Queries.PatchWorkspace(ctx, params); err != nil {
+		// The affected-row count is not the existence check here and
+		// cannot be: MySQL counts changed rows, so submitting the values
+		// the workspace already has reports zero. Existence is settled by
+		// the workspace middleware before this runs, and the re-read
+		// below would fail if the row had vanished in between.
+		if _, err := deps.Queries.PatchWorkspace(ctx, params); err != nil {
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
 

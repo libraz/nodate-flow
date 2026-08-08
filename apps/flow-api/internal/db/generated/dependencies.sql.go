@@ -52,6 +52,7 @@ SET enabled = FALSE
 WHERE workspace_id = ?
   AND public_id = ?
   AND from_task_id = ?
+  AND enabled = TRUE
 `
 
 type DeleteDependencyParams struct {
@@ -273,9 +274,10 @@ type ListDependencyEdgesForWorkspaceRow struct {
 }
 
 // List every enabled dependency edge in the workspace as (from, to) internal
-// id pairs. Used by AddDependency to walk the graph and reject an edge that
-// would close a cycle, keeping the dependency graph a DAG. Internal ids are
-// safe here because the result never leaves the handler (json:"-" on *.id).
+// id pairs. Read-only callers (the "would this be rejected" preview) use this
+// one. Writers must use ListDependencyEdgesForWorkspaceForUpdate instead.
+// Internal ids are safe here because the result never leaves the handler
+// (json:"-" on *.id).
 func (q *Queries) ListDependencyEdgesForWorkspace(ctx context.Context, workspaceID uint32) ([]ListDependencyEdgesForWorkspaceRow, error) {
 	rows, err := q.db.QueryContext(ctx, listDependencyEdgesForWorkspace, workspaceID)
 	if err != nil {
@@ -285,6 +287,73 @@ func (q *Queries) ListDependencyEdgesForWorkspace(ctx context.Context, workspace
 	items := []ListDependencyEdgesForWorkspaceRow{}
 	for rows.Next() {
 		var i ListDependencyEdgesForWorkspaceRow
+		if err := rows.Scan(&i.FromTaskID, &i.ToTaskID); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listDependencyEdgesForWorkspaceForUpdate = `-- name: ListDependencyEdgesForWorkspaceForUpdate :many
+SELECT
+  td.from_task_id,
+  td.to_task_id
+FROM task_dependencies td
+WHERE td.workspace_id = ?
+  AND td.enabled = TRUE
+FOR UPDATE
+`
+
+type ListDependencyEdgesForWorkspaceForUpdateRow struct {
+	FromTaskID uint32 `json:"fromTaskId"`
+	ToTaskID   uint32 `json:"toTaskId"`
+}
+
+// The same edge set, read under a lock. This is the serialization point for
+// adding an edge: the writer walks the graph to reject an edge that would
+// close a cycle, and the walk is only sound if no other writer can add an
+// edge between the walk and the insert.
+//
+// The lock is workspace-wide because the read is. An earlier version locked
+// only the two endpoint projects, which serializes writers that share a
+// project but not a cycle drawn across four of them: two transactions
+// holding disjoint project pairs both walked an edge set missing the
+// other's edge, both passed, and both committed. The result is a cycle no
+// request could see, and it is silent -- `dependency.all_done` is evaluated
+// by a cycle-tolerant walk, so the constraint simply never becomes
+// satisfiable and every screen still looks healthy.
+//
+// Locking the `workspaces` row instead (the obvious spelling of
+// "workspace-wide") is not an option: an exclusive lock on that row blocks
+// every INSERT into every table with a foreign key to workspaces, because
+// InnoDB takes a shared lock on the parent row for each such insert. That
+// includes the events log, so it would stall unrelated writes across the
+// whole workspace for the duration of the transaction. Locking the edge
+// rows themselves has no such reach: nothing references task_dependencies.
+//
+// Range scanning (workspace_id, from_task_id) also gap-locks the workspace's
+// slice of that index, so a concurrent INSERT of a new edge blocks rather
+// than slipping in behind the walk. Writers scan in the same index order, so
+// they queue rather than deadlock; the one case that can deadlock is two
+// writers meeting on an empty range, where the gap locks are mutually
+// compatible but the insert intentions are not. That resolves to a retry
+// (dbretry.InTx), and a workspace with no edges has no cycle to close.
+func (q *Queries) ListDependencyEdgesForWorkspaceForUpdate(ctx context.Context, workspaceID uint32) ([]ListDependencyEdgesForWorkspaceForUpdateRow, error) {
+	rows, err := q.db.QueryContext(ctx, listDependencyEdgesForWorkspaceForUpdate, workspaceID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListDependencyEdgesForWorkspaceForUpdateRow{}
+	for rows.Next() {
+		var i ListDependencyEdgesForWorkspaceForUpdateRow
 		if err := rows.Scan(&i.FromTaskID, &i.ToTaskID); err != nil {
 			return nil, err
 		}
@@ -464,34 +533,4 @@ func (q *Queries) ListRetroDraftsForWorkspace(ctx context.Context, arg ListRetro
 		return nil, err
 	}
 	return items, nil
-}
-
-const lockProjectForDependency = `-- name: LockProjectForDependency :one
-SELECT id
-FROM projects
-WHERE workspace_id = ?
-  AND id = ?
-  AND enabled = TRUE
-FOR UPDATE
-`
-
-type LockProjectForDependencyParams struct {
-	WorkspaceID uint32 `json:"-"`
-	ID          uint32 `json:"-"`
-}
-
-// Acquire a row-level lock on the owning project before creating a dependency
-// edge. The AddDependency handler reads the workspace's edge set and walks it
-// to reject an edge that would close a cycle; without serialization two
-// concurrent POSTs (A->B and B->A) both pass the cycle check and commit,
-// forming a cycle / mutual-block. Calling this inside the transaction first
-// makes concurrent dependency writers for the same project serialize, while
-// different projects still proceed independently. Mirrors
-// LockProjectForTaskNumber. Both endpoints of a dependency share a project,
-// so locking that project row is sufficient to serialize the check-then-insert.
-func (q *Queries) LockProjectForDependency(ctx context.Context, arg LockProjectForDependencyParams) (uint32, error) {
-	row := q.db.QueryRowContext(ctx, lockProjectForDependency, arg.WorkspaceID, arg.ID)
-	var id uint32
-	err := row.Scan(&id)
-	return id, err
 }

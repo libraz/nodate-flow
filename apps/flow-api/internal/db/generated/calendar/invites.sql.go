@@ -70,6 +70,7 @@ const disableCalendarEventInvite = `-- name: DisableCalendarEventInvite :exec
 UPDATE calendar_event_invites
 SET enabled = FALSE
 WHERE id = ?
+  AND enabled = TRUE
 `
 
 // Soft-disable (revoke) an invite by internal id.

@@ -14,11 +14,12 @@ import (
 	types "github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
 )
 
-const archiveInboxItem = `-- name: ArchiveInboxItem :exec
+const archiveInboxItem = `-- name: ArchiveInboxItem :execrows
 UPDATE signals
 SET enabled = FALSE
 WHERE workspace_id = ?
   AND public_id = ?
+  AND enabled = TRUE
 `
 
 type ArchiveInboxItemParams struct {
@@ -27,9 +28,12 @@ type ArchiveInboxItemParams struct {
 }
 
 // Archive a signal by soft-disabling it. The inbox view excludes disabled rows.
-func (q *Queries) ArchiveInboxItem(ctx context.Context, arg ArchiveInboxItemParams) error {
-	_, err := q.db.ExecContext(ctx, archiveInboxItem, arg.WorkspaceID, arg.PublicID)
-	return err
+func (q *Queries) ArchiveInboxItem(ctx context.Context, arg ArchiveInboxItemParams) (int64, error) {
+	result, err := q.db.ExecContext(ctx, archiveInboxItem, arg.WorkspaceID, arg.PublicID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
 }
 
 const listInbox = `-- name: ListInbox :many
@@ -286,7 +290,7 @@ func (q *Queries) ListInboxForUser(ctx context.Context, arg ListInboxForUserPara
 	return items, nil
 }
 
-const snoozeInboxItem = `-- name: SnoozeInboxItem :exec
+const snoozeInboxItem = `-- name: SnoozeInboxItem :execrows
 UPDATE signals
 SET received_at = ?
 WHERE workspace_id = ?
@@ -302,7 +306,10 @@ type SnoozeInboxItemParams struct {
 
 // Snooze a signal by pushing its received_at forward. Minimal impl;
 // a dedicated snoozed_until_at column may be added later on.
-func (q *Queries) SnoozeInboxItem(ctx context.Context, arg SnoozeInboxItemParams) error {
-	_, err := q.db.ExecContext(ctx, snoozeInboxItem, arg.ReceivedAt, arg.WorkspaceID, arg.PublicID)
-	return err
+func (q *Queries) SnoozeInboxItem(ctx context.Context, arg SnoozeInboxItemParams) (int64, error) {
+	result, err := q.db.ExecContext(ctx, snoozeInboxItem, arg.ReceivedAt, arg.WorkspaceID, arg.PublicID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
 }

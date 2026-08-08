@@ -46,11 +46,11 @@ SELECT
 FROM v_admin_users v
 WHERE v.public_id = ?;
 
--- name: AdminSuspendUser :exec
+-- name: AdminSuspendUser :execrows
 -- Disable a user account (soft-delete).
 UPDATE users SET enabled = FALSE WHERE public_id = ? AND enabled = TRUE;
 
--- name: AdminEnableUser :exec
+-- name: AdminEnableUser :execrows
 -- Re-enable a previously suspended user account.
 UPDATE users SET enabled = TRUE WHERE public_id = ? AND enabled = FALSE;
 

@@ -64,11 +64,13 @@ WHERE m.workspace_id = ?
 ORDER BY m.created_at DESC, m.public_id DESC
 LIMIT ? OFFSET ?;
 
--- name: RevokeMcpToken :exec
+-- name: RevokeMcpToken :execrows
 -- Revoke an MCP token (workspace + user scoped).
 UPDATE mcp_tokens
 SET revoked_at = CURRENT_TIMESTAMP,
     enabled = FALSE
 WHERE workspace_id = ?
   AND user_id = ?
-  AND public_id = ?;
+  AND public_id = ?
+  AND enabled = TRUE
+  AND revoked_at IS NULL;

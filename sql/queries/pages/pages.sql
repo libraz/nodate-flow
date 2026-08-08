@@ -155,7 +155,7 @@ WHERE pg.workspace_id = sqlc.arg('workspace_id')
   AND pg.id IN (SELECT id FROM enabled_tree)
 LIMIT 1;
 
--- name: UpdatePage :exec
+-- name: UpdatePage :execrows
 -- Update mutable page fields. Uses sqlc.narg for nullable columns.
 UPDATE pages
 SET title          = COALESCE(sqlc.narg('title'), title),
@@ -166,12 +166,13 @@ WHERE workspace_id = ?
   AND public_id = ?
   AND enabled = TRUE;
 
--- name: DisablePage :exec
+-- name: DisablePage :execrows
 -- Soft-delete a page.
 UPDATE pages
 SET enabled = FALSE
 WHERE workspace_id = ?
-  AND public_id = ?;
+  AND public_id = ?
+  AND enabled = TRUE;
 
 -- name: CountChildPages :one
 -- Count enabled child pages for a given parent. Used to check before deletion.

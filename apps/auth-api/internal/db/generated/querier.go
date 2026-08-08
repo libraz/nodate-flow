@@ -24,9 +24,9 @@ type Querier interface {
 	// Count active instance admins (for last-admin guard).
 	AdminCountActiveInstanceAdmins(ctx context.Context) (int64, error)
 	// Re-enable a previously suspended user account.
-	AdminEnableUser(ctx context.Context, publicID types.PublicID) error
+	AdminEnableUser(ctx context.Context, publicID types.PublicID) (int64, error)
 	// Re-enable a previously suspended workspace.
-	AdminEnableWorkspace(ctx context.Context, publicID types.PublicID) error
+	AdminEnableWorkspace(ctx context.Context, publicID types.PublicID) (int64, error)
 	// Find instance admin grant for a specific user.
 	// Used as an existence check by grant/revoke handlers (result is discarded).
 	AdminFindInstanceAdminByUserId(ctx context.Context, userID uint32) (AdminFindInstanceAdminByUserIdRow, error)
@@ -68,11 +68,11 @@ type Querier interface {
 	// Revoke an instance admin grant by setting revoked_at.
 	AdminRevokeInstanceAdmin(ctx context.Context, userID uint32) error
 	// Revoke any session by its public_id (admin override, no user scoping).
-	AdminRevokeSession(ctx context.Context, publicID types.PublicID) error
+	AdminRevokeSession(ctx context.Context, publicID types.PublicID) (int64, error)
 	// Disable a user account (soft-delete).
-	AdminSuspendUser(ctx context.Context, publicID types.PublicID) error
+	AdminSuspendUser(ctx context.Context, publicID types.PublicID) (int64, error)
 	// Disable a workspace (soft-delete).
-	AdminSuspendWorkspace(ctx context.Context, publicID types.PublicID) error
+	AdminSuspendWorkspace(ctx context.Context, publicID types.PublicID) (int64, error)
 	// Insert or update an instance setting.
 	AdminUpsertInstanceSetting(ctx context.Context, arg AdminUpsertInstanceSettingParams) error
 	// Append a workspace-scoped audit row. metadata_json MUST be redacted.
@@ -115,6 +115,31 @@ type Querier interface {
 	// Verify that a user is an enabled member of a workspace. Returns 1 if
 	// the membership exists, sql.ErrNoRows otherwise.
 	CheckWorkspaceMemberExists(ctx context.Context, arg CheckWorkspaceMemberExistsParams) (int32, error)
+	// Elect a single refresher for one integration row, by compare-and-swap
+	// on the value of last_refreshed_at that the caller read from
+	// ListConnectionsExpiringBefore.
+	//
+	// The refresher runs inside every API replica, so without this the same
+	// row is refreshed concurrently by all of them. That is not a wasted
+	// call but a data-loss hazard: with a provider that rotates the refresh
+	// token on use (Discord here), the second exchange presents a token the
+	// provider has already retired, the provider reads that as replay, and
+	// it revokes the whole grant. The connection then breaks permanently
+	// and the user has to re-authorise.
+	//
+	// <=> is MySQL's NULL-safe equality, needed because last_refreshed_at is
+	// NULL until the first refresh — plain `=` never matches NULL and the
+	// claim would fail forever on exactly the rows that were never
+	// refreshed. Callers MUST inspect RowsAffected and skip the row unless
+	// it is 1; anything else means another replica got there first.
+	//
+	// The CAS alone is not the whole guard, and cannot be: it only
+	// separates replicas that read the same value. A replica that lists a
+	// moment after the winner claimed reads the *new* last_refreshed_at, so
+	// its swap would also succeed. The caller therefore skips any row
+	// touched within its claim lease before reaching this statement; see
+	// Refresher.ClaimLease. The two together cover both orderings.
+	ClaimConnectionForRefresh(ctx context.Context, arg ClaimConnectionForRefreshParams) (int64, error)
 	// Atomically consume an OAuth state row. MySQL 8.4 has no
 	// DELETE ... RETURNING, so the row payload is read via FindOauthState
 	// and this guarded DELETE is the actual claim: the expires_at guard
@@ -427,6 +452,13 @@ type Querier interface {
 	// List enabled integrations whose access token will expire before
 	// the given cutoff AND still have a stored refresh token. Used by
 	// the background token refresher.
+	//
+	// This listing carries no claim of its own: every replica of the API
+	// process runs the refresher, so the same row comes back to all of
+	// them on the same tick. `last_refreshed_at` is selected because it is
+	// the compare-and-swap witness ClaimConnectionForRefresh matches on,
+	// and `public_id` because the refresher logs the row it worked on and
+	// an internal id must not appear in a log line.
 	ListConnectionsExpiringBefore(ctx context.Context, accessTokenExpiresAt sql.NullTime) ([]ListConnectionsExpiringBeforeRow, error)
 	// List a user's PATs in a workspace, masked (no token_hash).
 	ListPatsForUser(ctx context.Context, arg ListPatsForUserParams) ([]ListPatsForUserRow, error)
@@ -528,14 +560,14 @@ type Querier interface {
 	// Patch the authenticated user's profile. NULL params leave the column untouched.
 	PatchMe(ctx context.Context, arg PatchMeParams) error
 	// Patch a workspace via COALESCE; NULL params leave existing columns untouched.
-	PatchWorkspace(ctx context.Context, arg PatchWorkspaceParams) error
+	PatchWorkspace(ctx context.Context, arg PatchWorkspaceParams) (int64, error)
 	// Garbage-collect oauth_states rows past their expires_at. Called
 	// opportunistically from the callback handler.
 	PurgeExpiredOauthStates(ctx context.Context) error
 	// Insert a new global user account. The caller supplies a UUID v7 public_id.
 	RegisterUser(ctx context.Context, arg RegisterUserParams) (int64, error)
 	// Soft-remove a member from a workspace.
-	RemoveWorkspaceMember(ctx context.Context, arg RemoveWorkspaceMemberParams) error
+	RemoveWorkspaceMember(ctx context.Context, arg RemoveWorkspaceMemberParams) (int64, error)
 	// Soft-remove a member keyed by user_id.
 	RemoveWorkspaceMemberByUserId(ctx context.Context, arg RemoveWorkspaceMemberByUserIdParams) error
 	// Clear failed login counter and lockout after a successful authentication.
@@ -546,13 +578,13 @@ type Querier interface {
 	RevokeAllSessionsForUser(ctx context.Context, userID uint32) error
 	// Revoke every active session for a user except one identified by public_id.
 	// Used by "sign out of all other devices" in /settings/security.
-	RevokeAllSessionsForUserExcept(ctx context.Context, arg RevokeAllSessionsForUserExceptParams) error
+	RevokeAllSessionsForUserExcept(ctx context.Context, arg RevokeAllSessionsForUserExceptParams) (int64, error)
 	// Revoke a PAT (workspace + user scoped).
-	RevokePat(ctx context.Context, arg RevokePatParams) error
+	RevokePat(ctx context.Context, arg RevokePatParams) (int64, error)
 	// Mark a session as revoked. Workspace scoping does not apply (user-scoped).
-	RevokeSession(ctx context.Context, arg RevokeSessionParams) error
+	RevokeSession(ctx context.Context, arg RevokeSessionParams) (int64, error)
 	// Disable an invite link (soft delete).
-	RevokeWorkspaceInvite(ctx context.Context, arg RevokeWorkspaceInviteParams) error
+	RevokeWorkspaceInvite(ctx context.Context, arg RevokeWorkspaceInviteParams) (int64, error)
 	// Replace the refresh token hash, extend expiry, and record last usage on a refresh rotation.
 	RotateSessionRefreshHash(ctx context.Context, arg RotateSessionRefreshHashParams) error
 	// Begin (or restart) TOTP enrollment by writing a fresh encrypted
@@ -583,15 +615,15 @@ type Querier interface {
 	// Replace the Argon2id password hash on a local identity.
 	UpdateIdentityPasswordHash(ctx context.Context, arg UpdateIdentityPasswordHashParams) error
 	// Change a member's role.
-	UpdateMemberRole(ctx context.Context, arg UpdateMemberRoleParams) error
+	UpdateMemberRole(ctx context.Context, arg UpdateMemberRoleParams) (int64, error)
 	// Change a member's role keyed by user_id.
 	UpdateMemberRoleByUserId(ctx context.Context, arg UpdateMemberRoleByUserIdParams) error
 	// Stamp last successful login time on a user account.
 	UpdateUserLastLoginAt(ctx context.Context, id uint32) error
 	// Update mutable workspace fields by public_id.
-	UpdateWorkspace(ctx context.Context, arg UpdateWorkspaceParams) error
+	UpdateWorkspace(ctx context.Context, arg UpdateWorkspaceParams) (int64, error)
 	// Update workspace name and slug by public_id.
-	UpdateWorkspaceFull(ctx context.Context, arg UpdateWorkspaceFullParams) error
+	UpdateWorkspaceFull(ctx context.Context, arg UpdateWorkspaceFullParams) (int64, error)
 	// Insert or replace a user+provider integration. The uniq
 	// (user_id, provider) key guarantees only one active row per
 	// provider per user; on conflict we refresh every token column.

@@ -259,7 +259,10 @@ func Triage(deps Deps) func(context.Context, *TriageIntakeItemInput) (*TriageInt
 			snoozeUntil = sql.NullTime{Time: time.Unix(*in.Body.SnoozeUntil, 0), Valid: true}
 		}
 
-		if err := deps.Queries.UpdateIntakeItemTriage(ctx, generated.UpdateIntakeItemTriageParams{
+		// Not an existence check: re-triaging an item to the status it
+		// already holds changes nothing and MySQL counts zero. The item is
+		// re-read below and that read is what fails if it is gone.
+		if _, err := deps.Queries.UpdateIntakeItemTriage(ctx, generated.UpdateIntakeItemTriageParams{
 			TriageStatus:    generated.IntakeItemsTriageStatus(in.Body.Status),
 			TriagedByUserID: sql.NullInt32{Int32: int32(actorID), Valid: true}, //#nosec G115 -- actor user id sourced from session, fits int32 within realistic deployments
 			SnoozeUntil:     snoozeUntil,
@@ -383,7 +386,10 @@ func Convert(deps Deps) func(context.Context, *ConvertIntakeItemInput) (*Convert
 		taskPub := created.PublicID
 
 		// Link intake item to the created task.
-		if err := qtx.SetIntakeItemTask(ctx, generated.SetIntakeItemTaskParams{
+		// The item was resolved earlier in this transaction and the task it
+		// is being linked to was just inserted, so the count adds nothing the
+		// transaction does not already guarantee.
+		if _, err := qtx.SetIntakeItemTask(ctx, generated.SetIntakeItemTaskParams{
 			TaskID:      sql.NullInt32{Int32: int32(taskID), Valid: true}, //#nosec G115 -- task_id is tasks.id (BIGINT UNSIGNED), fits int32 within realistic deployments
 			WorkspaceID: ws.ID,
 			PublicID:    pub,

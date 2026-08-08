@@ -33,6 +33,14 @@ var nullStr = handlerutil.NullStr
 // Record is the public DTO for an intake item row. Named `Record` rather
 // than `Item` so the merged OpenAPI spec keeps a unique component name
 // (inbox.Item already claims the `Item` schema name).
+//
+// It carries no link to the task a converted item became. intake_items
+// stores that as an internal row id, which must never leave the API, and
+// none of the intake queries joins tasks to pick up its public id. The
+// field this DTO used to declare for it was therefore empty on every
+// response — a promise the contract could not keep, and one that
+// generated clients typed as if it could. Restoring the link means
+// joining tasks in the three intake queries first.
 type Record struct {
 	ID                   string   `json:"id" doc:"Intake item public id (UUID v7)"`
 	Title                string   `json:"title"`
@@ -41,7 +49,6 @@ type Record struct {
 	SnoozeUntil          *int64   `json:"snoozeUntil,omitempty"`
 	AIScore              *float64 `json:"aiScore,omitempty"`
 	AIReasoning          string   `json:"aiReasoning,omitempty"`
-	TaskID               string   `json:"taskId,omitempty"`
 	TriagedByUserID      string   `json:"triagedByUserId,omitempty"`
 	TriagedByDisplayName string   `json:"triagedByDisplayName,omitempty"`
 	CreatedAt            int64    `json:"createdAt"`

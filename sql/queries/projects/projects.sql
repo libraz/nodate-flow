@@ -60,7 +60,7 @@ WHERE v.workspace_id = ?
 ORDER BY v.sort_weight ASC, v.created_at DESC, v.public_id DESC
 LIMIT ? OFFSET ?;
 
--- name: UpdateProject :exec
+-- name: UpdateProject :execrows
 -- Update mutable project fields by public_id.
 UPDATE projects
 SET name = ?,
@@ -107,7 +107,7 @@ WHERE p.public_id = ?
   AND p.enabled = TRUE
 LIMIT 1;
 
--- name: UpdateProjectFull :exec
+-- name: UpdateProjectFull :execrows
 -- Update project name, slug and description by public_id.
 UPDATE projects
 SET name = ?,
@@ -136,7 +136,7 @@ WHERE workspace_id = ?
   AND project_id = ?
   AND enabled = TRUE;
 
--- name: DisableProject :exec
+-- name: DisableProject :execrows
 -- Soft-disable a project. The handler must call DisableProjectChildTasks
 -- inside the same transaction to cascade enabled = FALSE down to tasks;
 -- this query alone leaves child tasks live on the underlying table.
@@ -144,7 +144,8 @@ UPDATE projects
 SET enabled = FALSE,
     updated_at = CURRENT_TIMESTAMP(3)
 WHERE workspace_id = ?
-  AND public_id = ?;
+  AND public_id = ?
+  AND enabled = TRUE;
 
 -- name: FindProjectByIdentifier :one
 -- Resolve a project by its human-readable identifier within a workspace.

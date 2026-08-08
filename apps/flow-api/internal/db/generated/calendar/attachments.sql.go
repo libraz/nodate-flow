@@ -52,7 +52,7 @@ func (q *Queries) CreateCalendarEventAttachment(ctx context.Context, arg CreateC
 	return result.LastInsertId()
 }
 
-const deleteCalendarEventAttachment = `-- name: DeleteCalendarEventAttachment :exec
+const deleteCalendarEventAttachment = `-- name: DeleteCalendarEventAttachment :execrows
 DELETE FROM calendar_event_attachments
 WHERE workspace_id = ?
   AND event_id = ?
@@ -70,9 +70,12 @@ type DeleteCalendarEventAttachmentParams struct {
 // transaction; this row holding the FK reference must go away before
 // DeleteStorageObjectIfUnreferenced can free the storage object (FK is
 // ON DELETE RESTRICT). Audit trail survives via events.
-func (q *Queries) DeleteCalendarEventAttachment(ctx context.Context, arg DeleteCalendarEventAttachmentParams) error {
-	_, err := q.db.ExecContext(ctx, deleteCalendarEventAttachment, arg.WorkspaceID, arg.EventID, arg.PublicID)
-	return err
+func (q *Queries) DeleteCalendarEventAttachment(ctx context.Context, arg DeleteCalendarEventAttachmentParams) (int64, error) {
+	result, err := q.db.ExecContext(ctx, deleteCalendarEventAttachment, arg.WorkspaceID, arg.EventID, arg.PublicID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
 }
 
 const findCalendarEventAttachmentByPublicId = `-- name: FindCalendarEventAttachmentByPublicId :one

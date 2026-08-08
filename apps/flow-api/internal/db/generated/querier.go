@@ -51,9 +51,9 @@ type Querier interface {
 	// Count active instance admins (for last-admin guard).
 	AdminCountActiveInstanceAdmins(ctx context.Context) (int64, error)
 	// Re-enable a previously suspended user account.
-	AdminEnableUser(ctx context.Context, publicID types.PublicID) error
+	AdminEnableUser(ctx context.Context, publicID types.PublicID) (int64, error)
 	// Re-enable a previously suspended workspace.
-	AdminEnableWorkspace(ctx context.Context, publicID types.PublicID) error
+	AdminEnableWorkspace(ctx context.Context, publicID types.PublicID) (int64, error)
 	// Find instance admin grant for a specific user.
 	// Used as an existence check by grant/revoke handlers (result is discarded).
 	AdminFindInstanceAdminByUserId(ctx context.Context, userID uint32) (AdminFindInstanceAdminByUserIdRow, error)
@@ -95,11 +95,11 @@ type Querier interface {
 	// Revoke an instance admin grant by setting revoked_at.
 	AdminRevokeInstanceAdmin(ctx context.Context, userID uint32) error
 	// Revoke any session by its public_id (admin override, no user scoping).
-	AdminRevokeSession(ctx context.Context, publicID types.PublicID) error
+	AdminRevokeSession(ctx context.Context, publicID types.PublicID) (int64, error)
 	// Disable a user account (soft-delete).
-	AdminSuspendUser(ctx context.Context, publicID types.PublicID) error
+	AdminSuspendUser(ctx context.Context, publicID types.PublicID) (int64, error)
 	// Disable a workspace (soft-delete).
-	AdminSuspendWorkspace(ctx context.Context, publicID types.PublicID) error
+	AdminSuspendWorkspace(ctx context.Context, publicID types.PublicID) (int64, error)
 	// Insert or update an instance setting.
 	AdminUpsertInstanceSetting(ctx context.Context, arg AdminUpsertInstanceSettingParams) error
 	// Append a single agent-actor event to the append-only event log. Mirrors
@@ -119,6 +119,10 @@ type Querier interface {
 	// event being reversed was originally produced by an agent so the
 	// compensating event preserves the same actor kind. NULL for normal
 	// agent-emitted events.
+	//
+	// `calendar_id` mirrors AppendEvent: an agent acting on a calendar
+	// through the MCP calendar tools produces a row that has to land in the
+	// same per-calendar feed a human action would.
 	AppendAgentEvent(ctx context.Context, arg AppendAgentEventParams) (int64, error)
 	// Append a workspace-scoped audit row. metadata_json MUST be redacted.
 	AppendAuditLog(ctx context.Context, arg AppendAuditLogParams) (int64, error)
@@ -144,24 +148,31 @@ type Querier interface {
 	// projection can cancel the original out without ever UPDATEing the event
 	// log (events stay immutable; see CLAUDE.md rule 10). ON DELETE SET NULL
 	// so purging a reversed event detaches the backlink instead of cascading.
+	//
+	// `calendar_id` is the symmetric counterpart of `task_id`: the internal
+	// calendar the event happened inside, so a per-calendar activity feed
+	// reads the log directly instead of keeping a second history table that
+	// would drift from it. NULL for events with no calendar subject. Every
+	// event emitted from the calendar handlers binds it; see
+	// internal/http/handlers/calendars/deps.go.
 	AppendEvent(ctx context.Context, arg AppendEventParams) (int64, error)
 	// Append an instance-wide audit row. payload_json MUST be redacted.
 	AppendInstanceAuditLog(ctx context.Context, arg AppendInstanceAuditLogParams) (int64, error)
 	// Archive a signal by soft-disabling it. The inbox view excludes disabled rows.
-	ArchiveInboxItem(ctx context.Context, arg ArchiveInboxItemParams) error
+	ArchiveInboxItem(ctx context.Context, arg ArchiveInboxItemParams) (int64, error)
 	// Archive a single notification.
-	ArchiveNotification(ctx context.Context, arg ArchiveNotificationParams) error
+	ArchiveNotification(ctx context.Context, arg ArchiveNotificationParams) (int64, error)
 	// Set archived_at on a task.
 	// updated_by_user_id is appended so the audit field records who archived
 	// the row (NULL for system writers).
-	ArchiveTask(ctx context.Context, arg ArchiveTaskParams) error
+	ArchiveTask(ctx context.Context, arg ArchiveTaskParams) (int64, error)
 	// Allocate the next task number for a project. Must be called inside a
 	// transaction after LockProjectForTaskNumber.
 	// workspace_id is included so the index (workspace_id, project_id) is used and
 	// the query is bounded to the caller's workspace as a defence-in-depth check.
 	AssignTaskNumber(ctx context.Context, arg AssignTaskNumberParams) (int32, error)
 	// Link an existing signal to a task by public_id.
-	AttachSignalToTask(ctx context.Context, arg AttachSignalToTaskParams) error
+	AttachSignalToTask(ctx context.Context, arg AttachSignalToTaskParams) (int64, error)
 	// Count one failed authentication against an identity, locking the
 	// account once the count reaches the caller's threshold.
 	//
@@ -200,6 +211,31 @@ type Querier interface {
 	// Verify that a user is an enabled member of a workspace. Returns 1 if
 	// the membership exists, sql.ErrNoRows otherwise.
 	CheckWorkspaceMemberExists(ctx context.Context, arg CheckWorkspaceMemberExistsParams) (int32, error)
+	// Elect a single refresher for one integration row, by compare-and-swap
+	// on the value of last_refreshed_at that the caller read from
+	// ListConnectionsExpiringBefore.
+	//
+	// The refresher runs inside every API replica, so without this the same
+	// row is refreshed concurrently by all of them. That is not a wasted
+	// call but a data-loss hazard: with a provider that rotates the refresh
+	// token on use (Discord here), the second exchange presents a token the
+	// provider has already retired, the provider reads that as replay, and
+	// it revokes the whole grant. The connection then breaks permanently
+	// and the user has to re-authorise.
+	//
+	// <=> is MySQL's NULL-safe equality, needed because last_refreshed_at is
+	// NULL until the first refresh — plain `=` never matches NULL and the
+	// claim would fail forever on exactly the rows that were never
+	// refreshed. Callers MUST inspect RowsAffected and skip the row unless
+	// it is 1; anything else means another replica got there first.
+	//
+	// The CAS alone is not the whole guard, and cannot be: it only
+	// separates replicas that read the same value. A replica that lists a
+	// moment after the winner claimed reads the *new* last_refreshed_at, so
+	// its swap would also succeed. The caller therefore skips any row
+	// touched within its claim lease before reaching this statement; see
+	// Refresher.ClaimLease. The two together cover both orderings.
+	ClaimConnectionForRefresh(ctx context.Context, arg ClaimConnectionForRefreshParams) (int64, error)
 	// Take ownership of one pending job. The status column is the claim: the
 	// update matches only while the row is still pending, so exactly one
 	// replica can move it to running. Callers MUST treat a zero row count as
@@ -417,7 +453,7 @@ type Querier interface {
 	// The task_id predicate binds the delete to the task whose ACL the caller
 	// already cleared, so an attachment on a different (or unauthorized) task
 	// cannot be removed; a mismatch affects zero rows.
-	DeleteAttachment(ctx context.Context, arg DeleteAttachmentParams) error
+	DeleteAttachment(ctx context.Context, arg DeleteAttachmentParams) (int64, error)
 	// Clear the workspace's task attachments ahead of HardDeleteWorkspace.
 	//
 	// attachments.storage_object_id is ON DELETE RESTRICT, while both
@@ -442,7 +478,7 @@ type Querier interface {
 	// same RESTRICT edge exists from calendar_event_attachments.
 	DeleteCalendarEventAttachmentsForStorageObject(ctx context.Context, storageObjectID uint32) (int64, error)
 	// Soft-delete a comment.
-	DeleteComment(ctx context.Context, arg DeleteCommentParams) error
+	DeleteComment(ctx context.Context, arg DeleteCommentParams) (int64, error)
 	// Soft-delete a constraint. Scoped by the owning task_id so a sibling task's
 	// constraint cannot be deleted through another task's path; the affected-row
 	// count lets the handler return NOT_FOUND on a no-op.
@@ -459,7 +495,7 @@ type Querier interface {
 	// the claim.
 	DeleteIntegrationSourceMapping(ctx context.Context, arg DeleteIntegrationSourceMappingParams) (int64, error)
 	// Soft-delete a lens.
-	DeleteLens(ctx context.Context, arg DeleteLensParams) error
+	DeleteLens(ctx context.Context, arg DeleteLensParams) (int64, error)
 	// Remove all mentions for a specific comment (before re-extracting).
 	DeleteMentionsForComment(ctx context.Context, commentID sql.NullInt32) error
 	// Remove all task_description mentions for a task (before re-extracting).
@@ -483,7 +519,7 @@ type Querier interface {
 	// re-embed-on-edit flow when a workspace switches to a different model.
 	DeleteTaskEmbeddingsForTask(ctx context.Context, taskID uint32) error
 	// Soft-delete a link by public id within a workspace.
-	DeleteTaskEventLink(ctx context.Context, arg DeleteTaskEventLinkParams) error
+	DeleteTaskEventLink(ctx context.Context, arg DeleteTaskEventLinkParams) (int64, error)
 	// Remove a label from a task (hard delete from junction).
 	DeleteTaskLabel(ctx context.Context, arg DeleteTaskLabelParams) error
 	// Remove a reservation whose upload never arrived, guarded on the same
@@ -500,17 +536,17 @@ type Querier interface {
 	DeleteUnconfirmedStorageObjectByID(ctx context.Context, id uint32) (int64, error)
 	// Hard-delete a single integration row (user-scoped).
 	DeleteUserIntegration(ctx context.Context, arg DeleteUserIntegrationParams) error
-	DeleteWebhookSubscription(ctx context.Context, arg DeleteWebhookSubscriptionParams) error
+	DeleteWebhookSubscription(ctx context.Context, arg DeleteWebhookSubscriptionParams) (int64, error)
 	// Soft-delete a favorite.
-	DisableFavorite(ctx context.Context, arg DisableFavoriteParams) error
+	DisableFavorite(ctx context.Context, arg DisableFavoriteParams) (int64, error)
 	// Soft-disable a label.
-	DisableLabel(ctx context.Context, arg DisableLabelParams) error
+	DisableLabel(ctx context.Context, arg DisableLabelParams) (int64, error)
 	// Soft-delete a page.
-	DisablePage(ctx context.Context, arg DisablePageParams) error
+	DisablePage(ctx context.Context, arg DisablePageParams) (int64, error)
 	// Soft-disable a project. The handler must call DisableProjectChildTasks
 	// inside the same transaction to cascade enabled = FALSE down to tasks;
 	// this query alone leaves child tasks live on the underlying table.
-	DisableProject(ctx context.Context, arg DisableProjectParams) error
+	DisableProject(ctx context.Context, arg DisableProjectParams) (int64, error)
 	// Cascade-disable every currently-enabled task that lives under a project.
 	// Must be called inside the same transaction as DisableProject so callers
 	// observe a consistent snapshot. The views (v_task_list, v_task_detail)
@@ -523,21 +559,21 @@ type Querier interface {
 	// per project DB conventions, even though project_id is globally unique.
 	DisableProjectChildTasks(ctx context.Context, arg DisableProjectChildTasksParams) error
 	// Soft-delete a reaction by public id and user.
-	DisableReaction(ctx context.Context, arg DisableReactionParams) error
+	DisableReaction(ctx context.Context, arg DisableReactionParams) (int64, error)
 	// Soft-disable a task.
 	// updated_by_user_id is appended so the audit field records who disabled
 	// the row (NULL for system writers).
-	DisableTask(ctx context.Context, arg DisableTaskParams) error
+	DisableTask(ctx context.Context, arg DisableTaskParams) (int64, error)
 	// Soft-disable a task-label junction.
 	DisableTaskLabel(ctx context.Context, arg DisableTaskLabelParams) error
 	// Soft-delete a timebox.
-	DisableTimebox(ctx context.Context, arg DisableTimeboxParams) error
+	DisableTimebox(ctx context.Context, arg DisableTimeboxParams) (int64, error)
 	// Soft-delete a widget.
-	DisableWidget(ctx context.Context, arg DisableWidgetParams) error
+	DisableWidget(ctx context.Context, arg DisableWidgetParams) (int64, error)
 	// Bulk-dismiss all pending suggestions involving a specific task.
 	DismissAllForTask(ctx context.Context, arg DismissAllForTaskParams) error
 	// Edit a comment body and stamp edited_at.
-	EditComment(ctx context.Context, arg EditCommentParams) error
+	EditComment(ctx context.Context, arg EditCommentParams) (int64, error)
 	// Atomically enqueue a new run. The UNIQUE constraint on dedupe_key
 	// causes a second scheduler replica to get a duplicate-entry error,
 	// which callers translate to ErrDuplicate. No row is inserted on conflict.
@@ -576,7 +612,7 @@ type Querier interface {
 	ExportTasksForWorkspace(ctx context.Context, arg ExportTasksForWorkspaceParams) ([]ExportTasksForWorkspaceRow, error)
 	// Mark a constraint as currently failing. Clears satisfied_at so the
 	// transition is visible in v_task_constraint_satisfaction.
-	FailConstraint(ctx context.Context, arg FailConstraintParams) error
+	FailConstraint(ctx context.Context, arg FailConstraintParams) (int64, error)
 	// Fail agent runs that stranded once too often. Without this the rows
 	// requeued above would cycle between pending and claimed forever,
 	// spending a model call each time.
@@ -1138,6 +1174,13 @@ type Querier interface {
 	// List enabled integrations whose access token will expire before
 	// the given cutoff AND still have a stored refresh token. Used by
 	// the background token refresher.
+	//
+	// This listing carries no claim of its own: every replica of the API
+	// process runs the refresher, so the same row comes back to all of
+	// them on the same tick. `last_refreshed_at` is selected because it is
+	// the compare-and-swap witness ClaimConnectionForRefresh matches on,
+	// and `public_id` because the refresher logs the row it worked on and
+	// an internal id must not appear in a log line.
 	ListConnectionsExpiringBefore(ctx context.Context, accessTokenExpiresAt sql.NullTime) ([]ListConnectionsExpiringBeforeRow, error)
 	// List a task's constraints. The task is resolved by public_id outside.
 	ListConstraintsForTask(ctx context.Context, arg ListConstraintsForTaskParams) ([]ListConstraintsForTaskRow, error)
@@ -1148,10 +1191,41 @@ type Querier interface {
 	// List outgoing dependencies of a task. Returns the target task public_id.
 	ListDependenciesForTask(ctx context.Context, arg ListDependenciesForTaskParams) ([]ListDependenciesForTaskRow, error)
 	// List every enabled dependency edge in the workspace as (from, to) internal
-	// id pairs. Used by AddDependency to walk the graph and reject an edge that
-	// would close a cycle, keeping the dependency graph a DAG. Internal ids are
-	// safe here because the result never leaves the handler (json:"-" on *.id).
+	// id pairs. Read-only callers (the "would this be rejected" preview) use this
+	// one. Writers must use ListDependencyEdgesForWorkspaceForUpdate instead.
+	// Internal ids are safe here because the result never leaves the handler
+	// (json:"-" on *.id).
 	ListDependencyEdgesForWorkspace(ctx context.Context, workspaceID uint32) ([]ListDependencyEdgesForWorkspaceRow, error)
+	// The same edge set, read under a lock. This is the serialization point for
+	// adding an edge: the writer walks the graph to reject an edge that would
+	// close a cycle, and the walk is only sound if no other writer can add an
+	// edge between the walk and the insert.
+	//
+	// The lock is workspace-wide because the read is. An earlier version locked
+	// only the two endpoint projects, which serializes writers that share a
+	// project but not a cycle drawn across four of them: two transactions
+	// holding disjoint project pairs both walked an edge set missing the
+	// other's edge, both passed, and both committed. The result is a cycle no
+	// request could see, and it is silent -- `dependency.all_done` is evaluated
+	// by a cycle-tolerant walk, so the constraint simply never becomes
+	// satisfiable and every screen still looks healthy.
+	//
+	// Locking the `workspaces` row instead (the obvious spelling of
+	// "workspace-wide") is not an option: an exclusive lock on that row blocks
+	// every INSERT into every table with a foreign key to workspaces, because
+	// InnoDB takes a shared lock on the parent row for each such insert. That
+	// includes the events log, so it would stall unrelated writes across the
+	// whole workspace for the duration of the transaction. Locking the edge
+	// rows themselves has no such reach: nothing references task_dependencies.
+	//
+	// Range scanning (workspace_id, from_task_id) also gap-locks the workspace's
+	// slice of that index, so a concurrent INSERT of a new edge blocks rather
+	// than slipping in behind the walk. Writers scan in the same index order, so
+	// they queue rather than deadlock; the one case that can deadlock is two
+	// writers meeting on an empty range, where the gap locks are mutually
+	// compatible but the insert intentions are not. That resolves to a retry
+	// (dbretry.InTx), and a workspace with no edges has no cycle to close.
+	ListDependencyEdgesForWorkspaceForUpdate(ctx context.Context, workspaceID uint32) ([]ListDependencyEdgesForWorkspaceForUpdateRow, error)
 	// Outgoing dependencies of a task with the referenced task's
 	// public_id, current derived_state, and dependency kind. The engine
 	// builds a map[public_id]state and a map[public_id]kind from this
@@ -1584,16 +1658,6 @@ type Querier interface {
 	ListWorkspaceMembersForSmartCreate(ctx context.Context, workspaceID uint32) ([]ListWorkspaceMembersForSmartCreateRow, error)
 	// List workspaces a user belongs to.
 	ListWorkspacesForUser(ctx context.Context, arg ListWorkspacesForUserParams) ([]ListWorkspacesForUserRow, error)
-	// Acquire a row-level lock on the owning project before creating a dependency
-	// edge. The AddDependency handler reads the workspace's edge set and walks it
-	// to reject an edge that would close a cycle; without serialization two
-	// concurrent POSTs (A->B and B->A) both pass the cycle check and commit,
-	// forming a cycle / mutual-block. Calling this inside the transaction first
-	// makes concurrent dependency writers for the same project serialize, while
-	// different projects still proceed independently. Mirrors
-	// LockProjectForTaskNumber. Both endpoints of a dependency share a project,
-	// so locking that project row is sufficient to serialize the check-then-insert.
-	LockProjectForDependency(ctx context.Context, arg LockProjectForDependencyParams) (uint32, error)
 	// Lock the owning project row before task-number allocation. This serializes
 	// concurrent creators for the same project while still allowing different
 	// projects to allocate independently.
@@ -1635,9 +1699,9 @@ type Querier interface {
 	// recipient so a delivery flag can never be flipped on another user's
 	// notification, matching the recipient predicate on the sibling
 	// MarkNotificationRead / ArchiveNotification mutations.
-	MarkNotificationDelivered(ctx context.Context, arg MarkNotificationDeliveredParams) error
+	MarkNotificationDelivered(ctx context.Context, arg MarkNotificationDeliveredParams) (int64, error)
 	// Mark a single notification as read.
-	MarkNotificationRead(ctx context.Context, arg MarkNotificationReadParams) error
+	MarkNotificationRead(ctx context.Context, arg MarkNotificationReadParams) (int64, error)
 	// Atomically claim a recovery code by internal id. The WHERE clause
 	// includes used_at IS NULL so two concurrent login requests racing on
 	// the same code can never both succeed: exactly one UPDATE will match
@@ -1671,7 +1735,7 @@ type Querier interface {
 	// Patch the authenticated user's profile. NULL params leave the column untouched.
 	PatchMe(ctx context.Context, arg PatchMeParams) error
 	// Patch a workspace via COALESCE; NULL params leave existing columns untouched.
-	PatchWorkspace(ctx context.Context, arg PatchWorkspaceParams) error
+	PatchWorkspace(ctx context.Context, arg PatchWorkspaceParams) (int64, error)
 	// Garbage-collect oauth_states rows past their expires_at. Called
 	// opportunistically from the callback handler.
 	PurgeExpiredOauthStates(ctx context.Context) error
@@ -1690,15 +1754,15 @@ type Querier interface {
 	// the release exists for.
 	ReleaseReminderOccurrence(ctx context.Context, arg ReleaseReminderOccurrenceParams) error
 	// Soft-remove an actor from a task.
-	RemoveActor(ctx context.Context, arg RemoveActorParams) error
+	RemoveActor(ctx context.Context, arg RemoveActorParams) (int64, error)
 	// Soft-remove a project member.
-	RemoveProjectMember(ctx context.Context, arg RemoveProjectMemberParams) error
+	RemoveProjectMember(ctx context.Context, arg RemoveProjectMemberParams) (int64, error)
 	// Soft-remove a project member keyed by user_id.
 	RemoveProjectMemberByUserId(ctx context.Context, arg RemoveProjectMemberByUserIdParams) error
 	// Remove a task from a timebox.
-	RemoveTaskFromTimebox(ctx context.Context, arg RemoveTaskFromTimeboxParams) error
+	RemoveTaskFromTimebox(ctx context.Context, arg RemoveTaskFromTimeboxParams) (int64, error)
 	// Soft-remove a member from a workspace.
-	RemoveWorkspaceMember(ctx context.Context, arg RemoveWorkspaceMemberParams) error
+	RemoveWorkspaceMember(ctx context.Context, arg RemoveWorkspaceMemberParams) (int64, error)
 	// Soft-remove a member keyed by user_id.
 	RemoveWorkspaceMemberByUserId(ctx context.Context, arg RemoveWorkspaceMemberByUserIdParams) error
 	// Return agent runs stranded in 'claimed' to the pending queue.
@@ -1744,7 +1808,7 @@ type Querier interface {
 	// Used by the export handler to decide workspace-wide vs project-scoped queries.
 	ResolveLensProjectID(ctx context.Context, arg ResolveLensProjectIDParams) (sql.NullInt32, error)
 	// Accept or dismiss a pending suggestion. Only transitions from 'pending'.
-	ResolveSuggestion(ctx context.Context, arg ResolveSuggestionParams) error
+	ResolveSuggestion(ctx context.Context, arg ResolveSuggestionParams) (int64, error)
 	// Resolve a human-readable task reference (e.g. NF-42) to a task public_id.
 	ResolveTaskRef(ctx context.Context, arg ResolveTaskRefParams) (ResolveTaskRefRow, error)
 	// Revoke every active session for a user. Used by the refresh-reuse
@@ -1753,19 +1817,19 @@ type Querier interface {
 	RevokeAllSessionsForUser(ctx context.Context, userID uint32) error
 	// Revoke every active session for a user except one identified by public_id.
 	// Used by "sign out of all other devices" in /settings/security.
-	RevokeAllSessionsForUserExcept(ctx context.Context, arg RevokeAllSessionsForUserExceptParams) error
+	RevokeAllSessionsForUserExcept(ctx context.Context, arg RevokeAllSessionsForUserExceptParams) (int64, error)
 	// Revoke an MCP token (workspace + user scoped).
-	RevokeMcpToken(ctx context.Context, arg RevokeMcpTokenParams) error
+	RevokeMcpToken(ctx context.Context, arg RevokeMcpTokenParams) (int64, error)
 	// Revoke a PAT (workspace + user scoped).
-	RevokePat(ctx context.Context, arg RevokePatParams) error
+	RevokePat(ctx context.Context, arg RevokePatParams) (int64, error)
 	// Mark a session as revoked. Workspace scoping does not apply (user-scoped).
-	RevokeSession(ctx context.Context, arg RevokeSessionParams) error
+	RevokeSession(ctx context.Context, arg RevokeSessionParams) (int64, error)
 	// Disable an invite link (soft delete).
-	RevokeWorkspaceInvite(ctx context.Context, arg RevokeWorkspaceInviteParams) error
+	RevokeWorkspaceInvite(ctx context.Context, arg RevokeWorkspaceInviteParams) (int64, error)
 	// Replace the refresh token hash, extend expiry, and record last usage on a refresh rotation.
 	RotateSessionRefreshHash(ctx context.Context, arg RotateSessionRefreshHashParams) error
 	// Mark a constraint as satisfied at the current time.
-	SatisfyConstraint(ctx context.Context, arg SatisfyConstraintParams) error
+	SatisfyConstraint(ctx context.Context, arg SatisfyConstraintParams) (int64, error)
 	// Search enabled pages by title pattern within a workspace.
 	// The recursive CTE filters out pages whose ancestor chain contains any
 	// soft-disabled row, matching the propagation enforced by the list and
@@ -1775,18 +1839,18 @@ type Querier interface {
 	// secret and clearing any previous confirmation timestamp.
 	SetIdentityMfaSecret(ctx context.Context, arg SetIdentityMfaSecretParams) error
 	// Set AI score and reasoning for an intake item.
-	SetIntakeItemAIScore(ctx context.Context, arg SetIntakeItemAIScoreParams) error
+	SetIntakeItemAIScore(ctx context.Context, arg SetIntakeItemAIScoreParams) (int64, error)
 	// Link an intake item to a converted task.
-	SetIntakeItemTask(ctx context.Context, arg SetIntakeItemTaskParams) error
+	SetIntakeItemTask(ctx context.Context, arg SetIntakeItemTaskParams) (int64, error)
 	// Revoke public sharing on a lens. Clears the token hash so the URL
 	// stops resolving and re-publishing has to mint a fresh token.
 	// No-op if the lens is already private (WHERE is_public = TRUE guard).
-	SetLensPrivate(ctx context.Context, arg SetLensPrivateParams) error
+	SetLensPrivate(ctx context.Context, arg SetLensPrivateParams) (int64, error)
 	// Enable public sharing on a lens. Stores the SHA-256 hex of the share
 	// URL token minted by the caller; the plaintext is returned to the
 	// publisher once and is not recoverable afterwards.
 	// No-op if the lens is already public (WHERE is_public = FALSE guard).
-	SetLensPublic(ctx context.Context, arg SetLensPublicParams) error
+	SetLensPublic(ctx context.Context, arg SetLensPublicParams) (int64, error)
 	// Bind the authenticated user's avatar to a freshly inserted (or dedup-hit)
 	// storage_objects row. Used by POST /me/avatar after a successful upload to
 	// MinIO. Caller MUST run this in the same transaction as the InsertStorageObject
@@ -1807,7 +1871,7 @@ type Querier interface {
 	SetTaskNumber(ctx context.Context, arg SetTaskNumberParams) error
 	// Snooze a signal by pushing its received_at forward. Minimal impl;
 	// a dedicated snoozed_until_at column may be added later on.
-	SnoozeInboxItem(ctx context.Context, arg SnoozeInboxItemParams) error
+	SnoozeInboxItem(ctx context.Context, arg SnoozeInboxItemParams) (int64, error)
 	// Sum the estimated cost (cents) of LLM calls attributed to a given AI
 	// agent since a lower bound. Used by agentguard to enforce the
 	// agent's monthly cost cap.
@@ -1823,7 +1887,7 @@ type Querier interface {
 	// workspace. Embeddings have their own ai_settings.embed_budget_cents_day
 	// bucket, separate from chat/agent LLM budget.
 	SumEmbedCostTodayForWorkspace(ctx context.Context, arg SumEmbedCostTodayForWorkspaceParams) (int64, error)
-	ToggleWebhookSubscription(ctx context.Context, arg ToggleWebhookSubscriptionParams) error
+	ToggleWebhookSubscription(ctx context.Context, arg ToggleWebhookSubscriptionParams) (int64, error)
 	// Stamp an MCP token's last_used_at after a successful bearer auth.
 	// Called with the internal token id resolved by FindUserForMcpToken.
 	TouchMcpTokenLastUsed(ctx context.Context, id uint32) (int64, error)
@@ -1832,13 +1896,13 @@ type Querier interface {
 	// the same transaction as the events append.
 	// updated_by_user_id is appended so the audit field reflects who triggered
 	// the transition (NULL for system writers / event-bus replays).
-	TransitionTaskState(ctx context.Context, arg TransitionTaskStateParams) error
+	TransitionTaskState(ctx context.Context, arg TransitionTaskStateParams) (int64, error)
 	// Clear archived_at on a task.
 	// updated_by_user_id is appended so the audit field records who unarchived
 	// the row (NULL for system writers).
-	UnarchiveTask(ctx context.Context, arg UnarchiveTaskParams) error
+	UnarchiveTask(ctx context.Context, arg UnarchiveTaskParams) (int64, error)
 	// Update the schedule_kind on an existing agent.
-	UpdateAgentScheduleKind(ctx context.Context, arg UpdateAgentScheduleKindParams) error
+	UpdateAgentScheduleKind(ctx context.Context, arg UpdateAgentScheduleKindParams) (int64, error)
 	// Replace stored tokens after a successful refresh.
 	UpdateConnectionTokens(ctx context.Context, arg UpdateConnectionTokensParams) error
 	// Record the highest TOTP time-step that has been accepted for this
@@ -1854,27 +1918,27 @@ type Querier interface {
 	// Update the status and timing fields of an import job.
 	UpdateImportJobStatus(ctx context.Context, arg UpdateImportJobStatusParams) error
 	// Update the triage status of an intake item.
-	UpdateIntakeItemTriage(ctx context.Context, arg UpdateIntakeItemTriageParams) error
+	UpdateIntakeItemTriage(ctx context.Context, arg UpdateIntakeItemTriageParams) (int64, error)
 	// Patch the mutable fields of a mapping. NULL leaves a field unchanged.
 	// provider and external_key are immutable: changing them would move the
 	// claim to a different source, which is a create plus a delete.
-	UpdateIntegrationSourceMapping(ctx context.Context, arg UpdateIntegrationSourceMappingParams) error
+	UpdateIntegrationSourceMapping(ctx context.Context, arg UpdateIntegrationSourceMappingParams) (int64, error)
 	// Update mutable label fields.
-	UpdateLabel(ctx context.Context, arg UpdateLabelParams) error
+	UpdateLabel(ctx context.Context, arg UpdateLabelParams) (int64, error)
 	// Update a lens name, description and/or JSON body.
-	UpdateLens(ctx context.Context, arg UpdateLensParams) error
+	UpdateLens(ctx context.Context, arg UpdateLensParams) (int64, error)
 	// Record the timestamp of the latest AI safety check for a public lens.
 	UpdateLensSafetyCheck(ctx context.Context, id uint32) error
 	// Change a member's role.
-	UpdateMemberRole(ctx context.Context, arg UpdateMemberRoleParams) error
+	UpdateMemberRole(ctx context.Context, arg UpdateMemberRoleParams) (int64, error)
 	// Change a member's role keyed by user_id.
 	UpdateMemberRoleByUserId(ctx context.Context, arg UpdateMemberRoleByUserIdParams) error
 	// Update mutable page fields. Uses sqlc.narg for nullable columns.
-	UpdatePage(ctx context.Context, arg UpdatePageParams) error
+	UpdatePage(ctx context.Context, arg UpdatePageParams) (int64, error)
 	// Update mutable project fields by public_id.
-	UpdateProject(ctx context.Context, arg UpdateProjectParams) error
+	UpdateProject(ctx context.Context, arg UpdateProjectParams) (int64, error)
 	// Update project name, slug and description by public_id.
-	UpdateProjectFull(ctx context.Context, arg UpdateProjectFullParams) error
+	UpdateProjectFull(ctx context.Context, arg UpdateProjectFullParams) (int64, error)
 	// Rotate a provider's API key. Caller passes new ciphertext + prefix + suffix.
 	// Returns rows-affected so the handler can detect a not-found / wrong-workspace
 	// target (0 rows) instead of reporting a false success.
@@ -1882,7 +1946,7 @@ type Querier interface {
 	// Update mutable task fields. derived_state is intentionally NOT writable.
 	// updated_by_user_id is appended to the SET list so callers can attribute
 	// the edit; pass the acting user's internal id (NULL for system writers).
-	UpdateTask(ctx context.Context, arg UpdateTaskParams) error
+	UpdateTask(ctx context.Context, arg UpdateTaskParams) (int64, error)
 	// Merge the supplied JSON patch into the task's agent_memo column.
 	// JSON_MERGE_PATCH applies RFC 7396 semantics: keys present in the patch
 	// overwrite (or recursively merge object values), and explicit nulls in the
@@ -1896,19 +1960,19 @@ type Querier interface {
 	// acting user (NULL for system writers).
 	UpdateTaskSortWeight(ctx context.Context, arg UpdateTaskSortWeightParams) error
 	// Update mutable timebox fields.
-	UpdateTimebox(ctx context.Context, arg UpdateTimeboxParams) error
+	UpdateTimebox(ctx context.Context, arg UpdateTimeboxParams) (int64, error)
 	// Transition timebox lifecycle status.
-	UpdateTimeboxStatus(ctx context.Context, arg UpdateTimeboxStatusParams) error
+	UpdateTimeboxStatus(ctx context.Context, arg UpdateTimeboxStatusParams) (int64, error)
 	// Stamp last successful login time on a user account.
 	UpdateUserLastLoginAt(ctx context.Context, id uint32) error
 	// Update mutable widget fields. Uses sqlc.narg for optional partial updates.
-	UpdateWidget(ctx context.Context, arg UpdateWidgetParams) error
+	UpdateWidget(ctx context.Context, arg UpdateWidgetParams) (int64, error)
 	// Reposition a single widget on the grid (called N times for batch reorder).
-	UpdateWidgetPosition(ctx context.Context, arg UpdateWidgetPositionParams) error
+	UpdateWidgetPosition(ctx context.Context, arg UpdateWidgetPositionParams) (int64, error)
 	// Update mutable workspace fields by public_id.
-	UpdateWorkspace(ctx context.Context, arg UpdateWorkspaceParams) error
+	UpdateWorkspace(ctx context.Context, arg UpdateWorkspaceParams) (int64, error)
 	// Update workspace name and slug by public_id.
-	UpdateWorkspaceFull(ctx context.Context, arg UpdateWorkspaceFullParams) error
+	UpdateWorkspaceFull(ctx context.Context, arg UpdateWorkspaceFullParams) (int64, error)
 	// Create or update the ai_settings row for a workspace. The UNIQUE KEY on
 	// workspace_id makes this idempotent. modified_by_user_id is the audit
 	// trail for the most recent writer; system writers pass NULL.

@@ -49,12 +49,13 @@ func (q *Queries) CreateCalendarChecklistItem(ctx context.Context, arg CreateCal
 	return result.LastInsertId()
 }
 
-const disableCalendarChecklistItem = `-- name: DisableCalendarChecklistItem :exec
+const disableCalendarChecklistItem = `-- name: DisableCalendarChecklistItem :execrows
 UPDATE calendar_event_checklist_items
 SET enabled = FALSE
 WHERE public_id = ?
   AND event_id = ?
   AND workspace_id = ?
+  AND enabled = TRUE
 `
 
 type DisableCalendarChecklistItemParams struct {
@@ -64,9 +65,12 @@ type DisableCalendarChecklistItemParams struct {
 }
 
 // Soft-delete a checklist item.
-func (q *Queries) DisableCalendarChecklistItem(ctx context.Context, arg DisableCalendarChecklistItemParams) error {
-	_, err := q.db.ExecContext(ctx, disableCalendarChecklistItem, arg.PublicID, arg.EventID, arg.WorkspaceID)
-	return err
+func (q *Queries) DisableCalendarChecklistItem(ctx context.Context, arg DisableCalendarChecklistItemParams) (int64, error) {
+	result, err := q.db.ExecContext(ctx, disableCalendarChecklistItem, arg.PublicID, arg.EventID, arg.WorkspaceID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
 }
 
 const findCalendarChecklistItemByPublicId = `-- name: FindCalendarChecklistItemByPublicId :one
@@ -197,7 +201,7 @@ func (q *Queries) ListCalendarChecklistItems(ctx context.Context, arg ListCalend
 	return items, nil
 }
 
-const updateCalendarChecklistItem = `-- name: UpdateCalendarChecklistItem :exec
+const updateCalendarChecklistItem = `-- name: UpdateCalendarChecklistItem :execrows
 UPDATE calendar_event_checklist_items
 SET title       = COALESCE(?, title),
     done        = COALESCE(?, done),
@@ -218,8 +222,8 @@ type UpdateCalendarChecklistItemParams struct {
 }
 
 // Update a checklist item's title, done, or sort_weight.
-func (q *Queries) UpdateCalendarChecklistItem(ctx context.Context, arg UpdateCalendarChecklistItemParams) error {
-	_, err := q.db.ExecContext(ctx, updateCalendarChecklistItem,
+func (q *Queries) UpdateCalendarChecklistItem(ctx context.Context, arg UpdateCalendarChecklistItemParams) (int64, error) {
+	result, err := q.db.ExecContext(ctx, updateCalendarChecklistItem,
 		arg.Title,
 		arg.Done,
 		arg.SortWeight,
@@ -227,5 +231,8 @@ func (q *Queries) UpdateCalendarChecklistItem(ctx context.Context, arg UpdateCal
 		arg.EventID,
 		arg.WorkspaceID,
 	)
-	return err
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
 }

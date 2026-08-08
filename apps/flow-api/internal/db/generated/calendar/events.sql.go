@@ -101,7 +101,7 @@ func (q *Queries) CreateCalendarEvent(ctx context.Context, arg CreateCalendarEve
 	return result.LastInsertId()
 }
 
-const disableCalendarEvent = `-- name: DisableCalendarEvent :exec
+const disableCalendarEvent = `-- name: DisableCalendarEvent :execrows
 UPDATE calendar_events
 SET enabled = FALSE
 WHERE public_id = ?
@@ -119,9 +119,12 @@ type DisableCalendarEventParams struct {
 // Soft-delete a calendar event by clearing the enabled flag. enabled=FALSE
 // gates LIST/GET reads; the column doubles as the auditable soft-delete
 // marker (no separate deleted_at column).
-func (q *Queries) DisableCalendarEvent(ctx context.Context, arg DisableCalendarEventParams) error {
-	_, err := q.db.ExecContext(ctx, disableCalendarEvent, arg.PublicID, arg.CalendarID, arg.WorkspaceID)
-	return err
+func (q *Queries) DisableCalendarEvent(ctx context.Context, arg DisableCalendarEventParams) (int64, error) {
+	result, err := q.db.ExecContext(ctx, disableCalendarEvent, arg.PublicID, arg.CalendarID, arg.WorkspaceID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
 }
 
 const findCalendarEventByPublicId = `-- name: FindCalendarEventByPublicId :one
@@ -1247,7 +1250,7 @@ func (q *Queries) ListRecurringCalendarEventsByRange(ctx context.Context, arg Li
 	return items, nil
 }
 
-const patchCalendarEvent = `-- name: PatchCalendarEvent :exec
+const patchCalendarEvent = `-- name: PatchCalendarEvent :execrows
 UPDATE calendar_events
 SET kind                = COALESCE(?, kind),
     visibility          = COALESCE(?, visibility),
@@ -1339,8 +1342,8 @@ type PatchCalendarEventParams struct {
 // nullable for planning-stage events, but a task-projected row's dates
 // mirror the task and only the item projection engine may move them, so
 // clearing them belongs to that path rather than to a generic patch.
-func (q *Queries) PatchCalendarEvent(ctx context.Context, arg PatchCalendarEventParams) error {
-	_, err := q.db.ExecContext(ctx, patchCalendarEvent,
+func (q *Queries) PatchCalendarEvent(ctx context.Context, arg PatchCalendarEventParams) (int64, error) {
+	result, err := q.db.ExecContext(ctx, patchCalendarEvent,
 		arg.Kind,
 		arg.Visibility,
 		arg.ShowAs,
@@ -1374,5 +1377,8 @@ func (q *Queries) PatchCalendarEvent(ctx context.Context, arg PatchCalendarEvent
 		arg.CalendarID,
 		arg.WorkspaceID,
 	)
-	return err
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
 }

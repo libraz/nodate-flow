@@ -51,7 +51,7 @@ func (q *Queries) AttachEventToShare(ctx context.Context, arg AttachEventToShare
 	return result.LastInsertId()
 }
 
-const clearPublicShareExpiresAt = `-- name: ClearPublicShareExpiresAt :exec
+const clearPublicShareExpiresAt = `-- name: ClearPublicShareExpiresAt :execrows
 UPDATE calendar_public_shares
 SET expires_at = NULL
 WHERE workspace_id = ?
@@ -66,9 +66,12 @@ type ClearPublicShareExpiresAtParams struct {
 
 // Dedicated setter that clears expires_at (COALESCE-based patch cannot
 // distinguish "leave unchanged" from "clear" for nullable columns).
-func (q *Queries) ClearPublicShareExpiresAt(ctx context.Context, arg ClearPublicShareExpiresAtParams) error {
-	_, err := q.db.ExecContext(ctx, clearPublicShareExpiresAt, arg.WorkspaceID, arg.PublicID)
-	return err
+func (q *Queries) ClearPublicShareExpiresAt(ctx context.Context, arg ClearPublicShareExpiresAtParams) (int64, error) {
+	result, err := q.db.ExecContext(ctx, clearPublicShareExpiresAt, arg.WorkspaceID, arg.PublicID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
 }
 
 const createPublicShare = `-- name: CreatePublicShare :execlastid
@@ -124,7 +127,7 @@ func (q *Queries) CreatePublicShare(ctx context.Context, arg CreatePublicSharePa
 	return result.LastInsertId()
 }
 
-const detachCalendarEventsFromAllShares = `-- name: DetachCalendarEventsFromAllShares :exec
+const detachCalendarEventsFromAllShares = `-- name: DetachCalendarEventsFromAllShares :execrows
 UPDATE calendar_public_share_events cpse
 INNER JOIN calendar_events ce ON ce.id = cpse.event_id
 INNER JOIN calendars c ON c.id = ce.calendar_id
@@ -154,12 +157,15 @@ type DetachCalendarEventsFromAllSharesParams struct {
 // would hit the projection guard for any task-linked row, which only
 // the item projection engine may disable, and the calendar's own
 // enabled flag is already what every read path filters on.
-func (q *Queries) DetachCalendarEventsFromAllShares(ctx context.Context, arg DetachCalendarEventsFromAllSharesParams) error {
-	_, err := q.db.ExecContext(ctx, detachCalendarEventsFromAllShares, arg.PublicID, arg.WorkspaceID)
-	return err
+func (q *Queries) DetachCalendarEventsFromAllShares(ctx context.Context, arg DetachCalendarEventsFromAllSharesParams) (int64, error) {
+	result, err := q.db.ExecContext(ctx, detachCalendarEventsFromAllShares, arg.PublicID, arg.WorkspaceID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
 }
 
-const detachEventFromShare = `-- name: DetachEventFromShare :exec
+const detachEventFromShare = `-- name: DetachEventFromShare :execrows
 UPDATE calendar_public_share_events
 SET enabled = FALSE
 WHERE share_id = ?
@@ -174,16 +180,20 @@ type DetachEventFromShareParams struct {
 
 // Remove one event from a share (soft). Looks up the link by share +
 // event internal ids (caller resolves both via their public ids first).
-func (q *Queries) DetachEventFromShare(ctx context.Context, arg DetachEventFromShareParams) error {
-	_, err := q.db.ExecContext(ctx, detachEventFromShare, arg.ShareID, arg.EventID)
-	return err
+func (q *Queries) DetachEventFromShare(ctx context.Context, arg DetachEventFromShareParams) (int64, error) {
+	result, err := q.db.ExecContext(ctx, detachEventFromShare, arg.ShareID, arg.EventID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
 }
 
-const disablePublicShare = `-- name: DisablePublicShare :exec
+const disablePublicShare = `-- name: DisablePublicShare :execrows
 UPDATE calendar_public_shares
 SET enabled = FALSE
 WHERE workspace_id = ?
   AND public_id = ?
+  AND enabled = TRUE
 `
 
 type DisablePublicShareParams struct {
@@ -194,9 +204,12 @@ type DisablePublicShareParams struct {
 // Soft-delete a share page. Child rows in calendar_public_share_events
 // are left as-is (soft-disabled at the share level is sufficient; the
 // render query joins through cps.enabled).
-func (q *Queries) DisablePublicShare(ctx context.Context, arg DisablePublicShareParams) error {
-	_, err := q.db.ExecContext(ctx, disablePublicShare, arg.WorkspaceID, arg.PublicID)
-	return err
+func (q *Queries) DisablePublicShare(ctx context.Context, arg DisablePublicShareParams) (int64, error) {
+	result, err := q.db.ExecContext(ctx, disablePublicShare, arg.WorkspaceID, arg.PublicID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
 }
 
 const findEventIDAndVisibility = `-- name: FindEventIDAndVisibility :one
@@ -654,7 +667,7 @@ func (q *Queries) ListPublicShares(ctx context.Context, workspaceID uint32) ([]L
 	return items, nil
 }
 
-const patchPublicShare = `-- name: PatchPublicShare :exec
+const patchPublicShare = `-- name: PatchPublicShare :execrows
 UPDATE calendar_public_shares
 SET title                  = COALESCE(?, title),
     description            = COALESCE(?, description),
@@ -683,8 +696,8 @@ type PatchPublicShareParams struct {
 }
 
 // Update mutable share fields. NULL arguments leave columns untouched.
-func (q *Queries) PatchPublicShare(ctx context.Context, arg PatchPublicShareParams) error {
-	_, err := q.db.ExecContext(ctx, patchPublicShare,
+func (q *Queries) PatchPublicShare(ctx context.Context, arg PatchPublicShareParams) (int64, error) {
+	result, err := q.db.ExecContext(ctx, patchPublicShare,
 		arg.Title,
 		arg.Description,
 		arg.IconUrl,
@@ -696,10 +709,13 @@ func (q *Queries) PatchPublicShare(ctx context.Context, arg PatchPublicSharePara
 		arg.WorkspaceID,
 		arg.PublicID,
 	)
-	return err
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
 }
 
-const rotatePublicShareToken = `-- name: RotatePublicShareToken :exec
+const rotatePublicShareToken = `-- name: RotatePublicShareToken :execrows
 UPDATE calendar_public_shares
 SET token_hash = ?
 WHERE workspace_id = ?
@@ -714,12 +730,15 @@ type RotatePublicShareTokenParams struct {
 }
 
 // Regenerate the token hash; invalidates any previously issued URL.
-func (q *Queries) RotatePublicShareToken(ctx context.Context, arg RotatePublicShareTokenParams) error {
-	_, err := q.db.ExecContext(ctx, rotatePublicShareToken, arg.TokenHash, arg.WorkspaceID, arg.PublicID)
-	return err
+func (q *Queries) RotatePublicShareToken(ctx context.Context, arg RotatePublicShareTokenParams) (int64, error) {
+	result, err := q.db.ExecContext(ctx, rotatePublicShareToken, arg.TokenHash, arg.WorkspaceID, arg.PublicID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
 }
 
-const updateShareEventSortWeight = `-- name: UpdateShareEventSortWeight :exec
+const updateShareEventSortWeight = `-- name: UpdateShareEventSortWeight :execrows
 UPDATE calendar_public_share_events
 SET sort_weight = ?
 WHERE share_id = ?
@@ -737,7 +756,10 @@ type UpdateShareEventSortWeightParams struct {
 // Called in a loop (inside a tx) when a user reorders the events on a
 // public share. Scoped to (share_id, public_id) so a caller cannot
 // accidentally reorder a link belonging to a different share.
-func (q *Queries) UpdateShareEventSortWeight(ctx context.Context, arg UpdateShareEventSortWeightParams) error {
-	_, err := q.db.ExecContext(ctx, updateShareEventSortWeight, arg.SortWeight, arg.ShareID, arg.PublicID)
-	return err
+func (q *Queries) UpdateShareEventSortWeight(ctx context.Context, arg UpdateShareEventSortWeightParams) (int64, error) {
+	result, err := q.db.ExecContext(ctx, updateShareEventSortWeight, arg.SortWeight, arg.ShareID, arg.PublicID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
 }

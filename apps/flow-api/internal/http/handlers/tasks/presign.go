@@ -66,10 +66,7 @@ func PresignUpload(deps Deps) func(context.Context, *PresignUploadInput) (*Presi
 		if deps.Storage == nil {
 			return nil, httpErr(apierrors.InternalStorageNotConfigured)
 		}
-		if !handlerutil.IsAllowedContentType(in.Body.ContentType) {
-			return nil, httpErr(apierrors.ValidationFileTypeNotAllowed)
-		}
-		if handlerutil.HasBlockedExtension(in.Body.Filename) {
+		if !handlerutil.IsAllowedUpload(in.Body.ContentType, in.Body.Filename) {
 			return nil, httpErr(apierrors.ValidationFileTypeNotAllowed)
 		}
 		if in.Body.ByteSize > handlerutil.MaxUploadSize {

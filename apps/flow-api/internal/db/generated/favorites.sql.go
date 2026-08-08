@@ -49,12 +49,13 @@ func (q *Queries) CreateFavorite(ctx context.Context, arg CreateFavoriteParams) 
 	return result.LastInsertId()
 }
 
-const disableFavorite = `-- name: DisableFavorite :exec
+const disableFavorite = `-- name: DisableFavorite :execrows
 UPDATE user_favorites
 SET enabled = FALSE
 WHERE workspace_id = ?
   AND public_id = ?
   AND user_id = ?
+  AND enabled = TRUE
 `
 
 type DisableFavoriteParams struct {
@@ -64,9 +65,12 @@ type DisableFavoriteParams struct {
 }
 
 // Soft-delete a favorite.
-func (q *Queries) DisableFavorite(ctx context.Context, arg DisableFavoriteParams) error {
-	_, err := q.db.ExecContext(ctx, disableFavorite, arg.WorkspaceID, arg.PublicID, arg.UserID)
-	return err
+func (q *Queries) DisableFavorite(ctx context.Context, arg DisableFavoriteParams) (int64, error) {
+	result, err := q.db.ExecContext(ctx, disableFavorite, arg.WorkspaceID, arg.PublicID, arg.UserID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
 }
 
 const findFavoriteByPublicId = `-- name: FindFavoriteByPublicId :one

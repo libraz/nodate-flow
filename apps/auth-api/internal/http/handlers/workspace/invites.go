@@ -186,11 +186,19 @@ func RevokeInvite(deps InviteDeps) func(context.Context, *RevokeInviteInput) (*R
 		if err != nil {
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
-		if err := deps.Queries.RevokeWorkspaceInvite(ctx, generated.RevokeWorkspaceInviteParams{
+		// Scoped to this workspace and to invites that are still live, so
+		// zero rows means the caller named an invite that is not theirs
+		// to revoke — or one that is already gone. Either way there is
+		// nothing to report as revoked.
+		rows, err := deps.Queries.RevokeWorkspaceInvite(ctx, generated.RevokeWorkspaceInviteParams{
 			WorkspaceID: ws.ID,
 			PublicID:    pub,
-		}); err != nil {
+		})
+		if err != nil {
 			return nil, httpErr(apierrors.InternalUnexpected)
+		}
+		if rows == 0 {
+			return nil, httpErr(apierrors.WsWorkspaceInviteNotFound)
 		}
 		out := &RevokeInviteOutput{}
 		out.Body.Ok = true

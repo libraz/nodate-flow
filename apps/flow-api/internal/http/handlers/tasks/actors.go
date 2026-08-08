@@ -148,11 +148,20 @@ func RemoveActor(deps Deps) func(context.Context, *RemoveTaskActorInput) (*Remov
 		if err != nil {
 			return nil, httpErr(apierrors.ValidationPathParamInvalid)
 		}
-		if err := deps.Queries.RemoveActor(ctx, generated.RemoveActorParams{
+		// Nothing resolves the actor row before this, so the count is the
+		// only thing that knows whether it was there: a well-formed id for
+		// an actor on another task -- or none at all -- used to answer ok
+		// and append a task.actor.removed event for a removal that never
+		// happened.
+		rows, err := deps.Queries.RemoveActor(ctx, generated.RemoveActorParams{
 			WorkspaceID: ws.ID,
 			PublicID:    aid,
-		}); err != nil {
+		})
+		if err != nil {
 			return nil, httpErr(apierrors.InternalUnexpected)
+		}
+		if rows == 0 {
+			return nil, httpErr(apierrors.WsTaskActorNotFound)
 		}
 		taskInternal := int64(task.ID)
 		if err := eventbus.Append(ctx, deps.DB, eventbus.Event{

@@ -201,7 +201,10 @@ func Update(deps Deps) func(context.Context, *UpdateWidgetInput) (*UpdateWidgetO
 			params.Height = sql.NullInt16{Int16: int16(*in.Body.Height), Valid: true} //#nosec G115 -- Height request-validated to a small uint range
 		}
 
-		if err := deps.Queries.UpdateWidget(ctx, params); err != nil {
+		// Existence is not decided by the row count here; MySQL counts
+		// changed rows, so a PATCH that sets the values already stored
+		// reports zero. The re-read below fails if the widget is gone.
+		if _, err := deps.Queries.UpdateWidget(ctx, params); err != nil {
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
 
@@ -265,7 +268,10 @@ func UpdatePosition(deps Deps) func(context.Context, *UpdateWidgetPositionInput)
 			return nil, httpErr(apierr.SpecForErrNoRows(err, apierrors.WsWorkspaceNotFound, apierrors.InternalUnexpected))
 		}
 
-		if err := deps.Queries.UpdateWidgetPosition(ctx, generated.UpdateWidgetPositionParams{
+		// The affected-row count is not the existence check: MySQL counts
+		// changed rows, so re-sending the position a widget already has
+		// reports zero. Existence is checked by the read just above.
+		if _, err := deps.Queries.UpdateWidgetPosition(ctx, generated.UpdateWidgetPositionParams{
 			PositionX:   uint16(in.Body.PositionX), //#nosec G115 -- PositionX request-validated to maximum:1023 (well below uint16)
 			PositionY:   uint16(in.Body.PositionY), //#nosec G115 -- PositionY request-validated to maximum:1023 (well below uint16)
 			Width:       uint16(in.Body.Width),     //#nosec G115 -- Width request-validated to a small uint range
@@ -329,11 +335,19 @@ func Delete(deps Deps) func(context.Context, *DeleteWidgetInput) (*DeleteWidgetO
 			return nil, httpErr(apierrors.ValidationPathParamInvalid)
 		}
 
-		if err := deps.Queries.DisableWidget(ctx, generated.DisableWidgetParams{
+		// Scoped to the workspace and to widgets that are still live, so a
+		// zero count means the caller named a widget that is not there to
+		// remove. Reporting success wrote a dashboard.widget.disabled event
+		// for a widget that never existed.
+		rows, err := deps.Queries.DisableWidget(ctx, generated.DisableWidgetParams{
 			WorkspaceID: ws.ID,
 			PublicID:    pub,
-		}); err != nil {
+		})
+		if err != nil {
 			return nil, httpErr(apierrors.InternalUnexpected)
+		}
+		if rows == 0 {
+			return nil, httpErr(apierrors.WsDashboardWidgetNotFound)
 		}
 
 		if err := eventbus.Append(ctx, deps.DB, eventbus.Event{

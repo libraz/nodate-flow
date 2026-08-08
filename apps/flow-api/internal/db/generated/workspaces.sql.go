@@ -13,14 +13,17 @@ import (
 	types "github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
 )
 
-const adminEnableWorkspace = `-- name: AdminEnableWorkspace :exec
+const adminEnableWorkspace = `-- name: AdminEnableWorkspace :execrows
 UPDATE workspaces SET enabled = TRUE WHERE public_id = ? AND enabled = FALSE
 `
 
 // Re-enable a previously suspended workspace.
-func (q *Queries) AdminEnableWorkspace(ctx context.Context, publicID types.PublicID) error {
-	_, err := q.db.ExecContext(ctx, adminEnableWorkspace, publicID)
-	return err
+func (q *Queries) AdminEnableWorkspace(ctx context.Context, publicID types.PublicID) (int64, error) {
+	result, err := q.db.ExecContext(ctx, adminEnableWorkspace, publicID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
 }
 
 const adminGetWorkspace = `-- name: AdminGetWorkspace :one
@@ -175,14 +178,17 @@ func (q *Queries) AdminListWorkspaces(ctx context.Context, arg AdminListWorkspac
 	return items, nil
 }
 
-const adminSuspendWorkspace = `-- name: AdminSuspendWorkspace :exec
+const adminSuspendWorkspace = `-- name: AdminSuspendWorkspace :execrows
 UPDATE workspaces SET enabled = FALSE WHERE public_id = ? AND enabled = TRUE
 `
 
 // Disable a workspace (soft-delete).
-func (q *Queries) AdminSuspendWorkspace(ctx context.Context, publicID types.PublicID) error {
-	_, err := q.db.ExecContext(ctx, adminSuspendWorkspace, publicID)
-	return err
+func (q *Queries) AdminSuspendWorkspace(ctx context.Context, publicID types.PublicID) (int64, error) {
+	result, err := q.db.ExecContext(ctx, adminSuspendWorkspace, publicID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
 }
 
 const countEnabledWorkspaces = `-- name: CountEnabledWorkspaces :one
@@ -474,7 +480,7 @@ func (q *Queries) ListWorkspacesForUser(ctx context.Context, arg ListWorkspacesF
 	return items, nil
 }
 
-const patchWorkspace = `-- name: PatchWorkspace :exec
+const patchWorkspace = `-- name: PatchWorkspace :execrows
 UPDATE workspaces
 SET name        = COALESCE(?, name),
     slug        = COALESCE(?, slug),
@@ -497,8 +503,8 @@ type PatchWorkspaceParams struct {
 }
 
 // Patch a workspace via COALESCE; NULL params leave existing columns untouched.
-func (q *Queries) PatchWorkspace(ctx context.Context, arg PatchWorkspaceParams) error {
-	_, err := q.db.ExecContext(ctx, patchWorkspace,
+func (q *Queries) PatchWorkspace(ctx context.Context, arg PatchWorkspaceParams) (int64, error) {
+	result, err := q.db.ExecContext(ctx, patchWorkspace,
 		arg.Name,
 		arg.Slug,
 		arg.Description,
@@ -507,10 +513,13 @@ func (q *Queries) PatchWorkspace(ctx context.Context, arg PatchWorkspaceParams) 
 		arg.Country,
 		arg.PublicID,
 	)
-	return err
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
 }
 
-const updateWorkspace = `-- name: UpdateWorkspace :exec
+const updateWorkspace = `-- name: UpdateWorkspace :execrows
 UPDATE workspaces
 SET name = ?,
     description = ?,
@@ -527,17 +536,20 @@ type UpdateWorkspaceParams struct {
 }
 
 // Update mutable workspace fields by public_id.
-func (q *Queries) UpdateWorkspace(ctx context.Context, arg UpdateWorkspaceParams) error {
-	_, err := q.db.ExecContext(ctx, updateWorkspace,
+func (q *Queries) UpdateWorkspace(ctx context.Context, arg UpdateWorkspaceParams) (int64, error) {
+	result, err := q.db.ExecContext(ctx, updateWorkspace,
 		arg.Name,
 		arg.Description,
 		arg.IconUrl,
 		arg.PublicID,
 	)
-	return err
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
 }
 
-const updateWorkspaceFull = `-- name: UpdateWorkspaceFull :exec
+const updateWorkspaceFull = `-- name: UpdateWorkspaceFull :execrows
 UPDATE workspaces
 SET name = ?,
     slug = ?
@@ -552,7 +564,10 @@ type UpdateWorkspaceFullParams struct {
 }
 
 // Update workspace name and slug by public_id.
-func (q *Queries) UpdateWorkspaceFull(ctx context.Context, arg UpdateWorkspaceFullParams) error {
-	_, err := q.db.ExecContext(ctx, updateWorkspaceFull, arg.Name, arg.Slug, arg.PublicID)
-	return err
+func (q *Queries) UpdateWorkspaceFull(ctx context.Context, arg UpdateWorkspaceFullParams) (int64, error) {
+	result, err := q.db.ExecContext(ctx, updateWorkspaceFull, arg.Name, arg.Slug, arg.PublicID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
 }

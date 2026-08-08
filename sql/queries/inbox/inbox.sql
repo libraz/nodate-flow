@@ -104,14 +104,15 @@ INNER JOIN workspace_members wm
 ORDER BY v.received_at DESC, v.public_id DESC
 LIMIT ? OFFSET ?;
 
--- name: ArchiveInboxItem :exec
+-- name: ArchiveInboxItem :execrows
 -- Archive a signal by soft-disabling it. The inbox view excludes disabled rows.
 UPDATE signals
 SET enabled = FALSE
 WHERE workspace_id = ?
-  AND public_id = ?;
+  AND public_id = ?
+  AND enabled = TRUE;
 
--- name: SnoozeInboxItem :exec
+-- name: SnoozeInboxItem :execrows
 -- Snooze a signal by pushing its received_at forward. Minimal impl;
 -- a dedicated snoozed_until_at column may be added later on.
 UPDATE signals

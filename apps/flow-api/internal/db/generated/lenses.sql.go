@@ -59,11 +59,12 @@ func (q *Queries) CreateLens(ctx context.Context, arg CreateLensParams) (int64, 
 	return result.LastInsertId()
 }
 
-const deleteLens = `-- name: DeleteLens :exec
+const deleteLens = `-- name: DeleteLens :execrows
 UPDATE lenses
 SET enabled = FALSE
 WHERE workspace_id = ?
   AND public_id = ?
+  AND enabled = TRUE
 `
 
 type DeleteLensParams struct {
@@ -72,9 +73,12 @@ type DeleteLensParams struct {
 }
 
 // Soft-delete a lens.
-func (q *Queries) DeleteLens(ctx context.Context, arg DeleteLensParams) error {
-	_, err := q.db.ExecContext(ctx, deleteLens, arg.WorkspaceID, arg.PublicID)
-	return err
+func (q *Queries) DeleteLens(ctx context.Context, arg DeleteLensParams) (int64, error) {
+	result, err := q.db.ExecContext(ctx, deleteLens, arg.WorkspaceID, arg.PublicID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
 }
 
 const getLensByPublicID = `-- name: GetLensByPublicID :one
@@ -265,7 +269,7 @@ func (q *Queries) ResolveLensProjectID(ctx context.Context, arg ResolveLensProje
 	return project_id, err
 }
 
-const updateLens = `-- name: UpdateLens :exec
+const updateLens = `-- name: UpdateLens :execrows
 UPDATE lenses
 SET name = ?,
     description = ?,
@@ -286,8 +290,8 @@ type UpdateLensParams struct {
 }
 
 // Update a lens name, description and/or JSON body.
-func (q *Queries) UpdateLens(ctx context.Context, arg UpdateLensParams) error {
-	_, err := q.db.ExecContext(ctx, updateLens,
+func (q *Queries) UpdateLens(ctx context.Context, arg UpdateLensParams) (int64, error) {
+	result, err := q.db.ExecContext(ctx, updateLens,
 		arg.Name,
 		arg.Description,
 		arg.LensJson,
@@ -295,5 +299,8 @@ func (q *Queries) UpdateLens(ctx context.Context, arg UpdateLensParams) error {
 		arg.WorkspaceID,
 		arg.PublicID,
 	)
-	return err
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
 }

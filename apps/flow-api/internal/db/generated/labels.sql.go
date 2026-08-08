@@ -110,11 +110,12 @@ func (q *Queries) DeleteTaskLabel(ctx context.Context, arg DeleteTaskLabelParams
 	return err
 }
 
-const disableLabel = `-- name: DisableLabel :exec
+const disableLabel = `-- name: DisableLabel :execrows
 UPDATE labels
 SET enabled = FALSE
 WHERE workspace_id = ?
   AND public_id = ?
+  AND enabled = TRUE
 `
 
 type DisableLabelParams struct {
@@ -123,9 +124,12 @@ type DisableLabelParams struct {
 }
 
 // Soft-disable a label.
-func (q *Queries) DisableLabel(ctx context.Context, arg DisableLabelParams) error {
-	_, err := q.db.ExecContext(ctx, disableLabel, arg.WorkspaceID, arg.PublicID)
-	return err
+func (q *Queries) DisableLabel(ctx context.Context, arg DisableLabelParams) (int64, error) {
+	result, err := q.db.ExecContext(ctx, disableLabel, arg.WorkspaceID, arg.PublicID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
 }
 
 const disableTaskLabel = `-- name: DisableTaskLabel :exec
@@ -134,6 +138,7 @@ SET enabled = FALSE
 WHERE workspace_id = ?
   AND task_id = ?
   AND label_id = ?
+  AND enabled = TRUE
 `
 
 type DisableTaskLabelParams struct {
@@ -493,7 +498,7 @@ func (q *Queries) ListTaskLabels(ctx context.Context, arg ListTaskLabelsParams) 
 	return items, nil
 }
 
-const updateLabel = `-- name: UpdateLabel :exec
+const updateLabel = `-- name: UpdateLabel :execrows
 UPDATE labels
 SET name = ?,
     color = ?,
@@ -516,8 +521,8 @@ type UpdateLabelParams struct {
 }
 
 // Update mutable label fields.
-func (q *Queries) UpdateLabel(ctx context.Context, arg UpdateLabelParams) error {
-	_, err := q.db.ExecContext(ctx, updateLabel,
+func (q *Queries) UpdateLabel(ctx context.Context, arg UpdateLabelParams) (int64, error) {
+	result, err := q.db.ExecContext(ctx, updateLabel,
 		arg.Name,
 		arg.Color,
 		arg.Description,
@@ -526,5 +531,8 @@ func (q *Queries) UpdateLabel(ctx context.Context, arg UpdateLabelParams) error 
 		arg.WorkspaceID,
 		arg.PublicID,
 	)
-	return err
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
 }

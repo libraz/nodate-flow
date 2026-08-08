@@ -254,11 +254,12 @@ func (q *Queries) ListWorkspaceMembers(ctx context.Context, arg ListWorkspaceMem
 	return items, nil
 }
 
-const removeWorkspaceMember = `-- name: RemoveWorkspaceMember :exec
+const removeWorkspaceMember = `-- name: RemoveWorkspaceMember :execrows
 UPDATE workspace_members
 SET enabled = FALSE
 WHERE workspace_id = ?
   AND public_id = ?
+  AND enabled = TRUE
 `
 
 type RemoveWorkspaceMemberParams struct {
@@ -267,9 +268,12 @@ type RemoveWorkspaceMemberParams struct {
 }
 
 // Soft-remove a member from a workspace.
-func (q *Queries) RemoveWorkspaceMember(ctx context.Context, arg RemoveWorkspaceMemberParams) error {
-	_, err := q.db.ExecContext(ctx, removeWorkspaceMember, arg.WorkspaceID, arg.PublicID)
-	return err
+func (q *Queries) RemoveWorkspaceMember(ctx context.Context, arg RemoveWorkspaceMemberParams) (int64, error) {
+	result, err := q.db.ExecContext(ctx, removeWorkspaceMember, arg.WorkspaceID, arg.PublicID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
 }
 
 const removeWorkspaceMemberByUserId = `-- name: RemoveWorkspaceMemberByUserId :exec
@@ -290,7 +294,7 @@ func (q *Queries) RemoveWorkspaceMemberByUserId(ctx context.Context, arg RemoveW
 	return err
 }
 
-const updateMemberRole = `-- name: UpdateMemberRole :exec
+const updateMemberRole = `-- name: UpdateMemberRole :execrows
 UPDATE workspace_members
 SET role = ?
 WHERE workspace_id = ?
@@ -305,9 +309,12 @@ type UpdateMemberRoleParams struct {
 }
 
 // Change a member's role.
-func (q *Queries) UpdateMemberRole(ctx context.Context, arg UpdateMemberRoleParams) error {
-	_, err := q.db.ExecContext(ctx, updateMemberRole, arg.Role, arg.WorkspaceID, arg.PublicID)
-	return err
+func (q *Queries) UpdateMemberRole(ctx context.Context, arg UpdateMemberRoleParams) (int64, error) {
+	result, err := q.db.ExecContext(ctx, updateMemberRole, arg.Role, arg.WorkspaceID, arg.PublicID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
 }
 
 const updateMemberRoleByUserId = `-- name: UpdateMemberRoleByUserId :exec

@@ -142,11 +142,12 @@ func (q *Queries) CreateTimebox(ctx context.Context, arg CreateTimeboxParams) (i
 	return result.LastInsertId()
 }
 
-const disableTimebox = `-- name: DisableTimebox :exec
+const disableTimebox = `-- name: DisableTimebox :execrows
 UPDATE timeboxes
 SET enabled = FALSE
 WHERE workspace_id = ?
   AND public_id = ?
+  AND enabled = TRUE
 `
 
 type DisableTimeboxParams struct {
@@ -155,9 +156,12 @@ type DisableTimeboxParams struct {
 }
 
 // Soft-delete a timebox.
-func (q *Queries) DisableTimebox(ctx context.Context, arg DisableTimeboxParams) error {
-	_, err := q.db.ExecContext(ctx, disableTimebox, arg.WorkspaceID, arg.PublicID)
-	return err
+func (q *Queries) DisableTimebox(ctx context.Context, arg DisableTimeboxParams) (int64, error) {
+	result, err := q.db.ExecContext(ctx, disableTimebox, arg.WorkspaceID, arg.PublicID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
 }
 
 const getTimeboxByPublicId = `-- name: GetTimeboxByPublicId :one
@@ -430,7 +434,7 @@ func (q *Queries) ListTimeboxesForWorkspace(ctx context.Context, arg ListTimebox
 	return items, nil
 }
 
-const removeTaskFromTimebox = `-- name: RemoveTaskFromTimebox :exec
+const removeTaskFromTimebox = `-- name: RemoveTaskFromTimebox :execrows
 DELETE FROM timebox_tasks
 WHERE timebox_id = ?
   AND task_id = ?
@@ -442,12 +446,15 @@ type RemoveTaskFromTimeboxParams struct {
 }
 
 // Remove a task from a timebox.
-func (q *Queries) RemoveTaskFromTimebox(ctx context.Context, arg RemoveTaskFromTimeboxParams) error {
-	_, err := q.db.ExecContext(ctx, removeTaskFromTimebox, arg.TimeboxID, arg.TaskID)
-	return err
+func (q *Queries) RemoveTaskFromTimebox(ctx context.Context, arg RemoveTaskFromTimeboxParams) (int64, error) {
+	result, err := q.db.ExecContext(ctx, removeTaskFromTimebox, arg.TimeboxID, arg.TaskID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
 }
 
-const updateTimebox = `-- name: UpdateTimebox :exec
+const updateTimebox = `-- name: UpdateTimebox :execrows
 UPDATE timeboxes
 SET name = ?,
     description = ?,
@@ -468,8 +475,8 @@ type UpdateTimeboxParams struct {
 }
 
 // Update mutable timebox fields.
-func (q *Queries) UpdateTimebox(ctx context.Context, arg UpdateTimeboxParams) error {
-	_, err := q.db.ExecContext(ctx, updateTimebox,
+func (q *Queries) UpdateTimebox(ctx context.Context, arg UpdateTimeboxParams) (int64, error) {
+	result, err := q.db.ExecContext(ctx, updateTimebox,
 		arg.Name,
 		arg.Description,
 		arg.StartsOn,
@@ -477,10 +484,13 @@ func (q *Queries) UpdateTimebox(ctx context.Context, arg UpdateTimeboxParams) er
 		arg.WorkspaceID,
 		arg.PublicID,
 	)
-	return err
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
 }
 
-const updateTimeboxStatus = `-- name: UpdateTimeboxStatus :exec
+const updateTimeboxStatus = `-- name: UpdateTimeboxStatus :execrows
 UPDATE timeboxes
 SET status = ?
 WHERE workspace_id = ?
@@ -495,7 +505,10 @@ type UpdateTimeboxStatusParams struct {
 }
 
 // Transition timebox lifecycle status.
-func (q *Queries) UpdateTimeboxStatus(ctx context.Context, arg UpdateTimeboxStatusParams) error {
-	_, err := q.db.ExecContext(ctx, updateTimeboxStatus, arg.Status, arg.WorkspaceID, arg.PublicID)
-	return err
+func (q *Queries) UpdateTimeboxStatus(ctx context.Context, arg UpdateTimeboxStatusParams) (int64, error) {
+	result, err := q.db.ExecContext(ctx, updateTimeboxStatus, arg.Status, arg.WorkspaceID, arg.PublicID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
 }

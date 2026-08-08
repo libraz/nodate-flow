@@ -61,7 +61,7 @@ WHERE tb.workspace_id = ?
   AND tb.enabled = TRUE
 LIMIT 1;
 
--- name: UpdateTimebox :exec
+-- name: UpdateTimebox :execrows
 -- Update mutable timebox fields.
 UPDATE timeboxes
 SET name = ?,
@@ -72,7 +72,7 @@ WHERE workspace_id = ?
   AND public_id = ?
   AND enabled = TRUE;
 
--- name: UpdateTimeboxStatus :exec
+-- name: UpdateTimeboxStatus :execrows
 -- Transition timebox lifecycle status.
 UPDATE timeboxes
 SET status = ?
@@ -80,19 +80,20 @@ WHERE workspace_id = ?
   AND public_id = ?
   AND enabled = TRUE;
 
--- name: DisableTimebox :exec
+-- name: DisableTimebox :execrows
 -- Soft-delete a timebox.
 UPDATE timeboxes
 SET enabled = FALSE
 WHERE workspace_id = ?
-  AND public_id = ?;
+  AND public_id = ?
+  AND enabled = TRUE;
 
 -- name: AddTaskToTimebox :exec
 -- Associate a task with a timebox. Caller must resolve IDs beforehand.
 INSERT INTO timebox_tasks (public_id, workspace_id, timebox_id, task_id)
 VALUES (?, ?, ?, ?);
 
--- name: RemoveTaskFromTimebox :exec
+-- name: RemoveTaskFromTimebox :execrows
 -- Remove a task from a timebox.
 DELETE FROM timebox_tasks
 WHERE timebox_id = ?

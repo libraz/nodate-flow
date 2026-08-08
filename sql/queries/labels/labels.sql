@@ -72,7 +72,7 @@ WHERE workspace_id = ?
 ORDER BY sort_weight ASC, name ASC
 LIMIT ? OFFSET ?;
 
--- name: UpdateLabel :exec
+-- name: UpdateLabel :execrows
 -- Update mutable label fields.
 UPDATE labels
 SET name = ?,
@@ -84,12 +84,13 @@ WHERE workspace_id = ?
   AND public_id = ?
   AND enabled = TRUE;
 
--- name: DisableLabel :exec
+-- name: DisableLabel :execrows
 -- Soft-disable a label.
 UPDATE labels
 SET enabled = FALSE
 WHERE workspace_id = ?
-  AND public_id = ?;
+  AND public_id = ?
+  AND enabled = TRUE;
 
 -- name: CreateTaskLabel :execlastid
 -- Attach a label to a task.
@@ -142,7 +143,8 @@ UPDATE task_labels
 SET enabled = FALSE
 WHERE workspace_id = ?
   AND task_id = ?
-  AND label_id = ?;
+  AND label_id = ?
+  AND enabled = TRUE;
 
 -- name: FindLabelByWorkspaceAndName :one
 -- Find a label by name within a workspace (for MCP resolve).

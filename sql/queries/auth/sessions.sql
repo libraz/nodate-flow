@@ -76,13 +76,15 @@ FROM sessions
 WHERE rotated_from_hash = ?
 LIMIT 1;
 
--- name: RevokeSession :exec
+-- name: RevokeSession :execrows
 -- Mark a session as revoked. Workspace scoping does not apply (user-scoped).
 UPDATE sessions
 SET revoked_at = CURRENT_TIMESTAMP,
     enabled = FALSE
 WHERE user_id = ?
-  AND public_id = ?;
+  AND public_id = ?
+  AND enabled = TRUE
+  AND revoked_at IS NULL;
 
 -- name: RevokeAllSessionsForUser :exec
 -- Revoke every active session for a user. Used by the refresh-reuse
@@ -128,7 +130,7 @@ WHERE public_id = ?
   AND enabled = TRUE
 LIMIT 1;
 
--- name: RevokeAllSessionsForUserExcept :exec
+-- name: RevokeAllSessionsForUserExcept :execrows
 -- Revoke every active session for a user except one identified by public_id.
 -- Used by "sign out of all other devices" in /settings/security.
 UPDATE sessions

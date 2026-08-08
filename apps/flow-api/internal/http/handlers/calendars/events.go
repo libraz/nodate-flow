@@ -509,7 +509,7 @@ func CreateEvent(deps Deps) func(context.Context, *CreateEventInput) (*CreateEve
 			eventBusPayload["startAt"] = startAtNT.Time
 			eventBusPayload["endAt"] = endAtNT.Time
 		}
-		_ = appendCalendarEvent(ctx, deps.DB, wsID, "calendar.event.created", &actorID, eventBusPayload)
+		_ = appendCalendarEvent(ctx, deps.DB, wsID, cal.ID, "calendar.event.created", &actorID, eventBusPayload)
 
 		deps.Audit.Record(ctx, audit.Entry{
 			Action:       "calendar.event.create",
@@ -814,7 +814,10 @@ func PatchEvent(deps Deps) func(context.Context, *PatchEventInput) (*PatchEventO
 			params.StartAt, params.EndAt = normalizeAllDayBounds(true, params.StartAt, params.EndAt)
 		}
 
-		if err := cqtx.PatchCalendarEvent(ctx, params); err != nil {
+		// Not an existence check: MySQL counts changed rows, so a PATCH
+		// that re-sends the event's current values reports zero. The
+		// event is re-read below and that read is what would fail.
+		if _, err := cqtx.PatchCalendarEvent(ctx, params); err != nil {
 			return nil, httpErr(apierrors.CalendarEventStoreWriteInterrupted)
 		}
 
@@ -842,7 +845,7 @@ func PatchEvent(deps Deps) func(context.Context, *PatchEventInput) (*PatchEventO
 		// we preserve the existing kind to keep webhook subscribers
 		// working.
 		if !isLinked {
-			_ = appendCalendarEvent(ctx, deps.DB, wsID, "calendar.event.updated", &actorID, map[string]any{
+			_ = appendCalendarEvent(ctx, deps.DB, wsID, cal.ID, "calendar.event.updated", &actorID, map[string]any{
 				"eventId":    input.EvtID,
 				"calendarId": input.CalID,
 			})

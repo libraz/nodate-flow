@@ -105,7 +105,7 @@ WHERE wm.user_id = ?
 ORDER BY w.created_at DESC, w.public_id DESC
 LIMIT ? OFFSET ?;
 
--- name: UpdateWorkspace :exec
+-- name: UpdateWorkspace :execrows
 -- Update mutable workspace fields by public_id.
 UPDATE workspaces
 SET name = ?,
@@ -114,7 +114,7 @@ SET name = ?,
 WHERE public_id = ?
   AND enabled = TRUE;
 
--- name: UpdateWorkspaceFull :exec
+-- name: UpdateWorkspaceFull :execrows
 -- Update workspace name and slug by public_id.
 UPDATE workspaces
 SET name = ?,
@@ -122,7 +122,7 @@ SET name = ?,
 WHERE public_id = ?
   AND enabled = TRUE;
 
--- name: PatchWorkspace :exec
+-- name: PatchWorkspace :execrows
 -- Patch a workspace via COALESCE; NULL params leave existing columns untouched.
 UPDATE workspaces
 SET name        = COALESCE(sqlc.narg('name'), name),

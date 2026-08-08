@@ -85,13 +85,22 @@ WHERE id = ?
 -- List enabled integrations whose access token will expire before
 -- the given cutoff AND still have a stored refresh token. Used by
 -- the background token refresher.
+--
+-- This listing carries no claim of its own: every replica of the API
+-- process runs the refresher, so the same row comes back to all of
+-- them on the same tick. `last_refreshed_at` is selected because it is
+-- the compare-and-swap witness ClaimConnectionForRefresh matches on,
+-- and `public_id` because the refresher logs the row it worked on and
+-- an internal id must not appear in a log line.
 SELECT
   id,
+  public_id,
   user_id,
   provider,
   access_token_ciphertext,
   refresh_token_ciphertext,
-  access_token_expires_at
+  access_token_expires_at,
+  last_refreshed_at
 FROM user_integrations
 WHERE enabled = TRUE
   AND access_token_expires_at IS NOT NULL
@@ -100,6 +109,37 @@ WHERE enabled = TRUE
   AND LENGTH(refresh_token_ciphertext) > 0
 ORDER BY access_token_expires_at ASC
 LIMIT 200;
+
+-- name: ClaimConnectionForRefresh :execrows
+-- Elect a single refresher for one integration row, by compare-and-swap
+-- on the value of last_refreshed_at that the caller read from
+-- ListConnectionsExpiringBefore.
+--
+-- The refresher runs inside every API replica, so without this the same
+-- row is refreshed concurrently by all of them. That is not a wasted
+-- call but a data-loss hazard: with a provider that rotates the refresh
+-- token on use (Discord here), the second exchange presents a token the
+-- provider has already retired, the provider reads that as replay, and
+-- it revokes the whole grant. The connection then breaks permanently
+-- and the user has to re-authorise.
+--
+-- <=> is MySQL's NULL-safe equality, needed because last_refreshed_at is
+-- NULL until the first refresh — plain `=` never matches NULL and the
+-- claim would fail forever on exactly the rows that were never
+-- refreshed. Callers MUST inspect RowsAffected and skip the row unless
+-- it is 1; anything else means another replica got there first.
+--
+-- The CAS alone is not the whole guard, and cannot be: it only
+-- separates replicas that read the same value. A replica that lists a
+-- moment after the winner claimed reads the *new* last_refreshed_at, so
+-- its swap would also succeed. The caller therefore skips any row
+-- touched within its claim lease before reaching this statement; see
+-- Refresher.ClaimLease. The two together cover both orderings.
+UPDATE user_integrations
+SET last_refreshed_at = NOW(3)
+WHERE id = ?
+  AND enabled = TRUE
+  AND last_refreshed_at <=> ?;
 
 -- name: UpdateConnectionTokens :exec
 -- Replace stored tokens after a successful refresh.

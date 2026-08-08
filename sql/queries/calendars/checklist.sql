@@ -47,7 +47,7 @@ WHERE public_id = ?
   AND enabled = TRUE
 LIMIT 1;
 
--- name: UpdateCalendarChecklistItem :exec
+-- name: UpdateCalendarChecklistItem :execrows
 -- Update a checklist item's title, done, or sort_weight.
 UPDATE calendar_event_checklist_items
 SET title       = COALESCE(sqlc.narg('title'), title),
@@ -58,10 +58,11 @@ WHERE public_id = ?
   AND workspace_id = ?
   AND enabled = TRUE;
 
--- name: DisableCalendarChecklistItem :exec
+-- name: DisableCalendarChecklistItem :execrows
 -- Soft-delete a checklist item.
 UPDATE calendar_event_checklist_items
 SET enabled = FALSE
 WHERE public_id = ?
   AND event_id = ?
-  AND workspace_id = ?;
+  AND workspace_id = ?
+  AND enabled = TRUE;

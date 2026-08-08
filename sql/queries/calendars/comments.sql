@@ -55,7 +55,7 @@ WHERE public_id = ?
   AND deleted_at IS NULL
 LIMIT 1;
 
--- name: UpdateCalendarEventComment :exec
+-- name: UpdateCalendarEventComment :execrows
 -- Edit a comment's body and stamp edited_at.
 UPDATE calendar_event_comments
 SET body = ?,
@@ -67,7 +67,7 @@ WHERE public_id = ?
   AND enabled = TRUE
   AND deleted_at IS NULL;
 
--- name: DisableCalendarEventComment :exec
+-- name: DisableCalendarEventComment :execrows
 -- Soft-delete a comment (author or calendar owner).
 UPDATE calendar_event_comments
 SET enabled = FALSE,

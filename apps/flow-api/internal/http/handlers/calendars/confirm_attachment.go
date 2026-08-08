@@ -102,7 +102,7 @@ func ConfirmAttachment(deps Deps) func(context.Context, *ConfirmAttachmentInput)
 			return nil, err
 		}
 
-		_ = appendCalendarEvent(ctx, deps.DB, wsID, "calendar.event.attachment.deleted", &actorID, map[string]any{
+		_ = appendCalendarEvent(ctx, deps.DB, wsID, cal.ID, "calendar.event.attachment.deleted", &actorID, map[string]any{
 			"eventId":      input.EvtID,
 			"calendarId":   input.CalID,
 			"attachmentId": input.AttID,
@@ -126,7 +126,10 @@ func rejectOversizeCalendarAttachment(ctx context.Context, deps Deps, wsID uint3
 	qtx := deps.Queries.WithTx(tx)
 	cqtx := deps.CalendarQueries.WithTx(tx)
 
-	if err := cqtx.DeleteCalendarEventAttachment(ctx, calendar.DeleteCalendarEventAttachmentParams{
+	// This is the cleanup path for a blob this request has just rejected,
+	// not an endpoint answering about a resource the caller named, so a
+	// zero count has no 404 to map onto.
+	if _, err := cqtx.DeleteCalendarEventAttachment(ctx, calendar.DeleteCalendarEventAttachmentParams{
 		PublicID:    attPub,
 		EventID:     handlerutil.NullInt32From(eventID),
 		WorkspaceID: wsID,

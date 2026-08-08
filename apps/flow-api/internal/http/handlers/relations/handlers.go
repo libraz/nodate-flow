@@ -189,7 +189,7 @@ LIMIT 1`
 // exactly what POST /tasks/{id}/dependencies is held to: the caller must
 // be able to reach both endpoint tasks and be at least an editor in both
 // their projects, and the edge goes in through [taskdeps.Add] so it gets
-// the project locks and the cycle rejection. Workspace membership alone
+// the workspace edge lock and the cycle rejection. Workspace membership alone
 // is not enough — it would let a guest draw edges between tasks in
 // projects they were never added to — and skipping the cycle check
 // breaks the DAG the `dependency.all_done` walk depends on, silently and
@@ -207,12 +207,13 @@ func resolveAccept(
 		return nil, httpErr(apierrors.InternalUnexpected)
 	}
 
-	source, err := authorizeEndpoint(ctx, deps, suggestion.SourceTaskPublicID, actorID)
-	if err != nil {
+	// Called for the authorization it performs, not for the row: the
+	// edge is written by internal task id and the projects are no longer
+	// part of the lock set.
+	if _, err := authorizeEndpoint(ctx, deps, suggestion.SourceTaskPublicID, actorID); err != nil {
 		return nil, err
 	}
-	target, err := authorizeEndpoint(ctx, deps, suggestion.TargetTaskPublicID, actorID)
-	if err != nil {
+	if _, err := authorizeEndpoint(ctx, deps, suggestion.TargetTaskPublicID, actorID); err != nil {
 		return nil, err
 	}
 
@@ -221,9 +222,7 @@ func resolveAccept(
 		if _, e := taskdeps.Add(ctx, tx, taskdeps.Args{
 			WorkspaceID:      wsID,
 			FromTaskID:       suggestion.SourceTaskID,
-			FromProjectID:    source.Task.ProjectID,
 			ToTaskID:         suggestion.TargetTaskID,
-			ToProjectID:      target.Task.ProjectID,
 			Kind:             depKind,
 			ActorUserID:      &actor,
 			FromTaskPublicID: suggestion.SourceTaskPublicID.String(),
@@ -240,12 +239,16 @@ func resolveAccept(
 		// Mark the suggestion as accepted in the same transaction as the
 		// edge, so a failure cannot leave a suggestion claiming an edge
 		// that was never written.
-		return deps.Queries.WithTx(tx).ResolveSuggestion(ctx, generated.ResolveSuggestionParams{
+		// The count is not the existence check: the suggestion was read
+		// before this call, and re-accepting one already accepted changes
+		// no column, which MySQL counts as zero.
+		_, e := deps.Queries.WithTx(tx).ResolveSuggestion(ctx, generated.ResolveSuggestionParams{
 			Status:      generated.RelationSuggestionsStatusAccepted,
 			ResolvedBy:  sql.NullInt32{Int32: int32(actorID), Valid: true}, //#nosec G115 -- actor user id sourced from session, fits int32 within realistic deployments
 			WorkspaceID: wsID,
 			PublicID:    suggestion.PublicID,
 		})
+		return e
 	})
 	if txErr != nil {
 		if stderrors.Is(txErr, taskdeps.ErrCycle) {
@@ -299,7 +302,9 @@ func resolveDismiss(
 	wsID uint32,
 	actorID uint32,
 ) (*ResolveOutput, error) {
-	if err := deps.Queries.ResolveSuggestion(ctx, generated.ResolveSuggestionParams{
+	// Not an existence check: resolving a suggestion that already holds
+	// the target status changes nothing and MySQL counts zero.
+	if _, err := deps.Queries.ResolveSuggestion(ctx, generated.ResolveSuggestionParams{
 		Status:      generated.RelationSuggestionsStatusDismissed,
 		ResolvedBy:  sql.NullInt32{Int32: int32(actorID), Valid: true}, //#nosec G115 -- actor user id sourced from session, fits int32 within realistic deployments
 		WorkspaceID: wsID,

@@ -285,7 +285,7 @@ func CreatePublicShare(deps Deps) func(context.Context, *CreatePublicShareInput)
 			return nil, httpErr(apierrors.CalendarCalendarStoreReadInterrupted)
 		}
 
-		_ = appendCalendarEvent(ctx, deps.DB, wsID, "public_share.created", &actorID, map[string]any{
+		_ = appendCalendarEvent(ctx, deps.DB, wsID, noOwningCalendar, "public_share.created", &actorID, map[string]any{
 			"shareId": publicID.String(),
 			"title":   input.Body.Title,
 		})
@@ -398,11 +398,15 @@ func PatchPublicShare(deps Deps) func(context.Context, *PatchPublicShareInput) (
 			ExpiresAt:           nullTimeFromUnixPtr(input.Body.ExpiresAt),
 			SortWeight:          nullInt32FromPtr(input.Body.SortWeight),
 		}
-		if err := deps.CalendarQueries.PatchPublicShare(ctx, params); err != nil {
+		// Not an existence check: a PATCH carrying the values the share
+		// already has changes nothing and MySQL counts zero. The share
+		// was resolved above.
+		if _, err := deps.CalendarQueries.PatchPublicShare(ctx, params); err != nil {
 			return nil, httpErr(apierrors.CalendarCalendarStoreWriteInterrupted)
 		}
 		if input.Body.ClearExpiresAt {
-			if err := deps.CalendarQueries.ClearPublicShareExpiresAt(ctx, calendar.ClearPublicShareExpiresAtParams{
+			// Same: clearing an expiry that is already NULL counts zero.
+			if _, err := deps.CalendarQueries.ClearPublicShareExpiresAt(ctx, calendar.ClearPublicShareExpiresAtParams{
 				WorkspaceID: wsID,
 				PublicID:    sharePID,
 			}); err != nil {
@@ -421,7 +425,7 @@ func PatchPublicShare(deps Deps) func(context.Context, *PatchPublicShareInput) (
 			return nil, httpErr(apierrors.CalendarCalendarStoreReadInterrupted)
 		}
 
-		_ = appendCalendarEvent(ctx, deps.DB, wsID, "public_share.updated", &actorID, map[string]any{
+		_ = appendCalendarEvent(ctx, deps.DB, wsID, noOwningCalendar, "public_share.updated", &actorID, map[string]any{
 			"shareId": input.ShareID,
 		})
 
@@ -456,12 +460,19 @@ func RotatePublicShareToken(deps Deps) func(context.Context, *RotatePublicShareT
 		if err != nil {
 			return nil, httpErr(apierrors.CalendarCalendarStoreWriteInterrupted)
 		}
-		if err := deps.CalendarQueries.RotatePublicShareToken(ctx, calendar.RotatePublicShareTokenParams{
+		// A freshly minted hash never equals the stored one, so zero rows
+		// here does mean "no such share" -- and answering ok would hand
+		// the caller a token that unlocks nothing.
+		rotated, err := deps.CalendarQueries.RotatePublicShareToken(ctx, calendar.RotatePublicShareTokenParams{
 			TokenHash:   tokenHash,
 			WorkspaceID: wsID,
 			PublicID:    sharePID,
-		}); err != nil {
+		})
+		if err != nil {
 			return nil, httpErr(apierrors.CalendarCalendarStoreWriteInterrupted)
+		}
+		if rotated == 0 {
+			return nil, errShareNotFound
 		}
 		row, err := deps.CalendarQueries.FindPublicShareByPublicId(ctx, calendar.FindPublicShareByPublicIdParams{
 			WorkspaceID: wsID,
@@ -474,7 +485,7 @@ func RotatePublicShareToken(deps Deps) func(context.Context, *RotatePublicShareT
 			return nil, httpErr(apierrors.CalendarCalendarStoreReadInterrupted)
 		}
 
-		_ = appendCalendarEvent(ctx, deps.DB, wsID, "public_share.rotated", &actorID, map[string]any{
+		_ = appendCalendarEvent(ctx, deps.DB, wsID, noOwningCalendar, "public_share.rotated", &actorID, map[string]any{
 			"shareId": input.ShareID,
 		})
 
@@ -508,13 +519,20 @@ func DeletePublicShare(deps Deps) func(context.Context, *DeletePublicShareInput)
 		if err != nil {
 			return nil, errShareNotFound
 		}
-		if err := deps.CalendarQueries.DisablePublicShare(ctx, calendar.DisablePublicShareParams{
+		// Only matches a share that is still live, so zero rows means
+		// nothing was unpublished. Answering ok here told the caller a
+		// public URL had been taken down while it stayed reachable.
+		rows, err := deps.CalendarQueries.DisablePublicShare(ctx, calendar.DisablePublicShareParams{
 			WorkspaceID: wsID,
 			PublicID:    sharePID,
-		}); err != nil {
+		})
+		if err != nil {
 			return nil, httpErr(apierrors.CalendarCalendarStoreDeleteInterrupted)
 		}
-		_ = appendCalendarEvent(ctx, deps.DB, wsID, "public_share.deleted", &actorID, map[string]any{
+		if rows == 0 {
+			return nil, errShareNotFound
+		}
+		_ = appendCalendarEvent(ctx, deps.DB, wsID, noOwningCalendar, "public_share.deleted", &actorID, map[string]any{
 			"shareId": input.ShareID,
 		})
 		deps.Audit.Record(ctx, audit.Entry{
@@ -640,7 +658,7 @@ func AttachEventsToShare(deps Deps) func(context.Context, *AttachEventsToShareIn
 		}
 
 		if attached > 0 {
-			_ = appendCalendarEvent(ctx, deps.DB, wsID, "public_share.events_attached", &actorID, map[string]any{
+			_ = appendCalendarEvent(ctx, deps.DB, wsID, noOwningCalendar, "public_share.events_attached", &actorID, map[string]any{
 				"shareId":  input.ShareID,
 				"attached": attached,
 				"skipped":  skipped,
@@ -743,7 +761,11 @@ func ReorderShareEvents(deps Deps) func(context.Context, *ReorderShareEventsInpu
 		cqtx := deps.CalendarQueries.WithTx(tx)
 
 		for i, pid := range requested {
-			if err := cqtx.UpdateShareEventSortWeight(ctx, calendar.UpdateShareEventSortWeightParams{
+			// Not an existence check: an event already at position i keeps
+			// its sort_weight and MySQL counts zero. The caller's list is
+			// validated against the share's current events before this
+			// loop, which is what rejects an event that is not on it.
+			if _, err := cqtx.UpdateShareEventSortWeight(ctx, calendar.UpdateShareEventSortWeightParams{
 				SortWeight: int32(i),
 				ShareID:    share.ID,
 				PublicID:   pid,
@@ -756,7 +778,7 @@ func ReorderShareEvents(deps Deps) func(context.Context, *ReorderShareEventsInpu
 			return nil, httpErr(apierrors.CalendarCalendarStoreWriteInterrupted)
 		}
 
-		_ = appendCalendarEvent(ctx, deps.DB, wsID, "public_share.events_reordered", &actorID, map[string]any{
+		_ = appendCalendarEvent(ctx, deps.DB, wsID, noOwningCalendar, "public_share.events_reordered", &actorID, map[string]any{
 			"shareId": input.ShareID,
 			"count":   len(requested),
 		})
@@ -813,13 +835,21 @@ func DetachEventFromShare(deps Deps) func(context.Context, *DetachEventFromShare
 			}
 			return nil, httpErr(apierrors.CalendarCalendarStoreReadInterrupted)
 		}
-		if err := deps.CalendarQueries.DetachEventFromShare(ctx, calendar.DetachEventFromShareParams{
+		// Only matches a link that is still live, so zero rows means the
+		// event was never on this share -- or somebody else detached it
+		// first. Reporting success for that told the caller a page had
+		// stopped showing an event it was still publishing.
+		rows, err := deps.CalendarQueries.DetachEventFromShare(ctx, calendar.DetachEventFromShareParams{
 			ShareID: share.ID,
 			EventID: evt.ID,
-		}); err != nil {
+		})
+		if err != nil {
 			return nil, httpErr(apierrors.CalendarCalendarStoreWriteInterrupted)
 		}
-		_ = appendCalendarEvent(ctx, deps.DB, wsID, "public_share.event_detached", &actorID, map[string]any{
+		if rows == 0 {
+			return nil, httpErr(apierrors.ShareShareEventNotFound)
+		}
+		_ = appendCalendarEvent(ctx, deps.DB, wsID, evt.CalendarID, "public_share.event_detached", &actorID, map[string]any{
 			"shareId": input.ShareID,
 			"eventId": input.EvtID,
 		})

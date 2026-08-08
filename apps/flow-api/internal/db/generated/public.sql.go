@@ -181,7 +181,7 @@ func (q *Queries) ListPublicLensTasks(ctx context.Context, arg ListPublicLensTas
 	return items, nil
 }
 
-const setLensPrivate = `-- name: SetLensPrivate :exec
+const setLensPrivate = `-- name: SetLensPrivate :execrows
 UPDATE lenses
 SET is_public = FALSE,
     public_token_hash = NULL
@@ -199,12 +199,15 @@ type SetLensPrivateParams struct {
 // Revoke public sharing on a lens. Clears the token hash so the URL
 // stops resolving and re-publishing has to mint a fresh token.
 // No-op if the lens is already private (WHERE is_public = TRUE guard).
-func (q *Queries) SetLensPrivate(ctx context.Context, arg SetLensPrivateParams) error {
-	_, err := q.db.ExecContext(ctx, setLensPrivate, arg.WorkspaceID, arg.PublicID)
-	return err
+func (q *Queries) SetLensPrivate(ctx context.Context, arg SetLensPrivateParams) (int64, error) {
+	result, err := q.db.ExecContext(ctx, setLensPrivate, arg.WorkspaceID, arg.PublicID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
 }
 
-const setLensPublic = `-- name: SetLensPublic :exec
+const setLensPublic = `-- name: SetLensPublic :execrows
 UPDATE lenses
 SET is_public = TRUE,
     public_token_hash = ?,
@@ -225,9 +228,12 @@ type SetLensPublicParams struct {
 // URL token minted by the caller; the plaintext is returned to the
 // publisher once and is not recoverable afterwards.
 // No-op if the lens is already public (WHERE is_public = FALSE guard).
-func (q *Queries) SetLensPublic(ctx context.Context, arg SetLensPublicParams) error {
-	_, err := q.db.ExecContext(ctx, setLensPublic, arg.PublicTokenHash, arg.WorkspaceID, arg.PublicID)
-	return err
+func (q *Queries) SetLensPublic(ctx context.Context, arg SetLensPublicParams) (int64, error) {
+	result, err := q.db.ExecContext(ctx, setLensPublic, arg.PublicTokenHash, arg.WorkspaceID, arg.PublicID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
 }
 
 const updateLensSafetyCheck = `-- name: UpdateLensSafetyCheck :exec

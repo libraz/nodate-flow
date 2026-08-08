@@ -888,8 +888,11 @@ func Patch(deps Deps) func(context.Context, *PatchTaskInput) (*PatchTaskOutput, 
 			},
 		}
 
+		// Not an existence check on either branch: a PATCH that re-sends
+		// the task's current values changes nothing and MySQL counts zero.
+		// The task was resolved by the task middleware before this runs.
 		if !needsItemkit {
-			if err := deps.Queries.UpdateTask(ctx, updateParams); err != nil {
+			if _, err := deps.Queries.UpdateTask(ctx, updateParams); err != nil {
 				return nil, httpErr(apierrors.InternalUnexpected)
 			}
 			// No tx in scope on this path; append best-effort.
@@ -911,7 +914,7 @@ func Patch(deps Deps) func(context.Context, *PatchTaskInput) (*PatchTaskOutput, 
 			txErr := dbretry.InTx(ctx, deps.DB, "tasks.Patch", nil, func(ctx context.Context, tx *sql.Tx) error {
 				answered = nil
 				qtx := deps.Queries.WithTx(tx)
-				if err := qtx.UpdateTask(ctx, updateParams); err != nil {
+				if _, err := qtx.UpdateTask(ctx, updateParams); err != nil {
 					return err
 				}
 				if titleChanged {

@@ -44,13 +44,14 @@ WHERE uf.workspace_id = ?
   AND uf.user_id = ?
   AND uf.enabled = TRUE;
 
--- name: DisableFavorite :exec
+-- name: DisableFavorite :execrows
 -- Soft-delete a favorite.
 UPDATE user_favorites
 SET enabled = FALSE
 WHERE workspace_id = ?
   AND public_id = ?
-  AND user_id = ?;
+  AND user_id = ?
+  AND enabled = TRUE;
 
 -- name: FindFavoriteByTarget :one
 -- Check if a user has already favorited this entity.

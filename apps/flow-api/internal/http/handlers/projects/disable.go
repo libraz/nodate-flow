@@ -75,10 +75,14 @@ func Disable(deps Deps) func(context.Context, *DisableProjectInput) (*DisablePro
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
 
-		if err := qtx.DisableProject(ctx, generated.DisableProjectParams{
+		// Only matches a project that is still live, so a zero count means
+		// the caller named a project that is not there to archive. The child
+		// cascade above ran on nothing in that case.
+		rows, err := qtx.DisableProject(ctx, generated.DisableProjectParams{
 			WorkspaceID: ws.ID,
 			PublicID:    types.FromUUID(prj.PublicID),
-		}); err != nil {
+		})
+		if err != nil {
 			nflog.LoggerFromContext(ctx).ErrorContext(ctx, "projects.Disable: project disable failed",
 				slog.Any("err", err),
 				slog.String("handler", "projects.Disable"),
@@ -86,6 +90,9 @@ func Disable(deps Deps) func(context.Context, *DisableProjectInput) (*DisablePro
 				logutil.LogEntity("project", prj.PublicID),
 			)
 			return nil, httpErr(apierrors.InternalUnexpected)
+		}
+		if rows == 0 {
+			return nil, httpErr(apierrors.WsProjectNotFound)
 		}
 
 		if err := tx.Commit(); err != nil {

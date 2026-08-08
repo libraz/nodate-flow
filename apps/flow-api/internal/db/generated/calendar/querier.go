@@ -21,7 +21,7 @@ type Querier interface {
 	CleanupExpiredCalendarEventInvites(ctx context.Context) error
 	// Dedicated setter that clears expires_at (COALESCE-based patch cannot
 	// distinguish "leave unchanged" from "clear" for nullable columns).
-	ClearPublicShareExpiresAt(ctx context.Context, arg ClearPublicShareExpiresAtParams) error
+	ClearPublicShareExpiresAt(ctx context.Context, arg ClearPublicShareExpiresAtParams) (int64, error)
 	// Number of live members, used to pick the next colour from the palette.
 	CountCalendarMembers(ctx context.Context, arg CountCalendarMembersParams) (int64, error)
 	// Live owners of a calendar. Callers check this before demoting or
@@ -64,7 +64,7 @@ type Querier interface {
 	// transaction; this row holding the FK reference must go away before
 	// DeleteStorageObjectIfUnreferenced can free the storage object (FK is
 	// ON DELETE RESTRICT). Audit trail survives via events.
-	DeleteCalendarEventAttachment(ctx context.Context, arg DeleteCalendarEventAttachmentParams) error
+	DeleteCalendarEventAttachment(ctx context.Context, arg DeleteCalendarEventAttachmentParams) (int64, error)
 	// Withdraw every publication of a calendar's events, across every share
 	// in the workspace. Run when the calendar itself is deleted.
 	//
@@ -80,35 +80,35 @@ type Querier interface {
 	// would hit the projection guard for any task-linked row, which only
 	// the item projection engine may disable, and the calendar's own
 	// enabled flag is already what every read path filters on.
-	DetachCalendarEventsFromAllShares(ctx context.Context, arg DetachCalendarEventsFromAllSharesParams) error
+	DetachCalendarEventsFromAllShares(ctx context.Context, arg DetachCalendarEventsFromAllSharesParams) (int64, error)
 	// Remove one event from a share (soft). Looks up the link by share +
 	// event internal ids (caller resolves both via their public ids first).
-	DetachEventFromShare(ctx context.Context, arg DetachEventFromShareParams) error
+	DetachEventFromShare(ctx context.Context, arg DetachEventFromShareParams) (int64, error)
 	// Soft-delete a calendar.
-	DisableCalendar(ctx context.Context, arg DisableCalendarParams) error
+	DisableCalendar(ctx context.Context, arg DisableCalendarParams) (int64, error)
 	// Soft-delete a checklist item.
-	DisableCalendarChecklistItem(ctx context.Context, arg DisableCalendarChecklistItemParams) error
+	DisableCalendarChecklistItem(ctx context.Context, arg DisableCalendarChecklistItemParams) (int64, error)
 	// Soft-delete a calendar event by clearing the enabled flag. enabled=FALSE
 	// gates LIST/GET reads; the column doubles as the auditable soft-delete
 	// marker (no separate deleted_at column).
-	DisableCalendarEvent(ctx context.Context, arg DisableCalendarEventParams) error
+	DisableCalendarEvent(ctx context.Context, arg DisableCalendarEventParams) (int64, error)
 	// Remove an attendee from an event (soft-delete).
 	DisableCalendarEventAttendee(ctx context.Context, arg DisableCalendarEventAttendeeParams) error
 	// Soft-delete a comment (author or calendar owner).
-	DisableCalendarEventComment(ctx context.Context, arg DisableCalendarEventCommentParams) error
+	DisableCalendarEventComment(ctx context.Context, arg DisableCalendarEventCommentParams) (int64, error)
 	// Soft-disable (revoke) an invite by internal id.
 	DisableCalendarEventInvite(ctx context.Context, id uint32) error
 	// Revoke a membership. The row survives so the grant history stays
 	// readable and so a later re-add updates it in place.
 	DisableCalendarMember(ctx context.Context, arg DisableCalendarMemberParams) (sql.Result, error)
 	// Soft-delete a memo.
-	DisableCalendarMemo(ctx context.Context, arg DisableCalendarMemoParams) error
+	DisableCalendarMemo(ctx context.Context, arg DisableCalendarMemoParams) (int64, error)
 	// Remove a user from a calendar (soft-delete).
 	DisableCalendarSubscription(ctx context.Context, arg DisableCalendarSubscriptionParams) error
 	// Soft-delete a share page. Child rows in calendar_public_share_events
 	// are left as-is (soft-disabled at the share level is sufficient; the
 	// render query joins through cps.enabled).
-	DisablePublicShare(ctx context.Context, arg DisablePublicShareParams) error
+	DisablePublicShare(ctx context.Context, arg DisablePublicShareParams) (int64, error)
 	// Resolve a calendar by UUID v7 within a workspace.
 	FindCalendarByPublicId(ctx context.Context, arg FindCalendarByPublicIdParams) (FindCalendarByPublicIdRow, error)
 	// Resolve a checklist item by UUID v7.
@@ -289,7 +289,7 @@ type Querier interface {
 	// Stamp sent_at when the invite email is actually dispatched.
 	MarkCalendarEventInviteSent(ctx context.Context, id uint32) error
 	// Patch mutable calendar fields. NULL params leave columns untouched.
-	PatchCalendar(ctx context.Context, arg PatchCalendarParams) error
+	PatchCalendar(ctx context.Context, arg PatchCalendarParams) (int64, error)
 	// Patch mutable event fields. An omitted parameter leaves its column
 	// untouched; a clear_* flag sets its column to NULL.
 	//
@@ -310,11 +310,11 @@ type Querier interface {
 	// nullable for planning-stage events, but a task-projected row's dates
 	// mirror the task and only the item projection engine may move them, so
 	// clearing them belongs to that path rather than to a generic patch.
-	PatchCalendarEvent(ctx context.Context, arg PatchCalendarEventParams) error
+	PatchCalendarEvent(ctx context.Context, arg PatchCalendarEventParams) (int64, error)
 	// Update a subscriber's display preferences.
 	PatchCalendarSubscription(ctx context.Context, arg PatchCalendarSubscriptionParams) error
 	// Update mutable share fields. NULL arguments leave columns untouched.
-	PatchPublicShare(ctx context.Context, arg PatchPublicShareParams) error
+	PatchPublicShare(ctx context.Context, arg PatchPublicShareParams) (int64, error)
 	// Bring an invite row back into service with a fresh capability:
 	// install a new token_hash + expires_at, clear the delivery state, and
 	// re-enable the row.
@@ -326,26 +326,26 @@ type Querier interface {
 	// the same statement; enabled = TRUE is simply already true.
 	ReviveCalendarEventInvite(ctx context.Context, arg ReviveCalendarEventInviteParams) error
 	// Regenerate the token hash; invalidates any previously issued URL.
-	RotatePublicShareToken(ctx context.Context, arg RotatePublicShareTokenParams) error
+	RotatePublicShareToken(ctx context.Context, arg RotatePublicShareTokenParams) (int64, error)
 	// Grant or revoke edit permission on an attendee (by event owner).
 	UpdateAttendeeCanEdit(ctx context.Context, arg UpdateAttendeeCanEditParams) error
 	// Update an attendee's RSVP response (self-service).
 	UpdateAttendeeRsvp(ctx context.Context, arg UpdateAttendeeRsvpParams) error
 	// Update a checklist item's title, done, or sort_weight.
-	UpdateCalendarChecklistItem(ctx context.Context, arg UpdateCalendarChecklistItemParams) error
+	UpdateCalendarChecklistItem(ctx context.Context, arg UpdateCalendarChecklistItemParams) (int64, error)
 	// Edit a comment's body and stamp edited_at.
-	UpdateCalendarEventComment(ctx context.Context, arg UpdateCalendarEventCommentParams) error
+	UpdateCalendarEventComment(ctx context.Context, arg UpdateCalendarEventCommentParams) (int64, error)
 	// Change a member's role. RowsAffected = 0 means the target holds no live
 	// membership, which the caller maps to a 404 rather than silently
 	// reporting success.
 	UpdateCalendarMemberRole(ctx context.Context, arg UpdateCalendarMemberRoleParams) (sql.Result, error)
 	// Update a memo's title, done, or sort_weight.
-	UpdateCalendarMemo(ctx context.Context, arg UpdateCalendarMemoParams) error
+	UpdateCalendarMemo(ctx context.Context, arg UpdateCalendarMemoParams) (int64, error)
 	// Update the sort_weight of a single share-event link.
 	// Called in a loop (inside a tx) when a user reorders the events on a
 	// public share. Scoped to (share_id, public_id) so a caller cannot
 	// accidentally reorder a link belonging to a different share.
-	UpdateShareEventSortWeight(ctx context.Context, arg UpdateShareEventSortWeightParams) error
+	UpdateShareEventSortWeight(ctx context.Context, arg UpdateShareEventSortWeightParams) (int64, error)
 	// Grant (or re-grant) a user access to a calendar at a given role.
 	//
 	// Upsert rather than insert because uniq_calendar_members_calendar_user

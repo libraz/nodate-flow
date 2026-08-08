@@ -52,12 +52,13 @@ func (q *Queries) CreateCalendarMemo(ctx context.Context, arg CreateCalendarMemo
 	return result.LastInsertId()
 }
 
-const disableCalendarMemo = `-- name: DisableCalendarMemo :exec
+const disableCalendarMemo = `-- name: DisableCalendarMemo :execrows
 UPDATE calendar_memos
 SET enabled = FALSE
 WHERE public_id = ?
   AND calendar_id = ?
   AND workspace_id = ?
+  AND enabled = TRUE
 `
 
 type DisableCalendarMemoParams struct {
@@ -67,9 +68,12 @@ type DisableCalendarMemoParams struct {
 }
 
 // Soft-delete a memo.
-func (q *Queries) DisableCalendarMemo(ctx context.Context, arg DisableCalendarMemoParams) error {
-	_, err := q.db.ExecContext(ctx, disableCalendarMemo, arg.PublicID, arg.CalendarID, arg.WorkspaceID)
-	return err
+func (q *Queries) DisableCalendarMemo(ctx context.Context, arg DisableCalendarMemoParams) (int64, error) {
+	result, err := q.db.ExecContext(ctx, disableCalendarMemo, arg.PublicID, arg.CalendarID, arg.WorkspaceID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
 }
 
 const findCalendarMemoByPublicId = `-- name: FindCalendarMemoByPublicId :one
@@ -211,7 +215,7 @@ func (q *Queries) ListCalendarMemos(ctx context.Context, arg ListCalendarMemosPa
 	return items, nil
 }
 
-const updateCalendarMemo = `-- name: UpdateCalendarMemo :exec
+const updateCalendarMemo = `-- name: UpdateCalendarMemo :execrows
 UPDATE calendar_memos
 SET title       = COALESCE(?, title),
     body        = COALESCE(?, body),
@@ -234,8 +238,8 @@ type UpdateCalendarMemoParams struct {
 }
 
 // Update a memo's title, done, or sort_weight.
-func (q *Queries) UpdateCalendarMemo(ctx context.Context, arg UpdateCalendarMemoParams) error {
-	_, err := q.db.ExecContext(ctx, updateCalendarMemo,
+func (q *Queries) UpdateCalendarMemo(ctx context.Context, arg UpdateCalendarMemoParams) (int64, error) {
+	result, err := q.db.ExecContext(ctx, updateCalendarMemo,
 		arg.Title,
 		arg.Body,
 		arg.Done,
@@ -244,5 +248,8 @@ func (q *Queries) UpdateCalendarMemo(ctx context.Context, arg UpdateCalendarMemo
 		arg.CalendarID,
 		arg.WorkspaceID,
 	)
-	return err
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
 }

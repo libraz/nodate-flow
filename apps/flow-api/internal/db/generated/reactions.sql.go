@@ -49,11 +49,12 @@ func (q *Queries) CreateReaction(ctx context.Context, arg CreateReactionParams) 
 	return result.LastInsertId()
 }
 
-const disableReaction = `-- name: DisableReaction :exec
+const disableReaction = `-- name: DisableReaction :execrows
 UPDATE reactions
 SET enabled = FALSE
 WHERE public_id = ?
   AND user_id = ?
+  AND enabled = TRUE
 `
 
 type DisableReactionParams struct {
@@ -62,9 +63,12 @@ type DisableReactionParams struct {
 }
 
 // Soft-delete a reaction by public id and user.
-func (q *Queries) DisableReaction(ctx context.Context, arg DisableReactionParams) error {
-	_, err := q.db.ExecContext(ctx, disableReaction, arg.PublicID, arg.UserID)
-	return err
+func (q *Queries) DisableReaction(ctx context.Context, arg DisableReactionParams) (int64, error) {
+	result, err := q.db.ExecContext(ctx, disableReaction, arg.PublicID, arg.UserID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
 }
 
 const findExistingReaction = `-- name: FindExistingReaction :one

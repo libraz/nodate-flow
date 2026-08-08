@@ -203,12 +203,22 @@ func DeleteMcpToken(deps Deps) func(context.Context, *DeleteMcpTokenInput) (*Del
 		if err != nil {
 			return nil, httpErr(apierrors.ValidationPathParamInvalid)
 		}
-		if err := deps.Queries.RevokeMcpToken(ctx, generated.RevokeMcpTokenParams{
+		// Scoped to this user's live tokens in this workspace, so a zero
+		// count means nothing was revoked. This is the endpoint the audit
+		// item is named for: revoking a token id that does not exist -- the
+		// sort of thing that happens mid-incident, from a stale list --
+		// returned ok and wrote an audit entry saying the token was killed,
+		// while the token that was actually leaked stayed valid.
+		rows, err := deps.Queries.RevokeMcpToken(ctx, generated.RevokeMcpTokenParams{
 			WorkspaceID: ws.ID,
 			UserID:      userID,
 			PublicID:    pub,
-		}); err != nil {
+		})
+		if err != nil {
 			return nil, httpErr(apierrors.InternalUnexpected)
+		}
+		if rows == 0 {
+			return nil, httpErr(apierrors.McpTokenNotFound)
 		}
 		deps.Audit.Record(ctx, audit.Entry{
 			Action:       "mcp_token.delete",

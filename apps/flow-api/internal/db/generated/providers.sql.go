@@ -71,6 +71,7 @@ UPDATE ai_providers
 SET enabled = FALSE
 WHERE workspace_id = ?
   AND public_id = ?
+  AND enabled = TRUE
 `
 
 type DeleteProviderParams struct {

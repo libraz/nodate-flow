@@ -428,7 +428,7 @@ func (q *Queries) ListPendingSuggestionsForWorkspace(ctx context.Context, arg Li
 	return items, nil
 }
 
-const resolveSuggestion = `-- name: ResolveSuggestion :exec
+const resolveSuggestion = `-- name: ResolveSuggestion :execrows
 UPDATE relation_suggestions
 SET status = ?,
     resolved_by = ?,
@@ -446,12 +446,15 @@ type ResolveSuggestionParams struct {
 }
 
 // Accept or dismiss a pending suggestion. Only transitions from 'pending'.
-func (q *Queries) ResolveSuggestion(ctx context.Context, arg ResolveSuggestionParams) error {
-	_, err := q.db.ExecContext(ctx, resolveSuggestion,
+func (q *Queries) ResolveSuggestion(ctx context.Context, arg ResolveSuggestionParams) (int64, error) {
+	result, err := q.db.ExecContext(ctx, resolveSuggestion,
 		arg.Status,
 		arg.ResolvedBy,
 		arg.WorkspaceID,
 		arg.PublicID,
 	)
-	return err
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
 }

@@ -81,9 +81,10 @@ WHERE workspace_id = ?
   AND enabled = TRUE
 LIMIT 1;
 
--- name: RemoveActor :exec
+-- name: RemoveActor :execrows
 -- Soft-remove an actor from a task.
 UPDATE task_actors
 SET enabled = FALSE
 WHERE workspace_id = ?
-  AND public_id = ?;
+  AND public_id = ?
+  AND enabled = TRUE;

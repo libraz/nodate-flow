@@ -29,7 +29,10 @@ func Archive(deps Deps) func(context.Context, *ArchiveTaskInput) (*ArchiveTaskOu
 		}
 		actorID, _ := middleware.ActorFromContext(ctx)
 
-		if err := deps.Queries.ArchiveTask(ctx, generated.ArchiveTaskParams{
+		// Not an existence check: archiving a task that is already archived
+		// writes the same archived_at and MySQL counts zero. The task was
+		// resolved by the task middleware before this runs.
+		if _, err := deps.Queries.ArchiveTask(ctx, generated.ArchiveTaskParams{
 			UpdatedByUserID: sql.NullInt32{Int32: int32(actorID), Valid: actorID != 0}, //#nosec G115 -- actor user id sourced from session, fits int32 within realistic deployments
 			WorkspaceID:     ws.ID,
 			PublicID:        types.FromUUID(task.PublicID),
@@ -83,7 +86,9 @@ func Unarchive(deps Deps) func(context.Context, *UnarchiveTaskInput) (*Unarchive
 		}
 		actorID, _ := middleware.ActorFromContext(ctx)
 
-		if err := deps.Queries.UnarchiveTask(ctx, generated.UnarchiveTaskParams{
+		// See Archive: un-archiving an already-live task changes nothing
+		// and counts zero.
+		if _, err := deps.Queries.UnarchiveTask(ctx, generated.UnarchiveTaskParams{
 			UpdatedByUserID: sql.NullInt32{Int32: int32(actorID), Valid: actorID != 0}, //#nosec G115 -- actor user id sourced from session, fits int32 within realistic deployments
 			WorkspaceID:     ws.ID,
 			PublicID:        types.FromUUID(task.PublicID),

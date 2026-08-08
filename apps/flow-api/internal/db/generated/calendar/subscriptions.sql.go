@@ -52,6 +52,7 @@ UPDATE calendar_subscriptions
 SET enabled = FALSE
 WHERE calendar_id = ?
   AND user_id = ?
+  AND enabled = TRUE
 `
 
 type DisableCalendarSubscriptionParams struct {

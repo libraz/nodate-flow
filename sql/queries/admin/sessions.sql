@@ -15,7 +15,7 @@ WHERE s.user_id = ?
 ORDER BY s.created_at DESC, s.public_id DESC
 LIMIT ? OFFSET ?;
 
--- name: AdminRevokeSession :exec
+-- name: AdminRevokeSession :execrows
 -- Revoke any session by its public_id (admin override, no user scoping).
 UPDATE sessions
 SET revoked_at = CURRENT_TIMESTAMP,

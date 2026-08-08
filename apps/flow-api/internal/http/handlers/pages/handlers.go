@@ -364,7 +364,10 @@ func Update(deps Deps) func(context.Context, *UpdatePageInput) (*UpdatePageOutpu
 			}
 		}
 
-		if err := deps.Queries.UpdatePage(ctx, updateParams); err != nil {
+		// Not an existence check: re-submitting a page's current title and
+		// body changes nothing and MySQL counts zero. The re-read below is
+		// what fails if the page is gone.
+		if _, err := deps.Queries.UpdatePage(ctx, updateParams); err != nil {
 			if isDuplicateEntry(err) {
 				return nil, httpErr(apierrors.PagePageTitleTaken)
 			}
@@ -422,11 +425,17 @@ func Delete(deps Deps) func(context.Context, *DeletePageInput) (*DeletePageOutpu
 		if err != nil {
 			return nil, httpErr(apierrors.ValidationPathParamInvalid)
 		}
-		if err := deps.Queries.DisablePage(ctx, generated.DisablePageParams{
+		// Scoped to the workspace and to live pages, so a zero count means
+		// there is no such page to delete here.
+		rows, err := deps.Queries.DisablePage(ctx, generated.DisablePageParams{
 			WorkspaceID: ws.ID,
 			PublicID:    pub,
-		}); err != nil {
+		})
+		if err != nil {
 			return nil, httpErr(apierrors.InternalUnexpected)
+		}
+		if rows == 0 {
+			return nil, httpErr(apierrors.PagePageNotFound)
 		}
 
 		if err := eventbus.Append(ctx, deps.DB, eventbus.Event{

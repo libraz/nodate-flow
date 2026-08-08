@@ -14,7 +14,7 @@ import (
 	types "github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
 )
 
-const archiveTask = `-- name: ArchiveTask :exec
+const archiveTask = `-- name: ArchiveTask :execrows
 UPDATE tasks
 SET archived_at = CURRENT_TIMESTAMP,
     updated_by_user_id = ?
@@ -33,9 +33,12 @@ type ArchiveTaskParams struct {
 // Set archived_at on a task.
 // updated_by_user_id is appended so the audit field records who archived
 // the row (NULL for system writers).
-func (q *Queries) ArchiveTask(ctx context.Context, arg ArchiveTaskParams) error {
-	_, err := q.db.ExecContext(ctx, archiveTask, arg.UpdatedByUserID, arg.WorkspaceID, arg.PublicID)
-	return err
+func (q *Queries) ArchiveTask(ctx context.Context, arg ArchiveTaskParams) (int64, error) {
+	result, err := q.db.ExecContext(ctx, archiveTask, arg.UpdatedByUserID, arg.WorkspaceID, arg.PublicID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
 }
 
 const assignTaskNumber = `-- name: AssignTaskNumber :one
@@ -246,11 +249,12 @@ func (q *Queries) CreateTaskEventLink(ctx context.Context, arg CreateTaskEventLi
 	return result.LastInsertId()
 }
 
-const deleteTaskEventLink = `-- name: DeleteTaskEventLink :exec
+const deleteTaskEventLink = `-- name: DeleteTaskEventLink :execrows
 UPDATE task_event_links
 SET enabled = FALSE
 WHERE workspace_id = ?
   AND public_id = ?
+  AND enabled = TRUE
 `
 
 type DeleteTaskEventLinkParams struct {
@@ -259,17 +263,21 @@ type DeleteTaskEventLinkParams struct {
 }
 
 // Soft-delete a link by public id within a workspace.
-func (q *Queries) DeleteTaskEventLink(ctx context.Context, arg DeleteTaskEventLinkParams) error {
-	_, err := q.db.ExecContext(ctx, deleteTaskEventLink, arg.WorkspaceID, arg.PublicID)
-	return err
+func (q *Queries) DeleteTaskEventLink(ctx context.Context, arg DeleteTaskEventLinkParams) (int64, error) {
+	result, err := q.db.ExecContext(ctx, deleteTaskEventLink, arg.WorkspaceID, arg.PublicID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
 }
 
-const disableTask = `-- name: DisableTask :exec
+const disableTask = `-- name: DisableTask :execrows
 UPDATE tasks
 SET enabled = FALSE,
     updated_by_user_id = ?
 WHERE workspace_id = ?
   AND public_id = ?
+  AND enabled = TRUE
 `
 
 type DisableTaskParams struct {
@@ -281,9 +289,12 @@ type DisableTaskParams struct {
 // Soft-disable a task.
 // updated_by_user_id is appended so the audit field records who disabled
 // the row (NULL for system writers).
-func (q *Queries) DisableTask(ctx context.Context, arg DisableTaskParams) error {
-	_, err := q.db.ExecContext(ctx, disableTask, arg.UpdatedByUserID, arg.WorkspaceID, arg.PublicID)
-	return err
+func (q *Queries) DisableTask(ctx context.Context, arg DisableTaskParams) (int64, error) {
+	result, err := q.db.ExecContext(ctx, disableTask, arg.UpdatedByUserID, arg.WorkspaceID, arg.PublicID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
 }
 
 const findActiveLink = `-- name: FindActiveLink :one
@@ -2247,7 +2258,7 @@ func (q *Queries) SetTaskNumber(ctx context.Context, arg SetTaskNumberParams) er
 	return err
 }
 
-const transitionTaskState = `-- name: TransitionTaskState :exec
+const transitionTaskState = `-- name: TransitionTaskState :execrows
 UPDATE tasks
 SET derived_state = ?,
     completed_at = CASE WHEN ? = 'done' THEN CURRENT_TIMESTAMP ELSE NULL END,
@@ -2270,18 +2281,21 @@ type TransitionTaskStateParams struct {
 // the same transaction as the events append.
 // updated_by_user_id is appended so the audit field reflects who triggered
 // the transition (NULL for system writers / event-bus replays).
-func (q *Queries) TransitionTaskState(ctx context.Context, arg TransitionTaskStateParams) error {
-	_, err := q.db.ExecContext(ctx, transitionTaskState,
+func (q *Queries) TransitionTaskState(ctx context.Context, arg TransitionTaskStateParams) (int64, error) {
+	result, err := q.db.ExecContext(ctx, transitionTaskState,
 		arg.DerivedState,
 		arg.Column2,
 		arg.UpdatedByUserID,
 		arg.WorkspaceID,
 		arg.PublicID,
 	)
-	return err
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
 }
 
-const unarchiveTask = `-- name: UnarchiveTask :exec
+const unarchiveTask = `-- name: UnarchiveTask :execrows
 UPDATE tasks
 SET archived_at = NULL,
     updated_by_user_id = ?
@@ -2300,12 +2314,15 @@ type UnarchiveTaskParams struct {
 // Clear archived_at on a task.
 // updated_by_user_id is appended so the audit field records who unarchived
 // the row (NULL for system writers).
-func (q *Queries) UnarchiveTask(ctx context.Context, arg UnarchiveTaskParams) error {
-	_, err := q.db.ExecContext(ctx, unarchiveTask, arg.UpdatedByUserID, arg.WorkspaceID, arg.PublicID)
-	return err
+func (q *Queries) UnarchiveTask(ctx context.Context, arg UnarchiveTaskParams) (int64, error) {
+	result, err := q.db.ExecContext(ctx, unarchiveTask, arg.UpdatedByUserID, arg.WorkspaceID, arg.PublicID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
 }
 
-const updateTask = `-- name: UpdateTask :exec
+const updateTask = `-- name: UpdateTask :execrows
 UPDATE tasks
 SET title = ?,
     description = ?,
@@ -2336,8 +2353,8 @@ type UpdateTaskParams struct {
 // Update mutable task fields. derived_state is intentionally NOT writable.
 // updated_by_user_id is appended to the SET list so callers can attribute
 // the edit; pass the acting user's internal id (NULL for system writers).
-func (q *Queries) UpdateTask(ctx context.Context, arg UpdateTaskParams) error {
-	_, err := q.db.ExecContext(ctx, updateTask,
+func (q *Queries) UpdateTask(ctx context.Context, arg UpdateTaskParams) (int64, error) {
+	result, err := q.db.ExecContext(ctx, updateTask,
 		arg.Title,
 		arg.Description,
 		arg.Priority,
@@ -2349,7 +2366,10 @@ func (q *Queries) UpdateTask(ctx context.Context, arg UpdateTaskParams) error {
 		arg.WorkspaceID,
 		arg.PublicID,
 	)
-	return err
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
 }
 
 const updateTaskSortWeight = `-- name: UpdateTaskSortWeight :exec

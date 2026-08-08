@@ -186,7 +186,7 @@ func CreateComment(deps Deps) func(context.Context, *CreateCommentInput) (*Creat
 		}
 		out.Body.AvatarURL = dbtype.PtrFromNullString(profile.AvatarUrl)
 
-		_ = appendCalendarEvent(ctx, deps.DB, wsID, "calendar.event.comment.created", &actorID, map[string]any{
+		_ = appendCalendarEvent(ctx, deps.DB, wsID, cal.ID, "calendar.event.comment.created", &actorID, map[string]any{
 			"eventId":    input.EvtID,
 			"calendarId": input.CalID,
 			"commentId":  commentPublicID.String(),
@@ -218,7 +218,10 @@ func EditComment(deps Deps) func(context.Context, *EditCommentInput) (*EditComme
 			return nil, httpErr(apierrors.CalendarCommentNotFound)
 		}
 
-		err = deps.CalendarQueries.UpdateCalendarEventComment(ctx, calendar.UpdateCalendarEventCommentParams{
+		// Not an existence check: an edit that re-submits the current body
+		// changes nothing and MySQL counts zero. Authorship and the
+		// owning event are established above.
+		_, err = deps.CalendarQueries.UpdateCalendarEventComment(ctx, calendar.UpdateCalendarEventCommentParams{
 			Body:        input.Body.Body,
 			PublicID:    types.FromUUID(commentUID),
 			EventID:     handlerutil.NullInt32From(evt.ID),
@@ -229,7 +232,7 @@ func EditComment(deps Deps) func(context.Context, *EditCommentInput) (*EditComme
 			return nil, httpErr(apierrors.CalendarCommentStoreWriteInterrupted)
 		}
 
-		_ = appendCalendarEvent(ctx, deps.DB, wsID, "calendar.event.comment.updated", &actorID, map[string]any{
+		_ = appendCalendarEvent(ctx, deps.DB, wsID, cal.ID, "calendar.event.comment.updated", &actorID, map[string]any{
 			"eventId":    input.EvtID,
 			"calendarId": input.CalID,
 			"commentId":  input.CId,
@@ -280,7 +283,9 @@ func DeleteComment(deps Deps) func(context.Context, *DeleteCommentInput) (*Delet
 			return nil, httpErr(apierrors.CalendarCommentAuthorOrOwnerRequired)
 		}
 
-		err = deps.CalendarQueries.DisableCalendarEventComment(ctx, calendar.DisableCalendarEventCommentParams{
+		// The statement excludes comments already deleted, so zero rows
+		// means a concurrent delete won and this request removed nothing.
+		rows, err := deps.CalendarQueries.DisableCalendarEventComment(ctx, calendar.DisableCalendarEventCommentParams{
 			PublicID:    types.FromUUID(commentUID),
 			EventID:     handlerutil.NullInt32From(evt.ID),
 			WorkspaceID: wsID,
@@ -288,11 +293,14 @@ func DeleteComment(deps Deps) func(context.Context, *DeleteCommentInput) (*Delet
 		if err != nil {
 			return nil, httpErr(apierrors.CalendarCommentStoreDeleteInterrupted)
 		}
+		if rows == 0 {
+			return nil, httpErr(apierrors.CalendarCommentNotFound)
+		}
 
 		out := &DeleteCommentOutput{}
 		out.Body.Deleted = true
 
-		_ = appendCalendarEvent(ctx, deps.DB, wsID, "calendar.event.comment.deleted", &actorID, map[string]any{
+		_ = appendCalendarEvent(ctx, deps.DB, wsID, cal.ID, "calendar.event.comment.deleted", &actorID, map[string]any{
 			"eventId":    input.EvtID,
 			"calendarId": input.CalID,
 			"commentId":  input.CId,

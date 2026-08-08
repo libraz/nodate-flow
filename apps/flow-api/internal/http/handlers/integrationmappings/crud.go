@@ -124,7 +124,10 @@ func Patch(deps Deps) func(context.Context, *PatchInput) (*PatchOutput, error) {
 		if in.Body.Enabled != nil {
 			params.Enabled = sql.NullBool{Bool: *in.Body.Enabled, Valid: true}
 		}
-		if err := deps.Queries.UpdateIntegrationSourceMapping(ctx, params); err != nil {
+		// Not an existence check: a PATCH that re-sends the mapping's
+		// current label changes nothing and MySQL counts zero. The re-read
+		// below is what fails if the mapping is gone.
+		if _, err := deps.Queries.UpdateIntegrationSourceMapping(ctx, params); err != nil {
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
 

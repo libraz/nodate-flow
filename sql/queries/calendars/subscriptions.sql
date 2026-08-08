@@ -60,4 +60,5 @@ WHERE calendar_id = ?
 UPDATE calendar_subscriptions
 SET enabled = FALSE
 WHERE calendar_id = ?
-  AND user_id = ?;
+  AND user_id = ?
+  AND enabled = TRUE;

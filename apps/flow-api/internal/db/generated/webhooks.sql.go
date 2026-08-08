@@ -159,9 +159,10 @@ func (q *Queries) CreateWebhookSubscription(ctx context.Context, arg CreateWebho
 	return result.LastInsertId()
 }
 
-const deleteWebhookSubscription = `-- name: DeleteWebhookSubscription :exec
+const deleteWebhookSubscription = `-- name: DeleteWebhookSubscription :execrows
 UPDATE webhook_subscriptions SET enabled = FALSE
 WHERE workspace_id = ? AND public_id = ?
+  AND enabled = TRUE
 `
 
 type DeleteWebhookSubscriptionParams struct {
@@ -169,9 +170,12 @@ type DeleteWebhookSubscriptionParams struct {
 	PublicID    types.PublicID `json:"publicId"`
 }
 
-func (q *Queries) DeleteWebhookSubscription(ctx context.Context, arg DeleteWebhookSubscriptionParams) error {
-	_, err := q.db.ExecContext(ctx, deleteWebhookSubscription, arg.WorkspaceID, arg.PublicID)
-	return err
+func (q *Queries) DeleteWebhookSubscription(ctx context.Context, arg DeleteWebhookSubscriptionParams) (int64, error) {
+	result, err := q.db.ExecContext(ctx, deleteWebhookSubscription, arg.WorkspaceID, arg.PublicID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
 }
 
 const findPendingDeliveries = `-- name: FindPendingDeliveries :many
@@ -604,7 +608,7 @@ func (q *Queries) RequeueStrandedDeliveries(ctx context.Context, updatedAt sql.N
 	return result.RowsAffected()
 }
 
-const toggleWebhookSubscription = `-- name: ToggleWebhookSubscription :exec
+const toggleWebhookSubscription = `-- name: ToggleWebhookSubscription :execrows
 UPDATE webhook_subscriptions SET is_active = ?
 WHERE workspace_id = ? AND public_id = ? AND enabled = TRUE
 `
@@ -615,7 +619,10 @@ type ToggleWebhookSubscriptionParams struct {
 	PublicID    types.PublicID `json:"publicId"`
 }
 
-func (q *Queries) ToggleWebhookSubscription(ctx context.Context, arg ToggleWebhookSubscriptionParams) error {
-	_, err := q.db.ExecContext(ctx, toggleWebhookSubscription, arg.IsActive, arg.WorkspaceID, arg.PublicID)
-	return err
+func (q *Queries) ToggleWebhookSubscription(ctx context.Context, arg ToggleWebhookSubscriptionParams) (int64, error) {
+	result, err := q.db.ExecContext(ctx, toggleWebhookSubscription, arg.IsActive, arg.WorkspaceID, arg.PublicID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
 }

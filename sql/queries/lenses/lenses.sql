@@ -64,7 +64,7 @@ WHERE l.workspace_id = ?
   AND l.public_id = ?
   AND l.enabled = TRUE;
 
--- name: UpdateLens :exec
+-- name: UpdateLens :execrows
 -- Update a lens name, description and/or JSON body.
 UPDATE lenses
 SET name = ?,
@@ -85,9 +85,10 @@ WHERE l.workspace_id = ?
   AND l.public_id = ?
   AND l.enabled = TRUE;
 
--- name: DeleteLens :exec
+-- name: DeleteLens :execrows
 -- Soft-delete a lens.
 UPDATE lenses
 SET enabled = FALSE
 WHERE workspace_id = ?
-  AND public_id = ?;
+  AND public_id = ?
+  AND enabled = TRUE;

@@ -28,7 +28,7 @@ WHERE tc.workspace_id = ?
 ORDER BY tc.sort_weight ASC, tc.created_at ASC, tc.public_id ASC
 LIMIT ? OFFSET ?;
 
--- name: SatisfyConstraint :exec
+-- name: SatisfyConstraint :execrows
 -- Mark a constraint as satisfied at the current time.
 UPDATE task_constraints
 SET satisfied_at = CURRENT_TIMESTAMP,
@@ -37,7 +37,7 @@ WHERE workspace_id = ?
   AND public_id = ?
   AND enabled = TRUE;
 
--- name: FailConstraint :exec
+-- name: FailConstraint :execrows
 -- Mark a constraint as currently failing. Clears satisfied_at so the
 -- transition is visible in v_task_constraint_satisfaction.
 UPDATE task_constraints
@@ -55,4 +55,5 @@ UPDATE task_constraints
 SET enabled = FALSE
 WHERE workspace_id = ?
   AND public_id = ?
-  AND task_id = ?;
+  AND task_id = ?
+  AND enabled = TRUE;

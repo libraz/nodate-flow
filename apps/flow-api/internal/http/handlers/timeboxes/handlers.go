@@ -314,7 +314,10 @@ func Update(deps Deps) func(context.Context, *UpdateTimeboxInput) (*UpdateTimebo
 			return nil, httpErr(apierrors.TimeboxTimeboxInvalidDates)
 		}
 
-		if err := deps.Queries.UpdateTimebox(ctx, generated.UpdateTimeboxParams{
+		// Not an existence check: a PATCH re-sending the timebox's current
+		// name and dates changes nothing and MySQL counts zero. The re-read
+		// below is what fails if the timebox is gone.
+		if _, err := deps.Queries.UpdateTimebox(ctx, generated.UpdateTimeboxParams{
 			Name:        name,
 			Description: description,
 			StartsOn:    startsOn,
@@ -393,7 +396,10 @@ func UpdateStatus(deps Deps) func(context.Context, *UpdateTimeboxStatusInput) (*
 		}
 
 		targetStatus := generated.TimeboxesStatus(in.Body.Status)
-		if err := deps.Queries.UpdateTimeboxStatus(ctx, generated.UpdateTimeboxStatusParams{
+		// Not an existence check: setting the status the timebox already
+		// holds changes nothing and MySQL counts zero. The re-read below is
+		// what fails if the timebox is gone.
+		if _, err := deps.Queries.UpdateTimeboxStatus(ctx, generated.UpdateTimeboxStatusParams{
 			Status:      targetStatus,
 			WorkspaceID: ws.ID,
 			PublicID:    pub,
@@ -462,11 +468,18 @@ func Delete(deps Deps) func(context.Context, *DeleteTimeboxInput) (*DeleteTimebo
 		if err != nil {
 			return nil, httpErr(apierrors.ValidationPathParamInvalid)
 		}
-		if err := deps.Queries.DisableTimebox(ctx, generated.DisableTimeboxParams{
+		// Scoped to the workspace and to timeboxes that are still live, so a
+		// zero count means there is no such timebox to delete. Reporting
+		// success wrote an audit entry for a delete that never happened.
+		rows, err := deps.Queries.DisableTimebox(ctx, generated.DisableTimeboxParams{
 			WorkspaceID: ws.ID,
 			PublicID:    pub,
-		}); err != nil {
+		})
+		if err != nil {
 			return nil, httpErr(apierrors.InternalUnexpected)
+		}
+		if rows == 0 {
+			return nil, httpErr(apierrors.TimeboxTimeboxNotFound)
 		}
 
 		if actorID, ok := middleware.ActorFromContext(ctx); ok {
@@ -612,11 +625,19 @@ func RemoveTask(deps Deps) func(context.Context, *RemoveTaskInput) (*RemoveTaskO
 			return nil, err
 		}
 
-		if err := deps.Queries.RemoveTaskFromTimebox(ctx, generated.RemoveTaskFromTimeboxParams{
+		// Nothing checks the membership row before this, so the count is
+		// the only thing that knows the task was in the timebox at all:
+		// removing a task that was never added answered ok and wrote an
+		// audit entry saying it had been removed.
+		rows, err := deps.Queries.RemoveTaskFromTimebox(ctx, generated.RemoveTaskFromTimeboxParams{
 			TimeboxID: tb.ID,
 			TaskID:    taskID,
-		}); err != nil {
+		})
+		if err != nil {
 			return nil, httpErr(apierrors.InternalUnexpected)
+		}
+		if rows == 0 {
+			return nil, httpErr(apierrors.TimeboxTaskNotFound)
 		}
 
 		if err := eventbus.Append(ctx, deps.DB, eventbus.Event{

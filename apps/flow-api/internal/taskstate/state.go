@@ -212,7 +212,11 @@ func ApplyTransitionTx(ctx context.Context, tx *sql.Tx, p ApplyParams) (ApplyRes
 	if p.ActorUserID != nil {
 		updatedBy = sql.NullInt32{Int32: int32(*p.ActorUserID), Valid: true} //#nosec G115 -- actor user id sourced from session, fits int32 within realistic deployments
 	}
-	if err := qtx.TransitionTaskState(ctx, generated.TransitionTaskStateParams{
+	// The count is not the existence check: the task row was locked for
+	// this transition earlier in the transaction, and a transition whose
+	// target state equals the current one changes no column, which MySQL
+	// counts as zero.
+	if _, err := qtx.TransitionTaskState(ctx, generated.TransitionTaskStateParams{
 		DerivedState:    next,
 		Column2:         string(next),
 		UpdatedByUserID: updatedBy,

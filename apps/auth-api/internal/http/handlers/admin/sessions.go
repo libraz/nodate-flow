@@ -63,9 +63,16 @@ func RevokeSession(deps Deps) func(context.Context, *RevokeSessionInput) (*Revok
 			return nil, httpErr(apierrors.AuthSessionRevoked)
 		}
 
-		err = deps.Queries.AdminRevokeSession(ctx, pid)
+		// The statement only matches a live, unrevoked session, so zero
+		// rows means there is nothing here to revoke. Reporting success
+		// for that told an admin mid-incident that a session had been
+		// killed when none had, and left an audit entry saying so.
+		rows, err := deps.Queries.AdminRevokeSession(ctx, pid)
 		if err != nil {
 			return nil, httpErr(apierrors.InternalUnexpected)
+		}
+		if rows == 0 {
+			return nil, httpErr(apierrors.InstanceSessionNotFound)
 		}
 
 		deps.Audit.Record(ctx, audit.Entry{

@@ -158,7 +158,7 @@ func AddMember(deps Deps) func(context.Context, *AddMemberInput) (*AddMemberOutp
 		}
 		out.Body.AvatarURL = dbtype.PtrFromNullString(user.AvatarUrl)
 
-		_ = appendCalendarEvent(ctx, deps.DB, wsID, "calendar.member.added", &actorID, map[string]any{
+		_ = appendCalendarEvent(ctx, deps.DB, wsID, cal.ID, "calendar.member.added", &actorID, map[string]any{
 			"calendarId": input.CalID,
 			"userId":     user.PublicID.String(),
 			"role":       input.Body.Role,
@@ -287,7 +287,7 @@ func UpdateMemberRole(deps Deps) func(context.Context, *UpdateMemberRoleInput) (
 		out := &UpdateMemberRoleOutput{}
 		out.Body.Updated = true
 
-		_ = appendCalendarEvent(ctx, deps.DB, wsID, "calendar.member.role_changed", &actorID, map[string]any{
+		_ = appendCalendarEvent(ctx, deps.DB, wsID, cal.ID, "calendar.member.role_changed", &actorID, map[string]any{
 			"calendarId": input.CalID,
 			"userId":     input.UserID,
 			"newRole":    input.Body.Role,
@@ -362,7 +362,7 @@ func RemoveMember(deps Deps) func(context.Context, *RemoveMemberInput) (*RemoveM
 		out := &RemoveMemberOutput{}
 		out.Body.Removed = true
 
-		_ = appendCalendarEvent(ctx, deps.DB, wsID, "calendar.member.removed", &actorID, map[string]any{
+		_ = appendCalendarEvent(ctx, deps.DB, wsID, cal.ID, "calendar.member.removed", &actorID, map[string]any{
 			"calendarId": input.CalID,
 			"userId":     input.UserID,
 		})

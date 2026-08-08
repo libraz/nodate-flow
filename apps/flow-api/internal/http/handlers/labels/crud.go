@@ -272,7 +272,10 @@ func Patch(deps Deps) func(context.Context, *PatchLabelInput) (*PatchLabelOutput
 			sw = *in.Body.SortWeight
 		}
 
-		if err := deps.Queries.UpdateLabel(ctx, generated.UpdateLabelParams{
+		// Not an existence check: a PATCH re-sending the label's current
+		// name / colour changes nothing and MySQL counts zero. The re-read
+		// below is what fails if the label is gone.
+		if _, err := deps.Queries.UpdateLabel(ctx, generated.UpdateLabelParams{
 			Name:          name,
 			Color:         color,
 			Description:   desc,
@@ -339,11 +342,17 @@ func Disable(deps Deps) func(context.Context, *DisableLabelInput) (*DisableLabel
 			return nil, httpErr(apierrors.WsLabelNotFound)
 		}
 
-		if err := deps.Queries.DisableLabel(ctx, generated.DisableLabelParams{
+		// Scoped to the workspace and to live labels, so a zero count means
+		// there is no such label to delete here.
+		rows, err := deps.Queries.DisableLabel(ctx, generated.DisableLabelParams{
 			WorkspaceID: ws.ID,
 			PublicID:    pub,
-		}); err != nil {
+		})
+		if err != nil {
 			return nil, httpErr(apierrors.InternalUnexpected)
+		}
+		if rows == 0 {
+			return nil, httpErr(apierrors.WsLabelNotFound)
 		}
 
 		if err := eventbus.Append(ctx, deps.DB, eventbus.Event{

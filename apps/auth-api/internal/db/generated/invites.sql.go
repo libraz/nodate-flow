@@ -206,11 +206,12 @@ func (q *Queries) ListWorkspaceInvites(ctx context.Context, arg ListWorkspaceInv
 	return items, nil
 }
 
-const revokeWorkspaceInvite = `-- name: RevokeWorkspaceInvite :exec
+const revokeWorkspaceInvite = `-- name: RevokeWorkspaceInvite :execrows
 UPDATE workspace_invites
 SET enabled = FALSE
 WHERE workspace_id = ?
   AND public_id = ?
+  AND enabled = TRUE
 `
 
 type RevokeWorkspaceInviteParams struct {
@@ -219,7 +220,10 @@ type RevokeWorkspaceInviteParams struct {
 }
 
 // Disable an invite link (soft delete).
-func (q *Queries) RevokeWorkspaceInvite(ctx context.Context, arg RevokeWorkspaceInviteParams) error {
-	_, err := q.db.ExecContext(ctx, revokeWorkspaceInvite, arg.WorkspaceID, arg.PublicID)
-	return err
+func (q *Queries) RevokeWorkspaceInvite(ctx context.Context, arg RevokeWorkspaceInviteParams) (int64, error) {
+	result, err := q.db.ExecContext(ctx, revokeWorkspaceInvite, arg.WorkspaceID, arg.PublicID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
 }

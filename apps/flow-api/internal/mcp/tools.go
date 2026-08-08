@@ -1140,7 +1140,10 @@ func runUpdateTask(ctx context.Context, deps Deps, s *session, raw json.RawMessa
 	}
 
 	if !needsItemkit {
-		if err := deps.Queries.UpdateTask(ctx, updateParams); err != nil {
+		// Not an existence check: MySQL counts changed rows, so an update
+		// carrying the task's current values reports zero. The task is
+		// resolved into `current` above.
+		if _, err := deps.Queries.UpdateTask(ctx, updateParams); err != nil {
 			return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
 		}
 	} else {
@@ -1153,7 +1156,7 @@ func runUpdateTask(ctx context.Context, deps Deps, s *session, raw json.RawMessa
 		txErr := dbretry.InTx(ctx, deps.DB, "mcp.update_task", nil, func(ctx context.Context, tx *sql.Tx) error {
 			answered = nil
 			qtx := deps.Queries.WithTx(tx)
-			if err := qtx.UpdateTask(ctx, updateParams); err != nil {
+			if _, err := qtx.UpdateTask(ctx, updateParams); err != nil {
 				return err
 			}
 			if titleChanged {
@@ -2501,7 +2504,10 @@ func runUpdatePage(ctx context.Context, deps Deps, s *session, raw json.RawMessa
 		bodyParam = sql.NullString{String: *in.Body, Valid: true}
 	}
 
-	if err := deps.Queries.UpdatePage(ctx, generated.UpdatePageParams{
+	// Not an existence check: an update carrying the page's current
+	// title and body reports zero. resolvePage above is what answers for
+	// a page that is not there.
+	if _, err := deps.Queries.UpdatePage(ctx, generated.UpdatePageParams{
 		Title:        titleParam,
 		Body:         bodyParam,
 		ProjectID:    projectID,
@@ -3390,7 +3396,10 @@ func runUpdateCalendarEvent(ctx context.Context, deps Deps, s *session, raw json
 	}
 
 	if !isLinked || (!titleChanged && !timeChanged) {
-		if err := deps.CalendarQueries.PatchCalendarEvent(ctx, params); err != nil {
+		// Not an existence check: a patch carrying the event's current
+		// values reports zero. The event was read above to decide this
+		// branch.
+		if _, err := deps.CalendarQueries.PatchCalendarEvent(ctx, params); err != nil {
 			return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
 		}
 		// This branch never reaches itemkit, so nothing else appends the
@@ -3449,7 +3458,7 @@ func runUpdateCalendarEvent(ctx context.Context, deps Deps, s *session, raw json
 	if params.Title.Valid || params.Kind.Valid || params.ShowAs.Valid ||
 		params.Visibility.Valid || params.Location != nil || params.Memo != nil ||
 		params.BlockLabel != nil || params.StartAt.Valid || params.EndAt.Valid {
-		if err := qtxCal.PatchCalendarEvent(ctx, params); err != nil {
+		if _, err := qtxCal.PatchCalendarEvent(ctx, params); err != nil {
 			return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
 		}
 	}
@@ -3841,7 +3850,9 @@ func runToggleCalendarMemo(ctx context.Context, deps Deps, s *session, raw json.
 	if err != nil {
 		return nil, apierrors.Newf(apierrors.McpToolArgumentsInvalid, "invalid memoId")
 	}
-	if err := deps.CalendarQueries.UpdateCalendarMemo(ctx, calendar.UpdateCalendarMemoParams{
+	// Not an existence check: toggling a memo to the done state it
+	// already holds changes nothing and counts zero.
+	if _, err := deps.CalendarQueries.UpdateCalendarMemo(ctx, calendar.UpdateCalendarMemoParams{
 		Done:        sql.NullBool{Bool: *in.Done, Valid: true},
 		PublicID:    memoPub,
 		CalendarID:  calID,

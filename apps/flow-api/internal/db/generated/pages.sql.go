@@ -76,11 +76,12 @@ func (q *Queries) CreatePage(ctx context.Context, arg CreatePageParams) (int64, 
 	return result.LastInsertId()
 }
 
-const disablePage = `-- name: DisablePage :exec
+const disablePage = `-- name: DisablePage :execrows
 UPDATE pages
 SET enabled = FALSE
 WHERE workspace_id = ?
   AND public_id = ?
+  AND enabled = TRUE
 `
 
 type DisablePageParams struct {
@@ -89,9 +90,12 @@ type DisablePageParams struct {
 }
 
 // Soft-delete a page.
-func (q *Queries) DisablePage(ctx context.Context, arg DisablePageParams) error {
-	_, err := q.db.ExecContext(ctx, disablePage, arg.WorkspaceID, arg.PublicID)
-	return err
+func (q *Queries) DisablePage(ctx context.Context, arg DisablePageParams) (int64, error) {
+	result, err := q.db.ExecContext(ctx, disablePage, arg.WorkspaceID, arg.PublicID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
 }
 
 const getPageByPublicId = `-- name: GetPageByPublicId :one
@@ -604,7 +608,7 @@ func (q *Queries) SearchPages(ctx context.Context, arg SearchPagesParams) ([]Sea
 	return items, nil
 }
 
-const updatePage = `-- name: UpdatePage :exec
+const updatePage = `-- name: UpdatePage :execrows
 UPDATE pages
 SET title          = COALESCE(?, title),
     body           = COALESCE(?, body),
@@ -625,8 +629,8 @@ type UpdatePageParams struct {
 }
 
 // Update mutable page fields. Uses sqlc.narg for nullable columns.
-func (q *Queries) UpdatePage(ctx context.Context, arg UpdatePageParams) error {
-	_, err := q.db.ExecContext(ctx, updatePage,
+func (q *Queries) UpdatePage(ctx context.Context, arg UpdatePageParams) (int64, error) {
+	result, err := q.db.ExecContext(ctx, updatePage,
 		arg.Title,
 		arg.Body,
 		arg.ProjectID,
@@ -634,5 +638,8 @@ func (q *Queries) UpdatePage(ctx context.Context, arg UpdatePageParams) error {
 		arg.WorkspaceID,
 		arg.PublicID,
 	)
-	return err
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
 }

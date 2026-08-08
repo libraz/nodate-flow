@@ -61,7 +61,8 @@ WHERE event_id = ?
 UPDATE calendar_event_attendees
 SET enabled = FALSE
 WHERE event_id = ?
-  AND user_id = ?;
+  AND user_id = ?
+  AND enabled = TRUE;
 
 -- name: DeleteAllCalendarEventAttendees :exec
 -- Remove all attendees from an event (used when re-setting attendee list).

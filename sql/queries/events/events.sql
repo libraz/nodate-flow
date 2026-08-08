@@ -21,10 +21,18 @@
 -- projection can cancel the original out without ever UPDATEing the event
 -- log (events stay immutable; see CLAUDE.md rule 10). ON DELETE SET NULL
 -- so purging a reversed event detaches the backlink instead of cascading.
+--
+-- `calendar_id` is the symmetric counterpart of `task_id`: the internal
+-- calendar the event happened inside, so a per-calendar activity feed
+-- reads the log directly instead of keeping a second history table that
+-- would drift from it. NULL for events with no calendar subject. Every
+-- event emitted from the calendar handlers binds it; see
+-- internal/http/handlers/calendars/deps.go.
 INSERT INTO events (
   public_id,
   workspace_id,
   task_id,
+  calendar_id,
   actor_user_id,
   actor_system_source,
   triggered_by_signal_id,
@@ -32,7 +40,7 @@ INSERT INTO events (
   type,
   payload_json,
   occurred_at
-) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
 
 -- name: AppendAgentEvent :execlastid
 -- Append a single agent-actor event to the append-only event log. Mirrors
@@ -52,17 +60,22 @@ INSERT INTO events (
 -- event being reversed was originally produced by an agent so the
 -- compensating event preserves the same actor kind. NULL for normal
 -- agent-emitted events.
+--
+-- `calendar_id` mirrors AppendEvent: an agent acting on a calendar
+-- through the MCP calendar tools produces a row that has to land in the
+-- same per-calendar feed a human action would.
 INSERT INTO events (
   public_id,
   workspace_id,
   task_id,
+  calendar_id,
   actor_agent_id,
   triggered_by_signal_id,
   reverses_event_id,
   type,
   payload_json,
   occurred_at
-) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
 
 -- name: ListEventsForTask :many
 -- List a task's timeline via v_task_timeline. Projects

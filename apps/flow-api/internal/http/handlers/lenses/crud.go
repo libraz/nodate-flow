@@ -215,7 +215,10 @@ func Update(deps Deps) func(context.Context, *UpdateLensInput) (*UpdateLensOutpu
 
 		lensBlob := buildLensJSON(filter, sort, groupBy)
 
-		if err := deps.Queries.UpdateLens(ctx, generated.UpdateLensParams{
+		// Not an existence check: a PATCH that re-sends the view's current
+		// definition changes nothing and MySQL counts zero. The re-read below
+		// is what fails if the view is gone.
+		if _, err := deps.Queries.UpdateLens(ctx, generated.UpdateLensParams{
 			Name:        name,
 			Description: description,
 			LensJson:    lensBlob,
@@ -270,11 +273,17 @@ func Delete(deps Deps) func(context.Context, *DeleteLensInput) (*DeleteLensOutpu
 		if err != nil {
 			return nil, httpErr(apierrors.ValidationPathParamInvalid)
 		}
-		if err := deps.Queries.DeleteLens(ctx, generated.DeleteLensParams{
+		// Scoped to the workspace and to live views, so a zero count means
+		// the caller named a view that is not theirs to delete.
+		rows, err := deps.Queries.DeleteLens(ctx, generated.DeleteLensParams{
 			WorkspaceID: ws.ID,
 			PublicID:    lid,
-		}); err != nil {
+		})
+		if err != nil {
 			return nil, httpErr(apierrors.InternalUnexpected)
+		}
+		if rows == 0 {
+			return nil, httpErr(apierrors.WsLensNotFound)
 		}
 
 		if actorID, ok := middleware.ActorFromContext(ctx); ok {

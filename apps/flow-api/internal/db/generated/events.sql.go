@@ -19,19 +19,21 @@ INSERT INTO events (
   public_id,
   workspace_id,
   task_id,
+  calendar_id,
   actor_agent_id,
   triggered_by_signal_id,
   reverses_event_id,
   type,
   payload_json,
   occurred_at
-) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 `
 
 type AppendAgentEventParams struct {
 	PublicID            types.PublicID  `json:"publicId"`
 	WorkspaceID         uint32          `json:"-"`
 	TaskID              sql.NullInt32   `json:"-"`
+	CalendarID          sql.NullInt32   `json:"-"`
 	ActorAgentID        sql.NullInt32   `json:"actorAgentId"`
 	TriggeredBySignalID sql.NullInt32   `json:"-"`
 	ReversesEventID     sql.NullInt64   `json:"-"`
@@ -57,11 +59,16 @@ type AppendAgentEventParams struct {
 // event being reversed was originally produced by an agent so the
 // compensating event preserves the same actor kind. NULL for normal
 // agent-emitted events.
+//
+// `calendar_id` mirrors AppendEvent: an agent acting on a calendar
+// through the MCP calendar tools produces a row that has to land in the
+// same per-calendar feed a human action would.
 func (q *Queries) AppendAgentEvent(ctx context.Context, arg AppendAgentEventParams) (int64, error) {
 	result, err := q.db.ExecContext(ctx, appendAgentEvent,
 		arg.PublicID,
 		arg.WorkspaceID,
 		arg.TaskID,
+		arg.CalendarID,
 		arg.ActorAgentID,
 		arg.TriggeredBySignalID,
 		arg.ReversesEventID,
@@ -80,6 +87,7 @@ INSERT INTO events (
   public_id,
   workspace_id,
   task_id,
+  calendar_id,
   actor_user_id,
   actor_system_source,
   triggered_by_signal_id,
@@ -87,13 +95,14 @@ INSERT INTO events (
   type,
   payload_json,
   occurred_at
-) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 `
 
 type AppendEventParams struct {
 	PublicID            types.PublicID  `json:"publicId"`
 	WorkspaceID         uint32          `json:"-"`
 	TaskID              sql.NullInt32   `json:"-"`
+	CalendarID          sql.NullInt32   `json:"-"`
 	ActorUserID         sql.NullInt32   `json:"-"`
 	ActorSystemSource   sql.NullString  `json:"actorSystemSource"`
 	TriggeredBySignalID sql.NullInt32   `json:"-"`
@@ -125,11 +134,19 @@ type AppendEventParams struct {
 // projection can cancel the original out without ever UPDATEing the event
 // log (events stay immutable; see CLAUDE.md rule 10). ON DELETE SET NULL
 // so purging a reversed event detaches the backlink instead of cascading.
+//
+// `calendar_id` is the symmetric counterpart of `task_id`: the internal
+// calendar the event happened inside, so a per-calendar activity feed
+// reads the log directly instead of keeping a second history table that
+// would drift from it. NULL for events with no calendar subject. Every
+// event emitted from the calendar handlers binds it; see
+// internal/http/handlers/calendars/deps.go.
 func (q *Queries) AppendEvent(ctx context.Context, arg AppendEventParams) (int64, error) {
 	result, err := q.db.ExecContext(ctx, appendEvent,
 		arg.PublicID,
 		arg.WorkspaceID,
 		arg.TaskID,
+		arg.CalendarID,
 		arg.ActorUserID,
 		arg.ActorSystemSource,
 		arg.TriggeredBySignalID,

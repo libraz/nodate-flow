@@ -138,11 +138,18 @@ func Archive(deps Deps) func(context.Context, *ArchiveInboxInput) (*ArchiveInbox
 		if err != nil {
 			return nil, httpErr(apierrors.WsWorkspaceNotFound)
 		}
-		if err := deps.Queries.ArchiveInboxItem(ctx, generated.ArchiveInboxItemParams{
+		// Only matches items that are still in the inbox, so a zero count
+		// means the caller archived nothing. Answering ok for that is how an
+		// inbox that refuses to empty looks like it worked.
+		rows, err := deps.Queries.ArchiveInboxItem(ctx, generated.ArchiveInboxItemParams{
 			WorkspaceID: wsID,
 			PublicID:    pub,
-		}); err != nil {
+		})
+		if err != nil {
 			return nil, httpErr(apierrors.InternalUnexpected)
+		}
+		if rows == 0 {
+			return nil, httpErr(apierrors.WsInboxNotFound)
 		}
 		out := &ArchiveInboxOutput{}
 		out.Body.Ok = true
@@ -169,7 +176,9 @@ func Snooze(deps Deps) func(context.Context, *SnoozeInboxInput) (*SnoozeInboxOut
 			return nil, httpErr(apierrors.ValidationBodyFieldInvalid)
 		}
 		until := handlerutil.UnixToTime(in.Body.SnoozeUntil)
-		if err := deps.Queries.SnoozeInboxItem(ctx, generated.SnoozeInboxItemParams{
+		// Not an existence check: snoozing to the timestamp the item
+		// already carries changes no column and MySQL counts zero.
+		if _, err := deps.Queries.SnoozeInboxItem(ctx, generated.SnoozeInboxItemParams{
 			ReceivedAt:  until,
 			WorkspaceID: wsID,
 			PublicID:    pub,

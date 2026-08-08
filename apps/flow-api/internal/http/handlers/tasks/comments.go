@@ -223,7 +223,10 @@ func EditComment(deps Deps) func(context.Context, *EditTaskCommentInput) (*EditT
 		if author != actorID {
 			return nil, httpErr(apierrors.WsTaskAccessDenied)
 		}
-		if err := deps.Queries.EditComment(ctx, generated.EditCommentParams{
+		// Not an existence check: re-submitting the current body changes
+		// nothing and MySQL counts zero. Authorship, and with it the
+		// comment's existence, is established just above.
+		if _, err := deps.Queries.EditComment(ctx, generated.EditCommentParams{
 			Body:        in.Body.Body,
 			WorkspaceID: ws.ID,
 			PublicID:    cid,
@@ -293,11 +296,17 @@ func DeleteComment(deps Deps) func(context.Context, *DeleteTaskCommentInput) (*D
 		if author != actorID && !ws.Role.AtLeast(middleware.WorkspaceRoleAdmin) {
 			return nil, httpErr(apierrors.WsTaskAccessDenied)
 		}
-		if err := deps.Queries.DeleteComment(ctx, generated.DeleteCommentParams{
+		// Only matches a comment that is still live, so zero rows means a
+		// concurrent delete won and this request removed nothing.
+		rows, err := deps.Queries.DeleteComment(ctx, generated.DeleteCommentParams{
 			WorkspaceID: ws.ID,
 			PublicID:    cid,
-		}); err != nil {
+		})
+		if err != nil {
 			return nil, httpErr(apierrors.InternalUnexpected)
+		}
+		if rows == 0 {
+			return nil, httpErr(apierrors.WsCommentNotFound)
 		}
 		taskInternal := int64(task.ID)
 		if err := eventbus.Append(ctx, deps.DB, eventbus.Event{

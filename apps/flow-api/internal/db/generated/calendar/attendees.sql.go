@@ -66,6 +66,7 @@ UPDATE calendar_event_attendees
 SET enabled = FALSE
 WHERE event_id = ?
   AND user_id = ?
+  AND enabled = TRUE
 `
 
 type DisableCalendarEventAttendeeParams struct {

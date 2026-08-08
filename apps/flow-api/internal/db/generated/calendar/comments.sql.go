@@ -46,7 +46,7 @@ func (q *Queries) CreateCalendarEventComment(ctx context.Context, arg CreateCale
 	return result.LastInsertId()
 }
 
-const disableCalendarEventComment = `-- name: DisableCalendarEventComment :exec
+const disableCalendarEventComment = `-- name: DisableCalendarEventComment :execrows
 UPDATE calendar_event_comments
 SET enabled = FALSE,
     deleted_at = CURRENT_TIMESTAMP(3)
@@ -63,9 +63,12 @@ type DisableCalendarEventCommentParams struct {
 }
 
 // Soft-delete a comment (author or calendar owner).
-func (q *Queries) DisableCalendarEventComment(ctx context.Context, arg DisableCalendarEventCommentParams) error {
-	_, err := q.db.ExecContext(ctx, disableCalendarEventComment, arg.PublicID, arg.EventID, arg.WorkspaceID)
-	return err
+func (q *Queries) DisableCalendarEventComment(ctx context.Context, arg DisableCalendarEventCommentParams) (int64, error) {
+	result, err := q.db.ExecContext(ctx, disableCalendarEventComment, arg.PublicID, arg.EventID, arg.WorkspaceID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
 }
 
 const findCalendarEventCommentByPublicId = `-- name: FindCalendarEventCommentByPublicId :one
@@ -207,7 +210,7 @@ func (q *Queries) ListCalendarEventComments(ctx context.Context, arg ListCalenda
 	return items, nil
 }
 
-const updateCalendarEventComment = `-- name: UpdateCalendarEventComment :exec
+const updateCalendarEventComment = `-- name: UpdateCalendarEventComment :execrows
 UPDATE calendar_event_comments
 SET body = ?,
     edited_at = NOW()
@@ -228,13 +231,16 @@ type UpdateCalendarEventCommentParams struct {
 }
 
 // Edit a comment's body and stamp edited_at.
-func (q *Queries) UpdateCalendarEventComment(ctx context.Context, arg UpdateCalendarEventCommentParams) error {
-	_, err := q.db.ExecContext(ctx, updateCalendarEventComment,
+func (q *Queries) UpdateCalendarEventComment(ctx context.Context, arg UpdateCalendarEventCommentParams) (int64, error) {
+	result, err := q.db.ExecContext(ctx, updateCalendarEventComment,
 		arg.Body,
 		arg.PublicID,
 		arg.EventID,
 		arg.WorkspaceID,
 		arg.AuthorID,
 	)
-	return err
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
 }

@@ -52,7 +52,7 @@ func (q *Queries) AddAttachment(ctx context.Context, arg AddAttachmentParams) (i
 	return result.LastInsertId()
 }
 
-const deleteAttachment = `-- name: DeleteAttachment :exec
+const deleteAttachment = `-- name: DeleteAttachment :execrows
 DELETE FROM attachments
 WHERE workspace_id = ?
   AND task_id = ?
@@ -73,9 +73,12 @@ type DeleteAttachmentParams struct {
 // The task_id predicate binds the delete to the task whose ACL the caller
 // already cleared, so an attachment on a different (or unauthorized) task
 // cannot be removed; a mismatch affects zero rows.
-func (q *Queries) DeleteAttachment(ctx context.Context, arg DeleteAttachmentParams) error {
-	_, err := q.db.ExecContext(ctx, deleteAttachment, arg.WorkspaceID, arg.TaskID, arg.PublicID)
-	return err
+func (q *Queries) DeleteAttachment(ctx context.Context, arg DeleteAttachmentParams) (int64, error) {
+	result, err := q.db.ExecContext(ctx, deleteAttachment, arg.WorkspaceID, arg.TaskID, arg.PublicID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
 }
 
 const getAttachmentByPublicID = `-- name: GetAttachmentByPublicID :one

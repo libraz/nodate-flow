@@ -47,12 +47,13 @@ WHERE r.comment_id = ?
 ORDER BY r.created_at ASC, r.public_id ASC
 LIMIT ? OFFSET ?;
 
--- name: DisableReaction :exec
+-- name: DisableReaction :execrows
 -- Soft-delete a reaction by public id and user.
 UPDATE reactions
 SET enabled = FALSE
 WHERE public_id = ?
-  AND user_id = ?;
+  AND user_id = ?
+  AND enabled = TRUE;
 
 -- name: FindReactionByPublicId :one
 -- Find a single reaction by public id.

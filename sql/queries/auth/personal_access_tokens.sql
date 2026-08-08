@@ -54,11 +54,13 @@ WHERE workspace_id = ?
 ORDER BY created_at DESC, public_id DESC
 LIMIT ? OFFSET ?;
 
--- name: RevokePat :exec
+-- name: RevokePat :execrows
 -- Revoke a PAT (workspace + user scoped).
 UPDATE personal_access_tokens
 SET revoked_at = CURRENT_TIMESTAMP,
     enabled = FALSE
 WHERE workspace_id = ?
   AND user_id = ?
-  AND public_id = ?;
+  AND public_id = ?
+  AND enabled = TRUE
+  AND revoked_at IS NULL;

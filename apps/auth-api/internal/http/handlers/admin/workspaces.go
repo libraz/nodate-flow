@@ -87,13 +87,26 @@ func PatchWorkspace(deps Deps) func(context.Context, *PatchWorkspaceInput) (*Pat
 			return out, nil
 		}
 
+		// See PatchUser: a zero count means either "no such workspace" or
+		// "already in the requested state", and only the first is an
+		// error. Answering success for a workspace id that does not exist
+		// left an audit entry claiming a workspace had been suspended.
+		var rows int64
 		if *in.Body.Enabled {
-			err = deps.Queries.AdminEnableWorkspace(ctx, pid)
+			rows, err = deps.Queries.AdminEnableWorkspace(ctx, pid)
 		} else {
-			err = deps.Queries.AdminSuspendWorkspace(ctx, pid)
+			rows, err = deps.Queries.AdminSuspendWorkspace(ctx, pid)
 		}
 		if err != nil {
 			return nil, httpErr(apierrors.InternalUnexpected)
+		}
+		if rows == 0 {
+			if _, getErr := deps.Queries.AdminGetWorkspace(ctx, pid); getErr != nil {
+				return nil, httpErr(apierr.SpecForErrNoRows(getErr, apierrors.InstanceWorkspaceNotFound, apierrors.InternalUnexpected))
+			}
+			out := &PatchWorkspaceOutput{}
+			out.Body.Ok = true
+			return out, nil
 		}
 
 		action := "admin.workspace.enable"

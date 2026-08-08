@@ -212,12 +212,18 @@ func Delete(deps Deps) func(context.Context, *DeleteFavoriteInput) (*DeleteFavor
 			return nil, httpErr(apierr.SpecForErrNoRows(err, apierrors.WsFavoriteNotFound, apierrors.InternalUnexpected))
 		}
 
-		if err := deps.Queries.DisableFavorite(ctx, generated.DisableFavoriteParams{
+		// Scoped to this user's live favorites, so a zero count means there
+		// is nothing here to un-favorite.
+		rows, err := deps.Queries.DisableFavorite(ctx, generated.DisableFavoriteParams{
 			WorkspaceID: wsID,
 			PublicID:    pub,
 			UserID:      actorID,
-		}); err != nil {
+		})
+		if err != nil {
 			return nil, httpErr(apierrors.InternalUnexpected)
+		}
+		if rows == 0 {
+			return nil, httpErr(apierrors.WsFavoriteNotFound)
 		}
 
 		if err := eventbus.Append(ctx, deps.DB, eventbus.Event{

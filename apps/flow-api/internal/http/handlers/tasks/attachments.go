@@ -110,12 +110,19 @@ func DeleteAttachment(deps Deps) func(context.Context, *DeleteTaskAttachmentInpu
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
 
-		if err := qtx.DeleteAttachment(ctx, generated.DeleteAttachmentParams{
+		deleted, err := qtx.DeleteAttachment(ctx, generated.DeleteAttachmentParams{
 			WorkspaceID: ws.ID,
 			TaskID:      handlerutil.NullInt32From(task.ID),
 			PublicID:    aid,
-		}); err != nil {
+		})
+		if err != nil {
 			return nil, httpErr(apierrors.InternalUnexpected)
+		}
+		// Nothing was deleted, so the ref count below must not be
+		// decremented -- doing that on a delete that did not happen is how
+		// a blob still in use becomes eligible for collection.
+		if deleted == 0 {
+			return nil, httpErr(apierrors.WsTaskNotFound)
 		}
 
 		decResult, err := qtx.DecrementStorageObjectRefCount(ctx, soRow.StorageObjectID)

@@ -473,7 +473,7 @@ WHERE ce.recurrence_rule IS NOT NULL
 ORDER BY ce.start_at ASC, ce.public_id ASC
 LIMIT 2000;
 
--- name: PatchCalendarEvent :exec
+-- name: PatchCalendarEvent :execrows
 -- Patch mutable event fields. An omitted parameter leaves its column
 -- untouched; a clear_* flag sets its column to NULL.
 --
@@ -529,7 +529,7 @@ WHERE public_id = ?
   AND workspace_id = ?
   AND enabled = TRUE;
 
--- name: DisableCalendarEvent :exec
+-- name: DisableCalendarEvent :execrows
 -- Soft-delete a calendar event by clearing the enabled flag. enabled=FALSE
 -- gates LIST/GET reads; the column doubles as the auditable soft-delete
 -- marker (no separate deleted_at column).

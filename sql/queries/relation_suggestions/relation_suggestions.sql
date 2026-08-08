@@ -169,7 +169,7 @@ WHERE rs.workspace_id = ?
   AND rs.public_id = ?
 LIMIT 1;
 
--- name: ResolveSuggestion :exec
+-- name: ResolveSuggestion :execrows
 -- Accept or dismiss a pending suggestion. Only transitions from 'pending'.
 UPDATE relation_suggestions
 SET status = ?,

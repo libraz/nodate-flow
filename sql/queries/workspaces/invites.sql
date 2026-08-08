@@ -43,12 +43,13 @@ WHERE id = ?
   AND enabled = TRUE
   AND (max_uses IS NULL OR use_count < max_uses);
 
--- name: RevokeWorkspaceInvite :exec
+-- name: RevokeWorkspaceInvite :execrows
 -- Disable an invite link (soft delete).
 UPDATE workspace_invites
 SET enabled = FALSE
 WHERE workspace_id = ?
-  AND public_id = ?;
+  AND public_id = ?
+  AND enabled = TRUE;
 
 -- name: FindWorkspaceInviteWorkspaceName :one
 -- Get workspace name for invite info endpoint (public).

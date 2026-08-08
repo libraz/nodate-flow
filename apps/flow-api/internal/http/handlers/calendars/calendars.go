@@ -173,13 +173,15 @@ func CreateCalendar(deps Deps) func(context.Context, *CreateCalendarInput) (*Cre
 			return nil, httpErr(apierrors.CalendarCalendarStoreWriteInterrupted)
 		}
 
+		calID32 := uint32(calID) //#nosec G115 -- LastInsertId for calendars.id (BIGINT UNSIGNED), fits uint32 within realistic deployments
+
 		// The creator becomes the calendar's owner member. Without this row
 		// the calendar would exist with nobody able to reach it: access is
 		// calendar_members, and every resolution helper reads it.
 		_, err = deps.CalendarQueries.UpsertCalendarMember(ctx, calendar.UpsertCalendarMemberParams{
 			PublicID:    types.New(),
 			WorkspaceID: wsID,
-			CalendarID:  uint32(calID), //#nosec G115 -- LastInsertId for calendars.id (BIGINT UNSIGNED), fits uint32 within realistic deployments
+			CalendarID:  calID32,
 			UserID:      actorID,
 			Role:        calendar.CalendarMembersRoleOwner,
 			MemberColor: input.Body.Color,
@@ -205,7 +207,7 @@ func CreateCalendar(deps Deps) func(context.Context, *CreateCalendarInput) (*Cre
 			CreatedAt:              handlerutil.NowUnix(),
 		}
 
-		_ = appendCalendarEvent(ctx, deps.DB, wsID, "calendar.created", &actorID, map[string]any{
+		_ = appendCalendarEvent(ctx, deps.DB, wsID, calID32, "calendar.created", &actorID, map[string]any{
 			"calendarId": calPublicID.String(),
 			"name":       input.Body.Name,
 			"kind":       input.Body.Kind,
@@ -267,7 +269,10 @@ func PatchCalendar(deps Deps) func(context.Context, *PatchCalendarInput) (*Patch
 		}
 
 		calUID, _ := uuid.Parse(input.CalID)
-		err = deps.CalendarQueries.PatchCalendar(ctx, calendar.PatchCalendarParams{
+		// The affected-row count is not the existence check: MySQL counts
+		// changed rows, so a PATCH carrying the values the calendar
+		// already has reports zero. The calendar was resolved above.
+		_, err = deps.CalendarQueries.PatchCalendar(ctx, calendar.PatchCalendarParams{
 			Name:        patchName,
 			Description: patchDesc,
 			Color:       patchColor,
@@ -290,7 +295,7 @@ func PatchCalendar(deps Deps) func(context.Context, *PatchCalendarInput) (*Patch
 		out := &PatchCalendarOutput{}
 		out.Body = calendarFromRow(cal, member, findSubscription(ctx, deps.CalendarQueries, cal.ID, actorID))
 
-		_ = appendCalendarEvent(ctx, deps.DB, wsID, "calendar.updated", &actorID, map[string]any{
+		_ = appendCalendarEvent(ctx, deps.DB, wsID, cal.ID, "calendar.updated", &actorID, map[string]any{
 			"calendarId": input.CalID,
 		})
 
@@ -331,13 +336,22 @@ func DeleteCalendar(deps Deps) func(context.Context, *DeleteCalendarInput) (*Del
 		defer func() { _ = tx.Rollback() }()
 		cqtx := deps.CalendarQueries.WithTx(tx)
 
-		if err := cqtx.DisableCalendar(ctx, calendar.DisableCalendarParams{
+		// Only matches a calendar that is still live, so zero rows means
+		// there is nothing here to delete and the detach below has no
+		// subject either.
+		disabled, err := cqtx.DisableCalendar(ctx, calendar.DisableCalendarParams{
 			PublicID:    types.FromUUID(calUID),
 			WorkspaceID: wsID,
-		}); err != nil {
+		})
+		if err != nil {
 			return nil, httpErr(apierrors.CalendarCalendarStoreDeleteInterrupted)
 		}
-		if err := cqtx.DetachCalendarEventsFromAllShares(ctx, calendar.DetachCalendarEventsFromAllSharesParams{
+		if disabled == 0 {
+			return nil, httpErr(apierrors.CalendarCalendarNotFound)
+		}
+		// Genuinely multi-row: a calendar whose events were never added
+		// to a share has nothing to detach, and zero is the right answer.
+		if _, err := cqtx.DetachCalendarEventsFromAllShares(ctx, calendar.DetachCalendarEventsFromAllSharesParams{
 			PublicID:    types.FromUUID(calUID),
 			WorkspaceID: wsID,
 		}); err != nil {
@@ -350,7 +364,7 @@ func DeleteCalendar(deps Deps) func(context.Context, *DeleteCalendarInput) (*Del
 		out := &DeleteCalendarOutput{}
 		out.Body.Deleted = true
 
-		_ = appendCalendarEvent(ctx, deps.DB, wsID, "calendar.deleted", &actorID, map[string]any{
+		_ = appendCalendarEvent(ctx, deps.DB, wsID, cal.ID, "calendar.deleted", &actorID, map[string]any{
 			"calendarId": input.CalID,
 		})
 

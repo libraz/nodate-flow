@@ -62,11 +62,12 @@ func (q *Queries) CreateWidget(ctx context.Context, arg CreateWidgetParams) (int
 	return result.LastInsertId()
 }
 
-const disableWidget = `-- name: DisableWidget :exec
+const disableWidget = `-- name: DisableWidget :execrows
 UPDATE dashboard_widgets
 SET enabled = FALSE
 WHERE workspace_id = ?
   AND public_id = ?
+  AND enabled = TRUE
 `
 
 type DisableWidgetParams struct {
@@ -75,9 +76,12 @@ type DisableWidgetParams struct {
 }
 
 // Soft-delete a widget.
-func (q *Queries) DisableWidget(ctx context.Context, arg DisableWidgetParams) error {
-	_, err := q.db.ExecContext(ctx, disableWidget, arg.WorkspaceID, arg.PublicID)
-	return err
+func (q *Queries) DisableWidget(ctx context.Context, arg DisableWidgetParams) (int64, error) {
+	result, err := q.db.ExecContext(ctx, disableWidget, arg.WorkspaceID, arg.PublicID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
 }
 
 const getWidgetByPublicID = `-- name: GetWidgetByPublicID :one
@@ -237,7 +241,7 @@ func (q *Queries) ListWidgetsForWorkspace(ctx context.Context, arg ListWidgetsFo
 	return items, nil
 }
 
-const updateWidget = `-- name: UpdateWidget :exec
+const updateWidget = `-- name: UpdateWidget :execrows
 UPDATE dashboard_widgets
 SET title      = COALESCE(?, title),
     config     = COALESCE(?, config),
@@ -262,8 +266,8 @@ type UpdateWidgetParams struct {
 }
 
 // Update mutable widget fields. Uses sqlc.narg for optional partial updates.
-func (q *Queries) UpdateWidget(ctx context.Context, arg UpdateWidgetParams) error {
-	_, err := q.db.ExecContext(ctx, updateWidget,
+func (q *Queries) UpdateWidget(ctx context.Context, arg UpdateWidgetParams) (int64, error) {
+	result, err := q.db.ExecContext(ctx, updateWidget,
 		arg.Title,
 		arg.Config,
 		arg.PositionX,
@@ -273,10 +277,13 @@ func (q *Queries) UpdateWidget(ctx context.Context, arg UpdateWidgetParams) erro
 		arg.WorkspaceID,
 		arg.PublicID,
 	)
-	return err
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
 }
 
-const updateWidgetPosition = `-- name: UpdateWidgetPosition :exec
+const updateWidgetPosition = `-- name: UpdateWidgetPosition :execrows
 UPDATE dashboard_widgets
 SET position_x   = ?,
     position_y   = ?,
@@ -299,8 +306,8 @@ type UpdateWidgetPositionParams struct {
 }
 
 // Reposition a single widget on the grid (called N times for batch reorder).
-func (q *Queries) UpdateWidgetPosition(ctx context.Context, arg UpdateWidgetPositionParams) error {
-	_, err := q.db.ExecContext(ctx, updateWidgetPosition,
+func (q *Queries) UpdateWidgetPosition(ctx context.Context, arg UpdateWidgetPositionParams) (int64, error) {
+	result, err := q.db.ExecContext(ctx, updateWidgetPosition,
 		arg.PositionX,
 		arg.PositionY,
 		arg.Width,
@@ -309,5 +316,8 @@ func (q *Queries) UpdateWidgetPosition(ctx context.Context, arg UpdateWidgetPosi
 		arg.WorkspaceID,
 		arg.PublicID,
 	)
-	return err
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
 }

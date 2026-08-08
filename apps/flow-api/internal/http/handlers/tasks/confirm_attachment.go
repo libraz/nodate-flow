@@ -144,7 +144,10 @@ func rejectOversizeTaskAttachment(ctx context.Context, deps Deps, wsID uint32, t
 	defer func() { _ = tx.Rollback() }()
 	qtx := deps.Queries.WithTx(tx)
 
-	if err := qtx.DeleteAttachment(ctx, generated.DeleteAttachmentParams{
+	// This is the cleanup path for a blob this request has just rejected,
+	// not an endpoint answering about a resource the caller named, so a
+	// zero count has no 404 to map onto.
+	if _, err := qtx.DeleteAttachment(ctx, generated.DeleteAttachmentParams{
 		WorkspaceID: wsID,
 		TaskID:      handlerutil.NullInt32From(taskID),
 		PublicID:    aid,

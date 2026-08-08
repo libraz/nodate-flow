@@ -29,12 +29,13 @@ WHERE workspace_id = ?
   AND enabled = TRUE
 LIMIT 1;
 
--- name: DeleteTaskEventLink :exec
+-- name: DeleteTaskEventLink :execrows
 -- Soft-delete a link by public id within a workspace.
 UPDATE task_event_links
 SET enabled = FALSE
 WHERE workspace_id = ?
-  AND public_id = ?;
+  AND public_id = ?
+  AND enabled = TRUE;
 
 -- name: ListLinkedEventsForTask :many
 -- List the events a task is linked to (optionally filtered by relation).

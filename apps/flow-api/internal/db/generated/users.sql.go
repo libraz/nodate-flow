@@ -13,14 +13,17 @@ import (
 	types "github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
 )
 
-const adminEnableUser = `-- name: AdminEnableUser :exec
+const adminEnableUser = `-- name: AdminEnableUser :execrows
 UPDATE users SET enabled = TRUE WHERE public_id = ? AND enabled = FALSE
 `
 
 // Re-enable a previously suspended user account.
-func (q *Queries) AdminEnableUser(ctx context.Context, publicID types.PublicID) error {
-	_, err := q.db.ExecContext(ctx, adminEnableUser, publicID)
-	return err
+func (q *Queries) AdminEnableUser(ctx context.Context, publicID types.PublicID) (int64, error) {
+	result, err := q.db.ExecContext(ctx, adminEnableUser, publicID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
 }
 
 const adminGetUser = `-- name: AdminGetUser :one
@@ -206,14 +209,17 @@ func (q *Queries) AdminListUsers(ctx context.Context, arg AdminListUsersParams) 
 	return items, nil
 }
 
-const adminSuspendUser = `-- name: AdminSuspendUser :exec
+const adminSuspendUser = `-- name: AdminSuspendUser :execrows
 UPDATE users SET enabled = FALSE WHERE public_id = ? AND enabled = TRUE
 `
 
 // Disable a user account (soft-delete).
-func (q *Queries) AdminSuspendUser(ctx context.Context, publicID types.PublicID) error {
-	_, err := q.db.ExecContext(ctx, adminSuspendUser, publicID)
-	return err
+func (q *Queries) AdminSuspendUser(ctx context.Context, publicID types.PublicID) (int64, error) {
+	result, err := q.db.ExecContext(ctx, adminSuspendUser, publicID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
 }
 
 const bumpIdentityFailedAttempts = `-- name: BumpIdentityFailedAttempts :exec

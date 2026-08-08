@@ -14,7 +14,7 @@ import (
 	types "github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
 )
 
-const attachSignalToTask = `-- name: AttachSignalToTask :exec
+const attachSignalToTask = `-- name: AttachSignalToTask :execrows
 UPDATE signals s
 SET s.task_id = (
   SELECT t.id FROM tasks t
@@ -33,14 +33,17 @@ type AttachSignalToTaskParams struct {
 }
 
 // Link an existing signal to a task by public_id.
-func (q *Queries) AttachSignalToTask(ctx context.Context, arg AttachSignalToTaskParams) error {
-	_, err := q.db.ExecContext(ctx, attachSignalToTask,
+func (q *Queries) AttachSignalToTask(ctx context.Context, arg AttachSignalToTaskParams) (int64, error) {
+	result, err := q.db.ExecContext(ctx, attachSignalToTask,
 		arg.WorkspaceID,
 		arg.PublicID,
 		arg.WorkspaceID_2,
 		arg.PublicID_2,
 	)
-	return err
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
 }
 
 const insertSignal = `-- name: InsertSignal :execlastid

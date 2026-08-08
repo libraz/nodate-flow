@@ -94,7 +94,7 @@ func (q *Queries) AdminListUserSessions(ctx context.Context, arg AdminListUserSe
 	return items, nil
 }
 
-const adminRevokeSession = `-- name: AdminRevokeSession :exec
+const adminRevokeSession = `-- name: AdminRevokeSession :execrows
 UPDATE sessions
 SET revoked_at = CURRENT_TIMESTAMP,
     enabled = FALSE
@@ -104,9 +104,12 @@ WHERE public_id = ?
 `
 
 // Revoke any session by its public_id (admin override, no user scoping).
-func (q *Queries) AdminRevokeSession(ctx context.Context, publicID types.PublicID) error {
-	_, err := q.db.ExecContext(ctx, adminRevokeSession, publicID)
-	return err
+func (q *Queries) AdminRevokeSession(ctx context.Context, publicID types.PublicID) (int64, error) {
+	result, err := q.db.ExecContext(ctx, adminRevokeSession, publicID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
 }
 
 const createSession = `-- name: CreateSession :execlastid
@@ -432,7 +435,7 @@ func (q *Queries) RevokeAllSessionsForUser(ctx context.Context, userID uint32) e
 	return err
 }
 
-const revokeAllSessionsForUserExcept = `-- name: RevokeAllSessionsForUserExcept :exec
+const revokeAllSessionsForUserExcept = `-- name: RevokeAllSessionsForUserExcept :execrows
 UPDATE sessions
 SET revoked_at = CURRENT_TIMESTAMP,
     enabled = FALSE
@@ -449,17 +452,22 @@ type RevokeAllSessionsForUserExceptParams struct {
 
 // Revoke every active session for a user except one identified by public_id.
 // Used by "sign out of all other devices" in /settings/security.
-func (q *Queries) RevokeAllSessionsForUserExcept(ctx context.Context, arg RevokeAllSessionsForUserExceptParams) error {
-	_, err := q.db.ExecContext(ctx, revokeAllSessionsForUserExcept, arg.UserID, arg.PublicID)
-	return err
+func (q *Queries) RevokeAllSessionsForUserExcept(ctx context.Context, arg RevokeAllSessionsForUserExceptParams) (int64, error) {
+	result, err := q.db.ExecContext(ctx, revokeAllSessionsForUserExcept, arg.UserID, arg.PublicID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
 }
 
-const revokeSession = `-- name: RevokeSession :exec
+const revokeSession = `-- name: RevokeSession :execrows
 UPDATE sessions
 SET revoked_at = CURRENT_TIMESTAMP,
     enabled = FALSE
 WHERE user_id = ?
   AND public_id = ?
+  AND enabled = TRUE
+  AND revoked_at IS NULL
 `
 
 type RevokeSessionParams struct {
@@ -468,9 +476,12 @@ type RevokeSessionParams struct {
 }
 
 // Mark a session as revoked. Workspace scoping does not apply (user-scoped).
-func (q *Queries) RevokeSession(ctx context.Context, arg RevokeSessionParams) error {
-	_, err := q.db.ExecContext(ctx, revokeSession, arg.UserID, arg.PublicID)
-	return err
+func (q *Queries) RevokeSession(ctx context.Context, arg RevokeSessionParams) (int64, error) {
+	result, err := q.db.ExecContext(ctx, revokeSession, arg.UserID, arg.PublicID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
 }
 
 const rotateSessionRefreshHash = `-- name: RotateSessionRefreshHash :exec

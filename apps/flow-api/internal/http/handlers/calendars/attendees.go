@@ -204,7 +204,7 @@ func AddAttendees(deps Deps) func(context.Context, *AddAttendeesInput) (*AddAtte
 			out.Body.Attendees = append(out.Body.Attendees, resp)
 		}
 
-		_ = appendCalendarEvent(ctx, deps.DB, wsID, "calendar.event.attendees.added", &actorID, map[string]any{
+		_ = appendCalendarEvent(ctx, deps.DB, wsID, cal.ID, "calendar.event.attendees.added", &actorID, map[string]any{
 			"eventId":    input.EvtID,
 			"calendarId": input.CalID,
 			"count":      len(out.Body.Attendees),
@@ -298,7 +298,7 @@ func RemoveAttendee(deps Deps) func(context.Context, *RemoveAttendeeInput) (*Rem
 			return nil, httpErr(apierrors.CalendarAttendeeStoreRemoveInterrupted)
 		}
 
-		_ = appendCalendarEvent(ctx, deps.DB, wsID, "calendar.event.attendee.removed", &actorID, map[string]any{
+		_ = appendCalendarEvent(ctx, deps.DB, wsID, cal.ID, "calendar.event.attendee.removed", &actorID, map[string]any{
 			"eventId":    input.EvtID,
 			"calendarId": input.CalID,
 			"userId":     input.UserID,
@@ -339,7 +339,7 @@ func UpdateRsvp(deps Deps) func(context.Context, *UpdateRsvpInput) (*UpdateRsvpO
 		out := &UpdateRsvpOutput{}
 		out.Body.Updated = true
 
-		_ = appendCalendarEvent(ctx, deps.DB, wsID, "calendar.event.rsvp.updated", &actorID, map[string]any{
+		_ = appendCalendarEvent(ctx, deps.DB, wsID, cal.ID, "calendar.event.rsvp.updated", &actorID, map[string]any{
 			"eventId":    input.EvtID,
 			"calendarId": input.CalID,
 			"rsvp":       input.Body.Rsvp,

@@ -189,7 +189,7 @@ func SelfSubscribe(deps Deps) func(context.Context, *SelfSubscribeInput) (*SelfS
 			return nil, httpErr(apierrors.CalendarMemberStoreWriteInterrupted)
 		}
 
-		_ = appendCalendarEvent(ctx, deps.DB, wsID, "calendar.subscribed", &actorID, map[string]any{
+		_ = appendCalendarEvent(ctx, deps.DB, wsID, cal.ID, "calendar.subscribed", &actorID, map[string]any{
 			"calendarId": input.CalID,
 		})
 
@@ -232,7 +232,7 @@ func PatchOwnSubscription(deps Deps) func(context.Context, *PatchOwnSubscription
 			return nil, httpErr(apierrors.CalendarSubscriptionStoreWriteInterrupted)
 		}
 
-		_ = appendCalendarEvent(ctx, deps.DB, wsID, "calendar.subscription.updated", &actorID, map[string]any{
+		_ = appendCalendarEvent(ctx, deps.DB, wsID, cal.ID, "calendar.subscription.updated", &actorID, map[string]any{
 			"calendarId": input.CalID,
 		})
 

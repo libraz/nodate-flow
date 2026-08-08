@@ -64,7 +64,7 @@ WHERE v.workspace_id = ?
 ORDER BY v.priority DESC, v.due_on ASC, v.created_at DESC, v.public_id DESC
 LIMIT ?;
 
--- name: SetLensPublic :exec
+-- name: SetLensPublic :execrows
 -- Enable public sharing on a lens. Stores the SHA-256 hex of the share
 -- URL token minted by the caller; the plaintext is returned to the
 -- publisher once and is not recoverable afterwards.
@@ -78,7 +78,7 @@ WHERE workspace_id = ?
   AND is_public = FALSE
   AND enabled = TRUE;
 
--- name: SetLensPrivate :exec
+-- name: SetLensPrivate :execrows
 -- Revoke public sharing on a lens. Clears the token hash so the URL
 -- stops resolving and re-publishing has to mint a fresh token.
 -- No-op if the lens is already private (WHERE is_public = TRUE guard).

@@ -114,10 +114,15 @@ func (s *SqlcStore) MarkSatisfied(ctx context.Context, publicID string, _ time.T
 	if err != nil {
 		return err
 	}
-	return s.Queries.SatisfyConstraint(ctx, generated.SatisfyConstraintParams{
+	// The count is not an existence check: re-evaluating a constraint
+	// that is already satisfied writes the same values and MySQL reports
+	// zero changed rows. The constraint was read from the database a
+	// moment earlier by the evaluation that got us here.
+	_, err = s.Queries.SatisfyConstraint(ctx, generated.SatisfyConstraintParams{
 		WorkspaceID: s.WorkspaceID,
 		PublicID:    pid,
 	})
+	return err
 }
 
 // MarkFailed implements Store.
@@ -126,8 +131,11 @@ func (s *SqlcStore) MarkFailed(ctx context.Context, publicID string, _ time.Time
 	if err != nil {
 		return err
 	}
-	return s.Queries.FailConstraint(ctx, generated.FailConstraintParams{
+	// See MarkSatisfied: re-marking an already-failed constraint changes
+	// nothing and counts zero.
+	_, err = s.Queries.FailConstraint(ctx, generated.FailConstraintParams{
 		WorkspaceID: s.WorkspaceID,
 		PublicID:    pid,
 	})
+	return err
 }

@@ -37,7 +37,7 @@ WHERE a.workspace_id = ?
 ORDER BY a.created_at DESC, a.public_id DESC
 LIMIT ? OFFSET ?;
 
--- name: UpdateAgentScheduleKind :exec
+-- name: UpdateAgentScheduleKind :execrows
 -- Update the schedule_kind on an existing agent.
 UPDATE ai_agents
 SET schedule_kind = ?

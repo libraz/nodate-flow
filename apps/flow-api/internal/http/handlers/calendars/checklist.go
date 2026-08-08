@@ -178,7 +178,7 @@ func CreateChecklistItem(deps Deps) func(context.Context, *CreateChecklistItemIn
 			CreatedAt:  handlerutil.NowUnix(),
 		}
 
-		_ = appendCalendarEvent(ctx, deps.DB, wsID, "calendar.event.checklist.created", &actorID, map[string]any{
+		_ = appendCalendarEvent(ctx, deps.DB, wsID, cal.ID, "calendar.event.checklist.created", &actorID, map[string]any{
 			"eventId":    input.EvtID,
 			"calendarId": input.CalID,
 			"itemId":     itemPublicID.String(),
@@ -225,12 +225,15 @@ func UpdateChecklistItem(deps Deps) func(context.Context, *UpdateChecklistItemIn
 			params.SortWeight = sql.NullInt32{Int32: *input.Body.SortWeight, Valid: true}
 		}
 
-		err = deps.CalendarQueries.UpdateCalendarChecklistItem(ctx, params)
+		// Not an existence check: MySQL counts changed rows, so a PATCH
+		// that re-sends the item's current title / done / order reports
+		// zero. The owning event was resolved above.
+		_, err = deps.CalendarQueries.UpdateCalendarChecklistItem(ctx, params)
 		if err != nil {
 			return nil, httpErr(apierrors.CalendarChecklistStoreWriteInterrupted)
 		}
 
-		_ = appendCalendarEvent(ctx, deps.DB, wsID, "calendar.event.checklist.updated", &actorID, map[string]any{
+		_ = appendCalendarEvent(ctx, deps.DB, wsID, cal.ID, "calendar.event.checklist.updated", &actorID, map[string]any{
 			"eventId":    input.EvtID,
 			"calendarId": input.CalID,
 			"itemId":     input.ItemID,
@@ -264,7 +267,11 @@ func DeleteChecklistItem(deps Deps) func(context.Context, *DeleteChecklistItemIn
 			return nil, httpErr(apierrors.CalendarChecklistItemNotFound)
 		}
 
-		err = deps.CalendarQueries.DisableCalendarChecklistItem(ctx, calendar.DisableCalendarChecklistItemParams{
+		// Nothing resolves the item before this, so the count is the only
+		// thing that knows whether it was there: a well-formed id for an
+		// item on some other event -- or none at all -- used to answer
+		// deleted: true.
+		rows, err := deps.CalendarQueries.DisableCalendarChecklistItem(ctx, calendar.DisableCalendarChecklistItemParams{
 			PublicID:    types.FromUUID(itemUID),
 			EventID:     evt.ID,
 			WorkspaceID: wsID,
@@ -272,11 +279,14 @@ func DeleteChecklistItem(deps Deps) func(context.Context, *DeleteChecklistItemIn
 		if err != nil {
 			return nil, httpErr(apierrors.CalendarChecklistStoreDeleteInterrupted)
 		}
+		if rows == 0 {
+			return nil, httpErr(apierrors.CalendarChecklistItemNotFound)
+		}
 
 		out := &DeleteChecklistItemOutput{}
 		out.Body.Deleted = true
 
-		_ = appendCalendarEvent(ctx, deps.DB, wsID, "calendar.event.checklist.deleted", &actorID, map[string]any{
+		_ = appendCalendarEvent(ctx, deps.DB, wsID, cal.ID, "calendar.event.checklist.deleted", &actorID, map[string]any{
 			"eventId":    input.EvtID,
 			"calendarId": input.CalID,
 			"itemId":     input.ItemID,

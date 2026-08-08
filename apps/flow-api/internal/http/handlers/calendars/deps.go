@@ -76,21 +76,47 @@ func nullTimeUnixPtr(t sql.NullTime) *int64 {
 	return &v
 }
 
+// noOwningCalendar is the calendarID a caller passes when the event
+// genuinely belongs to no single calendar. A public share aggregates
+// events drawn from several calendars, so its own lifecycle -- created,
+// rotated, deleted -- is a workspace fact rather than a calendar one,
+// and events.calendar_id stays NULL for those rows.
+//
+// It exists so that "no calendar" has to be written down. The parameter
+// is required precisely so nobody can leave the column unset by
+// omission, which is how it came to be unwritten everywhere; a named
+// constant keeps the deliberate exceptions greppable.
+const noOwningCalendar uint32 = 0
+
 // appendCalendarEvent is the adapter that translates the calendar handlers'
-// legacy eventbus call shape into flow-api's eventbus.Event API. The
-// legacy callers pass workspaceID + eventType + actorUserID + payload
-// directly; flow-api's eventbus.Append takes a structured Event with
-// optional nullable fields. Keeping the wrapper here lets the relocated
-// handler bodies stay byte-identical to their pre-merge form.
-func appendCalendarEvent(ctx context.Context, db eventbus.DBTX, workspaceID uint32, eventType string, actorUserID *uint32, payload map[string]any) error {
+// call shape into flow-api's eventbus.Event API. The callers pass
+// workspaceID + calendarID + eventType + actorUserID + payload directly;
+// flow-api's eventbus.Append takes a structured Event with optional
+// nullable fields.
+//
+// calendarID is a required parameter rather than an optional field
+// because every event these handlers emit happens inside exactly one
+// calendar, and the column that records which one had never been written
+// by anything: events.calendar_id, its index and its foreign key all
+// existed while every INSERT left it NULL, so the per-calendar activity
+// feed the schema was shaped for could not be built. Making it a
+// parameter is what keeps that from being true again — a new emitter
+// cannot compile without deciding which calendar it belongs to.
+func appendCalendarEvent(ctx context.Context, db eventbus.DBTX, workspaceID, calendarID uint32, eventType string, actorUserID *uint32, payload map[string]any) error {
 	var actor *int64
 	if actorUserID != nil {
 		v := int64(*actorUserID)
 		actor = &v
 	}
+	var cal *int64
+	if calendarID != noOwningCalendar {
+		v := int64(calendarID)
+		cal = &v
+	}
 	return eventbus.Append(ctx, db, eventbus.Event{
 		Type:        eventType,
 		WorkspaceID: workspaceID,
+		CalendarID:  cal,
 		ActorUserID: actor,
 		Payload:     payload,
 	})

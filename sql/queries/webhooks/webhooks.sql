@@ -24,11 +24,12 @@ SELECT ws.public_id, ws.workspace_id, ws.url, ws.secret, ws.description,
 FROM webhook_subscriptions ws
 WHERE ws.workspace_id = ? AND ws.public_id = ? AND ws.enabled = TRUE;
 
--- name: DeleteWebhookSubscription :exec
+-- name: DeleteWebhookSubscription :execrows
 UPDATE webhook_subscriptions SET enabled = FALSE
-WHERE workspace_id = ? AND public_id = ?;
+WHERE workspace_id = ? AND public_id = ?
+  AND enabled = TRUE;
 
--- name: ToggleWebhookSubscription :exec
+-- name: ToggleWebhookSubscription :execrows
 UPDATE webhook_subscriptions SET is_active = ?
 WHERE workspace_id = ? AND public_id = ? AND enabled = TRUE;
 

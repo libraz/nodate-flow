@@ -64,7 +64,7 @@ INSERT INTO integration_source_mappings (
   label
 ) VALUES (?, ?, ?, ?, ?);
 
--- name: UpdateIntegrationSourceMapping :exec
+-- name: UpdateIntegrationSourceMapping :execrows
 -- Patch the mutable fields of a mapping. NULL leaves a field unchanged.
 -- provider and external_key are immutable: changing them would move the
 -- claim to a different source, which is a create plus a delete.

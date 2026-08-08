@@ -306,7 +306,7 @@ func (q *Queries) ListIntakeItemsForWorkspaceKeyset(ctx context.Context, arg Lis
 	return items, nil
 }
 
-const setIntakeItemAIScore = `-- name: SetIntakeItemAIScore :exec
+const setIntakeItemAIScore = `-- name: SetIntakeItemAIScore :execrows
 UPDATE intake_items
 SET ai_score     = ?,
     ai_reasoning = ?,
@@ -324,17 +324,20 @@ type SetIntakeItemAIScoreParams struct {
 }
 
 // Set AI score and reasoning for an intake item.
-func (q *Queries) SetIntakeItemAIScore(ctx context.Context, arg SetIntakeItemAIScoreParams) error {
-	_, err := q.db.ExecContext(ctx, setIntakeItemAIScore,
+func (q *Queries) SetIntakeItemAIScore(ctx context.Context, arg SetIntakeItemAIScoreParams) (int64, error) {
+	result, err := q.db.ExecContext(ctx, setIntakeItemAIScore,
 		arg.AiScore,
 		arg.AiReasoning,
 		arg.WorkspaceID,
 		arg.PublicID,
 	)
-	return err
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
 }
 
-const setIntakeItemTask = `-- name: SetIntakeItemTask :exec
+const setIntakeItemTask = `-- name: SetIntakeItemTask :execrows
 UPDATE intake_items
 SET task_id        = ?,
     triage_status  = 'accepted'
@@ -350,12 +353,15 @@ type SetIntakeItemTaskParams struct {
 }
 
 // Link an intake item to a converted task.
-func (q *Queries) SetIntakeItemTask(ctx context.Context, arg SetIntakeItemTaskParams) error {
-	_, err := q.db.ExecContext(ctx, setIntakeItemTask, arg.TaskID, arg.WorkspaceID, arg.PublicID)
-	return err
+func (q *Queries) SetIntakeItemTask(ctx context.Context, arg SetIntakeItemTaskParams) (int64, error) {
+	result, err := q.db.ExecContext(ctx, setIntakeItemTask, arg.TaskID, arg.WorkspaceID, arg.PublicID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
 }
 
-const updateIntakeItemTriage = `-- name: UpdateIntakeItemTriage :exec
+const updateIntakeItemTriage = `-- name: UpdateIntakeItemTriage :execrows
 UPDATE intake_items
 SET triage_status      = ?,
     triaged_by_user_id = ?,
@@ -374,13 +380,16 @@ type UpdateIntakeItemTriageParams struct {
 }
 
 // Update the triage status of an intake item.
-func (q *Queries) UpdateIntakeItemTriage(ctx context.Context, arg UpdateIntakeItemTriageParams) error {
-	_, err := q.db.ExecContext(ctx, updateIntakeItemTriage,
+func (q *Queries) UpdateIntakeItemTriage(ctx context.Context, arg UpdateIntakeItemTriageParams) (int64, error) {
+	result, err := q.db.ExecContext(ctx, updateIntakeItemTriage,
 		arg.TriageStatus,
 		arg.TriagedByUserID,
 		arg.SnoozeUntil,
 		arg.WorkspaceID,
 		arg.PublicID,
 	)
-	return err
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
 }

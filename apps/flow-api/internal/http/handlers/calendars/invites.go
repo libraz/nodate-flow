@@ -311,7 +311,7 @@ func CreateEventInvite(deps Deps) func(context.Context, *CreateEventInviteInput)
 			eventType = "calendar.event.invite.rotated"
 			auditAction = "calendar.invite.rotate"
 		}
-		_ = appendCalendarEvent(ctx, deps.DB, wsID, eventType, &actorID, map[string]any{
+		_ = appendCalendarEvent(ctx, deps.DB, wsID, cal.ID, eventType, &actorID, map[string]any{
 			"eventId":          input.EvtID,
 			"calendarId":       input.CalID,
 			"attendeePublicId": input.AttendeeID,
@@ -608,7 +608,7 @@ func RevokeEventInvite(deps Deps) func(context.Context, *RevokeEventInviteInput)
 		if err := deps.CalendarQueries.DisableCalendarEventInvite(ctx, invite.ID); err != nil {
 			return nil, httpErr(apierrors.CalendarInviteStoreRevokeInterrupted)
 		}
-		_ = appendCalendarEvent(ctx, deps.DB, wsID, "calendar.event.invite.revoked", &actorID, map[string]any{
+		_ = appendCalendarEvent(ctx, deps.DB, wsID, cal.ID, "calendar.event.invite.revoked", &actorID, map[string]any{
 			"eventId":        input.EvtID,
 			"calendarId":     input.CalID,
 			"invitePublicId": input.InviteID,

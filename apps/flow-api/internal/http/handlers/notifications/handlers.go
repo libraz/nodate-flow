@@ -192,7 +192,10 @@ func MarkRead(deps Deps) func(context.Context, *MarkReadInput) (*MarkReadOutput,
 		if err != nil {
 			return nil, httpErr(apierrors.WsNotificationNotFound)
 		}
-		if err := deps.Queries.MarkNotificationRead(ctx, generated.MarkNotificationReadParams{
+		// Reading a notification is idempotent -- the statement skips rows
+		// already read -- so a zero count is the normal answer to marking one
+		// twice and must not become a 404.
+		if _, err := deps.Queries.MarkNotificationRead(ctx, generated.MarkNotificationReadParams{
 			PublicID:        pub,
 			RecipientUserID: actorID,
 		}); err != nil {
@@ -250,7 +253,9 @@ func Archive(deps Deps) func(context.Context, *ArchiveInput) (*ArchiveOutput, er
 		if err != nil {
 			return nil, httpErr(apierrors.WsNotificationNotFound)
 		}
-		if err := deps.Queries.ArchiveNotification(ctx, generated.ArchiveNotificationParams{
+		// Archiving is idempotent for the same reason as MarkRead: the
+		// statement skips rows already archived.
+		if _, err := deps.Queries.ArchiveNotification(ctx, generated.ArchiveNotificationParams{
 			PublicID:        pub,
 			RecipientUserID: actorID,
 		}); err != nil {

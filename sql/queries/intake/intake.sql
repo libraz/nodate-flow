@@ -81,7 +81,7 @@ WHERE ii.workspace_id = ?
   AND ii.public_id = ?
   AND ii.enabled = TRUE;
 
--- name: UpdateIntakeItemTriage :exec
+-- name: UpdateIntakeItemTriage :execrows
 -- Update the triage status of an intake item.
 UPDATE intake_items
 SET triage_status      = ?,
@@ -91,7 +91,7 @@ WHERE workspace_id = ?
   AND public_id = ?
   AND enabled = TRUE;
 
--- name: SetIntakeItemTask :exec
+-- name: SetIntakeItemTask :execrows
 -- Link an intake item to a converted task.
 UPDATE intake_items
 SET task_id        = ?,
@@ -100,7 +100,7 @@ WHERE workspace_id = ?
   AND public_id = ?
   AND enabled = TRUE;
 
--- name: SetIntakeItemAIScore :exec
+-- name: SetIntakeItemAIScore :execrows
 -- Set AI score and reasoning for an intake item.
 UPDATE intake_items
 SET ai_score     = ?,

@@ -92,7 +92,8 @@ WHERE id = ?;
 -- Soft-disable (revoke) an invite by internal id.
 UPDATE calendar_event_invites
 SET enabled = FALSE
-WHERE id = ?;
+WHERE id = ?
+  AND enabled = TRUE;
 
 -- name: ListCalendarEventInvitesForEvent :many
 -- List active invites for a single event, newest first. Paginated

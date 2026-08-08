@@ -65,7 +65,10 @@ func Publish(deps Deps) func(context.Context, *PublishLensInput) (*PublishLensOu
 		}
 
 		// SetLensPublic is a no-op when is_public = TRUE (WHERE guard).
-		if err := deps.Queries.SetLensPublic(ctx, generated.SetLensPublicParams{
+		// The already-public case is answered from lensRow just below, which
+		// distinguishes it from a missing view; the count cannot, because it
+		// is zero for both.
+		if _, err := deps.Queries.SetLensPublic(ctx, generated.SetLensPublicParams{
 			PublicTokenHash: sql.NullString{String: tokenHash, Valid: true},
 			WorkspaceID:     ws.ID,
 			PublicID:        lid,
@@ -144,7 +147,9 @@ func Unpublish(deps Deps) func(context.Context, *UnpublishLensInput) (*Unpublish
 		}
 
 		// SetLensPrivate is a no-op when is_public = FALSE (WHERE guard).
-		if err := deps.Queries.SetLensPrivate(ctx, generated.SetLensPrivateParams{
+		// See Publish: the already-private case is answered from lensRow,
+		// which the count cannot distinguish from a missing view.
+		if _, err := deps.Queries.SetLensPrivate(ctx, generated.SetLensPrivateParams{
 			WorkspaceID: ws.ID,
 			PublicID:    lid,
 		}); err != nil {

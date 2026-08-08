@@ -29,12 +29,13 @@ WHERE v.workspace_id = ?
 ORDER BY v.created_at DESC, v.public_id DESC
 LIMIT ? OFFSET ?;
 
--- name: RemoveWorkspaceMember :exec
+-- name: RemoveWorkspaceMember :execrows
 -- Soft-remove a member from a workspace.
 UPDATE workspace_members
 SET enabled = FALSE
 WHERE workspace_id = ?
-  AND public_id = ?;
+  AND public_id = ?
+  AND enabled = TRUE;
 
 -- name: FindWorkspaceMemberByUserId :one
 -- Resolve a workspace membership by (workspace_id, user_id).
@@ -100,7 +101,7 @@ SELECT role FROM workspace_members
 WHERE workspace_id = ? AND user_id = ? AND enabled = TRUE
 LIMIT 1;
 
--- name: UpdateMemberRole :exec
+-- name: UpdateMemberRole :execrows
 -- Change a member's role.
 UPDATE workspace_members
 SET role = ?

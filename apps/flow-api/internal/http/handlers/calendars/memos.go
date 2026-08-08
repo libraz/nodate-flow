@@ -175,7 +175,7 @@ func CreateMemo(deps Deps) func(context.Context, *CreateMemoInput) (*CreateMemoO
 			CreatedAt:  handlerutil.NowUnix(),
 		}
 
-		_ = appendCalendarEvent(ctx, deps.DB, wsID, "calendar.memo.created", &actorID, map[string]any{
+		_ = appendCalendarEvent(ctx, deps.DB, wsID, cal.ID, "calendar.memo.created", &actorID, map[string]any{
 			"memoId":     memoPublicID.String(),
 			"calendarId": input.CalID,
 			"title":      input.Body.Title,
@@ -241,7 +241,10 @@ func UpdateMemo(deps Deps) func(context.Context, *UpdateMemoInput) (*UpdateMemoO
 			params.SortWeight = sql.NullInt32{Int32: *input.Body.SortWeight, Valid: true}
 		}
 
-		err = deps.CalendarQueries.UpdateCalendarMemo(ctx, params)
+		// Not an existence check: a PATCH re-sending the memo's current
+		// title / body / order changes nothing and MySQL counts zero. The
+		// memo was resolved above.
+		_, err = deps.CalendarQueries.UpdateCalendarMemo(ctx, params)
 		if err != nil {
 			return nil, httpErr(apierrors.CalendarMemoStoreWriteInterrupted)
 		}
@@ -249,7 +252,7 @@ func UpdateMemo(deps Deps) func(context.Context, *UpdateMemoInput) (*UpdateMemoO
 		out := &UpdateMemoOutput{}
 		out.Body.Updated = true
 
-		_ = appendCalendarEvent(ctx, deps.DB, wsID, "calendar.memo.updated", &actorID, map[string]any{
+		_ = appendCalendarEvent(ctx, deps.DB, wsID, cal.ID, "calendar.memo.updated", &actorID, map[string]any{
 			"memoId":     input.MemoID,
 			"calendarId": input.CalID,
 		})
@@ -295,7 +298,9 @@ func DeleteMemo(deps Deps) func(context.Context, *DeleteMemoInput) (*DeleteMemoO
 			return nil, httpErr(apierr.SpecForErrNoRows(err, apierrors.CalendarMemoNotFound, apierrors.CalendarMemoStoreReadInterrupted))
 		}
 
-		err = deps.CalendarQueries.DisableCalendarMemo(ctx, calendar.DisableCalendarMemoParams{
+		// Only matches a memo that is still live, so zero rows means a
+		// concurrent delete won and this request removed nothing.
+		rows, err := deps.CalendarQueries.DisableCalendarMemo(ctx, calendar.DisableCalendarMemoParams{
 			PublicID:    types.FromUUID(memoUID),
 			CalendarID:  cal.ID,
 			WorkspaceID: wsID,
@@ -303,11 +308,14 @@ func DeleteMemo(deps Deps) func(context.Context, *DeleteMemoInput) (*DeleteMemoO
 		if err != nil {
 			return nil, httpErr(apierrors.CalendarMemoStoreDeleteInterrupted)
 		}
+		if rows == 0 {
+			return nil, httpErr(apierrors.CalendarMemoNotFound)
+		}
 
 		out := &DeleteMemoOutput{}
 		out.Body.Deleted = true
 
-		_ = appendCalendarEvent(ctx, deps.DB, wsID, "calendar.memo.deleted", &actorID, map[string]any{
+		_ = appendCalendarEvent(ctx, deps.DB, wsID, cal.ID, "calendar.memo.deleted", &actorID, map[string]any{
 			"memoId":     input.MemoID,
 			"calendarId": input.CalID,
 		})

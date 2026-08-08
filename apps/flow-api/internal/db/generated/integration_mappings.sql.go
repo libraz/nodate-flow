@@ -225,7 +225,7 @@ func (q *Queries) ListIntegrationSourceMappings(ctx context.Context, workspaceID
 	return items, nil
 }
 
-const updateIntegrationSourceMapping = `-- name: UpdateIntegrationSourceMapping :exec
+const updateIntegrationSourceMapping = `-- name: UpdateIntegrationSourceMapping :execrows
 UPDATE integration_source_mappings
 SET
   label   = COALESCE(?, label),
@@ -244,12 +244,15 @@ type UpdateIntegrationSourceMappingParams struct {
 // Patch the mutable fields of a mapping. NULL leaves a field unchanged.
 // provider and external_key are immutable: changing them would move the
 // claim to a different source, which is a create plus a delete.
-func (q *Queries) UpdateIntegrationSourceMapping(ctx context.Context, arg UpdateIntegrationSourceMappingParams) error {
-	_, err := q.db.ExecContext(ctx, updateIntegrationSourceMapping,
+func (q *Queries) UpdateIntegrationSourceMapping(ctx context.Context, arg UpdateIntegrationSourceMappingParams) (int64, error) {
+	result, err := q.db.ExecContext(ctx, updateIntegrationSourceMapping,
 		arg.Label,
 		arg.Enabled,
 		arg.WorkspaceID,
 		arg.PublicID,
 	)
-	return err
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
 }

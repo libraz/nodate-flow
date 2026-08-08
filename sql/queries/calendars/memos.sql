@@ -56,7 +56,7 @@ WHERE public_id = ?
   AND enabled = TRUE
 LIMIT 1;
 
--- name: UpdateCalendarMemo :exec
+-- name: UpdateCalendarMemo :execrows
 -- Update a memo's title, done, or sort_weight.
 UPDATE calendar_memos
 SET title       = COALESCE(sqlc.narg('title'), title),
@@ -68,10 +68,11 @@ WHERE public_id = ?
   AND workspace_id = ?
   AND enabled = TRUE;
 
--- name: DisableCalendarMemo :exec
+-- name: DisableCalendarMemo :execrows
 -- Soft-delete a memo.
 UPDATE calendar_memos
 SET enabled = FALSE
 WHERE public_id = ?
   AND calendar_id = ?
-  AND workspace_id = ?;
+  AND workspace_id = ?
+  AND enabled = TRUE;

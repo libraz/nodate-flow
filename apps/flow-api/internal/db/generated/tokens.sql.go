@@ -222,13 +222,15 @@ func (q *Queries) ListMcpTokensForUser(ctx context.Context, arg ListMcpTokensFor
 	return items, nil
 }
 
-const revokeMcpToken = `-- name: RevokeMcpToken :exec
+const revokeMcpToken = `-- name: RevokeMcpToken :execrows
 UPDATE mcp_tokens
 SET revoked_at = CURRENT_TIMESTAMP,
     enabled = FALSE
 WHERE workspace_id = ?
   AND user_id = ?
   AND public_id = ?
+  AND enabled = TRUE
+  AND revoked_at IS NULL
 `
 
 type RevokeMcpTokenParams struct {
@@ -238,7 +240,10 @@ type RevokeMcpTokenParams struct {
 }
 
 // Revoke an MCP token (workspace + user scoped).
-func (q *Queries) RevokeMcpToken(ctx context.Context, arg RevokeMcpTokenParams) error {
-	_, err := q.db.ExecContext(ctx, revokeMcpToken, arg.WorkspaceID, arg.UserID, arg.PublicID)
-	return err
+func (q *Queries) RevokeMcpToken(ctx context.Context, arg RevokeMcpTokenParams) (int64, error) {
+	result, err := q.db.ExecContext(ctx, revokeMcpToken, arg.WorkspaceID, arg.UserID, arg.PublicID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
 }

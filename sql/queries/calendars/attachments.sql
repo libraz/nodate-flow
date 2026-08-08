@@ -66,7 +66,7 @@ WHERE a.workspace_id = ?
   AND a.enabled = TRUE
 LIMIT 1;
 
--- name: DeleteCalendarEventAttachment :exec
+-- name: DeleteCalendarEventAttachment :execrows
 -- Hard-delete a calendar event attachment row. Caller MUST have already
 -- decremented ref_count on the linked storage_objects row inside the same
 -- transaction; this row holding the FK reference must go away before

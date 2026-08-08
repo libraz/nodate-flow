@@ -44,10 +44,10 @@ LEFT JOIN projects p ON p.workspace_id = w.id AND p.enabled = TRUE
 WHERE w.public_id = ?
 GROUP BY w.id;
 
--- name: AdminSuspendWorkspace :exec
+-- name: AdminSuspendWorkspace :execrows
 -- Disable a workspace (soft-delete).
 UPDATE workspaces SET enabled = FALSE WHERE public_id = ? AND enabled = TRUE;
 
--- name: AdminEnableWorkspace :exec
+-- name: AdminEnableWorkspace :execrows
 -- Re-enable a previously suspended workspace.
 UPDATE workspaces SET enabled = TRUE WHERE public_id = ? AND enabled = FALSE;

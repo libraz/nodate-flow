@@ -87,13 +87,31 @@ func PatchUser(deps Deps) func(context.Context, *PatchUserInput) (*PatchUserOutp
 			return out, nil
 		}
 
+		// Both statements guard on the current state, so a zero count is
+		// either "no such user" or "already in the requested state". The
+		// second is not an error — PATCH is idempotent — so tell them
+		// apart with a read rather than answering 404 for both. Without
+		// the check, suspending a user id that does not exist reported
+		// success and wrote an audit entry saying an account had been
+		// suspended, which is the record an incident review would read.
+		var rows int64
 		if *in.Body.Enabled {
-			err = deps.Queries.AdminEnableUser(ctx, pid)
+			rows, err = deps.Queries.AdminEnableUser(ctx, pid)
 		} else {
-			err = deps.Queries.AdminSuspendUser(ctx, pid)
+			rows, err = deps.Queries.AdminSuspendUser(ctx, pid)
 		}
 		if err != nil {
 			return nil, httpErr(apierrors.InternalUnexpected)
+		}
+		if rows == 0 {
+			if _, getErr := deps.Queries.AdminGetUser(ctx, pid); getErr != nil {
+				return nil, httpErr(apierr.SpecForErrNoRows(getErr, apierrors.InstanceUserNotFound, apierrors.InternalUnexpected))
+			}
+			// The user exists and already holds the requested state.
+			// Nothing changed, so nothing is recorded.
+			out := &PatchUserOutput{}
+			out.Body.Ok = true
+			return out, nil
 		}
 
 		action := "admin.user.enable"

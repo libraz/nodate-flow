@@ -69,10 +69,11 @@ SET enabled = FALSE
 WHERE project_id = ?
   AND user_id = ?;
 
--- name: RemoveProjectMember :exec
+-- name: RemoveProjectMember :execrows
 -- Soft-remove a project member.
 UPDATE project_members
 SET enabled = FALSE
 WHERE workspace_id = ?
   AND project_id = ?
-  AND public_id = ?;
+  AND public_id = ?
+  AND enabled = TRUE;

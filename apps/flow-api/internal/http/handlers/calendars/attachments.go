@@ -199,10 +199,7 @@ func PresignAttachment(deps Deps) func(context.Context, *PresignAttachmentInput)
 		// Cross-surface upload validation: mirror the task presign path
 		// so calendar attachments enforce the same MIME allowlist,
 		// blocked-extension deny list, and per-file size ceiling.
-		if !handlerutil.IsAllowedContentType(input.Body.ContentType) {
-			return nil, httpErr(apierrors.ValidationFileTypeNotAllowed)
-		}
-		if handlerutil.HasBlockedExtension(input.Body.Filename) {
+		if !handlerutil.IsAllowedUpload(input.Body.ContentType, input.Body.Filename) {
 			return nil, httpErr(apierrors.ValidationFileTypeNotAllowed)
 		}
 		if input.Body.ByteSize > handlerutil.MaxUploadSize {
@@ -410,7 +407,7 @@ func PresignAttachment(deps Deps) func(context.Context, *PresignAttachmentInput)
 			requiredHeaders = map[string]string{"x-amz-content-sha256": shaHex}
 		}
 
-		_ = appendCalendarEvent(ctx, deps.DB, wsID, "calendar.event.attachment.created", &actorID, map[string]any{
+		_ = appendCalendarEvent(ctx, deps.DB, wsID, cal.ID, "calendar.event.attachment.created", &actorID, map[string]any{
 			"eventId":      input.EvtID,
 			"calendarId":   input.CalID,
 			"attachmentId": attPub.String(),
@@ -530,13 +527,19 @@ func DeleteAttachment(deps Deps) func(context.Context, *DeleteAttachmentInput) (
 		qtx := deps.Queries.WithTx(tx)
 		cqtx := deps.CalendarQueries.WithTx(tx)
 
-		err = cqtx.DeleteCalendarEventAttachment(ctx, calendar.DeleteCalendarEventAttachmentParams{
+		rows, err := cqtx.DeleteCalendarEventAttachment(ctx, calendar.DeleteCalendarEventAttachmentParams{
 			PublicID:    types.FromUUID(attUID),
 			EventID:     handlerutil.NullInt32From(evt.ID),
 			WorkspaceID: wsID,
 		})
 		if err != nil {
 			return nil, httpErr(apierrors.CalendarAttachmentStoreDeleteInterrupted)
+		}
+		// Nothing was deleted, so the ref count below must not be
+		// decremented -- doing that on a delete that did not happen is
+		// how a blob still in use becomes eligible for collection.
+		if rows == 0 {
+			return nil, httpErr(apierrors.CalendarAttachmentNotFound)
 		}
 
 		decRes, err := qtx.DecrementStorageObjectRefCount(ctx, att.StorageObjectID)
@@ -584,7 +587,7 @@ func DeleteAttachment(deps Deps) func(context.Context, *DeleteAttachmentInput) (
 		out := &DeleteAttachmentOutput{}
 		out.Body.Deleted = true
 
-		_ = appendCalendarEvent(ctx, deps.DB, wsID, "calendar.event.attachment.deleted", &actorID, map[string]any{
+		_ = appendCalendarEvent(ctx, deps.DB, wsID, cal.ID, "calendar.event.attachment.deleted", &actorID, map[string]any{
 			"eventId":      input.EvtID,
 			"calendarId":   input.CalID,
 			"attachmentId": input.AttID,

@@ -58,12 +58,13 @@ func (q *Queries) CreateProject(ctx context.Context, arg CreateProjectParams) (i
 	return result.LastInsertId()
 }
 
-const disableProject = `-- name: DisableProject :exec
+const disableProject = `-- name: DisableProject :execrows
 UPDATE projects
 SET enabled = FALSE,
     updated_at = CURRENT_TIMESTAMP(3)
 WHERE workspace_id = ?
   AND public_id = ?
+  AND enabled = TRUE
 `
 
 type DisableProjectParams struct {
@@ -74,9 +75,12 @@ type DisableProjectParams struct {
 // Soft-disable a project. The handler must call DisableProjectChildTasks
 // inside the same transaction to cascade enabled = FALSE down to tasks;
 // this query alone leaves child tasks live on the underlying table.
-func (q *Queries) DisableProject(ctx context.Context, arg DisableProjectParams) error {
-	_, err := q.db.ExecContext(ctx, disableProject, arg.WorkspaceID, arg.PublicID)
-	return err
+func (q *Queries) DisableProject(ctx context.Context, arg DisableProjectParams) (int64, error) {
+	result, err := q.db.ExecContext(ctx, disableProject, arg.WorkspaceID, arg.PublicID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
 }
 
 const disableProjectChildTasks = `-- name: DisableProjectChildTasks :exec
@@ -389,7 +393,7 @@ func (q *Queries) ListProjectsForWorkspace(ctx context.Context, arg ListProjects
 	return items, nil
 }
 
-const updateProject = `-- name: UpdateProject :exec
+const updateProject = `-- name: UpdateProject :execrows
 UPDATE projects
 SET name = ?,
     identifier = ?,
@@ -424,8 +428,8 @@ type UpdateProjectParams struct {
 }
 
 // Update mutable project fields by public_id.
-func (q *Queries) UpdateProject(ctx context.Context, arg UpdateProjectParams) error {
-	_, err := q.db.ExecContext(ctx, updateProject,
+func (q *Queries) UpdateProject(ctx context.Context, arg UpdateProjectParams) (int64, error) {
+	result, err := q.db.ExecContext(ctx, updateProject,
 		arg.Name,
 		arg.Identifier,
 		arg.Description,
@@ -440,10 +444,13 @@ func (q *Queries) UpdateProject(ctx context.Context, arg UpdateProjectParams) er
 		arg.WorkspaceID,
 		arg.PublicID,
 	)
-	return err
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
 }
 
-const updateProjectFull = `-- name: UpdateProjectFull :exec
+const updateProjectFull = `-- name: UpdateProjectFull :execrows
 UPDATE projects
 SET name = ?,
     slug = ?,
@@ -464,8 +471,8 @@ type UpdateProjectFullParams struct {
 }
 
 // Update project name, slug and description by public_id.
-func (q *Queries) UpdateProjectFull(ctx context.Context, arg UpdateProjectFullParams) error {
-	_, err := q.db.ExecContext(ctx, updateProjectFull,
+func (q *Queries) UpdateProjectFull(ctx context.Context, arg UpdateProjectFullParams) (int64, error) {
+	result, err := q.db.ExecContext(ctx, updateProjectFull,
 		arg.Name,
 		arg.Slug,
 		arg.Identifier,
@@ -473,5 +480,8 @@ func (q *Queries) UpdateProjectFull(ctx context.Context, arg UpdateProjectFullPa
 		arg.WorkspaceID,
 		arg.PublicID,
 	)
-	return err
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
 }

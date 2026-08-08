@@ -181,11 +181,17 @@ func Delete(deps Deps) func(context.Context, *DeleteInput) (*DeleteOutput, error
 			return nil, httpErr(apierrors.WebhookSubscriptionNotFound)
 		}
 
-		if err := deps.Queries.DeleteWebhookSubscription(ctx, generated.DeleteWebhookSubscriptionParams{
+		// Scoped to the workspace and to live subscriptions, so a zero count
+		// means there is no such subscription to delete here.
+		rows, err := deps.Queries.DeleteWebhookSubscription(ctx, generated.DeleteWebhookSubscriptionParams{
 			WorkspaceID: wsCtx.ID,
 			PublicID:    pub,
-		}); err != nil {
+		})
+		if err != nil {
 			return nil, httpErr(apierrors.InternalUnexpected)
+		}
+		if rows == 0 {
+			return nil, httpErr(apierrors.WebhookSubscriptionNotFound)
 		}
 
 		deps.Audit.Record(ctx, audit.Entry{
@@ -220,7 +226,10 @@ func Toggle(deps Deps) func(context.Context, *ToggleInput) (*ToggleOutput, error
 			return nil, httpErr(apierrors.WebhookSubscriptionNotFound)
 		}
 
-		if err := deps.Queries.ToggleWebhookSubscription(ctx, generated.ToggleWebhookSubscriptionParams{
+		// Not an existence check: toggling to the state the subscription
+		// already holds changes nothing and MySQL counts zero. The
+		// subscription is resolved above.
+		if _, err := deps.Queries.ToggleWebhookSubscription(ctx, generated.ToggleWebhookSubscriptionParams{
 			IsActive:    in.Body.IsActive,
 			WorkspaceID: wsCtx.ID,
 			PublicID:    pub,

@@ -59,7 +59,7 @@ WHERE v.workspace_id = ?
 ORDER BY v.created_at DESC, v.public_id DESC
 LIMIT ?;
 
--- name: EditComment :exec
+-- name: EditComment :execrows
 -- Edit a comment body and stamp edited_at.
 UPDATE comments
 SET body = ?,
@@ -69,9 +69,10 @@ WHERE workspace_id = ?
   AND author_id = ?
   AND enabled = TRUE;
 
--- name: DeleteComment :exec
+-- name: DeleteComment :execrows
 -- Soft-delete a comment.
 UPDATE comments
 SET enabled = FALSE
 WHERE workspace_id = ?
-  AND public_id = ?;
+  AND public_id = ?
+  AND enabled = TRUE;

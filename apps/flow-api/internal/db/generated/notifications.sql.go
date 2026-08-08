@@ -14,7 +14,7 @@ import (
 	types "github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
 )
 
-const archiveNotification = `-- name: ArchiveNotification :exec
+const archiveNotification = `-- name: ArchiveNotification :execrows
 UPDATE notifications
 SET archived_at = NOW()
 WHERE public_id = ?
@@ -28,9 +28,12 @@ type ArchiveNotificationParams struct {
 }
 
 // Archive a single notification.
-func (q *Queries) ArchiveNotification(ctx context.Context, arg ArchiveNotificationParams) error {
-	_, err := q.db.ExecContext(ctx, archiveNotification, arg.PublicID, arg.RecipientUserID)
-	return err
+func (q *Queries) ArchiveNotification(ctx context.Context, arg ArchiveNotificationParams) (int64, error) {
+	result, err := q.db.ExecContext(ctx, archiveNotification, arg.PublicID, arg.RecipientUserID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
 }
 
 const claimReminderOccurrence = `-- name: ClaimReminderOccurrence :execrows
@@ -711,7 +714,7 @@ func (q *Queries) MarkAllNotificationsRead(ctx context.Context, arg MarkAllNotif
 	return err
 }
 
-const markNotificationDelivered = `-- name: MarkNotificationDelivered :exec
+const markNotificationDelivered = `-- name: MarkNotificationDelivered :execrows
 UPDATE notifications
 SET delivered_at = NOW()
 WHERE public_id = ?
@@ -728,12 +731,15 @@ type MarkNotificationDeliveredParams struct {
 // recipient so a delivery flag can never be flipped on another user's
 // notification, matching the recipient predicate on the sibling
 // MarkNotificationRead / ArchiveNotification mutations.
-func (q *Queries) MarkNotificationDelivered(ctx context.Context, arg MarkNotificationDeliveredParams) error {
-	_, err := q.db.ExecContext(ctx, markNotificationDelivered, arg.PublicID, arg.RecipientUserID)
-	return err
+func (q *Queries) MarkNotificationDelivered(ctx context.Context, arg MarkNotificationDeliveredParams) (int64, error) {
+	result, err := q.db.ExecContext(ctx, markNotificationDelivered, arg.PublicID, arg.RecipientUserID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
 }
 
-const markNotificationRead = `-- name: MarkNotificationRead :exec
+const markNotificationRead = `-- name: MarkNotificationRead :execrows
 UPDATE notifications
 SET read_at = NOW()
 WHERE public_id = ?
@@ -747,9 +753,12 @@ type MarkNotificationReadParams struct {
 }
 
 // Mark a single notification as read.
-func (q *Queries) MarkNotificationRead(ctx context.Context, arg MarkNotificationReadParams) error {
-	_, err := q.db.ExecContext(ctx, markNotificationRead, arg.PublicID, arg.RecipientUserID)
-	return err
+func (q *Queries) MarkNotificationRead(ctx context.Context, arg MarkNotificationReadParams) (int64, error) {
+	result, err := q.db.ExecContext(ctx, markNotificationRead, arg.PublicID, arg.RecipientUserID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
 }
 
 const releaseReminderOccurrence = `-- name: ReleaseReminderOccurrence :exec
