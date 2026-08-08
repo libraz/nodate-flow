@@ -122,14 +122,11 @@ type Config struct {
 	// egress limiter. 0 → derived from OutboundLlmRps.
 	OutboundLlmBurst int `env:"NF_FLOW_OUTBOUND_LLM_BURST" envDefault:"0"`
 
-	// SessionStore selects the refresh-token session driver.
-	//   mysql (default) — wraps sqlc queries against the sessions table.
-	//   redis           — requires NF_REDIS_ADDR.
-	// Other subsystems (stream notifier, outbound rate limiter) follow
-	// the same env-switch pattern.
-	SessionStore string `env:"NF_FLOW_SESSION_STORE" envDefault:"mysql"`
 	// RedisAddr is the host:port for the Redis client shared by the
-	// redis-tagged drivers (sessionstore, stream, outbound).
+	// redis-backed drivers (stream, outbound).
+	//
+	// This service holds no sessions — auth-api owns identity, and the
+	// refresh-token store is selected there by NF_AUTH_SESSION_STORE.
 	RedisAddr string `env:"NF_REDIS_ADDR" envDefault:""`
 	// StreamBackend selects the SSE fan-out driver: "memory" (default)
 	// or "redis" (requires NF_REDIS_ADDR).
@@ -358,13 +355,6 @@ func validateEnums(cfg *Config) error {
 	port, err := strconv.Atoi(cfg.Port)
 	if err != nil || port < 1 || port > 65535 {
 		return fmt.Errorf("config: NF_FLOW_PORT must be an integer between 1 and 65535, got %q", cfg.Port)
-	}
-
-	// SessionStore must be "mysql" or "redis".
-	switch cfg.SessionStore {
-	case "mysql", "redis":
-	default:
-		return fmt.Errorf("config: NF_FLOW_SESSION_STORE must be \"mysql\" or \"redis\", got %q", cfg.SessionStore)
 	}
 
 	// AgentRunner must be "orchestrator" or "log".

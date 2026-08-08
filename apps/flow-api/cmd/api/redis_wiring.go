@@ -1,34 +1,15 @@
 package main
 
 import (
-	"database/sql"
 	"log/slog"
 
 	"github.com/redis/go-redis/v9"
 
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/ai/providers"
-	"github.com/libraz/nodate-flow/apps/flow-api/internal/auth/sessadapter"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/config"
-	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/outbound"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/stream"
-	"github.com/libraz/nodate-flow/packages/go-shared/sessionstore"
 )
-
-// buildSessionStore selects the Redis driver when NF_FLOW_SESSION_STORE=redis
-// and a Redis client is available; otherwise it falls through to the
-// MySQL driver.
-func buildSessionStore(cfg *config.Config, db *sql.DB, q *generated.Queries, logger *slog.Logger) sessionstore.Store {
-	if cfg.SessionStore != "redis" {
-		return sessadapter.NewMySQLStore(db, q)
-	}
-	rdb := dialRedis(cfg, logger)
-	if rdb == nil {
-		return sessadapter.NewMySQLStore(db, q)
-	}
-	logger.Info("session store: redis", "addr", cfg.RedisAddr)
-	return sessionstore.NewRedisStore(rdb)
-}
 
 // buildStreamNotifier returns a RedisNotifier when the env asks for
 // it, otherwise nil so main.go falls through to the in-process path.

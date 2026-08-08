@@ -13,6 +13,7 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/libraz/nodate-flow/packages/go-shared v0.0.0-00010101000000-000000000000
 	github.com/minio/minio-go/v7 v7.2.1
+	github.com/redis/go-redis/v9 v9.22.0
 	github.com/stretchr/testify v1.11.1
 	golang.org/x/image v0.44.0
 	golang.org/x/oauth2 v0.36.0
@@ -65,7 +66,6 @@ require (
 	github.com/philhofer/fwd v1.2.0 // indirect
 	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 // indirect
 	github.com/power-devops/perfstat v0.0.0-20240221224432-82ca36839d55 // indirect
-	github.com/redis/go-redis/v9 v9.22.0 // indirect
 	github.com/rs/xid v1.6.0 // indirect
 	github.com/shirou/gopsutil/v4 v4.26.7 // indirect
 	github.com/sirupsen/logrus v1.9.4 // indirect

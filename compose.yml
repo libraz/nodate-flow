@@ -161,7 +161,6 @@ services:
       NF_DB_DSN: ${NF_DB_DSN:-nodate:nodatepw@tcp(mysql:3306)/nodate_flow?parseTime=true&charset=utf8mb4&collation=utf8mb4_0900_ai_ci&time_zone=%27%2B00%3A00%27}
       NF_COOKIE_SECURE: "false"
       NF_REDIS_ADDR: ${NF_REDIS_ADDR:-redis:6379}
-      NF_FLOW_SESSION_STORE: ${NF_FLOW_SESSION_STORE:-mysql}
       NF_FLOW_STREAM_BACKEND: ${NF_FLOW_STREAM_BACKEND:-memory}
       NF_FLOW_OUTBOUND_BACKEND: ${NF_FLOW_OUTBOUND_BACKEND:-memory}
       NF_FLOW_AGENT_TICK_INTERVAL: ${NF_FLOW_AGENT_TICK_INTERVAL:-1m}

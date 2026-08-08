@@ -76,6 +76,13 @@ func main() {
 
 	queries := generated.New(db)
 
+	sessions, closeSessions, err := buildSessionStore(context.Background(), cfg, db, queries, logger)
+	if err != nil {
+		logger.Error("session store init failed", "err", err)
+		os.Exit(1)
+	}
+	defer closeSessions()
+
 	var cipher *crypto.Cipher
 	if c, cerr := crypto.NewFromEnv(); cerr == nil {
 		cipher = c
@@ -206,6 +213,7 @@ func main() {
 	inner := router.Build(router.Deps{
 		DB:                        db,
 		Queries:                   queries,
+		Sessions:                  sessions,
 		JWT:                       jwtIssuer,
 		OIDC:                      oidcClient,
 		OIDCGithub:                githubOAuth,

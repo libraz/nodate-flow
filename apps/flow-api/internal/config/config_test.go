@@ -1,6 +1,9 @@
 package config
 
 import (
+	"os"
+	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 )
@@ -9,7 +12,6 @@ func TestValidateEnumsAcceptsValid(t *testing.T) {
 	t.Parallel()
 	cfg := &Config{
 		Port:              "8080",
-		SessionStore:      "mysql",
 		AgentRunner:       "log",
 		AgentQueueBackend: "memory",
 		WebhooksInsecure:  true,
@@ -19,11 +21,10 @@ func TestValidateEnumsAcceptsValid(t *testing.T) {
 	}
 }
 
-func TestValidateEnumsAcceptsRedis(t *testing.T) {
+func TestValidateEnumsAcceptsOrchestratorAndMysqlQueue(t *testing.T) {
 	t.Parallel()
 	cfg := &Config{
 		Port:              "3000",
-		SessionStore:      "redis",
 		AgentRunner:       "orchestrator",
 		AgentQueueBackend: "mysql",
 		WebhooksInsecure:  true,
@@ -39,7 +40,6 @@ func TestValidateEnumsRejectsInvalidPort(t *testing.T) {
 	for _, port := range cases {
 		cfg := &Config{
 			Port:              port,
-			SessionStore:      "mysql",
 			AgentRunner:       "log",
 			AgentQueueBackend: "memory",
 			WebhooksInsecure:  true,
@@ -55,17 +55,47 @@ func TestValidateEnumsRejectsInvalidPort(t *testing.T) {
 	}
 }
 
-func TestValidateEnumsRejectsInvalidSessionStore(t *testing.T) {
+// TestNoSessionStoreKnob keeps the session-store selector from coming
+// back to this service. It never had sessions to store — auth-api owns
+// identity and the refresh-token store is chosen there by
+// NF_AUTH_SESSION_STORE — so a knob here could only ever validate a
+// value nothing read.
+func TestNoSessionStoreKnob(t *testing.T) {
 	t.Parallel()
-	cfg := &Config{
-		Port:              "8080",
-		SessionStore:      "postgres",
-		AgentRunner:       "log",
-		AgentQueueBackend: "memory",
-		WebhooksInsecure:  true,
+	typ := reflect.TypeOf(Config{})
+	for i := 0; i < typ.NumField(); i++ {
+		f := typ.Field(i)
+		if f.Name == "SessionStore" {
+			t.Errorf("Config.SessionStore is back; this service holds no sessions")
+		}
+		if env := f.Tag.Get("env"); strings.Contains(env, "SESSION_STORE") {
+			t.Errorf("Config.%s reads %s; the session store is auth-api's to select", f.Name, env)
+		}
 	}
-	if err := validateEnums(cfg); err == nil {
-		t.Fatal("invalid SessionStore should be rejected")
+}
+
+// TestSessionStoreEnvIsGoneFromDeploymentFiles catches the other half of
+// the same drift: a documented env var no code reads is exactly the
+// wiring gap the knob was removed to close, so the sample env and the
+// compose stack must not keep advertising it.
+func TestSessionStoreEnvIsGoneFromDeploymentFiles(t *testing.T) {
+	t.Parallel()
+	// Tests run in the package directory, four levels below the root.
+	root, err := filepath.Abs(filepath.Join("..", "..", "..", ".."))
+	if err != nil {
+		t.Fatalf("resolve repository root: %v", err)
+	}
+	if _, statErr := os.Stat(filepath.Join(root, "go.work")); statErr != nil {
+		t.Fatalf("expected the repository root at %s: %v", root, statErr)
+	}
+	for _, name := range []string{".env.example", "compose.yml"} {
+		raw, readErr := os.ReadFile(filepath.Join(root, name))
+		if readErr != nil {
+			t.Fatalf("read %s: %v", name, readErr)
+		}
+		if strings.Contains(string(raw), "NF_FLOW_SESSION_STORE") {
+			t.Errorf("%s still sets NF_FLOW_SESSION_STORE, which no code reads", name)
+		}
 	}
 }
 
@@ -73,7 +103,6 @@ func TestValidateEnumsRejectsInvalidAgentRunner(t *testing.T) {
 	t.Parallel()
 	cfg := &Config{
 		Port:              "8080",
-		SessionStore:      "mysql",
 		AgentRunner:       "invalid",
 		AgentQueueBackend: "memory",
 		WebhooksInsecure:  true,
@@ -87,7 +116,6 @@ func TestValidateEnumsRejectsInvalidQueueBackend(t *testing.T) {
 	t.Parallel()
 	cfg := &Config{
 		Port:              "8080",
-		SessionStore:      "mysql",
 		AgentRunner:       "log",
 		AgentQueueBackend: "redis",
 		WebhooksInsecure:  true,
@@ -101,7 +129,6 @@ func TestValidateEnumsRequiresWebhookSecrets(t *testing.T) {
 	t.Parallel()
 	base := Config{
 		Port:              "8080",
-		SessionStore:      "mysql",
 		AgentRunner:       "log",
 		AgentQueueBackend: "memory",
 		WebhooksInsecure:  false,

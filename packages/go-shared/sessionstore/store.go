@@ -1,18 +1,12 @@
 // Package sessionstore is the driver abstraction for refresh-token
-// backed sessions. The default driver is MySQL (wraps the existing
-// sqlc [generated.Queries]); a Redis driver lives behind the `redis`
-// build tag so the binary can be compiled without pulling go-redis
-// into the default dependency graph.
+// backed sessions. The default driver is MySQL (wraps the app's sqlc
+// generated queries through a small adapter); [NewRedisStore] is the
+// alternative.
 //
-// Usage from cmd/api:
-//
-//	var store sessionstore.Store
-//	switch cfg.SessionStore {
-//	case "redis":
-//	    store = sessionstore.NewRedisStore(...)   // requires -tags redis
-//	default:
-//	    store = sessionstore.NewMySQLStore(queries)
-//	}
+// auth-api owns identity and is the only service that holds sessions.
+// It picks the driver at startup from NF_AUTH_SESSION_STORE, and a
+// redis selection that cannot be satisfied refuses the start rather
+// than falling back, so the store in use is always the configured one.
 //
 // Handlers depend only on the [Store] interface; they never import
 // generated.Queries for sessions.
