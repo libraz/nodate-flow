@@ -35,6 +35,15 @@ resources:
   workspace_invite:
     breadcrumb: "Workspace > Invite"
     errors:
+      not_found:
+        code: WS.WORKSPACE_INVITE.NOT_FOUND
+        status: 404
+        message: "Invite not found"
+        message_ja: "招待が見つかりません"
+        message_zh: "未找到邀请"
+        description: "Returned when revoking an invite that does not exist in this workspace, or one that has already been revoked."
+        userAction: "Refresh the invite list and try again."
+
       expired:
         code: WS.WORKSPACE_INVITE.EXPIRED
         status: 410
@@ -52,6 +61,78 @@ resources:
         message_zh: "邀请已达到使用次数上限。"
         description: "Returned when the workspace invite has been redeemed the maximum allowed number of times."
         userAction: "Ask a workspace admin to send a new invite."
+
+  dashboard_widget:
+    breadcrumb: "Workspace > Dashboard"
+    errors:
+      not_found:
+        code: WS.DASHBOARD_WIDGET.NOT_FOUND
+        status: 404
+        message: "Widget not found"
+        message_ja: "ウィジェットが見つかりません"
+        message_zh: "未找到小部件"
+        description: "Returned when a dashboard widget with the given public_id does not exist in this workspace, or has already been removed."
+        userAction: "Refresh the dashboard and try again."
+
+  comment:
+    breadcrumb: "Workspace > Comment"
+    errors:
+      not_found:
+        code: WS.COMMENT.NOT_FOUND
+        status: 404
+        message: "Comment not found"
+        message_ja: "コメントが見つかりません"
+        message_zh: "未找到评论"
+        description: "Returned when a comment with the given public_id does not exist in this workspace, or has already been deleted."
+        userAction: "Refresh the discussion and try again."
+
+  inbox:
+    breadcrumb: "Workspace > Inbox"
+    errors:
+      not_found:
+        code: WS.INBOX.NOT_FOUND
+        status: 404
+        message: "Inbox item not found"
+        message_ja: "受信トレイの項目が見つかりません"
+        message_zh: "未找到收件箱项目"
+        description: "Returned when an inbox item with the given public_id does not exist in this workspace, or has already been archived."
+        userAction: "Refresh the inbox and try again."
+
+  task_actor:
+    breadcrumb: "Workspace > Task"
+    errors:
+      not_found:
+        code: WS.TASK_ACTOR.NOT_FOUND
+        status: 404
+        message: "Task actor not found"
+        message_ja: "タスクの担当者が見つかりません"
+        message_zh: "未找到任务参与者"
+        description: "Returned when removing an actor that is not assigned to this task, or was already removed."
+        userAction: "Refresh the task and try again."
+
+  task_constraint:
+    breadcrumb: "Workspace > Task"
+    errors:
+      not_found:
+        code: WS.TASK_CONSTRAINT.NOT_FOUND
+        status: 404
+        message: "Constraint not found"
+        message_ja: "制約が見つかりません"
+        message_zh: "未找到约束"
+        description: "Returned when a constraint with the given public_id does not exist on this task, or was already removed."
+        userAction: "Refresh the task and try again."
+
+  task_event_link:
+    breadcrumb: "Workspace > Task"
+    errors:
+      not_found:
+        code: WS.TASK_EVENT_LINK.NOT_FOUND
+        status: 404
+        message: "Linked event not found"
+        message_ja: "紐付けられた予定が見つかりません"
+        message_zh: "未找到关联日程"
+        description: "Returned when unlinking a calendar event that is not linked to this task, or was already unlinked."
+        userAction: "Refresh the task and try again."
 
   project:
     breadcrumb: "Workspace > Project"

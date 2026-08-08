@@ -74,6 +74,18 @@ resources:
         description: "Returned when an admin endpoint references a workspace that does not exist."
         userAction: "Verify the workspace ID."
 
+  session:
+    breadcrumb: "Instance > Session"
+    errors:
+      not_found:
+        code: INSTANCE.SESSION.NOT_FOUND
+        status: 404
+        message: "Session not found"
+        message_ja: "セッションが見つかりません"
+        message_zh: "未找到会话"
+        description: "Returned when an admin revoke references a session that does not exist or was already revoked."
+        userAction: "Refresh the session list and try again."
+
   settings:
     breadcrumb: "Instance > Settings"
     errors:

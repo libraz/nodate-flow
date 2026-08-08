@@ -44,6 +44,15 @@ resources:
   task:
     breadcrumb: "Timebox > Task"
     errors:
+      not_found:
+        code: TIMEBOX.TASK.NOT_FOUND
+        status: 404
+        message: "Task is not in this timebox"
+        message_ja: "このタイムボックスにタスクがありません"
+        message_zh: "该时间盒中没有此任务"
+        description: "Returned when removing a task that is not a member of the timebox, or was already removed."
+        userAction: "Refresh the timebox and try again."
+
       already_added:
         code: TIMEBOX.TASK.ALREADY_ADDED
         status: 409

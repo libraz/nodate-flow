@@ -49,6 +49,15 @@ resources:
   share_event:
     breadcrumb: "Share > Event"
     errors:
+      not_found:
+        code: SHARE.SHARE_EVENT.NOT_FOUND
+        status: 404
+        message: "Event is not on this share"
+        message_ja: "この共有に予定がありません"
+        message_zh: "该共享中没有此日程"
+        description: "Returned when detaching an event that is not attached to the share, or was already detached."
+        userAction: "Refresh the share and try again."
+
       reorder_invalid:
         code: SHARE.SHARE_EVENT.REORDER_INVALID
         status: 400

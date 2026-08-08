@@ -21,6 +21,11 @@ export const McpErrors = {
     status: 401,
     message: "MCP token has expired",
   },
+  MCP_TOKEN_NOT_FOUND: {
+    code: "MCP.TOKEN.NOT_FOUND",
+    status: 404,
+    message: "MCP token not found",
+  },
   MCP_TOKEN_REVOKED: {
     code: "MCP.TOKEN.REVOKED",
     status: 401,

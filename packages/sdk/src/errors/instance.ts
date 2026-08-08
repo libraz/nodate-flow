@@ -26,6 +26,11 @@ export const InstanceErrors = {
     status: 429,
     message: "Instance quota has been exceeded",
   },
+  INSTANCE_SESSION_NOT_FOUND: {
+    code: "INSTANCE.SESSION.NOT_FOUND",
+    status: 404,
+    message: "Session not found",
+  },
   INSTANCE_SETTINGS_INVALID_KEY: {
     code: "INSTANCE.SETTINGS.INVALID_KEY",
     status: 400,

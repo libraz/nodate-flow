@@ -14,6 +14,8 @@ var (
 	InstanceAdminStatusUnavailable = &Spec{Code: "INSTANCE.ADMIN.STATUS_UNAVAILABLE", Status: 500, Message: "Could not determine instance administrator status", Description: "Returned by the /me endpoint when the IsInstanceAdmin lookup cannot complete (database unavailable, query timeout). The previous behaviour silently treated the user as a non-admin, which could mask UI capability checks; this code surfaces the failure so the client can retry.", UserAction: "Retry the request. If the problem persists, contact your instance administrator."}
 	// INSTANCE.QUOTA.EXCEEDED — Instance quota has been exceeded
 	InstanceQuotaExceeded = &Spec{Code: "INSTANCE.QUOTA.EXCEEDED", Status: 429, Message: "Instance quota has been exceeded", Description: "Returned when an instance-wide resource quota (workspaces, users, storage) is exhausted.", UserAction: "Contact your instance administrator to raise the quota."}
+	// INSTANCE.SESSION.NOT_FOUND — Session not found
+	InstanceSessionNotFound = &Spec{Code: "INSTANCE.SESSION.NOT_FOUND", Status: 404, Message: "Session not found", Description: "Returned when an admin revoke references a session that does not exist or was already revoked.", UserAction: "Refresh the session list and try again."}
 	// INSTANCE.SETTINGS.INVALID_KEY — Unknown setting key
 	InstanceSettingsInvalidKey = &Spec{Code: "INSTANCE.SETTINGS.INVALID_KEY", Status: 400, Message: "Unknown setting key", Description: "Returned when a PATCH /admin/settings request references a setting key that is not recognized.", UserAction: "Use one of the supported setting keys."}
 	// INSTANCE.SETTINGS.INVALID_VALUE — Invalid value for setting

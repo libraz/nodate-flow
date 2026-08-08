@@ -12,6 +12,8 @@ var (
 	McpScopeInsufficient = &Spec{Code: "MCP.SCOPE.INSUFFICIENT", Status: 403, Message: "MCP token does not have the required scope", Description: "Returned when the requested tool or resource requires a scope not granted to the presented MCP token.", UserAction: "Re-issue the MCP token with the required scope."}
 	// MCP.TOKEN.EXPIRED — MCP token has expired
 	McpTokenExpired = &Spec{Code: "MCP.TOKEN.EXPIRED", Status: 401, Message: "MCP token has expired", Description: "Returned when the MCP token has passed its expiration timestamp.", UserAction: "Re-issue a new MCP token."}
+	// MCP.TOKEN.NOT_FOUND — MCP token not found
+	McpTokenNotFound = &Spec{Code: "MCP.TOKEN.NOT_FOUND", Status: 404, Message: "MCP token not found", Description: "Returned when revoking an MCP token that does not exist for this user in this workspace, or was already revoked.", UserAction: "Refresh the token list and try again."}
 	// MCP.TOKEN.REVOKED — MCP token has been revoked
 	McpTokenRevoked = &Spec{Code: "MCP.TOKEN.REVOKED", Status: 401, Message: "MCP token has been revoked", Description: "Returned when the MCP token has been explicitly revoked by the user or an admin.", UserAction: "Re-issue a new MCP token."}
 	// MCP.TOKEN.UNKNOWN — MCP token is invalid

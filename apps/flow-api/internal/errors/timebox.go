@@ -6,6 +6,8 @@ package errors
 var (
 	// TIMEBOX.TASK.ALREADY_ADDED — Task is already in this timebox
 	TimeboxTaskAlreadyAdded = &Spec{Code: "TIMEBOX.TASK.ALREADY_ADDED", Status: 409, Message: "Task is already in this timebox", Description: "Returned when the task has already been added to the target timebox.", UserAction: "No action needed; the task is already present in the timebox."}
+	// TIMEBOX.TASK.NOT_FOUND — Task is not in this timebox
+	TimeboxTaskNotFound = &Spec{Code: "TIMEBOX.TASK.NOT_FOUND", Status: 404, Message: "Task is not in this timebox", Description: "Returned when removing a task that is not a member of the timebox, or was already removed.", UserAction: "Refresh the timebox and try again."}
 	// TIMEBOX.TIMEBOX.ALREADY_COMPLETED — Cannot modify a completed timebox
 	TimeboxTimeboxAlreadyCompleted = &Spec{Code: "TIMEBOX.TIMEBOX.ALREADY_COMPLETED", Status: 409, Message: "Cannot modify a completed timebox", Description: "Returned when an update or state change is attempted on a timebox that has already been marked as completed.", UserAction: "Reopen the timebox before making changes, or create a new one."}
 	// TIMEBOX.TIMEBOX.INVALID_DATES — Timebox end date must be after start date

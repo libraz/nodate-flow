@@ -4,6 +4,10 @@ package errors
 
 // Error codes and specs.
 var (
+	// WS.COMMENT.NOT_FOUND — Comment not found
+	WsCommentNotFound = &Spec{Code: "WS.COMMENT.NOT_FOUND", Status: 404, Message: "Comment not found", Description: "Returned when a comment with the given public_id does not exist in this workspace, or has already been deleted.", UserAction: "Refresh the discussion and try again."}
+	// WS.DASHBOARD_WIDGET.NOT_FOUND — Widget not found
+	WsDashboardWidgetNotFound = &Spec{Code: "WS.DASHBOARD_WIDGET.NOT_FOUND", Status: 404, Message: "Widget not found", Description: "Returned when a dashboard widget with the given public_id does not exist in this workspace, or has already been removed.", UserAction: "Refresh the dashboard and try again."}
 	// WS.DESCRIPTION_VERSION.NOT_FOUND — Description version not found
 	WsDescriptionVersionNotFound = &Spec{Code: "WS.DESCRIPTION_VERSION.NOT_FOUND", Status: 404, Message: "Description version not found", Description: "Returned when a description version with the given public_id does not exist or has been removed.", UserAction: "Verify the version ID, or refresh the version history."}
 	// WS.FAVORITE.ALREADY_EXISTS — This item is already in your favorites
@@ -16,6 +20,8 @@ var (
 	WsImportCannotCancel = &Spec{Code: "WS.IMPORT.CANNOT_CANCEL", Status: 409, Message: "Only pending or running import jobs can be cancelled", Description: "Returned when attempting to cancel an import job that has already completed, failed, or been cancelled.", UserAction: "The import job is no longer in a cancellable state."}
 	// WS.IMPORT.NOT_FOUND — Import job not found
 	WsImportNotFound = &Spec{Code: "WS.IMPORT.NOT_FOUND", Status: 404, Message: "Import job not found", Description: "Returned when an import job with the given public_id does not exist or belongs to a different workspace.", UserAction: "Verify the import job ID, or refresh the list to see current imports."}
+	// WS.INBOX.NOT_FOUND — Inbox item not found
+	WsInboxNotFound = &Spec{Code: "WS.INBOX.NOT_FOUND", Status: 404, Message: "Inbox item not found", Description: "Returned when an inbox item with the given public_id does not exist in this workspace, or has already been archived.", UserAction: "Refresh the inbox and try again."}
 	// WS.INTAKE.ALREADY_CONVERTED — This intake item has already been converted to a task
 	WsIntakeAlreadyConverted = &Spec{Code: "WS.INTAKE.ALREADY_CONVERTED", Status: 409, Message: "This intake item has already been converted to a task", Description: "Returned when attempting to convert an intake item that has already been converted to a task.", UserAction: "The item has already been converted. Open the linked task instead."}
 	// WS.INTAKE.ALREADY_TRIAGED — This intake item has already been triaged
@@ -92,6 +98,8 @@ var (
 	WsTaskTransitionUnknown = &Spec{Code: "WS.TASK.TRANSITION_UNKNOWN", Status: 400, Message: "Unknown task transition", Description: "Returned when the client submits a transition name that is not one of {start|block|unblock|submit|complete|reopen|cancel}. Rejected at the HTTP layer before the constraint engine runs.", UserAction: "Use one of the supported transition names defined by the API."}
 	// WS.TASK.UPDATE_CONFLICT — Task was modified by someone else
 	WsTaskUpdateConflict = &Spec{Code: "WS.TASK.UPDATE_CONFLICT", Status: 409, Message: "Task was modified by someone else", Description: "Returned when an optimistic concurrency check (version or updated_at) fails during update.", UserAction: "Reload the task to see the latest version, then re-apply your changes."}
+	// WS.TASK_ACTOR.NOT_FOUND — Task actor not found
+	WsTaskActorNotFound = &Spec{Code: "WS.TASK_ACTOR.NOT_FOUND", Status: 404, Message: "Task actor not found", Description: "Returned when removing an actor that is not assigned to this task, or was already removed.", UserAction: "Refresh the task and try again."}
 	// WS.TASK_AGENT.ALREADY_ASSIGNED — Agent is already the assignee for this task
 	WsTaskAgentAlreadyAssigned = &Spec{Code: "WS.TASK_AGENT.ALREADY_ASSIGNED", Status: 409, Message: "Agent is already the assignee for this task", Description: "Returned by POST /tasks/{id}/handoff/to-agent when the supplied agent_id matches the task's current actor_agent_id, so the handoff would be a no-op.", UserAction: "If you intended to refresh the run, use the agent run trigger endpoint instead; otherwise hand off to a different agent."}
 	// WS.TASK_AGENT.COST_CAP_EXCEEDED — Agent monthly cost cap has been reached
@@ -100,6 +108,10 @@ var (
 	WsTaskAgentHandoffLoopDetected = &Spec{Code: "WS.TASK_AGENT.HANDOFF_LOOP_DETECTED", Status: 422, Message: "Handoff bounced between agent and user too many times", Description: "Returned when the recent agent.task.handoff_* event history shows the task ping-ponging between agent and user beyond the configured threshold (NF_AGENT_HANDOFF_LOOP_LIMIT). Protects against runaway autoaction cycles.", UserAction: "Open the task and resolve the underlying disagreement manually; the loop limit resets after a cool-down window or admin override."}
 	// WS.TASK_AGENT.NOT_ASSIGNED — Task has no agent assignee
 	WsTaskAgentNotAssigned = &Spec{Code: "WS.TASK_AGENT.NOT_ASSIGNED", Status: 422, Message: "Task has no agent assignee", Description: "Returned when an operation requires the task to have an AI agent assignee but none is currently assigned (for example, POST /tasks/{id}/handoff/to-user issued against a task whose actor_agent_id is NULL).", UserAction: "Assign an agent to the task via POST /tasks/{id}/handoff/to-agent before invoking the agent-only operation."}
+	// WS.TASK_CONSTRAINT.NOT_FOUND — Constraint not found
+	WsTaskConstraintNotFound = &Spec{Code: "WS.TASK_CONSTRAINT.NOT_FOUND", Status: 404, Message: "Constraint not found", Description: "Returned when a constraint with the given public_id does not exist on this task, or was already removed.", UserAction: "Refresh the task and try again."}
+	// WS.TASK_EVENT_LINK.NOT_FOUND — Linked event not found
+	WsTaskEventLinkNotFound = &Spec{Code: "WS.TASK_EVENT_LINK.NOT_FOUND", Status: 404, Message: "Linked event not found", Description: "Returned when unlinking a calendar event that is not linked to this task, or was already unlinked.", UserAction: "Refresh the task and try again."}
 	// WS.VIEW_PREFERENCE.NOT_FOUND — View preference not found
 	WsViewPreferenceNotFound = &Spec{Code: "WS.VIEW_PREFERENCE.NOT_FOUND", Status: 404, Message: "View preference not found", Description: "Returned when a view preference with the given public_id does not exist for the current user.", UserAction: "Verify the view preference ID, or create a new one."}
 	// WS.WORKSPACE.ACCESS_DENIED — You do not have access to this workspace
@@ -112,4 +124,6 @@ var (
 	WsWorkspaceInviteExhausted = &Spec{Code: "WS.WORKSPACE_INVITE.EXHAUSTED", Status: 410, Message: "Invite has reached its use limit.", Description: "Returned when the workspace invite has been redeemed the maximum allowed number of times.", UserAction: "Ask a workspace admin to send a new invite."}
 	// WS.WORKSPACE_INVITE.EXPIRED — Invite has expired.
 	WsWorkspaceInviteExpired = &Spec{Code: "WS.WORKSPACE_INVITE.EXPIRED", Status: 410, Message: "Invite has expired.", Description: "Returned when the workspace invite token's expiration time has passed.", UserAction: "Ask a workspace admin to send a new invite."}
+	// WS.WORKSPACE_INVITE.NOT_FOUND — Invite not found
+	WsWorkspaceInviteNotFound = &Spec{Code: "WS.WORKSPACE_INVITE.NOT_FOUND", Status: 404, Message: "Invite not found", Description: "Returned when revoking an invite that does not exist in this workspace, or one that has already been revoked.", UserAction: "Refresh the invite list and try again."}
 )

@@ -21,6 +21,11 @@ export const ShareErrors = {
     status: 404,
     message: "Share token is invalid",
   },
+  SHARE_SHARE_EVENT_NOT_FOUND: {
+    code: "SHARE.SHARE_EVENT.NOT_FOUND",
+    status: 404,
+    message: "Event is not on this share",
+  },
   SHARE_SHARE_EVENT_REORDER_INVALID: {
     code: "SHARE.SHARE_EVENT.REORDER_INVALID",
     status: 400,

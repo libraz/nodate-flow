@@ -12,6 +12,8 @@ var (
 	ShareShareNotFound = &Spec{Code: "SHARE.SHARE.NOT_FOUND", Status: 404, Message: "Share page not found", Description: "Returned when a share with the given public_id or token hash does not exist.", UserAction: "Verify the URL; if you rotated the token recently, use the new URL returned at rotate time."}
 	// SHARE.SHARE.TOKEN_INVALID — Share token is invalid
 	ShareShareTokenInvalid = &Spec{Code: "SHARE.SHARE.TOKEN_INVALID", Status: 404, Message: "Share token is invalid", Description: "Returned when the URL token does not match any token_hash. Deliberately 404 (not 401) so the existence of any share is not leaked by the status code.", UserAction: "Verify the URL was copied correctly. Rotation invalidates prior tokens."}
+	// SHARE.SHARE_EVENT.NOT_FOUND — Event is not on this share
+	ShareShareEventNotFound = &Spec{Code: "SHARE.SHARE_EVENT.NOT_FOUND", Status: 404, Message: "Event is not on this share", Description: "Returned when detaching an event that is not attached to the share, or was already detached.", UserAction: "Refresh the share and try again."}
 	// SHARE.SHARE_EVENT.REORDER_INVALID — Reorder input must be a permutation of the share's current events
 	ShareShareEventReorderInvalid = &Spec{Code: "SHARE.SHARE_EVENT.REORDER_INVALID", Status: 400, Message: "Reorder input must be a permutation of the share's current events", Description: "Returned when a batch reorder request supplies a linkPublicIds array that is missing an existing link, references a link that does not belong to the share, or contains duplicates. The reorder is atomic and requires the full current set.", UserAction: "Refetch the share's event list and resubmit the reorder with every current link exactly once."}
 )

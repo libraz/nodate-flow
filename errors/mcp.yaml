@@ -41,6 +41,18 @@ resources:
         description: "Returned when the MCP token is bound to one workspace but the tool arguments reference a resource belonging to another workspace."
         userAction: "Use an MCP token issued for the workspace that owns the target resource."
 
+  token_admin:
+    breadcrumb: "MCP > Token"
+    errors:
+      not_found:
+        code: MCP.TOKEN.NOT_FOUND
+        status: 404
+        message: "MCP token not found"
+        message_ja: "MCP トークンが見つかりません"
+        message_zh: "未找到 MCP 令牌"
+        description: "Returned when revoking an MCP token that does not exist for this user in this workspace, or was already revoked."
+        userAction: "Refresh the token list and try again."
+
   scope:
     breadcrumb: "MCP > Scope"
     errors:
