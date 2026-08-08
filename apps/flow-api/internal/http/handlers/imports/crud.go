@@ -58,6 +58,12 @@ func Create(deps Deps) func(context.Context, *CreateImportInput) (*CreateImportO
 
 		actorID, _ := middleware.ActorFromContext(ctx)
 
+		// Validate before marshalling: config_json is stored as typed,
+		// so a credential that reaches this point has already been
+		// written down in plaintext by the time anything else notices.
+		if err := checkImportConfig(in.Body); err != nil {
+			return nil, err
+		}
 		configJSON, err := json.Marshal(in.Body.ConfigJSON)
 		if err != nil {
 			return nil, httpErr(apierrors.InternalUnexpected)
@@ -249,6 +255,21 @@ func Cancel(deps Deps) func(context.Context, *CancelImportInput) (*CancelImportO
 // costs a round trip and leaves a megabyte of rejected data in the
 // table. The worker enforces the row-count ceiling, which needs a parse
 // and cannot be answered from the request alone.
+// checkImportConfig refuses a configuration that names a credential or
+// a setting the source does not have, and maps the two apart so the
+// caller is told which one it hit.
+func checkImportConfig(body CreateImportBody) error {
+	err := importer.ValidateConfig(body.Source, body.ConfigJSON)
+	switch {
+	case err == nil:
+		return nil
+	case errors.Is(err, importer.ErrConfigKeySecret):
+		return httpErr(apierrors.WsImportConfigSecretRejected)
+	default:
+		return httpErr(apierrors.WsImportConfigKeyUnknown)
+	}
+}
+
 func checkCSVPayloadSize(body CreateImportBody) error {
 	if body.Source != string(generated.ImportJobsSourceCsv) || body.ConfigJSON == nil {
 		return nil

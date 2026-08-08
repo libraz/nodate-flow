@@ -53,7 +53,7 @@ type ImportJobBody struct {
 type CreateImportBody struct {
 	Source     string         `json:"source" enum:"github,jira,linear,csv"`
 	ProjectID  *string        `json:"projectId,omitempty" doc:"Target project public id (UUID v7)"`
-	ConfigJSON map[string]any `json:"configJson,omitempty" doc:"Source-specific configuration"`
+	ConfigJSON map[string]any `json:"configJson,omitempty" doc:"Source-specific configuration. Stored in plaintext, so any key naming a token, secret, password or API key is rejected; sources with a connector accept only the keys they define (csv takes 'csv')"`
 }
 
 // CreateImportInput is the request for POST /workspaces/{wsId}/imports.

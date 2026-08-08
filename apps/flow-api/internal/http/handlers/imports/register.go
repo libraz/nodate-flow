@@ -15,7 +15,7 @@ func Register(api huma.API, deps Deps) {
 		Method:      http.MethodPost,
 		Path:        "/workspaces/{wsId}/imports",
 		Summary:     "Create an import job",
-		Description: "Submits an import job (Asana / CSV / etc.) referencing previously uploaded source data. The job runs asynchronously; poll /imports/{importId} for progress.",
+		Description: "Submits an import job (Asana / CSV / etc.) referencing previously uploaded source data. The job runs asynchronously; poll /imports/{importId} for progress. configJson is stored in plaintext and returned by the read endpoints, so it rejects any key that names a credential; connect an external service through its integration settings instead.",
 		Tags:        []string{"Admin"},
 	}, Create(deps))
 

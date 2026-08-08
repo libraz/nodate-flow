@@ -587,6 +587,26 @@ func hashToken(tok string) string {
 	return hex.EncodeToString(sum[:])
 }
 
+// invocationActor splits a session into the two actor columns
+// mcp_invocations records.
+//
+// Both are recorded, not one or the other: an agent-owned token still
+// names the human who minted it, and the audit trail needs to keep that
+// — but the agent is who acted. A row that carries only the user id
+// leaves the timeline no way to tell agent work from the person's own,
+// which is the question an AI-native product is least able to leave
+// unanswered. v_workspace_activity reads agent_id first for that reason.
+func invocationActor(s *session) (userID, agentID sql.NullInt32) {
+	if s == nil {
+		return sql.NullInt32{}, sql.NullInt32{}
+	}
+	userID = sql.NullInt32{Int32: int32(s.userID), Valid: true} //#nosec G115 -- session user id is users.id (BIGINT UNSIGNED), fits int32 within realistic deployments
+	if s.agentID != 0 {
+		agentID = sql.NullInt32{Int32: int32(s.agentID), Valid: true} //#nosec G115 -- agent id is ai_agents.id (BIGINT UNSIGNED), fits int32 within realistic deployments
+	}
+	return userID, agentID
+}
+
 // audit writes a single mcp_invocations row. It never returns an error
 // to the caller; audit failures are logged via fmt.Errorf and swallowed
 // because they must not break the tool response.
@@ -609,10 +629,7 @@ func (h *Handler) audit(
 	// upstream pay only an idempotent second pass.
 	argsBlob, resBlob := redactAuditPayloads(args, result)
 
-	var userID sql.NullInt32
-	if s != nil {
-		userID = sql.NullInt32{Int32: int32(s.userID), Valid: true} //#nosec G115 -- session user id is users.id (BIGINT UNSIGNED), fits int32 within realistic deployments
-	}
+	userID, agentID := invocationActor(s)
 	var ec sql.NullString
 	if errCode != "" {
 		ec = sql.NullString{String: errCode, Valid: true}
@@ -630,6 +647,7 @@ func (h *Handler) audit(
 		PublicID:              newPublicID(),
 		WorkspaceID:           s.workspaceID,
 		UserID:                userID,
+		AgentID:               agentID,
 		TaskID:                taskID,
 		ToolName:              toolName,
 		ArgumentsRedactedJson: argsBlob,

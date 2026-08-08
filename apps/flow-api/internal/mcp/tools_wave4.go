@@ -10,6 +10,7 @@ import (
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
 	apierrors "github.com/libraz/nodate-flow/apps/flow-api/internal/errors"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/eventbus"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/importer"
 )
 
 // importJobScanPage is how many rows a status-filtered listing reads per
@@ -182,6 +183,43 @@ func countValue(v any) int64 {
 	}
 }
 
+// parseImportConfig turns the tool's configJson argument into the blob
+// the row stores, refusing the same values REST refuses.
+//
+// The check has to live on this path too, not only on the handler.
+// config_json is plaintext and read back by the job endpoints, so the
+// rule that keeps a credential out of it is worth exactly as much as
+// its weakest entry point — and MCP is not a back door here, it is a
+// front one: an agent is the caller most likely to be handed a token
+// and told to "import from GitHub". Validating only the REST path would
+// have left the column open through the surface the product points
+// agents at.
+//
+// Decoding into an object rather than calling json.Valid also brings
+// this in line with REST, whose body type is an object: a bare array or
+// string was accepted here and would then fail in the worker, which
+// reads config_json as an object.
+func parseImportConfig(source, raw string) (json.RawMessage, error) {
+	const empty = `{}`
+	if raw == "" {
+		return json.RawMessage(empty), nil
+	}
+	var cfg map[string]any
+	if err := json.Unmarshal([]byte(raw), &cfg); err != nil {
+		return nil, apierrors.New(apierrors.McpToolArgumentsInvalid)
+	}
+	if cfg == nil {
+		return json.RawMessage(empty), nil
+	}
+	if err := importer.ValidateConfig(source, cfg); err != nil {
+		if stderrors.Is(err, importer.ErrConfigKeySecret) {
+			return nil, apierrors.New(apierrors.WsImportConfigSecretRejected)
+		}
+		return nil, apierrors.New(apierrors.WsImportConfigKeyUnknown)
+	}
+	return json.RawMessage(raw), nil
+}
+
 func runCreateImportJob(ctx context.Context, deps Deps, s *session, raw json.RawMessage) (any, error) {
 	if _, err := requireWorkspaceMember(ctx, deps, s); err != nil {
 		return nil, err
@@ -203,6 +241,13 @@ func runCreateImportJob(ctx context.Context, deps Deps, s *session, raw json.Raw
 		// ok
 	default:
 		return nil, apierrors.New(apierrors.McpToolArgumentsInvalid)
+	}
+
+	// Before any lookup: config_json is stored in plaintext, so a
+	// credential that gets past here has already been written down.
+	configJSON, err := parseImportConfig(in.Source, in.ConfigJSON)
+	if err != nil {
+		return nil, err
 	}
 
 	var projectID sql.NullInt32
@@ -240,17 +285,8 @@ func runCreateImportJob(ctx context.Context, deps Deps, s *session, raw json.Raw
 		}
 	}
 
-	configJSON := json.RawMessage("{}")
-	if in.ConfigJSON != "" {
-		// Validate it is valid JSON.
-		if !json.Valid([]byte(in.ConfigJSON)) {
-			return nil, apierrors.New(apierrors.McpToolArgumentsInvalid)
-		}
-		configJSON = json.RawMessage(in.ConfigJSON)
-	}
-
 	pub := newPublicID()
-	_, err := deps.Queries.CreateImportJob(ctx, generated.CreateImportJobParams{
+	_, err = deps.Queries.CreateImportJob(ctx, generated.CreateImportJobParams{
 		PublicID:          pub,
 		WorkspaceID:       s.workspaceID,
 		ProjectID:         projectID,
