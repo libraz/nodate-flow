@@ -24,9 +24,9 @@ vi.mock('../../../lib/sdk', () => ({
       data: {
         parentTaskId: 'task-001',
         steps: [
-          { title: 'Alpha', description: 'first', priority: 'low' },
-          { title: 'Beta', description: 'second', priority: 'medium' },
-          { title: 'Gamma', description: 'third', priority: 'high' },
+          { title: 'Alpha', description: 'first', priority: 1 },
+          { title: 'Beta', description: 'second', priority: 2 },
+          { title: 'Gamma', description: 'third', priority: 3 },
         ],
       } as unknown,
       error: undefined,
@@ -63,6 +63,10 @@ describe('useProposeSteps uiId augmentation', () => {
     expect(new Set(ids).size).toBe(ids.length);
     // Original payload fields are preserved.
     expect(out.steps.map((s) => s.title)).toEqual(['Alpha', 'Beta', 'Gamma']);
+    // Priority arrives on the same 0..4 scale the rest of the product
+    // uses and is carried through untouched — the hook has no business
+    // reinterpreting it.
+    expect(out.steps.map((s) => s.priority)).toEqual([1, 2, 3]);
   });
 
   it('produces a disjoint set of uiIds when re-proposing', async () => {

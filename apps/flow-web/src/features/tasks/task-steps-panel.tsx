@@ -5,7 +5,7 @@
  * then apply selected steps as real subtasks.
  */
 
-import Badge, { type BadgeTone } from '@nodate-flow/ui/primitives/badge';
+import Badge from '@nodate-flow/ui/primitives/badge';
 import Button from '@nodate-flow/ui/primitives/button';
 import Card from '@nodate-flow/ui/primitives/card';
 import Input from '@nodate-flow/ui/primitives/input';
@@ -15,24 +15,13 @@ import { type ReactElement, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { formatApiError } from '../../lib/api-error';
+import { PRIORITY_KEY, PRIORITY_TONE } from './constants';
 import {
   type StepGranularity,
   type StepProposalUI,
   useApplySteps,
   useProposeSteps,
 } from './steps-api';
-
-const PRIORITY_TONE: Record<string, BadgeTone> = {
-  low: 'neutral',
-  medium: 'warning',
-  high: 'danger',
-};
-
-const PRIORITY_MAP: Record<string, number> = {
-  low: 1,
-  medium: 2,
-  high: 3,
-};
 
 interface StepItemProps {
   step: StepProposalUI;
@@ -86,7 +75,7 @@ function StepItem({
           style={{ flex: 1, fontWeight: 500 }}
         />
         <Badge tone={PRIORITY_TONE[step.priority] ?? 'neutral'}>
-          {t(`tasks.steps.priority_${step.priority}`)}
+          {t(PRIORITY_KEY[step.priority] ?? 'tasks.priority.none')}
         </Badge>
       </div>
       {step.description.length > 0 ? (
@@ -175,7 +164,12 @@ export default function TaskStepsPanel({ taskId }: TaskStepsPanelProps): ReactEl
       .map(({ step, i }) => ({
         title: titles[i] ?? step.title,
         description: step.description,
-        priority: PRIORITY_MAP[step.priority] ?? 2,
+        // Straight through: propose-steps and apply-steps speak the same
+        // scale, so there is nothing left to translate here. The panel
+        // used to map a label to a number and quietly send 2 for
+        // anything it had no entry for, which silently rewrote the
+        // priority the user was shown.
+        priority: step.priority,
       }));
 
     if (selected.length === 0) return;

@@ -36,19 +36,19 @@ vi.mock('../steps-api', async () => {
           {
             title: 'First step',
             description: 'First step description',
-            priority: 'medium',
+            priority: 2,
             uiId: 'ui-step-1',
           },
           {
             title: 'Second step',
             description: 'Second step description',
-            priority: 'medium',
+            priority: 2,
             uiId: 'ui-step-2',
           },
           {
             title: 'Third step',
             description: 'Third step description',
-            priority: 'medium',
+            priority: 2,
             uiId: 'ui-step-3',
           },
         ],

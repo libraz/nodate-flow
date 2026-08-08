@@ -3745,7 +3745,7 @@ export interface paths {
         put?: never;
         /**
          * Create an import job
-         * @description Submits an import job (Asana / CSV / etc.) referencing previously uploaded source data. The job runs asynchronously; poll /imports/{importId} for progress.
+         * @description Submits an import job (Asana / CSV / etc.) referencing previously uploaded source data. The job runs asynchronously; poll /imports/{importId} for progress. configJson is stored in plaintext and returned by the read endpoints, so it rejects any key that names a credential; connect an external service through its integration settings instead.
          */
         post: operations["imports-create"];
         delete?: never;
@@ -5262,7 +5262,10 @@ export interface components {
         };
         ApplyStep: {
             description?: string;
-            /** Format: int32 */
+            /**
+             * Format: int32
+             * @default 0
+             */
             priority: number;
             title: string;
         };
@@ -5699,10 +5702,15 @@ export interface components {
             readonly $schema?: string;
             /** Format: double */
             costUsd: number;
-            /** @description Local date in the requested timezone (YYYY-MM-DD). Falls back to UTC if tz is absent or invalid. */
+            /** @description The window's date in the workspace timezone (YYYY-MM-DD). */
             date: string;
             /** Format: double */
             monthlyCapUsd?: number;
+            /**
+             * Format: int64
+             * @description Start of the enforced budget window (unixtime seconds).
+             */
+            windowStartsAt: number;
         };
         CountUnreadOutputBody: {
             /**
@@ -5914,7 +5922,7 @@ export interface components {
              * @example https://example.com/schemas/CreateImportBody.json
              */
             readonly $schema?: string;
-            /** @description Source-specific configuration */
+            /** @description Source-specific configuration. Stored in plaintext, so any key naming a token, secret, password or API key is rejected; sources with a connector accept only the keys they define (csv takes 'csv') */
             configJson?: {
                 [key: string]: unknown;
             };
@@ -8891,7 +8899,11 @@ export interface components {
         };
         ProposedStep: {
             description: string;
-            priority: string;
+            /**
+             * Format: int32
+             * @description Priority on the same 0-4 scale as tasks; 0 means none
+             */
+            priority: number;
             title: string;
         };
         Provider: {
@@ -15831,7 +15843,7 @@ export interface operations {
     "ai-cost-today": {
         parameters: {
             query?: {
-                /** @description IANA timezone name (e.g. Asia/Tokyo). Defaults to UTC when absent or invalid. */
+                /** @description Deprecated and ignored. The window is the workspace's own day, since that is the window the budget is enforced over. */
                 tz?: string;
             };
             header?: never;

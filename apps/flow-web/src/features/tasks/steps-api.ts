@@ -7,7 +7,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 
 import { ApiError } from '../../lib/api-error';
 import { sdk } from '../../lib/sdk';
-import { tasksKeys } from './api';
+import { type TaskPriority, tasksKeys } from './api';
 
 export { ApiError as TaskApiError };
 
@@ -21,7 +21,14 @@ export interface ProposeStepsInput {
 export interface StepProposal {
   title: string;
   description: string;
-  priority: string;
+  /**
+   * Same 0..4 scale every other task priority uses. It used to arrive
+   * as a label ("low" / "medium" / "high"), which nothing else in the
+   * product speaks and which apply-steps would not accept — the panel
+   * had to translate it back to a number on the way out, guessing at
+   * anything it did not recognise.
+   */
+  priority: TaskPriority;
 }
 
 /**
@@ -88,7 +95,7 @@ export function useProposeSteps() {
 
 export interface ApplyStepsArgs {
   taskId: string;
-  steps: { title: string; description: string; priority: number }[];
+  steps: { title: string; description: string; priority: TaskPriority }[];
 }
 
 export interface ApplyStepsResult {

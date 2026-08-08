@@ -16,6 +16,7 @@ import (
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
 	apierrors "github.com/libraz/nodate-flow/apps/flow-api/internal/errors"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/eventbus"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/handlers/handlerutil"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/middleware"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/taskcreate"
 	"github.com/libraz/nodate-flow/packages/go-shared/logutil"
@@ -44,10 +45,18 @@ type ProposeStepsInput struct {
 }
 
 // ProposedStep is a single step entry in the propose-steps response.
+//
+// The fields are the fields of [ApplyStep], with the same names, types
+// and bounds, because the pair of endpoints is documented as "apply
+// what propose returned" and a caller must be able to do exactly that.
+// Priority used to be a label here and an integer there, so the two
+// halves of the round trip did not fit: the proposal had to be
+// rewritten before it could be applied, using a mapping that lived
+// nowhere the caller could see.
 type ProposedStep struct {
 	Title       string `json:"title"`
 	Description string `json:"description"`
-	Priority    string `json:"priority"`
+	Priority    int32  `json:"priority" minimum:"0" maximum:"4" doc:"Priority on the same 0-4 scale as tasks; 0 means none"`
 }
 
 // ProposeStepsOutputBody is the response body for POST /tasks/{id}/propose-steps.
@@ -64,10 +73,18 @@ type ProposeStepsOutput struct {
 // ---- Apply Steps I/O -------------------------------------------------------
 
 // ApplyStep is a single step entry in the apply-steps request body.
+//
+// Priority is optional, matching CreateTaskBody and the MCP apply_steps
+// tool, both of which treat title as the only required field. The
+// column has a default and 0 is a real value ("no priority"), so
+// demanding the field prevented nothing and made the sibling surfaces
+// disagree about what a step is. An omitted priority and an explicit 0
+// both resolve to 0, so the usual `omitempty` ambiguity on an integer
+// costs nothing here.
 type ApplyStep struct {
 	Title       string `json:"title" minLength:"1" maxLength:"500"`
 	Description string `json:"description,omitempty" maxLength:"50000"`
-	Priority    int32  `json:"priority" minimum:"0" maximum:"4"`
+	Priority    int32  `json:"priority,omitempty" minimum:"0" maximum:"4" default:"0"`
 }
 
 // ApplyStepsInput is the request for POST /tasks/{id}/apply-steps.
@@ -167,10 +184,27 @@ func ProposeSteps(deps StepsDeps) func(context.Context, *ProposeStepsInput) (*Pr
 		out.Body.ParentTaskID = task.PublicID.String()
 		out.Body.Steps = make([]ProposedStep, 0, len(steps))
 		for _, st := range steps {
+			// The model answers with a word; the API speaks the same
+			// integer scale as every other task surface.
+			priority, known := handlerutil.PriorityFromLabel(st.Priority)
+			if !known {
+				// The proposal still goes out — one unrankable step is
+				// not worth failing a decomposition over — but the
+				// substitution is recorded. A model drifting off the
+				// vocabulary it was handed is otherwise invisible: the
+				// caller sees a priority and cannot tell it was chosen
+				// by a fallback rather than by the model.
+				slog.WarnContext(ctx, "tasks: LLM returned a priority outside the vocabulary",
+					slog.String("handler", "tasks.ProposeSteps"),
+					slog.String("priority_label", st.Priority),
+					logutil.LogEntity("workspace", ws.PublicID),
+					slog.String("task_public_id", task.PublicID.String()),
+				)
+			}
 			out.Body.Steps = append(out.Body.Steps, ProposedStep{
 				Title:       st.Title,
 				Description: st.Description,
-				Priority:    st.Priority,
+				Priority:    priority,
 			})
 		}
 		return out, nil

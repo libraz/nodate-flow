@@ -808,6 +808,7 @@
             "type": "string"
           },
           "priority": {
+            "default": 0,
             "format": "int32",
             "maximum": 4,
             "minimum": 0,
@@ -819,7 +820,7 @@
             "type": "string"
           }
         },
-        "required": ["title", "priority"],
+        "required": ["title"],
         "type": "object"
       },
       "ApplyStepsInputBody": {
@@ -1796,15 +1797,20 @@
             "type": "number"
           },
           "date": {
-            "description": "Local date in the requested timezone (YYYY-MM-DD). Falls back to UTC if tz is absent or invalid.",
+            "description": "The window's date in the workspace timezone (YYYY-MM-DD).",
             "type": "string"
           },
           "monthlyCapUsd": {
             "format": "double",
             "type": "number"
+          },
+          "windowStartsAt": {
+            "description": "Start of the enforced budget window (unixtime seconds).",
+            "format": "int64",
+            "type": "integer"
           }
         },
-        "required": ["costUsd", "date"],
+        "required": ["costUsd", "windowStartsAt", "date"],
         "type": "object"
       },
       "CountUnreadOutputBody": {
@@ -2169,7 +2175,7 @@
           },
           "configJson": {
             "additionalProperties": {},
-            "description": "Source-specific configuration",
+            "description": "Source-specific configuration. Stored in plaintext, so any key naming a token, secret, password or API key is rejected; sources with a connector accept only the keys they define (csv takes 'csv')",
             "type": "object"
           },
           "projectId": {
@@ -8639,7 +8645,11 @@
             "type": "string"
           },
           "priority": {
-            "type": "string"
+            "description": "Priority on the same 0-4 scale as tasks; 0 means none",
+            "format": "int32",
+            "maximum": 4,
+            "minimum": 0,
+            "type": "integer"
           },
           "title": {
             "type": "string"
@@ -20958,12 +20968,12 @@
             }
           },
           {
-            "description": "IANA timezone name (e.g. Asia/Tokyo). Defaults to UTC when absent or invalid.",
+            "description": "Deprecated and ignored. The window is the workspace's own day, since that is the window the budget is enforced over.",
             "explode": false,
             "in": "query",
             "name": "tz",
             "schema": {
-              "description": "IANA timezone name (e.g. Asia/Tokyo). Defaults to UTC when absent or invalid.",
+              "description": "Deprecated and ignored. The window is the workspace's own day, since that is the window the budget is enforced over.",
               "type": "string"
             }
           }
@@ -25960,7 +25970,7 @@
         "tags": ["Admin"]
       },
       "post": {
-        "description": "Submits an import job (Asana / CSV / etc.) referencing previously uploaded source data. The job runs asynchronously; poll /imports/{importId} for progress.",
+        "description": "Submits an import job (Asana / CSV / etc.) referencing previously uploaded source data. The job runs asynchronously; poll /imports/{importId} for progress. configJson is stored in plaintext and returned by the read endpoints, so it rejects any key that names a credential; connect an external service through its integration settings instead.",
         "operationId": "imports-create",
         "parameters": [
           {
