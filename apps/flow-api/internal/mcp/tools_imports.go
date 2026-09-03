@@ -1,3 +1,6 @@
+// MCP tools over import jobs: listing a workspace's jobs with a status
+// filter, and queueing a new import.
+
 package mcp
 
 import (
