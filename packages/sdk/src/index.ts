@@ -51,7 +51,6 @@ export {
   type RefreshMiddlewareOptions,
   type TokenRefresher,
 } from './refresh.js';
-
 // Region helpers (timezone + country)
 export {
   detectTimezone,
@@ -60,6 +59,17 @@ export {
   listSupportedTimezones,
   SUPPORTED_COUNTRIES,
 } from './region.js';
+// The single door between feature code and the HTTP client
+export {
+  type ApiFailurePolicy,
+  type ApiOutcome,
+  type ApiRequester,
+  type ApiRequestResult,
+  createApiRequester,
+  requestFailed,
+  type SdkCall,
+  type SdkResult,
+} from './request.js';
 export {
   lookup as lookupSignalKind,
   SIGNAL_KINDS,
