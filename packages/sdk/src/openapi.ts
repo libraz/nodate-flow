@@ -1188,14 +1188,14 @@ export interface paths {
         post?: never;
         /**
          * Soft-disable a project
-         * @description Marks the project as disabled so it disappears from listings and pickers. Tasks remain queryable for audit but reject new edits.
+         * @description Marks the project as disabled so it disappears from listings and pickers. Tasks remain queryable for audit but reject new edits. Requires project editor role or above.
          */
         delete: operations["projects-disable"];
         options?: never;
         head?: never;
         /**
          * Patch a project
-         * @description Updates editable project fields (name, description, status, settings). Project admin role required.
+         * @description Updates editable project fields (name, description, status, settings). Requires project editor role or above.
          */
         patch: operations["projects-patch"];
         trace?: never;
@@ -1235,7 +1235,7 @@ export interface paths {
         put?: never;
         /**
          * Add a member to a project
-         * @description Adds an existing workspace member to the project at the requested role. Requires project admin role; the user must already belong to the parent workspace.
+         * @description Adds an existing workspace member to the project at the requested role. Requires project lead role; the user must already belong to the parent workspace.
          */
         post: operations["projects-members-add"];
         delete?: never;
@@ -1256,7 +1256,7 @@ export interface paths {
         post?: never;
         /**
          * Remove a member from a project
-         * @description Removes the named user from the project. Workspace membership is unaffected. Refuses to remove the last project admin.
+         * @description Removes the named user from the project. Workspace membership is unaffected. Requires project lead role.
          */
         delete: operations["projects-members-remove"];
         options?: never;
@@ -4591,7 +4591,7 @@ export interface paths {
         };
         /**
          * List draft tasks in a workspace by reason (currently only retro)
-         * @description Returns draft tasks of the requested reason for review. Currently the only supported reason is 'retro' — retrospective drafts created by the signal_judge Applier when an event-day signal triggers action=generate_retro. Each row carries the source task back-reference plus optional agent attribution sourced from the task.retro.drafted event. The retro draft queue UI (Phase 6 / L2) renders Accept / Discard against this feed.
+         * @description Returns draft tasks of the requested reason for review. Currently the only supported reason is 'retro' — retrospective drafts created by the signal_judge Applier when an event-day signal triggers action=generate_retro. Each row carries the source task back-reference plus optional agent attribution sourced from the task.retro.drafted event. The retro draft queue UI renders Accept / Discard against this feed.
          */
         get: operations["tasks-drafts-list"];
         put?: never;
@@ -5089,6 +5089,16 @@ export interface components {
             minioErrors: number;
             /** Format: int64 */
             storageObjectsDeleted: number;
+        };
+        AdminDeleteWorkspaceInputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/AdminDeleteWorkspaceInputBody.json
+             */
+            readonly $schema?: string;
+            /** @description Must be true to acknowledge irreversible deletion */
+            confirm?: boolean;
         };
         AdminListWorkspacesOutputBody: {
             /**
@@ -6374,15 +6384,6 @@ export interface components {
             readonly $schema?: string;
             deleted: boolean;
         };
-        DeleteOutputBody: {
-            /**
-             * Format: uri
-             * @description A URL to the JSON Schema for this object.
-             * @example https://example.com/schemas/DeleteOutputBody.json
-             */
-            readonly $schema?: string;
-            ok: boolean;
-        };
         DeletePageBody: {
             /**
              * Format: uri
@@ -6473,16 +6474,6 @@ export interface components {
              */
             readonly $schema?: string;
             ok: boolean;
-        };
-        DeleteWorkspaceInputBody: {
-            /**
-             * Format: uri
-             * @description A URL to the JSON Schema for this object.
-             * @example https://example.com/schemas/DeleteWorkspaceInputBody.json
-             */
-            readonly $schema?: string;
-            /** @description Must be true to acknowledge irreversible deletion */
-            confirm?: boolean;
         };
         DeleteWorkspaceOutputBody: {
             /**
@@ -7061,6 +7052,15 @@ export interface components {
             provider: "github" | "slack" | "google";
             /** Format: int64 */
             updatedAt?: number;
+        };
+        IntegrationMappingDeleteOutputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/IntegrationMappingDeleteOutputBody.json
+             */
+            readonly $schema?: string;
+            ok: boolean;
         };
         InviteInfoOutputBody: {
             /**
@@ -8362,7 +8362,7 @@ export interface components {
         };
         PatchAutoActionRuleItem: {
             /**
-             * @description Operator-picked autonomy level override. Omit to preserve the prior value. Clearing back to NULL is not supported by this PATCH (Phase 4 follow-up).
+             * @description Operator-picked autonomy level override. Omit to preserve the prior value. Clearing back to NULL is not supported by this PATCH.
              * @enum {string}
              */
             autonomyLevel?: "suggest" | "draft" | "auto";
@@ -8788,6 +8788,12 @@ export interface components {
             uploadUrl?: string;
         };
         Project: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/Project.json
+             */
+            readonly $schema?: string;
             color?: string;
             /** Format: int64 */
             createdAt: number;
@@ -9096,6 +9102,12 @@ export interface components {
             publicToken: string;
         };
         Reaction: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/Reaction.json
+             */
+            readonly $schema?: string;
             /** Format: int64 */
             createdAt: number;
             emoji: string;
@@ -9740,6 +9752,12 @@ export interface components {
             workspaceId: string;
         };
         TaskActor: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/TaskActor.json
+             */
+            readonly $schema?: string;
             avatarUrl?: string;
             /** Format: int64 */
             createdAt: number;
@@ -9752,6 +9770,12 @@ export interface components {
             userId: string;
         };
         TaskAgentActor: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/TaskAgentActor.json
+             */
+            readonly $schema?: string;
             agentId: string;
             agentName: string;
             /** Format: int64 */
@@ -9813,6 +9837,12 @@ export interface components {
             title: string;
         };
         TaskComment: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/TaskComment.json
+             */
+            readonly $schema?: string;
             authorAvatarUrl?: string;
             authorDisplayName: string;
             authorId: string;
@@ -9874,6 +9904,12 @@ export interface components {
             otherTaskTitle: string;
         };
         TaskEventLink: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/TaskEventLink.json
+             */
+            readonly $schema?: string;
             calendarId?: string;
             calendarName?: string;
             /** Format: int64 */
@@ -9896,6 +9932,12 @@ export interface components {
             taskTitle?: string;
         };
         TaskLabel: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/TaskLabel.json
+             */
+            readonly $schema?: string;
             color: string;
             /** Format: int64 */
             createdAt: number;
@@ -10510,6 +10552,15 @@ export interface components {
             /** Format: int64 */
             workspaceCount: number;
         };
+        WebhookDeleteOutputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/WebhookDeleteOutputBody.json
+             */
+            readonly $schema?: string;
+            ok: boolean;
+        };
         WebhookDeliveryDTO: {
             /** Format: int32 */
             attempts: number;
@@ -10653,6 +10704,16 @@ export interface components {
             timezone: string;
             /** Format: int64 */
             updatedAt?: number;
+        };
+        WorkspaceDeleteWorkspaceInputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/WorkspaceDeleteWorkspaceInputBody.json
+             */
+            readonly $schema?: string;
+            /** @description Must be true to acknowledge irreversible deletion */
+            confirm?: boolean;
         };
         WorkspaceInvite: {
             /** Format: int64 */
@@ -11268,7 +11329,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["DeleteWorkspaceInputBody"];
+                "application/json": components["schemas"]["AdminDeleteWorkspaceInputBody"];
             };
         };
         responses: {
@@ -15342,7 +15403,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["DeleteWorkspaceInputBody"];
+                "application/json": components["schemas"]["WorkspaceDeleteWorkspaceInputBody"];
             };
         };
         responses: {
@@ -18968,7 +19029,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["DeleteOutputBody"];
+                    "application/json": components["schemas"]["IntegrationMappingDeleteOutputBody"];
                 };
             };
             /** @description Error */
@@ -21209,7 +21270,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["DeleteOutputBody"];
+                    "application/json": components["schemas"]["WebhookDeleteOutputBody"];
                 };
             };
             /** @description Error */

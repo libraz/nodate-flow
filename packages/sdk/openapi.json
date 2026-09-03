@@ -382,6 +382,23 @@
         "required": ["deleted", "storageObjectsDeleted", "minioErrors"],
         "type": "object"
       },
+      "AdminDeleteWorkspaceInputBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/AdminDeleteWorkspaceInputBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "confirm": {
+            "description": "Must be true to acknowledge irreversible deletion",
+            "type": "boolean"
+          }
+        },
+        "type": "object"
+      },
       "AdminListWorkspacesOutputBody": {
         "additionalProperties": false,
         "properties": {
@@ -3118,23 +3135,6 @@
         "required": ["deleted"],
         "type": "object"
       },
-      "DeleteOutputBody": {
-        "additionalProperties": false,
-        "properties": {
-          "$schema": {
-            "description": "A URL to the JSON Schema for this object.",
-            "examples": ["https://example.com/schemas/DeleteOutputBody.json"],
-            "format": "uri",
-            "readOnly": true,
-            "type": "string"
-          },
-          "ok": {
-            "type": "boolean"
-          }
-        },
-        "required": ["ok"],
-        "type": "object"
-      },
       "DeletePageBody": {
         "additionalProperties": false,
         "properties": {
@@ -3303,23 +3303,6 @@
           }
         },
         "required": ["ok"],
-        "type": "object"
-      },
-      "DeleteWorkspaceInputBody": {
-        "additionalProperties": false,
-        "properties": {
-          "$schema": {
-            "description": "A URL to the JSON Schema for this object.",
-            "examples": ["https://example.com/schemas/DeleteWorkspaceInputBody.json"],
-            "format": "uri",
-            "readOnly": true,
-            "type": "string"
-          },
-          "confirm": {
-            "description": "Must be true to acknowledge irreversible deletion",
-            "type": "boolean"
-          }
-        },
         "type": "object"
       },
       "DeleteWorkspaceOutputBody": {
@@ -4530,6 +4513,23 @@
           }
         },
         "required": ["id", "provider", "externalKey", "label", "enabled", "createdAt"],
+        "type": "object"
+      },
+      "IntegrationMappingDeleteOutputBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/IntegrationMappingDeleteOutputBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "ok": {
+            "type": "boolean"
+          }
+        },
+        "required": ["ok"],
         "type": "object"
       },
       "InviteInfoOutputBody": {
@@ -7510,7 +7510,7 @@
         "additionalProperties": false,
         "properties": {
           "autonomyLevel": {
-            "description": "Operator-picked autonomy level override. Omit to preserve the prior value. Clearing back to NULL is not supported by this PATCH (Phase 4 follow-up).",
+            "description": "Operator-picked autonomy level override. Omit to preserve the prior value. Clearing back to NULL is not supported by this PATCH.",
             "enum": ["suggest", "draft", "auto"],
             "type": "string"
           },
@@ -8364,6 +8364,13 @@
       "Project": {
         "additionalProperties": false,
         "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/Project.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
           "color": {
             "type": "string"
           },
@@ -9088,6 +9095,13 @@
       "Reaction": {
         "additionalProperties": false,
         "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/Reaction.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
           "createdAt": {
             "format": "int64",
             "type": "integer"
@@ -10444,6 +10458,13 @@
       "TaskActor": {
         "additionalProperties": false,
         "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/TaskActor.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
           "avatarUrl": {
             "type": "string"
           },
@@ -10477,6 +10498,13 @@
       "TaskAgentActor": {
         "additionalProperties": false,
         "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/TaskAgentActor.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
           "agentId": {
             "type": "string"
           },
@@ -10653,6 +10681,13 @@
       "TaskComment": {
         "additionalProperties": false,
         "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/TaskComment.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
           "authorAvatarUrl": {
             "type": "string"
           },
@@ -10811,6 +10846,13 @@
       "TaskEventLink": {
         "additionalProperties": false,
         "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/TaskEventLink.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
           "calendarId": {
             "type": "string"
           },
@@ -10870,6 +10912,13 @@
       "TaskLabel": {
         "additionalProperties": false,
         "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/TaskLabel.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
           "color": {
             "type": "string"
           },
@@ -12150,6 +12199,23 @@
         ],
         "type": "object"
       },
+      "WebhookDeleteOutputBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/WebhookDeleteOutputBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "ok": {
+            "type": "boolean"
+          }
+        },
+        "required": ["ok"],
+        "type": "object"
+      },
       "WebhookDeliveryDTO": {
         "additionalProperties": false,
         "properties": {
@@ -12518,6 +12584,23 @@
           }
         },
         "required": ["id", "slug", "name", "timezone", "country", "memberCount", "createdAt"],
+        "type": "object"
+      },
+      "WorkspaceDeleteWorkspaceInputBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/WorkspaceDeleteWorkspaceInputBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "confirm": {
+            "description": "Must be true to acknowledge irreversible deletion",
+            "type": "boolean"
+          }
+        },
         "type": "object"
       },
       "WorkspaceInvite": {
@@ -13545,7 +13628,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/DeleteWorkspaceInputBody"
+                "$ref": "#/components/schemas/AdminDeleteWorkspaceInputBody"
               }
             }
           },
@@ -16246,7 +16329,7 @@
     },
     "/projects/{prjId}": {
       "delete": {
-        "description": "Marks the project as disabled so it disappears from listings and pickers. Tasks remain queryable for audit but reject new edits.",
+        "description": "Marks the project as disabled so it disappears from listings and pickers. Tasks remain queryable for audit but reject new edits. Requires project editor role or above.",
         "operationId": "projects-disable",
         "parameters": [
           {
@@ -16332,7 +16415,7 @@
         "tags": ["Projects"]
       },
       "patch": {
-        "description": "Updates editable project fields (name, description, status, settings). Project admin role required.",
+        "description": "Updates editable project fields (name, description, status, settings). Requires project editor role or above.",
         "operationId": "projects-patch",
         "parameters": [
           {
@@ -16498,7 +16581,7 @@
         "tags": ["Projects"]
       },
       "post": {
-        "description": "Adds an existing workspace member to the project at the requested role. Requires project admin role; the user must already belong to the parent workspace.",
+        "description": "Adds an existing workspace member to the project at the requested role. Requires project lead role; the user must already belong to the parent workspace.",
         "operationId": "projects-members-add",
         "parameters": [
           {
@@ -16553,7 +16636,7 @@
     },
     "/projects/{prjId}/members/{userId}": {
       "delete": {
-        "description": "Removes the named user from the project. Workspace membership is unaffected. Refuses to remove the last project admin.",
+        "description": "Removes the named user from the project. Workspace membership is unaffected. Requires project lead role.",
         "operationId": "projects-members-remove",
         "parameters": [
           {
@@ -20090,7 +20173,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/DeleteWorkspaceInputBody"
+                "$ref": "#/components/schemas/WorkspaceDeleteWorkspaceInputBody"
               }
             }
           },
@@ -26640,7 +26723,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/DeleteOutputBody"
+                  "$ref": "#/components/schemas/IntegrationMappingDeleteOutputBody"
                 }
               }
             },
@@ -29514,7 +29597,7 @@
     },
     "/workspaces/{wsId}/tasks/drafts": {
       "get": {
-        "description": "Returns draft tasks of the requested reason for review. Currently the only supported reason is 'retro' — retrospective drafts created by the signal_judge Applier when an event-day signal triggers action=generate_retro. Each row carries the source task back-reference plus optional agent attribution sourced from the task.retro.drafted event. The retro draft queue UI (Phase 6 / L2) renders Accept / Discard against this feed.",
+        "description": "Returns draft tasks of the requested reason for review. Currently the only supported reason is 'retro' — retrospective drafts created by the signal_judge Applier when an event-day signal triggers action=generate_retro. Each row carries the source task back-reference plus optional agent attribution sourced from the task.retro.drafted event. The retro draft queue UI renders Accept / Discard against this feed.",
         "operationId": "tasks-drafts-list",
         "parameters": [
           {
@@ -30485,7 +30568,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/DeleteOutputBody"
+                  "$ref": "#/components/schemas/WebhookDeleteOutputBody"
                 }
               }
             },
