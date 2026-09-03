@@ -6,6 +6,12 @@
 #   - auth-api running at NF_AUTH_API_URL (default: http://localhost:8082)
 #   - Docker available (schemathesis runs in a container)
 #
+# unreachable-by-design: fuzzes two servers that have to already be
+# running and seeded, which no gate can arrange for itself. Invoked by
+# hand through `make test-contract`. The drift this would catch from a
+# cold start is covered by `make test-openapi-diff`, which regenerates
+# the spec from the Go sources and needs no live service.
+#
 # Usage:
 #   ./scripts/contract-test.sh              # full run
 #   ./scripts/contract-test.sh --dry-run    # show what would run

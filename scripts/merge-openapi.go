@@ -17,6 +17,7 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"flag"
 	"fmt"
 	"os"
@@ -131,7 +132,9 @@ func merge(dst, src map[string]any, srcName string) error {
 	}
 
 	mergePaths(dst, src)
-	mergeComponents(dst, src)
+	if err := mergeComponents(dst, src, srcName); err != nil {
+		return err
+	}
 	mergeTagList(dst, src)
 
 	// `security` and `servers` are document-wide and cannot be combined
@@ -178,10 +181,29 @@ func merge(dst, src map[string]any, srcName string) error {
 // mergeComponents merges every components sub-map, not just schemas.
 // securitySchemes, responses, parameters and the rest are as much a part
 // of the contract as the schemas are.
-func mergeComponents(dst, src map[string]any) {
+//
+// A name that exists on both sides is not resolved by keeping whichever
+// spec was read first: that is the same silent overwrite this program
+// exists to refuse, just moved one level down. Instead:
+//
+//   - identical entries merge trivially.
+//   - when one entry is a structural superset of the other (every
+//     key/value the smaller one carries also appears, unchanged, in the
+//     larger one) the superset wins. This is what lets the same Go type
+//     survive being rendered slightly differently by two independent
+//     huma registries — e.g. huma only adds the `$schema` self-description
+//     property to a type when that registry uses it as an operation's
+//     direct body, not when the same type is only ever nested inside
+//     another schema — without losing the more complete rendering.
+//   - anything else is a genuine name collision: two different
+//     declarations share a component name and neither is a fuller
+//     version of the other. Reporting it here, with the file and the
+//     name, is the whole point; picking one arbitrarily is the bug this
+//     program was written to stop.
+func mergeComponents(dst, src map[string]any, srcName string) error {
 	srcComp, ok := src["components"].(map[string]any)
 	if !ok {
-		return
+		return nil
 	}
 	dstComp, ok := dst["components"].(map[string]any)
 	if !ok {
@@ -203,11 +225,60 @@ func mergeComponents(dst, src map[string]any) {
 			dstComp[section] = dstEntries
 		}
 		for name, entry := range srcEntries {
-			if _, exists := dstEntries[name]; !exists {
+			existing, exists := dstEntries[name]
+			if !exists {
 				dstEntries[name] = entry
+				continue
 			}
+			merged, err := preferSuperset(existing, entry)
+			if err != nil {
+				return fmt.Errorf(
+					"%s: components.%s.%s disagrees with the same name already merged from an earlier spec, and neither definition is a superset of the other (%w) — two different declarations share this component name; rename one of the underlying Go types so each keeps its own schema",
+					srcName, section, name, err)
+			}
+			dstEntries[name] = merged
 		}
 	}
+	return nil
+}
+
+// preferSuperset returns whichever of a and b structurally contains the
+// other, so a name collision between two renderings of the same
+// underlying type resolves to the more complete rendering instead of
+// whichever side happened to be read first. It reports an error when
+// neither is a superset of the other, since that means the two values
+// disagree about what the component actually is.
+func preferSuperset(a, b any) (any, error) {
+	if isSupersetOf(a, b) {
+		return a, nil
+	}
+	if isSupersetOf(b, a) {
+		return b, nil
+	}
+	return nil, errors.New("neither value is a superset of the other")
+}
+
+// isSupersetOf reports whether every key/value that b carries also
+// appears, unchanged, in a. Maps are compared key by key so a can carry
+// extra keys b does not have; anything else (scalars, arrays) must match
+// exactly, since there is no meaningful "more complete" ordering for a
+// JSON Schema array like `required` or `enum`.
+func isSupersetOf(a, b any) bool {
+	bMap, ok := b.(map[string]any)
+	if !ok {
+		return equalJSON(a, b)
+	}
+	aMap, ok := a.(map[string]any)
+	if !ok {
+		return false
+	}
+	for key, bVal := range bMap {
+		aVal, present := aMap[key]
+		if !present || !isSupersetOf(aVal, bVal) {
+			return false
+		}
+	}
+	return true
 }
 
 // mergeTagList unions the document tag lists by tag name.

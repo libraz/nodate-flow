@@ -40,12 +40,15 @@ fi
 # The error catalog is generated from errors/*.yaml the way the data layer
 # is generated from the schema, and it drifted the same way: a YAML edit
 # without a regeneration left the Go constants, the TS catalog and the docs
-# describing something their source no longer said. The check compares a
-# hash recorded in the generated barrel against one recomputed from the
-# YAML, so it writes nothing and costs two file reads. Gated on the sources
-# being staged, for the same reason the schema check is.
-if git diff --cached --name-only --diff-filter=ACMR | grep -qE '^errors/.*\.yaml$'; then
-  if ! (cd "$toplevel" && go -C scripts run gen-errors.go --check-stamp); then
+# describing something their source no longer said. The check rebuilds every
+# output in memory and compares it against what is committed, so it writes
+# nothing; comparing the files rather than a hash of the sources also catches
+# a change in the generator and a hand-edit of its output. Gated on either
+# the catalog or the generator being staged -- a change to either can make
+# the committed output wrong.
+if git diff --cached --name-only --diff-filter=ACMR |
+  grep -qE '^(errors/.*\.yaml|scripts/gen-errors\.go)$'; then
+  if ! (cd "$toplevel" && go -C scripts run gen-errors.go --check); then
     echo "" >&2
     echo "✖ pre-commit hook: errors/*.yaml changed without regenerating (see above)." >&2
     echo "  Run 'make gen-errors' and stage the result." >&2
@@ -63,7 +66,7 @@ fi
 # than on nothing at all.
 if git diff --cached --name-only --diff-filter=ACMR |
   grep -qE '\.(css|tsx?)$'; then
-  if ! bash "$toplevel/scripts/check-css-var-parens.sh" --ci; then
+  if ! bash "$toplevel/scripts/check-css-var-parens.sh"; then
     echo "" >&2
     echo "✖ pre-commit hook: a var(--nf-...) reference has a stray closing paren (see above)." >&2
     echo "  The declaration around it is dropped by the browser." >&2

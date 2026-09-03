@@ -1,19 +1,20 @@
 #!/usr/bin/env bash
 # check-schema-collisions.sh — fail when the merged OpenAPI 3.1 spec
-# routes operations whose response shapes have been silently overwritten
-# by a name collision in components.schemas.
+# routes operations whose request or response shapes have been silently
+# overwritten by a name collision in components.schemas.
 #
 # The merged spec at packages/sdk/openapi.json combines flow-api +
 # auth-api outputs. Huma derives schema names from Go struct names; if
 # two Go packages both declare e.g. `type ListOutputBody struct {...}`
 # with different fields, the merge step keeps only one shape and every
 # operation that references that schema name gets the surviving shape
-# regardless of what the handler actually returns.
+# regardless of what the handler actually returns (response side) or
+# actually accepts (request side).
 #
-# This script flags every multi-operation schema reference whose shape
-# (sorted required keys + sorted property names) is consistent with one
-# Go type. A failing entry means at least one operation lies about its
-# response.
+# This script flags every schema name referenced by 2+ distinct
+# operations, whether that reference comes from a 200/201/202 response
+# body or from a requestBody. A failing entry means at least one of
+# those operations was renamed away from its own Go type by the merge.
 #
 # Run locally or in CI:
 #
@@ -52,28 +53,43 @@ fi
 # under multiple operations again. We allowlist names that are known
 # shared DTOs (e.g. `Task`, `Workspace`, `CalendarResponse`).
 
+# A name belongs here only when every operation carrying it resolves to
+# one Go declaration. Two declarations that merely happen to have the same
+# fields today are not shared: they drift independently, and the merge
+# keeps whichever it saw last.
+#
 # LoginBody is a single auth-api type (handlers/auth/dto.go) deliberately
 # reused as the response Body for every operation that finishes a sign-in:
 # POST /auth/login, magic-link verify, and the OIDC google/github/microsoft
 # callbacks. They all return the same discriminated login envelope
 # (step=complete|totp_required), so the shared schema is intentional, not a
 # silent overwrite.
-ALLOWLIST_PATTERN='^(AdminDeleteOutputBody|AuthTokens|AutoActionSettingsBody|CalendarResponse|EventResponse|ImportJobBody|Label|ListTimelineOutputBody|LoginBody|MeBody|OIDCStartOutputBody|PageDTO|Project|PublicShareResponse|Record|SavedLens|Task|TaskComment|TimeboxDTO|WidgetDTO|Workspace|WorkspaceMember)$'
+#
+# IntegrationMapping is the one resource type handlers/integrationmappings
+# returns from both create and patch; PreferencesOutputBody is the one type
+# handlers/notifications returns from both the list and the update.
+ALLOWLIST_PATTERN='^(AdminDeleteOutputBody|AuthTokens|AutoActionSettingsBody|CalendarResponse|EventResponse|ImportJobBody|IntegrationMapping|Label|ListTimelineOutputBody|LoginBody|MeBody|OIDCStartOutputBody|PageDTO|PreferencesOutputBody|Project|PublicShareResponse|Record|SavedLens|Task|TaskComment|TimeboxDTO|WidgetDTO|Workspace|WorkspaceMember)$'
 
 mapfile -t suspects < <(
   jq -r '
     [.paths[][]
       | select(type == "object")
-      | select(.responses)
-      | {op: .operationId,
-         ref: (.responses["200"].content["application/json"].schema."$ref" //
-               .responses["201"].content["application/json"].schema."$ref" //
-               .responses["202"].content["application/json"].schema."$ref")}
-      | select(.ref != null)]
+      | select(.operationId)
+      | . as $op
+      | (
+          ([$op.responses["200"]?, $op.responses["201"]?, $op.responses["202"]?]
+            | map(.content["application/json"].schema."$ref"? // empty))
+          + ([$op.requestBody?.content["application/json"].schema."$ref"? // empty])
+        )
+      | map(select(. != null and . != ""))
+      | unique
+      | .[]
+      | {op: $op.operationId, ref: .}]
+    | unique_by([.op, .ref])
     | group_by(.ref)
-    | map(select(length > 1))
+    | map(select((map(.op) | unique | length) > 1))
     | map({name: (.[0].ref | sub("^#/components/schemas/"; "")),
-           ops: [.[].op]})
+           ops: ([.[].op] | unique)})
     | .[] | "\(.name)\t\(.ops | join(","))"
   ' "$SPEC"
 )

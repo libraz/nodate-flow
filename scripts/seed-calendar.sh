@@ -1,4 +1,12 @@
 #!/usr/bin/env bash
+# Seed calendar demo data into a running dev stack through the REST API.
+#
+# unreachable-by-design: writes demo data into a developer's own
+# database through a running API. It is a convenience for looking at a
+# populated calendar, not an assertion about the code, so there is
+# nothing for a gate to learn from running it. Invoked by hand through
+# `make seed-calendar`.
+
 set -euo pipefail
 
 API="${TC_API_URL:-http://localhost:8080}"

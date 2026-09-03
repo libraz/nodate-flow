@@ -253,7 +253,11 @@ func run(check bool) error {
 	}
 
 	if check {
-		return compareOutputs(root, outputs)
+		// This generator owns no prunable namespace: every path it can
+		// emit is emitted on every run, so there is never an output it
+		// used to produce and no longer does. gen-errors, which prunes
+		// per-code doc pages, is what the second argument is for.
+		return compareOutputs(root, outputs, nil)
 	}
 	if err := os.MkdirAll(docsDir, 0o755); err != nil {
 		return err
@@ -272,8 +276,14 @@ func run(check bool) error {
 }
 
 // compareOutputs reports the committed files that differ from what the
-// generator produces now.
-func compareOutputs(root string, outputs map[string][]byte) error {
+// generator produces now, and the generated files it no longer produces.
+// Nothing is written.
+//
+// Kept identical to the function of the same name in
+// scripts/gen-errors.go: the two generators answer the drift question the
+// same way, in the same message shape, with the same exit status, so
+// neither can quietly become the weaker one.
+func compareOutputs(root string, outputs map[string][]byte, obsolete []string) error {
 	paths := make([]string, 0, len(outputs))
 	for path := range outputs {
 		paths = append(paths, path)
@@ -283,26 +293,73 @@ func compareOutputs(root string, outputs map[string][]byte) error {
 	var stale []string
 	for _, path := range paths {
 		committed, err := os.ReadFile(path)
-		rel, relErr := filepath.Rel(root, path)
-		if relErr != nil {
-			rel = path
-		}
 		switch {
 		case os.IsNotExist(err):
-			stale = append(stale, rel+" (not committed)")
+			stale = append(stale, relPath(root, path)+"\n    the generator produces this file, but it is not committed")
 		case err != nil:
-			return fmt.Errorf("gen-signal-kinds: cannot read %s: %w", rel, err)
+			return fmt.Errorf("gen-signal-kinds: cannot read %s: %w", relPath(root, path), err)
 		case !bytes.Equal(committed, outputs[path]):
-			stale = append(stale, rel)
+			stale = append(stale, relPath(root, path)+"\n"+firstDifference(committed, outputs[path]))
 		}
 	}
+	for _, path := range obsolete {
+		stale = append(stale, relPath(root, path)+"\n    no longer produced by the generator; it is stale")
+	}
 	if len(stale) > 0 {
-		return fmt.Errorf("gen-signal-kinds: these files are not what signal_kinds/*.yaml generates:\n  %s\n\n"+
+		return fmt.Errorf("gen-signal-kinds: these files are not what signal_kinds/*.yaml generates:\n\n  %s\n\n"+
 			"Run 'make gen-signal-kinds' and commit the result. Editing a generated locale by hand does not "+
 			"survive the next run — put the translation in signal_kinds/*.yaml instead",
-			strings.Join(stale, "\n  "))
+			strings.Join(stale, "\n\n  "))
 	}
 	return nil
+}
+
+// relPath renders a path relative to the repository root, falling back to
+// the absolute path when it is outside.
+func relPath(root, path string) string {
+	rel, err := filepath.Rel(root, path)
+	if err != nil {
+		return path
+	}
+	return rel
+}
+
+// firstDifference names the line where the committed file and the freshly
+// generated one diverge, so a failure points at a place rather than only
+// at a file.
+func firstDifference(committed, generated []byte) string {
+	oldLines := strings.Split(string(committed), "\n")
+	newLines := strings.Split(string(generated), "\n")
+	n := len(oldLines)
+	if len(newLines) > n {
+		n = len(newLines)
+	}
+	for i := range n {
+		var oldLine, newLine string
+		if i < len(oldLines) {
+			oldLine = oldLines[i]
+		}
+		if i < len(newLines) {
+			newLine = newLines[i]
+		}
+		if oldLine == newLine {
+			continue
+		}
+		return fmt.Sprintf("    first difference at line %d\n      committed:   %s\n      regenerated: %s",
+			i+1, elide(oldLine), elide(newLine))
+	}
+	return "    content differs"
+}
+
+// elide shortens a line so one long generated declaration cannot bury the
+// rest of the report.
+func elide(line string) string {
+	const max = 100
+	runes := []rune(line)
+	if len(runes) <= max {
+		return line
+	}
+	return string(runes[:max]) + "…"
 }
 
 func validateEntry(path string, e kindEntry) error {

@@ -13,10 +13,20 @@
  * or the covered range needs to move. `packages/go-shared/holidays` has a
  * test that fails once the dataset stops covering the current year.
  *
- * Usage: bun run scripts/gen-holidays.ts
+ * Usage:
+ *   bun run scripts/gen-holidays.ts            # regenerate the dataset
+ *   bun run scripts/gen-holidays.ts --check    # compare, write nothing
+ *
+ * --check answers "is what is committed what this generator would produce
+ * today?" by rebuilding the dataset in memory and comparing it against the
+ * committed file. It is the same contract the Go generators use
+ * (scripts/gen-errors.go, scripts/gen-signal-kinds.go): content comparison
+ * rather than a hash of the inputs, because a bumped provider version, an
+ * edited country list and a hand-edit of the JSON all leave the inputs of a
+ * hash untouched. Exit status 1 on any disagreement.
  */
 import { readFileSync, writeFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
+import { dirname, join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { getOrCreateProvider } from '@nodate-flow/holidays';
 
@@ -96,14 +106,10 @@ for (const code of [...COUNTRIES].sort()) {
   countries[code] = dates;
 }
 
-const outPath = join(
-  dirname(fileURLToPath(import.meta.url)),
-  '..',
-  'packages',
-  'go-shared',
-  'holidays',
-  'data.json',
-);
+const repoRoot = join(dirname(fileURLToPath(import.meta.url)), '..');
+const outPath = join(repoRoot, 'packages', 'go-shared', 'holidays', 'data.json');
+/** Repository-relative path, so the report reads the same anywhere. */
+const outLabel = relative(repoRoot, outPath);
 
 const payload = {
   fromYear: FROM_YEAR,
@@ -111,9 +117,67 @@ const payload = {
   countries,
 };
 
-writeFileSync(outPath, `${JSON.stringify(payload, null, 2)}\n`, 'utf8');
+const generated = `${JSON.stringify(payload, null, 2)}\n`;
+
+/** Shorten a line so one long entry cannot bury the rest of the report. */
+function elide(line: string): string {
+  const max = 100;
+  const runes = [...line];
+  return runes.length <= max ? line : `${runes.slice(0, max).join('')}…`;
+}
+
+/**
+ * Name the line where the committed file and the freshly generated one
+ * diverge, so a failure points at a place rather than only at a file.
+ */
+function firstDifference(committed: string, fresh: string): string {
+  const oldLines = committed.split('\n');
+  const newLines = fresh.split('\n');
+  const n = Math.max(oldLines.length, newLines.length);
+  for (let i = 0; i < n; i++) {
+    const oldLine = oldLines[i] ?? '';
+    const newLine = newLines[i] ?? '';
+    if (oldLine === newLine) continue;
+    return [
+      `    first difference at line ${i + 1}`,
+      `      committed:   ${elide(oldLine)}`,
+      `      regenerated: ${elide(newLine)}`,
+    ].join('\n');
+  }
+  return '    content differs';
+}
 
 const total = Object.values(countries).reduce((n, d) => n + d.length, 0);
-console.log(
-  `gen-holidays: wrote ${outPath} (${Object.keys(countries).length} countries, ${total} dates, ${FROM_YEAR}-${TO_YEAR})`,
-);
+
+if (process.argv.slice(2).includes('--check')) {
+  let committed: string | null = null;
+  try {
+    committed = readFileSync(outPath, 'utf8');
+  } catch {
+    committed = null;
+  }
+  if (committed === null) {
+    console.error(
+      `gen-holidays: the generator produces ${outLabel}, but it is not committed\n\n` +
+        "Run 'make gen-holidays' and commit the result.",
+    );
+    process.exit(1);
+  }
+  if (committed !== generated) {
+    console.error(
+      `gen-holidays: this file is not what the holiday provider generates:\n\n  ${outLabel}\n` +
+        `${firstDifference(committed, generated)}\n\n` +
+        "Run 'make gen-holidays' and commit the result. Editing the dataset by hand does not " +
+        'survive the next run — the holiday provider and the supported-country list are the source.',
+    );
+    process.exit(1);
+  }
+  console.log(
+    `gen-holidays: ${outLabel} matches the holiday provider (${Object.keys(countries).length} countries, ${total} dates, ${FROM_YEAR}-${TO_YEAR})`,
+  );
+} else {
+  writeFileSync(outPath, generated, 'utf8');
+  console.log(
+    `gen-holidays: wrote ${outLabel} (${Object.keys(countries).length} countries, ${total} dates, ${FROM_YEAR}-${TO_YEAR})`,
+  );
+}

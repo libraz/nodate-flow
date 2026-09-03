@@ -111,6 +111,24 @@ jobs:
       - name: Breakpoint scale
         run: make check-breakpoints
 
+      # A literal in an attribute reads as markup rather than as copy,
+      # which is why it is the easiest place for a string to escape
+      # translation: the page renders, every locale loads, and one label
+      # stays English everywhere.
+      - name: Hardcoded UI strings
+        run: make check-strings
+
+      # The guard over the guards. Several of the scans above sat in the
+      # tree for months with nothing invoking them, which reports exactly
+      # like a scan that passes. This one fails when a script exists that
+      # no gate runs, so the next one cannot go quiet the same way.
+      - name: Every guard is reachable
+        run: make check-reachability
+
+      - name: Unit tests (holidays)
+        working-directory: packages/holidays
+        run: bun run test
+
       - name: Unit tests (flow-web)
         working-directory: apps/flow-web
         run: bun run test --coverage

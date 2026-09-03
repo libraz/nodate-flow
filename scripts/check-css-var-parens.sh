@@ -23,14 +23,22 @@
 # Only lines satisfying both are reported.
 #
 # Usage:
-#   ./scripts/check-css-var-parens.sh          # scan, exit 0 (report only)
-#   ./scripts/check-css-var-parens.sh --ci     # strict mode (exit 1 on any hit)
+#   ./scripts/check-css-var-parens.sh
+#
+# There is one mode: a hit fails. The scan used to exit 0 unless it was
+# handed --ci, which made every caller's correctness depend on
+# remembering a flag, and a caller that forgot it reported success on a
+# tree full of violations. Arguments are rejected rather than ignored so
+# a stale `--ci` is visible instead of merely harmless.
 
 set -euo pipefail
 
+if [[ $# -gt 0 ]]; then
+  echo "check-css-var-parens: takes no arguments (got: $*)" >&2
+  exit 2
+fi
+
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-STRICT=false
-[[ "${1:-}" == "--ci" ]] && STRICT=true
 
 SCAN_DIRS=(
   "$ROOT/apps/flow-web/src"
@@ -84,9 +92,7 @@ if [[ $count -gt 0 ]]; then
   echo "Remove the extra ')' so the token reference is balanced:"
   echo "  color: var(--nf-color-fg));  ->  color: var(--nf-color-fg);"
   echo "Nested forms such as calc(var(--nf-space-4)) are valid and are not flagged."
-  if $STRICT; then
-    exit 1
-  fi
+  exit 1
 else
   echo "No malformed var(--nf-...)) references found."
 fi

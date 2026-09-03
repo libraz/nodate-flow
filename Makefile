@@ -145,7 +145,7 @@ override NF_TEST_INTEGRATION := 1
 endif
 NF_TEST_INTEGRATION ?= 1
 
-.PHONY: test test-api test-api-mock test-api-real test-auth-api test-worker test-presence test-go-shared test-cli test-web test-accounts-web test-ui test-sdk test-e2e test-contract test-openapi-diff test-schema-collisions test-schema-diff verify-codegen test-core-contract lighthouse
+.PHONY: test test-api test-api-mock test-api-real test-auth-api test-worker test-presence test-go-shared test-cli test-web test-accounts-web test-ui test-sdk test-holidays test-e2e test-contract test-openapi-diff test-schema-diff verify-codegen test-core-contract lighthouse
 
 # Every module that ships code has a target here and every target is
 # reachable from `test`. A suite nothing invokes is indistinguishable
@@ -161,7 +161,7 @@ NF_TEST_INTEGRATION ?= 1
 GO_TEST_P ?= 4
 
 test: test-api test-auth-api test-worker test-presence test-go-shared \
-      test-cli test-web test-accounts-web test-ui test-sdk ## Run unit/integration tests (Go + TS; Go integration suites need Docker)
+      test-cli test-web test-accounts-web test-ui test-sdk test-holidays ## Run unit/integration tests (Go + TS; Go integration suites need Docker)
 
 test-api: test-api-mock test-api-real ## Go tests (flow) — both NF_FLOW_AI_MOCK on and off
 
@@ -198,6 +198,9 @@ test-ui: ## Vitest (packages/ui)
 test-sdk: ## Vitest (packages/sdk)
 	cd packages/sdk && $(PKG_RUN) test
 
+test-holidays: ## bun test (packages/holidays)
+	cd packages/holidays && $(PKG_RUN) test
+
 test-e2e: ## Playwright E2E
 	cd apps/flow-web && $(PKG_RUN) e2e
 
@@ -207,16 +210,15 @@ test-contract: ## Schemathesis contract tests (requires running API)
 test-openapi-diff: ## Fail if the committed OpenAPI specs drift from the live Go sources
 	./scripts/openapi-diff.sh
 
-test-schema-collisions: ## Fail if the merged OpenAPI spec has schema name collisions
-	./scripts/check-schema-collisions.sh
-
 test-schema-diff: ## Fail if sql/schema.sql is out of sync with sql/core/** and sql/flow/**
 	./scripts/schema-diff.sh
 
-verify-codegen: ## Fail if generated code is out of sync with the schema, the error YAML, or the signal-kind YAML
+verify-codegen: ## Fail if generated code is out of sync with the schema, the error YAML, the signal-kind YAML, the sqlc overrides, or the holiday dataset
 	bash scripts/check-codegen-drift.sh
-	go -C scripts run gen-errors.go --check-stamp
+	go -C scripts run gen-errors.go --check
 	go -C scripts run gen-signal-kinds.go --check
+	go -C scripts run check-sqlc-overrides.go
+	$(PKG_RUN) scripts/gen-holidays.ts --check
 
 test-core-contract: ## Check a database against the core contract (NF_CONFORMANCE_DSN or NF_DB_* vars)
 	bash sql/core/conformance/run.sh \
@@ -228,8 +230,23 @@ lighthouse: build-web ## Run Lighthouse CI (a11y 95+, perf 70+)
 
 # ---------- lint / format / typecheck ----------
 
-.PHONY: check lint format typecheck vet check-dtos check-css-var-parens check-public-router check-tokens check-breakpoints check-themes check-colors check-spacing check-region-parity check-sdk-browser-safe
-check: lint typecheck vet i18n-check check-dtos check-css-var-parens check-public-router check-region-parity check-sdk-browser-safe check-tokens check-themes check-colors check-spacing check-breakpoints ## Lint + typecheck + go vet + i18n locale guard + DTO drift guard + CSS var() paren guard + public-surface guard + Go/TS region parity + browser-SDK Node-type guard + design-token guards (references, theme parity, colours, spacing) + breakpoint guard
+.PHONY: check lint format typecheck vet check-dtos check-css-var-parens check-public-router check-tokens check-breakpoints check-themes check-colors check-spacing check-strings check-region-parity check-sdk-browser-safe check-schema-collisions check-reachability check-revival-writers check-affected-rows check-vacuous-assertions check-task-visibility check-commit-boundary
+check: lint typecheck vet i18n-check check-dtos check-css-var-parens check-public-router check-region-parity check-sdk-browser-safe check-schema-collisions check-tokens check-themes check-colors check-spacing check-strings check-breakpoints check-reachability check-revival-writers check-affected-rows check-vacuous-assertions check-task-visibility check-commit-boundary ## Lint + typecheck + go vet + i18n locale guard + DTO drift guard + CSS var() paren guard + public-surface guard + Go/TS region parity + browser-SDK Node-type guard + OpenAPI schema-collision guard + design-token guards (references, theme parity, colours, spacing) + hardcoded UI string guard + breakpoint guard + gate-reachability guard + soft-delete revival-writer guard + affected-row guard + vacuous-assertion guard + task-visibility guard + commit-boundary compile gate
+
+check-revival-writers: ## Fail when a grant keyed on a tuple alone has no writer that revives a revoked row
+	cd apps/flow-api && NF_TEST_INTEGRATION= go test -count=1 ./tests/softdelete/
+
+check-affected-rows: ## Fail when a removal statement drops the affected-row count without saying why
+	cd apps/flow-api && NF_TEST_INTEGRATION= go test -count=1 ./tests/affectedrows/
+
+check-vacuous-assertions: ## Fail when a leak/isolation test never proves its needle discoverable or its row-scan loop non-empty
+	cd apps/flow-api && NF_TEST_INTEGRATION= go test -count=1 ./tests/vacuousassert/
+
+check-task-visibility: ## Fail when a statement projects task content without the one spelling of the Layer 4 visibility rule
+	cd apps/flow-api && NF_TEST_INTEGRATION= go test -count=1 ./tests/taskvisibility/
+
+check-commit-boundary: ## Fail when an event append against a handle with no observable commit becomes legal again
+	cd apps/flow-api && NF_TEST_INTEGRATION= go test -count=1 ./tests/commitboundary/
 
 check-dtos: ## Fail when web routes/features hand-roll response DTOs instead of using SDK schemas
 	bash scripts/check-handrolled-dtos.sh
@@ -243,8 +260,18 @@ check-region-parity: ## Fail when the Go and TS country allowlists disagree
 check-sdk-browser-safe: ## Fail when anything pulls Node types into the browser SDK
 	node scripts/check-sdk-browser-safe.mjs
 
-check-tokens: ## Fail when a var(--nf-*) reference names a token nothing defines
-	node scripts/check-undefined-tokens.mjs
+check-schema-collisions: ## Fail when one component schema is the response of two operations that were never declared to share it
+	./scripts/check-schema-collisions.sh
+
+check-reachability: ## Fail when a guard, generator, or suite exists that no gate runs
+	node scripts/check-reachability.mjs
+
+# --strict also rejects a reference to an undefined token that carries a
+# fallback. Such a reference still renders, which is why it was advisory
+# at first, and is also why it hides: the name is wrong, the styling
+# looks deliberate, and nothing ever resolves the token it claims.
+check-tokens: ## Fail when a var(--nf-*) reference names a token nothing defines, with or without a fallback
+	node scripts/check-undefined-tokens.mjs --strict
 
 check-themes: ## Fail when a semantic token is missing from a theme, or defined only in themes
 	cd packages/ui && $(PKG_RUN) check-themes
@@ -253,13 +280,16 @@ check-colors: ## Fail when a colour is written as a literal instead of a token
 	node scripts/check-hardcoded-colors.mjs
 
 check-spacing: ## Fail when spacing / sizing / type is written as a literal instead of a token
-	cd packages/ui && $(PKG_RUN) lint:design-tokens
+	cd packages/ui && $(PKG_RUN) check-inline-spacing
+
+check-strings: ## Fail when a JSX attribute carries a literal UI string instead of t('key')
+	bash scripts/check-hardcoded-strings.sh
 
 check-breakpoints: ## Fail when a media query does not match the declared breakpoint scale
 	node scripts/check-breakpoints.mjs
 
 check-css-var-parens: ## Fail when a var(--nf-...) token reference has a stray extra closing paren
-	bash scripts/check-css-var-parens.sh --ci
+	bash scripts/check-css-var-parens.sh
 
 lint: ## biome check + golangci-lint
 	$(PKG_RUN) check

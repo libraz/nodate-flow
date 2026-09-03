@@ -10,8 +10,6 @@ package main
 
 import (
 	"bytes"
-	"crypto/sha256"
-	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -77,41 +75,38 @@ var abstractReasons = map[string]bool{
 var codeRe = regexp.MustCompile(`^[A-Z][A-Z0-9_]*(\.[A-Z][A-Z0-9_]*){1,2}$`)
 
 func main() {
-	// --check-stamp answers "were the generated files made from the
-	// sources as they stand now?" without writing anything, so it is safe
-	// to run from verify-codegen and from a pre-commit hook.
-	if len(os.Args) > 1 && os.Args[1] == "--check-stamp" {
-		if err := runCheckStamp(); err != nil {
+	// --check answers "is what is committed what this generator would
+	// produce today?" without writing anything, so it is safe to run from
+	// verify-codegen and from a pre-commit hook.
+	//
+	// It compares content rather than hashing the YAML, because a source
+	// edited without a regeneration is only one of the ways the catalog
+	// goes wrong. A change in the generator, a hand-edit of its output and
+	// a regeneration that produced the wrong thing all leave the sources
+	// untouched, and a source hash calls every one of them fresh.
+	// Comparing the files themselves catches all four alike.
+	//
+	// Same contract as scripts/gen-signal-kinds.go --check: rebuild every
+	// output in memory, compare against what is committed, write nothing,
+	// exit 1 on any disagreement.
+	if len(os.Args) > 1 && os.Args[1] == "--check" {
+		if err := run(true); err != nil {
 			fmt.Fprintln(os.Stderr, err)
 			os.Exit(1)
 		}
-		fmt.Fprintln(os.Stdout, "gen-errors: generated catalog matches errors/*.yaml")
+		fmt.Fprintln(os.Stdout, "gen-errors: generated files match errors/*.yaml")
 		return
 	}
-	if err := run(); err != nil {
+	if err := run(false); err != nil {
 		fmt.Fprintln(os.Stderr, "gen-errors:", err)
 		os.Exit(1)
 	}
 	fmt.Fprintln(os.Stdout, "gen-errors: ok")
 }
 
-// runCheckStamp resolves the paths checkStamp needs and nothing else.
-func runCheckStamp() error {
-	root, err := repoRoot()
-	if err != nil {
-		return err
-	}
-	matches, err := filepath.Glob(filepath.Join(root, "errors", "*.yaml"))
-	if err != nil {
-		return err
-	}
-	if len(matches) == 0 {
-		return fmt.Errorf("gen-errors: no YAML files found in %s", filepath.Join(root, "errors"))
-	}
-	return checkStamp(root, matches)
-}
-
-func run() error {
+// run builds every output from the YAML catalog. With check set it
+// compares the results against what is committed and writes nothing.
+func run(check bool) error {
 	root, err := repoRoot()
 	if err != nil {
 		return err
@@ -125,11 +120,6 @@ func run() error {
 		return fmt.Errorf("no YAML files found in %s", errorsDir)
 	}
 	sort.Strings(matches)
-
-	stamp, err := sourceStamp(matches)
-	if err != nil {
-		return err
-	}
 
 	byFile := map[string][]record{}
 	var fileNames []string
@@ -195,10 +185,14 @@ func run() error {
 	}
 	sort.Slice(all, func(i, j int) bool { return all[i].Code < all[j].Code })
 
-	// Generate Go per-domain files for all app directories that have
-	// an internal/errors/ directory. flow-api receives all domains;
-	// auth-api receives only updates for domains it already tracks.
-	// The runtime helper (Spec/APIError/New/Newf/Wrap) lives in
+	// The outputs are assembled first and emitted second so that --check
+	// and a real run answer from the same values.
+	outputs := map[string][]byte{}
+
+	// 1) Go per-domain files for all app directories that have an
+	// internal/errors/ directory. flow-api receives all domains; auth-api
+	// receives only updates for domains it already tracks. The runtime
+	// helper (Spec/APIError/New/Newf/Wrap) lives in
 	// packages/go-shared/apierr and is not generated here.
 	goTargets := []struct {
 		dir     string
@@ -211,9 +205,6 @@ func run() error {
 		if _, err := os.Stat(tgt.dir); os.IsNotExist(err) {
 			continue
 		}
-		if err := os.MkdirAll(tgt.dir, 0o755); err != nil {
-			return err
-		}
 		for _, name := range fileNames {
 			outPath := filepath.Join(tgt.dir, fileBase(name)+".go")
 			if !tgt.allDoms {
@@ -222,53 +213,26 @@ func run() error {
 					continue
 				}
 			}
-			if err := writeFile(outPath, genGoFile(byFile[name])); err != nil {
-				return err
-			}
+			outputs[outPath] = genGoFile(byFile[name])
 		}
 	}
 
-	// Generate TS per-domain files + barrel.
+	// 2) TS per-domain files + barrel.
 	tsDir := filepath.Join(root, "packages", "sdk", "src", "errors")
-	if err := os.MkdirAll(tsDir, 0o755); err != nil {
-		return err
-	}
 	for _, name := range fileNames {
-		if err := writeFile(filepath.Join(tsDir, name+".ts"), genTsFile(name, byFile[name])); err != nil {
-			return err
-		}
+		outputs[filepath.Join(tsDir, name+".ts")] = genTsFile(name, byFile[name])
 	}
-	if err := writeFile(filepath.Join(tsDir, "index.ts"), genTsBarrel(fileNames, stamp)); err != nil {
-		return err
-	}
+	outputs[filepath.Join(tsDir, "index.ts")] = genTsBarrel(fileNames)
 
-	// Locale files — write to all web app directories that have locales/.
+	// 3) Locale bundles — every web app that has a locales/ directory.
 	localeApps := []string{"apps/flow-web", "apps/accounts-web"}
 	for _, app := range localeApps {
-		enDir := filepath.Join(root, app, "locales", "en")
-		jaDir := filepath.Join(root, app, "locales", "ja")
-		zhDir := filepath.Join(root, app, "locales", "zh")
 		// Skip apps whose locales directory doesn't exist yet.
-		if _, err := os.Stat(enDir); os.IsNotExist(err) {
+		if _, err := os.Stat(filepath.Join(root, app, "locales", "en")); os.IsNotExist(err) {
 			continue
 		}
-		if err := os.MkdirAll(enDir, 0o755); err != nil {
-			return err
-		}
-		if err := os.MkdirAll(jaDir, 0o755); err != nil {
-			return err
-		}
-		if err := os.MkdirAll(zhDir, 0o755); err != nil {
-			return err
-		}
-		if err := writeFile(filepath.Join(enDir, "errors.json"), genLocale(all, "en")); err != nil {
-			return err
-		}
-		if err := writeFile(filepath.Join(jaDir, "errors.json"), genLocale(all, "ja")); err != nil {
-			return err
-		}
-		if err := writeFile(filepath.Join(zhDir, "errors.json"), genLocale(all, "zh")); err != nil {
-			return err
+		for _, lang := range []string{"en", "ja", "zh"} {
+			outputs[filepath.Join(root, app, "locales", lang, "errors.json")] = genLocale(all, lang)
 		}
 	}
 
@@ -284,34 +248,50 @@ func run() error {
 	// Checked here rather than in a separate script because this is the
 	// step that writes the catalog the override displaces: a reference
 	// that resolves to nothing should not be able to reach a build.
-	if err := checkI18nKeys(root, all, localeApps); err != nil {
+	// 4) Per-code Markdown docs. A code removed from the YAML used to
+	// leave its page behind, and a stale page reads exactly like a live
+	// one — same shape, same path, no hint that the code it documents no
+	// longer exists anywhere in the product. So the pages that are no
+	// longer produced are part of the answer too: deleted on a real run,
+	// reported as drift by --check.
+	docsRoot := filepath.Join(root, "docs", "errors")
+	for _, name := range fileNames {
+		for _, r := range byFile[name] {
+			outputs[filepath.Join(docsRoot, name, r.Code+".md")] = genDoc(r)
+		}
+	}
+	obsolete, err := obsoleteDocs(docsRoot, outputs)
+	if err != nil {
 		return err
 	}
 
-	// Docs. Generated pages are also pruned: a code removed from the
-	// YAML used to leave its page behind, and a stale page reads exactly
-	// like a live one — same shape, same path, no hint that the code it
-	// documents no longer exists anywhere in the product.
-	docsRoot := filepath.Join(root, "docs", "errors")
-	for _, name := range fileNames {
-		dir := filepath.Join(docsRoot, name)
-		if err := os.MkdirAll(dir, 0o755); err != nil {
+	if check {
+		if err := compareOutputs(root, outputs, obsolete); err != nil {
 			return err
 		}
-		current := make(map[string]bool, len(byFile[name]))
-		for _, r := range byFile[name] {
-			current[r.Code+".md"] = true
-			if err := writeFile(filepath.Join(dir, r.Code+".md"), genDoc(r)); err != nil {
-				return err
-			}
-		}
-		if err := pruneDocs(dir, current); err != nil {
+		return checkI18nKeys(root, all, localeApps)
+	}
+
+	paths := make([]string, 0, len(outputs))
+	for path := range outputs {
+		paths = append(paths, path)
+	}
+	sort.Strings(paths)
+	for _, path := range paths {
+		if err := writeFile(path, outputs[path]); err != nil {
 			return err
 		}
 	}
+	for _, path := range obsolete {
+		if err := os.Remove(path); err != nil {
+			return err
+		}
+		fmt.Printf("gen-errors: removed stale doc %s\n", path)
+	}
 
 	// A domain whose YAML file is gone leaves a whole directory of pages
-	// that nothing generates any more.
+	// that nothing generates any more. The directory goes only when the
+	// prune emptied it, so a hand-written file keeps its folder alive.
 	live := make(map[string]bool, len(fileNames))
 	for _, name := range fileNames {
 		live[name] = true
@@ -325,11 +305,6 @@ func run() error {
 			continue
 		}
 		dir := filepath.Join(docsRoot, d.Name())
-		if err := pruneDocs(dir, nil); err != nil {
-			return err
-		}
-		// Only removes the directory when the prune emptied it, so a
-		// hand-written file keeps its folder alive.
 		if entries, err := os.ReadDir(dir); err == nil && len(entries) == 0 {
 			if err := os.Remove(dir); err != nil {
 				return err
@@ -337,40 +312,136 @@ func run() error {
 		}
 	}
 
+	return checkI18nKeys(root, all, localeApps)
+}
+
+// obsoleteDocs lists the generated error pages under docsRoot that the
+// current catalog no longer produces.
+//
+// Only files whose stem is a valid error code are considered, so anything
+// hand-written alongside them (a README, an index) is left alone: this
+// generator owns the `<CODE>.md` namespace and nothing else.
+func obsoleteDocs(docsRoot string, outputs map[string][]byte) ([]string, error) {
+	domains, err := os.ReadDir(docsRoot)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	var stale []string
+	for _, d := range domains {
+		if !d.IsDir() {
+			continue
+		}
+		dir := filepath.Join(docsRoot, d.Name())
+		entries, err := os.ReadDir(dir)
+		if err != nil {
+			return nil, err
+		}
+		for _, e := range entries {
+			if e.IsDir() {
+				continue
+			}
+			stem, ok := strings.CutSuffix(e.Name(), ".md")
+			if !ok || !codeRe.MatchString(stem) {
+				continue
+			}
+			path := filepath.Join(dir, e.Name())
+			if _, produced := outputs[path]; !produced {
+				stale = append(stale, path)
+			}
+		}
+	}
+	sort.Strings(stale)
+	return stale, nil
+}
+
+// compareOutputs reports the committed files that differ from what the
+// generator produces now, and the generated files it no longer produces.
+// Nothing is written.
+//
+// Kept identical to the function of the same name in
+// scripts/gen-signal-kinds.go: the two generators answer the drift
+// question the same way, in the same message shape, with the same exit
+// status, so neither can quietly become the weaker one.
+func compareOutputs(root string, outputs map[string][]byte, obsolete []string) error {
+	paths := make([]string, 0, len(outputs))
+	for path := range outputs {
+		paths = append(paths, path)
+	}
+	sort.Strings(paths)
+
+	var stale []string
+	for _, path := range paths {
+		committed, err := os.ReadFile(path)
+		switch {
+		case os.IsNotExist(err):
+			stale = append(stale, relPath(root, path)+"\n    the generator produces this file, but it is not committed")
+		case err != nil:
+			return fmt.Errorf("gen-errors: cannot read %s: %w", relPath(root, path), err)
+		case !bytes.Equal(committed, outputs[path]):
+			stale = append(stale, relPath(root, path)+"\n"+firstDifference(committed, outputs[path]))
+		}
+	}
+	for _, path := range obsolete {
+		stale = append(stale, relPath(root, path)+"\n    no longer produced by the generator; it is stale")
+	}
+	if len(stale) > 0 {
+		return fmt.Errorf("gen-errors: these files are not what errors/*.yaml generates:\n\n  %s\n\n"+
+			"Run 'make gen-errors' and commit the result. Editing a generated file by hand does not "+
+			"survive the next run — put the change in errors/*.yaml instead",
+			strings.Join(stale, "\n\n  "))
+	}
 	return nil
 }
 
-// pruneDocs deletes generated error pages in dir that are not in keep.
-//
-// Only files whose stem is a valid error code are touched, so anything
-// hand-written alongside them (a README, an index) is left alone: this
-// generator owns the `<CODE>.md` namespace and nothing else.
-func pruneDocs(dir string, keep map[string]bool) error {
-	entries, err := os.ReadDir(dir)
+// relPath renders a path relative to the repository root, falling back to
+// the absolute path when it is outside.
+func relPath(root, path string) string {
+	rel, err := filepath.Rel(root, path)
 	if err != nil {
-		if os.IsNotExist(err) {
-			return nil
-		}
-		return err
+		return path
 	}
-	for _, e := range entries {
-		if e.IsDir() {
-			continue
-		}
-		fileName := e.Name()
-		if keep[fileName] {
-			continue
-		}
-		stem, ok := strings.CutSuffix(fileName, ".md")
-		if !ok || !codeRe.MatchString(stem) {
-			continue
-		}
-		if err := os.Remove(filepath.Join(dir, fileName)); err != nil {
-			return err
-		}
-		fmt.Printf("gen-errors: removed stale doc %s\n", filepath.Join(dir, fileName))
+	return rel
+}
+
+// firstDifference names the line where the committed file and the freshly
+// generated one diverge, so a failure points at a place rather than only
+// at a file.
+func firstDifference(committed, generated []byte) string {
+	oldLines := strings.Split(string(committed), "\n")
+	newLines := strings.Split(string(generated), "\n")
+	n := len(oldLines)
+	if len(newLines) > n {
+		n = len(newLines)
 	}
-	return nil
+	for i := range n {
+		var oldLine, newLine string
+		if i < len(oldLines) {
+			oldLine = oldLines[i]
+		}
+		if i < len(newLines) {
+			newLine = newLines[i]
+		}
+		if oldLine == newLine {
+			continue
+		}
+		return fmt.Sprintf("    first difference at line %d\n      committed:   %s\n      regenerated: %s",
+			i+1, elide(oldLine), elide(newLine))
+	}
+	return "    content differs"
+}
+
+// elide shortens a line so one long generated declaration cannot bury the
+// rest of the report.
+func elide(line string) string {
+	const max = 100
+	runes := []rune(line)
+	if len(runes) <= max {
+		return line
+	}
+	return string(runes[:max]) + "…"
 }
 
 func validateEntry(path string, e errorEntry) error {
@@ -522,10 +593,9 @@ func tsExportName(domainFile string) string {
 	return b.String()
 }
 
-func genTsBarrel(names []string, stamp string) []byte {
+func genTsBarrel(names []string) []byte {
 	var b bytes.Buffer
-	b.WriteString("// Code generated by gen-errors. DO NOT EDIT.\n")
-	fmt.Fprintf(&b, "// %s%s\n\n", stampPrefix, stamp)
+	b.WriteString("// Code generated by gen-errors. DO NOT EDIT.\n\n")
 	for _, n := range names {
 		fmt.Fprintf(&b, "export * from \"./%s.js\";\n", n)
 	}
@@ -665,66 +735,4 @@ func localeKeyExists(file, dotted string) bool {
 	}
 	str, ok := cur.(string)
 	return ok && strings.TrimSpace(str) != ""
-}
-
-// stampPrefix labels the source hash in the generated barrel. The
-// checker greps for it, so it is defined once and used by both.
-const stampPrefix = "errors-source-stamp: "
-
-// sourceStamp hashes the YAML the catalog is generated from.
-//
-// It exists because nothing noticed a source edited without a
-// regeneration. verify-codegen compares schema against generated code by
-// re-running sqlc into a scratch directory; this generator only writes to
-// fixed paths, so the same trick would mean writing into the working tree
-// to find out whether the working tree is stale. Recording what the
-// output was made from turns the question into a comparison instead.
-//
-// What this guarantees: the generated files were produced from these
-// exact bytes. What it does not: that the generator produced the right
-// thing from them. That is the generator's determinism, which is a
-// different property and not what drift detection is for.
-func sourceStamp(paths []string) (string, error) {
-	sorted := append([]string(nil), paths...)
-	sort.Strings(sorted)
-	h := sha256.New()
-	for _, p := range sorted {
-		raw, err := os.ReadFile(p)
-		if err != nil {
-			return "", err
-		}
-		// The name is hashed too: renaming a domain file changes what is
-		// generated even when no byte of content moves.
-		fmt.Fprintf(h, "%s\x00%d\x00", filepath.Base(p), len(raw))
-		h.Write(raw)
-	}
-	return hex.EncodeToString(h.Sum(nil)), nil
-}
-
-// checkStamp compares the stamp recorded in the generated barrel against
-// one recomputed from the YAML, and writes nothing.
-func checkStamp(root string, paths []string) error {
-	want, err := sourceStamp(paths)
-	if err != nil {
-		return err
-	}
-	barrel := filepath.Join(root, "packages", "sdk", "src", "errors", "index.ts")
-	raw, err := os.ReadFile(barrel)
-	if err != nil {
-		return fmt.Errorf("gen-errors: cannot read %s: %w", barrel, err)
-	}
-	var got string
-	for _, line := range strings.Split(string(raw), "\n") {
-		if idx := strings.Index(line, stampPrefix); idx >= 0 {
-			got = strings.TrimSpace(line[idx+len(stampPrefix):])
-			break
-		}
-	}
-	if got == "" {
-		return fmt.Errorf("gen-errors: %s carries no source stamp; run 'make gen-errors'", barrel)
-	}
-	if got != want {
-		return fmt.Errorf("gen-errors: errors/*.yaml changed without regenerating\n  generated from: %s\n  sources are now: %s\n\nRun 'make gen-errors' and commit the result", got, want)
-	}
-	return nil
 }

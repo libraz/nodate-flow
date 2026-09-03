@@ -6,6 +6,12 @@
 // Alpha is ignored: a translucent surface composites over the page
 // background, and the page background is what the ratio is taken against.
 //
+// unreachable-by-design: an instrument, not an assertion. It takes the
+// token pair to measure as arguments and prints a ratio; which pairings
+// matter is a design question with no fixed answer, so there is no set
+// of arguments a gate could run it with. Contrast that is decided is
+// asserted in the theme tests instead.
+//
 // Usage:
 //   node scripts/measure-contrast.mjs <fg> <bg> [<fg> <bg> ...]
 //

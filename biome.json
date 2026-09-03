@@ -127,6 +127,46 @@
           }
         }
       }
+    },
+    {
+      "includes": [
+        "**/apps/*/src/features/**",
+        "**/apps/*/src/routes/**",
+        "**/apps/*/src/components/**",
+        "**/apps/*/src/providers/**",
+        "**/apps/*/src/hooks/**",
+        "!**/__tests__/**",
+        "!**/*.test.ts",
+        "!**/*.test.tsx"
+      ],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedImports": {
+              "level": "error",
+              "options": {
+                "paths": {
+                  "openapi-fetch": {
+                    "message": "Build clients in lib/sdk only. Feature and route code reaches the API through lib/api, whose requester converts every failure into an ApiError carrying the HTTP status, error code, translation key and recovery hint."
+                  }
+                },
+                "patterns": [
+                  {
+                    "group": ["**/lib/sdk"],
+                    "importNamePattern": "sdk|authSdk",
+                    "message": "Import apiRequest / authApiRequest / apiProbe / apiSettle from lib/api instead of the raw client. A call made straight on the client returns a result whose failure is easy to read as a success — a bodyless 405 or 502 arrives with no error at all — and every hand-written conversion so far has dropped the HTTP status, the error code, the translation key and the recovery hint."
+                  },
+                  {
+                    "group": ["@nodate-flow/sdk"],
+                    "importNamePattern": "createClient|createRefreshMiddleware|createAuthRequestMiddleware|createTokenRefresher|createApiRequester",
+                    "message": "Client construction belongs in lib/sdk and lib/api. Feature and route code reaches the API through the requesters lib/api exports; types from @nodate-flow/sdk stay fine to import here."
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
     }
   ]
 }

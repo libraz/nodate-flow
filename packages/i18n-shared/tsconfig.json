@@ -8,9 +8,10 @@
     "skipLibCheck": true,
     "resolveJsonModule": true,
     "outDir": "dist",
+    "composite": true,
     "declaration": true,
     "declarationMap": true,
     "sourceMap": true
   },
-  "include": ["src", "locales"]
+  "include": ["src", "locales", "locales/**/*.json"]
 }

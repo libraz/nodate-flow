@@ -4,18 +4,20 @@
 #
 # Scans TSX files for `placeholder=`, `aria-label=`, `aria-description=`,
 # `title=`, and `alt=` attributes whose value is a literal English-looking
-# string instead of a `t('key')` call. Exits non-zero in --ci mode if any
-# are found.
+# string instead of a `t('key')` call.
 #
 # Usage:
-#   ./scripts/check-hardcoded-strings.sh          # scan, exit 0
-#   ./scripts/check-hardcoded-strings.sh --ci     # strict mode (exit 1 on any hit)
+#   ./scripts/check-hardcoded-strings.sh
+#
+# There is one mode: a hit fails. Arguments are rejected rather than
+# ignored, so a caller still passing the old --ci flag is visible.
 #
 # Rationale:
-#   CLAUDE.md rule 6 (no hardcoded UI strings; everything routes through
-#   `t('key')`). All UI strings must live in `apps/<app>/locales/{en,ja,zh}/`
-#   so translators have a single source of truth and the app stays
-#   locale-flippable without code changes.
+#   No hardcoded UI strings: everything routes through `t('key')`. All UI
+#   strings live in `apps/<app>/locales/{en,ja,zh}/` so translators have a
+#   single source of truth and the app stays locale-flippable without code
+#   changes. An attribute is the easiest place to forget, because it reads
+#   as markup rather than as copy.
 #
 # Excluded:
 #   - test / spec / fixture files (literal copy is sometimes required for
@@ -25,9 +27,12 @@
 
 set -euo pipefail
 
+if [[ $# -gt 0 ]]; then
+  echo "check-hardcoded-strings: takes no arguments (got: $*)" >&2
+  exit 2
+fi
+
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-STRICT=false
-[[ "${1:-}" == "--ci" ]] && STRICT=true
 
 # Detects: attr="Word ...", attr='Word ...' where the value contains at
 # least one alphabetic run of length >= 4. Bound the inner pattern so we
@@ -69,10 +74,8 @@ if [[ $count -gt 0 ]]; then
   echo -e "$found_files" | sort
   echo ""
   echo "Move the literal to apps/<app>/locales/{en,ja,zh}/<namespace>.json"
-  echo "and use t('key') instead. See CLAUDE.md rule 6."
-  if $STRICT; then
-    exit 1
-  fi
+  echo "and use t('key') instead. Every UI string routes through i18n."
+  exit 1
 else
   echo "No hardcoded UI strings found in scanned JSX attributes."
 fi
