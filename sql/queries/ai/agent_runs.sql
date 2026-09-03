@@ -57,6 +57,10 @@ WHERE id = ?;
 -- name: PurgeFinishedAgentRuns :exec
 -- Housekeeping: drop succeeded / failed rows older than the cutoff so
 -- the table does not grow unbounded. Run from a cron or a startup task.
+--
+-- affected-rows: not-applicable — housekeeping over whatever has aged past
+-- the cutoff. No request is waiting on a row here, and a tick that finds
+-- nothing to drop is the steady state rather than a missing resource.
 DELETE FROM agent_runs
 WHERE status IN ('succeeded', 'failed')
   AND finished_at < ?;

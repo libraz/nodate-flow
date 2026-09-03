@@ -9,7 +9,7 @@
 -- `tsig` (triggering signal) to avoid colliding with any future signals
 -- JOIN that might use the conventional `s` alias.
 --
--- Reversal projection (ADR 0008 D4 / J5): `reverses_event_public_id`
+-- Reversal projection (ADR 0008 D4): `reverses_event_public_id`
 -- surfaces the target event's public_id when this row is a compensating
 -- reverse, sourced from a self-join aliased `e_rev` (reverse target).
 -- `was_reversed` is TRUE when some other enabled event points back to this

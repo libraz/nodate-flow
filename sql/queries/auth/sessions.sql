@@ -90,6 +90,10 @@ WHERE user_id = ?
 -- Revoke every active session for a user. Used by the refresh-reuse
 -- detector to tear down the entire session family when a rotated /
 -- revoked refresh token is replayed.
+--
+-- affected-rows: not-applicable — it revokes a set whose size is not known
+-- in advance and nobody named a session. What the caller asked for is that
+-- none be left live, and a user who already holds none satisfies it.
 UPDATE sessions
 SET revoked_at = CURRENT_TIMESTAMP,
     enabled = FALSE

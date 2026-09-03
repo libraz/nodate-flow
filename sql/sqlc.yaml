@@ -108,8 +108,6 @@ sql:
             go_struct_tag: 'json:"-"'
           - column: "*.parent_task_id"
             go_struct_tag: 'json:"-"'
-          - column: "*.actor_id"
-            go_struct_tag: 'json:"-"'
           - column: "*.provider_id"
             go_struct_tag: 'json:"-"'
           # Internal FKs whose target is itself a public_id-bearing table:
@@ -162,18 +160,19 @@ sql:
             go_struct_tag: 'json:"-"'
           - column: "*.task_internal_id"
             go_struct_tag: 'json:"-"'
-          - column: "*.user_internal_id"
-            go_struct_tag: 'json:"-"'
-          - column: "*.project_internal_id"
-            go_struct_tag: 'json:"-"'
-          - column: "*.event_internal_id"
-            go_struct_tag: 'json:"-"'
-          # Generated columns that exist solely to back de-NULLed UNIQUE indexes
-          # (calendar_events.task_role_key STORED, calendar_event_attendees.event_id_key
-          # VIRTUAL). Pure infrastructure derivatives — must never surface in JSON.
-          - column: "*.task_role_key"
+          # Generated columns that exist only to shape an index: the de-NULLed
+          # projections a partial UNIQUE key is built on (calendar_event_attendees.event_id_key,
+          # calendar_events.task_singleton_role, auto_action_rules.signal_kind_match)
+          # and the `active` liveness marker that scopes a soft-delete UNIQUE key to
+          # live rows. Pure infrastructure derivatives with no meaning to a client —
+          # must never surface in JSON.
+          - column: "*.active"
             go_struct_tag: 'json:"-"'
           - column: "*.event_id_key"
+            go_struct_tag: 'json:"-"'
+          - column: "*.signal_kind_match"
+            go_struct_tag: 'json:"-"'
+          - column: "*.task_singleton_role"
             go_struct_tag: 'json:"-"'
           - column: "*.comment_id"
             go_struct_tag: 'json:"-"'
@@ -270,8 +269,6 @@ sql:
           - column: "*.author_id"
             go_struct_tag: 'json:"-"'
           - column: "*.uploader_id"
-            go_struct_tag: 'json:"-"'
-          - column: "*.target_user_id"
             go_struct_tag: 'json:"-"'
           # Internal FK back-refs to storage_objects.id. The blob's external
           # identity is its storage_objects.public_id (UUID v7); the integer
@@ -432,8 +429,6 @@ sql:
             go_struct_tag: 'json:"-"'
           - column: "*.uploader_id"
             go_struct_tag: 'json:"-"'
-          - column: "*.target_user_id"
-            go_struct_tag: 'json:"-"'
           - column: "*.subscription_id"
             go_struct_tag: 'json:"-"'
           - column: "*.task_id"
@@ -441,8 +436,6 @@ sql:
           - column: "*.project_id"
             go_struct_tag: 'json:"-"'
           - column: "*.creator_id"
-            go_struct_tag: 'json:"-"'
-          - column: "*.actor_id"
             go_struct_tag: 'json:"-"'
           - column: "*.actor_user_id"
             go_struct_tag: 'json:"-"'
@@ -473,18 +466,14 @@ sql:
             go_struct_tag: 'json:"-"'
           - column: "*.task_internal_id"
             go_struct_tag: 'json:"-"'
-          - column: "*.user_internal_id"
-            go_struct_tag: 'json:"-"'
-          - column: "*.project_internal_id"
-            go_struct_tag: 'json:"-"'
-          - column: "*.event_internal_id"
-            go_struct_tag: 'json:"-"'
-          # Generated columns that exist solely to back de-NULLed UNIQUE indexes
-          # (calendar_events.task_role_key STORED, calendar_event_attendees.event_id_key
-          # VIRTUAL). Pure infrastructure derivatives — must never surface in JSON.
-          - column: "*.task_role_key"
+          # See the note on the same group in the flow-api block above.
+          - column: "*.active"
             go_struct_tag: 'json:"-"'
           - column: "*.event_id_key"
+            go_struct_tag: 'json:"-"'
+          - column: "*.signal_kind_match"
+            go_struct_tag: 'json:"-"'
+          - column: "*.task_singleton_role"
             go_struct_tag: 'json:"-"'
           # Internal FK back-refs to storage_objects.id. The blob's external
           # identity is its storage_objects.public_id (UUID v7); the integer
@@ -620,8 +609,6 @@ sql:
             go_struct_tag: 'json:"-"'
           - column: "*.actor_user_id"
             go_struct_tag: 'json:"-"'
-          - column: "*.target_user_id"
-            go_struct_tag: 'json:"-"'
           - column: "*.created_by_user_id"
             go_struct_tag: 'json:"-"'
           - column: "*.invited_by_user_id"
@@ -682,18 +669,14 @@ sql:
               type: "PublicID"
           - column: "*.task_internal_id"
             go_struct_tag: 'json:"-"'
-          - column: "*.user_internal_id"
-            go_struct_tag: 'json:"-"'
-          - column: "*.project_internal_id"
-            go_struct_tag: 'json:"-"'
-          - column: "*.event_internal_id"
-            go_struct_tag: 'json:"-"'
-          # Generated columns that exist solely to back de-NULLed UNIQUE indexes
-          # (calendar_events.task_role_key STORED, calendar_event_attendees.event_id_key
-          # VIRTUAL). Pure infrastructure derivatives — must never surface in JSON.
-          - column: "*.task_role_key"
+          # See the note on the same group in the flow-api block above.
+          - column: "*.active"
             go_struct_tag: 'json:"-"'
           - column: "*.event_id_key"
+            go_struct_tag: 'json:"-"'
+          - column: "*.signal_kind_match"
+            go_struct_tag: 'json:"-"'
+          - column: "*.task_singleton_role"
             go_struct_tag: 'json:"-"'
           # Internal FK back-refs to storage_objects.id. The blob's external
           # identity is its storage_objects.public_id (UUID v7); the integer
@@ -730,8 +713,6 @@ sql:
           # block and forgotten in another publishes the same sequence
           # from whichever app reads it. TestGeneratedIDFieldsAreNotSerialized
           # in apps/flow-api/internal/db compares the three.
-          - column: "*.actor_id"
-            go_struct_tag: 'json:"-"'
           - column: "*.attendee_id"
             go_struct_tag: 'json:"-"'
           - column: "*.author_id"

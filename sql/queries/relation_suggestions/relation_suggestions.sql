@@ -165,8 +165,55 @@ SELECT
 FROM relation_suggestions rs
 INNER JOIN tasks st ON st.id = rs.source_task_id
 INNER JOIN tasks tt ON tt.id = rs.target_task_id
-WHERE rs.workspace_id = ?
-  AND rs.public_id = ?
+WHERE rs.workspace_id = sqlc.arg('workspace_id')
+  AND rs.public_id = sqlc.arg('public_id')
+  -- Both titles are on the wire, so the suggestion is readable only when
+  -- the actor may see both ends -- the same filter the two list queries
+  -- carry. Elevated roles skip the check.
+  AND (
+    CAST(sqlc.arg('is_elevated') AS SIGNED) = 1
+    OR (
+      (
+        st.visibility = 'public'
+        OR (st.visibility = 'project' AND EXISTS (
+          SELECT 1 FROM project_members pm_st
+          WHERE pm_st.project_id = st.project_id
+            AND pm_st.user_id = CAST(sqlc.arg('actor_user_id') AS UNSIGNED)
+            AND pm_st.enabled = TRUE
+        ))
+        OR (st.visibility = 'private' AND (
+          st.created_by_user_id = CAST(sqlc.arg('actor_user_id') AS UNSIGNED)
+          OR EXISTS (
+            SELECT 1 FROM task_actors ta_st
+            WHERE ta_st.task_id = st.id
+              AND ta_st.kind = 'user'
+              AND ta_st.user_id = CAST(sqlc.arg('actor_user_id') AS UNSIGNED)
+              AND ta_st.enabled = TRUE
+          )
+        ))
+      )
+      AND
+      (
+        tt.visibility = 'public'
+        OR (tt.visibility = 'project' AND EXISTS (
+          SELECT 1 FROM project_members pm_tt
+          WHERE pm_tt.project_id = tt.project_id
+            AND pm_tt.user_id = CAST(sqlc.arg('actor_user_id') AS UNSIGNED)
+            AND pm_tt.enabled = TRUE
+        ))
+        OR (tt.visibility = 'private' AND (
+          tt.created_by_user_id = CAST(sqlc.arg('actor_user_id') AS UNSIGNED)
+          OR EXISTS (
+            SELECT 1 FROM task_actors ta_tt
+            WHERE ta_tt.task_id = tt.id
+              AND ta_tt.kind = 'user'
+              AND ta_tt.user_id = CAST(sqlc.arg('actor_user_id') AS UNSIGNED)
+              AND ta_tt.enabled = TRUE
+          )
+        ))
+      )
+    )
+  )
 LIMIT 1;
 
 -- name: ResolveSuggestion :execrows

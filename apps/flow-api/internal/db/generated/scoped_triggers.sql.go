@@ -162,7 +162,7 @@ type ListEventsForScopedAgentRow struct {
 // predicates. Events without a task_id (workspace-level signals) are
 // intentionally excluded — scoped agents only react to task-bound events.
 //
-// Reversal projection (ADR 0008 D4 / J5): `reverses_event_id` is exposed
+// Reversal projection (ADR 0008 D4): `reverses_event_id` is exposed
 // so the orchestrator can recognise compensating events and skip
 // triggering downstream agents on them when desired. `was_reversed` is
 // computed by a correlated EXISTS subquery aliased `e_chk` (reverse

@@ -18,7 +18,7 @@
 -- signal join uses alias `tsig` (triggering signal) to mirror the
 -- v_task_timeline view.
 --
--- Reversal projection (ADR 0008 D4 / J5): `reverses_event_public_id`
+-- Reversal projection (ADR 0008 D4): `reverses_event_public_id`
 -- comes from the LEFT self-join aliased `e_rev` (reverse target);
 -- `was_reversed` is computed by a correlated EXISTS subquery using
 -- alias `e_chk` (reverse check), backed by idx_events_reverses

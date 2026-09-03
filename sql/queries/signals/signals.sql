@@ -41,6 +41,29 @@ SELECT
 FROM v_inbox v
 WHERE v.workspace_id = ?
   AND v.task_public_id = ?
+  -- The task title rides on every row, so the signals are listable only
+  -- when the actor may see the task they hang off. Elevated roles skip
+  -- the check.
+  AND (
+    CAST(sqlc.arg('is_elevated') AS SIGNED) = 1
+    OR v.task_visibility = 'public'
+    OR (v.task_visibility = 'project' AND EXISTS (
+      SELECT 1 FROM project_members pm_vis
+      WHERE pm_vis.project_id = v.task_project_id
+        AND pm_vis.user_id = CAST(sqlc.arg('actor_user_id') AS UNSIGNED)
+        AND pm_vis.enabled = TRUE
+    ))
+    OR (v.task_visibility = 'private' AND (
+      v.task_created_by_user_id = CAST(sqlc.arg('actor_user_id') AS UNSIGNED)
+      OR EXISTS (
+        SELECT 1 FROM task_actors ta_vis
+        WHERE ta_vis.task_id = v.task_internal_id
+          AND ta_vis.kind = 'user'
+          AND ta_vis.user_id = CAST(sqlc.arg('actor_user_id') AS UNSIGNED)
+          AND ta_vis.enabled = TRUE
+      )
+    ))
+  )
 ORDER BY v.received_at DESC, v.public_id DESC
 LIMIT ? OFFSET ?;
 

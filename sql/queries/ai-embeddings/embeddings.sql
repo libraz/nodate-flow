@@ -55,6 +55,28 @@ LEFT JOIN task_embeddings te
 WHERE t.workspace_id = ?
   AND t.enabled = TRUE
   AND (te.task_id IS NULL OR te.embedded_at < t.updated_at)
+  -- Title and description are on the wire, so the row set is the one the
+  -- actor may read. Elevated roles skip the check.
+  AND (
+    CAST(sqlc.arg('is_elevated') AS SIGNED) = 1
+    OR t.visibility = 'public'
+    OR (t.visibility = 'project' AND EXISTS (
+      SELECT 1 FROM project_members pm_vis
+      WHERE pm_vis.project_id = t.project_id
+        AND pm_vis.user_id = CAST(sqlc.arg('actor_user_id') AS UNSIGNED)
+        AND pm_vis.enabled = TRUE
+    ))
+    OR (t.visibility = 'private' AND (
+      t.created_by_user_id = CAST(sqlc.arg('actor_user_id') AS UNSIGNED)
+      OR EXISTS (
+        SELECT 1 FROM task_actors ta_vis
+        WHERE ta_vis.task_id = t.id
+          AND ta_vis.kind = 'user'
+          AND ta_vis.user_id = CAST(sqlc.arg('actor_user_id') AS UNSIGNED)
+          AND ta_vis.enabled = TRUE
+      )
+    ))
+  )
 ORDER BY t.updated_at DESC, t.id DESC
 LIMIT ?;
 
@@ -76,6 +98,29 @@ INNER JOIN tasks t
 WHERE t.workspace_id = ?
   AND te.model = ?
   AND te.task_id <> ?
+  -- Candidate titles reach the caller as duplicate/relation suggestions
+  -- and as LLM prompt material, so the candidate pool is the set the
+  -- actor may read. Elevated roles skip the check.
+  AND (
+    CAST(sqlc.arg('is_elevated') AS SIGNED) = 1
+    OR t.visibility = 'public'
+    OR (t.visibility = 'project' AND EXISTS (
+      SELECT 1 FROM project_members pm_vis
+      WHERE pm_vis.project_id = t.project_id
+        AND pm_vis.user_id = CAST(sqlc.arg('actor_user_id') AS UNSIGNED)
+        AND pm_vis.enabled = TRUE
+    ))
+    OR (t.visibility = 'private' AND (
+      t.created_by_user_id = CAST(sqlc.arg('actor_user_id') AS UNSIGNED)
+      OR EXISTS (
+        SELECT 1 FROM task_actors ta_vis
+        WHERE ta_vis.task_id = t.id
+          AND ta_vis.kind = 'user'
+          AND ta_vis.user_id = CAST(sqlc.arg('actor_user_id') AS UNSIGNED)
+          AND ta_vis.enabled = TRUE
+      )
+    ))
+  )
 ORDER BY t.id DESC
 LIMIT ?;
 
@@ -83,5 +128,9 @@ LIMIT ?;
 -- Remove every embedding row for a task across all models. ON DELETE
 -- CASCADE already handles task deletion; this query is for the
 -- re-embed-on-edit flow when a workspace switches to a different model.
+--
+-- affected-rows: not-applicable — it clears whatever vectors a task
+-- carries before new ones are written. A task nobody has embedded yet
+-- holds none, which is already the state this is asked to produce.
 DELETE FROM task_embeddings
 WHERE task_id = ?;

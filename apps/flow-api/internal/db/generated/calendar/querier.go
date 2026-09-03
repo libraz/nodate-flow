@@ -18,6 +18,10 @@ type Querier interface {
 	// Uniqueness (share_id, event_id, enabled) is enforced by the table.
 	AttachEventToShare(ctx context.Context, arg AttachEventToShareParams) (int64, error)
 	// TTL sweep: disable any invite whose expires_at is in the past.
+	//
+	// affected-rows: not-applicable — a sweep runs against whatever has
+	// expired since the last one. Nobody named an invite, and a tick with
+	// nothing left to expire is the state the sweep exists to keep.
 	CleanupExpiredCalendarEventInvites(ctx context.Context) error
 	// Dedicated setter that clears expires_at (COALESCE-based patch cannot
 	// distinguish "leave unchanged" from "clear" for nullable columns).
@@ -41,6 +45,21 @@ type Querier interface {
 	// ref_count inside the same transaction.
 	CreateCalendarEventAttachment(ctx context.Context, arg CreateCalendarEventAttachmentParams) (int64, error)
 	// Add an attendee to a calendar event.
+	//
+	// uniq_calendar_event_attendees_event_user covers removed attendees too,
+	// so the row of someone taken off the event still holds the (event,
+	// user) pair. Inserting beside it is impossible; the row has to come
+	// back. Callers establish first that no live attendee row exists, which
+	// leaves this statement with two cases: a new attendee, or a removed one
+	// being invited again.
+	//
+	// Reviving is therefore a fresh invitation, not a restoration. The RSVP
+	// returns to whatever the caller passes -- pending -- because the answer
+	// a participant gave before they were removed is not an answer to being
+	// invited again, and can_edit returns to what is granted now rather than
+	// what was revoked. public_id follows the same reading: the caller has
+	// already minted one and reports it to the client, so the revived row
+	// adopts it instead of surfacing an identifier nobody was told about.
 	CreateCalendarEventAttendee(ctx context.Context, arg CreateCalendarEventAttendeeParams) (int64, error)
 	// Add a comment to a calendar event.
 	CreateCalendarEventComment(ctx context.Context, arg CreateCalendarEventCommentParams) (int64, error)
@@ -52,6 +71,12 @@ type Querier interface {
 	CreateCalendarMemo(ctx context.Context, arg CreateCalendarMemoParams) (int64, error)
 	// Subscribe a user to a calendar with display preferences.
 	// Not an ACL axis — event-level visibility governs access.
+	//
+	// uniq_calendar_subscriptions_calendar_user covers unsubscribed rows, so
+	// the row survives an unsubscribe holding the (calendar, user) pair and
+	// a second subscribe has to revive it. Re-subscribing installs the
+	// colour asked for now and adopts the caller's public_id, the same
+	// reading PatchCalendarSubscription takes of a returning subscriber.
 	CreateCalendarSubscription(ctx context.Context, arg CreateCalendarSubscriptionParams) (int64, error)
 	// Insert a new workspace-owned public share page. Token is pre-hashed
 	// by the handler (SHA-256); the plaintext is returned to the caller
@@ -93,10 +118,22 @@ type Querier interface {
 	// marker (no separate deleted_at column).
 	DisableCalendarEvent(ctx context.Context, arg DisableCalendarEventParams) (int64, error)
 	// Remove an attendee from an event (soft-delete).
+	//
+	// affected-rows: not-applicable — the (event_id, user_id) pair is a
+	// membership, and taking a user off a list they are not on asks for the
+	// state that already holds. The endpoint answers "this user is not on the
+	// event" only where it is the question being asked, which is why the RSVP
+	// and edit-permission writers above establish attendance with
+	// FindCalendarEventAttendee and this one does not.
 	DisableCalendarEventAttendee(ctx context.Context, arg DisableCalendarEventAttendeeParams) error
 	// Soft-delete a comment (author or calendar owner).
 	DisableCalendarEventComment(ctx context.Context, arg DisableCalendarEventCommentParams) (int64, error)
 	// Soft-disable (revoke) an invite by internal id.
+	//
+	// affected-rows: not-applicable — this takes an internal id, so the caller
+	// has already resolved the invite by its public id and been answered for
+	// one that names nothing. A zero count here is a revoke that landed
+	// between that lookup and this write, and the invite is revoked either way.
 	DisableCalendarEventInvite(ctx context.Context, id uint32) error
 	// Revoke a membership. The row survives so the grant history stays
 	// readable and so a later re-add updates it in place.
@@ -104,6 +141,11 @@ type Querier interface {
 	// Soft-delete a memo.
 	DisableCalendarMemo(ctx context.Context, arg DisableCalendarMemoParams) (int64, error)
 	// Remove a user from a calendar (soft-delete).
+	//
+	// affected-rows: not-applicable — the (calendar_id, user_id) pair is a
+	// membership, and unsubscribing a user who is not subscribed asks for the
+	// state that already holds. Membership itself is answered by the calendar
+	// member path, which resolves the row with FindCalendarMember first.
 	DisableCalendarSubscription(ctx context.Context, arg DisableCalendarSubscriptionParams) error
 	// Soft-delete a share page. Child rows in calendar_public_share_events
 	// are left as-is (soft-disabled at the share level is sufficient; the

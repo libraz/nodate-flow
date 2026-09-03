@@ -4,6 +4,10 @@ INSERT INTO user_recovery_codes (user_id, code_hash) VALUES (?, ?);
 
 -- name: DeleteAllRecoveryCodesForUser :exec
 -- Delete every recovery code (used or not) for a user.
+--
+-- affected-rows: not-applicable — it empties the whole set before a fresh
+-- batch is issued, and on the disable path it is the emptiness that is
+-- wanted. A user who holds no codes is already where this leaves them.
 DELETE FROM user_recovery_codes WHERE user_id = ?;
 
 -- name: CountActiveRecoveryCodes :one

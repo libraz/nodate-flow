@@ -21,6 +21,10 @@ WHERE task_id = ?
 // Remove every embedding row for a task across all models. ON DELETE
 // CASCADE already handles task deletion; this query is for the
 // re-embed-on-edit flow when a workspace switches to a different model.
+//
+// affected-rows: not-applicable — it clears whatever vectors a task
+// carries before new ones are written. A task nobody has embedded yet
+// holds none, which is already the state this is asked to produce.
 func (q *Queries) DeleteTaskEmbeddingsForTask(ctx context.Context, taskID uint32) error {
 	_, err := q.db.ExecContext(ctx, deleteTaskEmbeddingsForTask, taskID)
 	return err
@@ -77,15 +81,42 @@ INNER JOIN tasks t
 WHERE t.workspace_id = ?
   AND te.model = ?
   AND te.task_id <> ?
+  -- Candidate titles reach the caller as duplicate/relation suggestions
+  -- and as LLM prompt material, so the candidate pool is the set the
+  -- actor may read. Elevated roles skip the check.
+  AND (
+    CAST(? AS SIGNED) = 1
+    OR t.visibility = 'public'
+    OR (t.visibility = 'project' AND EXISTS (
+      SELECT 1 FROM project_members pm_vis
+      WHERE pm_vis.project_id = t.project_id
+        AND pm_vis.user_id = CAST(? AS UNSIGNED)
+        AND pm_vis.enabled = TRUE
+    ))
+    OR (t.visibility = 'private' AND (
+      t.created_by_user_id = CAST(? AS UNSIGNED)
+      OR EXISTS (
+        SELECT 1 FROM task_actors ta_vis
+        WHERE ta_vis.task_id = t.id
+          AND ta_vis.kind = 'user'
+          AND ta_vis.user_id = CAST(? AS UNSIGNED)
+          AND ta_vis.enabled = TRUE
+      )
+    ))
+  )
 ORDER BY t.id DESC
 LIMIT ?
 `
 
 type ListCandidateTaskEmbeddingsParams struct {
-	WorkspaceID uint32 `json:"-"`
-	Model       string `json:"model"`
-	TaskID      uint32 `json:"-"`
-	Limit       int32  `json:"limit"`
+	WorkspaceID   uint32 `json:"-"`
+	Model         string `json:"model"`
+	TaskID        uint32 `json:"-"`
+	IsElevated    int64  `json:"isElevated"`
+	ActorUserID   int64  `json:"actorUserId"`
+	ActorUserID_2 int64  `json:"actorUserId2"`
+	ActorUserID_3 int64  `json:"actorUserId3"`
+	Limit         int32  `json:"limit"`
 }
 
 type ListCandidateTaskEmbeddingsRow struct {
@@ -105,6 +136,10 @@ func (q *Queries) ListCandidateTaskEmbeddings(ctx context.Context, arg ListCandi
 		arg.WorkspaceID,
 		arg.Model,
 		arg.TaskID,
+		arg.IsElevated,
+		arg.ActorUserID,
+		arg.ActorUserID_2,
+		arg.ActorUserID_3,
 		arg.Limit,
 	)
 	if err != nil {
@@ -147,14 +182,40 @@ LEFT JOIN task_embeddings te
 WHERE t.workspace_id = ?
   AND t.enabled = TRUE
   AND (te.task_id IS NULL OR te.embedded_at < t.updated_at)
+  -- Title and description are on the wire, so the row set is the one the
+  -- actor may read. Elevated roles skip the check.
+  AND (
+    CAST(? AS SIGNED) = 1
+    OR t.visibility = 'public'
+    OR (t.visibility = 'project' AND EXISTS (
+      SELECT 1 FROM project_members pm_vis
+      WHERE pm_vis.project_id = t.project_id
+        AND pm_vis.user_id = CAST(? AS UNSIGNED)
+        AND pm_vis.enabled = TRUE
+    ))
+    OR (t.visibility = 'private' AND (
+      t.created_by_user_id = CAST(? AS UNSIGNED)
+      OR EXISTS (
+        SELECT 1 FROM task_actors ta_vis
+        WHERE ta_vis.task_id = t.id
+          AND ta_vis.kind = 'user'
+          AND ta_vis.user_id = CAST(? AS UNSIGNED)
+          AND ta_vis.enabled = TRUE
+      )
+    ))
+  )
 ORDER BY t.updated_at DESC, t.id DESC
 LIMIT ?
 `
 
 type ListStaleTaskEmbeddingsParams struct {
-	Model       string `json:"model"`
-	WorkspaceID uint32 `json:"-"`
-	Limit       int32  `json:"limit"`
+	Model         string `json:"model"`
+	WorkspaceID   uint32 `json:"-"`
+	IsElevated    int64  `json:"isElevated"`
+	ActorUserID   int64  `json:"actorUserId"`
+	ActorUserID_2 int64  `json:"actorUserId2"`
+	ActorUserID_3 int64  `json:"actorUserId3"`
+	Limit         int32  `json:"limit"`
 }
 
 type ListStaleTaskEmbeddingsRow struct {
@@ -169,7 +230,15 @@ type ListStaleTaskEmbeddingsRow struct {
 // the given (workspace_id, model). Used by the background re-embed worker.
 // LEFT JOIN so tasks with no row at all are returned as "stale".
 func (q *Queries) ListStaleTaskEmbeddings(ctx context.Context, arg ListStaleTaskEmbeddingsParams) ([]ListStaleTaskEmbeddingsRow, error) {
-	rows, err := q.db.QueryContext(ctx, listStaleTaskEmbeddings, arg.Model, arg.WorkspaceID, arg.Limit)
+	rows, err := q.db.QueryContext(ctx, listStaleTaskEmbeddings,
+		arg.Model,
+		arg.WorkspaceID,
+		arg.IsElevated,
+		arg.ActorUserID,
+		arg.ActorUserID_2,
+		arg.ActorUserID_3,
+		arg.Limit,
+	)
 	if err != nil {
 		return nil, err
 	}

@@ -43,6 +43,11 @@ LIMIT 1;
 --   * due_from       (nullable date) - due_on >= value
 --   * due_to         (nullable date) - due_on <= value
 -- All filters are AND-combined; pass empty / NULL to skip a knob.
+--
+-- task-visibility: not-applicable — the share page is unauthenticated, so
+-- there is no actor to compare a task against. The projection is narrowed
+-- to visibility = 'public' instead, which is strictly inside what the
+-- actor rule would allow for any reader.
 SELECT
   v.public_id,
   v.title,

@@ -21,6 +21,10 @@ WHERE expires_at <= NOW(6)
 `
 
 // TTL sweep: disable any invite whose expires_at is in the past.
+//
+// affected-rows: not-applicable — a sweep runs against whatever has
+// expired since the last one. Nobody named an invite, and a tick with
+// nothing left to expire is the state the sweep exists to keep.
 func (q *Queries) CleanupExpiredCalendarEventInvites(ctx context.Context) error {
 	_, err := q.db.ExecContext(ctx, cleanupExpiredCalendarEventInvites)
 	return err
@@ -74,6 +78,11 @@ WHERE id = ?
 `
 
 // Soft-disable (revoke) an invite by internal id.
+//
+// affected-rows: not-applicable — this takes an internal id, so the caller
+// has already resolved the invite by its public id and been answered for
+// one that names nothing. A zero count here is a revoke that landed
+// between that lookup and this write, and the invite is revoked either way.
 func (q *Queries) DisableCalendarEventInvite(ctx context.Context, id uint32) error {
 	_, err := q.db.ExecContext(ctx, disableCalendarEventInvite, id)
 	return err

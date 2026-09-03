@@ -77,6 +77,11 @@ ON DUPLICATE KEY UPDATE
 
 -- name: DeleteUserIntegration :exec
 -- Hard-delete a single integration row (user-scoped).
+--
+-- affected-rows: not-applicable — this takes an internal id, so the caller
+-- has already resolved the connection by its public id and been answered
+-- for one that names nothing. A zero count here is a disconnect that
+-- landed between that lookup and this write, and the row is gone either way.
 DELETE FROM user_integrations
 WHERE id = ?
   AND user_id = ?;
@@ -194,6 +199,10 @@ WHERE state = ?
 -- name: PurgeExpiredOauthStates :exec
 -- Garbage-collect oauth_states rows past their expires_at. Called
 -- opportunistically from the callback handler.
+--
+-- affected-rows: not-applicable — garbage collection over whatever has
+-- expired. The callback's own answer comes from ClaimOauthState, which
+-- does report its count; this one is housekeeping alongside it.
 DELETE FROM oauth_states
 WHERE expires_at < CURRENT_TIMESTAMP;
 

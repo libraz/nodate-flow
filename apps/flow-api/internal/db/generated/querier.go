@@ -36,6 +36,16 @@ type Querier interface {
 	// Add a directed dependency between two tasks.
 	AddDependency(ctx context.Context, arg AddDependencyParams) (int64, error)
 	// Add a user to a project (must already be a workspace member).
+	//
+	// uniq_project_members_project_id_user_id covers removed members too, so
+	// a revoked row keeps holding the (project, user) pair and a plain
+	// insert collides with it: without the revival below, anyone removed
+	// from a project could never be added back. Callers check for a live
+	// membership first, so what reaches here is either new or revoked.
+	//
+	// Re-adding states the grant afresh: the role is the one being asked
+	// for now, added_at records this joining, and the row adopts the
+	// public_id the caller has already reported to the client.
 	AddProjectMember(ctx context.Context, arg AddProjectMemberParams) (int64, error)
 	// Associate a task with a timebox. Caller must resolve IDs beforehand.
 	AddTaskToTimebox(ctx context.Context, arg AddTaskToTimeboxParams) error
@@ -114,7 +124,7 @@ type Querier interface {
 	// event in response to a judged signal so the timeline UI can render the
 	// causal chain "signal -> judge verdict -> task event".
 	//
-	// `reverses_event_id` (ADR 0008 D4 / J5) mirrors the same field on
+	// `reverses_event_id` (ADR 0008 D4) mirrors the same field on
 	// AppendEvent. The reversal handler uses this INSERT path when the target
 	// event being reversed was originally produced by an agent so the
 	// compensating event preserves the same actor kind. NULL for normal
@@ -142,7 +152,7 @@ type Querier interface {
 	// events with no signal lineage. ON DELETE SET NULL on the FK so signal
 	// purge does not cascade to the event log.
 	//
-	// `reverses_event_id` (ADR 0008 D4 / J5) is the internal event id this row
+	// `reverses_event_id` (ADR 0008 D4) is the internal event id this row
 	// compensates. NULL for non-reversal events. The reversal handler binds
 	// this when appending a same-type compensating event so the derived_state
 	// projection can cancel the original out without ever UPDATEing the event
@@ -284,6 +294,10 @@ type Querier interface {
 	// ReleaseReminderOccurrence so the next tick can retake it.
 	ClaimReminderOccurrence(ctx context.Context, arg ClaimReminderOccurrenceParams) (int64, error)
 	// Delete tokens that are either expired-and-used or expired-and-unused, for periodic cleanup.
+	//
+	// affected-rows: not-applicable — a TTL sweep runs against whatever has
+	// expired since the last one. Nobody named a token, and a sweep with
+	// nothing to collect is the state the sweep exists to keep.
 	CleanupExpiredMagicLinks(ctx context.Context) error
 	// Disable TOTP on a local identity.
 	ClearIdentityMfa(ctx context.Context, id uint32) error
@@ -320,8 +334,10 @@ type Querier interface {
 	// within the given time window. Used by the AI metrics endpoint
 	// to compute acceptance rate.
 	CountAiSuggestionOutcomesForWorkspace(ctx context.Context, arg CountAiSuggestionOutcomesForWorkspaceParams) (CountAiSuggestionOutcomesForWorkspaceRow, error)
-	// Row count behind ListArchivedTasksForWorkspace.
-	CountArchivedTasksForWorkspace(ctx context.Context, workspaceID uint32) (int64, error)
+	// Row count behind ListArchivedTasksForWorkspace, carrying the same
+	// Layer-4 visibility predicate. A total taken without it discloses how
+	// many archived tasks the caller is not allowed to see.
+	CountArchivedTasksForWorkspace(ctx context.Context, arg CountArchivedTasksForWorkspaceParams) (int64, error)
 	// Count enabled child pages for a given parent. Used to check before deletion.
 	CountChildPages(ctx context.Context, arg CountChildPagesParams) (int64, error)
 	// Number of live tenants on this instance. Used by the inbound webhook
@@ -335,7 +351,8 @@ type Querier interface {
 	CountImportedTasksForJob(ctx context.Context, id uint32) (CountImportedTasksForJobRow, error)
 	// Row count behind ListTasksForProject. Filters must stay identical to
 	// that query's WHERE clause or the pager reports a total the list can
-	// never reach.
+	// never reach -- including the Layer-4 visibility predicate, whose
+	// absence here would report tasks the caller can never page to.
 	CountTasksForProject(ctx context.Context, arg CountTasksForProjectParams) (int64, error)
 	// Count total and completed tasks in a timebox for progress tracking.
 	CountTasksForTimebox(ctx context.Context, arg CountTasksForTimeboxParams) (CountTasksForTimeboxRow, error)
@@ -437,6 +454,18 @@ type Querier interface {
 	// Insert a new invite link for a workspace.
 	CreateWorkspaceInvite(ctx context.Context, arg CreateWorkspaceInviteParams) (int64, error)
 	// Add a user to a workspace with the given role.
+	//
+	// uniq_workspace_members_workspace_id_user_id covers removed members
+	// too: the row of someone taken out of a workspace still holds the
+	// (workspace, user) pair, so re-adding them has to revive that row
+	// rather than insert beside it. Without the revival the second
+	// membership fails for good, and the workspace is the entry point to
+	// everything else in it.
+	//
+	// Re-joining states the membership afresh -- the role asked for now, the
+	// inviter and dates of this joining, and the public_id the caller has
+	// already reported to the client. Reviving into the previous role would
+	// hand back privileges the removal took away.
 	CreateWorkspaceMember(ctx context.Context, arg CreateWorkspaceMemberParams) (int64, error)
 	// Atomically drop ref_count by 1 with an underflow guard. Returning
 	// sql.Result lets the caller assert RowsAffected() == 1; a zero result
@@ -444,6 +473,10 @@ type Querier interface {
 	// and the caller should rollback rather than continue.
 	DecrementStorageObjectRefCount(ctx context.Context, id uint32) (sql.Result, error)
 	// Delete every recovery code (used or not) for a user.
+	//
+	// affected-rows: not-applicable — it empties the whole set before a fresh
+	// batch is issued, and on the disable path it is the emptiness that is
+	// wanted. A user who holds no codes is already where this leaves them.
 	DeleteAllRecoveryCodesForUser(ctx context.Context, userID uint32) error
 	// Hard-delete an attachment row. Caller MUST have already
 	// decremented ref_count on the linked storage_objects row inside
@@ -463,6 +496,11 @@ type Querier interface {
 	// chain — an ordering that follows table creation order and is not part of
 	// any documented contract. Removing the referrers up front makes the
 	// teardown independent of it.
+	//
+	// affected-rows: not-applicable — this clears whatever the workspace holds
+	// ahead of the delete that answers the caller. HardDeleteWorkspace reports
+	// whether the workspace was there; a workspace with no attachments is the
+	// ordinary case and produces exactly the state this asks for.
 	DeleteAttachmentsByWorkspace(ctx context.Context, workspaceID uint32) error
 	// Drop the attachment rows that point at a reservation being reclaimed.
 	// They exist because the presign created both in one transaction, and
@@ -473,6 +511,10 @@ type Querier interface {
 	// Calendar-side counterpart of DeleteAttachmentsByWorkspace;
 	// calendar_event_attachments.storage_object_id carries the same
 	// ON DELETE RESTRICT. See that query for the full rationale.
+	//
+	// affected-rows: not-applicable — same shape and same reason as
+	// DeleteAttachmentsByWorkspace: it clears a set ahead of the delete that
+	// answers the caller, and an empty set is the ordinary case.
 	DeleteCalendarEventAttachmentsByWorkspace(ctx context.Context, workspaceID uint32) error
 	// The calendar-side mirror of DeleteAttachmentsForStorageObject; the
 	// same RESTRICT edge exists from calendar_event_attachments.
@@ -517,10 +559,19 @@ type Querier interface {
 	// Remove every embedding row for a task across all models. ON DELETE
 	// CASCADE already handles task deletion; this query is for the
 	// re-embed-on-edit flow when a workspace switches to a different model.
+	//
+	// affected-rows: not-applicable — it clears whatever vectors a task
+	// carries before new ones are written. A task nobody has embedded yet
+	// holds none, which is already the state this is asked to produce.
 	DeleteTaskEmbeddingsForTask(ctx context.Context, taskID uint32) error
 	// Soft-delete a link by public id within a workspace.
 	DeleteTaskEventLink(ctx context.Context, arg DeleteTaskEventLinkParams) (int64, error)
 	// Remove a label from a task (hard delete from junction).
+	//
+	// affected-rows: not-applicable — the (task_id, label_id) pair is a
+	// membership, and detaching a label a task does not carry asks for the
+	// state that already holds. The label itself is resolved by public id
+	// first, which is what answers a caller naming a label that is not there.
 	DeleteTaskLabel(ctx context.Context, arg DeleteTaskLabelParams) error
 	// Remove a reservation whose upload never arrived, guarded on the same
 	// predicate that selected it.
@@ -535,6 +586,11 @@ type Querier interface {
 	// is exactly what uploaded_at IS NULL loses to.
 	DeleteUnconfirmedStorageObjectByID(ctx context.Context, id uint32) (int64, error)
 	// Hard-delete a single integration row (user-scoped).
+	//
+	// affected-rows: not-applicable — this takes an internal id, so the caller
+	// has already resolved the connection by its public id and been answered
+	// for one that names nothing. A zero count here is a disconnect that
+	// landed between that lookup and this write, and the row is gone either way.
 	DeleteUserIntegration(ctx context.Context, arg DeleteUserIntegrationParams) error
 	DeleteWebhookSubscription(ctx context.Context, arg DeleteWebhookSubscriptionParams) (int64, error)
 	// Soft-delete a favorite.
@@ -557,6 +613,11 @@ type Querier interface {
 	// ON UPDATE clause already.
 	// workspace_id is included as the first WHERE clause for defense-in-depth
 	// per project DB conventions, even though project_id is globally unique.
+	//
+	// affected-rows: not-applicable — a cascade over however many live tasks
+	// the project holds, and a project with none cascades onto nothing.
+	// DisableProject runs in the same transaction and is what reports whether
+	// the project the caller named was there.
 	DisableProjectChildTasks(ctx context.Context, arg DisableProjectChildTasksParams) error
 	// Soft-delete a reaction by public id and user.
 	DisableReaction(ctx context.Context, arg DisableReactionParams) (int64, error)
@@ -565,6 +626,10 @@ type Querier interface {
 	// the row (NULL for system writers).
 	DisableTask(ctx context.Context, arg DisableTaskParams) (int64, error)
 	// Soft-disable a task-label junction.
+	//
+	// affected-rows: not-applicable — same membership as DeleteTaskLabel and
+	// the same reason: detaching a label a task does not carry asks for the
+	// state that already holds, and the label is resolved by public id first.
 	DisableTaskLabel(ctx context.Context, arg DisableTaskLabelParams) error
 	// Soft-delete a timebox.
 	DisableTimebox(ctx context.Context, arg DisableTimeboxParams) (int64, error)
@@ -645,7 +710,7 @@ type Querier interface {
 	// Find a specific description version by public id.
 	FindDescriptionVersion(ctx context.Context, arg FindDescriptionVersionParams) (FindDescriptionVersionRow, error)
 	// Resolve a target event by public_id for the reversal handler (ADR 0008
-	// D4 / J5, POST /workspaces/{wsId}/events/{eventPublicId}/reverse). The
+	// D4, POST /workspaces/{wsId}/events/{eventPublicId}/reverse). The
 	// handler uses this single query to drive three eligibility checks
 	// before appending the compensating event:
 	//   - target exists in the caller's workspace (LIMIT 1 + workspace_id =
@@ -792,6 +857,11 @@ type Querier interface {
 	// of inserting a new row. Matches the (workspace_id, sha256) UNIQUE key.
 	FindStorageObjectByWorkspaceSha(ctx context.Context, arg FindStorageObjectByWorkspaceShaParams) (FindStorageObjectByWorkspaceShaRow, error)
 	// Detail projection via v_task_detail. Workspace-scoped.
+	// task-visibility: not-applicable — every route reaching this statement
+	// resolves the task through acl.AuthorizeTaskAccess first, which applies
+	// CheckTaskVisibility and answers WS.TASK.NOT_FOUND before the detail row
+	// is read. v_task_detail carries no project_id or actor id to write the
+	// predicate against in any case.
 	FindTaskByPublicId(ctx context.Context, arg FindTaskByPublicIdParams) (FindTaskByPublicIdRow, error)
 	// Resolve a single link (enabled only) inside a workspace.
 	FindTaskEventLinkByPublicId(ctx context.Context, arg FindTaskEventLinkByPublicIdParams) (FindTaskEventLinkByPublicIdRow, error)
@@ -901,7 +971,7 @@ type Querier interface {
 	GetAttachmentStorageObjectIDForDelete(ctx context.Context, arg GetAttachmentStorageObjectIDForDeleteParams) (GetAttachmentStorageObjectIDForDeleteRow, error)
 	// Resolve an event's public id and logical occurrence time given its
 	// internal id, scoped by workspace as a defence-in-depth check.
-	// Used by the webhook fanout chain (H1): the worker needs the event's
+	// Used by the webhook fanout chain: the worker needs the event's
 	// public_id to populate the dedupe key and the row's occurred_at to set
 	// the webhook OccurredAt field, instead of using time.Now() which would
 	// attribute the wrong instant when delivery is retried.
@@ -1079,7 +1149,7 @@ type Querier interface {
 	// signal join uses alias `tsig` (triggering signal) to mirror the
 	// v_task_timeline view.
 	//
-	// Reversal projection (ADR 0008 D4 / J5): `reverses_event_public_id`
+	// Reversal projection (ADR 0008 D4): `reverses_event_public_id`
 	// comes from the LEFT self-join aliased `e_rev` (reverse target);
 	// `was_reversed` is computed by a correlated EXISTS subquery using
 	// alias `e_chk` (reverse check), backed by idx_events_reverses
@@ -1277,7 +1347,7 @@ type Querier interface {
 	// predicates. Events without a task_id (workspace-level signals) are
 	// intentionally excluded — scoped agents only react to task-bound events.
 	//
-	// Reversal projection (ADR 0008 D4 / J5): `reverses_event_id` is exposed
+	// Reversal projection (ADR 0008 D4): `reverses_event_id` is exposed
 	// so the orchestrator can recognise compensating events and skip
 	// triggering downstream agents on them when desired. `was_reversed` is
 	// computed by a correlated EXISTS subquery aliased `e_chk` (reverse
@@ -1288,7 +1358,7 @@ type Querier interface {
 	// List a task's timeline via v_task_timeline. Projects
 	// `actor_system_source` (ADR 0008 D8, third actor source for worker-tick
 	// events), `triggered_by_signal_public_id` (ADR 0008 D4, signal
-	// traceability link), `reverses_event_public_id` (ADR 0008 D4 / J5,
+	// traceability link), `reverses_event_public_id` (ADR 0008 D4,
 	// target event the row compensates) and `was_reversed` (TRUE when some
 	// other enabled event reverses this one) so the timeline UI can render
 	// the causal chain plus the reversal state of each entry. The view
@@ -1351,12 +1421,18 @@ type Querier interface {
 	// List models registered under a provider. Workspace-scoped.
 	ListModelsForProvider(ctx context.Context, arg ListModelsForProviderParams) ([]ListModelsForProviderRow, error)
 	// Tasks where the given user is attached as an actor, via v_my_tasks.
+	// task-visibility: not-applicable — v_my_tasks emits only rows where the
+	// reader holds an enabled task_actors row, and every caller binds its own
+	// user_public_id, so the row set is already the private branch of the rule.
 	ListMyTasks(ctx context.Context, arg ListMyTasksParams) ([]ListMyTasksRow, error)
 	// Cross-workspace variant: tasks where the given user is attached as an
 	// actor across every workspace they belong to, joined with the workspace
 	// row so the caller gets workspace_public_id / name for grouping. Used by
 	// GET /me/tasks to power the cross-workspace "Today" / Calendar views in
 	// the web client without fanning out one request per workspace.
+	// task-visibility: not-applicable — v_my_tasks emits only rows where the
+	// reader holds an enabled task_actors row, and every caller binds its own
+	// user_public_id, so the row set is already the private branch of the rule.
 	ListMyTasksGlobal(ctx context.Context, arg ListMyTasksGlobalParams) ([]ListMyTasksGlobalRow, error)
 	// Keyset-paginated cross-workspace variant of ListMyTasksGlobal.
 	//
@@ -1364,6 +1440,9 @@ type Querier interface {
 	// row of the previous page. First page passes NULL for both
 	// cursor_created_at and cursor_public_id. ORDER BY (created_at DESC,
 	// public_id DESC) only.
+	// task-visibility: not-applicable — v_my_tasks emits only rows where the
+	// reader holds an enabled task_actors row, and every caller binds its own
+	// user_public_id, so the row set is already the private branch of the rule.
 	ListMyTasksGlobalKeyset(ctx context.Context, arg ListMyTasksGlobalKeysetParams) ([]ListMyTasksGlobalKeysetRow, error)
 	// Keyset-paginated variant of ListMyTasks.
 	//
@@ -1373,6 +1452,9 @@ type Querier interface {
 	// public_id DESC) only — priority / due_on are NOT considered, so the
 	// tuple comparison is monotonic. Callers that need priority-aware
 	// ordering must keep using the OFFSET variant.
+	// task-visibility: not-applicable — v_my_tasks emits only rows where the
+	// reader holds an enabled task_actors row, and every caller binds its own
+	// user_public_id, so the row set is already the private branch of the rule.
 	ListMyTasksKeyset(ctx context.Context, arg ListMyTasksKeysetParams) ([]ListMyTasksKeysetRow, error)
 	// Cross-workspace variant scoped to tasks whose due_on falls inside the
 	// requested [from, to] inclusive date range. Backs the unified flow-web
@@ -1380,6 +1462,9 @@ type Querier interface {
 	// answer for "what is on my plate across every workspace on these days".
 	// Undated tasks are excluded; use ListMyTasksGlobal for the planning
 	// bucket.
+	// task-visibility: not-applicable — v_my_tasks emits only rows where the
+	// reader holds an enabled task_actors row, and every caller binds its own
+	// user_public_id, so the row set is already the private branch of the rule.
 	ListMyTasksWithDates(ctx context.Context, arg ListMyTasksWithDatesParams) ([]ListMyTasksWithDatesRow, error)
 	// Keyset-paginated variant of ListMyTasksWithDates.
 	//
@@ -1390,6 +1475,9 @@ type Querier interface {
 	// orders by due_on first; the keyset cursor must use a monotonic key,
 	// and created_at + public_id is uniquely ordered. Callers that need
 	// due_on ordering must keep using the OFFSET variant.
+	// task-visibility: not-applicable — v_my_tasks emits only rows where the
+	// reader holds an enabled task_actors row, and every caller binds its own
+	// user_public_id, so the row set is already the private branch of the rule.
 	ListMyTasksWithDatesKeyset(ctx context.Context, arg ListMyTasksWithDatesKeysetParams) ([]ListMyTasksWithDatesKeysetRow, error)
 	// List all notification preferences for a user in a workspace.
 	ListNotificationPreferencesForUser(ctx context.Context, arg ListNotificationPreferencesForUserParams) ([]ListNotificationPreferencesForUserRow, error)
@@ -1499,6 +1587,11 @@ type Querier interface {
 	//   * due_from       (nullable date) - due_on >= value
 	//   * due_to         (nullable date) - due_on <= value
 	// All filters are AND-combined; pass empty / NULL to skip a knob.
+	//
+	// task-visibility: not-applicable — the share page is unauthenticated, so
+	// there is no actor to compare a task against. The projection is narrowed
+	// to visibility = 'public' instead, which is strictly inside what the
+	// actor rule would allow for any reader.
 	ListPublicLensTasks(ctx context.Context, arg ListPublicLensTasksParams) ([]ListPublicLensTasksRow, error)
 	// List reactions on a comment. Paginated (LIMIT/OFFSET) so the result
 	// set is always bounded; total carries the pre-page count.
@@ -1511,7 +1604,7 @@ type Querier interface {
 	// List the most recent visits for a user in a workspace, newest first.
 	ListRecentVisitsForUser(ctx context.Context, arg ListRecentVisitsForUserParams) ([]ListRecentVisitsForUserRow, error)
 	// List draft retrospective tasks: tasks linked back to a source task
-	// via a task_dependencies row with kind='retro_of'. Backs the Phase 6 / L2
+	// via a task_dependencies row with kind='retro_of'. Backs the
 	// retro draft queue endpoint (GET /workspaces/{wsId}/tasks/drafts?reason=retro).
 	// The retro task itself is the from_task; to_task is the original task whose
 	// lifecycle prompted the retrospective. Ordered newest-first so the queue
@@ -1762,9 +1855,17 @@ type Querier interface {
 	PatchWorkspace(ctx context.Context, arg PatchWorkspaceParams) (int64, error)
 	// Garbage-collect oauth_states rows past their expires_at. Called
 	// opportunistically from the callback handler.
+	//
+	// affected-rows: not-applicable — garbage collection over whatever has
+	// expired. The callback's own answer comes from ClaimOauthState, which
+	// does report its count; this one is housekeeping alongside it.
 	PurgeExpiredOauthStates(ctx context.Context) error
 	// Housekeeping: drop succeeded / failed rows older than the cutoff so
 	// the table does not grow unbounded. Run from a cron or a startup task.
+	//
+	// affected-rows: not-applicable — housekeeping over whatever has aged past
+	// the cutoff. No request is waiting on a row here, and a tick that finds
+	// nothing to drop is the steady state rather than a missing resource.
 	PurgeFinishedAgentRuns(ctx context.Context, finishedAt sql.NullTime) error
 	// Publish the running counters so the polling UI can show movement.
 	RecordImportJobProgress(ctx context.Context, arg RecordImportJobProgressParams) error
@@ -1776,6 +1877,10 @@ type Querier interface {
 	// second send, so a released claim has to stop occupying it. A
 	// tombstone would make the retry impossible in exactly the situation
 	// the release exists for.
+	//
+	// affected-rows: not-applicable — this gives back a claim the same tick
+	// took. What it needs to be true afterwards is that the occurrence is free
+	// for the next tick, and a claim that is already gone satisfies that.
 	ReleaseReminderOccurrence(ctx context.Context, arg ReleaseReminderOccurrenceParams) error
 	// Soft-remove an actor from a task.
 	RemoveActor(ctx context.Context, arg RemoveActorParams) (int64, error)
@@ -1834,10 +1939,17 @@ type Querier interface {
 	// Accept or dismiss a pending suggestion. Only transitions from 'pending'.
 	ResolveSuggestion(ctx context.Context, arg ResolveSuggestionParams) (int64, error)
 	// Resolve a human-readable task reference (e.g. NF-42) to a task public_id.
+	// task-visibility: not-applicable — the only caller re-resolves the task it
+	// finds through the shared task ACL and returns the error before the title
+	// reaches the caller, so a task the actor may not see is answered as missing.
 	ResolveTaskRef(ctx context.Context, arg ResolveTaskRefParams) (ResolveTaskRefRow, error)
 	// Revoke every active session for a user. Used by the refresh-reuse
 	// detector to tear down the entire session family when a rotated /
 	// revoked refresh token is replayed.
+	//
+	// affected-rows: not-applicable — it revokes a set whose size is not known
+	// in advance and nobody named a session. What the caller asked for is that
+	// none be left live, and a user who already holds none satisfies it.
 	RevokeAllSessionsForUser(ctx context.Context, userID uint32) error
 	// Revoke every active session for a user except one identified by public_id.
 	// Used by "sign out of all other devices" in /settings/security.

@@ -129,6 +129,11 @@ WHERE workspace_id = ?
 -- ON UPDATE clause already.
 -- workspace_id is included as the first WHERE clause for defense-in-depth
 -- per project DB conventions, even though project_id is globally unique.
+--
+-- affected-rows: not-applicable — a cascade over however many live tasks
+-- the project holds, and a project with none cascades onto nothing.
+-- DisableProject runs in the same transaction and is what reports whether
+-- the project the caller named was there.
 UPDATE tasks
 SET enabled = FALSE,
     updated_at = CURRENT_TIMESTAMP(3)

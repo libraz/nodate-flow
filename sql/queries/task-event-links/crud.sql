@@ -80,10 +80,33 @@ SELECT
 FROM task_event_links tel
 INNER JOIN tasks t ON t.id = tel.task_id AND t.enabled = TRUE
 INNER JOIN calendar_events ce ON ce.id = tel.event_id AND ce.enabled = TRUE
-WHERE tel.workspace_id = ?
-  AND ce.public_id = ?
+WHERE tel.workspace_id = sqlc.arg('workspace_id')
+  AND ce.public_id = sqlc.arg('event_public_id')
   AND tel.enabled = TRUE
   AND (sqlc.arg('relation') = '' OR tel.relation = sqlc.arg('relation'))
+  -- The task's title is on the wire and an event id is reachable by any
+  -- workspace member, so the link is listable only when the actor may
+  -- see the task at its far end. Elevated roles skip the check.
+  AND (
+    CAST(sqlc.arg('is_elevated') AS SIGNED) = 1
+    OR t.visibility = 'public'
+    OR (t.visibility = 'project' AND EXISTS (
+      SELECT 1 FROM project_members pm_t
+      WHERE pm_t.project_id = t.project_id
+        AND pm_t.user_id = CAST(sqlc.arg('actor_user_id') AS UNSIGNED)
+        AND pm_t.enabled = TRUE
+    ))
+    OR (t.visibility = 'private' AND (
+      t.created_by_user_id = CAST(sqlc.arg('actor_user_id') AS UNSIGNED)
+      OR EXISTS (
+        SELECT 1 FROM task_actors ta_t
+        WHERE ta_t.task_id = t.id
+          AND ta_t.kind = 'user'
+          AND ta_t.user_id = CAST(sqlc.arg('actor_user_id') AS UNSIGNED)
+          AND ta_t.enabled = TRUE
+      )
+    ))
+  )
 ORDER BY tel.sort_weight ASC, tel.created_at ASC, tel.public_id ASC
 LIMIT ? OFFSET ?;
 

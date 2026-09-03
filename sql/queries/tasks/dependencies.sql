@@ -23,9 +23,33 @@ SELECT
 FROM task_dependencies td
 INNER JOIN tasks ft ON ft.id = td.from_task_id AND ft.enabled = TRUE
 INNER JOIN tasks tt ON tt.id = td.to_task_id   AND tt.enabled = TRUE
-WHERE td.workspace_id = ?
-  AND ft.public_id = ?
+WHERE td.workspace_id = sqlc.arg('workspace_id')
+  AND ft.public_id = sqlc.arg('from_task_public_id')
   AND td.enabled = TRUE
+  -- Reaching this route means the actor may see the task named in the
+  -- path; the edge's far end is a different task and carries its own
+  -- title, so it is filtered on its own visibility. Elevated roles skip
+  -- the check.
+  AND (
+    CAST(sqlc.arg('is_elevated') AS SIGNED) = 1
+    OR tt.visibility = 'public'
+    OR (tt.visibility = 'project' AND EXISTS (
+      SELECT 1 FROM project_members pm_tt
+      WHERE pm_tt.project_id = tt.project_id
+        AND pm_tt.user_id = CAST(sqlc.arg('actor_user_id') AS UNSIGNED)
+        AND pm_tt.enabled = TRUE
+    ))
+    OR (tt.visibility = 'private' AND (
+      tt.created_by_user_id = CAST(sqlc.arg('actor_user_id') AS UNSIGNED)
+      OR EXISTS (
+        SELECT 1 FROM task_actors ta_tt
+        WHERE ta_tt.task_id = tt.id
+          AND ta_tt.kind = 'user'
+          AND ta_tt.user_id = CAST(sqlc.arg('actor_user_id') AS UNSIGNED)
+          AND ta_tt.enabled = TRUE
+      )
+    ))
+  )
 ORDER BY td.created_at ASC, td.public_id ASC
 LIMIT ? OFFSET ?;
 
@@ -44,9 +68,33 @@ SELECT
 FROM task_dependencies td
 INNER JOIN tasks ft ON ft.id = td.from_task_id AND ft.enabled = TRUE
 INNER JOIN tasks tt ON tt.id = td.to_task_id   AND tt.enabled = TRUE
-WHERE td.workspace_id = ?
-  AND tt.public_id = ?
+WHERE td.workspace_id = sqlc.arg('workspace_id')
+  AND tt.public_id = sqlc.arg('to_task_public_id')
   AND td.enabled = TRUE
+  -- Reaching this route means the actor may see the task named in the
+  -- path; the edge's far end is a different task and carries its own
+  -- title, so it is filtered on its own visibility. Elevated roles skip
+  -- the check.
+  AND (
+    CAST(sqlc.arg('is_elevated') AS SIGNED) = 1
+    OR ft.visibility = 'public'
+    OR (ft.visibility = 'project' AND EXISTS (
+      SELECT 1 FROM project_members pm_ft
+      WHERE pm_ft.project_id = ft.project_id
+        AND pm_ft.user_id = CAST(sqlc.arg('actor_user_id') AS UNSIGNED)
+        AND pm_ft.enabled = TRUE
+    ))
+    OR (ft.visibility = 'private' AND (
+      ft.created_by_user_id = CAST(sqlc.arg('actor_user_id') AS UNSIGNED)
+      OR EXISTS (
+        SELECT 1 FROM task_actors ta_ft
+        WHERE ta_ft.task_id = ft.id
+          AND ta_ft.kind = 'user'
+          AND ta_ft.user_id = CAST(sqlc.arg('actor_user_id') AS UNSIGNED)
+          AND ta_ft.enabled = TRUE
+      )
+    ))
+  )
 ORDER BY td.created_at ASC, td.public_id ASC
 LIMIT ? OFFSET ?;
 
@@ -136,7 +184,7 @@ WHERE workspace_id = ?
 
 -- name: ListRetroDraftsForWorkspace :many
 -- List draft retrospective tasks: tasks linked back to a source task
--- via a task_dependencies row with kind='retro_of'. Backs the Phase 6 / L2
+-- via a task_dependencies row with kind='retro_of'. Backs the
 -- retro draft queue endpoint (GET /workspaces/{wsId}/tasks/drafts?reason=retro).
 -- The retro task itself is the from_task; to_task is the original task whose
 -- lifecycle prompted the retrospective. Ordered newest-first so the queue
@@ -161,7 +209,7 @@ INNER JOIN task_dependencies td
  AND td.enabled = TRUE
 INNER JOIN tasks src
   ON src.id = td.to_task_id
-WHERE t.workspace_id = ?
+WHERE t.workspace_id = sqlc.arg('workspace_id')
   AND t.enabled = TRUE
   -- Archived drafts must not surface in the queue: Discard archives the
   -- task (POST /tasks/{id}/archive) and the UI expects the row to drop
@@ -169,6 +217,54 @@ WHERE t.workspace_id = ?
   -- but the row would still be returned by the next refetch — the
   -- optimistic UI removal would visually rubber-band back.
   AND t.archived_at IS NULL
+  -- The draft's title and the source task's title are both on the wire,
+  -- and the route is open to every workspace member, so a draft is
+  -- listable only when the actor may see both ends. Elevated roles skip
+  -- the check.
+  AND (
+    CAST(sqlc.arg('is_elevated') AS SIGNED) = 1
+    OR (
+      (
+        t.visibility = 'public'
+        OR (t.visibility = 'project' AND EXISTS (
+          SELECT 1 FROM project_members pm_t
+          WHERE pm_t.project_id = t.project_id
+            AND pm_t.user_id = CAST(sqlc.arg('actor_user_id') AS UNSIGNED)
+            AND pm_t.enabled = TRUE
+        ))
+        OR (t.visibility = 'private' AND (
+          t.created_by_user_id = CAST(sqlc.arg('actor_user_id') AS UNSIGNED)
+          OR EXISTS (
+            SELECT 1 FROM task_actors ta_t
+            WHERE ta_t.task_id = t.id
+              AND ta_t.kind = 'user'
+              AND ta_t.user_id = CAST(sqlc.arg('actor_user_id') AS UNSIGNED)
+              AND ta_t.enabled = TRUE
+          )
+        ))
+      )
+      AND
+      (
+        src.visibility = 'public'
+        OR (src.visibility = 'project' AND EXISTS (
+          SELECT 1 FROM project_members pm_src
+          WHERE pm_src.project_id = src.project_id
+            AND pm_src.user_id = CAST(sqlc.arg('actor_user_id') AS UNSIGNED)
+            AND pm_src.enabled = TRUE
+        ))
+        OR (src.visibility = 'private' AND (
+          src.created_by_user_id = CAST(sqlc.arg('actor_user_id') AS UNSIGNED)
+          OR EXISTS (
+            SELECT 1 FROM task_actors ta_src
+            WHERE ta_src.task_id = src.id
+              AND ta_src.kind = 'user'
+              AND ta_src.user_id = CAST(sqlc.arg('actor_user_id') AS UNSIGNED)
+              AND ta_src.enabled = TRUE
+          )
+        ))
+      )
+    )
+  )
 ORDER BY t.created_at DESC, t.public_id DESC
 LIMIT ? OFFSET ?;
 

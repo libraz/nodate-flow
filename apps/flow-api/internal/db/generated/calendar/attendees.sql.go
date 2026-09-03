@@ -22,6 +22,11 @@ INSERT INTO calendar_event_attendees (
   rsvp,
   can_edit
 ) VALUES (?, ?, ?, ?, ?, ?)
+ON DUPLICATE KEY UPDATE
+  public_id = VALUES(public_id),
+  rsvp      = VALUES(rsvp),
+  can_edit  = VALUES(can_edit),
+  enabled   = TRUE
 `
 
 type CreateCalendarEventAttendeeParams struct {
@@ -34,6 +39,21 @@ type CreateCalendarEventAttendeeParams struct {
 }
 
 // Add an attendee to a calendar event.
+//
+// uniq_calendar_event_attendees_event_user covers removed attendees too,
+// so the row of someone taken off the event still holds the (event,
+// user) pair. Inserting beside it is impossible; the row has to come
+// back. Callers establish first that no live attendee row exists, which
+// leaves this statement with two cases: a new attendee, or a removed one
+// being invited again.
+//
+// Reviving is therefore a fresh invitation, not a restoration. The RSVP
+// returns to whatever the caller passes -- pending -- because the answer
+// a participant gave before they were removed is not an answer to being
+// invited again, and can_edit returns to what is granted now rather than
+// what was revoked. public_id follows the same reading: the caller has
+// already minted one and reports it to the client, so the revived row
+// adopts it instead of surfacing an identifier nobody was told about.
 func (q *Queries) CreateCalendarEventAttendee(ctx context.Context, arg CreateCalendarEventAttendeeParams) (int64, error) {
 	result, err := q.db.ExecContext(ctx, createCalendarEventAttendee,
 		arg.PublicID,
@@ -75,6 +95,13 @@ type DisableCalendarEventAttendeeParams struct {
 }
 
 // Remove an attendee from an event (soft-delete).
+//
+// affected-rows: not-applicable — the (event_id, user_id) pair is a
+// membership, and taking a user off a list they are not on asks for the
+// state that already holds. The endpoint answers "this user is not on the
+// event" only where it is the question being asked, which is why the RSVP
+// and edit-permission writers above establish attendance with
+// FindCalendarEventAttendee and this one does not.
 func (q *Queries) DisableCalendarEventAttendee(ctx context.Context, arg DisableCalendarEventAttendeeParams) error {
 	_, err := q.db.ExecContext(ctx, disableCalendarEventAttendee, arg.EventID, arg.UserID)
 	return err

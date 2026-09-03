@@ -778,6 +778,10 @@ type ReleaseReminderOccurrenceParams struct {
 // second send, so a released claim has to stop occupying it. A
 // tombstone would make the retry impossible in exactly the situation
 // the release exists for.
+//
+// affected-rows: not-applicable — this gives back a claim the same tick
+// took. What it needs to be true afterwards is that the occurrence is free
+// for the next tick, and a claim that is already gone satisfies that.
 func (q *Queries) ReleaseReminderOccurrence(ctx context.Context, arg ReleaseReminderOccurrenceParams) error {
 	_, err := q.db.ExecContext(ctx, releaseReminderOccurrence, arg.EventID, arg.OccurrenceStart)
 	return err

@@ -26,6 +26,14 @@ SELECT
   t.workspace_id,
   t.project_id,
   t.created_by_user_id,
+  -- The task's own internal id, carried so a consumer can spell the
+  -- Layer 4 visibility rule the same way every other consumer spells
+  -- it. Without it the private branch has to rejoin tasks by public_id
+  -- to reach task_actors, and that rejoin is the only reason the
+  -- predicate ever had a second shape. Same rationale as v_inbox's
+  -- task_internal_id; it is a view column, not an API field, and no
+  -- mapper projects it.
+  t.id AS task_internal_id,
   t.public_id,
   p.public_id AS project_public_id,
   p.name AS project_name,

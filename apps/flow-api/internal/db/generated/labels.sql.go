@@ -105,6 +105,11 @@ type DeleteTaskLabelParams struct {
 }
 
 // Remove a label from a task (hard delete from junction).
+//
+// affected-rows: not-applicable — the (task_id, label_id) pair is a
+// membership, and detaching a label a task does not carry asks for the
+// state that already holds. The label itself is resolved by public id
+// first, which is what answers a caller naming a label that is not there.
 func (q *Queries) DeleteTaskLabel(ctx context.Context, arg DeleteTaskLabelParams) error {
 	_, err := q.db.ExecContext(ctx, deleteTaskLabel, arg.WorkspaceID, arg.TaskID, arg.LabelID)
 	return err
@@ -148,6 +153,10 @@ type DisableTaskLabelParams struct {
 }
 
 // Soft-disable a task-label junction.
+//
+// affected-rows: not-applicable — same membership as DeleteTaskLabel and
+// the same reason: detaching a label a task does not carry asks for the
+// state that already holds, and the label is resolved by public id first.
 func (q *Queries) DisableTaskLabel(ctx context.Context, arg DisableTaskLabelParams) error {
 	_, err := q.db.ExecContext(ctx, disableTaskLabel, arg.WorkspaceID, arg.TaskID, arg.LabelID)
 	return err

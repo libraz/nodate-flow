@@ -123,6 +123,11 @@ type DeleteUserIntegrationParams struct {
 }
 
 // Hard-delete a single integration row (user-scoped).
+//
+// affected-rows: not-applicable — this takes an internal id, so the caller
+// has already resolved the connection by its public id and been answered
+// for one that names nothing. A zero count here is a disconnect that
+// landed between that lookup and this write, and the row is gone either way.
 func (q *Queries) DeleteUserIntegration(ctx context.Context, arg DeleteUserIntegrationParams) error {
 	_, err := q.db.ExecContext(ctx, deleteUserIntegration, arg.ID, arg.UserID)
 	return err
@@ -434,6 +439,10 @@ WHERE expires_at < CURRENT_TIMESTAMP
 
 // Garbage-collect oauth_states rows past their expires_at. Called
 // opportunistically from the callback handler.
+//
+// affected-rows: not-applicable — garbage collection over whatever has
+// expired. The callback's own answer comes from ClaimOauthState, which
+// does report its count; this one is housekeeping alongside it.
 func (q *Queries) PurgeExpiredOauthStates(ctx context.Context) error {
 	_, err := q.db.ExecContext(ctx, purgeExpiredOauthStates)
 	return err

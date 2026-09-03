@@ -68,11 +68,47 @@ const countArchivedTasksForWorkspace = `-- name: CountArchivedTasksForWorkspace 
 SELECT COUNT(*)
 FROM v_task_list_archived v
 WHERE v.workspace_id = ?
+  AND (
+    CAST(? AS SIGNED) = 1
+    OR v.visibility = 'public'
+    OR (v.visibility = 'project' AND EXISTS (
+      SELECT 1 FROM project_members pm_vis
+      WHERE pm_vis.project_id = v.project_id
+        AND pm_vis.user_id = CAST(? AS UNSIGNED)
+        AND pm_vis.enabled = TRUE
+    ))
+    OR (v.visibility = 'private' AND (
+      v.created_by_user_id = CAST(? AS UNSIGNED)
+      OR EXISTS (
+        SELECT 1 FROM task_actors ta_vis
+        WHERE ta_vis.task_id = v.task_internal_id
+          AND ta_vis.kind = 'user'
+          AND ta_vis.user_id = CAST(? AS UNSIGNED)
+          AND ta_vis.enabled = TRUE
+      )
+    ))
+  )
 `
 
-// Row count behind ListArchivedTasksForWorkspace.
-func (q *Queries) CountArchivedTasksForWorkspace(ctx context.Context, workspaceID uint32) (int64, error) {
-	row := q.db.QueryRowContext(ctx, countArchivedTasksForWorkspace, workspaceID)
+type CountArchivedTasksForWorkspaceParams struct {
+	WorkspaceID   uint32 `json:"-"`
+	IsElevated    int64  `json:"isElevated"`
+	ActorUserID   int64  `json:"actorUserId"`
+	ActorUserID_2 int64  `json:"actorUserId2"`
+	ActorUserID_3 int64  `json:"actorUserId3"`
+}
+
+// Row count behind ListArchivedTasksForWorkspace, carrying the same
+// Layer-4 visibility predicate. A total taken without it discloses how
+// many archived tasks the caller is not allowed to see.
+func (q *Queries) CountArchivedTasksForWorkspace(ctx context.Context, arg CountArchivedTasksForWorkspaceParams) (int64, error) {
+	row := q.db.QueryRowContext(ctx, countArchivedTasksForWorkspace,
+		arg.WorkspaceID,
+		arg.IsElevated,
+		arg.ActorUserID,
+		arg.ActorUserID_2,
+		arg.ActorUserID_3,
+	)
 	var count int64
 	err := row.Scan(&count)
 	return count, err
@@ -83,18 +119,50 @@ SELECT COUNT(*)
 FROM v_task_list v
 WHERE v.workspace_id = ?
   AND v.project_public_id = ?
+  AND (
+    CAST(? AS SIGNED) = 1
+    OR v.visibility = 'public'
+    OR (v.visibility = 'project' AND EXISTS (
+      SELECT 1 FROM project_members pm_vis
+      WHERE pm_vis.project_id = v.project_id
+        AND pm_vis.user_id = CAST(? AS UNSIGNED)
+        AND pm_vis.enabled = TRUE
+    ))
+    OR (v.visibility = 'private' AND (
+      v.created_by_user_id = CAST(? AS UNSIGNED)
+      OR EXISTS (
+        SELECT 1 FROM task_actors ta_vis
+        WHERE ta_vis.task_id = v.task_internal_id
+          AND ta_vis.kind = 'user'
+          AND ta_vis.user_id = CAST(? AS UNSIGNED)
+          AND ta_vis.enabled = TRUE
+      )
+    ))
+  )
 `
 
 type CountTasksForProjectParams struct {
 	WorkspaceID     uint32 `json:"-"`
 	ProjectPublicID []byte `json:"projectPublicId"`
+	IsElevated      int64  `json:"isElevated"`
+	ActorUserID     int64  `json:"actorUserId"`
+	ActorUserID_2   int64  `json:"actorUserId2"`
+	ActorUserID_3   int64  `json:"actorUserId3"`
 }
 
 // Row count behind ListTasksForProject. Filters must stay identical to
 // that query's WHERE clause or the pager reports a total the list can
-// never reach.
+// never reach -- including the Layer-4 visibility predicate, whose
+// absence here would report tasks the caller can never page to.
 func (q *Queries) CountTasksForProject(ctx context.Context, arg CountTasksForProjectParams) (int64, error) {
-	row := q.db.QueryRowContext(ctx, countTasksForProject, arg.WorkspaceID, arg.ProjectPublicID)
+	row := q.db.QueryRowContext(ctx, countTasksForProject,
+		arg.WorkspaceID,
+		arg.ProjectPublicID,
+		arg.IsElevated,
+		arg.ActorUserID,
+		arg.ActorUserID_2,
+		arg.ActorUserID_3,
+	)
 	var count int64
 	err := row.Scan(&count)
 	return count, err
@@ -117,8 +185,8 @@ WHERE v.workspace_id = ?
       v.created_by_user_id = CAST(? AS UNSIGNED)
       OR EXISTS (
         SELECT 1 FROM task_actors ta_vis
-        INNER JOIN tasks tv ON tv.id = ta_vis.task_id AND tv.public_id = v.public_id
-        WHERE ta_vis.kind = 'user'
+        WHERE ta_vis.task_id = v.task_internal_id
+          AND ta_vis.kind = 'user'
           AND ta_vis.user_id = CAST(? AS UNSIGNED)
           AND ta_vis.enabled = TRUE
       )
@@ -430,6 +498,11 @@ type FindTaskByPublicIdRow struct {
 }
 
 // Detail projection via v_task_detail. Workspace-scoped.
+// task-visibility: not-applicable — every route reaching this statement
+// resolves the task through acl.AuthorizeTaskAccess first, which applies
+// CheckTaskVisibility and answers WS.TASK.NOT_FOUND before the detail row
+// is read. v_task_detail carries no project_id or actor id to write the
+// predicate against in any case.
 func (q *Queries) FindTaskByPublicId(ctx context.Context, arg FindTaskByPublicIdParams) (FindTaskByPublicIdRow, error) {
 	row := q.db.QueryRowContext(ctx, findTaskByPublicId, arg.WorkspaceID, arg.PublicID)
 	var i FindTaskByPublicIdRow
@@ -546,14 +619,41 @@ SELECT
   v.label_ids
 FROM v_task_list_archived v
 WHERE v.workspace_id = ?
+  -- Archiving does not widen who may read a task. The route is mounted
+  -- on workspace membership, so without this every member -- guests
+  -- included -- reads the titles of archived private and project tasks.
+  AND (
+    CAST(? AS SIGNED) = 1
+    OR v.visibility = 'public'
+    OR (v.visibility = 'project' AND EXISTS (
+      SELECT 1 FROM project_members pm_vis
+      WHERE pm_vis.project_id = v.project_id
+        AND pm_vis.user_id = CAST(? AS UNSIGNED)
+        AND pm_vis.enabled = TRUE
+    ))
+    OR (v.visibility = 'private' AND (
+      v.created_by_user_id = CAST(? AS UNSIGNED)
+      OR EXISTS (
+        SELECT 1 FROM task_actors ta_vis
+        WHERE ta_vis.task_id = v.task_internal_id
+          AND ta_vis.kind = 'user'
+          AND ta_vis.user_id = CAST(? AS UNSIGNED)
+          AND ta_vis.enabled = TRUE
+      )
+    ))
+  )
 ORDER BY v.archived_at DESC, v.public_id DESC
 LIMIT ? OFFSET ?
 `
 
 type ListArchivedTasksForWorkspaceParams struct {
-	WorkspaceID uint32 `json:"-"`
-	Limit       int32  `json:"limit"`
-	Offset      int32  `json:"offset"`
+	WorkspaceID   uint32 `json:"-"`
+	IsElevated    int64  `json:"isElevated"`
+	ActorUserID   int64  `json:"actorUserId"`
+	ActorUserID_2 int64  `json:"actorUserId2"`
+	ActorUserID_3 int64  `json:"actorUserId3"`
+	Limit         int32  `json:"limit"`
+	Offset        int32  `json:"offset"`
 }
 
 type ListArchivedTasksForWorkspaceRow struct {
@@ -582,7 +682,15 @@ type ListArchivedTasksForWorkspaceRow struct {
 // List archived tasks via v_task_list_archived. See ListTasksForProject
 // for why the total is a separate query.
 func (q *Queries) ListArchivedTasksForWorkspace(ctx context.Context, arg ListArchivedTasksForWorkspaceParams) ([]ListArchivedTasksForWorkspaceRow, error) {
-	rows, err := q.db.QueryContext(ctx, listArchivedTasksForWorkspace, arg.WorkspaceID, arg.Limit, arg.Offset)
+	rows, err := q.db.QueryContext(ctx, listArchivedTasksForWorkspace,
+		arg.WorkspaceID,
+		arg.IsElevated,
+		arg.ActorUserID,
+		arg.ActorUserID_2,
+		arg.ActorUserID_3,
+		arg.Limit,
+		arg.Offset,
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -649,6 +757,27 @@ SELECT
   v.label_ids
 FROM v_task_list_archived v
 WHERE v.workspace_id = ?
+  -- Same Layer-4 filter as ListArchivedTasksForWorkspace.
+  AND (
+    CAST(? AS SIGNED) = 1
+    OR v.visibility = 'public'
+    OR (v.visibility = 'project' AND EXISTS (
+      SELECT 1 FROM project_members pm_vis
+      WHERE pm_vis.project_id = v.project_id
+        AND pm_vis.user_id = CAST(? AS UNSIGNED)
+        AND pm_vis.enabled = TRUE
+    ))
+    OR (v.visibility = 'private' AND (
+      v.created_by_user_id = CAST(? AS UNSIGNED)
+      OR EXISTS (
+        SELECT 1 FROM task_actors ta_vis
+        WHERE ta_vis.task_id = v.task_internal_id
+          AND ta_vis.kind = 'user'
+          AND ta_vis.user_id = CAST(? AS UNSIGNED)
+          AND ta_vis.enabled = TRUE
+      )
+    ))
+  )
   AND (? IS NULL
        OR v.archived_at < ?
        OR (v.archived_at = ?
@@ -659,6 +788,10 @@ LIMIT ?
 
 type ListArchivedTasksForWorkspaceKeysetParams struct {
 	WorkspaceID      uint32         `json:"-"`
+	IsElevated       int64          `json:"isElevated"`
+	ActorUserID      int64          `json:"actorUserId"`
+	ActorUserID_2    int64          `json:"actorUserId2"`
+	ActorUserID_3    int64          `json:"actorUserId3"`
 	CursorArchivedAt sql.NullTime   `json:"cursorArchivedAt"`
 	CursorPublicID   types.PublicID `json:"cursorPublicId"`
 	Limit            int32          `json:"limit"`
@@ -698,6 +831,10 @@ type ListArchivedTasksForWorkspaceKeysetRow struct {
 func (q *Queries) ListArchivedTasksForWorkspaceKeyset(ctx context.Context, arg ListArchivedTasksForWorkspaceKeysetParams) ([]ListArchivedTasksForWorkspaceKeysetRow, error) {
 	rows, err := q.db.QueryContext(ctx, listArchivedTasksForWorkspaceKeyset,
 		arg.WorkspaceID,
+		arg.IsElevated,
+		arg.ActorUserID,
+		arg.ActorUserID_2,
+		arg.ActorUserID_3,
 		arg.CursorArchivedAt,
 		arg.CursorArchivedAt,
 		arg.CursorArchivedAt,
@@ -758,13 +895,40 @@ FROM tasks t
 WHERE t.workspace_id = ?
   AND t.parent_task_id = ?
   AND t.enabled = TRUE
+  -- Reaching this statement means the actor may see the parent; a child
+  -- carries its own visibility and its title and description are on the
+  -- wire. Elevated roles skip the check.
+  AND (
+    CAST(? AS SIGNED) = 1
+    OR t.visibility = 'public'
+    OR (t.visibility = 'project' AND EXISTS (
+      SELECT 1 FROM project_members pm_vis
+      WHERE pm_vis.project_id = t.project_id
+        AND pm_vis.user_id = CAST(? AS UNSIGNED)
+        AND pm_vis.enabled = TRUE
+    ))
+    OR (t.visibility = 'private' AND (
+      t.created_by_user_id = CAST(? AS UNSIGNED)
+      OR EXISTS (
+        SELECT 1 FROM task_actors ta_vis
+        WHERE ta_vis.task_id = t.id
+          AND ta_vis.kind = 'user'
+          AND ta_vis.user_id = CAST(? AS UNSIGNED)
+          AND ta_vis.enabled = TRUE
+      )
+    ))
+  )
 ORDER BY t.created_at ASC
 LIMIT 100
 `
 
 type ListChildTasksByParentIDParams struct {
-	WorkspaceID  uint32        `json:"-"`
-	ParentTaskID sql.NullInt32 `json:"-"`
+	WorkspaceID   uint32        `json:"-"`
+	ParentTaskID  sql.NullInt32 `json:"-"`
+	IsElevated    int64         `json:"isElevated"`
+	ActorUserID   int64         `json:"actorUserId"`
+	ActorUserID_2 int64         `json:"actorUserId2"`
+	ActorUserID_3 int64         `json:"actorUserId3"`
 }
 
 type ListChildTasksByParentIDRow struct {
@@ -779,7 +943,14 @@ type ListChildTasksByParentIDRow struct {
 // List existing child tasks for a given parent task. Used by step
 // decomposition to avoid suggesting duplicates of already-created steps.
 func (q *Queries) ListChildTasksByParentID(ctx context.Context, arg ListChildTasksByParentIDParams) ([]ListChildTasksByParentIDRow, error) {
-	rows, err := q.db.QueryContext(ctx, listChildTasksByParentID, arg.WorkspaceID, arg.ParentTaskID)
+	rows, err := q.db.QueryContext(ctx, listChildTasksByParentID,
+		arg.WorkspaceID,
+		arg.ParentTaskID,
+		arg.IsElevated,
+		arg.ActorUserID,
+		arg.ActorUserID_2,
+		arg.ActorUserID_3,
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -821,6 +992,28 @@ FROM tasks t
 WHERE t.workspace_id = ?
   AND t.parent_task_id = ?
   AND t.enabled = TRUE
+  -- Same Layer-4 filter as ListChildTasksByParentID: the parent being
+  -- visible says nothing about the children.
+  AND (
+    CAST(? AS SIGNED) = 1
+    OR t.visibility = 'public'
+    OR (t.visibility = 'project' AND EXISTS (
+      SELECT 1 FROM project_members pm_vis
+      WHERE pm_vis.project_id = t.project_id
+        AND pm_vis.user_id = CAST(? AS UNSIGNED)
+        AND pm_vis.enabled = TRUE
+    ))
+    OR (t.visibility = 'private' AND (
+      t.created_by_user_id = CAST(? AS UNSIGNED)
+      OR EXISTS (
+        SELECT 1 FROM task_actors ta_vis
+        WHERE ta_vis.task_id = t.id
+          AND ta_vis.kind = 'user'
+          AND ta_vis.user_id = CAST(? AS UNSIGNED)
+          AND ta_vis.enabled = TRUE
+      )
+    ))
+  )
   AND (? IS NULL
        OR t.created_at < ?
        OR (t.created_at = ?
@@ -832,6 +1025,10 @@ LIMIT ?
 type ListChildTasksByParentIDKeysetParams struct {
 	WorkspaceID     uint32         `json:"-"`
 	ParentTaskID    sql.NullInt32  `json:"-"`
+	IsElevated      int64          `json:"isElevated"`
+	ActorUserID     int64          `json:"actorUserId"`
+	ActorUserID_2   int64          `json:"actorUserId2"`
+	ActorUserID_3   int64          `json:"actorUserId3"`
 	CursorCreatedAt sql.NullTime   `json:"cursorCreatedAt"`
 	CursorPublicID  types.PublicID `json:"cursorPublicId"`
 	Limit           int32          `json:"limit"`
@@ -859,6 +1056,10 @@ func (q *Queries) ListChildTasksByParentIDKeyset(ctx context.Context, arg ListCh
 	rows, err := q.db.QueryContext(ctx, listChildTasksByParentIDKeyset,
 		arg.WorkspaceID,
 		arg.ParentTaskID,
+		arg.IsElevated,
+		arg.ActorUserID,
+		arg.ActorUserID_2,
+		arg.ActorUserID_3,
 		arg.CursorCreatedAt,
 		arg.CursorCreatedAt,
 		arg.CursorCreatedAt,
@@ -1009,16 +1210,43 @@ WHERE tel.workspace_id = ?
   AND ce.public_id = ?
   AND tel.enabled = TRUE
   AND (? = '' OR tel.relation = ?)
+  -- The task's title is on the wire and an event id is reachable by any
+  -- workspace member, so the link is listable only when the actor may
+  -- see the task at its far end. Elevated roles skip the check.
+  AND (
+    CAST(? AS SIGNED) = 1
+    OR t.visibility = 'public'
+    OR (t.visibility = 'project' AND EXISTS (
+      SELECT 1 FROM project_members pm_t
+      WHERE pm_t.project_id = t.project_id
+        AND pm_t.user_id = CAST(? AS UNSIGNED)
+        AND pm_t.enabled = TRUE
+    ))
+    OR (t.visibility = 'private' AND (
+      t.created_by_user_id = CAST(? AS UNSIGNED)
+      OR EXISTS (
+        SELECT 1 FROM task_actors ta_t
+        WHERE ta_t.task_id = t.id
+          AND ta_t.kind = 'user'
+          AND ta_t.user_id = CAST(? AS UNSIGNED)
+          AND ta_t.enabled = TRUE
+      )
+    ))
+  )
 ORDER BY tel.sort_weight ASC, tel.created_at ASC, tel.public_id ASC
 LIMIT ? OFFSET ?
 `
 
 type ListLinkedTasksForEventParams struct {
-	WorkspaceID uint32                 `json:"-"`
-	PublicID    types.PublicID         `json:"publicId"`
-	Relation    TaskEventLinksRelation `json:"relation"`
-	Limit       int32                  `json:"limit"`
-	Offset      int32                  `json:"offset"`
+	WorkspaceID   uint32                 `json:"-"`
+	EventPublicID types.PublicID         `json:"eventPublicId"`
+	Relation      TaskEventLinksRelation `json:"relation"`
+	IsElevated    int64                  `json:"isElevated"`
+	ActorUserID   int64                  `json:"actorUserId"`
+	ActorUserID_2 int64                  `json:"actorUserId2"`
+	ActorUserID_3 int64                  `json:"actorUserId3"`
+	Limit         int32                  `json:"limit"`
+	Offset        int32                  `json:"offset"`
 }
 
 type ListLinkedTasksForEventRow struct {
@@ -1037,9 +1265,13 @@ type ListLinkedTasksForEventRow struct {
 func (q *Queries) ListLinkedTasksForEvent(ctx context.Context, arg ListLinkedTasksForEventParams) ([]ListLinkedTasksForEventRow, error) {
 	rows, err := q.db.QueryContext(ctx, listLinkedTasksForEvent,
 		arg.WorkspaceID,
-		arg.PublicID,
+		arg.EventPublicID,
 		arg.Relation,
 		arg.Relation,
+		arg.IsElevated,
+		arg.ActorUserID,
+		arg.ActorUserID_2,
+		arg.ActorUserID_3,
 		arg.Limit,
 		arg.Offset,
 	)
@@ -1116,6 +1348,9 @@ type ListMyTasksRow struct {
 }
 
 // Tasks where the given user is attached as an actor, via v_my_tasks.
+// task-visibility: not-applicable — v_my_tasks emits only rows where the
+// reader holds an enabled task_actors row, and every caller binds its own
+// user_public_id, so the row set is already the private branch of the rule.
 func (q *Queries) ListMyTasks(ctx context.Context, arg ListMyTasksParams) ([]ListMyTasksRow, error) {
 	rows, err := q.db.QueryContext(ctx, listMyTasks,
 		arg.WorkspaceID,
@@ -1208,6 +1443,9 @@ type ListMyTasksGlobalRow struct {
 // row so the caller gets workspace_public_id / name for grouping. Used by
 // GET /me/tasks to power the cross-workspace "Today" / Calendar views in
 // the web client without fanning out one request per workspace.
+// task-visibility: not-applicable — v_my_tasks emits only rows where the
+// reader holds an enabled task_actors row, and every caller binds its own
+// user_public_id, so the row set is already the private branch of the rule.
 func (q *Queries) ListMyTasksGlobal(ctx context.Context, arg ListMyTasksGlobalParams) ([]ListMyTasksGlobalRow, error) {
 	rows, err := q.db.QueryContext(ctx, listMyTasksGlobal, arg.UserPublicID, arg.Limit, arg.Offset)
 	if err != nil {
@@ -1302,6 +1540,9 @@ type ListMyTasksGlobalKeysetRow struct {
 // row of the previous page. First page passes NULL for both
 // cursor_created_at and cursor_public_id. ORDER BY (created_at DESC,
 // public_id DESC) only.
+// task-visibility: not-applicable — v_my_tasks emits only rows where the
+// reader holds an enabled task_actors row, and every caller binds its own
+// user_public_id, so the row set is already the private branch of the rule.
 func (q *Queries) ListMyTasksGlobalKeyset(ctx context.Context, arg ListMyTasksGlobalKeysetParams) ([]ListMyTasksGlobalKeysetRow, error) {
 	rows, err := q.db.QueryContext(ctx, listMyTasksGlobalKeyset,
 		arg.UserPublicID,
@@ -1398,6 +1639,9 @@ type ListMyTasksKeysetRow struct {
 // public_id DESC) only — priority / due_on are NOT considered, so the
 // tuple comparison is monotonic. Callers that need priority-aware
 // ordering must keep using the OFFSET variant.
+// task-visibility: not-applicable — v_my_tasks emits only rows where the
+// reader holds an enabled task_actors row, and every caller binds its own
+// user_public_id, so the row set is already the private branch of the rule.
 func (q *Queries) ListMyTasksKeyset(ctx context.Context, arg ListMyTasksKeysetParams) ([]ListMyTasksKeysetRow, error) {
 	rows, err := q.db.QueryContext(ctx, listMyTasksKeyset,
 		arg.WorkspaceID,
@@ -1501,6 +1745,9 @@ type ListMyTasksWithDatesRow struct {
 // answer for "what is on my plate across every workspace on these days".
 // Undated tasks are excluded; use ListMyTasksGlobal for the planning
 // bucket.
+// task-visibility: not-applicable — v_my_tasks emits only rows where the
+// reader holds an enabled task_actors row, and every caller binds its own
+// user_public_id, so the row set is already the private branch of the rule.
 func (q *Queries) ListMyTasksWithDates(ctx context.Context, arg ListMyTasksWithDatesParams) ([]ListMyTasksWithDatesRow, error) {
 	rows, err := q.db.QueryContext(ctx, listMyTasksWithDates,
 		arg.UserPublicID,
@@ -1608,6 +1855,9 @@ type ListMyTasksWithDatesKeysetRow struct {
 // orders by due_on first; the keyset cursor must use a monotonic key,
 // and created_at + public_id is uniquely ordered. Callers that need
 // due_on ordering must keep using the OFFSET variant.
+// task-visibility: not-applicable — v_my_tasks emits only rows where the
+// reader holds an enabled task_actors row, and every caller binds its own
+// user_public_id, so the row set is already the private branch of the rule.
 func (q *Queries) ListMyTasksWithDatesKeyset(ctx context.Context, arg ListMyTasksWithDatesKeysetParams) ([]ListMyTasksWithDatesKeysetRow, error) {
 	rows, err := q.db.QueryContext(ctx, listMyTasksWithDatesKeyset,
 		arg.UserPublicID,
@@ -1679,6 +1929,26 @@ SELECT
 FROM v_task_list v
 WHERE v.workspace_id = ?
   AND v.project_public_id = ?
+  AND (
+    CAST(? AS SIGNED) = 1
+    OR v.visibility = 'public'
+    OR (v.visibility = 'project' AND EXISTS (
+      SELECT 1 FROM project_members pm_vis
+      WHERE pm_vis.project_id = v.project_id
+        AND pm_vis.user_id = CAST(? AS UNSIGNED)
+        AND pm_vis.enabled = TRUE
+    ))
+    OR (v.visibility = 'private' AND (
+      v.created_by_user_id = CAST(? AS UNSIGNED)
+      OR EXISTS (
+        SELECT 1 FROM task_actors ta_vis
+        WHERE ta_vis.task_id = v.task_internal_id
+          AND ta_vis.kind = 'user'
+          AND ta_vis.user_id = CAST(? AS UNSIGNED)
+          AND ta_vis.enabled = TRUE
+      )
+    ))
+  )
 ORDER BY v.sort_weight ASC, v.priority DESC, v.due_on ASC, v.created_at DESC, v.public_id DESC
 LIMIT ? OFFSET ?
 `
@@ -1686,6 +1956,10 @@ LIMIT ? OFFSET ?
 type ListTasksForProjectParams struct {
 	WorkspaceID     uint32 `json:"-"`
 	ProjectPublicID []byte `json:"projectPublicId"`
+	IsElevated      int64  `json:"isElevated"`
+	ActorUserID     int64  `json:"actorUserId"`
+	ActorUserID_2   int64  `json:"actorUserId2"`
+	ActorUserID_3   int64  `json:"actorUserId3"`
 	Limit           int32  `json:"limit"`
 	Offset          int32  `json:"offset"`
 }
@@ -1726,6 +2000,10 @@ func (q *Queries) ListTasksForProject(ctx context.Context, arg ListTasksForProje
 	rows, err := q.db.QueryContext(ctx, listTasksForProject,
 		arg.WorkspaceID,
 		arg.ProjectPublicID,
+		arg.IsElevated,
+		arg.ActorUserID,
+		arg.ActorUserID_2,
+		arg.ActorUserID_3,
 		arg.Limit,
 		arg.Offset,
 	)
@@ -1796,6 +2074,26 @@ SELECT
 FROM v_task_list v
 WHERE v.workspace_id = ?
   AND v.project_public_id = ?
+  AND (
+    CAST(? AS SIGNED) = 1
+    OR v.visibility = 'public'
+    OR (v.visibility = 'project' AND EXISTS (
+      SELECT 1 FROM project_members pm_vis
+      WHERE pm_vis.project_id = v.project_id
+        AND pm_vis.user_id = CAST(? AS UNSIGNED)
+        AND pm_vis.enabled = TRUE
+    ))
+    OR (v.visibility = 'private' AND (
+      v.created_by_user_id = CAST(? AS UNSIGNED)
+      OR EXISTS (
+        SELECT 1 FROM task_actors ta_vis
+        WHERE ta_vis.task_id = v.task_internal_id
+          AND ta_vis.kind = 'user'
+          AND ta_vis.user_id = CAST(? AS UNSIGNED)
+          AND ta_vis.enabled = TRUE
+      )
+    ))
+  )
   AND (? IS NULL
        OR v.created_at < ?
        OR (v.created_at = ?
@@ -1807,6 +2105,10 @@ LIMIT ?
 type ListTasksForProjectKeysetParams struct {
 	WorkspaceID     uint32         `json:"-"`
 	ProjectPublicID []byte         `json:"projectPublicId"`
+	IsElevated      int64          `json:"isElevated"`
+	ActorUserID     int64          `json:"actorUserId"`
+	ActorUserID_2   int64          `json:"actorUserId2"`
+	ActorUserID_3   int64          `json:"actorUserId3"`
 	CursorCreatedAt sql.NullTime   `json:"cursorCreatedAt"`
 	CursorPublicID  types.PublicID `json:"cursorPublicId"`
 	Limit           int32          `json:"limit"`
@@ -1851,6 +2153,10 @@ func (q *Queries) ListTasksForProjectKeyset(ctx context.Context, arg ListTasksFo
 	rows, err := q.db.QueryContext(ctx, listTasksForProjectKeyset,
 		arg.WorkspaceID,
 		arg.ProjectPublicID,
+		arg.IsElevated,
+		arg.ActorUserID,
+		arg.ActorUserID_2,
+		arg.ActorUserID_3,
 		arg.CursorCreatedAt,
 		arg.CursorCreatedAt,
 		arg.CursorCreatedAt,
@@ -1936,8 +2242,8 @@ WHERE v.workspace_id = ?
       v.created_by_user_id = CAST(? AS UNSIGNED)
       OR EXISTS (
         SELECT 1 FROM task_actors ta_vis
-        INNER JOIN tasks tv ON tv.id = ta_vis.task_id AND tv.public_id = v.public_id
-        WHERE ta_vis.kind = 'user'
+        WHERE ta_vis.task_id = v.task_internal_id
+          AND ta_vis.kind = 'user'
           AND ta_vis.user_id = CAST(? AS UNSIGNED)
           AND ta_vis.enabled = TRUE
       )
@@ -2059,6 +2365,26 @@ SELECT
 FROM v_task_list v
 WHERE v.workspace_id = ?
   AND (? = '' OR v.derived_state = ?)
+  AND (
+    CAST(? AS SIGNED) = 1
+    OR v.visibility = 'public'
+    OR (v.visibility = 'project' AND EXISTS (
+      SELECT 1 FROM project_members pm_vis
+      WHERE pm_vis.project_id = v.project_id
+        AND pm_vis.user_id = CAST(? AS UNSIGNED)
+        AND pm_vis.enabled = TRUE
+    ))
+    OR (v.visibility = 'private' AND (
+      v.created_by_user_id = CAST(? AS UNSIGNED)
+      OR EXISTS (
+        SELECT 1 FROM task_actors ta_vis
+        WHERE ta_vis.task_id = v.task_internal_id
+          AND ta_vis.kind = 'user'
+          AND ta_vis.user_id = CAST(? AS UNSIGNED)
+          AND ta_vis.enabled = TRUE
+      )
+    ))
+  )
   AND (? IS NULL
        OR v.created_at < ?
        OR (v.created_at = ?
@@ -2070,6 +2396,10 @@ LIMIT ?
 type ListTasksForWorkspaceKeysetParams struct {
 	WorkspaceID     uint32            `json:"-"`
 	StateFilter     TasksDerivedState `json:"stateFilter"`
+	IsElevated      int64             `json:"isElevated"`
+	ActorUserID     int64             `json:"actorUserId"`
+	ActorUserID_2   int64             `json:"actorUserId2"`
+	ActorUserID_3   int64             `json:"actorUserId3"`
 	CursorCreatedAt sql.NullTime      `json:"cursorCreatedAt"`
 	CursorPublicID  types.PublicID    `json:"cursorPublicId"`
 	Limit           int32             `json:"limit"`
@@ -2114,6 +2444,10 @@ func (q *Queries) ListTasksForWorkspaceKeyset(ctx context.Context, arg ListTasks
 		arg.WorkspaceID,
 		arg.StateFilter,
 		arg.StateFilter,
+		arg.IsElevated,
+		arg.ActorUserID,
+		arg.ActorUserID_2,
+		arg.ActorUserID_3,
 		arg.CursorCreatedAt,
 		arg.CursorCreatedAt,
 		arg.CursorCreatedAt,
@@ -2215,6 +2549,9 @@ type ResolveTaskRefRow struct {
 }
 
 // Resolve a human-readable task reference (e.g. NF-42) to a task public_id.
+// task-visibility: not-applicable — the only caller re-resolves the task it
+// finds through the shared task ACL and returns the error before the title
+// reaches the caller, so a task the actor may not see is answered as missing.
 func (q *Queries) ResolveTaskRef(ctx context.Context, arg ResolveTaskRefParams) (ResolveTaskRefRow, error) {
 	row := q.db.QueryRowContext(ctx, resolveTaskRef, arg.WorkspaceID, arg.Identifier, arg.TaskNumber)
 	var i ResolveTaskRefRow

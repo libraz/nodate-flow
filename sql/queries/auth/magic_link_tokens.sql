@@ -37,5 +37,9 @@ WHERE id = ?
 
 -- name: CleanupExpiredMagicLinks :exec
 -- Delete tokens that are either expired-and-used or expired-and-unused, for periodic cleanup.
+--
+-- affected-rows: not-applicable — a TTL sweep runs against whatever has
+-- expired since the last one. Nobody named a token, and a sweep with
+-- nothing to collect is the state the sweep exists to keep.
 DELETE FROM magic_link_tokens
 WHERE expires_at < CURRENT_TIMESTAMP;

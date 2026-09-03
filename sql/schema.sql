@@ -1068,7 +1068,7 @@ CREATE TABLE oauth_states (
   state CHAR(64) CHARACTER SET latin1 COLLATE latin1_swedish_ci NOT NULL PRIMARY KEY COMMENT 'Random 32-byte token, hex-encoded',
 
   user_id INT UNSIGNED NOT NULL COMMENT 'Internal FK to users.id — the user who started the connect flow',
-  provider ENUM('github','slack','google_calendar','discord') NOT NULL COMMENT 'Which provider this state belongs to. ''discord'' is required for the personal Discord presence-binding flow (Phase 8 presence-discord gateway).',
+  provider ENUM('github','slack','google_calendar','discord') NOT NULL COMMENT 'Which provider this state belongs to. ''discord'' is required for the personal Discord presence-binding flow (presence-discord gateway).',
   redirect_to VARCHAR(512) NULL COMMENT 'Optional client-supplied return URL to send the user to after the callback completes',
 
   expires_at DATETIME(3) NOT NULL COMMENT 'Hard expiry; callback handler rejects rows past this timestamp',
@@ -2923,7 +2923,7 @@ CREATE TABLE user_integrations (
   public_id BINARY(16) NOT NULL COMMENT 'UUID v7, the only externally visible ID',
   user_id INT UNSIGNED NOT NULL COMMENT 'Internal FK to users.id',
 
-  provider ENUM('github','slack','google_calendar','discord') NOT NULL COMMENT 'OAuth provider kind. ''discord'' is reserved for personal presence binding read by the Phase 8 presence-discord gateway (see ADR 0008 D6) — no task-mutating tokens are stored.',
+  provider ENUM('github','slack','google_calendar','discord') NOT NULL COMMENT 'OAuth provider kind. ''discord'' is reserved for personal presence binding read by the presence-discord gateway (see ADR 0008 D6) — no task-mutating tokens are stored.',
   external_account_id VARCHAR(255) CHARACTER SET latin1 COLLATE latin1_swedish_ci NOT NULL COMMENT 'Provider subject (GH login, Slack user id, Google sub)',
   external_account_label VARCHAR(255) NOT NULL COMMENT 'Display-only label (email or @handle)',
   scopes TEXT NOT NULL COMMENT 'Space-separated list of granted OAuth scopes',
@@ -2935,7 +2935,7 @@ CREATE TABLE user_integrations (
   connected_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) COMMENT 'When the user first authorised the app',
   last_refreshed_at DATETIME(3) NULL COMMENT 'Last successful token refresh',
 
-  metadata_json JSON NULL CHECK (metadata_json IS NULL OR JSON_VALID(metadata_json)) COMMENT 'Provider-specific binding metadata. For provider=''discord'': stores {"external_user_id": "<Discord snowflake>", "verified_at": "<ISO-8601 UTC>"} so the Phase 8 gateway can resolve presence events to a user without a second token table. Other providers may write their own keys here.',
+  metadata_json JSON NULL CHECK (metadata_json IS NULL OR JSON_VALID(metadata_json)) COMMENT 'Provider-specific binding metadata. For provider=''discord'': stores {"external_user_id": "<Discord snowflake>", "verified_at": "<ISO-8601 UTC>"} so the presence gateway can resolve presence events to a user without a second token table. Other providers may write their own keys here.',
 
   sort_weight INT NOT NULL DEFAULT 0 COMMENT 'Display order',
   notes TEXT NULL COMMENT 'Admin notes',
@@ -3175,6 +3175,14 @@ SELECT
   t.workspace_id,
   t.project_id,
   t.created_by_user_id,
+  -- The task's own internal id, carried so a consumer can spell the
+  -- Layer 4 visibility rule the same way every other consumer spells
+  -- it. Without it the private branch has to rejoin tasks by public_id
+  -- to reach task_actors, and that rejoin is the only reason the
+  -- predicate ever had a second shape. Same rationale as v_inbox's
+  -- task_internal_id; it is a view column, not an API field, and no
+  -- mapper projects it.
+  t.id AS task_internal_id,
   t.public_id,
   p.public_id AS project_public_id,
   p.name AS project_name,
@@ -3577,7 +3585,7 @@ WHERE v.archived_at IS NOT NULL;
 -- `tsig` (triggering signal) to avoid colliding with any future signals
 -- JOIN that might use the conventional `s` alias.
 --
--- Reversal projection (ADR 0008 D4 / J5): `reverses_event_public_id`
+-- Reversal projection (ADR 0008 D4): `reverses_event_public_id`
 -- surfaces the target event's public_id when this row is a compensating
 -- reverse, sourced from a self-join aliased `e_rev` (reverse target).
 -- `was_reversed` is TRUE when some other enabled event points back to this

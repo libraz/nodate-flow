@@ -150,6 +150,10 @@ type Querier interface {
 	// treat 0 as "invalid, expired, or already consumed".
 	ClaimOauthState(ctx context.Context, state string) (int64, error)
 	// Delete tokens that are either expired-and-used or expired-and-unused, for periodic cleanup.
+	//
+	// affected-rows: not-applicable — a TTL sweep runs against whatever has
+	// expired since the last one. Nobody named a token, and a sweep with
+	// nothing to collect is the state the sweep exists to keep.
 	CleanupExpiredMagicLinks(ctx context.Context) error
 	// Disable TOTP on a local identity.
 	ClearIdentityMfa(ctx context.Context, id uint32) error
@@ -199,6 +203,18 @@ type Querier interface {
 	// Insert a new invite link for a workspace.
 	CreateWorkspaceInvite(ctx context.Context, arg CreateWorkspaceInviteParams) (int64, error)
 	// Add a user to a workspace with the given role.
+	//
+	// uniq_workspace_members_workspace_id_user_id covers removed members
+	// too: the row of someone taken out of a workspace still holds the
+	// (workspace, user) pair, so re-adding them has to revive that row
+	// rather than insert beside it. Without the revival the second
+	// membership fails for good, and the workspace is the entry point to
+	// everything else in it.
+	//
+	// Re-joining states the membership afresh -- the role asked for now, the
+	// inviter and dates of this joining, and the public_id the caller has
+	// already reported to the client. Reviving into the previous role would
+	// hand back privileges the removal took away.
 	CreateWorkspaceMember(ctx context.Context, arg CreateWorkspaceMemberParams) (int64, error)
 	// Atomically drop ref_count by 1 with an underflow guard. Returning
 	// sql.Result lets the caller assert RowsAffected() == 1; a zero result
@@ -206,6 +222,10 @@ type Querier interface {
 	// and the caller should rollback rather than continue.
 	DecrementStorageObjectRefCount(ctx context.Context, id uint32) (sql.Result, error)
 	// Delete every recovery code (used or not) for a user.
+	//
+	// affected-rows: not-applicable — it empties the whole set before a fresh
+	// batch is issued, and on the disable path it is the emptiness that is
+	// wanted. A user who holds no codes is already where this leaves them.
 	DeleteAllRecoveryCodesForUser(ctx context.Context, userID uint32) error
 	// Clear the workspace's task attachments ahead of HardDeleteWorkspace.
 	//
@@ -216,6 +236,11 @@ type Querier interface {
 	// chain — an ordering that follows table creation order and is not part of
 	// any documented contract. Removing the referrers up front makes the
 	// teardown independent of it.
+	//
+	// affected-rows: not-applicable — this clears whatever the workspace holds
+	// ahead of the delete that answers the caller. HardDeleteWorkspace reports
+	// whether the workspace was there; a workspace with no attachments is the
+	// ordinary case and produces exactly the state this asks for.
 	DeleteAttachmentsByWorkspace(ctx context.Context, workspaceID uint32) error
 	// Drop the attachment rows that point at a reservation being reclaimed.
 	// They exist because the presign created both in one transaction, and
@@ -226,6 +251,10 @@ type Querier interface {
 	// Calendar-side counterpart of DeleteAttachmentsByWorkspace;
 	// calendar_event_attachments.storage_object_id carries the same
 	// ON DELETE RESTRICT. See that query for the full rationale.
+	//
+	// affected-rows: not-applicable — same shape and same reason as
+	// DeleteAttachmentsByWorkspace: it clears a set ahead of the delete that
+	// answers the caller, and an empty set is the ordinary case.
 	DeleteCalendarEventAttachmentsByWorkspace(ctx context.Context, workspaceID uint32) error
 	// The calendar-side mirror of DeleteAttachmentsForStorageObject; the
 	// same RESTRICT edge exists from calendar_event_attachments.
@@ -253,6 +282,11 @@ type Querier interface {
 	// is exactly what uploaded_at IS NULL loses to.
 	DeleteUnconfirmedStorageObjectByID(ctx context.Context, id uint32) (int64, error)
 	// Hard-delete a single integration row (user-scoped).
+	//
+	// affected-rows: not-applicable — this takes an internal id, so the caller
+	// has already resolved the connection by its public id and been answered
+	// for one that names nothing. A zero count here is a disconnect that
+	// landed between that lookup and this write, and the row is gone either way.
 	DeleteUserIntegration(ctx context.Context, arg DeleteUserIntegrationParams) error
 	// Resolve a session from its SHA-256 refresh hash regardless of its
 	// revoked / enabled state. Used by the refresh-reuse detector: a hash
@@ -574,6 +608,10 @@ type Querier interface {
 	PatchWorkspace(ctx context.Context, arg PatchWorkspaceParams) (int64, error)
 	// Garbage-collect oauth_states rows past their expires_at. Called
 	// opportunistically from the callback handler.
+	//
+	// affected-rows: not-applicable — garbage collection over whatever has
+	// expired. The callback's own answer comes from ClaimOauthState, which
+	// does report its count; this one is housekeeping alongside it.
 	PurgeExpiredOauthStates(ctx context.Context) error
 	// Insert a new global user account. The caller supplies a UUID v7 public_id.
 	RegisterUser(ctx context.Context, arg RegisterUserParams) (int64, error)
@@ -586,6 +624,10 @@ type Querier interface {
 	// Revoke every active session for a user. Used by the refresh-reuse
 	// detector to tear down the entire session family when a rotated /
 	// revoked refresh token is replayed.
+	//
+	// affected-rows: not-applicable — it revokes a set whose size is not known
+	// in advance and nobody named a session. What the caller asked for is that
+	// none be left live, and a user who already holds none satisfies it.
 	RevokeAllSessionsForUser(ctx context.Context, userID uint32) error
 	// Revoke every active session for a user except one identified by public_id.
 	// Used by "sign out of all other devices" in /settings/security.

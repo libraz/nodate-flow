@@ -1,13 +1,23 @@
 -- name: CreateCalendarSubscription :execlastid
 -- Subscribe a user to a calendar with display preferences.
 -- Not an ACL axis — event-level visibility governs access.
+--
+-- uniq_calendar_subscriptions_calendar_user covers unsubscribed rows, so
+-- the row survives an unsubscribe holding the (calendar, user) pair and
+-- a second subscribe has to revive it. Re-subscribing installs the
+-- colour asked for now and adopts the caller's public_id, the same
+-- reading PatchCalendarSubscription takes of a returning subscriber.
 INSERT INTO calendar_subscriptions (
   public_id,
   workspace_id,
   calendar_id,
   user_id,
   display_color
-) VALUES (?, ?, ?, ?, ?);
+) VALUES (?, ?, ?, ?, ?)
+ON DUPLICATE KEY UPDATE
+  public_id     = VALUES(public_id),
+  display_color = VALUES(display_color),
+  enabled       = TRUE;
 
 -- name: FindCalendarSubscription :one
 -- Look up a user's subscription to a specific calendar.
@@ -109,6 +119,11 @@ ON DUPLICATE KEY UPDATE
 
 -- name: DisableCalendarSubscription :exec
 -- Remove a user from a calendar (soft-delete).
+--
+-- affected-rows: not-applicable — the (calendar_id, user_id) pair is a
+-- membership, and unsubscribing a user who is not subscribed asks for the
+-- state that already holds. Membership itself is answered by the calendar
+-- member path, which resolves the row with FindCalendarMember first.
 UPDATE calendar_subscriptions
 SET enabled = FALSE
 WHERE calendar_id = ?

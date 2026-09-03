@@ -99,12 +99,66 @@ INNER JOIN tasks st ON st.id = rs.source_task_id
 INNER JOIN tasks tt ON tt.id = rs.target_task_id
 WHERE rs.workspace_id = ?
   AND rs.public_id = ?
+  -- Both titles are on the wire, so the suggestion is readable only when
+  -- the actor may see both ends -- the same filter the two list queries
+  -- carry. Elevated roles skip the check.
+  AND (
+    CAST(? AS SIGNED) = 1
+    OR (
+      (
+        st.visibility = 'public'
+        OR (st.visibility = 'project' AND EXISTS (
+          SELECT 1 FROM project_members pm_st
+          WHERE pm_st.project_id = st.project_id
+            AND pm_st.user_id = CAST(? AS UNSIGNED)
+            AND pm_st.enabled = TRUE
+        ))
+        OR (st.visibility = 'private' AND (
+          st.created_by_user_id = CAST(? AS UNSIGNED)
+          OR EXISTS (
+            SELECT 1 FROM task_actors ta_st
+            WHERE ta_st.task_id = st.id
+              AND ta_st.kind = 'user'
+              AND ta_st.user_id = CAST(? AS UNSIGNED)
+              AND ta_st.enabled = TRUE
+          )
+        ))
+      )
+      AND
+      (
+        tt.visibility = 'public'
+        OR (tt.visibility = 'project' AND EXISTS (
+          SELECT 1 FROM project_members pm_tt
+          WHERE pm_tt.project_id = tt.project_id
+            AND pm_tt.user_id = CAST(? AS UNSIGNED)
+            AND pm_tt.enabled = TRUE
+        ))
+        OR (tt.visibility = 'private' AND (
+          tt.created_by_user_id = CAST(? AS UNSIGNED)
+          OR EXISTS (
+            SELECT 1 FROM task_actors ta_tt
+            WHERE ta_tt.task_id = tt.id
+              AND ta_tt.kind = 'user'
+              AND ta_tt.user_id = CAST(? AS UNSIGNED)
+              AND ta_tt.enabled = TRUE
+          )
+        ))
+      )
+    )
+  )
 LIMIT 1
 `
 
 type GetSuggestionByPublicIdParams struct {
-	WorkspaceID uint32         `json:"-"`
-	PublicID    types.PublicID `json:"publicId"`
+	WorkspaceID   uint32         `json:"-"`
+	PublicID      types.PublicID `json:"publicId"`
+	IsElevated    int64          `json:"isElevated"`
+	ActorUserID   int64          `json:"actorUserId"`
+	ActorUserID_2 int64          `json:"actorUserId2"`
+	ActorUserID_3 int64          `json:"actorUserId3"`
+	ActorUserID_4 int64          `json:"actorUserId4"`
+	ActorUserID_5 int64          `json:"actorUserId5"`
+	ActorUserID_6 int64          `json:"actorUserId6"`
 }
 
 type GetSuggestionByPublicIdRow struct {
@@ -127,7 +181,17 @@ type GetSuggestionByPublicIdRow struct {
 
 // Fetch a single suggestion by public_id with source/target task info.
 func (q *Queries) GetSuggestionByPublicId(ctx context.Context, arg GetSuggestionByPublicIdParams) (GetSuggestionByPublicIdRow, error) {
-	row := q.db.QueryRowContext(ctx, getSuggestionByPublicId, arg.WorkspaceID, arg.PublicID)
+	row := q.db.QueryRowContext(ctx, getSuggestionByPublicId,
+		arg.WorkspaceID,
+		arg.PublicID,
+		arg.IsElevated,
+		arg.ActorUserID,
+		arg.ActorUserID_2,
+		arg.ActorUserID_3,
+		arg.ActorUserID_4,
+		arg.ActorUserID_5,
+		arg.ActorUserID_6,
+	)
 	var i GetSuggestionByPublicIdRow
 	err := row.Scan(
 		&i.ID,

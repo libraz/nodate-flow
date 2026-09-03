@@ -104,6 +104,11 @@ INSERT INTO task_labels (
 
 -- name: DeleteTaskLabel :exec
 -- Remove a label from a task (hard delete from junction).
+--
+-- affected-rows: not-applicable — the (task_id, label_id) pair is a
+-- membership, and detaching a label a task does not carry asks for the
+-- state that already holds. The label itself is resolved by public id
+-- first, which is what answers a caller naming a label that is not there.
 DELETE FROM task_labels
 WHERE workspace_id = ?
   AND task_id = ?
@@ -139,6 +144,10 @@ LIMIT 1;
 
 -- name: DisableTaskLabel :exec
 -- Soft-disable a task-label junction.
+--
+-- affected-rows: not-applicable — same membership as DeleteTaskLabel and
+-- the same reason: detaching a label a task does not carry asks for the
+-- state that already holds, and the label is resolved by public id first.
 UPDATE task_labels
 SET enabled = FALSE
 WHERE workspace_id = ?

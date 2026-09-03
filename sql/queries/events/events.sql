@@ -15,7 +15,7 @@
 -- events with no signal lineage. ON DELETE SET NULL on the FK so signal
 -- purge does not cascade to the event log.
 --
--- `reverses_event_id` (ADR 0008 D4 / J5) is the internal event id this row
+-- `reverses_event_id` (ADR 0008 D4) is the internal event id this row
 -- compensates. NULL for non-reversal events. The reversal handler binds
 -- this when appending a same-type compensating event so the derived_state
 -- projection can cancel the original out without ever UPDATEing the event
@@ -55,7 +55,7 @@ INSERT INTO events (
 -- event in response to a judged signal so the timeline UI can render the
 -- causal chain "signal -> judge verdict -> task event".
 --
--- `reverses_event_id` (ADR 0008 D4 / J5) mirrors the same field on
+-- `reverses_event_id` (ADR 0008 D4) mirrors the same field on
 -- AppendEvent. The reversal handler uses this INSERT path when the target
 -- event being reversed was originally produced by an agent so the
 -- compensating event preserves the same actor kind. NULL for normal
@@ -81,7 +81,7 @@ INSERT INTO events (
 -- List a task's timeline via v_task_timeline. Projects
 -- `actor_system_source` (ADR 0008 D8, third actor source for worker-tick
 -- events), `triggered_by_signal_public_id` (ADR 0008 D4, signal
--- traceability link), `reverses_event_public_id` (ADR 0008 D4 / J5,
+-- traceability link), `reverses_event_public_id` (ADR 0008 D4,
 -- target event the row compensates) and `was_reversed` (TRUE when some
 -- other enabled event reverses this one) so the timeline UI can render
 -- the causal chain plus the reversal state of each entry. The view
@@ -214,7 +214,7 @@ SELECT EXISTS(
 -- name: GetEventPublicIDAndOccurredAt :one
 -- Resolve an event's public id and logical occurrence time given its
 -- internal id, scoped by workspace as a defence-in-depth check.
--- Used by the webhook fanout chain (H1): the worker needs the event's
+-- Used by the webhook fanout chain: the worker needs the event's
 -- public_id to populate the dedupe key and the row's occurred_at to set
 -- the webhook OccurredAt field, instead of using time.Now() which would
 -- attribute the wrong instant when delivery is retried.
@@ -229,7 +229,7 @@ LIMIT 1;
 
 -- name: FindEventForReverse :one
 -- Resolve a target event by public_id for the reversal handler (ADR 0008
--- D4 / J5, POST /workspaces/{wsId}/events/{eventPublicId}/reverse). The
+-- D4, POST /workspaces/{wsId}/events/{eventPublicId}/reverse). The
 -- handler uses this single query to drive three eligibility checks
 -- before appending the compensating event:
 --   - target exists in the caller's workspace (LIMIT 1 + workspace_id =

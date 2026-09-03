@@ -22,6 +22,11 @@ INSERT INTO tasks (
 
 -- name: FindTaskByPublicId :one
 -- Detail projection via v_task_detail. Workspace-scoped.
+-- task-visibility: not-applicable — every route reaching this statement
+-- resolves the task through acl.AuthorizeTaskAccess first, which applies
+-- CheckTaskVisibility and answers WS.TASK.NOT_FOUND before the detail row
+-- is read. v_task_detail carries no project_id or actor id to write the
+-- predicate against in any case.
 SELECT
   v.public_id,
   v.workspace_public_id,
@@ -90,17 +95,58 @@ SELECT
 FROM v_task_list v
 WHERE v.workspace_id = ?
   AND v.project_public_id = ?
+  AND (
+    CAST(sqlc.arg('is_elevated') AS SIGNED) = 1
+    OR v.visibility = 'public'
+    OR (v.visibility = 'project' AND EXISTS (
+      SELECT 1 FROM project_members pm_vis
+      WHERE pm_vis.project_id = v.project_id
+        AND pm_vis.user_id = CAST(sqlc.arg('actor_user_id') AS UNSIGNED)
+        AND pm_vis.enabled = TRUE
+    ))
+    OR (v.visibility = 'private' AND (
+      v.created_by_user_id = CAST(sqlc.arg('actor_user_id') AS UNSIGNED)
+      OR EXISTS (
+        SELECT 1 FROM task_actors ta_vis
+        WHERE ta_vis.task_id = v.task_internal_id
+          AND ta_vis.kind = 'user'
+          AND ta_vis.user_id = CAST(sqlc.arg('actor_user_id') AS UNSIGNED)
+          AND ta_vis.enabled = TRUE
+      )
+    ))
+  )
 ORDER BY v.sort_weight ASC, v.priority DESC, v.due_on ASC, v.created_at DESC, v.public_id DESC
 LIMIT ? OFFSET ?;
 
 -- name: CountTasksForProject :one
 -- Row count behind ListTasksForProject. Filters must stay identical to
 -- that query's WHERE clause or the pager reports a total the list can
--- never reach.
+-- never reach -- including the Layer-4 visibility predicate, whose
+-- absence here would report tasks the caller can never page to.
 SELECT COUNT(*)
 FROM v_task_list v
 WHERE v.workspace_id = ?
-  AND v.project_public_id = ?;
+  AND v.project_public_id = ?
+  AND (
+    CAST(sqlc.arg('is_elevated') AS SIGNED) = 1
+    OR v.visibility = 'public'
+    OR (v.visibility = 'project' AND EXISTS (
+      SELECT 1 FROM project_members pm_vis
+      WHERE pm_vis.project_id = v.project_id
+        AND pm_vis.user_id = CAST(sqlc.arg('actor_user_id') AS UNSIGNED)
+        AND pm_vis.enabled = TRUE
+    ))
+    OR (v.visibility = 'private' AND (
+      v.created_by_user_id = CAST(sqlc.arg('actor_user_id') AS UNSIGNED)
+      OR EXISTS (
+        SELECT 1 FROM task_actors ta_vis
+        WHERE ta_vis.task_id = v.task_internal_id
+          AND ta_vis.kind = 'user'
+          AND ta_vis.user_id = CAST(sqlc.arg('actor_user_id') AS UNSIGNED)
+          AND ta_vis.enabled = TRUE
+      )
+    ))
+  );
 
 -- name: ListTasksForProjectKeyset :many
 -- Keyset-paginated variant of ListTasksForProject.
@@ -139,6 +185,26 @@ SELECT
 FROM v_task_list v
 WHERE v.workspace_id = ?
   AND v.project_public_id = ?
+  AND (
+    CAST(sqlc.arg('is_elevated') AS SIGNED) = 1
+    OR v.visibility = 'public'
+    OR (v.visibility = 'project' AND EXISTS (
+      SELECT 1 FROM project_members pm_vis
+      WHERE pm_vis.project_id = v.project_id
+        AND pm_vis.user_id = CAST(sqlc.arg('actor_user_id') AS UNSIGNED)
+        AND pm_vis.enabled = TRUE
+    ))
+    OR (v.visibility = 'private' AND (
+      v.created_by_user_id = CAST(sqlc.arg('actor_user_id') AS UNSIGNED)
+      OR EXISTS (
+        SELECT 1 FROM task_actors ta_vis
+        WHERE ta_vis.task_id = v.task_internal_id
+          AND ta_vis.kind = 'user'
+          AND ta_vis.user_id = CAST(sqlc.arg('actor_user_id') AS UNSIGNED)
+          AND ta_vis.enabled = TRUE
+      )
+    ))
+  )
   AND (sqlc.narg(cursor_created_at) IS NULL
        OR v.created_at < sqlc.narg(cursor_created_at)
        OR (v.created_at = sqlc.narg(cursor_created_at)
@@ -185,8 +251,8 @@ WHERE v.workspace_id = sqlc.arg('workspace_id')
       v.created_by_user_id = CAST(sqlc.arg('actor_user_id') AS UNSIGNED)
       OR EXISTS (
         SELECT 1 FROM task_actors ta_vis
-        INNER JOIN tasks tv ON tv.id = ta_vis.task_id AND tv.public_id = v.public_id
-        WHERE ta_vis.kind = 'user'
+        WHERE ta_vis.task_id = v.task_internal_id
+          AND ta_vis.kind = 'user'
           AND ta_vis.user_id = CAST(sqlc.arg('actor_user_id') AS UNSIGNED)
           AND ta_vis.enabled = TRUE
       )
@@ -216,8 +282,8 @@ WHERE v.workspace_id = sqlc.arg('workspace_id')
       v.created_by_user_id = CAST(sqlc.arg('actor_user_id') AS UNSIGNED)
       OR EXISTS (
         SELECT 1 FROM task_actors ta_vis
-        INNER JOIN tasks tv ON tv.id = ta_vis.task_id AND tv.public_id = v.public_id
-        WHERE ta_vis.kind = 'user'
+        WHERE ta_vis.task_id = v.task_internal_id
+          AND ta_vis.kind = 'user'
           AND ta_vis.user_id = CAST(sqlc.arg('actor_user_id') AS UNSIGNED)
           AND ta_vis.enabled = TRUE
       )
@@ -260,6 +326,26 @@ SELECT
 FROM v_task_list v
 WHERE v.workspace_id = ?
   AND (sqlc.arg(state_filter) = '' OR v.derived_state = sqlc.arg(state_filter))
+  AND (
+    CAST(sqlc.arg('is_elevated') AS SIGNED) = 1
+    OR v.visibility = 'public'
+    OR (v.visibility = 'project' AND EXISTS (
+      SELECT 1 FROM project_members pm_vis
+      WHERE pm_vis.project_id = v.project_id
+        AND pm_vis.user_id = CAST(sqlc.arg('actor_user_id') AS UNSIGNED)
+        AND pm_vis.enabled = TRUE
+    ))
+    OR (v.visibility = 'private' AND (
+      v.created_by_user_id = CAST(sqlc.arg('actor_user_id') AS UNSIGNED)
+      OR EXISTS (
+        SELECT 1 FROM task_actors ta_vis
+        WHERE ta_vis.task_id = v.task_internal_id
+          AND ta_vis.kind = 'user'
+          AND ta_vis.user_id = CAST(sqlc.arg('actor_user_id') AS UNSIGNED)
+          AND ta_vis.enabled = TRUE
+      )
+    ))
+  )
   AND (sqlc.narg(cursor_created_at) IS NULL
        OR v.created_at < sqlc.narg(cursor_created_at)
        OR (v.created_at = sqlc.narg(cursor_created_at)
@@ -323,6 +409,9 @@ WHERE workspace_id = ?
 
 -- name: ListMyTasks :many
 -- Tasks where the given user is attached as an actor, via v_my_tasks.
+-- task-visibility: not-applicable — v_my_tasks emits only rows where the
+-- reader holds an enabled task_actors row, and every caller binds its own
+-- user_public_id, so the row set is already the private branch of the rule.
 SELECT
   v.public_id,
   v.project_public_id,
@@ -350,6 +439,9 @@ LIMIT ? OFFSET ?;
 -- public_id DESC) only — priority / due_on are NOT considered, so the
 -- tuple comparison is monotonic. Callers that need priority-aware
 -- ordering must keep using the OFFSET variant.
+-- task-visibility: not-applicable — v_my_tasks emits only rows where the
+-- reader holds an enabled task_actors row, and every caller binds its own
+-- user_public_id, so the row set is already the private branch of the rule.
 SELECT
   v.public_id,
   v.project_public_id,
@@ -377,6 +469,9 @@ LIMIT ?;
 -- row so the caller gets workspace_public_id / name for grouping. Used by
 -- GET /me/tasks to power the cross-workspace "Today" / Calendar views in
 -- the web client without fanning out one request per workspace.
+-- task-visibility: not-applicable — v_my_tasks emits only rows where the
+-- reader holds an enabled task_actors row, and every caller binds its own
+-- user_public_id, so the row set is already the private branch of the rule.
 SELECT
   v.public_id,
   w.public_id AS workspace_public_id,
@@ -406,6 +501,9 @@ LIMIT ? OFFSET ?;
 -- row of the previous page. First page passes NULL for both
 -- cursor_created_at and cursor_public_id. ORDER BY (created_at DESC,
 -- public_id DESC) only.
+-- task-visibility: not-applicable — v_my_tasks emits only rows where the
+-- reader holds an enabled task_actors row, and every caller binds its own
+-- user_public_id, so the row set is already the private branch of the rule.
 SELECT
   v.public_id,
   w.public_id AS workspace_public_id,
@@ -438,6 +536,9 @@ LIMIT ?;
 -- answer for "what is on my plate across every workspace on these days".
 -- Undated tasks are excluded; use ListMyTasksGlobal for the planning
 -- bucket.
+-- task-visibility: not-applicable — v_my_tasks emits only rows where the
+-- reader holds an enabled task_actors row, and every caller binds its own
+-- user_public_id, so the row set is already the private branch of the rule.
 SELECT
   v.public_id,
   w.public_id AS workspace_public_id,
@@ -476,6 +577,9 @@ LIMIT ? OFFSET ?;
 -- orders by due_on first; the keyset cursor must use a monotonic key,
 -- and created_at + public_id is uniquely ordered. Callers that need
 -- due_on ordering must keep using the OFFSET variant.
+-- task-visibility: not-applicable — v_my_tasks emits only rows where the
+-- reader holds an enabled task_actors row, and every caller binds its own
+-- user_public_id, so the row set is already the private branch of the rule.
 SELECT
   v.public_id,
   w.public_id AS workspace_public_id,
@@ -517,6 +621,29 @@ FROM tasks t
 WHERE t.workspace_id = ?
   AND t.parent_task_id = ?
   AND t.enabled = TRUE
+  -- Reaching this statement means the actor may see the parent; a child
+  -- carries its own visibility and its title and description are on the
+  -- wire. Elevated roles skip the check.
+  AND (
+    CAST(sqlc.arg('is_elevated') AS SIGNED) = 1
+    OR t.visibility = 'public'
+    OR (t.visibility = 'project' AND EXISTS (
+      SELECT 1 FROM project_members pm_vis
+      WHERE pm_vis.project_id = t.project_id
+        AND pm_vis.user_id = CAST(sqlc.arg('actor_user_id') AS UNSIGNED)
+        AND pm_vis.enabled = TRUE
+    ))
+    OR (t.visibility = 'private' AND (
+      t.created_by_user_id = CAST(sqlc.arg('actor_user_id') AS UNSIGNED)
+      OR EXISTS (
+        SELECT 1 FROM task_actors ta_vis
+        WHERE ta_vis.task_id = t.id
+          AND ta_vis.kind = 'user'
+          AND ta_vis.user_id = CAST(sqlc.arg('actor_user_id') AS UNSIGNED)
+          AND ta_vis.enabled = TRUE
+      )
+    ))
+  )
 ORDER BY t.created_at ASC
 LIMIT 100;
 
@@ -541,6 +668,28 @@ FROM tasks t
 WHERE t.workspace_id = ?
   AND t.parent_task_id = ?
   AND t.enabled = TRUE
+  -- Same Layer-4 filter as ListChildTasksByParentID: the parent being
+  -- visible says nothing about the children.
+  AND (
+    CAST(sqlc.arg('is_elevated') AS SIGNED) = 1
+    OR t.visibility = 'public'
+    OR (t.visibility = 'project' AND EXISTS (
+      SELECT 1 FROM project_members pm_vis
+      WHERE pm_vis.project_id = t.project_id
+        AND pm_vis.user_id = CAST(sqlc.arg('actor_user_id') AS UNSIGNED)
+        AND pm_vis.enabled = TRUE
+    ))
+    OR (t.visibility = 'private' AND (
+      t.created_by_user_id = CAST(sqlc.arg('actor_user_id') AS UNSIGNED)
+      OR EXISTS (
+        SELECT 1 FROM task_actors ta_vis
+        WHERE ta_vis.task_id = t.id
+          AND ta_vis.kind = 'user'
+          AND ta_vis.user_id = CAST(sqlc.arg('actor_user_id') AS UNSIGNED)
+          AND ta_vis.enabled = TRUE
+      )
+    ))
+  )
   AND (sqlc.narg(cursor_created_at) IS NULL
        OR t.created_at < sqlc.narg(cursor_created_at)
        OR (t.created_at = sqlc.narg(cursor_created_at)
@@ -598,14 +747,59 @@ SELECT
   v.label_ids
 FROM v_task_list_archived v
 WHERE v.workspace_id = ?
+  -- Archiving does not widen who may read a task. The route is mounted
+  -- on workspace membership, so without this every member -- guests
+  -- included -- reads the titles of archived private and project tasks.
+  AND (
+    CAST(sqlc.arg('is_elevated') AS SIGNED) = 1
+    OR v.visibility = 'public'
+    OR (v.visibility = 'project' AND EXISTS (
+      SELECT 1 FROM project_members pm_vis
+      WHERE pm_vis.project_id = v.project_id
+        AND pm_vis.user_id = CAST(sqlc.arg('actor_user_id') AS UNSIGNED)
+        AND pm_vis.enabled = TRUE
+    ))
+    OR (v.visibility = 'private' AND (
+      v.created_by_user_id = CAST(sqlc.arg('actor_user_id') AS UNSIGNED)
+      OR EXISTS (
+        SELECT 1 FROM task_actors ta_vis
+        WHERE ta_vis.task_id = v.task_internal_id
+          AND ta_vis.kind = 'user'
+          AND ta_vis.user_id = CAST(sqlc.arg('actor_user_id') AS UNSIGNED)
+          AND ta_vis.enabled = TRUE
+      )
+    ))
+  )
 ORDER BY v.archived_at DESC, v.public_id DESC
 LIMIT ? OFFSET ?;
 
 -- name: CountArchivedTasksForWorkspace :one
--- Row count behind ListArchivedTasksForWorkspace.
+-- Row count behind ListArchivedTasksForWorkspace, carrying the same
+-- Layer-4 visibility predicate. A total taken without it discloses how
+-- many archived tasks the caller is not allowed to see.
 SELECT COUNT(*)
 FROM v_task_list_archived v
-WHERE v.workspace_id = ?;
+WHERE v.workspace_id = ?
+  AND (
+    CAST(sqlc.arg('is_elevated') AS SIGNED) = 1
+    OR v.visibility = 'public'
+    OR (v.visibility = 'project' AND EXISTS (
+      SELECT 1 FROM project_members pm_vis
+      WHERE pm_vis.project_id = v.project_id
+        AND pm_vis.user_id = CAST(sqlc.arg('actor_user_id') AS UNSIGNED)
+        AND pm_vis.enabled = TRUE
+    ))
+    OR (v.visibility = 'private' AND (
+      v.created_by_user_id = CAST(sqlc.arg('actor_user_id') AS UNSIGNED)
+      OR EXISTS (
+        SELECT 1 FROM task_actors ta_vis
+        WHERE ta_vis.task_id = v.task_internal_id
+          AND ta_vis.kind = 'user'
+          AND ta_vis.user_id = CAST(sqlc.arg('actor_user_id') AS UNSIGNED)
+          AND ta_vis.enabled = TRUE
+      )
+    ))
+  );
 
 -- name: ListArchivedTasksForWorkspaceKeyset :many
 -- Keyset-paginated variant of ListArchivedTasksForWorkspace.
@@ -639,6 +833,27 @@ SELECT
   v.label_ids
 FROM v_task_list_archived v
 WHERE v.workspace_id = ?
+  -- Same Layer-4 filter as ListArchivedTasksForWorkspace.
+  AND (
+    CAST(sqlc.arg('is_elevated') AS SIGNED) = 1
+    OR v.visibility = 'public'
+    OR (v.visibility = 'project' AND EXISTS (
+      SELECT 1 FROM project_members pm_vis
+      WHERE pm_vis.project_id = v.project_id
+        AND pm_vis.user_id = CAST(sqlc.arg('actor_user_id') AS UNSIGNED)
+        AND pm_vis.enabled = TRUE
+    ))
+    OR (v.visibility = 'private' AND (
+      v.created_by_user_id = CAST(sqlc.arg('actor_user_id') AS UNSIGNED)
+      OR EXISTS (
+        SELECT 1 FROM task_actors ta_vis
+        WHERE ta_vis.task_id = v.task_internal_id
+          AND ta_vis.kind = 'user'
+          AND ta_vis.user_id = CAST(sqlc.arg('actor_user_id') AS UNSIGNED)
+          AND ta_vis.enabled = TRUE
+      )
+    ))
+  )
   AND (sqlc.narg(cursor_archived_at) IS NULL
        OR v.archived_at < sqlc.narg(cursor_archived_at)
        OR (v.archived_at = sqlc.narg(cursor_archived_at)
@@ -682,6 +897,9 @@ WHERE id = ?
 
 -- name: ResolveTaskRef :one
 -- Resolve a human-readable task reference (e.g. NF-42) to a task public_id.
+-- task-visibility: not-applicable — the only caller re-resolves the task it
+-- finds through the shared task ACL and returns the error before the title
+-- reaches the caller, so a task the actor may not see is answered as missing.
 SELECT
   t.id,
   t.public_id,

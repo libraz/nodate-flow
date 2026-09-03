@@ -43,6 +43,13 @@ INSERT INTO workspace_members (
   invited_at,
   joined_at
 ) VALUES (?, ?, ?, ?, ?, ?, ?)
+ON DUPLICATE KEY UPDATE
+  public_id          = VALUES(public_id),
+  role               = VALUES(role),
+  invited_by_user_id = VALUES(invited_by_user_id),
+  invited_at         = VALUES(invited_at),
+  joined_at          = VALUES(joined_at),
+  enabled            = TRUE
 `
 
 type CreateWorkspaceMemberParams struct {
@@ -56,6 +63,18 @@ type CreateWorkspaceMemberParams struct {
 }
 
 // Add a user to a workspace with the given role.
+//
+// uniq_workspace_members_workspace_id_user_id covers removed members
+// too: the row of someone taken out of a workspace still holds the
+// (workspace, user) pair, so re-adding them has to revive that row
+// rather than insert beside it. Without the revival the second
+// membership fails for good, and the workspace is the entry point to
+// everything else in it.
+//
+// Re-joining states the membership afresh -- the role asked for now, the
+// inviter and dates of this joining, and the public_id the caller has
+// already reported to the client. Reviving into the previous role would
+// hand back privileges the removal took away.
 func (q *Queries) CreateWorkspaceMember(ctx context.Context, arg CreateWorkspaceMemberParams) (int64, error) {
 	result, err := q.db.ExecContext(ctx, createWorkspaceMember,
 		arg.PublicID,

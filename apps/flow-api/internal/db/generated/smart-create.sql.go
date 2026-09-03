@@ -33,13 +33,39 @@ LEFT JOIN users u ON u.id = ta.user_id AND u.enabled = TRUE
 WHERE t.workspace_id = ?
   AND t.enabled = TRUE
   AND t.id IN (/*SLICE:task_ids*/?)
+  -- These titles go into the LLM prompt, so the set is the one the actor
+  -- may read. Elevated roles skip the check.
+  AND (
+    CAST(? AS SIGNED) = 1
+    OR t.visibility = 'public'
+    OR (t.visibility = 'project' AND EXISTS (
+      SELECT 1 FROM project_members pm_vis
+      WHERE pm_vis.project_id = t.project_id
+        AND pm_vis.user_id = CAST(? AS UNSIGNED)
+        AND pm_vis.enabled = TRUE
+    ))
+    OR (t.visibility = 'private' AND (
+      t.created_by_user_id = CAST(? AS UNSIGNED)
+      OR EXISTS (
+        SELECT 1 FROM task_actors ta_vis
+        WHERE ta_vis.task_id = t.id
+          AND ta_vis.kind = 'user'
+          AND ta_vis.user_id = CAST(? AS UNSIGNED)
+          AND ta_vis.enabled = TRUE
+      )
+    ))
+  )
 ORDER BY t.id ASC
 LIMIT 200
 `
 
 type ListTasksWithAssigneesForSmartCreateParams struct {
-	WorkspaceID uint32   `json:"-"`
-	TaskIds     []uint32 `json:"-"`
+	WorkspaceID   uint32   `json:"-"`
+	TaskIds       []uint32 `json:"-"`
+	IsElevated    int64    `json:"isElevated"`
+	ActorUserID   int64    `json:"actorUserId"`
+	ActorUserID_2 int64    `json:"actorUserId2"`
+	ActorUserID_3 int64    `json:"actorUserId3"`
 }
 
 type ListTasksWithAssigneesForSmartCreateRow struct {
@@ -71,6 +97,10 @@ func (q *Queries) ListTasksWithAssigneesForSmartCreate(ctx context.Context, arg 
 	} else {
 		query = strings.Replace(query, "/*SLICE:task_ids*/?", "NULL", 1)
 	}
+	queryParams = append(queryParams, arg.IsElevated)
+	queryParams = append(queryParams, arg.ActorUserID)
+	queryParams = append(queryParams, arg.ActorUserID_2)
+	queryParams = append(queryParams, arg.ActorUserID_3)
 	rows, err := q.db.QueryContext(ctx, query, queryParams...)
 	if err != nil {
 		return nil, err

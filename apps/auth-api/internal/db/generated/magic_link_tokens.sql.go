@@ -19,6 +19,10 @@ WHERE expires_at < CURRENT_TIMESTAMP
 `
 
 // Delete tokens that are either expired-and-used or expired-and-unused, for periodic cleanup.
+//
+// affected-rows: not-applicable — a TTL sweep runs against whatever has
+// expired since the last one. Nobody named a token, and a sweep with
+// nothing to collect is the state the sweep exists to keep.
 func (q *Queries) CleanupExpiredMagicLinks(ctx context.Context) error {
 	_, err := q.db.ExecContext(ctx, cleanupExpiredMagicLinks)
 	return err

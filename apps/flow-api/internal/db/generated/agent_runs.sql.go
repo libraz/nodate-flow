@@ -240,7 +240,7 @@ type ListAgentRunsByTaskRow struct {
 // signal join uses alias `tsig` (triggering signal) to mirror the
 // v_task_timeline view.
 //
-// Reversal projection (ADR 0008 D4 / J5): `reverses_event_public_id`
+// Reversal projection (ADR 0008 D4): `reverses_event_public_id`
 // comes from the LEFT self-join aliased `e_rev` (reverse target);
 // `was_reversed` is computed by a correlated EXISTS subquery using
 // alias `e_chk` (reverse check), backed by idx_events_reverses
@@ -331,6 +331,10 @@ WHERE status IN ('succeeded', 'failed')
 
 // Housekeeping: drop succeeded / failed rows older than the cutoff so
 // the table does not grow unbounded. Run from a cron or a startup task.
+//
+// affected-rows: not-applicable — housekeeping over whatever has aged past
+// the cutoff. No request is waiting on a row here, and a tick that finds
+// nothing to drop is the steady state rather than a missing resource.
 func (q *Queries) PurgeFinishedAgentRuns(ctx context.Context, finishedAt sql.NullTime) error {
 	_, err := q.db.ExecContext(ctx, purgeFinishedAgentRuns, finishedAt)
 	return err

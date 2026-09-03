@@ -2599,7 +2599,7 @@ type AutoActionRule struct {
 	// When set, the autonomy resolver returns this level verbatim and skips confidence comparison. NULL falls back to the existing confidence-vs-threshold derivation. Closed enum mirrors signalkinds.Autonomy.
 	AutonomyLevel NullAutoActionRulesAutonomyLevel `json:"autonomyLevel"`
 	// Internal normalization of signal_kind for the UNIQUE index. Empty string represents the NULL wildcard. Never read from app code -- only the unique-key engine touches this. Constraint order (GENERATED clause before NOT NULL) is required by MySQL 9.x parser.
-	SignalKindMatch string       `json:"signalKindMatch"`
+	SignalKindMatch string       `json:"-"`
 	UpdatedAt       sql.NullTime `json:"updatedAt"`
 	CreatedAt       time.Time    `json:"createdAt"`
 }
@@ -2695,7 +2695,7 @@ type CalendarEvent struct {
 	// When task_id IS NOT NULL: which task field this event represents. due=task.due_on, scheduled=time-blocked (multi-link allowed).
 	TaskRole NullCalendarEventsTaskRole `json:"taskRole"`
 	// The task_role when it is a role a task may hold at most once and the row is live; NULL otherwise. Exists only to scope uniq_calendar_events_task_singleton_role to live singleton projections.
-	TaskSingletonRole sql.NullString `json:"taskSingletonRole"`
+	TaskSingletonRole sql.NullString `json:"-"`
 	// Display order
 	SortWeight int32 `json:"sortWeight"`
 	// Admin notes
@@ -2973,7 +2973,7 @@ type CalendarPublicShareEvent struct {
 	// Enabled flag (soft-disable)
 	Enabled bool `json:"enabled"`
 	// NULL once soft-deleted; exists only to scope the unique key below to live rows
-	Active    sql.NullInt16 `json:"active"`
+	Active    sql.NullInt16 `json:"-"`
 	UpdatedAt sql.NullTime  `json:"updatedAt"`
 	CreatedAt time.Time     `json:"createdAt"`
 }
@@ -3347,7 +3347,7 @@ type Label struct {
 	// Enabled flag
 	Enabled bool `json:"enabled"`
 	// NULL once soft-deleted; exists only to scope the unique key below to live rows
-	Active    sql.NullInt16 `json:"active"`
+	Active    sql.NullInt16 `json:"-"`
 	UpdatedAt sql.NullTime  `json:"updatedAt"`
 	CreatedAt time.Time     `json:"createdAt"`
 }
@@ -3389,7 +3389,7 @@ type Lense struct {
 	// Enabled flag
 	Enabled bool `json:"enabled"`
 	// NULL once soft-deleted; exists only to scope the unique key below to live rows
-	Active    sql.NullInt16 `json:"active"`
+	Active    sql.NullInt16 `json:"-"`
 	UpdatedAt sql.NullTime  `json:"updatedAt"`
 	CreatedAt time.Time     `json:"createdAt"`
 }
@@ -3589,7 +3589,7 @@ type OauthState struct {
 	State string `json:"state"`
 	// Internal FK to users.id — the user who started the connect flow
 	UserID uint32 `json:"-"`
-	// Which provider this state belongs to. 'discord' is required for the personal Discord presence-binding flow (Phase 8 presence-discord gateway).
+	// Which provider this state belongs to. 'discord' is required for the personal Discord presence-binding flow (presence-discord gateway).
 	Provider OauthStatesProvider `json:"provider"`
 	// Optional client-supplied return URL to send the user to after the callback completes
 	RedirectTo sql.NullString `json:"redirectTo"`
@@ -3704,7 +3704,7 @@ type Project struct {
 	// Enabled flag
 	Enabled bool `json:"enabled"`
 	// NULL once soft-deleted; exists only to scope the unique key below to live rows
-	Active    sql.NullInt16 `json:"active"`
+	Active    sql.NullInt16 `json:"-"`
 	UpdatedAt sql.NullTime  `json:"updatedAt"`
 	CreatedAt time.Time     `json:"createdAt"`
 }
@@ -3754,7 +3754,7 @@ type Reaction struct {
 	// Enabled flag
 	Enabled bool `json:"enabled"`
 	// NULL once soft-deleted; exists only to scope the unique key below to live rows
-	Active    sql.NullInt16 `json:"active"`
+	Active    sql.NullInt16 `json:"-"`
 	UpdatedAt sql.NullTime  `json:"updatedAt"`
 	CreatedAt time.Time     `json:"createdAt"`
 }
@@ -4018,7 +4018,7 @@ type TaskDependency struct {
 	// Enabled flag
 	Enabled bool `json:"enabled"`
 	// NULL once soft-deleted; exists only to scope the unique key below to live rows
-	Active    sql.NullInt16 `json:"active"`
+	Active    sql.NullInt16 `json:"-"`
 	UpdatedAt sql.NullTime  `json:"updatedAt"`
 	CreatedAt time.Time     `json:"createdAt"`
 }
@@ -4091,7 +4091,7 @@ type TaskEventLink struct {
 	// Enabled flag (soft-disable)
 	Enabled bool `json:"enabled"`
 	// NULL once soft-deleted; exists only to scope the unique key below to live rows
-	Active    sql.NullInt16 `json:"active"`
+	Active    sql.NullInt16 `json:"-"`
 	UpdatedAt sql.NullTime  `json:"updatedAt"`
 	CreatedAt time.Time     `json:"createdAt"`
 }
@@ -4115,7 +4115,7 @@ type TaskLabel struct {
 	// Enabled flag
 	Enabled bool `json:"enabled"`
 	// NULL once soft-deleted; exists only to scope the unique key below to live rows
-	Active    sql.NullInt16 `json:"active"`
+	Active    sql.NullInt16 `json:"-"`
 	UpdatedAt sql.NullTime  `json:"updatedAt"`
 	CreatedAt time.Time     `json:"createdAt"`
 }
@@ -4151,7 +4151,7 @@ type Timebox struct {
 	// Enabled flag
 	Enabled bool `json:"enabled"`
 	// NULL once soft-deleted; exists only to scope the unique key below to live rows
-	Active    sql.NullInt16 `json:"active"`
+	Active    sql.NullInt16 `json:"-"`
 	UpdatedAt sql.NullTime  `json:"updatedAt"`
 	CreatedAt time.Time     `json:"createdAt"`
 }
@@ -4175,7 +4175,7 @@ type TimeboxTask struct {
 	// Enabled flag
 	Enabled bool `json:"enabled"`
 	// NULL once soft-deleted; exists only to scope the unique key below to live rows
-	Active    sql.NullInt16 `json:"active"`
+	Active    sql.NullInt16 `json:"-"`
 	UpdatedAt sql.NullTime  `json:"updatedAt"`
 	CreatedAt time.Time     `json:"createdAt"`
 }
@@ -4260,7 +4260,7 @@ type UserFavorite struct {
 	// Enabled flag
 	Enabled bool `json:"enabled"`
 	// NULL once soft-deleted; exists only to scope the unique key below to live rows
-	Active    sql.NullInt16 `json:"active"`
+	Active    sql.NullInt16 `json:"-"`
 	UpdatedAt sql.NullTime  `json:"updatedAt"`
 	CreatedAt time.Time     `json:"createdAt"`
 }
@@ -4273,7 +4273,7 @@ type UserIntegration struct {
 	PublicID types.PublicID `json:"publicId"`
 	// Internal FK to users.id
 	UserID uint32 `json:"-"`
-	// OAuth provider kind. 'discord' is reserved for personal presence binding read by the Phase 8 presence-discord gateway (see ADR 0008 D6) — no task-mutating tokens are stored.
+	// OAuth provider kind. 'discord' is reserved for personal presence binding read by the presence-discord gateway (see ADR 0008 D6) — no task-mutating tokens are stored.
 	Provider UserIntegrationsProvider `json:"provider"`
 	// Provider subject (GH login, Slack user id, Google sub)
 	ExternalAccountID string `json:"externalAccountId"`
@@ -4291,7 +4291,7 @@ type UserIntegration struct {
 	ConnectedAt time.Time `json:"connectedAt"`
 	// Last successful token refresh
 	LastRefreshedAt sql.NullTime `json:"lastRefreshedAt"`
-	// Provider-specific binding metadata. For provider='discord': stores {"external_user_id": "<Discord snowflake>", "verified_at": "<ISO-8601 UTC>"} so the Phase 8 gateway can resolve presence events to a user without a second token table. Other providers may write their own keys here.
+	// Provider-specific binding metadata. For provider='discord': stores {"external_user_id": "<Discord snowflake>", "verified_at": "<ISO-8601 UTC>"} so the presence gateway can resolve presence events to a user without a second token table. Other providers may write their own keys here.
 	MetadataJson json.RawMessage `json:"metadataJson"`
 	// Display order
 	SortWeight int32 `json:"sortWeight"`
@@ -4518,6 +4518,7 @@ type VTaskList struct {
 	WorkspaceID             uint32            `json:"-"`
 	ProjectID               uint32            `json:"-"`
 	CreatedByUserID         sql.NullInt32     `json:"-"`
+	TaskInternalID          uint32            `json:"-"`
 	PublicID                types.PublicID    `json:"publicId"`
 	ProjectPublicID         []byte            `json:"projectPublicId"`
 	ProjectName             string            `json:"projectName"`
@@ -4544,6 +4545,7 @@ type VTaskListAll struct {
 	WorkspaceID             uint32            `json:"-"`
 	ProjectID               uint32            `json:"-"`
 	CreatedByUserID         sql.NullInt32     `json:"-"`
+	TaskInternalID          uint32            `json:"-"`
 	PublicID                types.PublicID    `json:"publicId"`
 	ProjectPublicID         []byte            `json:"projectPublicId"`
 	ProjectName             string            `json:"projectName"`
@@ -4570,6 +4572,7 @@ type VTaskListArchived struct {
 	WorkspaceID             uint32            `json:"-"`
 	ProjectID               uint32            `json:"-"`
 	CreatedByUserID         sql.NullInt32     `json:"-"`
+	TaskInternalID          uint32            `json:"-"`
 	PublicID                types.PublicID    `json:"publicId"`
 	ProjectPublicID         []byte            `json:"projectPublicId"`
 	ProjectName             string            `json:"projectName"`

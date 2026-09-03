@@ -1,5 +1,15 @@
 -- name: AddProjectMember :execlastid
 -- Add a user to a project (must already be a workspace member).
+--
+-- uniq_project_members_project_id_user_id covers removed members too, so
+-- a revoked row keeps holding the (project, user) pair and a plain
+-- insert collides with it: without the revival below, anyone removed
+-- from a project could never be added back. Callers check for a live
+-- membership first, so what reaches here is either new or revoked.
+--
+-- Re-adding states the grant afresh: the role is the one being asked
+-- for now, added_at records this joining, and the row adopts the
+-- public_id the caller has already reported to the client.
 INSERT INTO project_members (
   public_id,
   workspace_id,
@@ -7,7 +17,12 @@ INSERT INTO project_members (
   user_id,
   role,
   added_at
-) VALUES (?, ?, ?, ?, ?, ?);
+) VALUES (?, ?, ?, ?, ?, ?)
+ON DUPLICATE KEY UPDATE
+  public_id = VALUES(public_id),
+  role      = VALUES(role),
+  added_at  = VALUES(added_at),
+  enabled   = TRUE;
 
 -- name: ListProjectMembers :many
 -- List members of a project joined with user display fields.

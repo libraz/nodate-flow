@@ -47,9 +47,9 @@ An implementation that writes to a shared database must do all four.
 ### 1. Write `calendar_events` rows per the DDL
 
 Shape is enforced by the table itself — `CHECK` constraints, foreign keys,
-the `task_role_key` generated column, and the projection guard triggers. An
-implementation does not need to re-derive these rules; it needs to not work
-around them.
+the `task_singleton_role` generated column, and the projection guard
+triggers. An implementation does not need to re-derive these rules; it needs
+to not work around them.
 
 A recurring series is one row carrying the rule, and there are exactly two
 ways to depart from it. Cancelling a single occurrence appends its start to

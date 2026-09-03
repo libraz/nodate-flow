@@ -136,6 +136,11 @@ type ListPublicLensTasksRow struct {
 //   - due_to         (nullable date) - due_on <= value
 //
 // All filters are AND-combined; pass empty / NULL to skip a knob.
+//
+// task-visibility: not-applicable — the share page is unauthenticated, so
+// there is no actor to compare a task against. The projection is narrowed
+// to visibility = 'public' instead, which is strictly inside what the
+// actor rule would allow for any reader.
 func (q *Queries) ListPublicLensTasks(ctx context.Context, arg ListPublicLensTasksParams) ([]ListPublicLensTasksRow, error) {
 	rows, err := q.db.QueryContext(ctx, listPublicLensTasks,
 		arg.WorkspaceID,

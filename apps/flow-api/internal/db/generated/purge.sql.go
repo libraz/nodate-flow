@@ -44,6 +44,11 @@ WHERE workspace_id = ?
 // chain — an ordering that follows table creation order and is not part of
 // any documented contract. Removing the referrers up front makes the
 // teardown independent of it.
+//
+// affected-rows: not-applicable — this clears whatever the workspace holds
+// ahead of the delete that answers the caller. HardDeleteWorkspace reports
+// whether the workspace was there; a workspace with no attachments is the
+// ordinary case and produces exactly the state this asks for.
 func (q *Queries) DeleteAttachmentsByWorkspace(ctx context.Context, workspaceID uint32) error {
 	_, err := q.db.ExecContext(ctx, deleteAttachmentsByWorkspace, workspaceID)
 	return err
@@ -57,6 +62,10 @@ WHERE workspace_id = ?
 // Calendar-side counterpart of DeleteAttachmentsByWorkspace;
 // calendar_event_attachments.storage_object_id carries the same
 // ON DELETE RESTRICT. See that query for the full rationale.
+//
+// affected-rows: not-applicable — same shape and same reason as
+// DeleteAttachmentsByWorkspace: it clears a set ahead of the delete that
+// answers the caller, and an empty set is the ordinary case.
 func (q *Queries) DeleteCalendarEventAttachmentsByWorkspace(ctx context.Context, workspaceID uint32) error {
 	_, err := q.db.ExecContext(ctx, deleteCalendarEventAttachmentsByWorkspace, workspaceID)
 	return err
