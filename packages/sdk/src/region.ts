@@ -97,9 +97,22 @@ export function listSupportedTimezones(): string[] {
   return list;
 }
 
-/** Best-effort detection of the runtime's timezone, with a UTC fallback. */
+/**
+ * Best-effort detection of the runtime's timezone, with a UTC fallback.
+ *
+ * This is the reader's zone, for the timezone picker and for the last
+ * fallback of a preference chain — never for interpreting data that
+ * states its own zone.
+ *
+ * It duplicates `Zone.browser()` in `@nodate-flow/ui/time`, which is the
+ * general entry point, because this package cannot depend on the UI
+ * package: the dependency runs the other way. Both are host reads of the
+ * same value and both fall back to UTC, so they cannot disagree about
+ * an answer, only about where it is written.
+ */
 export function detectTimezone(): string {
   try {
+    // zone-exempt: the SDK's own reader-zone entry point; cannot import Zone.browser() from the UI package
     return Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
   } catch {
     return 'UTC';

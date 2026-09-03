@@ -1,5 +1,6 @@
 import { DateTime } from 'luxon';
 
+import { Zone } from '../time';
 import type { RecurrenceRule } from './types';
 
 interface RecurrenceEvent {
@@ -94,11 +95,19 @@ interface RecurrenceExceptionSets {
   localDayKeys: Set<string>;
 }
 
-// Parse an ISO timestamp and anchor it to `zone` if provided, so subsequent
-// calendar arithmetic preserves wall-clock time across DST transitions.
+// Parse an ISO timestamp and anchor it to `zone`, so subsequent calendar
+// arithmetic preserves wall-clock time across DST transitions.
 // Returns an invalid DateTime if parsing fails.
-function parseInZone(iso: string, zone: string | undefined): DateTime {
-  return zone ? DateTime.fromISO(iso, { zone }) : DateTime.fromISO(iso);
+//
+// The zone is a resolved [Zone] rather than an optional string on
+// purpose. Falling back to the browser's zone is what luxon does when
+// given a bare `fromISO`, and it made the expansion a property of who
+// was looking: wall-clock arithmetic ran in the viewer's zone, so a
+// weekly series spanning that viewer's DST transition slid by an hour
+// for them and not for anyone else, and a bare-date exception cancelled
+// a different occurrence in every zone.
+function parseInZone(iso: string, zone: Zone): DateTime {
+  return DateTime.fromISO(iso, { zone: zone.name });
 }
 
 /**
@@ -109,7 +118,7 @@ function parseInZone(iso: string, zone: string | undefined): DateTime {
  * day itself, so widen bare dates to `endOf('day')`. Datetime values stay an
  * exact inclusive instant.
  */
-function parseUntil(until: string, zone: string | undefined): DateTime {
+function parseUntil(until: string, zone: Zone): DateTime {
   const parsed = parseInZone(until, zone);
   if (/^\d{4}-\d{2}-\d{2}$/.test(until.trim())) {
     return parsed.endOf('day');
@@ -117,9 +126,22 @@ function parseUntil(until: string, zone: string | undefined): DateTime {
   return parsed;
 }
 
+/**
+ * Whether an ISO timestamp states its own UTC offset, either as `Z` or as
+ * `±HH:MM` / `±HHMM`.
+ *
+ * Luxon's `setZone` only takes effect when the string carries an offset;
+ * given a bare local timestamp it silently falls back to the system zone.
+ * The two cases therefore have to be told apart before parsing, because
+ * the fallback is never the reading we want.
+ */
+function hasExplicitOffset(value: string): boolean {
+  return /(?:Z|[+-]\d{2}:?\d{2})$/i.test(value);
+}
+
 function buildRecurrenceExceptionSets(
   values: string[] | undefined,
-  zone: string | undefined,
+  zone: Zone,
 ): RecurrenceExceptionSets {
   const instants = new Set<number>();
   const localDayKeys = new Set<string>();
@@ -132,8 +154,15 @@ function buildRecurrenceExceptionSets(
       continue;
     }
 
-    const withOffset = DateTime.fromISO(value, { setZone: true });
-    const parsed = withOffset.isValid ? withOffset : parseInZone(value, zone);
+    // An exception with no offset names a wall clock in the event's own
+    // timezone — that is the reading the API validator documents and the
+    // server expander applies. Resolved in the system zone instead, the
+    // instant misses the occurrence it was written to cancel by exactly
+    // the offset between the viewer and the event, so a cancelled meeting
+    // reappeared for everyone whose browser sat in a different zone.
+    const parsed = hasExplicitOffset(value)
+      ? DateTime.fromISO(value, { setZone: true })
+      : parseInZone(value, zone);
     if (parsed.isValid) {
       instants.add(parsed.toMillis());
     }
@@ -151,7 +180,14 @@ export function expandRecurrence(
   const rule = event.recurrenceRule;
   if (!rule) return [];
 
-  const zone = event.timezone || undefined;
+  // The one place the event's stored timezone becomes a resolved zone.
+  // `calendar_events.timezone` is NOT NULL DEFAULT 'UTC' and resolves
+  // event > user > workspace > UTC on the server, so a row that reaches
+  // a client without one is a row whose zone is UTC — not a row that
+  // wants the reader's. The Go expander
+  // (packages/go-shared/recurrence) has always read an absent zone as
+  // UTC; testdata/recurrence_golden.json pins both to it.
+  const zone = Zone.resolve(event.timezone);
   const eventStart = parseInZone(event.startAt, zone);
   const eventEnd = parseInZone(event.endAt, zone);
   const duration = eventEnd.diff(eventStart);

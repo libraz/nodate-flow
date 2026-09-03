@@ -1,7 +1,7 @@
 import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 
-import { DateTime } from 'luxon';
+import { DateTime, Settings } from 'luxon';
 import { describe, expect, it } from 'vitest';
 
 import { expandRecurrence } from '../recurrence';
@@ -22,6 +22,7 @@ interface RecurrenceGoldenFixture {
       count?: number;
     };
     recurrenceExceptions?: string[];
+    recurrenceEnd?: string;
   };
   rangeStart: string;
   rangeEnd: string;
@@ -104,15 +105,80 @@ describe('expandRecurrence — timezone awareness', () => {
 describe('expandRecurrence — shared golden fixtures', () => {
   for (const fixture of loadRecurrenceGolden()) {
     it(fixture.name, () => {
+      // The window bounds are read in UTC, not in whatever zone the
+      // machine running the suite is in. The fixture is shared with the
+      // Go expander, which reads them in UTC; a host-zone read here
+      // would make the TypeScript side of a shared fixture agree or
+      // disagree depending on where CI happens to run.
       const instances = expandRecurrence(
         fixture.event,
-        DateTime.fromISO(fixture.rangeStart),
-        DateTime.fromISO(fixture.rangeEnd),
+        DateTime.fromISO(fixture.rangeStart, { zone: 'utc' }),
+        DateTime.fromISO(fixture.rangeEnd, { zone: 'utc' }),
       );
 
       expect(instances.map((i) => i.startAt.toUTC().toFormat("yyyy-MM-dd'T'HH:mm:ss'Z'"))).toEqual(
         fixture.expectedStartAt,
       );
+    });
+  }
+});
+
+/**
+ * The expansion must not depend on where the machine running it is.
+ *
+ * The fixtures above are shared with the Go expander, and two of them
+ * exist specifically to pin that an omitted timezone reads as UTC. On a
+ * host that sits in a zone with no DST and a whole-hour offset east of
+ * UTC — Asia/Tokyo, say — those two fixtures pass whether or not the
+ * rule holds, because the host zone happens to give the same instants.
+ * Running the suite there and seeing green therefore says nothing, and
+ * which zone CI sits in is not a thing this repo controls.
+ *
+ * Sweeping the host zone turns that accident into a real check: the
+ * zones below straddle UTC, include northern and southern DST, and
+ * include the +14 and -11 extremes, so at least one of them disagrees
+ * with UTC for every fixture that has a day boundary or a wall clock in
+ * it.
+ */
+const HOST_ZONES = [
+  'UTC',
+  'America/New_York',
+  'America/Los_Angeles',
+  'Europe/London',
+  'Asia/Tokyo',
+  'Australia/Sydney',
+  'Pacific/Kiritimati',
+  'Pacific/Midway',
+];
+
+describe('expandRecurrence — invariant under the host zone', () => {
+  const fixtures = loadRecurrenceGolden();
+
+  it('loaded the shared fixtures', () => {
+    // Guard against the loop below silently iterating nothing.
+    expect(fixtures.length).toBeGreaterThanOrEqual(13);
+  });
+
+  for (const hostZone of HOST_ZONES) {
+    describe(`host zone ${hostZone}`, () => {
+      for (const fixture of fixtures) {
+        it(fixture.name, () => {
+          const previous = Settings.defaultZone;
+          Settings.defaultZone = hostZone;
+          try {
+            const instances = expandRecurrence(
+              fixture.event,
+              DateTime.fromISO(fixture.rangeStart, { zone: 'utc' }),
+              DateTime.fromISO(fixture.rangeEnd, { zone: 'utc' }),
+            );
+            expect(
+              instances.map((i) => i.startAt.toUTC().toFormat("yyyy-MM-dd'T'HH:mm:ss'Z'")),
+            ).toEqual(fixture.expectedStartAt);
+          } finally {
+            Settings.defaultZone = previous;
+          }
+        });
+      }
     });
   }
 });

@@ -66,6 +66,7 @@
     "./primitives/auth-card": "./src/primitives/auth-card/auth-card.tsx",
     "./primitives/theme-picker": "./src/primitives/theme-picker/theme-picker.tsx",
     "./primitives/time-picker": "./src/primitives/time-picker/time-picker.tsx",
+    "./time": "./src/time/index.ts",
     "./calendar": "./src/calendar/index.ts",
     "./calendar/recurrence": "./src/calendar/recurrence.ts",
     "./calendar/event-styles": "./src/calendar/event-styles.ts",
@@ -75,8 +76,7 @@
     "typecheck": "tsc -b",
     "test": "vitest run",
     "check-themes": "tsx scripts/check-theme-parity.ts",
-    "check-inline-spacing": "tsx scripts/check-inline-spacing.ts",
-    "lint:design-tokens": "tsx scripts/check-inline-spacing.ts --ci"
+    "check-inline-spacing": "tsx scripts/check-inline-spacing.ts"
   },
   "dependencies": {
     "@floating-ui/react": "0.27.20",
@@ -113,6 +113,7 @@
     }
   },
   "devDependencies": {
+    "@babel/parser": "^7.29.2",
     "@hookform/resolvers": "5.7.1",
     "@testing-library/react": "16.3.2",
     "@testing-library/user-event": "14.6.3",

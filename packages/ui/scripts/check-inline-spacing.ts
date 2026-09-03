@@ -40,9 +40,14 @@
  *
  * CLI:
  *
- *   tsx scripts/check-inline-spacing.ts            # report only, exit 0
- *   tsx scripts/check-inline-spacing.ts --ci       # exit 1 on offenses
+ *   tsx scripts/check-inline-spacing.ts            # exit 1 on offenses
  *   tsx scripts/check-inline-spacing.ts --json     # machine-readable output
+ *
+ * There is one mode: an offense fails. The scan used to exit 0 unless it
+ * was handed --ci, which made every caller's correctness depend on
+ * remembering a flag, and a caller that forgot it reported success on a
+ * tree full of violations. Unknown arguments are rejected rather than
+ * ignored so a stale `--ci` is visible instead of merely harmless.
  *
  * The scanner intentionally avoids regular expressions (per project
  * convention; see check-theme-parity.ts) and walks each file character
@@ -638,28 +643,29 @@ const DEFAULT_EXCLUDE_FRAGMENTS: ReadonlyArray<string> = [
 ];
 
 interface CliFlags {
-  ci: boolean;
   json: boolean;
   root: string;
 }
 
 function parseFlags(argv: ReadonlyArray<string>): CliFlags {
-  let ci = false;
   let json = false;
   let root = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
   for (let i = 0; i < argv.length; i += 1) {
     const a = argv[i];
-    if (a === '--ci') ci = true;
-    else if (a === '--json') json = true;
+    if (a === '--json') json = true;
     else if (a === '--root' && i + 1 < argv.length) {
       const next = argv[i + 1];
       if (next !== undefined) {
         root = resolve(next);
         i += 1;
       }
+    } else {
+      console.error(`check-inline-spacing: unknown argument ${a}`);
+      console.error('  Usage: check-inline-spacing.ts [--json] [--root <dir>]');
+      process.exit(2);
     }
   }
-  return { ci, json, root };
+  return { json, root };
 }
 
 function main(): void {
@@ -729,7 +735,7 @@ function main(): void {
     }
   }
 
-  if (flags.ci && offenses.length > 0) {
+  if (offenses.length > 0) {
     process.exit(1);
   }
 }
