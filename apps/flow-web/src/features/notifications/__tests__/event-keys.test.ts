@@ -1,6 +1,7 @@
 /**
- * Every event type the server can write a notification for needs a key
- * here, and every key here needs a translation in all three locales.
+ * Every key in the notification event map needs a translation in all
+ * three locales, and no locale may carry an `event.*` entry the map never
+ * reaches for.
  *
  * The map is the only thing standing between a reader and an English
  * title: the server stores one on every row, and until this existed the
@@ -9,9 +10,11 @@
  * sees no key, and it is not a literal in this repo either, so the
  * hardcoded-string guard sees nothing. This test is what sees it.
  *
- * The server list is read out of `classifyEvent` rather than restated,
- * so adding a case there without a key here fails instead of shipping
- * one more English line.
+ * Whether the map covers the event types the server actually notifies on
+ * is asserted on the server side, where that set is decided: a Go test
+ * loads `event-keys.json` and compares it against the fan-out's
+ * classification table. This file deliberately does not restate it, and
+ * does not read Go source to find out.
  */
 
 import { readFileSync } from 'node:fs';
@@ -23,52 +26,57 @@ import { NOTIFICATION_EVENT_KEY } from '../event-keys';
 
 const REPO = resolve(import.meta.dirname, '../../../../../..');
 
-/** Event types classifyEvent returns a non-empty title for. */
-function serverEventTypes(): string[] {
-  const src = readFileSync(resolve(REPO, 'apps/flow-api/internal/notification/fanout.go'), 'utf8');
-  const body = src.slice(src.indexOf('func classifyEvent('));
-  const out: string[] = [];
-  // `case "x":` followed by a return whose first value is a non-empty
-  // string. A case that returns "" is deliberately not notified.
-  for (const m of body.matchAll(/case "([a-z._]+)":\s*\n\s*return "([^"]*)"/g)) {
-    if ((m[2] ?? '') !== '') out.push(m[1] as string);
-  }
-  return out;
-}
-
 function locale(lang: string): Record<string, unknown> {
   return JSON.parse(
     readFileSync(resolve(REPO, `apps/flow-web/locales/${lang}/notifications.json`), 'utf8'),
   ) as Record<string, unknown>;
 }
 
+/** The `event.*` sub-tree of one locale bundle. */
+function localeEvents(lang: string): Record<string, string> {
+  return (locale(lang).event ?? {}) as Record<string, string>;
+}
+
+/** Key names under `event.` that the map points at. */
+function mappedNames(): string[] {
+  return Object.values(NOTIFICATION_EVENT_KEY).map((k) => k.replace(/^event\./, ''));
+}
+
 describe('NOTIFICATION_EVENT_KEY', () => {
-  it('covers every event type the server notifies on', () => {
-    const server = serverEventTypes();
-    expect(server.length).toBeGreaterThan(0);
-    const missing = server.filter((e) => !(e in NOTIFICATION_EVENT_KEY));
-    expect(missing).toEqual([]);
+  it('maps at least one event type', () => {
+    // Without this the two assertions below hold over an empty map and
+    // report a green that means nothing.
+    expect(Object.keys(NOTIFICATION_EVENT_KEY).length).toBeGreaterThan(0);
   });
 
-  it('maps nothing the server never sends', () => {
-    const server = new Set(serverEventTypes());
-    const stale = Object.keys(NOTIFICATION_EVENT_KEY).filter((e) => !server.has(e));
-    expect(stale).toEqual([]);
+  it('points every event type at a key in the event namespace', () => {
+    const stray = Object.entries(NOTIFICATION_EVENT_KEY).filter(
+      ([, key]) => !key.startsWith('event.'),
+    );
+    expect(stray).toEqual([]);
   });
 
   it.each(['en', 'ja', 'zh'])('has a %s translation for every key', (lang) => {
-    const bundle = locale(lang);
-    const event = (bundle.event ?? {}) as Record<string, string>;
-    const missing = Object.values(NOTIFICATION_EVENT_KEY)
-      .map((k) => k.replace(/^event\./, ''))
-      .filter((k) => typeof event[k] !== 'string' || event[k].trim() === '');
+    const event = localeEvents(lang);
+    const missing = mappedNames().filter(
+      (k) => typeof event[k] !== 'string' || event[k].trim() === '',
+    );
     expect(missing).toEqual([]);
   });
 
+  it.each(['en', 'ja', 'zh'])('carries no unreachable %s translation', (lang) => {
+    // A leftover translation is a rename that only landed on one side:
+    // the copy is still there, and the event type that used to reach it
+    // now renders as the English title stored on the row.
+    const mapped = new Set(mappedNames());
+    const unused = Object.keys(localeEvents(lang)).filter((k) => !mapped.has(k));
+    expect(unused).toEqual([]);
+  });
+
   it('translates each locale differently from English', () => {
-    const en = (locale('en').event ?? {}) as Record<string, string>;
+    const en = localeEvents('en');
     for (const lang of ['ja', 'zh']) {
-      const other = (locale(lang).event ?? {}) as Record<string, string>;
+      const other = localeEvents(lang);
       const untranslated = Object.keys(en).filter((k) => other[k] === en[k]);
       expect(untranslated, `${lang} still holds the English string`).toEqual([]);
     }

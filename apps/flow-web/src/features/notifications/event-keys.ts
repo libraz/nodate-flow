@@ -16,36 +16,14 @@
  * A static map rather than `t(\`event.${type}\`)`: dynamic keys are
  * banned because nothing can then tell which keys are reachable, and a
  * missing one only shows up as a raw key in front of a reader.
+ *
+ * The pairs live in `event-keys.json` rather than in this file so the
+ * server can read them. The set of event types the server notifies on is
+ * decided in Go, and the two lists have to agree; a Go test loads this
+ * JSON and compares it against the fan-out's classification table, which
+ * only works if the data is parseable rather than embedded in a module.
  */
-export const NOTIFICATION_EVENT_KEY: Readonly<Record<string, string>> = {
-  'task.created': 'event.task_created',
-  'task.updated': 'event.task_updated',
-  'task.disabled': 'event.task_disabled',
-  'task.comment.added': 'event.task_comment_added',
-  'task.comment.edited': 'event.task_comment_edited',
-  'task.comment.removed': 'event.task_comment_removed',
-  'task.actor.added': 'event.task_actor_added',
-  'task.actor.removed': 'event.task_actor_removed',
-  'task.transition.start': 'event.task_transition_start',
-  'task.transition.complete': 'event.task_transition_complete',
-  'task.transition.block': 'event.task_transition_block',
-  'task.transition.unblock': 'event.task_transition_unblock',
-  'task.transition.submit': 'event.task_transition_submit',
-  'task.transition.reopen': 'event.task_transition_reopen',
-  'task.transition.cancel': 'event.task_transition_cancel',
-  'item.scheduled': 'event.item_scheduled',
-  'item.unscheduled': 'event.item_unscheduled',
-  'item.rescheduled': 'event.item_rescheduled',
-  'item.renamed': 'event.item_renamed',
-  'item.deleted': 'event.item_deleted',
-  'item.reconciled': 'event.item_reconciled',
-  'item.actor.added': 'event.item_actor_added',
-  'item.actor.removed': 'event.item_actor_removed',
-  'item.visibility.changed': 'event.item_visibility_changed',
-  'item.milestone.link.added': 'event.item_milestone_link_added',
-  'item.milestone.link.removed': 'event.item_milestone_link_removed',
-  'agent.task.handoff_to_user': 'event.agent_task_handoff_to_user',
-  'agent.task.handoff_to_agent': 'event.agent_task_handoff_to_agent',
-  'agent.task.attached': 'event.agent_task_attached',
-  'agent.task.detached': 'event.agent_task_detached',
-};
+
+import eventKeys from './event-keys.json';
+
+export const NOTIFICATION_EVENT_KEY: Readonly<Record<string, string>> = eventKeys;
