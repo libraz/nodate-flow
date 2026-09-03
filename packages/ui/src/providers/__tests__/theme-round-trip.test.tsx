@@ -139,17 +139,32 @@ describe('setFamily with the colour mode on system', () => {
     const syncServerTheme = vi.fn(async (_pref: ThemePreference) => undefined);
     renderProvider({ syncServerTheme });
 
+    // Only a preference change reaches the server, so the account has to
+    // be driven through one before the payload can be observed at all.
+    // Going dark and back to system is the shortest route that leaves the
+    // account in system mode with a sync already on the wire.
+    await user.click(screen.getByRole('button', { name: 'dark' }));
+    await user.click(screen.getByRole('button', { name: 'system' }));
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 50));
+    });
+    expect(syncServerTheme.mock.calls.length).toBeGreaterThan(0);
+    expect(syncServerTheme).toHaveBeenLastCalledWith('system');
+
+    // Changing the family while in system mode must not resolve the
+    // preference to whichever concrete theme happens to be showing: that
+    // would pin the account to this moment's light/dark and end OS
+    // following. Nothing new may reach the server, and nothing that did
+    // may carry a concrete theme.
+    const before = syncServerTheme.mock.calls.length;
     await user.click(screen.getByRole('button', { name: 'glass' }));
     await act(async () => {
       await new Promise((r) => setTimeout(r, 50));
     });
+    expect(syncServerTheme.mock.calls.length).toBe(before);
+    expect(syncServerTheme.mock.calls.map((call) => call[0])).not.toContain('light');
+    expect(syncServerTheme.mock.calls.map((call) => call[0])).not.toContain('dark-glass');
 
-    // The stored preference did not change, so there is nothing to sync.
-    // What matters is the negative: a concrete theme must never reach the
-    // server on behalf of someone who chose "System".
-    for (const call of syncServerTheme.mock.calls) {
-      expect(call[0]).toBe('system');
-    }
     expect(window.localStorage.getItem('nf.theme')).toBe('system');
     expect(window.localStorage.getItem('nf.theme.family')).toBe('glass');
   });
