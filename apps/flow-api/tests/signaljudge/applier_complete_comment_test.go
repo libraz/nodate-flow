@@ -3,7 +3,7 @@
 // SQL [signaljudge.SQLTaskMutator].
 //
 // Where applier_retro_test.go covers the retro branch end-to-end, this
-// file pins the two branches that were previously no-op stubs:
+// file pins the `complete_task` and `add_comment` branches:
 //
 //   - complete_task under autonomy=auto must move the source task's
 //     tasks.derived_state to 'done' (the real mutation), not merely
@@ -33,8 +33,8 @@ import (
 	"github.com/libraz/nodate-flow/apps/flow-api/tests/helpers"
 )
 
-// TestApplierCompleteTaskMovesDerivedStateToDone is the core B-3
-// regression: a verdict with action=complete_task under autonomy=auto
+// TestApplierCompleteTaskMovesDerivedStateToDone pins the complete_task
+// branch: a verdict with action=complete_task under autonomy=auto
 // must (a) move the source task's tasks.derived_state to 'done' through
 // the canonical transition path and (b) emit TaskAutoCompleted — the
 // state change and the audit event must agree, no divergence.
@@ -86,7 +86,7 @@ func TestApplierCompleteTaskMovesDerivedStateToDone(t *testing.T) {
 	require.False(t, res.Skipped, "auto complete_task must materialise (Skipped=false)")
 
 	// 1. The real mutation landed: derived_state is now 'done'. This is
-	//    the assertion the no-op stub failed.
+	//    the assertion a no-op mutator fails.
 	require.Equal(t, "done", loadDerivedState(t, testDB, wsID, srcInternalID),
 		"complete_task must move tasks.derived_state to 'done', not just emit an event")
 

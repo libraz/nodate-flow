@@ -8,7 +8,7 @@ import (
 	apierrors "github.com/libraz/nodate-flow/apps/flow-api/internal/errors"
 )
 
-// TestWebhookErrEnvelopeShape locks in the C8 contract: webhook
+// TestWebhookErrEnvelopeShape locks in the envelope contract: webhook
 // failure responses ride the same RFC 9457 problem+json envelope as
 // every Huma-pipelined endpoint. Without this guarantee, signature
 // rejection would emit a status code with no machine-readable `type`

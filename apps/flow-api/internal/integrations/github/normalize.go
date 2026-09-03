@@ -25,8 +25,8 @@ func NormalizeEventKind(eventHeader, action string) string {
 
 // KnownGithubKinds enumerates the github event kinds we currently
 // handle in the constraint engine and timeline filters. The list is
-// not exhaustive but covers the M4 acceptance scope (issues, pull
-// requests, comments, check runs, deployments).
+// not exhaustive but covers issues, pull requests, comments, check
+// runs and deployments.
 var KnownGithubKinds = []string{
 	"issues.opened",
 	"issues.closed",

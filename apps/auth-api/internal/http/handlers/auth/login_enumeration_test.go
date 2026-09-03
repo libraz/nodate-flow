@@ -67,13 +67,13 @@ func attemptLogin(t *testing.T, deps Deps, email, password string) loginFailure 
 	return loginFailure{status: problem.Status, code: problem.Type}
 }
 
-// TestLogin_LockoutIsNotAnEnumerationOracle proves L-5 is closed: a
+// TestLogin_LockoutIsNotAnEnumerationOracle proves the lockout leaks nothing: a
 // known email with a wrong password and an unknown email must return the
 // identical status + error code on every attempt across the lockout
-// threshold. Before the fix the real account would eventually flip to
-// AUTH.LOGIN.RATE_LIMITED_AFTER_RETRIES and then AUTH.LOGIN.ACCOUNT_LOCKED,
-// while the unknown email stayed on AUTH.LOGIN.INVALID_CREDENTIALS —
-// letting an attacker distinguish real accounts.
+// threshold. A real account that flips to
+// AUTH.LOGIN.RATE_LIMITED_AFTER_RETRIES and then AUTH.LOGIN.ACCOUNT_LOCKED
+// while the unknown email stays on AUTH.LOGIN.INVALID_CREDENTIALS lets
+// an attacker distinguish real accounts.
 func TestLogin_LockoutIsNotAnEnumerationOracle(t *testing.T) {
 	t.Parallel()
 	db := requireB2DB(t)

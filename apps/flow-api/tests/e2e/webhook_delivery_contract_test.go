@@ -317,10 +317,10 @@ func v0Signature(secret, timestamp string, body []byte) string {
 }
 
 // TestWebhookPausedSubscriptionStopsQueuedDeliveries covers the half of
-// "stop sending" that a subscriber can actually observe. Pausing a
-// subscription used to leave everything already queued to be delivered
-// anyway, so from the receiving end the switch did nothing for as long
-// as the backlog lasted.
+// "stop sending" that a subscriber can actually observe. A pause that
+// only gates new enqueues leaves everything already queued to be
+// delivered anyway, so from the receiving end the switch does nothing
+// for as long as the backlog lasts.
 func TestWebhookPausedSubscriptionStopsQueuedDeliveries(t *testing.T) {
 	bootstrap(t)
 	t.Parallel()
@@ -330,7 +330,7 @@ func TestWebhookPausedSubscriptionStopsQueuedDeliveries(t *testing.T) {
 	fx := newWebhookFixture(ctx, t, tt, `["task.created"]`)
 
 	// Pause after the delivery is queued: this is the ordering that
-	// matters, and the one the old code got wrong.
+	// matters, and the one an enqueue-only gate gets wrong.
 	var toggled struct {
 		Ok bool `json:"ok"`
 	}

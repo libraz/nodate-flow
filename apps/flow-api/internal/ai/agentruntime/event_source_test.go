@@ -187,12 +187,13 @@ func (b *blockingQuerier) ListOnEventAgentsForEvent(context.Context, uint32, uin
 	return nil, nil
 }
 
-// TestNotifyHookDoesNotBlockCaller is the regression for H-47. The hook
+// TestNotifyHookDoesNotBlockCaller is the regression for inline hook work. The hook
 // runs on the goroutine that appended the event — a request handler, or
 // the commit hook of its transaction — so any work it does inline is
-// work the user waits for. A workspace with on_event agents made every
-// write in that workspace pay for an agent lookup plus an INSERT per
-// match, and a slow lookup stalled the request that triggered it.
+// work the user waits for. A workspace with on_event agents would make
+// every write in that workspace pay for an agent lookup plus an INSERT
+// per match, and a slow lookup would stall the request that triggered
+// it.
 //
 // The hook must return while the lookup is still in progress.
 func TestNotifyHookDoesNotBlockCaller(t *testing.T) {

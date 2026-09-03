@@ -149,16 +149,17 @@ func TestCalendarReminderDispatch(t *testing.T) {
 		"second tick must not duplicate the owner's reminder")
 }
 
-// TestRecurringCalendarReminderFiresEveryOccurrence is H-20.
+// TestRecurringCalendarReminderFiresEveryOccurrence pins that a
+// recurring reminder rings on every occurrence.
 //
-// A reminder used to be claimed on one column of the event row, so a
-// series rang once for its lifetime: "every Monday, 15 minutes before"
-// notified the first Monday and was silent for the remaining
-// fifty-one. Adding a rule to an event that had already fired meant it
-// never rang again at all.
+// Claiming a reminder on one column of the event row lets a series ring
+// once for its lifetime: "every Monday, 15 minutes before" notifies the
+// first Monday and stays silent for the rest of the year, and adding a
+// rule to an event that has already fired means it never rings again at
+// all.
 //
 // The test drives the same tick twice for two different occurrences,
-// because a single occurrence firing is exactly what the old code did.
+// because a single occurrence firing is the failure it has to catch.
 func TestRecurringCalendarReminderFiresEveryOccurrence(t *testing.T) {
 	bootstrap(t)
 	t.Parallel()
@@ -184,7 +185,7 @@ func TestRecurringCalendarReminderFiresEveryOccurrence(t *testing.T) {
 	// five minutes ahead of now. The occurrence the tick should find is
 	// today's — which exists only as an expansion of the rule, because
 	// the master row's own start is a month old and long past due. That
-	// is the arrangement the old claim could not serve.
+	// is the arrangement a single-column claim cannot serve.
 	anchor := time.Now().UTC().Add(5*time.Minute).Truncate(time.Minute).AddDate(0, 0, -30)
 	eventPub := types.New()
 	evRes, err := testDB.ExecContext(ctx, `

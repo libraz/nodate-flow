@@ -1,12 +1,13 @@
 // Suspending a user must not delete what that user contributed.
 //
-// The listing queries used to reach the author with
-// `INNER JOIN users ... AND u.enabled = TRUE`, so the moment an account
-// was suspended every row it had authored dropped out of everyone else's
-// view: attachments left the task, widgets left the shared dashboard,
-// lenses left the lens list, comments and memos left the calendar. The
-// blobs stayed in object storage and ref_count never moved, so nothing
-// could be reclaimed either — the rows were invisible, not gone.
+// A listing query that reaches the author with
+// `INNER JOIN users ... AND u.enabled = TRUE` drops every row a
+// suspended account authored out of everyone else's view the moment the
+// account is suspended: attachments leave the task, widgets leave the
+// shared dashboard, lenses leave the lens list, comments and memos leave
+// the calendar. The blobs stay in object storage and ref_count never
+// moves, so nothing can be reclaimed either — the rows are invisible,
+// not gone.
 //
 // Suspension is reversible bookkeeping (see delete_after_suspend_test.go
 // for the contract). The rows below therefore stay, and only the byline

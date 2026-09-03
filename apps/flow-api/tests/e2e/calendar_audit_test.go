@@ -10,8 +10,8 @@ import (
 
 // TestAuditCalendarEventLifecycle exercises the calendar event CRUD path
 // and verifies that each mutation produces the expected audit_logs entry.
-// Calendar mutations were previously the only mutation domain that did
-// not feed the audit recorder, so this guards the gap from regressing:
+// Calendar mutations feed the audit recorder like every other mutation
+// domain, and this guards that from regressing:
 // create / update / delete must each append a workspace-scoped row that
 // surfaces in v_workspace_activity alongside tasks, projects, etc.
 func TestAuditCalendarEventLifecycle(t *testing.T) {

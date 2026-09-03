@@ -35,11 +35,11 @@ func seedGuestMember(t *testing.T, owner *helpers.TestTenant) *helpers.TestTenan
 // guest keeps full read access to the workspace-scoped surface but cannot
 // mutate any of it.
 //
-// The shared workspace furniture is the point. A guest invited to review a
-// single project used to be able to rename or disable every workspace label
-// (breaking every saved filter that referenced it), delete or complete a
-// sprint, and publish a lens — a projection of workspace tasks — onto an
-// unauthenticated URL.
+// The shared workspace furniture is the point. Without the floor, a guest
+// invited to review a single project can rename or disable every workspace
+// label (breaking every saved filter that referenced it), delete or
+// complete a sprint, and publish a lens — a projection of workspace tasks
+// — onto an unauthenticated URL.
 func TestGuestIsReadOnlyOnWorkspaceResources(t *testing.T) {
 	bootstrap(t)
 	t.Parallel()

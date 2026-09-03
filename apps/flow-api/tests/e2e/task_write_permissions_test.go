@@ -207,7 +207,7 @@ func TestProjectViewerCannotWriteTask(t *testing.T) {
 }
 
 // TestWorkspaceMemberWithoutProjectRoleCannotWritePublicTask locks in the
-// C-2 regression: workspace members with no project_members row may read a
+// read/write split: workspace members with no project_members row may read a
 // public task, but they must not pass RequireProjectRole for mutations.
 func TestWorkspaceMemberWithoutProjectRoleCannotWritePublicTask(t *testing.T) {
 	bootstrap(t)

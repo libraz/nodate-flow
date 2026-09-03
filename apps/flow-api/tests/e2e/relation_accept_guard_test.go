@@ -111,7 +111,7 @@ func TestAcceptSuggestionRequiresProjectEditor(t *testing.T) {
 
 // TestAcceptSuggestionRejectsCycle is the second half, and the reason
 // fixing authorization alone would not be enough: two mutual `blocks`
-// suggestions accepted one after the other used to produce A→B and B→A.
+// suggestions accepted one after the other produce A→B and B→A.
 //
 // Nothing complains at the time. The constraint engine walks the graph
 // with a cycle-tolerant BFS, so it neither crashes nor loops — it simply

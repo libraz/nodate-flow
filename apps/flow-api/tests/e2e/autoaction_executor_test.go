@@ -450,12 +450,12 @@ func requireCompletePass(ctx context.Context, t *testing.T, exec *autoactions.Ex
 		"the auto-action pass did not reach every workspace, so this workspace may never have been evaluated")
 }
 
-// TestAutoActionExecutorReportsAnIncompletePass locks in the half of the
-// contract that was missing: a pass that did not reach every workspace
-// says so, instead of returning as though the whole instance had been
+// TestAutoActionExecutorReportsAnIncompletePass locks in the reporting
+// half of the contract: a pass that did not reach every workspace says
+// so, instead of returning as though the whole instance had been
 // evaluated.
 //
-// Silence was the damaging part. Workspaces are walked in id order, so
+// Silence is the damaging part. Workspaces are walked in id order, so
 // the tenants a truncated pass skips are always the same ones, and
 // nothing in the logs or the return value distinguished "evaluated and
 // nothing to do" from "never looked at". A cancelled context is the

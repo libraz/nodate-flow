@@ -11,8 +11,8 @@
 //   - Body MUST be {"confirm": true}; missing or false returns 400 with
 //     WORKSPACE.DELETE.CONFIRM_REQUIRED / USER.DELETE.CONFIRM_REQUIRED.
 //   - Self-delete on the user endpoint returns 400
-//     USER.DELETE.SELF_NOT_ALLOWED (replaces the old overloaded
-//     VALIDATION.PATH_PARAM.INVALID).
+//     USER.DELETE.SELF_NOT_ALLOWED, not the overloaded
+//     VALIDATION.PATH_PARAM.INVALID.
 //   - Success → 200 {deleted, storageObjectsDeleted, minioErrors}.
 //   - Workspace delete: every storage_objects row + MinIO blob owned by
 //     the workspace is swept, then the workspaces row is hard-deleted via

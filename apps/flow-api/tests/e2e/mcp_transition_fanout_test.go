@@ -94,7 +94,7 @@ func TestTransitionFanOutMatchesBetweenRESTAndMCP(t *testing.T) {
 		tt.AccessToken, map[string]any{"transition": "start"}, &restResult)
 	require.Equal(t, "waiting", restResult.DerivedState)
 
-	// --- MCP: the path that used to append and never deliver ---
+	// --- MCP: the path that must append and deliver, not just append ---
 	callBody := mcpCall(t, mcpToken.Token, "tools/call", map[string]any{
 		"name": "transition_task",
 		"arguments": map[string]any{

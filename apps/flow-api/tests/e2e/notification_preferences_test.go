@@ -40,11 +40,11 @@ func mutedCell(t *testing.T, body preferencesBody, category, channel string) boo
 // the notification settings: saving a mute has to stop delivery, not
 // just return 200.
 //
-// The screen these preferences back used to write five booleans on the
-// users row that nothing in the delivery path ever read, so every save
-// succeeded and changed nothing. Asserting the response status would
-// reproduce exactly that, so the assertion here is on the notifications
-// table after a real event fans out.
+// A preference written to a users-row column that nothing in the
+// delivery path reads makes every save succeed and change nothing.
+// Asserting the response status would reproduce exactly that, so the
+// assertion here is on the notifications table after a real event fans
+// out.
 //
 // A second, unmuted category runs through the same fan-out afterwards.
 // Without it, "mute works" and "fan-out is broken" produce identical

@@ -43,8 +43,8 @@ func TestTimeboxLifecycle(t *testing.T) {
 
 	// The create response is the only one a client has before it can
 	// render the new row, so it has to carry the same fields Get does.
-	// It used to be hand-built from the request body, which left the
-	// creator and the project name blank on that one path.
+	// Hand-building it from the request body leaves the creator and the
+	// project name blank on that one path.
 	require.NotEmpty(t, created.CreatorID, "create response must identify the creator")
 	require.NotEmpty(t, created.CreatorDisplayName, "create response must name the creator")
 	require.Equal(t, tt.ProjectPublicID, created.ProjectID)

@@ -16,7 +16,7 @@ import (
 )
 
 // TestListReactionsForTaskRespectsLimit verifies that ListReactionsForTask
-// (previously an unbounded `:many` query) honours LIMIT/OFFSET and reports
+// honours LIMIT/OFFSET and reports
 // the pre-page total via COUNT(*) OVER(). Without the LIMIT, a task with a
 // large reaction fan-out would return every row regardless of the caller's
 // requested page size.

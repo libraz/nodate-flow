@@ -20,10 +20,9 @@
 //     WS.WORKSPACE.NOT_FOUND BEFORE the delete handler runs. Documented
 //     as a comment + an assertion so any future change is loud.
 //
-// Note: the old code path that asserted "delete must reject when ws is
-// already disabled" (WORKSPACE.PURGE.NOT_DISABLED) no longer exists and
-// is deliberately not re-implemented here — that scenario is impossible
-// under the new contract.
+// Note: "delete must reject when ws is already disabled"
+// (WORKSPACE.PURGE.NOT_DISABLED) is deliberately not asserted here —
+// the middleware answers 404 first, so that scenario is unreachable.
 package e2e
 
 import (

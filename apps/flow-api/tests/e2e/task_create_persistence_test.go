@@ -7,8 +7,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// taskRowFacts are the columns that used to be silently wrong: task_number
-// was left at its 0 default and visibility was written as the empty string.
+// taskRowFacts are the columns a create can get silently wrong: task_number
+// left at its 0 default, visibility written as the empty string.
 // Both are invisible through the API surface, so the assertions read the row.
 type taskRowFacts struct {
 	taskNumber   uint32
@@ -162,10 +162,10 @@ func TestApplyStepsCreatesEveryChild(t *testing.T) {
 	}, &parent)
 	require.NotEmpty(t, parent.ID)
 
-	// The request body is the MCP one, field for field. Priority used to
-	// be required here and optional there, so the two transports could
-	// not be sent the same steps — and a client that omitted it got a
-	// 422 for leaving out a field whose column has a default.
+	// The request body is the MCP one, field for field. Priority has to
+	// be optional on both, or the two transports cannot be sent the same
+	// steps — and a client that omits it gets a 422 for leaving out a
+	// field whose column has a default.
 	var applied struct {
 		Created []string `json:"created"`
 	}

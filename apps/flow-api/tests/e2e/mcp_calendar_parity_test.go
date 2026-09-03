@@ -47,16 +47,17 @@ func mcpToolErrorCode(t *testing.T, tt *helpers.TestTenant, name string, args ma
 	return mcpErrorCode(t, body)
 }
 
-// TestMCPEventEditRuleMatchesREST is M-19. A calendar manager who is
+// TestMCPEventEditRuleMatchesREST pins the MCP edit rule against REST. A
+// calendar manager who is
 // neither the event's owner nor an attendee may move other people's
 // events — that is what the manager role is for on a shared calendar.
 //
-// The old MCP rule asked calendars.owner_user_id instead of
-// calendar_members.role, and a shared calendar leaves owner_user_id NULL
-// on purpose (naming an owner makes the FK cascade take everyone's
-// history with that user). So on exactly the calendars that have
-// managers, no manager qualified: the same edit succeeded in the web app
-// and failed through an agent.
+// A rule that asks calendars.owner_user_id instead of
+// calendar_members.role cannot express that: a shared calendar leaves
+// owner_user_id NULL on purpose (naming an owner makes the FK cascade
+// take everyone's history with that user), so on exactly the calendars
+// that have managers, no manager qualifies — the same edit succeeds in
+// the web app and fails through an agent.
 func TestMCPEventEditRuleMatchesREST(t *testing.T) {
 	bootstrap(t)
 	t.Parallel()
@@ -68,7 +69,7 @@ func TestMCPEventEditRuleMatchesREST(t *testing.T) {
 	addCalendarMemberWithRole(t, host, calID, manager.Email, "manager")
 
 	// Make it a shared calendar in the sense the schema means: nobody
-	// owns it. This is the shape the old rule could not handle.
+	// owns it. This is the shape an owner-column rule cannot handle.
 	_, err := testDB.Exec(
 		`UPDATE calendars SET owner_user_id = NULL WHERE public_id = UUID_TO_BIN(?, 0)`, calID)
 	require.NoError(t, err)
@@ -134,12 +135,12 @@ func TestMCPEventEditStillRefusesViewer(t *testing.T) {
 	assert.Equal(t, "Not theirs to move", title, "no rename may have landed")
 }
 
-// TestMCPFreeSlotsUsesUserTimezone is H-25. The working day belongs to
+// TestMCPFreeSlotsUsesUserTimezone pins that the working day belongs to
 // the person whose day it is.
 //
-// Fixed at UTC, "09:00–18:00" named 18:00–03:00 for a Tokyo user: their
-// real working day fell outside the query window, so every meeting in it
-// was invisible, the day was reported wholly free, and the agent booked
+// Fixed at UTC, "09:00–18:00" names 18:00–03:00 for a Tokyo user: their
+// real working day falls outside the query window, so every meeting in
+// it is invisible, the day is reported wholly free, and the agent books
 // the middle of the night.
 func TestMCPFreeSlotsUsesUserTimezone(t *testing.T) {
 	bootstrap(t)
@@ -225,13 +226,13 @@ func TestMCPFreeSlotsUsesUserTimezone(t *testing.T) {
 	}
 }
 
-// TestDefaultVisibilityResolvesAgainstCalendarSetting is M-49.
+// TestDefaultVisibilityResolvesAgainstCalendarSetting pins how the
+// column's own default is read.
 //
-// visibility='default' is the column's own default, so most events carry
-// it, and it resolved to nothing: the details of an ordinary event were
-// readable by anyone who could reach the calendar and were printed in
-// full on an unauthenticated share page. It now resolves against
-// calendars.default_event_visibility.
+// visibility='default' is what most events carry, so resolving it to
+// nothing makes the details of an ordinary event readable by anyone who
+// can reach the calendar and prints them in full on an unauthenticated
+// share page. It resolves against calendars.default_event_visibility.
 func TestDefaultVisibilityResolvesAgainstCalendarSetting(t *testing.T) {
 	bootstrap(t)
 	t.Parallel()
@@ -422,10 +423,10 @@ func TestMCPEventEditRequiresCalendarMembership(t *testing.T) {
 	assert.Equal(t, "Their own event", title, "no rename may have landed")
 }
 
-// TestMCPListsRecurringOccurrences is H-19 on the read side. A weekly
-// series has to appear in the agent's answer as the meetings it produces
-// in the window, not as one row plus a rule the model would have to
-// expand, and not — as it did — as nothing at all.
+// TestMCPListsRecurringOccurrences covers recurrence on the read side. A
+// weekly series has to appear in the agent's answer as the meetings it
+// produces in the window, not as one row plus a rule the model would
+// have to expand, and not as nothing at all.
 func TestMCPListsRecurringOccurrences(t *testing.T) {
 	bootstrap(t)
 	t.Parallel()
@@ -478,10 +479,10 @@ func TestMCPListsRecurringOccurrences(t *testing.T) {
 	}, got, "the series must be reported as its occurrences in the window: %s", out)
 }
 
-// TestMCPFreeSlotsTreatsRecurringMeetingsAsBusy is the harm H-19 named.
-// The free-slot search built its busy map from the non-recurring query,
-// so a standing meeting's hour was offered as available and an agent
-// booking into it double-booked the person.
+// TestMCPFreeSlotsTreatsRecurringMeetingsAsBusy covers the harm that
+// causes. A free-slot search that builds its busy map from the
+// non-recurring query offers a standing meeting's hour as available, and
+// an agent booking into it double-books the person.
 func TestMCPFreeSlotsTreatsRecurringMeetingsAsBusy(t *testing.T) {
 	bootstrap(t)
 	t.Parallel()
@@ -533,11 +534,11 @@ func TestMCPFreeSlotsTreatsRecurringMeetingsAsBusy(t *testing.T) {
 	}
 }
 
-// TestPatchClearsNullableEventFields is the backend half of H-26.
+// TestPatchClearsNullableEventFields covers removal through PATCH.
 //
 // A PATCH that only carries values cannot express removal: the field the
 // caller omitted and the field they want emptied arrive identically, so
-// every nullable column was write-once. The visible form was a dialog
+// every nullable column is write-once. The visible form is a dialog
 // offering "no repeat", reporting success, and leaving the daily standup
 // recurring — with no way short of deleting the series.
 func TestPatchClearsNullableEventFields(t *testing.T) {
@@ -649,7 +650,7 @@ func TestPatchClearRejectsUnknownField(t *testing.T) {
 		"an unrecognised clear target must be refused; body=%s", string(body))
 }
 
-// TestRecurrenceEndStopsExpansion is H-26's other half at the API
+// TestRecurrenceEndStopsExpansion is the other half at the API
 // boundary: setting recurrenceEnd has to actually end the series.
 func TestRecurrenceEndStopsExpansion(t *testing.T) {
 	bootstrap(t)
@@ -697,14 +698,15 @@ func TestRecurrenceEndStopsExpansion(t *testing.T) {
 		"the series must stop at recurrenceEnd rather than run on: %s", out)
 }
 
-// TestAllDayEventIsStoredAsACanonicalDate is the backend half of H-23.
+// TestAllDayEventIsStoredAsACanonicalDate pins the stored form.
 //
 // "All day on 5 August" is a date, and a date is the same square on the
 // calendar for everyone. The column pair is DATETIME, so the date has to
 // be encoded as an instant — and which instant it is has to be one
-// thing. It was two: the browser sent local midnight and MCP sent UTC
-// midnight, so a Tokyo user's holiday arrived as 2026-08-04T15:00Z and
-// showed as the 4th in Europe while its author had called it the 5th.
+// thing. Left to the writer it is two: a browser sends local midnight
+// and MCP sends UTC midnight, so a Tokyo user's holiday arrives as
+// 2026-08-04T15:00Z and shows as the 4th in Europe while its author
+// called it the 5th.
 func TestAllDayEventIsStoredAsACanonicalDate(t *testing.T) {
 	bootstrap(t)
 	t.Parallel()

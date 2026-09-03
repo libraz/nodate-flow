@@ -60,11 +60,11 @@ func TestTaskDuplicatesProposal(t *testing.T) {
 
 	require.Equal(t, sourceID, out.Source)
 	// Ask the embedder the server is running what it files rows under,
-	// rather than asserting its current name. The endpoint used to derive
-	// its lookup key from ai_settings.embed_model, which happens to
-	// default to the mock's name — so a literal here agreed with the
-	// broken key and this test passed while duplicate detection returned
-	// nothing on every deployment with a real embedding provider.
+	// rather than asserting its current name. A lookup key derived from
+	// ai_settings.embed_model happens to match the mock's name, so a
+	// literal here would agree with that key and pass while duplicate
+	// detection returns nothing on every deployment with a real
+	// embedding provider.
 	require.Equal(t, embed.NewMockProvider().Model(), out.Model)
 	require.NotEmpty(t, out.Candidates, "at least the identical twin must rank")
 	top := out.Candidates[0]

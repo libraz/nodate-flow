@@ -1,6 +1,6 @@
 /**
- * The root boundary used to print `error.message` into a `<pre>` in every
- * build. These tests assert the production branch by the text it withholds,
+ * The root boundary must not print `error.message` into a `<pre>` in a
+ * production build. These tests assert that branch by the text it withholds,
  * not by the branch it takes: the interesting property is that a stack-ish
  * developer string never reaches a production reader, whatever shape the
  * thrown value has.

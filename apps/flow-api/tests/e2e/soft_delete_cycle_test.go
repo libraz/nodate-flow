@@ -46,10 +46,10 @@ func createTaskForCycle(t *testing.T, tt *helpers.TestTenant, title string) stri
 	return task.ID
 }
 
-// TestReactionAddRemoveCycles is the canonical H-11 case: react, undo,
-// react again, undo again. The second undo is where the old key failed
-// with a duplicate entry, after which that reaction could never be
-// removed.
+// TestReactionAddRemoveCycles is the canonical revival cycle: react,
+// undo, react again, undo again. The second undo is where a key that
+// does not account for the tombstone fails with a duplicate entry, after
+// which that reaction can never be removed.
 func TestReactionAddRemoveCycles(t *testing.T) {
 	bootstrap(t)
 	t.Parallel()
@@ -168,12 +168,13 @@ func TestFavoriteAddRemoveCycles(t *testing.T) {
 	}
 }
 
-// TestPublicShareEventAttachDetachCycles is the H-11 case with the worst
-// consequence, because the row it strands is published to an
-// unauthenticated URL. The old key made the second detach fail with a
-// 500 while the event stayed on the page, and the re-attach that
-// followed returned 200 while reporting the event as skipped — so the
-// editor was told the event was not published at the moment it was.
+// TestPublicShareEventAttachDetachCycles is the revival cycle with the
+// worst consequence, because the row it strands is published to an
+// unauthenticated URL. A key that ignores the tombstone makes the second
+// detach fail with a 500 while the event stays on the page, and the
+// re-attach that follows returns 200 while reporting the event as
+// skipped — so the editor is told the event is not published at the
+// moment it is.
 func TestPublicShareEventAttachDetachCycles(t *testing.T) {
 	bootstrap(t)
 	t.Parallel()
@@ -292,10 +293,10 @@ func TestEventInviteRevokeAndReinvite(t *testing.T) {
 		"re-inviting must revive the single (event, attendee) row rather than add another")
 }
 
-// TestArchivedTaskDetailIsReachable is H-31. The archive room lists
-// archived tasks and links to them, so the detail view they link to has
-// to resolve; it was filtered out of v_task_detail, which every
-// task-detail route reads, so every one of those links 404'd.
+// TestArchivedTaskDetailIsReachable pins the archive room's links. It
+// lists archived tasks and links to them, so the detail view they link
+// to has to resolve; filtering archived rows out of v_task_detail, which
+// every task-detail route reads, 404s every one of those links.
 func TestArchivedTaskDetailIsReachable(t *testing.T) {
 	bootstrap(t)
 	t.Parallel()
@@ -390,11 +391,11 @@ func TestUnarchiveRoundTrip(t *testing.T) {
 	}
 }
 
-// TestTaskScheduleUnscheduleRescheduleOverHTTP is C-6 seen from the
-// product surface: projecting a task onto a calendar, removing the
-// projection, and projecting it again. The second projection used to
-// collide with the tombstone the first one left behind, which made the
-// task permanently unschedulable.
+// TestTaskScheduleUnscheduleRescheduleOverHTTP is the revival cycle seen
+// from the product surface: projecting a task onto a calendar, removing
+// the projection, and projecting it again. The second projection
+// collides with the tombstone the first one left behind unless the
+// revival is handled, which makes the task permanently unschedulable.
 func TestTaskScheduleUnscheduleRescheduleOverHTTP(t *testing.T) {
 	bootstrap(t)
 	t.Parallel()

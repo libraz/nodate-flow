@@ -4,8 +4,8 @@ import "testing"
 
 // TestParseFlexibleTime_RFC3339 covers the datetime parse path the
 // per-calendar list endpoint hits when the client passes a full
-// timestamp. C7 widened ListEventsInput.Start/End from time.Time to a
-// flexible string so the handler can route both shapes through this
+// timestamp. ListEventsInput.Start/End are a flexible string rather
+// than time.Time so the handler can route both shapes through this
 // helper.
 func TestParseFlexibleTime_RFC3339(t *testing.T) {
 	got, err := parseFlexibleTime("2026-04-01T10:00:00Z")

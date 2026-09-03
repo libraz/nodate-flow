@@ -496,8 +496,8 @@ func TestPresignConcurrentRace(t *testing.T) {
 	// Second assertion: telling a racer the content is already stored
 	// has to be true when it is said.
 	//
-	// This used to require exactly one miss and the rest dedups. That
-	// is no longer the contract, and requiring it would reinstate the
+	// Requiring exactly one miss and the rest dedups is not the
+	// contract, and asserting it would reinstate the
 	// bug: at the moment these racers run, nobody has uploaded
 	// anything, so answering "already stored" to the losers is a claim
 	// about bytes that do not exist. If the winner then abandons its

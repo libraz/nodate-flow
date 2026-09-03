@@ -12,9 +12,10 @@ import (
 // TestTaskListLabelIdsAreUUIDStrings pins the wire shape of a task list
 // row's labelIds.
 //
-// The column behind it is a GROUP_CONCAT, and the concatenation used to
-// run over raw BINARY(16) public ids. That shape is unrecoverable twice
-// over: 0x2C is a legal byte inside a UUIDv7 so a reader cannot tell a
+// The column behind it is a GROUP_CONCAT, and the concatenation has to
+// run over the UUID string form, not raw BINARY(16) public ids. That
+// shape is unrecoverable twice over: 0x2C is a legal byte inside a
+// UUIDv7 so a reader cannot tell a
 // separator from payload, and the bytes are not valid UTF-8 so JSON
 // encoding replaces them with U+FFFD before any reader sees them.
 //

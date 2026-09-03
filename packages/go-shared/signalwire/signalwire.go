@@ -115,7 +115,7 @@ func SourceEnumTag() string {
 //
 // The check is one-directional on purpose: every registry source MUST be
 // a wire-enum member (else the signal it advertises would be rejected by
-// Huma with a 422 before the handler runs — the B-1 class of bug). The
+// Huma with a 422 before the handler runs). The
 // reverse is intentionally NOT required: sources such as github, slack,
 // google, email, and webhook are emitted by the chi-level webhook
 // handlers with provider-specific kinds that never pass through the

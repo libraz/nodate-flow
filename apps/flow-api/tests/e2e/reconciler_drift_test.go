@@ -233,9 +233,10 @@ func TestReconcilerHealsDueOnDriftInTheEventTimezone(t *testing.T) {
 // TestReconcilerLeavesACorrectZonedDueDateAlone is the one that matters
 // most: a correctly-dated pair must survive the loop.
 //
-// Judged in UTC this pair looks drifted, so the reconciler used to
-// "heal" it backwards every five minutes — overwriting both itemkit's
-// correct write and any manual correction, with no error anywhere. A
+// Judged in UTC this pair looks drifted, so a reconciler that compares
+// in UTC "heals" it backwards every five minutes — overwriting both
+// itemkit's correct write and any manual correction, with no error
+// anywhere. A
 // background loop that reverts the fix makes the bug unfixable from the
 // outside.
 func TestReconcilerLeavesACorrectZonedDueDateAlone(t *testing.T) {

@@ -25,12 +25,11 @@ var exemptDirs = []string{
 // providers.Request gets built.
 //
 // The guard is "no other file may write the literal at all" rather than
-// "the known call sites look right" because the defect was never one
-// mistake in one place: thirteen call sites each hand-built a request,
-// and every one of them omitted the model. A reviewer reading any single
-// one sees nothing wrong — the omission is only visible against a
-// definition of what a complete request is, which is what this package
-// now holds.
+// "the known call sites look right" because the failure mode is not one
+// mistake in one place: every call site that hand-builds a request omits
+// the model the same way. A reviewer reading any single one sees nothing
+// wrong — the omission is only visible against a definition of what a
+// complete request is, which is what this package holds.
 //
 // Read the guarantee narrowly. It catches the literal, which is how the
 // omission actually happened; it cannot catch a caller that declares a

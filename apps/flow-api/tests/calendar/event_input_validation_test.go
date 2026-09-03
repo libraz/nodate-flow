@@ -298,10 +298,10 @@ func TestSmartCreateRejectsUnresolvableTimezone(t *testing.T) {
 }
 
 // TestSmartCreateRefusesTextItCannotRead is the fabrication check. The
-// parser only knows Japanese date and time expressions; given anything
-// else it used to fall back to today at 09:00 and return that as a
-// proposal, so an English caller received a confident answer for an
-// appointment nobody had described.
+// parser only knows Japanese date and time expressions. Falling back
+// to today at 09:00 for anything else returns that as a proposal, so an
+// English caller gets a confident answer for an appointment nobody
+// described.
 //
 // The assertion is that no proposal comes back at all. Checking the
 // returned time against the request would not do: there is no correct

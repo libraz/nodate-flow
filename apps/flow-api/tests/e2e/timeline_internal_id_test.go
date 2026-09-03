@@ -113,7 +113,7 @@ func isIDFieldName(key string) bool {
 }
 
 // exerciseWorkspaceForTimeline drives the flows whose event payloads
-// used to carry internal keys, so the sweep above has something to
+// can carry internal keys, so the sweep above has something to
 // inspect beyond the rows tenant creation happens to leave behind.
 func exerciseWorkspaceForTimeline(t *testing.T, tt *helpers.TestTenant) {
 	t.Helper()

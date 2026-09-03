@@ -31,9 +31,9 @@ func fetchTaskListPage(t *testing.T, token, query string) taskListPage {
 }
 
 // TestTaskListTotalSurvivesPageSplit pins the pagination contract of
-// GET /tasks against the two paths that now produce `total`.
+// GET /tasks against the two paths that produce `total`.
 //
-// The list query no longer carries COUNT(*) OVER(): a full page asks a
+// The list query does not carry COUNT(*) OVER(): a full page asks a
 // separate COUNT, and a short page derives the total from its own
 // offset because it is by definition the last one. Those are two
 // different code paths reporting the same number, and only a test that
@@ -109,12 +109,12 @@ func TestTaskListTotalSurvivesPageSplit(t *testing.T) {
 // TestTaskListPriorityFilterIsServerSide pins `priority` as a real
 // query parameter of GET /tasks.
 //
-// The web client used to fetch page after page and drop non-matching
-// rows itself, so a rare priority in a large project cost one request
-// per page it had to skip. The filter has to narrow the result set on
-// the server for that loop to be removable, and `total` has to count
-// the filtered set -- a total describing the unfiltered list is what
-// kept the old loop walking.
+// Without it the web client fetches page after page and drops
+// non-matching rows itself, so a rare priority in a large project costs
+// one request per page it has to skip. The filter has to narrow the
+// result set on the server for that loop to be removable, and `total`
+// has to count the filtered set -- a total describing the unfiltered
+// list is what keeps such a loop walking.
 func TestTaskListPriorityFilterIsServerSide(t *testing.T) {
 	bootstrap(t)
 	t.Parallel()

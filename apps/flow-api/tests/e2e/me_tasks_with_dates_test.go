@@ -86,8 +86,7 @@ func TestListMyTasksWithDates_HappyPath(t *testing.T) {
 
 // TestListMyTasksWithDates_MonthEndDayBoundary is the direct regression
 // guard for the rejected-regex bug. Days 29-31 must round-trip through
-// the input validator. The regex used to be
-// `^20\d{2}-(0[1-9]|1[0-2])-(0[1-9]|1\d|2[0-8])$` which rejected `30`
+// the input validator. A day pattern ending at `2[0-8]` rejects `30`
 // and `31`.
 func TestListMyTasksWithDates_MonthEndDayBoundary(t *testing.T) {
 	bootstrap(t)

@@ -128,8 +128,7 @@ func TestListMyCalendarEvents_YYYYMMDDRange(t *testing.T) {
 
 // TestListMyCalendarEvents_MonthEndDayBoundary is the direct regression
 // guard for the rejected-regex bug. Days 29-31 must round-trip through
-// the input validator. The regex used to be
-// `^20\d{2}-(0[1-9]|1[0-2])-(0[1-9]|1\d|2[0-8])$` which rejected `31`.
+// the input validator. A day pattern ending at `2[0-8]` rejects `31`.
 func TestListMyCalendarEvents_MonthEndDayBoundary(t *testing.T) {
 	bootstrap(t)
 	t.Parallel()

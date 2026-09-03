@@ -374,7 +374,7 @@ func TestPrivateEventVisibility_ScrubsFieldsForNonOwner(t *testing.T) {
 // parseFlexibleTime sentinel path to confirm the workspace-level
 // /calendar-events endpoint translates a malformed range parameter into
 // the CALENDAR.EVENT.DATE_RANGE_UNPARSEABLE apierror code rather than
-// leaking the raw fmt.Errorf message. Audit H5 regression guard.
+// leaking the raw fmt.Errorf message.
 func TestListCrossCalendarEvents_BadDateRangeReturnsApiError(t *testing.T) {
 	bootstrap(t)
 	t.Parallel()

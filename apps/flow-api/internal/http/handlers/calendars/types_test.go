@@ -5,7 +5,7 @@ import (
 	"testing"
 )
 
-// TestPublicShareResponseHasNoToken locks in the H4 schema split:
+// TestPublicShareResponseHasNoToken locks in the schema split:
 // list / get / patch endpoints return PublicShareResponse, which MUST
 // NOT carry the plaintext token. Re-introducing a Token field here
 // would silently leak the capability through endpoints that today only

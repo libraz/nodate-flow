@@ -112,10 +112,10 @@ func countTasksInProject(ctx context.Context, t *testing.T, projectPublicID stri
 }
 
 // TestImportJobDoesNotStayPending is the regression that matters most.
-// A created job used to be inserted and then never looked at: the row
-// held pending with 0/0 counters forever, which the UI renders as an
-// import that is still working. Whatever else changes here, a job must
-// reach a terminal state.
+// A created job that is inserted and then never looked at holds pending
+// with 0/0 counters forever, which the UI renders as an import that is
+// still working. Whatever else changes here, a job must reach a
+// terminal state.
 func TestImportJobDoesNotStayPending(t *testing.T) {
 	bootstrap(t)
 	t.Parallel()

@@ -105,7 +105,7 @@ func TestWriteSpecErrorByCode_UnknownCodeFallsThrough(t *testing.T) {
 // TestRequireInstanceAdmin_EmitsRFC9457OnDeny is an integration test
 // that exercises the shared-package middleware with the same callback
 // configuration [RequireInstanceAdmin] uses, and asserts the response
-// body is RFC 9457 problem+json (the regression guard for H2).
+// body is RFC 9457 problem+json.
 //
 // The IsInstanceAdmin callback returns false so the middleware
 // short-circuits with 403 AUTH.PERMISSION.INSTANCE_ADMIN_REQUIRED;
@@ -179,11 +179,11 @@ func TestRequireInstanceAdmin_EmitsRFC9457OnMissingActor(t *testing.T) {
 	assert.Equal(t, http.StatusUnauthorized, p.Status)
 }
 
-// TestRequireWorkspaceRole_EmitsRFC9457OnDeny is the regression test
-// for the H2 audit: [RequireWorkspaceRole] previously emitted a bare
-// `{"code":"...","message":"..."}` payload via the deleted
-// [writeError] helper. After the migration to
-// [handlerutil.WriteSpecError] the body must conform to RFC 9457.
+// TestRequireWorkspaceRole_EmitsRFC9457OnDeny pins the deny body.
+// [RequireWorkspaceRole] must refuse through
+// [handlerutil.WriteSpecError], so the response conforms to RFC 9457
+// rather than the bare `{"code":"...","message":"..."}` shape an
+// ad-hoc error writer produces.
 func TestRequireWorkspaceRole_EmitsRFC9457OnDeny(t *testing.T) {
 	t.Parallel()
 

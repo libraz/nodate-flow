@@ -17,13 +17,13 @@ describe('toWeekStartDay', () => {
   it('maps every value the server can store', () => {
     expect(toWeekStartDay('mon')).toBe('monday');
     expect(toWeekStartDay('sun')).toBe('sunday');
-    // The one that was previously inexpressible.
+    // The third value, which a monday/sunday flag cannot express.
     expect(toWeekStartDay('sat')).toBe('saturday');
   });
 
   it('falls back to the picker default when the session has no preference', () => {
     // Matches DatePicker's own default, so an account without a stored
-    // value renders exactly as it did before.
+    // value renders exactly as the picker does on its own.
     expect(toWeekStartDay(undefined)).toBe('monday');
     expect(toWeekStartDay('')).toBe('monday');
   });

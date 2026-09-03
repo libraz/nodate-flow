@@ -1,5 +1,5 @@
-// Calendar write-authorization e2e suite. Two invariants that the
-// schema states but the handlers used to leave unenforced:
+// Calendar write-authorization e2e suite. Two invariants the schema
+// states and the handlers have to enforce:
 //
 //   - calendar_members.role is ordered (owner > manager > editor >
 //     viewer) and "editor writes events, viewer reads". Every handler

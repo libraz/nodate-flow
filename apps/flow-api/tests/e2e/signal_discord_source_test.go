@@ -12,9 +12,9 @@ import (
 )
 
 // TestDiscordSignalSourceRoundTrip is a regression test: every
-// enforcement layer (DB ENUM, Huma validation, OpenAPI schema) previously
-// lacked "discord", causing the presence-discord gateway's POST /signals
-// to return 422 before reaching the handler. This test drives a full
+// enforcement layer (DB ENUM, Huma validation, OpenAPI schema) has to
+// carry "discord", or the presence-discord gateway's POST /signals
+// returns 422 before reaching the handler. This test drives a full
 // round-trip through the real HTTP router against a testcontainer MySQL
 // to confirm:
 //
