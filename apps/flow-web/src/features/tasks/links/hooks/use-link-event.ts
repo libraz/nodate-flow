@@ -9,9 +9,8 @@
  */
 
 import { type UseMutationResult, useMutation, useQueryClient } from '@tanstack/react-query';
-
-import { type ApiError, toApiError } from '../../../../lib/api-error';
-import { sdk } from '../../../../lib/sdk';
+import { apiRequest } from '../../../../lib/api';
+import type { ApiError } from '../../../../lib/api-error';
 import type { LinkKind, LinkRelation, TaskEventLink } from '../types';
 import { type LinkedEventsResult, linkedEventsKeys } from './use-linked-events';
 
@@ -47,11 +46,14 @@ export function useLinkEvent(): UseMutationResult<
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({ taskId, eventId, kind }: LinkEventArgs): Promise<TaskEventLink> => {
-      const { data, error } = await sdk.POST('/tasks/{id}/links', {
-        params: { path: { id: taskId } },
-        body: { eventId, relation: kind as LinkRelation },
-      });
-      if (error || !data) throw toApiError(error, 'Failed to link event');
+      const data = await apiRequest(
+        (client) =>
+          client.POST('/tasks/{id}/links', {
+            params: { path: { id: taskId } },
+            body: { eventId, relation: kind as LinkRelation },
+          }),
+        'Failed to link event',
+      );
       return data;
     },
     onMutate: async ({ taskId, eventId, kind, preview }) => {

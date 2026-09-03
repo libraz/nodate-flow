@@ -31,7 +31,7 @@ import {
   useSuspenseQuery,
 } from '@tanstack/react-query';
 
-import { sdk } from '../../lib/sdk';
+import { apiRequest } from '../../lib/api';
 
 export type Project = components['schemas']['Project'];
 export type ProjectMember = components['schemas']['ProjectMember'];
@@ -56,48 +56,17 @@ import { ApiError } from '../../lib/api-error';
 
 export { ApiError as ProjectApiError };
 
-function extractCode(detail: string): string | undefined {
-  const m = detail.match(/^([A-Z][A-Z0-9_.]+):/);
-  return m ? m[1] : undefined;
-}
-
-function toError(err: unknown, fallback: string): ApiError {
-  if (err && typeof err === 'object') {
-    const obj = err as {
-      detail?: unknown;
-      title?: unknown;
-      type?: unknown;
-      code?: unknown;
-      message?: unknown;
-    };
-    const message =
-      (typeof obj.detail === 'string' && obj.detail) ||
-      (typeof obj.title === 'string' && obj.title) ||
-      (typeof obj.message === 'string' && obj.message) ||
-      fallback;
-    // The backend emits two error envelope shapes today. The newer
-    // handlers use RFC 7807 (`{type, title, detail, status}`) where
-    // `type` carries the error code. The ACL middleware that raises
-    // WS.PROJECT.NOT_FOUND still uses the older `{code, message}`
-    // shape. Accept both so route-level fallbacks can branch on code.
-    const code =
-      (typeof obj.code === 'string' && obj.code) ||
-      (typeof obj.type === 'string' && obj.type) ||
-      (typeof obj.detail === 'string' && extractCode(obj.detail)) ||
-      undefined;
-    return new ApiError(code, message);
-  }
-  return new ApiError(undefined, fallback);
-}
-
 export function useProjectsQuery(workspaceId: string): UseSuspenseQueryResult<Project[]> {
   return useSuspenseQuery({
     queryKey: projectsKeys.list(workspaceId),
     queryFn: async (): Promise<Project[]> => {
-      const { data, error } = await sdk.GET('/workspaces/{wsId}/projects', {
-        params: { path: { wsId: workspaceId } },
-      });
-      if (error || !data) throw toError(error, 'Failed to load projects');
+      const data = await apiRequest(
+        (client) =>
+          client.GET('/workspaces/{wsId}/projects', {
+            params: { path: { wsId: workspaceId } },
+          }),
+        'Failed to load projects',
+      );
       return data.projects ?? [];
     },
   });
@@ -108,11 +77,10 @@ export function useProjectQuery(id: string): UseSuspenseQueryResult<Project> {
     queryKey: projectsKeys.detail(id || '__empty__'),
     queryFn: async (): Promise<Project> => {
       if (!id) throw new ApiError(undefined, 'Missing project ID');
-      const { data, error } = await sdk.GET('/projects/{prjId}', {
-        params: { path: { prjId: id } },
-      });
-      if (error || !data) throw toError(error, 'Failed to load project');
-      return data;
+      return apiRequest(
+        (client) => client.GET('/projects/{prjId}', { params: { path: { prjId: id } } }),
+        'Failed to load project',
+      );
     },
     // Prevent retrying when ID is empty — the query will never succeed.
     retry: id ? 2 : false,
@@ -126,10 +94,11 @@ export function useProjectDependenciesQuery(
     queryKey: projectsKeys.dependencies(id),
     staleTime: 30_000,
     queryFn: async (): Promise<ProjectDependencyEdge[]> => {
-      const { data, error } = await sdk.GET('/projects/{prjId}/dependencies', {
-        params: { path: { prjId: id } },
-      });
-      if (error || !data) throw toError(error, 'Failed to load project dependencies');
+      const data = await apiRequest(
+        (client) =>
+          client.GET('/projects/{prjId}/dependencies', { params: { path: { prjId: id } } }),
+        'Failed to load project dependencies',
+      );
       return data.edges ?? [];
     },
   });
@@ -154,10 +123,10 @@ export function useProjectMembersQuery(id: string): UseSuspenseQueryResult<Proje
   return useSuspenseQuery({
     queryKey: projectsKeys.members(id),
     queryFn: async (): Promise<ProjectMember[]> => {
-      const { data, error } = await sdk.GET('/projects/{prjId}/members', {
-        params: { path: { prjId: id } },
-      });
-      if (error || !data) throw toError(error, 'Failed to load project members');
+      const data = await apiRequest(
+        (client) => client.GET('/projects/{prjId}/members', { params: { path: { prjId: id } } }),
+        'Failed to load project members',
+      );
       return data.members ?? [];
     },
   });
@@ -172,12 +141,14 @@ export function useCreateProject(): UseMutationResult<Project, ApiError, CreateP
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({ workspaceId, input }: CreateProjectArgs): Promise<Project> => {
-      const { data, error } = await sdk.POST('/workspaces/{wsId}/projects', {
-        params: { path: { wsId: workspaceId } },
-        body: input,
-      });
-      if (error || !data) throw toError(error, 'Failed to create project');
-      return data;
+      return apiRequest(
+        (client) =>
+          client.POST('/workspaces/{wsId}/projects', {
+            params: { path: { wsId: workspaceId } },
+            body: input,
+          }),
+        'Failed to create project',
+      );
     },
     onSuccess: (_data, vars) => {
       void qc.invalidateQueries({ queryKey: projectsKeys.list(vars.workspaceId) });
@@ -194,12 +165,11 @@ export function useUpdateProject(): UseMutationResult<Project, ApiError, UpdateP
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({ id, patch }: UpdateProjectArgs): Promise<Project> => {
-      const { data, error } = await sdk.PATCH('/projects/{prjId}', {
-        params: { path: { prjId: id } },
-        body: patch,
-      });
-      if (error || !data) throw toError(error, 'Failed to update project');
-      return data;
+      return apiRequest(
+        (client) =>
+          client.PATCH('/projects/{prjId}', { params: { path: { prjId: id } }, body: patch }),
+        'Failed to update project',
+      );
     },
     onSuccess: (_data, vars) => {
       // Scope to detail + list keys (not `projectsKeys.all`) so we do
@@ -214,10 +184,10 @@ export function useDisableProject(): UseMutationResult<void, ApiError, string> {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (id: string): Promise<void> => {
-      const { error } = await sdk.DELETE('/projects/{prjId}', {
-        params: { path: { prjId: id } },
-      });
-      if (error) throw toError(error, 'Failed to disable project');
+      await apiRequest(
+        (client) => client.DELETE('/projects/{prjId}', { params: { path: { prjId: id } } }),
+        'Failed to disable project',
+      );
     },
     onSuccess: (_data, id) => {
       // Same scope as Update — list keys catch any workspace-level
@@ -241,12 +211,14 @@ export function useAddProjectMember(): UseMutationResult<
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({ id, input }: AddProjectMemberArgs): Promise<ProjectMember> => {
-      const { data, error } = await sdk.POST('/projects/{prjId}/members', {
-        params: { path: { prjId: id } },
-        body: input,
-      });
-      if (error || !data) throw toError(error, 'Failed to add project member');
-      return data;
+      return apiRequest(
+        (client) =>
+          client.POST('/projects/{prjId}/members', {
+            params: { path: { prjId: id } },
+            body: input,
+          }),
+        'Failed to add project member',
+      );
     },
     onSuccess: (_data, vars) => {
       void qc.invalidateQueries({ queryKey: projectsKeys.members(vars.id) });
@@ -273,10 +245,13 @@ export function useRemoveProjectMember(): UseMutationResult<
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({ id, userId }: RemoveProjectMemberArgs): Promise<void> => {
-      const { error } = await sdk.DELETE('/projects/{prjId}/members/{userId}', {
-        params: { path: { prjId: id, userId } },
-      });
-      if (error) throw toError(error, 'Failed to remove project member');
+      await apiRequest(
+        (client) =>
+          client.DELETE('/projects/{prjId}/members/{userId}', {
+            params: { path: { prjId: id, userId } },
+          }),
+        'Failed to remove project member',
+      );
     },
     onSuccess: (_data, vars) => {
       void qc.invalidateQueries({ queryKey: projectsKeys.members(vars.id) });

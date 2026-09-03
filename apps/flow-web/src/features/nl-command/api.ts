@@ -8,9 +8,8 @@
 
 import type { components } from '@nodate-flow/sdk';
 import { type UseMutationResult, useMutation } from '@tanstack/react-query';
-
-import { ApiError, toApiError } from '../../lib/api-error';
-import { sdk } from '../../lib/sdk';
+import { apiRequest } from '../../lib/api';
+import { ApiError } from '../../lib/api-error';
 
 /** Result returned by POST /workspaces/{wsId}/ai/resolve-command. */
 export type ResolveCommandResult = components['schemas']['ResolveCommandOutputBody'];
@@ -22,14 +21,14 @@ export function useResolveCommand(
   return useMutation<ResolveCommandResult, ApiError, string>({
     mutationFn: async (prompt: string): Promise<ResolveCommandResult> => {
       if (!wsId) throw new ApiError(undefined, 'No workspace selected');
-      const { data, error } = await sdk.POST('/workspaces/{wsId}/ai/resolve-command', {
-        params: { path: { wsId } },
-        body: { prompt },
-      });
-      if (error || !data) {
-        throw toApiError(error, 'Failed to resolve command');
-      }
-      return data;
+      return apiRequest(
+        (client) =>
+          client.POST('/workspaces/{wsId}/ai/resolve-command', {
+            params: { path: { wsId } },
+            body: { prompt },
+          }),
+        'Failed to resolve command',
+      );
     },
   });
 }

@@ -17,9 +17,8 @@ import {
   useQueryClient,
   useSuspenseQuery,
 } from '@tanstack/react-query';
-
-import { ApiError, toApiError } from '../../lib/api-error';
-import { sdk } from '../../lib/sdk';
+import { apiRequest } from '../../lib/api';
+import { ApiError } from '../../lib/api-error';
 
 export type PublicShare = components['schemas']['PublicShareResponse'];
 export type PublicShareWithToken =
@@ -47,10 +46,13 @@ export function usePublicSharesQuery(workspaceId: string): UseSuspenseQueryResul
   return useSuspenseQuery({
     queryKey: publicSharesKeys.list(workspaceId),
     queryFn: async (): Promise<PublicShare[]> => {
-      const { data, error } = await sdk.GET('/workspaces/{wsId}/public-shares', {
-        params: { path: { wsId: workspaceId } },
-      });
-      if (error || !data) throw toApiError(error, 'Failed to load public share pages');
+      const data = await apiRequest(
+        (client) =>
+          client.GET('/workspaces/{wsId}/public-shares', {
+            params: { path: { wsId: workspaceId } },
+          }),
+        'Failed to load public share pages',
+      );
       return data.shares ?? [];
     },
   });
@@ -67,11 +69,14 @@ export function useCreatePublicShare(
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (input: CreatePublicShareInput): Promise<PublicShareWithToken> => {
-      const { data, error } = await sdk.POST('/workspaces/{wsId}/public-shares', {
-        params: { path: { wsId: workspaceId } },
-        body: input,
-      });
-      if (error || !data) throw toApiError(error, 'Failed to create public share page');
+      const data = await apiRequest(
+        (client) =>
+          client.POST('/workspaces/{wsId}/public-shares', {
+            params: { path: { wsId: workspaceId } },
+            body: input,
+          }),
+        'Failed to create public share page',
+      );
       return data;
     },
     onSuccess: () => {
@@ -87,10 +92,13 @@ export function useDeletePublicShare(
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (shareId: string): Promise<void> => {
-      const { error } = await sdk.DELETE('/workspaces/{wsId}/public-shares/{shareId}', {
-        params: { path: { wsId: workspaceId, shareId } },
-      });
-      if (error) throw toApiError(error, 'Failed to delete public share page');
+      await apiRequest(
+        (client) =>
+          client.DELETE('/workspaces/{wsId}/public-shares/{shareId}', {
+            params: { path: { wsId: workspaceId, shareId } },
+          }),
+        'Failed to delete public share page',
+      );
     },
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: publicSharesKeys.list(workspaceId) });
@@ -108,10 +116,13 @@ export function useRotatePublicShareToken(
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (shareId: string): Promise<PublicShareWithToken> => {
-      const { data, error } = await sdk.POST('/workspaces/{wsId}/public-shares/{shareId}/rotate', {
-        params: { path: { wsId: workspaceId, shareId } },
-      });
-      if (error || !data) throw toApiError(error, 'Failed to rotate share token');
+      const data = await apiRequest(
+        (client) =>
+          client.POST('/workspaces/{wsId}/public-shares/{shareId}/rotate', {
+            params: { path: { wsId: workspaceId, shareId } },
+          }),
+        'Failed to rotate share token',
+      );
       return data;
     },
     onSuccess: () => {
@@ -128,10 +139,13 @@ export function usePublicShareDetailQuery(
   return useSuspenseQuery({
     queryKey: publicSharesKeys.detail(workspaceId, shareId),
     queryFn: async (): Promise<ShareDetail> => {
-      const { data, error } = await sdk.GET('/workspaces/{wsId}/public-shares/{shareId}', {
-        params: { path: { wsId: workspaceId, shareId } },
-      });
-      if (error || !data) throw toApiError(error, 'Failed to load public share page');
+      const data = await apiRequest(
+        (client) =>
+          client.GET('/workspaces/{wsId}/public-shares/{shareId}', {
+            params: { path: { wsId: workspaceId, shareId } },
+          }),
+        'Failed to load public share page',
+      );
       return data;
     },
   });
@@ -152,13 +166,16 @@ export function useWorkspaceCalendarEventsQuery(
   return useSuspenseQuery({
     queryKey: publicSharesKeys.candidates(workspaceId, startIso, endIso),
     queryFn: async (): Promise<CrossCalendarEvent[]> => {
-      const { data, error } = await sdk.GET('/workspaces/{wsId}/calendar-events', {
-        params: {
-          path: { wsId: workspaceId },
-          query: { start: startIso, end: endIso },
-        },
-      });
-      if (error || !data) throw toApiError(error, 'Failed to load workspace events');
+      const data = await apiRequest(
+        (client) =>
+          client.GET('/workspaces/{wsId}/calendar-events', {
+            params: {
+              path: { wsId: workspaceId },
+              query: { start: startIso, end: endIso },
+            },
+          }),
+        'Failed to load workspace events',
+      );
       return data.events ?? [];
     },
   });
@@ -178,11 +195,14 @@ export function useAttachEventsToShare(
     mutationFn: async (
       eventIds: string[],
     ): Promise<components['schemas']['AttachEventsToShareOutputBody']> => {
-      const { data, error } = await sdk.POST('/workspaces/{wsId}/public-shares/{shareId}/events', {
-        params: { path: { wsId: workspaceId, shareId } },
-        body: { eventIds },
-      });
-      if (error || !data) throw toApiError(error, 'Failed to attach events');
+      const data = await apiRequest(
+        (client) =>
+          client.POST('/workspaces/{wsId}/public-shares/{shareId}/events', {
+            params: { path: { wsId: workspaceId, shareId } },
+            body: { eventIds },
+          }),
+        'Failed to attach events',
+      );
       return data;
     },
     onSuccess: () => {
@@ -207,14 +227,14 @@ export function useReorderShareEvents(
     mutationFn: async (
       linkPublicIds: string[],
     ): Promise<components['schemas']['ReorderShareEventsOutputBody']> => {
-      const { data, error } = await sdk.PATCH(
-        '/workspaces/{wsId}/public-shares/{shareId}/events/reorder',
-        {
-          params: { path: { wsId: workspaceId, shareId } },
-          body: { linkPublicIds },
-        },
+      const data = await apiRequest(
+        (client) =>
+          client.PATCH('/workspaces/{wsId}/public-shares/{shareId}/events/reorder', {
+            params: { path: { wsId: workspaceId, shareId } },
+            body: { linkPublicIds },
+          }),
+        'Failed to reorder events',
       );
-      if (error || !data) throw toApiError(error, 'Failed to reorder events');
       return data;
     },
     onSuccess: () => {
@@ -235,13 +255,13 @@ export function useDetachEventFromShare(
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (eventId: string): Promise<void> => {
-      const { error } = await sdk.DELETE(
-        '/workspaces/{wsId}/public-shares/{shareId}/events/{evtId}',
-        {
-          params: { path: { wsId: workspaceId, shareId, evtId: eventId } },
-        },
+      await apiRequest(
+        (client) =>
+          client.DELETE('/workspaces/{wsId}/public-shares/{shareId}/events/{evtId}', {
+            params: { path: { wsId: workspaceId, shareId, evtId: eventId } },
+          }),
+        'Failed to detach event',
       );
-      if (error) throw toApiError(error, 'Failed to detach event');
     },
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: publicSharesKeys.detail(workspaceId, shareId) });

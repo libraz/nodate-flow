@@ -1,8 +1,7 @@
 /**
  * Retro drafts queue — typed query + Accept / Discard mutations.
  *
- * Backend contract (Phase 6 / L2 of
- * docs/plan/release-8-signals-and-judge-loop.md):
+ * Backend contract:
  *
  *   GET /workspaces/{wsId}/tasks/drafts?reason=retro&offset=0&limit=20
  *
@@ -34,9 +33,8 @@ import {
   useQueryClient,
   useSuspenseQuery,
 } from '@tanstack/react-query';
-
-import { type ApiError, toApiError } from '../../../lib/api-error';
-import { sdk } from '../../../lib/sdk';
+import { apiRequest } from '../../../lib/api';
+import type { ApiError } from '../../../lib/api-error';
 
 /** A single retrospective draft as returned by the API. */
 export interface RetroDraft {
@@ -88,13 +86,16 @@ export function useRetroDraftsQuery(
   return useSuspenseQuery({
     queryKey: retroDraftsKeys.list(workspaceId, offset, limit),
     queryFn: async (): Promise<RetroDraftsPage> => {
-      const { data, error } = await sdk.GET('/workspaces/{wsId}/tasks/drafts', {
-        params: {
-          path: { wsId: workspaceId },
-          query: { reason: 'retro', offset, limit },
-        },
-      });
-      if (error || !data) throw toApiError(error, 'Failed to load retrospective drafts');
+      const data = await apiRequest(
+        (client) =>
+          client.GET('/workspaces/{wsId}/tasks/drafts', {
+            params: {
+              path: { wsId: workspaceId },
+              query: { reason: 'retro', offset, limit },
+            },
+          }),
+        'Failed to load retrospective drafts',
+      );
       // The SDK types the array as nullable because Huma can omit empty
       // slices; normalise to an empty array so the UI never branches on null.
       const drafts: RetroDraft[] = (data.drafts ?? []).map((d) => ({
@@ -177,8 +178,8 @@ export interface AcceptRetroDraftArgs {
  * edge so the task is no longer surfaced as a draft.
  *
  * The mutation chains two SDK calls in series because the dependency
- * id is not embedded in the drafts response (the L2 brief defers
- * enrichment fields to a follow-up phase). On the rare case where the
+ * id is not embedded in the drafts response (enrichment fields are
+ * deferred to a follow-up). On the rare case where the
  * edge is absent (e.g. another tab already accepted it) the second
  * call is skipped and the mutation succeeds silently — the row was
  * already off the queue.
@@ -192,22 +193,22 @@ export function useAcceptRetroDraft(): UseMutationResult<
   const qc = useQueryClient();
   return useMutation<void, ApiError, AcceptRetroDraftArgs, MutationContext>({
     mutationFn: async ({ taskPublicId }: AcceptRetroDraftArgs): Promise<void> => {
-      const { data, error } = await sdk.GET('/tasks/{id}/dependencies', {
-        params: { path: { id: taskPublicId } },
-      });
-      if (error || !data) {
-        throw toApiError(error, 'Failed to accept retrospective draft');
-      }
+      const data = await apiRequest(
+        (client) =>
+          client.GET('/tasks/{id}/dependencies', { params: { path: { id: taskPublicId } } }),
+        'Failed to accept retrospective draft',
+      );
       const outgoing = data.outgoing ?? [];
       const retroEdge = outgoing.find((edge) => edge.kind === 'retro_of');
       // No edge → another client already accepted it; treat as success.
       if (!retroEdge) return;
-      const { error: deleteError } = await sdk.DELETE('/tasks/{id}/dependencies/{depId}', {
-        params: { path: { id: taskPublicId, depId: retroEdge.id } },
-      });
-      if (deleteError) {
-        throw toApiError(deleteError, 'Failed to accept retrospective draft');
-      }
+      await apiRequest(
+        (client) =>
+          client.DELETE('/tasks/{id}/dependencies/{depId}', {
+            params: { path: { id: taskPublicId, depId: retroEdge.id } },
+          }),
+        'Failed to accept retrospective draft',
+      );
     },
     onMutate: async ({ workspaceId, taskPublicId }): Promise<MutationContext> => {
       await qc.cancelQueries({ queryKey: retroDraftsKeys.listPrefix(workspaceId) });
@@ -243,10 +244,13 @@ export function useDiscardRetroDraft(): UseMutationResult<
   const qc = useQueryClient();
   return useMutation<void, ApiError, DiscardRetroDraftArgs, MutationContext>({
     mutationFn: async ({ taskPublicId }: DiscardRetroDraftArgs): Promise<void> => {
-      const { error } = await sdk.POST('/tasks/{id}/archive', {
-        params: { path: { id: taskPublicId } },
-      });
-      if (error) throw toApiError(error, 'Failed to discard retrospective draft');
+      await apiRequest(
+        (client) =>
+          client.POST('/tasks/{id}/archive', {
+            params: { path: { id: taskPublicId } },
+          }),
+        'Failed to discard retrospective draft',
+      );
     },
     onMutate: async ({ workspaceId, taskPublicId }): Promise<MutationContext> => {
       await qc.cancelQueries({ queryKey: retroDraftsKeys.listPrefix(workspaceId) });

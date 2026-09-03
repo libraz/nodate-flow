@@ -10,6 +10,7 @@
  */
 
 import type { components } from '@nodate-flow/sdk';
+import type { Zone } from '@nodate-flow/ui/time';
 
 import { dateKey, eventStartOfDay } from '../../../lib/date-utils';
 
@@ -35,7 +36,7 @@ export const MAX_EVENT_SPAN_DAYS = 42;
  * has to name the same square for every viewer, while a timed one falls
  * on whichever day the reader's own zone puts it.
  */
-export function eventDayKeys(event: CalendarEvent, zone?: string): string[] {
+export function eventDayKeys(event: CalendarEvent, zone: Zone): string[] {
   if (typeof event.startAt !== 'number') return [];
   const allDay = event.allDay === true;
   const start = eventStartOfDay(event.startAt, allDay, zone);

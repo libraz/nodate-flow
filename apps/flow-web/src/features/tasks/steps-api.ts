@@ -4,9 +4,8 @@
  */
 
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-
+import { apiRequest } from '../../lib/api';
 import { ApiError } from '../../lib/api-error';
-import { sdk } from '../../lib/sdk';
 import { type TaskPriority, tasksKeys } from './api';
 
 export { ApiError as TaskApiError };
@@ -76,14 +75,14 @@ function generateUiId(): string {
 export function useProposeSteps() {
   return useMutation<ProposeStepsResult, ApiError, ProposeStepsInput>({
     mutationFn: async ({ taskId, granularity }) => {
-      const { data, error } = await sdk.POST('/tasks/{id}/propose-steps', {
-        params: { path: { id: taskId } },
-        body: { granularity: granularity ?? 'standard' },
-      });
-      if (error || !data) {
-        const err = error as { detail?: string; title?: string; type?: string } | undefined;
-        throw new ApiError(err?.type, err?.detail ?? err?.title ?? 'Failed to propose steps');
-      }
+      const data = await apiRequest(
+        (client) =>
+          client.POST('/tasks/{id}/propose-steps', {
+            params: { path: { id: taskId } },
+            body: { granularity: granularity ?? 'standard' },
+          }),
+        'Failed to propose steps',
+      );
       const raw = data as { parentTaskId: string; steps: StepProposal[] };
       return {
         parentTaskId: raw.parentTaskId,
@@ -111,14 +110,14 @@ export function useApplySteps() {
   const qc = useQueryClient();
   return useMutation<ApplyStepsResult, ApiError, ApplyStepsArgs>({
     mutationFn: async (args) => {
-      const { data, error } = await sdk.POST('/tasks/{id}/apply-steps', {
-        params: { path: { id: args.taskId } },
-        body: { steps: args.steps },
-      });
-      if (error || !data) {
-        const err = error as { detail?: string; title?: string; type?: string } | undefined;
-        throw new ApiError(err?.type, err?.detail ?? err?.title ?? 'Failed to apply steps');
-      }
+      const data = await apiRequest(
+        (client) =>
+          client.POST('/tasks/{id}/apply-steps', {
+            params: { path: { id: args.taskId } },
+            body: { steps: args.steps },
+          }),
+        'Failed to apply steps',
+      );
       return data as ApplyStepsResult;
     },
     onSuccess: (_data, vars) => {

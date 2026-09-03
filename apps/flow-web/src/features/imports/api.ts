@@ -8,9 +8,8 @@ import {
   useQueryClient,
   useSuspenseQuery,
 } from '@tanstack/react-query';
-
-import { type ApiError, toApiError } from '../../lib/api-error';
-import { sdk } from '../../lib/sdk';
+import { apiRequest } from '../../lib/api';
+import type { ApiError } from '../../lib/api-error';
 
 export interface ImportJob {
   id: string;
@@ -36,10 +35,13 @@ export function useImportsQuery(workspaceId: string): UseSuspenseQueryResult<Imp
   return useSuspenseQuery({
     queryKey: importsKeys.list(workspaceId),
     queryFn: async (): Promise<ImportJob[]> => {
-      const { data, error } = await sdk.GET('/workspaces/{wsId}/imports', {
-        params: { path: { wsId: workspaceId }, query: { limit: 100, offset: 0 } },
-      });
-      if (error || !data) throw toApiError(error, 'Failed to load import jobs');
+      const data = await apiRequest(
+        (client) =>
+          client.GET('/workspaces/{wsId}/imports', {
+            params: { path: { wsId: workspaceId }, query: { limit: 100, offset: 0 } },
+          }),
+        'Failed to load import jobs',
+      );
       return (data.items ?? []) as ImportJob[];
     },
   });
@@ -63,15 +65,18 @@ export function useCreateImport(): UseMutationResult<ImportJob, ApiError, Create
       projectId,
       configJson,
     }: CreateImportArgs): Promise<ImportJob> => {
-      const { data, error } = await sdk.POST('/workspaces/{wsId}/imports', {
-        params: { path: { wsId: workspaceId } },
-        body: {
-          source,
-          ...(projectId != null ? { projectId } : {}),
-          ...(configJson != null ? { configJson } : {}),
-        },
-      });
-      if (error || !data) throw toApiError(error, 'Failed to create import job');
+      const data = await apiRequest(
+        (client) =>
+          client.POST('/workspaces/{wsId}/imports', {
+            params: { path: { wsId: workspaceId } },
+            body: {
+              source,
+              ...(projectId != null ? { projectId } : {}),
+              ...(configJson != null ? { configJson } : {}),
+            },
+          }),
+        'Failed to create import job',
+      );
       return data as ImportJob;
     },
     onSuccess: (_data, vars) => {
@@ -89,10 +94,13 @@ export function useCancelImport(): UseMutationResult<void, ApiError, CancelImpor
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({ workspaceId, importId }: CancelImportArgs): Promise<void> => {
-      const { error } = await sdk.POST('/workspaces/{wsId}/imports/{importId}/cancel', {
-        params: { path: { wsId: workspaceId, importId } },
-      });
-      if (error) throw toApiError(error, 'Failed to cancel import job');
+      await apiRequest(
+        (client) =>
+          client.POST('/workspaces/{wsId}/imports/{importId}/cancel', {
+            params: { path: { wsId: workspaceId, importId } },
+          }),
+        'Failed to cancel import job',
+      );
     },
     onSuccess: (_data, vars) => {
       void qc.invalidateQueries({ queryKey: importsKeys.list(vars.workspaceId) });

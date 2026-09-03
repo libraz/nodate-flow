@@ -21,8 +21,23 @@ vi.mock('../../../lib/sdk', () => ({
         projectId: 'proj-1',
       } as unknown,
       error: undefined,
+      response: new Response(null, { status: 200 }),
     })),
   },
+
+  authSdk: {
+    POST: vi.fn(async () => ({
+      // Minimal payload — the create hook only reads it to resolve the mutation,
+      // not to populate downstream caches, so a structural cast is safe here.
+      data: {
+        id: 'task-public-id',
+        projectId: 'proj-1',
+      } as unknown,
+      error: undefined,
+      response: new Response(null, { status: 200 }),
+    })),
+  },
+  response: new Response(null, { status: 200 }),
 }));
 
 function makeWrapper(qc: QueryClient): (props: { children: ReactNode }) => ReactElement {

@@ -25,6 +25,7 @@ const mocks = vi.hoisted(() => ({
 vi.mock('../../../lib/sdk', () => ({
   // openapi-fetch keys its client by HTTP method, hence the caps.
   sdk: { GET: mocks.get, POST: mocks.post, DELETE: mocks.del },
+  authSdk: { GET: mocks.get, POST: mocks.post, DELETE: mocks.del },
 }));
 
 vi.mock('@nodate-flow/ui/primitives/toast', () => ({
@@ -51,12 +52,24 @@ const AGENTS = [
 function serveAssigned(assigned: Array<{ id: string; agentId: string; agentName: string }>): void {
   mocks.get.mockImplementation(async (path: string): Promise<unknown> => {
     if (path === '/tasks/{id}/agents') {
-      return { data: { agents: assigned, total: assigned.length }, error: null };
+      return {
+        data: { agents: assigned, total: assigned.length },
+        error: null,
+        response: new Response(null, { status: 200 }),
+      };
     }
     if (path === '/workspaces/{wsId}/ai/agents') {
-      return { data: { agents: AGENTS, total: AGENTS.length }, error: null };
+      return {
+        data: { agents: AGENTS, total: AGENTS.length },
+        error: null,
+        response: new Response(null, { status: 200 }),
+      };
     }
-    return { data: null, error: { type: 'INTERNAL.UNEXPECTED', detail: `unmocked ${path}` } };
+    return {
+      data: null,
+      error: { type: 'INTERNAL.UNEXPECTED', detail: `unmocked ${path}` },
+      response: new Response(null, { status: 400 }),
+    };
   });
 }
 
@@ -105,8 +118,11 @@ beforeEach(() => {
   mocks.post.mockReset().mockResolvedValue({
     data: { id: 'actor-9', agentId: 'agent-1', agentName: 'Planner', role: 'assignee' },
     error: null,
+    response: new Response(null, { status: 200 }),
   });
-  mocks.del.mockReset().mockResolvedValue({ error: null });
+  mocks.del
+    .mockReset()
+    .mockResolvedValue({ error: null, response: new Response(null, { status: 200 }) });
   mocks.toastShow.mockReset();
 });
 
@@ -180,6 +196,7 @@ describe('AgentAssignSection', () => {
     mocks.post.mockResolvedValue({
       data: null,
       error: { type: 'AI.AGENT.NOT_FOUND', detail: 'agent not found', status: 404 },
+      response: new Response(null, { status: 400 }),
     });
     renderSection();
 

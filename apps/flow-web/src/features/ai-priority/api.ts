@@ -11,9 +11,8 @@
 
 import type { components } from '@nodate-flow/sdk';
 import { type UseSuspenseQueryResult, useSuspenseQuery } from '@tanstack/react-query';
-
-import { type ApiError, toApiError } from '../../lib/api-error';
-import { sdk } from '../../lib/sdk';
+import { apiRequest } from '../../lib/api';
+import type { ApiError } from '../../lib/api-error';
 
 /** Single priority adjustment proposal. Mirrors the SDK schema. */
 export type PrioritySuggestion = components['schemas']['TaskPrioritySuggestion'];
@@ -43,10 +42,13 @@ export function useAiPrioritySuggestionsQuery(
   return useSuspenseQuery<PrioritySuggestionsResult, ApiError>({
     queryKey: aiPriorityKeys.list(workspaceId),
     queryFn: async (): Promise<PrioritySuggestionsResult> => {
-      const { data, error } = await sdk.GET('/workspaces/{wsId}/ai/priority-suggestions', {
-        params: { path: { wsId: workspaceId } },
-      });
-      if (error || !data) throw toApiError(error, 'Failed to load priority suggestions');
+      const data = await apiRequest(
+        (client) =>
+          client.GET('/workspaces/{wsId}/ai/priority-suggestions', {
+            params: { path: { wsId: workspaceId } },
+          }),
+        'Failed to load priority suggestions',
+      );
       return {
         total: data.total,
         suggestions: data.suggestions ?? [],

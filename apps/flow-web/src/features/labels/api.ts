@@ -9,9 +9,8 @@ import {
   useQueryClient,
   useSuspenseQuery,
 } from '@tanstack/react-query';
-
-import { type ApiError, toApiError } from '../../lib/api-error';
-import { sdk } from '../../lib/sdk';
+import { apiRequest } from '../../lib/api';
+import type { ApiError } from '../../lib/api-error';
 
 export interface Label {
   id: string;
@@ -33,10 +32,13 @@ export function useLabelsQuery(workspaceId: string): UseSuspenseQueryResult<Labe
   return useSuspenseQuery({
     queryKey: labelsKeys.list(workspaceId),
     queryFn: async (): Promise<Label[]> => {
-      const { data, error } = await sdk.GET('/workspaces/{wsId}/labels', {
-        params: { path: { wsId: workspaceId } },
-      });
-      if (error || !data) throw toApiError(error, 'Failed to load labels');
+      const data = await apiRequest(
+        (client) =>
+          client.GET('/workspaces/{wsId}/labels', {
+            params: { path: { wsId: workspaceId } },
+          }),
+        'Failed to load labels',
+      );
       return (data.labels ?? []) as Label[];
     },
   });
@@ -46,10 +48,13 @@ export function useTaskLabelsQuery(taskId: string): UseSuspenseQueryResult<Label
   return useSuspenseQuery({
     queryKey: labelsKeys.forTask(taskId),
     queryFn: async (): Promise<Label[]> => {
-      const { data, error } = await sdk.GET('/tasks/{id}/labels', {
-        params: { path: { id: taskId } },
-      });
-      if (error || !data) throw toApiError(error, 'Failed to load task labels');
+      const data = await apiRequest(
+        (client) =>
+          client.GET('/tasks/{id}/labels', {
+            params: { path: { id: taskId } },
+          }),
+        'Failed to load task labels',
+      );
       return (data.labels ?? []) as Label[];
     },
   });
@@ -64,11 +69,14 @@ export function useCreateLabel(): UseMutationResult<Label, ApiError, CreateLabel
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({ workspaceId, input }: CreateLabelArgs): Promise<Label> => {
-      const { data, error } = await sdk.POST('/workspaces/{wsId}/labels', {
-        params: { path: { wsId: workspaceId } },
-        body: input,
-      });
-      if (error || !data) throw toApiError(error, 'Failed to create label');
+      const data = await apiRequest(
+        (client) =>
+          client.POST('/workspaces/{wsId}/labels', {
+            params: { path: { wsId: workspaceId } },
+            body: input,
+          }),
+        'Failed to create label',
+      );
       return data as Label;
     },
     onSuccess: (_data, vars) => {
@@ -87,11 +95,14 @@ export function useUpdateLabel(): UseMutationResult<Label, ApiError, UpdateLabel
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({ labelId, workspaceId, patch }: UpdateLabelArgs): Promise<Label> => {
-      const { data, error } = await sdk.PATCH('/workspaces/{wsId}/labels/{id}', {
-        params: { path: { wsId: workspaceId, id: labelId } },
-        body: patch,
-      });
-      if (error || !data) throw toApiError(error, 'Failed to update label');
+      const data = await apiRequest(
+        (client) =>
+          client.PATCH('/workspaces/{wsId}/labels/{id}', {
+            params: { path: { wsId: workspaceId, id: labelId } },
+            body: patch,
+          }),
+        'Failed to update label',
+      );
       return data as Label;
     },
     onSuccess: (_data, vars) => {
@@ -109,10 +120,13 @@ export function useDeleteLabel(): UseMutationResult<void, ApiError, DeleteLabelA
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({ labelId, workspaceId }: DeleteLabelArgs): Promise<void> => {
-      const { error } = await sdk.DELETE('/workspaces/{wsId}/labels/{id}', {
-        params: { path: { wsId: workspaceId, id: labelId } },
-      });
-      if (error) throw toApiError(error, 'Failed to delete label');
+      await apiRequest(
+        (client) =>
+          client.DELETE('/workspaces/{wsId}/labels/{id}', {
+            params: { path: { wsId: workspaceId, id: labelId } },
+          }),
+        'Failed to delete label',
+      );
     },
     onSuccess: (_data, vars) => {
       void qc.invalidateQueries({ queryKey: labelsKeys.list(vars.workspaceId) });
@@ -129,11 +143,14 @@ export function useAddTaskLabel(): UseMutationResult<void, ApiError, AddTaskLabe
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({ taskId, labelId }: AddTaskLabelArgs): Promise<void> => {
-      const { error } = await sdk.POST('/tasks/{id}/labels', {
-        params: { path: { id: taskId } },
-        body: { labelId },
-      });
-      if (error) throw toApiError(error, 'Failed to add label to task');
+      await apiRequest(
+        (client) =>
+          client.POST('/tasks/{id}/labels', {
+            params: { path: { id: taskId } },
+            body: { labelId },
+          }),
+        'Failed to add label to task',
+      );
     },
     onSuccess: (_data, vars) => {
       void qc.invalidateQueries({ queryKey: labelsKeys.forTask(vars.taskId) });
@@ -152,10 +169,13 @@ export function useRemoveTaskLabel(): UseMutationResult<void, ApiError, RemoveTa
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({ taskId, labelId }: RemoveTaskLabelArgs): Promise<void> => {
-      const { error } = await sdk.DELETE('/tasks/{id}/labels/{labelId}', {
-        params: { path: { id: taskId, labelId } },
-      });
-      if (error) throw toApiError(error, 'Failed to remove label from task');
+      await apiRequest(
+        (client) =>
+          client.DELETE('/tasks/{id}/labels/{labelId}', {
+            params: { path: { id: taskId, labelId } },
+          }),
+        'Failed to remove label from task',
+      );
     },
     onSuccess: (_data, vars) => {
       void qc.invalidateQueries({ queryKey: labelsKeys.forTask(vars.taskId) });

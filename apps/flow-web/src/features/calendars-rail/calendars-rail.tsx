@@ -35,7 +35,7 @@ import { ChevronLeft, Eye, EyeOff, MoreVertical } from 'lucide-react';
 import { type ReactElement, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { sdk } from '../../lib/sdk';
+import { apiRequest } from '../../lib/api';
 import CalendarMemosPanel from '../calendar-memos/calendar-memos-panel';
 import CalendarSettingsDrawer from '../calendars/calendar-settings-drawer';
 import { type RailCalendar, usePatchOwnSubscriptionMutation, useUnsubscribeMutation } from './api';
@@ -75,11 +75,16 @@ export default function CalendarsRail({
       queryKey: ['calendar-events', 'calendars', w.id] as const,
       staleTime: 60_000,
       queryFn: async (): Promise<RailCalendar[]> => {
-        const { data, error } = await sdk.GET('/workspaces/{wsId}/calendars', {
-          params: { path: { wsId: w.id } },
-        });
-        if (error || !data) return [];
-        return data.calendars ?? [];
+        // The rail fans out one query per workspace; a workspace the
+        // caller cannot read contributes no section rather than
+        // collapsing the whole rail.
+        const data = await apiRequest(
+          (client) =>
+            client.GET('/workspaces/{wsId}/calendars', { params: { path: { wsId: w.id } } }),
+          'Failed to load calendars',
+          { onError: 'empty', empty: null },
+        );
+        return data?.calendars ?? [];
       },
     })),
   });

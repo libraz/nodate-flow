@@ -4,9 +4,8 @@
  */
 
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-
+import { apiRequest } from '../../lib/api';
 import { ApiError } from '../../lib/api-error';
-import { sdk } from '../../lib/sdk';
 import { tasksKeys } from './api';
 
 export { ApiError as TaskApiError };
@@ -46,21 +45,18 @@ export interface ProposeSmartArgs {
 export function useProposeSmartTask() {
   return useMutation<SmartProposal, ApiError, ProposeSmartArgs>({
     mutationFn: async (args) => {
-      const { data, error } = await sdk.POST('/workspaces/{wsId}/tasks/propose-smart', {
-        params: { path: { wsId: args.workspaceId } },
-        body: {
-          projectId: args.projectId,
-          title: args.title,
-          description: args.description,
-        },
-      });
-      if (error || !data) {
-        const err = error as { detail?: string; title?: string; type?: string } | undefined;
-        throw new ApiError(
-          err?.type,
-          err?.detail ?? err?.title ?? 'Failed to get smart suggestions',
-        );
-      }
+      const data = await apiRequest(
+        (client) =>
+          client.POST('/workspaces/{wsId}/tasks/propose-smart', {
+            params: { path: { wsId: args.workspaceId } },
+            body: {
+              projectId: args.projectId,
+              title: args.title,
+              description: args.description,
+            },
+          }),
+        'Failed to get smart suggestions',
+      );
       return data as SmartProposal;
     },
   });
@@ -98,21 +94,21 @@ export function useApplySmartTask() {
   const qc = useQueryClient();
   return useMutation<ApplySmartResult, ApiError, ApplySmartArgs>({
     mutationFn: async (args) => {
-      const { data, error } = await sdk.POST('/workspaces/{wsId}/tasks/apply-smart', {
-        params: { path: { wsId: args.workspaceId } },
-        body: {
-          projectId: args.projectId,
-          title: args.title,
-          description: args.description,
-          priority: args.priority,
-          assigneeUserIds: args.assigneeUserIds,
-          subtasks: args.subtasks,
-        },
-      });
-      if (error || !data) {
-        const err = error as { detail?: string; title?: string; type?: string } | undefined;
-        throw new ApiError(err?.type, err?.detail ?? err?.title ?? 'Failed to apply smart create');
-      }
+      const data = await apiRequest(
+        (client) =>
+          client.POST('/workspaces/{wsId}/tasks/apply-smart', {
+            params: { path: { wsId: args.workspaceId } },
+            body: {
+              projectId: args.projectId,
+              title: args.title,
+              description: args.description,
+              priority: args.priority,
+              assigneeUserIds: args.assigneeUserIds,
+              subtasks: args.subtasks,
+            },
+          }),
+        'Failed to apply smart create',
+      );
       return data as ApplySmartResult;
     },
     onSuccess: () => {

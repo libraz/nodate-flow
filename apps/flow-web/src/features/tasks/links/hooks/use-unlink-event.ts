@@ -8,9 +8,8 @@
  */
 
 import { type UseMutationResult, useMutation, useQueryClient } from '@tanstack/react-query';
-
-import { type ApiError, toApiError } from '../../../../lib/api-error';
-import { sdk } from '../../../../lib/sdk';
+import { apiRequest } from '../../../../lib/api';
+import type { ApiError } from '../../../../lib/api-error';
 import { type LinkedEventsResult, linkedEventsKeys } from './use-linked-events';
 
 export interface UnlinkEventArgs {
@@ -27,10 +26,13 @@ export function useUnlinkEvent(): UseMutationResult<
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({ taskId, linkId }: UnlinkEventArgs): Promise<void> => {
-      const { error } = await sdk.DELETE('/tasks/{id}/links/{linkId}', {
-        params: { path: { id: taskId, linkId } },
-      });
-      if (error) throw toApiError(error, 'Failed to unlink event');
+      await apiRequest(
+        (client) =>
+          client.DELETE('/tasks/{id}/links/{linkId}', {
+            params: { path: { id: taskId, linkId } },
+          }),
+        'Failed to unlink event',
+      );
     },
     onMutate: async ({ taskId, linkId }) => {
       const key = linkedEventsKeys.list(taskId);

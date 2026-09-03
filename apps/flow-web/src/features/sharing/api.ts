@@ -18,9 +18,8 @@ import {
   useQuery,
   useQueryClient,
 } from '@tanstack/react-query';
-
-import { ApiError, toApiError } from '../../lib/api-error';
-import { sdk } from '../../lib/sdk';
+import { apiRequest } from '../../lib/api';
+import { ApiError } from '../../lib/api-error';
 
 /**
  * Public lens data returned by GET /public/lenses/{token}.
@@ -60,10 +59,13 @@ export function usePublishLens(
   const qc = useQueryClient();
   return useMutation<PublishResult, ApiError, LensMutationArgs>({
     mutationFn: async ({ lensId }): Promise<PublishResult> => {
-      const { data, error } = await sdk.POST('/workspaces/{wsId}/lenses/{lensId}/publish', {
-        params: { path: { wsId, lensId } },
-      });
-      if (error || !data) throw toApiError(error, 'Failed to publish lens');
+      const data = await apiRequest(
+        (client) =>
+          client.POST('/workspaces/{wsId}/lenses/{lensId}/publish', {
+            params: { path: { wsId, lensId } },
+          }),
+        'Failed to publish lens',
+      );
       return data;
     },
     onSettled: () => {
@@ -81,10 +83,13 @@ export function useUnpublishLens(
   const qc = useQueryClient();
   return useMutation<void, ApiError, LensMutationArgs>({
     mutationFn: async ({ lensId }): Promise<void> => {
-      const { error } = await sdk.POST('/workspaces/{wsId}/lenses/{lensId}/unpublish', {
-        params: { path: { wsId, lensId } },
-      });
-      if (error) throw toApiError(error, 'Failed to unpublish lens');
+      await apiRequest(
+        (client) =>
+          client.POST('/workspaces/{wsId}/lenses/{lensId}/unpublish', {
+            params: { path: { wsId, lensId } },
+          }),
+        'Failed to unpublish lens',
+      );
     },
     onSettled: () => {
       void qc.invalidateQueries({ queryKey: sharingKeys.all });
@@ -102,10 +107,13 @@ export function usePublicLensQuery(token: string): UseQueryResult<PublicLensData
   return useQuery<PublicLensData, ApiError>({
     queryKey: sharingKeys.publicLens(token),
     queryFn: async (): Promise<PublicLensData> => {
-      const { data, error } = await sdk.GET('/public/lenses/{token}', {
-        params: { path: { token } },
-      });
-      if (error || !data) throw toApiError(error, 'Failed to load public view');
+      const data = await apiRequest(
+        (client) =>
+          client.GET('/public/lenses/{token}', {
+            params: { path: { token } },
+          }),
+        'Failed to load public view',
+      );
       return data as PublicLensData;
     },
   });

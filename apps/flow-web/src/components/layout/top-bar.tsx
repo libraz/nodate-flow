@@ -10,7 +10,7 @@ import { useTranslation } from 'react-i18next';
 import AiCostMeter from '../../features/ai-providers/cost-meter';
 import { authStore, selectUser, useAuth } from '../../features/auth/auth-store';
 import NotificationBell from '../../features/notifications/notification-bell';
-import { authSdk } from '../../lib/sdk';
+import { authApiRequest } from '../../lib/api';
 import { clearActiveWorkspaceId } from '../../lib/use-current-workspace';
 import CommandPalette from './command-palette';
 import styles from './top-bar.module.css';
@@ -39,10 +39,10 @@ export default function TopBar(): ReactElement {
 
   const handleLogout = async (): Promise<void> => {
     try {
-      // Logout lives on auth-api; route through the auth-api SDK so the
-      // request goes to the right base URL with the same bearer/cookie
-      // plumbing as the rest of the auth surface.
-      await authSdk.POST('/auth/logout', {});
+      // Logout lives on auth-api; route through the auth-api requester
+      // so the call goes to the right base URL with the same
+      // bearer/cookie plumbing as the rest of the auth surface.
+      await authApiRequest((client) => client.POST('/auth/logout', {}), 'Failed to sign out');
     } catch {
       // Even on network failure, clear local state and bounce to /login.
     }

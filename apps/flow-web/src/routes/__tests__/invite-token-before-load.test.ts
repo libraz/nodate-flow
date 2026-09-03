@@ -48,6 +48,7 @@ describe('/invite/$token beforeLoad prefetch (B / item 36)', () => {
     sdkMocks.get.mockResolvedValueOnce({
       data: { workspaceName: 'Acme', role: 'member' },
       error: null,
+      response: new Response(null, { status: 200 }),
     });
 
     const qc = new QueryClient({
@@ -69,6 +70,7 @@ describe('/invite/$token beforeLoad prefetch (B / item 36)', () => {
     sdkMocks.get.mockResolvedValueOnce({
       data: null,
       error: { type: 'INVITE.TOKEN.INVALID', detail: 'gone' },
+      response: new Response(null, { status: 400 }),
     });
 
     const qc = new QueryClient({

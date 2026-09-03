@@ -15,10 +15,9 @@ import { useQuery } from '@tanstack/react-query';
 import { Calendar as CalendarIcon, Clock, MapPin } from 'lucide-react';
 import type { ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';
-
-import { formatApiError, toApiError } from '../../lib/api-error';
+import { apiRequest } from '../../lib/api';
+import { formatApiError } from '../../lib/api-error';
 import { formatEpochDateTime } from '../../lib/format';
-import { sdk } from '../../lib/sdk';
 import styles from './pending-invites-panel.module.css';
 
 type MyInvite = components['schemas']['MyInviteResponse'];
@@ -33,11 +32,11 @@ function useMyInvitesQuery() {
     queryKey: ['me', 'invites'] as const,
     staleTime: 30_000,
     queryFn: async (): Promise<MyInvite[]> => {
-      const result = await sdk.GET('/me/invites');
-      if (result.error || !result.data) {
-        throw toApiError(result.error, 'Failed to load invites');
-      }
-      return result.data.invites ?? [];
+      const data = await apiRequest(
+        (client) => client.GET('/me/invites'),
+        'Failed to load invites',
+      );
+      return data.invites ?? [];
     },
   });
 }

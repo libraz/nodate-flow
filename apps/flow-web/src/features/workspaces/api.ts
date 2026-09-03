@@ -14,7 +14,7 @@ import {
   useSuspenseQuery,
 } from '@tanstack/react-query';
 
-import { authSdk as sdk } from '../../lib/sdk';
+import { authApiRequest } from '../../lib/api';
 
 export type Workspace = components['schemas']['Workspace'];
 export type WorkspaceMember = components['schemas']['WorkspaceMember'];
@@ -44,46 +44,14 @@ import { ApiError } from '../../lib/api-error';
 
 export { ApiError as WorkspaceApiError };
 
-function extractCode(detail: string): string | undefined {
-  const m = detail.match(/^([A-Z][A-Z0-9_.]+):/);
-  return m ? m[1] : undefined;
-}
-
-function toError(err: unknown, fallback: string): ApiError {
-  if (err && typeof err === 'object') {
-    const obj = err as {
-      detail?: unknown;
-      title?: unknown;
-      type?: unknown;
-      code?: unknown;
-      message?: unknown;
-    };
-    const message =
-      (typeof obj.detail === 'string' && obj.detail) ||
-      (typeof obj.title === 'string' && obj.title) ||
-      (typeof obj.message === 'string' && obj.message) ||
-      fallback;
-    // The backend emits two error envelope shapes today. The newer
-    // handlers use RFC 7807 (`{type, title, detail, status}`) where
-    // `type` carries the error code. The ACL middleware that raises
-    // WS.WORKSPACE.NOT_FOUND still uses the older `{code, message}`
-    // shape. Accept both so route-level fallbacks can branch on code.
-    const code =
-      (typeof obj.code === 'string' && obj.code) ||
-      (typeof obj.type === 'string' && obj.type) ||
-      (typeof obj.detail === 'string' && extractCode(obj.detail)) ||
-      undefined;
-    return new ApiError(code, message);
-  }
-  return new ApiError(undefined, fallback);
-}
-
 export function useWorkspacesQuery(): UseSuspenseQueryResult<Workspace[]> {
   return useSuspenseQuery({
     queryKey: workspacesKeys.list(),
     queryFn: async (): Promise<Workspace[]> => {
-      const { data, error } = await sdk.GET('/workspaces', {});
-      if (error || !data) throw toError(error, 'Failed to load workspaces');
+      const data = await authApiRequest(
+        (client) => client.GET('/workspaces', {}),
+        'Failed to load workspaces',
+      );
       return data.workspaces ?? [];
     },
   });
@@ -93,10 +61,13 @@ export function useWorkspaceQuery(id: string): UseSuspenseQueryResult<Workspace>
   return useSuspenseQuery({
     queryKey: workspacesKeys.detail(id),
     queryFn: async (): Promise<Workspace> => {
-      const { data, error } = await sdk.GET('/workspaces/{wsId}', {
-        params: { path: { wsId: id } },
-      });
-      if (error || !data) throw toError(error, 'Failed to load workspace');
+      const data = await authApiRequest(
+        (client) =>
+          client.GET('/workspaces/{wsId}', {
+            params: { path: { wsId: id } },
+          }),
+        'Failed to load workspace',
+      );
       return data;
     },
   });
@@ -106,10 +77,13 @@ export function useWorkspaceMembersQuery(id: string): UseSuspenseQueryResult<Wor
   return useSuspenseQuery({
     queryKey: workspacesKeys.members(id),
     queryFn: async (): Promise<WorkspaceMember[]> => {
-      const { data, error } = await sdk.GET('/workspaces/{wsId}/members', {
-        params: { path: { wsId: id } },
-      });
-      if (error || !data) throw toError(error, 'Failed to load workspace members');
+      const data = await authApiRequest(
+        (client) =>
+          client.GET('/workspaces/{wsId}/members', {
+            params: { path: { wsId: id } },
+          }),
+        'Failed to load workspace members',
+      );
       return data.members ?? [];
     },
   });
@@ -126,10 +100,13 @@ export function useWorkspaceUsersQuery(
   return useSuspenseQuery({
     queryKey: workspacesKeys.users(workspaceId),
     queryFn: async (): Promise<WorkspaceUserSummary[]> => {
-      const { data, error } = await sdk.GET('/workspaces/{wsId}/users', {
-        params: { path: { wsId: workspaceId } },
-      });
-      if (error || !data) throw toError(error, 'Failed to load workspace users');
+      const data = await authApiRequest(
+        (client) =>
+          client.GET('/workspaces/{wsId}/users', {
+            params: { path: { wsId: workspaceId } },
+          }),
+        'Failed to load workspace users',
+      );
       return data.users ?? [];
     },
   });
@@ -139,8 +116,10 @@ export function useCreateWorkspace(): UseMutationResult<Workspace, ApiError, Cre
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (input: CreateWorkspaceInput): Promise<Workspace> => {
-      const { data, error } = await sdk.POST('/workspaces', { body: input });
-      if (error || !data) throw toError(error, 'Failed to create workspace');
+      const data = await authApiRequest(
+        (client) => client.POST('/workspaces', { body: input }),
+        'Failed to create workspace',
+      );
       return data;
     },
     onSuccess: () => {
@@ -158,11 +137,14 @@ export function useUpdateWorkspace(): UseMutationResult<Workspace, ApiError, Upd
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({ id, patch }: UpdateWorkspaceArgs): Promise<Workspace> => {
-      const { data, error } = await sdk.PATCH('/workspaces/{wsId}', {
-        params: { path: { wsId: id } },
-        body: patch,
-      });
-      if (error || !data) throw toError(error, 'Failed to update workspace');
+      const data = await authApiRequest(
+        (client) =>
+          client.PATCH('/workspaces/{wsId}', {
+            params: { path: { wsId: id } },
+            body: patch,
+          }),
+        'Failed to update workspace',
+      );
       return data;
     },
     onSuccess: (_data, vars) => {
@@ -203,11 +185,14 @@ export function useDeleteWorkspace(): UseMutationResult<
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({ wsId, confirm }: DeleteWorkspaceArgs): Promise<DeleteWorkspaceResult> => {
-      const { data, error } = await sdk.DELETE('/workspaces/{wsId}', {
-        params: { path: { wsId } },
-        body: { confirm },
-      });
-      if (error || !data) throw toError(error, 'Failed to delete workspace');
+      const data = await authApiRequest(
+        (client) =>
+          client.DELETE('/workspaces/{wsId}', {
+            params: { path: { wsId } },
+            body: { confirm },
+          }),
+        'Failed to delete workspace',
+      );
       return data;
     },
     onSuccess: (_data, vars) => {
@@ -233,11 +218,14 @@ export function useAddMember(): UseMutationResult<WorkspaceMember, ApiError, Add
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({ id, input }: AddMemberArgs): Promise<WorkspaceMember> => {
-      const { data, error } = await sdk.POST('/workspaces/{wsId}/members', {
-        params: { path: { wsId: id } },
-        body: input,
-      });
-      if (error || !data) throw toError(error, 'Failed to add member');
+      const data = await authApiRequest(
+        (client) =>
+          client.POST('/workspaces/{wsId}/members', {
+            params: { path: { wsId: id } },
+            body: input,
+          }),
+        'Failed to add member',
+      );
       return data;
     },
     onSuccess: (_data, vars) => {
@@ -262,11 +250,14 @@ export function useUpdateMemberRole(): UseMutationResult<
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({ wsId, userId, role }: UpdateMemberRoleArgs): Promise<WorkspaceMember> => {
-      const { data, error } = await sdk.PATCH('/workspaces/{wsId}/members/{userId}', {
-        params: { path: { wsId, userId } },
-        body: { role },
-      });
-      if (error || !data) throw toError(error, 'Failed to update member role');
+      const data = await authApiRequest(
+        (client) =>
+          client.PATCH('/workspaces/{wsId}/members/{userId}', {
+            params: { path: { wsId, userId } },
+            body: { role },
+          }),
+        'Failed to update member role',
+      );
       return data;
     },
     onSuccess: (_data, vars) => {
@@ -286,10 +277,13 @@ export function useRemoveMember(): UseMutationResult<void, ApiError, RemoveMembe
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({ wsId, userId }: RemoveMemberArgs): Promise<void> => {
-      const { error } = await sdk.DELETE('/workspaces/{wsId}/members/{userId}', {
-        params: { path: { wsId, userId } },
-      });
-      if (error) throw toError(error, 'Failed to remove member');
+      await authApiRequest(
+        (client) =>
+          client.DELETE('/workspaces/{wsId}/members/{userId}', {
+            params: { path: { wsId, userId } },
+          }),
+        'Failed to remove member',
+      );
     },
     onSuccess: (_data, vars) => {
       void qc.invalidateQueries({ queryKey: workspacesKeys.members(vars.wsId) });

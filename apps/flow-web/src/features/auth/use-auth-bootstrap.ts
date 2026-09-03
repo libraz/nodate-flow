@@ -21,7 +21,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { i18n, type SupportedLanguage, setLanguage, supportedLanguages } from '../../i18n';
-import { authSdk, refreshAccessToken } from '../../lib/sdk';
+import { authApiRequest } from '../../lib/api';
+import { isNetworkError } from '../../lib/api-error';
+import { refreshAccessToken } from '../../lib/sdk';
 import { queryClient } from '../../providers/query-client';
 import { type AuthUser, authStore } from './auth-store';
 
@@ -38,25 +40,43 @@ interface BootstrapResult {
 
 let bootstrapPromise: Promise<AuthBootstrapStatus> | null = null;
 
+/**
+ * Reads the signed-in profile, separating "the server said no" from
+ * "the request never got there". Both arrive as a thrown error, and
+ * only the first one is an answer about the session.
+ */
+async function probeSignedInUser() {
+  try {
+    const me = await authApiRequest(
+      (client) => client.GET('/me', {}),
+      'Failed to load the signed-in user',
+    );
+    return { ok: true as const, me };
+  } catch (cause) {
+    return { ok: false as const, offline: isNetworkError(cause) };
+  }
+}
+
 async function runBootstrap(): Promise<AuthBootstrapStatus> {
   const token = await refreshAccessToken();
   if (!token) {
     return refreshAccessToken.lastFailure() === 'network' ? 'offline' : 'unauthenticated';
   }
-  // Use the typed auth-api SDK for the /me probe. The SDK's request
-  // middleware reads the bearer from the auth store (which the
+  // Use the typed auth-api requester for the /me probe. The SDK's
+  // request middleware reads the bearer from the auth store (which the
   // refresher above has just populated) so we don't have to rebuild
   // the Authorization header by hand.
-  // A throw here is the transport dropping between two calls — the
-  // refresh above already succeeded, so the session it just minted is
-  // fine and must survive the blip.
-  const probe = await authSdk.GET('/me', {}).catch(() => null);
-  if (probe === null) return 'offline';
-  const { data, error, response } = probe;
-  if (error || !data || !response.ok) {
+  const probe = await probeSignedInUser();
+  if (!probe.ok) {
+    // A transport failure here is the connection dropping between two
+    // calls; the refresh above already succeeded, so the session it
+    // just minted survives. A refusal from the server is the opposite
+    // answer and does end the session.
+    if (probe.offline) return 'offline';
     authStore.getState().clearSession();
     return 'unauthenticated';
   }
+  const data = probe.me;
   const user: AuthUser = {
     id: data.id,
     email: data.email,

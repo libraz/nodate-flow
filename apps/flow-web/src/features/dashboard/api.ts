@@ -11,9 +11,8 @@ import {
   useQueryClient,
   useSuspenseQuery,
 } from '@tanstack/react-query';
-
-import { ApiError, toApiError } from '../../lib/api-error';
-import { sdk } from '../../lib/sdk';
+import { apiRequest } from '../../lib/api';
+import { ApiError } from '../../lib/api-error';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -76,10 +75,13 @@ export function useWidgetsQuery(wsId: string): UseSuspenseQueryResult<WidgetItem
   return useSuspenseQuery({
     queryKey: dashboardKeys.list(wsId),
     queryFn: async (): Promise<WidgetItem[]> => {
-      const { data, error } = await sdk.GET('/workspaces/{wsId}/dashboard/widgets', {
-        params: { path: { wsId }, query: { limit: 200 } },
-      });
-      if (error || !data) throw toApiError(error, 'Failed to load dashboard widgets');
+      const data = await apiRequest(
+        (client) =>
+          client.GET('/workspaces/{wsId}/dashboard/widgets', {
+            params: { path: { wsId }, query: { limit: 200 } },
+          }),
+        'Failed to load dashboard widgets',
+      );
       return (data.widgets ?? []).map(toWidgetItem);
     },
   });
@@ -100,11 +102,14 @@ export function useCreateWidget(
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({ input }: CreateWidgetArgs): Promise<WidgetItem> => {
-      const { data, error } = await sdk.POST('/workspaces/{wsId}/dashboard/widgets', {
-        params: { path: { wsId } },
-        body: input,
-      });
-      if (error || !data) throw toApiError(error, 'Failed to create dashboard widget');
+      const data = await apiRequest(
+        (client) =>
+          client.POST('/workspaces/{wsId}/dashboard/widgets', {
+            params: { path: { wsId } },
+            body: input,
+          }),
+        'Failed to create dashboard widget',
+      );
       return toWidgetItem(data);
     },
     onSuccess: () => {
@@ -125,11 +130,14 @@ export function useUpdateWidget(
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({ widgetId, patch }: UpdateWidgetArgs): Promise<WidgetItem> => {
-      const { data, error } = await sdk.PATCH('/workspaces/{wsId}/dashboard/widgets/{widgetId}', {
-        params: { path: { wsId, widgetId } },
-        body: patch,
-      });
-      if (error || !data) throw toApiError(error, 'Failed to update dashboard widget');
+      const data = await apiRequest(
+        (client) =>
+          client.PATCH('/workspaces/{wsId}/dashboard/widgets/{widgetId}', {
+            params: { path: { wsId, widgetId } },
+            body: patch,
+          }),
+        'Failed to update dashboard widget',
+      );
       return toWidgetItem(data);
     },
     onSuccess: (_data, vars) => {
@@ -162,14 +170,14 @@ export function useUpdateWidgetPosition(
       height,
       sortWeight,
     }: UpdateWidgetPositionArgs): Promise<WidgetItem> => {
-      const { data, error } = await sdk.PUT(
-        '/workspaces/{wsId}/dashboard/widgets/{widgetId}/position',
-        {
-          params: { path: { wsId, widgetId } },
-          body: { positionX, positionY, width, height, sortWeight },
-        },
+      const data = await apiRequest(
+        (client) =>
+          client.PUT('/workspaces/{wsId}/dashboard/widgets/{widgetId}/position', {
+            params: { path: { wsId, widgetId } },
+            body: { positionX, positionY, width, height, sortWeight },
+          }),
+        'Failed to update dashboard widget position',
       );
-      if (error || !data) throw toApiError(error, 'Failed to update dashboard widget position');
       return toWidgetItem(data);
     },
     onSuccess: (_data, vars) => {
@@ -184,10 +192,13 @@ export function useDeleteWidget(wsId: string): UseMutationResult<void, ApiError,
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (widgetId: string): Promise<void> => {
-      const { error } = await sdk.DELETE('/workspaces/{wsId}/dashboard/widgets/{widgetId}', {
-        params: { path: { wsId, widgetId } },
-      });
-      if (error) throw toApiError(error, 'Failed to delete dashboard widget');
+      await apiRequest(
+        (client) =>
+          client.DELETE('/workspaces/{wsId}/dashboard/widgets/{widgetId}', {
+            params: { path: { wsId, widgetId } },
+          }),
+        'Failed to delete dashboard widget',
+      );
     },
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: dashboardKeys.list(wsId) });

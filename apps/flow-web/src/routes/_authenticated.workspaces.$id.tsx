@@ -33,8 +33,8 @@ import { z } from 'zod';
 
 import { useWorkspaceQuery } from '../features/workspaces/api';
 import WorkspaceDetail, { type WorkspaceDetailTab } from '../features/workspaces/workspace-detail';
+import { apiProbe } from '../lib/api';
 import { ApiError } from '../lib/api-error';
-import { authSdk as sdk } from '../lib/sdk';
 
 /**
  * Allowed values for the `?tab=` search param across the workspace
@@ -342,10 +342,12 @@ export const Route = createFileRoute('/_authenticated/workspaces/$id')({
     throw error;
   },
   loader: async ({ params }) => {
-    const { response } = await sdk.GET('/workspaces/{wsId}', {
-      params: { path: { wsId: params.id } },
-    });
-    if (response.status === 404) {
+    // The loader only asks whether the workspace is there; the shape of
+    // the answer is the component's business.
+    const status = await apiProbe((client) =>
+      client.GET('/workspaces/{wsId}', { params: { path: { wsId: params.id } } }),
+    );
+    if (status === 404) {
       throw new ApiError('WS.WORKSPACE.NOT_FOUND', 'Workspace not found');
     }
     return null;

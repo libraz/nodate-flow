@@ -9,7 +9,7 @@
 import type { components } from '@nodate-flow/sdk';
 import { type UseSuspenseQueryResult, useSuspenseQuery } from '@tanstack/react-query';
 
-import { sdk } from '../../lib/sdk';
+import { apiRequest } from '../../lib/api';
 
 export type WeeklyDigest = components['schemas']['WeeklyDigestOutputBody'];
 export type WeeklyDigestTask = components['schemas']['WeeklyDigestTask'];
@@ -29,10 +29,13 @@ export function useWeeklyDigestQuery(workspaceId: string): UseSuspenseQueryResul
   return useSuspenseQuery({
     queryKey: weeklyDigestKeys.forWorkspace(workspaceId),
     queryFn: async (): Promise<WeeklyDigest> => {
-      const { data, error } = await sdk.GET('/workspaces/{wsId}/ai/weekly-digest', {
-        params: { path: { wsId: workspaceId } },
-      });
-      if (error || !data) throw new Error('Failed to load weekly digest');
+      const data = await apiRequest(
+        (client) =>
+          client.GET('/workspaces/{wsId}/ai/weekly-digest', {
+            params: { path: { wsId: workspaceId } },
+          }),
+        'Failed to load weekly digest',
+      );
       return data;
     },
   });

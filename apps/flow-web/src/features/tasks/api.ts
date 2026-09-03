@@ -56,7 +56,7 @@ import {
   useSuspenseQuery,
 } from '@tanstack/react-query';
 
-import { sdk } from '../../lib/sdk';
+import { apiRequest } from '../../lib/api';
 import { timelineKeys } from '../timeline/api';
 import { replayKeys } from '../timeline/replay-api';
 
@@ -176,7 +176,7 @@ export interface DuplicatesResult {
   candidates: DuplicateCandidate[];
 }
 
-import { ApiError, toApiError } from '../../lib/api-error';
+import { ApiError } from '../../lib/api-error';
 import { sha256Hex } from '../../lib/crypto/sha256';
 import { resolveContentType } from '../../lib/file-mime';
 
@@ -297,8 +297,10 @@ export function useTasksQuery(
       if (states.length > 0) query.state = [...states];
       if (assignee.length > 0) query.assignee = assignee;
       if (priorities.length > 0) query.priority = [...priorities];
-      const { data, error } = await sdk.GET('/tasks', { params: { query } });
-      if (error || !data) throw toApiError(error, 'Failed to load tasks');
+      const data = await apiRequest(
+        (client) => client.GET('/tasks', { params: { query } }),
+        'Failed to load tasks',
+      );
       return data.tasks ?? [];
     },
   });
@@ -371,8 +373,10 @@ export function useTasksInfiniteQuery(
       if (states.length > 0) query.state = [...states];
       if (assignee.length > 0) query.assignee = assignee;
       if (priorities.length > 0) query.priority = [...priorities];
-      const { data, error } = await sdk.GET('/tasks', { params: { query } });
-      if (error || !data) throw toApiError(error, 'Failed to load tasks');
+      const data = await apiRequest(
+        (client) => client.GET('/tasks', { params: { query } }),
+        'Failed to load tasks',
+      );
 
       const tasks = data.tasks ?? [];
       return {
@@ -411,8 +415,10 @@ export function useMyTasksInfiniteQuery(): UseSuspenseInfiniteQueryResult<
     queryFn: async ({ pageParam }): Promise<MyTasksPage> => {
       const query: { limit: number; cursor?: string } = { limit: TASKS_PAGE_SIZE };
       if (pageParam) query.cursor = pageParam;
-      const { data, error } = await sdk.GET('/me/tasks', { params: { query } });
-      if (error || !data) throw toApiError(error, 'Failed to load my tasks');
+      const data = await apiRequest(
+        (client) => client.GET('/me/tasks', { params: { query } }),
+        'Failed to load my tasks',
+      );
       return {
         tasks: data.tasks ?? [],
         nextCursor: data.nextCursor ?? null,
@@ -426,10 +432,13 @@ export function useTaskQuery(taskId: string): UseSuspenseQueryResult<Task> {
   return useSuspenseQuery({
     queryKey: tasksKeys.detail(taskId),
     queryFn: async (): Promise<Task> => {
-      const { data, error } = await sdk.GET('/tasks/{id}', {
-        params: { path: { id: taskId } },
-      });
-      if (error || !data) throw toApiError(error, 'Failed to load task');
+      const data = await apiRequest(
+        (client) =>
+          client.GET('/tasks/{id}', {
+            params: { path: { id: taskId } },
+          }),
+        'Failed to load task',
+      );
       return data;
     },
   });
@@ -439,10 +448,13 @@ export function useTaskDuplicatesQuery(taskId: string): UseSuspenseQueryResult<D
   return useSuspenseQuery({
     queryKey: tasksKeys.duplicates(taskId),
     queryFn: async (): Promise<DuplicatesResult> => {
-      const { data, error } = await sdk.GET('/tasks/{id}/duplicates', {
-        params: { path: { id: taskId } },
-      });
-      if (error || !data) throw toApiError(error, 'Failed to load duplicates');
+      const data = await apiRequest(
+        (client) =>
+          client.GET('/tasks/{id}/duplicates', {
+            params: { path: { id: taskId } },
+          }),
+        'Failed to load duplicates',
+      );
       return { model: data.model, candidates: data.candidates ?? [] };
     },
   });
@@ -452,10 +464,13 @@ export function useTaskInferStateQuery(taskId: string): UseSuspenseQueryResult<I
   return useSuspenseQuery({
     queryKey: tasksKeys.inferState(taskId),
     queryFn: async (): Promise<InferStateResult> => {
-      const { data, error } = await sdk.GET('/tasks/{id}/infer-state', {
-        params: { path: { id: taskId } },
-      });
-      if (error || !data) throw toApiError(error, 'Failed to infer state');
+      const data = await apiRequest(
+        (client) =>
+          client.GET('/tasks/{id}/infer-state', {
+            params: { path: { id: taskId } },
+          }),
+        'Failed to infer state',
+      );
       const result: InferStateResult = {
         taskId: data.taskId,
         state: data.state as TaskDerivedState,
@@ -472,10 +487,13 @@ export function useTaskAiInvocationsQuery(
   return useSuspenseQuery({
     queryKey: tasksKeys.aiInvocations(taskId),
     queryFn: async (): Promise<TaskAiInvocation[]> => {
-      const { data, error } = await sdk.GET('/tasks/{id}/ai/invocations', {
-        params: { path: { id: taskId } },
-      });
-      if (error || !data) throw toApiError(error, 'Failed to load task AI invocations');
+      const data = await apiRequest(
+        (client) =>
+          client.GET('/tasks/{id}/ai/invocations', {
+            params: { path: { id: taskId } },
+          }),
+        'Failed to load task AI invocations',
+      );
       return data.invocations ?? [];
     },
   });
@@ -485,10 +503,13 @@ export function useTaskActorsQuery(taskId: string): UseSuspenseQueryResult<TaskA
   return useSuspenseQuery({
     queryKey: tasksKeys.actors(taskId),
     queryFn: async (): Promise<TaskActor[]> => {
-      const { data, error } = await sdk.GET('/tasks/{id}/actors', {
-        params: { path: { id: taskId } },
-      });
-      if (error || !data) throw toApiError(error, 'Failed to load task actors');
+      const data = await apiRequest(
+        (client) =>
+          client.GET('/tasks/{id}/actors', {
+            params: { path: { id: taskId } },
+          }),
+        'Failed to load task actors',
+      );
       return data.actors ?? [];
     },
   });
@@ -503,11 +524,14 @@ export function useAddTaskActor(): UseMutationResult<TaskActor, ApiError, AddAct
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({ taskId, input }: AddActorArgs): Promise<TaskActor> => {
-      const { data, error } = await sdk.POST('/tasks/{id}/actors', {
-        params: { path: { id: taskId } },
-        body: input,
-      });
-      if (error || !data) throw toApiError(error, 'Failed to add task actor');
+      const data = await apiRequest(
+        (client) =>
+          client.POST('/tasks/{id}/actors', {
+            params: { path: { id: taskId } },
+            body: input,
+          }),
+        'Failed to add task actor',
+      );
       return data;
     },
     onSuccess: (_data, vars) => {
@@ -529,10 +553,13 @@ export function useTaskAgentActorsQuery(taskId: string): UseSuspenseQueryResult<
   return useSuspenseQuery({
     queryKey: tasksKeys.agentActors(taskId),
     queryFn: async (): Promise<TaskAgentActor[]> => {
-      const { data, error } = await sdk.GET('/tasks/{id}/agents', {
-        params: { path: { id: taskId } },
-      });
-      if (error || !data) throw toApiError(error, 'Failed to load task agents');
+      const data = await apiRequest(
+        (client) =>
+          client.GET('/tasks/{id}/agents', {
+            params: { path: { id: taskId } },
+          }),
+        'Failed to load task agents',
+      );
       return data.agents ?? [];
     },
   });
@@ -558,11 +585,14 @@ export function useAddTaskAgentActor(): UseMutationResult<
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({ taskId, input }: AddAgentActorArgs): Promise<TaskAgentActor> => {
-      const { data, error } = await sdk.POST('/tasks/{id}/agents', {
-        params: { path: { id: taskId } },
-        body: input,
-      });
-      if (error || !data) throw toApiError(error, 'Failed to assign agent to task');
+      const data = await apiRequest(
+        (client) =>
+          client.POST('/tasks/{id}/agents', {
+            params: { path: { id: taskId } },
+            body: input,
+          }),
+        'Failed to assign agent to task',
+      );
       return data;
     },
     onSuccess: (_data, vars) => {
@@ -583,10 +613,13 @@ export function useRemoveTaskActor(): UseMutationResult<void, ApiError, RemoveAc
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({ taskId, actorId }: RemoveActorArgs): Promise<void> => {
-      const { error } = await sdk.DELETE('/tasks/{id}/actors/{actorId}', {
-        params: { path: { id: taskId, actorId } },
-      });
-      if (error) throw toApiError(error, 'Failed to remove task actor');
+      await apiRequest(
+        (client) =>
+          client.DELETE('/tasks/{id}/actors/{actorId}', {
+            params: { path: { id: taskId, actorId } },
+          }),
+        'Failed to remove task actor',
+      );
     },
     onSuccess: (_data, vars) => {
       void qc.invalidateQueries({ queryKey: tasksKeys.actors(vars.taskId) });
@@ -600,10 +633,13 @@ export function useTaskCommentsQuery(taskId: string): UseSuspenseQueryResult<Tas
   return useSuspenseQuery({
     queryKey: tasksKeys.comments(taskId),
     queryFn: async (): Promise<TaskComment[]> => {
-      const { data, error } = await sdk.GET('/tasks/{id}/comments', {
-        params: { path: { id: taskId } },
-      });
-      if (error || !data) throw toApiError(error, 'Failed to load comments');
+      const data = await apiRequest(
+        (client) =>
+          client.GET('/tasks/{id}/comments', {
+            params: { path: { id: taskId } },
+          }),
+        'Failed to load comments',
+      );
       return data.comments ?? [];
     },
   });
@@ -613,8 +649,10 @@ export function useCreateTask(): UseMutationResult<Task, ApiError, CreateTaskInp
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (input: CreateTaskInput): Promise<Task> => {
-      const { data, error } = await sdk.POST('/tasks', { body: input });
-      if (error || !data) throw toApiError(error, 'Failed to create task');
+      const data = await apiRequest(
+        (client) => client.POST('/tasks', { body: input }),
+        'Failed to create task',
+      );
       return data;
     },
     onSuccess: () => {
@@ -635,11 +673,14 @@ export function useUpdateTask(): UseMutationResult<Task, ApiError, UpdateTaskArg
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({ id, patch }: UpdateTaskArgs): Promise<Task> => {
-      const { data, error } = await sdk.PATCH('/tasks/{id}', {
-        params: { path: { id } },
-        body: patch,
-      });
-      if (error || !data) throw toApiError(error, 'Failed to update task');
+      const data = await apiRequest(
+        (client) =>
+          client.PATCH('/tasks/{id}', {
+            params: { path: { id } },
+            body: patch,
+          }),
+        'Failed to update task',
+      );
       return data;
     },
     onSuccess: (data, vars) => {
@@ -655,10 +696,13 @@ export function useDeleteTask(): UseMutationResult<void, ApiError, string> {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (id: string): Promise<void> => {
-      const { error } = await sdk.DELETE('/tasks/{id}', {
-        params: { path: { id } },
-      });
-      if (error) throw toApiError(error, 'Failed to delete task');
+      await apiRequest(
+        (client) =>
+          client.DELETE('/tasks/{id}', {
+            params: { path: { id } },
+          }),
+        'Failed to delete task',
+      );
     },
     onSuccess: (_data, id) => {
       qc.removeQueries({ queryKey: tasksKeys.detail(id) });
@@ -676,11 +720,14 @@ export function useAddTaskComment(): UseMutationResult<TaskComment, ApiError, Ad
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({ taskId, body }: AddCommentArgs): Promise<TaskComment> => {
-      const { data, error } = await sdk.POST('/tasks/{id}/comments', {
-        params: { path: { id: taskId } },
-        body: { body },
-      });
-      if (error || !data) throw toApiError(error, 'Failed to add comment');
+      const data = await apiRequest(
+        (client) =>
+          client.POST('/tasks/{id}/comments', {
+            params: { path: { id: taskId } },
+            body: { body },
+          }),
+        'Failed to add comment',
+      );
       return data;
     },
     onSuccess: (_data, vars) => {
@@ -707,11 +754,14 @@ export function useEditTaskComment(): UseMutationResult<TaskComment, ApiError, E
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({ taskId, commentId, body }: EditCommentArgs): Promise<TaskComment> => {
-      const { data, error } = await sdk.PATCH('/tasks/{id}/comments/{cid}', {
-        params: { path: { id: taskId, cid: commentId } },
-        body: { body },
-      });
-      if (error || !data) throw toApiError(error, 'Failed to edit comment');
+      const data = await apiRequest(
+        (client) =>
+          client.PATCH('/tasks/{id}/comments/{cid}', {
+            params: { path: { id: taskId, cid: commentId } },
+            body: { body },
+          }),
+        'Failed to edit comment',
+      );
       return data;
     },
     onSuccess: (_data, vars) => {
@@ -736,10 +786,13 @@ export function useDeleteTaskComment(): UseMutationResult<void, ApiError, Delete
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({ taskId, commentId }: DeleteCommentArgs): Promise<void> => {
-      const { error } = await sdk.DELETE('/tasks/{id}/comments/{cid}', {
-        params: { path: { id: taskId, cid: commentId } },
-      });
-      if (error) throw toApiError(error, 'Failed to delete comment');
+      await apiRequest(
+        (client) =>
+          client.DELETE('/tasks/{id}/comments/{cid}', {
+            params: { path: { id: taskId, cid: commentId } },
+          }),
+        'Failed to delete comment',
+      );
     },
     onSuccess: (_data, vars) => {
       void qc.invalidateQueries({ queryKey: tasksKeys.comments(vars.taskId) });
@@ -768,11 +821,14 @@ export function useTransitionTask(): UseMutationResult<Task, ApiError, Transitio
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({ id, transition }: TransitionTaskArgs): Promise<Task> => {
-      const { data, error } = await sdk.POST('/tasks/{id}/transitions', {
-        params: { path: { id } },
-        body: { transition },
-      });
-      if (error || !data) throw toApiError(error, 'Failed to apply transition');
+      const data = await apiRequest(
+        (client) =>
+          client.POST('/tasks/{id}/transitions', {
+            params: { path: { id } },
+            body: { transition },
+          }),
+        'Failed to apply transition',
+      );
       return data;
     },
     onMutate: async (vars) => {
@@ -873,10 +929,13 @@ export function useTaskDependenciesQuery(
   return useSuspenseQuery({
     queryKey: tasksKeys.dependencies(taskId),
     queryFn: async (): Promise<TaskDependenciesResult> => {
-      const { data, error } = await sdk.GET('/tasks/{id}/dependencies', {
-        params: { path: { id: taskId } },
-      });
-      if (error || !data) throw toApiError(error, 'Failed to load task dependencies');
+      const data = await apiRequest(
+        (client) =>
+          client.GET('/tasks/{id}/dependencies', {
+            params: { path: { id: taskId } },
+          }),
+        'Failed to load task dependencies',
+      );
       return {
         outgoing: data.outgoing ?? [],
         incoming: data.incoming ?? [],
@@ -895,11 +954,14 @@ export function useAddTaskDependency(): UseMutationResult<void, ApiError, AddDep
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({ taskId, toTaskId, kind }: AddDependencyArgs): Promise<void> => {
-      const { error } = await sdk.POST('/tasks/{id}/dependencies', {
-        params: { path: { id: taskId } },
-        body: { toTaskId, kind },
-      });
-      if (error) throw toApiError(error, 'Failed to add task dependency');
+      await apiRequest(
+        (client) =>
+          client.POST('/tasks/{id}/dependencies', {
+            params: { path: { id: taskId } },
+            body: { toTaskId, kind },
+          }),
+        'Failed to add task dependency',
+      );
     },
     onSuccess: (_data, vars) => {
       void qc.invalidateQueries({ queryKey: tasksKeys.dependencies(vars.taskId) });
@@ -918,10 +980,13 @@ export function useRemoveTaskDependency(): UseMutationResult<void, ApiError, Rem
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({ taskId, depId }: RemoveDependencyArgs): Promise<void> => {
-      const { error } = await sdk.DELETE('/tasks/{id}/dependencies/{depId}', {
-        params: { path: { id: taskId, depId } },
-      });
-      if (error) throw toApiError(error, 'Failed to remove task dependency');
+      await apiRequest(
+        (client) =>
+          client.DELETE('/tasks/{id}/dependencies/{depId}', {
+            params: { path: { id: taskId, depId } },
+          }),
+        'Failed to remove task dependency',
+      );
     },
     onSuccess: (_data, vars) => {
       void qc.invalidateQueries({ queryKey: tasksKeys.dependencies(vars.taskId) });
@@ -954,10 +1019,13 @@ export function useReorderTasks(): UseMutationResult<void, ApiError, ReorderTask
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({ projectId, items }: ReorderTasksArgs): Promise<void> => {
-      const { error } = await sdk.POST('/tasks/reorder', {
-        body: { projectId, items },
-      });
-      if (error) throw toApiError(error, 'Failed to reorder tasks');
+      await apiRequest(
+        (client) =>
+          client.POST('/tasks/reorder', {
+            body: { projectId, items },
+          }),
+        'Failed to reorder tasks',
+      );
     },
     onMutate: async (vars) => {
       await qc.cancelQueries({ queryKey: [...tasksKeys.all, 'list', vars.projectId] });
@@ -1014,11 +1082,17 @@ export function useTaskSearch(
     enabled: enabled && workspaceId.length > 0 && query.trim().length > 0,
     staleTime: 10_000,
     queryFn: async (): Promise<TaskListItem[]> => {
-      const { data, error } = await sdk.GET('/tasks', {
-        params: { query: { workspaceId, q: query.trim(), limit: 20, offset: 0 } },
-      });
-      if (error || !data) return [];
-      return data.tasks ?? [];
+      // A type-ahead that cannot reach the server offers no matches
+      // rather than tearing down the surface it is typed into.
+      const data = await apiRequest(
+        (client) =>
+          client.GET('/tasks', {
+            params: { query: { workspaceId, q: query.trim(), limit: 20, offset: 0 } },
+          }),
+        'Failed to search tasks',
+        { onError: 'empty', empty: null },
+      );
+      return data?.tasks ?? [];
     },
   });
 }
@@ -1030,10 +1104,13 @@ export function useListAttachments(taskPublicId: string): UseSuspenseQueryResult
   return useSuspenseQuery({
     queryKey: tasksKeys.attachments(taskPublicId),
     queryFn: async (): Promise<TaskAttachment[]> => {
-      const { data, error } = await sdk.GET('/tasks/{id}/attachments', {
-        params: { path: { id: taskPublicId } },
-      });
-      if (error || !data) throw toApiError(error, 'Failed to load attachments');
+      const data = await apiRequest(
+        (client) =>
+          client.GET('/tasks/{id}/attachments', {
+            params: { path: { id: taskPublicId } },
+          }),
+        'Failed to load attachments',
+      );
       return data.attachments ?? [];
     },
   });
@@ -1078,16 +1155,19 @@ export function usePresignUpload(): UseMutationResult<
     mutationFn: async ({ taskId, file }: PresignUploadArgs): Promise<PresignUploadResult> => {
       const sha256 = await sha256Hex(file);
       const contentType = resolveContentType(file);
-      const { data, error } = await sdk.POST('/tasks/{id}/attachments/presign', {
-        params: { path: { id: taskId } },
-        body: {
-          filename: file.name,
-          contentType,
-          byteSize: file.size,
-          sha256,
-        },
-      });
-      if (error || !data) throw toApiError(error, 'Failed to presign upload');
+      const data = await apiRequest(
+        (client) =>
+          client.POST('/tasks/{id}/attachments/presign', {
+            params: { path: { id: taskId } },
+            body: {
+              filename: file.name,
+              contentType,
+              byteSize: file.size,
+              sha256,
+            },
+          }),
+        'Failed to presign upload',
+      );
 
       // Dedup hit — the blob already lives in object storage and the
       // attachments row was created with a refcount bump. Nothing else
@@ -1118,15 +1198,20 @@ export function usePresignUpload(): UseMutationResult<
       // unreferenced, the blob) when the actual size exceeds the
       // per-file ceiling. Only reachable on the non-deduplicated branch
       // where a fresh blob was actually stored.
-      const { error: confirmError } = await sdk.POST('/tasks/{id}/attachments/{aid}/confirm', {
-        params: { path: { id: taskId, aid: data.attachmentId } },
-      });
-      if (confirmError) {
+      try {
+        await apiRequest(
+          (client) =>
+            client.POST('/tasks/{id}/attachments/{aid}/confirm', {
+              params: { path: { id: taskId, aid: data.attachmentId } },
+            }),
+          'Attachment rejected by size check',
+        );
+      } catch (confirmError) {
         // The server already deleted the oversized attachment row;
         // refresh the list so the phantom row disappears before we
         // surface the error to the UI.
         void qc.invalidateQueries({ queryKey: tasksKeys.attachments(taskId) });
-        throw toApiError(confirmError, 'Attachment rejected by size check');
+        throw confirmError;
       }
 
       return data;
@@ -1144,10 +1229,13 @@ export interface DownloadAttachmentArgs {
 
 /** Gets a presigned download URL for an attachment. */
 export async function fetchDownloadUrl(taskId: string, attachmentId: string): Promise<string> {
-  const { data, error } = await sdk.GET('/tasks/{id}/attachments/{aid}/download', {
-    params: { path: { id: taskId, aid: attachmentId } },
-  });
-  if (error || !data) throw toApiError(error, 'Failed to get download URL');
+  const data = await apiRequest(
+    (client) =>
+      client.GET('/tasks/{id}/attachments/{aid}/download', {
+        params: { path: { id: taskId, aid: attachmentId } },
+      }),
+    'Failed to get download URL',
+  );
   return data.downloadUrl;
 }
 
@@ -1161,10 +1249,13 @@ export function useDeleteAttachment(): UseMutationResult<void, ApiError, DeleteA
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({ taskId, attachmentId }: DeleteAttachmentArgs): Promise<void> => {
-      const { error } = await sdk.DELETE('/tasks/{id}/attachments/{aid}', {
-        params: { path: { id: taskId, aid: attachmentId } },
-      });
-      if (error) throw toApiError(error, 'Failed to delete attachment');
+      await apiRequest(
+        (client) =>
+          client.DELETE('/tasks/{id}/attachments/{aid}', {
+            params: { path: { id: taskId, aid: attachmentId } },
+          }),
+        'Failed to delete attachment',
+      );
     },
     onSuccess: (_data, vars) => {
       void qc.invalidateQueries({ queryKey: tasksKeys.attachments(vars.taskId) });
@@ -1179,10 +1270,13 @@ export function useArchiveTask(): UseMutationResult<void, ApiError, string> {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (id: string): Promise<void> => {
-      const { error } = await sdk.POST('/tasks/{id}/archive', {
-        params: { path: { id } },
-      });
-      if (error) throw toApiError(error, 'Failed to archive task');
+      await apiRequest(
+        (client) =>
+          client.POST('/tasks/{id}/archive', {
+            params: { path: { id } },
+          }),
+        'Failed to archive task',
+      );
     },
     onSuccess: (_data, id) => {
       void qc.invalidateQueries({ queryKey: tasksKeys.detail(id) });
@@ -1196,10 +1290,13 @@ export function useUnarchiveTask(): UseMutationResult<void, ApiError, string> {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (id: string): Promise<void> => {
-      const { error } = await sdk.POST('/tasks/{id}/unarchive', {
-        params: { path: { id } },
-      });
-      if (error) throw toApiError(error, 'Failed to unarchive task');
+      await apiRequest(
+        (client) =>
+          client.POST('/tasks/{id}/unarchive', {
+            params: { path: { id } },
+          }),
+        'Failed to unarchive task',
+      );
     },
     onSuccess: (_data, id) => {
       void qc.invalidateQueries({ queryKey: tasksKeys.detail(id) });
@@ -1219,11 +1316,14 @@ export function useHandoffToAgent(): UseMutationResult<Task, ApiError, HandoffTo
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({ taskId, input }: HandoffToAgentArgs): Promise<Task> => {
-      const { data, error } = await sdk.POST('/tasks/{id}/handoff/to-agent', {
-        params: { path: { id: taskId } },
-        body: input,
-      });
-      if (error || !data) throw toApiError(error, 'Failed to hand off to agent');
+      const data = await apiRequest(
+        (client) =>
+          client.POST('/tasks/{id}/handoff/to-agent', {
+            params: { path: { id: taskId } },
+            body: input,
+          }),
+        'Failed to hand off to agent',
+      );
       return data;
     },
     onSuccess: (task) => {
@@ -1244,11 +1344,14 @@ export function useHandoffToUser(): UseMutationResult<Task, ApiError, HandoffToU
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({ taskId, input }: HandoffToUserArgs): Promise<Task> => {
-      const { data, error } = await sdk.POST('/tasks/{id}/handoff/to-user', {
-        params: { path: { id: taskId } },
-        body: input,
-      });
-      if (error || !data) throw toApiError(error, 'Failed to hand task back');
+      const data = await apiRequest(
+        (client) =>
+          client.POST('/tasks/{id}/handoff/to-user', {
+            params: { path: { id: taskId } },
+            body: input,
+          }),
+        'Failed to hand task back',
+      );
       return data;
     },
     onSuccess: (task) => {
@@ -1264,10 +1367,13 @@ export function useTaskAgentRunsQuery(taskId: string): UseSuspenseQueryResult<Ag
   return useSuspenseQuery({
     queryKey: tasksKeys.agentRuns(taskId),
     queryFn: async (): Promise<AgentRunEvent[]> => {
-      const { data, error } = await sdk.GET('/tasks/{id}/agent-runs', {
-        params: { path: { id: taskId } },
-      });
-      if (error || !data) throw toApiError(error, 'Failed to load agent runs');
+      const data = await apiRequest(
+        (client) =>
+          client.GET('/tasks/{id}/agent-runs', {
+            params: { path: { id: taskId } },
+          }),
+        'Failed to load agent runs',
+      );
       return data.runs ?? [];
     },
   });

@@ -34,9 +34,8 @@ import {
   useQueryClient,
   useSuspenseQuery,
 } from '@tanstack/react-query';
-
-import { type ApiError, toApiError } from '../../lib/api-error';
-import { sdk } from '../../lib/sdk';
+import { apiRequest } from '../../lib/api';
+import type { ApiError } from '../../lib/api-error';
 
 export type Calendar = components['schemas']['CalendarResponse'];
 export type PatchCalendarBody = components['schemas']['PatchCalendarInputBody'];
@@ -67,10 +66,13 @@ export function useCalendarQuery(wsId: string, calId: string): UseSuspenseQueryR
   return useSuspenseQuery({
     queryKey: calendarSettingsKeys.detail(wsId, calId),
     queryFn: async (): Promise<Calendar> => {
-      const { data, error } = await sdk.GET('/workspaces/{wsId}/calendars/{calId}', {
-        params: { path: { wsId, calId } },
-      });
-      if (error || !data) throw toApiError(error, 'Failed to load calendar');
+      const data = await apiRequest(
+        (client) =>
+          client.GET('/workspaces/{wsId}/calendars/{calId}', {
+            params: { path: { wsId, calId } },
+          }),
+        'Failed to load calendar',
+      );
       return data;
     },
   });
@@ -91,11 +93,14 @@ export function useUpdateCalendarMutation(): UseMutationResult<
   const qc = useQueryClient();
   return useMutation<Calendar, ApiError, UpdateCalendarArgs>({
     mutationFn: async ({ wsId, calId, body }): Promise<Calendar> => {
-      const { data, error } = await sdk.PATCH('/workspaces/{wsId}/calendars/{calId}', {
-        params: { path: { wsId, calId } },
-        body,
-      });
-      if (error || !data) throw toApiError(error, 'Failed to update calendar');
+      const data = await apiRequest(
+        (client) =>
+          client.PATCH('/workspaces/{wsId}/calendars/{calId}', {
+            params: { path: { wsId, calId } },
+            body,
+          }),
+        'Failed to update calendar',
+      );
       return data;
     },
     onSuccess: (_data, { wsId, calId }) => {
@@ -114,10 +119,13 @@ export function useDeleteCalendarMutation(): UseMutationResult<void, ApiError, D
   const qc = useQueryClient();
   return useMutation<void, ApiError, DeleteCalendarArgs>({
     mutationFn: async ({ wsId, calId }): Promise<void> => {
-      const { error } = await sdk.DELETE('/workspaces/{wsId}/calendars/{calId}', {
-        params: { path: { wsId, calId } },
-      });
-      if (error) throw toApiError(error, 'Failed to delete calendar');
+      await apiRequest(
+        (client) =>
+          client.DELETE('/workspaces/{wsId}/calendars/{calId}', {
+            params: { path: { wsId, calId } },
+          }),
+        'Failed to delete calendar',
+      );
     },
     onSuccess: (_void, { wsId, calId }) => {
       invalidateCalendarCaches(qc, wsId, calId);
@@ -149,13 +157,16 @@ export function useCalendarEventCountQuery(
       start.setFullYear(start.getFullYear() - 1);
       const end = new Date(now);
       end.setFullYear(end.getFullYear() + 1);
-      const { data, error } = await sdk.GET('/workspaces/{wsId}/calendars/{calId}/events', {
-        params: {
-          path: { wsId, calId },
-          query: { start: start.toISOString(), end: end.toISOString() },
-        },
-      });
-      if (error || !data) throw toApiError(error, 'Failed to load event count');
+      const data = await apiRequest(
+        (client) =>
+          client.GET('/workspaces/{wsId}/calendars/{calId}/events', {
+            params: {
+              path: { wsId, calId },
+              query: { start: start.toISOString(), end: end.toISOString() },
+            },
+          }),
+        'Failed to load event count',
+      );
       return (data.events ?? []).length;
     },
   });

@@ -19,6 +19,8 @@ const sdkMocks = vi.hoisted(() => ({
 
 vi.mock('../../../lib/sdk', () => ({
   sdk: { GET: sdkMocks.get, POST: sdkMocks.post, PATCH: sdkMocks.patch },
+
+  authSdk: { GET: sdkMocks.get, POST: sdkMocks.post, PATCH: sdkMocks.patch },
 }));
 
 import type { ResolveCommandResult } from '../api';
@@ -33,11 +35,15 @@ function call(tool: string, args: Record<string, unknown>): ResolveCommandResult
 }
 
 function tasksPage(tasks: Array<{ id: string; title: string }>): unknown {
-  return { data: { tasks, total: tasks.length }, error: null };
+  return {
+    data: { tasks, total: tasks.length },
+    error: null,
+    response: new Response(null, { status: 200 }),
+  };
 }
 
 function projectsPage(projects: Array<{ id: string; name: string }>): unknown {
-  return { data: { projects }, error: null };
+  return { data: { projects }, error: null, response: new Response(null, { status: 200 }) };
 }
 
 beforeEach(() => {
@@ -71,7 +77,11 @@ describe('unwired tools', () => {
 describe('transition_task', () => {
   it('posts the transition for a task named by title', async () => {
     sdkMocks.get.mockResolvedValueOnce(tasksPage([{ id: TASK_ID, title: 'Login bug' }]));
-    sdkMocks.post.mockResolvedValueOnce({ data: { ok: true }, error: null });
+    sdkMocks.post.mockResolvedValueOnce({
+      data: { ok: true },
+      error: null,
+      response: new Response(null, { status: 200 }),
+    });
 
     const outcome = await dispatchToolCall(
       call('transition_task', { taskId: 'Login bug', transition: 'complete' }),
@@ -93,7 +103,11 @@ describe('transition_task', () => {
   });
 
   it('uses a public id verbatim without a lookup', async () => {
-    sdkMocks.post.mockResolvedValueOnce({ data: { ok: true }, error: null });
+    sdkMocks.post.mockResolvedValueOnce({
+      data: { ok: true },
+      error: null,
+      response: new Response(null, { status: 200 }),
+    });
     await dispatchToolCall(call('transition_task', { taskId: TASK_ID, transition: 'start' }), {
       workspaceId: WS,
     });
@@ -129,7 +143,11 @@ describe('transition_task', () => {
         { id: TASK_ID, title: 'Login bug' },
       ]),
     );
-    sdkMocks.post.mockResolvedValueOnce({ data: { ok: true }, error: null });
+    sdkMocks.post.mockResolvedValueOnce({
+      data: { ok: true },
+      error: null,
+      response: new Response(null, { status: 200 }),
+    });
     await dispatchToolCall(call('transition_task', { taskId: 'login bug', transition: 'cancel' }), {
       workspaceId: WS,
     });
@@ -163,7 +181,11 @@ describe('transition_task', () => {
 describe('create_task', () => {
   it('creates the task and lands on it', async () => {
     sdkMocks.get.mockResolvedValueOnce(projectsPage([{ id: PROJECT_ID, name: 'Platform' }]));
-    sdkMocks.post.mockResolvedValueOnce({ data: { id: TASK_ID }, error: null });
+    sdkMocks.post.mockResolvedValueOnce({
+      data: { id: TASK_ID },
+      error: null,
+      response: new Response(null, { status: 200 }),
+    });
 
     const outcome = await dispatchToolCall(
       call('create_task', { title: 'Write the changelog', priority: 3 }),
@@ -192,7 +214,11 @@ describe('create_task', () => {
         { id: PROJECT_ID, name: 'Platform' },
       ]),
     );
-    sdkMocks.post.mockResolvedValueOnce({ data: { id: TASK_ID }, error: null });
+    sdkMocks.post.mockResolvedValueOnce({
+      data: { id: TASK_ID },
+      error: null,
+      response: new Response(null, { status: 200 }),
+    });
     await dispatchToolCall(call('create_task', { title: 'Ship it', projectId: 'Platform' }), {
       workspaceId: WS,
     });
@@ -215,7 +241,11 @@ describe('create_task', () => {
 
   it('reports a server refusal instead of navigating', async () => {
     sdkMocks.get.mockResolvedValueOnce(projectsPage([{ id: PROJECT_ID, name: 'Platform' }]));
-    sdkMocks.post.mockResolvedValueOnce({ data: undefined, error: { title: 'nope' } });
+    sdkMocks.post.mockResolvedValueOnce({
+      data: undefined,
+      error: { title: 'nope' },
+      response: new Response(null, { status: 400 }),
+    });
     const outcome = await dispatchToolCall(call('create_task', { title: 'Ship it' }), {
       workspaceId: WS,
     });
@@ -226,7 +256,11 @@ describe('create_task', () => {
 
 describe('update_task', () => {
   it('patches only the fields the command carried', async () => {
-    sdkMocks.patch.mockResolvedValueOnce({ data: { id: TASK_ID }, error: null });
+    sdkMocks.patch.mockResolvedValueOnce({
+      data: { id: TASK_ID },
+      error: null,
+      response: new Response(null, { status: 200 }),
+    });
     await dispatchToolCall(
       call('update_task', { taskId: TASK_ID, title: 'New title', dueOn: '2026-08-31' }),
       { workspaceId: WS },
@@ -248,7 +282,11 @@ describe('update_task', () => {
 
 describe('add_comment', () => {
   it('posts the comment on the resolved task', async () => {
-    sdkMocks.post.mockResolvedValueOnce({ data: { id: 'c-1' }, error: null });
+    sdkMocks.post.mockResolvedValueOnce({
+      data: { id: 'c-1' },
+      error: null,
+      response: new Response(null, { status: 200 }),
+    });
     const outcome = await dispatchToolCall(
       call('add_comment', { taskId: TASK_ID, body: 'Looks good' }),
       { workspaceId: WS },

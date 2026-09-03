@@ -10,7 +10,7 @@ import {
   useSuspenseQuery,
 } from '@tanstack/react-query';
 
-import { sdk } from '../../lib/sdk';
+import { apiRequest } from '../../lib/api';
 
 /** Shape returned by GET and PATCH auto-action-settings. */
 export interface AutoActionSettings {
@@ -39,13 +39,13 @@ export function useAutoActionSettingsQuery(
   return useSuspenseQuery({
     queryKey: autoActionSettingsKeys.settings(workspaceId),
     queryFn: async (): Promise<AutoActionSettings> => {
-      const { data, error } = await sdk.GET('/workspaces/{wsId}/ai/auto-action-settings', {
-        params: { path: { wsId: workspaceId } },
-      });
-      if (error || !data) {
-        throw new Error('Failed to load auto-action settings');
-      }
-      return data;
+      return apiRequest(
+        (client) =>
+          client.GET('/workspaces/{wsId}/ai/auto-action-settings', {
+            params: { path: { wsId: workspaceId } },
+          }),
+        'Failed to load auto-action settings',
+      );
     },
   });
 }
@@ -67,14 +67,14 @@ export function useUpdateAutoActionSettings(): UseMutationResult<
       workspaceId,
       patch,
     }: UpdateAutoActionSettingsArgs): Promise<AutoActionSettings> => {
-      const { data, error } = await sdk.PATCH('/workspaces/{wsId}/ai/auto-action-settings', {
-        params: { path: { wsId: workspaceId } },
-        body: patch,
-      });
-      if (error || !data) {
-        throw new Error('Failed to update auto-action settings');
-      }
-      return data;
+      return apiRequest(
+        (client) =>
+          client.PATCH('/workspaces/{wsId}/ai/auto-action-settings', {
+            params: { path: { wsId: workspaceId } },
+            body: patch,
+          }),
+        'Failed to update auto-action settings',
+      );
     },
     onSuccess: (_data, vars) => {
       void qc.invalidateQueries({

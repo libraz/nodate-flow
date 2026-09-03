@@ -12,7 +12,7 @@ import {
   useSuspenseQuery,
 } from '@tanstack/react-query';
 
-import { sdk } from '../../lib/sdk';
+import { apiRequest } from '../../lib/api';
 
 /** Source of an inbox signal. Backend is an open string; we narrow for UI. */
 export type InboxSource = 'manual' | 'github' | 'slack' | 'email' | 'webhook';
@@ -26,7 +26,7 @@ export const inboxKeys = {
   list: () => [...inboxKeys.all, 'list'] as const,
 };
 
-import { ApiError, toApiError } from '../../lib/api-error';
+import { ApiError } from '../../lib/api-error';
 
 export { ApiError as InboxApiError };
 
@@ -35,8 +35,7 @@ export function useInboxQuery(): UseSuspenseQueryResult<InboxItem[]> {
   return useSuspenseQuery({
     queryKey: inboxKeys.list(),
     queryFn: async (): Promise<InboxItem[]> => {
-      const { data, error } = await sdk.GET('/inbox');
-      if (error || !data) throw toApiError(error, 'Failed to load inbox');
+      const data = await apiRequest((client) => client.GET('/inbox'), 'Failed to load inbox');
       return data.items ?? [];
     },
   });
@@ -62,10 +61,13 @@ export function useArchiveInboxItem(): UseMutationResult<void, ApiError, string>
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (id: string): Promise<void> => {
-      const { error } = await sdk.POST('/inbox/{id}/archive', {
-        params: { path: { id } },
-      });
-      if (error) throw toApiError(error, 'Failed to archive inbox item');
+      await apiRequest(
+        (client) =>
+          client.POST('/inbox/{id}/archive', {
+            params: { path: { id } },
+          }),
+        'Failed to archive inbox item',
+      );
     },
     onMutate: async (id) => {
       await qc.cancelQueries({ queryKey: inboxKeys.list() });
@@ -97,11 +99,14 @@ export function useSnoozeInboxItem(): UseMutationResult<void, ApiError, SnoozeIn
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({ id, snoozeUntil }: SnoozeInboxArgs): Promise<void> => {
-      const { error } = await sdk.POST('/inbox/{id}/snooze', {
-        params: { path: { id } },
-        body: { snoozeUntil },
-      });
-      if (error) throw toApiError(error, 'Failed to snooze inbox item');
+      await apiRequest(
+        (client) =>
+          client.POST('/inbox/{id}/snooze', {
+            params: { path: { id } },
+            body: { snoozeUntil },
+          }),
+        'Failed to snooze inbox item',
+      );
     },
     onMutate: async ({ id }) => {
       await qc.cancelQueries({ queryKey: inboxKeys.list() });

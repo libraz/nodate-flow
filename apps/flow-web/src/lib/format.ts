@@ -5,6 +5,10 @@
  * No locale-specific formatting is hand-written.
  */
 
+import type { Zone } from '@nodate-flow/ui/time';
+
+import { todayKey } from './date-utils';
+
 /**
  * Format an ISO 8601 datetime or date string as a medium-length localised date.
  *
@@ -173,9 +177,15 @@ export function formatCurrency(amount: number, currency: string, locale: string)
   }
 }
 
-export function isOverdue(dueOn: string | null | undefined): boolean {
+/**
+ * Whether a `YYYY-MM-DD` due date is before today in `zone`.
+ *
+ * "Today" is a calendar day and therefore a zone question. Answered in
+ * the browser's zone, a task turned red — or stopped being red — up to a
+ * day away from when the profile zone says it is due, and from when the
+ * server-side reminder about it fires.
+ */
+export function isOverdue(dueOn: string | null | undefined, zone: Zone): boolean {
   if (!dueOn) return false;
-  const now = new Date();
-  const todayKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
-  return dueOn < todayKey;
+  return dueOn < todayKey(zone);
 }

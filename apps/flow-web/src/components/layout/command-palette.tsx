@@ -49,7 +49,7 @@ import { dispatchToolCall, isDispatchableTool } from '../../features/nl-command/
 import type { Project } from '../../features/projects/api';
 import type { TaskListItem } from '../../features/tasks/api';
 import { useWorkspacesQuery } from '../../features/workspaces/api';
-import { sdk } from '../../lib/sdk';
+import { apiRequest } from '../../lib/api';
 import { useCurrentWorkspaceId } from '../../lib/use-current-workspace';
 import css from './command-palette.module.css';
 
@@ -310,11 +310,17 @@ function PaletteBody({ onSelect, initialCommandMode }: InnerProps): ReactElement
       enabled: shouldSearchTasks,
       staleTime: 10_000,
       queryFn: async (): Promise<TaskListItem[]> => {
-        const { data, error } = await sdk.GET('/tasks', {
-          params: { query: { workspaceId: w.id, q: debounced, limit: 10, offset: 0 } },
-        });
-        if (error || !data) return [];
-        return data.tasks ?? [];
+        // One workspace refusing the search contributes no rows; the
+        // palette still answers from the workspaces that replied.
+        const data = await apiRequest(
+          (client) =>
+            client.GET('/tasks', {
+              params: { query: { workspaceId: w.id, q: debounced, limit: 10, offset: 0 } },
+            }),
+          'Failed to search tasks',
+          { onError: 'empty', empty: null },
+        );
+        return data?.tasks ?? [];
       },
     })),
   });
@@ -324,11 +330,13 @@ function PaletteBody({ onSelect, initialCommandMode }: InnerProps): ReactElement
       queryKey: ['command-palette', 'projects', w.id] as const,
       staleTime: 60_000,
       queryFn: async (): Promise<Array<Project & { workspaceId: string }>> => {
-        const { data, error } = await sdk.GET('/workspaces/{wsId}/projects', {
-          params: { path: { wsId: w.id } },
-        });
-        if (error || !data) return [];
-        return (data.projects ?? []).map((p) => ({ ...p, workspaceId: w.id }));
+        const data = await apiRequest(
+          (client) =>
+            client.GET('/workspaces/{wsId}/projects', { params: { path: { wsId: w.id } } }),
+          'Failed to load projects',
+          { onError: 'empty', empty: null },
+        );
+        return (data?.projects ?? []).map((p) => ({ ...p, workspaceId: w.id }));
       },
     })),
   });

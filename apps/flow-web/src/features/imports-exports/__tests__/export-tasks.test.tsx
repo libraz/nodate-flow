@@ -35,6 +35,7 @@ const mocks = vi.hoisted(() => ({
 vi.mock('../../../lib/sdk', () => ({
   // openapi-fetch keys its client by HTTP method, hence the caps.
   sdk: { GET: mocks.get, POST: mocks.post },
+  authSdk: { GET: mocks.get, POST: mocks.post },
 }));
 
 vi.mock('@nodate-flow/ui/primitives/toast', () => ({
@@ -340,6 +341,7 @@ describe('DataSettingsPage — export outcome messaging', () => {
         detail: 'dataset query failed',
         status: 500,
       },
+      response: new Response(null, { status: 400 }),
     });
     renderPage();
 

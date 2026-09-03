@@ -26,7 +26,9 @@ import { OPEN_COMMAND_PALETTE_EVENT } from '../components/layout/glass-dock';
 import { selectUser, useAuth } from '../features/auth/auth-store';
 import DashboardView from '../features/dashboard/dashboard-view';
 import { useWorkspacesQuery } from '../features/workspaces/api';
-import { sdk } from '../lib/sdk';
+import { apiRequest } from '../lib/api';
+import { todayKey } from '../lib/date-utils';
+import { useEffectiveZone } from '../lib/use-effective-timezone';
 
 type AssignedTask = components['schemas']['MyTaskListItem'];
 
@@ -97,21 +99,26 @@ function StatCard({
 
 function TaskSummary(): ReactElement {
   const { t } = useTranslation('common');
+  // "Overdue" and "due today" are calendar-day questions, so they are
+  // read in the effective zone — the same one the calendar files the
+  // same tasks under. Read from the browser, the two counts disagreed
+  // with the grid for anyone whose profile zone is on the other side of
+  // midnight.
+  const zone = useEffectiveZone();
   const { data: tasks } = useSuspenseQuery({
     queryKey: ['me', 'tasks'] as const,
     staleTime: 30_000,
     queryFn: async (): Promise<AssignedTask[]> => {
-      const { data, error } = await sdk.GET('/me/tasks', {
-        params: { query: { limit: 200, offset: 0 } },
-      });
-      if (error || !data) return [];
+      const data = await apiRequest(
+        (client) => client.GET('/me/tasks', { params: { query: { limit: 200, offset: 0 } } }),
+        'Failed to load assigned tasks',
+      );
       return data.tasks ?? [];
     },
   });
 
   const counts = useMemo(() => {
-    const now = new Date();
-    const todayKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+    const today = todayKey(zone);
     let open = 0;
     let overdue = 0;
     let dueToday = 0;
@@ -123,11 +130,11 @@ function TaskSummary(): ReactElement {
       }
       if (t.derivedState === 'cancelled') continue;
       open++;
-      if (t.dueOn && t.dueOn < todayKey) overdue++;
-      if (t.dueOn === todayKey) dueToday++;
+      if (t.dueOn && t.dueOn < today) overdue++;
+      if (t.dueOn === today) dueToday++;
     }
     return { open, overdue, dueToday, done };
-  }, [tasks]);
+  }, [tasks, zone]);
 
   const recentTasks = useMemo(() => {
     return tasks

@@ -13,7 +13,7 @@ import {
   useQueryClient,
 } from '@tanstack/react-query';
 
-import { sdk } from '../../lib/sdk';
+import { apiRequest } from '../../lib/api';
 import { useStreamHealthy } from '../realtime/stream-health';
 
 /** AI suggestion summary mirrored from the SDK. */
@@ -27,7 +27,7 @@ export const aiSuggestionsKeys = {
   list: (workspaceId: string) => [...aiSuggestionsKeys.all, 'list', workspaceId] as const,
 };
 
-import { ApiError, toApiError } from '../../lib/api-error';
+import { ApiError } from '../../lib/api-error';
 
 export { ApiError as AiSuggestionsApiError };
 
@@ -51,10 +51,13 @@ export function useAiSuggestionsQuery(
     throwOnError: false,
     queryFn: async (): Promise<AiSuggestion[]> => {
       if (!workspaceId) return [];
-      const { data, error } = await sdk.GET('/workspaces/{wsId}/ai/suggestions', {
-        params: { path: { wsId: workspaceId } },
-      });
-      if (error || !data) throw toApiError(error, 'Failed to load AI suggestions');
+      const data = await apiRequest(
+        (client) =>
+          client.GET('/workspaces/{wsId}/ai/suggestions', {
+            params: { path: { wsId: workspaceId } },
+          }),
+        'Failed to load AI suggestions',
+      );
       return data.suggestions ?? [];
     },
   });
@@ -70,10 +73,13 @@ export function useApplyAiSuggestion(
   const qc = useQueryClient();
   return useMutation<void, ApiError, string>({
     mutationFn: async (inboxItemId: string): Promise<void> => {
-      const { error } = await sdk.POST('/workspaces/{wsId}/ai/suggestions/{inboxItemId}/apply', {
-        params: { path: { wsId: workspaceId, inboxItemId } },
-      });
-      if (error) throw toApiError(error, 'Failed to apply AI suggestion');
+      await apiRequest(
+        (client) =>
+          client.POST('/workspaces/{wsId}/ai/suggestions/{inboxItemId}/apply', {
+            params: { path: { wsId: workspaceId, inboxItemId } },
+          }),
+        'Failed to apply AI suggestion',
+      );
     },
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: aiSuggestionsKeys.list(workspaceId) });
@@ -91,10 +97,13 @@ export function useDismissAiSuggestion(
   const qc = useQueryClient();
   return useMutation<void, ApiError, string>({
     mutationFn: async (inboxItemId: string): Promise<void> => {
-      const { error } = await sdk.POST('/workspaces/{wsId}/ai/suggestions/{inboxItemId}/dismiss', {
-        params: { path: { wsId: workspaceId, inboxItemId } },
-      });
-      if (error) throw toApiError(error, 'Failed to dismiss AI suggestion');
+      await apiRequest(
+        (client) =>
+          client.POST('/workspaces/{wsId}/ai/suggestions/{inboxItemId}/dismiss', {
+            params: { path: { wsId: workspaceId, inboxItemId } },
+          }),
+        'Failed to dismiss AI suggestion',
+      );
     },
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: aiSuggestionsKeys.list(workspaceId) });

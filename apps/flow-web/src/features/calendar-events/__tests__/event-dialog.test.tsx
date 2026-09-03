@@ -8,11 +8,13 @@
  */
 
 import type { components } from '@nodate-flow/sdk';
+import { Zone } from '@nodate-flow/ui/time';
 import { screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { renderWithProviders } from '@tests/helpers/render';
 import type { ReactElement } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { wallClockToUnix } from '../../../lib/date-utils';
 import EventDialog, { type EventDialogMode, presetToRRule, rruleToPreset } from '../event-dialog';
 
 type CreateEventInput = components['schemas']['CreateEventInputBody'];
@@ -92,8 +94,8 @@ function editMode(event: Partial<CalEventLike> = {}): EventDialogMode {
     showAs: 'busy',
     visibility: 'default',
     createdAt: 1_700_000_000,
-    startAt: Math.floor(new Date('2030-06-15T09:00:00').getTime() / 1000),
-    endAt: Math.floor(new Date('2030-06-15T10:00:00').getTime() / 1000),
+    startAt: Date.UTC(2030, 5, 15, 9) / 1000,
+    endAt: Date.UTC(2030, 5, 15, 10) / 1000,
     ...event,
   } as CalEventLike;
   return {
@@ -122,8 +124,8 @@ function eventDetail(overrides: Partial<EventDetail> = {}): EventDetail {
     flexibility: 'fixed',
     visibility: 'default',
     createdAt: 1_700_000_000,
-    startAt: Math.floor(new Date('2030-06-15T09:00:00').getTime() / 1000),
-    endAt: Math.floor(new Date('2030-06-15T10:00:00').getTime() / 1000),
+    startAt: Date.UTC(2030, 5, 15, 9) / 1000,
+    endAt: Date.UTC(2030, 5, 15, 10) / 1000,
     ...overrides,
   } as EventDetail;
 }
@@ -137,7 +139,7 @@ function renderDialog(overrides: Partial<Parameters<typeof EventDialog>[0]> = {}
   return (
     <EventDialog
       open
-      timezone="UTC"
+      zone={Zone.utc()}
       workspaceId="ws-1"
       projects={[{ id: 'proj-1', name: 'Alpha' }] as Parameters<typeof EventDialog>[0]['projects']}
       mode={overrides.mode ?? createMode()}
@@ -458,6 +460,74 @@ describe('<EventDialog>', () => {
     // survive a save that had nothing to do with it.
     expect('recurrenceRule' in args.body).toBe(false);
     expect(args.body.clear ?? []).not.toContain('recurrenceRule');
+  });
+
+  /* ── zone boundaries ────────────────────────────────────────── */
+
+  // The dialog is handed a zone that is deliberately not the runner's,
+  // so an implementation that resolved wall clocks in the browser's zone
+  // fails these on every machine rather than only on some.
+  const eventZone = Zone.resolve('America/New_York');
+
+  it('resolves a submitted wall clock in the zone it stamps on the event', () => {
+    // 09:00-10:00 on 2030-06-15 in New York is 13:00-14:00Z. Sending an
+    // instant resolved in the browser's zone alongside a `timezone` of
+    // America/New_York stores an event that contradicts its own label.
+    expect(wallClockToUnix('2030-06-15', '09:00', eventZone)).toBe(
+      Date.UTC(2030, 5, 15, 13, 0, 0, 0) / 1000,
+    );
+  });
+
+  it('stamps the zone it resolved the instants in', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(renderDialog({ zone: eventZone }));
+
+    await user.type(screen.getByRole('textbox', { name: 'field.title' }), 'Planning call');
+    await user.click(screen.getByRole('button', { name: 'action.submit.create' }));
+
+    const args = mocks.createEvent.mock.calls[0]?.[0] as { body: CreateEventInput };
+    expect(args.body.timezone).toBe('America/New_York');
+    // The default create times are 09:00-10:00 on the clicked date, and
+    // they have to be resolved in the zone the row declares.
+    expect(args.body.startAt).toBe(wallClockToUnix('2030-06-15', '09:00', eventZone));
+    expect(args.body.endAt).toBe(wallClockToUnix('2030-06-15', '10:00', eventZone));
+  });
+
+  it('opens an event on the wall clock its zone gives it', async () => {
+    // 2030-06-15T13:00Z is 09:00 in New York. Seeding the form from the
+    // browser's zone shows a time the event does not have.
+    withDetail({
+      startAt: Date.UTC(2030, 5, 15, 13) / 1000,
+      endAt: Date.UTC(2030, 5, 15, 14) / 1000,
+    });
+    renderWithProviders(renderDialog({ mode: editMode(), zone: eventZone }));
+
+    const times = await screen.findAllByRole('button', { name: /^\d{2}:\d{2}$/ });
+    expect(times.map((el) => el.textContent)).toEqual(['09:00', '10:00']);
+  });
+
+  it('does not move an event that was opened and saved without touching the time', async () => {
+    // The seed and the submit are one round trip. When only one of them
+    // was corrected, every edit shifted the event by the offset between
+    // the two zones — a silent rewrite of data nobody touched.
+    const user = userEvent.setup();
+    const startAt = Date.UTC(2030, 5, 15, 13) / 1000;
+    const endAt = Date.UTC(2030, 5, 15, 14) / 1000;
+    withDetail({ startAt, endAt });
+    renderWithProviders(renderDialog({ mode: editMode(), zone: eventZone }));
+
+    // Move a time control so the range reaches the payload at all, then
+    // put it back where the stored event had it.
+    const [startTrigger] = await screen.findAllByRole('button', { name: /^\d{2}:\d{2}$/ });
+    await user.click(startTrigger as HTMLElement);
+    await user.click(screen.getByRole('option', { name: '08:00' }));
+    await user.click(startTrigger as HTMLElement);
+    await user.click(screen.getByRole('option', { name: '09:00' }));
+    await user.click(screen.getByRole('button', { name: 'action.submit.edit' }));
+
+    const args = mocks.updateEvent.mock.calls[0]?.[0] as { body: PatchEventInput };
+    expect(args.body.startAt).toBe(startAt);
+    expect(args.body.endAt).toBe(endAt);
   });
 
   it('preserves backend error detail in mutation failure toasts', async () => {

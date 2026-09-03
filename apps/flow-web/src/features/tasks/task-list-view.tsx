@@ -29,6 +29,7 @@ import { useTranslation } from 'react-i18next';
 
 import { formatApiError } from '../../lib/api-error';
 import { formatDate, formatEpoch, isOverdue } from '../../lib/format';
+import { useEffectiveZone } from '../../lib/use-effective-timezone';
 import { useWeekStart } from '../../lib/use-week-start';
 import { computeBlockedByOpen, useProjectDependenciesQuery } from '../projects/api';
 import {
@@ -414,12 +415,13 @@ function InlineDueCell({
 }): ReactElement {
   const { t } = useTranslation('common');
   const weekStart = useWeekStart();
+  const zone = useEffectiveZone();
   const weekdayLabels = t('common.date.weekdays', { returnObjects: true }) as string[];
   const formatMonthYear = (year: number, month: number): string =>
     t('common.date.monthYear', { year, month });
   const dueOn = task.dueOn;
   const overdue =
-    isOverdue(dueOn) && task.derivedState !== 'done' && task.derivedState !== 'cancelled';
+    isOverdue(dueOn, zone) && task.derivedState !== 'done' && task.derivedState !== 'cancelled';
 
   if (editing) {
     return (

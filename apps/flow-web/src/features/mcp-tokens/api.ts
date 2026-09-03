@@ -16,7 +16,7 @@ import {
   useSuspenseQuery,
 } from '@tanstack/react-query';
 
-import { sdk } from '../../lib/sdk';
+import { apiRequest } from '../../lib/api';
 
 export type McpTokenSummary = components['schemas']['McpTokenSummary'];
 export type CreateMcpTokenInput = components['schemas']['CreateMcpTokenInputBody'];
@@ -28,7 +28,7 @@ export const mcpTokensKeys = {
   list: (workspaceId: string) => [...mcpTokensKeys.all, 'list', workspaceId] as const,
 };
 
-import { ApiError, toApiError } from '../../lib/api-error';
+import { ApiError } from '../../lib/api-error';
 
 export { ApiError as McpTokenApiError };
 
@@ -37,10 +37,13 @@ export function useMcpTokensQuery(workspaceId: string): UseSuspenseQueryResult<M
   return useSuspenseQuery({
     queryKey: mcpTokensKeys.list(workspaceId),
     queryFn: async (): Promise<McpTokenSummary[]> => {
-      const { data, error } = await sdk.GET('/workspaces/{wsId}/me/mcp-tokens', {
-        params: { path: { wsId: workspaceId } },
-      });
-      if (error || !data) throw toApiError(error, 'Failed to load MCP tokens');
+      const data = await apiRequest(
+        (client) =>
+          client.GET('/workspaces/{wsId}/me/mcp-tokens', {
+            params: { path: { wsId: workspaceId } },
+          }),
+        'Failed to load MCP tokens',
+      );
       return data.tokens ?? [];
     },
   });
@@ -53,11 +56,14 @@ export function useCreateMcpToken(
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (input: CreateMcpTokenInput): Promise<CreateMcpTokenOutput> => {
-      const { data, error } = await sdk.POST('/workspaces/{wsId}/me/mcp-tokens', {
-        params: { path: { wsId: workspaceId } },
-        body: input,
-      });
-      if (error || !data) throw toApiError(error, 'Failed to create MCP token');
+      const data = await apiRequest(
+        (client) =>
+          client.POST('/workspaces/{wsId}/me/mcp-tokens', {
+            params: { path: { wsId: workspaceId } },
+            body: input,
+          }),
+        'Failed to create MCP token',
+      );
       return data;
     },
     onSuccess: () => {
@@ -71,10 +77,13 @@ export function useRevokeMcpToken(workspaceId: string): UseMutationResult<void, 
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (tokenId: string): Promise<void> => {
-      const { error } = await sdk.DELETE('/workspaces/{wsId}/me/mcp-tokens/{tokenId}', {
-        params: { path: { wsId: workspaceId, tokenId } },
-      });
-      if (error) throw toApiError(error, 'Failed to revoke MCP token');
+      await apiRequest(
+        (client) =>
+          client.DELETE('/workspaces/{wsId}/me/mcp-tokens/{tokenId}', {
+            params: { path: { wsId: workspaceId, tokenId } },
+          }),
+        'Failed to revoke MCP token',
+      );
     },
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: mcpTokensKeys.list(workspaceId) });

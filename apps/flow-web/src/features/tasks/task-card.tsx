@@ -15,6 +15,7 @@ import type { ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { formatDate, isOverdue } from '../../lib/format';
+import { useEffectiveZone } from '../../lib/use-effective-timezone';
 import type { TaskDerivedState, TaskListItem, TaskPriority, TransitionName } from './api';
 import { PRIORITY_KEY, PRIORITY_TONE } from './constants';
 import TaskMoveMenu from './task-move-menu';
@@ -39,6 +40,7 @@ export default function TaskCard({
   onTransition,
 }: TaskCardProps): ReactElement {
   const { t, i18n } = useTranslation('common');
+  const zone = useEffectiveZone();
   const locale = i18n.resolvedLanguage ?? 'en';
   // Defensive cast for fields not yet in the regenerated SDK types.
   const ext = task as TaskListItem & {
@@ -98,7 +100,7 @@ export default function TaskCard({
         {task.dueOn ? (
           <Badge
             tone={
-              isOverdue(task.dueOn) &&
+              isOverdue(task.dueOn, zone) &&
               task.derivedState !== 'done' &&
               task.derivedState !== 'cancelled'
                 ? 'danger'

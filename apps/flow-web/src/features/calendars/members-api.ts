@@ -32,9 +32,8 @@ import {
   useQueryClient,
   useSuspenseQuery,
 } from '@tanstack/react-query';
-
-import { type ApiError, toApiError } from '../../lib/api-error';
-import { sdk } from '../../lib/sdk';
+import { apiRequest } from '../../lib/api';
+import type { ApiError } from '../../lib/api-error';
 
 export type CalendarMember = components['schemas']['MemberResponse'];
 
@@ -67,10 +66,13 @@ export function useCalendarMembersQuery(
   return useSuspenseQuery({
     queryKey: calendarMembersKeys.list(wsId, calId),
     queryFn: async (): Promise<CalendarMember[]> => {
-      const { data, error } = await sdk.GET('/workspaces/{wsId}/calendars/{calId}/members', {
-        params: { path: { wsId, calId } },
-      });
-      if (error || !data) throw toApiError(error, 'Failed to load calendar members');
+      const data = await apiRequest(
+        (client) =>
+          client.GET('/workspaces/{wsId}/calendars/{calId}/members', {
+            params: { path: { wsId, calId } },
+          }),
+        'Failed to load calendar members',
+      );
       return data.members ?? [];
     },
   });
@@ -91,11 +93,14 @@ export function useAddCalendarMemberMutation(): UseMutationResult<
   const qc = useQueryClient();
   return useMutation<CalendarMember, ApiError, AddCalendarMemberArgs>({
     mutationFn: async ({ wsId, calId, email, role }): Promise<CalendarMember> => {
-      const { data, error } = await sdk.POST('/workspaces/{wsId}/calendars/{calId}/members', {
-        params: { path: { wsId, calId } },
-        body: { email, role },
-      });
-      if (error || !data) throw toApiError(error, 'Failed to add member');
+      const data = await apiRequest(
+        (client) =>
+          client.POST('/workspaces/{wsId}/calendars/{calId}/members', {
+            params: { path: { wsId, calId } },
+            body: { email, role },
+          }),
+        'Failed to add member',
+      );
       return data;
     },
     onSuccess: (_data, { wsId, calId }) => {
@@ -119,11 +124,14 @@ export function useUpdateCalendarMemberRoleMutation(): UseMutationResult<
   const qc = useQueryClient();
   return useMutation<void, ApiError, UpdateCalendarMemberRoleArgs>({
     mutationFn: async ({ wsId, calId, userId, role }): Promise<void> => {
-      const { error } = await sdk.PATCH('/workspaces/{wsId}/calendars/{calId}/members/{userId}', {
-        params: { path: { wsId, calId, userId } },
-        body: { role },
-      });
-      if (error) throw toApiError(error, 'Failed to update member role');
+      await apiRequest(
+        (client) =>
+          client.PATCH('/workspaces/{wsId}/calendars/{calId}/members/{userId}', {
+            params: { path: { wsId, calId, userId } },
+            body: { role },
+          }),
+        'Failed to update member role',
+      );
     },
     onSuccess: (_void, { wsId, calId }) => {
       invalidate(qc, wsId, calId);
@@ -145,10 +153,13 @@ export function useRemoveCalendarMemberMutation(): UseMutationResult<
   const qc = useQueryClient();
   return useMutation<void, ApiError, RemoveCalendarMemberArgs>({
     mutationFn: async ({ wsId, calId, userId }): Promise<void> => {
-      const { error } = await sdk.DELETE('/workspaces/{wsId}/calendars/{calId}/members/{userId}', {
-        params: { path: { wsId, calId, userId } },
-      });
-      if (error) throw toApiError(error, 'Failed to remove member');
+      await apiRequest(
+        (client) =>
+          client.DELETE('/workspaces/{wsId}/calendars/{calId}/members/{userId}', {
+            params: { path: { wsId, calId, userId } },
+          }),
+        'Failed to remove member',
+      );
     },
     onSuccess: (_void, { wsId, calId }) => {
       invalidate(qc, wsId, calId);

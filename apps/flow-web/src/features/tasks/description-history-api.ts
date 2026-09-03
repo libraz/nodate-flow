@@ -6,9 +6,8 @@ import {
   useQueryClient,
   useSuspenseQuery,
 } from '@tanstack/react-query';
-
-import { type ApiError, toApiError } from '../../lib/api-error';
-import { sdk } from '../../lib/sdk';
+import { apiRequest } from '../../lib/api';
+import type { ApiError } from '../../lib/api-error';
 import { tasksKeys } from './api';
 
 export type DescriptionVersion = components['schemas']['DescriptionVersion'];
@@ -27,10 +26,13 @@ export function useDescriptionHistoryQuery(
   return useSuspenseQuery({
     queryKey: descriptionHistoryKeys.all(taskId),
     queryFn: async (): Promise<DescriptionVersion[]> => {
-      const { data, error } = await sdk.GET('/tasks/{id}/description-history', {
-        params: { path: { id: taskId } },
-      });
-      if (error || !data) throw toApiError(error, 'Failed to load description history');
+      const data = await apiRequest(
+        (client) =>
+          client.GET('/tasks/{id}/description-history', {
+            params: { path: { id: taskId } },
+          }),
+        'Failed to load description history',
+      );
       return data.versions ?? [];
     },
   });
@@ -43,10 +45,13 @@ export function useDescriptionVersionQuery(
   return useSuspenseQuery({
     queryKey: descriptionHistoryKeys.version(taskId, versionId),
     queryFn: async (): Promise<DescriptionVersionFull> => {
-      const { data, error } = await sdk.GET('/tasks/{id}/description-history/{versionId}', {
-        params: { path: { id: taskId, versionId } },
-      });
-      if (error || !data) throw toApiError(error, 'Failed to load description version');
+      const data = await apiRequest(
+        (client) =>
+          client.GET('/tasks/{id}/description-history/{versionId}', {
+            params: { path: { id: taskId, versionId } },
+          }),
+        'Failed to load description version',
+      );
       return data;
     },
   });
@@ -65,10 +70,13 @@ export function useRestoreDescriptionVersion(): UseMutationResult<
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({ taskId, versionId }: RestoreVersionArgs): Promise<void> => {
-      const { error } = await sdk.POST('/tasks/{id}/description-history/{versionId}/restore', {
-        params: { path: { id: taskId, versionId } },
-      });
-      if (error) throw toApiError(error, 'Failed to restore version');
+      await apiRequest(
+        (client) =>
+          client.POST('/tasks/{id}/description-history/{versionId}/restore', {
+            params: { path: { id: taskId, versionId } },
+          }),
+        'Failed to restore version',
+      );
     },
     onSuccess: (_data, vars) => {
       void qc.invalidateQueries({ queryKey: descriptionHistoryKeys.all(vars.taskId) });

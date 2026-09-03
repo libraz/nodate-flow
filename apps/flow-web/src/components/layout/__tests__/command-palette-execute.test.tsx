@@ -24,6 +24,8 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock('../../../lib/sdk', () => ({
   sdk: { GET: mocks.get, POST: mocks.post, PATCH: mocks.patch },
+
+  authSdk: { GET: mocks.get, POST: mocks.post, PATCH: mocks.patch },
 }));
 
 vi.mock('@tanstack/react-router', async (importOriginal) => {
@@ -32,7 +34,11 @@ vi.mock('@tanstack/react-router', async (importOriginal) => {
 });
 
 vi.mock('../../../features/workspaces/api', () => ({
-  useWorkspacesQuery: () => ({ data: [{ id: 'ws-1', name: 'Workspace' }] }),
+  useWorkspacesQuery: () => ({
+    data: [{ id: 'ws-1', name: 'Workspace' }],
+    response: new Response(null, { status: 200 }),
+  }),
+  response: new Response(null, { status: 200 }),
 }));
 
 vi.mock('../../../lib/use-current-workspace', () => ({
@@ -88,8 +94,13 @@ describe('NL command execution', () => {
     mocks.get.mockResolvedValue({
       data: { tasks: [{ id: TASK_ID, title: 'Login bug' }], total: 1 },
       error: null,
+      response: new Response(null, { status: 200 }),
     });
-    mocks.post.mockResolvedValue({ data: { ok: true }, error: null });
+    mocks.post.mockResolvedValue({
+      data: { ok: true },
+      error: null,
+      response: new Response(null, { status: 200 }),
+    });
 
     const input = openPalette();
     await runCommand(input, 'mark the login bug done', 'transition_task');
@@ -116,8 +127,13 @@ describe('NL command execution', () => {
     mocks.get.mockResolvedValue({
       data: { projects: [{ id: 'prj-1', name: 'Platform' }] },
       error: null,
+      response: new Response(null, { status: 200 }),
     });
-    mocks.post.mockResolvedValue({ data: { id: TASK_ID }, error: null });
+    mocks.post.mockResolvedValue({
+      data: { id: TASK_ID },
+      error: null,
+      response: new Response(null, { status: 200 }),
+    });
 
     const input = openPalette();
     await runCommand(input, 'add a task to write the changelog', 'create_task');
@@ -160,7 +176,11 @@ describe('NL command execution', () => {
       args: { taskId: 'a task that is not there', transition: 'complete' },
       confidence: 0.88,
     });
-    mocks.get.mockResolvedValue({ data: { tasks: [], total: 0 }, error: null });
+    mocks.get.mockResolvedValue({
+      data: { tasks: [], total: 0 },
+      error: null,
+      response: new Response(null, { status: 200 }),
+    });
 
     const input = openPalette();
     await runCommand(input, 'close the missing task', 'transition_task');

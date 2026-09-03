@@ -39,9 +39,8 @@ import {
   useQuery,
   useQueryClient,
 } from '@tanstack/react-query';
-
-import { type ApiError, toApiError } from '../../lib/api-error';
-import { sdk } from '../../lib/sdk';
+import { apiRequest, apiRequestDetailed } from '../../lib/api';
+import { ApiError } from '../../lib/api-error';
 
 /** Import job DTO mirrored from the generated SDK. */
 export type ImportJob = components['schemas']['ImportJobBody'];
@@ -83,10 +82,13 @@ export function useImportsQuery(
     queryKey: [...importsKeys.list(wsId), limit, offset],
     queryFn: async (): Promise<ImportJob[]> => {
       if (!wsId) return [];
-      const { data, error } = await sdk.GET('/workspaces/{wsId}/imports', {
-        params: { path: { wsId }, query: { limit, offset } },
-      });
-      if (error || !data) throw toApiError(error, 'Failed to load import jobs');
+      const data = await apiRequest(
+        (client) =>
+          client.GET('/workspaces/{wsId}/imports', {
+            params: { path: { wsId }, query: { limit, offset } },
+          }),
+        'Failed to load import jobs',
+      );
       return data.items ?? [];
     },
   });
@@ -114,15 +116,18 @@ export function useCreateImportMutation(): UseMutationResult<
   const qc = useQueryClient();
   return useMutation<ImportJob, ApiError, CreateImportArgs>({
     mutationFn: async ({ wsId, body }): Promise<ImportJob> => {
-      const { data, error } = await sdk.POST('/workspaces/{wsId}/imports', {
-        params: { path: { wsId } },
-        body: {
-          source: body.source,
-          ...(body.projectId != null ? { projectId: body.projectId } : {}),
-          ...(body.configJson != null ? { configJson: body.configJson } : {}),
-        },
-      });
-      if (error || !data) throw toApiError(error, 'Failed to create import job');
+      const data = await apiRequest(
+        (client) =>
+          client.POST('/workspaces/{wsId}/imports', {
+            params: { path: { wsId } },
+            body: {
+              source: body.source,
+              ...(body.projectId != null ? { projectId: body.projectId } : {}),
+              ...(body.configJson != null ? { configJson: body.configJson } : {}),
+            },
+          }),
+        'Failed to create import job',
+      );
       return data;
     },
     onSuccess: (_data, { wsId }) => {
@@ -147,10 +152,13 @@ export function useCancelImportMutation(): UseMutationResult<void, ApiError, Can
   const qc = useQueryClient();
   return useMutation<void, ApiError, CancelImportArgs>({
     mutationFn: async ({ wsId, importId }): Promise<void> => {
-      const { error } = await sdk.POST('/workspaces/{wsId}/imports/{importId}/cancel', {
-        params: { path: { wsId, importId } },
-      });
-      if (error) throw toApiError(error, 'Failed to cancel import job');
+      await apiRequest(
+        (client) =>
+          client.POST('/workspaces/{wsId}/imports/{importId}/cancel', {
+            params: { path: { wsId, importId } },
+          }),
+        'Failed to cancel import job',
+      );
     },
     onSuccess: (_data, { wsId }) => {
       void qc.invalidateQueries({ queryKey: ['imports', wsId] });
@@ -271,12 +279,16 @@ export function useExportTasksMutation(): UseMutationResult<
       };
 
       if (format === 'csv') {
-        const { data, error, response } = await sdk.GET('/workspaces/{wsId}/export/tasks.csv', {
-          params: { path: { wsId }, query },
-          parseAs: 'blob',
-        });
-        if (error || !response.ok || !(data instanceof Blob)) {
-          throw toApiError(error, 'Failed to export tasks');
+        const { data, response } = await apiRequestDetailed(
+          (client) =>
+            client.GET('/workspaces/{wsId}/export/tasks.csv', {
+              params: { path: { wsId }, query },
+              parseAs: 'blob',
+            }),
+          'Failed to export tasks',
+        );
+        if (!(data instanceof Blob)) {
+          throw new ApiError(undefined, 'Failed to export tasks');
         }
 
         // The row count rides in a header because the body is a file:
@@ -291,10 +303,13 @@ export function useExportTasksMutation(): UseMutationResult<
         return { count: rows, format: 'csv', filename, truncated };
       }
 
-      const { data, error } = await sdk.GET('/workspaces/{wsId}/export/tasks', {
-        params: { path: { wsId }, query: { format: 'json', ...query } },
-      });
-      if (error || !data) throw toApiError(error, 'Failed to export tasks');
+      const data = await apiRequest(
+        (client) =>
+          client.GET('/workspaces/{wsId}/export/tasks', {
+            params: { path: { wsId }, query: { format: 'json', ...query } },
+          }),
+        'Failed to export tasks',
+      );
 
       const tasks: ExportedTask[] = data.tasks ?? [];
       const truncated = tasks.length >= rowLimit;

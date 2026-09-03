@@ -28,6 +28,9 @@ vi.mock('../../../lib/sdk', () => {
     refreshAccessToken,
     // openapi-fetch keys its client by HTTP method, hence the caps.
     authSdk: { GET: mocks.meGet },
+    // lib/api builds a requester per client, so both have to exist even
+    // though this probe only reaches auth-api.
+    sdk: { GET: vi.fn() },
   };
 });
 

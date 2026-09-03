@@ -11,9 +11,8 @@
  */
 
 import { type UseMutationResult, useMutation, useQueryClient } from '@tanstack/react-query';
-
-import { type ApiError, toApiError } from '../../../lib/api-error';
-import { sdk } from '../../../lib/sdk';
+import { apiRequest } from '../../../lib/api';
+import type { ApiError } from '../../../lib/api-error';
 import { timelineKeys } from '../../timeline/api';
 import { tasksKeys } from '../api';
 
@@ -42,14 +41,14 @@ export function useCreateEventFromTaskMutation(): UseMutationResult<
       taskId,
       timezone,
     }): Promise<CreateEventFromTaskResult> => {
-      const { data, error } = await sdk.POST(
-        '/workspaces/{wsId}/calendars/{calId}/events/from-task',
-        {
-          params: { path: { wsId: workspaceId, calId: calendarId } },
-          body: { taskId, ...(timezone ? { timezone } : {}) },
-        },
+      const data = await apiRequest(
+        (client) =>
+          client.POST('/workspaces/{wsId}/calendars/{calId}/events/from-task', {
+            params: { path: { wsId: workspaceId, calId: calendarId } },
+            body: { taskId, ...(timezone ? { timezone } : {}) },
+          }),
+        'Failed to create event from task',
       );
-      if (error || !data) throw toApiError(error, 'Failed to create event from task');
       return { eventId: data.id };
     },
     onSuccess: (_data, { workspaceId, taskId }) => {

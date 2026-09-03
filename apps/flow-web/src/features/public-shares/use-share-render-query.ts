@@ -13,9 +13,8 @@
 
 import type { components } from '@nodate-flow/sdk';
 import { useQuery } from '@tanstack/react-query';
-
-import { ApiError, toApiError } from '../../lib/api-error';
-import { sdk } from '../../lib/sdk';
+import { apiRequest } from '../../lib/api';
+import { ApiError } from '../../lib/api-error';
 
 type SharePageDTO = components['schemas']['PublicShareRenderPage'];
 type ShareEventDTO = components['schemas']['PublicShareRenderEvent'];
@@ -40,15 +39,13 @@ export function useShareRenderQuery(token: string) {
   return useQuery({
     queryKey: ['share', 'cal', token],
     queryFn: async (): Promise<NormalisedShareRender> => {
-      const result = await sdk.GET('/share/cal/{token}', {
-        params: { path: { token } },
-      });
-      if (result.error || !result.data) {
-        throw toApiError(result.error, 'Failed to load shared calendar');
-      }
+      const data = await apiRequest(
+        (client) => client.GET('/share/cal/{token}', { params: { path: { token } } }),
+        'Failed to load shared calendar',
+      );
       return {
-        page: result.data.page,
-        events: result.data.events ?? [],
+        page: data.page,
+        events: data.events ?? [],
       };
     },
     retry: (count, err) => {

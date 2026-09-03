@@ -50,13 +50,58 @@ vi.mock('../../../lib/sdk', () => ({
     GET: vi.fn(async (path: string) => {
       if (path === '/workspaces/{wsId}/calendars') {
         sdkMocks.fetchCount += 1;
-        return { data: { calendars: sdkMocks.calendars }, error: null };
+        return {
+          data: { calendars: sdkMocks.calendars },
+          error: null,
+          response: new Response(null, { status: 200 }),
+        };
       }
-      return { data: null, error: { status: 404 } };
+      return { data: null, error: { status: 404 }, response: new Response(null, { status: 400 }) };
     }),
-    PATCH: vi.fn(async () => ({ data: null, error: null })),
-    DELETE: vi.fn(async () => ({ data: null, error: null })),
-    POST: vi.fn(async () => ({ data: null, error: null })),
+    PATCH: vi.fn(async () => ({
+      data: null,
+      error: null,
+      response: new Response(null, { status: 400 }),
+    })),
+    DELETE: vi.fn(async () => ({
+      data: null,
+      error: null,
+      response: new Response(null, { status: 400 }),
+    })),
+    POST: vi.fn(async () => ({
+      data: null,
+      error: null,
+      response: new Response(null, { status: 400 }),
+    })),
+  },
+
+  authSdk: {
+    GET: vi.fn(async (path: string) => {
+      if (path === '/workspaces/{wsId}/calendars') {
+        sdkMocks.fetchCount += 1;
+        return {
+          data: { calendars: sdkMocks.calendars },
+          error: null,
+          response: new Response(null, { status: 200 }),
+        };
+      }
+      return { data: null, error: { status: 404 }, response: new Response(null, { status: 400 }) };
+    }),
+    PATCH: vi.fn(async () => ({
+      data: null,
+      error: null,
+      response: new Response(null, { status: 400 }),
+    })),
+    DELETE: vi.fn(async () => ({
+      data: null,
+      error: null,
+      response: new Response(null, { status: 400 }),
+    })),
+    POST: vi.fn(async () => ({
+      data: null,
+      error: null,
+      response: new Response(null, { status: 400 }),
+    })),
   },
 }));
 

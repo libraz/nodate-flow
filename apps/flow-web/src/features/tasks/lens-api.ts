@@ -27,7 +27,7 @@ import {
   useSuspenseQuery,
 } from '@tanstack/react-query';
 
-import { sdk } from '../../lib/sdk';
+import { apiRequest } from '../../lib/api';
 
 /** SDK type for the lens response object. */
 type SavedLens = components['schemas']['SavedLens'];
@@ -75,7 +75,7 @@ function toLensDto(lens: SavedLens): LensDto {
   return dto;
 }
 
-import { ApiError, toApiError } from '../../lib/api-error';
+import { ApiError } from '../../lib/api-error';
 
 export { ApiError as LensApiError };
 
@@ -96,10 +96,13 @@ export function useLensesQuery(
     queryFn: async (): Promise<LensDto[]> => {
       const query: Record<string, string> = {};
       if (projectId) query.projectId = projectId;
-      const { data, error } = await sdk.GET('/workspaces/{wsId}/lenses', {
-        params: { path: { wsId: workspaceId }, query },
-      });
-      if (error || !data) throw toApiError(error, 'Failed to load saved views');
+      const data = await apiRequest(
+        (client) =>
+          client.GET('/workspaces/{wsId}/lenses', {
+            params: { path: { wsId: workspaceId }, query },
+          }),
+        'Failed to load saved views',
+      );
       return (data.lenses ?? []).map(toLensDto);
     },
   });
@@ -120,19 +123,22 @@ export function useCreateLens(): UseMutationResult<LensDto, ApiError, CreateLens
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (args: CreateLensArgs): Promise<LensDto> => {
-      const { data, error } = await sdk.POST('/workspaces/{wsId}/lenses', {
-        params: { path: { wsId: args.workspaceId } },
-        body: {
-          name: args.name,
-          ...(args.description ? { description: args.description } : {}),
-          ...(args.projectId ? { projectId: args.projectId } : {}),
-          filter: args.filter,
-          sort: args.sort ?? [],
-          ...(args.groupBy ? { groupBy: args.groupBy } : {}),
-          isDefault: false,
-        },
-      });
-      if (error || !data) throw toApiError(error, 'Failed to save view');
+      const data = await apiRequest(
+        (client) =>
+          client.POST('/workspaces/{wsId}/lenses', {
+            params: { path: { wsId: args.workspaceId } },
+            body: {
+              name: args.name,
+              ...(args.description ? { description: args.description } : {}),
+              ...(args.projectId ? { projectId: args.projectId } : {}),
+              filter: args.filter,
+              sort: args.sort ?? [],
+              ...(args.groupBy ? { groupBy: args.groupBy } : {}),
+              isDefault: false,
+            },
+          }),
+        'Failed to save view',
+      );
       return toLensDto(data);
     },
     onSuccess: (_data, vars) => {
@@ -152,10 +158,13 @@ export function useDeleteLens(): UseMutationResult<void, ApiError, DeleteLensArg
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({ workspaceId, lensId }: DeleteLensArgs): Promise<void> => {
-      const { error } = await sdk.DELETE('/workspaces/{wsId}/lenses/{lensId}', {
-        params: { path: { wsId: workspaceId, lensId } },
-      });
-      if (error) throw toApiError(error, 'Failed to delete view');
+      await apiRequest(
+        (client) =>
+          client.DELETE('/workspaces/{wsId}/lenses/{lensId}', {
+            params: { path: { wsId: workspaceId, lensId } },
+          }),
+        'Failed to delete view',
+      );
     },
     onSuccess: (_data, vars) => {
       void qc.invalidateQueries({ queryKey: lensesKeys.list(vars.workspaceId, vars.projectId) });

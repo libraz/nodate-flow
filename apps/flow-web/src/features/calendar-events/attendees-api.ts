@@ -17,9 +17,8 @@ import {
   useQuery,
   useQueryClient,
 } from '@tanstack/react-query';
-
-import { type ApiError, toApiError } from '../../lib/api-error';
-import { sdk } from '../../lib/sdk';
+import { apiRequest } from '../../lib/api';
+import type { ApiError } from '../../lib/api-error';
 
 /** Attendee row as returned by GET /attendees and POST /attendees. */
 export type Attendee = components['schemas']['AttendeeResponse'];
@@ -64,13 +63,13 @@ export function useAttendeesQuery({
     queryKey: attendeesQueryKey(workspaceId, calendarId, eventId),
     enabled: workspaceId.length > 0 && calendarId.length > 0 && eventId.length > 0,
     queryFn: async (): Promise<Attendee[]> => {
-      const { data, error } = await sdk.GET(
-        '/workspaces/{wsId}/calendars/{calId}/events/{evtId}/attendees',
-        {
-          params: { path: { wsId: workspaceId, calId: calendarId, evtId: eventId } },
-        },
+      const data = await apiRequest(
+        (client) =>
+          client.GET('/workspaces/{wsId}/calendars/{calId}/events/{evtId}/attendees', {
+            params: { path: { wsId: workspaceId, calId: calendarId, evtId: eventId } },
+          }),
+        'Failed to load attendees',
       );
-      if (error || !data) throw toApiError(error, 'Failed to load attendees');
       return data.attendees ?? [];
     },
   });
@@ -95,14 +94,14 @@ export function useAddAttendeesMutation(): UseMutationResult<
   const qc = useQueryClient();
   return useMutation<Attendee[], ApiError, AttendeesScope & { userIds: string[] }>({
     mutationFn: async ({ workspaceId, calendarId, eventId, userIds }): Promise<Attendee[]> => {
-      const { data, error } = await sdk.POST(
-        '/workspaces/{wsId}/calendars/{calId}/events/{evtId}/attendees',
-        {
-          params: { path: { wsId: workspaceId, calId: calendarId, evtId: eventId } },
-          body: { userIds },
-        },
+      const data = await apiRequest(
+        (client) =>
+          client.POST('/workspaces/{wsId}/calendars/{calId}/events/{evtId}/attendees', {
+            params: { path: { wsId: workspaceId, calId: calendarId, evtId: eventId } },
+            body: { userIds },
+          }),
+        'Failed to add attendees',
       );
-      if (error || !data) throw toApiError(error, 'Failed to add attendees');
       return data.attendees ?? [];
     },
     onSuccess: (_data, vars) => {
@@ -120,15 +119,15 @@ export function useRemoveAttendeeMutation(): UseMutationResult<
   const qc = useQueryClient();
   return useMutation<void, ApiError, AttendeesScope & { userId: string }>({
     mutationFn: async ({ workspaceId, calendarId, eventId, userId }): Promise<void> => {
-      const { error } = await sdk.DELETE(
-        '/workspaces/{wsId}/calendars/{calId}/events/{evtId}/attendees/{userId}',
-        {
-          params: {
-            path: { wsId: workspaceId, calId: calendarId, evtId: eventId, userId },
-          },
-        },
+      await apiRequest(
+        (client) =>
+          client.DELETE('/workspaces/{wsId}/calendars/{calId}/events/{evtId}/attendees/{userId}', {
+            params: {
+              path: { wsId: workspaceId, calId: calendarId, evtId: eventId, userId },
+            },
+          }),
+        'Failed to remove attendee',
       );
-      if (error) throw toApiError(error, 'Failed to remove attendee');
     },
     onSuccess: (_data, vars) => {
       invalidateAttendees(qc, vars);
@@ -151,14 +150,14 @@ export function useUpdateOwnRsvpMutation(): UseMutationResult<
   const qc = useQueryClient();
   return useMutation<void, ApiError, AttendeesScope & { rsvp: Rsvp }>({
     mutationFn: async ({ workspaceId, calendarId, eventId, rsvp }): Promise<void> => {
-      const { error } = await sdk.PATCH(
-        '/workspaces/{wsId}/calendars/{calId}/events/{evtId}/attendees/rsvp',
-        {
-          params: { path: { wsId: workspaceId, calId: calendarId, evtId: eventId } },
-          body: { rsvp },
-        },
+      await apiRequest(
+        (client) =>
+          client.PATCH('/workspaces/{wsId}/calendars/{calId}/events/{evtId}/attendees/rsvp', {
+            params: { path: { wsId: workspaceId, calId: calendarId, evtId: eventId } },
+            body: { rsvp },
+          }),
+        'Failed to update RSVP',
       );
-      if (error) throw toApiError(error, 'Failed to update RSVP');
     },
     onSuccess: (_data, vars) => {
       invalidateAttendees(qc, vars);
@@ -176,16 +175,19 @@ export function useToggleCanEditMutation(): UseMutationResult<
   const qc = useQueryClient();
   return useMutation<void, ApiError, AttendeesScope & { userId: string; canEdit: boolean }>({
     mutationFn: async ({ workspaceId, calendarId, eventId, userId, canEdit }): Promise<void> => {
-      const { error } = await sdk.PATCH(
-        '/workspaces/{wsId}/calendars/{calId}/events/{evtId}/attendees/{userId}/can-edit',
-        {
-          params: {
-            path: { wsId: workspaceId, calId: calendarId, evtId: eventId, userId },
-          },
-          body: { canEdit },
-        },
+      await apiRequest(
+        (client) =>
+          client.PATCH(
+            '/workspaces/{wsId}/calendars/{calId}/events/{evtId}/attendees/{userId}/can-edit',
+            {
+              params: {
+                path: { wsId: workspaceId, calId: calendarId, evtId: eventId, userId },
+              },
+              body: { canEdit },
+            },
+          ),
+        'Failed to update can-edit',
       );
-      if (error) throw toApiError(error, 'Failed to update can-edit');
     },
     onSuccess: (_data, vars) => {
       invalidateAttendees(qc, vars);
@@ -223,16 +225,19 @@ export function useCreateAttendeeInviteMutation(): UseMutationResult<
       attendeeId,
       expiresInHours,
     }): Promise<CreateAttendeeInviteResult> => {
-      const { data, error } = await sdk.POST(
-        '/workspaces/{wsId}/calendars/{calId}/events/{evtId}/attendees/{attendeeId}/invite',
-        {
-          params: {
-            path: { wsId: workspaceId, calId: calendarId, evtId: eventId, attendeeId },
-          },
-          body: expiresInHours !== undefined ? { expiresInHours } : {},
-        },
+      const data = await apiRequest(
+        (client) =>
+          client.POST(
+            '/workspaces/{wsId}/calendars/{calId}/events/{evtId}/attendees/{attendeeId}/invite',
+            {
+              params: {
+                path: { wsId: workspaceId, calId: calendarId, evtId: eventId, attendeeId },
+              },
+              body: expiresInHours !== undefined ? { expiresInHours } : {},
+            },
+          ),
+        'Failed to create invite',
       );
-      if (error || !data) throw toApiError(error, 'Failed to create invite');
       return { id: data.id, token: data.token, expiresAt: data.expiresAt };
     },
   });

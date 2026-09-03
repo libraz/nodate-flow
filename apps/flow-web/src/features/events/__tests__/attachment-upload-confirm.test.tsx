@@ -28,6 +28,10 @@ vi.mock('../../../lib/sdk', () => ({
   sdk: {
     POST: (...args: unknown[]) => postMock(...args),
   },
+
+  authSdk: {
+    POST: (...args: unknown[]) => postMock(...args),
+  },
 }));
 
 vi.mock('../../../lib/crypto/sha256', () => ({
@@ -76,9 +80,14 @@ describe('usePresignEventAttachmentMutation confirm handshake', () => {
             uploadUrl: 'https://blob.example/put',
           },
           error: undefined,
+          response: new Response(null, { status: 200 }),
         };
       }
-      return { data: { ok: true, byteSize: 1 }, error: undefined };
+      return {
+        data: { ok: true, byteSize: 1 },
+        error: undefined,
+        response: new Response(null, { status: 200 }),
+      };
     });
 
     const qc = makeQc();
@@ -100,6 +109,7 @@ describe('usePresignEventAttachmentMutation confirm handshake', () => {
         return {
           data: { storageKey: 'k', attachmentId: 'att-dup', deduplicated: true },
           error: undefined,
+          response: new Response(null, { status: 200 }),
         };
       }
       throw new Error(`unexpected POST ${path}`);
@@ -128,11 +138,13 @@ describe('usePresignEventAttachmentMutation confirm handshake', () => {
             uploadUrl: 'https://blob.example/put',
           },
           error: undefined,
+          response: new Response(null, { status: 200 }),
         };
       }
       return {
         data: undefined,
         error: { title: 'Payload Too Large', status: 413, detail: 'file too big' },
+        response: new Response(null, { status: 400 }),
       };
     });
 

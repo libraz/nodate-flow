@@ -40,7 +40,9 @@ vi.mock('../../../features/workspaces/api', () => ({
       { id: 'ws-1', name: 'Acme' },
       { id: 'ws-2', name: 'Globex' },
     ],
+    response: new Response(null, { status: 200 }),
   }),
+  response: new Response(null, { status: 200 }),
 }));
 
 vi.mock('react-i18next', () => ({
@@ -68,6 +70,7 @@ beforeEach(() => {
   mocks.sdkGet.mockReset().mockResolvedValue({
     data: { workspaces: [{ id: 'ws-1' }, { id: 'ws-2' }] },
     error: null,
+    response: new Response(null, { status: 200 }),
   });
   mocks.pathname = '/calendar';
   window.localStorage.clear();

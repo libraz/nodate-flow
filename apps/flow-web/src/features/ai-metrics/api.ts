@@ -11,7 +11,7 @@
 import type { components } from '@nodate-flow/sdk';
 import { type UseSuspenseQueryResult, useSuspenseQuery } from '@tanstack/react-query';
 
-import { sdk } from '../../lib/sdk';
+import { apiRequest } from '../../lib/api';
 
 /** Per-provider outbound rate-limit row from the metrics response. */
 export type OutboundLimitStat = components['schemas']['OutboundLimitStat'];
@@ -64,10 +64,13 @@ export function useAiMetricsQuery(
   return useSuspenseQuery({
     queryKey: aiMetricsKeys.workspace(workspaceId, windowDays),
     queryFn: async (): Promise<AiMetrics> => {
-      const { data, error } = await sdk.GET('/workspaces/{wsId}/ai/metrics', {
-        params: { path: { wsId: workspaceId }, query: { windowDays } },
-      });
-      if (error || !data) throw new Error('Failed to load AI metrics');
+      const data = await apiRequest(
+        (client) =>
+          client.GET('/workspaces/{wsId}/ai/metrics', {
+            params: { path: { wsId: workspaceId }, query: { windowDays } },
+          }),
+        'Failed to load AI metrics',
+      );
       return data;
     },
   });

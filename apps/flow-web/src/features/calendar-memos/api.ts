@@ -32,9 +32,8 @@ import {
   useQuery,
   useQueryClient,
 } from '@tanstack/react-query';
-
-import { type ApiError, toApiError } from '../../lib/api-error';
-import { sdk } from '../../lib/sdk';
+import { apiRequest } from '../../lib/api';
+import type { ApiError } from '../../lib/api-error';
 
 /** Single memo row as returned by the list / create endpoints. */
 export type Memo = components['schemas']['MemoResponse'];
@@ -72,10 +71,13 @@ export function useMemosQuery(wsId: string, calId: string): UseQueryResult<Memo[
     enabled: wsId.length > 0 && calId.length > 0,
     staleTime: 60_000,
     queryFn: async (): Promise<Memo[]> => {
-      const { data, error } = await sdk.GET('/workspaces/{wsId}/calendars/{calId}/memos', {
-        params: { path: { wsId, calId } },
-      });
-      if (error || !data) throw toApiError(error, 'Failed to load memos');
+      const data = await apiRequest(
+        (client) =>
+          client.GET('/workspaces/{wsId}/calendars/{calId}/memos', {
+            params: { path: { wsId, calId } },
+          }),
+        'Failed to load memos',
+      );
       return data.memos ?? [];
     },
   });
@@ -108,11 +110,14 @@ export function useCreateMemoMutation(): UseMutationResult<
   return useMutation<Memo, ApiError, CreateMemoArgs, CreateMemoContext>({
     mutationFn: async ({ wsId, calId, title, sortWeight }): Promise<Memo> => {
       const body: CreateMemoBody = sortWeight === undefined ? { title } : { title, sortWeight };
-      const { data, error } = await sdk.POST('/workspaces/{wsId}/calendars/{calId}/memos', {
-        params: { path: { wsId, calId } },
-        body,
-      });
-      if (error || !data) throw toApiError(error, 'Failed to create memo');
+      const data = await apiRequest(
+        (client) =>
+          client.POST('/workspaces/{wsId}/calendars/{calId}/memos', {
+            params: { path: { wsId, calId } },
+            body,
+          }),
+        'Failed to create memo',
+      );
       return data;
     },
     onMutate: async (vars): Promise<CreateMemoContext> => {
@@ -171,11 +176,14 @@ export function useUpdateMemoMutation(): UseMutationResult<
   const qc = useQueryClient();
   return useMutation<void, ApiError, UpdateMemoArgs, UpdateMemoContext>({
     mutationFn: async ({ wsId, calId, memoId, body }): Promise<void> => {
-      const { error } = await sdk.PATCH('/workspaces/{wsId}/calendars/{calId}/memos/{memoId}', {
-        params: { path: { wsId, calId, memoId } },
-        body,
-      });
-      if (error) throw toApiError(error, 'Failed to update memo');
+      await apiRequest(
+        (client) =>
+          client.PATCH('/workspaces/{wsId}/calendars/{calId}/memos/{memoId}', {
+            params: { path: { wsId, calId, memoId } },
+            body,
+          }),
+        'Failed to update memo',
+      );
     },
     onMutate: async (vars): Promise<UpdateMemoContext> => {
       const key = calendarMemosKeys.list(vars.wsId, vars.calId);
@@ -223,10 +231,13 @@ export function useDeleteMemoMutation(): UseMutationResult<
   const qc = useQueryClient();
   return useMutation<void, ApiError, DeleteMemoArgs, DeleteMemoContext>({
     mutationFn: async ({ wsId, calId, memoId }): Promise<void> => {
-      const { error } = await sdk.DELETE('/workspaces/{wsId}/calendars/{calId}/memos/{memoId}', {
-        params: { path: { wsId, calId, memoId } },
-      });
-      if (error) throw toApiError(error, 'Failed to delete memo');
+      await apiRequest(
+        (client) =>
+          client.DELETE('/workspaces/{wsId}/calendars/{calId}/memos/{memoId}', {
+            params: { path: { wsId, calId, memoId } },
+          }),
+        'Failed to delete memo',
+      );
     },
     onMutate: async (vars): Promise<DeleteMemoContext> => {
       const key = calendarMemosKeys.list(vars.wsId, vars.calId);

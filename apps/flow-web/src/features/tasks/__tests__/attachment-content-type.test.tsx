@@ -23,6 +23,10 @@ vi.mock('../../../lib/sdk', () => ({
   sdk: {
     POST: (...args: unknown[]) => postMock(...args),
   },
+
+  authSdk: {
+    POST: (...args: unknown[]) => postMock(...args),
+  },
 }));
 
 vi.mock('../../../lib/crypto/sha256', () => ({
@@ -51,9 +55,14 @@ async function declaredContentType(file: File): Promise<{ presign: string; put: 
           uploadUrl: 'https://blob.example/put',
         },
         error: undefined,
+        response: new Response(null, { status: 200 }),
       };
     }
-    return { data: { ok: true, byteSize: file.size }, error: undefined };
+    return {
+      data: { ok: true, byteSize: file.size },
+      error: undefined,
+      response: new Response(null, { status: 200 }),
+    };
   });
 
   const qc = new QueryClient({

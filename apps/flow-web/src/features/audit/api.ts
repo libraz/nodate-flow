@@ -4,9 +4,7 @@
 
 import type { components } from '@nodate-flow/sdk';
 import { type UseSuspenseQueryResult, useSuspenseQuery } from '@tanstack/react-query';
-
-import { toApiError } from '../../lib/api-error';
-import { sdk } from '../../lib/sdk';
+import { apiRequest } from '../../lib/api';
 
 export type AuditLogEntry = components['schemas']['LogEntryDTO'];
 export type AuditLogListResponse = {
@@ -52,10 +50,13 @@ export function useAuditLogsQuery(
       if (filters.dateFrom !== undefined) queryParams.dateFrom = filters.dateFrom;
       if (filters.dateTo !== undefined) queryParams.dateTo = filters.dateTo;
 
-      const { data, error } = await sdk.GET('/workspaces/{wsId}/audit-logs', {
-        params: { path: { wsId: workspaceId }, query: queryParams },
-      });
-      if (error || !data) throw toApiError(error, 'Failed to load audit logs');
+      const data = await apiRequest(
+        (client) =>
+          client.GET('/workspaces/{wsId}/audit-logs', {
+            params: { path: { wsId: workspaceId }, query: queryParams },
+          }),
+        'Failed to load audit logs',
+      );
       return { entries: data.entries ?? [], total: data.total ?? 0 };
     },
   });

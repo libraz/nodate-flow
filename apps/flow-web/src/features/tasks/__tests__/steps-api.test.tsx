@@ -30,8 +30,25 @@ vi.mock('../../../lib/sdk', () => ({
         ],
       } as unknown,
       error: undefined,
+      response: new Response(null, { status: 200 }),
     })),
   },
+
+  authSdk: {
+    POST: vi.fn(async () => ({
+      data: {
+        parentTaskId: 'task-001',
+        steps: [
+          { title: 'Alpha', description: 'first', priority: 1 },
+          { title: 'Beta', description: 'second', priority: 2 },
+          { title: 'Gamma', description: 'third', priority: 3 },
+        ],
+      } as unknown,
+      error: undefined,
+      response: new Response(null, { status: 200 }),
+    })),
+  },
+  response: new Response(null, { status: 200 }),
 }));
 
 function makeWrapper(qc: QueryClient): (props: { children: ReactNode }) => ReactElement {

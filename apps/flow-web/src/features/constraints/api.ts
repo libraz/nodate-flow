@@ -10,7 +10,7 @@
 import type { components } from '@nodate-flow/sdk';
 import { type UseMutationResult, useMutation, useQueryClient } from '@tanstack/react-query';
 
-import { sdk } from '../../lib/sdk';
+import { apiRequest } from '../../lib/api';
 
 export type ConstraintOutcome = components['schemas']['EvaluateConstraintsOutcome'];
 
@@ -29,10 +29,13 @@ export interface EvaluateResult {
 export function useEvaluateConstraints(): UseMutationResult<EvaluateResult, Error, EvaluateArgs> {
   return useMutation<EvaluateResult, Error, EvaluateArgs>({
     mutationFn: async ({ taskId }): Promise<EvaluateResult> => {
-      const { data, error } = await sdk.POST('/tasks/{id}/constraints/evaluate', {
-        params: { path: { id: taskId } },
-      });
-      if (error || !data) throw new Error('Failed to evaluate constraints');
+      const data = await apiRequest(
+        (client) =>
+          client.POST('/tasks/{id}/constraints/evaluate', {
+            params: { path: { id: taskId } },
+          }),
+        'Failed to evaluate constraints',
+      );
       return { outcomes: data.outcomes ?? [] };
     },
   });
@@ -55,11 +58,14 @@ export function useAddConstraint(): UseMutationResult<{ id: string }, Error, Add
   const qc = useQueryClient();
   return useMutation<{ id: string }, Error, AddConstraintArgs>({
     mutationFn: async ({ taskId, kind, expression }) => {
-      const { data, error } = await sdk.POST('/tasks/{id}/constraints', {
-        params: { path: { id: taskId } },
-        body: { kind, expression },
-      });
-      if (error || !data) throw new Error('Failed to add constraint');
+      const data = await apiRequest(
+        (client) =>
+          client.POST('/tasks/{id}/constraints', {
+            params: { path: { id: taskId } },
+            body: { kind, expression },
+          }),
+        'Failed to add constraint',
+      );
       return { id: data.id };
     },
     onSuccess: (_res, { taskId }) => {
@@ -89,11 +95,14 @@ export function useCompileConstraint(): UseMutationResult<
 > {
   return useMutation<CompileConstraintResult, Error, CompileConstraintArgs>({
     mutationFn: async ({ taskId, prompt }): Promise<CompileConstraintResult> => {
-      const { data, error } = await sdk.POST('/tasks/{id}/constraints/compile', {
-        params: { path: { id: taskId } },
-        body: { prompt },
-      });
-      if (error || !data) throw new Error('Failed to compile constraint');
+      const data = await apiRequest(
+        (client) =>
+          client.POST('/tasks/{id}/constraints/compile', {
+            params: { path: { id: taskId } },
+            body: { prompt },
+          }),
+        'Failed to compile constraint',
+      );
       return { kind: data.kind, expression: data.expression };
     },
   });
@@ -119,11 +128,14 @@ export function useExplainConstraint(): UseMutationResult<
 > {
   return useMutation<ExplainConstraintResult, Error, ExplainConstraintArgs>({
     mutationFn: async ({ taskId, expression }): Promise<ExplainConstraintResult> => {
-      const { data, error } = await sdk.POST('/tasks/{id}/constraints/explain', {
-        params: { path: { id: taskId } },
-        body: { expression },
-      });
-      if (error || !data) throw new Error('Failed to explain constraint');
+      const data = await apiRequest(
+        (client) =>
+          client.POST('/tasks/{id}/constraints/explain', {
+            params: { path: { id: taskId } },
+            body: { expression },
+          }),
+        'Failed to explain constraint',
+      );
       return { explanation: data.explanation };
     },
   });
@@ -148,10 +160,13 @@ export function useRemoveConstraint(): UseMutationResult<
   const qc = useQueryClient();
   return useMutation<{ ok: true }, Error, RemoveConstraintArgs>({
     mutationFn: async ({ taskId, constraintId }) => {
-      const { error } = await sdk.DELETE('/tasks/{id}/constraints/{cid}', {
-        params: { path: { id: taskId, cid: constraintId } },
-      });
-      if (error) throw new Error('Failed to remove constraint');
+      await apiRequest(
+        (client) =>
+          client.DELETE('/tasks/{id}/constraints/{cid}', {
+            params: { path: { id: taskId, cid: constraintId } },
+          }),
+        'Failed to remove constraint',
+      );
       return { ok: true };
     },
     onSuccess: (_res, { taskId }) => {

@@ -33,7 +33,11 @@ beforeEach(() => {
   sdkMocks.productPatch.mockReset();
   sdkMocks.authPatch.mockReset();
   // Default: succeed with an empty Me payload.
-  sdkMocks.authPatch.mockResolvedValue({ data: {}, error: null });
+  sdkMocks.authPatch.mockResolvedValue({
+    data: {},
+    error: null,
+    response: new Response(null, { status: 200 }),
+  });
   // Provide an access token so syncServerTheme does not bail early.
   authStore.getState().setAccessToken('test-token');
   // Reset the theme key so the provider boots into a known state.

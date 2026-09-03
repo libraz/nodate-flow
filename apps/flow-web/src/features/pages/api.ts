@@ -16,9 +16,8 @@ import {
   useQueryClient,
   useSuspenseQuery,
 } from '@tanstack/react-query';
-
-import { ApiError, toApiError } from '../../lib/api-error';
-import { sdk } from '../../lib/sdk';
+import { apiRequest } from '../../lib/api';
+import { ApiError } from '../../lib/api-error';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -72,10 +71,13 @@ export function usePagesQuery(wsId: string): UseSuspenseQueryResult<PageItem[]> 
   return useSuspenseQuery({
     queryKey: pageKeys.list(wsId),
     queryFn: async (): Promise<PageItem[]> => {
-      const { data, error } = await sdk.GET('/workspaces/{wsId}/pages', {
-        params: { path: { wsId }, query: { limit: 200 } },
-      });
-      if (error || !data) throw toApiError(error, 'Failed to load pages');
+      const data = await apiRequest(
+        (client) =>
+          client.GET('/workspaces/{wsId}/pages', {
+            params: { path: { wsId }, query: { limit: 200 } },
+          }),
+        'Failed to load pages',
+      );
       return (data.pages ?? []) as PageItem[];
     },
   });
@@ -89,10 +91,13 @@ export function useChildPagesQuery(
   return useSuspenseQuery({
     queryKey: pageKeys.children(pageId),
     queryFn: async (): Promise<PageItem[]> => {
-      const { data, error } = await sdk.GET('/workspaces/{wsId}/pages/{pageId}/children', {
-        params: { path: { wsId, pageId }, query: { limit: 200 } },
-      });
-      if (error || !data) throw toApiError(error, 'Failed to load child pages');
+      const data = await apiRequest(
+        (client) =>
+          client.GET('/workspaces/{wsId}/pages/{pageId}/children', {
+            params: { path: { wsId, pageId }, query: { limit: 200 } },
+          }),
+        'Failed to load child pages',
+      );
       return (data.pages ?? []) as PageItem[];
     },
   });
@@ -103,10 +108,13 @@ export function usePageQuery(wsId: string, pageId: string): UseSuspenseQueryResu
   return useSuspenseQuery({
     queryKey: pageKeys.detail(pageId),
     queryFn: async (): Promise<PageItem> => {
-      const { data, error } = await sdk.GET('/workspaces/{wsId}/pages/{pageId}', {
-        params: { path: { wsId, pageId } },
-      });
-      if (error || !data) throw toApiError(error, 'Failed to load page');
+      const data = await apiRequest(
+        (client) =>
+          client.GET('/workspaces/{wsId}/pages/{pageId}', {
+            params: { path: { wsId, pageId } },
+          }),
+        'Failed to load page',
+      );
       return data as PageItem;
     },
   });
@@ -118,10 +126,13 @@ export function useSearchPages(wsId: string, query: string): UseQueryResult<Page
     queryKey: pageKeys.search(wsId, query),
     enabled: query.length >= 2,
     queryFn: async (): Promise<PageItem[]> => {
-      const { data, error } = await sdk.GET('/workspaces/{wsId}/pages/search', {
-        params: { path: { wsId }, query: { q: query, limit: 50 } },
-      });
-      if (error || !data) throw toApiError(error, 'Failed to search pages');
+      const data = await apiRequest(
+        (client) =>
+          client.GET('/workspaces/{wsId}/pages/search', {
+            params: { path: { wsId }, query: { q: query, limit: 50 } },
+          }),
+        'Failed to search pages',
+      );
       return (data.pages ?? []) as PageItem[];
     },
   });
@@ -140,11 +151,14 @@ export function useCreatePage(wsId: string): UseMutationResult<PageItem, ApiErro
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({ input }: CreatePageArgs): Promise<PageItem> => {
-      const { data, error } = await sdk.POST('/workspaces/{wsId}/pages', {
-        params: { path: { wsId } },
-        body: input,
-      });
-      if (error || !data) throw toApiError(error, 'Failed to create page');
+      const data = await apiRequest(
+        (client) =>
+          client.POST('/workspaces/{wsId}/pages', {
+            params: { path: { wsId } },
+            body: input,
+          }),
+        'Failed to create page',
+      );
       return data as PageItem;
     },
     onSuccess: (_data, vars) => {
@@ -166,11 +180,14 @@ export function useUpdatePage(wsId: string): UseMutationResult<PageItem, ApiErro
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({ pageId, patch }: UpdatePageArgs): Promise<PageItem> => {
-      const { data, error } = await sdk.PATCH('/workspaces/{wsId}/pages/{pageId}', {
-        params: { path: { wsId, pageId } },
-        body: patch,
-      });
-      if (error || !data) throw toApiError(error, 'Failed to update page');
+      const data = await apiRequest(
+        (client) =>
+          client.PATCH('/workspaces/{wsId}/pages/{pageId}', {
+            params: { path: { wsId, pageId } },
+            body: patch,
+          }),
+        'Failed to update page',
+      );
       return data as PageItem;
     },
     onSuccess: (_data, vars) => {
@@ -185,10 +202,13 @@ export function useDeletePage(wsId: string): UseMutationResult<void, ApiError, s
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (pageId: string): Promise<void> => {
-      const { error } = await sdk.DELETE('/workspaces/{wsId}/pages/{pageId}', {
-        params: { path: { wsId, pageId } },
-      });
-      if (error) throw toApiError(error, 'Failed to delete page');
+      await apiRequest(
+        (client) =>
+          client.DELETE('/workspaces/{wsId}/pages/{pageId}', {
+            params: { path: { wsId, pageId } },
+          }),
+        'Failed to delete page',
+      );
     },
     onSuccess: (_data, pageId) => {
       void qc.invalidateQueries({ queryKey: pageKeys.list(wsId) });
@@ -216,11 +236,14 @@ export function useGeneratePage(
         prompt: args.prompt,
         ...(args.projectId !== undefined ? { projectId: args.projectId } : {}),
       };
-      const { data, error } = await sdk.POST('/workspaces/{wsId}/pages/generate', {
-        params: { path: { wsId } },
-        body,
-      });
-      if (error || !data) throw toApiError(error, 'Failed to generate page');
+      const data = await apiRequest(
+        (client) =>
+          client.POST('/workspaces/{wsId}/pages/generate', {
+            params: { path: { wsId } },
+            body,
+          }),
+        'Failed to generate page',
+      );
       return data as PageItem;
     },
     onSuccess: () => {

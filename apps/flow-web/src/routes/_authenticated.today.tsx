@@ -9,6 +9,7 @@
  */
 
 import type { components } from '@nodate-flow/sdk';
+import { Day } from '@nodate-flow/ui/time';
 import { useSuspenseQuery } from '@tanstack/react-query';
 import { createFileRoute, Link } from '@tanstack/react-router';
 import { CheckCircle } from 'lucide-react';
@@ -18,9 +19,9 @@ import { useTranslation } from 'react-i18next';
 import { OPEN_CREATE_TASK_EVENT } from '../components/layout/glass-dock';
 import type { TaskDerivedState, TaskPriority } from '../features/tasks/api';
 import { PRIORITY_COLOR, PRIORITY_KEY, STATE_COLOR } from '../features/tasks/constants';
-import { dateKey } from '../lib/date-utils';
+import { apiRequest } from '../lib/api';
 import { formatDueDate } from '../lib/format-date';
-import { sdk } from '../lib/sdk';
+import { useEffectiveZone } from '../lib/use-effective-timezone';
 
 type AssignedTask = components['schemas']['MyTaskListItem'];
 
@@ -35,33 +36,40 @@ const SECTION_ORDER: readonly SectionKey[] = [
   'noDue',
 ];
 
-function classifyDue(dueOn: string | undefined, todayKey: string): SectionKey {
+/**
+ * Which section a due date belongs to, relative to `today`.
+ *
+ * Both operands are calendar days, so the comparison never touches an
+ * instant and the offsets are stepped on {@link Day} rather than by
+ * adding 86,400 seconds — the day after a DST transition is still the
+ * next day.
+ */
+function classifyDue(dueOn: string | undefined, today: Day): SectionKey {
   if (!dueOn) return 'noDue';
+  const todayKey = today.toString();
   if (dueOn < todayKey) return 'overdue';
   if (dueOn === todayKey) return 'today';
-  // tomorrow = todayKey + 1 day
-  const t = new Date(`${todayKey}T00:00:00`);
-  const tomorrow = new Date(t);
-  tomorrow.setDate(t.getDate() + 1);
-  if (dueOn === dateKey(tomorrow)) return 'tomorrow';
-  const weekEnd = new Date(t);
-  weekEnd.setDate(t.getDate() + 7);
-  if (dueOn <= dateKey(weekEnd)) return 'thisWeek';
+  if (dueOn === today.addDays(1).toString()) return 'tomorrow';
+  if (dueOn <= today.addDays(7).toString()) return 'thisWeek';
   return 'later';
 }
 
 function TodayRoute(): ReactElement {
   const { t, i18n } = useTranslation('common');
   const locale = i18n.resolvedLanguage ?? 'en';
+  // Which day a task is due relative to has to be read in the same zone
+  // the calendar files it under, or a task sits in "overdue" here while
+  // the grid still shows it on today.
+  const zone = useEffectiveZone();
 
   const { data: tasks } = useSuspenseQuery({
     queryKey: ['me', 'tasks'] as const,
     staleTime: 30_000,
     queryFn: async (): Promise<AssignedTask[]> => {
-      const { data, error } = await sdk.GET('/me/tasks', {
-        params: { query: { limit: 200, offset: 0 } },
-      });
-      if (error || !data) return [];
+      const data = await apiRequest(
+        (client) => client.GET('/me/tasks', { params: { query: { limit: 200, offset: 0 } } }),
+        'Failed to load assigned tasks',
+      );
       return data.tasks ?? [];
     },
   });
@@ -75,11 +83,11 @@ function TodayRoute(): ReactElement {
       later: [],
       noDue: [],
     };
-    const todayKey = dateKey(new Date());
+    const today = Day.today(zone);
     for (const task of tasks) {
       // Hide closed states from the daily focus view.
       if (task.derivedState === 'done' || task.derivedState === 'cancelled') continue;
-      empty[classifyDue(task.dueOn, todayKey)].push(task);
+      empty[classifyDue(task.dueOn, today)].push(task);
     }
     // Sort each section: overdue ascending (oldest first), no_due by
     // priority desc, others ascending by due date then priority desc.
@@ -94,7 +102,7 @@ function TodayRoute(): ReactElement {
       empty[key].sort(key === 'noDue' ? byPriorityDesc : byDueAsc);
     }
     return empty;
-  }, [tasks]);
+  }, [tasks, zone]);
 
   const totalCount = SECTION_ORDER.reduce((sum, k) => sum + sections[k].length, 0);
 

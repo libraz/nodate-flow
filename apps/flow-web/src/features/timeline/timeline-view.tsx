@@ -4,9 +4,11 @@
  */
 
 import Button from '@nodate-flow/ui/primitives/button';
+import type { Zone } from '@nodate-flow/ui/time';
 import { type ReactElement, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-
+import { eventDateKey } from '../../lib/date-utils';
+import { useEffectiveZone } from '../../lib/use-effective-timezone';
 import {
   type TimelineEvent,
   type TimelineFilters,
@@ -42,12 +44,15 @@ interface InnerProps {
   workspaceId?: string;
 }
 
-function dayKey(ts: number): string {
-  const d = new Date(ts * 1000);
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  return `${y}-${m}-${day}`;
+/**
+ * The calendar day an event's instant falls on, read in `zone`.
+ *
+ * Both the group boundaries and the "Today" / "Yesterday" labels come
+ * from this, so reading it in the browser's zone put an event under a
+ * heading a day away from the one every other surface files it under.
+ */
+function dayKey(ts: number, zone: Zone): string {
+  return eventDateKey(ts, false, zone);
 }
 
 /**
@@ -97,6 +102,7 @@ function TimelineInner({
 }: InnerProps): ReactElement {
   const { t, i18n } = useTranslation('timeline');
   const locale = i18n.resolvedLanguage ?? 'en';
+  const zone = useEffectiveZone();
 
   // Accumulate events across pages. When filters change (kind, actor)
   // we reset; when only offset advances we append the new page.
@@ -129,11 +135,12 @@ function TimelineInner({
       day: 'numeric',
       weekday: 'short',
     });
-    const todayKey = dayKey(Math.floor(Date.now() / 1000));
-    const yesterdayKey = dayKey(Math.floor(Date.now() / 1000) - 86_400);
+    const nowSeconds = Math.floor(Date.now() / 1000);
+    const todayKey = dayKey(nowSeconds, zone);
+    const yesterdayKey = dayKey(nowSeconds - 86_400, zone);
     const out: { key: string; label: string; items: TimelineEvent[] }[] = [];
     for (const ev of allEvents) {
-      const key = dayKey(ev.occurredAt);
+      const key = dayKey(ev.occurredAt, zone);
       let group = out[out.length - 1];
       if (!group || group.key !== key) {
         let label: string;
@@ -146,7 +153,7 @@ function TimelineInner({
       group.items.push(ev);
     }
     return out;
-  }, [allEvents, locale, t]);
+  }, [allEvents, locale, t, zone]);
 
   const hasMore = allEvents.length < total;
 

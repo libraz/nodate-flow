@@ -17,6 +17,8 @@ const mocks = vi.hoisted(() => ({ post: vi.fn() }));
 
 vi.mock('../../../lib/sdk', () => ({
   sdk: { POST: mocks.post, GET: vi.fn(), DELETE: vi.fn() },
+
+  authSdk: { POST: mocks.post, GET: vi.fn(), DELETE: vi.fn() },
 }));
 
 import TokenCreateDialog from '../token-create-dialog';
@@ -40,7 +42,11 @@ function sentBody(): Record<string, unknown> {
 
 beforeEach(() => {
   mocks.post.mockReset();
-  mocks.post.mockResolvedValue({ data: { id: 't-1', token: 'mcp_secret' }, error: null });
+  mocks.post.mockResolvedValue({
+    data: { id: 't-1', token: 'mcp_secret' },
+    error: null,
+    response: new Response(null, { status: 200 }),
+  });
 });
 
 describe('TokenCreateDialog scopes', () => {
@@ -91,6 +97,7 @@ describe('TokenCreateDialog scopes', () => {
     mocks.post.mockResolvedValue({
       data: undefined,
       error: { type: 'VALIDATION.BODY.FIELD_INVALID', title: 'invalid', status: 422 },
+      response: new Response(null, { status: 400 }),
     });
     open();
     fillName();

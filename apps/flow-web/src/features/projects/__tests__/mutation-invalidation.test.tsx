@@ -22,6 +22,9 @@ vi.mock('../../../lib/sdk', () => ({
   sdk: {
     PATCH: sdkMocks.patch,
   },
+  authSdk: {
+    PATCH: sdkMocks.patch,
+  },
 }));
 
 import { projectsKeys, useUpdateProject } from '../api';
@@ -62,6 +65,7 @@ describe('useUpdateProject — W5 invalidation matrix', () => {
         createdAt: 1,
       },
       error: null,
+      response: new Response(null, { status: 200 }),
     });
 
     const client = buildClient();

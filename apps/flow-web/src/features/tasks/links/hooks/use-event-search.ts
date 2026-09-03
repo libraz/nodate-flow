@@ -15,9 +15,7 @@
  */
 
 import { type UseQueryResult, useQuery } from '@tanstack/react-query';
-
-import { toApiError } from '../../../../lib/api-error';
-import { sdk } from '../../../../lib/sdk';
+import { apiRequest } from '../../../../lib/api';
 import type { CalendarEventListItem } from '../types';
 
 const DAY_MS = 86_400_000;
@@ -83,10 +81,13 @@ export function useEventSearch(
       const now = Date.now();
       const start = toIsoSecond(new Date(now - DAY_MS * PAST_WINDOW_DAYS));
       const end = toIsoSecond(new Date(now + DAY_MS * UPCOMING_WINDOW_DAYS));
-      const { data, error } = await sdk.GET('/workspaces/{wsId}/calendar-events', {
-        params: { path: { wsId: workspaceId }, query: { start, end } },
-      });
-      if (error || !data) throw toApiError(error, 'Failed to load events');
+      const data = await apiRequest(
+        (client) =>
+          client.GET('/workspaces/{wsId}/calendar-events', {
+            params: { path: { wsId: workspaceId }, query: { start, end } },
+          }),
+        'Failed to load events',
+      );
       const all = data.events ?? [];
       const nowSec = Math.floor(now / 1000);
       let filtered = all;

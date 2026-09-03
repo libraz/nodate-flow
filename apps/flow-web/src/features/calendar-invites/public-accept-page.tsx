@@ -15,8 +15,8 @@ import { type ReactElement, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import PublicPageLayout from '../../components/public-page-layout';
-import { ApiError, formatApiError, isNetworkError, toApiError } from '../../lib/api-error';
-import { sdk } from '../../lib/sdk';
+import { apiRequest } from '../../lib/api';
+import { ApiError, formatApiError, isNetworkError } from '../../lib/api-error';
 
 type RsvpChoice = 'accepted' | 'tentative' | 'declined';
 
@@ -63,13 +63,11 @@ function AcceptInviteForm({ token }: AcceptInviteFormProps): ReactElement {
 
   const mutation = useMutation({
     mutationFn: async (rsvp: RsvpChoice): Promise<AcceptInviteResult> => {
-      const response = await sdk.POST('/public/invites/accept', {
-        body: { token, rsvp },
-      });
-      if (response.error || !response.data) {
-        throw toApiError(response.error, 'Failed to record RSVP');
-      }
-      return response.data as AcceptInviteResult;
+      const data = await apiRequest(
+        (client) => client.POST('/public/invites/accept', { body: { token, rsvp } }),
+        'Failed to record RSVP',
+      );
+      return data as AcceptInviteResult;
     },
     onSuccess: (_data, rsvp) => {
       setResult(rsvp);

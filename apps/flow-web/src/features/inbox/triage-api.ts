@@ -5,9 +5,8 @@
  */
 
 import { type UseMutationResult, useMutation } from '@tanstack/react-query';
-
-import { ApiError, toApiError } from '../../lib/api-error';
-import { sdk } from '../../lib/sdk';
+import { apiRequest } from '../../lib/api';
+import { ApiError } from '../../lib/api-error';
 import { type Suggestion, suggestionsStore } from '../ai-suggestions/store';
 
 export { ApiError as InboxApiError };
@@ -28,11 +27,14 @@ export function useInboxTriageMutation(
   return useMutation({
     mutationFn: async (args: InboxTriageArgs | undefined): Promise<Suggestion[]> => {
       const body: InboxTriageArgs = args ?? {};
-      const { data, error } = await sdk.POST('/workspaces/{wsId}/inbox/triage', {
-        params: { path: { wsId: workspaceId } },
-        body,
-      });
-      if (error || !data) throw toApiError(error, 'Failed to triage inbox');
+      const data = await apiRequest(
+        (client) =>
+          client.POST('/workspaces/{wsId}/inbox/triage', {
+            params: { path: { wsId: workspaceId } },
+            body,
+          }),
+        'Failed to triage inbox',
+      );
       return data.suggestions ?? [];
     },
     onSuccess: (suggestions) => {

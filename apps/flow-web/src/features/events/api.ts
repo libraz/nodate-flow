@@ -27,9 +27,8 @@ import {
   useQueryClient,
   useSuspenseQuery,
 } from '@tanstack/react-query';
-
-import { type ApiError, toApiError } from '../../lib/api-error';
-import { sdk } from '../../lib/sdk';
+import { apiRequest } from '../../lib/api';
+import type { ApiError } from '../../lib/api-error';
 
 export type Event = components['schemas']['EventResponse'];
 export type PatchEventBody = components['schemas']['PatchEventInputBody'];
@@ -64,10 +63,13 @@ export function useEventQuery(
   return useSuspenseQuery({
     queryKey: eventDetailKeys.detail(wsId, calId, evtId),
     queryFn: async (): Promise<Event> => {
-      const { data, error } = await sdk.GET('/workspaces/{wsId}/calendars/{calId}/events/{evtId}', {
-        params: { path: { wsId, calId, evtId } },
-      });
-      if (error || !data) throw toApiError(error, 'Failed to load event');
+      const data = await apiRequest(
+        (client) =>
+          client.GET('/workspaces/{wsId}/calendars/{calId}/events/{evtId}', {
+            params: { path: { wsId, calId, evtId } },
+          }),
+        'Failed to load event',
+      );
       return data;
     },
   });
@@ -84,11 +86,14 @@ export function usePatchEventMutation(): UseMutationResult<Event, ApiError, Patc
   const qc = useQueryClient();
   return useMutation<Event, ApiError, PatchEventArgs>({
     mutationFn: async ({ wsId, calId, evtId, body }): Promise<Event> => {
-      const { data, error } = await sdk.PATCH(
-        '/workspaces/{wsId}/calendars/{calId}/events/{evtId}',
-        { params: { path: { wsId, calId, evtId } }, body },
+      const data = await apiRequest(
+        (client) =>
+          client.PATCH('/workspaces/{wsId}/calendars/{calId}/events/{evtId}', {
+            params: { path: { wsId, calId, evtId } },
+            body,
+          }),
+        'Failed to update event',
       );
-      if (error || !data) throw toApiError(error, 'Failed to update event');
       return data;
     },
     onSuccess: (_data, { wsId, calId, evtId }) => {
@@ -107,10 +112,13 @@ export function useDeleteEventMutation(): UseMutationResult<void, ApiError, Dele
   const qc = useQueryClient();
   return useMutation<void, ApiError, DeleteEventArgs>({
     mutationFn: async ({ wsId, calId, evtId }): Promise<void> => {
-      const { error } = await sdk.DELETE('/workspaces/{wsId}/calendars/{calId}/events/{evtId}', {
-        params: { path: { wsId, calId, evtId } },
-      });
-      if (error) throw toApiError(error, 'Failed to delete event');
+      await apiRequest(
+        (client) =>
+          client.DELETE('/workspaces/{wsId}/calendars/{calId}/events/{evtId}', {
+            params: { path: { wsId, calId, evtId } },
+          }),
+        'Failed to delete event',
+      );
     },
     onSuccess: (_void, { wsId, calId, evtId }) => {
       invalidate(qc, wsId, calId, evtId);

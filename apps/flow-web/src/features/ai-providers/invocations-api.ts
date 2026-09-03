@@ -1,12 +1,12 @@
 /**
  * AI invocations feature — suspense query for the workspace audit
- * panel that lists recent redacted LLM calls (2.WEB-2).
+ * panel that lists recent redacted LLM calls.
  */
 
 import type { components } from '@nodate-flow/sdk';
 import { type UseSuspenseQueryResult, useSuspenseQuery } from '@tanstack/react-query';
 
-import { sdk } from '../../lib/sdk';
+import { apiRequest } from '../../lib/api';
 
 export type AiInvocation = components['schemas']['Invocation'];
 
@@ -23,10 +23,13 @@ export function useAiInvocationsQuery(workspaceId: string): UseSuspenseQueryResu
   return useSuspenseQuery({
     queryKey: aiInvocationsKeys.list(workspaceId),
     queryFn: async (): Promise<AiInvocation[]> => {
-      const { data, error } = await sdk.GET('/workspaces/{wsId}/ai/invocations', {
-        params: { path: { wsId: workspaceId }, query: { limit: 50, offset: 0 } },
-      });
-      if (error || !data) throw new Error('Failed to load AI invocations');
+      const data = await apiRequest(
+        (client) =>
+          client.GET('/workspaces/{wsId}/ai/invocations', {
+            params: { path: { wsId: workspaceId }, query: { limit: 50, offset: 0 } },
+          }),
+        'Failed to load AI invocations',
+      );
       return data.invocations ?? [];
     },
   });

@@ -31,6 +31,7 @@ import Textarea from '@nodate-flow/ui/primitives/textarea';
 import TimePicker from '@nodate-flow/ui/primitives/time-picker';
 import { toaster } from '@nodate-flow/ui/primitives/toast';
 import { ToggleChip, ToggleChipGroup } from '@nodate-flow/ui/primitives/toggle-chip';
+import type { Zone } from '@nodate-flow/ui/time';
 import {
   type FormEvent,
   type KeyboardEvent,
@@ -43,7 +44,7 @@ import {
 import { useTranslation } from 'react-i18next';
 import { formatApiError } from '../../lib/api-error';
 import { confirmAction } from '../../lib/confirm-action';
-import { dateKey } from '../../lib/date-utils';
+import { allDayToUnix, todayKey, unixToWallClock, wallClockToUnix } from '../../lib/date-utils';
 import { formatDate } from '../../lib/format';
 import { useWeekStart } from '../../lib/use-week-start';
 import { selectUser, useAuth } from '../auth/auth-store';
@@ -134,15 +135,21 @@ export interface EventDialogProps {
   open: boolean;
   workspaceId: string;
   /**
-   * Effective timezone (profile, else workspace, else browser). Stamped
-   * on events this dialog creates.
+   * Effective zone (profile, else workspace, else browser). Both stamped
+   * on events this dialog creates and used to read every wall clock it
+   * shows or submits.
    *
    * It used to be the browser's, which meant the profile setting had no
    * effect on the events it produced: a Tokyo user working in Berlin
    * created meetings labelled Europe/Berlin, and the reminders — which
    * already honoured the profile — disagreed about what time they were.
+   * Then the label was corrected without the arithmetic, which was worse:
+   * the request said Asia/Tokyo while the instant beside it had been
+   * resolved in Europe/Berlin, so the stored event contradicted its own
+   * declared zone. A `Zone` rather than a string because a string is as
+   * easy to leave off as to pass.
    */
-  timezone: string;
+  zone: Zone;
   /** Projects available to the Task kind picker. */
   projects: FlowProject[];
   mode: EventDialogMode;
@@ -151,57 +158,6 @@ export interface EventDialogProps {
 }
 
 /* ── helpers ────────────────────────────────────────────────────── */
-
-function unixToDateKey(sec: number): string {
-  return dateKey(new Date(sec * 1000));
-}
-
-function unixToHHMM(sec: number): string {
-  const d = new Date(sec * 1000);
-  return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
-}
-
-/**
- * Unix seconds for midnight UTC on a `YYYY-MM-DD` date.
- *
- * All-day events are dates, and a date is the same square on the
- * calendar wherever you are. Sending local midnight made it an instant
- * that lands on a different date for anyone whose offset crosses it: a
- * Tokyo user's company holiday arrived as 15:00Z the day before and read
- * as the 4th in Europe, and an agent reported it as the 4th as well. The
- * API normalises to midnight UTC on the way in, so sending anything else
- * only means the value echoed back is not the one that was sent.
- */
-function toUnixUTCDate(dateStr: string): number {
-  const [y, m, day] = dateStr.split('-').map(Number);
-  return Math.floor(Date.UTC(y ?? 1970, (m ?? 1) - 1, day ?? 1, 0, 0, 0, 0) / 1000);
-}
-
-/** Combine a `YYYY-MM-DD` date and a `HH:MM` time into unix seconds (local tz). */
-function toUnix(dateStr: string, timeStr: string): number {
-  const [y, m, day] = dateStr.split('-').map(Number);
-  const [hh, mm] = timeStr.split(':').map(Number);
-  const d = new Date(y ?? 1970, (m ?? 1) - 1, day ?? 1, hh ?? 0, mm ?? 0, 0, 0);
-  return Math.floor(d.getTime() / 1000);
-}
-
-/**
- * Detect the browser's IANA timezone or fall back to UTC.
- *
- * Cached at module load — the resolved timezone never changes during a
- * session, so calling `Intl.DateTimeFormat()` per render would be waste.
- */
-const CACHED_BROWSER_TIMEZONE: string = (() => {
-  try {
-    return Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
-  } catch {
-    return 'UTC';
-  }
-})();
-
-function browserTimezone(): string {
-  return CACHED_BROWSER_TIMEZONE;
-}
 
 /** Translate a notification preset to minutes (null = omit from payload). */
 function presetToMinutes(preset: NotificationPreset): number | null {
@@ -484,7 +440,7 @@ const KIND_OPTIONS: ItemKind[] = ['task', 'event', 'block', 'free', 'milestone']
 export default function EventDialog({
   open,
   workspaceId,
-  timezone,
+  zone,
   projects,
   mode,
   onClose,
@@ -517,7 +473,7 @@ export default function EventDialog({
   const initialKind: ItemKind =
     mode.kind === 'create' ? (mode.initialItemKind ?? 'event') : mode.initialKind;
 
-  const initialDate = mode.kind === 'create' ? mode.date : inferEditDate(mode.event);
+  const initialDate = mode.kind === 'create' ? mode.date : inferEditDate(mode.event, zone);
 
   /* ── dirty tracking ─── */
 
@@ -557,13 +513,13 @@ export default function EventDialog({
       const s = mode.event.startAt;
       const e = mode.event.endAt;
       return {
-        start: s != null ? unixToHHMM(s) : '09:00',
-        end: e != null ? unixToHHMM(e) : '10:00',
+        start: s != null ? unixToWallClock(s, zone).time : '09:00',
+        end: e != null ? unixToWallClock(e, zone).time : '10:00',
       };
     }
     const k: CalEventKind = initialKind === 'task' ? 'event' : initialKind;
     return defaultTimes(k);
-  }, [initialKind, mode]);
+  }, [initialKind, mode, zone]);
 
   const [startTime, setStartTime] = useState<string>(initialTimes.start);
   const [endTime, setEndTime] = useState<string>(initialTimes.end);
@@ -665,12 +621,14 @@ export default function EventDialog({
     if (!TIME_FIELDS.some((f) => dirty.has(f))) {
       setAllDay(detail.allDay);
       if (detail.startAt != null) {
-        setStartDate(unixToDateKey(detail.startAt));
-        setStartTime(unixToHHMM(detail.startAt));
+        const wall = unixToWallClock(detail.startAt, zone);
+        setStartDate(wall.date);
+        setStartTime(wall.time);
       }
       if (detail.endAt != null) {
-        setEndDate(unixToDateKey(detail.endAt));
-        setEndTime(unixToHHMM(detail.endAt));
+        const wall = unixToWallClock(detail.endAt, zone);
+        setEndDate(wall.date);
+        setEndTime(wall.time);
       }
     }
     // A memo sits behind the "more options" disclosure, so an event that
@@ -685,7 +643,10 @@ export default function EventDialog({
     // untouched unless the user picks something else.
     setRecurrence(rruleToPreset(detail.recurrenceRule as RecurrenceRule | null | undefined));
     if (detail.recurrenceRule) setExpanded(true);
-  }, [detail, open]);
+    // `zone` decides which wall clock the stored instants seed the form
+    // with, so it belongs in the dependency list even though it does not
+    // change while a dialog is open.
+  }, [detail, open, zone]);
 
   // Validation state.
   const [titleError, setTitleError] = useState<string | null>(null);
@@ -782,8 +743,8 @@ export default function EventDialog({
     if (kind !== 'task' && kind !== 'milestone') {
       // Time-ordered validation only where both ends are meaningful.
       if (!allDay) {
-        const s = toUnix(startDate, startTime);
-        const e = toUnix(endDate, endTime);
+        const s = wallClockToUnix(startDate, startTime, zone);
+        const e = wallClockToUnix(endDate, endTime, zone);
         if (e <= s) {
           setTimeError(t('validation.endBeforeStart'));
           ok = false;
@@ -860,23 +821,24 @@ export default function EventDialog({
 
   function buildCreateBody(): CreateEventInput {
     const calKind = kind as CalEventKind;
-    const tz = timezone || browserTimezone();
     const body: CreateEventInput = {
       title: title.trim(),
       kind: calKind,
-      timezone: tz,
+      // The declared zone and the instants below have to be resolved
+      // from the same value, or the row contradicts itself.
+      timezone: zone.name,
       allDay: calKind === 'milestone' ? true : allDay,
     };
     if (calKind === 'milestone') {
       // Backend enforces (StartAt == nil) != (EndAt == nil); set both.
-      body.startAt = toUnixUTCDate(startDate);
+      body.startAt = allDayToUnix(startDate);
       body.endAt = body.startAt;
     } else if (allDay) {
-      body.startAt = toUnixUTCDate(startDate);
-      body.endAt = toUnixUTCDate(endDate);
+      body.startAt = allDayToUnix(startDate);
+      body.endAt = allDayToUnix(endDate);
     } else {
-      body.startAt = toUnix(startDate, startTime);
-      body.endAt = toUnix(endDate, endTime);
+      body.startAt = wallClockToUnix(startDate, startTime, zone);
+      body.endAt = wallClockToUnix(endDate, endTime, zone);
     }
     if (calKind === 'event') {
       body.showAs = showAs;
@@ -916,14 +878,14 @@ export default function EventDialog({
       body.allDay = calKind === 'milestone' ? true : allDay;
       if (calKind === 'milestone') {
         // Backend enforces (StartAt == nil) != (EndAt == nil); set both.
-        body.startAt = toUnixUTCDate(startDate);
+        body.startAt = allDayToUnix(startDate);
         body.endAt = body.startAt;
       } else if (allDay) {
-        body.startAt = toUnixUTCDate(startDate);
-        body.endAt = toUnixUTCDate(endDate);
+        body.startAt = allDayToUnix(startDate);
+        body.endAt = allDayToUnix(endDate);
       } else {
-        body.startAt = toUnix(startDate, startTime);
-        body.endAt = toUnix(endDate, endTime);
+        body.startAt = wallClockToUnix(startDate, startTime, zone);
+        body.endAt = wallClockToUnix(endDate, endTime, zone);
       }
     }
     if (calKind === 'event') {
@@ -1499,7 +1461,7 @@ export default function EventDialog({
 }
 
 /** Best-effort derivation of the initial date for an edit-mode dialog. */
-function inferEditDate(event: CalEventLike): string {
-  if (typeof event.startAt === 'number') return unixToDateKey(event.startAt);
-  return dateKey(new Date());
+function inferEditDate(event: CalEventLike, zone: Zone): string {
+  if (typeof event.startAt === 'number') return unixToWallClock(event.startAt, zone).date;
+  return todayKey(zone);
 }

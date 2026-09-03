@@ -29,6 +29,10 @@ vi.mock('../../../lib/sdk', () => ({
   sdk: {
     POST: sdkMocks.post,
   },
+
+  authSdk: {
+    POST: sdkMocks.post,
+  },
 }));
 
 import { type TaskListItem, type TasksPage, tasksKeys, useReorderTasks } from '../api';
@@ -80,7 +84,11 @@ beforeEach(() => {
 
 describe('useReorderTasks with InfiniteData cache', () => {
   it('does not throw inside onMutate and reorders the cached infinite list', async () => {
-    sdkMocks.post.mockResolvedValueOnce({ data: undefined, error: null });
+    sdkMocks.post.mockResolvedValueOnce({
+      data: undefined,
+      error: null,
+      response: new Response(null, { status: 200 }),
+    });
 
     const client = buildClient();
     const initial = [aTask('a', 1000), aTask('b', 2000), aTask('c', 3000)];
@@ -121,6 +129,7 @@ describe('useReorderTasks with InfiniteData cache', () => {
     sdkMocks.post.mockResolvedValueOnce({
       data: undefined,
       error: { type: 'about:blank', title: 'Internal Server Error', status: 500 },
+      response: new Response(null, { status: 400 }),
     });
 
     const client = buildClient();
@@ -155,7 +164,11 @@ describe('useReorderTasks with InfiniteData cache', () => {
   });
 
   it('also handles the legacy flat TaskListItem[] cache shape', async () => {
-    sdkMocks.post.mockResolvedValueOnce({ data: undefined, error: null });
+    sdkMocks.post.mockResolvedValueOnce({
+      data: undefined,
+      error: null,
+      response: new Response(null, { status: 200 }),
+    });
 
     const client = buildClient();
     const flatKey = tasksKeys.list('prj-1');

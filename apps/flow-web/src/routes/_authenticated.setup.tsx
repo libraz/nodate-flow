@@ -17,7 +17,7 @@ import type { ReactElement } from 'react';
 
 import { workspacesKeys } from '../features/workspaces/api';
 import SetupPage from '../features/workspaces/setup-page';
-import { authSdk } from '../lib/sdk';
+import { authApiRequest } from '../lib/api';
 
 type Workspace = components['schemas']['Workspace'];
 
@@ -28,9 +28,15 @@ type Workspace = components['schemas']['Workspace'];
  * cached shape stays compatible.
  */
 async function fetchWorkspaceList(): Promise<Workspace[]> {
-  const { data, error } = await authSdk.GET('/workspaces', {});
-  if (error || !data) return [];
-  return data.workspaces ?? [];
+  const data = await authApiRequest(
+    (client) => client.GET('/workspaces', {}),
+    'Failed to load workspaces',
+    // The setup route exists for accounts with no workspace, and a
+    // failed read must not redirect anyone away from it; an unknown
+    // list reads as "none yet", which is what this route is for.
+    { onError: 'empty', empty: null },
+  );
+  return data?.workspaces ?? [];
 }
 
 function SetupRoute(): ReactElement {

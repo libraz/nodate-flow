@@ -40,9 +40,13 @@ vi.mock('../../../lib/sdk', () => ({
   sdk: {
     GET: vi.fn(async (path: string) => {
       if (path === '/workspaces/{wsId}/notification-preferences') {
-        return { data: { preferences: sdkMocks.preferences }, error: null };
+        return {
+          data: { preferences: sdkMocks.preferences },
+          error: null,
+          response: new Response(null, { status: 200 }),
+        };
       }
-      return { data: null, error: { status: 404 } };
+      return { data: null, error: { status: 404 }, response: new Response(null, { status: 400 }) };
     }),
     PUT: vi.fn(
       async (
@@ -55,18 +59,50 @@ vi.mock('../../../lib/sdk', () => ({
           preferences: init.body.preferences,
         });
         sdkMocks.preferences = init.body.preferences;
-        return { data: { preferences: init.body.preferences }, error: null };
+        return {
+          data: { preferences: init.body.preferences },
+          error: null,
+          response: new Response(null, { status: 200 }),
+        };
       },
     ),
-    POST: vi.fn(async () => ({ data: null, error: null })),
-    PATCH: vi.fn(async () => ({ data: null, error: null })),
-    DELETE: vi.fn(async () => ({ data: null, error: null })),
+    POST: vi.fn(async () => ({
+      data: null,
+      error: null,
+      response: new Response(null, { status: 400 }),
+    })),
+    PATCH: vi.fn(async () => ({
+      data: null,
+      error: null,
+      response: new Response(null, { status: 400 }),
+    })),
+    DELETE: vi.fn(async () => ({
+      data: null,
+      error: null,
+      response: new Response(null, { status: 400 }),
+    })),
   },
   authSdk: {
-    GET: vi.fn(async () => ({ data: { workspaces: sdkMocks.workspaces }, error: null })),
-    POST: vi.fn(async () => ({ data: null, error: null })),
-    PATCH: vi.fn(async () => ({ data: null, error: null })),
-    DELETE: vi.fn(async () => ({ data: null, error: null })),
+    GET: vi.fn(async () => ({
+      data: { workspaces: sdkMocks.workspaces },
+      error: null,
+      response: new Response(null, { status: 200 }),
+    })),
+    POST: vi.fn(async () => ({
+      data: null,
+      error: null,
+      response: new Response(null, { status: 400 }),
+    })),
+    PATCH: vi.fn(async () => ({
+      data: null,
+      error: null,
+      response: new Response(null, { status: 400 }),
+    })),
+    DELETE: vi.fn(async () => ({
+      data: null,
+      error: null,
+      response: new Response(null, { status: 400 }),
+    })),
   },
 }));
 

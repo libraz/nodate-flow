@@ -22,9 +22,17 @@
  * guessing.
  */
 
-import { sdk } from '../../lib/sdk';
+import { apiRequest } from '../../lib/api';
 import type { TransitionName } from '../tasks/api';
 import type { ResolveCommandResult } from './api';
+
+/**
+ * Stand-in the requester hands back when a dispatch call fails. A
+ * dispatch reports the refusal as its own outcome rather than letting
+ * it reach the user as an error, so it needs a value that cannot be
+ * confused with a bodyless success.
+ */
+const FAILED = Symbol('dispatch failed');
 
 /** Where the palette should send the user once a dispatch is done. */
 export interface NavTarget {
@@ -155,10 +163,18 @@ function pickUnique(rows: Array<{ id: string; title: string }>, term: string): L
 async function resolveTask(term: string | undefined, ctx: DispatchContext): Promise<Lookup> {
   if (term === undefined) return { reason: 'missing' };
   if (looksLikePublicId(term)) return { id: term };
-  const { data, error } = await sdk.GET('/tasks', {
-    params: { query: { workspaceId: ctx.workspaceId, q: term, limit: 10, offset: 0 } },
-  });
-  if (error || !data) return { reason: 'not_found' };
+  // A lookup that cannot reach the server is reported as "no match",
+  // which the caller already renders as an unresolved argument rather
+  // than as a command that ran.
+  const data = await apiRequest(
+    (client) =>
+      client.GET('/tasks', {
+        params: { query: { workspaceId: ctx.workspaceId, q: term, limit: 10, offset: 0 } },
+      }),
+    'Failed to look up tasks',
+    { onError: 'empty', empty: null },
+  );
+  if (!data) return { reason: 'not_found' };
   return pickUnique(
     (data.tasks ?? []).map((task) => ({ id: task.id, title: task.title })),
     term,
@@ -173,10 +189,13 @@ async function resolveTask(term: string | undefined, ctx: DispatchContext): Prom
  */
 async function resolveProject(term: string | undefined, ctx: DispatchContext): Promise<Lookup> {
   if (term !== undefined && looksLikePublicId(term)) return { id: term };
-  const { data, error } = await sdk.GET('/workspaces/{wsId}/projects', {
-    params: { path: { wsId: ctx.workspaceId } },
-  });
-  if (error || !data) return { reason: 'not_found' };
+  const data = await apiRequest(
+    (client) =>
+      client.GET('/workspaces/{wsId}/projects', { params: { path: { wsId: ctx.workspaceId } } }),
+    'Failed to look up projects',
+    { onError: 'empty', empty: null },
+  );
+  if (!data) return { reason: 'not_found' };
   const projects = (data.projects ?? []).map((p) => ({ id: p.id, title: p.name }));
   if (term === undefined) {
     const sole = projects[0];
@@ -223,20 +242,25 @@ const createTask: ToolHandler = async (args, ctx) => {
   const dueOn = text(args, 'dueOn');
   const startOn = text(args, 'startOn');
   const priority = integer(args, 'priority', 0, 4);
-  const { data, error } = await sdk.POST('/tasks', {
-    body: {
-      projectId: project.id,
-      title,
-      // Same default the create dialog applies: a task created from a
-      // command is a normal project task, not a private one.
-      visibility: 'public' as const,
-      ...(description !== undefined ? { description } : {}),
-      ...(dueOn !== undefined ? { dueOn } : {}),
-      ...(startOn !== undefined ? { startOn } : {}),
-      ...(priority !== undefined ? { priority } : {}),
-    },
-  });
-  if (error || !data) return { kind: 'failed', tool: 'create_task' };
+  const data = await apiRequest(
+    (client) =>
+      client.POST('/tasks', {
+        body: {
+          projectId: project.id,
+          title,
+          // Same default the create dialog applies: a task created from a
+          // command is a normal project task, not a private one.
+          visibility: 'public' as const,
+          ...(description !== undefined ? { description } : {}),
+          ...(dueOn !== undefined ? { dueOn } : {}),
+          ...(startOn !== undefined ? { startOn } : {}),
+          ...(priority !== undefined ? { priority } : {}),
+        },
+      }),
+    'Failed to create task',
+    { onError: 'empty', empty: null },
+  );
+  if (!data) return { kind: 'failed', tool: 'create_task' };
   return { kind: 'executed', tool: 'create_task', navigateTo: { href: `/tasks/${data.id}` } };
 };
 
@@ -266,11 +290,15 @@ const updateTask: ToolHandler = async (args, ctx) => {
       term: term ?? '',
     };
   }
-  const { error } = await sdk.PATCH('/tasks/{id}', {
-    params: { path: { id: task.id } },
-    body: patch,
-  });
-  if (error) return { kind: 'failed', tool: 'update_task' };
+  // The stand-in is a sentinel rather than a falsy value: an endpoint
+  // that answers 204 has no body, and "no body" must not read as
+  // "the call failed".
+  const updated = await apiRequest(
+    (client) => client.PATCH('/tasks/{id}', { params: { path: { id: task.id } }, body: patch }),
+    'Failed to update task',
+    { onError: 'empty', empty: FAILED },
+  );
+  if (updated === FAILED) return { kind: 'failed', tool: 'update_task' };
   return { kind: 'executed', tool: 'update_task', navigateTo: { href: `/tasks/${task.id}` } };
 };
 
@@ -291,11 +319,16 @@ const transitionTask: ToolHandler = async (args, ctx) => {
   if (!('id' in task)) return unresolved('transition_task', 'taskId', task, term ?? '');
 
   const reason = text(args, 'reason');
-  const { error } = await sdk.POST('/tasks/{id}/transitions', {
-    params: { path: { id: task.id } },
-    body: { transition, ...(reason !== undefined ? { reason } : {}) },
-  });
-  if (error) return { kind: 'failed', tool: 'transition_task' };
+  const moved = await apiRequest(
+    (client) =>
+      client.POST('/tasks/{id}/transitions', {
+        params: { path: { id: task.id } },
+        body: { transition, ...(reason !== undefined ? { reason } : {}) },
+      }),
+    'Failed to transition task',
+    { onError: 'empty', empty: FAILED },
+  );
+  if (moved === FAILED) return { kind: 'failed', tool: 'transition_task' };
   return { kind: 'executed', tool: 'transition_task', navigateTo: { href: `/tasks/${task.id}` } };
 };
 
@@ -314,11 +347,13 @@ const addComment: ToolHandler = async (args, ctx) => {
   const task = await resolveTask(term, ctx);
   if (!('id' in task)) return unresolved('add_comment', 'taskId', task, term ?? '');
 
-  const { error } = await sdk.POST('/tasks/{id}/comments', {
-    params: { path: { id: task.id } },
-    body: { body },
-  });
-  if (error) return { kind: 'failed', tool: 'add_comment' };
+  const posted = await apiRequest(
+    (client) =>
+      client.POST('/tasks/{id}/comments', { params: { path: { id: task.id } }, body: { body } }),
+    'Failed to add comment',
+    { onError: 'empty', empty: FAILED },
+  );
+  if (posted === FAILED) return { kind: 'failed', tool: 'add_comment' };
   return { kind: 'executed', tool: 'add_comment', navigateTo: { href: `/tasks/${task.id}` } };
 };
 

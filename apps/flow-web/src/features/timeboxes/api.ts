@@ -39,9 +39,8 @@ import {
   useQueryClient,
   useSuspenseQuery,
 } from '@tanstack/react-query';
-
-import { ApiError, toApiError } from '../../lib/api-error';
-import { sdk } from '../../lib/sdk';
+import { apiRequest } from '../../lib/api';
+import { ApiError } from '../../lib/api-error';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -96,10 +95,13 @@ export function useTimeboxesQuery(wsId: string): UseSuspenseQueryResult<Timebox[
     queryKey: timeboxKeys.list(wsId),
     queryFn: async (): Promise<Timebox[]> => {
       if (!wsId) return [];
-      const { data, error } = await sdk.GET('/workspaces/{wsId}/timeboxes', {
-        params: { path: { wsId }, query: { limit: 200 } },
-      });
-      if (error || !data) throw toApiError(error, 'Failed to load timeboxes');
+      const data = await apiRequest(
+        (client) =>
+          client.GET('/workspaces/{wsId}/timeboxes', {
+            params: { path: { wsId }, query: { limit: 200 } },
+          }),
+        'Failed to load timeboxes',
+      );
       return data.timeboxes ?? [];
     },
   });
@@ -110,10 +112,13 @@ export function useTimeboxQuery(wsId: string, timeboxId: string): UseSuspenseQue
   return useSuspenseQuery({
     queryKey: timeboxKeys.detail(wsId, timeboxId),
     queryFn: async (): Promise<Timebox> => {
-      const { data, error } = await sdk.GET('/workspaces/{wsId}/timeboxes/{timeboxId}', {
-        params: { path: { wsId, timeboxId } },
-      });
-      if (error || !data) throw toApiError(error, 'Failed to load timebox');
+      const data = await apiRequest(
+        (client) =>
+          client.GET('/workspaces/{wsId}/timeboxes/{timeboxId}', {
+            params: { path: { wsId, timeboxId } },
+          }),
+        'Failed to load timebox',
+      );
       return data;
     },
   });
@@ -133,10 +138,13 @@ export function useTimeboxTasksQuery(
     queryKey: timeboxKeys.tasks(wsId, timeboxId),
     enabled: enabled && wsId.length > 0 && timeboxId.length > 0,
     queryFn: async (): Promise<TimeboxTask[]> => {
-      const { data, error } = await sdk.GET('/workspaces/{wsId}/timeboxes/{timeboxId}/tasks', {
-        params: { path: { wsId, timeboxId }, query: { limit: 200 } },
-      });
-      if (error || !data) throw toApiError(error, 'Failed to load timebox tasks');
+      const data = await apiRequest(
+        (client) =>
+          client.GET('/workspaces/{wsId}/timeboxes/{timeboxId}/tasks', {
+            params: { path: { wsId, timeboxId }, query: { limit: 200 } },
+          }),
+        'Failed to load timebox tasks',
+      );
       return data.tasks ?? [];
     },
   });
@@ -175,11 +183,17 @@ export function useActiveTimeboxesQuery(workspaceIds: readonly string[]): {
       enabled: wsId.length > 0,
       throwOnError: false,
       queryFn: async (): Promise<Timebox[]> => {
-        const { data, error } = await sdk.GET('/workspaces/{wsId}/timeboxes', {
-          params: { path: { wsId }, query: { limit: 200 } },
-        });
-        if (error || !data) return [];
-        return data.timeboxes ?? [];
+        // One workspace out of many failing must not blank the bar for
+        // the rest, so this row reports nothing rather than failing.
+        const data = await apiRequest(
+          (client) =>
+            client.GET('/workspaces/{wsId}/timeboxes', {
+              params: { path: { wsId }, query: { limit: 200 } },
+            }),
+          'Failed to load timeboxes',
+          { onError: 'empty', empty: null },
+        );
+        return data?.timeboxes ?? [];
       },
     })),
   });
@@ -217,11 +231,14 @@ export function useCreateTimeboxMutation(): UseMutationResult<
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({ wsId, body }: CreateTimeboxArgs): Promise<Timebox> => {
-      const { data, error } = await sdk.POST('/workspaces/{wsId}/timeboxes', {
-        params: { path: { wsId } },
-        body,
-      });
-      if (error || !data) throw toApiError(error, 'Failed to create timebox');
+      const data = await apiRequest(
+        (client) =>
+          client.POST('/workspaces/{wsId}/timeboxes', {
+            params: { path: { wsId } },
+            body,
+          }),
+        'Failed to create timebox',
+      );
       return data;
     },
     onSuccess: (_data, vars) => {
@@ -245,11 +262,14 @@ export function useUpdateTimeboxMutation(): UseMutationResult<
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({ wsId, timeboxId, body }: UpdateTimeboxArgs): Promise<Timebox> => {
-      const { data, error } = await sdk.PATCH('/workspaces/{wsId}/timeboxes/{timeboxId}', {
-        params: { path: { wsId, timeboxId } },
-        body,
-      });
-      if (error || !data) throw toApiError(error, 'Failed to update timebox');
+      const data = await apiRequest(
+        (client) =>
+          client.PATCH('/workspaces/{wsId}/timeboxes/{timeboxId}', {
+            params: { path: { wsId, timeboxId } },
+            body,
+          }),
+        'Failed to update timebox',
+      );
       return data;
     },
     onSuccess: (_data, vars) => {
@@ -271,10 +291,13 @@ export function useDeleteTimeboxMutation(): UseMutationResult<void, ApiError, De
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({ wsId, timeboxId }: DeleteTimeboxArgs): Promise<void> => {
-      const { error } = await sdk.DELETE('/workspaces/{wsId}/timeboxes/{timeboxId}', {
-        params: { path: { wsId, timeboxId } },
-      });
-      if (error) throw toApiError(error, 'Failed to delete timebox');
+      await apiRequest(
+        (client) =>
+          client.DELETE('/workspaces/{wsId}/timeboxes/{timeboxId}', {
+            params: { path: { wsId, timeboxId } },
+          }),
+        'Failed to delete timebox',
+      );
     },
     onSuccess: (_data, vars) => {
       void qc.invalidateQueries({ queryKey: timeboxKeys.list(vars.wsId) });
@@ -297,11 +320,14 @@ export function useUpdateTimeboxStatusMutation(): UseMutationResult<
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({ wsId, timeboxId, status }: UpdateTimeboxStatusArgs): Promise<Timebox> => {
-      const { data, error } = await sdk.POST('/workspaces/{wsId}/timeboxes/{timeboxId}/status', {
-        params: { path: { wsId, timeboxId } },
-        body: { status },
-      });
-      if (error || !data) throw toApiError(error, 'Failed to update status');
+      const data = await apiRequest(
+        (client) =>
+          client.POST('/workspaces/{wsId}/timeboxes/{timeboxId}/status', {
+            params: { path: { wsId, timeboxId } },
+            body: { status },
+          }),
+        'Failed to update status',
+      );
       return data;
     },
     onSuccess: (_data, vars) => {
@@ -324,11 +350,14 @@ export function useAddTimeboxTaskMutation(): UseMutationResult<void, ApiError, A
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({ wsId, timeboxId, taskId }: AddTimeboxTaskArgs): Promise<void> => {
-      const { error } = await sdk.POST('/workspaces/{wsId}/timeboxes/{timeboxId}/tasks', {
-        params: { path: { wsId, timeboxId } },
-        body: { taskId },
-      });
-      if (error) throw toApiError(error, 'Failed to add task to timebox');
+      await apiRequest(
+        (client) =>
+          client.POST('/workspaces/{wsId}/timeboxes/{timeboxId}/tasks', {
+            params: { path: { wsId, timeboxId } },
+            body: { taskId },
+          }),
+        'Failed to add task to timebox',
+      );
     },
     onSuccess: (_data, vars) => {
       void qc.invalidateQueries({
@@ -356,11 +385,13 @@ export function useRemoveTimeboxTaskMutation(): UseMutationResult<
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({ wsId, timeboxId, taskId }: RemoveTimeboxTaskArgs): Promise<void> => {
-      const { error } = await sdk.DELETE(
-        '/workspaces/{wsId}/timeboxes/{timeboxId}/tasks/{taskId}',
-        { params: { path: { wsId, timeboxId, taskId } } },
+      await apiRequest(
+        (client) =>
+          client.DELETE('/workspaces/{wsId}/timeboxes/{timeboxId}/tasks/{taskId}', {
+            params: { path: { wsId, timeboxId, taskId } },
+          }),
+        'Failed to remove task from timebox',
       );
-      if (error) throw toApiError(error, 'Failed to remove task from timebox');
     },
     onSuccess: (_data, vars) => {
       void qc.invalidateQueries({

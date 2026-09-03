@@ -14,9 +14,8 @@ import {
   useQuery,
   useQueryClient,
 } from '@tanstack/react-query';
-
-import { ApiError, toApiError } from '../../lib/api-error';
-import { sdk } from '../../lib/sdk';
+import { apiRequest } from '../../lib/api';
+import { ApiError } from '../../lib/api-error';
 import { tasksKeys } from '../tasks/api';
 
 /** Suggested relation kind — narrowed from the SDK's open `string` field. */
@@ -65,10 +64,13 @@ export function useRelationSuggestionsForTask(
   return useQuery({
     queryKey: relationKeys.forTask(taskId),
     queryFn: async (): Promise<RelationSuggestion[]> => {
-      const { data, error } = await sdk.GET('/tasks/{id}/relation-suggestions', {
-        params: { path: { id: taskId } },
-      });
-      if (error || !data) throw toApiError(error, 'Failed to load relation suggestions');
+      const data = await apiRequest(
+        (client) =>
+          client.GET('/tasks/{id}/relation-suggestions', {
+            params: { path: { id: taskId } },
+          }),
+        'Failed to load relation suggestions',
+      );
       const list = (data.suggestions ?? []) as RelationSuggestion[];
       return list.filter((s) => s.status === 'pending');
     },
@@ -84,11 +86,14 @@ export function useResolveSuggestion(): UseMutationResult<void, ApiError, Resolv
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({ suggestionId, action }: ResolveSuggestionArgs): Promise<void> => {
-      const { error } = await sdk.POST('/relation-suggestions/{suggestionId}/resolve', {
-        params: { path: { suggestionId } },
-        body: { action },
-      });
-      if (error) throw toApiError(error, 'Failed to resolve relation suggestion');
+      await apiRequest(
+        (client) =>
+          client.POST('/relation-suggestions/{suggestionId}/resolve', {
+            params: { path: { suggestionId } },
+            body: { action },
+          }),
+        'Failed to resolve relation suggestion',
+      );
     },
     onMutate: async ({ suggestionId, taskId }) => {
       await qc.cancelQueries({ queryKey: relationKeys.forTask(taskId) });

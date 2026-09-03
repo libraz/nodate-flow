@@ -14,9 +14,8 @@ import {
   type UseInfiniteQueryResult,
   useInfiniteQuery,
 } from '@tanstack/react-query';
-
-import { type ApiError, toApiError } from '../../lib/api-error';
-import { sdk } from '../../lib/sdk';
+import { apiRequest } from '../../lib/api';
+import type { ApiError } from '../../lib/api-error';
 
 export type ActivityEntry = components['schemas']['Entry'];
 
@@ -97,10 +96,13 @@ export function useActivityFeedQuery(
       if (source !== undefined) query.source = source;
       if (pageParam !== undefined) query.cursor = pageParam;
 
-      const { data, error } = await sdk.GET('/workspaces/{wsId}/activity', {
-        params: { path: { wsId: workspaceId }, query },
-      });
-      if (error || !data) throw toApiError(error, 'Failed to load activity feed');
+      const data = await apiRequest(
+        (client) =>
+          client.GET('/workspaces/{wsId}/activity', {
+            params: { path: { wsId: workspaceId }, query },
+          }),
+        'Failed to load activity feed',
+      );
       return normalize(data);
     },
     getNextPageParam: (lastPage): string | undefined =>

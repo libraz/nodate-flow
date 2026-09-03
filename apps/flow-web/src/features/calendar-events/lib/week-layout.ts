@@ -3,10 +3,12 @@
  *
  * Adapted from nodate-time's `week-layout.ts` but rebuilt for flow's
  * data model: calendar events carry `startAt` / `endAt` as unix-second
- * integers (not luxon ISO strings), and the layout works in the
- * browser's local timezone via plain `Date` objects — matching the
- * desktop month grid in `_authenticated.calendar.tsx`, which also keys
- * cells on local-time `YYYY-MM-DD`.
+ * integers (not luxon ISO strings), and the geometry works in plain
+ * `Date` objects built from local components — matching the desktop
+ * month grid in `_authenticated.calendar.tsx`, which also keys cells on
+ * local-time `YYYY-MM-DD`. Which calendar day an event lands on is a
+ * separate question and is answered in the effective {@link Zone} the
+ * caller passes, never in the browser's.
  *
  * Multi-day events are packed into non-overlapping horizontal tracks so
  * a continuous bar can stretch across the seven day columns of a single
@@ -15,6 +17,7 @@
  */
 
 import type { components } from '@nodate-flow/sdk';
+import type { Zone } from '@nodate-flow/ui/time';
 
 import { eventDateKey, eventStartOfDay } from '../../../lib/date-utils';
 
@@ -63,19 +66,19 @@ function dayDiff(a: Date, b: Date): number {
  * a day for anyone whose offset crosses midnight, which is how the same
  * company holiday showed on different dates for different colleagues.
  */
-export function eventStartDay(evt: CalendarEvent, zone?: string): Date | null {
+export function eventStartDay(evt: CalendarEvent, zone: Zone): Date | null {
   if (typeof evt.startAt !== 'number') return null;
   return eventStartOfDay(evt.startAt, evt.allDay === true, zone);
 }
 
 /** Resolve an event's end as a day cell, falling back to its start. */
-export function eventEndDay(evt: CalendarEvent, zone?: string): Date | null {
+export function eventEndDay(evt: CalendarEvent, zone: Zone): Date | null {
   if (typeof evt.endAt === 'number') return eventStartOfDay(evt.endAt, evt.allDay === true, zone);
   return eventStartDay(evt, zone);
 }
 
 /** True when an event spans more than one calendar day in local time. */
-export function isMultiDay(evt: CalendarEvent, zone?: string): boolean {
+export function isMultiDay(evt: CalendarEvent, zone: Zone): boolean {
   const s = eventStartDay(evt, zone);
   const e = eventEndDay(evt, zone);
   if (!s || !e) return false;
@@ -83,7 +86,7 @@ export function isMultiDay(evt: CalendarEvent, zone?: string): boolean {
 }
 
 /** The `YYYY-MM-DD` key for an event's start day, or null. */
-export function eventStartKey(evt: CalendarEvent, zone?: string): string | null {
+export function eventStartKey(evt: CalendarEvent, zone: Zone): string | null {
   if (typeof evt.startAt !== 'number') return null;
   return eventDateKey(evt.startAt, evt.allDay === true, zone);
 }
@@ -110,7 +113,7 @@ export function groupEventsByWeek(
   events: CalendarEvent[],
   weekStarts: Date[],
   key: (weekStart: Date) => string,
-  zone?: string,
+  zone: Zone,
 ): Map<string, CalendarEvent[]> {
   const byWeek = new Map<string, CalendarEvent[]>();
   const first = weekStarts[0];
@@ -147,7 +150,7 @@ export function groupEventsByWeek(
 export function layoutWeek(
   weekStart: Date,
   events: CalendarEvent[],
-  zone?: string,
+  zone: Zone,
 ): PositionedEvent[] {
   const ws = startOfDay(weekStart);
   const we = startOfDay(new Date(ws.getTime() + 6 * 86_400_000));

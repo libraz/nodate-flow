@@ -42,7 +42,7 @@ import {
 } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { sdk } from '../../../lib/sdk';
+import { apiRequest } from '../../../lib/api';
 import {
   type AutoActionRule,
   type AutoActionRuleKind,
@@ -155,11 +155,14 @@ function useSaveAutonomyOverrides() {
       // Fan out a single batch PATCH containing every dirty row. The SDK
       // body type now natively carries signalKind + autonomyLevel after
       // the recent regen.
-      const { data, error } = await sdk.PATCH('/workspaces/{wsId}/ai/auto-action-rules', {
-        params: { path: { wsId: workspaceId } },
-        body: { rules: patches },
-      });
-      if (error || !data) throw new Error('Failed to save autonomy overrides');
+      const data = await apiRequest(
+        (client) =>
+          client.PATCH('/workspaces/{wsId}/ai/auto-action-rules', {
+            params: { path: { wsId: workspaceId } },
+            body: { rules: patches },
+          }),
+        'Failed to save autonomy overrides',
+      );
       return (data.rules ?? []) as AutoActionRule[];
     },
     onMutate: async ({ workspaceId, optimistic }): Promise<SaveContext> => {

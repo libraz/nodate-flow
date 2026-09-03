@@ -27,7 +27,7 @@ import { useTranslation } from 'react-i18next';
 import { useProjectDependenciesQuery } from '../features/projects/api';
 import type { TaskDerivedState } from '../features/tasks/api';
 import { STATE_COLOR } from '../features/tasks/constants';
-import { sdk } from '../lib/sdk';
+import { apiRequest } from '../lib/api';
 
 type TaskListItem = components['schemas']['TaskListItem'];
 
@@ -222,10 +222,11 @@ function GanttView(): ReactElement {
     queryKey: ['tasks', 'list', projectId, 'gantt'] as const,
     staleTime: 30_000,
     queryFn: async (): Promise<TaskListItem[]> => {
-      const { data, error } = await sdk.GET('/tasks', {
-        params: { query: { projectId, limit: 200, offset: 0 } },
-      });
-      if (error || !data) return [];
+      const data = await apiRequest(
+        (client) =>
+          client.GET('/tasks', { params: { query: { projectId, limit: 200, offset: 0 } } }),
+        'Failed to load tasks',
+      );
       return data.tasks ?? [];
     },
   });

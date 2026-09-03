@@ -6,9 +6,8 @@ import {
   useQueryClient,
   useSuspenseQuery,
 } from '@tanstack/react-query';
-
-import { type ApiError, toApiError } from '../../lib/api-error';
-import { sdk } from '../../lib/sdk';
+import { apiRequest } from '../../lib/api';
+import type { ApiError } from '../../lib/api-error';
 
 export type Favorite = components['schemas']['Favorite'];
 
@@ -22,10 +21,13 @@ export function useFavoritesQuery(workspaceId: string): UseSuspenseQueryResult<F
   return useSuspenseQuery({
     queryKey: favoritesKeys.list(workspaceId),
     queryFn: async (): Promise<Favorite[]> => {
-      const { data, error } = await sdk.GET('/me/favorites', {
-        params: { query: { workspaceId } },
-      });
-      if (error || !data) throw toApiError(error, 'Failed to load favorites');
+      const data = await apiRequest(
+        (client) =>
+          client.GET('/me/favorites', {
+            params: { query: { workspaceId } },
+          }),
+        'Failed to load favorites',
+      );
       return data.favorites ?? [];
     },
   });
@@ -47,10 +49,13 @@ export function useAddFavorite(): UseMutationResult<Favorite, ApiError, AddFavor
       targetType,
       targetId,
     }: AddFavoriteArgs): Promise<Favorite> => {
-      const { data, error } = await sdk.POST('/me/favorites', {
-        body: { workspaceId, targetType, targetId },
-      });
-      if (error || !data) throw toApiError(error, 'Failed to add favorite');
+      const data = await apiRequest(
+        (client) =>
+          client.POST('/me/favorites', {
+            body: { workspaceId, targetType, targetId },
+          }),
+        'Failed to add favorite',
+      );
       return data;
     },
     onSuccess: (_data, vars) => {
@@ -68,10 +73,13 @@ export function useRemoveFavorite(): UseMutationResult<void, ApiError, RemoveFav
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({ id, workspaceId }: RemoveFavoriteArgs): Promise<void> => {
-      const { error } = await sdk.DELETE('/me/favorites/{id}', {
-        params: { path: { id }, query: { workspaceId } },
-      });
-      if (error) throw toApiError(error, 'Failed to remove favorite');
+      await apiRequest(
+        (client) =>
+          client.DELETE('/me/favorites/{id}', {
+            params: { path: { id }, query: { workspaceId } },
+          }),
+        'Failed to remove favorite',
+      );
     },
     onSuccess: (_data, vars) => {
       void qc.invalidateQueries({ queryKey: favoritesKeys.list(vars.workspaceId) });

@@ -8,7 +8,7 @@
 
 import { type UseQueryResult, useQuery } from '@tanstack/react-query';
 
-import { sdk } from '../../lib/sdk';
+import { apiRequest } from '../../lib/api';
 
 export interface ReplayResult {
   derivedState: string;
@@ -35,10 +35,13 @@ export function useTaskReplayQuery(
     retry: false,
     queryFn: async (): Promise<ReplayResult> => {
       if (!taskId) throw new Error('taskId required');
-      const { data, error } = await sdk.GET('/tasks/{id}/replay', {
-        params: { path: { id: taskId } },
-      });
-      if (error || !data) throw new Error('Failed to replay task');
+      const data = await apiRequest(
+        (client) =>
+          client.GET('/tasks/{id}/replay', {
+            params: { path: { id: taskId } },
+          }),
+        'Failed to replay task',
+      );
       return {
         derivedState: data.derivedState,
         stored: data.stored,

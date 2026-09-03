@@ -49,15 +49,21 @@ vi.mock('../../../lib/sdk', () => ({
 }));
 
 vi.mock('../../../features/projects/api', () => ({
-  useProjectsQuery: () => ({ data: [] }),
+  useProjectsQuery: () => ({ data: [], response: new Response(null, { status: 200 }) }),
+  response: new Response(null, { status: 200 }),
 }));
 
 vi.mock('../../../features/favorites/api', () => ({
-  useFavoritesQuery: () => ({ data: [] }),
+  useFavoritesQuery: () => ({ data: [], response: new Response(null, { status: 200 }) }),
+  response: new Response(null, { status: 200 }),
 }));
 
 vi.mock('../../../features/workspaces/api', () => ({
-  useWorkspacesQuery: () => ({ data: mocks.workspaces }),
+  useWorkspacesQuery: () => ({
+    data: mocks.workspaces,
+    response: new Response(null, { status: 200 }),
+  }),
+  response: new Response(null, { status: 200 }),
 }));
 
 vi.mock('../../../features/nl-command/api', () => ({
@@ -87,6 +93,7 @@ beforeEach(() => {
   mocks.sdkGet.mockReset().mockResolvedValue({
     data: { workspaces: [{ id: 'ws-1' }] },
     error: null,
+    response: new Response(null, { status: 200 }),
   });
   window.localStorage.clear();
   clearActiveWorkspaceId();
@@ -141,7 +148,11 @@ describe('command palette', () => {
     // workspace in the URL and none to fall back to.
     mocks.pathname = '/login';
     mocks.workspaces = [];
-    mocks.sdkGet.mockResolvedValue({ data: { workspaces: [] }, error: null });
+    mocks.sdkGet.mockResolvedValue({
+      data: { workspaces: [] },
+      error: null,
+      response: new Response(null, { status: 200 }),
+    });
     const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     render(
       <QueryClientProvider client={client}>

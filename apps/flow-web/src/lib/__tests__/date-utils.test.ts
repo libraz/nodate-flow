@@ -1,6 +1,11 @@
+import { Zone } from '@nodate-flow/ui/time';
 import { describe, expect, it } from 'vitest';
 
 import { dateKey, eventDateKey, eventStartOfDay, todayKey } from '../date-utils';
+
+const utc = Zone.utc();
+const tokyo = Zone.resolve('Asia/Tokyo');
+const newYork = Zone.resolve('America/New_York');
 
 describe('dateKey', () => {
   it('formats a normal date as YYYY-MM-DD', () => {
@@ -35,12 +40,12 @@ describe('eventDateKey', () => {
   const allDayInstant = Date.UTC(2027, 7, 5, 0, 0, 0, 0) / 1000;
 
   it('reads an all-day event in UTC', () => {
-    expect(eventDateKey(allDayInstant, true)).toBe('2027-08-05');
+    expect(eventDateKey(allDayInstant, true, utc)).toBe('2027-08-05');
   });
 
-  it('reads a timed event in local time', () => {
-    const timed = new Date(2027, 7, 5, 14, 30, 0, 0).getTime() / 1000;
-    expect(eventDateKey(timed, false)).toBe('2027-08-05');
+  it('reads a timed event in the zone it is given', () => {
+    const timed = Date.UTC(2027, 7, 5, 14, 30, 0, 0) / 1000;
+    expect(eventDateKey(timed, false, utc)).toBe('2027-08-05');
   });
 
   // The two cases below straddle UTC midnight from either side, so one
@@ -51,20 +56,20 @@ describe('eventDateKey', () => {
   it('does not shift an all-day event late in the UTC day', () => {
     // 23:00Z on the 4th is already the 5th at any positive offset.
     const lateEvening = Date.UTC(2027, 7, 4, 23, 0, 0, 0) / 1000;
-    expect(eventDateKey(lateEvening, true)).toBe('2027-08-04');
+    expect(eventDateKey(lateEvening, true, utc)).toBe('2027-08-04');
   });
 
   it('does not shift an all-day event early in the UTC day', () => {
     // 01:00Z on the 5th is still the 4th at any offset below -01:00.
     const earlyMorning = Date.UTC(2027, 7, 5, 1, 0, 0, 0) / 1000;
-    expect(eventDateKey(earlyMorning, true)).toBe('2027-08-05');
+    expect(eventDateKey(earlyMorning, true, utc)).toBe('2027-08-05');
   });
 });
 
 describe('eventStartOfDay', () => {
   it('returns a local-midnight Date for the day the event belongs to', () => {
     const allDayInstant = Date.UTC(2027, 7, 5, 0, 0, 0, 0) / 1000;
-    const d = eventStartOfDay(allDayInstant, true);
+    const d = eventStartOfDay(allDayInstant, true, utc);
     expect(d.getFullYear()).toBe(2027);
     expect(d.getMonth()).toBe(7);
     expect(d.getDate()).toBe(5);
@@ -72,9 +77,9 @@ describe('eventStartOfDay', () => {
   });
 
   it('agrees with eventDateKey for timed events', () => {
-    const timed = new Date(2027, 7, 5, 23, 45, 0, 0).getTime() / 1000;
-    const d = eventStartOfDay(timed, false);
-    expect(dateKey(d)).toBe(eventDateKey(timed, false));
+    const timed = Date.UTC(2027, 7, 5, 23, 45, 0, 0) / 1000;
+    const d = eventStartOfDay(timed, false, tokyo);
+    expect(dateKey(d)).toBe(eventDateKey(timed, false, tokyo));
   });
 });
 
@@ -86,21 +91,21 @@ describe('eventDateKey with an effective timezone', () => {
   const timed = Date.UTC(2027, 7, 5, 22, 0, 0, 0) / 1000;
 
   it('files a timed event by the day it falls on in that zone', () => {
-    expect(eventDateKey(timed, false, 'Asia/Tokyo')).toBe('2027-08-06');
-    expect(eventDateKey(timed, false, 'America/New_York')).toBe('2027-08-05');
+    expect(eventDateKey(timed, false, tokyo)).toBe('2027-08-06');
+    expect(eventDateKey(timed, false, newYork)).toBe('2027-08-05');
   });
 
   it('leaves all-day events in UTC whatever zone is supplied', () => {
     const allDay = Date.UTC(2027, 7, 5, 0, 0, 0, 0) / 1000;
-    expect(eventDateKey(allDay, true, 'Asia/Tokyo')).toBe('2027-08-05');
-    expect(eventDateKey(allDay, true, 'America/New_York')).toBe('2027-08-05');
+    expect(eventDateKey(allDay, true, tokyo)).toBe('2027-08-05');
+    expect(eventDateKey(allDay, true, newYork)).toBe('2027-08-05');
   });
 });
 
 describe('todayKey', () => {
   it('reads today in the supplied zone', () => {
     const noonUTC = new Date(Date.UTC(2027, 7, 5, 22, 0, 0, 0));
-    expect(todayKey('Asia/Tokyo', noonUTC)).toBe('2027-08-06');
-    expect(todayKey('America/New_York', noonUTC)).toBe('2027-08-05');
+    expect(todayKey(tokyo, noonUTC)).toBe('2027-08-06');
+    expect(todayKey(newYork, noonUTC)).toBe('2027-08-05');
   });
 });

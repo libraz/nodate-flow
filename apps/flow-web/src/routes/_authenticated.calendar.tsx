@@ -30,6 +30,7 @@ import Button from '@nodate-flow/ui/primitives/button';
 import Drawer from '@nodate-flow/ui/primitives/drawer';
 import { toaster } from '@nodate-flow/ui/primitives/toast';
 import { ToggleChip, ToggleChipGroup } from '@nodate-flow/ui/primitives/toggle-chip';
+import { Zone } from '@nodate-flow/ui/time';
 import { BP } from '@nodate-flow/ui/tokens/breakpoints';
 import { useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
 import { createFileRoute, Link, useNavigate } from '@tanstack/react-router';
@@ -62,11 +63,11 @@ import { useMeQuery } from '../features/settings/api';
 import type { TaskDerivedState } from '../features/tasks/api';
 import { STATE_COLOR } from '../features/tasks/constants';
 import { useWorkspacesQuery } from '../features/workspaces/api';
-import { type ApiError, toApiError } from '../lib/api-error';
-import { dateKey, todayKey } from '../lib/date-utils';
-import { sdk } from '../lib/sdk';
+import { apiRequest } from '../lib/api';
+import type { ApiError } from '../lib/api-error';
+import { dateKey, endOfDayIso, startOfDayIso, todayKey } from '../lib/date-utils';
 import { useActiveWorkspaceId } from '../lib/use-current-workspace';
-import { resolveEffectiveTimezone } from '../lib/use-effective-timezone';
+import { resolveEffectiveZone } from '../lib/use-effective-timezone';
 import styles from './_authenticated.calendar.module.css';
 
 /**
@@ -294,10 +295,17 @@ function expandCalendarEvents(
     return input;
   });
 
+  // The window bounds are instants and the expander only ever compares
+  // them as instants, so the zone they are read in cannot change which
+  // occurrences fall inside. Naming UTC rather than letting them adopt
+  // the host zone keeps that true by construction instead of by
+  // coincidence: the moment a bound is used for anything day-shaped,
+  // an unnamed zone would quietly make the window the reader's.
+  const utc = Zone.utc().name;
   return expandAllRecurrences(
     recurrenceInput,
-    DateTime.fromJSDate(rangeStart),
-    DateTime.fromJSDate(rangeEnd).plus({ milliseconds: 1 }),
+    DateTime.fromJSDate(rangeStart, { zone: utc }),
+    DateTime.fromJSDate(rangeEnd, { zone: utc }).plus({ milliseconds: 1 }),
   ).map((instance) => ({
     ...instance.event,
     ...((isoToSeconds(instance.startAt) ?? instance.event.startAt)
@@ -416,7 +424,7 @@ function CalendarRoute(): ReactElement {
   // the grid, the pills and the dialog all used the browser's zone, so
   // someone from Tokyo working in Berlin saw Berlin days while the
   // server's reminders about the same events used Tokyo.
-  const timezone = resolveEffectiveTimezone(me.timezone, workspaces, activeWsId);
+  const zone = resolveEffectiveZone(me.timezone, workspaces, activeWsId);
   // Narrow workspace shape for the rail — id, name, and the optional
   // country code (so the holidays-mode picker can pre-select the
   // workspace's own configured country) — without coupling the rail to
@@ -440,33 +448,58 @@ function CalendarRoute(): ReactElement {
   }, [country]);
 
   // Range that covers the full 42-cell month grid (may span adjacent months).
-  const { fromDate, toDate, fromIso, toIso, rangeStart, rangeEnd } = useMemo(() => {
-    const cells = buildMonthGrid(cursor.year, cursor.month, weekStart);
-    const first = cells[0]?.date ?? new Date(cursor.year, cursor.month, 1);
-    const last = cells[cells.length - 1]?.date ?? new Date(cursor.year, cursor.month, 1);
-    const start = new Date(first);
-    start.setHours(0, 0, 0, 0);
-    const end = new Date(last);
-    end.setHours(23, 59, 59, 999);
-    return {
-      fromDate: dateKey(start),
-      toDate: dateKey(last),
-      fromIso: start.toISOString(),
-      toIso: end.toISOString(),
-      rangeStart: start,
-      rangeEnd: end,
-    };
-  }, [cursor, weekStart]);
+  //
+  // The grid's own cells are local-component Dates, so their day keys
+  // round-trip in whatever frame they were built in. The instants sent
+  // as `start`/`end` are a different question: they are the bounds of
+  // "the days on screen", and a day boundary only exists relative to a
+  // zone. Taken from the browser they asked the server for a window
+  // offset from the one being drawn, so events at the first and last
+  // cell were fetched for the wrong day — or, for a viewer far enough
+  // east or west, not fetched at all.
+  const { fromDate, toDate, fromIso, toIso, rangeStart, rangeEnd, holidayFrom, holidayTo } =
+    useMemo(() => {
+      const cells = buildMonthGrid(cursor.year, cursor.month, weekStart);
+      const first = cells[0]?.date ?? new Date(cursor.year, cursor.month, 1);
+      const last = cells[cells.length - 1]?.date ?? new Date(cursor.year, cursor.month, 1);
+      const firstKey = dateKey(first);
+      const lastKey = dateKey(last);
+      const startIso = startOfDayIso(firstKey, zone);
+      const endIso = endOfDayIso(lastKey, zone);
+      // The holiday window stays in local-component Dates because the
+      // provider compares against local-component Dates of its own. A
+      // holiday is a date, not an instant, so both sides being in the
+      // same arbitrary frame is what makes the comparison mean "the same
+      // square" — feeding it the zoned instants above would drop or add
+      // one at the edge of the grid.
+      const holidayStart = new Date(first);
+      holidayStart.setHours(0, 0, 0, 0);
+      const holidayEnd = new Date(last);
+      holidayEnd.setHours(23, 59, 59, 999);
+      return {
+        fromDate: firstKey,
+        toDate: lastKey,
+        fromIso: startIso,
+        toIso: endIso,
+        rangeStart: new Date(startIso),
+        rangeEnd: new Date(endIso),
+        holidayFrom: holidayStart,
+        holidayTo: holidayEnd,
+      };
+    }, [cursor, weekStart, zone]);
 
   // Single cross-workspace task query (flow-api /me/tasks-with-dates).
   const tasksQuery = useQuery({
     queryKey: ['calendar', 'me-tasks', fromDate, toDate] as const,
     staleTime: 30_000,
     queryFn: async (): Promise<CalendarTask[]> => {
-      const { data, error } = await sdk.GET('/me/tasks-with-dates', {
-        params: { query: { from: fromDate, to: toDate, limit: 1000 } },
-      });
-      if (error || !data) return [];
+      const data = await apiRequest(
+        (client) =>
+          client.GET('/me/tasks-with-dates', {
+            params: { query: { from: fromDate, to: toDate, limit: 1000 } },
+          }),
+        'Failed to load dated tasks',
+      );
       return data.tasks ?? [];
     },
   });
@@ -478,10 +511,11 @@ function CalendarRoute(): ReactElement {
     queryKey: ['calendar', 'me-events', fromIso, toIso] as const,
     staleTime: 30_000,
     queryFn: async (): Promise<CalendarEvent[]> => {
-      const { data, error } = await sdk.GET('/me/calendar-events', {
-        params: { query: { start: fromIso, end: toIso } },
-      });
-      if (error || !data) return [];
+      const data = await apiRequest(
+        (client) =>
+          client.GET('/me/calendar-events', { params: { query: { start: fromIso, end: toIso } } }),
+        'Failed to load calendar events',
+      );
       return data.events ?? [];
     },
   });
@@ -498,11 +532,14 @@ function CalendarRoute(): ReactElement {
     { taskId: string; dueOn: string }
   >({
     mutationFn: async ({ taskId, dueOn }) => {
-      const { data, error } = await sdk.PATCH('/tasks/{id}', {
-        params: { path: { id: taskId } },
-        body: { dueOn },
-      });
-      if (error || !data) throw toApiError(error, 'Failed to reschedule');
+      const data = await apiRequest(
+        (client) =>
+          client.PATCH('/tasks/{id}', {
+            params: { path: { id: taskId } },
+            body: { dueOn },
+          }),
+        'Failed to reschedule',
+      );
       return data;
     },
     onSuccess: () => {
@@ -599,11 +636,15 @@ function CalendarRoute(): ReactElement {
       queryKey: ['calendar', 'projects', w.id] as const,
       staleTime: 60_000,
       queryFn: async (): Promise<Project[]> => {
-        const { data, error } = await sdk.GET('/workspaces/{wsId}/projects', {
-          params: { path: { wsId: w.id } },
-        });
-        if (error || !data) return [];
-        return data.projects ?? [];
+        // The picker fans out per workspace; one that refuses simply
+        // offers no projects instead of emptying the whole list.
+        const data = await apiRequest(
+          (client) =>
+            client.GET('/workspaces/{wsId}/projects', { params: { path: { wsId: w.id } } }),
+          'Failed to load projects',
+          { onError: 'empty', empty: null },
+        );
+        return data?.projects ?? [];
       },
     })),
   });
@@ -672,7 +713,7 @@ function CalendarRoute(): ReactElement {
       if (k === 'free' && !layers.free) continue;
       if (k === 'milestone' && !layers.milestone) continue;
       if (k !== 'block' && k !== 'free' && k !== 'milestone' && !layers.events) continue;
-      for (const key of eventDayKeys(ev, timezone)) {
+      for (const key of eventDayKeys(ev, zone)) {
         const arr = map.get(key);
         if (arr) arr.push(ev);
         else map.set(key, [ev]);
@@ -682,11 +723,11 @@ function CalendarRoute(): ReactElement {
       arr.sort((a, b) => (a.startAt ?? 0) - (b.startAt ?? 0));
     }
     return map;
-    // `timezone` decides which day each event is filed under, so a
-    // profile change has to rebuild the map. It is a plain string from
-    // `resolveEffectiveTimezone`, so listing it does not invalidate the
-    // memo on every render the way an object identity would.
-  }, [expandedEvents, layers.events, layers.blocks, layers.free, layers.milestone, timezone]);
+    // `zone` decides which day each event is filed under, so a profile
+    // change has to rebuild the map. Zones are interned, so the same
+    // IANA name is the same object on every render and listing it here
+    // does not invalidate the memo the way a freshly built value would.
+  }, [expandedEvents, layers.events, layers.blocks, layers.free, layers.milestone, zone]);
 
   /**
    * Flat layer-filtered event list for the mobile month-scroll. Mirrors
@@ -712,18 +753,18 @@ function CalendarRoute(): ReactElement {
   const holidaysByDate = useMemo(() => {
     const map = new Map<string, HolidayEntry[]>();
     if (!holidayProvider || !layers.holidays) return map;
-    const entries = holidayProvider.holidaysBetween(rangeStart, rangeEnd, i18n.language);
+    const entries = holidayProvider.holidaysBetween(holidayFrom, holidayTo, i18n.language);
     for (const entry of entries) {
       const arr = map.get(entry.date);
       if (arr) arr.push(entry);
       else map.set(entry.date, [entry]);
     }
     return map;
-  }, [holidayProvider, rangeStart, rangeEnd, i18n.language, layers.holidays]);
+  }, [holidayProvider, holidayFrom, holidayTo, i18n.language, layers.holidays]);
 
   // "Today" has to be the reader's today, or the highlight lands on
   // a different cell from the one the events are filed under.
-  const todayKeyValue = todayKey(timezone, today);
+  const todayKeyValue = todayKey(zone, today);
   const monthLabel = useMemo(
     () =>
       new Intl.DateTimeFormat(locale, { year: 'numeric', month: 'long' }).format(
@@ -875,7 +916,7 @@ function CalendarRoute(): ReactElement {
               holidaysByDate={holidaysByDate}
               locale={locale}
               weekStart={weekStart}
-              timezone={timezone}
+              zone={zone}
               stateColor={stateColor}
               scrollToTodaySignal={scrollToTodaySignal}
               onDayCreate={(key) => handleCellClick(key, false)}
@@ -1110,7 +1151,7 @@ function CalendarRoute(): ReactElement {
       {editTarget !== null ? (
         <EventDialog
           open
-          timezone={timezone}
+          zone={zone}
           workspaceId={
             editTarget.mode === 'edit' ? editTarget.event.workspaceId : (activeWsId ?? '')
           }

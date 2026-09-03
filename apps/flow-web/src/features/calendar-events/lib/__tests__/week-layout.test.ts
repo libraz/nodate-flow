@@ -8,6 +8,7 @@
  */
 
 import type { components } from '@nodate-flow/sdk';
+import { Zone } from '@nodate-flow/ui/time';
 import { describe, expect, it } from 'vitest';
 
 import {
@@ -19,6 +20,15 @@ import {
 } from '../week-layout';
 
 type CalendarEvent = components['schemas']['MyCalendarEventResponse'];
+
+/**
+ * The fixtures below are built from local wall clocks and compared
+ * against week rows built the same way, so the host zone is the zone
+ * that makes the round trip exact and leaves these assertions about the
+ * geometry rather than about day boundaries. Which zone an event's day
+ * is read in is covered where it is decided, not here.
+ */
+const hostZone = Zone.browser();
 
 /** Local-midnight unix seconds for a given Y-M-D (month is 1-based). */
 function unix(y: number, m: number, d: number, hour = 9): number {
@@ -48,17 +58,17 @@ function makeEvent(partial: Partial<CalendarEvent> & { id: string }): CalendarEv
 describe('isMultiDay', () => {
   it('returns false for a same-day event', () => {
     const evt = makeEvent({ id: 'a', startAt: unix(2026, 6, 3, 9), endAt: unix(2026, 6, 3, 11) });
-    expect(isMultiDay(evt)).toBe(false);
+    expect(isMultiDay(evt, hostZone)).toBe(false);
   });
 
   it('returns true when the event crosses a day boundary', () => {
     const evt = makeEvent({ id: 'b', startAt: unix(2026, 6, 3, 9), endAt: unix(2026, 6, 5, 11) });
-    expect(isMultiDay(evt)).toBe(true);
+    expect(isMultiDay(evt, hostZone)).toBe(true);
   });
 
   it('ignores single-day events with no explicit end', () => {
     const evt = makeEvent({ id: 'c', startAt: unix(2026, 6, 3, 9) });
-    expect(isMultiDay(evt)).toBe(false);
+    expect(isMultiDay(evt, hostZone)).toBe(false);
   });
 });
 
@@ -68,7 +78,7 @@ describe('layoutWeek', () => {
 
   it('positions a fully-contained multi-day bar with correct span', () => {
     const evt = makeEvent({ id: 'a', startAt: unix(2026, 6, 1, 9), endAt: unix(2026, 6, 3, 11) });
-    const [pos] = layoutWeek(weekStart, [evt]);
+    const [pos] = layoutWeek(weekStart, [evt], hostZone);
     expect(pos).toBeDefined();
     expect(pos?.startCol).toBe(1); // Monday
     expect(pos?.span).toBe(3); // Mon..Wed inclusive
@@ -79,7 +89,7 @@ describe('layoutWeek', () => {
 
   it('clips a bar that starts before the week', () => {
     const evt = makeEvent({ id: 'a', startAt: unix(2026, 5, 28, 9), endAt: unix(2026, 6, 2, 11) });
-    const [pos] = layoutWeek(weekStart, [evt]);
+    const [pos] = layoutWeek(weekStart, [evt], hostZone);
     expect(pos?.startCol).toBe(0);
     expect(pos?.continuesLeft).toBe(true);
     expect(pos?.continuesRight).toBe(false);
@@ -88,7 +98,7 @@ describe('layoutWeek', () => {
 
   it('clips a bar that ends after the week', () => {
     const evt = makeEvent({ id: 'a', startAt: unix(2026, 6, 5, 9), endAt: unix(2026, 6, 10, 11) });
-    const [pos] = layoutWeek(weekStart, [evt]);
+    const [pos] = layoutWeek(weekStart, [evt], hostZone);
     expect(pos?.startCol).toBe(5); // Friday
     expect(pos?.span).toBe(2); // Fri..Sat visible
     expect(pos?.continuesRight).toBe(true);
@@ -97,7 +107,7 @@ describe('layoutWeek', () => {
   it('stacks overlapping bars onto separate tracks', () => {
     const a = makeEvent({ id: 'a', startAt: unix(2026, 6, 1, 9), endAt: unix(2026, 6, 3, 11) });
     const b = makeEvent({ id: 'b', startAt: unix(2026, 6, 2, 9), endAt: unix(2026, 6, 4, 11) });
-    const positioned = layoutWeek(weekStart, [a, b]);
+    const positioned = layoutWeek(weekStart, [a, b], hostZone);
     const tracks = positioned.map((p) => p.track).sort();
     expect(tracks).toEqual([0, 1]);
   });
@@ -105,7 +115,7 @@ describe('layoutWeek', () => {
   it('reuses a track for non-overlapping bars', () => {
     const a = makeEvent({ id: 'a', startAt: unix(2026, 6, 1, 9), endAt: unix(2026, 6, 2, 11) });
     const b = makeEvent({ id: 'b', startAt: unix(2026, 6, 4, 9), endAt: unix(2026, 6, 5, 11) });
-    const positioned = layoutWeek(weekStart, [a, b]);
+    const positioned = layoutWeek(weekStart, [a, b], hostZone);
     expect(positioned.every((p) => p.track === 0)).toBe(true);
   });
 
@@ -115,7 +125,7 @@ describe('layoutWeek', () => {
       startAt: unix(2026, 6, 2, 9),
       endAt: unix(2026, 6, 2, 11),
     });
-    expect(layoutWeek(weekStart, [single])).toHaveLength(0);
+    expect(layoutWeek(weekStart, [single], hostZone)).toHaveLength(0);
   });
 });
 
@@ -142,16 +152,16 @@ describe('groupEventsByWeek', () => {
   it('gives every week exactly the bars it got from the whole list', () => {
     // What the view did before: hand each row all the events and let it
     // filter. Grouping first must not change a single row's outcome.
-    const grouped = groupEventsByWeek(events, weekStarts, key);
+    const grouped = groupEventsByWeek(events, weekStarts, key, hostZone);
     for (const ws of weekStarts) {
-      const fromAll = layoutWeek(ws, events);
-      const fromBucket = layoutWeek(ws, grouped.get(key(ws)) ?? []);
+      const fromAll = layoutWeek(ws, events, hostZone);
+      const fromBucket = layoutWeek(ws, grouped.get(key(ws)) ?? [], hostZone);
       expect(fromBucket, key(ws)).toEqual(fromAll);
     }
   });
 
   it('gives every week exactly the single-day events it showed before', () => {
-    const grouped = groupEventsByWeek(events, weekStarts, key);
+    const grouped = groupEventsByWeek(events, weekStarts, key, hostZone);
     for (const ws of weekStarts) {
       const weekKeys = new Set(
         Array.from({ length: 7 }, (_, i) =>
@@ -160,9 +170,9 @@ describe('groupEventsByWeek', () => {
       );
       const singlesIn = (list: CalendarEvent[]): string[] =>
         list
-          .filter((e) => !isMultiDay(e))
+          .filter((e) => !isMultiDay(e, hostZone))
           .filter((e) => {
-            const k = eventStartKey(e);
+            const k = eventStartKey(e, hostZone);
             return k !== null && weekKeys.has(k);
           })
           .map((e) => e.id)
@@ -177,7 +187,7 @@ describe('groupEventsByWeek', () => {
       startAt: Math.floor(new Date(2026, 0, 7, 9).getTime() / 1000),
       endAt: Math.floor(new Date(2026, 0, 20, 9).getTime() / 1000),
     });
-    const grouped = groupEventsByWeek([spanning], weekStarts, key);
+    const grouped = groupEventsByWeek([spanning], weekStarts, key, hostZone);
     const weeksHolding = weekStarts.filter((ws) => grouped.get(key(ws))?.length);
     expect(weeksHolding.map(key)).toEqual(['2026-01-05', '2026-01-12', '2026-01-19']);
   });
@@ -188,6 +198,6 @@ describe('groupEventsByWeek', () => {
       startAt: Math.floor(new Date(2020, 0, 1, 9).getTime() / 1000),
       endAt: Math.floor(new Date(2020, 0, 1, 10).getTime() / 1000),
     });
-    expect(groupEventsByWeek([before], weekStarts, key).size).toBe(0);
+    expect(groupEventsByWeek([before], weekStarts, key, hostZone).size).toBe(0);
   });
 });

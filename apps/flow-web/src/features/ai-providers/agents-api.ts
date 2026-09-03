@@ -14,7 +14,7 @@ import {
   useSuspenseQuery,
 } from '@tanstack/react-query';
 
-import { sdk } from '../../lib/sdk';
+import { apiRequest } from '../../lib/api';
 
 /**
  * The four trigger modes mirror the ai_agents.schedule_kind ENUM
@@ -45,10 +45,13 @@ export function useAgentsQuery(
   return useSuspenseQuery({
     queryKey: ['ai-agents', workspaceId],
     queryFn: async () => {
-      const { data, error } = await sdk.GET('/workspaces/{wsId}/ai/agents', {
-        params: { path: { wsId: workspaceId }, query: { limit: 200, offset: 0 } },
-      });
-      if (error || !data) throw new Error('Failed to list agents');
+      const data = await apiRequest(
+        (client) =>
+          client.GET('/workspaces/{wsId}/ai/agents', {
+            params: { path: { wsId: workspaceId }, query: { limit: 200, offset: 0 } },
+          }),
+        'Failed to list agents',
+      );
       return {
         total: data.total ?? 0,
         agents: (data.agents ?? []) as AgentSummary[],
@@ -72,10 +75,13 @@ export function useModelsQuery(
   return useSuspenseQuery({
     queryKey: ['ai-models', workspaceId],
     queryFn: async () => {
-      const { data, error } = await sdk.GET('/workspaces/{wsId}/ai/models', {
-        params: { path: { wsId: workspaceId }, query: { limit: 200, offset: 0 } },
-      });
-      if (error || !data) throw new Error('Failed to list models');
+      const data = await apiRequest(
+        (client) =>
+          client.GET('/workspaces/{wsId}/ai/models', {
+            params: { path: { wsId: workspaceId }, query: { limit: 200, offset: 0 } },
+          }),
+        'Failed to list models',
+      );
       return {
         total: data.total ?? 0,
         models: (data.models ?? []) as ModelSummary[],
@@ -118,11 +124,14 @@ export function useCreateAgent(): UseMutationResult<AgentSummary, Error, CreateA
       if (body.temperature !== undefined) payload.temperature = body.temperature;
       if (body.eventTriggerTypes !== undefined && body.eventTriggerTypes.length > 0)
         payload.eventTriggerTypes = body.eventTriggerTypes;
-      const { data, error } = await sdk.POST('/workspaces/{wsId}/ai/agents', {
-        params: { path: { wsId: workspaceId } },
-        body: payload,
-      });
-      if (error || !data) throw new Error('Failed to create agent');
+      const data = await apiRequest(
+        (client) =>
+          client.POST('/workspaces/{wsId}/ai/agents', {
+            params: { path: { wsId: workspaceId } },
+            body: payload,
+          }),
+        'Failed to create agent',
+      );
       return data as AgentSummary;
     },
     onSuccess: (_res, { workspaceId }) => {
@@ -144,10 +153,13 @@ export function useTriggerAgent(): UseMutationResult<
 > {
   return useMutation<{ ok: true; dedupeKey: string }, Error, TriggerAgentArgs>({
     mutationFn: async ({ workspaceId, agentId }) => {
-      const { data, error } = await sdk.POST('/workspaces/{wsId}/ai/agents/{agentId}/trigger', {
-        params: { path: { wsId: workspaceId, agentId } },
-      });
-      if (error || !data) throw new Error('Failed to trigger agent');
+      const data = await apiRequest(
+        (client) =>
+          client.POST('/workspaces/{wsId}/ai/agents/{agentId}/trigger', {
+            params: { path: { wsId: workspaceId, agentId } },
+          }),
+        'Failed to trigger agent',
+      );
       return { ok: true, dedupeKey: data.dedupeKey ?? '' };
     },
   });
@@ -172,11 +184,14 @@ export function useUpdateAgentSchedule(): UseMutationResult<
   const qc = useQueryClient();
   return useMutation<{ ok: true }, Error, UpdateAgentScheduleArgs>({
     mutationFn: async ({ workspaceId, agentId, scheduleKind }) => {
-      const { error } = await sdk.PATCH('/workspaces/{wsId}/ai/agents/{agentId}/schedule', {
-        params: { path: { wsId: workspaceId, agentId } },
-        body: { scheduleKind },
-      });
-      if (error) throw new Error('Failed to update agent schedule');
+      await apiRequest(
+        (client) =>
+          client.PATCH('/workspaces/{wsId}/ai/agents/{agentId}/schedule', {
+            params: { path: { wsId: workspaceId, agentId } },
+            body: { scheduleKind },
+          }),
+        'Failed to update agent schedule',
+      );
       return { ok: true };
     },
     onSuccess: (_res, { workspaceId }) => {
@@ -203,11 +218,14 @@ export function useUpdateAgentEventTriggers(): UseMutationResult<
   const qc = useQueryClient();
   return useMutation<{ ok: true }, Error, UpdateAgentEventTriggersArgs>({
     mutationFn: async ({ workspaceId, agentId, eventTriggerTypes }) => {
-      const { error } = await sdk.PATCH('/workspaces/{wsId}/ai/agents/{agentId}/event-triggers', {
-        params: { path: { wsId: workspaceId, agentId } },
-        body: { eventTriggerTypes },
-      });
-      if (error) throw new Error('Failed to update agent event triggers');
+      await apiRequest(
+        (client) =>
+          client.PATCH('/workspaces/{wsId}/ai/agents/{agentId}/event-triggers', {
+            params: { path: { wsId: workspaceId, agentId } },
+            body: { eventTriggerTypes },
+          }),
+        'Failed to update agent event triggers',
+      );
       return { ok: true };
     },
     onSuccess: (_res, { workspaceId }) => {
@@ -227,11 +245,14 @@ export function usePauseAgent(): UseMutationResult<{ ok: true }, Error, PauseAge
   const qc = useQueryClient();
   return useMutation<{ ok: true }, Error, PauseAgentArgs>({
     mutationFn: async ({ workspaceId, agentId, paused }) => {
-      const { error } = await sdk.POST('/workspaces/{wsId}/ai/agents/{agentId}/pause', {
-        params: { path: { wsId: workspaceId, agentId } },
-        body: { paused },
-      });
-      if (error) throw new Error('Failed to toggle agent pause');
+      await apiRequest(
+        (client) =>
+          client.POST('/workspaces/{wsId}/ai/agents/{agentId}/pause', {
+            params: { path: { wsId: workspaceId, agentId } },
+            body: { paused },
+          }),
+        'Failed to toggle agent pause',
+      );
       return { ok: true };
     },
     onSuccess: (_res, { workspaceId }) => {

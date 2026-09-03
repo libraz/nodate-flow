@@ -5,6 +5,7 @@
  * verifying invariants that must hold across all possible inputs.
  */
 
+import { Zone } from '@nodate-flow/ui/time';
 import fc from 'fast-check';
 import { describe, expect, it, vi } from 'vitest';
 
@@ -227,16 +228,18 @@ describe('isZeroTime properties', () => {
   });
 });
 
+const zone = Zone.resolve('Asia/Tokyo');
+
 describe('isOverdue properties', () => {
   it('returns false for null and undefined', () => {
-    expect(isOverdue(null)).toBe(false);
-    expect(isOverdue(undefined)).toBe(false);
+    expect(isOverdue(null, zone)).toBe(false);
+    expect(isOverdue(undefined, zone)).toBe(false);
   });
 
   it('returns false for far-future dates', () => {
     fc.assert(
       fc.property(fc.integer({ min: 2090, max: 2099 }), (year) => {
-        expect(isOverdue(`${year}-12-31`)).toBe(false);
+        expect(isOverdue(`${year}-12-31`, zone)).toBe(false);
       }),
       { numRuns: 50 },
     );
@@ -244,7 +247,7 @@ describe('isOverdue properties', () => {
 
   it('returns true for dates well in the past', () => {
     vi.useFakeTimers();
-    vi.setSystemTime(new Date('2026-04-19T12:00:00'));
+    vi.setSystemTime(new Date('2026-04-19T03:00:00Z'));
 
     fc.assert(
       fc.property(
@@ -253,7 +256,7 @@ describe('isOverdue properties', () => {
         fc.integer({ min: 1, max: 28 }),
         (year, month, day) => {
           const dueOn = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-          expect(isOverdue(dueOn)).toBe(true);
+          expect(isOverdue(dueOn, zone)).toBe(true);
         },
       ),
       { numRuns: 200 },

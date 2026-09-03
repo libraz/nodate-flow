@@ -15,9 +15,8 @@ import {
   useQueryClient,
   useSuspenseQuery,
 } from '@tanstack/react-query';
-
-import { type ApiError, toApiError } from '../../lib/api-error';
-import { sdk } from '../../lib/sdk';
+import { apiRequest } from '../../lib/api';
+import type { ApiError } from '../../lib/api-error';
 
 export type NotificationPreference = components['schemas']['NotificationPreferenceDTO'];
 
@@ -38,10 +37,13 @@ export function useNotificationPreferencesQuery(
   return useSuspenseQuery({
     queryKey: notificationPreferencesKeys.forWorkspace(workspaceId),
     queryFn: async (): Promise<NotificationPreference[]> => {
-      const { data, error } = await sdk.GET('/workspaces/{wsId}/notification-preferences', {
-        params: { path: { wsId: workspaceId } },
-      });
-      if (error || !data) throw toApiError(error, 'Failed to load notification preferences');
+      const data = await apiRequest(
+        (client) =>
+          client.GET('/workspaces/{wsId}/notification-preferences', {
+            params: { path: { wsId: workspaceId } },
+          }),
+        'Failed to load notification preferences',
+      );
       return data.preferences ?? [];
     },
   });
@@ -64,11 +66,14 @@ export function useUpdateNotificationPreferences(
     mutationFn: async (
       preferences: NotificationPreference[],
     ): Promise<NotificationPreference[]> => {
-      const { data, error } = await sdk.PUT('/workspaces/{wsId}/notification-preferences', {
-        params: { path: { wsId: workspaceId } },
-        body: { preferences },
-      });
-      if (error || !data) throw toApiError(error, 'Failed to update notification preferences');
+      const data = await apiRequest(
+        (client) =>
+          client.PUT('/workspaces/{wsId}/notification-preferences', {
+            params: { path: { wsId: workspaceId } },
+            body: { preferences },
+          }),
+        'Failed to update notification preferences',
+      );
       return data.preferences ?? [];
     },
     onSuccess: (data) => {

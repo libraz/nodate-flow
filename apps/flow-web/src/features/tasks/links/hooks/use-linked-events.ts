@@ -10,9 +10,7 @@
  */
 
 import { type UseSuspenseQueryResult, useSuspenseQuery } from '@tanstack/react-query';
-
-import { toApiError } from '../../../../lib/api-error';
-import { sdk } from '../../../../lib/sdk';
+import { apiRequest } from '../../../../lib/api';
 import type { TaskEventLink } from '../types';
 
 /** Query key factory for the linked-events list per task. */
@@ -34,10 +32,13 @@ export function useLinkedEventsQuery(taskId: string): UseSuspenseQueryResult<Lin
   return useSuspenseQuery({
     queryKey: linkedEventsKeys.list(taskId),
     queryFn: async (): Promise<LinkedEventsResult> => {
-      const { data, error } = await sdk.GET('/tasks/{id}/linked-events', {
-        params: { path: { id: taskId } },
-      });
-      if (error || !data) throw toApiError(error, 'Failed to load linked events');
+      const data = await apiRequest(
+        (client) =>
+          client.GET('/tasks/{id}/linked-events', {
+            params: { path: { id: taskId } },
+          }),
+        'Failed to load linked events',
+      );
       return { links: data.links ?? [], total: data.total ?? 0 };
     },
   });

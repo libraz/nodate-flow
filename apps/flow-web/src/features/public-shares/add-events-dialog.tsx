@@ -14,10 +14,13 @@ import Dialog from '@nodate-flow/ui/primitives/dialog';
 import FormField from '@nodate-flow/ui/primitives/form-field';
 import Skeleton from '@nodate-flow/ui/primitives/skeleton';
 import { toaster } from '@nodate-flow/ui/primitives/toast';
+import { Day, type Zone } from '@nodate-flow/ui/time';
 import { type ReactElement, Suspense, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { endOfDayIso, startOfDayIso } from '../../lib/date-utils';
 import { formatDate } from '../../lib/format';
+import { useEffectiveZone } from '../../lib/use-effective-timezone';
 import { useWeekStart } from '../../lib/use-week-start';
 import styles from './add-events-dialog.module.css';
 import {
@@ -34,28 +37,17 @@ export interface AddEventsDialogProps {
   onClose: () => void;
 }
 
-/** Compute a default [today, +90 days] window as YYYY-MM-DD strings. */
-function defaultRange(): { from: string; to: string } {
-  const now = new Date();
-  const to = new Date(now);
-  to.setDate(to.getDate() + 90);
-  return { from: ymd(now), to: ymd(to) };
-}
-
-function ymd(d: Date): string {
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  return `${y}-${m}-${day}`;
-}
-
-/** Convert a YYYY-MM-DD string to an ISO datetime at local midnight. */
-function startOfDayIso(date: string): string {
-  return new Date(`${date}T00:00:00`).toISOString();
-}
-
-function endOfDayIso(date: string): string {
-  return new Date(`${date}T23:59:59.999`).toISOString();
+/**
+ * The default [today, +90 days] window, as `YYYY-MM-DD` strings in the
+ * effective zone.
+ *
+ * Which day "today" is has to match the zone the range is later resolved
+ * in, or the picker opens on a window that starts a day off its own
+ * label for anyone whose browser sits on the other side of midnight.
+ */
+export function defaultRange(zone: Zone): { from: string; to: string } {
+  const today = Day.today(zone);
+  return { from: today.toString(), to: today.addDays(90).toString() };
 }
 
 export default function AddEventsDialog({
@@ -72,7 +64,14 @@ export default function AddEventsDialog({
   const weekdayLabels = tCommon('common.date.weekdays', { returnObjects: true }) as string[];
   const formatMonthYear = (year: number, month: number): string =>
     tCommon('common.date.monthYear', { year, month });
-  const defaults = useMemo(defaultRange, []);
+  // The zone the range bounds are resolved in. Built in the browser's,
+  // the request asked for a window offset from the one the picker
+  // labelled: `new Date('2026-03-01T00:00:00').toISOString()` is local
+  // midnight reinterpreted as UTC, so a viewer in Tokyo asked for
+  // 2026-02-28T15:00Z and lost the events on the day they selected. The
+  // same strings are the query cache key, so the drift was cached too.
+  const zone = useEffectiveZone();
+  const defaults = useMemo(() => defaultRange(zone), [zone]);
   const [from, setFrom] = useState(defaults.from);
   const [to, setTo] = useState(defaults.to);
 
@@ -131,8 +130,8 @@ export default function AddEventsDialog({
           <PickerBody
             workspaceId={workspaceId}
             shareId={shareId}
-            startIso={startOfDayIso(from)}
-            endIso={endOfDayIso(to)}
+            startIso={startOfDayIso(from, zone)}
+            endIso={endOfDayIso(to, zone)}
             attachedIds={attachedIds}
             onClose={onClose}
           />

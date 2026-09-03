@@ -27,6 +27,7 @@ const mocks = vi.hoisted(() => ({
 vi.mock('../../../lib/sdk', () => ({
   // openapi-fetch keys its client by HTTP method, hence the caps.
   sdk: { GET: mocks.get, POST: mocks.post },
+  authSdk: { GET: mocks.get, POST: mocks.post },
 }));
 
 vi.mock('@nodate-flow/ui/primitives/toast', () => ({
@@ -39,7 +40,11 @@ vi.mock('@tanstack/react-router', () => ({
 }));
 
 vi.mock('../../projects/api', () => ({
-  useProjectsQuery: () => ({ data: [{ id: 'prj-1', name: 'Alpha' }] }),
+  useProjectsQuery: () => ({
+    data: [{ id: 'prj-1', name: 'Alpha' }],
+    response: new Response(null, { status: 200 }),
+  }),
+  response: new Response(null, { status: 200 }),
 }));
 
 import DataSettingsPage from '../data-settings-page';
@@ -107,7 +112,11 @@ function renderPage(): void {
 }
 
 beforeEach(() => {
-  mocks.get.mockReset().mockResolvedValue({ data: { items: [] }, error: null });
+  mocks.get.mockReset().mockResolvedValue({
+    data: { items: [] },
+    error: null,
+    response: new Response(null, { status: 200 }),
+  });
   mocks.post.mockReset();
   mocks.toastShow.mockReset();
 });
@@ -122,6 +131,7 @@ describe('DataSettingsPage — import failure messaging', () => {
         detail: 'configJson must be an object',
         status: 422,
       },
+      response: new Response(null, { status: 400 }),
     });
     renderPage();
 

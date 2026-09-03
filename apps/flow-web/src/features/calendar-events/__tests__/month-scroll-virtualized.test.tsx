@@ -12,6 +12,7 @@
  */
 
 import type { components } from '@nodate-flow/sdk';
+import { Zone } from '@nodate-flow/ui/time';
 import { render, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -23,6 +24,13 @@ const MS_PER_DAY = 86_400_000;
 const VIEWPORT_PX = 640;
 const ROW_PX = 112;
 const TZ = 'UTC';
+
+/**
+ * The fixtures are built from local wall clocks and the expected cell
+ * keys are read back the same way, so the host zone keeps this file
+ * about virtualisation rather than about day boundaries.
+ */
+const viewZone = Zone.browser();
 
 /** `YYYY-MM-DD` in local time, matching the view's cell keys. */
 function dayKey(d: Date): string {
@@ -156,7 +164,7 @@ function renderView(): ReturnType<typeof render> {
       holidaysByDate={new Map()}
       locale="en"
       weekStart="mon"
-      timezone={TZ}
+      zone={viewZone}
       stateColor={() => 'red'}
       scrollToTodaySignal={0}
       onDayCreate={noop}

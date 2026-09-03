@@ -18,9 +18,8 @@ import {
   useSuspenseInfiniteQuery,
   useSuspenseQuery,
 } from '@tanstack/react-query';
-
-import { ApiError, toApiError } from '../../lib/api-error';
-import { sdk } from '../../lib/sdk';
+import { apiRequest } from '../../lib/api';
+import { ApiError } from '../../lib/api-error';
 
 /**
  * Notification severity — narrowed from the SDK's open `string` field on
@@ -127,10 +126,13 @@ export function useNotificationsQuery(): UseSuspenseQueryResult<NotificationItem
   return useSuspenseQuery({
     queryKey: notificationKeys.list(),
     queryFn: async (): Promise<NotificationItem[]> => {
-      const { data, error } = await sdk.GET('/me/notifications', {
-        params: { query: { limit: 50 } },
-      });
-      if (error || !data) throw toApiError(error, 'Failed to load notifications');
+      const data = await apiRequest(
+        (client) =>
+          client.GET('/me/notifications', {
+            params: { query: { limit: 50 } },
+          }),
+        'Failed to load notifications',
+      );
       const total = data.total;
       return (data.notifications ?? []).map((dto) => dtoToItem(dto, total));
     },
@@ -157,15 +159,18 @@ export function useNotificationsInfiniteQuery(): UseSuspenseInfiniteQueryResult<
     queryKey: notificationKeys.infinite(),
     initialPageParam: undefined as string | undefined,
     queryFn: async ({ pageParam }): Promise<NotificationsPage> => {
-      const { data, error } = await sdk.GET('/me/notifications', {
-        params: {
-          query: {
-            limit: NOTIFICATIONS_PAGE_SIZE,
-            ...(pageParam ? { cursor: pageParam } : {}),
-          },
-        },
-      });
-      if (error || !data) throw toApiError(error, 'Failed to load notifications');
+      const data = await apiRequest(
+        (client) =>
+          client.GET('/me/notifications', {
+            params: {
+              query: {
+                limit: NOTIFICATIONS_PAGE_SIZE,
+                ...(pageParam ? { cursor: pageParam } : {}),
+              },
+            },
+          }),
+        'Failed to load notifications',
+      );
       const total = data.total;
       return {
         notifications: (data.notifications ?? []).map((dto) => dtoToItem(dto, total)),
@@ -193,15 +198,14 @@ export function useUnreadCountQuery(): UseQueryResult<number> {
   return useQuery({
     queryKey: notificationKeys.unreadCount(),
     queryFn: async (): Promise<number> => {
-      const { data, error, response } = await sdk.GET('/me/notifications/unread-count');
-      if (error || !data) {
-        // Thread `response.status` into the error so the global
-        // QueryCache 401 handler in the shared SDK QueryClient can
-        // detect a terminal auth failure on polling endpoints
-        // (notifications unread-count) and stop the poll / bounce
-        // the user to /login.
-        throw toApiError(error, 'Failed to load unread count', response?.status);
-      }
+      // The requester threads `response.status` into the thrown error,
+      // which is what the global QueryCache 401 handler in the shared
+      // SDK QueryClient reads to detect a terminal auth failure on this
+      // poll and stop it / bounce the user to /login.
+      const data = await apiRequest(
+        (client) => client.GET('/me/notifications/unread-count'),
+        'Failed to load unread count',
+      );
       return data.unreadCount;
     },
     refetchInterval: (query): number | false => {
@@ -276,10 +280,13 @@ export function useMarkNotificationRead(): UseMutationResult<void, ApiError, str
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (id: string): Promise<void> => {
-      const { error } = await sdk.POST('/notifications/{notifId}/read', {
-        params: { path: { notifId: id } },
-      });
-      if (error) throw toApiError(error, 'Failed to mark notification read');
+      await apiRequest(
+        (client) =>
+          client.POST('/notifications/{notifId}/read', {
+            params: { path: { notifId: id } },
+          }),
+        'Failed to mark notification read',
+      );
     },
     onMutate: async (id) => {
       // Cancel both the offset list and the infinite list so neither
@@ -336,10 +343,13 @@ export function useArchiveNotification(): UseMutationResult<void, ApiError, stri
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (id: string): Promise<void> => {
-      const { error } = await sdk.POST('/notifications/{notifId}/archive', {
-        params: { path: { notifId: id } },
-      });
-      if (error) throw toApiError(error, 'Failed to archive notification');
+      await apiRequest(
+        (client) =>
+          client.POST('/notifications/{notifId}/archive', {
+            params: { path: { notifId: id } },
+          }),
+        'Failed to archive notification',
+      );
     },
     onMutate: async (id) => {
       await qc.cancelQueries({ queryKey: [...notificationKeys.all, 'list'] });
@@ -401,10 +411,13 @@ export function useMarkAllRead(wsId: string | null): UseMutationResult<void, Api
   return useMutation({
     mutationFn: async (): Promise<void> => {
       if (!wsId) throw new ApiError(undefined, 'No workspace selected');
-      const { error } = await sdk.POST('/workspaces/{wsId}/notifications/read-all', {
-        params: { path: { wsId } },
-      });
-      if (error) throw toApiError(error, 'Failed to mark all notifications read');
+      await apiRequest(
+        (client) =>
+          client.POST('/workspaces/{wsId}/notifications/read-all', {
+            params: { path: { wsId } },
+          }),
+        'Failed to mark all notifications read',
+      );
     },
     onMutate: async () => {
       await qc.cancelQueries({ queryKey: [...notificationKeys.all, 'list'] });

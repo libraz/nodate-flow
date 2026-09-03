@@ -9,7 +9,7 @@
 import type { components } from '@nodate-flow/sdk';
 import { type UseMutationResult, useMutation } from '@tanstack/react-query';
 
-import { sdk } from '../../lib/sdk';
+import { apiRequest } from '../../lib/api';
 
 /** Validated Lens mirrored from the SDK. */
 export type Lens = components['schemas']['Lens'];
@@ -20,7 +20,7 @@ export interface CompileLensResult {
   lens: Lens;
 }
 
-import { ApiError, toApiError } from '../../lib/api-error';
+import { ApiError } from '../../lib/api-error';
 
 export { ApiError as NlQueryError };
 
@@ -39,11 +39,14 @@ export interface CompileLensArgs {
 export function useCompileLens(): UseMutationResult<CompileLensResult, ApiError, CompileLensArgs> {
   return useMutation<CompileLensResult, ApiError, CompileLensArgs>({
     mutationFn: async ({ workspaceId, prompt }): Promise<CompileLensResult> => {
-      const { data, error } = await sdk.POST('/workspaces/{wsId}/ai/compile-lens', {
-        params: { path: { wsId: workspaceId } },
-        body: { prompt },
-      });
-      if (error || !data) throw toApiError(error, 'Failed to compile prompt');
+      const data = await apiRequest(
+        (client) =>
+          client.POST('/workspaces/{wsId}/ai/compile-lens', {
+            params: { path: { wsId: workspaceId } },
+            body: { prompt },
+          }),
+        'Failed to compile prompt',
+      );
       return { prompt: data.prompt, lens: data.lens };
     },
   });

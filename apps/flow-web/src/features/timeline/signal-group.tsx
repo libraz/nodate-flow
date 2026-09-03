@@ -1,5 +1,5 @@
 /**
- * SignalGroup — Phase 6 / L3 signal-grouped timeline block.
+ * SignalGroup — signal-grouped timeline block.
  *
  * Renders a causal cluster of events that share a common
  * `triggeredBySignalId`. The block surfaces:
@@ -30,9 +30,8 @@ import { toaster } from '@nodate-flow/ui/primitives/toast';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import type { ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';
-
-import { ApiError, toApiError } from '../../lib/api-error';
-import { sdk } from '../../lib/sdk';
+import { apiRequest } from '../../lib/api';
+import { ApiError } from '../../lib/api-error';
 import { type TimelineEvent, timelineKeys } from './api';
 import EventCard from './event-card';
 
@@ -189,15 +188,15 @@ export default function SignalGroup({
 
   const reverseMut = useMutation({
     mutationFn: async (eventPublicId: string) => {
-      const { data, error } = await sdk.POST('/workspaces/{wsId}/events/{eventPublicId}/reverse', {
-        params: { path: { wsId: workspaceId, eventPublicId } },
-      });
-      if (error || !data) {
-        // Funnel the response into an ApiError so `reverseErrorKey`
-        // below can dispatch on the typed `code` (RFC 7807 `type`).
-        throw toApiError(error, 'Failed to reverse event');
-      }
-      return data;
+      // The requester converts the response into an ApiError so
+      // `reverseErrorKey` below can dispatch on the typed `code`.
+      return apiRequest(
+        (client) =>
+          client.POST('/workspaces/{wsId}/events/{eventPublicId}/reverse', {
+            params: { path: { wsId: workspaceId, eventPublicId } },
+          }),
+        'Failed to reverse event',
+      );
     },
     onError: (err) => {
       const key = `signal.reverse_error.${reverseErrorKey(err)}`;

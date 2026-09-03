@@ -6,7 +6,7 @@
 import type { components } from '@nodate-flow/sdk';
 import { type UseSuspenseQueryResult, useSuspenseQuery } from '@tanstack/react-query';
 
-import { sdk } from '../../lib/sdk';
+import { apiRequest } from '../../lib/api';
 
 export type TimelineEvent = components['schemas']['Event'];
 
@@ -63,7 +63,7 @@ export const timelineKeys = {
     [...timelineKeys.all, scope, id, filters ?? {}] as const,
 };
 
-import { ApiError, toApiError } from '../../lib/api-error';
+import { ApiError } from '../../lib/api-error';
 
 export { ApiError as TimelineApiError };
 
@@ -114,10 +114,13 @@ export function useTaskTimelineQuery(
   return useSuspenseQuery({
     queryKey: timelineKeys.scoped('task', taskId, filters),
     queryFn: async (): Promise<TimelinePage> => {
-      const { data, error } = await sdk.GET('/tasks/{id}/timeline', {
-        params: { path: { id: taskId }, query: buildQuery(filters) },
-      });
-      if (error || !data) throw toApiError(error, 'Failed to load task timeline');
+      const data = await apiRequest(
+        (client) =>
+          client.GET('/tasks/{id}/timeline', {
+            params: { path: { id: taskId }, query: buildQuery(filters) },
+          }),
+        'Failed to load task timeline',
+      );
       return normalize(data);
     },
   });
@@ -130,10 +133,13 @@ export function useProjectTimelineQuery(
   return useSuspenseQuery({
     queryKey: timelineKeys.scoped('project', projectId, filters),
     queryFn: async (): Promise<TimelinePage> => {
-      const { data, error } = await sdk.GET('/projects/{prjId}/timeline', {
-        params: { path: { prjId: projectId }, query: buildQuery(filters) },
-      });
-      if (error || !data) throw toApiError(error, 'Failed to load project timeline');
+      const data = await apiRequest(
+        (client) =>
+          client.GET('/projects/{prjId}/timeline', {
+            params: { path: { prjId: projectId }, query: buildQuery(filters) },
+          }),
+        'Failed to load project timeline',
+      );
       return normalize(data);
     },
   });
@@ -146,10 +152,13 @@ export function useWorkspaceTimelineQuery(
   return useSuspenseQuery({
     queryKey: timelineKeys.scoped('workspace', workspaceId, filters),
     queryFn: async (): Promise<TimelinePage> => {
-      const { data, error } = await sdk.GET('/workspaces/{wsId}/timeline', {
-        params: { path: { wsId: workspaceId }, query: buildQuery(filters) },
-      });
-      if (error || !data) throw toApiError(error, 'Failed to load workspace timeline');
+      const data = await apiRequest(
+        (client) =>
+          client.GET('/workspaces/{wsId}/timeline', {
+            params: { path: { wsId: workspaceId }, query: buildQuery(filters) },
+          }),
+        'Failed to load workspace timeline',
+      );
       return normalize(data);
     },
   });

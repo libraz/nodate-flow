@@ -17,6 +17,7 @@ import { useTranslation } from 'react-i18next';
 
 import { formatApiError } from '../../lib/api-error';
 import { formatDate, formatEpoch, isOverdue } from '../../lib/format';
+import { useEffectiveZone } from '../../lib/use-effective-timezone';
 import { useWeekStart } from '../../lib/use-week-start';
 import {
   TASKS_QUERY_LIMIT,
@@ -170,6 +171,7 @@ function BulkActionBar({
 export default function TaskSpreadsheetView({ projectId }: TaskSpreadsheetViewProps): ReactElement {
   const { t, i18n } = useTranslation('common');
   const weekStart = useWeekStart();
+  const zone = useEffectiveZone();
   const filters = useTaskFilters(projectId);
   const { data: tasks } = useTasksQuery(projectId, filters);
   const locale = i18n.resolvedLanguage ?? 'en';
@@ -494,7 +496,7 @@ export default function TaskSpreadsheetView({ projectId }: TaskSpreadsheetViewPr
   const renderDueCell = (task: TaskListItem, rowIdx: number): ReactElement => {
     const dueOn = task.dueOn;
     const overdue =
-      isOverdue(dueOn) && task.derivedState !== 'done' && task.derivedState !== 'cancelled';
+      isOverdue(dueOn, zone) && task.derivedState !== 'done' && task.derivedState !== 'cancelled';
 
     if (isEditing(rowIdx, 'due')) {
       return (

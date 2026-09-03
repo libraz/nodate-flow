@@ -6,9 +6,10 @@
  */
 
 import type { components } from '@nodate-flow/sdk';
+import { Zone } from '@nodate-flow/ui/time';
 import { type UseQueryResult, useQuery } from '@tanstack/react-query';
 
-import { sdk } from '../../lib/sdk';
+import { apiRequest } from '../../lib/api';
 
 export type AiCostToday = components['schemas']['CostTodayOutputBody'];
 
@@ -29,9 +30,15 @@ export const aiCostKeys = {
  * day window (and returned `date`) matches the viewer's local calendar day
  * instead of UTC. The tz is included in the query key so the cache busts
  * when the browser tz changes (travel, VM clock fix, etc.).
+ *
+ * "What day is it where the person looking at the meter is" is genuinely
+ * a reader-zone question, so this keeps using the browser zone — but via
+ * [Zone.browser], which guarantees a real IANA name. Read straight off
+ * `Intl` it can come back empty on a runtime with no zone database, and
+ * an empty `tz` was being sent to the API and baked into the query key.
  */
 export function useAiCostTodayQuery(workspaceId: string | undefined): UseQueryResult<AiCostToday> {
-  const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  const tz = Zone.browser().name;
   return useQuery({
     queryKey: aiCostKeys.today(workspaceId ?? '', tz),
     enabled: Boolean(workspaceId),
@@ -43,10 +50,13 @@ export function useAiCostTodayQuery(workspaceId: string | undefined): UseQueryRe
     // ErrorBoundary. Callers render nothing on error.
     throwOnError: false,
     queryFn: async (): Promise<AiCostToday> => {
-      const { data, error } = await sdk.GET('/workspaces/{wsId}/ai/cost-today', {
-        params: { path: { wsId: workspaceId as string }, query: { tz } },
-      });
-      if (error || !data) throw new Error('ai cost unavailable');
+      const data = await apiRequest(
+        (client) =>
+          client.GET('/workspaces/{wsId}/ai/cost-today', {
+            params: { path: { wsId: workspaceId as string }, query: { tz } },
+          }),
+        'ai cost unavailable',
+      );
       return data;
     },
   });

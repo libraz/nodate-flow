@@ -21,12 +21,13 @@
 import type { HolidayEntry } from '@nodate-flow/holidays';
 import type { components } from '@nodate-flow/sdk';
 import { cx } from '@nodate-flow/ui/lib/cx';
+import { Day, type Zone } from '@nodate-flow/ui/time';
 import { defaultRangeExtractor, useVirtualizer } from '@tanstack/react-virtual';
 import { Users } from 'lucide-react';
 import { type ReactElement, useCallback, useEffect, useLayoutEffect, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { dateKey } from '../../lib/date-utils';
+import { dateKey, todayKey as todayKeyIn } from '../../lib/date-utils';
 import {
   eventStartKey,
   groupEventsByWeek,
@@ -69,14 +70,23 @@ type ScrollItem =
  * `RANGE_MONTHS` before and after today, plus the week key that
  * contains today (so the view can auto-scroll there on mount).
  */
-function buildItems(weekStart: WeekStart): {
+function buildItems(
+  weekStart: WeekStart,
+  zone: Zone,
+): {
   items: ScrollItem[];
   todayWeekKey: string;
   todayIndex: number;
   headerIndexes: number[];
   weekStarts: Date[];
 } {
-  const today = startOfDay(new Date());
+  // The skeleton is laid out in local-component Dates, but *which* day is
+  // today is a zone question, and it decides both the month range and the
+  // week the view auto-scrolls to on mount. Taken from the browser it can
+  // name a different week from the one the highlight lands in, so the
+  // view opens scrolled past the day it marks.
+  const todayDay = Day.today(zone);
+  const today = new Date(todayDay.year, todayDay.month - 1, todayDay.day);
   const rangeStart = new Date(today.getFullYear(), today.getMonth() - RANGE_MONTHS, 1);
   const rangeEnd = new Date(today.getFullYear(), today.getMonth() + RANGE_MONTHS + 1, 0);
 
@@ -156,12 +166,12 @@ export interface MonthScrollProps {
   /** User's start-of-week preference. */
   weekStart: WeekStart;
   /**
-   * Effective timezone (profile, else workspace, else browser). Decides
+   * Effective zone (profile, else workspace, else browser). Decides
    * which calendar day a timed event falls on, so the mobile view files
    * events under the same days the desktop grid and the server-side
    * reminders do.
    */
-  timezone: string;
+  zone: Zone;
   /** State colour lookup for task dots, keyed by `derivedState`. */
   stateColor: (derivedState: string) => string;
   /** Bumped by the toolbar "Today" button to request a re-scroll. */
@@ -182,8 +192,8 @@ const EMPTY_EVENTS: CalendarEvent[] = [];
 
 interface WeekRowProps {
   weekStart: Date;
-  /** Effective timezone; see MonthScrollProps.timezone. */
-  timezone: string;
+  /** Effective zone; see MonthScrollProps.zone. */
+  zone: Zone;
   events: CalendarEvent[];
   tasksByDate: Map<string, CalendarTask[]>;
   holidaysByDate: Map<string, HolidayEntry[]>;
@@ -196,7 +206,7 @@ interface WeekRowProps {
 
 function WeekRow({
   weekStart,
-  timezone,
+  zone,
   events,
   tasksByDate,
   holidaysByDate,
@@ -215,26 +225,23 @@ function WeekRow({
     [weekStart],
   );
 
-  const positioned = useMemo(
-    () => layoutWeek(weekStart, events, timezone),
-    [weekStart, events, timezone],
-  );
+  const positioned = useMemo(() => layoutWeek(weekStart, events, zone), [weekStart, events, zone]);
 
   // Single-day events grouped by date key within this week, read in the
-  // effective timezone.
+  // effective zone.
   const singleDayMap = useMemo(() => {
     const map = new Map<string, CalendarEvent[]>();
     const weekKeys = new Set(week.map((d) => dateKey(d)));
     for (const evt of events) {
-      if (isMultiDay(evt, timezone)) continue;
-      const key = eventStartKey(evt, timezone);
+      if (isMultiDay(evt, zone)) continue;
+      const key = eventStartKey(evt, zone);
       if (!key || !weekKeys.has(key)) continue;
       const arr = map.get(key);
       if (arr) arr.push(evt);
       else map.set(key, [evt]);
     }
     return map;
-  }, [events, week, timezone]);
+  }, [events, week, zone]);
 
   // Tracks reserved by multi-day bars for each day column.
   const reservedByCol = useMemo(() => {
@@ -467,7 +474,7 @@ export default function MonthScroll({
   holidaysByDate,
   locale,
   weekStart,
-  timezone,
+  zone,
   stateColor,
   scrollToTodaySignal,
   onDayCreate,
@@ -478,15 +485,20 @@ export default function MonthScroll({
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const { items, todayIndex, headerIndexes, weekStarts } = useMemo(
-    () => buildItems(weekStart),
-    [weekStart],
+    () => buildItems(weekStart, zone),
+    [weekStart, zone],
   );
-  const todayKey = useMemo(() => dateKey(startOfDay(new Date())), []);
+  // "Today" is read in the effective zone, the same one the events are
+  // filed under. Read from the browser instead, the highlight lands on a
+  // different cell from the pills whenever the two zones are on opposite
+  // sides of midnight — the mobile view saying one day and the desktop
+  // grid, which already reads the effective zone, saying another.
+  const todayKey = useMemo(() => todayKeyIn(zone), [zone]);
 
   // One pass over the events instead of one pass per rendered week.
   const eventsByWeek = useMemo(
-    () => groupEventsByWeek(events, weekStarts, dateKey, timezone),
-    [events, weekStarts, timezone],
+    () => groupEventsByWeek(events, weekStarts, dateKey, zone),
+    [events, weekStarts, zone],
   );
 
   const weekdayLabels = useMemo(() => {
@@ -615,7 +627,7 @@ export default function MonthScroll({
               >
                 <WeekRow
                   weekStart={item.weekStart}
-                  timezone={timezone}
+                  zone={zone}
                   events={eventsByWeek.get(dateKey(item.weekStart)) ?? EMPTY_EVENTS}
                   tasksByDate={tasksByDate}
                   holidaysByDate={holidaysByDate}

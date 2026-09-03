@@ -13,9 +13,8 @@ import {
   useQueryClient,
   useSuspenseQuery,
 } from '@tanstack/react-query';
-
+import { authApiRequest } from '../../lib/api';
 import { ApiError } from '../../lib/api-error';
-import { authSdk as sdk } from '../../lib/sdk';
 import { workspacesKeys } from './api';
 
 export { ApiError as WorkspaceApiError };
@@ -31,22 +30,6 @@ export const inviteKeys = {
   list: (wsId: string) => [...inviteKeys.all(wsId), 'list'] as const,
   info: (token: string) => ['invites', 'info', token] as const,
 };
-
-function toError(err: unknown, fallback: string): ApiError {
-  if (err && typeof err === 'object') {
-    const obj = err as { detail?: unknown; title?: unknown; type?: unknown };
-    const message =
-      (typeof obj.detail === 'string' && obj.detail) ||
-      (typeof obj.title === 'string' && obj.title) ||
-      fallback;
-    const code =
-      (typeof obj.type === 'string' && obj.type) ||
-      (typeof obj.detail === 'string' && obj.detail.match(/^([A-Z][A-Z0-9_.]+):/)?.[1]) ||
-      undefined;
-    return new ApiError(code, message);
-  }
-  return new ApiError(undefined, fallback);
-}
 
 /** POST /workspaces/{wsId}/invites — create an invite link. */
 export interface CreateInviteArgs {
@@ -67,11 +50,14 @@ export function useCreateInvite(): UseMutationResult<
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({ wsId, input }: CreateInviteArgs): Promise<CreateInviteResult> => {
-      const { data, error } = await sdk.POST('/workspaces/{wsId}/invites', {
-        params: { path: { wsId } },
-        body: input,
-      });
-      if (error || !data) throw toError(error, 'Failed to create invite');
+      const data = await authApiRequest(
+        (client) =>
+          client.POST('/workspaces/{wsId}/invites', {
+            params: { path: { wsId } },
+            body: input,
+          }),
+        'Failed to create invite',
+      );
       return { invite: data.invite, token: data.token };
     },
     onSuccess: (_data, vars) => {
@@ -85,10 +71,13 @@ export function useListInvitesQuery(wsId: string): UseSuspenseQueryResult<Worksp
   return useSuspenseQuery({
     queryKey: inviteKeys.list(wsId),
     queryFn: async (): Promise<WorkspaceInvite[]> => {
-      const { data, error } = await sdk.GET('/workspaces/{wsId}/invites', {
-        params: { path: { wsId } },
-      });
-      if (error || !data) throw toError(error, 'Failed to load invites');
+      const data = await authApiRequest(
+        (client) =>
+          client.GET('/workspaces/{wsId}/invites', {
+            params: { path: { wsId } },
+          }),
+        'Failed to load invites',
+      );
       return data.invites ?? [];
     },
   });
@@ -104,10 +93,13 @@ export function useRevokeInvite(): UseMutationResult<void, ApiError, RevokeInvit
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({ wsId, inviteId }: RevokeInviteArgs): Promise<void> => {
-      const { error } = await sdk.DELETE('/workspaces/{wsId}/invites/{inviteId}', {
-        params: { path: { wsId, inviteId } },
-      });
-      if (error) throw toError(error, 'Failed to revoke invite');
+      await authApiRequest(
+        (client) =>
+          client.DELETE('/workspaces/{wsId}/invites/{inviteId}', {
+            params: { path: { wsId, inviteId } },
+          }),
+        'Failed to revoke invite',
+      );
     },
     onSuccess: (_data, vars) => {
       void qc.invalidateQueries({ queryKey: inviteKeys.list(vars.wsId) });
@@ -120,10 +112,13 @@ export function useAcceptInvite(): UseMutationResult<AcceptInviteOutput, ApiErro
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (token: string): Promise<AcceptInviteOutput> => {
-      const { data, error } = await sdk.POST('/invites/{token}/accept', {
-        params: { path: { token } },
-      });
-      if (error || !data) throw toError(error, 'Failed to accept invite');
+      const data = await authApiRequest(
+        (client) =>
+          client.POST('/invites/{token}/accept', {
+            params: { path: { token } },
+          }),
+        'Failed to accept invite',
+      );
       return data;
     },
     onSuccess: () => {
@@ -145,10 +140,13 @@ export function inviteInfoQueryOptions(token: string): {
   return {
     queryKey: inviteKeys.info(token),
     queryFn: async (): Promise<InviteInfoOutput> => {
-      const { data, error } = await sdk.GET('/invites/{token}/info', {
-        params: { path: { token } },
-      });
-      if (error || !data) throw toError(error, 'Failed to load invite info');
+      const data = await authApiRequest(
+        (client) =>
+          client.GET('/invites/{token}/info', {
+            params: { path: { token } },
+          }),
+        'Failed to load invite info',
+      );
       return data;
     },
   };

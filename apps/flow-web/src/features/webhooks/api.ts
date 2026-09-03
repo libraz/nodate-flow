@@ -35,9 +35,8 @@ import {
   useQuery,
   useQueryClient,
 } from '@tanstack/react-query';
-
-import { type ApiError, toApiError } from '../../lib/api-error';
-import { sdk } from '../../lib/sdk';
+import { apiRequest } from '../../lib/api';
+import type { ApiError } from '../../lib/api-error';
 
 /** WebhookSubscription summary DTO mirrored from the generated SDK. */
 export type Webhook = components['schemas']['WebhookSubscriptionDTO'];
@@ -81,10 +80,13 @@ export function useWebhooksQuery(
     queryKey: [...webhooksKeys.list(wsId), limit, offset],
     queryFn: async (): Promise<Webhook[]> => {
       if (!wsId) return [];
-      const { data, error } = await sdk.GET('/workspaces/{wsId}/webhooks', {
-        params: { path: { wsId }, query: { limit, offset } },
-      });
-      if (error || !data) throw toApiError(error, 'Failed to load webhooks');
+      const data = await apiRequest(
+        (client) =>
+          client.GET('/workspaces/{wsId}/webhooks', {
+            params: { path: { wsId }, query: { limit, offset } },
+          }),
+        'Failed to load webhooks',
+      );
       return data.webhooks ?? [];
     },
   });
@@ -104,10 +106,13 @@ export function useWebhookQuery(
     queryKey: webhooksKeys.detail(wsId, webhookId),
     enabled: wsId !== '' && webhookId !== '',
     queryFn: async (): Promise<WebhookDetail> => {
-      const { data, error } = await sdk.GET('/workspaces/{wsId}/webhooks/{webhookId}', {
-        params: { path: { wsId, webhookId } },
-      });
-      if (error || !data) throw toApiError(error, 'Failed to load webhook');
+      const data = await apiRequest(
+        (client) =>
+          client.GET('/workspaces/{wsId}/webhooks/{webhookId}', {
+            params: { path: { wsId, webhookId } },
+          }),
+        'Failed to load webhook',
+      );
       return data.webhook;
     },
   });
@@ -132,11 +137,14 @@ export function useCreateWebhookMutation(): UseMutationResult<
   const qc = useQueryClient();
   return useMutation<WebhookDetail, ApiError, CreateWebhookArgs>({
     mutationFn: async ({ wsId, body }): Promise<WebhookDetail> => {
-      const { data, error } = await sdk.POST('/workspaces/{wsId}/webhooks', {
-        params: { path: { wsId } },
-        body,
-      });
-      if (error || !data) throw toApiError(error, 'Failed to create webhook');
+      const data = await apiRequest(
+        (client) =>
+          client.POST('/workspaces/{wsId}/webhooks', {
+            params: { path: { wsId } },
+            body,
+          }),
+        'Failed to create webhook',
+      );
       return data.webhook;
     },
     onSuccess: (_data, { wsId }) => {
@@ -160,10 +168,13 @@ export function useDeleteWebhookMutation(): UseMutationResult<void, ApiError, De
   const qc = useQueryClient();
   return useMutation<void, ApiError, DeleteWebhookArgs>({
     mutationFn: async ({ wsId, webhookId }): Promise<void> => {
-      const { error } = await sdk.DELETE('/workspaces/{wsId}/webhooks/{webhookId}', {
-        params: { path: { wsId, webhookId } },
-      });
-      if (error) throw toApiError(error, 'Failed to delete webhook');
+      await apiRequest(
+        (client) =>
+          client.DELETE('/workspaces/{wsId}/webhooks/{webhookId}', {
+            params: { path: { wsId, webhookId } },
+          }),
+        'Failed to delete webhook',
+      );
     },
     onSuccess: (_data, { wsId }) => {
       void qc.invalidateQueries({ queryKey: webhooksKeys.list(wsId) });
@@ -187,11 +198,14 @@ export function useToggleWebhookMutation(): UseMutationResult<void, ApiError, To
   const qc = useQueryClient();
   return useMutation<void, ApiError, ToggleWebhookArgs>({
     mutationFn: async ({ wsId, webhookId, isActive }): Promise<void> => {
-      const { error } = await sdk.PATCH('/workspaces/{wsId}/webhooks/{webhookId}/toggle', {
-        params: { path: { wsId, webhookId } },
-        body: { isActive },
-      });
-      if (error) throw toApiError(error, 'Failed to toggle webhook');
+      await apiRequest(
+        (client) =>
+          client.PATCH('/workspaces/{wsId}/webhooks/{webhookId}/toggle', {
+            params: { path: { wsId, webhookId } },
+            body: { isActive },
+          }),
+        'Failed to toggle webhook',
+      );
     },
     onSuccess: (_data, { wsId, webhookId }) => {
       void qc.invalidateQueries({ queryKey: webhooksKeys.list(wsId) });
@@ -227,10 +241,13 @@ export function useTestWebhookMutation(): UseMutationResult<
   const qc = useQueryClient();
   return useMutation<TestWebhookResult, ApiError, TestWebhookArgs>({
     mutationFn: async ({ wsId, webhookId }): Promise<TestWebhookResult> => {
-      const { data, error } = await sdk.POST('/workspaces/{wsId}/webhooks/{webhookId}/test', {
-        params: { path: { wsId, webhookId } },
-      });
-      if (error || !data) throw toApiError(error, 'Failed to send test');
+      const data = await apiRequest(
+        (client) =>
+          client.POST('/workspaces/{wsId}/webhooks/{webhookId}/test', {
+            params: { path: { wsId, webhookId } },
+          }),
+        'Failed to send test',
+      );
       return { deliveryId: data.deliveryId };
     },
     onSuccess: (_data, { wsId, webhookId }) => {
@@ -264,10 +281,13 @@ export function useDeliveriesQuery(
     queryKey: [...webhooksKeys.deliveries(wsId, webhookId), limit, offset],
     enabled: wsId !== '' && webhookId !== '',
     queryFn: async (): Promise<WebhookDelivery[]> => {
-      const { data, error } = await sdk.GET('/workspaces/{wsId}/webhooks/{webhookId}/deliveries', {
-        params: { path: { wsId, webhookId }, query: { limit, offset } },
-      });
-      if (error || !data) throw toApiError(error, 'Failed to load deliveries');
+      const data = await apiRequest(
+        (client) =>
+          client.GET('/workspaces/{wsId}/webhooks/{webhookId}/deliveries', {
+            params: { path: { wsId, webhookId }, query: { limit, offset } },
+          }),
+        'Failed to load deliveries',
+      );
       return data.deliveries ?? [];
     },
   });

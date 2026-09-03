@@ -26,6 +26,7 @@ const mocks = vi.hoisted(() => ({
 vi.mock('../../../lib/sdk', () => ({
   // openapi-fetch keys its client by HTTP method, hence the caps.
   sdk: { GET: mocks.get, DELETE: mocks.del },
+  authSdk: { GET: mocks.get, DELETE: mocks.del },
 }));
 
 vi.mock('@nodate-flow/ui/primitives/toast', () => ({
@@ -70,7 +71,11 @@ function member(userId: string, role: string): Member {
 }
 
 function serveMembers(members: Member[]): void {
-  mocks.get.mockResolvedValue({ data: { members, total: members.length }, error: null });
+  mocks.get.mockResolvedValue({
+    data: { members, total: members.length },
+    error: null,
+    response: new Response(null, { status: 200 }),
+  });
 }
 
 function renderTable(): void {
@@ -96,7 +101,9 @@ function renderTable(): void {
 
 beforeEach(() => {
   mocks.get.mockReset();
-  mocks.del.mockReset().mockResolvedValue({ error: null });
+  mocks.del
+    .mockReset()
+    .mockResolvedValue({ error: null, response: new Response(null, { status: 200 }) });
   mocks.toastShow.mockReset();
   mocks.currentUserId = 'user-lead';
 });
@@ -157,6 +164,7 @@ describe('ProjectMembersTable removal', () => {
     serveMembers([member('user-lead', 'lead'), member('user-editor', 'editor')]);
     mocks.del.mockResolvedValue({
       error: { type: 'WS.MEMBER.NOT_FOUND', detail: 'gone', status: 404 },
+      response: new Response(null, { status: 400 }),
     });
     renderTable();
 

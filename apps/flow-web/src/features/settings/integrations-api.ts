@@ -12,9 +12,8 @@ import {
   useQueryClient,
   useSuspenseQuery,
 } from '@tanstack/react-query';
-
-import { ApiError, toApiError } from '../../lib/api-error';
-import { authSdk as sdk } from '../../lib/sdk';
+import { authApiRequest } from '../../lib/api';
+import { ApiError } from '../../lib/api-error';
 
 export { ApiError as SettingsApiError };
 
@@ -31,8 +30,10 @@ export function useIntegrationsQuery(): UseSuspenseQueryResult<ProviderStatus[]>
   return useSuspenseQuery({
     queryKey: integrationsKeys.list,
     queryFn: async (): Promise<ProviderStatus[]> => {
-      const { data, error } = await sdk.GET('/me/integrations');
-      if (error || !data) throw toApiError(error, 'Failed to load integrations');
+      const data = await authApiRequest(
+        (client) => client.GET('/me/integrations'),
+        'Failed to load integrations',
+      );
       return data.providers ?? [];
     },
   });
@@ -55,11 +56,14 @@ export function useConnectIntegration(): UseMutationResult<
   return useMutation<ConnectResponse, ApiError, ConnectRequest>({
     throwOnError: false,
     mutationFn: async ({ provider, redirectTo }): Promise<ConnectResponse> => {
-      const { data, error } = await sdk.POST('/me/integrations/{provider}/connect', {
-        params: { path: { provider } },
-        body: redirectTo != null ? { redirectTo } : {},
-      });
-      if (error || !data) throw toApiError(error, 'Failed to start connect flow');
+      const data = await authApiRequest(
+        (client) =>
+          client.POST('/me/integrations/{provider}/connect', {
+            params: { path: { provider } },
+            body: redirectTo != null ? { redirectTo } : {},
+          }),
+        'Failed to start connect flow',
+      );
       return { authorizeUrl: data.authorizeUrl };
     },
   });
@@ -71,10 +75,13 @@ export function useDisconnectIntegration(): UseMutationResult<void, ApiError, st
   return useMutation<void, ApiError, string>({
     throwOnError: false,
     mutationFn: async (id: string): Promise<void> => {
-      const { error } = await sdk.DELETE('/me/integrations/{id}', {
-        params: { path: { id } },
-      });
-      if (error) throw toApiError(error, 'Failed to disconnect integration');
+      await authApiRequest(
+        (client) =>
+          client.DELETE('/me/integrations/{id}', {
+            params: { path: { id } },
+          }),
+        'Failed to disconnect integration',
+      );
     },
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: integrationsKeys.list });

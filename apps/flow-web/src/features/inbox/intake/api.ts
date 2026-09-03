@@ -22,9 +22,8 @@ import {
   useQueryClient,
   useSuspenseQuery,
 } from '@tanstack/react-query';
-
-import { type ApiError, toApiError } from '../../../lib/api-error';
-import { sdk } from '../../../lib/sdk';
+import { apiRequest } from '../../../lib/api';
+import type { ApiError } from '../../../lib/api-error';
 
 /** Intake item DTO mirrored from the generated SDK. */
 export type IntakeItem = components['schemas']['Record'];
@@ -55,10 +54,13 @@ export function useIntakeQuery(
     queryKey: intakeKeys.list(wsId, status),
     queryFn: async (): Promise<IntakeItem[]> => {
       if (!wsId) return [];
-      const { data, error } = await sdk.GET('/workspaces/{wsId}/intake', {
-        params: { path: { wsId }, query: { status, limit: 200, offset: 0 } },
-      });
-      if (error || !data) throw toApiError(error, 'Failed to load intake items');
+      const data = await apiRequest(
+        (client) =>
+          client.GET('/workspaces/{wsId}/intake', {
+            params: { path: { wsId }, query: { status, limit: 200, offset: 0 } },
+          }),
+        'Failed to load intake items',
+      );
       return data.items ?? [];
     },
   });
@@ -84,11 +86,14 @@ export function useCreateIntakeItemMutation(): UseMutationResult<
   const qc = useQueryClient();
   return useMutation<IntakeItem, ApiError, CreateIntakeItemArgs>({
     mutationFn: async ({ wsId, title, body }): Promise<IntakeItem> => {
-      const { data, error } = await sdk.POST('/workspaces/{wsId}/intake', {
-        params: { path: { wsId } },
-        body: { title, ...(body ? { body } : {}) },
-      });
-      if (error || !data) throw toApiError(error, 'Failed to create intake item');
+      const data = await apiRequest(
+        (client) =>
+          client.POST('/workspaces/{wsId}/intake', {
+            params: { path: { wsId } },
+            body: { title, ...(body ? { body } : {}) },
+          }),
+        'Failed to create intake item',
+      );
       return data;
     },
     onSuccess: (_data, { wsId }) => {
@@ -116,11 +121,14 @@ export function useTriageIntakeItemMutation(): UseMutationResult<
   const qc = useQueryClient();
   return useMutation<IntakeItem, ApiError, TriageIntakeItemArgs>({
     mutationFn: async ({ wsId, id, status, snoozeUntil }): Promise<IntakeItem> => {
-      const { data, error } = await sdk.PATCH('/workspaces/{wsId}/intake/{id}', {
-        params: { path: { wsId, id } },
-        body: { status, ...(snoozeUntil ? { snoozeUntil } : {}) },
-      });
-      if (error || !data) throw toApiError(error, 'Failed to update intake item');
+      const data = await apiRequest(
+        (client) =>
+          client.PATCH('/workspaces/{wsId}/intake/{id}', {
+            params: { path: { wsId, id } },
+            body: { status, ...(snoozeUntil ? { snoozeUntil } : {}) },
+          }),
+        'Failed to update intake item',
+      );
       return data;
     },
     onSuccess: (_data, { wsId }) => {
@@ -149,11 +157,14 @@ export function useConvertIntakeItemMutation(): UseMutationResult<
   const qc = useQueryClient();
   return useMutation<{ taskId: string }, ApiError, ConvertIntakeItemArgs>({
     mutationFn: async ({ wsId, id, projectId }): Promise<{ taskId: string }> => {
-      const { data, error } = await sdk.POST('/workspaces/{wsId}/intake/{id}/convert', {
-        params: { path: { wsId, id } },
-        body: { projectId },
-      });
-      if (error || !data) throw toApiError(error, 'Failed to convert intake item');
+      const data = await apiRequest(
+        (client) =>
+          client.POST('/workspaces/{wsId}/intake/{id}/convert', {
+            params: { path: { wsId, id } },
+            body: { projectId },
+          }),
+        'Failed to convert intake item',
+      );
       return { taskId: data.taskId };
     },
     onSuccess: (_data, { wsId }) => {

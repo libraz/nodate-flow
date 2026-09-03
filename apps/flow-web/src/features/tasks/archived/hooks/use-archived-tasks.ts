@@ -14,9 +14,7 @@
  */
 
 import { useSuspenseInfiniteQuery } from '@tanstack/react-query';
-
-import { toApiError } from '../../../../lib/api-error';
-import { sdk } from '../../../../lib/sdk';
+import { apiRequest } from '../../../../lib/api';
 import type { TaskListItem } from '../../api';
 
 /** Page size requested per call. Max allowed by the API is 200. */
@@ -59,16 +57,19 @@ export function useArchivedTasksQuery(workspaceId: string): ArchivedTasksResult 
     queryKey: archivedTasksKeys.list(workspaceId),
     initialPageParam: '' as string,
     queryFn: async ({ pageParam }): Promise<ArchivedTasksPage> => {
-      const { data, error } = await sdk.GET('/workspaces/{wsId}/tasks/archived', {
-        params: {
-          path: { wsId: workspaceId },
-          query: {
-            limit: PAGE_SIZE,
-            ...(pageParam ? { cursor: pageParam } : {}),
-          },
-        },
-      });
-      if (error || !data) throw toApiError(error, 'Failed to load archived tasks');
+      const data = await apiRequest(
+        (client) =>
+          client.GET('/workspaces/{wsId}/tasks/archived', {
+            params: {
+              path: { wsId: workspaceId },
+              query: {
+                limit: PAGE_SIZE,
+                ...(pageParam ? { cursor: pageParam } : {}),
+              },
+            },
+          }),
+        'Failed to load archived tasks',
+      );
       return {
         tasks: data.tasks ?? [],
         total: data.total ?? 0,

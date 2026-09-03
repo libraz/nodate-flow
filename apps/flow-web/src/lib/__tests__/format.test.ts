@@ -5,6 +5,7 @@
  * use plain Vitest without renderWithProviders.
  */
 
+import { Zone } from '@nodate-flow/ui/time';
 import { describe, expect, it, vi } from 'vitest';
 
 import {
@@ -93,39 +94,43 @@ describe('isZeroTime', () => {
   });
 });
 
+// A fixed zone rather than the runner's: the whole point of the
+// parameter is that "today" is the user's day, not the machine's.
+const zone = Zone.resolve('Asia/Tokyo');
+
 describe('isOverdue', () => {
   it('returns false for null', () => {
-    expect(isOverdue(null)).toBe(false);
+    expect(isOverdue(null, zone)).toBe(false);
   });
 
   it('returns false for undefined', () => {
-    expect(isOverdue(undefined)).toBe(false);
+    expect(isOverdue(undefined, zone)).toBe(false);
   });
 
   it('returns true for a past date', () => {
-    expect(isOverdue('2020-01-01')).toBe(true);
+    expect(isOverdue('2020-01-01', zone)).toBe(true);
   });
 
   it('returns false for a far future date', () => {
-    expect(isOverdue('2099-12-31')).toBe(false);
+    expect(isOverdue('2099-12-31', zone)).toBe(false);
   });
 
   it('returns false for today', () => {
     // Use a fixed clock to avoid flakiness.
     vi.useFakeTimers();
-    vi.setSystemTime(new Date('2026-04-19T12:00:00'));
+    vi.setSystemTime(new Date('2026-04-19T03:00:00Z'));
 
     // Today's date string should NOT be overdue (strictly before today).
-    expect(isOverdue('2026-04-19')).toBe(false);
+    expect(isOverdue('2026-04-19', zone)).toBe(false);
 
     vi.useRealTimers();
   });
 
   it('returns true for yesterday when clock is fixed', () => {
     vi.useFakeTimers();
-    vi.setSystemTime(new Date('2026-04-19T12:00:00'));
+    vi.setSystemTime(new Date('2026-04-19T03:00:00Z'));
 
-    expect(isOverdue('2026-04-18')).toBe(true);
+    expect(isOverdue('2026-04-18', zone)).toBe(true);
 
     vi.useRealTimers();
   });

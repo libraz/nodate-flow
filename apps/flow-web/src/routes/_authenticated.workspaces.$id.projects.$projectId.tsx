@@ -21,8 +21,8 @@ import Forbidden from '../components/forbidden';
 import { useFavoritesQuery } from '../features/favorites/api';
 import FavoriteButton from '../features/favorites/favorite-button';
 import { useProjectQuery } from '../features/projects/api';
+import { apiRequest } from '../lib/api';
 import { ApiError } from '../lib/api-error';
-import { sdk } from '../lib/sdk';
 
 /** Sentinel thrown by the route loader to distinguish 403 from generic errors. */
 class ForbiddenError extends Error {
@@ -276,6 +276,27 @@ function errorCodeOf(err: unknown): string | undefined {
   return undefined;
 }
 
+/**
+ * Reads the project the URL names, translating the two refusals this
+ * route renders itself. Anything else resolves to `null`: the component
+ * runs the same read through its own query and reports the failure
+ * inside the project chrome, which says more than a blank route does.
+ */
+async function loadProjectForGuard(projectId: string): Promise<{ workspaceId: string } | null> {
+  try {
+    return await apiRequest(
+      (client) => client.GET('/projects/{prjId}', { params: { path: { prjId: projectId } } }),
+      'Failed to load project',
+    );
+  } catch (cause) {
+    if (cause instanceof ApiError && cause.httpStatus === 404) {
+      throw new ApiError('WS.PROJECT.NOT_FOUND', 'Project not found');
+    }
+    if (cause instanceof ApiError && cause.httpStatus === 403) throw new ForbiddenError();
+    return null;
+  }
+}
+
 function ProjectErrorComponent({ error }: { error: unknown }): ReactElement {
   const { id } = Route.useParams();
   if (error instanceof ForbiddenError) {
@@ -291,18 +312,12 @@ export const Route = createFileRoute('/_authenticated/workspaces/$id/projects/$p
   component: ProjectLayout,
   errorComponent: ProjectErrorComponent,
   loader: async ({ params }) => {
-    const { data, response } = await sdk.GET('/projects/{prjId}', {
-      params: { path: { prjId: params.projectId } },
-    });
-    if (response.status === 404) {
-      throw new ApiError('WS.PROJECT.NOT_FOUND', 'Project not found');
-    }
-    if (response.status === 403) throw new ForbiddenError();
+    const project = await loadProjectForGuard(params.projectId);
     // Cross-workspace protection: the project exists and the caller has
     // access, but the URL claims a different workspace. Treat it as a
     // 404 so we never render project data under the wrong workspace
     // breadcrumb.
-    if (data && data.workspaceId !== params.id) {
+    if (project && project.workspaceId !== params.id) {
       throw new ApiError('WS.PROJECT.NOT_FOUND', 'Project not found');
     }
     return null;

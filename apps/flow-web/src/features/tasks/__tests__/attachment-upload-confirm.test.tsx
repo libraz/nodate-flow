@@ -30,6 +30,10 @@ vi.mock('../../../lib/sdk', () => ({
   sdk: {
     POST: (...args: unknown[]) => postMock(...args),
   },
+
+  authSdk: {
+    POST: (...args: unknown[]) => postMock(...args),
+  },
 }));
 
 vi.mock('../../../lib/crypto/sha256', () => ({
@@ -74,10 +78,15 @@ describe('usePresignUpload confirm handshake', () => {
             uploadUrl: 'https://blob.example/put',
           },
           error: undefined,
+          response: new Response(null, { status: 200 }),
         };
       }
       // confirm
-      return { data: { ok: true, byteSize: 7 }, error: undefined };
+      return {
+        data: { ok: true, byteSize: 7 },
+        error: undefined,
+        response: new Response(null, { status: 200 }),
+      };
     });
 
     const qc = makeQc();
@@ -99,6 +108,7 @@ describe('usePresignUpload confirm handshake', () => {
         return {
           data: { storageKey: 'k', attachmentId: 'att-dup', deduplicated: true },
           error: undefined,
+          response: new Response(null, { status: 200 }),
         };
       }
       throw new Error(`unexpected POST ${path}`);
@@ -128,12 +138,14 @@ describe('usePresignUpload confirm handshake', () => {
             uploadUrl: 'https://blob.example/put',
           },
           error: undefined,
+          response: new Response(null, { status: 200 }),
         };
       }
       // Oversize blob — server deleted the row and returned an error.
       return {
         data: undefined,
         error: { title: 'Payload Too Large', status: 413, detail: 'file too big' },
+        response: new Response(null, { status: 400 }),
       };
     });
 

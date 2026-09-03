@@ -25,7 +25,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useRouterState } from '@tanstack/react-router';
 import type { Project } from '../features/projects/api';
 import { projectsKeys } from '../features/projects/api';
-import { sdk } from './sdk';
+import { apiRequest } from './api';
 import { useActiveWorkspaceId } from './use-current-workspace';
 
 export interface DefaultProjectResolution {
@@ -64,11 +64,17 @@ export function useDefaultProjectId(): DefaultProjectResolution {
     staleTime: 60_000,
     queryFn: async (): Promise<Project[]> => {
       if (!fallbackWsId) return [];
-      const { data, error } = await sdk.GET('/workspaces/{wsId}/projects', {
-        params: { path: { wsId: fallbackWsId } },
-      });
-      if (error || !data) return [];
-      return data.projects ?? [];
+      // This only picks a default destination; with no list the caller
+      // falls back to "no project", which is a valid state.
+      const data = await apiRequest(
+        (client) =>
+          client.GET('/workspaces/{wsId}/projects', {
+            params: { path: { wsId: fallbackWsId } },
+          }),
+        'Failed to load projects',
+        { onError: 'empty', empty: null },
+      );
+      return data?.projects ?? [];
     },
   });
 

@@ -35,6 +35,8 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock('../../../lib/sdk', () => ({
   sdk: { GET: mocks.get, POST: mocks.post },
+
+  authSdk: { GET: mocks.get, POST: mocks.post },
 }));
 
 vi.mock('@nodate-flow/ui/primitives/toast', () => ({
@@ -47,7 +49,11 @@ vi.mock('@tanstack/react-router', () => ({
 }));
 
 vi.mock('../../projects/api', () => ({
-  useProjectsQuery: () => ({ data: [{ id: 'prj-1', name: 'Alpha' }] }),
+  useProjectsQuery: () => ({
+    data: [{ id: 'prj-1', name: 'Alpha' }],
+    response: new Response(null, { status: 200 }),
+  }),
+  response: new Response(null, { status: 200 }),
 }));
 
 import DataSettingsPage from '../data-settings-page';
@@ -112,7 +118,11 @@ async function openCreateForm(): Promise<ReturnType<typeof userEvent.setup>> {
 }
 
 beforeEach(() => {
-  mocks.get.mockReset().mockResolvedValue({ data: { items: [] }, error: null });
+  mocks.get.mockReset().mockResolvedValue({
+    data: { items: [] },
+    error: null,
+    response: new Response(null, { status: 200 }),
+  });
   mocks.post.mockReset();
   mocks.toastShow.mockReset();
 });
@@ -149,6 +159,7 @@ describe('import configuration field — credential guidance', () => {
         detail: 'importer: configuration must not carry credentials: token',
         status: 400,
       },
+      response: new Response(null, { status: 400 }),
     });
     const user = await openCreateForm();
 
@@ -174,6 +185,7 @@ describe('import configuration field — credential guidance', () => {
         detail: 'importer: unknown configuration key: repo',
         status: 400,
       },
+      response: new Response(null, { status: 400 }),
     });
     const user = await openCreateForm();
 
@@ -194,6 +206,7 @@ describe('import configuration field — credential guidance', () => {
     mocks.post.mockResolvedValue({
       data: undefined,
       error: { type: 'WS.IMPORT.ALREADY_RUNNING', detail: 'already running', status: 409 },
+      response: new Response(null, { status: 400 }),
     });
     const user = await openCreateForm();
 

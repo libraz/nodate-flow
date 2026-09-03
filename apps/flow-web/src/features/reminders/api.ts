@@ -9,7 +9,7 @@
 import type { components } from '@nodate-flow/sdk';
 import { type UseQueryResult, useQuery } from '@tanstack/react-query';
 
-import { sdk } from '../../lib/sdk';
+import { apiRequest } from '../../lib/api';
 import { useStreamHealthy } from '../realtime/stream-health';
 
 export type TaskReminder = components['schemas']['TaskReminder'];
@@ -40,10 +40,13 @@ export function useRemindersQuery(
     throwOnError: false,
     queryFn: async (): Promise<TaskReminder[]> => {
       if (!workspaceId) return [];
-      const { data, error } = await sdk.GET('/workspaces/{wsId}/ai/reminders', {
-        params: { path: { wsId: workspaceId } },
-      });
-      if (error || !data) throw new Error('Failed to load reminders');
+      const data = await apiRequest(
+        (client) =>
+          client.GET('/workspaces/{wsId}/ai/reminders', {
+            params: { path: { wsId: workspaceId } },
+          }),
+        'Failed to load reminders',
+      );
       return data.reminders ?? [];
     },
   });

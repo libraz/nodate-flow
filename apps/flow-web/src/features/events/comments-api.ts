@@ -31,9 +31,8 @@ import {
   useQueryClient,
   useSuspenseQuery,
 } from '@tanstack/react-query';
-
-import { type ApiError, toApiError } from '../../lib/api-error';
-import { sdk } from '../../lib/sdk';
+import { apiRequest } from '../../lib/api';
+import type { ApiError } from '../../lib/api-error';
 
 export type EventComment = components['schemas']['CommentResponse'];
 
@@ -51,11 +50,13 @@ export function useEventCommentsQuery(
   return useSuspenseQuery({
     queryKey: eventCommentKeys.list(wsId, calId, evtId),
     queryFn: async (): Promise<EventComment[]> => {
-      const { data, error } = await sdk.GET(
-        '/workspaces/{wsId}/calendars/{calId}/events/{evtId}/comments',
-        { params: { path: { wsId, calId, evtId } } },
+      const data = await apiRequest(
+        (client) =>
+          client.GET('/workspaces/{wsId}/calendars/{calId}/events/{evtId}/comments', {
+            params: { path: { wsId, calId, evtId } },
+          }),
+        'Failed to load comments',
       );
-      if (error || !data) throw toApiError(error, 'Failed to load comments');
       return data.comments ?? [];
     },
   });
@@ -77,11 +78,14 @@ export function useAddEventCommentMutation(): UseMutationResult<
   const qc = useQueryClient();
   return useMutation<EventComment, ApiError, AddEventCommentArgs>({
     mutationFn: async ({ wsId, calId, evtId, body }): Promise<EventComment> => {
-      const { data, error } = await sdk.POST(
-        '/workspaces/{wsId}/calendars/{calId}/events/{evtId}/comments',
-        { params: { path: { wsId, calId, evtId } }, body: { body } },
+      const data = await apiRequest(
+        (client) =>
+          client.POST('/workspaces/{wsId}/calendars/{calId}/events/{evtId}/comments', {
+            params: { path: { wsId, calId, evtId } },
+            body: { body },
+          }),
+        'Failed to add comment',
       );
-      if (error || !data) throw toApiError(error, 'Failed to add comment');
       return data;
     },
     onSuccess: (_data, { wsId, calId, evtId }) => {
@@ -107,14 +111,14 @@ export function useEditEventCommentMutation(): UseMutationResult<
   const qc = useQueryClient();
   return useMutation<void, ApiError, EditEventCommentArgs>({
     mutationFn: async ({ wsId, calId, evtId, commentId, body }): Promise<void> => {
-      const { error } = await sdk.PATCH(
-        '/workspaces/{wsId}/calendars/{calId}/events/{evtId}/comments/{cId}',
-        {
-          params: { path: { wsId, calId, evtId, cId: commentId } },
-          body: { body },
-        },
+      await apiRequest(
+        (client) =>
+          client.PATCH('/workspaces/{wsId}/calendars/{calId}/events/{evtId}/comments/{cId}', {
+            params: { path: { wsId, calId, evtId, cId: commentId } },
+            body: { body },
+          }),
+        'Failed to edit comment',
       );
-      if (error) throw toApiError(error, 'Failed to edit comment');
     },
     onSuccess: (_void, { wsId, calId, evtId }) => {
       void qc.invalidateQueries({ queryKey: eventCommentKeys.list(wsId, calId, evtId) });
@@ -138,11 +142,13 @@ export function useDeleteEventCommentMutation(): UseMutationResult<
   const qc = useQueryClient();
   return useMutation<void, ApiError, DeleteEventCommentArgs>({
     mutationFn: async ({ wsId, calId, evtId, commentId }): Promise<void> => {
-      const { error } = await sdk.DELETE(
-        '/workspaces/{wsId}/calendars/{calId}/events/{evtId}/comments/{cId}',
-        { params: { path: { wsId, calId, evtId, cId: commentId } } },
+      await apiRequest(
+        (client) =>
+          client.DELETE('/workspaces/{wsId}/calendars/{calId}/events/{evtId}/comments/{cId}', {
+            params: { path: { wsId, calId, evtId, cId: commentId } },
+          }),
+        'Failed to delete comment',
       );
-      if (error) throw toApiError(error, 'Failed to delete comment');
     },
     onSuccess: (_void, { wsId, calId, evtId }) => {
       void qc.invalidateQueries({ queryKey: eventCommentKeys.list(wsId, calId, evtId) });

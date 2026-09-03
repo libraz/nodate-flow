@@ -31,6 +31,10 @@ vi.mock('../../../lib/sdk', () => ({
   sdk: {
     POST: sdkMocks.post,
   },
+
+  authSdk: {
+    POST: sdkMocks.post,
+  },
 }));
 
 import {
@@ -102,6 +106,7 @@ describe('useTransitionTask optimistic update — plain-array cache', () => {
     sdkMocks.post.mockResolvedValueOnce({
       data: aServerTask('a', 'waiting'),
       error: null,
+      response: new Response(null, { status: 200 }),
     });
 
     const client = buildClient();
@@ -134,6 +139,7 @@ describe('useTransitionTask optimistic update — plain-array cache', () => {
     sdkMocks.post.mockResolvedValueOnce({
       data: undefined,
       error: { type: 'about:blank', title: 'Internal Server Error', status: 500 },
+      response: new Response(null, { status: 400 }),
     });
 
     const client = buildClient();
@@ -163,6 +169,7 @@ describe('useTransitionTask optimistic update — InfiniteData cache', () => {
     sdkMocks.post.mockResolvedValueOnce({
       data: aServerTask('a', 'waiting'),
       error: null,
+      response: new Response(null, { status: 200 }),
     });
 
     const client = buildClient();
@@ -194,6 +201,7 @@ describe('useTransitionTask optimistic update — InfiniteData cache', () => {
     sdkMocks.post.mockResolvedValueOnce({
       data: undefined,
       error: { type: 'about:blank', title: 'Internal Server Error', status: 500 },
+      response: new Response(null, { status: 400 }),
     });
 
     const client = buildClient();
@@ -218,12 +226,13 @@ describe('useTransitionTask optimistic update — InfiniteData cache', () => {
   });
 
   it('updates both flat and infinite caches in the same project simultaneously', async () => {
-    // Repro path from the audit: List view primes the flat/infinite cache,
+    // Repro path: List view primes the flat/infinite cache,
     // Board view of the same project caches an infinite entry, then a card
     // move triggers the transition. Both must update without a TypeError.
     sdkMocks.post.mockResolvedValueOnce({
       data: aServerTask('a', 'waiting'),
       error: null,
+      response: new Response(null, { status: 200 }),
     });
 
     const client = buildClient();

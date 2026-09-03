@@ -16,7 +16,7 @@
 
 import { createFileRoute, notFound, redirect } from '@tanstack/react-router';
 
-import { sdk } from '../lib/sdk';
+import { apiRequest } from '../lib/api';
 
 type CanonicalTo =
   | '/workspaces/$id/projects/$projectId'
@@ -39,10 +39,15 @@ function canonicalToFor(suffix: string): CanonicalTo {
 
 export const Route = createFileRoute('/_authenticated/projects/$projectId')({
   beforeLoad: async ({ params, location }) => {
-    const { data, response } = await sdk.GET('/projects/{prjId}', {
-      params: { path: { prjId: params.projectId } },
-    });
-    if (response.status === 404 || !data) throw notFound();
+    // This route only exists to rewrite a legacy URL into the canonical
+    // one, so any answer that does not name a workspace is a dead link.
+    const data = await apiRequest(
+      (client) =>
+        client.GET('/projects/{prjId}', { params: { path: { prjId: params.projectId } } }),
+      'Failed to resolve the project',
+      { onError: 'empty', empty: null },
+    );
+    if (!data) throw notFound();
     const wsId = data.workspaceId;
     // Preserve any suffix after `/projects/$projectId` (e.g. `/tasks`,
     // `/gantt`, `/timeline`) so deep links map 1:1. Search params are

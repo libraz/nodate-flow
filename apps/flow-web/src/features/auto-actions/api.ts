@@ -9,7 +9,7 @@
 import type { components } from '@nodate-flow/sdk';
 import { type UseQueryResult, useQuery } from '@tanstack/react-query';
 
-import { sdk } from '../../lib/sdk';
+import { apiRequest } from '../../lib/api';
 import { useStreamHealthy } from '../realtime/stream-health';
 
 export type TaskAutoAction = components['schemas']['TaskAutoAction'];
@@ -41,10 +41,13 @@ export function useAutoActionsQuery(
     throwOnError: false,
     queryFn: async (): Promise<TaskAutoAction[]> => {
       if (!workspaceId) return [];
-      const { data, error } = await sdk.GET('/workspaces/{wsId}/ai/auto-actions', {
-        params: { path: { wsId: workspaceId } },
-      });
-      if (error || !data) throw new Error('Failed to load auto actions');
+      const data = await apiRequest(
+        (client) =>
+          client.GET('/workspaces/{wsId}/ai/auto-actions', {
+            params: { path: { wsId: workspaceId } },
+          }),
+        'Failed to load auto actions',
+      );
       return data.actions ?? [];
     },
   });

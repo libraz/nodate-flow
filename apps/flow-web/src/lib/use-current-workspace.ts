@@ -35,7 +35,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useRouterState } from '@tanstack/react-router';
 import { useEffect, useMemo, useSyncExternalStore } from 'react';
 
-import { authSdk, sdk } from './sdk';
+import { apiRequest, authApiRequest } from './api';
 
 /** localStorage key used to persist the last-visited workspace id. */
 const STORAGE_KEY = 'nf.activeWsId';
@@ -157,10 +157,15 @@ export function useCurrentWorkspaceId(): string | null {
     staleTime: 60_000,
     queryFn: async (): Promise<{ workspaceId: string } | null> => {
       if (!projectId) return null;
-      const { data, error } = await sdk.GET('/projects/{prjId}', {
-        params: { path: { prjId: projectId } },
-      });
-      if (error || !data) return null;
+      // A URL that does not resolve to a workspace leaves the chrome
+      // without a workspace, which the caller already handles; it is
+      // not a reason to fail the whole shell.
+      const data = await apiRequest(
+        (client) => client.GET('/projects/{prjId}', { params: { path: { prjId: projectId } } }),
+        'Failed to resolve the project workspace',
+        { onError: 'empty', empty: null },
+      );
+      if (!data) return null;
       return { workspaceId: data.workspaceId };
     },
   });
@@ -173,10 +178,12 @@ export function useCurrentWorkspaceId(): string | null {
     staleTime: 60_000,
     queryFn: async (): Promise<{ workspaceId: string } | null> => {
       if (!taskId) return null;
-      const { data, error } = await sdk.GET('/tasks/{id}', {
-        params: { path: { id: taskId } },
-      });
-      if (error || !data) return null;
+      const data = await apiRequest(
+        (client) => client.GET('/tasks/{id}', { params: { path: { id: taskId } } }),
+        'Failed to resolve the task workspace',
+        { onError: 'empty', empty: null },
+      );
+      if (!data) return null;
       return { workspaceId: data.workspaceId };
     },
   });
@@ -198,9 +205,12 @@ export function useCurrentWorkspaceId(): string | null {
     queryKey: ['workspaces', 'member-ids'] as const,
     staleTime: 60_000,
     queryFn: async (): Promise<string[]> => {
-      const { data, error } = await authSdk.GET('/workspaces', {});
-      if (error || !data) return [];
-      return (data.workspaces ?? []).map((w) => w.id);
+      const data = await authApiRequest(
+        (client) => client.GET('/workspaces', {}),
+        'Failed to load workspaces',
+        { onError: 'empty', empty: null },
+      );
+      return (data?.workspaces ?? []).map((w) => w.id);
     },
   });
 

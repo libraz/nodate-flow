@@ -17,9 +17,8 @@
 
 import type { components } from '@nodate-flow/sdk';
 import { type UseMutationResult, useMutation, useQueryClient } from '@tanstack/react-query';
-
-import { type ApiError, toApiError } from '../../lib/api-error';
-import { sdk } from '../../lib/sdk';
+import { apiRequest } from '../../lib/api';
+import type { ApiError } from '../../lib/api-error';
 import { eventDetailKeys } from './api';
 
 export type ShiftProposal = components['schemas']['ProposeShiftOutputBody'];
@@ -46,14 +45,14 @@ export function useProposeShiftMutation(): UseMutationResult<
 > {
   return useMutation<ShiftProposal, ApiError, ProposeShiftArgs>({
     mutationFn: async ({ wsId, evtId, newStartAt }): Promise<ShiftProposal> => {
-      const { data, error } = await sdk.POST(
-        '/workspaces/{wsId}/calendar-events/{evtId}/propose-shift',
-        {
-          params: { path: { wsId, evtId } },
-          body: { newStartAt },
-        },
+      const data = await apiRequest(
+        (client) =>
+          client.POST('/workspaces/{wsId}/calendar-events/{evtId}/propose-shift', {
+            params: { path: { wsId, evtId } },
+            body: { newStartAt },
+          }),
+        'Failed to preview shift',
       );
-      if (error || !data) throw toApiError(error, 'Failed to preview shift');
       return data;
     },
   });
@@ -84,14 +83,14 @@ export function useApplyShiftMutation(): UseMutationResult<ShiftResult, ApiError
   const qc = useQueryClient();
   return useMutation<ShiftResult, ApiError, ApplyShiftArgs>({
     mutationFn: async ({ wsId, evtId, newStartAt, confirmedTaskIds }): Promise<ShiftResult> => {
-      const { data, error } = await sdk.POST(
-        '/workspaces/{wsId}/calendar-events/{evtId}/apply-shift',
-        {
-          params: { path: { wsId, evtId } },
-          body: { newStartAt, confirmedTaskIds },
-        },
+      const data = await apiRequest(
+        (client) =>
+          client.POST('/workspaces/{wsId}/calendar-events/{evtId}/apply-shift', {
+            params: { path: { wsId, evtId } },
+            body: { newStartAt, confirmedTaskIds },
+          }),
+        'Failed to apply shift',
       );
-      if (error || !data) throw toApiError(error, 'Failed to apply shift');
       return data;
     },
     onSuccess: (_data, { wsId, calId, evtId }) => {

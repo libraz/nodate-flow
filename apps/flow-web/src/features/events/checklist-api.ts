@@ -22,9 +22,8 @@ import {
   useQueryClient,
   useSuspenseQuery,
 } from '@tanstack/react-query';
-
-import { type ApiError, toApiError } from '../../lib/api-error';
-import { sdk } from '../../lib/sdk';
+import { apiRequest } from '../../lib/api';
+import type { ApiError } from '../../lib/api-error';
 
 export type EventChecklistItem = components['schemas']['ChecklistItemResponse'];
 export type UpdateChecklistItemBody = components['schemas']['UpdateChecklistItemInputBody'];
@@ -43,11 +42,13 @@ export function useEventChecklistQuery(
   return useSuspenseQuery({
     queryKey: eventChecklistKeys.list(wsId, calId, evtId),
     queryFn: async (): Promise<EventChecklistItem[]> => {
-      const { data, error } = await sdk.GET(
-        '/workspaces/{wsId}/calendars/{calId}/events/{evtId}/checklist',
-        { params: { path: { wsId, calId, evtId } } },
+      const data = await apiRequest(
+        (client) =>
+          client.GET('/workspaces/{wsId}/calendars/{calId}/events/{evtId}/checklist', {
+            params: { path: { wsId, calId, evtId } },
+          }),
+        'Failed to load checklist',
       );
-      if (error || !data) throw toApiError(error, 'Failed to load checklist');
       return data.items ?? [];
     },
   });
@@ -72,11 +73,14 @@ export function useAddEventChecklistItemMutation(): UseMutationResult<
     mutationFn: async ({ wsId, calId, evtId, title, sortWeight }): Promise<EventChecklistItem> => {
       const body: components['schemas']['CreateChecklistItemInputBody'] = { title };
       if (sortWeight !== undefined) body.sortWeight = sortWeight;
-      const { data, error } = await sdk.POST(
-        '/workspaces/{wsId}/calendars/{calId}/events/{evtId}/checklist',
-        { params: { path: { wsId, calId, evtId } }, body },
+      const data = await apiRequest(
+        (client) =>
+          client.POST('/workspaces/{wsId}/calendars/{calId}/events/{evtId}/checklist', {
+            params: { path: { wsId, calId, evtId } },
+            body,
+          }),
+        'Failed to add checklist item',
       );
-      if (error || !data) throw toApiError(error, 'Failed to add checklist item');
       return data;
     },
     onSuccess: (_data, { wsId, calId, evtId }) => {
@@ -113,11 +117,14 @@ export function useUpdateEventChecklistItemMutation(): UseMutationResult<
     { snapshot: EventChecklistItem[] | undefined }
   >({
     mutationFn: async ({ wsId, calId, evtId, itemId, patch }): Promise<void> => {
-      const { error } = await sdk.PATCH(
-        '/workspaces/{wsId}/calendars/{calId}/events/{evtId}/checklist/{itemId}',
-        { params: { path: { wsId, calId, evtId, itemId } }, body: patch },
+      await apiRequest(
+        (client) =>
+          client.PATCH('/workspaces/{wsId}/calendars/{calId}/events/{evtId}/checklist/{itemId}', {
+            params: { path: { wsId, calId, evtId, itemId } },
+            body: patch,
+          }),
+        'Failed to update checklist item',
       );
-      if (error) throw toApiError(error, 'Failed to update checklist item');
     },
     onMutate: async ({ wsId, calId, evtId, itemId, patch }) => {
       const key = eventChecklistKeys.list(wsId, calId, evtId);
@@ -163,11 +170,13 @@ export function useDeleteEventChecklistItemMutation(): UseMutationResult<
   const qc = useQueryClient();
   return useMutation<void, ApiError, DeleteEventChecklistItemArgs>({
     mutationFn: async ({ wsId, calId, evtId, itemId }): Promise<void> => {
-      const { error } = await sdk.DELETE(
-        '/workspaces/{wsId}/calendars/{calId}/events/{evtId}/checklist/{itemId}',
-        { params: { path: { wsId, calId, evtId, itemId } } },
+      await apiRequest(
+        (client) =>
+          client.DELETE('/workspaces/{wsId}/calendars/{calId}/events/{evtId}/checklist/{itemId}', {
+            params: { path: { wsId, calId, evtId, itemId } },
+          }),
+        'Failed to delete checklist item',
       );
-      if (error) throw toApiError(error, 'Failed to delete checklist item');
     },
     onSuccess: (_void, { wsId, calId, evtId }) => {
       void qc.invalidateQueries({ queryKey: eventChecklistKeys.list(wsId, calId, evtId) });

@@ -33,9 +33,8 @@ import {
   useQuery,
   useQueryClient,
 } from '@tanstack/react-query';
-
-import { type ApiError, toApiError } from '../../lib/api-error';
-import { sdk } from '../../lib/sdk';
+import { apiRequest } from '../../lib/api';
+import type { ApiError } from '../../lib/api-error';
 import { eventDetailKeys } from '../events/api';
 
 export type Calendar = components['schemas']['CalendarResponse'];
@@ -81,10 +80,13 @@ export function useCalendarsQuery(workspaceId: string | null): UseQueryResult<Ca
     enabled: wsId.length > 0,
     staleTime: 60_000,
     queryFn: async (): Promise<Calendar[]> => {
-      const { data, error } = await sdk.GET('/workspaces/{wsId}/calendars', {
-        params: { path: { wsId } },
-      });
-      if (error || !data) throw new Error('Failed to load calendars');
+      const data = await apiRequest(
+        (client) =>
+          client.GET('/workspaces/{wsId}/calendars', {
+            params: { path: { wsId } },
+          }),
+        'Failed to load calendars',
+      );
       return data.calendars ?? [];
     },
   });
@@ -159,10 +161,13 @@ export function useEventDetailQuery(
     queryKey: eventDetailKeys.detail(workspaceId, calendarId, eventId),
     enabled: enabled && workspaceId !== '' && calendarId !== '' && eventId !== '',
     queryFn: async (): Promise<CalendarEventResponse> => {
-      const { data, error } = await sdk.GET('/workspaces/{wsId}/calendars/{calId}/events/{evtId}', {
-        params: { path: { wsId: workspaceId, calId: calendarId, evtId: eventId } },
-      });
-      if (error || !data) throw toApiError(error, 'Failed to load event');
+      const data = await apiRequest(
+        (client) =>
+          client.GET('/workspaces/{wsId}/calendars/{calId}/events/{evtId}', {
+            params: { path: { wsId: workspaceId, calId: calendarId, evtId: eventId } },
+          }),
+        'Failed to load event',
+      );
       return data;
     },
   });
@@ -194,11 +199,14 @@ export function useCreateEvent(): UseMutationResult<
   const qc = useQueryClient();
   return useMutation<CalendarEventResponse, ApiError, CreateEventArgs>({
     mutationFn: async ({ workspaceId, calendarId, body }): Promise<CalendarEventResponse> => {
-      const { data, error } = await sdk.POST('/workspaces/{wsId}/calendars/{calId}/events', {
-        params: { path: { wsId: workspaceId, calId: calendarId } },
-        body,
-      });
-      if (error || !data) throw toApiError(error, 'Failed to create event');
+      const data = await apiRequest(
+        (client) =>
+          client.POST('/workspaces/{wsId}/calendars/{calId}/events', {
+            params: { path: { wsId: workspaceId, calId: calendarId } },
+            body,
+          }),
+        'Failed to create event',
+      );
       return data;
     },
     onSuccess: () => {
@@ -228,14 +236,14 @@ export function useUpdateEvent(): UseMutationResult<
       eventId,
       body,
     }): Promise<CalendarEventResponse> => {
-      const { data, error } = await sdk.PATCH(
-        '/workspaces/{wsId}/calendars/{calId}/events/{evtId}',
-        {
-          params: { path: { wsId: workspaceId, calId: calendarId, evtId: eventId } },
-          body,
-        },
+      const data = await apiRequest(
+        (client) =>
+          client.PATCH('/workspaces/{wsId}/calendars/{calId}/events/{evtId}', {
+            params: { path: { wsId: workspaceId, calId: calendarId, evtId: eventId } },
+            body,
+          }),
+        'Failed to update event',
       );
-      if (error || !data) throw toApiError(error, 'Failed to update event');
       return data;
     },
     onSuccess: () => {
@@ -255,10 +263,13 @@ export function useDeleteEvent(): UseMutationResult<void, ApiError, DeleteEventA
   const qc = useQueryClient();
   return useMutation<void, ApiError, DeleteEventArgs>({
     mutationFn: async ({ workspaceId, calendarId, eventId }): Promise<void> => {
-      const { error } = await sdk.DELETE('/workspaces/{wsId}/calendars/{calId}/events/{evtId}', {
-        params: { path: { wsId: workspaceId, calId: calendarId, evtId: eventId } },
-      });
-      if (error) throw toApiError(error, 'Failed to delete event');
+      await apiRequest(
+        (client) =>
+          client.DELETE('/workspaces/{wsId}/calendars/{calId}/events/{evtId}', {
+            params: { path: { wsId: workspaceId, calId: calendarId, evtId: eventId } },
+          }),
+        'Failed to delete event',
+      );
     },
     onSuccess: () => {
       invalidateCalendarAggregates(qc);
@@ -279,8 +290,10 @@ export function useCreateCalendarTask(): UseMutationResult<FlowTask, ApiError, C
   const qc = useQueryClient();
   return useMutation<FlowTask, ApiError, CreateTaskInput>({
     mutationFn: async (input: CreateTaskInput): Promise<FlowTask> => {
-      const { data, error } = await sdk.POST('/tasks', { body: input });
-      if (error || !data) throw toApiError(error, 'Failed to create task');
+      const data = await apiRequest(
+        (client) => client.POST('/tasks', { body: input }),
+        'Failed to create task',
+      );
       return data;
     },
     onSuccess: () => {

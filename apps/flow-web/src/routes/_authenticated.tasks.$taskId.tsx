@@ -11,14 +11,16 @@
 
 import { createFileRoute, notFound } from '@tanstack/react-router';
 
-import { sdk } from '../lib/sdk';
+import { apiProbe } from '../lib/api';
 
 export const Route = createFileRoute('/_authenticated/tasks/$taskId')({
   loader: async ({ params }) => {
-    const { response } = await sdk.GET('/tasks/{id}', {
-      params: { path: { id: params.taskId } },
-    });
-    if (response.status === 404) throw notFound();
+    // The loader only asks whether the task is there; the lazy component
+    // fetches it for real and reports any other failure itself.
+    const status = await apiProbe((client) =>
+      client.GET('/tasks/{id}', { params: { path: { id: params.taskId } } }),
+    );
+    if (status === 404) throw notFound();
     return null;
   },
 });

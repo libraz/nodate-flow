@@ -12,6 +12,7 @@ import { useFocusTrap } from '@nodate-flow/ui/hooks/use-focus-trap';
 import Icon from '@nodate-flow/ui/icon';
 import Badge from '@nodate-flow/ui/primitives/badge';
 import Card from '@nodate-flow/ui/primitives/card';
+import { Day, type Zone } from '@nodate-flow/ui/time';
 import { Link, useMatches, useNavigate } from '@tanstack/react-router';
 import type { TFunction } from 'i18next';
 import { Sparkles, X } from 'lucide-react';
@@ -19,6 +20,7 @@ import { type ReactElement, useRef, useState } from 'react';
 import { ErrorBoundary } from 'react-error-boundary';
 import { useTranslation } from 'react-i18next';
 import { useCurrentWorkspaceId } from '../../lib/use-current-workspace';
+import { useEffectiveZone } from '../../lib/use-effective-timezone';
 
 import {
   type AiSuggestion,
@@ -54,13 +56,20 @@ function confidenceLabel(score: number, t: (key: string) => string): string {
   return t('confidence.low');
 }
 
-/** Format a YYYY-MM-DD date as a relative expression. */
-function formatRelativeDate(dateStr: string, t: TFunction): string {
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const target = new Date(`${dateStr}T00:00:00`);
-  const diffMs = target.getTime() - today.getTime();
-  const diffDays = Math.round(diffMs / (1000 * 60 * 60 * 24));
+/**
+ * Format a `YYYY-MM-DD` date as a relative expression, counted from
+ * today in `zone`.
+ *
+ * "Today" is a calendar day, so a reminder read in the browser's zone
+ * says "overdue" or "today" up to a day away from what the calendar and
+ * the server-side reminder about it say. Both operands are days here, so
+ * the difference never goes through an instant and a DST transition
+ * cannot make a day 23 or 25 hours long.
+ */
+function formatRelativeDate(dateStr: string, zone: Zone, t: TFunction): string {
+  const target = Day.parse(dateStr);
+  if (!target) return '';
+  const diffDays = target.diffDays(Day.today(zone));
   if (diffDays < 0) return String(t('relative_date.overdue', { count: Math.abs(diffDays) }));
   if (diffDays === 0) return String(t('relative_date.today'));
   return String(t('relative_date.in_days', { count: diffDays }));
@@ -424,6 +433,7 @@ function StateSuggestionsPanel({
 
 function RemindersPanel({ workspaceId }: { workspaceId: string | undefined }): ReactElement | null {
   const { t } = useTranslation('ai-suggestions');
+  const zone = useEffectiveZone();
   const { data } = useRemindersQuery(workspaceId);
   const items: TaskReminder[] = data ?? [];
   if (items.length === 0) return null;
@@ -476,7 +486,7 @@ function RemindersPanel({ workspaceId }: { workspaceId: string | undefined }): R
                     color: 'var(--nf-color-fg-muted)',
                   }}
                 >
-                  {r.dueOn ? formatRelativeDate(r.dueOn, t) : ''}
+                  {r.dueOn ? formatRelativeDate(r.dueOn, zone, t) : ''}
                 </span>
               </a>
             </li>

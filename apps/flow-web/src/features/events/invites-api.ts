@@ -21,9 +21,8 @@ import {
   useQueryClient,
   useSuspenseQuery,
 } from '@tanstack/react-query';
-
-import { type ApiError, toApiError } from '../../lib/api-error';
-import { sdk } from '../../lib/sdk';
+import { apiRequest } from '../../lib/api';
+import type { ApiError } from '../../lib/api-error';
 
 export type EventInvite = components['schemas']['InviteSummaryResponse'];
 
@@ -41,11 +40,13 @@ export function useEventInvitesQuery(
   return useSuspenseQuery({
     queryKey: eventInviteKeys.list(wsId, calId, evtId),
     queryFn: async (): Promise<EventInvite[]> => {
-      const { data, error } = await sdk.GET(
-        '/workspaces/{wsId}/calendars/{calId}/events/{evtId}/invites',
-        { params: { path: { wsId, calId, evtId } } },
+      const data = await apiRequest(
+        (client) =>
+          client.GET('/workspaces/{wsId}/calendars/{calId}/events/{evtId}/invites', {
+            params: { path: { wsId, calId, evtId } },
+          }),
+        'Failed to load invites',
       );
-      if (error || !data) throw toApiError(error, 'Failed to load invites');
       return data.invites ?? [];
     },
   });
@@ -66,11 +67,13 @@ export function useRevokeEventInviteMutation(): UseMutationResult<
   const qc = useQueryClient();
   return useMutation<void, ApiError, RevokeEventInviteArgs>({
     mutationFn: async ({ wsId, calId, evtId, inviteId }): Promise<void> => {
-      const { error } = await sdk.DELETE(
-        '/workspaces/{wsId}/calendars/{calId}/events/{evtId}/invites/{inviteId}',
-        { params: { path: { wsId, calId, evtId, inviteId } } },
+      await apiRequest(
+        (client) =>
+          client.DELETE('/workspaces/{wsId}/calendars/{calId}/events/{evtId}/invites/{inviteId}', {
+            params: { path: { wsId, calId, evtId, inviteId } },
+          }),
+        'Failed to revoke invite',
       );
-      if (error) throw toApiError(error, 'Failed to revoke invite');
     },
     onSuccess: (_void, { wsId, calId, evtId }) => {
       void qc.invalidateQueries({ queryKey: eventInviteKeys.list(wsId, calId, evtId) });

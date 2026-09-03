@@ -13,7 +13,7 @@ import {
   useSuspenseQuery,
 } from '@tanstack/react-query';
 
-import { sdk } from '../../lib/sdk';
+import { apiRequest } from '../../lib/api';
 
 /** The four auto-action rule kinds. */
 export type AutoActionRuleKind =
@@ -68,12 +68,13 @@ export function useAutoActionRulesQuery(
   return useSuspenseQuery({
     queryKey: autoActionRulesKeys.rules(workspaceId),
     queryFn: async (): Promise<AutoActionRule[]> => {
-      const { data, error } = await sdk.GET('/workspaces/{wsId}/ai/auto-action-rules', {
-        params: { path: { wsId: workspaceId } },
-      });
-      if (error || !data) {
-        throw new Error('Failed to load auto-action rules');
-      }
+      const data = await apiRequest(
+        (client) =>
+          client.GET('/workspaces/{wsId}/ai/auto-action-rules', {
+            params: { path: { wsId: workspaceId } },
+          }),
+        'Failed to load auto-action rules',
+      );
       // The API wraps the array in { rules: [...] }.
       return (data as { rules: AutoActionRule[] }).rules;
     },
@@ -97,13 +98,14 @@ export function useUpdateAutoActionRules(): UseMutationResult<
       workspaceId,
       rules,
     }: UpdateAutoActionRulesArgs): Promise<AutoActionRule[]> => {
-      const { data, error } = await sdk.PATCH('/workspaces/{wsId}/ai/auto-action-rules', {
-        params: { path: { wsId: workspaceId } },
-        body: { rules },
-      });
-      if (error || !data) {
-        throw new Error('Failed to update auto-action rules');
-      }
+      const data = await apiRequest(
+        (client) =>
+          client.PATCH('/workspaces/{wsId}/ai/auto-action-rules', {
+            params: { path: { wsId: workspaceId } },
+            body: { rules },
+          }),
+        'Failed to update auto-action rules',
+      );
       return (data.rules ?? []) as AutoActionRule[];
     },
     onSuccess: (_data, vars) => {

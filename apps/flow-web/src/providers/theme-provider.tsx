@@ -16,7 +16,7 @@ import type { ReactElement, ReactNode } from 'react';
 
 import { authStore } from '../features/auth/auth-store';
 import type { Me } from '../features/settings/api';
-import { authSdk } from '../lib/sdk';
+import { authApiRequest } from '../lib/api';
 import { queryClient } from './query-client';
 
 /** Backwards-compatible alias for ThemeId. */
@@ -53,7 +53,15 @@ async function fetchServerTheme(): Promise<ThemePreference | null> {
 async function syncServerTheme(pref: ThemePreference): Promise<void> {
   const token = authStore.getState().accessToken;
   if (!token) return;
-  const { data } = await authSdk.PATCH('/me', { body: { themePreference: pref } });
+  // A theme that failed to persist is a preference the next session
+  // will not have; the local switch already happened, so the stale
+  // cache entry is left alone rather than being overwritten with a
+  // value the server never accepted.
+  const data = await authApiRequest(
+    (client) => client.PATCH('/me', { body: { themePreference: pref } }),
+    'Failed to save theme preference',
+    { onError: 'empty', empty: null },
+  );
   if (data) queryClient.setQueryData<Me>(['me'], data);
 }
 

@@ -29,11 +29,10 @@ import {
   useQueryClient,
   useSuspenseQuery,
 } from '@tanstack/react-query';
-
-import { ApiError, toApiError } from '../../lib/api-error';
+import { apiRequest } from '../../lib/api';
+import { ApiError } from '../../lib/api-error';
 import { sha256Hex } from '../../lib/crypto/sha256';
 import { resolveContentType } from '../../lib/file-mime';
-import { sdk } from '../../lib/sdk';
 
 export type EventAttachment = components['schemas']['AttachmentResponse'];
 export type PresignAttachmentBody = components['schemas']['PresignAttachmentInputBody'];
@@ -55,11 +54,13 @@ export function useEventAttachmentsQuery(
   return useSuspenseQuery({
     queryKey: eventAttachmentKeys.list(wsId, calId, evtId),
     queryFn: async (): Promise<EventAttachment[]> => {
-      const { data, error } = await sdk.GET(
-        '/workspaces/{wsId}/calendars/{calId}/events/{evtId}/attachments',
-        { params: { path: { wsId, calId, evtId } } },
+      const data = await apiRequest(
+        (client) =>
+          client.GET('/workspaces/{wsId}/calendars/{calId}/events/{evtId}/attachments', {
+            params: { path: { wsId, calId, evtId } },
+          }),
+        'Failed to load attachments',
       );
-      if (error || !data) throw toApiError(error, 'Failed to load attachments');
       return data.attachments ?? [];
     },
   });
@@ -99,19 +100,19 @@ export function usePresignEventAttachmentMutation(): UseMutationResult<
     mutationFn: async ({ wsId, calId, evtId, file }): Promise<PresignAttachmentResult> => {
       const sha256 = await sha256Hex(file);
       const contentType = resolveContentType(file);
-      const { data, error } = await sdk.POST(
-        '/workspaces/{wsId}/calendars/{calId}/events/{evtId}/attachments/presign',
-        {
-          params: { path: { wsId, calId, evtId } },
-          body: {
-            filename: file.name,
-            contentType,
-            byteSize: file.size,
-            sha256,
-          },
-        },
+      const data = await apiRequest(
+        (client) =>
+          client.POST('/workspaces/{wsId}/calendars/{calId}/events/{evtId}/attachments/presign', {
+            params: { path: { wsId, calId, evtId } },
+            body: {
+              filename: file.name,
+              contentType,
+              byteSize: file.size,
+              sha256,
+            },
+          }),
+        'Failed to presign upload',
       );
-      if (error || !data) throw toApiError(error, 'Failed to presign upload');
 
       // Dedup hit — the byte stream already exists in object storage;
       // the attachments row was created in the same transaction.
@@ -138,16 +139,21 @@ export function usePresignEventAttachmentMutation(): UseMutationResult<
       // unreferenced, the blob) when the actual size exceeds the
       // per-file ceiling. Only reachable on the non-deduplicated branch
       // where a fresh blob was actually stored.
-      const { error: confirmError } = await sdk.POST(
-        '/workspaces/{wsId}/calendars/{calId}/events/{evtId}/attachments/{attId}/confirm',
-        { params: { path: { wsId, calId, evtId, attId: data.attachmentId } } },
-      );
-      if (confirmError) {
+      try {
+        await apiRequest(
+          (client) =>
+            client.POST(
+              '/workspaces/{wsId}/calendars/{calId}/events/{evtId}/attachments/{attId}/confirm',
+              { params: { path: { wsId, calId, evtId, attId: data.attachmentId } } },
+            ),
+          'Attachment rejected by size check',
+        );
+      } catch (confirmError) {
         // The server already deleted the oversized attachment row;
         // refresh the list so the phantom row disappears before we
         // surface the error to the UI.
         void qc.invalidateQueries({ queryKey: eventAttachmentKeys.list(wsId, calId, evtId) });
-        throw toApiError(confirmError, 'Attachment rejected by size check');
+        throw confirmError;
       }
 
       return data;
@@ -176,11 +182,14 @@ export async function fetchEventAttachmentDownloadUrl({
   evtId,
   attachmentId,
 }: FetchEventAttachmentDownloadUrlArgs): Promise<string> {
-  const { data, error } = await sdk.GET(
-    '/workspaces/{wsId}/calendars/{calId}/events/{evtId}/attachments/{attId}/download',
-    { params: { path: { wsId, calId, evtId, attId: attachmentId } } },
+  const data = await apiRequest(
+    (client) =>
+      client.GET(
+        '/workspaces/{wsId}/calendars/{calId}/events/{evtId}/attachments/{attId}/download',
+        { params: { path: { wsId, calId, evtId, attId: attachmentId } } },
+      ),
+    'Failed to get download URL',
   );
-  if (error || !data) throw toApiError(error, 'Failed to get download URL');
   return data.downloadUrl;
 }
 
@@ -221,11 +230,13 @@ export function useDeleteEventAttachmentMutation(): UseMutationResult<
   const qc = useQueryClient();
   return useMutation<void, ApiError, DeleteEventAttachmentArgs>({
     mutationFn: async ({ wsId, calId, evtId, attachmentId }): Promise<void> => {
-      const { error } = await sdk.DELETE(
-        '/workspaces/{wsId}/calendars/{calId}/events/{evtId}/attachments/{attId}',
-        { params: { path: { wsId, calId, evtId, attId: attachmentId } } },
+      await apiRequest(
+        (client) =>
+          client.DELETE('/workspaces/{wsId}/calendars/{calId}/events/{evtId}/attachments/{attId}', {
+            params: { path: { wsId, calId, evtId, attId: attachmentId } },
+          }),
+        'Failed to delete attachment',
       );
-      if (error) throw toApiError(error, 'Failed to delete attachment');
     },
     onSuccess: (_void, { wsId, calId, evtId }) => {
       void qc.invalidateQueries({ queryKey: eventAttachmentKeys.list(wsId, calId, evtId) });

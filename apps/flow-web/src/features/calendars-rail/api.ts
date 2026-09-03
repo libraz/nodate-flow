@@ -28,9 +28,8 @@ import {
   useQuery,
   useQueryClient,
 } from '@tanstack/react-query';
-
-import { type ApiError, toApiError } from '../../lib/api-error';
-import { sdk } from '../../lib/sdk';
+import { apiRequest } from '../../lib/api';
+import type { ApiError } from '../../lib/api-error';
 
 /**
  * Subscribed calendar row as returned by
@@ -95,10 +94,13 @@ export function useDiscoverableCalendarsQuery(
     enabled: id.length > 0,
     staleTime: 30_000,
     queryFn: async (): Promise<DiscoverableCalendar[]> => {
-      const { data, error } = await sdk.GET('/workspaces/{wsId}/discoverable-calendars', {
-        params: { path: { wsId: id } },
-      });
-      if (error || !data) throw toApiError(error, 'Failed to load discoverable calendars');
+      const data = await apiRequest(
+        (client) =>
+          client.GET('/workspaces/{wsId}/discoverable-calendars', {
+            params: { path: { wsId: id } },
+          }),
+        'Failed to load discoverable calendars',
+      );
       return data.calendars ?? [];
     },
   });
@@ -123,10 +125,13 @@ export function useSubscribeToCalendarMutation(): UseMutationResult<
   const qc = useQueryClient();
   return useMutation<void, ApiError, SubscribeToCalendarArgs>({
     mutationFn: async ({ wsId, calId }): Promise<void> => {
-      const { error } = await sdk.POST('/workspaces/{wsId}/calendars/{calId}/subscribe', {
-        params: { path: { wsId, calId } },
-      });
-      if (error) throw toApiError(error, 'Failed to subscribe to calendar');
+      await apiRequest(
+        (client) =>
+          client.POST('/workspaces/{wsId}/calendars/{calId}/subscribe', {
+            params: { path: { wsId, calId } },
+          }),
+        'Failed to subscribe to calendar',
+      );
     },
     onSuccess: (_void, { wsId }) => {
       invalidateRailCaches(qc, wsId);
@@ -154,11 +159,14 @@ export function usePatchOwnSubscriptionMutation(): UseMutationResult<
   const qc = useQueryClient();
   return useMutation<void, ApiError, PatchOwnSubscriptionArgs>({
     mutationFn: async ({ wsId, calId, body }): Promise<void> => {
-      const { error } = await sdk.PATCH('/workspaces/{wsId}/calendars/{calId}/subscription', {
-        params: { path: { wsId, calId } },
-        body,
-      });
-      if (error) throw toApiError(error, 'Failed to update subscription');
+      await apiRequest(
+        (client) =>
+          client.PATCH('/workspaces/{wsId}/calendars/{calId}/subscription', {
+            params: { path: { wsId, calId } },
+            body,
+          }),
+        'Failed to update subscription',
+      );
     },
     onSuccess: (_void, { wsId }) => {
       // PATCH does not change discoverability, so we only refresh the
@@ -187,10 +195,13 @@ export function useUnsubscribeMutation(): UseMutationResult<void, ApiError, Unsu
   const qc = useQueryClient();
   return useMutation<void, ApiError, UnsubscribeArgs>({
     mutationFn: async ({ wsId, calId, userId }): Promise<void> => {
-      const { error } = await sdk.DELETE('/workspaces/{wsId}/calendars/{calId}/members/{userId}', {
-        params: { path: { wsId, calId, userId } },
-      });
-      if (error) throw toApiError(error, 'Failed to leave calendar');
+      await apiRequest(
+        (client) =>
+          client.DELETE('/workspaces/{wsId}/calendars/{calId}/members/{userId}', {
+            params: { path: { wsId, calId, userId } },
+          }),
+        'Failed to leave calendar',
+      );
     },
     onSuccess: (_void, { wsId }) => {
       invalidateRailCaches(qc, wsId);
