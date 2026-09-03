@@ -2,8 +2,8 @@
  * /workspaces/$id/tasks/drafts — route stub. See sibling `.lazy.tsx`
  * for the page component; the retro draft queue is code-split so the
  * Card / EmptyState chunk only loads when the surface is opened. The
- * queue is deep-linked (no sidebar entry) and the Phase 6 / L3
- * timeline backlink will navigate here.
+ * queue is deep-linked (no sidebar entry); the signal-grouped timeline
+ * block is what navigates here.
  */
 
 import { createFileRoute } from '@tanstack/react-router';

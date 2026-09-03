@@ -1,6 +1,6 @@
 /**
  * Verify that the auth store correctly handles the full AuthUser shape
- * including the themePreference and isInstanceAdmin fields added in C4.
+ * including the themePreference and isInstanceAdmin fields.
  */
 
 import { afterEach, describe, expect, it } from 'vitest';

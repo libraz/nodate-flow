@@ -10,7 +10,7 @@
  *   2. Every i18n key the mapper can emit actually exists in all three
  *      locale bundles (so profile/login errors never render a raw key).
  *   3. The three `auth.json` bundles share an identical key set, which is
- *      the parity guarantee the audit asked for (catches a future
+ *      the parity guarantee (catches a future
  *      drop-one-locale regression like the zh gap that motivated this).
  */
 

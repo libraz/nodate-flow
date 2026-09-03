@@ -24,7 +24,7 @@ import (
 )
 
 // b2DB lazily boots a shared MySQL testcontainer with the full repo
-// schema. The B-2 security regressions need a real DB because they
+// schema. These security regressions need a real DB because they
 // exercise the identities / sessions tables and the sqlc query paths
 // that persist the TOTP last-step and tear down session families.
 var b2DB = testhelpers.NewSharedMySQL(testhelpers.MySQLConfig{Database: "nodate_auth_b2_test"})
@@ -35,10 +35,10 @@ var b2DB = testhelpers.NewSharedMySQL(testhelpers.MySQLConfig{Database: "nodate_
 func requireB2DB(t *testing.T) *sql.DB {
 	t.Helper()
 	if testing.Short() {
-		t.Skip("skipping B-2 integration test in -short mode")
+		t.Skip("skipping integration test in -short mode")
 	}
 	if os.Getenv("NF_TEST_INTEGRATION") == "" {
-		t.Skip("set NF_TEST_INTEGRATION=1 to run B-2 integration tests")
+		t.Skip("set NF_TEST_INTEGRATION=1 to run integration tests")
 	}
 	inst, err := b2DB.Start(context.Background())
 	require.NoError(t, err, "start mysql testcontainer")
@@ -135,7 +135,7 @@ func problemFor(t *testing.T, err error) *handlerutil.ProblemDetails {
 	return problem
 }
 
-// TestMagicLinkVerify_2FAAccountReturnsChallenge proves B-2(a): a
+// TestMagicLinkVerify_2FAAccountReturnsChallenge proves that a
 // magic-link verification on a 2FA-enrolled account must NOT issue
 // session tokens. It returns a totp_required step-up challenge instead,
 // forcing the second factor.
@@ -199,7 +199,7 @@ func TestMagicLinkVerify_NoMFAStillCompletes(t *testing.T) {
 	assert.NotEmpty(t, out.SetCookie.Value, "refresh cookie set on completion")
 }
 
-// TestLoginTotp_ReplayedCodeRejected proves B-2(b): a TOTP code that has
+// TestLoginTotp_ReplayedCodeRejected proves that a TOTP code that has
 // already been accepted (same time-step) is rejected on a second
 // presentation, even inside the validation window.
 func TestLoginTotp_ReplayedCodeRejected(t *testing.T) {

@@ -159,7 +159,7 @@ func readDeliveryState(ctx context.Context, t *testing.T, db *sql.DB, publicID t
 	return status, attempts, nextRetryAt.Valid
 }
 
-// TestWebhookFanoutDedupAndOccurredAt is the H1 + M2 regression guard.
+// TestWebhookFanoutDedupAndOccurredAt is the fan-out dedupe and occurred-at guard.
 // The contract under test is:
 //
 //   - Firing the webhook hook twice for the same eventInternalID must
@@ -270,9 +270,9 @@ func TestWebhookFanoutDedupAndOccurredAt(t *testing.T) {
 	`, subInternalID).Scan(&gotEventPubID, &gotPayload)
 	require.NoError(t, err)
 	require.Equal(t, eventPubID.String(), gotEventPubID.String(),
-		"event_public_id must equal the source events.public_id (H1: required for dedupe)")
+		"event_public_id must equal the source events.public_id (required for dedupe)")
 
-	// M2: payload OccurredAt must reflect the event's occurred_at,
+	// Payload OccurredAt must reflect the event's occurred_at,
 	// not the dispatch time. Allow 1s of slop for clock truncation.
 	var payload struct {
 		EventType  string `json:"eventType"`

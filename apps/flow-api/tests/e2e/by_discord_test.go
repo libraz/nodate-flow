@@ -233,7 +233,7 @@ func repoRootFromTest(t *testing.T) string {
 	return ""
 }
 
-// TestByDiscordHiddenFromPublicSDK guards P2-7: the internal service-
+// TestByDiscordHiddenFromPublicSDK guards the hidden-operation rule: the internal service-
 // token-only operation must be marked Hidden so it never appears in the
 // generated public OpenAPI document or the TypeScript SDK, even though
 // it remains routable for the service-token caller (asserted by the

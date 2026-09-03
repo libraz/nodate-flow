@@ -193,7 +193,7 @@ func Callback(deps Deps) func(context.Context, *OAuthCallbackInput) (*OAuthCallb
 			expiresAt = sql.NullTime{Time: tokens.ExpiresAt, Valid: true}
 		}
 		// Providers may attach binding metadata (Discord stores the
-		// snowflake + verified_at here so the Phase 8 presence
+		// snowflake + verified_at here so the presence
 		// gateway can resolve events through JSON_EXTRACT). Pass
 		// through as-is; nil from acc.Metadata persists as NULL.
 		if _, err := deps.Queries.UpsertUserIntegration(ctx, generated.UpsertUserIntegrationParams{

@@ -1,4 +1,4 @@
-// Package signaljudge — prompt-side secret redaction (Phase 6 / L1).
+// Package signaljudge — prompt-side secret redaction.
 //
 // The judge prompt ships two distinct kinds of operator-influenced
 // content into the LLM call:

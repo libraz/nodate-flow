@@ -1,6 +1,6 @@
 // Package signaljudge — SQL-backed adapters for the three
 // [PromptDeps] lookups the runner uses to build a judge's per-run
-// context window (Phase 6 / L1). These bind [RecentTasksLookup],
+// context window. These bind [RecentTasksLookup],
 // [LinkedTasksLookup], and [JudgeInstructionsLookup] to the production
 // database via narrow SELECTs against the live schema.
 //

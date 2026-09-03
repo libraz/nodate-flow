@@ -1,5 +1,5 @@
 /**
- * InvocationsList — workspace AI activity audit panel (2.WEB-2).
+ * InvocationsList — workspace AI activity audit panel.
  *
  * Renders the most recent redacted LLM calls as a compact table. All
  * prompt / response bodies are already redacted at write time; this

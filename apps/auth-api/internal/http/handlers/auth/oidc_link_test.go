@@ -86,8 +86,8 @@ func signedMicrosoftState(t *testing.T, deps *Deps) (string, http.Cookie) {
 	return boundOIDCState(t, deps, "microsoft", "nonce-value")
 }
 
-// TestOIDCGithubCallback_LinksExistingPasswordAccount proves the fix for
-// the M-7 / P2-6 defect: a user who already holds a local-password
+// TestOIDCGithubCallback_LinksExistingPasswordAccount proves the
+// account-linking path: a user who already holds a local-password
 // account signing in via GitHub with the SAME verified email links the
 // GitHub identity onto the existing user and logs in, instead of hitting
 // the uniq_users_email constraint and surfacing an opaque 500.

@@ -1,12 +1,12 @@
-// Package signaljudge — autonomy resolver interface and Phase 3 stub
+// Package signaljudge — autonomy resolver interface and inert stub
 // (ADR 0008 D4 / D7).
 //
 // The Applier consults an [AutonomyResolver] to translate a
 // (workspace, signal_kind, confidence) triple into the
-// suggest / draft / auto decision lattice. Phase 3 lands the
-// interface and a stub that always returns Suggest; Phase 4 (A1)
-// replaces the binding in cmd/api/main.go with a production resolver
-// that reads auto_action_rules + ai_settings.auto_action_threshold.
+// suggest / draft / auto decision lattice. This file holds the
+// interface plus a stub that always returns Suggest; cmd/api/main.go
+// binds the production resolver in autonomy.go, which reads
+// auto_action_rules + ai_settings.auto_action_threshold.
 //
 // Keeping the interface in this package avoids an import cycle: the
 // Applier consumes the resolver, the autonomy implementation lives
@@ -34,29 +34,28 @@ const (
 )
 
 // AutonomyDecision is the full autonomy resolution for one verdict.
-// Phase 3 only uses Level; Phase 4 may extend the struct with rule
-// references / proposed-event caps without breaking the Applier
-// signature (struct return keeps the contract stable).
+// Returning a struct rather than a bare level lets rule references
+// and further caps be added without breaking the Applier signature.
 type AutonomyDecision struct {
 	// Level is the resolved suggest / draft / auto branch.
 	Level AutonomyLevel
 	// MaxProposedEvents caps the number of [ProposedEvent] entries
 	// the Applier reifies under autonomy=Auto. Zero means "no cap";
-	// Phase 4 will populate this from auto_action_rules.
+	// nothing populates it until auto_action_rules gains the column.
 	MaxProposedEvents int
 }
 
 // AutonomyResolver maps (workspace, signal_kind, confidence) to the
-// resolved autonomy decision. Phase 3 ships [SuggestOnlyResolver];
-// Phase 4 (A1) replaces it with a sqlc-backed implementation.
+// resolved autonomy decision. [SuggestOnlyResolver] is the inert
+// default; [RuleBackedResolver] is the sqlc-backed production one.
 type AutonomyResolver interface {
 	Resolve(ctx context.Context, workspaceID uint32, kind signalkinds.Kind, confidence float64) (AutonomyDecision, error)
 }
 
-// SuggestOnlyResolver always returns AutonomySuggest. Used during
-// Phase 3 so the Applier wiring compiles end-to-end without yet
-// depending on auto_action_rules. The production resolver in Phase 4
-// will drop in via the same interface.
+// SuggestOnlyResolver always returns AutonomySuggest. It lets the
+// Applier wiring run end-to-end without depending on
+// auto_action_rules; [RuleBackedResolver] drops in via the same
+// interface.
 type SuggestOnlyResolver struct{}
 
 // Resolve implements [AutonomyResolver]. Ignores every input and

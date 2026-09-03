@@ -1,7 +1,6 @@
 // Package lifecycle_test exercises the flow-worker binary end-to-end via
-// the exported Run function. Three deterministic tests cover the W1
-// surface laid out in docs/plan/release-8-signals-and-judge-loop.md
-// (Phase 5 / W1):
+// the exported Run function. Three deterministic tests cover the
+// process lifecycle:
 //
 //  1. TestWorkerBootsAndExposesMetrics — happy path: Run boots, /metrics
 //     returns 200 with nf_flow_worker_up=1 and the calendar histogram
@@ -253,7 +252,7 @@ func TestWorkerBootsAndExposesMetrics(t *testing.T) {
 	require.Contains(t, body, "nf_flow_worker_up 1",
 		"metrics body should expose up=1 once boot completes")
 	require.Contains(t, body, "nf_flow_worker_calendar_event_day_tick_seconds_bucket",
-		"metrics body should expose the histogram bucket lines W2 will populate")
+		"metrics body should expose the calendar job histogram bucket lines")
 
 	// Initiate graceful shutdown and confirm Run returns nil.
 	cancel()

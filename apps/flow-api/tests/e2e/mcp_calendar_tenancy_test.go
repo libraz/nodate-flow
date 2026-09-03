@@ -55,7 +55,7 @@ func createMCPCalendar(t *testing.T, accessToken, workspacePublicID, name string
 // TestMCPListCalendarEventsHidesInternalIDs verifies that the
 // list_calendar_events MCP tool exposes only public UUID strings and
 // never emits internal sequential ids (calendars.id / users.id). This is
-// the regression guard for audit finding B-4 / H-9: REST already exposes
+// the regression guard for internal-id leakage: REST already exposes
 // only public_id, and the MCP surface must match.
 func TestMCPListCalendarEventsHidesInternalIDs(t *testing.T) {
 	bootstrap(t)
@@ -142,8 +142,8 @@ func TestMCPListCalendarEventsHidesInternalIDs(t *testing.T) {
 // create_calendar_event refuses to assign an owner who is not a member of
 // the caller's workspace. The FK on calendar_events.owner_user_id
 // references the global users table, so without a membership check a
-// globally-existing non-member would be assignable as owner (audit
-// finding B-4 / M-4). The fix resolves the owner through a
+// globally-existing non-member would be assignable as owner. The fix
+// resolves the owner through a
 // workspace-membership-scoped query and rejects non-members with
 // MCP.TOKEN.WORKSPACE_MISMATCH.
 func TestMCPCreateCalendarEventRejectsNonMemberOwner(t *testing.T) {

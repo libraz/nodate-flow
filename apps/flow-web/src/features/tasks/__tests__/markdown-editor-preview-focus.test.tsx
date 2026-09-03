@@ -1,5 +1,5 @@
 /**
- * Regression test for the MarkdownEditor preview-toggle focus indicator (C8).
+ * Regression test for the MarkdownEditor preview-toggle focus indicator.
  *
  * The preview toggle is a `<Button>` (from `@nodate-flow/ui/primitives/button`)
  * that switches between Write and Preview modes. Keyboard users must see a
@@ -18,7 +18,7 @@
  * If the toggle ever loses the Button primitive (e.g. someone replaces it
  * with a raw `<button>`), this test fails because the .root class is gone.
  * If the toggle becomes non-focusable (tabindex=-1, disabled, hidden), the
- * Tab assertion fails. Either way, this catches the C8 regression.
+ * Tab assertion fails. Either way, the missing focus ring is caught.
  */
 
 import { screen } from '@testing-library/react';
@@ -27,7 +27,7 @@ import { renderWithProviders } from '@tests/helpers/render';
 import { describe, expect, it } from 'vitest';
 import MarkdownEditor from '../markdown-editor';
 
-describe('<MarkdownEditor> preview toggle focus ring (C8)', () => {
+describe('<MarkdownEditor> preview toggle focus ring', () => {
   it('preview toggle carries the Button primitive .root class so :focus-visible paints the ring', () => {
     renderWithProviders(<MarkdownEditor value="hello" onChange={() => undefined} />);
 

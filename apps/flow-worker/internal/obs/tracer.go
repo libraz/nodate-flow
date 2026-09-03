@@ -3,8 +3,8 @@
 // global provider so any future instrumentation library picks it up.
 //
 // This is a near-verbatim copy of apps/flow-api/internal/obs/tracer.go.
-// It should be extracted to packages/go-shared/obs in a follow-up; the
-// W1 scaffold keeps it inline to avoid touching flow-api in this task.
+// It should be extracted to packages/go-shared/obs in a follow-up; it
+// stays inline for now to avoid touching flow-api.
 package obs
 
 import (

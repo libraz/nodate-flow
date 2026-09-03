@@ -1,7 +1,7 @@
 // HTTP client that translates debounced presence events into POST
 // /signals calls against flow-api. The Discord snowflake → flow user
-// resolution goes through a separate lookup endpoint (Option A in the
-// P8-2 design notes) so this binary stays DB-free.
+// resolution goes through a separate lookup endpoint rather than a
+// direct DB read, so this binary stays DB-free.
 //
 // Resolution flow:
 //

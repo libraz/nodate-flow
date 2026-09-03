@@ -1,13 +1,14 @@
 // Package tests exercises the presence-discord binary end-to-end via
-// the exported lifecycle.Run function. P8-1 ships only a smoke test:
-// the binary boots, /metrics returns 200 with the three Phase 8
-// metrics, and shutdown completes cleanly when ctx is cancelled. P8-5
-// will land the integration tests that exercise the actual gateway
-// behaviour (debounce, signal emission, unknown-user drop, reconnect).
+// the exported lifecycle.Run function. This file is the smoke test:
+// the binary boots, /metrics returns 200 with the three gateway
+// metrics, and shutdown completes cleanly when ctx is cancelled. The
+// integration tests that exercise the actual gateway behaviour
+// (debounce, signal emission, unknown-user drop, reconnect) live in
+// gateway_test.go.
 //
-// The fake gatewayRunner avoids any Discord WS dependency: P8-1's real
-// gateway intentionally returns "not yet implemented" until P8-2
-// finishes the wiring, so the smoke test cannot use it.
+// The fake gatewayRunner avoids any Discord WS dependency: the smoke
+// test asserts only the process lifecycle, so it must not need a live
+// Discord session.
 //
 // This package does NOT require Docker. Unlike the flow-worker
 // lifecycle tests, presence-discord has no MySQL dependency at the
@@ -91,17 +92,17 @@ func waitForMetricsReady(t *testing.T, addr string, timeout time.Duration) strin
 	return ""
 }
 
-// TestGatewayBootsAndExposesMetrics is the P8-1 smoke test. It asserts
+// TestGatewayBootsAndExposesMetrics is the process smoke test. It asserts
 // that lifecycle.Run:
 //
 //  1. binds the metrics server,
 //  2. starts the (fake) gateway,
-//  3. exposes the three Phase 8 metrics,
+//  3. exposes the three gateway metrics,
 //  4. returns nil within the shutdown timeout when ctx is cancelled,
 //  5. invokes Stop on the gateway exactly once.
 //
-// The real Discord gateway implementation is exercised by P8-5's
-// integration suite.
+// The real Discord gateway implementation is exercised by the
+// integration suite in gateway_test.go.
 func TestGatewayBootsAndExposesMetrics(t *testing.T) {
 	t.Parallel()
 

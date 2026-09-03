@@ -20,7 +20,7 @@ import { describe, expect, it } from 'vitest';
 
 const LOCALES = ['en', 'ja', 'zh'] as const;
 
-/** Keys pulled from the sites the audit named, with their namespace. */
+/** Keys pulled from the call sites that emit them, with their namespace. */
 const REQUIRED: ReadonlyArray<{ source: string; ns: string; keys: readonly string[] }> = [
   {
     source: '../../workspaces/workspace-members-table.tsx',

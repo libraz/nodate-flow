@@ -12,8 +12,8 @@
 // Within the four List* mappers the column set is byte-identical, so
 // they collapse onto a single rowToTaskListItem helper through a
 // taskListRow projection struct with thin per-source adapters
-// (taskListRowFrom*). This is the H7 audit fix: before the
-// consolidation each adapter ran the same TaskListItem field
+// (taskListRowFrom*). Before that consolidation each adapter ran
+// the same TaskListItem field
 // projection inline, which had drifted at least once during the
 // keyset rollout.
 

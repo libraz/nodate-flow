@@ -1,19 +1,18 @@
-// Package signaljudge — TaskMutator stub for Phase 3 wiring.
+// Package signaljudge — TaskMutator stub that skips task writes.
 //
 // The Applier accepts a [TaskMutator] interface so production wiring
 // can plug in the existing task / comment handlers (the canonical
 // path that emits task.transition.complete, task.comment.added, and
-// task.created events). Phase 3 lands the Applier and its event
-// emission contract; the production TaskMutator that actually closes
+// task.created events). The production TaskMutator that actually closes
 // tasks and writes comments is wired piecewise as the existing
 // handlers are exposed as reusable functions.
 //
-// [LogOnlyTaskMutator] is the safe default for Phase 3: it logs every
+// [LogOnlyTaskMutator] is the safe default: it logs every
 // call at warn level and returns success without touching the
 // database. The Applier still emits TaskAutoCompleted / SignalApplied
 // / TaskRetroDrafted events; only the task-row side effects are
 // skipped. This lets the judge-loop event stream go live without
-// blocking on the handler refactor that Phase 6 will sort out.
+// blocking on the handler refactor.
 package signaljudge
 
 import (

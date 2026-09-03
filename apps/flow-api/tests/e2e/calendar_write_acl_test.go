@@ -44,7 +44,7 @@ func addCalendarMemberWithRole(t *testing.T, host *helpers.TestTenant, calID, em
 	require.Equal(t, role, added.Role, "add-member must grant the requested role")
 }
 
-// TestCalendarViewerCannotWriteContents is the H-9 regression: a
+// TestCalendarViewerCannotWriteContents is the read-side regression: a
 // read-only member of a calendar must not be able to create anything
 // its whole audience will see. The check is per surface rather than
 // per handler file, because the hole was that one shared helper existed
@@ -151,7 +151,7 @@ func TestCalendarViewerCannotWriteContents(t *testing.T) {
 	assert.NotEmpty(t, created.ID, "an editor must be able to create an event")
 }
 
-// TestSystemCalendarRejectsContentWrites is the second half of H-9: a
+// TestSystemCalendarRejectsContentWrites covers the write half of the system-calendar rule: a
 // system calendar's rows are populated from a provider feed, so a user
 // row written there has no source to be reconciled against and survives
 // no refresh. The refusal must not depend on role, so the test promotes
@@ -226,7 +226,7 @@ func TestSystemCalendarRejectsContentWrites(t *testing.T) {
 	assert.Zero(t, events, "a refused system-calendar write must not reach the table")
 }
 
-// TestPublicShareAttachRequiresCalendarWriteAccess is the H-5
+// TestPublicShareAttachRequiresCalendarWriteAccess is the share-attach
 // regression. A workspace member who holds no grant at all on a
 // colleague's calendar must not be able to republish that calendar's
 // events on a share page, whose URL needs no authentication to open.
@@ -312,7 +312,7 @@ func TestPublicShareAttachRequiresCalendarWriteAccess(t *testing.T) {
 		"the published event must reach the public page once access is granted")
 }
 
-// TestPublicShareAttachSkipsViewerOnlyCalendar narrows the H-5 fix to
+// TestPublicShareAttachSkipsViewerOnlyCalendar narrows that to
 // the role boundary rather than the membership boundary: read access to
 // a calendar is not permission to republish it to the world. A viewer
 // sees the event in the app, so an implementation that checks only for

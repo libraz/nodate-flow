@@ -53,7 +53,7 @@ func TestDiscord_AuthURL_ContainsRequiredParams(t *testing.T) {
 	assert.Contains(t, got, "state=state-xyz")
 	assert.Contains(t, got, "response_type=code")
 	assert.Contains(t, got, "scope=identify+guilds",
-		"Discord must request the identify + guilds scopes required by the Phase 8 presence gateway")
+		"Discord must request the identify + guilds scopes required by the presence gateway")
 	assert.Contains(t, got, "redirect_uri=",
 		"redirect_uri must be forwarded so Discord echoes it back on the exchange")
 }

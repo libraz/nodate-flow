@@ -1,7 +1,6 @@
-// Metrics surface for presence-discord. P8-1 pre-registers the three
-// metrics named in docs/plan/release-8-signals-and-judge-loop.md (Phase
-// 8 / P2). The gateway implementation (P8-2) increments them as events
-// are received, debounced, and emitted.
+// Metrics surface for presence-discord. The three metrics below are
+// pre-registered at package load; the gateway implementation
+// increments them as events are received, debounced, and emitted.
 //
 // The Up gauge mirrors flow-worker's nf_flow_worker_up and flow-api's
 // equivalent so dashboards can use a single "process up" pattern across
@@ -31,14 +30,14 @@ var GatewayUp = prometheus.NewGauge(prometheus.GaugeOpts{
 // EventsTotal counts gateway events the binary has processed,
 // partitioned by kind.
 //
-// kind values reserved for P8-2:
+// kind values:
 //   - "presence_update" — Discord PresenceUpdate gateway event received
 //   - "signal_emitted"  — POST /signals to flow-api succeeded
 //   - "signal_failed"   — POST /signals to flow-api errored
 //   - "drop_no_user"    — presence belongs to a Discord user with no
 //     matching user_integrations.metadata_json.external_user_id
 //
-// More kinds may be added by P8-2 without coordination; the label is
+// More kinds may be added without coordination; the label is
 // low-cardinality by design (no user_id, no guild_id).
 //
 //nolint:gochecknoglobals // process-wide metric, matches flow-api / flow-worker pattern.
@@ -71,7 +70,7 @@ func init() {
 	// appear in /metrics from boot with value 0. Without this the CounterVec
 	// would emit only the HELP/TYPE comments until the first increment,
 	// which breaks dashboards that auto-discover series by name. Add new
-	// kinds here as P8-2 introduces them.
+	// kinds here as they are introduced.
 	for _, kind := range []string{
 		"presence_update",
 		"signal_emitted",

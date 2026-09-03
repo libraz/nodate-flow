@@ -11,7 +11,7 @@ import (
 	"github.com/libraz/nodate-flow/apps/flow-api/tests/helpers"
 )
 
-// TestDiscordSignalSourceRoundTrip is a regression test for B-1: every
+// TestDiscordSignalSourceRoundTrip is a regression test: every
 // enforcement layer (DB ENUM, Huma validation, OpenAPI schema) previously
 // lacked "discord", causing the presence-discord gateway's POST /signals
 // to return 422 before reaching the handler. This test drives a full

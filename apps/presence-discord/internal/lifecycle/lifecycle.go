@@ -189,7 +189,7 @@ func Run(ctx context.Context, cfg *config.Config, logger *slog.Logger, opts *Run
 	}
 
 	// Graceful shutdown. Cancel the gateway's context so its Start loop
-	// observes ctx.Done(), invoke Stop for the WS close handshake (P8-2),
+	// observes ctx.Done(), invoke Stop for the WS close handshake,
 	// then drain the metrics server. Order mirrors flow-worker.
 	gatewayCancel()
 	stopCtx, stopCancel := context.WithTimeout(context.Background(), cfg.ShutdownTimeout)

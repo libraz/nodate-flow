@@ -1,5 +1,5 @@
 // Package signaljudge — deterministic pre-judge eligibility filter
-// (ADR 0008 D4 / Phase 3 J4).
+// (ADR 0008 D4).
 //
 // The Matcher runs synchronously inside the signal-ingestion path
 // (apps/flow-api/internal/http/handlers/signals/handlers.go) before
@@ -256,8 +256,8 @@ func (m *Matcher) subjectExists(ctx context.Context, workspaceID uint32, subject
 // row we are evaluating does not appear as its own duplicate.
 //
 // The query scans `signals` directly; a covering index on
-// (workspace_id, subject_type, subject_id, received_at) lands with
-// Phase 1 D1 so this stays cheap.
+// (workspace_id, subject_type, subject_id, received_at) keeps the
+// scan cheap.
 func (m *Matcher) recentSameKindSubject(ctx context.Context, workspaceID uint32, kind signalkinds.Kind, subjectType string, subjectID sql.NullInt32, currentSignalID int64, now time.Time, window time.Duration) (bool, error) {
 	cutoff := now.Add(-window)
 	if subjectID.Valid {

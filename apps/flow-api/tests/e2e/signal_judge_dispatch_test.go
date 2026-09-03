@@ -26,12 +26,12 @@ import (
 // The test server harness does not wire signaljudge.Enqueuer into the
 // router today (production wiring lives in cmd/api/main.go), so the
 // test drives the enqueuer directly against the same DB. This still
-// covers the Phase 2 J1 surface: the SELECT match query, the dedupe
+// covers the enqueue surface: the SELECT match query, the dedupe
 // key shape, the Job.DedupeKey propagation, and the dispatch-arm side
 // of the orchestrator runner is covered by the unit tests in
 // internal/ai/agentruntime/judge_dispatch_test.go.
 //
-// TODO(phase-5): once the test server wires JudgeEnqueuer through
+// TODO(judge-enqueuer): once the test server wires JudgeEnqueuer through
 // router.Build, replace the direct enq.EnqueueForSignal call with an
 // assertion that POST /signals alone produces the queue row.
 func TestSignalJudgeEnqueueOnManualSignal(t *testing.T) {

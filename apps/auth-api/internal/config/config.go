@@ -147,7 +147,7 @@ type Config struct {
 	IntGoogleClientID     string `env:"NF_AUTH_GOOGLE_INTEGRATION_CLIENT_ID" envDefault:""`
 	IntGoogleClientSecret string `env:"NF_AUTH_GOOGLE_INTEGRATION_CLIENT_SECRET" envDefault:""`
 
-	// Discord personal connection (Phase 8 presence binding). The
+	// Discord personal connection (presence binding). The
 	// redirect URI is read from env so deployments can keep the
 	// Discord OAuth app's registered callback in lock-step with the
 	// auth-api's public URL without re-deriving it server-side.

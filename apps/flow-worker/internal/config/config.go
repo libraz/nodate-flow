@@ -51,9 +51,8 @@ type Config struct {
 	// via env.
 	FlowAPIBaseURL string `env:"NF_FLOW_API_BASE_URL" envDefault:"http://localhost:8080"`
 
-	// JobTickInterval is the period between job runner ticks. The W1
-	// scaffold uses this for the placeholder tick; W2 jobs reuse it as
-	// the default cadence unless they declare their own.
+	// JobTickInterval is the period between job runner ticks. Jobs use it
+	// as the default cadence unless they declare their own.
 	JobTickInterval time.Duration `env:"NF_FLOW_WORKER_TICK_INTERVAL" envDefault:"60s"`
 
 	// JobShutdownTimeout caps how long the runner waits for an in-flight

@@ -41,8 +41,8 @@ type Enqueuer struct {
 	Queue  agentruntime.Queue
 	Logger *slog.Logger
 	Now    func() time.Time
-	// Matcher is the optional deterministic pre-judge gate
-	// (Phase 3 / J4). When non-nil, every EnqueueForSignal call runs
+	// Matcher is the optional deterministic pre-judge gate.
+	// When non-nil, every EnqueueForSignal call runs
 	// the matcher first; signals the matcher rejects are not
 	// enqueued (and the agent_runs slot is not consumed). nil
 	// disables the gate — useful for tests that already curate the

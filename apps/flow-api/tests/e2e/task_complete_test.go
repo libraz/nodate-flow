@@ -70,7 +70,7 @@ func TestTaskDirectCompleteFromOpen(t *testing.T) {
 
 // TestTaskReopenClearsCompletedAt verifies that reopening a completed
 // task clears the completedAt timestamp, so a non-done task never
-// carries a stale completion time (H-4 / P2-2).
+// carries a stale completion time.
 func TestTaskReopenClearsCompletedAt(t *testing.T) {
 	bootstrap(t)
 	t.Parallel()

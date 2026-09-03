@@ -2,8 +2,8 @@
  * /workspaces/$id/settings/ai-activity — workspace AI invocation audit (lazy).
  *
  * Surfaces recent redacted LLM calls so workspace members can audit
- * what their AI providers have been asked and what came back
- * (2.WEB-2). Read-only.
+ * what their AI providers have been asked and what came back.
+ * Read-only.
  */
 
 import Skeleton from '@nodate-flow/ui/primitives/skeleton';

@@ -3,7 +3,7 @@
 // database without going through the full sqlc surface for a single
 // UPDATE / SELECT — the queries are small enough that raw SQL stays
 // reviewable, and tests inject fakes against the same interfaces so
-// the sqlc surface does not grow for a Phase 3 wiring concern.
+// the sqlc surface does not grow for a single wiring concern.
 package signaljudge
 
 import (

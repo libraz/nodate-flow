@@ -745,10 +745,10 @@ type AgentRunEvent struct {
 	ActorSystemSource   *string  `json:"actorSystemSource,omitempty"`
 	TriggeredBySignalID *string  `json:"triggeredBySignalId,omitempty"`
 	// ReversesEventID is the public_id of the event this row compensates
-	// (ADR 0008 D4 / J5). Null for non-reversal events.
+	// (ADR 0008 D4). Null for non-reversal events.
 	ReversesEventID *string `json:"reversesEventId,omitempty"`
 	// WasReversed is TRUE when some other enabled event reverses this
-	// row (ADR 0008 D4 / J5). Mirrors the timeline DTO so the
+	// row (ADR 0008 D4). Mirrors the timeline DTO so the
 	// agent-runs view can render the same "Reversed" badge.
 	WasReversed bool   `json:"wasReversed"`
 	PayloadJSON string `json:"payloadJson,omitempty"`
@@ -1008,7 +1008,7 @@ type ListArchivedTasksOutput struct {
 	Body ListArchivedTasksBody
 }
 
-// ---- Retro draft queue (Phase 6 / L2) -------------------------------------
+// ---- Retro draft queue ----------------------------------------------------
 
 // RetroDraftSourceTask is the minimal reference to the original task that
 // prompted a retrospective draft. Embedded on RetroDraft so the queue UI
@@ -1025,7 +1025,7 @@ type RetroDraftSourceTask struct {
 // fields name the AI agent that produced the draft (resolved from the
 // task.retro.drafted event's actor_agent_id, not from a column on tasks).
 //
-// The `signal` block from the Phase 6 / L2 design is deliberately omitted
+// The `signal` block from the original design is deliberately omitted
 // from the first iteration: the draft itself already carries enough
 // context (title, description, source task) for the operator to make an
 // Accept / Discard decision, and the signal join can be added later
@@ -1046,7 +1046,7 @@ type RetroDraft struct {
 // `reason` is constrained to the single value `retro` for now; the enum
 // rejects anything else at the boundary with a 422 (Huma validation).
 // Pagination is offset-based, defaulting to 20 rows per page with a hard
-// cap of 50 per the L2 design.
+// cap of 50.
 type ListRetroDraftsInput struct {
 	WsID   string `path:"wsId"`
 	Reason string `query:"reason" enum:"retro" required:"true" doc:"Draft kind filter. Currently only 'retro' is supported."`

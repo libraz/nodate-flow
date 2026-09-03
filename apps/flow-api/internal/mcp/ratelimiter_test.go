@@ -75,7 +75,7 @@ func TestRateLimiterIsolatesTokens(t *testing.T) {
 	}
 }
 
-// TestRateLimiterSseAndPostShareHashedBudget locks in the M-5 fix: both
+// TestRateLimiterSseAndPostShareHashedBudget locks in the shared budget: both
 // the SSE (GET) path (sse.go) and the POST path (server.go) key the rate
 // limiter on hashToken(tok). Because both reduce to the same hashed key,
 // a client cannot double its budget by splitting requests across the two
@@ -107,7 +107,7 @@ func TestRateLimiterSseAndPostShareHashedBudget(t *testing.T) {
 }
 
 // TestRateLimiterNeverKeysOnPlaintextToken guards the secret-in-memory
-// half of M-5: the raw bearer token must never appear as a rate-limiter
+// boundary: the raw bearer token must never appear as a rate-limiter
 // map key. Exhausting the budget through the hashed key must leave no
 // entry under the plaintext token.
 func TestRateLimiterNeverKeysOnPlaintextToken(t *testing.T) {

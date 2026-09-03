@@ -66,7 +66,7 @@ func createScopedTaskWithFacts(t *testing.T, tt *helpers.TestTenant) (triggerPub
 	return trigger.ID, target.ID
 }
 
-// TestEngineReadsRejectForeignWorkspace proves C-3: the constraint
+// TestEngineReadsRejectForeignWorkspace proves that the constraint
 // engine's READ queries are scoped at the SQL boundary on workspace_id,
 // not just by the upstream ACL middleware. We populate a task with every
 // engine fact in tenant A, then drive the SqlcStore directly (bypassing
@@ -129,13 +129,13 @@ func TestEngineReadsRejectForeignWorkspace(t *testing.T) {
 	require.NotEmpty(t, constraintsOwn, "owning workspace must see constraints")
 }
 
-// TestListPendingSuggestionsRejectForeignWorkspace proves the C-3 fix
-// for ListPendingSuggestionsForTask: a relation suggestion bound to
+// TestListPendingSuggestionsRejectForeignWorkspace proves the workspace scoping
+// of ListPendingSuggestionsForTask: a relation suggestion bound to
 // tenant A's workspace must not surface when the query is invoked with
 // tenant B's workspace id, even though the internal task id is supplied
-// verbatim. The earlier query correlated workspace_id to the joined task
-// instead of an explicit parameter, so an ACL bypass would have returned
-// the row.
+// verbatim. A query that correlates workspace_id to the joined task
+// instead of an explicit parameter returns the row regardless, so the
+// scoping has to be a parameter.
 func TestListPendingSuggestionsRejectForeignWorkspace(t *testing.T) {
 	bootstrap(t)
 	t.Parallel()

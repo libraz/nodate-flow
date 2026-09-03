@@ -1,6 +1,5 @@
 /**
- * Signal-grouped timeline block with reversal — Phase 6 / L3 of
- * docs/plan/release-8-signals-and-judge-loop.md.
+ * Signal-grouped timeline block with reversal.
  *
  * Covers `apps/flow-web/src/features/timeline/signal-group.tsx`
  * mounted via `timeline-view.tsx` at `/workspaces/{wsId}/timeline`.

@@ -1,6 +1,6 @@
 // Package sqlviews exercises view-level guards that protect against
 // leaking child rows when their parent task has been soft-disabled
-// (`tasks.enabled = FALSE`). Audit item M7: every view that surfaces
+// (`tasks.enabled = FALSE`). Every view that surfaces
 // rows from task_actors / task_labels / task_constraints /
 // task_dependencies must propagate `enabled = TRUE` from the parent
 // task so a single missed WHERE clause cannot leak archived data.
@@ -194,7 +194,7 @@ func scanInt(t *testing.T, query string, args ...any) int {
 // TestParentDisabledHidesChildrenFromViews verifies that disabling the
 // parent task removes its actor / label / constraint / dependency rows
 // from every view that surfaces them. v_task_detail is the canonical
-// reference (M7 baseline); v_task_list_all and v_my_tasks are the
+// reference; v_task_list_all and v_my_tasks are the
 // defense-in-depth additions.
 func TestParentDisabledHidesChildrenFromViews(t *testing.T) {
 	skipIfNoIntegration(t)

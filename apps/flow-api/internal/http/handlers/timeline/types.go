@@ -75,12 +75,12 @@ type Event struct {
 	// to surface the causal chain "signal -> judge verdict -> task event".
 	TriggeredBySignalID *string `json:"triggeredBySignalId,omitempty"`
 	// ReversesEventID is the public_id of the event this row compensates
-	// (ADR 0008 D4 / J5). Null for non-reversal events. Pointer-typed so
+	// (ADR 0008 D4). Null for non-reversal events. Pointer-typed so
 	// the JSON shape is unambiguously `null` when the column was SQL
 	// NULL — SDK consumers branch on presence, not emptiness.
 	ReversesEventID *string `json:"reversesEventId,omitempty"`
 	// WasReversed is TRUE when some other enabled event points back at
-	// this row via reverses_event_id (ADR 0008 D4 / J5). Drives the
+	// this row via reverses_event_id (ADR 0008 D4). Drives the
 	// "Reversed" badge on the timeline so the user does not see two
 	// matching reverse-buttons for a row that has already been undone.
 	WasReversed bool `json:"wasReversed"`

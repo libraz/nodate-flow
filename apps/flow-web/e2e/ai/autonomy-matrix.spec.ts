@@ -1,5 +1,5 @@
 /**
- * Autonomy Matrix E2E — Phase 4 / A2 of release-8-signals-and-judge-loop.
+ * Autonomy Matrix E2E.
  *
  * Covers `apps/flow-web/src/features/ai/autonomy/autonomy-matrix.tsx`
  * rendered as a section inside `auto-action-settings.tsx`, mounted at

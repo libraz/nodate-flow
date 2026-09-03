@@ -125,7 +125,7 @@ func TestExecuteJudgeHappyPath(t *testing.T) {
 	if len(logged) != 1 || logged[0].Status != "ok" || logged[0].AgentID != 7 || logged[0].Purpose != "signal_judge" {
 		t.Fatalf("invocation log = %+v, want one ok record for agent 7 purpose signal_judge", logged)
 	}
-	// System prompt must default to the Phase 2 skeleton when the
+	// System prompt must default to the skeleton when the
 	// agent row carries an empty one.
 	if prov.req.System != SystemPromptSkeleton() {
 		t.Fatalf("provider system prompt did not default to skeleton; got %q", prov.req.System)
@@ -344,7 +344,7 @@ func TestExecuteJudgeRetryKeepsTheAgentsSettings(t *testing.T) {
 }
 
 // TestComposeJudgePromptShape pins the user-prompt JSON shape so the
-// Phase 3 Applier verdict parser can rely on the same input contract
+// Applier verdict parser can rely on the same input contract
 // without a prompt rewrite.
 func TestComposeJudgePromptShape(t *testing.T) {
 	t.Parallel()

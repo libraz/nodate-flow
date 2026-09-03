@@ -1,7 +1,7 @@
 /**
  * Discord personal-integration connect / disconnect flow E2E.
  *
- * Covers the panel wiring added in Phase 7 / P1 of release-8: the new
+ * Covers the Discord integration panel wiring: the new
  * Discord row in apps/flow-web/src/features/settings/integrations-panel.tsx
  * must surface alongside github / slack / google_calendar, accept a
  * Connect click that drives the browser to a discord.com authorize URL,

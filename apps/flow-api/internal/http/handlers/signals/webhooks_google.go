@@ -100,7 +100,7 @@ func HandleGoogleWebhook(deps Deps) http.HandlerFunc {
 		// signals.subject_type NOT NULL satisfied without claiming a more
 		// specific subject than we actually resolved.
 		//
-		// TODO(signal_kinds): once Phase 4 promotes calendar push events to
+		// TODO(signal_kinds): once calendar push events are promoted to
 		// the signal_kinds/calendar.yaml registry and a per-channel
 		// calendar_event resolver is in place, switch to
 		// SignalsSubjectTypeCalendarEvent with the resolved internal id.

@@ -20,7 +20,7 @@ import (
 
 // TestAIProviderFailures exercises POST /workspaces/{wsId}/ai/compile-lens
 // against a per-tenant openai_compat provider whose baseURL points at an
-// httptest.Server that simulates each upstream failure mode. Audit M15.
+// httptest.Server that simulates each upstream failure mode.
 //
 // The shared flow-api test server already wires
 // providers.WorkspaceResolver when NF_FLOW_AI_MOCK is unset, so each
@@ -155,7 +155,7 @@ func TestAIProviderFailures(t *testing.T) {
 // against a fake server that never responds. Lives in its own top-level
 // test so the call to providers.SetHTTPTimeoutForTest cannot race with
 // the parallel sub-tests in TestAIProviderFailures, which would also use
-// providers.sharedClient (audit M15).
+// providers.sharedClient.
 func TestAIProviderFailures_Timeout(t *testing.T) {
 	bootstrap(t)
 	if os.Getenv("NF_FLOW_AI_MOCK") != "" && os.Getenv("NF_FLOW_AI_MOCK") != "0" && os.Getenv("NF_FLOW_AI_MOCK") != "false" {

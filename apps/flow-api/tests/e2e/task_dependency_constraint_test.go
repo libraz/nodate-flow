@@ -23,7 +23,7 @@ func createTask(t *testing.T, accessToken, projectID, title string) string {
 // TestDependencyCycleRejected verifies the documented DAG contract: a
 // direct (A->B then B->A) and a transitive (A->B->C then C->A) cycle are
 // both rejected with WS.TASK.DEPENDENCY_CYCLE, while a parallel same-
-// direction edge stays a DAG and is accepted (P2-1).
+// direction edge stays a DAG and is accepted.
 func TestDependencyCycleRejected(t *testing.T) {
 	bootstrap(t)
 	t.Parallel()
@@ -60,7 +60,7 @@ func TestDependencyCycleRejected(t *testing.T) {
 
 // TestReopenClearsCompletedAt verifies completed_at is cleared when a
 // task leaves the done state via reopen, so non-done tasks never carry a
-// stale completion timestamp (P2-2).
+// stale completion timestamp.
 func TestReopenClearsCompletedAt(t *testing.T) {
 	bootstrap(t)
 	t.Parallel()
@@ -99,7 +99,7 @@ func TestReopenClearsCompletedAt(t *testing.T) {
 // only be deleted through the task path that owns it. Deleting via a
 // sibling task's path returns NOT_FOUND, and a repeated delete on the
 // owning path also returns NOT_FOUND so a no-op is distinguishable from
-// a real delete (P2-3).
+// a real delete.
 func TestDependencyDeleteScopedToPathTask(t *testing.T) {
 	bootstrap(t)
 	t.Parallel()
@@ -136,7 +136,7 @@ func TestDependencyDeleteScopedToPathTask(t *testing.T) {
 
 // TestConstraintDeleteScopedToPathTask mirrors the dependency case for
 // task constraints: a sibling task's path cannot delete a constraint and
-// a repeated delete reports NOT_FOUND (P2-3).
+// a repeated delete reports NOT_FOUND.
 func TestConstraintDeleteScopedToPathTask(t *testing.T) {
 	bootstrap(t)
 	t.Parallel()
@@ -171,7 +171,7 @@ func TestConstraintDeleteScopedToPathTask(t *testing.T) {
 
 // TestAddConstraintRejectsUnparseableExpression verifies an invalid DSL
 // expression is rejected at add time with a CONSTRAINT.PARSE.* code
-// instead of saving with HTTP 200 and being silently inert (P2-4). A
+// instead of saving with HTTP 200 and being silently inert. A
 // well-formed expression on the same task still succeeds.
 func TestAddConstraintRejectsUnparseableExpression(t *testing.T) {
 	bootstrap(t)

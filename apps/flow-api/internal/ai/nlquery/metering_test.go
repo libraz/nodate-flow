@@ -1,6 +1,6 @@
 // Guard + metering tests for the workspace-backed nlquery provider.
 //
-// These lock in audit fix C-2 (H-8 / M-6): the NL-query (compile-lens)
+// These lock in the metering contract: the NL-query (compile-lens)
 // surface must enforce the per-workspace daily budget before billing the
 // provider and must write a redacted ai_invocations row (with cost) for
 // every successful call, exactly like the orchestrator path.

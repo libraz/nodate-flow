@@ -1,4 +1,4 @@
-// View-level test for v_workspace_activity (audit item M8).
+// View-level test for v_workspace_activity.
 // Asserts that audit_logs / ai_invocations / mcp_invocations are
 // projected through a single ListWorkspaceActivity query and that
 // the source filter narrows to a single leg.

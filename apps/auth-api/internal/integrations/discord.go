@@ -18,7 +18,7 @@ const (
 	discordUserURL      = "https://discord.com/api/users/@me"
 )
 
-// discordScopes is the minimal scope set needed by the Phase 8
+// discordScopes is the minimal scope set needed by the
 // presence-discord gateway: identify gives us the user snowflake we
 // bind to the workspace user, guilds lets the gateway recognise the
 // shared guild membership that gates presence events.
@@ -27,7 +27,7 @@ var discordScopes = []string{"identify", "guilds"}
 // DiscordProvider implements [Provider] against Discord's OAuth2
 // flow. Personal Discord connections are presence-binding only —
 // the access token unlocks identity + guild membership for the
-// Phase 8 gateway and is not used to mutate tasks.
+// gateway and is not used to mutate tasks.
 type DiscordProvider struct {
 	clientID     string
 	clientSecret string
@@ -155,7 +155,7 @@ func (p *DiscordProvider) Exchange(ctx context.Context, code, redirectURI string
 	label := discordLabel(u.GlobalName, u.Username, u.Discriminator)
 
 	// metadata_json carries the snowflake + verified_at so the
-	// Phase 8 presence-discord gateway can resolve incoming events
+	// presence-discord gateway can resolve incoming events
 	// via JSON_EXTRACT(metadata_json, '$.external_user_id') without
 	// branching on the provider column. The snowflake is duplicated
 	// into external_account_id for the standard reverse lookup; the

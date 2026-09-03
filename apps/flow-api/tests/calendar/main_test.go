@@ -1,8 +1,8 @@
 // Package calendar contains end-to-end tests for calendar features
 // (calendars, events, attendees, invites, public shares, task<->event
 // sync) running against the merged flow-api router. The suite was
-// migrated from apps/time-api/tests/e2e/ as part of R6 Phase 0 when
-// time-api was folded into flow-api.
+// migrated from apps/time-api/tests/e2e/ when time-api was folded
+// into flow-api.
 //
 // Every test is gated on NF_TEST_INTEGRATION=1 and requires Docker for
 // testcontainers. `go test -short` skips them entirely.

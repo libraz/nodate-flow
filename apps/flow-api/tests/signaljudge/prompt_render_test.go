@@ -1,4 +1,4 @@
-// signal_judge prompt rendering integration tests (Phase 6 / L1).
+// signal_judge prompt rendering integration tests.
 //
 // These tests are the end-to-end deterministic snapshot of the full
 // rendered judge prompt against a real testcontainer MySQL. They wire
@@ -11,7 +11,7 @@
 // apps/flow-api/cmd/api/main.go is NOT yet in place: the judgeRunner
 // constructor leaves [signaljudge.Runner.Prompt] zero-valued, which
 // causes [signaljudge.Runner.renderUserPrompt] to fall back to the
-// Phase 2 [signaljudge.composeJudgePrompt] shape. Until the runner is
+// legacy [signaljudge.composeJudgePrompt] shape. Until the runner is
 // wired with these adapters, the rendered prompt these tests assert is
 // not exercised on the live path. The adapter shapes here mirror what
 // the production wiring will need so the gap is mechanical to close.
@@ -706,8 +706,8 @@ func countBullets(section string) int {
 // rendered prompt contains [REDACTED] markers and does NOT contain any
 // of the secret values.
 //
-// This is the programmatic gate the L1 plan DoD calls for ("secret 0
-// 件" via the audit-secrets skill conceptually).
+// This is the programmatic form of the secret sweep: no operator-
+// supplied secret may reach the provider in a rendered prompt.
 func TestRenderedPromptRedactsSecrets(t *testing.T) {
 	bootstrap(t)
 	t.Parallel()

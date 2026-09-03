@@ -31,7 +31,7 @@ type keysetTaskListResponse struct {
 // TestKeysetHandlerListTasksWorkspace exercises the cursor query
 // parameter on GET /tasks at the HTTP layer (not the SQL layer like
 // TestKeysetPaginationListTasksForWorkspace does). The contract under
-// test is the additive boundary established in Phase 2 of the keyset
+// test is the additive boundary of the keyset
 // rollout: callers that pass `cursor=` get the keyset path and a
 // `nextCursor` in the response; callers that omit it keep getting
 // the OFFSET path. The two paths must enumerate the same set of rows

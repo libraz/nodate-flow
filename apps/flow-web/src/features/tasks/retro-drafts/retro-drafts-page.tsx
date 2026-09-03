@@ -2,8 +2,7 @@
  * RetroDraftsPage — `/workspaces/{wsId}/tasks/drafts`.
  *
  * The retro draft queue surfaces every retrospective task drafted by
- * the signal_judge Applier (Phase 6 / L2 of
- * docs/plan/release-8-signals-and-judge-loop.md). Each row carries:
+ * the signal_judge Applier. Each row carries:
  *
  *   - The draft task's title (linked to its detail page)
  *   - A "Linked to: {source title}" back-reference (linked to the

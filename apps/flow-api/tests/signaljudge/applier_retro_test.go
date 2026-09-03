@@ -1,4 +1,4 @@
-// Package signaljudgetests — Phase 6 / L2 integration coverage for
+// Package signaljudgetests — integration coverage for
 // the production `generate_retro` Applier branch.
 //
 // The fake-only tests in applier_test.go cover the Applier's event

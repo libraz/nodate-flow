@@ -1,6 +1,5 @@
 /**
- * Retro draft queue E2E — Phase 6 / L2 of
- * docs/plan/release-8-signals-and-judge-loop.md.
+ * Retro draft queue E2E.
  *
  * Covers `apps/flow-web/src/features/tasks/retro-drafts/retro-drafts-page.tsx`
  * mounted at `/workspaces/{wsId}/tasks/drafts`. The page lists every

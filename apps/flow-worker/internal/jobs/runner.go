@@ -1,10 +1,9 @@
 // Package jobs hosts the flow-worker job runner and the individual
 // scheduled jobs registered against it.
 //
-// The runner is intentionally small. Phase 5 / W1 lands the scaffold with
-// no real job; W2 plugs in the calendar_event_day materialiser, and later
-// phases register additional jobs by calling Runner.Register before
-// Runner.Start.
+// The runner is intentionally small: jobs register themselves by
+// calling Runner.Register before Runner.Start. The calendar_event_day
+// materialiser is the first such job.
 package jobs
 
 import (
@@ -31,9 +30,9 @@ type Job interface {
 	Tick(ctx context.Context, now time.Time) error
 }
 
-// Runner ticks every registered Job on a shared interval. The W1 scaffold
-// uses a single global interval (configured by NF_FLOW_WORKER_TICK_INTERVAL);
-// later phases may add per-job overrides if a job needs a different cadence.
+// Runner ticks every registered Job on a shared interval configured by
+// NF_FLOW_WORKER_TICK_INTERVAL. There are no per-job overrides; a job
+// needing a different cadence gets its own Runner.
 type Runner struct {
 	// Interval is the period between ticks. Must be > 0.
 	Interval time.Duration
@@ -53,8 +52,8 @@ type Runner struct {
 }
 
 // Register adds a job to the runner. MUST be called before Start; the
-// runner does not support dynamic registration after Start (W2 wires the
-// calendar_event_day job in main and that's the only caller for now).
+// runner does not support dynamic registration after Start (main wires
+// the calendar_event_day job and is the only caller for now).
 func (r *Runner) Register(j Job) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -79,8 +78,8 @@ func (r *Runner) Registered() int {
 // any in-flight tick to drain.
 //
 // When no jobs are registered Start still runs the loop, logging a debug
-// "tick" line per interval. This is intentional for the W1 scaffold so
-// the binary is observably alive before W2 lands a real job.
+// "tick" line per interval. This is intentional so the binary stays
+// observably alive even with no job registered.
 func (r *Runner) Start(ctx context.Context) error {
 	r.mu.Lock()
 	if r.running {
@@ -106,7 +105,7 @@ func (r *Runner) Start(ctx context.Context) error {
 
 // loop runs the tick cycle until ctx is cancelled. Each tick runs all
 // registered jobs sequentially so a slow job delays the next cycle; this
-// keeps the runner simple for W1. If a future job needs isolated cadence
+// keeps the runner simple. If a future job needs isolated cadence
 // it can be registered as a separate Runner instance.
 func (r *Runner) loop(ctx context.Context, jobs []Job) {
 	defer close(r.done)

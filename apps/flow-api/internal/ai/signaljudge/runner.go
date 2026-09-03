@@ -78,7 +78,7 @@ type AgentLookup interface {
 // AgentSnapshot is the minimal projection of an ai_agents row the
 // runner needs to compose a judge invocation. system_prompt is taken
 // from the row when non-empty so workspace admins can override the
-// Phase 2 SystemPromptSkeleton without code edits; an empty value
+// default SystemPromptSkeleton without code edits; an empty value
 // falls back to the skeleton.
 type AgentSnapshot struct {
 	WorkspaceID  uint32
@@ -96,7 +96,7 @@ type AgentSnapshot struct {
 // signal payload by internal id. The production adapter does a single
 // SELECT against signals and returns the workspace id, kind, and
 // payload_json. The runner uses these to build the judge prompt; the
-// Applier (Phase 3 / J4) will read the verdict back from agent_runs.
+// Applier will read the verdict back from agent_runs.
 type SignalLookup interface {
 	Load(ctx context.Context, workspaceID uint32, signalID int64) (SignalSnapshot, error)
 }
@@ -111,8 +111,8 @@ type SignalSnapshot struct {
 	// string. The Applier embeds it in payload strings (retro task
 	// title, debug logs) so the timeline can render the lineage
 	// without an extra join. Empty when the lookup adapter did not
-	// populate it (e.g. early Phase 2 deployments before the column
-	// projection was widened).
+	// populate it (e.g. deployments predating the widened column
+	// projection).
 	PublicID     string
 	WorkspaceID  uint32
 	Kind         string
@@ -126,11 +126,11 @@ type SignalSnapshot struct {
 // Runner executes one signal_judge agent tick. It is the production
 // adapter behind the OrchestratorRunner's dispatch branch for the
 // signal_judge kind. The runner does not write events — only the
-// Applier (Phase 3 / J4) does — and it does not write to signals
+// Applier does — and it does not write to signals
 // either; for now the verdict is logged via the InvocationLogger so
 // every judge run produces an audit-visible ai_invocations row.
 //
-// As of Phase 3 / J4, the runner parses the LLM response into a
+// The runner parses the LLM response into a
 // [Verdict] and forwards it to [Applier.Apply] when one is wired. The
 // runner itself still never writes events — every event the verdict
 // produces is appended by the Applier via [eventbus.AppendJudgeEvent],
@@ -156,11 +156,11 @@ type Runner struct {
 	// case rather than rejecting the verdict.
 	RunIDFromContext func(ctx context.Context) uint32
 	// Prompt configures the per-run context window the runner
-	// renders alongside the system prompt (Phase 6 / L1). Every
+	// renders alongside the system prompt. Every
 	// field on [PromptDeps] is optional; an empty value collapses
 	// the relevant context section so the runner can be wired
 	// progressively. When the entire struct is zero-valued the
-	// runner falls back to the Phase 2 [composeJudgePrompt] shape
+	// runner falls back to the legacy [composeJudgePrompt] shape
 	// (a JSON-serialised signal snapshot only) so legacy callers
 	// that have not yet wired the lookups keep working.
 	Prompt PromptDeps
@@ -187,11 +187,11 @@ var ErrSignalMissing = errors.New("signaljudge: signal not found")
 // ExecuteJudge runs one judge tick for the given (agent, signal)
 // pair. It loads the agent + signal snapshots, enforces the cost
 // guard, resolves the workspace's default LLM provider, builds the
-// minimal Phase 2 prompt, invokes the provider, logs the redacted
+// minimal prompt, invokes the provider, logs the redacted
 // invocation, and returns the ExecutionResult the OrchestratorRunner
 // uses for memo bookkeeping / handoff decisions.
 //
-// The function does not write events; the Applier (Phase 3 / J4)
+// The function does not write events; the Applier
 // owns event emission. The function does not write to signals
 // either; persisting judge_output_json is also Applier work.
 func (r *Runner) ExecuteJudge(ctx context.Context, workspaceID, agentID uint32, signalID int64) (agentruntime.ExecutionResult, error) {
@@ -343,7 +343,7 @@ func (r *Runner) ExecuteJudge(ctx context.Context, workspaceID, agentID uint32, 
 		// through the Applier's SignalRejected path.
 	}
 
-	// Phase 3 / J4 — once an Applier is wired, translate the LLM
+	// Once an Applier is wired, translate the LLM
 	// response into a [Verdict] and let the Applier reify it. The
 	// runner stays write-free for events/signals; everything from
 	// here on is the Applier's responsibility.
@@ -403,8 +403,8 @@ func (r *Runner) shouldRetry(text string) bool {
 // renderUserPrompt builds the user-message body. When the [Runner]
 // has been configured with [PromptDeps] (any non-nil lookup), it
 // invokes [BuildPromptContext] + [RenderUserPrompt] for the full
-// Phase 6 context window. Otherwise it falls back to the legacy
-// Phase 2 [composeJudgePrompt] shape — a JSON-serialised signal
+// full context window. Otherwise it falls back to the legacy
+// [composeJudgePrompt] shape — a JSON-serialised signal
 // snapshot only — so callers that have not yet wired the lookups
 // keep working unchanged.
 func (r *Runner) renderUserPrompt(ctx context.Context, sig SignalSnapshot) (string, error) {
@@ -461,12 +461,12 @@ func (r *Runner) logInvocation(ctx context.Context, rec InvocationRecord) {
 	r.Log(ctx, rec)
 }
 
-// composeJudgePrompt assembles the Phase 2 user-prompt body the judge
+// composeJudgePrompt assembles the fallback user-prompt body the judge
 // sees alongside its system prompt. The shape is intentionally a
-// JSON-serialised signal snapshot — Phase 6 / L1 will layer the
+// JSON-serialised signal snapshot; [RenderUserPrompt] layers the
 // workspace context window, recent events, and active lenses on top.
 //
-// Returning a JSON-shaped prompt now gives the Phase 3 Applier a
+// Returning a JSON-shaped prompt gives the Applier a
 // stable input contract to write a structured-output verdict parser
 // against without a prompt rewrite.
 func composeJudgePrompt(s SignalSnapshot) (string, error) {

@@ -26,8 +26,8 @@ import (
 	"time"
 )
 
-// systemPrompt is the production signal_judge system prompt (Phase 6
-// / L1). It is intentionally long, factual, and procedural: every
+// systemPrompt is the production signal_judge system prompt. It is
+// intentionally long, factual, and procedural: every
 // rule the Applier later enforces (closed action enum, confidence
 // range, target task requirement per action) is also surfaced to the
 // model so structured-output models can lock to the schema embedded
@@ -174,8 +174,8 @@ func SystemPrompt() string {
 	return systemPrompt
 }
 
-// SystemPromptSkeleton is the legacy alias retained for callers wired
-// during Phase 2. New code should call [SystemPrompt] directly; the
+// SystemPromptSkeleton is the legacy alias retained for older callers.
+// New code should call [SystemPrompt] directly; the
 // alias forwards to the same string so existing tests stay green.
 func SystemPromptSkeleton() string {
 	return systemPrompt
@@ -286,9 +286,8 @@ const (
 // the rest of the system to fill in the per-run context. Every field
 // is optional: a nil lookup just yields an empty section in the
 // rendered prompt rather than an error. This lets the runner be
-// wired progressively — Phase 6 wires the recent-tasks lookup, Phase
-// 7 wires the linked-tasks lookup, and the judge keeps working in
-// the meantime with whatever subset is available.
+// wired progressively — each lookup binds independently and the
+// judge keeps working with whatever subset is available.
 type PromptDeps struct {
 	// RecentTasks loads the most recent tasks in the workspace.
 	// Implementations should return at most MaxRecentTasks rows;

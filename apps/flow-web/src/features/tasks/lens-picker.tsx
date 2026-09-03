@@ -6,8 +6,7 @@
  * roles. The picker is still feature-local because the savedviews CRUD
  * shape is tasks-specific.
  *
- * The L1 fix lifts `aria-selected` from a hardcoded `false` to a real
- * comparison between the current task filters and each lens's stored
+ * `aria-selected` is a real comparison between the current task filters and each lens's stored
  * filter map.
  */
 

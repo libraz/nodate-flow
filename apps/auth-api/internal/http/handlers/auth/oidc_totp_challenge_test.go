@@ -11,12 +11,12 @@ import (
 	"github.com/libraz/nodate-flow/apps/auth-api/internal/db/types"
 )
 
-// TestOIDCCallback_2FAAccountReturnsChallenge proves the L-3 fix: an OIDC
+// TestOIDCCallback_2FAAccountReturnsChallenge proves that an OIDC
 // callback that resolves a linked account which enrolled app-level TOTP
 // must NOT issue session tokens. It returns a totp_required step-up
 // challenge instead, forcing the second factor — closing the bypass
-// where an OIDC sign-in could defeat the user's opted-in 2FA (same root
-// as H-11 / B-2, which fixed the magic-link path).
+// where an OIDC sign-in could defeat the user's opted-in 2FA. The
+// magic-link path enforces the same rule.
 func TestOIDCCallback_2FAAccountReturnsChallenge(t *testing.T) {
 	t.Parallel()
 	db := requireB2DB(t)
@@ -82,7 +82,7 @@ func TestOIDCCallback_NoMFACompletesDirectly(t *testing.T) {
 	ctx := context.Background()
 
 	// A brand-new email with no local TOTP enrollment.
-	newEmail := "oidc-l3-" + types.New().String() + "@example.test"
+	newEmail := "oidc-nomfa-" + types.New().String() + "@example.test"
 	const ghSub = "gh-no-totp-subject-6006"
 	deps.OIDCGithub = &fakeGithubExchanger{
 		claims: &internauth.GithubClaims{

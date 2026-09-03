@@ -1,5 +1,4 @@
-// Integration tests for the presence-discord gateway. Phase 8 / P8-5
-// of docs/plan/release-8-signals-and-judge-loop.md.
+// Integration tests for the presence-discord gateway.
 //
 // Scope:
 //
@@ -18,7 +17,7 @@
 // The suite deliberately avoids:
 //
 //   - testcontainers MySQL — the worker has no DB connection of its own
-//     (P8-1 decision); the fake flow-api below is the entire data plane,
+//     by design; the fake flow-api below is the entire data plane,
 //   - a real Discord WS — synthetic PresenceUpdate events are dispatched
 //     through the gateway's test seam (apps/presence-discord/internal/
 //     gateway/testseam.go), which feeds the production handler chain

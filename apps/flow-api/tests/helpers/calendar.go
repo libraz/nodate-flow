@@ -1,5 +1,5 @@
 // Calendar-specific test helpers, ported from the pre-merge time-api
-// test harness when calendar moved into flow-api (R6 Phase 0). The
+// test harness when calendar moved into flow-api. The
 // public surface is intentionally narrow: only what calendar e2e tests
 // need beyond the standard auth-api register flow used by
 // CreateTestTenant.
@@ -38,15 +38,13 @@ type CalendarTestTenant struct {
 // through the API, then resolves the internal ids the calendar tests
 // need out of the resulting rows.
 //
-// It used to INSERT the user, the workspace and the owner membership
-// with sqlc and hand-sign a JWT, which is what time-api had to do
-// before the services merged. Carried forward into flow-api, that
-// bypassed POST /workspaces — and POST /workspaces is where a workspace
-// gets its personal calendar (EnsurePersonalCalendar). So the whole
-// register → create workspace → provision personal calendar chain went
-// unexercised by every calendar test in this package, which is exactly
-// the wiring those tests exist to protect. Going through
-// CreateTestTenant puts them back on the production path.
+// It must go through CreateTestTenant rather than INSERT the user, the
+// workspace and the owner membership with sqlc and hand-sign a JWT.
+// POST /workspaces is where a workspace gets its personal calendar
+// (EnsurePersonalCalendar), so a seed that writes the rows directly
+// leaves the whole register → create workspace → provision personal
+// calendar chain unexercised by every calendar test in this package —
+// which is exactly the wiring those tests exist to protect.
 func CreateCalendarTestTenant(t *testing.T, srv *TestServer) *CalendarTestTenant {
 	t.Helper()
 
@@ -217,9 +215,9 @@ func ResolveWorkspaceInternalID(t *testing.T, db *sql.DB, wsPublicIDStr string) 
 	return id
 }
 
-// RandomHex returns a random hex string of 2*n characters. Re-exported
-// so calendar tests that previously called helpers.RandomHex (in
-// time-api) keep working without renaming.
+// RandomHex returns a random hex string of 2*n characters. Exported
+// wrapper over the package-private generator, for calendar tests
+// outside this package.
 func RandomHex(n int) string {
 	return randomHex(n)
 }

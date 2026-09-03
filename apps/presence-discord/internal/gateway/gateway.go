@@ -1,7 +1,7 @@
 // Package gateway hosts the Discord gateway WebSocket bridge that
 // translates presence updates into signals POSTed to flow-api.
 //
-// P8-2 fills in the discordgo wiring, the per-user debounce table,
+// The package owns the discordgo wiring, the per-user debounce table,
 // and the HTTP emitter that calls POST /signals (with a separate
 // lookup against GET /internal/users/by-discord/{snowflake} to map a
 // Discord snowflake to a flow user public id).

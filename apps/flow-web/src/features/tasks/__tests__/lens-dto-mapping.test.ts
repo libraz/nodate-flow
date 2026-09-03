@@ -1,5 +1,5 @@
 /**
- * Verify the toLensDto mapper handles null/undefined fields correctly (M9).
+ * Verify the toLensDto mapper handles null/undefined fields correctly.
  *
  * The toLensDto function is module-private (not exported), so we test its
  * behavior indirectly by reading the source code to ensure it:

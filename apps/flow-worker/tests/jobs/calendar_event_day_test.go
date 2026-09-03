@@ -353,7 +353,7 @@ func TestDedupeOnRetick(t *testing.T) {
 }
 
 // TestWorkspaceTimezoneBoundary pins the per-workspace day boundary
-// against the documented Tokyo + UTC pair from the W2 brief. The fixed
+// against the documented Tokyo + UTC pair. The fixed
 // clock instant 2026-05-17T15:30:00Z lands on 2026-05-18 in Tokyo and
 // 2026-05-17 in UTC, so each workspace must receive exactly one signal
 // whose external_id carries its own local YYYY-MM-DD. A regression in
@@ -628,7 +628,7 @@ func signalsForOccurrenceDay(rows []signalRow, day string) []signalRow {
 	return out
 }
 
-// TestRecurringEventFiresOnNonBaseDay is the core P2-8 fix: a daily recurring
+// TestRecurringEventFiresOnNonBaseDay covers recurrence expansion: a daily recurring
 // event must emit event_day_arrived on a day after its base start day. The
 // base sits two days before the tick window; the worker must expand the rule
 // and fire the occurrence whose local day the tick just crossed, with the

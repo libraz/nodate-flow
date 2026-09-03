@@ -34,8 +34,8 @@ func TestFetchGithubPrimaryVerifiedEmail_ReturnsVerifiedPrimary(t *testing.T) {
 }
 
 // TestFetchGithubPrimaryVerifiedEmail_RejectsUnverifiedPrimary is the
-// regression for the audit finding: when the primary email is not
-// verified, the helper must surface ErrGithubEmailNotVerified so the
+// regression guard for unverified primaries: when the primary email is
+// not verified, the helper must surface ErrGithubEmailNotVerified so the
 // callback can map it to AUTH.OIDC.EMAIL_NOT_VERIFIED rather than
 // silently auto-provisioning an account against an unverified address.
 func TestFetchGithubPrimaryVerifiedEmail_RejectsUnverifiedPrimary(t *testing.T) {

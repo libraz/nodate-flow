@@ -1,7 +1,8 @@
 /**
- * UI audit regression tests for flow-web.
+ * Cross-route rendering regression tests for flow-web.
  *
- * Covers issues discovered during the comprehensive UI audit:
+ * Each case guards a surface that previously shipped raw i18n keys or
+ * an empty shell:
  * - Not-found page renders properly (no raw i18n keys)
  * - Today view renders sections (not i18n keys)
  * - Home/index page renders dashboard elements

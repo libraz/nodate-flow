@@ -16,7 +16,7 @@
 // no white-box access to the unexported handler, sink or factory
 // fields. Without this seam tests would have to either reimplement
 // discordgo's WS protocol or move into package gateway, both of
-// which the Phase 8 / P8-5 plan explicitly calls out as undesirable.
+// would be worse than the seam itself.
 package gateway
 
 import (

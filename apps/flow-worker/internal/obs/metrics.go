@@ -1,4 +1,4 @@
-// Metrics surface for flow-worker. W1 ships only the up gauge; the
+// Metrics surface for flow-worker. Only the up gauge lives here; the
 // per-job counters live with their job under internal/jobs and register
 // against the same default Prometheus registry exposed by Handler().
 package obs
@@ -38,9 +38,9 @@ var JobsRegisteredGauge = prometheus.NewGauge(prometheus.GaugeOpts{
 })
 
 // CalendarEventDayTicksTotal counts how many times the calendar event-day
-// job has executed a tick, partitioned by outcome. W2 increments this from
-// the job's Tick implementation; W1 only registers the metric so it shows
-// up in /metrics output as soon as the binary boots.
+// job has executed a tick, partitioned by outcome. The job's Tick
+// implementation increments it; registering it here means it shows up
+// in /metrics output as soon as the binary boots.
 //
 // status values:
 //   - "ok"      — tick scanned events and emitted (or skipped via dedupe) cleanly.
@@ -48,9 +48,9 @@ var JobsRegisteredGauge = prometheus.NewGauge(prometheus.GaugeOpts{
 //   - "skipped" — tick decided there was nothing to do (e.g. no workspaces).
 //
 // The workspace dimension is intentionally omitted: high-cardinality and
-// out of scope for the v1 SLO. Per-workspace tick observability is a
-// Phase 9+ concern when multiple jobs land and operators need per-tenant
-// dashboards.
+// out of scope for the v1 SLO. Per-workspace tick observability only
+// becomes worth the cardinality once multiple jobs land and operators
+// need per-tenant dashboards.
 //
 //nolint:gochecknoglobals // process-wide metric, matches flow-api pattern.
 var CalendarEventDayTicksTotal = prometheus.NewCounterVec(

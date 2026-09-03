@@ -1,6 +1,6 @@
 // Package events contains Huma operation handlers for the
 // /workspaces/{wsId}/events/* endpoints. Today the only operation is
-// the J5 reversal flow (POST .../events/{eventPublicId}/reverse) per
+// the reversal flow (POST .../events/{eventPublicId}/reverse) per
 // ADR 0008 D4 — listing events lives in the timeline package and is
 // scoped per task / project / workspace there.
 package events

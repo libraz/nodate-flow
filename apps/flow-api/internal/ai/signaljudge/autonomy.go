@@ -1,4 +1,4 @@
-// Package signaljudge — production AutonomyResolver (Phase 4 / A1).
+// Package signaljudge — production AutonomyResolver.
 //
 // [RuleBackedResolver] implements [AutonomyResolver] by consulting the
 // five-layer resolution order documented in docs/conventions/autonomy.md:
@@ -19,8 +19,8 @@
 //
 // Within L1-L3, if the matched row carries a non-NULL
 // auto_action_rules.autonomy_level the resolver returns that value
-// verbatim and skips the confidence-vs-threshold comparison entirely
-// (Phase 4 / A2). NULL preserves the legacy confidence-based
+// verbatim and skips the confidence-vs-threshold comparison entirely.
+// NULL preserves the legacy confidence-based
 // derivation so existing rules behave as before.
 package signaljudge
 
@@ -114,9 +114,8 @@ type matchedRule struct {
 //     verbatim. Unknown kinds fall back to AutonomySuggest, the
 //     safest level (no action, just surface).
 //
-// Phase 4 / Phase 6 will populate MaxProposedEvents once the
-// auto_action_rules schema gains the field; today the resolver
-// returns 0 (no cap).
+// MaxProposedEvents stays 0 (no cap) until auto_action_rules gains a
+// column to populate it from.
 func (r *RuleBackedResolver) Resolve(ctx context.Context, workspaceID uint32, kind signalkinds.Kind, confidence float64) (AutonomyDecision, error) {
 	if r == nil || r.Rules == nil {
 		// Defensive: a nil resolver or missing dependency should not

@@ -7,7 +7,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// TestSignalDuplicateCreateIsIdempotent verifies the P3-2 / H-13 fix: a
+// TestSignalDuplicateCreateIsIdempotent verifies the dedupe contract: a
 // duplicate POST /signals (same workspace-scoped dedupe key
 // workspace_id+source+external_id) must NOT mint a fresh throwaway
 // public_id and must NOT write a second audit row. The server detects the

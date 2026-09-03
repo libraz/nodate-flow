@@ -1,6 +1,6 @@
 // Command worker is the entry point for the nodate-flow scheduled job
-// runner. It hosts cron-like jobs (calendar_event_day materialiser in W2,
-// future ones in later phases) that previously lived inline in flow-api.
+// runner. It hosts cron-like jobs (the calendar_event_day materialiser
+// today) that previously lived inline in flow-api.
 //
 // Wiring mirrors apps/flow-api/cmd/api/main.go: config → logger → tracer →
 // MySQL → metrics server → job runner → signal-driven graceful shutdown.

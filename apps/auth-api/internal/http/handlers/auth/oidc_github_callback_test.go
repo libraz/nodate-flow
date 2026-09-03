@@ -67,7 +67,7 @@ func TestOIDCGithubCallback_PassesNonceFromState(t *testing.T) {
 
 	assert.Equal(t, "auth-code", gh.gotCode, "code must be forwarded verbatim")
 	assert.Equal(t, wantNonce, gh.gotNonce,
-		"nonce decoded from the signed state must be forwarded to Exchange (was discarded before the audit fix)")
+		"nonce decoded from the signed state must be forwarded to Exchange")
 }
 
 // TestOIDCGithubCallback_RejectsUnverifiedEmail asserts the callback

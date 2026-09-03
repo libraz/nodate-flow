@@ -82,7 +82,7 @@ func (s *stubRefreshSessions) RevokeAllForUser(_ context.Context, userID uint32)
 	return nil
 }
 
-// TestRefresh_RejectsIdleSessionPastTimeout is the regression for L2:
+// TestRefresh_RejectsIdleSessionPastTimeout is the idle-timeout regression:
 // a session whose last_used_at is older than [sessionIdleTimeout] must
 // fail refresh with TOKEN.REFRESH_EXPIRED, even when the wall-clock
 // expires_at is still in the future. This stops a stolen refresh
@@ -120,7 +120,7 @@ func TestRefresh_RejectsIdleSessionPastTimeout(t *testing.T) {
 
 // TestRefresh_AcceptsActiveSession is the happy-path counterpart: a
 // session used recently must pass the idle-timeout gate. Without this
-// the L2 fix would lock everyone out on the next refresh.
+// the idle-timeout gate would lock everyone out on the next refresh.
 //
 // We do not exercise the post-gate code paths (RotateRefreshHash, JWT
 // re-sign, FindUserPublicIdById) — those need a real DB and are

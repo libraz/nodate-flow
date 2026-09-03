@@ -38,7 +38,7 @@ type Account struct {
 	// Metadata is optional provider-specific binding metadata,
 	// persisted verbatim into user_integrations.metadata_json. It is
 	// the carrier for queries that must look up integration rows by
-	// a provider-defined key (e.g. the Phase 8 presence-discord
+	// a provider-defined key (e.g. the presence-discord
 	// gateway resolves Discord events via
 	// JSON_EXTRACT(metadata_json, '$.external_user_id')). Providers
 	// that have nothing to store leave this nil.

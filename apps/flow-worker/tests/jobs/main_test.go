@@ -1,6 +1,5 @@
 // Package jobs hosts the cross-binary integration tests for the
-// flow-worker job set (Phase 5 / W2 of
-// docs/plan/release-8-signals-and-judge-loop.md). Unlike the unit tests
+// flow-worker job set. Unlike the unit tests
 // next to each job in apps/flow-worker/internal/jobs/<job>/, these tests:
 //
 //   - boot a real MySQL testcontainer with the full nodate-flow schema,
