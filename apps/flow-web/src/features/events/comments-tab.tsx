@@ -31,6 +31,7 @@ import { toaster } from '@nodate-flow/ui/primitives/toast';
 import { type ReactElement, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { formatApiError } from '../../lib/api-error';
 import { confirmAction } from '../../lib/confirm-action';
 import { formatEpochDateTime } from '../../lib/format';
 import { selectUser, useAuth } from '../auth/auth-store';
@@ -112,8 +113,11 @@ function EventCommentRow({
         body: trimmed,
       });
       setEditing(false);
-    } catch {
-      toaster.show({ tone: 'danger', message: t('event.comments.edit_error') });
+    } catch (err) {
+      toaster.show({
+        tone: 'danger',
+        message: formatApiError(err, t, 'event.comments.edit_error'),
+      });
     }
   };
 
@@ -131,8 +135,11 @@ function EventCommentRow({
         commentId: comment.id,
       });
       toaster.show({ tone: 'success', message: t('event.comments.delete_success') });
-    } catch {
-      toaster.show({ tone: 'danger', message: t('event.comments.delete_error') });
+    } catch (err) {
+      toaster.show({
+        tone: 'danger',
+        message: formatApiError(err, t, 'event.comments.delete_error'),
+      });
     }
   };
 
@@ -236,8 +243,8 @@ export default function CommentsTab({
         body: trimmed,
       });
       setDraft('');
-    } catch {
-      toaster.show({ tone: 'danger', message: t('event.comments.add_error') });
+    } catch (err) {
+      toaster.show({ tone: 'danger', message: formatApiError(err, t, 'event.comments.add_error') });
     }
   };
 

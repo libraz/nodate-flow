@@ -31,7 +31,7 @@ import { type ReactElement, useRef, useState } from 'react';
 import { ErrorBoundary } from 'react-error-boundary';
 import { useTranslation } from 'react-i18next';
 
-import { ApiError } from '../../../lib/api-error';
+import { ApiError, formatApiError } from '../../../lib/api-error';
 import EventPicker from './event-picker';
 import { useCollapsibleState } from './hooks/use-collapsible-state';
 import { useLinkEvent } from './hooks/use-link-event';
@@ -145,8 +145,8 @@ function LinkedEventsSectionImpl({
         onSuccess: () => {
           toaster.show({ tone: 'success', message: t('toast.unlinked', { title }) });
         },
-        onError: () => {
-          toaster.show({ tone: 'danger', message: t('toast.unlinkFailed') });
+        onError: (err) => {
+          toaster.show({ tone: 'danger', message: formatApiError(err, t, 'toast.unlinkFailed') });
         },
       },
     );

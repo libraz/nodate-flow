@@ -11,6 +11,7 @@ import type { TFunction } from 'i18next';
 import type { ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { formatApiError } from '../../lib/api-error';
 import { confirmAction } from '../../lib/confirm-action';
 import {
   type SessionSummary,
@@ -145,8 +146,11 @@ export default function SessionsPanel(): ReactElement {
     try {
       await revokeOne.mutateAsync(id);
       toaster.show({ tone: 'success', message: t('security.sessions.revoked') });
-    } catch {
-      toaster.show({ tone: 'danger', message: t('security.sessions.errors.revoke_failed') });
+    } catch (err) {
+      toaster.show({
+        tone: 'danger',
+        message: formatApiError(err, t, 'security.sessions.errors.revoke_failed'),
+      });
     }
   };
 
@@ -158,8 +162,11 @@ export default function SessionsPanel(): ReactElement {
         tone: 'success',
         message: t('security.sessions.revoked_all', { count: revoked }),
       });
-    } catch {
-      toaster.show({ tone: 'danger', message: t('security.sessions.errors.revoke_all_failed') });
+    } catch (err) {
+      toaster.show({
+        tone: 'danger',
+        message: formatApiError(err, t, 'security.sessions.errors.revoke_all_failed'),
+      });
     }
   };
 

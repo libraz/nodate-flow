@@ -28,6 +28,7 @@ import { toaster } from '@nodate-flow/ui/primitives/toast';
 import { type ChangeEvent, type ReactElement, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { formatApiError } from '../../lib/api-error';
 import { confirmAction } from '../../lib/confirm-action';
 import { formatEpochDateTime } from '../../lib/format';
 import {
@@ -102,8 +103,11 @@ function AttachmentRow({
         attachmentId: attachment.id,
       });
       toaster.show({ tone: 'success', message: t('event.attachments.delete_success') });
-    } catch {
-      toaster.show({ tone: 'danger', message: t('event.attachments.delete_error') });
+    } catch (err) {
+      toaster.show({
+        tone: 'danger',
+        message: formatApiError(err, t, 'event.attachments.delete_error'),
+      });
     }
   };
 
@@ -116,8 +120,11 @@ function AttachmentRow({
         attachmentId: attachment.id,
       });
       window.open(url, '_blank');
-    } catch {
-      toaster.show({ tone: 'danger', message: t('event.attachments.download_error') });
+    } catch (err) {
+      toaster.show({
+        tone: 'danger',
+        message: formatApiError(err, t, 'event.attachments.download_error'),
+      });
     }
   };
 
@@ -192,8 +199,11 @@ export default function AttachmentsTab({
           ? t('event.attachments.upload_dedup_success')
           : t('event.attachments.upload_success'),
       });
-    } catch {
-      toaster.show({ tone: 'danger', message: t('event.attachments.upload_error') });
+    } catch (err) {
+      toaster.show({
+        tone: 'danger',
+        message: formatApiError(err, t, 'event.attachments.upload_error'),
+      });
     }
     // Reset the input so the same file can be re-selected.
     if (fileInputRef.current) {

@@ -13,6 +13,7 @@ import { Link, useNavigate } from '@tanstack/react-router';
 import { type FormEvent, type ReactElement, Suspense, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { formatApiError } from '../../lib/api-error';
 import { confirmAction } from '../../lib/confirm-action';
 import { type TaskDerivedState, useTasksQuery } from '../tasks/api';
 import { STATE_COLOR } from '../tasks/constants';
@@ -63,8 +64,11 @@ function SettingsPanel({ id }: { id: string }): ReactElement {
     setSubmitting(true);
     try {
       await update.mutateAsync({ id, patch: { name: trimmedName } });
-    } catch {
-      toaster.show({ tone: 'danger', message: t('projects.errors.update_failed') });
+    } catch (err) {
+      toaster.show({
+        tone: 'danger',
+        message: formatApiError(err, t, 'projects.errors.update_failed'),
+      });
     } finally {
       setSubmitting(false);
     }
@@ -75,8 +79,11 @@ function SettingsPanel({ id }: { id: string }): ReactElement {
     try {
       await disable.mutateAsync(id);
       void navigate({ to: '/workspaces' });
-    } catch {
-      toaster.show({ tone: 'danger', message: t('projects.errors.disable_failed') });
+    } catch (err) {
+      toaster.show({
+        tone: 'danger',
+        message: formatApiError(err, t, 'projects.errors.disable_failed'),
+      });
     }
   };
 

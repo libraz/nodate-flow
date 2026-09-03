@@ -18,6 +18,7 @@ import { Day, type Zone } from '@nodate-flow/ui/time';
 import { type ReactElement, Suspense, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { formatApiError } from '../../lib/api-error';
 import { endOfDayIso, startOfDayIso } from '../../lib/date-utils';
 import { formatDate } from '../../lib/format';
 import { useEffectiveZone } from '../../lib/use-effective-timezone';
@@ -187,10 +188,10 @@ function PickerBody({
       });
       setSelected(new Set());
       onClose();
-    } catch {
+    } catch (err) {
       toaster.show({
         tone: 'danger',
-        message: t('workspace.public_shares.detail.errors.attach_failed'),
+        message: formatApiError(err, t, 'workspace.public_shares.detail.errors.attach_failed'),
       });
     }
   };

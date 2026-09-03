@@ -15,6 +15,7 @@ import type { ColumnDef } from '@tanstack/react-table';
 import { type ReactElement, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { formatApiError } from '../../lib/api-error';
 import { formatEpoch } from '../../lib/format';
 import { selectUser, useAuth } from '../auth/auth-store';
 import { type ProjectMember, useProjectMembersQuery, useRemoveProjectMember } from './api';
@@ -42,8 +43,11 @@ export default function ProjectMembersTable({ projectId }: ProjectMembersTablePr
     try {
       await removeMember.mutateAsync({ id: projectId, userId: member.userId });
       toaster.show({ tone: 'success', message: t('projects.members.removed') });
-    } catch {
-      toaster.show({ tone: 'danger', message: t('projects.members.remove_failed') });
+    } catch (err) {
+      toaster.show({
+        tone: 'danger',
+        message: formatApiError(err, t, 'projects.members.remove_failed'),
+      });
     }
   };
 

@@ -15,6 +15,7 @@ import { toaster } from '@nodate-flow/ui/primitives/toast';
 import { type FormEvent, type ReactElement, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { formatApiError } from '../../lib/api-error';
 import { useUpdateAiProvider } from './api';
 
 export interface ProviderRotateDialogProps {
@@ -50,8 +51,8 @@ export default function ProviderRotateDialog({
       setApiKey('');
       toaster.show({ tone: 'success', message: t('providers.toast.rotated') });
       onClose();
-    } catch {
-      toaster.show({ tone: 'danger', message: t('providers.toast.error') });
+    } catch (err) {
+      toaster.show({ tone: 'danger', message: formatApiError(err, t, 'providers.toast.error') });
     } finally {
       setSubmitting(false);
     }

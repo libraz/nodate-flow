@@ -36,6 +36,7 @@ import { ArrowLeft, GripVertical, Plus } from 'lucide-react';
 import { type CSSProperties, type ReactElement, Suspense, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { formatApiError } from '../../lib/api-error';
 import { confirmAction } from '../../lib/confirm-action';
 import AddEventsDialog from './add-events-dialog';
 import {
@@ -118,10 +119,10 @@ export default function ShareDetail({ workspaceId, shareId }: ShareDetailProps):
     reorder.mutate(
       next.map((e) => e.linkId),
       {
-        onError: () => {
+        onError: (err) => {
           toaster.show({
             tone: 'danger',
-            message: t('workspace.public_shares.detail.errors.reorder_failed'),
+            message: formatApiError(err, t, 'workspace.public_shares.detail.errors.reorder_failed'),
           });
         },
       },
@@ -182,10 +183,10 @@ export default function ShareDetail({ workspaceId, shareId }: ShareDetailProps):
     try {
       await detach.mutateAsync(event.eventId);
       toaster.show({ tone: 'success', message: t('workspace.public_shares.detail.detached') });
-    } catch {
+    } catch (err) {
       toaster.show({
         tone: 'danger',
-        message: t('workspace.public_shares.detail.errors.detach_failed'),
+        message: formatApiError(err, t, 'workspace.public_shares.detail.errors.detach_failed'),
       });
     }
   };

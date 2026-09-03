@@ -21,6 +21,7 @@ import { Link } from '@tanstack/react-router';
 import type { ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { formatApiError } from '../../lib/api-error';
 import { confirmAction } from '../../lib/confirm-action';
 import { useWorkspacesQuery, type Workspace } from '../workspaces/api';
 import styles from './active-timebox-bar.module.css';
@@ -89,8 +90,11 @@ function ActiveTimeboxBarInner({ workspaces }: { workspaces: Workspace[] }): Rea
         status: 'completed',
       });
       toaster.show({ tone: 'success', message: t('active_timebox_bar.stop_success') });
-    } catch {
-      toaster.show({ tone: 'danger', message: t('timeboxes.transition.error') });
+    } catch (err) {
+      toaster.show({
+        tone: 'danger',
+        message: formatApiError(err, t, 'timeboxes.transition.error'),
+      });
     }
   };
 

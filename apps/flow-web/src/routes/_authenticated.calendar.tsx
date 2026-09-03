@@ -64,7 +64,7 @@ import type { TaskDerivedState } from '../features/tasks/api';
 import { STATE_COLOR } from '../features/tasks/constants';
 import { useWorkspacesQuery } from '../features/workspaces/api';
 import { apiRequest } from '../lib/api';
-import type { ApiError } from '../lib/api-error';
+import { type ApiError, formatApiError } from '../lib/api-error';
 import { dateKey, endOfDayIso, startOfDayIso, todayKey } from '../lib/date-utils';
 import { useActiveWorkspaceId } from '../lib/use-current-workspace';
 import { resolveEffectiveZone } from '../lib/use-effective-timezone';
@@ -621,8 +621,11 @@ function CalendarRoute(): ReactElement {
           onSuccess: () => {
             toaster.show({ tone: 'success', message: t('calendar.event_move_success') });
           },
-          onError: () => {
-            toaster.show({ tone: 'danger', message: t('calendar.event_move_error') });
+          onError: (err) => {
+            toaster.show({
+              tone: 'danger',
+              message: formatApiError(err, t, 'calendar.event_move_error'),
+            });
           },
         },
       );

@@ -29,6 +29,7 @@ import { toaster } from '@nodate-flow/ui/primitives/toast';
 import { type ReactElement, useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { formatApiError } from '../../../lib/api-error';
 import RetroDraftRow from './retro-draft-row';
 import styles from './retro-drafts.module.css';
 import {
@@ -73,10 +74,10 @@ export default function RetroDraftsPage({ workspaceId }: RetroDraftsPageProps): 
           tone: 'success',
           message: t('tasks.retro.queue.accepted_toast'),
         });
-      } catch {
+      } catch (err) {
         toaster.show({
           tone: 'danger',
-          message: t('tasks.retro.queue.accept_error'),
+          message: formatApiError(err, t, 'tasks.retro.queue.accept_error'),
         });
       } finally {
         markBusy(taskPublicId, false);
@@ -102,10 +103,10 @@ export default function RetroDraftsPage({ workspaceId }: RetroDraftsPageProps): 
           tone: 'success',
           message: t('tasks.retro.queue.discarded_toast'),
         });
-      } catch {
+      } catch (err) {
         toaster.show({
           tone: 'danger',
-          message: t('tasks.retro.queue.discard_error'),
+          message: formatApiError(err, t, 'tasks.retro.queue.discard_error'),
         });
       } finally {
         markBusy(taskPublicId, false);

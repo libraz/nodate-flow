@@ -14,6 +14,7 @@ import { Check, X } from 'lucide-react';
 import type { ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { formatApiError } from '../../lib/api-error';
 import {
   type RelationSuggestion,
   type ResolveAction,
@@ -63,8 +64,8 @@ export default function RelationSuggestions({
           const toastKey = action === 'accept' ? 'toast.accepted' : 'toast.dismissed';
           toaster.show({ tone: 'success', message: t(toastKey) });
         },
-        onError: () => {
-          toaster.show({ tone: 'danger', message: t('toast.dismissed') });
+        onError: (err) => {
+          toaster.show({ tone: 'danger', message: formatApiError(err, t, 'toast.dismissed') });
         },
       },
     );

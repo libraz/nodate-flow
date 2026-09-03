@@ -20,6 +20,7 @@ import { toaster } from '@nodate-flow/ui/primitives/toast';
 import { type FormEvent, type ReactElement, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { formatApiError } from '../../lib/api-error';
 import { getPublicBaseUrl } from '../../lib/public-base-url';
 import { type CreatePublicShareInput, useCreatePublicShare } from './api';
 import styles from './create-dialog.module.css';
@@ -83,10 +84,10 @@ export default function PublicShareCreateDialog({
           message: t('workspace.public_shares.errors.create_failed'),
         });
       }
-    } catch {
+    } catch (err) {
       toaster.show({
         tone: 'danger',
-        message: t('workspace.public_shares.errors.create_failed'),
+        message: formatApiError(err, t, 'workspace.public_shares.errors.create_failed'),
       });
     } finally {
       setSubmitting(false);

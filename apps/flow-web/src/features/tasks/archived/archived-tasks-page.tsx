@@ -36,6 +36,7 @@ import { toaster } from '@nodate-flow/ui/primitives/toast';
 import { type ReactElement, useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { ApiError, formatApiError } from '../../../lib/api-error';
 import { useProjectsQuery } from '../../projects/api';
 import { useWorkspaceMembersQuery } from '../../workspaces/api';
 import { type TaskListItem, useUnarchiveTask } from '../api';
@@ -184,12 +185,17 @@ export default function ArchivedTasksPage({ workspaceId }: ArchivedTasksPageProp
           tone: 'success',
           message: t('toast.unarchivedOne', { title }),
         });
-      } catch {
+      } catch (err) {
         markRemoving([id], false);
         const title = titleById.get(id) ?? '';
         toaster.show({
           tone: 'danger',
-          message: t('error.unarchiveFailed', { title }),
+          // The fallback names the task, which formatApiError's key-only path
+          // cannot interpolate — so it only takes over when the API told us why.
+          message:
+            err instanceof ApiError && err.code
+              ? formatApiError(err, t, 'error.unarchiveFailed')
+              : t('error.unarchiveFailed', { title }),
         });
       }
     },

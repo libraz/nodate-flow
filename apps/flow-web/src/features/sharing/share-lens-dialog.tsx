@@ -13,6 +13,7 @@ import { toaster } from '@nodate-flow/ui/primitives/toast';
 import { type ReactElement, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { formatApiError } from '../../lib/api-error';
 import { getPublicBaseUrl } from '../../lib/public-base-url';
 import { usePublishLens, useUnpublishLens } from './api';
 import styles from './sharing.module.css';
@@ -61,8 +62,8 @@ export default function ShareLensDialog({
       setCurrentToken(result.publicToken);
       onTokenChange?.(result.publicToken);
       toaster.show({ tone: 'success', message: t('toast.published') });
-    } catch {
-      toaster.show({ tone: 'danger', message: t('error.publish_failed') });
+    } catch (err) {
+      toaster.show({ tone: 'danger', message: formatApiError(err, t, 'error.publish_failed') });
     }
   };
 
@@ -72,8 +73,8 @@ export default function ShareLensDialog({
       setCurrentToken(null);
       onTokenChange?.(null);
       toaster.show({ tone: 'success', message: t('toast.unpublished') });
-    } catch {
-      toaster.show({ tone: 'danger', message: t('error.unpublish_failed') });
+    } catch (err) {
+      toaster.show({ tone: 'danger', message: formatApiError(err, t, 'error.unpublish_failed') });
     }
   };
 

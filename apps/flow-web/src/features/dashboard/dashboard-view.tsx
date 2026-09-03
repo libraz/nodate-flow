@@ -11,6 +11,7 @@ import { LayoutDashboard, Pencil, Plus } from 'lucide-react';
 import { type ReactElement, Suspense, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { formatApiError } from '../../lib/api-error';
 import AddWidgetDialog from './add-widget-dialog';
 import { useDeleteWidget, useUpdateWidgetPosition, useWidgetsQuery, type WidgetItem } from './api';
 import styles from './dashboard.module.css';
@@ -92,8 +93,11 @@ function WidgetGrid({ wsId, editing, onAddWidget }: WidgetGridProps): ReactEleme
             height: widget.height,
             sortWeight: widget.sortWeight,
           })
-          .catch(() => {
-            toaster.show({ tone: 'danger', message: t('update_position_error') });
+          .catch((err: unknown) => {
+            toaster.show({
+              tone: 'danger',
+              message: formatApiError(err, t, 'update_position_error'),
+            });
           });
       }
 
@@ -106,8 +110,8 @@ function WidgetGrid({ wsId, editing, onAddWidget }: WidgetGridProps): ReactEleme
   };
 
   const handleRemove = (widgetId: string): void => {
-    void deleteWidget.mutateAsync(widgetId).catch(() => {
-      toaster.show({ tone: 'danger', message: t('delete_widget_error') });
+    void deleteWidget.mutateAsync(widgetId).catch((err: unknown) => {
+      toaster.show({ tone: 'danger', message: formatApiError(err, t, 'delete_widget_error') });
     });
   };
 

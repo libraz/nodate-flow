@@ -23,6 +23,7 @@ import { toaster } from '@nodate-flow/ui/primitives/toast';
 import { type ChangeEvent, type FormEvent, type ReactElement, Suspense, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { formatApiError } from '../../../lib/api-error';
 import { useWorkspacesQuery } from '../../workspaces/api';
 import {
   type IntakeItem,
@@ -104,8 +105,11 @@ function IntakeBody({ workspaceId }: IntakeBodyProps): ReactElement {
         onSuccess: () => {
           setTitle('');
         },
-        onError: () => {
-          toaster.show({ tone: 'danger', message: t('intake.quick_add.error') });
+        onError: (err) => {
+          toaster.show({
+            tone: 'danger',
+            message: formatApiError(err, t, 'intake.quick_add.error'),
+          });
         },
       },
     );
@@ -118,8 +122,8 @@ function IntakeBody({ workspaceId }: IntakeBodyProps): ReactElement {
         onSuccess: () => {
           toaster.show({ tone: 'success', message: t('intake.dismiss.success') });
         },
-        onError: () => {
-          toaster.show({ tone: 'danger', message: t('intake.dismiss.error') });
+        onError: (err) => {
+          toaster.show({ tone: 'danger', message: formatApiError(err, t, 'intake.dismiss.error') });
         },
       },
     );

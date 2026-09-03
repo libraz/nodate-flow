@@ -46,7 +46,7 @@ import { MoreHorizontal } from 'lucide-react';
 import { type ChangeEvent, type FormEvent, type ReactElement, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { ApiError } from '../../lib/api-error';
+import { ApiError, formatApiError } from '../../lib/api-error';
 import { confirmAction } from '../../lib/confirm-action';
 import {
   useCreateWebhookMutation,
@@ -356,6 +356,9 @@ function CreateWebhookDialog({ workspaceId, open, onClose }: CreateDialogProps):
         message: t('settings.webhooks.create.secret.copied'),
       });
     } catch {
+      // error-toast-exempt: the clipboard write never reaches the API. What it
+      // rejects with is a browser DOMException whose message is untranslated UA
+      // text, so surfacing it would be worse than the localized fallback.
       toaster.show({
         tone: 'danger',
         message: t('settings.webhooks.create.secret.copy_failed'),
@@ -505,6 +508,9 @@ function ShowSecretDialog({
         message: t('settings.webhooks.create.secret.copied'),
       });
     } catch {
+      // error-toast-exempt: the clipboard write never reaches the API. What it
+      // rejects with is a browser DOMException whose message is untranslated UA
+      // text, so surfacing it would be worse than the localized fallback.
       toaster.show({
         tone: 'danger',
         message: t('settings.webhooks.create.secret.copy_failed'),
@@ -669,10 +675,10 @@ export default function WebhooksSettingsPage(): ReactElement {
               : t('settings.webhooks.toggle.deactivate'),
           });
         },
-        onError: () => {
+        onError: (err) => {
           toaster.show({
             tone: 'danger',
-            message: t('settings.webhooks.toggle.error'),
+            message: formatApiError(err, t, 'settings.webhooks.toggle.error'),
           });
         },
       },
@@ -696,10 +702,10 @@ export default function WebhooksSettingsPage(): ReactElement {
               message: t('settings.webhooks.delete.success'),
             });
           },
-          onError: () => {
+          onError: (err) => {
             toaster.show({
               tone: 'danger',
-              message: t('settings.webhooks.delete.error'),
+              message: formatApiError(err, t, 'settings.webhooks.delete.error'),
             });
           },
         },
@@ -718,10 +724,10 @@ export default function WebhooksSettingsPage(): ReactElement {
           });
           setDeliveriesWebhookId(webhook.id);
         },
-        onError: () => {
+        onError: (err) => {
           toaster.show({
             tone: 'danger',
-            message: t('settings.webhooks.test.error'),
+            message: formatApiError(err, t, 'settings.webhooks.test.error'),
           });
         },
       },

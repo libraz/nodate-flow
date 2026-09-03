@@ -14,6 +14,7 @@ import { type ReactElement, Suspense, useState } from 'react';
 import { ErrorBoundary } from 'react-error-boundary';
 import { useTranslation } from 'react-i18next';
 
+import { formatApiError } from '../../lib/api-error';
 import { formatEpoch } from '../../lib/format';
 import { selectUser, useAuth } from '../auth/auth-store';
 import {
@@ -53,8 +54,11 @@ export default function WorkspaceMembersTable({
     try {
       await updateRole.mutateAsync({ wsId: workspaceId, userId, role });
       toaster.show({ tone: 'success', message: t('workspaces.members.role_updated') });
-    } catch {
-      toaster.show({ tone: 'danger', message: t('workspaces.members.role_update_failed') });
+    } catch (err) {
+      toaster.show({
+        tone: 'danger',
+        message: formatApiError(err, t, 'workspaces.members.role_update_failed'),
+      });
     }
   };
 
@@ -62,8 +66,11 @@ export default function WorkspaceMembersTable({
     try {
       await removeMember.mutateAsync({ wsId: workspaceId, userId });
       toaster.show({ tone: 'success', message: t('workspaces.members.removed') });
-    } catch {
-      toaster.show({ tone: 'danger', message: t('workspaces.members.remove_failed') });
+    } catch (err) {
+      toaster.show({
+        tone: 'danger',
+        message: formatApiError(err, t, 'workspaces.members.remove_failed'),
+      });
     }
   };
 

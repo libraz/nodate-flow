@@ -18,6 +18,7 @@ import { Link } from '@tanstack/react-router';
 import { type ReactElement, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { formatApiError } from '../../lib/api-error';
 import {
   type TaskDependencyEdge,
   type TaskDependencyKind,
@@ -91,8 +92,11 @@ export default function DependenciesSection({
   const handleRemove = async (depId: string): Promise<void> => {
     try {
       await remove.mutateAsync({ taskId, depId });
-    } catch {
-      toaster.show({ tone: 'danger', message: t('tasks.detail.dependencies.removeError') });
+    } catch (err) {
+      toaster.show({
+        tone: 'danger',
+        message: formatApiError(err, t, 'tasks.detail.dependencies.removeError'),
+      });
     }
   };
 
@@ -267,8 +271,11 @@ function DependencyPicker({
     try {
       await add.mutateAsync({ taskId, toTaskId, kind });
       onClose();
-    } catch {
-      toaster.show({ tone: 'danger', message: t('tasks.detail.dependencies.addError') });
+    } catch (err) {
+      toaster.show({
+        tone: 'danger',
+        message: formatApiError(err, t, 'tasks.detail.dependencies.addError'),
+      });
     }
   };
 

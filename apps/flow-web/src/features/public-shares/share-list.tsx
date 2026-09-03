@@ -11,6 +11,7 @@ import { Link } from '@tanstack/react-router';
 import { type ReactElement, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { formatApiError } from '../../lib/api-error';
 import { confirmAction } from '../../lib/confirm-action';
 import { formatEpochDateTime } from '../../lib/format';
 import { getPublicBaseUrl } from '../../lib/public-base-url';
@@ -49,10 +50,10 @@ export default function ShareList({ workspaceId }: ShareListProps): ReactElement
     try {
       await deleteShare.mutateAsync(share.id);
       toaster.show({ tone: 'success', message: t('workspace.public_shares.deleted') });
-    } catch {
+    } catch (err) {
       toaster.show({
         tone: 'danger',
-        message: t('workspace.public_shares.errors.delete_failed'),
+        message: formatApiError(err, t, 'workspace.public_shares.errors.delete_failed'),
       });
     }
   };
@@ -62,10 +63,10 @@ export default function ShareList({ workspaceId }: ShareListProps): ReactElement
     try {
       const result = await rotate.mutateAsync(share.id);
       setRotatedShare(result);
-    } catch {
+    } catch (err) {
       toaster.show({
         tone: 'danger',
-        message: t('workspace.public_shares.errors.rotate_failed'),
+        message: formatApiError(err, t, 'workspace.public_shares.errors.rotate_failed'),
       });
     }
   };

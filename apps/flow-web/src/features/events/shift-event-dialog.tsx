@@ -47,6 +47,7 @@ import type { TFunction } from 'i18next';
 import { type FormEvent, type ReactElement, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { formatApiError } from '../../lib/api-error';
 import { type PatchMeInput, useMeQuery, useUpdateMe } from '../settings/api';
 import styles from './event-detail-page.module.css';
 import {
@@ -274,8 +275,11 @@ export default function ShiftEventDialog({
       for (const c of asList(result.safeTasks)) initial.add(c.taskId);
       setSelected(initial);
       setPhase('confirm');
-    } catch {
-      toaster.show({ tone: 'danger', message: t('event.shift.pick.preview_error') });
+    } catch (err) {
+      toaster.show({
+        tone: 'danger',
+        message: formatApiError(err, t, 'event.shift.pick.preview_error'),
+      });
     }
   };
 
@@ -340,15 +344,21 @@ export default function ShiftEventDialog({
           onSuccess: () => {
             toaster.show({ tone: 'info', message: t('event.shift.default_saved_toast') });
           },
-          onError: () => {
-            toaster.show({ tone: 'danger', message: t('event.shift.default_save_error') });
+          onError: (err) => {
+            toaster.show({
+              tone: 'danger',
+              message: formatApiError(err, t, 'event.shift.default_save_error'),
+            });
           },
         });
       }
 
       onClose();
-    } catch {
-      toaster.show({ tone: 'danger', message: t('event.shift.confirm.error') });
+    } catch (err) {
+      toaster.show({
+        tone: 'danger',
+        message: formatApiError(err, t, 'event.shift.confirm.error'),
+      });
     }
   };
 

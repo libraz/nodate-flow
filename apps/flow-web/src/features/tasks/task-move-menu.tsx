@@ -14,6 +14,7 @@ import { Archive, ArchiveRestore, MoreVertical } from 'lucide-react';
 import { type ReactElement, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { formatApiError } from '../../lib/api-error';
 import {
   type TaskDerivedState,
   TRANSITIONS_BY_STATE,
@@ -75,8 +76,11 @@ export default function TaskMoveMenu({
         onSuccess: () => {
           toaster.show({ tone: 'success', message: t('archive.unarchived', { ns: 'labels' }) });
         },
-        onError: () => {
-          toaster.show({ tone: 'danger', message: t('archive.error_unarchive', { ns: 'labels' }) });
+        onError: (err) => {
+          toaster.show({
+            tone: 'danger',
+            message: formatApiError(err, t, 'labels:archive.error_unarchive'),
+          });
         },
       });
     } else {
@@ -84,8 +88,11 @@ export default function TaskMoveMenu({
         onSuccess: () => {
           toaster.show({ tone: 'success', message: t('archive.archived', { ns: 'labels' }) });
         },
-        onError: () => {
-          toaster.show({ tone: 'danger', message: t('archive.error_archive', { ns: 'labels' }) });
+        onError: (err) => {
+          toaster.show({
+            tone: 'danger',
+            message: formatApiError(err, t, 'labels:archive.error_archive'),
+          });
         },
       });
     }

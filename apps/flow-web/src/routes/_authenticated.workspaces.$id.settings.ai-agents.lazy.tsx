@@ -35,6 +35,7 @@ import {
   useUpdateAgentEventTriggers,
   useUpdateAgentSchedule,
 } from '../features/ai-providers/agents-api';
+import { formatApiError } from '../lib/api-error';
 
 const routeApi = getRouteApi('/_authenticated/workspaces/$id/settings/ai-agents');
 
@@ -82,8 +83,11 @@ function AgentsList({ workspaceId }: { workspaceId: string }): ReactElement {
               agentId: agent.id,
               scheduleKind: next,
             });
-          } catch {
-            toaster.show({ tone: 'danger', message: t('agents.errors.scheduleFailed') });
+          } catch (err) {
+            toaster.show({
+              tone: 'danger',
+              message: formatApiError(err, t, 'agents.errors.scheduleFailed'),
+            });
           }
         };
         const handleTogglePause = async (): Promise<void> => {
@@ -93,16 +97,22 @@ function AgentsList({ workspaceId }: { workspaceId: string }): ReactElement {
               agentId: agent.id,
               paused: !agent.paused,
             });
-          } catch {
-            toaster.show({ tone: 'danger', message: t('agents.errors.pauseFailed') });
+          } catch (err) {
+            toaster.show({
+              tone: 'danger',
+              message: formatApiError(err, t, 'agents.errors.pauseFailed'),
+            });
           }
         };
         const handleTrigger = async (): Promise<void> => {
           try {
             await triggerMut.mutateAsync({ workspaceId, agentId: agent.id });
             toaster.show({ tone: 'success', message: t('agents.trigger.queued') });
-          } catch {
-            toaster.show({ tone: 'danger', message: t('agents.errors.triggerFailed') });
+          } catch (err) {
+            toaster.show({
+              tone: 'danger',
+              message: formatApiError(err, t, 'agents.errors.triggerFailed'),
+            });
           }
         };
         return (
@@ -226,10 +236,10 @@ function AgentsList({ workspaceId }: { workspaceId: string }): ReactElement {
                         tone: 'success',
                         message: t('agents.eventTriggers.saved'),
                       });
-                    } catch {
+                    } catch (err) {
                       toaster.show({
                         tone: 'danger',
-                        message: t('agents.eventTriggers.failed'),
+                        message: formatApiError(err, t, 'agents.eventTriggers.failed'),
                       });
                     }
                   }}
@@ -357,8 +367,8 @@ function CreateAgentForm({
       });
       toaster.show({ tone: 'success', message: t('agents.create.success') });
       onDone();
-    } catch {
-      toaster.show({ tone: 'danger', message: t('agents.create.failed') });
+    } catch (err) {
+      toaster.show({ tone: 'danger', message: formatApiError(err, t, 'agents.create.failed') });
     }
   };
 

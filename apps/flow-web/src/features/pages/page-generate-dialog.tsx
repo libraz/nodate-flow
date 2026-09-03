@@ -18,6 +18,7 @@ import { Sparkles } from 'lucide-react';
 import { type FormEvent, type ReactElement, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { formatApiError } from '../../lib/api-error';
 import { type PageItem, useGeneratePage } from './api';
 import styles from './pages.module.css';
 
@@ -88,8 +89,8 @@ export default function PageGenerateDialog({
           onGenerated(generated);
           onClose();
         },
-        onError: () => {
-          toaster.show({ tone: 'danger', message: t('generate.error') });
+        onError: (err) => {
+          toaster.show({ tone: 'danger', message: formatApiError(err, t, 'generate.error') });
         },
       },
     );

@@ -8,6 +8,7 @@ import { toaster } from '@nodate-flow/ui/primitives/toast';
 import type { ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { formatApiError } from '../../lib/api-error';
 import { confirmAction } from '../../lib/confirm-action';
 import { getPublicBaseUrl } from '../../lib/public-base-url';
 import {
@@ -48,11 +49,17 @@ export default function IntegrationsPanel(): ReactElement {
         }
         window.location.assign(url.href);
       } catch {
+        // error-toast-exempt: this inner catch only sees the scheme rejection
+        // thrown two lines up, whose message is a developer string, not
+        // anything the API said about the authorize URL.
         toaster.show({ tone: 'danger', message: t('integrations.errors.connect_failed') });
         return;
       }
-    } catch {
-      toaster.show({ tone: 'danger', message: t('integrations.errors.connect_failed') });
+    } catch (err) {
+      toaster.show({
+        tone: 'danger',
+        message: formatApiError(err, t, 'integrations.errors.connect_failed'),
+      });
     }
   };
 
@@ -66,8 +73,11 @@ export default function IntegrationsPanel(): ReactElement {
     try {
       await disconnect.mutateAsync(id);
       toaster.show({ tone: 'success', message: t('integrations.disconnected') });
-    } catch {
-      toaster.show({ tone: 'danger', message: t('integrations.errors.disconnect_failed') });
+    } catch (err) {
+      toaster.show({
+        tone: 'danger',
+        message: formatApiError(err, t, 'integrations.errors.disconnect_failed'),
+      });
     }
   };
 

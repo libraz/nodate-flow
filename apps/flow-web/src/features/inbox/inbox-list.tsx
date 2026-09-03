@@ -12,6 +12,7 @@ import { Inbox as InboxIcon } from 'lucide-react';
 import { type ChangeEvent, type ReactElement, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { formatApiError } from '../../lib/api-error';
 import { useApplyAiSuggestion, useDismissAiSuggestion } from '../ai-suggestions/api';
 import EditSuggestionDialog, {
   type EditSuggestionPatch,
@@ -56,8 +57,8 @@ export default function InboxList(): ReactElement {
       onSuccess: () => {
         toaster.show({ tone: 'success', message: t('toast.archived') });
       },
-      onError: () => {
-        toaster.show({ tone: 'danger', message: t('toast.error') });
+      onError: (err) => {
+        toaster.show({ tone: 'danger', message: formatApiError(err, t, 'toast.error') });
       },
     });
   };
@@ -69,8 +70,8 @@ export default function InboxList(): ReactElement {
         onSuccess: () => {
           toaster.show({ tone: 'success', message: t('toast.snoozed') });
         },
-        onError: () => {
-          toaster.show({ tone: 'danger', message: t('toast.error') });
+        onError: (err) => {
+          toaster.show({ tone: 'danger', message: formatApiError(err, t, 'toast.error') });
         },
       },
     );
@@ -92,8 +93,8 @@ export default function InboxList(): ReactElement {
               : tAi('triage.success_empty'),
         });
       },
-      onError: () => {
-        toaster.show({ tone: 'danger', message: tAi('error') });
+      onError: (err) => {
+        toaster.show({ tone: 'danger', message: formatApiError(err, tAi, 'error') });
       },
     });
   };
@@ -116,8 +117,8 @@ export default function InboxList(): ReactElement {
           toaster.show({ tone: 'success', message: t('toast.archived') });
           recordApply(suggestion.inboxItemId);
         },
-        onError: () => {
-          toaster.show({ tone: 'danger', message: t('toast.error') });
+        onError: (err) => {
+          toaster.show({ tone: 'danger', message: formatApiError(err, t, 'toast.error') });
         },
       });
     } else if (action === 'snooze') {
@@ -129,8 +130,8 @@ export default function InboxList(): ReactElement {
             toaster.show({ tone: 'success', message: t('toast.snoozed') });
             recordApply(suggestion.inboxItemId);
           },
-          onError: () => {
-            toaster.show({ tone: 'danger', message: t('toast.error') });
+          onError: (err) => {
+            toaster.show({ tone: 'danger', message: formatApiError(err, t, 'toast.error') });
           },
         },
       );

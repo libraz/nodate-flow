@@ -16,6 +16,7 @@ import { type FormEvent, type ReactElement, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { z } from 'zod';
 
+import { formatApiError } from '../../lib/api-error';
 import { type AddMemberInput, useAddMember } from './api';
 
 type Role = AddMemberInput['role'];
@@ -84,8 +85,11 @@ export default function WorkspaceAddMemberDialog({
       });
       reset();
       onClose();
-    } catch {
-      toaster.show({ tone: 'danger', message: t('workspaces.errors.add_member_failed') });
+    } catch (err) {
+      toaster.show({
+        tone: 'danger',
+        message: formatApiError(err, t, 'workspaces.errors.add_member_failed'),
+      });
     } finally {
       setSubmitting(false);
     }

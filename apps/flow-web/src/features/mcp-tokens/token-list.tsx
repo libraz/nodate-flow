@@ -9,6 +9,7 @@ import { toaster } from '@nodate-flow/ui/primitives/toast';
 import { type ReactElement, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { formatApiError } from '../../lib/api-error';
 import { confirmAction } from '../../lib/confirm-action';
 import { formatEpochDateTime } from '../../lib/format';
 import { type McpTokenSummary, useMcpTokensQuery, useRevokeMcpToken } from './api';
@@ -39,10 +40,10 @@ export default function TokenList({ workspaceId }: TokenListProps): ReactElement
     try {
       await revoke.mutateAsync(token.id);
       toaster.show({ tone: 'success', message: t('workspace.mcp_tokens.revoked') });
-    } catch {
+    } catch (err) {
       toaster.show({
         tone: 'danger',
-        message: t('workspace.mcp_tokens.errors.revoke_failed'),
+        message: formatApiError(err, t, 'workspace.mcp_tokens.errors.revoke_failed'),
       });
     }
   };

@@ -43,6 +43,7 @@ import {
 import { useTranslation } from 'react-i18next';
 
 import { apiRequest } from '../../../lib/api';
+import { formatApiError } from '../../../lib/api-error';
 import {
   type AutoActionRule,
   type AutoActionRuleKind,
@@ -265,8 +266,11 @@ export default function AutonomyMatrix({ workspaceId }: AutonomyMatrixProps): Re
           setDrafts(new Map());
           toaster.show({ tone: 'success', message: t('ai:autonomy.matrix.changed_toast') });
         },
-        onError: () => {
-          toaster.show({ tone: 'danger', message: t('ai:autonomy.matrix.error_toast') });
+        onError: (err) => {
+          toaster.show({
+            tone: 'danger',
+            message: formatApiError(err, t, 'ai:autonomy.matrix.error_toast'),
+          });
         },
       },
     );

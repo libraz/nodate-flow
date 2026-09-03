@@ -15,6 +15,7 @@ import { toaster } from '@nodate-flow/ui/primitives/toast';
 import { type FormEvent, type ReactElement, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { formatApiError } from '../../lib/api-error';
 import type { CreateInviteInput } from './invite-api';
 import { useCreateInvite } from './invite-api';
 import { workspaceInviteUrl } from './invite-link';
@@ -96,8 +97,11 @@ export default function WorkspaceInviteDialog({
       };
       const result = await createInvite.mutateAsync({ wsId: workspaceId, input });
       setGeneratedUrl(workspaceInviteUrl(globalThis.location.origin, result.token));
-    } catch {
-      toaster.show({ tone: 'danger', message: t('workspaces.invites.create_failed') });
+    } catch (err) {
+      toaster.show({
+        tone: 'danger',
+        message: formatApiError(err, t, 'workspaces.invites.create_failed'),
+      });
     } finally {
       setSubmitting(false);
     }
@@ -109,6 +113,9 @@ export default function WorkspaceInviteDialog({
       await navigator.clipboard.writeText(generatedUrl);
       toaster.show({ tone: 'success', message: t('workspaces.invites.copied') });
     } catch {
+      // error-toast-exempt: the clipboard write never reaches the API. What it
+      // rejects with is a browser DOMException whose message is untranslated UA
+      // text, so surfacing it would be worse than the localized fallback.
       toaster.show({ tone: 'danger', message: t('workspaces.invites.copy_failed') });
     }
   };

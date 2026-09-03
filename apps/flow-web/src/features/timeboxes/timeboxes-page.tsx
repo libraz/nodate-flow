@@ -33,6 +33,7 @@ import { ChevronDown, ChevronRight } from 'lucide-react';
 import { type FormEvent, type ReactElement, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { formatApiError } from '../../lib/api-error';
 import { confirmAction } from '../../lib/confirm-action';
 import {
   asTimeboxStatus,
@@ -94,8 +95,11 @@ function TaskList({ workspaceId, timeboxId }: TaskListProps): ReactElement {
     try {
       await removeTask.mutateAsync({ wsId: workspaceId, timeboxId, taskId });
       toaster.show({ tone: 'success', message: t('timeboxes.remove_task.success') });
-    } catch {
-      toaster.show({ tone: 'danger', message: t('timeboxes.remove_task.error') });
+    } catch (err) {
+      toaster.show({
+        tone: 'danger',
+        message: formatApiError(err, t, 'timeboxes.remove_task.error'),
+      });
     }
   };
 
@@ -107,8 +111,8 @@ function TaskList({ workspaceId, timeboxId }: TaskListProps): ReactElement {
       await addTask.mutateAsync({ wsId: workspaceId, timeboxId, taskId: trimmed });
       setTaskIdInput('');
       toaster.show({ tone: 'success', message: t('timeboxes.add_task.success') });
-    } catch {
-      toaster.show({ tone: 'danger', message: t('timeboxes.add_task.error') });
+    } catch (err) {
+      toaster.show({ tone: 'danger', message: formatApiError(err, t, 'timeboxes.add_task.error') });
     }
   };
 
@@ -185,8 +189,8 @@ function TimeboxCard({ timebox, workspaceId, locale, onEdit }: TimeboxCardProps)
         timeboxId: timebox.id,
         status: next,
       });
-    } catch {
-      toaster.show({ tone: 'danger', message: t(errorKey) });
+    } catch (err) {
+      toaster.show({ tone: 'danger', message: formatApiError(err, t, errorKey) });
     }
   };
 
@@ -199,8 +203,8 @@ function TimeboxCard({ timebox, workspaceId, locale, onEdit }: TimeboxCardProps)
     try {
       await deleteMutation.mutateAsync({ wsId: workspaceId, timeboxId: timebox.id });
       toaster.show({ tone: 'success', message: t('timeboxes.delete.success') });
-    } catch {
-      toaster.show({ tone: 'danger', message: t('timeboxes.delete.error') });
+    } catch (err) {
+      toaster.show({ tone: 'danger', message: formatApiError(err, t, 'timeboxes.delete.error') });
     }
   };
 

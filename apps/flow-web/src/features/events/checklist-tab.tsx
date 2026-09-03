@@ -29,6 +29,7 @@ import { toaster } from '@nodate-flow/ui/primitives/toast';
 import { type KeyboardEvent, type ReactElement, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { formatApiError } from '../../lib/api-error';
 import { confirmAction } from '../../lib/confirm-action';
 import {
   type EventChecklistItem,
@@ -66,8 +67,11 @@ function ChecklistRow({ workspaceId, calendarId, eventId, item }: ChecklistRowPr
         itemId: item.id,
         patch: { done: !item.done },
       });
-    } catch {
-      toaster.show({ tone: 'danger', message: t('event.checklist.update_error') });
+    } catch (err) {
+      toaster.show({
+        tone: 'danger',
+        message: formatApiError(err, t, 'event.checklist.update_error'),
+      });
     }
   };
 
@@ -85,8 +89,11 @@ function ChecklistRow({ workspaceId, calendarId, eventId, item }: ChecklistRowPr
         itemId: item.id,
       });
       toaster.show({ tone: 'success', message: t('event.checklist.delete_success') });
-    } catch {
-      toaster.show({ tone: 'danger', message: t('event.checklist.delete_error') });
+    } catch (err) {
+      toaster.show({
+        tone: 'danger',
+        message: formatApiError(err, t, 'event.checklist.delete_error'),
+      });
     }
   };
 
@@ -148,8 +155,11 @@ export default function ChecklistTab({
         title: trimmed,
       });
       setDraft('');
-    } catch {
-      toaster.show({ tone: 'danger', message: t('event.checklist.add_error') });
+    } catch (err) {
+      toaster.show({
+        tone: 'danger',
+        message: formatApiError(err, t, 'event.checklist.add_error'),
+      });
     }
   };
 

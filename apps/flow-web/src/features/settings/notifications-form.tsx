@@ -19,6 +19,7 @@ import { toaster } from '@nodate-flow/ui/primitives/toast';
 import { type FormEvent, type ReactElement, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { formatApiError } from '../../lib/api-error';
 import { useSubmitGuard } from '../../lib/use-submit-guard';
 import { useWorkspacesQuery } from '../workspaces/api';
 import {
@@ -113,8 +114,11 @@ function WorkspacePreferences({ workspaceId }: { workspaceId: string }): ReactEl
     try {
       await update.mutateAsync(body);
       toaster.show({ tone: 'success', message: t('notifications.saved') });
-    } catch {
-      toaster.show({ tone: 'danger', message: t('notifications.errors.update_failed') });
+    } catch (err) {
+      toaster.show({
+        tone: 'danger',
+        message: formatApiError(err, t, 'notifications.errors.update_failed'),
+      });
     } finally {
       submitGuard.end();
     }

@@ -27,6 +27,7 @@ import { toaster } from '@nodate-flow/ui/primitives/toast';
 import type { ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { formatApiError } from '../../lib/api-error';
 import { confirmAction } from '../../lib/confirm-action';
 import styles from './event-detail-page.module.css';
 import {
@@ -116,8 +117,11 @@ export default function InvitesTab({
         onSuccess: () => {
           toaster.show({ tone: 'success', message: t('event.invites.revoke_success') });
         },
-        onError: () => {
-          toaster.show({ tone: 'danger', message: t('event.invites.revoke_error') });
+        onError: (err) => {
+          toaster.show({
+            tone: 'danger',
+            message: formatApiError(err, t, 'event.invites.revoke_error'),
+          });
         },
       },
     );

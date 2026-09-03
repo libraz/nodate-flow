@@ -6,6 +6,7 @@ import { toaster } from '@nodate-flow/ui/primitives/toast';
 import { type ReactElement, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { formatApiError } from '../../lib/api-error';
 import { type FavoriteTargetType, useAddFavorite, useRemoveFavorite } from './api';
 
 export interface FavoriteButtonProps {
@@ -39,10 +40,14 @@ export default function FavoriteButton({
         await add.mutateAsync({ workspaceId, targetType, targetId });
         toaster.show({ tone: 'success', message: t('favorites.added') });
       }
-    } catch {
+    } catch (err) {
       toaster.show({
         tone: 'danger',
-        message: t(isFavorite ? 'favorites.error_remove' : 'favorites.error_add'),
+        message: formatApiError(
+          err,
+          t,
+          isFavorite ? 'favorites.error_remove' : 'favorites.error_add',
+        ),
       });
     } finally {
       setPending(false);

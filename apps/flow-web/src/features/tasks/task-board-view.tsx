@@ -16,6 +16,7 @@ import { useNavigate } from '@tanstack/react-router';
 import { type ReactElement, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { formatApiError } from '../../lib/api-error';
 import { computeBlockedByOpen, useProjectDependenciesQuery } from '../projects/api';
 
 import {
@@ -74,8 +75,11 @@ export default function TaskBoardView({ projectId }: TaskBoardViewProps): ReactE
           optimisticState: landingState,
         },
         {
-          onError: () => {
-            toaster.show({ tone: 'warning', message: t('tasks.errors.move_failed') });
+          onError: (err) => {
+            toaster.show({
+              tone: 'warning',
+              message: formatApiError(err, t, 'tasks.errors.move_failed'),
+            });
           },
         },
       );

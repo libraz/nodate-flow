@@ -17,6 +17,7 @@ import { toaster } from '@nodate-flow/ui/primitives/toast';
 import { type FormEvent, type ReactElement, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { formatApiError } from '../../lib/api-error';
 import AutonomyMatrix from '../ai/autonomy/autonomy-matrix';
 import {
   type AutoActionRule,
@@ -74,10 +75,10 @@ export default function AutoActionSettingsPage({
         tone: 'success',
         message: t('workspace.auto_actions.saved'),
       });
-    } catch {
+    } catch (err) {
       toaster.show({
         tone: 'danger',
-        message: t('workspace.auto_actions.errors.update_failed'),
+        message: formatApiError(err, t, 'workspace.auto_actions.errors.update_failed'),
       });
     } finally {
       setSubmitting(false);
@@ -341,10 +342,10 @@ function AutoActionRulesSection({
         tone: 'success',
         message: t('workspace.auto_actions.rules.saved'),
       });
-    } catch {
+    } catch (err) {
       toaster.show({
         tone: 'danger',
-        message: t('workspace.auto_actions.rules.errors.update_failed'),
+        message: formatApiError(err, t, 'workspace.auto_actions.rules.errors.update_failed'),
       });
     } finally {
       setSavingRules(false);

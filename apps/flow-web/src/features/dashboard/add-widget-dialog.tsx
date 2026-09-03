@@ -22,6 +22,7 @@ import {
 import { type FormEvent, type ReactElement, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { formatApiError } from '../../lib/api-error';
 import { dashboardKeys, useCreateWidget, type WidgetItem, type WidgetType } from './api';
 import styles from './dashboard.module.css';
 
@@ -132,8 +133,8 @@ export default function AddWidgetDialog({
       reset();
       onClose();
       toaster.show({ tone: 'success', message: t('add_widget_success') });
-    } catch {
-      toaster.show({ tone: 'danger', message: t('add_widget_error') });
+    } catch (err) {
+      toaster.show({ tone: 'danger', message: formatApiError(err, t, 'add_widget_error') });
     } finally {
       setSubmitting(false);
     }

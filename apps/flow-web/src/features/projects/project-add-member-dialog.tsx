@@ -17,6 +17,7 @@ import { type FormEvent, type ReactElement, Suspense, useMemo, useState } from '
 import { useTranslation } from 'react-i18next';
 import { z } from 'zod';
 
+import { formatApiError } from '../../lib/api-error';
 import { useWorkspaceMembersQuery } from '../workspaces/api';
 import {
   type ProjectRole,
@@ -117,8 +118,11 @@ function ProjectAddMemberDialogBody({
       });
       reset();
       onClose();
-    } catch {
-      toaster.show({ tone: 'danger', message: t('projects.errors.add_member_failed') });
+    } catch (err) {
+      toaster.show({
+        tone: 'danger',
+        message: formatApiError(err, t, 'projects.errors.add_member_failed'),
+      });
     } finally {
       setSubmitting(false);
     }

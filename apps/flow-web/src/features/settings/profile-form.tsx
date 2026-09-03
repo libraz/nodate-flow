@@ -30,6 +30,7 @@ import { useTranslation } from 'react-i18next';
 import { z } from 'zod';
 
 import { type SupportedLanguage, setLanguage } from '../../i18n';
+import { formatApiError } from '../../lib/api-error';
 import { useTheme } from '../../providers/theme-provider';
 import { type Me, type PatchMeInput, useMeQuery, useUpdateMe } from './api';
 import AvatarUpload from './avatar-upload';
@@ -258,8 +259,11 @@ export default function ProfileForm(): ReactElement {
         setLanguage(values.locale);
       }
       toaster.show({ tone: 'success', message: t('profile.saved') });
-    } catch {
-      toaster.show({ tone: 'danger', message: t('profile.errors.update_failed') });
+    } catch (err) {
+      toaster.show({
+        tone: 'danger',
+        message: formatApiError(err, t, 'profile.errors.update_failed'),
+      });
     }
   };
 

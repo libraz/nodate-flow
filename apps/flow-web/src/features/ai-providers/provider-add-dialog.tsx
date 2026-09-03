@@ -17,6 +17,7 @@ import { toaster } from '@nodate-flow/ui/primitives/toast';
 import { type FormEvent, type ReactElement, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { formatApiError } from '../../lib/api-error';
 import { type AiProviderKind, useCreateAiProvider } from './api';
 
 const KINDS: readonly AiProviderKind[] = [
@@ -95,8 +96,8 @@ export default function ProviderAddDialog({
       toaster.show({ tone: 'success', message: t('providers.toast.created') });
       reset();
       onClose();
-    } catch {
-      toaster.show({ tone: 'danger', message: t('providers.toast.error') });
+    } catch (err) {
+      toaster.show({ tone: 'danger', message: formatApiError(err, t, 'providers.toast.error') });
     } finally {
       setSubmitting(false);
     }

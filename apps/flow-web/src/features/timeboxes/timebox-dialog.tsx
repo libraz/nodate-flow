@@ -20,6 +20,7 @@ import { toaster } from '@nodate-flow/ui/primitives/toast';
 import { type FormEvent, type ReactElement, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { formatApiError } from '../../lib/api-error';
 import { useProjectsQuery } from '../projects/api';
 import { type Timebox, useCreateTimeboxMutation, useUpdateTimeboxMutation } from './api';
 import styles from './timeboxes-page.module.css';
@@ -170,11 +171,14 @@ export default function TimeboxDialog({
         toaster.show({ tone: 'success', message: t('timeboxes.dialog.create.success') });
       }
       onClose();
-    } catch {
+    } catch (err) {
       toaster.show({
         tone: 'danger',
-        message:
-          mode === 'edit' ? t('timeboxes.dialog.edit.error') : t('timeboxes.dialog.create.error'),
+        message: formatApiError(
+          err,
+          t,
+          mode === 'edit' ? 'timeboxes.dialog.edit.error' : 'timeboxes.dialog.create.error',
+        ),
       });
     } finally {
       setSubmitting(false);

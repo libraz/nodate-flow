@@ -10,6 +10,7 @@ import { toaster } from '@nodate-flow/ui/primitives/toast';
 import { type ReactElement, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { formatApiError } from '../../lib/api-error';
 import { confirmAction } from '../../lib/confirm-action';
 import { type AiProvidersQueryError, useAiProvidersQuery, useDeleteAiProvider } from './api';
 import MaskedKey from './masked-key';
@@ -67,8 +68,8 @@ export default function ProviderList({ workspaceId }: ProviderListProps): ReactE
       onSuccess: () => {
         toaster.show({ tone: 'success', message: t('providers.toast.deleted') });
       },
-      onError: () => {
-        toaster.show({ tone: 'danger', message: t('providers.toast.error') });
+      onError: (err) => {
+        toaster.show({ tone: 'danger', message: formatApiError(err, t, 'providers.toast.error') });
       },
     });
   };

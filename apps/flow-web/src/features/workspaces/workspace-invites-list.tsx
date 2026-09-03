@@ -11,6 +11,7 @@ import type { ColumnDef } from '@tanstack/react-table';
 import type { ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { formatApiError } from '../../lib/api-error';
 import { formatEpochDateTime } from '../../lib/format';
 import { useListInvitesQuery, useRevokeInvite, type WorkspaceInvite } from './invite-api';
 
@@ -44,8 +45,11 @@ export default function WorkspaceInvitesList({
     try {
       await revokeInvite.mutateAsync({ wsId: workspaceId, inviteId });
       toaster.show({ tone: 'success', message: t('workspaces.invites.revoked') });
-    } catch {
-      toaster.show({ tone: 'danger', message: t('workspaces.invites.revoke_failed') });
+    } catch (err) {
+      toaster.show({
+        tone: 'danger',
+        message: formatApiError(err, t, 'workspaces.invites.revoke_failed'),
+      });
     }
   };
 
