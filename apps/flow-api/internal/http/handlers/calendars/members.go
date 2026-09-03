@@ -6,9 +6,11 @@ import (
 
 	"github.com/google/uuid"
 
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/dbretry"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated/calendar"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
 	apierrors "github.com/libraz/nodate-flow/apps/flow-api/internal/errors"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/eventbus"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/handlers/handlerutil"
 	"github.com/libraz/nodate-flow/packages/go-shared/apierr"
 	"github.com/libraz/nodate-flow/packages/go-shared/dbtype"
@@ -158,11 +160,11 @@ func AddMember(deps Deps) func(context.Context, *AddMemberInput) (*AddMemberOutp
 		}
 		out.Body.AvatarURL = dbtype.PtrFromNullString(user.AvatarUrl)
 
-		_ = appendCalendarEvent(ctx, deps.DB, wsID, cal.ID, "calendar.member.added", &actorID, map[string]any{
+		appendCalendarEvent(ctx, dbretry.AutoCommit(deps.DB), wsID, cal.ID, eventbus.CalMemberAdded, &actorID, map[string]any{
 			"calendarId": input.CalID,
 			"userId":     user.PublicID.String(),
 			"role":       input.Body.Role,
-		})
+		}, "calendars.AddMember")
 
 		return out, nil
 	}
@@ -287,11 +289,11 @@ func UpdateMemberRole(deps Deps) func(context.Context, *UpdateMemberRoleInput) (
 		out := &UpdateMemberRoleOutput{}
 		out.Body.Updated = true
 
-		_ = appendCalendarEvent(ctx, deps.DB, wsID, cal.ID, "calendar.member.role_changed", &actorID, map[string]any{
+		appendCalendarEvent(ctx, dbretry.AutoCommit(deps.DB), wsID, cal.ID, eventbus.CalMemberRoleChanged, &actorID, map[string]any{
 			"calendarId": input.CalID,
 			"userId":     input.UserID,
 			"newRole":    input.Body.Role,
-		})
+		}, "calendars.UpdateMemberRole")
 
 		return out, nil
 	}
@@ -352,6 +354,9 @@ func RemoveMember(deps Deps) func(context.Context, *RemoveMemberInput) (*RemoveM
 			}
 		}
 
+		// affected-rows: not-applicable — FindCalendarMember above already
+		// answered for a user who is not a member of this calendar, and the
+		// role checks between the two ran against the row it returned.
 		if _, err = deps.CalendarQueries.DisableCalendarMember(ctx, calendar.DisableCalendarMemberParams{
 			CalendarID: cal.ID,
 			UserID:     targetUserID,
@@ -362,10 +367,10 @@ func RemoveMember(deps Deps) func(context.Context, *RemoveMemberInput) (*RemoveM
 		out := &RemoveMemberOutput{}
 		out.Body.Removed = true
 
-		_ = appendCalendarEvent(ctx, deps.DB, wsID, cal.ID, "calendar.member.removed", &actorID, map[string]any{
+		appendCalendarEvent(ctx, dbretry.AutoCommit(deps.DB), wsID, cal.ID, eventbus.CalMemberRemoved, &actorID, map[string]any{
 			"calendarId": input.CalID,
 			"userId":     input.UserID,
-		})
+		}, "calendars.RemoveMember")
 
 		return out, nil
 	}

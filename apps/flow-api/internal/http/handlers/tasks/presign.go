@@ -5,10 +5,10 @@ import (
 	"database/sql"
 	"encoding/hex"
 	stderrors "errors"
-	"log/slog"
 	"strings"
 	"time"
 
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/dbretry"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
 	apierrors "github.com/libraz/nodate-flow/apps/flow-api/internal/errors"
@@ -16,7 +16,6 @@ import (
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/handlers/handlerutil"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/middleware"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/storage"
-	"github.com/libraz/nodate-flow/packages/go-shared/logutil"
 )
 
 const presignExpiry = 15 * time.Minute
@@ -276,7 +275,7 @@ func PresignUpload(deps Deps) func(context.Context, *PresignUploadInput) (*Presi
 		}
 
 		taskInternal := int64(task.ID)
-		if err := eventbus.Append(ctx, deps.DB, eventbus.Event{
+		eventbus.AppendBestEffort(ctx, dbretry.AutoCommit(deps.DB), eventbus.Event{
 			Type:        eventbus.TaskAttachmentAdded,
 			WorkspaceID: ws.ID,
 			ActorUserID: actorPtr(ctx),
@@ -287,16 +286,7 @@ func PresignUpload(deps Deps) func(context.Context, *PresignUploadInput) (*Presi
 				"filename":     in.Body.Filename,
 				"deduplicated": deduplicated,
 			},
-		}); err != nil {
-			slog.ErrorContext(ctx, "eventbus.Append failed",
-				slog.Any("err", err),
-				slog.String("handler", "tasks.PresignUpload"),
-				slog.String("event_type", string(eventbus.TaskAttachmentAdded)),
-				logutil.LogEntity("workspace", ws.PublicID),
-				logutil.LogEntity("task", task.PublicID),
-				slog.String("attachment_id", attachPub.String()),
-			)
-		}
+		}, "tasks.PresignUpload")
 
 		return &PresignUploadOutput{Body: PresignUploadOutputBody{
 			UploadURL:       uploadURL,

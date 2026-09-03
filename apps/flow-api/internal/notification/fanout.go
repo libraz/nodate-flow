@@ -18,6 +18,7 @@ import (
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/notification/prefs"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/obs"
 	"github.com/libraz/nodate-flow/packages/go-shared/email"
+	"github.com/libraz/nodate-flow/packages/go-shared/eventbus"
 )
 
 // preferenceFetchRetryDelay is the back-off applied between the first
@@ -582,86 +583,237 @@ func (f *Fanout) workspaceMemberUserIDs(ctx context.Context, workspaceID uint32)
 	return ids, rows.Err()
 }
 
-// classifyEvent maps an event type to a human-readable notification
-// title template, resource type, and severity. Returns an empty title
-// when the event type should not generate notifications.
-func classifyEvent(eventType string) (title string, resourceType string, severity generated.NotificationsSeverity) {
-	switch eventType {
-	case "task.created":
-		return "A new task was created", "task", generated.NotificationsSeverityNormal
-	case "task.updated":
-		return "A task was updated", "task", generated.NotificationsSeverityLow
-	case "task.disabled":
-		return "A task was deleted", "task", generated.NotificationsSeverityNormal
-	case "task.comment.added":
-		return "A new comment was added", "comment", generated.NotificationsSeverityNormal
-	case "task.comment.edited":
-		return "A comment was edited", "comment", generated.NotificationsSeverityLow
-	case "task.comment.removed":
-		return "A comment was removed", "comment", generated.NotificationsSeverityLow
-	case "task.actor.added":
-		return "You were added to a task", "task", generated.NotificationsSeverityNormal
-	case "task.actor.removed":
-		return "You were removed from a task", "task", generated.NotificationsSeverityNormal
-	case "task.transition.start":
-		return "A task was started", "task", generated.NotificationsSeverityNormal
-	case "task.transition.complete":
-		return "A task was completed", "task", generated.NotificationsSeverityNormal
-	case "task.transition.block":
-		return "A task was blocked", "task", generated.NotificationsSeverityHigh
-	case "task.transition.unblock":
-		return "A task was unblocked", "task", generated.NotificationsSeverityNormal
-	case "task.transition.submit":
-		return "A task was submitted for review", "task", generated.NotificationsSeverityNormal
-	case "task.transition.reopen":
-		return "A task was reopened", "task", generated.NotificationsSeverityNormal
-	case "task.transition.cancel":
-		return "A task was cancelled", "task", generated.NotificationsSeverityNormal
+// classification is what a notification row says about one event kind.
+// A zero Title means the kind notifies nobody.
+type classification struct {
+	Title        string
+	ResourceType string
+	Severity     generated.NotificationsSeverity
+}
 
-	// itemkit kinds: task ↔ calendar_event atomic mutations.
-	// The reader for these events is the "item" (task + its projections);
+// silent is the classification of a kind that deliberately notifies
+// nobody. Written out rather than left as a missing map entry, because
+// "nothing to say about this" and "nobody has decided yet" are different
+// answers and the table has to tell them apart.
+var silent = classification{}
+
+// notify builds the classification of a kind that does notify.
+func notify(title, resourceType string, severity generated.NotificationsSeverity) classification {
+	return classification{Title: title, ResourceType: resourceType, Severity: severity}
+}
+
+// classifications maps every declared event kind onto its notification
+// copy. It is total over [eventbus.Kinds]: a kind with no entry fails
+// TestEveryKindIsClassified rather than reaching fan-out and being
+// dropped by a default branch.
+//
+// That default branch is what this table replaces. It answered "do not
+// notify" for a kind nobody had classified yet, so adding an event kind
+// — or renaming one — produced a feature that worked everywhere except
+// the notification bell, with nothing anywhere to say so. Most kinds
+// here are [silent], and that is fine; what matters is that each one was
+// looked at.
+var classifications = map[eventbus.Kind]classification{
+	eventbus.TaskCreated:  notify("A new task was created", "task", generated.NotificationsSeverityNormal),
+	eventbus.TaskUpdated:  notify("A task was updated", "task", generated.NotificationsSeverityLow),
+	eventbus.TaskDisabled: notify("A task was deleted", "task", generated.NotificationsSeverityNormal),
+
+	eventbus.TaskCommentAdded:   notify("A new comment was added", "comment", generated.NotificationsSeverityNormal),
+	eventbus.TaskCommentEdited:  notify("A comment was edited", "comment", generated.NotificationsSeverityLow),
+	eventbus.TaskCommentRemoved: notify("A comment was removed", "comment", generated.NotificationsSeverityLow),
+
+	eventbus.TaskActorAdded:   notify("You were added to a task", "task", generated.NotificationsSeverityNormal),
+	eventbus.TaskActorRemoved: notify("You were removed from a task", "task", generated.NotificationsSeverityNormal),
+
+	eventbus.TaskTransitionStart:    notify("A task was started", "task", generated.NotificationsSeverityNormal),
+	eventbus.TaskTransitionComplete: notify("A task was completed", "task", generated.NotificationsSeverityNormal),
+	eventbus.TaskTransitionBlock:    notify("A task was blocked", "task", generated.NotificationsSeverityHigh),
+	eventbus.TaskTransitionUnblock:  notify("A task was unblocked", "task", generated.NotificationsSeverityNormal),
+	eventbus.TaskTransitionSubmit:   notify("A task was submitted for review", "task", generated.NotificationsSeverityNormal),
+	eventbus.TaskTransitionReopen:   notify("A task was reopened", "task", generated.NotificationsSeverityNormal),
+	eventbus.TaskTransitionCancel:   notify("A task was cancelled", "task", generated.NotificationsSeverityNormal),
+
+	// itemkit kinds: task ↔ calendar_event atomic mutations. The reader
+	// for these events is the "item" (task + its projections);
 	// resourceType stays "task" because downstream routing is the same.
-	case "item.scheduled":
-		return "An item was placed on a calendar", "task", generated.NotificationsSeverityNormal
-	case "item.unscheduled":
-		return "An item was removed from a calendar", "task", generated.NotificationsSeverityLow
-	case "item.rescheduled":
-		return "An item was rescheduled", "task", generated.NotificationsSeverityNormal
-	case "item.renamed":
-		return "An item was renamed", "task", generated.NotificationsSeverityLow
-	case "item.deleted":
-		return "An item was deleted", "task", generated.NotificationsSeverityNormal
-	case "item.reconciled":
-		return "An item was auto-reconciled", "task", generated.NotificationsSeverityLow
-	case "item.actor.added":
-		return "You were added to an item", "task", generated.NotificationsSeverityNormal
-	case "item.actor.removed":
-		return "You were removed from an item", "task", generated.NotificationsSeverityNormal
-	case "item.visibility.changed":
-		return "An item's visibility changed", "task", generated.NotificationsSeverityLow
-	case "item.milestone.link.added":
-		return "An item was linked to a milestone", "task", generated.NotificationsSeverityLow
-	case "item.milestone.link.removed":
-		return "An item was unlinked from a milestone", "task", generated.NotificationsSeverityLow
+	eventbus.ItemScheduled:            notify("An item was placed on a calendar", "task", generated.NotificationsSeverityNormal),
+	eventbus.ItemUnscheduled:          notify("An item was removed from a calendar", "task", generated.NotificationsSeverityLow),
+	eventbus.ItemRescheduled:          notify("An item was rescheduled", "task", generated.NotificationsSeverityNormal),
+	eventbus.ItemRenamed:              notify("An item was renamed", "task", generated.NotificationsSeverityLow),
+	eventbus.ItemDeleted:              notify("An item was deleted", "task", generated.NotificationsSeverityNormal),
+	eventbus.ItemReconciled:           notify("An item was auto-reconciled", "task", generated.NotificationsSeverityLow),
+	eventbus.ItemActorAdded:           notify("You were added to an item", "task", generated.NotificationsSeverityNormal),
+	eventbus.ItemActorRemoved:         notify("You were removed from an item", "task", generated.NotificationsSeverityNormal),
+	eventbus.ItemVisibilityChanged:    notify("An item's visibility changed", "task", generated.NotificationsSeverityLow),
+	eventbus.ItemMilestoneLinkAdded:   notify("An item was linked to a milestone", "task", generated.NotificationsSeverityLow),
+	eventbus.ItemMilestoneLinkRemoved: notify("An item was unlinked from a milestone", "task", generated.NotificationsSeverityLow),
 
 	// agent.task.* events: AI agent lifecycle on tasks. handoff_to_user is
 	// the user-facing one that the inbox badge must surface; thought is
-	// suppressed because it represents private agent reasoning that should
-	// not generate notifications.
-	case "agent.task.handoff_to_user":
-		return "An agent handed back to you", "task", generated.NotificationsSeverityHigh
-	case "agent.task.handoff_to_agent":
-		return "A task was handed off to an agent", "task", generated.NotificationsSeverityNormal
-	case "agent.task.attached":
-		return "An agent was attached to a task", "task", generated.NotificationsSeverityLow
-	case "agent.task.detached":
-		return "An agent was detached from a task", "task", generated.NotificationsSeverityLow
-	case "agent.task.thought":
-		return "", "", ""
+	// silent because it records private agent reasoning.
+	eventbus.AgentTaskHandoffToUser:  notify("An agent handed back to you", "task", generated.NotificationsSeverityHigh),
+	eventbus.AgentTaskHandoffToAgent: notify("A task was handed off to an agent", "task", generated.NotificationsSeverityNormal),
+	eventbus.AgentTaskAttached:       notify("An agent was attached to a task", "task", generated.NotificationsSeverityLow),
+	eventbus.AgentTaskDetached:       notify("An agent was detached from a task", "task", generated.NotificationsSeverityLow),
+	eventbus.AgentTaskThought:        silent,
 
-	default:
-		return "", "", ""
-	}
+	// Task metadata: the task itself carries the change and the lists
+	// refresh off the stream, so a per-recipient row would be noise.
+	eventbus.TaskAttachmentAdded:   silent,
+	eventbus.TaskAttachmentRemoved: silent,
+	eventbus.TaskDependencyAdded:   silent,
+	eventbus.TaskDependencyRemoved: silent,
+	eventbus.TaskConstraintAdded:   silent,
+	eventbus.TaskConstraintRemoved: silent,
+	eventbus.TaskLabelAdded:        silent,
+	eventbus.TaskLabelRemoved:      silent,
+	eventbus.TaskArchived:          silent,
+	eventbus.TaskUnarchived:        silent,
+
+	// Judge-driven task effects. The signal timeline is where these are
+	// read; a notification would duplicate the transition row the Applier
+	// also appends.
+	eventbus.TaskAutoCompleted: silent,
+	eventbus.TaskRetroDrafted:  silent,
+
+	// Signal lifecycle: machine-facing audit anchors for the judge loop.
+	eventbus.SignalAttached: silent,
+	eventbus.SignalJudged:   silent,
+	eventbus.SignalApplied:  silent,
+	eventbus.SignalRejected: silent,
+
+	// AI suggestions and agent runs surface in their own screens, which
+	// the stream keeps fresh.
+	eventbus.AiSuggestionProposed:  silent,
+	eventbus.AiSuggestionApplied:   silent,
+	eventbus.AiSuggestionDismissed: silent,
+	eventbus.AiSuggestionEdited:    silent,
+	// A proposal the executor has not acted on is a note on the activity
+	// feed, not something to interrupt anyone with; the applied action
+	// that may follow carries its own kind.
+	eventbus.AiAutoActionProposed: silent,
+	eventbus.AiAgentPaused:        silent,
+	eventbus.AiAgentResumed:       silent,
+	eventbus.AiAgentRunStarted:    silent,
+	eventbus.AiAgentRunCompleted:  silent,
+	eventbus.AiAgentRunFailed:     silent,
+
+	// Workspace furniture: labels, pages, lenses, dashboards, timeboxes,
+	// relations and exports are read from their own lists.
+	eventbus.LabelCreated:            silent,
+	eventbus.LabelUpdated:            silent,
+	eventbus.LabelDisabled:           silent,
+	eventbus.PageCreated:             silent,
+	eventbus.PageUpdated:             silent,
+	eventbus.PageDisabled:            silent,
+	eventbus.PageArchived:            silent,
+	eventbus.PageUnarchived:          silent,
+	eventbus.LensShared:              silent,
+	eventbus.LensUnshared:            silent,
+	eventbus.LensArchived:            silent,
+	eventbus.DashboardWidgetCreated:  silent,
+	eventbus.DashboardWidgetUpdated:  silent,
+	eventbus.DashboardWidgetDisabled: silent,
+	eventbus.TimeboxCreated:          silent,
+	eventbus.TimeboxUpdated:          silent,
+	eventbus.TimeboxActivated:        silent,
+	eventbus.TimeboxCompleted:        silent,
+	eventbus.TimeboxTaskAdded:        silent,
+	eventbus.TimeboxTaskRemoved:      silent,
+	eventbus.TimeboxArchived:         silent,
+	eventbus.RelationSuggested:       silent,
+	eventbus.RelationAccepted:        silent,
+	eventbus.RelationDismissed:       silent,
+	eventbus.ExportRequested:         silent,
+
+	// Calendar surface. Calendar changes reach their readers through the
+	// calendar itself rather than the notification bell.
+	eventbus.CalendarCreated:             silent,
+	eventbus.CalendarUpdated:             silent,
+	eventbus.CalendarDeleted:             silent,
+	eventbus.CalendarSubscribed:          silent,
+	eventbus.CalendarSubscriptionUpdated: silent,
+	eventbus.CalEventCreated:             silent,
+	eventbus.CalEventUpdated:             silent,
+	eventbus.CalEventDeleted:             silent,
+	eventbus.CalMemberAdded:              silent,
+	eventbus.CalMemberRemoved:            silent,
+	eventbus.CalMemberRoleChanged:        silent,
+	eventbus.CalMemoCreated:              silent,
+	eventbus.CalMemoUpdated:              silent,
+	eventbus.CalMemoCompleted:            silent,
+	eventbus.CalMemoDeleted:              silent,
+
+	eventbus.CalEventCommentCreated:    silent,
+	eventbus.CalEventCommentUpdated:    silent,
+	eventbus.CalEventCommentDeleted:    silent,
+	eventbus.CalEventAttachmentCreated: silent,
+	eventbus.CalEventAttachmentDeleted: silent,
+	eventbus.CalEventChecklistCreated:  silent,
+	eventbus.CalEventChecklistUpdated:  silent,
+	eventbus.CalEventChecklistDeleted:  silent,
+	eventbus.CalEventAttendeeAdded:     silent,
+	eventbus.CalEventAttendeeRemoved:   silent,
+	eventbus.CalEventRsvpUpdated:       silent,
+	eventbus.CalEventInviteCreated:     silent,
+	eventbus.CalEventInviteRotated:     silent,
+	eventbus.CalEventInviteRevoked:     silent,
+
+	// Public shares are an owner-side administrative surface.
+	eventbus.PublicShareCreated:         silent,
+	eventbus.PublicShareUpdated:         silent,
+	eventbus.PublicShareRotated:         silent,
+	eventbus.PublicShareDeleted:         silent,
+	eventbus.PublicShareEventsAttached:  silent,
+	eventbus.PublicShareEventsReordered: silent,
+	eventbus.PublicShareEventDetached:   silent,
+
+	// Reactions, mentions and favourites. Mentions are the one that
+	// should reach a person, but the fan-out has no way to resolve the
+	// mentioned user from the event row, so it stays silent rather than
+	// notifying the whole workspace.
+	eventbus.ReactionAdded:   silent,
+	eventbus.ReactionRemoved: silent,
+	eventbus.MentionCreated:  silent,
+	eventbus.FavoriteAdded:   silent,
+	eventbus.FavoriteRemoved: silent,
+
+	// Intake triage, description history and import jobs are read from
+	// the screen that started them.
+	eventbus.IntakeItemCreated:         silent,
+	eventbus.IntakeItemAccepted:        silent,
+	eventbus.IntakeItemRejected:        silent,
+	eventbus.IntakeItemSnoozed:         silent,
+	eventbus.IntakeItemDuplicate:       silent,
+	eventbus.DescriptionVersionCreated: silent,
+
+	eventbus.DescriptionVersionRestored: silent,
+	eventbus.ImportJobCreated:           silent,
+	eventbus.ImportJobCompleted:         silent,
+	eventbus.ImportJobFailed:            silent,
+	eventbus.ImportJobCancelled:         silent,
+
+	// Workspace membership is handled by the invitation flow in auth-api.
+	eventbus.WorkspaceMemberAdded:       silent,
+	eventbus.WorkspaceMemberRemoved:     silent,
+	eventbus.WorkspaceMemberRoleChanged: silent,
+
+	// Historical rows only; nothing emits this any more.
+	eventbus.CommentAddedLegacy: silent,
+}
+
+// classifyEvent maps an event type to a human-readable notification
+// title template, resource type, and severity. Returns an empty title
+// when the event type should not generate notifications.
+//
+// A kind outside [classifications] notifies nobody. That is reachable
+// only for the `task.transition.<name>` kinds minted at runtime from a
+// free-form transition name, which have no copy to render; every kind
+// declared as a constant has an entry, and the guard test is what keeps
+// it that way.
+func classifyEvent(eventType string) (title string, resourceType string, severity generated.NotificationsSeverity) {
+	c := classifications[eventbus.Kind(eventType)]
+	return c.Title, c.ResourceType, c.Severity
 }
 
 // categoryForEventType maps an eventbus event type (the dotted string

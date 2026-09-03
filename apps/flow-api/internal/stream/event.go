@@ -18,7 +18,7 @@
 // TanStack Query invalidation calls.
 package stream
 
-import "strings"
+import "github.com/libraz/nodate-flow/packages/go-shared/eventbus"
 
 // Kind is the closed set of event families the stream emits. Adding
 // a new kind requires an ADR amendment (ADR 0005 §Wire format).
@@ -96,33 +96,77 @@ type Event struct {
 	At          int64  `json:"at"`
 }
 
+// streamKindForFamily maps every event family onto the stream [Kind]
+// subscribers see for it. A family mapped to "" is deliberately not
+// published: the wire format is a closed set (ADR 0005 §Wire format), so
+// carrying a family onto the stream is an ADR amendment and a frontend
+// change, not a silent addition here.
+//
+// The table is total over [eventbus.Families]. That is the point of it:
+// the prefix switch it replaced answered "not published" for anything it
+// did not list, so a family added later reached this function, matched
+// no case, and vanished — indistinguishable from a family somebody chose
+// not to publish. A missing entry now fails
+// TestStreamKindCoversEveryFamily instead, and the choice has to be
+// written down either way.
+var streamKindForFamily = map[eventbus.Family]Kind{
+	eventbus.FamilyTask:         KindTaskChanged,
+	eventbus.FamilyAiSuggestion: KindAiSuggestionChanged,
+
+	// An auto-action proposal changes nothing about the task except what
+	// its activity feed shows, and that feed is what KindTaskChanged
+	// invalidates. It is not an ai.suggestion: those name rows in
+	// ai_suggestions, and a subscriber told to re-read that list would
+	// find nothing new.
+	eventbus.FamilyAiAutoAction: KindTaskChanged,
+
+	eventbus.FamilyTimebox:   KindTimeboxChanged,
+	eventbus.FamilyRelation:  KindRelationChanged,
+	eventbus.FamilyLens:      KindLensChanged,
+	eventbus.FamilyPage:      KindPageChanged,
+	eventbus.FamilyDashboard: KindDashboardChanged,
+	eventbus.FamilyItem:      KindItemChanged,
+
+	// Calendar and public-share appends share one stream kind because the
+	// frontend invalidates calendars, events and public-share views
+	// together off it.
+	eventbus.FamilyCalendar:    KindCalendarChanged,
+	eventbus.FamilyPublicShare: KindCalendarChanged,
+
+	// Not published. Each of these is an audit-trail or back-office
+	// family with no live query to invalidate, or one whose stream kind
+	// the frontend does not yet accept.
+	eventbus.FamilyLabel:           "",
+	eventbus.FamilyAgentTask:       "",
+	eventbus.FamilyAiAgent:         "",
+	eventbus.FamilySignal:          "",
+	eventbus.FamilyExport:          "",
+	eventbus.FamilyReaction:        "",
+	eventbus.FamilyMention:         "",
+	eventbus.FamilyFavorite:        "",
+	eventbus.FamilyIntake:          "",
+	eventbus.FamilyDescription:     "",
+	eventbus.FamilyImport:          "",
+	eventbus.FamilyWorkspaceMember: "",
+	eventbus.FamilyComment:         "",
+}
+
 // KindForEventType maps a dotted `eventbus.Kind` string (e.g.
 // "task.transition.complete") to the stream [Kind] the frontend
 // should see. Returns ("", false) when the event does not belong to
 // any published family.
+//
+// [KindNotificationChanged] and [KindAiInvocationWritten] have no entry
+// above because no row in `events` carries them: they are published
+// straight to the notifier by the fan-out and the invocation writer.
 func KindForEventType(eventType string) (Kind, bool) {
-	switch {
-	case strings.HasPrefix(eventType, "task."):
-		return KindTaskChanged, true
-	case strings.HasPrefix(eventType, "ai.suggestion."):
-		return KindAiSuggestionChanged, true
-	case strings.HasPrefix(eventType, "notification."):
-		return KindNotificationChanged, true
-	case strings.HasPrefix(eventType, "timebox."):
-		return KindTimeboxChanged, true
-	case strings.HasPrefix(eventType, "relation."):
-		return KindRelationChanged, true
-	case strings.HasPrefix(eventType, "lens."):
-		return KindLensChanged, true
-	case strings.HasPrefix(eventType, "page."):
-		return KindPageChanged, true
-	case strings.HasPrefix(eventType, "calendar."),
-		strings.HasPrefix(eventType, "share."):
-		return KindCalendarChanged, true
-	case strings.HasPrefix(eventType, "item."):
-		return KindItemChanged, true
-	case strings.HasPrefix(eventType, "dashboard."):
-		return KindDashboardChanged, true
+	family, ok := eventbus.FamilyForEventType(eventType)
+	if !ok {
+		return "", false
 	}
-	return "", false
+	kind, published := streamKindForFamily[family]
+	if !published || kind == "" {
+		return "", false
+	}
+	return kind, true
 }

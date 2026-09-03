@@ -8,7 +8,7 @@
 // construct it with a fixed test cipher and an empty default workspace
 // id.
 //
-// Sub-router split (R6 Phase 0 / ADR 0007). The router composes three
+// Sub-router split (ADR 0007). The router composes three
 // builder functions:
 //
 //   - buildAuthenticatedAPI: every route that requires a valid bearer
@@ -55,6 +55,7 @@ import (
 	airelations "github.com/libraz/nodate-flow/apps/flow-api/internal/ai/relations"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/audit"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/auth"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/dbretry"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated/calendar"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
@@ -94,7 +95,6 @@ import (
 	"github.com/libraz/nodate-flow/packages/go-shared/crypto"
 	"github.com/libraz/nodate-flow/packages/go-shared/email"
 	"github.com/libraz/nodate-flow/packages/go-shared/httputil"
-	"github.com/libraz/nodate-flow/packages/go-shared/openapiutil"
 	"github.com/libraz/nodate-flow/packages/go-shared/ratelimit"
 )
 
@@ -224,9 +224,8 @@ type Deps struct {
 // spec for TypeScript SDK generation.
 //
 // AuthenticatedOps, PublicOps, and AuthOps capture the (method, path,
-// operationID) triples registered through each builder. They are
-// snapshotted before mergeAPIs mutates the first sub-API's OpenAPI
-// document, so the static check tests
+// operationID) triples registered through each builder separately, so
+// the static check tests
 // (TestPublicSubRouterIsAuthFree / TestAuthenticatedSubRouterAlwaysAuthenticated)
 // see only the operations that belong to their builder rather than
 // the merged super-set. AuthOps is empty today (see buildAuthAPI).
@@ -251,7 +250,7 @@ type OperationRef struct {
 	// mutating methods (one of the floor* constants). It is recorded by
 	// the same call that mounts the middleware, so a group cannot claim a
 	// floor it does not enforce.
-	WriteFloor string
+	WriteFloor auth.Floor
 }
 
 // aclFloor pairs the label a group records on its operations with the
@@ -267,8 +266,10 @@ type OperationRef struct {
 // group actually ended up with.
 type aclFloor struct {
 	// label identifies the floor in the operation inventory the static
-	// checks walk. Empty for groups that enforce their ACL elsewhere.
-	label string
+	// checks walk. Empty for groups that enforce their ACL elsewhere. The
+	// vocabulary is auth.Floor so the router and the MCP surface name the
+	// same set of floors instead of each keeping its own.
+	label auth.Floor
 	// mw enforces the floor. Nil only for floorNone.
 	mw func(http.Handler) http.Handler
 }
@@ -283,25 +284,33 @@ var (
 	// floorWorkspaceMember keeps guests (the read-only workspace role)
 	// out of every mutating operation on the group.
 	floorWorkspaceMember = aclFloor{
-		label: "workspace:member",
+		label: auth.FloorWorkspaceMember,
 		mw:    middleware.RequireWorkspaceRoleForWrites(middleware.WorkspaceRoleMember),
 	}
 	// floorWorkspaceAdmin restricts the whole group to workspace
 	// admins / owners, reads included.
 	floorWorkspaceAdmin = aclFloor{
-		label: "workspace:admin",
+		label: auth.FloorWorkspaceAdmin,
 		mw:    middleware.RequireWorkspaceRole(middleware.WorkspaceRoleAdmin),
 	}
 	// floorProjectCommenter / floorProjectEditor restrict the group to the
 	// matching project role; they apply to reads as well because the
 	// groups carrying them register only mutations.
 	floorProjectCommenter = aclFloor{
-		label: "project:commenter",
+		label: auth.FloorProjectCommenter,
 		mw:    middleware.RequireProjectRole(middleware.ProjectRoleCommenter),
 	}
 	floorProjectEditor = aclFloor{
-		label: "project:editor",
+		label: auth.FloorProjectEditor,
 		mw:    middleware.RequireProjectRole(middleware.ProjectRoleEditor),
+	}
+	// floorProjectLead restricts the group to the role that decides who
+	// else reaches the project. It is separate from the editor floor
+	// because granting roles is not an editing power: an editor who could
+	// also grant roles could promote themselves and remove every lead.
+	floorProjectLead = aclFloor{
+		label: auth.FloorProjectLead,
+		mw:    middleware.RequireProjectRole(middleware.ProjectRoleLead),
 	}
 )
 
@@ -309,7 +318,7 @@ var (
 // registered on.
 type groupAPI struct {
 	api   huma.API
-	floor string
+	floor auth.Floor
 }
 
 // plainGroups adapts a builder that returns bare huma.API values (the
@@ -325,9 +334,9 @@ func plainGroups(apis []huma.API) []groupAPI {
 
 // snapshotOps reads each sub-API's OpenAPI document and emits one
 // OperationRef per registered (verb, path) pair, tagged with its group's
-// ACL floor. It MUST be called before mergeAPIs, because that function
-// mutates apis[0]'s OpenAPI document in place to host every other
-// sub-API's paths.
+// ACL floor. It reads each builder's own document, so an operation is
+// attributed to the group that registered it rather than to the merged
+// super-set.
 func snapshotOps(groups []groupAPI) []OperationRef {
 	var ops []OperationRef
 	for _, g := range groups {
@@ -427,10 +436,10 @@ func BuildResult(deps Deps) Result {
 	publicGroups := plainGroups(buildPublicShareAPI(r, deps, shared))
 	authGroups := plainGroups(buildAuthAPI(r, deps, shared))
 
-	// Snapshot the per-builder operation set before mergeAPIs mutates
-	// apis[0]'s OpenAPI document. The static check tests rely on these
-	// pristine slices to walk only the routes that belong to their
-	// builder; once merged, every path appears under apis[0].
+	// Snapshot the per-builder operation set. The static check tests rely
+	// on these slices to walk only the routes that belong to their own
+	// builder rather than the merged super-set, which is why they are
+	// taken per builder rather than read back off the merged document.
 	authedOps := snapshotOps(authedGroups)
 	publicOps := snapshotOps(publicGroups)
 	authOps := snapshotOps(authGroups)
@@ -577,7 +586,8 @@ func buildSharedDeps(deps Deps) *sharedDeps {
 		// NL endpoints so command-palette / NL query / NL constraint calls
 		// enforce the same per-workspace daily budget and write redacted
 		// ai_invocations rows. Without this the NL surfaces bill the
-		// provider unbounded and untracked (audit C-2 / H-8 / M-6).
+		// provider with no daily cap and leave no invocation row behind,
+		// so spend is neither stopped nor attributable to a workspace.
 		nlBudget := ai.BudgetReaderFunc(func(ctx context.Context, wsID uint32) (int64, error) {
 			return deps.Queries.SumAiCostTodayForWorkspace(ctx, ai.DailyCostParams(ctx, deps.Queries, wsID))
 		})
@@ -671,7 +681,7 @@ func buildSharedDeps(deps Deps) *sharedDeps {
 		aiOrch = &ai.Orchestrator{
 			Resolver:      mockResolver,
 			Guard:         ai.NewCostGuard(budget, deps.AiDailyBudgetCents),
-			DB:            deps.DB,
+			DB:            dbretry.AutoCommit(deps.DB),
 			Queries:       deps.Queries,
 			OnInvocation:  obs.RecordAIInvocation,
 			ProposalCache: ai.NewProposalCache(10 * time.Minute),
@@ -684,7 +694,7 @@ func buildSharedDeps(deps Deps) *sharedDeps {
 		aiOrch = &ai.Orchestrator{
 			Resolver:      resolver,
 			Guard:         ai.NewCostGuard(budget, deps.AiDailyBudgetCents),
-			DB:            deps.DB,
+			DB:            dbretry.AutoCommit(deps.DB),
 			Queries:       deps.Queries,
 			LogInvoke:     invocationLogger,
 			OnInvocation:  obs.RecordAIInvocation,
@@ -1051,13 +1061,47 @@ func buildAuthenticatedAPI(r chi.Router, deps Deps, shared *sharedDeps, authMW f
 		audithandlers.Register(subAPI, auditHandlerDeps)
 	})
 
-	// /projects/{prjId}.
+	// /projects/{prjId}, split into three chi groups by the minimum project
+	// role each operation requires. All three mount
+	// RequireProjectMemberByGlobalID first, which resolves the project from
+	// the path, derives the owning workspace, and injects the caller's
+	// effective project role; the write groups then chain RequireProjectRole
+	// so that a member who can *see* the project cannot reshape it.
+	//
+	// Membership alone used to be the whole check here, which made every
+	// mutation on this prefix available to a project viewer: renaming the
+	// project, soft-deleting it along with its tasks, and rewriting its
+	// member list, own promotion included.
+	//
+	//   - reads: membership only. Any project role may call these.
+	//   - editor writes: metadata edits and the soft delete, which are
+	//     structural changes to a project the caller already works in.
+	//   - lead writes: the member list. Deciding who reaches the project is
+	//     held one role higher than editing it, because that decision is
+	//     what protects every other role.
+	//
+	// Workspace owners / admins pass all three via the ProjectRoleElevated
+	// bypass inside RequireProjectRole.
 	r.Group(func(sub chi.Router) {
 		sub.Use(authMW)
 		sub.Use(middleware.RequireProjectMemberByGlobalID(shared.aclDB))
 		subAPI := mountGroup(sub, floorNone, &apis)
-		projects.RegisterGlobal(subAPI, shared.prjDeps)
+		projects.RegisterGlobalReads(subAPI, shared.prjDeps)
 		timeline.RegisterProjectScoped(subAPI, shared.tlDeps)
+	})
+
+	r.Group(func(sub chi.Router) {
+		sub.Use(authMW)
+		sub.Use(middleware.RequireProjectMemberByGlobalID(shared.aclDB))
+		subAPI := mountGroup(sub, floorProjectEditor, &apis)
+		projects.RegisterGlobalEditorWrites(subAPI, shared.prjDeps)
+	})
+
+	r.Group(func(sub chi.Router) {
+		sub.Use(authMW)
+		sub.Use(middleware.RequireProjectMemberByGlobalID(shared.aclDB))
+		subAPI := mountGroup(sub, floorProjectLead, &apis)
+		projects.RegisterGlobalLeadWrites(subAPI, shared.prjDeps)
 	})
 
 	// Task collection routes.
@@ -1121,7 +1165,7 @@ func buildAuthenticatedAPI(r chi.Router, deps Deps, shared *sharedDeps, authMW f
 		tasks.RegisterSteps(subAPI, stepsDeps)
 	})
 
-	// Workspace timeline + event reversal (ADR 0008 D4 / J5). Both share
+	// Workspace timeline + event reversal (ADR 0008 D4). Both share
 	// the same RequireWorkspaceMember middleware because reversal is a
 	// workspace-scoped mutation of an audit-log row that is otherwise
 	// only visible through the timeline.
@@ -2030,12 +2074,20 @@ const scalarHTML = `<!DOCTYPE html>
 </html>`
 
 // buildOpenAPIJSON merges the separate huma.API OpenAPI documents into a
-// single spec and returns the marshaled JSON bytes. This is the same
-// merge logic used by cmd/dump-openapi but executed at router build time
-// so the running server can serve the spec without a filesystem artifact.
+// single spec and returns the marshaled JSON bytes. It runs the same
+// MergeAPIs that cmd/dump-openapi runs, at router build time, so the
+// running server can serve the spec without a filesystem artifact.
+//
+// A merge error means two sub-APIs claim one schema name for two
+// different types, so there is no spec that describes both. Panicking
+// stops the process at build time, where huma already panics for a
+// duplicate operation ID; the alternative is a server that starts and
+// serves a document describing one of the two operations wrongly.
 func buildOpenAPIJSON(apis []huma.API) []byte {
-	merged := mergeAPIs(apis)
-	openapiutil.PatchErrorModelSchema(merged)
+	merged, err := MergeAPIs(apis)
+	if err != nil {
+		panic(err)
+	}
 	buf, err := json.Marshal(merged)
 	if err != nil {
 		// Should never happen: Huma's OpenAPI types are always
@@ -2044,76 +2096,6 @@ func buildOpenAPIJSON(apis []huma.API) []byte {
 		return []byte(`{"openapi":"3.1.0","info":{"title":"nodate-flow","version":"0.0.0"},"paths":{}}`)
 	}
 	return buf
-}
-
-// mergeAPIs merges every sub-API's OpenAPI document into a single
-// OpenAPI 3.1 spec. The nodate-flow router splits operations across
-// multiple humachi.New instances so each middleware chain lives in its
-// own chi group, which means each group carries its own OpenAPI doc.
-func mergeAPIs(apis []huma.API) *huma.OpenAPI {
-	if len(apis) == 0 {
-		return &huma.OpenAPI{OpenAPI: "3.1.0"}
-	}
-	root := apis[0].OpenAPI()
-	if root.Paths == nil {
-		root.Paths = map[string]*huma.PathItem{}
-	}
-	if root.Components == nil {
-		root.Components = &huma.Components{}
-	}
-	for _, a := range apis[1:] {
-		spec := a.OpenAPI()
-		for path, item := range spec.Paths {
-			if existing, ok := root.Paths[path]; ok {
-				mergePathItem(existing, item)
-			} else {
-				root.Paths[path] = item
-			}
-		}
-		if spec.Components == nil {
-			continue
-		}
-		if spec.Components.Schemas != nil && root.Components.Schemas != nil {
-			rootMap := root.Components.Schemas.Map()
-			for name, schema := range spec.Components.Schemas.Map() {
-				if _, ok := rootMap[name]; ok {
-					continue
-				}
-				rootMap[name] = schema
-			}
-		}
-	}
-	openapiutil.PatchErrorModelSchema(root)
-	return root
-}
-
-// mergePathItem copies operations from src into dst for HTTP verbs that
-// dst does not already define.
-func mergePathItem(dst, src *huma.PathItem) {
-	if dst.Get == nil {
-		dst.Get = src.Get
-	}
-	if dst.Put == nil {
-		dst.Put = src.Put
-	}
-	if dst.Post == nil {
-		dst.Post = src.Post
-	}
-	if dst.Delete == nil {
-		dst.Delete = src.Delete
-	}
-	if dst.Patch == nil {
-		dst.Patch = src.Patch
-	}
-	if dst.Head == nil {
-		dst.Head = src.Head
-	}
-	if dst.Options == nil {
-		dst.Options = src.Options
-	}
-	if dst.Trace == nil {
-		dst.Trace = src.Trace
-	}
 }
 
 // passthroughDB adapts *sql.DB to middleware.ACLDB.

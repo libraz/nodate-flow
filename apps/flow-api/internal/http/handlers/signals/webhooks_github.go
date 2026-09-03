@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/dbretry"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
 	apierrors "github.com/libraz/nodate-flow/apps/flow-api/internal/errors"
@@ -177,7 +178,7 @@ func HandleGithubWebhook(deps Deps) http.HandlerFunc {
 		}
 
 		if taskLinked {
-			if err := eventbus.Append(ctx, deps.DB, eventbus.Event{
+			eventbus.AppendBestEffort(ctx, dbretry.AutoCommit(deps.DB), eventbus.Event{
 				Type:        eventbus.SignalAttached,
 				WorkspaceID: wsID,
 				TaskID:      &taskInternal,
@@ -186,15 +187,7 @@ func HandleGithubWebhook(deps Deps) http.HandlerFunc {
 					"source":   "github",
 					"kind":     event,
 				},
-			}); err != nil {
-				slog.ErrorContext(ctx, "eventbus.Append failed",
-					slog.Any("err", err),
-					slog.String("handler", "signals.HandleGithubWebhook"),
-					slog.String("event_type", string(eventbus.SignalAttached)),
-					slog.String("signal_id", pub.String()),
-					slog.String("kind", event),
-				)
-			}
+			}, "signals.HandleGithubWebhook")
 		}
 
 		// Best-effort signal_judge dispatch (ADR 0008 D3). The

@@ -17,6 +17,8 @@ import (
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/ai"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/ai/embed"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/ai/nlquery"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/auth"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/calendarrules"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/dbretry"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated/calendar"
@@ -33,24 +35,35 @@ import (
 // countLinkedEvents returns how many enabled calendar_events are
 // attached to a task. Used to decide when an MCP mutation must route
 // through itemkit to keep the task / event pair consistent.
+//
+// The same question decides the same thing on the REST task read path,
+// so both ask it with the same generated query.
 func countLinkedEvents(ctx context.Context, deps Deps, taskID uint32) (int, error) {
-	var n int
-	if err := deps.DB.QueryRowContext(ctx,
-		`SELECT COUNT(*) FROM calendar_events WHERE task_id = ? AND enabled = TRUE`,
-		taskID,
-	).Scan(&n); err != nil {
+	n, err := deps.Queries.CountActiveCalendarEventsByTaskId(ctx, sql.NullInt32{
+		Int32: int32(taskID), //#nosec G115 -- internal row id, bounded by realistic deployments
+		Valid: true,
+	})
+	if err != nil {
 		return 0, err
 	}
-	return n, nil
+	return int(n), nil
 }
+
+// toolRun is the signature every tool body has.
+type toolRun func(ctx context.Context, deps Deps, s *session, args json.RawMessage) (any, error)
 
 // tool is the internal descriptor for a registered MCP tool.
 type tool struct {
 	name          string
 	description   string
 	requiredScope string
-	inputSchema   map[string]any
-	run           func(ctx context.Context, deps Deps, s *session, args json.RawMessage) (any, error)
+	// floor is the minimum role the caller has to hold. It is filled in by
+	// [Handler.register] from that function's first argument rather than
+	// written in the literal below, so a tool cannot be registered without
+	// one.
+	floor       auth.Floor
+	inputSchema map[string]any
+	run         toolRun
 }
 
 // toolDescriptor is the public shape returned by tools/list.
@@ -72,17 +85,46 @@ func (h *Handler) listTools() []toolDescriptor {
 	return out
 }
 
-func (h *Handler) register(t tool) { h.tools[t.name] = t }
+// register records a tool under the role floor its callers have to clear.
+//
+// The floor is a positional argument rather than another field on the
+// literal below because a keyed composite literal that omits a field still
+// compiles: a tool registered without a floor would read as "no floor at
+// all" and nothing would say so. Leaving the argument out does not compile.
+//
+// The floor is also bound to the call here, so it is the value the ACL
+// helpers apply rather than a label each tool body separately remembers to
+// honour. A floor that no longer matches what the tool enforces therefore
+// changes behaviour instead of going stale.
+func (h *Handler) register(floor auth.Floor, t tool) {
+	t.floor = floor
+	t.run = withFloor(floor, t.run)
+	h.tools[t.name] = t
+}
+
+// withFloor binds the declared floor to the session the tool body runs
+// with. The session is copied rather than mutated so a caller's value is
+// never left carrying the floor of a tool it has finished invoking.
+func withFloor(floor auth.Floor, run toolRun) toolRun {
+	return func(ctx context.Context, deps Deps, s *session, args json.RawMessage) (any, error) {
+		if s == nil {
+			return nil, apierrors.New(apierrors.McpTokenUnknown)
+		}
+		scoped := *s
+		scoped.floor = floor
+		return run(ctx, deps, &scoped, args)
+	}
+}
 
 func registerTools(h *Handler) {
-	h.register(tool{
+	h.register(auth.FloorWorkspaceMember, tool{
 		name:          "list_projects",
 		description:   "List projects in the caller's workspace.",
 		requiredScope: "read:workspace",
 		inputSchema:   objectSchema(nil, nil),
 		run:           runListProjects,
 	})
-	h.register(tool{
+	h.register(auth.FloorWorkspaceMember, tool{
 		name:          "list_tasks",
 		description:   "List tasks, optionally scoped to a project.",
 		requiredScope: "read:workspace",
@@ -93,7 +135,7 @@ func registerTools(h *Handler) {
 		}, nil),
 		run: runListTasks,
 	})
-	h.register(tool{
+	h.register(auth.FloorWorkspaceMember, tool{
 		name:          "get_task",
 		description:   "Fetch a single task by public id.",
 		requiredScope: "read:workspace",
@@ -102,7 +144,7 @@ func registerTools(h *Handler) {
 		}, []string{"taskId"}),
 		run: runGetTask,
 	})
-	h.register(tool{
+	h.register(auth.FloorProjectEditor, tool{
 		name:          "create_task",
 		description:   "Create a new task in a project.",
 		requiredScope: "write:workspace",
@@ -116,7 +158,7 @@ func registerTools(h *Handler) {
 		}, []string{"projectId", "title"}),
 		run: runCreateTask,
 	})
-	h.register(tool{
+	h.register(auth.FloorProjectEditor, tool{
 		name:          "update_task",
 		description:   "Update mutable fields of a task.",
 		requiredScope: "write:workspace",
@@ -130,7 +172,7 @@ func registerTools(h *Handler) {
 		}, []string{"taskId"}),
 		run: runUpdateTask,
 	})
-	h.register(tool{
+	h.register(auth.FloorProjectEditor, tool{
 		name:          "transition_task",
 		description:   "Apply a state machine transition to a task. Valid transitions: start, block, unblock, submit, complete, reopen, cancel.",
 		requiredScope: "write:workspace",
@@ -141,7 +183,7 @@ func registerTools(h *Handler) {
 		}, []string{"taskId", "transition"}),
 		run: runTransitionTask,
 	})
-	h.register(tool{
+	h.register(auth.FloorProjectCommenter, tool{
 		name:          "add_comment",
 		description:   "Append a comment to a task.",
 		requiredScope: "write:workspace",
@@ -151,7 +193,7 @@ func registerTools(h *Handler) {
 		}, []string{"taskId", "body"}),
 		run: runAddComment,
 	})
-	h.register(tool{
+	h.register(auth.FloorWorkspaceMember, tool{
 		name:          "search_tasks",
 		description:   "Search tasks by title or description within the workspace.",
 		requiredScope: "read:workspace",
@@ -162,7 +204,7 @@ func registerTools(h *Handler) {
 		}, []string{"query"}),
 		run: runSearchTasks,
 	})
-	h.register(tool{
+	h.register(auth.FloorWorkspaceMember, tool{
 		name:          "propose_tasks_from",
 		description:   "Ask the workspace LLM to propose tasks from free text. Requires a configured AI provider.",
 		requiredScope: "write:workspace",
@@ -171,7 +213,7 @@ func registerTools(h *Handler) {
 		}, []string{"source"}),
 		run: runProposeTasksFrom,
 	})
-	h.register(tool{
+	h.register(auth.FloorWorkspaceMember, tool{
 		name:          "propose_priority",
 		description:   "Ask the workspace LLM to propose a priority for a task. Requires a configured AI provider.",
 		requiredScope: "write:workspace",
@@ -180,7 +222,7 @@ func registerTools(h *Handler) {
 		}, []string{"taskId"}),
 		run: runProposePriority,
 	})
-	h.register(tool{
+	h.register(auth.FloorProjectEditor, tool{
 		name:          "propose_steps",
 		description:   "Ask the workspace LLM to break an existing task into concrete execution steps.",
 		requiredScope: "write:workspace",
@@ -189,7 +231,7 @@ func registerTools(h *Handler) {
 		}, []string{"taskId"}),
 		run: runProposeSteps,
 	})
-	h.register(tool{
+	h.register(auth.FloorProjectEditor, tool{
 		name:          "apply_steps",
 		description:   "Create the given steps as child tasks under an existing parent task.",
 		requiredScope: "write:workspace",
@@ -207,7 +249,7 @@ func registerTools(h *Handler) {
 		}, []string{"parentTaskId", "steps"}),
 		run: runApplySteps,
 	})
-	h.register(tool{
+	h.register(auth.FloorWorkspaceMember, tool{
 		name:          "propose_duplicates",
 		description:   "Return likely-duplicate tasks for a given task by embedding similarity (ADR 0003).",
 		requiredScope: "write:workspace",
@@ -216,7 +258,7 @@ func registerTools(h *Handler) {
 		}, []string{"taskId"}),
 		run: runProposeDuplicates,
 	})
-	h.register(tool{
+	h.register(auth.FloorWorkspaceMember, tool{
 		name:          "propose_lens",
 		description:   "Compile a natural-language query into a validated Lens view JSON.",
 		requiredScope: "write:workspace",
@@ -225,7 +267,7 @@ func registerTools(h *Handler) {
 		}, []string{"prompt"}),
 		run: runProposeLens,
 	})
-	h.register(tool{
+	h.register(auth.FloorWorkspaceMember, tool{
 		name:          "list_timeboxes",
 		description:   "List timeboxes (sprints / iterations) in the caller's workspace.",
 		requiredScope: "read:workspace",
@@ -235,7 +277,7 @@ func registerTools(h *Handler) {
 		}, nil),
 		run: runListTimeboxes,
 	})
-	h.register(tool{
+	h.register(auth.FloorWorkspaceMember, tool{
 		name:          "create_timebox",
 		description:   "Create a new timebox (sprint / iteration) in the workspace.",
 		requiredScope: "write:workspace",
@@ -248,7 +290,7 @@ func registerTools(h *Handler) {
 		}, []string{"name", "startsOn", "endsOn"}),
 		run: runCreateTimebox,
 	})
-	h.register(tool{
+	h.register(auth.FloorWorkspaceMember, tool{
 		name:          "add_task_to_timebox",
 		description:   "Add a task to a timebox.",
 		requiredScope: "write:workspace",
@@ -258,7 +300,7 @@ func registerTools(h *Handler) {
 		}, []string{"timeboxId", "taskId"}),
 		run: runAddTaskToTimebox,
 	})
-	h.register(tool{
+	h.register(auth.FloorWorkspaceMember, tool{
 		name:          "export_tasks",
 		description:   "Export tasks as JSON for MCP consumers. Optionally scoped to a project.",
 		requiredScope: "read:workspace",
@@ -268,7 +310,7 @@ func registerTools(h *Handler) {
 		}, nil),
 		run: runExportTasks,
 	})
-	h.register(tool{
+	h.register(auth.FloorWorkspaceMember, tool{
 		name:          "propose_relations",
 		description:   "Given a task, find related or duplicate tasks by embedding similarity. Returns structured suggestions with kind.",
 		requiredScope: "write:workspace",
@@ -277,7 +319,7 @@ func registerTools(h *Handler) {
 		}, []string{"taskId"}),
 		run: runProposeRelations,
 	})
-	h.register(tool{
+	h.register(auth.FloorWorkspaceMember, tool{
 		name:          "list_pages",
 		description:   "List wiki pages for the current workspace. Returns root-level pages by default.",
 		requiredScope: "read:workspace",
@@ -287,7 +329,7 @@ func registerTools(h *Handler) {
 		}, nil),
 		run: runListPages,
 	})
-	h.register(tool{
+	h.register(auth.FloorWorkspaceMember, tool{
 		name:          "get_page",
 		description:   "Get a wiki page by ID, including its content.",
 		requiredScope: "read:workspace",
@@ -296,7 +338,7 @@ func registerTools(h *Handler) {
 		}, []string{"pageId"}),
 		run: runGetPage,
 	})
-	h.register(tool{
+	h.register(auth.FloorWorkspaceMember, tool{
 		name:          "create_page",
 		description:   "Create a new wiki page.",
 		requiredScope: "write:workspace",
@@ -308,7 +350,7 @@ func registerTools(h *Handler) {
 		}, []string{"title"}),
 		run: runCreatePage,
 	})
-	h.register(tool{
+	h.register(auth.FloorWorkspaceMember, tool{
 		name:          "update_page",
 		description:   "Update a wiki page's title or content.",
 		requiredScope: "write:workspace",
@@ -319,7 +361,7 @@ func registerTools(h *Handler) {
 		}, []string{"pageId"}),
 		run: runUpdatePage,
 	})
-	h.register(tool{
+	h.register(auth.FloorWorkspaceMember, tool{
 		name:          "generate_page",
 		description:   "Generate a wiki page using AI based on project or task context.",
 		requiredScope: "write:workspace",
@@ -334,7 +376,7 @@ func registerTools(h *Handler) {
 		}, []string{"contextDescription"}),
 		run: runGeneratePage,
 	})
-	h.register(tool{
+	h.register(auth.FloorProjectEditor, tool{
 		name:          "smart_create_task",
 		description:   "Create a task with AI-suggested subtask breakdown and assignees based on past ticket patterns.",
 		requiredScope: "write:workspace",
@@ -347,14 +389,14 @@ func registerTools(h *Handler) {
 	})
 
 	// Calendar tools.
-	h.register(tool{
+	h.register(auth.FloorWorkspaceMember, tool{
 		name:          "list_calendars",
 		description:   "List calendars the caller subscribes to in the workspace.",
 		requiredScope: "read:workspace",
 		inputSchema:   objectSchema(nil, nil),
 		run:           runListCalendars,
 	})
-	h.register(tool{
+	h.register(auth.FloorWorkspaceMember, tool{
 		name:          "list_calendar_events",
 		description:   "List events in a date range across all subscribed calendars. Use startDate/endDate (YYYY-MM-DD) for day ranges, or startAt/endAt (unix seconds since epoch) for sub-day windows.",
 		requiredScope: "read:workspace",
@@ -366,7 +408,7 @@ func registerTools(h *Handler) {
 		}, nil),
 		run: runListCalendarEvents,
 	})
-	h.register(tool{
+	h.register(auth.FloorWorkspaceMember, tool{
 		name:          "create_calendar_event",
 		description:   "Create a calendar event. Use startAt/endAt (unix seconds since epoch) for timed events, or startDate/endDate (YYYY-MM-DD) when allDay=true.",
 		requiredScope: "write:workspace",
@@ -389,7 +431,7 @@ func registerTools(h *Handler) {
 		}, []string{"calendarId", "title"}),
 		run: runCreateCalendarEvent,
 	})
-	h.register(tool{
+	h.register(auth.FloorWorkspaceMember, tool{
 		name:          "update_calendar_event",
 		description:   "Update mutable fields of a calendar event. Times are unix seconds since epoch (startAt/endAt); use startDate/endDate (YYYY-MM-DD) for all-day events.",
 		requiredScope: "write:workspace",
@@ -410,7 +452,7 @@ func registerTools(h *Handler) {
 		}, []string{"eventId"}),
 		run: runUpdateCalendarEvent,
 	})
-	h.register(tool{
+	h.register(auth.FloorWorkspaceMember, tool{
 		name:          "delete_calendar_event",
 		description:   "Delete a calendar event (soft-delete).",
 		requiredScope: "write:workspace",
@@ -419,7 +461,7 @@ func registerTools(h *Handler) {
 		}, []string{"eventId"}),
 		run: runDeleteCalendarEvent,
 	})
-	h.register(tool{
+	h.register(auth.FloorWorkspaceMember, tool{
 		name:          "list_free_slots",
 		description:   "Find available time slots for a user on a given date within working hours (09:00-18:00).",
 		requiredScope: "read:workspace",
@@ -430,7 +472,7 @@ func registerTools(h *Handler) {
 		}, []string{"date"}),
 		run: runListFreeSlots,
 	})
-	h.register(tool{
+	h.register(auth.FloorProjectEditor, tool{
 		name:          "create_event_from_task",
 		description:   "Create a calendar event linked to an existing task. Times are unix seconds since epoch.",
 		requiredScope: "write:workspace",
@@ -442,7 +484,7 @@ func registerTools(h *Handler) {
 		}, []string{"taskId", "calendarId", "startAt", "endAt"}),
 		run: runCreateEventFromTask,
 	})
-	h.register(tool{
+	h.register(auth.FloorWorkspaceMember, tool{
 		name:          "list_calendar_memos",
 		description:   "List memos (shared to-do items) in a calendar.",
 		requiredScope: "read:workspace",
@@ -451,7 +493,7 @@ func registerTools(h *Handler) {
 		}, []string{"calendarId"}),
 		run: runListCalendarMemos,
 	})
-	h.register(tool{
+	h.register(auth.FloorWorkspaceMember, tool{
 		name:          "toggle_calendar_memo",
 		description:   "Toggle the done/undone state of a calendar memo.",
 		requiredScope: "write:workspace",
@@ -463,7 +505,7 @@ func registerTools(h *Handler) {
 		run: runToggleCalendarMemo,
 	})
 	// Label & archive tools.
-	h.register(tool{
+	h.register(auth.FloorWorkspaceMember, tool{
 		name:          "list_labels",
 		description:   "List labels in the caller's workspace.",
 		requiredScope: "read:workspace",
@@ -473,7 +515,7 @@ func registerTools(h *Handler) {
 		}, nil),
 		run: runListLabels,
 	})
-	h.register(tool{
+	h.register(auth.FloorWorkspaceMember, tool{
 		name:          "create_label",
 		description:   "Create a new label in the workspace.",
 		requiredScope: "write:workspace",
@@ -484,7 +526,7 @@ func registerTools(h *Handler) {
 		}, []string{"name"}),
 		run: runCreateLabel,
 	})
-	h.register(tool{
+	h.register(auth.FloorProjectEditor, tool{
 		name:          "add_task_label",
 		description:   "Attach a label to a task.",
 		requiredScope: "write:workspace",
@@ -494,7 +536,7 @@ func registerTools(h *Handler) {
 		}, []string{"taskId", "labelId"}),
 		run: runAddTaskLabel,
 	})
-	h.register(tool{
+	h.register(auth.FloorProjectEditor, tool{
 		name:          "remove_task_label",
 		description:   "Remove a label from a task.",
 		requiredScope: "write:workspace",
@@ -504,7 +546,7 @@ func registerTools(h *Handler) {
 		}, []string{"taskId", "labelId"}),
 		run: runRemoveTaskLabel,
 	})
-	h.register(tool{
+	h.register(auth.FloorWorkspaceMember, tool{
 		name:          "resolve_task_ref",
 		description:   "Resolve a human-readable task reference (e.g. NF-42) to a task public id.",
 		requiredScope: "read:workspace",
@@ -513,7 +555,7 @@ func registerTools(h *Handler) {
 		}, []string{"ref"}),
 		run: runResolveTaskRef,
 	})
-	h.register(tool{
+	h.register(auth.FloorProjectEditor, tool{
 		name:          "archive_task",
 		description:   "Archive a task.",
 		requiredScope: "write:workspace",
@@ -522,7 +564,7 @@ func registerTools(h *Handler) {
 		}, []string{"taskId"}),
 		run: runArchiveTask,
 	})
-	h.register(tool{
+	h.register(auth.FloorProjectEditor, tool{
 		name:          "unarchive_task",
 		description:   "Unarchive a task.",
 		requiredScope: "write:workspace",
@@ -533,7 +575,7 @@ func registerTools(h *Handler) {
 	})
 
 	// Favorites, reactions, and recent visits.
-	h.register(tool{
+	h.register(auth.FloorWorkspaceMember, tool{
 		name:          "list_favorites",
 		description:   "List the current user's favorite items in the workspace.",
 		requiredScope: "read:workspace",
@@ -543,7 +585,7 @@ func registerTools(h *Handler) {
 		}, nil),
 		run: runListFavorites,
 	})
-	h.register(tool{
+	h.register(auth.FloorWorkspaceMember, tool{
 		name:          "add_favorite",
 		description:   "Add a task, project, page, lens, or timebox to the user's favorites.",
 		requiredScope: "write:workspace",
@@ -553,7 +595,7 @@ func registerTools(h *Handler) {
 		}, []string{"targetType", "targetId"}),
 		run: runAddFavorite,
 	})
-	h.register(tool{
+	h.register(auth.FloorProjectCommenter, tool{
 		name:          "add_reaction",
 		description:   "Add an emoji reaction to a task.",
 		requiredScope: "write:workspace",
@@ -563,7 +605,7 @@ func registerTools(h *Handler) {
 		}, []string{"taskId", "emoji"}),
 		run: runAddReaction,
 	})
-	h.register(tool{
+	h.register(auth.FloorWorkspaceMember, tool{
 		name:          "list_reactions",
 		description:   "List emoji reactions on a task.",
 		requiredScope: "read:workspace",
@@ -572,7 +614,7 @@ func registerTools(h *Handler) {
 		}, []string{"taskId"}),
 		run: runListReactions,
 	})
-	h.register(tool{
+	h.register(auth.FloorWorkspaceMember, tool{
 		name:          "list_recent",
 		description:   "List the user's recently visited entities in the workspace.",
 		requiredScope: "read:workspace",
@@ -583,7 +625,7 @@ func registerTools(h *Handler) {
 	})
 
 	// Intake triage and description version history.
-	h.register(tool{
+	h.register(auth.FloorWorkspaceMember, tool{
 		name:          "list_intake_items",
 		description:   "List intake items in the workspace triage queue.",
 		requiredScope: "read:workspace",
@@ -594,7 +636,7 @@ func registerTools(h *Handler) {
 		}, nil),
 		run: runListIntakeItems,
 	})
-	h.register(tool{
+	h.register(auth.FloorWorkspaceMember, tool{
 		name:          "triage_intake_item",
 		description:   "Accept, reject, snooze, or mark as duplicate an intake item.",
 		requiredScope: "write:workspace",
@@ -605,7 +647,7 @@ func registerTools(h *Handler) {
 		}, []string{"intakeItemId", "status"}),
 		run: runTriageIntakeItem,
 	})
-	h.register(tool{
+	h.register(auth.FloorProjectEditor, tool{
 		name:          "convert_intake_to_task",
 		description:   "Convert an intake item into a task in a specified project.",
 		requiredScope: "write:workspace",
@@ -615,7 +657,7 @@ func registerTools(h *Handler) {
 		}, []string{"intakeItemId", "projectId"}),
 		run: runConvertIntakeToTask,
 	})
-	h.register(tool{
+	h.register(auth.FloorWorkspaceMember, tool{
 		name:          "list_description_versions",
 		description:   "List description version history for a task (newest first, without body).",
 		requiredScope: "read:workspace",
@@ -624,7 +666,7 @@ func registerTools(h *Handler) {
 		}, []string{"taskId"}),
 		run: runListDescriptionVersions,
 	})
-	h.register(tool{
+	h.register(auth.FloorProjectEditor, tool{
 		name:          "restore_description_version",
 		description:   "Restore a previous description version, updating the task description and creating a new version snapshot.",
 		requiredScope: "write:workspace",
@@ -636,7 +678,7 @@ func registerTools(h *Handler) {
 	})
 
 	// Import job management.
-	h.register(tool{
+	h.register(auth.FloorWorkspaceMember, tool{
 		name:          "list_import_jobs",
 		description:   "List import jobs for the workspace.",
 		requiredScope: "read:workspace",
@@ -647,7 +689,7 @@ func registerTools(h *Handler) {
 		}, nil),
 		run: runListImportJobs,
 	})
-	h.register(tool{
+	h.register(auth.FloorWorkspaceMember, tool{
 		name:          "create_import_job",
 		description:   "Create a new import job.",
 		requiredScope: "write:workspace",
@@ -930,6 +972,13 @@ ORDER BY v.sort_weight ASC, v.priority DESC, v.due_on ASC, v.created_at DESC, v.
 LIMIT ? OFFSET ?`, strings.Join(where, " AND "))
 	args = append(args, limit, offset)
 
+	// no-generated-query: the WHERE clause is not fixed. acl.TaskVisibilityFilter
+	// returns a different fragment, with a different number of binds, depending on
+	// the caller's workspace role, and sqlc compiles one statement per query. A
+	// static version would have to spell the visibility predicate out a second
+	// time, which is how a listing ends up projecting rows the caller may not see.
+	// Replacing this needs a way to compose the filter into a generated statement,
+	// not another copy of the predicate.
 	rows, err := db.QueryContext(ctx, query, args...) //#nosec G701 -- query is assembled from static WHERE fragments; all user values are bound args.
 	if err != nil {
 		return nil, err
@@ -1011,7 +1060,7 @@ func runCreateTask(ctx context.Context, deps Deps, s *session, raw json.RawMessa
 	if _, err := requireWorkspaceMember(ctx, deps, s); err != nil {
 		return nil, err
 	}
-	prjID, err := resolveProjectForWrite(ctx, deps, s, in.ProjectID, acl.ProjectRoleEditor)
+	prjID, err := resolveProjectForWrite(ctx, deps, s, in.ProjectID)
 	if err != nil {
 		return nil, err
 	}
@@ -1027,7 +1076,7 @@ func runCreateTask(ctx context.Context, deps Deps, s *session, raw json.RawMessa
 		pub    types.PublicID
 		taskID int64
 	)
-	if txErr := dbretry.InTx(ctx, deps.DB, "mcp.create_task", nil, func(ctx context.Context, tx *sql.Tx) error {
+	if txErr := dbretry.InTx(ctx, deps.DB, "mcp.create_task", nil, func(ctx context.Context, tx *dbretry.Tx) error {
 		created, err := taskcreate.New(ctx, tx, taskcreate.Args{
 			WorkspaceID: s.workspaceID,
 			ProjectID:   prjID,
@@ -1081,7 +1130,7 @@ func runUpdateTask(ctx context.Context, deps Deps, s *session, raw json.RawMessa
 	if _, err := requireWorkspaceMember(ctx, deps, s); err != nil {
 		return nil, err
 	}
-	taskInternal, current, err := resolveTaskRowForWrite(ctx, deps, s, in.TaskID, acl.ProjectRoleEditor)
+	taskInternal, current, err := resolveTaskRowForWrite(ctx, deps, s, in.TaskID)
 	if err != nil {
 		return nil, err
 	}
@@ -1153,9 +1202,9 @@ func runUpdateTask(ctx context.Context, deps Deps, s *session, raw json.RawMessa
 		// would achieve nothing. dbretry.InTx retries the unit that
 		// actually failed.
 		var answered error
-		txErr := dbretry.InTx(ctx, deps.DB, "mcp.update_task", nil, func(ctx context.Context, tx *sql.Tx) error {
+		txErr := dbretry.InTx(ctx, deps.DB, "mcp.update_task", nil, func(ctx context.Context, tx *dbretry.Tx) error {
 			answered = nil
-			qtx := deps.Queries.WithTx(tx)
+			qtx := deps.Queries.WithTx(tx.RawTx())
 			if _, err := qtx.UpdateTask(ctx, updateParams); err != nil {
 				return err
 			}
@@ -1242,7 +1291,7 @@ func runTransitionTask(ctx context.Context, deps Deps, s *session, raw json.RawM
 	if _, err := requireWorkspaceMember(ctx, deps, s); err != nil {
 		return nil, err
 	}
-	taskInternal, pub, err := resolveTaskForWrite(ctx, deps, s, in.TaskID, acl.ProjectRoleEditor)
+	taskInternal, pub, err := resolveTaskForWrite(ctx, deps, s, in.TaskID)
 	if err != nil {
 		return nil, err
 	}
@@ -1262,7 +1311,7 @@ func runTransitionTask(ctx context.Context, deps Deps, s *session, raw json.RawM
 		result taskstate.ApplyResult
 		spec   *apierrors.Spec
 	)
-	txErr := dbretry.InTx(ctx, deps.DB, "mcp.transition_task", nil, func(ctx context.Context, tx *sql.Tx) error {
+	txErr := dbretry.InTx(ctx, deps.DB, "mcp.transition_task", nil, func(ctx context.Context, tx *dbretry.Tx) error {
 		var applyErr error
 		result, spec, applyErr = taskstate.ApplyTransitionTx(ctx, tx, taskstate.ApplyParams{
 			WorkspaceID:  s.workspaceID,
@@ -1328,7 +1377,7 @@ func runAddComment(ctx context.Context, deps Deps, s *session, raw json.RawMessa
 	if _, err := requireWorkspaceMember(ctx, deps, s); err != nil {
 		return nil, err
 	}
-	taskInternal, pub, err := resolveTaskForWrite(ctx, deps, s, in.TaskID, acl.ProjectRoleCommenter)
+	taskInternal, pub, err := resolveTaskForWrite(ctx, deps, s, in.TaskID)
 	if err != nil {
 		return nil, err
 	}
@@ -1426,6 +1475,11 @@ ORDER BY v.priority DESC, v.due_on ASC, v.created_at DESC, v.public_id DESC
 LIMIT ? OFFSET ?`, strings.Join(where, " AND "))
 	args = append(args, limit, offset)
 
+	// no-generated-query: same reason as listMCPTasks. The search predicate is
+	// fixed, but acl.TaskVisibilityFilter AND-ed into it is not: its fragment and
+	// its bind count follow the caller's workspace role. Search is the path where
+	// omitting it matters most, since a LIKE over titles and descriptions is
+	// exactly how a task nobody may see would surface.
 	rows, err := db.QueryContext(ctx, query, args...) //#nosec G701 -- query is assembled from static WHERE fragments; all user values are bound args.
 	if err != nil {
 		return nil, err
@@ -1525,9 +1579,11 @@ func runProposeDuplicates(ctx context.Context, deps Deps, s *session, raw json.R
 	if err := parseArgs(raw, &in); err != nil {
 		return nil, err
 	}
-	if _, err := requireWorkspaceMember(ctx, deps, s); err != nil {
+	wsRole, err := requireWorkspaceMember(ctx, deps, s)
+	if err != nil {
 		return nil, err
 	}
+	vis := acl.ListVisibilityArgs(s.userID, wsRole)
 	if deps.Embedder == nil {
 		return nil, apierrors.New(apierrors.AiProviderNotConfigured)
 	}
@@ -1577,10 +1633,14 @@ func runProposeDuplicates(ctx context.Context, deps Deps, s *session, raw json.R
 	}
 
 	rows, err := deps.Queries.ListCandidateTaskEmbeddings(ctx, generated.ListCandidateTaskEmbeddingsParams{
-		WorkspaceID: s.workspaceID,
-		Model:       model,
-		TaskID:      taskInternal,
-		Limit:       200,
+		WorkspaceID:   s.workspaceID,
+		Model:         model,
+		TaskID:        taskInternal,
+		IsElevated:    vis.IsElevated,
+		ActorUserID:   vis.ActorUserID,
+		ActorUserID_2: vis.ActorUserID,
+		ActorUserID_3: vis.ActorUserID,
+		Limit:         200,
 	})
 	if err != nil {
 		return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
@@ -1633,6 +1693,13 @@ func runProposeDuplicates(ctx context.Context, deps Deps, s *session, raw json.R
 // feeding the task's title + description back in as the source
 // signal, which keeps the prompt path and cost guard identical to
 // propose_tasks_from.
+//
+// The project-editor floor is the one REST holds the same request to: a
+// breakdown is the first half of apply_steps, it spends the workspace's
+// model budget on a task the caller may only be able to read, and the
+// decomposition it returns is meant for whoever may restructure the task.
+// Reading the task was the whole gate here, so anyone who could see a task
+// could bill the workspace for a plan they could not act on.
 func runProposeSteps(ctx context.Context, deps Deps, s *session, raw json.RawMessage) (any, error) {
 	var in struct {
 		TaskID string `json:"taskId"`
@@ -1643,7 +1710,7 @@ func runProposeSteps(ctx context.Context, deps Deps, s *session, raw json.RawMes
 	if _, err := requireWorkspaceMember(ctx, deps, s); err != nil {
 		return nil, err
 	}
-	_, row, err := resolveTaskRow(ctx, deps, s, in.TaskID)
+	_, row, err := resolveTaskRowForWrite(ctx, deps, s, in.TaskID)
 	if err != nil {
 		return nil, err
 	}
@@ -1691,10 +1758,18 @@ func runApplySteps(ctx context.Context, deps Deps, s *session, raw json.RawMessa
 	if _, err := requireWorkspaceMember(ctx, deps, s); err != nil {
 		return nil, err
 	}
-	parentInternal, parentPub, err := resolveTaskForWrite(ctx, deps, s, in.ParentTaskID, acl.ProjectRoleEditor)
+	parentInternal, parentPub, err := resolveTaskForWrite(ctx, deps, s, in.ParentTaskID)
 	if err != nil {
 		return nil, err
 	}
+	// no-generated-query: the child rows need the parent's internal project_id as
+	// an FK value, and no generated read hands it over. The single-task lookup in
+	// acl.go projects the project's public id, which would have to be resolved
+	// back to an internal one; LockTaskForTransition does return project_id but
+	// is FOR UPDATE and belongs inside the transition transaction, so reading
+	// through it here would take a row lock this path has no reason to hold.
+	// Replacing this takes a plain generated read of tasks.project_id keyed on
+	// the internal id.
 	var parentProjectID uint32
 	if err := deps.DB.QueryRowContext(ctx,
 		`SELECT project_id FROM tasks WHERE id = ? AND workspace_id = ? LIMIT 1`,
@@ -1715,7 +1790,7 @@ func runApplySteps(ctx context.Context, deps Deps, s *session, raw json.RawMessa
 	// back instead of leaving orphan children behind.
 	created := make([]string, 0, len(in.Steps))
 	childIDs := make([]int64, 0, len(in.Steps))
-	if txErr := dbretry.InTx(ctx, deps.DB, "mcp.apply_steps", nil, func(ctx context.Context, tx *sql.Tx) error {
+	if txErr := dbretry.InTx(ctx, deps.DB, "mcp.apply_steps", nil, func(ctx context.Context, tx *dbretry.Tx) error {
 		created = created[:0]
 		childIDs = childIDs[:0]
 		for _, st := range in.Steps {
@@ -2119,9 +2194,11 @@ func runProposeRelations(ctx context.Context, deps Deps, s *session, raw json.Ra
 	if err := parseArgs(raw, &in); err != nil {
 		return nil, err
 	}
-	if _, err := requireWorkspaceMember(ctx, deps, s); err != nil {
+	wsRole, err := requireWorkspaceMember(ctx, deps, s)
+	if err != nil {
 		return nil, err
 	}
+	vis := acl.ListVisibilityArgs(s.userID, wsRole)
 	if deps.Embedder == nil {
 		return nil, apierrors.New(apierrors.AiProviderNotConfigured)
 	}
@@ -2171,10 +2248,14 @@ func runProposeRelations(ctx context.Context, deps Deps, s *session, raw json.Ra
 	}
 
 	rows, err := deps.Queries.ListCandidateTaskEmbeddings(ctx, generated.ListCandidateTaskEmbeddingsParams{
-		WorkspaceID: s.workspaceID,
-		Model:       model,
-		TaskID:      taskInternal,
-		Limit:       200,
+		WorkspaceID:   s.workspaceID,
+		Model:         model,
+		TaskID:        taskInternal,
+		IsElevated:    vis.IsElevated,
+		ActorUserID:   vis.ActorUserID,
+		ActorUserID_2: vis.ActorUserID,
+		ActorUserID_3: vis.ActorUserID,
+		Limit:         200,
 	})
 	if err != nil {
 		return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
@@ -2486,7 +2567,16 @@ func runUpdatePage(ctx context.Context, deps Deps, s *session, raw json.RawMessa
 		return nil, err
 	}
 
-	// Fetch current project_id and parent_page_id to preserve them.
+	// Fetch current project_id and parent_page_id to preserve them: UpdatePage
+	// takes both as parameters, so a value not read back here is a value the
+	// update would clear.
+	//
+	// no-generated-query: UpdatePage takes the internal project_id and
+	// parent_page_id, and GetPageByPublicId — the only generated read of a single
+	// page — projects ProjectPublicID and ParentPagePublicID instead. Going
+	// through it would mean resolving two public ids back to internal ones to
+	// write back values that were never meant to change. Replacing this takes a
+	// generated read that returns the two FK columns as they are stored.
 	var projectID sql.NullInt32
 	var parentPageID sql.NullInt32
 	const qPage = `SELECT project_id, parent_page_id FROM pages WHERE id = ? AND workspace_id = ? LIMIT 1`
@@ -2664,10 +2754,12 @@ func runSmartCreateTask(ctx context.Context, deps Deps, s *session, raw json.Raw
 	if in.Title == "" {
 		return nil, apierrors.New(apierrors.McpToolArgumentsInvalid)
 	}
-	if _, err := requireWorkspaceMember(ctx, deps, s); err != nil {
+	wsRole, err := requireWorkspaceMember(ctx, deps, s)
+	if err != nil {
 		return nil, err
 	}
-	prjID, err := resolveProjectForWrite(ctx, deps, s, in.ProjectID, acl.ProjectRoleEditor)
+	vis := acl.ListVisibilityArgs(s.userID, wsRole)
+	prjID, err := resolveProjectForWrite(ctx, deps, s, in.ProjectID)
 	if err != nil {
 		return nil, err
 	}
@@ -2684,6 +2776,7 @@ func runSmartCreateTask(ctx context.Context, deps Deps, s *session, raw json.Raw
 		ctx, s.workspaceID,
 		in.Title, in.Description,
 		deps.Embedder.Provider, deps.Queries,
+		vis,
 	)
 	if err != nil {
 		return nil, mapAiError(err)
@@ -2702,7 +2795,7 @@ func runSmartCreateTask(ctx context.Context, deps Deps, s *session, raw json.Raw
 		parentID  int64
 		children  []createdChild
 	)
-	if txErr := dbretry.InTx(ctx, deps.DB, "mcp.smart_create_task", nil, func(ctx context.Context, tx *sql.Tx) error {
+	if txErr := dbretry.InTx(ctx, deps.DB, "mcp.smart_create_task", nil, func(ctx context.Context, tx *dbretry.Tx) error {
 		children = children[:0]
 		parent, err := taskcreate.New(ctx, tx, taskcreate.Args{
 			WorkspaceID: s.workspaceID,
@@ -3115,7 +3208,7 @@ func runCreateCalendarEvent(ctx context.Context, deps Deps, s *session, raw json
 	if _, err := requireWorkspaceMember(ctx, deps, s); err != nil {
 		return nil, err
 	}
-	calID, err := resolveCalendar(ctx, deps, s, in.CalendarID)
+	calID, err := resolveCalendarWrite(ctx, deps, s, in.CalendarID)
 	if err != nil {
 		return nil, err
 	}
@@ -3143,6 +3236,22 @@ func runCreateCalendarEvent(ctx context.Context, deps Deps, s *session, raw json
 		startAt = time.Unix(*in.StartAt, 0).UTC()
 		endAt = time.Unix(*in.EndAt, 0).UTC()
 	}
+	// The window is checked before it is normalised, and through the same
+	// rule the REST create applies: an agent that inverts it is told which
+	// way round it goes, instead of being handed the CHECK constraint's
+	// refusal as an unexplained execution failure.
+	if rangeErr := calendarrules.RequireEventChronology(
+		calendarrules.UnixSeconds(startAt), calendarrules.UnixSeconds(endAt)); rangeErr != nil {
+		return nil, rangeErr
+	}
+	// An all-day row is stored as UTC midnight on the author's date.
+	// parseDayBoundary already lands there, so this changes nothing today
+	// — it is here because the canonical form is one decision for every
+	// transport, and reading it off the shared rule is what stops the two
+	// from drifting apart the way they did before.
+	normStart, normEnd := calendarrules.NormalizeAllDayBounds(allDay,
+		sql.NullTime{Time: startAt, Valid: true}, sql.NullTime{Time: endAt, Valid: true})
+	startAt, endAt = normStart.Time, normEnd.Time
 
 	kind := calendar.CalendarEventsKindEvent
 	if in.Kind != "" {
@@ -3166,23 +3275,21 @@ func runCreateCalendarEvent(ctx context.Context, deps Deps, s *session, raw json
 
 	ownerUserID := s.userID
 	if in.OwnerUserID != "" {
-		// calendar_subscriptions.role is gone, so "manager/owner" tiers
-		// no longer exist. Only the personal-calendar owner can set a
-		// different ownerUserId here. System calendars have no editable
-		// owner. Event-level ACL (attendee can_edit) is still TBD.
-		const qCalOwner = `SELECT owner_user_id FROM calendars WHERE id = ? AND enabled = TRUE LIMIT 1`
-		var calOwner sql.NullInt32
-		if serr := deps.DB.QueryRowContext(ctx, qCalOwner, calID).Scan(&calOwner); serr != nil {
-			return nil, apierrors.Newf(apierrors.McpToolExecutionFailed, "calendar not found")
-		}
-		if !calOwner.Valid || uint32(calOwner.Int32) != s.userID { //#nosec G115 -- owner_user_id is users.id (BIGINT UNSIGNED), fits uint32 within realistic deployments
-			return nil, apierrors.Newf(apierrors.McpToolExecutionFailed, "only the calendar owner can set ownerUserId")
-		}
 		// Resolve the target user by public id, scoped to workspace
 		// membership so a non-member cannot be assigned as owner.
 		resolved, uerr := resolveWorkspaceUser(ctx, deps, s, in.OwnerUserID)
 		if uerr != nil {
 			return nil, uerr
+		}
+		// Same rule and same refusal REST gives: delegation takes a
+		// manager or owner role on the calendar, and filing an event
+		// under yourself takes nothing.
+		allowed, aerr := canSetCalendarEventOwner(ctx, deps, s, resolved, calID)
+		if aerr != nil {
+			return nil, aerr
+		}
+		if !allowed {
+			return nil, apierrors.New(apierrors.CalendarEventEditPermissionRequired)
 		}
 		ownerUserID = resolved
 	}
@@ -3301,7 +3408,7 @@ func runUpdateCalendarEvent(ctx context.Context, deps Deps, s *session, raw json
 	if err != nil {
 		return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
 	}
-	if err := requireCalendarMembership(ctx, deps, s, owner.CalendarID); err != nil {
+	if err := requireCalendarWritable(ctx, deps, s, owner.CalendarID); err != nil {
 		return nil, err
 	}
 	ok, err := canEditCalendarEvent(ctx, deps, s, owner.OwnerUserID, evt.ID, owner.CalendarID)
@@ -3353,6 +3460,31 @@ func runUpdateCalendarEvent(ctx context.Context, deps Deps, s *session, raw json
 		if newEndAt.IsZero() && evt.EndAt.Valid {
 			newEndAt = evt.EndAt.Time
 		}
+		// The fall-back above answers "the caller moved one end of a
+		// window that already had two". On an undated event there is no
+		// other end to borrow, and writing the half pair reached the
+		// column as a zero instant the driver rejects. The REST patch
+		// refuses that request by name, so this one does too.
+		if pairErr := calendarrules.RequireEventStartEndPair(
+			calendarrules.UnixSeconds(newStartAt), calendarrules.UnixSeconds(newEndAt)); pairErr != nil {
+			return nil, pairErr
+		}
+		// Both branches below write this pair — the standalone patch and
+		// the itemkit reschedule — so the ordering is checked once, here,
+		// through the rule the REST patch applies. Without it an inverted
+		// window reached chk_calendar_events_chronology and came back as
+		// an execution failure that named nothing.
+		if rangeErr := calendarrules.RequireEventChronology(
+			calendarrules.UnixSeconds(newStartAt), calendarrules.UnixSeconds(newEndAt)); rangeErr != nil {
+			return nil, rangeErr
+		}
+		// The stored row decides whether the pair is a date or an instant:
+		// this tool takes no allDay argument, so moving an all-day event by
+		// startAt would otherwise store an off-midnight instant and put the
+		// event on a different square for readers in another zone.
+		normStart, normEnd := calendarrules.NormalizeAllDayBounds(evt.AllDay,
+			sql.NullTime{Time: newStartAt, Valid: true}, sql.NullTime{Time: newEndAt, Valid: true})
+		newStartAt, newEndAt = normStart.Time, normEnd.Time
 	}
 	if in.Title != nil {
 		params.Title = sql.NullString{String: *in.Title, Valid: true}
@@ -3420,34 +3552,15 @@ func runUpdateCalendarEvent(ctx context.Context, deps Deps, s *session, raw json
 		return map[string]any{"success": true}, nil
 	}
 
-	tx, err := deps.DB.BeginTx(ctx, nil)
-	if err != nil {
-		return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
-	}
-	defer tx.Rollback() //nolint:errcheck
-	qtxCal := deps.CalendarQueries.WithTx(tx)
-
+	// itemkit owns the title and time columns for a linked event, so they
+	// drop out of the remaining-fields patch. Decided here rather than
+	// inside the transaction because the transaction is retried on a
+	// deadlock and would otherwise re-read params its own first attempt
+	// had already emptied.
 	if titleChanged {
-		if err := itemkit.RenameItem(ctx, tx, itemkit.RenameItemArgs{
-			WorkspaceID: s.workspaceID,
-			ActorUserID: s.userID,
-			EventID:     evt.ID,
-			NewTitle:    *in.Title,
-		}); err != nil {
-			return nil, translateItemkitMCPError(err)
-		}
 		params.Title = sql.NullString{}
 	}
 	if timeChanged {
-		if err := itemkit.RescheduleEvent(ctx, tx, itemkit.RescheduleEventArgs{
-			WorkspaceID: s.workspaceID,
-			EventID:     evt.ID,
-			ActorUserID: s.userID,
-			StartAt:     newStartAt,
-			EndAt:       newEndAt,
-		}); err != nil {
-			return nil, translateItemkitMCPError(err)
-		}
 		params.StartAt = sql.NullTime{}
 		params.EndAt = sql.NullTime{}
 	}
@@ -3455,15 +3568,53 @@ func runUpdateCalendarEvent(ctx context.Context, deps Deps, s *session, raw json
 	// clearable columns arrive as a bare any rather than a typed Null*,
 	// because their SET expression wraps the COALESCE in an IF that
 	// reads the matching clear flag; nil is the absent case.
-	if params.Title.Valid || params.Kind.Valid || params.ShowAs.Valid ||
+	patchRemaining := params.Title.Valid || params.Kind.Valid || params.ShowAs.Valid ||
 		params.Visibility.Valid || params.Location != nil || params.Memo != nil ||
-		params.BlockLabel != nil || params.StartAt.Valid || params.EndAt.Valid {
-		if _, err := qtxCal.PatchCalendarEvent(ctx, params); err != nil {
-			return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
+		params.BlockLabel != nil || params.StartAt.Valid || params.EndAt.Valid
+
+	// answered holds a response-shaped error decided inside the
+	// transaction, so an itemkit invariant is not reported as a generic
+	// tool-execution failure.
+	var answered error
+	txErr := dbretry.InTx(ctx, deps.DB, "mcp.update_calendar_event", nil, func(ctx context.Context, tx *dbretry.Tx) error {
+		answered = nil
+		qtxCal := deps.CalendarQueries.WithTx(tx.RawTx())
+
+		if titleChanged {
+			if err := itemkit.RenameItem(ctx, tx, itemkit.RenameItemArgs{
+				WorkspaceID: s.workspaceID,
+				ActorUserID: s.userID,
+				EventID:     evt.ID,
+				NewTitle:    *in.Title,
+			}); err != nil {
+				answered = translateItemkitMCPError(err)
+				return err
+			}
 		}
+		if timeChanged {
+			if err := itemkit.RescheduleEvent(ctx, tx, itemkit.RescheduleEventArgs{
+				WorkspaceID: s.workspaceID,
+				EventID:     evt.ID,
+				ActorUserID: s.userID,
+				StartAt:     newStartAt,
+				EndAt:       newEndAt,
+			}); err != nil {
+				answered = translateItemkitMCPError(err)
+				return err
+			}
+		}
+		if patchRemaining {
+			if _, err := qtxCal.PatchCalendarEvent(ctx, params); err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+	if answered != nil {
+		return nil, answered
 	}
-	if err := tx.Commit(); err != nil {
-		return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
+	if txErr != nil {
+		return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, txErr)
 	}
 	// itemkit appended calendar.event.updated inside the transaction that
 	// just committed, so only the audit half is left to add here.
@@ -3517,7 +3668,7 @@ func runDeleteCalendarEvent(ctx context.Context, deps Deps, s *session, raw json
 	if err != nil {
 		return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
 	}
-	if err := requireCalendarMembership(ctx, deps, s, owner.CalendarID); err != nil {
+	if err := requireCalendarWritable(ctx, deps, s, owner.CalendarID); err != nil {
 		return nil, err
 	}
 	ok, err := canEditCalendarEvent(ctx, deps, s, owner.OwnerUserID, evt.ID, owner.CalendarID)
@@ -3525,16 +3676,20 @@ func runDeleteCalendarEvent(ctx context.Context, deps Deps, s *session, raw json
 		return nil, apierrors.Newf(apierrors.McpToolExecutionFailed, "permission denied: cannot delete event")
 	}
 
-	tx, err := deps.DB.BeginTx(ctx, nil)
-	if err != nil {
-		return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
+	var answered error
+	txErr := dbretry.InTx(ctx, deps.DB, "mcp.delete_calendar_event", nil, func(ctx context.Context, tx *dbretry.Tx) error {
+		answered = nil
+		if err := itemkit.DeleteEvent(ctx, tx, s.workspaceID, evt.ID, s.userID); err != nil {
+			answered = translateItemkitMCPError(err)
+			return err
+		}
+		return nil
+	})
+	if answered != nil {
+		return nil, answered
 	}
-	defer tx.Rollback() //nolint:errcheck
-	if err := itemkit.DeleteEvent(ctx, tx, s.workspaceID, evt.ID, s.userID); err != nil {
-		return nil, translateItemkitMCPError(err)
-	}
-	if err := tx.Commit(); err != nil {
-		return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
+	if txErr != nil {
+		return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, txErr)
 	}
 	// itemkit appended item.unscheduled and the legacy
 	// calendar.event.deleted inside the committed transaction; the audit
@@ -3561,14 +3716,16 @@ const (
 	workDayEndHour   = 18
 )
 
-// resolveUserTimezone returns the IANA timezone to interpret a user's
-// day in: their own preference, else the workspace default, else UTC.
+// resolveUserTimezone returns the zone to interpret a user's day in:
+// their own preference, else the workspace default, else UTC.
 //
 // Same chain as the REST handlers' resolveEffectiveTimezone, minus the
 // explicit-request tier, because no MCP tool takes a timezone argument.
 // Lookup failures fall through rather than erroring: a missing profile
-// row should degrade to the workspace's timezone, not fail the tool.
-func resolveUserTimezone(ctx context.Context, deps Deps, workspaceID, userID uint32) string {
+// row should degrade to the workspace's timezone, not fail the tool. A
+// stored name the zoneinfo database cannot resolve falls through for the
+// same reason, so the tiers below it still apply.
+func resolveUserTimezone(ctx context.Context, deps Deps, workspaceID, userID uint32) region.Zone {
 	var userTz string
 	if profile, err := deps.Queries.FindUserProfileById(ctx, userID); err == nil {
 		userTz = profile.Timezone
@@ -3577,7 +3734,19 @@ func resolveUserTimezone(ctx context.Context, deps Deps, workspaceID, userID uin
 	if row, err := deps.Queries.FindWorkspaceTimezoneCountryById(ctx, workspaceID); err == nil {
 		wsTz = row.Timezone
 	}
-	return region.EffectiveTimezone(userTz, wsTz)
+	if region.ValidateTimezone(userTz) != nil {
+		userTz = ""
+	}
+	if region.ValidateTimezone(wsTz) != nil {
+		wsTz = ""
+	}
+	// The chain ends at region.DefaultTimezone, which always resolves,
+	// so the surviving candidates cannot fail.
+	z, err := region.Resolve(userTz, wsTz)
+	if err != nil {
+		return region.UTC()
+	}
+	return z
 }
 
 func runListFreeSlots(ctx context.Context, deps Deps, s *session, raw json.RawMessage) (any, error) {
@@ -3608,7 +3777,7 @@ func runListFreeSlots(ctx context.Context, deps Deps, s *session, raw json.RawMe
 		targetUserID = resolved
 	}
 
-	date, err := time.Parse("2006-01-02", in.Date)
+	day, err := region.ParseDay(in.Date)
 	if err != nil {
 		return nil, apierrors.Newf(apierrors.McpToolArgumentsInvalid, "invalid date: %v", err)
 	}
@@ -3622,13 +3791,9 @@ func runListFreeSlots(ctx context.Context, deps Deps, s *session, raw json.RawMe
 	// outside the query window, so every meeting in it was invisible,
 	// the day was reported wholly free, and the agent booked the middle
 	// of the night.
-	tzName := resolveUserTimezone(ctx, deps, s.workspaceID, targetUserID)
-	loc, lerr := time.LoadLocation(tzName)
-	if lerr != nil {
-		loc = time.UTC
-	}
-	workStart := time.Date(date.Year(), date.Month(), date.Day(), workDayStartHour, 0, 0, 0, loc)
-	workEnd := time.Date(date.Year(), date.Month(), date.Day(), workDayEndHour, 0, 0, 0, loc)
+	zone := resolveUserTimezone(ctx, deps, s.workspaceID, targetUserID)
+	workStart := day.At(zone, workDayStartHour, 0, 0)
+	workEnd := day.At(zone, workDayEndHour, 0, 0)
 
 	// The viewer here is the target, not the caller. This tool returns
 	// free windows and never any event data, so the question it has to
@@ -3704,6 +3869,12 @@ func runListFreeSlots(ctx context.Context, deps Deps, s *session, raw json.RawMe
 	return map[string]any{"slots": slots}, nil
 }
 
+// runCreateEventFromTask projects a task onto a calendar as a timed
+// event.
+//
+// calendar-precondition: all-day-bounds not-applicable — the row is
+// written with all_day false and the tool takes no date arguments, so
+// there is no calendar square to pin to UTC midnight
 func runCreateEventFromTask(ctx context.Context, deps Deps, s *session, raw json.RawMessage) (any, error) {
 	var in struct {
 		TaskID     string `json:"taskId"`
@@ -3725,16 +3896,24 @@ func runCreateEventFromTask(ctx context.Context, deps Deps, s *session, raw json
 	// to the task. REST reaches the same end state with two calls, the second
 	// of which (tasks-event-links-create) is project-editor gated, so the
 	// editor floor applies here too on top of the calendar_members grant.
-	taskInternal, task, err := resolveTaskRowForWrite(ctx, deps, s, in.TaskID, acl.ProjectRoleEditor)
+	taskInternal, task, err := resolveTaskRowForWrite(ctx, deps, s, in.TaskID)
 	if err != nil {
 		return nil, err
 	}
-	calID, err := resolveCalendar(ctx, deps, s, in.CalendarID)
+	calID, err := resolveCalendarWrite(ctx, deps, s, in.CalendarID)
 	if err != nil {
 		return nil, err
 	}
 	startAt := time.Unix(*in.StartAt, 0).UTC()
 	endAt := time.Unix(*in.EndAt, 0).UTC()
+	// This tool takes a window the caller chose, which the REST route it
+	// answers for does not — that one derives the window from the task's
+	// due date. Taking the window means owing the same refusal the event
+	// routes give when it is inverted.
+	if rangeErr := calendarrules.RequireEventChronology(
+		calendarrules.UnixSeconds(startAt), calendarrules.UnixSeconds(endAt)); rangeErr != nil {
+		return nil, rangeErr
+	}
 
 	pub := newPublicID()
 	_, err = deps.CalendarQueries.CreateCalendarEvent(ctx, calendar.CreateCalendarEventParams{
@@ -3842,7 +4021,7 @@ func runToggleCalendarMemo(ctx context.Context, deps Deps, s *session, raw json.
 	if _, err := requireWorkspaceMember(ctx, deps, s); err != nil {
 		return nil, err
 	}
-	calID, err := resolveCalendar(ctx, deps, s, in.CalendarID)
+	calID, err := resolveCalendarWrite(ctx, deps, s, in.CalendarID)
 	if err != nil {
 		return nil, err
 	}
@@ -3864,7 +4043,7 @@ func runToggleCalendarMemo(ctx context.Context, deps Deps, s *session, raw json.
 	// ticked off by an agent reads the same on the timeline as one ticked
 	// off in the web app.
 	if err := recordMutationStrict(ctx, deps, s, mutation{
-		EventType:    "calendar.memo.updated",
+		EventType:    eventbus.CalMemoUpdated,
 		AuditAction:  "calendar.memo.update",
 		ResourceType: "calendar.memo",
 		ResourceID:   in.MemoID,

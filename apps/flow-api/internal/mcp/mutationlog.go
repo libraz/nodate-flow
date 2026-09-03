@@ -5,6 +5,7 @@ import (
 	"log/slog"
 
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/audit"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/dbretry"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/eventbus"
 )
 
@@ -44,7 +45,7 @@ type mutation struct {
 	// e.g. eventbus.CalEventCreated. Use the same kind the REST handler
 	// for this operation uses — a second spelling of the same change
 	// splits every consumer that subscribes by kind.
-	EventType string
+	EventType eventbus.Kind
 	// AuditAction is the audit_logs.action, e.g. "calendar.event.create".
 	// Same rule: match REST, because the administrator querying it does
 	// not know or care which transport made the change.
@@ -79,7 +80,7 @@ func recordMutation(ctx context.Context, deps Deps, s *session, m mutation) {
 	if !mutationIsComplete(ctx, m) {
 		return
 	}
-	eventbus.AppendBestEffort(ctx, deps.DB, mutationEvent(s, m), m.CallSite)
+	eventbus.AppendBestEffort(ctx, dbretry.AutoCommit(deps.DB), mutationEvent(s, m), m.CallSite)
 	recordMutationAudit(ctx, deps, s, m)
 }
 
@@ -91,7 +92,7 @@ func recordMutationStrict(ctx context.Context, deps Deps, s *session, m mutation
 	if !mutationIsComplete(ctx, m) {
 		return nil
 	}
-	if err := eventbus.Append(ctx, deps.DB, mutationEvent(s, m)); err != nil {
+	if err := eventbus.Append(ctx, dbretry.AutoCommit(deps.DB), mutationEvent(s, m)); err != nil {
 		return err
 	}
 	recordMutationAudit(ctx, deps, s, m)
@@ -128,7 +129,7 @@ func mutationIsComplete(ctx context.Context, m mutation) bool {
 		return true
 	}
 	slog.ErrorContext(ctx, "mcp: incomplete mutation record dropped",
-		slog.String("event_type", m.EventType),
+		slog.String("event_type", string(m.EventType)),
 		slog.String("audit_action", m.AuditAction),
 		slog.String("call_site", m.CallSite),
 	)

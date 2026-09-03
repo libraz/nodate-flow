@@ -157,11 +157,11 @@ type PatchWorkspaceOutput struct {
 // acknowledge by sending {"confirm": true}.
 type DeleteWorkspaceInput struct {
 	WsID string `path:"wsId"`
-	Body DeleteWorkspaceInputBody
+	Body WorkspaceDeleteWorkspaceInputBody
 }
 
-// DeleteWorkspaceInputBody is the JSON body for DELETE /workspaces/{wsId}.
-type DeleteWorkspaceInputBody struct {
+// WorkspaceDeleteWorkspaceInputBody is the JSON body for DELETE /workspaces/{wsId}.
+type WorkspaceDeleteWorkspaceInputBody struct {
 	Confirm *bool `json:"confirm,omitempty" doc:"Must be true to acknowledge irreversible deletion"`
 }
 

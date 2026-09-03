@@ -180,7 +180,7 @@ func RescheduleTask(ctx context.Context, tx TX, args RescheduleTaskArgs) error {
 func updateTaskDateColumn(ctx context.Context, tx TX, taskID uint32, col string, d time.Time) error {
 	var val sql.NullTime
 	if !d.IsZero() {
-		val = sql.NullTime{Time: dateOnly(d), Valid: true}
+		val = sql.NullTime{Time: dateOnly(d).DateColumn(), Valid: true}
 	}
 	q := "UPDATE tasks SET " + col + " = ? WHERE id = ?"
 	if _, err := tx.ExecContext(ctx, q, val, taskID); err != nil {
@@ -218,15 +218,15 @@ func propagateEventFromTaskDate(ctx context.Context, tx TX, task taskRow, role D
 	// past the deadline that asked for it. The two then disagree
 	// permanently, and the drift reconciler resolves that disagreement in
 	// the event's favour, silently undoing the date the user typed.
-	loc, err := region.LoadLocation(region.EffectiveTimezone(existing.timezone))
+	z, err := region.Resolve(existing.timezone)
 	if err != nil {
 		return wrapInvariant("event_timezone_valid",
 			fmt.Sprintf("event timezone %q is not a known IANA zone", existing.timezone))
 	}
 	dur := existing.endAt.Time.Sub(existing.startAt.Time)
-	localStart := existing.startAt.Time.In(loc)
-	newStart := time.Date(newDate.Year(), newDate.Month(), newDate.Day(),
-		localStart.Hour(), localStart.Minute(), localStart.Second(), 0, loc)
+	localStart := existing.startAt.Time.In(z.Location())
+	newStart := dateOnly(newDate).At(z,
+		localStart.Hour(), localStart.Minute(), localStart.Second())
 	newEnd := newStart.Add(dur)
 
 	// Task date has already been snapped upstream; re-run snap here only
@@ -252,5 +252,5 @@ func dateOrNull(t time.Time) any {
 	if t.IsZero() {
 		return nil
 	}
-	return dateOnly(t).Format("2006-01-02")
+	return dateOnly(t).String()
 }

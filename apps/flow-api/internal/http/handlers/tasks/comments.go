@@ -3,7 +3,6 @@ package tasks
 import (
 	"context"
 	"database/sql"
-	"log/slog"
 
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/audit"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/dbretry"
@@ -13,9 +12,7 @@ import (
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/eventbus"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/handlers/handlerutil"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/middleware"
-	nflog "github.com/libraz/nodate-flow/apps/flow-api/internal/log"
 	"github.com/libraz/nodate-flow/packages/go-shared/apierr"
-	"github.com/libraz/nodate-flow/packages/go-shared/logutil"
 )
 
 // AddComment handles POST /tasks/{id}/comments.
@@ -50,7 +47,7 @@ func AddComment(deps Deps) func(context.Context, *AddTaskCommentInput) (*AddTask
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
 		taskInternal := int64(task.ID)
-		if err := eventbus.Append(ctx, deps.DB, eventbus.Event{
+		eventbus.AppendBestEffort(ctx, dbretry.AutoCommit(deps.DB), eventbus.Event{
 			Type:        eventbus.TaskCommentAdded,
 			WorkspaceID: ws.ID,
 			ActorUserID: actorPtr(ctx),
@@ -59,16 +56,7 @@ func AddComment(deps Deps) func(context.Context, *AddTaskCommentInput) (*AddTask
 				"taskId":    task.PublicID.String(),
 				"commentId": pub.String(),
 			},
-		}); err != nil {
-			nflog.LoggerFromContext(ctx).ErrorContext(ctx, "eventbus.Append failed",
-				slog.Any("err", err),
-				slog.String("handler", "tasks.AddComment"),
-				slog.String("event_type", string(eventbus.TaskCommentAdded)),
-				logutil.LogEntity("workspace", ws.PublicID),
-				logutil.LogEntity("task", task.PublicID),
-				slog.String("comment_public_id", pub.String()),
-			)
-		}
+		}, "tasks.AddComment")
 		deps.Audit.Record(ctx, audit.Entry{
 			Action:       "comment.create",
 			ActorID:      actorID,
@@ -235,7 +223,7 @@ func EditComment(deps Deps) func(context.Context, *EditTaskCommentInput) (*EditT
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
 		taskInternal := int64(task.ID)
-		if err := eventbus.Append(ctx, deps.DB, eventbus.Event{
+		eventbus.AppendBestEffort(ctx, dbretry.AutoCommit(deps.DB), eventbus.Event{
 			Type:        eventbus.TaskCommentEdited,
 			WorkspaceID: ws.ID,
 			ActorUserID: actorPtr(ctx),
@@ -244,16 +232,7 @@ func EditComment(deps Deps) func(context.Context, *EditTaskCommentInput) (*EditT
 				"taskId":    task.PublicID.String(),
 				"commentId": cid.String(),
 			},
-		}); err != nil {
-			nflog.LoggerFromContext(ctx).ErrorContext(ctx, "eventbus.Append failed",
-				slog.Any("err", err),
-				slog.String("handler", "tasks.EditComment"),
-				slog.String("event_type", string(eventbus.TaskCommentEdited)),
-				logutil.LogEntity("workspace", ws.PublicID),
-				logutil.LogEntity("task", task.PublicID),
-				slog.String("comment_public_id", cid.String()),
-			)
-		}
+		}, "tasks.EditComment")
 		deps.Audit.Record(ctx, audit.Entry{
 			Action:       "comment.update",
 			ActorID:      actorID,
@@ -309,7 +288,7 @@ func DeleteComment(deps Deps) func(context.Context, *DeleteTaskCommentInput) (*D
 			return nil, httpErr(apierrors.WsCommentNotFound)
 		}
 		taskInternal := int64(task.ID)
-		if err := eventbus.Append(ctx, deps.DB, eventbus.Event{
+		eventbus.AppendBestEffort(ctx, dbretry.AutoCommit(deps.DB), eventbus.Event{
 			Type:        eventbus.TaskCommentRemoved,
 			WorkspaceID: ws.ID,
 			ActorUserID: actorPtr(ctx),
@@ -318,16 +297,7 @@ func DeleteComment(deps Deps) func(context.Context, *DeleteTaskCommentInput) (*D
 				"taskId":    task.PublicID.String(),
 				"commentId": cid.String(),
 			},
-		}); err != nil {
-			nflog.LoggerFromContext(ctx).ErrorContext(ctx, "eventbus.Append failed",
-				slog.Any("err", err),
-				slog.String("handler", "tasks.DeleteComment"),
-				slog.String("event_type", string(eventbus.TaskCommentRemoved)),
-				logutil.LogEntity("workspace", ws.PublicID),
-				logutil.LogEntity("task", task.PublicID),
-				slog.String("comment_public_id", cid.String()),
-			)
-		}
+		}, "tasks.DeleteComment")
 		deps.Audit.Record(ctx, audit.Entry{
 			Action:       "comment.delete",
 			ActorID:      actorID,

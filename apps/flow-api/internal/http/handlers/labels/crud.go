@@ -3,17 +3,15 @@ package labels
 import (
 	"context"
 	"database/sql"
-	"log/slog"
 
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/audit"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/dbretry"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
 	apierrors "github.com/libraz/nodate-flow/apps/flow-api/internal/errors"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/eventbus"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/middleware"
-	nflog "github.com/libraz/nodate-flow/apps/flow-api/internal/log"
 	"github.com/libraz/nodate-flow/packages/go-shared/apierr"
-	"github.com/libraz/nodate-flow/packages/go-shared/logutil"
 )
 
 // Create handles POST /workspaces/{wsId}/labels.
@@ -84,20 +82,12 @@ func Create(deps Deps) func(context.Context, *CreateLabelInput) (*CreateLabelOut
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
 
-		if err := eventbus.Append(ctx, deps.DB, eventbus.Event{
+		eventbus.AppendBestEffort(ctx, dbretry.AutoCommit(deps.DB), eventbus.Event{
 			Type:        eventbus.LabelCreated,
 			WorkspaceID: ws.ID,
 			ActorUserID: actorPtr(ctx),
 			Payload:     map[string]any{"labelId": pub.String()},
-		}); err != nil {
-			nflog.LoggerFromContext(ctx).ErrorContext(ctx, "eventbus.Append failed",
-				slog.Any("err", err),
-				slog.String("handler", "labels.Create"),
-				slog.String("event_type", string(eventbus.LabelCreated)),
-				logutil.LogEntity("workspace", ws.PublicID),
-				slog.String("label_public_id", pub.String()),
-			)
-		}
+		}, "labels.Create")
 
 		if deps.Audit != nil {
 			if actorID, ok := middleware.ActorFromContext(ctx); ok {
@@ -290,20 +280,12 @@ func Patch(deps Deps) func(context.Context, *PatchLabelInput) (*PatchLabelOutput
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
 
-		if err := eventbus.Append(ctx, deps.DB, eventbus.Event{
+		eventbus.AppendBestEffort(ctx, dbretry.AutoCommit(deps.DB), eventbus.Event{
 			Type:        eventbus.LabelUpdated,
 			WorkspaceID: ws.ID,
 			ActorUserID: actorPtr(ctx),
 			Payload:     map[string]any{"labelId": pub.String()},
-		}); err != nil {
-			nflog.LoggerFromContext(ctx).ErrorContext(ctx, "eventbus.Append failed",
-				slog.Any("err", err),
-				slog.String("handler", "labels.Patch"),
-				slog.String("event_type", string(eventbus.LabelUpdated)),
-				logutil.LogEntity("workspace", ws.PublicID),
-				slog.String("label_public_id", pub.String()),
-			)
-		}
+		}, "labels.Patch")
 
 		if deps.Audit != nil {
 			if actorID, ok := middleware.ActorFromContext(ctx); ok {
@@ -355,20 +337,12 @@ func Disable(deps Deps) func(context.Context, *DisableLabelInput) (*DisableLabel
 			return nil, httpErr(apierrors.WsLabelNotFound)
 		}
 
-		if err := eventbus.Append(ctx, deps.DB, eventbus.Event{
+		eventbus.AppendBestEffort(ctx, dbretry.AutoCommit(deps.DB), eventbus.Event{
 			Type:        eventbus.LabelDisabled,
 			WorkspaceID: ws.ID,
 			ActorUserID: actorPtr(ctx),
 			Payload:     map[string]any{"labelId": pub.String()},
-		}); err != nil {
-			nflog.LoggerFromContext(ctx).ErrorContext(ctx, "eventbus.Append failed",
-				slog.Any("err", err),
-				slog.String("handler", "labels.Disable"),
-				slog.String("event_type", string(eventbus.LabelDisabled)),
-				logutil.LogEntity("workspace", ws.PublicID),
-				slog.String("label_public_id", pub.String()),
-			)
-		}
+		}, "labels.Disable")
 
 		if deps.Audit != nil {
 			if actorID, ok := middleware.ActorFromContext(ctx); ok {
@@ -428,22 +402,13 @@ func AddTaskLabel(deps Deps) func(context.Context, *AddTaskLabelInput) (*AddTask
 		}
 
 		taskID := int64(task.ID)
-		if err := eventbus.Append(ctx, deps.DB, eventbus.Event{
+		eventbus.AppendBestEffort(ctx, dbretry.AutoCommit(deps.DB), eventbus.Event{
 			Type:        eventbus.TaskLabelAdded,
 			WorkspaceID: ws.ID,
 			ActorUserID: actorPtr(ctx),
 			TaskID:      &taskID,
 			Payload:     map[string]any{"labelId": labelPub.String()},
-		}); err != nil {
-			nflog.LoggerFromContext(ctx).ErrorContext(ctx, "eventbus.Append failed",
-				slog.Any("err", err),
-				slog.String("handler", "labels.AddTaskLabel"),
-				slog.String("event_type", string(eventbus.TaskLabelAdded)),
-				logutil.LogEntity("workspace", ws.PublicID),
-				logutil.LogEntity("task", task.PublicID),
-				slog.String("label_public_id", labelPub.String()),
-			)
-		}
+		}, "labels.AddTaskLabel")
 
 		return &AddTaskLabelOutput{Body: TaskLabel{
 			ID:          labelPub.String(),
@@ -519,22 +484,13 @@ func RemoveTaskLabel(deps Deps) func(context.Context, *RemoveTaskLabelInput) (*R
 		}
 
 		taskID := int64(task.ID)
-		if err := eventbus.Append(ctx, deps.DB, eventbus.Event{
+		eventbus.AppendBestEffort(ctx, dbretry.AutoCommit(deps.DB), eventbus.Event{
 			Type:        eventbus.TaskLabelRemoved,
 			WorkspaceID: ws.ID,
 			ActorUserID: actorPtr(ctx),
 			TaskID:      &taskID,
 			Payload:     map[string]any{"labelId": labelPub.String()},
-		}); err != nil {
-			nflog.LoggerFromContext(ctx).ErrorContext(ctx, "eventbus.Append failed",
-				slog.Any("err", err),
-				slog.String("handler", "labels.RemoveTaskLabel"),
-				slog.String("event_type", string(eventbus.TaskLabelRemoved)),
-				logutil.LogEntity("workspace", ws.PublicID),
-				logutil.LogEntity("task", task.PublicID),
-				slog.String("label_public_id", labelPub.String()),
-			)
-		}
+		}, "labels.RemoveTaskLabel")
 
 		if deps.Audit != nil {
 			if actorID, ok := middleware.ActorFromContext(ctx); ok {

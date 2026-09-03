@@ -4,9 +4,9 @@ import (
 	"context"
 	"database/sql"
 	"errors"
-	"log/slog"
 
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/audit"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/dbretry"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
 	apierrors "github.com/libraz/nodate-flow/apps/flow-api/internal/errors"
@@ -14,7 +14,6 @@ import (
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/handlers/handlerutil"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/middleware"
 	"github.com/libraz/nodate-flow/packages/go-shared/apierr"
-	"github.com/libraz/nodate-flow/packages/go-shared/logutil"
 )
 
 // Create handles POST /tasks/{id}/reactions.
@@ -61,7 +60,7 @@ func Create(deps Deps) func(context.Context, *CreateReactionInput) (*CreateReact
 		}
 
 		taskIDInt64 := int64(task.ID)
-		if err := eventbus.Append(ctx, deps.DB, eventbus.Event{
+		eventbus.AppendBestEffort(ctx, dbretry.AutoCommit(deps.DB), eventbus.Event{
 			Type:        eventbus.ReactionAdded,
 			WorkspaceID: ws.ID,
 			ActorUserID: actorPtr(ctx),
@@ -70,16 +69,7 @@ func Create(deps Deps) func(context.Context, *CreateReactionInput) (*CreateReact
 				"reactionId": pub.String(),
 				"emoji":      in.Body.Emoji,
 			},
-		}); err != nil {
-			slog.ErrorContext(ctx, "eventbus.Append failed",
-				slog.Any("err", err),
-				slog.String("handler", "reactions.Create"),
-				slog.String("event_type", string(eventbus.ReactionAdded)),
-				logutil.LogEntity("workspace", ws.PublicID),
-				logutil.LogEntity("task", task.PublicID),
-				slog.String("reaction_public_id", pub.String()),
-			)
-		}
+		}, "reactions.Create")
 
 		if deps.Audit != nil {
 			deps.Audit.Record(ctx, audit.Entry{
@@ -171,8 +161,9 @@ func Delete(deps Deps) func(context.Context, *DeleteReactionInput) (*DeleteReact
 		if !ok {
 			return nil, httpErr(apierrors.WsWorkspaceNotFound)
 		}
-		task, ok := middleware.TaskFromContext(ctx)
-		if !ok {
+		// The task itself is not needed here — the reaction is located by
+		// its own public id — but its presence is the route's precondition.
+		if _, ok := middleware.TaskFromContext(ctx); !ok {
 			return nil, httpErr(apierrors.WsTaskNotFound)
 		}
 		actorID, ok := middleware.ActorFromContext(ctx)
@@ -208,7 +199,7 @@ func Delete(deps Deps) func(context.Context, *DeleteReactionInput) (*DeleteReact
 		}
 
 		taskIDInt64 := int64(row.TaskID.Int32)
-		if err := eventbus.Append(ctx, deps.DB, eventbus.Event{
+		eventbus.AppendBestEffort(ctx, dbretry.AutoCommit(deps.DB), eventbus.Event{
 			Type:        eventbus.ReactionRemoved,
 			WorkspaceID: ws.ID,
 			ActorUserID: actorPtr(ctx),
@@ -217,16 +208,7 @@ func Delete(deps Deps) func(context.Context, *DeleteReactionInput) (*DeleteReact
 				"reactionId": pub.String(),
 				"emoji":      row.Emoji,
 			},
-		}); err != nil {
-			slog.ErrorContext(ctx, "eventbus.Append failed",
-				slog.Any("err", err),
-				slog.String("handler", "reactions.Delete"),
-				slog.String("event_type", string(eventbus.ReactionRemoved)),
-				logutil.LogEntity("workspace", ws.PublicID),
-				logutil.LogEntity("task", task.PublicID),
-				slog.String("reaction_public_id", pub.String()),
-			)
-		}
+		}, "reactions.Delete")
 
 		if deps.Audit != nil {
 			deps.Audit.Record(ctx, audit.Entry{

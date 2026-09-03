@@ -160,10 +160,10 @@ func Workspace(ctx context.Context, db *sql.DB, q *generated.Queries, store Blob
 	// and readily loses a lock race, and every attempt re-reads the keys
 	// from scratch so a retry cannot carry state from the attempt that
 	// rolled back.
-	err := dbretry.InTx(ctx, db, "teardown.Workspace", nil, func(ctx context.Context, tx *sql.Tx) error {
+	err := dbretry.InTx(ctx, db, "teardown.Workspace", nil, func(ctx context.Context, tx *dbretry.Tx) error {
 		keys = nil
 		deleted = false
-		qtx := q.WithTx(tx)
+		qtx := q.WithTx(tx.RawTx())
 
 		objs, lerr := qtx.ListStorageObjectsByWorkspace(ctx, sql.NullInt32{Int32: int32(wsID), Valid: true}) //#nosec G115 -- workspace internal id is INT UNSIGNED, fits int32 within realistic deployments
 		if lerr != nil {
@@ -310,10 +310,10 @@ func User(ctx context.Context, db *sql.DB, q *generated.Queries, store BlobSweep
 	// Retried as a whole on a deadlock, same as the workspace pipeline.
 	// freedSharedKeys is rebuilt per attempt: an attempt that rolls back
 	// must not leave keys behind for the sweep that follows.
-	err = dbretry.InTx(ctx, db, "teardown.User", nil, func(ctx context.Context, tx *sql.Tx) error {
+	err = dbretry.InTx(ctx, db, "teardown.User", nil, func(ctx context.Context, tx *dbretry.Tx) error {
 		freedSharedKeys = nil
 		deleted = false
-		qtx := q.WithTx(tx)
+		qtx := q.WithTx(tx.RawTx())
 
 		for _, a := range taskAtts {
 			decRes, derr := qtx.DecrementStorageObjectRefCount(ctx, a.StorageObjectID)

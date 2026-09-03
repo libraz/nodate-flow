@@ -94,17 +94,16 @@ func EffectiveWorkingHours(userStart, userEnd, wsStart, wsEnd *time.Time) (start
 		pick(userEnd, wsEnd, WorkingHoursEndDefault)
 }
 
-// IsWorkingDay returns true when d falls on a day marked working in
-// the effective working-days string AND is not in the holidays set.
-// Holidays is a set of ISO-date strings (YYYY-MM-DD) in the target
-// timezone; IsWorkingDay renders d in loc to compare. treatHolidays
-// controls whether the holidays set suppresses the day; when false,
-// holidays are still working days even if subscribed.
-func IsWorkingDay(days string, d time.Time, loc *time.Location, holidays map[string]struct{}, treatHolidays bool) bool {
-	if loc == nil {
-		loc = time.UTC
-	}
-	local := d.In(loc)
+// IsWorkingDay returns true when the instant d falls on a day marked
+// working in the effective working-days string AND is not in the
+// holidays set. Holidays is a set of ISO-date strings (YYYY-MM-DD);
+// both the weekday and the holiday key are taken from the calendar date
+// d falls on in z, because a working day is a property of somebody's
+// calendar rather than of the instant. treatHolidays controls whether
+// the holidays set suppresses the day; when false, holidays are still
+// working days even if subscribed.
+func IsWorkingDay(days string, d time.Time, z Zone, holidays map[string]struct{}, treatHolidays bool) bool {
+	local := DayOf(d, z)
 	idx := weekdayIndex(local.Weekday())
 	effective := days
 	if len(effective) != WorkingDaysLength {
@@ -114,8 +113,7 @@ func IsWorkingDay(days string, d time.Time, loc *time.Location, holidays map[str
 		return false
 	}
 	if treatHolidays && len(holidays) > 0 {
-		key := local.Format("2006-01-02")
-		if _, ok := holidays[key]; ok {
+		if _, ok := holidays[local.String()]; ok {
 			return false
 		}
 	}
@@ -127,10 +125,10 @@ func IsWorkingDay(days string, d time.Time, loc *time.Location, holidays map[str
 // rolls the date forward until IsWorkingDay is true. Caps at 366
 // iterations so a pathological all-off string can't loop forever —
 // returns d unchanged in that case.
-func NextWorkingDay(days string, d time.Time, loc *time.Location, holidays map[string]struct{}, treatHolidays bool) time.Time {
+func NextWorkingDay(days string, d time.Time, z Zone, holidays map[string]struct{}, treatHolidays bool) time.Time {
 	cursor := d
 	for i := 0; i < 366; i++ {
-		if IsWorkingDay(days, cursor, loc, holidays, treatHolidays) {
+		if IsWorkingDay(days, cursor, z, holidays, treatHolidays) {
 			return cursor
 		}
 		cursor = cursor.AddDate(0, 0, 1)

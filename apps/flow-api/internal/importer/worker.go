@@ -313,7 +313,7 @@ func (w *Worker) execute(ctx context.Context, job generated.ListPendingImportJob
 // so an imported task is indistinguishable from one made through the
 // API: same task-number allocation, same defaults, same created event.
 func (w *Worker) createTask(ctx context.Context, workspaceID, projectID uint32, row Row) error {
-	return dbretry.InTx(ctx, w.DB, "importer.createTask", nil, func(ctx context.Context, tx *sql.Tx) error {
+	return dbretry.InTx(ctx, w.DB, "importer.createTask", nil, func(ctx context.Context, tx *dbretry.Tx) error {
 		created, err := taskcreate.New(ctx, tx, taskcreate.Args{
 			WorkspaceID: workspaceID,
 			ProjectID:   projectID,
@@ -375,7 +375,7 @@ func (w *Worker) announce(ctx context.Context, job generated.ListPendingImportJo
 	if status == generated.ImportJobsStatusFailed {
 		kind = eventbus.ImportJobFailed
 	}
-	eventbus.AppendBestEffort(ctx, w.DB, eventbus.Event{
+	eventbus.AppendBestEffort(ctx, dbretry.AutoCommit(w.DB), eventbus.Event{
 		Type:        kind,
 		WorkspaceID: job.WorkspaceID,
 		Payload: map[string]any{

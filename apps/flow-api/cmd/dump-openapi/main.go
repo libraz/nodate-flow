@@ -12,11 +12,8 @@ import (
 	"os"
 	"time"
 
-	"github.com/danielgtaylor/huma/v2"
-
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/auth"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/router"
-	"github.com/libraz/nodate-flow/packages/go-shared/openapiutil"
 )
 
 func main() {
@@ -33,9 +30,11 @@ func main() {
 	}
 
 	res := router.BuildResult(router.Deps{JWT: issuer})
-	merged := mergeSpecs(res.APIs)
-	openapiutil.PatchErrorModelSchema(merged)
-
+	merged, err := router.MergeAPIs(res.APIs)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "dump-openapi: %v\n", err)
+		os.Exit(1)
+	}
 	buf, err := json.MarshalIndent(merged, "", "  ")
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "dump-openapi: marshal: %v\n", err)
@@ -46,77 +45,4 @@ func main() {
 		os.Exit(1)
 	}
 	fmt.Printf("dump-openapi: wrote %s (%d paths)\n", *out, len(merged.Paths))
-}
-
-// mergeSpecs merges every sub-API's OpenAPI document into a single
-// OpenAPI 3.1 spec. The nodate-flow router splits operations across
-// multiple humachi.New instances so each middleware chain lives in its
-// own chi group, which means each group carries its own OpenAPI doc
-// that shares nothing with the others.
-func mergeSpecs(apis []huma.API) *huma.OpenAPI {
-	if len(apis) == 0 {
-		return &huma.OpenAPI{OpenAPI: "3.1.0"}
-	}
-	root := apis[0].OpenAPI()
-	if root.Paths == nil {
-		root.Paths = map[string]*huma.PathItem{}
-	}
-	if root.Components == nil {
-		root.Components = &huma.Components{}
-	}
-	for _, a := range apis[1:] {
-		spec := a.OpenAPI()
-		for path, item := range spec.Paths {
-			if existing, ok := root.Paths[path]; ok {
-				mergePathItem(existing, item)
-			} else {
-				root.Paths[path] = item
-			}
-		}
-		if spec.Components == nil {
-			continue
-		}
-		if spec.Components.Schemas != nil && root.Components.Schemas != nil {
-			rootMap := root.Components.Schemas.Map()
-			for name, schema := range spec.Components.Schemas.Map() {
-				if _, ok := rootMap[name]; ok {
-					continue
-				}
-				rootMap[name] = schema
-			}
-		}
-	}
-	openapiutil.PatchErrorModelSchema(root)
-	return root
-}
-
-// mergePathItem copies operations from src into dst for verbs that dst
-// does not already define. The router never registers the same verb on
-// the same path twice, so collisions should be impossible, but we keep
-// the existing entry on conflict to stay deterministic.
-func mergePathItem(dst, src *huma.PathItem) {
-	if dst.Get == nil {
-		dst.Get = src.Get
-	}
-	if dst.Put == nil {
-		dst.Put = src.Put
-	}
-	if dst.Post == nil {
-		dst.Post = src.Post
-	}
-	if dst.Delete == nil {
-		dst.Delete = src.Delete
-	}
-	if dst.Patch == nil {
-		dst.Patch = src.Patch
-	}
-	if dst.Head == nil {
-		dst.Head = src.Head
-	}
-	if dst.Options == nil {
-		dst.Options = src.Options
-	}
-	if dst.Trace == nil {
-		dst.Trace = src.Trace
-	}
 }

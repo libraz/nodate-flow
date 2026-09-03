@@ -16,6 +16,7 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/audit"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/dbretry"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
 	apierrors "github.com/libraz/nodate-flow/apps/flow-api/internal/errors"
@@ -80,7 +81,7 @@ func Export(deps Deps) func(ctx context.Context, in *Input) (*Output, error) {
 
 		// Append event.
 		actorInt64 := int64(actorID)
-		if err := eventbus.Append(ctx, deps.DB, eventbus.Event{
+		eventbus.AppendBestEffort(ctx, dbretry.AutoCommit(deps.DB), eventbus.Event{
 			Type:        eventbus.ExportRequested,
 			WorkspaceID: ws.ID,
 			ActorUserID: &actorInt64,
@@ -88,15 +89,7 @@ func Export(deps Deps) func(ctx context.Context, in *Input) (*Output, error) {
 				"format": in.Format,
 				"count":  len(tasks),
 			},
-		}); err != nil {
-			slog.ErrorContext(ctx, "eventbus.Append failed",
-				slog.Any("err", err),
-				slog.String("handler", "export.Export"),
-				slog.String("event_type", string(eventbus.ExportRequested)),
-				logutil.LogEntity("workspace", ws.PublicID),
-				slog.String("format", in.Format),
-			)
-		}
+		}, "export.Export")
 
 		return &Output{
 			Body: Body{
@@ -219,20 +212,12 @@ func recordExport(
 	})
 
 	actorInt64 := int64(actorID)
-	if err := eventbus.Append(context.WithoutCancel(ctx), deps.DB, eventbus.Event{
+	eventbus.AppendBestEffort(context.WithoutCancel(ctx), dbretry.AutoCommit(deps.DB), eventbus.Event{
 		Type:        eventbus.ExportRequested,
 		WorkspaceID: ws.ID,
 		ActorUserID: &actorInt64,
 		Payload:     meta,
-	}); err != nil {
-		slog.ErrorContext(ctx, "eventbus.Append failed",
-			slog.Any("err", err),
-			slog.String("handler", "export.CSVOperation"),
-			slog.String("event_type", string(eventbus.ExportRequested)),
-			logutil.LogEntity("workspace", ws.PublicID),
-			slog.String("format", "csv"),
-		)
-	}
+	}, "export.CSVOperation")
 
 	if res.err != nil {
 		slog.ErrorContext(ctx, "export: CSV body write failed",

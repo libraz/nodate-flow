@@ -7,9 +7,11 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/audit"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/dbretry"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated/calendar"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
 	apierrors "github.com/libraz/nodate-flow/apps/flow-api/internal/errors"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/eventbus"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/handlers/handlerutil"
 	"github.com/libraz/nodate-flow/packages/go-shared/apierr"
 	"github.com/libraz/nodate-flow/packages/go-shared/dbtype"
@@ -175,11 +177,11 @@ func CreateMemo(deps Deps) func(context.Context, *CreateMemoInput) (*CreateMemoO
 			CreatedAt:  handlerutil.NowUnix(),
 		}
 
-		_ = appendCalendarEvent(ctx, deps.DB, wsID, cal.ID, "calendar.memo.created", &actorID, map[string]any{
+		appendCalendarEvent(ctx, dbretry.AutoCommit(deps.DB), wsID, cal.ID, eventbus.CalMemoCreated, &actorID, map[string]any{
 			"memoId":     memoPublicID.String(),
 			"calendarId": input.CalID,
 			"title":      input.Body.Title,
-		})
+		}, "calendars.CreateMemo")
 
 		deps.Audit.Record(ctx, audit.Entry{
 			Action:       "calendar.memo.create",
@@ -252,10 +254,10 @@ func UpdateMemo(deps Deps) func(context.Context, *UpdateMemoInput) (*UpdateMemoO
 		out := &UpdateMemoOutput{}
 		out.Body.Updated = true
 
-		_ = appendCalendarEvent(ctx, deps.DB, wsID, cal.ID, "calendar.memo.updated", &actorID, map[string]any{
+		appendCalendarEvent(ctx, dbretry.AutoCommit(deps.DB), wsID, cal.ID, eventbus.CalMemoUpdated, &actorID, map[string]any{
 			"memoId":     input.MemoID,
 			"calendarId": input.CalID,
-		})
+		}, "calendars.UpdateMemo")
 
 		deps.Audit.Record(ctx, audit.Entry{
 			Action:       "calendar.memo.update",
@@ -315,10 +317,10 @@ func DeleteMemo(deps Deps) func(context.Context, *DeleteMemoInput) (*DeleteMemoO
 		out := &DeleteMemoOutput{}
 		out.Body.Deleted = true
 
-		_ = appendCalendarEvent(ctx, deps.DB, wsID, cal.ID, "calendar.memo.deleted", &actorID, map[string]any{
+		appendCalendarEvent(ctx, dbretry.AutoCommit(deps.DB), wsID, cal.ID, eventbus.CalMemoDeleted, &actorID, map[string]any{
 			"memoId":     input.MemoID,
 			"calendarId": input.CalID,
-		})
+		}, "calendars.DeleteMemo")
 
 		deps.Audit.Record(ctx, audit.Entry{
 			Action:       "calendar.memo.delete",

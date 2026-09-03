@@ -3,11 +3,11 @@ package intake
 import (
 	"context"
 	"database/sql"
-	"log/slog"
 	"time"
 
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/acl"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/audit"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/dbretry"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
 	apierrors "github.com/libraz/nodate-flow/apps/flow-api/internal/errors"
@@ -16,7 +16,6 @@ import (
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/middleware"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/taskcreate"
 	"github.com/libraz/nodate-flow/packages/go-shared/apierr"
-	"github.com/libraz/nodate-flow/packages/go-shared/logutil"
 )
 
 // requireNonGuest rejects workspace guests. Guests have read-only access to
@@ -70,20 +69,12 @@ func Create(deps Deps) func(context.Context, *CreateIntakeItemInput) (*CreateInt
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
 
-		if err := eventbus.Append(ctx, deps.DB, eventbus.Event{
+		eventbus.AppendBestEffort(ctx, dbretry.AutoCommit(deps.DB), eventbus.Event{
 			Type:        eventbus.IntakeItemCreated,
 			WorkspaceID: ws.ID,
 			ActorUserID: actorPtr(ctx),
 			Payload:     map[string]any{"intakeItemId": pub.String()},
-		}); err != nil {
-			slog.ErrorContext(ctx, "eventbus.Append failed",
-				slog.Any("err", err),
-				slog.String("handler", "intake.Create"),
-				slog.String("event_type", string(eventbus.IntakeItemCreated)),
-				logutil.LogEntity("workspace", ws.PublicID),
-				slog.String("intake_item_public_id", pub.String()),
-			)
-		}
+		}, "intake.Create")
 
 		if deps.Audit != nil {
 			if actorID, ok := middleware.ActorFromContext(ctx); ok {
@@ -273,21 +264,12 @@ func Triage(deps Deps) func(context.Context, *TriageIntakeItemInput) (*TriageInt
 		}
 
 		triageType := triageEventKind(in.Body.Status)
-		if err := eventbus.Append(ctx, deps.DB, eventbus.Event{
+		eventbus.AppendBestEffort(ctx, dbretry.AutoCommit(deps.DB), eventbus.Event{
 			Type:        triageType,
 			WorkspaceID: ws.ID,
 			ActorUserID: actorPtr(ctx),
 			Payload:     map[string]any{"intakeItemId": pub.String(), "status": in.Body.Status},
-		}); err != nil {
-			slog.ErrorContext(ctx, "eventbus.Append failed",
-				slog.Any("err", err),
-				slog.String("handler", "intake.Triage"),
-				slog.String("event_type", string(triageType)),
-				logutil.LogEntity("workspace", ws.PublicID),
-				slog.String("intake_item_public_id", pub.String()),
-				slog.String("status", in.Body.Status),
-			)
-		}
+		}, "intake.Triage")
 
 		if deps.Audit != nil {
 			deps.Audit.Record(ctx, audit.Entry{
@@ -363,45 +345,46 @@ func Convert(deps Deps) func(context.Context, *ConvertIntakeItemInput) (*Convert
 		}
 
 		// Create the task inside a transaction for task-number safety.
-		tx, err := deps.DB.BeginTx(ctx, nil)
-		if err != nil {
-			return nil, httpErr(apierrors.InternalUnexpected)
-		}
-		defer tx.Rollback() //nolint:errcheck
-		qtx := deps.Queries.WithTx(tx)
+		// Number allocation locks the project counter, so two conversions
+		// racing on the same project can deadlock; InTx re-runs the whole
+		// unit rather than failing the request.
+		var (
+			taskID  int64
+			taskPub types.PublicID
+		)
+		if err := dbretry.InTx(ctx, deps.DB, "intake.Convert", nil, func(ctx context.Context, tx *dbretry.Tx) error {
+			qtx := deps.Queries.WithTx(tx.RawTx())
 
-		// An intake item is a workspace-level inbox entry with no audience of
-		// its own, so the converted task takes the workspace default.
-		created, err := taskcreate.New(ctx, tx, taskcreate.Args{
-			WorkspaceID: ws.ID,
-			ProjectID:   prj.ID,
-			ActorUserID: sql.NullInt32{Int32: int32(actorID), Valid: true}, //#nosec G115 -- actor user id sourced from session, fits int32 within realistic deployments
-			Title:       item.Title,
-			Description: sql.NullString{String: nullStr(item.Body), Valid: item.Body.Valid},
-		})
-		if err != nil {
-			return nil, httpErr(apierrors.InternalUnexpected)
-		}
-		taskID := created.ID
-		taskPub := created.PublicID
+			// An intake item is a workspace-level inbox entry with no audience of
+			// its own, so the converted task takes the workspace default.
+			created, err := taskcreate.New(ctx, tx, taskcreate.Args{
+				WorkspaceID: ws.ID,
+				ProjectID:   prj.ID,
+				ActorUserID: sql.NullInt32{Int32: int32(actorID), Valid: true}, //#nosec G115 -- actor user id sourced from session, fits int32 within realistic deployments
+				Title:       item.Title,
+				Description: sql.NullString{String: nullStr(item.Body), Valid: item.Body.Valid},
+			})
+			if err != nil {
+				return err
+			}
+			taskID = created.ID
+			taskPub = created.PublicID
 
-		// Link intake item to the created task.
-		// The item was resolved earlier in this transaction and the task it
-		// is being linked to was just inserted, so the count adds nothing the
-		// transaction does not already guarantee.
-		if _, err := qtx.SetIntakeItemTask(ctx, generated.SetIntakeItemTaskParams{
-			TaskID:      sql.NullInt32{Int32: int32(taskID), Valid: true}, //#nosec G115 -- task_id is tasks.id (BIGINT UNSIGNED), fits int32 within realistic deployments
-			WorkspaceID: ws.ID,
-			PublicID:    pub,
+			// Link intake item to the created task.
+			// The item was resolved earlier in this transaction and the task it
+			// is being linked to was just inserted, so the count adds nothing the
+			// transaction does not already guarantee.
+			_, err = qtx.SetIntakeItemTask(ctx, generated.SetIntakeItemTaskParams{
+				TaskID:      sql.NullInt32{Int32: int32(taskID), Valid: true}, //#nosec G115 -- task_id is tasks.id (BIGINT UNSIGNED), fits int32 within realistic deployments
+				WorkspaceID: ws.ID,
+				PublicID:    pub,
+			})
+			return err
 		}); err != nil {
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
 
-		if err := tx.Commit(); err != nil {
-			return nil, httpErr(apierrors.InternalUnexpected)
-		}
-
-		if err := eventbus.Append(ctx, deps.DB, eventbus.Event{
+		eventbus.AppendBestEffort(ctx, dbretry.AutoCommit(deps.DB), eventbus.Event{
 			Type:        eventbus.IntakeItemAccepted,
 			WorkspaceID: ws.ID,
 			ActorUserID: actorPtr(ctx),
@@ -411,18 +394,9 @@ func Convert(deps Deps) func(context.Context, *ConvertIntakeItemInput) (*Convert
 				"taskId":       taskPub.String(),
 				"projectId":    prjPub.String(),
 			},
-		}); err != nil {
-			slog.ErrorContext(ctx, "eventbus.Append failed",
-				slog.Any("err", err),
-				slog.String("handler", "intake.Convert"),
-				slog.String("event_type", string(eventbus.IntakeItemAccepted)),
-				logutil.LogEntity("workspace", ws.PublicID),
-				slog.String("task_public_id", taskPub.String()),
-				slog.String("intake_item_public_id", pub.String()),
-			)
-		}
+		}, "intake.Convert")
 
-		if err := eventbus.Append(ctx, deps.DB, eventbus.Event{
+		eventbus.AppendBestEffort(ctx, dbretry.AutoCommit(deps.DB), eventbus.Event{
 			Type:        eventbus.TaskCreated,
 			WorkspaceID: ws.ID,
 			ActorUserID: actorPtr(ctx),
@@ -433,16 +407,7 @@ func Convert(deps Deps) func(context.Context, *ConvertIntakeItemInput) (*Convert
 				"title":     item.Title,
 				"source":    "intake_convert",
 			},
-		}); err != nil {
-			slog.ErrorContext(ctx, "eventbus.Append failed",
-				slog.Any("err", err),
-				slog.String("handler", "intake.Convert"),
-				slog.String("event_type", string(eventbus.TaskCreated)),
-				logutil.LogEntity("workspace", ws.PublicID),
-				slog.String("task_public_id", taskPub.String()),
-				slog.String("intake_item_public_id", pub.String()),
-			)
-		}
+		}, "intake.Convert")
 
 		if deps.Audit != nil {
 			deps.Audit.Record(ctx, audit.Entry{

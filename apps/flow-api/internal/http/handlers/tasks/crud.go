@@ -98,9 +98,12 @@ func hasListFilters(in *ListTasksInput) bool {
 // The dynamic path is required for two non-overlapping reasons:
 //   - the caller passed at least one of the user-facing filters
 //     (q / state / assignee), which sqlc cannot express;
-//   - the caller is not a workspace admin or owner, so the Layer-4
-//     task visibility filter must be appended at runtime — again
-//     beyond what the static sqlc queries express.
+//   - the caller is not a workspace admin or owner, so the list is
+//     routed through the runtime-spliced form of the Layer-4 filter.
+//
+// The static sqlc queries carry the same predicate, so the second
+// condition is a routing choice rather than the thing that keeps a
+// task the caller may not see off the wire.
 //
 // The helper is kept (and not inlined into both call sites) because
 // the combined predicate covers two filter sources and four boolean
@@ -381,9 +384,9 @@ func Create(deps Deps) func(context.Context, *CreateTaskInput) (*CreateTaskOutpu
 			taskID       int64
 			validationFn func() error
 		)
-		txErr := dbretry.InTx(ctx, deps.DB, "tasks.Create", nil, func(ctx context.Context, tx *sql.Tx) error {
+		txErr := dbretry.InTx(ctx, deps.DB, "tasks.Create", nil, func(ctx context.Context, tx *dbretry.Tx) error {
 			validationFn = nil
-			qtx := deps.Queries.WithTx(tx)
+			qtx := deps.Queries.WithTx(tx.RawTx())
 
 			created, err := taskcreate.New(ctx, tx, taskcreate.Args{
 				WorkspaceID: prj.WorkspaceID,
@@ -469,7 +472,7 @@ func Create(deps Deps) func(context.Context, *CreateTaskInput) (*CreateTaskOutpu
 			}
 			// Append the lifecycle event inside the same tx so a crash
 			// between commit and a post-commit append cannot lose the
-			// timeline/audit row (L-14). On a deadlock retry the whole tx
+			// timeline/audit row. On a deadlock retry the whole tx
 			// (including this append) rolls back and re-runs, so no
 			// duplicate row is committed.
 			if err := eventbus.Append(ctx, tx, eventbus.Event{
@@ -554,6 +557,7 @@ func List(deps Deps) func(context.Context, *ListTasksInput) (*ListTasksOutput, e
 				return nil, httpErr(apierr.SpecForErrNoRows(err, apierrors.WsProjectAccessDenied, apierrors.InternalUnexpected))
 			}
 			wsRole := middleware.WorkspaceRole(wsRoleStr)
+			prjVis := acl.ListVisibilityArgs(actorID, acl.WorkspaceRole(wsRole))
 			pubBytes := prjPub.UUID()
 			if needsDynamicQuery(in, wsRole) {
 				in.Limit = limit
@@ -584,6 +588,10 @@ func List(deps Deps) func(context.Context, *ListTasksInput) (*ListTasksOutput, e
 				rows, qerr := deps.Queries.ListTasksForProjectKeyset(ctx, generated.ListTasksForProjectKeysetParams{
 					WorkspaceID:     prj.WorkspaceID,
 					ProjectPublicID: pubBytes[:],
+					IsElevated:      prjVis.IsElevated,
+					ActorUserID:     prjVis.ActorUserID,
+					ActorUserID_2:   prjVis.ActorUserID,
+					ActorUserID_3:   prjVis.ActorUserID,
 					CursorCreatedAt: sql.NullTime{Time: cursorAt, Valid: !cursorAt.IsZero()},
 					CursorPublicID:  cursorPID,
 					Limit:           limit + 1,
@@ -608,6 +616,10 @@ func List(deps Deps) func(context.Context, *ListTasksInput) (*ListTasksOutput, e
 			rows, err := deps.Queries.ListTasksForProject(ctx, generated.ListTasksForProjectParams{
 				WorkspaceID:     prj.WorkspaceID,
 				ProjectPublicID: pubBytes[:],
+				IsElevated:      prjVis.IsElevated,
+				ActorUserID:     prjVis.ActorUserID,
+				ActorUserID_2:   prjVis.ActorUserID,
+				ActorUserID_3:   prjVis.ActorUserID,
 				Limit:           limit,
 				Offset:          in.Offset,
 			})
@@ -622,6 +634,10 @@ func List(deps Deps) func(context.Context, *ListTasksInput) (*ListTasksOutput, e
 					return deps.Queries.CountTasksForProject(ctx, generated.CountTasksForProjectParams{
 						WorkspaceID:     prj.WorkspaceID,
 						ProjectPublicID: pubBytes[:],
+						IsElevated:      prjVis.IsElevated,
+						ActorUserID:     prjVis.ActorUserID,
+						ActorUserID_2:   prjVis.ActorUserID,
+						ActorUserID_3:   prjVis.ActorUserID,
 					})
 				})
 				if terr != nil {
@@ -657,6 +673,7 @@ func List(deps Deps) func(context.Context, *ListTasksInput) (*ListTasksOutput, e
 			return nil, httpErr(apierr.SpecForErrNoRows(err, apierrors.WsWorkspaceAccessDenied, apierrors.InternalUnexpected))
 		}
 		wsRole2 := middleware.WorkspaceRole(wsRoleStr2)
+		vis := acl.ListVisibilityArgs(actorID, acl.WorkspaceRole(wsRole2))
 		if needsDynamicQuery(in, wsRole2) {
 			in.Limit = limit
 			frows, total, ferr := listTasksFiltered(ctx, deps.DB, wsInternal, nil, actorID, wsRole2, in)
@@ -684,6 +701,10 @@ func List(deps Deps) func(context.Context, *ListTasksInput) (*ListTasksOutput, e
 			rows, qerr := deps.Queries.ListTasksForWorkspaceKeyset(ctx, generated.ListTasksForWorkspaceKeysetParams{
 				WorkspaceID:     wsInternal,
 				StateFilter:     "", // empty string skips the filter (see SQL comment)
+				IsElevated:      vis.IsElevated,
+				ActorUserID:     vis.ActorUserID,
+				ActorUserID_2:   vis.ActorUserID,
+				ActorUserID_3:   vis.ActorUserID,
 				CursorCreatedAt: sql.NullTime{Time: cursorAt, Valid: !cursorAt.IsZero()},
 				CursorPublicID:  cursorPID,
 				Limit:           limit + 1,
@@ -706,7 +727,6 @@ func List(deps Deps) func(context.Context, *ListTasksInput) (*ListTasksOutput, e
 			return out, nil
 		}
 
-		vis := acl.ListVisibilityArgs(actorID, acl.WorkspaceRole(wsRole2))
 		rows, err := deps.Queries.ListTasksForWorkspace(ctx, generated.ListTasksForWorkspaceParams{
 			WorkspaceID:   wsInternal,
 			IsElevated:    vis.IsElevated,
@@ -895,8 +915,8 @@ func Patch(deps Deps) func(context.Context, *PatchTaskInput) (*PatchTaskOutput, 
 			// scope, so a crash in between left a task whose change had
 			// landed and whose timeline never recorded it — and the
 			// append error was only logged, which made the loss silent.
-			if err := dbretry.InTx(ctx, deps.DB, "tasks.Patch", nil, func(ctx context.Context, tx *sql.Tx) error {
-				qtx := deps.Queries.WithTx(tx)
+			if err := dbretry.InTx(ctx, deps.DB, "tasks.Patch", nil, func(ctx context.Context, tx *dbretry.Tx) error {
+				qtx := deps.Queries.WithTx(tx.RawTx())
 				if _, err := qtx.UpdateTask(ctx, updateParams); err != nil {
 					return err
 				}
@@ -910,9 +930,9 @@ func Patch(deps Deps) func(context.Context, *PatchTaskInput) (*PatchTaskOutput, 
 			// only has a commit boundary to defer its fan-out to when
 			// the transaction came from here.
 			var answered error
-			txErr := dbretry.InTx(ctx, deps.DB, "tasks.Patch", nil, func(ctx context.Context, tx *sql.Tx) error {
+			txErr := dbretry.InTx(ctx, deps.DB, "tasks.Patch", nil, func(ctx context.Context, tx *dbretry.Tx) error {
 				answered = nil
-				qtx := deps.Queries.WithTx(tx)
+				qtx := deps.Queries.WithTx(tx.RawTx())
 				if _, err := qtx.UpdateTask(ctx, updateParams); err != nil {
 					return err
 				}
@@ -1015,7 +1035,7 @@ func Disable(deps Deps) func(context.Context, *DisableTaskInput) (*DisableTaskOu
 		// exhausted (or the error is non-transient) do we translate
 		// the result into a problem+json envelope.
 		var rawErr error
-		txErr := dbretry.InTx(ctx, deps.DB, "tasks.Disable", nil, func(ctx context.Context, tx *sql.Tx) error {
+		txErr := dbretry.InTx(ctx, deps.DB, "tasks.Disable", nil, func(ctx context.Context, tx *dbretry.Tx) error {
 			rawErr = nil
 			if err := itemkit.DeleteTask(ctx, tx, ws.ID, task.ID, actorID); err != nil {
 				rawErr = err
@@ -1042,7 +1062,7 @@ func Disable(deps Deps) func(context.Context, *DisableTaskInput) (*DisableTaskOu
 		// item.deleted plus its legacy task.disabled dual-emit inside the
 		// tx above (see itemkit.legacyKindFor). A second post-commit append
 		// here duplicated the task.disabled timeline row for one delete and
-		// risked losing it on a crash between commit and append (L-14).
+		// risked losing it on a crash between commit and append.
 		out := &DisableTaskOutput{}
 		out.Body.Ok = true
 		return out, nil

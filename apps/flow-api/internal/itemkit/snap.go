@@ -25,9 +25,11 @@ type SnapConfig struct {
 	// falls back to region.WorkingDaysDefault inside the resolver.
 	WorkingDays string
 
-	// Location is the timezone the target date is rendered in when
-	// deciding which weekday it falls on. Nil means UTC.
-	Location *time.Location
+	// Zone is the timezone the target date is read in when deciding
+	// which weekday it falls on. ResolveSnapConfig fills it from the
+	// actor's preference chain; the zero value reads as UTC, which is
+	// what an actor with no row anywhere gets.
+	Zone region.Zone
 
 	// Holidays is the set of ISO-date (YYYY-MM-DD) strings that count as
 	// public holidays for the actor. ResolveSnapConfig fills it from the
@@ -79,11 +81,8 @@ func applySnap(startAt, endAt time.Time, cfg SnapConfig) snapOutcome {
 		return out
 	}
 
-	loc := cfg.Location
-	if loc == nil {
-		loc = time.UTC
-	}
-	if region.IsWorkingDay(cfg.WorkingDays, startAt, loc, cfg.Holidays, cfg.TreatHolidays) {
+	z := cfg.Zone
+	if region.IsWorkingDay(cfg.WorkingDays, startAt, z, cfg.Holidays, cfg.TreatHolidays) {
 		return out
 	}
 
@@ -94,16 +93,21 @@ func applySnap(startAt, endAt time.Time, cfg SnapConfig) snapOutcome {
 
 	// SnapAuto: compute the next working day and shift the range by the
 	// whole-day delta so the time-of-day and duration are preserved.
-	next := region.NextWorkingDay(cfg.WorkingDays, startAt, loc, cfg.Holidays, cfg.TreatHolidays)
+	next := region.NextWorkingDay(cfg.WorkingDays, startAt, z, cfg.Holidays, cfg.TreatHolidays)
 	if next.Equal(startAt) {
 		// NextWorkingDay refused to move (all-off string) — degrade to
 		// warn so the caller still gets a signal.
 		out.NonWorkingDay = true
 		return out
 	}
-	fromDate := startAt.In(loc).Format("2006-01-02")
-	toDate := next.In(loc).Format("2006-01-02")
-	dayDelta := dateOnly(next.In(loc)).Sub(dateOnly(startAt.In(loc)))
+	fromDay := region.DayOf(startAt, z)
+	toDay := region.DayOf(next, z)
+	fromDate := fromDay.String()
+	toDate := toDay.String()
+	// Midnight to midnight in the actor's own zone, so a shift across a
+	// DST transition carries the 23 or 25 hours the day actually had
+	// rather than a nominal multiple of 24.
+	dayDelta := toDay.Start(z).Sub(fromDay.Start(z))
 	out.NewStart = startAt.Add(dayDelta)
 	if !endAt.IsZero() {
 		out.NewEnd = endAt.Add(dayDelta)

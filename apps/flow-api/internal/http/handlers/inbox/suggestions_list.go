@@ -13,6 +13,7 @@ import (
 
 	"github.com/danielgtaylor/huma/v2"
 
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/dbretry"
 	apierrors "github.com/libraz/nodate-flow/apps/flow-api/internal/errors"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/eventbus"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/handlers/resolve"
@@ -157,7 +158,7 @@ func appendSuggestionReaction(deps TriageDeps, kind eventbus.Kind) func(context.
 			return nil, httpErr(apierrors.ValidationBodyFieldInvalid)
 		}
 		actor := int64(actorID)
-		if err := eventbus.Append(ctx, deps.DB, eventbus.Event{
+		if err := eventbus.Append(ctx, dbretry.AutoCommit(deps.DB), eventbus.Event{
 			Type:        kind,
 			WorkspaceID: wsID,
 			ActorUserID: &actor,

@@ -2,7 +2,6 @@ package calendars
 
 import (
 	"context"
-	"database/sql"
 	"strings"
 	"time"
 
@@ -15,7 +14,14 @@ import (
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/handlers/handlerutil"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/itemkit"
 	"github.com/libraz/nodate-flow/packages/go-shared/apierr"
+	"github.com/libraz/nodate-flow/packages/go-shared/region"
 )
+
+// taskEventStartHour is the wall-clock hour a task-projected event
+// starts at on its due date. A task carries a date and no time, so the
+// projection has to choose one; naming it keeps the choice visible
+// rather than leaving a literal in the middle of the handler.
+const taskEventStartHour = 9
 
 // --- Input/Output types ---
 
@@ -73,25 +79,24 @@ func CreateEventFromTask(deps Deps) func(context.Context, *CreateEventFromTaskIn
 		}
 
 		// Determine timezone from request or caller/workspace preference.
-		tzName, tzErr := resolveEffectiveTimezone(ctx, deps.Queries, wsID, actorID, input.Body.Timezone)
+		tz, tzErr := resolveEffectiveTimezone(ctx, deps.Queries, wsID, actorID, input.Body.Timezone)
 		if tzErr != nil {
 			return nil, tzErr
 		}
-		loc, locErr := time.LoadLocation(tzName)
-		if locErr != nil {
-			return nil, httpErr(apierrors.CalendarTaskSyncTimezoneUnrecognized)
-		}
 
 		// Pick the base date: prefer the task's due_on, otherwise today.
+		// due_on is a DATE column, so its day is already zone-free;
+		// "today" is not, and is the caller's day rather than the
+		// server's.
 		// RoleDue is the only role meaningful for task-projected events.
 		role := itemkit.RoleDue
-		var baseDate time.Time
+		var baseDay region.Day
 		if dueOn != nil {
-			baseDate = *dueOn
+			baseDay = region.DayFromDateColumn(*dueOn)
 		} else {
-			baseDate = time.Now().In(loc)
+			baseDay = region.DayOf(time.Now(), tz)
 		}
-		startAt := time.Date(baseDate.Year(), baseDate.Month(), baseDate.Day(), 9, 0, 0, 0, loc)
+		startAt := baseDay.At(tz, taskEventStartHour, 0, 0)
 		endAt := startAt.Add(time.Hour)
 
 		// itemkit writes an event row through eventlog inside this
@@ -99,7 +104,7 @@ func CreateEventFromTask(deps Deps) func(context.Context, *CreateEventFromTaskIn
 		// back, so the retry has to restart the transaction rather than
 		// a statement inside it.
 		var eventPublicID types.PublicID
-		txErr := dbretry.InTx(ctx, deps.DB, "calendars.CreateEventFromTask", nil, func(ctx context.Context, tx *sql.Tx) error {
+		txErr := dbretry.InTx(ctx, deps.DB, "calendars.CreateEventFromTask", nil, func(ctx context.Context, tx *dbretry.Tx) error {
 			id, _, err := itemkit.ScheduleTask(ctx, tx, itemkit.ScheduleTaskArgs{
 				WorkspaceID: wsID,
 				TaskID:      taskID,
@@ -109,7 +114,7 @@ func CreateEventFromTask(deps Deps) func(context.Context, *CreateEventFromTaskIn
 				Title:       title,
 				StartAt:     startAt,
 				EndAt:       endAt,
-				Timezone:    tzName,
+				Timezone:    tz.Name(),
 			})
 			if err != nil {
 				return err
@@ -136,7 +141,7 @@ func CreateEventFromTask(deps Deps) func(context.Context, *CreateEventFromTaskIn
 			AllDay:     false,
 			StartAt:    &startUnix,
 			EndAt:      &endUnix,
-			Timezone:   tzName,
+			Timezone:   tz.Name(),
 			CreatedAt:  handlerutil.NowUnix(),
 		}
 

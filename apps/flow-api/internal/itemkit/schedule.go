@@ -228,7 +228,7 @@ func propagateTaskDateFromRole(ctx context.Context, tx TX, taskID uint32, role D
 func appendItemEvents(
 	ctx context.Context,
 	tx TX,
-	kind string,
+	kind eventbus.Kind,
 	workspaceID uint32,
 	actorUserID *uint32,
 	taskID *uint32,
@@ -261,7 +261,7 @@ func appendItemEvents(
 
 // legacyKindFor returns the legacy kind to dual-emit alongside a new
 // item.* kind. Empty return skips dual-emit.
-func legacyKindFor(itemKind string) string {
+func legacyKindFor(itemKind eventbus.Kind) eventbus.Kind {
 	switch itemKind {
 	case eventbus.ItemScheduled:
 		return eventbus.CalEventCreated

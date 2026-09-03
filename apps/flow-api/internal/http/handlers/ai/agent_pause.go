@@ -2,14 +2,13 @@ package ai
 
 import (
 	"context"
-	"log/slog"
 
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/audit"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/dbretry"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
 	apierrors "github.com/libraz/nodate-flow/apps/flow-api/internal/errors"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/eventbus"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/middleware"
-	"github.com/libraz/nodate-flow/packages/go-shared/logutil"
 )
 
 // PauseAgentInput is the body for POST /workspaces/{wsId}/ai/agents/{agentId}/pause.
@@ -62,22 +61,14 @@ func PauseAgent(deps Deps) func(context.Context, *PauseAgentInput) (*PauseAgentO
 		if in.Body.Paused {
 			kind = eventbus.AiAgentPaused
 		}
-		if err := eventbus.Append(ctx, deps.DB, eventbus.Event{
+		eventbus.AppendBestEffort(ctx, dbretry.AutoCommit(deps.DB), eventbus.Event{
 			Type:        kind,
 			WorkspaceID: ws.ID,
 			Payload: map[string]any{
 				"agentId": agentPub.String(),
 				"paused":  in.Body.Paused,
 			},
-		}); err != nil {
-			slog.ErrorContext(ctx, "eventbus.Append failed",
-				slog.Any("err", err),
-				slog.String("handler", "ai.PauseAgent"),
-				slog.String("event_type", string(kind)),
-				logutil.LogEntity("workspace", ws.PublicID),
-				slog.String("agent_id", agentPub.String()),
-			)
-		}
+		}, "ai.PauseAgent")
 		if actorID, ok := middleware.ActorFromContext(ctx); ok {
 			deps.Audit.Record(ctx, audit.Entry{
 				Action:       "ai_agent.pause",

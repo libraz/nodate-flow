@@ -5,6 +5,7 @@ import (
 	"database/sql"
 
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/audit"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/dbretry"
 	generated "github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated/calendar"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/eventbus"
@@ -102,7 +103,16 @@ const noOwningCalendar uint32 = 0
 // feed the schema was shaped for could not be built. Making it a
 // parameter is what keeps that from being true again — a new emitter
 // cannot compile without deciding which calendar it belongs to.
-func appendCalendarEvent(ctx context.Context, db eventbus.DBTX, workspaceID, calendarID uint32, eventType string, actorUserID *uint32, payload map[string]any) error {
+//
+// It appends best effort and returns nothing. Every caller runs after the
+// calendar row it describes is already committed on its own connection,
+// so failing the request would report "nothing happened" for work that
+// did, and the client's retry would duplicate it. Returning an error
+// there only offered the caller a choice it never took: all of them
+// discarded it, which left a dropped event with no record of what it
+// would have said. callSite names the operation in that record, e.g.
+// "calendars.CreateEvent".
+func appendCalendarEvent(ctx context.Context, db dbretry.CommitBoundary, workspaceID, calendarID uint32, eventType eventbus.Kind, actorUserID *uint32, payload map[string]any, callSite string) {
 	var actor *int64
 	if actorUserID != nil {
 		v := int64(*actorUserID)
@@ -113,11 +123,11 @@ func appendCalendarEvent(ctx context.Context, db eventbus.DBTX, workspaceID, cal
 		v := int64(calendarID)
 		cal = &v
 	}
-	return eventbus.Append(ctx, db, eventbus.Event{
+	eventbus.AppendBestEffort(ctx, db, eventbus.Event{
 		Type:        eventType,
 		WorkspaceID: workspaceID,
 		CalendarID:  cal,
 		ActorUserID: actor,
 		Payload:     payload,
-	})
+	}, callSite)
 }

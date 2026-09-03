@@ -16,6 +16,7 @@ import (
 	"database/sql"
 	stderrors "errors"
 
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/dbretry"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
 	apierrors "github.com/libraz/nodate-flow/apps/flow-api/internal/errors"
@@ -173,7 +174,7 @@ type ApplyResult struct {
 //   - [apierrors.WsTaskTransitionUnknown] for unknown verbs
 //   - [apierrors.WsTaskTransitionRejected] for verbs the state machine refuses
 //   - [apierrors.InternalUnexpected] otherwise
-func ApplyTransitionTx(ctx context.Context, tx *sql.Tx, p ApplyParams) (ApplyResult, *apierrors.Spec, error) {
+func ApplyTransitionTx(ctx context.Context, tx *dbretry.Tx, p ApplyParams) (ApplyResult, *apierrors.Spec, error) {
 	if !IsKnownTransition(p.Transition) {
 		return ApplyResult{}, apierrors.WsTaskTransitionUnknown, nil
 	}

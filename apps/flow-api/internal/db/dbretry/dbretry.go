@@ -1,13 +1,13 @@
-// Package dbretry re-exports the shared retry policy and commit-hook
-// machinery from packages/go-shared/dbretry under flow-api's own import
+// Package dbretry re-exports the shared retry policy and commit-boundary
+// types from packages/go-shared/dbretry under flow-api's own import
 // path.
 //
 // Everything lives in the shared package because both event appenders
 // have to agree on it: flow-api's eventbus and the cross-service
 // eventlog both defer their fan-out to the same commit boundary, and a
-// second collector keyed by a second context key would silently miss
-// every transaction opened through the other one. The alias keeps the
-// existing call sites unchanged.
+// second boundary type declared here would be a type neither appender
+// accepts. These are aliases, not new types, so the call sites stay
+// unchanged and the identity is exact.
 //
 // The fan-out path is the primary caller: parallel goroutines append
 // rows to the events log and create notification rows for the same
@@ -39,16 +39,21 @@ var Do = shared.Do
 
 // InTx runs fn inside a fresh transaction, retrying the whole
 // transaction (begin → fn → commit) on transient MySQL errors and
-// running the hooks registered with [AddCommitHook] once it commits.
+// running the hooks registered with [Tx.AfterCommit] once it commits.
 var InTx = shared.InTx
 
-// WithCommitHooks returns a child context carrying a fresh commit-hook
-// collector.
-var WithCommitHooks = shared.WithCommitHooks
+// CommitBoundary is a database handle that knows when its writes become
+// durable. Only [Tx] and [AutoCommitDB] satisfy it.
+type CommitBoundary = shared.CommitBoundary
 
-// AddCommitHook registers fn to run when the transaction enclosing ctx
-// commits, or immediately when there is no enclosing transaction.
-var AddCommitHook = shared.AddCommitHook
+// Tx is the transaction [InTx] hands to its closure, carrying the
+// collector for work that must wait for the commit.
+type Tx = shared.Tx
 
-// HasCommitHooks reports whether ctx descends from an [InTx] attempt.
-var HasCommitHooks = shared.HasCommitHooks
+// AutoCommitDB is a *sql.DB addressed as a commit boundary: each
+// statement commits on its own and post-commit work runs immediately.
+type AutoCommitDB = shared.AutoCommitDB
+
+// AutoCommit declares that statements issued through db commit
+// individually, with no enclosing transaction to wait for.
+var AutoCommit = shared.AutoCommit

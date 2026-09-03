@@ -237,11 +237,12 @@ func ApplyShiftEventAndChildren(ctx context.Context, tx TX, args ApplyShiftEvent
 	// dates belong to the event's timezone. Measured in UTC, moving a
 	// Tokyo meeting from 08:00 to 20:00 on the same day crosses a UTC
 	// midnight and drags every linked task forward a day.
-	dayDeltaInt, err := region.LocalDayDelta(oldStart, args.NewStartAt, region.EffectiveTimezone(evt.timezone))
+	z, err := region.Resolve(evt.timezone)
 	if err != nil {
 		return wrapInvariant("event_timezone_valid",
 			fmt.Sprintf("event timezone %q is not a known IANA zone", evt.timezone))
 	}
+	dayDeltaInt := region.DayOf(args.NewStartAt, z).Sub(region.DayOf(oldStart, z))
 	if dayDeltaInt == 0 {
 		// Time-of-day only: tasks have DATE precision and do not move.
 		return nil

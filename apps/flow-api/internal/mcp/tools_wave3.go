@@ -8,7 +8,6 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/libraz/nodate-flow/apps/flow-api/internal/acl"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/dbretry"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
@@ -200,7 +199,7 @@ func runConvertIntakeToTask(ctx context.Context, deps Deps, s *session, raw json
 
 	// Converting writes a task into the target project, so the actor must be
 	// a project editor (or workspace-elevated), matching intake.Convert.
-	prjID, err := resolveProjectForWrite(ctx, deps, s, in.ProjectID, acl.ProjectRoleEditor)
+	prjID, err := resolveProjectForWrite(ctx, deps, s, in.ProjectID)
 	if err != nil {
 		return nil, err
 	}
@@ -209,7 +208,7 @@ func runConvertIntakeToTask(ctx context.Context, deps Deps, s *session, raw json
 		taskPub types.PublicID
 		taskID  int64
 	)
-	if txErr := dbretry.InTx(ctx, deps.DB, "mcp.convert_intake_to_task", nil, func(ctx context.Context, tx *sql.Tx) error {
+	if txErr := dbretry.InTx(ctx, deps.DB, "mcp.convert_intake_to_task", nil, func(ctx context.Context, tx *dbretry.Tx) error {
 		// An intake item is a workspace-level inbox entry with no audience of
 		// its own, so the converted task takes the workspace default, exactly
 		// as REST intake.Convert does.
@@ -229,7 +228,7 @@ func runConvertIntakeToTask(ctx context.Context, deps Deps, s *session, raw json
 		// The item was resolved before this transaction and the task it is
 		// being linked to was just inserted, so the count adds nothing the
 		// transaction does not already guarantee.
-		_, linkErr := deps.Queries.WithTx(tx).SetIntakeItemTask(ctx, generated.SetIntakeItemTaskParams{
+		_, linkErr := deps.Queries.WithTx(tx.RawTx()).SetIntakeItemTask(ctx, generated.SetIntakeItemTaskParams{
 			TaskID:      sql.NullInt32{Int32: int32(created.ID), Valid: true}, //#nosec G115 -- task_id is tasks.id (BIGINT UNSIGNED), fits int32 within realistic deployments
 			WorkspaceID: s.workspaceID,
 			PublicID:    pub,
@@ -328,7 +327,7 @@ func runRestoreDescriptionVersion(ctx context.Context, deps Deps, s *session, ra
 		return nil, apierrors.New(apierrors.McpToolArgumentsInvalid)
 	}
 
-	taskInternal, taskPub, err := resolveTaskForWrite(ctx, deps, s, in.TaskID, acl.ProjectRoleEditor)
+	taskInternal, taskPub, err := resolveTaskForWrite(ctx, deps, s, in.TaskID)
 	if err != nil {
 		return nil, err
 	}

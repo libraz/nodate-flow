@@ -244,10 +244,16 @@ func (s *Sweeper) reclaim(ctx context.Context, id uint32, key string, kind recla
 	defer func() { _ = tx.Rollback() }()
 	qtx := s.Queries.WithTx(tx)
 
+	// affected-rows: not-applicable — the collector drops whatever still
+	// refers to the blob it is reclaiming, and a blob with no task
+	// attachments is the ordinary case rather than a missing resource.
 	if _, err := qtx.DeleteAttachmentsForStorageObject(ctx, id); err != nil {
 		log.Error("storage sweeper: drop task attachments", slog.String("err", err.Error()))
 		return false
 	}
+	// affected-rows: not-applicable — same reason on the calendar side; the
+	// delete that decides whether the blob goes is the one below, and it
+	// does read its count.
 	if _, err := qtx.DeleteCalendarEventAttachmentsForStorageObject(ctx, id); err != nil {
 		log.Error("storage sweeper: drop event attachments", slog.String("err", err.Error()))
 		return false

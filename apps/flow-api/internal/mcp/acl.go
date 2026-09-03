@@ -19,6 +19,7 @@ import (
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated/calendar"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
 	apierrors "github.com/libraz/nodate-flow/apps/flow-api/internal/errors"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/handlers/calendars"
 	"github.com/libraz/nodate-flow/packages/go-shared/eventacl"
 )
 
@@ -32,6 +33,61 @@ type session struct {
 	// behalf of an AI agent. Zero means a human-owned token.
 	agentID uint32
 	scopes  []string
+	// floor is the role floor the tool being invoked was registered under.
+	// It is bound by the registry, not by the caller, and it is what the
+	// helpers below compare against: the declared floor and the enforced
+	// one are the same value, so they cannot drift.
+	floor auth.Floor
+}
+
+// floorWorkspaceRole returns the workspace role a floor demands, and
+// whether it demands one at all.
+func floorWorkspaceRole(f auth.Floor) (acl.WorkspaceRole, bool) {
+	switch f {
+	case auth.FloorWorkspaceAdmin:
+		return acl.WorkspaceRoleAdmin, true
+	case auth.FloorWorkspaceMember, auth.FloorProjectCommenter, auth.FloorProjectEditor, auth.FloorProjectLead:
+		// Every project floor is a workspace membership plus a project
+		// role; the membership half is answered here.
+		return acl.WorkspaceRoleMember, true
+	default:
+		return acl.WorkspaceRole(""), false
+	}
+}
+
+// floorProjectRole returns the project role a floor demands, and whether it
+// names one at all. The workspace floors do not, which is why the write
+// resolvers refuse under them: a tool that reaches inside a project without
+// declaring which project role it needs has no answer to give.
+func floorProjectRole(f auth.Floor) (acl.ProjectRole, bool) {
+	switch f {
+	case auth.FloorProjectCommenter:
+		return acl.ProjectRoleCommenter, true
+	case auth.FloorProjectEditor:
+		return acl.ProjectRoleEditor, true
+	case auth.FloorProjectLead:
+		return acl.ProjectRoleLead, true
+	default:
+		return acl.ProjectRole(""), false
+	}
+}
+
+// checkWorkspaceFloor applies the workspace half of a tool's declared
+// floor to the role the membership lookup returned. The denial code is the
+// one REST middleware writes for the same comparison, so a caller cannot
+// tell the transports apart by the refusal they get.
+func checkWorkspaceFloor(role acl.WorkspaceRole, floor auth.Floor) error {
+	minRole, ok := floorWorkspaceRole(floor)
+	if !ok {
+		// A tool dispatched under no floor at all. Registration cannot
+		// produce one, so reaching here means the session was assembled
+		// outside the registry.
+		return apierrors.New(apierrors.WsMemberRoleDenied)
+	}
+	if !role.AtLeast(minRole) {
+		return apierrors.New(apierrors.WsMemberRoleDenied)
+	}
+	return nil
 }
 
 // hasScope reports whether the session's granted scopes satisfy the
@@ -161,13 +217,19 @@ func parseScopes(raw []byte) []string {
 }
 
 // requireWorkspaceMember verifies the acting user is an enabled member
-// of the session workspace. Returns the workspace role on success.
+// of the session workspace and clears the workspace half of the invoked
+// tool's declared floor. Returns the workspace role on success.
 //
 // Delegates to the shared [acl.CheckWorkspaceMember] so the rule
-// cannot drift from the HTTP middleware's behavior.
+// cannot drift from the HTTP middleware's behavior. Every tool body calls
+// this first, which is what makes the declared floor the value the request
+// is actually held to rather than a label nothing reads.
 func requireWorkspaceMember(ctx context.Context, deps Deps, s *session) (acl.WorkspaceRole, error) {
 	role, err := acl.CheckWorkspaceMember(ctx, deps.DB, s.workspaceID, s.userID, nil)
 	if err != nil {
+		return acl.WorkspaceRole(""), err
+	}
+	if err := checkWorkspaceFloor(role, s.floor); err != nil {
 		return acl.WorkspaceRole(""), err
 	}
 	return role, nil
@@ -198,13 +260,23 @@ func resolveProject(ctx context.Context, deps Deps, s *session, publicID string)
 	return prj.ID, nil
 }
 
-// checkProjectRoleFloor applies the Layer-3 project-role floor to an already
-// resolved role. It is the MCP mirror of REST RequireProjectRole
-// (apps/flow-api/internal/http/middleware/acl.go): workspace owners / admins
-// arrive as [acl.ProjectRoleElevated] and pass unconditionally, everyone else
-// must meet minRole, and denial is WS.PROJECT.ACCESS_DENIED — the same code
-// the HTTP middleware writes.
-func checkProjectRoleFloor(role, minRole acl.ProjectRole) error {
+// checkProjectRoleFloor applies the Layer-3 project-role floor a tool
+// declared to an already resolved role. It is the MCP mirror of REST
+// RequireProjectRole (apps/flow-api/internal/http/middleware/acl.go):
+// workspace owners / admins arrive as [acl.ProjectRoleElevated] and pass
+// unconditionally, everyone else must meet the declared role, and denial is
+// WS.PROJECT.ACCESS_DENIED — the same code the HTTP middleware writes.
+//
+// A floor that names no project role refuses outright. That is the
+// fail-closed half of tying enforcement to the declaration: a tool that
+// reaches into a project while claiming only a workspace floor is not a
+// tool with a lenient rule, it is a tool with no stated rule, and guessing
+// one for it is how the two transports came apart in the first place.
+func checkProjectRoleFloor(role acl.ProjectRole, floor auth.Floor) error {
+	minRole, ok := floorProjectRole(floor)
+	if !ok {
+		return apierrors.New(apierrors.WsProjectAccessDenied)
+	}
 	if role == acl.ProjectRoleElevated || role.AtLeast(minRole) {
 		return nil
 	}
@@ -221,7 +293,11 @@ func checkProjectRoleFloor(role, minRole acl.ProjectRole) error {
 // have no path parameter to hang RequireProjectRole on
 // (tasks.requireProjectEditor / intake.requireProjectEditor):
 // acl.CheckWorkspaceMember → acl.LookupProjectMembership → role floor.
-func resolveProjectForWrite(ctx context.Context, deps Deps, s *session, publicID string, minRole acl.ProjectRole) (uint32, error) {
+//
+// The minimum role comes from the floor the tool was registered under, not
+// from an argument at the call site, so the floor the registry advertises is
+// the one the request is held to.
+func resolveProjectForWrite(ctx context.Context, deps Deps, s *session, publicID string) (uint32, error) {
 	prjID, err := resolveProject(ctx, deps, s, publicID)
 	if err != nil {
 		return 0, err
@@ -234,7 +310,7 @@ func resolveProjectForWrite(ctx context.Context, deps Deps, s *session, publicID
 	if err != nil {
 		return 0, err
 	}
-	if err := checkProjectRoleFloor(role, minRole); err != nil {
+	if err := checkProjectRoleFloor(role, s.floor); err != nil {
 		return 0, err
 	}
 	return prjID, nil
@@ -278,18 +354,18 @@ func resolveTask(ctx context.Context, deps Deps, s *session, publicID string) (u
 	return access.Task.ID, pub, nil
 }
 
-// resolveTaskForWrite is [resolveTask] plus the Layer-3 project-role floor.
-// It is the MCP equivalent of the REST chain RequireTaskAccess +
-// RequireProjectRole(minRole), reusing the very same role that
+// resolveTaskForWrite is [resolveTask] plus the Layer-3 project-role floor
+// the tool declared. It is the MCP equivalent of the REST chain
+// RequireTaskAccess + RequireProjectRole, reusing the very same role that
 // acl.AuthorizeTaskAccess hands the HTTP middleware, so a project viewer (or
 // a workspace member with no project_members row at all) who can read a task
 // cannot mutate it.
-func resolveTaskForWrite(ctx context.Context, deps Deps, s *session, publicID string, minRole acl.ProjectRole) (uint32, types.PublicID, error) {
+func resolveTaskForWrite(ctx context.Context, deps Deps, s *session, publicID string) (uint32, types.PublicID, error) {
 	access, pub, err := authorizeTask(ctx, deps, s, publicID)
 	if err != nil {
 		return 0, types.PublicID{}, err
 	}
-	if err := checkProjectRoleFloor(access.ProjectRole, minRole); err != nil {
+	if err := checkProjectRoleFloor(access.ProjectRole, s.floor); err != nil {
 		return 0, types.PublicID{}, err
 	}
 	return access.Task.ID, pub, nil
@@ -324,8 +400,8 @@ func resolveTaskRow(ctx context.Context, deps Deps, s *session, publicID string)
 
 // resolveTaskRowForWrite is [resolveTaskRow] with the Layer-3 project-role
 // floor applied, for mutating tools that also need the current task fields.
-func resolveTaskRowForWrite(ctx context.Context, deps Deps, s *session, publicID string, minRole acl.ProjectRole) (uint32, generated.FindTaskByPublicIdRow, error) {
-	internalID, pub, err := resolveTaskForWrite(ctx, deps, s, publicID, minRole)
+func resolveTaskRowForWrite(ctx context.Context, deps Deps, s *session, publicID string) (uint32, generated.FindTaskByPublicIdRow, error) {
+	internalID, pub, err := resolveTaskForWrite(ctx, deps, s, publicID)
 	if err != nil {
 		return 0, generated.FindTaskByPublicIdRow{}, err
 	}
@@ -366,12 +442,29 @@ func resolvePage(ctx context.Context, deps Deps, s *session, publicID string) (u
 	return row.ID, pub, nil
 }
 
-// resolveCalendar resolves a calendar public id to its internal id and
-// verifies it belongs to the session workspace.
-func resolveCalendar(ctx context.Context, deps Deps, s *session, publicID string) (uint32, error) {
+// calendarAccess is a calendar row together with the caller's membership
+// of it.
+//
+// The two travel together because the write rule needs both halves — the
+// calendar's kind and the member's role — and fetching them at separate
+// call sites is how one of them ends up not being consulted.
+type calendarAccess struct {
+	cal    calendar.FindCalendarByPublicIdRow
+	member calendar.FindCalendarMemberRow
+}
+
+// authorizeCalendar resolves a calendar public id, verifies the calendar
+// belongs to the session workspace, and verifies the caller holds a
+// calendar_members row on it.
+//
+// This is the shared half of every calendar resolution. It proves tenancy
+// and membership and says nothing about what the caller may do with the
+// calendar; [resolveCalendar] is the read gate on top of it and
+// [resolveCalendarWrite] the write gate.
+func authorizeCalendar(ctx context.Context, deps Deps, s *session, publicID string) (calendarAccess, error) {
 	pub, err := types.Parse(publicID)
 	if err != nil {
-		return 0, apierrors.Newf(apierrors.McpToolArgumentsInvalid, "invalid calendar id")
+		return calendarAccess{}, apierrors.Newf(apierrors.McpToolArgumentsInvalid, "invalid calendar id")
 	}
 	row, err := deps.CalendarQueries.FindCalendarByPublicId(ctx, calendar.FindCalendarByPublicIdParams{
 		PublicID:    pub,
@@ -379,22 +472,75 @@ func resolveCalendar(ctx context.Context, deps Deps, s *session, publicID string
 	})
 	if err != nil {
 		if stderrors.Is(err, sql.ErrNoRows) {
-			return 0, apierrors.Newf(apierrors.McpToolExecutionFailed, "calendar not found")
+			return calendarAccess{}, apierrors.Newf(apierrors.McpToolExecutionFailed, "calendar not found")
 		}
-		return 0, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
+		return calendarAccess{}, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
 	}
 	// Access is calendar_members, not the subscription: a subscription is a
 	// display preference and grants nothing.
-	if _, err := deps.CalendarQueries.FindCalendarMember(ctx, calendar.FindCalendarMemberParams{
+	member, err := deps.CalendarQueries.FindCalendarMember(ctx, calendar.FindCalendarMemberParams{
 		CalendarID: row.ID,
 		UserID:     s.userID,
-	}); err != nil {
+	})
+	if err != nil {
 		if stderrors.Is(err, sql.ErrNoRows) {
-			return 0, apierrors.New(apierrors.CalendarCalendarAccessDenied)
+			return calendarAccess{}, apierrors.New(apierrors.CalendarCalendarAccessDenied)
 		}
-		return 0, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
+		return calendarAccess{}, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
 	}
-	return row.ID, nil
+	return calendarAccess{cal: row, member: member}, nil
+}
+
+// resolveCalendar resolves a calendar public id to its internal id and
+// verifies it belongs to the session workspace.
+//
+// This is the *read* gate. Being a member of a calendar is not permission
+// to change what is on it, so tools that write must use
+// [resolveCalendarWrite] instead.
+func resolveCalendar(ctx context.Context, deps Deps, s *session, publicID string) (uint32, error) {
+	access, err := authorizeCalendar(ctx, deps, s, publicID)
+	if err != nil {
+		return 0, err
+	}
+	return access.cal.ID, nil
+}
+
+// resolveCalendarWrite is [resolveCalendar] plus the rule REST applies to
+// every handler that changes a calendar's contents.
+//
+// The name is REST's rather than this package's usual *ForWrite suffix on
+// purpose: it is the same gate, and the decision behind it is literally
+// the same function. The MCP tools used to stop at the membership lookup,
+// which let a viewer — a member who may read the calendar and nothing
+// more — create events on it through an agent, and let anyone write to a
+// system calendar whose rows belong to a provider feed.
+func resolveCalendarWrite(ctx context.Context, deps Deps, s *session, publicID string) (uint32, error) {
+	access, err := authorizeCalendar(ctx, deps, s, publicID)
+	if err != nil {
+		return 0, err
+	}
+	if err := checkCalendarWrite(access.cal.Kind, access.member.Role); err != nil {
+		return 0, err
+	}
+	return access.cal.ID, nil
+}
+
+// checkCalendarWrite maps the shared decision onto the refusals this
+// transport answers with.
+//
+// The codes are the ones the REST handlers write for the same two
+// refusals, so a caller cannot tell the transports apart by what they are
+// told: below editor is CALENDAR.CALENDAR.OWNER_ROLE_REQUIRED, and a
+// system calendar is CALENDAR.CALENDAR.ACCESS_DENIED.
+func checkCalendarWrite(kind calendar.CalendarsKind, role calendar.CalendarMembersRole) error {
+	switch calendars.DecideCalendarWrite(kind, role) {
+	case calendars.CalendarWriteRoleTooLow:
+		return apierrors.New(apierrors.CalendarCalendarOwnerRoleRequired)
+	case calendars.CalendarWriteCalendarReadOnly:
+		return apierrors.New(apierrors.CalendarCalendarAccessDenied)
+	case calendars.CalendarWriteAllowed:
+	}
+	return nil
 }
 
 // resolveWorkspaceUser resolves a user public id to its internal id and
@@ -412,15 +558,12 @@ func resolveWorkspaceUser(ctx context.Context, deps Deps, s *session, publicID s
 	if err != nil {
 		return 0, apierrors.Newf(apierrors.McpToolArgumentsInvalid, "invalid userId")
 	}
-	const q = `SELECT u.id FROM users u
-INNER JOIN workspace_members wm
-  ON wm.user_id = u.id
-  AND wm.workspace_id = ?
-  AND wm.enabled = TRUE
-WHERE u.public_id = ? AND u.enabled = TRUE
-LIMIT 1`
-	var userID uint32
-	if err := deps.DB.QueryRowContext(ctx, q, s.workspaceID, pub).Scan(&userID); err != nil {
+	userID, err := deps.Queries.FindWorkspaceMemberUserInternalIdByPublicId(ctx,
+		generated.FindWorkspaceMemberUserInternalIdByPublicIdParams{
+			WorkspaceID: s.workspaceID,
+			PublicID:    pub,
+		})
+	if err != nil {
 		if stderrors.Is(err, sql.ErrNoRows) {
 			return 0, apierrors.New(apierrors.McpTokenWorkspaceMismatch)
 		}
@@ -429,26 +572,35 @@ LIMIT 1`
 	return userID, nil
 }
 
-// requireCalendarMembership refuses a caller who holds no
-// calendar_members row on the given calendar.
+// requireCalendarWritable is [resolveCalendarWrite] for a caller that
+// reached the calendar through an event rather than by naming it.
 //
-// The REST handlers reach every event through resolveCalendar, so
-// membership is checked before the edit rule is ever consulted. The MCP
-// event tools resolve the event by its own public id and went straight
-// to the edit rule, which let somebody removed from a calendar keep
-// editing the events on it that they happen to own. Membership is the
-// outer gate on both transports now.
-func requireCalendarMembership(ctx context.Context, deps Deps, s *session, calendarID uint32) error {
-	if _, err := deps.CalendarQueries.FindCalendarMember(ctx, calendar.FindCalendarMemberParams{
-		CalendarID: calendarID,
-		UserID:     s.userID,
-	}); err != nil {
-		if stderrors.Is(err, sql.ErrNoRows) {
-			return apierrors.New(apierrors.CalendarCalendarAccessDenied)
-		}
+// The event tools take an event id and learn the calendar from the row,
+// so there is no public id to resolve; the membership and the calendar's
+// kind are read back from the caller's own calendar list, which is driven
+// by calendar_members and scoped to the session workspace. A calendar
+// absent from that list is one the caller holds no row on, and refusing
+// it as access-denied is the same answer [authorizeCalendar] gives.
+//
+// Membership alone used to be the whole gate here, which let somebody
+// removed from a calendar keep editing the events on it they happen to
+// own, and — once membership was added — still let a viewer and a
+// provider-fed system calendar through. Both halves of the write rule
+// apply on this path too.
+func requireCalendarWritable(ctx context.Context, deps Deps, s *session, calendarID uint32) error {
+	rows, err := deps.CalendarQueries.ListCalendarsForUser(ctx, calendar.ListCalendarsForUserParams{
+		UserID:      s.userID,
+		WorkspaceID: s.workspaceID,
+	})
+	if err != nil {
 		return apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
 	}
-	return nil
+	for _, row := range rows {
+		if row.ID == calendarID {
+			return checkCalendarWrite(row.Kind, row.Role)
+		}
+	}
+	return apierrors.New(apierrors.CalendarCalendarAccessDenied)
 }
 
 // canEditCalendarEvent answers the same question the REST handlers ask,
@@ -482,6 +634,34 @@ func canEditCalendarEvent(ctx context.Context, deps Deps, s *session, eventOwner
 	}
 
 	return eventacl.CanEdit(eventOwnerUserID, actor), nil
+}
+
+// canSetCalendarEventOwner answers the same question the REST handlers
+// ask, through the same rule: eventacl.CanSetOwner. Filing an event
+// under somebody else is delegation, and delegation is a calendar_members
+// role — manager or owner.
+//
+// It used to be keyed on calendars.owner_user_id, which a shared calendar
+// leaves NULL by design. On exactly the calendars that have managers, no
+// manager qualified: the same delegation the web app accepted was refused
+// through an agent.
+//
+// Membership is established before this is reached, by resolveCalendar.
+// A missing membership row therefore means the actor holds no role rather
+// than that the lookup failed, and RoleNone ranks below every role.
+func canSetCalendarEventOwner(ctx context.Context, deps Deps, s *session, ownerUserID uint32, calendarID uint32) (bool, error) {
+	actor := eventacl.Editor{UserID: s.userID}
+
+	if member, err := deps.CalendarQueries.FindCalendarMember(ctx, calendar.FindCalendarMemberParams{
+		CalendarID: calendarID,
+		UserID:     s.userID,
+	}); err == nil {
+		actor.CalendarRole = eventacl.Role(member.Role)
+	} else if !stderrors.Is(err, sql.ErrNoRows) {
+		return false, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
+	}
+
+	return eventacl.CanSetOwner(ownerUserID, actor), nil
 }
 
 func newPublicID() types.PublicID { return types.New() }

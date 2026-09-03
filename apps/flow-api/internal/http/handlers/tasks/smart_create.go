@@ -4,24 +4,23 @@ import (
 	"context"
 	"database/sql"
 	"errors"
-	"log/slog"
 	"math"
 	"net/http"
 
 	"github.com/danielgtaylor/huma/v2"
 
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/acl"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/ai"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/ai/embed"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/audit"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/dbretry"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
 	apierrors "github.com/libraz/nodate-flow/apps/flow-api/internal/errors"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/eventbus"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/middleware"
-	nflog "github.com/libraz/nodate-flow/apps/flow-api/internal/log"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/taskcreate"
 	"github.com/libraz/nodate-flow/packages/go-shared/apierr"
-	"github.com/libraz/nodate-flow/packages/go-shared/logutil"
 )
 
 // SmartCreateDeps is the dependency bundle for the propose-smart and
@@ -102,11 +101,20 @@ func ProposeSmart(deps SmartCreateDeps) func(context.Context, *ProposeSmartInput
 		if deps.AI == nil || deps.Embedder == nil {
 			return nil, httpErr(apierrors.AiProviderNotConfigured)
 		}
+		actorID, ok := middleware.ActorFromContext(ctx)
+		if !ok {
+			return nil, httpErr(apierrors.WsWorkspaceAccessDenied)
+		}
 
+		// The similar tasks the proposal is built from are quoted by
+		// title into the prompt and the rationale, so they are drawn
+		// from what this actor may read.
+		vis := acl.ListVisibilityArgs(actorID, acl.WorkspaceRole(ws.Role))
 		proposal, err := deps.AI.ProposeSmartCreate(
 			ctx, ws.ID,
 			in.Body.Title, in.Body.Description,
 			deps.Embedder.Provider, deps.Queries,
+			vis,
 		)
 		if err != nil {
 			return nil, mapAIError(err)
@@ -149,64 +157,73 @@ func ApplySmart(deps SmartCreateDeps) func(context.Context, *ApplySmartInput) (*
 			return nil, httpErr(spec)
 		}
 
-		// Begin transaction.
-		tx, err := deps.DB.BeginTx(ctx, nil)
-		if err != nil {
-			return nil, httpErr(apierrors.InternalUnexpected)
-		}
-		defer tx.Rollback() //nolint:errcheck
+		var (
+			parentID   int64
+			parentPub  types.PublicID
+			subtaskIDs []string
+			// answered holds a response-shaped error decided inside the
+			// transaction, so a rejected assignee is not reported as a
+			// transaction failure.
+			answered error
+		)
+		txErr := dbretry.InTx(ctx, deps.DB, "tasks.ApplySmart", nil, func(ctx context.Context, tx *dbretry.Tx) error {
+			answered = nil
+			qtx := deps.Queries.WithTx(tx.RawTx())
 
-		qtx := deps.Queries.WithTx(tx)
-
-		// Create parent task.
-		parent, err := taskcreate.New(ctx, tx, taskcreate.Args{
-			WorkspaceID: ws.ID,
-			ProjectID:   prj.ID,
-			ActorUserID: sql.NullInt32{Int32: int32(actorID), Valid: true}, //#nosec G115 -- actor user id sourced from session, fits int32 within realistic deployments
-			Title:       in.Body.Title,
-			Description: sql.NullString{String: in.Body.Description, Valid: in.Body.Description != ""},
-			Priority:    in.Body.Priority,
-		})
-		if err != nil {
-			return nil, httpErr(apierrors.InternalUnexpected)
-		}
-		parentID := parent.ID
-		parentPub := parent.PublicID
-
-		// Attach assignees to parent task.
-		for _, uid := range in.Body.AssigneeUserIDs {
-			if err := addActorByPublicID(ctx, qtx, ws.ID, uint32(parentID), uid); err != nil { //#nosec G115 -- LastInsertId for tasks.id (BIGINT UNSIGNED), fits uint32 within realistic deployments
-				return nil, err
-			}
-		}
-
-		// Create subtasks.
-		subtaskIDs := make([]string, 0, len(in.Body.Subtasks))
-		for _, sub := range in.Body.Subtasks {
-			child, err := taskcreate.New(ctx, tx, taskcreate.Args{
-				WorkspaceID:  ws.ID,
-				ProjectID:    prj.ID,
-				ParentTaskID: sql.NullInt32{Int32: int32(parentID), Valid: true}, //#nosec G115 -- parent_task_id is tasks.id (BIGINT UNSIGNED), fits int32 within realistic deployments
-				ActorUserID:  sql.NullInt32{Int32: int32(actorID), Valid: true},  //#nosec G115 -- actor user id sourced from session, fits int32 within realistic deployments
-				Title:        sub.Title,
-				Description:  sql.NullString{String: sub.Description, Valid: sub.Description != ""},
-				Priority:     sub.Priority,
+			// Create parent task.
+			parent, err := taskcreate.New(ctx, tx, taskcreate.Args{
+				WorkspaceID: ws.ID,
+				ProjectID:   prj.ID,
+				ActorUserID: sql.NullInt32{Int32: int32(actorID), Valid: true}, //#nosec G115 -- actor user id sourced from session, fits int32 within realistic deployments
+				Title:       in.Body.Title,
+				Description: sql.NullString{String: in.Body.Description, Valid: in.Body.Description != ""},
+				Priority:    in.Body.Priority,
 			})
 			if err != nil {
-				return nil, httpErr(apierrors.InternalUnexpected)
+				return err
 			}
+			parentID = parent.ID
+			parentPub = parent.PublicID
 
-			// Attach subtask assignee if provided.
-			if sub.AssigneeUserID != "" {
-				if err := addActorByPublicID(ctx, qtx, ws.ID, uint32(child.ID), sub.AssigneeUserID); err != nil { //#nosec G115 -- LastInsertId for tasks.id (BIGINT UNSIGNED), fits uint32 within realistic deployments
-					return nil, err
+			// Attach assignees to parent task.
+			for _, uid := range in.Body.AssigneeUserIDs {
+				if err := addActorByPublicID(ctx, qtx, ws.ID, uint32(parentID), uid); err != nil { //#nosec G115 -- LastInsertId for tasks.id (BIGINT UNSIGNED), fits uint32 within realistic deployments
+					answered = err
+					return err
 				}
 			}
-			subtaskIDs = append(subtaskIDs, child.PublicID.String())
-		}
 
-		// Commit transaction.
-		if err := tx.Commit(); err != nil {
+			// Create subtasks.
+			subtaskIDs = make([]string, 0, len(in.Body.Subtasks))
+			for _, sub := range in.Body.Subtasks {
+				child, err := taskcreate.New(ctx, tx, taskcreate.Args{
+					WorkspaceID:  ws.ID,
+					ProjectID:    prj.ID,
+					ParentTaskID: sql.NullInt32{Int32: int32(parentID), Valid: true}, //#nosec G115 -- parent_task_id is tasks.id (BIGINT UNSIGNED), fits int32 within realistic deployments
+					ActorUserID:  sql.NullInt32{Int32: int32(actorID), Valid: true},  //#nosec G115 -- actor user id sourced from session, fits int32 within realistic deployments
+					Title:        sub.Title,
+					Description:  sql.NullString{String: sub.Description, Valid: sub.Description != ""},
+					Priority:     sub.Priority,
+				})
+				if err != nil {
+					return err
+				}
+
+				// Attach subtask assignee if provided.
+				if sub.AssigneeUserID != "" {
+					if err := addActorByPublicID(ctx, qtx, ws.ID, uint32(child.ID), sub.AssigneeUserID); err != nil { //#nosec G115 -- LastInsertId for tasks.id (BIGINT UNSIGNED), fits uint32 within realistic deployments
+						answered = err
+						return err
+					}
+				}
+				subtaskIDs = append(subtaskIDs, child.PublicID.String())
+			}
+			return nil
+		})
+		if answered != nil {
+			return nil, answered
+		}
+		if txErr != nil {
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
 
@@ -305,7 +322,7 @@ func addActorByPublicID(ctx context.Context, qtx *generated.Queries, wsID, taskI
 // emitCreatedEvent appends a TaskCreated event for a newly created task.
 func emitCreatedEvent(ctx context.Context, db *sql.DB, wsID, actorID uint32, taskID int64, taskPub, prjPub types.PublicID, title string) {
 	actorIDv := int64(actorID)
-	if err := eventbus.Append(ctx, db, eventbus.Event{
+	eventbus.AppendBestEffort(ctx, dbretry.AutoCommit(db), eventbus.Event{
 		Type:        eventbus.TaskCreated,
 		WorkspaceID: wsID,
 		ActorUserID: &actorIDv,
@@ -315,14 +332,7 @@ func emitCreatedEvent(ctx context.Context, db *sql.DB, wsID, actorID uint32, tas
 			"projectId": prjPub.String(),
 			"title":     title,
 		},
-	}); err != nil {
-		nflog.LoggerFromContext(ctx).ErrorContext(ctx, "eventbus.Append failed",
-			slog.Any("err", err),
-			slog.String("handler", "tasks.emitCreatedEvent"),
-			slog.String("event_type", string(eventbus.TaskCreated)),
-			logutil.LogEntityPID("task", taskPub),
-		)
-	}
+	}, "tasks.emitCreatedEvent")
 }
 
 // mapAIError translates AI package sentinel errors into HTTP error

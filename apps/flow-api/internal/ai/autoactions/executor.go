@@ -21,6 +21,7 @@ import (
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
 	apierrors "github.com/libraz/nodate-flow/apps/flow-api/internal/errors"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/eventbus"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/taskstate"
 )
 
@@ -799,34 +800,32 @@ func (e *Executor) escalate(ctx context.Context, r taskRow, act *Action) {
 		return
 	}
 
-	tx, err := e.DB.BeginTx(ctx, nil)
-	if err != nil {
-		e.Logger.Error("auto-action executor: begin tx", "err", err)
-		return
-	}
-	defer func() { _ = tx.Rollback() }()
-
-	if _, err := tx.ExecContext(ctx,
-		"UPDATE tasks SET priority = ?, updated_at = NOW() WHERE id = ?",
-		newPriority, r.id,
-	); err != nil {
-		e.Logger.Error("auto-action executor: update priority", "task", r.publicID.String(), "err", err)
-		return
-	}
-
-	payload, _ := json.Marshal(map[string]any{
-		"auto_action": string(act.Kind),
-		"field":       "priority",
-		"from":        r.priority,
-		"to":          newPriority,
-		"reason":      act.Reason,
-	})
-	if err := e.appendEvent(ctx, tx, r, "task.updated", payload); err != nil {
-		return
-	}
-
-	if err := tx.Commit(); err != nil {
-		e.Logger.Error("auto-action executor: commit", "task", r.publicID.String(), "err", err)
+	// dbretry.InTx owns the transaction so the event's fan-out (realtime,
+	// notifications, webhooks) fires after the commit. A hand-rolled
+	// transaction has no boundary to defer that to, and the appenders do
+	// not accept one.
+	if err := dbretry.InTx(ctx, e.DB, "autoactions.escalate", nil, func(ctx context.Context, tx *dbretry.Tx) error {
+		if _, err := tx.ExecContext(ctx,
+			"UPDATE tasks SET priority = ?, updated_at = NOW() WHERE id = ?",
+			newPriority, r.id,
+		); err != nil {
+			return err
+		}
+		taskInternal := int64(r.id)
+		return eventbus.Append(ctx, tx, eventbus.Event{
+			Type:        eventbus.TaskUpdated,
+			WorkspaceID: r.workspaceID,
+			TaskID:      &taskInternal,
+			Payload: map[string]any{
+				"auto_action": string(act.Kind),
+				"field":       "priority",
+				"from":        r.priority,
+				"to":          newPriority,
+				"reason":      act.Reason,
+			},
+		})
+	}); err != nil {
+		e.Logger.Error("auto-action executor: escalate", "task", r.publicID.String(), "err", err)
 		return
 	}
 	e.Logger.Info("auto-action applied: escalate",
@@ -857,9 +856,9 @@ func (e *Executor) recordProposal(ctx context.Context, r taskRow, act *Action) {
 	err := e.DB.QueryRowContext(ctx, `
 		SELECT JSON_UNQUOTE(JSON_EXTRACT(payload_json, '$.kind')), occurred_at
 		FROM events
-		WHERE task_id = ? AND type = 'ai.auto_action.proposed'
+		WHERE task_id = ? AND type = ?
 		ORDER BY occurred_at DESC
-		LIMIT 1`, r.id).Scan(&lastKind, &lastOccurred)
+		LIMIT 1`, r.id, string(eventbus.AiAutoActionProposed)).Scan(&lastKind, &lastOccurred)
 	if err == nil && lastKind.Valid && lastKind.String == string(act.Kind) && lastOccurred.Valid {
 		var userSince int
 		_ = e.DB.QueryRowContext(ctx, `
@@ -873,49 +872,47 @@ func (e *Executor) recordProposal(ctx context.Context, r taskRow, act *Action) {
 		}
 	}
 
-	payload, _ := json.Marshal(map[string]any{
-		"kind":       string(act.Kind),
-		"confidence": act.Confidence,
-		"reason":     act.Reason,
-	})
-	if _, err := e.DB.ExecContext(ctx,
-		`INSERT INTO events (public_id, workspace_id, task_id, type, payload_json, occurred_at)
-		 VALUES (?, ?, ?, ?, ?, ?)`,
-		types.New(), r.workspaceID, r.id,
-		"ai.auto_action.proposed", payload, time.Now().UTC(),
-	); err != nil {
-		e.Logger.Error("auto-action executor: record proposal", "task", r.publicID.String(), "err", err)
-	}
+	// The proposal is the whole write: there is no mutation for it to be
+	// atomic with, and nothing downstream of this call depends on it. A
+	// failure here costs the activity feed one line, which is not worth
+	// abandoning the tick over, so it is recorded rather than propagated.
+	taskInternal := int64(r.id)
+	eventbus.AppendBestEffort(ctx, dbretry.AutoCommit(e.DB), eventbus.Event{
+		Type:        eventbus.AiAutoActionProposed,
+		WorkspaceID: r.workspaceID,
+		TaskID:      &taskInternal,
+		Payload: map[string]any{
+			"kind":       string(act.Kind),
+			"confidence": act.Confidence,
+			"reason":     act.Reason,
+		},
+	}, "autoactions.recordProposal")
 }
 
 // autoArchive sets archived_at on a completed/cancelled task that has
 // been idle longer than the configured threshold.
 func (e *Executor) autoArchive(ctx context.Context, r taskRow, act *Action) {
-	tx, err := e.DB.BeginTx(ctx, nil)
-	if err != nil {
-		e.Logger.Error("auto-action executor: begin tx", "err", err)
-		return
-	}
-	defer func() { _ = tx.Rollback() }()
-
-	if _, err := tx.ExecContext(ctx,
-		"UPDATE tasks SET archived_at = NOW(), updated_at = NOW() WHERE id = ? AND archived_at IS NULL",
-		r.id,
-	); err != nil {
-		e.Logger.Error("auto-action executor: archive task", "task", r.publicID.String(), "err", err)
-		return
-	}
-
-	payload, _ := json.Marshal(map[string]any{
-		"auto_action": string(act.Kind),
-		"reason":      act.Reason,
-	})
-	if err := e.appendEvent(ctx, tx, r, "task.archived", payload); err != nil {
-		return
-	}
-
-	if err := tx.Commit(); err != nil {
-		e.Logger.Error("auto-action executor: commit", "task", r.publicID.String(), "err", err)
+	// As in escalate: the transaction is opened through dbretry.InTx so
+	// the archive event reaches its subscribers once the row is durable.
+	if err := dbretry.InTx(ctx, e.DB, "autoactions.autoArchive", nil, func(ctx context.Context, tx *dbretry.Tx) error {
+		if _, err := tx.ExecContext(ctx,
+			"UPDATE tasks SET archived_at = NOW(), updated_at = NOW() WHERE id = ? AND archived_at IS NULL",
+			r.id,
+		); err != nil {
+			return err
+		}
+		taskInternal := int64(r.id)
+		return eventbus.Append(ctx, tx, eventbus.Event{
+			Type:        eventbus.TaskArchived,
+			WorkspaceID: r.workspaceID,
+			TaskID:      &taskInternal,
+			Payload: map[string]any{
+				"auto_action": string(act.Kind),
+				"reason":      act.Reason,
+			},
+		})
+	}); err != nil {
+		e.Logger.Error("auto-action executor: auto-archive", "task", r.publicID.String(), "err", err)
 		return
 	}
 	e.Logger.Info("auto-action applied: auto-archive",
@@ -953,7 +950,7 @@ func (e *Executor) applyStateTransition(ctx context.Context, r taskRow, act *Act
 		spec     *apierrors.Spec
 		rejected error
 	)
-	txErr := dbretry.InTx(ctx, e.DB, "autoactions.applyStateTransition", nil, func(ctx context.Context, tx *sql.Tx) error {
+	txErr := dbretry.InTx(ctx, e.DB, "autoactions.applyStateTransition", nil, func(ctx context.Context, tx *dbretry.Tx) error {
 		var cause error
 		result, spec, cause = taskstate.ApplyTransitionTx(ctx, tx, taskstate.ApplyParams{
 			WorkspaceID: r.workspaceID,
@@ -996,17 +993,4 @@ func (e *Executor) applyStateTransition(ctx context.Context, r taskRow, act *Act
 		"from", string(result.FromState),
 		"to", string(result.ToState),
 	)
-}
-
-func (e *Executor) appendEvent(ctx context.Context, tx *sql.Tx, r taskRow, eventType string, payload json.RawMessage) error {
-	if _, err := tx.ExecContext(ctx,
-		`INSERT INTO events (public_id, workspace_id, task_id, type, payload_json, occurred_at)
-		 VALUES (?, ?, ?, ?, ?, ?)`,
-		types.New(), r.workspaceID, r.id,
-		eventType, payload, time.Now().UTC(),
-	); err != nil {
-		e.Logger.Error("auto-action executor: append event", "task", r.publicID.String(), "err", err)
-		return err
-	}
-	return nil
 }

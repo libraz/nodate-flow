@@ -3,18 +3,16 @@ package tasks
 import (
 	"context"
 	"database/sql"
-	"log/slog"
 	"math"
 
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/audit"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/dbretry"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
 	apierrors "github.com/libraz/nodate-flow/apps/flow-api/internal/errors"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/eventbus"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/middleware"
-	nflog "github.com/libraz/nodate-flow/apps/flow-api/internal/log"
 	"github.com/libraz/nodate-flow/packages/go-shared/apierr"
-	"github.com/libraz/nodate-flow/packages/go-shared/logutil"
 )
 
 // AddActor handles POST /tasks/{id}/actors.
@@ -59,7 +57,7 @@ func AddActor(deps Deps) func(context.Context, *AddTaskActorInput) (*AddTaskActo
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
 		taskInternal := int64(task.ID)
-		if err := eventbus.Append(ctx, deps.DB, eventbus.Event{
+		eventbus.AppendBestEffort(ctx, dbretry.AutoCommit(deps.DB), eventbus.Event{
 			Type:        eventbus.TaskActorAdded,
 			WorkspaceID: ws.ID,
 			ActorUserID: actorPtr(ctx),
@@ -70,16 +68,7 @@ func AddActor(deps Deps) func(context.Context, *AddTaskActorInput) (*AddTaskActo
 				"userId":  userPub.String(),
 				"role":    in.Body.Role,
 			},
-		}); err != nil {
-			nflog.LoggerFromContext(ctx).ErrorContext(ctx, "eventbus.Append failed",
-				slog.Any("err", err),
-				slog.String("handler", "tasks.AddActor"),
-				slog.String("event_type", string(eventbus.TaskActorAdded)),
-				logutil.LogEntity("workspace", ws.PublicID),
-				logutil.LogEntity("task", task.PublicID),
-				slog.String("actor_public_id", pub.String()),
-			)
-		}
+		}, "tasks.AddActor")
 		if aID, aOk := middleware.ActorFromContext(ctx); aOk {
 			deps.Audit.Record(ctx, audit.Entry{
 				Action:       "task.actor.add",
@@ -164,7 +153,7 @@ func RemoveActor(deps Deps) func(context.Context, *RemoveTaskActorInput) (*Remov
 			return nil, httpErr(apierrors.WsTaskActorNotFound)
 		}
 		taskInternal := int64(task.ID)
-		if err := eventbus.Append(ctx, deps.DB, eventbus.Event{
+		eventbus.AppendBestEffort(ctx, dbretry.AutoCommit(deps.DB), eventbus.Event{
 			Type:        eventbus.TaskActorRemoved,
 			WorkspaceID: ws.ID,
 			ActorUserID: actorPtr(ctx),
@@ -173,16 +162,7 @@ func RemoveActor(deps Deps) func(context.Context, *RemoveTaskActorInput) (*Remov
 				"taskId":  task.PublicID.String(),
 				"actorId": aid.String(),
 			},
-		}); err != nil {
-			nflog.LoggerFromContext(ctx).ErrorContext(ctx, "eventbus.Append failed",
-				slog.Any("err", err),
-				slog.String("handler", "tasks.RemoveActor"),
-				slog.String("event_type", string(eventbus.TaskActorRemoved)),
-				logutil.LogEntity("workspace", ws.PublicID),
-				logutil.LogEntity("task", task.PublicID),
-				slog.String("actor_public_id", aid.String()),
-			)
-		}
+		}, "tasks.RemoveActor")
 		if aID, aOk := middleware.ActorFromContext(ctx); aOk {
 			deps.Audit.Record(ctx, audit.Entry{
 				Action:       "task.actor.remove",

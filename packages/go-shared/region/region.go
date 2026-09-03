@@ -11,10 +11,7 @@
 //	explicit value on row > user.country  > workspace.country  > ""
 package region
 
-import (
-	"regexp"
-	"time"
-)
+import "regexp"
 
 // DefaultTimezone is the fallback used when no tz is set anywhere in the chain.
 const DefaultTimezone = "UTC"
@@ -22,13 +19,13 @@ const DefaultTimezone = "UTC"
 var countryCodePattern = regexp.MustCompile(`^[A-Z]{2}$`)
 
 // ValidateTimezone returns nil when tz is a valid IANA timezone identifier
-// that time.LoadLocation can resolve. Empty string is rejected so callers
-// must pass DefaultTimezone explicitly.
+// that the zoneinfo database can resolve. Empty string is rejected so
+// callers must pass DefaultTimezone explicitly.
 func ValidateTimezone(tz string) error {
 	if tz == "" {
 		return ErrInvalidTimezone
 	}
-	if _, err := time.LoadLocation(tz); err != nil {
+	if _, err := LoadLocation(tz); err != nil {
 		return ErrInvalidTimezone
 	}
 	return nil

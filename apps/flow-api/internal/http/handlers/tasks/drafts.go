@@ -1,4 +1,4 @@
-// Package tasks — handler for the Phase 6 / L2 retro draft queue endpoint.
+// Package tasks — handler for the retro draft queue endpoint.
 //
 // GET /workspaces/{wsId}/tasks/drafts?reason=retro returns the workspace's
 // draft retrospective tasks: tasks linked back to an original task via a
@@ -16,6 +16,7 @@ import (
 	"context"
 	"database/sql"
 
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/acl"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
 	apierrors "github.com/libraz/nodate-flow/apps/flow-api/internal/errors"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/middleware"
@@ -36,7 +37,7 @@ import (
 // whole page at once by [Queries.FindRetroDraftAgents]. Rows where the
 // event has been retention-swept simply omit the agent fields.
 //
-// The `signal` enrichment block from the L2 design is deliberately left
+// The `signal` enrichment block from the original design is deliberately left
 // out of this iteration (see the doc comment on [RetroDraft]).
 func ListRetroDrafts(deps Deps) func(context.Context, *ListRetroDraftsInput) (*ListRetroDraftsOutput, error) {
 	return func(ctx context.Context, in *ListRetroDraftsInput) (*ListRetroDraftsOutput, error) {
@@ -44,7 +45,16 @@ func ListRetroDrafts(deps Deps) func(context.Context, *ListRetroDraftsInput) (*L
 		if !ok {
 			return nil, httpErr(apierrors.WsWorkspaceNotFound)
 		}
-		return listRetroDrafts(ctx, deps.Queries, ws.ID, in.Limit, in.Offset)
+		actorID, ok := middleware.ActorFromContext(ctx)
+		if !ok {
+			return nil, httpErr(apierrors.WsWorkspaceAccessDenied)
+		}
+		// The route is open to every workspace member and each row
+		// carries the draft's title next to the source task's, so the
+		// page is filtered to drafts whose two ends the actor may both
+		// see.
+		vis := acl.ListVisibilityArgs(actorID, acl.WorkspaceRole(ws.Role))
+		return listRetroDrafts(ctx, deps.Queries, ws.ID, vis, in.Limit, in.Offset)
 	}
 }
 
@@ -57,12 +67,19 @@ func ListRetroDrafts(deps Deps) func(context.Context, *ListRetroDraftsInput) (*L
 // is the property that matters here and it is not visible from the
 // response.
 func listRetroDrafts(
-	ctx context.Context, q *generated.Queries, workspaceID uint32, limit, offset int32,
+	ctx context.Context, q *generated.Queries, workspaceID uint32, vis acl.VisibilityArgs, limit, offset int32,
 ) (*ListRetroDraftsOutput, error) {
 	rows, err := q.ListRetroDraftsForWorkspace(ctx, generated.ListRetroDraftsForWorkspaceParams{
-		WorkspaceID: workspaceID,
-		Limit:       limit,
-		Offset:      offset,
+		WorkspaceID:   workspaceID,
+		IsElevated:    vis.IsElevated,
+		ActorUserID:   vis.ActorUserID,
+		ActorUserID_2: vis.ActorUserID,
+		ActorUserID_3: vis.ActorUserID,
+		ActorUserID_4: vis.ActorUserID,
+		ActorUserID_5: vis.ActorUserID,
+		ActorUserID_6: vis.ActorUserID,
+		Limit:         limit,
+		Offset:        offset,
 	})
 	if err != nil {
 		return nil, httpErr(apierrors.InternalUnexpected)

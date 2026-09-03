@@ -2,9 +2,7 @@ package tasks
 
 import (
 	"context"
-	"database/sql"
 	"errors"
-	"log/slog"
 
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/audit"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/constraint"
@@ -14,8 +12,6 @@ import (
 	apierrors "github.com/libraz/nodate-flow/apps/flow-api/internal/errors"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/eventbus"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/middleware"
-	nflog "github.com/libraz/nodate-flow/apps/flow-api/internal/log"
-	"github.com/libraz/nodate-flow/packages/go-shared/logutil"
 )
 
 // constraintParseErr maps a constraint.Parse failure to the matching
@@ -59,9 +55,9 @@ func AddConstraint(deps Deps) func(context.Context, *AddTaskConstraintInput) (*A
 		pub := types.New()
 		taskInternal := int64(task.ID)
 		// Insert and append atomically so a crash between the insert and a
-		// post-commit append cannot lose the timeline row (L-14).
-		if err := dbretry.InTx(ctx, deps.DB, "tasks.AddConstraint", nil, func(ctx context.Context, tx *sql.Tx) error {
-			qtx := deps.Queries.WithTx(tx)
+		// post-commit append cannot lose the timeline row.
+		if err := dbretry.InTx(ctx, deps.DB, "tasks.AddConstraint", nil, func(ctx context.Context, tx *dbretry.Tx) error {
+			qtx := deps.Queries.WithTx(tx.RawTx())
 			if _, e := qtx.AddConstraint(ctx, generated.AddConstraintParams{
 				PublicID:    pub,
 				WorkspaceID: ws.ID,
@@ -134,7 +130,7 @@ func RemoveConstraint(deps Deps) func(context.Context, *RemoveTaskConstraintInpu
 			return nil, httpErr(apierrors.WsTaskNotFound)
 		}
 		taskInternal := int64(task.ID)
-		if err := eventbus.Append(ctx, deps.DB, eventbus.Event{
+		eventbus.AppendBestEffort(ctx, dbretry.AutoCommit(deps.DB), eventbus.Event{
 			Type:        eventbus.TaskConstraintRemoved,
 			WorkspaceID: ws.ID,
 			ActorUserID: actorPtr(ctx),
@@ -143,16 +139,7 @@ func RemoveConstraint(deps Deps) func(context.Context, *RemoveTaskConstraintInpu
 				"taskId":       task.PublicID.String(),
 				"constraintId": cid.String(),
 			},
-		}); err != nil {
-			nflog.LoggerFromContext(ctx).ErrorContext(ctx, "eventbus.Append failed",
-				slog.Any("err", err),
-				slog.String("handler", "tasks.RemoveConstraint"),
-				slog.String("event_type", string(eventbus.TaskConstraintRemoved)),
-				logutil.LogEntity("workspace", ws.PublicID),
-				logutil.LogEntity("task", task.PublicID),
-				slog.String("constraint_public_id", cid.String()),
-			)
-		}
+		}, "tasks.RemoveConstraint")
 		if aID, aOk := middleware.ActorFromContext(ctx); aOk {
 			deps.Audit.Record(ctx, audit.Entry{
 				Action:       "task.constraint.remove",

@@ -1,5 +1,5 @@
 // Package signaljudge — verdict schema and validator for the LLM
-// signal_judge agent's structured output (ADR 0008 D4 / Phase 3 J4).
+// signal_judge agent's structured output (ADR 0008 D4).
 //
 // The verdict is the contract between the Runner (LLM-facing) and the
 // Applier (event-emitting). The Runner is responsible for parsing the
@@ -32,8 +32,8 @@ import (
 // Verdict is the structured output the signal_judge LLM returns.
 // Marshalling round-trips through [json.Marshal]; the JSON shape is
 // pinned by the field tags below and forms the prompt-side schema
-// the Runner asks the LLM to produce (Phase 6 will switch this to
-// provider-native structured output where available).
+// the Runner asks the LLM to produce (provider-native structured
+// output can replace it where available).
 type Verdict struct {
 	// Action selects which Applier branch reifies the verdict.
 	Action VerdictAction `json:"action"`
@@ -78,7 +78,7 @@ const (
 	ActionGenerateRetro VerdictAction = "generate_retro"
 	// ActionAddComment asks the Applier to append a comment on the
 	// target task (under autonomy=auto only; suggest/draft surface
-	// the proposed comment in a future Phase 6 review queue).
+	// the proposed comment in a future review queue).
 	ActionAddComment VerdictAction = "add_comment"
 	// ActionDefer means the judge chose to wait for more information
 	// rather than act. The Applier emits SignalJudged only and does
@@ -117,7 +117,7 @@ type ProposedEvent struct {
 // events bypass the per-action switch in the Applier, so the
 // allowlist is the only gate stopping a creative LLM from emitting
 // task.deleted or similar destructive kinds.
-var allowedProposedEventTypes = map[string]bool{
+var allowedProposedEventTypes = map[eventbus.Kind]bool{
 	eventbus.SignalJudged:      true,
 	eventbus.SignalApplied:     true,
 	eventbus.SignalRejected:    true,
@@ -177,7 +177,7 @@ func ValidateVerdict(v Verdict) error {
 		if pe.Type == "" {
 			return verdictError("proposed_events[%d].type is required", i)
 		}
-		if !allowedProposedEventTypes[pe.Type] {
+		if !allowedProposedEventTypes[eventbus.Kind(pe.Type)] {
 			return verdictError("proposed_events[%d].type %q is not allowed", i, pe.Type)
 		}
 	}

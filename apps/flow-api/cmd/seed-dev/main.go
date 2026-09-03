@@ -60,6 +60,7 @@ import (
 	_ "github.com/go-sql-driver/mysql"
 
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/auth"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/dbretry"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated/calendar"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
@@ -501,25 +502,21 @@ func ensureTasks(ctx context.Context, db *sql.DB, _ *generated.Queries, wsID, pr
 		return 0, err
 	}
 	if count == 0 {
-		tx, err := db.BeginTx(ctx, nil)
-		if err != nil {
-			return 0, err
-		}
-		defer tx.Rollback() //nolint:errcheck
-
 		createdBy := sql.NullInt32{Int32: int32(userID), Valid: true} //#nosec G115 -- user id sourced from seed flow, fits int32
-		for _, s := range l.Tasks {
-			if _, err := taskcreate.New(ctx, tx, taskcreate.Args{
-				WorkspaceID: wsID,
-				ProjectID:   projID,
-				ActorUserID: createdBy,
-				Title:       s.Title,
-				Priority:    s.Priority,
-			}); err != nil {
-				return 0, fmt.Errorf("create seed task: %w", err)
+		if err := dbretry.InTx(ctx, db, "seed.ensureTasks", nil, func(ctx context.Context, tx *dbretry.Tx) error {
+			for _, s := range l.Tasks {
+				if _, err := taskcreate.New(ctx, tx, taskcreate.Args{
+					WorkspaceID: wsID,
+					ProjectID:   projID,
+					ActorUserID: createdBy,
+					Title:       s.Title,
+					Priority:    s.Priority,
+				}); err != nil {
+					return fmt.Errorf("create seed task: %w", err)
+				}
 			}
-		}
-		if err := tx.Commit(); err != nil {
+			return nil
+		}); err != nil {
 			return 0, err
 		}
 		logger.Info("created seed tasks", "project_id", projID, "count", len(l.Tasks))

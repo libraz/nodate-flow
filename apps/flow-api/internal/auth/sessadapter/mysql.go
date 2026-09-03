@@ -60,6 +60,9 @@ func (a *queriesAdapter) FindSessionByRefreshHash(ctx context.Context, refreshHa
 // earlier, so "the row was already revoked" is a normal outcome for both
 // and not something to report. The user-facing DELETE /me/sessions/{id}
 // does its own existence check.
+//
+// affected-rows: not-applicable — what the caller asked for is that the
+// session not be live, and a row that was already revoked satisfies it.
 func (a *queriesAdapter) RevokeSession(ctx context.Context, userID uint32, publicID dbtype.PublicID) error {
 	_, err := a.q.RevokeSession(ctx, generated.RevokeSessionParams{
 		UserID:   userID,
@@ -113,6 +116,9 @@ func (a *queriesAdapter) FindSessionByRotatedFromHash(ctx context.Context, rotat
 // purpose: it revokes a set whose size is not known in advance, and a
 // user whose only session is the one being kept legitimately has none
 // left to revoke.
+//
+// affected-rows: not-applicable — nobody named a session, and none left
+// live is the outcome the request asked for.
 func (a *queriesAdapter) RevokeAllSessionsForUserExcept(ctx context.Context, userID uint32, publicID dbtype.PublicID) error {
 	_, err := a.q.RevokeAllSessionsForUserExcept(ctx, generated.RevokeAllSessionsForUserExceptParams{
 		UserID:   userID,

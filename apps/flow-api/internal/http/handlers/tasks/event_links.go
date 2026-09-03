@@ -5,7 +5,9 @@ import (
 	"database/sql"
 	"errors"
 
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/acl"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/audit"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/dbretry"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
 	apierrors "github.com/libraz/nodate-flow/apps/flow-api/internal/errors"
@@ -45,25 +47,20 @@ func CreateTaskEventLink(deps Deps) func(context.Context, *CreateTaskEventLinkIn
 			return nil, httpErr(apierr.SpecForErrNoRows(err, apierrors.CalendarEventNotFound, apierrors.InternalUnexpected))
 		}
 
-		tx, err := deps.DB.BeginTx(ctx, nil)
-		if err != nil {
-			return nil, httpErr(apierrors.InternalUnexpected)
-		}
-		defer func() { _ = tx.Rollback() }()
-
-		linkPub, _, err := itemkit.LinkTaskToEvent(ctx, tx, itemkit.LinkTaskToEventArgs{
-			WorkspaceID: ws.ID,
-			TaskID:      task.ID,
-			EventID:     eventID,
-			Relation:    itemkit.Relation(in.Body.Relation),
-			ActorUserID: actorID,
-			SortWeight:  in.Body.SortWeight,
-		})
-		if err != nil {
+		var linkPub types.PublicID
+		if err := dbretry.InTx(ctx, deps.DB, "tasks.CreateTaskEventLink", nil, func(ctx context.Context, tx *dbretry.Tx) error {
+			var err error
+			linkPub, _, err = itemkit.LinkTaskToEvent(ctx, tx, itemkit.LinkTaskToEventArgs{
+				WorkspaceID: ws.ID,
+				TaskID:      task.ID,
+				EventID:     eventID,
+				Relation:    itemkit.Relation(in.Body.Relation),
+				ActorUserID: actorID,
+				SortWeight:  in.Body.SortWeight,
+			})
+			return err
+		}); err != nil {
 			return nil, translateItemkitTaskError(err)
-		}
-		if err := tx.Commit(); err != nil {
-			return nil, httpErr(apierrors.InternalUnexpected)
 		}
 
 		if deps.Audit != nil {
@@ -104,24 +101,17 @@ func DeleteTaskEventLink(deps Deps) func(context.Context, *DeleteTaskEventLinkIn
 			return nil, httpErr(apierrors.ValidationPathParamInvalid)
 		}
 
-		tx, err := deps.DB.BeginTx(ctx, nil)
-		if err != nil {
-			return nil, httpErr(apierrors.InternalUnexpected)
-		}
-		defer func() { _ = tx.Rollback() }()
-
-		if err := itemkit.UnlinkTaskFromEvent(ctx, tx, itemkit.UnlinkTaskFromEventArgs{
-			WorkspaceID: ws.ID,
-			LinkID:      linkPub,
-			ActorUserID: actorID,
+		if err := dbretry.InTx(ctx, deps.DB, "tasks.DeleteTaskEventLink", nil, func(ctx context.Context, tx *dbretry.Tx) error {
+			return itemkit.UnlinkTaskFromEvent(ctx, tx, itemkit.UnlinkTaskFromEventArgs{
+				WorkspaceID: ws.ID,
+				LinkID:      linkPub,
+				ActorUserID: actorID,
+			})
 		}); err != nil {
 			if errors.Is(err, sql.ErrNoRows) {
 				return nil, httpErr(apierrors.CalendarEventNotFound)
 			}
 			return nil, translateItemkitTaskError(err)
-		}
-		if err := tx.Commit(); err != nil {
-			return nil, httpErr(apierrors.InternalUnexpected)
 		}
 
 		if deps.Audit != nil {
@@ -204,6 +194,10 @@ func ListLinkedTasks(deps Deps) func(context.Context, *ListLinkedTasksInput) (*L
 		if !ok {
 			return nil, httpErr(apierrors.WsTaskNotFound)
 		}
+		actorID, ok := middleware.ActorFromContext(ctx)
+		if !ok {
+			return nil, httpErr(apierrors.WsTaskNotFound)
+		}
 		eventPub, err := types.Parse(in.EventID)
 		if err != nil {
 			return nil, httpErr(apierrors.CalendarEventNotFound)
@@ -213,12 +207,22 @@ func ListLinkedTasks(deps Deps) func(context.Context, *ListLinkedTasksInput) (*L
 		if limit <= 0 {
 			limit = 100
 		}
+		// An event id is reachable by every workspace member, guests
+		// included, and each link row carries the linked task's title.
+		// The filter is what keeps a task the actor may not read out of
+		// the answer; total counts the filtered set because COUNT(*)
+		// OVER() sits inside the same statement.
+		vis := acl.ListVisibilityArgs(actorID, acl.WorkspaceRole(ws.Role))
 		rows, err := deps.Queries.ListLinkedTasksForEvent(ctx, generated.ListLinkedTasksForEventParams{
-			WorkspaceID: ws.ID,
-			PublicID:    eventPub,
-			Relation:    generated.TaskEventLinksRelation(in.Relation),
-			Limit:       limit,
-			Offset:      in.Offset,
+			WorkspaceID:   ws.ID,
+			EventPublicID: eventPub,
+			Relation:      generated.TaskEventLinksRelation(in.Relation),
+			IsElevated:    vis.IsElevated,
+			ActorUserID:   vis.ActorUserID,
+			ActorUserID_2: vis.ActorUserID,
+			ActorUserID_3: vis.ActorUserID,
+			Limit:         limit,
+			Offset:        in.Offset,
 		})
 		if err != nil {
 			return nil, httpErr(apierrors.InternalUnexpected)

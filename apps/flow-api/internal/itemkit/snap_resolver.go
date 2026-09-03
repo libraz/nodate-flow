@@ -5,7 +5,6 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"time"
 
 	"github.com/libraz/nodate-flow/packages/go-shared/holidays"
 	"github.com/libraz/nodate-flow/packages/go-shared/region"
@@ -70,17 +69,17 @@ func ResolveSnapConfig(ctx context.Context, tx TX, workspaceID, userID uint32) (
 		cfg.Holidays = holidays.Set(effectiveCountry(userCountry, wsCountry))
 	}
 
-	loc := time.UTC
-	if userTZ.Valid && userTZ.String != "" {
-		if parsed, err := time.LoadLocation(userTZ.String); err == nil {
-			loc = parsed
-		}
-	} else if wsTZ.Valid && wsTZ.String != "" {
-		if parsed, err := time.LoadLocation(wsTZ.String); err == nil {
-			loc = parsed
-		}
+	// The same chain the calendar handlers and the MCP tools apply, run
+	// through the one resolver rather than restated here. Restated, it
+	// drifted: this copy fell through to the next candidate on an
+	// unresolvable name while the others errored, so a user whose stored
+	// zone had been retired got their workspace's working week while
+	// every other surface refused the row.
+	z, zerr := region.Resolve(valueOrEmpty(userTZ), valueOrEmpty(wsTZ))
+	if zerr != nil {
+		return cfg, fmt.Errorf("itemkit: resolve timezone for user %d: %w", userID, zerr)
 	}
-	cfg.Location = loc
+	cfg.Zone = z
 	return cfg, nil
 }
 

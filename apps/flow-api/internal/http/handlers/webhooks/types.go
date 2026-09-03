@@ -131,14 +131,18 @@ type DeleteInput struct {
 	WebhookID string `path:"webhookId" doc:"Webhook subscription public id (UUID v7)"`
 }
 
-// DeleteOutputBody is the response body for DELETE /workspaces/{wsId}/webhooks/{webhookId}.
-type DeleteOutputBody struct {
+// WebhookDeleteOutputBody is the response body for DELETE
+// /workspaces/{wsId}/webhooks/{webhookId}. The name carries the resource
+// because Huma derives component schema names from the Go type name, and a
+// bare DeleteOutputBody would share one component with every other delete
+// operation in the merged spec.
+type WebhookDeleteOutputBody struct {
 	Ok bool `json:"ok"`
 }
 
 // DeleteOutput is the response for DELETE /workspaces/{wsId}/webhooks/{webhookId}.
 type DeleteOutput struct {
-	Body DeleteOutputBody
+	Body WebhookDeleteOutputBody
 }
 
 // --- Toggle ---

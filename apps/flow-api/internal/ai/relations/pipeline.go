@@ -50,7 +50,7 @@ type Pipeline struct {
 // background goroutine when a task is created or updated.
 func (p *Pipeline) Hook() eventbus.NotifyHook {
 	return func(ctx context.Context, workspaceInternalID uint32, eventType string, _ uint64) {
-		if eventType != eventbus.TaskCreated && eventType != eventbus.TaskUpdated {
+		if eventType != string(eventbus.TaskCreated) && eventType != string(eventbus.TaskUpdated) {
 			return
 		}
 		// The NotifyHook fires after each Append; the event row was just
@@ -149,11 +149,23 @@ func (p *Pipeline) processTask(ctx context.Context, workspaceID uint32, taskID u
 	}
 
 	// Fetch candidate embeddings.
+	//
+	// This runs off an event, not a request: there is no actor whose
+	// visibility could scope the pool, and the titles it reads go into
+	// relation_suggestions rows rather than onto any wire. The reader is
+	// gated instead -- every statement that projects a suggestion's task
+	// titles carries the Layer 4 rule against both ends -- so the pool
+	// here is the workspace's, and a suggestion between two tasks stays
+	// invisible to anyone who may not see them both.
 	candidates, err := p.Queries.ListCandidateTaskEmbeddings(ctx, generated.ListCandidateTaskEmbeddingsParams{
-		WorkspaceID: workspaceID,
-		Model:       model,
-		TaskID:      taskID,
-		Limit:       MaxCandidates,
+		WorkspaceID:   workspaceID,
+		Model:         model,
+		TaskID:        taskID,
+		IsElevated:    1,
+		ActorUserID:   0,
+		ActorUserID_2: 0,
+		ActorUserID_3: 0,
+		Limit:         MaxCandidates,
 	})
 	if err != nil {
 		slog.Error("relations pipeline: list candidates", "err", err)
@@ -228,8 +240,8 @@ func (p *Pipeline) processTask(ctx context.Context, workspaceID uint32, taskID u
 		// on the parent task rows, so by the time the event insert runs
 		// the task cannot have gone away: either both rows land or
 		// neither does.
-		if err := dbretry.InTx(ctx, p.DB, "relations.suggest", nil, func(ctx context.Context, tx *sql.Tx) error {
-			if _, err := p.Queries.WithTx(tx).CreateRelationSuggestion(ctx, generated.CreateRelationSuggestionParams{
+		if err := dbretry.InTx(ctx, p.DB, "relations.suggest", nil, func(ctx context.Context, tx *dbretry.Tx) error {
+			if _, err := p.Queries.WithTx(tx.RawTx()).CreateRelationSuggestion(ctx, generated.CreateRelationSuggestionParams{
 				PublicID:      pub,
 				WorkspaceID:   workspaceID,
 				SourceTaskID:  taskID,

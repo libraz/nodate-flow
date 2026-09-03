@@ -2,7 +2,6 @@ package tasks
 
 import (
 	"context"
-	"database/sql"
 
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/audit"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/dbretry"
@@ -47,7 +46,7 @@ func Transition(deps Deps) func(context.Context, *TransitionTaskInput) (*Transit
 			result  taskstate.ApplyResult
 			specErr *apierrors.Spec
 		)
-		txErr := dbretry.InTx(ctx, deps.DB, "tasks.Transition", nil, func(ctx context.Context, tx *sql.Tx) error {
+		txErr := dbretry.InTx(ctx, deps.DB, "tasks.Transition", nil, func(ctx context.Context, tx *dbretry.Tx) error {
 			r, spec, applyErr := taskstate.ApplyTransitionTx(ctx, tx, taskstate.ApplyParams{
 				WorkspaceID:  ws.ID,
 				TaskID:       task.ID,

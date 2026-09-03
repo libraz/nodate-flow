@@ -1,5 +1,5 @@
 // Package signaljudge — Applier translates a judge verdict into
-// task-domain events (ADR 0008 D4 / Phase 3 J4).
+// task-domain events (ADR 0008 D4).
 //
 // The Applier is the sole writer of judge-driven task events. The
 // invariant is enforced at runtime by [eventbus.Append], which
@@ -272,7 +272,7 @@ func (a *Applier) Apply(ctx context.Context, sig SignalRef, agent AgentRef, runI
 	//   - action=noop / defer: never materialise, regardless of
 	//     autonomy. applied_at stays NULL.
 	//   - autonomy=Suggest: never materialise. The verdict waits for
-	//     a Phase 6 UI confirmation step.
+	//     a UI confirmation step.
 	//   - everything else: branch on (action, autonomy) below.
 	now := nowFn().UTC()
 	var appliedAt *time.Time
@@ -299,8 +299,8 @@ func (a *Applier) Apply(ctx context.Context, sig SignalRef, agent AgentRef, runI
 
 	// Proposed events are only reified when the verdict was applied
 	// (Auto branches). Under Suggest / noop / defer the LLM proposal
-	// is recorded in judge_output_json but not emitted — Phase 6 may
-	// surface them in the suggestion UI.
+	// is recorded in judge_output_json but not emitted; the suggestion
+	// UI can surface them later.
 	if !result.Skipped && decision.Level == AutonomyAuto && len(verdict.ProposedEvents) > 0 {
 		emitted, propErr := a.emitProposedEvents(ctx, sig, agent, taskID, verdict, decision)
 		if propErr != nil {
@@ -350,8 +350,8 @@ func (a *Applier) applyMaterialised(ctx context.Context, sig SignalRef, agent Ag
 		if decision.Level != AutonomyAuto {
 			// Only the Auto branch closes tasks. Draft/Suggest for
 			// complete_task surface as suggestions only — adjacent
-			// to the no-op semantics. Phase 6 may add a "queue draft
-			// completion" surface but Phase 3 does not act.
+			// to the no-op semantics. A "queue draft completion"
+			// surface could be added later; today nothing acts.
 			return 0, nil
 		}
 		if a.Tasks != nil {
@@ -479,7 +479,10 @@ func (a *Applier) emitProposedEvents(ctx context.Context, sig SignalRef, agent A
 			}
 		}
 		if err := a.append(ctx, eventbus.Event{
-			Type:                pe.Type,
+			// The kind arrives as a string from the judge's JSON output;
+			// ValidateVerdict has already rejected anything outside
+			// allowedProposedEventTypes, so the conversion is checked.
+			Type:                eventbus.Kind(pe.Type),
 			WorkspaceID:         sig.WorkspaceID,
 			ActorAgentID:        agentInt64(agent),
 			TaskID:              taskIntPtr(taskID),

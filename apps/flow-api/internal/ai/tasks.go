@@ -2,7 +2,6 @@ package ai
 
 import (
 	"context"
-	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -10,9 +9,11 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/acl"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/ai/airequest"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/ai/embed"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/ai/providers"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/dbretry"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
 )
 
@@ -88,14 +89,11 @@ func (o *Orchestrator) recordMetrics(provider, model, wsID string, costMicros in
 	}
 }
 
-// EventDB is the narrow surface ProposeInboxTriage needs to append a
-// row to the events table. It is satisfied by *sql.DB and *sql.Tx.
-type EventDB interface {
-	ExecContext(ctx context.Context, query string, args ...interface{}) (sql.Result, error)
-	PrepareContext(ctx context.Context, query string) (*sql.Stmt, error)
-	QueryContext(ctx context.Context, query string, args ...interface{}) (*sql.Rows, error)
-	QueryRowContext(ctx context.Context, query string, args ...interface{}) *sql.Row
-}
+// EventDB is the handle ProposeInboxTriage appends its
+// ai.suggestion.proposed rows through. It is a commit boundary rather
+// than a bare statement executor because the append wakes subscribers
+// that have to be able to read the row.
+type EventDB = dbretry.CommitBoundary
 
 // InboxReader is the narrow contract ProposeInboxTriage uses to fetch
 // the top-N inbox items for a workspace. The production wiring passes
@@ -308,6 +306,10 @@ const (
 // duplicates) and similar past tasks (via embedding similarity). The
 // embedClient and reader may be nil; in that case, similar-task context
 // is omitted and only the task text and existing children are used.
+//
+// vis carries the Layer 4 task-visibility binds for the actor asking
+// for the decomposition. The similar tasks are quoted into the prompt
+// by title, so the candidate pool is that actor's readable set.
 func (o *Orchestrator) ProposeSteps(
 	ctx context.Context,
 	workspaceID uint32,
@@ -316,6 +318,7 @@ func (o *Orchestrator) ProposeSteps(
 	existingChildren []ChildTaskSummary,
 	embedClient EmbedClient,
 	reader SmartCreateReader,
+	vis acl.VisibilityArgs,
 ) ([]ProposedTask, error) {
 	// ---- guard ----
 	if o == nil || o.Resolver == nil {
@@ -350,10 +353,14 @@ func (o *Orchestrator) ProposeSteps(
 			if embedErr == nil {
 				embed.Normalize(queryVec)
 				candidates, listErr := reader.ListCandidateTaskEmbeddings(ctx, generated.ListCandidateTaskEmbeddingsParams{
-					WorkspaceID: workspaceID,
-					Model:       embedClient.Model(),
-					TaskID:      0,
-					Limit:       stepsMaxCandidates,
+					WorkspaceID:   workspaceID,
+					Model:         embedClient.Model(),
+					TaskID:        0,
+					IsElevated:    vis.IsElevated,
+					ActorUserID:   vis.ActorUserID,
+					ActorUserID_2: vis.ActorUserID,
+					ActorUserID_3: vis.ActorUserID,
+					Limit:         stepsMaxCandidates,
 				})
 				if listErr == nil {
 					ranked = make([]scoredTask, 0, len(candidates))

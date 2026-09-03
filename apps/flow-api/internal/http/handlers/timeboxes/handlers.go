@@ -3,11 +3,11 @@ package timeboxes
 import (
 	"context"
 	"database/sql"
-	"log/slog"
 	"time"
 
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/acl"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/audit"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/dbretry"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
 	apierrors "github.com/libraz/nodate-flow/apps/flow-api/internal/errors"
@@ -15,7 +15,6 @@ import (
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/handlers/handlerutil"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/middleware"
 	"github.com/libraz/nodate-flow/packages/go-shared/apierr"
-	"github.com/libraz/nodate-flow/packages/go-shared/logutil"
 )
 
 const dateLayout = "2006-01-02"
@@ -154,7 +153,7 @@ func Create(deps Deps) func(context.Context, *CreateTimeboxInput) (*CreateTimebo
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
 
-		if err := eventbus.Append(ctx, deps.DB, eventbus.Event{
+		eventbus.AppendBestEffort(ctx, dbretry.AutoCommit(deps.DB), eventbus.Event{
 			Type:        eventbus.TimeboxCreated,
 			WorkspaceID: ws.ID,
 			ActorUserID: actorPtr(ctx),
@@ -162,15 +161,7 @@ func Create(deps Deps) func(context.Context, *CreateTimeboxInput) (*CreateTimebo
 				"timeboxId": pub.String(),
 				"name":      in.Body.Name,
 			},
-		}); err != nil {
-			slog.ErrorContext(ctx, "eventbus.Append failed",
-				slog.Any("err", err),
-				slog.String("handler", "timeboxes.Create"),
-				slog.String("event_type", string(eventbus.TimeboxCreated)),
-				logutil.LogEntity("workspace", ws.PublicID),
-				slog.String("timebox_public_id", pub.String()),
-			)
-		}
+		}, "timeboxes.Create")
 
 		deps.Audit.Record(ctx, audit.Entry{
 			Action:       "timebox.create",
@@ -324,7 +315,7 @@ func Update(deps Deps) func(context.Context, *UpdateTimeboxInput) (*UpdateTimebo
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
 
-		if err := eventbus.Append(ctx, deps.DB, eventbus.Event{
+		eventbus.AppendBestEffort(ctx, dbretry.AutoCommit(deps.DB), eventbus.Event{
 			Type:        eventbus.TimeboxUpdated,
 			WorkspaceID: ws.ID,
 			ActorUserID: actorPtr(ctx),
@@ -332,15 +323,7 @@ func Update(deps Deps) func(context.Context, *UpdateTimeboxInput) (*UpdateTimebo
 				"timeboxId": pub.String(),
 				"name":      name,
 			},
-		}); err != nil {
-			slog.ErrorContext(ctx, "eventbus.Append failed",
-				slog.Any("err", err),
-				slog.String("handler", "timeboxes.Update"),
-				slog.String("event_type", string(eventbus.TimeboxUpdated)),
-				logutil.LogEntity("workspace", ws.PublicID),
-				slog.String("timebox_public_id", pub.String()),
-			)
-		}
+		}, "timeboxes.Update")
 
 		if actorID, ok := middleware.ActorFromContext(ctx); ok {
 			deps.Audit.Record(ctx, audit.Entry{
@@ -408,7 +391,7 @@ func UpdateStatus(deps Deps) func(context.Context, *UpdateTimeboxStatusInput) (*
 		case generated.TimeboxesStatusCompleted:
 			evtType = eventbus.TimeboxCompleted
 		}
-		if err := eventbus.Append(ctx, deps.DB, eventbus.Event{
+		eventbus.AppendBestEffort(ctx, dbretry.AutoCommit(deps.DB), eventbus.Event{
 			Type:        evtType,
 			WorkspaceID: ws.ID,
 			ActorUserID: actorPtr(ctx),
@@ -416,16 +399,7 @@ func UpdateStatus(deps Deps) func(context.Context, *UpdateTimeboxStatusInput) (*
 				"timeboxId": pub.String(),
 				"status":    in.Body.Status,
 			},
-		}); err != nil {
-			slog.ErrorContext(ctx, "eventbus.Append failed",
-				slog.Any("err", err),
-				slog.String("handler", "timeboxes.UpdateStatus"),
-				slog.String("event_type", string(evtType)),
-				logutil.LogEntity("workspace", ws.PublicID),
-				slog.String("timebox_public_id", pub.String()),
-				slog.String("status", in.Body.Status),
-			)
-		}
+		}, "timeboxes.UpdateStatus")
 
 		if actorID, ok := middleware.ActorFromContext(ctx); ok {
 			deps.Audit.Record(ctx, audit.Entry{
@@ -551,7 +525,7 @@ func AddTask(deps Deps) func(context.Context, *AddTaskInput) (*AddTaskOutput, er
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
 
-		if err := eventbus.Append(ctx, deps.DB, eventbus.Event{
+		eventbus.AppendBestEffort(ctx, dbretry.AutoCommit(deps.DB), eventbus.Event{
 			Type:        eventbus.TimeboxTaskAdded,
 			WorkspaceID: ws.ID,
 			ActorUserID: actorPtr(ctx),
@@ -559,16 +533,7 @@ func AddTask(deps Deps) func(context.Context, *AddTaskInput) (*AddTaskOutput, er
 				"timeboxId": tbPub.String(),
 				"taskId":    taskPub.String(),
 			},
-		}); err != nil {
-			slog.ErrorContext(ctx, "eventbus.Append failed",
-				slog.Any("err", err),
-				slog.String("handler", "timeboxes.AddTask"),
-				slog.String("event_type", string(eventbus.TimeboxTaskAdded)),
-				logutil.LogEntity("workspace", ws.PublicID),
-				slog.String("timebox_public_id", tbPub.String()),
-				slog.String("task_public_id", taskPub.String()),
-			)
-		}
+		}, "timeboxes.AddTask")
 
 		if actorID, ok := middleware.ActorFromContext(ctx); ok {
 			deps.Audit.Record(ctx, audit.Entry{
@@ -633,7 +598,7 @@ func RemoveTask(deps Deps) func(context.Context, *RemoveTaskInput) (*RemoveTaskO
 			return nil, httpErr(apierrors.TimeboxTaskNotFound)
 		}
 
-		if err := eventbus.Append(ctx, deps.DB, eventbus.Event{
+		eventbus.AppendBestEffort(ctx, dbretry.AutoCommit(deps.DB), eventbus.Event{
 			Type:        eventbus.TimeboxTaskRemoved,
 			WorkspaceID: ws.ID,
 			ActorUserID: actorPtr(ctx),
@@ -641,16 +606,7 @@ func RemoveTask(deps Deps) func(context.Context, *RemoveTaskInput) (*RemoveTaskO
 				"timeboxId": tbPub.String(),
 				"taskId":    taskPub.String(),
 			},
-		}); err != nil {
-			slog.ErrorContext(ctx, "eventbus.Append failed",
-				slog.Any("err", err),
-				slog.String("handler", "timeboxes.RemoveTask"),
-				slog.String("event_type", string(eventbus.TimeboxTaskRemoved)),
-				logutil.LogEntity("workspace", ws.PublicID),
-				slog.String("timebox_public_id", tbPub.String()),
-				slog.String("task_public_id", taskPub.String()),
-			)
-		}
+		}, "timeboxes.RemoveTask")
 
 		if actorID, ok := middleware.ActorFromContext(ctx); ok {
 			deps.Audit.Record(ctx, audit.Entry{

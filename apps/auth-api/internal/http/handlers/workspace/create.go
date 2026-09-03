@@ -58,8 +58,8 @@ func Create(deps Deps) func(context.Context, *CreateWorkspaceInput) (*CreateWork
 		// and this is the first thing a new user does. A transient 1213
 		// must not surface as a permanent 500 on the onboarding step.
 		var wsID int64
-		txErr := dbretry.InTx(ctx, deps.DB, "workspace.Create", nil, func(ctx context.Context, tx *sql.Tx) error {
-			id, err := deps.Queries.WithTx(tx).CreateWorkspace(ctx, generated.CreateWorkspaceParams{
+		txErr := dbretry.InTx(ctx, deps.DB, "workspace.Create", nil, func(ctx context.Context, tx *dbretry.Tx) error {
+			id, err := deps.Queries.WithTx(tx.RawTx()).CreateWorkspace(ctx, generated.CreateWorkspaceParams{
 				PublicID:    pub,
 				Slug:        slug,
 				Name:        in.Body.Name,

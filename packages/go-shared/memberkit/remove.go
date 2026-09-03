@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/libraz/nodate-flow/packages/go-shared/dbretry"
 	"github.com/libraz/nodate-flow/packages/go-shared/eventbus"
 	"github.com/libraz/nodate-flow/packages/go-shared/eventlog"
 )
@@ -44,7 +45,7 @@ type RemoveWorkspaceMemberResult struct {
 // MemberAlreadyDisabled. Callers that treat "remove unknown member"
 // as 404 can check for sql.ErrNoRows; everything else is a real
 // database error.
-func RemoveWorkspaceMember(ctx context.Context, tx TX, args RemoveWorkspaceMemberArgs) (RemoveWorkspaceMemberResult, error) {
+func RemoveWorkspaceMember(ctx context.Context, tx *dbretry.Tx, args RemoveWorkspaceMemberArgs) (RemoveWorkspaceMemberResult, error) {
 	if args.WorkspaceID == 0 || args.UserID == 0 {
 		return RemoveWorkspaceMemberResult{}, fmt.Errorf("memberkit: WorkspaceID and UserID required")
 	}
@@ -174,7 +175,7 @@ func RemoveWorkspaceMember(ctx context.Context, tx TX, args RemoveWorkspaceMembe
 		return res, err
 	}
 	if _, err := eventlog.Append(ctx, tx, eventlog.Event{
-		Type:        string(eventbus.WorkspaceMemberRemoved),
+		Type:        eventbus.WorkspaceMemberRemoved,
 		WorkspaceID: args.WorkspaceID,
 		ActorUserID: &actor,
 		Payload: map[string]any{

@@ -502,6 +502,17 @@ func AuthorizeTaskAccess(ctx context.Context, db DB, pub uuid.UUID, userID uint3
 // were three, while the endpoints returning task titles were many.
 // TestTaskListEndpointsHideInvisibleTitles drives the reachable ones as
 // a guest and fails on any body carrying a title it should not.
+//
+// Two spellings that cannot share a string can still be held to being
+// the same string. The fragment below is one character-for-character
+// spelling of the rule, and the .sql files carry the same one; the
+// tests/taskvisibility gate reads both out of the tree, normalises away
+// the differences the rule does not have — wrapping, subquery alias,
+// which of the two argument forms — and refuses anything else. It also
+// derives which statements are in scope, so the set held to the rule is
+// read out of the SQL rather than remembered. Editing the fragment here
+// without editing the .sql files fails that gate rather than silently
+// making the two surfaces disagree.
 
 // TaskVisibilityFilter returns a SQL WHERE fragment and associated bind
 // arguments that enforce Layer 4 task visibility in list queries. The
@@ -519,18 +530,19 @@ func TaskVisibilityFilter(userID uint32, wsRole WorkspaceRole) (fragment string,
 	const frag = `(
     v.visibility = 'public'
     OR (v.visibility = 'project' AND EXISTS (
-      SELECT 1 FROM project_members pm
-      WHERE pm.project_id = v.project_id
-        AND pm.user_id = ?
-        AND pm.enabled = TRUE
+      SELECT 1 FROM project_members pm_vis
+      WHERE pm_vis.project_id = v.project_id
+        AND pm_vis.user_id = ?
+        AND pm_vis.enabled = TRUE
     ))
     OR (v.visibility = 'private' AND (
       v.created_by_user_id = ?
       OR EXISTS (
-        SELECT 1 FROM task_actors ta
-        INNER JOIN tasks tav ON tav.id = ta.task_id AND tav.public_id = v.public_id
-        WHERE ta.user_id = ?
-          AND ta.enabled = TRUE
+        SELECT 1 FROM task_actors ta_vis
+        WHERE ta_vis.task_id = v.task_internal_id
+          AND ta_vis.kind = 'user'
+          AND ta_vis.user_id = ?
+          AND ta_vis.enabled = TRUE
       )
     ))
   )`

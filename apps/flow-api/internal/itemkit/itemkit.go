@@ -1,6 +1,6 @@
 // Package itemkit is the sole writer for cross-table mutations that
 // span tasks and calendar_events. Every function runs inside a caller-
-// provided *sql.Tx so the two tables move in lockstep and the
+// provided transaction so the two tables move in lockstep and the
 // append-only events log contains exactly one item.* row per logical
 // change.
 //
@@ -18,8 +18,7 @@
 // drop in the next release (see packages/go-shared/eventbus/kinds.go).
 //
 // itemkit does NOT enforce ACL — callers must authorize the actor
-// before invoking. See docs/plan/release-5-unified-calendar.md
-// "ACL model" for the policy.
+// before invoking.
 package itemkit
 
 import (
@@ -28,6 +27,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/dbretry"
 	"github.com/libraz/nodate-flow/packages/go-shared/dbtype"
 	"github.com/libraz/nodate-flow/packages/go-shared/region"
 )
@@ -51,15 +51,15 @@ func (r DateRole) IsValid() bool {
 	return false
 }
 
-// TX is the minimal transaction surface itemkit needs. *sql.Tx
-// satisfies it. Callers MUST pass a tx — passing *sql.DB would split
-// the task write and the event write across connections and defeat
-// the atomicity guarantee.
-type TX interface {
-	ExecContext(ctx context.Context, q string, a ...any) (sql.Result, error)
-	QueryRowContext(ctx context.Context, q string, a ...any) *sql.Row
-	QueryContext(ctx context.Context, q string, a ...any) (*sql.Rows, error)
-}
+// TX is the transaction itemkit writes through. Callers MUST pass one —
+// passing *sql.DB would split the task write and the event write across
+// connections and defeat the atomicity guarantee.
+//
+// It is dbretry's owned transaction rather than a bare *sql.Tx because
+// itemkit appends to the event log, and the subscribers woken by that
+// append read the row on another connection. Only a transaction that
+// reports its own commit can hold them back until the row is there.
+type TX = *dbretry.Tx
 
 // taskRow is itemkit's minimal projection of a tasks row. Fields are
 // named to mirror the tasks table columns.
@@ -135,31 +135,30 @@ func findLinkedEvent(ctx context.Context, tx TX, taskID uint32, role DateRole) (
 	return e, err
 }
 
-// dateOnly returns t truncated to midnight in its own Location.
+// dateOnly reads a value that is already a date into a [region.Day].
 //
-// Only safe for a value that is already a date — an `*_on` column read
-// back from MySQL, or one parsed from `YYYY-MM-DD`, both of which arrive
-// as midnight UTC. To take the date of an *instant* use [eventDate],
-// which asks the question in the event's timezone; doing it here would
-// answer in UTC and put a Tokyo morning meeting on the previous day.
-func dateOnly(t time.Time) time.Time {
-	return time.Date(t.Year(), t.Month(), t.Day(), 0, 0, 0, 0, t.Location())
+// Only safe for exactly that — an `*_on` column read back from MySQL, or
+// one parsed from `YYYY-MM-DD`. To take the date of an *instant* use
+// [eventDate], which asks the question in the event's timezone; doing it
+// here would answer in whatever location the driver handed over and put
+// a Tokyo morning meeting on the previous day.
+func dateOnly(t time.Time) region.Day {
+	return region.DayFromDateColumn(t)
 }
 
 // eventDate returns the calendar date an event instant falls on, read in
-// the event's own timezone and carried as midnight UTC (the shape a DATE
-// column round-trips without a shift).
+// the event's own timezone.
 //
 // An unresolvable timezone is an error rather than a fallback to UTC:
 // the fallback is precisely the bug, and it is silent — the task simply
 // gets a date one day off and no one is told.
-func eventDate(t time.Time, tz string) (time.Time, error) {
-	d, err := region.LocalDate(t, region.EffectiveTimezone(tz))
+func eventDate(t time.Time, tz string) (region.Day, error) {
+	z, err := region.Resolve(tz)
 	if err != nil {
-		return time.Time{}, wrapInvariant("event_timezone_valid",
+		return region.Day{}, wrapInvariant("event_timezone_valid",
 			fmt.Sprintf("event timezone %q is not a known IANA zone", tz))
 	}
-	return d, nil
+	return region.DayOf(t, z), nil
 }
 
 // roleNullString wraps a DateRole as sql.NullString for nullable

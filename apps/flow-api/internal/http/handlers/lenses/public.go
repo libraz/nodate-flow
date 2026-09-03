@@ -6,13 +6,13 @@ import (
 	"log/slog"
 
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/audit"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/dbretry"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
 	apierrors "github.com/libraz/nodate-flow/apps/flow-api/internal/errors"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/eventbus"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/middleware"
 	"github.com/libraz/nodate-flow/packages/go-shared/apierr"
-	"github.com/libraz/nodate-flow/packages/go-shared/logutil"
 	sharedtoken "github.com/libraz/nodate-flow/packages/go-shared/token"
 )
 
@@ -84,22 +84,14 @@ func Publish(deps Deps) func(context.Context, *PublishLensInput) (*PublishLensOu
 		}
 
 		// Append event for the state change.
-		if err := eventbus.Append(ctx, deps.DB, eventbus.Event{
+		eventbus.AppendBestEffort(ctx, dbretry.AutoCommit(deps.DB), eventbus.Event{
 			Type:        eventbus.LensShared,
 			WorkspaceID: ws.ID,
 			ActorUserID: actorInt64Ptr(actorID),
 			Payload: map[string]any{
 				"lensId": lensRow.PublicID.String(),
 			},
-		}); err != nil {
-			slog.ErrorContext(ctx, "eventbus.Append failed",
-				slog.Any("err", err),
-				slog.String("handler", "lenses.Publish"),
-				slog.String("event_type", string(eventbus.LensShared)),
-				logutil.LogEntity("workspace", ws.PublicID),
-				slog.String("lens_id", lensRow.PublicID.String()),
-			)
-		}
+		}, "lenses.Publish")
 
 		deps.Audit.Record(ctx, audit.Entry{
 			Action:       "lens.publish",
@@ -162,22 +154,14 @@ func Unpublish(deps Deps) func(context.Context, *UnpublishLensInput) (*Unpublish
 		}
 
 		// Append event for the state change.
-		if err := eventbus.Append(ctx, deps.DB, eventbus.Event{
+		eventbus.AppendBestEffort(ctx, dbretry.AutoCommit(deps.DB), eventbus.Event{
 			Type:        eventbus.LensUnshared,
 			WorkspaceID: ws.ID,
 			ActorUserID: actorInt64Ptr(actorID),
 			Payload: map[string]any{
 				"lensId": lensRow.PublicID.String(),
 			},
-		}); err != nil {
-			slog.ErrorContext(ctx, "eventbus.Append failed",
-				slog.Any("err", err),
-				slog.String("handler", "lenses.Unpublish"),
-				slog.String("event_type", string(eventbus.LensUnshared)),
-				logutil.LogEntity("workspace", ws.PublicID),
-				slog.String("lens_id", lensRow.PublicID.String()),
-			)
-		}
+		}, "lenses.Unpublish")
 
 		deps.Audit.Record(ctx, audit.Entry{
 			Action:       "lens.unpublish",

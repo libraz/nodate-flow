@@ -5,9 +5,11 @@ import (
 
 	"github.com/google/uuid"
 
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/dbretry"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated/calendar"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
 	apierrors "github.com/libraz/nodate-flow/apps/flow-api/internal/errors"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/eventbus"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/handlers/handlerutil"
 	"github.com/libraz/nodate-flow/packages/go-shared/apierr"
 	"github.com/libraz/nodate-flow/packages/go-shared/dbtype"
@@ -186,11 +188,11 @@ func CreateComment(deps Deps) func(context.Context, *CreateCommentInput) (*Creat
 		}
 		out.Body.AvatarURL = dbtype.PtrFromNullString(profile.AvatarUrl)
 
-		_ = appendCalendarEvent(ctx, deps.DB, wsID, cal.ID, "calendar.event.comment.created", &actorID, map[string]any{
+		appendCalendarEvent(ctx, dbretry.AutoCommit(deps.DB), wsID, cal.ID, eventbus.CalEventCommentCreated, &actorID, map[string]any{
 			"eventId":    input.EvtID,
 			"calendarId": input.CalID,
 			"commentId":  commentPublicID.String(),
-		})
+		}, "calendars.CreateComment")
 
 		return out, nil
 	}
@@ -232,11 +234,11 @@ func EditComment(deps Deps) func(context.Context, *EditCommentInput) (*EditComme
 			return nil, httpErr(apierrors.CalendarCommentStoreWriteInterrupted)
 		}
 
-		_ = appendCalendarEvent(ctx, deps.DB, wsID, cal.ID, "calendar.event.comment.updated", &actorID, map[string]any{
+		appendCalendarEvent(ctx, dbretry.AutoCommit(deps.DB), wsID, cal.ID, eventbus.CalEventCommentUpdated, &actorID, map[string]any{
 			"eventId":    input.EvtID,
 			"calendarId": input.CalID,
 			"commentId":  input.CId,
-		})
+		}, "calendars.EditComment")
 
 		out := &EditCommentOutput{}
 		out.Body.Updated = true
@@ -300,11 +302,11 @@ func DeleteComment(deps Deps) func(context.Context, *DeleteCommentInput) (*Delet
 		out := &DeleteCommentOutput{}
 		out.Body.Deleted = true
 
-		_ = appendCalendarEvent(ctx, deps.DB, wsID, cal.ID, "calendar.event.comment.deleted", &actorID, map[string]any{
+		appendCalendarEvent(ctx, dbretry.AutoCommit(deps.DB), wsID, cal.ID, eventbus.CalEventCommentDeleted, &actorID, map[string]any{
 			"eventId":    input.EvtID,
 			"calendarId": input.CalID,
 			"commentId":  input.CId,
-		})
+		}, "calendars.DeleteComment")
 
 		return out, nil
 	}

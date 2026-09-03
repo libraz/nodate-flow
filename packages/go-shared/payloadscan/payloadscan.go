@@ -98,7 +98,7 @@ func Scan(cfg Config) ([]Finding, error) {
 
 	info := &types.Info{Types: make(map[ast.Expr]types.TypeAndValue)}
 	conf := types.Config{
-		Importer: newExportImporter(fset),
+		Importer: NewExportImporter(fset),
 		// Errors are collected by Check and returned below; a dependency
 		// that cannot be resolved must not silently downgrade the scan to
 		// "found nothing".
@@ -267,11 +267,15 @@ func isStringType(t types.Type) bool {
 	return ok && basic.Info()&types.IsString != 0
 }
 
-// newExportImporter builds an importer backed by the export data `go
+// NewExportImporter builds an importer backed by the export data `go
 // list` writes into the build cache. It keeps the scan on the standard
 // library: no analysis toolchain dependency has to be added to a module
 // that ships a server.
-func newExportImporter(fset *token.FileSet) types.Importer {
+//
+// Exported because the sibling static scans type-check packages the same
+// way; a second copy of this would be a second place for the build-cache
+// lookup to go wrong.
+func NewExportImporter(fset *token.FileSet) types.Importer {
 	var mu sync.Mutex
 	cache := map[string]string{}
 	lookup := func(path string) (io.ReadCloser, error) {

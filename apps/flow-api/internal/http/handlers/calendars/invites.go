@@ -11,9 +11,11 @@ import (
 	"time"
 
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/audit"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/dbretry"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated/calendar"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
 	apierrors "github.com/libraz/nodate-flow/apps/flow-api/internal/errors"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/eventbus"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/handlers/handlerutil"
 	"github.com/libraz/nodate-flow/packages/go-shared/apierr"
 	"github.com/libraz/nodate-flow/packages/go-shared/email"
@@ -295,18 +297,18 @@ func CreateEventInvite(deps Deps) func(context.Context, *CreateEventInviteInput)
 			return nil, httpErr(apierrors.CalendarInviteStoreLookupInterrupted)
 		}
 
-		eventType := "calendar.event.invite.created"
+		eventType := eventbus.CalEventInviteCreated
 		auditAction := "calendar.invite.create"
 		if rotated {
-			eventType = "calendar.event.invite.rotated"
+			eventType = eventbus.CalEventInviteRotated
 			auditAction = "calendar.invite.rotate"
 		}
-		_ = appendCalendarEvent(ctx, deps.DB, wsID, cal.ID, eventType, &actorID, map[string]any{
+		appendCalendarEvent(ctx, dbretry.AutoCommit(deps.DB), wsID, cal.ID, eventType, &actorID, map[string]any{
 			"eventId":          input.EvtID,
 			"calendarId":       input.CalID,
 			"attendeePublicId": input.AttendeeID,
 			"invitePublicId":   invitePublicID.String(),
-		})
+		}, "calendars.CreateEventInvite")
 
 		deps.Audit.Record(ctx, audit.Entry{
 			Action:       auditAction,
@@ -590,11 +592,11 @@ func RevokeEventInvite(deps Deps) func(context.Context, *RevokeEventInviteInput)
 		if err := deps.CalendarQueries.DisableCalendarEventInvite(ctx, invite.ID); err != nil {
 			return nil, httpErr(apierrors.CalendarInviteStoreRevokeInterrupted)
 		}
-		_ = appendCalendarEvent(ctx, deps.DB, wsID, cal.ID, "calendar.event.invite.revoked", &actorID, map[string]any{
+		appendCalendarEvent(ctx, dbretry.AutoCommit(deps.DB), wsID, cal.ID, eventbus.CalEventInviteRevoked, &actorID, map[string]any{
 			"eventId":        input.EvtID,
 			"calendarId":     input.CalID,
 			"invitePublicId": input.InviteID,
-		})
+		}, "calendars.RevokeEventInvite")
 		deps.Audit.Record(ctx, audit.Entry{
 			Action:       "calendar.invite.revoke",
 			ActorID:      actorID,

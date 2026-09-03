@@ -3,17 +3,16 @@ package tasks
 import (
 	"context"
 	"database/sql"
-	"log/slog"
 
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/acl"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/audit"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/dbretry"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
 	apierrors "github.com/libraz/nodate-flow/apps/flow-api/internal/errors"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/eventbus"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/handlers/handlerutil"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/middleware"
-	nflog "github.com/libraz/nodate-flow/apps/flow-api/internal/log"
-	"github.com/libraz/nodate-flow/packages/go-shared/logutil"
 )
 
 // Archive returns a handler for POST /tasks/{id}/archive.
@@ -41,21 +40,13 @@ func Archive(deps Deps) func(context.Context, *ArchiveTaskInput) (*ArchiveTaskOu
 		}
 
 		taskInternal := int64(task.ID)
-		if err := eventbus.Append(ctx, deps.DB, eventbus.Event{
+		eventbus.AppendBestEffort(ctx, dbretry.AutoCommit(deps.DB), eventbus.Event{
 			Type:        eventbus.TaskArchived,
 			WorkspaceID: ws.ID,
 			ActorUserID: actorPtr(ctx),
 			TaskID:      &taskInternal,
 			Payload:     map[string]any{"taskId": task.PublicID.String()},
-		}); err != nil {
-			nflog.LoggerFromContext(ctx).ErrorContext(ctx, "eventbus.Append failed",
-				slog.Any("err", err),
-				slog.String("handler", "tasks.Archive"),
-				slog.String("event_type", string(eventbus.TaskArchived)),
-				logutil.LogEntity("workspace", ws.PublicID),
-				logutil.LogEntity("task", task.PublicID),
-			)
-		}
+		}, "tasks.Archive")
 
 		if actorID != 0 {
 			deps.Audit.Record(ctx, audit.Entry{
@@ -97,21 +88,13 @@ func Unarchive(deps Deps) func(context.Context, *UnarchiveTaskInput) (*Unarchive
 		}
 
 		taskInternal := int64(task.ID)
-		if err := eventbus.Append(ctx, deps.DB, eventbus.Event{
+		eventbus.AppendBestEffort(ctx, dbretry.AutoCommit(deps.DB), eventbus.Event{
 			Type:        eventbus.TaskUnarchived,
 			WorkspaceID: ws.ID,
 			ActorUserID: actorPtr(ctx),
 			TaskID:      &taskInternal,
 			Payload:     map[string]any{"taskId": task.PublicID.String()},
-		}); err != nil {
-			nflog.LoggerFromContext(ctx).ErrorContext(ctx, "eventbus.Append failed",
-				slog.Any("err", err),
-				slog.String("handler", "tasks.Unarchive"),
-				slog.String("event_type", string(eventbus.TaskUnarchived)),
-				logutil.LogEntity("workspace", ws.PublicID),
-				logutil.LogEntity("task", task.PublicID),
-			)
-		}
+		}, "tasks.Unarchive")
 
 		if actorID != 0 {
 			deps.Audit.Record(ctx, audit.Entry{
@@ -142,6 +125,16 @@ func ListArchived(deps Deps) func(context.Context, *ListArchivedTasksInput) (*Li
 		if !ok {
 			return nil, httpErr(apierrors.WsWorkspaceNotFound)
 		}
+		actorID, ok := middleware.ActorFromContext(ctx)
+		if !ok {
+			return nil, httpErr(apierrors.WsWorkspaceAccessDenied)
+		}
+
+		// The route is mounted on workspace membership, which is a
+		// weaker condition than being allowed to read any given task.
+		// Archiving does not widen visibility, so the archived list is
+		// filtered by the same Layer-4 rule the live list carries.
+		vis := acl.ListVisibilityArgs(actorID, acl.WorkspaceRole(ws.Role))
 
 		out := &ListArchivedTasksOutput{}
 		out.Body.Tasks = make([]TaskListItem, 0)
@@ -153,6 +146,10 @@ func ListArchived(deps Deps) func(context.Context, *ListArchivedTasksInput) (*Li
 			}
 			rows, qerr := deps.Queries.ListArchivedTasksForWorkspaceKeyset(ctx, generated.ListArchivedTasksForWorkspaceKeysetParams{
 				WorkspaceID:      ws.ID,
+				IsElevated:       vis.IsElevated,
+				ActorUserID:      vis.ActorUserID,
+				ActorUserID_2:    vis.ActorUserID,
+				ActorUserID_3:    vis.ActorUserID,
 				CursorArchivedAt: sql.NullTime{Time: cursorAt, Valid: !cursorAt.IsZero()},
 				CursorPublicID:   cursorPID,
 				Limit:            in.Limit + 1,
@@ -179,9 +176,13 @@ func ListArchived(deps Deps) func(context.Context, *ListArchivedTasksInput) (*Li
 		}
 
 		rows, err := deps.Queries.ListArchivedTasksForWorkspace(ctx, generated.ListArchivedTasksForWorkspaceParams{
-			WorkspaceID: ws.ID,
-			Limit:       in.Limit,
-			Offset:      in.Offset,
+			WorkspaceID:   ws.ID,
+			IsElevated:    vis.IsElevated,
+			ActorUserID:   vis.ActorUserID,
+			ActorUserID_2: vis.ActorUserID,
+			ActorUserID_3: vis.ActorUserID,
+			Limit:         in.Limit,
+			Offset:        in.Offset,
 		})
 		if err != nil {
 			return nil, httpErr(apierrors.InternalUnexpected)
@@ -193,7 +194,13 @@ func ListArchived(deps Deps) func(context.Context, *ListArchivedTasksInput) (*Li
 		}
 		if len(rows) > 0 {
 			total, terr := listTotal(in.Offset, in.Limit, len(rows), func() (int64, error) {
-				return deps.Queries.CountArchivedTasksForWorkspace(ctx, ws.ID)
+				return deps.Queries.CountArchivedTasksForWorkspace(ctx, generated.CountArchivedTasksForWorkspaceParams{
+					WorkspaceID:   ws.ID,
+					IsElevated:    vis.IsElevated,
+					ActorUserID:   vis.ActorUserID,
+					ActorUserID_2: vis.ActorUserID,
+					ActorUserID_3: vis.ActorUserID,
+				})
 			})
 			if terr != nil {
 				return nil, httpErr(apierrors.InternalUnexpected)

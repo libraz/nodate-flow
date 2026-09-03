@@ -10,13 +10,26 @@
 //
 // Adding a new kind: pick a dotted name in the existing namespaces
 // (task.*, calendar.*, item.*, signal.*, ai.*, ...) and add it here
-// before any handler emits it.
+// before any handler emits it. A kind also has to resolve to a
+// [Family] (see registry.go) — that is what routes it to the SSE
+// stream and the notification fan-out, and the totality check refuses
+// a constant no family covers.
 package eventbus
 
-// Kind is the canonical type of an entry in the events table. The
-// underlying type is string so it can be assigned directly to any
-// `type` column; constants are grouped by entity below.
-type Kind = string
+// Kind is the canonical type of an entry in the events table.
+// Constants are grouped by entity below.
+//
+// It is a defined type rather than an alias for string so that a raw
+// string cannot be used as an event kind by accident: a typo or an
+// ad-hoc literal produces an event nobody consumes, and the failure
+// only shows up as a missing notification much later. Writing an
+// event kind therefore requires either one of the constants below or
+// an explicit conversion. Conversions back to string are needed where
+// the value leaves Go — the `type` column, JSON, log attributes — and
+// those are spelled out at the boundary rather than hidden behind
+// driver.Valuer / sql.Scanner on Kind, which would let any string
+// flow back in unchecked.
+type Kind string
 
 // Task lifecycle and metadata events.
 const (
@@ -78,10 +91,10 @@ const (
 // TaskTransition builds a "task.transition.<name>" event kind from a
 // free-form transition name.
 func TaskTransition(name string) Kind {
-	return "task.transition." + name
+	return Kind("task.transition." + name)
 }
 
-// Task events driven by the signaljudge Applier (Release 8 / Phase 2).
+// Task events driven by the signaljudge Applier .
 // These are emitted exclusively from apps/flow-api/internal/ai/signaljudge
 // in response to a judged signal — never from generic task handlers.
 const (
@@ -98,7 +111,7 @@ const (
 
 // Signal events. SignalAttached is appended by the public signal
 // ingestion endpoint; the remaining kinds are emitted exclusively by
-// the signaljudge Applier (Release 8 / Phase 2) as it translates a
+// the signaljudge Applier as it translates a
 // judge verdict into concrete task-level effects.
 const (
 	// SignalAttached is appended when an external signal is ingested
@@ -123,6 +136,14 @@ const (
 	AiSuggestionApplied   Kind = "ai.suggestion.applied"
 	AiSuggestionDismissed Kind = "ai.suggestion.dismissed"
 	AiSuggestionEdited    Kind = "ai.suggestion.edited"
+)
+
+// AI auto-action events. The auto-action executor proposes a change it
+// could apply and records the proposal without touching the task, so the
+// activity feed shows what the rule engine wanted before anything acted
+// on it.
+const (
+	AiAutoActionProposed Kind = "ai.auto_action.proposed"
 )
 
 // AI agent lifecycle events (kill switch audit trail).
@@ -206,15 +227,56 @@ const (
 	CalendarUpdated Kind = "calendar.updated"
 	CalendarDeleted Kind = "calendar.deleted"
 
+	// CalendarSubscribed is appended when a user starts following a
+	// calendar they do not own; CalendarSubscriptionUpdated when they
+	// change how it is displayed to them (colour, visibility, alerts).
+	CalendarSubscribed          Kind = "calendar.subscribed"
+	CalendarSubscriptionUpdated Kind = "calendar.subscription.updated"
+
 	CalEventCreated Kind = "calendar.event.created"
 	CalEventUpdated Kind = "calendar.event.updated"
 	CalEventDeleted Kind = "calendar.event.deleted"
 
-	CalMemberJoined Kind = "calendar.member.joined"
-	CalMemberLeft   Kind = "calendar.member.left"
+	// Calendar membership reuses the added / removed / role_changed
+	// vocabulary of workspace.member.*, so a reader of the log does not
+	// have to learn two words for the same change.
+	CalMemberAdded       Kind = "calendar.member.added"
+	CalMemberRemoved     Kind = "calendar.member.removed"
+	CalMemberRoleChanged Kind = "calendar.member.role_changed"
 
 	CalMemoCreated   Kind = "calendar.memo.created"
+	CalMemoUpdated   Kind = "calendar.memo.updated"
 	CalMemoCompleted Kind = "calendar.memo.completed"
+	CalMemoDeleted   Kind = "calendar.memo.deleted"
+)
+
+// Calendar event detail events — the comments, attachments, checklist
+// items, attendees and invites that hang off a single calendar event.
+// They carry the event's public id in the payload; the subject of the
+// row is still the calendar, so they share the calendar.* namespace.
+const (
+	CalEventCommentCreated Kind = "calendar.event.comment.created"
+	CalEventCommentUpdated Kind = "calendar.event.comment.updated"
+	CalEventCommentDeleted Kind = "calendar.event.comment.deleted"
+
+	CalEventAttachmentCreated Kind = "calendar.event.attachment.created"
+	CalEventAttachmentDeleted Kind = "calendar.event.attachment.deleted"
+
+	CalEventChecklistCreated Kind = "calendar.event.checklist.created"
+	CalEventChecklistUpdated Kind = "calendar.event.checklist.updated"
+	CalEventChecklistDeleted Kind = "calendar.event.checklist.deleted"
+
+	// Attendee changes are named for the change, not for how many rows
+	// one request happened to touch: the bulk add carries a count in its
+	// payload and still appends CalEventAttendeeAdded, so the pair reads
+	// the same way as task.actor.added / task.actor.removed.
+	CalEventAttendeeAdded   Kind = "calendar.event.attendee.added"
+	CalEventAttendeeRemoved Kind = "calendar.event.attendee.removed"
+	CalEventRsvpUpdated     Kind = "calendar.event.rsvp.updated"
+
+	CalEventInviteCreated Kind = "calendar.event.invite.created"
+	CalEventInviteRotated Kind = "calendar.event.invite.rotated"
+	CalEventInviteRevoked Kind = "calendar.event.invite.revoked"
 )
 
 // Reaction events.
@@ -310,14 +372,23 @@ const (
 	ItemMilestoneLinkRemoved Kind = "item.milestone.link.removed"
 )
 
-// Public share events — calendar_public_shares.
+// Public share events — calendar_public_shares. The namespace is
+// public_share.* rather than share.*: these rows are what the handlers
+// have always written, so the log's history and the constants name the
+// same thing.
 const (
-	SharePublished     Kind = "share.published"
-	ShareUpdated       Kind = "share.updated"
-	ShareTokenRotated  Kind = "share.token.rotated"
-	ShareDeleted       Kind = "share.deleted"
-	ShareEventAttached Kind = "share.event.attached"
-	ShareEventDetached Kind = "share.event.detached"
+	PublicShareCreated Kind = "public_share.created"
+	PublicShareUpdated Kind = "public_share.updated"
+	// PublicShareRotated is appended when the share's token is replaced,
+	// which revokes every URL handed out so far.
+	PublicShareRotated Kind = "public_share.rotated"
+	PublicShareDeleted Kind = "public_share.deleted"
+
+	// The attach and reorder kinds are plural because one request works
+	// on the share's whole event list; detach names a single event.
+	PublicShareEventsAttached  Kind = "public_share.events_attached"
+	PublicShareEventsReordered Kind = "public_share.events_reordered"
+	PublicShareEventDetached   Kind = "public_share.event_detached"
 )
 
 // Legacy / compatibility kinds. Kept so historical events continue to

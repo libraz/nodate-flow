@@ -30,10 +30,11 @@ func RegisterWorkspaceScoped(api huma.API, deps Deps) {
 	}, List(deps))
 }
 
-// RegisterGlobal wires the global project routes (under /projects/{prjId}).
-// The caller must attach RequireProjectMemberByGlobalID to the underlying
-// chi router.
-func RegisterGlobal(api huma.API, deps Deps) {
+// RegisterGlobalReads wires the read-only global project routes (under
+// /projects/{prjId}). The caller must attach RequireProjectMemberByGlobalID
+// to the underlying chi router; project membership is the whole check these
+// operations need.
+func RegisterGlobalReads(api huma.API, deps Deps) {
 	huma.Register(api, huma.Operation{
 		OperationID: "projects-get",
 		Method:      http.MethodGet,
@@ -42,24 +43,6 @@ func RegisterGlobal(api huma.API, deps Deps) {
 		Description: "Returns the project metadata (name, description, status, settings). Used by the project header and detail pages.",
 		Tags:        []string{"Projects"},
 	}, Get(deps))
-
-	huma.Register(api, huma.Operation{
-		OperationID: "projects-patch",
-		Method:      http.MethodPatch,
-		Path:        "/projects/{prjId}",
-		Summary:     "Patch a project",
-		Description: "Updates editable project fields (name, description, status, settings). Project admin role required.",
-		Tags:        []string{"Projects"},
-	}, Patch(deps))
-
-	huma.Register(api, huma.Operation{
-		OperationID: "projects-disable",
-		Method:      http.MethodDelete,
-		Path:        "/projects/{prjId}",
-		Summary:     "Soft-disable a project",
-		Description: "Marks the project as disabled so it disappears from listings and pickers. Tasks remain queryable for audit but reject new edits.",
-		Tags:        []string{"Projects"},
-	}, Disable(deps))
 
 	huma.Register(api, huma.Operation{
 		OperationID: "projects-dependencies-list",
@@ -78,13 +61,45 @@ func RegisterGlobal(api huma.API, deps Deps) {
 		Description: "Lists every active member of the project with their role. Drives the project members panel and the assignee picker.",
 		Tags:        []string{"Projects"},
 	}, ListMembers(deps))
+}
 
+// RegisterGlobalEditorWrites wires the global project routes that reshape the
+// project itself. The caller must attach RequireProjectMemberByGlobalID and a
+// project editor role floor to the underlying chi router.
+func RegisterGlobalEditorWrites(api huma.API, deps Deps) {
+	huma.Register(api, huma.Operation{
+		OperationID: "projects-patch",
+		Method:      http.MethodPatch,
+		Path:        "/projects/{prjId}",
+		Summary:     "Patch a project",
+		Description: "Updates editable project fields (name, description, status, settings). Requires project editor role or above.",
+		Tags:        []string{"Projects"},
+	}, Patch(deps))
+
+	huma.Register(api, huma.Operation{
+		OperationID: "projects-disable",
+		Method:      http.MethodDelete,
+		Path:        "/projects/{prjId}",
+		Summary:     "Soft-disable a project",
+		Description: "Marks the project as disabled so it disappears from listings and pickers. Tasks remain queryable for audit but reject new edits. Requires project editor role or above.",
+		Tags:        []string{"Projects"},
+	}, Disable(deps))
+}
+
+// RegisterGlobalLeadWrites wires the global project routes that decide who
+// reaches the project. The caller must attach RequireProjectMemberByGlobalID
+// and a project lead role floor to the underlying chi router.
+//
+// These are split from the editor writes because granting roles is not an
+// editing power: an editor who could also grant roles could promote
+// themselves and remove every lead above them.
+func RegisterGlobalLeadWrites(api huma.API, deps Deps) {
 	huma.Register(api, huma.Operation{
 		OperationID: "projects-members-add",
 		Method:      http.MethodPost,
 		Path:        "/projects/{prjId}/members",
 		Summary:     "Add a member to a project",
-		Description: "Adds an existing workspace member to the project at the requested role. Requires project admin role; the user must already belong to the parent workspace.",
+		Description: "Adds an existing workspace member to the project at the requested role. Requires project lead role; the user must already belong to the parent workspace.",
 		Tags:        []string{"Projects"},
 	}, AddMember(deps))
 
@@ -93,7 +108,7 @@ func RegisterGlobal(api huma.API, deps Deps) {
 		Method:      http.MethodDelete,
 		Path:        "/projects/{prjId}/members/{userId}",
 		Summary:     "Remove a member from a project",
-		Description: "Removes the named user from the project. Workspace membership is unaffected. Refuses to remove the last project admin.",
+		Description: "Removes the named user from the project. Workspace membership is unaffected. Requires project lead role.",
 		Tags:        []string{"Projects"},
 	}, RemoveMember(deps))
 }

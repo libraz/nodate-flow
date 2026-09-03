@@ -303,7 +303,7 @@ func classifyHandoff(result ExecutionResult) string {
 // runEventArgs bundles the inputs to appendRunEvent so call sites
 // stay readable when adding/removing payload keys.
 type runEventArgs struct {
-	eventType   string
+	eventType   eventbus.Kind
 	workspaceID uint32
 	agentID     uint32
 	agentPubID  string
@@ -338,7 +338,7 @@ func (r *OrchestratorRunner) appendRunEvent(ctx context.Context, args runEventAr
 		WorkspaceID:  args.workspaceID,
 		TaskID:       taskID,
 		ActorAgentID: actorAgentID,
-		Type:         args.eventType,
+		Type:         string(args.eventType),
 		PayloadJson:  raw,
 		OccurredAt:   args.occurred,
 	}

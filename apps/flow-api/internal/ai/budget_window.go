@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
+	"github.com/libraz/nodate-flow/packages/go-shared/region"
 )
 
 // workspaceTimezoneLoader loads a workspace's IANA timezone by its internal
@@ -30,14 +31,11 @@ var nowFunc = time.Now
 // Asia/Tokyo). An empty or unrecognised zone name falls back to UTC so a
 // misconfigured workspace still gets a coherent 24h window.
 func DailyBudgetBoundary(now time.Time, tz string) time.Time {
-	loc := time.UTC
-	if tz != "" {
-		if l, err := time.LoadLocation(tz); err == nil {
-			loc = l
-		}
+	z, err := region.Resolve(tz)
+	if err != nil {
+		z = region.UTC()
 	}
-	local := now.In(loc)
-	return time.Date(local.Year(), local.Month(), local.Day(), 0, 0, 0, 0, loc)
+	return region.DayOf(now, z).Start(z)
 }
 
 // WorkspaceDayStart loads the workspace's timezone and returns the current
@@ -47,12 +45,12 @@ func DailyBudgetBoundary(now time.Time, tz string) time.Time {
 //
 // This is the only definition of "today" for AI spend, and every place that
 // bounds a cost query — the completion guard, the embed guard, the
-// cost-today meter — has to use it. Each of those once computed its own
-// boundary, and they disagreed: the workspace's local midnight, UTC
-// midnight, and whatever timezone the browser reported. A workspace could
-// be refused every AI call for hours after its budget had reset while the
-// meter reported that nothing had been spent, and nobody could reconcile
-// the three answers because none of them was wrong on its own terms.
+// cost-today meter — has to use it. A guard computing its own boundary
+// picks a defensible one — the workspace's local midnight, UTC midnight,
+// the timezone the browser reported — and any two that pick differently
+// disagree about when the budget resets: a workspace is refused every AI
+// call for hours after its reset while the meter reports that nothing has
+// been spent, and neither answer is wrong on its own terms.
 //
 // Call sites do not use it directly, though: they take a whole params
 // struct from [DailyCostParams] or [DailyEmbedCostParams], so there is no
@@ -71,11 +69,11 @@ func WorkspaceDayStart(ctx context.Context, loader workspaceTimezoneLoader, work
 // on LLM calls in the current budget window.
 //
 // The whole parameter struct is built here rather than the boundary alone
-// because the defect this replaces was not a wrong calculation — each call
-// site computed a defensible boundary — it was three call sites each
-// computing their own. Handing back the finished struct leaves the caller
-// nothing to decide, and [TestCostQueryParamsAreCentralized] keeps the
-// literal from being written anywhere else.
+// because the failure mode is not a wrong calculation — a call site
+// computing its own boundary computes a defensible one — it is call sites
+// each computing their own. Handing back the finished struct leaves the
+// caller nothing to decide, and [TestCostQueryParamsAreCentralized] keeps
+// the literal from being written anywhere else.
 func DailyCostParams(ctx context.Context, loader workspaceTimezoneLoader, workspaceID uint32) generated.SumAiCostTodayForWorkspaceParams {
 	return generated.SumAiCostTodayForWorkspaceParams{
 		WorkspaceID: workspaceID,

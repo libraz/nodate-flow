@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/audit"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/dbretry"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
 	apierrors "github.com/libraz/nodate-flow/apps/flow-api/internal/errors"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/handlers/handlerutil"
@@ -52,14 +53,13 @@ func ProposeShift(deps Deps) func(context.Context, *ProposeShiftInput) (*Propose
 		}
 		newStart := handlerutil.UnixToTime(in.Body.NewStartAt)
 
-		tx, err := deps.DB.BeginTx(ctx, &sql.TxOptions{ReadOnly: true})
-		if err != nil {
-			return nil, httpErr(apierrors.InternalUnexpected)
-		}
-		defer func() { _ = tx.Rollback() }()
-
-		proposal, err := itemkit.ProposeShiftEventAndChildren(ctx, tx, ws.ID, eventID, newStart)
-		if err != nil {
+		var proposal itemkit.ShiftProposal
+		if err := dbretry.InTx(ctx, deps.DB, "tasks.ProposeShift", &sql.TxOptions{ReadOnly: true},
+			func(ctx context.Context, tx *dbretry.Tx) error {
+				var err error
+				proposal, err = itemkit.ProposeShiftEventAndChildren(ctx, tx, ws.ID, eventID, newStart)
+				return err
+			}); err != nil {
 			return nil, translateItemkitTaskError(err)
 		}
 
@@ -96,33 +96,25 @@ func ApplyShift(deps Deps) func(context.Context, *ApplyShiftInput) (*ApplyShiftO
 			return nil, err
 		}
 
-		tx, err := deps.DB.BeginTx(ctx, nil)
-		if err != nil {
-			return nil, httpErr(apierrors.InternalUnexpected)
-		}
-		defer func() { _ = tx.Rollback() }()
-
 		// Capture the old start so we can compute the delta for the
 		// response after itemkit runs.
 		var oldStart sql.NullTime
-		if err := tx.QueryRowContext(ctx,
-			`SELECT start_at FROM calendar_events WHERE id = ? AND workspace_id = ?`,
-			eventID, ws.ID,
-		).Scan(&oldStart); err != nil {
-			return nil, httpErr(apierrors.InternalUnexpected)
-		}
-
-		if err := itemkit.ApplyShiftEventAndChildren(ctx, tx, itemkit.ApplyShiftEventAndChildrenArgs{
-			WorkspaceID:      ws.ID,
-			EventID:          eventID,
-			NewStartAt:       newStart,
-			ConfirmedTaskIDs: confirmedInternal,
-			ActorUserID:      actorID,
+		if err := dbretry.InTx(ctx, deps.DB, "tasks.ApplyShift", nil, func(ctx context.Context, tx *dbretry.Tx) error {
+			if err := tx.QueryRowContext(ctx,
+				`SELECT start_at FROM calendar_events WHERE id = ? AND workspace_id = ?`,
+				eventID, ws.ID,
+			).Scan(&oldStart); err != nil {
+				return err
+			}
+			return itemkit.ApplyShiftEventAndChildren(ctx, tx, itemkit.ApplyShiftEventAndChildrenArgs{
+				WorkspaceID:      ws.ID,
+				EventID:          eventID,
+				NewStartAt:       newStart,
+				ConfirmedTaskIDs: confirmedInternal,
+				ActorUserID:      actorID,
+			})
 		}); err != nil {
 			return nil, translateItemkitTaskError(err)
-		}
-		if err := tx.Commit(); err != nil {
-			return nil, httpErr(apierrors.InternalUnexpected)
 		}
 
 		if deps.Audit != nil {

@@ -24,6 +24,7 @@ import (
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
 	apierrors "github.com/libraz/nodate-flow/apps/flow-api/internal/errors"
+	sharedbus "github.com/libraz/nodate-flow/packages/go-shared/eventbus"
 	"github.com/libraz/nodate-flow/packages/go-shared/eventlog"
 )
 
@@ -51,7 +52,7 @@ var ErrAlreadyReversed = errors.New("eventbus: event already reversed")
 //
 // The function is a pure predicate to keep it trivially testable; [Append]
 // is the only production caller today, but the helper is exported across
-// the file so future eventbus extension points (Phase 5 worker append
+// the file so future eventbus extension points (the worker append
 // path, judge Applier) reuse the same guard.
 func validateActors(evt Event) error {
 	set := 0
@@ -86,16 +87,6 @@ func isDuplicateEntry(err error) bool {
 // events that arrive out of order from concurrent goroutines.
 var globalSeq atomic.Int64
 
-// DBTX is the minimal sqlc DBTX surface needed by [Append]. Both *sql.DB
-// and *sql.Tx satisfy it; passing a *sql.Tx keeps the event row in the
-// same transaction as the underlying state change.
-type DBTX interface {
-	ExecContext(ctx context.Context, query string, args ...interface{}) (sql.Result, error)
-	PrepareContext(ctx context.Context, query string) (*sql.Stmt, error)
-	QueryContext(ctx context.Context, query string, args ...interface{}) (*sql.Rows, error)
-	QueryRowContext(ctx context.Context, query string, args ...interface{}) *sql.Row
-}
-
 // Event is the high-level shape callers pass to [Append]. The optional
 // TaskID and ActorUserID accept *int64 so callers can express NULL by
 // passing nil. Payload is JSON-marshalled before insertion; pass nil for
@@ -111,8 +102,11 @@ type DBTX interface {
 // "system actor" path used by reconciliation jobs that predate the
 // system-source column.
 type Event struct {
-	// Type is the canonical dotted event name, e.g. "task.created".
-	Type string
+	// Type is the canonical event kind, e.g. [TaskCreated]. A raw
+	// string is not accepted: an event kind nothing subscribes to is
+	// indistinguishable from a correct one at the call site and only
+	// surfaces later as a missing notification.
+	Type Kind
 	// WorkspaceID is the internal workspace id (never the public id).
 	WorkspaceID uint32
 	// ActorUserID is the internal user id of the actor; nil for system.
@@ -128,7 +122,7 @@ type Event struct {
 	// `worker.retention`, ...) when the event was emitted by the worker
 	// binary (ADR 0008 D8). Not an FK because the worker is not
 	// represented in the database. Mutually exclusive with the other
-	// two actor fields. The Phase 5 worker is the first writer; this
+	// two actor fields. The worker binary is the first writer; this
 	// field exists today so the eventbus contract is stable when that
 	// landing happens.
 	ActorSystemSource string
@@ -151,7 +145,7 @@ type Event struct {
 	// verdict -> task event".
 	TriggeredBySignalID *int64
 	// ReversesEventID is the internal events.id this row compensates
-	// (ADR 0008 D4 / J5). Set by the reversal handler when appending a
+	// (ADR 0008 D4). Set by the reversal handler when appending a
 	// compensating event so the derived_state projection can cancel the
 	// original out without ever UPDATEing the immutable event log. Nil
 	// for normal (non-reversal) callers — every other writer leaves
@@ -281,54 +275,46 @@ func fireNotifyHooks(ctx context.Context, workspaceInternalID uint32, eventType 
 	}
 }
 
-// judgeEventKinds enumerates the event kinds that may only be emitted
-// from the signaljudge Applier (ADR 0008 D4). [Append] rejects any
+// IsJudgeEventKind reports whether t is one of the event kinds reserved
+// for the signaljudge Applier (ADR 0008 D4). [Append] rejects any other
 // caller that tries to use them so the Applier remains the sole writer
-// of judge-driven task state. The Applier itself uses [AppendJudgeEvent]
+// of judge-driven task state; the Applier itself uses [AppendJudgeEvent]
 // to bypass this gate while still going through the shared INSERT path.
 //
-// Keep this set in sync with the Kind constants in
-// packages/go-shared/eventbus/kinds.go — specifically the
-// "Task events driven by the signaljudge Applier" and the
-// SignalJudged / SignalApplied / SignalRejected entries under
-// "Signal events". SignalAttached is intentionally NOT in this set
-// because it is emitted by the public POST /signals handler before
-// any judge run exists.
-var judgeEventKinds = map[string]bool{
-	TaskAutoCompleted: true,
-	TaskRetroDrafted:  true,
-	SignalJudged:      true,
-	SignalApplied:     true,
-	SignalRejected:    true,
-}
+// The set is declared beside the constants themselves
+// (packages/go-shared/eventbus) rather than restated here. A local copy
+// kept in step by a comment leaves a kind added to the judge loop
+// appendable by anyone until somebody notices the two have drifted, and
+// nothing in this file would say so.
+func IsJudgeEventKind(t Kind) bool { return sharedbus.IsJudgeOnly(t) }
 
-// IsJudgeEventKind reports whether t is one of the event kinds reserved
-// for the signaljudge Applier. Exposed so callers (tests, the Applier
-// itself) can assert the set without duplicating the literal map.
-func IsJudgeEventKind(t string) bool { return judgeEventKinds[t] }
-
-// Append inserts a single event row using the provided DBTX. When db is
-// a *sql.Tx the event is part of that transaction.
+// Append inserts a single event row through db. With a [dbretry.Tx] the
+// event is part of that transaction and the fan-out waits for its
+// commit; with [dbretry.AutoCommit] the row is durable on return and the
+// fan-out runs immediately.
 //
-// When db is a *sql.DB (auto-commit, no enclosing transaction) the
-// INSERT is wrapped in a deadlock retry loop: parallel handlers and
-// fan-out goroutines compete on FK record locks for shared parents
-// (workspaces, tasks, users), and InnoDB occasionally rolls one back
-// with ER_LOCK_DEADLOCK (1213). Re-issuing the statement reliably
-// resolves the contention. Callers passing a *sql.Tx own the retry
-// boundary themselves — InnoDB invalidates the whole tx on deadlock,
-// so retrying just the INSERT inside the dead tx would not help.
+// db is a [dbretry.CommitBoundary] rather than a bare statement
+// executor because the fan-out this append triggers has to observe a
+// committed row. A transaction whose commit nobody reports would leave
+// every subscriber with an event they cannot read, so that handle is not
+// expressible here.
+//
+// The retry policy comes from the handle for the same reason it has to:
+// on auto-commit the INSERT is its own transaction and re-issuing it
+// clears the FK-lock contention parallel writers produce, while inside a
+// transaction a deadlock has already invalidated everything and only the
+// caller's [dbretry.InTx] can retry the unit that matters.
 //
 // Judge-kind guard (ADR 0008 D4). Event kinds listed in
-// [judgeEventKinds] are reserved for the signaljudge Applier. Any
+// [IsJudgeEventKind] are reserved for the signaljudge Applier. Any
 // other caller using [Append] with one of those kinds short-circuits
 // with INTERNAL.EVENTBUS.JUDGE_KIND_OUTSIDE_APPLIER so the invariant
 // "Applier is the sole writer of judge-driven task state" is enforced
 // at runtime rather than relying on grep / code review. The Applier
 // itself uses [AppendJudgeEvent] which sets an internal flag so the
 // guard lets the row through.
-func Append(ctx context.Context, db DBTX, evt Event) error {
-	return appendInternal(ctx, db, evt, false)
+func Append(ctx context.Context, db dbretry.CommitBoundary, evt Event) error {
+	return appendInternal(ctx, db, evt, appendMode{})
 }
 
 // AppendBestEffort appends evt and, when the INSERT fails, records what
@@ -341,26 +327,39 @@ func Append(ctx context.Context, db DBTX, evt Event) error {
 // the two forms is a real decision, so a static test rejects the
 // discarded one (see no_swallowed_append_test.go).
 //
-// Use this form only where the state change the event describes is
-// already committed and the client cannot safely retry — creating a
-// task, adding a comment, converting an intake item. Returning an error
-// there would report "nothing happened" for work that did happen, and a
-// retry would duplicate it. Where the mutation is idempotent (setting a
-// status, updating fields, archiving) call [Append] and propagate: the
-// retry that follows is what repairs the log.
+// What decides between the two forms is the boundary, not the mutation.
+//
+// Call [Append] and propagate when the append shares the mutation's
+// transaction. Failing there takes the mutation down with it, which is
+// the outcome that keeps the two in step, and [dbretry.InTx] enforces it
+// whatever the call site does with the returned error.
+//
+// Use this form when the mutation is already durable — an append that
+// follows a committed transaction, or one issued on
+// [dbretry.AutoCommit] after the write it describes. There is nothing
+// left to undo, so reporting failure would tell the client nothing
+// happened when it did, and would skip whatever the handler still had to
+// do afterwards, typically its audit entry.
+//
+// Anything a projection reads must be on the first path. `derived_state`
+// is built from the `task.transition.*` kinds and no others (see
+// internal/constraint/engine/replay.go), and those appends are made
+// inside the transaction that moves the task; losing one is a wrong
+// state that nothing later corrects. Every other kind is a notification
+// or a timeline entry, where losing one costs a delivery.
 //
 // callSite names the operation, e.g. "mcp.create_task". The payload is
 // logged alongside it because the row does not exist: this line is the
 // only remaining description of the change, and any state derived from
 // the log stays wrong until someone replays it.
-func AppendBestEffort(ctx context.Context, db DBTX, evt Event, callSite string) {
-	if err := appendInternal(ctx, db, evt, false); err != nil {
+func AppendBestEffort(ctx context.Context, db dbretry.CommitBoundary, evt Event, callSite string) {
+	if err := appendInternal(ctx, db, evt, appendMode{bestEffort: true}); err != nil {
 		// Append already logged the driver error; this line adds what it
 		// could not know — who dropped it and what the row would have
 		// said.
 		attrs := []any{
 			slog.String("call_site", callSite),
-			slog.String("type", evt.Type),
+			slog.String("type", string(evt.Type)),
 			slog.Uint64("workspace_id", uint64(evt.WorkspaceID)),
 			slog.Any("error", err),
 		}
@@ -385,8 +384,8 @@ func AppendBestEffort(ctx context.Context, db DBTX, evt Event, callSite string) 
 // exists so the Applier shares one INSERT path (and one deadlock
 // retry, one actor-exclusion check, one notify fan-out, ...) with
 // every other event writer.
-func AppendJudgeEvent(ctx context.Context, db DBTX, evt Event) error {
-	return appendInternal(ctx, db, evt, true)
+func AppendJudgeEvent(ctx context.Context, db dbretry.CommitBoundary, evt Event) error {
+	return appendInternal(ctx, db, evt, appendMode{fromApplier: true})
 }
 
 // ReverseAppendResult is the metadata the reversal handler returns
@@ -400,7 +399,7 @@ type ReverseAppendResult struct {
 	OccurredAt time.Time
 }
 
-// AppendReverseEvent is the dedicated entry point for the J5 reversal
+// AppendReverseEvent is the dedicated entry point for the reversal
 // flow (ADR 0008 D4 / `POST /workspaces/{wsId}/events/{eventPublicId}/reverse`).
 // It bypasses the judge-kind guard because reversing a judge-only
 // event (e.g. `task.auto_completed`) is, by construction, a
@@ -410,7 +409,7 @@ type ReverseAppendResult struct {
 // projection can cancel both rows out symmetrically.
 //
 // Restricted contract: this function MUST only be called from
-// apps/flow-api/internal/http/handlers/events/ (the J5 reversal
+// apps/flow-api/internal/http/handlers/events/ (the reversal
 // handler). Every other writer goes through [Append] / [AppendJudgeEvent]
 // so the judge-kind guard stays effective for accidental misuse. The
 // three-way actor exclusion ([validateActors]) still runs, and
@@ -420,15 +419,29 @@ type ReverseAppendResult struct {
 //
 // Returns the new event's public_id + occurred_at so the handler can
 // echo them in the 201 response without a follow-up SELECT.
-func AppendReverseEvent(ctx context.Context, db DBTX, evt Event) (ReverseAppendResult, error) {
-	return appendInternalWithMeta(ctx, db, evt, true)
+func AppendReverseEvent(ctx context.Context, db dbretry.CommitBoundary, evt Event) (ReverseAppendResult, error) {
+	return appendInternalWithMeta(ctx, db, evt, appendMode{fromApplier: true})
 }
 
-// appendInternal is the shared implementation of [Append] and
-// [AppendJudgeEvent]. fromApplier signals that the caller is the
-// signaljudge Applier and judge-kind events should pass the guard.
-func appendInternal(ctx context.Context, db DBTX, evt Event, fromApplier bool) error {
-	_, err := appendInternalWithMeta(ctx, db, evt, fromApplier)
+// appendMode carries what the entry points differ by, so the shared
+// implementation reads as the property it is branching on rather than as
+// a pair of positional booleans.
+type appendMode struct {
+	// fromApplier signals that the caller is the signaljudge Applier and
+	// judge-kind events should pass the guard.
+	fromApplier bool
+	// bestEffort marks the one entry point that accepts a dropped row.
+	// Every other one reports its failure to the commit boundary, which
+	// refuses to commit a transaction that lost an event; best effort is
+	// the deliberate exception and must stay able to fail inside a
+	// transaction without taking it down.
+	bestEffort bool
+}
+
+// appendInternal is the shared implementation of [Append],
+// [AppendBestEffort] and [AppendJudgeEvent].
+func appendInternal(ctx context.Context, db dbretry.CommitBoundary, evt Event, mode appendMode) error {
+	_, err := appendInternalWithMeta(ctx, db, evt, mode)
 	return err
 }
 
@@ -437,12 +450,29 @@ func appendInternal(ctx context.Context, db DBTX, evt Event, fromApplier bool) e
 // need to echo them back (currently only [AppendReverseEvent]).
 // Everything else goes through [appendInternal] which discards the
 // metadata to keep the existing zero-result contract.
-func appendInternalWithMeta(ctx context.Context, db DBTX, evt Event, fromApplier bool) (ReverseAppendResult, error) {
-	// Judge-kind guard (ADR 0008 D4). See judgeEventKinds for the set.
+//
+// Every failure is reported to db through [dbretry.CommitBoundary.Fail]
+// unless the caller asked for best effort. Task state is derived from
+// the event log (CLAUDE.md rule 8), so a transaction that mutated a task
+// and then failed to record why must not commit the mutation on its own
+// — and whether it does is not the call site's to decide.
+func appendInternalWithMeta(ctx context.Context, db dbretry.CommitBoundary, evt Event, mode appendMode) (ReverseAppendResult, error) {
+	// fail reports the failure to the commit boundary on the way out. In a
+	// transaction that refuses the commit, so discarding the returned
+	// error does not buy the caller a mutation without the event that
+	// describes it. [AppendBestEffort] is the one entry point exempt from
+	// this: accepting a dropped row is what it is for.
+	fail := func(err error) (ReverseAppendResult, error) {
+		if !mode.bestEffort {
+			db.Fail(err)
+		}
+		return ReverseAppendResult{}, err
+	}
+	// Judge-kind guard (ADR 0008 D4). See IsJudgeEventKind for the set.
 	// Reject early so we do not log noise or wake notify hooks for an
 	// event the Applier-only invariant says should never reach the
 	// INSERT path from this caller.
-	if !fromApplier && judgeEventKinds[evt.Type] {
+	if !mode.fromApplier && IsJudgeEventKind(evt.Type) {
 		err := apierrors.New(apierrors.InternalEventbusJudgeKindOutsideApplier).
 			WithDetail("type", evt.Type).
 			WithDetail("workspace_id", evt.WorkspaceID)
@@ -451,7 +481,7 @@ func appendInternalWithMeta(ctx context.Context, db DBTX, evt Event, fromApplier
 			"workspace_id", evt.WorkspaceID,
 			"error", err,
 		)
-		return ReverseAppendResult{}, err
+		return fail(err)
 	}
 	// Three-way actor exclusion (ADR 0008 D8). MySQL cannot enforce this
 	// via CHECK constraint because all three actor FKs are declared with
@@ -465,7 +495,7 @@ func appendInternalWithMeta(ctx context.Context, db DBTX, evt Event, fromApplier
 			"workspace_id", evt.WorkspaceID,
 			"error", err,
 		)
-		return ReverseAppendResult{}, err
+		return fail(err)
 	}
 	// Internal ids must not reach the payload. The rail lives on the
 	// append path, shared with eventlog.Append, because a payload map is
@@ -477,7 +507,7 @@ func appendInternalWithMeta(ctx context.Context, db DBTX, evt Event, fromApplier
 			"workspace_id", evt.WorkspaceID,
 			"error", err,
 		)
-		return ReverseAppendResult{}, err
+		return fail(err)
 	}
 	var raw json.RawMessage
 	if evt.Payload == nil {
@@ -485,7 +515,7 @@ func appendInternalWithMeta(ctx context.Context, db DBTX, evt Event, fromApplier
 	} else {
 		b, err := json.Marshal(evt.Payload)
 		if err != nil {
-			return ReverseAppendResult{}, fmt.Errorf("eventbus: marshal payload: %w", err)
+			return fail(fmt.Errorf("eventbus: marshal payload: %w", err))
 		}
 		raw = b
 	}
@@ -531,7 +561,7 @@ func appendInternalWithMeta(ctx context.Context, db DBTX, evt Event, fromApplier
 			ActorAgentID:        agentID,
 			TriggeredBySignalID: signalID,
 			ReversesEventID:     reversesID,
-			Type:                evt.Type,
+			Type:                string(evt.Type),
 			PayloadJson:         raw,
 			OccurredAt:          now,
 		}
@@ -561,7 +591,7 @@ func appendInternalWithMeta(ctx context.Context, db DBTX, evt Event, fromApplier
 			ActorSystemSource:   sysSource,
 			TriggeredBySignalID: signalID,
 			ReversesEventID:     reversesID,
-			Type:                evt.Type,
+			Type:                string(evt.Type),
 			PayloadJson:         raw,
 			OccurredAt:          now,
 		}
@@ -574,13 +604,10 @@ func appendInternalWithMeta(ctx context.Context, db DBTX, evt Event, fromApplier
 			return nil
 		}
 	}
-	var err error
-	if _, isTx := db.(*sql.Tx); isTx {
-		// Caller owns the transaction boundary; do not retry inside it.
-		err = insert(ctx)
-	} else {
-		err = dbretry.Do(ctx, "eventbus.Append", insert)
-	}
+	// The handle decides whether the INSERT may be retried on its own: a
+	// transaction is invalidated whole by a deadlock, so only the
+	// auto-commit path can re-issue the statement.
+	err := db.RunStatement(ctx, "eventbus.Append", insert)
 	if err != nil {
 		if evt.ReversesEventID != nil && isDuplicateEntry(err) {
 			// Two requests reversed the same event at once and the
@@ -597,14 +624,14 @@ func appendInternalWithMeta(ctx context.Context, db DBTX, evt Event, fromApplier
 				"workspace_id", evt.WorkspaceID,
 				"reverses_event_id", *evt.ReversesEventID,
 			)
-			return ReverseAppendResult{}, fmt.Errorf("%w (%w)", ErrAlreadyReversed, err)
+			return fail(fmt.Errorf("%w (%w)", ErrAlreadyReversed, err))
 		}
 		slog.ErrorContext(ctx, "eventbus: append failed",
 			"type", evt.Type,
 			"workspace_id", evt.WorkspaceID,
 			"error", err,
 		)
-		return ReverseAppendResult{}, err
+		return fail(err)
 	}
 	// LastInsertId is a positive int64 produced by AUTO_INCREMENT, and
 	// events.id is BIGINT UNSIGNED, so uint64 carries it without loss.
@@ -617,30 +644,17 @@ func appendInternalWithMeta(ctx context.Context, db DBTX, evt Event, fromApplier
 	// — the notification goroutine writes rows that FK-reference the new
 	// event/task and would otherwise block on this transaction's own
 	// locks, a self-inflicted deadlock that InnoDB resolves by rolling
-	// one side back. AddCommitHook defers the fan-out until the
-	// transaction commits when the caller ran us via dbretry.InTx; on
-	// the auto-commit path the row is already durable, so it fires
-	// immediately.
+	// one side back. AfterCommit holds the dispatch until the
+	// transaction commits; on the auto-commit path the row is already
+	// durable, so it fires immediately.
 	//
-	// The third case — a transaction the caller opened by hand — has
-	// neither property: there is no collector to defer to, so the hooks
-	// would fire against a row no other connection can see yet. That is
-	// how webhook deliveries and in-app notifications went missing for
-	// MCP-driven transitions while the identical REST transition
-	// delivered fine. Refuse the dispatch rather than fire it early: a
-	// hook that runs too soon looks like it worked and silently drops
-	// the delivery, while a refusal is one loud line naming the caller
-	// that needs dbretry.InTx.
-	if _, isTx := db.(*sql.Tx); isTx && !dbretry.HasCommitHooks(seqCtx) {
-		slog.ErrorContext(ctx, "eventbus: fan-out skipped; append ran in a hand-rolled transaction without a commit boundary (use dbretry.InTx)",
-			"type", evt.Type,
-			"workspace_id", evt.WorkspaceID,
-			"event_id", eventInternalID,
-		)
-		return ReverseAppendResult{PublicID: pubID, OccurredAt: now}, nil
-	}
-	dbretry.AddCommitHook(seqCtx, func() {
-		fireNotifyHooks(seqCtx, evt.WorkspaceID, evt.Type, eventInternalID)
+	// A transaction with no observable commit has neither property, and
+	// waking subscribers there hands them an id nothing else can resolve
+	// yet — the delivery looks sent and arrives nowhere. There is no
+	// branch for that case because [dbretry.CommitBoundary] leaves no way
+	// to reach it.
+	db.AfterCommit(func() {
+		fireNotifyHooks(seqCtx, evt.WorkspaceID, string(evt.Type), eventInternalID)
 	})
 	return ReverseAppendResult{PublicID: pubID, OccurredAt: now}, nil
 }

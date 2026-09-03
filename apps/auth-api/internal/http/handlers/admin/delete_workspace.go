@@ -17,13 +17,13 @@ import (
 // DELETE /admin/workspaces/{wsId}.
 type DeleteWorkspaceInput struct {
 	WsID string `path:"wsId"`
-	Body DeleteWorkspaceInputBody
+	Body AdminDeleteWorkspaceInputBody
 }
 
-// DeleteWorkspaceInputBody is the JSON body for
+// AdminDeleteWorkspaceInputBody is the JSON body for
 // DELETE /admin/workspaces/{wsId}. See the workspace owner self-delete
 // types for why Confirm is *bool (distinguish missing from explicit false).
-type DeleteWorkspaceInputBody struct {
+type AdminDeleteWorkspaceInputBody struct {
 	Confirm *bool `json:"confirm,omitempty" doc:"Must be true to acknowledge irreversible deletion"`
 }
 

@@ -4,9 +4,9 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
-	"log/slog"
 
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/audit"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/dbretry"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
 	apierrors "github.com/libraz/nodate-flow/apps/flow-api/internal/errors"
@@ -14,7 +14,6 @@ import (
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/handlers/handlerutil"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/middleware"
 	"github.com/libraz/nodate-flow/packages/go-shared/apierr"
-	"github.com/libraz/nodate-flow/packages/go-shared/logutil"
 )
 
 // actorPtr delegates to handlerutil.ActorPtr.
@@ -54,7 +53,7 @@ func Create(deps Deps) func(context.Context, *CreateWidgetInput) (*CreateWidgetO
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
 
-		if err := eventbus.Append(ctx, deps.DB, eventbus.Event{
+		eventbus.AppendBestEffort(ctx, dbretry.AutoCommit(deps.DB), eventbus.Event{
 			Type:        eventbus.DashboardWidgetCreated,
 			WorkspaceID: ws.ID,
 			ActorUserID: actorPtr(ctx),
@@ -63,15 +62,7 @@ func Create(deps Deps) func(context.Context, *CreateWidgetInput) (*CreateWidgetO
 				"widgetType": in.Body.WidgetType,
 				"title":      in.Body.Title,
 			},
-		}); err != nil {
-			slog.ErrorContext(ctx, "eventbus.Append failed",
-				slog.Any("err", err),
-				slog.String("handler", "dashboard.Create"),
-				slog.String("event_type", string(eventbus.DashboardWidgetCreated)),
-				logutil.LogEntity("workspace", ws.PublicID),
-				slog.String("widget_public_id", pub.String()),
-			)
-		}
+		}, "dashboard.Create")
 
 		deps.Audit.Record(ctx, audit.Entry{
 			Action:       "dashboard.widget.create",
@@ -208,22 +199,14 @@ func Update(deps Deps) func(context.Context, *UpdateWidgetInput) (*UpdateWidgetO
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
 
-		if err := eventbus.Append(ctx, deps.DB, eventbus.Event{
+		eventbus.AppendBestEffort(ctx, dbretry.AutoCommit(deps.DB), eventbus.Event{
 			Type:        eventbus.DashboardWidgetUpdated,
 			WorkspaceID: ws.ID,
 			ActorUserID: actorPtr(ctx),
 			Payload: map[string]any{
 				"widgetId": pub.String(),
 			},
-		}); err != nil {
-			slog.ErrorContext(ctx, "eventbus.Append failed",
-				slog.Any("err", err),
-				slog.String("handler", "dashboard.Update"),
-				slog.String("event_type", string(eventbus.DashboardWidgetUpdated)),
-				logutil.LogEntity("workspace", ws.PublicID),
-				slog.String("widget_public_id", pub.String()),
-			)
-		}
+		}, "dashboard.Update")
 
 		if actorID, ok := middleware.ActorFromContext(ctx); ok {
 			deps.Audit.Record(ctx, audit.Entry{
@@ -283,7 +266,7 @@ func UpdatePosition(deps Deps) func(context.Context, *UpdateWidgetPositionInput)
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
 
-		if err := eventbus.Append(ctx, deps.DB, eventbus.Event{
+		eventbus.AppendBestEffort(ctx, dbretry.AutoCommit(deps.DB), eventbus.Event{
 			Type:        eventbus.DashboardWidgetUpdated,
 			WorkspaceID: ws.ID,
 			ActorUserID: actorPtr(ctx),
@@ -291,15 +274,7 @@ func UpdatePosition(deps Deps) func(context.Context, *UpdateWidgetPositionInput)
 				"widgetId": pub.String(),
 				"action":   "position",
 			},
-		}); err != nil {
-			slog.ErrorContext(ctx, "eventbus.Append failed",
-				slog.Any("err", err),
-				slog.String("handler", "dashboard.UpdatePosition"),
-				slog.String("event_type", string(eventbus.DashboardWidgetUpdated)),
-				logutil.LogEntity("workspace", ws.PublicID),
-				slog.String("widget_public_id", pub.String()),
-			)
-		}
+		}, "dashboard.UpdatePosition")
 
 		if actorID, ok := middleware.ActorFromContext(ctx); ok {
 			deps.Audit.Record(ctx, audit.Entry{
@@ -350,22 +325,14 @@ func Delete(deps Deps) func(context.Context, *DeleteWidgetInput) (*DeleteWidgetO
 			return nil, httpErr(apierrors.WsDashboardWidgetNotFound)
 		}
 
-		if err := eventbus.Append(ctx, deps.DB, eventbus.Event{
+		eventbus.AppendBestEffort(ctx, dbretry.AutoCommit(deps.DB), eventbus.Event{
 			Type:        eventbus.DashboardWidgetDisabled,
 			WorkspaceID: ws.ID,
 			ActorUserID: actorPtr(ctx),
 			Payload: map[string]any{
 				"widgetId": pub.String(),
 			},
-		}); err != nil {
-			slog.ErrorContext(ctx, "eventbus.Append failed",
-				slog.Any("err", err),
-				slog.String("handler", "dashboard.Delete"),
-				slog.String("event_type", string(eventbus.DashboardWidgetDisabled)),
-				logutil.LogEntity("workspace", ws.PublicID),
-				slog.String("widget_public_id", pub.String()),
-			)
-		}
+		}, "dashboard.Delete")
 
 		if actorID, ok := middleware.ActorFromContext(ctx); ok {
 			deps.Audit.Record(ctx, audit.Entry{

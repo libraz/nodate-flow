@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/libraz/nodate-flow/packages/go-shared/dbretry"
 	"github.com/libraz/nodate-flow/packages/go-shared/eventbus"
 	"github.com/libraz/nodate-flow/packages/go-shared/eventlog"
 )
@@ -119,7 +120,7 @@ type UpdateMemberRoleArgs struct {
 // No downstream row is touched: the current design drops the
 // workspace-role → calendar-role mapping (calendars no longer have
 // cross-member ACL), so a role change is a single UPDATE.
-func UpdateMemberRole(ctx context.Context, tx TX, args UpdateMemberRoleArgs) error {
+func UpdateMemberRole(ctx context.Context, tx *dbretry.Tx, args UpdateMemberRoleArgs) error {
 	if !args.NewRole.IsValid() {
 		return fmt.Errorf("memberkit: invalid role %q", args.NewRole)
 	}
@@ -190,7 +191,7 @@ func UpdateMemberRole(ctx context.Context, tx TX, args UpdateMemberRoleArgs) err
 		return err
 	}
 	if _, err := eventlog.Append(ctx, tx, eventlog.Event{
-		Type:        string(eventbus.WorkspaceMemberRoleChanged),
+		Type:        eventbus.WorkspaceMemberRoleChanged,
 		WorkspaceID: args.WorkspaceID,
 		ActorUserID: &actor,
 		Payload: map[string]any{

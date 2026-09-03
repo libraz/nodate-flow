@@ -32,6 +32,8 @@ import (
 	"math"
 	"strings"
 	"time"
+
+	"github.com/libraz/nodate-flow/packages/go-shared/region"
 )
 
 // Freq mirrors the freq values the rule grammar allows.
@@ -43,6 +45,21 @@ const (
 	FreqMonthly Freq = "monthly"
 	FreqYearly  Freq = "yearly"
 )
+
+// Valid reports whether f is one of the frequencies the grammar defines.
+//
+// Nothing else can be stepped: occurrenceFromAnchor has no arm for an
+// unrecognised value and hands the anchor back unchanged, so a scan of a
+// rule carrying one would sit on the same instant and emit it once per
+// step. Callers that must reject a malformed stored rule loudly rather
+// than expand it to nothing check this before expanding.
+func (f Freq) Valid() bool {
+	switch f {
+	case FreqDaily, FreqWeekly, FreqMonthly, FreqYearly:
+		return true
+	}
+	return false
+}
 
 // Rule is the stored recurrence rule.
 //
@@ -90,11 +107,14 @@ type Occurrence struct {
 	EndAt   time.Time
 }
 
-// maxIterations bounds the candidate scan so a rule with no Until and no
-// Count cannot spin when the range is far from the anchor. Weekly BYDAY
-// rules step one day at a time, so the bound is in days: roughly twenty
-// years, well past any range a calendar UI or an agent asks for.
-const maxIterations = 8000
+// minScanSteps and maxScanSteps bound the candidate scan. The scan ends
+// on its own as soon as a candidate reaches rangeEnd, so the budget only
+// has to cover the walk from the anchor to the window; the ceiling is
+// there so a range in some far century still terminates.
+const (
+	minScanSteps = 8000
+	maxScanSteps = 1_000_000
+)
 
 var dayNumbers = map[string]time.Weekday{
 	"su": time.Sunday,
@@ -143,10 +163,10 @@ func ParseExceptions(raw []byte) []string {
 // separately, because those need no expansion and carry their own
 // identity.
 func Expand(evt Event, rangeStart, rangeEnd time.Time) []Occurrence {
-	if evt.Rule == nil || evt.Rule.Freq == "" {
+	if evt.Rule == nil || !evt.Rule.Freq.Valid() {
 		return nil
 	}
-	loc := loadLocation(evt.Timezone)
+	loc := zoneFor(evt.Timezone).Location()
 	anchor := evt.StartAt.In(loc)
 	duration := evt.EndAt.Sub(evt.StartAt)
 
@@ -183,10 +203,11 @@ func Expand(evt Event, rangeStart, rangeEnd time.Time) []Occurrence {
 	// narrow the freq cursor instead of expanding it.
 	expandsWeekdays := evt.Rule.Freq == FreqWeekly && len(byDay) > 0
 	anchorWeekStart := startOfISOWeek(anchor)
+	budget := scanBudget(anchor, rangeEnd, evt.Rule.Freq, interval, expandsWeekdays)
 
 	var out []Occurrence
 	emitted := 0
-	for n := 0; emitted < maxCount && n < maxIterations; n++ {
+	for n := 0; emitted < maxCount && n < budget; n++ {
 		var candidate time.Time
 		if expandsWeekdays {
 			candidate = addDaysWallClock(anchor, n)
@@ -227,6 +248,59 @@ func Expand(evt Event, rangeStart, rangeEnd time.Time) []Occurrence {
 		}
 	}
 	return out
+}
+
+// scanBudget returns how many candidates the scan may examine before
+// giving up.
+//
+// The budget is derived from the distance between the anchor and the far
+// edge of the window, because that is how many steps it takes to get
+// there. A fixed budget truncates instead, and silently: a daily series
+// anchored two decades before the window runs out of steps on the way and
+// the window comes back empty, which reads as "nothing is scheduled" to
+// an agent and as "no reminder is due" to the scheduler.
+//
+// perDay marks the weekly-BYDAY path, which walks one day at a time
+// regardless of the rule's interval.
+func scanBudget(anchor, rangeEnd time.Time, freq Freq, interval int, perDay bool) int {
+	if interval <= 0 {
+		interval = 1
+	}
+	// Sub saturates rather than wrapping, so a range centuries out yields
+	// a large step count that the ceiling below then caps.
+	days := int(rangeEnd.Sub(anchor).Hours() / 24)
+
+	needed := 0
+	switch {
+	case perDay:
+		needed = days
+	case freq == FreqDaily:
+		needed = days / interval
+	case freq == FreqWeekly:
+		needed = days / 7 / interval
+	case freq == FreqMonthly:
+		needed = monthsBetween(anchor, rangeEnd) / interval
+	case freq == FreqYearly:
+		needed = monthsBetween(anchor, rangeEnd) / 12 / interval
+	}
+	// Two spare steps absorb the rounding in the estimate itself: a
+	// partial period at either end still needs a candidate of its own.
+	needed += 2
+
+	if needed < minScanSteps {
+		return minScanSteps
+	}
+	if needed > maxScanSteps {
+		return maxScanSteps
+	}
+	return needed
+}
+
+// monthsBetween counts whole months from one instant to another, read on
+// the anchor's own calendar so the count is not skewed by month lengths.
+func monthsBetween(from, to time.Time) int {
+	end := to.In(from.Location())
+	return (end.Year()-from.Year())*12 + int(end.Month()) - int(from.Month())
 }
 
 // occurrenceFromAnchor returns the candidate `offset` freq-units after
@@ -388,13 +462,17 @@ func isDateOnly(v string) bool {
 	return err == nil
 }
 
-func loadLocation(name string) *time.Location {
-	if name == "" {
-		return time.UTC
-	}
-	loc, err := time.LoadLocation(name)
+// zoneFor resolves the event's stored timezone through the one resolver.
+//
+// An absent or unresolvable name yields UTC, which is what the schema
+// says the column falls back to and what region.DefaultTimezone is.
+// Erroring is not open to this function: expansion runs over stored rows
+// on the notification path, where refusing a single broken row would
+// take the whole scan down with it.
+func zoneFor(name string) region.Zone {
+	z, err := region.Resolve(name)
 	if err != nil {
-		return time.UTC
+		return region.UTC()
 	}
-	return loc
+	return z
 }

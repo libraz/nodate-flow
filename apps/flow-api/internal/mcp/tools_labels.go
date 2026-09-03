@@ -8,7 +8,6 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/libraz/nodate-flow/apps/flow-api/internal/acl"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
 	apierrors "github.com/libraz/nodate-flow/apps/flow-api/internal/errors"
@@ -110,7 +109,7 @@ func runAddTaskLabel(ctx context.Context, deps Deps, s *session, raw json.RawMes
 	if err := parseArgs(raw, &in); err != nil {
 		return nil, err
 	}
-	taskInternal, _, err := resolveTaskForWrite(ctx, deps, s, in.TaskID, acl.ProjectRoleEditor)
+	taskInternal, _, err := resolveTaskForWrite(ctx, deps, s, in.TaskID)
 	if err != nil {
 		return nil, err
 	}
@@ -163,7 +162,7 @@ func runRemoveTaskLabel(ctx context.Context, deps Deps, s *session, raw json.Raw
 	if err := parseArgs(raw, &in); err != nil {
 		return nil, err
 	}
-	taskInternal, _, err := resolveTaskForWrite(ctx, deps, s, in.TaskID, acl.ProjectRoleEditor)
+	taskInternal, _, err := resolveTaskForWrite(ctx, deps, s, in.TaskID)
 	if err != nil {
 		return nil, err
 	}
@@ -259,7 +258,7 @@ func runArchiveTask(ctx context.Context, deps Deps, s *session, raw json.RawMess
 	if err := parseArgs(raw, &in); err != nil {
 		return nil, err
 	}
-	_, taskPub, err := resolveTaskForWrite(ctx, deps, s, in.TaskID, acl.ProjectRoleEditor)
+	_, taskPub, err := resolveTaskForWrite(ctx, deps, s, in.TaskID)
 	if err != nil {
 		return nil, err
 	}
@@ -298,7 +297,7 @@ func runUnarchiveTask(ctx context.Context, deps Deps, s *session, raw json.RawMe
 	if err := parseArgs(raw, &in); err != nil {
 		return nil, err
 	}
-	_, taskPub, err := resolveTaskForWrite(ctx, deps, s, in.TaskID, acl.ProjectRoleEditor)
+	_, taskPub, err := resolveTaskForWrite(ctx, deps, s, in.TaskID)
 	if err != nil {
 		return nil, err
 	}

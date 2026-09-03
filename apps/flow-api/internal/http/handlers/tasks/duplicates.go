@@ -7,6 +7,7 @@ import (
 	"sort"
 	"strconv"
 
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/acl"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/ai/embed"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
@@ -96,11 +97,19 @@ func ListDuplicates(deps Deps) func(context.Context, *ListDuplicatesInput) (*Lis
 			return emptyDuplicates(model), nil
 		}
 
+		// Each candidate's title is returned to the caller, so the pool
+		// is the actor's readable set rather than the workspace's.
+		actorID, _ := middleware.ActorFromContext(ctx)
+		vis := acl.ListVisibilityArgs(actorID, acl.WorkspaceRole(ws.Role))
 		rows, err := deps.Queries.ListCandidateTaskEmbeddings(ctx, generated.ListCandidateTaskEmbeddingsParams{
-			WorkspaceID: ws.ID,
-			Model:       model,
-			TaskID:      task.ID,
-			Limit:       duplicateCandidateLimit,
+			WorkspaceID:   ws.ID,
+			Model:         model,
+			TaskID:        task.ID,
+			IsElevated:    vis.IsElevated,
+			ActorUserID:   vis.ActorUserID,
+			ActorUserID_2: vis.ActorUserID,
+			ActorUserID_3: vis.ActorUserID,
+			Limit:         duplicateCandidateLimit,
 		})
 		if err != nil {
 			return nil, httpErr(apierrors.InternalUnexpected)

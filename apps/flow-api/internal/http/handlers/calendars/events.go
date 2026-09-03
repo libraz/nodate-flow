@@ -11,9 +11,12 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/audit"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/calendarrules"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/dbretry"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated/calendar"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
 	apierrors "github.com/libraz/nodate-flow/apps/flow-api/internal/errors"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/eventbus"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/handlers/handlerutil"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/itemkit"
 	"github.com/libraz/nodate-flow/packages/go-shared/dbtype"
@@ -323,41 +326,18 @@ func ListEvents(deps Deps) func(context.Context, *ListEventsInput) (*ListEventsO
 // normalizeAllDayBounds pins an all-day event's stored instants to UTC
 // midnight.
 //
-// "All day on 5 August" is a date, not an interval on the world clock:
-// it means the same square on the calendar for everyone. The column pair
-// is DATETIME, so the date has to be encoded as an instant, and which
-// instant it is has to be one thing — otherwise the same row reads as a
-// different day depending on who wrote it and who is looking.
-//
-// It was two things. The browser dialog sent local midnight and the MCP
-// tools sent UTC midnight, so a Tokyo user's company holiday arrived as
-// 2026-08-04T15:00Z and every reader bucketing by local date showed it
-// on 4 August in Europe, while an agent reported startDate 2026-08-04
-// for a day the creator had called the 5th.
-//
-// Normalising on the way in makes the row canonical whichever client
-// wrote it, so a reader that takes the UTC date parts gets the date the
-// author meant. Clients still have to read it that way — a reader
-// bucketing all-day rows by local date undoes this — but the stored
-// value is no longer the thing that disagrees.
+// The rule lives in calendarrules because the MCP tools write the same
+// column pair: an all-day row that two transports encode differently is
+// a row whose date depends on which client wrote it, which is the defect
+// the shared function describes.
 func normalizeAllDayBounds(allDay bool, start, end sql.NullTime) (sql.NullTime, sql.NullTime) {
-	if !allDay {
-		return start, end
-	}
-	if start.Valid {
-		start.Time = truncateToUTCDay(start.Time)
-	}
-	if end.Valid {
-		end.Time = truncateToUTCDay(end.Time)
-	}
-	return start, end
+	return calendarrules.NormalizeAllDayBounds(allDay, start, end)
 }
 
 // truncateToUTCDay returns midnight UTC on the calendar day t falls on
 // in UTC.
 func truncateToUTCDay(t time.Time) time.Time {
-	u := t.UTC()
-	return time.Date(u.Year(), u.Month(), u.Day(), 0, 0, 0, 0, time.UTC)
+	return calendarrules.TruncateToUTCDay(t)
 }
 
 // CreateEvent creates a new event in a calendar.
@@ -417,8 +397,8 @@ func CreateEvent(deps Deps) func(context.Context, *CreateEventInput) (*CreateEve
 		// (persisted as NULL). Requesting start without end (or vice versa)
 		// is rejected to keep the pair invariant enforced by
 		// chk_calendar_events_start_end_pair.
-		if (input.Body.StartAt == nil) != (input.Body.EndAt == nil) {
-			return nil, httpErr(apierrors.CalendarEventStartEndPairRequired)
+		if err := requireEventStartEndPair(input.Body.StartAt, input.Body.EndAt); err != nil {
+			return nil, err
 		}
 		if err := requireEventChronology(input.Body.StartAt, input.Body.EndAt); err != nil {
 			return nil, err
@@ -450,7 +430,7 @@ func CreateEvent(deps Deps) func(context.Context, *CreateEventInput) (*CreateEve
 			AllDay:          input.Body.AllDay,
 			StartAt:         startAtNT,
 			EndAt:           endAtNT,
-			Timezone:        timezone,
+			Timezone:        timezone.Name(),
 			OwnerUserID:     ownerUserID,
 			CreatedByUserID: actorID,
 		}
@@ -509,7 +489,7 @@ func CreateEvent(deps Deps) func(context.Context, *CreateEventInput) (*CreateEve
 			eventBusPayload["startAt"] = startAtNT.Time
 			eventBusPayload["endAt"] = endAtNT.Time
 		}
-		_ = appendCalendarEvent(ctx, deps.DB, wsID, cal.ID, "calendar.event.created", &actorID, eventBusPayload)
+		appendCalendarEvent(ctx, dbretry.AutoCommit(deps.DB), wsID, cal.ID, eventbus.CalEventCreated, &actorID, eventBusPayload, "calendars.CreateEvent")
 
 		deps.Audit.Record(ctx, audit.Entry{
 			Action:       "calendar.event.create",
@@ -646,8 +626,8 @@ func PatchEvent(deps Deps) func(context.Context, *PatchEventInput) (*PatchEventO
 		// Pair invariant: explicit partial start_at without end_at (or
 		// vice versa) is ambiguous. Undated transitions are supported,
 		// but they must come through unlink first.
-		if (input.Body.StartAt == nil) != (input.Body.EndAt == nil) {
-			return nil, httpErr(apierrors.CalendarEventStartEndPairRequired)
+		if err := requireEventStartEndPair(input.Body.StartAt, input.Body.EndAt); err != nil {
+			return nil, err
 		}
 		if err := requireEventChronology(input.Body.StartAt, input.Body.EndAt); err != nil {
 			return nil, err
@@ -658,43 +638,25 @@ func PatchEvent(deps Deps) func(context.Context, *PatchEventInput) (*PatchEventO
 			}
 		}
 
-		tx, err := deps.DB.BeginTx(ctx, nil)
-		if err != nil {
-			return nil, httpErr(apierrors.CalendarEventStoreWriteInterrupted)
-		}
-		defer func() { _ = tx.Rollback() }()
-		cqtx := deps.CalendarQueries.WithTx(tx)
-
 		isLinked := evt.TaskID.Valid
 		titleChanged := input.Body.Title != nil && *input.Body.Title != evt.Title
 		timeChanged := input.Body.StartAt != nil // pair invariant guarantees EndAt also set
 
-		// Linked title change → itemkit.RenameItem (propagates to task + siblings)
+		// itemkit owns the propagation of a linked event's title and
+		// times to the task, so those fields drop out of the direct PATCH
+		// rather than being written twice. They are decided here rather
+		// than by clearing input.Body inside the transaction: the
+		// transaction is retried on a deadlock and would then re-read a
+		// request body its own first attempt had emptied.
+		patchTitle := input.Body.Title
+		patchStartAt := input.Body.StartAt
+		patchEndAt := input.Body.EndAt
 		if isLinked && titleChanged {
-			if err := itemkit.RenameItem(ctx, tx, itemkit.RenameItemArgs{
-				WorkspaceID: wsID,
-				ActorUserID: actorID,
-				NewTitle:    *input.Body.Title,
-				EventID:     evt.ID,
-			}); err != nil {
-				return nil, translateItemkitError(ctx, "itemkit.RenameItem", err)
-			}
-			// Prevent the sqlc PATCH below from redundantly touching title.
-			input.Body.Title = nil
+			patchTitle = nil
 		}
-		// Linked time change → itemkit.RescheduleEvent (propagates to task date)
 		if isLinked && timeChanged {
-			if err := itemkit.RescheduleEvent(ctx, tx, itemkit.RescheduleEventArgs{
-				WorkspaceID: wsID,
-				EventID:     evt.ID,
-				ActorUserID: actorID,
-				StartAt:     handlerutil.UnixToTime(*input.Body.StartAt),
-				EndAt:       handlerutil.UnixToTime(*input.Body.EndAt),
-			}); err != nil {
-				return nil, translateItemkitError(ctx, "itemkit.RescheduleEvent", err)
-			}
-			input.Body.StartAt = nil
-			input.Body.EndAt = nil
+			patchStartAt = nil
+			patchEndAt = nil
 		}
 
 		cleared, cerr := parseClearFields(input.Body.Clear)
@@ -745,17 +707,17 @@ func PatchEvent(deps Deps) func(context.Context, *PatchEventInput) (*PatchEventO
 				Valid:                     true,
 			}
 		}
-		if input.Body.Title != nil {
-			params.Title = sql.NullString{String: *input.Body.Title, Valid: true}
+		if patchTitle != nil {
+			params.Title = sql.NullString{String: *patchTitle, Valid: true}
 		}
 		if input.Body.AllDay != nil {
 			params.AllDay = sql.NullBool{Bool: *input.Body.AllDay, Valid: true}
 		}
-		if input.Body.StartAt != nil {
-			params.StartAt = sql.NullTime{Time: handlerutil.UnixToTime(*input.Body.StartAt), Valid: true}
+		if patchStartAt != nil {
+			params.StartAt = sql.NullTime{Time: handlerutil.UnixToTime(*patchStartAt), Valid: true}
 		}
-		if input.Body.EndAt != nil {
-			params.EndAt = sql.NullTime{Time: handlerutil.UnixToTime(*input.Body.EndAt), Valid: true}
+		if patchEndAt != nil {
+			params.EndAt = sql.NullTime{Time: handlerutil.UnixToTime(*patchEndAt), Valid: true}
 		}
 		if input.Body.Timezone != nil {
 			params.Timezone = sql.NullString{String: *input.Body.Timezone, Valid: true}
@@ -817,30 +779,72 @@ func PatchEvent(deps Deps) func(context.Context, *PatchEventInput) (*PatchEventO
 			params.StartAt, params.EndAt = normalizeAllDayBounds(true, params.StartAt, params.EndAt)
 		}
 
-		// Not an existence check: MySQL counts changed rows, so a PATCH
-		// that re-sends the event's current values reports zero. The
-		// event is re-read below and that read is what would fail.
-		if _, err := cqtx.PatchCalendarEvent(ctx, params); err != nil {
-			return nil, httpErr(apierrors.CalendarEventStoreWriteInterrupted)
-		}
+		// updated carries the post-write row out of the transaction; evt
+		// stays the pre-write snapshot the decisions above were made from.
+		updated := evt
+		// answered holds a response-shaped error decided inside the
+		// transaction, so an itemkit invariant is not reported as a
+		// generic write failure.
+		var answered error
+		txErr := dbretry.InTx(ctx, deps.DB, "calendars.PatchEvent", nil, func(ctx context.Context, tx *dbretry.Tx) error {
+			answered = nil
+			cqtx := deps.CalendarQueries.WithTx(tx.RawTx())
 
-		// Re-read inside the tx so the response reflects what itemkit
-		// + sqlc jointly wrote.
-		evt, err = cqtx.FindCalendarEventByPublicId(ctx, calendar.FindCalendarEventByPublicIdParams{
-			PublicID:    types.FromUUID(evtUID),
-			CalendarID:  cal.ID,
-			WorkspaceID: wsID,
+			// Linked title change → itemkit.RenameItem (propagates to task + siblings)
+			if isLinked && titleChanged {
+				if err := itemkit.RenameItem(ctx, tx, itemkit.RenameItemArgs{
+					WorkspaceID: wsID,
+					ActorUserID: actorID,
+					NewTitle:    *input.Body.Title,
+					EventID:     evt.ID,
+				}); err != nil {
+					answered = translateItemkitError(ctx, "itemkit.RenameItem", err)
+					return err
+				}
+			}
+			// Linked time change → itemkit.RescheduleEvent (propagates to task date)
+			if isLinked && timeChanged {
+				if err := itemkit.RescheduleEvent(ctx, tx, itemkit.RescheduleEventArgs{
+					WorkspaceID: wsID,
+					EventID:     evt.ID,
+					ActorUserID: actorID,
+					StartAt:     handlerutil.UnixToTime(*input.Body.StartAt),
+					EndAt:       handlerutil.UnixToTime(*input.Body.EndAt),
+				}); err != nil {
+					answered = translateItemkitError(ctx, "itemkit.RescheduleEvent", err)
+					return err
+				}
+			}
+
+			// Not an existence check: MySQL counts changed rows, so a PATCH
+			// that re-sends the event's current values reports zero. The
+			// event is re-read below and that read is what would fail.
+			if _, err := cqtx.PatchCalendarEvent(ctx, params); err != nil {
+				return err
+			}
+
+			// Re-read inside the tx so the response reflects what itemkit
+			// + sqlc jointly wrote.
+			var rerr error
+			updated, rerr = cqtx.FindCalendarEventByPublicId(ctx, calendar.FindCalendarEventByPublicIdParams{
+				PublicID:    types.FromUUID(evtUID),
+				CalendarID:  cal.ID,
+				WorkspaceID: wsID,
+			})
+			if rerr != nil {
+				answered = httpErr(apierrors.CalendarEventStoreReadInterrupted)
+			}
+			return rerr
 		})
-		if err != nil {
-			return nil, httpErr(apierrors.CalendarEventStoreReadInterrupted)
+		if answered != nil {
+			return nil, answered
 		}
-
-		if err := tx.Commit(); err != nil {
+		if txErr != nil {
 			return nil, httpErr(apierrors.CalendarEventStoreWriteInterrupted)
 		}
 
 		out := &PatchEventOutput{}
-		out.Body = eventFromFullRow(evt)
+		out.Body = eventFromFullRow(updated)
 
 		// When itemkit fired item.rescheduled / item.renamed it already
 		// dual-emitted the legacy calendar.event.updated kind, so no
@@ -848,10 +852,10 @@ func PatchEvent(deps Deps) func(context.Context, *PatchEventInput) (*PatchEventO
 		// we preserve the existing kind to keep webhook subscribers
 		// working.
 		if !isLinked {
-			_ = appendCalendarEvent(ctx, deps.DB, wsID, cal.ID, "calendar.event.updated", &actorID, map[string]any{
+			appendCalendarEvent(ctx, dbretry.AutoCommit(deps.DB), wsID, cal.ID, eventbus.CalEventUpdated, &actorID, map[string]any{
 				"eventId":    input.EvtID,
 				"calendarId": input.CalID,
-			})
+			}, "calendars.PatchEvent")
 		}
 
 		deps.Audit.Record(ctx, audit.Entry{
@@ -932,21 +936,24 @@ func DeleteEvent(deps Deps) func(context.Context, *DeleteEventInput) (*DeleteEve
 			return nil, httpErr(apierrors.CalendarEventEditPermissionRequired)
 		}
 
-		tx, err := deps.DB.BeginTx(ctx, nil)
-		if err != nil {
-			return nil, httpErr(apierrors.CalendarEventStoreDeleteInterrupted)
+		var answered error
+		txErr := dbretry.InTx(ctx, deps.DB, "calendars.DeleteEvent", nil, func(ctx context.Context, tx *dbretry.Tx) error {
+			answered = nil
+			if err := itemkit.DeleteEvent(ctx, tx, wsID, evt.ID, actorID); err != nil {
+				// Mirror the unwrapped pattern used by the other itemkit
+				// call sites (RenameItem / RescheduleEvent above): the
+				// translator's structured log already records the op name,
+				// and the classifier matches on the original error's
+				// message so wrapping would only duplicate context.
+				answered = translateItemkitError(ctx, "itemkit.DeleteEvent", err)
+				return err
+			}
+			return nil
+		})
+		if answered != nil {
+			return nil, answered
 		}
-		defer func() { _ = tx.Rollback() }()
-
-		if err := itemkit.DeleteEvent(ctx, tx, wsID, evt.ID, actorID); err != nil {
-			// Mirror the unwrapped pattern used by the other itemkit
-			// call sites (RenameItem / RescheduleEvent above): the
-			// translator's structured log already records the op name,
-			// and the classifier matches on the original error's
-			// message so wrapping would only duplicate context.
-			return nil, translateItemkitError(ctx, "itemkit.DeleteEvent", err)
-		}
-		if err := tx.Commit(); err != nil {
+		if txErr != nil {
 			return nil, httpErr(apierrors.CalendarEventStoreDeleteInterrupted)
 		}
 

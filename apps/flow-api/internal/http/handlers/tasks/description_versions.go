@@ -3,9 +3,9 @@ package tasks
 import (
 	"context"
 	"database/sql"
-	"log/slog"
 
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/audit"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/dbretry"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
 	apierrors "github.com/libraz/nodate-flow/apps/flow-api/internal/errors"
@@ -13,7 +13,6 @@ import (
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/handlers/handlerutil"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/middleware"
 	"github.com/libraz/nodate-flow/packages/go-shared/apierr"
-	"github.com/libraz/nodate-flow/packages/go-shared/logutil"
 )
 
 // mapDescriptionVersionRow converts a ListDescriptionVersionsRow to the DTO.
@@ -193,7 +192,7 @@ func RestoreDescriptionVersion(deps Deps) func(context.Context, *RestoreDescript
 		}
 
 		taskIDInt64 := int64(task.ID)
-		if err := eventbus.Append(ctx, deps.DB, eventbus.Event{
+		eventbus.AppendBestEffort(ctx, dbretry.AutoCommit(deps.DB), eventbus.Event{
 			Type:        eventbus.DescriptionVersionRestored,
 			WorkspaceID: ws.ID,
 			ActorUserID: actorPtr(ctx),
@@ -204,17 +203,7 @@ func RestoreDescriptionVersion(deps Deps) func(context.Context, *RestoreDescript
 				"newVersionId":  newPub.String(),
 				"versionNumber": nextVer,
 			},
-		}); err != nil {
-			slog.ErrorContext(ctx, "eventbus.Append failed",
-				slog.Any("err", err),
-				slog.String("handler", "tasks.RestoreDescriptionVersion"),
-				slog.String("event_type", string(eventbus.DescriptionVersionRestored)),
-				logutil.LogEntity("workspace", ws.PublicID),
-				logutil.LogEntity("task", task.PublicID),
-				slog.String("version_id", versionPub.String()),
-				slog.String("new_version_id", newPub.String()),
-			)
-		}
+		}, "tasks.RestoreDescriptionVersion")
 
 		if deps.Audit != nil {
 			deps.Audit.Record(ctx, audit.Entry{

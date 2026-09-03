@@ -121,7 +121,7 @@ func AddMember(deps Deps) func(context.Context, *AddMemberInput) (*AddMemberOutp
 		// materialise in the same transaction as the member row.
 		now := time.Now()
 		var mkRes memberkit.AddWorkspaceMemberResult
-		if err := dbretry.InTx(ctx, deps.DB, "workspace.AddMember", nil, func(ctx context.Context, tx *sql.Tx) error {
+		if err := dbretry.InTx(ctx, deps.DB, "workspace.AddMember", nil, func(ctx context.Context, tx *dbretry.Tx) error {
 			res, err := memberkit.AddWorkspaceMember(ctx, tx, memberkit.AddWorkspaceMemberArgs{
 				WorkspaceID:            ws.ID,
 				UserID:                 userID,
@@ -190,7 +190,7 @@ func UpdateMemberRole(deps Deps) func(context.Context, *UpdateMemberRoleInput) (
 		// The closure returns memberkit's error unchanged so the mapping
 		// below stays a pure function of the error value; nothing in it
 		// depends on which attempt produced it.
-		if err := dbretry.InTx(ctx, deps.DB, "workspace.UpdateMemberRole", nil, func(ctx context.Context, tx *sql.Tx) error {
+		if err := dbretry.InTx(ctx, deps.DB, "workspace.UpdateMemberRole", nil, func(ctx context.Context, tx *dbretry.Tx) error {
 			return memberkit.UpdateMemberRole(ctx, tx, memberkit.UpdateMemberRoleArgs{
 				WorkspaceID: ws.ID,
 				UserID:      uid,
@@ -247,7 +247,7 @@ func RemoveMember(deps Deps) func(context.Context, *RemoveMemberInput) (*RemoveM
 			return nil, httpErr(apierr.SpecForErrNoRows(err, apierrors.WsMemberNotFound, apierrors.InternalUnexpected))
 		}
 
-		if err := dbretry.InTx(ctx, deps.DB, "workspace.RemoveMember", nil, func(ctx context.Context, tx *sql.Tx) error {
+		if err := dbretry.InTx(ctx, deps.DB, "workspace.RemoveMember", nil, func(ctx context.Context, tx *dbretry.Tx) error {
 			_, err := memberkit.RemoveWorkspaceMember(ctx, tx, memberkit.RemoveWorkspaceMemberArgs{
 				WorkspaceID: ws.ID,
 				UserID:      uid,

@@ -26,6 +26,7 @@ import (
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/auth"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/bgloop"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/config"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/dbretry"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated/calendar"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/eventbus"
@@ -299,7 +300,7 @@ func main() {
 			// path so cost accounting and ai_invocations stay uniform
 			// across both kinds (ADR 0008 D3).
 			//
-			// Phase 3 / J4 — wire the Applier so the runner's verdict
+			// Wire the Applier so the runner's verdict
 			// turns into events through the deterministic, non-LLM
 			// stage that owns the judge-only event kinds. The Applier
 			// is the sole legitimate caller of eventbus.AppendJudgeEvent
@@ -307,12 +308,12 @@ func main() {
 			// else with INTERNAL.EVENTBUS.JUDGE_KIND_OUTSIDE_APPLIER).
 			//
 			// The autonomy resolver is the production
-			// [signaljudge.RuleBackedResolver] (Phase 4 / A1) which
+			// [signaljudge.RuleBackedResolver] which
 			// walks auto_action_rules → ai_settings.auto_action_threshold
 			// → signalkinds YAML default. The stub
 			// [signaljudge.SuggestOnlyResolver] stays available for
 			// tests but is no longer wired here.
-			// Phase 6 / L2 — the production TaskMutator wires the
+			// The production TaskMutator wires the
 			// `generate_retro` branch through to a real tasks INSERT +
 			// task_dependencies(kind='retro_of') INSERT in one
 			// transaction. The other two action branches
@@ -322,7 +323,7 @@ func main() {
 			// timeline contract is preserved end-to-end.
 			judgeApplier := &signaljudge.Applier{
 				Bus: signaljudge.AppendJudgeEventFunc(func(ctx context.Context, evt eventbus.Event) error {
-					return eventbus.AppendJudgeEvent(ctx, db, evt)
+					return eventbus.AppendJudgeEvent(ctx, dbretry.AutoCommit(db), evt)
 				}),
 				Tasks: &signaljudge.SQLTaskMutator{
 					DB:      db,
@@ -357,11 +358,11 @@ func main() {
 					})
 				},
 				Applier: judgeApplier,
-				// Phase 6 / L1 — wire the three PromptDeps lookups so
+				// Wire the three PromptDeps lookups so
 				// the runner renders the full context window
 				// (recent tasks + linked tasks + judge_instructions +
 				// "now in workspace timezone") instead of falling back
-				// to the Phase 2 composeJudgePrompt JSON snapshot.
+				// to the composeJudgePrompt JSON snapshot.
 				// The lookups are narrow raw-SQL adapters that mirror
 				// the integration-test inline adapters in
 				// apps/flow-api/tests/signaljudge/prompt_render_test.go;
@@ -470,7 +471,7 @@ func main() {
 	// branch in OrchestratorRunner.Run picks the queued row up via
 	// the judge-shaped dedupe_key.
 	//
-	// Phase 3 / J4 — attach the Matcher so deterministic, cheap
+	// Attach the Matcher so deterministic, cheap
 	// filters (workspace AI kill switch, per-kind dedupe window,
 	// subject existence) run before we burn an agent_runs slot. The
 	// Matcher does NOT emit SignalRejected; that kind is reserved

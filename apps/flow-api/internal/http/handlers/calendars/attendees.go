@@ -7,9 +7,11 @@ import (
 
 	"github.com/google/uuid"
 
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/dbretry"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated/calendar"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
 	apierrors "github.com/libraz/nodate-flow/apps/flow-api/internal/errors"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/eventbus"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/handlers/handlerutil"
 	"github.com/libraz/nodate-flow/packages/go-shared/dbtype"
 )
@@ -164,6 +166,25 @@ func AddAttendees(deps Deps) func(context.Context, *AddAttendeesInput) (*AddAtte
 		out := &AddAttendeesOutput{}
 		out.Body.Attendees = make([]AttendeeResponse, 0, len(input.Body.UserIDs))
 
+		// Who is on the event already, read once rather than once per
+		// name in the request. The insert revives a removed attendee
+		// with a fresh RSVP, which is right for someone being invited
+		// again and wrong for someone who is already listed and has
+		// answered: adding a name twice must not quietly withdraw the
+		// answer its owner gave. Listing the live rows first is what
+		// keeps those two cases apart.
+		present := map[uint32]calendar.ListCalendarEventAttendeesRow{}
+		existing, listErr := deps.CalendarQueries.ListCalendarEventAttendees(ctx, calendar.ListCalendarEventAttendeesParams{
+			EventID:     handlerutil.NullInt32From(evt.ID),
+			WorkspaceID: wsID,
+		})
+		if listErr != nil {
+			return nil, httpErr(apierrors.CalendarAttendeeListQueryInterrupted)
+		}
+		for _, row := range existing {
+			present[row.UserID] = row
+		}
+
 		for _, uidStr := range input.Body.UserIDs {
 			uid, parseErr := uuid.Parse(uidStr)
 			if parseErr != nil {
@@ -171,6 +192,19 @@ func AddAttendees(deps Deps) func(context.Context, *AddAttendeesInput) (*AddAtte
 			}
 			userID, findErr := deps.Queries.FindUserInternalIdByPublicId(ctx, types.FromUUID(uid))
 			if findErr != nil {
+				continue
+			}
+			if row, already := present[userID]; already {
+				resp := AttendeeResponse{
+					ID:          row.PublicID.String(),
+					UserID:      uidStr,
+					DisplayName: row.DisplayName,
+					Rsvp:        string(row.Rsvp),
+					CanEdit:     row.CanEdit,
+					CreatedAt:   row.CreatedAt.Unix(),
+				}
+				resp.AvatarURL = dbtype.PtrFromNullString(row.AvatarUrl)
+				out.Body.Attendees = append(out.Body.Attendees, resp)
 				continue
 			}
 
@@ -204,11 +238,11 @@ func AddAttendees(deps Deps) func(context.Context, *AddAttendeesInput) (*AddAtte
 			out.Body.Attendees = append(out.Body.Attendees, resp)
 		}
 
-		_ = appendCalendarEvent(ctx, deps.DB, wsID, cal.ID, "calendar.event.attendees.added", &actorID, map[string]any{
+		appendCalendarEvent(ctx, dbretry.AutoCommit(deps.DB), wsID, cal.ID, eventbus.CalEventAttendeeAdded, &actorID, map[string]any{
 			"eventId":    input.EvtID,
 			"calendarId": input.CalID,
 			"count":      len(out.Body.Attendees),
-		})
+		}, "calendars.AddAttendees")
 
 		return out, nil
 	}
@@ -298,11 +332,11 @@ func RemoveAttendee(deps Deps) func(context.Context, *RemoveAttendeeInput) (*Rem
 			return nil, httpErr(apierrors.CalendarAttendeeStoreRemoveInterrupted)
 		}
 
-		_ = appendCalendarEvent(ctx, deps.DB, wsID, cal.ID, "calendar.event.attendee.removed", &actorID, map[string]any{
+		appendCalendarEvent(ctx, dbretry.AutoCommit(deps.DB), wsID, cal.ID, eventbus.CalEventAttendeeRemoved, &actorID, map[string]any{
 			"eventId":    input.EvtID,
 			"calendarId": input.CalID,
 			"userId":     input.UserID,
-		})
+		}, "calendars.RemoveAttendee")
 
 		out := &RemoveAttendeeOutput{}
 		out.Body.Removed = true
@@ -355,11 +389,11 @@ func UpdateRsvp(deps Deps) func(context.Context, *UpdateRsvpInput) (*UpdateRsvpO
 		out := &UpdateRsvpOutput{}
 		out.Body.Updated = true
 
-		_ = appendCalendarEvent(ctx, deps.DB, wsID, cal.ID, "calendar.event.rsvp.updated", &actorID, map[string]any{
+		appendCalendarEvent(ctx, dbretry.AutoCommit(deps.DB), wsID, cal.ID, eventbus.CalEventRsvpUpdated, &actorID, map[string]any{
 			"eventId":    input.EvtID,
 			"calendarId": input.CalID,
 			"rsvp":       input.Body.Rsvp,
-		})
+		}, "calendars.UpdateRsvp")
 
 		return out, nil
 	}

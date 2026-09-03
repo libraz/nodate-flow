@@ -93,6 +93,11 @@ const (
 	AiSuggestionEdited    = sharedbus.AiSuggestionEdited
 )
 
+// AI auto-action events.
+const (
+	AiAutoActionProposed = sharedbus.AiAutoActionProposed
+)
+
 // AI agent lifecycle events.
 const (
 	AiAgentPaused       = sharedbus.AiAgentPaused
@@ -163,11 +168,40 @@ const (
 	CalEventUpdated = sharedbus.CalEventUpdated
 	CalEventDeleted = sharedbus.CalEventDeleted
 
-	CalMemberJoined = sharedbus.CalMemberJoined
-	CalMemberLeft   = sharedbus.CalMemberLeft
+	CalendarSubscribed          = sharedbus.CalendarSubscribed
+	CalendarSubscriptionUpdated = sharedbus.CalendarSubscriptionUpdated
+
+	CalMemberAdded       = sharedbus.CalMemberAdded
+	CalMemberRemoved     = sharedbus.CalMemberRemoved
+	CalMemberRoleChanged = sharedbus.CalMemberRoleChanged
 
 	CalMemoCreated   = sharedbus.CalMemoCreated
+	CalMemoUpdated   = sharedbus.CalMemoUpdated
 	CalMemoCompleted = sharedbus.CalMemoCompleted
+	CalMemoDeleted   = sharedbus.CalMemoDeleted
+)
+
+// Calendar event detail events — comments, attachments, checklist items,
+// attendees and invites on a single calendar event.
+const (
+	CalEventCommentCreated = sharedbus.CalEventCommentCreated
+	CalEventCommentUpdated = sharedbus.CalEventCommentUpdated
+	CalEventCommentDeleted = sharedbus.CalEventCommentDeleted
+
+	CalEventAttachmentCreated = sharedbus.CalEventAttachmentCreated
+	CalEventAttachmentDeleted = sharedbus.CalEventAttachmentDeleted
+
+	CalEventChecklistCreated = sharedbus.CalEventChecklistCreated
+	CalEventChecklistUpdated = sharedbus.CalEventChecklistUpdated
+	CalEventChecklistDeleted = sharedbus.CalEventChecklistDeleted
+
+	CalEventAttendeeAdded   = sharedbus.CalEventAttendeeAdded
+	CalEventAttendeeRemoved = sharedbus.CalEventAttendeeRemoved
+	CalEventRsvpUpdated     = sharedbus.CalEventRsvpUpdated
+
+	CalEventInviteCreated = sharedbus.CalEventInviteCreated
+	CalEventInviteRotated = sharedbus.CalEventInviteRotated
+	CalEventInviteRevoked = sharedbus.CalEventInviteRevoked
 )
 
 // Reaction events.
@@ -234,13 +268,28 @@ const (
 
 // Public share events — calendar_public_shares.
 const (
-	SharePublished     = sharedbus.SharePublished
-	ShareUpdated       = sharedbus.ShareUpdated
-	ShareTokenRotated  = sharedbus.ShareTokenRotated
-	ShareDeleted       = sharedbus.ShareDeleted
-	ShareEventAttached = sharedbus.ShareEventAttached
-	ShareEventDetached = sharedbus.ShareEventDetached
+	PublicShareCreated         = sharedbus.PublicShareCreated
+	PublicShareUpdated         = sharedbus.PublicShareUpdated
+	PublicShareRotated         = sharedbus.PublicShareRotated
+	PublicShareDeleted         = sharedbus.PublicShareDeleted
+	PublicShareEventsAttached  = sharedbus.PublicShareEventsAttached
+	PublicShareEventsReordered = sharedbus.PublicShareEventsReordered
+	PublicShareEventDetached   = sharedbus.PublicShareEventDetached
 )
+
+// Family re-exports the shared kind classification so flow-api consumers
+// (SSE tap, notification fan-out) route on the same table the constants
+// are declared against.
+type Family = sharedbus.Family
+
+// FamilyForEventType delegates to the shared classification.
+func FamilyForEventType(eventType string) (Family, bool) {
+	return sharedbus.FamilyForEventType(eventType)
+}
+
+// Kinds returns every declared event kind. Consumers that must handle
+// all of them iterate this rather than restating the set.
+func Kinds() []Kind { return sharedbus.Kinds() }
 
 // Legacy / compatibility kinds.
 const (

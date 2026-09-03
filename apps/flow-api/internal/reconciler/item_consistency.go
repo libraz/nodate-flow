@@ -191,7 +191,7 @@ func (r *Reconciler) scanDueDateDrift(ctx context.Context) {
 		if !startAt.Valid {
 			continue
 		}
-		local, err := region.LocalDate(startAt.Time, region.EffectiveTimezone(tz))
+		z, err := region.Resolve(tz)
 		if err != nil {
 			// The row names a zone that does not exist, so there is no
 			// date to heal toward. Report it rather than falling back to
@@ -204,10 +204,11 @@ func (r *Reconciler) scanDueDateDrift(ctx context.Context) {
 				"event_id", d.eventID, "timezone", tz)
 			continue
 		}
-		if d.taskDate.Valid && sameDate(d.taskDate.Time, local) {
+		local := region.DayOf(startAt.Time, z)
+		if d.taskDate.Valid && region.DayFromDateColumn(d.taskDate.Time).Equal(local) {
 			continue
 		}
-		d.eventDate = sql.NullTime{Time: local, Valid: true}
+		d.eventDate = sql.NullTime{Time: local.DateColumn(), Valid: true}
 		drifts = append(drifts, d)
 	}
 	if err := rows.Err(); err != nil {
@@ -410,16 +411,6 @@ func (r *Reconciler) logError(msg string, err error, args ...any) {
 	}
 	args = append([]any{"err", err}, args...)
 	r.Logger.Error(msg, args...)
-}
-
-// sameDate reports whether two date-carrying times name the same
-// calendar day. Both sides are midnight-carried values (a DATE column
-// read back, and region.LocalDate's output), so comparing the Y/M/D
-// triple avoids depending on either one's location.
-func sameDate(a, b time.Time) bool {
-	ay, am, ad := a.Date()
-	by, bm, bd := b.Date()
-	return ay == by && am == bm && ad == bd
 }
 
 func nullTimeString(t sql.NullTime) string {

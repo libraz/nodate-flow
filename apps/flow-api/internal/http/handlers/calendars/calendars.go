@@ -6,9 +6,11 @@ import (
 
 	"github.com/google/uuid"
 
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/dbretry"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated/calendar"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
 	apierrors "github.com/libraz/nodate-flow/apps/flow-api/internal/errors"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/eventbus"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/handlers/handlerutil"
 	"github.com/libraz/nodate-flow/packages/go-shared/dbtype"
 )
@@ -136,9 +138,15 @@ func ListCalendars(deps Deps) func(context.Context, *ListCalendarsInput) (*ListC
 
 // CreateCalendar creates a new calendar in the workspace and automatically
 // subscribes the creator as owner.
+//
+// Guests are refused. A calendar is workspace state, not the creator's own
+// row: a team calendar is discoverable to every member by default, and the
+// creator lands in it as owner, which is a role a read-only member cannot
+// otherwise hold anywhere. Every later reach into the calendar goes through
+// calendar_members and so cannot re-ask this question.
 func CreateCalendar(deps Deps) func(context.Context, *CreateCalendarInput) (*CreateCalendarOutput, error) {
 	return func(ctx context.Context, input *CreateCalendarInput) (*CreateCalendarOutput, error) {
-		wsID, actorID, err := resolveWorkspace(ctx, deps.Queries, input.WsID)
+		wsID, actorID, err := resolveWorkspaceNonGuest(ctx, deps.Queries, input.WsID)
 		if err != nil {
 			return nil, err
 		}
@@ -207,11 +215,11 @@ func CreateCalendar(deps Deps) func(context.Context, *CreateCalendarInput) (*Cre
 			CreatedAt:              handlerutil.NowUnix(),
 		}
 
-		_ = appendCalendarEvent(ctx, deps.DB, wsID, calID32, "calendar.created", &actorID, map[string]any{
+		appendCalendarEvent(ctx, dbretry.AutoCommit(deps.DB), wsID, calID32, eventbus.CalendarCreated, &actorID, map[string]any{
 			"calendarId": calPublicID.String(),
 			"name":       input.Body.Name,
 			"kind":       input.Body.Kind,
-		})
+		}, "calendars.CreateCalendar")
 
 		return out, nil
 	}
@@ -295,9 +303,9 @@ func PatchCalendar(deps Deps) func(context.Context, *PatchCalendarInput) (*Patch
 		out := &PatchCalendarOutput{}
 		out.Body = calendarFromRow(cal, member, findSubscription(ctx, deps.CalendarQueries, cal.ID, actorID))
 
-		_ = appendCalendarEvent(ctx, deps.DB, wsID, cal.ID, "calendar.updated", &actorID, map[string]any{
+		appendCalendarEvent(ctx, dbretry.AutoCommit(deps.DB), wsID, cal.ID, eventbus.CalendarUpdated, &actorID, map[string]any{
 			"calendarId": input.CalID,
-		})
+		}, "calendars.PatchCalendar")
 
 		return out, nil
 	}
@@ -351,6 +359,10 @@ func DeleteCalendar(deps Deps) func(context.Context, *DeleteCalendarInput) (*Del
 		}
 		// Genuinely multi-row: a calendar whose events were never added
 		// to a share has nothing to detach, and zero is the right answer.
+		//
+		// affected-rows: not-applicable — the calendar the caller named is
+		// answered for by DisableCalendar above; this detaches whatever
+		// happened to be published from it.
 		if _, err := cqtx.DetachCalendarEventsFromAllShares(ctx, calendar.DetachCalendarEventsFromAllSharesParams{
 			PublicID:    types.FromUUID(calUID),
 			WorkspaceID: wsID,
@@ -364,9 +376,9 @@ func DeleteCalendar(deps Deps) func(context.Context, *DeleteCalendarInput) (*Del
 		out := &DeleteCalendarOutput{}
 		out.Body.Deleted = true
 
-		_ = appendCalendarEvent(ctx, deps.DB, wsID, cal.ID, "calendar.deleted", &actorID, map[string]any{
+		appendCalendarEvent(ctx, dbretry.AutoCommit(deps.DB), wsID, cal.ID, eventbus.CalendarDeleted, &actorID, map[string]any{
 			"calendarId": input.CalID,
-		})
+		}, "calendars.DeleteCalendar")
 
 		return out, nil
 	}

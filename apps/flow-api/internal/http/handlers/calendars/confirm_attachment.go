@@ -7,10 +7,12 @@ import (
 
 	"github.com/google/uuid"
 
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/dbretry"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated/calendar"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
 	apierrors "github.com/libraz/nodate-flow/apps/flow-api/internal/errors"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/eventbus"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/handlers/handlerutil"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/storage"
 	"github.com/libraz/nodate-flow/packages/go-shared/apierr"
@@ -102,12 +104,12 @@ func ConfirmAttachment(deps Deps) func(context.Context, *ConfirmAttachmentInput)
 			return nil, err
 		}
 
-		_ = appendCalendarEvent(ctx, deps.DB, wsID, cal.ID, "calendar.event.attachment.deleted", &actorID, map[string]any{
+		appendCalendarEvent(ctx, dbretry.AutoCommit(deps.DB), wsID, cal.ID, eventbus.CalEventAttachmentDeleted, &actorID, map[string]any{
 			"eventId":      input.EvtID,
 			"calendarId":   input.CalID,
 			"attachmentId": input.AttID,
 			"reason":       "size_limit_exceeded",
-		})
+		}, "calendars.ConfirmAttachment")
 
 		return nil, httpErr(apierrors.ValidationFileTooLarge)
 	}
@@ -129,6 +131,9 @@ func rejectOversizeCalendarAttachment(ctx context.Context, deps Deps, wsID uint3
 	// This is the cleanup path for a blob this request has just rejected,
 	// not an endpoint answering about a resource the caller named, so a
 	// zero count has no 404 to map onto.
+	//
+	// affected-rows: not-applicable — the row was read a moment ago in this
+	// same request, and the reject path needs it gone rather than counted.
 	if _, err := cqtx.DeleteCalendarEventAttachment(ctx, calendar.DeleteCalendarEventAttachmentParams{
 		PublicID:    attPub,
 		EventID:     handlerutil.NullInt32From(eventID),

@@ -9,6 +9,7 @@ import (
 	"unicode/utf8"
 
 	apierrors "github.com/libraz/nodate-flow/apps/flow-api/internal/errors"
+	"github.com/libraz/nodate-flow/packages/go-shared/region"
 )
 
 // --- Input/Output types ---
@@ -79,7 +80,9 @@ var errUnparseableText = errors.New("calendar: no date or time found in text")
 
 // ParseEventFromText extracts event parameters from natural language.
 // This is a simple rule-based parser. Can be replaced with LLM later.
-// The timezone parameter is an IANA timezone name (e.g. "America/New_York").
+// The zone is the caller's, resolved upstream: "tomorrow" and "15:00"
+// name a wall clock, and which instant that is depends on whose day the
+// text was written in.
 //
 // The patterns below are Japanese. Text in any other language matches
 // none of them, and the parser used to answer anyway: with no date it
@@ -94,37 +97,34 @@ var errUnparseableText = errors.New("calendar: no date or time found in text")
 // starts at 09:00, a recognised time with no date is today. Both
 // defaults describe a value the text did supply; neither invents the
 // whole appointment.
-func ParseEventFromText(text string, now time.Time, timezone string) (*EventProposal, error) {
-	loc, err := time.LoadLocation(timezone)
-	if err != nil {
-		return nil, err
-	}
-	nowJST := now.In(loc)
+func ParseEventFromText(text string, now time.Time, zone region.Zone) (*EventProposal, error) {
+	localNow := now.In(zone.Location())
 
 	remaining := text
 
 	// Extract date
-	date := nowJST
-	remaining, date, hasDate := extractDate(remaining, nowJST)
+	date := localNow
+	remaining, date, hasDate := extractDate(remaining, localNow)
 
 	// Extract start time
 	startHour, startMin, hasStart := extractStartTime(remaining)
 	if !hasDate && !hasStart {
 		return nil, errUnparseableText
 	}
+	day := region.DayOf(date, zone)
 	if hasStart {
-		date = time.Date(date.Year(), date.Month(), date.Day(), startHour, startMin, 0, 0, loc)
+		date = day.At(zone, startHour, startMin, 0)
 	} else {
-		date = time.Date(date.Year(), date.Month(), date.Day(), 9, 0, 0, 0, loc)
+		date = day.At(zone, taskEventStartHour, 0, 0)
 	}
 
 	// Extract end time
 	endHour, endMin, hasEnd := extractEndTime(remaining)
 	var endAt time.Time
 	if hasEnd {
-		endAt = time.Date(date.Year(), date.Month(), date.Day(), endHour, endMin, 0, 0, loc)
+		endAt = day.At(zone, endHour, endMin, 0)
 		if endAt.Before(date) {
-			endAt = endAt.Add(24 * time.Hour)
+			endAt = day.AddDays(1).At(zone, endHour, endMin, 0)
 		}
 	} else {
 		endAt = date.Add(time.Hour)

@@ -345,7 +345,7 @@ func Create(deps Deps) func(context.Context, *CreateInput) (*CreateOutput, error
 				actor := int64(actorID)
 				actorPtr = &actor
 			}
-			if err := eventbus.Append(ctx, deps.DB, eventbus.Event{
+			eventbus.AppendBestEffort(ctx, dbretry.AutoCommit(deps.DB), eventbus.Event{
 				Type:        eventbus.SignalAttached,
 				WorkspaceID: wsID,
 				ActorUserID: actorPtr,
@@ -355,16 +355,7 @@ func Create(deps Deps) func(context.Context, *CreateInput) (*CreateOutput, error
 					"source":   in.Body.Source,
 					"kind":     in.Body.Kind,
 				},
-			}); err != nil {
-				slog.ErrorContext(ctx, "eventbus.Append failed",
-					slog.Any("err", err),
-					slog.String("handler", "signals.Create"),
-					slog.String("event_type", string(eventbus.SignalAttached)),
-					slog.String("workspace_public_id", in.Body.WorkspaceID),
-					slog.String("task_public_id", in.Body.TaskID),
-					slog.String("signal_public_id", pub.String()),
-				)
-			}
+			}, "signals.Create")
 		}
 
 		// Wake any matching signal_judge agents (ADR 0008 D3). The

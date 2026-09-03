@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"time"
 
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/dbretry"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
 	apierrors "github.com/libraz/nodate-flow/apps/flow-api/internal/errors"
@@ -109,7 +110,7 @@ func ConfirmUpload(deps Deps) func(context.Context, *ConfirmTaskAttachmentInput)
 		}
 
 		taskInternal := int64(task.ID)
-		if evtErr := eventbus.Append(ctx, deps.DB, eventbus.Event{
+		eventbus.AppendBestEffort(ctx, dbretry.AutoCommit(deps.DB), eventbus.Event{
 			Type:        eventbus.TaskAttachmentRemoved,
 			WorkspaceID: ws.ID,
 			ActorUserID: actorPtr(ctx),
@@ -119,14 +120,7 @@ func ConfirmUpload(deps Deps) func(context.Context, *ConfirmTaskAttachmentInput)
 				"attachmentId": aid.String(),
 				"reason":       "size_limit_exceeded",
 			},
-		}); evtErr != nil {
-			nflog.LoggerFromContext(ctx).ErrorContext(ctx, "eventbus.Append failed",
-				slog.Any("err", evtErr),
-				slog.String("handler", "tasks.ConfirmUpload"),
-				slog.String("event_type", string(eventbus.TaskAttachmentRemoved)),
-				slog.String("attachment_public_id", aid.String()),
-			)
-		}
+		}, "tasks.ConfirmUpload")
 
 		return nil, httpErr(apierrors.ValidationFileTooLarge)
 	}
@@ -147,6 +141,9 @@ func rejectOversizeTaskAttachment(ctx context.Context, deps Deps, wsID uint32, t
 	// This is the cleanup path for a blob this request has just rejected,
 	// not an endpoint answering about a resource the caller named, so a
 	// zero count has no 404 to map onto.
+	//
+	// affected-rows: not-applicable — the row was read a moment ago in this
+	// same request, and the reject path needs it gone rather than counted.
 	if _, err := qtx.DeleteAttachment(ctx, generated.DeleteAttachmentParams{
 		WorkspaceID: wsID,
 		TaskID:      handlerutil.NullInt32From(taskID),

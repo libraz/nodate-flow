@@ -8,6 +8,7 @@ import (
 
 	"github.com/danielgtaylor/huma/v2"
 
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/acl"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/ai"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/ai/embed"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/audit"
@@ -142,11 +143,20 @@ func ProposeSteps(deps StepsDeps) func(context.Context, *ProposeStepsInput) (*Pr
 			granularity = ai.GranularityFine
 		}
 
-		// Fetch existing child tasks to avoid duplicate proposals.
+		// Fetch existing child tasks to avoid duplicate proposals. The
+		// middleware resolved the parent for this actor; a child carries
+		// its own visibility and its title reaches the response, so the
+		// children are filtered by the Layer-4 rule in their own right.
+		actorID, _ := middleware.ActorFromContext(ctx)
+		vis := acl.ListVisibilityArgs(actorID, acl.WorkspaceRole(ws.Role))
 		var children []ai.ChildTaskSummary
 		childRows, err := deps.Queries.ListChildTasksByParentID(ctx, generated.ListChildTasksByParentIDParams{
-			WorkspaceID:  ws.ID,
-			ParentTaskID: sql.NullInt32{Int32: int32(task.ID), Valid: true}, //#nosec G115 -- parent task id is tasks.id (BIGINT UNSIGNED), fits int32 within realistic deployments
+			WorkspaceID:   ws.ID,
+			ParentTaskID:  sql.NullInt32{Int32: int32(task.ID), Valid: true}, //#nosec G115 -- parent task id is tasks.id (BIGINT UNSIGNED), fits int32 within realistic deployments
+			IsElevated:    vis.IsElevated,
+			ActorUserID:   vis.ActorUserID,
+			ActorUserID_2: vis.ActorUserID,
+			ActorUserID_3: vis.ActorUserID,
 		})
 		if err == nil {
 			for _, c := range childRows {
@@ -175,6 +185,7 @@ func ProposeSteps(deps StepsDeps) func(context.Context, *ProposeStepsInput) (*Pr
 			row.Title, desc,
 			granularity, children,
 			embedProvider, reader,
+			vis,
 		)
 		if err != nil {
 			return nil, mapAIError(err)
@@ -246,7 +257,7 @@ func ApplySteps(deps StepsDeps) func(context.Context, *ApplyStepsInput) (*ApplyS
 		// distinct numbers.
 		created := make([]string, 0, len(in.Body.Steps))
 		childIDs := make([]int64, 0, len(in.Body.Steps))
-		txErr := dbretry.InTx(ctx, deps.DB, "tasks.ApplySteps", nil, func(ctx context.Context, tx *sql.Tx) error {
+		txErr := dbretry.InTx(ctx, deps.DB, "tasks.ApplySteps", nil, func(ctx context.Context, tx *dbretry.Tx) error {
 			created = created[:0]
 			childIDs = childIDs[:0]
 			for _, st := range in.Body.Steps {
@@ -275,7 +286,7 @@ func ApplySteps(deps StepsDeps) func(context.Context, *ApplyStepsInput) (*ApplyS
 		parentPubStr := task.PublicID.String()
 		for i, st := range in.Body.Steps {
 			actor := int64(actorID)
-			if err := eventbus.Append(ctx, deps.DB, eventbus.Event{
+			eventbus.AppendBestEffort(ctx, dbretry.AutoCommit(deps.DB), eventbus.Event{
 				Type:        eventbus.TaskCreated,
 				WorkspaceID: ws.ID,
 				ActorUserID: &actor,
@@ -286,16 +297,7 @@ func ApplySteps(deps StepsDeps) func(context.Context, *ApplyStepsInput) (*ApplyS
 					"parentTaskId": parentPubStr,
 					"via":          "api:apply_steps",
 				},
-			}); err != nil {
-				slog.ErrorContext(ctx, "eventbus.Append failed",
-					slog.Any("err", err),
-					slog.String("handler", "tasks.ApplySteps"),
-					slog.String("event_type", string(eventbus.TaskCreated)),
-					logutil.LogEntity("workspace", ws.PublicID),
-					slog.String("task_public_id", created[i]),
-					slog.String("parent_task_public_id", parentPubStr),
-				)
-			}
+			}, "tasks.ApplySteps")
 		}
 
 		deps.Audit.Record(ctx, audit.Entry{

@@ -109,9 +109,15 @@ type DeleteInput struct {
 	ID   string `path:"id" doc:"Mapping public ID"`
 }
 
+// IntegrationMappingDeleteOutputBody is the response body for the delete
+// operation. It is named rather than inline because Huma names an anonymous
+// Body after the operation alone, which makes it share one component schema
+// with every other delete operation in the merged spec.
+type IntegrationMappingDeleteOutputBody struct {
+	Ok bool `json:"ok"`
+}
+
 // DeleteOutput is the response for the delete operation.
 type DeleteOutput struct {
-	Body struct {
-		Ok bool `json:"ok"`
-	}
+	Body IntegrationMappingDeleteOutputBody
 }

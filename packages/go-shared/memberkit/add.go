@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/libraz/nodate-flow/packages/go-shared/dbretry"
 	"github.com/libraz/nodate-flow/packages/go-shared/dbtype"
 	"github.com/libraz/nodate-flow/packages/go-shared/eventbus"
 	"github.com/libraz/nodate-flow/packages/go-shared/eventlog"
@@ -64,7 +65,7 @@ type AddWorkspaceMemberResult struct {
 // calendar, personal subscription) all happen inside the caller's
 // transaction. If any step fails, the caller rolls back and none of
 // the rows stick.
-func AddWorkspaceMember(ctx context.Context, tx TX, args AddWorkspaceMemberArgs) (AddWorkspaceMemberResult, error) {
+func AddWorkspaceMember(ctx context.Context, tx *dbretry.Tx, args AddWorkspaceMemberArgs) (AddWorkspaceMemberResult, error) {
 	if !args.Role.IsValid() {
 		return AddWorkspaceMemberResult{}, fmt.Errorf("memberkit: invalid role %q", args.Role)
 	}
@@ -159,7 +160,6 @@ func AddWorkspaceMember(ctx context.Context, tx TX, args AddWorkspaceMemberArgs)
 		}
 	}
 
-
 	// Step 4: emit the audit event. Inviter (if any) is the actor,
 	// otherwise the user themselves (self-registration).
 	actor := args.InvitedByUserID
@@ -171,7 +171,7 @@ func AddWorkspaceMember(ctx context.Context, tx TX, args AddWorkspaceMemberArgs)
 		return res, err
 	}
 	if _, err := eventlog.Append(ctx, tx, eventlog.Event{
-		Type:        string(eventbus.WorkspaceMemberAdded),
+		Type:        eventbus.WorkspaceMemberAdded,
 		WorkspaceID: args.WorkspaceID,
 		ActorUserID: &actor,
 		Payload: map[string]any{

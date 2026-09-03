@@ -30,6 +30,7 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/dbretry"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/tasknumber"
@@ -91,7 +92,7 @@ type Result struct {
 // Creating several tasks in one transaction is supported and expected:
 // allocation reads MAX(task_number) within the transaction, so each
 // successive call sees the rows the previous ones inserted.
-func New(ctx context.Context, tx *sql.Tx, args Args) (Result, error) {
+func New(ctx context.Context, tx *dbretry.Tx, args Args) (Result, error) {
 	visibility, err := resolveVisibility(args.Visibility)
 	if err != nil {
 		return Result{}, err

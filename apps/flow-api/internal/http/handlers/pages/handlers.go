@@ -8,6 +8,7 @@ import (
 
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/ai"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/audit"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/dbretry"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
 	apierrors "github.com/libraz/nodate-flow/apps/flow-api/internal/errors"
@@ -148,7 +149,7 @@ func Create(deps Deps) func(context.Context, *CreatePageInput) (*CreatePageOutpu
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
 
-		if err := eventbus.Append(ctx, deps.DB, eventbus.Event{
+		eventbus.AppendBestEffort(ctx, dbretry.AutoCommit(deps.DB), eventbus.Event{
 			Type:        eventbus.PageCreated,
 			WorkspaceID: ws.ID,
 			ActorUserID: actorPtr(ctx),
@@ -156,15 +157,7 @@ func Create(deps Deps) func(context.Context, *CreatePageInput) (*CreatePageOutpu
 				"pageId": pub.String(),
 				"title":  in.Body.Title,
 			},
-		}); err != nil {
-			slog.ErrorContext(ctx, "eventbus.Append failed",
-				slog.Any("err", err),
-				slog.String("handler", "pages.Create"),
-				slog.String("event_type", string(eventbus.PageCreated)),
-				logutil.LogEntity("workspace", ws.PublicID),
-				slog.String("page_public_id", pub.String()),
-			)
-		}
+		}, "pages.Create")
 
 		deps.Audit.Record(ctx, audit.Entry{
 			Action:       "page.create",
@@ -374,22 +367,14 @@ func Update(deps Deps) func(context.Context, *UpdatePageInput) (*UpdatePageOutpu
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
 
-		if err := eventbus.Append(ctx, deps.DB, eventbus.Event{
+		eventbus.AppendBestEffort(ctx, dbretry.AutoCommit(deps.DB), eventbus.Event{
 			Type:        eventbus.PageUpdated,
 			WorkspaceID: ws.ID,
 			ActorUserID: actorPtr(ctx),
 			Payload: map[string]any{
 				"pageId": pub.String(),
 			},
-		}); err != nil {
-			slog.ErrorContext(ctx, "eventbus.Append failed",
-				slog.Any("err", err),
-				slog.String("handler", "pages.Update"),
-				slog.String("event_type", string(eventbus.PageUpdated)),
-				logutil.LogEntity("workspace", ws.PublicID),
-				slog.String("page_public_id", pub.String()),
-			)
-		}
+		}, "pages.Update")
 
 		if actorID, ok := middleware.ActorFromContext(ctx); ok {
 			deps.Audit.Record(ctx, audit.Entry{
@@ -438,22 +423,14 @@ func Delete(deps Deps) func(context.Context, *DeletePageInput) (*DeletePageOutpu
 			return nil, httpErr(apierrors.PagePageNotFound)
 		}
 
-		if err := eventbus.Append(ctx, deps.DB, eventbus.Event{
+		eventbus.AppendBestEffort(ctx, dbretry.AutoCommit(deps.DB), eventbus.Event{
 			Type:        eventbus.PageDisabled,
 			WorkspaceID: ws.ID,
 			ActorUserID: actorPtr(ctx),
 			Payload: map[string]any{
 				"pageId": pub.String(),
 			},
-		}); err != nil {
-			slog.ErrorContext(ctx, "eventbus.Append failed",
-				slog.Any("err", err),
-				slog.String("handler", "pages.Delete"),
-				slog.String("event_type", string(eventbus.PageDisabled)),
-				logutil.LogEntity("workspace", ws.PublicID),
-				slog.String("page_public_id", pub.String()),
-			)
-		}
+		}, "pages.Delete")
 
 		if actorID, ok := middleware.ActorFromContext(ctx); ok {
 			deps.Audit.Record(ctx, audit.Entry{
@@ -579,7 +556,7 @@ func GenerateWithAI(deps Deps) func(context.Context, *GeneratePageInput) (*Gener
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
 
-		if err := eventbus.Append(ctx, deps.DB, eventbus.Event{
+		eventbus.AppendBestEffort(ctx, dbretry.AutoCommit(deps.DB), eventbus.Event{
 			Type:        eventbus.PageCreated,
 			WorkspaceID: ws.ID,
 			ActorUserID: actorPtr(ctx),
@@ -588,15 +565,7 @@ func GenerateWithAI(deps Deps) func(context.Context, *GeneratePageInput) (*Gener
 				"title":         in.Body.Title,
 				"isAiGenerated": true,
 			},
-		}); err != nil {
-			slog.ErrorContext(ctx, "eventbus.Append failed",
-				slog.Any("err", err),
-				slog.String("handler", "pages.GenerateWithAI"),
-				slog.String("event_type", string(eventbus.PageCreated)),
-				logutil.LogEntity("workspace", ws.PublicID),
-				slog.String("page_public_id", pub.String()),
-			)
-		}
+		}, "pages.GenerateWithAI")
 
 		deps.Audit.Record(ctx, audit.Entry{
 			Action:       "page.generate",

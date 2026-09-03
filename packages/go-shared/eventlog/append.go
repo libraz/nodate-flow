@@ -10,7 +10,6 @@ package eventlog
 
 import (
 	"context"
-	"database/sql"
 	"encoding/json"
 	"fmt"
 	"log/slog"
@@ -18,22 +17,17 @@ import (
 
 	"github.com/libraz/nodate-flow/packages/go-shared/dbretry"
 	"github.com/libraz/nodate-flow/packages/go-shared/dbtype"
+	"github.com/libraz/nodate-flow/packages/go-shared/eventbus"
 )
-
-// DBTX is the minimal surface accepted by Append. Both *sql.DB and
-// *sql.Tx satisfy it; passing a *sql.Tx keeps the event row in the
-// same transaction as the underlying state change.
-type DBTX interface {
-	ExecContext(ctx context.Context, query string, args ...any) (sql.Result, error)
-}
 
 // Event is the canonical shape passed to Append. Optional FKs accept
 // pointers so the caller can express NULL by passing nil. Payload is
 // marshalled to JSON; passing nil produces `{}`.
 type Event struct {
-	// Type is the dotted event kind string, e.g. "item.scheduled".
-	// See packages/go-shared/eventbus/kinds.go for the canonical set.
-	Type string
+	// Type is the event kind, e.g. eventbus.ItemScheduled. The canonical
+	// set is packages/go-shared/eventbus/kinds.go; a raw string is not
+	// accepted here so an unconsumed kind cannot be minted at a call site.
+	Type eventbus.Kind
 	// WorkspaceID is the internal workspace id (never the public id).
 	WorkspaceID uint32
 	// ActorUserID is the acting user's internal id; nil for system.
@@ -61,32 +55,45 @@ type Event struct {
 // either log to the same set of subscribers.
 type NotifyHook = func(ctx context.Context, workspaceID uint32, eventType string, eventInternalID uint64)
 
-// Append inserts a single event row using the provided DBTX. When db
-// is a *sql.Tx the event is part of that transaction. Returns the
-// inserted public_id on success.
+// Append inserts a single event row through db and returns the
+// inserted public_id on success. With a [dbretry.Tx] the row is part of
+// that transaction and the hooks wait for its commit; with
+// [dbretry.AutoCommit] the row is durable on return and the hooks run
+// immediately.
 //
-// Retries mirror [eventbus.Append] in flow-api, and so does the split
-// between the two cases:
+// db is a [dbretry.CommitBoundary] rather than a bare statement
+// executor because [NotifyHook] subscribers read the event row on their
+// own connection: a handle whose commit nobody reports would wake them
+// for a row they cannot see, and every delivery would silently resolve
+// to nothing. That handle is therefore not expressible here.
 //
-//   - On a *sql.DB (auto-commit) the INSERT is wrapped in a deadlock
-//     retry. Parallel writers contend on FK record locks for shared
-//     parents — workspaces, tasks, users — and InnoDB resolves the
-//     contention by rolling one side back with ER_LOCK_DEADLOCK.
-//     Re-issuing the statement clears it.
-//   - On a *sql.Tx the caller owns the retry boundary and Append must
-//     not retry: a deadlock invalidates the entire transaction, so
-//     re-running this one statement would issue it against a
-//     transaction the server has already rolled back. The unit that has
-//     to be retried is the caller's transaction, which is what
-//     [dbretry.InTx] wraps. Callers that open a transaction by hand get
-//     no retry at all, and a deadlock surfaces to the user as a 500 for
-//     work that would have succeeded on a second attempt.
-func Append(ctx context.Context, db DBTX, evt Event) (dbtype.PublicID, error) {
+// The retry policy comes from the handle, matching [eventbus.Append] in
+// flow-api. On auto-commit the INSERT is its own transaction, so
+// re-issuing it clears the FK-lock contention parallel writers produce
+// on shared parents (workspaces, tasks, users). Inside a transaction a
+// deadlock has invalidated the whole thing, so the only meaningful unit
+// of retry is the caller's transaction, which [dbretry.InTx] wraps.
+//
+// A failure is reported to db as well as returned. Inside a transaction
+// that means the transaction will not commit, so discarding the returned
+// error does not buy the caller a half-recorded change.
+func Append(ctx context.Context, db dbretry.CommitBoundary, evt Event) (dbtype.PublicID, error) {
+	// fail reports the loss to the commit boundary before handing it back.
+	// A transaction that changed something and then failed to record the
+	// event describing it must not commit the change alone, and leaving
+	// that to the caller is what produced logs full of appends nobody
+	// acted on. Inside a transaction this refuses the commit; on the
+	// auto-commit path there is nothing left to withhold and it is a
+	// no-op.
+	fail := func(err error) (dbtype.PublicID, error) {
+		db.Fail(err)
+		return dbtype.PublicID{}, err
+	}
 	// Internal ids must not reach the payload; see ValidatePayloadIDs.
 	// The check is here rather than at each builder because this is the
 	// only place every payload passes through.
 	if err := ValidatePayloadIDs(evt.Payload); err != nil {
-		return dbtype.PublicID{}, fmt.Errorf("eventlog: append %s: %w", evt.Type, err)
+		return fail(fmt.Errorf("eventlog: append %s: %w", evt.Type, err))
 	}
 	var raw json.RawMessage
 	if evt.Payload == nil {
@@ -94,7 +101,7 @@ func Append(ctx context.Context, db DBTX, evt Event) (dbtype.PublicID, error) {
 	} else {
 		b, err := json.Marshal(evt.Payload)
 		if err != nil {
-			return dbtype.PublicID{}, fmt.Errorf("eventlog: marshal payload: %w", err)
+			return fail(fmt.Errorf("eventlog: marshal payload: %w", err))
 		}
 		raw = b
 	}
@@ -116,7 +123,7 @@ func Append(ctx context.Context, db DBTX, evt Event) (dbtype.PublicID, error) {
 	           VALUES (?, ?, ?, ?, ?, ?, ?)`
 	var lastID int64
 	insert := func(ctx context.Context) error {
-		res, err := db.ExecContext(ctx, q, pubID, evt.WorkspaceID, taskArg, actorArg, evt.Type, raw, occurred)
+		res, err := db.ExecContext(ctx, q, pubID, evt.WorkspaceID, taskArg, actorArg, string(evt.Type), raw, occurred)
 		if err != nil {
 			return err
 		}
@@ -127,42 +134,25 @@ func Append(ctx context.Context, db DBTX, evt Event) (dbtype.PublicID, error) {
 		lastID = id
 		return nil
 	}
-	_, isTx := db.(*sql.Tx)
-	var err error
-	if isTx {
-		err = insert(ctx)
-	} else {
-		err = dbretry.Do(ctx, "eventlog.Append", insert)
-	}
+	err := db.RunStatement(ctx, "eventlog.Append", insert)
 	if err != nil {
 		slog.ErrorContext(ctx, "eventlog: append failed",
-			slog.String("type", evt.Type),
+			slog.String("type", string(evt.Type)),
 			slog.Uint64("workspace_id", uint64(evt.WorkspaceID)),
 			slog.String("error", err.Error()))
-		return dbtype.PublicID{}, err
+		return fail(err)
 	}
 
 	// LastInsertId is a positive int64 from AUTO_INCREMENT and events.id
 	// is BIGINT UNSIGNED, so uint64 carries it without loss.
 	eventInternalID := uint64(lastID) //#nosec G115 -- AUTO_INCREMENT LastInsertId is non-negative
 	// Subscribers read the event row on their own connection, so they
-	// must not be woken before it is visible there. With a collector on
-	// the context (dbretry.InTx) the fan-out waits for the commit; on the
-	// auto-commit path the row is already durable and it fires now.
-	//
-	// A transaction the caller opened by hand has neither property: the
-	// hooks would be handed an id nothing else can resolve yet, and every
-	// subscriber would quietly deliver nothing. Refuse instead, and name
-	// the caller — the same rule flow-api's eventbus applies.
-	if isTx && !dbretry.HasCommitHooks(ctx) && hasHooks() {
-		slog.ErrorContext(ctx, "eventlog: fan-out skipped; append ran in a hand-rolled transaction without a commit boundary (use dbretry.InTx)",
-			slog.String("type", evt.Type),
-			slog.Uint64("workspace_id", uint64(evt.WorkspaceID)),
-			slog.Uint64("event_id", eventInternalID))
-		return pubID, nil
-	}
-	dbretry.AddCommitHook(ctx, func() {
-		fireHooks(ctx, evt.WorkspaceID, evt.Type, eventInternalID)
+	// must not be woken before it is visible there. Inside a transaction
+	// AfterCommit holds them until the commit; on the auto-commit path
+	// the row is already durable and they fire now. There is no third
+	// case: a handle whose commit is unobservable cannot reach here.
+	db.AfterCommit(func() {
+		fireHooks(ctx, evt.WorkspaceID, string(evt.Type), eventInternalID)
 	})
 	return pubID, nil
 }

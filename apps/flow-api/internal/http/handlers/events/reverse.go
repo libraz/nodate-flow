@@ -33,7 +33,7 @@ import (
 // Empty value means "no state rollback for this event type" — the
 // compensating event is still appended (so timeline UIs can render
 // the undo) but nothing else moves.
-var reverseStateRollback = map[string]string{
+var reverseStateRollback = map[eventbus.Kind]string{
 	eventbus.TaskAutoCompleted: taskstate.TransitionReopen,
 }
 
@@ -73,7 +73,7 @@ var errReverseAnswered = stderrors.New("events: reverse answered")
 //  6. For event types listed in [reverseStateRollback] the handler
 //     additionally drives the task back through the canonical state
 //     transition (e.g. TaskAutoCompleted → reopen). This is the
-//     state-cancellation half of the J5 plan: rather than mutate
+//     state-cancellation half of the reversal: rather than mutate
 //     derived_state directly (forbidden by CLAUDE.md rule 10) we
 //     funnel through taskstate.ApplyTransitionTx so the engine's
 //     row-lock + trigger guard + transition event all run together.
@@ -160,6 +160,11 @@ func Reverse(deps Deps) func(context.Context, *ReverseInput) (*ReverseOutput, er
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
 
+		// The stored `type` column is the one place an event kind comes
+		// back from outside Go, so it is converted here rather than at
+		// each use below.
+		targetKind := eventbus.Kind(target.Type)
+
 		// One transaction so the compensating event INSERT and the
 		// optional state-rollback transition land together. It is opened
 		// through dbretry.InTx for two reasons beyond deadlock retries:
@@ -174,13 +179,13 @@ func Reverse(deps Deps) func(context.Context, *ReverseInput) (*ReverseOutput, er
 			// transaction failure, so it travels alongside the sentinel.
 			answered error
 		)
-		txErr := dbretry.InTx(ctx, deps.DB, "events.Reverse", nil, func(ctx context.Context, tx *sql.Tx) error {
+		txErr := dbretry.InTx(ctx, deps.DB, "events.Reverse", nil, func(ctx context.Context, tx *dbretry.Tx) error {
 			answered = nil
 
 			// Optional state rollback. Runs BEFORE the compensating event
 			// append so a failed rollback cannot leave a half-applied
 			// reversal on the timeline (the tx rolls back atomically).
-			if transition, needsRollback := reverseStateRollback[target.Type]; needsRollback {
+			if transition, needsRollback := reverseStateRollback[targetKind]; needsRollback {
 				if err := applyStateRollback(ctx, tx, ws.ID, eventPub, transition, actorInternal); err != nil {
 					answered = err
 					return errReverseAnswered
@@ -195,7 +200,7 @@ func Reverse(deps Deps) func(context.Context, *ReverseInput) (*ReverseOutput, er
 			origInternal := int64(target.ID) //#nosec G115 -- event ids are auto-increment DB ids and fit int64.
 			var aerr error
 			result, aerr = eventbus.AppendReverseEvent(ctx, tx, eventbus.Event{
-				Type:            target.Type,
+				Type:            targetKind,
 				WorkspaceID:     ws.ID,
 				ActorUserID:     &actor,
 				ReversesEventID: &origInternal,
@@ -301,7 +306,7 @@ func checkReverseTargetVisible(ctx context.Context, db *sql.DB, wsID uint32, eve
 // timeline shows the reverse, the user expectation is that the undo
 // landed; an unrelated state mismatch does not invalidate that
 // record.
-func applyStateRollback(ctx context.Context, tx *sql.Tx, wsID uint32, eventPublicID types.PublicID, transition string, actorInternal uint32) error {
+func applyStateRollback(ctx context.Context, tx *dbretry.Tx, wsID uint32, eventPublicID types.PublicID, transition string, actorInternal uint32) error {
 	// Re-fetch the task pointer from the event row using the same tx
 	// so the lock-order with the upcoming ApplyTransitionTx FOR UPDATE
 	// stays consistent. We deliberately query the event again instead

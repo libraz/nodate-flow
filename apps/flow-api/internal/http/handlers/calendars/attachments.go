@@ -11,10 +11,12 @@ import (
 
 	"github.com/google/uuid"
 
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/dbretry"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated/calendar"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
 	apierrors "github.com/libraz/nodate-flow/apps/flow-api/internal/errors"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/eventbus"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/handlers/handlerutil"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/storage"
 	"github.com/libraz/nodate-flow/packages/go-shared/apierr"
@@ -408,13 +410,13 @@ func PresignAttachment(deps Deps) func(context.Context, *PresignAttachmentInput)
 			requiredHeaders = map[string]string{"x-amz-content-sha256": shaHex}
 		}
 
-		_ = appendCalendarEvent(ctx, deps.DB, wsID, cal.ID, "calendar.event.attachment.created", &actorID, map[string]any{
+		appendCalendarEvent(ctx, dbretry.AutoCommit(deps.DB), wsID, cal.ID, eventbus.CalEventAttachmentCreated, &actorID, map[string]any{
 			"eventId":      input.EvtID,
 			"calendarId":   input.CalID,
 			"attachmentId": attPub.String(),
 			"filename":     input.Body.Filename,
 			"deduplicated": deduplicated,
-		})
+		}, "calendars.PresignAttachment")
 
 		out := &PresignAttachmentOutput{}
 		out.Body.UploadURL = uploadURL
@@ -588,11 +590,11 @@ func DeleteAttachment(deps Deps) func(context.Context, *DeleteAttachmentInput) (
 		out := &DeleteAttachmentOutput{}
 		out.Body.Deleted = true
 
-		_ = appendCalendarEvent(ctx, deps.DB, wsID, cal.ID, "calendar.event.attachment.deleted", &actorID, map[string]any{
+		appendCalendarEvent(ctx, dbretry.AutoCommit(deps.DB), wsID, cal.ID, eventbus.CalEventAttachmentDeleted, &actorID, map[string]any{
 			"eventId":      input.EvtID,
 			"calendarId":   input.CalID,
 			"attachmentId": input.AttID,
-		})
+		}, "calendars.DeleteAttachment")
 
 		return out, nil
 	}

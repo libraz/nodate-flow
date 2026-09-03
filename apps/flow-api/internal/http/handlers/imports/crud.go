@@ -5,9 +5,9 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
-	"log/slog"
 
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/audit"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/dbretry"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
 	apierrors "github.com/libraz/nodate-flow/apps/flow-api/internal/errors"
@@ -15,7 +15,6 @@ import (
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/middleware"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/importer"
 	"github.com/libraz/nodate-flow/packages/go-shared/apierr"
-	"github.com/libraz/nodate-flow/packages/go-shared/logutil"
 )
 
 // Create handles POST /workspaces/{wsId}/imports.
@@ -84,20 +83,12 @@ func Create(deps Deps) func(context.Context, *CreateImportInput) (*CreateImportO
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
 
-		if err := eventbus.Append(ctx, deps.DB, eventbus.Event{
+		eventbus.AppendBestEffort(ctx, dbretry.AutoCommit(deps.DB), eventbus.Event{
 			Type:        eventbus.ImportJobCreated,
 			WorkspaceID: ws.ID,
 			ActorUserID: actorPtr(ctx),
 			Payload:     map[string]any{"importJobId": pub.String(), "source": in.Body.Source},
-		}); err != nil {
-			slog.ErrorContext(ctx, "eventbus.Append failed",
-				slog.Any("err", err),
-				slog.String("handler", "imports.Create"),
-				slog.String("event_type", string(eventbus.ImportJobCreated)),
-				logutil.LogEntity("workspace", ws.PublicID),
-				slog.String("import_job_public_id", pub.String()),
-			)
-		}
+		}, "imports.Create")
 
 		if deps.Audit != nil {
 			deps.Audit.Record(ctx, audit.Entry{
@@ -214,20 +205,12 @@ func Cancel(deps Deps) func(context.Context, *CancelImportInput) (*CancelImportO
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
 
-		if err := eventbus.Append(ctx, deps.DB, eventbus.Event{
+		eventbus.AppendBestEffort(ctx, dbretry.AutoCommit(deps.DB), eventbus.Event{
 			Type:        eventbus.ImportJobCancelled,
 			WorkspaceID: ws.ID,
 			ActorUserID: actorPtr(ctx),
 			Payload:     map[string]any{"importJobId": pub.String()},
-		}); err != nil {
-			slog.ErrorContext(ctx, "eventbus.Append failed",
-				slog.Any("err", err),
-				slog.String("handler", "imports.Cancel"),
-				slog.String("event_type", string(eventbus.ImportJobCancelled)),
-				logutil.LogEntity("workspace", ws.PublicID),
-				slog.String("import_job_public_id", pub.String()),
-			)
-		}
+		}, "imports.Cancel")
 
 		if deps.Audit != nil {
 			actorID, _ := middleware.ActorFromContext(ctx)

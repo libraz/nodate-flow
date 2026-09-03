@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/audit"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/dbretry"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
 	apierrors "github.com/libraz/nodate-flow/apps/flow-api/internal/errors"
@@ -176,7 +177,7 @@ func DeleteAttachment(deps Deps) func(context.Context, *DeleteTaskAttachmentInpu
 		}
 
 		taskInternal := int64(task.ID)
-		if err := eventbus.Append(ctx, deps.DB, eventbus.Event{
+		eventbus.AppendBestEffort(ctx, dbretry.AutoCommit(deps.DB), eventbus.Event{
 			Type:        eventbus.TaskAttachmentRemoved,
 			WorkspaceID: ws.ID,
 			ActorUserID: actorPtr(ctx),
@@ -185,16 +186,7 @@ func DeleteAttachment(deps Deps) func(context.Context, *DeleteTaskAttachmentInpu
 				"taskId":       task.PublicID.String(),
 				"attachmentId": aid.String(),
 			},
-		}); err != nil {
-			nflog.LoggerFromContext(ctx).ErrorContext(ctx, "eventbus.Append failed",
-				slog.Any("err", err),
-				slog.String("handler", "tasks.DeleteAttachment"),
-				slog.String("event_type", string(eventbus.TaskAttachmentRemoved)),
-				logutil.LogEntity("workspace", ws.PublicID),
-				logutil.LogEntity("task", task.PublicID),
-				slog.String("attachment_public_id", aid.String()),
-			)
-		}
+		}, "tasks.DeleteAttachment")
 		if actorID, ok := middleware.ActorFromContext(ctx); ok {
 			deps.Audit.Record(ctx, audit.Entry{
 				Action:       "attachment.delete",

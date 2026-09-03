@@ -4,7 +4,6 @@ import (
 	"context"
 	"database/sql"
 	stderrors "errors"
-	"log/slog"
 	"strconv"
 
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/acl"
@@ -143,25 +142,27 @@ func Resolve(deps Deps) func(context.Context, *ResolveInput) (*ResolveOutput, er
 			return nil, httpErr(apierrors.RelationSuggestionNotFound)
 		}
 
-		// We need workspace context to scope the query. The suggestion
-		// itself carries the workspace_id, so we look it up across all
-		// workspaces the actor belongs to. We first need to resolve the
-		// suggestion; we'll iterate the actor's workspaces if needed.
-		// For simplicity, we query using the raw DB to find the
-		// suggestion's workspace, then verify membership.
-		var wsID uint32
-		const wsFindQuery = `SELECT rs.workspace_id FROM relation_suggestions rs
-INNER JOIN workspace_members wm ON wm.workspace_id = rs.workspace_id AND wm.user_id = ? AND wm.enabled = TRUE
-WHERE rs.public_id = ?
-LIMIT 1`
-		if err := deps.DB.QueryRowContext(ctx, wsFindQuery, actorID, pub).Scan(&wsID); err != nil {
-			return nil, httpErr(apierr.SpecForErrNoRows(err, apierrors.RelationSuggestionNotFound, apierrors.InternalUnexpected))
+		wsID, wsRole, err := resolveSuggestionWorkspaceForActor(ctx, deps, actorID, pub)
+		if err != nil {
+			return nil, err
 		}
 
-		// Fetch the full suggestion row (scoped to the resolved workspace).
+		// Fetch the full suggestion row (scoped to the resolved
+		// workspace). Both task titles ride on the row, so the same
+		// two-ended filter the list queries carry applies here: a
+		// suggestion whose ends the actor may not both see reads as
+		// absent rather than as a refusal.
+		vis := acl.ListVisibilityArgs(actorID, wsRole)
 		suggestion, err := deps.Queries.GetSuggestionByPublicId(ctx, generated.GetSuggestionByPublicIdParams{
-			WorkspaceID: wsID,
-			PublicID:    pub,
+			WorkspaceID:   wsID,
+			PublicID:      pub,
+			IsElevated:    vis.IsElevated,
+			ActorUserID:   vis.ActorUserID,
+			ActorUserID_2: vis.ActorUserID,
+			ActorUserID_3: vis.ActorUserID,
+			ActorUserID_4: vis.ActorUserID,
+			ActorUserID_5: vis.ActorUserID,
+			ActorUserID_6: vis.ActorUserID,
 		})
 		if err != nil {
 			return nil, httpErr(apierr.SpecForErrNoRows(err, apierrors.RelationSuggestionNotFound, apierrors.InternalUnexpected))
@@ -180,6 +181,46 @@ LIMIT 1`
 			return nil, httpErr(apierrors.ValidationPathParamInvalid)
 		}
 	}
+}
+
+// resolveSuggestionWorkspaceForActor returns the workspace a relation
+// suggestion belongs to together with the caller's role in it, and only
+// when the caller is an enabled member of that workspace.
+//
+// The route carries no workspace parameter, so the workspace has to come from
+// the suggestion itself — which means the lookup is also the access check.
+// The membership join is part of the same statement for that reason: a
+// two-step version can resolve the workspace and then forget to ask whether
+// the caller belongs to it, and the answer would be a suggestion from someone
+// else's workspace. A suggestion the caller cannot reach is reported as
+// absent rather than refused, so the id space stays opaque.
+//
+// The role comes back from the same row because the caller needs it to
+// decide the Layer-4 elevation flag, and a second membership lookup is a
+// second chance for the two answers to disagree.
+func resolveSuggestionWorkspaceForActor(
+	ctx context.Context,
+	deps Deps,
+	actorID uint32,
+	pub types.PublicID,
+) (uint32, acl.WorkspaceRole, error) {
+	const query = `SELECT rs.workspace_id, wm.role FROM relation_suggestions rs
+INNER JOIN workspace_members wm ON wm.workspace_id = rs.workspace_id AND wm.user_id = ? AND wm.enabled = TRUE
+WHERE rs.public_id = ?
+LIMIT 1`
+	var wsID uint32
+	var role string
+	if err := deps.DB.QueryRowContext(ctx, query, actorID, pub).Scan(&wsID, &role); err != nil {
+		return 0, "", httpErr(apierr.SpecForErrNoRows(err, apierrors.RelationSuggestionNotFound, apierrors.InternalUnexpected))
+	}
+	wsRole := acl.WorkspaceRole(role)
+	if !wsRole.IsValid() {
+		// A role the Go enum does not know is a corrupt row, not a
+		// permission answer; failing closed here would read as a
+		// missing suggestion and hide the invariant violation.
+		return 0, "", httpErr(apierrors.InternalUnexpected)
+	}
+	return wsID, wsRole, nil
 }
 
 // resolveAccept creates a task_dependencies row and marks the suggestion
@@ -218,7 +259,7 @@ func resolveAccept(
 	}
 
 	actor := int64(actorID)
-	txErr := dbretry.InTx(ctx, deps.DB, "relations.Accept", nil, func(ctx context.Context, tx *sql.Tx) error {
+	txErr := dbretry.InTx(ctx, deps.DB, "relations.Accept", nil, func(ctx context.Context, tx *dbretry.Tx) error {
 		if _, e := taskdeps.Add(ctx, tx, taskdeps.Args{
 			WorkspaceID:      wsID,
 			FromTaskID:       suggestion.SourceTaskID,
@@ -242,43 +283,42 @@ func resolveAccept(
 		// The count is not the existence check: the suggestion was read
 		// before this call, and re-accepting one already accepted changes
 		// no column, which MySQL counts as zero.
-		_, e := deps.Queries.WithTx(tx).ResolveSuggestion(ctx, generated.ResolveSuggestionParams{
+		if _, e := deps.Queries.WithTx(tx.RawTx()).ResolveSuggestion(ctx, generated.ResolveSuggestionParams{
 			Status:      generated.RelationSuggestionsStatusAccepted,
 			ResolvedBy:  sql.NullInt32{Int32: int32(actorID), Valid: true}, //#nosec G115 -- actor user id sourced from session, fits int32 within realistic deployments
 			WorkspaceID: wsID,
 			PublicID:    suggestion.PublicID,
+		}); e != nil {
+			return e
+		}
+
+		// The event goes in with the edge and the status, not after them.
+		// Everything it says is known before the transaction opens, so
+		// nothing here needs a row that does not exist yet — the boundary
+		// sat outside only because that is where the append happened to
+		// be written. Inside, a failed append rolls the accept back
+		// instead of leaving an accepted suggestion nothing was told
+		// about, and the fan-out still waits for the commit because the
+		// transaction is the boundary it defers to.
+		srcTaskID := int64(suggestion.SourceTaskID)
+		return eventbus.Append(ctx, tx, eventbus.Event{
+			Type:        eventbus.RelationAccepted,
+			WorkspaceID: wsID,
+			ActorUserID: &actor,
+			TaskID:      &srcTaskID,
+			Payload: map[string]any{
+				"suggestionId":  suggestion.PublicID.String(),
+				"suggestedKind": string(suggestion.SuggestedKind),
+				"sourceTaskId":  suggestion.SourceTaskPublicID.String(),
+				"targetTaskId":  suggestion.TargetTaskPublicID.String(),
+			},
 		})
-		return e
 	})
 	if txErr != nil {
 		if stderrors.Is(txErr, taskdeps.ErrCycle) {
 			return nil, httpErr(apierrors.WsTaskDependencyCycle)
 		}
 		return nil, httpErr(apierrors.InternalUnexpected)
-	}
-
-	// Emit event.
-	srcTaskID := int64(suggestion.SourceTaskID)
-	if err := eventbus.Append(ctx, deps.DB, eventbus.Event{
-		Type:        eventbus.RelationAccepted,
-		WorkspaceID: wsID,
-		ActorUserID: &actor,
-		TaskID:      &srcTaskID,
-		Payload: map[string]any{
-			"suggestionId":  suggestion.PublicID.String(),
-			"suggestedKind": string(suggestion.SuggestedKind),
-			"sourceTaskId":  suggestion.SourceTaskPublicID.String(),
-			"targetTaskId":  suggestion.TargetTaskPublicID.String(),
-		},
-	}); err != nil {
-		slog.ErrorContext(ctx, "eventbus.Append failed",
-			slog.Any("err", err),
-			slog.String("handler", "relations.resolveAccept"),
-			slog.String("event_type", string(eventbus.RelationAccepted)),
-			slog.String("source_task_public_id", suggestion.SourceTaskPublicID.String()),
-			slog.String("target_task_public_id", suggestion.TargetTaskPublicID.String()),
-			slog.String("suggestion_public_id", suggestion.PublicID.String()),
-		)
 	}
 
 	deps.Audit.Record(ctx, audit.Entry{
@@ -316,7 +356,7 @@ func resolveDismiss(
 	// Emit event.
 	actor := int64(actorID)
 	srcTaskID := int64(suggestion.SourceTaskID)
-	if err := eventbus.Append(ctx, deps.DB, eventbus.Event{
+	eventbus.AppendBestEffort(ctx, dbretry.AutoCommit(deps.DB), eventbus.Event{
 		Type:        eventbus.RelationDismissed,
 		WorkspaceID: wsID,
 		ActorUserID: &actor,
@@ -327,16 +367,7 @@ func resolveDismiss(
 			"sourceTaskId":  suggestion.SourceTaskPublicID.String(),
 			"targetTaskId":  suggestion.TargetTaskPublicID.String(),
 		},
-	}); err != nil {
-		slog.ErrorContext(ctx, "eventbus.Append failed",
-			slog.Any("err", err),
-			slog.String("handler", "relations.resolveDismiss"),
-			slog.String("event_type", string(eventbus.RelationDismissed)),
-			slog.String("source_task_public_id", suggestion.SourceTaskPublicID.String()),
-			slog.String("target_task_public_id", suggestion.TargetTaskPublicID.String()),
-			slog.String("suggestion_public_id", suggestion.PublicID.String()),
-		)
-	}
+	}, "relations.resolveDismiss")
 
 	deps.Audit.Record(ctx, audit.Entry{
 		Action:       "relation.suggestion.dismiss",

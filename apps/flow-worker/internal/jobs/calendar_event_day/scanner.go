@@ -27,13 +27,11 @@
 // Recurring events: a row carrying a recurrence_rule is expanded
 // worker-side so every occurrence whose local day arrives in the tick
 // window emits its own event_day_arrived (not just the base start day).
-// The expander honours interval / count / until / byDay / byMonthDay plus
-// the recurrence_end column and recurrence_exceptions exclusions, and
-// advances occurrences in the event timezone so DST does not drift a
-// recurring meeting. The day-scoped external_id keeps each
-// (event, occurrence-day) idempotent across ticks and catch-up. See
-// ListEventsForDays and expandOccurrences (recurrence.go) for the
-// supported-rule boundary.
+// The expansion is packages/go-shared/recurrence, the same code the agent
+// surface and the notification scheduler expand with, so the days this
+// job fires on and the days those two report are one answer rather than
+// three that happen to agree. The day-scoped external_id keeps each
+// (event, occurrence-day) idempotent across ticks and catch-up.
 //
 // All public_id values are surfaced as canonical UUID v7 strings so that
 // internal numeric ids never leak past the worker → API boundary
@@ -43,11 +41,15 @@ package calendar_event_day
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"log/slog"
+	"strings"
 	"time"
 
 	"github.com/libraz/nodate-flow/packages/go-shared/dbtype"
+	"github.com/libraz/nodate-flow/packages/go-shared/recurrence"
+	"github.com/libraz/nodate-flow/packages/go-shared/region"
 )
 
 // Scanner reads the worker's MySQL view of workspaces and calendar_events.
@@ -97,7 +99,11 @@ type Event struct {
 // the recurrence columns so a recurring row's occurrences can be projected
 // Go-side without a second query.
 type candidateRow struct {
-	event                Event
+	event Event
+	// endAt is the event's UTC end. The expander needs the duration to
+	// decide which occurrences meet a window, so the scan reads it even
+	// though the emitted tuple carries only the start.
+	endAt                sql.NullTime
 	timezone             string
 	recurrenceRule       []byte
 	recurrenceEnd        sql.NullTime
@@ -169,16 +175,14 @@ type EventOnDay struct {
 // are never scanned (the judge must not run on a deleted calendar's
 // events). Workspace scoping is asserted on both ce and c.
 //
-// Recurring events: a row carrying a recurrence_rule is expanded Go-side.
-// For each arriving day the scan walks the rule's occurrences (honouring
-// interval / count / until / byDay / byMonthDay, the recurrence_end
-// column, and the recurrence_exceptions exclusions) and emits one
+// Recurring events: a row carrying a recurrence_rule is expanded Go-side
+// through packages/go-shared/recurrence, and the scan emits one
 // (event, occurrence-day) tuple per occurrence whose UTC start falls in
-// that day's range. Occurrences advance in the event timezone so a daily
-// or weekly meeting keeps its wall-clock time across a DST transition.
-// The day-scoped external_id keeps each occurrence-day idempotent across
-// ticks and catch-up. See expandOccurrences for the supported-rule
-// boundary (BYSETPOS is not applied, mirroring the client expander).
+// that day's range. The supported-rule boundary and the arithmetic are
+// that package's, so the days this job fires on are the days the agent
+// surface and the calendar report for the same series. The day-scoped
+// external_id keeps each occurrence-day idempotent across ticks and
+// catch-up.
 //
 // The local-day boundary is converted to its UTC range Go-side and the
 // query uses a plain half-open interval `[utcStart, utcEnd)` per day.
@@ -189,12 +193,12 @@ type EventOnDay struct {
 // day's upper bound (occurrences only move forward), then filtered down to
 // the day's range by the expansion.
 func (s *Scanner) ListEventsForDays(ctx context.Context, workspaceID uint32, tz string, now time.Time, window time.Duration) ([]EventOnDay, error) {
-	loc, err := time.LoadLocation(tz)
+	z, err := region.Resolve(tz)
 	if err != nil {
 		return nil, fmt.Errorf("load workspace timezone %q: %w", tz, err)
 	}
 
-	days := localDaysArriving(now, window, loc)
+	days := localDaysArriving(now, window, z)
 	if len(days) == 0 {
 		return nil, nil
 	}
@@ -205,7 +209,7 @@ func (s *Scanner) ListEventsForDays(ctx context.Context, workspaceID uint32, tz 
 	// the day even though the base is earlier; the Go-side expansion makes
 	// the final per-day decision.
 	const q = `
-		SELECT ce.id, ce.public_id, ce.start_at, ce.all_day,
+		SELECT ce.id, ce.public_id, ce.start_at, ce.end_at, ce.all_day,
 		       ce.timezone, ce.recurrence_rule, ce.recurrence_end, ce.recurrence_exceptions
 		FROM calendar_events ce
 		INNER JOIN calendars c
@@ -232,7 +236,7 @@ func (s *Scanner) ListEventsForDays(ctx context.Context, workspaceID uint32, tz 
 		for rows.Next() {
 			var c candidateRow
 			if scanErr := rows.Scan(
-				&c.event.ID, &c.event.PublicID, &c.event.StartAt, &c.event.AllDay,
+				&c.event.ID, &c.event.PublicID, &c.event.StartAt, &c.endAt, &c.event.AllDay,
 				&c.timezone, &c.recurrenceRule, &c.recurrenceEnd, &c.recurrenceExceptions,
 			); scanErr != nil {
 				_ = rows.Close()
@@ -272,9 +276,9 @@ func (s *Scanner) ListEventsForDays(ctx context.Context, workspaceID uint32, tz 
 // excluded by recurrence_exceptions or falling past recurrence_end / until
 // contributes none.
 func (s *Scanner) expandCandidate(c candidateRow, d arrivingDay) ([]EventOnDay, error) {
-	rule, err := parseRecurrenceRule(c.recurrenceRule)
+	rule, err := recurrence.ParseRule(c.recurrenceRule)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("decode recurrence_rule: %w", err)
 	}
 	if rule == nil {
 		return []EventOnDay{{
@@ -283,42 +287,52 @@ func (s *Scanner) expandCandidate(c candidateRow, d arrivingDay) ([]EventOnDay, 
 			ExpiresAtUnix: d.utcEnd.Unix(),
 		}}, nil
 	}
-
-	// Anchor occurrence arithmetic to the event timezone so wall-clock
-	// time-of-day is preserved across DST; fall back to UTC when the
-	// stored zone is unknown rather than dropping the event.
-	eventLoc, err := time.LoadLocation(c.timezone)
-	if err != nil {
-		eventLoc = time.UTC
+	// A freq outside the grammar cannot be stepped, and expanding it
+	// yields nothing — which is indistinguishable from "this series has no
+	// occurrence today". Reporting it puts the row in the log instead.
+	if !rule.Freq.Valid() {
+		return nil, fmt.Errorf("unsupported recurrence freq %q", rule.Freq)
 	}
 
-	exceptions, err := parseRecurrenceExceptions(c.recurrenceExceptions, eventLoc)
+	exceptions, err := decodeRecurrenceExceptions(c.recurrenceExceptions)
 	if err != nil {
 		return nil, err
 	}
 
-	var until time.Time
-	if rule.Until != nil && *rule.Until != "" {
-		until = parseRuleUntil(*rule.Until, eventLoc)
+	// The expander decides which occurrences meet the window from the
+	// occurrence's whole span, so it needs the event's end. start_at and
+	// end_at are set or NULL together (chk_calendar_events_start_end_pair)
+	// and the query already excludes NULL starts; the fallback keeps a row
+	// that somehow lacks an end from expanding with a negative duration.
+	endAt := c.event.StartAt
+	if c.endAt.Valid {
+		endAt = c.endAt.Time
 	}
-	var recurrenceEnd time.Time
+
+	var seriesEnd *time.Time
 	if c.recurrenceEnd.Valid {
-		recurrenceEnd = c.recurrenceEnd.Time.UTC()
+		end := c.recurrenceEnd.Time.UTC()
+		seriesEnd = &end
 	}
 
-	occurrences := expandOccurrences(
-		rule, c.event.StartAt.UTC(), eventLoc,
-		recurrenceEnd, until, exceptions,
-		d.utcStart, d.utcEnd,
-	)
-	if len(occurrences) == 0 {
-		return nil, nil
-	}
-
-	out := make([]EventOnDay, 0, len(occurrences))
-	for _, occ := range occurrences {
+	var out []EventOnDay
+	for _, occ := range recurrence.Expand(recurrence.Event{
+		StartAt:       c.event.StartAt.UTC(),
+		EndAt:         endAt.UTC(),
+		Timezone:      c.timezone,
+		Rule:          rule,
+		Exceptions:    exceptions,
+		RecurrenceEnd: seriesEnd,
+	}, d.utcStart, d.utcEnd) {
+		// The expander answers "which occurrences meet this window"; a day
+		// arrives for an occurrence that *starts* in it. A meeting that
+		// began the previous day and is still running already had its day,
+		// and emitting it again would announce the same series twice.
+		if occ.StartAt.Before(d.utcStart) {
+			continue
+		}
 		ev := c.event
-		ev.StartAt = occ
+		ev.StartAt = occ.StartAt.UTC()
 		out = append(out, EventOnDay{
 			Event:         ev,
 			Day:           d.day,
@@ -328,29 +342,23 @@ func (s *Scanner) expandCandidate(c candidateRow, d arrivingDay) ([]EventOnDay, 
 	return out, nil
 }
 
-// parseRuleUntil parses the recurrence rule's `until` field, accepting an
-// RFC 3339 timestamp or a bare YYYY-MM-DD date (interpreted in loc, the
-// event timezone). A bare date names the whole local day as the inclusive
-// upper bound, so it resolves to the final instant of that local day
-// (23:59:59.999999999 local) rather than its midnight: because
-// expandOccurrences treats until as an inclusive upper bound on the
-// candidate instant, an occurrence at any wall-clock time on the until day
-// still qualifies. Resolving to midnight would drop occurrences whose
-// time-of-day is past 00:00. Returns the zero time when neither form
-// parses, so an unparseable until simply leaves the sequence unbounded by
-// until.
-func parseRuleUntil(value string, loc *time.Location) time.Time {
-	if t, err := time.Parse(time.RFC3339, value); err == nil {
-		return t.UTC()
+// decodeRecurrenceExceptions reads the recurrence_exceptions column into
+// the string list the expander resolves.
+//
+// A malformed value is reported rather than ignored. The scan would
+// otherwise expand the series with no exclusions at all and announce a
+// meeting somebody cancelled; skipping the row and saying so in the log
+// is the failure the operator can act on.
+func decodeRecurrenceExceptions(raw []byte) ([]string, error) {
+	trimmed := strings.TrimSpace(string(raw))
+	if trimmed == "" || trimmed == "null" {
+		return nil, nil
 	}
-	if t, err := time.ParseInLocation("2006-01-02", value, loc); err == nil {
-		// Extend the bare date to the end of that local day so the until
-		// day is inclusive across every wall-clock time-of-day; stepping to
-		// the next local midnight and backing off a nanosecond keeps the
-		// boundary correct across DST transitions.
-		return t.AddDate(0, 0, 1).Add(-time.Nanosecond).UTC()
+	var values []string
+	if err := json.Unmarshal([]byte(trimmed), &values); err != nil {
+		return nil, fmt.Errorf("decode recurrence_exceptions: %w", err)
 	}
-	return time.Time{}
+	return values, nil
 }
 
 // arrivingDay describes a single workspace-local day whose midnight
@@ -377,7 +385,7 @@ type arrivingDay struct {
 // The walk steps backwards a bounded number of local days from `now`
 // (capped so a pathologically large window cannot fan out without limit)
 // and keeps each day whose local midnight lands in the window.
-func localDaysArriving(now time.Time, window time.Duration, loc *time.Location) []arrivingDay {
+func localDaysArriving(now time.Time, window time.Duration, z region.Zone) []arrivingDay {
 	if window <= 0 {
 		return nil
 	}
@@ -389,10 +397,9 @@ func localDaysArriving(now time.Time, window time.Duration, loc *time.Location) 
 	const maxDays = 400
 
 	var out []arrivingDay
-	local := now.In(loc)
-	dayStart := time.Date(local.Year(), local.Month(), local.Day(), 0, 0, 0, 0, loc)
+	day := region.DayOf(now, z)
 	for i := 0; i < maxDays; i++ {
-		midnightUTC := dayStart.UTC()
+		midnightUTC := day.Start(z).UTC()
 		if midnightUTC.Before(windowStart) {
 			// This day's midnight predates the window; every earlier day
 			// does too, so stop walking.
@@ -400,16 +407,13 @@ func localDaysArriving(now time.Time, window time.Duration, loc *time.Location) 
 		}
 		// Keep the day when its local midnight is in [windowStart, now).
 		if midnightUTC.Before(now) {
-			start, end := localDayUTCRange(dayStart, loc)
 			out = append(out, arrivingDay{
-				day:      dayStart.Format("2006-01-02"),
-				utcStart: start,
-				utcEnd:   end,
+				day:      day.String(),
+				utcStart: midnightUTC,
+				utcEnd:   day.EndExclusive(z).UTC(),
 			})
 		}
-		// Step to the previous local midnight via time.Date so DST
-		// transitions are normalised by the tz database.
-		dayStart = time.Date(dayStart.Year(), dayStart.Month(), dayStart.Day()-1, 0, 0, 0, 0, loc)
+		day = day.AddDays(-1)
 	}
 
 	// Reverse to oldest-first so a catch-up pass materialises days in
@@ -421,43 +425,35 @@ func localDaysArriving(now time.Time, window time.Duration, loc *time.Location) 
 }
 
 // localDayUTCRange returns the half-open UTC range `[start, end)` that
-// covers exactly one calendar day in the supplied location, where the
-// day is the one `now` falls on when projected into `loc`.
+// covers exactly one calendar day in z, where the day is the one `now`
+// falls on when read in z.
 //
-// Example: now = 2026-05-17T15:30:00Z, loc = Asia/Tokyo (+09:00) → the
+// Example: now = 2026-05-17T15:30:00Z, z = Asia/Tokyo (+09:00) → the
 // local day is 2026-05-18, so the function returns
 // `[2026-05-17T15:00:00Z, 2026-05-18T15:00:00Z)`.
 //
 // On a DST transition day the range is 23h (spring forward) or 25h
-// (fall back) wide in UTC, matching the local-day length. The function
-// computes the upper bound by constructing the *next* local midnight
-// directly rather than adding 24h to the lower bound, so the DST jump
-// is honoured.
-func localDayUTCRange(now time.Time, loc *time.Location) (time.Time, time.Time) {
-	local := now.In(loc)
-	dayStart := time.Date(local.Year(), local.Month(), local.Day(), 0, 0, 0, 0, loc)
-	// Use day+1 in time.Date so the next midnight is resolved by the
-	// tz normaliser; this is what produces the correct 23h / 25h UTC
-	// span on DST transition days. Naïvely adding 24h would always
-	// yield a 24h UTC interval and miss the spring-forward / fall-back
-	// hour.
-	dayEnd := time.Date(local.Year(), local.Month(), local.Day()+1, 0, 0, 0, 0, loc)
-	return dayStart.UTC(), dayEnd.UTC()
+// (fall back) wide in UTC, matching the local-day length: region.Day
+// constructs the upper bound as the *next* local midnight rather than
+// adding 24h to the lower one, so the jump is honoured.
+func localDayUTCRange(now time.Time, z region.Zone) (time.Time, time.Time) {
+	day := region.DayOf(now, z)
+	return day.Start(z).UTC(), day.EndExclusive(z).UTC()
 }
 
 // eventDayString formats the workspace-local day for the dedupe key as
-// YYYY-MM-DD. The value is computed from `now.In(loc)` so every event
-// emitted during the same local day collapses into the same external_id
-// even when the worker restarts mid-day.
-func eventDayString(now time.Time, loc *time.Location) string {
-	return now.In(loc).Format("2006-01-02")
+// YYYY-MM-DD. The value is the calendar date `now` falls on in z, so
+// every event emitted during the same local day collapses into the same
+// external_id even when the worker restarts mid-day.
+func eventDayString(now time.Time, z region.Zone) string {
+	return region.DayOf(now, z).String()
 }
 
 // endOfDayUnixSeconds returns the unix-seconds timestamp of the instant
 // the workspace-local day ends. Used as the signal's `expiresAt` so a
 // matured calendar.event_day_arrived stops being a candidate for the
 // retention sweep once the day rolls.
-func endOfDayUnixSeconds(now time.Time, loc *time.Location) int64 {
-	_, end := localDayUTCRange(now, loc)
+func endOfDayUnixSeconds(now time.Time, z region.Zone) int64 {
+	_, end := localDayUTCRange(now, z)
 	return end.Unix()
 }

@@ -2,9 +2,9 @@ package tasks
 
 import (
 	"context"
-	"database/sql"
 	stderrors "errors"
 
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/acl"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/audit"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/dbretry"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
@@ -34,15 +34,29 @@ func ListDependencies(deps Deps) func(context.Context, *ListTaskDependenciesInpu
 		if !ok {
 			return nil, httpErr(apierrors.WsTaskNotFound)
 		}
+		actorID, ok := middleware.ActorFromContext(ctx)
+		if !ok {
+			return nil, httpErr(apierrors.WsTaskNotFound)
+		}
 		out := &ListTaskDependenciesOutput{}
 		out.Body.Outgoing = []TaskDependencyEdge{}
 		out.Body.Incoming = []TaskDependencyEdge{}
 
+		// Reaching this route means the actor may see the task in the
+		// path. Each edge names a second task and carries its title, so
+		// the far end is filtered on its own visibility; without it an
+		// edge into a private task discloses that task's title to anyone
+		// who can read the task it points at.
+		vis := acl.ListVisibilityArgs(actorID, acl.WorkspaceRole(ws.Role))
 		outRows, err := deps.Queries.ListDependenciesForTask(ctx, generated.ListDependenciesForTaskParams{
-			WorkspaceID: ws.ID,
-			PublicID:    types.FromUUID(task.PublicID),
-			Limit:       200,
-			Offset:      0,
+			WorkspaceID:      ws.ID,
+			FromTaskPublicID: types.FromUUID(task.PublicID),
+			IsElevated:       vis.IsElevated,
+			ActorUserID:      vis.ActorUserID,
+			ActorUserID_2:    vis.ActorUserID,
+			ActorUserID_3:    vis.ActorUserID,
+			Limit:            200,
+			Offset:           0,
 		})
 		if err != nil {
 			return nil, httpErr(apierrors.InternalUnexpected)
@@ -59,10 +73,14 @@ func ListDependencies(deps Deps) func(context.Context, *ListTaskDependenciesInpu
 		}
 
 		inRows, err := deps.Queries.ListIncomingDependenciesForTask(ctx, generated.ListIncomingDependenciesForTaskParams{
-			WorkspaceID: ws.ID,
-			PublicID:    types.FromUUID(task.PublicID),
-			Limit:       200,
-			Offset:      0,
+			WorkspaceID:    ws.ID,
+			ToTaskPublicID: types.FromUUID(task.PublicID),
+			IsElevated:     vis.IsElevated,
+			ActorUserID:    vis.ActorUserID,
+			ActorUserID_2:  vis.ActorUserID,
+			ActorUserID_3:  vis.ActorUserID,
+			Limit:          200,
+			Offset:         0,
 		})
 		if err != nil {
 			return nil, httpErr(apierrors.InternalUnexpected)
@@ -111,7 +129,7 @@ func AddDependency(deps Deps) func(context.Context, *AddTaskDependencyInput) (*A
 		// FKs into tasks/workspaces and races with concurrent transition
 		// transactions on the same task rows.
 		var pub types.PublicID
-		txErr := dbretry.InTx(ctx, deps.DB, "tasks.AddDependency", nil, func(ctx context.Context, tx *sql.Tx) error {
+		txErr := dbretry.InTx(ctx, deps.DB, "tasks.AddDependency", nil, func(ctx context.Context, tx *dbretry.Tx) error {
 			id, e := taskdeps.Add(ctx, tx, taskdeps.Args{
 				WorkspaceID:      ws.ID,
 				FromTaskID:       task.ID,
@@ -177,8 +195,8 @@ func RemoveDependency(deps Deps) func(context.Context, *RemoveTaskDependencyInpu
 		// in one tx). dbretry retries transient FK deadlocks with
 		// concurrent transition transactions on the same task rows.
 		var affected int64
-		txErr := dbretry.InTx(ctx, deps.DB, "tasks.RemoveDependency", nil, func(ctx context.Context, tx *sql.Tx) error {
-			qtx := deps.Queries.WithTx(tx)
+		txErr := dbretry.InTx(ctx, deps.DB, "tasks.RemoveDependency", nil, func(ctx context.Context, tx *dbretry.Tx) error {
+			qtx := deps.Queries.WithTx(tx.RawTx())
 			n, e := qtx.DeleteDependency(ctx, generated.DeleteDependencyParams{
 				WorkspaceID: ws.ID,
 				PublicID:    depID,

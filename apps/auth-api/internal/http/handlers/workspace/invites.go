@@ -260,9 +260,9 @@ func AcceptInvite(deps InviteDeps) func(context.Context, *AcceptInviteInput) (*A
 		// deadlock site; retry the whole transaction rather than telling
 		// the invitee their link is broken.
 		exhausted := false
-		txErr := dbretry.InTx(ctx, deps.DB, "workspace.AcceptInvite", nil, func(ctx context.Context, tx *sql.Tx) error {
+		txErr := dbretry.InTx(ctx, deps.DB, "workspace.AcceptInvite", nil, func(ctx context.Context, tx *dbretry.Tx) error {
 			exhausted = false
-			txQueries := deps.Queries.WithTx(tx)
+			txQueries := deps.Queries.WithTx(tx.RawTx())
 
 			// Atomically claim a use slot first. The conditional UPDATE only
 			// affects a row while use_count < max_uses, so concurrent accepts

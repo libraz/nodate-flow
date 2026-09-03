@@ -8,10 +8,12 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/audit"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/dbretry"
 	generated "github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated/calendar"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
 	apierrors "github.com/libraz/nodate-flow/apps/flow-api/internal/errors"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/eventbus"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/handlers/handlerutil"
 	"github.com/libraz/nodate-flow/packages/go-shared/region"
 	sharedtoken "github.com/libraz/nodate-flow/packages/go-shared/token"
@@ -285,10 +287,10 @@ func CreatePublicShare(deps Deps) func(context.Context, *CreatePublicShareInput)
 			return nil, httpErr(apierrors.CalendarCalendarStoreReadInterrupted)
 		}
 
-		_ = appendCalendarEvent(ctx, deps.DB, wsID, noOwningCalendar, "public_share.created", &actorID, map[string]any{
+		appendCalendarEvent(ctx, dbretry.AutoCommit(deps.DB), wsID, noOwningCalendar, eventbus.PublicShareCreated, &actorID, map[string]any{
 			"shareId": publicID.String(),
 			"title":   input.Body.Title,
-		})
+		}, "calendars.CreatePublicShare")
 
 		deps.Audit.Record(ctx, audit.Entry{
 			Action:       "calendar.share.create",
@@ -425,9 +427,9 @@ func PatchPublicShare(deps Deps) func(context.Context, *PatchPublicShareInput) (
 			return nil, httpErr(apierrors.CalendarCalendarStoreReadInterrupted)
 		}
 
-		_ = appendCalendarEvent(ctx, deps.DB, wsID, noOwningCalendar, "public_share.updated", &actorID, map[string]any{
+		appendCalendarEvent(ctx, dbretry.AutoCommit(deps.DB), wsID, noOwningCalendar, eventbus.PublicShareUpdated, &actorID, map[string]any{
 			"shareId": input.ShareID,
-		})
+		}, "calendars.PatchPublicShare")
 
 		deps.Audit.Record(ctx, audit.Entry{
 			Action:       "calendar.share.update",
@@ -485,9 +487,9 @@ func RotatePublicShareToken(deps Deps) func(context.Context, *RotatePublicShareT
 			return nil, httpErr(apierrors.CalendarCalendarStoreReadInterrupted)
 		}
 
-		_ = appendCalendarEvent(ctx, deps.DB, wsID, noOwningCalendar, "public_share.rotated", &actorID, map[string]any{
+		appendCalendarEvent(ctx, dbretry.AutoCommit(deps.DB), wsID, noOwningCalendar, eventbus.PublicShareRotated, &actorID, map[string]any{
 			"shareId": input.ShareID,
-		})
+		}, "calendars.RotatePublicShareToken")
 
 		deps.Audit.Record(ctx, audit.Entry{
 			Action:       "calendar.share.rotate",
@@ -532,9 +534,9 @@ func DeletePublicShare(deps Deps) func(context.Context, *DeletePublicShareInput)
 		if rows == 0 {
 			return nil, errShareNotFound
 		}
-		_ = appendCalendarEvent(ctx, deps.DB, wsID, noOwningCalendar, "public_share.deleted", &actorID, map[string]any{
+		appendCalendarEvent(ctx, dbretry.AutoCommit(deps.DB), wsID, noOwningCalendar, eventbus.PublicShareDeleted, &actorID, map[string]any{
 			"shareId": input.ShareID,
-		})
+		}, "calendars.DeletePublicShare")
 		deps.Audit.Record(ctx, audit.Entry{
 			Action:       "calendar.share.delete",
 			ActorID:      actorID,
@@ -658,11 +660,11 @@ func AttachEventsToShare(deps Deps) func(context.Context, *AttachEventsToShareIn
 		}
 
 		if attached > 0 {
-			_ = appendCalendarEvent(ctx, deps.DB, wsID, noOwningCalendar, "public_share.events_attached", &actorID, map[string]any{
+			appendCalendarEvent(ctx, dbretry.AutoCommit(deps.DB), wsID, noOwningCalendar, eventbus.PublicShareEventsAttached, &actorID, map[string]any{
 				"shareId":  input.ShareID,
 				"attached": attached,
 				"skipped":  skipped,
-			})
+			}, "calendars.AttachEventsToShare")
 			deps.Audit.Record(ctx, audit.Entry{
 				Action:       "calendar.share.events_attach",
 				ActorID:      actorID,
@@ -778,10 +780,10 @@ func ReorderShareEvents(deps Deps) func(context.Context, *ReorderShareEventsInpu
 			return nil, httpErr(apierrors.CalendarCalendarStoreWriteInterrupted)
 		}
 
-		_ = appendCalendarEvent(ctx, deps.DB, wsID, noOwningCalendar, "public_share.events_reordered", &actorID, map[string]any{
+		appendCalendarEvent(ctx, dbretry.AutoCommit(deps.DB), wsID, noOwningCalendar, eventbus.PublicShareEventsReordered, &actorID, map[string]any{
 			"shareId": input.ShareID,
 			"count":   len(requested),
-		})
+		}, "calendars.ReorderShareEvents")
 
 		deps.Audit.Record(ctx, audit.Entry{
 			Action:       "calendar.share.events_reorder",
@@ -849,10 +851,10 @@ func DetachEventFromShare(deps Deps) func(context.Context, *DetachEventFromShare
 		if rows == 0 {
 			return nil, httpErr(apierrors.ShareShareEventNotFound)
 		}
-		_ = appendCalendarEvent(ctx, deps.DB, wsID, evt.CalendarID, "public_share.event_detached", &actorID, map[string]any{
+		appendCalendarEvent(ctx, dbretry.AutoCommit(deps.DB), wsID, evt.CalendarID, eventbus.PublicShareEventDetached, &actorID, map[string]any{
 			"shareId": input.ShareID,
 			"eventId": input.EvtID,
-		})
+		}, "calendars.DetachEventFromShare")
 		deps.Audit.Record(ctx, audit.Entry{
 			Action:       "calendar.share.event_detach",
 			ActorID:      actorID,

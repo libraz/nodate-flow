@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	stderrors "errors"
 
-	"github.com/libraz/nodate-flow/apps/flow-api/internal/acl"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
 	apierrors "github.com/libraz/nodate-flow/apps/flow-api/internal/errors"
@@ -190,7 +189,7 @@ func runAddReaction(ctx context.Context, deps Deps, s *session, raw json.RawMess
 	if in.Emoji == "" {
 		return nil, apierrors.New(apierrors.McpToolArgumentsInvalid)
 	}
-	taskInternal, _, err := resolveTaskForWrite(ctx, deps, s, in.TaskID, acl.ProjectRoleCommenter)
+	taskInternal, _, err := resolveTaskForWrite(ctx, deps, s, in.TaskID)
 	if err != nil {
 		return nil, err
 	}

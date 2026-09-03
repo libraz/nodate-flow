@@ -13,11 +13,11 @@ package taskdeps
 
 import (
 	"context"
-	"database/sql"
 	"errors"
 
 	"github.com/go-sql-driver/mysql"
 
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/dbretry"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/eventbus"
@@ -88,7 +88,7 @@ type Args struct {
 // concurrent transition transactions on the same task rows, and that
 // has to be retried as a whole transaction. The event append also needs
 // InTx's commit boundary to fan out.
-func Add(ctx context.Context, tx *sql.Tx, args Args) (types.PublicID, error) {
+func Add(ctx context.Context, tx *dbretry.Tx, args Args) (types.PublicID, error) {
 	q := generated.New(tx)
 
 	// Reading the edge set under the lock is a single step: the locking

@@ -124,13 +124,18 @@ func List(deps Deps) func(context.Context, *ListInboxInput) (*ListInboxOutput, e
 }
 
 // Archive handles POST /inbox/{id}/archive.
+//
+// The intake queue belongs to the workspace, not to the reader: a signal row
+// carries no user column, so archiving one takes it off every member's list.
+// That is shared state, and guests — the read-only workspace role — are held
+// out of it the same way they are held out of labels or pages.
 func Archive(deps Deps) func(context.Context, *ArchiveInboxInput) (*ArchiveInboxOutput, error) {
 	return func(ctx context.Context, in *ArchiveInboxInput) (*ArchiveInboxOutput, error) {
 		actorID, ok := middleware.ActorFromContext(ctx)
 		if !ok {
 			return nil, httpErr(apierrors.WsWorkspaceAccessDenied)
 		}
-		wsID, err := resolve.WorkspaceMember(ctx, deps.DB, in.WorkspaceID, actorID)
+		wsID, err := resolve.WorkspaceMemberForWrite(ctx, deps.DB, in.WorkspaceID, actorID)
 		if err != nil {
 			return nil, err
 		}
@@ -158,13 +163,16 @@ func Archive(deps Deps) func(context.Context, *ArchiveInboxInput) (*ArchiveInbox
 }
 
 // Snooze handles POST /inbox/{id}/snooze.
+//
+// Same shared-state reasoning as [Archive]: the snoozed item disappears from
+// the queue every member reads, so the workspace write floor applies.
 func Snooze(deps Deps) func(context.Context, *SnoozeInboxInput) (*SnoozeInboxOutput, error) {
 	return func(ctx context.Context, in *SnoozeInboxInput) (*SnoozeInboxOutput, error) {
 		actorID, ok := middleware.ActorFromContext(ctx)
 		if !ok {
 			return nil, httpErr(apierrors.WsWorkspaceAccessDenied)
 		}
-		wsID, err := resolve.WorkspaceMember(ctx, deps.DB, in.WorkspaceID, actorID)
+		wsID, err := resolve.WorkspaceMemberForWrite(ctx, deps.DB, in.WorkspaceID, actorID)
 		if err != nil {
 			return nil, err
 		}

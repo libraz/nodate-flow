@@ -93,11 +93,15 @@ func (r Role) IsValid() bool {
 	return false
 }
 
-// TX is the minimal transaction surface memberkit needs. *sql.Tx
-// satisfies it. Passing *sql.DB would split the member insert and the
-// calendar materialisation across connections and defeat the
-// atomicity guarantee; memberkit therefore rejects it at the type
+// TX is the minimal transaction surface the helpers in this package
+// need. *sql.Tx satisfies it. Passing *sql.DB would split the member
+// insert and the calendar materialisation across connections and defeat
+// the atomicity guarantee; memberkit therefore rejects it at the type
 // level.
+//
+// The exported entry points take a *dbretry.Tx instead, which is
+// stricter again: they append to the event log, so they need a
+// transaction whose commit the fan-out can wait for.
 type TX interface {
 	ExecContext(ctx context.Context, q string, a ...any) (sql.Result, error)
 	QueryRowContext(ctx context.Context, q string, a ...any) *sql.Row

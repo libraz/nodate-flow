@@ -2,7 +2,7 @@
 // MySQL pool.
 //
 // [SQLTaskMutator] is the production wiring for [TaskMutator]; it
-// replaces the Phase 3 [LogOnlyTaskMutator] stub. All three branches
+// replaces the [LogOnlyTaskMutator] stub. All three branches
 // are real writes:
 //
 //   - `complete_task` routes through [taskstate.ApplyTransitionTx], the
@@ -168,7 +168,7 @@ func (m *SQLTaskMutator) CompleteTask(ctx context.Context, workspaceID uint32, t
 	}
 
 	var rejected bool
-	txErr := dbretry.InTx(ctx, m.DB, "signaljudge.SQLTaskMutator.CompleteTask", nil, func(ctx context.Context, tx *sql.Tx) error {
+	txErr := dbretry.InTx(ctx, m.DB, "signaljudge.SQLTaskMutator.CompleteTask", nil, func(ctx context.Context, tx *dbretry.Tx) error {
 		_, spec, cause := taskstate.ApplyTransitionTx(ctx, tx, taskstate.ApplyParams{
 			WorkspaceID: workspaceID,
 			TaskID:      uint32(taskInternalID), //#nosec G115 -- tasks.id (INT UNSIGNED), fits uint32
@@ -185,7 +185,7 @@ func (m *SQLTaskMutator) CompleteTask(ctx context.Context, workspaceID uint32, t
 			ExtraPayload: nil,
 		})
 		if spec != nil {
-			if spec == apierrors.WsTaskTransitionRejected && m.taskIsDone(ctx, tx, workspaceID, taskInternalID) {
+			if spec == apierrors.WsTaskTransitionRejected && m.taskIsDone(ctx, tx.RawTx(), workspaceID, taskInternalID) {
 				// Already done: idempotent success. The desired end
 				// state holds; let the Applier emit its audit event.
 				rejected = false
@@ -367,14 +367,13 @@ SELECT COALESCE(
 // On any sub-error the transaction rolls back and the function
 // returns the wrapped error verbatim. The caller (Applier) treats
 // that as a signal to emit SignalRejected with reason
-// "retro_creation_failed" instead of TaskRetroDrafted, per the L2
-// brief.
+// "retro_creation_failed" instead of TaskRetroDrafted.
 //
 // `draft` is the autonomy hint from the verdict: true under
 // AutonomyDraft, false under AutonomyAuto. Both branches create the
 // task at `derived_state='open'`; the flag is only used to confirm
-// the L2 invariant ("retro draft tasks are always created in a
-// reviewable state, even under autonomy=auto"). It is also forwarded
+// the invariant that retro draft tasks are always created in a
+// reviewable state, even under autonomy=auto. It is also forwarded
 // to the TaskRetroDrafted payload by the Applier.
 func (m *SQLTaskMutator) DraftRetroTask(
 	ctx context.Context,
@@ -428,8 +427,8 @@ func (m *SQLTaskMutator) DraftRetroTask(
 	// fn is idempotent because no row references the auto-increment
 	// id of a previous attempt — both pubIDs (tasks + dependency +
 	// actor) are minted fresh per attempt.
-	txErr := dbretry.InTx(ctx, m.DB, "signaljudge.SQLTaskMutator.DraftRetroTask", nil, func(ctx context.Context, tx *sql.Tx) error {
-		qtx := m.Queries.WithTx(tx)
+	txErr := dbretry.InTx(ctx, m.DB, "signaljudge.SQLTaskMutator.DraftRetroTask", nil, func(ctx context.Context, tx *dbretry.Tx) error {
+		qtx := m.Queries.WithTx(tx.RawTx())
 
 		created, err := taskcreate.New(ctx, tx, taskcreate.Args{
 			WorkspaceID: workspaceID,
