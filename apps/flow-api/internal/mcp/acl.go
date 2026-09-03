@@ -216,6 +216,21 @@ func parseScopes(raw []byte) []string {
 	return strings.Fields(strings.Trim(string(raw), `"`))
 }
 
+// requireWorkspaceMembership verifies the acting user is an enabled
+// member of the session workspace and returns their role. It answers
+// membership and nothing else: no role floor is applied.
+//
+// It exists apart from [requireWorkspaceMember] for the callers that have
+// no floor to be held to. A floor is bound by the tool registry at
+// dispatch, so it only means something on a tool call; opening an event
+// stream is not one, and its session carries the zero floor legitimately.
+//
+// Tool bodies must not call this — [requireWorkspaceMember] is their entry
+// point, and the floor check is the point of it.
+func requireWorkspaceMembership(ctx context.Context, deps Deps, s *session) (acl.WorkspaceRole, error) {
+	return acl.CheckWorkspaceMember(ctx, deps.DB, s.workspaceID, s.userID, nil)
+}
+
 // requireWorkspaceMember verifies the acting user is an enabled member
 // of the session workspace and clears the workspace half of the invoked
 // tool's declared floor. Returns the workspace role on success.
@@ -225,7 +240,7 @@ func parseScopes(raw []byte) []string {
 // this first, which is what makes the declared floor the value the request
 // is actually held to rather than a label nothing reads.
 func requireWorkspaceMember(ctx context.Context, deps Deps, s *session) (acl.WorkspaceRole, error) {
-	role, err := acl.CheckWorkspaceMember(ctx, deps.DB, s.workspaceID, s.userID, nil)
+	role, err := requireWorkspaceMembership(ctx, deps, s)
 	if err != nil {
 		return acl.WorkspaceRole(""), err
 	}

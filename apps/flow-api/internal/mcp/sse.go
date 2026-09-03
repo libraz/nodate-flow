@@ -124,11 +124,18 @@ var (
 // belonging to a person who had been removed from the workspace
 // entirely. Both are checked here now, on the same terms the POST path
 // applies per call.
+//
+// Membership is asked for without a role floor. A floor belongs to a
+// tool and is bound by the registry when one is dispatched; a stream
+// dispatches nothing, so its session carries the zero floor and there is
+// no declared minimum to hold it to. Reading the workspace's events is
+// what any member may do, which is the rule the two checks below state in
+// full: hold read:workspace, and still be in the workspace.
 func (h *Handler) authorizeStream(ctx context.Context, sess *session) error {
 	if !sess.hasScope(ScopeReadWorkspace) {
 		return apierrors.New(apierrors.McpScopeInsufficient)
 	}
-	if _, err := requireWorkspaceMember(ctx, h.deps, sess); err != nil {
+	if _, err := requireWorkspaceMembership(ctx, h.deps, sess); err != nil {
 		return err
 	}
 	return nil
