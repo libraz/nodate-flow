@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/dbretry"
 	"github.com/libraz/nodate-flow/packages/go-shared/dbtype"
 )
 
@@ -44,26 +45,25 @@ func TestLinkTaskToEvent_CreatesAndAppendsEvent(t *testing.T) {
 	defer purge(t, db, f.wsID)
 	evtID, _ := seedEvent(ctx, t, db, f, time.Date(2026, 5, 1, 10, 0, 0, 0, time.UTC))
 
-	tx, err := db.BeginTx(ctx, nil)
-	if err != nil {
-		t.Fatalf("begin: %v", err)
-	}
-	defer func() { _ = tx.Rollback() }()
-	pub, linkID, err := LinkTaskToEvent(ctx, tx, LinkTaskToEventArgs{
-		WorkspaceID: f.wsID,
-		TaskID:      f.taskID,
-		EventID:     evtID,
-		Relation:    RelationContributesTo,
-		ActorUserID: f.userID,
+	var (
+		pub    dbtype.PublicID
+		linkID uint32
+	)
+	withTx(t, db, func(tx TX) {
+		var err error
+		pub, linkID, err = LinkTaskToEvent(ctx, tx, LinkTaskToEventArgs{
+			WorkspaceID: f.wsID,
+			TaskID:      f.taskID,
+			EventID:     evtID,
+			Relation:    RelationContributesTo,
+			ActorUserID: f.userID,
+		})
+		if err != nil {
+			t.Fatalf("LinkTaskToEvent: %v", err)
+		}
 	})
-	if err != nil {
-		t.Fatalf("LinkTaskToEvent: %v", err)
-	}
 	if linkID == 0 || pub == (dbtype.PublicID{}) {
 		t.Errorf("expected non-zero ID + public_id, got id=%d pub=%v", linkID, pub)
-	}
-	if err := tx.Commit(); err != nil {
-		t.Fatalf("commit: %v", err)
 	}
 
 	var relation string
@@ -97,24 +97,20 @@ func TestLinkTaskToEvent_IsIdempotent(t *testing.T) {
 
 	var firstPub dbtype.PublicID
 	for i := 0; i < 2; i++ {
-		tx, err := db.BeginTx(ctx, nil)
-		if err != nil {
-			t.Fatalf("begin: %v", err)
-		}
-		pub, _, err := LinkTaskToEvent(ctx, tx, LinkTaskToEventArgs{
-			WorkspaceID: f.wsID,
-			TaskID:      f.taskID,
-			EventID:     evtID,
-			Relation:    RelationContributesTo,
-			ActorUserID: f.userID,
+		var pub dbtype.PublicID
+		withTx(t, db, func(tx TX) {
+			var err error
+			pub, _, err = LinkTaskToEvent(ctx, tx, LinkTaskToEventArgs{
+				WorkspaceID: f.wsID,
+				TaskID:      f.taskID,
+				EventID:     evtID,
+				Relation:    RelationContributesTo,
+				ActorUserID: f.userID,
+			})
+			if err != nil {
+				t.Fatalf("iter %d: %v", i, err)
+			}
 		})
-		if err != nil {
-			_ = tx.Rollback()
-			t.Fatalf("iter %d: %v", i, err)
-		}
-		if err := tx.Commit(); err != nil {
-			t.Fatalf("commit iter %d: %v", i, err)
-		}
 		if i == 0 {
 			firstPub = pub
 		} else if pub != firstPub {
@@ -149,17 +145,15 @@ func TestLinkTaskToEvent_RejectsUnknownRelation(t *testing.T) {
 	defer purge(t, db, f.wsID)
 	evtID, _ := seedEvent(ctx, t, db, f, time.Date(2026, 5, 3, 9, 0, 0, 0, time.UTC))
 
-	tx, err := db.BeginTx(ctx, nil)
-	if err != nil {
-		t.Fatalf("begin: %v", err)
-	}
-	defer func() { _ = tx.Rollback() }()
-	_, _, err = LinkTaskToEvent(ctx, tx, LinkTaskToEventArgs{
-		WorkspaceID: f.wsID,
-		TaskID:      f.taskID,
-		EventID:     evtID,
-		Relation:    "unknown",
-		ActorUserID: f.userID,
+	err := dbretry.InTx(ctx, db, "itemkit.test", nil, func(ctx context.Context, tx *dbretry.Tx) error {
+		_, _, lerr := LinkTaskToEvent(ctx, tx, LinkTaskToEventArgs{
+			WorkspaceID: f.wsID,
+			TaskID:      f.taskID,
+			EventID:     evtID,
+			Relation:    "unknown",
+			ActorUserID: f.userID,
+		})
+		return lerr
 	})
 	if err == nil {
 		t.Fatal("expected invariant error, got nil")
@@ -173,17 +167,15 @@ func TestLinkTaskToEvent_RejectsMissingTask(t *testing.T) {
 	defer purge(t, db, f.wsID)
 	evtID, _ := seedEvent(ctx, t, db, f, time.Date(2026, 5, 4, 9, 0, 0, 0, time.UTC))
 
-	tx, err := db.BeginTx(ctx, nil)
-	if err != nil {
-		t.Fatalf("begin: %v", err)
-	}
-	defer func() { _ = tx.Rollback() }()
-	_, _, err = LinkTaskToEvent(ctx, tx, LinkTaskToEventArgs{
-		WorkspaceID: f.wsID,
-		TaskID:      999999,
-		EventID:     evtID,
-		Relation:    RelationContributesTo,
-		ActorUserID: f.userID,
+	err := dbretry.InTx(ctx, db, "itemkit.test", nil, func(ctx context.Context, tx *dbretry.Tx) error {
+		_, _, lerr := LinkTaskToEvent(ctx, tx, LinkTaskToEventArgs{
+			WorkspaceID: f.wsID,
+			TaskID:      999999,
+			EventID:     evtID,
+			Relation:    RelationContributesTo,
+			ActorUserID: f.userID,
+		})
+		return lerr
 	})
 	if err == nil {
 		t.Fatal("expected not-found error, got nil")
@@ -197,32 +189,27 @@ func TestUnlinkTaskFromEvent_SoftDisables(t *testing.T) {
 	defer purge(t, db, f.wsID)
 	evtID, _ := seedEvent(ctx, t, db, f, time.Date(2026, 5, 5, 9, 0, 0, 0, time.UTC))
 
-	tx, err := db.BeginTx(ctx, nil)
-	if err != nil {
-		t.Fatalf("begin: %v", err)
-	}
-	pub, _, err := LinkTaskToEvent(ctx, tx, LinkTaskToEventArgs{
-		WorkspaceID: f.wsID,
-		TaskID:      f.taskID,
-		EventID:     evtID,
-		Relation:    RelationContributesTo,
-		ActorUserID: f.userID,
+	var pub dbtype.PublicID
+	withTx(t, db, func(tx TX) {
+		var err error
+		pub, _, err = LinkTaskToEvent(ctx, tx, LinkTaskToEventArgs{
+			WorkspaceID: f.wsID,
+			TaskID:      f.taskID,
+			EventID:     evtID,
+			Relation:    RelationContributesTo,
+			ActorUserID: f.userID,
+		})
+		if err != nil {
+			t.Fatalf("link: %v", err)
+		}
+		if err := UnlinkTaskFromEvent(ctx, tx, UnlinkTaskFromEventArgs{
+			WorkspaceID: f.wsID,
+			LinkID:      pub,
+			ActorUserID: f.userID,
+		}); err != nil {
+			t.Fatalf("unlink: %v", err)
+		}
 	})
-	if err != nil {
-		_ = tx.Rollback()
-		t.Fatalf("link: %v", err)
-	}
-	if err := UnlinkTaskFromEvent(ctx, tx, UnlinkTaskFromEventArgs{
-		WorkspaceID: f.wsID,
-		LinkID:      pub,
-		ActorUserID: f.userID,
-	}); err != nil {
-		_ = tx.Rollback()
-		t.Fatalf("unlink: %v", err)
-	}
-	if err := tx.Commit(); err != nil {
-		t.Fatalf("commit: %v", err)
-	}
 	var enabled bool
 	if err := db.QueryRowContext(ctx,
 		`SELECT enabled FROM task_event_links WHERE public_id = ?`, pub).Scan(&enabled); err != nil {
@@ -254,16 +241,13 @@ func TestUnlinkTaskFromEvent_ReturnsNotFoundForAlreadyDisabled(t *testing.T) {
 	f := seed(ctx, t, db)
 	defer purge(t, db, f.wsID)
 
-	tx, err := db.BeginTx(ctx, nil)
-	if err != nil {
-		t.Fatalf("begin: %v", err)
-	}
-	defer func() { _ = tx.Rollback() }()
 	// Bogus link id — not present.
-	err = UnlinkTaskFromEvent(ctx, tx, UnlinkTaskFromEventArgs{
-		WorkspaceID: f.wsID,
-		LinkID:      dbtype.New(),
-		ActorUserID: f.userID,
+	err := dbretry.InTx(ctx, db, "itemkit.test", nil, func(ctx context.Context, tx *dbretry.Tx) error {
+		return UnlinkTaskFromEvent(ctx, tx, UnlinkTaskFromEventArgs{
+			WorkspaceID: f.wsID,
+			LinkID:      dbtype.New(),
+			ActorUserID: f.userID,
+		})
 	})
 	if !errors.Is(err, sql.ErrNoRows) {
 		t.Errorf("want sql.ErrNoRows, got %v", err)
@@ -277,27 +261,21 @@ func TestLinkTaskToEvent_DifferentRelationsCoexist(t *testing.T) {
 	defer purge(t, db, f.wsID)
 	evtID, _ := seedEvent(ctx, t, db, f, time.Date(2026, 5, 6, 9, 0, 0, 0, time.UTC))
 
-	tx, err := db.BeginTx(ctx, nil)
-	if err != nil {
-		t.Fatalf("begin: %v", err)
-	}
-	defer func() { _ = tx.Rollback() }()
-	for _, rel := range []Relation{
-		RelationContributesTo, RelationBlocks, RelationDependsOn, RelationPrepFor,
-	} {
-		if _, _, err := LinkTaskToEvent(ctx, tx, LinkTaskToEventArgs{
-			WorkspaceID: f.wsID,
-			TaskID:      f.taskID,
-			EventID:     evtID,
-			Relation:    rel,
-			ActorUserID: f.userID,
-		}); err != nil {
-			t.Fatalf("LinkTaskToEvent(%s): %v", rel, err)
+	withTx(t, db, func(tx TX) {
+		for _, rel := range []Relation{
+			RelationContributesTo, RelationBlocks, RelationDependsOn, RelationPrepFor,
+		} {
+			if _, _, err := LinkTaskToEvent(ctx, tx, LinkTaskToEventArgs{
+				WorkspaceID: f.wsID,
+				TaskID:      f.taskID,
+				EventID:     evtID,
+				Relation:    rel,
+				ActorUserID: f.userID,
+			}); err != nil {
+				t.Fatalf("LinkTaskToEvent(%s): %v", rel, err)
+			}
 		}
-	}
-	if err := tx.Commit(); err != nil {
-		t.Fatalf("commit: %v", err)
-	}
+	})
 	var count int
 	if err := db.QueryRowContext(ctx,
 		`SELECT COUNT(*) FROM task_event_links

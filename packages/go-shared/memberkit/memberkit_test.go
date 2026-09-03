@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/libraz/nodate-flow/packages/go-shared/dbretry"
 	"github.com/libraz/nodate-flow/packages/go-shared/dbtype"
 	"github.com/libraz/nodate-flow/packages/go-shared/testhelpers"
 )
@@ -115,18 +116,20 @@ func purgeWorkspace(t *testing.T, db *sql.DB, wsID uint32) {
 	_, _ = db.ExecContext(ctx, "SET FOREIGN_KEY_CHECKS = 1")
 }
 
-func withTx(t *testing.T, db *sql.DB, fn func(tx *sql.Tx)) {
+// withTx runs fn inside the transaction type memberkit's entry points
+// take. It goes through dbretry.InTx rather than db.BeginTx because
+// those entry points append to the event log and the appender only
+// accepts a transaction whose commit it can wait for.
+func withTx(t *testing.T, db *sql.DB, fn func(tx *dbretry.Tx)) {
 	t.Helper()
-	tx, err := db.BeginTx(context.Background(), nil)
+	err := dbretry.InTx(context.Background(), db, "memberkit.test", nil,
+		func(_ context.Context, tx *dbretry.Tx) error {
+			fn(tx)
+			return nil
+		})
 	if err != nil {
-		t.Fatalf("begin tx: %v", err)
+		t.Fatalf("tx: %v", err)
 	}
-	defer func() {
-		if err := tx.Commit(); err != nil {
-			t.Logf("commit: %v", err)
-		}
-	}()
-	fn(tx)
 }
 
 // TestAddWorkspaceMember_NewMemberCreatesCalendar verifies the
@@ -141,7 +144,7 @@ func TestAddWorkspaceMember_NewMemberCreatesCalendar(t *testing.T) {
 	userID := seedUser(t, ctx, db)
 
 	var res AddWorkspaceMemberResult
-	withTx(t, db, func(tx *sql.Tx) {
+	withTx(t, db, func(tx *dbretry.Tx) {
 		r, err := AddWorkspaceMember(ctx, tx, AddWorkspaceMemberArgs{
 			WorkspaceID:            ws.wsID,
 			UserID:                 userID,
@@ -222,7 +225,7 @@ func TestAddWorkspaceMember_IdempotentOnExistingEnabled(t *testing.T) {
 	userID := seedUser(t, ctx, db)
 
 	var first, second AddWorkspaceMemberResult
-	withTx(t, db, func(tx *sql.Tx) {
+	withTx(t, db, func(tx *dbretry.Tx) {
 		r, err := AddWorkspaceMember(ctx, tx, AddWorkspaceMemberArgs{
 			WorkspaceID: ws.wsID, UserID: userID, Role: RoleMember,
 			InvitedByUserID: ws.actorID, EnsurePersonalCalendar: true,
@@ -232,7 +235,7 @@ func TestAddWorkspaceMember_IdempotentOnExistingEnabled(t *testing.T) {
 		}
 		first = r
 	})
-	withTx(t, db, func(tx *sql.Tx) {
+	withTx(t, db, func(tx *dbretry.Tx) {
 		r, err := AddWorkspaceMember(ctx, tx, AddWorkspaceMemberArgs{
 			WorkspaceID: ws.wsID, UserID: userID, Role: RoleMember,
 			InvitedByUserID: ws.actorID, EnsurePersonalCalendar: true,
@@ -276,7 +279,7 @@ func TestRemoveWorkspaceMember_CascadesSoftDisable(t *testing.T) {
 	userID := seedUser(t, ctx, db)
 
 	// Add the user with a personal calendar + subscription.
-	withTx(t, db, func(tx *sql.Tx) {
+	withTx(t, db, func(tx *dbretry.Tx) {
 		if _, err := AddWorkspaceMember(ctx, tx, AddWorkspaceMemberArgs{
 			WorkspaceID: ws.wsID, UserID: userID, Role: RoleMember,
 			InvitedByUserID: ws.actorID, EnsurePersonalCalendar: true,
@@ -323,7 +326,7 @@ func TestRemoveWorkspaceMember_CascadesSoftDisable(t *testing.T) {
 
 	// Remove.
 	var res RemoveWorkspaceMemberResult
-	withTx(t, db, func(tx *sql.Tx) {
+	withTx(t, db, func(tx *dbretry.Tx) {
 		r, err := RemoveWorkspaceMember(ctx, tx, RemoveWorkspaceMemberArgs{
 			WorkspaceID: ws.wsID, UserID: userID, ActorUserID: ws.actorID,
 		})
@@ -370,7 +373,7 @@ func TestRemoveWorkspaceMember_ReturnsNotFoundForUnknownUser(t *testing.T) {
 
 	bogusUser := seedUser(t, ctx, db) // exists but never joined the ws
 
-	withTx(t, db, func(tx *sql.Tx) {
+	withTx(t, db, func(tx *dbretry.Tx) {
 		_, err := RemoveWorkspaceMember(ctx, tx, RemoveWorkspaceMemberArgs{
 			WorkspaceID: ws.wsID, UserID: bogusUser,
 		})
@@ -390,7 +393,7 @@ func TestUpdateMemberRole_ChangesRoleAndLogsEvent(t *testing.T) {
 	t.Cleanup(func() { purgeWorkspace(t, db, ws.wsID) })
 
 	userID := seedUser(t, ctx, db)
-	withTx(t, db, func(tx *sql.Tx) {
+	withTx(t, db, func(tx *dbretry.Tx) {
 		if _, err := AddWorkspaceMember(ctx, tx, AddWorkspaceMemberArgs{
 			WorkspaceID: ws.wsID, UserID: userID, Role: RoleMember,
 			InvitedByUserID: ws.actorID,
@@ -399,7 +402,7 @@ func TestUpdateMemberRole_ChangesRoleAndLogsEvent(t *testing.T) {
 		}
 	})
 
-	withTx(t, db, func(tx *sql.Tx) {
+	withTx(t, db, func(tx *dbretry.Tx) {
 		if err := UpdateMemberRole(ctx, tx, UpdateMemberRoleArgs{
 			WorkspaceID: ws.wsID, UserID: userID, NewRole: RoleAdmin,
 			ActorUserID: ws.actorID,
@@ -455,7 +458,7 @@ func TestUpdateMemberRole_SelfModifyRejected(t *testing.T) {
 	ws := seedWorkspace(t, ctx, db, "")
 	t.Cleanup(func() { purgeWorkspace(t, db, ws.wsID) })
 
-	withTx(t, db, func(tx *sql.Tx) {
+	withTx(t, db, func(tx *dbretry.Tx) {
 		err := UpdateMemberRole(ctx, tx, UpdateMemberRoleArgs{
 			WorkspaceID: ws.wsID, UserID: ws.actorID, NewRole: RoleAdmin,
 			ActorUserID: ws.actorID,
@@ -492,7 +495,7 @@ func TestUpdateMemberRole_DemoteLastOwnerRejected(t *testing.T) {
 		t.Fatalf("disable second owner: %v", err)
 	}
 
-	withTx(t, db, func(tx *sql.Tx) {
+	withTx(t, db, func(tx *dbretry.Tx) {
 		err := UpdateMemberRole(ctx, tx, UpdateMemberRoleArgs{
 			WorkspaceID: ws.wsID, UserID: ws.actorID, NewRole: RoleAdmin,
 			ActorUserID: otherOwner,
@@ -513,7 +516,7 @@ func TestUpdateMemberRole_DemoteNonLastOwnerOK(t *testing.T) {
 
 	secondOwner := addOwner(t, ctx, db, ws.wsID)
 
-	withTx(t, db, func(tx *sql.Tx) {
+	withTx(t, db, func(tx *dbretry.Tx) {
 		if err := UpdateMemberRole(ctx, tx, UpdateMemberRoleArgs{
 			WorkspaceID: ws.wsID, UserID: secondOwner, NewRole: RoleAdmin,
 			ActorUserID: ws.actorID,
@@ -539,7 +542,7 @@ func TestRemoveWorkspaceMember_SelfModifyRejected(t *testing.T) {
 	ws := seedWorkspace(t, ctx, db, "")
 	t.Cleanup(func() { purgeWorkspace(t, db, ws.wsID) })
 
-	withTx(t, db, func(tx *sql.Tx) {
+	withTx(t, db, func(tx *dbretry.Tx) {
 		_, err := RemoveWorkspaceMember(ctx, tx, RemoveWorkspaceMemberArgs{
 			WorkspaceID: ws.wsID, UserID: ws.actorID, ActorUserID: ws.actorID,
 		})
@@ -574,7 +577,7 @@ func TestRemoveWorkspaceMember_LastOwnerRejected(t *testing.T) {
 		t.Fatalf("seed admin: %v", err)
 	}
 
-	withTx(t, db, func(tx *sql.Tx) {
+	withTx(t, db, func(tx *dbretry.Tx) {
 		_, err := RemoveWorkspaceMember(ctx, tx, RemoveWorkspaceMemberArgs{
 			WorkspaceID: ws.wsID, UserID: ws.actorID, ActorUserID: adminActor,
 		})
@@ -602,7 +605,7 @@ func TestRemoveWorkspaceMember_NonLastOwnerOK(t *testing.T) {
 
 	secondOwner := addOwner(t, ctx, db, ws.wsID)
 
-	withTx(t, db, func(tx *sql.Tx) {
+	withTx(t, db, func(tx *dbretry.Tx) {
 		res, err := RemoveWorkspaceMember(ctx, tx, RemoveWorkspaceMemberArgs{
 			WorkspaceID: ws.wsID, UserID: secondOwner, ActorUserID: ws.actorID,
 		})
@@ -624,7 +627,7 @@ func TestUpdateMemberRole_SameRoleIsNoop(t *testing.T) {
 	t.Cleanup(func() { purgeWorkspace(t, db, ws.wsID) })
 
 	userID := seedUser(t, ctx, db)
-	withTx(t, db, func(tx *sql.Tx) {
+	withTx(t, db, func(tx *dbretry.Tx) {
 		if _, err := AddWorkspaceMember(ctx, tx, AddWorkspaceMemberArgs{
 			WorkspaceID: ws.wsID, UserID: userID, Role: RoleMember,
 			InvitedByUserID: ws.actorID,
@@ -633,7 +636,7 @@ func TestUpdateMemberRole_SameRoleIsNoop(t *testing.T) {
 		}
 	})
 
-	withTx(t, db, func(tx *sql.Tx) {
+	withTx(t, db, func(tx *dbretry.Tx) {
 		if err := UpdateMemberRole(ctx, tx, UpdateMemberRoleArgs{
 			WorkspaceID: ws.wsID, UserID: userID, NewRole: RoleMember,
 		}); err != nil {

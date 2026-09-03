@@ -182,6 +182,19 @@ func TestInviteTokenHashNeverExposed(t *testing.T) {
 	// List invites — must NOT contain token, token_hash, or tokenHash.
 	status, listBody := doJSONStatus(t, http.MethodGet, base, tt.AccessToken, nil)
 	require.Equal(t, http.StatusOK, status)
+
+	// The list must actually render the invite just created, or the
+	// absence checks below would pass the same way against an empty
+	// response.
+	var list struct {
+		Total   int64 `json:"total"`
+		Invites []struct {
+			ID string `json:"id"`
+		} `json:"invites"`
+	}
+	require.NoError(t, json.Unmarshal(listBody, &list))
+	require.NotEmpty(t, list.Invites, "the invite list must render the invite just created")
+
 	require.NotContains(t, string(listBody), "token_hash")
 	require.NotContains(t, string(listBody), "tokenHash")
 
@@ -376,6 +389,16 @@ func TestMemberEmailNotVisibleToOutsider(t *testing.T) {
 		"an outsider listing workspace members")
 	require.NotContains(t, string(body), owner.Email,
 		"a refusal must not carry the addresses it refused")
+
+	// The address is discoverable by a genuine member, so the assertion
+	// above is about authorization rather than a route that answers
+	// nobody.
+	status, body = doJSONStatus(t, http.MethodGet,
+		testServerURL+"/workspaces/"+owner.WorkspacePublicID+"/members",
+		owner.AccessToken, nil)
+	require.Equal(t, http.StatusOK, status, "a member must be able to list workspace members")
+	require.Contains(t, string(body), owner.Email,
+		"a member's own read must contain the member addresses")
 }
 
 // ---------- Export does not leak internal data ----------

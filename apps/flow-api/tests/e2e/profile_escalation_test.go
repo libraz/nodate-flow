@@ -26,8 +26,12 @@ func TestProfileUpdateIgnoresRoleField(t *testing.T) {
 
 	// Regardless of acceptance or rejection, verify no role/admin
 	// field appears in the user profile response.
-	_, body := doJSONStatus(t, http.MethodGet, testServerURL+"/me",
+	status, body := doJSONStatus(t, http.MethodGet, testServerURL+"/me",
 		tt.AccessToken, nil)
+	require.Equal(t, http.StatusOK, status, "GET /me must render the caller's own profile")
+	require.NotEmpty(t, body, "GET /me must render real profile data, not an empty body")
+	require.Contains(t, string(body), tt.Email,
+		"GET /me must render the caller's own email")
 	require.NotContains(t, string(body), `"role"`,
 		"GET /me must not expose a role field")
 	require.NotContains(t, string(body), `"isAdmin"`,

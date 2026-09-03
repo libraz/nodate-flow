@@ -78,7 +78,7 @@ func TestExportTasksCSV(t *testing.T) {
 // TestExportTasksExcludesDisabledProjectTasks verifies that tasks whose
 // parent project is disabled (enabled=FALSE) are excluded from the
 // workspace export, even when the tasks themselves still claim
-// enabled=TRUE. Regression for the audit fix that added
+// enabled=TRUE. The exclusion comes from the
 // `AND p.enabled = TRUE` to the projects INNER JOIN in
 // ExportTasksForWorkspace.
 //
@@ -333,15 +333,15 @@ func TestExportTasksCountsAMultiAssigneeTaskOnce(t *testing.T) {
 		"the reported count must match the rows actually returned")
 }
 
-// TestExportLimitCountsTasksNotAssignees pins the consequence that made
-// the duplication a data-loss bug rather than a cosmetic one: the limit
-// is a budget of tasks, and copies of one task must not spend it.
+// TestExportLimitCountsTasksNotAssignees pins what makes assignee
+// duplication a data-loss bug rather than a cosmetic one: the limit is a
+// budget of tasks, and copies of one task must not spend it.
 //
 // Order matters to the test. Rows come back newest first, so the
-// multi-assignee task is created last: under the old join its three
-// copies filled a limit of three on their own and the two older tasks
-// fell off the end. Created first, its copies would have sorted last
-// and the loss would not show.
+// multi-assignee task is created last: under a duplicating join its
+// three copies fill a limit of three on their own and the two older
+// tasks fall off the end. Created first, its copies would sort last and
+// the loss would not show.
 func TestExportLimitCountsTasksNotAssignees(t *testing.T) {
 	bootstrap(t)
 	t.Parallel()
@@ -410,6 +410,9 @@ func TestExportJSONRouteRejectsCSVFormat(t *testing.T) {
 		tt.AccessToken, nil)
 	require.Equal(t, http.StatusUnprocessableEntity, status,
 		"the JSON route must refuse a format it cannot produce, not answer with the other one")
+	require.NotEmpty(t, body, "the refusal must explain itself rather than answer with nothing")
+	require.Contains(t, string(body), "csv",
+		"the validation error must name the format value it rejected")
 	require.NotContains(t, string(body), `"tasks"`,
 		"a refusal must not carry an export payload")
 
@@ -476,11 +479,11 @@ func TestExportCSVReportsItsRowCount(t *testing.T) {
 // trail says an export was.
 //
 // The handler sends 200 before the first row, so the record it leaves
-// is the only lasting account of how much data left the workspace. It
-// used to be written before the body and to carry the size of the
-// result set, which meant an export the caller cut off after a dozen
-// rows was filed as a complete one. The count now comes from the write,
-// and `complete` is what qualifies it.
+// is the only lasting account of how much data left the workspace.
+// Written before the body and carrying the size of the result set, it
+// files an export the caller cut off after a dozen rows as a complete
+// one. The count therefore comes from the write, and `complete` is what
+// qualifies it.
 func TestExportCSVAuditRecordsTheDownloadNotTheQuery(t *testing.T) {
 	bootstrap(t)
 	t.Parallel()

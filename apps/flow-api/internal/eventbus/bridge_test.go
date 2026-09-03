@@ -2,7 +2,6 @@ package eventbus
 
 import (
 	"context"
-	"database/sql"
 	"go/ast"
 	"go/parser"
 	"go/token"
@@ -10,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/dbretry"
+	sharedbus "github.com/libraz/nodate-flow/packages/go-shared/eventbus"
 	"github.com/libraz/nodate-flow/packages/go-shared/eventlog"
 )
 
@@ -37,8 +37,8 @@ func TestBridgeDeliversEventlogAppends(t *testing.T) {
 
 	BridgeEventlog()
 
-	if _, err := eventlog.Append(context.Background(), db, eventlog.Event{
-		Type:        "workspace.member.added",
+	if _, err := eventlog.Append(context.Background(), dbretry.AutoCommit(db), eventlog.Event{
+		Type:        sharedbus.WorkspaceMemberAdded,
 		WorkspaceID: 11,
 	}); err != nil {
 		t.Fatalf("append: %v", err)
@@ -71,8 +71,8 @@ func TestBridgeWaitsForCommit(t *testing.T) {
 	BridgeEventlog()
 
 	firedInside := false
-	err := dbretry.InTx(context.Background(), db, "eventbus.bridge.test", nil, func(ctx context.Context, tx *sql.Tx) error {
-		if _, err := eventlog.Append(ctx, tx, eventlog.Event{Type: "item.scheduled", WorkspaceID: 3}); err != nil {
+	err := dbretry.InTx(context.Background(), db, "eventbus.bridge.test", nil, func(ctx context.Context, tx *dbretry.Tx) error {
+		if _, err := eventlog.Append(ctx, tx, eventlog.Event{Type: sharedbus.ItemScheduled, WorkspaceID: 3}); err != nil {
 			return err
 		}
 		firedInside = fired > 0
@@ -89,36 +89,11 @@ func TestBridgeWaitsForCommit(t *testing.T) {
 	}
 }
 
-// TestBridgeRefusedInHandRolledTx mirrors the eventbus rule: a
-// transaction opened by hand has no commit boundary, so the fan-out is
-// refused rather than fired against a row nobody else can see.
-func TestBridgeRefusedInHandRolledTx(t *testing.T) {
-	db := stubDB(t)
-	eventlog.ClearHooks()
-	t.Cleanup(eventlog.ClearHooks)
-	resetBridge(t)
-
-	fired := 0
-	handle := AddNotifyHook(func(context.Context, uint32, string, uint64) { fired++ })
-	t.Cleanup(func() { RemoveNotifyHook(handle) })
-	BridgeEventlog()
-
-	ctx := context.Background()
-	tx, err := db.BeginTx(ctx, nil)
-	if err != nil {
-		t.Fatalf("begin: %v", err)
-	}
-	t.Cleanup(func() { _ = tx.Rollback() })
-	if _, err := eventlog.Append(ctx, tx, eventlog.Event{Type: "item.scheduled", WorkspaceID: 3}); err != nil {
-		t.Fatalf("append: %v", err)
-	}
-	if err := tx.Commit(); err != nil {
-		t.Fatalf("commit: %v", err)
-	}
-	if fired != 0 {
-		t.Fatalf("fan-out must be refused without a commit boundary, fired %d times", fired)
-	}
-}
+// The bridge inherits the eventbus rule: a transaction opened by hand
+// has no commit boundary, so the forwarded fan-out would fire against a
+// row nobody else can see. There is no test for that case because
+// eventlog.Append takes a dbretry.CommitBoundary, which a bare *sql.Tx
+// does not satisfy: the call does not compile.
 
 // TestEventlogBridgeIsWired is the structural half. The defect was never
 // that the forwarding was wrong — it did not exist, while every

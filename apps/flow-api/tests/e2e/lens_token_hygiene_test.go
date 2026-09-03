@@ -48,7 +48,7 @@ func publishLensForHygiene(t *testing.T, base, accessToken, name string) (lensID
 	return created.ID, published.PublicToken
 }
 
-// TestLensPublishTokenNeverReachesTimelineOrAudit is the C-3 regression.
+// TestLensPublishTokenNeverReachesTimelineOrAudit is the token-hygiene regression.
 // After a publish, the token must not be recoverable from any record
 // the workspace keeps: the timeline endpoint, the events table behind
 // it, the audit log, or the lens read endpoints.
@@ -114,6 +114,7 @@ func TestLensPublishTokenNeverReachesTimelineOrAudit(t *testing.T) {
 		auditMeta = append(auditMeta, m)
 	}
 	require.NoError(t, auditRows.Err())
+	require.NotEmpty(t, auditMeta, "the workspace must have recorded audit rows")
 	for _, m := range auditMeta {
 		assert.NotContains(t, m, token, "no audit metadata may carry the share token")
 	}

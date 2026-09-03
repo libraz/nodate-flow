@@ -113,53 +113,50 @@ func TestDoHonoursContextCancel(t *testing.T) {
 	}
 }
 
-// TestAddCommitHookFiresImmediatelyWithoutCollector verifies that on a
-// context with no commit-hook collector (the auto-commit path, or a
-// caller not using InTx) the callback runs synchronously, preserving
-// the historical fire-on-append behavior.
-func TestAddCommitHookFiresImmediatelyWithoutCollector(t *testing.T) {
+// TestAutoCommitRunsHooksImmediately verifies that on the auto-commit
+// path the callback runs synchronously: the statement it follows is
+// already durable, so there is no boundary to wait for.
+func TestAutoCommitRunsHooksImmediately(t *testing.T) {
 	t.Parallel()
 	fired := 0
-	AddCommitHook(context.Background(), func() { fired++ })
+	AutoCommit(nil).AfterCommit(func() { fired++ })
 	if fired != 1 {
 		t.Fatalf("fired = %d, want 1 (immediate)", fired)
 	}
 }
 
-// TestCommitHooksDeferUntilRun verifies that a callback registered on a
-// context carrying a collector does not fire until runCommitHooks is
-// invoked — the post-commit trigger InTx uses.
-func TestCommitHooksDeferUntilRun(t *testing.T) {
+// TestTxHooksDeferUntilRun verifies that a callback registered on a
+// transaction does not fire until the post-commit trigger InTx pulls.
+func TestTxHooksDeferUntilRun(t *testing.T) {
 	t.Parallel()
-	ctx := WithCommitHooks(context.Background())
+	tx := &Tx{}
 	fired := 0
-	AddCommitHook(ctx, func() { fired++ })
-	AddCommitHook(ctx, func() { fired++ })
+	tx.AfterCommit(func() { fired++ })
+	tx.AfterCommit(func() { fired++ })
 	if fired != 0 {
 		t.Fatalf("fired = %d before run, want 0 (deferred)", fired)
 	}
-	runCommitHooks(ctx)
+	tx.hooks.run()
 	if fired != 2 {
 		t.Fatalf("fired = %d after run, want 2", fired)
 	}
 	// A second run must not re-fire the drained callbacks.
-	runCommitHooks(ctx)
+	tx.hooks.run()
 	if fired != 2 {
 		t.Fatalf("fired = %d after second run, want 2 (drained once)", fired)
 	}
 }
 
-// TestCommitHooksDroppedWhenNeverRun verifies that hooks registered on
-// an attempt's collector simply never fire when runCommitHooks is not
-// called (the rollback / failed-commit path), so an aborted transaction
-// leaks no side effects.
-func TestCommitHooksDroppedWhenNeverRun(t *testing.T) {
+// TestTxHooksDroppedWhenNeverRun verifies that hooks registered on an
+// attempt's transaction simply never fire when the commit does not
+// happen (the rollback / failed-commit path), so an aborted transaction
+// leaks no side effects. InTx builds a fresh Tx per attempt, so the
+// discarded value takes its hooks with it.
+func TestTxHooksDroppedWhenNeverRun(t *testing.T) {
 	t.Parallel()
-	ctx := WithCommitHooks(context.Background())
+	tx := &Tx{}
 	fired := 0
-	AddCommitHook(ctx, func() { fired++ })
-	// Simulate a rolled-back attempt: the collector is discarded without
-	// runCommitHooks ever being called.
+	tx.AfterCommit(func() { fired++ })
 	if fired != 0 {
 		t.Fatalf("fired = %d, want 0 (dropped)", fired)
 	}

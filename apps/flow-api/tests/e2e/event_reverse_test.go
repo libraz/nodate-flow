@@ -12,15 +12,16 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/dbretry"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/eventbus"
 	"github.com/libraz/nodate-flow/apps/flow-api/tests/helpers"
 )
 
-// Phase 3 / J5 — POST /workspaces/{wsId}/events/{eventPublicId}/reverse.
+// POST /workspaces/{wsId}/events/{eventPublicId}/reverse.
 //
-// These tests cover the six scenarios pinned by the release-8 plan:
+// These tests cover six scenarios:
 //
 //  1. LLM-origin event reverse succeeds (201 + reverses_event_id link).
 //  2. Double reverse of the same event returns 409 ALREADY_REVERSED.
@@ -76,7 +77,7 @@ func appendUserEventForTask(t *testing.T, db *sql.DB, wsID, taskID, userID uint3
 
 // appendSystemEventForTask inserts a worker-tick event bound to
 // (workspace, task). Used to seed the NOT_LLM_ORIGIN system-source
-// test path; mirrors how the Phase 5 worker would emit reconciliation
+// test path; mirrors how the worker would emit reconciliation
 // events with actor_system_source set instead of any actor FK.
 func appendSystemEventForTask(t *testing.T, db *sql.DB, wsID, taskID uint32, source, eventType string) string {
 	t.Helper()
@@ -290,7 +291,7 @@ func TestReverseUnknownEventReturns404(t *testing.T) {
 // judge-only kind; the seed therefore goes through the Applier-only
 // gate the same way the production Applier would. The reverse handler
 // itself goes through AppendReverseEvent which is the dedicated
-// bypass for the J5 flow.
+// bypass for the reversal flow.
 func TestReverseCancelsDerivedState(t *testing.T) {
 	bootstrap(t)
 	t.Parallel()
@@ -313,7 +314,7 @@ func TestReverseCancelsDerivedState(t *testing.T) {
 	// Applier does in production.
 	taskFK := int64(taskInternalID)
 	agentFK := int64(agent.AgentID)
-	require.NoError(t, eventbus.AppendJudgeEvent(context.Background(), testDB, eventbus.Event{
+	require.NoError(t, eventbus.AppendJudgeEvent(context.Background(), dbretry.AutoCommit(testDB), eventbus.Event{
 		Type:         eventbus.TaskAutoCompleted,
 		WorkspaceID:  wsID,
 		ActorAgentID: &agentFK,

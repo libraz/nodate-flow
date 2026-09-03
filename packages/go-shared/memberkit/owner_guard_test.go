@@ -6,6 +6,7 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/libraz/nodate-flow/packages/go-shared/dbretry"
 	"github.com/libraz/nodate-flow/packages/go-shared/dbtype"
 )
 
@@ -50,7 +51,7 @@ func TestUpdateMemberRole_AdminCannotDemoteOwner(t *testing.T) {
 	secondOwner := addOwner(t, ctx, db, ws.wsID)
 	admin := addAdmin(t, ctx, db, ws.wsID)
 
-	withTx(t, db, func(tx *sql.Tx) {
+	withTx(t, db, func(tx *dbretry.Tx) {
 		err := UpdateMemberRole(ctx, tx, UpdateMemberRoleArgs{
 			WorkspaceID: ws.wsID, UserID: secondOwner, NewRole: RoleMember,
 			ActorUserID: admin,
@@ -78,7 +79,7 @@ func TestRemoveWorkspaceMember_AdminCannotRemoveOwner(t *testing.T) {
 	secondOwner := addOwner(t, ctx, db, ws.wsID)
 	admin := addAdmin(t, ctx, db, ws.wsID)
 
-	withTx(t, db, func(tx *sql.Tx) {
+	withTx(t, db, func(tx *dbretry.Tx) {
 		_, err := RemoveWorkspaceMember(ctx, tx, RemoveWorkspaceMemberArgs{
 			WorkspaceID: ws.wsID, UserID: secondOwner, ActorUserID: admin,
 		})
@@ -109,7 +110,7 @@ func TestUpdateMemberRole_OwnerMayDemoteCoOwner(t *testing.T) {
 
 	secondOwner := addOwner(t, ctx, db, ws.wsID)
 
-	withTx(t, db, func(tx *sql.Tx) {
+	withTx(t, db, func(tx *dbretry.Tx) {
 		if err := UpdateMemberRole(ctx, tx, UpdateMemberRoleArgs{
 			WorkspaceID: ws.wsID, UserID: secondOwner, NewRole: RoleMember,
 			ActorUserID: ws.actorID,
@@ -141,7 +142,7 @@ func TestUpdateMemberRole_AdminMayStillManageMembers(t *testing.T) {
 		t.Fatalf("seed member: %v", err)
 	}
 
-	withTx(t, db, func(tx *sql.Tx) {
+	withTx(t, db, func(tx *dbretry.Tx) {
 		if err := UpdateMemberRole(ctx, tx, UpdateMemberRoleArgs{
 			WorkspaceID: ws.wsID, UserID: target, NewRole: RoleGuest,
 			ActorUserID: admin,

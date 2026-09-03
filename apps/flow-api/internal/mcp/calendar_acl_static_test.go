@@ -21,9 +21,11 @@ var calendarMembershipGates = map[string]bool{
 	// Two shapes, one requirement. The tools that take a calendar id
 	// resolve it and get membership checked on the way; the tools that
 	// take an event id resolve the event first and check membership on
-	// the calendar it turns out to live on.
-	"resolveCalendar":           true,
-	"requireCalendarMembership": true,
+	// the calendar it turns out to live on. Each shape has a read form
+	// and a write form, and both forms establish membership.
+	"resolveCalendar":         true,
+	"resolveCalendarWrite":    true,
+	"requireCalendarWritable": true,
 }
 
 // calendarEventEditGates are the resolvers that apply the shared
@@ -51,16 +53,16 @@ func TestMCPCalendarWriteToolsReachTheirGates(t *testing.T) {
 
 	h := NewHandler(Deps{})
 	graph := mcpPackageCallGraph(t)
+	registry := mcpRegisteredTools(t)
 
 	seen := map[string]bool{}
 	for name, editsExisting := range calendarWriteTools {
-		tl, ok := h.tools[name]
-		if !ok {
+		if _, ok := h.tools[name]; !ok {
 			t.Errorf("calendarWriteTools lists %q, which is not a registered tool; drop the stale entry", name)
 			continue
 		}
 		seen[name] = true
-		entry := mcpRunFuncName(t, name, tl.run)
+		entry := mcpRunFuncName(t, registry, name)
 
 		if !reachesAny(graph, entry, calendarMembershipGates) {
 			t.Errorf("calendar tool %q (%s) never reaches %s; a calendar is reachable only through calendar_members, and workspace membership is not a substitute",
@@ -107,6 +109,32 @@ func TestMCPCalendarEventEditRuleIsShared(t *testing.T) {
 	}
 }
 
+// TestMCPCalendarOwnerRuleIsShared proves the delegation decision — may
+// this caller file an event under somebody else — is the one REST uses.
+//
+// It was a second opinion keyed on calendars.owner_user_id, the same
+// column that broke the edit rule and for the same reason: a group
+// calendar leaves it NULL, so no caller matched it and delegation was
+// impossible on exactly the calendars that have managers.
+func TestMCPCalendarOwnerRuleIsShared(t *testing.T) {
+	t.Parallel()
+
+	acl := readMCPSource(t, "acl.go")
+	if !strings.Contains(acl, "eventacl.CanSetOwner") {
+		t.Fatal("canSetCalendarEventOwner must decide through eventacl.CanSetOwner so MCP and REST answer alike")
+	}
+
+	graph := mcpPackageCallGraph(t)
+	entry := mcpRunFuncName(t, mcpRegisteredTools(t), "create_calendar_event")
+	if !reachesAny(graph, entry, map[string]bool{"canSetCalendarEventOwner": true}) {
+		t.Error("create_calendar_event must reach canSetCalendarEventOwner; deciding delegation in the tool body is how the two transports drifted apart")
+	}
+
+	if strings.Contains(readMCPSource(t, "tools.go"), "owner_user_id FROM calendars") {
+		t.Error("the calendar-owner lookup is back in the delegation decision; it is NULL on every calendar a group shares")
+	}
+}
+
 // TestMCPFreeSlotsResolvesTimezone pins the working-day window to the
 // user whose day it is.
 //
@@ -117,13 +145,8 @@ func TestMCPCalendarEventEditRuleIsShared(t *testing.T) {
 func TestMCPFreeSlotsResolvesTimezone(t *testing.T) {
 	t.Parallel()
 
-	h := NewHandler(Deps{})
-	tl, ok := h.tools["list_free_slots"]
-	if !ok {
-		t.Fatal("list_free_slots is not registered")
-	}
 	graph := mcpPackageCallGraph(t)
-	entry := mcpRunFuncName(t, "list_free_slots", tl.run)
+	entry := mcpRunFuncName(t, mcpRegisteredTools(t), "list_free_slots")
 
 	if !reachesAny(graph, entry, map[string]bool{"resolveUserTimezone": true}) {
 		t.Error("list_free_slots must reach resolveUserTimezone; a working day built in UTC is a working day only at offset zero")

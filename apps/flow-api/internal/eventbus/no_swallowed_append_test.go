@@ -7,16 +7,42 @@ import (
 	"go/token"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"testing"
 )
 
 // appendFuncs are the entry points that put a row in the events log.
-// Discarding what any of them returns is what this guard rejects.
+// Losing what any of them returns is what this guard rejects.
 var appendFuncs = map[string]bool{
 	"Append":             true,
 	"AppendJudgeEvent":   true,
 	"AppendReverseEvent": true,
+}
+
+// appendPackages are the packages those entry points live in. There are
+// two appenders writing the same table — this one and the
+// service-agnostic eventlog shared with auth-api — and a row lost through
+// either leaves the same gap, so the guard does not distinguish them.
+var appendPackages = map[string]bool{
+	"eventbus": true,
+	"eventlog": true,
+}
+
+// swallow is one place an append failure goes no further.
+type swallow struct {
+	// File is the path relative to the module root, slash-separated.
+	File string
+	// Line is where the offending statement starts.
+	Line int
+	// Entry is the append entry point whose failure was lost.
+	Entry string
+	// Why names the shape, so the message says what to change.
+	Why string
+}
+
+func (s swallow) String() string {
+	return fmt.Sprintf("%s:%d %s: %s", s.File, s.Line, s.Entry, s.Why)
 }
 
 // TestNoSwallowedAppends proves every event append in the module either
@@ -24,28 +50,138 @@ var appendFuncs = map[string]bool{
 //
 // The guard is a whole-module walk rather than a package-local check
 // because the writers are spread across internal/mcp, internal/ai,
-// internal/http/handlers and the workers, and the defect was never one
-// call site: the same discarded error appeared independently in two
-// dozen places while fifty-odd neighbours checked it, so a review-time
-// rule had already failed to hold. Dropping a row is not cosmetic —
-// task state is derived from the event log (CLAUDE.md rule 8), so a
-// missing row is a wrong state that nothing later corrects.
+// internal/http/handlers and the workers, and the failure mode is not one
+// call site: the same lost error turns up independently wherever an
+// append is written, alongside neighbours that check it, which is what a
+// review-time rule fails to hold. Dropping a row is not cosmetic — task
+// state is derived from the event log (CLAUDE.md rule 8), so a missing
+// row is a wrong state that nothing later corrects.
 //
-// The check parses each file and looks for an assignment of an append
-// call to the blank identifier. Matching source text instead would be
-// wrong in both directions: a commented-out example would fail the build
-// for nothing, and reformatting the call across two lines, or inserting
-// a second space, would walk straight past it. The AST knows which
-// spellings are the same statement.
+// Three shapes count as losing the failure, and the middle one is the
+// reason the guard reads the control flow rather than the assignment:
+//
+//   - assigning the result to the blank identifier,
+//   - checking the error and then continuing anyway, however loudly the
+//     branch logs — a log line is not a repair, and the request goes on
+//     to report success for a change the log does not describe,
+//   - calling the entry point as a bare statement, which discards the
+//     result without even naming it.
+//
+// The check parses each file rather than matching source text, which
+// would be wrong in both directions: a commented-out example would fail
+// the build for nothing, and reformatting a call across two lines would
+// walk straight past it. The AST knows which spellings are the same
+// statement.
 //
 // Choosing between propagation and [AppendBestEffort] is a real
 // decision; see that function for the criterion.
 func TestNoSwallowedAppends(t *testing.T) {
 	t.Parallel()
 
-	root := flowAPIModuleRoot(t)
-	var offenders []string
+	offenders, err := scanSwallowedAppends(flowAPIModuleRoot(t))
+	if err != nil {
+		t.Fatalf("scan module: %v", err)
+	}
+	if len(offenders) == 0 {
+		return
+	}
+	lines := make([]string, 0, len(offenders))
+	for _, o := range offenders {
+		lines = append(lines, o.String())
+	}
+	t.Fatalf("an append failure must reach a return: propagate it, or call "+
+		"eventbus.AppendBestEffort with a call site so the dropped row is recorded:\n  %s",
+		strings.Join(lines, "\n  "))
+}
 
+// parsedFile is one source file kept around for both passes: the facade
+// derivation reads every file before the offence walk can start.
+type parsedFile struct {
+	rel  string
+	pkg  string
+	fset *token.FileSet
+	file *ast.File
+}
+
+// scanSwallowedAppends walks the module rooted at root and returns every
+// place an append failure stops travelling.
+func scanSwallowedAppends(root string) ([]swallow, error) {
+	files, err := parseModule(root)
+	if err != nil {
+		return nil, err
+	}
+	facades := deriveFacades(files)
+
+	var offenders []swallow
+	for _, pf := range files {
+		names := func(call *ast.CallExpr) (string, bool) {
+			return appendEntryPoint(call, pf.pkg, facades)
+		}
+		report := func(pos token.Pos, entry, why string) {
+			offenders = append(offenders, swallow{
+				File:  pf.rel,
+				Line:  pf.fset.Position(pos).Line,
+				Entry: entry,
+				Why:   why,
+			})
+		}
+		ast.Inspect(pf.file, func(n ast.Node) bool {
+			switch s := n.(type) {
+			case *ast.AssignStmt:
+				if !allBlank(s.Lhs) || len(s.Rhs) != 1 {
+					return true
+				}
+				call, ok := s.Rhs[0].(*ast.CallExpr)
+				if !ok {
+					return true
+				}
+				if entry, ok := names(call); ok {
+					report(s.Pos(), entry, "the result is assigned to the blank identifier")
+				}
+			case *ast.ExprStmt:
+				call, ok := s.X.(*ast.CallExpr)
+				if !ok {
+					return true
+				}
+				if entry, ok := names(call); ok {
+					report(s.Pos(), entry, "the result is discarded by calling it as a statement")
+				}
+			case *ast.IfStmt:
+				init, ok := s.Init.(*ast.AssignStmt)
+				if !ok || len(init.Rhs) != 1 {
+					return true
+				}
+				call, ok := init.Rhs[0].(*ast.CallExpr)
+				if !ok {
+					return true
+				}
+				entry, ok := names(call)
+				if !ok {
+					return true
+				}
+				if !blockExits(s.Body) {
+					report(s.Pos(), entry, "the failure is handled without leaving the function")
+				}
+			}
+			return true
+		})
+	}
+	sort.Slice(offenders, func(i, j int) bool {
+		if offenders[i].File != offenders[j].File {
+			return offenders[i].File < offenders[j].File
+		}
+		return offenders[i].Line < offenders[j].Line
+	})
+	return offenders, nil
+}
+
+// parseModule reads every non-test Go file under root. A file that does
+// not parse is skipped rather than reported: it cannot compile either, so
+// the build already rejects it and this guard has nothing to add.
+// Failing here instead would turn any half-written file in the tree into
+// a confusing failure of an unrelated check.
+func parseModule(root string) ([]parsedFile, error) {
+	var files []parsedFile
 	err := filepath.WalkDir(root, func(path string, d os.DirEntry, err error) error {
 		if err != nil {
 			return err
@@ -58,47 +194,127 @@ func TestNoSwallowedAppends(t *testing.T) {
 			return nil
 		}
 		fset := token.NewFileSet()
-		file, perr := parser.ParseFile(fset, path, nil, 0)
+		parsed, perr := parser.ParseFile(fset, path, nil, 0)
 		if perr != nil {
-			// A file that does not parse cannot compile either, so the
-			// build already rejects it and this guard has nothing to add.
-			// Failing here instead would turn any half-written file in
-			// the tree into a confusing failure of an unrelated check.
 			return nil
 		}
 		rel, relErr := filepath.Rel(root, path)
 		if relErr != nil {
 			return relErr
 		}
-		rel = filepath.ToSlash(rel)
-		inEventbus := file.Name.Name == "eventbus"
-
-		ast.Inspect(file, func(n ast.Node) bool {
-			assign, ok := n.(*ast.AssignStmt)
-			if !ok || !allBlank(assign.Lhs) || len(assign.Rhs) != 1 {
-				return true
-			}
-			call, ok := assign.Rhs[0].(*ast.CallExpr)
-			if !ok {
-				return true
-			}
-			if fn, ok := appendCallName(call, inEventbus); ok {
-				offenders = append(offenders, fmt.Sprintf("%s:%d discards the result of %s",
-					rel, fset.Position(assign.Pos()).Line, fn))
-			}
-			return true
+		files = append(files, parsedFile{
+			rel:  filepath.ToSlash(rel),
+			pkg:  parsed.Name.Name,
+			fset: fset,
+			file: parsed,
 		})
 		return nil
 	})
 	if err != nil {
-		t.Fatalf("walk module: %v", err)
+		return nil, err
 	}
+	sort.Slice(files, func(i, j int) bool { return files[i].rel < files[j].rel })
+	return files, nil
+}
 
-	if len(offenders) > 0 {
-		t.Fatalf("an append error may not be discarded: propagate it, or call "+
-			"eventbus.AppendBestEffort with a call site so the dropped row is recorded:\n  %s",
-			strings.Join(offenders, "\n  "))
+// deriveFacades returns the wrappers that are an append entry point by
+// another name, keyed "package.Func".
+//
+// A wrapper counts only when it hands the append's error straight back —
+// `return eventbus.Append(...)` and nothing else on that path. Such a
+// function adds no failure of its own, so losing what it returns loses
+// exactly the append, and a guard that stopped at the qualified call
+// would have declared the tree clean while three dozen call sites threw
+// the same error away one indirection further out. The derivation
+// iterates to a fixed point so a wrapper around a wrapper is caught too.
+//
+// The bar is deliberately this narrow. A function that appends among
+// other work owns a failure of its own, and its callers are answering a
+// different question than this guard asks.
+func deriveFacades(files []parsedFile) map[string]bool {
+	facades := map[string]bool{}
+	for {
+		added := false
+		for _, pf := range files {
+			for _, decl := range pf.file.Decls {
+				fn, ok := decl.(*ast.FuncDecl)
+				if !ok || fn.Body == nil || fn.Recv != nil {
+					continue
+				}
+				key := pf.pkg + "." + fn.Name.Name
+				if facades[key] {
+					continue
+				}
+				if !returnsAppendDirectly(fn.Body, pf.pkg, facades) {
+					continue
+				}
+				facades[key] = true
+				added = true
+			}
+		}
+		if !added {
+			return facades
+		}
 	}
+}
+
+// returnsAppendDirectly reports whether the body has a `return <append>`
+// statement whose single result is the append call itself.
+func returnsAppendDirectly(body *ast.BlockStmt, pkg string, facades map[string]bool) bool {
+	found := false
+	ast.Inspect(body, func(n ast.Node) bool {
+		if found {
+			return false
+		}
+		ret, ok := n.(*ast.ReturnStmt)
+		if !ok || len(ret.Results) != 1 {
+			return true
+		}
+		call, ok := ret.Results[0].(*ast.CallExpr)
+		if !ok {
+			return true
+		}
+		if _, ok := appendEntryPoint(call, pkg, facades); ok {
+			found = true
+			return false
+		}
+		return true
+	})
+	return found
+}
+
+// appendEntryPoint reports whether call targets something that appends to
+// the event log, and under what name.
+//
+// A qualified call must name one of the appender packages, or a package
+// that declares a facade under that name, so an unrelated Append method
+// on some other type is not mistaken for one of ours. Inside an appender
+// package the call is unqualified; so is a call to a facade from its own
+// package.
+func appendEntryPoint(call *ast.CallExpr, pkg string, facades map[string]bool) (string, bool) {
+	switch fn := call.Fun.(type) {
+	case *ast.SelectorExpr:
+		qualifier, ok := fn.X.(*ast.Ident)
+		if !ok {
+			return "", false
+		}
+		if appendPackages[qualifier.Name] && appendFuncs[fn.Sel.Name] {
+			return qualifier.Name + "." + fn.Sel.Name, true
+		}
+		key := qualifier.Name + "." + fn.Sel.Name
+		if facades[key] {
+			return key, true
+		}
+	case *ast.Ident:
+		if appendPackages[pkg] && appendFuncs[fn.Name] {
+			return fn.Name, true
+		}
+		key := pkg + "." + fn.Name
+		if facades[key] {
+			return key, true
+		}
+	}
+	return "", false
 }
 
 // allBlank reports whether every expression on the left of an
@@ -117,25 +333,48 @@ func allBlank(lhs []ast.Expr) bool {
 	return true
 }
 
-// appendCallName reports whether call targets one of the append entry
-// points, and under what name. A qualified call must name this package
-// so an unrelated Append method on some other type is not mistaken for
-// one of ours; inside the package itself the call is unqualified.
-func appendCallName(call *ast.CallExpr, inEventbus bool) (string, bool) {
-	switch fn := call.Fun.(type) {
-	case *ast.SelectorExpr:
-		pkg, ok := fn.X.(*ast.Ident)
-		if !ok || pkg.Name != "eventbus" || !appendFuncs[fn.Sel.Name] {
-			return "", false
-		}
-		return "eventbus." + fn.Sel.Name, true
-	case *ast.Ident:
-		if !inEventbus || !appendFuncs[fn.Name] {
-			return "", false
-		}
-		return fn.Name, true
+// blockExits reports whether control leaves the enclosing function at the
+// end of b.
+//
+// Only the forms an error branch actually uses are recognised: a return,
+// a panic, and an if/else where both arms leave. Anything else — logging
+// and falling through, `continue`, a bare `break` — keeps the function
+// running past a failure it decided not to act on, which is the shape
+// this guard exists to name. A branch that leaves by some form not listed
+// here is reported too; the analysis errs toward asking for proof.
+func blockExits(b *ast.BlockStmt) bool {
+	if b == nil {
+		return false
 	}
-	return "", false
+	for i := len(b.List) - 1; i >= 0; i-- {
+		if _, empty := b.List[i].(*ast.EmptyStmt); empty {
+			continue
+		}
+		return stmtExits(b.List[i])
+	}
+	return false
+}
+
+// stmtExits reports whether s is a terminating statement.
+func stmtExits(s ast.Stmt) bool {
+	switch s := s.(type) {
+	case *ast.ReturnStmt:
+		return true
+	case *ast.ExprStmt:
+		call, ok := s.X.(*ast.CallExpr)
+		if !ok {
+			return false
+		}
+		id, ok := call.Fun.(*ast.Ident)
+		return ok && id.Name == "panic"
+	case *ast.BlockStmt:
+		return blockExits(s)
+	case *ast.IfStmt:
+		return s.Else != nil && blockExits(s.Body) && stmtExits(s.Else)
+	case *ast.LabeledStmt:
+		return stmtExits(s.Stmt)
+	}
+	return false
 }
 
 // TestAppendBestEffortStaysAccountable pins the two things that make

@@ -3,8 +3,6 @@ package db
 import (
 	"fmt"
 	"go/ast"
-	"go/parser"
-	"go/token"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -32,6 +30,10 @@ import (
 // UUID v7 that is *meant* to be public. Anything else ending in ID is an
 // internal surrogate key and has to carry `json:"-"`.
 //
+// The one exception is derived from the schema rather than listed here:
+// a foreign key into a master / enumeration table names an id that is
+// documented as safe to publish. See masterForeignKeyColumns.
+//
 // This reads the generated source rather than reflecting over the
 // packages so it can cover all three generated trees, including
 // auth-api's, which lives in a different module and cannot be imported
@@ -39,60 +41,29 @@ import (
 func TestGeneratedIDFieldsAreNotSerialized(t *testing.T) {
 	t.Parallel()
 
-	roots := generatedRoots(t)
+	exempt := masterForeignKeyColumns(t)
 	var offenders []string
 
-	for _, root := range roots {
-		err := filepath.WalkDir(root, func(path string, d os.DirEntry, err error) error {
-			if err != nil {
-				return err
-			}
-			if d.IsDir() || !strings.HasSuffix(d.Name(), ".go") {
-				return nil
-			}
-			fset := token.NewFileSet()
-			file, perr := parser.ParseFile(fset, path, nil, parser.SkipObjectResolution)
-			if perr != nil {
-				return perr
-			}
-			ast.Inspect(file, func(n ast.Node) bool {
-				spec, ok := n.(*ast.TypeSpec)
-				if !ok {
-					return true
-				}
-				st, ok := spec.Type.(*ast.StructType)
-				if !ok || st.Fields == nil {
-					return true
-				}
-				// Params types are the arguments a query takes, built by
-				// server code and never marshalled to a client, so the
-				// serialisation rule does not reach them. They also carry
-				// fields sqlc cannot tag at all: a sqlc.arg() bound
-				// through a CAST is a named parameter rather than a
-				// column, and column overrides do not apply to it.
-				if strings.HasSuffix(spec.Name.Name, "Params") {
-					return true
-				}
-				for _, f := range st.Fields.List {
-					for _, name := range f.Names {
-						if !name.IsExported() || !strings.HasSuffix(name.Name, "ID") {
-							continue
-						}
-						if !isIntegerType(f.Type) || hasJSONExcludeTag(f.Tag) {
-							continue
-						}
-						pos := fset.Position(name.Pos())
-						offenders = append(offenders, fmt.Sprintf("%s:%d %s",
-							relativeTo(t, path), pos.Line, name.Name))
-					}
-				}
-				return true
-			})
-			return nil
-		})
-		if err != nil {
-			t.Fatalf("walk %s: %v", root, err)
+	for _, f := range walkGeneratedFields(t) {
+		// Params types are the arguments a query takes, built by server
+		// code and never marshalled to a client, so the serialisation
+		// rule does not reach them. They also carry fields sqlc cannot
+		// tag at all: a sqlc.arg() bound through a CAST is a named
+		// parameter rather than a column, and column overrides do not
+		// apply to it.
+		if strings.HasSuffix(f.Struct, "Params") {
+			continue
 		}
+		if !ast.IsExported(f.Name) || !strings.HasSuffix(f.Name, "ID") {
+			continue
+		}
+		if !isIntegerType(f.Type) || hasJSONExcludeTag(f.Tag) {
+			continue
+		}
+		if _, ok := exempt[normalizeIdentifier(f.Name)]; ok {
+			continue
+		}
+		offenders = append(offenders, fmt.Sprintf("%s:%d %s.%s", f.Path, f.Line, f.Struct, f.Name))
 	}
 
 	if len(offenders) > 0 {

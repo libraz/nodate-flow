@@ -67,8 +67,12 @@ func TestKeysetPaginationListTasksForWorkspace(t *testing.T) {
 	for {
 		rows, err := queries.ListTasksForWorkspaceKeyset(ctx,
 			generated.ListTasksForWorkspaceKeysetParams{
-				WorkspaceID:     wsInternalID,
-				StateFilter:     "", // empty string skips the filter
+				WorkspaceID: wsInternalID,
+				StateFilter: "", // empty string skips the filter
+				// What is under test is the cursor contract, not Layer 4:
+				// read as elevated so the page set is the whole seed and a
+				// visibility change cannot quietly shrink it into passing.
+				IsElevated:      1,
 				CursorCreatedAt: cursorCreatedAt,
 				CursorPublicID:  cursorPublicID,
 				Limit:           pageLimit,

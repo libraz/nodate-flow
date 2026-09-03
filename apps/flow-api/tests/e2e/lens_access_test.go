@@ -91,4 +91,11 @@ func TestLensCrossTenantNotVisible(t *testing.T) {
 		"outsider reading another workspace's lens")
 	require.NotContains(t, string(body), "T1 Lens",
 		"a refusal must not carry the lens it refused")
+
+	// The name is discoverable by tenant1, so the assertion above is
+	// about authorization rather than a route that answers nobody.
+	status, body = doJSONStatus(t, http.MethodGet, wsURL+"/lenses/"+lens.ID, tenant1.AccessToken, nil)
+	require.Equal(t, http.StatusOK, status, "the lens's own workspace must still be able to read it")
+	require.Contains(t, string(body), "T1 Lens",
+		"tenant1's read must contain the lens's name")
 }

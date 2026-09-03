@@ -9,6 +9,7 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/dbretry"
 	apierrors "github.com/libraz/nodate-flow/apps/flow-api/internal/errors"
 	"github.com/libraz/nodate-flow/packages/go-shared/apierr"
 )
@@ -16,16 +17,15 @@ import (
 // TestAppendRejectsJudgeKindsFromOutsideApplier locks in that calling
 // [Append] with one of the judge-only event kinds short-circuits with
 // INTERNAL.EVENTBUS.JUDGE_KIND_OUTSIDE_APPLIER before any DB write
-// happens. This is the test #6 from Phase 3 / J4: the Applier is the
-// sole writer of these kinds.
+// happens. The Applier is the sole writer of these kinds.
 //
-// We pass a nil DBTX so that any code path that tried to execute SQL
-// would panic instead of silently succeeding — the test passes only
-// if the guard fires before reaching the INSERT.
+// The boundary wraps a nil pool, so any code path that reached a
+// statement would panic instead of silently succeeding — the test passes
+// only if the guard fires before the INSERT.
 func TestAppendRejectsJudgeKindsFromOutsideApplier(t *testing.T) {
 	t.Parallel()
 
-	judgeKinds := []string{
+	judgeKinds := []Kind{
 		TaskAutoCompleted,
 		TaskRetroDrafted,
 		SignalJudged,
@@ -35,9 +35,9 @@ func TestAppendRejectsJudgeKindsFromOutsideApplier(t *testing.T) {
 
 	for _, kind := range judgeKinds {
 		kind := kind
-		t.Run(kind, func(t *testing.T) {
+		t.Run(string(kind), func(t *testing.T) {
 			t.Parallel()
-			err := Append(context.Background(), nil, Event{
+			err := Append(context.Background(), dbretry.AutoCommit(nil), Event{
 				Type:        kind,
 				WorkspaceID: 1,
 			})
@@ -67,7 +67,7 @@ func TestAppendRejectsJudgeKindsFromOutsideApplier(t *testing.T) {
 func TestAppendAllowsNonJudgeKinds(t *testing.T) {
 	t.Parallel()
 
-	cases := []string{
+	cases := []Kind{
 		TaskCreated,
 		SignalAttached, // explicitly NOT in the judge-only set
 		CalEventCreated,
@@ -76,20 +76,20 @@ func TestAppendAllowsNonJudgeKinds(t *testing.T) {
 
 	for _, kind := range cases {
 		kind := kind
-		t.Run(kind, func(t *testing.T) {
+		t.Run(string(kind), func(t *testing.T) {
 			t.Parallel()
 			defer func() {
-				// Recover the expected panic from sql.NullInt32 / nil
-				// DBTX. The point of the test is that we got PAST the
-				// guard; the subsequent INSERT failure mode is not
-				// what we are exercising here.
+				// Recover the expected panic from the nil pool behind
+				// the boundary. The point of the test is that we got
+				// PAST the guard; the subsequent INSERT failure mode is
+				// not what we are exercising here.
 				_ = recover()
 			}()
-			err := Append(context.Background(), nil, Event{
+			err := Append(context.Background(), dbretry.AutoCommit(nil), Event{
 				Type:        kind,
 				WorkspaceID: 1,
 			})
-			// We do NOT assert err is nil — the nil DBTX will explode
+			// We do NOT assert err is nil — the nil pool will explode
 			// somewhere inside the INSERT path. The assertion we
 			// actually care about is the negative one: if the guard
 			// had fired we would have returned a JudgeKindOutsideApplier
@@ -113,11 +113,11 @@ func TestAppendJudgeEventBypassesGuard(t *testing.T) {
 	t.Parallel()
 
 	defer func() {
-		// As in TestAppendAllowsNonJudgeKinds, the nil DBTX will
+		// As in TestAppendAllowsNonJudgeKinds, the nil pool will
 		// panic past the guard. Recover and pass the test.
 		_ = recover()
 	}()
-	err := AppendJudgeEvent(context.Background(), nil, Event{
+	err := AppendJudgeEvent(context.Background(), dbretry.AutoCommit(nil), Event{
 		Type:        TaskAutoCompleted,
 		WorkspaceID: 1,
 	})
@@ -135,7 +135,7 @@ func TestAppendJudgeEventBypassesGuard(t *testing.T) {
 func TestIsJudgeEventKind(t *testing.T) {
 	t.Parallel()
 
-	in := []string{
+	in := []Kind{
 		TaskAutoCompleted,
 		TaskRetroDrafted,
 		SignalJudged,
@@ -147,7 +147,7 @@ func TestIsJudgeEventKind(t *testing.T) {
 			t.Fatalf("IsJudgeEventKind(%q) = false, want true", k)
 		}
 	}
-	out := []string{
+	out := []Kind{
 		TaskCreated,
 		SignalAttached,
 		AiAgentRunStarted,

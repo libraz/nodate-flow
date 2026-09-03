@@ -13,6 +13,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/acl"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
 )
@@ -58,7 +59,7 @@ func TestRetroDraftsStillAttributeEveryAgent(t *testing.T) {
 	db := openDraftStubDB(t, stub)
 	defer db.Close()
 
-	out, err := listRetroDrafts(context.Background(), generated.New(db), 1, 50, 0)
+	out, err := listRetroDrafts(context.Background(), generated.New(db), 1, elevatedDraftReader, 50, 0)
 	require.NoError(t, err)
 	require.Len(t, out.Body.Drafts, 4)
 
@@ -85,12 +86,18 @@ func retroDraftStatementCount(t *testing.T, n int) int {
 	db := openDraftStubDB(t, stub)
 	defer db.Close()
 
-	out, err := listRetroDrafts(context.Background(), generated.New(db), 1, int32(n), 0) //#nosec G115 -- n is a test constant
+	out, err := listRetroDrafts(context.Background(), generated.New(db), 1, elevatedDraftReader, int32(n), 0) //#nosec G115 -- n is a test constant
 	require.NoError(t, err)
 	require.Len(t, out.Body.Drafts, n)
 
 	return stub.count()
 }
+
+// elevatedDraftReader is the visibility binding these tests read the page
+// with. The stub driver answers with a fixed row set whatever the binds
+// are, so the value only has to be well-formed; what is under test is the
+// number of statements and the agent attribution, not the filter.
+var elevatedDraftReader = acl.ListVisibilityArgs(1, acl.WorkspaceRoleOwner)
 
 // --- stub driver ------------------------------------------------------
 

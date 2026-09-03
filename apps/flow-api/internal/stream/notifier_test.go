@@ -292,12 +292,19 @@ func TestKindForEventType(t *testing.T) {
 		"task.transition.complete": KindTaskChanged,
 		"ai.suggestion.applied":    KindAiSuggestionChanged,
 		"calendar.event.created":   KindCalendarChanged,
-		"calendar.member.joined":   KindCalendarChanged,
-		"share.token.rotated":      KindCalendarChanged,
-		"item.scheduled":           KindItemChanged,
-		"item.rescheduled":         KindItemChanged,
-		"signal.attached":          "",
-		"comment.added":            "",
+		"calendar.member.added":    KindCalendarChanged,
+		"calendar.subscribed":      KindCalendarChanged,
+		// Public shares live in their own namespace and used to match no
+		// prefix here, so every share mutation reached the tap and was
+		// dropped. They belong to the calendar surface the frontend
+		// invalidates.
+		"public_share.rotated":         KindCalendarChanged,
+		"public_share.events_attached": KindCalendarChanged,
+		"item.scheduled":               KindItemChanged,
+		"item.rescheduled":             KindItemChanged,
+		"signal.attached":              "",
+		"comment.added":                "",
+		"totally.made.up":              "",
 	}
 	for in, want := range cases {
 		got, ok := KindForEventType(in)

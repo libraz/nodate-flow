@@ -67,21 +67,21 @@ func TestIsWorkingDay(t *testing.T) {
 	monday := time.Date(2026, 4, 20, 9, 0, 0, 0, time.UTC)
 	saturday := time.Date(2026, 4, 25, 9, 0, 0, 0, time.UTC)
 
-	if !IsWorkingDay("MTWTF__", monday, time.UTC, nil, false) {
+	if !IsWorkingDay("MTWTF__", monday, UTC(), nil, false) {
 		t.Error("Mon should be working under MTWTF__")
 	}
-	if IsWorkingDay("MTWTF__", saturday, time.UTC, nil, false) {
+	if IsWorkingDay("MTWTF__", saturday, UTC(), nil, false) {
 		t.Error("Sat should be off under MTWTF__")
 	}
-	if !IsWorkingDay("MTWTFSS", saturday, time.UTC, nil, false) {
+	if !IsWorkingDay("MTWTFSS", saturday, UTC(), nil, false) {
 		t.Error("Sat should be working under MTWTFSS")
 	}
 
 	holidays := map[string]struct{}{"2026-04-20": {}}
-	if IsWorkingDay("MTWTF__", monday, time.UTC, holidays, true) {
+	if IsWorkingDay("MTWTF__", monday, UTC(), holidays, true) {
 		t.Error("Mon should be off when it's a treated holiday")
 	}
-	if !IsWorkingDay("MTWTF__", monday, time.UTC, holidays, false) {
+	if !IsWorkingDay("MTWTF__", monday, UTC(), holidays, false) {
 		t.Error("treatHolidays=false should ignore the holiday set")
 	}
 }
@@ -90,13 +90,13 @@ func TestNextWorkingDay(t *testing.T) {
 	t.Parallel()
 	// Start on Saturday; expect Monday (with MTWTF__).
 	saturday := time.Date(2026, 4, 25, 14, 30, 0, 0, time.UTC)
-	next := NextWorkingDay("MTWTF__", saturday, time.UTC, nil, false)
+	next := NextWorkingDay("MTWTF__", saturday, UTC(), nil, false)
 	want := time.Date(2026, 4, 27, 14, 30, 0, 0, time.UTC)
 	if !next.Equal(want) {
 		t.Errorf("NextWorkingDay: want %v, got %v", want, next)
 	}
 	// All-off string must not loop forever.
-	stuck := NextWorkingDay("_______", saturday, time.UTC, nil, false)
+	stuck := NextWorkingDay("_______", saturday, UTC(), nil, false)
 	if !stuck.Equal(saturday) {
 		t.Errorf("NextWorkingDay with all-off: expected original %v, got %v", saturday, stuck)
 	}

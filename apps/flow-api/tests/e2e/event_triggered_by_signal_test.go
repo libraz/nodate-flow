@@ -1,5 +1,5 @@
 // Package e2e — coverage for the ADR 0008 D4 traceability link surfaced
-// on event-returning endpoints (J3 in the release-8 plan).
+// on event-returning endpoints.
 //
 // The test creates a signal through the public POST /signals path, then
 // appends an event via the in-process eventbus with `triggered_by_signal_id`
@@ -18,6 +18,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/dbretry"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/eventbus"
 	"github.com/libraz/nodate-flow/apps/flow-api/tests/helpers"
 )
@@ -25,7 +26,7 @@ import (
 // TestEventTriggeredBySignalIDFlowsThroughTimeline locks in that
 // `triggered_by_signal_id` is round-tripped from eventbus.Append() to the
 // GET /workspaces/{wsId}/timeline response as a public_id string. The
-// linkage is the contract J4 (Applier) will rely on once it starts writing
+// linkage is the contract the Applier will rely on once it starts writing
 // SignalApplied / TaskAutoCompleted events.
 func TestEventTriggeredBySignalIDFlowsThroughTimeline(t *testing.T) {
 	bootstrap(t)
@@ -66,7 +67,7 @@ func TestEventTriggeredBySignalIDFlowsThroughTimeline(t *testing.T) {
 
 	// Resolve internal ids: the eventbus contract is in terms of
 	// internal BIGINTs so the assertion exercises the same path the
-	// Applier (J4) will use when it lands.
+	// Applier will use when it lands.
 	wsInternalID, userInternalID := lookupWorkspaceAndOwner(ctx, t, tt.WorkspacePublicID)
 	var signalInternalID int64
 	require.NoError(t,
@@ -91,7 +92,7 @@ func TestEventTriggeredBySignalIDFlowsThroughTimeline(t *testing.T) {
 	// assertion is keyed on `triggered_by_signal_id` rather than
 	// matching any incidental event the handlers emit.
 	actorUserID := int64(userInternalID)
-	require.NoError(t, eventbus.Append(ctx, testDB, eventbus.Event{
+	require.NoError(t, eventbus.Append(ctx, dbretry.AutoCommit(testDB), eventbus.Event{
 		Type:                "task.note",
 		WorkspaceID:         wsInternalID,
 		ActorUserID:         &actorUserID,
@@ -104,7 +105,7 @@ func TestEventTriggeredBySignalIDFlowsThroughTimeline(t *testing.T) {
 
 	// And append a sibling event with no signal lineage so the null
 	// branch of the mapper gets exercised by the same response.
-	require.NoError(t, eventbus.Append(ctx, testDB, eventbus.Event{
+	require.NoError(t, eventbus.Append(ctx, dbretry.AutoCommit(testDB), eventbus.Event{
 		Type:        "task.note",
 		WorkspaceID: wsInternalID,
 		ActorUserID: &actorUserID,
@@ -156,7 +157,7 @@ func TestEventTriggeredBySignalIDFlowsThroughTimeline(t *testing.T) {
 // actor source (ADR 0008 D8, worker-tick events) round-trips from
 // eventbus.Append() to the GET /workspaces/{wsId}/timeline response as a
 // `actorSystemSource` string. Worker binaries are not yet wired up but the
-// contract is exercised here so the Phase 5 worker has a stable boundary.
+// contract is exercised here so the worker has a stable boundary.
 func TestEventActorSystemSourceFlowsThroughTimeline(t *testing.T) {
 	bootstrap(t)
 	t.Parallel()
@@ -169,7 +170,7 @@ func TestEventActorSystemSourceFlowsThroughTimeline(t *testing.T) {
 
 	wsInternalID, _ := lookupWorkspaceAndOwner(ctx, t, tt.WorkspacePublicID)
 
-	require.NoError(t, eventbus.Append(ctx, testDB, eventbus.Event{
+	require.NoError(t, eventbus.Append(ctx, dbretry.AutoCommit(testDB), eventbus.Event{
 		Type:              "workspace.tick",
 		WorkspaceID:       wsInternalID,
 		ActorSystemSource: "worker.calendar",

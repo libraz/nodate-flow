@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/dbretry"
 	"github.com/libraz/nodate-flow/packages/go-shared/dbtype"
 )
 
@@ -47,7 +48,7 @@ func TestScheduleTaskDatesTheDeadlineInTheEventTimezone(t *testing.T) {
 		t.Fatalf("test premise broken: %v is not on the previous UTC day", start.UTC())
 	}
 
-	withTx(t, db, func(tx *sql.Tx) {
+	withTx(t, db, func(tx TX) {
 		if _, _, err := ScheduleTask(ctx, tx, ScheduleTaskArgs{
 			WorkspaceID: fx.wsID, TaskID: fx.taskID, CalendarID: fx.calendarID,
 			ActorUserID: fx.userID, Role: RoleDue, Title: "Morning standup",
@@ -81,7 +82,7 @@ func TestScheduleTaskDatesTheDeadlineBehindUTCToo(t *testing.T) {
 		t.Fatalf("test premise broken: %v is not on the next UTC day", start.UTC())
 	}
 
-	withTx(t, db, func(tx *sql.Tx) {
+	withTx(t, db, func(tx TX) {
 		if _, _, err := ScheduleTask(ctx, tx, ScheduleTaskArgs{
 			WorkspaceID: fx.wsID, TaskID: fx.taskID, CalendarID: fx.calendarID,
 			ActorUserID: fx.userID, Role: RoleDue, Title: "Evening review",
@@ -111,7 +112,7 @@ func TestRescheduleEventKeepsTheDeadlineOnItsLocalDay(t *testing.T) {
 	}
 	start := time.Date(2030, 6, 3, 8, 0, 0, 0, tokyo)
 	var eventID uint32
-	withTx(t, db, func(tx *sql.Tx) {
+	withTx(t, db, func(tx TX) {
 		_, id, err := ScheduleTask(ctx, tx, ScheduleTaskArgs{
 			WorkspaceID: fx.wsID, TaskID: fx.taskID, CalendarID: fx.calendarID,
 			ActorUserID: fx.userID, Role: RoleDue, Title: "Standup",
@@ -136,7 +137,7 @@ func TestRescheduleEventKeepsTheDeadlineOnItsLocalDay(t *testing.T) {
 	if moved.UTC().Day() == start.UTC().Day() {
 		t.Fatal("test premise broken: the move does not cross a UTC midnight")
 	}
-	withTx(t, db, func(tx *sql.Tx) {
+	withTx(t, db, func(tx TX) {
 		if err := RescheduleEvent(ctx, tx, RescheduleEventArgs{
 			WorkspaceID: fx.wsID, EventID: eventID, ActorUserID: fx.userID,
 			StartAt: moved, EndAt: moved.Add(time.Hour),
@@ -172,7 +173,7 @@ func TestRescheduleTaskMovesTheEventToTheRequestedLocalDay(t *testing.T) {
 		t.Fatalf("load location: %v", err)
 	}
 	start := time.Date(2030, 6, 3, 8, 0, 0, 0, tokyo)
-	withTx(t, db, func(tx *sql.Tx) {
+	withTx(t, db, func(tx TX) {
 		if _, _, err := ScheduleTask(ctx, tx, ScheduleTaskArgs{
 			WorkspaceID: fx.wsID, TaskID: fx.taskID, CalendarID: fx.calendarID,
 			ActorUserID: fx.userID, Role: RoleDue, Title: "Standup",
@@ -183,7 +184,7 @@ func TestRescheduleTaskMovesTheEventToTheRequestedLocalDay(t *testing.T) {
 	})
 
 	newDue := time.Date(2030, 6, 10, 0, 0, 0, 0, time.UTC)
-	withTx(t, db, func(tx *sql.Tx) {
+	withTx(t, db, func(tx TX) {
 		if err := RescheduleTask(ctx, tx, RescheduleTaskArgs{
 			WorkspaceID: fx.wsID, TaskID: fx.taskID, ActorUserID: fx.userID,
 			SetDueOn: true, DueOn: newDue,
@@ -227,16 +228,16 @@ func TestScheduleTaskRefusesAnUnknownTimezone(t *testing.T) {
 	defer purge(t, db, fx.wsID)
 
 	start := time.Date(2030, 6, 3, 8, 0, 0, 0, time.UTC)
-	tx, err := db.BeginTx(ctx, nil)
-	if err != nil {
-		t.Fatalf("begin: %v", err)
-	}
-	_, _, err = ScheduleTask(ctx, tx, ScheduleTaskArgs{
-		WorkspaceID: fx.wsID, TaskID: fx.taskID, CalendarID: fx.calendarID,
-		ActorUserID: fx.userID, Role: RoleDue, Title: "Broken zone",
-		StartAt: start, EndAt: start.Add(time.Hour), Timezone: "Mars/Olympus",
+	// The closure returns the invariant error, so InTx rolls the
+	// attempt back — which is the second half of what this test checks.
+	err := dbretry.InTx(ctx, db, "itemkit.test", nil, func(ctx context.Context, tx *dbretry.Tx) error {
+		_, _, serr := ScheduleTask(ctx, tx, ScheduleTaskArgs{
+			WorkspaceID: fx.wsID, TaskID: fx.taskID, CalendarID: fx.calendarID,
+			ActorUserID: fx.userID, Role: RoleDue, Title: "Broken zone",
+			StartAt: start, EndAt: start.Add(time.Hour), Timezone: "Mars/Olympus",
+		})
+		return serr
 	})
-	_ = tx.Rollback()
 	if err == nil {
 		t.Fatal("ScheduleTask accepted an unknown timezone")
 	}
@@ -275,23 +276,17 @@ func TestApplyShiftCountsDaysInTheEventTimezone(t *testing.T) {
 		t.Fatal("test premise broken: the move does not cross a UTC midnight")
 	}
 
-	tx, err := db.BeginTx(ctx, nil)
-	if err != nil {
-		t.Fatalf("begin: %v", err)
-	}
-	if err := ApplyShiftEventAndChildren(ctx, tx, ApplyShiftEventAndChildrenArgs{
-		WorkspaceID:      f.wsID,
-		EventID:          umbrella,
-		NewStartAt:       newStart,
-		ConfirmedTaskIDs: []uint32{taskID},
-		ActorUserID:      f.userID,
-	}); err != nil {
-		_ = tx.Rollback()
-		t.Fatalf("apply: %v", err)
-	}
-	if err := tx.Commit(); err != nil {
-		t.Fatalf("commit: %v", err)
-	}
+	withTx(t, db, func(tx TX) {
+		if err := ApplyShiftEventAndChildren(ctx, tx, ApplyShiftEventAndChildrenArgs{
+			WorkspaceID:      f.wsID,
+			EventID:          umbrella,
+			NewStartAt:       newStart,
+			ConfirmedTaskIDs: []uint32{taskID},
+			ActorUserID:      f.userID,
+		}); err != nil {
+			t.Fatalf("apply: %v", err)
+		}
+	})
 
 	if got := dueOnString(ctx, t, db, taskID); got != "2030-05-28" {
 		t.Errorf("tasks.due_on = %q, want 2030-05-28 — the umbrella stayed on its Tokyo day", got)

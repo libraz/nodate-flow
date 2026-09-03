@@ -39,17 +39,19 @@ func TestPrivateTaskHiddenFromNonActor(t *testing.T) {
 			"visibility": "private",
 		}, &task)
 
-	// Owner can access it.
-	status, _ := doJSONStatus(t, http.MethodGet,
+	// Owner can access it, and the title is genuinely there to conceal.
+	status, body := doJSONStatus(t, http.MethodGet,
 		testServerURL+"/tasks/"+task.ID, owner.AccessToken, nil)
 	require.Equal(t, http.StatusOK, status,
 		"owner must see their private task")
+	require.Contains(t, string(body), "Owner's Private Task",
+		"the owner's read must contain the task's title")
 
 	// Member cannot see it. Unlike the cross-workspace case, a private
 	// task inside a workspace the actor belongs to is concealed rather
 	// than denied: the refusal is 404 WS.TASK.NOT_FOUND so a member
 	// cannot use the status to confirm that the task exists at all.
-	status, body := doJSONStatus(t, http.MethodGet,
+	status, body = doJSONStatus(t, http.MethodGet,
 		testServerURL+"/tasks/"+task.ID, member.AccessToken, nil)
 	requireDenied(t, status, body, http.StatusNotFound, "WS.TASK.NOT_FOUND",
 		"a non-actor member reading a private task")

@@ -1,373 +1,245 @@
 package calendar_event_day
 
 import (
-	"encoding/json"
-	"os"
-	"path/filepath"
-	"runtime"
+	"database/sql"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/require"
+
+	"github.com/libraz/nodate-flow/packages/go-shared/region"
 )
 
-// ptrInt returns a pointer to v for the optional rule fields.
-func ptrInt(v int) *int { return &v }
+// The expansion arithmetic belongs to packages/go-shared/recurrence and is
+// pinned there against testdata/recurrence_golden.json, the same fixture
+// the browser expander is held to. What is left here is what this scanner
+// adds on top of it: which column feeds which field, which occurrences
+// count as arriving on the day being materialised, and which malformed
+// rows are reported rather than silently expanded to nothing.
 
-// ptrStr returns a pointer to v for the optional rule fields.
-func ptrStr(v string) *string { return &v }
+// arriving builds the day window the scan materialises, the same way
+// ListEventsForDays derives it from a local date.
+func arriving(z region.Zone, y int, m time.Month, d int) arrivingDay {
+	day := region.NewDay(y, m, d)
+	return arrivingDay{
+		day:      day.String(),
+		utcStart: day.Start(z).UTC(),
+		utcEnd:   day.EndExclusive(z).UTC(),
+	}
+}
 
-// occUnix maps the expanded occurrence instants to unix seconds so the
-// assertions read as a flat list rather than time.Time literals.
-func occUnix(occ []time.Time) []int64 {
-	out := make([]int64, 0, len(occ))
-	for _, o := range occ {
-		out = append(out, o.Unix())
+// row builds a scanned candidate. duration is how long each occurrence
+// runs, which is what the expander reads out of end_at.
+func row(startAt time.Time, duration time.Duration, tz, rule string) candidateRow {
+	return candidateRow{
+		event:          Event{StartAt: startAt.UTC()},
+		endAt:          sql.NullTime{Time: startAt.Add(duration).UTC(), Valid: true},
+		timezone:       tz,
+		recurrenceRule: []byte(rule),
+	}
+}
+
+// startsOf renders the emitted tuples as UTC RFC3339 so a failure reads as
+// a list of instants rather than as time.Time literals.
+func startsOf(tuples []EventOnDay) []string {
+	out := make([]string, 0, len(tuples))
+	for _, tuple := range tuples {
+		out = append(out, tuple.Event.StartAt.UTC().Format(time.RFC3339))
 	}
 	return out
 }
 
-// dayRange returns the UTC [start, end) bounds of one calendar day in loc,
-// matching how the scanner derives an arriving day's window.
-func dayRange(t *testing.T, loc *time.Location, y int, m time.Month, d int) (time.Time, time.Time) {
+func expand(t *testing.T, c candidateRow, d arrivingDay) []EventOnDay {
 	t.Helper()
-	start := time.Date(y, m, d, 0, 0, 0, 0, loc)
-	end := time.Date(y, m, d+1, 0, 0, 0, 0, loc)
-	return start.UTC(), end.UTC()
+	tuples, err := (&Scanner{}).expandCandidate(c, d)
+	require.NoError(t, err)
+	return tuples
 }
 
-// TestParseRecurrenceRule_NullVariants verifies the decode treats SQL NULL,
-// empty bytes, and the JSON null literal as "no rule" so a non-recurring row
-// flows through the single-occurrence path.
-func TestParseRecurrenceRule_NullVariants(t *testing.T) {
+// TestExpandCandidate_NonRecurringRowEmitsItsOwnDay pins the path a row
+// without a rule takes: the SQL filter already decided it belongs to this
+// day, so it contributes exactly one tuple and no expansion runs.
+func TestExpandCandidate_NonRecurringRowEmitsItsOwnDay(t *testing.T) {
 	t.Parallel()
-	for _, in := range [][]byte{nil, {}, []byte("  "), []byte("null"), []byte(" null ")} {
-		rule, err := parseRecurrenceRule(in)
-		require.NoError(t, err)
-		require.Nil(t, rule, "input %q must decode to no rule", string(in))
+	day := arriving(region.UTC(), 2026, time.July, 1)
+	base := time.Date(2026, time.July, 1, 9, 0, 0, 0, time.UTC)
+
+	for _, raw := range []string{"", "null", "  "} {
+		c := row(base, time.Hour, "UTC", raw)
+		tuples := expand(t, c, day)
+		require.Len(t, tuples, 1, "input %q must take the single-occurrence path", raw)
+		require.Equal(t, "2026-07-01", tuples[0].Day)
+		require.Equal(t, day.utcEnd.Unix(), tuples[0].ExpiresAtUnix)
 	}
 }
 
-// TestParseRecurrenceRule_UnsupportedFreq rejects an unknown freq so the scan
-// fails loudly rather than silently emitting nothing.
-func TestParseRecurrenceRule_UnsupportedFreq(t *testing.T) {
+// TestExpandCandidate_FiresOnADayAfterTheBase is the whole reason the
+// scanner expands at all: a recurring row has to reach days its base start
+// never touches.
+func TestExpandCandidate_FiresOnADayAfterTheBase(t *testing.T) {
 	t.Parallel()
-	_, err := parseRecurrenceRule([]byte(`{"freq":"hourly"}`))
-	require.Error(t, err)
-}
-
-// TestExpandDaily_FiresOnNonBaseDay is the core P2-8 fix: a daily rule must
-// produce an occurrence on a day after the base start day.
-func TestExpandDaily_FiresOnNonBaseDay(t *testing.T) {
-	t.Parallel()
-	loc := time.UTC
 	base := time.Date(2026, time.July, 1, 9, 0, 0, 0, time.UTC)
-	rule := &recurrenceRule{Freq: "daily"}
+	c := row(base, time.Hour, "UTC", `{"freq":"daily"}`)
 
-	// Window = 2026-07-05 (four days after base). The daily occurrence at
-	// 09:00 on 07-05 must land in the range.
-	ws, we := dayRange(t, loc, 2026, time.July, 5)
-	occ := expandOccurrences(rule, base, loc, time.Time{}, time.Time{}, nil, ws, we)
-	require.Equal(t, []int64{
-		time.Date(2026, time.July, 5, 9, 0, 0, 0, time.UTC).Unix(),
-	}, occUnix(occ), "the 07-05 occurrence of a daily rule must fire")
+	tuples := expand(t, c, arriving(region.UTC(), 2026, time.July, 5))
+	require.Equal(t, []string{"2026-07-05T09:00:00Z"}, startsOf(tuples))
+	require.Equal(t, "2026-07-05", tuples[0].Day,
+		"the tuple must be labelled with the day it arrived on, not the base day")
 }
 
-// TestExpandDaily_BaseDayStillFires confirms the base day is unchanged by the
-// expansion: an occurrence on the base day lands in its own window.
-func TestExpandDaily_BaseDayStillFires(t *testing.T) {
+// TestExpandCandidate_OnlyOccurrencesStartingInTheDayArrive states the
+// rule the scanner applies on top of the expander. The expander answers
+// which occurrences meet a window, including one that began earlier and is
+// still running; a day arrives for an occurrence that starts in it. An
+// overnight series would otherwise announce itself twice — once on the day
+// it starts and again on the day it ends.
+func TestExpandCandidate_OnlyOccurrencesStartingInTheDayArrive(t *testing.T) {
 	t.Parallel()
-	loc := time.UTC
+	// A nightly series running 22:00 -> 02:00 the next day.
+	base := time.Date(2026, time.July, 1, 22, 0, 0, 0, time.UTC)
+	c := row(base, 4*time.Hour, "UTC", `{"freq":"daily"}`)
+
+	tuples := expand(t, c, arriving(region.UTC(), 2026, time.July, 5))
+	require.Equal(t, []string{"2026-07-05T22:00:00Z"}, startsOf(tuples),
+		"only the occurrence starting on 07-05 arrives; the one that started on 07-04 does not")
+}
+
+// TestExpandCandidate_OccurrenceAtLocalMidnightArrives covers the edge of
+// that rule: an occurrence starting exactly at the local midnight the day
+// begins on belongs to the day that just started.
+func TestExpandCandidate_OccurrenceAtLocalMidnightArrives(t *testing.T) {
+	t.Parallel()
+	loc := mustLoad(t, "Asia/Tokyo")
+	base := time.Date(2026, time.July, 1, 0, 0, 0, 0, loc.Location())
+	c := row(base, time.Hour, "Asia/Tokyo", `{"freq":"daily"}`)
+
+	tuples := expand(t, c, arriving(loc, 2026, time.July, 5))
+	require.Len(t, tuples, 1, "an occurrence at local midnight arrives on the day it opens")
+	require.Equal(t, "2026-07-05", tuples[0].Day)
+}
+
+// TestExpandCandidate_ExceptionSuppressesTheOccurrence proves the
+// recurrence_exceptions column reaches the expander.
+func TestExpandCandidate_ExceptionSuppressesTheOccurrence(t *testing.T) {
+	t.Parallel()
 	base := time.Date(2026, time.July, 1, 9, 0, 0, 0, time.UTC)
-	rule := &recurrenceRule{Freq: "daily"}
+	c := row(base, time.Hour, "UTC", `{"freq":"daily"}`)
+	c.recurrenceExceptions = []byte(`["2026-07-05T09:00:00Z"]`)
 
-	ws, we := dayRange(t, loc, 2026, time.July, 1)
-	occ := expandOccurrences(rule, base, loc, time.Time{}, time.Time{}, nil, ws, we)
-	require.Equal(t, []int64{base.Unix()}, occUnix(occ))
+	require.Empty(t, expand(t, c, arriving(region.UTC(), 2026, time.July, 5)),
+		"a cancelled occurrence must not arrive")
+	require.Len(t, expand(t, c, arriving(region.UTC(), 2026, time.July, 6)), 1,
+		"cancelling one occurrence must not end the series")
 }
 
-// TestExpandDaily_ExceptionSuppresses proves an occurrence whose instant is
-// in the recurrence_exceptions set does not fire.
-func TestExpandDaily_ExceptionSuppresses(t *testing.T) {
+// TestExpandCandidate_RecurrenceEndStopsTheSeries proves the
+// recurrence_end column — which lives beside the rule, not inside it —
+// reaches the expander as the series' upper bound.
+func TestExpandCandidate_RecurrenceEndStopsTheSeries(t *testing.T) {
 	t.Parallel()
-	loc := time.UTC
 	base := time.Date(2026, time.July, 1, 9, 0, 0, 0, time.UTC)
-	rule := &recurrenceRule{Freq: "daily"}
+	end := time.Date(2026, time.July, 4, 9, 0, 0, 0, time.UTC)
+	c := row(base, time.Hour, "UTC", `{"freq":"daily"}`)
+	c.recurrenceEnd = sql.NullTime{Time: end, Valid: true}
 
-	excludedInstant := time.Date(2026, time.July, 5, 9, 0, 0, 0, time.UTC)
-	exceptions := &recurrenceExceptions{instants: map[int64]struct{}{excludedInstant.Unix(): {}}}
-
-	ws, we := dayRange(t, loc, 2026, time.July, 5)
-	occ := expandOccurrences(rule, base, loc, time.Time{}, time.Time{}, exceptions, ws, we)
-	require.Empty(t, occ, "an excluded occurrence must not fire")
+	require.Len(t, expand(t, c, arriving(region.UTC(), 2026, time.July, 4)), 1,
+		"the occurrence landing on recurrence_end is the last one, and it still arrives")
+	require.Empty(t, expand(t, c, arriving(region.UTC(), 2026, time.July, 5)),
+		"an occurrence past recurrence_end must not arrive")
 }
 
-// TestExpandDaily_PastRecurrenceEnd proves an occurrence at or after the
-// recurrence_end bound does not fire.
-func TestExpandDaily_PastRecurrenceEnd(t *testing.T) {
+// TestExpandCandidate_UntilAndCountBoundTheSeries covers the two bounds
+// the rule itself carries, including the bare-date UNTIL that names a
+// whole local day rather than its midnight.
+func TestExpandCandidate_UntilAndCountBoundTheSeries(t *testing.T) {
 	t.Parallel()
-	loc := time.UTC
+	ny := mustLoad(t, "America/New_York")
+	base := time.Date(2026, time.July, 1, 9, 0, 0, 0, ny.Location())
+
+	until := row(base, time.Hour, "America/New_York", `{"freq":"daily","until":"2026-07-10"}`)
+	require.Len(t, expand(t, until, arriving(ny, 2026, time.July, 10)), 1,
+		"the 09:00 occurrence on a bare-date UNTIL day still arrives")
+	require.Empty(t, expand(t, until, arriving(ny, 2026, time.July, 11)),
+		"an occurrence past the UNTIL day must not arrive")
+
+	counted := row(base, time.Hour, "America/New_York", `{"freq":"daily","count":3}`)
+	require.Len(t, expand(t, counted, arriving(ny, 2026, time.July, 3)), 1,
+		"the third occurrence of a count=3 series arrives")
+	require.Empty(t, expand(t, counted, arriving(ny, 2026, time.July, 4)),
+		"the fourth occurrence of a count=3 series must not arrive")
+}
+
+// TestExpandCandidate_PreservesWallClockAcrossDST pins that the event's
+// own timezone drives the arithmetic: a 09:00 New York meeting stays at
+// 09:00 local across the spring-forward, so its UTC instant moves by an
+// hour and its local day does not.
+func TestExpandCandidate_PreservesWallClockAcrossDST(t *testing.T) {
+	t.Parallel()
+	ny := mustLoad(t, "America/New_York")
+	// The day before the 2026-03-08 transition. 09:00 EST is 14:00Z.
+	base := time.Date(2026, time.March, 7, 9, 0, 0, 0, ny.Location())
+	c := row(base, time.Hour, "America/New_York", `{"freq":"daily"}`)
+
+	tuples := expand(t, c, arriving(ny, 2026, time.March, 8))
+	require.Equal(t, []string{"2026-03-08T13:00:00Z"}, startsOf(tuples),
+		"a daily 09:00 New York meeting is 13:00Z once the clocks move, not 14:00Z")
+}
+
+// TestExpandCandidate_UnknownTimezoneFallsBack keeps a row with an
+// unreadable zone in the scan. Dropping it would silence the series
+// entirely over one bad string.
+func TestExpandCandidate_UnknownTimezoneFallsBack(t *testing.T) {
+	t.Parallel()
 	base := time.Date(2026, time.July, 1, 9, 0, 0, 0, time.UTC)
-	rule := &recurrenceRule{Freq: "daily"}
+	c := row(base, time.Hour, "Nowhere/Imaginary", `{"freq":"daily"}`)
 
-	// recurrence_end falls on 07-04; the 07-05 occurrence is past it.
-	recurrenceEnd := time.Date(2026, time.July, 4, 12, 0, 0, 0, time.UTC)
-	ws, we := dayRange(t, loc, 2026, time.July, 5)
-	occ := expandOccurrences(rule, base, loc, recurrenceEnd, time.Time{}, nil, ws, we)
-	require.Empty(t, occ, "an occurrence past recurrence_end must not fire")
+	require.Equal(t, []string{"2026-07-05T09:00:00Z"},
+		startsOf(expand(t, c, arriving(region.UTC(), 2026, time.July, 5))))
 }
 
-// TestExpandDaily_PastUntil proves the inclusive UNTIL bound stops the
-// sequence: an occurrence after until does not fire.
-func TestExpandDaily_PastUntil(t *testing.T) {
+// TestExpandCandidate_OldSeriesReachesTheCurrentWindow guards the scan
+// budget. A series anchored many years before the window has to be walked
+// all the way to it; a fixed step budget would run out on the way and the
+// day would come back empty, which reads as "nothing is scheduled".
+func TestExpandCandidate_OldSeriesReachesTheCurrentWindow(t *testing.T) {
 	t.Parallel()
-	loc := time.UTC
+	base := time.Date(2000, time.January, 1, 9, 0, 0, 0, time.UTC)
+	c := row(base, time.Hour, "UTC", `{"freq":"daily"}`)
+
+	require.Equal(t, []string{"2026-07-04T09:00:00Z"},
+		startsOf(expand(t, c, arriving(region.UTC(), 2026, time.July, 4))))
+}
+
+// TestExpandCandidate_ReportsMalformedRows covers the rows the scan
+// refuses to guess about. Each returns an error so ListEventsForDays logs
+// it and keeps scanning the workspace, rather than expanding to nothing
+// and leaving the day looking empty.
+func TestExpandCandidate_ReportsMalformedRows(t *testing.T) {
+	t.Parallel()
 	base := time.Date(2026, time.July, 1, 9, 0, 0, 0, time.UTC)
-	rule := &recurrenceRule{Freq: "daily"}
+	day := arriving(region.UTC(), 2026, time.July, 5)
 
-	until := time.Date(2026, time.July, 4, 9, 0, 0, 0, time.UTC)
-	ws, we := dayRange(t, loc, 2026, time.July, 5)
-	occ := expandOccurrences(rule, base, loc, time.Time{}, until, nil, ws, we)
-	require.Empty(t, occ, "an occurrence past until must not fire")
+	badRule := row(base, time.Hour, "UTC", `{"freq":`)
+	_, err := (&Scanner{}).expandCandidate(badRule, day)
+	require.Error(t, err, "an undecodable recurrence_rule must be reported")
+
+	unsupported := row(base, time.Hour, "UTC", `{"freq":"hourly"}`)
+	_, err = (&Scanner{}).expandCandidate(unsupported, day)
+	require.Error(t, err, "a freq outside the grammar must be reported, not expanded to nothing")
+
+	badExceptions := row(base, time.Hour, "UTC", `{"freq":"daily"}`)
+	badExceptions.recurrenceExceptions = []byte(`{"not":"a list"}`)
+	_, err = (&Scanner{}).expandCandidate(badExceptions, day)
+	require.Error(t, err, "an undecodable exception list must be reported rather than expanded without exclusions")
 }
 
-// TestExpandDaily_CountCaps proves COUNT limits the number of occurrences:
-// with count=3 the fourth day (07-04) is past the sequence.
-func TestExpandDaily_CountCaps(t *testing.T) {
+// TestDecodeRecurrenceExceptions_NullVariants pins the three spellings of
+// "no exceptions" the column uses, none of which is an error.
+func TestDecodeRecurrenceExceptions_NullVariants(t *testing.T) {
 	t.Parallel()
-	loc := time.UTC
-	base := time.Date(2026, time.July, 1, 9, 0, 0, 0, time.UTC)
-	rule := &recurrenceRule{Freq: "daily", Count: ptrInt(3)}
-
-	// 07-03 (3rd occurrence) fires; 07-04 (4th) does not.
-	ws3, we3 := dayRange(t, loc, 2026, time.July, 3)
-	occ3 := expandOccurrences(rule, base, loc, time.Time{}, time.Time{}, nil, ws3, we3)
-	require.Len(t, occ3, 1, "the 3rd occurrence (count=3) must fire")
-
-	ws4, we4 := dayRange(t, loc, 2026, time.July, 4)
-	occ4 := expandOccurrences(rule, base, loc, time.Time{}, time.Time{}, nil, ws4, we4)
-	require.Empty(t, occ4, "the 4th occurrence must not fire when count=3")
-}
-
-func TestExpandDaily_OldMasterReachesCurrentWindow(t *testing.T) {
-	t.Parallel()
-	loc := time.UTC
-	base := time.Date(2010, time.January, 1, 9, 0, 0, 0, time.UTC)
-	rule := &recurrenceRule{Freq: "daily"}
-
-	ws, we := dayRange(t, loc, 2026, time.July, 4)
-	occ := expandOccurrences(rule, base, loc, time.Time{}, time.Time{}, nil, ws, we)
-
-	require.Len(t, occ, 1, "daily recurrences older than maxOccurrences days must still reach the requested window")
-	require.Equal(t, time.Date(2026, time.July, 4, 9, 0, 0, 0, time.UTC), occ[0])
-}
-
-// TestExpandWeekly_Interval proves FREQ=WEEKLY;INTERVAL=2 skips the off-week:
-// base 07-01 (Wed) fires on 07-15, not 07-08.
-func TestExpandWeekly_Interval(t *testing.T) {
-	t.Parallel()
-	loc := time.UTC
-	base := time.Date(2026, time.July, 1, 9, 0, 0, 0, time.UTC)
-	rule := &recurrenceRule{Freq: "weekly", Interval: ptrInt(2)}
-
-	wsOff, weOff := dayRange(t, loc, 2026, time.July, 8)
-	require.Empty(t, expandOccurrences(rule, base, loc, time.Time{}, time.Time{}, nil, wsOff, weOff),
-		"the off-week (07-08) must not fire for interval=2")
-
-	wsOn, weOn := dayRange(t, loc, 2026, time.July, 15)
-	require.Len(t, expandOccurrences(rule, base, loc, time.Time{}, time.Time{}, nil, wsOn, weOn), 1,
-		"the on-week (07-15) must fire for interval=2")
-}
-
-// TestExpandWeekly_ByDay pins the byDay filter semantics the worker shares
-// with the client expander (packages/ui/src/calendar/recurrence.ts): the
-// weekly cursor advances a whole week per step and byDay filters the cursor
-// instant, so a byDay weekday that is NOT the base weekday is filtered out
-// rather than emitted intra-week. base is a Monday with byDay=[MO,WE,FR]:
-// the Monday cursor matches MO, but the Wednesday is never visited. This
-// keeps the worker's firing days identical to the calendar the UI renders.
-func TestExpandWeekly_ByDay(t *testing.T) {
-	t.Parallel()
-	loc := time.UTC
-	// 2026-07-06 is a Monday.
-	base := time.Date(2026, time.July, 6, 9, 0, 0, 0, time.UTC)
-	rule := &recurrenceRule{Freq: "weekly", ByDay: []string{"MO", "WE", "FR"}}
-
-	// The base Monday matches byDay (MO) and fires.
-	wsMon, weMon := dayRange(t, loc, 2026, time.July, 6)
-	require.Len(t, expandOccurrences(rule, base, loc, time.Time{}, time.Time{}, nil, wsMon, weMon), 1,
-		"the base Monday matches byDay MO and must fire")
-
-	// Wednesday 2026-07-08 is listed in byDay (WE) and must also fire: weekly
-	// BYDAY expands every listed weekday within the week, not just the DTSTART
-	// weekday (parity with the client expander).
-	wsWed, weWed := dayRange(t, loc, 2026, time.July, 8)
-	require.Len(t, expandOccurrences(rule, base, loc, time.Time{}, time.Time{}, nil, wsWed, weWed), 1,
-		"intra-week byDay weekdays are expanded (parity with the client)")
-
-	// The following Monday 2026-07-13 fires again.
-	wsNext, weNext := dayRange(t, loc, 2026, time.July, 13)
-	require.Len(t, expandOccurrences(rule, base, loc, time.Time{}, time.Time{}, nil, wsNext, weNext), 1,
-		"the next weekly cursor (Monday) must fire")
-}
-
-// TestExpandDaily_DSTPreservesWallClock proves occurrences advance in the
-// event timezone: a daily 09:00 America/New_York meeting stays at 09:00
-// local across the 2026 spring-forward, so its UTC instant shifts by an hour
-// but the local day boundary still matches.
-func TestExpandDaily_DSTPreservesWallClock(t *testing.T) {
-	t.Parallel()
-	ny, err := time.LoadLocation("America/New_York")
-	require.NoError(t, err)
-
-	// Base the day before spring-forward (2026-03-08). 09:00 EST = 14:00Z.
-	base := time.Date(2026, time.March, 7, 9, 0, 0, 0, ny)
-	rule := &recurrenceRule{Freq: "daily"}
-
-	// The 2026-03-08 occurrence must be 09:00 EDT = 13:00Z, not 14:00Z.
-	ws, we := dayRange(t, ny, 2026, time.March, 8)
-	occ := expandOccurrences(rule, base.UTC(), ny, time.Time{}, time.Time{}, nil, ws, we)
-	require.Len(t, occ, 1)
-	require.Equal(t, 13, occ[0].UTC().Hour(),
-		"a daily 09:00 New York meeting must stay at 09:00 local (13:00Z after spring-forward)")
-}
-
-// TestParseRuleUntil_BareDate proves a YYYY-MM-DD until parses in the event
-// timezone to the final instant of that local day, so the until day is an
-// inclusive upper bound across every wall-clock time-of-day.
-func TestParseRuleUntil_BareDate(t *testing.T) {
-	t.Parallel()
-	ny, err := time.LoadLocation("America/New_York")
-	require.NoError(t, err)
-	got := parseRuleUntil("2026-07-10", ny)
-	want := time.Date(2026, time.July, 11, 0, 0, 0, 0, ny).Add(-time.Nanosecond).UTC()
-	require.Equal(t, want, got)
-	require.Truef(t, got.After(time.Date(2026, time.July, 10, 9, 0, 0, 0, ny).UTC()),
-		"a bare-date until must sit past a 09:00 occurrence on the until day")
-}
-
-// TestExpandDaily_BareDateUntilIncludesUntilDay proves the regression the
-// worker shares with the client expander: a daily 09:00 event with a bare
-// YYYY-MM-DD until must still fire on the until day itself. Resolving the
-// until to local midnight (instead of end-of-day) would drop the 09:00
-// occurrence on that day because 09:00 > 00:00.
-func TestExpandDaily_BareDateUntilIncludesUntilDay(t *testing.T) {
-	t.Parallel()
-	ny, err := time.LoadLocation("America/New_York")
-	require.NoError(t, err)
-
-	base := time.Date(2026, time.July, 1, 9, 0, 0, 0, ny)
-	rule := &recurrenceRule{Freq: "daily", Until: ptrStr("2026-07-10")}
-	until := parseRuleUntil(*rule.Until, ny)
-
-	// The until day (07-10) is inclusive: its 09:00 occurrence must fire.
-	wsUntil, weUntil := dayRange(t, ny, 2026, time.July, 10)
-	require.Len(t, expandOccurrences(rule, base.UTC(), ny, time.Time{}, until, nil, wsUntil, weUntil), 1,
-		"the 09:00 occurrence on the bare-date until day must fire (inclusive UNTIL)")
-
-	// The day after the until (07-11) must not fire.
-	wsAfter, weAfter := dayRange(t, ny, 2026, time.July, 11)
-	require.Empty(t, expandOccurrences(rule, base.UTC(), ny, time.Time{}, until, nil, wsAfter, weAfter),
-		"an occurrence past the bare-date until day must not fire")
-}
-
-// TestParseRecurrenceExceptions_MixedFormats proves both RFC 3339 and bare
-// date exceptions decode, and a bad value is skipped rather than failing.
-func TestParseRecurrenceExceptions_MixedFormats(t *testing.T) {
-	t.Parallel()
-	loc := time.UTC
-	raw := []byte(`["2026-07-05T09:00:00Z","2026-07-06","not-a-date"]`)
-	set, err := parseRecurrenceExceptions(raw, loc)
-	require.NoError(t, err)
-	require.Contains(t, set.instants, time.Date(2026, time.July, 5, 9, 0, 0, 0, time.UTC).Unix())
-	require.Contains(t, set.localDayKeys, "2026-07-06")
-	require.Len(t, set.instants, 1, "the RFC3339 exception must be tracked as an instant")
-	require.Len(t, set.localDayKeys, 1, "the bare date exception must be tracked as a local day")
-}
-
-// TestExpandRule_UntilPtr exercises the rule field decode path end-to-end via
-// expandCandidate-equivalent inputs: a rule with a pointer until string is
-// honoured.
-func TestExpandRule_UntilPtr(t *testing.T) {
-	t.Parallel()
-	loc := time.UTC
-	base := time.Date(2026, time.July, 1, 9, 0, 0, 0, time.UTC)
-	rule := &recurrenceRule{Freq: "daily", Until: ptrStr("2026-07-03T09:00:00Z")}
-	until := parseRuleUntil(*rule.Until, loc)
-
-	// 07-03 fires (inclusive), 07-04 does not.
-	ws3, we3 := dayRange(t, loc, 2026, time.July, 3)
-	require.Len(t, expandOccurrences(rule, base, loc, time.Time{}, until, nil, ws3, we3), 1)
-	ws4, we4 := dayRange(t, loc, 2026, time.July, 4)
-	require.Empty(t, expandOccurrences(rule, base, loc, time.Time{}, until, nil, ws4, we4))
-}
-
-func TestRecurrenceGoldenFixtures(t *testing.T) {
-	t.Parallel()
-	for _, fx := range loadRecurrenceGolden(t) {
-		t.Run(fx.Name, func(t *testing.T) {
-			t.Parallel()
-			loc := time.UTC
-			if fx.Event.Timezone != "" {
-				var err error
-				loc, err = time.LoadLocation(fx.Event.Timezone)
-				require.NoError(t, err)
-			}
-			base, err := time.Parse(time.RFC3339, fx.Event.StartAt)
-			require.NoError(t, err)
-			rangeStart, err := time.Parse(time.RFC3339, fx.RangeStart)
-			require.NoError(t, err)
-			rangeEnd, err := time.Parse(time.RFC3339, fx.RangeEnd)
-			require.NoError(t, err)
-
-			rawExceptions, err := json.Marshal(fx.Event.RecurrenceExceptions)
-			require.NoError(t, err)
-			exceptions, err := parseRecurrenceExceptions(rawExceptions, loc)
-			require.NoError(t, err)
-
-			var until time.Time
-			if fx.Event.RecurrenceRule.Until != nil && *fx.Event.RecurrenceRule.Until != "" {
-				until = parseRuleUntil(*fx.Event.RecurrenceRule.Until, loc)
-			}
-
-			occ := expandOccurrences(&fx.Event.RecurrenceRule, base, loc, time.Time{}, until, exceptions, rangeStart, rangeEnd)
-			got := make([]string, 0, len(occ))
-			for _, o := range occ {
-				got = append(got, o.UTC().Format(time.RFC3339))
-			}
-			require.Equal(t, fx.ExpectedStartAt, got)
-		})
-	}
-}
-
-type recurrenceGoldenFixture struct {
-	Name  string `json:"name"`
-	Event struct {
-		StartAt              string         `json:"startAt"`
-		EndAt                string         `json:"endAt"`
-		Timezone             string         `json:"timezone"`
-		RecurrenceRule       recurrenceRule `json:"recurrenceRule"`
-		RecurrenceExceptions []string       `json:"recurrenceExceptions"`
-	} `json:"event"`
-	RangeStart      string   `json:"rangeStart"`
-	RangeEnd        string   `json:"rangeEnd"`
-	ExpectedStartAt []string `json:"expectedStartAt"`
-}
-
-func loadRecurrenceGolden(t *testing.T) []recurrenceGoldenFixture {
-	t.Helper()
-	_, file, _, ok := runtime.Caller(0)
-	require.True(t, ok)
-	dir := filepath.Dir(file)
-	for {
-		candidate := filepath.Join(dir, "testdata", "recurrence_golden.json")
-		if b, err := os.ReadFile(candidate); err == nil {
-			var out []recurrenceGoldenFixture
-			require.NoError(t, json.Unmarshal(b, &out))
-			return out
-		}
-		parent := filepath.Dir(dir)
-		require.NotEqual(t, dir, parent, "could not find testdata/recurrence_golden.json")
-		dir = parent
+	for _, raw := range [][]byte{nil, {}, []byte("  "), []byte("null"), []byte(" null ")} {
+		values, err := decodeRecurrenceExceptions(raw)
+		require.NoErrorf(t, err, "input %q", string(raw))
+		require.Emptyf(t, values, "input %q", string(raw))
 	}
 }

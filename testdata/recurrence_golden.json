@@ -122,5 +122,97 @@
       "2026-07-04T13:00:00Z",
       "2026-07-05T13:00:00Z"
     ]
+  },
+  {
+    "name": "an exception written without an offset names an instant in the event timezone",
+    "event": {
+      "startAt": "2026-07-01T09:00:00-04:00",
+      "endAt": "2026-07-01T10:00:00-04:00",
+      "timezone": "America/New_York",
+      "recurrenceRule": { "freq": "daily", "count": 4 },
+      "recurrenceExceptions": ["2026-07-03T09:00:00"]
+    },
+    "rangeStart": "2026-07-01T00:00:00Z",
+    "rangeEnd": "2026-07-07T00:00:00Z",
+    "expectedStartAt": ["2026-07-01T13:00:00Z", "2026-07-02T13:00:00Z", "2026-07-04T13:00:00Z"]
+  },
+  {
+    "name": "the occurrence landing exactly on recurrenceEnd is the last one kept",
+    "event": {
+      "startAt": "2026-09-01T09:00:00Z",
+      "endAt": "2026-09-01T10:00:00Z",
+      "timezone": "UTC",
+      "recurrenceRule": { "freq": "daily" },
+      "recurrenceEnd": "2026-09-03T09:00:00Z"
+    },
+    "rangeStart": "2026-09-01T00:00:00Z",
+    "rangeEnd": "2026-10-01T00:00:00Z",
+    "expectedStartAt": ["2026-09-01T09:00:00Z", "2026-09-02T09:00:00Z", "2026-09-03T09:00:00Z"]
+  },
+  {
+    "name": "recurrenceEnd and the rule UNTIL are independent bounds and the earlier one ends the series",
+    "event": {
+      "startAt": "2026-09-01T09:00:00Z",
+      "endAt": "2026-09-01T10:00:00Z",
+      "timezone": "UTC",
+      "recurrenceRule": { "freq": "daily", "until": "2026-09-20" },
+      "recurrenceEnd": "2026-09-02T23:59:59Z"
+    },
+    "rangeStart": "2026-09-01T00:00:00Z",
+    "rangeEnd": "2026-10-01T00:00:00Z",
+    "expectedStartAt": ["2026-09-01T09:00:00Z", "2026-09-02T09:00:00Z"]
+  },
+  {
+    "name": "biweekly across a spring-forward transition keeps both the 09:00 wall clock and the two-week cadence",
+    "event": {
+      "startAt": "2026-02-16T09:00:00-05:00",
+      "endAt": "2026-02-16T10:00:00-05:00",
+      "timezone": "America/New_York",
+      "recurrenceRule": { "freq": "weekly", "interval": 2, "byDay": ["MO"] }
+    },
+    "rangeStart": "2026-02-16T00:00:00Z",
+    "rangeEnd": "2026-04-14T00:00:00Z",
+    "expectedStartAt": [
+      "2026-02-16T14:00:00Z",
+      "2026-03-02T14:00:00Z",
+      "2026-03-16T13:00:00Z",
+      "2026-03-30T13:00:00Z",
+      "2026-04-13T13:00:00Z"
+    ]
+  },
+  {
+    "name": "a daily series anchored decades before the window still reaches it",
+    "event": {
+      "startAt": "2000-01-01T09:00:00Z",
+      "endAt": "2000-01-01T10:00:00Z",
+      "timezone": "UTC",
+      "recurrenceRule": { "freq": "daily" }
+    },
+    "rangeStart": "2026-07-04T00:00:00Z",
+    "rangeEnd": "2026-07-06T00:00:00Z",
+    "expectedStartAt": ["2026-07-04T09:00:00Z", "2026-07-05T09:00:00Z"]
+  },
+  {
+    "name": "an omitted timezone is UTC, so a series spanning a northern spring-forward keeps its 09:00Z",
+    "event": {
+      "startAt": "2026-03-01T09:00:00Z",
+      "endAt": "2026-03-01T10:00:00Z",
+      "recurrenceRule": { "freq": "weekly", "interval": 1, "count": 3 }
+    },
+    "rangeStart": "2026-03-01T00:00:00Z",
+    "rangeEnd": "2026-03-22T00:00:00Z",
+    "expectedStartAt": ["2026-03-01T09:00:00Z", "2026-03-08T09:00:00Z", "2026-03-15T09:00:00Z"]
+  },
+  {
+    "name": "an omitted timezone dates a bare-date exception in UTC, not in whatever zone the reader is in",
+    "event": {
+      "startAt": "2026-03-01T02:00:00Z",
+      "endAt": "2026-03-01T03:00:00Z",
+      "recurrenceRule": { "freq": "daily", "count": 3 },
+      "recurrenceExceptions": ["2026-03-02"]
+    },
+    "rangeStart": "2026-03-01T00:00:00Z",
+    "rangeEnd": "2026-03-05T00:00:00Z",
+    "expectedStartAt": ["2026-03-01T02:00:00Z", "2026-03-03T02:00:00Z"]
   }
 ]

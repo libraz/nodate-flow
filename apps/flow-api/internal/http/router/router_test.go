@@ -1,4 +1,4 @@
-// Package router static-check tests (R6 Phase 0 / ADR 0007). The
+// Package router static-check tests (ADR 0007). The
 // router has been split into three builders (buildAuthenticatedAPI /
 // buildPublicShareAPI / buildAuthAPI) and the tests in this file are
 // the safety net that prevents auth-bypass regressions when later
@@ -357,102 +357,321 @@ func TestEveryOperationHasTags(t *testing.T) {
 
 // roleFloorExemptOps lists every mutating operation on the authenticated
 // surface that deliberately runs without a group-level workspace/project role
-// floor, together with the reason it is safe.
+// floor, together with the check that authorises it instead.
 //
-// The map is the whole exemption budget: TestEveryMutatingOpHasARoleFloor
+// The map is the whole exemption budget. TestEveryMutatingOpHasARoleFloor
 // fails both when an unlisted mutation has no floor (a new route slipped in
 // without a role decision) and when a listed one turns out to have one or to
-// no longer exist (a stale entry). Grant an exemption only when the operation
-// enforces its authorization somewhere the router cannot see, and say where.
+// no longer exist (a stale entry). TestRoleFloorExemptionsNameCodeThatRuns
+// then resolves every entry against the source: an exemption naming a check
+// the handler does not reach, middleware the group does not mount, or a
+// statement that does not bind its rows to the caller fails there.
+//
+// That second half is the point of the aclExemption shape. A sentence saying
+// an operation is checked elsewhere stays true-looking after the check is
+// deleted; a named function that has to be reachable does not.
 //
 // Deciding whether an operation needs a workspace role floor: ask what rows
 // the request writes. The workspace role floor exists to protect state the
 // workspace shares — labels, timeboxes, lenses, pages, dashboards, imports,
 // the intake queue — where one member's edit changes what every other member
 // sees. It is NOT a general "guests may not POST" rule: an operation whose
-// every write is bound to the caller (user_id = actor: their notifications,
-// their favorites, their inbox rows, their own tokens) has no shared state to
-// protect, and putting a floor on it only removes the caller's control over
-// their own account.
-// #nosec G101 -- operation ids mapped to prose reasons; no credentials here
-var roleFloorExemptOps = map[string]string{
-	// Resolved through RequireProjectMemberByGlobalID; the handlers apply
-	// the project-role rules themselves because the required role differs
-	// per operation (lead for membership changes, editor for metadata).
-	"projects-patch":          "project role checked in handler",
-	"projects-disable":        "project role checked in handler",
-	"projects-members-add":    "project role checked in handler",
-	"projects-members-remove": "project role checked in handler",
-
+// every write is bound to the caller (their notifications, their favorites,
+// their own tokens) has no shared state to protect, and putting a floor on it
+// only removes the caller's control over their own account.
+// #nosec G101 -- operation ids mapped to the checks that authorise them; no credentials here
+var roleFloorExemptOps = map[string]aclExemption{
 	// No workspace path parameter to hang a floor on: the project comes
-	// from the request body and the handlers gate on project editor via
-	// tasks.requireProjectEditor.
-	"tasks-create":  "project editor checked in handler",
-	"tasks-reorder": "project editor checked in handler",
+	// from the request body, so the project role is compared in the handler
+	// once the body has been resolved.
+	"tasks-create": {
+		via:    auth.EnforcedByHandlerCall,
+		checks: []string{"tasks.requireProjectEditor"},
+		note:   "project taken from the request body, so the role comparison happens after it resolves",
+	},
+	"tasks-reorder": {
+		via:    auth.EnforcedByHandlerCall,
+		checks: []string{"tasks.requireProjectEditor"},
+		note:   "project taken from the request body, so the role comparison happens after it resolves",
+	},
 
 	// Accepts either the internal service token or a workspace member
-	// bearer; membership is resolved from the body through
-	// resolve.WorkspaceMember.
-	"signals-create": "workspace membership checked in handler",
+	// bearer, so the workspace comes from the body rather than the path.
+	"signals-create": {
+		via:    auth.EnforcedByHandlerCall,
+		checks: []string{"resolve.WorkspaceMember"},
+		note:   "workspace taken from the request body; the service-token path resolves the workspace without an actor",
+	},
 
-	// Caller-scoped rows. Ownership, not workspace role, is the access rule:
-	// every statement is bound by user_id = actor, so the request cannot
-	// change what any other member sees.
-	"inbox-archive":                   "caller-scoped row",
-	"inbox-snooze":                    "caller-scoped row",
-	"notifications-mark-read":         "caller-scoped row",
-	"notifications-archive":           "caller-scoped row",
-	"notifications-mark-all-read":     "caller-scoped row",
-	"notification-preferences-update": "caller-scoped row",
-	"favorites-create":                "caller-scoped row",
-	"favorites-delete":                "caller-scoped row",
-	"mcp-tokens-create":               "caller-scoped row",
-	"mcp-tokens-delete":               "caller-scoped row",
-	"relation-suggestions-resolve":    "workspace membership checked in handler",
+	// The intake queue belongs to the workspace, not to the caller: both
+	// statements match on workspace_id and public_id alone, so one member's
+	// archive or snooze takes the item off every other member's list. That
+	// is the shared state a workspace floor protects — but the route carries
+	// no {wsId} to hang a group floor on, so the same floor is asked for in
+	// the handler.
+	"inbox-archive": {
+		via:    auth.EnforcedByHandlerCall,
+		checks: []string{"resolve.WorkspaceMemberForWrite"},
+		note:   "workspace taken from the query string; the item is workspace-shared state, so the write floor keeps guests out of it",
+	},
+	"inbox-snooze": {
+		via:    auth.EnforcedByHandlerCall,
+		checks: []string{"resolve.WorkspaceMemberForWrite"},
+		note:   "workspace taken from the query string; the item is workspace-shared state, so the write floor keeps guests out of it",
+	},
 
-	// Calendar surface. The write floor is enforced in the handlers rather
-	// than by a router-level floor: resolveCalendarWrite requires calendar
-	// editor or above (and refuses writes to system calendars), with
-	// resolveWorkspaceNonGuest / resolveWorkspaceAdmin covering the
-	// public-share admin routes.
-	"calendars-create":                  "calendar ACL in handler",
-	"calendars-self-subscribe":          "calendar ACL in handler",
-	"calendars-patch":                   "calendar ACL in handler",
-	"calendars-delete":                  "calendar ACL in handler",
-	"calendars-self-subscription-patch": "calendar ACL in handler",
-	"public-shares-create":              "calendar ACL in handler",
-	"public-shares-patch":               "calendar ACL in handler",
-	"public-shares-rotate":              "calendar ACL in handler",
-	"public-shares-delete":              "calendar ACL in handler",
-	"public-shares-events-attach":       "calendar ACL in handler",
-	"public-shares-events-detach":       "calendar ACL in handler",
-	"public-shares-events-reorder":      "calendar ACL in handler",
-	"events-create":                     "calendar ACL in handler",
-	"events-patch":                      "calendar ACL in handler",
-	"events-delete":                     "calendar ACL in handler",
-	"events-smart-create":               "calendar ACL in handler",
-	"events-from-task":                  "calendar ACL in handler",
-	"members-add":                       "calendar ACL in handler",
-	"members-update-role":               "calendar ACL in handler",
-	"members-remove":                    "calendar ACL in handler",
-	"attendees-add":                     "calendar ACL in handler",
-	"attendees-remove":                  "calendar ACL in handler",
-	"attendees-rsvp":                    "calendar ACL in handler",
-	"attendees-can-edit":                "calendar ACL in handler",
-	"event-invites-create":              "calendar ACL in handler",
-	"event-invites-revoke":              "calendar ACL in handler",
-	"comments-create":                   "calendar ACL in handler",
-	"comments-edit":                     "calendar ACL in handler",
-	"comments-delete":                   "calendar ACL in handler",
-	"checklist-create":                  "calendar ACL in handler",
-	"checklist-update":                  "calendar ACL in handler",
-	"checklist-delete":                  "calendar ACL in handler",
-	"memos-create":                      "calendar ACL in handler",
-	"memos-update":                      "calendar ACL in handler",
-	"memos-delete":                      "calendar ACL in handler",
-	"attachments-presign":               "calendar ACL in handler",
-	"attachments-confirm":               "calendar ACL in handler",
-	"attachments-delete":                "calendar ACL in handler",
+	// The suggestion's workspace and the caller's membership of it are
+	// resolved in one statement, so a suggestion in a workspace the caller
+	// does not belong to reads as absent.
+	"relation-suggestions-resolve": {
+		via:    auth.EnforcedByHandlerCall,
+		checks: []string{"relations.resolveSuggestionWorkspaceForActor"},
+		note:   "the route carries no workspace parameter; the suggestion supplies it and membership is joined onto the same lookup",
+	},
+
+	// Caller-scoped writes. Ownership, not workspace role, is the access
+	// rule: each statement below binds the rows it changes to the caller,
+	// whose identity comes from the session rather than the request.
+	"notifications-mark-read": {
+		via:    auth.EnforcedByActorScopedWrite,
+		writes: []actorScopedWrite{{query: "MarkNotificationRead", column: "recipient_user_id"}},
+		note:   "the caller's own notification",
+	},
+	"notifications-archive": {
+		via:    auth.EnforcedByActorScopedWrite,
+		writes: []actorScopedWrite{{query: "ArchiveNotification", column: "recipient_user_id"}},
+		note:   "the caller's own notification",
+	},
+	"notifications-mark-all-read": {
+		via:    auth.EnforcedByActorScopedWrite,
+		writes: []actorScopedWrite{{query: "MarkAllNotificationsRead", column: "recipient_user_id"}},
+		note:   "the caller's own notifications within one workspace",
+	},
+	"notification-preferences-update": {
+		via:    auth.EnforcedByActorScopedWrite,
+		writes: []actorScopedWrite{{query: "UpsertNotificationPreference", column: "user_id"}},
+		note:   "the caller's own delivery preferences",
+	},
+	"favorites-create": {
+		via:    auth.EnforcedByActorScopedWrite,
+		writes: []actorScopedWrite{{query: "CreateFavorite", column: "user_id"}},
+		note:   "the caller's own pinned list",
+	},
+	"favorites-delete": {
+		via:    auth.EnforcedByActorScopedWrite,
+		writes: []actorScopedWrite{{query: "DisableFavorite", column: "user_id"}},
+		note:   "the caller's own pinned list",
+	},
+	"mcp-tokens-create": {
+		via:    auth.EnforcedByActorScopedWrite,
+		writes: []actorScopedWrite{{query: "CreateMcpToken", column: "user_id"}},
+		note:   "the caller's own token, which in turn carries no more than the caller's own role",
+	},
+	"mcp-tokens-delete": {
+		via:    auth.EnforcedByActorScopedWrite,
+		writes: []actorScopedWrite{{query: "RevokeMcpToken", column: "user_id"}},
+		note:   "the caller's own token",
+	},
+
+	// Workspace-scoped calendar surface. These routes sit behind the bearer
+	// check only, so the handler resolves the workspace and the role it
+	// needs from {wsId} itself.
+	"calendars-create": {
+		via:    auth.EnforcedByHandlerCall,
+		checks: []string{"calendars.resolveWorkspaceNonGuest"},
+		note:   "a calendar is workspace state, not the creator's own row: it is discoverable to the workspace and the creator lands in it as owner, so the read-only role is refused",
+	},
+	"calendars-self-subscribe": {
+		via:    auth.EnforcedByHandlerCall,
+		checks: []string{"calendars.resolveWorkspace"},
+		note:   "workspace membership; the only row written is the caller's own viewer membership of a calendar the workspace can already see, which is what a read-only role joining should get",
+	},
+	"public-shares-create": {
+		via:    auth.EnforcedByHandlerCall,
+		checks: []string{"calendars.resolveWorkspaceNonGuest"},
+		note:   "publishing to a URL anyone may open is not a read-only role's decision",
+	},
+	"public-shares-patch": {
+		via:    auth.EnforcedByHandlerCall,
+		checks: []string{"calendars.resolveWorkspaceNonGuest"},
+		note:   "publishing to a URL anyone may open is not a read-only role's decision",
+	},
+	"public-shares-rotate": {
+		via:    auth.EnforcedByHandlerCall,
+		checks: []string{"calendars.resolveWorkspaceNonGuest"},
+		note:   "publishing to a URL anyone may open is not a read-only role's decision",
+	},
+	"public-shares-delete": {
+		via:    auth.EnforcedByHandlerCall,
+		checks: []string{"calendars.resolveWorkspaceAdmin"},
+		note:   "withdrawing a published page is held to a higher role than publishing one",
+	},
+	"public-shares-events-attach": {
+		via:    auth.EnforcedByHandlerCall,
+		checks: []string{"calendars.resolveWorkspaceNonGuest"},
+		note:   "publishing to a URL anyone may open is not a read-only role's decision",
+	},
+	"public-shares-events-detach": {
+		via:    auth.EnforcedByHandlerCall,
+		checks: []string{"calendars.resolveWorkspaceNonGuest"},
+		note:   "publishing to a URL anyone may open is not a read-only role's decision",
+	},
+	"public-shares-events-reorder": {
+		via:    auth.EnforcedByHandlerCall,
+		checks: []string{"calendars.resolveWorkspaceNonGuest"},
+		note:   "publishing to a URL anyone may open is not a read-only role's decision",
+	},
+
+	// Calendar-scoped surface. Access to a calendar is calendar_members,
+	// which the workspace role says nothing about: a workspace admin is not
+	// a member of a calendar nobody added them to, and a guest may well be a
+	// member of one. Each handler resolves the calendar together with the
+	// role that calendar demands.
+	"calendars-patch": {
+		via:    auth.EnforcedByHandlerCall,
+		checks: []string{"calendars.resolveCalendarAdmin"},
+		note:   "editing the calendar itself needs manager or above",
+	},
+	"calendars-delete": {
+		via:    auth.EnforcedByHandlerCall,
+		checks: []string{"calendars.resolveCalendarAtLeast"},
+		note:   "deleting the calendar is the one action a manager does not get; the floor is owner",
+	},
+	"calendars-self-subscription-patch": {
+		via:    auth.EnforcedByHandlerCall,
+		checks: []string{"calendars.resolveCalendar"},
+		note:   "calendar membership; the row written is the caller's own display preference for it, which nobody else reads",
+	},
+	"events-create": {
+		via:    auth.EnforcedByHandlerCall,
+		checks: []string{"calendars.resolveCalendarWrite"},
+		note:   "calendar editor or above, and never a provider-fed system calendar",
+	},
+	"events-patch": {
+		via:    auth.EnforcedByHandlerCall,
+		checks: []string{"calendars.resolveCalendarWrite"},
+		note:   "calendar editor or above, and never a provider-fed system calendar",
+	},
+	"events-delete": {
+		via:    auth.EnforcedByHandlerCall,
+		checks: []string{"calendars.resolveCalendarWrite"},
+		note:   "calendar editor or above, and never a provider-fed system calendar",
+	},
+	"events-smart-create": {
+		via:    auth.EnforcedByHandlerCall,
+		checks: []string{"calendars.resolveCalendar"},
+		note:   "calendar membership; the request parses text into a proposal and writes no row, so there is no shared state for a floor to protect — creating the proposed event is a separate call that does carry the editor floor",
+	},
+	"events-from-task": {
+		via:    auth.EnforcedByHandlerCall,
+		checks: []string{"calendars.resolveCalendarWrite"},
+		note:   "calendar editor or above, and never a provider-fed system calendar",
+	},
+	"members-add": {
+		via:    auth.EnforcedByHandlerCall,
+		checks: []string{"calendars.resolveCalendarAdmin"},
+		note:   "deciding who reaches the calendar needs manager or above",
+	},
+	"members-update-role": {
+		via:    auth.EnforcedByHandlerCall,
+		checks: []string{"calendars.resolveCalendarAdmin"},
+		note:   "deciding who reaches the calendar needs manager or above",
+	},
+	"members-remove": {
+		via:    auth.EnforcedByHandlerCall,
+		checks: []string{"calendars.resolveCalendar", "calendars.roleRank"},
+		note:   "leaving is always allowed, so the role comparison is per-target rather than a floor on the route: removing anyone else needs manager or above, and removing an owner needs owner",
+	},
+	"attendees-add": {
+		via:    auth.EnforcedByHandlerCall,
+		checks: []string{"calendars.resolveCalendarWrite"},
+		note:   "calendar editor or above, and never a provider-fed system calendar",
+	},
+	"attendees-remove": {
+		via:    auth.EnforcedByHandlerCall,
+		checks: []string{"calendars.resolveCalendarWrite"},
+		note:   "calendar editor or above, and never a provider-fed system calendar",
+	},
+	"attendees-rsvp": {
+		via:    auth.EnforcedByHandlerCall,
+		checks: []string{"calendars.resolveCalendar"},
+		note:   "calendar membership; the handler then refuses anyone the event's attendee list does not name, and the only row it writes is that caller's own answer — a floor here would stop invitees replying to their own invitation",
+	},
+	"attendees-can-edit": {
+		via:    auth.EnforcedByHandlerCall,
+		checks: []string{"calendars.resolveCalendarWrite"},
+		note:   "calendar editor or above, and never a provider-fed system calendar",
+	},
+	"event-invites-create": {
+		via:    auth.EnforcedByHandlerCall,
+		checks: []string{"calendars.resolveCalendarWrite"},
+		note:   "calendar editor or above, and never a provider-fed system calendar",
+	},
+	"event-invites-revoke": {
+		via:    auth.EnforcedByHandlerCall,
+		checks: []string{"calendars.resolveCalendarWrite"},
+		note:   "calendar editor or above, and never a provider-fed system calendar",
+	},
+	"comments-create": {
+		via:    auth.EnforcedByHandlerCall,
+		checks: []string{"calendars.resolveCalendarWrite"},
+		note:   "calendar editor or above, and never a provider-fed system calendar",
+	},
+	"comments-edit": {
+		via:    auth.EnforcedByHandlerCall,
+		checks: []string{"calendars.resolveCalendarWrite"},
+		note:   "calendar editor or above, and never a provider-fed system calendar",
+	},
+	"comments-delete": {
+		via:    auth.EnforcedByHandlerCall,
+		checks: []string{"calendars.resolveCalendarWrite"},
+		note:   "calendar editor or above, and never a provider-fed system calendar",
+	},
+	"checklist-create": {
+		via:    auth.EnforcedByHandlerCall,
+		checks: []string{"calendars.resolveCalendarWrite"},
+		note:   "calendar editor or above, and never a provider-fed system calendar",
+	},
+	"checklist-update": {
+		via:    auth.EnforcedByHandlerCall,
+		checks: []string{"calendars.resolveCalendarWrite"},
+		note:   "calendar editor or above, and never a provider-fed system calendar",
+	},
+	"checklist-delete": {
+		via:    auth.EnforcedByHandlerCall,
+		checks: []string{"calendars.resolveCalendarWrite"},
+		note:   "calendar editor or above, and never a provider-fed system calendar",
+	},
+	"memos-create": {
+		via:    auth.EnforcedByHandlerCall,
+		checks: []string{"calendars.resolveCalendarWrite"},
+		note:   "calendar editor or above, and never a provider-fed system calendar",
+	},
+	"memos-update": {
+		via:    auth.EnforcedByHandlerCall,
+		checks: []string{"calendars.resolveCalendarWrite"},
+		note:   "calendar editor or above, and never a provider-fed system calendar",
+	},
+	"memos-delete": {
+		via:    auth.EnforcedByHandlerCall,
+		checks: []string{"calendars.resolveCalendarWrite"},
+		note:   "calendar editor or above, and never a provider-fed system calendar",
+	},
+	"attachments-presign": {
+		via:    auth.EnforcedByHandlerCall,
+		checks: []string{"calendars.resolveCalendarWrite"},
+		note:   "calendar editor or above, and never a provider-fed system calendar",
+	},
+	"attachments-confirm": {
+		via:    auth.EnforcedByHandlerCall,
+		checks: []string{"calendars.resolveCalendarWrite"},
+		note:   "calendar editor or above, and never a provider-fed system calendar",
+	},
+	"attachments-delete": {
+		via:    auth.EnforcedByHandlerCall,
+		checks: []string{"calendars.resolveCalendarWrite"},
+		note:   "calendar editor or above, and never a provider-fed system calendar",
+	},
 }
 
 // TestEveryMutatingOpHasARoleFloor asserts that every mutating operation on
@@ -499,7 +718,7 @@ func TestEveryMutatingOpHasARoleFloor(t *testing.T) {
 		return offenders[i].Method < offenders[j].Method
 	})
 	for _, op := range offenders {
-		t.Errorf("mutating op %-6s %s (%s) has no workspace/project role floor — mount one via mountGroup, or add it to roleFloorExemptOps with the reason it is safe",
+		t.Errorf("mutating op %-6s %s (%s) has no workspace/project role floor — mount one via mountGroup, or add it to roleFloorExemptOps naming the check that authorises it instead",
 			op.Method, op.Path, op.OperationID)
 	}
 

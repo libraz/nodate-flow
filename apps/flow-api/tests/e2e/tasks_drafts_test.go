@@ -1,4 +1,4 @@
-// Phase 6 / L2 — GET /workspaces/{wsId}/tasks/drafts?reason=retro coverage.
+// GET /workspaces/{wsId}/tasks/drafts?reason=retro coverage.
 //
 // The endpoint surfaces retrospective draft tasks the signal_judge
 // Applier created (task + task_dependencies row of kind='retro_of' +
@@ -71,7 +71,7 @@ func seedRetroDraft(t *testing.T, db *sql.DB, tt *helpers.TestTenant, agentInter
 	// of asserting, and re-reads the per-project task_number on each
 	// attempt.
 	err = dbretry.InTx(context.Background(), db, "test seed: retro draft", nil,
-		func(ctx context.Context, tx *sql.Tx) error {
+		func(ctx context.Context, tx *dbretry.Tx) error {
 			// Source task (the "completed" task that prompts a retrospective).
 			srcNum, err := nextTaskNumberTx(ctx, tx, projectID)
 			if err != nil {
@@ -175,7 +175,7 @@ func lookupProjectIDForDrafts(t *testing.T, db *sql.DB, workspaceID uint32, proj
 // importing the generated package. It returns an error rather than
 // asserting so it can run inside a dbretry.InTx closure that must be
 // re-entrant on a transient-error retry.
-func nextTaskNumberTx(ctx context.Context, tx *sql.Tx, projectID uint32) (uint32, error) {
+func nextTaskNumberTx(ctx context.Context, tx *dbretry.Tx, projectID uint32) (uint32, error) {
 	var n sql.NullInt32
 	if err := tx.QueryRowContext(ctx,
 		`SELECT MAX(task_number) FROM tasks WHERE project_id = ?`,

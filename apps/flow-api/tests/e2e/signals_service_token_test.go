@@ -129,6 +129,7 @@ func TestSignalsRejectsWrongServiceToken(t *testing.T) {
 		"kind":        "manual",
 	})
 	require.Equalf(t, http.StatusUnauthorized, status, "expected 401, got %d body=%s", status, string(raw))
+	require.NotEmpty(t, raw, "the 401 must answer with an error envelope, not an empty body")
 
 	// The envelope must not reveal which auth mode was attempted.
 	require.NotContains(t, string(raw), "service_token", "401 body leaks the service-token auth mode")

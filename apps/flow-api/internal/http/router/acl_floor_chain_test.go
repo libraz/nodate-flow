@@ -27,6 +27,8 @@ import (
 	"testing"
 
 	"github.com/go-chi/chi/v5"
+
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/auth"
 )
 
 // mutatingMethods are the verbs a role floor has to stop.
@@ -57,6 +59,7 @@ func floorContracts() []floorContract {
 		{floor: floorWorkspaceAdmin, deniesSafeMethods: true},
 		{floor: floorProjectCommenter, deniesSafeMethods: true},
 		{floor: floorProjectEditor, deniesSafeMethods: true},
+		{floor: floorProjectLead, deniesSafeMethods: true},
 	}
 }
 
@@ -106,7 +109,7 @@ func TestMountGroupMountsTheFloorItRecords(t *testing.T) {
 	t.Parallel()
 
 	for _, fc := range floorContracts() {
-		t.Run(fc.floor.label, func(t *testing.T) {
+		t.Run(string(fc.floor.label), func(t *testing.T) {
 			t.Parallel()
 
 			for _, method := range mutatingMethods {
@@ -163,7 +166,7 @@ func TestFloorsGateEveryMethodWhereDeclared(t *testing.T) {
 		if !fc.deniesSafeMethods {
 			continue
 		}
-		t.Run(fc.floor.label, func(t *testing.T) {
+		t.Run(string(fc.floor.label), func(t *testing.T) {
 			t.Parallel()
 
 			sentinel := &sentinelHandler{}
@@ -204,10 +207,16 @@ func TestFloorNoneMountsNothing(t *testing.T) {
 // TestEveryRecordedFloorHasAContract makes the contract table exhaustive:
 // a new floor label added to mountGroup without a row here would otherwise
 // be mounted by production code and checked by nothing.
+//
+// Exhaustiveness is measured against two sets, because they fail apart. A
+// floor can reach a registered operation without a contract (production
+// mounts something no test drives), and a floor can be added to the shared
+// vocabulary while no group mounts it yet (the next group to pick it up
+// inherits a middleware nothing has exercised).
 func TestEveryRecordedFloorHasAContract(t *testing.T) {
 	t.Parallel()
 
-	covered := map[string]bool{floorNone.label: true}
+	covered := map[auth.Floor]bool{floorNone.label: true}
 	for _, fc := range floorContracts() {
 		covered[fc.floor.label] = true
 	}
@@ -217,6 +226,13 @@ func TestEveryRecordedFloorHasAContract(t *testing.T) {
 		if !covered[op.WriteFloor] {
 			t.Errorf("operation %s carries floor %q, which has no row in floorContracts — add one so the floor's middleware is exercised",
 				op.OperationID, op.WriteFloor)
+		}
+	}
+
+	for _, floor := range auth.Floors() {
+		if !covered[floor] {
+			t.Errorf("the shared floor vocabulary declares %q, which has no row in floorContracts — add one so the floor is exercised before a group adopts it",
+				floor)
 		}
 	}
 }

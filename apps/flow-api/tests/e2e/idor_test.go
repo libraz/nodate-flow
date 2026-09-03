@@ -37,6 +37,15 @@ func TestIDORTaskCrossWorkspace(t *testing.T) {
 		"outsider reading a task from another workspace")
 	require.NotContains(t, string(body), "Confidential",
 		"a refusal must not carry the task it refused")
+
+	// The title is discoverable by the task's owner, so the assertion
+	// above is about authorization rather than a route that answers
+	// nobody.
+	status, body = doJSONStatus(t, http.MethodGet,
+		testServerURL+"/tasks/"+task.ID, owner.AccessToken, nil)
+	require.Equal(t, http.StatusOK, status, "the owner must be able to read their own task")
+	require.Contains(t, string(body), "Confidential",
+		"the owner's read must contain the task's title")
 }
 
 // TestIDORTaskUpdate verifies that an outsider cannot update a task

@@ -3,39 +3,14 @@ package eventbus
 import (
 	"bytes"
 	"context"
-	"database/sql"
 	"errors"
 	"log/slog"
 	"strings"
 	"testing"
 
 	"github.com/go-sql-driver/mysql"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/dbretry"
 )
-
-// failingDBTX is a [DBTX] whose INSERT always fails with err. Only
-// ExecContext is reachable: the generated AppendEvent / AppendAgentEvent
-// statements are ExecContext + LastInsertId.
-type failingDBTX struct {
-	err   error
-	calls int
-}
-
-func (d *failingDBTX) ExecContext(context.Context, string, ...interface{}) (sql.Result, error) {
-	d.calls++
-	return nil, d.err
-}
-
-func (d *failingDBTX) PrepareContext(context.Context, string) (*sql.Stmt, error) {
-	return nil, d.err
-}
-
-func (d *failingDBTX) QueryContext(context.Context, string, ...interface{}) (*sql.Rows, error) {
-	return nil, d.err
-}
-
-func (d *failingDBTX) QueryRowContext(context.Context, string, ...interface{}) *sql.Row {
-	return nil
-}
 
 // captureLogs redirects the default slog logger into a buffer for the
 // duration of the test. Tests using it must stay sequential (no
@@ -57,17 +32,17 @@ func captureLogs(t *testing.T) *bytes.Buffer {
 // forbids it.
 func TestAppendBestEffortRecordsWhatWasLost(t *testing.T) {
 	buf := captureLogs(t)
-	db := &failingDBTX{err: errors.New("connection reset")}
+	db, fail := failingStubDB(t, errors.New("connection reset"))
 
 	taskID := int64(77)
-	AppendBestEffort(context.Background(), db, Event{
+	AppendBestEffort(context.Background(), dbretry.AutoCommit(db), Event{
 		Type:        TaskCreated,
 		WorkspaceID: 42,
 		TaskID:      &taskID,
 		Payload:     map[string]any{"taskId": "01HX-abc", "title": "Recoverable"},
 	}, "mcp.create_task")
 
-	if db.calls == 0 {
+	if fail.count() == 0 {
 		t.Fatal("AppendBestEffort must attempt the insert")
 	}
 	logged := buf.String()
@@ -90,9 +65,9 @@ func TestAppendBestEffortRecordsWhatWasLost(t *testing.T) {
 func TestAppendReturnsTheFailure(t *testing.T) {
 	t.Parallel()
 	sentinel := errors.New("insert rejected")
-	db := &failingDBTX{err: sentinel}
+	db, _ := failingStubDB(t, sentinel)
 
-	err := Append(context.Background(), db, Event{Type: TaskCreated, WorkspaceID: 1})
+	err := Append(context.Background(), dbretry.AutoCommit(db), Event{Type: TaskCreated, WorkspaceID: 1})
 	if !errors.Is(err, sentinel) {
 		t.Fatalf("Append must return the underlying failure, got %v", err)
 	}
@@ -107,11 +82,11 @@ func TestAppendReturnsTheFailure(t *testing.T) {
 func TestAppendReverseEventReportsAlreadyReversed(t *testing.T) {
 	buf := captureLogs(t)
 	dup := &mysql.MySQLError{Number: 1062, Message: "Duplicate entry '209-763' for key 'events.uniq_events_reverses'"}
-	db := &failingDBTX{err: dup}
+	db, _ := failingStubDB(t, dup)
 
 	actor := int64(5)
 	origin := int64(763)
-	_, err := AppendReverseEvent(context.Background(), db, Event{
+	_, err := AppendReverseEvent(context.Background(), dbretry.AutoCommit(db), Event{
 		Type:            "ai.agent.run.completed",
 		WorkspaceID:     209,
 		ActorUserID:     &actor,
@@ -140,9 +115,9 @@ func TestAppendReverseEventReportsAlreadyReversed(t *testing.T) {
 func TestAppendKeepsErrorLevelForRealFailures(t *testing.T) {
 	buf := captureLogs(t)
 	dup := &mysql.MySQLError{Number: 1062, Message: "Duplicate entry for key 'events.uniq_events_public_id'"}
-	db := &failingDBTX{err: dup}
+	db, _ := failingStubDB(t, dup)
 
-	if err := Append(context.Background(), db, Event{Type: TaskCreated, WorkspaceID: 1}); err == nil {
+	if err := Append(context.Background(), dbretry.AutoCommit(db), Event{Type: TaskCreated, WorkspaceID: 1}); err == nil {
 		t.Fatal("Append must fail when the insert does")
 	}
 	if !strings.Contains(buf.String(), "append failed") {

@@ -7,7 +7,7 @@ import (
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
-	"strings"
+	"strconv"
 	"testing"
 
 	"github.com/google/uuid"
@@ -87,9 +87,50 @@ func TestLoggerContext_AttachesAttrs(t *testing.T) {
 			t.Fatalf("%s must not be on the request-scoped logger: %v", key, rec1)
 		}
 	}
-	if raw := buf.String(); strings.Contains(raw, "\"42\"") || strings.Contains(raw, ":42") || strings.Contains(raw, ":7") {
-		t.Fatalf("an internal id reached the log line: %s", raw)
+	// Renaming the key is not a fix, so the values are checked too — but
+	// against the decoded attributes rather than the raw line. Searching
+	// the line for ":42" also searches the handler's own timestamp, where
+	// that text appears whenever the minute or second happens to be 42.
+	for key, val := range rec1 {
+		if key == slog.TimeKey {
+			continue
+		}
+		for _, id := range []string{strconv.FormatUint(uint64(wsID), 10), strconv.FormatUint(uint64(userID), 10)} {
+			if attrCarriesValue(val, id) {
+				t.Fatalf("internal id %s reached the request-scoped logger under %q: %v", id, key, rec1)
+			}
+		}
 	}
+}
+
+// attrCarriesValue reports whether a decoded log attribute holds the
+// given value, at any depth.
+//
+// It compares whole values rather than searching for the text, because
+// the record also carries public ids: a UUID has a one-in-a-few chance
+// of containing any short digit string, and a check that reacted to
+// that would fail on the run that generated the wrong UUID.
+func attrCarriesValue(v any, want string) bool {
+	switch val := v.(type) {
+	case map[string]any:
+		for _, nested := range val {
+			if attrCarriesValue(nested, want) {
+				return true
+			}
+		}
+	case []any:
+		for _, nested := range val {
+			if attrCarriesValue(nested, want) {
+				return true
+			}
+		}
+	case float64:
+		// JSON has one number type, so an integer attr arrives as a float.
+		return strconv.FormatFloat(val, 'f', -1, 64) == want
+	case string:
+		return val == want
+	}
+	return false
 }
 
 // TestLoggerContext_OmitsEmpty verifies that when neither actor nor

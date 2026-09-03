@@ -1,44 +1,34 @@
 package dbretry
 
 import (
-	"context"
 	"testing"
 
 	shared "github.com/libraz/nodate-flow/packages/go-shared/dbretry"
 )
 
-// TestAliasesShareTheSharedCollector is the point of this package now
-// that the implementation lives in packages/go-shared/dbretry: a hook
-// registered through flow-api's alias must be visible to the shared
-// package and vice versa.
+// TestAliasesAreTheSharedTypes is the point of this package now that the
+// implementation lives in packages/go-shared/dbretry: what it exports
+// must BE the shared types, not look-alikes.
 //
-// Re-declaring the collector here instead of aliasing would compile and
-// pass every local test while silently splitting the fan-out in two —
-// flow-api's eventbus deferring to one context key, the cross-service
-// eventlog to another — and whichever appender lost the coin toss would
-// deliver nothing. The behaviour of the hooks themselves is covered in
-// the shared package alongside the code.
-func TestAliasesShareTheSharedCollector(t *testing.T) {
+// Re-declaring them here instead of aliasing would compile and pass
+// every local test while silently splitting the fan-out in two —
+// flow-api's eventbus deferring to one commit boundary, the
+// cross-service eventlog to another — and whichever appender lost the
+// coin toss would deliver nothing. The behaviour of the boundary itself
+// is covered in the shared package alongside the code.
+func TestAliasesAreTheSharedTypes(t *testing.T) {
 	t.Parallel()
 
-	ctx := WithCommitHooks(context.Background())
-	if !shared.HasCommitHooks(ctx) {
-		t.Fatal("a collector attached through the alias must be visible to the shared package")
-	}
+	// Compiles only while Tx is the shared type rather than one declared
+	// here; the interface assertions then follow from it.
+	sameTx := func(tx *Tx) *shared.Tx { return tx }
+	var _ shared.CommitBoundary = sameTx(nil)
+	var _ shared.CommitBoundary = AutoCommit(nil)
 
-	sharedCtx := shared.WithCommitHooks(context.Background())
-	if !HasCommitHooks(sharedCtx) {
-		t.Fatal("a collector attached by the shared package must be visible through the alias")
-	}
-
+	// The auto-commit path has no boundary to wait for, so a hook
+	// registered through the alias runs at once.
 	fired := 0
-	AddCommitHook(ctx, func() { fired++ })
-	if fired != 0 {
-		t.Fatalf("a hook on a collector context must be deferred, fired = %d", fired)
-	}
-
-	// No collector: the row is already durable, so the hook runs now.
-	AddCommitHook(context.Background(), func() { fired++ })
+	AutoCommit(nil).AfterCommit(func() { fired++ })
 	if fired != 1 {
 		t.Fatalf("a hook with no enclosing transaction must fire immediately, fired = %d", fired)
 	}

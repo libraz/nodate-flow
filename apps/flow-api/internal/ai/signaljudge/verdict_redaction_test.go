@@ -105,7 +105,7 @@ func TestSanitizeVerdictRedactsProposedEventPayload(t *testing.T) {
 		Confidence:       0.5,
 		ReasoningExcerpt: "ok",
 		ProposedEvents: []ProposedEvent{
-			{Type: eventbus.SignalJudged, PayloadJSON: payload},
+			{Type: string(eventbus.SignalJudged), PayloadJSON: payload},
 		},
 	}
 	out := SanitizeVerdict(in)

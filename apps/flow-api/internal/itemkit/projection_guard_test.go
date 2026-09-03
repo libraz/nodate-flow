@@ -6,6 +6,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/dbretry"
 )
 
 // scheduleFixture seeds a workspace and returns it together with the
@@ -18,7 +20,7 @@ func scheduleFixture(t *testing.T, db *sql.DB) (fixtures, uint32) {
 
 	start := time.Date(2030, 7, 1, 10, 0, 0, 0, time.UTC)
 	var evtID uint32
-	withTx(t, db, func(tx *sql.Tx) {
+	withTx(t, db, func(tx TX) {
 		var err error
 		_, evtID, err = ScheduleTask(context.Background(), tx, ScheduleTaskArgs{
 			WorkspaceID: fx.wsID,
@@ -149,26 +151,25 @@ func TestProjectionGuardDisarmsAfterItemkitReturns(t *testing.T) {
 	}
 	defer func() { _ = conn.Close() }()
 
-	tx, err := conn.BeginTx(ctx, nil)
-	if err != nil {
-		t.Fatalf("begin tx: %v", err)
-	}
+	// The transaction is opened on the pinned connection, not the pool,
+	// so the session variable can be read back afterwards on the same
+	// connection itemkit ran on.
 	start := time.Date(2030, 8, 1, 10, 0, 0, 0, time.UTC)
-	if _, _, err := ScheduleTask(ctx, tx, ScheduleTaskArgs{
-		WorkspaceID: fx.wsID,
-		TaskID:      fx.taskID,
-		CalendarID:  fx.calendarID,
-		ActorUserID: fx.userID,
-		Role:        RoleDue,
-		Title:       "Guarded task",
-		StartAt:     start,
-		EndAt:       start.Add(time.Hour),
-		Timezone:    "UTC",
+	if err := dbretry.InTx(ctx, conn, "itemkit.test", nil, func(ctx context.Context, tx *dbretry.Tx) error {
+		_, _, serr := ScheduleTask(ctx, tx, ScheduleTaskArgs{
+			WorkspaceID: fx.wsID,
+			TaskID:      fx.taskID,
+			CalendarID:  fx.calendarID,
+			ActorUserID: fx.userID,
+			Role:        RoleDue,
+			Title:       "Guarded task",
+			StartAt:     start,
+			EndAt:       start.Add(time.Hour),
+			Timezone:    "UTC",
+		})
+		return serr
 	}); err != nil {
 		t.Fatalf("ScheduleTask: %v", err)
-	}
-	if err := tx.Commit(); err != nil {
-		t.Fatalf("commit: %v", err)
 	}
 
 	var armed sql.NullInt64

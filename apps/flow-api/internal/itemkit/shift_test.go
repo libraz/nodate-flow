@@ -40,23 +40,17 @@ func seedExtraTask(ctx context.Context, t *testing.T, db *sql.DB, f fixtures, ti
 // an event in one tx so tests stay terse.
 func linkContributesTo(ctx context.Context, t *testing.T, db *sql.DB, f fixtures, taskID, eventID uint32) {
 	t.Helper()
-	tx, err := db.BeginTx(ctx, nil)
-	if err != nil {
-		t.Fatalf("begin: %v", err)
-	}
-	if _, _, err := LinkTaskToEvent(ctx, tx, LinkTaskToEventArgs{
-		WorkspaceID: f.wsID,
-		TaskID:      taskID,
-		EventID:     eventID,
-		Relation:    RelationContributesTo,
-		ActorUserID: f.userID,
-	}); err != nil {
-		_ = tx.Rollback()
-		t.Fatalf("link: %v", err)
-	}
-	if err := tx.Commit(); err != nil {
-		t.Fatalf("commit: %v", err)
-	}
+	withTx(t, db, func(tx TX) {
+		if _, _, err := LinkTaskToEvent(ctx, tx, LinkTaskToEventArgs{
+			WorkspaceID: f.wsID,
+			TaskID:      taskID,
+			EventID:     eventID,
+			Relation:    RelationContributesTo,
+			ActorUserID: f.userID,
+		}); err != nil {
+			t.Fatalf("link: %v", err)
+		}
+	})
 }
 
 func TestProposeShiftEventAndChildren_NoLinks(t *testing.T) {
@@ -66,16 +60,15 @@ func TestProposeShiftEventAndChildren_NoLinks(t *testing.T) {
 	defer purge(t, db, f.wsID)
 	evtID, _ := seedEvent(ctx, t, db, f, time.Date(2026, 6, 1, 10, 0, 0, 0, time.UTC))
 
-	tx, err := db.BeginTx(ctx, nil)
-	if err != nil {
-		t.Fatalf("begin: %v", err)
-	}
-	defer func() { _ = tx.Rollback() }()
 	newStart := time.Date(2026, 6, 8, 10, 0, 0, 0, time.UTC)
-	p, err := ProposeShiftEventAndChildren(ctx, tx, f.wsID, evtID, newStart)
-	if err != nil {
-		t.Fatalf("propose: %v", err)
-	}
+	var p ShiftProposal
+	withTx(t, db, func(tx TX) {
+		var err error
+		p, err = ProposeShiftEventAndChildren(ctx, tx, f.wsID, evtID, newStart)
+		if err != nil {
+			t.Fatalf("propose: %v", err)
+		}
+	})
 	if len(p.SafeTasks) != 0 || len(p.ConflictTasks) != 0 {
 		t.Errorf("expected empty proposal, got safe=%d conflict=%d", len(p.SafeTasks), len(p.ConflictTasks))
 	}
@@ -101,16 +94,15 @@ func TestProposeShiftEventAndChildren_PartitionsSafeAndConflict(t *testing.T) {
 	linkContributesTo(ctx, t, db, f, conflictTaskID, umbrella)
 	linkContributesTo(ctx, t, db, f, conflictTaskID, other)
 
-	tx, err := db.BeginTx(ctx, nil)
-	if err != nil {
-		t.Fatalf("begin: %v", err)
-	}
-	defer func() { _ = tx.Rollback() }()
 	newStart := time.Date(2026, 6, 8, 10, 0, 0, 0, time.UTC)
-	p, err := ProposeShiftEventAndChildren(ctx, tx, f.wsID, umbrella, newStart)
-	if err != nil {
-		t.Fatalf("propose: %v", err)
-	}
+	var p ShiftProposal
+	withTx(t, db, func(tx TX) {
+		var err error
+		p, err = ProposeShiftEventAndChildren(ctx, tx, f.wsID, umbrella, newStart)
+		if err != nil {
+			t.Fatalf("propose: %v", err)
+		}
+	})
 	if len(p.SafeTasks) != 1 {
 		t.Fatalf("safe count = %d, want 1", len(p.SafeTasks))
 	}
@@ -158,13 +150,11 @@ func TestProposeShiftEventAndChildren_RejectsUndated(t *testing.T) {
 	id64, _ := res.LastInsertId()
 	evtID := uint32(id64) //#nosec G115 -- LastInsertId in test seed, fits uint32
 
-	tx, err := db.BeginTx(ctx, nil)
-	if err != nil {
-		t.Fatalf("begin: %v", err)
-	}
-	defer func() { _ = tx.Rollback() }()
-	_, err = ProposeShiftEventAndChildren(ctx, tx, f.wsID, evtID,
-		time.Date(2026, 6, 8, 10, 0, 0, 0, time.UTC))
+	err = inTxErr(ctx, db, func(tx TX) error {
+		_, perr := ProposeShiftEventAndChildren(ctx, tx, f.wsID, evtID,
+			time.Date(2026, 6, 8, 10, 0, 0, 0, time.UTC))
+		return perr
+	})
 	if err == nil {
 		t.Fatal("expected invariant error for undated umbrella, got nil")
 	}
@@ -183,24 +173,18 @@ func TestApplyShiftEventAndChildren_ShiftsUmbrellaAndSafeTasks(t *testing.T) {
 	safeTaskID, _ := seedExtraTask(ctx, t, db, f, "Safe", dueDate)
 	linkContributesTo(ctx, t, db, f, safeTaskID, umbrella)
 
-	tx, err := db.BeginTx(ctx, nil)
-	if err != nil {
-		t.Fatalf("begin: %v", err)
-	}
 	newStart := umbrellaStart.AddDate(0, 0, 7)
-	if err := ApplyShiftEventAndChildren(ctx, tx, ApplyShiftEventAndChildrenArgs{
-		WorkspaceID:      f.wsID,
-		EventID:          umbrella,
-		NewStartAt:       newStart,
-		ConfirmedTaskIDs: []uint32{safeTaskID},
-		ActorUserID:      f.userID,
-	}); err != nil {
-		_ = tx.Rollback()
-		t.Fatalf("apply: %v", err)
-	}
-	if err := tx.Commit(); err != nil {
-		t.Fatalf("commit: %v", err)
-	}
+	withTx(t, db, func(tx TX) {
+		if err := ApplyShiftEventAndChildren(ctx, tx, ApplyShiftEventAndChildrenArgs{
+			WorkspaceID:      f.wsID,
+			EventID:          umbrella,
+			NewStartAt:       newStart,
+			ConfirmedTaskIDs: []uint32{safeTaskID},
+			ActorUserID:      f.userID,
+		}); err != nil {
+			t.Fatalf("apply: %v", err)
+		}
+	})
 
 	// Umbrella event shifted.
 	var gotStart sql.NullTime
@@ -239,24 +223,18 @@ func TestApplyShiftEventAndChildren_IgnoresUnconfirmedTasks(t *testing.T) {
 	skippedTaskID, _ := seedExtraTask(ctx, t, db, f, "Skipped", dueDate)
 	linkContributesTo(ctx, t, db, f, skippedTaskID, umbrella)
 
-	tx, err := db.BeginTx(ctx, nil)
-	if err != nil {
-		t.Fatalf("begin: %v", err)
-	}
 	newStart := umbrellaStart.AddDate(0, 0, 7)
-	if err := ApplyShiftEventAndChildren(ctx, tx, ApplyShiftEventAndChildrenArgs{
-		WorkspaceID:      f.wsID,
-		EventID:          umbrella,
-		NewStartAt:       newStart,
-		ConfirmedTaskIDs: nil, // empty = shift umbrella only
-		ActorUserID:      f.userID,
-	}); err != nil {
-		_ = tx.Rollback()
-		t.Fatalf("apply: %v", err)
-	}
-	if err := tx.Commit(); err != nil {
-		t.Fatalf("commit: %v", err)
-	}
+	withTx(t, db, func(tx TX) {
+		if err := ApplyShiftEventAndChildren(ctx, tx, ApplyShiftEventAndChildrenArgs{
+			WorkspaceID:      f.wsID,
+			EventID:          umbrella,
+			NewStartAt:       newStart,
+			ConfirmedTaskIDs: nil, // empty = shift umbrella only
+			ActorUserID:      f.userID,
+		}); err != nil {
+			t.Fatalf("apply: %v", err)
+		}
+	})
 
 	var gotDue sql.NullTime
 	if err := db.QueryRowContext(ctx,
@@ -282,24 +260,18 @@ func TestApplyShiftEventAndChildren_IgnoresStaleTaskIDs(t *testing.T) {
 	unrelatedTaskID, _ := seedExtraTask(ctx, t, db, f, "Unrelated", dueDate)
 	// Note: NOT linked to umbrella.
 
-	tx, err := db.BeginTx(ctx, nil)
-	if err != nil {
-		t.Fatalf("begin: %v", err)
-	}
 	newStart := umbrellaStart.AddDate(0, 0, 7)
-	if err := ApplyShiftEventAndChildren(ctx, tx, ApplyShiftEventAndChildrenArgs{
-		WorkspaceID:      f.wsID,
-		EventID:          umbrella,
-		NewStartAt:       newStart,
-		ConfirmedTaskIDs: []uint32{unrelatedTaskID, 999999},
-		ActorUserID:      f.userID,
-	}); err != nil {
-		_ = tx.Rollback()
-		t.Fatalf("apply: %v", err)
-	}
-	if err := tx.Commit(); err != nil {
-		t.Fatalf("commit: %v", err)
-	}
+	withTx(t, db, func(tx TX) {
+		if err := ApplyShiftEventAndChildren(ctx, tx, ApplyShiftEventAndChildrenArgs{
+			WorkspaceID:      f.wsID,
+			EventID:          umbrella,
+			NewStartAt:       newStart,
+			ConfirmedTaskIDs: []uint32{unrelatedTaskID, 999999},
+			ActorUserID:      f.userID,
+		}); err != nil {
+			t.Fatalf("apply: %v", err)
+		}
+	})
 
 	var gotDue sql.NullTime
 	if err := db.QueryRowContext(ctx,
@@ -325,25 +297,19 @@ func TestApplyShiftEventAndChildren_TimeOnlyChangeSkipsTasks(t *testing.T) {
 	taskID, _ := seedExtraTask(ctx, t, db, f, "Same-day", dueDate)
 	linkContributesTo(ctx, t, db, f, taskID, umbrella)
 
-	tx, err := db.BeginTx(ctx, nil)
-	if err != nil {
-		t.Fatalf("begin: %v", err)
-	}
 	// Shift umbrella by 30 minutes — DATE component unchanged.
 	newStart := umbrellaStart.Add(30 * time.Minute)
-	if err := ApplyShiftEventAndChildren(ctx, tx, ApplyShiftEventAndChildrenArgs{
-		WorkspaceID:      f.wsID,
-		EventID:          umbrella,
-		NewStartAt:       newStart,
-		ConfirmedTaskIDs: []uint32{taskID},
-		ActorUserID:      f.userID,
-	}); err != nil {
-		_ = tx.Rollback()
-		t.Fatalf("apply: %v", err)
-	}
-	if err := tx.Commit(); err != nil {
-		t.Fatalf("commit: %v", err)
-	}
+	withTx(t, db, func(tx TX) {
+		if err := ApplyShiftEventAndChildren(ctx, tx, ApplyShiftEventAndChildrenArgs{
+			WorkspaceID:      f.wsID,
+			EventID:          umbrella,
+			NewStartAt:       newStart,
+			ConfirmedTaskIDs: []uint32{taskID},
+			ActorUserID:      f.userID,
+		}); err != nil {
+			t.Fatalf("apply: %v", err)
+		}
+	})
 
 	// Umbrella moved, but the task's due_on stays put.
 	var gotDue sql.NullTime
@@ -388,16 +354,13 @@ func TestApplyShiftEventAndChildren_RejectsUndatedUmbrella(t *testing.T) {
 	id64, _ := res.LastInsertId()
 	evtID := uint32(id64) //#nosec G115 -- LastInsertId in test seed, fits uint32
 
-	tx, err := db.BeginTx(ctx, nil)
-	if err != nil {
-		t.Fatalf("begin: %v", err)
-	}
-	defer func() { _ = tx.Rollback() }()
-	err = ApplyShiftEventAndChildren(ctx, tx, ApplyShiftEventAndChildrenArgs{
-		WorkspaceID: f.wsID,
-		EventID:     evtID,
-		NewStartAt:  time.Date(2026, 6, 8, 10, 0, 0, 0, time.UTC),
-		ActorUserID: f.userID,
+	err = inTxErr(ctx, db, func(tx TX) error {
+		return ApplyShiftEventAndChildren(ctx, tx, ApplyShiftEventAndChildrenArgs{
+			WorkspaceID: f.wsID,
+			EventID:     evtID,
+			NewStartAt:  time.Date(2026, 6, 8, 10, 0, 0, 0, time.UTC),
+			ActorUserID: f.userID,
+		})
 	})
 	if err == nil {
 		t.Fatal("expected invariant error for undated umbrella, got nil")

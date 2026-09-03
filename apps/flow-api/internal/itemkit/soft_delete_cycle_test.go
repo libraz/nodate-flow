@@ -36,7 +36,7 @@ func TestScheduleTaskAllowsSecondTimeBlock(t *testing.T) {
 
 	var pubs []dbtype.PublicID
 	for _, start := range []time.Time{first, second} {
-		withTx(t, db, func(tx *sql.Tx) {
+		withTx(t, db, func(tx TX) {
 			pub, _, err := ScheduleTask(context.Background(), tx, ScheduleTaskArgs{
 				WorkspaceID: fx.wsID,
 				TaskID:      fx.taskID,
@@ -87,7 +87,7 @@ func TestScheduleUnscheduleRescheduleCycles(t *testing.T) {
 	for cycle := 0; cycle < 3; cycle++ {
 		start := base.AddDate(0, 0, cycle)
 		var evtID uint32
-		withTx(t, db, func(tx *sql.Tx) {
+		withTx(t, db, func(tx TX) {
 			var err error
 			_, evtID, err = ScheduleTask(context.Background(), tx, ScheduleTaskArgs{
 				WorkspaceID: fx.wsID,
@@ -117,7 +117,7 @@ func TestScheduleUnscheduleRescheduleCycles(t *testing.T) {
 			t.Fatalf("cycle %d: live due projections = %d, want exactly 1", cycle, live)
 		}
 
-		withTx(t, db, func(tx *sql.Tx) {
+		withTx(t, db, func(tx TX) {
 			if err := DeleteEvent(context.Background(), tx, fx.wsID, evtID, fx.userID); err != nil {
 				t.Fatalf("cycle %d: DeleteEvent: %v", cycle, err)
 			}
@@ -163,7 +163,7 @@ func TestScheduleTaskRefusesSecondLiveDue(t *testing.T) {
 	second := time.Date(2030, 9, 8, 9, 0, 0, 0, time.UTC)
 
 	var firstPub, secondPub dbtype.PublicID
-	withTx(t, db, func(tx *sql.Tx) {
+	withTx(t, db, func(tx TX) {
 		var err error
 		firstPub, _, err = ScheduleTask(context.Background(), tx, ScheduleTaskArgs{
 			WorkspaceID: fx.wsID, TaskID: fx.taskID, CalendarID: fx.calendarID,
@@ -174,7 +174,7 @@ func TestScheduleTaskRefusesSecondLiveDue(t *testing.T) {
 			t.Fatalf("first ScheduleTask: %v", err)
 		}
 	})
-	withTx(t, db, func(tx *sql.Tx) {
+	withTx(t, db, func(tx TX) {
 		var err error
 		secondPub, _, err = ScheduleTask(context.Background(), tx, ScheduleTaskArgs{
 			WorkspaceID: fx.wsID, TaskID: fx.taskID, CalendarID: fx.calendarID,

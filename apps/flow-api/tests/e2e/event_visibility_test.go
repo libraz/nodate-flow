@@ -101,7 +101,8 @@ func mcpListCalendarEvents(t *testing.T, tt *helpers.TestTenant, name string) st
 }
 
 // TestConfidentialEventHiddenFromCalendarCoMembers is the row-level half
-// of H-6. A confidential event must not reach a co-member on any read
+// of the confidential-event rule. A confidential event must not reach a
+// co-member on any read
 // surface, including MCP, and the detail route must answer as though the
 // id did not exist rather than refusing — a 403 would confirm the event
 // is there, which is the fact the setting exists to hide.
@@ -241,10 +242,10 @@ func TestPrivateEventIsTimeVisibleAndDetailScoped(t *testing.T) {
 	assert.Contains(t, string(body), secretMemo)
 }
 
-// TestDeletedCalendarLeavesPublicSharePage is H-10, asserted where it
-// matters: the unauthenticated page. Checking that the link row is gone
-// would not catch the original bug, whose whole shape was that the row
-// was still being served by a query nobody had filtered.
+// TestDeletedCalendarLeavesPublicSharePage asserts the deleted-calendar
+// rule where it matters: the unauthenticated page. Checking that the
+// link row is gone would not catch the failure, whose whole shape is a
+// row still being served by a query nobody filtered.
 func TestDeletedCalendarLeavesPublicSharePage(t *testing.T) {
 	bootstrap(t)
 	t.Parallel()
@@ -324,17 +325,16 @@ func TestDeletedCalendarLeavesPublicSharePage(t *testing.T) {
 }
 
 // TestPublicShareRenderIgnoresLinksOnDeletedCalendars covers the other
-// half of H-10, and it needs its own test because the two halves mask
+// half, and it needs its own test because the two halves mask
 // each other: with the delete path withdrawing the links, the render
 // query never meets one belonging to a deleted calendar, so removing
 // its join changes nothing observable.
 //
-// The state this reproduces is the one the fix was written for — a live
-// link row whose calendar is gone. Every row published before the
-// cascade existed is in exactly that state, and so is any calendar
-// disabled by something other than the delete handler. Disabling the
-// calendar directly is the only way to produce it now, which is the
-// point: the query has to be correct on its own.
+// The state this reproduces is a live link row whose calendar is gone —
+// which is what any calendar disabled by something other than the
+// delete handler leaves behind. Disabling the calendar directly is the
+// only way to produce it, which is the point: the query has to be
+// correct on its own.
 func TestPublicShareRenderIgnoresLinksOnDeletedCalendars(t *testing.T) {
 	bootstrap(t)
 	t.Parallel()
@@ -343,6 +343,14 @@ func TestPublicShareRenderIgnoresLinksOnDeletedCalendars(t *testing.T) {
 	calID := createCalendarMut(t, tt, "Legacy Calendar")
 	const strandedTitle = "Stranded publication"
 	evtID := createEventMut(t, tt, calID, strandedTitle)
+
+	// A second event on a calendar that stays enabled. Without it, the
+	// render assertion below cannot tell "the stranded event was
+	// filtered" from "the render route answers nobody" — both look like
+	// a page missing strandedTitle.
+	liveCalID := createCalendarMut(t, tt, "Live Calendar")
+	const liveTitle = "Live publication"
+	liveEvtID := createEventMut(t, tt, liveCalID, liveTitle)
 
 	var share struct {
 		ID    string `json:"id"`
@@ -357,8 +365,8 @@ func TestPublicShareRenderIgnoresLinksOnDeletedCalendars(t *testing.T) {
 	}
 	doJSON(t, http.MethodPost,
 		testServerURL+"/workspaces/"+tt.WorkspacePublicID+"/public-shares/"+share.ID+"/events",
-		tt.AccessToken, map[string]any{"eventIds": []string{evtID}}, &attach)
-	require.Equal(t, 1, attach.Attached)
+		tt.AccessToken, map[string]any{"eventIds": []string{evtID, liveEvtID}}, &attach)
+	require.Equal(t, 2, attach.Attached)
 
 	// Disable the calendar without going through the delete handler, so
 	// the link row stays enabled — the shape of every row stranded
@@ -379,6 +387,14 @@ func TestPublicShareRenderIgnoresLinksOnDeletedCalendars(t *testing.T) {
 	status, rendered := doJSONStatus(t, http.MethodGet,
 		testServerURL+"/share/cal/"+share.Token, "", nil)
 	require.Equal(t, http.StatusOK, status, "render; body=%s", string(rendered))
+	require.NotEmpty(t, rendered, "the render must answer with the page, not an empty body")
 	assert.NotContains(t, string(rendered), strandedTitle,
 		"a live link whose calendar is disabled must not render on the public page")
+
+	// The other attached event's calendar was never disabled, so it must
+	// still render — proving the page renders attached events at all,
+	// rather than coming back empty regardless of which calendar the
+	// event is on.
+	assert.Contains(t, string(rendered), liveTitle,
+		"an event on a calendar that stayed enabled must still render")
 }

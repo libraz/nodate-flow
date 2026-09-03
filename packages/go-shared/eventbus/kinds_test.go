@@ -7,8 +7,8 @@ package eventbus
 
 import "testing"
 
-// TestJudgeLoopKinds pins the wire strings introduced by Release 8 /
-// Phase 2 (signaljudge Applier). These are the only producers of the
+// TestJudgeLoopKinds pins the wire strings the signaljudge Applier
+// emits. These are the only producers of the
 // new kinds — if the strings drift, the Applier output schema, the SDK
 // enum and the events table CHECK rows all silently disagree.
 func TestJudgeLoopKinds(t *testing.T) {
@@ -29,7 +29,7 @@ func TestJudgeLoopKinds(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
-			if tc.got != tc.want {
+			if string(tc.got) != tc.want {
 				t.Fatalf("kind %s: got %q, want %q", tc.name, tc.got, tc.want)
 			}
 		})
@@ -42,109 +42,12 @@ func TestJudgeLoopKinds(t *testing.T) {
 func TestKindsAreUnique(t *testing.T) {
 	t.Parallel()
 
-	all := []Kind{
-		// task.*
-		TaskCreated, TaskUpdated, TaskDisabled,
-		TaskCommentAdded, TaskCommentEdited, TaskCommentRemoved,
-		TaskAttachmentAdded, TaskAttachmentRemoved,
-		TaskActorAdded, TaskActorRemoved,
-		TaskDependencyAdded, TaskDependencyRemoved,
-		TaskConstraintAdded, TaskConstraintRemoved,
-		TaskArchived, TaskUnarchived,
-		TaskTransitionStart, TaskTransitionBlock, TaskTransitionUnblock,
-		TaskTransitionSubmit, TaskTransitionComplete, TaskTransitionReopen,
-		TaskTransitionCancel,
-		TaskAutoCompleted, TaskRetroDrafted,
-		TaskLabelAdded, TaskLabelRemoved,
-
-		// label.*
-		LabelCreated, LabelUpdated, LabelDisabled,
-
-		// page.* / lens.* / timebox.* archives
-		PageArchived, PageUnarchived, LensArchived, TimeboxArchived,
-
-		// signal.*
-		SignalAttached, SignalJudged, SignalApplied, SignalRejected,
-
-		// ai.suggestion.*
-		AiSuggestionProposed, AiSuggestionApplied,
-		AiSuggestionDismissed, AiSuggestionEdited,
-
-		// ai.agent.*
-		AiAgentPaused, AiAgentResumed,
-		AiAgentRunStarted, AiAgentRunCompleted, AiAgentRunFailed,
-
-		// agent.task.*
-		AgentTaskAttached, AgentTaskDetached, AgentTaskThought,
-		AgentTaskHandoffToUser, AgentTaskHandoffToAgent,
-
-		// timebox.*
-		TimeboxCreated, TimeboxUpdated, TimeboxActivated, TimeboxCompleted,
-		TimeboxTaskAdded, TimeboxTaskRemoved,
-
-		// relation.*
-		RelationSuggested, RelationAccepted, RelationDismissed,
-
-		// lens.*
-		LensShared, LensUnshared,
-
-		// page.*
-		PageCreated, PageUpdated, PageDisabled,
-
-		// dashboard.widget.*
-		DashboardWidgetCreated, DashboardWidgetUpdated, DashboardWidgetDisabled,
-
-		// export.*
-		ExportRequested,
-
-		// calendar.*
-		CalendarCreated, CalendarUpdated, CalendarDeleted,
-		CalEventCreated, CalEventUpdated, CalEventDeleted,
-		CalMemberJoined, CalMemberLeft,
-		CalMemoCreated, CalMemoCompleted,
-
-		// reaction.*
-		ReactionAdded, ReactionRemoved,
-
-		// mention.*
-		MentionCreated,
-
-		// favorite.*
-		FavoriteAdded, FavoriteRemoved,
-
-		// intake.*
-		IntakeItemCreated, IntakeItemAccepted, IntakeItemRejected,
-		IntakeItemSnoozed, IntakeItemDuplicate,
-
-		// description.version.*
-		DescriptionVersionCreated, DescriptionVersionRestored,
-
-		// import.job.*
-		ImportJobCreated, ImportJobCompleted, ImportJobFailed, ImportJobCancelled,
-
-		// workspace.member.*
-		WorkspaceMemberAdded, WorkspaceMemberRemoved, WorkspaceMemberRoleChanged,
-
-		// item.*
-		ItemScheduled, ItemUnscheduled, ItemRescheduled, ItemRenamed,
-		ItemDeleted, ItemReconciled,
-		ItemActorAdded, ItemActorRemoved, ItemVisibilityChanged,
-		ItemMilestoneLinkAdded, ItemMilestoneLinkRemoved,
-
-		// share.*
-		SharePublished, ShareUpdated, ShareTokenRotated, ShareDeleted,
-		ShareEventAttached, ShareEventDetached,
-
-		// legacy
-		CommentAddedLegacy,
-	}
-
-	seen := make(map[Kind]string, len(all))
-	for _, k := range all {
-		if prev, dup := seen[k]; dup {
-			t.Fatalf("duplicate kind string %q (seen previously as %q)", k, prev)
+	names := map[string]string{}
+	for name, value := range declaredKindConstants(t) {
+		if prev, dup := names[value]; dup {
+			t.Fatalf("%s and %s both resolve to %q", name, prev, value)
 		}
-		seen[k] = k
+		names[value] = name
 	}
 }
 

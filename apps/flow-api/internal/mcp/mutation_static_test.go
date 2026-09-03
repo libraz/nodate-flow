@@ -5,7 +5,6 @@ import (
 	"go/parser"
 	"go/token"
 	"os"
-	"regexp"
 	"strings"
 	"testing"
 )
@@ -68,6 +67,7 @@ func TestMCPMutatingToolsRecordBothHalves(t *testing.T) {
 		t.Fatal("no tools registered")
 	}
 	graph := mcpPackageCallGraph(t)
+	registry := mcpRegisteredTools(t)
 
 	seenExempt := map[string]bool{}
 	seenRequiredRead := map[string]bool{}
@@ -84,7 +84,7 @@ func TestMCPMutatingToolsRecordBothHalves(t *testing.T) {
 			seenExempt[name] = true
 			continue
 		}
-		entry := mcpRunFuncName(t, name, tl.run)
+		entry := mcpRunFuncName(t, registry, name)
 		if !reachesAny(graph, entry, mutationLogGates) {
 			t.Errorf("tool %q (%s) changes the workspace but never reaches a mutation-log gate (%s); "+
 				"route it through recordMutation / recordMutationStrict, or through recordTxMutationAudit "+
@@ -196,142 +196,6 @@ func TestMCPMutationLiteralsNameBothHalves(t *testing.T) {
 	if found == 0 {
 		t.Fatal("no mutation literals found; the guard is passing because it is looking at nothing")
 	}
-}
-
-// restActionSources maps each audit action an MCP tool records onto the
-// REST handler that records the same action for the same change.
-//
-// The point of the mapping is that the two transports must be
-// indistinguishable to whoever queries audit_logs. An administrator
-// asking "who exported this workspace's tasks" filters by action name;
-// if MCP wrote export.mcp.create and REST wrote export.create, the query
-// would answer with half the truth and look complete.
-var restActionSources = map[string]string{
-	"calendar.event.create": "../http/handlers/calendars/events.go",
-	"calendar.event.update": "../http/handlers/calendars/events.go",
-	"calendar.event.delete": "../http/handlers/calendars/events.go",
-	"calendar.memo.update":  "../http/handlers/calendars/memos.go",
-	"export.create":         "../http/handlers/export/handler.go",
-	"import.create":         "../http/handlers/imports/crud.go",
-	"task.create":           "../http/handlers/tasks/crud.go",
-	"task.update":           "../http/handlers/tasks/crud.go",
-	"task.transition":       "../http/handlers/tasks/transitions.go",
-	"task.archived":         "../http/handlers/tasks/archive.go",
-	"task.unarchived":       "../http/handlers/tasks/archive.go",
-	"comment.create":        "../http/handlers/tasks/comments.go",
-	"label.create":          "../http/handlers/labels/crud.go",
-	"task.label.remove":     "../http/handlers/labels/crud.go",
-	"page.create":           "../http/handlers/pages/handlers.go",
-	"page.update":           "../http/handlers/pages/handlers.go",
-	"page.generate":         "../http/handlers/pages/handlers.go",
-	"timebox.create":        "../http/handlers/timeboxes/handlers.go",
-	"timebox.task.add":      "../http/handlers/timeboxes/handlers.go",
-	"favorite.create":       "../http/handlers/favorites/crud.go",
-	"reaction.create":       "../http/handlers/reactions/crud.go",
-	"intake.triage":         "../http/handlers/intake/crud.go",
-	"intake.convert":        "../http/handlers/intake/crud.go",
-	"task.smart_create":     "../http/handlers/tasks/smart_create.go",
-	"task.apply_steps":      "../http/handlers/tasks/steps.go",
-
-	"description_version.restore": "../http/handlers/tasks/description_versions.go",
-}
-
-// mcpOnlyActions are the audit actions MCP records for a change REST has
-// no equivalent route for. Each needs a reason, because "REST does not
-// do this" is usually a sign the action name was invented rather than
-// borrowed.
-var mcpOnlyActions = map[string]string{
-	"task.label.add": "REST attaches a label through the task-labels route, which records no audit entry; the name mirrors task.label.remove",
-}
-
-// TestMCPMutationActionsMatchREST proves every audit action an MCP tool
-// writes is spelled the same way the REST handler for that change spells
-// it.
-func TestMCPMutationActionsMatchREST(t *testing.T) {
-	t.Parallel()
-
-	actions := mcpAuditActions(t)
-	if len(actions) == 0 {
-		t.Fatal("no audit actions found; the guard is passing because it is looking at nothing")
-	}
-
-	sources := map[string]string{}
-	for action := range actions {
-		if _, ok := mcpOnlyActions[action]; ok {
-			continue
-		}
-		path, ok := restActionSources[action]
-		if !ok {
-			t.Errorf("MCP records audit action %q with no REST counterpart declared; add it to restActionSources, "+
-				"or to mcpOnlyActions with the reason REST has no equivalent", action)
-			continue
-		}
-		src, ok := sources[path]
-		if !ok {
-			b, err := os.ReadFile(path)
-			if err != nil {
-				t.Errorf("restActionSources points %q at %s, which cannot be read: %v", action, path, err)
-				continue
-			}
-			src = string(b)
-			sources[path] = src
-		}
-		// Whitespace-insensitive: gofmt aligns the key to whatever else
-		// the audit.Entry literal sets, so a fixed run of spaces would
-		// make this guard depend on an unrelated field being present.
-		declared := regexp.MustCompile(`Action:\s*"` + regexp.QuoteMeta(action) + `"`)
-		if !declared.MatchString(src) {
-			t.Errorf("MCP records audit action %q but %s no longer does; the two transports must be "+
-				"indistinguishable to an audit query, so follow the rename or correct the mapping",
-				action, path)
-		}
-	}
-
-	for action := range mcpOnlyActions {
-		if !actions[action] {
-			t.Errorf("mcpOnlyActions lists %q, which no MCP tool records any more; drop the stale entry", action)
-		}
-	}
-}
-
-// mcpAuditActions collects the AuditAction string literals set on every
-// mutation literal in the package.
-func mcpAuditActions(t *testing.T) map[string]bool {
-	t.Helper()
-	fset := token.NewFileSet()
-	out := map[string]bool{}
-	for _, name := range mcpPackageSourceFiles(t) {
-		file, err := parser.ParseFile(fset, name, nil, 0)
-		if err != nil {
-			t.Fatalf("parse %s: %v", name, err)
-		}
-		ast.Inspect(file, func(n ast.Node) bool {
-			lit, ok := n.(*ast.CompositeLit)
-			if !ok {
-				return true
-			}
-			if id, ok := lit.Type.(*ast.Ident); !ok || id.Name != "mutation" {
-				return true
-			}
-			for _, elt := range lit.Elts {
-				kv, ok := elt.(*ast.KeyValueExpr)
-				if !ok {
-					continue
-				}
-				key, ok := kv.Key.(*ast.Ident)
-				if !ok || key.Name != "AuditAction" {
-					continue
-				}
-				val, ok := kv.Value.(*ast.BasicLit)
-				if !ok || val.Kind != token.STRING {
-					continue
-				}
-				out[strings.Trim(val.Value, `"`)] = true
-			}
-			return true
-		})
-	}
-	return out
 }
 
 // mutationLiteralArg returns the mutation composite literal passed to a

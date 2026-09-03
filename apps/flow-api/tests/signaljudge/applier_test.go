@@ -1,6 +1,6 @@
-// Package signaljudgetests covers the Phase 3 / J4 Applier
-// (apps/flow-api/internal/ai/signaljudge/applier.go) against the
-// six scenarios pinned by the release-8 plan:
+// Package signaljudgetests covers the Applier
+// (apps/flow-api/internal/ai/signaljudge/applier.go) against its
+// six (action, autonomy) scenarios:
 //
 //  1. noop verdict → only SignalJudged emitted, applied_at NULL.
 //  2. complete_task × autonomy=auto → SignalJudged + TaskAutoCompleted
@@ -37,7 +37,7 @@ import (
 type fakeBus struct {
 	mu     sync.Mutex
 	events []eventbus.Event
-	failOn map[string]error
+	failOn map[eventbus.Kind]error
 }
 
 func (b *fakeBus) AppendJudgeEvent(_ context.Context, evt eventbus.Event) error {
@@ -60,8 +60,8 @@ func (b *fakeBus) snapshot() []eventbus.Event {
 
 // kindsOnly returns the Type values of every recorded event, in
 // emission order. Lets tests assert sequences with one comparison.
-func kindsOnly(events []eventbus.Event) []string {
-	out := make([]string, len(events))
+func kindsOnly(events []eventbus.Event) []eventbus.Kind {
+	out := make([]eventbus.Kind, len(events))
 	for i, e := range events {
 		out[i] = e.Type
 	}
@@ -204,8 +204,8 @@ func newApplier(t *testing.T, bus *fakeBus, mutator *fakeMutator, resolver *fake
 
 // ----- Scenario 1: noop verdict ----------------------------------------------
 
-// TestApplierNoopVerdictEmitsOnlySignalJudged covers Phase 3 / J4
-// scenario #1: a verdict with action=noop must emit only
+// TestApplierNoopVerdictEmitsOnlySignalJudged covers scenario #1:
+// a verdict with action=noop must emit only
 // SignalJudged, must not set applied_at, and must not touch the
 // TaskMutator.
 func TestApplierNoopVerdictEmitsOnlySignalJudged(t *testing.T) {
@@ -228,7 +228,7 @@ func TestApplierNoopVerdictEmitsOnlySignalJudged(t *testing.T) {
 		t.Fatalf("Apply result: want Skipped=true reason=noop, got %+v", res)
 	}
 	events := bus.snapshot()
-	if got, want := kindsOnly(events), []string{eventbus.SignalJudged}; !equalStrSlice(got, want) {
+	if got, want := kindsOnly(events), []eventbus.Kind{eventbus.SignalJudged}; !equalStrSlice(got, want) {
 		t.Fatalf("event sequence = %v, want %v", got, want)
 	}
 	if len(mutator.completed) != 0 || len(mutator.commented) != 0 || len(mutator.drafted) != 0 {
@@ -278,7 +278,7 @@ func TestApplierCompleteTaskAutoEmitsFullChain(t *testing.T) {
 		t.Fatalf("Apply result: want not skipped, got %+v", res)
 	}
 	events := bus.snapshot()
-	wantSeq := []string{
+	wantSeq := []eventbus.Kind{
 		eventbus.SignalJudged,
 		eventbus.TaskAutoCompleted,
 		eventbus.SignalApplied,
@@ -335,7 +335,7 @@ func TestApplierCompleteTaskSuggestEmitsJudgedOnly(t *testing.T) {
 	if res == nil || !res.Skipped || res.SkipReason != "suggested_only" {
 		t.Fatalf("Apply result: want Skipped=true reason=suggested_only, got %+v", res)
 	}
-	if got, want := kindsOnly(bus.snapshot()), []string{eventbus.SignalJudged}; !equalStrSlice(got, want) {
+	if got, want := kindsOnly(bus.snapshot()), []eventbus.Kind{eventbus.SignalJudged}; !equalStrSlice(got, want) {
 		t.Fatalf("event sequence = %v, want %v", got, want)
 	}
 	if len(mutator.completed) != 0 {
@@ -376,7 +376,7 @@ func TestApplierGenerateRetroDraftCreatesNewTask(t *testing.T) {
 	if res == nil || res.Skipped {
 		t.Fatalf("Apply result: want not skipped, got %+v", res)
 	}
-	wantSeq := []string{eventbus.SignalJudged, eventbus.TaskRetroDrafted}
+	wantSeq := []eventbus.Kind{eventbus.SignalJudged, eventbus.TaskRetroDrafted}
 	if got := kindsOnly(bus.snapshot()); !equalStrSlice(got, wantSeq) {
 		t.Fatalf("event sequence = %v, want %v", got, wantSeq)
 	}
@@ -426,7 +426,7 @@ func TestApplierSchemaViolationEmitsSignalRejected(t *testing.T) {
 	if res == nil || !res.Skipped || res.SkipReason != "verdict_invalid" {
 		t.Fatalf("Apply result: want Skipped=true reason=verdict_invalid, got %+v", res)
 	}
-	if got, want := kindsOnly(bus.snapshot()), []string{eventbus.SignalRejected}; !equalStrSlice(got, want) {
+	if got, want := kindsOnly(bus.snapshot()), []eventbus.Kind{eventbus.SignalRejected}; !equalStrSlice(got, want) {
 		t.Fatalf("event sequence = %v, want %v", got, want)
 	}
 	// The SignalRejected payload must carry a structured reason so
@@ -471,7 +471,7 @@ func TestApplierUnknownActionRejected(t *testing.T) {
 	if res == nil || !res.Skipped {
 		t.Fatalf("Apply result: want Skipped, got %+v", res)
 	}
-	if got, want := kindsOnly(bus.snapshot()), []string{eventbus.SignalRejected}; !equalStrSlice(got, want) {
+	if got, want := kindsOnly(bus.snapshot()), []eventbus.Kind{eventbus.SignalRejected}; !equalStrSlice(got, want) {
 		t.Fatalf("event sequence = %v, want %v", got, want)
 	}
 }
@@ -500,7 +500,7 @@ func TestApplierMissingTargetRejected(t *testing.T) {
 	if res == nil || !res.Skipped {
 		t.Fatalf("Apply result: want Skipped, got %+v", res)
 	}
-	if got, want := kindsOnly(bus.snapshot()), []string{eventbus.SignalRejected}; !equalStrSlice(got, want) {
+	if got, want := kindsOnly(bus.snapshot()), []eventbus.Kind{eventbus.SignalRejected}; !equalStrSlice(got, want) {
 		t.Fatalf("event sequence = %v, want %v", got, want)
 	}
 }
@@ -512,7 +512,7 @@ func TestApplierMissingTargetRejected(t *testing.T) {
 func TestApplierBusFailurePropagates(t *testing.T) {
 	t.Parallel()
 
-	bus := &fakeBus{failOn: map[string]error{
+	bus := &fakeBus{failOn: map[eventbus.Kind]error{
 		eventbus.SignalJudged: errors.New("simulated bus failure"),
 	}}
 	applier := newApplier(t, bus, &fakeMutator{}, nil, &fakeSignalUpdater{}, signaljudge.AutonomyAuto)
@@ -528,6 +528,6 @@ func TestApplierBusFailurePropagates(t *testing.T) {
 
 // equalStrSlice is a tiny helper that returns true when two []string
 // slices have identical length and elements in order.
-func equalStrSlice(a, b []string) bool {
+func equalStrSlice(a, b []eventbus.Kind) bool {
 	return slices.Equal(a, b)
 }

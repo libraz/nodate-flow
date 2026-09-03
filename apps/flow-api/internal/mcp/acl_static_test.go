@@ -5,8 +5,6 @@ import (
 	"go/parser"
 	"go/token"
 	"os"
-	"reflect"
-	"runtime"
 	"sort"
 	"strings"
 	"testing"
@@ -119,7 +117,6 @@ var projectRoleWriteGates = map[string]bool{
 var writeToolsWithoutProjectGate = map[string]string{
 	"propose_tasks_from":    "LLM proposal that persists nothing",
 	"propose_priority":      "read-only proposal behind the Layer-4 visibility ACL",
-	"propose_steps":         "read-only proposal behind the Layer-4 visibility ACL; write-scoped because it bills the model",
 	"propose_duplicates":    "read-only similarity search behind the Layer-4 visibility ACL; write-scoped because it bills the embedder",
 	"propose_relations":     "read-only similarity search behind the Layer-4 visibility ACL; write-scoped because it bills the embedder",
 	"propose_lens":          "compiles a query and persists nothing; write-scoped because it bills the model",
@@ -154,6 +151,7 @@ func TestMCPWriteToolsPassProjectRoleGate(t *testing.T) {
 		t.Fatal("no tools registered")
 	}
 	graph := mcpPackageCallGraph(t)
+	registry := mcpRegisteredTools(t)
 
 	seenExempt := map[string]bool{}
 	for name, tl := range h.tools {
@@ -164,7 +162,7 @@ func TestMCPWriteToolsPassProjectRoleGate(t *testing.T) {
 			seenExempt[name] = true
 			continue
 		}
-		entry := mcpRunFuncName(t, name, tl.run)
+		entry := mcpRunFuncName(t, registry, name)
 		if !reachesAny(graph, entry, projectRoleWriteGates) {
 			t.Errorf("write tool %q (%s) never reaches a project-role gate (%s); "+
 				"route it through resolveTaskForWrite / resolveTaskRowForWrite / resolveProjectForWrite, "+
@@ -216,16 +214,138 @@ func TestMCPProjectRoleFloorCentralized(t *testing.T) {
 	}
 }
 
-// mcpRunFuncName maps a registered tool's run field back to its top-level
-// function name so the AST call graph can be entered at the right node.
-func mcpRunFuncName(t *testing.T, tool string, run any) string {
+// mcpRegistration is one entry of the tool registry as it is written in
+// the source: the tool's name, the floor argument it was registered under,
+// and the function named in its run field.
+type mcpRegistration struct {
+	name  string
+	floor string
+	run   string
+	pos   string
+}
+
+// mcpRegisteredTools reads the registry out of the source rather than
+// reflecting on the built table.
+//
+// Registration wraps each run function so the declared floor is bound to
+// the call, so the value in the table is a closure and reflection can only
+// report the wrapper. The declaration names the implementation, which is
+// what a call-graph check has to be entered at.
+func mcpRegisteredTools(t *testing.T) []mcpRegistration {
 	t.Helper()
-	v := reflect.ValueOf(run)
-	if v.Kind() != reflect.Func || v.IsNil() {
-		t.Fatalf("tool %q has no run function", tool)
+	fset := token.NewFileSet()
+	var out []mcpRegistration
+	for _, file := range mcpPackageSourceFiles(t) {
+		parsed, err := parser.ParseFile(fset, file, nil, 0)
+		if err != nil {
+			t.Fatalf("parse %s: %v", file, err)
+		}
+		ast.Inspect(parsed, func(n ast.Node) bool {
+			call, ok := n.(*ast.CallExpr)
+			if !ok || len(call.Args) != 2 {
+				return true
+			}
+			sel, ok := call.Fun.(*ast.SelectorExpr)
+			if !ok || sel.Sel.Name != "register" {
+				return true
+			}
+			floor, ok := call.Args[0].(*ast.SelectorExpr)
+			if !ok {
+				t.Errorf("%s: register is called with a floor that is not one of the auth.Floor constants",
+					fset.Position(call.Pos()))
+				return true
+			}
+			lit, ok := call.Args[1].(*ast.CompositeLit)
+			if !ok {
+				return true
+			}
+			reg := mcpRegistration{floor: floor.Sel.Name, pos: fset.Position(call.Pos()).String()}
+			for _, elt := range lit.Elts {
+				kv, ok := elt.(*ast.KeyValueExpr)
+				if !ok {
+					continue
+				}
+				key, ok := kv.Key.(*ast.Ident)
+				if !ok {
+					continue
+				}
+				switch key.Name {
+				case "name":
+					if v, ok := kv.Value.(*ast.BasicLit); ok && v.Kind == token.STRING {
+						reg.name = strings.Trim(v.Value, `"`)
+					}
+				case "run":
+					if v, ok := kv.Value.(*ast.Ident); ok {
+						reg.run = v.Name
+					}
+				case "floor":
+					t.Errorf("%s: the tool literal sets floor directly; the floor belongs in the register argument, where leaving it out does not compile",
+						fset.Position(kv.Pos()))
+				}
+			}
+			if reg.name == "" || reg.run == "" {
+				t.Errorf("%s: register call names neither a tool nor a run function the source can be entered at", reg.pos)
+				return true
+			}
+			out = append(out, reg)
+			return true
+		})
 	}
-	full := runtime.FuncForPC(v.Pointer()).Name()
-	return full[strings.LastIndex(full, ".")+1:]
+	sort.Slice(out, func(i, j int) bool { return out[i].name < out[j].name })
+	return out
+}
+
+// mcpRunFuncName returns the implementation function a registered tool
+// names, so the AST call graph can be entered at the right node.
+func mcpRunFuncName(t *testing.T, registry []mcpRegistration, tool string) string {
+	t.Helper()
+	for _, reg := range registry {
+		if reg.name == tool {
+			return reg.run
+		}
+	}
+	t.Fatalf("tool %q is not registered", tool)
+	return ""
+}
+
+// projectFloors are the floors that name a project role. A tool declaring
+// one has to reach a resolver that applies it, and a tool that reaches one
+// of those resolvers has to declare one — the resolver refuses otherwise,
+// and a refusal every caller hits is a tool that is simply broken.
+var projectFloors = map[string]bool{
+	"FloorProjectCommenter": true,
+	"FloorProjectEditor":    true,
+	"FloorProjectLead":      true,
+}
+
+// TestMCPProjectFloorsMatchTheGatesThatApplyThem proves the two halves of
+// a project floor agree: the declaration and the resolver that enforces it.
+//
+// Either half alone is inert. A floor declared on a tool that never reaches
+// a write resolver is a claim nothing applies; a write resolver reached by a
+// tool that declared only a workspace floor refuses every caller, because
+// the resolver has no role to compare against.
+func TestMCPProjectFloorsMatchTheGatesThatApplyThem(t *testing.T) {
+	t.Parallel()
+
+	registry := mcpRegisteredTools(t)
+	if len(registry) == 0 {
+		t.Fatal("no tool registrations were read from the source; the check is looking at nothing")
+	}
+	graph := mcpPackageCallGraph(t)
+
+	for _, reg := range registry {
+		gated := reachesAny(graph, reg.run, projectRoleWriteGates)
+		declared := projectFloors[reg.floor]
+		switch {
+		case declared && !gated:
+			t.Errorf("tool %q declares %s but nothing reachable from %s applies it (%s); route it through one of %s, or declare the floor the tool actually enforces",
+				reg.name, reg.floor, reg.run, strings.Join(sortedKeys(projectRoleWriteGates), " / "), reg.pos)
+		case gated && !declared:
+			t.Errorf("tool %q reaches a project-role gate from %s but is registered under %s, which names no project role (%s); the gate would refuse every caller",
+				reg.name, reg.run, reg.floor, reg.pos)
+		}
+	}
 }
 
 // mcpPackageCallGraph parses every non-test file in this package and returns

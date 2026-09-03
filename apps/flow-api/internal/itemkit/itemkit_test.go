@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/dbretry"
 	"github.com/libraz/nodate-flow/packages/go-shared/dbtype"
 	"github.com/libraz/nodate-flow/packages/go-shared/testhelpers"
 )
@@ -147,18 +148,28 @@ func startDB(t *testing.T) *sql.DB {
 	return inst.DB
 }
 
-func withTx(t *testing.T, db *sql.DB, fn func(tx *sql.Tx)) {
+// withTx runs fn inside the transaction type itemkit writes through and
+// commits. It goes through dbretry.InTx rather than db.BeginTx because
+// itemkit appends to the event log, and the appender only accepts a
+// transaction whose commit it can wait for.
+func withTx(t *testing.T, db *sql.DB, fn func(tx TX)) {
 	t.Helper()
-	tx, err := db.BeginTx(context.Background(), nil)
+	err := dbretry.InTx(context.Background(), db, "itemkit.test", nil,
+		func(_ context.Context, tx *dbretry.Tx) error {
+			fn(tx)
+			return nil
+		})
 	if err != nil {
-		t.Fatalf("begin tx: %v", err)
+		t.Fatalf("tx: %v", err)
 	}
-	defer func() {
-		if err := tx.Commit(); err != nil {
-			t.Fatalf("commit: %v", err)
-		}
-	}()
-	fn(tx)
+}
+
+// inTxErr is withTx for the cases that expect a failure: fn's error is
+// returned to the caller, and returning it also rolls the transaction
+// back.
+func inTxErr(ctx context.Context, db *sql.DB, fn func(tx TX) error) error {
+	return dbretry.InTx(ctx, db, "itemkit.test", nil,
+		func(_ context.Context, tx *dbretry.Tx) error { return fn(tx) })
 }
 
 // --- Scenarios ---------------------------------------------------------------
@@ -172,7 +183,7 @@ func TestScheduleTaskCreatesLink(t *testing.T) {
 	end := start.Add(time.Hour)
 	var evtPub dbtype.PublicID
 	var evtID uint32
-	withTx(t, db, func(tx *sql.Tx) {
+	withTx(t, db, func(tx TX) {
 		var err error
 		evtPub, evtID, err = ScheduleTask(context.Background(), tx, ScheduleTaskArgs{
 			WorkspaceID: fx.wsID,
@@ -234,7 +245,7 @@ func TestRescheduleTaskPropagatesToEvent(t *testing.T) {
 
 	start := time.Date(2030, 6, 3, 10, 0, 0, 0, time.UTC)
 	end := start.Add(time.Hour)
-	withTx(t, db, func(tx *sql.Tx) {
+	withTx(t, db, func(tx TX) {
 		if _, _, err := ScheduleTask(context.Background(), tx, ScheduleTaskArgs{
 			WorkspaceID: fx.wsID, TaskID: fx.taskID, CalendarID: fx.calendarID,
 			ActorUserID: fx.userID, Role: RoleDue, Title: "T", StartAt: start, EndAt: end, Timezone: "UTC",
@@ -244,7 +255,7 @@ func TestRescheduleTaskPropagatesToEvent(t *testing.T) {
 	})
 
 	newDate := time.Date(2030, 6, 10, 0, 0, 0, 0, time.UTC)
-	withTx(t, db, func(tx *sql.Tx) {
+	withTx(t, db, func(tx TX) {
 		if err := RescheduleTask(context.Background(), tx, RescheduleTaskArgs{
 			WorkspaceID: fx.wsID,
 			TaskID:      fx.taskID,
@@ -279,7 +290,7 @@ func TestDeleteTaskCascadesEvents(t *testing.T) {
 	defer purge(t, db, fx.wsID)
 
 	start := time.Date(2030, 6, 3, 10, 0, 0, 0, time.UTC)
-	withTx(t, db, func(tx *sql.Tx) {
+	withTx(t, db, func(tx TX) {
 		if _, _, err := ScheduleTask(context.Background(), tx, ScheduleTaskArgs{
 			WorkspaceID: fx.wsID, TaskID: fx.taskID, CalendarID: fx.calendarID,
 			ActorUserID: fx.userID, Role: RoleDue, Title: "T", StartAt: start, EndAt: start.Add(time.Hour), Timezone: "UTC",
@@ -288,7 +299,7 @@ func TestDeleteTaskCascadesEvents(t *testing.T) {
 		}
 	})
 
-	withTx(t, db, func(tx *sql.Tx) {
+	withTx(t, db, func(tx TX) {
 		if err := DeleteTask(context.Background(), tx, fx.wsID, fx.taskID, fx.userID); err != nil {
 			t.Fatalf("DeleteTask: %v", err)
 		}
@@ -315,7 +326,7 @@ func TestRenameFromTaskPropagatesToEvent(t *testing.T) {
 	defer purge(t, db, fx.wsID)
 
 	start := time.Date(2030, 6, 3, 10, 0, 0, 0, time.UTC)
-	withTx(t, db, func(tx *sql.Tx) {
+	withTx(t, db, func(tx TX) {
 		if _, _, err := ScheduleTask(context.Background(), tx, ScheduleTaskArgs{
 			WorkspaceID: fx.wsID, TaskID: fx.taskID, CalendarID: fx.calendarID,
 			ActorUserID: fx.userID, Role: RoleDue, Title: "Old", StartAt: start, EndAt: start.Add(time.Hour), Timezone: "UTC",
@@ -324,7 +335,7 @@ func TestRenameFromTaskPropagatesToEvent(t *testing.T) {
 		}
 	})
 
-	withTx(t, db, func(tx *sql.Tx) {
+	withTx(t, db, func(tx TX) {
 		if err := RenameItem(context.Background(), tx, RenameItemArgs{
 			WorkspaceID: fx.wsID, ActorUserID: fx.userID, TaskID: fx.taskID, NewTitle: "New",
 		}); err != nil {

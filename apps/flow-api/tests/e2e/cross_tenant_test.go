@@ -31,7 +31,7 @@ func TestCrossTenantPageIsolation(t *testing.T) {
 	// which refuses with 403 WS.WORKSPACE.ACCESS_DENIED. The workspace
 	// id is in the path and already known to the caller, so there is
 	// nothing for a 404 to conceal here — what must not happen is the
-	// gate answering 5xx, which the old ">= 403" assertion accepted.
+	// gate answering 5xx, which a bare ">= 403" assertion would accept.
 	status, body := doJSONStatus(t, http.MethodGet, base, outsider.AccessToken, nil)
 	requireDenied(t, status, body, http.StatusForbidden, "WS.WORKSPACE.ACCESS_DENIED",
 		"outsider listing pages")
@@ -92,6 +92,14 @@ func TestCrossTenantDashboardIsolation(t *testing.T) {
 		"outsider reading a dashboard widget")
 	require.NotContains(t, string(body), "My Widget",
 		"a refusal must not carry the widget it refused")
+
+	// The needle is discoverable by the widget's owner, so the assertion
+	// above is about authorization rather than a route that answers
+	// nobody.
+	status, body = doJSONStatus(t, http.MethodGet, base+"/"+widget.ID, owner.AccessToken, nil)
+	require.Equal(t, http.StatusOK, status, "the owner must be able to read their own widget")
+	require.Contains(t, string(body), "My Widget",
+		"the owner's read must contain the widget's title")
 }
 
 // TestCrossTenantLensIsolation verifies that a member of workspace A
@@ -129,9 +137,13 @@ func TestCrossTenantLensIsolation(t *testing.T) {
 	requireDenied(t, status, body, http.StatusForbidden, "WS.WORKSPACE.ACCESS_DENIED",
 		"outsider deleting a lens")
 
-	// The lens survived the refused delete.
-	status, _ = doJSONStatus(t, http.MethodGet, base+"/"+lens.ID, owner.AccessToken, nil)
+	// The lens survived the refused delete, and the needle is discoverable
+	// by its owner, so the assertions above are about authorization
+	// rather than a route that answers nobody.
+	status, body = doJSONStatus(t, http.MethodGet, base+"/"+lens.ID, owner.AccessToken, nil)
 	require.Equal(t, http.StatusOK, status, "the lens must still exist for its owner")
+	require.Contains(t, string(body), "Private View",
+		"the owner's read must contain the lens's name")
 }
 
 // TestCrossTenantTimeboxIsolation verifies that a member of workspace A
@@ -214,6 +226,14 @@ func TestCrossTenantWebhookIsolation(t *testing.T) {
 		"outsider reading a webhook")
 	require.NotContains(t, string(body), "example.com/hook",
 		"a refusal must not carry the endpoint it refused")
+
+	// The needle is discoverable by the webhook's owner, so the assertion
+	// above is about authorization rather than a route that answers
+	// nobody.
+	status, body = doJSONStatus(t, http.MethodGet, base+"/"+created.Webhook.ID, owner.AccessToken, nil)
+	require.Equal(t, http.StatusOK, status, "the owner must be able to read their own webhook")
+	require.Contains(t, string(body), "example.com/hook",
+		"the owner's read must contain the webhook's endpoint")
 
 	status, body = doJSONStatus(t, http.MethodDelete, base+"/"+created.Webhook.ID, outsider.AccessToken, nil)
 	requireDenied(t, status, body, http.StatusForbidden, "WS.WORKSPACE.ACCESS_DENIED",

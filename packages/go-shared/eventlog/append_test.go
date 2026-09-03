@@ -17,6 +17,7 @@ import (
 
 	"github.com/libraz/nodate-flow/packages/go-shared/dbretry"
 	"github.com/libraz/nodate-flow/packages/go-shared/dbtype"
+	"github.com/libraz/nodate-flow/packages/go-shared/eventbus"
 )
 
 // None of the tests in this file call t.Parallel. The subscriber
@@ -37,8 +38,8 @@ func TestAppendWritesTheRow(t *testing.T) {
 	task := uint32(99)
 	occurred := time.Date(2026, 3, 4, 5, 6, 7, 0, time.UTC)
 
-	pubID, err := Append(context.Background(), db, Event{
-		Type:        "item.scheduled",
+	pubID, err := Append(context.Background(), dbretry.AutoCommit(db), Event{
+		Type:        eventbus.ItemScheduled,
 		WorkspaceID: 3,
 		ActorUserID: &actor,
 		TaskID:      &task,
@@ -75,7 +76,7 @@ func TestAppendWritesTheRow(t *testing.T) {
 	if got.args[3] != driver.Value(actor) {
 		t.Errorf("actor_user_id arg = %v, want %d", got.args[3], actor)
 	}
-	if got.args[4] != driver.Value("item.scheduled") {
+	if got.args[4] != driver.Value(string(eventbus.ItemScheduled)) {
 		t.Errorf("type arg = %v, want item.scheduled", got.args[4])
 	}
 	raw, ok := got.args[5].(json.RawMessage)
@@ -97,7 +98,7 @@ func TestAppendDefaultsPayloadAndTimestamp(t *testing.T) {
 	db, rec := stubDB(t)
 
 	before := time.Now().UTC()
-	if _, err := Append(context.Background(), db, Event{Type: "member.joined", WorkspaceID: 1}); err != nil {
+	if _, err := Append(context.Background(), dbretry.AutoCommit(db), Event{Type: eventbus.WorkspaceMemberAdded, WorkspaceID: 1}); err != nil {
 		t.Fatalf("append: %v", err)
 	}
 	after := time.Now().UTC()
@@ -134,7 +135,7 @@ func TestAppendPropagatesTheWriteError(t *testing.T) {
 	boom := errors.New("events table is read-only")
 	rec.failWith(boom)
 
-	pubID, err := Append(context.Background(), db, Event{Type: "item.scheduled", WorkspaceID: 3})
+	pubID, err := Append(context.Background(), dbretry.AutoCommit(db), Event{Type: eventbus.ItemScheduled, WorkspaceID: 3})
 	if !errors.Is(err, boom) {
 		t.Fatalf("append error = %v, want %v", err, boom)
 	}
@@ -153,7 +154,7 @@ func TestAppendDoesNotFanOutOnFailure(t *testing.T) {
 	var sub subscriber
 	sub.register(t)
 
-	if _, err := Append(context.Background(), db, Event{Type: "item.scheduled", WorkspaceID: 3}); err == nil {
+	if _, err := Append(context.Background(), dbretry.AutoCommit(db), Event{Type: eventbus.ItemScheduled, WorkspaceID: 3}); err == nil {
 		t.Fatal("append returned nil despite the write failing")
 	}
 	if got := sub.fired(); got != 0 {
@@ -167,8 +168,8 @@ func TestAppendDoesNotFanOutOnFailure(t *testing.T) {
 func TestAppendRejectsInternalIDsInThePayload(t *testing.T) {
 	db, rec := stubDB(t)
 
-	_, err := Append(context.Background(), db, Event{
-		Type:        "item.scheduled",
+	_, err := Append(context.Background(), dbretry.AutoCommit(db), Event{
+		Type:        eventbus.ItemScheduled,
 		WorkspaceID: 3,
 		Payload:     map[string]any{"taskId": 42},
 	})
@@ -189,7 +190,7 @@ func TestAppendRetriesDeadlockOnAutoCommit(t *testing.T) {
 	rec.failWith(&mysql.MySQLError{Number: 1213, Message: "Deadlock found"})
 	rec.recoverAfter(1)
 
-	if _, err := Append(context.Background(), db, Event{Type: "item.scheduled", WorkspaceID: 3}); err != nil {
+	if _, err := Append(context.Background(), dbretry.AutoCommit(db), Event{Type: eventbus.ItemScheduled, WorkspaceID: 3}); err != nil {
 		t.Fatalf("append: %v", err)
 	}
 	if n := len(rec.statements()); n != 2 {
@@ -201,24 +202,23 @@ func TestAppendRetriesDeadlockOnAutoCommit(t *testing.T) {
 // deadlock invalidates the whole transaction, so re-issuing this one
 // statement would send it to a transaction the server has already
 // rolled back; the unit that has to be retried is the caller's
-// transaction.
+// transaction. Each attempt therefore issues the INSERT exactly once,
+// and the attempts are counted by InTx.
 func TestAppendDoesNotRetryInsideATransaction(t *testing.T) {
 	db, rec := stubDB(t)
 	deadlock := &mysql.MySQLError{Number: 1213, Message: "Deadlock found"}
 	rec.failWith(deadlock)
 
-	tx, err := db.BeginTx(context.Background(), nil)
-	if err != nil {
-		t.Fatalf("begin: %v", err)
-	}
-	defer func() { _ = tx.Rollback() }()
-
-	_, err = Append(context.Background(), tx, Event{Type: "item.scheduled", WorkspaceID: 3})
+	err := dbretry.InTx(context.Background(), db, "eventlog.test", nil, func(ctx context.Context, tx *dbretry.Tx) error {
+		_, aerr := Append(ctx, tx, Event{Type: eventbus.ItemScheduled, WorkspaceID: 3})
+		return aerr
+	})
 	if !errors.Is(err, deadlock) {
-		t.Fatalf("append error = %v, want the deadlock surfaced to the caller", err)
+		t.Fatalf("InTx error = %v, want the deadlock surfaced to the caller", err)
 	}
-	if n := len(rec.statements()); n != 1 {
-		t.Fatalf("statement count = %d, want 1 — the transaction is the retry unit, not the statement", n)
+	if n := len(rec.statements()); n != dbretry.MaxAttempts {
+		t.Fatalf("statement count = %d, want %d — one INSERT per transaction attempt, not a retry inside one",
+			n, dbretry.MaxAttempts)
 	}
 }
 
@@ -232,8 +232,8 @@ func TestAppendRetriesTheWholeTransactionThroughInTx(t *testing.T) {
 	rec.failWith(&mysql.MySQLError{Number: 1213, Message: "Deadlock found"})
 	rec.recoverAfter(1)
 
-	err := dbretry.InTx(context.Background(), db, "eventlog.test", nil, func(ctx context.Context, tx *sql.Tx) error {
-		_, aerr := Append(ctx, tx, Event{Type: "item.scheduled", WorkspaceID: 3})
+	err := dbretry.InTx(context.Background(), db, "eventlog.test", nil, func(ctx context.Context, tx *dbretry.Tx) error {
+		_, aerr := Append(ctx, tx, Event{Type: eventbus.ItemScheduled, WorkspaceID: 3})
 		return aerr
 	})
 	if err != nil {
@@ -253,8 +253,8 @@ func TestFanOutDeferredUntilCommit(t *testing.T) {
 	sub.register(t)
 
 	firedInside := false
-	err := dbretry.InTx(context.Background(), db, "eventlog.test", nil, func(ctx context.Context, tx *sql.Tx) error {
-		if _, aerr := Append(ctx, tx, Event{Type: "item.scheduled", WorkspaceID: 3}); aerr != nil {
+	err := dbretry.InTx(context.Background(), db, "eventlog.test", nil, func(ctx context.Context, tx *dbretry.Tx) error {
+		if _, aerr := Append(ctx, tx, Event{Type: eventbus.ItemScheduled, WorkspaceID: 3}); aerr != nil {
 			return aerr
 		}
 		firedInside = sub.fired() > 0
@@ -271,36 +271,11 @@ func TestFanOutDeferredUntilCommit(t *testing.T) {
 	}
 }
 
-// TestFanOutRefusedInHandRolledTransaction pins the refusal. A
-// transaction the caller opened themselves has no commit boundary to
-// defer to, so waking subscribers there hands each of them an id that
-// resolves to nothing yet — every delivery quietly evaporates. The row
-// is still written and its public id still returned; only the fan-out
-// is withheld, and loudly.
-func TestFanOutRefusedInHandRolledTransaction(t *testing.T) {
-	db, _ := stubDB(t)
-	var sub subscriber
-	sub.register(t)
-
-	tx, err := db.BeginTx(context.Background(), nil)
-	if err != nil {
-		t.Fatalf("begin: %v", err)
-	}
-	pubID, err := Append(context.Background(), tx, Event{Type: "item.scheduled", WorkspaceID: 3})
-	if err != nil {
-		t.Fatalf("append: %v", err)
-	}
-	if err := tx.Commit(); err != nil {
-		t.Fatalf("commit: %v", err)
-	}
-
-	if pubID == (dbtype.PublicID{}) {
-		t.Error("the row was written, so its public id must still come back")
-	}
-	if got := sub.fired(); got != 0 {
-		t.Fatalf("subscribers fired %d times without a commit boundary, want 0", got)
-	}
-}
+// A transaction the caller opened themselves has no commit boundary to
+// defer to, so waking subscribers there would hand each of them an id
+// that resolves to nothing yet. There is no test for that case because
+// Append takes a dbretry.CommitBoundary, which a bare *sql.Tx does not
+// satisfy: the call does not compile.
 
 // TestFanOutCarriesTheInsertedRow checks what a subscriber is actually
 // handed. The internal id is the whole point: webhook deliveries dedupe
@@ -312,7 +287,7 @@ func TestFanOutCarriesTheInsertedRow(t *testing.T) {
 	var sub subscriber
 	sub.register(t)
 
-	if _, err := Append(context.Background(), db, Event{Type: "item.scheduled", WorkspaceID: 3}); err != nil {
+	if _, err := Append(context.Background(), dbretry.AutoCommit(db), Event{Type: eventbus.ItemScheduled, WorkspaceID: 3}); err != nil {
 		t.Fatalf("append: %v", err)
 	}
 
@@ -320,7 +295,7 @@ func TestFanOutCarriesTheInsertedRow(t *testing.T) {
 	if call.workspaceID != 3 {
 		t.Errorf("workspace id = %d, want 3", call.workspaceID)
 	}
-	if call.eventType != "item.scheduled" {
+	if call.eventType != string(eventbus.ItemScheduled) {
 		t.Errorf("event type = %q, want item.scheduled", call.eventType)
 	}
 	if call.eventInternalID != stubLastInsertID {
@@ -352,7 +327,7 @@ func TestHooksFireInRegistrationOrderAndCanBeRemoved(t *testing.T) {
 	})
 	t.Cleanup(func() { RemoveHook(second) })
 
-	if _, err := Append(context.Background(), db, Event{Type: "item.scheduled", WorkspaceID: 3}); err != nil {
+	if _, err := Append(context.Background(), dbretry.AutoCommit(db), Event{Type: eventbus.ItemScheduled, WorkspaceID: 3}); err != nil {
 		t.Fatalf("append: %v", err)
 	}
 	if len(order) != 2 || order[0] != "first" || order[1] != "second" {
@@ -361,7 +336,7 @@ func TestHooksFireInRegistrationOrderAndCanBeRemoved(t *testing.T) {
 
 	RemoveHook(first)
 	order = nil
-	if _, err := Append(context.Background(), db, Event{Type: "item.scheduled", WorkspaceID: 3}); err != nil {
+	if _, err := Append(context.Background(), dbretry.AutoCommit(db), Event{Type: eventbus.ItemScheduled, WorkspaceID: 3}); err != nil {
 		t.Fatalf("append: %v", err)
 	}
 	if len(order) != 1 || order[0] != "second" {
@@ -372,7 +347,7 @@ func TestHooksFireInRegistrationOrderAndCanBeRemoved(t *testing.T) {
 	// the subscribers that remain.
 	RemoveHook(first)
 	order = nil
-	if _, err := Append(context.Background(), db, Event{Type: "item.scheduled", WorkspaceID: 3}); err != nil {
+	if _, err := Append(context.Background(), dbretry.AutoCommit(db), Event{Type: eventbus.ItemScheduled, WorkspaceID: 3}); err != nil {
 		t.Fatalf("append: %v", err)
 	}
 	if len(order) != 1 || order[0] != "second" {
@@ -380,10 +355,10 @@ func TestHooksFireInRegistrationOrderAndCanBeRemoved(t *testing.T) {
 	}
 }
 
-// TestHandlesSurviveOtherRegistrations pins what the handle is worth. It
-// used to be a slice position, which addressed a different subscriber as
-// soon as an earlier one went away — so an unregister would have taken
-// down whoever had shifted into that slot.
+// TestHandlesSurviveOtherRegistrations pins what the handle is worth. A
+// slice position would address a different subscriber as soon as an
+// earlier one went away, so an unregister would take down whoever had
+// shifted into that slot.
 func TestHandlesSurviveOtherRegistrations(t *testing.T) {
 	db, _ := stubDB(t)
 
@@ -398,7 +373,7 @@ func TestHandlesSurviveOtherRegistrations(t *testing.T) {
 	RemoveHook(a)
 	RemoveHook(b)
 
-	if _, err := Append(context.Background(), db, Event{Type: "item.scheduled", WorkspaceID: 3}); err != nil {
+	if _, err := Append(context.Background(), dbretry.AutoCommit(db), Event{Type: eventbus.ItemScheduled, WorkspaceID: 3}); err != nil {
 		t.Fatalf("append: %v", err)
 	}
 	if len(fired) != 1 || fired[0] != "c" {
@@ -414,7 +389,7 @@ func TestSeqIncrementsPerDispatch(t *testing.T) {
 	sub.register(t)
 
 	for range 2 {
-		if _, err := Append(context.Background(), db, Event{Type: "item.scheduled", WorkspaceID: 3}); err != nil {
+		if _, err := Append(context.Background(), dbretry.AutoCommit(db), Event{Type: eventbus.ItemScheduled, WorkspaceID: 3}); err != nil {
 			t.Fatalf("append: %v", err)
 		}
 	}

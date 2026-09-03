@@ -5,6 +5,8 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
+
+	"github.com/libraz/nodate-flow/packages/go-shared/region"
 )
 
 // fixedNow is the reference instant the day-boundary tests project into
@@ -16,17 +18,17 @@ var fixedNow = time.Date(2026, time.May, 17, 15, 30, 0, 0, time.UTC)
 // mustLoad is a test helper that fails loudly when the system tzdata is
 // missing the requested zone. Every Go toolchain ships with the embedded
 // time/tzdata fallback path, but exercising the helper makes a missing
-// tz an explicit test failure rather than a confusing nil-deref.
-func mustLoad(t *testing.T, name string) *time.Location {
+// tz an explicit test failure rather than a confusing zero value.
+func mustLoad(t *testing.T, name string) region.Zone {
 	t.Helper()
-	loc, err := time.LoadLocation(name)
+	z, err := region.Resolve(name)
 	require.NoErrorf(t, err, "tzdata missing zone %q", name)
-	return loc
+	return z
 }
 
 // TestEventDayInWorkspaceTz_Tokyo verifies that an early-evening UTC
 // instant (15:30Z) projects to the *next* day in Tokyo (+09:00). This is
-// the boundary case the W2 brief specifically calls out.
+// the boundary case the per-workspace day projection has to get right.
 func TestEventDayInWorkspaceTz_Tokyo(t *testing.T) {
 	t.Parallel()
 	loc := mustLoad(t, "Asia/Tokyo")
@@ -99,7 +101,7 @@ func TestLocalDayUTCRange_NewYorkDSTSpringForward(t *testing.T) {
 	loc := mustLoad(t, "America/New_York")
 
 	// noon on the spring-forward day, regardless of zone
-	noonLocal := time.Date(2026, time.March, 8, 12, 0, 0, 0, loc)
+	noonLocal := time.Date(2026, time.March, 8, 12, 0, 0, 0, loc.Location())
 
 	utcStart, utcEnd := localDayUTCRange(noonLocal, loc)
 
