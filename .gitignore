@@ -48,6 +48,7 @@ vendor/
 /apps/auth-api/dump-openapi
 /apps/auth-api/healthcheck
 /scripts/merge-openapi
+/scripts/scripts
 /apps/flow-worker/worker
 /apps/presence-discord/gateway
 /healthcheck
