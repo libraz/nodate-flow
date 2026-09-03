@@ -29,9 +29,8 @@ import { type ProfileFormValues, profileSchema } from '../../features/auth/auth-
 import { type AuthUser, authStore, selectUser, useAuth } from '../../features/auth/auth-store';
 import { userFromMe } from '../../features/auth/user-from-me';
 import { type SupportedLanguage, setLanguage } from '../../i18n';
-import type { ProblemJson } from '../../lib/api-error';
-import { mapAuthError } from '../../lib/auth-errors';
-import { sdk } from '../../lib/sdk';
+import { apiRequest } from '../../lib/api';
+import { mapAuthThrown } from '../../lib/auth-errors';
 import { useSubmitGuard } from '../../lib/use-submit-guard';
 import { type ThemePreference, useTheme } from '../../providers/theme-provider';
 
@@ -96,21 +95,24 @@ function useWorkspaceCount(user: AuthUser | null): number | undefined {
     if (inlineLen != null) return;
     if (!user) return;
     let cancelled = false;
-    void sdk
-      .GET('/workspaces', { params: { query: { limit: 1, offset: 0 } } })
+    void apiRequest(
+      (client) => client.GET('/workspaces', { params: { query: { limit: 1, offset: 0 } } }),
+      'Failed to count workspaces',
+      // Treat a failed read as "unknown" so we never falsely promote
+      // the empty-state CTA when the user already has workspaces but
+      // the request happened to fail.
+      { onError: 'empty', empty: null },
+    )
       .then((result) => {
         if (cancelled) return;
-        if (result.error || !result.data) {
-          // Treat fetch errors as "unknown" so we never falsely promote
-          // the empty-state CTA when the user already has workspaces
-          // but the request happened to fail.
+        if (result === null) {
           setFetched(undefined);
           return;
         }
         // Field name follows GET /workspaces -> WorkspacesListOutputBody:
         // `workspaces`, NOT `items`. We still tolerate `total` first because
         // the endpoint always populates it, even when the array is null.
-        const body = result.data as components['schemas']['WorkspacesListOutputBody'];
+        const body = result as components['schemas']['WorkspacesListOutputBody'];
         const total =
           typeof body.total === 'number'
             ? body.total
@@ -301,22 +303,28 @@ export function ProfilePage(): ReactElement {
     setServerError(null);
     setSuccess(false);
     try {
-      const { data, error } = await sdk.PATCH('/me', {
-        body: {
-          displayName: values.displayName,
-          locale: values.locale,
-          timezone: values.timezone,
-          country: values.country,
-          themePreference: values.themePreference,
-          weekStart: values.weekStart,
-        },
-      });
-      if (error || !data) {
-        // Route the server error through the shared auth-error mapper so
-        // validation / session-revoked / specific codes surface their
-        // localized messages; mapAuthError falls back to `errors.unknown`
-        // for anything it cannot classify.
-        setServerError(t(mapAuthError(error as ProblemJson | undefined)));
+      // Route the server error through the shared auth-error mapper so
+      // validation / session-revoked / specific codes surface their
+      // localized messages; the mapper falls back to `errors.unknown`
+      // for anything it cannot classify.
+      let data: unknown;
+      try {
+        data = await apiRequest(
+          (client) =>
+            client.PATCH('/me', {
+              body: {
+                displayName: values.displayName,
+                locale: values.locale,
+                timezone: values.timezone,
+                country: values.country,
+                themePreference: values.themePreference,
+                weekStart: values.weekStart,
+              },
+            }),
+          'Failed to save the profile',
+        );
+      } catch (err) {
+        setServerError(t(mapAuthThrown(err)));
         return;
       }
       const me = data as MeResponse;

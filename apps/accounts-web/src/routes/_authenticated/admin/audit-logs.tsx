@@ -11,8 +11,8 @@ import { type ReactElement, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { adminTableStyle, adminTdStyle, adminThStyle } from '../../../features/admin/styles';
+import { apiRequest } from '../../../lib/api';
 import { formatTimestamp } from '../../../lib/format-timestamp';
-import { sdk } from '../../../lib/sdk';
 
 /**
  * SDK-derived shapes; the local interfaces this replaced silently drifted
@@ -66,30 +66,33 @@ function AuditLogsPage(): ReactElement {
     const toTs = toUnix(toDate);
     const offset = (page - 1) * perPage;
 
-    void sdk
-      .GET('/admin/audit-logs', {
-        params: {
-          query: {
-            limit: perPage,
-            offset,
-            ...(actionFilter ? { action: actionFilter } : {}),
-            ...(fromTs !== undefined ? { from: fromTs } : {}),
-            ...(toTs !== undefined ? { to: toTs } : {}),
+    void apiRequest(
+      (client) =>
+        client.GET('/admin/audit-logs', {
+          params: {
+            query: {
+              limit: perPage,
+              offset,
+              ...(actionFilter ? { action: actionFilter } : {}),
+              ...(fromTs !== undefined ? { from: fromTs } : {}),
+              ...(toTs !== undefined ? { to: toTs } : {}),
+            },
           },
-        },
-      })
-      .then((result) => {
-        if (cancelled) return;
-        if (result.error || !result.data) {
-          setError(t('errors.generic'));
-          setLoading(false);
-          return;
-        }
-        const body = result.data as AuditLogsResponse;
-        setEntries(body.items ?? []);
-        setTotal(body.total);
+        }),
+      'Failed to load audit logs',
+      { onError: 'empty', empty: null },
+    ).then((result) => {
+      if (cancelled) return;
+      if (result === null) {
+        setError(t('errors.generic'));
         setLoading(false);
-      });
+        return;
+      }
+      const body = result as AuditLogsResponse;
+      setEntries(body.items ?? []);
+      setTotal(body.total);
+      setLoading(false);
+    });
 
     return () => {
       cancelled = true;

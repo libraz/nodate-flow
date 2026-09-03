@@ -19,10 +19,9 @@ import { type FormEvent, type ReactElement, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { adminBadgeBase, adminLabelStyle, adminValueStyle } from '../../../features/admin/styles';
-import type { ProblemJson } from '../../../lib/api-error';
-import { extractErrorCode } from '../../../lib/auth-errors';
+import { apiRequest } from '../../../lib/api';
+import { refusalCode } from '../../../lib/auth-errors';
 import { formatTimestamp } from '../../../lib/format-timestamp';
-import { sdk } from '../../../lib/sdk';
 import { useSubmitGuard } from '../../../lib/use-submit-guard';
 
 interface WorkspaceDetail {
@@ -183,14 +182,18 @@ function WorkspaceDetailPage(): ReactElement {
     setLoading(true);
     setError(null);
 
-    void sdk.GET('/admin/workspaces/{wsId}', { params: { path: { wsId } } }).then((result) => {
+    void apiRequest(
+      (client) => client.GET('/admin/workspaces/{wsId}', { params: { path: { wsId } } }),
+      'Failed to load the workspace',
+      { onError: 'empty', empty: null },
+    ).then((result) => {
       if (cancelled) return;
-      if (result.error || !result.data) {
+      if (result === null) {
         setError(t('errors.generic'));
         setLoading(false);
         return;
       }
-      setWorkspace(result.data as WorkspaceDetail);
+      setWorkspace(result as WorkspaceDetail);
       setLoading(false);
     });
 
@@ -209,29 +212,34 @@ function WorkspaceDetailPage(): ReactElement {
     if (!ok) return;
 
     setActionLoading(true);
-    const { error: err } = await (async () => {
-      try {
-        return await sdk.PATCH('/admin/workspaces/{wsId}', {
-          params: { path: { wsId } },
-          body: { enabled: !workspace.enabled },
-        });
-      } finally {
-        setActionLoading(false);
-      }
-    })();
-    if (err) {
-      const code = extractErrorCode(err as ProblemJson);
+    try {
+      await apiRequest(
+        (client) =>
+          client.PATCH('/admin/workspaces/{wsId}', {
+            params: { path: { wsId } },
+            body: { enabled: !workspace.enabled },
+          }),
+        'Failed to update the workspace',
+      );
+    } catch (err) {
+      const code = refusalCode(err);
       toaster.show({
         tone: 'danger',
         message: code ? `${t('errors.generic')} (${code})` : t('errors.generic'),
       });
       return;
+    } finally {
+      setActionLoading(false);
     }
 
     // Refetch
-    const result = await sdk.GET('/admin/workspaces/{wsId}', { params: { path: { wsId } } });
-    if (result.data) {
-      setWorkspace(result.data as WorkspaceDetail);
+    const result = await apiRequest(
+      (client) => client.GET('/admin/workspaces/{wsId}', { params: { path: { wsId } } }),
+      'Failed to load the workspace',
+      { onError: 'empty', empty: null },
+    );
+    if (result) {
+      setWorkspace(result as WorkspaceDetail);
     }
   };
 
@@ -239,12 +247,17 @@ function WorkspaceDetailPage(): ReactElement {
     if (!workspace) return;
     if (deleteGuard.guard()) return;
     try {
-      const { error: err } = await sdk.DELETE('/admin/workspaces/{wsId}', {
-        params: { path: { wsId } },
-        body: { confirm: true },
-      });
-      if (err) {
-        const code = extractErrorCode(err as ProblemJson);
+      try {
+        await apiRequest(
+          (client) =>
+            client.DELETE('/admin/workspaces/{wsId}', {
+              params: { path: { wsId } },
+              body: { confirm: true },
+            }),
+          'Failed to delete the workspace',
+        );
+      } catch (err) {
+        const code = refusalCode(err);
         toaster.show({
           tone: 'danger',
           message: code

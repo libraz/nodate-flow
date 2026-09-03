@@ -24,10 +24,9 @@ import { useCapsLockHint } from '../features/auth/use-caps-lock-hint';
 import { useRateLimitCountdown } from '../features/auth/use-rate-limit-countdown';
 import { type MeResponse, userFromMe } from '../features/auth/user-from-me';
 import OAuthButtonRow from '../features/oauth/oauth-button-row';
-import type { ProblemJson } from '../lib/api-error';
-import { type AuthErrorI18nKey, mapAuthError, mapAuthThrown } from '../lib/auth-errors';
+import { apiRequest, apiSettle } from '../lib/api';
+import { type AuthErrorI18nKey, mapAuthThrown } from '../lib/auth-errors';
 import { safeRedirectTarget } from '../lib/redirect-target';
-import { sdk } from '../lib/sdk';
 import { useSubmitGuard } from '../lib/use-submit-guard';
 
 /**
@@ -367,9 +366,11 @@ function LoginPage(): ReactElement {
 
   const completeSignIn = async (accessToken: string): Promise<void> => {
     authStore.getState().setAccessToken(accessToken);
-    const { data, error } = await sdk.GET('/me');
-    if (error || !data) {
-      setServerError(mapAuthError(error as ProblemJson | undefined));
+    let data: unknown;
+    try {
+      data = await apiRequest((client) => client.GET('/me'), 'Failed to load the signed-in user');
+    } catch (err) {
+      setServerError(mapAuthThrown(err));
       authStore.getState().clearSession();
       return;
     }
@@ -381,24 +382,31 @@ function LoginPage(): ReactElement {
     if (rateLimited) return;
     setServerError(null);
     try {
-      const { data, error, response } = await sdk.POST('/auth/login', {
-        body: { email: values.email, password: values.password },
-      });
-      if (error || !data) {
-        setServerError(mapAuthError(error as ProblemJson | undefined));
-        if (response.status === 429) {
+      // The cooldown after too many attempts rides in a `Retry-After`
+      // header, which no error envelope carries, so this call reads the
+      // outcome rather than having the refusal thrown for it.
+      const settled = await apiSettle(
+        (client) =>
+          client.POST('/auth/login', {
+            body: { email: values.email, password: values.password },
+          }),
+        'Sign-in failed',
+      );
+      if (!settled.ok) {
+        setServerError(mapAuthThrown(settled.error));
+        if (settled.response?.status === 429) {
           // The auth-api signals the cooldown via the Retry-After header,
           // serialised as an integer number of seconds. Anything <= 0 is
           // treated as "no banner" so the form does not get stuck if the
           // header is absent on a future provider.
-          const retry = Number.parseInt(response.headers.get('Retry-After') ?? '', 10);
+          const retry = Number.parseInt(settled.response.headers.get('Retry-After') ?? '', 10);
           if (Number.isFinite(retry) && retry > 0) {
             setRetryAfterSeconds(retry);
           }
         }
         return;
       }
-      const login = data as LoginResponse;
+      const login = settled.data as LoginResponse;
       if (login.step === 'totp_required') {
         setChallengeToken(login.challengeToken ?? '');
         return;
@@ -422,15 +430,15 @@ function LoginPage(): ReactElement {
     // bails on the second call before reaching the network layer.
     if (totpGuard.guard()) return;
     try {
-      const { data, error } = await sdk.POST('/auth/login/totp', {
-        body: useRecovery
-          ? { challengeToken, recoveryCode: recoveryCode.trim() }
-          : { challengeToken, code: totpCode },
-      });
-      if (error || !data) {
-        setServerError(mapAuthError(error as ProblemJson | undefined));
-        return;
-      }
+      const data = await apiRequest(
+        (client) =>
+          client.POST('/auth/login/totp', {
+            body: useRecovery
+              ? { challengeToken, recoveryCode: recoveryCode.trim() }
+              : { challengeToken, code: totpCode },
+          }),
+        'Sign-in failed',
+      );
       const totp = data as TotpResponse;
       await completeSignIn(totp.accessToken);
     } catch (err) {
@@ -456,13 +464,11 @@ function LoginPage(): ReactElement {
     if (magicLinkGuard.guard()) return;
     setServerError(null);
     try {
-      const { error } = await sdk.POST('/auth/magic-link/request', {
-        body: { email: magicLinkEmail.trim() },
-      });
-      if (error) {
-        setServerError(mapAuthError(error as ProblemJson | undefined));
-        return;
-      }
+      await apiRequest(
+        (client) =>
+          client.POST('/auth/magic-link/request', { body: { email: magicLinkEmail.trim() } }),
+        'Failed to send the sign-in link',
+      );
       setMagicLinkSent(true);
     } catch (err) {
       setServerError(mapAuthThrown(err));

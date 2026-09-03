@@ -15,8 +15,8 @@ import {
   adminTdStyle,
   adminThStyle,
 } from '../../../features/admin/styles';
+import { apiRequest } from '../../../lib/api';
 import { formatTimestamp } from '../../../lib/format-timestamp';
-import { sdk } from '../../../lib/sdk';
 
 /**
  * SDK-derived shapes; the local interfaces this replaced silently allowed
@@ -54,29 +54,32 @@ function WorkspacesPage(): ReactElement {
     const offset = (page - 1) * perPage;
     const enabledParam = STATUS_TO_ENABLED[statusFilter];
 
-    void sdk
-      .GET('/admin/workspaces', {
-        params: {
-          query: {
-            limit: perPage,
-            offset,
-            ...(search ? { search } : {}),
-            ...(enabledParam !== undefined ? { enabled: enabledParam } : {}),
+    void apiRequest(
+      (client) =>
+        client.GET('/admin/workspaces', {
+          params: {
+            query: {
+              limit: perPage,
+              offset,
+              ...(search ? { search } : {}),
+              ...(enabledParam !== undefined ? { enabled: enabledParam } : {}),
+            },
           },
-        },
-      })
-      .then((result) => {
-        if (cancelled) return;
-        if (result.error || !result.data) {
-          setError(t('errors.generic'));
-          setLoading(false);
-          return;
-        }
-        const body = result.data as WorkspacesResponse;
-        setWorkspaces(body.items ?? []);
-        setTotal(body.total);
+        }),
+      'Failed to load workspaces',
+      { onError: 'empty', empty: null },
+    ).then((result) => {
+      if (cancelled) return;
+      if (result === null) {
+        setError(t('errors.generic'));
         setLoading(false);
-      });
+        return;
+      }
+      const body = result as WorkspacesResponse;
+      setWorkspaces(body.items ?? []);
+      setTotal(body.total);
+      setLoading(false);
+    });
 
     return () => {
       cancelled = true;

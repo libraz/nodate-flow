@@ -30,6 +30,12 @@ vi.mock('../../../../lib/sdk', () => ({
     POST: sdkMocks.post,
     DELETE: sdkMocks.delete,
   },
+
+  authSdk: {
+    GET: sdkMocks.get,
+    POST: sdkMocks.post,
+    DELETE: sdkMocks.delete,
+  },
 }));
 
 vi.mock('@tanstack/react-router', () => ({
@@ -121,6 +127,7 @@ describe('admins responsive table wrapper', () => {
         ],
         total: 1,
       },
+      response: new Response(null, { status: 200 }),
     });
 
     mount();

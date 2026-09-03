@@ -48,6 +48,11 @@ vi.mock('../../lib/sdk', () => ({
     GET: sdkMocks.get,
     POST: sdkMocks.post,
   },
+
+  authSdk: {
+    GET: sdkMocks.get,
+    POST: sdkMocks.post,
+  },
 }));
 
 vi.mock('../../features/auth/use-capabilities', () => ({

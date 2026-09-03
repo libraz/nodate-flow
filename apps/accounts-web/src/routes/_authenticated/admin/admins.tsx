@@ -11,8 +11,8 @@ import { type ReactElement, useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { adminTableStyle, adminTdStyle, adminThStyle } from '../../../features/admin/styles';
 import { useInvalidateInstanceStats } from '../../../features/admin-stats/api';
+import { apiRequest } from '../../../lib/api';
 import { formatTimestamp } from '../../../lib/format-timestamp';
-import { sdk } from '../../../lib/sdk';
 import { useSubmitGuard } from '../../../lib/use-submit-guard';
 
 /**
@@ -48,20 +48,23 @@ export function AdminsPage(): ReactElement {
         return;
       }
       setSearching(true);
-      void sdk
-        .GET('/admin/users', {
-          params: { query: { limit: 8, offset: 0, search: trimmed } },
-        })
-        .then((result) => {
-          setSearching(false);
-          if (result.error || !result.data) return;
-          const body = result.data as components['schemas']['ListUsersOutputBody'];
-          // Exclude users already promoted to instance admin. Compare against
-          // the admin row's `userId` (the user's public_id), not `id` (the
-          // grant row's public_id), so the exclusion actually matches.
-          const adminIds = new Set(admins.map((a) => a.userId));
-          setUserResults((body.items ?? []).filter((u) => !adminIds.has(u.id)));
-        });
+      void apiRequest(
+        (client) =>
+          client.GET('/admin/users', {
+            params: { query: { limit: 8, offset: 0, search: trimmed } },
+          }),
+        'Failed to search users',
+        { onError: 'empty', empty: null },
+      ).then((result) => {
+        setSearching(false);
+        if (result === null) return;
+        const body = result as components['schemas']['ListUsersOutputBody'];
+        // Exclude users already promoted to instance admin. Compare against
+        // the admin row's `userId` (the user's public_id), not `id` (the
+        // grant row's public_id), so the exclusion actually matches.
+        const adminIds = new Set(admins.map((a) => a.userId));
+        setUserResults((body.items ?? []).filter((u) => !adminIds.has(u.id)));
+      });
     },
     [admins],
   );
@@ -69,13 +72,17 @@ export function AdminsPage(): ReactElement {
   useEffect(() => {
     setLoading(true);
     setError(null);
-    void sdk.GET('/admin/instance-admins').then((result) => {
-      if (result.error || !result.data) {
+    void apiRequest(
+      (client) => client.GET('/admin/instance-admins'),
+      'Failed to load instance admins',
+      { onError: 'empty', empty: null },
+    ).then((result) => {
+      if (result === null) {
         setError(t('errors.generic'));
         setLoading(false);
         return;
       }
-      const body = result.data as AdminsResponse;
+      const body = result as AdminsResponse;
       setAdmins(body.items ?? []);
       setLoading(false);
     });
@@ -90,10 +97,13 @@ export function AdminsPage(): ReactElement {
     if (!ok) return;
     if (guardSubmit()) return;
     try {
-      const { error: err } = await sdk.DELETE('/admin/instance-admins/{userId}', {
-        params: { path: { userId } },
-      });
-      if (err) {
+      try {
+        await apiRequest(
+          (client) =>
+            client.DELETE('/admin/instance-admins/{userId}', { params: { path: { userId } } }),
+          'Failed to revoke the instance admin',
+        );
+      } catch {
         setError(t('errors.generic'));
         return;
       }
@@ -108,19 +118,25 @@ export function AdminsPage(): ReactElement {
     setGrantError(null);
     if (guardSubmit()) return;
     try {
-      const { data, error: err } = await sdk.POST('/admin/instance-admins', {
-        body: { userId: user.id },
-      });
-      if (err || !data) {
+      try {
+        await apiRequest(
+          (client) => client.POST('/admin/instance-admins', { body: { userId: user.id } }),
+          'Failed to grant instance admin',
+        );
+      } catch {
         setGrantError(t('errors.generic'));
         return;
       }
       // The grant endpoint returns `{ok: boolean}`, not the new admin row,
       // so refetch the list to surface the freshly-promoted admin with the
       // server-side `grantedAt` / `grantedByDisplayName` fields filled in.
-      const refreshed = await sdk.GET('/admin/instance-admins');
-      if (refreshed.data) {
-        const refreshedBody = refreshed.data as AdminsResponse;
+      const refreshed = await apiRequest(
+        (client) => client.GET('/admin/instance-admins'),
+        'Failed to load instance admins',
+        { onError: 'empty', empty: null },
+      );
+      if (refreshed) {
+        const refreshedBody = refreshed as AdminsResponse;
         setAdmins(refreshedBody.items ?? []);
       }
       setSelectedUserId(undefined);

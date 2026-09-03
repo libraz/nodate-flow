@@ -20,9 +20,8 @@ import { authStore, selectIsAuthenticated, useAuth } from '../features/auth/auth
 import PasswordInput from '../features/auth/password-input';
 import { type MeResponse, userFromMe } from '../features/auth/user-from-me';
 import OAuthButtonRow from '../features/oauth/oauth-button-row';
-import type { ProblemJson } from '../lib/api-error';
-import { type AuthErrorI18nKey, mapAuthError, mapAuthThrown } from '../lib/auth-errors';
-import { sdk } from '../lib/sdk';
+import { apiRequest } from '../lib/api';
+import { type AuthErrorI18nKey, mapAuthThrown } from '../lib/auth-errors';
 import { useSubmitGuard } from '../lib/use-submit-guard';
 
 /**
@@ -77,22 +76,27 @@ function SignupPage(): ReactElement {
     if (submitGuard.guard()) return;
     setServerError(null);
     try {
-      const { data, error } = await sdk.POST('/auth/register', {
-        body: {
-          email: values.email,
-          password: values.password,
-          displayName: values.displayName,
-        },
-      });
-      if (error || !data) {
-        setServerError(mapAuthError(error as ProblemJson | undefined));
-        return;
-      }
+      const data = await apiRequest(
+        (client) =>
+          client.POST('/auth/register', {
+            body: {
+              email: values.email,
+              password: values.password,
+              displayName: values.displayName,
+            },
+          }),
+        'Registration failed',
+      );
       const reg = data as RegisterResponse;
       authStore.getState().setAccessToken(reg.accessToken);
-      const { data: meData, error: meError } = await sdk.GET('/me');
-      if (meError || !meData) {
-        setServerError(mapAuthError(meError as ProblemJson | undefined));
+      let meData: unknown;
+      try {
+        meData = await apiRequest(
+          (client) => client.GET('/me'),
+          'Failed to load the signed-in user',
+        );
+      } catch (meError) {
+        setServerError(mapAuthThrown(meError));
         authStore.getState().clearSession();
         return;
       }

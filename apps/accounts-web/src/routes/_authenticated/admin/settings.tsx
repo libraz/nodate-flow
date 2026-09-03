@@ -8,9 +8,8 @@ import { createFileRoute } from '@tanstack/react-router';
 import { type ReactElement, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import type { ProblemJson } from '../../../lib/api-error';
-import { extractErrorCode } from '../../../lib/auth-errors';
-import { sdk } from '../../../lib/sdk';
+import { apiRequest } from '../../../lib/api';
+import { ApiError } from '../../../lib/api-error';
 import styles from './settings.module.css';
 
 /**
@@ -26,12 +25,16 @@ const settingKeys = {
   maxMembersPerWorkspace: 'max_members_per_workspace',
 } as const;
 
-function formatSettingsSaveError(err: ProblemJson | undefined, fallback: string): string {
-  if (!err) return fallback;
-  if (typeof err.detail === 'string' && err.detail.length > 0) return err.detail;
-  if (typeof err.title === 'string' && err.title.length > 0) return err.title;
-  const code = extractErrorCode(err);
-  return code ? `${fallback} (${code})` : fallback;
+/**
+ * Turns a refused save into the line shown above the form. The
+ * requester has already read the envelope, so the message it carries
+ * is the server's own wording; the code is appended only when there is
+ * nothing better to say than the generic line.
+ */
+function formatSettingsSaveError(err: unknown, fallback: string): string {
+  if (!(err instanceof ApiError)) return fallback;
+  if (err.message.length > 0 && err.message !== fallback) return err.message;
+  return err.code ? `${fallback} (${err.code})` : fallback;
 }
 
 export function SettingsPage(): ReactElement {
@@ -47,9 +50,12 @@ export function SettingsPage(): ReactElement {
   const [maxMembersPerWorkspace, setMaxMembersPerWorkspace] = useState('');
 
   useEffect(() => {
-    void sdk.GET('/admin/settings').then((result) => {
-      if (result.data) {
-        const body = result.data as SettingsResponse;
+    void apiRequest((client) => client.GET('/admin/settings'), 'Failed to load settings', {
+      onError: 'empty',
+      empty: null,
+    }).then((result) => {
+      if (result) {
+        const body = result as SettingsResponse;
         for (const s of body.items ?? []) {
           switch (s.key) {
             case 'registration_open':
@@ -87,15 +93,16 @@ export function SettingsPage(): ReactElement {
       settings[settingKeys.maxMembersPerWorkspace] = maxMembersPerWorkspace;
     }
 
-    const { error: err } = await sdk.PATCH('/admin/settings', {
-      body: { settings },
-    });
-    setSaving(false);
-
-    if (err) {
-      setError(formatSettingsSaveError(err as ProblemJson | undefined, t('errors.generic')));
-    } else {
+    try {
+      await apiRequest(
+        (client) => client.PATCH('/admin/settings', { body: { settings } }),
+        'Failed to save settings',
+      );
       setSuccess(true);
+    } catch (err) {
+      setError(formatSettingsSaveError(err, t('errors.generic')));
+    } finally {
+      setSaving(false);
     }
   };
 

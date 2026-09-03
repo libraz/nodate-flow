@@ -20,7 +20,7 @@ import { useTranslation } from 'react-i18next';
 import { z } from 'zod';
 
 import AuthCard from '../../components/auth-card';
-import { sdk } from '../../lib/sdk';
+import { apiRequest } from '../../lib/api';
 
 const schema = z.object({
   name: z.string().min(1, 'validation.workspace_name_required').max(100),
@@ -93,13 +93,17 @@ function WorkspaceEditPage(): ReactElement {
 
   useEffect(() => {
     let cancelled = false;
-    void sdk.GET('/workspaces/{wsId}', { params: { path: { wsId } } }).then((result) => {
+    void apiRequest(
+      (client) => client.GET('/workspaces/{wsId}', { params: { path: { wsId } } }),
+      'Failed to load workspace',
+      { onError: 'empty', empty: null },
+    ).then((result) => {
       if (cancelled) return;
-      if (result.error || !result.data) {
+      if (result === null) {
         setLoadError(t('errors.generic'));
         return;
       }
-      setWorkspace(result.data as Workspace);
+      setWorkspace(result as Workspace);
     });
     return () => {
       cancelled = true;
@@ -110,17 +114,22 @@ function WorkspaceEditPage(): ReactElement {
     setServerError(null);
     setSuccess(false);
     try {
-      const { data, error } = await sdk.PATCH('/workspaces/{wsId}', {
-        params: { path: { wsId } },
-        body: {
-          name: values.name,
-          slug: values.slug,
-          description: values.description,
-          timezone: values.timezone,
-          country: values.country,
-        },
-      });
-      if (error || !data) {
+      const data = await apiRequest(
+        (client) =>
+          client.PATCH('/workspaces/{wsId}', {
+            params: { path: { wsId } },
+            body: {
+              name: values.name,
+              slug: values.slug,
+              description: values.description,
+              timezone: values.timezone,
+              country: values.country,
+            },
+          }),
+        'Failed to save the workspace',
+        { onError: 'empty', empty: null },
+      );
+      if (data === null) {
         setServerError(t('errors.generic'));
         return;
       }

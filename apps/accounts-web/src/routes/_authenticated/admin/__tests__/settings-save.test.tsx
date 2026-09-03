@@ -26,6 +26,11 @@ vi.mock('../../../../lib/sdk', () => ({
     GET: sdkMocks.get,
     PATCH: sdkMocks.patch,
   },
+
+  authSdk: {
+    GET: sdkMocks.get,
+    PATCH: sdkMocks.patch,
+  },
 }));
 
 vi.mock('@tanstack/react-router', () => ({
@@ -82,8 +87,12 @@ describe('admin settings save', () => {
           { key: 'max_members_per_workspace', value: '25' },
         ],
       },
+      response: new Response(null, { status: 200 }),
     });
-    sdkMocks.patch.mockResolvedValueOnce({ data: { ok: true } });
+    sdkMocks.patch.mockResolvedValueOnce({
+      data: { ok: true },
+      response: new Response(null, { status: 200 }),
+    });
 
     mount();
 
@@ -115,6 +124,7 @@ describe('admin settings save', () => {
           { key: 'mfa_enforcement', value: 'optional' },
         ],
       },
+      response: new Response(null, { status: 200 }),
     });
     sdkMocks.patch.mockResolvedValueOnce({
       error: {
@@ -122,6 +132,7 @@ describe('admin settings save', () => {
         title: 'Invalid setting',
         detail: 'max members per workspace must be a positive integer',
       },
+      response: new Response(null, { status: 400 }),
     });
 
     mount();

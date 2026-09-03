@@ -9,7 +9,7 @@ import { type ReactElement, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import AuthCard from '../../components/auth-card';
-import { sdk } from '../../lib/sdk';
+import { apiRequest } from '../../lib/api';
 
 type Workspace = components['schemas']['Workspace'];
 type WorkspacesListOutputBody = components['schemas']['WorkspacesListOutputBody'];
@@ -22,14 +22,18 @@ function WorkspacesPage(): ReactElement {
 
   useEffect(() => {
     let cancelled = false;
-    void sdk.GET('/workspaces', { params: { query: { limit: 50, offset: 0 } } }).then((result) => {
+    void apiRequest(
+      (client) => client.GET('/workspaces', { params: { query: { limit: 50, offset: 0 } } }),
+      'Failed to load workspaces',
+      { onError: 'empty', empty: null },
+    ).then((result) => {
       if (cancelled) return;
-      if (result.error || !result.data) {
+      if (result === null) {
         setError(t('errors.generic'));
         setLoading(false);
         return;
       }
-      const body = result.data as WorkspacesListOutputBody;
+      const body = result as WorkspacesListOutputBody;
       setWorkspaces(body.workspaces ?? []);
       setLoading(false);
     });

@@ -28,6 +28,11 @@ vi.mock('../../lib/sdk', () => ({
     GET: sdkMocks.get,
     POST: sdkMocks.post,
   },
+
+  authSdk: {
+    GET: sdkMocks.get,
+    POST: sdkMocks.post,
+  },
 }));
 
 import { Route as MagicLinkRoute } from '../magic-link';
@@ -97,7 +102,11 @@ describe('magic-link verify route', () => {
   it('consumes the token, creates a session, and redirects to profile', async () => {
     sdkMocks.get.mockImplementation(async (path: string) => {
       if (path === '/auth/magic-link/verify') {
-        return { data: { step: 'complete', accessToken: 'access-1' }, error: null };
+        return {
+          data: { step: 'complete', accessToken: 'access-1' },
+          error: null,
+          response: new Response(null, { status: 200 }),
+        };
       }
       if (path === '/me') {
         return {
@@ -113,6 +122,7 @@ describe('magic-link verify route', () => {
             avatarUrl: null,
           },
           error: null,
+          response: new Response(null, { status: 200 }),
         };
       }
       throw new Error(`unexpected GET ${path}`);
@@ -135,6 +145,7 @@ describe('magic-link verify route', () => {
         return {
           data: { step: 'totp_required', challengeToken: 'challenge-1' },
           error: null,
+          response: new Response(null, { status: 200 }),
         };
       }
       if (path === '/me') {
@@ -151,11 +162,16 @@ describe('magic-link verify route', () => {
             avatarUrl: null,
           },
           error: null,
+          response: new Response(null, { status: 200 }),
         };
       }
       throw new Error(`unexpected GET ${path}`);
     });
-    sdkMocks.post.mockResolvedValueOnce({ data: { accessToken: 'access-2' }, error: null });
+    sdkMocks.post.mockResolvedValueOnce({
+      data: { accessToken: 'access-2' },
+      error: null,
+      response: new Response(null, { status: 200 }),
+    });
 
     const router = mountMagicLink('/magic-link?token=plain-token-2');
 

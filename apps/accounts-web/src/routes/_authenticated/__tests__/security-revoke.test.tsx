@@ -38,6 +38,12 @@ vi.mock('../../../lib/sdk', () => ({
     DELETE: sdkMocks.delete,
     POST: sdkMocks.post,
   },
+
+  authSdk: {
+    GET: sdkMocks.get,
+    DELETE: sdkMocks.delete,
+    POST: sdkMocks.post,
+  },
 }));
 
 vi.mock('@nodate-flow/ui/primitives/toast', () => ({
@@ -126,14 +132,23 @@ describe('SecurityPage — revoke session error path', () => {
             ],
           },
           error: null,
+          response: new Response(null, { status: 200 }),
         });
       }
       // /me/totp etc — return resolvable empty.
-      return Promise.resolve({ data: { status: 'disabled' }, error: null });
+      return Promise.resolve({
+        data: { status: 'disabled' },
+        error: null,
+        response: new Response(null, { status: 200 }),
+      });
     });
 
     // DELETE rejects — this is the path that previously got swallowed.
-    sdkMocks.delete.mockResolvedValue({ error: { detail: 'boom' }, data: null });
+    sdkMocks.delete.mockResolvedValue({
+      error: { detail: 'boom' },
+      data: null,
+      response: new Response(null, { status: 400 }),
+    });
 
     mountSecurity();
 
@@ -168,9 +183,14 @@ describe('SecurityPage — revoke session error path', () => {
             ],
           },
           error: null,
+          response: new Response(null, { status: 200 }),
         });
       }
-      return Promise.resolve({ data: { status: 'disabled' }, error: null });
+      return Promise.resolve({
+        data: { status: 'disabled' },
+        error: null,
+        response: new Response(null, { status: 200 }),
+      });
     });
 
     // A 403 with no body: openapi-fetch has nothing to parse, so it

@@ -1,5 +1,5 @@
 /**
- * B8 — `/admin/users/$userId` per-action guards.
+ * `/admin/users/$userId` per-action guards.
  *
  * Before this fix all destructive actions on the user-detail page shared
  * a single `actionLoading` boolean. If the suspend mutation hung (slow
@@ -39,6 +39,13 @@ const confirmMock = vi.hoisted(() => ({
 
 vi.mock('../../../../lib/sdk', () => ({
   sdk: {
+    GET: sdkMocks.get,
+    POST: sdkMocks.post,
+    PATCH: sdkMocks.patch,
+    DELETE: sdkMocks.delete,
+  },
+
+  authSdk: {
     GET: sdkMocks.get,
     POST: sdkMocks.post,
     PATCH: sdkMocks.patch,
@@ -150,16 +157,24 @@ const baseUser = {
 function primeInitialFetch(): void {
   sdkMocks.get.mockImplementation(async (path: string) => {
     if (path === '/admin/users/{userId}') {
-      return { data: baseUser, error: null };
+      return { data: baseUser, error: null, response: new Response(null, { status: 200 }) };
     }
     if (path === '/admin/users/{userId}/sessions') {
-      return { data: { items: [], total: 0 }, error: null };
+      return {
+        data: { items: [], total: 0 },
+        error: null,
+        response: new Response(null, { status: 200 }),
+      };
     }
-    return { data: null, error: { type: 'unhandled' } };
+    return {
+      data: null,
+      error: { type: 'unhandled' },
+      response: new Response(null, { status: 400 }),
+    };
   });
 }
 
-describe('user-detail per-action guard (B8)', () => {
+describe('user-detail per-action guard', () => {
   it('clicking suspend twice fires PATCH once', async () => {
     primeInitialFetch();
     confirmMock.fn.mockResolvedValue(true);
@@ -204,7 +219,11 @@ describe('user-detail per-action guard (B8)', () => {
     // Park the suspend PATCH so the suspend guard stays busy.
     sdkMocks.patch.mockImplementation(() => new Promise(() => undefined));
     // Resolve the grant POST immediately.
-    sdkMocks.post.mockResolvedValue({ data: { admin: { id: 'u-1' } }, error: null });
+    sdkMocks.post.mockResolvedValue({
+      data: { admin: { id: 'u-1' } },
+      error: null,
+      response: new Response(null, { status: 200 }),
+    });
 
     mountUserDetail();
 

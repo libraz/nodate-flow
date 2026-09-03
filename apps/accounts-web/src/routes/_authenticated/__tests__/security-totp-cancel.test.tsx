@@ -41,6 +41,12 @@ vi.mock('../../../lib/sdk', () => ({
     DELETE: sdkMocks.delete,
     POST: sdkMocks.post,
   },
+
+  authSdk: {
+    GET: sdkMocks.get,
+    DELETE: sdkMocks.delete,
+    POST: sdkMocks.post,
+  },
 }));
 
 vi.mock('@nodate-flow/ui/primitives/toast', () => ({
@@ -115,16 +121,32 @@ describe('SecurityPage — cancel pending TOTP enrollment error path', () => {
     // GET /me/totp reports a pending enrollment; /me/sessions returns empty.
     sdkMocks.get.mockImplementation((path: string) => {
       if (path === '/me/totp') {
-        return Promise.resolve({ data: { status: 'pending' }, error: null });
+        return Promise.resolve({
+          data: { status: 'pending' },
+          error: null,
+          response: new Response(null, { status: 200 }),
+        });
       }
       if (path === '/me/sessions') {
-        return Promise.resolve({ data: { items: [] }, error: null });
+        return Promise.resolve({
+          data: { items: [] },
+          error: null,
+          response: new Response(null, { status: 200 }),
+        });
       }
-      return Promise.resolve({ data: {}, error: null });
+      return Promise.resolve({
+        data: {},
+        error: null,
+        response: new Response(null, { status: 200 }),
+      });
     });
 
     // DELETE /me/totp is rejected (e.g. password mismatch / still pending).
-    sdkMocks.delete.mockResolvedValue({ error: { detail: 'boom' }, data: null });
+    sdkMocks.delete.mockResolvedValue({
+      error: { detail: 'boom' },
+      data: null,
+      response: new Response(null, { status: 400 }),
+    });
 
     mountSecurity();
 

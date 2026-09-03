@@ -14,7 +14,8 @@ import { useEffect, useState } from 'react';
 
 import { authStore } from '../features/auth/auth-store';
 import { type MeResponse, userFromMe } from '../features/auth/user-from-me';
-import { refreshAccessToken, sdk } from '../lib/sdk';
+import { apiRequest } from '../lib/api';
+import { refreshAccessToken } from '../lib/sdk';
 
 export type AuthBootstrapStatus = 'loading' | 'authenticated' | 'unauthenticated';
 
@@ -27,8 +28,12 @@ let bootstrapPromise: Promise<AuthBootstrapStatus> | null = null;
 async function runBootstrap(): Promise<AuthBootstrapStatus> {
   const token = await refreshAccessToken();
   if (!token) return 'unauthenticated';
-  const { data, error } = await sdk.GET('/me');
-  if (error || !data) {
+  const data = await apiRequest(
+    (client) => client.GET('/me'),
+    'Failed to load the signed-in user',
+    { onError: 'empty', empty: null },
+  );
+  if (!data) {
     authStore.getState().clearSession();
     return 'unauthenticated';
   }

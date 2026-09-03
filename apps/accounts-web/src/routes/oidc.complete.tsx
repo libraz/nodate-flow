@@ -25,9 +25,9 @@ import { authStore } from '../features/auth/auth-store';
 import { useCapsLockHint } from '../features/auth/use-caps-lock-hint';
 import { type MeResponse, userFromMe } from '../features/auth/user-from-me';
 import { takeOidcRedirect } from '../features/oauth/oidc-redirect';
-import type { ProblemJson } from '../lib/api-error';
-import { type AuthErrorI18nKey, mapAuthError, mapAuthThrown } from '../lib/auth-errors';
-import { refreshAccessToken, sdk } from '../lib/sdk';
+import { apiRequest } from '../lib/api';
+import { type AuthErrorI18nKey, mapAuthThrown } from '../lib/auth-errors';
+import { refreshAccessToken } from '../lib/sdk';
 import { useSubmitGuard } from '../lib/use-submit-guard';
 
 const RECOVERY_MIN_LEN = 8;
@@ -74,10 +74,12 @@ export function OIDCCompletePage(): ReactElement {
   const completeSignIn = useCallback(
     async (accessToken: string): Promise<void> => {
       authStore.getState().setAccessToken(accessToken);
-      const { data, error: meError } = await sdk.GET('/me');
-      if (meError || !data) {
+      let data: unknown;
+      try {
+        data = await apiRequest((client) => client.GET('/me'), 'Failed to load the signed-in user');
+      } catch (meError) {
         authStore.getState().clearSession();
-        setError(mapAuthError(meError as ProblemJson | undefined));
+        setError(mapAuthThrown(meError));
         setStatus('error');
         return;
       }
@@ -153,15 +155,15 @@ export function OIDCCompletePage(): ReactElement {
     if (totpGuard.guard()) return;
     setError(null);
     try {
-      const { data, error: totpError } = await sdk.POST('/auth/login/totp', {
-        body: useRecovery
-          ? { challengeToken, recoveryCode: recoveryCode.trim() }
-          : { challengeToken, code: totpCode },
-      });
-      if (totpError || !data) {
-        setError(mapAuthError(totpError as ProblemJson | undefined));
-        return;
-      }
+      const data = await apiRequest(
+        (client) =>
+          client.POST('/auth/login/totp', {
+            body: useRecovery
+              ? { challengeToken, recoveryCode: recoveryCode.trim() }
+              : { challengeToken, code: totpCode },
+          }),
+        'Sign-in failed',
+      );
       await completeSignIn((data as TotpResponse).accessToken);
     } catch (err) {
       setError(mapAuthThrown(err));

@@ -21,10 +21,8 @@
 import Button from '@nodate-flow/ui/primitives/button';
 import { type ReactElement, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-
-import type { ProblemJson } from '../../lib/api-error';
-import { type AuthErrorI18nKey, mapAuthError, mapAuthThrown } from '../../lib/auth-errors';
-import { sdk } from '../../lib/sdk';
+import { apiRequest } from '../../lib/api';
+import { type AuthErrorI18nKey, mapAuthThrown } from '../../lib/auth-errors';
 import { useCapabilities } from '../auth/use-capabilities';
 import styles from './oauth-button-row.module.css';
 import { rememberOidcRedirect } from './oidc-redirect';
@@ -107,13 +105,10 @@ function OAuthButtonRow({ mode, redirect, onError }: OAuthButtonRowProps): React
     // so a previous attempt cannot leak into this one.
     rememberOidcRedirect(redirect);
     try {
-      const { data, error } = await sdk.GET(oidcStartPath[provider]);
-      if (error || !data) {
-        onError?.(mapAuthError(error as ProblemJson | undefined));
-        setBusyProvider(null);
-        setPendingProvider(null);
-        return;
-      }
+      const data = await apiRequest(
+        (client) => client.GET(oidcStartPath[provider]),
+        'Failed to start the sign-in flow',
+      );
       // Leave `pendingProvider` set on success: the browser is about to
       // navigate away, so re-enabling the buttons would only flash a
       // brief idle UX and re-open the multi-click race we are guarding

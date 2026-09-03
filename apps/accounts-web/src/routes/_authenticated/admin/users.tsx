@@ -8,9 +8,8 @@ import Input from '@nodate-flow/ui/primitives/input';
 import { createFileRoute, Link } from '@tanstack/react-router';
 import { type ReactElement, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-
+import { apiRequest } from '../../../lib/api';
 import { formatTimestamp } from '../../../lib/format-timestamp';
-import { sdk } from '../../../lib/sdk';
 
 /**
  * SDK-derived shapes; the local interfaces this replaced silently allowed
@@ -48,29 +47,32 @@ function UsersPage(): ReactElement {
     const offset = (page - 1) * perPage;
     const enabledParam = STATUS_TO_ENABLED[statusFilter];
 
-    void sdk
-      .GET('/admin/users', {
-        params: {
-          query: {
-            limit: perPage,
-            offset,
-            ...(search ? { search } : {}),
-            ...(enabledParam !== undefined ? { enabled: enabledParam } : {}),
+    void apiRequest(
+      (client) =>
+        client.GET('/admin/users', {
+          params: {
+            query: {
+              limit: perPage,
+              offset,
+              ...(search ? { search } : {}),
+              ...(enabledParam !== undefined ? { enabled: enabledParam } : {}),
+            },
           },
-        },
-      })
-      .then((result) => {
-        if (cancelled) return;
-        if (result.error || !result.data) {
-          setError(t('errors.generic'));
-          setLoading(false);
-          return;
-        }
-        const body = result.data as UsersResponse;
-        setUsers(body.items ?? []);
-        setTotal(body.total);
+        }),
+      'Failed to load users',
+      { onError: 'empty', empty: null },
+    ).then((result) => {
+      if (cancelled) return;
+      if (result === null) {
+        setError(t('errors.generic'));
         setLoading(false);
-      });
+        return;
+      }
+      const body = result as UsersResponse;
+      setUsers(body.items ?? []);
+      setTotal(body.total);
+      setLoading(false);
+    });
 
     return () => {
       cancelled = true;

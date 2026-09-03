@@ -36,6 +36,11 @@ vi.mock('../../../lib/sdk', () => ({
     GET: sdkMocks.get,
     PATCH: sdkMocks.patch,
   },
+
+  authSdk: {
+    GET: sdkMocks.get,
+    PATCH: sdkMocks.patch,
+  },
 }));
 
 vi.mock('../../../providers/theme-provider', () => ({
@@ -165,6 +170,7 @@ describe('<ProfilePage> empty-workspaces CTA (W6)', () => {
     sdkMocks.get.mockResolvedValue({
       data: { workspaces: [], total: 0 },
       error: null,
+      response: new Response(null, { status: 200 }),
     });
 
     mountProfile();

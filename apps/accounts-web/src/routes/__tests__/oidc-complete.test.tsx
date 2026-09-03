@@ -30,6 +30,10 @@ vi.mock('../../lib/sdk', () => ({
     GET: sdkMocks.get,
     POST: sdkMocks.post,
   },
+  authSdk: {
+    GET: sdkMocks.get,
+    POST: sdkMocks.post,
+  },
 }));
 
 import { rememberOidcRedirect, takeOidcRedirect } from '../../features/oauth/oidc-redirect';
@@ -135,6 +139,7 @@ function mockMe(email: string) {
           avatarUrl: null,
         },
         error: null,
+        response: new Response(null, { status: 200 }),
       };
     }
     throw new Error(`unexpected GET ${path}`);
@@ -217,7 +222,11 @@ describe('oidc complete route', () => {
 
   it('finishes a TOTP-required OIDC callback through /auth/login/totp', async () => {
     mockMe('oidc-totp@example.test');
-    sdkMocks.post.mockResolvedValueOnce({ data: { accessToken: 'access-oidc-2' }, error: null });
+    sdkMocks.post.mockResolvedValueOnce({
+      data: { accessToken: 'access-oidc-2' },
+      error: null,
+      response: new Response(null, { status: 200 }),
+    });
 
     const router = mountOIDCComplete(
       '/oidc/complete#step=totp_required&challengeToken=challenge-oidc',

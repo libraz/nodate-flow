@@ -39,6 +39,10 @@ vi.mock('../../../lib/sdk', () => ({
   sdk: {
     GET: sdkMocks.get,
   },
+
+  authSdk: {
+    GET: sdkMocks.get,
+  },
 }));
 
 vi.mock('../../auth/use-capabilities', () => ({
@@ -190,6 +194,7 @@ describe('<OAuthButtonRow>', () => {
     sdkMocks.get.mockResolvedValue({
       data: { authorizationUrl: 'https://oidc.example/start' },
       error: null,
+      response: new Response(null, { status: 200 }),
     });
 
     // window.location is read-only; replace `href` setter with a spy.
@@ -229,6 +234,7 @@ describe('<OAuthButtonRow>', () => {
     sdkMocks.get.mockResolvedValue({
       data: { authorizationUrl: 'https://oidc.example/start' },
       error: null,
+      response: new Response(null, { status: 200 }),
     });
     const location = stubLocationHref();
     try {
@@ -246,6 +252,7 @@ describe('<OAuthButtonRow>', () => {
     sdkMocks.get.mockResolvedValue({
       data: { authorizationUrl: 'https://oidc.example/start' },
       error: null,
+      response: new Response(null, { status: 200 }),
     });
     const location = stubLocationHref();
     try {
@@ -274,6 +281,7 @@ describe('<OAuthButtonRow>', () => {
     sdkMocks.get.mockResolvedValue({
       data: null,
       error: { type: 'AUTH.OIDC.UNAVAILABLE', detail: 'oops' },
+      response: new Response(null, { status: 400 }),
     });
     const onError = vi.fn();
     render(<OAuthButtonRow mode="signup" onError={onError} />, { wrapper: Wrapper });

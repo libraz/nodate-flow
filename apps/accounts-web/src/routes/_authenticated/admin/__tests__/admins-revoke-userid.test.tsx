@@ -15,15 +15,14 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { AUTH_API_URL, server, useMockApi } from '@tests/msw/server';
 import i18n from 'i18next';
 import ICU from 'i18next-icu';
 import { HttpResponse, http } from 'msw';
 import type { ReactElement, ReactNode } from 'react';
 import { I18nextProvider, initReactI18next } from 'react-i18next';
 import { describe, expect, it, vi } from 'vitest';
-
 import enAdmin from '../../../../../locales/en/admin.json';
-import { AUTH_API_URL, server, useMockApi } from '../../../../../tests/msw/server';
 
 vi.mock('@tanstack/react-router', () => ({
   createFileRoute: () => () => ({ options: {} }),

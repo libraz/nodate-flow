@@ -23,10 +23,9 @@ import {
 } from '../../../features/admin/styles';
 import { useInvalidateInstanceStats } from '../../../features/admin-stats/api';
 import { selectUser, useAuth } from '../../../features/auth/auth-store';
-import type { ProblemJson } from '../../../lib/api-error';
-import { extractErrorCode } from '../../../lib/auth-errors';
+import { apiRequest } from '../../../lib/api';
+import { refusalCode } from '../../../lib/auth-errors';
 import { formatTimestamp } from '../../../lib/format-timestamp';
-import { sdk } from '../../../lib/sdk';
 import { useSubmitGuard } from '../../../lib/use-submit-guard';
 
 /**
@@ -200,17 +199,25 @@ export function UserDetailPage(): ReactElement {
     setError(null);
 
     void Promise.all([
-      sdk.GET('/admin/users/{userId}', { params: { path: { userId } } }),
-      sdk.GET('/admin/users/{userId}/sessions', { params: { path: { userId } } }),
+      apiRequest(
+        (client) => client.GET('/admin/users/{userId}', { params: { path: { userId } } }),
+        'Failed to load the user',
+        { onError: 'empty', empty: null },
+      ),
+      apiRequest(
+        (client) => client.GET('/admin/users/{userId}/sessions', { params: { path: { userId } } }),
+        'Failed to load the sessions',
+        { onError: 'empty', empty: null },
+      ),
     ]).then(([userResult, sessionsResult]) => {
-      if (userResult.error || !userResult.data) {
+      if (userResult === null) {
         setError(t('errors.generic'));
         setLoading(false);
         return;
       }
-      setUser(userResult.data as UserDetail);
-      if (sessionsResult.data) {
-        const sessBody = sessionsResult.data as SessionsResponse;
+      setUser(userResult as UserDetail);
+      if (sessionsResult) {
+        const sessBody = sessionsResult as SessionsResponse;
         setSessions(sessBody.items ?? []);
       }
       setLoading(false);
@@ -227,12 +234,17 @@ export function UserDetailPage(): ReactElement {
     if (!ok) return;
     if (enabledGuard.guard()) return;
     try {
-      const { error: err } = await sdk.PATCH('/admin/users/{userId}', {
-        params: { path: { userId } },
-        body: { enabled: !user.enabled },
-      });
-      if (err) {
-        const code = extractErrorCode(err as ProblemJson);
+      try {
+        await apiRequest(
+          (client) =>
+            client.PATCH('/admin/users/{userId}', {
+              params: { path: { userId } },
+              body: { enabled: !user.enabled },
+            }),
+          'Failed to update the user',
+        );
+      } catch (err) {
+        const code = refusalCode(err);
         toaster.show({
           tone: 'danger',
           message: code ? `${t('errors.generic')} (${code})` : t('errors.generic'),
@@ -240,9 +252,13 @@ export function UserDetailPage(): ReactElement {
         return;
       }
       // Refetch to get updated state
-      const result = await sdk.GET('/admin/users/{userId}', { params: { path: { userId } } });
-      if (result.data) {
-        setUser(result.data as UserDetail);
+      const result = await apiRequest(
+        (client) => client.GET('/admin/users/{userId}', { params: { path: { userId } } }),
+        'Failed to load the user',
+        { onError: 'empty', empty: null },
+      );
+      if (result) {
+        setUser(result as UserDetail);
         void invalidateInstanceStats();
       }
     } finally {
@@ -262,43 +278,48 @@ export function UserDetailPage(): ReactElement {
       if (!ok) return;
       if (adminGuard.guard()) return;
       try {
-        const { error: err } = await sdk.DELETE('/admin/instance-admins/{userId}', {
-          params: { path: { userId } },
+        await apiRequest(
+          (client) =>
+            client.DELETE('/admin/instance-admins/{userId}', { params: { path: { userId } } }),
+          'Failed to revoke the instance admin',
+        );
+      } catch (err) {
+        const code = refusalCode(err);
+        toaster.show({
+          tone: 'danger',
+          message: code ? `${t('errors.generic')} (${code})` : t('errors.generic'),
         });
-        if (err) {
-          const code = extractErrorCode(err as ProblemJson);
-          toaster.show({
-            tone: 'danger',
-            message: code ? `${t('errors.generic')} (${code})` : t('errors.generic'),
-          });
-          return;
-        }
+        return;
       } finally {
         adminGuard.end();
       }
     } else {
       if (adminGuard.guard()) return;
       try {
-        const { error: err } = await sdk.POST('/admin/instance-admins', {
-          body: { userId: user.id },
+        await apiRequest(
+          (client) => client.POST('/admin/instance-admins', { body: { userId: user.id } }),
+          'Failed to grant instance admin',
+        );
+      } catch (err) {
+        const code = refusalCode(err);
+        toaster.show({
+          tone: 'danger',
+          message: code ? `${t('errors.generic')} (${code})` : t('errors.generic'),
         });
-        if (err) {
-          const code = extractErrorCode(err as ProblemJson);
-          toaster.show({
-            tone: 'danger',
-            message: code ? `${t('errors.generic')} (${code})` : t('errors.generic'),
-          });
-          return;
-        }
+        return;
       } finally {
         adminGuard.end();
       }
     }
 
     // Refetch
-    const result = await sdk.GET('/admin/users/{userId}', { params: { path: { userId } } });
-    if (result.data) {
-      setUser(result.data as UserDetail);
+    const result = await apiRequest(
+      (client) => client.GET('/admin/users/{userId}', { params: { path: { userId } } }),
+      'Failed to load the user',
+      { onError: 'empty', empty: null },
+    );
+    if (result) {
+      setUser(result as UserDetail);
       void invalidateInstanceStats();
     }
   };
@@ -306,11 +327,14 @@ export function UserDetailPage(): ReactElement {
   const handleRevokeSession = async (sessionId: string) => {
     if (sessionGuard.guard()) return;
     try {
-      const { error: err } = await sdk.DELETE('/admin/sessions/{sessionId}', {
-        params: { path: { sessionId } },
-      });
-      if (err) {
-        const code = extractErrorCode(err as ProblemJson);
+      try {
+        await apiRequest(
+          (client) =>
+            client.DELETE('/admin/sessions/{sessionId}', { params: { path: { sessionId } } }),
+          'Failed to revoke the session',
+        );
+      } catch (err) {
+        const code = refusalCode(err);
         toaster.show({
           tone: 'danger',
           message: code ? `${t('errors.generic')} (${code})` : t('errors.generic'),
@@ -327,12 +351,17 @@ export function UserDetailPage(): ReactElement {
     if (!user) return;
     if (deleteGuard.guard()) return;
     try {
-      const { error: err } = await sdk.DELETE('/admin/users/{userId}', {
-        params: { path: { userId } },
-        body: { confirm: true },
-      });
-      if (err) {
-        const code = extractErrorCode(err as ProblemJson);
+      try {
+        await apiRequest(
+          (client) =>
+            client.DELETE('/admin/users/{userId}', {
+              params: { path: { userId } },
+              body: { confirm: true },
+            }),
+          'Failed to delete the user',
+        );
+      } catch (err) {
+        const code = refusalCode(err);
         toaster.show({
           tone: 'danger',
           message: code

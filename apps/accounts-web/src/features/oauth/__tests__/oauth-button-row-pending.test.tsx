@@ -36,6 +36,10 @@ vi.mock('../../../lib/sdk', () => ({
   sdk: {
     GET: sdkMocks.get,
   },
+
+  authSdk: {
+    GET: sdkMocks.get,
+  },
 }));
 
 vi.mock('../../auth/use-capabilities', () => ({
@@ -112,6 +116,7 @@ describe('<OAuthButtonRow> pending state (A12)', () => {
     sdkMocks.get.mockResolvedValue({
       data: null,
       error: { type: 'AUTH.OIDC.UNAVAILABLE', detail: 'oops' },
+      response: new Response(null, { status: 400 }),
     });
 
     render(<OAuthButtonRow mode="login" onError={onError} />, { wrapper: Wrapper });

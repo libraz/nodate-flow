@@ -7,9 +7,8 @@
  */
 
 import { type UseQueryResult, useQuery, useQueryClient } from '@tanstack/react-query';
-
-import { ApiError, toApiError } from '../../lib/api-error';
-import { sdk } from '../../lib/sdk';
+import { apiRequest } from '../../lib/api';
+import { ApiError } from '../../lib/api-error';
 
 /** Fields returned from `GET /admin/instance-stats`. */
 export interface InstanceStats {
@@ -45,8 +44,10 @@ export function useInstanceStatsQuery(): UseQueryResult<InstanceStats, ApiError>
     // inline `role="alert"` block — keep the failure local to this card.
     throwOnError: false,
     queryFn: async (): Promise<InstanceStats> => {
-      const { data, error } = await sdk.GET('/admin/instance-stats');
-      if (error || !data) throw toApiError(error, 'Failed to load instance stats');
+      const data = await apiRequest(
+        (client) => client.GET('/admin/instance-stats'),
+        'Failed to load instance stats',
+      );
       if (!isInstanceStats(data)) {
         throw new ApiError(undefined, 'Unexpected instance stats payload', 500);
       }

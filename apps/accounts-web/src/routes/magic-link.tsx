@@ -18,9 +18,8 @@ import AuthCard from '../components/auth-card';
 import { authStore } from '../features/auth/auth-store';
 import { useCapsLockHint } from '../features/auth/use-caps-lock-hint';
 import { type MeResponse, userFromMe } from '../features/auth/user-from-me';
-import type { ProblemJson } from '../lib/api-error';
-import { type AuthErrorI18nKey, mapAuthError, mapAuthThrown } from '../lib/auth-errors';
-import { sdk } from '../lib/sdk';
+import { apiRequest } from '../lib/api';
+import { type AuthErrorI18nKey, mapAuthThrown } from '../lib/auth-errors';
 import { useSubmitGuard } from '../lib/use-submit-guard';
 
 const RECOVERY_MIN_LEN = 8;
@@ -34,9 +33,7 @@ export interface MagicLinkSearch {
   token?: string;
 }
 
-type VerifyResult =
-  | { ok: true; body: LoginResponse }
-  | { ok: false; error: ProblemJson | undefined };
+type VerifyResult = { ok: true; body: LoginResponse } | { ok: false; error: unknown };
 
 const verifyPromises = new Map<string, Promise<VerifyResult>>();
 
@@ -44,16 +41,12 @@ function verifyMagicLink(token: string): Promise<VerifyResult> {
   const cached = verifyPromises.get(token);
   if (cached) return cached;
 
-  const promise: Promise<VerifyResult> = sdk
-    .GET('/auth/magic-link/verify', { params: { query: { token } } })
-    .then(({ data, error }) => {
-      if (error || !data) {
-        const result: VerifyResult = { ok: false, error: error as ProblemJson | undefined };
-        return result;
-      }
-      const result: VerifyResult = { ok: true, body: data as LoginResponse };
-      return result;
-    })
+  const promise: Promise<VerifyResult> = apiRequest(
+    (client) => client.GET('/auth/magic-link/verify', { params: { query: { token } } }),
+    'The sign-in link could not be verified',
+  )
+    .then((data): VerifyResult => ({ ok: true, body: data as LoginResponse }))
+    .catch((error: unknown): VerifyResult => ({ ok: false, error }))
     .finally(() => {
       window.setTimeout(() => {
         verifyPromises.delete(token);
@@ -79,10 +72,12 @@ export function MagicLinkPage(): ReactElement {
   const completeSignIn = useCallback(
     async (accessToken: string): Promise<void> => {
       authStore.getState().setAccessToken(accessToken);
-      const { data, error: meError } = await sdk.GET('/me');
-      if (meError || !data) {
+      let data: unknown;
+      try {
+        data = await apiRequest((client) => client.GET('/me'), 'Failed to load the signed-in user');
+      } catch (meError) {
         authStore.getState().clearSession();
-        setError(mapAuthError(meError as ProblemJson | undefined));
+        setError(mapAuthThrown(meError));
         setStatus('error');
         return;
       }
@@ -107,7 +102,7 @@ export function MagicLinkPage(): ReactElement {
         const result = await verifyMagicLink(token);
         if (cancelled) return;
         if (!result.ok) {
-          setError(mapAuthError(result.error));
+          setError(mapAuthThrown(result.error));
           setStatus('error');
           return;
         }
@@ -143,15 +138,15 @@ export function MagicLinkPage(): ReactElement {
     if (totpGuard.guard()) return;
     setError(null);
     try {
-      const { data, error: totpError } = await sdk.POST('/auth/login/totp', {
-        body: useRecovery
-          ? { challengeToken, recoveryCode: recoveryCode.trim() }
-          : { challengeToken, code: totpCode },
-      });
-      if (totpError || !data) {
-        setError(mapAuthError(totpError as ProblemJson | undefined));
-        return;
-      }
+      const data = await apiRequest(
+        (client) =>
+          client.POST('/auth/login/totp', {
+            body: useRecovery
+              ? { challengeToken, recoveryCode: recoveryCode.trim() }
+              : { challengeToken, code: totpCode },
+          }),
+        'Sign-in failed',
+      );
       const totp = data as TotpResponse;
       await completeSignIn(totp.accessToken);
     } catch (err) {

@@ -62,6 +62,16 @@ export function mapAuthError(problem: ProblemJson | null | undefined): AuthError
   return 'auth:errors.unknown';
 }
 
+/**
+ * The catalog code carried by a refusal, for the branches that pick a
+ * message per code. The requester has already parsed the envelope, so
+ * there is nothing left to dig out of the response here — and a value
+ * that is not an ApiError never reached the server, so it has no code.
+ */
+export function refusalCode(err: unknown): string | undefined {
+  return err instanceof ApiError ? err.code : undefined;
+}
+
 /** Maps a thrown SDK error / network failure to an i18n key. */
 export function mapAuthThrown(err: unknown): AuthErrorI18nKey {
   if (err instanceof TypeError) return 'auth:errors.network';

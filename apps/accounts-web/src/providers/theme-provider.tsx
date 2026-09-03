@@ -14,7 +14,7 @@ import {
 import type { ReactElement, ReactNode } from 'react';
 
 import { authStore } from '../features/auth/auth-store';
-import { sdk } from '../lib/sdk';
+import { apiRequest } from '../lib/api';
 
 export {
   type ColorMode,
@@ -39,9 +39,14 @@ async function fetchServerTheme(): Promise<ThemePreference | null> {
 async function syncServerTheme(pref: ThemePreference): Promise<void> {
   const token = authStore.getState().accessToken;
   if (!token) return;
-  await sdk.PATCH('/me', {
-    body: { themePreference: pref },
-  });
+  // The local switch has already happened; a theme the server refused
+  // to store is a preference the next session will not have, which is
+  // not worth interrupting the user over.
+  await apiRequest(
+    (client) => client.PATCH('/me', { body: { themePreference: pref } }),
+    'Failed to save theme preference',
+    { onError: 'empty', empty: null },
+  );
 }
 
 /** ThemeProvider wired with accounts-web's server sync. */

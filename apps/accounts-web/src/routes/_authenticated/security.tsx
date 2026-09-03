@@ -21,16 +21,9 @@ import {
 } from '../../features/auth/auth-schemas';
 import PasswordInput from '../../features/auth/password-input';
 import { useCapsLockHint } from '../../features/auth/use-caps-lock-hint';
-import type { ProblemJson } from '../../lib/api-error';
-import {
-  type AuthErrorI18nKey,
-  extractErrorCode,
-  mapAuthError,
-  mapAuthThrown,
-} from '../../lib/auth-errors';
+import { apiRequest } from '../../lib/api';
+import { type AuthErrorI18nKey, mapAuthThrown, refusalCode } from '../../lib/auth-errors';
 import { logError } from '../../lib/log';
-import { sdk } from '../../lib/sdk';
-import { requestFailed } from '../../lib/sdk-result';
 
 import recoveryStyles from './recovery-codes.module.css';
 
@@ -185,16 +178,16 @@ export function SecurityPage(): ReactElement {
     setPasswordError(null);
     setPasswordSuccess(false);
     try {
-      const result = await sdk.POST('/me/password', {
-        body: {
-          currentPassword: values.currentPassword,
-          newPassword: values.newPassword,
-        },
-      });
-      if (requestFailed(result)) {
-        setPasswordError(mapAuthError(result.error as ProblemJson | undefined));
-        return;
-      }
+      await apiRequest(
+        (client) =>
+          client.POST('/me/password', {
+            body: {
+              currentPassword: values.currentPassword,
+              newPassword: values.newPassword,
+            },
+          }),
+        'Failed to change the password',
+      );
       setPasswordSuccess(true);
       reset();
     } catch (err) {
@@ -209,11 +202,10 @@ export function SecurityPage(): ReactElement {
 
   useEffect(() => {
     let cancelled = false;
-    void sdk
-      .GET('/me/sessions')
+    void apiRequest((client) => client.GET('/me/sessions'), 'Failed to load sessions')
       .then((res) => {
         if (!cancelled) {
-          const body = res.data as ListSessionsOutputBody | undefined;
+          const body = res as ListSessionsOutputBody | undefined;
           setSessions(body?.items ?? []);
           setSessionsLoading(false);
         }
@@ -232,13 +224,10 @@ export function SecurityPage(): ReactElement {
   const handleRevokeSession = async (sessionId: string): Promise<void> => {
     setRevokingId(sessionId);
     try {
-      const result = await sdk.DELETE('/me/sessions/{sessionId}', {
-        params: { path: { sessionId } },
-      });
-      if (requestFailed(result)) {
-        toaster.show({ message: t('security.session_revoke_failed'), tone: 'danger' });
-        return;
-      }
+      await apiRequest(
+        (client) => client.DELETE('/me/sessions/{sessionId}', { params: { path: { sessionId } } }),
+        'Failed to revoke the session',
+      );
       setSessions((prev) => prev.filter((s) => s.id !== sessionId));
     } catch {
       toaster.show({ message: t('security.session_revoke_failed'), tone: 'danger' });
@@ -408,11 +397,10 @@ function TotpSection(): ReactElement {
   // back to a "resume" affordance (see pending branch below).
   useEffect(() => {
     let cancelled = false;
-    void sdk
-      .GET('/me/totp')
+    void apiRequest((client) => client.GET('/me/totp'), 'Failed to load two-factor status')
       .then((res) => {
-        if (!cancelled && res.data) {
-          const body = res.data as TotpStatusOutputBody;
+        if (!cancelled && res) {
+          const body = res as TotpStatusOutputBody;
           setStatus(body.status);
         }
       })
@@ -430,23 +418,20 @@ function TotpSection(): ReactElement {
     setErrorKey(null);
     setBusy(true);
     try {
-      const result = await sdk.POST('/me/totp/enroll', { body: { password } });
-      const { data, error } = result;
-      if (requestFailed(result)) {
-        const errCode = extractErrorCode(error as ProblemJson | undefined);
-        setErrorKey(
-          errCode === 'AUTH.PASSWORD.CURRENT_MISMATCH'
-            ? 'security.totp.errors.password_mismatch'
-            : 'security.totp.errors.enroll_failed',
-        );
-        return;
-      }
+      const data = await apiRequest(
+        (client) => client.POST('/me/totp/enroll', { body: { password } }),
+        'Failed to start two-factor enrollment',
+      );
       const body = data as TotpEnrollOutputBody;
       setEnrollment(body);
       setStatus('pending');
       setStartPassword('');
-    } catch {
-      setErrorKey('security.totp.errors.enroll_failed');
+    } catch (err) {
+      setErrorKey(
+        refusalCode(err) === 'AUTH.PASSWORD.CURRENT_MISMATCH'
+          ? 'security.totp.errors.password_mismatch'
+          : 'security.totp.errors.enroll_failed',
+      );
     } finally {
       setBusy(false);
     }
@@ -465,23 +450,19 @@ function TotpSection(): ReactElement {
     }
     setBusy(true);
     try {
-      const result = await sdk.DELETE('/me/totp', { body: { password } });
-      const { error } = result;
-      if (requestFailed(result)) {
-        const errCode = extractErrorCode(error as ProblemJson | undefined);
-        setErrorKey(
-          errCode === 'AUTH.PASSWORD.CURRENT_MISMATCH'
-            ? 'security.totp.errors.password_mismatch'
-            : 'security.totp.errors.cancel_failed',
-        );
-        toaster.show({ message: t('security.totp.errors.cancel_failed'), tone: 'danger' });
-        // Keep the real (pending) state — the secret still exists server-side.
-        return;
-      }
+      await apiRequest(
+        (client) => client.DELETE('/me/totp', { body: { password } }),
+        'Failed to clear the pending secret',
+      );
       setEnrollment(null);
       setStatus('disabled');
-    } catch {
-      setErrorKey('security.totp.errors.cancel_failed');
+    } catch (err) {
+      // Keep the real (pending) state — the secret still exists server-side.
+      setErrorKey(
+        refusalCode(err) === 'AUTH.PASSWORD.CURRENT_MISMATCH'
+          ? 'security.totp.errors.password_mismatch'
+          : 'security.totp.errors.cancel_failed',
+      );
       toaster.show({ message: t('security.totp.errors.cancel_failed'), tone: 'danger' });
     } finally {
       setBusy(false);
@@ -492,25 +473,23 @@ function TotpSection(): ReactElement {
     setErrorKey(null);
     setBusy(true);
     try {
-      const result = await sdk.POST('/me/totp/confirm', { body: { code, password } });
-      const { data, error } = result;
-      if (requestFailed(result)) {
-        const errCode = extractErrorCode(error as ProblemJson | undefined);
-        if (errCode === 'AUTH.TOTP.CODE_MISMATCH') {
-          setErrorKey('security.totp.errors.code_mismatch');
-        } else if (errCode === 'AUTH.PASSWORD.CURRENT_MISMATCH') {
-          setErrorKey('security.totp.errors.password_mismatch');
-        } else {
-          setErrorKey('security.totp.errors.confirm_failed');
-        }
-        return;
-      }
+      const data = await apiRequest(
+        (client) => client.POST('/me/totp/confirm', { body: { code, password } }),
+        'Failed to confirm two-factor enrollment',
+      );
       const body = data as TotpConfirmOutputBody;
       setRecoveryCodes(body.recoveryCodes ?? []);
       setEnrollment(null);
       setStatus('enabled');
-    } catch {
-      setErrorKey('security.totp.errors.confirm_failed');
+    } catch (err) {
+      const errCode = refusalCode(err);
+      if (errCode === 'AUTH.TOTP.CODE_MISMATCH') {
+        setErrorKey('security.totp.errors.code_mismatch');
+      } else if (errCode === 'AUTH.PASSWORD.CURRENT_MISMATCH') {
+        setErrorKey('security.totp.errors.password_mismatch');
+      } else {
+        setErrorKey('security.totp.errors.confirm_failed');
+      }
     } finally {
       setBusy(false);
     }
@@ -941,21 +920,18 @@ function EnabledPanel({
     setErrorKey(null);
     setBusy(true);
     try {
-      const result = await sdk.DELETE('/me/totp', { body: { password } });
-      const { error } = result;
-      if (requestFailed(result)) {
-        const errCode = extractErrorCode(error as ProblemJson | undefined);
-        if (errCode === 'AUTH.PASSWORD.CURRENT_MISMATCH') {
-          setErrorKey('security.totp.errors.password_mismatch');
-        } else {
-          setErrorKey('security.totp.errors.disable_failed');
-        }
-        return;
-      }
+      await apiRequest(
+        (client) => client.DELETE('/me/totp', { body: { password } }),
+        'Failed to turn off two-factor authentication',
+      );
       resetForm();
       onDisabled();
-    } catch {
-      setErrorKey('security.totp.errors.disable_failed');
+    } catch (err) {
+      if (refusalCode(err) === 'AUTH.PASSWORD.CURRENT_MISMATCH') {
+        setErrorKey('security.totp.errors.password_mismatch');
+      } else {
+        setErrorKey('security.totp.errors.disable_failed');
+      }
     } finally {
       setBusy(false);
     }
@@ -966,22 +942,19 @@ function EnabledPanel({
     setErrorKey(null);
     setBusy(true);
     try {
-      const result = await sdk.POST('/me/totp/recovery-codes', { body: { password } });
-      const { data, error } = result;
-      if (requestFailed(result)) {
-        const errCode = extractErrorCode(error as ProblemJson | undefined);
-        if (errCode === 'AUTH.PASSWORD.CURRENT_MISMATCH') {
-          setErrorKey('security.totp.errors.password_mismatch');
-        } else {
-          setErrorKey('security.totp.errors.regenerate_failed');
-        }
-        return;
-      }
+      const data = await apiRequest(
+        (client) => client.POST('/me/totp/recovery-codes', { body: { password } }),
+        'Failed to regenerate recovery codes',
+      );
       const body = data as TotpRegenerateRecoveryCodesOutputBody;
       resetForm();
       onRegenerated(body.recoveryCodes ?? []);
-    } catch {
-      setErrorKey('security.totp.errors.regenerate_failed');
+    } catch (err) {
+      if (refusalCode(err) === 'AUTH.PASSWORD.CURRENT_MISMATCH') {
+        setErrorKey('security.totp.errors.password_mismatch');
+      } else {
+        setErrorKey('security.totp.errors.regenerate_failed');
+      }
     } finally {
       setBusy(false);
     }

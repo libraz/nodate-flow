@@ -1,5 +1,5 @@
 /**
- * B5 + B11 — login.tsx TOTP / magic-link submit guards and recovery-code
+ * login.tsx TOTP / magic-link submit guards and recovery-code
  * input wiring.
  *
  *   - A fast double-Enter on the TOTP form must fire only ONE network
@@ -52,6 +52,11 @@ const capsMocks = vi.hoisted(() => ({
 
 vi.mock('../../lib/sdk', () => ({
   sdk: {
+    GET: sdkMocks.get,
+    POST: sdkMocks.post,
+  },
+
+  authSdk: {
     GET: sdkMocks.get,
     POST: sdkMocks.post,
   },
@@ -127,6 +132,7 @@ async function reachTotpStep(): Promise<void> {
   sdkMocks.post.mockImplementationOnce(async () => ({
     data: { step: 'totp_required', challengeToken: 'tok-1' },
     error: null,
+    response: new Response(null, { status: 200 }),
   }));
 
   mountLogin();
@@ -143,7 +149,7 @@ async function reachTotpStep(): Promise<void> {
   await screen.findByRole('heading', { name: enAuth.login.totp_title });
 }
 
-describe('login TOTP submit guard (B5)', () => {
+describe('login TOTP submit guard', () => {
   it('a fast double Enter on the TOTP form fires only ONE /auth/login/totp call', async () => {
     await reachTotpStep();
 
@@ -175,11 +181,15 @@ describe('login TOTP submit guard (B5)', () => {
     expect(totpCalls.length).toBe(1);
 
     // Resolve the parked promise so the test exits cleanly.
-    resolveTotp({ data: null, error: { type: 'auth.totp.code-mismatch' } });
+    resolveTotp({
+      data: null,
+      error: { type: 'auth.totp.code-mismatch' },
+      response: new Response(null, { status: 400 }),
+    });
   });
 });
 
-describe('login magic-link submit guard (B5)', () => {
+describe('login magic-link submit guard', () => {
   it('a fast double click on the magic-link form fires only ONE request', async () => {
     mountLogin();
 
@@ -212,11 +222,15 @@ describe('login magic-link submit guard (B5)', () => {
     );
     expect(magicCalls.length).toBe(1);
 
-    resolveMagic({ data: { ok: true }, error: null });
+    resolveMagic({
+      data: { ok: true },
+      error: null,
+      response: new Response(null, { status: 200 }),
+    });
   });
 });
 
-describe('login recovery code field (B11)', () => {
+describe('login recovery code field', () => {
   it('renders helper text, enforces maxLength=20, and wires aria-describedby', async () => {
     await reachTotpStep();
 
@@ -239,7 +253,7 @@ describe('login recovery code field (B11)', () => {
   });
 });
 
-describe('login TOTP code aria wiring (B11)', () => {
+describe('login TOTP code aria wiring', () => {
   it('exposes a "needs digits" status when length < 6 and links it via aria-describedby', async () => {
     await reachTotpStep();
 
@@ -270,6 +284,7 @@ describe('login TOTP code aria wiring (B11)', () => {
     sdkMocks.post.mockImplementationOnce(async () => ({
       data: null,
       error: { type: 'auth.totp.code-mismatch', status: 401, detail: 'no' },
+      response: new Response(null, { status: 401 }),
     }));
 
     const codeInput = screen.getByLabelText(
