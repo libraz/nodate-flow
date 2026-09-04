@@ -13,6 +13,11 @@ concurrency:
 env:
   GO_VERSION: "1.26.0"
   BUN_VERSION: "1.3.14"
+  # Pinned for the same reason the Go and bun versions are: a linter
+  # release that adds a check would otherwise turn main red on its own
+  # schedule, and it would disagree with the version a contributor has
+  # installed locally.
+  GOLANGCI_LINT_VERSION: "v2.11.4"
 
 jobs:
   web:
@@ -78,6 +83,14 @@ jobs:
       - name: Browser SDK Node types
         run: make check-sdk-browser-safe
 
+      # Two operations that were never declared to share a response
+      # schema but resolve to one component are indistinguishable from
+      # two that agree: the SDK gives both call sites the same type, so
+      # a change made for one silently redefines the other. It reads the
+      # committed spec, so no Go toolchain is needed.
+      - name: OpenAPI schema collisions
+        run: make check-schema-collisions
+
       # A var() naming a token nothing defines takes its whole
       # declaration down with it, so the style is simply absent — no
       # error, no fallback, and nothing else in the pipeline reads CSS
@@ -117,6 +130,13 @@ jobs:
       # stays English everywhere.
       - name: Hardcoded UI strings
         run: make check-strings
+
+      # A toast built from a fixed sentence reports the same thing
+      # whatever went wrong, so the one detail that would identify the
+      # failure — the caught error — never reaches the person looking at
+      # it, and the mutation looks handled.
+      - name: Error-path toasts
+        run: make check-error-toasts
 
       # The guard over the guards. Several of the scans above sat in the
       # tree for months with nothing invoking them, which reports exactly
@@ -191,9 +211,12 @@ jobs:
       - uses: actions/setup-go@v6
         with:
           go-version: ${{ env.GO_VERSION }}
+          # The two services are dumped, then the tool module merges the
+          # two specs, so all three take part in this job.
           cache-dependency-path: |
             apps/flow-api/go.sum
             apps/auth-api/go.sum
+            scripts/go.sum
 
       - uses: oven-sh/setup-bun@v2
         with:
@@ -298,35 +321,34 @@ jobs:
             apps/flow-worker/go.sum
             apps/presence-discord/go.sum
             packages/go-shared/go.sum
+            scripts/go.sum
 
-      # Every module in go.work, not just the two services. The worker,
-      # the presence gateway and the shared kit all ship code and all
-      # have tests; leaving them out of the pipeline made those tests
-      # invisible rather than optional.
-      - name: Gofmt check
+      # Installed rather than run through the linter's own action: that
+      # action lints one directory per invocation, so using it would put
+      # a second copy of the module list in this file. The tool module is
+      # the reason the version has to be installed at all — the action
+      # would not see it, because it is outside go.work.
+      - name: Install golangci-lint
         run: |
-          fmt_out=$(gofmt -l apps/flow-api apps/auth-api apps/flow-worker apps/presence-discord packages/go-shared)
-          if [ -n "$fmt_out" ]; then
-            echo "::error::unformatted Go files:"
-            echo "$fmt_out"
-            exit 1
-          fi
+          go install "github.com/golangci/golangci-lint/v2/cmd/golangci-lint@$GOLANGCI_LINT_VERSION"
+          echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
+
+      # The four Go gates below are the make targets, called rather than
+      # restated. Each derives its module set from every go.mod in the
+      # tree, so a module added later is covered here without anyone
+      # remembering to edit this file — a list written out in YAML reads
+      # as exhaustive and stops being true silently.
+      - name: Gofmt check
+        run: make format-check-go
+
+      - name: Golangci-lint
+        run: make lint-go
 
       - name: Go vet
-        run: |
-          for mod in apps/flow-api apps/auth-api apps/flow-worker apps/presence-discord packages/go-shared; do
-            echo "::group::go vet $mod"
-            (cd "$mod" && go vet ./...) || exit 1
-            echo "::endgroup::"
-          done
+        run: make vet
 
       - name: Build
-        run: |
-          for mod in apps/flow-api apps/auth-api apps/flow-worker apps/presence-discord packages/go-shared; do
-            echo "::group::go build $mod"
-            (cd "$mod" && go build ./...) || exit 1
-            echo "::endgroup::"
-          done
+        run: make build-go
 
       # -short is deliberately absent: the integration guards skip on it as
       # well as on NF_TEST_INTEGRATION, so passing it would silence the

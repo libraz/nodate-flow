@@ -108,7 +108,10 @@ func dsn(t *testing.T) string {
 			sharedDSNErr = fmt.Errorf("open mysql: %w", err)
 			return
 		}
-		defer db.Close()
+		// The probe pool is discarded once the DSN is known to be
+		// pingable; a close error on it says nothing about the
+		// container the tests go on to use.
+		defer func() { _ = db.Close() }()
 		deadline := time.Now().Add(60 * time.Second)
 		for {
 			pctx, pcancel := context.WithTimeout(ctx, 2*time.Second)

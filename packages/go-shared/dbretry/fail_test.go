@@ -55,7 +55,7 @@ func (failStubDriver) Open(name string) (driver.Conn, error) {
 
 func (c failStubConn) Prepare(string) (driver.Stmt, error) { return failStubStmt{}, nil }
 func (c failStubConn) Close() error                        { return nil }
-func (c failStubConn) Begin() (driver.Tx, error)           { return failStubTx{rec: c.rec}, nil }
+func (c failStubConn) Begin() (driver.Tx, error)           { return failStubTx(c), nil }
 
 func (t failStubTx) Commit() error {
 	t.rec.mu.Lock()

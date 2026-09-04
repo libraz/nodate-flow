@@ -106,7 +106,7 @@ logs: ## Tail compose logs
 
 # ---------- build ----------
 
-.PHONY: build build-api build-auth-api build-worker build-presence build-web build-accounts-web
+.PHONY: build build-go build-api build-auth-api build-worker build-presence build-web build-accounts-web
 build: build-api build-auth-api build-worker build-presence build-web build-accounts-web ## Build all apps
 
 build-api:
@@ -126,6 +126,13 @@ build-web:
 
 build-accounts-web:
 	cd apps/accounts-web && $(PKG_RUN) build
+
+# Compile gate rather than a packaging step: every package in every Go
+# module, not only the packages the binaries above happen to import. The
+# module set is derived the same way the lint and vet targets derive
+# theirs (see GO_MODULES), so a module added later is covered on arrival.
+build-go: ## go build every package in every Go module
+	$(call go-modules-each,go build ./...)
 
 # ---------- test ----------
 
@@ -230,8 +237,46 @@ lighthouse: build-web ## Run Lighthouse CI (a11y 95+, perf 70+)
 
 # ---------- lint / format / typecheck ----------
 
-.PHONY: check lint format typecheck vet check-dtos check-css-var-parens check-public-router check-tokens check-breakpoints check-themes check-colors check-spacing check-strings check-region-parity check-sdk-browser-safe check-schema-collisions check-reachability check-revival-writers check-affected-rows check-vacuous-assertions check-task-visibility check-commit-boundary check-error-toasts
-check: lint typecheck vet i18n-check check-dtos check-css-var-parens check-public-router check-region-parity check-sdk-browser-safe check-schema-collisions check-tokens check-themes check-colors check-spacing check-strings check-breakpoints check-reachability check-revival-writers check-affected-rows check-vacuous-assertions check-task-visibility check-commit-boundary check-error-toasts ## Lint + typecheck + go vet + i18n locale guard + DTO drift guard + CSS var() paren guard + public-surface guard + Go/TS region parity + browser-SDK Node-type guard + OpenAPI schema-collision guard + design-token guards (references, theme parity, colours, spacing) + hardcoded UI string guard + breakpoint guard + gate-reachability guard + soft-delete revival-writer guard + affected-row guard + vacuous-assertion guard + task-visibility guard + commit-boundary compile gate + error-toast guard
+# The Go modules are discovered, never listed. A hand-written list reads
+# as exhaustive and stops being true the moment a module is added: four
+# of the six here — a worker, an app, the tool module, and the shared kit
+# both services depend on — went unlinted that way, and nothing could
+# notice, because a target that names two directories reports green for
+# the two it visited.
+#
+# Nothing is excluded from this file. A module that genuinely must be
+# skipped says so in its own go.mod, on a line reading
+# `// lint-skip: <reason>`, so the exclusion is visible to whoever opens
+# the module rather than buried in a build file they have no reason to
+# read.
+GO_MODULES = $(shell find . \( -name node_modules -o -name vendor -o -name .git \) -prune \
+	       -o -name go.mod -exec grep -LF '// lint-skip:' {} + \
+	     | sed -e 's|/go\.mod$$||' -e 's|^\./||' | sort)
+
+# GOWORK=off makes each module resolve through its own go.mod and go.sum.
+# go.work lists the five modules that build together; scripts/ is
+# deliberately outside it, so `./...` inside that module resolves to
+# nothing under the workspace and any tool run there reports a clean
+# sweep of zero packages. Every module carries explicit replace
+# directives for its in-tree dependencies, so resolving per-module yields
+# the same graph the workspace does.
+#
+# The loop does not stop at the first failure — one red module would hide
+# the next — and it names the modules that failed at the end, so the
+# result is attributable without reading the paths in the diagnostics.
+define go-modules-each
+	@failed=""; for mod in $(GO_MODULES); do \
+	  echo "==> $$mod"; \
+	  ( cd "$$mod" && GOWORK=off $(1) ) || failed="$$failed $$mod"; \
+	done; \
+	if [ -n "$$failed" ]; then \
+	  echo "$@ failed in:$$failed" >&2; \
+	  exit 1; \
+	fi
+endef
+
+.PHONY: check lint lint-go format format-check format-check-go typecheck vet check-dtos check-css-var-parens check-public-router check-tokens check-breakpoints check-themes check-colors check-spacing check-strings check-region-parity check-sdk-browser-safe check-schema-collisions check-reachability check-revival-writers check-affected-rows check-vacuous-assertions check-task-visibility check-commit-boundary check-error-toasts check-outbound-deadline check-enum-parity check-calendar-write-acl
+check: lint format-check typecheck vet i18n-check check-dtos check-css-var-parens check-public-router check-region-parity check-sdk-browser-safe check-schema-collisions check-tokens check-themes check-colors check-spacing check-strings check-breakpoints check-reachability check-revival-writers check-affected-rows check-vacuous-assertions check-task-visibility check-commit-boundary check-error-toasts check-outbound-deadline check-enum-parity check-calendar-write-acl ## Lint + formatting + typecheck + go vet + i18n locale guard + DTO drift guard + CSS var() paren guard + public-surface guard + Go/TS region parity + browser-SDK Node-type guard + OpenAPI schema-collision guard + design-token guards (references, theme parity, colours, spacing) + hardcoded UI string guard + breakpoint guard + gate-reachability guard + soft-delete revival-writer guard + affected-row guard + vacuous-assertion guard + task-visibility guard + commit-boundary compile gate + error-toast guard + outbound-deadline guard + input enum-parity guard + calendar write-ACL guard
 
 check-revival-writers: ## Fail when a grant keyed on a tuple alone has no writer that revives a revoked row
 	cd apps/flow-api && NF_TEST_INTEGRATION= go test -count=1 ./tests/softdelete/
@@ -247,6 +292,15 @@ check-task-visibility: ## Fail when a statement projects task content without th
 
 check-commit-boundary: ## Fail when an event append against a handle with no observable commit becomes legal again
 	cd apps/flow-api && NF_TEST_INTEGRATION= go test -count=1 ./tests/commitboundary/
+
+check-outbound-deadline: ## Fail when a request can leave the repository with no deadline, including through a context nothing installed a client into
+	cd apps/flow-api && NF_TEST_INTEGRATION= go test -count=1 ./tests/outbounddeadline/
+
+check-enum-parity: ## Fail when one operation states a field's accepted values and a sibling operation leaves the same field open
+	cd apps/flow-api && NF_TEST_INTEGRATION= go test -count=1 ./tests/enumparity/
+
+check-calendar-write-acl: ## Fail when a tool writes a calendar's contents without the rule the REST handlers apply to the same write
+	cd apps/flow-api && NF_TEST_INTEGRATION= go test -count=1 ./tests/precondition/
 
 check-dtos: ## Fail when web routes/features hand-roll response DTOs instead of using SDK schemas
 	bash scripts/check-handrolled-dtos.sh
@@ -294,22 +348,37 @@ check-error-toasts: ## Fail when an error-path toast is built from a fixed sente
 check-css-var-parens: ## Fail when a var(--nf-...) token reference has a stray extra closing paren
 	bash scripts/check-css-var-parens.sh
 
-lint: ## biome check + golangci-lint
+lint: ## biome check + golangci-lint over every Go module
 	$(PKG_RUN) check
-	cd apps/flow-api && golangci-lint run ./...
-	cd apps/auth-api && golangci-lint run ./...
+	@$(MAKE) --no-print-directory lint-go
 
-format: ## biome format + gofmt
+# The Go halves stand alone so a pipeline that has no bun installed can
+# call the gate this file defines instead of restating the module set in
+# its own configuration, where the list would drift out of sight.
+lint-go: ## golangci-lint over every Go module
+	$(call go-modules-each,golangci-lint run ./...)
+
+format: ## biome format + gofmt over every Go module
 	$(PKG_RUN) format
-	cd apps/flow-api && gofmt -w .
-	cd apps/auth-api && gofmt -w .
+	gofmt -w $(GO_MODULES)
+
+format-check: ## Fail when anything is unformatted (check-only counterpart of `format`)
+	$(PKG_X) biome format .
+	@$(MAKE) --no-print-directory format-check-go
+
+format-check-go: ## Fail when any Go module is unformatted
+	@unformatted=$$(gofmt -l $(GO_MODULES)); \
+	if [ -n "$$unformatted" ]; then \
+	  echo "unformatted Go files:" >&2; \
+	  echo "$$unformatted" >&2; \
+	  exit 1; \
+	fi
 
 typecheck: ## tsc -b
 	$(PKG_RUN) typecheck
 
-vet: ## go vet
-	cd apps/flow-api && go vet ./...
-	cd apps/auth-api && go vet ./...
+vet: ## go vet over every Go module
+	$(call go-modules-each,go vet ./...)
 
 # ---------- codegen ----------
 
@@ -387,5 +456,11 @@ seed-calendar: ## Seed calendar demo data via REST API (NF_SEED_LOCALE=en|ja)
 # ---------- clean ----------
 
 .PHONY: clean
+# The dist directories are found rather than listed, for the same reason
+# the Go modules are: the list named three of them and the workspaces
+# that build had grown past it, so `make clean` left build output behind
+# in the ones nobody remembered to add. -maxdepth 2 keeps the search to
+# workspace roots and out of node_modules.
 clean: ## Remove build artifacts
-	rm -rf bin apps/flow-web/dist packages/sdk/dist packages/holidays/dist
+	rm -rf bin
+	@find apps packages -maxdepth 2 -type d -name dist -prune -exec rm -rf {} +

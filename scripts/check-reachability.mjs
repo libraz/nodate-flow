@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 // check-reachability — fail when a guard, generator, or test suite exists
-// that nothing in this repository ever runs.
+// that nothing in this repository ever runs, and when one that `make
+// check` runs is run by nothing in CI.
 //
 // A check nobody invokes is indistinguishable from a check that passes.
 // The repository accumulated several: scans written for a real failure
@@ -47,6 +48,24 @@
 // script exempted there carries the same marker as a trailing shell
 // comment in its command.
 //
+// The second question has the same shape and the same answer machinery.
+// CI does not run `make check`; it runs a hand-picked set of that
+// target's prerequisites, one step per guard. So a guard wired into
+// `make check` is enforced locally and absent from CI until somebody
+// remembers to write it down a second time, in another file, in another
+// language — and the pipeline that omits it is green, because a step
+// that does not exist reports nothing.
+//
+// The same fixpoint therefore runs twice more, over the same candidates:
+// once seeded from `make check` alone, once from the workflows alone.
+// What the first reaches and the second does not is a guard CI does not
+// run. A target that genuinely cannot run in CI says so in its own
+// recipe, next to the command:
+//
+//     # ci-local-only: <reason>
+//
+// which exempts what that target reaches and nothing else.
+//
 // The self-verification cases run on every invocation, before the
 // inventory is built, and a failure among them stops the run. This check
 // fails silently in one direction only — it reports fewer orphans — and an
@@ -69,6 +88,13 @@ const repo = join(here, '..');
  * of it — the same rule scripts/lib/token-override.mjs uses.
  */
 const MARKER = /unreachable-by-design:[^\S\n]*[A-Za-z][^\n]*[A-Za-z]/;
+
+/**
+ * The exemption marker for the CI half, read from a make target's own
+ * recipe so it sits beside the command it excuses. A reason is mandatory
+ * for the same reason as above.
+ */
+const CI_LOCAL_MARKER = /ci-local-only:[^\S\n]*[A-Za-z][^\n]*[A-Za-z]/;
 
 /** Directories whose scripts are candidates. */
 const SCRIPT_ROOTS = ['scripts', 'sql'];
@@ -179,6 +205,16 @@ function stripComments(text, path) {
 const RUNNERS = ['node', 'bun', 'bunx', 'tsx', 'bash', 'sh', 'zsh', 'run', 'python3', 'python'];
 
 /**
+ * A token that could be an argument to make: a target name, a path, a
+ * variable override. Prose is not, and the difference matters because
+ * the corpus is full of sentences that begin "run `make check` and …" —
+ * everything after such a phrase is ordinary English, and any word in it
+ * that happens to name a target would otherwise enrol that target and
+ * everything it runs.
+ */
+const MAKE_ARGUMENT = /^[A-Za-z0-9._/-]+$/;
+
+/**
  * Does `corpus` call `basename`, as opposed to naming it?
  *
  * Two shapes count: preceded by a path separator (`scripts/x.sh`,
@@ -226,6 +262,134 @@ function selfCheck() {
       () => {
         assert.equal(invokes(`\tbash scripts/${guard}.bak`, guard), false);
         assert.equal(invokes(`\tbash scripts/${guard} && echo done`, guard), true);
+      },
+    ],
+    [
+      'separates a guard CI runs from one it does not, and heeds the local-only marker',
+      () => {
+        // Two guards, identical in every way except that one workflow
+        // step exists. If the two sides of the comparison ever stop
+        // being told apart, this is where it shows: the case asserts
+        // both directions, so a checker that reports everything and a
+        // checker that reports nothing both fail it.
+        const paired = 'sample-paired.mjs';
+        const lonely = 'sample-lonely.mjs';
+        const makefile = [
+          'check: guard-paired guard-lonely',
+          'guard-paired:',
+          `\tnode scripts/${paired}`,
+          'guard-lonely:',
+          `\tnode scripts/${lonely}`,
+          '',
+        ].join('\n');
+        const targets = parseMakefile(makefile);
+        const scripts = [paired, lonely].map((basename) => ({
+          id: `scripts/${basename}`,
+          body: '',
+          code: '',
+          basename,
+        }));
+        const seeds = { targets, scripts, packages: [] };
+        const workflow = ['- name: Paired guard', '  run: make guard-paired'].join('\n');
+
+        const fromCheck = reachFrom({ ...seeds, seedTargets: ['check'], seedUnits: [] });
+        const fromCI = reachFrom({ ...seeds, seedTargets: [], seedUnits: [workflow] });
+        assert.deepEqual([...fromCheck.scripts].sort(), [`scripts/${lonely}`, `scripts/${paired}`]);
+        assert.deepEqual([...fromCI.scripts], [`scripts/${paired}`]);
+
+        // The same tree with the marker written on the unpaired target:
+        // the guard is still absent from CI, and is no longer reported.
+        const declaration = `\t# ci-local-only: needs a device no runner has`;
+        const marked = parseMakefile(
+          makefile.replace(`\tnode scripts/${lonely}`, `${declaration}\n\tnode scripts/${lonely}`),
+        );
+        assert.deepEqual([...localOnlyTargets(targets)], []);
+        assert.deepEqual([...localOnlyTargets(marked)], ['guard-lonely']);
+        const exempted = reachFrom({
+          ...seeds,
+          targets: marked,
+          seedTargets: ['guard-lonely'],
+          seedUnits: [],
+        });
+        assert.deepEqual([...exempted.scripts], [`scripts/${lonely}`]);
+      },
+    ],
+    [
+      'tells a package that reads the tree from one that exercises a system',
+      () => {
+        const guard = [
+          'package guard',
+          'import (',
+          '\t"os"',
+          '\t"path/filepath"',
+          '\t"testing"',
+          ')',
+          'func TestX(t *testing.T) { os.ReadDir(filepath.Join("internal")) }',
+        ].join('\n');
+        const suite = [
+          'package suite',
+          'import (',
+          '\t"database/sql"',
+          '\t"path/filepath"',
+          '\t"testing"',
+          ')',
+          'func TestX(t *testing.T) { os.ReadFile(filepath.Join("q.sql")); var _ *sql.DB }',
+        ].join('\n');
+        // The shape that made the first rule wrong: a service storing
+        // nothing has suites that need no database either, and they are
+        // still suites, because they do not read the sources.
+        const noStorage = [
+          'package gateway',
+          'import (',
+          '\t"net/http/httptest"',
+          '\t"testing"',
+          ')',
+          'func TestX(t *testing.T) { httptest.NewServer(nil) }',
+        ].join('\n');
+
+        const classify = (code) =>
+          readsTheTree(importPaths(code), code) && !needsInfrastructure(importPaths(code));
+        assert.equal(classify(guard), true);
+        assert.equal(classify(suite), false);
+        assert.equal(classify(noStorage), false);
+        assert.deepEqual(importPaths(guard), ['os', 'path/filepath', 'testing']);
+      },
+    ],
+    [
+      'reads make arguments as arguments and stops where the sentence starts',
+      () => {
+        const targets = parseMakefile(['check:', '\ttrue', 'test:', '\ttrue', ''].join('\n'));
+        assert.deepEqual(makeTargetsIn(targets, '\t$(MAKE) --no-print-directory check'), ['check']);
+        assert.deepEqual(makeTargetsIn(targets, '\tmake -C sub check'), ['check']);
+        // The shape every message in this file has: a quoted invocation
+        // followed by prose. Only the quoted target is an argument, and
+        // it is quoted, so the run ends before the sentence does.
+        assert.deepEqual(makeTargetsIn(targets, "'`make check` runs the test suites too'"), []);
+      },
+    ],
+    [
+      'reads a go test run out of both shapes, and knows which package sets contain it',
+      () => {
+        // The guard is a test package, so the only thing that can say CI
+        // runs it is the package set of some step's own `go test`.
+        const recipe =
+          '\tcd apps/flow-api && NF_TEST_INTEGRATION= go test -count=1 ./tests/sample/';
+        assert.deepEqual(goTestRuns(recipe), [{ dir: 'apps/flow-api', pkg: './tests/sample' }]);
+        const step = [
+          '- name: Tests',
+          '  working-directory: apps/flow-api',
+          '  run: go test ./...',
+        ];
+        assert.deepEqual(goTestRuns(step.join('\n')), [{ dir: 'apps/flow-api', pkg: './...' }]);
+
+        const want = { dir: 'apps/flow-api', pkg: './tests/sample' };
+        assert.equal(goRunCovers({ dir: 'apps/flow-api', pkg: './...' }, want), true);
+        assert.equal(goRunCovers({ dir: 'apps/flow-api', pkg: './tests/...' }, want), true);
+        assert.equal(goRunCovers({ dir: 'apps/flow-api', pkg: './tests/sample' }, want), true);
+        // A sibling module running everything says nothing about this one,
+        // and neither does a narrower set in the right module.
+        assert.equal(goRunCovers({ dir: 'apps/auth-api', pkg: './...' }, want), false);
+        assert.equal(goRunCovers({ dir: 'apps/flow-api', pkg: './internal/...' }, want), false);
       },
     ],
     [
@@ -483,16 +647,23 @@ const targets = parseMakefile(readFileSync(join(repo, 'Makefile'), 'utf8'));
  * Comments are removed here rather than in the parser, which needs the
  * raw text to find the targets themselves.
  */
-function recipeUnits(name) {
+function recipeUnits(targets, name) {
   return (targets.get(name)?.recipe ?? []).map(stripHashComments);
 }
 
-const closure = new Set();
-function addTarget(name) {
-  if (!targets.has(name) || closure.has(name)) return;
-  closure.add(name);
-  for (const prereq of targets.get(name)?.prereqs ?? []) addTarget(prereq);
+/**
+ * The make targets whose own recipe declares that CI cannot run them.
+ * The raw recipe is read, not the corpus form: the declaration is a
+ * comment, and the corpus has its comments removed.
+ */
+function localOnlyTargets(targets) {
+  const marked = new Set();
+  for (const [name, target] of targets) {
+    if (target.recipe.some((line) => CI_LOCAL_MARKER.test(line))) marked.add(name);
+  }
+  return marked;
 }
+
 // The gates are the other set that has to be non-empty, and they fail
 // the opposite way: a gate that goes missing makes everything look
 // unreachable rather than everything look fine. Naming the missing gate
@@ -505,11 +676,10 @@ for (const gate of ['check', 'test']) {
       'Every script that only that gate runs would be reported as reachable by nothing.',
     ]);
   }
-  addTarget(gate);
 }
 
 /** Every make target named in a chunk of text, filtered against real targets. */
-function makeTargetsIn(text) {
+function makeTargetsIn(targets, text) {
   const found = [];
   for (const m of text.matchAll(/(?:\$\(MAKE\)|\bmake\b)([^\n;|&]*)/g)) {
     const tokens = (m[1] ?? '').trim().split(/\s+/);
@@ -520,10 +690,136 @@ function makeTargetsIn(text) {
         continue;
       }
       if (token.startsWith('-') || token.includes('=') || token.includes('$')) continue;
+      // The invocation ends where its arguments stop looking like
+      // arguments; what follows belongs to the sentence, not to make.
+      if (!MAKE_ARGUMENT.test(token)) break;
       if (targets.has(token)) found.push(token);
     }
   }
   return found;
+}
+
+// ---------------------------------------------------------------------
+// Candidates, second kind: guard packages
+// ---------------------------------------------------------------------
+
+/** The import paths a Go source file declares. */
+function importPaths(code) {
+  const paths = [];
+  for (const block of code.matchAll(/import\s*\(([\s\S]*?)\)/g)) {
+    for (const quoted of (block[1] ?? '').matchAll(/"([^"]+)"/g)) paths.push(quoted[1] ?? '');
+  }
+  for (const single of code.matchAll(/import\s+(?:[\w.]+\s+)?"([^"]+)"/g)) {
+    paths.push(single[1] ?? '');
+  }
+  return paths;
+}
+
+/**
+ * Does this package need a system to run against?
+ *
+ * Reaching a database, a driver, a container or the tenant helpers means
+ * it does. Nothing else can run such a package usefully, so the module's
+ * whole-suite sweep is the only sensible caller.
+ */
+function needsInfrastructure(paths) {
+  return paths.some(
+    (path) =>
+      path === 'database/sql' ||
+      path.startsWith('database/sql/') ||
+      path.includes('go-sql-driver') ||
+      path.includes('testcontainers') ||
+      path.endsWith('/tests/helpers'),
+  );
+}
+
+/**
+ * Does this package read the repository's own files?
+ *
+ * This is what a guard does and a suite does not: it opens the sources
+ * and reports on what it finds there, the same job the scans under
+ * scripts/ do. Needing no database is not the same question — a service
+ * that stores nothing has suites that need none either — so both halves
+ * are asked, and a package is a guard only when it reads the tree and
+ * needs nothing to run against.
+ */
+function readsTheTree(paths, code) {
+  if (!paths.includes('path/filepath')) return false;
+  return /\b(?:filepath\.Walk\w*|fs\.WalkDir|os\.ReadDir|os\.ReadFile|os\.DirFS|os\.Open)\b/.test(
+    code,
+  );
+}
+
+/**
+ * Every Go test package under a Go module's tests/ directory, classified.
+ *
+ * testdata is skipped because the Go tool skips it: the files in there
+ * are fixtures, not packages, and several are written to look exactly
+ * like the code a guard rejects.
+ */
+function collectTestPackages() {
+  const found = [];
+  const visit = (moduleDir, dir) => {
+    let entries;
+    try {
+      entries = readdirSync(dir);
+    } catch {
+      return;
+    }
+    const sources = [];
+    let isPackage = false;
+    for (const entry of entries) {
+      const full = join(dir, entry);
+      let st;
+      try {
+        st = statSync(full);
+      } catch {
+        continue;
+      }
+      if (st.isDirectory()) {
+        if (entry !== 'testdata') visit(moduleDir, full);
+        continue;
+      }
+      if (!entry.endsWith('.go')) continue;
+      if (entry.endsWith('_test.go')) isPackage = true;
+      sources.push(readFileSync(full, 'utf8'));
+    }
+    if (!isPackage) return;
+    const code = sources.map((text) => stripSlashComments(text)).join('\n');
+    const paths = importPaths(code);
+    found.push({
+      id: relative(repo, dir),
+      dir: moduleDir,
+      pkg: `./${relative(join(repo, moduleDir), dir)}`,
+      guard: readsTheTree(paths, code) && !needsInfrastructure(paths),
+      body: sources.join('\n'),
+    });
+  };
+  for (const parent of WORKSPACE_PARENTS) {
+    for (const ws of listDirs(parent)) {
+      try {
+        statSync(join(repo, ws, 'go.mod'));
+      } catch {
+        continue;
+      }
+      visit(ws, join(repo, ws, 'tests'));
+    }
+  }
+  return found;
+}
+
+const testPackages = collectTestPackages();
+const guardPackages = testPackages.filter((p) => p.guard);
+
+// Both classes have to be populated. All-guard means the imports stopped
+// being read and every suite is about to be reported; all-suite means the
+// classifier swallowed the guards and reports nothing, which is the
+// direction that reads like success.
+if (guardPackages.length === 0 || guardPackages.length === testPackages.length) {
+  vacuous([
+    `check-reachability: ${testPackages.length} Go test package(s) under a module's tests/ directory were read, and ${guardPackages.length} of them classified as guards, so the two kinds were not told apart.`,
+    'Either the packages moved, or the imports that mark a package as needing a database are no longer the ones it declares.',
+  ]);
 }
 
 /**
@@ -579,8 +875,41 @@ if (hookText === '') {
 // Fixpoint: a gate reaches a script, whose body reaches the next one
 // ---------------------------------------------------------------------
 
-const reachableScripts = new Set();
-const reachablePackages = new Set();
+/**
+ * The `go test` runs a chunk of text makes, as `{dir, pkg}` pairs.
+ *
+ * A guard can be a Go test package instead of a script — several are —
+ * and those are invisible to the script inventory, which walks scripts/
+ * and sql/. The directory comes from the `cd` a recipe starts with or
+ * from a workflow step's working-directory, because the package path is
+ * relative to it and `./tests/x` under one module is a different package
+ * from `./tests/x` under another.
+ */
+function goTestRuns(unit) {
+  const cd = /\bcd\s+([^\s;&|]+)/.exec(unit);
+  const wd = /working-directory:\s*(\S+)/.exec(unit);
+  const dir = (cd?.[1] ?? wd?.[1] ?? '.').replace(/\/+$/, '');
+  const runs = [];
+  for (const m of unit.matchAll(/\bgo\s+test\b([^\n;|&]*)/g)) {
+    const paths = (m[1] ?? '')
+      .trim()
+      .split(/\s+/)
+      .filter((token) => token.startsWith('.'));
+    // `go test` with no package argument tests the directory it runs in.
+    if (paths.length === 0) paths.push('.');
+    for (const path of paths) runs.push({ dir, pkg: path.replace(/\/+$/, '') });
+  }
+  return runs;
+}
+
+/** Does running `have` also run everything `want` would? */
+function goRunCovers(have, want) {
+  if (have.dir !== want.dir) return false;
+  if (have.pkg === want.pkg) return true;
+  if (!have.pkg.endsWith('/...')) return false;
+  const prefix = have.pkg.slice(0, -'...'.length);
+  return want.pkg === prefix.replace(/\/$/, '') || want.pkg.startsWith(prefix);
+}
 
 function packageUnitMatches(unit, dir, name) {
   const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -593,43 +922,77 @@ function packageUnitMatches(unit, dir, name) {
   return !/\bcd\s/.test(unit) && !/working-directory:/.test(unit);
 }
 
-for (let pass = 0; pass < 32; pass += 1) {
-  const units = [...workflowUnits, hookText];
-  for (const name of closure) units.push(...recipeUnits(name));
-  for (const id of reachableScripts) {
-    const found = scriptCandidates.find((c) => c.id === id);
-    if (found !== undefined) units.push(...found.code.split('\n'));
-  }
-  for (const id of reachablePackages) {
-    const found = packageCandidates.find((c) => c.id === id);
-    if (found !== undefined) units.push(stripHashComments(`${found.dir} ${found.command}`));
-  }
-  const corpus = units.join('\n');
+/**
+ * Everything a set of seeds reaches: make targets through their
+ * prerequisites and their recipes, scripts and package.json scripts
+ * through the text of everything already known to run.
+ *
+ * The seeds and the inventory are parameters rather than the module's
+ * own constants because the same fixpoint answers three questions —
+ * what does this repository run at all, what does `make check` run, what
+ * do the workflows run — and those answers are only comparable when one
+ * implementation produces all of them.
+ */
+function reachFrom({ targets, scripts, packages, seedTargets, seedUnits }) {
+  const closure = new Set();
+  const addTarget = (name) => {
+    if (!targets.has(name) || closure.has(name)) return;
+    closure.add(name);
+    for (const prereq of targets.get(name)?.prereqs ?? []) addTarget(prereq);
+  };
+  for (const seed of seedTargets) addTarget(seed);
 
-  let changed = false;
-  for (const target of makeTargetsIn(corpus)) {
-    if (!closure.has(target)) {
-      addTarget(target);
+  const reachedScripts = new Set();
+  const reachedPackages = new Set();
+  for (let pass = 0; pass < 32; pass += 1) {
+    const units = [...seedUnits];
+    for (const name of closure) units.push(...recipeUnits(targets, name));
+    for (const id of reachedScripts) {
+      const found = scripts.find((c) => c.id === id);
+      if (found !== undefined) units.push(...found.code.split('\n'));
+    }
+    for (const id of reachedPackages) {
+      const found = packages.find((c) => c.id === id);
+      if (found !== undefined) units.push(stripHashComments(`${found.dir} ${found.command}`));
+    }
+    const corpus = units.join('\n');
+
+    let changed = false;
+    for (const target of makeTargetsIn(targets, corpus)) {
+      if (!closure.has(target)) {
+        addTarget(target);
+        changed = true;
+      }
+    }
+    for (const candidate of scripts) {
+      if (reachedScripts.has(candidate.id)) continue;
+      if (!invokes(corpus, candidate.basename)) continue;
+      reachedScripts.add(candidate.id);
       changed = true;
     }
+    for (const candidate of packages) {
+      if (reachedPackages.has(candidate.id)) continue;
+      if (!units.some((unit) => packageUnitMatches(unit, candidate.dir, candidate.name))) continue;
+      reachedPackages.add(candidate.id);
+      changed = true;
+    }
+    if (!changed) break;
   }
-  for (const candidate of scriptCandidates) {
-    if (reachableScripts.has(candidate.id)) continue;
-    if (!invokes(corpus, candidate.basename)) continue;
-    reachableScripts.add(candidate.id);
-    changed = true;
-  }
-  for (const candidate of packageCandidates) {
-    if (reachablePackages.has(candidate.id)) continue;
-    if (!units.some((unit) => packageUnitMatches(unit, candidate.dir, candidate.name))) continue;
-    reachablePackages.add(candidate.id);
-    changed = true;
-  }
-  if (!changed) break;
+  return { closure, scripts: reachedScripts, packages: reachedPackages };
 }
 
+const inventory = { targets, scripts: scriptCandidates, packages: packageCandidates };
+
+const everything = reachFrom({
+  ...inventory,
+  seedTargets: ['check', 'test'],
+  seedUnits: [...workflowUnits, hookText],
+});
+const reachableScripts = everything.scripts;
+const reachablePackages = everything.packages;
+
 // ---------------------------------------------------------------------
-// Report
+// Report: what nothing runs
 // ---------------------------------------------------------------------
 
 const orphans = [];
@@ -664,4 +1027,138 @@ if (orphans.length > 0) {
 const total = scriptCandidates.length + packageCandidates.length;
 console.info(
   `check-reachability: ${total - exempt.length} of ${total} scripts reachable from a gate, ${exempt.length} declared unreachable by design`,
+);
+
+// ---------------------------------------------------------------------
+// Report: what `make check` runs and CI does not
+// ---------------------------------------------------------------------
+
+const byCheck = reachFrom({ ...inventory, seedTargets: ['check'], seedUnits: [] });
+const byCI = reachFrom({ ...inventory, seedTargets: [], seedUnits: workflowUnits });
+
+const checkReaches = [...byCheck.scripts, ...byCheck.packages];
+const ciReaches = new Set([...byCI.scripts, ...byCI.packages]);
+
+// Both sets fail towards silence. An empty `make check` side reports
+// perfect parity because there was nothing to compare; an empty CI side
+// would report every guard at once, which is loud, but the first is the
+// one that reads like success.
+if (checkReaches.length === 0) {
+  vacuous([
+    'check-reachability: `make check` was found to run no script at all, so nothing was compared against CI.',
+    'Either the target stopped depending on the guards, or the Makefile parser no longer follows it.',
+  ]);
+}
+if (ciReaches.size === 0) {
+  vacuous([
+    'check-reachability: the workflows were found to run no script at all, so every guard would be reported as missing from CI.',
+    'Either the steps stopped calling make targets, or the workflow parser no longer follows them.',
+  ]);
+}
+
+// A target that cannot run in CI exempts what it reaches, and only what
+// it reaches: the same fixpoint answers that question too, so the
+// exemption is as narrow as the target it is written on.
+const ciExempt = new Set();
+for (const name of localOnlyTargets(targets)) {
+  if (!byCheck.closure.has(name)) continue;
+  const local = reachFrom({ ...inventory, seedTargets: [name], seedUnits: [] });
+  for (const id of local.scripts) ciExempt.add(id);
+  for (const id of local.packages) ciExempt.add(id);
+}
+
+const ciMissing = checkReaches.filter((id) => !ciReaches.has(id) && !ciExempt.has(id));
+
+// The Go half of the same question. These guards are test packages, so
+// the script inventory never sees them, and CI runs them the way it runs
+// every other test in the module — through one `./...` — rather than by
+// naming the target. What matters is that some workflow step runs a
+// package set that contains them.
+const ciGoRuns = workflowUnits.flatMap(goTestRuns);
+const localOnly = localOnlyTargets(targets);
+/** @type {Array<{target: string, run: {dir: string, pkg: string}}>} */
+const goRequired = [];
+for (const name of byCheck.closure) {
+  if (localOnly.has(name)) continue;
+  for (const unit of recipeUnits(targets, name)) {
+    for (const run of goTestRuns(unit)) goRequired.push({ target: name, run });
+  }
+}
+
+// Only the CI side is checked for emptiness at runtime. `make check`
+// having no Go-backed guard is a legitimate state of the tree, while CI
+// running no Go test at all, with guards to cover, means the step shapes
+// changed under the parser. The parser itself is proven on every run by
+// the self-verification case, which reads both shapes.
+if (goRequired.length > 0 && ciGoRuns.length === 0) {
+  vacuous([
+    'check-reachability: the check target runs Go test packages as guards, and no workflow step was found to run `go test` at all.',
+    'Either CI stopped testing Go, or the step no longer has the shape the run parser reads.',
+  ]);
+}
+
+for (const { target, run } of goRequired) {
+  if (ciGoRuns.some((have) => goRunCovers(have, run))) continue;
+  ciMissing.push(`${run.dir}: ${run.pkg} (${target})`);
+}
+
+if (ciMissing.length > 0) {
+  console.error(
+    `check-reachability: ${ciMissing.length} guard(s) that \`make check\` runs and no workflow does. These are enforced on the machine of whoever remembers to run them, and nowhere else:`,
+  );
+  for (const id of ciMissing.sort()) console.error(`  ${id}`);
+  console.error('');
+  console.error('Add a step to .github/workflows that calls the make target running it, or,');
+  console.error('for a guard that is a Go test package, a step whose `go test` covers it.');
+  console.error('A target that genuinely cannot run in CI says so in its own recipe:');
+  console.error('');
+  console.error('  # ci-local-only: <why CI cannot run this>');
+  console.error('');
+  console.error('written as a tab-indented comment among that recipe’s commands.');
+  process.exit(1);
+}
+
+// ---------------------------------------------------------------------
+// Report: a guard package no gate names
+// ---------------------------------------------------------------------
+
+// A guard package is run by the module's whole-suite sweep, so it is
+// never unrun — but being swept up is not the same as being a gate, in
+// the same way that being named in a comment is not the same as being
+// invoked. Only an exact package path counts here: `./...` is the sweep.
+const namedByGate = [];
+for (const name of byCheck.closure) {
+  for (const unit of recipeUnits(targets, name)) namedByGate.push(...goTestRuns(unit));
+}
+
+const unnamedGuards = [];
+const guardExempt = [];
+for (const pkg of guardPackages) {
+  if (namedByGate.some((run) => run.dir === pkg.dir && run.pkg === pkg.pkg)) continue;
+  if (MARKER.test(pkg.body)) guardExempt.push(pkg.id);
+  else unnamedGuards.push(pkg.id);
+}
+
+if (unnamedGuards.length > 0) {
+  console.error(
+    `check-reachability: ${unnamedGuards.length} guard package(s) that no gate names. Each of these reads the tree and reports on it, like the scans under scripts/, but only ever runs inside its module's whole-suite sweep:`,
+  );
+  for (const id of unnamedGuards.sort()) console.error(`  ${id}`);
+  console.error('');
+  console.error('Give each one a target that runs that package alone, and put the target in');
+  console.error("`check`'s prerequisites, the way the other guard packages are wired. A");
+  console.error('package that is deliberately not a gate says so in its own source:');
+  console.error('');
+  console.error('  unreachable-by-design: <why no gate names this>');
+  process.exit(1);
+}
+
+console.info(
+  `check-reachability: ${guardPackages.length} of ${testPackages.length} Go test package(s) under tests/ are guards, ${guardPackages.length - guardExempt.length} named by a gate`,
+);
+
+const ciTotal = checkReaches.length + goRequired.length;
+const ciCovered = checkReaches.filter((id) => ciReaches.has(id)).length + goRequired.length;
+console.info(
+  `check-reachability: ${ciCovered} of ${ciTotal} guard(s) reachable from \`make check\` also run in CI, ${ciTotal - ciCovered} declared local-only`,
 );

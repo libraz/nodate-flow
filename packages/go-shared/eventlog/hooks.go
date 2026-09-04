@@ -88,22 +88,16 @@ func SeqFromContext(ctx context.Context) int64 {
 	return v
 }
 
-// hasHooks reports whether any subscriber is registered. auth-api
-// registers none — it writes member events but nothing in that process
-// consumes them — so callers use this to stay quiet about a fan-out
-// that has nowhere to go.
-func hasHooks() bool {
-	hooksMu.RLock()
-	defer hooksMu.RUnlock()
-	return len(hooks) > 0
-}
-
 // fireHooks dispatches to every subscriber in registration order.
 //
 // The snapshot is taken under the lock and dispatched outside it, so a
 // subscriber is free to register or remove one during its own call
 // without deadlocking, and a subscriber added mid-dispatch does not see
 // the event that was already in flight.
+//
+// An empty registry is the normal case in auth-api, which writes member
+// events but consumes none, so the empty snapshot returns without
+// touching the sequence counter.
 func fireHooks(ctx context.Context, workspaceID uint32, eventType string, eventInternalID uint64) {
 	hooksMu.RLock()
 	snapshot := make([]NotifyHook, 0, len(hookOrder))
