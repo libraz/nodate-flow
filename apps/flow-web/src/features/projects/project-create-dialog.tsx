@@ -12,7 +12,7 @@ import { type FormEvent, type ReactElement, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { z } from 'zod';
 
-import { createIdentifierField, createSlugField } from '../../lib/validation/identifier';
+import { createIdentifierField, createSlugField, slugify } from '../../lib/validation/identifier';
 import { useCreateProject } from './api';
 
 export interface ProjectCreateDialogProps {
@@ -55,13 +55,6 @@ export default function ProjectCreateDialog({
   const [description, setDescription] = useState('');
   const [errors, setErrors] = useState<FieldErrors>({});
   const [submitting, setSubmitting] = useState(false);
-
-  const slugify = (s: string): string =>
-    s
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, '-')
-      .replace(/^-+|-+$/g, '')
-      .slice(0, 64);
 
   const reset = (): void => {
     setName('');

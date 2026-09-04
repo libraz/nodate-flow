@@ -12,7 +12,7 @@ import { type FormEvent, type ReactElement, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { z } from 'zod';
 
-import { createSlugField } from '../../lib/validation/identifier';
+import { createSlugField, slugify } from '../../lib/validation/identifier';
 import { useCreateWorkspace } from './api';
 
 export interface WorkspaceCreateDialogProps {
@@ -48,15 +48,6 @@ export default function WorkspaceCreateDialog({
   const [description, setDescription] = useState('');
   const [errors, setErrors] = useState<FieldErrors>({});
   const [submitting, setSubmitting] = useState(false);
-
-  // Derive a slug-safe string from a display name: lowercase, spaces +
-  // punctuation → '-', collapse repeats, trim leading/trailing dashes.
-  const slugify = (s: string): string =>
-    s
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, '-')
-      .replace(/^-+|-+$/g, '')
-      .slice(0, 64);
 
   const reset = (): void => {
     setName('');

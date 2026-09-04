@@ -18,6 +18,7 @@ import { type FormEvent, type ReactElement, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { z } from 'zod';
 
+import { createSlugField, slugify } from '../../lib/validation/identifier';
 import { useCreateWorkspace } from './api';
 
 interface FieldErrors {
@@ -27,25 +28,11 @@ interface FieldErrors {
 
 const schema = z.object({
   name: z.string().min(1, 'workspaces.validation.name_required').max(100),
-  slug: z
-    .string()
-    .min(1, 'workspaces.validation.slug_required')
-    .max(64)
-    .regex(/^[a-z0-9-]+$/, 'workspaces.validation.slug_format'),
+  slug: createSlugField({
+    requiredKey: 'workspaces.validation.slug_required',
+    formatKey: 'workspaces.validation.slug_format',
+  }),
 });
-
-/**
- * Derive a slug-safe string from the display name. Mirrors the logic in
- * `workspace-create-dialog.tsx` so the UX is consistent between the
- * onboarding route and the in-app "new workspace" dialog.
- */
-function slugify(input: string): string {
-  return input
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '')
-    .slice(0, 64);
-}
 
 export default function SetupPage(): ReactElement {
   const { t } = useTranslation('common');

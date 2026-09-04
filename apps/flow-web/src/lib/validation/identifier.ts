@@ -23,25 +23,49 @@ export interface IdentifierFieldOptions {
 }
 
 /**
+ * @brief Maximum length of a slug, in characters.
+ *
+ * A slug has to survive as a single DNS label, which RFC 1035 caps at 63
+ * octets. Both the workspace and project slug columns are sized to that
+ * limit and the API rejects anything longer, so the form has to stop at
+ * the same point to keep the error inline instead of coming back as a
+ * 422. Generation ({@link slugify}) and validation
+ * ({@link createSlugField}) both read this constant so a generated slug
+ * can never exceed what the schema accepts.
+ */
+export const DNS_LABEL_MAX_LENGTH = 63;
+
+/**
  * @brief Build a Zod schema for a URL-safe slug field.
  *
  * Lowercase letters, digits, and hyphens only. The translator key for
  * each rule is supplied by the caller because the surrounding namespace
  * differs (workspaces vs projects).
- *
- * The default maximum is 63 because a slug has to survive as a single
- * DNS label, which RFC 1035 caps at 63 octets. Both the workspace and
- * project slug columns are sized to that limit and the API rejects
- * anything longer, so the form has to stop at the same point to keep
- * the error inline instead of coming back as a 422.
  */
 export function createSlugField(opts: SlugFieldOptions): z.ZodString {
-  const max = opts.maxLength ?? 63;
+  const max = opts.maxLength ?? DNS_LABEL_MAX_LENGTH;
   return z
     .string()
     .min(1, opts.requiredKey)
     .max(max)
     .regex(/^[a-z0-9-]+$/, opts.formatKey);
+}
+
+/**
+ * @brief Derive a slug-safe string from a display name.
+ *
+ * Lowercase, spaces and punctuation collapse to a single '-', leading
+ * and trailing dashes are dropped, and the result is truncated to
+ * {@link DNS_LABEL_MAX_LENGTH}. Used to prefill the slug field while the
+ * user types a name, so its output must always be accepted by
+ * {@link createSlugField}.
+ */
+export function slugify(input: string): string {
+  return input
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, DNS_LABEL_MAX_LENGTH);
 }
 
 /**
