@@ -377,6 +377,13 @@ jobs:
       - name: Metrics wiring
         run: make check-metrics-wiring
 
+      # Called as the make target rather than through the suite below, so
+      # the counts it prints on a passing run are in the log: a scan that
+      # has stopped matching reports the same clean result as a tree whose
+      # provider calls are all accounted for.
+      - name: AI invocation outcome
+        run: make check-ai-outcome
+
       # -short is deliberately absent: the integration guards skip on it as
       # well as on NF_TEST_INTEGRATION, so passing it would silence the
       # suites this job just opted into.
