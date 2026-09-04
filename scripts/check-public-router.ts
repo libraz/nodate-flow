@@ -10,7 +10,7 @@
  * that builder is a security boundary and has to be enumerated
  * deliberately rather than discovered later.
  *
- * The check has two halves, and they fail for different reasons:
+ * The check has three halves, and they fail for different reasons:
  *
  *   1. Every allowlisted public path is present in the merged spec.
  *      Losing one is a regression against ADR 0007 — a share link that
@@ -24,6 +24,44 @@
  *      registered in the public group under, say, `/workspaces/...`
  *      was invisible to it: exactly the shape of an accidental
  *      exposure, and the one case the check most needs to catch.
+ *
+ *   3. No response schema reachable from a public route names a person.
+ *      Halves 1 and 2 police which doors are open; this one polices what
+ *      walks out of them. A share link is handed around, forwarded and
+ *      indexed, and its holder has no identity, so there is nobody the
+ *      response can be trusted to name: a display name, an address, an
+ *      avatar or a person's public id all identify a human being to an
+ *      audience that was never granted one. The route set comes from
+ *      half 2's source scan, so a route added to the public group is
+ *      body-checked the moment it exists rather than when someone
+ *      remembers to list it.
+ *
+ * What half 3 counts as naming a person, and why that shape:
+ *
+ *   - A person role used as a property name, alone or carrying a person
+ *     attribute: `assignee`, `attendees`, `creatorName`, `userEmail`,
+ *     `ownerAvatarUrl`, `actorId`. The role vocabulary is what makes the
+ *     rule narrow enough to need no exemptions — the attribute half
+ *     (`name`, `id`, `email`, `avatar`, …) is exactly the set of words a
+ *     resource also uses about itself, so it only counts when a role
+ *     word puts a human on the other side of it.
+ *   - `*By` audit attribution and its variants — `createdBy`,
+ *     `revokedByName`, `updatedById`. These name whoever acted, which is
+ *     a person even when the surrounding resource is not.
+ *   - Standalone properties that cannot describe anything but a human:
+ *     `email`, `firstName`, `avatarUrl`, `phoneNumber`, `username`.
+ *
+ *   Person public ids are in scope deliberately. An opaque id looks
+ *   harmless and is not: correlated across two share links it re-links
+ *   the same human, and the last leak of this shape travelled as an
+ *   assignee id rather than as a name.
+ *
+ *   A resource's own `id`, `name`, `title` and `description` are not
+ *   matched, and neither are `displayName` or `iconUrl` on their own —
+ *   a lens, a calendar and a share page legitimately have all of those.
+ *   A person embedded as an object is caught at the property that holds
+ *   it (`assignee`, `user`), not at the fields inside it, so nothing is
+ *   lost by leaving the bare words alone.
  *
  * Registration forms the source scan understands:
  *
@@ -41,18 +79,24 @@
  * into decoration.
  *
  * The self-verification cases run on every invocation, before the spec
- * and the router are read, and a failure among them stops the run. The
- * source scan is the half that can go quiet: a pattern that no longer
- * matches how a route is registered yields an empty public set, and an
- * empty public set is allowlisted by definition.
+ * and the router are read, and a failure among them stops the run. Every
+ * half of this check can go quiet rather than fail: a pattern that no
+ * longer matches how a route is registered yields an empty public set,
+ * and an empty public set is allowlisted, body-checked and compliant by
+ * definition. So each half asserts its own input is non-empty and
+ * reports no verdict when it is not, and the cases include a positive
+ * control that feeds half 3 a schema graph it must reject — proving the
+ * scanner read something is not proving it can still detect something.
  *
  * Usage:
  *
  *   bun run scripts/check-public-router.ts
  *
  * Exit codes:
- *   0 — public surface matches the allowlist
- *   1 — drift detected, see stderr for the offending paths
+ *   0 — public surface matches the allowlist and names no person
+ *   1 — read the input and found a violation, see stderr
+ *   2 — could not reach a verdict: an input was unreadable or empty, so
+ *       the run proves nothing and must not be read as a pass
  */
 
 import assert from 'node:assert/strict';
@@ -68,7 +112,11 @@ const handlersRoot = resolve(repoRoot, 'apps/flow-api/internal/http/handlers');
 
 interface OpenApiSpec {
   paths?: Record<string, Record<string, unknown>>;
+  components?: { schemas?: Record<string, unknown> };
 }
+
+/** A JSON Schema node as it appears in the merged document. */
+type SchemaNode = Record<string, unknown>;
 
 /**
  * Public paths owned by flow-api's `buildPublicShareAPI`.
@@ -128,6 +176,297 @@ function matchesPattern(path: string, pattern: string): boolean {
     return path.startsWith(pattern);
   }
   return path === pattern;
+}
+
+/* ── Person-shaped property names ───────────────────────────────── */
+
+/**
+ * Words that put a human on the other side of a property. A role word is
+ * what narrows the attribute vocabulary below from "every field a
+ * resource has" to "a field about a person", so the two are only ever
+ * matched together — or the role alone, which holds the person itself.
+ */
+const personRoles: ReadonlyArray<string> = [
+  'actor',
+  'admin',
+  'assignee',
+  'assigner',
+  'attendee',
+  'author',
+  'collaborator',
+  'contact',
+  'creator',
+  'follower',
+  'guest',
+  'host',
+  'invitee',
+  'inviter',
+  'member',
+  'organizer',
+  'owner',
+  'participant',
+  'person',
+  'recipient',
+  'reporter',
+  'requester',
+  'reviewer',
+  'sender',
+  'subscriber',
+  'user',
+  'watcher',
+];
+
+/**
+ * Attributes that identify the person a role word points at. Each is a
+ * word a resource also uses about itself, which is why none of them
+ * counts on its own.
+ */
+const personAttributes: ReadonlyArray<string> = [
+  'avatar',
+  'avatarurl',
+  'displayname',
+  'email',
+  'emailaddress',
+  'emails',
+  'fullname',
+  'handle',
+  'icon',
+  'iconurl',
+  'id',
+  'ids',
+  'image',
+  'imageurl',
+  'initials',
+  'mail',
+  'name',
+  'names',
+  'nickname',
+  'photo',
+  'photourl',
+  'picture',
+  'pictureurl',
+  'publicid',
+  'publicids',
+  'username',
+];
+
+/**
+ * Verbs whose `*By` form attributes an action to whoever performed it.
+ * `createdBy` names a person even on a resource that has no other person
+ * on it, so these are matched independently of the role vocabulary.
+ */
+const attributionVerbs: ReadonlyArray<string> = [
+  'accepted',
+  'approved',
+  'archived',
+  'assigned',
+  'canceled',
+  'cancelled',
+  'closed',
+  'completed',
+  'created',
+  'deleted',
+  'invited',
+  'locked',
+  'modified',
+  'performed',
+  'published',
+  'rejected',
+  'requested',
+  'resolved',
+  'revoked',
+  'sent',
+  'shared',
+  'submitted',
+  'triggered',
+  'updated',
+  'uploaded',
+];
+
+/**
+ * Properties that cannot describe anything but a human whatever they sit
+ * on. Deliberately excludes `displayName`, `icon*` and `name` — a
+ * calendar, a lens and a share page each legitimately have those, and a
+ * person carrying them is caught at the role-named property holding it.
+ */
+const standalonePersonKeys: ReadonlyArray<string> = [
+  'avatar',
+  'avatarurl',
+  'email',
+  'emailaddress',
+  'emails',
+  'familyname',
+  'firstname',
+  'fullname',
+  'givenname',
+  'gravatarurl',
+  'lastname',
+  'middlename',
+  'nickname',
+  'phone',
+  'phonenumber',
+  'photourl',
+  'pictureurl',
+  'profileimageurl',
+  'realname',
+  'surname',
+  'username',
+];
+
+function buildPersonKeys(): ReadonlyMap<string, string> {
+  const keys = new Map<string, string>();
+  const add = (key: string, reason: string) => {
+    if (!keys.has(key)) keys.set(key, reason);
+  };
+
+  for (const role of personRoles) {
+    add(role, `\`${role}\` holds a person`);
+    add(`${role}s`, `\`${role}s\` holds people`);
+    for (const attr of personAttributes) {
+      add(`${role}${attr}`, `\`${role}\` + \`${attr}\` identifies a person`);
+      add(`${role}s${attr}`, `\`${role}s\` + \`${attr}\` identifies people`);
+    }
+  }
+
+  for (const verb of attributionVerbs) {
+    add(`${verb}by`, `\`${verb}By\` attributes an action to a person`);
+    for (const attr of personAttributes) {
+      add(`${verb}by${attr}`, `\`${verb}By\` + \`${attr}\` identifies the person who acted`);
+    }
+  }
+
+  for (const key of standalonePersonKeys) {
+    add(key, `\`${key}\` describes a person and nothing else`);
+  }
+
+  return keys;
+}
+
+const personKeys = buildPersonKeys();
+
+/**
+ * Compare property names without their separators, so `assignee_email`,
+ * `assigneeEmail` and `AssigneeEmail` are one key.
+ */
+function normalizeKey(property: string): string {
+  return property.replace(/[^A-Za-z0-9]/g, '').toLowerCase();
+}
+
+/** Why this property name identifies a human, or null if it does not. */
+function personKeyReason(property: string): string | null {
+  return personKeys.get(normalizeKey(property)) ?? null;
+}
+
+/* ── Public response bodies ─────────────────────────────────────── */
+
+interface PersonLeak {
+  path: string;
+  property: string;
+  trail: string;
+  reason: string;
+}
+
+/**
+ * Every response body schema a path serves, across all of its methods,
+ * status codes and content types. Returned unresolved — `$ref`s are
+ * followed during the walk, where the cycle guard lives.
+ */
+function responseSchemas(pathItem: Record<string, unknown>): SchemaNode[] {
+  const out: SchemaNode[] = [];
+  for (const operation of Object.values(pathItem)) {
+    if (!operation || typeof operation !== 'object') continue;
+    const responses = (operation as Record<string, unknown>).responses;
+    if (!responses || typeof responses !== 'object') continue;
+    for (const response of Object.values(responses as Record<string, unknown>)) {
+      if (!response || typeof response !== 'object') continue;
+      const content = (response as Record<string, unknown>).content;
+      if (!content || typeof content !== 'object') continue;
+      for (const media of Object.values(content as Record<string, unknown>)) {
+        if (!media || typeof media !== 'object') continue;
+        const schema = (media as Record<string, unknown>).schema;
+        if (schema && typeof schema === 'object') out.push(schema as SchemaNode);
+      }
+    }
+  }
+  return out;
+}
+
+/**
+ * Walk a schema to a fixpoint, following `$ref`s, array items, map
+ * values and composition keywords, and report every property name that
+ * identifies a person. `$ref` graphs in this document are recursive in
+ * places, so a schema name is walked once per call and revisiting it is
+ * a no-op rather than a hang.
+ */
+function findPersonKeys(spec: OpenApiSpec, root: SchemaNode, rootTrail: string): PersonLeak[] {
+  const found: PersonLeak[] = [];
+  const visited = new Set<string>();
+  const components = (spec.components?.schemas ?? {}) as Record<string, SchemaNode>;
+
+  const walk = (node: unknown, trail: string): void => {
+    if (!node || typeof node !== 'object') return;
+    if (Array.isArray(node)) {
+      for (const item of node) walk(item, trail);
+      return;
+    }
+    const schema = node as SchemaNode;
+
+    const ref = schema.$ref;
+    if (typeof ref === 'string') {
+      const name = ref.split('/').pop() ?? '';
+      if (visited.has(name)) return;
+      visited.add(name);
+      walk(components[name], `${trail} -> ${name}`);
+      return;
+    }
+
+    const properties = schema.properties;
+    if (properties && typeof properties === 'object') {
+      for (const [property, child] of Object.entries(properties as Record<string, unknown>)) {
+        const reason = personKeyReason(property);
+        if (reason !== null) {
+          found.push({ path: '', property, trail: `${trail}.${property}`, reason });
+        }
+        walk(child, `${trail}.${property}`);
+      }
+    }
+
+    walk(schema.items, `${trail}[]`);
+    walk(schema.prefixItems, `${trail}[]`);
+    if (typeof schema.additionalProperties === 'object') {
+      walk(schema.additionalProperties, `${trail}{}`);
+    }
+    for (const keyword of ['allOf', 'anyOf', 'oneOf', 'not'] as const) {
+      walk(schema[keyword], trail);
+    }
+  };
+
+  walk(root, rootTrail);
+  return found;
+}
+
+/**
+ * Scan the response bodies of a set of paths. Returns the leaks and the
+ * number of schemas actually resolved, so the caller can tell "nothing
+ * names a person" apart from "nothing was read".
+ */
+function scanPublicResponses(
+  spec: OpenApiSpec,
+  paths: ReadonlyArray<string>,
+): { leaks: PersonLeak[]; schemaCount: number } {
+  const leaks: PersonLeak[] = [];
+  let schemaCount = 0;
+  for (const path of paths) {
+    const pathItem = spec.paths?.[path];
+    if (!pathItem) continue;
+    for (const schema of responseSchemas(pathItem)) {
+      schemaCount++;
+      for (const leak of findPersonKeys(spec, schema, path)) {
+        leaks.push({ ...leak, path });
+      }
+    }
+  }
+  return { leaks, schemaCount };
 }
 
 /* ── Go source scanning ─────────────────────────────────────────── */
@@ -301,6 +640,75 @@ function selfCheck(): string[] {
     '',
   ].join('\n');
 
+  /**
+   * A spec-shaped graph the person-key half must judge correctly: one
+   * body whose person sits behind a `$ref`, inside an array, on a schema
+   * that refers back to itself, and one carrying nothing but the fields
+   * a resource has about itself. The second is as load-bearing as the
+   * first — a rule that fires on `name` or `iconUrl` would need
+   * exemptions to pass the real spec, and an exemption list is how a
+   * guard stops meaning anything.
+   */
+  const CONTROL_SPEC: OpenApiSpec = {
+    paths: {
+      '/control/leaky': {
+        get: {
+          responses: {
+            '200': {
+              content: {
+                'application/json': { schema: { $ref: '#/components/schemas/controlPage' } },
+              },
+            },
+          },
+        },
+      },
+      '/control/clean': {
+        get: {
+          responses: {
+            '200': {
+              content: {
+                'application/json': { schema: { $ref: '#/components/schemas/controlClean' } },
+              },
+            },
+          },
+        },
+      },
+    },
+    components: {
+      schemas: {
+        controlPage: {
+          type: 'object',
+          properties: {
+            rows: { type: 'array', items: { $ref: '#/components/schemas/controlRow' } },
+          },
+        },
+        controlRow: {
+          type: 'object',
+          properties: {
+            id: { type: 'string' },
+            title: { type: 'string' },
+            assigneeName: { type: 'string' },
+            children: { type: 'array', items: { $ref: '#/components/schemas/controlRow' } },
+          },
+        },
+        controlClean: {
+          type: 'object',
+          properties: {
+            id: { type: 'string' },
+            name: { type: 'string' },
+            title: { type: 'string' },
+            description: { type: 'string' },
+            iconUrl: { type: 'string' },
+            coverUrl: { type: 'string' },
+            workspaceName: { type: 'string' },
+            calendarName: { type: 'string' },
+            userAction: { type: 'string' },
+          },
+        },
+      },
+    },
+  };
+
   const cases: ReadonlyArray<[string, () => void]> = [
     [
       'reads a huma path and a raw chi route out of a builder body',
@@ -336,6 +744,29 @@ function selfCheck(): string[] {
         assert.deepEqual(unresolvedRegistrations('\tadmin.RegisterAll(sub, deps)\n'), [
           'admin.RegisterAll',
         ]);
+      },
+    ],
+    [
+      'detects a person behind a $ref, inside an array, in a self-referential graph',
+      () => {
+        const { leaks, schemaCount } = scanPublicResponses(CONTROL_SPEC, ['/control/leaky']);
+        assert.equal(schemaCount, 1);
+        assert.deepEqual(
+          leaks.map((l) => l.property),
+          ['assigneeName'],
+        );
+        assert.equal(
+          leaks[0]?.trail,
+          '/control/leaky -> controlPage.rows[] -> controlRow.assigneeName',
+        );
+      },
+    ],
+    [
+      'leaves a body that carries only the resource own fields alone',
+      () => {
+        const { leaks, schemaCount } = scanPublicResponses(CONTROL_SPEC, ['/control/clean']);
+        assert.equal(schemaCount, 1);
+        assert.deepEqual(leaks, []);
       },
     ],
   ];
@@ -393,13 +824,37 @@ const registeredSet = new Set(registered.humaPaths);
 const staleAllowlist =
   registered.humaPaths.length > 0 ? flowApiPublicPaths.filter((p) => !registeredSet.has(p)) : [];
 
-let failed = false;
+// Half 3 body-checks the routes half 2 read out of the builder, plus the
+// invite routes another service contributes to the same unauthenticated
+// surface. The flow-api side is deliberately not read from the allowlist:
+// a route added to the public group is checked because it is registered,
+// not because someone remembered to list it.
+const bodyCheckedPaths = [...new Set([...registered.humaPaths, ...externalPublicPaths])];
+const { leaks: personLeaks, schemaCount: publicSchemaCount } = scanPublicResponses(
+  spec,
+  bodyCheckedPaths,
+);
 
-if (problems.length > 0) {
-  failed = true;
-  console.error('check-public-router: could not read the public surface with confidence:');
-  for (const p of problems) console.error(`  - ${p}`);
+// An input that came back empty means a half ran over nothing, and
+// nothing is compliant by definition. Each of these makes the run prove
+// less than it claims, so they end it without a verdict.
+const verdictBlockers: string[] = [...problems];
+
+if (allPaths.length === 0) {
+  verdictBlockers.push(`the merged spec at ${specPath} declares no paths`);
 }
+if (registered.humaPaths.length === 0) {
+  verdictBlockers.push(
+    'the public builder scan found no huma operations — the registration patterns no longer match the router source, and an empty public set passes every check that reads it',
+  );
+}
+if (publicSchemaCount === 0) {
+  verdictBlockers.push(
+    `no response schema resolved for the ${bodyCheckedPaths.length} public path(s), so no response body was actually inspected for person-shaped fields`,
+  );
+}
+
+let failed = false;
 
 if (missingPublic.length > 0) {
   failed = true;
@@ -439,10 +894,28 @@ if (staleAllowlist.length > 0) {
   for (const p of staleAllowlist) console.error(`  - ${p}`);
 }
 
+if (personLeaks.length > 0) {
+  failed = true;
+  console.error(
+    'check-public-router: public response schema(s) name a person. The holder of a share link has no identity and was never granted one, so drop the field from the DTO rather than filling it conditionally:',
+  );
+  for (const leak of personLeaks) {
+    console.error(`  - ${leak.trail} — ${leak.reason}`);
+  }
+}
+
+if (verdictBlockers.length > 0) {
+  console.error(
+    'check-public-router: could not reach a verdict on the public surface, so this run proves nothing:',
+  );
+  for (const b of verdictBlockers) console.error(`  - ${b}`);
+  process.exit(2);
+}
+
 if (failed) {
   process.exit(1);
 }
 
 console.info(
-  `check-public-router: ${registered.humaPaths.length} public operation(s) and ${registered.rawRoutes.length} raw route(s) registered, all allowlisted; ${allPaths.length} spec paths checked`,
+  `check-public-router: ${registered.humaPaths.length} public operation(s) and ${registered.rawRoutes.length} raw route(s) registered, all allowlisted; ${publicSchemaCount} response schema(s) across ${bodyCheckedPaths.length} public path(s) name no person; ${allPaths.length} spec paths checked`,
 );
