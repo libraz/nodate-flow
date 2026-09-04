@@ -16,7 +16,7 @@
     {
       "id": 1,
       "title": "Task Creation Rate",
-      "description": "Rate of new tasks being created. Metric nf_tasks_created_total is expected as a counter with labels: workspace_id.",
+      "description": "Rate at which new tasks are created, across all workspaces.",
       "type": "timeseries",
       "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
       "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
@@ -40,7 +40,7 @@
     {
       "id": 2,
       "title": "Task Completion Rate",
-      "description": "Rate of tasks transitioning to a completed state. Metric nf_tasks_completed_total is expected as a counter.",
+      "description": "Rate at which tasks transition into the done state, across all workspaces.",
       "type": "timeseries",
       "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
       "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
@@ -65,14 +65,14 @@
     {
       "id": 3,
       "title": "Active Workspaces",
-      "description": "Number of workspaces with at least one API request in the last 5 minutes.",
+      "description": "Number of workspaces active within a 5 minute window, from the nf_active_workspaces gauge.",
       "type": "stat",
       "gridPos": { "h": 8, "w": 8, "x": 0, "y": 8 },
       "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
       "targets": [
         {
-          "expr": "count(sum by (workspace_id) (rate(nf_http_requests_total[5m]) > 0))",
-          "legendFormat": "active workspaces"
+          "expr": "nf_active_workspaces",
+          "legendFormat": "workspaces active in the last 5m"
         }
       ],
       "fieldConfig": {
@@ -93,7 +93,7 @@
     {
       "id": 4,
       "title": "Task State Distribution",
-      "description": "Current distribution of tasks across states. Metric nf_tasks_by_state is expected as a gauge with label: state.",
+      "description": "Current number of tasks in each derived state: open, waiting, review, done, cancelled.",
       "type": "piechart",
       "gridPos": { "h": 8, "w": 8, "x": 8, "y": 8 },
       "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
@@ -111,7 +111,7 @@
     {
       "id": 5,
       "title": "Total Tasks (gauge)",
-      "description": "Total number of tasks across all workspaces. Metric nf_tasks_total is expected as a gauge.",
+      "description": "Current total number of tasks.",
       "type": "stat",
       "gridPos": { "h": 8, "w": 8, "x": 16, "y": 8 },
       "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
@@ -139,7 +139,7 @@
     {
       "id": 6,
       "title": "Task State Transitions (events/s)",
-      "description": "Rate of task state change events. Metric nf_task_state_transitions_total is expected as a counter with labels: from_state, to_state.",
+      "description": "Rate of task derived_state changes: the total, and the same rate broken out by the state entered (open, waiting, review, done, cancelled).",
       "type": "timeseries",
       "gridPos": { "h": 8, "w": 12, "x": 0, "y": 16 },
       "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
@@ -167,7 +167,7 @@
     {
       "id": 7,
       "title": "User Registrations Rate",
-      "description": "Rate of new user sign-ups. Metric nf_users_registered_total is expected as a counter.",
+      "description": "Rate at which new users sign up.",
       "type": "timeseries",
       "gridPos": { "h": 8, "w": 12, "x": 12, "y": 16 },
       "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
