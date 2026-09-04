@@ -5,6 +5,8 @@
   "public_link": "公開リンク",
   "copy_link": "リンクをコピー",
   "link_copied": "リンクをクリップボードにコピーしました",
+  "link_unavailable": "共有リンクは、ビューを公開した直後に一度だけ表示されます。",
+  "link_unavailable_hint": "もう一度リンクを取得するには、ビューを非公開にしてから公開し直してください。以前のリンクは無効になります。",
   "safety_check": {
     "title": "安全性チェック",
     "description": "公開前に機密データをスキャンしています...",
@@ -35,7 +37,6 @@
     "col_status": "ステータス",
     "col_priority": "優先度",
     "col_due": "期日",
-    "col_assignee": "担当者",
     "no_tasks": "このビューにはタスクがありません。",
     "errors": {
       "invalid_title": "この公開ビューは利用できません。",

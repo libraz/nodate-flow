@@ -8,6 +8,12 @@
  * the share still sees whether one is live and can copy the link, which is
  * already public. Both halves are asserted so a dialog that rendered nothing
  * would fail.
+ *
+ * The third case is a lens that is public while this session does not hold
+ * the token — the ordinary state, since the API returns the plaintext token
+ * only in the publish response and stores a digest. The dialog must not offer
+ * publish there (the API refuses it on an already-public lens) and must not
+ * put a fabricated or empty URL on screen.
  */
 
 import { render, screen } from '@testing-library/react';
@@ -41,12 +47,18 @@ function testI18n(): ReturnType<typeof i18n.createInstance> {
   return instance;
 }
 
-function renderDialog(opts: { canManage: boolean; publicToken: string | null }): void {
+function renderDialog(opts: {
+  canManage: boolean;
+  publicToken: string | null;
+  /** Defaults to whether a token is at hand, matching a just-published lens. */
+  isPublic?: boolean;
+}): void {
   render(
     <I18nextProvider i18n={testI18n()}>
       <ShareLensDialog
         workspaceId="ws-1"
         lensId="01920000-0000-7000-8000-000000001001"
+        isPublic={opts.isPublic ?? opts.publicToken !== null}
         publicToken={opts.publicToken}
         canManage={opts.canManage}
         open
@@ -88,5 +100,46 @@ describe('ShareLensDialog publish affordances', () => {
     expect(screen.getByText(enSharing.badge)).toBeTruthy();
     const link = screen.getByLabelText(enSharing.public_link) as HTMLInputElement;
     expect(link.value).toContain('/public/lenses/tok-1');
+  });
+});
+
+describe('ShareLensDialog on a published lens whose token is not at hand', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('withholds publish from a manager and explains the link cannot be shown again', () => {
+    renderDialog({ canManage: true, publicToken: null, isPublic: true });
+
+    // Publishing is what the old token-only reading offered here, and the
+    // API refuses it while `is_public` is true.
+    expect(screen.queryByText(enSharing.publish)).toBeNull();
+    expect(screen.queryByText(enSharing.confirm_publish)).toBeNull();
+
+    expect(screen.getByText(enSharing.badge)).toBeTruthy();
+    expect(screen.getByText(enSharing.link_unavailable)).toBeTruthy();
+    expect(screen.getByText(enSharing.link_unavailable_hint)).toBeTruthy();
+
+    // Withdrawing the share is still available to a manager.
+    expect(screen.getByText(enSharing.unpublish)).toBeTruthy();
+  });
+
+  it('withholds both controls from a non-manager and still reports the lens is public', () => {
+    renderDialog({ canManage: false, publicToken: null, isPublic: true });
+
+    expect(screen.queryByText(enSharing.publish)).toBeNull();
+    expect(screen.queryByText(enSharing.unpublish)).toBeNull();
+    expect(screen.getByText(enSharing.badge)).toBeTruthy();
+    expect(screen.getByText(enSharing.link_unavailable)).toBeTruthy();
+    expect(screen.getByText(enSharing.close)).toBeTruthy();
+  });
+
+  it('renders no share URL at all rather than an empty or fabricated one', () => {
+    renderDialog({ canManage: true, publicToken: null, isPublic: true });
+
+    expect(screen.queryByLabelText(enSharing.public_link)).toBeNull();
+    expect(screen.queryByText(enSharing.copy_link)).toBeNull();
+    const dialog = screen.getByRole('dialog');
+    expect(dialog.textContent).not.toContain('/public/lenses/');
   });
 });

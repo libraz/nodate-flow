@@ -946,7 +946,9 @@
       "delete_confirm": "删除此已保存的视图？",
       "empty": "暂无已保存的视图",
       "default_badge": "默认",
+      "public_badge": "公开",
       "apply": "应用",
+      "share": "分享视图",
       "load_failed": "加载已保存视图失败",
       "save_failed": "保存视图失败",
       "delete_failed": "删除视图失败"

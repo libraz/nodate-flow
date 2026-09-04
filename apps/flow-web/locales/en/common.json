@@ -946,7 +946,9 @@
       "delete_confirm": "Delete this saved view?",
       "empty": "No saved views",
       "default_badge": "Default",
+      "public_badge": "Public",
       "apply": "Apply",
+      "share": "Share view",
       "load_failed": "Failed to load saved views",
       "save_failed": "Failed to save view",
       "delete_failed": "Failed to delete view"

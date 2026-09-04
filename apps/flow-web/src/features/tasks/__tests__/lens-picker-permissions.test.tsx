@@ -14,6 +14,7 @@
  * can act first) and asserts the user is told.
  */
 
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import i18n from 'i18next';
 import type { ReactNode } from 'react';
@@ -55,6 +56,10 @@ vi.mock('../lens-api', () => ({
   useLensesQuery: () => ({ data: state.lenses }),
   useDeleteLens: () => ({ mutateAsync: deleteMutateAsync }),
   useCreateLens: () => ({ mutateAsync: createMutateAsync }),
+  lensesKeys: {
+    all: ['lenses'],
+    list: (workspaceId: string, projectId?: string) => ['lenses', workspaceId, projectId ?? ''],
+  },
 }));
 
 vi.mock('../../workspaces/api', () => ({
@@ -97,6 +102,7 @@ function makeLens(overrides: Partial<LensDto> = {}): LensDto {
     sort: [],
     groupBy: null,
     isDefault: false,
+    isPublic: false,
     sortWeight: 0,
     createdAt: 1_700_000_000,
     ...overrides,
@@ -123,9 +129,11 @@ function testI18n(): ReturnType<typeof i18n.createInstance> {
 function renderAs(signedInAs: string): void {
   authStore.getState().setSession('test-token', makeUser(signedInAs));
   render(
-    <I18nextProvider i18n={testI18n()}>
-      <LensPicker workspaceId="ws-1" projectId="p-1" />
-    </I18nextProvider>,
+    <QueryClientProvider client={new QueryClient()}>
+      <I18nextProvider i18n={testI18n()}>
+        <LensPicker workspaceId="ws-1" projectId="p-1" />
+      </I18nextProvider>
+    </QueryClientProvider>,
   );
 }
 

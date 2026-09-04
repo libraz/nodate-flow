@@ -54,6 +54,7 @@ describe('toLensDto mapper (source analysis)', () => {
       'sort',
       'groupBy',
       'isDefault',
+      'isPublic',
       'sortWeight',
       'createdAt',
     ];

@@ -12,6 +12,9 @@
  *   - Delete  → same (the list shrinks).
  *   - Update  → not exposed yet; when added, it must invalidate the
  *               same list scope plus a detail key once one exists.
+ *   - Publish / unpublish  → owned by the sharing feature, which does not
+ *               know the list scope. Its caller invalidates this list so a
+ *               row's `isPublic` does not go stale.
  *
  * Lenses do not feed any other cache today, so there is no cross-key
  * fan-out. Keep the scope tight to avoid disturbing tasks / projects
@@ -43,6 +46,13 @@ export interface LensDto {
   sort: Array<{ field: string; dir: string }>;
   groupBy: string | null;
   isDefault: boolean;
+  /**
+   * Whether the lens is exposed on an unauthenticated share URL. The
+   * plaintext share token is not part of this record — the API returns it
+   * only in the publish response — so this is the only durable signal that
+   * a saved view is public.
+   */
+  isPublic: boolean;
   sortWeight: number;
   updatedAt?: number;
   createdAt: number;
@@ -63,6 +73,7 @@ function toLensDto(lens: SavedLens): LensDto {
     sort: (lens.sort ?? []) as Array<{ field: string; dir: string }>,
     groupBy: lens.groupBy,
     isDefault: lens.isDefault,
+    isPublic: lens.isPublic,
     sortWeight: lens.sortWeight,
     createdAt: lens.createdAt,
   };

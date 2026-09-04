@@ -9,21 +9,27 @@
  * `aria-selected` is a real comparison between the current task filters and each lens's stored
  * filter map.
  *
- * Deleting a lens is offered only to the people the API lets do it — its
- * creator and workspace admins / owners. See {@link canManageLens}.
+ * Deleting and sharing a lens are offered only to the people the API lets do
+ * it — its creator and workspace admins / owners. See {@link canManageLens}.
+ * Whether a lens is already public is shown to every member regardless: an
+ * exposed saved view is something the whole workspace should be able to see,
+ * even when only some of them can withdraw it.
  */
 
 import Popover from '@nodate-flow/ui/primitives/popover';
 import { toaster } from '@nodate-flow/ui/primitives/toast';
+import { useQueryClient } from '@tanstack/react-query';
+import { Share2 } from 'lucide-react';
 import { type ReactElement, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { formatApiError } from '../../lib/api-error';
 import { selectUser, useAuth } from '../auth/auth-store';
+import ShareLensDialog from '../sharing/share-lens-dialog';
 import { useWorkspaceQuery } from '../workspaces/api';
 import type { TaskDerivedState, TaskFilters, TaskPriority } from './api';
 import type { LensDto } from './lens-api';
-import { useCreateLens, useDeleteLens, useLensesQuery } from './lens-api';
+import { lensesKeys, useCreateLens, useDeleteLens, useLensesQuery } from './lens-api';
 import styles from './lens-picker.module.css';
 import { getTaskFilters, setTaskFilters, useTaskFilters } from './use-task-filters';
 
@@ -156,11 +162,43 @@ export default function LensPicker({ workspaceId, projectId }: LensPickerProps):
   const currentFilters = useTaskFilters(projectId);
   const createLens = useCreateLens();
   const deleteLens = useDeleteLens();
+  const qc = useQueryClient();
 
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [nameInput, setNameInput] = useState('');
   const [descriptionInput, setDescriptionInput] = useState('');
+  const [shareLensId, setShareLensId] = useState<string | null>(null);
+  /**
+   * Share tokens minted in this session, keyed by lens id. The API hands the
+   * plaintext token out once, in the publish response, so a token that is
+   * not here cannot be recovered — the dialog says so rather than guessing.
+   */
+  const [sessionTokens, setSessionTokens] = useState<Record<string, string>>({});
+
+  const shareLens =
+    shareLensId === null ? null : (lenses.find((l) => l.id === shareLensId) ?? null);
+
+  const handleShare = (lens: LensDto): void => {
+    // The popover and the dialog both trap focus; hand it over cleanly.
+    setOpen(false);
+    setShareLensId(lens.id);
+  };
+
+  /**
+   * Publish and unpublish flip `isPublic` on the lens record, and the sharing
+   * mutations only invalidate their own keys, so the saved-view list is
+   * refreshed from here — the sharing feature does not know this list's scope.
+   */
+  const handleTokenChange = (lensId: string, token: string | null): void => {
+    setSessionTokens((prev) => {
+      const next = { ...prev };
+      if (token === null) delete next[lensId];
+      else next[lensId] = token;
+      return next;
+    });
+    void qc.invalidateQueries({ queryKey: lensesKeys.list(workspaceId, projectId) });
+  };
 
   const handleApply = (lens: LensDto): void => {
     const filters = lensFilterToTaskFilters(lens.filter);
@@ -232,18 +270,33 @@ export default function LensPicker({ workspaceId, projectId }: LensPickerProps):
                   {lens.isDefault ? (
                     <span className={styles.defaultBadge}>{t('tasks.lens.default_badge')}</span>
                   ) : null}
+                  {lens.isPublic ? (
+                    <span className={styles.publicBadge}>{t('tasks.lens.public_badge')}</span>
+                  ) : null}
                 </button>
                 {canManageLens(lens, currentUser?.id, workspace.role) ? (
-                  <button
-                    type="button"
-                    aria-label={t('tasks.lens.delete')}
-                    className={styles.optionDelete}
-                    onClick={() => {
-                      void handleDelete(lens);
-                    }}
-                  >
-                    &times;
-                  </button>
+                  <>
+                    <button
+                      type="button"
+                      aria-label={t('tasks.lens.share')}
+                      className={styles.optionAction}
+                      onClick={() => {
+                        handleShare(lens);
+                      }}
+                    >
+                      <Share2 size={14} aria-hidden />
+                    </button>
+                    <button
+                      type="button"
+                      aria-label={t('tasks.lens.delete')}
+                      className={styles.optionDelete}
+                      onClick={() => {
+                        void handleDelete(lens);
+                      }}
+                    >
+                      &times;
+                    </button>
+                  </>
                 ) : null}
               </li>
             );
@@ -292,10 +345,29 @@ export default function LensPicker({ workspaceId, projectId }: LensPickerProps):
   );
 
   return (
-    <Popover open={open} onOpenChange={setOpen} placement="bottom-end" content={panel}>
-      <button type="button" aria-haspopup="listbox" className={styles.trigger}>
-        {t('tasks.lens.title')}
-      </button>
-    </Popover>
+    <>
+      <Popover open={open} onOpenChange={setOpen} placement="bottom-end" content={panel}>
+        <button type="button" aria-haspopup="listbox" className={styles.trigger}>
+          {t('tasks.lens.title')}
+        </button>
+      </Popover>
+      {shareLens ? (
+        <ShareLensDialog
+          key={shareLens.id}
+          workspaceId={workspaceId}
+          lensId={shareLens.id}
+          isPublic={shareLens.isPublic}
+          publicToken={sessionTokens[shareLens.id] ?? null}
+          canManage={canManageLens(shareLens, currentUser?.id, workspace.role)}
+          open
+          onClose={() => {
+            setShareLensId(null);
+          }}
+          onTokenChange={(token) => {
+            handleTokenChange(shareLens.id, token);
+          }}
+        />
+      ) : null}
+    </>
   );
 }

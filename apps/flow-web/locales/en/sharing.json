@@ -5,6 +5,8 @@
   "public_link": "Public link",
   "copy_link": "Copy link",
   "link_copied": "Link copied to clipboard",
+  "link_unavailable": "The share link is shown only once, right after the view is published.",
+  "link_unavailable_hint": "To get a link again, unpublish the view and publish it again. The previous link will stop working.",
   "safety_check": {
     "title": "Safety check",
     "description": "Scanning for sensitive data before publishing...",
@@ -35,7 +37,6 @@
     "col_status": "Status",
     "col_priority": "Priority",
     "col_due": "Due",
-    "col_assignee": "Assignee",
     "no_tasks": "No tasks in this view.",
     "errors": {
       "invalid_title": "This public view is not available.",

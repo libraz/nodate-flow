@@ -946,7 +946,9 @@
       "delete_confirm": "この保存済みビューを削除しますか？",
       "empty": "保存済みビューはありません",
       "default_badge": "デフォルト",
+      "public_badge": "公開",
       "apply": "適用",
+      "share": "ビューを共有",
       "load_failed": "保存済みビューの読み込みに失敗しました",
       "save_failed": "ビューの保存に失敗しました",
       "delete_failed": "ビューの削除に失敗しました"

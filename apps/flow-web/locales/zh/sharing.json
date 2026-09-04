@@ -5,6 +5,8 @@
   "public_link": "公开链接",
   "copy_link": "复制链接",
   "link_copied": "已将链接复制到剪贴板",
+  "link_unavailable": "分享链接仅在视图发布后显示一次。",
+  "link_unavailable_hint": "如需重新获取链接，请先取消发布该视图，然后再次发布。之前的链接将停止工作。",
   "safety_check": {
     "title": "安全检查",
     "description": "正在发布前扫描敏感数据…",
@@ -35,7 +37,6 @@
     "col_status": "状态",
     "col_priority": "优先级",
     "col_due": "截止",
-    "col_assignee": "负责人",
     "no_tasks": "此视图中暂无任务。",
     "errors": {
       "invalid_title": "此公开视图不可用。",

@@ -84,6 +84,28 @@
   line-height: 1;
 }
 
+/*
+ * Row-level icon control (share), sitting beside the delete glyph. It uses
+ * flex centring rather than the delete control's text metrics so the SVG
+ * lines up with the `×` and the row height does not move with the badges,
+ * which live inside the flexible apply button.
+ */
+.optionAction {
+  display: inline-flex;
+  align-items: center;
+  background: none;
+  border: none;
+  padding-block: var(--nf-space-px);
+  padding-inline: var(--nf-space-1);
+  cursor: pointer;
+  color: var(--nf-color-fg-muted);
+  line-height: 1;
+}
+
+.optionAction:hover {
+  color: var(--nf-color-fg);
+}
+
 .defaultBadge {
   margin-inline-start: var(--nf-space-2);
   font-size: var(--nf-text-xs);
@@ -92,6 +114,21 @@
   border-radius: var(--nf-radius-pill);
   background: var(--nf-color-accent-subtle);
   color: var(--nf-color-accent-fg);
+}
+
+/*
+ * "Public" marker, shown to every member — it is the only signal a
+ * non-manager gets that a saved view is exposed on an unauthenticated URL,
+ * so it reads as text and does not rely on colour alone.
+ */
+.publicBadge {
+  margin-inline-start: var(--nf-space-2);
+  font-size: var(--nf-text-xs);
+  padding-block: var(--nf-space-px);
+  padding-inline: var(--nf-space-2);
+  border-radius: var(--nf-radius-pill);
+  background: var(--nf-color-success-subtle);
+  color: var(--nf-color-success-fg);
 }
 
 .saveRow {
