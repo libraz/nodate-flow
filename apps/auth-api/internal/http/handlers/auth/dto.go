@@ -183,7 +183,7 @@ type RegisterInput struct {
 		Timezone string `json:"timezone,omitempty" maxLength:"64"`
 		// Country is an optional ISO 3166-1 alpha-2 code. Drives the
 		// initial holiday subscription. Independent of Locale.
-		Country string `json:"country,omitempty" pattern:"^$|^[A-Z]{2}$"`
+		Country string `json:"country,omitempty" maxLength:"2" pattern:"^$|^[A-Z]{2}$"`
 	}
 }
 
@@ -206,7 +206,7 @@ type RegisterOutput struct {
 type LoginInput struct {
 	UserAgent string `header:"User-Agent"`
 	Body      struct {
-		Email    string `json:"email" format:"email"`
+		Email    string `json:"email" format:"email" maxLength:"254"`
 		Password string `json:"password"`
 	}
 }
@@ -388,7 +388,7 @@ type PatchMeInputBody struct {
 	// invalid values return AUTH.VALIDATION.
 	Timezone *string `json:"timezone,omitempty" maxLength:"64"`
 	// Country is an optional ISO 3166-1 alpha-2 code. Empty string clears it.
-	Country *string `json:"country,omitempty" pattern:"^$|^[A-Z]{2}$"`
+	Country *string `json:"country,omitempty" maxLength:"2" pattern:"^$|^[A-Z]{2}$"`
 	// WeekStart is the user's preferred first day of the week for calendar grids.
 	// One of "mon", "sun", "sat".
 	WeekStart       *string `json:"weekStart,omitempty" enum:"mon,sun,sat"`

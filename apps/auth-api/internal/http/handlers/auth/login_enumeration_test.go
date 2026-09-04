@@ -59,7 +59,7 @@ func attemptLogin(t *testing.T, deps Deps, email, password string) loginFailure 
 	t.Helper()
 	_, err := Login(deps)(context.Background(), &LoginInput{
 		Body: struct {
-			Email    string `json:"email" format:"email"`
+			Email    string `json:"email" format:"email" maxLength:"254"`
 			Password string `json:"password"`
 		}{Email: email, Password: password},
 	})

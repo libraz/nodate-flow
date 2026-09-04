@@ -88,10 +88,10 @@ type CreatePublicShareInput struct {
 	WsID string `path:"wsId" doc:"Workspace public ID"`
 	Body struct {
 		Title               string  `json:"title" minLength:"1" maxLength:"255" doc:"Public-facing title"`
-		Description         *string `json:"description,omitempty" required:"false" doc:"Markdown description"`
+		Description         *string `json:"description,omitempty" required:"false" maxLength:"10000" doc:"Markdown description"`
 		IconURL             *string `json:"iconUrl,omitempty" required:"false" maxLength:"2048" doc:"Icon image URL"`
 		CoverURL            *string `json:"coverUrl,omitempty" required:"false" maxLength:"2048" doc:"Cover image URL"`
-		Timezone            *string `json:"timezone,omitempty" required:"false" doc:"IANA timezone; defaults to workspace tz"`
+		Timezone            *string `json:"timezone,omitempty" required:"false" maxLength:"64" doc:"IANA timezone; defaults to workspace tz"`
 		ShowHolidaysCountry *string `json:"showHolidaysCountry,omitempty" required:"false" minLength:"2" maxLength:"2" doc:"ISO 3166-1 alpha-2 country code; enables holiday overlay"`
 		ExpiresAt           *int64  `json:"expiresAt,omitempty" required:"false" doc:"Unix seconds; omit for no expiry"`
 	}
@@ -137,10 +137,10 @@ type PatchPublicShareInput struct {
 	ShareID string `path:"shareId" doc:"Share public ID"`
 	Body    struct {
 		Title                    *string `json:"title,omitempty" required:"false" minLength:"1" maxLength:"255"`
-		Description              *string `json:"description,omitempty" required:"false"`
+		Description              *string `json:"description,omitempty" required:"false" maxLength:"10000"`
 		IconURL                  *string `json:"iconUrl,omitempty" required:"false" maxLength:"2048"`
 		CoverURL                 *string `json:"coverUrl,omitempty" required:"false" maxLength:"2048"`
-		Timezone                 *string `json:"timezone,omitempty" required:"false"`
+		Timezone                 *string `json:"timezone,omitempty" required:"false" maxLength:"64"`
 		ShowHolidaysCountry      *string `json:"showHolidaysCountry,omitempty" required:"false" minLength:"2" maxLength:"2"`
 		ClearShowHolidaysCountry bool    `json:"clearShowHolidaysCountry,omitempty" required:"false"`
 		ExpiresAt                *int64  `json:"expiresAt,omitempty" required:"false"`

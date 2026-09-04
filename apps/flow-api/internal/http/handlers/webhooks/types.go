@@ -68,8 +68,8 @@ type WebhookDeliveryDTO struct {
 type CreateInput struct {
 	WsID string `path:"wsId" doc:"Workspace public id (UUID v7)"`
 	Body struct {
-		URL         string          `json:"url" required:"true" doc:"Target URL for webhook delivery"`
-		Description string          `json:"description" doc:"Human-readable description"`
+		URL         string          `json:"url" required:"true" maxLength:"2048" doc:"Target URL for webhook delivery"`
+		Description string          `json:"description" maxLength:"255" doc:"Human-readable description"`
 		EventTypes  json.RawMessage `json:"eventTypes" required:"true" doc:"JSON array of event type patterns"`
 	}
 }

@@ -65,7 +65,7 @@ type UpdateChecklistItemInput struct {
 	EvtID  string `path:"evtId" doc:"Event public ID"`
 	ItemID string `path:"itemId" doc:"Checklist item public ID"`
 	Body   struct {
-		Title      *string `json:"title,omitempty" required:"false" doc:"Item title"`
+		Title      *string `json:"title,omitempty" required:"false" maxLength:"500" doc:"Item title"`
 		Done       *bool   `json:"done,omitempty" required:"false" doc:"Done flag"`
 		SortWeight *int32  `json:"sortWeight,omitempty" required:"false" doc:"Sort weight"`
 	}

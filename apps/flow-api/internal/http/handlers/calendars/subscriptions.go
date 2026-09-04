@@ -78,7 +78,7 @@ type PatchOwnSubscriptionInput struct {
 	CalID string `path:"calId" doc:"Calendar public ID"`
 	Body  struct {
 		Visible      *bool   `json:"visible,omitempty" required:"false" doc:"Whether events from this calendar are rendered for the caller"`
-		DisplayColor *string `json:"displayColor,omitempty" required:"false" doc:"Caller-specific display color (hex)"`
+		DisplayColor *string `json:"displayColor,omitempty" required:"false" maxLength:"7" doc:"Caller-specific display color (hex)"`
 		SortWeight   *int    `json:"sortWeight,omitempty" required:"false" doc:"Caller-specific sort weight in the right-rail list"`
 	}
 }

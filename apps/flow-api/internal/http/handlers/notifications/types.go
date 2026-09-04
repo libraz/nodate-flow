@@ -139,7 +139,7 @@ type MarkAllReadOutput struct {
 // channel) keeps the write idempotent and spares the client from
 // tracking which cells happen to be materialised.
 type NotificationPreferenceDTO struct {
-	EventCategory string `json:"eventCategory" doc:"Event category the setting applies to"`
+	EventCategory string `json:"eventCategory" maxLength:"64" doc:"Event category the setting applies to"`
 	Channel       string `json:"channel" enum:"in_app,email,push" doc:"Delivery channel"`
 	Muted         bool   `json:"muted" doc:"True when delivery of this category on this channel is suppressed"`
 }

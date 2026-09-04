@@ -94,7 +94,7 @@ type CreateWorkspaceInputBody struct {
 	// Timezone defaults to "UTC" when omitted; must be a valid IANA identifier.
 	Timezone string `json:"timezone,omitempty" maxLength:"64"`
 	// Country is an optional ISO 3166-1 alpha-2 code. Empty string means unset.
-	Country string `json:"country,omitempty" pattern:"^$|^[A-Z]{2}$"`
+	Country string `json:"country,omitempty" maxLength:"2" pattern:"^$|^[A-Z]{2}$"`
 }
 
 // CreateWorkspaceOutput is the response for POST /workspaces.
@@ -147,7 +147,7 @@ type WorkspacePatchWorkspaceInputBody struct {
 	// Timezone is an optional IANA identifier; invalid values return 422.
 	Timezone *string `json:"timezone,omitempty" maxLength:"64"`
 	// Country is an optional ISO 3166-1 alpha-2 code; empty string clears it.
-	Country *string `json:"country,omitempty" pattern:"^$|^[A-Z]{2}$"`
+	Country *string `json:"country,omitempty" maxLength:"2" pattern:"^$|^[A-Z]{2}$"`
 }
 
 // PatchWorkspaceOutput is the response for PATCH /workspaces/{wsId}.
@@ -245,7 +245,7 @@ type AddMemberInput struct {
 
 // AddWorkspaceMemberInputBody is the JSON body for POST /workspaces/{wsId}/members.
 type AddWorkspaceMemberInputBody struct {
-	Email string `json:"email" format:"email"`
+	Email string `json:"email" format:"email" maxLength:"254"`
 	Role  string `json:"role" enum:"owner,admin,member,guest"`
 }
 

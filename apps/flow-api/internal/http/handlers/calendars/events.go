@@ -89,8 +89,10 @@ type ListEventsOutput struct {
 // Stating it here is what refuses an over-long value as a validation
 // error naming the field; without it the only thing left refusing it is
 // the driver, which answers as a write failure for input this API
-// described as acceptable. Memo is absent from that list on purpose: it
-// is MEDIUMTEXT, so the request body limit is its only real bound.
+// described as acceptable. Memo is the one whose bound is not its
+// column's: it is MEDIUMTEXT, so the column would draw the line at 16 MB
+// of prose, and the number stated is the one the tools writing the same
+// column state.
 type CreateEventInput struct {
 	WsID  string `path:"wsId" doc:"Workspace public ID"`
 	CalID string `path:"calId" doc:"Calendar public ID"`
@@ -105,7 +107,7 @@ type CreateEventInput struct {
 		EndAt              *int64           `json:"endAt,omitempty" required:"false" doc:"End time as unix seconds (UTC); omit for a planning-stage (undated) event"`
 		Timezone           string           `json:"timezone" maxLength:"64" doc:"IANA timezone"`
 		Location           *string          `json:"location,omitempty" required:"false" maxLength:"500" doc:"Location"`
-		Memo               *string          `json:"memo,omitempty" required:"false" doc:"Memo / notes"`
+		Memo               *string          `json:"memo,omitempty" required:"false" maxLength:"10000" doc:"Memo / notes"`
 		URL                *string          `json:"url,omitempty" required:"false" maxLength:"2048" doc:"Related URL"`
 		OwnerUserID        *string          `json:"ownerUserId,omitempty" required:"false" doc:"Owner user public ID (defaults to actor)"`
 		BlockLabel         *string          `json:"blockLabel,omitempty" required:"false" maxLength:"100" doc:"Block label"`
@@ -165,7 +167,7 @@ type PatchEventInput struct {
 		EndAt                *int64           `json:"endAt,omitempty" required:"false" doc:"End time as unix seconds (UTC)"`
 		Timezone             *string          `json:"timezone,omitempty" required:"false" maxLength:"64" doc:"IANA timezone"`
 		Location             *string          `json:"location,omitempty" required:"false" maxLength:"500" doc:"Location"`
-		Memo                 *string          `json:"memo,omitempty" required:"false" doc:"Memo"`
+		Memo                 *string          `json:"memo,omitempty" required:"false" maxLength:"10000" doc:"Memo"`
 		URL                  *string          `json:"url,omitempty" required:"false" maxLength:"2048" doc:"Related URL"`
 		BlockLabel           *string          `json:"blockLabel,omitempty" required:"false" maxLength:"100" doc:"Block label"`
 		RecurrenceRule       *json.RawMessage `json:"recurrenceRule,omitempty" required:"false" doc:"Recurrence rule"`
