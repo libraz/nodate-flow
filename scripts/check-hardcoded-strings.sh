@@ -28,6 +28,13 @@
 # Every scan root must reach at least one file. A root that matches
 # nothing is reported as a failure rather than as a pass, because a scan
 # over zero files is indistinguishable from a clean scan.
+#
+# Reading files still does not prove the pattern can match: an attribute
+# list or a quoting rule that has stopped matching anything prints the
+# same success line as a clean tree. The self-verification below runs the
+# pattern over known-bad and known-good samples on every invocation,
+# before the real scan, and a failure among them stops the run with
+# exit 2.
 
 set -euo pipefail
 
@@ -59,6 +66,66 @@ EXCLUDES=(
   --exclude='*.d.ts'
 )
 
+# Offending attributes under $1, as `path:lineno:text` lines. grep exits 1
+# when it matches nothing, which under `set -e` with pipefail would end the
+# caller with no message; a clean tree is not an error here, so that status
+# is absorbed.
+scan_root() {
+  grep -rnE "$ATTR_PATTERN" "$1" "${EXCLUDES[@]}" --include='*.tsx' 2>/dev/null || true
+}
+
+# ---------------------------------------------------------------------------
+# Self-verification. Runs before the scan, every time.
+# ---------------------------------------------------------------------------
+
+CONTROL_DIR="$(mktemp -d)"
+trap 'rm -rf "$CONTROL_DIR"' EXIT
+
+cat >"$CONTROL_DIR/literal.tsx" <<'TSX'
+export const Search = () => <input placeholder="Search tasks" />;
+TSX
+
+# The fix the message asks for: the value is an expression, not a quoted
+# literal. A pattern that stopped requiring the quote would flag this too
+# and there would be nothing left to change.
+cat >"$CONTROL_DIR/translated.tsx" <<'TSX'
+export const Search = () => <input placeholder={t('tasks.search')} />;
+TSX
+
+# An attribute outside the list carries markup, not copy, however English
+# its value looks.
+cat >"$CONTROL_DIR/untargeted.tsx" <<'TSX'
+export const Row = () => <div className="flex items-center gap-2" data-testid="task-row" />;
+TSX
+
+control_failures=""
+control_count=0
+fail_case() {
+  control_failures="${control_failures}  $1"$'\n'
+  control_count=$((control_count + 1))
+}
+
+control_out="$(scan_root "$CONTROL_DIR")"
+
+grep -q 'literal\.tsx:1:' <<<"$control_out" \
+  || fail_case "a quoted English literal in a placeholder attribute must be reported"
+! grep -q 'translated\.tsx' <<<"$control_out" \
+  || fail_case "an attribute bound to t('key') must not be reported"
+! grep -q 'untargeted\.tsx' <<<"$control_out" \
+  || fail_case "an attribute outside the user-facing list must not be reported"
+
+if [[ $control_count -gt 0 ]]; then
+  echo "check-hardcoded-strings: $control_count self-verification case(s) failed, so the scan was not run:" >&2
+  printf '%s' "$control_failures" >&2
+  echo "" >&2
+  echo "The pattern itself is wrong. Fix it before trusting anything this" >&2
+  echo "check says about the sources." >&2
+  exit 2
+fi
+
+rm -rf "$CONTROL_DIR"
+trap - EXIT
+
 count=0
 found_files=""
 
@@ -76,10 +143,7 @@ for dir in "${SCAN_DIRS[@]}"; do
   while IFS= read -r line; do
     count=$((count + 1))
     found_files="$found_files\n$line"
-  done < <(grep -rnE "$ATTR_PATTERN" "$dir" "${EXCLUDES[@]}" \
-    --include='*.tsx' \
-    2>/dev/null \
-    || true)
+  done < <(scan_root "$dir")
 done
 
 if [[ $count -gt 0 ]]; then

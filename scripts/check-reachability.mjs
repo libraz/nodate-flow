@@ -46,7 +46,15 @@
 // whoever next opens the script. package.json has no comments, so a
 // script exempted there carries the same marker as a trailing shell
 // comment in its command.
+//
+// The self-verification cases run on every invocation, before the
+// inventory is built, and a failure among them stops the run. This check
+// fails silently in one direction only — it reports fewer orphans — and an
+// empty orphan list is what a healthy tree looks like, so a comment
+// stripper or an invocation shape that stopped working produces the
+// happiest output this script has.
 
+import assert from 'node:assert/strict';
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { dirname, join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -183,6 +191,78 @@ function invokes(corpus, basename) {
     String.raw`(?:/|(?:^|[\s;|&("'\`])(?:${RUNNERS.join('|')})\s+)${escaped}(?![\w.-])`,
   );
   return shape.test(corpus);
+}
+
+// ---------------------------------------------------------------------
+// Self-verification. Runs before the inventory is built, every time.
+// ---------------------------------------------------------------------
+
+function selfCheck() {
+  // Names no file in this tree carries, so nothing here can be read as an
+  // invocation of a real candidate when this script's own body joins the
+  // corpus.
+  const guard = 'sample-guard.mjs';
+  const task = 'sample-task.ts';
+
+  const cases = [
+    [
+      'reads a runner call and a path call as invocations',
+      () => {
+        assert.equal(invokes(`\tnode scripts/${guard}`, guard), true);
+        assert.equal(invokes(`\t$(PKG_RUN) scripts/${task}`, task), true);
+        assert.equal(invokes(`\tbun run ${task}`, task), true);
+      },
+    ],
+    [
+      'does not read a name mentioned in a comment as an invocation',
+      () => {
+        const mention = `# the nightly job runs scripts/${guard}`;
+        assert.equal(invokes(mention, guard), true, 'raw text still contains the shape');
+        assert.equal(invokes(stripComments(mention, 'Makefile'), guard), false);
+      },
+    ],
+    [
+      'does not match a longer filename that starts with the same name',
+      () => {
+        assert.equal(invokes(`\tbash scripts/${guard}.bak`, guard), false);
+        assert.equal(invokes(`\tbash scripts/${guard} && echo done`, guard), true);
+      },
+    ],
+    [
+      'strips comments by the language of the file they are in',
+      () => {
+        assert.equal(
+          stripComments(`bash ./${guard} # nightly`, 'run.sh').trim(),
+          `bash ./${guard}`,
+        );
+        const url = `const docs = "https://example.com/${guard}";`;
+        assert.equal(stripComments(url, 'a.mjs'), url);
+        assert.equal(stripComments(`run(); // node ${guard}`, 'a.mjs').trim(), 'run();');
+      },
+    ],
+  ];
+
+  const failures = [];
+  for (const [name, run] of cases) {
+    try {
+      run();
+    } catch (err) {
+      failures.push(`  ${name}\n    ${err instanceof Error ? err.message : String(err)}`);
+    }
+  }
+  return failures;
+}
+
+const selfFailures = selfCheck();
+if (selfFailures.length > 0) {
+  console.error(
+    `check-reachability: ${selfFailures.length} self-verification case(s) failed, so the inventory was not built:\n`,
+  );
+  for (const f of selfFailures) console.error(f);
+  console.error(
+    '\nThe scanner itself is wrong. Fix it before trusting anything it says about the sources.',
+  );
+  process.exit(1);
 }
 
 function walk(dir, out) {

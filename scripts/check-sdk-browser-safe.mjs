@@ -25,9 +25,15 @@
 // A cross-language comparison that genuinely needs to read files belongs in
 // this directory instead. `check-region-parity.mjs` is the worked example.
 //
+// The self-verification cases run on every invocation, before the walk,
+// and a failure among them stops the run. Both doors are recognised by a
+// pattern, and a pattern that stopped matching reports a clean package
+// exactly the way a genuinely clean one does.
+//
 // Usage:
 //   node scripts/check-sdk-browser-safe.mjs
 
+import assert from 'node:assert/strict';
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { dirname, join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -56,19 +62,105 @@ function walk(dir, out) {
   return out;
 }
 
+/**
+ * Which door this line opens, or null when it opens none.
+ *
+ * A comment may name these; only a real directive or import counts, so a
+ * continuation line of a doc comment is excused. The directive itself is
+ * written as a comment and cannot be.
+ */
+function doorOpenedBy(line) {
+  if (REFERENCE_RE.test(line)) return 'Node type reference directive';
+  const inDocComment = line.trimStart().startsWith('*');
+  if (NODE_IMPORT_RE.test(line) && !inDocComment) return 'import of a node: builtin';
+  if (TYPES_NODE_RE.test(line) && !inDocComment) return 'reference to @types/node';
+  return null;
+}
+
+/** Does this tsconfig still withhold ambient types from the project? */
+function withholdsAmbientTypes(tsconfig) {
+  return /"types"\s*:\s*\[\s*\]/.test(tsconfig);
+}
+
+// ---------------------------------------------------------------------------
+// Self-verification. Runs before the walk, every time.
+// ---------------------------------------------------------------------------
+
+function selfCheck() {
+  const cases = [
+    [
+      'reports the type reference directive',
+      () => {
+        assert.equal(
+          doorOpenedBy('/// <reference types="node" />'),
+          'Node type reference directive',
+        );
+        assert.equal(doorOpenedBy("///<reference types='node'/>"), 'Node type reference directive');
+      },
+    ],
+    [
+      'reports an import of a node: builtin, in any of its forms',
+      () => {
+        assert.equal(
+          doorOpenedBy("import { readFileSync } from 'node:fs';"),
+          'import of a node: builtin',
+        );
+        assert.equal(doorOpenedBy("const p = require('node:path');"), 'import of a node: builtin');
+        assert.equal(doorOpenedBy('  "types": ["@types/node"]'), 'reference to @types/node');
+      },
+    ],
+    [
+      'leaves an ordinary import and a doc comment naming the same thing alone',
+      () => {
+        assert.equal(doorOpenedBy("import { decodeBase64 } from './base64';"), null);
+        assert.equal(doorOpenedBy(' * a check that needs node:fs belongs in scripts/'), null);
+        assert.equal(doorOpenedBy("import { toRefreshToken } from './refresh';"), null);
+      },
+    ],
+    [
+      'tells an empty types array from one that names a package',
+      () => {
+        assert.equal(withholdsAmbientTypes('{ "compilerOptions": { "types": [] } }'), true);
+        assert.equal(withholdsAmbientTypes('{ "compilerOptions": { "types": ["node"] } }'), false);
+        assert.equal(withholdsAmbientTypes('{ "compilerOptions": { "strict": true } }'), false);
+      },
+    ],
+  ];
+
+  const failures = [];
+  for (const [name, run] of cases) {
+    try {
+      run();
+    } catch (err) {
+      failures.push(`  ${name}\n    ${err instanceof Error ? err.message : String(err)}`);
+    }
+  }
+  return failures;
+}
+
+const selfFailures = selfCheck();
+if (selfFailures.length > 0) {
+  console.error(
+    `check-sdk-browser-safe: ${selfFailures.length} self-verification case(s) failed, so the scan was not run:\n`,
+  );
+  for (const f of selfFailures) console.error(f);
+  console.error(
+    '\nThe scanner itself is wrong. Fix it before trusting anything it says about the package.',
+  );
+  process.exit(1);
+}
+
+// ---------------------------------------------------------------------------
+// The scan.
+// ---------------------------------------------------------------------------
+
 const findings = [];
 
 for (const file of walk(sdkSrc, [])) {
   const lines = readFileSync(file, 'utf-8').split('\n');
   lines.forEach((line, i) => {
-    // A comment may name these; only a real directive or import counts.
-    if (REFERENCE_RE.test(line)) {
-      findings.push({ file, line: i + 1, text: line.trim(), why: 'Node type reference directive' });
-    } else if (NODE_IMPORT_RE.test(line) && !line.trimStart().startsWith('*')) {
-      findings.push({ file, line: i + 1, text: line.trim(), why: 'import of a node: builtin' });
-    } else if (TYPES_NODE_RE.test(line) && !line.trimStart().startsWith('*')) {
-      findings.push({ file, line: i + 1, text: line.trim(), why: 'reference to @types/node' });
-    }
+    const why = doorOpenedBy(line);
+    if (why !== null) findings.push({ file, line: i + 1, text: line.trim(), why });
   });
 }
 
@@ -76,7 +168,7 @@ for (const file of walk(sdkSrc, [])) {
 // ambient types; without this the guard would pass on a package that had
 // quietly regained them.
 const tsconfig = readFileSync(join(sdkRoot, 'tsconfig.json'), 'utf-8');
-const hasEmptyTypes = /"types"\s*:\s*\[\s*\]/.test(tsconfig);
+const hasEmptyTypes = withholdsAmbientTypes(tsconfig);
 
 if (!hasEmptyTypes) {
   console.error(

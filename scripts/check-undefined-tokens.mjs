@@ -22,10 +22,18 @@
 // rename that rewrites a token's own definition into a reference to
 // itself produces exactly this, silently.
 //
+// The self-verification cases run on every invocation, before the real
+// scan, and a failure among them stops the run. Reading files proves the
+// roots are there; it does not prove the three patterns below still
+// recognise a definition, a reference, or a fallback. Each of those
+// failing silently turns the whole check into a statement about the empty
+// set, which reads as success.
+//
 // Usage:
 //   node scripts/check-undefined-tokens.mjs           # fail on fallback-less refs
 //   node scripts/check-undefined-tokens.mjs --strict  # also fail on ones with fallbacks
 
+import assert from 'node:assert/strict';
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { dirname, join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -84,6 +92,148 @@ function vacuous(lines) {
   process.exit(2);
 }
 
+/**
+ * Token definitions in one source: name -> the tokens its own value
+ * spends, and the 1-based line it was first declared on.
+ *
+ * The value is what follows the colon on that line. Declarations are one
+ * per line throughout this codebase; a value spilling onto the next line
+ * just means those references are not collected, which can miss a cycle
+ * but never invents one.
+ */
+function definitionsIn(text) {
+  const out = new Map();
+  const lines = text.split('\n');
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i] ?? '';
+    for (const m of line.matchAll(DEFINITION_RE)) {
+      const name = m[1];
+      if (name === undefined) continue;
+      const existing = out.get(name);
+      const deps = existing?.deps ?? new Set();
+      const value = line.slice((m.index ?? 0) + m[0].length);
+      for (const r of value.matchAll(REFERENCE_RE)) {
+        if (r[1] !== undefined) deps.add(r[1]);
+      }
+      out.set(name, { deps, line: existing?.line ?? i + 1 });
+    }
+  }
+  return out;
+}
+
+/** Every `var(--nf-*)` reference in one source, with its 1-based line. */
+function referencesIn(text) {
+  const out = [];
+  const lines = text.split('\n');
+  for (let i = 0; i < lines.length; i++) {
+    for (const m of (lines[i] ?? '').matchAll(REFERENCE_RE)) {
+      const name = m[1];
+      if (name === undefined) continue;
+      out.push({ name, line: i + 1, hasFallback: m[2] !== undefined });
+    }
+  }
+  return out;
+}
+
+/** Tokens that reach themselves through their own definitions. */
+function findCycles(dependsOn) {
+  const cycles = [];
+  const state = new Map(); // name -> 'open' | 'done'
+  const stack = [];
+  const visit = (name) => {
+    const seen = state.get(name);
+    if (seen === 'done') return;
+    if (seen === 'open') {
+      cycles.push([...stack.slice(stack.indexOf(name)), name]);
+      return;
+    }
+    state.set(name, 'open');
+    stack.push(name);
+    for (const dep of dependsOn.get(name) ?? []) visit(dep);
+    stack.pop();
+    state.set(name, 'done');
+  };
+  for (const name of dependsOn.keys()) visit(name);
+  return cycles;
+}
+
+// ---------------------------------------------------------------------------
+// Self-verification. Runs before the scan, every time.
+// ---------------------------------------------------------------------------
+
+function selfCheck() {
+  const cases = [
+    [
+      'tells a fallback-less reference from one that carries a fallback',
+      () => {
+        assert.deepEqual(referencesIn('  color: var(--nf-color-gone);'), [
+          { name: '--nf-color-gone', line: 1, hasFallback: false },
+        ]);
+        assert.deepEqual(referencesIn('  gap: var(--nf-space-gone, 1rem);'), [
+          { name: '--nf-space-gone', line: 1, hasFallback: true },
+        ]);
+      },
+    ],
+    [
+      'reads a declaration as a definition and a use as neither',
+      () => {
+        assert.deepEqual([...definitionsIn('  --nf-color-fg: #111;').keys()], ['--nf-color-fg']);
+        assert.equal(definitionsIn('  color: var(--nf-color-fg);').size, 0);
+      },
+    ],
+    [
+      'collects the tokens a definition spends in its own value',
+      () => {
+        const defs = definitionsIn('  --nf-color-fg: var(--nf-color-ink);');
+        assert.deepEqual([...(defs.get('--nf-color-fg')?.deps ?? [])], ['--nf-color-ink']);
+      },
+    ],
+    [
+      'finds a definition that reaches itself and leaves an acyclic chain alone',
+      () => {
+        assert.deepEqual(findCycles(new Map([['--nf-a', new Set(['--nf-a'])]])), [
+          ['--nf-a', '--nf-a'],
+        ]);
+        assert.deepEqual(
+          findCycles(
+            new Map([
+              ['--nf-a', new Set(['--nf-b'])],
+              ['--nf-b', new Set()],
+            ]),
+          ),
+          [],
+        );
+      },
+    ],
+  ];
+
+  const failures = [];
+  for (const [name, run] of cases) {
+    try {
+      run();
+    } catch (err) {
+      failures.push(`  ${name}\n    ${err instanceof Error ? err.message : String(err)}`);
+    }
+  }
+  return failures;
+}
+
+const selfFailures = selfCheck();
+if (selfFailures.length > 0) {
+  console.error(
+    `check-undefined-tokens: ${selfFailures.length} self-verification case(s) failed, so the scan was not run:\n`,
+  );
+  for (const f of selfFailures) console.error(f);
+  console.error(
+    '\nThe scanner itself is wrong. Fix it before trusting anything it says about the sources.',
+  );
+  process.exit(1);
+}
+
+// ---------------------------------------------------------------------------
+// The scan.
+// ---------------------------------------------------------------------------
+
 const files = [];
 /** Root -> files walked, so an empty root can be named rather than summed away. */
 const filesByRoot = new Map();
@@ -110,26 +260,12 @@ const dependsOn = new Map();
 /** token -> where it was declared, for the cycle report. */
 const declaredAt = new Map();
 for (const file of files) {
-  const text = readFileSync(file, 'utf8');
-  const lines = text.split('\n');
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i] ?? '';
-    for (const m of line.matchAll(DEFINITION_RE)) {
-      const name = m[1];
-      if (name === undefined) continue;
-      defined.add(name);
-      // The value is what follows the colon on this line. Declarations
-      // are one per line throughout this codebase; a value spilling onto
-      // the next line just means those references are not collected,
-      // which can miss a cycle but never invents one.
-      const value = line.slice((m.index ?? 0) + m[0].length);
-      const deps = dependsOn.get(name) ?? new Set();
-      for (const r of value.matchAll(REFERENCE_RE)) {
-        if (r[1] !== undefined) deps.add(r[1]);
-      }
-      dependsOn.set(name, deps);
-      if (!declaredAt.has(name)) declaredAt.set(name, `${relative(repo, file)}:${i + 1}`);
-    }
+  for (const [name, { deps, line }] of definitionsIn(readFileSync(file, 'utf8'))) {
+    defined.add(name);
+    const merged = dependsOn.get(name) ?? new Set();
+    for (const dep of deps) merged.add(dep);
+    dependsOn.set(name, merged);
+    if (!declaredAt.has(name)) declaredAt.set(name, `${relative(repo, file)}:${line}`);
   }
 }
 
@@ -146,28 +282,7 @@ if (defined.size === 0) {
   ]);
 }
 
-/** Tokens that reach themselves through their own definitions. */
-function findCycles() {
-  const cycles = [];
-  const state = new Map(); // name -> 'open' | 'done'
-  const stack = [];
-  const visit = (name) => {
-    const seen = state.get(name);
-    if (seen === 'done') return;
-    if (seen === 'open') {
-      cycles.push([...stack.slice(stack.indexOf(name)), name]);
-      return;
-    }
-    state.set(name, 'open');
-    stack.push(name);
-    for (const dep of dependsOn.get(name) ?? []) visit(dep);
-    stack.pop();
-    state.set(name, 'done');
-  };
-  for (const name of dependsOn.keys()) visit(name);
-  return cycles;
-}
-const cycles = findCycles();
+const cycles = findCycles(dependsOn);
 
 /** @type {Map<string, {withFallback: number, bare: Array<{file: string, line: number}>}>} */
 const undefinedRefs = new Map();
@@ -177,18 +292,13 @@ let referenceCount = 0;
 for (const file of files) {
   const text = readFileSync(file, 'utf8');
   if (!TOKEN_RE.test(text)) continue;
-  const lines = text.split('\n');
-  for (let i = 0; i < lines.length; i++) {
-    for (const m of (lines[i] ?? '').matchAll(REFERENCE_RE)) {
-      const name = m[1];
-      if (name === undefined) continue;
-      referenceCount += 1;
-      if (defined.has(name)) continue;
-      const entry = undefinedRefs.get(name) ?? { withFallback: 0, bare: [] };
-      if (m[2]) entry.withFallback += 1;
-      else entry.bare.push({ file: relative(repo, file), line: i + 1 });
-      undefinedRefs.set(name, entry);
-    }
+  for (const { name, line, hasFallback } of referencesIn(text)) {
+    referenceCount += 1;
+    if (defined.has(name)) continue;
+    const entry = undefinedRefs.get(name) ?? { withFallback: 0, bare: [] };
+    if (hasFallback) entry.withFallback += 1;
+    else entry.bare.push({ file: relative(repo, file), line });
+    undefinedRefs.set(name, entry);
   }
 }
 

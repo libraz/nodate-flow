@@ -7,8 +7,15 @@
  * Intentionally avoids regular expressions: we walk the file character by character
  * looking for `--nf-` identifiers preceded by start-of-line / whitespace and
  * followed by `:`.
+ *
+ * The self-verification cases run on every invocation, before any file is
+ * read, and a failure among them stops the run. The extractor is the whole
+ * check: if it stopped recognising a declaration it would read every theme
+ * as empty, and the empty-semantic guard below is the only thing standing
+ * between that and a green run over six themes nobody compared.
  */
 
+import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -67,7 +74,86 @@ function extractNfVars(source: string): Set<string> {
   return out;
 }
 
+/**
+ * Which tokens a theme is missing, and which it declares that the semantic
+ * layer never named.
+ */
+function parity(
+  expected: ReadonlySet<string>,
+  have: ReadonlySet<string>,
+): { missing: string[]; extra: string[] } {
+  const missing: string[] = [];
+  for (const name of expected) {
+    if (!have.has(name)) missing.push(name);
+  }
+  const extra: string[] = [];
+  for (const name of have) {
+    if (!expected.has(name)) extra.push(name);
+  }
+  return { missing, extra };
+}
+
+/* Self-verification. Runs before any file is read, every time. */
+
+function selfCheck(): string[] {
+  const cases: ReadonlyArray<[string, () => void]> = [
+    [
+      'reads a declaration',
+      () => {
+        assert.deepEqual([...extractNfVars('  --nf-color-fg: #111;')], ['--nf-color-fg']);
+        assert.deepEqual([...extractNfVars('  --nf-space-2\t: 8px;')], ['--nf-space-2']);
+      },
+    ],
+    [
+      'does not read a use as a declaration',
+      () => {
+        assert.deepEqual([...extractNfVars('  color: var(--nf-color-fg);')], []);
+        assert.deepEqual([...extractNfVars('  box-shadow: 0 0 0 var(--nf-space-1) red;')], []);
+      },
+    ],
+    [
+      'ignores a custom property outside the nf namespace',
+      () => {
+        assert.deepEqual([...extractNfVars('  --sc-inactive-fg: red;')], []);
+      },
+    ],
+    [
+      'reports a token missing from a theme and one only the theme declares',
+      () => {
+        const expected = new Set(['--nf-color-fg', '--nf-color-bg']);
+        assert.deepEqual(parity(expected, new Set(['--nf-color-fg', '--nf-color-ink'])), {
+          missing: ['--nf-color-bg'],
+          extra: ['--nf-color-ink'],
+        });
+        assert.deepEqual(parity(expected, expected), { missing: [], extra: [] });
+      },
+    ],
+  ];
+
+  const failures: string[] = [];
+  for (const [name, run] of cases) {
+    try {
+      run();
+    } catch (err) {
+      failures.push(`  ${name}\n    ${err instanceof Error ? err.message : String(err)}`);
+    }
+  }
+  return failures;
+}
+
 function main(): void {
+  const selfFailures = selfCheck();
+  if (selfFailures.length > 0) {
+    console.error(
+      `check-theme-parity: ${selfFailures.length} self-verification case(s) failed, so no theme was read:\n`,
+    );
+    for (const f of selfFailures) console.error(f);
+    console.error(
+      '\nThe extractor itself is wrong. Fix it before trusting anything it says about the themes.',
+    );
+    process.exit(1);
+  }
+
   const semanticSource = readFileSync(semanticPath, 'utf8');
   const expected = extractNfVars(semanticSource);
 
@@ -79,15 +165,7 @@ function main(): void {
   let failed = false;
   for (const path of themePaths) {
     const source = readFileSync(path, 'utf8');
-    const have = extractNfVars(source);
-    const missing: string[] = [];
-    for (const name of expected) {
-      if (!have.has(name)) missing.push(name);
-    }
-    const extra: string[] = [];
-    for (const name of have) {
-      if (!expected.has(name)) extra.push(name);
-    }
+    const { missing, extra } = parity(expected, extractNfVars(source));
     if (missing.length > 0 || extra.length > 0) {
       failed = true;
       console.error(`\n[theme-parity] ${path}`);

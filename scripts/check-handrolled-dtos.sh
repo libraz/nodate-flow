@@ -46,6 +46,13 @@
 # nothing is reported as a failure rather than as a pass, because a scan
 # over zero files is indistinguishable from a clean scan.
 #
+# Reading files still does not prove the patterns can match: an anchor
+# tightened one character too far matches no declaration in the tree and
+# prints the same success line as a clean tree. The self-verification
+# below runs both patterns over known-bad and known-good samples on every
+# invocation, before the real scan, and a failure among them stops the
+# run with exit 2.
+#
 # Usage:
 #   ./scripts/check-handrolled-dtos.sh        # exit 1 on any hit
 #
@@ -93,6 +100,85 @@ INCLUDES=(
   --include='*.tsx'
 )
 
+# Declarations under $1, as `path:lineno:text` lines. grep exits 1 when it
+# matches nothing, which under `set -e` with pipefail would end the caller
+# with no message; a clean tree is not an error here, so that status is
+# absorbed.
+scan_root() {
+  grep -rnE -e "$INTERFACE_PATTERN" -e "$ALIAS_PATTERN" \
+    "$1" "${EXCLUDES[@]}" "${INCLUDES[@]}" \
+    2>/dev/null || true
+}
+
+# ---------------------------------------------------------------------------
+# Self-verification. Runs before the scan, every time.
+# ---------------------------------------------------------------------------
+
+CONTROL_DIR="$(mktemp -d)"
+trap 'rm -rf "$CONTROL_DIR"' EXIT
+
+cat >"$CONTROL_DIR/interface.ts" <<'TS'
+export interface WorkspacesBody {
+  workspaces: Workspace[];
+}
+TS
+
+cat >"$CONTROL_DIR/alias.ts" <<'TS'
+export type WorkspacesResponse = {
+  workspaces: Workspace[];
+};
+TS
+
+# Derived from the generated schema rather than spelled out, which is the
+# form the message below asks for. An alias branch that stopped drawing
+# this distinction would ban the fix along with the defect.
+cat >"$CONTROL_DIR/derived.ts" <<'TS'
+import type { components } from '@nodate-flow/sdk';
+
+export type MembersResponse = components['schemas']['MembersOutputBody'];
+export type MemberSummaryResponse = Pick<components['schemas']['Member'], 'id' | 'role'>;
+TS
+
+# Prose, not code. Both lines would match if the patterns lost their
+# column-0 anchor, which is what keeps documentation out of the results.
+cat >"$CONTROL_DIR/prose.ts" <<'TS'
+/**
+ * A comment naming `interface WorkspacesBody {` or
+ * `type WorkspacesResponse = {` describes the ban; it does not break it.
+ */
+export const NOTE = 1;
+TS
+
+control_failures=""
+control_count=0
+fail_case() {
+  control_failures="${control_failures}  $1"$'\n'
+  control_count=$((control_count + 1))
+}
+
+control_out="$(scan_root "$CONTROL_DIR")"
+
+grep -q 'interface\.ts:1:' <<<"$control_out" \
+  || fail_case "a hand-rolled 'interface FooBody {' declaration must be reported"
+grep -q 'alias\.ts:1:' <<<"$control_out" \
+  || fail_case "a hand-rolled 'type FooResponse = {' alias must be reported"
+! grep -q 'derived\.ts' <<<"$control_out" \
+  || fail_case "an alias derived from components['schemas'] must not be reported"
+! grep -q 'prose\.ts' <<<"$control_out" \
+  || fail_case "a suffixed name mentioned in an indented comment must not be reported"
+
+if [[ $control_count -gt 0 ]]; then
+  echo "check-handrolled-dtos: $control_count self-verification case(s) failed, so the scan was not run:" >&2
+  printf '%s' "$control_failures" >&2
+  echo "" >&2
+  echo "The patterns themselves are wrong. Fix them before trusting anything" >&2
+  echo "this check says about the sources." >&2
+  exit 2
+fi
+
+rm -rf "$CONTROL_DIR"
+trap - EXIT
+
 hits=""
 count=0
 
@@ -111,9 +197,7 @@ for dir in "${SCAN_DIRS[@]}"; do
     [[ -z "$line" ]] && continue
     hits="${hits}${line}"$'\n'
     count=$((count + 1))
-  done < <(grep -rnE -e "$INTERFACE_PATTERN" -e "$ALIAS_PATTERN" \
-    "$dir" "${EXCLUDES[@]}" "${INCLUDES[@]}" \
-    2>/dev/null || true)
+  done < <(scan_root "$dir")
 done
 
 if [[ $count -gt 0 ]]; then

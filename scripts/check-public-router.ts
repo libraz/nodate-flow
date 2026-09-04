@@ -40,6 +40,12 @@
  * it cannot vouch for, and silently ignoring it is how a guard turns
  * into decoration.
  *
+ * The self-verification cases run on every invocation, before the spec
+ * and the router are read, and a failure among them stops the run. The
+ * source scan is the half that can go quiet: a pattern that no longer
+ * matches how a route is registered yields an empty public set, and an
+ * empty public set is allowlisted by definition.
+ *
  * Usage:
  *
  *   bun run scripts/check-public-router.ts
@@ -49,6 +55,7 @@
  *   1 — drift detected, see stderr for the offending paths
  */
 
+import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -127,16 +134,27 @@ function matchesPattern(path: string, pattern: string): boolean {
 
 const problems: string[] = [];
 
-/** Extract a top-level function body by brace matching from its `func` line. */
-function extractFuncBody(source: string, signaturePrefix: string, where: string): string | null {
+/**
+ * Extract a top-level function body by brace matching from its `func`
+ * line. Failures are recorded in `sink` rather than returned, so a body
+ * this script could not read is reported instead of read as empty; the
+ * sink is a parameter so the self-verification cases can inspect it
+ * without writing into the run's own problem list.
+ */
+function extractFuncBody(
+  source: string,
+  signaturePrefix: string,
+  where: string,
+  sink: string[] = problems,
+): string | null {
   const start = source.indexOf(signaturePrefix);
   if (start === -1) {
-    problems.push(`${where}: could not find \`${signaturePrefix}\``);
+    sink.push(`${where}: could not find \`${signaturePrefix}\``);
     return null;
   }
   const open = source.indexOf('{', start);
   if (open === -1) {
-    problems.push(`${where}: \`${signaturePrefix}\` has no body`);
+    sink.push(`${where}: \`${signaturePrefix}\` has no body`);
     return null;
   }
   let depth = 0;
@@ -148,7 +166,7 @@ function extractFuncBody(source: string, signaturePrefix: string, where: string)
       if (depth === 0) return source.slice(open + 1, i);
     }
   }
-  problems.push(`${where}: unbalanced braces in \`${signaturePrefix}\``);
+  sink.push(`${where}: unbalanced braces in \`${signaturePrefix}\``);
   return null;
 }
 
@@ -163,6 +181,24 @@ function chiRoutes(body: string): string[] {
   return [...body.matchAll(new RegExp(`\\b\\w+\\.(?:${verbs})\\(\\s*"([^"]+)"`, 'g'))].map(
     (m) => m[1] as string,
   );
+}
+
+/**
+ * `pkg.Register*` calls in a builder body that this script cannot resolve
+ * to a set of paths. Returned as `pkg.Fn` pairs; `huma.Register` is the
+ * inline form and `RegisterPublic` is the delegation form, both of which
+ * are read elsewhere.
+ */
+function unresolvedRegistrations(body: string): string[] {
+  const out: string[] = [];
+  for (const m of body.matchAll(/\b([A-Za-z_]\w*)\.(Register\w*)\(/g)) {
+    const pkg = m[1] as string;
+    const fn = m[2] as string;
+    if (pkg === 'huma' && fn === 'Register') continue;
+    if (fn === 'RegisterPublic') continue;
+    out.push(`${pkg}.${fn}`);
+  }
+  return out;
 }
 
 /** Map an import alias in `router.go` to its package directory name. */
@@ -231,16 +267,100 @@ function scanPublicBuilder(): { humaPaths: string[]; rawRoutes: string[] } {
 
   // Any other `Register*` call in the builder registers routes this
   // script cannot see. Fail rather than under-report the public surface.
-  for (const m of body.matchAll(/\b([A-Za-z_]\w*)\.(Register\w*)\(/g)) {
-    const [, pkg, fn] = m as unknown as [string, string, string];
-    if (pkg === 'huma' && fn === 'Register') continue;
-    if (fn === 'RegisterPublic') continue;
+  for (const call of unresolvedRegistrations(body)) {
     problems.push(
-      `router.go: public builder calls \`${pkg}.${fn}\`, a registration form this check cannot resolve — teach the scanner or move the route out of the public group`,
+      `router.go: public builder calls \`${call}\`, a registration form this check cannot resolve — teach the scanner or move the route out of the public group`,
     );
   }
 
   return { humaPaths: paths, rawRoutes: chiRoutes(body) };
+}
+
+/* ── Self-verification ──────────────────────────────────────────────
+ *
+ * Runs before the spec and the router are read, every time.
+ */
+
+function selfCheck(): string[] {
+  const BUILDER = [
+    'func buildPublicShareAPI(r chi.Router, deps Deps) {',
+    '\thuma.Register(sub, huma.Operation{',
+    '\t\tOperationID: "getPublicCalendar",',
+    '\t\tPath:        "/share/cal/{token}",',
+    '\t}, handleShare)',
+    '\tif deps.Webhooks {',
+    '\t\tr.Post("/webhooks/github", handleGithub)',
+    '\t}',
+    '\tlogger.Info("mounted /webhooks/github")',
+    '\tlenses.RegisterPublic(sub, deps)',
+    '}',
+    '',
+    'func buildAuthedAPI(r chi.Router, deps Deps) {',
+    '\thuma.Register(sub, huma.Operation{Path: "/tasks"}, handleTasks)',
+    '}',
+    '',
+  ].join('\n');
+
+  const cases: ReadonlyArray<[string, () => void]> = [
+    [
+      'reads a huma path and a raw chi route out of a builder body',
+      () => {
+        const sink: string[] = [];
+        const body = extractFuncBody(BUILDER, 'func buildPublicShareAPI(', 'sample.go', sink);
+        assert.deepEqual(sink, []);
+        assert.deepEqual(humaPaths(body ?? ''), ['/share/cal/{token}']);
+        assert.deepEqual(chiRoutes(body ?? ''), ['/webhooks/github']);
+      },
+    ],
+    [
+      'stops at the builder own closing brace',
+      () => {
+        const sink: string[] = [];
+        const body = extractFuncBody(BUILDER, 'func buildPublicShareAPI(', 'sample.go', sink);
+        assert.equal(humaPaths(body ?? '').includes('/tasks'), false);
+      },
+    ],
+    [
+      'records a body it could not read instead of returning an empty one',
+      () => {
+        const sink: string[] = [];
+        assert.equal(extractFuncBody(BUILDER, 'func buildGoneAPI(', 'sample.go', sink), null);
+        assert.equal(sink.length, 1);
+        assert.match(sink[0] ?? '', /could not find/);
+      },
+    ],
+    [
+      'reports a registration form it cannot resolve and passes the two it can',
+      () => {
+        assert.deepEqual(unresolvedRegistrations(BUILDER), []);
+        assert.deepEqual(unresolvedRegistrations('\tadmin.RegisterAll(sub, deps)\n'), [
+          'admin.RegisterAll',
+        ]);
+      },
+    ],
+  ];
+
+  const failures: string[] = [];
+  for (const [name, run] of cases) {
+    try {
+      run();
+    } catch (err) {
+      failures.push(`  ${name}\n    ${err instanceof Error ? err.message : String(err)}`);
+    }
+  }
+  return failures;
+}
+
+const selfFailures = selfCheck();
+if (selfFailures.length > 0) {
+  console.error(
+    `check-public-router: ${selfFailures.length} self-verification case(s) failed, so the public surface was not read:\n`,
+  );
+  for (const f of selfFailures) console.error(f);
+  console.error(
+    '\nThe scanner itself is wrong. Fix it before trusting anything it says about the router.',
+  );
+  process.exit(1);
 }
 
 /* ── Run ────────────────────────────────────────────────────────── */

@@ -72,6 +72,149 @@ fi
 # handlers/notifications returns from both the list and the update.
 ALLOWLIST_PATTERN='^(AdminDeleteOutputBody|AuthTokens|AutoActionSettingsBody|CalendarResponse|EventResponse|ImportJobBody|IntegrationMapping|Label|ListTimelineOutputBody|LoginBody|MeBody|OIDCStartOutputBody|PageDTO|PreferencesOutputBody|Project|PublicShareResponse|Record|SavedLens|Task|TaskComment|TimeboxDTO|WidgetDTO|Workspace|WorkspaceMember)$'
 
+# The detector: every schema name that 2+ distinct operations reference
+# from a 200/201/202 response body or from a requestBody, as
+# `name<TAB>op,op` lines. Held in one place so the samples below are
+# judged by the same query the spec is.
+SUSPECTS_JQ='
+  [.paths[][]
+    | select(type == "object")
+    | select(.operationId)
+    | . as $op
+    | (
+        ([$op.responses["200"]?, $op.responses["201"]?, $op.responses["202"]?]
+          | map(.content["application/json"].schema."$ref"? // empty))
+        + ([$op.requestBody?.content["application/json"].schema."$ref"? // empty])
+      )
+    | map(select(. != null and . != ""))
+    | unique
+    | .[]
+    | {op: $op.operationId, ref: .}]
+  | unique_by([.op, .ref])
+  | group_by(.ref)
+  | map(select((map(.op) | unique | length) > 1))
+  | map({name: (.[0].ref | sub("^#/components/schemas/"; "")),
+         ops: ([.[].op] | unique)})
+  | .[] | "\(.name)\t\(.ops | join(","))"
+'
+
+# ---------------------------------------------------------------------------
+# Self-verification. Runs before the scan, every time.
+#
+# The emptiness counts below prove the spec was read; they do not prove
+# the query can still single a shared name out of it. A traversal that has
+# stopped reaching either body position returns an empty suspect list,
+# which is exactly what a collision-free spec returns. So the query is run
+# first against a synthetic spec whose collisions are known.
+# ---------------------------------------------------------------------------
+
+CONTROL_DIR="$(mktemp -d)"
+trap 'rm -rf "$CONTROL_DIR"' EXIT
+
+# a-list and b-list share a response schema (the defect); c-get holds one
+# of its own (the legitimate neighbour); d-create and e-replace share a
+# request schema, which is the half of the traversal that has no response
+# to fall back on.
+cat >"$CONTROL_DIR/spec.json" <<'JSON'
+{
+  "openapi": "3.1.0",
+  "paths": {
+    "/a": {
+      "get": {
+        "operationId": "a-list",
+        "responses": {
+          "200": {"content": {"application/json": {"schema": {"$ref": "#/components/schemas/ListOutputBody"}}}}
+        }
+      }
+    },
+    "/b": {
+      "get": {
+        "operationId": "b-list",
+        "responses": {
+          "200": {"content": {"application/json": {"schema": {"$ref": "#/components/schemas/ListOutputBody"}}}}
+        }
+      }
+    },
+    "/c": {
+      "get": {
+        "operationId": "c-get",
+        "responses": {
+          "200": {"content": {"application/json": {"schema": {"$ref": "#/components/schemas/COutputBody"}}}}
+        }
+      }
+    },
+    "/d": {
+      "post": {
+        "operationId": "d-create",
+        "requestBody": {"content": {"application/json": {"schema": {"$ref": "#/components/schemas/SharedInputBody"}}}},
+        "responses": {
+          "201": {"content": {"application/json": {"schema": {"$ref": "#/components/schemas/DOutputBody"}}}}
+        }
+      }
+    },
+    "/e": {
+      "put": {
+        "operationId": "e-replace",
+        "requestBody": {"content": {"application/json": {"schema": {"$ref": "#/components/schemas/SharedInputBody"}}}},
+        "responses": {
+          "200": {"content": {"application/json": {"schema": {"$ref": "#/components/schemas/EOutputBody"}}}}
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "ListOutputBody": {"type": "object"},
+      "COutputBody": {"type": "object"},
+      "DOutputBody": {"type": "object"},
+      "EOutputBody": {"type": "object"},
+      "SharedInputBody": {"type": "object"}
+    }
+  }
+}
+JSON
+
+control_failures=""
+control_count=0
+fail_case() {
+  control_failures="${control_failures}  $1"$'\n'
+  control_count=$((control_count + 1))
+}
+
+if ! control_out="$(jq -r "$SUSPECTS_JQ" "$CONTROL_DIR/spec.json")"; then
+  fail_case "the query did not run at all against the sample spec (jq's error is above)"
+  control_out=""
+fi
+
+grep -q "^ListOutputBody"$'\t' <<<"$control_out" \
+  || fail_case "a schema name under two operations' responses must be reported"
+grep -q "^SharedInputBody"$'\t' <<<"$control_out" \
+  || fail_case "a schema name under two operations' request bodies must be reported"
+! grep -q "^COutputBody"$'\t' <<<"$control_out" \
+  || fail_case "a schema name only one operation references must not be reported"
+
+# The allowlist is the other half of the verdict: a pattern that has
+# drifted into matching everything silences every collision the query
+# finds, and the run still prints ok.
+if ! [[ "Task" =~ $ALLOWLIST_PATTERN ]]; then
+  fail_case "ALLOWLIST_PATTERN must still match the shared DTOs it names (Task)"
+fi
+if [[ "TaskDraftOutputBody" =~ $ALLOWLIST_PATTERN ]]; then
+  fail_case "ALLOWLIST_PATTERN must match whole names only, not a name that merely starts with one"
+fi
+
+if [[ $control_count -gt 0 ]]; then
+  echo "check-schema-collisions: $control_count self-verification case(s) failed, so the scan was not run:" >&2
+  printf '%s' "$control_failures" >&2
+  echo "" >&2
+  echo "The query itself is wrong. Fix it before trusting anything this check" >&2
+  echo "says about $SPEC." >&2
+  exit 2
+fi
+
+rm -rf "$CONTROL_DIR"
+trap - EXIT
+
 # The whole verdict rests on one jq traversal of a generated document.
 # Every way that traversal can stop reaching the spec — a path layout the
 # `.paths[][]` walk no longer matches, response bodies moving out from
@@ -115,29 +258,7 @@ if [[ "$ref_count" -eq 0 ]]; then
   exit 2
 fi
 
-mapfile -t suspects < <(
-  jq -r '
-    [.paths[][]
-      | select(type == "object")
-      | select(.operationId)
-      | . as $op
-      | (
-          ([$op.responses["200"]?, $op.responses["201"]?, $op.responses["202"]?]
-            | map(.content["application/json"].schema."$ref"? // empty))
-          + ([$op.requestBody?.content["application/json"].schema."$ref"? // empty])
-        )
-      | map(select(. != null and . != ""))
-      | unique
-      | .[]
-      | {op: $op.operationId, ref: .}]
-    | unique_by([.op, .ref])
-    | group_by(.ref)
-    | map(select((map(.op) | unique | length) > 1))
-    | map({name: (.[0].ref | sub("^#/components/schemas/"; "")),
-           ops: ([.[].op] | unique)})
-    | .[] | "\(.name)\t\(.ops | join(","))"
-  ' "$SPEC"
-)
+mapfile -t suspects < <(jq -r "$SUSPECTS_JQ" "$SPEC")
 
 violations=()
 for line in "${suspects[@]}"; do

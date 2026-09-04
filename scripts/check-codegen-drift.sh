@@ -16,6 +16,12 @@
 # directory and the result is compared against what is committed. A failure
 # therefore tells you to run the generator; it does not half-run it for you.
 #
+# Reaching the generated files still does not prove the comparison can see
+# drift: a comparison that opened nothing reports no drift for the same
+# reason an up-to-date tree does. The self-verification below runs the
+# comparison over sample trees whose drift is known, before the real one,
+# and a failure among those stops the run.
+#
 # Usage:
 #   bash scripts/check-codegen-drift.sh            # check everything
 #   bash scripts/check-codegen-drift.sh --staged   # skip when no input is staged
@@ -42,7 +48,7 @@ for arg in "$@"; do
     --staged) staged_only=1 ;;
     --check-tool) tool_only=1 ;;
     -h | --help)
-      sed -n '2,26p' "${BASH_SOURCE[0]}"
+      sed -n '2,32p' "${BASH_SOURCE[0]}"
       exit 0
       ;;
     *)
@@ -90,72 +96,18 @@ if [[ $staged_only -eq 1 ]]; then
   fi
 fi
 
-# ── the composed schema matches the layered sources ──
-
-bash "$ROOT_DIR/scripts/schema-diff.sh"
-
-# ── the generated Go matches the schema and queries ──
-
-# A comparison across versions would report drift that is not there, so
-# this must hold before the scratch generation means anything.
-assert_sqlc_version
-
-SCRATCH="$(mktemp -d)"
-# The config lives beside the schema and queries it names by relative path,
-# so the copy has to stay in the same directory for those to resolve.
-SCRATCH_CONFIG="$(mktemp "$ROOT_DIR/sql/.sqlc-drift-XXXXXX.yaml")"
-trap 'rm -rf "$SCRATCH" "$SCRATCH_CONFIG"' EXIT
-
-# Redirect every output directory into the scratch tree, keeping the same
-# relative layout so nested outputs stay nested and a recursive diff lines up.
-outs="$(python3 - "$SQLC_CONFIG" "$SCRATCH_CONFIG" "$SCRATCH" "$ROOT_DIR" <<'PY'
-import os, re, sys
-
-config_path, scratch_config, scratch, root = sys.argv[1:5]
-sql_dir = os.path.dirname(config_path)
-
-rewritten = []
-outs = []
-
-
-def repoint(match):
-    prefix, quote, value = match.group(1), match.group(2), match.group(3)
-    rel = os.path.relpath(os.path.normpath(os.path.join(sql_dir, value)), root)
-    outs.append(rel)
-    # sqlc joins out: onto the config's directory, so an absolute path would
-    # land under sql/ rather than at the root of the filesystem. Express the
-    # scratch destination as a path relative to that directory instead.
-    dest = os.path.relpath(os.path.join(scratch, rel), sql_dir)
-    return f"{prefix}{quote}{dest}{quote}"
-
-
-with open(config_path) as fh:
-    for line in fh:
-        rewritten.append(re.sub(r'^(\s*out:\s*)(["\']?)(.*?)\2\s*$', repoint, line.rstrip("\n")) + "\n")
-
-if not outs:
-    sys.stderr.write("no out: entries found in the sqlc config\n")
-    sys.exit(2)
-
-with open(scratch_config, "w") as fh:
-    fh.writelines(rewritten)
-
-print("\n".join(outs))
-PY
-)"
-
-sqlc generate -f "$SCRATCH_CONFIG" >/dev/null
-
 # Generated output shares a directory with hand-written files (tests,
 # .gitattributes), so the comparison is limited to what sqlc actually emits:
 # every file it wrote into the scratch tree, plus any file left in the
 # repository that carries a generated name but is no longer produced.
-compare_status=0
-python3 - "$ROOT_DIR" "$SCRATCH" <<PY || compare_status=$?
+#
+# Reads: <committed root> <scratch root> <output directory>...
+# Exits: 0 in agreement, 1 on drift, 2 when nothing was compared.
+COMPARE_PY='
 import difflib, os, sys
 
 root, scratch = sys.argv[1], sys.argv[2]
-outs = """$outs""".split()
+outs = sys.argv[3:]
 
 GENERATED_NAMES = {"models.go", "db.go", "querier.go", "copyfrom.go", "batch.go"}
 
@@ -229,7 +181,130 @@ if problems:
         print(f"---- {key} ----")
         print("\n".join(lines))
     sys.exit(1)
+'
+
+# ---------------------------------------------------------------------------
+# Self-verification. Runs before the scan, every time.
+#
+# The comparison is the only thing standing between a stale generated tree
+# and a green run, and its silent failure mode looks exactly like success.
+# So it is first pointed at sample trees whose answer is known.
+# ---------------------------------------------------------------------------
+
+CONTROL_DIR="$(mktemp -d)"
+trap 'rm -rf "$CONTROL_DIR"' EXIT
+
+control_root="$CONTROL_DIR/root/internal/db/generated"
+control_scratch="$CONTROL_DIR/scratch/internal/db/generated"
+mkdir -p "$control_root" "$control_scratch"
+
+control_failures=""
+control_count=0
+fail_case() {
+  control_failures="${control_failures}  $1"$'\n'
+  control_count=$((control_count + 1))
+}
+
+# Runs the comparison exactly as the real one below runs it, and checks the
+# verdict rather than the wording.
+expect_compare() {
+  local expected="$1" description="$2" status=0
+  python3 -c "$COMPARE_PY" "$CONTROL_DIR/root" "$CONTROL_DIR/scratch" \
+    internal/db/generated >/dev/null 2>&1 || status=$?
+  if [[ "$status" -ne "$expected" ]]; then
+    fail_case "$description (expected exit $expected, got $status)"
+  fi
+}
+
+printf 'package generated\n\ntype Task struct {\n\tID uint32\n}\n' >"$control_root/models.go"
+cp "$control_root/models.go" "$control_scratch/models.go"
+expect_compare 0 "a generated file identical to the committed one must not be reported as drift"
+
+printf 'package generated\n\ntype Task struct {\n\tID uint32\n\tTitle string\n}\n' >"$control_scratch/models.go"
+expect_compare 1 "a committed file missing a field the generator emits must be reported"
+
+cp "$control_scratch/models.go" "$control_root/models.go"
+printf 'package generated\n' >"$control_root/retired.sql.go"
+expect_compare 1 "a committed file the generator no longer produces must be reported"
+
+rm -f "$control_root/retired.sql.go" "$control_scratch/models.go"
+expect_compare 2 "an output directory the generator wrote nothing into must not read as agreement"
+
+if [[ $control_count -gt 0 ]]; then
+  echo "check-codegen-drift: $control_count self-verification case(s) failed, so nothing was compared:" >&2
+  printf '%s' "$control_failures" >&2
+  echo "" >&2
+  echo "The comparison itself is wrong. Fix it before trusting anything this" >&2
+  echo "check says about the generated tree." >&2
+  exit 2
+fi
+
+rm -rf "$CONTROL_DIR"
+trap - EXIT
+
+# ── the composed schema matches the layered sources ──
+
+bash "$ROOT_DIR/scripts/schema-diff.sh"
+
+# ── the generated Go matches the schema and queries ──
+
+# A comparison across versions would report drift that is not there, so
+# this must hold before the scratch generation means anything.
+assert_sqlc_version
+
+SCRATCH="$(mktemp -d)"
+# The config lives beside the schema and queries it names by relative path,
+# so the copy has to stay in the same directory for those to resolve.
+SCRATCH_CONFIG="$(mktemp "$ROOT_DIR/sql/.sqlc-drift-XXXXXX.yaml")"
+trap 'rm -rf "$SCRATCH" "$SCRATCH_CONFIG"' EXIT
+
+# Redirect every output directory into the scratch tree, keeping the same
+# relative layout so nested outputs stay nested and a recursive diff lines up.
+outs="$(python3 - "$SQLC_CONFIG" "$SCRATCH_CONFIG" "$SCRATCH" "$ROOT_DIR" <<'PY'
+import os, re, sys
+
+config_path, scratch_config, scratch, root = sys.argv[1:5]
+sql_dir = os.path.dirname(config_path)
+
+rewritten = []
+outs = []
+
+
+def repoint(match):
+    prefix, quote, value = match.group(1), match.group(2), match.group(3)
+    rel = os.path.relpath(os.path.normpath(os.path.join(sql_dir, value)), root)
+    outs.append(rel)
+    # sqlc joins out: onto the config's directory, so an absolute path would
+    # land under sql/ rather than at the root of the filesystem. Express the
+    # scratch destination as a path relative to that directory instead.
+    dest = os.path.relpath(os.path.join(scratch, rel), sql_dir)
+    return f"{prefix}{quote}{dest}{quote}"
+
+
+with open(config_path) as fh:
+    for line in fh:
+        rewritten.append(re.sub(r'^(\s*out:\s*)(["\']?)(.*?)\2\s*$', repoint, line.rstrip("\n")) + "\n")
+
+if not outs:
+    sys.stderr.write("no out: entries found in the sqlc config\n")
+    sys.exit(2)
+
+with open(scratch_config, "w") as fh:
+    fh.writelines(rewritten)
+
+print("\n".join(outs))
 PY
+)"
+
+sqlc generate -f "$SCRATCH_CONFIG" >/dev/null
+
+# The out: entries carry no whitespace, so splitting the newline-separated
+# list on IFS is enough to hand them over as separate arguments.
+# shellcheck disable=SC2206
+out_dirs=($outs)
+
+compare_status=0
+python3 -c "$COMPARE_PY" "$ROOT_DIR" "$SCRATCH" "${out_dirs[@]}" || compare_status=$?
 
 if [[ $compare_status -eq 2 ]]; then
   exit 2

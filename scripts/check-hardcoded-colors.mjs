@@ -22,9 +22,16 @@
 // colour exemption ever being written. Giving each check its own marker
 // is what makes an exemption a claim about a specific thing.
 //
+// The self-verification cases run on every invocation, before the real
+// scan, and a failure among them stops the run. A scan that proved it read
+// files has not proved it can still recognise a colour: a pattern that
+// stopped matching prints the same clean line as a tree where every value
+// flows through a token.
+//
 // Usage:
 //   node scripts/check-hardcoded-colors.mjs
 
+import assert from 'node:assert/strict';
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { dirname, join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -142,6 +149,88 @@ const FILLS = FILL_TOKENS.map((t) => t.replace('--', '')).join('|');
 const STATUS_AS_TEXT = new RegExp(String.raw`(?<![-\w])color:\s*['"]?var\(--(${FILLS})\)`);
 const STATUS_AS_FG_ALIAS = new RegExp(String.raw`--[\w-]*-fg:\s*var\(--(${FILLS})\)`);
 
+/**
+ * The verdict on one line, exemption-blind: whether it writes a literal
+ * colour, and which fill token it paints text with, if any.
+ *
+ * `status` is read before `literal` for the same reason the two are
+ * separate findings: a fill used as text is already routed through a
+ * token, so the literal test has nothing to say about it.
+ */
+function inspectLine(line) {
+  // Commented-out code and prose that quotes a colour.
+  if (/^\s*(\/\/|\/\*|\*)/.test(line)) return { literal: false, status: null };
+  const status = line.match(STATUS_AS_TEXT) ?? line.match(STATUS_AS_FG_ALIAS);
+  // A value already routed through a token on the same declaration.
+  const literal = COLOR.test(line) && !/var\(--nf-/.test(line);
+  return { literal, status: status?.[1] ?? null };
+}
+
+// ---------------------------------------------------------------------------
+// Self-verification. Runs before the scan, every time.
+// ---------------------------------------------------------------------------
+
+function selfCheck() {
+  const cases = [
+    [
+      'reports a literal colour value',
+      () => {
+        assert.equal(inspectLine('  background: #6e5494;').literal, true);
+        assert.equal(inspectLine('  background: rgba(0, 0, 0, 0.4);').literal, true);
+      },
+    ],
+    [
+      'accepts the same declaration written through a token',
+      () => {
+        assert.deepEqual(inspectLine('  background: var(--nf-color-surface);'), {
+          literal: false,
+          status: null,
+        });
+      },
+    ],
+    [
+      'does not read a colour out of a comment',
+      () => {
+        assert.equal(inspectLine('  // background: #6e5494;').literal, false);
+        assert.equal(inspectLine('   * the brand hex is #6e5494').literal, false);
+      },
+    ],
+    [
+      'reports a fill token painting text, directly and through a -fg alias',
+      () => {
+        assert.equal(inspectLine('  color: var(--nf-color-danger);').status, 'nf-color-danger');
+        assert.equal(
+          inspectLine('  --sc-inactive-fg: var(--nf-cal-task-color);').status,
+          'nf-cal-task-color',
+        );
+        assert.equal(inspectLine('  color: var(--nf-color-danger-fg);').status, null);
+      },
+    ],
+  ];
+
+  const failures = [];
+  for (const [name, run] of cases) {
+    try {
+      run();
+    } catch (err) {
+      failures.push(`  ${name}\n    ${err instanceof Error ? err.message : String(err)}`);
+    }
+  }
+  return failures;
+}
+
+const selfFailures = selfCheck();
+if (selfFailures.length > 0) {
+  console.error(
+    `check-hardcoded-colors: ${selfFailures.length} self-verification case(s) failed, so the scan was not run:\n`,
+  );
+  for (const f of selfFailures) console.error(f);
+  console.error(
+    '\nThe scanner itself is wrong. Fix it before trusting anything it says about the sources.',
+  );
+  process.exit(1);
+}
+
 // The fill tokens are the second set with a vacuous mode. Both text
 // patterns above are built by interpolating these names, so a token that
 // has been renamed away leaves a pattern that cannot match anything: the
@@ -196,19 +285,15 @@ for (const root of SCAN_DIRS) {
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i] ?? '';
       if (exempt.lines.has(i + 1)) continue;
-      // Commented-out code and prose that quotes a colour.
-      if (/^\s*(\/\/|\/\*|\*)/.test(line)) continue;
-      const status = line.match(STATUS_AS_TEXT) ?? line.match(STATUS_AS_FG_ALIAS);
-      if (status) {
+      const { literal, status } = inspectLine(line);
+      if (status !== null) {
         textFindings.push({
           where: `${relative(repo, file)}:${i + 1}`,
-          status: status[1],
+          status,
           text: line.trim(),
         });
       }
-      if (!COLOR.test(line)) continue;
-      // A value already routed through a token on the same declaration.
-      if (/var\(--nf-/.test(line)) continue;
+      if (!literal) continue;
       findings.push({ where: `${relative(repo, file)}:${i + 1}`, text: line.trim() });
     }
   }

@@ -47,9 +47,17 @@
 // check names the cause instead, and reports any annotation that ends up
 // exempting nothing.
 //
+// The self-verification cases run on every invocation, before the real
+// scan, and a failure among them stops the run. Proving the scan read
+// something is not the same as proving it can still find something: a
+// condition pattern that stopped matching how these queries are written,
+// or a lookup table built the wrong way round, prints exactly what a
+// correct tree prints.
+//
 // Usage:
 //   node scripts/check-breakpoints.mjs
 
+import assert from 'node:assert/strict';
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { dirname, join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -112,6 +120,141 @@ function vacuous(lines) {
   process.exit(2);
 }
 
+const CONDITION = /@(?:media|container)[^{;]*?\((max|min)-width:\s*([^)]+?)\s*\)/g;
+/**
+ * A reason is required, and it has to be words.
+ *
+ * Matching "any non-space after the colon" is not enough: in
+ * `/* nf-breakpoint-override: *\/` the comment's own closing `*` satisfies
+ * it, so a marker with the justification deleted still silences the
+ * check. The reason must contain letters that are not comment syntax.
+ */
+const OVERRIDE = /nf-breakpoint-override:[^\S\n]*(?![*/]\s*$)[A-Za-z][^\n]*[A-Za-z]/;
+
+/**
+ * Every query on one line that does not match the scale, plus a tally of
+ * the queries examined. Exemption-blind.
+ *
+ * The scale arrives as the two lookup tables rather than being read from
+ * the module, so this is a function of its arguments alone and the
+ * self-verification cases can hand it one line and a scale of their own.
+ *
+ * The tally matters because a run that examined nothing reports the same
+ * "every media query matches" as a run over a correct tree.
+ */
+function queryViolations(line, byMax, byMin) {
+  const violations = [];
+  let examined = 0;
+  for (const m of line.matchAll(CONDITION)) {
+    examined += 1;
+    const kind = m[1];
+    const raw = m[2] ?? '';
+    const px = /^(\d+(?:\.\d+)?)px$/.test(raw)
+      ? Number(raw.replace('px', ''))
+      : /^(\d+(?:\.\d+)?)rem$/.test(raw)
+        ? Number(raw.replace('rem', '')) * 16
+        : null;
+    if (px === null) {
+      violations.push({ raw, kind, why: 'not a plain px/rem length' });
+      continue;
+    }
+    if (!raw.endsWith('px')) {
+      violations.push({
+        raw,
+        kind,
+        why: `write it in px (${px}px); the declaration and the runtime queries are px, and a rem query moves with the reader's font size while they do not`,
+      });
+      continue;
+    }
+    const table = kind === 'max' ? byMax : byMin;
+    if (!table.has(px)) {
+      const expected = [...table.keys()].sort((a, b) => a - b).join(' / ');
+      violations.push({
+        raw,
+        kind,
+        why:
+          kind === 'max'
+            ? `not one below a declared breakpoint (expected ${expected})`
+            : `not a declared breakpoint (expected ${expected})`,
+      });
+    }
+  }
+  return { examined, violations };
+}
+
+// ---------------------------------------------------------------------------
+// Self-verification. Runs before the scan, every time.
+// ---------------------------------------------------------------------------
+
+function selfCheck() {
+  // A scale of one step, so the expected numbers in each case are visible
+  // rather than inferred from the real declaration.
+  const byMax = new Map([[767, 'md']]);
+  const byMin = new Map([[768, 'md']]);
+  const check = (line) => queryViolations(line, byMax, byMin);
+
+  const cases = [
+    [
+      'reports a max-width written at the breakpoint instead of one below it',
+      () => {
+        const { examined, violations } = check('  @media (max-width: 768px) {');
+        assert.equal(examined, 1);
+        assert.equal(violations.length, 1);
+        assert.match(violations[0]?.why ?? '', /not one below a declared breakpoint/);
+      },
+    ],
+    [
+      'accepts the two forms the scale is written in',
+      () => {
+        assert.deepEqual(check('@media (max-width: 767px) {').violations, []);
+        assert.deepEqual(check('@media (min-width: 768px) {').violations, []);
+      },
+    ],
+    [
+      'reports a min-width one below the breakpoint, which is the max-width form',
+      () => {
+        const { violations } = check('@media (min-width: 767px) {');
+        assert.equal(violations.length, 1);
+        assert.match(violations[0]?.why ?? '', /not a declared breakpoint/);
+      },
+    ],
+    [
+      'reports a rem query even when it converts to the right pixel value',
+      () => {
+        const { violations } = check('@media (max-width: 47.9375rem) {');
+        assert.equal(violations.length, 1);
+        assert.match(violations[0]?.why ?? '', /write it in px \(767px\)/);
+      },
+    ],
+  ];
+
+  const failures = [];
+  for (const [name, run] of cases) {
+    try {
+      run();
+    } catch (err) {
+      failures.push(`  ${name}\n    ${err instanceof Error ? err.message : String(err)}`);
+    }
+  }
+  return failures;
+}
+
+const selfFailures = selfCheck();
+if (selfFailures.length > 0) {
+  console.error(
+    `check-breakpoints: ${selfFailures.length} self-verification case(s) failed, so the scan was not run:\n`,
+  );
+  for (const f of selfFailures) console.error(f);
+  console.error(
+    '\nThe scanner itself is wrong. Fix it before trusting anything it says about the sources.',
+  );
+  process.exit(1);
+}
+
+// ---------------------------------------------------------------------------
+// The scan.
+// ---------------------------------------------------------------------------
+
 const bp = readBreakpoints();
 // The scale is the set every verdict here is measured against. It is
 // recovered from the declaration by looking for two literal markers, so a
@@ -131,16 +274,6 @@ for (const [name, px] of bp) {
   byMinWidth.set(px, name);
 }
 
-const CONDITION = /@(?:media|container)[^{;]*?\((max|min)-width:\s*([^)]+?)\s*\)/g;
-/**
- * A reason is required, and it has to be words.
- *
- * Matching "any non-space after the colon" is not enough: in
- * `/* nf-breakpoint-override: *\/` the comment's own closing `*` satisfies
- * it, so a marker with the justification deleted still silences the
- * check. The reason must contain letters that are not comment syntax.
- */
-const OVERRIDE = /nf-breakpoint-override:[^\S\n]*(?![*/]\s*$)[A-Za-z][^\n]*[A-Za-z]/;
 const findings = [];
 
 /** 1-based lines carrying an annotation. */
@@ -152,52 +285,11 @@ function annotationLines(lines) {
   return out;
 }
 
-/**
- * Every query on one line that does not match the scale. Exemption-blind.
- *
- * Also tallies the queries it examined. A run that examined none reports
- * the same "every media query matches" as a run over a correct tree, so
- * the tally is what tells those apart.
- */
+/** The violations on one line, tagged with where the line lives. */
 function violationsOn(line, where) {
-  const out = [];
-  for (const m of line.matchAll(CONDITION)) {
-    conditionCount += 1;
-    const kind = m[1];
-    const raw = m[2] ?? '';
-    const px = /^(\d+(?:\.\d+)?)px$/.test(raw)
-      ? Number(raw.replace('px', ''))
-      : /^(\d+(?:\.\d+)?)rem$/.test(raw)
-        ? Number(raw.replace('rem', '')) * 16
-        : null;
-    if (px === null) {
-      out.push({ where, raw, kind, why: 'not a plain px/rem length' });
-      continue;
-    }
-    if (!raw.endsWith('px')) {
-      out.push({
-        where,
-        raw,
-        kind,
-        why: `write it in px (${px}px); the declaration and the runtime queries are px, and a rem query moves with the reader's font size while they do not`,
-      });
-      continue;
-    }
-    const table = kind === 'max' ? byMaxWidth : byMinWidth;
-    if (!table.has(px)) {
-      const expected = [...table.keys()].sort((a, b) => a - b).join(' / ');
-      out.push({
-        where,
-        raw,
-        kind,
-        why:
-          kind === 'max'
-            ? `not one below a declared breakpoint (expected ${expected})`
-            : `not a declared breakpoint (expected ${expected})`,
-      });
-    }
-  }
-  return out;
+  const { examined, violations } = queryViolations(line, byMaxWidth, byMinWidth);
+  conditionCount += examined;
+  return violations.map((v) => ({ where, ...v }));
 }
 
 const dangling = [];
